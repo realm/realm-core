@@ -101,6 +101,7 @@ public:
     void to_dot(std::ostream&, StringData title = StringData()) const;
 #endif
 
+    bool update_from_parent(std::size_t old_baseline) TIGHTDB_NOEXCEPT;
 private:
     Array m_offsets;
     ArrayBlob m_blob;
@@ -193,6 +194,16 @@ inline void ArrayStringLong::destroy()
     m_blob.destroy();
     m_offsets.destroy();
     Array::destroy();
+}
+
+inline bool ArrayStringLong::update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT
+{
+    bool res = Array::update_from_parent(old_baseline);
+    if (res) {
+        m_blob.update_from_parent(old_baseline);
+        m_offsets.update_from_parent(old_baseline);
+    }
+    return res;
 }
 
 inline std::size_t ArrayStringLong::get_size_from_header(const char* header,

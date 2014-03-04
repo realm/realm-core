@@ -91,7 +91,7 @@ public:
 #ifdef TIGHTDB_DEBUG
     void to_dot(std::ostream&, bool is_strings, StringData title = StringData()) const;
 #endif
-
+    bool update_from_parent(std::size_t old_baseline) TIGHTDB_NOEXCEPT;
 private:
     Array m_offsets;
     ArrayBlob m_blob;
@@ -184,6 +184,15 @@ inline std::size_t ArrayBinary::get_size_from_header(const char* header,
     return Array::get_size_from_header(offsets_header);
 }
 
+inline bool ArrayBinary::update_from_parent(std::size_t old_baseline) TIGHTDB_NOEXCEPT
+{
+    bool res = Array::update_from_parent(old_baseline);
+    if (res) {
+        m_blob.update_from_parent(old_baseline);
+        m_offsets.update_from_parent(old_baseline);
+    }
+    return res;
+}
 
 } // namespace tightdb
 
