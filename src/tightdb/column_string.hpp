@@ -101,6 +101,7 @@ public:
     ref_type write(std::size_t, std::size_t, std::size_t,
                    _impl::OutputStream&) const TIGHTDB_OVERRIDE;
 
+    virtual void update_from_parent(std::size_t old_baseline) TIGHTDB_NOEXCEPT;
 #ifdef TIGHTDB_DEBUG
     void Verify() const TIGHTDB_OVERRIDE;
     void to_dot(std::ostream&, StringData title) const TIGHTDB_OVERRIDE;
@@ -209,6 +210,30 @@ inline std::size_t AdaptiveStringColumn::get_size_from_ref(ref_type root_ref,
     return Array::get_bptree_size_from_header(root_header);
 }
 
+inline void AdaptiveStringColumn::update_from_parent(std::size_t old_baseline) TIGHTDB_NOEXCEPT
+{
+    if (root_is_leaf()) {
+        bool long_strings = m_array->has_refs();
+        if (!long_strings) {
+            // Small strings root leaf
+            ArrayString* leaf = static_cast<ArrayString*>(m_array);
+            leaf->update_from_parent(old_baseline);
+            return;
+        }
+        bool is_big = m_array->get_context_flag();
+        if (!is_big) {
+            // Medium strings root leaf
+            ArrayStringLong* leaf = static_cast<ArrayStringLong*>(m_array);
+            leaf->update_from_parent(old_baseline);
+            return;
+        }
+        // Big strings root leaf
+        ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array);
+        leaf->update_from_parent(old_baseline);
+        return;
+    }
+    // Non-leaf root
+}
 
 } // namespace tightdb
 

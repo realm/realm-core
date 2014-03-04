@@ -74,6 +74,7 @@ public:
     void dump_node_structure(std::ostream&, int level) const TIGHTDB_OVERRIDE;
     using ColumnBase::dump_node_structure;
 #endif
+    virtual void update_from_parent(std::size_t old_baseline) TIGHTDB_NOEXCEPT;
 
 private:
     std::size_t do_get_size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return size(); }
@@ -130,6 +131,25 @@ inline std::size_t ColumnBinary::size() const  TIGHTDB_NOEXCEPT
     }
     // Non-leaf root
     return m_array->get_bptree_size();
+}
+
+inline void ColumnBinary::update_from_parent(std::size_t old_baseline) TIGHTDB_NOEXCEPT
+{
+    if (root_is_leaf()) {
+        bool is_big = m_array->get_context_flag();
+        if (!is_big) {
+            // Small blobs root leaf
+            ArrayBinary* leaf = static_cast<ArrayBinary*>(m_array);
+            leaf->update_from_parent(old_baseline);
+            return;
+        }
+        // Big blobs root leaf
+        ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array);
+        leaf->update_from_parent(old_baseline);
+        return;
+    }
+    // Non-leaf root
+    m_array->update_from_parent(old_baseline);
 }
 
 inline BinaryData ColumnBinary::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
