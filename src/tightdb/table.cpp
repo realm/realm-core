@@ -1497,6 +1497,11 @@ void Table::insert_int(size_t column_ndx, size_t ndx, int64_t value)
 #endif
 }
 
+void Table::foreach_int_p(size_t col_ndx, Array::ForEachOp<int64_t>* op) const TIGHTDB_NOEXCEPT
+{
+    get_column(col_ndx).foreach(op);
+}
+
 
 float Table::get_float(size_t column_ndx, size_t ndx) const TIGHTDB_NOEXCEPT
 {
@@ -1533,6 +1538,11 @@ void Table::insert_float(size_t column_ndx, size_t ndx, float value)
 #endif
 }
 
+void Table::foreach_float_p(size_t col_ndx, Array::ForEachOp<float>* op) const TIGHTDB_NOEXCEPT
+{
+    get_column_float(col_ndx).foreach(op);
+}
+
 
 double Table::get_double(size_t column_ndx, size_t ndx) const TIGHTDB_NOEXCEPT
 {
@@ -1567,6 +1577,11 @@ void Table::insert_double(size_t column_ndx, size_t ndx, double value)
 #ifdef TIGHTDB_ENABLE_REPLICATION
     transact_log().insert_value(column_ndx, ndx, value); // Throws
 #endif
+}
+
+void Table::foreach_double_p(size_t col_ndx, Array::ForEachOp<double>* op) const TIGHTDB_NOEXCEPT
+{
+    get_column_double(col_ndx).foreach(op);
 }
 
 
@@ -1626,6 +1641,19 @@ void Table::insert_string(size_t column_ndx, size_t ndx, StringData value)
 #ifdef TIGHTDB_ENABLE_REPLICATION
     transact_log().insert_value(column_ndx, ndx, value); // Throws
 #endif
+}
+
+void Table::foreach_string_p(size_t col_ndx, Array::ForEachOp<StringData>* op) const
+    TIGHTDB_NOEXCEPT
+{
+    const ColumnType type = get_real_column_type(col_ndx);
+    if (type == col_type_String) {
+        get_column_string(col_ndx).foreach(op);
+        return;
+    }
+
+    TIGHTDB_ASSERT(type == col_type_StringEnum);
+    get_column_string_enum(col_ndx).foreach(op);
 }
 
 

@@ -224,6 +224,20 @@ bool BasicArray<T>::compare(const BasicArray<T>& a) const
 
 
 template<class T>
+inline void BasicArray<T>::foreach(ForEachOp<T>* op) const TIGHTDB_NOEXCEPT
+{
+    foreach(this, op);
+}
+
+template<class T>
+inline void BasicArray<T>::foreach(const Array* a, ForEachOp<T>* op) TIGHTDB_NOEXCEPT
+{
+    const T* begin = reinterpret_cast<T*>(a->m_data);
+    op->handle_chunk(begin, begin + a->size());
+}
+
+
+template<class T>
 std::size_t BasicArray<T>::CalcByteLen(std::size_t size, std::size_t) const
 {
     // FIXME: Consider calling `calc_aligned_byte_size(size)`

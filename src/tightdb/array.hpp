@@ -959,6 +959,12 @@ public:
     /// FIXME: Belongs in IntegerArray
     static std::size_t calc_aligned_byte_size(std::size_t size, int width);
 
+    template<class T> struct ForEachOp {
+        virtual void handle_chunk(const T* begin, const T* end) TIGHTDB_NOEXCEPT = 0;
+    };
+
+    void foreach(ForEachOp<int64_t>*) const TIGHTDB_NOEXCEPT;
+
 #ifdef TIGHTDB_DEBUG
     void print() const;
     void Verify() const;

@@ -97,6 +97,9 @@ public:
     /// array using the specified target allocator.
     MemRef slice(std::size_t offset, std::size_t size, Allocator& target_alloc) const;
 
+    void foreach(ForEachOp<StringData>*) const TIGHTDB_NOEXCEPT;
+    static void foreach(const Array*, ForEachOp<StringData>*) TIGHTDB_NOEXCEPT;
+
 #ifdef TIGHTDB_DEBUG
     void to_dot(std::ostream&, StringData title = StringData()) const;
 #endif
@@ -104,6 +107,8 @@ public:
 private:
     Array m_offsets;
     ArrayBlob m_blob;
+
+    struct ForEachOffsetOp;
 };
 
 
@@ -201,6 +206,31 @@ inline std::size_t ArrayStringLong::get_size_from_header(const char* header,
     ref_type offsets_ref = to_ref(Array::get(header, 0));
     const char* offsets_header = alloc.translate(offsets_ref);
     return Array::get_size_from_header(offsets_header);
+}
+
+struct ArrayStringLong::ForEachOffsetOp: ForEachOp<int64_t> {
+    void handle_chunk(const int64_t* begin, const int64_t* end) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    ForEachOffsetOp(const ArrayBlob& b, ForEachOp<StringData>* o) TIGHTDB_NOEXCEPT:
+        m_blob(b), m_op(o), m_offset(0) {}
+private:
+    const ArrayBlob& m_blob;
+    ForEachOp<StringData>* const m_op;
+    std::size_t m_offset;
+};
+
+inline void ArrayStringLong::foreach(ForEachOp<StringData>* op) const TIGHTDB_NOEXCEPT
+{
+    ForEachOffsetOp op2(m_blob, op);
+    m_offsets.foreach(&op2);
+}
+
+inline void ArrayStringLong::foreach(const Array* a, ForEachOp<StringData>* op) TIGHTDB_NOEXCEPT
+{
+    Allocator& alloc = a->get_alloc();
+    Array offsets(a->get_as_ref(0), 0, 0, alloc);
+    ArrayBlob blob(a->get_as_ref(1), 0, 0, alloc);
+    ForEachOffsetOp op2(blob, op);
+    offsets.foreach(&op2);
 }
 
 

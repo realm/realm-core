@@ -361,6 +361,30 @@ ref_type ArrayString::bptree_leaf_insert(size_t ndx, StringData value, TreeInser
     return new_leaf.get_ref();
 }
 
+void ArrayString::foreach(const Array* a, ForEachOp<StringData>* op) TIGHTDB_NOEXCEPT
+{
+    const char* data = reinterpret_cast<char*>(a->m_data);
+    const int buf_size = 16;
+    StringData buf[buf_size];
+    const size_t stride = a->get_width();
+    size_t n = a->size();
+    while (size_t(buf_size) < n) {
+        for (int i=0; i<buf_size; ++i) {
+            size_t size = (stride-1) - data[stride-1];
+            buf[i] = StringData(data, size);
+            data += stride;
+        }
+        op->handle_chunk(buf, buf + buf_size);
+        n -= buf_size;
+    }
+    for (int i=0; i<int(n); ++i) {
+        size_t size = (stride-1) - data[stride-1];
+        buf[i] = StringData(data, size);
+        data += stride;
+    }
+    op->handle_chunk(buf, buf + n);
+}
+
 
 MemRef ArrayString::slice(size_t offset, size_t size, Allocator& target_alloc) const
 {

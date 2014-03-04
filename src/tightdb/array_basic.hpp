@@ -84,6 +84,9 @@ public:
     /// using the specified target allocator.
     MemRef slice(std::size_t offset, std::size_t size, Allocator& target_alloc) const;
 
+    void foreach(ForEachOp<T>*) const TIGHTDB_NOEXCEPT;
+    static void foreach(const Array*, ForEachOp<T>*) TIGHTDB_NOEXCEPT;
+
 #ifdef TIGHTDB_DEBUG
     void to_dot(std::ostream&, StringData title = StringData()) const;
 #endif

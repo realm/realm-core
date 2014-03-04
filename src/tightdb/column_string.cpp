@@ -1069,6 +1069,30 @@ AdaptiveStringColumn::GetBlock(size_t ndx, ArrayParent** ap, size_t& off, bool u
 }
 
 
+void AdaptiveStringColumn::foreach(const Array* parent, Array::ForEachOp<StringData>* op)
+    TIGHTDB_NOEXCEPT
+{
+    Allocator& alloc = parent->get_alloc();
+    Array children(parent->get_as_ref(1), 0, 0, alloc);
+    const size_t n = children.size();
+    for (size_t i=0; i<n; ++i) {
+        const size_t ref = children.get_as_ref(i);
+        Array child(ref, 0, 0, alloc);
+        if (TIGHTDB_LIKELY(!child.is_inner_bptree_node())) {
+            if (child.has_refs()) {
+                ArrayStringLong::foreach(&child, op);
+            }
+            else {
+                ArrayString::foreach(&child, op);
+            }
+        }
+        else {
+            foreach(&child, op);
+        }
+    }
+}
+
+
 class AdaptiveStringColumn::CreateHandler: public ColumnBase::CreateHandler {
 public:
     CreateHandler(Allocator& alloc): m_alloc(alloc) {}

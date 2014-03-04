@@ -296,6 +296,36 @@ template<class T> ref_type BasicColumn<T>::write(size_t slice_offset, size_t sli
 }
 
 
+template<class T>
+inline void BasicColumn<T>::foreach(Array::ForEachOp<T>* op) const TIGHTDB_NOEXCEPT
+{
+    if (TIGHTDB_LIKELY(!m_array->is_inner_bptree_node())) {
+        static_cast<const BasicArray<T>*>(m_array)->foreach(op);
+        return;
+    }
+
+    foreach(m_array, op);
+}
+
+template<class T>
+inline void BasicColumn<T>::foreach(const Array* parent, Array::ForEachOp<T>* op) TIGHTDB_NOEXCEPT
+{
+    Allocator& alloc = parent->get_alloc();
+    Array children(parent->get_as_ref(1), 0, 0, alloc);
+    std::size_t n = children.size();
+    for (std::size_t i=0; i<n; ++i) {
+        std::size_t ref = children.get_as_ref(i);
+        Array child(ref, 0, 0, alloc);
+        if (TIGHTDB_LIKELY(!child.is_inner_bptree_node())) {
+            BasicArray<T>::foreach(&child, op);
+        }
+        else {
+            foreach(&child, op);
+        }
+    }
+}
+
+
 #ifdef TIGHTDB_DEBUG
 
 template<class T>

@@ -83,6 +83,8 @@ public:
 
     const Array* get_enum_root_array() const TIGHTDB_NOEXCEPT { return m_keys.get_root_array(); }
 
+    void foreach(Array::ForEachOp<StringData>*) const TIGHTDB_NOEXCEPT;
+
 #ifdef TIGHTDB_DEBUG
     void Verify() const TIGHTDB_OVERRIDE; // Must be upper case to avoid conflict with macro in ObjC
     void to_dot(std::ostream&, StringData title) const TIGHTDB_OVERRIDE;
@@ -99,7 +101,29 @@ private:
     // Member variables
     AdaptiveStringColumn m_keys;
     StringIndex* m_index;
+
+    struct ForEachIndexOp;
 };
+
+
+
+
+// Implementation:
+
+struct ColumnStringEnum::ForEachIndexOp: Array::ForEachOp<int64_t> {
+    void handle_chunk(const int64_t* begin, const int64_t* end) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    ForEachIndexOp(const AdaptiveStringColumn& k,
+                   Array::ForEachOp<StringData>* o) TIGHTDB_NOEXCEPT: m_keys(k), m_op(o) {}
+private:
+    const AdaptiveStringColumn& m_keys;
+    Array::ForEachOp<StringData>* const m_op;
+};
+
+inline void ColumnStringEnum::foreach(Array::ForEachOp<StringData>* op) const TIGHTDB_NOEXCEPT
+{
+    ForEachIndexOp op2(m_keys, op);
+    Column::foreach(&op2);
+}
 
 
 

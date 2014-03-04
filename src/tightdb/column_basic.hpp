@@ -91,6 +91,8 @@ public:
     ref_type write(std::size_t, std::size_t, std::size_t,
                    _impl::OutputStream&) const TIGHTDB_OVERRIDE;
 
+    void foreach(Array::ForEachOp<T>*) const TIGHTDB_NOEXCEPT;
+
 #ifdef TIGHTDB_DEBUG
     void Verify() const TIGHTDB_OVERRIDE;
     void to_dot(std::ostream&, StringData title) const TIGHTDB_OVERRIDE;
@@ -115,6 +117,8 @@ private:
     class EraseLeafElem;
     class CreateHandler;
     class SliceHandler;
+
+    static void foreach(const Array* parent, Array::ForEachOp<T>*) TIGHTDB_NOEXCEPT;
 
 #ifdef TIGHTDB_DEBUG
     static std::size_t verify_leaf(MemRef, Allocator&);

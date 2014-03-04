@@ -256,6 +256,34 @@ MemRef ArrayStringLong::slice(size_t offset, size_t size, Allocator& target_allo
 }
 
 
+void ArrayStringLong::ForEachOffsetOp::handle_chunk(const int64_t* begin, const int64_t* end)
+    TIGHTDB_NOEXCEPT
+{
+    const int buf_size = 16;
+    StringData buf[buf_size];
+    size_t offset = m_offset;
+    while (buf_size < end - begin) {
+        for (int i=0; i<buf_size; ++i) {
+            size_t next_offset = *(begin++);
+            const char* data = m_blob.get(offset);
+            size_t size = next_offset - offset - 1; // Discount the terminating null
+            buf[i] = StringData(data, size);
+            offset = next_offset;
+        }
+        m_op->handle_chunk(buf, buf + buf_size);
+    }
+    for (int i = 0; i < int(end - begin); ++i) {
+        size_t next_offset = *(begin+i);
+        const char* data = m_blob.get(offset);
+        size_t size = next_offset - offset - 1; // Discount the terminating null
+        buf[i] = StringData(data, size);
+        offset = next_offset;
+    }
+    m_op->handle_chunk(buf, buf + (end - begin));
+    m_offset = offset;
+}
+
+
 #ifdef TIGHTDB_DEBUG
 
 void ArrayStringLong::to_dot(ostream& out, StringData title) const

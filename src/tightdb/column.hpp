@@ -290,7 +290,8 @@ public:
     ref_type write(std::size_t, std::size_t, std::size_t,
                    _impl::OutputStream&) const TIGHTDB_OVERRIDE;
 
-    // Debug
+    void foreach(Array::ForEachOp<int64_t>*) const TIGHTDB_NOEXCEPT;
+
 #ifdef TIGHTDB_DEBUG
     virtual void Verify() const TIGHTDB_OVERRIDE;
     void to_dot(std::ostream&, StringData title) const TIGHTDB_OVERRIDE;
@@ -321,6 +322,8 @@ private:
     class EraseLeafElem;
     class CreateHandler;
     class SliceHandler;
+
+    static void foreach(const Array* parent, Array::ForEachOp<int64_t>*) TIGHTDB_NOEXCEPT;
 
     friend class Array;
     friend class ColumnBase;
@@ -540,6 +543,17 @@ inline std::size_t Column::upper_bound_int(int64_t value) const TIGHTDB_NOEXCEPT
         return m_array->upper_bound_int(value);
     }
     return ColumnBase::upper_bound(*this, value);
+}
+
+
+inline void Column::foreach(Array::ForEachOp<int64_t>* op) const TIGHTDB_NOEXCEPT
+{
+    if (TIGHTDB_LIKELY(!m_array->is_inner_bptree_node())) {
+        m_array->foreach(op);
+        return;
+    }
+
+    foreach(m_array, op);
 }
 
 

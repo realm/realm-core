@@ -3986,3 +3986,23 @@ pair<int_least64_t, int_least64_t> Array::get_two(const char* header, size_t ndx
     pair<int_fast64_t, int_fast64_t> p = ::get_two(data, width, ndx);
     return make_pair(int_least64_t(p.first), int_least64_t(p.second));
 }
+
+
+void Array::foreach(ForEachOp<int64_t>* op) const TIGHTDB_NOEXCEPT
+{
+    const int buf_size = 16;
+    int64_t buf[buf_size];
+    // FIXME: Consider whether it would be worth introducing a bulk-getter rather than getting each element individually
+    size_t n = m_size;
+    size_t ndx = 0;
+    while (size_t(buf_size) < n - ndx) {
+        for (int i=0; i<buf_size; ++i) {
+            buf[i] = get(ndx++);
+        }
+        op->handle_chunk(buf, buf + buf_size);
+    }
+    for (int i=0; i<int(n - ndx); ++i) {
+        buf[i] = get(ndx+i);
+    }
+    op->handle_chunk(buf, buf + (n - ndx));
+}

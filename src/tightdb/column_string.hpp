@@ -101,6 +101,8 @@ public:
     ref_type write(std::size_t, std::size_t, std::size_t,
                    _impl::OutputStream&) const TIGHTDB_OVERRIDE;
 
+    void foreach(Array::ForEachOp<StringData>*) const TIGHTDB_NOEXCEPT;
+
 #ifdef TIGHTDB_DEBUG
     void Verify() const TIGHTDB_OVERRIDE;
     void to_dot(std::ostream&, StringData title) const TIGHTDB_OVERRIDE;
@@ -133,6 +135,8 @@ private:
     void leaf_to_dot(MemRef, ArrayParent*, std::size_t ndx_in_parent,
                      std::ostream&) const TIGHTDB_OVERRIDE;
 #endif
+
+    static void foreach(const Array* parent, Array::ForEachOp<StringData>*) TIGHTDB_NOEXCEPT;
 
     friend class Array;
     friend class ColumnBase;
@@ -180,6 +184,7 @@ inline void AdaptiveStringColumn::insert(size_t ndx, StringData value)
     do_insert(ndx, value);
 }
 
+
 inline StringIndex* AdaptiveStringColumn::release_index() TIGHTDB_NOEXCEPT
 {
     StringIndex* i = m_index;
@@ -207,6 +212,21 @@ inline std::size_t AdaptiveStringColumn::get_size_from_ref(ref_type root_ref,
         return ArrayBigBlobs::get_size_from_header(root_header);
     }
     return Array::get_bptree_size_from_header(root_header);
+}
+
+inline void AdaptiveStringColumn::foreach(Array::ForEachOp<StringData>* op) const TIGHTDB_NOEXCEPT
+{
+    if (TIGHTDB_LIKELY(!m_array->is_inner_bptree_node())) {
+        if (m_array->has_refs()) {
+            static_cast<const ArrayStringLong*>(m_array)->foreach(op);
+        }
+        else {
+            static_cast<const ArrayString*>(m_array)->foreach(op);
+        }
+        return;
+    }
+
+    foreach(m_array, op);
 }
 
 

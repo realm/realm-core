@@ -81,6 +81,9 @@ public:
     /// using the specified target allocator.
     MemRef slice(std::size_t offset, std::size_t size, Allocator& target_alloc) const;
 
+    void foreach(ForEachOp<StringData>*) const TIGHTDB_NOEXCEPT;
+    static void foreach(const Array*, ForEachOp<StringData>*) TIGHTDB_NOEXCEPT;
+
 #ifdef TIGHTDB_DEBUG
     void string_stats() const;
     void to_dot(std::ostream&, StringData title = StringData()) const;
@@ -180,6 +183,11 @@ inline StringData ArrayString::get(const char* header, std::size_t ndx) TIGHTDB_
     const char* data = get_data_from_header(header) + (ndx * width);
     std::size_t size = (width-1) - data[width-1];
     return StringData(data, size);
+}
+
+inline void ArrayString::foreach(ForEachOp<StringData>* op) const TIGHTDB_NOEXCEPT
+{
+    foreach(this, op);
 }
 
 
