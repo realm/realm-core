@@ -36,6 +36,8 @@ IPHONE_EXTENSIONS="objc"
 IPHONE_PLATFORMS="iPhoneOS iPhoneSimulator"
 IPHONE_DIR="iphone-lib"
 
+ANDROID_DIR="android-lib"
+
 map_ext_name_to_dir()
 {
     local ext_name
@@ -173,6 +175,47 @@ find_iphone_sdk()
     printf "%s\n" "$dir"
 }
 
+# Find the path of most recent version of the installed Android NDKs
+find_android_ndk()
+{
+    local ndks ndks_index current_ndk latest_ndk sorted highest result
+
+    ndks_index=0
+
+    # If homebrew is installed...
+    if [ -d "/usr/local/Cellar/android-ndk" ]; then
+        ndks[$ndks_index]="/usr/local/Cellar/android-ndk"
+        ((ndks_index = ndks_index + 1))
+    fi
+    if [ -d "/usr/local/android-ndk" ]; then
+        ndks[$ndks_index]="/usr/local/android-ndk"
+        ((ndks_index = ndks_index + 1))
+    fi
+    if [ "$ndks_index" -eq 0 ]; then
+        return 1
+    fi
+
+    latest_ndk=""
+    result=""
+    for ndk in "${ndks[@]}"; do
+        for i in $(cd "$ndk" && echo *); do
+            if [ -f "$ndk/$i/RELEASE.TXT" ]; then
+                current_ndk=$(sed 's/\(r\)\([1-9]\{1,\}\)\([a-z]\)/\1.\2.\3/' < "$ndk/$i/RELEASE.TXT") || return 1
+                sorted="$(printf "%s\n%s\n" "$current_ndk" "$latest_ndk" | sort -t . -k 2,2nr -k 3,3r)" || return 1
+                highest="$(printf "%s\n" "$sorted" | head -n 1)" || return 1
+                if [ $current_ndk = $highest ]; then
+                    result=$ndk/$i
+                fi
+            fi
+        done
+    done
+
+    if [ -z $result ]; then
+        return 1
+    fi
+
+    printf "%s\n" "$result"
+}
 
 CONFIG_MK="src/config.mk"
 
@@ -373,6 +416,13 @@ case "$MODE" in
             done
         fi
 
+        # Find Android NDK
+        if [ "$NDK_HOME" ]; then
+            ndk_home="$NDK_HOME"
+        else
+            ndk_home="$(find_android_ndk)" || ndk_home="none"
+        fi
+
         cat >"$CONFIG_MK" <<EOF
 TIGHTDB_VERSION       = $tightdb_version
 INSTALL_PREFIX        = $install_prefix
@@ -386,6 +436,7 @@ ENABLE_ALLOC_SET_ZERO = $enable_alloc_set_zero
 XCODE_HOME            = $xcode_home
 IPHONE_SDKS           = ${iphone_sdks:-none}
 IPHONE_SDKS_AVAIL     = $iphone_sdks_avail
+NDK_HOME              = $ndk_home
 EOF
         if ! [ "$INTERACTIVE" ]; then
             echo "New configuration in $CONFIG_MK:"
@@ -411,6 +462,10 @@ EOF
                 rm -f "$IPHONE_DIR/tightdb-config" "$IPHONE_DIR/tightdb-config-dbg" || exit 1
                 rmdir "$IPHONE_DIR" || exit 1
             fi
+        fi
+        if [ -e "$ANDROID_DIR" ];then
+            echo "Removing '$ANDROID_DIR'"
+            rm -rf "$ANDROID_DIR"
         fi
         echo "Done cleaning"
         exit 0
@@ -482,6 +537,53 @@ EOF
         done
         echo "Done building"
         exit 0
+        ;;
+
+    "build-android")
+        auto_configure || exit 1
+        export TIGHTDB_HAVE_CONFIG="1"
+        ndk_home="$(get_config_param "NDK_HOME")" || exit 1
+        if [ "$ndk_home" = "none" ]; then
+            cat 1>&2 <<EOF
+ERROR: No Android NDK was found.
+Please do one of the following:
+ * Install an NDK in /usr/local/android-ndk
+ * Provide the path to the NDK in the environment variable NDK_HOME
+ * If on OSX and using Homebrew install the package android-sdk
+EOF
+            exit 1
+        fi
+
+        mkdir -p "$ANDROID_DIR" || exit 1
+
+        OLDPATH=$PATH
+        for target in "arm" "mips" "x86"; do
+            temp_dir="$(mktemp -d /tmp/tightdb.build-android.XXXX)" || exit 1
+            if [ "$target" = "arm" ]; then
+                platform=8
+            else
+                platform=9
+            fi
+            $ndk_home/build/tools/make-standalone-toolchain.sh --platform=android-$platform --install-dir=$temp_dir --arch=$target || exit 1
+            export PATH=$temp_dir/bin:$OLDPATH
+            if [ "$target" = "arm" ]; then
+                android_prefix="arm"
+            elif [ "$target" = "mips" ]; then
+                android_prefix="mipsel"
+            elif [ "$target" = "x86" ]; then
+                android_prefix="i686"
+            fi
+            export CXX="$(cd "$temp_dir/bin" && echo $android_prefix-linux-*-gcc)"
+            export AR="$(cd "$temp_dir/bin" && echo $android_prefix-linux-*-ar)"
+            extra_cflags="-DANDROID -D_POSIX_THREAD_PROCESS_SHARED -fPIC -DPIC"
+            if [ "$target" = "arm" ]; then
+                extra_cflags="$extra_cflags -mthumb"
+            fi
+            denom="android-$target"
+            $MAKE -C "src/tightdb" "libtightdb-$denom.a" BASE_DENOM="$denom" CFLAGS_ARCH="$extra_cflags" || exit 1
+            cp "src/tightdb/libtightdb-$denom.a" "$ANDROID_DIR" || exit 1
+            rm -rf $temp_dir
+        done
         ;;
 
     "test")
