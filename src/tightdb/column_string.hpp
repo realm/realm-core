@@ -233,6 +233,7 @@ inline void AdaptiveStringColumn::update_from_parent(std::size_t old_baseline) T
         return;
     }
     // Non-leaf root
+    m_array->update_from_parent(old_baseline);
 }
 
 } // namespace tightdb
