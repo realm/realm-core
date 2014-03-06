@@ -417,10 +417,10 @@ case "$MODE" in
         fi
 
         # Find Android NDK
-        if [ "$NDK_HOME" ]; then
-            ndk_home="$NDK_HOME"
+        if [ "$ANDROID_NDK_HOME" ]; then
+            android_ndk_home="$ANDROID_NDK_HOME"
         else
-            ndk_home="$(find_android_ndk)" || ndk_home="none"
+            android_ndk_home="$(find_android_ndk)" || android_ndk_home="none"
         fi
 
         cat >"$CONFIG_MK" <<EOF
@@ -436,7 +436,7 @@ ENABLE_ALLOC_SET_ZERO = $enable_alloc_set_zero
 XCODE_HOME            = $xcode_home
 IPHONE_SDKS           = ${iphone_sdks:-none}
 IPHONE_SDKS_AVAIL     = $iphone_sdks_avail
-NDK_HOME              = $ndk_home
+ANDROID_NDK_HOME      = $android_ndk_home
 EOF
         if ! [ "$INTERACTIVE" ]; then
             echo "New configuration in $CONFIG_MK:"
@@ -542,13 +542,13 @@ EOF
     "build-android")
         auto_configure || exit 1
         export TIGHTDB_HAVE_CONFIG="1"
-        ndk_home="$(get_config_param "NDK_HOME")" || exit 1
-        if [ "$ndk_home" = "none" ]; then
+        android_ndk_home="$(get_config_param "ANDROID_NDK_HOME")" || exit 1
+        if [ "$android_ndk_home" = "none" ]; then
             cat 1>&2 <<EOF
 ERROR: No Android NDK was found.
 Please do one of the following:
  * Install an NDK in /usr/local/android-ndk
- * Provide the path to the NDK in the environment variable NDK_HOME
+ * Provide the path to the NDK in the environment variable ANDROID_NDK_HOME
  * If on OSX and using Homebrew install the package android-sdk
 EOF
             exit 1
@@ -564,7 +564,7 @@ EOF
             else
                 platform=9
             fi
-            $ndk_home/build/tools/make-standalone-toolchain.sh --platform=android-$platform --install-dir=$temp_dir --arch=$target || exit 1
+            $android_ndk_home/build/tools/make-standalone-toolchain.sh --platform=android-$platform --install-dir=$temp_dir --arch=$target || exit 1
             export PATH=$temp_dir/bin:$OLDPATH
             if [ "$target" = "arm" ]; then
                 android_prefix="arm"
