@@ -557,7 +557,7 @@ EOF
         mkdir -p "$ANDROID_DIR" || exit 1
 
         OLDPATH=$PATH
-        for target in "arm" "mips" "x86"; do
+        for target in "arm" "arm-v7a" "mips" "x86"; do
             temp_dir="$(mktemp -d /tmp/tightdb.build-android.XXXX)" || exit 1
             if [ "$target" = "arm" ]; then
                 platform=8
@@ -567,6 +567,8 @@ EOF
             $android_ndk_home/build/tools/make-standalone-toolchain.sh --platform=android-$platform --install-dir=$temp_dir --arch=$target || exit 1
             export PATH=$temp_dir/bin:$OLDPATH
             if [ "$target" = "arm" ]; then
+                android_prefix="arm"
+            elif [ "$target" = "arm-v7a" ]; then
                 android_prefix="arm"
             elif [ "$target" = "mips" ]; then
                 android_prefix="mipsel"
@@ -578,6 +580,8 @@ EOF
             extra_cflags="-DANDROID -D_POSIX_THREAD_PROCESS_SHARED -fPIC -DPIC"
             if [ "$target" = "arm" ]; then
                 extra_cflags="$extra_cflags -mthumb"
+            elif [ "$target" = "arm-v7a" ]; then
+                extra_cflags="$extra_cflags -mthumb -march=armv7-a -mfloat-abi=softfp -mfpu=vfpv3-d16"
             fi
             denom="android-$target"
             $MAKE -C "src/tightdb" "libtightdb-$denom.a" BASE_DENOM="$denom" CFLAGS_ARCH="$extra_cflags" || exit 1
