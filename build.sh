@@ -584,6 +584,14 @@ EOF
             cp "src/tightdb/libtightdb-$denom.a" "$ANDROID_DIR" || exit 1
             rm -rf $temp_dir
         done
+        echo "Copying headers to '$ANDROID_DIR/include'"
+        mkdir -p "$ANDROID_DIR/include" || exit 1
+        cp "src/tightdb.hpp" "$ANDROID_DIR/include/" || exit 1
+        mkdir -p "$ANDROID_DIR/include/tightdb" || exit 1
+        inst_headers="$(cd "src/tightdb" && $MAKE --no-print-directory get-inst-headers)" || exit 1
+        temp_dir="$(mktemp -d /tmp/tightdb.build-android.XXXX)" || exit 1
+        (cd "src/tightdb" && tar czf "$temp_dir/headers.tar.gz" $inst_headers) || exit 1
+        (cd "$TIGHTDB_HOME/$ANDROID_DIR/include/tightdb" && tar xzmf "$temp_dir/headers.tar.gz") || exit 1
         ;;
 
     "test")
