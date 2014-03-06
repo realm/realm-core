@@ -155,7 +155,7 @@ inline StringData ArrayString::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < m_size);
     if (m_width == 0)
-        return StringData(NULL, 0);
+        return StringData("", 0);
     const char* data = m_data + (ndx * m_width);
     std::size_t size = (m_width-1) - data[m_width-1];
     return StringData(data, size);
