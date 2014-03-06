@@ -584,6 +584,7 @@ EOF
             cp "src/tightdb/libtightdb-$denom.a" "$ANDROID_DIR" || exit 1
             rm -rf $temp_dir
         done
+        PATH=$OLDPATH
         echo "Copying headers to '$ANDROID_DIR/include'"
         mkdir -p "$ANDROID_DIR/include" || exit 1
         cp "src/tightdb.hpp" "$ANDROID_DIR/include/" || exit 1
