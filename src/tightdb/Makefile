@@ -55,7 +55,7 @@ lang_bind_helper.cpp importer.cpp version.cpp
 # The meaning of this version string is identical to the one defined
 # by GNU Libtool. See also
 # http://www.gnu.org/software/libtool/manual/libtool.html#Libtool-versioning
-libtightdb_a_VERSION = 6:0:0
+libtightdb_a_VERSION = 7:0:0
 
 tightdb_config_SOURCES = config_tool.cpp
 
