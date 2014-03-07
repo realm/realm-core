@@ -11,11 +11,53 @@ Format:
 . Any other notes ....                   (internal changes)
 
 
+2014-02-19 (Finn Schiermer Andersen)
+! Fixed space leak in group_writer. Could in some scenarios cause massive increase in database file size.
+
+
+2014-02-17 (Kristian Spangsege)
++ Adding Table::write() as a means to effieciently serialize a table, or part of a table.
+! Fixing table copy bug. The error occured when the table contained strings longer than 64 bytes.
+! Fixing table comparison bug. The error occured when the table has a `float` or a `double` column.
+
+
+2014-02-14 (Kristian Spangsege)
++ The StringData class now distinguishes `null` from the empty string.
++ Adding StringData::is_null().
+
+
+2014-02-11 (Kristian Spangsege)
++ Group::write(std::ostream&) added. This allows general online streaming of TightDB databases in memory for the first time.
++ Adding Table::get_name() which returns the name of the table when the table is a direct member of a group.
+
+
+2014-02-05 (Kenneth Geisshirt)
++ Two new targets in build.sh: get_version and set_version.
+
+
+2014-02-04 (Kristian Spangsege)
++ Introducing Table::get_parent_table() with allows a subtable to know its parent table.
++ Table::rename_subcolumn() and Table::remove_subcolumn() now take an extra argument which is the index of the column to rename. Before the index was specified as part of the path.
++ Introducing Table::insert_column() and Table::insert_subcolumn() for inserting new columns at arbitrary positions.
++ New class `Descriptor` introduced into the public API. It plays the role that `Spec` played before. Class `Spec` is no longer to be considered part of the public API.
++ Table::add_column() now takes a third optinal argument `DescriptorRef* subdesc`.
++ Introducing Table::get_descriptor() and Table::get_subdescriptor()
+- Table::get_spec() and Table::update_from_spec() removed from public API since are part of the now non-public `Spec` API.
+. Table::has_shared_spec() renamed to Table::has_shared_type().
+
+
+2014-01-27 (Brian Munkholm)
+! Fixed bug in Query with subtables. Whith empty subtables query returned incorrect results.
+  In debug mode it could assert when querying a subtable with more columns than the base table.
+
+
 2014-01-23 (Kenneth Geisshirt)
 ! Fixed bug: Subtable queries is validated by Query::validate(). An invalid subtable query can lead to a segfault.
 
+
 2014-01-07 (Kenneth Geisshirt)
 + Table::range() added. The method returns a set of rows as a TableView.
+
 
 2014-01-06 (Kristian Spangsege)
 ! 'No parent info in shared specs' conflicts with implementation of `Group::commit()`.

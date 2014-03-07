@@ -131,12 +131,12 @@ private:
         void operator()(const T& param, State* state)
         {
             state->m_formatter << "%" << state->m_param_num;
-            const std::string key = state->m_formatter.str();
+            std::string key = state->m_formatter.str();
             state->m_formatter.str(std::string());
-            std::string::size_type const j = state->m_search.find(key);
+            std::string::size_type j = state->m_search.find(key);
             if (j != std::string::npos) {
                 state->m_formatter << param;
-                const std::string str = state->m_formatter.str();
+                std::string str = state->m_formatter.str();
                 state->m_formatter.str(std::string());
                 state->m_message.replace(j, key.size(), str);
                 state->m_search.replace(j, key.size(), std::string(str.size(), '\0'));

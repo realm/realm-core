@@ -10,8 +10,10 @@ test_stl_DEPS     = util
 
 check_PROGRAMS = tightdb-tests
 
-tightdb_tests_SOURCES := $(wildcard *.c *.cpp large_tests/*.cpp)
-tightdb_tests_LIBS    := util/test-util.a
+TESTS := $(wildcard test_*.cpp large_tests/*.cpp)
+
+tightdb_tests_SOURCES = $(TESTS) main.cpp
+tightdb_tests_LIBS    = util/test-util.a
 
 ifeq ($(shell pkg-config unittest++ --exists 2>/dev/null && echo yes),yes)
 UNITTESTPP_CFLAGS  := $(shell pkg-config unittest++ --cflags)
@@ -79,11 +81,15 @@ benchmark-transaction: check-norun/subdir/util
 	@$(MAKE) -C benchmark-transaction check-norun
 
 # Build and run whatever is in experiements/testcase.cpp
-.PHONY: testcase testcase-debug
-testcase: check-norun/subdir/util
+.PHONY: check-testcase check-testcase-debug memcheck-testcase memcheck-testcase-debug
+check-testcase: check-norun/subdir/util
 	@$(MAKE) -C experiments check
-testcase-debug: check-debug-norun/subdir/util
+check-testcase-debug: check-debug-norun/subdir/util
 	@$(MAKE) -C experiments check-debug
+memcheck-testcase: check-norun/subdir/util
+	@$(MAKE) -C experiments memcheck
+memcheck-testcase-debug: check-debug-norun/subdir/util
+	@$(MAKE) -C experiments memcheck-debug
 
 
 include ../src/generic.mk

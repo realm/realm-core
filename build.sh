@@ -309,18 +309,38 @@ case "$MODE" in
             tightdb_version="$(printf "%s\n" "$value" | sed 's/^v//')" || exit 1
         fi
 
-        enable_replication=""
+        enable_replication="no"
         if [ "$TIGHTDB_ENABLE_REPLICATION" ]; then
             enable_replication="yes"
         fi
 
+        enable_alloc_set_zero="no"
+        if [ "$TIGHTDB_ENABLE_ALLOC_SET_ZERO" ]; then
+            enable_alloc_set_zero="yes"
+        fi
+
+        # Find Xcode
         xcode_home="none"
+        arm64_supported=""
         if [ "$OS" = "Darwin" ]; then
             if path="$(xcode-select --print-path 2>/dev/null)"; then
                 xcode_home="$path"
             fi
+            xcodebuild="$xcode_home/usr/bin/xcodebuild"
+            version="$("$xcodebuild" -version)" || exit 1
+            version="$(printf "%s" "$version" | grep -E '^Xcode +[0-9]+\.[0-9]' | head -n1)"
+            version="$(printf "%s" "$version" | sed 's/^Xcode *\([0-9A-Z_.-]*\).*$/\1/')" || exit 1
+            if ! printf "%s" "$version" | grep -q -E '^[0-9]+(\.[0-9]+)+$'; then
+                echo "Failed to determine Xcode version using \`$xcodebuild -version\`" 1>&2
+                exit 1
+            fi
+            major="$(printf "%s" "$version" | cut -d. -f1)" || exit 1
+            if [ "$major" -ge "5" ]; then
+                arm64_supported="1"
+            fi
         fi
 
+        # Find iPhone SDKs
         iphone_sdks=""
         iphone_sdks_avail="no"
         if [ "$xcode_home" != "none" ]; then
@@ -338,38 +358,34 @@ case "$MODE" in
                         iphone_sdks_avail="no"
                     else
                         if [ "$x" = "iPhoneSimulator" ]; then
-                            arch="i386"
-                        else
-                            type="$(defaults read-type "$platform_home/Info" "DefaultProperties")" || exit 1
-                            if [ "$type" != "Type is dictionary" ]; then
-                                echo "Unexpected type of value of key 'DefaultProperties' in '$platform_home/Info.plist'" 1>&2
-                                exit 1
+                            archs="i386,x86_64"
+                        elif [  "$x" = "iPhoneOS" ]; then
+                            archs="armv7,armv7s"
+                            if [ "$arm64_supported" ]; then
+                                archs="$archs,arm64"
                             fi
-                            temp_dir="$(mktemp -d "/tmp/tmp.XXXXXXXXXX")" || exit 1
-                            chunk="$temp_dir/chunk.plist"
-                            defaults read "$platform_home/Info" "DefaultProperties" >"$chunk" || exit 1
-                            arch="$(defaults read "$chunk" NATIVE_ARCH)" || exit 1
-                            rm -f "$chunk" || exit 1
-                            rmdir "$temp_dir" || exit 1
+                        else
+                            continue
                         fi
-                        word_list_append "iphone_sdks" "$x:$sdk:$arch" || exit 1
+                        word_list_append "iphone_sdks" "$x:$sdk:$archs" || exit 1
                     fi
                 fi
             done
         fi
 
         cat >"$CONFIG_MK" <<EOF
-TIGHTDB_VERSION     = $tightdb_version
-INSTALL_PREFIX      = $install_prefix
-INSTALL_EXEC_PREFIX = $install_exec_prefix
-INSTALL_INCLUDEDIR  = $install_includedir
-INSTALL_BINDIR      = $install_bindir
-INSTALL_LIBDIR      = $install_libdir
-INSTALL_LIBEXECDIR  = $install_libexecdir
-ENABLE_REPLICATION  = $enable_replication
-XCODE_HOME          = $xcode_home
-IPHONE_SDKS         = ${iphone_sdks:-none}
-IPHONE_SDKS_AVAIL   = $iphone_sdks_avail
+TIGHTDB_VERSION       = $tightdb_version
+INSTALL_PREFIX        = $install_prefix
+INSTALL_EXEC_PREFIX   = $install_exec_prefix
+INSTALL_INCLUDEDIR    = $install_includedir
+INSTALL_BINDIR        = $install_bindir
+INSTALL_LIBDIR        = $install_libdir
+INSTALL_LIBEXECDIR    = $install_libexecdir
+ENABLE_REPLICATION    = $enable_replication
+ENABLE_ALLOC_SET_ZERO = $enable_alloc_set_zero
+XCODE_HOME            = $xcode_home
+IPHONE_SDKS           = ${iphone_sdks:-none}
+IPHONE_SDKS_AVAIL     = $iphone_sdks_avail
 EOF
         if ! [ "$INTERACTIVE" ]; then
             echo "New configuration in $CONFIG_MK:"
@@ -435,9 +451,13 @@ EOF
         for x in $iphone_sdks; do
             platform="$(printf "%s\n" "$x" | cut -d: -f1)" || exit 1
             sdk="$(printf "%s\n" "$x" | cut -d: -f2)" || exit 1
-            arch="$(printf "%s\n" "$x" | cut -d: -f3)" || exit 1
+            archs="$(printf "%s\n" "$x" | cut -d: -f3 | sed 's/,/ /g')" || exit 1
+            cflags_arch=""
+            for y in $archs; do
+                word_list_append "cflags_arch" "-arch $y" || exit 1
+            done
             sdk_root="$xcode_home/Platforms/$platform.platform/Developer/SDKs/$sdk"
-            $MAKE -C "src/tightdb" "libtightdb-$platform.a" "libtightdb-$platform-dbg.a" BASE_DENOM="$platform" CFLAGS_ARCH="-arch $arch -isysroot $sdk_root" || exit 1
+            $MAKE -C "src/tightdb" "libtightdb-$platform.a" "libtightdb-$platform-dbg.a" BASE_DENOM="$platform" CFLAGS_ARCH="$cflags_arch -isysroot $sdk_root" || exit 1
             mkdir "$temp_dir/platforms/$platform" || exit 1
             cp "src/tightdb/libtightdb-$platform.a"     "$temp_dir/platforms/$platform/libtightdb.a"     || exit 1
             cp "src/tightdb/libtightdb-$platform-dbg.a" "$temp_dir/platforms/$platform/libtightdb-dbg.a" || exit 1
@@ -465,7 +485,7 @@ EOF
         ;;
 
     "test")
-        require_config || exit 1
+        auto_configure || exit 1
         export TIGHTDB_HAVE_CONFIG="1"
         $MAKE check || exit 1
         echo "Test passed"
@@ -473,9 +493,25 @@ EOF
         ;;
 
     "test-debug")
-        require_config || exit 1
+        auto_configure || exit 1
         export TIGHTDB_HAVE_CONFIG="1"
         $MAKE check-debug || exit 1
+        echo "Test passed"
+        exit 0
+        ;;
+
+    "memtest")
+        auto_configure || exit 1
+        export TIGHTDB_HAVE_CONFIG="1"
+        $MAKE memcheck || exit 1
+        echo "Test passed"
+        exit 0
+        ;;
+
+    "memtest-debug")
+        auto_configure || exit 1
+        export TIGHTDB_HAVE_CONFIG="1"
+        $MAKE memcheck-debug || exit 1
         echo "Test passed"
         exit 0
         ;;
@@ -489,6 +525,51 @@ EOF
         rm -fr "$temp_dir/fake-root" || exit 1
         rm "$temp_dir/list" || exit 1
         rmdir "$temp_dir" || exit 1
+        exit 0
+        ;;
+
+    "get-version")
+        version_file="src/tightdb/version.hpp"
+        tightdb_ver_major="$(grep ^"#define TIGHTDB_VER_MAJOR" $version_file | awk '{print $3}')" || exit 1
+        tightdb_ver_minor="$(grep ^"#define TIGHTDB_VER_MINOR" $version_file | awk '{print $3}')" || exit 1
+        tightdb_ver_patch="$(grep ^"#define TIGHTDB_VER_PATCH" $version_file | awk '{print $3}')" || exit 1
+        echo "$tightdb_ver_major.$tightdb_ver_minor.$tightdb_ver_patch"
+        exit 0
+        ;;
+
+    "set-version")
+        tightdb_version="$1"
+        version_file="src/tightdb/version.hpp"
+        tightdb_ver_major="$(echo "$tightdb_version" | cut -f1 -d.)" || exit 1
+        tightdb_ver_minor="$(echo "$tightdb_version" | cut -f2 -d.)" || exit 1
+        tightdb_ver_patch="$(echo "$tightdb_version" | cut -f3 -d.)" || exit 1
+
+        # update version.hpp
+        sed -i -e "s/\#define TIGHTDB_VER_MAJOR .*/\#define TIGHTDB_VER_MAJOR $tightdb_ver_major/" $version_file || exit 1
+        sed -i -e "s/\#define TIGHTDB_VER_MINOR .*/\#define TIGHTDB_VER_MINOR $tightdb_ver_minor/" $version_file || exit 1
+        sed -i -e "s/\#define TIGHTDB_VER_PATCH .*/\#define TIGHTDB_VER_PATCH $tightdb_ver_patch/" $version_file || exit 1
+
+        sh tools/add-deb-changelog.sh "$tightdb_version" "$(pwd)/debian/changelog.in" libtightdb || exit 1
+        exit 0
+        ;;
+
+    "copy-tools")
+        repo="$1"
+        if [ -z "$repo" ]; then
+            echo "No path to repository set: sh build.sh copy-tools <path-to-repo>"
+            exit 1
+        fi
+        if ! [ -e "$repo" ]; then
+            echo "Repository $repo does not exist"
+            exit 1
+        fi
+        mkdir -p $repo/tools || exit 1
+
+        tools="add-deb-changelog.sh"
+        for t in $tools; do
+            cp tools/$t $repo/tools || exit 1
+            sed -i -e "1i # Do not edit here - go to core repository" $repo/tools/$t || exit 1
+        done
         exit 0
         ;;
 
@@ -506,7 +587,7 @@ EOF
     "install-prod")
         require_config || exit 1
         export TIGHTDB_HAVE_CONFIG="1"
-        $MAKE install-only DESTDIR="$DESTDIR" INSTALL_FILTER=shared-libs,progs || exit 1
+        $MAKE install-only DESTDIR="$DESTDIR" INSTALL_FILTER="shared-libs,progs" || exit 1
         if [ "$USER" = "root" ] && which ldconfig >/dev/null 2>&1; then
             ldconfig || exit 1
         fi
@@ -517,7 +598,7 @@ EOF
     "install-devel")
         require_config || exit 1
         export TIGHTDB_HAVE_CONFIG="1"
-        $MAKE install-only DESTDIR="$DESTDIR" INSTALL_FILTER=static-libs,dev-progs,headers || exit 1
+        $MAKE install-only DESTDIR="$DESTDIR" INSTALL_FILTER="static-libs,dev-progs,headers" || exit 1
         echo "Done installing"
         exit 0
         ;;
@@ -536,7 +617,7 @@ EOF
     "uninstall-prod")
         require_config || exit 1
         export TIGHTDB_HAVE_CONFIG="1"
-        $MAKE uninstall INSTALL_FILTER=shared-libs,progs || exit 1
+        $MAKE uninstall INSTALL_FILTER="shared-libs,progs" || exit 1
         if [ "$USER" = "root" ] && which ldconfig >/dev/null 2>&1; then
             ldconfig || exit 1
         fi
@@ -547,7 +628,7 @@ EOF
     "uninstall-devel")
         require_config || exit 1
         export TIGHTDB_HAVE_CONFIG="1"
-        $MAKE uninstall INSTALL_FILTER=static-libs,dev-progs,headers || exit 1
+        $MAKE uninstall INSTALL_FILTER="static-libs,dev-progs,headers" || exit 1
         echo "Done uninstalling"
         exit 0
         ;;
@@ -2088,6 +2169,7 @@ EOF
         echo "As well as: install-prod install-devel uninstall-prod uninstall-devel dist-copy" 1>&2
         echo "As well as: src-dist bin-dist dist-deb dist-status dist-pull dist-checkout" 1>&2
         echo "As well as: dist-config dist-clean dist-build dist-build-iphone dist-test dist-test-debug dist-install dist-uninstall dist-test-installed" 1>&2
+        echo "As well as: get-version set-version copy-tools" 1>&2
         exit 1
         ;;
 esac

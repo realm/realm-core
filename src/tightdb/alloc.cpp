@@ -43,27 +43,28 @@ public:
         m_baseline = 1; // Zero is not available
     }
 
-    MemRef alloc(size_t size) TIGHTDB_OVERRIDE
+    MemRef do_alloc(size_t size) TIGHTDB_OVERRIDE
     {
-        char* addr = static_cast<char*>(malloc(size));
+        char* addr = static_cast<char*>(::malloc(size));
         if (TIGHTDB_UNLIKELY(!addr)) {
             TIGHTDB_ASSERT(errno == ENOMEM);
             throw bad_alloc();
         }
-#ifdef TIGHTDB_ALLOC_SET_ZERO
+#ifdef TIGHTDB_ENABLE_ALLOC_SET_ZERO
         fill(addr, addr+size, 0);
 #endif
         return MemRef(addr, reinterpret_cast<size_t>(addr));
     }
 
-    MemRef realloc_(ref_type, const char* addr, size_t old_size, size_t new_size) TIGHTDB_OVERRIDE
+    MemRef do_realloc(ref_type, const char* addr, size_t old_size,
+                      size_t new_size) TIGHTDB_OVERRIDE
     {
-        char* new_addr = static_cast<char*>(realloc(const_cast<char*>(addr), new_size));
+        char* new_addr = static_cast<char*>(::realloc(const_cast<char*>(addr), new_size));
         if (TIGHTDB_UNLIKELY(!new_addr)) {
             TIGHTDB_ASSERT(errno == ENOMEM);
             throw bad_alloc();
         }
-#ifdef TIGHTDB_ALLOC_SET_ZERO
+#ifdef TIGHTDB_ENABLE_ALLOC_SET_ZERO
         fill(new_addr+old_size, new_addr+new_size, 0);
 #else
         static_cast<void>(old_size);
@@ -71,12 +72,12 @@ public:
         return MemRef(new_addr, reinterpret_cast<size_t>(new_addr));
     }
 
-    void free_(ref_type, const char* addr) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
+    void do_free(ref_type, const char* addr) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
     {
-        free(const_cast<char*>(addr));
+        ::free(const_cast<char*>(addr));
     }
 
-    char* translate(ref_type ref) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
+    char* do_translate(ref_type ref) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
     {
         return reinterpret_cast<char*>(ref);
     }
@@ -94,4 +95,20 @@ Allocator& Allocator::get_default() TIGHTDB_NOEXCEPT
 {
     static DefaultAllocator default_alloc;
     return default_alloc;
+}
+
+MemRef Allocator::do_realloc(ref_type ref, const char* addr, size_t old_size,
+                             size_t new_size)
+{
+    // Allocate new space
+    MemRef new_mem = do_alloc(new_size); // Throws
+
+    // Copy existing contents
+    char* new_addr = new_mem.m_addr;
+    copy(addr, addr+old_size, new_addr);
+
+    // Free old chunk
+    do_free(ref, addr);
+
+    return new_mem;
 }
