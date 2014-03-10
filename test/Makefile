@@ -10,8 +10,10 @@ test_stl_DEPS     = util
 
 check_PROGRAMS = tightdb-tests
 
-tightdb_tests_SOURCES := $(wildcard *.c *.cpp large_tests/*.cpp)
-tightdb_tests_LIBS    := util/test-util.a
+TESTS := $(wildcard test_*.cpp large_tests/*.cpp)
+
+tightdb_tests_SOURCES = $(TESTS) main.cpp
+tightdb_tests_LIBS    = util/test-util.a
 
 ifeq ($(shell pkg-config unittest++ --exists 2>/dev/null && echo yes),yes)
 UNITTESTPP_CFLAGS  := $(shell pkg-config unittest++ --cflags)

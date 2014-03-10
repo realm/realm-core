@@ -121,6 +121,21 @@ CATEGORIES :
       - CODE   : ex_cpp_dyn_table_is_attached
         DESCR  :
 
+  - g_dyn_table_get_name:
+      NAME     : get_name
+      SUMMARY  : &g_dyn_table_get_name_summary
+                 Get the name of this table, if it has any.
+      DESCR    : &g_dyn_table_get_name_descr
+                 Tables have names when, and only when they are direct
+                 members of groups. For a table of any other kind,
+                 this function returns the empty string.
+      CONST    : true
+      RETURN:
+        TYPES  : StringData
+        DESCR  : &g_dyn_table_get_name_return_descr
+                 The name of the table, or the empty string if the
+                 table is not a direct member of a group.
+
 
 - Table:
   METHODS:
@@ -1084,6 +1099,10 @@ CATEGORIES :
       DESCR    :
       - TEXT   : &g_dyn_table_sum_descr
                  This method calculates the sum of all values in the specified column.
+      - TEXT   : &g_dyn_table_sum_descr_notes
+                 |
+                 Note: The summation can overflow depending on the values stored. Nothing will indicate this.
+                 Note: Adding many floats or doubles can accumulate representation imprecisions.
       - TEXT   : >
                  As the sum of many <code>float</code>
                  values can be greater than the maximum value of the type, a <code>double</code>
@@ -1166,8 +1185,18 @@ CATEGORIES :
       NAMES    : [average_int, average_float, average_double]
       SUMMARY  : &g_dyn_table_average_summary
                  Calculate the average value.
-      DESCR    : &g_dyn_table_average_descr
+      DESCR    :
+      - TEXT   : &g_dyn_table_average_descr
                  This method calculates the average value in the specified column.
+      - TEXT   : &g_dyn_table_average_descr_notes
+                 |
+                 Note: The method performs a summation, which can overflow depending on the values stored. Nothing will indicate this.
+                 Note: Averaging many floats or doubles can accumulate representation imprecisions.
+      - TEXT   : &g_dyn_table_average_descr_double
+                 >
+                 As the sum of many <code>int64_t</code> or <code>float</code>
+                 values can be greater than the average value of the type, a <code>double</code>
+                 is returned.
       CONST    : True
       SIGNATURE: |
                  double  average_int(size_t column_ndx) const;

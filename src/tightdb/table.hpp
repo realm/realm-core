@@ -130,6 +130,11 @@ public:
     /// that even Table::is_attached() is disallowed in this case.
     bool is_attached() const TIGHTDB_NOEXCEPT;
 
+    /// Get the name of this table, if it has any. Tables have names
+    /// when, and only when they are direct members of groups. For a
+    /// table of any other kind, this function returns the empty
+    /// string.
+    StringData get_name() const TIGHTDB_NOEXCEPT;
 
     //@{
     /// Conventience methods for inspecting the dynamic table type.
@@ -487,6 +492,38 @@ public:
     // Optimizing
     void optimize();
 
+    /// Write this table (or a slice of this table) to the specified
+    /// output stream.
+    ///
+    /// The output will have the same format as any other TightDB
+    /// database file, such as those produced by Group::write(). In
+    /// this case, however, the resulting database file will contain
+    /// exactly one table, and that table will contain only the
+    /// specified slice of the source table (this table).
+    ///
+    /// The new table will always have the same dynamic type (see
+    /// Descriptor) as the source table (this table), and unless it is
+    /// overridden (\a override_table_name), the new table will have
+    /// the same name as the source table (see get_name()). Indexes
+    /// (see set_index()) will not be carried over to the new table.
+    ///
+    /// \param offset Index of first row to include (if `size >
+    /// 0`). Must be less than, or equal to size().
+    ///
+    /// \param size Number of rows to include. May be zero. If `size >
+    /// size() - offset`, then the effective size of the written slice
+    /// will be `size() - offset`.
+    ///
+    /// \throw std::out_of_range If `offset > size()`.
+    ///
+    /// FIXME: While this function does provided a maximally efficient
+    /// way of serializing part of a table, it offers little in terms
+    /// of general utility. This is unfortunate, because it pulls
+    /// quite a large amount of code into the core library to support
+    /// it.
+    void write(std::ostream&, std::size_t offset = 0, std::size_t size = npos,
+               StringData override_table_name = StringData()) const;
+
     // Conversion
     void to_json(std::ostream& out) const;
     void to_string(std::ostream& out, std::size_t limit = 500) const;
@@ -544,8 +581,10 @@ protected:
     void set_into_mixed(Table* parent, std::size_t col_ndx, std::size_t row_ndx) const;
 
 private:
+    class SliceWriter;
+
     // view management support:
-    void from_view_remove(std::size_t row_ndx, TableViewBase* view);
+    void from_view_remove(std::size_t row_ndx, TableViewBase* view); // FIXME: Please rename to remove_by_view()
 
     void do_remove(std::size_t row_ndx);
 
@@ -557,8 +596,7 @@ private:
     Array m_columns;
     Spec m_spec;
 
-    // Column accessor instances
-    Array m_cols;
+    Array m_cols; // Column accessors
     mutable std::size_t m_ref_count;
     mutable const StringIndex* m_lookup_index;
     mutable Descriptor* m_descriptor;
@@ -810,22 +848,22 @@ private:
 };
 
 
-inline void Table::remove(std::size_t row_ndx) 
-{ 
+inline void Table::remove(std::size_t row_ndx)
+{
     detach_views_except(NULL);
-    do_remove(row_ndx); 
+    do_remove(row_ndx);
 }
 
-inline void Table::from_view_remove(std::size_t row_ndx, TableViewBase* view) 
-{ 
+inline void Table::from_view_remove(std::size_t row_ndx, TableViewBase* view)
+{
     detach_views_except(view);
-    do_remove(row_ndx); 
+    do_remove(row_ndx);
 }
 
-inline void Table::remove_last() 
-{ 
+inline void Table::remove_last()
+{
     if (!is_empty())
-        remove(size()-1); 
+        remove(size()-1);
 }
 
 inline void Table::register_view(const TableViewBase* view)
@@ -840,6 +878,8 @@ public:
     ~Parent() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
 
 protected:
+    virtual StringData get_child_name(std::size_t child_ndx) const TIGHTDB_NOEXCEPT;
+
     // If this table parent is a column in a parent table, this
     // function must return the pointer to the parent table, otherwise
     // it must return null.
@@ -853,7 +893,8 @@ protected:
     // Must be called whenever a child table accessor is destroyed.
     virtual void child_accessor_destroyed(std::size_t child_ndx) TIGHTDB_NOEXCEPT = 0;
 
-    virtual std::size_t* record_subtable_path(std::size_t* begin, std::size_t* end) TIGHTDB_NOEXCEPT;
+    virtual std::size_t* record_subtable_path(std::size_t* begin,
+                                              std::size_t* end) TIGHTDB_NOEXCEPT;
 
     friend class Table;
 };
@@ -878,6 +919,18 @@ inline bool Table::is_attached() const TIGHTDB_NOEXCEPT
     // degenerate subtables, m_columns is initialized with the correct
     // parent pointer.
     return m_columns.has_parent();
+}
+
+inline StringData Table::get_name() const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(is_attached());
+    const Array& real_top = m_top.is_attached() ? m_top : m_columns;
+    ArrayParent* parent = real_top.get_parent();
+    if (!parent)
+        return StringData();
+    std::size_t index_in_parent = real_top.get_ndx_in_parent();
+    TIGHTDB_ASSERT(dynamic_cast<Parent*>(parent));
+    return static_cast<Parent*>(parent)->get_child_name(index_in_parent);
 }
 
 inline std::size_t Table::get_column_count() const TIGHTDB_NOEXCEPT
@@ -1093,7 +1146,7 @@ inline bool Table::operator==(const Table& t) const
 
 inline bool Table::operator!=(const Table& t) const
 {
-    return m_spec != t.m_spec || !compare_rows(t); // Throws
+    return !(*this == t); // Throws
 }
 
 inline void Table::insert_into(Table* parent, std::size_t col_ndx, std::size_t row_ndx) const

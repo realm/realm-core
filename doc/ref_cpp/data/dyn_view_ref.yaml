@@ -48,8 +48,8 @@ CATEGORIES :
   METHODS:
   - g_dyn_view_size:
       NAME     : size
-      SUMMARY  : *g_dyn_table_size_summary
-      DESCR    : *g_dyn_table_size_descr
+      SUMMARY  : *g_typed_view_size_summary
+      DESCR    : *g_typed_view_size_descr
       CONST    : True
       RETURN:
         TYPES  : size_t
@@ -474,7 +474,8 @@ CATEGORIES :
                  Calculates the sum.
       DESCR    :
       - TEXT   : &g_dyn_view_sum_descr
-                 Calculates the sum of a column.
+                 Calculates the sum of the values in the selected column.
+      - TEXT   : *g_dyn_table_sum_descr_notes
       - TEXT   : >
                  As the sum of many <code>float</code>
                  values can be greater than the maximum value of the type, a <code>double</code>
@@ -506,10 +507,8 @@ CATEGORIES :
       DESCR    :
       - TEXT   : &g_dyn_view_average_descr
                  Calculates the average of a column.
-      - TEXT   : >
-                 As the sum of many <code>int64_t</code> or <code>float</code>
-                 values can be greater than the average value of the type, a <code>double</code>
-                 is returned.
+      - TEXT   : *g_dyn_table_average_descr_notes
+      - TEXT   : *g_dyn_table_average_descr_double
       CONST    : True
       SIGNATURE: |
                  double  average_int(size_t column_ndx) const;

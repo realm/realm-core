@@ -4,21 +4,11 @@
 
 #include <tightdb/array_binary.hpp>
 #include <tightdb/array_blob.hpp>
+#include <tightdb/impl/destroy_guard.hpp>
 
 using namespace std;
 using namespace tightdb;
 
-
-ArrayBinary::ArrayBinary(ArrayParent* parent, size_t ndx_in_parent, Allocator& alloc):
-    Array(type_HasRefs, parent, ndx_in_parent, alloc),
-    m_offsets(type_Normal, 0, 0, alloc), m_blob(0, 0, alloc)
-{
-    // Add subarrays for long string
-    Array::add(m_offsets.get_ref());
-    Array::add(m_blob.get_ref());
-    m_offsets.set_parent(this, 0);
-    m_blob.set_parent(this, 1);
-}
 
 ArrayBinary::ArrayBinary(MemRef mem, ArrayParent* parent, size_t ndx_in_parent,
                          Allocator& alloc) TIGHTDB_NOEXCEPT:
@@ -47,6 +37,16 @@ ArrayBinary::ArrayBinary(ref_type ref, ArrayParent* parent, size_t ndx_in_parent
     m_offsets.set_parent(this, 0);
     m_blob.set_parent(this, 1);
 }
+
+
+void ArrayBinary::init_from_mem(MemRef mem) TIGHTDB_NOEXCEPT
+{
+    Array::init_from_mem(mem);
+    ref_type offsets_ref = get_as_ref(0), blob_ref = get_as_ref(1);
+    m_offsets.init_from_ref(offsets_ref);
+    m_blob.init_from_ref(blob_ref);
+}
+
 
 void ArrayBinary::add(BinaryData value, bool add_zero_term)
 {
@@ -104,22 +104,6 @@ void ArrayBinary::erase(size_t ndx)
     m_offsets.adjust(ndx, m_offsets.size(), int64_t(start) - end);
 }
 
-void ArrayBinary::truncate(size_t size)
-{
-    TIGHTDB_ASSERT(size < m_offsets.size());
-
-    size_t blob_size = size ? to_size_t(m_offsets.get(size-1)) : 0;
-
-    m_offsets.truncate(size);
-    m_blob.truncate(blob_size);
-}
-
-void ArrayBinary::clear()
-{
-    m_blob.clear();
-    m_offsets.clear();
-}
-
 BinaryData ArrayBinary::get(const char* header, size_t ndx, Allocator& alloc) TIGHTDB_NOEXCEPT
 {
     pair<int_least64_t, int_least64_t> p = get_two(header, 0);
@@ -138,6 +122,7 @@ BinaryData ArrayBinary::get(const char* header, size_t ndx, Allocator& alloc) TI
     return BinaryData(ArrayBlob::get(blob_header, begin), end-begin);
 }
 
+// FIXME: Not exception safe (leaks are possible).
 ref_type ArrayBinary::bptree_leaf_insert(size_t ndx, BinaryData value, bool add_zero_term,
                                          TreeInsertBase& state)
 {
@@ -146,21 +131,22 @@ ref_type ArrayBinary::bptree_leaf_insert(size_t ndx, BinaryData value, bool add_
     if (leaf_size < ndx)
         ndx = leaf_size;
     if (TIGHTDB_LIKELY(leaf_size < TIGHTDB_MAX_LIST_SIZE)) {
-        insert(ndx, value, add_zero_term);
+        insert(ndx, value, add_zero_term); // Throws
         return 0; // Leaf was not split
     }
 
     // Split leaf node
-    ArrayBinary new_leaf(0, 0, get_alloc());
+    ArrayBinary new_leaf(get_alloc());
+    new_leaf.create(); // Throws
     if (ndx == leaf_size) {
-        new_leaf.add(value, add_zero_term);
+        new_leaf.add(value, add_zero_term); // Throws
         state.m_split_offset = ndx;
     }
     else {
         for (size_t i = ndx; i != leaf_size; ++i)
-            new_leaf.add(get(i));
-        truncate(ndx);
-        add(value, add_zero_term);
+            new_leaf.add(get(i)); // Throws
+        truncate(ndx); // Throws
+        add(value, add_zero_term); // Throws
         state.m_split_offset = ndx + 1;
     }
     state.m_split_size = leaf_size + 1;
@@ -168,37 +154,51 @@ ref_type ArrayBinary::bptree_leaf_insert(size_t ndx, BinaryData value, bool add_
 }
 
 
-ref_type ArrayBinary::create_array(std::size_t size, Allocator& alloc)
+MemRef ArrayBinary::create_array(size_t size, Allocator& alloc)
 {
     Array top(alloc);
+    _impl::DeepArrayDestroyGuard dg(&top);
     top.create(type_HasRefs); // Throws
-    try {
+
+    _impl::DeepArrayRefDestroyGuard dg_2(alloc);
+    {
+        bool context_flag = false;
         int_fast64_t value = 0;
-        ref_type offsets_ref = Array::create_array(type_Normal, size, value, alloc); // Throws
-        try {
-            int_fast64_t v = offsets_ref; // FIXME: Dangerous cast: unsigned -> signed
-            top.add(v); // Throws
-        }
-        catch (...) {
-            Array::destroy(offsets_ref, alloc);
-            throw;
-        }
+        MemRef mem = Array::create_array(type_Normal, context_flag, size, value, alloc); // Throws
+        dg_2.reset(mem.m_ref);
+        int_fast64_t v(mem.m_ref); // FIXME: Dangerous cast (unsigned -> signed)
+        top.add(v); // Throws
+        dg_2.release();
+    }
+    {
         size_t blobs_size = 0;
-        ref_type blobs_ref = ArrayBlob::create_array(blobs_size, alloc); // Throws
-        try {
-            int_fast64_t v = blobs_ref; // FIXME: Dangerous cast: unsigned -> signed
-            top.add(v); // Throws
-        }
-        catch (...) {
-            Array::destroy(blobs_ref, alloc);
-            throw;
-        }
-        return top.get_ref();
+        MemRef mem = ArrayBlob::create_array(blobs_size, alloc); // Throws
+        dg_2.reset(mem.m_ref);
+        int_fast64_t v(mem.m_ref); // FIXME: Dangerous cast (unsigned -> signed)
+        top.add(v); // Throws
+        dg_2.release();
     }
-    catch (...) {
-        top.destroy();
-        throw;
+
+    dg.release();
+    return top.get_mem();
+}
+
+
+MemRef ArrayBinary::slice(size_t offset, size_t size, Allocator& target_alloc) const
+{
+    TIGHTDB_ASSERT(is_attached());
+
+    ArrayBinary slice(target_alloc);
+    _impl::ShallowArrayDestroyGuard dg(&slice);
+    slice.create(); // Throws
+    size_t begin = offset;
+    size_t end   = offset + size;
+    for (size_t i = begin; i != end; ++i) {
+        BinaryData value = get(i);
+        slice.add(value); // Throws
     }
+    dg.release();
+    return slice.get_mem();
 }
 
 

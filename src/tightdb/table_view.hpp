@@ -365,7 +365,7 @@ inline TableViewBase::~TableViewBase() TIGHTDB_NOEXCEPT
         m_table->unregister_view(this);
         m_table = TableRef();
     }
-    m_refs.destroy();
+    m_refs.destroy(); // Shallow
 }
 
 inline void TableViewBase::move_assign(TableViewBase* tv) TIGHTDB_NOEXCEPT

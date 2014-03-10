@@ -47,7 +47,7 @@ string get_errno_msg(const char* prefix, int err)
         return buffer.str();
     }
 
-#elif _GNU_SOURCE // GNU specific version <string.h>
+#elif _GNU_SOURCE && ! defined ANDROID// GNU specific version <string.h>
 
     // Note that Linux provides the GNU specific version even though
     // it sets _POSIX_C_SOURCE >= 200112L.

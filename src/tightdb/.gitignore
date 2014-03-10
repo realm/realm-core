@@ -2,6 +2,8 @@
 /*.o
 /util/*.d
 /util/*.o
+/impl/*.d
+/impl/*.o
 /*.libdeps
 
 # Coverage data
@@ -9,6 +11,8 @@
 /*.gcda
 /util/*.gcno
 /util/*.gcda
+/impl/*.gcno
+/impl/*.gcda
 
 /libtightdb.a
 /libtightdb.so
