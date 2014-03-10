@@ -226,7 +226,7 @@ inline void ColumnBinary::insert_string(std::size_t ndx, StringData value)
 }
 
 inline std::size_t ColumnBinary::get_size_from_ref(ref_type root_ref,
-                                                   Allocator& alloc) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
+                                                   Allocator& alloc) TIGHTDB_NOEXCEPT
 {
     const char* root_header = alloc.translate(root_ref);
     bool root_is_leaf = !Array::get_is_inner_bptree_node_from_header(root_header);
