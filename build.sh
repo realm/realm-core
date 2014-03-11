@@ -37,6 +37,7 @@ IPHONE_PLATFORMS="iPhoneOS iPhoneSimulator"
 IPHONE_DIR="iphone-lib"
 
 ANDROID_DIR="android-lib"
+ANDROID_PLATFORMS="arm arm-v7a mips x86"
 
 map_ext_name_to_dir()
 {
@@ -463,6 +464,10 @@ EOF
                 rmdir "$IPHONE_DIR" || exit 1
             fi
         fi
+        for x in $ANDROID_PLATFORMS; do
+            denom="android-$x"
+            $MAKE -C "src/tightdb" BASE_DENOM="$denom" clean || exit 1
+        done
         if [ -e "$ANDROID_DIR" ];then
             echo "Removing '$ANDROID_DIR'"
             rm -rf "$ANDROID_DIR"
@@ -557,15 +562,15 @@ EOF
         mkdir -p "$ANDROID_DIR" || exit 1
 
         OLDPATH=$PATH
-        for target in "arm" "arm-v7a" "mips" "x86"; do
+        for target in $ANDROID_PLATFORMS; do
             temp_dir="$(mktemp -d /tmp/tightdb.build-android.XXXX)" || exit 1
             if [ "$target" = "arm" ]; then
-                platform=8
+                platform="8"
             else
-                platform=9
+                platform="9"
             fi
             $android_ndk_home/build/tools/make-standalone-toolchain.sh --platform=android-$platform --install-dir=$temp_dir --arch=$target || exit 1
-            export PATH=$temp_dir/bin:$OLDPATH
+            export PATH="$temp_dir/bin:$OLDPATH"
             if [ "$target" = "arm" ]; then
                 android_prefix="arm"
             elif [ "$target" = "arm-v7a" ]; then
@@ -588,7 +593,7 @@ EOF
             cp "src/tightdb/libtightdb-$denom.a" "$ANDROID_DIR" || exit 1
             rm -rf $temp_dir
         done
-        PATH=$OLDPATH
+        PATH="$OLDPATH"
         echo "Copying headers to '$ANDROID_DIR/include'"
         mkdir -p "$ANDROID_DIR/include" || exit 1
         cp "src/tightdb.hpp" "$ANDROID_DIR/include/" || exit 1
