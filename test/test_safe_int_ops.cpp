@@ -72,7 +72,7 @@ template<class T_1, class T_2> void test_two_args(const set<super_int>& values)
     iter_2 end_2 = values_2.end();
     for (iter_1 i_1 = values_1.begin(); i_1 != end_1; ++i_1) {
         for (iter_2 i_2 = values_2.begin(); i_2 != end_2; ++i_2) {
-//            cout << "--> " << int_promote(*i_1) << " vs " << int_promote(*i_2) << "\n";
+//            cout << "--> " << promote(*i_1) << " vs " << promote(*i_2) << "\n";
             // Comparisons
             {
                 T_1 v_1 = *i_1;
