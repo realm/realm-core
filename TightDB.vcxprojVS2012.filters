@@ -163,6 +163,9 @@
     <ClCompile Include="test\test_file.cpp">
       <Filter>test</Filter>
     </ClCompile>
+    <ClCompile Include="test\test_safe_int_ops.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
     <ClCompile Include="test\test_thread.cpp">
       <Filter>test</Filter>
     </ClCompile>
@@ -191,6 +194,9 @@
       <Filter>test\util</Filter>
     </ClCompile>
     <ClCompile Include="src\tightdb\array_blobs_big.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\tightdb\impl\output_stream.cpp">
       <Filter>src</Filter>
     </ClCompile>
     <ClCompile Include="test\test_array_blobs_big.cpp">
@@ -346,6 +352,9 @@
       <Filter>src\include</Filter>
     </ClInclude>
     <ClInclude Include="src\tightdb\util\meta.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\util\type_traits.hpp">
       <Filter>src\include</Filter>
     </ClInclude>
     <ClInclude Include="src\tightdb\mixed.hpp">

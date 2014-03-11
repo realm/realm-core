@@ -1,9 +1,11 @@
 #include <cstring>
+#include <typeinfo>
 #include <limits>
 #include <vector>
 #include <map>
 #include <fstream>
 #include <iostream>
+
 #include <unistd.h>
 #include <sys/wait.h>
 
@@ -16,6 +18,7 @@
 #include <tightdb/array_binary.hpp>
 #include <tightdb/array_string_long.hpp>
 
+#include "../util/demangle.hpp"
 #include "../util/thread_wrapper.hpp"
 #include "unit_test.hpp"
 
