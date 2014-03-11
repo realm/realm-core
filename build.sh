@@ -631,6 +631,11 @@ EOF
         exit 0
         ;;
 
+    "check-doc-examples")
+        auto_configure || exit 1
+        $MAKE check-doc-examples || exit 1
+        ;;
+
     "show-install")
         temp_dir="$(mktemp -d /tmp/tightdb.show-install.XXXX)" || exit 1
         mkdir "$temp_dir/fake-root" || exit 1
