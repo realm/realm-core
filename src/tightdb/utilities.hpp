@@ -184,6 +184,15 @@ private:
     void operator& () const;
 } null_ptr = {};
 
+
+template<class T> struct Wrap {
+    Wrap(const T& v): m_value(v) {}
+    operator T() const { return m_value; }
+private:
+    T m_value;
+};
+
+
 } // namespace tightdb
 
 #endif // TIGHTDB_UTILITIES_HPP

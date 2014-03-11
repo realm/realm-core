@@ -24,7 +24,7 @@
 #include <string>
 #include <sstream>
 
-#include <tightdb/util/meta.hpp>
+#include <tightdb/util/type_traits.hpp>
 #include <tightdb/util/safe_int_ops.hpp>
 
 
