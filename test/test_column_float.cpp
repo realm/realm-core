@@ -224,18 +224,103 @@ void BasicColumn_Delete(T val[], size_t valLen)
 TEST(ColumnFloat_Delete) { BasicColumn_Delete<ColumnFloat, float>(floatVal, floatValLen); }
 TEST(ColumnDouble_Delete){ BasicColumn_Delete<ColumnDouble, double>(doubleVal, doubleValLen); }
 
-TEST(InitOfEmptyColumn)
+TEST(InitOfEmptyColumnDouble)
 {
     Table t;
     t.add_column(type_Double, "virker");
     t.add_column(type_Double, "virker ogsaa");
     t.add_empty_row();
     t.set_double(0,0,1.1);
-    t.set_double(0,1,2.2);
+    t.set_double(1,0,2.2);
     t.remove_column(1);
     t.add_empty_row();
     t.add_column(type_Double, "virker ikke");
     CHECK_EQUAL(0.0, t.get_double(1,0));
 }
+
+TEST(InitOfEmptyColumnFloat)
+{
+    Table t;
+    t.add_column(type_Float, "virker");
+    t.add_column(type_Float, "virker ogsaa");
+    t.add_empty_row();
+    t.set_float(0,0,1.1);
+    t.set_float(1,0,2.2);
+    t.remove_column(1);
+    t.add_empty_row();
+    t.add_column(type_Float, "virker ikke");
+    CHECK_EQUAL(0.0, t.get_float(1,0));
+}
+
+TEST(InitOfEmptyColumnInt)
+{
+    Table t;
+    t.add_column(type_Int, "virker");
+    t.add_column(type_Int, "virker ogsaa");
+    t.add_empty_row();
+    t.set_int(0,0,1);
+    t.set_int(1,0,2);
+    t.remove_column(1);
+    t.add_empty_row();
+    t.add_column(type_Int, "virker ikke");
+    CHECK_EQUAL(0, t.get_int(1,0));
+}
+
+TEST(InitOfEmptyColumnString)
+{
+    Table t;
+    t.add_column(type_String, "virker");
+    t.add_column(type_String, "virker ogsaa");
+    t.add_empty_row();
+    t.set_string(0,0, "gylle");
+    t.set_string(1,0, "monster prut");
+    t.remove_column(1);
+    t.add_empty_row();
+    t.add_column(type_String, "virker ikke");
+    CHECK_EQUAL("", t.get_string(1,0));
+}
+
+TEST(InitOfEmptyColumnBinary)
+{
+    Table t;
+    t.add_column(type_Binary, "virker");
+    t.add_column(type_Binary, "virker ogsaa");
+    t.add_empty_row();
+    t.set_binary(0,0, BinaryData("gylle",10));
+    t.set_binary(1,0, BinaryData("monster prut", 15));
+    t.remove_column(1);
+    t.add_empty_row();
+    t.add_column(type_Binary, "virker ikke");
+    CHECK_EQUAL(BinaryData("gnaf",0), t.get_binary(1,0));
+}
+
+TEST(InitOfEmptyColumnBool)
+{
+    Table t;
+    t.add_column(type_Bool, "virker");
+    t.add_column(type_Bool, "virker ogsaa");
+    t.add_empty_row();
+    t.set_bool(0,0, true);
+    t.set_bool(1,0, true);
+    t.remove_column(1);
+    t.add_empty_row();
+    t.add_column(type_Bool, "virker ikke");
+    CHECK_EQUAL(false, t.get_bool(1,0));
+}
+
+TEST(InitOfEmptyColumnMixed)
+{
+    Table t;
+    t.add_column(type_Mixed, "virker");
+    t.add_column(type_Mixed, "virker ogsaa");
+    t.add_empty_row();
+    t.set_mixed(0,0, new Mixed(1.1));
+    t.set_mixed(1,0, new Mixed(2.2));
+    t.remove_column(1);
+    t.add_empty_row();
+    t.add_column(type_Mixed, "virker ikke");
+    CHECK_EQUAL(NULL, t.get_mixed(1,0));
+}
+
 
 #endif // TEST_COLUMN_FLOAT
