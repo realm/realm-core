@@ -247,6 +247,11 @@ public:
     ref_type create_leaf(std::size_t size) TIGHTDB_OVERRIDE
     {
         MemRef mem = BasicArray<T>::create_array(size, m_alloc); // Throws
+        T* tp = reinterpret_cast<T*>(Array::get_data_from_header(mem.m_addr));
+        while (size) {
+            *tp++ = 0.0;
+            --size;
+        }
         return mem.m_ref;
     }
 private:
