@@ -224,4 +224,18 @@ void BasicColumn_Delete(T val[], size_t valLen)
 TEST(ColumnFloat_Delete) { BasicColumn_Delete<ColumnFloat, float>(floatVal, floatValLen); }
 TEST(ColumnDouble_Delete){ BasicColumn_Delete<ColumnDouble, double>(doubleVal, doubleValLen); }
 
+TEST(InitOfEmptyColumn)
+{
+    Table t;
+    t.add_column(type_Double, "virker");
+    t.add_column(type_Double, "virker ogsaa");
+    t.add_empty_row();
+    t.set_double(0,0,1.1);
+    t.set_double(0,1,2.2);
+    t.remove_column(1);
+    t.add_empty_row();
+    t.add_column(type_Double, "virker ikke");
+    CHECK_EQUAL(0.0, t.get_double(1,0));
+}
+
 #endif // TEST_COLUMN_FLOAT
