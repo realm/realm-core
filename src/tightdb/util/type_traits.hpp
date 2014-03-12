@@ -20,6 +20,7 @@
 #ifndef TIGHTDB_UTIL_TYPE_TRAITS_HPP
 #define TIGHTDB_UTIL_TYPE_TRAITS_HPP
 
+#include <stdint.h>
 #include <climits>
 #include <cwchar>
 #include <limits>
@@ -70,48 +71,76 @@ template<> struct IsIntegral<unsigned long long> { static const bool value = tru
 
 
 
-/// Determine the type resulting from integral promotion.
+/// Determine the type resulting from integral or floating-point
+/// promotion.
 ///
 /// \note Enum types are supported only when the compiler supports the
 /// C++11 'decltype' feature.
 #ifdef TIGHTDB_HAVE_CXX11_DECLTYPE
-template<class T> struct IntegralPromote { typedef decltype(+T()) type; };
+template<class T> struct Promote { typedef decltype(+T()) type; }; // FIXME: This is not performing floating-point promotion.
 #else // !TIGHTDB_HAVE_CXX11_DECLTYPE
-template<class T> struct IntegralPromote;
-template<> struct IntegralPromote<bool> { typedef int type; };
-template<> struct IntegralPromote<char> {
-    typedef CondType<INT_MIN <= CHAR_MIN && CHAR_MAX <= INT_MAX, int, unsigned>::type type;
-};
-template<> struct IntegralPromote<signed char> {
-    typedef CondType<INT_MIN <= SCHAR_MIN && SCHAR_MAX <= INT_MAX, int, unsigned>::type type;
-};
-template<> struct IntegralPromote<unsigned char> {
-    typedef CondType<UCHAR_MAX <= INT_MAX, int, unsigned>::type type;
-};
-template<> struct IntegralPromote<wchar_t> {
+template<class T> struct Promote;
+template<> struct Promote<bool> { typedef int type; };
+template<> struct Promote<char> {
 private:
-    typedef CondType<LLONG_MIN <= WCHAR_MIN && WCHAR_MAX <= LLONG_MAX, long long, unsigned long long>::type type_1;
-    typedef CondType<0 <= WCHAR_MIN && WCHAR_MAX <= ULONG_MAX, unsigned long, type_1>::type type_2;
-    typedef CondType<LONG_MIN <= WCHAR_MIN && WCHAR_MAX <= LONG_MAX, long, type_2>::type type_3;
-    typedef CondType<0 <= WCHAR_MIN && WCHAR_MAX <= UINT_MAX, unsigned, type_3>::type type_4;
+    static const bool cond =
+        int(INT_MIN) <= int(CHAR_MIN) && unsigned(CHAR_MAX) <= unsigned(INT_MAX);
 public:
-    typedef CondType<INT_MIN <= WCHAR_MIN && WCHAR_MAX <= INT_MAX, int, type_4>::type type;
+    typedef CondType<cond, int, unsigned>::type type;
 };
-template<> struct IntegralPromote<short> {
-    typedef CondType<INT_MIN <= SHRT_MIN && SHRT_MAX <= INT_MAX, int, unsigned>::type type;
+template<> struct Promote<signed char> {
+    typedef int type;
 };
-template<> struct IntegralPromote<unsigned short> {
-    typedef CondType<USHRT_MAX <= INT_MAX, int, unsigned>::type type;
+template<> struct Promote<unsigned char> {
+private:
+    static const bool cond = unsigned(UCHAR_MAX) <= unsigned(INT_MAX);
+public:
+    typedef CondType<cond, int, unsigned>::type type;
 };
-template<> struct IntegralPromote<int> { typedef int type; };
-template<> struct IntegralPromote<unsigned> { typedef unsigned type; };
-template<> struct IntegralPromote<long> { typedef long type; };
-template<> struct IntegralPromote<unsigned long> { typedef unsigned long type; };
-template<> struct IntegralPromote<long long> { typedef long long type; };
-template<> struct IntegralPromote<unsigned long long> { typedef unsigned long long type; };
-template<> struct IntegralPromote<float> { typedef float type; };
-template<> struct IntegralPromote<double> { typedef double type; };
-template<> struct IntegralPromote<long double> { typedef long double type; };
+template<> struct Promote<wchar_t> {
+private:
+    typedef intmax_t  max_int;
+    typedef uintmax_t max_uint;
+    static const bool cond_0 =
+        (0 <= max_int(WCHAR_MIN)) && (max_uint(WCHAR_MAX) <= max_uint(ULLONG_MAX));
+    static const bool cond_1 =
+        (max_int(LLONG_MIN) <= max_int(WCHAR_MIN)) && (max_uint(WCHAR_MAX) <= max_uint(LLONG_MAX));
+    static const bool cond_2 =
+        (0 <= max_int(WCHAR_MIN)) && (max_uint(WCHAR_MAX) <= max_uint(ULONG_MAX));
+    static const bool cond_3 =
+        (max_int(LONG_MIN) <= max_int(WCHAR_MIN)) && (max_uint(WCHAR_MAX) <= max_uint(LONG_MAX));
+    static const bool cond_4 =
+        (0 <= max_int(WCHAR_MIN)) && (max_uint(WCHAR_MAX) <= unsigned(UINT_MAX));
+    static const bool cond_5 =
+        (int(INT_MIN) <= max_int(WCHAR_MIN)) && (max_uint(WCHAR_MAX) <= unsigned(INT_MAX));
+    typedef CondType<cond_0, unsigned long long, void>::type type_0;
+    typedef CondType<cond_1, long long,        type_0>::type type_1;
+    typedef CondType<cond_2, unsigned long,    type_1>::type type_2;
+    typedef CondType<cond_3, long,             type_2>::type type_3;
+    typedef CondType<cond_4, unsigned,         type_3>::type type_4;
+    typedef CondType<cond_5, int,              type_4>::type type_5;
+    TIGHTDB_STATIC_ASSERT(!(SameType<type_5, void>::value), "Failed to promote `wchar_t`");
+public:
+    typedef type_5 type;
+};
+template<> struct Promote<short> {
+    typedef int type;
+};
+template<> struct Promote<unsigned short> {
+private:
+    static const bool cond = unsigned(USHRT_MAX) <= unsigned(INT_MAX);
+public:
+    typedef CondType<cond, int, unsigned>::type type;
+};
+template<> struct Promote<int> { typedef int type; };
+template<> struct Promote<unsigned> { typedef unsigned type; };
+template<> struct Promote<long> { typedef long type; };
+template<> struct Promote<unsigned long> { typedef unsigned long type; };
+template<> struct Promote<long long> { typedef long long type; };
+template<> struct Promote<unsigned long long> { typedef unsigned long long type; };
+template<> struct Promote<float> { typedef double type; };
+template<> struct Promote<double> { typedef double type; };
+template<> struct Promote<long double> { typedef long double type; };
 #endif // !TIGHTDB_HAVE_CXX11_DECLTYPE
 
 
@@ -131,14 +160,15 @@ template<class A, class B> struct ArithBinOpType { typedef decltype(A()+B()) typ
 #else // !TIGHTDB_HAVE_CXX11_DECLTYPE
 template<class A, class B> struct ArithBinOpType {
 private:
-    typedef typename IntegralPromote<A>::type A2;
-    typedef typename IntegralPromote<B>::type B2;
+    typedef typename Promote<A>::type A2;
+    typedef typename Promote<B>::type B2;
 
-    typedef typename CondType<UINT_MAX <= LONG_MAX, long, unsigned long>::type type_l_u;
+    typedef unsigned long long ullong;
+    typedef typename CondType<ullong(UINT_MAX) <= ullong(LONG_MAX), long, unsigned long>::type type_l_u;
     typedef typename CondType<EitherTypeIs<unsigned, A2, B2>::value, type_l_u, long>::type type_l;
 
-    typedef typename CondType<UINT_MAX <= LLONG_MAX, long long, unsigned long long>::type type_ll_u;
-    typedef typename CondType<ULONG_MAX <= LLONG_MAX, long long, unsigned long long>::type type_ll_ul;
+    typedef typename CondType<ullong(UINT_MAX) <= ullong(LLONG_MAX), long long, unsigned long long>::type type_ll_u;
+    typedef typename CondType<ullong(ULONG_MAX) <= ullong(LLONG_MAX), long long, unsigned long long>::type type_ll_ul;
     typedef typename CondType<EitherTypeIs<unsigned, A2, B2>::value, type_ll_u, long long>::type type_ll_1;
     typedef typename CondType<EitherTypeIs<unsigned long, A2, B2>::value, type_ll_ul, type_ll_1>::type type_ll;
 

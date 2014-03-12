@@ -31,12 +31,12 @@ namespace tightdb {
 namespace util {
 
 
-/// Perform integral promotion on the argument. This is useful for
-/// example when printing a number of arbitrary integer type to
-/// 'stdout', since it will converto character like types to regular
-/// integer types that will then be printed as numbers rather
+/// Perform integral or floating-point promotion on the argument. This
+/// is useful for example when printing a number of arbitrary numeric
+/// type to 'stdout', since it will converto character-like types to
+/// regular integer types that will then be printed as numbers rather
 /// characters.
-template<class T> typename IntegralPromote<T>::type int_promote(T value) TIGHTDB_NOEXCEPT;
+template<class T> typename Promote<T>::type promote(T value) TIGHTDB_NOEXCEPT;
 
 
 /// This function allows you to test for a negative value in any
@@ -219,9 +219,9 @@ template<class To, class From> To from_twos_compl(From twos_compl) TIGHTDB_NOEXC
 
 // Implementation:
 
-template<class T> inline typename IntegralPromote<T>::type int_promote(T value) TIGHTDB_NOEXCEPT
+template<class T> inline typename Promote<T>::type promote(T value) TIGHTDB_NOEXCEPT
 {
-    typedef typename IntegralPromote<T>::type promoted_type;
+    typedef typename Promote<T>::type promoted_type;
     promoted_type value_2 = promoted_type(value);
     return value_2;
 }

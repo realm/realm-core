@@ -569,7 +569,10 @@ EOF
             else
                 platform="9"
             fi
-            $android_ndk_home/build/tools/make-standalone-toolchain.sh --platform=android-$platform --install-dir=$temp_dir --arch=$target || exit 1
+            # Note that `make-standalone-toolchain.sh` is written for
+            # `bash` and must therefore be executed by `bash`.
+            make_toolchain="$android_ndk_home/build/tools/make-standalone-toolchain.sh"
+            bash "$make_toolchain" --platform="android-$platform" --install-dir="$temp_dir" --arch="$target" || exit 1
             export PATH="$temp_dir/bin:$OLDPATH"
             if [ "$target" = "arm" ]; then
                 android_prefix="arm"
