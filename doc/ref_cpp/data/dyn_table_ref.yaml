@@ -322,7 +322,8 @@ CATEGORIES :
       RETURN:
         TYPES  : StringData
         DESCR  : &g_dyn_table_get_column_name_return_descr
-                 The column name. An empty string if index is out of range.
+                 The column name. The behaviour is undefined
+                 if the column index is out of range.
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_get_column_name
         DESCR  :
