@@ -453,9 +453,9 @@ EOF
         $MAKE clean || exit 1
         if [ "$OS" = "Darwin" ]; then
             for x in $IPHONE_PLATFORMS; do
-                $MAKE -C "src/tightdb" BASE_DENOM="$x" clean || exit 1
+                $MAKE -C "src/tightdb" clean BASE_DENOM="$x" || exit 1
             done
-            $MAKE -C "src/tightdb" BASE_DENOM="ios" clean || exit 1
+            $MAKE -C "src/tightdb" clean BASE_DENOM="ios" || exit 1
             if [ -e "$IPHONE_DIR" ]; then
                 echo "Removing '$IPHONE_DIR'"
                 rm -fr "$IPHONE_DIR/include" || exit 1
@@ -466,7 +466,7 @@ EOF
         fi
         for x in $ANDROID_PLATFORMS; do
             denom="android-$x"
-            $MAKE -C "src/tightdb" BASE_DENOM="$denom" clean || exit 1
+            $MAKE -C "src/tightdb" clean BASE_DENOM="$denom" || exit 1
         done
         if [ -e "$ANDROID_DIR" ];then
             echo "Removing '$ANDROID_DIR'"
@@ -594,7 +594,7 @@ EOF
             denom="android-$target"
             $MAKE -C "src/tightdb" "libtightdb-$denom.a" BASE_DENOM="$denom" CFLAGS_ARCH="$extra_cflags" || exit 1
             cp "src/tightdb/libtightdb-$denom.a" "$ANDROID_DIR" || exit 1
-            rm -rf $temp_dir
+            rm -rf "$temp_dir"
         done
         PATH="$OLDPATH"
         echo "Copying headers to '$ANDROID_DIR/include'"
