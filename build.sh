@@ -585,7 +585,7 @@ EOF
             fi
             export CXX="$(cd "$temp_dir/bin" && echo $android_prefix-linux-*-gcc)"
             export AR="$(cd "$temp_dir/bin" && echo $android_prefix-linux-*-ar)"
-            extra_cflags="-DANDROID -D_POSIX_THREAD_PROCESS_SHARED -fPIC -DPIC -Os"
+            extra_cflags="-DANDROID -fPIC -DPIC -Os"
             if [ "$target" = "arm" ]; then
                 extra_cflags="$extra_cflags -mthumb"
             elif [ "$target" = "arm-v7a" ]; then
