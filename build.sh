@@ -453,9 +453,9 @@ EOF
         $MAKE clean || exit 1
         if [ "$OS" = "Darwin" ]; then
             for x in $IPHONE_PLATFORMS; do
-                $MAKE -C "src/tightdb" BASE_DENOM="$x" clean || exit 1
+                $MAKE -C "src/tightdb" clean BASE_DENOM="$x" || exit 1
             done
-            $MAKE -C "src/tightdb" BASE_DENOM="ios" clean || exit 1
+            $MAKE -C "src/tightdb" clean BASE_DENOM="ios" || exit 1
             if [ -e "$IPHONE_DIR" ]; then
                 echo "Removing '$IPHONE_DIR'"
                 rm -fr "$IPHONE_DIR/include" || exit 1
@@ -466,7 +466,7 @@ EOF
         fi
         for x in $ANDROID_PLATFORMS; do
             denom="android-$x"
-            $MAKE -C "src/tightdb" BASE_DENOM="$denom" clean || exit 1
+            $MAKE -C "src/tightdb" clean BASE_DENOM="$denom" || exit 1
         done
         if [ -e "$ANDROID_DIR" ];then
             echo "Removing '$ANDROID_DIR'"
@@ -569,7 +569,10 @@ EOF
             else
                 platform="9"
             fi
-            $android_ndk_home/build/tools/make-standalone-toolchain.sh --platform=android-$platform --install-dir=$temp_dir --arch=$target || exit 1
+            # Note that `make-standalone-toolchain.sh` is written for
+            # `bash` and must therefore be executed by `bash`.
+            make_toolchain="$android_ndk_home/build/tools/make-standalone-toolchain.sh"
+            bash "$make_toolchain" --platform="android-$platform" --install-dir="$temp_dir" --arch="$target" || exit 1
             export PATH="$temp_dir/bin:$OLDPATH"
             if [ "$target" = "arm" ]; then
                 android_prefix="arm"
@@ -582,7 +585,7 @@ EOF
             fi
             export CXX="$(cd "$temp_dir/bin" && echo $android_prefix-linux-*-gcc)"
             export AR="$(cd "$temp_dir/bin" && echo $android_prefix-linux-*-ar)"
-            extra_cflags="-DANDROID -D_POSIX_THREAD_PROCESS_SHARED -fPIC -DPIC -Os"
+            extra_cflags="-DANDROID -fPIC -DPIC -Os"
             if [ "$target" = "arm" ]; then
                 extra_cflags="$extra_cflags -mthumb"
             elif [ "$target" = "arm-v7a" ]; then
@@ -591,7 +594,7 @@ EOF
             denom="android-$target"
             $MAKE -C "src/tightdb" "libtightdb-$denom.a" BASE_DENOM="$denom" CFLAGS_ARCH="$extra_cflags" || exit 1
             cp "src/tightdb/libtightdb-$denom.a" "$ANDROID_DIR" || exit 1
-            rm -rf $temp_dir
+            rm -rf "$temp_dir"
         done
         PATH="$OLDPATH"
         echo "Copying headers to '$ANDROID_DIR/include'"
