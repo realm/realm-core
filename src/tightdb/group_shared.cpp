@@ -58,7 +58,11 @@ const int max_wait_for_daemon_start = 100;
 // reference to a newer one.
 
 // Atomically double increment a counter if it is even, returns true
-// if succesfull
+// if succesfull. This is (somewhat non-intuitively) implemented by
+// optimistically incrementing the counter, then checking if it is even
+// and potentially reversing the increment if it was odd. This approach
+// allow us to use fetch_add_acquire which has *very* fast implementation
+// on some architectures.
 template<typename T> bool atomic_double_inc_if_even(Atomic<T>& counter)
 {
     T oldval = counter.fetch_add_acquire(2);
@@ -77,6 +81,7 @@ template<typename T> inline T atomic_double_dec(Atomic<T>& counter)
 
 // Atomically set a counter to one, if it is 0.
 // true if succesfull.
+// Same "optimistic" approach as described for atomic_double_inc_if_even
 template<typename T> bool atomic_one_if_zero(Atomic<T>& counter)
 {
     T old_val = counter.fetch_add_acquire(1);
@@ -104,24 +109,16 @@ public:
     // as part of write transactions, where mutual exclusion is assured by the
     // write mutex.
     struct ReadCount {
-        uint64_t version;
-        uint64_t filesize;
-        uint64_t current_top;
+        uint_fast64_t version;
+        uint_fast64_t filesize;
+        uint_fast64_t current_top;
         // The count field acts as synchronization point for accesses to the above
         // fields. A succesfull inc implies acquire wrt memory consistency. 
         // Release is triggered by explicitly storing into count whenever a 
         // new entry has been initialized.
-        mutable Atomic<uint32_t> count;
-        uint32_t next;
+        mutable Atomic<uint_fast32_t> count;
+        uint_fast32_t next;
     };
-
-    // number of entries. Access synchronized through put_pos.
-    uint32_t entries;
-    Atomic<uint32_t> put_pos; // only changed under lock, but accessed outside lock
-    uint32_t old_pos; // only accessed during write transactions and under lock
-
-    const static int init_readers_size = 32;
-    ReadCount data[init_readers_size];
 
     Ringbuffer()
     {
@@ -136,12 +133,12 @@ public:
         old_pos = 0;
         data[ 0 ].count.store_relaxed( 0 );
         data[ init_readers_size-1 ].next = 0 ;
-        put_pos.store_release( (uint32_t)0);
+        put_pos.store_release( static_cast<uint_fast32_t>(0));
     }
 
     void dump() 
     {
-        uint32_t i = old_pos;
+        uint_fast32_t i = old_pos;
         cout << "--- " << endl;
          while (i != put_pos.load_relaxed()) {
             cout << "  used " << i << " : " 
@@ -165,12 +162,12 @@ public:
         cout << "--- Done" << endl;
     }
 
-    void expand_to(uint32_t new_entries)
+    void expand_to(uint_fast32_t new_entries)
     {
         // cout << "expanding to " << new_entries << endl;
         // dump();
-        for (uint32_t i = entries; i < new_entries; i++) {
-            data[i].version = 0;
+        for (uint_fast32_t i = entries; i < new_entries; i++) {
+            data[i].version = 1;
             data[i].count.store_relaxed( 1 );
             data[i].current_top = 0;
             data[i].filesize = 0;
@@ -182,54 +179,65 @@ public:
         // dump();
     }
 
-    static size_t compute_required_space(uint32_t num_entries) { 
+    static size_t compute_required_space(uint_fast32_t num_entries) 
+    { 
         // get space required for given number of entries beyond the initial count.
         // NB: this not the size of the ringbuffer, it is the size minus whatever was
         // the initial size.
         return sizeof(ReadCount) * (num_entries - init_readers_size);
     }
 
-    uint32_t get_num_entries() const {
+    uint_fast32_t get_num_entries() const 
+    {
         return entries;
     }
 
-    uint32_t last() const {
+    uint_fast32_t last() const 
+    {
         return put_pos.load_acquire();
     }
 
-    const ReadCount& get(uint32_t idx) const {
+    const ReadCount& get(uint_fast32_t idx) const 
+    {
         return data[idx];
     }
 
-    const ReadCount& get_last() const {
+    const ReadCount& get_last() const 
+    {
         return get(last());
     }
 
-    const ReadCount& get_oldest() const {
+    const ReadCount& get_oldest() const 
+    {
         return get(old_pos);
     }
 
-    bool is_full() const {
-        uint32_t idx = get(last()).next;
+    bool is_full() const 
+    {
+        uint_fast32_t idx = get(last()).next;
         return idx == old_pos;
     }
 
-    uint32_t next() const { // do not call this if the buffer is full!
-        uint32_t idx = get(last()).next;
+    uint_fast32_t next() const 
+    { // do not call this if the buffer is full!
+        uint_fast32_t idx = get(last()).next;
         return idx;
     }
 
-    ReadCount& get_next() {
+    ReadCount& get_next() 
+    {
         TIGHTDB_ASSERT(!is_full());
         return data[ next() ];
     }
 
-    void use_next() {
+    void use_next() 
+    {
         get_next().count.store_release(0);
         put_pos.store_release(next());
     }
 
-    void cleanup() { // invariant: entry held by put_pos has count > 1.
+    void cleanup() 
+    {   // invariant: entry held by put_pos has count > 1.
         // cout << "cleanup: from " << old_pos << " to " << put_pos.load_relaxed();
         // dump();
         while (old_pos != put_pos.load_relaxed()) {
@@ -239,9 +247,27 @@ public:
             old_pos = get(old_pos).next;
         }
     }
+
+private:
+    // number of entries. Access synchronized through put_pos.
+    uint_fast32_t entries;
+    Atomic<uint_fast32_t> put_pos; // only changed under lock, but accessed outside lock
+    uint_fast32_t old_pos; // only accessed during write transactions and under lock
+
+    const static int init_readers_size = 32;
+
+    // IMPORTANT: The actual data comprising the linked list MUST BE PLACED LAST in
+    // the RingBuffer structure, as the linked list area is extended at run time.
+    // Similarly, the RingBuffer must be the final element of the SharedInfo structure.
+    // IMPORTANT II:
+    // To ensure proper alignment across all platforms, the SharedInfo structure
+    // should NOT have a stricter alignment requirement than the ReadCount structure.
+    ReadCount data[init_readers_size];
+
 };
 
-struct SharedGroup::SharedInfo {
+struct SharedGroup::SharedInfo 
+{
 
     Atomic<uint16_t> init_complete; // indicates lock file has valid content
     Atomic<uint16_t> shutdown_started; // indicates that shutdown is in progress
@@ -256,10 +282,11 @@ struct SharedGroup::SharedInfo {
     CondVar work_to_do;
 #endif
     uint16_t free_write_slots;
+    // IMPORTANT: The ringbuffer MUST be the last field in SharedInfo - see above.
     Ringbuffer readers;
     SharedInfo(ref_type top_ref, size_t file_size, DurabilityLevel);
     ~SharedInfo() TIGHTDB_NOEXCEPT {}
-    uint64_t get_current_version_unchecked() const {
+    uint_fast64_t get_current_version_unchecked() const {
         return readers.get_last().version;
     }
 };
@@ -388,7 +415,7 @@ void spawn_daemon(const string& file) {}
 #endif
 
 
-inline void micro_sleep(uint64_t microsec_delay)
+inline void micro_sleep(uint_fast64_t microsec_delay)
 {
 #ifdef _WIN32
     // FIXME: this is not optimal, but it should work
@@ -742,8 +769,8 @@ void SharedGroup::do_async_commits()
     // processes that that they can start commiting to the db.
     begin_read();
     // we must treat version and version_index the same way:
-    uint64_t last_version = m_version;
-    uint32_t last_version_index = m_reader_idx;
+    uint_fast64_t last_version = m_version;
+    uint_fast32_t last_version_index = m_reader_idx;
 
     info->free_write_slots = max_write_slots;
     info->init_complete.store_release(2); // allow waiting clients to proceed
@@ -795,8 +822,8 @@ void SharedGroup::do_async_commits()
             }
             begin_read();
 
-            uint64_t current_version = m_version;
-            uint32_t current_version_index = m_reader_idx;
+            uint_fast64_t current_version = m_version;
+            uint_fast32_t current_version_index = m_reader_idx;
             size_t current_top_ref = m_group.m_top.get_ref();
 #ifdef TIGHTDB_ENABLE_LOGFILE
             cerr << "(version " << m_version << " from "
@@ -879,7 +906,7 @@ const Group& SharedGroup::begin_read()
 
     ref_type new_top_ref = 0;
     size_t new_file_size = 0;
-    uint64_t old_version = m_version;
+    uint_fast64_t old_version = m_version;
 
     {
         // SharedInfo* info = m_file_map.get_addr();
@@ -1006,7 +1033,7 @@ void SharedGroup::commit()
     // rethrown, because the commit was effectively successful.
 
     {
-        uint64_t new_version;
+        uint_fast64_t new_version;
 #ifdef TIGHTDB_ENABLE_REPLICATION
         // It is essential that if Replicatin::commit_write_transact()
         // fails, then the transaction is not completed. A subsequent call
@@ -1073,42 +1100,11 @@ void SharedGroup::rollback() TIGHTDB_NOEXCEPT
     }
 }
 
-#if 0
-void SharedGroup::zero_free_space()
-{
-    SharedInfo* info = m_file_map.get_addr();
-
-    // Get version info
-    uint64_t current_version;
-    size_t readlock_version;
-    size_t file_size;
-
-    {
-        uint32_t count = wait_for_lock(info->last_reader.count);
-        current_version = info->current_version.load_relaxed() + 1;
-        file_size = to_size_t(info->filesize);
-
-        if (ringbuf_is_empty()) {
-            if (count)
-                readlock_version = info->last_reader.version;
-            else
-                readlock_version = current_version;//FIXME:vs2012 32bit warning  warning C4244: '=' : conversion from 'uint64_t' to 'size_t', possible loss of data
-        }
-        else {
-            const ReadCount& r = ringbuf_get_first();
-            readlock_version = r.version;//FIXME:vs2012 32bit warning C4244: '=' : conversion from 'const uint64_t' to 'size_t', possible loss of data
-        }
-        release_locked(info->last_reader.count, count);
-    }
-
-    m_group.zero_free_space(file_size, readlock_version);
-}
-#endif
 
 
 // given an index (which the caller wants to used to index the ringbuffer), verify
 // that the given entry is within the memory mapped. If not, remap it!
-bool SharedGroup::grow_reader_mapping(uint32_t index)
+bool SharedGroup::grow_reader_mapping(uint_fast32_t index)
 {
     if (index >= m_local_max_entry) {
 
@@ -1124,7 +1120,7 @@ bool SharedGroup::grow_reader_mapping(uint32_t index)
         return false;
 }
 
-uint64_t SharedGroup::get_current_version()
+uint_fast64_t SharedGroup::get_current_version()
 {
     // As get_current_version may be called outside of the write mutex, another
     // thread may be performing changes to the ringbuffer concurrently. It may
@@ -1132,7 +1128,7 @@ uint64_t SharedGroup::get_current_version()
     // to protect the entry by temporarily incrementing the reader ref count until
     // we've got a safe reading of the version number.
     while (1) {
-        uint32_t index;
+        uint_fast32_t index;
         SharedInfo* r_info;
         do {
             // make sure that the index we are about to dereference falls within
@@ -1149,17 +1145,17 @@ uint64_t SharedGroup::get_current_version()
 
             continue;
         }
-        uint64_t version = r.version;
+        uint_fast64_t version = r.version;
         // release the entry again:
         atomic_double_dec(r.count);
         return version;
     }
 }
 
-void SharedGroup::low_level_commit(uint64_t new_version)
+void SharedGroup::low_level_commit(uint_fast64_t new_version)
 {
     SharedInfo* info = m_file_map.get_addr();
-    uint64_t readlock_version;
+    uint_fast64_t readlock_version;
     {
         SharedInfo* r_info = m_reader_map.get_addr();
         r_info->readers.cleanup();
@@ -1191,7 +1187,7 @@ void SharedGroup::low_level_commit(uint64_t new_version)
         SharedInfo* r_info = m_reader_map.get_addr();
         if (r_info->readers.is_full()) {
             // buffer expansion
-            uint32_t entries = r_info->readers.get_num_entries();
+            uint_fast32_t entries = r_info->readers.get_num_entries();
             entries = entries + 32;
             size_t new_info_size = sizeof(SharedInfo) + r_info->readers.compute_required_space( entries );
             // cout << "resizing: " << entries << " = " << new_info_size << endl;
