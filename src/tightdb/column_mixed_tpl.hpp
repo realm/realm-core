@@ -321,7 +321,7 @@ inline void ColumnMixed::insert_string(std::size_t ndx, StringData value)
 {
     TIGHTDB_ASSERT(ndx <= m_types->size());
     detach_subtable_accessors();
-    init_data_column();
+    init_binary_data_column();
 
     std::size_t data_ndx = m_binary_data->size();
     m_binary_data->add_string(value);
@@ -337,7 +337,7 @@ inline void ColumnMixed::insert_binary(std::size_t ndx, BinaryData value)
 {
     TIGHTDB_ASSERT(ndx <= m_types->size());
     detach_subtable_accessors();
-    init_data_column();
+    init_binary_data_column();
 
     std::size_t data_ndx = m_binary_data->size();
     m_binary_data->add(value);

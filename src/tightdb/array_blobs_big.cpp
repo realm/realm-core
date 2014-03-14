@@ -116,7 +116,9 @@ ref_type ArrayBigBlobs::bptree_leaf_insert(size_t ndx, BinaryData value, bool ad
     }
 
     // Split leaf node
-    ArrayBigBlobs new_leaf(0, 0, get_alloc());
+    ArrayParent* parent = 0;
+    size_t ndx_in_parent = 0;
+    ArrayBigBlobs new_leaf(parent, ndx_in_parent, get_alloc());
     if (ndx == leaf_size) {
         new_leaf.add(value, add_zero_term);
         state.m_split_offset = ndx;
@@ -126,7 +128,7 @@ ref_type ArrayBigBlobs::bptree_leaf_insert(size_t ndx, BinaryData value, bool ad
             ref_type blob_ref = Array::get_as_ref(i);
             new_leaf.Array::add(blob_ref);
         }
-        truncate(ndx);
+        Array::truncate(ndx); // Avoiding destruction of transferred blobs
         add(value, add_zero_term);
         state.m_split_offset = ndx + 1;
     }
@@ -136,6 +138,18 @@ ref_type ArrayBigBlobs::bptree_leaf_insert(size_t ndx, BinaryData value, bool ad
 
 
 #ifdef TIGHTDB_DEBUG
+
+void ArrayBigBlobs::Verify() const
+{
+    TIGHTDB_ASSERT(has_refs());
+    for (size_t i = 0; i < size(); ++i) {
+        ref_type blob_ref = Array::get_as_ref(i);
+        ArrayParent* parent = 0;
+        size_t ndx_in_parent = 0;
+        ArrayBlob blob(blob_ref, parent, ndx_in_parent, get_alloc());
+        blob.Verify();
+    }
+}
 
 void ArrayBigBlobs::to_dot(std::ostream& out, bool, StringData title) const
 {
@@ -151,7 +165,7 @@ void ArrayBigBlobs::to_dot(std::ostream& out, bool, StringData title) const
 
     for (size_t i = 0; i < size(); ++i) {
         ref_type blob_ref = Array::get_as_ref(i);
-        ArrayBlob blob(blob_ref, (ArrayParent*)this, i, get_alloc());
+        ArrayBlob blob(blob_ref, const_cast<ArrayBigBlobs*>(this), i, get_alloc());
         blob.to_dot(out);
     }
 

@@ -338,21 +338,206 @@ TEST(Table_Delete)
 }
 
 
+TEST(Table_GetName)
+{
+    // Freestanding tables have no names
+    {
+        Table table;
+        CHECK_EQUAL("", table.get_name());
+    }
+    // ... regardless of how they are created
+    {
+        TableRef table = Table::create();
+        CHECK_EQUAL("", table->get_name());
+    }
+
+    // Direct members of groups do have names
+    {
+        Group group;
+        TableRef table = group.get_table("table");
+        CHECK_EQUAL("table", table->get_name());
+    }
+    {
+        Group group;
+        TableRef foo = group.get_table("foo");
+        TableRef bar = group.get_table("bar");
+        CHECK_EQUAL("foo", foo->get_name());
+        CHECK_EQUAL("bar", bar->get_name());
+    }
+
+    // Subtables should never have names
+    {
+        Table table;
+        DescriptorRef subdesc;
+        table.add_column(type_Table, "sub", &subdesc);
+        table.add_empty_row();
+        TableRef subtab = table.get_subtable(0,0);
+        CHECK_EQUAL("", table.get_name());
+        CHECK_EQUAL("", subtab->get_name());
+    }
+    // ... not even when the parent is a member of a group
+    {
+        Group group;
+        TableRef table = group.get_table("table");
+        DescriptorRef subdesc;
+        table->add_column(type_Table, "sub", &subdesc);
+        table->add_empty_row();
+        TableRef subtab = table->get_subtable(0,0);
+        CHECK_EQUAL("table", table->get_name());
+        CHECK_EQUAL("", subtab->get_name());
+    }
+}
+
+
+namespace {
+
+void setup_multi_table(Table& table, size_t rows, size_t sub_rows,
+                       bool fixed_subtab_sizes = false)
+{
+    // Create table with all column types
+    {
+        DescriptorRef sub1;
+        table.add_column(type_Int,      "int");              //  0
+        table.add_column(type_Bool,     "bool");             //  1
+        table.add_column(type_DateTime, "date");             //  2
+        table.add_column(type_Float,    "float");            //  3
+        table.add_column(type_Double,   "double");           //  4
+        table.add_column(type_String,   "string");           //  5
+        table.add_column(type_String,   "string_long");      //  6
+        table.add_column(type_String,   "string_big_blobs"); //  7
+        table.add_column(type_String,   "string_enum");      //  8 - becomes ColumnStringEnum
+        table.add_column(type_Binary,   "binary");           //  9
+        table.add_column(type_Table,    "tables", &sub1);    // 10
+        table.add_column(type_Mixed,    "mixed");            // 11
+        sub1->add_column(type_Int,        "sub_first");
+        sub1->add_column(type_String,     "sub_second");
+    }
+
+    table.add_empty_row(rows);
+
+    // Add some rows
+    for (size_t i = 0; i < rows; ++i) {
+        int64_t sign = (i%2 == 0) ? 1 : -1;
+        table.set_int(0, i, int64_t(i*sign));
+    }
+    for (size_t i = 0; i < rows; ++i)
+        table.set_bool(1, i, (i % 2 ? true : false));
+    for (size_t i = 0; i < rows; ++i)
+        table.set_datetime(2, i, 12345);
+    for (size_t i = 0; i < rows; ++i) {
+        int64_t sign = (i%2 == 0) ? 1 : -1;
+        table.set_float(3, i, 123.456f*sign);
+    }
+    for (size_t i = 0; i < rows; ++i) {
+        int64_t sign = (i%2 == 0) ? 1 : -1;
+        table.set_double(4, i, 9876.54321*sign);
+    }
+    vector<string> strings;
+    for (size_t i = 0; i < rows; ++i) {
+        stringstream out;
+        out << "string" << i;
+        strings.push_back(out.str());
+    }
+    for (size_t i = 0; i < rows; ++i)
+        table.set_string(5, i, strings[i]);
+    for (size_t i = 0; i < rows; ++i)
+        table.set_string(6, i, strings[i] + " very long string.........");
+    for (size_t i = 0; i < rows; ++i) {
+        switch (i % 2) {
+            case 0: {
+                string s = strings[i];
+                s += " very long string.........";
+                for (int j = 0; j != 4; ++j)
+                    s += " big blobs big blobs big blobs"; // +30
+                table.set_string(7, i, s);
+                break;
+            }
+            case 1:
+                table.set_string(7, i, "");
+                break;
+        }
+    }
+    for (size_t i = 0; i < rows; ++i) {
+        switch (i % 3) {
+            case 0:
+                table.set_string(8, i, "enum1");
+                break;
+            case 1:
+                table.set_string(8, i, "enum2");
+                break;
+            case 2:
+                table.set_string(8, i, "enum3");
+                break;
+        }
+    }
+    for (size_t i = 0; i < rows; ++i)
+        table.set_binary(9, i, BinaryData("binary", 7));
+    for (size_t i = 0; i < rows; ++i) {
+        int64_t sign = (i%2 == 0) ? 1 : -1;
+        size_t n = sub_rows;
+        if (!fixed_subtab_sizes)
+            n += i;
+        for (size_t j = 0; j != n; ++j) {
+            TableRef subtable = table.get_subtable(10, i);
+            int64_t val = -123+i*j*1234*sign;
+            subtable->insert_int(0, j, val);
+            subtable->insert_string(1, j, "sub");
+            subtable->insert_done();
+        }
+    }
+    for (size_t i = 0; i < rows; ++i) {
+        int64_t sign = (i%2 == 0) ? 1 : -1;
+        switch (i % 8) {
+            case 0:
+                table.set_mixed(11, i, false);
+                break;
+            case 1:
+                table.set_mixed(11, i, int64_t(i*i*sign));
+                break;
+            case 2:
+                table.set_mixed(11, i, "string");
+                break;
+            case 3:
+                table.set_mixed(11, i, DateTime(123456789));
+                break;
+            case 4:
+                table.set_mixed(11, i, BinaryData("binary", 7));
+                break;
+            case 5: {
+                // Add subtable to mixed column
+                // We can first set schema and contents when the entire
+                // row has been inserted
+                table.set_mixed(11, i, Mixed::subtable_tag());
+                TableRef subtable = table.get_subtable(11, i);
+                subtable->add_column(type_Int,    "first");
+                subtable->add_column(type_String, "second");
+                for (size_t j = 0; j != 2; ++j) {
+                    subtable->insert_int(0, j, i*i*j*sign);
+                    subtable->insert_string(1, j, "mixed sub");
+                    subtable->insert_done();
+                }
+                break;
+            }
+            case 6:
+                table.set_mixed(11, i, float(123.1*i*sign));
+                break;
+            case 7:
+                table.set_mixed(11, i, double(987.65*i*sign));
+                break;
+        }
+    }
+
+    // We also want a ColumnStringEnum
+    table.optimize();
+}
+
+} // anonymous namespace
+
+
 TEST(Table_LowLevelCopy)
 {
     Table table;
-    table.add_column(type_Int, "i1");
-    table.add_column(type_Int, "i2");
-    table.add_column(type_Int, "xxxxxxxxxxxxxxxxxxxxxxx");
-
-    table.insert_int(0, 0, 10);
-    table.insert_int(1, 0, 120);
-    table.insert_int(2, 0, 1230);
-    table.insert_done();
-    table.insert_int(0, 1, 12);
-    table.insert_int(1, 1, 100);
-    table.insert_int(2, 1, 1300);
-    table.insert_done();
+    setup_multi_table(table, 15, 2);
 
 #ifdef TIGHTDB_DEBUG
     table.Verify();
@@ -402,121 +587,6 @@ TEST(Table_HighLevelCopy)
 
     CHECK(*table3 == table);
 }
-
-
-namespace {
-
-void setup_multi_table(Table& table, size_t rows, size_t sub_rows)
-{
-    // Create table with all column types
-    {
-        DescriptorRef sub1;
-        table.add_column(type_Int,      "int");
-        table.add_column(type_Bool,     "bool");
-        table.add_column(type_DateTime, "date");
-        table.add_column(type_Float,    "float");
-        table.add_column(type_Double,   "double");
-        table.add_column(type_String,   "string");
-        table.add_column(type_String,   "string_long");
-        table.add_column(type_String,   "string_enum"); // becomes ColumnStringEnum
-        table.add_column(type_Binary,   "binary");
-        table.add_column(type_Mixed,    "mixed");
-        table.add_column(type_Table,    "tables", &sub1);
-        sub1->add_column(type_Int,        "sub_first");
-        sub1->add_column(type_String,     "sub_second");
-    }
-
-    // Add some rows
-    for (size_t i = 0; i < rows; ++i) {
-        int64_t sign = (i%2 == 0) ? 1 : -1;
-        table.insert_int(0, i, int64_t(i*sign));
-        table.insert_bool(1, i, (i % 2 ? true : false));
-        table.insert_datetime(2, i, 12345);
-        table.insert_float(3, i, 123.456f*sign);
-        table.insert_double(4, i, 9876.54321*sign);
-
-        stringstream ss;
-        ss << "string" << i;
-        table.insert_string(5, i, ss.str().c_str());
-
-        ss << " very long string.........";
-        table.insert_string(6, i, ss.str().c_str());
-
-        switch (i % 3) {
-            case 0:
-                table.insert_string(7, i, "enum1");
-                break;
-            case 1:
-                table.insert_string(7, i, "enum2");
-                break;
-            case 2:
-                table.insert_string(7, i, "enum3");
-                break;
-        }
-
-        table.insert_binary(8, i, BinaryData("binary", 7));
-
-        switch (i % 8) {
-            case 0:
-                table.insert_mixed(9, i, false);
-                break;
-            case 1:
-                table.insert_mixed(9, i, int64_t(i*i*sign));
-                break;
-            case 2:
-                table.insert_mixed(9, i, "string");
-                break;
-            case 3:
-                table.insert_mixed(9, i, DateTime(123456789));
-                break;
-            case 4:
-                table.insert_mixed(9, i, BinaryData("binary", 7));
-                break;
-            case 5:
-            {
-                // Add subtable to mixed column
-                // We can first set schema and contents when the entire
-                // row has been inserted
-                table.insert_mixed(9, i, Mixed::subtable_tag());
-                break;
-            }
-            case 6:
-                table.insert_mixed(9, i, float(123.1*i*sign));
-                break;
-            case 7:
-                table.insert_mixed(9, i, double(987.65*i*sign));
-                break;
-        }
-
-        table.insert_subtable(10, i);
-        table.insert_done();
-
-        // Add subtable to mixed column
-        if (i % 8 == 5) {
-            TableRef subtable = table.get_subtable(9, i);
-            subtable->add_column(type_Int,    "first");
-            subtable->add_column(type_String, "second");
-            for (size_t j=0; j<2; j++) {
-                subtable->insert_int(0, j, i*i*j*sign);
-                subtable->insert_string(1, j, "mixed sub");
-                subtable->insert_done();
-            }
-        }
-
-        // Add sub-tables to table column
-        for (size_t j = 0; j != sub_rows+i; ++j) {
-            TableRef subtable = table.get_subtable(10, i);
-            int64_t val = -123+i*j*1234*sign;
-            subtable->insert_int(0, j, val);
-            subtable->insert_string(1, j, "sub");
-            subtable->insert_done();
-        }
-    }
-    // We also want a ColumnStringEnum
-    table.optimize();
-}
-
-} // anonymous namespace
 
 
 TEST(Table_Delete_All_Types)
@@ -732,7 +802,7 @@ TEST(Table_range_const)
     ConstTableView tv = ctable->get_range_view(10, 20);
     CHECK_EQUAL(10, tv.size());
     for (size_t i = 0; i<tv.size(); ++i)
-        CHECK_EQUAL(i+10, tv.get_int(0, i));
+        CHECK_EQUAL(int64_t(i+10), tv.get_int(0, i));
 }
 
 
@@ -2878,5 +2948,211 @@ TEST(Table_pivot)
         table.optimize();
     }
 }
+
+
+namespace {
+
+void compare_table_with_slice(const Table& table, const Table& slice, size_t offset, size_t size)
+{
+    ConstDescriptorRef table_desc = table.get_descriptor();
+    ConstDescriptorRef slice_desc = slice.get_descriptor();
+    CHECK(*table_desc == *slice_desc);
+    if (*table_desc != *slice_desc)
+        return;
+
+    size_t num_cols = table.get_column_count();
+    for (size_t col_i = 0; col_i != num_cols; ++col_i) {
+        DataType type = table.get_column_type(col_i);
+        switch (type) {
+            case type_Int:
+                for (size_t i = 0; i != size; ++i) {
+                    int_fast64_t v_1 = table.get_int(col_i, offset + i);
+                    int_fast64_t v_2 = slice.get_int(col_i, i);
+                    CHECK_EQUAL(v_1, v_2);
+                }
+                break;
+            case type_Bool:
+                for (size_t i = 0; i != size; ++i) {
+                    bool v_1 = table.get_bool(col_i, offset + i);
+                    bool v_2 = slice.get_bool(col_i, i);
+                    CHECK_EQUAL(v_1, v_2);
+                }
+                break;
+            case type_Float:
+                for (size_t i = 0; i != size; ++i) {
+                    float v_1 = table.get_float(col_i, offset + i);
+                    float v_2 = slice.get_float(col_i, i);
+                    CHECK_EQUAL(v_1, v_2);
+                }
+                break;
+            case type_Double:
+                for (size_t i = 0; i != size; ++i) {
+                    double v_1 = table.get_double(col_i, offset + i);
+                    double v_2 = slice.get_double(col_i, i);
+                    CHECK_EQUAL(v_1, v_2);
+                }
+                break;
+            case type_String:
+                for (size_t i = 0; i != size; ++i) {
+                    StringData v_1 = table.get_string(col_i, offset + i);
+                    StringData v_2 = slice.get_string(col_i, i);
+                    CHECK_EQUAL(v_1, v_2);
+                }
+                break;
+            case type_Binary:
+                for (size_t i = 0; i != size; ++i) {
+                    BinaryData v_1 = table.get_binary(col_i, offset + i);
+                    BinaryData v_2 = slice.get_binary(col_i, i);
+                    CHECK_EQUAL(v_1, v_2);
+                }
+                break;
+            case type_DateTime:
+                for (size_t i = 0; i != size; ++i) {
+                    DateTime v_1 = table.get_datetime(col_i, offset + i);
+                    DateTime v_2 = slice.get_datetime(col_i, i);
+                    CHECK_EQUAL(v_1, v_2);
+                }
+                break;
+            case type_Table:
+                for (size_t i = 0; i != size; ++i) {
+                    ConstTableRef t_1 = table.get_subtable(col_i, offset + i);
+                    ConstTableRef t_2 = slice.get_subtable(col_i, i);
+                    CHECK(*t_1 == *t_2);
+                }
+                break;
+            case type_Mixed:
+                for (size_t i = 0; i != size; ++i) {
+                    Mixed v_1 = table.get_mixed(col_i, offset + i);
+                    Mixed v_2 = slice.get_mixed(col_i, i);
+                    CHECK_EQUAL(v_1.get_type(), v_2.get_type());
+                    if (v_1.get_type() == v_2.get_type()) {
+                        switch (v_1.get_type()) {
+                            case type_Int:
+                                CHECK_EQUAL(v_1.get_int(), v_2.get_int());
+                                break;
+                            case type_Bool:
+                                CHECK_EQUAL(v_1.get_bool(), v_2.get_bool());
+                                break;
+                            case type_Float:
+                                CHECK_EQUAL(v_1.get_float(), v_2.get_float());
+                                break;
+                            case type_Double:
+                                CHECK_EQUAL(v_1.get_double(), v_2.get_double());
+                                break;
+                            case type_String:
+                                CHECK_EQUAL(v_1.get_string(), v_2.get_string());
+                                break;
+                            case type_Binary:
+                                CHECK_EQUAL(v_1.get_binary(), v_2.get_binary());
+                                break;
+                            case type_DateTime:
+                                CHECK_EQUAL(v_1.get_datetime(), v_2.get_datetime());
+                                break;
+                            case type_Table: {
+                                ConstTableRef t_1 = table.get_subtable(col_i, offset + i);
+                                ConstTableRef t_2 = slice.get_subtable(col_i, i);
+                                CHECK(*t_1 == *t_2);
+                                break;
+                            }
+                            case type_Mixed:
+                                TIGHTDB_ASSERT(false);
+                        }
+                    }
+                }
+                break;
+        }
+    }
+}
+
+
+void test_write_slice_name(const Table& table, StringData expect_name, bool override_name)
+{
+    size_t offset = 0, size = 0;
+    ostringstream out;
+    if (override_name) {
+        table.write(out, offset, size, expect_name);
+    }
+    else {
+        table.write(out, offset, size);
+    }
+    string str = out.str();
+    BinaryData buffer(str.data(), str.size());
+    bool take_ownership = false;
+    Group group(buffer, take_ownership);
+    TableRef slice = group.get_table(expect_name);
+    CHECK(slice);
+}
+
+void test_write_slice_contents(const Table& table, size_t offset, size_t size)
+{
+    ostringstream out;
+    table.write(out, offset, size);
+    string str = out.str();
+    BinaryData buffer(str.data(), str.size());
+    bool take_ownership = false;
+    Group group(buffer, take_ownership);
+    TableRef slice = group.get_table("test");
+    CHECK(slice);
+    if (slice) {
+        size_t remaining_size = table.size() - offset;
+        size_t size_2 = size;
+        if (size_2 > remaining_size)
+            size_2 = remaining_size;
+        CHECK_EQUAL(size_2, slice->size());
+        if (size_2 == slice->size())
+            compare_table_with_slice(table, *slice, offset, size_2);
+    }
+}
+
+} // namespace
+
+TEST(Table_WriteSlice)
+{
+    // check that the name of the written table is as expected
+    {
+        Table table;
+        test_write_slice_name(table, "",    false);
+        test_write_slice_name(table, "foo", true); // Override
+        test_write_slice_name(table, "",    true); // Override
+    }
+    {
+        Group group;
+        TableRef table = group.get_table("test");
+        test_write_slice_name(*table, "test", false);
+        test_write_slice_name(*table, "foo",  true); // Override
+        test_write_slice_name(*table, "",     true); // Override
+    }
+
+    // Run through a 3-D matrix of table sizes, slice offsets, and
+    // slice sizes. Each test involves a table with columns of each
+    // possible type.
+#ifdef TIGHTDB_DEBUG
+    int table_sizes[] = { 0, 1, 2, 3, 5, 9, 27, 81, 82, 135 };
+#else
+    int table_sizes[] = { 0, 1, 2, 3, 5, 9, 27, 81, 82, 243, 729, 2187, 6561 };
+#endif
+    int num_sizes = sizeof table_sizes / sizeof *table_sizes;
+    for (int table_size_i = 0; table_size_i != num_sizes; ++table_size_i) {
+        int table_size = table_sizes[table_size_i];
+        Group group;
+        TableRef table = group.get_table("test");
+        bool fixed_subtab_sizes = true;
+        setup_multi_table(*table, table_size, 1, fixed_subtab_sizes);
+        for (int offset_i = 0; offset_i != num_sizes; ++offset_i) {
+            int offset = table_sizes[offset_i];
+            if (offset > table_size)
+                break;
+            for (int size_i = 0; size_i != num_sizes; ++size_i) {
+                int size = table_sizes[size_i];
+                // This also checks that the range can extend beyond
+                // end of table
+                test_write_slice_contents(*table, offset, size);
+                if (offset + size > table_size)
+                    break;
+            }
+        }
+    }
+}
+
 
 #endif // TEST_TABLE

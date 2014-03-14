@@ -3,7 +3,6 @@
 #include <ostream>
 #include <iomanip>
 
-#include <tightdb/util/safe_int_ops.hpp>
 #include <tightdb/util/string_buffer.hpp>
 #include <tightdb/util/unique_ptr.hpp>
 #include <tightdb/table.hpp>
@@ -208,7 +207,7 @@ template<class T> T Replication::TransactLogApplier::read_int()
     T value = 0;
     int part;
     const int max_bytes = (numeric_limits<T>::digits+1+6)/7;
-    for (int i=0; i<max_bytes; ++i) {
+    for (int i = 0; i != max_bytes; ++i) {
         char c;
         if (!read_char(c))
             goto bad_transact_log;
@@ -228,8 +227,8 @@ template<class T> T Replication::TransactLogApplier::read_int()
     }
     if (part & 0x40) {
         // The real value is negative. Because 'value' is positive at
-        // this point, the following negation is guaranteed by the
-        // standard to never overflow.
+        // this point, the following negation is guaranteed by C++11
+        // to never overflow. See C99+TC3 section 6.2.6.2 paragraph 2.
         value = -value;
         if (int_subtract_with_overflow_detect(value, 1))
             goto bad_transact_log;

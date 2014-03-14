@@ -1459,11 +1459,9 @@ TEST(ArrayCopy)
     CHECK_EQUAL(3, e.get(3));
     CHECK_EQUAL(4, e.get(4));
 
-    //a.destroy() // will be destroyed as sub-array by c
     b.destroy();
-    c.destroy();
-    d.destroy();
-    //e.destroy() // will be destroyed as sub-array by d
+    c.destroy_deep();
+    d.destroy_deep();
 }
 
 TEST(ArrayCount)

@@ -213,19 +213,51 @@ nonempty value during configuration as in the following example:
     TIGHTDB_ENABLE_ALLOC_SET_ZERO=1 sh build.sh config
 
 
-Packaging
----------
+Packaging for Debian/Ubuntu
+---------------------------
 
 It is possible to create Debian/Ubuntu packages (`.deb`) by running the
 following command:
 
-    dpkg-buildpackage -rfakeroot
+    sh build.sh dist-deb
 
-The packages will be signed by the maintainer's signature. It is also
-possible to create packages without signature:
 
-    dpkg-buildpackage -rfakeroot -us -uc
+Packaging for Fedora
+--------------------
 
+Fedora is distributing binary packages as `.rpm` files. In order to create
+packages for Fedora, you need to install a few packages:
+
+    sudo yum install rpmdevtools rpmbuild
+
+First, you must initialize you RPM build system:
+
+    rpmdev-setuptree
+
+This command will create a directory structure in your home directory
+where the `.rpm` will be created.
+
+Second, you must copy the relevant `.spec` files after you have
+updated the changelog and version number in the `.spec` file. The core
+library and each binding have a `.spec` file. For the core, the
+command is:
+
+    cp libtightdb.spec $HOME/rpmbuild/SPECS
+
+Next, you create a `tar.gz` file with the core, and copy it to the
+build area:
+
+    mkdir /tmp/libtightdb-0.1.5
+    sh build.sh dist-copy /tmp/libtightdb-0.1.5
+    (cd /tmp && tar czf libtightdb-0.1.5.tar.gz libtightdb-0.1.5)
+    mv /tmp/libtightdb-0.1.5.tar.gz $HOME/rpmbuild/SOURCES
+
+Finally, you can build the `.rpm` files:
+
+    cd $HOME/rpmbuld/SPECS
+    rpmbuild -bb libtightdb.spec
+
+The `.rpm` files can be found in `$HOME/rpmbuild/RPMS`.
 
 
 Building a distribution package

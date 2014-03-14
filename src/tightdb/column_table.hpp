@@ -23,6 +23,7 @@
 #include <vector>
 
 #include <tightdb/util/features.h>
+#include <tightdb/util/unique_ptr.hpp>
 #include <tightdb/column.hpp>
 #include <tightdb/table.hpp>
 
@@ -91,10 +92,17 @@ protected:
     /// a TableRef.
     Table* get_subtable_ptr(std::size_t subtable_ndx) const;
 
-    void update_child_ref(std::size_t subtable_ndx, ref_type new_ref) TIGHTDB_OVERRIDE;
-    ref_type get_child_ref(std::size_t subtable_ndx) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-    void child_accessor_destroyed(std::size_t subtable_ndx) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    // Overriding method in ArrayParent
+    void update_child_ref(std::size_t, ref_type) TIGHTDB_OVERRIDE;
+
+    // Overriding method in ArrayParent
+    ref_type get_child_ref(std::size_t) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+
+    // Overriding method in Table::Parent
     Table* get_parent_table(std::size_t*) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+
+    // Overriding method in Table::Parent
+    void child_accessor_destroyed(std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
     /// Assumes that the two tables have the same spec.
     static bool compare_subtable_rows(const Table&, const Table&);
@@ -295,14 +303,14 @@ inline ColumnSubtableParent::ColumnSubtableParent(Allocator& alloc,
 {
 }
 
-inline void ColumnSubtableParent::update_child_ref(std::size_t subtable_ndx, ref_type new_ref)
+inline void ColumnSubtableParent::update_child_ref(std::size_t child_ndx, ref_type new_ref)
 {
-    set(subtable_ndx, new_ref);
+    set(child_ndx, new_ref);
 }
 
-inline ref_type ColumnSubtableParent::get_child_ref(std::size_t subtable_ndx) const TIGHTDB_NOEXCEPT
+inline ref_type ColumnSubtableParent::get_child_ref(std::size_t child_ndx) const TIGHTDB_NOEXCEPT
 {
-    return get_as_ref(subtable_ndx);
+    return get_as_ref(child_ndx);
 }
 
 inline void ColumnSubtableParent::detach_subtable_accessors() TIGHTDB_NOEXCEPT
@@ -363,21 +371,22 @@ inline Table* ColumnTable::get_subtable_ptr(std::size_t subtable_ndx) const
 {
     TIGHTDB_ASSERT(subtable_ndx < size());
 
-    Table* subtable = m_subtable_map.find(subtable_ndx);
-    if (!subtable) {
-        typedef _impl::TableFriend tf;
-        const Spec* spec = tf::get_spec(*m_table);
-        std::size_t subspec_ndx = get_subspec_ndx();
-        ConstSubspecRef shared_subspec = spec->get_subspec_by_ndx(subspec_ndx);
-        ref_type columns_ref = get_as_ref(subtable_ndx);
-        ColumnTable* parent = const_cast<ColumnTable*>(this);
-        subtable = tf::create_ref_counted(shared_subspec, columns_ref, parent, subtable_ndx);
-        bool was_empty = m_subtable_map.empty();
-        m_subtable_map.add(subtable_ndx, subtable);
-        if (was_empty && m_table)
-            tf::bind_ref(*m_table);
-    }
-    return subtable;
+    if (Table* subtable = m_subtable_map.find(subtable_ndx))
+        return subtable;
+
+    typedef _impl::TableFriend tf;
+    const Spec* spec = tf::get_spec(*m_table);
+    std::size_t subspec_ndx = get_subspec_ndx();
+    ConstSubspecRef shared_subspec = spec->get_subspec_by_ndx(subspec_ndx);
+    ref_type columns_ref = get_as_ref(subtable_ndx);
+    ColumnTable* parent = const_cast<ColumnTable*>(this);
+    util::UniquePtr<Table> subtable(tf::create_ref_counted(shared_subspec, columns_ref,
+                                                           parent, subtable_ndx)); // Throws
+    bool was_empty = m_subtable_map.empty();
+    m_subtable_map.add(subtable_ndx, subtable.get()); // Throws
+    if (was_empty && m_table)
+        tf::bind_ref(*m_table);
+    return subtable.release();
 }
 
 inline void ColumnTable::add(const Table* subtable)

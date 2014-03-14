@@ -104,7 +104,7 @@ SlabAlloc::~SlabAlloc() TIGHTDB_NOEXCEPT
 }
 
 
-MemRef SlabAlloc::alloc(size_t size)
+MemRef SlabAlloc::do_alloc(size_t size)
 {
     TIGHTDB_ASSERT(0 < size);
     TIGHTDB_ASSERT((size & 0x7) == 0); // only allow sizes that are multiples of 8
@@ -216,7 +216,7 @@ MemRef SlabAlloc::alloc(size_t size)
 }
 
 
-void SlabAlloc::free_(ref_type ref, const char* addr) TIGHTDB_NOEXCEPT
+void SlabAlloc::do_free(ref_type ref, const char* addr) TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(translate(ref) == addr);
 
@@ -268,6 +268,12 @@ void SlabAlloc::free_(ref_type ref, const char* addr) TIGHTDB_NOEXCEPT
 
         // Check if we can merge with end of free block
         if (m_slabs.column().ref_end.find_first(ref) == not_found) { // avoid slab borders
+            // FIXME: Thie following search loop appears to have
+            // quadratic complexity in terms of the numner of
+            // previosuly freed chunks. This can easily become
+            // intolerable. I (Kristian) have seen half an hour spent
+            // just to destroy a group containing a single table with
+            // 10 columns and less than 10K rows.
             size_t n = free_space.size();
             for (size_t i = 0; i < n; ++i) {
                 FreeSpace::Cursor c = free_space[i];
@@ -297,7 +303,7 @@ void SlabAlloc::free_(ref_type ref, const char* addr) TIGHTDB_NOEXCEPT
 }
 
 
-MemRef SlabAlloc::realloc_(size_t ref, const char* addr, size_t old_size, size_t new_size)
+MemRef SlabAlloc::do_realloc(size_t ref, const char* addr, size_t old_size, size_t new_size)
 {
     TIGHTDB_ASSERT(translate(ref) == addr);
     TIGHTDB_ASSERT(0 < new_size);
@@ -308,14 +314,14 @@ MemRef SlabAlloc::realloc_(size_t ref, const char* addr, size_t old_size, size_t
     // with zero if TIGHTDB_ENABLE_ALLOC_SET_ZERO is defined.
 
     // Allocate new space
-    MemRef new_mem = alloc(new_size); // Throws
+    MemRef new_mem = do_alloc(new_size); // Throws
 
     // Copy existing segment
     char* new_addr = new_mem.m_addr;
     copy(addr, addr+old_size, new_addr);
 
     // Add old segment to freelist
-    free_(ref, addr);
+    do_free(ref, addr);
 
 #ifdef TIGHTDB_DEBUG
     if (m_debug_out) {
@@ -328,7 +334,7 @@ MemRef SlabAlloc::realloc_(size_t ref, const char* addr, size_t old_size, size_t
 }
 
 
-char* SlabAlloc::translate(ref_type ref) const TIGHTDB_NOEXCEPT
+char* SlabAlloc::do_translate(ref_type ref) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(is_attached());
 
@@ -518,7 +524,7 @@ void SlabAlloc::do_prepare_for_update(char* mutable_data)
 }
 
 
-size_t SlabAlloc::get_total_size() const
+size_t SlabAlloc::get_total_size() const TIGHTDB_NOEXCEPT
 {
     return m_slabs.is_empty() ? m_baseline : to_size_t(m_slabs.back().ref_end);
 }
