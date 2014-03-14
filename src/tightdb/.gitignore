@@ -54,4 +54,7 @@
 /tightdb-config-ios
 /tightdb-config-ios-dbg
 
+# Android
+/libtightdb-android-*.a
+
 /util/config.h

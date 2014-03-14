@@ -163,6 +163,9 @@
     <ClCompile Include="test\test_file.cpp">
       <Filter>test</Filter>
     </ClCompile>
+    <ClCompile Include="test\test_safe_int_ops.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
     <ClCompile Include="test\test_thread.cpp">
       <Filter>test</Filter>
     </ClCompile>
@@ -222,6 +225,9 @@
     </ClCompile>
     <ClCompile Include="test\test_version.cpp">
       <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="src\tightdb\impl\output_stream.cpp">
+      <Filter>src</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -361,6 +367,9 @@
       <Filter>src\include</Filter>
     </ClInclude>
     <ClInclude Include="src\tightdb\util\meta.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\util\type_traits.hpp">
       <Filter>src\include</Filter>
     </ClInclude>
     <ClInclude Include="src\tightdb\mixed.hpp">

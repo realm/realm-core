@@ -2,15 +2,15 @@ REPLICATION_HPP = $(if $(TIGHTDB_ENABLE_REPLICATION),replication.hpp)
 REPLICATION_CPP = $(if $(TIGHTDB_ENABLE_REPLICATION),replication.cpp)
 
 nobase_subinclude_HEADERS = util/features.h util/meta.hpp util/assert.hpp util/terminate.hpp \
-util/type_list.hpp util/tuple.hpp util/bind.hpp util/safe_int_ops.hpp util/unique_ptr.hpp \
-util/bind_ptr.hpp util/buffer.hpp util/string_buffer.hpp util/memory_stream.hpp util/logger.hpp \
-util/thread.hpp util/file.hpp util/utf8.hpp exceptions.hpp utilities.hpp alloc.hpp alloc_slab.hpp \
-array.hpp array_string.hpp data_type.hpp column_type.hpp column_fwd.hpp spec.hpp \
-impl/destroy_guard.hpp impl/output_stream.hpp datetime.hpp string_data.hpp binary_data.hpp \
-mixed.hpp table.hpp table_ref.hpp table_basic_fwd.hpp table_accessors.hpp table_basic.hpp \
-table_view.hpp table_view_basic.hpp table_macros.hpp descriptor_fwd.hpp descriptor.hpp group.hpp \
-group_shared.hpp $(REPLICATION_HPP) query.hpp query_conditions.hpp lang_bind_helper.hpp \
-tightdb_nmmintrin.h importer.hpp version.hpp
+util/type_list.hpp util/tuple.hpp util/type_traits.hpp util/bind.hpp util/safe_int_ops.hpp \
+util/unique_ptr.hpp util/bind_ptr.hpp util/buffer.hpp util/string_buffer.hpp \
+util/memory_stream.hpp util/logger.hpp util/thread.hpp util/file.hpp util/utf8.hpp exceptions.hpp \
+utilities.hpp alloc.hpp alloc_slab.hpp array.hpp array_string.hpp data_type.hpp column_type.hpp \
+column_fwd.hpp spec.hpp impl/destroy_guard.hpp impl/output_stream.hpp datetime.hpp \
+string_data.hpp binary_data.hpp mixed.hpp table.hpp table_ref.hpp table_basic_fwd.hpp \
+table_accessors.hpp table_basic.hpp table_view.hpp table_view_basic.hpp table_macros.hpp \
+descriptor_fwd.hpp descriptor.hpp group.hpp group_shared.hpp $(REPLICATION_HPP) query.hpp \
+query_conditions.hpp lang_bind_helper.hpp tightdb_nmmintrin.h importer.hpp version.hpp
 
 nobase_subinclude_HEADERS_EXTRA_UNINSTALL = *.h *.hpp util/*.h util/*.hpp
 
@@ -55,7 +55,7 @@ lang_bind_helper.cpp importer.cpp version.cpp
 # The meaning of this version string is identical to the one defined
 # by GNU Libtool. See also
 # http://www.gnu.org/software/libtool/manual/libtool.html#Libtool-versioning
-libtightdb_a_VERSION = 6:0:0
+libtightdb_a_VERSION = 7:0:0
 
 tightdb_config_SOURCES = config_tool.cpp
 

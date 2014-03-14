@@ -4,6 +4,10 @@
 #include <algorithm>
 #include <fstream>
 #include <sys/stat.h>
+#ifndef _WIN32
+#include <unistd.h>
+#include <sys/types.h>
+#endif
 
 // File permissions for Windows
 // http://stackoverflow.com/questions/592448/c-how-to-set-file-permissions-cross-platform
@@ -74,32 +78,40 @@ TEST(Group_OpenFile)
 
 TEST(Group_Permissions)
 {
-    util::File::try_remove("test.tightdb");
-    {
-        Group group1;
-        TableRef t1 = group1.get_table("table1");
-        t1->add_column(type_String, "s");
-        t1->add_column(type_Int,    "i");
-        for(size_t i=0; i<4; ++i) {
-            t1->insert_string(0, i, "a");
-            t1->insert_int(1, i, 3);
-            t1->insert_done();
-        }
-        group1.write("test.tightdb");
-    }
-
-#ifdef _WIN32
-    _chmod("test.tightdb", S_IWUSR & MS_MODE_MASK);
-#else
-    chmod("test.tightdb", S_IWUSR);
+#ifndef _WIN32
+    if(getuid() != 0) {
 #endif
+        util::File::try_remove("test.tightdb");
+        {
+            Group group1;
+            TableRef t1 = group1.get_table("table1");
+            t1->add_column(type_String, "s");
+            t1->add_column(type_Int,    "i");
+            for(size_t i=0; i<4; ++i) {
+                t1->insert_string(0, i, "a");
+                t1->insert_int(1, i, 3);
+                t1->insert_done();
+            }
+            group1.write("test.tightdb");
+        }
 
-    {
-        Group group2((Group::unattached_tag()));
-        CHECK_THROW(group2.open("test.tightdb", Group::mode_ReadOnly), util::File::PermissionDenied);
-        CHECK(!group2.has_table("table1"));  // is not attached
+    #ifdef _WIN32
+        _chmod("test.tightdb", S_IWUSR & MS_MODE_MASK);
+    #else
+        chmod("test.tightdb", S_IWUSR);
+    #endif
+
+        {
+            Group group2((Group::unattached_tag()));
+            CHECK_THROW(group2.open("test.tightdb", Group::mode_ReadOnly), util::File::PermissionDenied);
+            CHECK(!group2.has_table("table1"));  // is not attached
+        }
+        util::File::try_remove("test.tightdb");
+#ifndef _WIN32
+    } else {
+        cout << "Group_Permissions test skipped because you are running it as root" << endl << endl;
     }
-    util::File::try_remove("test.tightdb");
+#endif
 }
 
 

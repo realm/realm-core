@@ -28,6 +28,7 @@ using namespace tightdb::util;
 // Note: You can now temporarely declare unit tests with the ONLY(TestName) macro instead of TEST(TestName). This
 // will disable all unit tests except these. Remember to undo your temporary changes before committing.
 
+
 TEST(Shared_Unattached)
 {
     SharedGroup sg((SharedGroup::unattached_tag()));
@@ -43,6 +44,7 @@ TIGHTDB_TABLE_4(TestTableShared,
                 fourth, String)
 
 } // anonymous namespace
+
 
 TEST(Shared_no_create_cleanup_lock_file_after_failure)
 {
@@ -64,6 +66,7 @@ TEST(Shared_no_create_cleanup_lock_file_after_failure)
     CHECK( !File::exists("test_shared.tightdb") );
     CHECK( !File::exists("test_shared.tightdb.lock") );    //     <========= FAILS
 }
+
 
 TEST(Shared_no_create_cleanup_lock_file_after_failure_2)
 {
@@ -96,6 +99,7 @@ TEST(Shared_no_create_cleanup_lock_file_after_failure_2)
 
 }
 
+
 TEST(Shared_Initial)
 {
     // Delete old files if there
@@ -118,13 +122,6 @@ TEST(Shared_Initial)
     CHECK(!File::exists("test_shared.tightdb.lock"));
 }
 
-void copy_file(const char* from, const char* to)
-{
-    std::ifstream  src(from, std::ios::binary);
-    std::ofstream  dst(to,   std::ios::binary);
-
-    dst << src.rdbuf();
-}
 
 TEST(Shared_Stale_Lock_File_Faked)
 {

@@ -228,7 +228,7 @@ struct Table::RemoveSubtableColumns: Table::SubtableUpdater {
     }
     void update(const ColumnTable&, size_t, Array& subcolumns) TIGHTDB_OVERRIDE
     {
-        ref_type column_ref = subcolumns.get(m_column_ndx);
+        ref_type column_ref = to_ref(subcolumns.get(m_column_ndx));
         subcolumns.erase(m_column_ndx); // Throws
         Array::destroy_deep(column_ref, subcolumns.get_alloc());
     }

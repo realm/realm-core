@@ -25,8 +25,9 @@
 #include <exception>
 #include <string>
 
-#include <tightdb/util/meta.hpp>
+#include <tightdb/util/assert.hpp>
 #include <tightdb/util/tuple.hpp>
+#include <tightdb/util/safe_int_ops.hpp>
 #include <tightdb/util/buffer.hpp>
 #include <tightdb/util/file.hpp>
 #include <tightdb/mixed.hpp>
@@ -467,9 +468,9 @@ template<class T> inline char* Replication::encode_int(char* ptr, T value)
     bool negative = false;
     if (util::is_negative(value)) {
         negative = true;
-        // The following conversion is guaranteed by C++03 to never
+        // The following conversion is guaranteed by C++11 to never
         // overflow (contrast this with "-value" which indeed could
-        // overflow).
+        // overflow). See C99+TC3 section 6.2.6.2 paragraph 2.
         value = -(value + 1);
     }
     // At this point 'value' is always a positive number. Also, small
