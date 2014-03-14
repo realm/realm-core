@@ -167,6 +167,35 @@ public:
     void commit();
     void rollback() TIGHTDB_NOEXCEPT;
 
+
+    // Pinned transactions:
+
+    // Shared group can work with either pinned or unpinned transactions.
+    // - With unpinned transactions, each new read transaction will refer
+    //   to the latest database state.
+    // - With pinned transactions, each new read transaction will refer
+    //   to the database state as it was, when pin_transactions() was called,
+    //   ignoring further changes until shared group is either unpinned or
+    //   pinned again to a new state.
+    // Default is to use unpinned transactions.
+    //
+    // When using pinned transactions in a scenario with simultaneous write
+    // transactions, you MUST periodically unpin or (re)pin to limit the
+    // memory consumption.
+    //
+    // You can only pin read transactions. You must unpin before starting a
+    // write transaction.
+
+    // Pin subsequent read transactions to the current state. It is illegal
+    // to use pin_transactions() from within a transaction.
+    void pin_transactions();
+
+    // Unpin, i.e. allow subsequent read transactions to refer to whatever
+    // is the current state, when they are created. It is illegal to use
+    // unpin_transactions() from within a transaction.
+    void unpin_transactions();
+
+
 #ifdef TIGHTDB_DEBUG
     void test_ringbuf();
     void zero_free_space();
