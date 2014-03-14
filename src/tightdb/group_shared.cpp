@@ -40,8 +40,6 @@ const int max_wait_for_ok_filesize = 100;
 const int max_wait_for_sharedinfo_valid = 100;
 const int max_wait_for_daemon_start = 100;
 
-} // anonymous namespace
-
 // The following 3 functions are carefully designed for minimal overhead
 // in case of contention among read transactions. In case of contention,
 // they consume roughly 90% of the cycles used to start and end a read transaction.
@@ -91,6 +89,9 @@ template<typename T> bool atomic_one_if_zero(Atomic<T>& counter)
     } 
     return true;
 }
+
+} // anonymous namespace
+
 
 
 // nonblocking ringbuffer
