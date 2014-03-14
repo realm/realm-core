@@ -319,7 +319,7 @@ TEST(ColumnMixed_InitOfEmptyColumn)
     t.remove_column(1);
     t.add_empty_row();
     t.add_column(type_Mixed, "doesn't work");
-    CHECK_EQUAL(NULL, t.get_mixed(1,0));
+    CHECK_EQUAL(0, t.get_mixed(1,0));
 }
 
 

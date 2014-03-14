@@ -225,7 +225,7 @@ CATEGORIES :
                    <li><code>type_Binary</code> (default: "")</li>
                    <li><code>type_DateTime</code> (default: 1970-01-01 00:00:00)</li>
                    <li><code>type_Table</code> (default: NULL)</li>
-                   <li><code>type_Mixed</code> (default: NULL)</li>
+                   <li><code>type_Mixed</code> (default: 0)</li>
                  </ul>
       PARAMS:
       - NAME   : type
