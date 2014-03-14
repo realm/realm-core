@@ -2386,7 +2386,7 @@ bool Array::find_optimized(int64_t value, size_t start, size_t end, size_t basei
 
         // Search remainder with CompareEquality()
         return Compare<cond2, action, bitwidth, Callback>(value, (reinterpret_cast<char*>(b) - m_data) * 8 / no0(bitwidth),
-                                                          end, baseindex, state, callback))
+                                                          end, baseindex, state, callback));
     }
     else {
         return Compare<cond2, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
