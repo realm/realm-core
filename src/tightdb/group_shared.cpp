@@ -684,10 +684,6 @@ void SharedGroup::open(const string& path, bool no_create_file,
 
 SharedGroup::~SharedGroup() TIGHTDB_NOEXCEPT
 {
-    if (m_deferred_detach) {
-        m_group.detach();
-        m_deferred_detach = false;
-    }
     if (!is_attached())
         return;
 
@@ -776,7 +772,6 @@ void SharedGroup::do_async_commits()
     info->free_write_slots = max_write_slots;
     info->init_complete.store_release(2); // allow waiting clients to proceed
     m_group.detach();
-    m_deferred_detach = false;
 
     while(true) {
 
@@ -816,11 +811,6 @@ void SharedGroup::do_async_commits()
             // to commit to disk.
             m_transact_stage = transact_Ready; // FAKE stage to prevent begin_read from failing
 
-            // force begin_read to refresh top pointer
-            if (m_deferred_detach) {
-                m_deferred_detach = false;
-                m_group.detach();
-            }
             begin_read();
 
             uint_fast64_t current_version = m_version;
@@ -907,7 +897,6 @@ const Group& SharedGroup::begin_read()
 
     ref_type new_top_ref = 0;
     size_t new_file_size = 0;
-    uint_fast64_t old_version = m_version;
 
     {
         // SharedInfo* info = m_file_map.get_addr();
@@ -936,14 +925,6 @@ const Group& SharedGroup::begin_read()
 
     m_transact_stage = transact_Reading;
 
-    if (old_version == m_version && m_deferred_detach) {
-        m_deferred_detach = false;
-        return m_group;
-    }
-    if (m_deferred_detach) {
-        m_group.detach();
-        m_deferred_detach = false;
-    }
     // A zero ref means that the file has just been created.
     try {
         m_group.update_from_shared(new_top_ref, new_file_size); // Throws
@@ -959,7 +940,7 @@ const Group& SharedGroup::begin_read()
 
 void SharedGroup::end_read() TIGHTDB_NOEXCEPT
 {
-    if (m_deferred_detach || !m_group.is_attached())
+    if (!m_group.is_attached())
         return;
 
     TIGHTDB_ASSERT(m_transact_stage == transact_Reading);
@@ -970,8 +951,8 @@ void SharedGroup::end_read() TIGHTDB_NOEXCEPT
         const Ringbuffer::ReadCount& r = r_info->readers.get(m_reader_idx);
         atomic_double_dec(r.count); // <-- most of the exec time spent here
     }
-    m_deferred_detach = true;
 
+    m_group.detach();
     m_transact_stage = transact_Ready;
 }
 
@@ -979,11 +960,6 @@ void SharedGroup::end_read() TIGHTDB_NOEXCEPT
 void SharedGroup::do_begin_write()
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Ready);
-    
-    if (m_deferred_detach) {
-        m_group.detach();
-        m_deferred_detach = false;
-    }
     
     SharedInfo* info = m_file_map.get_addr();
 
@@ -1082,11 +1058,6 @@ void SharedGroup::rollback() TIGHTDB_NOEXCEPT
         if (Replication* repl = m_group.get_replication())
             repl->rollback_write_transact(*this);
 #endif
-
-        if (m_deferred_detach) {
-            m_group.detach();
-            m_deferred_detach = false;
-        }
         m_transact_stage = transact_Reading;
         end_read();
 
@@ -1097,7 +1068,6 @@ void SharedGroup::rollback() TIGHTDB_NOEXCEPT
 
         // Clear all changes made during transaction
         m_group.detach();
-        m_deferred_detach = false;
     }
 }
 
