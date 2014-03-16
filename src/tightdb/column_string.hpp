@@ -210,7 +210,7 @@ inline std::size_t AdaptiveStringColumn::get_size_from_ref(ref_type root_ref,
     return Array::get_bptree_size_from_header(root_header);
 }
 
-inline void AdaptiveStringColumn::update_from_parent(std::size_t old_baseline) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
+inline void AdaptiveStringColumn::update_from_parent(std::size_t old_baseline) TIGHTDB_NOEXCEPT
 {
     if (root_is_leaf()) {
         bool long_strings = m_array->has_refs();

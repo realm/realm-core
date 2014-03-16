@@ -109,7 +109,7 @@ namespace query
     /// Encoding of bitwise complementation.
     struct Compl {
         static const char* sym() { return "~"; }
-        template<class A> struct Result { typedef typename IntegralPromote<A>::type type; };
+        template<class A> struct Result { typedef typename Promote<A>::type type; };
         template<class A> static typename Result<A>::type eval(const A& a) { return ~a; }
     };
 
@@ -118,14 +118,14 @@ namespace query
     /// nothing.
     struct Pos {
         static const char* sym() { return "+"; }
-        template<class A> struct Result { typedef typename IntegralPromote<A>::type type; };
+        template<class A> struct Result { typedef typename Promote<A>::type type; };
         template<class A> static typename Result<A>::type eval(const A& a) { return +a; }
     };
 
     /// Encoding of arithmetic negation.
     struct Neg {
         static const char* sym() { return "-"; }
-        template<class A> struct Result { typedef typename IntegralPromote<A>::type type; };
+        template<class A> struct Result { typedef typename Promote<A>::type type; };
         template<class A> static typename Result<A>::type eval(const A& a) { return -a; }
     };
 
@@ -184,7 +184,7 @@ namespace query
     /// Encoding of 'shift left' operation.
     struct Shl {
         static const char* sym() { return "<<"; }
-        template<class A, class> struct Result { typedef typename IntegralPromote<A>::type type; };
+        template<class A, class> struct Result { typedef typename Promote<A>::type type; };
         template<class A, class B>
         static typename Result<A,B>::type eval(const A& a, const B& b) { return a << b; }
     };
@@ -192,7 +192,7 @@ namespace query
     /// Encoding of 'shift right' operation.
     struct Shr {
         static const char* sym() { return ">>"; }
-        template<class A, class> struct Result { typedef typename IntegralPromote<A>::type type; };
+        template<class A, class> struct Result { typedef typename Promote<A>::type type; };
         template<class A, class B>
         static typename Result<A,B>::type eval(const A& a, const B& b) { return a >> b; }
     };

@@ -1,5 +1,3 @@
-#include <cstdlib>
-#include <typeinfo>
 #include <exception>
 #include <vector>
 #include <string>
@@ -7,13 +5,9 @@
 
 #include <unistd.h>
 
-#if __GNUC__ > 3 || __GNUC__ == 3 && __GNUC_MINOR__ >= 2
-#  define TIGHTDB_HAVE_CXXABI_DEMANGLE
-#  include <cxxabi.h>
-#endif
-
 #include <tightdb/util/thread.hpp>
 
+#include "../util/demangle.hpp"
 #include "../util/timer.hpp"
 #include "unit_test.hpp"
 
@@ -70,34 +64,6 @@ void check_failed(const char* file, long line, const string& message)
     reg.m_errors_seen = true;
     ++reg.m_checks_failed;
     ++reg.m_checks_completed;
-}
-
-// See http://gcc.gnu.org/onlinedocs/libstdc++/latest-doxygen/namespaceabi.html
-//
-// FIXME: Could use the Autoconf macro 'ax_cxx_gcc_abi_demangle'. See
-// http://autoconf-archive.cryp.to.
-string demangle(string n)
-{
-#ifdef TIGHTDB_HAVE_CXXABI_DEMANGLE
-    int s = 0;
-    char *r = abi::__cxa_demangle(n.c_str(), 0, 0, &s);
-    if(!r) return n;
-    string m = r;
-    free(r);
-    return m;
-#else
-    return n;
-#endif
-}
-
-template<class T> inline string rtti_name()
-{
-    return demangle(typeid(T).name());
-}
-
-template<typename T> inline string rtti_name(T const &v)
-{
-    return demangle(typeid(v).name());
 }
 
 } // anonymous namespace
@@ -172,7 +138,7 @@ int main()
         catch (exception& ex) {
             reg.m_errors_seen = true;
             emit(cerr, test, "ERROR in "+string(test.m_name)+": "
-                 "Unhandled exception "+rtti_name(ex)+": "+ex.what());
+                 "Unhandled exception "+test_util::get_type_name(ex)+": "+ex.what());
         }
         catch (...) {
             reg.m_errors_seen = true;
