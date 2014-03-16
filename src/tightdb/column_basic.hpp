@@ -87,6 +87,10 @@ public:
 
     static ref_type create(std::size_t size, Allocator&);
 
+    // Overrriding method in ColumnBase
+    ref_type write(std::size_t, std::size_t, std::size_t,
+                   _impl::OutputStream&) const TIGHTDB_OVERRIDE;
+
 #ifdef TIGHTDB_DEBUG
     void Verify() const TIGHTDB_OVERRIDE;
     void to_dot(std::ostream&, StringData title) const TIGHTDB_OVERRIDE;
@@ -110,6 +114,7 @@ private:
     class SetLeafElem;
     class EraseLeafElem;
     class CreateHandler;
+    class SliceHandler;
 
 #ifdef TIGHTDB_DEBUG
     static std::size_t verify_leaf(MemRef, Allocator&);

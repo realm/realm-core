@@ -6,6 +6,7 @@
 #include <iostream>
 #include <iomanip>
 
+#include <tightdb/impl/destroy_guard.hpp>
 #include <tightdb/column.hpp>
 #include <tightdb/column_table.hpp>
 #include <tightdb/column_mixed.hpp>
@@ -272,7 +273,180 @@ template<class Op> void col_type_deleg(Op& op, ColumnType type)
     TIGHTDB_ASSERT(false);
 }
 
+
+class TreeWriter {
+public:
+    TreeWriter(_impl::OutputStream&) TIGHTDB_NOEXCEPT;
+    ~TreeWriter() TIGHTDB_NOEXCEPT;
+
+    void add_leaf_ref(ref_type child_ref, size_t elems_in_child, ref_type* is_last);
+
+private:
+    Allocator& m_alloc;
+    _impl::OutputStream& m_out;
+    class ParentLevel;
+    UniquePtr<ParentLevel> m_last_parent_level;
+};
+
+class TreeWriter::ParentLevel {
+public:
+    ParentLevel(Allocator&, _impl::OutputStream&, size_t max_elems_per_child);
+    ~ParentLevel() TIGHTDB_NOEXCEPT;
+
+    void add_child_ref(ref_type child_ref, size_t elems_in_child,
+                       bool leaf_or_compact, ref_type* is_last);
+
+private:
+    const size_t m_max_elems_per_child; // A power of `TIGHTDB_MAX_LIST_SIZE`
+    size_t m_elems_in_parent; // Zero if reinitialization is needed
+    bool m_is_on_general_form; // Defined only when m_elems_in_parent > 0
+    Array m_main, m_offsets;
+    _impl::OutputStream& m_out;
+    UniquePtr<ParentLevel> m_prev_parent_level;
+};
+
+
+inline TreeWriter::TreeWriter(_impl::OutputStream& out) TIGHTDB_NOEXCEPT:
+    m_alloc(Allocator::get_default()),
+    m_out(out)
+{
+}
+
+inline TreeWriter::~TreeWriter() TIGHTDB_NOEXCEPT
+{
+}
+
+void TreeWriter::add_leaf_ref(ref_type leaf_ref, size_t elems_in_leaf, ref_type* is_last)
+{
+    if (!m_last_parent_level) {
+        if (is_last) {
+            *is_last = leaf_ref;
+            return;
+        }
+        m_last_parent_level.reset(new ParentLevel(m_alloc, m_out,
+                                                  TIGHTDB_MAX_LIST_SIZE)); // Throws
+    }
+    bool leaf_or_compact = true;
+    m_last_parent_level->add_child_ref(leaf_ref, elems_in_leaf,
+                                       leaf_or_compact, is_last); // Throws
+}
+
+
+inline TreeWriter::ParentLevel::ParentLevel(Allocator& alloc, _impl::OutputStream& out,
+                                            size_t max_elems_per_child):
+    m_max_elems_per_child(max_elems_per_child),
+    m_elems_in_parent(0),
+    m_main(alloc),
+    m_offsets(alloc),
+    m_out(out)
+{
+    m_main.create(Array::type_InnerBptreeNode); // Throws
+}
+
+inline TreeWriter::ParentLevel::~ParentLevel() TIGHTDB_NOEXCEPT
+{
+    m_offsets.destroy(); // Shallow
+    m_main.destroy(); // Shallow
+}
+
+void TreeWriter::ParentLevel::add_child_ref(ref_type child_ref, size_t elems_in_child,
+                                            bool leaf_or_compact, ref_type* is_last)
+{
+    bool force_general_form = !leaf_or_compact ||
+        (elems_in_child != m_max_elems_per_child &&
+         m_main.size() != 1 + TIGHTDB_MAX_LIST_SIZE - 1 &&
+         !is_last);
+
+    // Add the incoming child to this inner node
+    if (m_elems_in_parent > 0) { // This node contains children already
+        if (!m_is_on_general_form && force_general_form) {
+            if (!m_offsets.is_attached())
+                m_offsets.create(Array::type_Normal); // Throws
+            int_fast64_t v(m_max_elems_per_child); // FIXME: Dangerous cast (unsigned -> signed)
+            size_t n = m_main.size();
+            for (size_t i = 1; i != n; ++i)
+                m_offsets.add(v); // Throws
+            m_is_on_general_form = true;
+        }
+        {
+            int_fast64_t v(child_ref); // FIXME: Dangerous cast (unsigned -> signed)
+            m_main.add(v); // Throws
+        }
+        if (m_is_on_general_form) {
+            int_fast64_t v(m_elems_in_parent); // FIXME: Dangerous cast (unsigned -> signed)
+            m_offsets.add(v); // Throws
+        }
+        m_elems_in_parent += elems_in_child;
+        if (!is_last && m_main.size() < 1 + TIGHTDB_MAX_LIST_SIZE)
+          return;
+    }
+    else { // First child in this node
+        m_main.add(0); // Placeholder for `elems_per_child` or `offsets_ref`
+        int_fast64_t v(child_ref); // FIXME: Dangerous cast (unsigned -> signed)
+        m_main.add(v); // Throws
+        m_elems_in_parent = elems_in_child;
+        m_is_on_general_form = force_general_form; // `invar:bptree-node-form`
+        if (m_is_on_general_form && !m_offsets.is_attached())
+            m_offsets.create(Array::type_Normal); // Throws
+        if (!is_last)
+            return;
+    }
+
+    // No more children will be added to this node
+
+    // Write this inner node to the output stream
+    if (!m_is_on_general_form) {
+        int_fast64_t v(m_max_elems_per_child); // FIXME: Dangerous cast (unsigned -> signed)
+        m_main.set(0, 1 + 2*v); // Throws
+    }
+    else {
+        size_t pos = m_offsets.write(m_out); // Throws
+        ref_type ref = pos;
+        int_fast64_t v(ref); // FIXME: Dangerous cast (unsigned -> signed)
+        m_main.set(0, v); // Throws
+    }
+    {
+        int_fast64_t v(m_elems_in_parent); // FIXME: Dangerous cast (unsigned -> signed)
+        m_main.add(1 + 2*v); // Throws
+    }
+    bool recurse = false; // Shallow
+    size_t pos = m_main.write(m_out, recurse); // Throws
+    ref_type parent_ref = pos;
+
+    // Whether the resulting ref must be added to the previous parent
+    // level, or reported as the final ref (through `is_last`) depends
+    // on whether more children are going to be added, and on whether
+    // a previous parent level already exists
+    if (!is_last) {
+        if (!m_prev_parent_level) {
+            Allocator& alloc = m_main.get_alloc();
+            size_t next_level_elems_per_child = m_max_elems_per_child;
+            if (int_multiply_with_overflow_detect(next_level_elems_per_child,
+                                                  TIGHTDB_MAX_LIST_SIZE))
+                throw runtime_error("Overflow in number of elements per child");
+            m_prev_parent_level.reset(new ParentLevel(alloc, m_out,
+                                                      next_level_elems_per_child)); // Throws
+        }
+    }
+    else if (!m_prev_parent_level) {
+        *is_last = parent_ref;
+        return;
+    }
+    m_prev_parent_level->add_child_ref(parent_ref, m_elems_in_parent,
+                                       !m_is_on_general_form, is_last); // Throws
+
+    // Clear the arrays in preperation for the next child
+    if (!is_last) {
+        if (m_offsets.is_attached())
+            m_offsets.clear(); // Shallow
+        m_main.clear(); // Shallow
+        m_elems_in_parent = 0;
+    }
+}
+
 } // anonymous namespace
+
+
 
 size_t ColumnBase::get_size_from_type_and_ref(ColumnType type, ref_type ref,
                                               Allocator& alloc) TIGHTDB_NOEXCEPT
@@ -283,14 +457,102 @@ size_t ColumnBase::get_size_from_type_and_ref(ColumnType type, ref_type ref,
 }
 
 
+class ColumnBase::WriteSliceHandler: public Array::VisitHandler {
+public:
+    WriteSliceHandler(size_t offset, size_t size, Allocator& alloc,
+                      ColumnBase::SliceHandler &slice_handler,
+                      _impl::OutputStream& out) TIGHTDB_NOEXCEPT:
+        m_begin(offset), m_end(offset + size),
+        m_leaf_cache(alloc),
+        m_slice_handler(slice_handler),
+        m_out(out),
+        m_tree_writer(out),
+        m_top_ref(0)
+    {
+    }
+    ~WriteSliceHandler() TIGHTDB_NOEXCEPT
+    {
+    }
+    bool visit(const Array::NodeInfo& leaf_info) TIGHTDB_OVERRIDE
+    {
+        size_t size = leaf_info.m_size, pos;
+        size_t leaf_begin = leaf_info.m_offset;
+        size_t leaf_end   = leaf_begin + size;
+        TIGHTDB_ASSERT(leaf_begin <= m_end);
+        TIGHTDB_ASSERT(leaf_end   >= m_begin);
+        bool no_slicing = leaf_begin >= m_begin && leaf_end <= m_end;
+        if (no_slicing) {
+            m_leaf_cache.init_from_mem(leaf_info.m_mem);
+            pos = m_leaf_cache.write(m_out); // Throws
+        }
+        else {
+            // Slice the leaf
+            Allocator& slice_alloc = Allocator::get_default();
+            size_t begin = max(leaf_begin, m_begin);
+            size_t end   = min(leaf_end,   m_end);
+            size_t offset = begin - leaf_begin;
+            size = end - begin;
+            MemRef mem =
+                m_slice_handler.slice_leaf(leaf_info.m_mem, offset, size, slice_alloc); // Throws
+            Array slice(slice_alloc);
+            _impl::DeepArrayDestroyGuard dg(&slice);
+            slice.init_from_mem(mem);
+            pos = slice.write(m_out); // Throws
+        }
+        ref_type ref = pos;
+        ref_type* is_last = 0;
+        if (leaf_end >= m_end)
+            is_last = &m_top_ref;
+        m_tree_writer.add_leaf_ref(ref, size, is_last); // Throws
+        return !is_last;
+    }
+    ref_type get_top_ref() const TIGHTDB_NOEXCEPT
+    {
+        return m_top_ref;
+    }
+private:
+    size_t m_begin, m_end;
+    Array m_leaf_cache;
+    ColumnBase::SliceHandler& m_slice_handler;
+    _impl::OutputStream& m_out;
+    TreeWriter m_tree_writer;
+    ref_type m_top_ref;
+};
+
+
+ref_type ColumnBase::write(const Array* root, size_t slice_offset, size_t slice_size,
+                           size_t table_size, SliceHandler& handler, _impl::OutputStream& out)
+{
+    TIGHTDB_ASSERT(root->is_inner_bptree_node());
+
+    size_t offset = slice_offset;
+    if (slice_size == 0)
+        offset = 0;
+    // At this point we know that `offset` refers to an element that
+    // exists in the tree (this is required by
+    // Array::visit_bptree_leaves()). There are two cases to consider:
+    // First, if `slice_size` is non-zero, then `offset` must already
+    // refer to an existsing element. If `slice_size` is zero, then
+    // `offset` has been set to zero at this point. Zero is the index
+    // of an existing element, because the tree cannot be empty at
+    // this point. This follows from the fact that the root is an
+    // inner node, and that an inner node must contain at least one
+    // element (invar:bptree-nonempty-inner +
+    // invar:bptree-nonempty-leaf).
+    WriteSliceHandler handler_2(offset, slice_size, root->get_alloc(), handler, out);
+    const_cast<Array*>(root)->visit_bptree_leaves(offset, table_size, handler_2); // Throws
+    return handler_2.get_top_ref();
+}
+
+
 void ColumnBase::introduce_new_root(ref_type new_sibling_ref, Array::TreeInsertBase& state,
                                     bool is_append)
 {
     // At this point the original root and its new sibling is either
     // both leaves, or both inner nodes on the same form, compact or
-    // general. Due to invar:bptree-node-form, the new root may be on
-    // the compact form if is_append is true and both are either
-    // leaves or inner nodes on the compact form.
+    // general. Due to invar:bptree-node-form, the new root is allowed
+    // to be on the compact form if is_append is true and both
+    // siblings are either leaves or inner nodes on the compact form.
 
     Array* orig_root = m_array;
     Allocator& alloc = orig_root->get_alloc();
@@ -299,7 +561,7 @@ void ColumnBase::introduce_new_root(ref_type new_sibling_ref, Array::TreeInsertB
     UniquePtr<Array> new_root(new Array(Array::type_InnerBptreeNode,
                                         parent, ndx_in_parent, alloc)); // Throws
     bool compact_form =
-        is_append && (!orig_root->is_inner_bptree_node() || orig_root->get(0) % 2 == 1);
+        is_append && (!orig_root->is_inner_bptree_node() || orig_root->get(0) % 2 != 0);
     // Something is wrong if we were not appending and the original
     // root is still on the compact form.
     TIGHTDB_ASSERT(!compact_form || is_append);
@@ -359,7 +621,7 @@ ref_type ColumnBase::build(size_t* rest_size_ptr, size_t fixed_height,
                         new_inner_node.add(v); // Throws
                     }
                     catch (...) {
-                        Array::destroy(child, alloc);
+                        Array::destroy_deep(child, alloc);
                         throw;
                     }
                     if (rest_size == 0 || ++num_children == TIGHTDB_MAX_LIST_SIZE)
@@ -369,7 +631,7 @@ ref_type ColumnBase::build(size_t* rest_size_ptr, size_t fixed_height,
                 new_inner_node.add(1 + 2*v); // Throws
             }
             catch (...) {
-                new_inner_node.destroy();
+                new_inner_node.destroy_deep();
                 throw;
             }
             node = new_inner_node.get_ref();
@@ -378,7 +640,7 @@ ref_type ColumnBase::build(size_t* rest_size_ptr, size_t fixed_height,
     }
     catch (...) {
         if (node != 0)
-            Array::destroy(node, alloc);
+            Array::destroy_deep(node, alloc);
         throw;
     }
 }
@@ -386,7 +648,7 @@ ref_type ColumnBase::build(size_t* rest_size_ptr, size_t fixed_height,
 
 void Column::clear()
 {
-    m_array->clear();
+    m_array->clear_and_destroy_children();
     if (m_array->is_inner_bptree_node())
         m_array->set_type(Array::type_Normal);
 }
@@ -751,7 +1013,10 @@ public:
         m_leaf_type(leaf_type), m_value(value), m_alloc(alloc) {}
     ref_type create_leaf(size_t size) TIGHTDB_OVERRIDE
     {
-        return Array::create_array(m_leaf_type, size, m_value, m_alloc);
+        bool context_flag = false;
+        MemRef mem = Array::create_array(m_leaf_type, context_flag, size,
+                                         m_value, m_alloc); // Throws
+        return mem.m_ref;
     }
 private:
     const Array::Type m_leaf_type;
@@ -763,6 +1028,42 @@ ref_type Column::create(Array::Type leaf_type, size_t size, int_fast64_t value, 
 {
     CreateHandler handler(leaf_type, value, alloc);
     return ColumnBase::create(size, alloc, handler);
+}
+
+
+class Column::SliceHandler: public ColumnBase::SliceHandler {
+public:
+    SliceHandler(Allocator& alloc): m_leaf(alloc) {}
+    MemRef slice_leaf(MemRef leaf_mem, size_t offset, size_t size,
+                      Allocator& target_alloc) TIGHTDB_OVERRIDE
+    {
+        m_leaf.init_from_mem(leaf_mem);
+        return m_leaf.slice_and_clone_children(offset, size, target_alloc); // Throws
+    }
+private:
+    Array m_leaf;
+};
+
+ref_type Column::write(size_t slice_offset, size_t slice_size,
+                       size_t table_size, _impl::OutputStream& out) const
+{
+    ref_type ref;
+    if (root_is_leaf()) {
+        Allocator& alloc = Allocator::get_default();
+        MemRef mem = m_array->slice_and_clone_children(slice_offset, slice_size, alloc); // Throws
+        Array slice(alloc);
+        _impl::DeepArrayDestroyGuard dg(&slice);
+        slice.init_from_mem(mem);
+        bool recurse = true;
+        size_t pos = slice.write(out, recurse); // Throws
+        ref = pos;
+    }
+    else {
+        SliceHandler handler(get_alloc());
+        ref = ColumnBase::write(m_array, slice_offset, slice_size,
+                                table_size, handler, out); // Throws
+    }
+    return ref;
 }
 
 

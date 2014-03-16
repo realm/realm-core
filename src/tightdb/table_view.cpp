@@ -357,9 +357,8 @@ void TableView::clear()
 
     // Delete all referenced rows in source table
     // (in reverse order to avoid index drift)
-    const size_t count = m_refs.size();
-    for (size_t i = count; i; --i) {
-        const size_t ndx = size_t(m_refs.get(i-1));
+    for (size_t i = m_refs.size(); i != 0; --i) {
+        size_t ndx = size_t(m_refs.get(i-1));
         m_table->from_view_remove(ndx, this);
     }
 

@@ -286,8 +286,8 @@ pair<size_t, size_t> GroupWriter::reserve_free_space(size_t size)
     }
 
     if (begin > 0) {
-        begin = 0;
         end = begin;
+        begin = 0;
         goto again;
     }
 

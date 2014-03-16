@@ -30,7 +30,7 @@ TEST(VERSION)
     CHECK_EQUAL(true, Version::is_at_least(0,1,5));
     CHECK_EQUAL(true, Version::is_at_least(0,1,6));
     // Below might have to be updated when the version is incremented
-    CHECK_EQUAL(false, Version::is_at_least(0,1,9));
+    CHECK_EQUAL(true, Version::is_at_least(0,1,9));
     CHECK_EQUAL(false, Version::is_at_least(1,0,0));
-    CHECK_EQUAL(false, Version::is_at_least(0,2,0));
+    CHECK_EQUAL(true, Version::is_at_least(0,2,0));
 }

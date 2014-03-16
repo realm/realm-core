@@ -59,6 +59,9 @@ Static library*/
 /iphone-lib/tightdb-config
 /iphone-lib/tightdb-config-dbg
 
+# sh build.sh build-android
+/android-lib/
+
 # debian/ubuntu builds
 debian/tightdb/*
 debian/libtightdb/*

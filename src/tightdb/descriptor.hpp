@@ -145,9 +145,9 @@ public:
     ///
     /// This function modifies the dynamic type of all the tables that
     /// share this descriptor. It does this by removing the column at
-    /// the specified index from the descriptor, and from each of the 
-    /// tables that share this descriptor. The consequences of specifying
-    /// a column index that is out of range, are undefined.
+    /// the specified index from the descriptor, and from each of the
+    /// tables that share this descriptor. The consequences of
+    /// specifying a column index that is out of range, are undefined.
     ///
     /// If the removed column was a subtable column, then the
     /// associated descriptor accessor will be detached, if it
@@ -260,6 +260,17 @@ public:
     /// column is removed. A descriptor accessor does not get detached
     /// under any other circumstances.
     bool is_attached() const TIGHTDB_NOEXCEPT;
+
+    //@{
+    /// Compare two table descriptors. Two descriptors are equal if,
+    /// and only if they contain the same number of columns, and each
+    /// corresponding pair of columns have the same name and type.
+    ///
+    /// The consequences of comparing a deatched descriptor are
+    /// undefined.
+    bool operator==(const Descriptor&) const TIGHTDB_NOEXCEPT;
+    bool operator!=(const Descriptor&) const TIGHTDB_NOEXCEPT;
+    //@}
 
     ~Descriptor() TIGHTDB_NOEXCEPT;
 
@@ -451,6 +462,18 @@ inline void Descriptor::attach(Table* table, Descriptor* parent, Spec* spec) TIG
 inline bool Descriptor::is_attached() const TIGHTDB_NOEXCEPT
 {
     return bool(m_root_table);
+}
+
+inline bool Descriptor::operator==(const Descriptor& d) const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(is_attached());
+    TIGHTDB_ASSERT(d.is_attached());
+    return *m_spec == *d.m_spec;
+}
+
+inline bool Descriptor::operator!=(const Descriptor& d) const TIGHTDB_NOEXCEPT
+{
+    return !(*this == d);
 }
 
 } // namespace tightdb

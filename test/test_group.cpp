@@ -1252,6 +1252,28 @@ TEST(Group_Index_String)
     CHECK_EQUAL(2, m6);
 }
 
+
+TEST(Group_Stock_Bug)
+{
+    // This test is a regression test - it once triggered a bug.
+    // the bug was fixed in pr 351. In release mode, it crashes
+    // the application. To get an assert in debug mode, the max
+    // list size should be set to 1000.
+    File::try_remove("test.tightdb");
+    Group group("test.tightdb", Group::mode_ReadWrite);
+
+    TableRef table  = group.get_table("stocks");
+    table->add_column(type_String, "ticker");
+
+    for (size_t i = 0; i < 100; ++i) {
+        table->Verify();
+        table->insert_string(0, i, "123456789012345678901234567890123456789");
+        table->insert_done();
+        table->Verify();
+        group.commit();
+    }
+}
+
 #ifdef TIGHTDB_DEBUG
 #ifdef TIGHTDB_TO_DOT
 

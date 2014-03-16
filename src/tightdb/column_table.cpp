@@ -14,9 +14,9 @@ void ColumnSubtableParent::update_from_parent(size_t old_baseline) TIGHTDB_NOEXC
     m_subtable_map.update_from_parent(old_baseline);
 }
 
-void ColumnSubtableParent::child_accessor_destroyed(size_t subtable_ndx) TIGHTDB_NOEXCEPT
+void ColumnSubtableParent::child_accessor_destroyed(size_t child_ndx) TIGHTDB_NOEXCEPT
 {
-    m_subtable_map.remove(subtable_ndx);
+    m_subtable_map.remove(child_ndx);
     // Note that this column instance may be destroyed upon return
     // from Table::unbind_ref(), i.e., a so-called suicide is
     // possible.
@@ -133,7 +133,7 @@ void ColumnTable::destroy_subtable(size_t ndx)
     // Delete sub-tree
     Allocator& alloc = get_alloc();
     Array columns(columns_ref, 0, 0, alloc);
-    columns.destroy();
+    columns.destroy_deep();
 }
 
 bool ColumnTable::compare_table(const ColumnTable& c) const

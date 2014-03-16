@@ -27,7 +27,7 @@ CFLAGS_GENERAL += -Wextra -ansi -pedantic -Wno-long-long
 # have to override that with an empty value.
 ifneq ($(call CC_CXX_AND_LD_ARE,clang),)
   ifeq ($(OS),Darwin)
-    LDFLAGS_PTHREADS =
+    LDFLAGS_PTHREADS = $(EMPTY)
   endif
 endif
 

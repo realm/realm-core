@@ -64,12 +64,17 @@ public:
 
     static std::size_t get_size_from_ref(ref_type root_ref, Allocator&) TIGHTDB_NOEXCEPT;
 
+    // Overrriding method in ColumnBase
+    ref_type write(std::size_t, std::size_t, std::size_t,
+                   _impl::OutputStream&) const TIGHTDB_OVERRIDE;
+
 #ifdef TIGHTDB_DEBUG
     void Verify() const TIGHTDB_OVERRIDE;
     void to_dot(std::ostream&, StringData title) const TIGHTDB_OVERRIDE;
     void dump_node_structure(std::ostream&, int level) const TIGHTDB_OVERRIDE;
     using ColumnBase::dump_node_structure;
 #endif
+    void update_from_parent(std::size_t old_baseline) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
 private:
     std::size_t do_get_size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return size(); }
@@ -90,6 +95,7 @@ private:
 
     class EraseLeafElem;
     class CreateHandler;
+    class SliceHandler;
 
     /// Root must be a leaf. Upgrades the root leaf if
     /// necessary. Returns true if, and only if the root is a 'big
@@ -113,7 +119,7 @@ private:
 inline std::size_t ColumnBinary::size() const  TIGHTDB_NOEXCEPT
 {
     if (root_is_leaf()) {
-        bool is_big = m_array->context_bit();
+        bool is_big = m_array->get_context_flag();
         if (!is_big) {
             // Small blobs root leaf
             ArrayBinary* leaf = static_cast<ArrayBinary*>(m_array);
@@ -127,11 +133,30 @@ inline std::size_t ColumnBinary::size() const  TIGHTDB_NOEXCEPT
     return m_array->get_bptree_size();
 }
 
+inline void ColumnBinary::update_from_parent(std::size_t old_baseline) TIGHTDB_NOEXCEPT
+{
+    if (root_is_leaf()) {
+        bool is_big = m_array->get_context_flag();
+        if (!is_big) {
+            // Small blobs root leaf
+            ArrayBinary* leaf = static_cast<ArrayBinary*>(m_array);
+            leaf->update_from_parent(old_baseline);
+            return;
+        }
+        // Big blobs root leaf
+        ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array);
+        leaf->update_from_parent(old_baseline);
+        return;
+    }
+    // Non-leaf root
+    m_array->update_from_parent(old_baseline);
+}
+
 inline BinaryData ColumnBinary::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < size());
     if (root_is_leaf()) {
-        bool is_big = m_array->context_bit();
+        bool is_big = m_array->get_context_flag();
         if (!is_big) {
             // Small blobs root leaf
             ArrayBinary* leaf = static_cast<ArrayBinary*>(m_array);
@@ -147,7 +172,7 @@ inline BinaryData ColumnBinary::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
     const char* leaf_header = p.first.m_addr;
     std::size_t ndx_in_leaf = p.second;
     Allocator& alloc = m_array->get_alloc();
-    bool is_big = Array::get_context_bit_from_header(leaf_header);
+    bool is_big = Array::get_context_flag_from_header(leaf_header);
     if (!is_big) {
         // Small blobs
         return ArrayBinary::get(leaf_header, ndx_in_leaf, alloc);
@@ -201,12 +226,12 @@ inline void ColumnBinary::insert_string(std::size_t ndx, StringData value)
 }
 
 inline std::size_t ColumnBinary::get_size_from_ref(ref_type root_ref,
-                                                   Allocator& alloc) TIGHTDB_NOEXCEPT
+                                                   Allocator& alloc) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
 {
     const char* root_header = alloc.translate(root_ref);
     bool root_is_leaf = !Array::get_is_inner_bptree_node_from_header(root_header);
     if (root_is_leaf) {
-        bool is_big = Array::get_context_bit_from_header(root_header);
+        bool is_big = Array::get_context_flag_from_header(root_header);
         if (!is_big) {
             // Small blobs leaf
             return ArrayBinary::get_size_from_header(root_header, alloc);

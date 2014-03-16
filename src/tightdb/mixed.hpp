@@ -122,13 +122,13 @@ public:
 
     DataType get_type() const TIGHTDB_NOEXCEPT { return m_type; }
 
-    int64_t     get_int()    const TIGHTDB_NOEXCEPT;
-    bool        get_bool()   const TIGHTDB_NOEXCEPT;
-    float       get_float()  const TIGHTDB_NOEXCEPT;
-    double      get_double() const TIGHTDB_NOEXCEPT;
-    StringData  get_string() const TIGHTDB_NOEXCEPT;
-    BinaryData  get_binary() const TIGHTDB_NOEXCEPT;
-    DateTime    get_datetime()   const TIGHTDB_NOEXCEPT;
+    int64_t     get_int()      const TIGHTDB_NOEXCEPT;
+    bool        get_bool()     const TIGHTDB_NOEXCEPT;
+    float       get_float()    const TIGHTDB_NOEXCEPT;
+    double      get_double()   const TIGHTDB_NOEXCEPT;
+    StringData  get_string()   const TIGHTDB_NOEXCEPT;
+    BinaryData  get_binary()   const TIGHTDB_NOEXCEPT;
+    DateTime    get_datetime() const TIGHTDB_NOEXCEPT;
 
     void set_int(int64_t) TIGHTDB_NOEXCEPT;
     void set_bool(bool) TIGHTDB_NOEXCEPT;

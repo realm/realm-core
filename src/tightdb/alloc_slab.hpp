@@ -197,7 +197,7 @@ public:
     ///
     /// It is an error to call this function on a detached
     /// allocator. Doing so will result in undefined behavior.
-    std::size_t get_total_size() const;
+    std::size_t get_total_size() const TIGHTDB_NOEXCEPT;
 
     /// Mark all managed memory (except the attached file) as free
     /// space.
@@ -215,19 +215,20 @@ public:
     /// mapped byte has changed.
     bool remap(std::size_t file_size);
 
-    MemRef alloc(std::size_t size) TIGHTDB_OVERRIDE;
-    MemRef realloc_(ref_type, const char*, std::size_t old_size,
-                    std::size_t new_size) TIGHTDB_OVERRIDE;
-    // FIXME: It would be very nice if we could detect an invalid free operation in debug mode
-    void free_(ref_type, const char*) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-    char* translate(ref_type) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-
 #ifdef TIGHTDB_DEBUG
     void enable_debug(bool enable) { m_debug_out = enable; }
-    void Verify() const;
+    void Verify() const TIGHTDB_OVERRIDE;
     bool is_all_free() const;
     void print() const;
 #endif
+
+protected:
+    MemRef do_alloc(std::size_t size) TIGHTDB_OVERRIDE;
+    MemRef do_realloc(ref_type, const char*, std::size_t old_size,
+                    std::size_t new_size) TIGHTDB_OVERRIDE;
+    // FIXME: It would be very nice if we could detect an invalid free operation in debug mode
+    void do_free(ref_type, const char*) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    char* do_translate(ref_type) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
 private:
     enum AttachMode {

@@ -91,7 +91,7 @@ void BasicColumn<T>::clear()
         parent->update_child_ref(pndx, array->get_ref()); // Throws
 
     // Remove original node
-    m_array->destroy();
+    m_array->destroy_deep();
     delete m_array;
 
     m_array = array;
@@ -172,10 +172,10 @@ bool BasicColumn<T>::compare(const BasicColumn& c) const
     std::size_t n = size();
     if (c.size() != n)
         return false;
-    for (std::size_t i=0; i<n; ++i) {
-        T v1 = get(i);
-        T v2 = c.get(i);
-        if (v1 == v2)
+    for (std::size_t i = 0; i != n; ++i) {
+        T v_1 = get(i);
+        T v_2 = c.get(i);
+        if (v_1 != v_2)
             return false;
     }
     return true;
@@ -246,7 +246,8 @@ public:
     CreateHandler(Allocator& alloc): m_alloc(alloc) {}
     ref_type create_leaf(std::size_t size) TIGHTDB_OVERRIDE
     {
-        return BasicArray<T>::create_array(size, m_alloc);
+        MemRef mem = BasicArray<T>::create_array(size, m_alloc); // Throws
+        return mem.m_ref;
     }
 private:
     Allocator& m_alloc;
@@ -256,6 +257,42 @@ template<class T> ref_type BasicColumn<T>::create(std::size_t size, Allocator& a
 {
     CreateHandler handler(alloc);
     return ColumnBase::create(size, alloc, handler);
+}
+
+
+template<class T> class BasicColumn<T>::SliceHandler: public ColumnBase::SliceHandler {
+public:
+    SliceHandler(Allocator& alloc): m_leaf(alloc) {}
+    MemRef slice_leaf(MemRef leaf_mem, size_t offset, size_t size,
+                      Allocator& target_alloc) TIGHTDB_OVERRIDE
+    {
+        m_leaf.init_from_mem(leaf_mem);
+        return m_leaf.slice(offset, size, target_alloc); // Throws
+    }
+private:
+    BasicArray<T> m_leaf;
+};
+
+template<class T> ref_type BasicColumn<T>::write(size_t slice_offset, size_t slice_size,
+                                                 size_t table_size, _impl::OutputStream& out) const
+{
+    ref_type ref;
+    if (root_is_leaf()) {
+        Allocator& alloc = Allocator::get_default();
+        BasicArray<T>* leaf = static_cast<BasicArray<T>*>(m_array);
+        MemRef mem = leaf->slice(slice_offset, slice_size, alloc); // Throws
+        Array slice(alloc);
+        _impl::DeepArrayDestroyGuard dg(&slice);
+        slice.init_from_mem(mem);
+        size_t pos = slice.write(out); // Throws
+        ref = pos;
+    }
+    else {
+        SliceHandler handler(get_alloc());
+        ref = ColumnBase::write(m_array, slice_offset, slice_size,
+                                table_size, handler, out); // Throws
+    }
+    return ref;
 }
 
 

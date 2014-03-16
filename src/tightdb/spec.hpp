@@ -91,10 +91,9 @@ public:
     std::size_t get_column_pos(std::size_t column_ndx) const;
 
     /// Compare two table specs for equality.
-    bool operator==(const Spec&) const;
+    bool operator==(const Spec&) const TIGHTDB_NOEXCEPT;
 
-    /// Compare two tables specs for inequality. See operator==().
-    bool operator!=(const Spec& s) const { return !(*this == s); }
+    void destroy() TIGHTDB_NOEXCEPT;
 
 #ifdef TIGHTDB_DEBUG
     void Verify() const; // Must be upper case to avoid conflict with macro in ObjC
@@ -111,12 +110,15 @@ private:
     Array m_enumkeys;
 
     Spec(Allocator&) TIGHTDB_NOEXCEPT; // Uninitialized
+    Spec(Allocator&, MemRef, ArrayParent*, std::size_t ndx_in_parent);
+
+    // FIXME: Deprecated. The constructor must not allocate anything
+    // that the destructor does not deallocate.
     Spec(Allocator&, ArrayParent*, std::size_t ndx_in_parent);
-    Spec(Allocator&, ref_type, ArrayParent*, std::size_t ndx_in_parent);
 
     void init(ref_type, ArrayParent*, std::size_t ndx_in_parent) TIGHTDB_NOEXCEPT;
+    void init(MemRef, ArrayParent*, std::size_t ndx_in_parent) TIGHTDB_NOEXCEPT;
     void init(SubspecRef) TIGHTDB_NOEXCEPT;
-    void destroy() TIGHTDB_NOEXCEPT;
 
     ref_type get_ref() const TIGHTDB_NOEXCEPT;
 
@@ -136,7 +138,7 @@ private:
 
     /// Construct an empty spec and return just the reference to the
     /// underlying memory.
-    static ref_type create_empty_spec(Allocator&);
+    static MemRef create_empty_spec(Allocator&);
 
     struct ColumnInfo {
         std::size_t m_column_ref_ndx; ///< Index within Table::m_columns
@@ -243,16 +245,16 @@ inline Spec::Spec(Allocator& alloc, ArrayParent* parent, std::size_t ndx_in_pare
     m_top(alloc), m_spec(alloc), m_names(alloc), m_attr(alloc), m_subspecs(alloc),
     m_enumkeys(alloc)
 {
-    ref_type ref = create_empty_spec(alloc); // Throws
-    init(ref, parent, ndx_in_parent);
+    MemRef mem = create_empty_spec(alloc); // Throws
+    init(mem, parent, ndx_in_parent);
 }
 
 // Create Spec from ref
-inline Spec::Spec(Allocator& alloc, ref_type ref, ArrayParent* parent, std::size_t ndx_in_parent):
+inline Spec::Spec(Allocator& alloc, MemRef mem, ArrayParent* parent, std::size_t ndx_in_parent):
     m_top(alloc), m_spec(alloc), m_names(alloc), m_attr(alloc), m_subspecs(alloc),
     m_enumkeys(alloc)
 {
-    init(ref, parent, ndx_in_parent);
+    init(mem, parent, ndx_in_parent);
 }
 
 
@@ -282,6 +284,12 @@ inline ConstSubspecRef Spec::get_subspec_by_ndx(std::size_t subspec_ndx) const T
     return const_cast<Spec*>(this)->get_subspec_by_ndx(subspec_ndx);
 }
 
+inline void Spec::init(ref_type ref, ArrayParent* parent, size_t ndx_in_parent) TIGHTDB_NOEXCEPT
+{
+    MemRef mem(ref, get_alloc());
+    init(mem, parent, ndx_in_parent);
+}
+
 inline void Spec::init(SubspecRef r) TIGHTDB_NOEXCEPT
 {
     ref_type ref = r.m_parent->get_as_ref(r.m_ndx_in_parent);
@@ -290,7 +298,7 @@ inline void Spec::init(SubspecRef r) TIGHTDB_NOEXCEPT
 
 inline void Spec::destroy() TIGHTDB_NOEXCEPT
 {
-    m_top.destroy();
+    m_top.destroy_deep();
 }
 
 inline ref_type Spec::get_ref() const TIGHTDB_NOEXCEPT
