@@ -589,7 +589,7 @@ EOF
                 extra_cflags="$extra_cflags -mthumb -march=armv7-a -mfloat-abi=softfp -mfpu=vfpv3-d16"
             fi
             denom="android-$target"
-            PATH="$path" CC="$cc" $MAKE -C "src/tightdb" CC_IS="gcc" BASE_DENOM="$denom" CFLAGS_ARCH="$extra_cflags" "libtightdb-$denom.a" || exit 1
+            PATH="$path" CC="$cc" $MAKE -C "src/tightdb" CC_IS="gcc" BASE_DENOM="$denom" CFLAGS_OPTIM="-Os -DNDEBUG" CFLAGS_ARCH="$extra_cflags" "libtightdb-$denom.a" || exit 1
             cp "src/tightdb/libtightdb-$denom.a" "$ANDROID_DIR" || exit 1
             rm -rf "$temp_dir" || exit 1
         done
