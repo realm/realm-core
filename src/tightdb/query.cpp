@@ -91,16 +91,17 @@ Query& Query::expression(Expression* compare, bool auto_delete)
 Query& Query::tableview(const TableView& tv)
 {
     const Array& arr = tv.get_ref_column();
-    return tableview(arr);
+    return tableview(arr, tv.m_is_in_index_order);
 }
 
 // Makes query search only in rows contained in tv
-Query& Query::tableview(const Array& arr)
+Query& Query::tableview(const Array& arr, bool is_in_index_order)
 {
-    // FIXME: Optimize this so that we only sort if needed:
     // FIXME: The memory management for the Array 'a' is dubious at best.
     Array* a = new Array(arr, arr.get_alloc());
-    a->sort();
+    // only sort if needed:
+    if (! is_in_index_order)
+        a->sort();
     ParentNode* const p = new ListviewNode(a);
     UpdatePointers(p, &p->m_child);
     return *this;

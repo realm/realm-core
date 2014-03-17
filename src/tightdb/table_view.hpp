@@ -115,6 +115,7 @@ protected:
     // Null if, and only if, the view is detached
     mutable TableRef m_table;
     Array m_refs;
+    bool m_is_in_index_order;
 
     /// Construct null view (no memory allocated).
     TableViewBase();
@@ -328,27 +329,29 @@ inline std::size_t TableViewBase::get_source_ndx(std::size_t row_ndx) const TIGH
 }
 
 inline TableViewBase::TableViewBase():
-    m_refs(Allocator::get_default())
+    m_refs(Allocator::get_default()), m_is_in_index_order(false)
 {
 }
 
 inline TableViewBase::TableViewBase(Table* parent):
-    m_table(parent->get_table_ref())
+    m_table(parent->get_table_ref()), m_is_in_index_order(false)
 {
     parent->register_view(this);
 }
 
 inline TableViewBase::TableViewBase(const TableViewBase& tv):
-    m_table(tv.m_table),
-    m_refs(tv.m_refs, Allocator::get_default())
+    m_table(tv.m_table), 
+    m_refs(tv.m_refs, Allocator::get_default()),
+    m_is_in_index_order(tv.m_is_in_index_order)
 {
     if (m_table)
         m_table->register_view(this);
 }
 
 inline TableViewBase::TableViewBase(TableViewBase* tv) TIGHTDB_NOEXCEPT:
-    m_table(tv->m_table),
-    m_refs(tv->m_refs) // Note: This is a moving copy
+    m_table(tv->m_table), 
+    m_refs(tv->m_refs), // Note: This is a moving copy
+    m_is_in_index_order(tv->m_is_in_index_order)
 {
     if (m_table) {
         m_table->unregister_view(tv);
@@ -388,6 +391,7 @@ inline void TableViewBase::move_assign(TableViewBase* tv) TIGHTDB_NOEXCEPT
         m_table->register_view(this);
     }
     m_refs.move_assign(tv->m_refs);
+    m_is_in_index_order = tv->m_is_in_index_order;
 }
 
 inline Array& TableViewBase::get_ref_column() TIGHTDB_NOEXCEPT
