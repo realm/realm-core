@@ -225,7 +225,7 @@ CATEGORIES :
                    <li><code>type_Binary</code> (default: "")</li>
                    <li><code>type_DateTime</code> (default: 1970-01-01 00:00:00)</li>
                    <li><code>type_Table</code> (default: NULL)</li>
-                   <li><code>type_Mixed</code> (default: NULL)</li>
+                   <li><code>type_Mixed</code> (default: 0)</li>
                  </ul>
       PARAMS:
       - NAME   : type
@@ -321,8 +321,10 @@ CATEGORIES :
 
       RETURN:
         TYPES  : StringData
-        DESCR  : &g_dyn_table_get_column_name_return_descr
-                 The column name. An empty string if index is out of range.
+        DESCR  :
+        - TEXT : &g_dyn_table_get_column_name_return_descr
+                 The column name.
+        - TEXT : The behaviour is undefined if the index is out of range.
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_get_column_name
         DESCR  :
