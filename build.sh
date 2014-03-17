@@ -572,9 +572,8 @@ EOF
             # `bash` and must therefore be executed by `bash`.
             make_toolchain="$android_ndk_home/build/tools/make-standalone-toolchain.sh"
             bash "$make_toolchain" --platform="android-$platform" --install-dir="$temp_dir" --arch="$target" || exit 1
-            if [ "$target" = "arm" ]; then
-                android_prefix="arm"
-            elif [ "$target" = "arm-v7a" ]; then
+            android_prefix="$target"
+            if [ "$target" = "arm-v7a" ]; then
                 android_prefix="arm"
             elif [ "$target" = "mips" ]; then
                 android_prefix="mipsel"
@@ -583,7 +582,7 @@ EOF
             fi
             path="$temp_dir/bin:$PATH"
             cc="$(cd "$temp_dir/bin" && echo $android_prefix-linux-*-gcc)" || exit 1
-            extra_cflags="-DANDROID -fPIC -DPIC -Os"
+            extra_cflags="-DANDROID -fPIC -DPIC"
             if [ "$target" = "arm" ]; then
                 extra_cflags="$extra_cflags -mthumb"
             elif [ "$target" = "arm-v7a" ]; then
