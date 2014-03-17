@@ -507,36 +507,40 @@ protected:
 // correctly.
 class ListviewNode: public ParentNode {
 public:
-    ListviewNode(const Array& arr) : m_arr(arr), m_max(0), m_next(0), m_size(arr.size()) {m_child = 0; m_dT = 0.0;}
-    ~ListviewNode() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
+    ListviewNode(Array* arr) : m_arr(arr), m_max(0), m_next(0), m_size(arr->size()) {m_child = 0; m_dT = 0.0;}
+    ~ListviewNode() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { 
+        // FIXME: How to delete our local array? 
+        m_arr->destroy();
+        delete(m_arr); // NOT nice!
+    }
 
     void init(const Table& table) TIGHTDB_OVERRIDE
     {
         m_table = &table;
 
-        m_dD =  m_table->size() / (m_arr.size() + 1.0);
+        m_dD =  m_table->size() / (m_arr->size() + 1.0);
         m_probes = 0;
         m_matches = 0;
 
         m_next = 0;
         if (m_size > 0)
-            m_max = to_size_t(m_arr.get(m_size-1));
+            m_max = to_size_t(m_arr->get(m_size-1));
         if (m_child) m_child->init(table);
     }
 
     size_t find_first_local(size_t start, size_t end)  TIGHTDB_OVERRIDE
     {
         // Simply return next TableView item which is >= start
-        size_t r = m_arr.FindGTE(start, m_next);
+        size_t r = m_arr->FindGTE(start, m_next);
         if (r >= end)
             return not_found;
 
         m_next = r;
-        return to_size_t(m_arr.get(r));
+        return to_size_t(m_arr->get(r));
     }
 
 protected:
-    const Array& m_arr;
+    Array* m_arr;
     size_t m_max;
     size_t m_next;
     size_t m_size;

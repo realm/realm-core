@@ -95,9 +95,13 @@ Query& Query::tableview(const TableView& tv)
 }
 
 // Makes query search only in rows contained in tv
-Query& Query::tableview(const Array &arr)
+Query& Query::tableview(const Array& arr)
 {
-    ParentNode* const p = new ListviewNode(arr);
+    // FIXME: Optimize this so that we only sort if needed:
+    // FIXME: The memory management for the Array 'a' is dubious at best.
+    Array* a = new Array(arr, arr.get_alloc());
+    a->sort();
+    ParentNode* const p = new ListviewNode(a);
     UpdatePointers(p, &p->m_child);
     return *this;
 }
