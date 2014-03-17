@@ -187,11 +187,13 @@ public:
     // write transaction.
 
     // Pin subsequent read transactions to the current state. It is illegal
-    // to use pin_transactions() from within a transaction.
-    void pin_transactions();
+    // to use pin_transactions() from within a transaction. Returns true,
+    // if transactions are pinned to a new version of the database, false
+    // if there are no changes.
+    bool pin_transactions();
 
     // Unpin, i.e. allow subsequent read transactions to refer to whatever
-    // is the current state, when they are created. It is illegal to use
+    // is the current state when they are created. It is illegal to use
     // unpin_transactions() from within a transaction.
     void unpin_transactions();
 
