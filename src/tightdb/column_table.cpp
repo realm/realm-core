@@ -14,14 +14,21 @@ void ColumnSubtableParent::update_from_parent(size_t old_baseline) TIGHTDB_NOEXC
     m_subtable_map.update_from_parent(old_baseline);
 }
 
-void ColumnSubtableParent::child_accessor_destroyed(size_t subtable_ndx) TIGHTDB_NOEXCEPT
+void ColumnSubtableParent::child_accessor_destroyed(size_t child_ndx) TIGHTDB_NOEXCEPT
 {
-    m_subtable_map.remove(subtable_ndx);
+    m_subtable_map.remove(child_ndx);
     // Note that this column instance may be destroyed upon return
     // from Table::unbind_ref(), i.e., a so-called suicide is
     // possible.
     if (m_table && m_subtable_map.empty())
-        m_table->unbind_ref();
+        _impl::TableFriend::unbind_ref(*m_table);
+}
+
+Table* ColumnSubtableParent::get_parent_table(size_t* column_ndx_out) const TIGHTDB_NOEXCEPT
+{
+    if (column_ndx_out)
+        *column_ndx_out = m_column_ndx;
+    return m_table;
 }
 
 #ifdef TIGHTDB_DEBUG
@@ -37,18 +44,18 @@ pair<ref_type, size_t> ColumnSubtableParent::get_to_dot_parent(size_t ndx_in_par
 
 size_t ColumnTable::get_subtable_size(size_t ndx) const TIGHTDB_NOEXCEPT
 {
-    // FIXME: If the table object is cached, it is possible to get the
-    // size from it. Maybe it is faster in general to check for the
-    // presence of the cached object and use it when available.
     TIGHTDB_ASSERT(ndx < size());
 
     ref_type columns_ref = get_as_ref(ndx);
     if (columns_ref == 0)
         return 0;
 
-    const char* columns_header = get_alloc().translate(columns_ref);
-    ref_type first_col_ref = to_ref(Array::get(columns_header, 0));
-    return get_size_from_ref(first_col_ref, get_alloc());
+    typedef _impl::TableFriend tf;
+    size_t subspec_ndx = get_subspec_ndx();
+    Spec* spec = tf::get_spec(*m_table);
+    ref_type subspec_ref = spec->get_subspec_ref(subspec_ndx);
+    Allocator& alloc = spec->get_alloc();
+    return tf::get_size_from_ref(subspec_ref, columns_ref, alloc);
 }
 
 void ColumnTable::add()
@@ -126,7 +133,7 @@ void ColumnTable::destroy_subtable(size_t ndx)
     // Delete sub-tree
     Allocator& alloc = get_alloc();
     Array columns(columns_ref, 0, 0, alloc);
-    columns.destroy();
+    columns.destroy_deep();
 }
 
 bool ColumnTable::compare_table(const ColumnTable& c) const
@@ -135,8 +142,8 @@ bool ColumnTable::compare_table(const ColumnTable& c) const
     if (c.size() != n)
         return false;
     for (size_t i = 0; i != n; ++i) {
-        ConstTableRef t1 = get_subtable_ptr(i)->get_table_ref();
-        ConstTableRef t2 = c.get_subtable_ptr(i)->get_table_ref();
+        ConstTableRef t1 = get_subtable_ptr(i)->get_table_ref(); // Throws
+        ConstTableRef t2 = c.get_subtable_ptr(i)->get_table_ref(); // throws
         if (!compare_subtable_rows(*t1, *t2))
             return false;
     }

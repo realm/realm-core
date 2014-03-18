@@ -767,20 +767,21 @@ Query& Query::Or()
     return *this;
 }
 
-void Query::subtable(size_t column)
+Query& Query::subtable(size_t column)
 {
     ParentNode* const p = new SubtableNode(column);
     UpdatePointers(p, &p->m_child);
     // once subtable conditions have been evaluated, resume evaluation from m_child2
     subtables.push_back(&((SubtableNode*)p)->m_child2);
     group();
+    return *this;
 }
 
-void Query::end_subtable()
+Query& Query::end_subtable()
 {
     if (subtables.size() == 0) {
         error_code = "Unbalanced subtable";
-        return;
+        return *this;
     }
 
     end_group();
@@ -789,6 +790,7 @@ void Query::end_subtable()
         update[update.size()-1] = subtables[subtables.size()-1];
 
     subtables.pop_back();
+    return *this;
 }
 
 // todo, add size_t end? could be useful

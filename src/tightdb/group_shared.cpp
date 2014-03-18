@@ -163,11 +163,15 @@ void spawn_daemon(const string& file)
             async_daemon = TIGHTDB_INSTALL_LIBEXECDIR "/tightdbd-dbg";
 #endif
         }
-        execl(async_daemon, async_daemon, file.c_str(), 0);
+        execl(async_daemon, async_daemon, file.c_str(), static_cast<char*>(0));
 
         // if we continue here, exec has failed so return error
         // if exec succeeds, we don't come back here.
+#ifndef ANDROID        
         _Exit(1);
+#else
+        _exit(1);
+#endif
         // child process ends here
 
     }

@@ -33,8 +33,9 @@ using std::size_t;
 /// Common base class for TableView and ConstTableView.
 class TableViewBase {
 public:
-    bool is_empty() const TIGHTDB_NOEXCEPT { return m_refs.is_empty(); }
-    std::size_t size() const TIGHTDB_NOEXCEPT { return m_refs.size(); }
+    bool is_empty() const TIGHTDB_NOEXCEPT;
+    bool is_attached() const TIGHTDB_NOEXCEPT;
+    std::size_t size() const TIGHTDB_NOEXCEPT;
 
     // Column information
     size_t      get_column_count() const TIGHTDB_NOEXCEPT;
@@ -65,10 +66,12 @@ public:
     size_t find_first_string(size_t column_ndx, StringData value) const;
     size_t find_first_binary(size_t column_ndx, BinaryData value) const;
 
-    // Aggregate functions. count_target is ignored by all <int function> except Count. Hack because of bug in optional
+    // Aggregate functions. count_target is ignored by all <int
+    // function> except Count. Hack because of bug in optional
     // arguments in clang and vs2010 (fixed in 2012)
     template <int function, typename T, typename R, class ColType>
-    R aggregate(R (ColType::*aggregateMethod)(size_t, size_t, size_t) const, size_t column_ndx, T count_target) const;
+    R aggregate(R (ColType::*aggregateMethod)(size_t, size_t, size_t) const,
+                size_t column_ndx, T count_target) const;
 
     int64_t sum_int(size_t column_ndx) const;
     int64_t maximum_int(size_t column_ndx) const;
@@ -94,36 +97,33 @@ public:
     // Sort the view according to the specified column and the
     // specified direction.
     void sort(size_t column_ndx, bool ascending = true);
-    
-    // Simple pivot aggregate method. Experimental! Please do not document method publicly.
-    void aggregate(size_t group_by_column, size_t aggr_column, Table::AggrType op, Table& result) const;
+
+    // Simple pivot aggregate method. Experimental! Please do not
+    // document method publicly.
+    void aggregate(size_t group_by_column, size_t aggr_column,
+                   Table::AggrType op, Table& result) const;
 
     // Get row index in the source table this view is "looking" at.
-    size_t get_source_ndx(size_t row_ndx) const TIGHTDB_NOEXCEPT
-    {
-        return size_t(m_refs.get(row_ndx));
-    }
+    std::size_t get_source_ndx(std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
 
     // Conversion
-    void to_json(std::ostream& out) const;
-    void to_string(std::ostream& out, size_t limit=500) const;
-    void row_to_string(std::size_t row_ndx, std::ostream& out) const;
+    void to_json(std::ostream&) const;
+    void to_string(std::ostream&, std::size_t limit = 500) const;
+    void row_to_string(std::size_t row_ndx, std::ostream&) const;
 
 protected:
-    TableRef m_table;
+    // Null if, and only if, the view is detached
+    mutable TableRef m_table;
     Array m_refs;
 
-
-/// Copy constructor.
     /// Construct null view (no memory allocated).
-    TableViewBase(): m_refs(Allocator::get_default()) {}
+    TableViewBase();
 
     /// Construct empty view, ready for addition of row indices.
-    TableViewBase(Table* parent): m_table(parent->get_table_ref()) {}
+    TableViewBase(Table* parent);
 
     /// Copy constructor.
-    TableViewBase(const TableViewBase& tv):
-        m_table(tv.m_table), m_refs(tv.m_refs, Allocator::get_default()) {}
+    TableViewBase(const TableViewBase&);
 
     /// Moving constructor.
     TableViewBase(TableViewBase*) TIGHTDB_NOEXCEPT;
@@ -132,21 +132,27 @@ protected:
 
     void move_assign(TableViewBase*) TIGHTDB_NOEXCEPT;
 
-    Array& get_ref_column() TIGHTDB_NOEXCEPT { return m_refs; }
-    const Array& get_ref_column() const TIGHTDB_NOEXCEPT { return m_refs; }
+    Array& get_ref_column() TIGHTDB_NOEXCEPT;
+    const Array& get_ref_column() const TIGHTDB_NOEXCEPT;
 
-    template <class R, class V> static R find_all_integer(V*, std::size_t, int64_t);
-    template <class R, class V> static R find_all_float(V*, std::size_t, float);
-    template <class R, class V> static R find_all_double(V*, std::size_t, double);
-    template <class R, class V> static R find_all_string(V*, std::size_t, StringData);
+    template<class R, class V> static R find_all_integer(V*, std::size_t, int64_t);
+    template<class R, class V> static R find_all_float(V*, std::size_t, float);
+    template<class R, class V> static R find_all_double(V*, std::size_t, double);
+    template<class R, class V> static R find_all_string(V*, std::size_t, StringData);
 
 private:
+    void detach() const TIGHTDB_NOEXCEPT;
     std::size_t find_first_integer(std::size_t column_ndx, int64_t value) const;
 
     friend class Table;
     friend class Query;
 };
 
+
+inline void TableViewBase::detach() const TIGHTDB_NOEXCEPT
+{
+    m_table = TableRef();
+}
 
 
 class ConstTableView;
@@ -166,17 +172,17 @@ class ConstTableView;
 ///
 /// You should use 'return tv' whenever the type of 'tv' matches the
 /// return type in the function signature exactly, such as
-/// ´T fun() { return T(...); }´ or ´T fun() { T tv; return tv }´ to
+/// `T fun() { return T(...); }` or `T fun() { T tv; return tv }` to
 /// enable return-value-optimization and named-return-value-optimization
 /// respectively.
 ///
 /// You should use 'return move(tv)' whenever the type of 'tv' mismatch
 /// the signature (where 'tv' needs conversion to return type), such as
-/// ´ConstTableView fun() {TableView tv; return move(tv);}´ to enable
+/// `ConstTableView fun() {TableView tv; return move(tv);}` to enable
 /// move-semantics.
 ///
 /// Avoid return(tv) whenever possible because it inhibits rvo and nrvo.
-/// ´return tv´ has been benchmarked to be slower than ´return move(tv)´
+/// `return tv` has been benchmarked to be slower than `return move(tv)`
 /// for both VC2012 and GCC 4.7 in many cases but never the opposite.
 //
 /// Note that move(tv) removes the contents from tv and leaves it
@@ -186,9 +192,9 @@ class ConstTableView;
 /// to it from here.
 class TableView: public TableViewBase {
 public:
-    TableView() {}
-    ~TableView() TIGHTDB_NOEXCEPT {}
-    TableView& operator=(TableView tv) { move_assign(&tv); return *this; }
+    TableView();
+    ~TableView() TIGHTDB_NOEXCEPT;
+    TableView& operator=(TableView);
     friend TableView move(TableView& tv) { return TableView(&tv); }
 
     // Subtables
@@ -211,8 +217,8 @@ public:
 
     // Deleting
     void clear();
-    void remove(size_t row_ndx);
-    void remove_last() { if (!is_empty()) remove(size()-1); }
+    void remove(std::size_t row_ndx);
+    void remove_last();
 
     // Searching (Int and String)
     TableView       find_all_int(size_t column_ndx, int64_t value);
@@ -230,13 +236,12 @@ public:
     // FIXME: Need: TableView find_all_binary(size_t column_ndx, BinaryData value);
     // FIXME: Need: ConstTableView find_all_binary(size_t column_ndx, BinaryData value) const;
 
-    Table& get_parent() TIGHTDB_NOEXCEPT { return *m_table; }
-    const Table& get_parent() const TIGHTDB_NOEXCEPT { return *m_table; }
+    Table& get_parent() TIGHTDB_NOEXCEPT;
+    const Table& get_parent() const TIGHTDB_NOEXCEPT;
 
 private:
-    TableView(Table& parent): TableViewBase(&parent) {}
-    TableView(TableView* tv) TIGHTDB_NOEXCEPT: TableViewBase(tv) {}
-    TableView(ConstTableView tv);
+    TableView(Table& parent);
+    TableView(TableView* tv) TIGHTDB_NOEXCEPT;
 
     TableView find_all_integer(size_t column_ndx, int64_t value);
     ConstTableView find_all_integer(size_t column_ndx, int64_t value) const;
@@ -262,13 +267,13 @@ private:
 /// for more on this.
 class ConstTableView: public TableViewBase {
 public:
-    ConstTableView() {}
-    ~ConstTableView() TIGHTDB_NOEXCEPT {}
-    ConstTableView& operator=(ConstTableView tv) { move_assign(&tv); return *this; }
+    ConstTableView();
+    ~ConstTableView() TIGHTDB_NOEXCEPT;
+    ConstTableView& operator=(ConstTableView);
     friend ConstTableView move(ConstTableView& tv) { return ConstTableView(&tv); }
 
-    ConstTableView(TableView tv): TableViewBase(&tv) {}
-    ConstTableView& operator=(TableView tv) { move_assign(&tv); return *this; }
+    ConstTableView(TableView);
+    ConstTableView& operator=(TableView);
 
     // Getting values
     ConstTableRef get_subtable(size_t column_ndx, size_t row_ndx) const;
@@ -281,11 +286,11 @@ public:
     ConstTableView find_all_double(size_t column_ndx, double value) const;
     ConstTableView find_all_string(size_t column_ndx, StringData value) const;
 
-   const Table& get_parent() const TIGHTDB_NOEXCEPT { return *m_table; }
+    const Table& get_parent() const TIGHTDB_NOEXCEPT;
 
 private:
-    ConstTableView(const Table& parent): TableViewBase(const_cast<Table*>(&parent)) {}
-    ConstTableView(ConstTableView* tv) TIGHTDB_NOEXCEPT: TableViewBase(tv) {}
+    ConstTableView(const Table& parent);
+    ConstTableView(ConstTableView*) TIGHTDB_NOEXCEPT;
 
     ConstTableView find_all_integer(size_t column_ndx, int64_t value) const;
 
@@ -302,24 +307,97 @@ private:
 // TableViewBase Implementation:
 
 
-inline TableViewBase::~TableViewBase() TIGHTDB_NOEXCEPT
+inline bool TableViewBase::is_empty() const TIGHTDB_NOEXCEPT
 {
-    m_refs.destroy();
+    return m_refs.is_empty();
+}
+
+inline bool TableViewBase::is_attached() const TIGHTDB_NOEXCEPT
+{
+    return bool(m_table);
+}
+
+inline std::size_t TableViewBase::size() const TIGHTDB_NOEXCEPT
+{
+    return m_refs.size();
+}
+
+inline std::size_t TableViewBase::get_source_ndx(std::size_t row_ndx) const TIGHTDB_NOEXCEPT
+{
+    return to_size_t(m_refs.get(row_ndx));
+}
+
+inline TableViewBase::TableViewBase():
+    m_refs(Allocator::get_default())
+{
+}
+
+inline TableViewBase::TableViewBase(Table* parent):
+    m_table(parent->get_table_ref())
+{
+    parent->register_view(this);
+}
+
+inline TableViewBase::TableViewBase(const TableViewBase& tv):
+    m_table(tv.m_table),
+    m_refs(tv.m_refs, Allocator::get_default())
+{
+    if (m_table)
+        m_table->register_view(this);
 }
 
 inline TableViewBase::TableViewBase(TableViewBase* tv) TIGHTDB_NOEXCEPT:
     m_table(tv->m_table),
     m_refs(tv->m_refs) // Note: This is a moving copy
 {
+    if (m_table) {
+        m_table->unregister_view(tv);
+        // exception safe, because register_view cannot except if called right after unregister:
+        m_table->register_view(this);
+    }
     tv->m_table = TableRef();
     tv->m_refs.detach();
 }
 
+inline TableViewBase::~TableViewBase() TIGHTDB_NOEXCEPT
+{
+    if (m_table) {
+        m_table->unregister_view(this);
+        m_table = TableRef();
+    }
+    m_refs.destroy(); // Shallow
+}
+
 inline void TableViewBase::move_assign(TableViewBase* tv) TIGHTDB_NOEXCEPT
 {
-    m_table = tv->m_table;
-    tv->m_table = TableRef();
+    if (m_table)
+        m_table->unregister_view(this);
+    m_table = move(tv->m_table);
+    if (m_table) {
+        m_table->unregister_view(tv);
+        // Table::register_view() is guaranteed to *not* throw an
+        // exception below. Since the capacity of the underlying STL
+        // vector (Table::m_views) remains unchanged across element
+        // removal, the preceeding unregistration guarantees that the
+        // vector has enough capacity to store the new element.
+        //
+        // FIXME: Consider adding a Table::replace_registered_view(),
+        // and using it here to avoid the "fragile" relationship
+        // between the assumptions of TableViewBase::move_assign() and
+        // the implementation of the "registry of views" in Table.
+        m_table->register_view(this);
+    }
     m_refs.move_assign(tv->m_refs);
+}
+
+inline Array& TableViewBase::get_ref_column() TIGHTDB_NOEXCEPT
+{
+    return m_refs;
+}
+
+inline const Array& TableViewBase::get_ref_column() const TIGHTDB_NOEXCEPT
+{
+    return m_refs;
 }
 
 
@@ -538,6 +616,88 @@ R TableViewBase::find_all_string(V* view, size_t column_ndx, StringData value)
 
 
 //-------------------------- TableView, ConstTableView implementation:
+
+inline TableView::TableView()
+{
+}
+
+inline ConstTableView::ConstTableView()
+{
+}
+
+inline ConstTableView::ConstTableView(TableView tv):
+    TableViewBase(&tv)
+{
+}
+
+inline TableView::~TableView() TIGHTDB_NOEXCEPT
+{
+}
+
+inline ConstTableView::~ConstTableView() TIGHTDB_NOEXCEPT
+{
+}
+
+inline TableView& TableView::operator=(TableView tv)
+{
+    move_assign(&tv);
+    return *this;
+}
+
+inline ConstTableView& ConstTableView::operator=(ConstTableView tv)
+{
+    move_assign(&tv);
+    return *this;
+}
+
+inline ConstTableView& ConstTableView::operator=(TableView tv)
+{
+    move_assign(&tv);
+    return *this;
+}
+
+inline void TableView::remove_last()
+{
+    if (!is_empty())
+        remove(size()-1);
+}
+
+inline Table& TableView::get_parent() TIGHTDB_NOEXCEPT
+{
+    return *m_table;
+}
+
+inline const Table& TableView::get_parent() const TIGHTDB_NOEXCEPT
+{
+    return *m_table;
+}
+
+inline const Table& ConstTableView::get_parent() const TIGHTDB_NOEXCEPT
+{
+    return *m_table;
+}
+
+inline TableView::TableView(Table& parent):
+    TableViewBase(&parent)
+{
+}
+
+inline ConstTableView::ConstTableView(const Table& parent):
+    TableViewBase(const_cast<Table*>(&parent))
+{
+}
+
+inline TableView::TableView(TableView* tv) TIGHTDB_NOEXCEPT:
+    TableViewBase(tv)
+{
+}
+
+inline ConstTableView::ConstTableView(ConstTableView* tv) TIGHTDB_NOEXCEPT:
+    TableViewBase(tv)
+{
+}
+
+
 
 // - string
 inline TableView TableView::find_all_string(size_t column_ndx, StringData value)

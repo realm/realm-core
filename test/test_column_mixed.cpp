@@ -322,4 +322,51 @@ TEST(ColumnMixed_Mixed)
     c.destroy();
 }
 
+
+TEST(ColumnMixed_Subtable_Size)
+{
+    ColumnMixed c;
+    c.insert_subtable(0, 0);
+    c.insert_subtable(1, 0);
+    c.insert_subtable(2, 0);
+    c.insert_subtable(3, 0);
+    c.insert_subtable(4, 0);
+
+    // No table instantiated yet (zero ref)
+    CHECK_EQUAL( 0, c.get_subtable_size(0));
+
+    {    // Empty table (no columns)
+        TableRef const t1 = c.get_subtable_ptr(1)->get_table_ref();
+        CHECK(t1->is_empty());
+        CHECK_EQUAL( 0, c.get_subtable_size(1));
+    }
+
+    {   // Empty table (1 column, no rows)
+        TableRef const t2 = c.get_subtable_ptr(2)->get_table_ref();
+        CHECK(t2->is_empty());
+        t2->add_column(type_Int, "col1");
+        CHECK_EQUAL( 0, c.get_subtable_size(2));
+    }
+    
+    {   // Table with rows
+        TableRef const t3 = c.get_subtable_ptr(3)->get_table_ref();
+        CHECK(t3->is_empty());
+        t3->add_column(type_Int, "col1");
+        t3->add_empty_row(10);
+        CHECK_EQUAL(10, c.get_subtable_size(3));
+    }
+
+    {   // Table with mixed column first
+        TableRef const t4 = c.get_subtable_ptr(4)->get_table_ref();
+        CHECK(t4->is_empty());
+        t4->add_column(type_Mixed, "col1");
+        t4->add_empty_row(10);
+        // FAILS because it tries to manually get size from first column
+        // which is topped by a node with two subentries.
+        CHECK_EQUAL(10, c.get_subtable_size(4));
+    }
+
+    c.destroy();
+}
+
 #endif // TEST_COLUMN_MIXED

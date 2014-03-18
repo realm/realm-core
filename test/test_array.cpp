@@ -52,7 +52,9 @@ void has_zero_byte(int64_t value, size_t reps)
 
 } // anonymous namespace
 
-TEST(UPPERLOWERBOUND)
+
+// Oops, see Array_LowerUpperBound
+TEST(Array_UpperLowerBound)
 {
     // Tests Array::upper_bound() and Array::lower_bound()
     // This test is independent of TIGHTDB_MAX_LIST_SIZE
@@ -89,16 +91,18 @@ TEST(UPPERLOWERBOUND)
 }
 
 
-TEST_FIXTURE(db_setup_array, Array_Add0)
+TEST(Array_Add0)
 {
+    Array& c = db_setup_array::c;
     c.add(0);
     CHECK_EQUAL(c.get(0), 0);
     CHECK_EQUAL(c.size(), 1);
     CHECK_EQUAL(0, c.get_width());
 }
 
-TEST_FIXTURE(db_setup_array, Array_Add1)
+TEST(Array_Add1)
 {
+    Array& c = db_setup_array::c;
     c.add(1);
     CHECK_EQUAL(c.get(0), 0);
     CHECK_EQUAL(c.get(1), 1);
@@ -106,8 +110,9 @@ TEST_FIXTURE(db_setup_array, Array_Add1)
     CHECK_EQUAL(1, c.get_width());
 }
 
-TEST_FIXTURE(db_setup_array, Array_Add2)
+TEST(Array_Add2)
 {
+    Array& c = db_setup_array::c;
     c.add(2);
     CHECK_EQUAL(c.get(0), 0);
     CHECK_EQUAL(c.get(1), 1);
@@ -116,8 +121,9 @@ TEST_FIXTURE(db_setup_array, Array_Add2)
     CHECK_EQUAL(2, c.get_width());
 }
 
-TEST_FIXTURE(db_setup_array, Array_Add3)
+TEST(Array_Add3)
 {
+    Array& c = db_setup_array::c;
     c.add(3);
     CHECK_EQUAL(c.get(0), 0);
     CHECK_EQUAL(c.get(1), 1);
@@ -127,8 +133,9 @@ TEST_FIXTURE(db_setup_array, Array_Add3)
     CHECK_EQUAL(2, c.get_width());
 }
 
-TEST_FIXTURE(db_setup_array, Array_Add4)
+TEST(Array_Add4)
 {
+    Array& c = db_setup_array::c;
     c.add(4);
     CHECK_EQUAL(c.get(0), 0);
     CHECK_EQUAL(c.get(1), 1);
@@ -139,8 +146,9 @@ TEST_FIXTURE(db_setup_array, Array_Add4)
     CHECK_EQUAL(4, c.get_width());
 }
 
-TEST_FIXTURE(db_setup_array, Array_Add5)
+TEST(Array_Add5)
 {
+    Array& c = db_setup_array::c;
     c.add(16);
     CHECK_EQUAL(c.get(0), 0);
     CHECK_EQUAL(c.get(1), 1);
@@ -152,8 +160,9 @@ TEST_FIXTURE(db_setup_array, Array_Add5)
     CHECK_EQUAL(8, c.get_width());
 }
 
-TEST_FIXTURE(db_setup_array, Array_Add6)
+TEST(Array_Add6)
 {
+    Array& c = db_setup_array::c;
     c.add(256);
     CHECK_EQUAL(c.get(0), 0);
     CHECK_EQUAL(c.get(1), 1);
@@ -166,8 +175,9 @@ TEST_FIXTURE(db_setup_array, Array_Add6)
     CHECK_EQUAL(16, c.get_width());
 }
 
-TEST_FIXTURE(db_setup_array, Array_Add7)
+TEST(Array_Add7)
 {
+    Array& c = db_setup_array::c;
     c.add(65536);
     CHECK_EQUAL(c.get(0), 0);
     CHECK_EQUAL(c.get(1), 1);
@@ -181,8 +191,9 @@ TEST_FIXTURE(db_setup_array, Array_Add7)
     CHECK_EQUAL(32, c.get_width());
 }
 
-TEST_FIXTURE(db_setup_array, Array_Add8)
+TEST(Array_Add8)
 {
+    Array& c = db_setup_array::c;
     c.add(4294967296LL);
     CHECK_EQUAL(c.get(0), 0);
     CHECK_EQUAL(c.get(1), 1);
@@ -197,8 +208,9 @@ TEST_FIXTURE(db_setup_array, Array_Add8)
     CHECK_EQUAL(64, c.get_width());
 }
 
-TEST_FIXTURE(db_setup_array, Array_AddNeg1)
+TEST(Array_AddNeg1)
 {
+    Array& c = db_setup_array::c;
     c.clear();
     c.add(-1);
 
@@ -227,8 +239,9 @@ TEST(Array_AddNeg1_1)
     c.destroy();
 }
 
-TEST_FIXTURE(db_setup_array, Array_AddNeg2)
+TEST(Array_AddNeg2)
 {
+    Array& c = db_setup_array::c;
     c.add(-256);
 
     CHECK_EQUAL(c.size(), 2);
@@ -237,8 +250,9 @@ TEST_FIXTURE(db_setup_array, Array_AddNeg2)
     CHECK_EQUAL(16, c.get_width());
 }
 
-TEST_FIXTURE(db_setup_array, Array_AddNeg3)
+TEST(Array_AddNeg3)
 {
+    Array& c = db_setup_array::c;
     c.add(-65536);
 
     CHECK_EQUAL(c.size(), 3);
@@ -248,8 +262,9 @@ TEST_FIXTURE(db_setup_array, Array_AddNeg3)
     CHECK_EQUAL(32, c.get_width());
 }
 
-TEST_FIXTURE(db_setup_array, Array_AddNeg4)
+TEST(Array_AddNeg4)
 {
+    Array& c = db_setup_array::c;
     c.add(-4294967296LL);
 
     CHECK_EQUAL(c.size(), 4);
@@ -260,8 +275,9 @@ TEST_FIXTURE(db_setup_array, Array_AddNeg4)
     CHECK_EQUAL(64, c.get_width());
 }
 
-TEST_FIXTURE(db_setup_array, Array_Set)
+TEST(Array_Set)
 {
+    Array& c = db_setup_array::c;
     c.set(0, 3);
     c.set(1, 2);
     c.set(2, 1);
@@ -274,8 +290,10 @@ TEST_FIXTURE(db_setup_array, Array_Set)
     CHECK_EQUAL(c.get(3), 0);
 }
 
-TEST_FIXTURE(db_setup_array, Array_Insert1)
+TEST(Array_Insert1)
 {
+    Array& c = db_setup_array::c;
+
     // Set up some initial values
     c.clear();
     c.add(0);
@@ -294,8 +312,10 @@ TEST_FIXTURE(db_setup_array, Array_Insert1)
     CHECK_EQUAL(c.get(4), 3);
 }
 
-TEST_FIXTURE(db_setup_array, Array_Insert2)
+TEST(Array_Insert2)
 {
+    Array& c = db_setup_array::c;
+
     // Insert at top
     c.insert(0, 256);
 
@@ -308,8 +328,10 @@ TEST_FIXTURE(db_setup_array, Array_Insert2)
     CHECK_EQUAL(c.get(5), 3);
 }
 
-TEST_FIXTURE(db_setup_array, Array_Insert3)
+TEST(Array_Insert3)
 {
+    Array& c = db_setup_array::c;
+
     // Insert at bottom
     c.insert(6, 65536);
 
@@ -324,8 +346,10 @@ TEST_FIXTURE(db_setup_array, Array_Insert3)
 }
 
 /*
-TEST_FIXTURE(db_setup_array, Array_Index1)
+TEST(Array_Index1)
 {
+    Array& c = db_setup_array::c;
+
     // Create index
     Column index;
     c.BuildIndex(index);
@@ -342,8 +366,10 @@ TEST_FIXTURE(db_setup_array, Array_Index1)
 }
 */
 
-TEST_FIXTURE(db_setup_array, Array_Delete1)
+TEST(Array_Delete1)
 {
+    Array& c = db_setup_array::c;
+
     // Delete from middle
     c.erase(3);
 
@@ -356,8 +382,10 @@ TEST_FIXTURE(db_setup_array, Array_Delete1)
     CHECK_EQUAL(c.get(5), 65536);
 }
 
-TEST_FIXTURE(db_setup_array, Array_Delete2)
+TEST(Array_Delete2)
 {
+    Array& c = db_setup_array::c;
+
     // Delete from top
     c.erase(0);
 
@@ -369,8 +397,10 @@ TEST_FIXTURE(db_setup_array, Array_Delete2)
     CHECK_EQUAL(c.get(4), 65536);
 }
 
-TEST_FIXTURE(db_setup_array, Array_Delete3)
+TEST(Array_Delete3)
 {
+    Array& c = db_setup_array::c;
+
     // Delete from bottom
     c.erase(4);
 
@@ -381,8 +411,10 @@ TEST_FIXTURE(db_setup_array, Array_Delete3)
     CHECK_EQUAL(c.get(3), 3);
 }
 
-TEST_FIXTURE(db_setup_array, Array_DeleteAll)
+TEST(Array_DeleteAll)
 {
+    Array& c = db_setup_array::c;
+
     // Delete all items one at a time
     c.erase(0);
     c.erase(0);
@@ -393,16 +425,20 @@ TEST_FIXTURE(db_setup_array, Array_DeleteAll)
     CHECK_EQUAL(0, c.size());
 }
 
-TEST_FIXTURE(db_setup_array, Array_Find1)
+TEST(Array_Find1)
 {
+    Array& c = db_setup_array::c;
+
     // Look for a non-existing value
     size_t res = c.find_first(10);
 
     CHECK_EQUAL(res, -1);
 }
 
-TEST_FIXTURE(db_setup_array, Array_Find2)
+TEST(Array_Find2)
 {
+    Array& c = db_setup_array::c;
+
     // zero-bit width
     c.clear();
     c.add(0);
@@ -412,8 +448,10 @@ TEST_FIXTURE(db_setup_array, Array_Find2)
     CHECK_EQUAL(res, 0);
 }
 
-TEST_FIXTURE(db_setup_array, Array_Find3)
+TEST(Array_Find3)
 {
+    Array& c = db_setup_array::c;
+
     // expand to 1-bit width
     c.add(1);
 
@@ -421,8 +459,10 @@ TEST_FIXTURE(db_setup_array, Array_Find3)
     CHECK_EQUAL(res, 2);
 }
 
-TEST_FIXTURE(db_setup_array, Array_Find4)
+TEST(Array_Find4)
 {
+    Array& c = db_setup_array::c;
+
     // expand to 2-bit width
     c.add(2);
 
@@ -430,8 +470,10 @@ TEST_FIXTURE(db_setup_array, Array_Find4)
     CHECK_EQUAL(res, 3);
 }
 
-TEST_FIXTURE(db_setup_array, Array_Find5)
+TEST(Array_Find5)
 {
+    Array& c = db_setup_array::c;
+
     // expand to 4-bit width
     c.add(4);
 
@@ -439,8 +481,10 @@ TEST_FIXTURE(db_setup_array, Array_Find5)
     CHECK_EQUAL(res, 4);
 }
 
-TEST_FIXTURE(db_setup_array, Array_Find6)
+TEST(Array_Find6)
 {
+    Array& c = db_setup_array::c;
+
     // expand to 8-bit width
     c.add(16);
 
@@ -453,8 +497,10 @@ TEST_FIXTURE(db_setup_array, Array_Find6)
     CHECK_EQUAL(7, res);
 }
 
-TEST_FIXTURE(db_setup_array, Array_Find7)
+TEST(Array_Find7)
 {
+    Array& c = db_setup_array::c;
+
     // expand to 16-bit width
     c.add(256);
 
@@ -462,8 +508,10 @@ TEST_FIXTURE(db_setup_array, Array_Find7)
     CHECK_EQUAL(8, res);
 }
 
-TEST_FIXTURE(db_setup_array, Array_Find8)
+TEST(Array_Find8)
 {
+    Array& c = db_setup_array::c;
+
     // expand to 32-bit width
     c.add(65536);
 
@@ -471,8 +519,10 @@ TEST_FIXTURE(db_setup_array, Array_Find8)
     CHECK_EQUAL(9, res);
 }
 
-TEST_FIXTURE(db_setup_array, Array_Find9)
+TEST(Array_Find9)
 {
+    Array& c = db_setup_array::c;
+
     // expand to 64-bit width
     c.add(4294967296LL);
 
@@ -482,8 +532,10 @@ TEST_FIXTURE(db_setup_array, Array_Find9)
 
 /* Partial find is not fully implemented yet
 #define PARTIAL_COUNT 100
-TEST_FIXTURE(db_setup_array, Array_PartialFind1)
+TEST(Array_PartialFind1)
 {
+    Array& c = db_setup_array::c;
+
     c.clear();
 
     for (size_t i = 0; i < PARTIAL_COUNT; ++i) {
@@ -496,13 +548,15 @@ TEST_FIXTURE(db_setup_array, Array_PartialFind1)
 }
 */
 
-TEST_FIXTURE(db_setup_array, Array_Destroy)
+TEST(Array_Destroy)
 {
+    Array& c = db_setup_array::c;
+
     // clean up (ALWAYS PUT THIS LAST)
     c.destroy();
 }
 
-TEST_FIXTURE(db_setup_array, Array_LowerUpperBound)
+TEST(Array_LowerUpperBound)
 {
     Array a;
     a.add(10);
@@ -588,7 +642,7 @@ TEST(Array_Sort)
  */
 
 
-TEST(findallint0)
+TEST(Array_FindAllInt0)
 {
     Array a;
     Array r;
@@ -616,7 +670,7 @@ TEST(findallint0)
     r.destroy();
 }
 
-TEST(findallint1)
+TEST(Array_FindAllInt1)
 {
     Array a;
     Array r;
@@ -647,7 +701,7 @@ TEST(findallint1)
     r.destroy();
 }
 
-TEST(findallint2)
+TEST(Array_FindAllInt2)
 {
     Array a;
     Array r;
@@ -678,7 +732,7 @@ TEST(findallint2)
     r.destroy();
 }
 
-TEST(findallint3)
+TEST(Array_FindAllInt3)
 {
     Array a;
     Array r;
@@ -709,7 +763,7 @@ TEST(findallint3)
     r.destroy();
 }
 
-TEST(findallint4)
+TEST(Array_FindAllInt4)
 {
     Array a;
     Array r;
@@ -741,7 +795,7 @@ TEST(findallint4)
     r.destroy();
 }
 
-TEST(findallint5)
+TEST(Array_FindAllInt5)
 {
     Array a;
     Array r;
@@ -773,7 +827,7 @@ TEST(findallint5)
     r.destroy();
 }
 
-TEST(findallint6)
+TEST(Array_FindAllInt6)
 {
     Array a;
     Array r;
@@ -805,7 +859,7 @@ TEST(findallint6)
     r.destroy();
 }
 
-TEST(findallint7)
+TEST(Array_FindAllInt7)
 {
     Array a;
     Array r;
@@ -838,7 +892,7 @@ TEST(findallint7)
 }
 
 // Tests the case where a value does *not* exist in one entire 64-bit chunk (triggers the 'if (has_zero_byte()) break;' condition)
-TEST(FindHasZeroByte)
+TEST(Array_FindHasZeroByte)
 {
     // we want at least 1 entire 64-bit chunk-test, and we also want a remainder-test, so we chose n to be a prime > 64
     size_t n = 73;
@@ -852,7 +906,7 @@ TEST(FindHasZeroByte)
 }
 
 // New find test for SSE search, to trigger partial finds (see FindSSE()) before and after the aligned data area
-TEST(FindSSE)
+TEST(Array_FindSSE)
 {
     Array a;
     for (uint64_t i = 0; i < 100; i++) {
@@ -870,7 +924,7 @@ TEST(FindSSE)
 }
 
 
-TEST(Sum0)
+TEST(Array_Sum0)
 {
     Array a;
     for (int i = 0; i < 64 + 7; i++) {
@@ -880,7 +934,7 @@ TEST(Sum0)
     a.destroy();
 }
 
-TEST(Sum1)
+TEST(Array_Sum1)
 {
     int64_t s1 = 0;
     Array a;
@@ -900,7 +954,7 @@ TEST(Sum1)
     a.destroy();
 }
 
-TEST(Sum2)
+TEST(Array_Sum2)
 {
     int64_t s1 = 0;
     Array a;
@@ -921,7 +975,7 @@ TEST(Sum2)
 }
 
 
-TEST(Sum4)
+TEST(Array_Sum4)
 {
     int64_t s1 = 0;
     Array a;
@@ -941,7 +995,7 @@ TEST(Sum4)
     a.destroy();
 }
 
-TEST(Sum16)
+TEST(Array_Sum16)
 {
     int64_t s1 = 0;
     Array a;
@@ -961,7 +1015,7 @@ TEST(Sum16)
     a.destroy();
 }
 
-TEST(Greater)
+TEST(Array_Greater)
 {
     Array a;
 
@@ -1086,7 +1140,7 @@ TEST(Greater)
 
 
 
-TEST(Less)
+TEST(Array_Less)
 {
     Array a;
 
@@ -1206,7 +1260,7 @@ TEST(Less)
 }
 
 
-TEST(NotEqual1)
+TEST(Array_NotEqual1)
 {
     Array a;
 
@@ -1220,7 +1274,7 @@ TEST(NotEqual1)
     a.destroy();
 }
 
-TEST(NotEqual)
+TEST(Array_NotEqual)
 {
     Array a;
 
@@ -1341,7 +1395,7 @@ TEST(NotEqual)
 
 
 
-TEST(ArraySort)
+TEST(Array_Sort1)
 {
     // negative values
     Array a;
@@ -1360,7 +1414,7 @@ TEST(ArraySort)
 }
 
 
-TEST(ArraySort2)
+TEST(Array_Sort2)
 {
     // 64 bit values
     Array a;
@@ -1378,7 +1432,7 @@ TEST(ArraySort2)
     a.destroy();
 }
 
-TEST(ArraySort3)
+TEST(Array_Sort3)
 {
     // many values
     Array a;
@@ -1397,7 +1451,7 @@ TEST(ArraySort3)
 }
 
 
-TEST(ArraySort4)
+TEST(Array_Sort4)
 {
     // same values
     Array a;
@@ -1415,7 +1469,7 @@ TEST(ArraySort4)
     a.destroy();
 }
 
-TEST(ArrayCopy)
+TEST(Array_Copy)
 {
     Array a;
     a.add(0);
@@ -1459,14 +1513,12 @@ TEST(ArrayCopy)
     CHECK_EQUAL(3, e.get(3));
     CHECK_EQUAL(4, e.get(4));
 
-    //a.destroy() // will be destroyed as sub-array by c
     b.destroy();
-    c.destroy();
-    d.destroy();
-    //e.destroy() // will be destroyed as sub-array by d
+    c.destroy_deep();
+    d.destroy_deep();
 }
 
-TEST(ArrayCount)
+TEST(Array_Count)
 {
     Array a;
 

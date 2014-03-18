@@ -5,7 +5,9 @@
 #include <iomanip>
 #include <fstream>
 
+#include <tightdb/util/memory_stream.hpp>
 #include <tightdb/util/thread.hpp>
+#include <tightdb/impl/destroy_guard.hpp>
 #include <tightdb/utilities.hpp>
 #include <tightdb/group_writer.hpp>
 #include <tightdb/group.hpp>
@@ -27,118 +29,6 @@ public:
 };
 
 Initialization initialization;
-
-class MemoryOStream {
-public:
-    MemoryOStream(size_t buffer_size): m_pos(0)
-    {
-        m_buffer = static_cast<char*>(malloc(buffer_size));
-        if (!m_buffer)
-            throw bad_alloc();
-    }
-
-    ~MemoryOStream()
-    {
-        free(m_buffer);
-    }
-
-    size_t get_pos() const { return m_pos; }
-
-    void write(const char* data, size_t size)
-    {
-        char* dest = m_buffer + m_pos;
-        copy(data, data+size, dest);
-        m_pos += size;
-    }
-
-    size_t write_array(const char* data, size_t size, uint_fast32_t checksum)
-    {
-        size_t pos = m_pos;
-        char* dest = m_buffer + pos;
-#ifdef TIGHTDB_DEBUG
-        const char* cksum_bytes = reinterpret_cast<const char*>(&checksum);
-        copy(cksum_bytes, cksum_bytes+4, dest);
-        copy(data+4, data+size, dest+4);
-#else
-        static_cast<void>(checksum);
-        copy(data, data+size, dest);
-#endif
-        m_pos += size;
-        return pos;
-    }
-
-    char* release_buffer() TIGHTDB_NOEXCEPT
-    {
-        char* const buffer = m_buffer;
-        m_buffer = 0;
-        return buffer;
-    }
-
-private:
-    size_t m_pos;
-    char* m_buffer;
-};
-
-class FileOStream {
-public:
-    FileOStream(const string& path): m_pos(0), m_streambuf(&m_file), m_out(&m_streambuf)
-    {
-        m_file.open(path, File::access_ReadWrite, File::create_Must, 0);
-    }
-
-    size_t get_pos() const { return m_pos; }
-
-    void write(const char* data, size_t size)
-    {
-        size_t size_0 = size;
-
-        const char* data_1 = data;
-        size_t size_1 = size_0;
-
-        // Handle the case where 'size_t' has a larger range than 'streamsize'
-        streamsize max_streamsize = numeric_limits<streamsize>::max();
-        size_t max_put = numeric_limits<size_t>::max();
-        if (int_less_than(max_streamsize, max_put))
-            max_put = size_t(max_streamsize);
-        while (max_put < size_1) {
-            m_out.write(data_1, max_put);
-            data_1 += max_put;
-            size_1 -= max_put;
-        }
-
-        m_out.write(data_1, size_1);
-
-        if (int_add_with_overflow_detect(m_pos, size_0))
-            throw runtime_error("File size overflow");
-    }
-
-    size_t write_array(const char* data, size_t size, uint_fast32_t checksum)
-    {
-        const char* data_1 = data;
-        size_t size_1 = size;
-        size_t pos = m_pos;
-
-#ifdef TIGHTDB_DEBUG
-        const char* cksum_bytes = reinterpret_cast<const char*>(&checksum);
-        m_out.write(cksum_bytes, 4);
-        data_1 += 4;
-        size_1 -= 4;
-        if (int_add_with_overflow_detect(m_pos, 4))
-            throw runtime_error("File size overflow");
-#else
-        static_cast<void>(checksum);
-#endif
-
-        write(data_1, size_1);
-        return pos;
-    }
-
-private:
-    size_t m_pos;
-    File m_file;
-    File::Streambuf m_streambuf;
-    ostream m_out;
-};
 
 } // anonymous namespace
 
@@ -224,8 +114,8 @@ void Group::create(bool add_free_versions)
         m_free_lengths.destroy();
         m_free_positions.destroy();
         m_table_names.destroy();
-        m_tables.destroy();
-        m_top.destroy();
+        m_tables.destroy_deep();
+        m_top.destroy(); // Shallow!
         throw;
     }
 }
@@ -320,7 +210,7 @@ Group::~Group() TIGHTDB_NOEXCEPT
 #ifdef TIGHTDB_DEBUG
     // Recursively deletes entire tree. The destructor in
     // the allocator will verify that all has been deleted.
-    m_top.destroy();
+    m_top.destroy_deep();
 #else
     // Just allow the allocator to release all mem in one chunk
     // without having to traverse the entire tree first
@@ -335,8 +225,8 @@ void Group::detach_table_accessors() TIGHTDB_NOEXCEPT
     iter end = m_table_accessors.end();
     for (iter i = m_table_accessors.begin(); i != end; ++i) {
         if (Table* t = *i) {
-            t->detach();
-            t->unbind_ref();
+            _impl::TableFriend::detach(*t);
+            _impl::TableFriend::unbind_ref(*t);
         }
     }
 }
@@ -370,9 +260,9 @@ Table* Group::get_table_by_ndx(size_t ndx)
     Table* table = m_table_accessors[ndx];
     if (!table) {
         ref_type ref = m_tables.get_as_ref(ndx);
-        table = new Table(Table::ref_count_tag(), m_alloc, ref, this, ndx); // Throws
+        table = _impl::TableFriend::create_ref_counted(m_alloc, ref, this, ndx); // Throws
         m_table_accessors[ndx] = table;
-        table->bind_ref(); // Increase reference count from 0 to 1
+        _impl::TableFriend::bind_ref(*table); // Increase reference count from 0 to 1
     }
     return table;
 }
@@ -388,7 +278,8 @@ ref_type Group::create_new_table(StringData name)
     // side-effects when it throws, at least not in any way that
     // matters.
 
-    Array::DestroyGuard ref_dg(Table::create_empty_table(m_alloc), m_alloc); // Throws
+    using namespace _impl;
+    DeepArrayRefDestroyGuard ref_dg(TableFriend::create_empty_table(m_alloc), m_alloc); // Throws
     size_t ndx = m_tables.size();
     TIGHTDB_ASSERT(ndx == m_table_names.size());
     m_tables.insert(ndx, ref_dg.get()); // Throws
@@ -434,18 +325,20 @@ Table* Group::create_new_table_and_accessor(StringData name, SpecSetter spec_set
         repl->new_top_level_table(name); // Throws
 #endif
 
-    Array::DestroyGuard ref_dg(Table::create_empty_table(m_alloc), m_alloc); // Throws
-    Table::UnbindGuard table_ug(new Table(Table::ref_count_tag(), m_alloc,
-                                          ref_dg.get(), null_ptr, 0)); // Throws
+    using namespace _impl;
+    DeepArrayRefDestroyGuard ref_dg(TableFriend::create_empty_table(m_alloc), m_alloc); // Throws
+    typedef TableFriend::UnbindGuard TableUnbindGuard;
+    TableUnbindGuard table_ug(TableFriend::create_ref_counted(m_alloc, ref_dg.get(),
+                                                              null_ptr, 0)); // Throws
 
     // The table accessor owns the ref until the point below where a
     // parent is set in Table::m_top.
     ref_type ref = ref_dg.release();
-    table_ug->bind_ref(); // Increase reference count from 0 to 1
+    TableFriend::bind_ref(*table_ug); // Increase reference count from 0 to 1
 
     size_t ndx = m_tables.size();
     m_table_accessors.resize(ndx+1); // Throws
-    table_ug->m_top.set_parent(this, ndx);
+    TableFriend::set_top_parent(*table_ug, this, ndx);
     try {
         if (spec_setter)
             (*spec_setter)(*table_ug); // Throws
@@ -465,28 +358,47 @@ Table* Group::create_new_table_and_accessor(StringData name, SpecSetter spec_set
         }
     }
     catch (...) {
-        table_ug->m_top.set_parent(0,0);
+        TableFriend::set_top_parent(*table_ug, 0, 0);
         throw;
     }
 }
 
 
-void Group::write(const string& path) const
+class Group::DefaultTableWriter: public Group::TableWriter {
+public:
+    DefaultTableWriter(const Group& group):
+        m_group(group)
+    {
+    }
+    size_t write_names(_impl::OutputStream& out) TIGHTDB_OVERRIDE
+    {
+        return m_group.m_table_names.write(out); // Throws
+    }
+    size_t write_tables(_impl::OutputStream& out) TIGHTDB_OVERRIDE
+    {
+        return m_group.m_tables.write(out); // Throws
+    }
+private:
+    const Group& m_group;
+};
+
+void Group::write(ostream& out) const
 {
     TIGHTDB_ASSERT(is_attached());
-
-    FileOStream out(path);
-    write_to_stream(out); // Throws
+    DefaultTableWriter table_writer(*this);
+    write(out, table_writer); // Throws
 }
-/*
-FIXME VS2012 warning on the line write_to_stream(out) above :
-warning C4244: 'initializing' : conversion from 'uint64_t' to 'size_t', possible loss of data
-          src\tightdb\group.cpp(480) : see reference to function template instantiation 'size_t tightdb::Group::write_to_stream<`anonymous-namespace'::FileOStream>(S &) const' being compiled
-          with
-          [
-              S=`anonymous-namespace'::FileOStream
-          ]
-*/
+
+void Group::write(const string& path) const
+{
+    File file;
+    int flags = 0;
+    file.open(path, File::access_ReadWrite, File::create_Must, flags);
+    File::Streambuf streambuf(&file);
+    ostream out(&streambuf);
+    write(out);
+}
+
 
 BinaryData Group::write_to_mem() const
 {
@@ -498,11 +410,74 @@ BinaryData Group::write_to_mem() const
     // is actually needed.
     size_t max_size = m_alloc.get_total_size();
 
-    MemoryOStream out(max_size);
-    size_t size = write_to_stream(out); // Throws
+    char* buffer = static_cast<char*>(malloc(max_size)); // Throws
+    if (!buffer)
+        throw bad_alloc();
+    try {
+        MemoryOutputStream out; // Throws
+        out.set_buffer(buffer, buffer + max_size);
+        write(out); // Throws
+        size_t size = out.size();
+        return BinaryData(buffer, size);
+    }
+    catch (...) {
+        free(buffer);
+        throw;
+    }
+}
 
-    char* data = out.release_buffer();
-    return BinaryData(data, size);
+
+void Group::write(ostream& out, TableWriter& table_writer)
+{
+    _impl::OutputStream out_2(out);
+
+    // Write the file header
+    const char* data = reinterpret_cast<const char*>(&SlabAlloc::streaming_header);
+    out_2.write(data, sizeof SlabAlloc::streaming_header);
+
+    // Because we need to include the total logical file size in the
+    // top-array, we have to start by writing everything except the
+    // top-array, and then finally compute and write a correct version
+    // of the top-array. The free-space information of the group will
+    // not be included, as it is not needed in the streamed format.
+    size_t names_pos  = table_writer.write_names(out_2); // Throws
+    size_t tables_pos = table_writer.write_tables(out_2); // Throws
+    size_t top_pos = out_2.get_pos();
+
+    // Produce a preliminary version of the top array whose
+    // representation is guaranteed to be able to hold the final file
+    // size
+    int top_size = 3;
+    size_t max_top_byte_size = Array::get_max_byte_size(top_size);
+    uint64_t max_final_file_size = top_pos + max_top_byte_size;
+    Array top(Array::type_HasRefs); // Throws
+    // FIXME: Dangerous cast: unsigned -> signed
+    top.ensure_minimum_width(1 + 2*max_final_file_size); // Throws
+    // FIXME: We really need an alternative to Array::truncate() that is able to expand.
+    // FIXME: Dangerous cast: unsigned -> signed
+    top.add(names_pos); // Throws
+    top.add(tables_pos); // Throws
+    top.add(0); // Throws
+
+    // Finalize the top array by adding the projected final file size
+    // to it
+    size_t top_byte_size = top.get_byte_size();
+    size_t final_file_size = top_pos + top_byte_size;
+    // FIXME: Dangerous cast: unsigned -> signed
+    top.set(2, 1 + 2*final_file_size);
+
+    // Write the top array
+    bool recurse = false;
+    top.write(out_2, recurse); // Throws
+    TIGHTDB_ASSERT(out_2.get_pos() == final_file_size);
+
+    top.destroy(); // Shallow
+
+    // Write streaming footer
+    SlabAlloc::StreamingFooter footer;
+    footer.m_top_ref = top_pos;
+    footer.m_magic_cookie = SlabAlloc::footer_magic_cookie;
+    out_2.write(reinterpret_cast<const char*>(&footer), sizeof footer);
 }
 
 
@@ -605,7 +580,7 @@ void Group::update_refs(ref_type top_ref, size_t old_baseline) TIGHTDB_NOEXCEPT
     iter end = m_table_accessors.end();
     for (iter i = m_table_accessors.begin(); i != end; ++i) {
         if (Table* table = *i)
-            table->update_from_parent(old_baseline);
+            _impl::TableFriend::update_from_parent(*table, old_baseline);
     }
 }
 

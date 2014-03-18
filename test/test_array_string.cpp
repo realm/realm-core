@@ -10,14 +10,22 @@ using namespace tightdb;
 // Note: You can now temporarely declare unit tests with the ONLY(TestName) macro instead of TEST(TestName). This
 // will disable all unit tests except these. Remember to undo your temporary changes before committing.
 
+
+namespace {
+
 struct db_setup_string {
     static ArrayString c;
 };
 
 ArrayString db_setup_string::c;
 
-TEST_FIXTURE(db_setup_string, ArrayStringMultiEmpty)
+} // anonnymous namespace
+
+
+TEST(ArrayString_MultiEmpty)
 {
+    ArrayString& c = db_setup_string::c;
+
     c.add("");
     c.add("");
     c.add("");
@@ -34,8 +42,10 @@ TEST_FIXTURE(db_setup_string, ArrayStringMultiEmpty)
     CHECK_EQUAL("", c.get(5));
 }
 
-TEST_FIXTURE(db_setup_string, ArrayStringSetEmpty1)
+TEST(ArrayString_SetEmpty1)
 {
+    ArrayString& c = db_setup_string::c;
+
     c.set(0, "");
 
     CHECK_EQUAL(6, c.size());
@@ -47,13 +57,16 @@ TEST_FIXTURE(db_setup_string, ArrayStringSetEmpty1)
     CHECK_EQUAL("", c.get(5));
 }
 
-TEST_FIXTURE(db_setup_string, ArrayStringErase0)
+TEST(ArrayString_Erase0)
 {
+    ArrayString& c = db_setup_string::c;
     c.erase(5);
 }
 
-TEST_FIXTURE(db_setup_string, ArrayStringInsert0)
+TEST(ArrayString_Insert0)
 {
+    ArrayString& c = db_setup_string::c;
+
     // Intention: Insert a non-empty string into an array that is not
     // empty but contains only empty strings (and only ever have
     // contained empty strings). The insertion is not at the end of
@@ -61,8 +74,10 @@ TEST_FIXTURE(db_setup_string, ArrayStringInsert0)
     c.insert(0, "x");
 }
 
-TEST_FIXTURE(db_setup_string, ArrayStringSetEmpty2)
+TEST(ArrayString_SetEmpty2)
 {
+    ArrayString& c = db_setup_string::c;
+
     c.set(0, "");
     c.set(5, "");
 
@@ -75,9 +90,11 @@ TEST_FIXTURE(db_setup_string, ArrayStringSetEmpty2)
     CHECK_EQUAL("", c.get(5));
 }
 
-TEST_FIXTURE(db_setup_string, ArrayStringClear)
+TEST(ArrayString_Clear)
 {
+    ArrayString& c = db_setup_string::c;
     c.clear();
+
     c.add("");
     c.add("");
     c.add("");
@@ -94,8 +111,10 @@ TEST_FIXTURE(db_setup_string, ArrayStringClear)
     CHECK_EQUAL("", c.get(5));
 }
 
-TEST_FIXTURE(db_setup_string, ArrayStringFind1)
+TEST(ArrayString_Find1)
 {
+    ArrayString& c = db_setup_string::c;
+
     CHECK_EQUAL(6, c.size());
     CHECK_EQUAL("", c.get(0));
     // Intention: Search for strings in an array that is not empty but
@@ -107,8 +126,10 @@ TEST_FIXTURE(db_setup_string, ArrayStringFind1)
     CHECK_EQUAL(size_t(-1), c.find_first("", 6));
 }
 
-TEST_FIXTURE(db_setup_string, ArrayStringSetExpand4)
+TEST(ArrayString_SetExpand4)
 {
+    ArrayString& c = db_setup_string::c;
+
     c.set(0, "hey");
 
     CHECK_EQUAL(6, c.size());
@@ -120,15 +141,19 @@ TEST_FIXTURE(db_setup_string, ArrayStringSetExpand4)
     CHECK_EQUAL("", c.get(5));
 }
 
-TEST_FIXTURE(db_setup_string, ArrayStringFind2)
+TEST(ArrayString_Find2)
 {
+    ArrayString& c = db_setup_string::c;
+
     // Intention: Search for non-empty string P that is not in then
     // array, but the array does contain a string where P is a prefix.
     CHECK_EQUAL(size_t(-1), c.find_first("he"));
 }
 
-TEST_FIXTURE(db_setup_string, ArrayStringSetExpand8)
+TEST(ArrayString_SetExpand8)
 {
+    ArrayString& c = db_setup_string::c;
+
     c.set(1, "test");
 
     CHECK_EQUAL(6, c.size());
@@ -140,24 +165,30 @@ TEST_FIXTURE(db_setup_string, ArrayStringSetExpand8)
     CHECK_EQUAL("", c.get(5));
 }
 
-TEST_FIXTURE(db_setup_string, ArrayArrayStringAdd0)
+TEST(ArrayArrayString_Add0)
 {
+    ArrayString& c = db_setup_string::c;
     c.clear();
+
     c.add();
     CHECK_EQUAL("", c.get(0));
     CHECK_EQUAL(1, c.size());
 }
 
-TEST_FIXTURE(db_setup_string, ArrayStringAdd1)
+TEST(ArrayString_Add1)
 {
+    ArrayString& c = db_setup_string::c;
+
     c.add("a");
     CHECK_EQUAL("",  c.get(0));
     CHECK_EQUAL("a", c.get(1));
     CHECK_EQUAL(2, c.size());
 }
 
-TEST_FIXTURE(db_setup_string, ArrayStringAdd2)
+TEST(ArrayString_Add2)
 {
+    ArrayString& c = db_setup_string::c;
+
     c.add("bb");
     CHECK_EQUAL("",   c.get(0));
     CHECK_EQUAL("a",  c.get(1));
@@ -165,8 +196,10 @@ TEST_FIXTURE(db_setup_string, ArrayStringAdd2)
     CHECK_EQUAL(3, c.size());
 }
 
-TEST_FIXTURE(db_setup_string, ArrayStringAdd3)
+TEST(ArrayString_Add3)
 {
+    ArrayString& c = db_setup_string::c;
+
     c.add("ccc");
     CHECK_EQUAL("",    c.get(0));
     CHECK_EQUAL("a",   c.get(1));
@@ -175,8 +208,10 @@ TEST_FIXTURE(db_setup_string, ArrayStringAdd3)
     CHECK_EQUAL(4, c.size());
 }
 
-TEST_FIXTURE(db_setup_string, ArrayStringAdd4)
+TEST(ArrayString_Add4)
 {
+    ArrayString& c = db_setup_string::c;
+
     c.add("dddd");
     CHECK_EQUAL("",     c.get(0));
     CHECK_EQUAL("a",    c.get(1));
@@ -186,8 +221,10 @@ TEST_FIXTURE(db_setup_string, ArrayStringAdd4)
     CHECK_EQUAL(5, c.size());
 }
 
-TEST_FIXTURE(db_setup_string, ArrayStringAdd8)
+TEST(ArrayString_Add8)
 {
+    ArrayString& c = db_setup_string::c;
+
     c.add("eeeeeeee");
     CHECK_EQUAL("",     c.get(0));
     CHECK_EQUAL("a",    c.get(1));
@@ -198,8 +235,10 @@ TEST_FIXTURE(db_setup_string, ArrayStringAdd8)
     CHECK_EQUAL(6, c.size());
 }
 
-TEST_FIXTURE(db_setup_string, ArrayStringAdd16)
+TEST(ArrayString_Add16)
 {
+    ArrayString& c = db_setup_string::c;
+
     c.add("ffffffffffffffff");
     CHECK_EQUAL("",     c.get(0));
     CHECK_EQUAL("a",    c.get(1));
@@ -211,8 +250,10 @@ TEST_FIXTURE(db_setup_string, ArrayStringAdd16)
     CHECK_EQUAL(7, c.size());
 }
 
-TEST_FIXTURE(db_setup_string, ArrayStringAdd32)
+TEST(ArrayString_Add32)
 {
+    ArrayString& c = db_setup_string::c;
+
     c.add("gggggggggggggggggggggggggggggggg");
 
     CHECK_EQUAL("",     c.get(0));
@@ -226,8 +267,10 @@ TEST_FIXTURE(db_setup_string, ArrayStringAdd32)
     CHECK_EQUAL(8, c.size());
 }
 
-TEST_FIXTURE(db_setup_string, ArrayStringSet1)
+TEST(ArrayString_Set1)
 {
+    ArrayString& c = db_setup_string::c;
+
     c.set(0, "ccc");
     c.set(1, "bb");
     c.set(2, "a");
@@ -244,8 +287,10 @@ TEST_FIXTURE(db_setup_string, ArrayStringSet1)
     CHECK_EQUAL(8, c.size());
 }
 
-TEST_FIXTURE(db_setup_string, ArrayStringInsert1)
+TEST(ArrayString_Insert1)
 {
+    ArrayString& c = db_setup_string::c;
+
     // Insert in middle
     c.insert(4, "xx");
 
@@ -261,8 +306,10 @@ TEST_FIXTURE(db_setup_string, ArrayStringInsert1)
     CHECK_EQUAL(9, c.size());
 }
 
-TEST_FIXTURE(db_setup_string, ArrayStringErase1)
+TEST(ArrayString_Erase1)
 {
+    ArrayString& c = db_setup_string::c;
+
     // Erase from end
     c.erase(8);
 
@@ -277,8 +324,10 @@ TEST_FIXTURE(db_setup_string, ArrayStringErase1)
     CHECK_EQUAL(8, c.size());
 }
 
-TEST_FIXTURE(db_setup_string, ArrayStringErase2)
+TEST(ArrayString_Erase2)
 {
+    ArrayString& c = db_setup_string::c;
+
     // Erase from top
     c.erase(0);
 
@@ -292,8 +341,10 @@ TEST_FIXTURE(db_setup_string, ArrayStringErase2)
     CHECK_EQUAL(7, c.size());
 }
 
-TEST_FIXTURE(db_setup_string, ArrayStringErase3)
+TEST(ArrayString_Erase3)
 {
+    ArrayString& c = db_setup_string::c;
+
     // Erase from middle
     c.erase(3);
 
@@ -306,8 +357,10 @@ TEST_FIXTURE(db_setup_string, ArrayStringErase3)
     CHECK_EQUAL(6, c.size());
 }
 
-TEST_FIXTURE(db_setup_string, ArrayStringEraseAll)
+TEST(ArrayString_EraseAll)
 {
+    ArrayString& c = db_setup_string::c;
+
     // Erase all items one at a time
     c.erase(0);
     c.erase(0);
@@ -320,8 +373,10 @@ TEST_FIXTURE(db_setup_string, ArrayStringEraseAll)
     CHECK_EQUAL(0, c.size());
 }
 
-TEST_FIXTURE(db_setup_string, ArrayStringInsert2)
+TEST(ArrayString_Insert2)
 {
+    ArrayString& c = db_setup_string::c;
+
     // Create new list
     c.clear();
     c.add("a");
@@ -340,8 +395,10 @@ TEST_FIXTURE(db_setup_string, ArrayStringInsert2)
     CHECK_EQUAL(5, c.size());
 }
 
-TEST_FIXTURE(db_setup_string, ArrayStringInsert3)
+TEST(ArrayString_Insert3)
 {
+    ArrayString& c = db_setup_string::c;
+
     // Insert in middle with expansion
     c.insert(3, "xxxxxxxxxx");
 
@@ -354,8 +411,10 @@ TEST_FIXTURE(db_setup_string, ArrayStringInsert3)
     CHECK_EQUAL(6, c.size());
 }
 
-TEST_FIXTURE(db_setup_string, ArrayStringFind3)
+TEST(ArrayString_Find3)
 {
+    ArrayString& c = db_setup_string::c;
+
     // Create new list
     c.clear();
     c.add("a");
@@ -369,8 +428,10 @@ TEST_FIXTURE(db_setup_string, ArrayStringFind3)
     CHECK_EQUAL(3, r);
 }
 
-TEST_FIXTURE(db_setup_string, ArrayStringFind4)
+TEST(ArrayString_Find4)
 {
+    ArrayString& c = db_setup_string::c;
+
     // Expand to 8 bytes width
     c.add("eeeeee");
 
@@ -380,8 +441,10 @@ TEST_FIXTURE(db_setup_string, ArrayStringFind4)
     CHECK_EQUAL(4, r);
 }
 
-TEST_FIXTURE(db_setup_string, ArrayStringFind5)
+TEST(ArrayString_Find5)
 {
+    ArrayString& c = db_setup_string::c;
+
     // Expand to 16 bytes width
     c.add("ffffffffffff");
 
@@ -391,8 +454,10 @@ TEST_FIXTURE(db_setup_string, ArrayStringFind5)
     CHECK_EQUAL(5, r);
 }
 
-TEST_FIXTURE(db_setup_string, ArrayStringFind6)
+TEST(ArrayString_Find6)
 {
+    ArrayString& c = db_setup_string::c;
+
     // Expand to 32 bytes width
     c.add("gggggggggggggggggggggggg");
 
@@ -402,8 +467,10 @@ TEST_FIXTURE(db_setup_string, ArrayStringFind6)
     CHECK_EQUAL(6, r);
 }
 
-TEST_FIXTURE(db_setup_string, ArrayStringFind7)
+TEST(ArrayString_Find7)
 {
+    ArrayString& c = db_setup_string::c;
+
     // Expand to 64 bytes width
     c.add("hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh");
 
@@ -413,9 +480,11 @@ TEST_FIXTURE(db_setup_string, ArrayStringFind7)
     CHECK_EQUAL(7, r);
 }
 
-TEST_FIXTURE(db_setup_string, ArrayStringFindAll)
+TEST(ArrayString_FindAll)
 {
+    ArrayString& c = db_setup_string::c;
     c.clear();
+
     Array col;
 
     // first, middle and end
@@ -435,8 +504,9 @@ TEST_FIXTURE(db_setup_string, ArrayStringFindAll)
     col.destroy();
 }
 
-TEST_FIXTURE(db_setup_string, ArrayStringCount)
+TEST(ArrayString_Count)
 {
+    ArrayString& c = db_setup_string::c;
     c.clear();
 
     // first, middle and end
@@ -450,8 +520,9 @@ TEST_FIXTURE(db_setup_string, ArrayStringCount)
     CHECK_EQUAL(3, count);
 }
 
-TEST_FIXTURE(db_setup_string, ArrayStringWithZeroBytes)
+TEST(ArrayString_WithZeroBytes)
 {
+    ArrayString& c = db_setup_string::c;
     c.clear();
 
     const char buf_1[] = { 'a', 0, 'b', 0, 'c' };
@@ -471,13 +542,15 @@ TEST_FIXTURE(db_setup_string, ArrayStringWithZeroBytes)
     CHECK_EQUAL(StringData(buf_3, sizeof buf_3), c.get(2));
 }
 
-TEST_FIXTURE(db_setup_string, ArrayStringDestroy)
+TEST(ArrayString_Destroy)
 {
+    ArrayString& c = db_setup_string::c;
+
     // clean up (ALWAYS PUT THIS LAST)
     c.destroy();
 }
 
-TEST(ArrayStringCompare)
+TEST(ArrayString_Compare)
 {
     ArrayString a, b;
 

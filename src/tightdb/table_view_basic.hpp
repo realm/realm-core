@@ -20,7 +20,7 @@
 #ifndef TIGHTDB_TABLE_VIEW_BASIC_HPP
 #define TIGHTDB_TABLE_VIEW_BASIC_HPP
 
-#include <tightdb/util/meta.hpp>
+#include <tightdb/util/type_traits.hpp>
 #include <tightdb/table_view.hpp>
 #include <tightdb/table_accessors.hpp>
 
@@ -37,6 +37,7 @@ public:
     typedef Tab table_type;
 
     bool is_empty() const TIGHTDB_NOEXCEPT { return m_impl.is_empty(); }
+    bool is_attached() const TIGHTDB_NOEXCEPT { return m_impl.is_attached(); }
     size_t size() const TIGHTDB_NOEXCEPT { return m_impl.size(); }
 
     // Get row index in the source table this view is "looking" at.

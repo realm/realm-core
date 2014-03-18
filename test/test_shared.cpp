@@ -28,6 +28,7 @@ using namespace tightdb::util;
 // Note: You can now temporarely declare unit tests with the ONLY(TestName) macro instead of TEST(TestName). This
 // will disable all unit tests except these. Remember to undo your temporary changes before committing.
 
+
 TEST(Shared_Unattached)
 {
     SharedGroup sg((SharedGroup::unattached_tag()));
@@ -43,6 +44,7 @@ TIGHTDB_TABLE_4(TestTableShared,
                 fourth, String)
 
 } // anonymous namespace
+
 
 TEST(Shared_no_create_cleanup_lock_file_after_failure)
 {
@@ -64,6 +66,7 @@ TEST(Shared_no_create_cleanup_lock_file_after_failure)
     CHECK( !File::exists("test_shared.tightdb") );
     CHECK( !File::exists("test_shared.tightdb.lock") );    //     <========= FAILS
 }
+
 
 TEST(Shared_no_create_cleanup_lock_file_after_failure_2)
 {
@@ -96,6 +99,7 @@ TEST(Shared_no_create_cleanup_lock_file_after_failure_2)
 
 }
 
+
 TEST(Shared_Initial)
 {
     // Delete old files if there
@@ -122,13 +126,6 @@ TEST(Shared_Initial)
     CHECK(!File::exists("test_shared.tightdb.lock"));
 }
 
-void copy_file(const char* from, const char* to)
-{
-    std::ifstream  src(from, std::ios::binary);
-    std::ofstream  dst(to,   std::ios::binary);
-
-    dst << src.rdbuf();
-}
 
 TEST(Shared_Stale_Lock_File_Faked)
 {
@@ -537,8 +534,9 @@ TEST(Shared_AddColumnToSubspec)
         {
             WriteTransaction wt(sg);
             TableRef table = wt.get_table("table");
-            table->add_column(type_Table, "subtable");
-            table->add_subcolumn(tuple(0), type_Int, "int");
+            DescriptorRef sub_1;
+            table->add_column(type_Table, "subtable", &sub_1);
+            sub_1->add_column(type_Int,   "int");
             table->add_empty_row();
             TableRef subtable = table->get_subtable(0,0);
             subtable->add_empty_row();
@@ -552,7 +550,8 @@ TEST(Shared_AddColumnToSubspec)
         {
             WriteTransaction wt(sg);
             TableRef table = wt.get_table("table");
-            table->add_subcolumn(tuple(0), type_Int, "int_2");
+            DescriptorRef subdesc = table->get_subdescriptor(0);
+            subdesc->add_column(type_Int, "int_2");
             TableRef subtable = table->get_subtable(0,0);
             CHECK_EQUAL(2, subtable->get_column_count());
             CHECK_EQUAL(type_Int, subtable->get_column_type(0));
@@ -599,10 +598,11 @@ TEST(Shared_RemoveColumnBeforeSubtableColumn)
         // that is preceded by another column
         {
             WriteTransaction wt(sg);
+            DescriptorRef sub_1;
             TableRef table = wt.get_table("table");
             table->add_column(type_Int,   "int");
-            table->add_column(type_Table, "subtable");
-            table->add_subcolumn(tuple(1), type_Int, "int");
+            table->add_column(type_Table, "subtable", &sub_1);
+            sub_1->add_column(type_Int,   "int");
             table->add_empty_row();
             TableRef subtable = table->get_subtable(1,0);
             subtable->add_empty_row();
@@ -1106,6 +1106,7 @@ TEST(Shared_FormerErrorCase1)
     File::try_remove("test_shared.tightdb.lock");
     SharedGroup sg("test_shared.tightdb");
     {
+        DescriptorRef sub_1, sub_2;
         WriteTransaction wt(sg);
         wt.get_group().Verify();
         TableRef table = wt.get_table("my_table");
@@ -1115,11 +1116,11 @@ TEST(Shared_FormerErrorCase1)
         table->add_column(type_DateTime, "delta");
         table->add_column(type_String,   "epsilon");
         table->add_column(type_Binary,   "zeta");
-        table->add_column(type_Table,    "eta");
+        table->add_column(type_Table,    "eta", &sub_1);
         table->add_column(type_Mixed,    "theta");
-        table->add_subcolumn(tuple(6), type_Int,   "foo");
-        table->add_subcolumn(tuple(6), type_Table, "bar");
-        table->add_subcolumn(tuple(6,1), type_Int, "value");
+        sub_1->add_column(type_Int,        "foo");
+        sub_1->add_column(type_Table,      "bar", &sub_2);
+        sub_2->add_column(type_Int,          "value");
         table->insert_empty_row(0, 1);
         wt.commit();
     }

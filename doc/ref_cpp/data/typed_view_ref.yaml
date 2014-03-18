@@ -40,8 +40,10 @@ CATEGORIES :
   METHODS:
   - g_typed_view_size:
       NAME     : size
-      SUMMARY  : *g_typed_table_size_summary
-      DESCR    : *g_typed_table_size_descr
+      SUMMARY  : &g_typed_view_size_summary
+                 Number of rows.
+      DESCR    : &g_typed_view_size_descr
+                 This method returns the number of rows in the table view.
       CONST    : True
       RETURN:
         TYPES  : size_t

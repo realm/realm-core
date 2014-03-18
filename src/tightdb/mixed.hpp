@@ -27,6 +27,7 @@
 
 #include <tightdb/util/assert.hpp>
 #include <tightdb/util/meta.hpp>
+#include <tightdb/utilities.hpp>
 #include <tightdb/data_type.hpp>
 #include <tightdb/datetime.hpp>
 #include <tightdb/string_data.hpp>
@@ -122,13 +123,13 @@ public:
 
     DataType get_type() const TIGHTDB_NOEXCEPT { return m_type; }
 
-    int64_t     get_int()    const TIGHTDB_NOEXCEPT;
-    bool        get_bool()   const TIGHTDB_NOEXCEPT;
-    float       get_float()  const TIGHTDB_NOEXCEPT;
-    double      get_double() const TIGHTDB_NOEXCEPT;
-    StringData  get_string() const TIGHTDB_NOEXCEPT;
-    BinaryData  get_binary() const TIGHTDB_NOEXCEPT;
-    DateTime    get_datetime()   const TIGHTDB_NOEXCEPT;
+    int64_t     get_int()      const TIGHTDB_NOEXCEPT;
+    bool        get_bool()     const TIGHTDB_NOEXCEPT;
+    float       get_float()    const TIGHTDB_NOEXCEPT;
+    double      get_double()   const TIGHTDB_NOEXCEPT;
+    StringData  get_string()   const TIGHTDB_NOEXCEPT;
+    BinaryData  get_binary()   const TIGHTDB_NOEXCEPT;
+    DateTime    get_datetime() const TIGHTDB_NOEXCEPT;
 
     void set_int(int64_t) TIGHTDB_NOEXCEPT;
     void set_bool(bool) TIGHTDB_NOEXCEPT;
@@ -156,63 +157,63 @@ private:
 };
 
 // Note: We cannot compare two mixed values, since when the type of
-// both is type_Table, we would have to compare the two tables,
-// but the mixed values do not provide access to those tables.
+// both is type_Table, we would have to compare the two tables, but
+// the mixed values do not provide access to those tables.
 
-// Note: The mixed values are specified as util::Wrap<Mixed>. If they
-// were not, these operators would apply to simple comparisons, such
-// as int vs int64_t, and cause ambiguity. This is because the
-// constructors of Mixed are not explicit.
+// Note: The mixed values are specified as Wrap<Mixed>. If they were
+// not, these operators would apply to simple comparisons, such as int
+// vs int64_t, and cause ambiguity. This is because the constructors
+// of Mixed are not explicit.
 
 // Compare mixed with integer
-template<class T> bool operator==(util::Wrap<Mixed>, const T&) TIGHTDB_NOEXCEPT;
-template<class T> bool operator!=(util::Wrap<Mixed>, const T&) TIGHTDB_NOEXCEPT;
-template<class T> bool operator==(const T&, util::Wrap<Mixed>) TIGHTDB_NOEXCEPT;
-template<class T> bool operator!=(const T&, util::Wrap<Mixed>) TIGHTDB_NOEXCEPT;
+template<class T> bool operator==(Wrap<Mixed>, const T&) TIGHTDB_NOEXCEPT;
+template<class T> bool operator!=(Wrap<Mixed>, const T&) TIGHTDB_NOEXCEPT;
+template<class T> bool operator==(const T&, Wrap<Mixed>) TIGHTDB_NOEXCEPT;
+template<class T> bool operator!=(const T&, Wrap<Mixed>) TIGHTDB_NOEXCEPT;
 
 // Compare mixed with boolean
-bool operator==(util::Wrap<Mixed>, bool) TIGHTDB_NOEXCEPT;
-bool operator!=(util::Wrap<Mixed>, bool) TIGHTDB_NOEXCEPT;
-bool operator==(bool, util::Wrap<Mixed>) TIGHTDB_NOEXCEPT;
-bool operator!=(bool, util::Wrap<Mixed>) TIGHTDB_NOEXCEPT;
+bool operator==(Wrap<Mixed>, bool) TIGHTDB_NOEXCEPT;
+bool operator!=(Wrap<Mixed>, bool) TIGHTDB_NOEXCEPT;
+bool operator==(bool, Wrap<Mixed>) TIGHTDB_NOEXCEPT;
+bool operator!=(bool, Wrap<Mixed>) TIGHTDB_NOEXCEPT;
 
 // Compare mixed with float
-bool operator==(util::Wrap<Mixed>, float);
-bool operator!=(util::Wrap<Mixed>, float);
-bool operator==(float, util::Wrap<Mixed>);
-bool operator!=(float, util::Wrap<Mixed>);
+bool operator==(Wrap<Mixed>, float);
+bool operator!=(Wrap<Mixed>, float);
+bool operator==(float, Wrap<Mixed>);
+bool operator!=(float, Wrap<Mixed>);
 
 // Compare mixed with double
-bool operator==(util::Wrap<Mixed>, double);
-bool operator!=(util::Wrap<Mixed>, double);
-bool operator==(double, util::Wrap<Mixed>);
-bool operator!=(double, util::Wrap<Mixed>);
+bool operator==(Wrap<Mixed>, double);
+bool operator!=(Wrap<Mixed>, double);
+bool operator==(double, Wrap<Mixed>);
+bool operator!=(double, Wrap<Mixed>);
 
 // Compare mixed with string
-bool operator==(util::Wrap<Mixed>, StringData) TIGHTDB_NOEXCEPT;
-bool operator!=(util::Wrap<Mixed>, StringData) TIGHTDB_NOEXCEPT;
-bool operator==(StringData, util::Wrap<Mixed>) TIGHTDB_NOEXCEPT;
-bool operator!=(StringData, util::Wrap<Mixed>) TIGHTDB_NOEXCEPT;
-bool operator==(util::Wrap<Mixed>, const char* c_str) TIGHTDB_NOEXCEPT;
-bool operator!=(util::Wrap<Mixed>, const char* c_str) TIGHTDB_NOEXCEPT;
-bool operator==(const char* c_str, util::Wrap<Mixed>) TIGHTDB_NOEXCEPT;
-bool operator!=(const char* c_str, util::Wrap<Mixed>) TIGHTDB_NOEXCEPT;
-bool operator==(util::Wrap<Mixed>, char* c_str) TIGHTDB_NOEXCEPT;
-bool operator!=(util::Wrap<Mixed>, char* c_str) TIGHTDB_NOEXCEPT;
-bool operator==(char* c_str, util::Wrap<Mixed>) TIGHTDB_NOEXCEPT;
-bool operator!=(char* c_str, util::Wrap<Mixed>) TIGHTDB_NOEXCEPT;
+bool operator==(Wrap<Mixed>, StringData) TIGHTDB_NOEXCEPT;
+bool operator!=(Wrap<Mixed>, StringData) TIGHTDB_NOEXCEPT;
+bool operator==(StringData, Wrap<Mixed>) TIGHTDB_NOEXCEPT;
+bool operator!=(StringData, Wrap<Mixed>) TIGHTDB_NOEXCEPT;
+bool operator==(Wrap<Mixed>, const char* c_str) TIGHTDB_NOEXCEPT;
+bool operator!=(Wrap<Mixed>, const char* c_str) TIGHTDB_NOEXCEPT;
+bool operator==(const char* c_str, Wrap<Mixed>) TIGHTDB_NOEXCEPT;
+bool operator!=(const char* c_str, Wrap<Mixed>) TIGHTDB_NOEXCEPT;
+bool operator==(Wrap<Mixed>, char* c_str) TIGHTDB_NOEXCEPT;
+bool operator!=(Wrap<Mixed>, char* c_str) TIGHTDB_NOEXCEPT;
+bool operator==(char* c_str, Wrap<Mixed>) TIGHTDB_NOEXCEPT;
+bool operator!=(char* c_str, Wrap<Mixed>) TIGHTDB_NOEXCEPT;
 
 // Compare mixed with binary data
-bool operator==(util::Wrap<Mixed>, BinaryData) TIGHTDB_NOEXCEPT;
-bool operator!=(util::Wrap<Mixed>, BinaryData) TIGHTDB_NOEXCEPT;
-bool operator==(BinaryData, util::Wrap<Mixed>) TIGHTDB_NOEXCEPT;
-bool operator!=(BinaryData, util::Wrap<Mixed>) TIGHTDB_NOEXCEPT;
+bool operator==(Wrap<Mixed>, BinaryData) TIGHTDB_NOEXCEPT;
+bool operator!=(Wrap<Mixed>, BinaryData) TIGHTDB_NOEXCEPT;
+bool operator==(BinaryData, Wrap<Mixed>) TIGHTDB_NOEXCEPT;
+bool operator!=(BinaryData, Wrap<Mixed>) TIGHTDB_NOEXCEPT;
 
 // Compare mixed with date
-bool operator==(util::Wrap<Mixed>, DateTime) TIGHTDB_NOEXCEPT;
-bool operator!=(util::Wrap<Mixed>, DateTime) TIGHTDB_NOEXCEPT;
-bool operator==(DateTime, util::Wrap<Mixed>) TIGHTDB_NOEXCEPT;
-bool operator!=(DateTime, util::Wrap<Mixed>) TIGHTDB_NOEXCEPT;
+bool operator==(Wrap<Mixed>, DateTime) TIGHTDB_NOEXCEPT;
+bool operator!=(Wrap<Mixed>, DateTime) TIGHTDB_NOEXCEPT;
+bool operator==(DateTime, Wrap<Mixed>) TIGHTDB_NOEXCEPT;
+bool operator!=(DateTime, Wrap<Mixed>) TIGHTDB_NOEXCEPT;
 
 
 
@@ -385,22 +386,22 @@ inline std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, c
 
 // Compare mixed with integer
 
-template<class T> inline bool operator==(util::Wrap<Mixed> a, const T& b) TIGHTDB_NOEXCEPT
+template<class T> inline bool operator==(Wrap<Mixed> a, const T& b) TIGHTDB_NOEXCEPT
 {
     return Mixed(a).get_type() == type_Int && Mixed(a).get_int() == b;
 }
 
-template<class T> inline bool operator!=(util::Wrap<Mixed> a, const T& b) TIGHTDB_NOEXCEPT
+template<class T> inline bool operator!=(Wrap<Mixed> a, const T& b) TIGHTDB_NOEXCEPT
 {
     return Mixed(a).get_type() != type_Int || Mixed(a).get_int() != b;
 }
 
-template<class T> inline bool operator==(const T& a, util::Wrap<Mixed> b) TIGHTDB_NOEXCEPT
+template<class T> inline bool operator==(const T& a, Wrap<Mixed> b) TIGHTDB_NOEXCEPT
 {
     return type_Int == Mixed(b).get_type() && a == Mixed(b).get_int();
 }
 
-template<class T> inline bool operator!=(const T& a, util::Wrap<Mixed> b) TIGHTDB_NOEXCEPT
+template<class T> inline bool operator!=(const T& a, Wrap<Mixed> b) TIGHTDB_NOEXCEPT
 {
     return type_Int != Mixed(b).get_type() || a != Mixed(b).get_int();
 }
@@ -408,22 +409,22 @@ template<class T> inline bool operator!=(const T& a, util::Wrap<Mixed> b) TIGHTD
 
 // Compare mixed with boolean
 
-inline bool operator==(util::Wrap<Mixed> a, bool b) TIGHTDB_NOEXCEPT
+inline bool operator==(Wrap<Mixed> a, bool b) TIGHTDB_NOEXCEPT
 {
     return Mixed(a).get_type() == type_Bool && Mixed(a).get_bool() == b;
 }
 
-inline bool operator!=(util::Wrap<Mixed> a, bool b) TIGHTDB_NOEXCEPT
+inline bool operator!=(Wrap<Mixed> a, bool b) TIGHTDB_NOEXCEPT
 {
     return Mixed(a).get_type() != type_Bool || Mixed(a).get_bool() != b;
 }
 
-inline bool operator==(bool a, util::Wrap<Mixed> b) TIGHTDB_NOEXCEPT
+inline bool operator==(bool a, Wrap<Mixed> b) TIGHTDB_NOEXCEPT
 {
     return type_Bool == Mixed(b).get_type() && a == Mixed(b).get_bool();
 }
 
-inline bool operator!=(bool a, util::Wrap<Mixed> b) TIGHTDB_NOEXCEPT
+inline bool operator!=(bool a, Wrap<Mixed> b) TIGHTDB_NOEXCEPT
 {
     return type_Bool != Mixed(b).get_type() || a != Mixed(b).get_bool();
 }
@@ -431,22 +432,22 @@ inline bool operator!=(bool a, util::Wrap<Mixed> b) TIGHTDB_NOEXCEPT
 
 // Compare mixed with float
 
-inline bool operator==(util::Wrap<Mixed> a, float b)
+inline bool operator==(Wrap<Mixed> a, float b)
 {
     return Mixed(a).get_type() == type_Float && Mixed(a).get_float() == b;
 }
 
-inline bool operator!=(util::Wrap<Mixed> a, float b)
+inline bool operator!=(Wrap<Mixed> a, float b)
 {
     return Mixed(a).get_type() != type_Float || Mixed(a).get_float() != b;
 }
 
-inline bool operator==(float a, util::Wrap<Mixed> b)
+inline bool operator==(float a, Wrap<Mixed> b)
 {
     return type_Float == Mixed(b).get_type() && a == Mixed(b).get_float();
 }
 
-inline bool operator!=(float a, util::Wrap<Mixed> b)
+inline bool operator!=(float a, Wrap<Mixed> b)
 {
     return type_Float != Mixed(b).get_type() || a != Mixed(b).get_float();
 }
@@ -454,22 +455,22 @@ inline bool operator!=(float a, util::Wrap<Mixed> b)
 
 // Compare mixed with double
 
-inline bool operator==(util::Wrap<Mixed> a, double b)
+inline bool operator==(Wrap<Mixed> a, double b)
 {
     return Mixed(a).get_type() == type_Double && Mixed(a).get_double() == b;
 }
 
-inline bool operator!=(util::Wrap<Mixed> a, double b)
+inline bool operator!=(Wrap<Mixed> a, double b)
 {
     return Mixed(a).get_type() != type_Double || Mixed(a).get_double() != b;
 }
 
-inline bool operator==(double a, util::Wrap<Mixed> b)
+inline bool operator==(double a, Wrap<Mixed> b)
 {
     return type_Double == Mixed(b).get_type() && a == Mixed(b).get_double();
 }
 
-inline bool operator!=(double a, util::Wrap<Mixed> b)
+inline bool operator!=(double a, Wrap<Mixed> b)
 {
     return type_Double != Mixed(b).get_type() || a != Mixed(b).get_double();
 }
@@ -477,62 +478,62 @@ inline bool operator!=(double a, util::Wrap<Mixed> b)
 
 // Compare mixed with string
 
-inline bool operator==(util::Wrap<Mixed> a, StringData b) TIGHTDB_NOEXCEPT
+inline bool operator==(Wrap<Mixed> a, StringData b) TIGHTDB_NOEXCEPT
 {
     return Mixed(a).get_type() == type_String && Mixed(a).get_string() == b;
 }
 
-inline bool operator!=(util::Wrap<Mixed> a, StringData b) TIGHTDB_NOEXCEPT
+inline bool operator!=(Wrap<Mixed> a, StringData b) TIGHTDB_NOEXCEPT
 {
     return Mixed(a).get_type() != type_String || Mixed(a).get_string() != b;
 }
 
-inline bool operator==(StringData a, util::Wrap<Mixed> b) TIGHTDB_NOEXCEPT
+inline bool operator==(StringData a, Wrap<Mixed> b) TIGHTDB_NOEXCEPT
 {
     return type_String == Mixed(b).get_type() && a == Mixed(b).get_string();
 }
 
-inline bool operator!=(StringData a, util::Wrap<Mixed> b) TIGHTDB_NOEXCEPT
+inline bool operator!=(StringData a, Wrap<Mixed> b) TIGHTDB_NOEXCEPT
 {
     return type_String != Mixed(b).get_type() || a != Mixed(b).get_string();
 }
 
-inline bool operator==(util::Wrap<Mixed> a, const char* b) TIGHTDB_NOEXCEPT
+inline bool operator==(Wrap<Mixed> a, const char* b) TIGHTDB_NOEXCEPT
 {
     return a == StringData(b);
 }
 
-inline bool operator!=(util::Wrap<Mixed> a, const char* b) TIGHTDB_NOEXCEPT
+inline bool operator!=(Wrap<Mixed> a, const char* b) TIGHTDB_NOEXCEPT
 {
     return a != StringData(b);
 }
 
-inline bool operator==(const char* a, util::Wrap<Mixed> b) TIGHTDB_NOEXCEPT
+inline bool operator==(const char* a, Wrap<Mixed> b) TIGHTDB_NOEXCEPT
 {
     return StringData(a) == b;
 }
 
-inline bool operator!=(const char* a, util::Wrap<Mixed> b) TIGHTDB_NOEXCEPT
+inline bool operator!=(const char* a, Wrap<Mixed> b) TIGHTDB_NOEXCEPT
 {
     return StringData(a) != b;
 }
 
-inline bool operator==(util::Wrap<Mixed> a, char* b) TIGHTDB_NOEXCEPT
+inline bool operator==(Wrap<Mixed> a, char* b) TIGHTDB_NOEXCEPT
 {
     return a == StringData(b);
 }
 
-inline bool operator!=(util::Wrap<Mixed> a, char* b) TIGHTDB_NOEXCEPT
+inline bool operator!=(Wrap<Mixed> a, char* b) TIGHTDB_NOEXCEPT
 {
     return a != StringData(b);
 }
 
-inline bool operator==(char* a, util::Wrap<Mixed> b) TIGHTDB_NOEXCEPT
+inline bool operator==(char* a, Wrap<Mixed> b) TIGHTDB_NOEXCEPT
 {
     return StringData(a) == b;
 }
 
-inline bool operator!=(char* a, util::Wrap<Mixed> b) TIGHTDB_NOEXCEPT
+inline bool operator!=(char* a, Wrap<Mixed> b) TIGHTDB_NOEXCEPT
 {
     return StringData(a) != b;
 }
@@ -540,22 +541,22 @@ inline bool operator!=(char* a, util::Wrap<Mixed> b) TIGHTDB_NOEXCEPT
 
 // Compare mixed with binary data
 
-inline bool operator==(util::Wrap<Mixed> a, BinaryData b) TIGHTDB_NOEXCEPT
+inline bool operator==(Wrap<Mixed> a, BinaryData b) TIGHTDB_NOEXCEPT
 {
     return Mixed(a).get_type() == type_Binary && Mixed(a).get_binary() == b;
 }
 
-inline bool operator!=(util::Wrap<Mixed> a, BinaryData b) TIGHTDB_NOEXCEPT
+inline bool operator!=(Wrap<Mixed> a, BinaryData b) TIGHTDB_NOEXCEPT
 {
     return Mixed(a).get_type() != type_Binary || Mixed(a).get_binary() != b;
 }
 
-inline bool operator==(BinaryData a, util::Wrap<Mixed> b) TIGHTDB_NOEXCEPT
+inline bool operator==(BinaryData a, Wrap<Mixed> b) TIGHTDB_NOEXCEPT
 {
     return type_Binary == Mixed(b).get_type() && a == Mixed(b).get_binary();
 }
 
-inline bool operator!=(BinaryData a, util::Wrap<Mixed> b) TIGHTDB_NOEXCEPT
+inline bool operator!=(BinaryData a, Wrap<Mixed> b) TIGHTDB_NOEXCEPT
 {
     return type_Binary != Mixed(b).get_type() || a != Mixed(b).get_binary();
 }
@@ -563,22 +564,22 @@ inline bool operator!=(BinaryData a, util::Wrap<Mixed> b) TIGHTDB_NOEXCEPT
 
 // Compare mixed with date
 
-inline bool operator==(util::Wrap<Mixed> a, DateTime b) TIGHTDB_NOEXCEPT
+inline bool operator==(Wrap<Mixed> a, DateTime b) TIGHTDB_NOEXCEPT
 {
     return Mixed(a).get_type() == type_DateTime && DateTime(Mixed(a).get_datetime()) == b;
 }
 
-inline bool operator!=(util::Wrap<Mixed> a, DateTime b) TIGHTDB_NOEXCEPT
+inline bool operator!=(Wrap<Mixed> a, DateTime b) TIGHTDB_NOEXCEPT
 {
     return Mixed(a).get_type() != type_DateTime || DateTime(Mixed(a).get_datetime()) != b;
 }
 
-inline bool operator==(DateTime a, util::Wrap<Mixed> b) TIGHTDB_NOEXCEPT
+inline bool operator==(DateTime a, Wrap<Mixed> b) TIGHTDB_NOEXCEPT
 {
     return type_DateTime == Mixed(b).get_type() && a == DateTime(Mixed(b).get_datetime());
 }
 
-inline bool operator!=(DateTime a, util::Wrap<Mixed> b) TIGHTDB_NOEXCEPT
+inline bool operator!=(DateTime a, Wrap<Mixed> b) TIGHTDB_NOEXCEPT
 {
     return type_DateTime != Mixed(b).get_type() || a != DateTime(Mixed(b).get_datetime());
 }

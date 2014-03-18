@@ -25,8 +25,9 @@
 #include <exception>
 #include <string>
 
-#include <tightdb/util/meta.hpp>
+#include <tightdb/util/assert.hpp>
 #include <tightdb/util/tuple.hpp>
+#include <tightdb/util/safe_int_ops.hpp>
 #include <tightdb/util/buffer.hpp>
 #include <tightdb/util/file.hpp>
 #include <tightdb/mixed.hpp>
@@ -127,8 +128,10 @@ public:
     //
     //   N  New top level table
     //   T  Select table
-    //   S  Select spec for currently selected table
-    //   A  Add column to selected spec
+    //   S  Select descriptor from currently selected root table
+    //   O  Insert column into selected descriptor
+    //   P  Remove column from selected descriptor
+    //   Q  Rename column in selected descriptor
     //   s  Set value
     //   i  Insert value
     //   c  Row insert complete
@@ -142,7 +145,10 @@ public:
     struct subtable_tag {};
 
     void new_top_level_table(StringData name);
-    void add_column (const Table*, const Spec*, DataType, StringData name);
+    void insert_column (const Table*, const Spec*, std::size_t column_ndx,
+                        DataType type, StringData name);
+    void remove_column (const Table*, const Spec*, std::size_t column_ndx);
+    void rename_column (const Table*, const Spec*, std::size_t column_ndx, StringData name);
 
     template<class T>
     void set_value(const Table*, std::size_t column_ndx, std::size_t ndx, T value);
@@ -266,10 +272,10 @@ private:
     void transact_log_append(const char* data, std::size_t size);
 
     void check_table(const Table*);
-    void select_table(const Table*);
+    void select_table(const Table*); // Deselects a selected spec
 
     void check_spec(const Table*, const Spec*);
-    void select_spec(const Table*, const Spec*);
+    void select_spec(const Table*, const Spec*); // Table must *not* have shared type descriptor
 
     void string_cmd(char cmd, std::size_t column_ndx, std::size_t ndx,
                     const char* data, std::size_t size);
@@ -462,9 +468,9 @@ template<class T> inline char* Replication::encode_int(char* ptr, T value)
     bool negative = false;
     if (util::is_negative(value)) {
         negative = true;
-        // The following conversion is guaranteed by C++03 to never
+        // The following conversion is guaranteed by C++11 to never
         // overflow (contrast this with "-value" which indeed could
-        // overflow).
+        // overflow). See C99+TC3 section 6.2.6.2 paragraph 2.
         value = -(value + 1);
     }
     // At this point 'value' is always a positive number. Also, small
@@ -630,11 +636,26 @@ inline void Replication::new_top_level_table(StringData name)
 }
 
 
-inline void Replication::add_column(const Table* table, const Spec* spec,
-                                    DataType type, StringData name)
+inline void Replication::insert_column(const Table* table, const Spec* spec,
+                                       std::size_t column_ndx, DataType type, StringData name)
 {
     check_spec(table, spec); // Throws
-    simple_cmd('A', util::tuple(int(type), name.size())); // Throws
+    simple_cmd('O', util::tuple(column_ndx, int(type), name.size())); // Throws
+    transact_log_append(name.data(), name.size()); // Throws
+}
+
+inline void Replication::remove_column(const Table* table, const Spec* spec,
+                                       std::size_t column_ndx)
+{
+    check_spec(table, spec); // Throws
+    simple_cmd('P', util::tuple(column_ndx)); // Throws
+}
+
+inline void Replication::rename_column(const Table* table, const Spec* spec,
+                                       std::size_t column_ndx, StringData name)
+{
+    check_spec(table, spec); // Throws
+    simple_cmd('Q', util::tuple(column_ndx, name.size())); // Throws
     transact_log_append(name.data(), name.size()); // Throws
 }
 

@@ -5,10 +5,6 @@
 using namespace std;
 using namespace tightdb;
 
-// Convert ConstTableView to TableView. Used to let const and non-const public methods Table::find_all_xxx re-use
-// eachothers code
-TableView::TableView(ConstTableView tv): TableViewBase(&tv) {}
-
 // Searching
 
 // find_*_integer() methods are used for all "kinds" of integer values (bool, int, DateTime)
@@ -340,7 +336,7 @@ void TableView::remove(size_t ndx)
 
     // Delete row in source table
     const size_t real_ndx = size_t(m_refs.get(ndx));
-    m_table->remove(real_ndx);
+    m_table->from_view_remove(real_ndx, this);
 
     // Update refs
     m_refs.erase(ndx);
@@ -361,10 +357,9 @@ void TableView::clear()
 
     // Delete all referenced rows in source table
     // (in reverse order to avoid index drift)
-    const size_t count = m_refs.size();
-    for (size_t i = count; i; --i) {
-        const size_t ndx = size_t(m_refs.get(i-1));
-        m_table->remove(ndx);
+    for (size_t i = m_refs.size(); i != 0; --i) {
+        size_t ndx = size_t(m_refs.get(i-1));
+        m_table->from_view_remove(ndx, this);
     }
 
     m_refs.clear();

@@ -240,6 +240,28 @@ TEST(TableViewSumNegative)
     CHECK_EQUAL(-9, sum);
 }
 
+TEST(TableViewIsAttached)
+{
+    TestTableInt table;
+
+    table.add(0);
+    table.add(0);
+    table.add(0);
+
+    TestTableInt::View v = table.column().first.find_all(0);
+    TestTableInt::View v2 = table.column().first.find_all(0);
+    v[0].first = 11;
+    CHECK_EQUAL(true, v.is_attached());
+    CHECK_EQUAL(true, v2.is_attached());
+    v.remove_last();
+    CHECK_EQUAL(true, v.is_attached());
+    CHECK_EQUAL(false, v2.is_attached());
+
+    table.remove_last();
+    CHECK_EQUAL(false, v.is_attached());
+    CHECK_EQUAL(false, v2.is_attached());
+}
+
 TEST(TableViewMax)
 {
     TestTableInt table;
@@ -894,8 +916,8 @@ TEST(TableView_ref_counting)
 TEST(TableView_dyn_pivot)
 {
     TableRef table = Table::create();
-    size_t column_ndx_sex   = table->add_column(type_String, "sex");
-    size_t column_ndx_age   = table->add_column(type_Int, "age");
+    size_t column_ndx_sex = table->add_column(type_String, "sex");
+    size_t column_ndx_age = table->add_column(type_Int,    "age");
     table->add_column(type_Bool, "hired");
 
     size_t count = 5000;
@@ -906,9 +928,9 @@ TEST(TableView_dyn_pivot)
         table->insert_bool(2, i, true);
         table->insert_done();
     }
-    
+
     TableView tv = table->where().find_all();
-    
+
     Table result_count;
     tv.aggregate(0, 1, Table::aggr_count, result_count);
     int64_t half = count/2;
@@ -916,10 +938,10 @@ TEST(TableView_dyn_pivot)
     CHECK_EQUAL(2, result_count.size());
     CHECK_EQUAL(half, result_count.get_int(1, 0));
     CHECK_EQUAL(half, result_count.get_int(1, 1));
-    
+
     Table result_sum;
     tv.aggregate(column_ndx_sex, column_ndx_age, Table::aggr_sum, result_sum);
-    
+
     Table result_avg;
     tv.aggregate(column_ndx_sex, column_ndx_age, Table::aggr_avg, result_avg);
 

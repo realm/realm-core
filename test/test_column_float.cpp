@@ -224,4 +224,103 @@ void BasicColumn_Delete(T val[], size_t valLen)
 TEST(ColumnFloat_Delete) { BasicColumn_Delete<ColumnFloat, float>(floatVal, floatValLen); }
 TEST(ColumnDouble_Delete){ BasicColumn_Delete<ColumnDouble, double>(doubleVal, doubleValLen); }
 
+TEST(ColumnDouble_InitOfEmptyColumn)
+{
+    Table t;
+    t.add_column(type_Double, "works");
+    t.add_column(type_Double, "works also");
+    t.add_empty_row();
+    t.set_double(0,0,1.1);
+    t.set_double(1,0,2.2);
+    t.remove_column(1);
+    t.add_empty_row();
+    t.add_column(type_Double, "doesn't work");
+    CHECK_EQUAL(0.0, t.get_double(1,0));
+}
+
+TEST(ColumnFloat_InitOfEmptyColumn)
+{
+    Table t;
+    t.add_column(type_Float, "works");
+    t.add_column(type_Float, "works also");
+    t.add_empty_row();
+    t.set_float(0,0,1.1);
+    t.set_float(1,0,2.2);
+    t.remove_column(1);
+    t.add_empty_row();
+    t.add_column(type_Float, "doesn't work");
+    CHECK_EQUAL(0.0, t.get_float(1,0));
+}
+
+TEST(ColumnInt_InitOfEmptyColumn)
+{
+    Table t;
+    t.add_column(type_Int, "works");
+    t.add_column(type_Int, "works also");
+    t.add_empty_row();
+    t.set_int(0,0,1);
+    t.set_int(1,0,2);
+    t.remove_column(1);
+    t.add_empty_row();
+    t.add_column(type_Int, "doesn't work");
+    CHECK_EQUAL(0, t.get_int(1,0));
+}
+
+TEST(ColumnString_InitOfEmptyColumn)
+{
+    Table t;
+    t.add_column(type_String, "works");
+    t.add_column(type_String, "works also");
+    t.add_empty_row();
+    t.set_string(0,0, "yellow");
+    t.set_string(1,0, "very bright");
+    t.remove_column(1);
+    t.add_empty_row();
+    t.add_column(type_String, "doesn't work");
+    CHECK_EQUAL("", t.get_string(1,0));
+}
+
+TEST(ColumnBinary_InitOfEmptyColumn)
+{
+    Table t;
+    t.add_column(type_Binary, "works");
+    t.add_column(type_Binary, "works also");
+    t.add_empty_row();
+    t.set_binary(0,0, BinaryData("yellow",10));
+    t.set_binary(1,0, BinaryData("very bright", 15));
+    t.remove_column(1);
+    t.add_empty_row();
+    t.add_column(type_Binary, "doesn't work");
+    CHECK_EQUAL(BinaryData("",0), t.get_binary(1,0));
+}
+
+TEST(ColumnBool_InitOfEmptyColumn)
+{
+    Table t;
+    t.add_column(type_Bool, "works");
+    t.add_column(type_Bool, "works also");
+    t.add_empty_row();
+    t.set_bool(0,0, true);
+    t.set_bool(1,0, true);
+    t.remove_column(1);
+    t.add_empty_row();
+    t.add_column(type_Bool, "doesn't work");
+    CHECK_EQUAL(false, t.get_bool(1,0));
+}
+
+TEST(ColumnMixed_InitOfEmptyColumn)
+{
+    Table t;
+    t.add_column(type_Mixed, "works");
+    t.add_column(type_Mixed, "works also");
+    t.add_empty_row();
+    t.set_mixed(0,0, new Mixed(1.1));
+    t.set_mixed(1,0, new Mixed(2.2));
+    t.remove_column(1);
+    t.add_empty_row();
+    t.add_column(type_Mixed, "doesn't work");
+    CHECK_EQUAL(0, t.get_mixed(1,0));
+}
+
+
 #endif // TEST_COLUMN_FLOAT

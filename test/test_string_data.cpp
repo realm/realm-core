@@ -16,6 +16,25 @@ using namespace tightdb;
 // Note: You can now temporarely declare unit tests with the ONLY(TestName) macro instead of TEST(TestName). This
 // will disable all unit tests except these. Remember to undo your temporary changes before committing.
 
+
+TEST(StringData_Null)
+{
+    // A default constructed reference must be a null reference.
+    {
+        StringData sd;
+        CHECK(!sd);
+        CHECK(sd.is_null());
+    }
+    // When constructed from the empty string literal, it must not be
+    // a null reference.
+    {
+        StringData sd("");
+        CHECK(sd);
+        CHECK(!sd.is_null());
+    }
+}
+
+
 TEST(StringData_Equal)
 {
     // Test operator==() and operator!=()
