@@ -52,7 +52,9 @@ void has_zero_byte(int64_t value, size_t reps)
 
 } // anonymous namespace
 
-TEST(UPPERLOWERBOUND)
+
+// Oops, see Array_LowerUpperBound
+TEST(Array_UpperLowerBound)
 {
     // Tests Array::upper_bound() and Array::lower_bound()
     // This test is independent of TIGHTDB_MAX_LIST_SIZE
@@ -640,7 +642,7 @@ TEST(Array_Sort)
  */
 
 
-TEST(findallint0)
+TEST(Array_FindAllInt0)
 {
     Array a;
     Array r;
@@ -668,7 +670,7 @@ TEST(findallint0)
     r.destroy();
 }
 
-TEST(findallint1)
+TEST(Array_FindAllInt1)
 {
     Array a;
     Array r;
@@ -699,7 +701,7 @@ TEST(findallint1)
     r.destroy();
 }
 
-TEST(findallint2)
+TEST(Array_FindAllInt2)
 {
     Array a;
     Array r;
@@ -730,7 +732,7 @@ TEST(findallint2)
     r.destroy();
 }
 
-TEST(findallint3)
+TEST(Array_FindAllInt3)
 {
     Array a;
     Array r;
@@ -761,7 +763,7 @@ TEST(findallint3)
     r.destroy();
 }
 
-TEST(findallint4)
+TEST(Array_FindAllInt4)
 {
     Array a;
     Array r;
@@ -793,7 +795,7 @@ TEST(findallint4)
     r.destroy();
 }
 
-TEST(findallint5)
+TEST(Array_FindAllInt5)
 {
     Array a;
     Array r;
@@ -825,7 +827,7 @@ TEST(findallint5)
     r.destroy();
 }
 
-TEST(findallint6)
+TEST(Array_FindAllInt6)
 {
     Array a;
     Array r;
@@ -857,7 +859,7 @@ TEST(findallint6)
     r.destroy();
 }
 
-TEST(findallint7)
+TEST(Array_FindAllInt7)
 {
     Array a;
     Array r;
@@ -890,7 +892,7 @@ TEST(findallint7)
 }
 
 // Tests the case where a value does *not* exist in one entire 64-bit chunk (triggers the 'if (has_zero_byte()) break;' condition)
-TEST(FindHasZeroByte)
+TEST(Array_FindHasZeroByte)
 {
     // we want at least 1 entire 64-bit chunk-test, and we also want a remainder-test, so we chose n to be a prime > 64
     size_t n = 73;
@@ -904,7 +906,7 @@ TEST(FindHasZeroByte)
 }
 
 // New find test for SSE search, to trigger partial finds (see FindSSE()) before and after the aligned data area
-TEST(FindSSE)
+TEST(Array_FindSSE)
 {
     Array a;
     for (uint64_t i = 0; i < 100; i++) {
@@ -922,7 +924,7 @@ TEST(FindSSE)
 }
 
 
-TEST(Sum0)
+TEST(Array_Sum0)
 {
     Array a;
     for (int i = 0; i < 64 + 7; i++) {
@@ -932,7 +934,7 @@ TEST(Sum0)
     a.destroy();
 }
 
-TEST(Sum1)
+TEST(Array_Sum1)
 {
     int64_t s1 = 0;
     Array a;
@@ -952,7 +954,7 @@ TEST(Sum1)
     a.destroy();
 }
 
-TEST(Sum2)
+TEST(Array_Sum2)
 {
     int64_t s1 = 0;
     Array a;
@@ -973,7 +975,7 @@ TEST(Sum2)
 }
 
 
-TEST(Sum4)
+TEST(Array_Sum4)
 {
     int64_t s1 = 0;
     Array a;
@@ -993,7 +995,7 @@ TEST(Sum4)
     a.destroy();
 }
 
-TEST(Sum16)
+TEST(Array_Sum16)
 {
     int64_t s1 = 0;
     Array a;
@@ -1013,7 +1015,7 @@ TEST(Sum16)
     a.destroy();
 }
 
-TEST(Greater)
+TEST(Array_Greater)
 {
     Array a;
 
@@ -1138,7 +1140,7 @@ TEST(Greater)
 
 
 
-TEST(Less)
+TEST(Array_Less)
 {
     Array a;
 
@@ -1258,7 +1260,7 @@ TEST(Less)
 }
 
 
-TEST(NotEqual1)
+TEST(Array_NotEqual1)
 {
     Array a;
 
@@ -1272,7 +1274,7 @@ TEST(NotEqual1)
     a.destroy();
 }
 
-TEST(NotEqual)
+TEST(Array_NotEqual)
 {
     Array a;
 
@@ -1393,7 +1395,7 @@ TEST(NotEqual)
 
 
 
-TEST(ArraySort)
+TEST(Array_Sort1)
 {
     // negative values
     Array a;
@@ -1412,7 +1414,7 @@ TEST(ArraySort)
 }
 
 
-TEST(ArraySort2)
+TEST(Array_Sort2)
 {
     // 64 bit values
     Array a;
@@ -1430,7 +1432,7 @@ TEST(ArraySort2)
     a.destroy();
 }
 
-TEST(ArraySort3)
+TEST(Array_Sort3)
 {
     // many values
     Array a;
@@ -1449,7 +1451,7 @@ TEST(ArraySort3)
 }
 
 
-TEST(ArraySort4)
+TEST(Array_Sort4)
 {
     // same values
     Array a;
@@ -1467,7 +1469,7 @@ TEST(ArraySort4)
     a.destroy();
 }
 
-TEST(ArrayCopy)
+TEST(Array_Copy)
 {
     Array a;
     a.add(0);
@@ -1516,7 +1518,7 @@ TEST(ArrayCopy)
     d.destroy_deep();
 }
 
-TEST(ArrayCount)
+TEST(Array_Count)
 {
     Array a;
 
