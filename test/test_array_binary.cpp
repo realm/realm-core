@@ -9,14 +9,21 @@ using namespace tightdb;
 // Note: You can now temporarely declare unit tests with the ONLY(TestName) macro instead of TEST(TestName). This
 // will disable all unit tests except these. Remember to undo your temporary changes before committing.
 
+namespace {
+
 struct db_setup_binary {
     static ArrayBinary c;
 };
 
 ArrayBinary db_setup_binary::c;
 
-TEST_FIXTURE(db_setup_binary, ArrayBinaryMultiEmpty)
+} // anonnymous namespace
+
+
+TEST(ArrayBinary_MultiEmpty)
 {
+    ArrayBinary& c = db_setup_binary::c;
+
     c.add(BinaryData("", 0));
     c.add(BinaryData("", 0));
     c.add(BinaryData("", 0));
@@ -34,8 +41,10 @@ TEST_FIXTURE(db_setup_binary, ArrayBinaryMultiEmpty)
     CHECK_EQUAL(0, c.get(5).size());
 }
 
-TEST_FIXTURE(db_setup_binary, ArrayBinarySet)
+TEST(ArrayBinary_Set)
 {
+    ArrayBinary& c = db_setup_binary::c;
+
     c.set(0, BinaryData("hey", 4));
 
     CHECK_EQUAL(6, c.size());
@@ -49,8 +58,10 @@ TEST_FIXTURE(db_setup_binary, ArrayBinarySet)
     CHECK_EQUAL(0, c.get(5).size());
 }
 
-TEST_FIXTURE(db_setup_binary, ArrayBinaryAdd)
+TEST(ArrayBinary_Add)
 {
+    ArrayBinary& c = db_setup_binary::c;
+
     c.clear();
     CHECK_EQUAL(0, c.size());
 
@@ -67,8 +78,10 @@ TEST_FIXTURE(db_setup_binary, ArrayBinaryAdd)
     CHECK_EQUAL(2, c.size());
 }
 
-TEST_FIXTURE(db_setup_binary, ArrayBinarySet2)
+TEST(ArrayBinary_Set2)
 {
+    ArrayBinary& c = db_setup_binary::c;
+
     // {shrink, grow} x {first, middle, last, single}
     c.clear();
 
@@ -122,8 +135,9 @@ TEST_FIXTURE(db_setup_binary, ArrayBinarySet2)
     CHECK_EQUAL(3, c.size());
 }
 
-TEST_FIXTURE(db_setup_binary, ArrayBinaryInsert)
+TEST(ArrayBinary_Insert)
 {
+    ArrayBinary& c = db_setup_binary::c;
     c.clear();
 
     c.insert(0, BinaryData("abc", 4)); // single
@@ -157,8 +171,9 @@ TEST_FIXTURE(db_setup_binary, ArrayBinaryInsert)
     CHECK_EQUAL(5, c.size());
 }
 
-TEST_FIXTURE(db_setup_binary, ArrayBinaryErase)
+TEST(ArrayBinary_Erase)
 {
+    ArrayBinary& c = db_setup_binary::c;
     c.clear();
 
     c.add(BinaryData("a", 2));
@@ -194,8 +209,10 @@ TEST_FIXTURE(db_setup_binary, ArrayBinaryErase)
     CHECK(c.is_empty());
 }
 
-TEST_FIXTURE(db_setup_binary, ArrayBinary_Destroy)
+TEST(ArrayBinary_Destroy)
 {
+    ArrayBinary& c = db_setup_binary::c;
+
     // clean up (ALWAYS PUT THIS LAST)
     c.destroy();
 }
