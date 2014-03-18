@@ -89,16 +89,18 @@ TEST(UPPERLOWERBOUND)
 }
 
 
-TEST_FIXTURE(db_setup_array, Array_Add0)
+TEST(Array_Add0)
 {
+    Array& c = db_setup_array::c;
     c.add(0);
     CHECK_EQUAL(c.get(0), 0);
     CHECK_EQUAL(c.size(), 1);
     CHECK_EQUAL(0, c.get_width());
 }
 
-TEST_FIXTURE(db_setup_array, Array_Add1)
+TEST(Array_Add1)
 {
+    Array& c = db_setup_array::c;
     c.add(1);
     CHECK_EQUAL(c.get(0), 0);
     CHECK_EQUAL(c.get(1), 1);
@@ -106,8 +108,9 @@ TEST_FIXTURE(db_setup_array, Array_Add1)
     CHECK_EQUAL(1, c.get_width());
 }
 
-TEST_FIXTURE(db_setup_array, Array_Add2)
+TEST(Array_Add2)
 {
+    Array& c = db_setup_array::c;
     c.add(2);
     CHECK_EQUAL(c.get(0), 0);
     CHECK_EQUAL(c.get(1), 1);
@@ -116,8 +119,9 @@ TEST_FIXTURE(db_setup_array, Array_Add2)
     CHECK_EQUAL(2, c.get_width());
 }
 
-TEST_FIXTURE(db_setup_array, Array_Add3)
+TEST(Array_Add3)
 {
+    Array& c = db_setup_array::c;
     c.add(3);
     CHECK_EQUAL(c.get(0), 0);
     CHECK_EQUAL(c.get(1), 1);
@@ -127,8 +131,9 @@ TEST_FIXTURE(db_setup_array, Array_Add3)
     CHECK_EQUAL(2, c.get_width());
 }
 
-TEST_FIXTURE(db_setup_array, Array_Add4)
+TEST(Array_Add4)
 {
+    Array& c = db_setup_array::c;
     c.add(4);
     CHECK_EQUAL(c.get(0), 0);
     CHECK_EQUAL(c.get(1), 1);
@@ -139,8 +144,9 @@ TEST_FIXTURE(db_setup_array, Array_Add4)
     CHECK_EQUAL(4, c.get_width());
 }
 
-TEST_FIXTURE(db_setup_array, Array_Add5)
+TEST(Array_Add5)
 {
+    Array& c = db_setup_array::c;
     c.add(16);
     CHECK_EQUAL(c.get(0), 0);
     CHECK_EQUAL(c.get(1), 1);
@@ -152,8 +158,9 @@ TEST_FIXTURE(db_setup_array, Array_Add5)
     CHECK_EQUAL(8, c.get_width());
 }
 
-TEST_FIXTURE(db_setup_array, Array_Add6)
+TEST(Array_Add6)
 {
+    Array& c = db_setup_array::c;
     c.add(256);
     CHECK_EQUAL(c.get(0), 0);
     CHECK_EQUAL(c.get(1), 1);
@@ -166,8 +173,9 @@ TEST_FIXTURE(db_setup_array, Array_Add6)
     CHECK_EQUAL(16, c.get_width());
 }
 
-TEST_FIXTURE(db_setup_array, Array_Add7)
+TEST(Array_Add7)
 {
+    Array& c = db_setup_array::c;
     c.add(65536);
     CHECK_EQUAL(c.get(0), 0);
     CHECK_EQUAL(c.get(1), 1);
@@ -181,8 +189,9 @@ TEST_FIXTURE(db_setup_array, Array_Add7)
     CHECK_EQUAL(32, c.get_width());
 }
 
-TEST_FIXTURE(db_setup_array, Array_Add8)
+TEST(Array_Add8)
 {
+    Array& c = db_setup_array::c;
     c.add(4294967296LL);
     CHECK_EQUAL(c.get(0), 0);
     CHECK_EQUAL(c.get(1), 1);
@@ -197,8 +206,9 @@ TEST_FIXTURE(db_setup_array, Array_Add8)
     CHECK_EQUAL(64, c.get_width());
 }
 
-TEST_FIXTURE(db_setup_array, Array_AddNeg1)
+TEST(Array_AddNeg1)
 {
+    Array& c = db_setup_array::c;
     c.clear();
     c.add(-1);
 
@@ -227,8 +237,9 @@ TEST(Array_AddNeg1_1)
     c.destroy();
 }
 
-TEST_FIXTURE(db_setup_array, Array_AddNeg2)
+TEST(Array_AddNeg2)
 {
+    Array& c = db_setup_array::c;
     c.add(-256);
 
     CHECK_EQUAL(c.size(), 2);
@@ -237,8 +248,9 @@ TEST_FIXTURE(db_setup_array, Array_AddNeg2)
     CHECK_EQUAL(16, c.get_width());
 }
 
-TEST_FIXTURE(db_setup_array, Array_AddNeg3)
+TEST(Array_AddNeg3)
 {
+    Array& c = db_setup_array::c;
     c.add(-65536);
 
     CHECK_EQUAL(c.size(), 3);
@@ -248,8 +260,9 @@ TEST_FIXTURE(db_setup_array, Array_AddNeg3)
     CHECK_EQUAL(32, c.get_width());
 }
 
-TEST_FIXTURE(db_setup_array, Array_AddNeg4)
+TEST(Array_AddNeg4)
 {
+    Array& c = db_setup_array::c;
     c.add(-4294967296LL);
 
     CHECK_EQUAL(c.size(), 4);
@@ -260,8 +273,9 @@ TEST_FIXTURE(db_setup_array, Array_AddNeg4)
     CHECK_EQUAL(64, c.get_width());
 }
 
-TEST_FIXTURE(db_setup_array, Array_Set)
+TEST(Array_Set)
 {
+    Array& c = db_setup_array::c;
     c.set(0, 3);
     c.set(1, 2);
     c.set(2, 1);
@@ -274,8 +288,10 @@ TEST_FIXTURE(db_setup_array, Array_Set)
     CHECK_EQUAL(c.get(3), 0);
 }
 
-TEST_FIXTURE(db_setup_array, Array_Insert1)
+TEST(Array_Insert1)
 {
+    Array& c = db_setup_array::c;
+
     // Set up some initial values
     c.clear();
     c.add(0);
@@ -294,8 +310,10 @@ TEST_FIXTURE(db_setup_array, Array_Insert1)
     CHECK_EQUAL(c.get(4), 3);
 }
 
-TEST_FIXTURE(db_setup_array, Array_Insert2)
+TEST(Array_Insert2)
 {
+    Array& c = db_setup_array::c;
+
     // Insert at top
     c.insert(0, 256);
 
@@ -308,8 +326,10 @@ TEST_FIXTURE(db_setup_array, Array_Insert2)
     CHECK_EQUAL(c.get(5), 3);
 }
 
-TEST_FIXTURE(db_setup_array, Array_Insert3)
+TEST(Array_Insert3)
 {
+    Array& c = db_setup_array::c;
+
     // Insert at bottom
     c.insert(6, 65536);
 
@@ -324,8 +344,10 @@ TEST_FIXTURE(db_setup_array, Array_Insert3)
 }
 
 /*
-TEST_FIXTURE(db_setup_array, Array_Index1)
+TEST(Array_Index1)
 {
+    Array& c = db_setup_array::c;
+
     // Create index
     Column index;
     c.BuildIndex(index);
@@ -342,8 +364,10 @@ TEST_FIXTURE(db_setup_array, Array_Index1)
 }
 */
 
-TEST_FIXTURE(db_setup_array, Array_Delete1)
+TEST(Array_Delete1)
 {
+    Array& c = db_setup_array::c;
+
     // Delete from middle
     c.erase(3);
 
@@ -356,8 +380,10 @@ TEST_FIXTURE(db_setup_array, Array_Delete1)
     CHECK_EQUAL(c.get(5), 65536);
 }
 
-TEST_FIXTURE(db_setup_array, Array_Delete2)
+TEST(Array_Delete2)
 {
+    Array& c = db_setup_array::c;
+
     // Delete from top
     c.erase(0);
 
@@ -369,8 +395,10 @@ TEST_FIXTURE(db_setup_array, Array_Delete2)
     CHECK_EQUAL(c.get(4), 65536);
 }
 
-TEST_FIXTURE(db_setup_array, Array_Delete3)
+TEST(Array_Delete3)
 {
+    Array& c = db_setup_array::c;
+
     // Delete from bottom
     c.erase(4);
 
@@ -381,8 +409,10 @@ TEST_FIXTURE(db_setup_array, Array_Delete3)
     CHECK_EQUAL(c.get(3), 3);
 }
 
-TEST_FIXTURE(db_setup_array, Array_DeleteAll)
+TEST(Array_DeleteAll)
 {
+    Array& c = db_setup_array::c;
+
     // Delete all items one at a time
     c.erase(0);
     c.erase(0);
@@ -393,16 +423,20 @@ TEST_FIXTURE(db_setup_array, Array_DeleteAll)
     CHECK_EQUAL(0, c.size());
 }
 
-TEST_FIXTURE(db_setup_array, Array_Find1)
+TEST(Array_Find1)
 {
+    Array& c = db_setup_array::c;
+
     // Look for a non-existing value
     size_t res = c.find_first(10);
 
     CHECK_EQUAL(res, -1);
 }
 
-TEST_FIXTURE(db_setup_array, Array_Find2)
+TEST(Array_Find2)
 {
+    Array& c = db_setup_array::c;
+
     // zero-bit width
     c.clear();
     c.add(0);
@@ -412,8 +446,10 @@ TEST_FIXTURE(db_setup_array, Array_Find2)
     CHECK_EQUAL(res, 0);
 }
 
-TEST_FIXTURE(db_setup_array, Array_Find3)
+TEST(Array_Find3)
 {
+    Array& c = db_setup_array::c;
+
     // expand to 1-bit width
     c.add(1);
 
@@ -421,8 +457,10 @@ TEST_FIXTURE(db_setup_array, Array_Find3)
     CHECK_EQUAL(res, 2);
 }
 
-TEST_FIXTURE(db_setup_array, Array_Find4)
+TEST(Array_Find4)
 {
+    Array& c = db_setup_array::c;
+
     // expand to 2-bit width
     c.add(2);
 
@@ -430,8 +468,10 @@ TEST_FIXTURE(db_setup_array, Array_Find4)
     CHECK_EQUAL(res, 3);
 }
 
-TEST_FIXTURE(db_setup_array, Array_Find5)
+TEST(Array_Find5)
 {
+    Array& c = db_setup_array::c;
+
     // expand to 4-bit width
     c.add(4);
 
@@ -439,8 +479,10 @@ TEST_FIXTURE(db_setup_array, Array_Find5)
     CHECK_EQUAL(res, 4);
 }
 
-TEST_FIXTURE(db_setup_array, Array_Find6)
+TEST(Array_Find6)
 {
+    Array& c = db_setup_array::c;
+
     // expand to 8-bit width
     c.add(16);
 
@@ -453,8 +495,10 @@ TEST_FIXTURE(db_setup_array, Array_Find6)
     CHECK_EQUAL(7, res);
 }
 
-TEST_FIXTURE(db_setup_array, Array_Find7)
+TEST(Array_Find7)
 {
+    Array& c = db_setup_array::c;
+
     // expand to 16-bit width
     c.add(256);
 
@@ -462,8 +506,10 @@ TEST_FIXTURE(db_setup_array, Array_Find7)
     CHECK_EQUAL(8, res);
 }
 
-TEST_FIXTURE(db_setup_array, Array_Find8)
+TEST(Array_Find8)
 {
+    Array& c = db_setup_array::c;
+
     // expand to 32-bit width
     c.add(65536);
 
@@ -471,8 +517,10 @@ TEST_FIXTURE(db_setup_array, Array_Find8)
     CHECK_EQUAL(9, res);
 }
 
-TEST_FIXTURE(db_setup_array, Array_Find9)
+TEST(Array_Find9)
 {
+    Array& c = db_setup_array::c;
+
     // expand to 64-bit width
     c.add(4294967296LL);
 
@@ -482,8 +530,10 @@ TEST_FIXTURE(db_setup_array, Array_Find9)
 
 /* Partial find is not fully implemented yet
 #define PARTIAL_COUNT 100
-TEST_FIXTURE(db_setup_array, Array_PartialFind1)
+TEST(Array_PartialFind1)
 {
+    Array& c = db_setup_array::c;
+
     c.clear();
 
     for (size_t i = 0; i < PARTIAL_COUNT; ++i) {
@@ -496,13 +546,15 @@ TEST_FIXTURE(db_setup_array, Array_PartialFind1)
 }
 */
 
-TEST_FIXTURE(db_setup_array, Array_Destroy)
+TEST(Array_Destroy)
 {
+    Array& c = db_setup_array::c;
+
     // clean up (ALWAYS PUT THIS LAST)
     c.destroy();
 }
 
-TEST_FIXTURE(db_setup_array, Array_LowerUpperBound)
+TEST(Array_LowerUpperBound)
 {
     Array a;
     a.add(10);
