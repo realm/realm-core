@@ -26,3 +26,234 @@ using namespace std;
 using namespace tightdb;
 using namespace tightdb::util;
 using namespace tightdb::_impl;
+
+
+
+namespace  {
+
+#define INCREMENTS 100
+
+
+TIGHTDB_TABLE_4(TestTableShared,
+                first,  Int,
+                second, Int,
+                third,  Bool,
+                fourth, String)
+
+
+void* IncrementEntry(void* arg)
+{
+    try
+    {
+        const size_t row_ndx = (size_t)arg;
+
+        // Open shared db
+        SharedGroup sg("test_shared.tightdb",
+                       false, SharedGroup::durability_Async );
+
+        for (size_t i = 0; i < INCREMENTS; ++i) {
+
+            // Increment cell
+            {
+
+                WriteTransaction wt(sg);
+                wt.get_group().Verify();
+                TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
+                t1[row_ndx].first += 1;
+                // FIXME: For some reason this takes ages when running
+                // inside valgrind, it is probably due to the "extreme
+                // overallocation" bug. The 1000 transactions performed
+                // here can produce a final database file size of more
+                // than 1 GiB. Really! And that is a table with only 10
+                // rows. It is about 1 MiB per transaction.
+                wt.commit();
+            }
+            // Verify in new transaction so that we interleave
+            // read and write transactions
+
+            {
+                ReadTransaction rt(sg);
+                rt.get_group().Verify();
+                TestTableShared::ConstRef t = rt.get_table<TestTableShared>("test");
+
+                const int64_t v = t[row_ndx].first;
+                const int64_t expected = i+1;
+                CHECK_EQUAL(expected, v);
+            }
+
+        }
+
+    } catch (runtime_error e) {
+        printf("Thread exiting due to runtime exception\n");
+        printf("what(): %s\n", e.what());
+    } catch (...) {
+        printf("Thread exiting for unknown reason\n");
+        printf("\n");
+    }
+    return 0;
+}
+
+
+void make_table(size_t rows)
+{
+    File::try_remove("test_shared.tightdb");
+    File::try_remove("test_shared.tightdb.log");
+    File::try_remove("test_alone.tightdb");
+    // Create first table in group
+#if 1
+#if 0
+    {
+        SharedGroup sgr("test_shared.tightdb");
+        SharedGroup sgw("test_shared.tightdb");
+        {
+            ReadTransaction rt0(sgr);
+            WriteTransaction wt0(sgw);
+            wt0.commit();
+        }
+        ReadTransaction rt(sgr);
+        {
+        }
+        WriteTransaction wt(sgw);
+        TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
+        for (size_t i = 0; i < rows; ++i) {
+            t1->add(0, 2, false, "test");
+        }
+        wt.commit();
+        WriteTransaction wt2(sgw);
+        TestTableShared::Ref t2 = wt2.get_table<TestTableShared>("test");
+        for (size_t i = 0; i < rows; ++i) {
+            t2->add(0, 2, false, "test");
+        }
+        wt2.commit();
+    }
+#else
+#if 0
+    {
+        SharedGroup sg("test_shared.tightdb");
+        WriteTransaction wt(sg);
+        TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
+        for (size_t i = 0; i < rows; ++i) {
+            t1->add(0, 2, false, "test");
+        }
+        wt.commit();
+    }
+#else
+    {
+        SharedGroup sg("test_shared.tightdb",
+                       false, SharedGroup::durability_Async);
+        WriteTransaction wt(sg);
+        TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
+        for (size_t i = 0; i < rows; ++i) {
+            t1->add(0, 2, false, "test");
+        }
+        wt.commit();
+    }
+#endif
+#endif
+    // Wait for async_commit process to shutdown
+    while (File::exists("test_shared.tightdb.lock")) {
+        usleep(100);
+    }
+#else
+    {
+        Group g("test_alone.tightdb", Group::mode_ReadWrite);
+        TestTableShared::Ref t1 = g.get_table<TestTableShared>("test");
+        for (size_t i = 0; i < rows; ++i) {
+            t1->add(0, 2, false, "test");
+        }
+        printf("Writing db\n");
+        g.commit();
+    }
+#endif
+}
+
+void multi_threaded(size_t thread_count, size_t base)
+{
+    // Do some changes in a async db
+    {
+
+        pthread_t* threads = new pthread_t[thread_count];
+
+        // Create all threads
+        for (size_t i = 0; i < thread_count; ++i) {
+            const int rc = pthread_create(&threads[i], NULL, IncrementEntry, (void*)(i+base));
+            CHECK_EQUAL(0, rc);
+        }
+
+        // Wait for all threads to complete
+        for (size_t i = 0; i < thread_count; ++i) {
+            const int rc = pthread_join(threads[i], NULL);
+            CHECK_EQUAL(0, rc);
+        }
+
+        delete[] threads;
+
+        // Verify that the changes were made
+        {
+            SharedGroup sg("test_shared.tightdb",
+                           false, SharedGroup::durability_Async);
+            ReadTransaction rt(sg);
+            rt.get_group().Verify();
+            TestTableShared::ConstRef t = rt.get_table<TestTableShared>("test");
+
+            for (size_t i = 0; i < thread_count; ++i) {
+                const int64_t v = t[i+base].first;
+                CHECK_EQUAL(INCREMENTS, v);
+            }
+        }
+    }
+}
+
+void validate_and_clear(size_t rows, int result)
+{
+    // Wait for async_commit process to shutdown
+    while (File::exists("test_shared.tightdb.lock")) {
+        usleep(100);
+    }
+    // Verify - once more, in sync mode - that the changes were made
+    {
+        SharedGroup sg("test_shared.tightdb");
+        WriteTransaction wt(sg);
+        wt.get_group().Verify();
+        TestTableShared::Ref t = wt.get_table<TestTableShared>("test");
+
+        for (size_t i = 0; i < rows; ++i) {
+            const int64_t v = t[i].first;
+            t[i].first = 0;
+            CHECK_EQUAL(result, v);
+        }
+        wt.commit();
+    }
+}
+
+void multi_process(int numprocs, size_t numthreads)
+{
+    for (int i=0; i<numprocs; i++) {
+        if (fork()==0) {
+            multi_threaded(numthreads, i*numthreads);
+            exit(0);
+        }
+    }
+    int status = 0;
+    for (int i=0; i<numprocs; i++) wait(&status);
+}
+
+} // anonymous namespace
+
+
+TEST(Shared_Multiprocess)
+{
+    // wait for any daemon hanging around to exit
+    File::try_remove("test_shared.tightdb.lock");
+    usleep(100);
+
+    make_table(100);
+
+    multi_threaded(10,0);
+    validate_and_clear(10, INCREMENTS);
+
+    for (int k=1; k<10; k++) {
+        multi_process(10,10);
+        validate_and_clear(100,INCREMENTS);
+    }
+}
