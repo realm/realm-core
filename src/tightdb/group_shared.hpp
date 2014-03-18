@@ -241,7 +241,9 @@ private:
         transact_Writing
     };
     TransactStage m_transact_stage;
-
+    bool m_transactions_are_pinned;
+    ref_type m_pinned_top_ref;
+    size_t m_pinned_file_size;
     struct ReadCount;
 
     // Ring buffer managment
@@ -358,13 +360,15 @@ private:
 // Implementation:
 
 inline SharedGroup::SharedGroup(const std::string& file, bool no_create, DurabilityLevel dlevel):
-    m_group(Group::shared_tag()), m_version(std::numeric_limits<std::size_t>::max())
+    m_group(Group::shared_tag()), m_version(std::numeric_limits<std::size_t>::max()),
+    m_transactions_are_pinned(false)
 {
     open(file, no_create, dlevel);
 }
 
 inline SharedGroup::SharedGroup(unattached_tag) TIGHTDB_NOEXCEPT:
-    m_group(Group::shared_tag()), m_version(std::numeric_limits<std::size_t>::max())
+    m_group(Group::shared_tag()), m_version(std::numeric_limits<std::size_t>::max()),
+    m_transactions_are_pinned(false)
 {
 }
 
@@ -398,7 +402,8 @@ inline Group& SharedGroup::begin_write()
 #ifdef TIGHTDB_ENABLE_REPLICATION
 
 inline SharedGroup::SharedGroup(Replication& repl):
-    m_group(Group::shared_tag()), m_version(std::numeric_limits<std::size_t>::max())
+    m_group(Group::shared_tag()), m_version(std::numeric_limits<std::size_t>::max()),
+    m_transactions_are_pinned(false)
 {
     open(repl);
 }

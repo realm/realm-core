@@ -527,6 +527,23 @@ SharedGroup::~SharedGroup() TIGHTDB_NOEXCEPT
     catch (...) {} // ignored on purpose
 }
 
+bool SharedGroup::pin_transactions()
+{
+    TIGHTDB_ASSERT(! m_transactions_are_pinned);
+    size_t last_version = m_version;
+    begin_read();
+    m_transactions_are_pinned = true;
+    m_transact_stage = transact_Ready;
+    return last_version != m_version;
+}
+
+void SharedGroup::unpin_transactions()
+{
+    TIGHTDB_ASSERT(m_transactions_are_pinned);
+    m_transact_stage = transact_Reading;
+    end_read();
+    m_transactions_are_pinned = false;
+}
 
 bool SharedGroup::has_changed() const TIGHTDB_NOEXCEPT
 {
@@ -688,7 +705,13 @@ const Group& SharedGroup::begin_read()
     ref_type new_top_ref = 0;
     size_t new_file_size = 0;
 
-    {
+    if (m_transactions_are_pinned) {
+
+        new_top_ref   = m_pinned_top_ref;
+        new_file_size = m_pinned_file_size;
+
+    } else {
+
         SharedInfo* info = m_file_map.get_addr();
         Mutex::Lock lock(info->readmutex);
 
@@ -696,8 +719,8 @@ const Group& SharedGroup::begin_read()
             m_reader_map.remap(m_file, util::File::access_ReadWrite, info->infosize); // Throws
 
         // Get the current top ref
-        new_top_ref   = to_size_t(info->current_top);
-        new_file_size = to_size_t(info->filesize);
+        new_top_ref   = m_pinned_top_ref   = to_size_t(info->current_top);
+        new_file_size = m_pinned_file_size = to_size_t(info->filesize);
         m_version     = info->current_version.load_relaxed();
 
         // Update reader list
@@ -741,6 +764,7 @@ void SharedGroup::end_read() TIGHTDB_NOEXCEPT
     TIGHTDB_ASSERT(m_transact_stage == transact_Reading);
     TIGHTDB_ASSERT(m_version != numeric_limits<size_t>::max());
 
+    if (! m_transactions_are_pinned)
     {
         SharedInfo* info = m_file_map.get_addr();
         Mutex::Lock lock(info->readmutex);
@@ -775,6 +799,7 @@ void SharedGroup::end_read() TIGHTDB_NOEXCEPT
 void SharedGroup::do_begin_write()
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Ready);
+    TIGHTDB_ASSERT(! m_transactions_are_pinned);
 
     SharedInfo* info = m_file_map.get_addr();
 
