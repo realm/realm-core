@@ -8,17 +8,25 @@
 
 using namespace tightdb;
 
+// Note: You can now temporarely declare unit tests with the ONLY(TestName) macro instead of TEST(TestName). This
+// will disable all unit tests except these. Remember to undo your temporary changes before committing.
+
+
+namespace {
+
 struct db_setup_column_string {
     static AdaptiveStringColumn c;
 };
 
 AdaptiveStringColumn db_setup_column_string::c;
 
-// Note: You can now temporarely declare unit tests with the ONLY(TestName) macro instead of TEST(TestName). This
-// will disable all unit tests except these. Remember to undo your temporary changes before committing.
+} // anonymous namespace
 
-TEST_FIXTURE(db_setup_column_string, ColumnStringMultiEmpty)
+
+TEST(ColumnString_MultiEmpty)
 {
+    AdaptiveStringColumn& c = db_setup_column_string::c;
+
     c.add("");
     c.add("");
     c.add("");
@@ -36,8 +44,10 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringMultiEmpty)
 }
 
 
-TEST_FIXTURE(db_setup_column_string, ColumnStringSetExpand4)
+TEST(ColumnString_SetExpand4)
 {
+    AdaptiveStringColumn& c = db_setup_column_string::c;
+
     c.set(0, "hey");
 
     CHECK_EQUAL(6, c.size());
@@ -49,8 +59,10 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringSetExpand4)
     CHECK_EQUAL("", c.get(5));
 }
 
-TEST_FIXTURE(db_setup_column_string, ColumnStringSetExpand8)
+TEST(ColumnString_SetExpand8)
 {
+    AdaptiveStringColumn& c = db_setup_column_string::c;
+
     c.set(1, "test");
 
     CHECK_EQUAL(6, c.size());
@@ -62,24 +74,27 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringSetExpand8)
     CHECK_EQUAL("", c.get(5));
 }
 
-TEST_FIXTURE(db_setup_column_string, ColumnStringAdd0)
+TEST(ColumnString_Add0)
 {
+    AdaptiveStringColumn& c = db_setup_column_string::c;
     c.clear();
     c.add();
     CHECK_EQUAL("", c.get(0));
     CHECK_EQUAL(1, c.size());
 }
 
-TEST_FIXTURE(db_setup_column_string, ColumnStringAdd1)
+TEST(ColumnString_Add1)
 {
+    AdaptiveStringColumn& c = db_setup_column_string::c;
     c.add("a");
     CHECK_EQUAL("",  c.get(0));
     CHECK_EQUAL("a", c.get(1));
     CHECK_EQUAL(2, c.size());
 }
 
-TEST_FIXTURE(db_setup_column_string, ColumnStringAdd2)
+TEST(ColumnString_Add2)
 {
+    AdaptiveStringColumn& c = db_setup_column_string::c;
     c.add("bb");
     CHECK_EQUAL("",   c.get(0));
     CHECK_EQUAL("a",  c.get(1));
@@ -87,8 +102,9 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringAdd2)
     CHECK_EQUAL(3, c.size());
 }
 
-TEST_FIXTURE(db_setup_column_string, ColumnStringAdd3)
+TEST(ColumnString_Add3)
 {
+    AdaptiveStringColumn& c = db_setup_column_string::c;
     c.add("ccc");
     CHECK_EQUAL("",    c.get(0));
     CHECK_EQUAL("a",   c.get(1));
@@ -97,8 +113,9 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringAdd3)
     CHECK_EQUAL(4, c.size());
 }
 
-TEST_FIXTURE(db_setup_column_string, ColumnStringAdd4)
+TEST(ColumnString_Add4)
 {
+    AdaptiveStringColumn& c = db_setup_column_string::c;
     c.add("dddd");
     CHECK_EQUAL("",     c.get(0));
     CHECK_EQUAL("a",    c.get(1));
@@ -108,8 +125,9 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringAdd4)
     CHECK_EQUAL(5, c.size());
 }
 
-TEST_FIXTURE(db_setup_column_string, ColumnStringAdd8)
+TEST(ColumnString_Add8)
 {
+    AdaptiveStringColumn& c = db_setup_column_string::c;
     c.add("eeeeeeee");
     CHECK_EQUAL("",     c.get(0));
     CHECK_EQUAL("a",    c.get(1));
@@ -120,8 +138,9 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringAdd8)
     CHECK_EQUAL(6, c.size());
 }
 
-TEST_FIXTURE(db_setup_column_string, ColumnStringAdd16)
+TEST(ColumnString_Add16)
 {
+    AdaptiveStringColumn& c = db_setup_column_string::c;
     c.add("ffffffffffffffff");
     CHECK_EQUAL("",     c.get(0));
     CHECK_EQUAL("a",    c.get(1));
@@ -133,8 +152,10 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringAdd16)
     CHECK_EQUAL(7, c.size());
 }
 
-TEST_FIXTURE(db_setup_column_string, ColumnStringAdd32)
+TEST(ColumnString_Add32)
 {
+    AdaptiveStringColumn& c = db_setup_column_string::c;
+
     c.add("gggggggggggggggggggggggggggggggg");
 
     CHECK_EQUAL("",     c.get(0));
@@ -148,8 +169,10 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringAdd32)
     CHECK_EQUAL(8, c.size());
 }
 
-TEST_FIXTURE(db_setup_column_string, ColumnStringAdd64)
+TEST(ColumnString_Add64)
 {
+    AdaptiveStringColumn& c = db_setup_column_string::c;
+
     // Add a string longer than 64 bytes to trigger long strings
     c.add("xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx");
 
@@ -166,8 +189,10 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringAdd64)
 }
 
 
-TEST_FIXTURE(db_setup_column_string, ColumnStringSet1)
+TEST(ColumnString_Set1)
 {
+    AdaptiveStringColumn& c = db_setup_column_string::c;
+
     c.set(0, "ccc");
     c.set(1, "bb");
     c.set(2, "a");
@@ -186,8 +211,10 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringSet1)
     CHECK_EQUAL("xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx", c.get(8));
 }
 
-TEST_FIXTURE(db_setup_column_string, ColumnStringInsert1)
+TEST(ColumnString_Insert1)
 {
+    AdaptiveStringColumn& c = db_setup_column_string::c;
+
     // Insert in middle
     c.insert(4, "xx");
 
@@ -205,8 +232,10 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringInsert1)
     CHECK_EQUAL("xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx", c.get(9));
 }
 
-TEST_FIXTURE(db_setup_column_string, ColumnStringDelete1)
+TEST(ColumnString_Delete1)
 {
+    AdaptiveStringColumn& c = db_setup_column_string::c;
+
     // Delete from end
     c.erase(9, 9 == c.size()-1);
 
@@ -223,8 +252,10 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringDelete1)
     CHECK_EQUAL("gggggggggggggggggggggggggggggggg", c.get(8));
 }
 
-TEST_FIXTURE(db_setup_column_string, ColumnStringDelete2)
+TEST(ColumnString_Delete2)
 {
+    AdaptiveStringColumn& c = db_setup_column_string::c;
+
     // Delete from top
     c.erase(0, 0 == c.size()-1);
 
@@ -240,8 +271,10 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringDelete2)
     CHECK_EQUAL("gggggggggggggggggggggggggggggggg", c.get(7));
 }
 
-TEST_FIXTURE(db_setup_column_string, ColumnStringDelete3)
+TEST(ColumnString_Delete3)
 {
+    AdaptiveStringColumn& c = db_setup_column_string::c;
+
     // Delete from middle
     c.erase(3, 3 == c.size()-1);
 
@@ -256,8 +289,10 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringDelete3)
     CHECK_EQUAL("gggggggggggggggggggggggggggggggg", c.get(6));
 }
 
-TEST_FIXTURE(db_setup_column_string, ColumnStringDeleteAll)
+TEST(ColumnString_DeleteAll)
 {
+    AdaptiveStringColumn& c = db_setup_column_string::c;
+
     // Delete all items one at a time
     c.erase(0, 0 == c.size()-1);
     CHECK_EQUAL(6, c.size());
@@ -277,8 +312,10 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringDeleteAll)
     CHECK(c.is_empty());
 }
 
-TEST_FIXTURE(db_setup_column_string, ColumnStringInsert2)
+TEST(ColumnString_Insert2)
 {
+    AdaptiveStringColumn& c = db_setup_column_string::c;
+
     // Create new list
     c.clear();
     c.add("a");
@@ -297,8 +334,10 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringInsert2)
     CHECK_EQUAL(5, c.size());
 }
 
-TEST_FIXTURE(db_setup_column_string, ColumnStringInsert3)
+TEST(ColumnString_Insert3)
 {
+    AdaptiveStringColumn& c = db_setup_column_string::c;
+
     // Insert in middle with expansion
     c.insert(3, "xxxxxxxxxx");
 
@@ -311,7 +350,7 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringInsert3)
     CHECK_EQUAL(6, c.size());
 }
 
-TEST(ColumnStringFind1)
+TEST(ColumnString_Find1)
 {
     AdaptiveStringColumn c;
 
@@ -334,7 +373,7 @@ TEST(ColumnStringFind1)
     c.destroy();
 }
 
-TEST(ColumnStringFind2)
+TEST(ColumnString_Find2)
 {
     AdaptiveStringColumn c;
 
@@ -363,7 +402,7 @@ TEST(ColumnStringFind2)
     c.destroy();
 }
 
-TEST(ColumnStringAutoEnumerate)
+TEST(ColumnString_AutoEnumerate)
 {
     AdaptiveStringColumn c;
 
@@ -407,7 +446,7 @@ TEST(ColumnStringAutoEnumerate)
 
 #if !defined DISABLE_INDEX
 
-TEST(ColumnStringAutoEnumerateIndex)
+TEST(ColumnString_AutoEnumerateIndex)
 {
     AdaptiveStringColumn c;
 
@@ -489,7 +528,7 @@ TEST(ColumnStringAutoEnumerateIndex)
     results.destroy();
 }
 
-TEST(ColumnStringAutoEnumerateIndexReuse)
+TEST(ColumnString_AutoEnumerateIndexReuse)
 {
     AdaptiveStringColumn c;
 
@@ -535,9 +574,11 @@ TEST(ColumnStringAutoEnumerateIndexReuse)
 
 
 // Test "Replace string array with long string array" when doing it through LeafSet()
-TEST_FIXTURE(db_setup_column_string, ArrayStringSetLeafToLong)
+TEST(ColumnString_SetLeafToLong)
 {
+    AdaptiveStringColumn& c = db_setup_column_string::c;
     c.clear();
+
     Column col;
 
     c.add("foobar");
@@ -556,9 +597,11 @@ TEST_FIXTURE(db_setup_column_string, ArrayStringSetLeafToLong)
 }
 
 // Test "Replace string array with long string array" when doing it through LeafSet()
-TEST_FIXTURE(db_setup_column_string, ArrayStringSetLeafToBig)
+TEST(ColumnString_SetLeafToBig)
 {
+    AdaptiveStringColumn& c = db_setup_column_string::c;
     c.clear();
+
     Column col;
 
     c.add("foobar");
@@ -577,9 +620,11 @@ TEST_FIXTURE(db_setup_column_string, ArrayStringSetLeafToBig)
 }
 
 // Test against a bug where FindWithLen() would fail finding ajacent hits
-TEST_FIXTURE(db_setup_column_string, ArrayStringLongFindAjacent)
+TEST(ColumnString_FindAjacentLong)
 {
+    AdaptiveStringColumn& c = db_setup_column_string::c;
     c.clear();
+
     Array col;
 
     c.add("40 chars  40 chars  40 chars  40 chars  ");
@@ -595,9 +640,11 @@ TEST_FIXTURE(db_setup_column_string, ArrayStringLongFindAjacent)
     col.destroy();
 }
 
-TEST_FIXTURE(db_setup_column_string, ArrayStringBigFindAjacent)
+TEST(ColumnString_FindAjacentBig)
 {
+    AdaptiveStringColumn& c = db_setup_column_string::c;
     c.clear();
+
     Array col;
 
     c.add("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ");
@@ -613,7 +660,7 @@ TEST_FIXTURE(db_setup_column_string, ArrayStringBigFindAjacent)
     col.destroy();
 }
 
-TEST(AdaptiveStringColumnFindAllExpand)
+TEST(ColumnString_FindAllExpand)
 {
     AdaptiveStringColumn asc;
     Array c;
@@ -657,7 +704,7 @@ TEST(AdaptiveStringColumnFindAllExpand)
 }
 
 // FindAll using ranges, when expanded ArrayStringLong
-TEST(AdaptiveStringColumnFindAllRangesLong)
+TEST(ColumnString_FindAllRangesLong)
 {
     AdaptiveStringColumn asc;
     Array c;
@@ -711,7 +758,7 @@ TEST(AdaptiveStringColumnFindAllRangesLong)
 }
 
 // FindAll using ranges, when not expanded (using ArrayString)
-TEST(AdaptiveStringColumnFindAllRanges)
+TEST(ColumnString_FindAllRanges)
 {
     AdaptiveStringColumn asc;
     Array c;
@@ -764,7 +811,7 @@ TEST(AdaptiveStringColumnFindAllRanges)
     c.destroy();
 }
 
-TEST(AdaptiveStringColumnCount)
+TEST(ColumnString_Count)
 {
     AdaptiveStringColumn asc;
 
@@ -809,7 +856,7 @@ TEST(AdaptiveStringColumnCount)
 
 #if !defined DISABLE_INDEX
 
-TEST(AdaptiveStringColumnIndex)
+TEST(ColumnString_Index)
 {
     AdaptiveStringColumn asc;
 
@@ -910,8 +957,10 @@ TEST(AdaptiveStringColumnIndex)
 #endif // !defined DISABLE_INDEX
 
 
-TEST_FIXTURE(db_setup_column_string, ColumnString_Destroy)
+TEST(ColumnString_Destroy)
 {
+    AdaptiveStringColumn& c = db_setup_column_string::c;
+
     // clean up (ALWAYS PUT THIS LAST)
     c.destroy();
 }

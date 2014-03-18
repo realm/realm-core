@@ -12,7 +12,7 @@ table_accessors.hpp table_basic.hpp table_view.hpp table_view_basic.hpp table_ma
 descriptor_fwd.hpp descriptor.hpp group.hpp group_shared.hpp $(REPLICATION_HPP) query.hpp \
 query_conditions.hpp lang_bind_helper.hpp tightdb_nmmintrin.h importer.hpp version.hpp
 
-nobase_subinclude_HEADERS_EXTRA_UNINSTALL = *.h *.hpp util/*.h util/*.hpp
+nobase_subinclude_HEADERS_EXTRA_UNINSTALL = *.h *.hpp util/*.h util/*.hpp impl/*.h impl/*.hpp
 
 # Temporary hack due to public dependency on query_engine.hpp in
 # Lasses new "query expressions" implementation. None of these should
