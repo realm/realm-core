@@ -2004,14 +2004,16 @@ TEST(GroupShared_PinnedTransactions)
     }
     {   // can't unpin while we're inside a transaction
         sg1.pin_transactions();
-        WriteTransaction rt(sg1);
-        bool is_ok = false;
-        try {
-            sg1.unpin_transactions();
-        } catch (runtime_error) {
-            is_ok = true;
+        {
+            ReadTransaction rt(sg1);
+            bool is_ok = false;
+            try {
+                sg1.unpin_transactions();
+            } catch (runtime_error) {
+                is_ok = true;
+            }
+            CHECK(is_ok);
         }
-        CHECK(is_ok);
         sg1.unpin_transactions();
     }
     {   // can't start a write transaction while pinned
@@ -2023,7 +2025,7 @@ TEST(GroupShared_PinnedTransactions)
             is_ok = true;
         }
         CHECK(is_ok);
-        sg2.unpin_transactions();
+        sg1.unpin_transactions();
     }
 }
 
