@@ -34,7 +34,7 @@ struct Shared {
     void increment_10000_times()
     {
         for (int i=0; i<10000; ++i) {
-            Mutex::Lock lock(m_mutex);
+            LockGuard lock(m_mutex);
             ++m_value;
         }
     }
@@ -42,7 +42,7 @@ struct Shared {
     void increment_10000_times2()
     {
         for (int i=0; i<10000; ++i) {
-            Mutex::Lock lock(m_mutex);
+            LockGuard lock(m_mutex);
             // Create a time window where thread interference can take place. Problem with ++m_value is that it
             // could assemble into 'inc [addr]' which has very tiny gap
             double f = m_value;
@@ -91,7 +91,7 @@ public:
 
     bool get(int& value)
     {
-        Mutex::Lock lock(m_mutex);
+        LockGuard lock(m_mutex);
         for (;;) {
             if (!m_queue.empty())
                 break;
@@ -109,7 +109,7 @@ public:
 
     void put(int value)
     {
-        Mutex::Lock lock(m_mutex);
+        LockGuard lock(m_mutex);
         while (m_queue.size() == max_queue_size)
             m_nonfull.wait(lock); // Wait for consumer
         bool was_empty = m_queue.empty();
@@ -120,7 +120,7 @@ public:
 
     void close()
     {
-        Mutex::Lock lock(m_mutex);
+        LockGuard lock(m_mutex);
         m_closed = true;
         m_nonempty_or_closed.notify_all(); // Resume all waiting consumers
     }
@@ -184,10 +184,10 @@ TEST(Thread_MutexLock)
 {
     Mutex mutex;
     {
-        Mutex::Lock lock(mutex);
+        LockGuard lock(mutex);
     }
     {
-        Mutex::Lock lock(mutex);
+        LockGuard lock(mutex);
     }
 }
 
@@ -196,10 +196,10 @@ TEST(Thread_ProcessSharedMutex)
 {
     Mutex mutex((Mutex::process_shared_tag()));
     {
-        Mutex::Lock lock(mutex);
+        LockGuard lock(mutex);
     }
     {
-        Mutex::Lock lock(mutex);
+        LockGuard lock(mutex);
     }
 }
 

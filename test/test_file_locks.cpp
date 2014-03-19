@@ -40,7 +40,7 @@ bool slaves_run[num_slaves];
 
 void master()
 {
-    Mutex::Lock l(mutex);
+    LockGuard l(mutex);
     for (int i = 0; i != num_rounds; ++i) {
         while (num_slaves_ready != num_slaves)
             cond.wait(l);
@@ -63,7 +63,7 @@ void slave(int ndx)
         if (good_lock)
             file.unlock();
         {
-            Mutex::Lock l(mutex);
+            LockGuard l(mutex);
             if (good_lock)
                 ++num_good_locks;
             ++num_slaves_ready;

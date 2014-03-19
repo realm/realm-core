@@ -96,7 +96,7 @@ public:
     /// legal and will not cause any system resources to be leaked.
     Mutex(process_shared_tag);
 
-    class Lock;
+    friend class LockGuard;
 
 protected:
     pthread_mutex_t m_impl;
@@ -119,11 +119,11 @@ protected:
 };
 
 
-/// A simple scoped lock on a mutex.
-class Mutex::Lock {
+/// A simple scoped lock guard on a mutex.
+class LockGuard {
 public:
-    Lock(Mutex& m) TIGHTDB_NOEXCEPT;
-    ~Lock() TIGHTDB_NOEXCEPT;
+    LockGuard(Mutex& m) TIGHTDB_NOEXCEPT;
+    ~LockGuard() TIGHTDB_NOEXCEPT;
 
 private:
     Mutex& m_mutex;
@@ -224,7 +224,7 @@ public:
     CondVar(process_shared_tag);
 
     /// Wait for another thread to call notify() or notify_all().
-    void wait(Mutex::Lock& l) TIGHTDB_NOEXCEPT;
+    void wait(LockGuard& l) TIGHTDB_NOEXCEPT;
     template<class Func>
     void wait(RobustMutex& m, Func recover_func, const struct timespec* tp = 0);
 
@@ -344,12 +344,12 @@ inline void Mutex::unlock() TIGHTDB_NOEXCEPT
 }
 
 
-inline Mutex::Lock::Lock(Mutex& m) TIGHTDB_NOEXCEPT: m_mutex(m)
+inline LockGuard::LockGuard(Mutex& m) TIGHTDB_NOEXCEPT: m_mutex(m)
 {
     m_mutex.lock();
 }
 
-inline Mutex::Lock::~Lock() TIGHTDB_NOEXCEPT
+inline LockGuard::~LockGuard() TIGHTDB_NOEXCEPT
 {
     m_mutex.unlock();
 }
@@ -408,7 +408,7 @@ inline CondVar::~CondVar() TIGHTDB_NOEXCEPT
         destroy_failed(r);
 }
 
-inline void CondVar::wait(Mutex::Lock& l) TIGHTDB_NOEXCEPT
+inline void CondVar::wait(LockGuard& l) TIGHTDB_NOEXCEPT
 {
     int r = pthread_cond_wait(&m_impl, &l.m_mutex.m_impl);
     if (TIGHTDB_UNLIKELY(r != 0))

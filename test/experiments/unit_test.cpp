@@ -57,7 +57,7 @@ void emit(ostream& out, Test& test, string message)
 void check_failed(const char* file, long line, const string& message)
 {
     Registry& reg = get_registry();
-    util::Mutex::Lock lock(reg.m_mutex);
+    util::LockGuard lock(reg.m_mutex);
     Test& test = *reg.m_current_test;
     string name = test.m_name;
     emit(cerr, file, line, "ERROR in " + name + ": " + message);
@@ -76,14 +76,14 @@ namespace unit_test {
 void register_test(const char* file, long line, const char* name, void (*func)())
 {
     Registry& reg = get_registry();
-    util::Mutex::Lock lock(reg.m_mutex);
+    util::LockGuard lock(reg.m_mutex);
     reg.m_tests.push_back(Test(file, line, name, func));
 }
 
 void check_succeeded()
 {
     Registry& reg = get_registry();
-    util::Mutex::Lock lock(reg.m_mutex);
+    util::LockGuard lock(reg.m_mutex);
     ++reg.m_checks_completed;
 }
 
