@@ -259,6 +259,8 @@ private:
     void        ringbuf_put(const ReadCount& v);
     void        ringbuf_expand();
 
+    void grab_readlock(ref_type& new_top_ref, size_t& new_file_size);
+    void release_readlock() TIGHTDB_NOEXCEPT;
     void do_begin_write();
 
     // Must be called only by someone that has a lock on the write
