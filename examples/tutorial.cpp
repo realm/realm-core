@@ -1,8 +1,6 @@
 #include <iostream>
 using namespace std;
 
-#define _unused(x) ((void)x)
-
 // @@Example: create_table @@
 #include <tightdb.hpp>
 using namespace tightdb;
@@ -48,8 +46,8 @@ int main() {
     table[3].age += 1; // Happy birthday!
     // @@EndExample@@
 
-    _unused(age);
-    _unused(hired);
+    static_cast<void>(age);
+    static_cast<void>(hired);
 
     // @@Example: last_row @@
     cout << table.back().name << endl;                 // => "Anni"
@@ -83,7 +81,7 @@ int main() {
     size_t cnt = view.size();         // cnt => 2
     // @@EndExample@@
 
-    _unused(cnt);
+    static_cast<void>(cnt);
 
     cout << endl << endl;
 
