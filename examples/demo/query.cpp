@@ -9,7 +9,7 @@ TIGHTDB_TABLE_3(People,
                 hired, Bool)
 
 
-int main(int argc, char *argv[]) {
+int main(int, char*[]) {
     // Create table
     People t;
 

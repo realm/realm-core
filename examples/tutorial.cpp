@@ -46,6 +46,9 @@ int main() {
     table[3].age += 1; // Happy birthday!
     // @@EndExample@@
 
+    static_cast<void>(age);
+    static_cast<void>(hired);
+
     // @@Example: last_row @@
     cout << table.back().name << endl;                 // => "Anni"
     // @@EndExample@@
@@ -77,6 +80,8 @@ int main() {
     MyTable::View view = table.column().age.find_all(21);
     size_t cnt = view.size();         // cnt => 2
     // @@EndExample@@
+
+    static_cast<void>(cnt);
 
     cout << endl << endl;
 
