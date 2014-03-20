@@ -39,19 +39,19 @@ public:
 
     vector<Result> m_results;
 
-    void ReportTestStart(TestDetails const& test)
+    void ReportTestStart(const TestDetails& test)
     {
         static_cast<void>(test);
 //        cerr << test.filename << ":" << test.lineNumber << ": Begin " << test.testName << "\n";
     }
 
-    void ReportFailure(TestDetails const& test, char const* failure)
+    void ReportFailure(const TestDetails& test, const char* failure)
     {
         cerr << test.filename << ":" << test.lineNumber << ": error: "
             "Failure in " << test.testName << ": " << failure << "\n";
     }
 
-    void ReportTestFinish(TestDetails const& test, float elapsed_seconds)
+    void ReportTestFinish(const TestDetails& test, float elapsed_seconds)
     {
         static_cast<void>(test);
         static_cast<void>(elapsed_seconds);
@@ -152,13 +152,13 @@ int main(int argc, char* argv[])
     cerr << "\n\n";
 
     int res;
-    char* pPath;
-    pPath = getenv("JENKINS_URL");
-    if(pPath == NULL) {
+    char* jenkins_url = getenv("JENKINS_URL");
+    if (!jenkins_url) {
         CustomTestReporter reporter;
         TestRunner runner(reporter);
         res = runner.RunTestsIf(Test::GetTestList(), 0, True(), 0);
-    } else {
+    }
+    else {
         ofstream f("unit-test-report.xml");
         XmlTestReporter reporter(f);
         TestRunner runner(reporter);

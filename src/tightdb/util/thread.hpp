@@ -97,6 +97,7 @@ public:
     Mutex(process_shared_tag);
 
     friend class LockGuard;
+    friend class UniqueLock;
 
 protected:
     pthread_mutex_t m_impl;
@@ -119,15 +120,35 @@ protected:
 };
 
 
-/// A simple scoped lock guard on a mutex.
+/// A simple mutex ownership wrapper.
 class LockGuard {
 public:
-    LockGuard(Mutex& m) TIGHTDB_NOEXCEPT;
+    LockGuard(Mutex&) TIGHTDB_NOEXCEPT;
     ~LockGuard() TIGHTDB_NOEXCEPT;
 
 private:
     Mutex& m_mutex;
     friend class CondVar;
+};
+
+
+/// See UniqueLock.
+struct defer_lock_tag {};
+
+/// A general-purpose mutex ownership wrapper supporting deferred
+/// locking as well as repeated unlocking and relocking.
+class UniqueLock {
+public:
+    UniqueLock(Mutex&) TIGHTDB_NOEXCEPT;
+    UniqueLock(Mutex&, defer_lock_tag) TIGHTDB_NOEXCEPT;
+    ~UniqueLock() TIGHTDB_NOEXCEPT;
+
+    void lock() TIGHTDB_NOEXCEPT;
+    void unlock() TIGHTDB_NOEXCEPT;
+
+private:
+    Mutex* m_mutex;
+    bool m_is_locked;
 };
 
 
@@ -344,7 +365,8 @@ inline void Mutex::unlock() TIGHTDB_NOEXCEPT
 }
 
 
-inline LockGuard::LockGuard(Mutex& m) TIGHTDB_NOEXCEPT: m_mutex(m)
+inline LockGuard::LockGuard(Mutex& m) TIGHTDB_NOEXCEPT:
+    m_mutex(m)
 {
     m_mutex.lock();
 }
@@ -355,7 +377,41 @@ inline LockGuard::~LockGuard() TIGHTDB_NOEXCEPT
 }
 
 
-inline RobustMutex::RobustMutex(): Mutex(no_init_tag())
+inline UniqueLock::UniqueLock(Mutex& m) TIGHTDB_NOEXCEPT:
+    m_mutex(&m)
+{
+    m_mutex->lock();
+    m_is_locked = true;
+}
+
+inline UniqueLock::UniqueLock(Mutex& m, defer_lock_tag) TIGHTDB_NOEXCEPT:
+    m_mutex(&m)
+{
+    m_is_locked = false;
+}
+
+inline UniqueLock::~UniqueLock() TIGHTDB_NOEXCEPT
+{
+    if (m_is_locked)
+        m_mutex->unlock();
+}
+
+inline void UniqueLock::lock() TIGHTDB_NOEXCEPT
+{
+    m_mutex->lock();
+    m_is_locked = true;
+}
+
+inline void UniqueLock::unlock() TIGHTDB_NOEXCEPT
+{
+    m_mutex->unlock();
+    m_is_locked = false;
+}
+
+
+
+inline RobustMutex::RobustMutex():
+    Mutex(no_init_tag())
 {
     bool robust_if_available = true;
     init_as_process_shared(robust_if_available);

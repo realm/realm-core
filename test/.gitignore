@@ -30,4 +30,4 @@
 *.tightdb.lock
 
 # Jenkins unit test reports
-unit-test-report.xml
+/unit-test-report.xml
