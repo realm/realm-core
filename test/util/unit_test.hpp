@@ -222,8 +222,8 @@ struct Summary {
     long num_included_tests;
     long num_failed_tests;
     long num_excluded_tests;
-    long num_checks;
-    long num_failed_checks;
+    long long num_checks;
+    long long num_failed_checks;
     double elapsed_seconds;
 };
 

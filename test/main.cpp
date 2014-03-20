@@ -35,6 +35,7 @@ namespace {
 
 void fix_async_damon_path()
 {
+#ifndef _WIN32
     const char* async_daemon;
     // When running the unit-tests in Xcode, it runs them
     // in its own temporary directory. So we have to make sure we
@@ -59,6 +60,7 @@ void fix_async_damon_path()
 #endif
     }
     setenv("TIGHTDB_ASYNC_DAEMON", async_daemon, 0);
+#endif // _WIN32
 }
 
 

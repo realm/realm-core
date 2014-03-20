@@ -71,8 +71,8 @@ struct Registry {
     vector<Test> m_tests;
     Test* m_current_test;
     bool m_errors_seen;
-    long m_checks_failed;
-    long m_checks_completed;
+    long long m_checks_failed;
+    long long m_checks_completed;
     Reporter* m_reporter;
     Registry():
         m_current_test(0),
@@ -358,9 +358,9 @@ bool run(Reporter* reporter, Filter* filter)
     Registry& reg = get_registry();
     UniqueLock lock(reg.m_mutex);
     reg.m_reporter = reporter;
-    size_t num_tests = reg.m_tests.size();
-    size_t num_excluded_tests = 0, num_failed_tests = 0;
-    for (size_t i = 0; i < num_tests; ++i) {
+    long num_tests = long(reg.m_tests.size());
+    long num_excluded_tests = 0, num_failed_tests = 0;
+    for (long i = 0; i != num_tests; ++i) {
         Test& test = reg.m_tests[i];
         if (filter && !filter->include(test.m_loc)) {
             ++num_excluded_tests;
