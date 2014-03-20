@@ -142,7 +142,7 @@ public:
         }
         for(size_t i = 0; i != n; ++i) {
             const result& r = m_results[i];
-            cout << left << setw(longest_name+2) << (r.m_test_name + ":") << right <<
+            cout << left << setw(int(longest_name+2)) << (r.m_test_name + ":") << right <<
                 Timer::format(r.m_elapsed_seconds) << "\n";
         }
         cout << "\n";

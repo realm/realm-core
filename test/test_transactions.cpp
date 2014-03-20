@@ -52,8 +52,6 @@ const int num_threads = 23;
 const int num_rounds  = 2;
 
 const size_t max_blob_size   = 32*1024; // 32 KiB
-const size_t max_string_size = 32*1024; // 32 KiB
-
 
 void round(SharedGroup& db, int index)
 {

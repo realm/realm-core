@@ -254,8 +254,8 @@ TEST(ColumnFloat_InitOfEmptyColumn)
     t.add_column(type_Float, "works");
     t.add_column(type_Float, "works also");
     t.add_empty_row();
-    t.set_float(0,0,1.1);
-    t.set_float(1,0,2.2);
+    t.set_float(0,0,1.1f);
+    t.set_float(1,0,2.2f);
     t.remove_column(1);
     t.add_empty_row();
     t.add_column(type_Float, "doesn't work");
