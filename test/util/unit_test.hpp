@@ -258,6 +258,9 @@ protected:
 
 /// Generates output that is compatible with the XML output of
 /// UnitTest++. Caller receives ownership of the reporter.
+///
+/// FIXME: Consider producing output that conforms to
+/// http://windyroad.com.au/dl/Open%20Source/JUnit.xsd.
 Reporter* create_xml_reporter(std::ostream&);
 
 /// Run only those tests whose name is both included and not excluded.
