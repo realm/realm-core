@@ -1928,13 +1928,13 @@ TEST(GroupShared_PinnedTransactions)
     SharedGroup sg2("test.tightdb");
     {
         // initially, always say that the db has changed
-        bool changed = sg2.pin_transactions();
+        bool changed = sg2.pin_read_transactions();
         CHECK(changed);
-        sg2.unpin_transactions();
+        sg2.unpin_read_transactions();
         // asking again - this time there is no change
-        changed = sg2.pin_transactions();
+        changed = sg2.pin_read_transactions();
         CHECK(!changed);
-        sg2.unpin_transactions();
+        sg2.unpin_read_transactions();
     }
     {   // add something to the db to play with
         WriteTransaction wt(sg1);
@@ -1943,7 +1943,7 @@ TEST(GroupShared_PinnedTransactions)
         wt.commit();
     }
     {   // validate that we can see previous commit from within a new pinned transaction
-        bool changed = sg2.pin_transactions();
+        bool changed = sg2.pin_read_transactions();
         CHECK(changed);
         ReadTransaction rt(sg2);
         TestTableShared::ConstRef t1 = rt.get_table<TestTableShared>("test");
@@ -1966,8 +1966,8 @@ TEST(GroupShared_PinnedTransactions)
         CHECK_EQUAL(2, t1[0].second);
     }
     {   // unpin, pin again and validate that we can now see previous commit
-        sg2.unpin_transactions();
-        bool changed = sg2.pin_transactions();
+        sg2.unpin_read_transactions();
+        bool changed = sg2.pin_read_transactions();
         CHECK(changed);
         ReadTransaction rt(sg2);
         TestTableShared::ConstRef t1 = rt.get_table<TestTableShared>("test");
@@ -1976,18 +1976,18 @@ TEST(GroupShared_PinnedTransactions)
     {   // can't pin if already pinned
         bool is_ok = false;
         try {
-            sg2.pin_transactions();
-        } catch (runtime_error) {
+            sg2.pin_read_transactions();
+        } catch (runtime_error&) {
             is_ok = true;
         }
         CHECK(is_ok);
-        sg2.unpin_transactions();
+        sg2.unpin_read_transactions();
     }
     {   // can't unpin if already unpinned
         bool is_ok = false;
         try {
-            sg2.unpin_transactions();
-        } catch (runtime_error) {
+            sg2.unpin_read_transactions();
+        } catch (runtime_error&) {
             is_ok = true;
         }
         CHECK(is_ok);
@@ -1996,36 +1996,36 @@ TEST(GroupShared_PinnedTransactions)
         ReadTransaction rt(sg1);
         bool is_ok = false;
         try {
-            sg1.pin_transactions();
-        } catch (runtime_error) {
+            sg1.pin_read_transactions();
+        } catch (runtime_error&) {
             is_ok = true;
         }
         CHECK(is_ok);
     }
     {   // can't unpin while we're inside a transaction
-        sg1.pin_transactions();
+        sg1.pin_read_transactions();
         {
             ReadTransaction rt(sg1);
             bool is_ok = false;
             try {
-                sg1.unpin_transactions();
-            } catch (runtime_error) {
+                sg1.unpin_read_transactions();
+            } catch (runtime_error&) {
                 is_ok = true;
             }
             CHECK(is_ok);
         }
-        sg1.unpin_transactions();
+        sg1.unpin_read_transactions();
     }
     {   // can't start a write transaction while pinned
-        sg1.pin_transactions();
+        sg1.pin_read_transactions();
         bool is_ok = false;
         try {
             WriteTransaction rt(sg1);
-        } catch (runtime_error) {
+        } catch (runtime_error&) {
             is_ok = true;
         }
         CHECK(is_ok);
-        sg1.unpin_transactions();
+        sg1.unpin_read_transactions();
     }
 }
 

@@ -527,7 +527,7 @@ SharedGroup::~SharedGroup() TIGHTDB_NOEXCEPT
     catch (...) {} // ignored on purpose
 }
 
-bool SharedGroup::pin_transactions()
+bool SharedGroup::pin_read_transactions()
 {
     if (m_transactions_are_pinned) {
         throw runtime_error("transactions are already pinned, cannot pin again");
@@ -541,7 +541,7 @@ bool SharedGroup::pin_transactions()
     return last_version != m_version;
 }
 
-void SharedGroup::unpin_transactions()
+void SharedGroup::unpin_read_transactions()
 {
     if (! m_transactions_are_pinned) {
         throw runtime_error("transactions are not pinned, cannot unpin");

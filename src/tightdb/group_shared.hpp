@@ -170,32 +170,36 @@ public:
 
     // Pinned transactions:
 
-    // Shared group can work with either pinned or unpinned transactions.
-    // - With unpinned transactions, each new read transaction will refer
+    // Shared group can work with either pinned or unpinned read transactions.
+    // - With unpinned read transactions, each new read transaction will refer
     //   to the latest database state.
-    // - With pinned transactions, each new read transaction will refer
-    //   to the database state as it was, when pin_transactions() was called,
+    // - With pinned read transactions, each new read transaction will refer
+    //   to the database state as it was, when pin_read_transactions() was called,
     //   ignoring further changes until shared group is either unpinned or
     //   pinned again to a new state.
-    // Default is to use unpinned transactions.
-    //
-    // When using pinned transactions in a scenario with simultaneous write
-    // transactions, you MUST periodically unpin or (re)pin to limit the
-    // memory consumption.
+    // Default is to use unpinned read transactions.
     //
     // You can only pin read transactions. You must unpin before starting a
     // write transaction.
+    //
+    // Note that a write transaction can proceed via one SharedGroup, while
+    // read transactions are pinned via another SharedGroup that is attached
+    // to the same database. It is important to understand that each such
+    // write transaction will allocate resources (memory and/or disk), which
+    // will not be freed until the pinning is ended. For this reason, one should
+    // be careful to avoid long lived pinnings on databases that also see many
+    // write transactions.
 
     // Pin subsequent read transactions to the current state. It is illegal
-    // to use pin_transactions() from within a transaction. Returns true,
+    // to use pin_read_transactions() while a transaction is in progress. Returns true,
     // if transactions are pinned to a new version of the database, false
     // if there are no changes.
-    bool pin_transactions();
+    bool pin_read_transactions();
 
     // Unpin, i.e. allow subsequent read transactions to refer to whatever
-    // is the current state when they are created. It is illegal to use
-    // unpin_transactions() from within a transaction.
-    void unpin_transactions();
+    // is the current state when they are initiated. It is illegal to use
+    // unpin_read_transactions() while a transaction is in progress.
+    void unpin_read_transactions();
 
 
 #ifdef TIGHTDB_DEBUG
