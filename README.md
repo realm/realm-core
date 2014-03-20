@@ -88,7 +88,7 @@ Except for `tightdb.hpp` which is installed as:
 
     /usr/local/include/tightdb.hpp
 
-The following libraries are installed:
+The following libraries will be installed:
 
     /usr/local/lib/libtightdb.so
     /usr/local/lib/libtightdb-dbg.so
@@ -96,7 +96,7 @@ The following libraries are installed:
 
 Note: '.so' is replaced by '.dylib' on OS X.
 
-The following programs are installed:
+The following programs will be installed:
 
     /usr/local/bin/tightdb-import
     /usr/local/bin/tightdb-import-dbg
@@ -120,8 +120,6 @@ Here is a more comple set of build-related commands:
     sh build.sh config
     sh build.sh clean
     sh build.sh build
-    sh build.sh test
-    sh build.sh test-debug
     sh build.sh show-install
     sudo sh build.sh install
     sh build.sh test-intalled
@@ -196,7 +194,44 @@ available for installation to the end-user:
 
     TIGHTDB_ENABLE_REPLICATION=1 sh build.sh bin-dist all
 
-### Memory debugging
+
+
+Testing
+-------
+
+The core library comes with a suite of unite tests. You can run it in
+one of the following ways:
+
+    sh build.sh test
+    sh build.sh test-debug
+    sh build.sh memtest
+    sh build.sh memtest-debug
+
+The `mem` versions will run the suite inside Valgrind.
+
+There are a number of environment variable that can be use the
+customize the execution. For example, here is how to run only the
+query related tests, and report progress along the way:
+
+    UNITTEST_FILTER="Query_*" UNITTEST_PROGRESS=1 sh build.sh test-debug
+
+These variables are available:
+
+ - Set `UNITTEST_PROGRESS` to a non-empty value to enable reporting of
+   progress (write the name of each test as it is executed).
+
+ - `UNITTEST_FILTER` can be used to exclude one or more tests from a
+   particular run. For more information about the syntax, see the
+   documentation of
+   `tightdb::test_util::unit_test::create_wildcard_filter()` in
+   `test/util/unit_test.hpp`.
+
+ - Set `UNITTEST_XML` to a non-empty value to dump the test results
+   into an XML file. For details, see
+   `tightdb::test_util::unit_test::create_xml_reporter()` in
+   `test/util/unit_test.hpp`.
+
+Memory debugging:
 
 TightDB currently allows for uninitialized data to be written to a
 database file. This is not an error (technically), but it does cause
@@ -205,6 +240,7 @@ testing and debugging, set `TIGHTDB_ENABLE_ALLOC_SET_ZERO` to a
 nonempty value during configuration as in the following example:
 
     TIGHTDB_ENABLE_ALLOC_SET_ZERO=1 sh build.sh config
+
 
 
 Packaging for Debian/Ubuntu

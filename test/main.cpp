@@ -33,8 +33,9 @@ using namespace tightdb::test_util::unit_test;
 namespace {
 
 
-void fix_async_damon_path()
+void fix_async_daemon_path()
 {
+    // `setenv()` is POSIX. _WIN32 has `_putenv_s()` instead.
 #ifndef _WIN32
     const char* async_daemon;
     // When running the unit-tests in Xcode, it runs them
@@ -129,25 +130,33 @@ public:
     {
         SimpleReporter::summary(summary);
 
-        cout <<
-            "\n"
-            "Top 5 time usage:\n"
-            "-----------------\n";
-        sort(m_results.begin(), m_results.end());
-        size_t n = min<size_t>(5, m_results.size());
-        size_t longest_name = 0;
+        size_t max_n = 5;
+        size_t n = min<size_t>(max_n, m_results.size());
+        if (n < 2)
+            return;
+
+        partial_sort(m_results.begin(), m_results.begin() + n, m_results.end());
+        size_t name_col_width = 0, time_col_width = 0;
         for(size_t i = 0; i != n; ++i) {
             const result& r = m_results[i];
             size_t size = r.m_test_name.size();
-            if (size > longest_name)
-                longest_name = size;
+            if (size > name_col_width)
+                name_col_width = size;
+            size = Timer::format(r.m_elapsed_seconds).size();
+            if (size > time_col_width)
+                time_col_width = size;
         }
+        name_col_width += 2;
+        size_t full_width = name_col_width + time_col_width;
+        cout.fill('-');
+        cout << "\nTop "<<n<<" time usage:\n"<<setw(int(full_width)) << "" << "\n";
+        cout.fill(' ');
         for(size_t i = 0; i != n; ++i) {
             const result& r = m_results[i];
-            cout << left << setw(int(longest_name+2)) << (r.m_test_name + ":") << right <<
-                Timer::format(r.m_elapsed_seconds) << "\n";
+            cout <<
+                left  << setw(int(name_col_width)) << r.m_test_name <<
+                right << setw(int(time_col_width)) << Timer::format(r.m_elapsed_seconds) << "\n";
         }
-        cout << "\n";
     }
 
 private:
@@ -169,11 +178,13 @@ bool run_tests()
     UniquePtr<Reporter> reporter;
     UniquePtr<Filter> filter;
 
-    ofstream jenkins_file;
-    const char* jenkins_url = getenv("JENKINS_URL");
-    if (jenkins_url) {
-        jenkins_file.open("unit-test-report.xml");
-        reporter.reset(create_xml_reporter(jenkins_file));
+    // Set up reporter
+    ofstream xml_file;
+    const char* xml_str = getenv("UNITTEST_XML");
+    bool xml = (xml_str && strlen(xml_str) != 0) || getenv("JENKINS_URL");
+    if (xml) {
+        xml_file.open("unit-test-report.xml");
+        reporter.reset(create_xml_reporter(xml_file));
     }
     else {
         const char* str = getenv("UNITTEST_PROGRESS");
@@ -181,6 +192,7 @@ bool run_tests()
         reporter.reset(new CustomReporter(report_progress));
     }
 
+    // Set up filter
     const char* filter_str = getenv("UNITTEST_FILTER");
     const char* test_only = get_test_only();
     if (test_only)
@@ -188,10 +200,14 @@ bool run_tests()
     if (filter_str && strlen(filter_str) != 0)
         filter.reset(create_wildcard_filter(filter_str));
 
+    // Run
     bool success = run(reporter.get(), filter.get());
 
     if (test_only)
-        cout << "\n*** BE AWARE THAT MOST TESTS ARE EXCLUDED DUE TO USING 'ONLY' MACRO ***\n\n";
+        cout << "\n*** BE AWARE THAT MOST TESTS ARE EXCLUDED DUE TO USING 'ONLY' MACRO ***\n";
+
+    if (!xml)
+        cout << "\n";
 
     return success;
 }
@@ -205,7 +221,7 @@ int main(int argc, char* argv[])
 {
     bool no_error_exit_staus = 2 <= argc && strcmp(argv[1], "--no-error-exitcode") == 0;
 
-    fix_async_damon_path();
+    fix_async_daemon_path();
     display_build_config();
 
     bool success = run_tests();
