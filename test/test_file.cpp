@@ -4,9 +4,10 @@
 #include <sstream>
 #include <ostream>
 
-#include <UnitTest++.h>
-
 #include <tightdb/util/file.hpp>
+
+#include "util/unit_test.hpp"
+#include "util/test_only.hpp"
 
 using namespace std;
 using namespace tightdb;

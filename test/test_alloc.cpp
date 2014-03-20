@@ -1,10 +1,11 @@
 #include "testsettings.hpp"
 #ifdef TEST_ALLOC
 
-#include <UnitTest++.h>
-
 #include <tightdb/alloc_slab.hpp>
 #include <tightdb/util/file.hpp>
+
+#include "util/unit_test.hpp"
+#include "util/test_only.hpp"
 
 using namespace tightdb;
 

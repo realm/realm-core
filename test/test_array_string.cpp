@@ -1,9 +1,11 @@
 #include "testsettings.hpp"
 #ifdef TEST_ARRAY_STRING
 
-#include <UnitTest++.h>
 #include <tightdb/array_string.hpp>
 #include <tightdb/column.hpp>
+
+#include "util/unit_test.hpp"
+#include "util/test_only.hpp"
 
 using namespace tightdb;
 

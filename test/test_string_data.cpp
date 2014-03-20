@@ -5,10 +5,10 @@
 #include <string>
 #include <sstream>
 
-#include <UnitTest++.h>
-
 #include <tightdb/string_data.hpp>
 
+#include "util/unit_test.hpp"
+#include "util/test_only.hpp"
 
 using namespace std;
 using namespace tightdb;

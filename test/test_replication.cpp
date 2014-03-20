@@ -1,16 +1,17 @@
-#include <algorithm>
+#include "testsettings.hpp"
+#ifdef TEST_REPLICATION
 
-#include <UnitTest++.h>
+#include <algorithm>
 
 #include <tightdb.hpp>
 #include <tightdb/util/features.h>
 #include <tightdb/util/unique_ptr.hpp>
 #include <tightdb/util/file.hpp>
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#include "util/unit_test.hpp"
+#include "util/test_only.hpp"
 
-#include "testsettings.hpp"
-#ifdef TEST_REPLICATION
+#ifdef TIGHTDB_ENABLE_REPLICATION
 
 using namespace std;
 using namespace tightdb;
@@ -58,7 +59,7 @@ TIGHTDB_TABLE_1(MyTable,
 } // anonymous namespace
 
 
-TEST(Replication)
+TEST(Replication_General)
 {
     string database_1 = "replication-1.tightdb";
     string database_2 = "replication-2.tightdb";
@@ -102,5 +103,5 @@ TEST(Replication)
 }
 
 
-#endif // TEST_REPLICATION
 #endif // TIGHTDB_ENABLE_REPLICATION
+#endif // TEST_REPLICATION

@@ -1,8 +1,10 @@
 #include "testsettings.hpp"
 #ifdef TEST_INDEX
 
-#include <UnitTest++.h>
 #include <tightdb/index.hpp>
+
+#include "util/unit_test.hpp"
+#include "util/test_only.hpp"
 
 using namespace tightdb;
 
