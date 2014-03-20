@@ -8,7 +8,6 @@
 
 /* Begin PBXBuildFile section */
 		3604595214C97A4E008ACFFD /* test_column_mixed.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3604595114C97A4E008ACFFD /* test_column_mixed.cpp */; };
-		360F1A1D146AB3AA00EBB9C6 /* libUnitTest++.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 360F1A1C146AB3AA00EBB9C6 /* libUnitTest++.a */; };
 		3620DF0118B6C93C003AD498 /* memory_stream.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3620DEFF18B6C93C003AD498 /* memory_stream.cpp */; };
 		3620DF0218B6C93C003AD498 /* memory_stream.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 3620DF0018B6C93C003AD498 /* memory_stream.hpp */; };
 		3620DF0D18B6CA7B003AD498 /* destroy_guard.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 3620DF0418B6CA7B003AD498 /* destroy_guard.hpp */; };
@@ -228,6 +227,12 @@
 		80ADCCEB18A23DD00049D472 /* version.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 80ADCCE818A23DD00049D472 /* version.hpp */; };
 		80ADCCEC18A23DD00049D472 /* version.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 80ADCCE818A23DD00049D472 /* version.hpp */; };
 		80ADCCEE18A23E2D0049D472 /* test_version.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 80ADCCED18A23E2D0049D472 /* test_version.cpp */; };
+		B159627418DB14C4008B9421 /* test_only.cpp in Sources */ = {isa = PBXBuildFile; fileRef = B159626E18DB14C4008B9421 /* test_only.cpp */; };
+		B159627518DB14C4008B9421 /* test_only.hpp in Headers */ = {isa = PBXBuildFile; fileRef = B159626F18DB14C4008B9421 /* test_only.hpp */; };
+		B159627618DB14C4008B9421 /* unit_test.cpp in Sources */ = {isa = PBXBuildFile; fileRef = B159627018DB14C4008B9421 /* unit_test.cpp */; };
+		B159627718DB14C4008B9421 /* unit_test.hpp in Headers */ = {isa = PBXBuildFile; fileRef = B159627118DB14C4008B9421 /* unit_test.hpp */; };
+		B159627818DB14C4008B9421 /* wildcard.cpp in Sources */ = {isa = PBXBuildFile; fileRef = B159627218DB14C4008B9421 /* wildcard.cpp */; };
+		B159627918DB14C4008B9421 /* wildcard.hpp in Headers */ = {isa = PBXBuildFile; fileRef = B159627318DB14C4008B9421 /* wildcard.hpp */; };
 		B159814518CF55D400E3C5DF /* type_traits.hpp in Headers */ = {isa = PBXBuildFile; fileRef = B159814418CF55D400E3C5DF /* type_traits.hpp */; };
 		B159814618CF55D400E3C5DF /* type_traits.hpp in Headers */ = {isa = PBXBuildFile; fileRef = B159814418CF55D400E3C5DF /* type_traits.hpp */; };
 		B159814A18CF560000E3C5DF /* demangle.cpp in Sources */ = {isa = PBXBuildFile; fileRef = B159814718CF560000E3C5DF /* demangle.cpp */; };
@@ -313,7 +318,6 @@
 
 /* Begin PBXFileReference section */
 		3604595114C97A4E008ACFFD /* test_column_mixed.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = test_column_mixed.cpp; sourceTree = "<group>"; };
-		360F1A1C146AB3AA00EBB9C6 /* libUnitTest++.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = "libUnitTest++.a"; path = "test/UnitTest++/libUnitTest++.a"; sourceTree = "<group>"; };
 		3620DEFF18B6C93C003AD498 /* memory_stream.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = memory_stream.cpp; sourceTree = "<group>"; };
 		3620DF0018B6C93C003AD498 /* memory_stream.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = memory_stream.hpp; sourceTree = "<group>"; };
 		3620DF0418B6CA7B003AD498 /* destroy_guard.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = destroy_guard.hpp; sourceTree = "<group>"; };
@@ -552,6 +556,12 @@
 		80ADCCE718A23DD00049D472 /* version.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = version.cpp; path = tightdb/version.cpp; sourceTree = "<group>"; };
 		80ADCCE818A23DD00049D472 /* version.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = version.hpp; path = tightdb/version.hpp; sourceTree = "<group>"; };
 		80ADCCED18A23E2D0049D472 /* test_version.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = test_version.cpp; sourceTree = "<group>"; };
+		B159626E18DB14C4008B9421 /* test_only.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = test_only.cpp; sourceTree = "<group>"; };
+		B159626F18DB14C4008B9421 /* test_only.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = test_only.hpp; sourceTree = "<group>"; };
+		B159627018DB14C4008B9421 /* unit_test.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = unit_test.cpp; sourceTree = "<group>"; };
+		B159627118DB14C4008B9421 /* unit_test.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = unit_test.hpp; sourceTree = "<group>"; };
+		B159627218DB14C4008B9421 /* wildcard.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = wildcard.cpp; sourceTree = "<group>"; };
+		B159627318DB14C4008B9421 /* wildcard.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = wildcard.hpp; sourceTree = "<group>"; };
 		B159814418CF55D400E3C5DF /* type_traits.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = type_traits.hpp; sourceTree = "<group>"; };
 		B159814718CF560000E3C5DF /* demangle.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = demangle.cpp; sourceTree = "<group>"; };
 		B159814818CF560000E3C5DF /* demangle.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = demangle.hpp; sourceTree = "<group>"; };
@@ -572,7 +582,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				526F3F0B18246B33005217F1 /* test-util.a in Frameworks */,
-				360F1A1D146AB3AA00EBB9C6 /* libUnitTest++.a in Frameworks */,
 				3626F56B14A228850097F17B /* libtightdb.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -614,7 +623,6 @@
 		3611F2FA14209B7000017263 = {
 			isa = PBXGroup;
 			children = (
-				360F1A1C146AB3AA00EBB9C6 /* libUnitTest++.a */,
 				3647DFF214209CE600D56FD7 /* test */,
 				3647DEEA14209C1200D56FD7 /* src */,
 				3647E0E814209E6B00D56FD7 /* Products */,
@@ -930,6 +938,12 @@
 		52D6E056175BDBDD00B423E5 /* util */ = {
 			isa = PBXGroup;
 			children = (
+				B159626E18DB14C4008B9421 /* test_only.cpp */,
+				B159626F18DB14C4008B9421 /* test_only.hpp */,
+				B159627018DB14C4008B9421 /* unit_test.cpp */,
+				B159627118DB14C4008B9421 /* unit_test.hpp */,
+				B159627218DB14C4008B9421 /* wildcard.cpp */,
+				B159627318DB14C4008B9421 /* wildcard.hpp */,
 				B159814718CF560000E3C5DF /* demangle.cpp */,
 				B159814818CF560000E3C5DF /* demangle.hpp */,
 				B159814918CF560000E3C5DF /* super_int.hpp */,
@@ -1130,6 +1144,9 @@
 				526F3F0418246519005217F1 /* benchmark_results.hpp in Headers */,
 				526F3F081824652B005217F1 /* thread_wrapper.hpp in Headers */,
 				B159814C18CF560000E3C5DF /* super_int.hpp in Headers */,
+				B159627918DB14C4008B9421 /* wildcard.hpp in Headers */,
+				B159627518DB14C4008B9421 /* test_only.hpp in Headers */,
+				B159627718DB14C4008B9421 /* unit_test.hpp in Headers */,
 				B159814B18CF560000E3C5DF /* demangle.hpp in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -1415,10 +1432,13 @@
 			buildActionMask = 2147483647;
 			files = (
 				52D6E070175BDC6500B423E5 /* timer.cpp in Sources */,
+				B159627618DB14C4008B9421 /* unit_test.cpp in Sources */,
+				B159627418DB14C4008B9421 /* test_only.cpp in Sources */,
 				52D6E06F175BDC5D00B423E5 /* mem.cpp in Sources */,
 				B159814A18CF560000E3C5DF /* demangle.cpp in Sources */,
 				526F3F0218246508005217F1 /* misc.cpp in Sources */,
 				526F3F0618246523005217F1 /* benchmark_results.cpp in Sources */,
+				B159627818DB14C4008B9421 /* wildcard.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1570,14 +1590,8 @@
 				GCC_WARN_ABOUT_MISSING_PROTOTYPES = NO;
 				GCC_WARN_ABOUT_RETURN_TYPE = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				HEADER_SEARCH_PATHS = (
-					"$(inherited)",
-					"\"$(SRCROOT)/test/UnitTest++/src\"",
-				);
-				LIBRARY_SEARCH_PATHS = (
-					"$(inherited)",
-					"\"$(SRCROOT)/test/UnitTest++\"",
-				);
+				HEADER_SEARCH_PATHS = "$(inherited)";
+				LIBRARY_SEARCH_PATHS = "$(inherited)";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				VERSION_INFO_FILE = "$(TARGET_NAME)";
 			};
@@ -1593,14 +1607,8 @@
 				GCC_WARN_ABOUT_MISSING_PROTOTYPES = NO;
 				GCC_WARN_ABOUT_RETURN_TYPE = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				HEADER_SEARCH_PATHS = (
-					"$(inherited)",
-					"\"$(SRCROOT)/test/UnitTest++/src\"",
-				);
-				LIBRARY_SEARCH_PATHS = (
-					"$(inherited)",
-					"\"$(SRCROOT)/test/UnitTest++\"",
-				);
+				HEADER_SEARCH_PATHS = "$(inherited)";
+				LIBRARY_SEARCH_PATHS = "$(inherited)";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				VERSION_INFO_FILE = "$(TARGET_NAME)";
 			};
