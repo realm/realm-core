@@ -25,7 +25,7 @@ TEST(ArrayBlob_AddEmpty)
     blob.destroy();
 }
 
-TEST(ArrayBlob)
+TEST(ArrayBlob_General)
 {
     ArrayBlob blob;
 
@@ -84,7 +84,7 @@ TEST(ArrayBlob)
     blob.destroy();
 }
 
-TEST(AdaptiveStringLeak)
+TEST(ArrayBlob_AdaptiveStringLeak)
 {
     AdaptiveStringColumn col;
     for (size_t i = 0; i != 2 * TIGHTDB_MAX_LIST_SIZE; ++i)

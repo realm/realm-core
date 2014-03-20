@@ -125,7 +125,7 @@ TEST(Query_NoConditions)
     }
 }
 
-TEST(TestQueryCount)
+TEST(Query_Count)
 {
     // Intended to test QueryState::match<pattern = true>(); which is only triggered if:
     // * Table size is large enough to have SSE-aligned or bithack-aligned rows (this requires
@@ -157,7 +157,7 @@ TEST(TestQueryCount)
 }
 
 
-TEST(NextGenSyntaxTypedString)
+TEST(Query_NextGenSyntaxTypedString)
 {
     Books books;
 
@@ -180,7 +180,7 @@ TEST(NextGenSyntaxTypedString)
     CHECK_EQUAL(1, match);
 }
 
-TEST(NextGenSyntax)
+TEST(Query_NextGenSyntax)
 {
     volatile size_t match;
 
@@ -423,7 +423,7 @@ TEST(NextGenSyntax)
     delete first2;
 }
 
-TEST(NextGenSyntaxMonkey0)
+TEST(Query_NextGenSyntaxMonkey0)
 {
     // Intended to test eval() for columns in query_expression.hpp which fetch 8 values at a time. This test varies
     // table size to test out-of-bounds bugs.
@@ -481,7 +481,7 @@ TEST(NextGenSyntaxMonkey0)
 
 }
 
-TEST(NextGenSyntaxMonkey)
+TEST(Query_NextGenSyntaxMonkey)
 {
     for(int iter = 1; iter < 20 * (TEST_DURATION * TEST_DURATION * TEST_DURATION + 1); iter++)
     {
@@ -624,7 +624,7 @@ TEST(NextGenSyntaxMonkey)
 }
 
 
-TEST(LimitUntyped)
+TEST(Query_LimitUntyped)
 {
     Table table;
     table.add_column(type_Int, "first1");
@@ -650,7 +650,7 @@ TEST(LimitUntyped)
 }
 
 
-TEST(MergeQueriesOverloads)
+TEST(Query_MergeQueriesOverloads)
 {
     // Tests && and || overloads of Query class
     Table table;
@@ -709,7 +709,7 @@ TEST(MergeQueriesOverloads)
 }
 
 
-TEST(MergeQueries)
+TEST(Query_MergeQueries)
 {
     // test OR vs AND precedence
     Table table;
@@ -738,7 +738,7 @@ TEST(MergeQueries)
 
 
 
-TEST(MergeQueriesMonkey)
+TEST(Query_MergeQueriesMonkey)
 {
     for(int iter = 0; iter < 5; iter++)
     {
@@ -916,7 +916,7 @@ TEST(MergeQueriesMonkey)
 
 
 
-TEST(MergeQueriesMonkeyOverloads)
+TEST(Query_MergeQueriesMonkeyOverloads)
 {
     for(int iter = 0; iter < 5; iter++)
     {
@@ -1023,7 +1023,7 @@ TEST(MergeQueriesMonkeyOverloads)
 }
 
 
-TEST(CountLimit)
+TEST(Query_CountLimit)
 {
     PeopleTable2 table;
 
@@ -1050,7 +1050,7 @@ TEST(CountLimit)
     CHECK_EQUAL(1, count3);
 }
 
-TEST(QueryExpressions0)
+TEST(Query_Expressions0)
 {
 /*
     We have following variables to vary in the tests:
@@ -1265,7 +1265,7 @@ TEST(QueryExpressions0)
 
 }
 
-TEST(LimitUntyped2)
+TEST(Query_LimitUntyped2)
 {
     Table table;
     table.add_column(type_Int, "first1");
@@ -1404,7 +1404,7 @@ TEST(LimitUntyped2)
 }
 
 
-TEST(TestQueryStrIndexCrash)
+TEST(Query_StrIndexCrash)
 {
     // Rasmus "8" index crash
     for(int iter = 0; iter < 5; ++iter) {
@@ -1438,7 +1438,7 @@ TEST(TestQueryStrIndexCrash)
 }
 
 
-TEST(QueryTwoColsEqualVaryWidthAndValues)
+TEST(Query_TwoColsEqualVaryWidthAndValues)
 {
     vector<size_t> ints1;
     vector<size_t> ints2;
@@ -1535,7 +1535,7 @@ TEST(QueryTwoColsEqualVaryWidthAndValues)
         CHECK_EQUAL(doubles[t], t5.get_source_ndx(t));
 }
 
-TEST(QueryTwoColsVaryOperators)
+TEST(Query_TwoColsVaryOperators)
 {
     vector<size_t> ints1;
     vector<size_t> floats;
@@ -1602,7 +1602,7 @@ TEST(QueryTwoColsVaryOperators)
 
 
 
-TEST(QueryTwoCols0)
+TEST(Query_TwoCols0)
 {
     Table table;
     table.add_column(type_Int, "first1");
@@ -1623,7 +1623,7 @@ TEST(QueryTwoCols0)
 }
 
 
-TEST(QueryTwoColsNoRows)
+TEST(Query_TwoColsNoRows)
 {
     Table table;
     table.add_column(type_Int, "first1");
@@ -1634,7 +1634,7 @@ TEST(QueryTwoColsNoRows)
 }
 
 
-TEST(TestQueryHuge)
+TEST(Query_Huge)
 {
 #if TEST_DURATION == 0
     for (int N = 0; N < 1; N++) {
@@ -1808,7 +1808,7 @@ TEST(TestQueryHuge)
     }
 }
 
-TEST(TestQueryOnTableView)
+TEST(Query_OnTableView)
 {
     // Mostly intended to test the Array::FindGTE method
     for(int iter = 0; iter < 100 * (1 + TEST_DURATION * TEST_DURATION * TEST_DURATION * TEST_DURATION * TEST_DURATION); iter++) {
@@ -1846,7 +1846,7 @@ TEST(TestQueryOnTableView)
 
 }
 
-TEST(TestQueryStrIndex3)
+TEST(Query_StrIndex3)
 {
     // Create two columns where query match-density varies alot throughout the rows. This forces the query engine to
     // jump back and forth between the two conditions and test edge cases in these transitions. Tests combinations of
@@ -1951,7 +1951,7 @@ TEST(TestQueryStrIndex3)
 }
 
 
-TEST(TestQueryStrIndex2)
+TEST(Query_StrIndex2)
 {
     TupleTableType ttt;
 
@@ -1974,7 +1974,7 @@ TEST(TestQueryStrIndex2)
 }
 
 
-TEST(TestQueryStrEnum)
+TEST(Query_StrEnum)
 {
     TupleTableType ttt;
 
@@ -2000,7 +2000,7 @@ TEST(TestQueryStrEnum)
 }
 
 
-TEST(TestQueryStrIndex)
+TEST(Query_StrIndex)
 {
 #ifdef TIGHTDB_DEBUG
     size_t itera = 4;
@@ -2041,7 +2041,7 @@ TEST(TestQueryStrIndex)
 }
 
 
-TEST(Group_GameAnalytics)
+TEST(Query_GameAnalytics)
 {
     {
         Group g;
@@ -2078,7 +2078,7 @@ TEST(Group_GameAnalytics)
 }
 
 
-TEST(TestQueryFloat3)
+TEST(Query_Float3)
 {
     FloatTable3 t;
 
@@ -2125,7 +2125,7 @@ TEST(TestQueryFloat3)
     CHECK_EQUAL(15, a8);
 }
 
-TEST(TestTableViewSum)
+TEST(Query_TableViewSum)
 {
     TableViewSum ttt;
 
@@ -2147,7 +2147,7 @@ TEST(TestTableViewSum)
 }
 
 
-TEST(TestQueryJavaMinimumCrash)
+TEST(Query_JavaMinimumCrash)
 {
     // Test that triggers a bug that was discovered through Java intnerface and has been fixed
     PHPMinimumCrash ttt;
@@ -2164,7 +2164,7 @@ TEST(TestQueryJavaMinimumCrash)
 
 
 
-TEST(TestQueryFloat4)
+TEST(Query_Float4)
 {
     FloatTable3 t;
 
@@ -2186,7 +2186,7 @@ TEST(TestQueryFloat4)
     CHECK_EQUAL(12345.0, a4);
 }
 
-TEST(TestQueryFloat)
+TEST(Query_Float)
 {
     FloatTable t;
 
@@ -2288,7 +2288,7 @@ TEST(TestQueryFloat)
 }
 
 
-TEST(TestDateQuery)
+TEST(Query_DateQuery)
 {
     PeopleTable table;
 
@@ -2304,7 +2304,7 @@ TEST(TestDateQuery)
 }
 
 
-TEST(TestQueryStrIndexed_enum)
+TEST(Query_StrIndexedEnum)
 {
     TupleTableType ttt;
 
@@ -2335,7 +2335,7 @@ TEST(TestQueryStrIndexed_enum)
 }
 
 
-TEST(TestQueryStrIndexed_non_enum)
+TEST(Query_StrIndexedNonEnum)
 {
     TupleTableType ttt;
 
@@ -2363,7 +2363,7 @@ TEST(TestQueryStrIndexed_non_enum)
     CHECK_EQUAL(10*2, tv.size());
 }
 
-TEST(TestQueryFindAll_Contains2_2)
+TEST(Query_FindAllContains2_2)
 {
     TupleTableType ttt;
 
@@ -2395,7 +2395,7 @@ TEST(TestQueryFindAll_Contains2_2)
     CHECK_EQUAL(5, tv2.get_source_ndx(2));
 }
 
-TEST(TestQuery_sum_new_aggregates)
+TEST(Query_SumNewAggregates)
 {
     // test the new ACTION_FIND_PATTERN() method in array
     OneIntTable t;
@@ -2413,7 +2413,7 @@ TEST(TestQuery_sum_new_aggregates)
 }
 
 
-TEST(TestQuery_sum_min_max_avg_foreign_col)
+TEST(Query_SumMinMaxAvgForeignCol)
 {
     TwoIntTable t;
     t.add(1, 10);
@@ -2425,7 +2425,7 @@ TEST(TestQuery_sum_min_max_avg_foreign_col)
 }
 
 
-TEST(TestAggregateSingleCond)
+TEST(Query_AggregateSingleCond)
 {
     OneIntTable ttt;
 
@@ -2449,7 +2449,7 @@ TEST(TestAggregateSingleCond)
     CHECK_EQUAL(9, s);
 }
 
-TEST(TestQueryFindAll_range1)
+TEST(Query_FindAllRange1)
 {
     TupleTableType ttt;
 
@@ -2472,7 +2472,7 @@ TEST(TestQueryFindAll_range1)
 }
 
 
-TEST(TestQueryFindAll_range_or_monkey2)
+TEST(Query_FindAllRangeOrMonkey2)
 {
     const size_t ROWS = 20;
     const size_t ITER = 100;
@@ -2517,7 +2517,7 @@ TEST(TestQueryFindAll_range_or_monkey2)
 
 
 
-TEST(TestQueryFindAll_range_or)
+TEST(Query_FindAllRangeOr)
 {
     TupleTableType ttt;
 
@@ -2543,7 +2543,7 @@ TEST(TestQueryFindAll_range_or)
 }
 
 
-TEST(TestQuerySimpleStr)
+TEST(Query_SimpleStr)
 {
     TupleTableType ttt;
 
@@ -2559,7 +2559,7 @@ TEST(TestQuerySimpleStr)
     CHECK_EQUAL(4, c);
 }
 
-TEST(TestQueryDelete)
+TEST(Query_Delete)
 {
     TupleTableType ttt;
 
@@ -2589,7 +2589,7 @@ TEST(TestQueryDelete)
     CHECK_EQUAL(0, ttt.size());
 }
 
-TEST(TestQueryDeleteRange)
+TEST(Query_DeleteRange)
 {
     TupleTableType ttt;
 
@@ -2610,7 +2610,7 @@ TEST(TestQueryDeleteRange)
     CHECK_EQUAL(5, ttt[2].first);
 }
 
-TEST(TestQueryDeleteLimit)
+TEST(Query_DeleteLimit)
 {
     TupleTableType ttt;
 
@@ -2634,7 +2634,7 @@ TEST(TestQueryDeleteLimit)
 
 
 
-TEST(TestQuerySimple)
+TEST(Query_Simple)
 {
     TupleTableType ttt;
 
@@ -2649,7 +2649,7 @@ TEST(TestQuerySimple)
     CHECK_EQUAL(1, tv1.get_source_ndx(0));
 }
 
-TEST(TestQuerySimpleBUGdetect)
+TEST(Query_SimpleBugDetect)
 {
     TupleTableType ttt;
     ttt.add(1, "a");
@@ -2669,7 +2669,7 @@ TEST(TestQuerySimpleBUGdetect)
 }
 
 
-TEST(TestQuerySubtable)
+TEST(Query_Subtable)
 {
     Group group;
     TableRef table = group.get_table("test");
@@ -2779,11 +2779,11 @@ TEST(TestQuerySubtable)
     CHECK_EQUAL(2, t4.get_source_ndx(1));
 }
 
-TEST(TestQuerySubtable_bug)
+TEST(Query_SubtableBug)
 {
     Group group;
     TableRef table = group.get_table("test");
-    
+
     // Create specification with sub-table
     table->add_column(type_Int,   "col 0");
     DescriptorRef sub;
@@ -2828,7 +2828,7 @@ TEST(Query_SubtableViewSizeBug)
 }
 */
 
-TEST(TestQuerySort1)
+TEST(Query_Sort1)
 {
     TupleTableType ttt;
 
@@ -2862,7 +2862,7 @@ TEST(TestQuerySort1)
 
 
 
-TEST(TestQuerySort_QuickSort)
+TEST(Query_QuickSort)
 {
     // Triggers QuickSort because range > len
     TupleTableType ttt;
@@ -2880,7 +2880,7 @@ TEST(TestQuerySort_QuickSort)
     }
 }
 
-TEST(TestQuerySort_CountSort)
+TEST(Query_CountSort)
 {
     // Triggers CountSort because range <= len
     TupleTableType ttt;
@@ -2899,7 +2899,7 @@ TEST(TestQuerySort_CountSort)
 }
 
 
-TEST(TestQuerySort_Descending)
+TEST(Query_SortDescending)
 {
     TupleTableType ttt;
 
@@ -2917,7 +2917,7 @@ TEST(TestQuerySort_Descending)
 }
 
 
-TEST(TestQuerySort_Dates)
+TEST(Query_SortDates)
 {
     Table table;
     table.add_column(type_DateTime, "first");
@@ -2944,7 +2944,7 @@ TEST(TestQuerySort_Dates)
 }
 
 
-TEST(TestQuerySort_Bools)
+TEST(Query_SortBools)
 {
     Table table;
     table.add_column(type_Bool, "first");
@@ -2965,7 +2965,7 @@ TEST(TestQuerySort_Bools)
     CHECK(tv.get_bool(0, 2) == true);
 }
 
-TEST(TestQueryThreads)
+TEST(Query_Threads)
 {
     TupleTableType ttt;
 
@@ -2997,7 +2997,7 @@ TEST(TestQueryThreads)
 }
 
 
-TEST(TestQueryLongString)
+TEST(Query_LongString)
 {
     TupleTableType ttt;
 
@@ -3029,7 +3029,7 @@ TEST(TestQueryLongString)
 }
 
 
-TEST(TestQueryLongEnum)
+TEST(Query_LongEnum)
 {
     TupleTableType ttt;
 
@@ -3061,7 +3061,7 @@ TEST(TestQueryLongEnum)
     }
 }
 
-TEST(TestQueryBigString)
+TEST(Query_BigString)
 {
     TupleTableType ttt;
     ttt.add(1, "a");
@@ -3077,7 +3077,7 @@ TEST(TestQueryBigString)
     CHECK_EQUAL(2, res3);
 }
 
-TEST(TestQuerySimple2)
+TEST(Query_Simple2)
 {
     TupleTableType ttt;
 
@@ -3100,7 +3100,7 @@ TEST(TestQuerySimple2)
 }
 
 
-TEST(TestQueryLimit)
+TEST(Query_Limit)
 {
     TupleTableType ttt;
 
@@ -3147,7 +3147,7 @@ TEST(TestQueryLimit)
 }
 
 
-TEST(TestQueryFindNext)
+TEST(Query_FindNext)
 {
     TupleTableType ttt;
 
@@ -3180,7 +3180,7 @@ TEST(TestQueryFindNext)
 }
 
 
-TEST(TestQueryFindNextBackwards)
+TEST(Query_FindNextBackwards)
 {
     TupleTableType ttt;
 
@@ -3203,7 +3203,7 @@ TEST(TestQueryFindNextBackwards)
 
 // Begin search at arbitrary positions for *same* query object (other tests in this test_query file test same thing,
 // but for independent query objects) to test if leaf cacher works correctly (can go backwards, etc).
-TEST(TestQueryFindRandom)
+TEST(Query_FindRandom)
 {
     TupleTableType ttt;
     int64_t search = TIGHTDB_MAX_LIST_SIZE / 2;
@@ -3237,7 +3237,7 @@ TEST(TestQueryFindRandom)
 
 }
 
-TEST(TestQueryFindNext2)
+TEST(Query_FindNext2)
 {
     TupleTableType ttt;
 
@@ -3255,7 +3255,7 @@ TEST(TestQueryFindNext2)
     CHECK_EQUAL(6, res1);
 }
 
-TEST(TestQueryFindAll1)
+TEST(Query_FindAll1)
 {
     TupleTableType ttt;
 
@@ -3278,7 +3278,7 @@ TEST(TestQueryFindAll1)
 
 }
 
-TEST(TestQueryFindAll2)
+TEST(Query_FindAll2)
 {
     TupleTableType ttt;
 
@@ -3295,7 +3295,7 @@ TEST(TestQueryFindAll2)
     CHECK_EQUAL(6, tv2.get_source_ndx(0));
 }
 
-TEST(TestQueryFindAllBetween)
+TEST(Query_FindAllBetween)
 {
     TupleTableType ttt;
 
@@ -3316,7 +3316,7 @@ TEST(TestQueryFindAllBetween)
 }
 
 
-TEST(TestQueryFindAll_Range)
+TEST(Query_FindAllRange)
 {
     TupleTableType ttt;
 
@@ -3330,7 +3330,7 @@ TEST(TestQueryFindAll_Range)
 }
 
 
-TEST(TestQueryFindAll_Or)
+TEST(Query_FindAllOr)
 {
     TupleTableType ttt;
 
@@ -3352,7 +3352,7 @@ TEST(TestQueryFindAll_Or)
 }
 
 
-TEST(TestQueryFindAll_Parans1)
+TEST(Query_FindAllParens1)
 {
     TupleTableType ttt;
 
@@ -3372,7 +3372,7 @@ TEST(TestQueryFindAll_Parans1)
 }
 
 
-TEST(TestQueryFindAll_OrParan)
+TEST(Query_FindAllOrParan)
 {
     TupleTableType ttt;
 
@@ -3395,7 +3395,7 @@ TEST(TestQueryFindAll_OrParan)
 }
 
 
-TEST(TestQueryFindAll_OrNested0)
+TEST(Query_FindAllOrNested0)
 {
     TupleTableType ttt;
 
@@ -3416,7 +3416,7 @@ TEST(TestQueryFindAll_OrNested0)
     CHECK_EQUAL(6, tv1.get_source_ndx(1));
 }
 
-TEST(TestQueryFindAll_OrNested)
+TEST(Query_FindAllOrNested)
 {
     TupleTableType ttt;
 
@@ -3437,7 +3437,7 @@ TEST(TestQueryFindAll_OrNested)
     CHECK_EQUAL(7, tv1.get_source_ndx(2));
 }
 
-TEST(TestQueryFindAll_OrPHP)
+TEST(Query_FindAllOrPHP)
 {
     TupleTableType ttt;
 
@@ -3451,7 +3451,7 @@ TEST(TestQueryFindAll_OrPHP)
     CHECK_EQUAL(0, tv1.get_source_ndx(0));
 }
 
-TEST(TestQueryFindAllOr)
+TEST(Query_FindAllOr2)
 {
     TupleTableType ttt;
 
@@ -3469,7 +3469,7 @@ TEST(TestQueryFindAllOr)
 
 
 
-TEST(TestQueryFindAll_Parans2)
+TEST(Query_FindAllParens2)
 {
     TupleTableType ttt;
 
@@ -3490,7 +3490,7 @@ TEST(TestQueryFindAll_Parans2)
     CHECK_EQUAL(6, tv1.get_source_ndx(2));
 }
 
-TEST(TestQueryFindAll_Parans4)
+TEST(Query_FindAllParens4)
 {
     TupleTableType ttt;
 
@@ -3509,7 +3509,7 @@ TEST(TestQueryFindAll_Parans4)
 }
 
 
-TEST(TestQueryFindAll_Bool)
+TEST(Query_FindAllBool)
 {
     BoolTupleTable btt;
 
@@ -3529,7 +3529,7 @@ TEST(TestQueryFindAll_Bool)
     CHECK_EQUAL(3, tv2.get_source_ndx(1));
 }
 
-TEST(TestQueryFindAll_Begins)
+TEST(Query_FindAllBegins)
 {
     TupleTableType ttt;
 
@@ -3544,7 +3544,7 @@ TEST(TestQueryFindAll_Begins)
     CHECK_EQUAL(2, tv1.get_source_ndx(1));
 }
 
-TEST(TestQueryFindAll_Ends)
+TEST(Query_FindAllEnds)
 {
 
     TupleTableType ttt;
@@ -3560,7 +3560,7 @@ TEST(TestQueryFindAll_Ends)
 }
 
 
-TEST(TestQueryFindAll_Contains)
+TEST(Query_FindAllContains)
 {
     TupleTableType ttt;
 
@@ -3581,7 +3581,7 @@ TEST(TestQueryFindAll_Contains)
     CHECK_EQUAL(3, tv1.get_source_ndx(3));
 }
 
-TEST(TestQuery_Binary)
+TEST(Query_Binary)
 {
     TupleTableTypeBin t;
 
@@ -3655,7 +3655,7 @@ TEST(TestQuery_Binary)
 }
 
 
-TEST(TestQueryEnums)
+TEST(Query_Enums)
 {
     TupleTableType table;
 
@@ -3691,7 +3691,7 @@ TEST(TestQueryEnums)
 #define ua  "\x0c3\x0a5"         // danish lower case a with ring above (as in blaabaergroed)
 #define uad "\x061\x0cc\x08a"    // decomposed form (a (41) followed by ring)
 
-TEST(TestQueryCaseSensitivity)
+TEST(Query_CaseSensitivity)
 {
     TupleTableType ttt;
 
@@ -3707,7 +3707,7 @@ TEST(TestQueryCaseSensitivity)
 
 #if (defined(_WIN32) || defined(__WIN32__) || defined(_WIN64))
 
-TEST(TestQueryUnicode2)
+TEST(Query_Unicode2)
 {
     TupleTableType ttt;
 
@@ -3734,7 +3734,7 @@ TEST(TestQueryUnicode2)
     CHECK_EQUAL(1, tv3.get_source_ndx(0));
 }
 
-TEST(TestQueryUnicode3)
+TEST(Query_Unicode3)
 {
     TupleTableType ttt;
 
@@ -3770,7 +3770,7 @@ TEST(TestQueryUnicode3)
 
 #endif
 
-TEST(TestQueryFindAll_BeginsUNICODE)
+TEST(Query_FindAllBeginsUnicode)
 {
     TupleTableType ttt;
 
@@ -3786,7 +3786,7 @@ TEST(TestQueryFindAll_BeginsUNICODE)
 }
 
 
-TEST(TestQueryFindAll_EndsUNICODE)
+TEST(Query_FindAllEndsUnicode)
 {
     TupleTableType ttt;
 
@@ -3806,7 +3806,7 @@ TEST(TestQueryFindAll_EndsUNICODE)
 }
 
 
-TEST(TestQueryFindAll_ContainsUNICODE)
+TEST(Query_FindAllContainsUnicode)
 {
     TupleTableType ttt;
 
@@ -3835,7 +3835,7 @@ TEST(TestQueryFindAll_ContainsUNICODE)
     CHECK_EQUAL(3, tv2.get_source_ndx(3));
 }
 
-TEST(TestQuerySyntaxCheck)
+TEST(Query_SyntaxCheck)
 {
     TupleTableType ttt;
     string s;
@@ -3880,7 +3880,7 @@ TEST(TestQuerySyntaxCheck)
 */
 }
 
-TEST(TestQuerySubtableSyntaxCheck)
+TEST(Query_SubtableSyntaxCheck)
 {
     Group group;
     TableRef table = group.get_table("test");
@@ -3960,7 +3960,7 @@ TEST(TestQuerySubtableSyntaxCheck)
     CHECK(s != "");
 }
 
-TEST(TestTV)
+TEST(Query_TestTV)
 {
     TupleTableType t;
     t.add(1, "a");
@@ -3979,7 +3979,7 @@ TEST(TestTV)
     CHECK_EQUAL(1, q4.count());
 }
 
-TEST(TestQuery_sum_min_max_avg)
+TEST(Query_SumMinMaxAvg)
 {
     TupleTableType t;
     t.add(1, "a");
@@ -4017,7 +4017,7 @@ TEST(TestQuery_sum_min_max_avg)
     CHECK_EQUAL(3, cnt);
 }
 
-TEST(TestQuery_avg)
+TEST(Query_Avg)
 {
     TupleTableType t;
     size_t cnt;
@@ -4037,7 +4037,7 @@ TEST(TestQuery_avg)
     CHECK_EQUAL(30,t.where().first.average(NULL, 1, 2));     // second
 }
 
-TEST(TestQuery_avg2)
+TEST(Query_Avg2)
 {
     TupleTableType t;
     size_t cnt;
@@ -4077,7 +4077,7 @@ TEST(TestQuery_avg2)
 }
 
 
-TEST(TestQuery_OfByOne)
+TEST(Query_OfByOne)
 {
     TupleTableType t;
     for (size_t i = 0; i < TIGHTDB_MAX_LIST_SIZE * 2; ++i) {
@@ -4109,7 +4109,7 @@ TEST(TestQuery_OfByOne)
     CHECK_EQUAL(last_pos, res);
 }
 
-TEST(TestQuery_Const)
+TEST(Query_Const)
 {
     TupleTableType t;
     t.add(10, "a");
@@ -4139,7 +4139,7 @@ TIGHTDB_TABLE_4(EmployeeTable,
 
 } // anonymous namespace
 
-TEST(TestQuery_Subtables_Typed)
+TEST(Query_SubtablesTyped)
 {
     // Create table
     EmployeeTable employees;
@@ -4162,7 +4162,7 @@ TEST(TestQuery_Subtables_Typed)
 }
 
 
-TEST(TestQuery_AllTypes_DynamicallyTyped)
+TEST(Query_AllTypesDynamicallyTyped)
 {
     Table table;
     DescriptorRef sub1;
@@ -4253,7 +4253,7 @@ TIGHTDB_TABLE_9(TestQueryAllTypes,
                 mixed_col,  Mixed)
 }
 
-TEST(TestQuery_AllTypes_StaticallyTyped)
+TEST(Query_AllTypesStaticallyTyped)
 {
     TestQueryAllTypes table;
 
@@ -4300,7 +4300,7 @@ TEST(TestQuery_AllTypes_StaticallyTyped)
 }
 
 
-TEST(Query_ref_counting)
+TEST(Query_RefCounting)
 {
     Table* t = LangBindHelper::new_table();
     t->add_column(type_Int, "myint");

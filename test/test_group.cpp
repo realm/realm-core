@@ -1179,7 +1179,7 @@ TEST(Group_InvalidateTables)
     CHECK(!subtable3->is_attached());
 }
 
-TEST(Group_toJSON)
+TEST(Group_ToJSON)
 {
     Group g;
     TestTableGroup::Ref table = g.get_table<TestTableGroup>("test");
@@ -1207,7 +1207,7 @@ TEST(Group_toString)
     CHECK_EQUAL("     tables     rows  \n   0 test       2     \n", str.c_str());
 }
 
-TEST(Group_Index_String)
+TEST(Group_IndexString)
 {
     Group to_mem;
     TestTableGroup::Ref table = to_mem.get_table<TestTableGroup>("test");
@@ -1267,7 +1267,7 @@ TEST(Group_Index_String)
 }
 
 
-TEST(Group_Stock_Bug)
+TEST(Group_StockBug)
 {
     // This test is a regression test - it once triggered a bug.
     // the bug was fixed in pr 351. In release mode, it crashes

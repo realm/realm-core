@@ -167,7 +167,7 @@ TEST(ArrayString_SetExpand8)
     CHECK_EQUAL("", c.get(5));
 }
 
-TEST(ArrayArrayString_Add0)
+TEST(ArrayString_Add0)
 {
     ArrayString& c = db_setup_string::c;
     c.clear();
