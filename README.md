@@ -17,12 +17,8 @@ If you are going to modify the TightDB core library, you will need
 Cheetah for Python (http://www.cheetahtemplate.org). It is needed
 because some source files are generated from Cheetah templates.
 
-To run the test suite, you will need "UnitTest++"
-(http://unittest-cpp.sourceforge.net), however, a bundled fallback
-version will be used if `pkg-config unittest++ --exists` fails.
-
-Finally, to run the benchmarking suite (make benchmark) on Linux, you
-will need the development part of the 'procps' library.
+To run the benchmarking suite (make benchmark) on Linux, you will need
+the development part of the 'procps' library.
 
 The following is a suggestion of how to install the prerequisites on
 each of our major platforms:
@@ -31,14 +27,12 @@ each of our major platforms:
 
     sudo apt-get install build-essential
     sudo apt-get install python-cheetah
-    sudo apt-get install libunittest++-dev
     sudo apt-get install libproc-dev
 
 ### Ubuntu 13.04, Linux Mint 15
 
     sudo apt-get install build-essential
     sudo apt-get install python-cheetah
-    sudo apt-get install libunittest++-dev
     sudo apt-get install libprocps0-dev
 
 ### Fedora 17, 18, 19, 20, Amazon Linux 2012.09

@@ -1,5 +1,7 @@
-#include <UnitTest++.h>
 #include <tightdb/array_blobs_big.hpp>
+
+#include "util/unit_test.hpp"
+#include "util/test_only.hpp"
 
 using namespace tightdb;
 

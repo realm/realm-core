@@ -3,10 +3,11 @@
 
 #include <cstring>
 
-#include <UnitTest++.h>
-
 #include <tightdb/array_blob.hpp>
 #include <tightdb/column_string.hpp>
+
+#include "util/unit_test.hpp"
+#include "util/test_only.hpp"
 
 using namespace std;
 using namespace tightdb;

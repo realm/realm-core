@@ -3,25 +3,27 @@
 
 #include <algorithm>
 #include <fstream>
+
 #include <sys/stat.h>
 #ifndef _WIN32
-#include <unistd.h>
-#include <sys/types.h>
+#  include <unistd.h>
+#  include <sys/types.h>
 #endif
 
 // File permissions for Windows
 // http://stackoverflow.com/questions/592448/c-how-to-set-file-permissions-cross-platform
 #ifdef _WIN32
-#include <io.h>
+#  include <io.h>
 typedef int mode_t;
 static const mode_t S_IWUSR = mode_t(_S_IWRITE);
 static const mode_t MS_MODE_MASK = 0x0000ffff;
 #endif
 
-#include <UnitTest++.h>
-
 #include <tightdb.hpp>
 #include <tightdb/util/file.hpp>
+
+#include "util/unit_test.hpp"
+#include "util/test_only.hpp"
 
 using namespace std;
 using namespace tightdb;

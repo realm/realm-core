@@ -5,12 +5,11 @@
 #include <algorithm>
 #include <queue>
 
-#include <UnitTest++.h>
-
 #include <tightdb/util/bind.hpp>
 #include <tightdb/util/thread.hpp>
 
-#include "testsettings.hpp"
+#include "util/unit_test.hpp"
+#include "util/test_only.hpp"
 
 using namespace std;
 using namespace tightdb;

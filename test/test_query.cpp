@@ -4,12 +4,13 @@
 #include <cstdlib> // itoa()
 #include <vector>
 
-#include <UnitTest++.h>
-
 #include <tightdb.hpp>
 #include <tightdb/lang_bind_helper.hpp>
 #include <tightdb/column.hpp>
 #include <tightdb/query_engine.hpp>
+
+#include "util/unit_test.hpp"
+#include "util/test_only.hpp"
 
 using namespace std;
 using namespace tightdb;
@@ -17,6 +18,7 @@ using namespace tightdb::util;
 
 // Note: You can now temporarely declare unit tests with the ONLY(TestName) macro instead of TEST(TestName). This
 // will disable all unit tests except these. Remember to undo your temporary changes before committing.
+
 
 namespace {
 

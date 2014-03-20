@@ -8,14 +8,13 @@
 #include <iostream>
 #include <iomanip>
 
-#include <UnitTest++.h>
-
 #include <tightdb/group_shared.hpp>
 #include <tightdb/util/bind.hpp>
 #include <tightdb/util/file.hpp>
 
 #include "util/thread_wrapper.hpp"
-#include "testsettings.hpp"
+#include "util/unit_test.hpp"
+#include "util/test_only.hpp"
 
 using namespace std;
 using namespace tightdb;
@@ -24,8 +23,8 @@ using namespace tightdb::util;
 // Note: You can now temporarely declare unit tests with the ONLY(TestName) macro instead of TEST(TestName). This
 // will disable all unit tests except these. Remember to undo your temporary changes before committing.
 
-namespace {
 
+namespace {
 
 enum MyEnum { moja, mbili, tatu, nne, tano, sita, saba, nane, tisa, kumi,
               kumi_na_moja, kumi_na_mbili, kumi_na_tatu };
@@ -379,7 +378,7 @@ void thread(int index, string database_path)
 } // anonymous namespace
 
 
-TEST(Transactions)
+TEST(Transactions_General)
 {
     string database_path = "transactions.tightdb";
     util::File::try_remove(database_path);
@@ -513,4 +512,4 @@ TEST(Transactions)
     // End of read transaction
 }
 
-#endif
+#endif // TEST_TRANSACTIONS

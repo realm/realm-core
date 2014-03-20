@@ -3,9 +3,11 @@
 
 #include <vector>
 #include <algorithm>
-#include <UnitTest++.h>
+
 #include <tightdb/column.hpp>
-#include "testsettings.hpp"
+
+#include "util/unit_test.hpp"
+#include "util/test_only.hpp"
 
 using namespace tightdb;
 
@@ -346,7 +348,7 @@ TEST(Column_Find1)
     // Look for a non-existing value
     size_t res = c.find_first(10);
 
-    CHECK_EQUAL(-1, res);
+    CHECK_EQUAL(size_t(-1), res);
 }
 
 TEST(Column_Find2)

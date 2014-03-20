@@ -6,12 +6,12 @@
 #include <stdexcept>
 #include <string>
 
-#include <UnitTest++.h>
-
 #include <tightdb/util/assert.hpp>
 #include <tightdb/util/unique_ptr.hpp>
 #include <tightdb/util/utf8.hpp>
 
+#include "util/unit_test.hpp"
+#include "util/test_only.hpp"
 
 using namespace std;
 using namespace tightdb;
