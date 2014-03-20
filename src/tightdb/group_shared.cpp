@@ -816,9 +816,6 @@ void SharedGroup::end_read() TIGHTDB_NOEXCEPT
 void SharedGroup::do_begin_write()
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Ready);
-    if (m_transactions_are_pinned) {
-        throw runtime_error("Write transactions are not allowed while transactions are pinned");
-    }
 
     SharedInfo* info = m_file_map.get_addr();
 

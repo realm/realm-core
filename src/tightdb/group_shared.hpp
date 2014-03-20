@@ -385,6 +385,10 @@ inline bool SharedGroup::is_attached() const TIGHTDB_NOEXCEPT
 
 inline Group& SharedGroup::begin_write()
 {
+    if (m_transactions_are_pinned) {
+        throw std::runtime_error("Write transactions are not allowed while transactions are pinned");
+    }
+
 #ifdef TIGHTDB_ENABLE_REPLICATION
     if (Replication* repl = m_group.get_replication()) {
         repl->begin_write_transact(*this); // Throws
