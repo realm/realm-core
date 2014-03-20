@@ -25,6 +25,7 @@
 #include <sstream>
 #include <ostream>
 
+#include <tightdb/util/features.h>
 #include <tightdb/util/type_traits.hpp>
 #include <tightdb/util/safe_int_ops.hpp>
 
@@ -59,10 +60,11 @@
         catch (exception&) { \
             tightdb::test_util::unit_test::check_succeeded(); \
         } \
-    } while(false)
+    } \
+    while(false)
 
 #define TEST(name) \
-    void Tightdb_UnitTest__##name();            \
+    void Tightdb_UnitTest__##name(); \
     tightdb::test_util::unit_test::RegisterTest \
     tightdb_unit_test__##name(__FILE__, __LINE__, #name, &Tightdb_UnitTest__##name); \
     void Tightdb_UnitTest__##name()
@@ -77,8 +79,8 @@ struct RegisterTest {
 };
 
 void cond_failed(const char* file, long line, const char* cond_text);
-void comp_failed(const char* file, long line, const char* macro_name,
-                 const char* a_text, const char* b_text,
+void compare_failed(const char* file, long line, const char* macro_name,
+                    const char* a_text, const char* b_text,
                  const std::string& a_val, const std::string& b_val);
 void throw_failed(const char* file, long line, const char* expr_text, const char* exception);
 
@@ -157,7 +159,7 @@ inline void test_compare(bool cond, const A& a, const B& b, const char* file, lo
             out << b;
             b_val = out.str();
         }
-        comp_failed(file, line, macro_name, a_text, b_text, a_val, b_val);
+        compare_failed(file, line, macro_name, a_text, b_text, a_val, b_val);
     }
 }
 
@@ -256,13 +258,14 @@ protected:
 };
 
 /// Generates output that is compatible with the XML output of
-/// UnitTest++. Caller receives ownership of the reporter.
+/// UnitTest++. Caller receives ownership of the returned reporter.
 ///
 /// FIXME: Consider producing output that conforms to
 /// http://windyroad.com.au/dl/Open%20Source/JUnit.xsd.
 Reporter* create_xml_reporter(std::ostream&);
 
-/// Run only those tests whose name is both included and not excluded.
+/// Run only those tests whose name is both included and not
+/// excluded. Caller receives ownership of the returned filter.
 ///
 /// EBNF:
 ///

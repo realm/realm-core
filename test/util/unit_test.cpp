@@ -3,8 +3,6 @@
 #include <string>
 #include <iostream>
 
-#include <unistd.h>
-
 #include <tightdb/util/thread.hpp>
 
 #include "demangle.hpp"
@@ -321,9 +319,9 @@ void cond_failed(const char* file, long line, const char* cond_text)
     check_failed(file, line, msg);
 }
 
-void comp_failed(const char* file, long line, const char* macro_name,
-                 const char* a_text, const char* b_text,
-                 const string& a_val, const string& b_val)
+void compare_failed(const char* file, long line, const char* macro_name,
+                    const char* a_text, const char* b_text,
+                    const string& a_val, const string& b_val)
 {
     string msg = string(macro_name)+"("+a_text+", "+b_text+") failed with ("+a_val+", "+b_val+")";
     check_failed(file, line, msg);
