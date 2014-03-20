@@ -62,11 +62,10 @@
     } while(false)
 
 #define TEST(name) \
-    void UnitTest__##name##__##__LINE__(); \
+    void Tightdb_UnitTest__##name();            \
     tightdb::test_util::unit_test::RegisterTest \
-    tightdb_unit_test__##name##__##__LINE__(__FILE__, __LINE__, #name, \
-                                            &UnitTest__##name##__##__LINE__); \
-    void UnitTest__##name##__##__LINE__()
+    tightdb_unit_test__##name(__FILE__, __LINE__, #name, &Tightdb_UnitTest__##name); \
+    void Tightdb_UnitTest__##name()
 
 
 namespace tightdb {

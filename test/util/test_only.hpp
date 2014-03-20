@@ -23,7 +23,7 @@
 #include "unit_test.hpp"
 
 #define ONLY(name) \
-    tightdb::test_util::SetTestOnly tightdb_set_test_only__##name##__##__LINE__(#name); \
+    tightdb::test_util::SetTestOnly tightdb_set_test_only__##name(#name); \
     TEST(name)
 
 namespace tightdb {
