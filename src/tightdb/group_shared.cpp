@@ -1129,6 +1129,13 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
     uint_fast64_t readlock_version;
     {
         SharedInfo* r_info = m_reader_map.get_addr();
+
+        // the cleanup process may access the entire ring buffer, so make sure it is mapped.
+        // this is not ensured as part of begin_read, which only makes sure that the current
+        // last entry in the buffer is available.
+        if (grow_reader_mapping(r_info->readers.get_num_entries())) {
+            r_info = m_reader_map.get_addr();
+        }
         r_info->readers.cleanup();
         const Ringbuffer::ReadCount& r = r_info->readers.get_oldest();
         readlock_version = r.version;
