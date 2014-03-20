@@ -314,8 +314,8 @@ TEST(ColumnMixed_InitOfEmptyColumn)
     t.add_column(type_Mixed, "works");
     t.add_column(type_Mixed, "works also");
     t.add_empty_row();
-    t.set_mixed(0,0, new Mixed(1.1));
-    t.set_mixed(1,0, new Mixed(2.2));
+    t.set_mixed(0,0, Mixed(1.1));
+    t.set_mixed(1,0, Mixed(2.2));
     t.remove_column(1);
     t.add_empty_row();
     t.add_column(type_Mixed, "doesn't work");
