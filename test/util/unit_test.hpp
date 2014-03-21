@@ -121,6 +121,8 @@ template<class A, class B> inline bool less(const A& a, const B& b)
 }
 
 // Special hooks for comparing zero terminated strings
+// FIXME: Also handle (char*, char*), (const char*, char*), (char*, const char*).
+// FIXME: Also handle `wchar_t*`.
 inline bool equal(const char* a, const char* b)
 {
     return std::strcmp(a,b) == 0;
@@ -128,6 +130,26 @@ inline bool equal(const char* a, const char* b)
 inline bool less(const char* a, const char* b)
 {
     return std::strcmp(a,b) < 0;
+}
+
+
+template<class T, bool is_float> struct SetPrecision {
+    static void exec(std::ostream&) {}
+};
+template<class T> struct SetPrecision<T, true> {
+    static void exec(std::ostream& out)
+    {
+        out.precision(std::numeric_limits<T>::digits10 + 1);
+    }
+};
+
+template<class T> void to_string(const T& value, std::string& str)
+{
+    // FIXME: Put string values in quotes, and escape non-printables as well as '"' and '\\'.
+    std::ostringstream out;
+    SetPrecision<T, util::IsFloatingPoint<T>::value>::exec(out);
+    out << value;
+    str = out.str();
 }
 
 
@@ -150,16 +172,8 @@ inline void check_compare(bool cond, const A& a, const B& b, const char* file, l
     }
     else {
         std::string a_val, b_val;
-        {
-            std::ostringstream out;
-            out << a;
-            a_val = out.str();
-        }
-        {
-            std::ostringstream out;
-            out << b;
-            b_val = out.str();
-        }
+        to_string(a, a_val);
+        to_string(b, b_val);
         compare_failed(file, line, macro_name, a_text, b_text, a_val, b_val);
     }
 }

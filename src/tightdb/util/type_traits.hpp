@@ -41,34 +41,43 @@ namespace util {
 template<class T> struct IsConst          { static const bool value = false; };
 template<class T> struct IsConst<const T> { static const bool value = true;  };
 
-template<class From, class To> struct CopyConstness                 { typedef       To type; };
-template<class From, class To> struct CopyConstness<const From, To> { typedef const To type; };
+template<class T> struct IsVolatile             { static const bool value = false; };
+template<class T> struct IsVolatile<volatile T> { static const bool value = true;  };
 
-template<class T> struct DerefType {};
-template<class T> struct DerefType<T*> { typedef T type; };
+template<class T> struct RemoveConst          { typedef T type; };
+template<class T> struct RemoveConst<const T> { typedef T type; };
+
+template<class T> struct RemoveVolatile             { typedef T type; };
+template<class T> struct RemoveVolatile<volatile T> { typedef T type; };
+
+template<class T> struct RemoveCV {
+    typedef typename RemoveVolatile<typename RemoveConst<T>::type>::type type;
+};
+
+template<class From, class To> struct CopyConst {
+private:
+    typedef typename RemoveConst<To>::type type_1;
+public:
+    typedef typename CondType<IsConst<From>::value, const type_1, type_1>::type type;
+};
+
+template<class T> struct RemovePointer                    { typedef T type; };
+template<class T> struct RemovePointer<T*>                { typedef T type; };
+template<class T> struct RemovePointer<T* const>          { typedef T type; };
+template<class T> struct RemovePointer<T* volatile>       { typedef T type; };
+template<class T> struct RemovePointer<T* const volatile> { typedef T type; };
 
 
+/// Member `value` is true if, and only if the specified type is an
+/// integral type. Same as `std::is_integral` in C++11, however,
+/// implementation-defined extended integer types are recognized only
+/// when TIGHTDB_HAVE_CXX11_TYPE_TRAITS is defined.
+template<class T> struct IsIntegral;
 
-/// Determine whether a type is an integral type.
-#ifdef TIGHTDB_HAVE_CXX11_TYPE_TRAITS
-template<class T> struct IsIntegral { static const bool value = std::is_integral<T>::value; };
-#else // !TIGHTDB_HAVE_CXX11_TYPE_TRAITS
-template<class T> struct IsIntegral { static const bool value = false; };
-template<> struct IsIntegral<bool>               { static const bool value = true; };
-template<> struct IsIntegral<char>               { static const bool value = true; };
-template<> struct IsIntegral<signed char>        { static const bool value = true; };
-template<> struct IsIntegral<unsigned char>      { static const bool value = true; };
-template<> struct IsIntegral<wchar_t>            { static const bool value = true; };
-template<> struct IsIntegral<short>              { static const bool value = true; };
-template<> struct IsIntegral<unsigned short>     { static const bool value = true; };
-template<> struct IsIntegral<int>                { static const bool value = true; };
-template<> struct IsIntegral<unsigned>           { static const bool value = true; };
-template<> struct IsIntegral<long>               { static const bool value = true; };
-template<> struct IsIntegral<unsigned long>      { static const bool value = true; };
-template<> struct IsIntegral<long long>          { static const bool value = true; };
-template<> struct IsIntegral<unsigned long long> { static const bool value = true; };
-#endif // !TIGHTDB_HAVE_CXX11_TYPE_TRAITS
 
+/// Member `value` is true if, and only if the specified type is a
+/// floating point type. Same as `std::is_floating_point` in C++11.
+template<class T> struct IsFloatingPoint;
 
 
 /// Determine the type resulting from integral or floating-point
@@ -227,6 +236,61 @@ private:
                           "Both types must be integers");
 public:
     typedef typename CondType<(lim_a::digits >= lim_b::digits), A, B>::type type;
+};
+
+
+
+
+
+// Implementation
+
+} // namespace util
+
+namespace _impl {
+
+#ifndef TIGHTDB_HAVE_CXX11_TYPE_TRAITS
+
+template<class T> struct is_int { static const bool value = false; };
+template<> struct is_int<bool>               { static const bool value = true; };
+template<> struct is_int<char>               { static const bool value = true; };
+template<> struct is_int<signed char>        { static const bool value = true; };
+template<> struct is_int<unsigned char>      { static const bool value = true; };
+template<> struct is_int<wchar_t>            { static const bool value = true; };
+template<> struct is_int<short>              { static const bool value = true; };
+template<> struct is_int<unsigned short>     { static const bool value = true; };
+template<> struct is_int<int>                { static const bool value = true; };
+template<> struct is_int<unsigned>           { static const bool value = true; };
+template<> struct is_int<long>               { static const bool value = true; };
+template<> struct is_int<unsigned long>      { static const bool value = true; };
+template<> struct is_int<long long>          { static const bool value = true; };
+template<> struct is_int<unsigned long long> { static const bool value = true; };
+
+template<class T> struct is_float { static const bool value = false; };
+template<> struct is_float<float>       { static const bool value = true; };
+template<> struct is_float<double>      { static const bool value = true; };
+template<> struct is_float<long double> { static const bool value = true; };
+
+#endif // !TIGHTDB_HAVE_CXX11_TYPE_TRAITS
+
+} // namespace _impl
+
+
+namespace util {
+
+template<class T> struct IsIntegral {
+#ifdef TIGHTDB_HAVE_CXX11_TYPE_TRAITS
+    static const bool value = std::is_integral<T>::value;
+#else
+    static const bool value = _impl::is_int<typename RemoveCV<T>::type>::value;
+#endif
+};
+
+template<class T> struct IsFloatingPoint {
+#ifdef TIGHTDB_HAVE_CXX11_TYPE_TRAITS
+    static const bool value = std::is_floating_point<T>::value;
+#else
+    static const bool value = _impl::is_float<typename RemoveCV<T>::type>::value;
+#endif
 };
 
 
