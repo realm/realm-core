@@ -2,6 +2,7 @@
 #ifdef TEST_TABLE
 
 #include <algorithm>
+#include <limits>
 #include <string>
 #include <fstream>
 #include <ostream>
@@ -2784,7 +2785,7 @@ TEST(Table_Aggregates)
     for (int i = 0; i < TBL_SIZE; i++) {
         table.add(5987654, 4.0f, 3.0);
         i_sum += 5987654;
-        f_sum += double(4.0f);
+        f_sum += 4.0f;
         d_sum += 3.0;
     }
     table.add(1, 1.1f, 1.2);
@@ -2795,6 +2796,8 @@ TEST(Table_Aggregates)
     d_sum += 1.2 + 12.0 + 3.0;
     double size = TBL_SIZE + 3;
 
+    double epsilon = numeric_limits<double>::epsilon();
+
     // minimum
     CHECK_EQUAL(1, table.column().c_int.minimum());
     CHECK_EQUAL(1.1f, table.column().c_float.minimum());
@@ -2804,14 +2807,13 @@ TEST(Table_Aggregates)
     CHECK_EQUAL(11.0f, table.column().c_float.maximum());
     CHECK_EQUAL(12.0, table.column().c_double.maximum());
     // sum
-    CHECK_EQUAL(i_sum, table.column().c_int.sum());
-    CHECK_EQUAL(f_sum, table.column().c_float.sum());
-    CHECK_EQUAL(d_sum, table.column().c_double.sum());
+    CHECK_APPROXIMATELY_EQUAL(i_sum, table.column().c_int.sum(),    10*epsilon);
+    CHECK_APPROXIMATELY_EQUAL(f_sum, table.column().c_float.sum(),  10*epsilon);
+    CHECK_APPROXIMATELY_EQUAL(d_sum, table.column().c_double.sum(), 10*epsilon);
     // average
-    CHECK_EQUAL(double(i_sum)/size, table.column().c_int.average());
-    CHECK_EQUAL(double(f_sum)/size, table.column().c_float.average());
-    // almost_equal because of double/float imprecision
-    CHECK(almost_equal(double(d_sum)/size, table.column().c_double.average()));
+    CHECK_APPROXIMATELY_EQUAL(i_sum/size, table.column().c_int.average(),    10*epsilon);
+    CHECK_APPROXIMATELY_EQUAL(f_sum/size, table.column().c_float.average(),  10*epsilon);
+    CHECK_APPROXIMATELY_EQUAL(d_sum/size, table.column().c_double.average(), 10*epsilon);
 }
 
 namespace {

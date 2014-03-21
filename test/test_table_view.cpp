@@ -1,6 +1,7 @@
 #include "testsettings.hpp"
 #ifdef TEST_TABLE_VIEW
 
+#include <limits>
 #include <string>
 #include <sstream>
 #include <ostream>
@@ -149,7 +150,7 @@ TEST(TableView_FloatsFindAndAggregations)
     for (size_t i=0; i<6; ++i) {
         table.add(f_val[i], d_val[i], 1);
         sum_d += d_val[i];
-        sum_f += double(f_val[i]);
+        sum_f += f_val[i];
     }
 
     // Test find_all()
@@ -172,11 +173,13 @@ TEST(TableView_FloatsFindAndAggregations)
 
     // TODO: add for float as well
 
+    double epsilon = numeric_limits<double>::epsilon();
+
     // Test sum
-    CHECK(almost_equal(sum_d, v_all.column().col_double.sum())); // almost_equal because of double/float imprecision
-    CHECK_EQUAL(sum_f, v_all.column().col_float.sum());
-    CHECK_EQUAL(-1.2 -1.2, v_some.column().col_double.sum());
-    CHECK_EQUAL(1.2f -1.1f, v_some.column().col_float.sum());
+    CHECK_APPROXIMATELY_EQUAL(sum_d, v_all.column().col_double.sum(),                        10*epsilon);
+    CHECK_APPROXIMATELY_EQUAL(sum_f, v_all.column().col_float.sum(),                         10*epsilon);
+    CHECK_APPROXIMATELY_EQUAL(-1.2 + -1.2, v_some.column().col_double.sum(),                 10*epsilon);
+    CHECK_APPROXIMATELY_EQUAL(double(1.2f) + double(-1.1f), v_some.column().col_float.sum(), 10*epsilon);
 
     // Test max
     CHECK_EQUAL(3.2, v_all.column().col_double.maximum());
@@ -191,12 +194,14 @@ TEST(TableView_FloatsFindAndAggregations)
     CHECK_EQUAL(-1.1f, v_some.column().col_float.minimum());
 
     // Test avg
-    CHECK(almost_equal(sum_d / 6.0, v_all.column().col_double.average())); // almost_equal because of double/float imprecision
-    CHECK_EQUAL((-1.2 + -1.2) / 2.0, v_some.column().col_double.average());
-    CHECK_EQUAL(sum_f / 6.0, v_all.column().col_float.average());
+    CHECK_APPROXIMATELY_EQUAL(sum_d / 6.0, v_all.column().col_double.average(),          10*epsilon);
+    CHECK_APPROXIMATELY_EQUAL((-1.2 + -1.2) / 2.0, v_some.column().col_double.average(), 10*epsilon);
+    CHECK_APPROXIMATELY_EQUAL(sum_f / 6.0, v_all.column().col_float.average(),           10*epsilon);
 
-    // Need to test this way because items summed one at a time differ with compile-time constant by some infinitesimal
-    CHECK_EQUAL(int(0.05 * 1000), int(v_some.column().col_float.average() * 1000));
+    // FIXME: Ooops, huge inaccuracy in the following average
+    // computation. We probably need to replace it with the one
+    // suggested in https://github.com/Tightdb/tightdb/pull/53.
+    CHECK_APPROXIMATELY_EQUAL(0.05 * 1000, v_some.column().col_float.average() * 1000, 10000000000*epsilon);
 
     CHECK_EQUAL(1, v_some.column().col_float.count(1.2f));
     CHECK_EQUAL(2, v_some.column().col_double.count(-1.2));
