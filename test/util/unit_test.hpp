@@ -30,26 +30,33 @@
 #include <tightdb/util/safe_int_ops.hpp>
 
 
+#define TEST(name) \
+    void Tightdb_UnitTest__##name(); \
+    tightdb::test_util::unit_test::RegisterTest \
+    tightdb_unit_test__##name(__FILE__, __LINE__, #name, &Tightdb_UnitTest__##name); \
+    void Tightdb_UnitTest__##name()
+
+
 #define CHECK(cond) \
-    tightdb::test_util::unit_test::test(bool(cond), __FILE__, __LINE__, #cond)
+    tightdb::test_util::unit_test::check(bool(cond), __FILE__, __LINE__, #cond)
 
 #define CHECK_EQUAL(a,b) \
-    tightdb::test_util::unit_test::test_equal((a), (b), __FILE__, __LINE__, #a, #b)
+    tightdb::test_util::unit_test::check_equal((a), (b), __FILE__, __LINE__, #a, #b)
 
 #define CHECK_NOT_EQUAL(a,b) \
-    tightdb::test_util::unit_test::test_not_equal((a), (b), __FILE__, __LINE__, #a, #b)
+    tightdb::test_util::unit_test::check_not_equal((a), (b), __FILE__, __LINE__, #a, #b)
 
 #define CHECK_LESS(a,b) \
-    tightdb::test_util::unit_test::test_less((a), (b), __FILE__, __LINE__, #a, #b)
+    tightdb::test_util::unit_test::check_less((a), (b), __FILE__, __LINE__, #a, #b)
 
 #define CHECK_LESS_EQUAL(a,b) \
-    tightdb::test_util::unit_test::test_less_equal((a), (b), __FILE__, __LINE__, #a, #b)
+    tightdb::test_util::unit_test::check_less_equal((a), (b), __FILE__, __LINE__, #a, #b)
 
 #define CHECK_GREATER(a,b) \
-    tightdb::test_util::unit_test::test_greater((a), (b), __FILE__, __LINE__, #a, #b)
+    tightdb::test_util::unit_test::check_greater((a), (b), __FILE__, __LINE__, #a, #b)
 
 #define CHECK_GREATER_EQUAL(a,b) \
-    tightdb::test_util::unit_test::test_greater_equal((a), (b), __FILE__, __LINE__, #a, #b)
+    tightdb::test_util::unit_test::check_greater_equal((a), (b), __FILE__, __LINE__, #a, #b)
 
 #define CHECK_THROW(expr, exception) \
     do { \
@@ -62,12 +69,6 @@
         } \
     } \
     while(false)
-
-#define TEST(name) \
-    void Tightdb_UnitTest__##name(); \
-    tightdb::test_util::unit_test::RegisterTest \
-    tightdb_unit_test__##name(__FILE__, __LINE__, #name, &Tightdb_UnitTest__##name); \
-    void Tightdb_UnitTest__##name()
 
 
 namespace tightdb {
@@ -130,7 +131,7 @@ inline bool less(const char* a, const char* b)
 }
 
 
-inline void test(bool cond, const char* file, long line, const char* cond_text)
+inline void check(bool cond, const char* file, long line, const char* cond_text)
 {
     if (TIGHTDB_LIKELY(cond)) {
         check_succeeded();
@@ -141,8 +142,8 @@ inline void test(bool cond, const char* file, long line, const char* cond_text)
 }
 
 template<class A, class B>
-inline void test_compare(bool cond, const A& a, const B& b, const char* file, long line,
-                         const char* macro_name, const char* a_text, const char* b_text)
+inline void check_compare(bool cond, const A& a, const B& b, const char* file, long line,
+                          const char* macro_name, const char* a_text, const char* b_text)
 {
     if (TIGHTDB_LIKELY(cond)) {
         check_succeeded();
@@ -164,51 +165,51 @@ inline void test_compare(bool cond, const A& a, const B& b, const char* file, lo
 }
 
 template<class A, class B>
-inline void test_equal(const A& a, const B& b, const char* file, long line,
-                       const char* a_text, const char* b_text)
+inline void check_equal(const A& a, const B& b, const char* file, long line,
+                        const char* a_text, const char* b_text)
 {
     bool cond = equal(a,b);
-    test_compare(cond, a, b, file, line, "TEST_EQUAL", a_text, b_text);
+    check_compare(cond, a, b, file, line, "CHECK_EQUAL", a_text, b_text);
 }
 
 template<class A, class B>
-inline void test_not_equal(const A& a, const B& b, const char* file, long line,
-                           const char* a_text, const char* b_text)
-{
-    bool cond = !equal(a,b);
-    test_compare(cond, a, b, file, line, "TEST_NOT_EQUAL", a_text, b_text);
-}
-
-template<class A, class B>
-inline void test_less(const A& a, const B& b, const char* file, long line,
-                      const char* a_text, const char* b_text)
-{
-    bool cond = less(a,b);
-    test_compare(cond, a, b, file, line, "TEST_LESS", a_text, b_text);
-}
-
-template<class A, class B>
-inline void test_less_equal(const A& a, const B& b, const char* file, long line,
+inline void check_not_equal(const A& a, const B& b, const char* file, long line,
                             const char* a_text, const char* b_text)
 {
-    bool cond = !less(b,a);
-    test_compare(cond, a, b, file, line, "TEST_LESS_EQUAL", a_text, b_text);
+    bool cond = !equal(a,b);
+    check_compare(cond, a, b, file, line, "CHECK_NOT_EQUAL", a_text, b_text);
 }
 
 template<class A, class B>
-inline void test_greater(const A& a, const B& b, const char* file, long line,
-                         const char* a_text, const char* b_text)
+inline void check_less(const A& a, const B& b, const char* file, long line,
+                       const char* a_text, const char* b_text)
+{
+    bool cond = less(a,b);
+    check_compare(cond, a, b, file, line, "CHECK_LESS", a_text, b_text);
+}
+
+template<class A, class B>
+inline void check_less_equal(const A& a, const B& b, const char* file, long line,
+                             const char* a_text, const char* b_text)
+{
+    bool cond = !less(b,a);
+    check_compare(cond, a, b, file, line, "CHECK_LESS_EQUAL", a_text, b_text);
+}
+
+template<class A, class B>
+inline void check_greater(const A& a, const B& b, const char* file, long line,
+                          const char* a_text, const char* b_text)
 {
     bool cond = less(b,a);
-    test_compare(cond, a, b, file, line, "TEST_GREATER", a_text, b_text);
+    check_compare(cond, a, b, file, line, "CHECK_GREATER", a_text, b_text);
 }
 
 template<class A, class B>
-inline void test_greater_equal(const A& a, const B& b, const char* file, long line,
-                               const char* a_text, const char* b_text)
+inline void check_greater_equal(const A& a, const B& b, const char* file, long line,
+                                const char* a_text, const char* b_text)
 {
     bool cond = !less(a,b);
-    test_compare(cond, a, b, file, line, "TEST_GREATER_EQUAL", a_text, b_text);
+    check_compare(cond, a, b, file, line, "CHECK_GREATER_EQUAL", a_text, b_text);
 }
 
 
