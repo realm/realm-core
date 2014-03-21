@@ -217,14 +217,14 @@ query related tests, and report progress along the way:
 
 These variables are available:
 
- - Set `UNITTEST_PROGRESS` to a non-empty value to enable reporting of
-   progress (write the name of each test as it is executed).
-
  - `UNITTEST_FILTER` can be used to exclude one or more tests from a
    particular run. For more information about the syntax, see the
    documentation of
    `tightdb::test_util::unit_test::create_wildcard_filter()` in
    `test/util/unit_test.hpp`.
+
+ - Set `UNITTEST_PROGRESS` to a non-empty value to enable reporting of
+   progress (write the name of each test as it is executed).
 
  - Set `UNITTEST_XML` to a non-empty value to dump the test results
    into an XML file. For details, see
