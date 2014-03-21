@@ -77,11 +77,11 @@
 /// These are the inexact floating point comparisons defined by
 /// Donald. E. Knuth. in volume II of his "The Art of Computer
 /// Programming" 3rd edition, section 4.2.2 "Accuracy of Floating
-/// Point Arithmetic", defintions (21)-(24).
+/// Point Arithmetic", definitions (21)-(24).
 ///
 /// In general you should set `epsilon` to some small multiple of the
-/// maching epsilon for the floating point type used in your
-/// compuations (e.g. `std::numeric_limits<double>::epsilon()`). As a
+/// machine epsilon for the floating point type used in your
+/// computations (e.g. `std::numeric_limits<double>::epsilon()`). As a
 /// general rule, a longer and more complex computation needs a higher
 /// multiple of the machine epsilon.
 
@@ -169,7 +169,7 @@ inline bool less(const char* a, const char* b)
 
 // See Donald. E. Knuth, "The Art of Computer Programming", 3rd
 // edition, volume II, section 4.2.2 "Accuracy of Floating Point
-// Arithmetic", defintions (21)-(24).
+// Arithmetic", definitions (21)-(24).
 inline bool approximately_equal(long double a, long double b, long double epsilon)
 {
     using namespace std;
