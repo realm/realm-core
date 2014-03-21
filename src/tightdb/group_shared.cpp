@@ -766,7 +766,7 @@ void SharedGroup::end_read() TIGHTDB_NOEXCEPT
     }
 
     // The read may have allocated some temporary state
-    m_group.detach();
+    m_group.detach_but_retain();
 
     m_transact_stage = transact_Ready;
 }

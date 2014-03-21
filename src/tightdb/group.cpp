@@ -108,6 +108,7 @@ void Group::create(bool add_free_versions)
             size_t initial_database_version = 0; // A.k.a. transaction number
             m_top.add(1 + 2*initial_database_version); // Throws
         }
+        m_is_attached = true;
     }
     catch (...) {
         m_free_versions.destroy();
@@ -131,6 +132,7 @@ void Group::init_from_ref(ref_type top_ref) TIGHTDB_NOEXCEPT
     ref_type tables_ref = m_top.get_as_ref(1);
     m_table_names.init_from_ref(names_ref);
     m_tables.init_from_ref(tables_ref);
+    m_is_attached = true;
 
     // Note that the third slot is the logical file size.
 
@@ -234,6 +236,7 @@ void Group::detach_table_accessors() TIGHTDB_NOEXCEPT
 
 void Group::detach() TIGHTDB_NOEXCEPT
 {
+    m_is_attached = false;
     detach_table_accessors();
     m_table_accessors.clear();
 
@@ -245,6 +248,23 @@ void Group::detach() TIGHTDB_NOEXCEPT
     m_free_versions.detach();
 }
 
+void Group::detach_but_retain() TIGHTDB_NOEXCEPT
+{
+    m_is_attached = false;
+    detach_table_accessors();
+    m_table_accessors.clear();
+}
+
+void Group::complete_detach() TIGHTDB_NOEXCEPT
+{
+
+    m_top.detach();
+    m_tables.detach();
+    m_table_names.detach();
+    m_free_positions.detach();
+    m_free_lengths.detach();
+    m_free_versions.detach();
+}
 
 Table* Group::get_table_by_ndx(size_t ndx)
 {
@@ -590,6 +610,19 @@ void Group::update_from_shared(ref_type new_top_ref, size_t new_file_size)
     TIGHTDB_ASSERT(new_top_ref < new_file_size);
     TIGHTDB_ASSERT(!is_attached());
 
+    if (m_top.is_attached()) {
+        // we're retaining data and mostly "faking" we've detached
+        if (m_top.get_ref() == new_top_ref) {
+            // top ref matches, so we'll simply reuse retained data!
+            // FIXME: What about file size? Is it sufficient to match on top ref?
+            m_is_attached = true;
+            return;
+        }
+        else {
+            // new and different top ref, must complete "faked" detach
+            complete_detach();
+        }
+    }
     // Make all managed memory beyond the attached file available
     // again.
     //
