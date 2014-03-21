@@ -327,6 +327,17 @@ void compare_failed(const char* file, long line, const char* macro_name,
     check_failed(file, line, msg);
 }
 
+void inexact_compare_failed(const char* file, long line, const char* macro_name,
+                            const char* a_text, const char* b_text, const char* eps_text,
+                            long double a, long double b, long double eps)
+{
+    ostringstream out;
+    out.precision(std::numeric_limits<long double>::digits10 + 1);
+    out << macro_name<<"("<<a_text<<", "<<b_text<<", "<<eps_text<<") "
+        "failed with ("<<a<<", "<<b<<", "<<eps<<")";
+    check_failed(file, line, out.str());
+}
+
 void throw_failed(const char* file, long line, const char* expr_text, const char* exception)
 {
     string msg = "CHECK_THROW("+string(expr_text)+") failed: Expected exception "+exception;

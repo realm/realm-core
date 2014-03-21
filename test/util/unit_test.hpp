@@ -20,7 +20,9 @@
 #ifndef TIGHTDB_TEST_UTIL_UNIT_TEST_HPP
 #define TIGHTDB_TEST_UTIL_UNIT_TEST_HPP
 
+#include <cmath>
 #include <cstring>
+#include <algorithm>
 #include <string>
 #include <sstream>
 #include <ostream>
@@ -70,6 +72,41 @@
     } \
     while(false)
 
+//@{
+
+/// These are the four inexact floating point comparisons defined by
+/// Donald. E. Knuth. in volume II of his "The Art of Computer
+/// Programming" 3rd edition, section 4.2.2 "Accuracy of Floating
+/// Point Arithmetic", definitions (21)-(24):
+///
+///     approximately equal       |a-b| <= max(|a|, |b|) * epsilon
+///     essentially equal         |a-b| <= min(|a|, |b|) * epsilon
+///     definitely less than      b - a >  max(|a|, |b|) * epsilon
+///     definitely greater than   a - b >  max(|a|, |b|) * epsilon
+///
+/// In general you should set `epsilon` to some small multiple of the
+/// machine epsilon for the floating point type used in your
+/// computations (e.g. `std::numeric_limits<double>::epsilon()`). As a
+/// general rule, a longer and more complex computation needs a higher
+/// multiple of the machine epsilon.
+
+#define CHECK_APPROXIMATELY_EQUAL(a, b, epsilon) \
+    tightdb::test_util::unit_test::check_approximately_equal((a), (b), (epsilon), \
+                                                             __FILE__, __LINE__, #a, #b, #epsilon)
+
+#define CHECK_ESSENTIALLY_EQUAL(a, b, epsilon) \
+    tightdb::test_util::unit_test::check_essentially_equal((a), (b), (epsilon), \
+                                                           __FILE__, __LINE__, #a, #b, #epsilon)
+
+#define CHECK_DEFINITELY_LESS(a, b, epsilon) \
+    tightdb::test_util::unit_test::check_definitely_less((a), (b), (epsilon), \
+                                                         __FILE__, __LINE__, #a, #b, #epsilon)
+
+#define CHECK_DEFINITELY_GREATER(a, b, epsilon) \
+    tightdb::test_util::unit_test::check_definitely_greater((a), (b), (epsilon), \
+                                                            __FILE__, __LINE__, #a, #b, #epsilon)
+
+//@}
 
 namespace tightdb {
 namespace test_util {
@@ -82,7 +119,10 @@ struct RegisterTest {
 void cond_failed(const char* file, long line, const char* cond_text);
 void compare_failed(const char* file, long line, const char* macro_name,
                     const char* a_text, const char* b_text,
-                 const std::string& a_val, const std::string& b_val);
+                    const std::string& a_val, const std::string& b_val);
+void inexact_compare_failed(const char* file, long line, const char* macro_name,
+                            const char* a_text, const char* b_text, const char* eps_text,
+                            long double a, long double b, long double eps);
 void throw_failed(const char* file, long line, const char* expr_text, const char* exception);
 
 void check_succeeded();
@@ -132,6 +172,25 @@ inline bool less(const char* a, const char* b)
     return std::strcmp(a,b) < 0;
 }
 
+// See Donald. E. Knuth, "The Art of Computer Programming", 3rd
+// edition, volume II, section 4.2.2 "Accuracy of Floating Point
+// Arithmetic", definitions (21)-(24).
+inline bool approximately_equal(long double a, long double b, long double epsilon)
+{
+    using namespace std;
+    return abs(a - b) <= max(abs(a), abs(b)) * epsilon;
+}
+inline bool essentially_equal(long double a, long double b, long double epsilon)
+{
+    using namespace std;
+    return abs(a - b) <= min(abs(a), abs(b)) * epsilon;
+}
+inline bool definitely_less(long double a, long double b, long double epsilon)
+{
+    using namespace std;
+    return b - a > max(abs(a), abs(b)) * epsilon;
+}
+
 
 template<class T, bool is_float> struct SetPrecision {
     static void exec(std::ostream&) {}
@@ -175,6 +234,18 @@ inline void check_compare(bool cond, const A& a, const B& b, const char* file, l
         to_string(a, a_val);
         to_string(b, b_val);
         compare_failed(file, line, macro_name, a_text, b_text, a_val, b_val);
+    }
+}
+
+inline void check_inexact_compare(bool cond, long double a, long double b, long double eps,
+                                  const char* file, long line, const char* macro_name,
+                                  const char* a_text, const char* b_text, const char* eps_text)
+{
+    if (TIGHTDB_LIKELY(cond)) {
+        check_succeeded();
+    }
+    else {
+        inexact_compare_failed(file, line, macro_name, a_text, b_text, eps_text, a, b, eps);
     }
 }
 
@@ -224,6 +295,46 @@ inline void check_greater_equal(const A& a, const B& b, const char* file, long l
 {
     bool cond = !less(a,b);
     check_compare(cond, a, b, file, line, "CHECK_GREATER_EQUAL", a_text, b_text);
+}
+
+inline void check_approximately_equal(long double a, long double b, long double eps,
+                                      const char* file, long line,
+                                      const char* a_text, const char* b_text,
+                                      const char* eps_text)
+{
+    bool cond = approximately_equal(a, b, eps);
+    check_inexact_compare(cond, a, b, eps, file, line, "CHECK_APPROXIMATELY_EQUAL",
+                          a_text, b_text, eps_text);
+}
+
+inline void check_essentially_equal(long double a, long double b, long double eps,
+                                    const char* file, long line,
+                                    const char* a_text, const char* b_text,
+                                    const char* eps_text)
+{
+    bool cond = essentially_equal(a, b, eps);
+    check_inexact_compare(cond, a, b, eps, file, line, "CHECK_ESSENTIALLY_EQUAL",
+                          a_text, b_text, eps_text);
+}
+
+inline void check_definitely_less(long double a, long double b, long double eps,
+                                  const char* file, long line,
+                                  const char* a_text, const char* b_text,
+                                  const char* eps_text)
+{
+    bool cond = definitely_less(a, b, eps);
+    check_inexact_compare(cond, a, b, eps, file, line, "CHECK_DEFINITELY_LESS",
+                          a_text, b_text, eps_text);
+}
+
+inline void check_definitely_greater(long double a, long double b, long double eps,
+                                     const char* file, long line,
+                                     const char* a_text, const char* b_text,
+                                     const char* eps_text)
+{
+    bool cond = definitely_less(b, a, eps);
+    check_inexact_compare(cond, a, b, eps, file, line, "CHECK_DEFINITELY_GREATER",
+                          a_text, b_text, eps_text);
 }
 
 

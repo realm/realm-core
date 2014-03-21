@@ -2,6 +2,7 @@
 #ifdef TEST_QUERY
 
 #include <cstdlib> // itoa()
+#include <limits>
 #include <vector>
 
 #include <tightdb.hpp>
@@ -2223,32 +2224,34 @@ TEST(Query_Float)
     CHECK_EQUAL(3, t.where().col_double.less(2.22).count());
     CHECK_EQUAL(4, t.where().col_double.between(2.20, 2.22).count());
 
+    double epsilon = numeric_limits<double>::epsilon();
+
     // ------ Test sum()
     // ... NO conditions
     double sum1_d = 2.20 + 2.21 + 2.22 + 2.20 + 3.20;
-    CHECK_EQUAL(sum1_d, t.where().col_double.sum());
+    CHECK_APPROXIMATELY_EQUAL(sum1_d, t.where().col_double.sum(), 10*epsilon);
 
     // Note: sum of float is calculated by having a double aggregate to where each float is added
     // (thereby getting casted to double).
     double sum1_f = double(1.10f) + double(1.13f) + double(1.13f) + double(1.10f) + double(1.20f);
     double res = t.where().col_float.sum();
-    CHECK_EQUAL(sum1_f, res);
+    CHECK_APPROXIMATELY_EQUAL(sum1_f, res, 10*epsilon);
 
     // ... with conditions
     double sum2_f = double(1.13f) + double(1.20f);
     double sum2_d = 2.21 + 3.20;
     FloatTable::Query q2 = t.where().col_float.between(1.13f, 1.20f).col_double.not_equal(2.22);
-    CHECK_EQUAL(sum2_d, q2.col_double.sum());
-    CHECK_EQUAL(sum2_f, q2.col_float.sum());
+    CHECK_APPROXIMATELY_EQUAL(sum2_f, q2.col_float.sum(), 10*epsilon);
+    CHECK_APPROXIMATELY_EQUAL(sum2_d, q2.col_double.sum(), 10*epsilon);
 
     // ------ Test average()
 
     // ... NO conditions
-    CHECK_EQUAL(sum1_f/5, t.where().col_float.average());
-    CHECK_EQUAL(sum1_d/5, t.where().col_double.average());
+    CHECK_APPROXIMATELY_EQUAL(sum1_f/5, t.where().col_float.average(), 10*epsilon);
+    CHECK_APPROXIMATELY_EQUAL(sum1_d/5, t.where().col_double.average(), 10*epsilon);
     // ... with conditions
-    CHECK_EQUAL(sum2_f/2, q2.col_float.average());
-    CHECK_EQUAL(sum2_d/2, q2.col_double.average());
+    CHECK_APPROXIMATELY_EQUAL(sum2_f/2, q2.col_float.average(), 10*epsilon);
+    CHECK_APPROXIMATELY_EQUAL(sum2_d/2, q2.col_double.average(), 10*epsilon);
 
     // -------- Test minimum(), maximum()
 
