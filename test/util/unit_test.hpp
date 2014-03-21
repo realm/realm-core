@@ -74,10 +74,15 @@
 
 //@{
 
-/// These are the inexact floating point comparisons defined by
+/// These are the four inexact floating point comparisons defined by
 /// Donald. E. Knuth. in volume II of his "The Art of Computer
 /// Programming" 3rd edition, section 4.2.2 "Accuracy of Floating
-/// Point Arithmetic", definitions (21)-(24).
+/// Point Arithmetic", definitions (21)-(24):
+///
+///     approximately equal       |a-b| <= max(|a|, |b|) * epsilon
+///     essentially equal         |a-b| <= min(|a|, |b|) * epsilon
+///     definitely less than      b - a >  max(|a|, |b|) * epsilon
+///     definitely greater than   a - b >  max(|a|, |b|) * epsilon
 ///
 /// In general you should set `epsilon` to some small multiple of the
 /// machine epsilon for the floating point type used in your

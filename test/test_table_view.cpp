@@ -176,10 +176,14 @@ TEST(TableView_FloatsFindAndAggregations)
     double epsilon = numeric_limits<double>::epsilon();
 
     // Test sum
-    CHECK_APPROXIMATELY_EQUAL(sum_d, v_all.column().col_double.sum(),                        10*epsilon);
-    CHECK_APPROXIMATELY_EQUAL(sum_f, v_all.column().col_float.sum(),                         10*epsilon);
-    CHECK_APPROXIMATELY_EQUAL(-1.2 + -1.2, v_some.column().col_double.sum(),                 10*epsilon);
-    CHECK_APPROXIMATELY_EQUAL(double(1.2f) + double(-1.1f), v_some.column().col_float.sum(), 10*epsilon);
+    CHECK_APPROXIMATELY_EQUAL(sum_d,
+                              v_all.column().col_double.sum(),  10*epsilon);
+    CHECK_APPROXIMATELY_EQUAL(sum_f,
+                              v_all.column().col_float.sum(),   10*epsilon);
+    CHECK_APPROXIMATELY_EQUAL(-1.2 + -1.2,
+                              v_some.column().col_double.sum(), 10*epsilon);
+    CHECK_APPROXIMATELY_EQUAL(double(1.2f) + double(-1.1f),
+                              v_some.column().col_float.sum(),  10*epsilon);
 
     // Test max
     CHECK_EQUAL(3.2, v_all.column().col_double.maximum());
@@ -194,14 +198,14 @@ TEST(TableView_FloatsFindAndAggregations)
     CHECK_EQUAL(-1.1f, v_some.column().col_float.minimum());
 
     // Test avg
-    CHECK_APPROXIMATELY_EQUAL(sum_d / 6.0, v_all.column().col_double.average(),          10*epsilon);
-    CHECK_APPROXIMATELY_EQUAL((-1.2 + -1.2) / 2.0, v_some.column().col_double.average(), 10*epsilon);
-    CHECK_APPROXIMATELY_EQUAL(sum_f / 6.0, v_all.column().col_float.average(),           10*epsilon);
-
-    // FIXME: Ooops, huge inaccuracy in the following average
-    // computation. We probably need to replace it with the one
-    // suggested in https://github.com/Tightdb/tightdb/pull/53.
-    CHECK_APPROXIMATELY_EQUAL(0.05 * 1000, v_some.column().col_float.average() * 1000, 10000000000*epsilon);
+    CHECK_APPROXIMATELY_EQUAL(sum_d / 6.0,
+                              v_all.column().col_double.average(),  10*epsilon);
+    CHECK_APPROXIMATELY_EQUAL((-1.2 + -1.2) / 2.0,
+                              v_some.column().col_double.average(), 10*epsilon);
+    CHECK_APPROXIMATELY_EQUAL(sum_f / 6.0,
+                              v_all.column().col_float.average(),   10*epsilon);
+    CHECK_APPROXIMATELY_EQUAL((double(1.2f) + double(-1.1f)) / 2,
+                              v_some.column().col_float.average(), 10*epsilon);
 
     CHECK_EQUAL(1, v_some.column().col_float.count(1.2f));
     CHECK_EQUAL(2, v_some.column().col_double.count(-1.2));
