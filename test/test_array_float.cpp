@@ -232,7 +232,7 @@ template <class C, typename T>
 void BasicArray_Minimum()
 {
     C f;
-    T res;
+    T res = T();
 
     CHECK_EQUAL(false, f.minimum(res));
 
@@ -268,7 +268,7 @@ template <class C, typename T>
 void BasicArray_Maximum()
 {
     C f;
-    T res;
+    T res = T();
 
     CHECK_EQUAL(false, f.maximum(res));
 
