@@ -337,7 +337,7 @@ to a nonempty value to disable the conversion to PDF.
 
     sudo yum install pandoc-pdf texlive
 
-## Mac OS X 10.7, 10.8, and 10.9
+### Mac OS X 10.7, 10.8, and 10.9
 
 Install Pandoc and XeLaTeX (aka MacTeX) by following the instructions
 on http://johnmacfarlane.net/pandoc/installing.html. This boils down
