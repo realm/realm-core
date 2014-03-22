@@ -5,7 +5,7 @@
 #include <string>
 #include <algorithm>
 #ifdef _MSC_VER
-    #include <win32\stdint.h>
+#  include <win32\stdint.h>
 #endif
 #include <stdio.h>
 #include "verified_integer.hpp"

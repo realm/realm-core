@@ -690,7 +690,7 @@ const Group& SharedGroup::begin_read()
 
     {
         SharedInfo* info = m_file_map.get_addr();
-        Mutex::Lock lock(info->readmutex);
+        LockGuard lock(info->readmutex);
 
         if (TIGHTDB_UNLIKELY(info->infosize > m_reader_map.get_size()))
             m_reader_map.remap(m_file, util::File::access_ReadWrite, info->infosize); // Throws
@@ -743,7 +743,7 @@ void SharedGroup::end_read() TIGHTDB_NOEXCEPT
 
     {
         SharedInfo* info = m_file_map.get_addr();
-        Mutex::Lock lock(info->readmutex);
+        LockGuard lock(info->readmutex);
 
         if (TIGHTDB_UNLIKELY(info->infosize > m_reader_map.get_size()))
             m_reader_map.remap(m_file, util::File::access_ReadWrite, info->infosize);
@@ -1123,7 +1123,7 @@ void SharedGroup::zero_free_space()
     size_t file_size;
 
     {
-        Mutex::Lock lock(info->readmutex);
+        LockGuard lock(info->readmutex);
         current_version = info->current_version.load_relaxed() + 1;
         file_size = to_size_t(info->filesize);
 
@@ -1153,7 +1153,7 @@ void SharedGroup::low_level_commit(uint64_t new_version)
     SharedInfo* info = m_file_map.get_addr();
     uint64_t readlock_version;
     {
-        Mutex::Lock lock(info->readmutex);
+        LockGuard lock(info->readmutex);
 
         if (TIGHTDB_UNLIKELY(info->infosize > m_reader_map.get_size()))
             m_reader_map.remap(m_file, util::File::access_ReadWrite, info->infosize); // Throws
@@ -1187,7 +1187,7 @@ void SharedGroup::low_level_commit(uint64_t new_version)
 
     // Update reader info
     {
-        Mutex::Lock lock(info->readmutex);
+        LockGuard lock(info->readmutex);
         info->current_top = new_top_ref;
         info->filesize    = new_file_size;
         info->current_version.store_relaxed(new_version);

@@ -179,7 +179,7 @@ protected:
 
     void do_log(const std::string& msg) TIGHTDB_OVERRIDE
     {
-        Mutex::Lock l(m_mutex);
+        LockGuard l(m_mutex);
         Logger::do_log(m_base_logger, msg);
     }
 };

@@ -3,11 +3,6 @@ Microsoft Visual Studio Solution File, Format Version 11.00
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{ED0C49D7-6CFD-4B05-BA18-7C6E98A994C8}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TightDB", "TightDB.vcxproj", "{C18EDDC1-166A-49C4-B483-11458F48CF8E}"
-	ProjectSection(ProjectDependencies) = postProject
-		{64A4FEFE-0461-4E95-8CC1-91EF5F57DBC6} = {64A4FEFE-0461-4E95-8CC1-91EF5F57DBC6}
-	EndProjectSection
-EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "UnitTest++", "test\UnitTest++\UnitTest++.vsnet2005.vcxproj", "{64A4FEFE-0461-4E95-8CC1-91EF5F57DBC6}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "test-tightdb", "test\test-tightdb\test-tightdb.vcxproj", "{6DF07480-ECC6-4116-860A-818B9D2BA7B3}"
 	ProjectSection(ProjectDependencies) = postProject
@@ -74,28 +69,6 @@ Global
 		{C18EDDC1-166A-49C4-B483-11458F48CF8E}.Static lib, release|Win32.Build.0 = Static library, release|Win32
 		{C18EDDC1-166A-49C4-B483-11458F48CF8E}.Static lib, release|x64.ActiveCfg = Static library, release|x64
 		{C18EDDC1-166A-49C4-B483-11458F48CF8E}.Static lib, release|x64.Build.0 = Static library, release|x64
-		{64A4FEFE-0461-4E95-8CC1-91EF5F57DBC6}.csv debug|Win32.ActiveCfg = csv debug|Win32
-		{64A4FEFE-0461-4E95-8CC1-91EF5F57DBC6}.csv debug|Win32.Build.0 = csv debug|Win32
-		{64A4FEFE-0461-4E95-8CC1-91EF5F57DBC6}.csv debug|x64.ActiveCfg = csv debug|x64
-		{64A4FEFE-0461-4E95-8CC1-91EF5F57DBC6}.csv debug|x64.Build.0 = csv debug|x64
-		{64A4FEFE-0461-4E95-8CC1-91EF5F57DBC6}.csv release|Win32.ActiveCfg = csv importer|Win32
-		{64A4FEFE-0461-4E95-8CC1-91EF5F57DBC6}.csv release|Win32.Build.0 = csv importer|Win32
-		{64A4FEFE-0461-4E95-8CC1-91EF5F57DBC6}.csv release|x64.ActiveCfg = csv importer|x64
-		{64A4FEFE-0461-4E95-8CC1-91EF5F57DBC6}.csv release|x64.Build.0 = csv importer|x64
-		{64A4FEFE-0461-4E95-8CC1-91EF5F57DBC6}.Debug|Win32.ActiveCfg = Debug|Win32
-		{64A4FEFE-0461-4E95-8CC1-91EF5F57DBC6}.Debug|Win32.Build.0 = Debug|Win32
-		{64A4FEFE-0461-4E95-8CC1-91EF5F57DBC6}.Debug|x64.ActiveCfg = Debug|x64
-		{64A4FEFE-0461-4E95-8CC1-91EF5F57DBC6}.Debug|x64.Build.0 = Debug|x64
-		{64A4FEFE-0461-4E95-8CC1-91EF5F57DBC6}.Release|Win32.ActiveCfg = Release|Win32
-		{64A4FEFE-0461-4E95-8CC1-91EF5F57DBC6}.Release|Win32.Build.0 = Release|Win32
-		{64A4FEFE-0461-4E95-8CC1-91EF5F57DBC6}.Release|x64.ActiveCfg = Release|x64
-		{64A4FEFE-0461-4E95-8CC1-91EF5F57DBC6}.Release|x64.Build.0 = Release|x64
-		{64A4FEFE-0461-4E95-8CC1-91EF5F57DBC6}.Static lib, debug|Win32.ActiveCfg = Release|x64
-		{64A4FEFE-0461-4E95-8CC1-91EF5F57DBC6}.Static lib, debug|x64.ActiveCfg = Release|x64
-		{64A4FEFE-0461-4E95-8CC1-91EF5F57DBC6}.Static lib, debug|x64.Build.0 = Release|x64
-		{64A4FEFE-0461-4E95-8CC1-91EF5F57DBC6}.Static lib, release|Win32.ActiveCfg = Release|x64
-		{64A4FEFE-0461-4E95-8CC1-91EF5F57DBC6}.Static lib, release|x64.ActiveCfg = Release|x64
-		{64A4FEFE-0461-4E95-8CC1-91EF5F57DBC6}.Static lib, release|x64.Build.0 = Release|x64
 		{6DF07480-ECC6-4116-860A-818B9D2BA7B3}.csv debug|Win32.ActiveCfg = Static library, release|x64
 		{6DF07480-ECC6-4116-860A-818B9D2BA7B3}.csv debug|x64.ActiveCfg = Static library, release|x64
 		{6DF07480-ECC6-4116-860A-818B9D2BA7B3}.csv debug|x64.Build.0 = Static library, release|x64

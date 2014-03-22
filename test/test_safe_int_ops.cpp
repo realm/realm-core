@@ -6,13 +6,13 @@
 
 #include <stdint.h>
 
-#include <UnitTest++.h>
-
 #include <tightdb/util/type_list.hpp>
 #include <tightdb/util/safe_int_ops.hpp>
 
 #include "util/demangle.hpp"
 #include "util/super_int.hpp"
+#include "util/unit_test.hpp"
+#include "util/test_only.hpp"
 
 using namespace std;
 using namespace tightdb::util;

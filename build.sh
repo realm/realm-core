@@ -561,7 +561,6 @@ EOF
 
         mkdir -p "$ANDROID_DIR" || exit 1
 
-        OLDPATH=$PATH
         for target in $ANDROID_PLATFORMS; do
             temp_dir="$(mktemp -d /tmp/tightdb.build-android.XXXX)" || exit 1
             if [ "$target" = "arm" ]; then
@@ -573,30 +572,27 @@ EOF
             # `bash` and must therefore be executed by `bash`.
             make_toolchain="$android_ndk_home/build/tools/make-standalone-toolchain.sh"
             bash "$make_toolchain" --platform="android-$platform" --install-dir="$temp_dir" --arch="$target" || exit 1
-            export PATH="$temp_dir/bin:$OLDPATH"
-            if [ "$target" = "arm" ]; then
-                android_prefix="arm"
-            elif [ "$target" = "arm-v7a" ]; then
+            android_prefix="$target"
+            if [ "$target" = "arm-v7a" ]; then
                 android_prefix="arm"
             elif [ "$target" = "mips" ]; then
                 android_prefix="mipsel"
             elif [ "$target" = "x86" ]; then
                 android_prefix="i686"
             fi
-            export CXX="$(cd "$temp_dir/bin" && echo $android_prefix-linux-*-gcc)"
-            export AR="$(cd "$temp_dir/bin" && echo $android_prefix-linux-*-ar)"
-            extra_cflags="-DANDROID -fPIC -DPIC -Os"
+            path="$temp_dir/bin:$PATH"
+            cc="$(cd "$temp_dir/bin" && echo $android_prefix-linux-*-gcc)" || exit 1
+            extra_cflags="-DANDROID -fPIC -DPIC"
             if [ "$target" = "arm" ]; then
                 extra_cflags="$extra_cflags -mthumb"
             elif [ "$target" = "arm-v7a" ]; then
                 extra_cflags="$extra_cflags -mthumb -march=armv7-a -mfloat-abi=softfp -mfpu=vfpv3-d16"
             fi
             denom="android-$target"
-            $MAKE -C "src/tightdb" "libtightdb-$denom.a" BASE_DENOM="$denom" CFLAGS_ARCH="$extra_cflags" || exit 1
+            PATH="$path" CC="$cc" $MAKE -C "src/tightdb" CC_IS="gcc" BASE_DENOM="$denom" CFLAGS_OPTIM="-Os -DNDEBUG" CFLAGS_ARCH="$extra_cflags" "libtightdb-$denom.a" || exit 1
             cp "src/tightdb/libtightdb-$denom.a" "$ANDROID_DIR" || exit 1
-            rm -rf "$temp_dir"
+            rm -rf "$temp_dir" || exit 1
         done
-        PATH="$OLDPATH"
         echo "Copying headers to '$ANDROID_DIR/include'"
         mkdir -p "$ANDROID_DIR/include" || exit 1
         cp "src/tightdb.hpp" "$ANDROID_DIR/include/" || exit 1
