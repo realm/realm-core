@@ -6,11 +6,12 @@
 #include <map>
 #include <iostream>
 
-#include <UnitTest++.h>
-
 #include <tightdb/util/bind.hpp>
 #include <tightdb/util/thread.hpp>
 #include <tightdb/util/file.hpp>
+
+#include "util/unit_test.hpp"
+#include "util/test_only.hpp"
 
 using namespace std;
 using namespace tightdb::util;
@@ -40,7 +41,7 @@ bool slaves_run[num_slaves];
 
 void master()
 {
-    Mutex::Lock l(mutex);
+    LockGuard l(mutex);
     for (int i = 0; i != num_rounds; ++i) {
         while (num_slaves_ready != num_slaves)
             cond.wait(l);
@@ -63,7 +64,7 @@ void slave(int ndx)
         if (good_lock)
             file.unlock();
         {
-            Mutex::Lock l(mutex);
+            LockGuard l(mutex);
             if (good_lock)
                 ++num_good_locks;
             ++num_slaves_ready;

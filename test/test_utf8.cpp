@@ -6,12 +6,12 @@
 #include <stdexcept>
 #include <string>
 
-#include <UnitTest++.h>
-
 #include <tightdb/util/assert.hpp>
 #include <tightdb/util/unique_ptr.hpp>
 #include <tightdb/util/utf8.hpp>
 
+#include "util/unit_test.hpp"
+#include "util/test_only.hpp"
 
 using namespace std;
 using namespace tightdb;
@@ -225,7 +225,7 @@ template<class String16> size_t find_buf_size_utf16_to_utf8(const String16& s)
 
 #ifndef _WIN32
 
-TEST(Utf8_Utf16_Transcode)
+TEST(Utf8_TranscodeUtf16)
 {
     typedef IntChar<int>                   Char16;
     typedef IntCharTraits<Char16, long>    Traits16;

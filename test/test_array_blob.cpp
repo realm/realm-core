@@ -3,10 +3,11 @@
 
 #include <cstring>
 
-#include <UnitTest++.h>
-
 #include <tightdb/array_blob.hpp>
 #include <tightdb/column_string.hpp>
+
+#include "util/unit_test.hpp"
+#include "util/test_only.hpp"
 
 using namespace std;
 using namespace tightdb;
@@ -24,7 +25,7 @@ TEST(ArrayBlob_AddEmpty)
     blob.destroy();
 }
 
-TEST(ArrayBlob)
+TEST(ArrayBlob_General)
 {
     ArrayBlob blob;
 
@@ -83,7 +84,7 @@ TEST(ArrayBlob)
     blob.destroy();
 }
 
-TEST(AdaptiveStringLeak)
+TEST(ArrayBlob_AdaptiveStringLeak)
 {
     AdaptiveStringColumn col;
     for (size_t i = 0; i != 2 * TIGHTDB_MAX_LIST_SIZE; ++i)

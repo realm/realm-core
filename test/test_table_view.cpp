@@ -1,6 +1,7 @@
 #include "testsettings.hpp"
 #ifdef TEST_TABLE_VIEW
 
+#include <limits>
 #include <string>
 #include <sstream>
 #include <ostream>
@@ -8,8 +9,8 @@
 #include <tightdb/table_macros.hpp>
 
 #include "util/misc.hpp"
-
-#include <UnitTest++.h>
+#include "util/unit_test.hpp"
+#include "util/test_only.hpp"
 
 using namespace std;
 using namespace tightdb;
@@ -34,7 +35,7 @@ TIGHTDB_TABLE_2(TestTableDate,
 } // anonymous namespace
 
 
-TEST(TableViewJSON)
+TEST(TableView_Json)
 {
     Table table;
     table.add_column(type_Int, "first");
@@ -55,7 +56,7 @@ TEST(TableViewJSON)
 }
 
 
-TEST(TableViewDateMaxMin)
+TEST(TableView_DateMaxMin)
 {
     TestTableDate ttd;
 
@@ -70,7 +71,7 @@ TEST(TableViewDateMaxMin)
     CHECK_EQUAL(DateTime(2013, 7, 10), v.column().first.minimum());
 }
 
-TEST(GetSetInteger)
+TEST(TableView_GetSetInteger)
 {
     TestTableInt table;
 
@@ -103,7 +104,7 @@ TIGHTDB_TABLE_3(TableFloats,
                 col_int, Int)
 }
 
-TEST(TableView_Floats_GetSet)
+TEST(TableView_FloatsGetSet)
 {
     TableFloats table;
 
@@ -139,7 +140,7 @@ TEST(TableView_Floats_GetSet)
     CHECK_EQUAL(123.3219, v[0].col_double);
 }
 
-TEST(TableView_Floats_Find_and_Aggregations)
+TEST(TableView_FloatsFindAndAggregations)
 {
     TableFloats table;
     float  f_val[] = { 1.2f, 2.1f, 3.1f, -1.1f, 2.1f, 0.0f };
@@ -149,7 +150,7 @@ TEST(TableView_Floats_Find_and_Aggregations)
     for (size_t i=0; i<6; ++i) {
         table.add(f_val[i], d_val[i], 1);
         sum_d += d_val[i];
-        sum_f += double(f_val[i]);
+        sum_f += f_val[i];
     }
 
     // Test find_all()
@@ -172,11 +173,17 @@ TEST(TableView_Floats_Find_and_Aggregations)
 
     // TODO: add for float as well
 
+    double epsilon = numeric_limits<double>::epsilon();
+
     // Test sum
-    CHECK(almost_equal(sum_d, v_all.column().col_double.sum())); // almost_equal because of double/float imprecision
-    CHECK_EQUAL(sum_f, v_all.column().col_float.sum());
-    CHECK_EQUAL(-1.2 -1.2, v_some.column().col_double.sum());
-    CHECK_EQUAL(1.2f -1.1f, v_some.column().col_float.sum());
+    CHECK_APPROXIMATELY_EQUAL(sum_d,
+                              v_all.column().col_double.sum(),  10*epsilon);
+    CHECK_APPROXIMATELY_EQUAL(sum_f,
+                              v_all.column().col_float.sum(),   10*epsilon);
+    CHECK_APPROXIMATELY_EQUAL(-1.2 + -1.2,
+                              v_some.column().col_double.sum(), 10*epsilon);
+    CHECK_APPROXIMATELY_EQUAL(double(1.2f) + double(-1.1f),
+                              v_some.column().col_float.sum(),  10*epsilon);
 
     // Test max
     CHECK_EQUAL(3.2, v_all.column().col_double.maximum());
@@ -191,12 +198,14 @@ TEST(TableView_Floats_Find_and_Aggregations)
     CHECK_EQUAL(-1.1f, v_some.column().col_float.minimum());
 
     // Test avg
-    CHECK(almost_equal(sum_d / 6.0, v_all.column().col_double.average())); // almost_equal because of double/float imprecision
-    CHECK_EQUAL((-1.2 + -1.2) / 2.0, v_some.column().col_double.average());
-    CHECK_EQUAL(sum_f / 6.0, v_all.column().col_float.average());
-
-    // Need to test this way because items summed one at a time differ with compile-time constant by some infinitesimal
-    CHECK_EQUAL(int(0.05 * 1000), int(v_some.column().col_float.average() * 1000));
+    CHECK_APPROXIMATELY_EQUAL(sum_d / 6.0,
+                              v_all.column().col_double.average(),  10*epsilon);
+    CHECK_APPROXIMATELY_EQUAL((-1.2 + -1.2) / 2.0,
+                              v_some.column().col_double.average(), 10*epsilon);
+    CHECK_APPROXIMATELY_EQUAL(sum_f / 6.0,
+                              v_all.column().col_float.average(),   10*epsilon);
+    CHECK_APPROXIMATELY_EQUAL((double(1.2f) + double(-1.1f)) / 2,
+                              v_some.column().col_float.average(), 10*epsilon);
 
     CHECK_EQUAL(1, v_some.column().col_float.count(1.2f));
     CHECK_EQUAL(2, v_some.column().col_double.count(-1.2));
@@ -207,7 +216,7 @@ TEST(TableView_Floats_Find_and_Aggregations)
     CHECK_EQUAL(6, v_all.column().col_int.count(1));
 }
 
-TEST(TableViewSum)
+TEST(TableView_Sum)
 {
     TestTableInt table;
 
@@ -224,7 +233,7 @@ TEST(TableViewSum)
     CHECK_EQUAL(10, sum);
 }
 
-TEST(TableViewSumNegative)
+TEST(TableView_SumNegative)
 {
     TestTableInt table;
 
@@ -240,7 +249,7 @@ TEST(TableViewSumNegative)
     CHECK_EQUAL(-9, sum);
 }
 
-TEST(TableViewIsAttached)
+TEST(TableView_IsAttached)
 {
     TestTableInt table;
 
@@ -262,7 +271,7 @@ TEST(TableViewIsAttached)
     CHECK_EQUAL(false, v2.is_attached());
 }
 
-TEST(TableViewMax)
+TEST(TableView_Max)
 {
     TestTableInt table;
 
@@ -279,7 +288,7 @@ TEST(TableViewMax)
     CHECK_EQUAL(2, max);
 }
 
-TEST(TableViewMax2)
+TEST(TableView_Max2)
 {
     TestTableInt table;
 
@@ -297,7 +306,7 @@ TEST(TableViewMax2)
 }
 
 
-TEST(TableViewMin)
+TEST(TableView_Min)
 {
     TestTableInt table;
 
@@ -314,7 +323,7 @@ TEST(TableViewMin)
     CHECK_EQUAL(-1, min);
 }
 
-TEST(TableViewMin2)
+TEST(TableView_Min2)
 {
     TestTableInt table;
 
@@ -332,7 +341,7 @@ TEST(TableViewMin2)
 }
 
 
-TEST(TableViewFind)
+TEST(TableView_Find)
 {
     TestTableInt table;
 
@@ -350,7 +359,7 @@ TEST(TableViewFind)
 }
 
 
-TEST(TableViewFindAll)
+TEST(TableView_FindAll)
 {
     TestTableInt table;
 
@@ -372,11 +381,13 @@ TEST(TableViewFindAll)
 }
 
 namespace {
+
 TIGHTDB_TABLE_1(TestTableString,
                 first, String)
-}
 
-TEST(TableViewFindAllString)
+} // anonymous namespace
+
+TEST(TableView_FindAllString)
 {
     TestTableString table;
 
@@ -395,7 +406,7 @@ TEST(TableViewFindAllString)
     CHECK_EQUAL(2, v2.get_source_ndx(1));
 }
 
-TEST(TableViewDelete)
+TEST(TableView_Delete)
 {
     TestTableInt table;
 
@@ -436,7 +447,7 @@ TEST(TableViewDelete)
     CHECK_EQUAL(3, table[1].first);
 }
 
-TEST(TableViewClear)
+TEST(TableView_Clear)
 {
     TestTableInt table;
 
@@ -462,7 +473,7 @@ TEST(TableViewClear)
 //view V1 selects a subset of rows from Table T1
 //View V2 selects rows from  view V1
 //Then, some rows in V2 can be found, that are not in V1
-TEST(TableViewStacked)
+TEST(TableView_Stacked)
 {
     Table t;
     t.add_column(type_Int,"i1");
@@ -479,7 +490,7 @@ TEST(TableViewStacked)
 }
 
 
-TEST(TableViewClearNone)
+TEST(TableView_ClearNone)
 {
     TestTableInt table;
 
@@ -490,7 +501,7 @@ TEST(TableViewClearNone)
 }
 
 
-TEST(TableViewFindAllStacked)
+TEST(TableView_FindAllStacked)
 {
     TestTableInt2 table;
 
@@ -715,19 +726,20 @@ TEST(TableView_LowLevelSubtables)
 }
 
 
-namespace
-{
-    TIGHTDB_TABLE_1(MyTable1,
-                    val, Int)
+namespace {
 
-    TIGHTDB_TABLE_2(MyTable2,
-                    val, Int,
-                    subtab, Subtable<MyTable1>)
+TIGHTDB_TABLE_1(MyTable1,
+                val, Int)
 
-    TIGHTDB_TABLE_2(MyTable3,
-                    val, Int,
-                    subtab, Subtable<MyTable2>)
-}
+TIGHTDB_TABLE_2(MyTable2,
+                val, Int,
+                subtab, Subtable<MyTable1>)
+
+TIGHTDB_TABLE_2(MyTable3,
+                val, Int,
+                subtab, Subtable<MyTable2>)
+
+} // anonymous namespace
 
 TEST(TableView_HighLevelSubtables)
 {
@@ -853,7 +865,7 @@ TEST(TableView_HighLevelSubtables)
 }
 
 
-TEST(TableView_to_string)
+TEST(TableView_ToString)
 {
     TestTableInt2 tbl;
 
@@ -887,7 +899,7 @@ TEST(TableView_to_string)
 }
 
 
-TEST(TableView_ref_counting)
+TEST(TableView_RefCounting)
 {
     TableView tv, tv2;
     {
@@ -913,7 +925,7 @@ TEST(TableView_ref_counting)
     CHECK_EQUAL(s, "just a test string");
 }
 
-TEST(TableView_dyn_pivot)
+TEST(TableView_DynPivot)
 {
     TableRef table = Table::create();
     size_t column_ndx_sex = table->add_column(type_String, "sex");

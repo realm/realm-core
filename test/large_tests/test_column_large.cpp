@@ -1,13 +1,16 @@
 #include "../testsettings.hpp"
-
 #ifdef TEST_COLUMN_LARGE
 
-#include "tightdb/column.hpp"
-#include <UnitTest++.h>
-#include <vector>
 #include <algorithm>
+#include <vector>
+
+#include <tightdb/column.hpp>
+#include <tightdb/query_conditions.hpp>
+
+#include "../util/unit_test.hpp"
+#include "../util/test_only.hpp"
+
 #include "verified_integer.hpp"
-#include "tightdb/query_conditions.hpp"
 
 using namespace tightdb;
 
@@ -27,10 +30,10 @@ uint64_t rand2(int bitwidth = 64)
     return i;
 }
 
-}
+} // anonymous namespace
 
 
-TEST(LESS)
+TEST(ColumnLarge_Less)
 {
     // Interesting boundary values to test
     int64_t v[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17,
@@ -236,7 +239,7 @@ TEST(LESS)
 }
 
 
-ONLY(Column_monkeytest2)
+ONLY(ColumnLarge_Monkey2)
 {
     const uint64_t ITER_PER_BITWIDTH = 16 * 1000 * 20;
     const uint64_t SEED = 123;
@@ -288,4 +291,4 @@ ONLY(Column_monkeytest2)
     res.destroy();
 }
 
-#endif
+#endif // TEST_COLUMN_LARGE

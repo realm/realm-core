@@ -1,26 +1,17 @@
-#include "testsettings.hpp"
-
 #include <string>
 #include <iostream>
-#include <UnitTest++.h>
 
 #include <tightdb/version.hpp>
+
+#include "util/unit_test.hpp"
+#include "util/test_only.hpp"
 
 using namespace std;
 using namespace tightdb;
 
 
-TEST(VERSION)
+TEST(Version_General)
 {
-#if 1
-    cout << "TightDB version: " << Version::get_version();
-    cout << "\n  with Debug " << 
-        (Version::has_feature(feature_Debug) ? "Enabled" : "Disabled"); 
-    cout << "\n  with Replication " << 
-        (Version::has_feature(feature_Replication) ? "Enabled" : "Disabled"); 
-    cout << endl << endl;
-#endif
-
     CHECK_EQUAL(TIGHTDB_VER_MAJOR, Version::get_major());
     CHECK_EQUAL(TIGHTDB_VER_MINOR, Version::get_minor());
     CHECK_EQUAL(TIGHTDB_VER_PATCH, Version::get_patch());
