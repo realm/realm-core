@@ -748,7 +748,8 @@ const Group& SharedGroup::begin_read()
         new_top_ref   = m_pinned_top_ref;
         new_file_size = m_pinned_file_size;
 
-    } else {
+    } 
+    else {
 
         grab_readlock(new_top_ref, new_file_size);
     }
@@ -807,7 +808,7 @@ void SharedGroup::end_read() TIGHTDB_NOEXCEPT
     }
 
     // The read may have allocated some temporary state
-    m_group.detach_but_retain();
+    m_group.detach(); // _but_retain();
 
     m_transact_stage = transact_Ready;
 }

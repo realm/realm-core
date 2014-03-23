@@ -236,16 +236,8 @@ void Group::detach_table_accessors() TIGHTDB_NOEXCEPT
 
 void Group::detach() TIGHTDB_NOEXCEPT
 {
-    m_is_attached = false;
-    detach_table_accessors();
-    m_table_accessors.clear();
-
-    m_top.detach();
-    m_tables.detach();
-    m_table_names.detach();
-    m_free_positions.detach();
-    m_free_lengths.detach();
-    m_free_versions.detach();
+    detach_but_retain();
+    complete_detach();
 }
 
 void Group::detach_but_retain() TIGHTDB_NOEXCEPT
@@ -257,7 +249,6 @@ void Group::detach_but_retain() TIGHTDB_NOEXCEPT
 
 void Group::complete_detach() TIGHTDB_NOEXCEPT
 {
-
     m_top.detach();
     m_tables.detach();
     m_table_names.detach();
