@@ -762,7 +762,8 @@ const Group& SharedGroup::begin_read()
     // Make sure the group is up-to-date.
     // A zero ref means that the file has just been created.
     try {
-        m_group.update_from_shared(new_top_ref, new_file_size); // Throws
+        m_group.update_from_shared(new_top_ref, new_file_size, 
+                                   same_as_before || m_transactions_are_pinned); // Throws
     }
     catch (...) {
         end_read();
@@ -856,7 +857,7 @@ void SharedGroup::do_begin_write()
     // Make sure the group is up-to-date
     // zero ref means that the file has just been created
     m_group.update_from_shared(new_top_ref, new_file_size); // Throws
-    m_group.Verify();
+
     m_transact_stage = transact_Writing;
 }
 

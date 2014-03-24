@@ -248,7 +248,6 @@ void Group::detach() TIGHTDB_NOEXCEPT
 
 void Group::detach_but_retain() TIGHTDB_NOEXCEPT
 {
-    Verify();
     m_is_attached = false;
     detach_table_accessors();
     m_table_accessors.clear();
@@ -630,7 +629,6 @@ void Group::update_from_shared(ref_type new_top_ref, size_t new_file_size, bool 
                 }
             }
             m_is_attached = true;
-            Verify();
             return;
         }
         else {
