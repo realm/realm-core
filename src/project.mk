@@ -68,6 +68,6 @@ else
 endif
 
 ifneq ($(TIGHTDB_ANDROID),)
-  PROJECT_CFLAGS += -fPIC -DPIC -DANDROID
-  CFLAGS_OPTIM = -Os -DNDEBUG
+  PROJECT_CFLAGS += -fPIC -DPIC -fvisibility=hidden -DANDROID
+  CFLAGS_OPTIM = -Os -flto -DNDEBUG
 endif
