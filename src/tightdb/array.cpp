@@ -1674,11 +1674,6 @@ template<size_t width> void Array::set_width() TIGHTDB_NOEXCEPT
     m_finder[cond_Less] = fl;
 }
 
-template<size_t w> int64_t Array::Get(size_t ndx) const TIGHTDB_NOEXCEPT
-{
-    return GetUniversal<w>(m_data, ndx);
-}
-
 // This method reads 8 concecutive values into res[8], starting from index 'ndx'. It's allowed for the 8 values to
 // exceed array length; in this case, remainder of res[8] will be left untouched.
 template<size_t w> void Array::get_chunk(size_t ndx, int64_t res[8]) const TIGHTDB_NOEXCEPT

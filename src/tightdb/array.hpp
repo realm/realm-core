@@ -2217,6 +2217,11 @@ ref_type Array::bptree_insert(std::size_t elem_ndx, TreeInsert<TreeTraits>& stat
 // Finding code                                                                       *
 //*************************************************************************************
 
+template<std::size_t w> int64_t Array::Get(std::size_t ndx) const TIGHTDB_NOEXCEPT
+{
+    return GetUniversal<w>(m_data, ndx);
+}
+
 template<std::size_t w> int64_t Array::GetUniversal(const char* data, std::size_t ndx) const
 {
     if (w == 0) {
