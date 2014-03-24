@@ -124,6 +124,8 @@ void Group::create(bool add_free_versions)
 
 void Group::init_from_ref(ref_type top_ref) TIGHTDB_NOEXCEPT
 {
+    TIGHTDB_ASSERT(!is_attached());
+
     m_top.init_from_ref(top_ref);
     size_t top_size = m_top.size();
     TIGHTDB_ASSERT(top_size >= 3);
@@ -160,6 +162,8 @@ void Group::init_from_ref(ref_type top_ref) TIGHTDB_NOEXCEPT
 
 void Group::init_shared()
 {
+    TIGHTDB_ASSERT(m_top.is_attached());
+    TIGHTDB_ASSERT(m_is_attached);
     if (m_free_versions.is_attached()) {
         TIGHTDB_ASSERT(m_top.size() == 7);
         // If free space tracking is enabled
@@ -204,9 +208,11 @@ void Group::init_shared()
 
 Group::~Group() TIGHTDB_NOEXCEPT
 {
-    if (!is_attached())
+    if (!is_attached()) {
+        if (m_top.is_attached())
+            complete_detach();
         return;
-
+    }
     detach_table_accessors();
 
 #ifdef TIGHTDB_DEBUG
@@ -242,6 +248,7 @@ void Group::detach() TIGHTDB_NOEXCEPT
 
 void Group::detach_but_retain() TIGHTDB_NOEXCEPT
 {
+    Verify();
     m_is_attached = false;
     detach_table_accessors();
     m_table_accessors.clear();
@@ -596,23 +603,43 @@ void Group::update_refs(ref_type top_ref, size_t old_baseline) TIGHTDB_NOEXCEPT
 }
 
 
-void Group::update_from_shared(ref_type new_top_ref, size_t new_file_size)
+void Group::update_from_shared(ref_type new_top_ref, size_t new_file_size, bool same_version)
 {
     TIGHTDB_ASSERT(new_top_ref < new_file_size);
     TIGHTDB_ASSERT(!is_attached());
 
     if (m_top.is_attached()) {
+
         // we're retaining data and mostly "faking" we've detached
-        if (m_top.get_ref() == new_top_ref) {
+        if (same_version 
+            && new_top_ref 
+            && (m_top.get_ref() == new_top_ref) 
+            && (new_file_size == m_alloc.get_baseline())) {
+
             // top ref matches, so we'll simply reuse retained data!
-            // FIXME: What about file size? Is it sufficient to match on top ref?
+            // init_from_ref(new_top_ref);
+            size_t top_size = m_top.size();
+            TIGHTDB_ASSERT(m_top.get_ref()         == new_top_ref);
+            TIGHTDB_ASSERT(m_table_names.get_ref() == m_top.get_as_ref(0));
+            TIGHTDB_ASSERT(m_tables.get_ref()      == m_top.get_as_ref(1));
+            if (top_size > 3) {
+                TIGHTDB_ASSERT(m_free_positions.get_ref() == m_top.get_as_ref(3));
+                TIGHTDB_ASSERT(m_free_lengths.get_ref()   == m_top.get_as_ref(4));
+                if (top_size > 5) {
+                    TIGHTDB_ASSERT(m_free_versions.get_ref() == m_top.get_as_ref(5));
+                }
+            }
             m_is_attached = true;
+            Verify();
             return;
         }
         else {
-            // new and different top ref, must complete "faked" detach
+            // new and different top ref -- or new file mapping, must 
+            // complete "faked" detach, then re-attach
             complete_detach();
         }
+
+//        complete_detach();
     }
     // Make all managed memory beyond the attached file available
     // again.

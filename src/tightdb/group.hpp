@@ -344,7 +344,7 @@ private:
     /// commits via shared group.
     void update_refs(ref_type top_ref, std::size_t old_baseline) TIGHTDB_NOEXCEPT;
 
-    void update_from_shared(ref_type new_top_ref, std::size_t new_file_size);
+    void update_from_shared(ref_type new_top_ref, std::size_t new_file_size, bool same_version = false);
 
     // Overriding method in ArrayParent
     void update_child_ref(std::size_t, ref_type) TIGHTDB_OVERRIDE;
