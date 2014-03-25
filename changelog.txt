@@ -11,8 +11,13 @@ Format:
 . Any other notes ....                   (internal changes)
 
 
+2014-03-25 (Kristian Spangsege)
+! Fixed bug when clearing table with a float/double column.
+
+
 2014-03-13 (Finn Schiermer Andersen)
 ! Fixed missing initialization of empty columns in some scenarios.
+
 
 2014-02-19 (Finn Schiermer Andersen)
 ! Fixed space leak in group_writer. Could in some scenarios cause massive increase in database file size.
