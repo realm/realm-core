@@ -90,9 +90,6 @@ template<typename T> bool atomic_one_if_zero(Atomic<T>& counter)
     return true;
 }
 
-} // anonymous namespace
-
-
 
 // nonblocking ringbuffer
 class Ringbuffer {
@@ -266,6 +263,10 @@ private:
     ReadCount data[init_readers_size];
 
 };
+
+} // anonymous namespace
+
+
 
 struct SharedGroup::SharedInfo 
 {
