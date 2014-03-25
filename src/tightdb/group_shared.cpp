@@ -287,7 +287,8 @@ struct SharedGroup::SharedInfo
     Ringbuffer readers;
     SharedInfo(ref_type top_ref, size_t file_size, DurabilityLevel);
     ~SharedInfo() TIGHTDB_NOEXCEPT {}
-    uint_fast64_t get_current_version_unchecked() const {
+    uint_fast64_t get_current_version_unchecked() const 
+    {
         return readers.get_last().version;
     }
 };
