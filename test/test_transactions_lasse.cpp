@@ -13,8 +13,6 @@
 #  include <unistd.h> // usleep()
 #endif
 
-#include <UnitTest++.h>
-
 #include <tightdb.hpp>
 #include <tightdb/column.hpp>
 #include <tightdb/utilities.hpp>
@@ -22,9 +20,8 @@
 #include <tightdb/util/file.hpp>
 
 #include "util/thread_wrapper.hpp"
-
-#include "testsettings.hpp"
-
+#include "util/unit_test.hpp"
+#include "util/test_only.hpp"
 
 using namespace std;
 using namespace tightdb;
@@ -103,7 +100,7 @@ void write_thread(int thread_ndx)
             table->set_int(0, 0, w);
             rand_sleep();
             int64_t r = table->get_int(0, 0);
-            CHECK_EQUAL(r, w); // FIXME: Is UnitTest++ thread-safe to this extent?
+            CHECK_EQUAL(r, w);
             wt.commit();
         }
 
@@ -120,7 +117,7 @@ void read_thread()
         int64_t r1 = rt.get_table("table")->get_int(0, 0);
         rand_sleep();
         int64_t r2 = rt.get_table("table")->get_int(0, 0);
-        CHECK_EQUAL(r1, r2); // FIXME: Is UnitTest++ thread-safe to this extent?
+        CHECK_EQUAL(r1, r2);
     }
 }
 

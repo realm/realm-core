@@ -5,7 +5,7 @@
 using namespace tightdb;
 using namespace std;
 
-int main(int argc, char *argv[]) {
+int main(int, char*[]) {
     Table t;
 
     t.add_column(type_String, "name");
@@ -23,7 +23,7 @@ int main(int argc, char *argv[]) {
     t.set_int(age_ndx, 0, 32);
     t.set_int(age_ndx, 1, 18);
 
-    cout << "Total: " << t.sum(age_ndx) << endl;
+    cout << "Total: " << t.sum_int(age_ndx) << endl;
     stringstream ss;
     t.to_json(ss);
     cout << "JSON:  " << ss.str() << endl;

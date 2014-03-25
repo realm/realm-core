@@ -1,6 +1,6 @@
 check_PROGRAMS = testcase innotest
 
-testcase_SOURCES = unit_test.cpp testcase.cpp
+testcase_SOURCES = testcase.cpp run-testcase.cpp
 testcase_LIBS = ../util/test-util.a
 
 innotest_SOURCES = innotest.cpp

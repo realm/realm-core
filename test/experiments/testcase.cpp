@@ -20,7 +20,8 @@
 
 #include "../util/demangle.hpp"
 #include "../util/thread_wrapper.hpp"
-#include "unit_test.hpp"
+#include "../util/unit_test.hpp"
+#include "../util/test_only.hpp"
 
 using namespace std;
 using namespace tightdb;

@@ -1,10 +1,15 @@
-#include <UnitTest++.h>
 #include <tightdb/array_blobs_big.hpp>
+
+#include "util/unit_test.hpp"
+#include "util/test_only.hpp"
 
 using namespace tightdb;
 
 // Note: You can now temporarely declare unit tests with the ONLY(TestName) macro instead of TEST(TestName). This
 // will disable all unit tests except these. Remember to undo your temporary changes before committing.
+
+
+namespace {
 
 struct db_setup_big_blobs {
     static ArrayBigBlobs c;
@@ -12,13 +17,20 @@ struct db_setup_big_blobs {
 
 ArrayBigBlobs db_setup_big_blobs::c;
 
-TEST_FIXTURE(db_setup_big_blobs, ArrayBigBlobsIsEmpty)
+} // anonymous namespace
+
+
+TEST(ArrayBigBlobs_IsEmpty)
 {
+    ArrayBigBlobs& c = db_setup_big_blobs::c;
+
     CHECK_EQUAL(true, c.is_empty());
 }
 
-TEST_FIXTURE(db_setup_big_blobs, ArrayBigBlobsMultiEmpty)
+TEST(ArrayBigBlobs_MultiEmpty)
 {
+    ArrayBigBlobs& c = db_setup_big_blobs::c;
+
     c.add(BinaryData("", 0));
     c.add(BinaryData("", 0));
     c.add(BinaryData("", 0));
@@ -36,8 +48,10 @@ TEST_FIXTURE(db_setup_big_blobs, ArrayBigBlobsMultiEmpty)
     CHECK_EQUAL(0, c.get(5).size());
 }
 
-TEST_FIXTURE(db_setup_big_blobs, ArrayBigBlobsSet)
+TEST(ArrayBigBlobs_Set)
 {
+    ArrayBigBlobs& c = db_setup_big_blobs::c;
+
     c.set(0, BinaryData("hey", 4));
 
     CHECK_EQUAL(6, c.size());
@@ -51,9 +65,11 @@ TEST_FIXTURE(db_setup_big_blobs, ArrayBigBlobsSet)
     CHECK_EQUAL(0, c.get(5).size());
 }
 
-TEST_FIXTURE(db_setup_big_blobs, ArrayBigBlobsAdd)
+TEST(ArrayBigBlobs_Add)
 {
+    ArrayBigBlobs& c = db_setup_big_blobs::c;
     c.clear();
+
     CHECK_EQUAL(0, c.size());
 
     c.add(BinaryData("abc", 4));
@@ -69,8 +85,10 @@ TEST_FIXTURE(db_setup_big_blobs, ArrayBigBlobsAdd)
     CHECK_EQUAL(2, c.size());
 }
 
-TEST_FIXTURE(db_setup_big_blobs, ArrayBigBlobsSet2)
+TEST(ArrayBigBlobs_Set2)
 {
+    ArrayBigBlobs& c = db_setup_big_blobs::c;
+
     // {shrink, grow} x {first, middle, last, single}
     c.clear();
 
@@ -124,8 +142,9 @@ TEST_FIXTURE(db_setup_big_blobs, ArrayBigBlobsSet2)
     CHECK_EQUAL(3, c.size());
 }
 
-TEST_FIXTURE(db_setup_big_blobs, ArrayBigBlobsInsert)
+TEST(ArrayBigBlobs_Insert)
 {
+    ArrayBigBlobs& c = db_setup_big_blobs::c;
     c.clear();
 
     c.insert(0, BinaryData("abc", 4)); // single
@@ -159,8 +178,9 @@ TEST_FIXTURE(db_setup_big_blobs, ArrayBigBlobsInsert)
     CHECK_EQUAL(5, c.size());
 }
 
-TEST_FIXTURE(db_setup_big_blobs, ArrayBigBlobsErase)
+TEST(ArrayBigBlobs_Erase)
 {
+    ArrayBigBlobs& c = db_setup_big_blobs::c;
     c.clear();
 
     c.add(BinaryData("a", 2));
@@ -196,8 +216,9 @@ TEST_FIXTURE(db_setup_big_blobs, ArrayBigBlobsErase)
     CHECK(c.is_empty());
 }
 
-TEST_FIXTURE(db_setup_big_blobs, ArrayBigBlobsCount)
+TEST(ArrayBigBlobs_Count)
 {
+    ArrayBigBlobs& c = db_setup_big_blobs::c;
     c.clear();
 
     // first, middle and end
@@ -215,8 +236,10 @@ TEST_FIXTURE(db_setup_big_blobs, ArrayBigBlobsCount)
     CHECK_EQUAL(3, count2);
 }
 
-TEST_FIXTURE(db_setup_big_blobs, ArrayBigBlobsFind)
+TEST(ArrayBigBlobs_Find)
 {
+    ArrayBigBlobs& c = db_setup_big_blobs::c;
+
     const size_t res = c.find_first(BinaryData("baz", 4));
     CHECK_EQUAL(3, res);
 
@@ -235,8 +258,10 @@ TEST_FIXTURE(db_setup_big_blobs, ArrayBigBlobsFind)
     results.destroy();
 }
 
-TEST_FIXTURE(db_setup_big_blobs, ArrayBigBlobs_Destroy)
+TEST(ArrayBigBlobs_Destroy)
 {
+    ArrayBigBlobs& c = db_setup_big_blobs::c;
+
     // clean up (ALWAYS PUT THIS LAST)
     c.destroy();
 }

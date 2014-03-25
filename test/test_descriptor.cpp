@@ -1,6 +1,7 @@
-#include <UnitTest++.h>
-
 #include <tightdb/descriptor.hpp>
+
+#include "util/unit_test.hpp"
+#include "util/test_only.hpp"
 
 using namespace std;
 using namespace tightdb;

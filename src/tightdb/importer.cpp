@@ -20,21 +20,21 @@
 
 // Test tool in test/test_csv/test.pl
 
-#include "importer.hpp"
 #include <stdint.h>
 #include <limits>
 #include <vector>
-#include <assert.h>
 #include <sstream>
+
+#include <tightdb/util/assert.hpp>
+#include <tightdb/importer.hpp>
+
 using namespace std;
 using namespace tightdb;
 
-Importer::Importer(void) : Quiet(false), Separator(',')
+namespace {
+
+string set_width(string s, size_t w)
 {
-
-}
-
-string set_width(string s, size_t w) {
     if(s.size() > w)
         s = s.substr(0, w - 3) + "...";
     else
@@ -42,7 +42,8 @@ string set_width(string s, size_t w) {
     return s;
 }
 
-const char* DataTypeToText(DataType t) {
+const char* DataTypeToText(DataType t)
+{
     if(t == type_Int)
         return "Int";
     else if(t == type_Bool)
@@ -67,7 +68,8 @@ const char* DataTypeToText(DataType t) {
     }
 }
 
-void print_col_names(Table& table) {
+void print_col_names(Table& table)
+{
     cout << "\n";
     for(size_t t = 0; t < table.get_column_count(); t++) {
         string s = string(table.get_column_name(t).data());
@@ -85,7 +87,8 @@ void print_col_names(Table& table) {
 }
 
 // Prints row 'r' of a TightDB table
-void print_row(Table& table, size_t r) {
+void print_row(Table& table, size_t r)
+{
     for(size_t c = 0; c < table.get_column_count(); c++) {
         char buf[print_width];
 
@@ -124,6 +127,15 @@ bool is_null(const char* v)
         return true;
 
     return false;
+}
+
+} // anonymous namespace
+
+
+Importer::Importer():
+    Quiet(false),
+    Separator(',')
+{
 }
 
 // Convert string to int64_t. Set can_fail = true if you also want to verify if your string was of that type. In this
@@ -400,7 +412,7 @@ vector<DataType> Importer::lowest_common(vector<DataType> types1, vector<DataTyp
         else if(types1[t] == type_Bool && types2[t] == type_Bool)
             res.push_back(type_Bool);
         else
-            assert(false);
+            TIGHTDB_ASSERT(false);
     }
     return res;
 }
@@ -664,7 +676,7 @@ size_t Importer::import_csv(FILE* file, Table& table, vector<DataType> *scheme2,
                 else if(scheme[col] == type_Bool)
                     table.set_bool(col, imported_rows, parse_bool<true>(payload[row][col].c_str(), &success));
                 else
-                    assert(false);
+                    TIGHTDB_ASSERT(false);
 
                 if(!success) {
                     // Remove all columns so that user can call csv_import() on it again

@@ -1,3 +1,10 @@
+libtightdb (0.4.0~@CODENAME@-1) UNRELEASED; urgency=low
+
+  * Tracking upstream release.
+
+ -- Emanuele Zattin <ez@tightdb.com>  Thu, 20 Mar 2014 10:21:26 +0100
+
+
 libtightdb (0.3.0~@CODENAME@-1) UNRELEASED; urgency=low
 
   * Tracking upstream release.

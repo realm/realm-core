@@ -740,6 +740,31 @@ SharedGroup::~SharedGroup() TIGHTDB_NOEXCEPT
     catch (...) {} // ignored on purpose
 }
 
+bool SharedGroup::pin_read_transactions()
+{
+    if (m_transactions_are_pinned) {
+        throw runtime_error("transactions are already pinned, cannot pin again");
+    }
+    if (m_transact_stage != transact_Ready) {
+        throw runtime_error("pinning transactions not allowed inside a transaction");
+    }
+    size_t last_version = m_version;
+    grab_readlock(m_pinned_top_ref, m_pinned_file_size);
+    m_transactions_are_pinned = true;
+    return last_version != m_version;
+}
+
+void SharedGroup::unpin_read_transactions()
+{
+    if (! m_transactions_are_pinned) {
+        throw runtime_error("transactions are not pinned, cannot unpin");
+    }
+    if (m_transact_stage != transact_Ready) {
+        throw runtime_error("unpinning transactions not allowed inside a transaction");
+    }
+    m_transactions_are_pinned = false;
+    release_readlock();
+}
 
 bool SharedGroup::has_changed()
 {
@@ -891,6 +916,31 @@ void SharedGroup::do_async_commits()
 }
 #endif // _WIN32
 
+void SharedGroup::grab_readlock(ref_type& new_top_ref, size_t& new_file_size)
+{
+    // SharedInfo* info = m_file_map.get_addr();
+    do {
+        SharedInfo* r_info = m_reader_map.get_addr();
+        m_reader_idx = r_info->readers.last();
+        if (grow_reader_mapping(m_reader_idx)) {
+            
+            // remapping takes time, so retry with a fresh entry
+            continue;
+        }
+        const Ringbuffer::ReadCount& r = r_info->readers.get(m_reader_idx);
+        // if the entry is stale and has been cleared by the cleanup process,
+        // we need to start all over again. This is extremely unlikely, but possible.
+        if (! atomic_double_inc_if_even(r.count)) { // <-- most of the exec time spent here!
+            
+            continue;
+        }
+        m_version = r.version;
+        new_top_ref   = to_size_t(r.current_top);
+        new_file_size = to_size_t(r.filesize);
+        break;
+    } while (1);
+}
+
 const Group& SharedGroup::begin_read()
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Ready);
@@ -898,29 +948,14 @@ const Group& SharedGroup::begin_read()
     ref_type new_top_ref = 0;
     size_t new_file_size = 0;
 
-    {
-        // SharedInfo* info = m_file_map.get_addr();
-        do {
-            SharedInfo* r_info = m_reader_map.get_addr();
-            m_reader_idx = r_info->readers.last();
-            if (grow_reader_mapping(m_reader_idx)) {
+    if (m_transactions_are_pinned) {
 
-                // remapping takes time, so retry with a fresh entry
-                continue;
-            }
-            const Ringbuffer::ReadCount& r = r_info->readers.get(m_reader_idx);
-            // if the entry is stale and has been cleared by the cleanup process,
-            // we need to start all over again. This is extremely unlikely, but possible.
-            if (! atomic_double_inc_if_even(r.count)) { // <-- most of the exec time spent here!
+        new_top_ref   = m_pinned_top_ref;
+        new_file_size = m_pinned_file_size;
 
-                continue;
-            }
-            m_version = r.version;
-            new_top_ref   = to_size_t(r.current_top);
-            new_file_size = to_size_t(r.filesize);
-            break;
-        } while (1);
+    } else {
 
+        grab_readlock(new_top_ref, new_file_size);
     }
 
     m_transact_stage = transact_Reading;
@@ -937,6 +972,12 @@ const Group& SharedGroup::begin_read()
     return m_group;
 }
 
+void SharedGroup::release_readlock() TIGHTDB_NOEXCEPT
+{
+    SharedInfo* r_info = m_reader_map.get_addr();
+    const Ringbuffer::ReadCount& r = r_info->readers.get(m_reader_idx);
+    atomic_double_dec(r.count); // <-- most of the exec time spent here
+}
 
 void SharedGroup::end_read() TIGHTDB_NOEXCEPT
 {
@@ -946,10 +987,9 @@ void SharedGroup::end_read() TIGHTDB_NOEXCEPT
     TIGHTDB_ASSERT(m_transact_stage == transact_Reading);
     TIGHTDB_ASSERT(m_version != numeric_limits<size_t>::max());
 
+    if (! m_transactions_are_pinned)
     {
-        SharedInfo* r_info = m_reader_map.get_addr();
-        const Ringbuffer::ReadCount& r = r_info->readers.get(m_reader_idx);
-        atomic_double_dec(r.count); // <-- most of the exec time spent here
+        release_readlock();
     }
 
     m_group.detach();

@@ -229,6 +229,18 @@
     <ClCompile Include="src\tightdb\impl\output_stream.cpp">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="test\util\demangle.cpp">
+      <Filter>test\util</Filter>
+    </ClCompile>
+    <ClCompile Include="test\util\test_only.cpp">
+      <Filter>test\util</Filter>
+    </ClCompile>
+    <ClCompile Include="test\util\unit_test.cpp">
+      <Filter>test\util</Filter>
+    </ClCompile>
+    <ClCompile Include="test\util\wildcard.cpp">
+      <Filter>test\util</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\win32\pthread\pthread.h">
@@ -423,14 +435,8 @@
     <ClInclude Include="src\tightdb\query_expression.hpp">
       <Filter>src\include</Filter>
     </ClInclude>
-    <ClInclude Include="test\util\misc.hpp">
-      <Filter>test\util</Filter>
-    </ClInclude>
     <ClInclude Include="src\tightdb\array_blobs_big.hpp">
       <Filter>src\include</Filter>
-    </ClInclude>
-    <ClInclude Include="test\util\timer.hpp">
-      <Filter>test\util</Filter>
     </ClInclude>
     <ClInclude Include="src\tightdb\importer.hpp">
       <Filter>csv importer</Filter>

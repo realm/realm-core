@@ -1,6 +1,8 @@
 check_LIBRARIES = test-util.a
 
-test_util_a_SOURCES = demangle.cpp mem.cpp timer.cpp benchmark_results.cpp misc.cpp
+test_util_a_SOURCES = demangle.cpp mem.cpp timer.cpp benchmark_results.cpp wildcard.cpp \
+unit_test.cpp test_only.cpp misc.cpp
+
 test_util_a_LIBS = ../../src/tightdb/libtightdb.a
 
 ifeq ($(shell uname),Linux)

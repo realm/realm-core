@@ -1,14 +1,17 @@
-#include <UnitTest++.h>
 #include <tightdb/column.hpp>
-#include "../testsettings.hpp"
+
 #include "../util/number_names.hpp"
+#include "../util/unit_test.hpp"
+#include "../util/test_only.hpp"
+
+#include "../testsettings.hpp"
+
 #include "verified_string.hpp"
 
 #if TEST_DURATION > 0
 
+using namespace std;
 using namespace tightdb;
-
-std::string randstring(void);
 
 namespace {
 
@@ -23,16 +26,14 @@ uint64_t rand2(int bitwidth = 64)
     return i;
 }
 
-}
-
-std::string randstring(void)
+string randstring(void)
 {
     // If there are in the order of TIGHTDB_MAX_LIST_SIZE different strings, then we'll get a good
     // distribution btw. arrays with no matches and arrays with multiple matches, when
     // testing Find/FindAll
     int64_t t = (rand() % 100) * 100;
     size_t len = (rand() % 10) * 100 + 1;
-    std::string s;
+    string s;
     while (s.length() < len)
         s += test_util::number_name(t);
 
@@ -40,7 +41,9 @@ std::string randstring(void)
     return s;
 }
 
-TEST(ColumnString_monkeytest2)
+} // anonymous namespace
+
+TEST(Strings_Monkey2)
 {
     const uint64_t ITER = 16 * 5000 * TEST_DURATION * TEST_DURATION * TEST_DURATION;
     const uint64_t SEED = 123;
@@ -85,4 +88,4 @@ TEST(ColumnString_monkeytest2)
     res.destroy();
 }
 
-#endif
+#endif // TEST_DURATION > 0

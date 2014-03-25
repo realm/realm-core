@@ -3,47 +3,57 @@
 
 #include <vector>
 #include <algorithm>
-#include <UnitTest++.h>
+
 #include <tightdb/column.hpp>
-#include "testsettings.hpp"
+
+#include "util/unit_test.hpp"
+#include "util/test_only.hpp"
 
 using namespace tightdb;
 
 // Note: You can now temporarely declare unit tests with the ONLY(TestName) macro instead of TEST(TestName). This
 // will disable all unit tests except these. Remember to undo your temporary changes before committing.
 
+
+namespace {
+
 struct db_setup {
     static Column c;
 };
 
-// Pre-declare local functions
-
 Column db_setup::c;
 
-TEST_FIXTURE(db_setup, Column_IsEmpty)
+} // anonymous namespace
+
+
+TEST(Column_IsEmpty)
 {
+    Column& c = db_setup::c;
     CHECK_EQUAL(0U, c.size());
     CHECK(c.is_empty());
 }
 
-TEST_FIXTURE(db_setup, Column_Add0)
+TEST(Column_Add0)
 {
+    Column& c = db_setup::c;
     c.add(0);
     CHECK_EQUAL(0, c.get(0));
     CHECK_EQUAL(1U, c.size());
     CHECK(!c.is_empty());
 }
 
-TEST_FIXTURE(db_setup, Column_Add1)
+TEST(Column_Add1)
 {
+    Column& c = db_setup::c;
     c.add(1);
     CHECK_EQUAL(0, c.get(0));
     CHECK_EQUAL(1, c.get(1));
     CHECK_EQUAL(2U, c.size());
 }
 
-TEST_FIXTURE(db_setup, Column_Add2)
+TEST(Column_Add2)
 {
+    Column& c = db_setup::c;
     c.add(2);
     CHECK_EQUAL(0, c.get(0));
     CHECK_EQUAL(1, c.get(1));
@@ -51,8 +61,9 @@ TEST_FIXTURE(db_setup, Column_Add2)
     CHECK_EQUAL(3U, c.size());
 }
 
-TEST_FIXTURE(db_setup, Column_Add3)
+TEST(Column_Add3)
 {
+    Column& c = db_setup::c;
     c.add(3);
     CHECK_EQUAL(0, c.get(0));
     CHECK_EQUAL(1, c.get(1));
@@ -61,8 +72,9 @@ TEST_FIXTURE(db_setup, Column_Add3)
     CHECK_EQUAL(4U, c.size());
 }
 
-TEST_FIXTURE(db_setup, Column_Add4)
+TEST(Column_Add4)
 {
+    Column& c = db_setup::c;
     c.add(4);
     CHECK_EQUAL(0, c.get(0));
     CHECK_EQUAL(1, c.get(1));
@@ -72,8 +84,9 @@ TEST_FIXTURE(db_setup, Column_Add4)
     CHECK_EQUAL(5U, c.size());
 }
 
-TEST_FIXTURE(db_setup, Column_Add5)
+TEST(Column_Add5)
 {
+    Column& c = db_setup::c;
     c.add(16);
     CHECK_EQUAL(0,  c.get(0));
     CHECK_EQUAL(1,  c.get(1));
@@ -84,8 +97,9 @@ TEST_FIXTURE(db_setup, Column_Add5)
     CHECK_EQUAL(6U, c.size());
 }
 
-TEST_FIXTURE(db_setup, Column_Add6)
+TEST(Column_Add6)
 {
+    Column& c = db_setup::c;
     c.add(256);
     CHECK_EQUAL(0,   c.get(0));
     CHECK_EQUAL(1,   c.get(1));
@@ -97,8 +111,9 @@ TEST_FIXTURE(db_setup, Column_Add6)
     CHECK_EQUAL(7U, c.size());
 }
 
-TEST_FIXTURE(db_setup, Column_Add7)
+TEST(Column_Add7)
 {
+    Column& c = db_setup::c;
     c.add(65536);
     CHECK_EQUAL(0,     c.get(0));
     CHECK_EQUAL(1,     c.get(1));
@@ -111,8 +126,9 @@ TEST_FIXTURE(db_setup, Column_Add7)
     CHECK_EQUAL(8U, c.size());
 }
 
-TEST_FIXTURE(db_setup, Column_Add8)
+TEST(Column_Add8)
 {
+    Column& c = db_setup::c;
     c.add(4294967296LL);
     CHECK_EQUAL(0,            c.get(0));
     CHECK_EQUAL(1,            c.get(1));
@@ -126,17 +142,21 @@ TEST_FIXTURE(db_setup, Column_Add8)
     CHECK_EQUAL(9U, c.size());
 }
 
-TEST_FIXTURE(db_setup, Column_AddNeg1)
+TEST(Column_AddNeg1)
 {
+    Column& c = db_setup::c;
     c.clear();
+
     c.add(-1);
 
     CHECK_EQUAL(1U, c.size());
     CHECK_EQUAL(-1, c.get(0));
 }
 
-TEST_FIXTURE(db_setup, Column_AddNeg2)
+TEST(Column_AddNeg2)
 {
+    Column& c = db_setup::c;
+
     c.add(-256);
 
     CHECK_EQUAL(2U, c.size());
@@ -144,8 +164,10 @@ TEST_FIXTURE(db_setup, Column_AddNeg2)
     CHECK_EQUAL(-256, c.get(1));
 }
 
-TEST_FIXTURE(db_setup, Column_AddNeg3)
+TEST(Column_AddNeg3)
 {
+    Column& c = db_setup::c;
+
     c.add(-65536);
 
     CHECK_EQUAL(3U, c.size());
@@ -154,8 +176,10 @@ TEST_FIXTURE(db_setup, Column_AddNeg3)
     CHECK_EQUAL(-65536, c.get(2));
 }
 
-TEST_FIXTURE(db_setup, Column_AddNeg4)
+TEST(Column_AddNeg4)
 {
+    Column& c = db_setup::c;
+
     c.add(-4294967296LL);
 
     CHECK_EQUAL(4U, c.size());
@@ -165,8 +189,10 @@ TEST_FIXTURE(db_setup, Column_AddNeg4)
     CHECK_EQUAL(-4294967296LL, c.get(3));
 }
 
-TEST_FIXTURE(db_setup, Column_Set)
+TEST(Column_Set)
 {
+    Column& c = db_setup::c;
+
     c.set(0, 3);
     c.set(1, 2);
     c.set(2, 1);
@@ -179,8 +205,10 @@ TEST_FIXTURE(db_setup, Column_Set)
     CHECK_EQUAL(0, c.get(3));
 }
 
-TEST_FIXTURE(db_setup, Column_Insert1)
+TEST(Column_Insert1)
 {
+    Column& c = db_setup::c;
+
     // Set up some initial values
     c.clear();
     c.add(0);
@@ -199,8 +227,10 @@ TEST_FIXTURE(db_setup, Column_Insert1)
     CHECK_EQUAL(3,  c.get(4));
 }
 
-TEST_FIXTURE(db_setup, Column_Insert2)
+TEST(Column_Insert2)
 {
+    Column& c = db_setup::c;
+
     // Insert at top
     c.insert(0, 256);
 
@@ -213,8 +243,10 @@ TEST_FIXTURE(db_setup, Column_Insert2)
     CHECK_EQUAL(3,   c.get(5));
 }
 
-TEST_FIXTURE(db_setup, Column_Insert3)
+TEST(Column_Insert3)
 {
+    Column& c = db_setup::c;
+
     // Insert at bottom
     c.insert(6, 65536);
 
@@ -229,8 +261,10 @@ TEST_FIXTURE(db_setup, Column_Insert3)
 }
 
 /*
-TEST_FIXTURE(db_setup, Column_Index1)
+TEST(Column_Index1)
 {
+    Column& c = db_setup::c;
+
     // Create index
     Column index;
     c.BuildIndex(index);
@@ -247,8 +281,10 @@ TEST_FIXTURE(db_setup, Column_Index1)
 }
 */
 
-TEST_FIXTURE(db_setup, Column_Delete1)
+TEST(Column_Delete1)
 {
+    Column& c = db_setup::c;
+
     // Delete from middle
     c.erase(3, 3 == c.size()-1);
 
@@ -261,8 +297,10 @@ TEST_FIXTURE(db_setup, Column_Delete1)
     CHECK_EQUAL(65536, c.get(5));
 }
 
-TEST_FIXTURE(db_setup, Column_Delete2)
+TEST(Column_Delete2)
 {
+    Column& c = db_setup::c;
+
     // Delete from top
     c.erase(0, 0 == c.size()-1);
 
@@ -274,8 +312,10 @@ TEST_FIXTURE(db_setup, Column_Delete2)
     CHECK_EQUAL(65536, c.get(4));
 }
 
-TEST_FIXTURE(db_setup, Column_Delete3)
+TEST(Column_Delete3)
 {
+    Column& c = db_setup::c;
+
     // Delete from bottom
     c.erase(4, 4 == c.size()-1);
 
@@ -286,8 +326,10 @@ TEST_FIXTURE(db_setup, Column_Delete3)
     CHECK_EQUAL(3, c.get(3));
 }
 
-TEST_FIXTURE(db_setup, Column_DeleteAll)
+TEST(Column_DeleteAll)
 {
+    Column& c = db_setup::c;
+
     // Delete all items one at a time
     c.erase(0, 0 == c.size()-1);
     c.erase(0, 0 == c.size()-1);
@@ -299,16 +341,20 @@ TEST_FIXTURE(db_setup, Column_DeleteAll)
 }
 
 
-TEST_FIXTURE(db_setup, Column_Find1)
+TEST(Column_Find1)
 {
+    Column& c = db_setup::c;
+
     // Look for a non-existing value
     size_t res = c.find_first(10);
 
-    CHECK_EQUAL(-1, res);
+    CHECK_EQUAL(size_t(-1), res);
 }
 
-TEST_FIXTURE(db_setup, Column_Find2)
+TEST(Column_Find2)
 {
+    Column& c = db_setup::c;
+
     // zero-bit width
     c.clear();
     c.add(0);
@@ -318,8 +364,10 @@ TEST_FIXTURE(db_setup, Column_Find2)
     CHECK_EQUAL(0, res);
 }
 
-TEST_FIXTURE(db_setup, Column_Find3)
+TEST(Column_Find3)
 {
+    Column& c = db_setup::c;
+
     // expand to 1-bit width
     c.add(1);
 
@@ -327,8 +375,10 @@ TEST_FIXTURE(db_setup, Column_Find3)
     CHECK_EQUAL(2, res);
 }
 
-TEST_FIXTURE(db_setup, Column_Find4)
+TEST(Column_Find4)
 {
+    Column& c = db_setup::c;
+
     // expand to 2-bit width
     c.add(2);
 
@@ -336,8 +386,10 @@ TEST_FIXTURE(db_setup, Column_Find4)
     CHECK_EQUAL(3, res);
 }
 
-TEST_FIXTURE(db_setup, Column_Find5)
+TEST(Column_Find5)
 {
+    Column& c = db_setup::c;
+
     // expand to 4-bit width
     c.add(4);
 
@@ -345,8 +397,10 @@ TEST_FIXTURE(db_setup, Column_Find5)
     CHECK_EQUAL(4, res);
 }
 
-TEST_FIXTURE(db_setup, Column_Find6)
+TEST(Column_Find6)
 {
+    Column& c = db_setup::c;
+
     // expand to 8-bit width
     c.add(16);
 
@@ -359,8 +413,10 @@ TEST_FIXTURE(db_setup, Column_Find6)
     CHECK_EQUAL(7, res);
 }
 
-TEST_FIXTURE(db_setup, Column_Find7)
+TEST(Column_Find7)
 {
+    Column& c = db_setup::c;
+
     // expand to 16-bit width
     c.add(256);
 
@@ -368,8 +424,10 @@ TEST_FIXTURE(db_setup, Column_Find7)
     CHECK_EQUAL(8, res);
 }
 
-TEST_FIXTURE(db_setup, Column_Find8)
+TEST(Column_Find8)
 {
+    Column& c = db_setup::c;
+
     // expand to 32-bit width
     c.add(65536);
 
@@ -377,8 +435,10 @@ TEST_FIXTURE(db_setup, Column_Find8)
     CHECK_EQUAL(9, res);
 }
 
-TEST_FIXTURE(db_setup, Column_Find9)
+TEST(Column_Find9)
 {
+    Column& c = db_setup::c;
+
     // expand to 64-bit width
     c.add(4294967296LL);
 
@@ -386,7 +446,7 @@ TEST_FIXTURE(db_setup, Column_Find9)
     CHECK_EQUAL(10, res);
 }
 
-TEST_FIXTURE(db_setup, Column_FindLeafs)
+TEST(Column_FindLeafs)
 {
     Column a;
 
@@ -435,8 +495,9 @@ TEST_FIXTURE(db_setup, Column_FindLeafs)
 
 /* Partial find is not fully implemented yet
 #define PARTIAL_COUNT 100
-TEST_FIXTURE(db_setup, Column_PartialFind1)
+TEST(Column_PartialFind1)
 {
+    Column& c = db_setup::c;
     c.clear();
 
     for (size_t i = 0; i < PARTIAL_COUNT; ++i)
@@ -448,15 +509,19 @@ TEST_FIXTURE(db_setup, Column_PartialFind1)
 }
 */
 
-TEST_FIXTURE(db_setup, Column_HeaderParse)
+TEST(Column_HeaderParse)
 {
+    Column& c = db_setup::c;
+
     Column column(c.get_ref(), 0, 0);
     bool is_equal = c.compare_int(column);
     CHECK(is_equal);
 }
 
-TEST_FIXTURE(db_setup, Column_Destroy)
+TEST(Column_Destroy)
 {
+    Column& c = db_setup::c;
+
     // clean up (ALWAYS PUT THIS LAST)
     c.destroy();
 }
@@ -499,7 +564,7 @@ TEST(Column_Sort)
  *
  */
 
-TEST(Column_FindAll_IntMin)
+TEST(Column_FindAllIntMin)
 {
     Column c;
     Array r;
@@ -526,7 +591,7 @@ TEST(Column_FindAll_IntMin)
     r.destroy();
 }
 
-TEST(Column_FindAll_IntMax)
+TEST(Column_FindAllIntMax)
 {
     Column c;
     Array r;
@@ -612,7 +677,7 @@ TEST(Column_Average)
     c.destroy();
 }
 
-TEST(Column_Sum_Average)
+TEST(Column_SumAverage)
 {
     Column c;
     int64_t sum = 0;
@@ -752,7 +817,7 @@ TEST(Column_Sort2)
 
 #if TEST_DURATION > 0
 
-TEST(Column_prepend_many)
+TEST(Column_PrependMany)
 {
     // Test against a "Assertion failed: start < m_len, file src\Array.cpp, line 276" bug
     Column a;

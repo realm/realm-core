@@ -1,5 +1,3 @@
-
-
 #ifndef TESTSETTINGS_H
 #define TESTSETTINGS_H
 

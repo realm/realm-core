@@ -14,7 +14,7 @@ TIGHTDB_TABLE_4(People,
                 hired, Bool,
                 phones, Subtable<Phones>)
 
-int main(int argc, char *argv[]) {
+int main(int, char*[]) {
 
     People t;
 
