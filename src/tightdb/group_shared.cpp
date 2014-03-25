@@ -536,7 +536,20 @@ bool SharedGroup::pin_read_transactions()
         throw runtime_error("pinning transactions not allowed inside a transaction");
     }
     bool same_as_before;
-    grab_readlock(m_pinned_top_ref, m_pinned_file_size, same_as_before);
+    ref_type pinned_top_ref;
+    size_t pinned_file_size;
+    grab_readlock(pinned_top_ref, pinned_file_size, same_as_before);
+
+    // Make sure the group is up-to-date.
+    // A zero ref means that the file has just been created.
+    try {
+        m_group.update_from_shared(pinned_top_ref, pinned_file_size); // Throws
+    }
+    catch (...) {
+        end_read();
+        throw;
+    }
+    m_group.detach_but_retain_data();
     m_transactions_are_pinned = true;
     return !same_as_before;
 }
@@ -744,31 +757,33 @@ const Group& SharedGroup::begin_read()
 
     ref_type new_top_ref = 0;
     size_t new_file_size = 0;
-    bool same_as_before;
+    bool same_version_as_before;
 
     if (m_transactions_are_pinned) {
 
-        new_top_ref   = m_pinned_top_ref;
-        new_file_size = m_pinned_file_size;
+        m_group.reattach_from_retained_data();
 
     } 
     else {
 
-        grab_readlock(new_top_ref, new_file_size, same_as_before);
-    }
+        grab_readlock(new_top_ref, new_file_size, same_version_as_before);
+        if (same_version_as_before && m_group.may_reattach_if_same_version()) {
 
+            m_group.reattach_from_retained_data();
+        }
+        else {
+            // Make sure the group is up-to-date.
+            // A zero ref means that the file has just been created.
+            try {
+                m_group.update_from_shared(new_top_ref, new_file_size); // Throws
+            }
+            catch (...) {
+                end_read();
+                throw;
+            }
+        }
+    }
     m_transact_stage = transact_Reading;
-
-    // Make sure the group is up-to-date.
-    // A zero ref means that the file has just been created.
-    try {
-        m_group.update_from_shared(new_top_ref, new_file_size, 
-                                   same_as_before || m_transactions_are_pinned); // Throws
-    }
-    catch (...) {
-        end_read();
-        throw;
-    }
 
     return m_group;
 }
@@ -812,8 +827,7 @@ void SharedGroup::end_read() TIGHTDB_NOEXCEPT
     }
 
     // The read may have allocated some temporary state
-    // m_group.detach();
-    m_group.detach_but_retain();
+    m_group.detach_but_retain_data();
 
     m_transact_stage = transact_Ready;
 }

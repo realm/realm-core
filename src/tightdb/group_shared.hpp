@@ -246,8 +246,6 @@ private:
     };
     TransactStage m_transact_stage;
     bool m_transactions_are_pinned;
-    ref_type m_pinned_top_ref;
-    size_t m_pinned_file_size;
     struct ReadCount;
 
     // Ring buffer managment

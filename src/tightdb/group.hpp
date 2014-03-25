@@ -331,9 +331,11 @@ private:
 
     void init_array_parents() TIGHTDB_NOEXCEPT;
     void detach() TIGHTDB_NOEXCEPT;
-    void detach_but_retain() TIGHTDB_NOEXCEPT;
+    void detach_but_retain_data() TIGHTDB_NOEXCEPT;
     void complete_detach() TIGHTDB_NOEXCEPT;
     void init_shared();
+    void reattach_from_retained_data();
+    inline bool may_reattach_if_same_version() { return m_top.is_attached(); }
 
     /// Recursively update refs stored in all cached array
     /// accessors. This includes cached array accessors in any
@@ -344,7 +346,7 @@ private:
     /// commits via shared group.
     void update_refs(ref_type top_ref, std::size_t old_baseline) TIGHTDB_NOEXCEPT;
 
-    void update_from_shared(ref_type new_top_ref, std::size_t new_file_size, bool same_version = false);
+    void update_from_shared(ref_type new_top_ref, std::size_t new_file_size);
 
     // Overriding method in ArrayParent
     void update_child_ref(std::size_t, ref_type) TIGHTDB_OVERRIDE;
