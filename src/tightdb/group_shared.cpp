@@ -821,8 +821,7 @@ void SharedGroup::end_read() TIGHTDB_NOEXCEPT
     TIGHTDB_ASSERT(m_transact_stage == transact_Reading);
     TIGHTDB_ASSERT(m_version != numeric_limits<size_t>::max());
 
-    if (! m_transactions_are_pinned)
-    {
+    if (! m_transactions_are_pinned) {
         release_readlock();
     }
 
