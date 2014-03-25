@@ -95,7 +95,9 @@ public:
     DateTime minimum_datetime(size_t column_ndx) const;
 
     // Sort the view according to the specified column and the
-    // specified direction.
+    // specified direction. IMPORTANT: Once you've sorted a view,
+    // it cannot be used in queries. Trying to do so will trigger
+    // a runtime exception.
     void sort(size_t column_ndx, bool ascending = true);
 
     // Simple pivot aggregate method. Experimental! Please do not
@@ -329,12 +331,12 @@ inline std::size_t TableViewBase::get_source_ndx(std::size_t row_ndx) const TIGH
 }
 
 inline TableViewBase::TableViewBase():
-    m_refs(Allocator::get_default()), m_is_in_index_order(false)
+    m_refs(Allocator::get_default()), m_is_in_index_order(true)
 {
 }
 
 inline TableViewBase::TableViewBase(Table* parent):
-    m_table(parent->get_table_ref()), m_is_in_index_order(false)
+    m_table(parent->get_table_ref()), m_is_in_index_order(true)
 {
     parent->register_view(this);
 }

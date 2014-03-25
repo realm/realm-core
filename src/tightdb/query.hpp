@@ -62,8 +62,8 @@ public:
     Expression* get_expression();
 
     // Conditions: Query only rows contained in tv
-    Query& tableview(const TableView& tv);
-    Query& tableview(const Array& arr, bool is_in_index_order = false);
+    Query& tableview(const TableView& tv); // throws
+    Query& tableview(const Array& arr, bool is_in_index_order = false); // throws
 
     // Conditions: int64_t
     Query& equal(size_t column_ndx, int64_t value);
