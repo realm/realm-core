@@ -530,10 +530,10 @@ SharedGroup::~SharedGroup() TIGHTDB_NOEXCEPT
 bool SharedGroup::pin_read_transactions()
 {
     if (m_transactions_are_pinned) {
-        throw runtime_error("transactions are already pinned, cannot pin again");
+        throw PinWhilePinned();
     }
     if (m_transact_stage != transact_Ready) {
-        throw runtime_error("pinning transactions not allowed inside a transaction");
+        throw PinOrUnpinInTransaction();
     }
     size_t last_version = m_version;
     grab_readlock(m_pinned_top_ref, m_pinned_file_size);
@@ -544,10 +544,10 @@ bool SharedGroup::pin_read_transactions()
 void SharedGroup::unpin_read_transactions()
 {
     if (! m_transactions_are_pinned) {
-        throw runtime_error("transactions are not pinned, cannot unpin");
+        throw UnpinWhileUnpinned();
     }
     if (m_transact_stage != transact_Ready) {
-        throw runtime_error("unpinning transactions not allowed inside a transaction");
+        throw PinOrUnpinInTransaction();
     }
     m_transactions_are_pinned = false;
     release_readlock();
