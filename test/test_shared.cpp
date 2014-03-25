@@ -1524,6 +1524,31 @@ TEST(Shared_StringIndexBug3)
 }
 
 
+TEST(Shared_ClearColumnWithBasicArrayRootLeaf)
+{
+    const char* path = "tightdb.tightdb";
+    File::try_remove(path);
+
+    {
+        SharedGroup sg(path);
+        WriteTransaction wt(sg);
+        TableRef test = wt.get_table("Test");
+        test->add_column(type_Double, "foo");
+        test->clear();
+        test->add_empty_row();
+        test->set_double(0, 0, 727.2);
+        wt.commit();
+    }
+
+    {
+        SharedGroup sg(path);
+        ReadTransaction rt(sg);
+        ConstTableRef test = rt.get_table("Test");
+        CHECK_EQUAL(727.2, test->get_double(0,0));
+    }
+}
+
+
 // disable shared async on windows
 #ifndef _WIN32
 // Todo. Keywords: winbug
