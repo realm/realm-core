@@ -535,10 +535,23 @@ bool SharedGroup::pin_read_transactions()
     if (m_transact_stage != transact_Ready) {
         throw runtime_error("pinning transactions not allowed inside a transaction");
     }
-    size_t last_version = m_version;
-    grab_readlock(m_pinned_top_ref, m_pinned_file_size);
+    bool same_as_before;
+    ref_type pinned_top_ref;
+    size_t pinned_file_size;
+    grab_readlock(pinned_top_ref, pinned_file_size, same_as_before);
+
+    // Make sure the group is up-to-date.
+    // A zero ref means that the file has just been created.
+    try {
+        m_group.update_from_shared(pinned_top_ref, pinned_file_size); // Throws
+    }
+    catch (...) {
+        end_read();
+        throw;
+    }
+    m_group.detach_but_retain_data();
     m_transactions_are_pinned = true;
-    return last_version != m_version;
+    return !same_as_before;
 }
 
 void SharedGroup::unpin_read_transactions()
@@ -706,7 +719,7 @@ void SharedGroup::do_async_commits()
 }
 #endif // _WIN32
 
-void SharedGroup::grab_readlock(ref_type& new_top_ref, size_t& new_file_size)
+void SharedGroup::grab_readlock(ref_type& new_top_ref, size_t& new_file_size, bool& same_as_before)
 {
     SharedInfo* info = m_file_map.get_addr();
     LockGuard lock(info->readmutex);
@@ -715,9 +728,11 @@ void SharedGroup::grab_readlock(ref_type& new_top_ref, size_t& new_file_size)
         m_reader_map.remap(m_file, util::File::access_ReadWrite, info->infosize); // Throws
 
     // Get the current top ref
-    new_top_ref   = to_size_t(info->current_top);
-    new_file_size = to_size_t(info->filesize);
-    m_version     = info->current_version.load_relaxed();
+    new_top_ref    = to_size_t(info->current_top);
+    new_file_size  = to_size_t(info->filesize);
+    size_t version = info->current_version.load_relaxed();
+    same_as_before = version == m_version;
+    m_version      = version;
 
     // Update reader list
     if (ringbuf_is_empty()) {
@@ -740,30 +755,35 @@ const Group& SharedGroup::begin_read()
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Ready);
 
-    ref_type new_top_ref = 0;
-    size_t new_file_size = 0;
-
     if (m_transactions_are_pinned) {
 
-        new_top_ref   = m_pinned_top_ref;
-        new_file_size = m_pinned_file_size;
+        m_group.reattach_from_retained_data();
 
-    } else {
+    } 
+    else {
 
-        grab_readlock(new_top_ref, new_file_size);
+        ref_type new_top_ref = 0;
+        size_t new_file_size = 0;
+        bool same_version_as_before;
+        grab_readlock(new_top_ref, new_file_size, same_version_as_before);
+
+        if (same_version_as_before && m_group.may_reattach_if_same_version()) {
+
+            m_group.reattach_from_retained_data();
+        }
+        else {
+            // Make sure the group is up-to-date.
+            // A zero ref means that the file has just been created.
+            try {
+                m_group.update_from_shared(new_top_ref, new_file_size); // Throws
+            }
+            catch (...) {
+                end_read();
+                throw;
+            }
+        }
     }
-
     m_transact_stage = transact_Reading;
-
-    // Make sure the group is up-to-date.
-    // A zero ref means that the file has just been created.
-    try {
-        m_group.update_from_shared(new_top_ref, new_file_size); // Throws
-    }
-    catch (...) {
-        end_read();
-        throw;
-    }
 
     return m_group;
 }
@@ -801,13 +821,12 @@ void SharedGroup::end_read() TIGHTDB_NOEXCEPT
     TIGHTDB_ASSERT(m_transact_stage == transact_Reading);
     TIGHTDB_ASSERT(m_version != numeric_limits<size_t>::max());
 
-    if (! m_transactions_are_pinned)
-    {
+    if (! m_transactions_are_pinned) {
         release_readlock();
     }
 
     // The read may have allocated some temporary state
-    m_group.detach();
+    m_group.detach_but_retain_data();
 
     m_transact_stage = transact_Ready;
 }

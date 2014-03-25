@@ -320,6 +320,7 @@ private:
     typedef std::vector<Table*> table_accessors;
     mutable table_accessors m_table_accessors;
     const bool m_is_shared;
+    bool m_is_attached;
     std::size_t m_readlock_version;
 
     struct shared_tag {};
@@ -330,7 +331,11 @@ private:
 
     void init_array_parents() TIGHTDB_NOEXCEPT;
     void detach() TIGHTDB_NOEXCEPT;
+    void detach_but_retain_data() TIGHTDB_NOEXCEPT;
+    void complete_detach() TIGHTDB_NOEXCEPT;
     void init_shared();
+    void reattach_from_retained_data();
+    inline bool may_reattach_if_same_version() { return m_top.is_attached(); }
 
     /// Recursively update refs stored in all cached array
     /// accessors. This includes cached array accessors in any
@@ -409,7 +414,7 @@ private:
 inline Group::Group():
     m_alloc(), // Throws
     m_top(m_alloc), m_tables(m_alloc), m_table_names(m_alloc), m_free_positions(m_alloc),
-    m_free_lengths(m_alloc), m_free_versions(m_alloc), m_is_shared(false)
+    m_free_lengths(m_alloc), m_free_versions(m_alloc), m_is_shared(false), m_is_attached(false)
 {
     init_array_parents();
     m_alloc.attach_empty(); // Throws
@@ -420,7 +425,7 @@ inline Group::Group():
 inline Group::Group(const std::string& file, OpenMode mode):
     m_alloc(), // Throws
     m_top(m_alloc), m_tables(m_alloc), m_table_names(m_alloc), m_free_positions(m_alloc),
-    m_free_lengths(m_alloc), m_free_versions(m_alloc), m_is_shared(false)
+    m_free_lengths(m_alloc), m_free_versions(m_alloc), m_is_shared(false), m_is_attached(false)
 {
     init_array_parents();
     open(file, mode); // Throws
@@ -429,7 +434,7 @@ inline Group::Group(const std::string& file, OpenMode mode):
 inline Group::Group(BinaryData buffer, bool take_ownership):
     m_alloc(), // Throws
     m_top(m_alloc), m_tables(m_alloc), m_table_names(m_alloc), m_free_positions(m_alloc),
-    m_free_lengths(m_alloc), m_free_versions(m_alloc), m_is_shared(false)
+    m_free_lengths(m_alloc), m_free_versions(m_alloc), m_is_shared(false), m_is_attached(false)
 {
     init_array_parents();
     open(buffer, take_ownership); // Throws
@@ -438,7 +443,7 @@ inline Group::Group(BinaryData buffer, bool take_ownership):
 inline Group::Group(unattached_tag) TIGHTDB_NOEXCEPT:
     m_alloc(), // Throws
     m_top(m_alloc), m_tables(m_alloc), m_table_names(m_alloc), m_free_positions(m_alloc),
-    m_free_lengths(m_alloc), m_free_versions(m_alloc), m_is_shared(false)
+    m_free_lengths(m_alloc), m_free_versions(m_alloc), m_is_shared(false), m_is_attached(false)
 {
     init_array_parents();
 }
@@ -446,7 +451,7 @@ inline Group::Group(unattached_tag) TIGHTDB_NOEXCEPT:
 inline Group::Group(shared_tag) TIGHTDB_NOEXCEPT:
     m_alloc(), // Throws
     m_top(m_alloc), m_tables(m_alloc), m_table_names(m_alloc), m_free_positions(m_alloc),
-    m_free_lengths(m_alloc), m_free_versions(m_alloc), m_is_shared(true)
+    m_free_lengths(m_alloc), m_free_versions(m_alloc), m_is_shared(true), m_is_attached(false)
 {
     init_array_parents();
 }
@@ -464,7 +469,7 @@ inline void Group::init_array_parents() TIGHTDB_NOEXCEPT
 
 inline bool Group::is_attached() const TIGHTDB_NOEXCEPT
 {
-    return m_top.is_attached();
+    return m_is_attached;
 }
 
 inline bool Group::is_empty() const TIGHTDB_NOEXCEPT
