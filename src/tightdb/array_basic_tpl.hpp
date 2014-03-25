@@ -211,6 +211,24 @@ void BasicArray<T>::erase(std::size_t ndx)
     set_header_size(m_size);
 }
 
+template<class T> void BasicArray<T>::truncate(std::size_t size)
+{
+    TIGHTDB_ASSERT(is_attached());
+    TIGHTDB_ASSERT(size <= m_size);
+
+    copy_on_write(); // Throws
+
+    // Update size in accessor and in header. This leaves the capacity
+    // unchanged.
+    m_size = size;
+    set_header_size(size);
+}
+
+template<class T> inline void BasicArray<T>::clear()
+{
+    truncate(0); // Throws
+}
+
 template<class T>
 bool BasicArray<T>::compare(const BasicArray<T>& a) const
 {

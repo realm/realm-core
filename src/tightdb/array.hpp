@@ -478,8 +478,8 @@ public:
     /// Reduce the size of this array to the specified number of
     /// elements. It is an error to specify a size that is greater
     /// than the current size of this array. The effect of doing so is
-    /// undefined. This is just a shorthand / for calling the ranged
-    /// erase() function with appropriate / arguments.
+    /// undefined. This is just a shorthand for calling the ranged
+    /// erase() function with appropriate arguments.
     ///
     /// Please note that this function does **not** destroy removed
     /// subarrays. See clear_and_destroy_children() for an
@@ -1526,7 +1526,7 @@ inline void Array::erase(std::size_t begin, std::size_t end)
 
 inline void Array::clear()
 {
-    truncate(0);
+    truncate(0); // Throws
 }
 
 inline void Array::clear_and_destroy_children()
