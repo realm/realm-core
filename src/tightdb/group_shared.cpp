@@ -750,10 +750,23 @@ bool SharedGroup::pin_read_transactions()
     if (m_transact_stage != transact_Ready) {
         throw runtime_error("pinning transactions not allowed inside a transaction");
     }
-    size_t last_version = m_version;
-    grab_readlock(m_pinned_top_ref, m_pinned_file_size);
+    bool same_as_before;
+    ref_type pinned_top_ref;
+    size_t pinned_file_size;
+    grab_readlock(pinned_top_ref, pinned_file_size, same_as_before);
+
+    // Make sure the group is up-to-date.
+    // A zero ref means that the file has just been created.
+    try {
+        m_group.update_from_shared(pinned_top_ref, pinned_file_size); // Throws
+    }
+    catch (...) {
+        end_read();
+        throw;
+    }
+    m_group.detach_but_retain_data();
     m_transactions_are_pinned = true;
-    return last_version != m_version;
+    return !same_as_before;
 }
 
 void SharedGroup::unpin_read_transactions()
@@ -918,9 +931,8 @@ void SharedGroup::do_async_commits()
 }
 #endif // _WIN32
 
-void SharedGroup::grab_readlock(ref_type& new_top_ref, size_t& new_file_size)
+void SharedGroup::grab_readlock(ref_type& new_top_ref, size_t& new_file_size, bool& same_as_before)
 {
-    // SharedInfo* info = m_file_map.get_addr();
     do {
         SharedInfo* r_info = m_reader_map.get_addr();
         m_reader_idx = r_info->readers.last();
@@ -936,10 +948,12 @@ void SharedGroup::grab_readlock(ref_type& new_top_ref, size_t& new_file_size)
             
             continue;
         }
-        m_version = r.version;
-        new_top_ref   = to_size_t(r.current_top);
-        new_file_size = to_size_t(r.filesize);
-        break;
+        same_as_before = m_version == r.version;
+        m_version      = r.version;
+        new_top_ref    = to_size_t(r.current_top);
+        new_file_size  = to_size_t(r.filesize);
+        return;
+
     } while (1);
 }
 
@@ -947,29 +961,35 @@ const Group& SharedGroup::begin_read()
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Ready);
 
-    ref_type new_top_ref = 0;
-    size_t new_file_size = 0;
-
     if (m_transactions_are_pinned) {
 
-        new_top_ref   = m_pinned_top_ref;
-        new_file_size = m_pinned_file_size;
+        m_group.reattach_from_retained_data();
 
-    } else {
+    } 
+    else {
 
-        grab_readlock(new_top_ref, new_file_size);
+        ref_type new_top_ref = 0;
+        size_t new_file_size = 0;
+        bool same_version_as_before;
+        grab_readlock(new_top_ref, new_file_size, same_version_as_before);
+
+        if (same_version_as_before && m_group.may_reattach_if_same_version()) {
+
+            m_group.reattach_from_retained_data();
+        }
+        else {
+            // Make sure the group is up-to-date.
+            // A zero ref means that the file has just been created.
+            try {
+                m_group.update_from_shared(new_top_ref, new_file_size); // Throws
+            }
+            catch (...) {
+                end_read();
+                throw;
+            }
+        }
     }
-
     m_transact_stage = transact_Reading;
-
-    // A zero ref means that the file has just been created.
-    try {
-        m_group.update_from_shared(new_top_ref, new_file_size); // Throws
-    }
-    catch (...) {
-        end_read();
-        throw;
-    }
 
     return m_group;
 }
@@ -989,12 +1009,12 @@ void SharedGroup::end_read() TIGHTDB_NOEXCEPT
     TIGHTDB_ASSERT(m_transact_stage == transact_Reading);
     TIGHTDB_ASSERT(m_version != numeric_limits<size_t>::max());
 
-    if (! m_transactions_are_pinned)
-    {
+    if (! m_transactions_are_pinned) {
         release_readlock();
     }
 
-    m_group.detach();
+    // The read may have allocated some temporary state
+    m_group.detach_but_retain_data();
     m_transact_stage = transact_Ready;
 }
 
@@ -1082,6 +1102,8 @@ void SharedGroup::commit()
     // downgrade to a read transaction (if not, assert in end_read)
     m_transact_stage = transact_Reading;
     end_read();
+    // complete detach (end_read allows group to retain data, but is becomes invalid after commit):
+    m_group.complete_detach();
     // Release write lock
     info->writemutex.unlock();
 }

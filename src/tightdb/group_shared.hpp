@@ -247,8 +247,6 @@ private:
     };
     TransactStage m_transact_stage;
     bool m_transactions_are_pinned;
-    ref_type m_pinned_top_ref;
-    size_t m_pinned_file_size;
     struct ReadCount;
 
     // Ring buffer managment
@@ -264,7 +262,7 @@ private:
     void        ringbuf_put(const ReadCount& v);
     void        ringbuf_expand();
 
-    void grab_readlock(ref_type& new_top_ref, size_t& new_file_size);
+    void grab_readlock(ref_type& new_top_ref, size_t& new_file_size, bool& same_as_before);
     void release_readlock() TIGHTDB_NOEXCEPT;
     void do_begin_write();
 

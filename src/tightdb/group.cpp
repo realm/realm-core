@@ -108,6 +108,7 @@ void Group::create(bool add_free_versions)
             size_t initial_database_version = 0; // A.k.a. transaction number
             m_top.add(1 + 2*initial_database_version); // Throws
         }
+        m_is_attached = true;
     }
     catch (...) {
         m_free_versions.destroy();
@@ -123,6 +124,8 @@ void Group::create(bool add_free_versions)
 
 void Group::init_from_ref(ref_type top_ref) TIGHTDB_NOEXCEPT
 {
+    TIGHTDB_ASSERT(!is_attached());
+
     m_top.init_from_ref(top_ref);
     size_t top_size = m_top.size();
     TIGHTDB_ASSERT(top_size >= 3);
@@ -131,6 +134,7 @@ void Group::init_from_ref(ref_type top_ref) TIGHTDB_NOEXCEPT
     ref_type tables_ref = m_top.get_as_ref(1);
     m_table_names.init_from_ref(names_ref);
     m_tables.init_from_ref(tables_ref);
+    m_is_attached = true;
 
     // Note that the third slot is the logical file size.
 
@@ -158,6 +162,8 @@ void Group::init_from_ref(ref_type top_ref) TIGHTDB_NOEXCEPT
 
 void Group::init_shared()
 {
+    TIGHTDB_ASSERT(m_top.is_attached());
+    TIGHTDB_ASSERT(m_is_attached);
     if (m_free_versions.is_attached()) {
         TIGHTDB_ASSERT(m_top.size() == 7);
         // If free space tracking is enabled
@@ -202,9 +208,11 @@ void Group::init_shared()
 
 Group::~Group() TIGHTDB_NOEXCEPT
 {
-    if (!is_attached())
+    if (!is_attached()) {
+        if (m_top.is_attached())
+            complete_detach();
         return;
-
+    }
     detach_table_accessors();
 
 #ifdef TIGHTDB_DEBUG
@@ -234,9 +242,19 @@ void Group::detach_table_accessors() TIGHTDB_NOEXCEPT
 
 void Group::detach() TIGHTDB_NOEXCEPT
 {
+    detach_but_retain_data();
+    complete_detach();
+}
+
+void Group::detach_but_retain_data() TIGHTDB_NOEXCEPT
+{
+    m_is_attached = false;
     detach_table_accessors();
     m_table_accessors.clear();
+}
 
+void Group::complete_detach() TIGHTDB_NOEXCEPT
+{
     m_top.detach();
     m_tables.detach();
     m_table_names.detach();
@@ -244,7 +262,6 @@ void Group::detach() TIGHTDB_NOEXCEPT
     m_free_lengths.detach();
     m_free_versions.detach();
 }
-
 
 Table* Group::get_table_by_ndx(size_t ndx)
 {
@@ -584,12 +601,22 @@ void Group::update_refs(ref_type top_ref, size_t old_baseline) TIGHTDB_NOEXCEPT
     }
 }
 
+void Group::reattach_from_retained_data()
+{
+    TIGHTDB_ASSERT(!is_attached());
+    TIGHTDB_ASSERT(m_top.is_attached());
+    m_is_attached = true;
+}
 
 void Group::update_from_shared(ref_type new_top_ref, size_t new_file_size)
 {
     TIGHTDB_ASSERT(new_top_ref < new_file_size);
     TIGHTDB_ASSERT(!is_attached());
 
+    if (m_top.is_attached()) {
+
+        complete_detach();
+    }
     // Make all managed memory beyond the attached file available
     // again.
     //
