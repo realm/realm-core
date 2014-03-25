@@ -501,7 +501,7 @@ EOF
         export TIGHTDB_HAVE_CONFIG="1"
         iphone_sdks_avail="$(get_config_param "IPHONE_SDKS_AVAIL")" || exit 1
         if [ "$iphone_sdks_avail" != "yes" ]; then
-            echo "ERROR: Required iPhone SDKs are not available!" 1>&2
+            echo "ERROR: Required iPhone SDKs are not available" 1>&2
             exit 1
         fi
         temp_dir="$(mktemp -d /tmp/tightdb.build-iphone.XXXX)" || exit 1
@@ -550,7 +550,7 @@ EOF
         android_ndk_home="$(get_config_param "ANDROID_NDK_HOME")" || exit 1
         if [ "$android_ndk_home" = "none" ]; then
             cat 1>&2 <<EOF
-ERROR: No Android NDK was found.
+ERROR: Android NDK was not found during configuration.
 Please do one of the following:
  * Install an NDK in /usr/local/android-ndk
  * Provide the path to the NDK in the environment variable ANDROID_NDK_HOME
@@ -558,9 +558,8 @@ Please do one of the following:
 EOF
             exit 1
         fi
-
+        export TIGHTDB_ANDROID="1"
         mkdir -p "$ANDROID_DIR" || exit 1
-
         for target in $ANDROID_PLATFORMS; do
             temp_dir="$(mktemp -d /tmp/tightdb.build-android.XXXX)" || exit 1
             if [ "$target" = "arm" ]; then
@@ -582,14 +581,14 @@ EOF
             fi
             path="$temp_dir/bin:$PATH"
             cc="$(cd "$temp_dir/bin" && echo $android_prefix-linux-*-gcc)" || exit 1
-            extra_cflags="-DANDROID -fPIC -DPIC"
+            cflags_arch=""
             if [ "$target" = "arm" ]; then
-                extra_cflags="$extra_cflags -mthumb"
+                word_list_append "cflags_arch" "-mthumb" || exit 1
             elif [ "$target" = "arm-v7a" ]; then
-                extra_cflags="$extra_cflags -mthumb -march=armv7-a -mfloat-abi=softfp -mfpu=vfpv3-d16"
+                word_list_append "cflags_arch" "-mthumb -march=armv7-a -mfloat-abi=softfp -mfpu=vfpv3-d16" || exit 1
             fi
             denom="android-$target"
-            PATH="$path" CC="$cc" $MAKE -C "src/tightdb" CC_IS="gcc" BASE_DENOM="$denom" CFLAGS_OPTIM="-Os -DNDEBUG" CFLAGS_ARCH="$extra_cflags" "libtightdb-$denom.a" || exit 1
+            PATH="$path" CC="$cc" $MAKE -C "src/tightdb" CC_IS="gcc" BASE_DENOM="$denom" CFLAGS_ARCH="$cflags_arch" "libtightdb-$denom.a" || exit 1
             cp "src/tightdb/libtightdb-$denom.a" "$ANDROID_DIR" || exit 1
             rm -rf "$temp_dir" || exit 1
         done
@@ -1472,7 +1471,7 @@ EOF
 #            if [ -e "$EXT_HOME/build.sh" ]; then
 #                echo ">>>>>>>> CHECKING AVAILABILITY OF '$x'"
 #                if sh "$EXT_HOME/build.sh" check-avail; then
-#                    echo "YES!"
+#                    echo 'YES!'
 #                fi
 #            fi
 #        done
@@ -1542,7 +1541,7 @@ EOF
                 fi
             fi
             if [ "$ERROR" ]; then
-                echo "Failed!" | tee -a "$LOG_FILE" 1>&2
+                echo 'Failed!' | tee -a "$LOG_FILE" 1>&2
             else
                 touch ".DIST_CORE_WAS_CONFIGURED" || exit 1
             fi
@@ -1592,7 +1591,7 @@ EOF
                         if sh "$EXT_HOME/build.sh" config $TIGHTDB_TEST_INSTALL_PREFIX >>"$LOG_FILE" 2>&1; then
                             touch "$EXT_HOME/.DIST_WAS_CONFIGURED" || exit 1
                         else
-                            echo "Failed!" | tee -a "$LOG_FILE" 1>&2
+                            echo 'Failed!' | tee -a "$LOG_FILE" 1>&2
                             ERROR="1"
                         fi
                     fi
@@ -1645,7 +1644,7 @@ EOF
         if ! [ "$PREBUILT_CORE" ]; then
             echo "CLEANING Core library" | tee -a "$LOG_FILE"
             if ! sh "build.sh" clean >>"$LOG_FILE" 2>&1; then
-                echo "Failed!" | tee -a "$LOG_FILE" 1>&2
+                echo 'Failed!' | tee -a "$LOG_FILE" 1>&2
                 ERROR="1"
             fi
         fi
@@ -1655,7 +1654,7 @@ EOF
                 echo "CLEANING Extension '$x'" | tee -a "$LOG_FILE"
                 rm -f "$EXT_HOME/.DIST_WAS_BUILT" || exit 1
                 if ! sh "$EXT_HOME/build.sh" clean >>"$LOG_FILE" 2>&1; then
-                    echo "Failed!" | tee -a "$LOG_FILE" 1>&2
+                    echo 'Failed!' | tee -a "$LOG_FILE" 1>&2
                     ERROR="1"
                 fi
             fi
@@ -1713,9 +1712,9 @@ EOF
                 touch ".DIST_CORE_WAS_BUILT" || exit 1
             else
                 if [ "$INTERACTIVE" ]; then
-                    echo "  > Failed!" | tee -a "$LOG_FILE"
+                    echo '  > Failed!' | tee -a "$LOG_FILE"
                 else
-                    echo "Failed!" | tee -a "$LOG_FILE" 1>&2
+                    echo 'Failed!' | tee -a "$LOG_FILE" 1>&2
                 fi
                 if ! [ "$TIGHTDB_DIST_NONINTERACTIVE" ]; then
                     cat 1>&2 <<EOF
@@ -1742,9 +1741,9 @@ EOF
                     touch "$EXT_HOME/.DIST_WAS_BUILT" || exit 1
                 else
                     if [ "$INTERACTIVE" ]; then
-                        echo "  > Failed!" | tee -a "$LOG_FILE"
+                        echo '  > Failed!' | tee -a "$LOG_FILE"
                     else
-                        echo "Failed!" | tee -a "$LOG_FILE" 1>&2
+                        echo 'Failed!' | tee -a "$LOG_FILE" 1>&2
                     fi
                     ERROR="1"
                 fi
@@ -1820,7 +1819,7 @@ EOF
             if sh "build.sh" build-iphone >>"$LOG_FILE" 2>&1; then
                 touch ".DIST_CORE_WAS_BUILT_FOR_IPHONE" || exit 1
             else
-                echo "Failed!" | tee -a "$LOG_FILE" 1>&2
+                echo 'Failed!' | tee -a "$LOG_FILE" 1>&2
                 if ! [ "$TIGHTDB_DIST_NONINTERACTIVE" ]; then
                     cat 1>&2 <<EOF
 
@@ -1846,7 +1845,7 @@ EOF
                     cp -R "$EXT_HOME/$IPHONE_DIR"/* "$dist_home/iphone-$x/" || exit 1
                     touch "$EXT_HOME/.DIST_WAS_BUILT_FOR_IPHONE" || exit 1
                 else
-                    echo "Failed!" | tee -a "$LOG_FILE" 1>&2
+                    echo 'Failed!' | tee -a "$LOG_FILE" 1>&2
                     ERROR="1"
                 fi
             fi
@@ -1915,7 +1914,7 @@ EOF
         if ! [ "$PREBUILT_CORE" ]; then
             printf "$test_msg\n" "Core library" | tee -a "$LOG_FILE"
             if ! sh "build.sh" "$test_mode" >>"$LOG_FILE" 2>&1; then
-                echo "Failed!" | tee -a "$LOG_FILE" 1>&2
+                echo 'Failed!' | tee -a "$LOG_FILE" 1>&2
                 ERROR="1"
             fi
         fi
@@ -1929,7 +1928,7 @@ EOF
             if [ -e "$EXT_HOME/.DIST_WAS_BUILT" ]; then
                 printf "$test_msg\n" "Extension '$x'" | tee -a "$LOG_FILE"
                 if ! sh "$EXT_HOME/build.sh" "$test_mode" >>"$LOG_FILE" 2>&1; then
-                    echo "Failed!" | tee -a "$LOG_FILE" 1>&2
+                    echo 'Failed!' | tee -a "$LOG_FILE" 1>&2
                     ERROR="1"
                 fi
             fi
@@ -1989,9 +1988,9 @@ EOF
                     NEED_USR_LOCAL_LIB_NOTE="$PLATFORM_HAS_LIBRARY_PATH_ISSUE"
                 else
                     if [ "$INTERACTIVE" ]; then
-                        echo "  > Failed!" | tee -a "$LOG_FILE"
+                        echo '  > Failed!' | tee -a "$LOG_FILE"
                     else
-                        echo "Failed!" | tee -a "$LOG_FILE" 1>&2
+                        echo 'Failed!' | tee -a "$LOG_FILE" 1>&2
                     fi
                     ERROR="1"
                 fi
@@ -2011,9 +2010,9 @@ EOF
                         fi
                     else
                         if [ "$INTERACTIVE" ]; then
-                            echo "  > Failed!" | tee -a "$LOG_FILE"
+                            echo '  > Failed!' | tee -a "$LOG_FILE"
                         else
-                            echo "Failed!" | tee -a "$LOG_FILE" 1>&2
+                            echo 'Failed!' | tee -a "$LOG_FILE" 1>&2
                         fi
                         ERROR="1"
                     fi
@@ -2045,7 +2044,7 @@ EOF
                 echo "DONE INSTALLING" | tee -a "$LOG_FILE"
             fi
         else
-            echo "Failed!" | tee -a "$LOG_FILE" 1>&2
+            echo 'Failed!' | tee -a "$LOG_FILE" 1>&2
             ERROR="1"
         fi
         if ! [ "$TIGHTDB_DIST_NONINTERACTIVE" ]; then
@@ -2103,7 +2102,7 @@ EOF
             if [ -e "$EXT_HOME/.DIST_WAS_CONFIGURED" ]; then
                 echo "UNINSTALLING Extension '$x'" | tee -a "$LOG_FILE"
                 if ! sh "$EXT_HOME/build.sh" uninstall >>"$LOG_FILE" 2>&1; then
-                    echo "Failed!" | tee -a "$LOG_FILE" 1>&2
+                    echo 'Failed!' | tee -a "$LOG_FILE" 1>&2
                     ERROR="1"
                 fi
                 rm -f "$EXT_HOME/.DIST_WAS_INSTALLED" || exit 1
@@ -2112,14 +2111,14 @@ EOF
         if [ -e ".DIST_CXX_WAS_CONFIGURED" ]; then
             echo "UNINSTALLING Extension 'c++'" | tee -a "$LOG_FILE"
             if ! sh build.sh uninstall-devel >>"$LOG_FILE" 2>&1; then
-                echo "Failed!" | tee -a "$LOG_FILE" 1>&2
+                echo 'Failed!' | tee -a "$LOG_FILE" 1>&2
                 ERROR="1"
             fi
             rm -f ".DIST_CXX_WAS_INSTALLED" || exit 1
         fi
         echo "UNINSTALLING Core library" | tee -a "$LOG_FILE"
         if ! sh build.sh uninstall-prod >>"$LOG_FILE" 2>&1; then
-            echo "Failed!" | tee -a "$LOG_FILE" 1>&2
+            echo 'Failed!' | tee -a "$LOG_FILE" 1>&2
             ERROR="1"
         fi
         rm -f ".DIST_CORE_WAS_INSTALLED" || exit 1
@@ -2162,9 +2161,9 @@ EOF
         if [ -e ".DIST_CXX_WAS_INSTALLED" ]; then
             echo "TESTING Installed extension 'c++'" | tee -a "$LOG_FILE"
             if sh build.sh test-installed >>"$LOG_FILE" 2>&1; then
-                echo "Success!" | tee -a "$LOG_FILE"
+                echo 'Success!' | tee -a "$LOG_FILE"
             else
-                echo "Failed!" | tee -a "$LOG_FILE" 1>&2
+                echo 'Failed!' | tee -a "$LOG_FILE" 1>&2
                 ERROR="1"
             fi
         fi
@@ -2173,9 +2172,9 @@ EOF
             if [ -e "$EXT_HOME/.DIST_WAS_INSTALLED" ]; then
                 echo "TESTING Installed extension '$x'" | tee -a "$LOG_FILE"
                 if sh "$EXT_HOME/build.sh" test-installed >>"$LOG_FILE" 2>&1; then
-                    echo "Success!" | tee -a "$LOG_FILE"
+                    echo 'Success!' | tee -a "$LOG_FILE"
                 else
-                    echo "Failed!" | tee -a "$LOG_FILE" 1>&2
+                    echo 'Failed!' | tee -a "$LOG_FILE" 1>&2
                     ERROR="1"
                 fi
             fi
