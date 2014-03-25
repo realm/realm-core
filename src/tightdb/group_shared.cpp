@@ -755,10 +755,6 @@ const Group& SharedGroup::begin_read()
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Ready);
 
-    ref_type new_top_ref = 0;
-    size_t new_file_size = 0;
-    bool same_version_as_before;
-
     if (m_transactions_are_pinned) {
 
         m_group.reattach_from_retained_data();
@@ -766,7 +762,11 @@ const Group& SharedGroup::begin_read()
     } 
     else {
 
+        ref_type new_top_ref = 0;
+        size_t new_file_size = 0;
+        bool same_version_as_before;
         grab_readlock(new_top_ref, new_file_size, same_version_as_before);
+
         if (same_version_as_before && m_group.may_reattach_if_same_version()) {
 
             m_group.reattach_from_retained_data();
