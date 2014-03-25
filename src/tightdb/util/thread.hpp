@@ -96,7 +96,8 @@ public:
     /// legal and will not cause any system resources to be leaked.
     Mutex(process_shared_tag);
 
-    class Lock;
+    friend class LockGuard;
+    friend class UniqueLock;
 
 protected:
     pthread_mutex_t m_impl;
@@ -119,15 +120,35 @@ protected:
 };
 
 
-/// A simple scoped lock on a mutex.
-class Mutex::Lock {
+/// A simple mutex ownership wrapper.
+class LockGuard {
 public:
-    Lock(Mutex& m) TIGHTDB_NOEXCEPT;
-    ~Lock() TIGHTDB_NOEXCEPT;
+    LockGuard(Mutex&) TIGHTDB_NOEXCEPT;
+    ~LockGuard() TIGHTDB_NOEXCEPT;
 
 private:
     Mutex& m_mutex;
     friend class CondVar;
+};
+
+
+/// See UniqueLock.
+struct defer_lock_tag {};
+
+/// A general-purpose mutex ownership wrapper supporting deferred
+/// locking as well as repeated unlocking and relocking.
+class UniqueLock {
+public:
+    UniqueLock(Mutex&) TIGHTDB_NOEXCEPT;
+    UniqueLock(Mutex&, defer_lock_tag) TIGHTDB_NOEXCEPT;
+    ~UniqueLock() TIGHTDB_NOEXCEPT;
+
+    void lock() TIGHTDB_NOEXCEPT;
+    void unlock() TIGHTDB_NOEXCEPT;
+
+private:
+    Mutex* m_mutex;
+    bool m_is_locked;
 };
 
 
@@ -224,7 +245,7 @@ public:
     CondVar(process_shared_tag);
 
     /// Wait for another thread to call notify() or notify_all().
-    void wait(Mutex::Lock& l) TIGHTDB_NOEXCEPT;
+    void wait(LockGuard& l) TIGHTDB_NOEXCEPT;
     template<class Func>
     void wait(RobustMutex& m, Func recover_func, const struct timespec* tp = 0);
 
@@ -344,18 +365,53 @@ inline void Mutex::unlock() TIGHTDB_NOEXCEPT
 }
 
 
-inline Mutex::Lock::Lock(Mutex& m) TIGHTDB_NOEXCEPT: m_mutex(m)
+inline LockGuard::LockGuard(Mutex& m) TIGHTDB_NOEXCEPT:
+    m_mutex(m)
 {
     m_mutex.lock();
 }
 
-inline Mutex::Lock::~Lock() TIGHTDB_NOEXCEPT
+inline LockGuard::~LockGuard() TIGHTDB_NOEXCEPT
 {
     m_mutex.unlock();
 }
 
 
-inline RobustMutex::RobustMutex(): Mutex(no_init_tag())
+inline UniqueLock::UniqueLock(Mutex& m) TIGHTDB_NOEXCEPT:
+    m_mutex(&m)
+{
+    m_mutex->lock();
+    m_is_locked = true;
+}
+
+inline UniqueLock::UniqueLock(Mutex& m, defer_lock_tag) TIGHTDB_NOEXCEPT:
+    m_mutex(&m)
+{
+    m_is_locked = false;
+}
+
+inline UniqueLock::~UniqueLock() TIGHTDB_NOEXCEPT
+{
+    if (m_is_locked)
+        m_mutex->unlock();
+}
+
+inline void UniqueLock::lock() TIGHTDB_NOEXCEPT
+{
+    m_mutex->lock();
+    m_is_locked = true;
+}
+
+inline void UniqueLock::unlock() TIGHTDB_NOEXCEPT
+{
+    m_mutex->unlock();
+    m_is_locked = false;
+}
+
+
+
+inline RobustMutex::RobustMutex():
+    Mutex(no_init_tag())
 {
     bool robust_if_available = true;
     init_as_process_shared(robust_if_available);
@@ -408,7 +464,7 @@ inline CondVar::~CondVar() TIGHTDB_NOEXCEPT
         destroy_failed(r);
 }
 
-inline void CondVar::wait(Mutex::Lock& l) TIGHTDB_NOEXCEPT
+inline void CondVar::wait(LockGuard& l) TIGHTDB_NOEXCEPT
 {
     int r = pthread_cond_wait(&m_impl, &l.m_mutex.m_impl);
     if (TIGHTDB_UNLIKELY(r != 0))

@@ -33,9 +33,9 @@ namespace util {
 
 /// Perform integral or floating-point promotion on the argument. This
 /// is useful for example when printing a number of arbitrary numeric
-/// type to 'stdout', since it will converto character-like types to
-/// regular integer types that will then be printed as numbers rather
-/// characters.
+/// type to 'stdout', since it will convert values of character-like
+/// types to regular integer types, which will then be printed as
+/// numbers rather characters.
 template<class T> typename Promote<T>::type promote(T value) TIGHTDB_NOEXCEPT;
 
 

@@ -1,38 +1,45 @@
 #include "testsettings.hpp"
 #ifdef TEST_ARRAY_FLOAT
 
-#include <UnitTest++.h>
 #include <tightdb/array_basic.hpp>
 #include <tightdb/column.hpp>
 
-template <typename T, size_t N> inline
-size_t SizeOfArray( const T(&)[ N ] )
-{
-  return N;
-}
+#include "util/unit_test.hpp"
+#include "util/test_only.hpp"
 
 using namespace tightdb;
+
+
+namespace {
+
+template<class T, size_t N> inline size_t size_of_array(T(&)[N])
+{
+    return N;
+}
 
 // Article about comparing floats:
 // http://randomascii.wordpress.com/2012/02/25/comparing-floating-point-numbers-2012-edition/
 
-namespace {
-float floatVal[] = {0.0f,
-                   1.0f,
-                   2.12345f,
-                   12345.12f,
-                   -12345.12f
-                  };
-const size_t floatValLen = SizeOfArray(floatVal);
+float float_val[] = {
+    0.0f,
+    1.0f,
+    2.12345f,
+    12345.12f,
+    -12345.12f
+};
+const size_t float_val_len = size_of_array(float_val);
 
-double doubleVal[] = {0.0,
-                      1.0,
-                      2.12345,
-                      12345.12,
-                      -12345.12
-                     };
-const size_t doubleValLen = SizeOfArray(doubleVal);
-}
+double double_val[] = {
+    0.0,
+    1.0,
+    2.12345,
+    12345.12,
+    -12345.12
+};
+const size_t double_val_len = size_of_array(double_val);
+
+} // anonymous namespace
+
 
 // TODO: Add test of full range of floats.
 
@@ -55,8 +62,8 @@ void BasicArray_AddGet(T val[], size_t valLen)
 
     f.destroy();    // cleanup
 }
-TEST(ArrayFloat_AddGet) { BasicArray_AddGet<ArrayFloat, float>(floatVal, floatValLen); }
-TEST(ArrayDouble_AddGet){ BasicArray_AddGet<ArrayDouble, double>(doubleVal, doubleValLen); }
+TEST(ArrayFloat_AddGet) { BasicArray_AddGet<ArrayFloat, float>(float_val, float_val_len); }
+TEST(ArrayDouble_AddGet){ BasicArray_AddGet<ArrayDouble, double>(double_val, double_val_len); }
 
 
 template <class C, typename T>
@@ -146,8 +153,8 @@ void BasicArray_Set(T val[], size_t valLen)
 
     f.destroy();    // cleanup
 }
-TEST(ArrayFloat_Set) { BasicArray_Set<ArrayFloat, float>(floatVal, floatValLen); }
-TEST(ArrayDouble_Set){ BasicArray_Set<ArrayDouble, double>(doubleVal, doubleValLen); }
+TEST(ArrayFloat_Set) { BasicArray_Set<ArrayFloat, float>(float_val, float_val_len); }
+TEST(ArrayDouble_Set){ BasicArray_Set<ArrayDouble, double>(double_val, double_val_len); }
 
 
 template <class C, typename T>
@@ -225,7 +232,7 @@ template <class C, typename T>
 void BasicArray_Minimum()
 {
     C f;
-    T res;
+    T res = T();
 
     CHECK_EQUAL(false, f.minimum(res));
 
@@ -261,7 +268,7 @@ template <class C, typename T>
 void BasicArray_Maximum()
 {
     C f;
-    T res;
+    T res = T();
 
     CHECK_EQUAL(false, f.maximum(res));
 
@@ -299,13 +306,12 @@ void BasicArray_Find()
     C f;
 
     // Empty list
-    CHECK_EQUAL(-1, f.find_first(0));
+    CHECK_EQUAL(size_t(-1), f.find_first(0));
 
     // Add some values
-    T values[] = { T(1.1), T(2.2), T(-1.0), T(5.5), T(1.1), T(4.4)};
-    for (size_t i=0; i<6; ++i) {
+    T values[] = { T(1.1), T(2.2), T(-1.0), T(5.5), T(1.1), T(4.4) };
+    for (size_t i=0; i<6; ++i)
         f.add(values[i]);
-    }
 
     // Find (full range: start=0, end=-1)
     CHECK_EQUAL(0, f.find_first(T(1.1)));
@@ -313,15 +319,15 @@ void BasicArray_Find()
     CHECK_EQUAL(2, f.find_first(T(-1.0)));
 
     // non-existing
-    CHECK_EQUAL(-1, f.find_first(T(0)));
+    CHECK_EQUAL(size_t(-1), f.find_first(T(0)));
 
     // various range limitations
-    CHECK_EQUAL( 1, f.find_first(T(2.2), 1, 2));    // ok
-    CHECK_EQUAL( 1, f.find_first(T(2.2), 1, 3));
-    CHECK_EQUAL( 5, f.find_first(T(4.4), 1));       // defaul end=all
-    CHECK_EQUAL(-1, f.find_first(T(2.2), 1, 1));    // start=end
-    CHECK_EQUAL(-1, f.find_first(T(1.1), 1, 4));    // no match .end 1 too little
-    CHECK_EQUAL( 4, f.find_first(T(1.1), 1, 5));    // skip first match, end at last match
+    CHECK_EQUAL(1,          f.find_first(T(2.2), 1, 2));    // ok
+    CHECK_EQUAL(1,          f.find_first(T(2.2), 1, 3));
+    CHECK_EQUAL(5,          f.find_first(T(4.4), 1));       // defaul end=all
+    CHECK_EQUAL(size_t(-1), f.find_first(T(2.2), 1, 1));    // start=end
+    CHECK_EQUAL(size_t(-1), f.find_first(T(1.1), 1, 4));    // no match .end 1 too little
+    CHECK_EQUAL(4,          f.find_first(T(1.1), 1, 5));    // skip first match, end at last match
 
     // Find all
     Array resArr;

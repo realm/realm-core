@@ -1,13 +1,18 @@
 #include "testsettings.hpp"
 #ifdef TEST_ARRAY_STRING_LONG
 
-#include <UnitTest++.h>
 #include <tightdb/array_string_long.hpp>
+
+#include "util/unit_test.hpp"
+#include "util/test_only.hpp"
 
 using namespace tightdb;
 
 // Note: You can now temporarely declare unit tests with the ONLY(TestName) macro instead of TEST(TestName). This
 // will disable all unit tests except these. Remember to undo your temporary changes before committing.
+
+
+namespace {
 
 struct db_setup_string_long {
     static ArrayStringLong c;
@@ -15,8 +20,13 @@ struct db_setup_string_long {
 
 ArrayStringLong db_setup_string_long::c;
 
-TEST_FIXTURE(db_setup_string_long, ArrayStringLongMultiEmpty)
+} // anonymous namespace
+
+
+TEST(ArrayStringLong_MultiEmpty)
 {
+    ArrayStringLong& c = db_setup_string_long::c;
+
     c.add("");
     c.add("");
     c.add("");
@@ -33,8 +43,10 @@ TEST_FIXTURE(db_setup_string_long, ArrayStringLongMultiEmpty)
     CHECK_EQUAL("", c.get(5));
 }
 
-TEST_FIXTURE(db_setup_string_long, ArrayStringLongSet)
+TEST(ArrayStringLong_Set)
 {
+    ArrayStringLong& c = db_setup_string_long::c;
+
     c.set(0, "hey");
 
     CHECK_EQUAL(6, c.size());
@@ -46,9 +58,11 @@ TEST_FIXTURE(db_setup_string_long, ArrayStringLongSet)
     CHECK_EQUAL("", c.get(5));
 }
 
-TEST_FIXTURE(db_setup_string_long, ArrayStringLongAdd)
+TEST(ArrayStringLong_Add)
 {
+    ArrayStringLong& c = db_setup_string_long::c;
     c.clear();
+
     CHECK_EQUAL(0, c.size());
 
     c.add("abc");
@@ -61,8 +75,10 @@ TEST_FIXTURE(db_setup_string_long, ArrayStringLongAdd)
     CHECK_EQUAL(2, c.size());
 }
 
-TEST_FIXTURE(db_setup_string_long, ArrayStringLongSet2)
+TEST(ArrayStringLong_Set2)
 {
+    ArrayStringLong& c = db_setup_string_long::c;
+
     // {shrink, grow} x {first, middle, last, single}
     c.clear();
 
@@ -117,8 +133,9 @@ TEST_FIXTURE(db_setup_string_long, ArrayStringLongSet2)
 }
 
 
-TEST_FIXTURE(db_setup_string_long, ArrayStringLongInsert)
+TEST(ArrayStringLong_Insert)
 {
+    ArrayStringLong& c = db_setup_string_long::c;
     c.clear();
 
     c.insert(0, "abc"); // single
@@ -152,8 +169,9 @@ TEST_FIXTURE(db_setup_string_long, ArrayStringLongInsert)
     CHECK_EQUAL(5, c.size());
 }
 
-TEST_FIXTURE(db_setup_string_long, ArrayStringLongDelete)
+TEST(ArrayStringLong_Delete)
 {
+    ArrayStringLong& c = db_setup_string_long::c;
     c.clear();
 
     c.add("a");
@@ -189,8 +207,9 @@ TEST_FIXTURE(db_setup_string_long, ArrayStringLongDelete)
     CHECK(c.is_empty());
 }
 
-TEST_FIXTURE(db_setup_string_long, ArrayStringLongFind)
+TEST(ArrayStringLong_Find)
 {
+    ArrayStringLong& c = db_setup_string_long::c;
     c.clear();
 
     c.add("a");
@@ -209,8 +228,9 @@ TEST_FIXTURE(db_setup_string_long, ArrayStringLongFind)
     CHECK_EQUAL(3, res3);
 }
 
-TEST_FIXTURE(db_setup_string_long, ArrayStringLongCount)
+TEST(ArrayStringLong_Count)
 {
+    ArrayStringLong& c = db_setup_string_long::c;
     c.clear();
 
     // first, middle and end
@@ -225,8 +245,10 @@ TEST_FIXTURE(db_setup_string_long, ArrayStringLongCount)
 }
 
 
-TEST_FIXTURE(db_setup_string_long, ArrayStringLong_Destroy)
+TEST(ArrayStringLong_Destroy)
 {
+    ArrayStringLong& c = db_setup_string_long::c;
+
     // clean up (ALWAYS PUT THIS LAST)
     c.destroy();
 }

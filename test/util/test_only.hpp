@@ -3,7 +3,7 @@
  * TIGHTDB CONFIDENTIAL
  * __________________
  *
- *  [2011] - [2013] TightDB Inc
+ *  [2011] - [2012] TightDB Inc
  *  All Rights Reserved.
  *
  * NOTICE:  All information contained herein is, and remains
@@ -17,34 +17,25 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_VERSION_HPP
-#define TIGHTDB_VERSION_HPP
+#ifndef TIGHTDB_TEST_UTIL_TEST_ONLY_HPP
+#define TIGHTDB_TEST_UTIL_TEST_ONLY_HPP
 
-#include <string>
-#include <sstream>
+#include "unit_test.hpp"
 
-#define TIGHTDB_VER_MAJOR 0
-#define TIGHTDB_VER_MINOR 4
-#define TIGHTDB_VER_PATCH 0
+#define ONLY(name) \
+    tightdb::test_util::SetTestOnly tightdb_set_test_only__##name(#name); \
+    TEST(name)
 
 namespace tightdb {
+namespace test_util {
 
-enum Feature {
-    feature_Debug,
-    feature_Replication
+struct SetTestOnly {
+    SetTestOnly(const char* test_name);
 };
 
-class Version {
-public:
-    static int get_major() { return TIGHTDB_VER_MAJOR; }
-    static int get_minor() { return TIGHTDB_VER_MINOR; }
-    static int get_patch() { return TIGHTDB_VER_PATCH; }
-    static std::string get_version();
-    static bool is_at_least(int major, int minor, int patch);
-    static bool has_feature(Feature feature);
-};
+const char* get_test_only();
 
+} // namespace test_util
+} // namespace tightdb
 
-} // namespace tigthdb
-
-#endif // TIGHTDB_VERSION_HPP
+#endif // TIGHTDB_TEST_UTIL_TEST_ONLY_HPP

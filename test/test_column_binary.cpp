@@ -3,13 +3,18 @@
 
 #include <string>
 
-#include <UnitTest++.h>
 #include <tightdb/column_binary.hpp>
+
+#include "util/unit_test.hpp"
+#include "util/test_only.hpp"
 
 using namespace tightdb;
 
 // Note: You can now temporarely declare unit tests with the ONLY(TestName) macro instead of TEST(TestName). This
 // will disable all unit tests except these. Remember to undo your temporary changes before committing.
+
+
+namespace {
 
 struct db_setup_column_binary {
     static ColumnBinary c;
@@ -17,8 +22,13 @@ struct db_setup_column_binary {
 
 ColumnBinary db_setup_column_binary::c;
 
-TEST_FIXTURE(db_setup_column_binary, ColumnBinaryMultiEmpty)
+} // anonymous namespace
+
+
+TEST(ColumnBinary_MultiEmpty)
 {
+    ColumnBinary& c = db_setup_column_binary::c;
+
     c.add(BinaryData("", 0));
     c.add(BinaryData("", 0));
     c.add(BinaryData("", 0));
@@ -36,8 +46,10 @@ TEST_FIXTURE(db_setup_column_binary, ColumnBinaryMultiEmpty)
     CHECK_EQUAL(0, c.get(5).size());
 }
 
-TEST_FIXTURE(db_setup_column_binary, ColumnBinarySet)
+TEST(ColumnBinary_Set)
 {
+    ColumnBinary& c = db_setup_column_binary::c;
+
     c.set(0, BinaryData("hey", 4));
 
     CHECK_EQUAL(6, c.size());
@@ -51,9 +63,11 @@ TEST_FIXTURE(db_setup_column_binary, ColumnBinarySet)
     CHECK_EQUAL(0, c.get(5).size());
 }
 
-TEST_FIXTURE(db_setup_column_binary, ColumnBinaryAdd)
+TEST(ColumnBinary_Add)
 {
+    ColumnBinary& c = db_setup_column_binary::c;
     c.clear();
+
     CHECK_EQUAL(0, c.size());
 
     c.add(BinaryData("abc", 4));
@@ -69,8 +83,10 @@ TEST_FIXTURE(db_setup_column_binary, ColumnBinaryAdd)
     CHECK_EQUAL(2, c.size());
 }
 
-TEST_FIXTURE(db_setup_column_binary, ColumnBinarySet2)
+TEST(ColumnBinary_Set2)
 {
+    ColumnBinary& c = db_setup_column_binary::c;
+
     // {shrink, grow} x {first, middle, last, single}
     c.clear();
 
@@ -124,8 +140,9 @@ TEST_FIXTURE(db_setup_column_binary, ColumnBinarySet2)
     CHECK_EQUAL(3, c.size());
 }
 
-TEST_FIXTURE(db_setup_column_binary, ColumnBinaryInsert)
+TEST(ColumnBinary_Insert)
 {
+    ColumnBinary& c = db_setup_column_binary::c;
     c.clear();
 
     c.insert(0, BinaryData("abc", 4)); // single
@@ -168,8 +185,9 @@ TEST_FIXTURE(db_setup_column_binary, ColumnBinaryInsert)
     CHECK_EQUAL(6, c.size());
 }
 
-TEST_FIXTURE(db_setup_column_binary, ColumnBinaryDelete)
+TEST(ColumnBinary_Delete)
 {
+    ColumnBinary& c = db_setup_column_binary::c;
     c.clear();
 
     c.add(BinaryData("a", 2));
@@ -205,8 +223,9 @@ TEST_FIXTURE(db_setup_column_binary, ColumnBinaryDelete)
     CHECK(c.is_empty());
 }
 
-TEST_FIXTURE(db_setup_column_binary, ColumnBinaryBig)
+TEST(ColumnBinary_Big)
 {
+    ColumnBinary& c = db_setup_column_binary::c;
     c.clear();
 
     c.add(BinaryData("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ", 71));
@@ -251,8 +270,10 @@ TEST_FIXTURE(db_setup_column_binary, ColumnBinaryBig)
     }
 }
 
-TEST_FIXTURE(db_setup_column_binary, ColumnBinary_Destroy)
+TEST(ColumnBinary_Destroy)
 {
+    ColumnBinary& c = db_setup_column_binary::c;
+
     // clean up (ALWAYS PUT THIS LAST)
     c.destroy();
 }

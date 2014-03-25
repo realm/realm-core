@@ -2,24 +2,29 @@
 #ifdef TEST_INDEX_STRING
 
 #include "tightdb/index_string.hpp"
-#include <UnitTest++.h>
+
+#include "util/unit_test.hpp"
+#include "util/test_only.hpp"
 
 using namespace tightdb;
 
 // Note: You can now temporarely declare unit tests with the ONLY(TestName) macro instead of TEST(TestName). This
 // will disable all unit tests except these. Remember to undo your temporary changes before committing.
 
-namespace {
-    // strings used by tests
-    const char s1[] = "John";
-    const char s2[] = "Brian";
-    const char s3[] = "Samantha";
-    const char s4[] = "Tom";
-    const char s5[] = "Johnathan";
-    const char s6[] = "Johnny";
-    const char s7[] = "Sam";
 
-} // namespace
+namespace {
+
+// strings used by tests
+const char s1[] = "John";
+const char s2[] = "Brian";
+const char s3[] = "Samantha";
+const char s4[] = "Tom";
+const char s5[] = "Johnathan";
+const char s6[] = "Johnny";
+const char s7[] = "Sam";
+
+} // anonymous namespace
+
 
 TEST(StringIndex_IsEmpty)
 {

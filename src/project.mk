@@ -5,8 +5,8 @@ ENABLE_INSTALL_DEBUG_PROGS = 1
 
 # Construct fat binaries on Darwin when using Clang
 ifneq ($(TIGHTDB_ENABLE_FAT_BINARIES),)
-  ifneq ($(call CC_CXX_AND_LD_ARE,clang),)
-    ifeq ($(OS),Darwin)
+  ifeq ($(OS),Darwin)
+    ifeq ($(COMPILER_IS),clang)
       CFLAGS_ARCH += -arch i386 -arch x86_64
     endif
   endif
@@ -17,7 +17,7 @@ ifeq ($(OS),Darwin)
 endif
 
 # FIXME: '-fno-elide-constructors' currently causes TightDB to fail
-#CFLAGS_DEBUG   += -fno-elide-constructors
+#CFLAGS_DEBUG += -fno-elide-constructors
 CFLAGS_PTHREADS += -pthread
 CFLAGS_GENERAL += -Wextra -ansi -pedantic -Wno-long-long
 # CFLAGS_CXX = -std=c++11
@@ -25,8 +25,8 @@ CFLAGS_GENERAL += -Wextra -ansi -pedantic -Wno-long-long
 # Avoid a warning from Clang when linking on OS X. By default,
 # `LDFLAGS_PTHREADS` inherits its value from `CFLAGS_PTHREADS`, so we
 # have to override that with an empty value.
-ifneq ($(call CC_CXX_AND_LD_ARE,clang),)
-  ifeq ($(OS),Darwin)
+ifeq ($(OS),Darwin)
+  ifeq ($(LD_IS),clang)
     LDFLAGS_PTHREADS = $(EMPTY)
   endif
 endif
@@ -65,4 +65,9 @@ else
   ifneq ($(TIGHTDB_ENABLE_ALLOC_SET_ZERO),)
     PROJECT_CFLAGS += -DTIGHTDB_ENABLE_ALLOC_SET_ZERO
   endif
+endif
+
+ifneq ($(TIGHTDB_ANDROID),)
+  PROJECT_CFLAGS += -fPIC -DPIC -fvisibility=hidden -DANDROID
+  CFLAGS_OPTIM = -Os -flto -DNDEBUG
 endif

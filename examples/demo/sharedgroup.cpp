@@ -23,8 +23,7 @@ TIGHTDB_TABLE_2(Books,
                 author, String)
 
 
-static void *reader(void *arg) {
-    struct thread_info *tinfo = (struct thread_info *)arg;
+static void *reader(void*) {
     SharedGroup sg("test.tdb");
 
     // Read transaction
@@ -50,8 +49,7 @@ static void *reader(void *arg) {
     return NULL;
 }
 
-static void *writer(void *arg) {
-    struct thread_info *tinfo = (struct thread_info *)arg;
+static void *writer(void*) {
     SharedGroup sg("test.tdb");
 
     sleep(5);
@@ -68,7 +66,7 @@ static void *writer(void *arg) {
     return NULL;
 }
 
-int main(int argc, char *argv[]) {
+int main(int, char*[]) {
     pthread_attr_t attr;
     struct thread_info tinfo[2];
     void *res;

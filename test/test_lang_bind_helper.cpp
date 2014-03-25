@@ -1,10 +1,11 @@
 #include "testsettings.hpp"
 #ifdef TEST_LANG_BIND_HELPER
 
-#include <UnitTest++.h>
-
 #include <tightdb/lang_bind_helper.hpp>
 #include <tightdb/descriptor.hpp>
+
+#include "util/unit_test.hpp"
+#include "util/test_only.hpp"
 
 using namespace std;
 using namespace tightdb;
@@ -13,7 +14,7 @@ using namespace tightdb::util;
 // Note: You can now temporarely declare unit tests with the ONLY(TestName) macro instead of TEST(TestName). This
 // will disable all unit tests except these. Remember to undo your temporary changes before committing.
 
-TEST(InsertSubtable)
+TEST(LangBindHelper_InsertSubtable)
 {
     Table t1;
     DescriptorRef s;
@@ -44,7 +45,7 @@ TEST(InsertSubtable)
 
 
 // FIXME: Move this test to test_table.cpp
-TEST(SetSubtable)
+TEST(LangBindHelper_SetSubtable)
 {
     Table t1;
     DescriptorRef s;
