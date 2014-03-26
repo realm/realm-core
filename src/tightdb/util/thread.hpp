@@ -524,7 +524,11 @@ inline void CondVar::notify_all() TIGHTDB_NOEXCEPT
 }
 
 
-// Support for simple atomic variables with release and acquire semantics
+// Support for simple atomic variables, inspired by C++11 atomics, but incomplete.
+//
+// The level of support provided is driven by the need of the tightdb library.
+// It is not meant to provide full support for atomics, but it is meant to be
+// the place where we put low level code related to atomic variables.
 //
 // Useful for non-blocking data structures.
 //
@@ -532,18 +536,27 @@ inline void CondVar::notify_all() TIGHTDB_NOEXCEPT
 // of the variables, and ensures that the compiler will not optimize away
 // relevant instructions.
 //
-// Use it only on naturally aligned and naturally atomic objects,
-// should work on integers and pointers on all machines.
+// This template can only be used for types for which the underlying hardware
+// guarantees atomic reads and writes. On almost any machine in production,
+// this includes all types with the size of a machine word (or machine register) 
+// or less, except bit fields.
+// 
+// FIXME: This leaves it to the user of the software to ascertain that the
+// hardware lives up to the requirement. The long term goal should be to provide
+// atomicity in a way which will cause compilation to fail if the underlying
+// platform is not guaranteed to support the requirements given by the use of
+// the primitives.
+//
+// FIXME: The current implementation provides the functionality required for the
+// tightdb library, but *not* all the functionality often provided by atomics.
+// (see C++11 atomics for an example). We'll add additional functionality as
+// the need arises.
 //
 // Usage: For non blocking data structures, you need to wrap any synchronization
 // variables using the Atomic template. Variables which are not used for
 // synchronization need no special declaration. As long as signaling between threads
 // is done using the store and load methods declared here, memory barriers will
 // ensure a consistent view of the other variables.
-//
-// Technical note: The intent is to provide acquire semantics on load and release
-// semantics on store. This means that things like Petersons algorithm cannot be
-// implemented using these primitive, because it requires sequential consistency.
 //
 // Prior to gcc 4.7 there was no portable ways of providing acquire/release semantics,
 // so for earlier versions we fall back to sequential consistency.
