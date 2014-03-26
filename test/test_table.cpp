@@ -2,18 +2,17 @@
 #ifdef TEST_TABLE
 
 #include <algorithm>
+#include <limits>
 #include <string>
 #include <fstream>
 #include <ostream>
 
-
-#include <UnitTest++.h>
-
 #include <tightdb.hpp>
 #include <tightdb/lang_bind_helper.hpp>
 
-#include "testsettings.hpp"
 #include "util/misc.hpp"
+#include "util/unit_test.hpp"
+#include "util/test_only.hpp"
 
 using namespace std;
 using namespace tightdb;
@@ -24,10 +23,13 @@ using namespace test_util;
 // will disable all unit tests except these. Remember to undo your temporary changes before committing.
 
 namespace {
+
 TIGHTDB_TABLE_2(TupleTableType,
                 first,  Int,
                 second, String)
-}
+
+} // anonymous namespace
+
 
 #ifdef JAVA_MANY_COLUMNS_CRASH
 
@@ -45,7 +47,7 @@ TIGHTDB_TABLE_7(MainTableType,
                 zipCode, String,
                 events, Subtable<SubtableType>)
 
-TEST(ManyColumnsCrash2)
+TEST(Table_ManyColumnsCrash2)
 {
     // Trying to reproduce Java crash.
     for (int a = 0; a < 10; a++)
@@ -80,9 +82,9 @@ TEST(ManyColumnsCrash2)
     }
 }
 
-#endif
+#endif // JAVA_MANY_COLUMNS_CRASH
 
-TEST(DeleteCrash)
+TEST(Table_DeleteCrash)
 {
     Group group;
     TableRef table = group.get_table("test");
@@ -106,7 +108,7 @@ TEST(DeleteCrash)
 }
 
 
-TEST(TestOptimizeCrash)
+TEST(Table_OptimizeCrash)
 {
     // This will crash at the .add() method
     TupleTableType ttt;
@@ -116,7 +118,7 @@ TEST(TestOptimizeCrash)
     ttt.add(1, "AA");
 }
 
-TEST(Table1)
+TEST(Table_1)
 {
     Table table;
     table.add_column(type_Int, "first");
@@ -155,7 +157,7 @@ TEST(Table1)
 #endif
 }
 
-TEST(Table_floats)
+TEST(Table_Floats)
 {
     Table table;
     table.add_column(type_Float, "first");
@@ -206,7 +208,7 @@ TIGHTDB_TABLE_4(TestTable,
 
 } // anonymous namespace
 
-TEST(Table2)
+TEST(Table_2)
 {
     TestTable table;
 
@@ -223,7 +225,7 @@ TEST(Table2)
 #endif
 }
 
-TEST(Table3)
+TEST(Table_3)
 {
     TestTable table;
 
@@ -252,12 +254,14 @@ TEST(Table3)
 }
 
 namespace {
+
 TIGHTDB_TABLE_2(TestTableEnum,
                 first,      Enum<Days>,
                 second,     String)
+
 } // anonymous namespace
 
-TEST(Table4)
+TEST(Table_4)
 {
     TestTableEnum table;
 
@@ -278,12 +282,14 @@ TEST(Table4)
 }
 
 namespace {
+
 TIGHTDB_TABLE_2(TestTableFloats,
                 first,      Float,
                 second,     Double)
+
 } // anonymous namespace
 
-TEST(Table_float2)
+TEST(Table_Float2)
 {
     TestTableFloats table;
 
@@ -589,7 +595,7 @@ TEST(Table_HighLevelCopy)
 }
 
 
-TEST(Table_Delete_All_Types)
+TEST(Table_DeleteAllTypes)
 {
     Table table;
     setup_multi_table(table, 15, 2);
@@ -614,7 +620,7 @@ TEST(Table_Delete_All_Types)
 #endif
 }
 
-TEST(Table_Move_All_Types)
+TEST(Table_MoveAllTypes)
 {
     Table table;
     setup_multi_table(table, 15, 2);
@@ -775,7 +781,7 @@ TEST(Table_DegenerateSubtableSearchAndAggregate)
     CHECK_EQUAL(0, res);
 }
 
-TEST(Table_range)
+TEST(Table_Range)
 {
     Table table;
     table.add_column(type_Int, "int");
@@ -788,7 +794,7 @@ TEST(Table_range)
         CHECK_EQUAL(int64_t(i+10), tv.get_int(0, i));
 }
 
-TEST(Table_range_const)
+TEST(Table_RangeConst)
 {
     Group group;
     {
@@ -809,7 +815,7 @@ TEST(Table_range_const)
 // enable to generate testfiles for to_string and json below
 #define GENERATE 0
 
-TEST(Table_test_to_string)
+TEST(Table_ToString)
 {
     Table table;
     setup_multi_table(table, 15, 6);
@@ -842,7 +848,7 @@ TEST(Table_test_to_string)
 #endif
 }
 
-TEST(Table_test_json_all_data)
+TEST(Table_JsonAllAata)
 {
     Table table;
     setup_multi_table(table, 15, 2);
@@ -878,7 +884,7 @@ TEST(Table_test_json_all_data)
 
 
 /* DISABLED BECAUSE IT FAILS - A PULL REQUEST WILL BE MADE WHERE IT IS REENABLED!
-TEST(Table_test_row_to_string)
+TEST(Table_RowToString)
 {
     // Create table with all column types
     Table table;
@@ -904,7 +910,7 @@ TEST(Table_test_row_to_string)
 }
 
 
-TEST(Table_Find_Int)
+TEST(Table_FindInt)
 {
     TestTable table;
 
@@ -924,7 +930,7 @@ TEST(Table_Find_Int)
 
 
 /*
-TEST(Table6)
+TEST(Table_6)
 {
     TestTableEnum table;
 
@@ -951,7 +957,7 @@ TEST(Table6)
 */
 
 
-TEST(Table_FindAll_Int)
+TEST(Table_FindAllInt)
 {
     TestTable table;
 
@@ -985,7 +991,7 @@ TEST(Table_FindAll_Int)
 #endif
 }
 
-TEST(Table_Sorted_Int)
+TEST(Table_SortedInt)
 {
     TestTable table;
 
@@ -1020,7 +1026,7 @@ TEST(Table_Sorted_Int)
 #endif
 }
 
-TEST(Table_Index_String)
+TEST(Table_IndexString)
 {
     TestTableEnum table;
 
@@ -1052,7 +1058,7 @@ TEST(Table_Index_String)
     CHECK_EQUAL(2, c1);
 }
 
-TEST(Table_Index_String_Twice)
+TEST(Table_IndexStringTwice)
 {
     TestTableEnum table;
 
@@ -1072,9 +1078,11 @@ TEST(Table_Index_String_Twice)
 }
 
 namespace {
+
 TIGHTDB_TABLE_2(LookupTable,
                 first,  String,
                 second, Int)
+
 } // anonymous namespace
 
 TEST(Table_Lookup)
@@ -1131,10 +1139,12 @@ TEST(Table_Lookup)
 }
 
 namespace {
+
 TIGHTDB_TABLE_1(TestSubtableLookup2,
                 str, String)
 TIGHTDB_TABLE_1(TestSubtableLookup1,
                 subtab, Subtable<TestSubtableLookup2>)
+
 } // anonymous namespace
 
 
@@ -1187,7 +1197,7 @@ TEST(Table_Distinct)
 }
 
 /*
-TEST(Table_Index_Int)
+TEST(Table_IndexInt)
 {
     TestTable table;
 
@@ -1273,14 +1283,16 @@ TEST(Table_Index_Int)
 */
 
 namespace {
+
 TIGHTDB_TABLE_4(TestTableAE,
                 first,  Int,
                 second, String,
                 third,  Bool,
                 fourth, Enum<Days>)
+
 } // anonymous namespace
 
-TEST(TableAutoEnumeration)
+TEST(Table_AutoEnumeration)
 {
     TestTableAE table;
 
@@ -1335,7 +1347,7 @@ TEST(TableAutoEnumeration)
 }
 
 
-TEST(TableAutoEnumerationFindFindAll)
+TEST(Table_AutoEnumerationFindFindAll)
 {
     TestTableAE table;
 
@@ -1362,14 +1374,16 @@ TEST(TableAutoEnumerationFindFindAll)
 }
 
 namespace {
+
 TIGHTDB_TABLE_4(TestTableEnum4,
                 col1, String,
                 col2, String,
                 col3, String,
                 col4, String)
+
 } // anonymous namespace
 
-TEST(TableAutoEnumerationOptimize)
+TEST(Table_AutoEnumerationOptimize)
 {
     TestTableEnum4 t;
 
@@ -1412,10 +1426,12 @@ TEST(TableAutoEnumerationOptimize)
 }
 
 namespace {
+
 TIGHTDB_TABLE_1(TestSubtabEnum2,
                 str, String)
 TIGHTDB_TABLE_1(TestSubtabEnum1,
                 subtab, Subtable<TestSubtabEnum2>)
+
 } // anonymous namespace
 
 TEST(Table_OptimizeSubtable)
@@ -1582,7 +1598,7 @@ TEST(Table_Spec)
     }
 }
 
-TEST(Table_Spec_ColumnPath)
+TEST(Table_SpecColumnPath)
 {
     Group group;
     TableRef table = group.get_table("test");
@@ -1620,7 +1636,7 @@ TEST(Table_Spec_ColumnPath)
     }
 }
 
-TEST(Table_Spec_RenameColumns)
+TEST(Table_SpecRenameColumns)
 {
     Group group;
     TableRef table = group.get_table("test");
@@ -1670,7 +1686,7 @@ TEST(Table_Spec_RenameColumns)
     }
 }
 
-TEST(Table_Spec_DeleteColumns)
+TEST(Table_SpecDeleteColumns)
 {
     Group group;
     TableRef table = group.get_table("test");
@@ -1788,7 +1804,7 @@ TEST(Table_Spec_DeleteColumns)
 }
 
 
-TEST(Table_Spec_AddColumns)
+TEST(Table_SpecAddColumns)
 {
     Group group;
     TableRef table = group.get_table("test");
@@ -1921,7 +1937,7 @@ TEST(Table_Spec_AddColumns)
 }
 
 
-TEST(Table_Spec_DeleteColumnsBug)
+TEST(Table_SpecDeleteColumnsBug)
 {
     TableRef table = Table::create();
 
@@ -2526,7 +2542,7 @@ TEST(Table_DateAndBinary)
 }
 
 // Test for a specific bug found: Calling clear on a group with a table with a subtable
-TEST(Table_Test_Clear_With_Subtable_AND_Group)
+TEST(Table_ClearWithSubtableAndGroup)
 {
     Group group;
     TableRef table = group.get_table("test");
@@ -2564,7 +2580,8 @@ TEST(Table_Test_Clear_With_Subtable_AND_Group)
 
 
 //set a subtable in an already exisitng row by providing an existing subtable as the example to copy
-TEST(Table_SetSubTableByExample)
+// FIXME: Do we need both this one and Table_SetSubTableByExample2?
+TEST(Table_SetSubTableByExample1)
 {
     Group group;
     TableRef table = group.get_table("test");
@@ -2617,7 +2634,8 @@ TEST(Table_SetSubTableByExample)
 }
 
 //In the tableview class, set a subtable in an already exisitng row by providing an existing subtable as the example to copy
-TEST(TableView_SetSubTableByExample)
+// FIXME: Do we need both this one and Table_SetSubTableByExample1?
+TEST(Table_SetSubTableByExample2)
 {
     Group group;
     TableRef table = group.get_table("test");
@@ -2767,7 +2785,7 @@ TEST(Table_Aggregates)
     for (int i = 0; i < TBL_SIZE; i++) {
         table.add(5987654, 4.0f, 3.0);
         i_sum += 5987654;
-        f_sum += double(4.0f);
+        f_sum += 4.0f;
         d_sum += 3.0;
     }
     table.add(1, 1.1f, 1.2);
@@ -2778,6 +2796,8 @@ TEST(Table_Aggregates)
     d_sum += 1.2 + 12.0 + 3.0;
     double size = TBL_SIZE + 3;
 
+    double epsilon = numeric_limits<double>::epsilon();
+
     // minimum
     CHECK_EQUAL(1, table.column().c_int.minimum());
     CHECK_EQUAL(1.1f, table.column().c_float.minimum());
@@ -2787,14 +2807,13 @@ TEST(Table_Aggregates)
     CHECK_EQUAL(11.0f, table.column().c_float.maximum());
     CHECK_EQUAL(12.0, table.column().c_double.maximum());
     // sum
-    CHECK_EQUAL(i_sum, table.column().c_int.sum());
-    CHECK_EQUAL(f_sum, table.column().c_float.sum());
-    CHECK_EQUAL(d_sum, table.column().c_double.sum());
+    CHECK_APPROXIMATELY_EQUAL(i_sum, table.column().c_int.sum(),    10*epsilon);
+    CHECK_APPROXIMATELY_EQUAL(f_sum, table.column().c_float.sum(),  10*epsilon);
+    CHECK_APPROXIMATELY_EQUAL(d_sum, table.column().c_double.sum(), 10*epsilon);
     // average
-    CHECK_EQUAL(double(i_sum)/size, table.column().c_int.average());
-    CHECK_EQUAL(double(f_sum)/size, table.column().c_float.average());
-    // almost_equal because of double/float imprecision
-    CHECK(almost_equal(double(d_sum)/size, table.column().c_double.average()));
+    CHECK_APPROXIMATELY_EQUAL(i_sum/size, table.column().c_int.average(),    10*epsilon);
+    CHECK_APPROXIMATELY_EQUAL(f_sum/size, table.column().c_float.average(),  10*epsilon);
+    CHECK_APPROXIMATELY_EQUAL(d_sum/size, table.column().c_double.average(), 10*epsilon);
 }
 
 namespace {
@@ -2873,7 +2892,7 @@ TIGHTDB_TABLE_3(TablePivotAgg,
 
 } // anonymous namespace
 
-TEST(Table_pivot)
+TEST(Table_Pivot)
 {
     size_t count = 1717;
     TablePivotAgg table;
@@ -3104,7 +3123,7 @@ void test_write_slice_contents(const Table& table, size_t offset, size_t size)
     }
 }
 
-} // namespace
+} // anonymous namespace
 
 TEST(Table_WriteSlice)
 {

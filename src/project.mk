@@ -66,3 +66,8 @@ else
     PROJECT_CFLAGS += -DTIGHTDB_ENABLE_ALLOC_SET_ZERO
   endif
 endif
+
+ifneq ($(TIGHTDB_ANDROID),)
+  PROJECT_CFLAGS += -fPIC -DPIC -fvisibility=hidden -DANDROID
+  CFLAGS_OPTIM = -Os -flto -DNDEBUG
+endif

@@ -1,8 +1,10 @@
 #include "testsettings.hpp"
 #ifdef TEST_ARRAY_BINARY
 
-#include <UnitTest++.h>
 #include <tightdb/array_binary.hpp>
+
+#include "util/unit_test.hpp"
+#include "util/test_only.hpp"
 
 using namespace tightdb;
 

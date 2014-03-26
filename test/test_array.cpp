@@ -6,12 +6,12 @@
 #include <vector>
 #include <algorithm>
 
-#include <UnitTest++.h>
-
 #include <tightdb/array.hpp>
 #include <tightdb/column.hpp>
 #include <tightdb/query_conditions.hpp>
-#include "testsettings.hpp"
+
+#include "util/unit_test.hpp"
+#include "util/test_only.hpp"
 
 using namespace std;
 using namespace tightdb;
@@ -432,7 +432,7 @@ TEST(Array_Find1)
     // Look for a non-existing value
     size_t res = c.find_first(10);
 
-    CHECK_EQUAL(res, -1);
+    CHECK_EQUAL(size_t(-1), res);
 }
 
 TEST(Array_Find2)
@@ -1029,7 +1029,7 @@ TEST(Array_Greater)
             a.add(0);
         }
         size_t t = a.find_first<Greater>(0, 0, (size_t)-1);
-        CHECK_EQUAL(-1, t);
+        CHECK_EQUAL(size_t(-1), t);
 
 
         a.clear();
@@ -1154,7 +1154,7 @@ TEST(Array_Less)
             a.add(0);
         }
         size_t t = a.find_first<Less>(0, 0, (size_t)-1);
-        CHECK_EQUAL(-1, t);
+        CHECK_EQUAL(size_t(-1), t);
 
 
         a.clear();
@@ -1287,7 +1287,7 @@ TEST(Array_NotEqual)
             a.add(0);
         }
         size_t t = a.find_first<NotEqual>(0, 0, (size_t)-1);
-        CHECK_EQUAL(-1, t);
+        CHECK_EQUAL(size_t(-1), t);
 
 
         a.clear();

@@ -2,35 +2,45 @@
 #ifdef TEST_COLUMN_FLOAT
 
 #include <iostream>
-#include <UnitTest++.h>
+
 #include <tightdb/column_basic.hpp>
+
+#include "util/unit_test.hpp"
+#include "util/test_only.hpp"
 
 using namespace tightdb;
 
-template <typename T, size_t N> inline
-size_t SizeOfArray( const T(&)[ N ] )
-{
-  return N;
-}
 
 namespace {
-float floatVal[] = {0.0f,
-                   1.0f,
-                   2.12345f,
-                   12345.12f,
-                   -12345.12f
-                  };
-const size_t floatValLen = SizeOfArray(floatVal);
 
-double doubleVal[] = {0.0,
-                      1.0,
-                      2.12345,
-                      12345.12,
-                      -12345.12
-                     };
-const size_t doubleValLen = SizeOfArray(doubleVal);
+template<class T, size_t N> inline size_t size_of_array(T(&)[N])
+{
+    return N;
+}
 
-} //namespace
+// Article about comparing floats:
+// http://randomascii.wordpress.com/2012/02/25/comparing-floating-point-numbers-2012-edition/
+
+float float_val[] = {
+    0.0f,
+    1.0f,
+    2.12345f,
+    12345.12f,
+    -12345.12f
+};
+const size_t float_val_len = size_of_array(float_val);
+
+double double_val[] = {
+    0.0,
+    1.0,
+    2.12345,
+    12345.12,
+    -12345.12
+};
+const size_t double_val_len = size_of_array(double_val);
+
+} // anonymous namespace
+
 
 template <class C>
 void BasicColumn_IsEmpty()
@@ -60,8 +70,8 @@ void BasicColumn_AddGet(T val[], size_t valLen)
 
     c.destroy();
 }
-TEST(ColumnFloat_AddGet) { BasicColumn_AddGet<ColumnFloat, float>(floatVal, floatValLen); }
-TEST(ColumnDouble_AddGet){ BasicColumn_AddGet<ColumnDouble, double>(doubleVal, doubleValLen); }
+TEST(ColumnFloat_AddGet) { BasicColumn_AddGet<ColumnFloat, float>(float_val, float_val_len); }
+TEST(ColumnDouble_AddGet){ BasicColumn_AddGet<ColumnDouble, double>(double_val, double_val_len); }
 
 
 template <class C, typename T>
@@ -104,8 +114,8 @@ void BasicColumn_Set(T val[], size_t valLen)
 
     c.destroy();
 }
-TEST(ColumnFloat_Set) { BasicColumn_Set<ColumnFloat, float>(floatVal, floatValLen); }
-TEST(ColumnDouble_Set){ BasicColumn_Set<ColumnDouble, double>(doubleVal, doubleValLen); }
+TEST(ColumnFloat_Set) { BasicColumn_Set<ColumnFloat, float>(float_val, float_val_len); }
+TEST(ColumnDouble_Set){ BasicColumn_Set<ColumnDouble, double>(double_val, double_val_len); }
 
 
 template <class C, typename T>
@@ -152,8 +162,8 @@ void BasicColumn_Insert(T val[], size_t valLen)
 
     c.destroy();
 }
-TEST(ColumnFloat_Insert) { BasicColumn_Insert<ColumnFloat, float>(floatVal, floatValLen); }
-TEST(ColumnDouble_Insert){ BasicColumn_Insert<ColumnDouble, double>(doubleVal, doubleValLen); }
+TEST(ColumnFloat_Insert) { BasicColumn_Insert<ColumnFloat, float>(float_val, float_val_len); }
+TEST(ColumnDouble_Insert){ BasicColumn_Insert<ColumnDouble, double>(double_val, double_val_len); }
 
 
 template <class C, typename T>
@@ -172,8 +182,8 @@ void BasicColumn_Aggregates(T val[], size_t valLen)
 
    c.destroy();
 }
-TEST(ColumnFloat_Aggregates) { BasicColumn_Aggregates<ColumnFloat, float>(floatVal, floatValLen); }
-TEST(ColumnDouble_Aggregates){ BasicColumn_Aggregates<ColumnDouble, double>(doubleVal, doubleValLen); }
+TEST(ColumnFloat_Aggregates) { BasicColumn_Aggregates<ColumnFloat, float>(float_val, float_val_len); }
+TEST(ColumnDouble_Aggregates){ BasicColumn_Aggregates<ColumnDouble, double>(double_val, double_val_len); }
 
 
 template <class C, typename T>
@@ -221,8 +231,8 @@ void BasicColumn_Delete(T val[], size_t valLen)
 
     c.destroy();
 }
-TEST(ColumnFloat_Delete) { BasicColumn_Delete<ColumnFloat, float>(floatVal, floatValLen); }
-TEST(ColumnDouble_Delete){ BasicColumn_Delete<ColumnDouble, double>(doubleVal, doubleValLen); }
+TEST(ColumnFloat_Delete) { BasicColumn_Delete<ColumnFloat, float>(float_val, float_val_len); }
+TEST(ColumnDouble_Delete){ BasicColumn_Delete<ColumnDouble, double>(double_val, double_val_len); }
 
 TEST(ColumnDouble_InitOfEmptyColumn)
 {
@@ -244,8 +254,8 @@ TEST(ColumnFloat_InitOfEmptyColumn)
     t.add_column(type_Float, "works");
     t.add_column(type_Float, "works also");
     t.add_empty_row();
-    t.set_float(0,0,1.1);
-    t.set_float(1,0,2.2);
+    t.set_float(0,0,1.1f);
+    t.set_float(1,0,2.2f);
     t.remove_column(1);
     t.add_empty_row();
     t.add_column(type_Float, "doesn't work");
@@ -314,8 +324,8 @@ TEST(ColumnMixed_InitOfEmptyColumn)
     t.add_column(type_Mixed, "works");
     t.add_column(type_Mixed, "works also");
     t.add_empty_row();
-    t.set_mixed(0,0, new Mixed(1.1));
-    t.set_mixed(1,0, new Mixed(2.2));
+    t.set_mixed(0,0, Mixed(1.1));
+    t.set_mixed(1,0, Mixed(2.2));
     t.remove_column(1);
     t.add_empty_row();
     t.add_column(type_Mixed, "doesn't work");

@@ -1,15 +1,7 @@
 #include "testsettings.hpp"
 #ifdef TEST_SHARED
+
 #include <fstream>
-#include <UnitTest++.h>
-
-#include <tightdb.hpp>
-#include <tightdb/util/bind.hpp>
-#include <tightdb/util/terminate.hpp>
-#include <tightdb/util/file.hpp>
-#include <tightdb/util/thread.hpp>
-
-#include "testsettings.hpp"
 
 // Need fork() and waitpid() for Shared_RobustAgainstDeathDuringWrite
 #ifndef _WIN32
@@ -20,6 +12,15 @@
 #  define NOMINMAX
 #  include <windows.h>
 #endif
+
+#include <tightdb.hpp>
+#include <tightdb/util/bind.hpp>
+#include <tightdb/util/terminate.hpp>
+#include <tightdb/util/file.hpp>
+#include <tightdb/util/thread.hpp>
+
+#include "util/unit_test.hpp"
+#include "util/test_only.hpp"
 
 using namespace std;
 using namespace tightdb;
@@ -46,7 +47,7 @@ TIGHTDB_TABLE_4(TestTableShared,
 } // anonymous namespace
 
 
-TEST(Shared_no_create_cleanup_lock_file_after_failure)
+TEST(Shared_NoCreateCleanupLockFileAfterFailure)
 {
     // Delete old files if there
     File::try_remove("test_shared.tightdb");
@@ -68,7 +69,7 @@ TEST(Shared_no_create_cleanup_lock_file_after_failure)
 }
 
 
-TEST(Shared_no_create_cleanup_lock_file_after_failure_2)
+TEST(Shared_NoCreateCleanupLockFileAfterFailure2)
 {
     // Delete old files if there
     File::try_remove("test_shared.tightdb");
@@ -127,7 +128,7 @@ TEST(Shared_Initial)
 }
 
 
-TEST(Shared_Stale_Lock_File_Faked)
+TEST(Shared_StaleLockFileFaked)
 {
     // Delete old files if there
     File::try_remove("test_shared.tightdb");
@@ -151,7 +152,7 @@ TEST(Shared_Stale_Lock_File_Faked)
 
 // FIXME:
 // At the moment this test does not work on windows when run as a virtual machine.
-TEST(Shared_Stale_Lock_File_Renamed)
+TEST(Shared_StaleLockFileRenamed)
 {
     // Delete old files if there
     File::try_remove("test_shared.tightdb");
@@ -186,7 +187,7 @@ TEST(Shared_Stale_Lock_File_Renamed)
 }
 
 
-TEST(Shared_Initial_Mem)
+TEST(Shared_InitialMem)
 {
     // Delete old files if there
     File::try_remove("test_shared.tightdb");
@@ -311,7 +312,7 @@ TEST(Shared_Initial2_Mem)
     CHECK(!File::exists("test_shared.tightdb.lock"));
 }
 
-TEST(Shared1)
+TEST(Shared_1)
 {
     // Delete old files if there
     File::try_remove("test_shared.tightdb");
@@ -406,7 +407,7 @@ TEST(Shared1)
     CHECK(!File::exists("test_shared.tightdb.lock"));
 }
 
-TEST(Shared_rollback)
+TEST(Shared_Rollback)
 {
     // Delete old files if there
     File::try_remove("test_shared.tightdb");
@@ -894,7 +895,7 @@ TIGHTDB_TABLE_1(MyTable_SpecialOrder, first,  Int)
 
 } // anonymous namespace
 
-TEST(Shared_Writes_SpecialOrder)
+TEST(Shared_WritesSpecialOrder)
 {
     File::try_remove("test.tightdb");
     File::try_remove("test.tightdb.lock");
@@ -1415,7 +1416,7 @@ TEST(Shared_FromSerialized)
 }
 
 #if TEST_DURATION > 2
-TEST(StringIndex_Bug1)
+TEST(Shared_StringIndexBug1)
 {
     File::try_remove("test.tightdb");
     File::try_remove("test.tightdb.lock");
@@ -1442,7 +1443,7 @@ TEST(StringIndex_Bug1)
 }
 #endif
 
-TEST(StringIndex_Bug2)
+TEST(Shared_StringIndexBug2)
 {
     File::try_remove("test.tightdb");
     File::try_remove("test.tightdb.lock");
@@ -1473,7 +1474,7 @@ void rand_str(char* res, size_t len) {
 }
 } // anonymous namespace
 
-TEST(StringIndex_Bug3)
+TEST(Shared_StringIndexBug3)
 {
     File::try_remove("indexbug.tightdb");
     File::try_remove("indexbug.tightdb.lock");
@@ -1519,6 +1520,31 @@ TEST(StringIndex_Bug3)
             table->Verify();
             db.commit();
         }
+    }
+}
+
+
+TEST(Shared_ClearColumnWithBasicArrayRootLeaf)
+{
+    const char* path = "tightdb.tightdb";
+    File::try_remove(path);
+
+    {
+        SharedGroup sg(path);
+        WriteTransaction wt(sg);
+        TableRef test = wt.get_table("Test");
+        test->add_column(type_Double, "foo");
+        test->clear();
+        test->add_empty_row();
+        test->set_double(0, 0, 727.2);
+        wt.commit();
+    }
+
+    {
+        SharedGroup sg(path);
+        ReadTransaction rt(sg);
+        ConstTableRef test = rt.get_table("Test");
+        CHECK_EQUAL(727.2, test->get_double(0,0));
     }
 }
 
@@ -1921,8 +1947,116 @@ TEST(Shared_MixedWithNonShared)
     File::remove("test.tightdb");
 }
 
+TEST(GroupShared_PinnedTransactions)
+{
+    File::try_remove("test.tightdb");
+    SharedGroup sg1("test.tightdb");
+    SharedGroup sg2("test.tightdb");
+    {
+        // initially, always say that the db has changed
+        bool changed = sg2.pin_read_transactions();
+        CHECK(changed);
+        sg2.unpin_read_transactions();
+        // asking again - this time there is no change
+        changed = sg2.pin_read_transactions();
+        CHECK(!changed);
+        sg2.unpin_read_transactions();
+    }
+    {   // add something to the db to play with
+        WriteTransaction wt(sg1);
+        TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
+        t1->add(0, 2, false, "test");
+        wt.commit();
+    }
+    {   // validate that we can see previous commit from within a new pinned transaction
+        bool changed = sg2.pin_read_transactions();
+        CHECK(changed);
+        ReadTransaction rt(sg2);
+        TestTableShared::ConstRef t1 = rt.get_table<TestTableShared>("test");
+        CHECK_EQUAL(2, t1[0].second);
+    }
+    {   // commit new data, without unpinning
+        WriteTransaction wt(sg1);
+        TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
+        t1[0].second = 5;
+        wt.commit();
+    }
+    {   // validate that we can see previous commit if we're not pinned
+        ReadTransaction rt(sg1);
+        TestTableShared::ConstRef t1 = rt.get_table<TestTableShared>("test");
+        CHECK_EQUAL(5, t1[0].second);
+    }
+    {   // validate that we can NOT see previous commit from within a pinned transaction
+        ReadTransaction rt(sg2);
+        TestTableShared::ConstRef t1 = rt.get_table<TestTableShared>("test");
+        CHECK_EQUAL(2, t1[0].second);
+    }
+    {   // unpin, pin again and validate that we can now see previous commit
+        sg2.unpin_read_transactions();
+        bool changed = sg2.pin_read_transactions();
+        CHECK(changed);
+        ReadTransaction rt(sg2);
+        TestTableShared::ConstRef t1 = rt.get_table<TestTableShared>("test");
+        CHECK_EQUAL(5, t1[0].second);
+    }
+    {   // can't pin if already pinned
+        bool is_ok = false;
+        try {
+            sg2.pin_read_transactions();
+        } catch (runtime_error&) {
+            is_ok = true;
+        }
+        CHECK(is_ok);
+        sg2.unpin_read_transactions();
+    }
+    {   // can't unpin if already unpinned
+        bool is_ok = false;
+        try {
+            sg2.unpin_read_transactions();
+        } catch (runtime_error&) {
+            is_ok = true;
+        }
+        CHECK(is_ok);
+    }
+    {   // can't pin while we're inside a transaction
+        ReadTransaction rt(sg1);
+        bool is_ok = false;
+        try {
+            sg1.pin_read_transactions();
+        } catch (runtime_error&) {
+            is_ok = true;
+        }
+        CHECK(is_ok);
+    }
+    {   // can't unpin while we're inside a transaction
+        sg1.pin_read_transactions();
+        {
+            ReadTransaction rt(sg1);
+            bool is_ok = false;
+            try {
+                sg1.unpin_read_transactions();
+            } catch (runtime_error&) {
+                is_ok = true;
+            }
+            CHECK(is_ok);
+        }
+        sg1.unpin_read_transactions();
+    }
+    {   // can't start a write transaction while pinned
+        sg1.pin_read_transactions();
+        bool is_ok = false;
+        try {
+            WriteTransaction rt(sg1);
+        } catch (runtime_error&) {
+            is_ok = true;
+        }
+        CHECK(is_ok);
+        sg1.unpin_read_transactions();
+    }
+}
 
-TEST(GroupShared_MultipleRollbacks)
+
+TEST(Shared_MultipleRollbacks)
 {
     File::try_remove("test.tightdb");
     {
@@ -1934,7 +2068,7 @@ TEST(GroupShared_MultipleRollbacks)
     File::remove("test.tightdb");
 }
 
-TEST(GroupShared_MultipleEndReads)
+TEST(Shared_MultipleEndReads)
 {
     File::try_remove("test.tightdb");
     {
@@ -1947,7 +2081,7 @@ TEST(GroupShared_MultipleEndReads)
 }
 
 
-TEST(GroupShared_ReserveDiskSpace)
+TEST(Shared_ReserveDiskSpace)
 {
     // SharedGroup::reserve() has no effect unless file preallocation
     // is supported.

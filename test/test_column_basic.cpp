@@ -1,11 +1,10 @@
 #include "testsettings.hpp"
 #ifdef TEST_COLUMN_BASIC
 
-#include <UnitTest++.h>
-
 #include <tightdb/column_basic.hpp>
 
-#include "testsettings.hpp"
+#include "util/unit_test.hpp"
+#include "util/test_only.hpp"
 
 using namespace tightdb;
 

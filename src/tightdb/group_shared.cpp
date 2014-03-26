@@ -527,6 +527,44 @@ SharedGroup::~SharedGroup() TIGHTDB_NOEXCEPT
     catch (...) {} // ignored on purpose
 }
 
+bool SharedGroup::pin_read_transactions()
+{
+    if (m_transactions_are_pinned) {
+        throw runtime_error("transactions are already pinned, cannot pin again");
+    }
+    if (m_transact_stage != transact_Ready) {
+        throw runtime_error("pinning transactions not allowed inside a transaction");
+    }
+    bool same_as_before;
+    ref_type pinned_top_ref;
+    size_t pinned_file_size;
+    grab_readlock(pinned_top_ref, pinned_file_size, same_as_before);
+
+    // Make sure the group is up-to-date.
+    // A zero ref means that the file has just been created.
+    try {
+        m_group.update_from_shared(pinned_top_ref, pinned_file_size); // Throws
+    }
+    catch (...) {
+        end_read();
+        throw;
+    }
+    m_group.detach_but_retain_data();
+    m_transactions_are_pinned = true;
+    return !same_as_before;
+}
+
+void SharedGroup::unpin_read_transactions()
+{
+    if (! m_transactions_are_pinned) {
+        throw runtime_error("transactions are not pinned, cannot unpin");
+    }
+    if (m_transact_stage != transact_Ready) {
+        throw runtime_error("unpinning transactions not allowed inside a transaction");
+    }
+    m_transactions_are_pinned = false;
+    release_readlock();
+}
 
 bool SharedGroup::has_changed() const TIGHTDB_NOEXCEPT
 {
@@ -681,57 +719,99 @@ void SharedGroup::do_async_commits()
 }
 #endif // _WIN32
 
+void SharedGroup::grab_readlock(ref_type& new_top_ref, size_t& new_file_size, bool& same_as_before)
+{
+    SharedInfo* info = m_file_map.get_addr();
+    LockGuard lock(info->readmutex);
+
+    if (TIGHTDB_UNLIKELY(info->infosize > m_reader_map.get_size()))
+        m_reader_map.remap(m_file, util::File::access_ReadWrite, info->infosize); // Throws
+
+    // Get the current top ref
+    new_top_ref    = to_size_t(info->current_top);
+    new_file_size  = to_size_t(info->filesize);
+    size_t version = info->current_version.load_relaxed();
+    same_as_before = version == m_version;
+    m_version      = version;
+
+    // Update reader list
+    if (ringbuf_is_empty()) {
+        ReadCount r2 = { m_version, 1 };
+        ringbuf_put(r2); // Throws
+    }
+    else {
+        ReadCount& r = ringbuf_get_last();
+        if (r.version == m_version) {
+            ++r.count;
+        }
+        else {
+            ReadCount r2 = { m_version, 1 };
+            ringbuf_put(r2); // Throws
+        }
+    }
+}
+
 const Group& SharedGroup::begin_read()
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Ready);
 
-    ref_type new_top_ref = 0;
-    size_t new_file_size = 0;
+    if (m_transactions_are_pinned) {
 
-    {
-        SharedInfo* info = m_file_map.get_addr();
-        Mutex::Lock lock(info->readmutex);
+        m_group.reattach_from_retained_data();
 
-        if (TIGHTDB_UNLIKELY(info->infosize > m_reader_map.get_size()))
-            m_reader_map.remap(m_file, util::File::access_ReadWrite, info->infosize); // Throws
+    } 
+    else {
 
-        // Get the current top ref
-        new_top_ref   = to_size_t(info->current_top);
-        new_file_size = to_size_t(info->filesize);
-        m_version     = info->current_version.load_relaxed();
+        ref_type new_top_ref = 0;
+        size_t new_file_size = 0;
+        bool same_version_as_before;
+        grab_readlock(new_top_ref, new_file_size, same_version_as_before);
 
-        // Update reader list
-        if (ringbuf_is_empty()) {
-            ReadCount r2 = { m_version, 1 };
-            ringbuf_put(r2); // Throws
+        if (same_version_as_before && m_group.may_reattach_if_same_version()) {
+
+            m_group.reattach_from_retained_data();
         }
         else {
-            ReadCount& r = ringbuf_get_last();
-            if (r.version == m_version) {
-                ++r.count;
+            // Make sure the group is up-to-date.
+            // A zero ref means that the file has just been created.
+            try {
+                m_group.update_from_shared(new_top_ref, new_file_size); // Throws
             }
-            else {
-                ReadCount r2 = { m_version, 1 };
-                ringbuf_put(r2); // Throws
+            catch (...) {
+                end_read();
+                throw;
             }
         }
     }
-
     m_transact_stage = transact_Reading;
-
-    // Make sure the group is up-to-date.
-    // A zero ref means that the file has just been created.
-    try {
-        m_group.update_from_shared(new_top_ref, new_file_size); // Throws
-    }
-    catch (...) {
-        end_read();
-        throw;
-    }
 
     return m_group;
 }
 
+void SharedGroup::release_readlock() TIGHTDB_NOEXCEPT
+{
+    SharedInfo* info = m_file_map.get_addr();
+    LockGuard lock(info->readmutex);
+
+    if (TIGHTDB_UNLIKELY(info->infosize > m_reader_map.get_size()))
+        m_reader_map.remap(m_file, util::File::access_ReadWrite, info->infosize);
+
+    // Find entry for current version
+    size_t ndx = ringbuf_find(m_version);
+    TIGHTDB_ASSERT(ndx != not_found);
+    ReadCount& r = ringbuf_get(ndx);
+
+    // Decrement count and remove as many entries as possible
+    if (r.count == 1 && ringbuf_is_first(ndx)) {
+        ringbuf_remove_first();
+        while (!ringbuf_is_empty() && ringbuf_get_first().count == 0)
+            ringbuf_remove_first();
+    }
+    else {
+        TIGHTDB_ASSERT(r.count > 0);
+        --r.count;
+    }
+}
 
 void SharedGroup::end_read() TIGHTDB_NOEXCEPT
 {
@@ -741,32 +821,12 @@ void SharedGroup::end_read() TIGHTDB_NOEXCEPT
     TIGHTDB_ASSERT(m_transact_stage == transact_Reading);
     TIGHTDB_ASSERT(m_version != numeric_limits<size_t>::max());
 
-    {
-        SharedInfo* info = m_file_map.get_addr();
-        Mutex::Lock lock(info->readmutex);
-
-        if (TIGHTDB_UNLIKELY(info->infosize > m_reader_map.get_size()))
-            m_reader_map.remap(m_file, util::File::access_ReadWrite, info->infosize);
-
-        // Find entry for current version
-        size_t ndx = ringbuf_find(m_version);
-        TIGHTDB_ASSERT(ndx != not_found);
-        ReadCount& r = ringbuf_get(ndx);
-
-        // Decrement count and remove as many entries as possible
-        if (r.count == 1 && ringbuf_is_first(ndx)) {
-            ringbuf_remove_first();
-            while (!ringbuf_is_empty() && ringbuf_get_first().count == 0)
-                ringbuf_remove_first();
-        }
-        else {
-            TIGHTDB_ASSERT(r.count > 0);
-            --r.count;
-        }
+    if (! m_transactions_are_pinned) {
+        release_readlock();
     }
 
     // The read may have allocated some temporary state
-    m_group.detach();
+    m_group.detach_but_retain_data();
 
     m_transact_stage = transact_Ready;
 }
@@ -1123,7 +1183,7 @@ void SharedGroup::zero_free_space()
     size_t file_size;
 
     {
-        Mutex::Lock lock(info->readmutex);
+        LockGuard lock(info->readmutex);
         current_version = info->current_version.load_relaxed() + 1;
         file_size = to_size_t(info->filesize);
 
@@ -1153,7 +1213,7 @@ void SharedGroup::low_level_commit(uint64_t new_version)
     SharedInfo* info = m_file_map.get_addr();
     uint64_t readlock_version;
     {
-        Mutex::Lock lock(info->readmutex);
+        LockGuard lock(info->readmutex);
 
         if (TIGHTDB_UNLIKELY(info->infosize > m_reader_map.get_size()))
             m_reader_map.remap(m_file, util::File::access_ReadWrite, info->infosize); // Throws
@@ -1187,7 +1247,7 @@ void SharedGroup::low_level_commit(uint64_t new_version)
 
     // Update reader info
     {
-        Mutex::Lock lock(info->readmutex);
+        LockGuard lock(info->readmutex);
         info->current_top = new_top_ref;
         info->filesize    = new_file_size;
         info->current_version.store_relaxed(new_version);

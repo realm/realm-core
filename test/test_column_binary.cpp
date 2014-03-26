@@ -3,8 +3,10 @@
 
 #include <string>
 
-#include <UnitTest++.h>
 #include <tightdb/column_binary.hpp>
+
+#include "util/unit_test.hpp"
+#include "util/test_only.hpp"
 
 using namespace tightdb;
 
