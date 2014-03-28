@@ -253,10 +253,10 @@
 #endif
 
 #if defined(__APPLE__) && defined(__MACH__)
-    /* Apple OSX and iOS (Darwin). ------------------------------ */
+    /* Apple OSX and iOS (Darwin). */
 #include <TargetConditionals.h>
 #if TARGET_OS_IPHONE == 1
-    /* Device or Simulator */
+    /* Device or simulator. */
     #define TIGHTDB_IOS 1
 #endif
 #endif
