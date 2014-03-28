@@ -2407,6 +2407,7 @@ template<class cond2, Action action, size_t bitwidth, class Callback> bool Array
     cond2 c;
     TIGHTDB_ASSERT(start <= m_size && (end <= m_size || end == std::size_t(-1)) && start <= end);
 
+#ifndef TIGHTDB_REDUCE_SIZE
     // Test first few items with no initial time overhead
     if (start > 0) {
         if (m_size > start && c(Get<bitwidth>(start), value) && start < end) {
@@ -2437,6 +2438,7 @@ template<class cond2, Action action, size_t bitwidth, class Callback> bool Array
 
         ++start;
     }
+#endif
 
     if (!(m_size > start && start < end))
         return true;
@@ -2647,6 +2649,20 @@ template<bool gt, Action action, size_t width, class Callback> bool Array::FindG
 template<bool gt, Action action, size_t width, class Callback> bool Array::FindGTLT(int64_t v, uint64_t chunk, QueryState<int64_t>* state, size_t baseindex, Callback callback) const
 {
     // Find items in 'chunk' that are greater (if gt == true) or smaller (if gt == false) than 'v'. Fixme, __forceinline can make it crash in vS2010 - find out why
+#ifdef TIGHTDB_REDUCE_SIZE
+
+    if (width < 8) {
+        uint64_t mask = (1ULL << ((width < 8) ? width : 0)) - 1;
+        size_t idx = 0;
+        for (size_t t = 0; t < 64; t += width) {
+            if (gt ? static_cast<int64_t>(chunk & mask) > v : static_cast<int64_t>(chunk & mask) < v) {
+                if (!find_action<action, Callback>( idx + baseindex, static_cast<int64_t>(chunk & mask), state, callback)) return false;
+            } chunk >>= (width < 8) ? width : 0;
+            idx++;
+        }
+    }
+
+#else
     if (width == 1) {
         for (size_t t = 0; t < 64; t++) {
             if (gt ? static_cast<int64_t>(chunk & 0x1) > v : static_cast<int64_t>(chunk & 0x1) < v) {if (!find_action<action, Callback>( t + baseindex, static_cast<int64_t>(chunk & 0x1), state, callback)) return false;} chunk >>= 1;
@@ -2713,6 +2729,7 @@ template<bool gt, Action action, size_t width, class Callback> bool Array::FindG
         // 187 ms:
         // if (gt ? static_cast<int64_t>(chunk >> 0*4) & 0xf > v : static_cast<int64_t>(chunk >> 0*4) & 0xf < v) return 0;
     }
+#endif
     else if (width == 8) {
         // 88 ms:
         if (gt ? static_cast<char>(chunk) > v : static_cast<char>(chunk) < v) {if (!find_action<action, Callback>( 0 + baseindex, static_cast<char>(chunk), state, callback)) return false;} chunk >>= 8;
