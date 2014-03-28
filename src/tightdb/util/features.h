@@ -252,5 +252,13 @@
     #define TIGHTDB_FORCEINLINE inline
 #endif
 
+#if defined(__APPLE__) && defined(__MACH__)
+    /* Apple OSX and iOS (Darwin). ------------------------------ */
+#include <TargetConditionals.h>
+#if TARGET_OS_IPHONE == 1
+    /* Device or Simulator */
+    #define TIGHTDB_IOS 1
+#endif
+#endif
 
 #endif /* TIGHTDB_UTIL_FEATURES_H */
