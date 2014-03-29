@@ -241,6 +241,9 @@
     <ClCompile Include="test\util\wildcard.cpp">
       <Filter>test\util</Filter>
     </ClCompile>
+    <ClCompile Include="test\test_self.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\win32\pthread\pthread.h">

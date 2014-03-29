@@ -4,8 +4,7 @@
 #include <tightdb/array_string.hpp>
 #include <tightdb/column.hpp>
 
-#include "util/unit_test.hpp"
-#include "util/test_only.hpp"
+#include "test.hpp"
 
 using namespace tightdb;
 

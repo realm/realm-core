@@ -3,8 +3,7 @@
 
 #include <tightdb/array_string_long.hpp>
 
-#include "util/unit_test.hpp"
-#include "util/test_only.hpp"
+#include "test.hpp"
 
 using namespace tightdb;
 

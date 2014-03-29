@@ -11,13 +11,14 @@
 #include <tightdb/lang_bind_helper.hpp>
 
 #include "util/misc.hpp"
-#include "util/unit_test.hpp"
-#include "util/test_only.hpp"
+
+#include "test.hpp"
 
 using namespace std;
 using namespace tightdb;
 using namespace tightdb::util;
-using namespace test_util;
+using namespace tightdb::test_util;
+using unit_test::TestResults;
 
 // Note: You can now temporarely declare unit tests with the ONLY(TestName) macro instead of TEST(TestName). This
 // will disable all unit tests except these. Remember to undo your temporary changes before committing.
@@ -848,7 +849,7 @@ TEST(Table_ToString)
 #endif
 }
 
-TEST(Table_JsonAllAata)
+TEST(Table_JsonAllData)
 {
     Table table;
     setup_multi_table(table, 15, 2);
@@ -2851,7 +2852,7 @@ TEST(Table_Aggregates)
     CHECK_EQUAL(11.0f, table.column().c_float.maximum());
     CHECK_EQUAL(12.0, table.column().c_double.maximum());
     // sum
-    CHECK_APPROXIMATELY_EQUAL(i_sum, table.column().c_int.sum(),    10*epsilon);
+    CHECK_APPROXIMATELY_EQUAL(double(i_sum), double(table.column().c_int.sum()), 10*epsilon);
     CHECK_APPROXIMATELY_EQUAL(f_sum, table.column().c_float.sum(),  10*epsilon);
     CHECK_APPROXIMATELY_EQUAL(d_sum, table.column().c_double.sum(), 10*epsilon);
     // average
@@ -3015,7 +3016,8 @@ TEST(Table_Pivot)
 
 namespace {
 
-void compare_table_with_slice(const Table& table, const Table& slice, size_t offset, size_t size)
+void compare_table_with_slice(TestResults& test_results, const Table& table,
+                              const Table& slice, size_t offset, size_t size)
 {
     ConstDescriptorRef table_desc = table.get_descriptor();
     ConstDescriptorRef slice_desc = slice.get_descriptor();
@@ -3128,7 +3130,8 @@ void compare_table_with_slice(const Table& table, const Table& slice, size_t off
 }
 
 
-void test_write_slice_name(const Table& table, StringData expect_name, bool override_name)
+void test_write_slice_name(TestResults& test_results, const Table& table,
+                           StringData expect_name, bool override_name)
 {
     size_t offset = 0, size = 0;
     ostringstream out;
@@ -3146,7 +3149,8 @@ void test_write_slice_name(const Table& table, StringData expect_name, bool over
     CHECK(slice);
 }
 
-void test_write_slice_contents(const Table& table, size_t offset, size_t size)
+void test_write_slice_contents(TestResults& test_results, const Table& table,
+                               size_t offset, size_t size)
 {
     ostringstream out;
     table.write(out, offset, size);
@@ -3163,7 +3167,7 @@ void test_write_slice_contents(const Table& table, size_t offset, size_t size)
             size_2 = remaining_size;
         CHECK_EQUAL(size_2, slice->size());
         if (size_2 == slice->size())
-            compare_table_with_slice(table, *slice, offset, size_2);
+            compare_table_with_slice(test_results, table, *slice, offset, size_2);
     }
 }
 
@@ -3174,16 +3178,16 @@ TEST(Table_WriteSlice)
     // check that the name of the written table is as expected
     {
         Table table;
-        test_write_slice_name(table, "",    false);
-        test_write_slice_name(table, "foo", true); // Override
-        test_write_slice_name(table, "",    true); // Override
+        test_write_slice_name(test_results, table, "",    false);
+        test_write_slice_name(test_results, table, "foo", true); // Override
+        test_write_slice_name(test_results, table, "",    true); // Override
     }
     {
         Group group;
         TableRef table = group.get_table("test");
-        test_write_slice_name(*table, "test", false);
-        test_write_slice_name(*table, "foo",  true); // Override
-        test_write_slice_name(*table, "",     true); // Override
+        test_write_slice_name(test_results, *table, "test", false);
+        test_write_slice_name(test_results, *table, "foo",  true); // Override
+        test_write_slice_name(test_results, *table, "",     true); // Override
     }
 
     // Run through a 3-D matrix of table sizes, slice offsets, and
@@ -3209,7 +3213,7 @@ TEST(Table_WriteSlice)
                 int size = table_sizes[size_i];
                 // This also checks that the range can extend beyond
                 // end of table
-                test_write_slice_contents(*table, offset, size);
+                test_write_slice_contents(test_results, *table, offset, size);
                 if (offset + size > table_size)
                     break;
             }

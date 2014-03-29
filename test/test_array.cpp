@@ -10,11 +10,11 @@
 #include <tightdb/column.hpp>
 #include <tightdb/query_conditions.hpp>
 
-#include "util/unit_test.hpp"
-#include "util/test_only.hpp"
+#include "test.hpp"
 
 using namespace std;
 using namespace tightdb;
+using test_util::unit_test::TestResults;
 
 // Note: You can now temporarely declare unit tests with the ONLY(TestName) macro instead of TEST(TestName). This
 // will disable all unit tests except these. Remember to undo your temporary changes before committing.
@@ -27,7 +27,7 @@ struct db_setup_array {
 
 Array db_setup_array::c;
 
-void has_zero_byte(int64_t value, size_t reps)
+void has_zero_byte(TestResults& test_results, int64_t value, size_t reps)
 {
     Array a;
     Array r;
@@ -896,13 +896,13 @@ TEST(Array_FindHasZeroByte)
 {
     // we want at least 1 entire 64-bit chunk-test, and we also want a remainder-test, so we chose n to be a prime > 64
     size_t n = 73;
-    has_zero_byte(1, n); // width = 1
-    has_zero_byte(3, n); // width = 2
-    has_zero_byte(13, n); // width = 4
-    has_zero_byte(100, n); // 8
-    has_zero_byte(10000, n); // 16
-    has_zero_byte(100000, n); // 32
-    has_zero_byte(8000000000LL, n); // 64
+    has_zero_byte(test_results, 1, n); // width = 1
+    has_zero_byte(test_results, 3, n); // width = 2
+    has_zero_byte(test_results, 13, n); // width = 4
+    has_zero_byte(test_results, 100, n); // 8
+    has_zero_byte(test_results, 10000, n); // 16
+    has_zero_byte(test_results, 100000, n); // 32
+    has_zero_byte(test_results, 8000000000LL, n); // 64
 }
 
 // New find test for SSE search, to trigger partial finds (see FindSSE()) before and after the aligned data area

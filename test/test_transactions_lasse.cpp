@@ -20,8 +20,8 @@
 #include <tightdb/util/file.hpp>
 
 #include "util/thread_wrapper.hpp"
-#include "util/unit_test.hpp"
-#include "util/test_only.hpp"
+
+#include "test.hpp"
 
 using namespace std;
 using namespace tightdb;
