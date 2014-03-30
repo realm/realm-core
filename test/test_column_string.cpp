@@ -5,8 +5,7 @@
 #include <tightdb/column_string_enum.hpp>
 #include <tightdb/index_string.hpp>
 
-#include "util/unit_test.hpp"
-#include "util/test_only.hpp"
+#include "test.hpp"
 
 using namespace tightdb;
 

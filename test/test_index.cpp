@@ -3,8 +3,7 @@
 
 #include <tightdb/index.hpp>
 
-#include "util/unit_test.hpp"
-#include "util/test_only.hpp"
+#include "test.hpp"
 
 using namespace tightdb;
 

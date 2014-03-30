@@ -10,8 +10,7 @@
 #include <tightdb/column.hpp>
 #include <tightdb/query_engine.hpp>
 
-#include "util/unit_test.hpp"
-#include "util/test_only.hpp"
+#include "test.hpp"
 
 using namespace std;
 using namespace tightdb;
@@ -143,7 +142,7 @@ TEST(Query_Count)
         size_t count = 0;
         size_t rows = rand() % (5 * TIGHTDB_MAX_LIST_SIZE); // to cross some leaf boundaries
 
-        for(size_t i = 0; i < rows; i++) {
+        for(size_t i = 0; i < rows; ++i) {
             table.add_empty_row();
             int64_t val = rand() % 5;
             table.set_int(0, i, val);

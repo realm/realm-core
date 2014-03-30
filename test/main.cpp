@@ -117,13 +117,13 @@ public:
     {
     }
 
-    void end(const Location& loc, double elapsed_seconds) TIGHTDB_OVERRIDE
+    void end(const TestDetails& details, double elapsed_seconds) TIGHTDB_OVERRIDE
     {
         result r;
-        r.m_test_name = loc.test_name;
+        r.m_test_name = details.test_name;
         r.m_elapsed_seconds = elapsed_seconds;
         m_results.push_back(r);
-        SimpleReporter::end(loc, elapsed_seconds);
+        SimpleReporter::end(details, elapsed_seconds);
     }
 
     void summary(const Summary& summary) TIGHTDB_OVERRIDE
@@ -201,7 +201,8 @@ bool run_tests()
         filter.reset(create_wildcard_filter(filter_str));
 
     // Run
-    bool success = run(reporter.get(), filter.get());
+    TestList& list = get_default_test_list();
+    bool success = list.run(reporter.get(), filter.get());
 
     if (test_only)
         cout << "\n*** BE AWARE THAT MOST TESTS ARE EXCLUDED DUE TO USING 'ONLY' MACRO ***\n";

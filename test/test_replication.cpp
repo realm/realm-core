@@ -8,8 +8,7 @@
 #include <tightdb/util/unique_ptr.hpp>
 #include <tightdb/util/file.hpp>
 
-#include "util/unit_test.hpp"
-#include "util/test_only.hpp"
+#include "test.hpp"
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
 

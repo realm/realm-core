@@ -22,8 +22,7 @@ static const mode_t MS_MODE_MASK = 0x0000ffff;
 #include <tightdb.hpp>
 #include <tightdb/util/file.hpp>
 
-#include "util/unit_test.hpp"
-#include "util/test_only.hpp"
+#include "test.hpp"
 
 using namespace std;
 using namespace tightdb;
