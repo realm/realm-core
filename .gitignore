@@ -63,12 +63,12 @@ Static library*/
 /android-lib/
 
 # debian/ubuntu builds
-debian/tightdb/*
-debian/libtightdb/*
-debian/libtightdb-dev/*
-debian/libtightdb-dev.substvars
-debian/libtightdb.substvars
-debian/tightdb.substvars
+/debian/tightdb/*
+/debian/libtightdb/*
+/debian/libtightdb-dev/*
+/debian/libtightdb-dev.substvars
+/debian/libtightdb.substvars
+/debian/tightdb.substvars
 /debian/files
 /debian/changelog
 /debian/debhelper.log

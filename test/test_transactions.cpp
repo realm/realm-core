@@ -366,10 +366,10 @@ void round(TestResults& test_results, SharedGroup& db, int index)
 }
 
 
-void thread(TestResults* test_results, int index, string database_path)
+void thread(TestResults* test_results, int index, string path)
 {
     for (int i=0; i<num_rounds; ++i) {
-        SharedGroup db(database_path);
+        SharedGroup db(path);
         round(*test_results, db, index);
     }
 }
@@ -379,9 +379,7 @@ void thread(TestResults* test_results, int index, string database_path)
 
 TEST(Transactions_General)
 {
-    string database_path = "transactions.tightdb";
-    File::try_remove(database_path);
-    File::try_remove(database_path+".lock");
+    SHARED_GROUP_TEST_PATH(path);
 
     // Run N rounds in each thread
     {
@@ -389,7 +387,7 @@ TEST(Transactions_General)
 
         // Start threads
         for (int i = 0; i != num_threads; ++i)
-            threads[i].start(bind(&thread, &test_results, i, database_path));
+            threads[i].start(bind(&thread, &test_results, i, string(path)));
 
         // Wait for threads to finish
         for (int i = 0; i != num_threads; ++i) {
@@ -410,7 +408,7 @@ TEST(Transactions_General)
     table1_theta_size *= num_rounds;
     table1_theta_size += 2;
 
-    SharedGroup db(database_path);
+    SharedGroup db(path);
     ReadTransaction rt(db);
     MyTable::ConstRef table = rt.get_table<MyTable>("my_table");
     CHECK(2 <= table->size());

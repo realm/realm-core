@@ -67,13 +67,13 @@
 #define CHECK_GREATER_EQUAL(a,b) \
     test_results.check_greater_equal((a), (b), __FILE__, __LINE__, #a, #b)
 
-#define CHECK_THROW(expr, exception) \
+#define CHECK_THROW(expr, exception_class) \
     do { \
         try { \
             (expr); \
-            test_results.throw_failed(__FILE__, __LINE__, #expr, #exception); \
+            test_results.throw_failed(__FILE__, __LINE__, #expr, #exception_class); \
         } \
-        catch (exception&) { \
+        catch (exception_class&) { \
             test_results.check_succeeded(); \
         } \
     } \
