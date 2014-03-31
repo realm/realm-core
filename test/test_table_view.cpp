@@ -9,8 +9,8 @@
 #include <tightdb/table_macros.hpp>
 
 #include "util/misc.hpp"
-#include "util/unit_test.hpp"
-#include "util/test_only.hpp"
+
+#include "test.hpp"
 
 using namespace std;
 using namespace tightdb;

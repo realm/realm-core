@@ -209,6 +209,7 @@ void TableViewBase::sort(size_t column, bool Ascending)
 
     if (m_refs.size() == 0)
         return;
+    m_is_in_index_order = false;
 
     Array vals;
     Array ref;
