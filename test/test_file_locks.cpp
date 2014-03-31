@@ -9,6 +9,7 @@
 #include <tightdb/util/bind.hpp>
 #include <tightdb/util/thread.hpp>
 #include <tightdb/util/file.hpp>
+#include <tightdb/util/features.h>
 
 #include "test.hpp"
 
@@ -77,6 +78,7 @@ void slave(int ndx)
 
 } // anonymous namespace
 
+#ifndef TIGHTDB_IOS
 
 // The assumption is that if multiple processes try to place an
 // exclusive lock on a file in a non-blocking fashion, then at least
@@ -107,5 +109,7 @@ TEST(File_NoSpuriousTryLockFailures)
     // Check that there are no cases where no one got the lock
     CHECK_EQUAL(0, results[0]);
 }
+
+#endif // TIGHTDB_IOS
 
 #endif // TEST_FILE_LOCKS
