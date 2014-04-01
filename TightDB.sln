@@ -1,5 +1,7 @@
-Microsoft Visual Studio Solution File, Format Version 11.00
-# Visual Studio 2010
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 2013
+VisualStudioVersion = 12.0.21005.1
+MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{ED0C49D7-6CFD-4B05-BA18-7C6E98A994C8}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TightDB", "TightDB.vcxproj", "{C18EDDC1-166A-49C4-B483-11458F48CF8E}"
@@ -27,9 +29,6 @@ EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "benchmark-sqlite", "test\benchmark-sqlite\benchmark-sqlite.vcxproj", "{69AAE70E-B352-433B-B6E9-1AEEC438B49C}"
 EndProject
 Global
-	GlobalSection(TestCaseManagementSettings) = postSolution
-		CategoryFile = TightDB.vsmdi
-	EndGlobalSection
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		csv debug|Win32 = csv debug|Win32
 		csv debug|x64 = csv debug|x64
@@ -147,14 +146,14 @@ Global
 		{54618B78-8356-44A7-8860-18A455509A86}.Static lib, release|Win32.ActiveCfg = Release|x64
 		{54618B78-8356-44A7-8860-18A455509A86}.Static lib, release|x64.ActiveCfg = Release|x64
 		{54618B78-8356-44A7-8860-18A455509A86}.Static lib, release|x64.Build.0 = Release|x64
-		{64D11991-F0F0-470D-B230-48410066090E}.csv debug|Win32.ActiveCfg = csv debug|Win32
-		{64D11991-F0F0-470D-B230-48410066090E}.csv debug|Win32.Build.0 = csv debug|Win32
-		{64D11991-F0F0-470D-B230-48410066090E}.csv debug|x64.ActiveCfg = csv debug|x64
-		{64D11991-F0F0-470D-B230-48410066090E}.csv debug|x64.Build.0 = csv debug|x64
-		{64D11991-F0F0-470D-B230-48410066090E}.csv release|Win32.ActiveCfg = csv importer|Win32
-		{64D11991-F0F0-470D-B230-48410066090E}.csv release|Win32.Build.0 = csv importer|Win32
-		{64D11991-F0F0-470D-B230-48410066090E}.csv release|x64.ActiveCfg = csv importer|x64
-		{64D11991-F0F0-470D-B230-48410066090E}.csv release|x64.Build.0 = csv importer|x64
+		{64D11991-F0F0-470D-B230-48410066090E}.csv debug|Win32.ActiveCfg = Release|Win32
+		{64D11991-F0F0-470D-B230-48410066090E}.csv debug|Win32.Build.0 = Release|Win32
+		{64D11991-F0F0-470D-B230-48410066090E}.csv debug|x64.ActiveCfg = Release|x64
+		{64D11991-F0F0-470D-B230-48410066090E}.csv debug|x64.Build.0 = Release|x64
+		{64D11991-F0F0-470D-B230-48410066090E}.csv release|Win32.ActiveCfg = Release|Win32
+		{64D11991-F0F0-470D-B230-48410066090E}.csv release|Win32.Build.0 = Release|Win32
+		{64D11991-F0F0-470D-B230-48410066090E}.csv release|x64.ActiveCfg = Release|x64
+		{64D11991-F0F0-470D-B230-48410066090E}.csv release|x64.Build.0 = Release|x64
 		{64D11991-F0F0-470D-B230-48410066090E}.Debug|Win32.ActiveCfg = Debug|Win32
 		{64D11991-F0F0-470D-B230-48410066090E}.Debug|Win32.Build.0 = Debug|Win32
 		{64D11991-F0F0-470D-B230-48410066090E}.Debug|x64.ActiveCfg = Debug|x64
@@ -163,10 +162,14 @@ Global
 		{64D11991-F0F0-470D-B230-48410066090E}.Release|Win32.Build.0 = Release|Win32
 		{64D11991-F0F0-470D-B230-48410066090E}.Release|x64.ActiveCfg = Release|x64
 		{64D11991-F0F0-470D-B230-48410066090E}.Release|x64.Build.0 = Release|x64
-		{64D11991-F0F0-470D-B230-48410066090E}.Static lib, debug|Win32.ActiveCfg = Static library, debug|Win32
-		{64D11991-F0F0-470D-B230-48410066090E}.Static lib, debug|x64.ActiveCfg = Static library, debug|x64
-		{64D11991-F0F0-470D-B230-48410066090E}.Static lib, release|Win32.ActiveCfg = Static library, release|Win32
-		{64D11991-F0F0-470D-B230-48410066090E}.Static lib, release|x64.ActiveCfg = Static library, release|x64
+		{64D11991-F0F0-470D-B230-48410066090E}.Static lib, debug|Win32.ActiveCfg = Release|Win32
+		{64D11991-F0F0-470D-B230-48410066090E}.Static lib, debug|Win32.Build.0 = Release|Win32
+		{64D11991-F0F0-470D-B230-48410066090E}.Static lib, debug|x64.ActiveCfg = Release|x64
+		{64D11991-F0F0-470D-B230-48410066090E}.Static lib, debug|x64.Build.0 = Release|x64
+		{64D11991-F0F0-470D-B230-48410066090E}.Static lib, release|Win32.ActiveCfg = Release|Win32
+		{64D11991-F0F0-470D-B230-48410066090E}.Static lib, release|Win32.Build.0 = Release|Win32
+		{64D11991-F0F0-470D-B230-48410066090E}.Static lib, release|x64.ActiveCfg = Release|x64
+		{64D11991-F0F0-470D-B230-48410066090E}.Static lib, release|x64.Build.0 = Release|x64
 		{69AAE70E-B352-433B-B6E9-1AEEC438B49C}.csv debug|Win32.ActiveCfg = Release|x64
 		{69AAE70E-B352-433B-B6E9-1AEEC438B49C}.csv debug|x64.ActiveCfg = Release|x64
 		{69AAE70E-B352-433B-B6E9-1AEEC438B49C}.csv debug|x64.Build.0 = Release|x64
@@ -198,5 +201,8 @@ Global
 		{54618B78-8356-44A7-8860-18A455509A86} = {ED0C49D7-6CFD-4B05-BA18-7C6E98A994C8}
 		{64D11991-F0F0-470D-B230-48410066090E} = {ED0C49D7-6CFD-4B05-BA18-7C6E98A994C8}
 		{69AAE70E-B352-433B-B6E9-1AEEC438B49C} = {ED0C49D7-6CFD-4B05-BA18-7C6E98A994C8}
+	EndGlobalSection
+	GlobalSection(TestCaseManagementSettings) = postSolution
+		CategoryFile = TightDB.vsmdi
 	EndGlobalSection
 EndGlobal
