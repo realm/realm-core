@@ -113,7 +113,11 @@ const int max_wait_for_daemon_start = 100;
 //     While delayed, the entry selected by put_pos may be freed and reused, and then
 //     we will lack synchronization. Hence case 1 was added.
 //
-// - The use of release (in case 2 above) could be replaced
+//   - a read transaction must complete all reads of memory before it can be changed
+//     by another thread (this is an example of an anti-dependency). This requires
+//     the solution described as case 2 above.
+//
+// - The use of release (in case 2 above) could - in principle - be replaced
 //   by a read memory barrier which would be faster on some architectures, but
 //   there is no standardized support for it.
 //
