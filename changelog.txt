@@ -12,7 +12,7 @@ Format:
 
 
 2014-04-01 (Kristian Spangsege)
-+ New test suite with support for parallelized testing replaces UnitTest++. See section 'Testing' in `README.md`.
++ New framework with support for parallelized unit testing replaces UnitTest++. See section 'Testing' in `README.md`.
 
 
 2014-03-25 (Kristian Spangsege)
