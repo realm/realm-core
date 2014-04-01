@@ -1401,7 +1401,7 @@ namespace {
 void rand_str(Random& random, char* res, size_t len)
 {
     for (size_t i = 0; i < len; ++i)
-        res[i] = 'a' + random.draw_int_mod(10);
+        res[i] = char(int('a') + random.draw_int_mod(10));
 }
 
 } // anonymous namespace

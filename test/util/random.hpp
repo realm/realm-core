@@ -119,7 +119,7 @@ private:
 
 
 /// 32-bit Mersenne Twister.
-typedef MersenneTwisterEngine<typename util::FastestUnsigned<32>::type,
+typedef MersenneTwisterEngine<util::FastestUnsigned<32>::type,
                               32, 624, 397, 31, 0x9908B0DFUL,
                               11, 0xFFFFFFFFUL,
                               7,  0x9D2C5680UL,
@@ -356,13 +356,13 @@ inline Random::Random() TIGHTDB_NOEXCEPT:
 }
 
 inline Random::Random(unsigned long seed) TIGHTDB_NOEXCEPT:
-    m_engine(seed)
+    m_engine(MT19937::result_type(seed))
 {
 }
 
 inline void Random::seed(unsigned long seed) TIGHTDB_NOEXCEPT
 {
-    m_engine.seed(seed);
+    m_engine.seed(MT19937::result_type(seed));
 }
 
 template<class T> inline T Random::draw_int(T min, T max) TIGHTDB_NOEXCEPT

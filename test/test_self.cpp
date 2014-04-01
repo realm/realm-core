@@ -447,10 +447,8 @@ void throw_nothing()
 
 TEST_EX(Success_Exception, success_list) // Test #6, accum checks = 85 + 2 = 87
 {
-//    CHECK_THROW(throw_foo(), FooException);
-//    CHECK_THROW(throw_bar(), BarException);
-    CHECK(true);
-    CHECK(true);
+    CHECK_THROW(throw_foo(), FooException);
+    CHECK_THROW(throw_bar(), BarException);
 }
 
 TEST_EX(Failure_Exception, failure_list) // Test #6, accum checks = 105 + 2 = 107

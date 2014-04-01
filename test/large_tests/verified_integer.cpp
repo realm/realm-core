@@ -189,7 +189,7 @@ bool VerifiedInteger::Verify()
 // makes it run amortized the same time complexity as original, even though the row count grows
 bool VerifiedInteger::occasional_verify()
 {
-    if (m_random.chance(1, v.size() / 10))
+    if (m_random.draw_int_max(v.size() / 10) == 0)
         return Verify();
     return true;
 }
