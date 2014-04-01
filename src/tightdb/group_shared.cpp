@@ -40,27 +40,84 @@ const int max_wait_for_ok_filesize = 100;
 const int max_wait_for_sharedinfo_valid = 100;
 const int max_wait_for_daemon_start = 100;
 
-// The following 3 functions are carefully designed for minimal overhead
+// The following functions are carefully designed for minimal overhead
 // in case of contention among read transactions. In case of contention,
 // they consume roughly 90% of the cycles used to start and end a read transaction.
 //
 // Each live version carries a "count" field, which combines a reference count
-// of the readers bound to that version, and a single-bit "reclaimed" flag, which
+// of the readers bound to that version, and a single-bit "free" flag, which
 // indicates that the entry does not hold valid data.
 //
-// Read transactions increment and decrement the reference count. A write transaction
-// may set the "reclaimed" flag to indicate that the entry is being recycled, and clear
-// it again once the entry has been initialized with new data. The write transaction
-// will only reclaim an entry with a reference count of zero. Read transactions may see
-// (very rarely) a reclaimed entry in which case, they abandon the entry and obtain a
-// reference to a newer one.
+// The usage patterns are as follows:
+//
+// Read transactions guard their access to the version information by
+// increasing the count field for the duration of the transaction.
+// A non-zero count field also indicates that the free space associated
+// with the version must remain intact. A zero count field indicates that
+// no one refers to that version, so it's free lists can be merged into
+// older free space and recycled.
+//
+// Only write transactions allocate and write new version entries. Also,
+// Only write transactions scan the ringbuffer for older versions which
+// are not used (count is zero) and free them. As write transactions are
+// atomic (ensured by mutex), there is no race between freeing entries
+// in the ringbuffer and allocating and writing them.
+//
+// There are no race conditions between read transactions. Read transactions
+// never change the versioning information, only increment or decrement the
+// count (and do so solely through the use of atomic operations).
+//
+// There is a race between read transactions incrementing the count field and
+// a write transaction setting the free field. These are mutually exclusive:
+// if a read sees the free field set, it cannot use the entry. As it has already
+// incremented the count field (optimistically, anticipating that the free bit
+// was clear), it must immediately decrement it again. Likewise, it is possible
+// for one thread to set the free bit (anticipating a count of zero) while another
+// thread increments the count (anticipating a clear free bit). In such cases,
+// both threads undo their changes and back off.
+//
+// For all changes to the free field and the count field: It is important that changes
+// to the free field takes the count field into account and vice versa, because they
+// are changed optimistically but atomically. This is implemented by modifying the
+// count field only by atomic add/sub of '2', and modifying the free field only by
+// atomic add/sub of '1'.
+//
+// The following *memory* ordering is required for correctness:
+//
+// 1 Accesses within a transaction assumes the version info is valid *before*
+//   reading it. This is achieved by synchronizing on the count field. Reading
+//   the count field is an *acquire*, while clearing the free field is a *release*.
+//
+// 2 Accesses within a transaction assumes the version *remains* valid, so
+//   all memory accesses with a read transaction must happen before
+//   the changes to memory (by a write transaction). This is achieved
+//   by use of *release* when the count field is decremented, and use of
+//   *acquire* when the free field is set (by the write transaction).
+//
+// 3 Reads of the counter is synchronized by accesses to the put_pos variable
+//   in the ringbuffer. Reading put_pos is an acquire and writing put_pos is
+//   a release. Put pos is only ever written when a write transaction updates
+//   the ring buffer.
+//
+// Discussion:
+//
+// - The design forces release/acquire style synchronization on every
+//   begin_read/end_read. This feels like a bit too much, because *only* a write
+//   transaction ever changes memory contents. Read transactions do not communicate,
+//   so with the right scheme, synchronization should only be proportional to the 
+//   number of write transactions, not all transactions. The original design achieved
+//   this by ONLY synchronizing on the put_pos (case 3 above), BUT the following
+//   problems forced the addition of further synchronization:
+//
+//   - during begin_read, after reading put_pos, a thread may be arbitrarily delayed.
+//     While delayed, the entry selected by put_pos may be freed and reused, and then
+//     we will lack synchronization. Hence case 1 was added.
+//
+// - The use of release (in case 2 above) could be replaced
+//   by a read memory barrier which would be faster on some architectures, but
+//   there is no standardized support for it.
+//
 
-// Atomically double increment a counter if it is even, returns true
-// if succesfull. This is (somewhat non-intuitively) implemented by
-// optimistically incrementing the counter, then checking if it is even
-// and potentially reversing the increment if it was odd. This approach
-// allow us to use fetch_add_acquire which has *very* fast implementation
-// on some architectures.
 template<typename T> bool atomic_double_inc_if_even(Atomic<T>& counter)
 {
     T oldval = counter.fetch_add_acquire(2);
@@ -72,14 +129,11 @@ template<typename T> bool atomic_double_inc_if_even(Atomic<T>& counter)
     return true;
 }
 
-template<typename T> inline T atomic_double_dec(Atomic<T>& counter)
+template<typename T> inline void atomic_double_dec(Atomic<T>& counter)
 {
-    return counter.fetch_sub_relaxed(2);
+    counter.fetch_sub_release(2);
 }
 
-// Atomically set a counter to one, if it is 0.
-// true if succesfull.
-// Same "optimistic" approach as described for atomic_double_inc_if_even
 template<typename T> bool atomic_one_if_zero(Atomic<T>& counter)
 {
     T old_val = counter.fetch_add_acquire(1);
@@ -90,6 +144,10 @@ template<typename T> bool atomic_one_if_zero(Atomic<T>& counter)
     return true;
 }
 
+template<typename T> void atomic_dec(Atomic<T>& counter)
+{
+    counter.fetch_sub_release(1);
+}
 
 // nonblocking ringbuffer
 class Ringbuffer {
@@ -230,7 +288,7 @@ public:
 
     void use_next() 
     {
-        get_next().count.store_release(0);
+        atomic_dec(get_next().count); // .store_release(0);
         put_pos.store_release(next());
     }
 
@@ -1242,8 +1300,7 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
         Ringbuffer::ReadCount& r = r_info->readers.get_next();
         r.current_top = new_top_ref;
         r.filesize    = new_file_size;
-        r.version =     new_version;
-        r.count.store_release(0);
+        r.version     = new_version;
         r_info->readers.use_next();
     }
 
