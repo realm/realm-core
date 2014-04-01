@@ -2043,35 +2043,33 @@ TEST(Query_StrIndex)
 
 TEST(Query_GameAnalytics)
 {
+    GROUP_TEST_PATH(path);
     {
         Group g;
         GATable::Ref t = g.get_table<GATable>("firstevents");
 
         for (size_t i = 0; i < 100; ++i) {
-            const int64_t r1 = rand() % 100;
-            const int64_t r2 = rand() % 100;
+            int64_t r1 = rand() % 100;
+            int64_t r2 = rand() % 100;
 
             t->add("10", "US", "1.0", r1, r2);
         }
         t->optimize();
-        File::try_remove("ga_test.tightdb");
-        g.write("ga_test.tightdb");
+        g.write(path);
     }
 
-    Group g("ga_test.tightdb");
+    Group g(path);
     GATable::Ref t = g.get_table<GATable>("firstevents");
 
     GATable::Query q = t->where().country.equal("US");
 
     size_t c1 = 0;
-    for (size_t i = 0; i < 100; ++i) {
+    for (size_t i = 0; i < 100; ++i)
         c1 += t->column().country.count("US");
-    }
 
     size_t c2 = 0;
-    for (size_t i = 0; i < 100; ++i) {
+    for (size_t i = 0; i < 100; ++i)
         c2 += q.count();
-    }
 
     CHECK_EQUAL(c1, t->size() * 100);
     CHECK_EQUAL(c1, c2);

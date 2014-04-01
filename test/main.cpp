@@ -13,8 +13,8 @@
 #include <tightdb/version.hpp>
 
 #include "util/timer.hpp"
-#include "util/unit_test.hpp"
-#include "util/test_only.hpp"
+
+#include "test.hpp"
 
 
 // #define USE_VLD
@@ -175,6 +175,12 @@ private:
 
 bool run_tests()
 {
+    {
+        const char* str = getenv("UNITTEST_KEEP_FILES");
+        if (str && strlen(str) != 0)
+            keep_test_files();
+    }
+
     UniquePtr<Reporter> reporter;
     UniquePtr<Filter> filter;
 

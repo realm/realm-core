@@ -56,9 +56,9 @@ void master()
     }
 }
 
-void slave(int ndx)
+void slave(int ndx, string path)
 {
-    File file("test_file_locks.test", File::mode_Write);
+    File file(path, File::mode_Write);
     for (int i = 0; i != num_rounds; ++i) {
         bool good_lock = file.try_lock_exclusive();
         if (good_lock)
@@ -88,16 +88,16 @@ void slave(int ndx)
 // test, but it is probably the best we can do.
 TEST(File_NoSpuriousTryLockFailures)
 {
+    TEST_PATH(path);
+
     Thread slaves[num_slaves];
     for (int i = 0; i != num_slaves; ++i) {
         slaves_run[i] = false;
-        slaves[i].start(bind(&slave, i));
+        slaves[i].start(bind(&slave, i, string(path)));
     }
     master();
     for (int i = 0; i != num_slaves; ++i)
         slaves[i].join();
-
-    File::try_remove("test_file_locks.test");
 
 /*
     typedef map<int, int>::const_iterator iter;

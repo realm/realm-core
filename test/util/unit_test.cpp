@@ -427,8 +427,9 @@ void TestResults::inexact_compare_failed(const char* file, long line, const char
 void TestResults::throw_failed(const char* file, long line,
                                const char* expr_text, const char* exception)
 {
-    string msg = "CHECK_THROW("+string(expr_text)+") failed: Expected exception "+exception;
-    check_failed(file, line, msg);
+    ostringstream out;
+    out << "CHECK_THROW("<<expr_text<<", "<<exception<<") failed: Did not throw";
+    check_failed(file, line, out.str());
 }
 
 

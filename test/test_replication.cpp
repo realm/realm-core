@@ -21,7 +21,7 @@ namespace {
 
 class MyTrivialReplication: public TrivialReplication {
 public:
-    MyTrivialReplication(string database_file): TrivialReplication(database_file) {}
+    MyTrivialReplication(string path): TrivialReplication(path) {}
 
     ~MyTrivialReplication() TIGHTDB_NOEXCEPT
     {
@@ -60,13 +60,10 @@ TIGHTDB_TABLE_1(MyTable,
 
 TEST(Replication_General)
 {
-    string database_1 = "replication-1.tightdb";
-    string database_2 = "replication-2.tightdb";
-    File::try_remove(database_1);
-    File::try_remove(database_2);
-
+    GROUP_TEST_PATH(path_1);
+    GROUP_TEST_PATH(path_2);
     {
-        MyTrivialReplication repl(database_1);
+        MyTrivialReplication repl(path_1);
         SharedGroup sg_1(repl);
         {
             WriteTransaction wt(sg_1);
@@ -87,7 +84,7 @@ TEST(Replication_General)
             wt.commit();
         }
 
-        SharedGroup sg_2(database_2);
+        SharedGroup sg_2(path_2);
         repl.replay_transacts(sg_2);
 
         {
@@ -96,9 +93,6 @@ TEST(Replication_General)
             CHECK(rt_1.get_group() == rt_2.get_group());
         }
     }
-
-    File::try_remove(database_1);
-    File::try_remove(database_2);
 }
 
 

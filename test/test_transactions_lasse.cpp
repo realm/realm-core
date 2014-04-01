@@ -88,10 +88,10 @@ const int ITER1 =    2000;
 const int READERS1 =   10;
 const int WRITERS1 =   10;
 
-void write_thread(int thread_ndx)
+void write_thread(int thread_ndx, string path)
 {
     int_least64_t w = thread_ndx;
-    SharedGroup sg("database.tightdb");
+    SharedGroup sg(path);
 
     for (int i = 0; i < ITER1; ++i) {
         {
@@ -109,9 +109,9 @@ void write_thread(int thread_ndx)
     }
 }
 
-void read_thread()
+void read_thread(string path)
 {
-    SharedGroup sg("database.tightdb");
+    SharedGroup sg(path);
     for (size_t i = 0; i < ITER1; ++i) {
         ReadTransaction rt(sg);
         int64_t r1 = rt.get_table("table")->get_int(0, 0);
@@ -131,44 +131,38 @@ TEST(Transactions_Stress1)
 
     srand(123);
 
-    File::try_remove("database.tightdb");
-    File::try_remove("database.tightdb.lock");
-
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg(path);
     {
-        SharedGroup sg("database.tightdb");
-        {
-            WriteTransaction wt(sg);
-            TableRef table = wt.get_table("table");
-            Spec& spec = table->get_spec();
-            spec.add_column(type_Int, "row");
-            table->update_from_spec();
-            table->insert_empty_row(0, 1);
-            table->set_int(0, 0, 0);
-            wt.commit();
-        }
-
-        #if defined(_WIN32) || defined(__WIN32__) || defined(_WIN64)
-            pthread_win32_process_attach_np ();
-        #endif
-
-        for (int i = 0; i < READERS1; ++i)
-            read_threads[i].start(&read_thread);
-
-        for (int i = 0; i < WRITERS1; ++i)
-            write_threads[i].start(util::bind(write_thread, i));
-
-        for (int i = 0; i < READERS1; ++i) {
-            bool reader_has_thrown = read_threads[i].join();
-            CHECK(!reader_has_thrown);
-        }
-
-        for (int i = 0; i < WRITERS1; ++i) {
-            bool writer_has_thrown = write_threads[i].join();
-            CHECK(!writer_has_thrown);
-        }
+        WriteTransaction wt(sg);
+        TableRef table = wt.get_table("table");
+        Spec& spec = table->get_spec();
+        spec.add_column(type_Int, "row");
+        table->update_from_spec();
+        table->insert_empty_row(0, 1);
+        table->set_int(0, 0, 0);
+        wt.commit();
     }
 
-    File::try_remove("database.tightdb");
+#if defined(_WIN32) || defined(__WIN32__) || defined(_WIN64)
+    pthread_win32_process_attach_np ();
+#endif
+
+    for (int i = 0; i < READERS1; ++i)
+        read_threads[i].start(util::bind(&read_thread, string(path)));
+
+    for (int i = 0; i < WRITERS1; ++i)
+        write_threads[i].start(util::bind(write_thread, string(path), i));
+
+    for (int i = 0; i < READERS1; ++i) {
+        bool reader_has_thrown = read_threads[i].join();
+        CHECK(!reader_has_thrown);
+    }
+
+    for (int i = 0; i < WRITERS1; ++i) {
+        bool writer_has_thrown = write_threads[i].join();
+        CHECK(!writer_has_thrown);
+    }
 }
 
 
@@ -184,7 +178,7 @@ const int      THREADS2 = 30;
 const int      ITER2    = 2000;
 const unsigned GROUPS2  = 30;
 
-void create_groups()
+void create_groups(string path)
 {
     std::vector<SharedGroup*> groups;
 
@@ -193,7 +187,7 @@ void create_groups()
         int action = rand() % 2;
 
         if (action == 0 && groups.size() < GROUPS2) {
-            groups.push_back(new SharedGroup("database.tightdb"));
+            groups.push_back(new SharedGroup(path));
         }
         else if (action == 1 && groups.size() > 0) {
             size_t g = rand() % groups.size();
@@ -214,18 +208,15 @@ TEST(Transactions_Stress2)
     srand(123);
     test_util::ThreadWrapper threads[THREADS2];
 
-    File::try_remove("database.tightdb");
-    File::try_remove("database.tightdb.lock");
+    SHARED_GROUP_TEST_PATH(path);
 
     for (int i = 0; i < THREADS2; ++i)
-        threads[i].start(&create_groups);
+        threads[i].start(util::bind(&create_groups, string(path)));
 
     for (int i = 0; i < THREADS2; ++i) {
         bool thread_has_thrown = threads[i].join();
         CHECK(!thread_has_thrown);
     }
-
-    File::try_remove("database.tightdb");
 }
 
 
@@ -253,9 +244,9 @@ const int READERS3 =   4;
 const size_t ROWS3 = 1*1000*1000 + 1000; // + 1000 to add extra depth level if TIGHTDB_MAX_LIST_SIZE = 1000
 volatile bool terminate3 = false;
 
-void write_thread3()
+void write_thread3(string path)
 {
-    SharedGroup sg("database.tightdb");
+    SharedGroup sg(path);
 
     for (int i = 0; i < ITER3; ++i) {
         WriteTransaction wt(sg);
@@ -281,9 +272,9 @@ void write_thread3()
     }
 }
 
-void read_thread3()
+void read_thread3(string path)
 {
-    SharedGroup sg("database.tightdb");
+    SharedGroup sg(path);
     while (!terminate3) { // FIXME: Oops - this 'read' participates in a data race - http://stackoverflow.com/questions/12878344/volatile-in-c11
         ReadTransaction rt(sg);
         if(rt.get_table("table")->size() > 0) {
@@ -305,43 +296,39 @@ TEST(Transactions_Stress3)
 
     srand(123);
 
-    File::try_remove("database.tightdb");
-    File::try_remove("database.tightdb.lock");
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg(path);
+
     {
-        SharedGroup sg("database.tightdb");
-
-        {
-            WriteTransaction wt(sg);
-            TableRef table = wt.get_table("table");
-            Spec& spec = table->get_spec();
-            spec.add_column(type_Int, "row");
-            table->update_from_spec();
-            wt.commit();
-        }
-
-        #if defined(_WIN32) || defined(__WIN32__) || defined(_WIN64)
-            pthread_win32_process_attach_np ();
-        #endif
-
-        for (int i = 0; i < WRITERS3; ++i)
-            write_threads[i].start(&write_thread3);
-
-        for (int i = 0; i < READERS3; ++i)
-            read_threads[i].start(&read_thread3);
-
-        for (int i = 0; i < WRITERS3; ++i) {
-            bool writer_has_thrown = write_threads[i].join();
-            CHECK(!writer_has_thrown);
-        }
-
-        // Terminate reader threads cleanly
-        terminate3 = true; // FIXME: Oops - this 'write' participates in a data race - http://stackoverflow.com/questions/12878344/volatile-in-c11
-        for (int i = 0; i < READERS3; ++i) {
-            bool reader_has_thrown = read_threads[i].join();
-            CHECK(!reader_has_thrown);
-        }
+        WriteTransaction wt(sg);
+        TableRef table = wt.get_table("table");
+        Spec& spec = table->get_spec();
+        spec.add_column(type_Int, "row");
+        table->update_from_spec();
+        wt.commit();
     }
-    File::try_remove("database.tightdb");
+
+#if defined(_WIN32) || defined(__WIN32__) || defined(_WIN64)
+    pthread_win32_process_attach_np ();
+#endif
+
+    for (int i = 0; i < WRITERS3; ++i)
+        write_threads[i].start(util::bind(&write_thread3, string(path)));
+
+    for (int i = 0; i < READERS3; ++i)
+        read_threads[i].start(util::bind(&read_thread3, string(path)));
+
+    for (int i = 0; i < WRITERS3; ++i) {
+        bool writer_has_thrown = write_threads[i].join();
+        CHECK(!writer_has_thrown);
+    }
+
+    // Terminate reader threads cleanly
+    terminate3 = true; // FIXME: Oops - this 'write' participates in a data race - http://stackoverflow.com/questions/12878344/volatile-in-c11
+    for (int i = 0; i < READERS3; ++i) {
+        bool reader_has_thrown = read_threads[i].join();
+        CHECK(!reader_has_thrown);
+    }
 }
 
 
@@ -359,10 +346,10 @@ const int READERS4 =   20;
 const int WRITERS4 =   20;
 volatile bool terminate4 = false;
 
-void write_thread4(int thread_ndx)
+void write_thread4(string path, int thread_ndx)
 {
     int_least64_t w = thread_ndx;
-    SharedGroup sg("database.tightdb");
+    SharedGroup sg(path);
 
     for (int i = 0; i < ITER4; ++i) {
         {
@@ -380,9 +367,9 @@ void write_thread4(int thread_ndx)
     }
 }
 
-void read_thread4()
+void read_thread4(string path)
 {
-    SharedGroup sg("database.tightdb");
+    SharedGroup sg(path);
     while (!terminate4) { // FIXME: Oops - this 'read' participates in a data race - http://stackoverflow.com/questions/12878344/volatile-in-c11
         ReadTransaction rt(sg);
         int64_t r1 = rt.get_table("table")->get_int(0, 0);
@@ -402,46 +389,40 @@ TEST(Transactions_Stress4)
 
     srand(123);
 
-    File::try_remove("database.tightdb");
-    File::try_remove("database.tightdb.lock");
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg(path);
 
     {
-        SharedGroup sg("database.tightdb");
-
-        {
-            WriteTransaction wt(sg);
-            TableRef table = wt.get_table("table");
-            Spec& spec = table->get_spec();
-            spec.add_column(type_Int, "row");
-            table->update_from_spec();
-            table->insert_empty_row(0, 1);
-            table->set_int(0, 0, 0);
-            wt.commit();
-        }
-
-        #if defined(_WIN32) || defined(__WIN32__) || defined(_WIN64)
-            pthread_win32_process_attach_np ();
-        #endif
-
-        for (int i = 0; i < READERS4; ++i)
-            read_threads[i].start(&read_thread4);
-
-        for (int i = 0; i < WRITERS4; ++i)
-            write_threads[i].start(util::bind(write_thread4, i));
-
-        for (int i = 0; i < WRITERS4; ++i) {
-            bool writer_has_thrown = write_threads[i].join();
-            CHECK(!writer_has_thrown);
-        }
-
-        terminate4 = true; // FIXME: Oops - this 'write' participates in a data race - http://stackoverflow.com/questions/12878344/volatile-in-c11
-        for (int i = 0; i < READERS4; ++i) {
-            bool reader_has_thrown = read_threads[i].join();
-            CHECK(!reader_has_thrown);
-        }
+        WriteTransaction wt(sg);
+        TableRef table = wt.get_table("table");
+        Spec& spec = table->get_spec();
+        spec.add_column(type_Int, "row");
+        table->update_from_spec();
+        table->insert_empty_row(0, 1);
+        table->set_int(0, 0, 0);
+        wt.commit();
     }
 
-    File::try_remove("database.tightdb");
+#if defined(_WIN32) || defined(__WIN32__) || defined(_WIN64)
+    pthread_win32_process_attach_np ();
+#endif
+
+    for (int i = 0; i < READERS4; ++i)
+        read_threads[i].start(util::bind(&read_thread4, string(path)));
+
+    for (int i = 0; i < WRITERS4; ++i)
+        write_threads[i].start(util::bind(&write_thread4, string(path), i));
+
+    for (int i = 0; i < WRITERS4; ++i) {
+        bool writer_has_thrown = write_threads[i].join();
+        CHECK(!writer_has_thrown);
+    }
+
+    terminate4 = true; // FIXME: Oops - this 'write' participates in a data race - http://stackoverflow.com/questions/12878344/volatile-in-c11
+    for (int i = 0; i < READERS4; ++i) {
+        bool reader_has_thrown = read_threads[i].join();
+        CHECK(!reader_has_thrown);
+    }
 }
 
 #endif // TEST_TRANSACTIONS_LASSE

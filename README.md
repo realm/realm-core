@@ -226,6 +226,9 @@ These variables are available:
  - Set `UNITTEST_PROGRESS` to a non-empty value to enable reporting of
    progress (write the name of each test as it is executed).
 
+ - Set `UNITTEST_KEEP_FILES` to a non-empty value to disable automatic
+   removal of test files.
+
  - Set `UNITTEST_XML` to a non-empty value to dump the test results
    into an XML file. For details, see
    `tightdb::test_util::unit_test::create_xml_reporter()` in
