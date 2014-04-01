@@ -23,6 +23,7 @@
 #include <cmath>
 #include <cstring>
 #include <algorithm>
+#include <vector>
 #include <string>
 #include <sstream>
 #include <ostream>
@@ -30,7 +31,6 @@
 #include <tightdb/util/features.h>
 #include <tightdb/util/type_traits.hpp>
 #include <tightdb/util/safe_int_ops.hpp>
-#include <tightdb/util/unique_ptr.hpp>
 
 
 #define TEST(name) \
@@ -163,14 +163,12 @@ public:
 
 class TestList {
 public:
-    TestList();
-    ~TestList() TIGHTDB_NOEXCEPT;
     void add(Test&, const char* name, const char* file, long line);
-    bool run(Reporter* = 0, Filter* = 0);
+    bool run(Reporter* = 0, Filter* = 0, int num_threads = 1, bool shuffle = false);
 private:
-    class Impl;
-    util::UniquePtr<Impl> m_impl;
+    std::vector<Test*> m_tests;
 
+    class ExecContext;
     friend class TestResults;
 };
 
@@ -213,20 +211,16 @@ Reporter* create_xml_reporter(std::ostream&);
 /// containg `*` wild cards. Each `*` matches zero or more arbitrary
 /// characters.
 ///
-/// An empty filter is functionally equivalent to "*" and a filter on
-/// the form "- ..." is equivalent to "* - ...".
+/// An empty filter is functionally equivalent to `*` and a filter on
+/// the form `- ...` is equivalent to `* - ...`.
 ///
-/// Examples:
+/// Note that the empty string, `*`, `* -`, and `-` all mean
+/// "everything". Likewise, both `- *` and `* - *` means "nothing".
 ///
-///     ""                 everything
-///     "*"                everything
-///     "* -"              everything
-///     "-"                everything
-///     "- *"              nothing
-///     "* - *"            nothing
-///     "Array_Count"      only "Array_Count"
-///     "- Array_*"        all except those that match "Array_*"
-///     "Array_* Column_* - *_Count"
+/// For example, `Foo Bar*` will inlcude only the `Foo` test and those
+/// whose names start with `Bar`. Another example is `Foo* - Foo2 *X`,
+/// which will include all tests whose names start with `Foo`, except
+/// `Foo2` and those whose names end with an `X`.
 Filter* create_wildcard_filter(const std::string&);
 
 
@@ -289,13 +283,13 @@ public:
     void throw_failed(const char* file, long line, const char* expr_text, const char* exception);
 
 private:
-    class ExecContext;
-
+    Test* m_test;
     TestList* m_list;
-    ExecContext* m_context;
+    TestList::ExecContext* m_context;
 
     TestResults();
 
+    void test_failed(const std::string& message);
     void check_failed(const char* file, long line, const std::string& message);
     void cond_failed(const char* file, long line, const char* cond_text);
     void compare_failed(const char* file, long line, const char* macro_name,

@@ -247,6 +247,9 @@
     <ClCompile Include="test\util\test_path.cpp">
       <Filter>test\util</Filter>
     </ClCompile>
+    <ClCompile Include="test\util\random.cpp">
+      <Filter>test\util</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\win32\pthread\pthread.h">

@@ -11,6 +11,10 @@ Format:
 . Any other notes ....                   (internal changes)
 
 
+2014-04-01 (Kristian Spangsege)
++ New test suite with support for parallelized testing replaces UnitTest++. See section 'Testing' in `README.md`.
+
+
 2014-03-25 (Kristian Spangsege)
 ! Fixed bug when clearing table with a float/double column.
 

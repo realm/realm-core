@@ -27,7 +27,8 @@
 using namespace std;
 using namespace tightdb;
 using namespace tightdb::util;
-using test_util::unit_test::TestResults;
+using namespace tightdb::test_util;
+using unit_test::TestResults;
 
 // Note: You can now temporarely declare unit tests with the ONLY(TestName) macro instead of TEST(TestName). This
 // will disable all unit tests except these. Remember to undo your temporary changes before committing.
@@ -1396,11 +1397,13 @@ TEST(Shared_StringIndexBug2)
 
 
 namespace {
-void rand_str(char* res, size_t len) {
-    for (size_t i = 0; i < len; ++i) {
-        res[i] = 'a' + rand() % 10;
-    }
+
+void rand_str(Random& random, char* res, size_t len)
+{
+    for (size_t i = 0; i < len; ++i)
+        res[i] = char(int('a') + random.draw_int_mod(10));
 }
+
 } // anonymous namespace
 
 TEST(Shared_StringIndexBug3)
@@ -1416,10 +1419,11 @@ TEST(Shared_StringIndexBug3)
         db.commit();
     }
 
+    Random random(random_int<unsigned long>()); // Seed from slow global generator
     size_t transactions = 0;
 
     for (size_t n = 0; n < 100; ++n) {
-        const uint64_t action = rand() % 1000;
+        const uint64_t action = random.draw_int_mod(1000);
 
         transactions++;
 
@@ -1428,7 +1432,7 @@ TEST(Shared_StringIndexBug3)
             Group& group = db.begin_write();
             TableRef table = group.get_table("users");
             if (table->size() > 0) {
-                size_t del = rand() % table->size();
+                size_t del = random.draw_int_mod(table->size());
                 //cerr << "-" << del << ": " << table->get_string(0, del) << endl;
                 table->remove(del);
                 table->Verify();
@@ -1441,7 +1445,7 @@ TEST(Shared_StringIndexBug3)
             TableRef table = group.get_table("users");
             table->add_empty_row();
             char txt[100];
-            rand_str(txt, 8);
+            rand_str(random, txt, 8);
             txt[8] = 0;
             //cerr << "+" << txt << endl;
             table->set_string(0, table->size() - 1, txt);
