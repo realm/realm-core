@@ -1,16 +1,19 @@
+#include <cstddef>
+#include <algorithm>
 #include <vector>
 #include <string>
-#include <algorithm>
+
 #ifdef _MSC_VER
 #  include <win32\stdint.h>
 #endif
-#include <stdio.h>
+
 #include <tightdb/column.hpp>
 
+#include "../util/random.hpp"
+
 class VerifiedInteger {
-    std::vector<int64_t> v;
-    tightdb::Column u;
 public:
+    VerifiedInteger(tightdb::test_util::Random&);
     void add(int64_t value);
     void insert(std::size_t ndx, int64_t value);
     void insert(std::size_t ndx, const char *value);
@@ -25,7 +28,20 @@ public:
     int64_t maximum(std::size_t start = 0, std::size_t end = -1);
     int64_t minimum(std::size_t start = 0, std::size_t end = -1);
     bool Verify();
-    bool conditional_verify();
+    bool occasional_verify();
     void verify_neighbours(std::size_t ndx);
     void destroy();
+private:
+    std::vector<int64_t> v;
+    tightdb::Column u;
+    tightdb::test_util::Random& m_random;
 };
+
+
+
+// Implementation
+
+inline VerifiedInteger::VerifiedInteger(tightdb::test_util::Random& random):
+    m_random(random)
+{
+}

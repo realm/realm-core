@@ -9,71 +9,59 @@
 #include "test.hpp"
 
 using namespace tightdb;
+using namespace tightdb::test_util;
 
 // Note: You can now temporarely declare unit tests with the ONLY(TestName) macro instead of TEST(TestName). This
 // will disable all unit tests except these. Remember to undo your temporary changes before committing.
 
 
-namespace {
-
-struct db_setup {
-    static Column c;
-};
-
-Column db_setup::c;
-
-} // anonymous namespace
-
-
-TEST(Column_IsEmpty)
+TEST(Column_Basic)
 {
-    Column& c = db_setup::c;
+    Column c;
+
+    // TEST(Column_IsEmpty)
+
     CHECK_EQUAL(0U, c.size());
     CHECK(c.is_empty());
-}
 
-TEST(Column_Add0)
-{
-    Column& c = db_setup::c;
+
+    // TEST(Column_Add0)
+
     c.add(0);
     CHECK_EQUAL(0, c.get(0));
     CHECK_EQUAL(1U, c.size());
     CHECK(!c.is_empty());
-}
 
-TEST(Column_Add1)
-{
-    Column& c = db_setup::c;
+
+    // TEST(Column_Add1)
+
     c.add(1);
     CHECK_EQUAL(0, c.get(0));
     CHECK_EQUAL(1, c.get(1));
     CHECK_EQUAL(2U, c.size());
-}
 
-TEST(Column_Add2)
-{
-    Column& c = db_setup::c;
+
+    // TEST(Column_Add2)
+
     c.add(2);
     CHECK_EQUAL(0, c.get(0));
     CHECK_EQUAL(1, c.get(1));
     CHECK_EQUAL(2, c.get(2));
     CHECK_EQUAL(3U, c.size());
-}
 
-TEST(Column_Add3)
-{
-    Column& c = db_setup::c;
+
+    // TEST(Column_Add3)
+
     c.add(3);
     CHECK_EQUAL(0, c.get(0));
     CHECK_EQUAL(1, c.get(1));
     CHECK_EQUAL(2, c.get(2));
     CHECK_EQUAL(3, c.get(3));
     CHECK_EQUAL(4U, c.size());
-}
 
-TEST(Column_Add4)
-{
-    Column& c = db_setup::c;
+
+    // TEST(Column_Add4)
+
     c.add(4);
     CHECK_EQUAL(0, c.get(0));
     CHECK_EQUAL(1, c.get(1));
@@ -81,11 +69,10 @@ TEST(Column_Add4)
     CHECK_EQUAL(3, c.get(3));
     CHECK_EQUAL(4, c.get(4));
     CHECK_EQUAL(5U, c.size());
-}
 
-TEST(Column_Add5)
-{
-    Column& c = db_setup::c;
+
+    // TEST(Column_Add5)
+
     c.add(16);
     CHECK_EQUAL(0,  c.get(0));
     CHECK_EQUAL(1,  c.get(1));
@@ -94,11 +81,10 @@ TEST(Column_Add5)
     CHECK_EQUAL(4,  c.get(4));
     CHECK_EQUAL(16, c.get(5));
     CHECK_EQUAL(6U, c.size());
-}
 
-TEST(Column_Add6)
-{
-    Column& c = db_setup::c;
+
+    // TEST(Column_Add6)
+
     c.add(256);
     CHECK_EQUAL(0,   c.get(0));
     CHECK_EQUAL(1,   c.get(1));
@@ -108,11 +94,10 @@ TEST(Column_Add6)
     CHECK_EQUAL(16,  c.get(5));
     CHECK_EQUAL(256, c.get(6));
     CHECK_EQUAL(7U, c.size());
-}
 
-TEST(Column_Add7)
-{
-    Column& c = db_setup::c;
+
+    // TEST(Column_Add7)
+
     c.add(65536);
     CHECK_EQUAL(0,     c.get(0));
     CHECK_EQUAL(1,     c.get(1));
@@ -123,11 +108,10 @@ TEST(Column_Add7)
     CHECK_EQUAL(256,   c.get(6));
     CHECK_EQUAL(65536, c.get(7));
     CHECK_EQUAL(8U, c.size());
-}
 
-TEST(Column_Add8)
-{
-    Column& c = db_setup::c;
+
+    // TEST(Column_Add8)
+
     c.add(4294967296LL);
     CHECK_EQUAL(0,            c.get(0));
     CHECK_EQUAL(1,            c.get(1));
@@ -139,33 +123,28 @@ TEST(Column_Add8)
     CHECK_EQUAL(65536,        c.get(7));
     CHECK_EQUAL(4294967296LL, c.get(8));
     CHECK_EQUAL(9U, c.size());
-}
 
-TEST(Column_AddNeg1)
-{
-    Column& c = db_setup::c;
+
+    // TEST(Column_AddNeg1)
+
     c.clear();
 
     c.add(-1);
 
     CHECK_EQUAL(1U, c.size());
     CHECK_EQUAL(-1, c.get(0));
-}
 
-TEST(Column_AddNeg2)
-{
-    Column& c = db_setup::c;
+
+    // TEST(Column_AddNeg2)
 
     c.add(-256);
 
     CHECK_EQUAL(2U, c.size());
     CHECK_EQUAL(-1,   c.get(0));
     CHECK_EQUAL(-256, c.get(1));
-}
 
-TEST(Column_AddNeg3)
-{
-    Column& c = db_setup::c;
+
+    // TEST(Column_AddNeg3)
 
     c.add(-65536);
 
@@ -173,11 +152,9 @@ TEST(Column_AddNeg3)
     CHECK_EQUAL(-1,     c.get(0));
     CHECK_EQUAL(-256,   c.get(1));
     CHECK_EQUAL(-65536, c.get(2));
-}
 
-TEST(Column_AddNeg4)
-{
-    Column& c = db_setup::c;
+
+    // TEST(Column_AddNeg4)
 
     c.add(-4294967296LL);
 
@@ -186,11 +163,9 @@ TEST(Column_AddNeg4)
     CHECK_EQUAL(-256,          c.get(1));
     CHECK_EQUAL(-65536,        c.get(2));
     CHECK_EQUAL(-4294967296LL, c.get(3));
-}
 
-TEST(Column_Set)
-{
-    Column& c = db_setup::c;
+
+    // TEST(Column_Set)
 
     c.set(0, 3);
     c.set(1, 2);
@@ -202,11 +177,9 @@ TEST(Column_Set)
     CHECK_EQUAL(2, c.get(1));
     CHECK_EQUAL(1, c.get(2));
     CHECK_EQUAL(0, c.get(3));
-}
 
-TEST(Column_Insert1)
-{
-    Column& c = db_setup::c;
+
+    // TEST(Column_Insert1)
 
     // Set up some initial values
     c.clear();
@@ -224,11 +197,9 @@ TEST(Column_Insert1)
     CHECK_EQUAL(16, c.get(2));
     CHECK_EQUAL(2,  c.get(3));
     CHECK_EQUAL(3,  c.get(4));
-}
 
-TEST(Column_Insert2)
-{
-    Column& c = db_setup::c;
+
+    // TEST(Column_Insert2)
 
     // Insert at top
     c.insert(0, 256);
@@ -240,11 +211,9 @@ TEST(Column_Insert2)
     CHECK_EQUAL(16,  c.get(3));
     CHECK_EQUAL(2,   c.get(4));
     CHECK_EQUAL(3,   c.get(5));
-}
 
-TEST(Column_Insert3)
-{
-    Column& c = db_setup::c;
+
+    // TEST(Column_Insert3)
 
     // Insert at bottom
     c.insert(6, 65536);
@@ -257,12 +226,10 @@ TEST(Column_Insert3)
     CHECK_EQUAL(2,     c.get(4));
     CHECK_EQUAL(3,     c.get(5));
     CHECK_EQUAL(65536, c.get(6));
-}
+
 
 /*
-TEST(Column_Index1)
-{
-    Column& c = db_setup::c;
+    // TEST(Column_Index1)
 
     // Create index
     Column index;
@@ -277,12 +244,10 @@ TEST(Column_Index1)
     CHECK_EQUAL(6, c.FindWithIndex(65536));
 
     c.ClearIndex();
-}
 */
 
-TEST(Column_Delete1)
-{
-    Column& c = db_setup::c;
+
+    // TEST(Column_Delete1)
 
     // Delete from middle
     c.erase(3, 3 == c.size()-1);
@@ -294,11 +259,9 @@ TEST(Column_Delete1)
     CHECK_EQUAL(2,     c.get(3));
     CHECK_EQUAL(3,     c.get(4));
     CHECK_EQUAL(65536, c.get(5));
-}
 
-TEST(Column_Delete2)
-{
-    Column& c = db_setup::c;
+
+    // TEST(Column_Delete2)
 
     // Delete from top
     c.erase(0, 0 == c.size()-1);
@@ -309,11 +272,9 @@ TEST(Column_Delete2)
     CHECK_EQUAL(2,     c.get(2));
     CHECK_EQUAL(3,     c.get(3));
     CHECK_EQUAL(65536, c.get(4));
-}
 
-TEST(Column_Delete3)
-{
-    Column& c = db_setup::c;
+
+    // TEST(Column_Delete3)
 
     // Delete from bottom
     c.erase(4, 4 == c.size()-1);
@@ -323,11 +284,9 @@ TEST(Column_Delete3)
     CHECK_EQUAL(1, c.get(1));
     CHECK_EQUAL(2, c.get(2));
     CHECK_EQUAL(3, c.get(3));
-}
 
-TEST(Column_DeleteAll)
-{
-    Column& c = db_setup::c;
+
+    // TEST(Column_DeleteAll)
 
     // Delete all items one at a time
     c.erase(0, 0 == c.size()-1);
@@ -337,68 +296,49 @@ TEST(Column_DeleteAll)
 
     CHECK(c.is_empty());
     CHECK_EQUAL(0U, c.size());
-}
 
 
-TEST(Column_Find1)
-{
-    Column& c = db_setup::c;
+    // TEST(Column_Find1)
 
     // Look for a non-existing value
-    size_t res = c.find_first(10);
+    CHECK_EQUAL(size_t(-1), c.find_first(10));
 
-    CHECK_EQUAL(size_t(-1), res);
-}
 
-TEST(Column_Find2)
-{
-    Column& c = db_setup::c;
+    // TEST(Column_Find2)
 
     // zero-bit width
     c.clear();
     c.add(0);
     c.add(0);
 
-    size_t res = c.find_first(0);
-    CHECK_EQUAL(0, res);
-}
+    CHECK_EQUAL(0, c.find_first(0));
 
-TEST(Column_Find3)
-{
-    Column& c = db_setup::c;
+
+    // TEST(Column_Find3)
 
     // expand to 1-bit width
     c.add(1);
 
-    size_t res = c.find_first(1);
-    CHECK_EQUAL(2, res);
-}
+    CHECK_EQUAL(2, c.find_first(1));
 
-TEST(Column_Find4)
-{
-    Column& c = db_setup::c;
+
+    // TEST(Column_Find4)
 
     // expand to 2-bit width
     c.add(2);
 
-    size_t res = c.find_first(2);
-    CHECK_EQUAL(3, res);
-}
+    CHECK_EQUAL(3, c.find_first(2));
 
-TEST(Column_Find5)
-{
-    Column& c = db_setup::c;
+
+    // TEST(Column_Find5)
 
     // expand to 4-bit width
     c.add(4);
 
-    size_t res = c.find_first(4);
-    CHECK_EQUAL(4, res);
-}
+    CHECK_EQUAL(4, c.find_first(4));
 
-TEST(Column_Find6)
-{
-    Column& c = db_setup::c;
+
+    // TEST(Column_Find6)
 
     // expand to 8-bit width
     c.add(16);
@@ -408,42 +348,61 @@ TEST(Column_Find6)
     c.add(16);
     c.add(7);
 
-    size_t res = c.find_first(7);
-    CHECK_EQUAL(7, res);
-}
+    CHECK_EQUAL(7, c.find_first(7));
 
-TEST(Column_Find7)
-{
-    Column& c = db_setup::c;
+
+    // TEST(Column_Find7)
 
     // expand to 16-bit width
     c.add(256);
 
-    size_t res = c.find_first(256);
-    CHECK_EQUAL(8, res);
-}
+    CHECK_EQUAL(8, c.find_first(256));
 
-TEST(Column_Find8)
-{
-    Column& c = db_setup::c;
+
+    // TEST(Column_Find8)
 
     // expand to 32-bit width
     c.add(65536);
 
-    size_t res = c.find_first(65536);
-    CHECK_EQUAL(9, res);
-}
+    CHECK_EQUAL(9, c.find_first(65536));
 
-TEST(Column_Find9)
-{
-    Column& c = db_setup::c;
+
+    // TEST(Column_Find9)
 
     // expand to 64-bit width
     c.add(4294967296LL);
 
-    size_t res = c.find_first(4294967296LL);
-    CHECK_EQUAL(10, res);
+    CHECK_EQUAL(10, c.find_first(4294967296LL));
+
+
+// Partial find is not fully implemented yet
+/*
+    // TEST(Column_PartialFind1)
+
+    c.clear();
+
+    size_t partial_count = 100;
+    for (size_t i = 0; i < partial_count; ++i)
+        c.add(i);
+
+    CHECK_EQUAL(-1, c.find_first(partial_count+1, 0, partial_count));
+    CHECK_EQUAL(-1, c.find_first(0, 1, partial_count));
+    CHECK_EQUAL(partial_count-1, c.find_first(partial_count-1, partial_count-1, partial_count));
+*/
+
+
+    // TEST(Column_HeaderParse)
+
+    Column column(c.get_ref(), 0, 0);
+    bool is_equal = c.compare_int(column);
+    CHECK(is_equal);
+
+
+    // TEST(Column_Destroy)
+
+    c.destroy();
 }
+
 
 TEST(Column_FindLeafs)
 {
@@ -467,16 +426,16 @@ TEST(Column_FindLeafs)
     a.set(TIGHTDB_MAX_LIST_SIZE*4, 9);
     a.set(TIGHTDB_MAX_LIST_SIZE*5-1, 10);
 
-    const size_t res1 = a.find_first(1);
-    const size_t res2 = a.find_first(2);
-    const size_t res3 = a.find_first(3);
-    const size_t res4 = a.find_first(4);
-    const size_t res5 = a.find_first(5);
-    const size_t res6 = a.find_first(6);
-    const size_t res7 = a.find_first(7);
-    const size_t res8 = a.find_first(8);
-    const size_t res9 = a.find_first(9);
-    const size_t res10 = a.find_first(10);
+    size_t res1 = a.find_first(1);
+    size_t res2 = a.find_first(2);
+    size_t res3 = a.find_first(3);
+    size_t res4 = a.find_first(4);
+    size_t res5 = a.find_first(5);
+    size_t res6 = a.find_first(6);
+    size_t res7 = a.find_first(7);
+    size_t res8 = a.find_first(8);
+    size_t res9 = a.find_first(9);
+    size_t res10 = a.find_first(10);
 
     CHECK_EQUAL(0, res1);
     CHECK_EQUAL(TIGHTDB_MAX_LIST_SIZE-1, res2);
@@ -492,38 +451,6 @@ TEST(Column_FindLeafs)
     a.destroy();
 }
 
-/* Partial find is not fully implemented yet
-#define PARTIAL_COUNT 100
-TEST(Column_PartialFind1)
-{
-    Column& c = db_setup::c;
-    c.clear();
-
-    for (size_t i = 0; i < PARTIAL_COUNT; ++i)
-        c.add(i);
-
-    CHECK_EQUAL(-1, c.find_first(PARTIAL_COUNT+1, 0, PARTIAL_COUNT));
-    CHECK_EQUAL(-1, c.find_first(0, 1, PARTIAL_COUNT));
-    CHECK_EQUAL(PARTIAL_COUNT-1, c.find_first(PARTIAL_COUNT-1, PARTIAL_COUNT-1, PARTIAL_COUNT));
-}
-*/
-
-TEST(Column_HeaderParse)
-{
-    Column& c = db_setup::c;
-
-    Column column(c.get_ref(), 0, 0);
-    bool is_equal = c.compare_int(column);
-    CHECK(is_equal);
-}
-
-TEST(Column_Destroy)
-{
-    Column& c = db_setup::c;
-
-    // clean up (ALWAYS PUT THIS LAST)
-    c.destroy();
-}
 
 /*
 TEST(Column_Sort)
@@ -801,8 +728,9 @@ TEST(Column_Sort2)
 {
     Column c;
 
+    Random random(random_int<unsigned long>()); // Seed from slow global generator
     for (size_t t = 0; t < 9*TIGHTDB_MAX_LIST_SIZE; t++)
-        c.add(rand() % 300 - 100);
+        c.add(random.draw_int(-100, 199));
 
     c.sort();
 
@@ -830,6 +758,6 @@ TEST(Column_PrependMany)
     a.destroy();
 }
 
-#endif
+#endif // TEST_DURATION > 0
 
 #endif // TEST_COLUMN

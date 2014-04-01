@@ -12,6 +12,7 @@
 
 using namespace std;
 using namespace tightdb;
+using namespace tightdb::test_util;
 
 void VerifiedInteger::verify_neighbours(size_t ndx)
 {
@@ -31,7 +32,7 @@ void VerifiedInteger::add(int64_t value)
     u.add(value);
     TIGHTDB_ASSERT(v.size() == u.size());
     verify_neighbours(v.size());
-    TIGHTDB_ASSERT(conditional_verify());
+    TIGHTDB_ASSERT(occasional_verify());
 }
 
 void VerifiedInteger::insert(size_t ndx, int64_t value)
@@ -40,7 +41,7 @@ void VerifiedInteger::insert(size_t ndx, int64_t value)
     u.insert(ndx, value);
     TIGHTDB_ASSERT(v.size() == u.size());
     verify_neighbours(ndx);
-    TIGHTDB_ASSERT(conditional_verify());
+    TIGHTDB_ASSERT(occasional_verify());
 }
 
 int64_t VerifiedInteger::get(size_t ndx)
@@ -107,7 +108,7 @@ void VerifiedInteger::set(size_t ndx, int64_t value)
     v[ndx] = value;
     u.set(ndx, value);
     verify_neighbours(ndx);
-    TIGHTDB_ASSERT(conditional_verify());
+    TIGHTDB_ASSERT(occasional_verify());
 }
 
 void VerifiedInteger::erase(size_t ndx)
@@ -116,7 +117,7 @@ void VerifiedInteger::erase(size_t ndx)
     u.erase(ndx, ndx + 1 == u.size());
     TIGHTDB_ASSERT(v.size() == u.size());
     verify_neighbours(ndx);
-    TIGHTDB_ASSERT(conditional_verify());
+    TIGHTDB_ASSERT(occasional_verify());
 }
 
 void VerifiedInteger::clear()
@@ -124,7 +125,7 @@ void VerifiedInteger::clear()
     v.clear();
     u.clear();
     TIGHTDB_ASSERT(v.size() == u.size());
-    TIGHTDB_ASSERT(conditional_verify());
+    TIGHTDB_ASSERT(occasional_verify());
 }
 
 size_t VerifiedInteger::find_first(int64_t value)
@@ -186,14 +187,11 @@ bool VerifiedInteger::Verify()
 }
 
 // makes it run amortized the same time complexity as original, even though the row count grows
-bool VerifiedInteger::conditional_verify()
+bool VerifiedInteger::occasional_verify()
 {
-    if ((uint64_t(rand()) * uint64_t(rand()))  % (v.size() / 10 + 1) == 0) {
+    if (m_random.chance(1, v.size() / 10))
         return Verify();
-    }
-    else {
-        return true;
-    }
+    return true;
 }
 
 void VerifiedInteger::destroy()

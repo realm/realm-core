@@ -60,8 +60,8 @@ TIGHTDB_TABLE_1(MyTable,
 
 TEST(Replication_General)
 {
-    GROUP_TEST_PATH(path_1);
-    GROUP_TEST_PATH(path_2);
+    SHARED_GROUP_TEST_PATH(path_1);
+    SHARED_GROUP_TEST_PATH(path_2);
     {
         MyTrivialReplication repl(path_1);
         SharedGroup sg_1(repl);

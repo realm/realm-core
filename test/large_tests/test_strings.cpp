@@ -1,10 +1,9 @@
 #include <tightdb/column.hpp>
 
 #include "../util/number_names.hpp"
-#include "../util/unit_test.hpp"
-#include "../util/test_only.hpp"
 
 #include "../testsettings.hpp"
+#include "../test.hpp"
 
 #include "verified_string.hpp"
 
@@ -12,30 +11,20 @@
 
 using namespace std;
 using namespace tightdb;
+using namespace tightdb::test_util;
 
 namespace {
 
-// Support functions for monkey test
-uint64_t rand2(int bitwidth = 64)
-{
-    uint64_t i = int64_t(rand()) * int64_t(rand()) * int64_t(rand()) * int64_t(rand()) * int64_t(rand());
-    if (bitwidth < 64) {
-        uint64_t mask = ((1ULL << bitwidth) - 1ULL);
-        i &= mask;
-    }
-    return i;
-}
-
-string randstring(void)
+string randstring(Random& random)
 {
     // If there are in the order of TIGHTDB_MAX_LIST_SIZE different strings, then we'll get a good
     // distribution btw. arrays with no matches and arrays with multiple matches, when
     // testing Find/FindAll
-    int64_t t = (rand() % 100) * 100;
-    size_t len = (rand() % 10) * 100 + 1;
+    int64_t t = random.draw_int_mod(100) * 100;
+    size_t len = random.draw_int_mod(10) * 100 + 1;
     string s;
     while (s.length() < len)
-        s += test_util::number_name(t);
+        s += number_name(t);
 
     s = s.substr(0, len);
     return s;
@@ -43,42 +32,44 @@ string randstring(void)
 
 } // anonymous namespace
 
+
 TEST(Strings_Monkey2)
 {
     const uint64_t ITER = 16 * 5000 * TEST_DURATION * TEST_DURATION * TEST_DURATION;
-    const uint64_t SEED = 123;
+    const uint64_t seed = 123;
 
     VerifiedString a;
     Array res;
 
-    srand(SEED);
-    unsigned int trend = 5;
+    Random random(seed);
+    int trend = 5;
 
     for (size_t iter = 0; iter < ITER; iter++) {
 
-//          if (rand() % 10 == 0) printf("Input bitwidth around ~%d, , a.Size()=%d\n", (int)current_bitwidth, (int)a.Size());
+//        if (random.chance(1, 10))
+//            cout << "Input bitwidth around ~"<<current_bitwidth<<", , a.Size()="<<a.size()<<"\n";
 
-        if (!(rand2() % (ITER / 100))) {
-            trend = unsigned(rand2()) % 10;
+        if (random.draw_int_mod(ITER / 100) == 0) {
+            trend = random.draw_int_mod(10);
 
-            a.find_first(randstring().c_str());
-            a.find_all(res, randstring().c_str());
+            a.find_first(randstring(random));
+            a.find_all(res, randstring(random));
         }
 
-        if (rand2() % 10 > trend && a.size() < ITER / 100) {
-            if (rand2() % 2 == 0) {
+        if (random.draw_int_mod(10) > trend && a.size() < ITER / 100) {
+            if (random.draw_bool()) {
                 // Insert
-                size_t pos = rand2() % (a.size() + 1);
-                a.insert(pos, randstring().c_str());
+                size_t pos = random.draw_int_max(a.size());
+                a.insert(pos, randstring(random));
             }
             else {
                 // Add
-                a.add(randstring().c_str());
+                a.add(randstring(random));
             }
         }
         else if (a.size() > 0) {
             // Delete
-            size_t i = rand2() % a.size();
+            size_t i = random.draw_int_mod(a.size());
             a.erase(i);
         }
     }
