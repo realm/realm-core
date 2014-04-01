@@ -1029,6 +1029,7 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="test\util\test_only.cpp" />
+    <ClCompile Include="test\util\test_path.cpp" />
     <ClCompile Include="test\util\timer.cpp" />
     <ClCompile Include="test\util\unit_test.cpp" />
     <ClCompile Include="test\util\wildcard.cpp" />
