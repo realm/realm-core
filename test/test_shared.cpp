@@ -105,10 +105,6 @@ TEST(Shared_Initial)
             CHECK(rt.get_group().is_empty());
         }
 
-#ifdef TIGHTDB_DEBUG
-        // Also do a basic ringbuffer test
-        sg.test_ringbuf();
-#endif
     }
 
     // Verify that the `lock` file is not left behind
@@ -183,10 +179,6 @@ TEST(Shared_InitialMem)
             CHECK(rt.get_group().is_empty());
         }
 
-#ifdef TIGHTDB_DEBUG
-        // Also do a basic ringbuffer test
-        sg.test_ringbuf();
-#endif
     }
 
     // In MemOnly mode, the database file must be automatically
