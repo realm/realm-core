@@ -16,6 +16,7 @@
 #include "util/unit_test.hpp"
 #include "util/test_only.hpp"
 
+#include "test_all.hpp"
 
 // #define USE_VLD
 #if defined(_MSC_VER) && defined(_DEBUG) && defined(USE_VLD)
@@ -218,7 +219,7 @@ bool run_tests()
 
 
 
-int run_tests(int argc, char* argv[])
+int test_all(int argc, char* argv[])
 {
     bool no_error_exit_staus = 2 <= argc && strcmp(argv[1], "--no-error-exitcode") == 0;
 
