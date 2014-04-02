@@ -193,7 +193,7 @@ public:
         old_pos = 0;
         data[ 0 ].count.store_relaxed( 0 );
         data[ init_readers_size-1 ].next = 0 ;
-        put_pos.store_release( static_cast<uint_fast32_t>(0));
+        put_pos.store_release( 0 );
     }
 
     void dump() 
