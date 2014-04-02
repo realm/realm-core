@@ -23,9 +23,9 @@ template<class T> inline std::string get_type_name()
 
 
 /// Get the demangled name of the type of the specified argument.
-template<typename T> inline std::string get_type_name(T const &)
+template<typename T> inline std::string get_type_name(const T& v)
 {
-    return get_type_name<T>();
+    return demangle(typeid(v).name());
 }
 
 

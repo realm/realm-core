@@ -3,28 +3,19 @@
 
 #include <tightdb/array_binary.hpp>
 
-#include "util/unit_test.hpp"
-#include "util/test_only.hpp"
+#include "test.hpp"
 
 using namespace tightdb;
 
 // Note: You can now temporarely declare unit tests with the ONLY(TestName) macro instead of TEST(TestName). This
 // will disable all unit tests except these. Remember to undo your temporary changes before committing.
 
-namespace {
 
-struct db_setup_binary {
-    static ArrayBinary c;
-};
-
-ArrayBinary db_setup_binary::c;
-
-} // anonnymous namespace
-
-
-TEST(ArrayBinary_MultiEmpty)
+TEST(ArrayBinary_Basic)
 {
-    ArrayBinary& c = db_setup_binary::c;
+    ArrayBinary c;
+
+    // TEST(ArrayBinary_MultiEmpty)
 
     c.add(BinaryData("", 0));
     c.add(BinaryData("", 0));
@@ -41,11 +32,9 @@ TEST(ArrayBinary_MultiEmpty)
     CHECK_EQUAL(0, c.get(3).size());
     CHECK_EQUAL(0, c.get(4).size());
     CHECK_EQUAL(0, c.get(5).size());
-}
 
-TEST(ArrayBinary_Set)
-{
-    ArrayBinary& c = db_setup_binary::c;
+
+    // TEST(ArrayBinary_Set)
 
     c.set(0, BinaryData("hey", 4));
 
@@ -58,11 +47,9 @@ TEST(ArrayBinary_Set)
     CHECK_EQUAL(0, c.get(3).size());
     CHECK_EQUAL(0, c.get(4).size());
     CHECK_EQUAL(0, c.get(5).size());
-}
 
-TEST(ArrayBinary_Add)
-{
-    ArrayBinary& c = db_setup_binary::c;
+
+    // TEST(ArrayBinary_Add)
 
     c.clear();
     CHECK_EQUAL(0, c.size());
@@ -78,11 +65,9 @@ TEST(ArrayBinary_Add)
     CHECK_EQUAL(4, c.get(0).size());
     CHECK_EQUAL(5, c.get(1).size());
     CHECK_EQUAL(2, c.size());
-}
 
-TEST(ArrayBinary_Set2)
-{
-    ArrayBinary& c = db_setup_binary::c;
+
+    // TEST(ArrayBinary_Set2)
 
     // {shrink, grow} x {first, middle, last, single}
     c.clear();
@@ -135,11 +120,10 @@ TEST(ArrayBinary_Set2)
     CHECK_EQUAL("x", c.get(1).data());
     CHECK_EQUAL("pq", c.get(2).data());
     CHECK_EQUAL(3, c.size());
-}
 
-TEST(ArrayBinary_Insert)
-{
-    ArrayBinary& c = db_setup_binary::c;
+
+    // TEST(ArrayBinary_Insert)
+
     c.clear();
 
     c.insert(0, BinaryData("abc", 4)); // single
@@ -171,11 +155,10 @@ TEST(ArrayBinary_Insert)
     CHECK_EQUAL("d", c.get(3).data());
     CHECK_EQUAL("ef", c.get(4).data());
     CHECK_EQUAL(5, c.size());
-}
 
-TEST(ArrayBinary_Erase)
-{
-    ArrayBinary& c = db_setup_binary::c;
+
+    // TEST(ArrayBinary_Erase)
+
     c.clear();
 
     c.add(BinaryData("a", 2));
@@ -209,13 +192,10 @@ TEST(ArrayBinary_Erase)
     c.erase(0); // all
     CHECK_EQUAL(0, c.size());
     CHECK(c.is_empty());
-}
 
-TEST(ArrayBinary_Destroy)
-{
-    ArrayBinary& c = db_setup_binary::c;
 
-    // clean up (ALWAYS PUT THIS LAST)
+    // TEST(ArrayBinary_Destroy)
+
     c.destroy();
 }
 

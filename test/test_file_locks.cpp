@@ -9,9 +9,9 @@
 #include <tightdb/util/bind.hpp>
 #include <tightdb/util/thread.hpp>
 #include <tightdb/util/file.hpp>
+#include <tightdb/util/features.h>
 
-#include "util/unit_test.hpp"
-#include "util/test_only.hpp"
+#include "test.hpp"
 
 using namespace std;
 using namespace tightdb::util;
@@ -56,9 +56,9 @@ void master()
     }
 }
 
-void slave(int ndx)
+void slave(int ndx, string path)
 {
-    File file("test_file_locks.test", File::mode_Write);
+    File file(path, File::mode_Write);
     for (int i = 0; i != num_rounds; ++i) {
         bool good_lock = file.try_lock_exclusive();
         if (good_lock)
@@ -78,6 +78,7 @@ void slave(int ndx)
 
 } // anonymous namespace
 
+#ifndef TIGHTDB_IOS
 
 // The assumption is that if multiple processes try to place an
 // exclusive lock on a file in a non-blocking fashion, then at least
@@ -87,16 +88,16 @@ void slave(int ndx)
 // test, but it is probably the best we can do.
 TEST(File_NoSpuriousTryLockFailures)
 {
+    TEST_PATH(path);
+
     Thread slaves[num_slaves];
     for (int i = 0; i != num_slaves; ++i) {
         slaves_run[i] = false;
-        slaves[i].start(bind(&slave, i));
+        slaves[i].start(bind(&slave, i, string(path)));
     }
     master();
     for (int i = 0; i != num_slaves; ++i)
         slaves[i].join();
-
-    File::try_remove("test_file_locks.test");
 
 /*
     typedef map<int, int>::const_iterator iter;
@@ -108,5 +109,7 @@ TEST(File_NoSpuriousTryLockFailures)
     // Check that there are no cases where no one got the lock
     CHECK_EQUAL(0, results[0]);
 }
+
+#endif // TIGHTDB_IOS
 
 #endif // TEST_FILE_LOCKS

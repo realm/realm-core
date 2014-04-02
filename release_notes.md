@@ -1,3 +1,60 @@
+Template
+=============================================================
+x.x.x Release notes (yyyy—MM-dd)
+
+C++ (core)
+-----------
+The C++ API has been updated and your code will break!
+
+### Bugfixes:
+
+* None.
+
+### API breaking changes:
+
+* `???`
+
+### Enhancements:
+
+* `???`
+
+-----------
+
+### Internals:
+
+* `???`
+
+----------------------------------------------
+
+0.5.0 Release notes (2014-04-02)
+================================
+
+C++ (core)
+-----------
+The C++ API has been updated and your code will break!
+
+### Bugfixes:
+
+* None.
+
+### API breaking changes:
+
+* None.
+
+### Enhancements:
+
+* None.
+
+-----------
+
+### Internals:
+
+* New test suite with support for parallelized testing replaces UnitTest++. See section 'Testing' in `README.md`.
+
+
+----------------------------------------------
+
+
 TightDB Changelog:
 ==================
 
@@ -11,8 +68,17 @@ Format:
 . Any other notes ....                   (internal changes)
 
 
+2014-04-01 (Kristian Spangsege)
++ New test suite with support for parallelized testing replaces UnitTest++. See section 'Testing' in `README.md`.
+
+
+2014-03-25 (Kristian Spangsege)
+! Fixed bug when clearing table with a float/double column.
+
+
 2014-03-13 (Finn Schiermer Andersen)
 ! Fixed missing initialization of empty columns in some scenarios.
+
 
 2014-02-19 (Finn Schiermer Andersen)
 ! Fixed space leak in group_writer. Could in some scenarios cause massive increase in database file size.
@@ -25,6 +91,8 @@ Format:
 
 
 2014-02-14 (Kristian Spangsege)
+
+* New test suite with support for parallelized testing replaces UnitTest++. See section 'Testing' in `README.md`.
 + The StringData class now distinguishes `null` from the empty string.
 + Adding StringData::is_null().
 

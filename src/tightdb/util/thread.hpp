@@ -562,9 +562,10 @@ inline void CondVar::notify_all() TIGHTDB_NOEXCEPT
 // so for earlier versions we fall back to sequential consistency.
 // As some architectures, most notably x86, provide release and acquire semantics
 // in hardware, this is somewhat annoying, because we will use a full memory barrier
-// where no-one is needed. FIXME: introduce x86 specific optimization to avoid the
-// memory barrier!
-
+// where no-one is needed.
+//
+// FIXME: introduce x86 specific optimization to avoid the memory
+// barrier!
 template<class T>
 class Atomic
 {

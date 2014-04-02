@@ -963,6 +963,39 @@ bool File::try_remove(const string& path)
 }
 
 
+void File::move(const string& old_path, const string& new_path)
+{
+    int r = rename(old_path.c_str(), new_path.c_str());
+    if (r == 0)
+        return;
+    int err = errno; // Eliminate any risk of clobbering
+    string msg = get_errno_msg("rename() failed: ", err);
+    switch (err) {
+        case EACCES:
+        case EROFS:
+        case ETXTBSY:
+        case EBUSY:
+        case EPERM:
+        case EEXIST:
+        case ENOTEMPTY:
+            throw PermissionDenied(msg);
+        case ENOENT:
+            throw File::NotFound(msg);
+        case ELOOP:
+        case EMLINK:
+        case ENAMETOOLONG:
+        case EINVAL:
+        case EISDIR:
+        case ENOTDIR:
+            throw AccessError(msg);
+        case ENOSPC:
+            throw ResourceAllocError(msg);
+        default:
+            throw runtime_error(msg);
+    }
+}
+
+
 bool File::is_same_file(const File& f) const
 {
     TIGHTDB_ASSERT(is_attached());

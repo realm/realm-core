@@ -11,12 +11,13 @@
 
 #include "util/demangle.hpp"
 #include "util/super_int.hpp"
-#include "util/unit_test.hpp"
-#include "util/test_only.hpp"
+
+#include "test.hpp"
 
 using namespace std;
 using namespace tightdb::util;
 using namespace tightdb::test_util;
+using unit_test::TestResults;
 
 
 // FIXME: Test T -> tightdb::test_util::super_int -> T using min/max
@@ -45,7 +46,8 @@ TEST(SafeIntOps_AddWithOverflowDetect)
 
 namespace {
 
-template<class T_1, class T_2> void test_two_args(const set<super_int>& values)
+template<class T_1, class T_2>
+void test_two_args(TestResults& test_results, const set<super_int>& values)
 {
 //    if (!(SameType<T_1, bool>::value && SameType<T_2, char>::value))
 //        return;
@@ -170,14 +172,14 @@ template<class T, int> struct add_min_max {
 
 template<class T_1, int> struct test_two_args_1 {
     template<class T_2, int> struct test_two_args_2 {
-        static void exec(const set<super_int>* values)
+        static void exec(TestResults* test_results, const set<super_int>* values)
         {
-            test_two_args<T_1, T_2>(*values);
+            test_two_args<T_1, T_2>(*test_results, *values);
         }
     };
-    static void exec(const set<super_int>* values)
+    static void exec(TestResults* test_results, const set<super_int>* values)
     {
-        ForEachType<types, test_two_args_2>::exec(values);
+        ForEachType<types, test_two_args_2>::exec(test_results, values);
     }
 };
 
@@ -244,5 +246,5 @@ TEST(SafeIntOps_General)
     }
 */
 
-    ForEachType<types, test_two_args_1>::exec(&values);
+    ForEachType<types, test_two_args_1>::exec(&test_results, &values);
 }

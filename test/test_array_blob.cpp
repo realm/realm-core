@@ -6,8 +6,7 @@
 #include <tightdb/array_blob.hpp>
 #include <tightdb/column_string.hpp>
 
-#include "util/unit_test.hpp"
-#include "util/test_only.hpp"
+#include "test.hpp"
 
 using namespace std;
 using namespace tightdb;
@@ -25,17 +24,18 @@ TEST(ArrayBlob_AddEmpty)
     blob.destroy();
 }
 
+
 TEST(ArrayBlob_General)
 {
     ArrayBlob blob;
 
-    const char* const t1 = "aaa";
-    const char* const t2 = "bbbbbb";
-    const char* const t3 = "ccccccccccc";
-    const char* const t4 = "xxx";
-    const size_t l1 = strlen(t1)+1;
-    const size_t l2 = strlen(t2)+1;
-    const size_t l3 = strlen(t3)+1;
+    const char* t1 = "aaa";
+    const char* t2 = "bbbbbb";
+    const char* t3 = "ccccccccccc";
+    const char* t4 = "xxx";
+    size_t l1 = strlen(t1) + 1;
+    size_t l2 = strlen(t2) + 1;
+    size_t l3 = strlen(t3) + 1;
 
     // Test add
     blob.add(t1, l1);
@@ -83,6 +83,7 @@ TEST(ArrayBlob_General)
     // Cleanup
     blob.destroy();
 }
+
 
 TEST(ArrayBlob_AdaptiveStringLeak)
 {
