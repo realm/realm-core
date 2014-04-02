@@ -180,7 +180,7 @@ public:
         uint_fast32_t next;
     };
 
-    Ringbuffer()
+    Ringbuffer() TIGHTDB_NOEXCEPT
     {
         entries = init_readers_size;
         for (int i=0; i < init_readers_size; i++) {
@@ -222,7 +222,7 @@ public:
         cout << "--- Done" << endl;
     }
 
-    void expand_to(uint_fast32_t new_entries)
+    void expand_to(uint_fast32_t new_entries)  TIGHTDB_NOEXCEPT
     {
         // cout << "expanding to " << new_entries << endl;
         // dump();
@@ -239,7 +239,7 @@ public:
         // dump();
     }
 
-    static size_t compute_required_space(uint_fast32_t num_entries) 
+    static size_t compute_required_space(uint_fast32_t num_entries)  TIGHTDB_NOEXCEPT
     { 
         // get space required for given number of entries beyond the initial count.
         // NB: this not the size of the ringbuffer, it is the size minus whatever was
@@ -247,56 +247,56 @@ public:
         return sizeof(ReadCount) * (num_entries - init_readers_size);
     }
 
-    uint_fast32_t get_num_entries() const 
+    uint_fast32_t get_num_entries() const  TIGHTDB_NOEXCEPT
     {
         return entries;
     }
 
-    uint_fast32_t last() const 
+    uint_fast32_t last() const  TIGHTDB_NOEXCEPT
     {
         return put_pos.load_acquire();
     }
 
-    const ReadCount& get(uint_fast32_t idx) const 
+    const ReadCount& get(uint_fast32_t idx) const  TIGHTDB_NOEXCEPT
     {
         return data[idx];
     }
 
-    const ReadCount& get_last() const 
+    const ReadCount& get_last() const  TIGHTDB_NOEXCEPT
     {
         return get(last());
     }
 
-    const ReadCount& get_oldest() const 
+    const ReadCount& get_oldest() const  TIGHTDB_NOEXCEPT
     {
         return get(old_pos);
     }
 
-    bool is_full() const 
+    bool is_full() const  TIGHTDB_NOEXCEPT
     {
         uint_fast32_t idx = get(last()).next;
         return idx == old_pos;
     }
 
-    uint_fast32_t next() const 
+    uint_fast32_t next() const  TIGHTDB_NOEXCEPT
     { // do not call this if the buffer is full!
         uint_fast32_t idx = get(last()).next;
         return idx;
     }
 
-    ReadCount& get_next() 
+    ReadCount& get_next()  TIGHTDB_NOEXCEPT
     {
         TIGHTDB_ASSERT(!is_full());
         return data[ next() ];
     }
 
-    void use_next() 
+    void use_next()  TIGHTDB_NOEXCEPT
     {
         atomic_dec(get_next().count); // .store_release(0);
         put_pos.store_release(next());
     }
 
-    void cleanup() 
+    void cleanup()  TIGHTDB_NOEXCEPT
     {   // invariant: entry held by put_pos has count > 1.
         // cout << "cleanup: from " << old_pos << " to " << put_pos.load_relaxed();
         // dump();
@@ -998,7 +998,7 @@ void SharedGroup::grab_readlock(ref_type& new_top_ref, size_t& new_file_size, bo
     do {
         SharedInfo* r_info = m_reader_map.get_addr();
         m_reader_idx = r_info->readers.last();
-        if (grow_reader_mapping(m_reader_idx)) {
+        if (grow_reader_mapping(m_reader_idx)) { // throws
             
             // remapping takes time, so retry with a fresh entry
             continue;
@@ -1233,7 +1233,7 @@ uint_fast64_t SharedGroup::get_current_version()
             // the mapping to fit.
             r_info = m_reader_map.get_addr();
             index = r_info->readers.last();
-        } while (grow_reader_mapping(index));
+        } while (grow_reader_mapping(index)); // throws
 
         // now (double) increment the read count so that no-one cleans up the entry
         // while we read it.
@@ -1259,7 +1259,7 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
         // the cleanup process may access the entire ring buffer, so make sure it is mapped.
         // this is not ensured as part of begin_read, which only makes sure that the current
         // last entry in the buffer is available.
-        if (grow_reader_mapping(r_info->readers.get_num_entries())) {
+        if (grow_reader_mapping(r_info->readers.get_num_entries())) { // throws
             r_info = m_reader_map.get_addr();
         }
         r_info->readers.cleanup();
