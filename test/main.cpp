@@ -1,6 +1,6 @@
-#include "run_tests.hpp"
+#include "test_all.hpp"
 
 int main(int argc, char** argv)
 {
-    return run_tests(argc, argv);
+    return test_all(argc, argv);
 }
