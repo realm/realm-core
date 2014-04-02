@@ -43,7 +43,7 @@ The C++ API has been updated and your code will break!
 
 ### Enhancements:
 
-* None.
+* Read transactions are now non-blocking and their overhead has been reduced by an order of magnitude.
 
 -----------
 
