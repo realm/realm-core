@@ -1,7 +1,10 @@
 #include <cstring>
 #include <cstdlib>
 #include <algorithm>
+#include <stdexcept>
 #include <vector>
+#include <locale>
+#include <sstream>
 #include <fstream>
 #include <iostream>
 #include <iomanip>
@@ -12,11 +15,11 @@
 #include <tightdb/utilities.hpp>
 #include <tightdb/version.hpp>
 
-#include "util/timer.hpp"
-#include "util/unit_test.hpp"
-#include "util/test_only.hpp"
-
 #include "test_all.hpp"
+#include "util/timer.hpp"
+
+#include "test.hpp"
+
 
 // #define USE_VLD
 #if defined(_MSC_VER) && defined(_DEBUG) && defined(USE_VLD)
@@ -96,9 +99,13 @@ void display_build_config()
         "  with Debug "<<with_debug<<"\n"
         "  with Replication "<<with_replication<<"\n"
         "\n"
-        "TIGHTDB_MAX_LIST_SIZE = "<<TIGHTDB_MAX_LIST_SIZE<<"\n"
+        "TIGHTDB_MAX_LIST_SIZE = " << TIGHTDB_MAX_LIST_SIZE << "\n"
         "\n"
-        "Compiler supported SSE (auto detect):       "<<compiler_sse<<"\n"
+        // Be aware that ps3/xbox have sizeof(void*) = 4 && sizeof(size_t) == 8
+        // We decide to print size_t here
+        "sizeof(size_t) * 8 = " << sizeof(size_t)* 8 << "\n"
+        "\n"
+        "Compiler supported SSE (auto detect):       " << compiler_sse << "\n"
         "This CPU supports SSE (auto detect):        "<<cpu_sse<<"\n"
         "Compiler supported AVX (auto detect):       "<<compiler_avx<<"\n"
         "This CPU supports AVX (AVX1) (auto detect): "<<cpu_avx<<"\n"
@@ -176,6 +183,12 @@ private:
 
 bool run_tests()
 {
+    {
+        const char* str = getenv("UNITTEST_KEEP_FILES");
+        if (str && strlen(str) != 0)
+            keep_test_files();
+    }
+
     UniquePtr<Reporter> reporter;
     UniquePtr<Filter> filter;
 
@@ -201,12 +214,57 @@ bool run_tests()
     if (filter_str && strlen(filter_str) != 0)
         filter.reset(create_wildcard_filter(filter_str));
 
+    int num_threads = 1;
+    {
+        const char* str = getenv("UNITTEST_THREADS");
+        if (str && strlen(str) != 0) {
+            istringstream in(str);
+            in.imbue(locale::classic());
+            in.flags(in.flags() & ~ios_base::skipws); // Do not accept white space
+            in >> num_threads;
+            bool bad = !in || in.get() != char_traits<char>::eof() ||
+                num_threads < 1 || num_threads > 1024;
+            if (bad)
+                throw runtime_error("Bad number of threads");
+            if (num_threads > 1)
+                cout << "Number of test threads: "<<num_threads<<"\n\n";
+        }
+    }
+
+    bool shuffle = false;
+    {
+        const char* str = getenv("UNITTEST_SHUFFLE");
+        if (str && strlen(str) != 0)
+            shuffle = true;
+    }
+
+    {
+        const char* str = getenv("UNITTEST_RANDOM_SEED");
+        if (str && strlen(str) != 0) {
+            unsigned long seed;
+            if (strcmp(str, "random") == 0) {
+                seed = produce_nondeterministic_random_seed();
+            }
+            else {
+                istringstream in(str);
+                in.imbue(locale::classic());
+                in.flags(in.flags() & ~ios_base::skipws); // Do not accept white space
+                in >> seed;
+                bool bad = !in || in.get() != char_traits<char>::eof();
+                if (bad)
+                    throw runtime_error("Bad random seed");
+            }
+            cout << "Random seed: "<<seed<<"\n\n";
+            random_seed(seed);
+        }
+    }
+
     // Run
     TestList& list = get_default_test_list();
-    bool success = list.run(reporter.get(), filter.get());
+    bool success = list.run(reporter.get(), filter.get(), num_threads, shuffle);
 
     if (test_only)
-        cout << "\n*** BE AWARE THAT MOST TESTS ARE EXCLUDED DUE TO USING 'ONLY' MACRO ***\n";
+        cout << "\n*** BE AWARE THAT MOST TESTS WERE EXCLUDED DUE TO USING 'ONLY' MACRO ***\n";
 
     if (!xml)
         cout << "\n";
@@ -216,8 +274,6 @@ bool run_tests()
 
 
 } // anonymous namespace
-
-
 
 int test_all(int argc, char* argv[])
 {
