@@ -618,7 +618,7 @@ EOF
         cp "$IPHONE_DIR/libtightdb-ios.a" "$FRAMEWORK/$BASENAME" || exit 1
         cp -r "$IPHONE_DIR/include/"* "$FRAMEWORK/Headers/" || exit 1
         find "$FRAMEWORK/Headers" -iregex "^.*\.[ch]\(pp\)\{0,1\}$" \
-            -exec sed -i '' -e 's/<tightdb\(.*\)>/<TightdbCore\/tightdb\1>/g' {} \; || exit 1
+            -exec sed -i '' -e "s/<tightdb\(.*\)>/<$BASENAME\/tightdb\1>/g" {} \; || exit 1
         echo "Core framework for iOS can be found under $FRAMEWORK."
         exit 0
         ;;
