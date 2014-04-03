@@ -544,7 +544,7 @@ EOF
         exit 0
         ;;
 
-     "build-android")
+    "build-android")
         auto_configure || exit 1
         export TIGHTDB_HAVE_CONFIG="1"
         android_ndk_home="$(get_config_param "ANDROID_NDK_HOME")" || exit 1
