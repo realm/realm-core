@@ -604,24 +604,24 @@ EOF
 
    "build-ios-framework")
         if [ "$OS" != "Darwin" ]; then
-	    echo "Framework for iOS can only be generated under Mac OS X."
+	        echo "Framework for iOS can only be generated under Mac OS X."
+	        exit 0
+	    fi
+	    BASENAME="TightdbCore"
+        FRAMEWORK="$BASENAME.framework"
+        mkdir -p "$FRAMEWORK/Headers" || exit 1
+        if [ ! -f "$IPHONE_DIR/libtightdb-ios.a" ]; then
+            echo "\"$IPHONE_DIR/libtightdb-ios.a\" missing."
+            echo "Did you forget to build-iphone?"
+            exit 1
+        fi
+	    cp "$IPHONE_DIR/libtightdb-ios.a" "$FRAMEWORK/$BASENAME" || exit 1
+	    cp -r "$IPHONE_DIR/include/"* "$FRAMEWORK/Headers/" || exit 1
+        find "$FRAMEWORK/Headers" -iregex "^.*\.[ch]\(pp\)\{0,1\}$" \
+            -exec sed -i '' -e 's/<tightdb\(.*\)>/<TightdbCore\/tightdb\1>/g' {} \; || exit 1
+	    echo "Core framework for iOS can be found under $FRAMEWORK."
 	    exit 0
-	fi
-	BASENAME="TightdbCore"
-    FRAMEWORK="$BASENAME.framework"
-	mkdir -p "$FRAMEWORK/Headers" || exit 1
-    if [ ! -f "$IPHONE_DIR/libtightdb-ios.a" ]; then
-        echo "\"$IPHONE_DIR/libtightdb-ios.a\" missing."
-        echo "Did you forget to build-iphone?"
-        exit 1
-    fi
-	cp "$IPHONE_DIR/libtightdb-ios.a" "$FRAMEWORK/$BASENAME" || exit 1
-	cp -r "$IPHONE_DIR/include/"* "$FRAMEWORK/Headers/" || exit 1
-    find "$FRAMEWORK/Headers" -iregex "^.*\.[ch]\(pp\)\{0,1\}$" \
-        -exec sed -i '' -e 's/<tightdb\(.*\)>/<TightdbCore\/tightdb\1>/g' {} \; || exit 1
-	echo "Core framework for iOS can be found in $FRAMEWORK."
-	exit 0
-	;;
+	    ;;
 
     "test")
         auto_configure || exit 1
