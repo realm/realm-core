@@ -544,7 +544,7 @@ EOF
         exit 0
         ;;
 
-    "build-android")
+     "build-android")
         auto_configure || exit 1
         export TIGHTDB_HAVE_CONFIG="1"
         android_ndk_home="$(get_config_param "ANDROID_NDK_HOME")" || exit 1
@@ -601,6 +601,27 @@ EOF
         (cd "src/tightdb" && tar czf "$temp_dir/headers.tar.gz" $inst_headers) || exit 1
         (cd "$TIGHTDB_HOME/$ANDROID_DIR/include/tightdb" && tar xzmf "$temp_dir/headers.tar.gz") || exit 1
         ;;
+
+   "build-ios-framework")
+        if [ "$OS" != "Darwin" ]; then
+	    echo "Framework for iOS can only be generated under Mac OS X."
+	    exit 0
+	fi
+	BASENAME="TightdbCore"
+    FRAMEWORK="$BASENAME.framework"
+	mkdir -p "$FRAMEWORK/Headers" || exit 1
+    if [ ! -f "$IPHONE_DIR/libtightdb-ios.a" ]; then
+        echo "\"$IPHONE_DIR/libtightdb-ios.a\" missing."
+        echo "Did you forget to build-iphone?"
+        exit 1
+    fi
+	cp "$IPHONE_DIR/libtightdb-ios.a" "$FRAMEWORK/$BASENAME" || exit 1
+	cp -r "$IPHONE_DIR/include/"* "$FRAMEWORK/Headers/" || exit 1
+    find "$FRAMEWORK/Headers" -iregex "^.*\.[ch]\(pp\)\{0,1\}$" \
+        -exec sed -i '' -e 's/<tightdb\(.*\)>/<TightdbCore\/tightdb\1>/g' {} \; || exit 1
+	echo "Core framework for iOS can be found in $FRAMEWORK."
+	exit 0
+	;;
 
     "test")
         auto_configure || exit 1
@@ -2288,7 +2309,7 @@ EOF
 
     *)
         echo "Unspecified or bad mode '$MODE'" 1>&2
-        echo "Available modes are: config clean build build-config-progs build-iphone build-android test test-debug show-install install uninstall test-installed wipe-installed" 1>&2
+        echo "Available modes are: config clean build build-config-progs build-iphone build-android build-ios-framework test test-debug show-install install uninstall test-installed wipe-installed" 1>&2
         echo "As well as: install-prod install-devel uninstall-prod uninstall-devel dist-copy" 1>&2
         echo "As well as: src-dist bin-dist dist-deb dist-status dist-pull dist-checkout" 1>&2
         echo "As well as: dist-config dist-clean dist-build dist-build-iphone dist-test dist-test-debug dist-install dist-uninstall dist-test-installed" 1>&2
