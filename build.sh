@@ -2308,7 +2308,7 @@ EOF
         ;;
 
     *)
-        cat << EOF
+        cat 1>&2 << EOF
 Unspecified or bad mode '$MODE'.
 Available modes are:
     config clean build build-config-progs build-iphone build-android
