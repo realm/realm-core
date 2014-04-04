@@ -588,6 +588,23 @@ void Table::create_columns()
 }
 
 
+void Table::fake_detached() TIGHTDB_NOEXCEPT
+{
+    m_columns.set_parent(0,0);
+}
+
+void Table::re_attach() TIGHTDB_NOEXCEPT
+{
+    m_columns.set_parent(&m_top, 1);
+}
+
+void Table::detach_offspring() TIGHTDB_NOEXCEPT
+{
+    detach_subtable_accessors();
+    destroy_column_accessors();
+    detach_views_except(NULL);
+}
+
 void Table::detach() TIGHTDB_NOEXCEPT
 {
 #ifdef TIGHTDB_ENABLE_REPLICATION
@@ -603,10 +620,7 @@ void Table::detach() TIGHTDB_NOEXCEPT
     m_columns.set_parent(0,0);
 
     // Detach all offspring accessors
-    detach_subtable_accessors();
-
-    destroy_column_accessors();
-    detach_views_except(NULL);
+    detach_offspring();
 }
 
 // Note about exception safety:
