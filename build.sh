@@ -124,6 +124,10 @@ if ! printf "%s\n" "$MODE" | grep -q '^\(src-\|bin-\)\?dist'; then
     if [ "$NUM_PROCESSORS" ]; then
         word_list_prepend MAKEFLAGS "-j$NUM_PROCESSORS" || exit 1
         export MAKEFLAGS
+
+        if ! [ "$UNITTEST_THREADS" ]; then
+            export UNITTEST_THREADS="$NUM_PROCESSORS"
+        fi
     fi
 fi
 IS_REDHAT_DERIVATIVE=""
