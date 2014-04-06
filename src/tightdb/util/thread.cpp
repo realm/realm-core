@@ -10,7 +10,7 @@
 
 // "Process shared mutexes" are not officially supported on Android,
 // but they appear to work anyway.
-#if _POSIX_THREAD_PROCESS_SHARED > 0 || defined ANDROID
+#if _POSIX_THREAD_PROCESS_SHARED > 0 || TIGHTDB_ANDROID
 #  define TIGHTDB_HAVE_PTHREAD_PROCESS_SHARED
 #endif
 

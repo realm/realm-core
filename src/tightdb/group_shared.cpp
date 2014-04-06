@@ -439,10 +439,10 @@ void spawn_daemon(const string& file)
 
         // if we continue here, exec has failed so return error
         // if exec succeeds, we don't come back here.
-#ifndef ANDROID        
-        _Exit(1);
-#else
+#if TIGHTDB_ANDROID
         _exit(1);
+#else
+        _Exit(1);
 #endif
         // child process ends here
 

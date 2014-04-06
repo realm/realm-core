@@ -6,6 +6,7 @@
 #include <map>
 #include <iostream>
 
+#include <tightdb/util/features.h>
 #include <tightdb/util/bind.hpp>
 #include <tightdb/util/thread.hpp>
 #include <tightdb/util/file.hpp>
