@@ -590,18 +590,19 @@ void Table::create_columns()
 
 void Table::fake_detached() TIGHTDB_NOEXCEPT
 {
+    TIGHTDB_ASSERT(is_attached());
     m_columns.set_parent(0,0);
 }
 
 void Table::re_attach() TIGHTDB_NOEXCEPT
 {
+    TIGHTDB_ASSERT(!is_attached());
     m_columns.set_parent(&m_top, 1);
 }
 
 void Table::detach_offspring() TIGHTDB_NOEXCEPT
 {
     detach_subtable_accessors();
-    destroy_column_accessors();
     detach_views_except(NULL);
 }
 
@@ -621,6 +622,7 @@ void Table::detach() TIGHTDB_NOEXCEPT
 
     // Detach all offspring accessors
     detach_offspring();
+    destroy_column_accessors();
 }
 
 // Note about exception safety:

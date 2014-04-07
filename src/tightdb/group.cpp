@@ -248,21 +248,23 @@ void Group::detach() TIGHTDB_NOEXCEPT
 
 void Group::detach_but_retain_data() TIGHTDB_NOEXCEPT
 {
-    m_is_attached = false;
-    typedef table_accessors::const_iterator iter;
-    iter end = m_table_accessors.end();
-    for (iter i = m_table_accessors.begin(); i != end; ++i) {
-        if (Table* t = *i) {
-            _impl::TableFriend::fake_detached(*t);
-            _impl::TableFriend::detach_offspring(*t);
+    if (m_is_attached) {
+        m_is_attached = false;
+        typedef table_accessors::const_iterator iter;
+        iter end = m_table_accessors.end();
+        for (iter i = m_table_accessors.begin(); i != end; ++i) {
+            if (Table* t = *i) {
+                _impl::TableFriend::fake_detached(*t);
+                _impl::TableFriend::detach_offspring(*t);
+            }
         }
     }
-//    detach_table_accessors();
-//    m_table_accessors.clear();
 }
 
 void Group::complete_detach() TIGHTDB_NOEXCEPT
 {
+    detach_table_accessors();
+    m_table_accessors.clear();
     m_top.detach();
     m_tables.detach();
     m_table_names.detach();

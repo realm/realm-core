@@ -294,6 +294,7 @@ TEST(Shared_1)
             wt.get_group().Verify();
             TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
             t1->add(1, 2, false, "test");
+            wt.get_group().Verify();
             wt.commit();
         }
 
