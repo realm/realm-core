@@ -826,17 +826,19 @@ TEST(Table_ToString)
     stringstream ss;
     table.to_string(ss);
     const string result = ss.str();
+    PlatformConfig* platform_config = PlatformConfig::Instance();
+    string file_name = platform_config->get_resource_path();
 #if _MSC_VER
-    const char* file_name = "expect_string-win.txt";
+    file_name += "expect_string-win.txt";
 #else
-    const char* file_name = "expect_string.txt";
+    file_name += "expect_string.txt";
 #endif
 #if GENERATE   // enable to generate testfile - check it manually
-    ofstream test_file(file_name, ios::out);
+    ofstream test_file(file_name.c_str(), ios::out);
     test_file << result;
     cerr << "to_string() test:\n" << result << endl;
 #else
-    ifstream test_file(file_name, ios::in);
+    ifstream test_file(file_name.c_str(), ios::in);
     CHECK(!test_file.fail());
     string expected;
     expected.assign( istreambuf_iterator<char>(test_file),
@@ -860,21 +862,23 @@ TEST(Table_JsonAllData)
     stringstream ss;
     table.to_json(ss);
     const string json = ss.str();
+    PlatformConfig* platform_config = PlatformConfig::Instance();
+    string file_name = platform_config->get_resource_path();
 #if _MSC_VER
-    const char* file_name = "expect_json-win.json";
+    file_name += "expect_json-win.json";
 #else
-    const char* file_name = "expect_json.json";
+    file_name += "expect_json.json";
 #endif
 #if GENERATE
         // Generate the testdata to compare. After doing this,
         // verify that the output is correct with a json validator:
         // http://jsonformatter.curiousconcept.com/
     cerr << "JSON:" << json << "\n";
-    ofstream test_file(file_name, ios::out | ios::binary);
+    ofstream test_file(file_name.c_str(), ios::out | ios::binary);
     test_file << json;
 #else
     string expected;
-    ifstream test_file(file_name, ios::in | ios::binary);
+    ifstream test_file(file_name.c_str(), ios::in | ios::binary);
     CHECK(!test_file.fail());
     getline(test_file,expected);
     CHECK_EQUAL(true, json == expected);
