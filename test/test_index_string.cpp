@@ -1,7 +1,7 @@
 #include "testsettings.hpp"
 #ifdef TEST_INDEX_STRING
 
-#include "tightdb/index_string.hpp"
+#include <tightdb/index_string.hpp>
 
 #include "test.hpp"
 
