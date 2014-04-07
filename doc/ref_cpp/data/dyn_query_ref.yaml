@@ -477,7 +477,7 @@ CATEGORIES :
       NAME     : find
       DESCR    : &g_dyn_query_find_descr
                  >
-                 This will find the first row index from the provided row index that fulfils the query condition. Use the return
+                 This will find the first row index from the provided row index that fulfills the query condition. Use the return
                  value + 1 as parameter for successive calls to iterate through
                  matching rows.
       SUMMARY  : &g_dyn_query_find_summary
