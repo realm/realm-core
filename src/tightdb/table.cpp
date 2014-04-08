@@ -1402,7 +1402,7 @@ TableRef Table::get_parent_table() TIGHTDB_NOEXCEPT
 }
 
 
-size_t Table::get_index_in_parent() TIGHTDB_NOEXCEPT
+size_t Table::get_index_in_parent() const TIGHTDB_NOEXCEPT
 {
     const Array& real_top = m_top.is_attached() ? m_top : m_columns;
     ArrayParent* parent = real_top.get_parent();

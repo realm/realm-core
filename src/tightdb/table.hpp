@@ -375,7 +375,7 @@ public:
     /// returns null, and get_index_in_parent() returns tightdb::npos.
     TableRef get_parent_table() TIGHTDB_NOEXCEPT;
     ConstTableRef get_parent_table() const TIGHTDB_NOEXCEPT;
-    std::size_t get_index_in_parent() TIGHTDB_NOEXCEPT;
+    std::size_t get_index_in_parent() const TIGHTDB_NOEXCEPT;
     //@}
 
     // Aggregate functions
