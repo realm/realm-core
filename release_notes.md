@@ -36,7 +36,7 @@ Adding Table::get_index_in_parent() and Group::get_table(std::size_t table_ndx).
 
 ### Bugfixes:
 
-* None.
+* Fixed bug in TableView::remove(), causing crash or undefined behaviour.
 
 ### API breaking changes:
 
