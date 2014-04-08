@@ -1855,6 +1855,40 @@ TEST(Shared_MixedWithNonShared)
     }
 }
 
+TEST(Shared_RetainedTableAccessors)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg1(path);
+    SharedGroup sg2(path);
+    TestTableShared::Ref t1;
+    TestTableShared::ConstRef t2;
+    {
+        // add something to the db to play with
+        WriteTransaction wt(sg1);
+        t1 = wt.get_table<TestTableShared>("test");
+        t1->add(0, 2, false, "test");
+        wt.commit();
+    }
+    CHECK(!t1->is_attached());
+    {
+        WriteTransaction wt(sg1); // no revival from write to write transaction
+        CHECK(!t1->is_attached());
+    }
+    CHECK(!t1->is_attached());
+    {
+        ReadTransaction rt(sg1);
+        CHECK(!t1->is_attached()); // no revival when following a write transaction.
+        t2 = rt.get_table<TestTableShared>("test");
+        CHECK(t2->is_attached());
+        CHECK_EQUAL(2, t2[0].second);
+    }
+    CHECK(!t2->is_attached());
+    {
+        ReadTransaction rt(sg1);
+        CHECK(t2->is_attached()); // revived when following a read transaction.
+        CHECK_EQUAL(2, t2[0].second);
+    }
+}
 
 TEST(Shared_PinnedTransactions)
 {
