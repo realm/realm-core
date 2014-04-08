@@ -213,7 +213,8 @@ public:
     template<class T> bool has_table(StringData name) const;
 
     //@{
-    /// Get the table with the specified name from this group.
+    /// Get the table with the specified name (or at the specified
+    /// idnex) from this group.
     ///
     /// The non-const versions of this function will create a table
     /// with the specified name if one does not already exist. The
@@ -240,6 +241,7 @@ public:
     TableRef      get_table(StringData name);
     TableRef      get_table(StringData name, bool& was_created);
     ConstTableRef get_table(StringData name) const;
+    ConstTableRef get_table(std::size_t table_ndx) const;
     template<class T> typename T::Ref      get_table(StringData name);
     template<class T> typename T::ConstRef get_table(StringData name) const;
     //@}
@@ -579,6 +581,11 @@ inline ConstTableRef Group::get_table(StringData name) const
 {
     TIGHTDB_ASSERT(has_table(name));
     return get_table_ptr(name)->get_table_ref();
+}
+
+inline ConstTableRef Group::get_table(std::size_t table_ndx) const
+{
+    return get_table_by_ndx(table_ndx)->get_table_ref();
 }
 
 template<class T> inline typename T::Ref Group::get_table(StringData name)

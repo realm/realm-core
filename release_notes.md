@@ -32,7 +32,7 @@ x.x.x Release notes (yyyy—MM-dd)    <<<------------ PLEASE NOTE, THIS IS THE N
 
 C++ (core)
 -----------
-Adding Table::get_index_in_parent(). It was needed for implicit transactions.
+Adding Table::get_index_in_parent() and Group::get_table(std::size_t table_ndx). They were needed for implicit transactions.
 
 ### Bugfixes:
 
