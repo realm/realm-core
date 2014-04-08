@@ -1888,6 +1888,21 @@ TEST(Shared_RetainedTableAccessors)
         CHECK(t2->is_attached()); // revived when following a read transaction.
         CHECK_EQUAL(2, t2[0].second);
     }
+    CHECK(!t2->is_attached());
+    {
+        WriteTransaction wt(sg2); // no revival from write to write transaction
+        TestTableShared::Ref t3 = wt.get_table<TestTableShared>("test");
+        t3[0].second = 42;
+        wt.commit();
+    }
+    CHECK(!t2->is_attached());
+    {
+        ReadTransaction rt(sg1);
+        CHECK(!t2->is_attached()); // not revived as the state has changed!
+        t2 = rt.get_table<TestTableShared>("test"); // need to refresh
+        CHECK_EQUAL(42, t2[0].second);
+    }
+
 }
 
 TEST(Shared_PinnedTransactions)

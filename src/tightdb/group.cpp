@@ -242,7 +242,7 @@ void Group::detach_table_accessors() TIGHTDB_NOEXCEPT
 
 void Group::detach() TIGHTDB_NOEXCEPT
 {
-    detach_but_retain_data();
+    m_is_attached = false;
     complete_detach();
 }
 
