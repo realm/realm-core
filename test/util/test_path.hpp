@@ -57,7 +57,7 @@ public:
 private:
     PlatformConfig(){};
     PlatformConfig(PlatformConfig const&){}; // Private copy constructor
-    PlatformConfig& operator=(PlatformConfig const&){}; // Private assignment operator
+    PlatformConfig& operator=(PlatformConfig const&); // Private assignment operator
     static PlatformConfig* instance;
     std::string test_path;
     std::string test_resource_path;

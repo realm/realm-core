@@ -255,6 +255,8 @@
 
 #if defined ANDROID
 #  define TIGHTDB_ANDROID 1
+#else
+#  define TIGHTDB_ANDROID 0
 #endif
 
 
