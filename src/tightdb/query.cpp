@@ -92,21 +92,10 @@ Query& Query::expression(Expression* compare, bool auto_delete)
 // Makes query search only in rows contained in tv
 Query& Query::tableview(const TableView& tv)
 {
-    const Array& arr = tv.get_ref_column();
-    return tableview(arr, tv.m_is_in_index_order); // throw
-}
-
-// Makes query search only in rows contained in tv
-Query& Query::tableview(const Array& arr, bool is_in_index_order)
-{
-    if (!is_in_index_order) {
-        throw runtime_error("Sorted views cannot be used in queries");
-    }
-    ParentNode* const p = new ListviewNode(arr);
+    ParentNode* const p = new ListviewNode(tv);
     UpdatePointers(p, &p->m_child);
     return *this;
 }
-
 
 // Binary
 Query& Query::equal(size_t column_ndx, BinaryData b)
@@ -792,6 +781,7 @@ TableView Query::find_all(size_t start, size_t end, size_t limit)
     st.init(act_FindAll, &tv.get_ref_column(), limit);
     aggregate_internal(act_FindAll, ColumnTypeTraits<int64_t>::id, first[0], &st, start, end, NULL);
     return tv;
+
 }
 
 

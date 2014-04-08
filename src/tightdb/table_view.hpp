@@ -100,6 +100,8 @@ public:
     // a runtime exception.
     void sort(size_t column_ndx, bool ascending = true);
 
+    void apply_same_order(TableViewBase& order);
+    
     // Simple pivot aggregate method. Experimental! Please do not
     // document method publicly.
     void aggregate(size_t group_by_column, size_t aggr_column,
@@ -117,6 +119,13 @@ protected:
     // Null if, and only if, the view is detached
     mutable TableRef m_table;
     Array m_refs;
+
+    // If m_is_in_index_order == false, then this array must contain pointers into m_refs such that the items pointed 
+    // at are in increasingly sorted order. m_index_order must be maintained upon modifying m_refs (that is, upon 
+    // TableView::remove() and future modifying methods).
+    mutable Array m_index_order;
+
+    // If m_is_in_index_order == true, then m_index_order has no requirements and can be empty.
     bool m_is_in_index_order;
 
     /// Construct null view (no memory allocated).
@@ -137,6 +146,8 @@ protected:
 
     Array& get_ref_column() TIGHTDB_NOEXCEPT;
     const Array& get_ref_column() const TIGHTDB_NOEXCEPT;
+    Array& get_index_order_column() const TIGHTDB_NOEXCEPT;
+    void rebuild_index_order_column() const TIGHTDB_NOEXCEPT;
 
     template<class R, class V> static R find_all_integer(V*, std::size_t, int64_t);
     template<class R, class V> static R find_all_float(V*, std::size_t, float);
@@ -253,6 +264,7 @@ private:
     friend class Table;
     friend class Query;
     friend class TableViewBase;
+    friend class ListviewNode;
 };
 
 
@@ -406,7 +418,19 @@ inline const Array& TableViewBase::get_ref_column() const TIGHTDB_NOEXCEPT
     return m_refs;
 }
 
+inline Array& TableViewBase::get_index_order_column() const TIGHTDB_NOEXCEPT
+{
+    return m_index_order;
+}
 
+inline void TableViewBase::rebuild_index_order_column() const TIGHTDB_NOEXCEPT
+{
+    m_index_order.clear();
+    for (size_t t = 0; t < m_refs.size(); t++) {
+        m_index_order.add(t);
+    }
+    m_refs.ReferenceSort(m_index_order);
+}
 
 #define TIGHTDB_ASSERT_COLUMN(column_ndx)                                   \
     TIGHTDB_ASSERT(m_table);                                                \

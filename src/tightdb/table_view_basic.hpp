@@ -167,6 +167,9 @@ public:
     void remove(size_t ndx) { Base::m_impl.remove(ndx); }
     void remove_last() { Base::m_impl.remove_last(); }
 
+    // Resort after requery
+    void apply_same_order(BasicTableView& order) { Base::m_impl.apply_same_order(order.m_impl); };
+
     Tab& get_parent() TIGHTDB_NOEXCEPT
     {
         return static_cast<Tab&>(Base::m_impl.get_parent());

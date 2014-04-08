@@ -200,6 +200,58 @@ size_t TableViewBase::count_double(size_t column_ndx, double target) const
     return aggregate<act_Count, double, size_t, ColumnDouble>(NULL, column_ndx, target);
 }
 
+// Put items in 'this' in same order as 'order'. Requirements: 'this' must be a subset of 'order'. Also, both 
+// TableViews must have coherent m_is_in_index_order and m_index_order members. O(n*log(n)) for n = 
+// order.size().
+//
+// Rationale: find_all() always returns an increasingly sorted TableView. If you have once called
+// res = ...tableview(tv).find_all() you can call this method to give 'res' the same sort order as 'tv'
+void TableViewBase::apply_same_order(TableViewBase& order)
+{
+    // Both are increasingly, hence already have same order
+    if (m_is_in_index_order && order.m_is_in_index_order)
+        return;
+    
+    Array& sorted = order.get_index_order_column();
+    Array& view = order.get_ref_column();
+    Array res;
+
+    TIGHTDB_ASSERT(sorted.size() == view.size());
+
+    // Add same number of entries as in 'order', mark all as non-existing (-1)
+    for (size_t t = 0; t < view.size(); t++)
+        res.add(-1);
+
+    size_t index = 0;
+    for (size_t t = 0; t < m_refs.size(); t++) {
+
+        // Take next element in 'this' and find it in 'order'
+        while (view.get(order.m_is_in_index_order ? index : sorted[index]) <
+               m_refs[m_is_in_index_order ? t : get_index_order_column().get(t)]) {
+            index++;
+        }
+
+        TIGHTDB_ASSERT(view.get(order.m_is_in_index_order ? index : sorted[index]) == 
+                       m_refs[m_is_in_index_order ? t : get_index_order_column().get(t)]);
+
+        // Add found element to 'res' (overwriting the -1)
+        size_t a = order.m_is_in_index_order ? index : sorted[index];
+        size_t b = m_refs[m_is_in_index_order ? t : get_index_order_column().get(t)];
+        res.set(a, b);
+    }
+
+    // Copy all items from res to m_refs, skipping those marked as non-existing (-1)
+    m_refs.clear();
+    for (size_t t = 0; t < res.size(); t++) {
+        if (res[t] != -1)
+            m_refs.add(res[t]);
+    }
+
+    m_is_in_index_order = false;
+    // Todo, see if we can avoid this rebuild which runs O(n*log(n)) quicksort.
+    rebuild_index_order_column();
+}
+
 void TableViewBase::sort(size_t column, bool Ascending)
 {
     TIGHTDB_ASSERT(m_table);
@@ -265,6 +317,16 @@ void TableViewBase::sort(size_t column, bool Ascending)
             m_refs.add(v);
         }
     }
+
+
+    for (size_t t = 0; t < ref.size(); t++) {
+        m_index_order.add(0);
+    }
+
+    for (size_t t = 0; t < ref.size(); t++) {
+        m_index_order.set(ref[t], t);
+    }
+
     result.destroy();
     ref.destroy();
 }
@@ -329,7 +391,7 @@ void TableViewBase::row_to_string(size_t row_ndx, ostream& out) const
     m_table->to_string_row(get_source_ndx(row_ndx), out, widths);
 }
 
-
+// O(n) for n = this->size()
 void TableView::remove(size_t ndx)
 {
     TIGHTDB_ASSERT(m_table);
@@ -344,10 +406,22 @@ void TableView::remove(size_t ndx)
 
     // Decrement row indexes greater than or equal to ndx
     //
-    // FIXME: I believe this should have been 'real_ndx', not 'ndx'
-    //
-    // FIXME: Dangerous cast below: unsigned -> signed
-    m_refs.adjust_ge(int_fast64_t(ndx), -1);
+    // O(n) for n = this->size(). FIXME: Dangerous cast below: unsigned -> signed
+    m_refs.adjust_ge(int_fast64_t(real_ndx), -1);
+
+    if (!m_is_in_index_order) {
+        // Delete reference in m_index_order
+        size_t t;
+        for (t = 0; t < m_index_order.size(); t++) {
+            if (m_index_order.get(t) == ndx) {
+                m_index_order.erase(t);
+                m_index_order.adjust_ge(int_fast64_t(ndx), -1);
+                break;
+            }
+        }
+        TIGHTDB_ASSERT(t <= m_index_order.size()); // Ensure the reference in m_index_order was actually found
+    }
+
 }
 
 
@@ -364,4 +438,6 @@ void TableView::clear()
     }
 
     m_refs.clear();
+    m_index_order.clear();
+    m_is_in_index_order = false;
 }

@@ -95,13 +95,13 @@ void display_build_config()
         "  with Debug "<<with_debug<<"\n"
         "  with Replication "<<with_replication<<"\n"
         "\n"
-		"TIGHTDB_MAX_LIST_SIZE = " << TIGHTDB_MAX_LIST_SIZE << "\n"
-		"\n"
-		// Be aware that ps3/xbox have sizeof(void*) = 4 && sizeof(size_t) == 8
-		// We decide to print size_t here
-		"sizeof(size_t) * 8 = " << sizeof(size_t)* 8 << "\n"
-		"\n"
-		"Compiler supported SSE (auto detect):       " << compiler_sse << "\n"
+        "TIGHTDB_MAX_LIST_SIZE = " << TIGHTDB_MAX_LIST_SIZE << "\n"
+        "\n"
+        // Be aware that ps3/xbox have sizeof(void*) = 4 && sizeof(size_t) == 8
+        // We decide to print size_t here
+        "sizeof(size_t) * 8 = " << sizeof(size_t)* 8 << "\n"
+        "\n"
+        "Compiler supported SSE (auto detect):       " << compiler_sse << "\n"
         "This CPU supports SSE (auto detect):        "<<cpu_sse<<"\n"
         "Compiler supported AVX (auto detect):       "<<compiler_avx<<"\n"
         "This CPU supports AVX (AVX1) (auto detect): "<<cpu_avx<<"\n"

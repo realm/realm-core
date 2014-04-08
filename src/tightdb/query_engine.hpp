@@ -503,43 +503,60 @@ protected:
 };
 
 // Used for performing queries on a Tableview. This is done by simply passing the TableView to this query condition
-// actually it's the Array of the TableView which is passed). TableView must be sorted for Array::FindGTE to work
-// correctly.
 class ListviewNode: public ParentNode {
 public:
-    ListviewNode(const Array& arr) : m_arr(arr), m_max(0), m_next(0), m_size(arr.size()) {m_child = 0; m_dT = 0.0;}
+    ListviewNode(const TableView& tv) : m_tv(tv), m_max(0), m_next(0), m_size(tv.size()) {m_child = 0; m_dT = 0.0;}
     ~ListviewNode() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {  }
+
+    // Return the n'th table row index contained in the TableView.
+    size_t tableindex(size_t n)
+    {
+        // If TableView is sorted increasingly, then simply return m_refs[n].
+        // If TableView is non-sorted, then go through its ordere array to return the same as it would have returned if it
+        // had been sorted
+        size_t n2 = m_tv.m_is_in_index_order ? n : m_tv.get_index_order_column().get(n);
+        return to_size_t(m_tv.get_ref_column().get(n2));
+    }
 
     void init(const Table& table) TIGHTDB_OVERRIDE
     {
         m_table = &table;
 
-        m_dD =  m_table->size() / (m_arr.size() + 1.0);
+        m_dD = m_table->size() / (m_tv.size() + 1.0);
         m_probes = 0;
         m_matches = 0;
 
         m_next = 0;
         if (m_size > 0)
-            m_max = to_size_t(m_arr.get(m_size-1));
+            m_max = tableindex(m_size - 1);
         if (m_child) m_child->init(table);
     }
 
     size_t find_first_local(size_t start, size_t end)  TIGHTDB_OVERRIDE
     {
-        // Simply return next TableView item which is >= start
-        size_t r = m_arr.FindGTE(start, m_next);
+        // Simply return index of first table row which is >= start
+        size_t r;
+        if (m_tv.m_is_in_index_order) {
+            r = m_tv.get_ref_column().FindGTE(start, m_next, null_ptr);
+        }
+        else {
+            r = m_tv.get_ref_column().FindGTE(start, m_next, &m_tv.get_index_order_column());
+        }
+
         if (r >= end)
             return not_found;
 
         m_next = r;
-        return to_size_t(m_arr.get(r));
+        return tableindex(r);
     }
 
 protected:
-    const Array& m_arr;
     size_t m_max;
     size_t m_next;
     size_t m_size;
+
+    const TableView& m_tv;
+    Array m_arr;
 };
 
 // For conditions on a subtable (encapsulated in subtable()...end_subtable()). These return the parent row as match if and
@@ -1257,7 +1274,7 @@ public:
 
                 while (f == not_found && last_indexed < m_index_size) {
                     m_index_getter->cache_next(last_indexed);
-                    f = m_index_getter->m_array_ptr->FindGTE(s, last_indexed - m_index_getter->m_leaf_start);
+                    f = m_index_getter->m_array_ptr->FindGTE(s, last_indexed - m_index_getter->m_leaf_start, null_ptr);
 
                     if (f >= end || f == not_found) {
                         last_indexed = m_index_getter->m_leaf_end;
