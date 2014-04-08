@@ -1,6 +1,7 @@
 Template
 =============================================================
 x.x.x Release notes (yyyy—MM-dd)
+================================
 
 C++ (core)
 -----------
@@ -9,6 +10,33 @@ The C++ API has been updated and your code will break!
 ### Bugfixes:
 
 * None.
+
+### API breaking changes:
+
+* `???`
+
+### Enhancements:
+
+* `???`
+
+-----------
+
+### Internals:
+
+* `???`
+
+----------------------------------------------
+
+x.x.x Release notes (yyyy—MM-dd)    <<<------------ PLEASE NOTE, THIS IS THE NEXT RELEASE!!!!!!
+================================
+
+C++ (core)
+-----------
+Adding Table::get_index_in_parent() and Group::get_table(std::size_t table_ndx). They were needed for implicit transactions.
+
+### Bugfixes:
+
+* Fixed bug in TableView::remove(), causing crash or undefined behaviour.
 
 ### API breaking changes:
 

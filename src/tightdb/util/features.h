@@ -104,7 +104,7 @@
  * FIXME: Somehow MSVC 11 (2012) fails when <atomic> is included in thread.cpp. */
 #  if TIGHTDB_HAVE_CXX11 && TIGHTDB_HAVE_AT_LEAST_GCC(4, 4) || \
     TIGHTDB_HAVE_CXX11 && _LIBCPP_VERSION >= 1001 || \
-	TIGHTDB_HAVE_AT_LEAST_MSVC_12_2013
+    TIGHTDB_HAVE_AT_LEAST_MSVC_12_2013
 #    define TIGHTDB_HAVE_CXX11_ATOMIC 1
 #  endif
 
