@@ -362,12 +362,20 @@ public:
     void           clear_subtable(std::size_t column_ndx, std::size_t row_ndx);
 
     //@{
-    /// If this table accessor is attached to a subtable in a column
-    /// of type `table` or `mixed`, then this function returns a
-    /// reference to the accessor of the parent table. Otherwise it
-    /// returns null.
+    /// If this accessor is attached to a subtable, then that subtable
+    /// has a parent table, and the subtable either resides in a
+    /// column of type `table` or of type `mixed` in that parent. In
+    /// that case get_parent_table() returns a reference to the
+    /// accessor assocaited with the parent and get_index_in_parent()
+    /// returns the index of the row in which the subtable
+    /// resides. Otherwise, if this table is a group-level table,
+    /// get_parent_table() returns null and get_index_in_parent()
+    /// returns the index of this table within the group. Otherwise
+    /// this table is a free-standing table, get_parent_table()
+    /// returns null, and get_index_in_parent() returns tightdb::npos.
     TableRef get_parent_table() TIGHTDB_NOEXCEPT;
     ConstTableRef get_parent_table() const TIGHTDB_NOEXCEPT;
+    std::size_t get_index_in_parent() TIGHTDB_NOEXCEPT;
     //@}
 
     // Aggregate functions

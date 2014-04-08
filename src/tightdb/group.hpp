@@ -199,6 +199,8 @@ public:
     /// Returns the number of tables in this group.
     std::size_t size() const;
 
+    /// Get the name of the table at the specified index within this
+    /// group.
     StringData get_table_name(std::size_t table_ndx) const;
 
     /// Check whether this group has a table with the specified name.

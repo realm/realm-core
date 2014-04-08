@@ -1402,6 +1402,17 @@ TableRef Table::get_parent_table() TIGHTDB_NOEXCEPT
 }
 
 
+size_t Table::get_index_in_parent() TIGHTDB_NOEXCEPT
+{
+    const Array& real_top = m_top.is_attached() ? m_top : m_columns;
+    ArrayParent* parent = real_top.get_parent();
+    if (!parent)
+        return npos;
+    size_t index_in_parent = real_top.get_ndx_in_parent();
+    return index_in_parent;
+}
+
+
 int64_t Table::get_int(size_t column_ndx, size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(column_ndx < get_column_count());
