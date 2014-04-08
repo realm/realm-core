@@ -3168,7 +3168,6 @@ void test_write_slice_contents(TestResults& test_results, const Table& table,
 
 } // anonymous namespace
 
-/*
 
 TEST(Table_WriteSlice)
 {
@@ -3218,6 +3217,5 @@ TEST(Table_WriteSlice)
     }
 }
 
-*/
 
 #endif // TEST_TABLE
