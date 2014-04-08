@@ -76,14 +76,14 @@ template <class C, typename T>
 void BasicArray_AddManyValues(TestResults& test_results)
 {
     C f;
-    const size_t repeats = 1100;
-    for (size_t i=0; i<repeats; ++i) {
+    size_t repeats = 1100;
+    for (size_t i = 0; i < repeats; ++i) {
         f.add(T(i));
         T val = f.get(i);
         CHECK_EQUAL(T(i), val);
         CHECK_EQUAL(i+1, f.size());
     }
-    for (size_t i=0; i<repeats; ++i) {
+    for (size_t i = 0; i < repeats; ++i) {
         T val = f.get(i);
         CHECK_EQUAL(T(i), val);
     }
@@ -106,7 +106,7 @@ template <class C, typename T>
 void BasicArray_Delete(TestResults& test_results)
 {
     C f;
-    for (size_t i=0; i<5; ++i)
+    for (size_t i = 0; i < 5; ++i)
         f.add( T(i) );
 
     // Delete first
@@ -155,7 +155,7 @@ void BasicArray_Set(TestResults& test_results, T values[], size_t num_values)
 {
     C f;
     CHECK_EQUAL(0, f.size());
-    for (size_t i=0; i<num_values; ++i)
+    for (size_t i = 0; i < num_values; ++i)
         f.add(values[i]);
     CHECK_EQUAL(num_values, f.size());
 
@@ -185,8 +185,8 @@ template <class C, typename T>
 void BasicArray_Insert(TestResults& test_results)
 {
     C f;
-    const T v0 = T(123.970);
-    const T v1 = T(-321.971);
+    T v0 = T(123.970);
+    T v1 = T(-321.971);
     T v2 = T(555.972);
     T v3 = T(-999.973);
 
@@ -236,7 +236,7 @@ void BasicArray_Sum(TestResults& test_results)
 
     T values[] = { T(1.1), T(2.2), T(3.3), T(4.4), T(5.5)};
     double sum = 0.0;
-    for (size_t i=0; i<5; ++i) {
+    for (size_t i = 0; i < 5; ++i) {
         f.add(values[i]);
         sum += values[i];
     }
@@ -273,9 +273,8 @@ void BasicArray_Minimum(TestResults& test_results)
     CHECK_EQUAL(false, f.minimum(res));
 
     T values[] = { T(1.1), T(2.2), T(-1.0), T(5.5), T(4.4)};
-    for (size_t i=0; i<5; ++i) {
+    for (size_t i = 0; i < 5; ++i)
         f.add(values[i]);
-    }
     CHECK_EQUAL(5, f.size());
 
     // middle match in all
@@ -315,9 +314,8 @@ void BasicArray_Maximum(TestResults& test_results)
     CHECK_EQUAL(false, f.maximum(res));
 
     T values[] = { T(1.1), T(2.2), T(-1.0), T(5.5), T(4.4)};
-    for (size_t i=0; i<5; ++i) {
+    for (size_t i = 0; i < 5; ++i)
         f.add(values[i]);
-    }
     CHECK_EQUAL(5, f.size());
 
     // middle match in all
@@ -358,7 +356,7 @@ void BasicArray_Find(TestResults& test_results)
 
     // Add some values
     T values[] = { T(1.1), T(2.2), T(-1.0), T(5.5), T(1.1), T(4.4) };
-    for (size_t i=0; i<6; ++i)
+    for (size_t i = 0; i < 6; ++i)
         f.add(values[i]);
 
     // Find (full range: start=0, end=-1)
@@ -378,16 +376,16 @@ void BasicArray_Find(TestResults& test_results)
     CHECK_EQUAL(4,          f.find_first(T(1.1), 1, 5));    // skip first match, end at last match
 
     // Find all
-    Array resArr;
-    f.find_all(resArr, T(1.1), 0);
-    CHECK_EQUAL(2, resArr.size());
-    CHECK_EQUAL(0, resArr.get(0));
-    CHECK_EQUAL(4, resArr.get(1));
+    Array res_arr;
+    f.find_all(res_arr, T(1.1), 0);
+    CHECK_EQUAL(2, res_arr.size());
+    CHECK_EQUAL(0, res_arr.get(0));
+    CHECK_EQUAL(4, res_arr.get(1));
     // Find all, range limited -> no match
-    resArr.clear();
-    f.find_all(resArr, T(1.1), 0, 1, 4);
-    CHECK_EQUAL(0, resArr.size());
-    resArr.destroy();
+    res_arr.clear();
+    f.find_all(res_arr, T(1.1), 0, 1, 4);
+    CHECK_EQUAL(0, res_arr.size());
+    res_arr.destroy();
 
     f.destroy();    // cleanup
 }
@@ -412,9 +410,9 @@ void BasicArray_Count(TestResults& test_results)
     // Add some values
     //                0       1        2       3       4       5
     T values[] = { T(1.1), T(2.2), T(-1.0), T(5.5), T(1.1), T(4.4)};
-    for (size_t i=0; i<6; ++i) {
+    for (size_t i = 0; i < 6; ++i)
         f.add(values[i]);
-    }
+
     // count full range
     CHECK_EQUAL(0, f.count(T(0.0)));
     CHECK_EQUAL(1, f.count(T(4.4)));
@@ -454,7 +452,7 @@ void BasicArray_Compare(TestResults& test_results)
 
     // Add some values
     T values[] = { T(1.1), T(2.2), T(-1.0), T(5.5), T(1.1), T(4.4)};
-    for (size_t i=0; i<6; ++i) {
+    for (size_t i = 0; i < 6; ++i) {
         f1.add(values[i]);
         f2.add(values[i]);
         CHECK_EQUAL(true, f1.compare(f2));

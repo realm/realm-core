@@ -253,7 +253,7 @@ protected:
 
     /// Must be called only from do_begin_write_transact(),
     /// do_commit_write_transact(), or do_rollback_write_transact().
-    static version_type get_current_version(SharedGroup&) TIGHTDB_NOEXCEPT;
+    static version_type get_current_version(SharedGroup&);
 
 private:
     struct TransactLogApplier;

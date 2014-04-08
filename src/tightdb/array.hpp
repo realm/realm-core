@@ -2761,6 +2761,7 @@ template<bool gt, Action action, size_t width, class Callback> bool Array::FindG
         int main(int argc, char const *const argv[])
         {
             int64_t v;
+            FIXME: We cannot use rand() as it is not thread-safe.
             if (rand()*rand() == 3) {
                 v = rand()*rand()*rand()*rand()*rand();
                 printf("Change '3' to something else and run test again\n");

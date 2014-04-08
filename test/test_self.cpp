@@ -458,22 +458,6 @@ TEST_EX(Failure_Exception, failure_list) // Test #6, accum checks = 105 + 2 = 10
 }
 
 
-TEST(Self_SuccessFailure)
-{
-    CHECK(zero_tests_list.run());
-    CHECK(zero_checks_list.run());
-    CHECK(one_check_success_list.run());
-    CHECK(!one_check_failure_list.run());
-    CHECK(one_test_success_list.run());
-    CHECK(!one_test_failure_list.run());
-    CHECK(few_tests_success_list.run());
-    CHECK(!few_tests_failure_list.run());
-    CHECK(!mixed_list.run());
-    CHECK(success_list.run());
-    CHECK(!failure_list.run());
-}
-
-
 struct SummaryRecorder: Reporter {
     Summary& m_summary;
     SummaryRecorder(Summary& summary):
@@ -500,21 +484,6 @@ void check_summary(TestResults& test_results, TestList& list,
     CHECK_EQUAL(num_failed_checks,  summary.num_failed_checks);
 }
 
-TEST(Self_CorrectSummary)
-{
-    check_summary(test_results, zero_tests_list,        0, 0, 0,   0,   0);
-    check_summary(test_results, zero_checks_list,       1, 0, 0,   0,   0);
-    check_summary(test_results, one_check_success_list, 1, 0, 0,   1,   0);
-    check_summary(test_results, one_check_failure_list, 1, 1, 0,   1,   1);
-    check_summary(test_results, one_test_success_list,  1, 0, 0,   5,   0);
-    check_summary(test_results, one_test_failure_list,  1, 1, 0,   5,   1);
-    check_summary(test_results, few_tests_success_list, 3, 0, 0,  13,   0);
-    check_summary(test_results, few_tests_failure_list, 3, 1, 0,  13,   1);
-    check_summary(test_results, mixed_list,             7, 3, 0,  19,   6);
-    check_summary(test_results, success_list,           6, 0, 0,  87,   0);
-    check_summary(test_results, failure_list,           6, 6, 0, 107, 107);
-}
-
 
 void check_filtered_summary(TestResults& test_results, TestList& list, const char* filter_str,
                             int num_included_tests, int num_failed_tests, int num_excluded_tests,
@@ -531,8 +500,33 @@ void check_filtered_summary(TestResults& test_results, TestList& list, const cha
     CHECK_EQUAL(num_failed_checks,  summary.num_failed_checks);
 }
 
-TEST(Self_Filter)
+
+TEST(Self_Basic)
 {
+    CHECK(zero_tests_list.run());
+    CHECK(zero_checks_list.run());
+    CHECK(one_check_success_list.run());
+    CHECK(!one_check_failure_list.run());
+    CHECK(one_test_success_list.run());
+    CHECK(!one_test_failure_list.run());
+    CHECK(few_tests_success_list.run());
+    CHECK(!few_tests_failure_list.run());
+    CHECK(!mixed_list.run());
+    CHECK(success_list.run());
+    CHECK(!failure_list.run());
+
+    check_summary(test_results, zero_tests_list,        0, 0, 0,   0,   0);
+    check_summary(test_results, zero_checks_list,       1, 0, 0,   0,   0);
+    check_summary(test_results, one_check_success_list, 1, 0, 0,   1,   0);
+    check_summary(test_results, one_check_failure_list, 1, 1, 0,   1,   1);
+    check_summary(test_results, one_test_success_list,  1, 0, 0,   5,   0);
+    check_summary(test_results, one_test_failure_list,  1, 1, 0,   5,   1);
+    check_summary(test_results, few_tests_success_list, 3, 0, 0,  13,   0);
+    check_summary(test_results, few_tests_failure_list, 3, 1, 0,  13,   1);
+    check_summary(test_results, mixed_list,             7, 3, 0,  19,   6);
+    check_summary(test_results, success_list,           6, 0, 0,  87,   0);
+    check_summary(test_results, failure_list,           6, 6, 0, 107, 107);
+
     check_filtered_summary(test_results, mixed_list, "- *",           0, 0, 7,  0, 0);
     check_filtered_summary(test_results, mixed_list, "* - *",         0, 0, 7,  0, 0);
     check_filtered_summary(test_results, mixed_list, "",              7, 3, 0, 19, 6);

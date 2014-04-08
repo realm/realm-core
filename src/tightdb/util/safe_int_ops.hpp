@@ -178,16 +178,23 @@ bool int_cast_with_overflow_detect(From from, To& to) TIGHTDB_NOEXCEPT;
 
 
 /// Convert negative values from two's complement representation to
-/// the platforms native representation in the specified signed type.
+/// the platforms native representation.
 ///
-/// The result is well-defined if, and only if the value with the
-/// specified two's complement representation is representable in the
-/// specified signed type. While this is generally the case when using
-/// corresponding signed/unsigned type pairs, it is not guaranteed by
-/// the standard. However, if you know that the signed type has at
-/// least as many value bits as the unsigned type, then the result is
-/// always well-defined. Note that a 'value bit' in this context is
-/// the same as a 'digit' in the context of `std::numeric_limits`.
+/// If `To` is an unsigned type, this function is does nothing beyond
+/// casting the specified value to `To`. Otherwise, `To` is a signed
+/// type, and negative values will be converted from two's complement
+/// representation in unsigned `From` to the platforms native
+/// representation in `To`.
+///
+/// For signed `To` the result is well-defined if, and only if the
+/// value with the specified two's complement representation is
+/// representable in the specified signed type. While this is
+/// generally the case when using corresponding signed/unsigned type
+/// pairs, it is not guaranteed by the standard. However, if you know
+/// that the signed type has at least as many value bits as the
+/// unsigned type, then the result is always well-defined. Note that a
+/// 'value bit' in this context is the same as a 'digit' from the
+/// point of view of `std::numeric_limits`.
 ///
 /// On platforms that use two's complement representation of negative
 /// values, this function is expected to be completely optimized
@@ -205,11 +212,10 @@ bool int_cast_with_overflow_detect(From from, To& to) TIGHTDB_NOEXCEPT;
 /// that makes no assumption about the underlying platform except what
 /// is guaranteed by C++11.
 ///
-/// \tparam From The unsigned type of the two's complement
-/// representation of the specified value.
+/// \tparam From The unsigned type used to store the two's complement
+/// representation.
 ///
-/// \tparam To A signed type use to return the specified value in its
-/// native representation.
+/// \tparam To A signed or unsigned integer type.
 template<class To, class From> To from_twos_compl(From twos_compl) TIGHTDB_NOEXCEPT;
 
 
@@ -275,8 +281,7 @@ template<class L, class R> struct SafeIntBinopsImpl<L, R, false, false> {
     static const int needed_bits_l = lim_l::digits;
     static const int needed_bits_r = lim_r::digits;
     static const int needed_bits = needed_bits_l >= needed_bits_r ? needed_bits_l : needed_bits_r;
-    typedef typename util::LeastUnsigned<needed_bits>::type almost_common_unsigned;
-    typedef typename util::ChooseWidestInt<unsigned, almost_common_unsigned>::type common_unsigned;
+    typedef typename util::FastestUnsigned<needed_bits>::type common_unsigned;
     static bool equal(L l, R r) TIGHTDB_NOEXCEPT
     {
         return common_unsigned(l) == common_unsigned(r);
@@ -312,8 +317,7 @@ template<class L, class R> struct SafeIntBinopsImpl<L, R, false, true> {
     static const int needed_bits_l = lim_l::digits;
     static const int needed_bits_r = lim_r::digits + 1;
     static const int needed_bits = needed_bits_l >= needed_bits_r ? needed_bits_l : needed_bits_r;
-    typedef typename util::LeastUnsigned<needed_bits>::type almost_common_unsigned;
-    typedef typename util::ChooseWidestInt<unsigned, almost_common_unsigned>::type common_unsigned;
+    typedef typename util::FastestUnsigned<needed_bits>::type common_unsigned;
     typedef std::numeric_limits<common_unsigned> lim_cu;
     static bool equal(L l, R r) TIGHTDB_NOEXCEPT
     {
@@ -364,8 +368,7 @@ template<class L, class R> struct SafeIntBinopsImpl<L, R, true, false> {
     static const int needed_bits_l = lim_l::digits + 1;
     static const int needed_bits_r = lim_r::digits;
     static const int needed_bits = needed_bits_l >= needed_bits_r ? needed_bits_l : needed_bits_r;
-    typedef typename util::LeastUnsigned<needed_bits>::type almost_common_unsigned;
-    typedef typename util::ChooseWidestInt<unsigned, almost_common_unsigned>::type common_unsigned;
+    typedef typename util::FastestUnsigned<needed_bits>::type common_unsigned;
     static bool equal(L l, R r) TIGHTDB_NOEXCEPT
     {
         return (lim_l::digits < lim_r::digits) ?
@@ -578,19 +581,18 @@ template<class To, class From> inline To from_twos_compl(From twos_compl) TIGHTD
                           "std::numeric_limits<> must be specialized for both types");
     TIGHTDB_STATIC_ASSERT(lim_f::is_integer && lim_t::is_integer,
                           "Both types must be integers");
-    TIGHTDB_STATIC_ASSERT(!lim_f::is_signed && lim_t::is_signed,
-                          "`From` must be unsigned and `To` must be signed");
+    TIGHTDB_STATIC_ASSERT(!lim_f::is_signed, "`From` must be unsigned");
     To native;
     int sign_bit_pos = lim_f::digits - 1;
     From sign_bit = From(1) << sign_bit_pos;
-    bool non_negative = (twos_compl & sign_bit) == 0;
+    bool non_negative = !lim_t::is_signed || (twos_compl & sign_bit) == 0;
     if (non_negative) {
         // Non-negative value
         native = To(twos_compl);
     }
     else {
         // Negative value
-        native = -1 - To(From(-1) - twos_compl);
+        native = To(-1 - To(From(-1) - twos_compl));
     }
     return native;
 }

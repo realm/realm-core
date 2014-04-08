@@ -623,13 +623,15 @@ TEST(Table_DeleteAllTypes)
 
 TEST(Table_MoveAllTypes)
 {
+    Random random(random_int<unsigned long>()); // Seed from slow global generator
+
     Table table;
     setup_multi_table(table, 15, 2);
     table.set_index(6);
 
     while (table.size() > 1) {
         size_t size = table.size();
-        size_t ndx = size_t(rand()) % (size-1);
+        size_t ndx = random.draw_int_mod(size-1);
 
         table.move_last_over(ndx);
 

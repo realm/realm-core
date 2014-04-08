@@ -64,14 +64,13 @@ template <class C, typename T>
 void BasicColumn_AddGet(TestResults& test_results, T values[], size_t num_values)
 {
     C c;
-    for (size_t i=0; i<num_values; ++i) {
+    for (size_t i = 0; i < num_values; ++i) {
         c.add(values[i]);
 
         CHECK_EQUAL(i+1, c.size());
 
-        for (size_t j=0; j<i; ++j) {
+        for (size_t j = 0; j < i; ++j)
             CHECK_EQUAL(values[j], c.get(j));
-        }
     }
 
     c.destroy();
@@ -92,7 +91,7 @@ void BasicColumn_Clear(TestResults& test_results)
     C c;
     CHECK(c.is_empty());
 
-    for (size_t i=0; i<100; ++i)
+    for (size_t i = 0; i < 100; ++i)
         c.add();
     CHECK(!c.is_empty());
 
@@ -115,7 +114,7 @@ template <class C, typename T>
 void BasicColumn_Set(TestResults& test_results, T values[], size_t num_values)
 {
     C c;
-    for (size_t i=0; i<num_values; ++i)
+    for (size_t i = 0; i < num_values; ++i)
         c.add(values[i]);
     CHECK_EQUAL(num_values, c.size());
 
@@ -227,7 +226,7 @@ template <class C, typename T>
 void BasicColumn_Delete(TestResults& test_results, T values[], size_t num_values)
 {
     C c;
-    for (size_t i=0; i<num_values; ++i)
+    for (size_t i = 0; i < num_values; ++i)
         c.add(values[i]);
     CHECK_EQUAL(5, c.size());
     CHECK_EQUAL(values[0], c.get(0));

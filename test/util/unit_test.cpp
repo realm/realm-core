@@ -1,13 +1,15 @@
-#include <exception>
-#include <vector>
+#include <stdexcept>
 #include <map>
 #include <string>
 #include <iostream>
 
+#include <tightdb/util/unique_ptr.hpp>
+#include <tightdb/util/bind.hpp>
 #include <tightdb/util/thread.hpp>
 
 #include "demangle.hpp"
 #include "timer.hpp"
+#include "random.hpp"
 #include "wildcard.hpp"
 #include "unit_test.hpp"
 
@@ -19,37 +21,25 @@ using namespace tightdb::test_util::unit_test;
 
 
 
-// Threading: Need a job-scheduler based on a thread pool as opposed
-// to a process pool.
-
-// FIXME: Add meta unit test to test that all checks work - it is
-// important to trigger all variations of the implementation of the
-// checks.
-
 // FIXME: Think about order of tests during execution.
 // FIXME: Write quoted strings with escaped nonprintables
-// FIXME: Multi-threaded
 
 
 
 namespace {
 
 
-class TempUnlockGuard {
-public:
-    TempUnlockGuard(UniqueLock& lock) TIGHTDB_NOEXCEPT:
-        m_lock(lock)
-    {
-        m_lock.unlock();
-    }
+struct SharedContext {
+    Reporter& m_reporter;
+    vector<Test*> m_tests;
+    Mutex m_mutex;
+    size_t m_next_test;
 
-    ~TempUnlockGuard() TIGHTDB_NOEXCEPT
+    SharedContext(Reporter& reporter):
+        m_reporter(reporter),
+        m_next_test(0)
     {
-        m_lock.lock();
     }
-
-private:
-    UniqueLock& m_lock;
 };
 
 
@@ -250,106 +240,140 @@ namespace test_util {
 namespace unit_test {
 
 
-class TestList::Impl {
+class TestList::ExecContext {
 public:
-    vector<Test*> m_tests;
+    SharedContext* m_shared;
     Mutex m_mutex;
     long long m_num_checks;
-    long long m_num_checks_failed;
-};
-
-
-class TestResults::ExecContext {
-public:
-    Reporter* m_reporter;
-    Test* m_current_test;
+    long long m_num_failed_checks;
+    long m_num_failed_tests;
     bool m_errors_seen;
+
+    ExecContext():
+        m_shared(0),
+        m_num_checks(0),
+        m_num_failed_checks(0),
+        m_num_failed_tests(0)
+    {
+    }
+
+    void run();
 };
-
-
-TestList::TestList()
-{
-    m_impl.reset(new Impl);
-}
-
-
-TestList::~TestList() TIGHTDB_NOEXCEPT
-{
-}
 
 
 void TestList::add(Test& test, const char* name, const char* file, long line)
 {
+    test.test_results.m_test = &test;
     test.test_results.m_list = this;
     TestDetails& details = test.test_details;
-    long index = long(m_impl->m_tests.size());
+    long index = long(m_tests.size());
     details.test_index  = index;
     details.test_name   = name;
     details.file_name   = file;
     details.line_number = line;
-    m_impl->m_tests.push_back(&test);
+    m_tests.push_back(&test);
 }
 
-
-bool TestList::run(Reporter* reporter, Filter* filter)
+void TestList::ExecContext::run()
 {
-    Timer timer(Timer::type_UserTime);
-    double prev_time = 0;
-    TestResults::ExecContext context;
-    context.m_reporter = reporter;
-    UniqueLock lock(m_impl->m_mutex);
-    m_impl->m_num_checks = 0;
-    m_impl->m_num_checks_failed = 0;
-    long num_tests = long(m_impl->m_tests.size());
-    long num_excluded_tests = 0, num_failed_tests = 0;
-    for (long i = 0; i != num_tests; ++i) {
-        Test* test = m_impl->m_tests[i];
-        if (filter && !filter->include(test->test_details)) {
-            ++num_excluded_tests;
-            continue;
+    Timer timer;
+    double time = 0;
+    Test* test = 0;
+    for (;;) {
+        double prev_time = time;
+        time = timer.get_elapsed_time();
+
+        // Next test
+        {
+            SharedContext& shared = *m_shared;
+            Reporter& reporter = shared.m_reporter;
+            LockGuard lock(shared.m_mutex);
+            if (test)
+                reporter.end(test->test_details, time - prev_time);
+            if (shared.m_next_test == shared.m_tests.size())
+                break;
+            test = shared.m_tests[shared.m_next_test++];
+            reporter.begin(test->test_details);
         }
-        context.m_current_test = test;
-        context.m_errors_seen = false;
-        test->test_results.m_context = &context;
-        if (reporter)
-            reporter->begin(test->test_details);
+
+        m_errors_seen = false;
+        test->test_results.m_context = this;
+
         try {
-            TempUnlockGuard unlock(lock);
             test->test_run();
         }
         catch (exception& ex) {
-            context.m_errors_seen = true;
-            if (reporter) {
-                string message = "Unhandled exception "+get_type_name(ex)+": "+ex.what();
-                reporter->fail(test->test_details, message);
-            }
+            string message = "Unhandled exception "+get_type_name(ex)+": "+ex.what();
+            test->test_results.test_failed(message);
         }
         catch (...) {
-            context.m_errors_seen = true;
-            if (reporter) {
-                string message = "Unhandled exception of unknown type";
-                reporter->fail(test->test_details, message);
-            }
+            m_errors_seen = true;
+            string message = "Unhandled exception of unknown type";
+            test->test_results.test_failed(message);
         }
-        if (reporter) {
-            double time = timer.get_elapsed_time();
-            reporter->end(test->test_details, time - prev_time);
-            prev_time = time;
-        }
-        if (context.m_errors_seen)
-            ++num_failed_tests;
+
         test->test_results.m_context = 0;
+        if (m_errors_seen)
+            ++m_num_failed_tests;
     }
-    if (reporter) {
-        Summary summary;
-        summary.num_included_tests = num_tests - num_excluded_tests;
-        summary.num_failed_tests   = num_failed_tests;
-        summary.num_excluded_tests = num_excluded_tests;
-        summary.num_checks         = m_impl->m_num_checks;
-        summary.num_failed_checks  = m_impl->m_num_checks_failed;
-        summary.elapsed_seconds    = timer.get_elapsed_time();
-        reporter->summary(summary);
+}
+
+bool TestList::run(Reporter* reporter, Filter* filter, int num_threads, bool shuffle)
+{
+    Timer timer;
+    Reporter fallback_reporter;
+    Reporter& reporter_2 = reporter ? *reporter : fallback_reporter;
+    if (num_threads < 1 || num_threads > 1024)
+        throw runtime_error("Bad number of threads");
+
+    SharedContext shared(reporter_2);
+    size_t num_tests = m_tests.size();
+    for (size_t i = 0; i != num_tests; ++i) {
+        Test* test = m_tests[i];
+        if (!filter || filter->include(test->test_details))
+            shared.m_tests.push_back(test);
     }
+
+    if (shuffle) {
+        Random random(random_int<unsigned long>()); // Seed from slow global generator
+        random.shuffle(shared.m_tests.begin(), shared.m_tests.end());
+    }
+
+    UniquePtr<ExecContext[]> thread_contexts(new ExecContext[num_threads]);
+    for (int i = 0; i != num_threads; ++i)
+        thread_contexts[i].m_shared = &shared;
+
+    if (num_threads == 1) {
+        thread_contexts[0].run();
+    }
+    else {
+        UniquePtr<Thread[]> threads(new Thread[num_threads]);
+        for (int i = 0; i != num_threads; ++i)
+            threads[i].start(bind(&ExecContext::run, &thread_contexts[i]));
+        for (int i = 0; i != num_threads; ++i)
+            threads[i].join();
+    }
+
+    long num_failed_tests = 0;
+    long long num_checks = 0;
+    long long num_failed_checks = 0;
+
+    for (int i = 0; i != num_threads; ++i) {
+        ExecContext& thread_context = thread_contexts[i];
+        num_failed_tests  += thread_context.m_num_failed_tests;
+        num_checks        += thread_context.m_num_checks;
+        num_failed_checks += thread_context.m_num_failed_checks;
+    }
+
+    Summary summary;
+    summary.num_included_tests = long(shared.m_tests.size());
+    summary.num_failed_tests   = num_failed_tests;
+    summary.num_excluded_tests = long(num_tests) - summary.num_included_tests;
+    summary.num_checks         = num_checks;
+    summary.num_failed_checks  = num_failed_checks;
+    summary.elapsed_seconds    = timer.get_elapsed_time();
+    reporter_2.summary(summary);
+
     return num_failed_tests == 0;
 }
 
@@ -362,6 +386,7 @@ TestList& get_default_test_list()
 
 
 TestResults::TestResults():
+    m_test(0),
     m_list(0),
     m_context(0)
 {
@@ -370,28 +395,41 @@ TestResults::TestResults():
 
 void TestResults::check_succeeded()
 {
-    TestList::Impl& list_impl = *m_list->m_impl;
-    LockGuard lock(list_impl.m_mutex);
-    TIGHTDB_ASSERT(m_context);
-    ++list_impl.m_num_checks;
+    LockGuard lock(m_context->m_mutex);
+    ++m_context->m_num_checks;
 }
 
 
 void TestResults::check_failed(const char* file, long line, const string& message)
 {
-    TestList::Impl& list_impl = *m_list->m_impl;
-    LockGuard lock(list_impl.m_mutex);
-    TIGHTDB_ASSERT(m_context);
-    if (m_context->m_reporter) {
-        Test& test = *m_context->m_current_test;
-        TestDetails details = test.test_details; // Copy
-        details.file_name   = file;
-        details.line_number = line;
-        m_context->m_reporter->fail(details, message);
+    {
+        LockGuard lock(m_context->m_mutex);
+        ++m_context->m_num_checks;
+        ++m_context->m_num_failed_checks;
+        m_context->m_errors_seen = true;
     }
-    m_context->m_errors_seen = true;
-    ++list_impl.m_num_checks;
-    ++list_impl.m_num_checks_failed;
+    SharedContext& shared = *m_context->m_shared;
+    TestDetails details = m_test->test_details; // Copy
+    details.file_name   = file;
+    details.line_number = line;
+    {
+        LockGuard lock(shared.m_mutex);
+        shared.m_reporter.fail(details, message);
+    }
+}
+
+
+void TestResults::test_failed(const string& message)
+{
+    {
+        LockGuard lock(m_context->m_mutex);
+        m_context->m_errors_seen = true;
+    }
+    SharedContext& shared = *m_context->m_shared;
+    {
+        LockGuard lock(shared.m_mutex);
+        shared.m_reporter.fail(m_test->test_details, message);
+    }
 }
 
 

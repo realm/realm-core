@@ -15,6 +15,7 @@
 using namespace std;
 using namespace tightdb;
 using namespace tightdb::util;
+using namespace tightdb::test_util;
 
 // Note: You can now temporarely declare unit tests with the ONLY(TestName) macro instead of TEST(TestName). This
 // will disable all unit tests except these. Remember to undo your temporary changes before committing.
@@ -135,16 +136,17 @@ TEST(Query_Count)
     //   and if there exists > 1 conditions, 'pattern' is currently not supported - but could easily be
     //   extended to support it)
 
+    Random random(random_int<unsigned long>()); // Seed from slow global generator
     for(int j = 0; j < 100; j++) {
         Table table;
         table.add_column(type_Int, "i");
 
         size_t count = 0;
-        size_t rows = rand() % (5 * TIGHTDB_MAX_LIST_SIZE); // to cross some leaf boundaries
+        size_t rows = random.draw_int_mod(5 * TIGHTDB_MAX_LIST_SIZE); // to cross some leaf boundaries
 
         for(size_t i = 0; i < rows; ++i) {
             table.add_empty_row();
-            int64_t val = rand() % 5;
+            int64_t val = random.draw_int_mod(5);
             table.set_int(0, i, val);
             if(val == 2)
                 count++;
@@ -428,9 +430,10 @@ TEST(Query_NextGenSyntaxMonkey0)
     // Intended to test eval() for columns in query_expression.hpp which fetch 8 values at a time. This test varies
     // table size to test out-of-bounds bugs.
 
+    Random random(random_int<unsigned long>()); // Seed from slow global generator
     for(int iter = 1; iter < 100 + TEST_DURATION * 10000; iter++)
     {
-        const size_t rows = 1 + rand() % (2 * TIGHTDB_MAX_LIST_SIZE);
+        const size_t rows = 1 + random.draw_int_mod(2 * TIGHTDB_MAX_LIST_SIZE);
         Table table;
 
         // Two different row types prevents fallback to query_engine (good because we want to test query_expression)
@@ -441,9 +444,9 @@ TEST(Query_NextGenSyntaxMonkey0)
         for(size_t r = 0; r < rows; r++) {
             table.add_empty_row();
             // using '% iter' tests different bitwidths
-            table.set_int(0, r, rand() % iter);
-            table.set_float(1, r, float(rand() % iter));
-            if(rand() % 2 == 0)
+            table.set_int(0, r, random.draw_int_mod(iter));
+            table.set_float(1, r, float(random.draw_int_mod(iter)));
+            if(random.draw_bool())
                 table.set_string(2, r, "a");
             else
                 table.set_string(2, r, "b");
@@ -466,8 +469,8 @@ TEST(Query_NextGenSyntaxMonkey0)
         tvpos = 0;
 
         // with start and limit
-        size_t start = rand() % rows;
-        size_t limit = rand() % rows;
+        size_t start = random.draw_int_mod(rows);
+        size_t limit = random.draw_int_mod(rows);
         tv = q.find_all(start, size_t(-1), limit);
         tvpos = 0;
         for(size_t r = 0; r < rows; r++) {
@@ -483,11 +486,12 @@ TEST(Query_NextGenSyntaxMonkey0)
 
 TEST(Query_NextGenSyntaxMonkey)
 {
-    for(int iter = 1; iter < 20 * (TEST_DURATION * TEST_DURATION * TEST_DURATION + 1); iter++)
-    {
+    Random random(random_int<unsigned long>()); // Seed from slow global generator
+    for(int iter = 1; iter < 20 * (TEST_DURATION * TEST_DURATION * TEST_DURATION + 1); iter++) {
         // Keep at least '* 20' else some tests will give 0 matches and bad coverage
-        const size_t rows = 1 + ((size_t)rand() * (size_t)rand())
-            % (TIGHTDB_MAX_LIST_SIZE * 20 * (TEST_DURATION * TEST_DURATION * TEST_DURATION + 1));
+        const size_t rows =
+            1 + random.draw_int_mod<size_t>(TIGHTDB_MAX_LIST_SIZE * 20 *
+                                            (TEST_DURATION * TEST_DURATION * TEST_DURATION + 1));
         Table table;
         table.add_column(type_Int, "first");
         table.add_column(type_Int, "second");
@@ -496,9 +500,9 @@ TEST(Query_NextGenSyntaxMonkey)
         for(size_t r = 0; r < rows; r++) {
             table.add_empty_row();
             // using '% iter' tests different bitwidths
-            table.set_int(0, r, rand() % iter);
-            table.set_int(1, r, rand() % iter);
-            table.set_int(2, r, rand() % iter);
+            table.set_int(0, r, random.draw_int_mod(iter));
+            table.set_int(1, r, random.draw_int_mod(iter));
+            table.set_int(2, r, random.draw_int_mod(iter));
         }
 
         size_t tvpos;
@@ -740,8 +744,8 @@ TEST(Query_MergeQueries)
 
 TEST(Query_MergeQueriesMonkey)
 {
-    for(int iter = 0; iter < 5; iter++)
-    {
+    Random random(random_int<unsigned long>()); // Seed from slow global generator
+    for(int iter = 0; iter < 5; iter++) {
         const size_t rows = TIGHTDB_MAX_LIST_SIZE * 4;
         Table table;
         table.add_column(type_Int, "first");
@@ -750,9 +754,9 @@ TEST(Query_MergeQueriesMonkey)
 
         for(size_t r = 0; r < rows; r++) {
             table.add_empty_row();
-            table.set_int(0, r, rand() % 3);
-            table.set_int(1, r, rand() % 3);
-            table.set_int(2, r, rand() % 3);
+            table.set_int(0, r, random.draw_int_mod(3));
+            table.set_int(1, r, random.draw_int_mod(3));
+            table.set_int(2, r, random.draw_int_mod(3));
         }
 
         size_t tvpos;
@@ -918,8 +922,8 @@ TEST(Query_MergeQueriesMonkey)
 
 TEST(Query_MergeQueriesMonkeyOverloads)
 {
-    for(int iter = 0; iter < 5; iter++)
-    {
+    Random random(random_int<unsigned long>()); // Seed from slow global generator
+    for(int iter = 0; iter < 5; iter++) {
         const size_t rows = TIGHTDB_MAX_LIST_SIZE * 4;
         Table table;
         table.add_column(type_Int, "first");
@@ -929,9 +933,9 @@ TEST(Query_MergeQueriesMonkeyOverloads)
 
         for(size_t r = 0; r < rows; r++) {
             table.add_empty_row();
-            table.set_int(0, r, rand() % 3);
-            table.set_int(1, r, rand() % 3);
-            table.set_int(2, r, rand() % 3);
+            table.set_int(0, r, random.draw_int_mod(3));
+            table.set_int(1, r, random.draw_int_mod(3));
+            table.set_int(2, r, random.draw_int_mod(3));
         }
 
         size_t tvpos;
@@ -1407,6 +1411,8 @@ TEST(Query_LimitUntyped2)
 TEST(Query_StrIndexCrash)
 {
     // Rasmus "8" index crash
+    Random random(random_int<unsigned long>()); // Seed from slow global generator
+
     for(int iter = 0; iter < 5; ++iter) {
         Group group;
         TableRef table = group.get_table("test");
@@ -1415,7 +1421,7 @@ TEST(Query_StrIndexCrash)
         size_t eights = 0;
 
         for(int i = 0; i < TIGHTDB_MAX_LIST_SIZE * 2; ++i) {
-            int v = rand() % 10;
+            int v = random.draw_int_mod(10);
             if(v == 8) {
                 eights++;
             }
@@ -1440,6 +1446,8 @@ TEST(Query_StrIndexCrash)
 
 TEST(Query_TwoColsEqualVaryWidthAndValues)
 {
+    Random random(random_int<unsigned long>()); // Seed from slow global generator
+
     vector<size_t> ints1;
     vector<size_t> ints2;
     vector<size_t> ints3;
@@ -1472,22 +1480,22 @@ TEST(Query_TwoColsEqualVaryWidthAndValues)
         // Important thing to test is different bitwidths because we might use SSE and/or bithacks on 64-bit blocks
 
         // Both are bytes
-        table.set_int(0, i, rand() % 100);
-        table.set_int(1, i, rand() % 100);
+        table.set_int(0, i, random.draw_int_mod(100));
+        table.set_int(1, i, random.draw_int_mod(100));
 
         // Second column widest
-        table.set_int(2, i, rand() % 10);
-        table.set_int(3, i, rand() % 100);
+        table.set_int(2, i, random.draw_int_mod(10));
+        table.set_int(3, i, random.draw_int_mod(100));
 
         // First column widest
-        table.set_int(4, i, rand() % 100);
-        table.set_int(5, i, rand() % 10);
+        table.set_int(4, i, random.draw_int_mod(100));
+        table.set_int(5, i, random.draw_int_mod(10));
 
-        table.set_float(6, i, float(rand() % 10));
-        table.set_float(7, i, float(rand() % 10));
+        table.set_float(6, i, float(random.draw_int_mod(10)));
+        table.set_float(7, i, float(random.draw_int_mod(10)));
 
-        table.set_double(8, i, double(rand() % 10));
-        table.set_double(9, i, double(rand() % 10));
+        table.set_double(8, i, double(random.draw_int_mod(10)));
+        table.set_double(9, i, double(random.draw_int_mod(10)));
 
         if (table.get_int(0, i) == table.get_int(1, i))
             ints1.push_back(i);
@@ -1636,6 +1644,8 @@ TEST(Query_TwoColsNoRows)
 
 TEST(Query_Huge)
 {
+    Random random;
+
 #if TEST_DURATION == 0
     for (int N = 0; N < 1; N++) {
 #elif TEST_DURATION == 1
@@ -1645,7 +1655,10 @@ TEST(Query_Huge)
 #elif TEST_DURATION == 3
     for (int N = 0; N < 10000; N++) {
 #endif
-        srand(N + 123);    // Makes you reproduce a bug in a certain run, without having to run all successive runs
+
+        // Makes you reproduce a bug in a certain run, without having
+        // to run all successive runs
+        random.seed(N + 123);
 
         TripleTable tt;
         TripleTable::View v;
@@ -1669,64 +1682,64 @@ TEST(Query_Huge)
         size_t res7 = 0;
         size_t res8 = 0;
 
-        size_t start = rand() % 3000;
-        size_t end = start + rand() % (3000 - start);
+        size_t start = random.draw_int_mod(3000);
+        size_t end = start + random.draw_int_mod(3000 - start);
         size_t limit;
-        if(rand() % 2 == 0)
-            limit = rand() % 5000;
+        if(random.draw_bool())
+            limit = random.draw_int_mod(5000);
         else
             limit = size_t(-1);
 
 
-        size_t blocksize = rand() % 800 + 1;
+        size_t blocksize = random.draw_int_mod(800) + 1;
 
         for (size_t row = 0; row < 3000; row++) {
 
             if (row % blocksize == 0) {
-                long1 = (rand() % 2 == 0);
-                long2 = (rand() % 2 == 0);
+                long1 = random.draw_bool();
+                long2 = random.draw_bool();
 
-                if (rand() % 2 == 0) {
-                    mdist1 = rand() % 500 + 1;
-                    mdist2 = rand() % 500 + 1;
-                    mdist3 = rand() % 500 + 1;
+                if (random.draw_bool()) {
+                    mdist1 = random.draw_int(1, 500);
+                    mdist2 = random.draw_int(1, 500);
+                    mdist3 = random.draw_int(1, 500);
                 }
                 else {
-                    mdist1 = rand() % 5 + 1;
-                    mdist2 = rand() % 5 + 1;
-                    mdist3 = rand() % 5 + 1;
+                    mdist1 = random.draw_int(1, 5);
+                    mdist2 = random.draw_int(1, 5);
+                    mdist3 = random.draw_int(1, 5);
                 }
             }
 
             tt.add_empty_row();
 
             if (long1) {
-                if (rand() % mdist1 == 0)
+                if (random.draw_int_mod(mdist1) == 0)
                     first = "longlonglonglonglonglonglong A";
                 else
                     first = "longlonglonglonglonglonglong B";
             }
             else {
-                if (rand() % mdist1 == 0)
+                if (random.draw_int_mod(mdist1) == 0)
                     first = "A";
                 else
                     first = "B";
             }
 
             if (long2) {
-                if (rand() % mdist2 == 0)
+                if (random.draw_int_mod(mdist2) == 0)
                     second = "longlonglonglonglonglonglong A";
                 else
                     second = "longlonglonglonglonglonglong B";
             }
             else {
-                if (rand() % mdist2 == 0)
+                if (random.draw_int_mod(mdist2) == 0)
                     second = "A";
                 else
                     second = "B";
             }
 
-            if (rand() % mdist3 == 0)
+            if (random.draw_int_mod(mdist3) == 0)
                 third = 1;
             else
                 third = 2;
@@ -1810,19 +1823,21 @@ TEST(Query_Huge)
 
 TEST(Query_OnTableView)
 {
+    Random random;
+
     // Mostly intended to test the Array::FindGTE method
     for(int iter = 0; iter < 100 * (1 + TEST_DURATION * TEST_DURATION * TEST_DURATION * TEST_DURATION * TEST_DURATION); iter++) {
-        srand(164);
+        random.seed(164);
         OneIntTable oti;
         size_t cnt1 = 0;
         size_t cnt0 = 0;
-        size_t limit = rand() % (TIGHTDB_MAX_LIST_SIZE * 10 + 1);
+        size_t limit = random.draw_int_max(TIGHTDB_MAX_LIST_SIZE * 10);
 
-        size_t lbound = rand() % (TIGHTDB_MAX_LIST_SIZE * 10);
-        size_t ubound = lbound + rand() % (TIGHTDB_MAX_LIST_SIZE * 10 - lbound);
+        size_t lbound = random.draw_int_mod(TIGHTDB_MAX_LIST_SIZE * 10);
+        size_t ubound = lbound + random.draw_int_mod(TIGHTDB_MAX_LIST_SIZE * 10 - lbound);
 
         for(size_t i = 0; i < TIGHTDB_MAX_LIST_SIZE * 10; i++) {
-            int v = rand() % 3;
+            int v = random.draw_int_mod(3);
 
             if(v == 1 && i >= lbound && i < ubound && cnt0 < limit)
                 cnt1++;
@@ -1852,6 +1867,8 @@ TEST(Query_StrIndex3)
     // jump back and forth between the two conditions and test edge cases in these transitions. Tests combinations of
     // linear scan, enum and index
 
+    Random random(random_int<unsigned long>()); // Seed from slow global generator
+
 #ifdef TIGHTDB_DEBUG
     for (int N = 0; N < 4; N++) {
 #else
@@ -1870,30 +1887,34 @@ TEST(Query_StrIndex3)
 #endif
             // 1/500 match probability because we want possibility for a 1000 sized leaf to contain 0 matches (important
             // edge case)
-            int f1 = rand() % TIGHTDB_MAX_LIST_SIZE / 2 + 1;
-            int f2 = rand() % TIGHTDB_MAX_LIST_SIZE / 2 + 1;
-            bool longstrings = (rand() % 5 == 1);
+            int f1 = random.draw_int_mod(TIGHTDB_MAX_LIST_SIZE) / 2 + 1;
+            int f2 = random.draw_int_mod(TIGHTDB_MAX_LIST_SIZE) / 2 + 1;
+            bool longstrings = random.chance(1,5);
 
             // 2200 entries with that probability to fill out two concecutive 1000 sized leaves with above probability,
             // plus a remainder (edge case)
             for (int j = 0; j < TIGHTDB_MAX_LIST_SIZE * 2 + TIGHTDB_MAX_LIST_SIZE / 5; j++) {
-                if (rand() % f1 == 0)
-                    if (rand() % f2 == 0) {
+                if (random.chance(1, f1)) {
+                    if (random.chance(1, f2)) {
                         ttt.add(0, longstrings ? "AAAAAAAAAAAAAAAAAAAAAAAA" : "AA");
                         if (!longstrings) {
                             n++;
                             vec.push_back(row);
                         }
                     }
-                    else
+                    else {
                         ttt.add(0, "BB");
-                else
-                    if (rand() % f2 == 0)
+                    }
+                }
+                else {
+                    if (random.chance(1, f2)) {
                         ttt.add(1, "AA");
-                    else
+                    }
+                    else {
                         ttt.add(1, "BB");
-
-                row++;
+                    }
+                }
+                ++row;
             }
         }
 
@@ -1976,6 +1997,7 @@ TEST(Query_StrIndex2)
 
 TEST(Query_StrEnum)
 {
+    Random random(random_int<unsigned long>()); // Seed from slow global generator
     TupleTableType ttt;
 
     int aa;
@@ -1985,7 +2007,7 @@ TEST(Query_StrEnum)
         ttt.clear();
         aa = 0;
         for (size_t t = 0; t < TIGHTDB_MAX_LIST_SIZE * 2; ++t) {
-            if (rand() % 3 == 0) {
+            if (random.chance(1,3)) {
                 ttt.add(1, "AA");
                 ++aa;
             }
@@ -2002,6 +2024,8 @@ TEST(Query_StrEnum)
 
 TEST(Query_StrIndex)
 {
+    Random random(random_int<unsigned long>()); // Seed from slow global generator
+
 #ifdef TIGHTDB_DEBUG
     size_t itera = 4;
     size_t iterb = 100;
@@ -2017,7 +2041,7 @@ TEST(Query_StrIndex)
         TupleTableType ttt;
         aa = 0;
         for (size_t t = 0; t < iterb; t++) {
-            if (rand() % 3 == 0) {
+            if (random.chance(1,3)) {
                 ttt.add(1, "AA");
                 aa++;
             }
@@ -2044,13 +2068,14 @@ TEST(Query_StrIndex)
 TEST(Query_GameAnalytics)
 {
     GROUP_TEST_PATH(path);
+    Random random(random_int<unsigned long>()); // Seed from slow global generator
     {
         Group g;
         GATable::Ref t = g.get_table<GATable>("firstevents");
 
         for (size_t i = 0; i < 100; ++i) {
-            int64_t r1 = rand() % 100;
-            int64_t r2 = rand() % 100;
+            int64_t r1 = random.draw_int_mod(100);
+            int64_t r2 = random.draw_int_mod(100);
 
             t->add("10", "US", "1.0", r1, r2);
         }
@@ -2477,19 +2502,20 @@ TEST(Query_FindAllRangeOrMonkey2)
     const size_t ROWS = 20;
     const size_t ITER = 100;
 
-    for (size_t u = 0; u < ITER; u++)
-    {
+    Random random(random_int<unsigned long>()); // Seed from slow global generator
+
+    for (size_t u = 0; u < ITER; u++) {
         TwoIntTable tit;
         Array a;
-        size_t start = rand() % (ROWS + 1);
-        size_t end = start + rand() % (ROWS + 1);
+        size_t start = random.draw_int_max(ROWS);
+        size_t end = start + random.draw_int_max(ROWS);
 
         if (end > ROWS)
             end = ROWS;
 
         for (size_t t = 0; t < ROWS; t++) {
-            int64_t r1 = rand() % 10;
-            int64_t r2 = rand() % 10;
+            int64_t r1 = random.draw_int_mod(10);
+            int64_t r2 = random.draw_int_mod(10);
             tit.add(r1, r2);
         }
 
@@ -2497,9 +2523,8 @@ TEST(Query_FindAllRangeOrMonkey2)
         TwoIntTable::View tv1 = q1.find_all(start, end);
 
         for (size_t t = start; t < end; t++) {
-            if ((tit[t].first == 3 || tit[t].first == 7) && tit[t].second > 5) {
+            if ((tit[t].first == 3 || tit[t].first == 7) && tit[t].second > 5)
                 a.add(t);
-            }
         }
         size_t s1 = a.size();
         size_t s2 = tv1.size();
@@ -2864,11 +2889,13 @@ TEST(Query_Sort1)
 
 TEST(Query_QuickSort)
 {
+    Random random(random_int<unsigned long>()); // Seed from slow global generator
+
     // Triggers QuickSort because range > len
     TupleTableType ttt;
 
     for (size_t t = 0; t < 1000; t++)
-        ttt.add(rand() % 1100, "a"); // 0
+        ttt.add(random.draw_int_mod(1100), "a"); // 0
 
     TupleTableType::Query q = ttt.where();
     TupleTableType::View tv = q.find_all();
@@ -2882,11 +2909,13 @@ TEST(Query_QuickSort)
 
 TEST(Query_CountSort)
 {
+    Random random(random_int<unsigned long>()); // Seed from slow global generator
+
     // Triggers CountSort because range <= len
     TupleTableType ttt;
 
     for (size_t t = 0; t < 1000; t++)
-        ttt.add(rand() % 900, "a"); // 0
+        ttt.add(random.draw_int_mod(900), "a"); // 0
 
     TupleTableType::Query q = ttt.where();
     TupleTableType::View tv = q.find_all();
@@ -2901,10 +2930,12 @@ TEST(Query_CountSort)
 
 TEST(Query_SortDescending)
 {
+    Random random(random_int<unsigned long>()); // Seed from slow global generator
+
     TupleTableType ttt;
 
     for (size_t t = 0; t < 1000; t++)
-        ttt.add(rand() % 1100, "a"); // 0
+        ttt.add(random.draw_int_mod(1100), "a"); // 0
 
     TupleTableType::Query q = ttt.where();
     TupleTableType::View tv = q.find_all();
@@ -3485,6 +3516,8 @@ TEST(Query_FindNextBackwards)
 // but for independent query objects) to test if leaf cacher works correctly (can go backwards, etc).
 TEST(Query_FindRandom)
 {
+    Random random(random_int<unsigned long>()); // Seed from slow global generator
+
     TupleTableType ttt;
     int64_t search = TIGHTDB_MAX_LIST_SIZE / 2;
     size_t rows = TIGHTDB_MAX_LIST_SIZE * 20;
@@ -3493,13 +3526,13 @@ TEST(Query_FindRandom)
     for(size_t i = 0; i < rows; i++) {
         // This value distribution makes us sometimes cross a leaf boundary, and sometimes not, with both having
         // a fair probability of happening
-        ttt.add(rand() % TIGHTDB_MAX_LIST_SIZE, "X");
+        ttt.add(random.draw_int_mod(TIGHTDB_MAX_LIST_SIZE), "X");
     }
 
     TupleTableType::Query q = ttt.where().first.equal(search);
 
     for(size_t t = 0; t < 100; t++) {
-        size_t begin = rand() % rows;
+        size_t begin = random.draw_int_mod(rows);
         size_t res = q.find(begin);
 
         // Find correct match position manually in a for-loop
