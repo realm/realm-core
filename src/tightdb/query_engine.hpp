@@ -505,7 +505,7 @@ protected:
 // Used for performing queries on a Tableview. This is done by simply passing the TableView to this query condition
 class ListviewNode: public ParentNode {
 public:
-    ListviewNode(const TableView& tv) : m_tv(tv), m_max(0), m_next(0), m_size(tv.size()) {m_child = 0; m_dT = 0.0;}
+    ListviewNode(const TableView& tv) : m_max(0), m_next(0), m_size(tv.size()), m_tv(tv) { m_child = 0; m_dT = 0.0; }
     ~ListviewNode() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {  }
 
     // Return the n'th table row index contained in the TableView.

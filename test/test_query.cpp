@@ -3128,7 +3128,7 @@ TEST(Query_Sort_And_Requery_Untyped1)
 
 
 
-ONLY(Query_Sort_And_Requery_Untyped_Monkey)
+TEST(Query_Sort_And_Requery_Untyped_Monkey)
 {
     for (int iter = 0; iter < 100; iter++) {
         size_t b;
@@ -3141,7 +3141,7 @@ ONLY(Query_Sort_And_Requery_Untyped_Monkey)
             table.add_empty_row();
             int64_t val = rand() % 5;
             table.set_int(0, t, val);
-            char* c = val % 2 == 0 ? "a" : "b";
+            const char* c = val % 2 == 0 ? "a" : "b";
             table.set_string(1, t, c);
         }
 

@@ -216,7 +216,8 @@ void TableViewBase::apply_same_order(TableViewBase& order)
     Array& view = order.get_ref_column();
     Array res;
 
-    TIGHTDB_ASSERT(sorted.size() == view.size());
+    TIGHTDB_ASSERT(order.m_is_in_index_order || sorted.size() == view.size());
+    TIGHTDB_ASSERT(m_is_in_index_order || get_index_order_column().size() == get_ref_column().size());
 
     // Add same number of entries as in 'order', mark all as non-existing (-1)
     for (size_t t = 0; t < view.size(); t++)
@@ -413,7 +414,7 @@ void TableView::remove(size_t ndx)
         // Delete reference in m_index_order
         size_t t;
         for (t = 0; t < m_index_order.size(); t++) {
-            if (m_index_order.get(t) == ndx) {
+            if (to_size_t(m_index_order.get(t)) == ndx) {
                 m_index_order.erase(t);
                 m_index_order.adjust_ge(int_fast64_t(ndx), -1);
                 break;
