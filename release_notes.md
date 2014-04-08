@@ -1,3 +1,88 @@
+Template
+=============================================================
+x.x.x Release notes (yyyy—MM-dd)
+================================
+
+C++ (core)
+-----------
+The C++ API has been updated and your code will break!
+
+### Bugfixes:
+
+* None.
+
+### API breaking changes:
+
+* `???`
+
+### Enhancements:
+
+* `???`
+
+-----------
+
+### Internals:
+
+* `???`
+
+----------------------------------------------
+
+x.x.x Release notes (yyyy—MM-dd)    <<<------------ PLEASE NOTE, THIS IS THE NEXT RELEASE!!!!!!
+================================
+
+C++ (core)
+-----------
+Adding Table::get_index_in_parent() and Group::get_table(std::size_t table_ndx). They were needed for implicit transactions.
+
+### Bugfixes:
+
+* Fixed bug in TableView::remove(), causing crash or undefined behaviour.
+
+### API breaking changes:
+
+* `???`
+
+### Enhancements:
+
+* `???`
+
+-----------
+
+### Internals:
+
+* `???`
+
+----------------------------------------------
+
+0.5.0 Release notes (2014-04-02)
+================================
+
+C++ (core)
+-----------
+The C++ API has been updated and your code will break!
+
+### Bugfixes:
+
+* None.
+
+### API breaking changes:
+
+* None.
+
+### Enhancements:
+
+* Read transactions are now non-blocking and their overhead has been reduced by an order of magnitude.
+
+-----------
+
+### Internals:
+
+* New test suite with support for parallelized testing replaces UnitTest++. See section 'Testing' in `README.md`.
+
+
+----------------------------------------------
+
+
 TightDB Changelog:
 ==================
 
@@ -9,6 +94,10 @@ Format:
 + Added feature ....                     (user visible new feature     - passed on to release notes)
 - Removed/deprecated feature/method .... (user visible removed feature - passed on to release notes)
 . Any other notes ....                   (internal changes)
+
+
+2014-04-01 (Kristian Spangsege)
++ New framework with support for parallelized unit testing replaces UnitTest++. See section 'Testing' in `README.md`.
 
 
 2014-03-25 (Kristian Spangsege)
@@ -30,6 +119,8 @@ Format:
 
 
 2014-02-14 (Kristian Spangsege)
+
+* New test suite with support for parallelized testing replaces UnitTest++. See section 'Testing' in `README.md`.
 + The StringData class now distinguishes `null` from the empty string.
 + Adding StringData::is_null().
 

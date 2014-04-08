@@ -39,7 +39,7 @@ void Replication::set_replication(Group& group, Replication* repl) TIGHTDB_NOEXC
 }
 
 
-Replication::version_type Replication::get_current_version(SharedGroup& sg) TIGHTDB_NOEXCEPT
+Replication::version_type Replication::get_current_version(SharedGroup& sg)
 {
     return sg.get_current_version();
 }

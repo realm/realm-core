@@ -623,13 +623,15 @@ TEST(Table_DeleteAllTypes)
 
 TEST(Table_MoveAllTypes)
 {
+    Random random(random_int<unsigned long>()); // Seed from slow global generator
+
     Table table;
     setup_multi_table(table, 15, 2);
     table.set_index(6);
 
     while (table.size() > 1) {
         size_t size = table.size();
-        size_t ndx = size_t(rand()) % (size-1);
+        size_t ndx = random.draw_int_mod(size-1);
 
         table.move_last_over(ndx);
 
@@ -825,26 +827,27 @@ TEST(Table_ToString)
     table.to_string(ss);
     const string result = ss.str();
 #if _MSC_VER
-    const char* filename = "expect_string-win.txt";
+    const char* file_name = "expect_string-win.txt";
 #else
-    const char* filename = "expect_string.txt";
+    const char* file_name = "expect_string.txt";
 #endif
 #if GENERATE   // enable to generate testfile - check it manually
-    ofstream testFile(filename, ios::out);
-    testFile << result;
+    ofstream test_file(file_name, ios::out);
+    test_file << result;
     cerr << "to_string() test:\n" << result << endl;
 #else
-    ifstream testFile(filename, ios::in);
-    CHECK(!testFile.fail());
+    ifstream test_file(file_name, ios::in);
+    CHECK(!test_file.fail());
     string expected;
-    expected.assign( istreambuf_iterator<char>(testFile),
+    expected.assign( istreambuf_iterator<char>(test_file),
                      istreambuf_iterator<char>() );
     bool test_ok = test_util::equal_without_cr(result, expected);
     CHECK_EQUAL(true, test_ok);
     if (!test_ok) {
-        ofstream testFile("expect_string.error.txt", ios::out | ios::binary);
-        testFile << result;
-        cerr << "\n error result in 'expect_string.error.txt'\n";
+        TEST_PATH(path);
+        File out(path, File::mode_Write);
+        out.write(result);
+        cerr << "\n error result in '"<<string(path)<<"'\n";
     }
 #endif
 }
@@ -858,27 +861,28 @@ TEST(Table_JsonAllData)
     table.to_json(ss);
     const string json = ss.str();
 #if _MSC_VER
-    const char* filename = "expect_json-win.json";
+    const char* file_name = "expect_json-win.json";
 #else
-    const char* filename = "expect_json.json";
+    const char* file_name = "expect_json.json";
 #endif
 #if GENERATE
         // Generate the testdata to compare. After doing this,
         // verify that the output is correct with a json validator:
         // http://jsonformatter.curiousconcept.com/
     cerr << "JSON:" << json << "\n";
-    ofstream testFile(filename, ios::out | ios::binary);
-    testFile << json;
+    ofstream test_file(file_name, ios::out | ios::binary);
+    test_file << json;
 #else
     string expected;
-    ifstream testFile(filename, ios::in | ios::binary);
-    CHECK(!testFile.fail());
-    getline(testFile,expected);
+    ifstream test_file(file_name, ios::in | ios::binary);
+    CHECK(!test_file.fail());
+    getline(test_file,expected);
     CHECK_EQUAL(true, json == expected);
     if (json != expected) {
-        ofstream testFile("expect_json.error.json", ios::out | ios::binary);
-        testFile << json;
-        cerr << "\n error result in 'expect_json.error.json'\n";
+        TEST_PATH(path);
+        File out(path, File::mode_Write);
+        out.write(json);
+        cerr << "\n error result in '"<<string(path)<<"'\n";
     }
 #endif
 }
@@ -895,8 +899,8 @@ TEST(Table_RowToString)
     table.row_to_string(1, ss);
     const string row_str = ss.str();
 #if 0
-    ofstream testFile("row_to_string.txt", ios::out);
-    testFile << row_str;
+    ofstream test_file("row_to_string.txt", ios::out);
+    test_file << row_str;
 #endif
 
     string expected = "    int   bool                 date           float          double   string              string_long  string_enum     binary  mixed  tables\n"
@@ -1627,15 +1631,15 @@ TEST(Table_Spec)
     }
 
     // Write the group to disk
-    File::try_remove("subtables.tightdb");
-    group.write("subtables.tightdb");
+    GROUP_TEST_PATH(path);
+    group.write(path);
 
     // Read back tables
     {
-        Group fromDisk("subtables.tightdb", Group::mode_ReadOnly);
-        TableRef fromDiskTable = fromDisk.get_table("test");
+        Group from_disk(path, Group::mode_ReadOnly);
+        TableRef from_disk_table = from_disk.get_table("test");
 
-        TableRef subtable2 = fromDiskTable->get_subtable(2, 0);
+        TableRef subtable2 = from_disk_table->get_subtable(2, 0);
 
         CHECK_EQUAL(1,      subtable2->size());
         CHECK_EQUAL(42,     subtable2->get_int(0, 0));

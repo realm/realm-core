@@ -156,7 +156,7 @@ public:
     void reserve(std::size_t size_in_bytes);
 
     // Has db been modified since last transaction?
-    bool has_changed() const TIGHTDB_NOEXCEPT;
+    bool has_changed();
 
     // Read transactions
     const Group& begin_read();
@@ -233,12 +233,13 @@ private:
 
     // Member variables
     Group      m_group;
-    uint64_t   m_version;
+    uint_fast64_t   m_version;
+    uint_fast32_t   m_reader_idx;
+    uint_fast32_t   m_local_max_entry;
     util::File m_file;
     util::File::Map<SharedInfo> m_file_map; // Never remapped
     util::File::Map<SharedInfo> m_reader_map;
     std::string m_file_path;
-
     enum TransactStage {
         transact_Ready,
         transact_Reading,
@@ -267,11 +268,15 @@ private:
 
     // Must be called only by someone that has a lock on the write
     // mutex.
-    uint64_t get_current_version() TIGHTDB_NOEXCEPT;
+    uint_fast64_t get_current_version();
+
+    // make sure the given index is within the currently mapped area.
+    // if not, expand the mapped area. Returns true if the area is expanded.
+    bool grow_reader_mapping(uint_fast32_t index);
 
     // Must be called only by someone that has a lock on the write
     // mutex.
-    void low_level_commit(uint64_t new_version);
+    void low_level_commit(uint_fast64_t new_version);
 
     void do_async_commits();
 

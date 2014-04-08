@@ -170,6 +170,10 @@
 		52113CDE16C27EF800C301FB /* lang_bind_helper.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 52113CDD16C27EF800C301FB /* lang_bind_helper.cpp */; };
 		523239F51800EF33006E9F13 /* test_binary_data.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 523239F41800EF33006E9F13 /* test_binary_data.cpp */; };
 		523239F81800EF33006E9F13 /* test_replication.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 523239F71800EF33006E9F13 /* test_replication.cpp */; };
+		523AC1A718EABFCC00049AEA /* random.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 523AC1A618EABFCC00049AEA /* random.hpp */; };
+		523AC1AA18EABFE900049AEA /* random.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 523AC1A918EABFE900049AEA /* random.cpp */; };
+		524F3C9A18EA346A00DEE22A /* test_path.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 524F3C9918EA346A00DEE22A /* test_path.cpp */; };
+		524F3C9D18EA347900DEE22A /* test_path.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 524F3C9C18EA347900DEE22A /* test_path.hpp */; };
 		5263C6DF17D2D28C00A99AA4 /* test_thread.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 5263C6DE17D2D28C00A99AA4 /* test_thread.cpp */; };
 		5267884B189AB4B8009CDE7D /* descriptor.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 5267884A189AB4B8009CDE7D /* descriptor.cpp */; };
 		5267884E189AB4D7009CDE7D /* descriptor.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 5267884D189AB4D7009CDE7D /* descriptor.hpp */; };
@@ -435,6 +439,10 @@
 		52113CDD16C27EF800C301FB /* lang_bind_helper.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = lang_bind_helper.cpp; path = tightdb/lang_bind_helper.cpp; sourceTree = "<group>"; };
 		523239F41800EF33006E9F13 /* test_binary_data.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = test_binary_data.cpp; sourceTree = "<group>"; };
 		523239F71800EF33006E9F13 /* test_replication.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = test_replication.cpp; sourceTree = "<group>"; };
+		523AC1A618EABFCC00049AEA /* random.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = random.hpp; sourceTree = "<group>"; };
+		523AC1A918EABFE900049AEA /* random.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = random.cpp; sourceTree = "<group>"; };
+		524F3C9918EA346A00DEE22A /* test_path.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = test_path.cpp; sourceTree = "<group>"; };
+		524F3C9C18EA347900DEE22A /* test_path.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = test_path.hpp; sourceTree = "<group>"; };
 		5263C6DE17D2D28C00A99AA4 /* test_thread.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = test_thread.cpp; sourceTree = "<group>"; };
 		5267884A189AB4B8009CDE7D /* descriptor.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = descriptor.cpp; path = tightdb/descriptor.cpp; sourceTree = "<group>"; };
 		5267884D189AB4D7009CDE7D /* descriptor.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = descriptor.hpp; path = tightdb/descriptor.hpp; sourceTree = "<group>"; };
@@ -763,26 +771,30 @@
 		52D6E056175BDBDD00B423E5 /* util */ = {
 			isa = PBXGroup;
 			children = (
-				B159626E18DB14C4008B9421 /* test_only.cpp */,
-				B159626F18DB14C4008B9421 /* test_only.hpp */,
-				B159627018DB14C4008B9421 /* unit_test.cpp */,
-				B159627118DB14C4008B9421 /* unit_test.hpp */,
-				B159627218DB14C4008B9421 /* wildcard.cpp */,
-				B159627318DB14C4008B9421 /* wildcard.hpp */,
-				B159814718CF560000E3C5DF /* demangle.cpp */,
-				B159814818CF560000E3C5DF /* demangle.hpp */,
 				B159814918CF560000E3C5DF /* super_int.hpp */,
-				52D6E058175BDBDD00B423E5 /* Makefile */,
-				52D6E059175BDBDD00B423E5 /* mem.cpp */,
-				52D6E05B175BDBDD00B423E5 /* mem.hpp */,
 				52D6E05D175BDBDD00B423E5 /* number_names.hpp */,
-				52D6E060175BDBDD00B423E5 /* timer.cpp */,
+				526F3F071824652B005217F1 /* thread_wrapper.hpp */,
+				B159814818CF560000E3C5DF /* demangle.hpp */,
+				B159814718CF560000E3C5DF /* demangle.cpp */,
+				52D6E05B175BDBDD00B423E5 /* mem.hpp */,
+				52D6E059175BDBDD00B423E5 /* mem.cpp */,
 				52D6E062175BDBDD00B423E5 /* timer.hpp */,
-				526F3EFE182464F1005217F1 /* misc.hpp */,
-				526F3F0118246508005217F1 /* misc.cpp */,
+				52D6E060175BDBDD00B423E5 /* timer.cpp */,
+				523AC1A618EABFCC00049AEA /* random.hpp */,
+				523AC1A918EABFE900049AEA /* random.cpp */,
 				526F3F0318246519005217F1 /* benchmark_results.hpp */,
 				526F3F0518246523005217F1 /* benchmark_results.cpp */,
-				526F3F071824652B005217F1 /* thread_wrapper.hpp */,
+				B159627318DB14C4008B9421 /* wildcard.hpp */,
+				B159627218DB14C4008B9421 /* wildcard.cpp */,
+				B159627118DB14C4008B9421 /* unit_test.hpp */,
+				B159627018DB14C4008B9421 /* unit_test.cpp */,
+				524F3C9C18EA347900DEE22A /* test_path.hpp */,
+				524F3C9918EA346A00DEE22A /* test_path.cpp */,
+				B159626F18DB14C4008B9421 /* test_only.hpp */,
+				B159626E18DB14C4008B9421 /* test_only.cpp */,
+				526F3EFE182464F1005217F1 /* misc.hpp */,
+				526F3F0118246508005217F1 /* misc.cpp */,
+				52D6E058175BDBDD00B423E5 /* Makefile */,
 			);
 			path = util;
 			sourceTree = "<group>";
@@ -973,6 +985,8 @@
 				B159627518DB14C4008B9421 /* test_only.hpp in Headers */,
 				B159627718DB14C4008B9421 /* unit_test.hpp in Headers */,
 				B159814B18CF560000E3C5DF /* demangle.hpp in Headers */,
+				524F3C9D18EA347900DEE22A /* test_path.hpp in Headers */,
+				523AC1A718EABFCC00049AEA /* random.hpp in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1267,6 +1281,8 @@
 				526F3F0218246508005217F1 /* misc.cpp in Sources */,
 				526F3F0618246523005217F1 /* benchmark_results.cpp in Sources */,
 				B159627818DB14C4008B9421 /* wildcard.cpp in Sources */,
+				524F3C9A18EA346A00DEE22A /* test_path.cpp in Sources */,
+				523AC1AA18EABFE900049AEA /* random.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -11,20 +11,11 @@ using namespace tightdb;
 // will disable all unit tests except these. Remember to undo your temporary changes before committing.
 
 
-namespace {
-
-struct db_setup_string_long {
-    static ArrayStringLong c;
-};
-
-ArrayStringLong db_setup_string_long::c;
-
-} // anonymous namespace
-
-
-TEST(ArrayStringLong_MultiEmpty)
+TEST(ArrayStringLong_Basic)
 {
-    ArrayStringLong& c = db_setup_string_long::c;
+    ArrayStringLong c;
+
+    // TEST(ArrayStringLong_MultiEmpty)
 
     c.add("");
     c.add("");
@@ -40,11 +31,9 @@ TEST(ArrayStringLong_MultiEmpty)
     CHECK_EQUAL("", c.get(3));
     CHECK_EQUAL("", c.get(4));
     CHECK_EQUAL("", c.get(5));
-}
 
-TEST(ArrayStringLong_Set)
-{
-    ArrayStringLong& c = db_setup_string_long::c;
+
+    // TEST(ArrayStringLong_Set)
 
     c.set(0, "hey");
 
@@ -55,11 +44,10 @@ TEST(ArrayStringLong_Set)
     CHECK_EQUAL("", c.get(3));
     CHECK_EQUAL("", c.get(4));
     CHECK_EQUAL("", c.get(5));
-}
 
-TEST(ArrayStringLong_Add)
-{
-    ArrayStringLong& c = db_setup_string_long::c;
+
+    // TEST(ArrayStringLong_Add)
+
     c.clear();
 
     CHECK_EQUAL(0, c.size());
@@ -72,11 +60,9 @@ TEST(ArrayStringLong_Add)
     CHECK_EQUAL("abc", c.get(0));
     CHECK_EQUAL("defg", c.get(1));
     CHECK_EQUAL(2, c.size());
-}
 
-TEST(ArrayStringLong_Set2)
-{
-    ArrayStringLong& c = db_setup_string_long::c;
+
+    // TEST(ArrayStringLong_Set2)
 
     // {shrink, grow} x {first, middle, last, single}
     c.clear();
@@ -129,12 +115,10 @@ TEST(ArrayStringLong_Set2)
     CHECK_EQUAL("x", c.get(1));
     CHECK_EQUAL("pq", c.get(2));
     CHECK_EQUAL(3, c.size());
-}
 
 
-TEST(ArrayStringLong_Insert)
-{
-    ArrayStringLong& c = db_setup_string_long::c;
+    // TEST(ArrayStringLong_Insert)
+
     c.clear();
 
     c.insert(0, "abc"); // single
@@ -166,11 +150,10 @@ TEST(ArrayStringLong_Insert)
     CHECK_EQUAL("d", c.get(3));
     CHECK_EQUAL("ef", c.get(4));
     CHECK_EQUAL(5, c.size());
-}
 
-TEST(ArrayStringLong_Delete)
-{
-    ArrayStringLong& c = db_setup_string_long::c;
+
+    // TEST(ArrayStringLong_Delete)
+
     c.clear();
 
     c.add("a");
@@ -204,11 +187,10 @@ TEST(ArrayStringLong_Delete)
     c.erase(0); // all
     CHECK_EQUAL(0, c.size());
     CHECK(c.is_empty());
-}
 
-TEST(ArrayStringLong_Find)
-{
-    ArrayStringLong& c = db_setup_string_long::c;
+
+    // TEST(ArrayStringLong_Find)
+
     c.clear();
 
     c.add("a");
@@ -217,19 +199,15 @@ TEST(ArrayStringLong_Find)
     c.add("ghij uihi i ih iu huih ui");
     c.add("klmno hiuh iuh uih i huih i biuhui");
 
-    size_t res1 = c.find_first("");
-    CHECK_EQUAL((size_t)-1, res1);
+    CHECK_EQUAL(size_t(-1), c.find_first(""));
 
-    size_t res2 = c.find_first("xlmno hiuh iuh uih i huih i biuhui");
-    CHECK_EQUAL((size_t)-1, res2);
+    CHECK_EQUAL(size_t(-1), c.find_first("xlmno hiuh iuh uih i huih i biuhui"));
 
-    size_t res3 = c.find_first("ghij uihi i ih iu huih ui");
-    CHECK_EQUAL(3, res3);
-}
+    CHECK_EQUAL(3, c.find_first("ghij uihi i ih iu huih ui"));
 
-TEST(ArrayStringLong_Count)
-{
-    ArrayStringLong& c = db_setup_string_long::c;
+
+    // TEST(ArrayStringLong_Count)
+
     c.clear();
 
     // first, middle and end
@@ -239,16 +217,11 @@ TEST(ArrayStringLong_Count)
     c.add("baz");
     c.add("foobar");
 
-    const size_t count = c.count("foobar");
-    CHECK_EQUAL(3, count);
-}
+    CHECK_EQUAL(3, c.count("foobar"));
 
 
-TEST(ArrayStringLong_Destroy)
-{
-    ArrayStringLong& c = db_setup_string_long::c;
+    // TEST(ArrayStringLong_Destroy)
 
-    // clean up (ALWAYS PUT THIS LAST)
     c.destroy();
 }
 
