@@ -36,9 +36,9 @@ const uint16_t relaxed_sync_threshold = 50;
 // Constants controlling timeout behaviour during opening of a shared group
 const int max_retries_awaiting_shutdown = 5;
 // rough limits, milliseconds:
-const int max_wait_for_ok_filesize = 100;
-const int max_wait_for_sharedinfo_valid = 100;
-const int max_wait_for_daemon_start = 100;
+const int max_wait_for_ok_filesize = 500;
+const int max_wait_for_sharedinfo_valid = 500;
+const int max_wait_for_daemon_start = 500;
 
 // The following functions are carefully designed for minimal overhead
 // in case of contention among read transactions. In case of contention,
@@ -439,10 +439,10 @@ void spawn_daemon(const string& file)
 
         // if we continue here, exec has failed so return error
         // if exec succeeds, we don't come back here.
-#ifndef ANDROID        
-        _Exit(1);
-#else
+#if TIGHTDB_ANDROID
         _exit(1);
+#else
+        _Exit(1);
 #endif
         // child process ends here
 

@@ -23,7 +23,7 @@
 
 // #define USE_VLD
 #if defined(_MSC_VER) && defined(_DEBUG) && defined(USE_VLD)
-    #include "C:\\Program Files (x86)\\Visual Leak Detector\\include\\vld.h"
+#  include "C:\\Program Files (x86)\\Visual Leak Detector\\include\\vld.h"
 #endif
 
 
@@ -47,22 +47,22 @@ void fix_async_daemon_path()
     // look for the daemon there
     const char* xcode_env = getenv("__XCODE_BUILT_PRODUCTS_DIR_PATHS");
     if (xcode_env) {
-#ifdef TIGHTDB_DEBUG
+#  ifdef TIGHTDB_DEBUG
         async_daemon = "tightdbd-dbg-noinst";
-#else
+#  else
         async_daemon = "tightdbd-noinst";
-#endif
+#  endif
     }
     else {
-#ifdef TIGHTDB_COVER
+#  ifdef TIGHTDB_COVER
         async_daemon = "../src/tightdb/tightdbd-cov-noinst";
-#else
-#  ifdef TIGHTDB_DEBUG
-        async_daemon = "../src/tightdb/tightdbd-dbg-noinst";
 #  else
+#    ifdef TIGHTDB_DEBUG
+        async_daemon = "../src/tightdb/tightdbd-dbg-noinst";
+#    else
         async_daemon = "../src/tightdb/tightdbd-noinst";
+#    endif
 #  endif
-#endif
     }
     setenv("TIGHTDB_ASYNC_DAEMON", async_daemon, 0);
 #endif // _WIN32
@@ -99,13 +99,13 @@ void display_build_config()
         "  with Debug "<<with_debug<<"\n"
         "  with Replication "<<with_replication<<"\n"
         "\n"
-        "TIGHTDB_MAX_LIST_SIZE = " << TIGHTDB_MAX_LIST_SIZE << "\n"
+        "TIGHTDB_MAX_LIST_SIZE = "<<TIGHTDB_MAX_LIST_SIZE<<"\n"
         "\n"
-        // Be aware that ps3/xbox have sizeof(void*) = 4 && sizeof(size_t) == 8
+        // Be aware that ps3/xbox have sizeof (void*) = 4 && sizeof (size_t) == 8
         // We decide to print size_t here
-        "sizeof(size_t) * 8 = " << sizeof(size_t)* 8 << "\n"
+        "sizeof (size_t) * 8 = " << (sizeof (size_t) * 8) << "\n"
         "\n"
-        "Compiler supported SSE (auto detect):       " << compiler_sse << "\n"
+        "Compiler supported SSE (auto detect):       "<<compiler_sse<<"\n"
         "This CPU supports SSE (auto detect):        "<<cpu_sse<<"\n"
         "Compiler supported AVX (auto detect):       "<<compiler_avx<<"\n"
         "This CPU supports AVX (AVX1) (auto detect): "<<cpu_avx<<"\n"
@@ -184,6 +184,27 @@ private:
 bool run_tests()
 {
     {
+        const char* str = getenv("UNITTEST_RANDOM_SEED");
+        if (str && strlen(str) != 0) {
+            unsigned long seed;
+            if (strcmp(str, "random") == 0) {
+                seed = produce_nondeterministic_random_seed();
+            }
+            else {
+                istringstream in(str);
+                in.imbue(locale::classic());
+                in.flags(in.flags() & ~ios_base::skipws); // Do not accept white space
+                in >> seed;
+                bool bad = !in || in.get() != char_traits<char>::eof();
+                if (bad)
+                    throw runtime_error("Bad random seed");
+            }
+            cout << "Random seed: "<<seed<<"\n\n";
+            random_seed(seed);
+        }
+    }
+
+    {
         const char* str = getenv("UNITTEST_KEEP_FILES");
         if (str && strlen(str) != 0)
             keep_test_files();
@@ -195,7 +216,7 @@ bool run_tests()
     // Set up reporter
     ofstream xml_file;
     const char* xml_str = getenv("UNITTEST_XML");
-    bool xml = (xml_str && strlen(xml_str) != 0) || getenv("JENKINS_URL");
+    bool xml = (xml_str && strlen(xml_str) != 0);
     if (xml) {
         xml_file.open("unit-test-report.xml");
         reporter.reset(create_xml_reporter(xml_file));
@@ -236,27 +257,6 @@ bool run_tests()
         const char* str = getenv("UNITTEST_SHUFFLE");
         if (str && strlen(str) != 0)
             shuffle = true;
-    }
-
-    {
-        const char* str = getenv("UNITTEST_RANDOM_SEED");
-        if (str && strlen(str) != 0) {
-            unsigned long seed;
-            if (strcmp(str, "random") == 0) {
-                seed = produce_nondeterministic_random_seed();
-            }
-            else {
-                istringstream in(str);
-                in.imbue(locale::classic());
-                in.flags(in.flags() & ~ios_base::skipws); // Do not accept white space
-                in >> seed;
-                bool bad = !in || in.get() != char_traits<char>::eof();
-                if (bad)
-                    throw runtime_error("Bad random seed");
-            }
-            cout << "Random seed: "<<seed<<"\n\n";
-            random_seed(seed);
-        }
     }
 
     // Run
