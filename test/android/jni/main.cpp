@@ -16,8 +16,8 @@
 #define LOGW(...) ((void)__android_log_print(ANDROID_LOG_WARN, "native-activity", __VA_ARGS__))
 
 
-void android_main(struct android_app* state) {
-
+void android_main(struct android_app* state) 
+{
     // Make sure glue isn't stripped.
     app_dummy();
 
@@ -67,6 +67,4 @@ void android_main(struct android_app* state) {
     LOGI("The XML file is located in %s", destination.c_str());
 
     ANativeActivity_finish(nativeActivity);
-
-    return;
 }

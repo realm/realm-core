@@ -217,7 +217,7 @@ bool run_tests()
     // Set up reporter
     ofstream xml_file;
     const char* xml_str = getenv("UNITTEST_XML");
-    bool xml = (xml_str && strlen(xml_str) != 0 || TIGHTDB_ANDROID);
+    bool xml = ((xml_str && strlen(xml_str) != 0) || TIGHTDB_ANDROID);
     if (xml) {
         string path = "";
         if (TIGHTDB_ANDROID) {
