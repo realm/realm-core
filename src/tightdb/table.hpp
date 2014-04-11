@@ -492,10 +492,10 @@ public:
     //@}
 
     // Queries
-    Query where() { return Query(*this); }
+    Query where(TableViewBase* tv = null_ptr) { return Query(*this, tv); }
 
     // FIXME: We need a ConstQuery class or runtime check against modifications in read transaction.
-    Query where() const { return Query(*this); }
+    Query where(TableViewBase* tv = null_ptr) const { return Query(*this, tv); }
 
     // Optimizing
     void optimize();

@@ -16,18 +16,18 @@ const size_t thread_chunk_size = 1000;
 }
 #endif
 
-Query::Query()
+Query::Query() : m_tableview(null_ptr)
 {
     Create();
 //    expression(static_cast<Expression*>(this));
 }
 
-Query::Query(Table& table) : m_table(table.get_table_ref())
+Query::Query(Table& table, TableViewBase* tv) : m_table(table.get_table_ref()), m_tableview(tv)
 {
     Create();
 }
 
-Query::Query(const Table& table) : m_table((const_cast<Table&>(table)).get_table_ref())
+Query::Query(const Table& table, TableViewBase* tv) : m_table((const_cast<Table&>(table)).get_table_ref()), m_tableview(tv)
 {
     Create();
 }
@@ -52,6 +52,7 @@ Query::Query(const Query& copy)
     update_override = copy.update_override;
     first = copy.first;
     error_code = copy.error_code;
+    m_tableview = copy.m_tableview;
 #if TIGHTDB_MULTITHREAD_QUERY
     m_threadcount = copy.m_threadcount;
 #endif
@@ -490,12 +491,12 @@ R Query::aggregate(R (ColType::*aggregateMethod)(size_t start, size_t end, size_
     }
 
     if (end == size_t(-1))
-        end = m_table->size();
+        end = m_tableview ? m_tableview->size() : m_table->size();
 
     const ColType& column =
         m_table->get_column<ColType, ColumnType(ColumnTypeTraits<T>::id)>(column_ndx);
 
-    if (first.size() == 0 || first[0] == 0) {
+    if ((first.size() == 0 || first[0] == 0) && !m_tableview) {
 
         // No criteria, so call aggregate METHODS directly on columns
         // - this bypasses the query system and is faster
@@ -508,21 +509,31 @@ R Query::aggregate(R (ColType::*aggregateMethod)(size_t start, size_t end, size_
     }
     else {
 
-        // Aggregate with criteria - goest through the nodes in the query system
+        // Aggregate with criteria - goes through the nodes in the query system
         Init(*m_table);
         QueryState<R> st;
         st.init(action, null_ptr, limit);
 
         SequentialGetter<T> source_column(*m_table, column_ndx);
 
-        aggregate_internal(action, ColumnTypeTraits<T>::id, first[0],&st, start, end, &source_column);
+        if (!m_tableview) {
+            aggregate_internal(action, ColumnTypeTraits<T>::id, first[0], &st, start, end, &source_column);
+        }
+        else {
+            for (size_t t = start; t < end && st.m_match_count < limit; t++) {
+                size_t tablerow = m_tableview->get_source_ndx(t);
+                size_t r = FindInternal(tablerow, tablerow + 1);
+                if (r != not_found)
+                    st.match<action, false>(r, 0, source_column.get_next(tablerow));
+            }
+        }
+
         if (resultcount) {
             *resultcount = st.m_match_count;
         }
         return st.m_state;
     }
 }
-
 
     /**************************************************************************************************************
     *                                                                                                             *
@@ -728,29 +739,44 @@ Query& Query::end_subtable()
 }
 
 // todo, add size_t end? could be useful
-size_t Query::find(size_t begin_at_table_row)
+size_t Query::find(size_t begin)
 {
-    if(m_table->is_degenerate())
+    if (m_table->is_degenerate())
         return not_found;
 
-    TIGHTDB_ASSERT(begin_at_table_row <= m_table->size());
+    TIGHTDB_ASSERT(begin <= m_table->size());
 
     Init(*m_table);
 
     // User created query with no criteria; return first
     if (first.size() == 0 || first[0] == 0) {
-        return m_table->size() == 0 ? not_found : begin_at_table_row;
+        if (m_tableview)
+            return m_tableview->size() == 0 ? not_found : begin;
+        else
+            return m_table->size() == 0 ? not_found : begin;
     }
 
-    const size_t end = m_table->size();
-    const size_t res = first[0]->find_first(begin_at_table_row, end);
-
-    return (res == end) ? not_found : res;
+    if (m_tableview) {
+        size_t end = m_tableview->size();
+        for (size_t begin2 = begin; begin < end; begin++) {
+            size_t tablerow = m_tableview->get_source_ndx(begin2);
+            size_t res = first[0]->find_first(tablerow, tablerow + 1);
+            if (res != not_found)
+                return begin2;
+        }
+        return not_found;
+    }
+    else {
+        size_t end = m_table->size();
+        size_t res = first[0]->find_first(begin, end);
+        return (res == end) ? not_found : res;
+    }
 }
+
 
 TableView Query::find_all(size_t start, size_t end, size_t limit)
 {
-    if(limit == 0 || m_table->is_degenerate())
+    if (limit == 0 || m_table->is_degenerate())
         return TableView(*m_table);
 
     TIGHTDB_ASSERT(start <= m_table->size());
@@ -758,30 +784,33 @@ TableView Query::find_all(size_t start, size_t end, size_t limit)
     Init(*m_table);
 
     if (end == size_t(-1))
-        end = m_table->size();
+        end = m_tableview ? m_tableview->size() : m_table->size();
 
     // User created query with no criteria; return everything
     if (first.size() == 0 || first[0] == 0) {
         TableView tv(*m_table);
         for (size_t i = start; i < end && i - start < limit; i++)
-            tv.get_ref_column().add(i);
+            tv.get_ref_column().add(m_tableview ? m_tableview->get_source_ndx(i) : i);
         return tv;
     }
 
-#if TIGHTDB_MULTITHREAD_QUERY
-    if (m_threadcount > 0) {
-        // Use multithreading
-        return find_all_multi(start, end);
+    TableView ret(*m_table);
+
+    if (m_tableview) {
+        for (size_t begin = start; begin < end && ret.size() < limit; begin++) {
+            size_t tablerow = m_tableview->get_source_ndx(begin);
+            size_t res = first[0]->find_first(tablerow, tablerow + 1);
+            if (res != not_found)
+                ret.get_ref_column().add(res);
+        }
     }
-#endif
+    else {
+        QueryState<int64_t> st;
+        st.init(act_FindAll, &ret.get_ref_column(), limit);
+        aggregate_internal(act_FindAll, ColumnTypeTraits<int64_t>::id, first[0], &st, start, end, NULL);
+    }
 
-    // Use single threading
-    TableView tv(*m_table);
-    QueryState<int64_t> st;
-    st.init(act_FindAll, &tv.get_ref_column(), limit);
-    aggregate_internal(act_FindAll, ColumnTypeTraits<int64_t>::id, first[0], &st, start, end, NULL);
-    return tv;
-
+    return ret;
 }
 
 
@@ -791,18 +820,32 @@ size_t Query::count(size_t start, size_t end, size_t limit) const
         return 0;
 
     if (end == size_t(-1))
-        end = m_table->size();
+        end = m_tableview ? m_tableview->size() : m_table->size();
 
-    if (first.size() == 0 || first[0] == 0) {
+    if ((first.size() == 0 || first[0] == 0) && !m_tableview) {
         // User created query with no criteria; count all
         return (limit < end - start ? limit : end - start);
     }
 
     Init(*m_table);
-    QueryState<int64_t> st;
-    st.init(act_Count, null_ptr, limit);
-    aggregate_internal(act_Count, ColumnTypeTraits<int64_t>::id, first[0], &st, start, end, NULL);
-    return size_t(st.m_state);
+    size_t cnt = 0;
+
+    if (m_tableview) {
+        for (size_t begin = start; begin < end && cnt < limit; begin++) {
+            size_t tablerow = m_tableview->get_source_ndx(begin);
+            size_t res = FindInternal(tablerow, tablerow + 1);
+            if (res != not_found)
+                cnt++;
+        }
+    }
+    else {
+        QueryState<int64_t> st;
+        st.init(act_Count, null_ptr, limit);
+        aggregate_internal(act_Count, ColumnTypeTraits<int64_t>::id, first[0], &st, start, end, NULL);
+        cnt = size_t(st.m_state);
+    }
+
+    return cnt;
 }
 
 
@@ -813,23 +856,46 @@ size_t Query::remove(size_t start, size_t end, size_t limit)
         return 0;
 
     if (end == not_found)
-        end = m_table->size();
+        end = m_tableview ? m_tableview->size() : m_table->size();
 
-    size_t r = start;
     size_t results = 0;
 
-    for (;;) {
-        // Every remove invalidates the array cache in the nodes
-        // so we have to re-initialize it before searching
-        Init(*m_table);
+    if (m_tableview) {
+        Array a = m_tableview->get_ref_column();
 
-        r = FindInternal(r, end - results);
-        if (r == not_found || r == m_table->size() || results == limit)
-            break;
-        ++results;
-        m_table->remove(r);
+        for (;;) {
+            if (start + results == a.size() || start + results == end || results == limit)
+                return results;
+
+            Init(*m_table);
+
+            size_t tablerow = a[start + results];
+            size_t r = FindInternal(tablerow, tablerow + 1);
+            if (r != not_found) {
+                m_table->remove(r);
+                results++;
+                a.adjust_ge(tablerow, -1);
+            }
+            else {
+                return results;
+            }
+        }
     }
-    return results;
+    else {
+        size_t r = start;
+        for (;;) {
+            // Every remove invalidates the array cache in the nodes
+            // so we have to re-initialize it before searching
+            Init(*m_table);
+
+            r = FindInternal(r, end - results);
+            if (r == not_found || r == m_table->size() || results == limit)
+                break;
+            ++results;
+            m_table->remove(r);
+        }
+        return results;
+    }
 }
 
 #if TIGHTDB_MULTITHREAD_QUERY

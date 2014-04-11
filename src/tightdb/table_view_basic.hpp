@@ -111,6 +111,7 @@ public:
 protected:
     template<class, int, class, bool> friend class _impl::FieldAccessor;
     template<class, int, class> friend class _impl::MixedFieldAccessorBase;
+    template<class Spec> friend class BasicTable;
 
     Impl m_impl;
 

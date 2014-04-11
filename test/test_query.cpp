@@ -1855,11 +1855,46 @@ TEST(Query_OnTableView)
             cerr << iter << " ";
 
         CHECK_EQUAL(cnt1, cnt2);
-
-
     }
-
 }
+
+TEST(Query_OnTableView_where)
+{
+    Random random;
+
+    // Mostly intended to test the Array::FindGTE method
+    for (int iter = 0; iter < 100 * (1 + TEST_DURATION * TEST_DURATION * TEST_DURATION * TEST_DURATION * TEST_DURATION); iter++) {
+        random.seed(164);
+        OneIntTable oti;
+        size_t cnt1 = 0;
+        size_t cnt0 = 0;
+        size_t limit = random.draw_int_max(TIGHTDB_MAX_LIST_SIZE * 10);
+
+        size_t lbound = random.draw_int_mod(TIGHTDB_MAX_LIST_SIZE * 10);
+        size_t ubound = lbound + random.draw_int_mod(TIGHTDB_MAX_LIST_SIZE * 10 - lbound);
+
+        for (size_t i = 0; i < TIGHTDB_MAX_LIST_SIZE * 10; i++) {
+            int v = random.draw_int_mod(3);
+
+            if (v == 1 && i >= lbound && i < ubound && cnt0 < limit)
+                cnt1++;
+
+            if (v != 0 && i >= lbound && i < ubound)
+                cnt0++;
+
+            oti.add(v);
+        }
+
+        OneIntTable::View v = oti.where().first.not_equal(0).find_all(lbound, ubound, limit);
+        size_t cnt2 = oti.where(&v).first.equal(1).count();
+
+        if (cnt1 != cnt2)
+            cerr << iter << " ";
+
+        CHECK_EQUAL(cnt1, cnt2);
+    }
+}
+
 
 TEST(Query_StrIndex3)
 {
@@ -2144,6 +2179,58 @@ TEST(Query_Float3)
     int64_t a7 = q7.col_int.sum();
     CHECK_EQUAL(15, a7);
     FloatTable3::Query q8 = t.where().col_int.greater(3).col_int.less(7);
+    int64_t a8 = q8.col_int.sum();
+    CHECK_EQUAL(15, a8);
+}
+
+
+
+TEST(Query_Float3_where)
+{
+    // Sum on query on tableview
+    FloatTable3 t;
+
+    t.add(float(1.1), double(2.1), 1);
+    t.add(float(1.2), double(2.2), 2);
+    t.add(float(1.3), double(2.3), 3);
+    t.add(float(1.4), double(2.4), 4); // match
+    t.add(float(1.5), double(2.5), 5); // match
+    t.add(float(1.6), double(2.6), 6); // match
+    t.add(float(1.7), double(2.7), 7);
+    t.add(float(1.8), double(2.8), 8);
+    t.add(float(1.9), double(2.9), 9);
+
+    FloatTable3::View v = t.where().find_all();
+
+    FloatTable3::Query q1 = t.where(&v).col_float.greater(1.35f).col_double.less(2.65);
+    int64_t a1 = q1.col_int.sum();
+    CHECK_EQUAL(15, a1);
+
+    FloatTable3::Query q2 = t.where(&v).col_double.less(2.65).col_float.greater(1.35f);
+    int64_t a2 = q2.col_int.sum();
+    CHECK_EQUAL(15, a2);
+
+    FloatTable3::Query q3 = t.where(&v).col_double.less(2.65).col_float.greater(1.35f);
+    double a3 = q3.col_float.sum();
+    double sum3 = double(1.4f) + double(1.5f) + double(1.6f);
+    CHECK_EQUAL(sum3, a3);
+
+    FloatTable3::Query q4 = t.where(&v).col_float.greater(1.35f).col_double.less(2.65);
+    double a4 = q4.col_float.sum();
+    CHECK_EQUAL(sum3, a4);
+
+    FloatTable3::Query q5 = t.where(&v).col_int.greater_equal(4).col_double.less(2.65);
+    double a5 = q5.col_float.sum();
+    CHECK_EQUAL(sum3, a5);
+
+    FloatTable3::Query q6 = t.where(&v).col_double.less(2.65).col_int.greater_equal(4);
+    double a6 = q6.col_float.sum();
+    CHECK_EQUAL(sum3, a6);
+
+    FloatTable3::Query q7 = t.where(&v).col_int.greater(3).col_int.less(7);
+    int64_t a7 = q7.col_int.sum();
+    CHECK_EQUAL(15, a7);
+    FloatTable3::Query q8 = t.where(&v).col_int.greater(3).col_int.less(7);
     int64_t a8 = q8.col_int.sum();
     CHECK_EQUAL(15, a8);
 }
@@ -2635,6 +2722,29 @@ TEST(Query_DeleteRange)
     CHECK_EQUAL(5, ttt[2].first);
 }
 
+TEST(Query_DeleteRange_where)
+{
+    TupleTableType ttt;
+
+    ttt.add(0, "X");
+    ttt.add(1, "X");
+    ttt.add(2, "X");
+    ttt.add(3, "X");
+    ttt.add(4, "X");
+    ttt.add(5, "X");
+
+    TupleTableType::View tv = ttt.where().second.equal("X").find_all();
+    TupleTableType::Query q = ttt.where(&tv).second.equal("X");
+
+    size_t r = q.remove(1, 4);
+
+    CHECK_EQUAL(3, r);
+    CHECK_EQUAL(3, ttt.size());
+    CHECK_EQUAL(0, ttt[0].first);
+    CHECK_EQUAL(4, ttt[1].first);
+    CHECK_EQUAL(5, ttt[2].first);
+}
+
 TEST(Query_DeleteLimit)
 {
     TupleTableType ttt;
@@ -2658,6 +2768,29 @@ TEST(Query_DeleteLimit)
 }
 
 
+TEST(Query_DeleteLimit_where)
+{
+    TwoIntTable ttt;
+
+    ttt.add(0, 50);
+    ttt.add(1, 40);
+    ttt.add(2, 30);
+    ttt.add(3, 20);
+    ttt.add(4, 10);
+    ttt.add(5, 00);
+
+    TwoIntTable::View q = ttt.where().second.greater_equal(0).find_all();
+    TwoIntTable::Query q2 = ttt.where().second.greater_equal(0);
+
+    size_t r = q2.remove(1, 4, 2);
+
+    CHECK_EQUAL(2, r);
+    CHECK_EQUAL(4, ttt.size());
+    CHECK_EQUAL(0, ttt[0].first);
+    CHECK_EQUAL(3, ttt[1].first);
+    CHECK_EQUAL(4, ttt[2].first);
+    CHECK_EQUAL(5, ttt[3].first);
+}
 
 TEST(Query_Simple)
 {
@@ -3028,16 +3161,8 @@ TEST(Query_Sort_And_Requery_Typed1)
     CHECK(tv[5].first == 8);
     CHECK(tv[6].first == 9);
 
-    TupleTableType::Query q2 = ttt.where().tableview(tv).second.not_equal("X");
+    TupleTableType::Query q2 = ttt.where(&tv).second.not_equal("X");
     TupleTableType::View tv2 = q2.find_all();
-
-    CHECK_EQUAL(4, tv2.size());
-    CHECK_EQUAL(1, tv2[0].first);
-    CHECK_EQUAL(1, tv2[1].first);
-    CHECK_EQUAL(9, tv2[2].first); // 9, 8 (table order) instead of 8, 9 (sort order)
-    CHECK_EQUAL(8, tv2[3].first);
-
-    tv2.apply_same_order(tv);
 
     CHECK_EQUAL(4, tv2.size());
     CHECK_EQUAL(1, tv2[0].first);
@@ -3048,8 +3173,124 @@ TEST(Query_Sort_And_Requery_Typed1)
 
 
 
+TEST(Query_Sort_And_Requery_FindFirst)
+{
+    TwoIntTable ttt;
+
+    ttt.add(1, 60); 
+    ttt.add(2, 50); // **
+    ttt.add(3, 40); // *
+    ttt.add(1, 30); 
+    ttt.add(2, 20); // **
+    ttt.add(3, 10); // **
+
+    TwoIntTable::Query q = ttt.where().first.greater(1);
+    TwoIntTable::View tv = q.find_all();
+    tv.column().second.sort();
+
+    // 3, 2, 1, 3, 2, 1
+    size_t t = ttt.where(&tv).first.equal(3).find();
+
+    int s = ttt.where(&tv).second.not_equal(40).first.sum();
+
+}
+
+
+TEST(Query_Sort_And_Requery_Untyped2)
+{
+    // New where(tableview) method
+    Table table;
+    table.add_column(type_Int, "first1");
+    table.add_column(type_String, "second1");
+
+    table.add_empty_row();
+    table.set_int(0, 0, 1);
+    table.set_string(1, 0, "a");
+
+    table.add_empty_row();
+    table.set_int(0, 1, 2);
+    table.set_string(1, 1, "a");
+
+    table.add_empty_row();
+    table.set_int(0, 2, 3);
+    table.set_string(1, 2, "X");
+
+    table.add_empty_row();
+    table.set_int(0, 3, 1);
+    table.set_string(1, 3, "a");
+
+    table.add_empty_row();
+    table.set_int(0, 4, 2);
+    table.set_string(1, 4, "a");
+
+    table.add_empty_row();
+    table.set_int(0, 5, 3);
+    table.set_string(1, 5, "X");
+
+    table.add_empty_row();
+    table.set_int(0, 6, 9);
+    table.set_string(1, 6, "a");
+
+    table.add_empty_row();
+    table.set_int(0, 7, 8);
+    table.set_string(1, 7, "a");
+
+    table.add_empty_row();
+    table.set_int(0, 8, 7);
+    table.set_string(1, 8, "X");
+
+    // tv.get_source_ndx()  = 0, 2, 3, 5, 6, 7, 8
+    // Vals         = 1, 3, 1, 3, 9, 8, 7
+    // result       = 3, 0, 5, 2, 8, 7, 6
+
+    Query q = table.where().not_equal(0, 2);
+    TableView tv = q.find_all();
+    tv.sort(0);
+
+    CHECK(tv.size() == 7);
+
+    CHECK(tv.get_int(0, 0) == 1);
+    CHECK(tv.get_int(0, 1) == 1);
+    CHECK(tv.get_int(0, 2) == 3);
+    CHECK(tv.get_int(0, 3) == 3);
+    CHECK(tv.get_int(0, 4) == 7);
+    CHECK(tv.get_int(0, 5) == 8);
+    CHECK(tv.get_int(0, 6) == 9);
+
+    Query q2 = table.where(&tv).not_equal(1, "X");
+    TableView tv2 = q2.find_all();
+
+    CHECK_EQUAL(4, tv2.size());
+    CHECK_EQUAL(1, tv2.get_int(0, 0));
+    CHECK_EQUAL(1, tv2.get_int(0, 1));
+    CHECK_EQUAL(8, tv2.get_int(0, 2)); // 8, 9 (sort order) instead of 9, 8 (table order)
+    CHECK_EQUAL(9, tv2.get_int(0, 3));
+
+    Query q3 = table.where(&tv2).not_equal(1, "X");
+    TableView tv3 = q3.find_all();
+
+    CHECK_EQUAL(4, tv3.size());
+    CHECK_EQUAL(1, tv3.get_int(0, 0));
+    CHECK_EQUAL(1, tv3.get_int(0, 1));
+    CHECK_EQUAL(8, tv3.get_int(0, 2)); // 8, 9 (sort order) instead of 9, 8 (table order)
+    CHECK_EQUAL(9, tv3.get_int(0, 3));
+
+    // Test that remove() maintains order
+    tv3.remove(0);
+    Query q4 = table.where(&tv3).not_equal(1, "X");
+    TableView tv4 = q4.find_all();
+
+    CHECK_EQUAL(3, tv4.size());
+    CHECK_EQUAL(1, tv4.get_int(0, 0));
+    CHECK_EQUAL(8, tv4.get_int(0, 1)); // 8, 9 (sort order) instead of 9, 8 (table order)
+    CHECK_EQUAL(9, tv4.get_int(0, 2));
+}
+
+
+
 TEST(Query_Sort_And_Requery_Untyped1)
 {
+    // Old/fast tableview() + apply_same_order() method
     Table table;
     table.add_column(type_Int, "first1");
     table.add_column(type_String, "second1");
@@ -3109,16 +3350,8 @@ TEST(Query_Sort_And_Requery_Untyped1)
     CHECK(tv.get_int(0, 5) == 8);
     CHECK(tv.get_int(0, 6) == 9);
 
-    Query q2 = table.where().tableview(tv).not_equal(1, "X");
+    Query q2 = table.where(&tv).not_equal(1, "X");
     TableView tv2 = q2.find_all();
-
-    CHECK_EQUAL(4, tv2.size());
-    CHECK_EQUAL(1, tv2.get_int(0, 0));
-    CHECK_EQUAL(1, tv2.get_int(0, 1));
-    CHECK_EQUAL(9, tv2.get_int(0, 2)); // 9, 8 (table order) instead of 8, 9 (sort order)
-    CHECK_EQUAL(8, tv2.get_int(0, 3));
-
-    tv2.apply_same_order(tv);
 
     CHECK_EQUAL(4, tv2.size());
     CHECK_EQUAL(1, tv2.get_int(0, 0));
@@ -3126,12 +3359,10 @@ TEST(Query_Sort_And_Requery_Untyped1)
     CHECK_EQUAL(8, tv2.get_int(0, 2)); // 8, 9 (sort order) instead of 9, 8 (table order)
     CHECK_EQUAL(9, tv2.get_int(0, 3));
 
-    Query q3 = table.where().tableview(tv2).not_equal(1, "X");
+    Query q3 = table.where(&tv2).not_equal(1, "X");
     TableView tv3 = q3.find_all();
 
     CHECK_EQUAL(4, tv3.size());
-
-    tv3.apply_same_order(tv2);
 
     CHECK_EQUAL(4, tv3.size());
     CHECK_EQUAL(1, tv3.get_int(0, 0));
@@ -3141,15 +3372,8 @@ TEST(Query_Sort_And_Requery_Untyped1)
 
     // Test that remove() maintains internal sorted order array of TableView
     tv3.remove(0);
-    Query q4 = table.where().tableview(tv3).not_equal(1, "X");
+    Query q4 = table.where(&tv3).not_equal(1, "X");
     TableView tv4 = q4.find_all();
-
-    CHECK_EQUAL(3, tv4.size());
-    CHECK_EQUAL(1, tv4.get_int(0, 0));
-    CHECK_EQUAL(9, tv4.get_int(0, 1)); // 9, 8 (table order) instead of 8, 9 (sort order)
-    CHECK_EQUAL(8, tv4.get_int(0, 2));
-
-    tv4.apply_same_order(tv3);
 
     CHECK_EQUAL(3, tv4.size());
     CHECK_EQUAL(1, tv4.get_int(0, 0));
@@ -3158,33 +3382,32 @@ TEST(Query_Sort_And_Requery_Untyped1)
 }
 
 
-
-TEST(Query_Sort_And_Requery_Untyped_Monkey)
+TEST(Query_Sort_And_Requery_Untyped_Monkey2)
 {
+    // New where(tableview) method
     for (int iter = 0; iter < 100; iter++) {
         size_t b;
         Table table;
         table.add_column(type_Int, "first1");
-        table.add_column(type_String, "second1");
+        table.add_column(type_Int, "second1");
 
         // Add random data to table
-        for (size_t t = 0; t < 20; t++) {
+        for (size_t t = 0; t < 3 * TIGHTDB_MAX_LIST_SIZE; t++) {
             table.add_empty_row();
-            int64_t val = rand() % 5;
-            table.set_int(0, t, val);
-            const char* c = val % 2 == 0 ? "a" : "b";
-            table.set_string(1, t, c);
+            int64_t val1 = rand() % 5;
+            table.set_int(0, t, val1);
+            int64_t val2 = rand() % 5;
+            table.set_int(1, t, val2);
         }
 
         // Query and sort
-        Query q = table.where().equal(1, "a");
+        Query q = table.where().equal(1, 2);
         TableView tv = q.find_all();
         tv.sort(0);
 
         // Requery and keep original sort order
-        Query q2 = table.where().tableview(tv).not_equal(0, 3);
+        Query q2 = table.where(&tv).not_equal(0, 3);
         TableView tv2 = q2.find_all();
-        tv2.apply_same_order(tv);
 
         b = 0;
         // Test if sort order is the same as original
@@ -3204,9 +3427,8 @@ TEST(Query_Sort_And_Requery_Untyped_Monkey)
         // Remove should update the m_index_order array correctly
         tv2.remove(remove);
 
-        Query q3 = table.where().tableview(tv2).not_equal(0, 2);
+        Query q3 = table.where(&tv2).not_equal(0, 2);
         TableView tv3 = q3.find_all();
-        tv3.apply_same_order(tv2);
 
         b = 0;
         // Test if sort order is the same as original
@@ -3222,20 +3444,12 @@ TEST(Query_Sort_And_Requery_Untyped_Monkey)
         Query q4 = table.where().not_equal(0, 1);
         TableView tv4 = q4.find_all();
 
-        Query q5 = table.where().not_equal(0, 2).tableview(tv4);
+        Query q5 = table.where(&tv4).not_equal(0, 2);
         TableView tv5 = q5.find_all();
-
-        // Both tableview sorted increasingly. No-op
-        tv5.apply_same_order(tv4);
 
         for (size_t t = 0; t < tv5.size() - 1; t++) {
             CHECK(tv5.get_source_ndx(t) < tv5.get_source_ndx(t + 1));
         }
-
-        tv4.sort(0);
-
-        // First view not increasingly (sorted by column instead), next view increasingly
-        tv5.apply_same_order(tv4);
 
         // Test that tv5 is ordered the same way as tv4 (tv5 is subset of tv4)
         size_t foreignindex = 0;
@@ -3248,18 +3462,14 @@ TEST(Query_Sort_And_Requery_Untyped_Monkey)
             foreignindex = foreignindex2;
         }
 
-        // Now have first increasingly and second non-increasingly (sorted by column instead)
-        Query q6 = table.where().not_equal(0, 1);
+        // New test where both tableviews are sorted according to a column, and both sets are equal
+        Query q6 = table.where().not_equal(0, 2);
         TableView tv6 = q6.find_all();
 
-        Query q7 = table.where().not_equal(0, 2).tableview(tv6);
+        Query q7 = table.where(&tv6).not_equal(0, 2);
         TableView tv7 = q7.find_all();
 
-        tv7.sort(0);
-
-        tv7.apply_same_order(tv6);
-
-        // Test that tv7 is ordered the same way as tv6 (tv7 is subset of tv6)
+        // Test that tv7 is ordered the same way as tv6
         foreignindex = 0;
         for (size_t t = 0; t < tv5.size(); t++) {
             size_t foreignindex2 = 0;
@@ -3270,10 +3480,21 @@ TEST(Query_Sort_And_Requery_Untyped_Monkey)
             foreignindex = foreignindex2;
         }
 
+        tv7.sort(1);
+        tv6.sort(1);
 
+        // Test that tv7 is ordered the same way as tv6
+        foreignindex = 0;
+        for (size_t t = 0; t < tv5.size(); t++) {
+            size_t foreignindex2 = 0;
+            while (tv4.get_source_ndx(foreignindex2) != tv5.get_source_ndx(t))
+                foreignindex2++;
+
+            CHECK(foreignindex2 >= foreignindex);
+            foreignindex = foreignindex2;
+        }
     }
 }
-
 
 
 TEST(Query_Threads)
@@ -4275,6 +4496,7 @@ TEST(Query_SubtableSyntaxCheck)
 
 TEST(Query_TestTV)
 {
+    // tableview(...) is deprecated
     TupleTableType t;
     t.add(1, "a");
     t.add(2, "a");
@@ -4288,9 +4510,30 @@ TEST(Query_TestTV)
     TupleTableType::Query q3 = t.where().tableview(v).second.equal("a");
     CHECK_EQUAL(1, q3.count());
 
-    TupleTableType::Query q4 = t.where().tableview(v).first.between(3,6);
+    TupleTableType::Query q4 = t.where().tableview(v).first.between(3, 6);
     CHECK_EQUAL(1, q4.count());
 }
+
+TEST(Query_TestTV_where)
+{
+    // Using where(tv) instead of tableview(tv)
+    TupleTableType t;
+    t.add(1, "a");
+    t.add(2, "a");
+    t.add(3, "c");
+
+    TupleTableType::View v = t.where().first.greater(1).find_all();
+
+    TupleTableType::Query q1 = t.where(&v);
+    CHECK_EQUAL(2, q1.count());
+
+    TupleTableType::Query q3 = t.where(&v).second.equal("a");
+    CHECK_EQUAL(1, q3.count());
+
+    TupleTableType::Query q4 = t.where(&v).first.between(3, 6);
+    CHECK_EQUAL(1, q4.count());
+}
+
 
 TEST(Query_SumMinMaxAvg)
 {
@@ -4327,6 +4570,46 @@ TEST(Query_SumMinMaxAvg)
     CHECK_EQUAL(6, t.where().first.sum(&cnt, 0, 3));
     CHECK_EQUAL(3, cnt);
     CHECK_EQUAL(6, t.where().first.sum(&cnt, 0, size_t(-1)));
+    CHECK_EQUAL(3, cnt);
+}
+
+TEST(Query_SumMinMaxAvg_where)
+{
+    TupleTableType t;
+    t.add(1, "a");
+    t.add(2, "b");
+    t.add(3, "c");
+
+    TupleTableType::View v = t.where().find_all();
+
+    CHECK_EQUAL(6, t.where(&v).first.sum());
+    CHECK_EQUAL(1, t.where(&v).first.minimum());
+    CHECK_EQUAL(3, t.where(&v).first.maximum());
+    CHECK_EQUAL(2, t.where(&v).first.average());
+
+    size_t cnt;
+    CHECK_EQUAL(0, t.where(&v).first.sum(&cnt, 0, 0));
+    CHECK_EQUAL(0, cnt);
+    CHECK_EQUAL(0, t.where(&v).first.sum(&cnt, 1, 1));
+    CHECK_EQUAL(0, cnt);
+    CHECK_EQUAL(0, t.where(&v).first.sum(&cnt, 2, 2));
+    CHECK_EQUAL(0, cnt);
+
+    CHECK_EQUAL(1, t.where(&v).first.sum(&cnt, 0, 1));
+    CHECK_EQUAL(1, cnt);
+    CHECK_EQUAL(2, t.where(&v).first.sum(&cnt, 1, 2));
+    CHECK_EQUAL(1, cnt);
+    CHECK_EQUAL(3, t.where(&v).first.sum(&cnt, 2, 3));
+    CHECK_EQUAL(1, cnt);
+
+    CHECK_EQUAL(3, t.where(&v).first.sum(&cnt, 0, 2));
+    CHECK_EQUAL(2, cnt);
+    CHECK_EQUAL(5, t.where(&v).first.sum(&cnt, 1, 3));
+    CHECK_EQUAL(2, cnt);
+
+    CHECK_EQUAL(6, t.where(&v).first.sum(&cnt, 0, 3));
+    CHECK_EQUAL(3, cnt);
+    CHECK_EQUAL(6, t.where(&v).first.sum(&cnt, 0, size_t(-1)));
     CHECK_EQUAL(3, cnt);
 }
 

@@ -1243,6 +1243,8 @@ private:
 
 public:
     explicit QueryColumn(Query* q) TIGHTDB_NOEXCEPT: Base(q) {}
+
+    // Todo, these do not turn up in Visual Studio 2013 intellisense
     using Base::equal;
     using Base::not_equal;
 

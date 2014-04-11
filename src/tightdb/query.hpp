@@ -46,6 +46,7 @@ namespace tightdb {
 class ParentNode;
 class Table;
 class TableView;
+class TableViewBase;
 class ConstTableView;
 class Array;
 class Expression;
@@ -53,7 +54,7 @@ class SequentialGetterBase;
 
 class Query {
 public:
-    Query(const Table& table);
+    Query(const Table& table, TableViewBase* tv = null_ptr);
     Query();
     Query(const Query& copy); // FIXME: Try to remove this
     ~Query() TIGHTDB_NOEXCEPT;
@@ -216,7 +217,7 @@ public:
     mutable bool do_delete;
 
 protected:
-    Query(Table& table);
+    Query(Table& table, TableViewBase* tv = null_ptr);
 //    Query(const Table& table); // FIXME: This constructor should not exist. We need a ConstQuery class.
     void Create();
 
@@ -227,27 +228,6 @@ protected:
 
     static bool  comp(const std::pair<size_t, size_t>& a, const std::pair<size_t, size_t>& b);
 
-#if TIGHTDB_MULTITHREAD_QUERY
-    static void* query_thread(void* arg);
-    struct thread_state {
-        pthread_mutex_t result_mutex;
-        pthread_cond_t  completed_cond;
-        pthread_mutex_t completed_mutex;
-        pthread_mutex_t jobs_mutex;
-        pthread_cond_t  jobs_cond;
-        size_t next_job;
-        size_t end_job;
-        size_t done_job;
-        size_t count;
-        ParentNode* node;
-        Table* table;
-        std::vector<size_t> results;
-        std::vector<std::pair<size_t, size_t> > chunks;
-    } ts;
-    static const size_t max_threads = 128;
-    pthread_t threads[max_threads];
-#endif
-
 public:
     TableRef m_table;
     std::vector<ParentNode*> first;
@@ -255,7 +235,8 @@ public:
     std::vector<ParentNode**> update_override;
     std::vector<ParentNode**> subtables;
     std::vector<ParentNode*> all_nodes;
-
+    
+    TableViewBase* m_tableview;
 
 private:
     template <class TColumnType> Query& equal(size_t column_ndx1, size_t column_ndx2);
@@ -266,10 +247,6 @@ private:
     template <class TColumnType> Query& not_equal(size_t column_ndx1, size_t column_ndx2);
 
     std::string error_code;
-
-#if TIGHTDB_MULTITHREAD_QUERY
-    size_t m_threadcount;
-#endif
 
     template <typename T, class N> Query& add_condition(size_t column_ndx, T value);
     template<typename T>
@@ -287,9 +264,6 @@ private:
     friend class XQueryAccessorInt;
     friend class XQueryAccessorString;
 };
-
-
-
 
 // Implementation:
 

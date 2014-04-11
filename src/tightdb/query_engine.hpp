@@ -789,7 +789,7 @@ public:
                            && static_cast<SequentialGetter<int64_t>*>(source_column)->m_column == m_condition_column)));
         for (size_t s = start; s < end; ) {
             // Cache internal leaves
-            if (s >= m_leaf_end) {
+            if (s >= m_leaf_end || s < m_leaf_start) {
                 m_condition_column->GetBlock(s, m_array, m_leaf_start);
                 m_leaf_end = m_leaf_start + m_array.size();
                 size_t w = m_array.get_width();
@@ -840,7 +840,7 @@ public:
         while (start < end) {
 
             // Cache internal leaves
-            if (start >= m_leaf_end) {
+            if (start >= m_leaf_end || start < m_leaf_start) {
                 m_condition_column->GetBlock(start, m_array, m_leaf_start);
                 m_leaf_end = m_leaf_start + m_array.size();
             }
@@ -1074,7 +1074,7 @@ public:
             else {
                 // short or long
                 const AdaptiveStringColumn* asc = static_cast<const AdaptiveStringColumn*>(m_condition_column);
-                if (s >= m_end_s) {
+                if (s >= m_end_s || s < m_leaf_start) {
                     // we exceeded current leaf's range
                     clear_leaf_state();
 
@@ -1310,7 +1310,7 @@ public:
 
                     // Normal string column, with long or short leaf
                     AdaptiveStringColumn* asc = (AdaptiveStringColumn*)m_condition_column;
-                    if (s >= m_leaf_end) {
+                    if (s >= m_leaf_end || s < m_leaf_start) {
                         clear_leaf_state();
                         m_leaf_type = asc->GetBlock(s, &m_leaf, m_leaf_start);
                         if (m_leaf_type == AdaptiveStringColumn::leaf_type_Small)
