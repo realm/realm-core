@@ -530,7 +530,7 @@ public:
         patterns::const_iterator j = m_patterns.begin(), end = m_patterns.end();
         while (j != end && !j->match(details->file_name))
             ++j;
-        int major = j - m_patterns.begin();
+        int major = int(j - m_patterns.begin());
         m_major_map[details] = major;
         return major;
     }
