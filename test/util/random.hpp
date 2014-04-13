@@ -337,7 +337,7 @@ inline T UniformIntDistribution<T>::draw(G& generator, T min, T max) TIGHTDB_NOE
         uint_type num_gen_values = gen_max + 1;
         uint_type val_max_2 = val_max / num_gen_values;
         for (;;) {
-            uint_type v = num_gen_values * draw(generator, 0, val_max_2);
+            uint_type v = num_gen_values * draw(generator, 0, T(val_max_2));
             value += v;
             // Previous addition may have overflowed, so we have
             // to test for that too

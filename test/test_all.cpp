@@ -36,6 +36,41 @@ using namespace tightdb::test_util::unit_test;
 
 namespace {
 
+const char* file_order[] = {
+    "test_self.cpp",
+
+    // tightdb/util/
+    "test_safe_int_ops.cpp",
+    "test_file*.cpp",
+    "test_thread.cpp",
+    "test_utf8.cpp",
+
+    // /tightdb/ (helpers)
+    "test_string_data.cpp",
+    "test_binary_data.cpp",
+
+    // /tightdb/impl/ (detail)
+    "test_alloc*.cpp",
+    "test_array*.cpp",
+    "test_column*.cpp",
+    "test_index*.cpp",
+    "test_destroy_guard.cpp",
+
+    // /tightdb/ (main API)
+    "test_version.cpp",
+    "test_table*.cpp",
+    "test_descriptor*.cpp",
+    "test_query*.cpp",
+    "test_group*.cpp",
+    "test_shared*.cpp",
+    "test_transactions*.cpp",
+    "test_replication*.cpp",
+
+    "test_lang_bind.cpp",
+
+    "large_tests*.cpp"
+};
+
 
 void fix_async_daemon_path()
 {
@@ -261,6 +296,7 @@ bool run_tests()
 
     // Run
     TestList& list = get_default_test_list();
+    list.sort(PatternBasedFileOrder(file_order));
     bool success = list.run(reporter.get(), filter.get(), num_threads, shuffle);
 
     if (test_only)

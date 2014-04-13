@@ -7,19 +7,53 @@
 #include <tightdb/column.hpp>
 #include <tightdb/query_conditions.hpp>
 
+#include "../util/verified_integer.hpp"
+
 #include "../test.hpp"
 
-#include "verified_integer.hpp"
+#define LL_MAX (9223372036854775807LL)
+#define LL_MIN (-LL_MAX - 1)
 
 using namespace std;
 using namespace tightdb;
 using namespace tightdb::test_util;
 
-#define LL_MAX (9223372036854775807LL)
-#define LL_MIN (-LL_MAX - 1)
+
+// Test independence and thread-safety
+// -----------------------------------
+//
+// All tests must be thread safe and independent of each other. This
+// is required because it allows for both shuffling of the execution
+// order and for parallelized testing.
+//
+// In particular, avoid using std::rand() since it is not guaranteed
+// to be thread safe. Instead use the API offered in
+// `test/util/random.hpp`.
+//
+// All files created in tests must use the TEST_PATH macro (or one of
+// its friends) to obtain a suitable file system path. See
+// `test/util/test_path.hpp`.
+//
+//
+// Debugging and the ONLY() macro
+// ------------------------------
+//
+// A simple way of disabling all tests except one called `Foo`, is to
+// replace TEST(Foo) with ONLY(Foo) and then recompile and rerun the
+// test suite. Note that you can also use filtering by setting the
+// environment varible `UNITTEST_FILTER`. See `README.md` for more on
+// this.
+//
+// Another way to debug a particular test, is to copy that test into
+// `experiments/testcase.cpp` and then run `sh build.sh
+// check-testcase` (or one of its friends) from the command line.
 
 
-TEST(ColumnLarge_Less)
+// These tests take ~5 min in release mode with
+// TIGHTDB_MAX_LIST_SIZE=1000
+
+
+TEST_IF(ColumnLarge_Less, TEST_DURATION >= 2)
 {
     // Interesting boundary values to test
     int64_t v[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17,
@@ -45,7 +79,9 @@ TEST(ColumnLarge_Less)
         for (size_t t = 0; t < LEN; t++)
             a.add(v[w]);
 
-        // to create at least 64 bytes of data (2 * 128-bit SSE chunks + 64 bit chunk before and after + some unaligned data before and after)
+        // to create at least 64 bytes of data (2 * 128-bit SSE chunks
+        // + 64 bit chunk before and after + some unaligned data
+        // before and after)
         size_t LEN2 = 64 * 8 / (a.get_width() == 0 ? 1 : a.get_width());
 
         Array akku;
@@ -225,7 +261,7 @@ TEST(ColumnLarge_Less)
 }
 
 
-TEST(ColumnLarge_Monkey2)
+TEST_IF(ColumnLarge_Monkey2, TEST_DURATION >= 2)
 {
     const uint64_t ITER_PER_BITWIDTH = 16 * 1000 * 20;
     const uint64_t seed = 123;
