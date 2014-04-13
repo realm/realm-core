@@ -36,6 +36,13 @@
 
 #define TEST(name) TEST_IF(name, true)
 
+/// Allows you to control whether the test will be enabled or
+/// disabled. The test will be compiled in both cases. You can pass
+/// any expression that would be a valid condition in an `if`
+/// statement. The expression is not evaluated until you call
+/// TestList::run(). This allows you to base the condition on global
+/// variables which can then be adjusted before calling
+/// TestList::run().
 #define TEST_IF(name, enabled) \
     TEST_EX(name, tightdb::test_util::unit_test::get_default_test_list(), enabled)
 
