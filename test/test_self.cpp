@@ -10,23 +10,53 @@ using namespace tightdb::util;
 using namespace tightdb::test_util::unit_test;
 
 
+// Test independence and thread-safety
+// -----------------------------------
+//
+// All tests must be thread safe and independent of each other. This
+// is required because it allows for both shuffling of the execution
+// order and for parallelized testing.
+//
+// In particular, avoid using std::rand() since it is not guaranteed
+// to be thread safe. Instead use the API offered in
+// `test/util/random.hpp`.
+//
+// All files created in tests must use the TEST_PATH macro (or one of
+// its friends) to obtain a suitable file system path. See
+// `test/util/test_path.hpp`.
+//
+//
+// Debugging and the ONLY() macro
+// ------------------------------
+//
+// A simple way of disabling all tests except one called `Foo`, is to
+// replace TEST(Foo) with ONLY(Foo) and then recompile and rerun the
+// test suite. Note that you can also use filtering by setting the
+// environment varible `UNITTEST_FILTER`. See `README.md` for more on
+// this.
+//
+// Another way to debug a particular test, is to copy that test into
+// `experiments/testcase.cpp` and then run `sh build.sh
+// check-testcase` (or one of its friends) from the command line.
+
+
 namespace {
 
 TestList zero_tests_list, zero_checks_list;
 
-TEST_EX(ZeroChecks, zero_checks_list)
+TEST_EX(ZeroChecks, zero_checks_list, true)
 {
 }
 
 
 TestList one_check_success_list, one_check_failure_list;
 
-TEST_EX(OneCheckSuccess, one_check_success_list)
+TEST_EX(OneCheckSuccess, one_check_success_list, true)
 {
     CHECK(true);
 }
 
-TEST_EX(OneCheckFailure, one_check_failure_list)
+TEST_EX(OneCheckFailure, one_check_failure_list, true)
 {
     CHECK(false);
 }
@@ -34,7 +64,7 @@ TEST_EX(OneCheckFailure, one_check_failure_list)
 
 TestList one_test_success_list, one_test_failure_list;
 
-TEST_EX(OneTestSuccess, one_test_success_list)
+TEST_EX(OneTestSuccess, one_test_success_list, true)
 {
     CHECK_EQUAL(0,0);
     CHECK_NOT_EQUAL(0,1);
@@ -43,7 +73,7 @@ TEST_EX(OneTestSuccess, one_test_success_list)
     CHECK_GREATER(1,0);
 }
 
-TEST_EX(OneTestFailure, one_test_failure_list)
+TEST_EX(OneTestFailure, one_test_failure_list, true)
 {
     CHECK_EQUAL(0,0);
     CHECK_NOT_EQUAL(0,1);
@@ -55,7 +85,7 @@ TEST_EX(OneTestFailure, one_test_failure_list)
 
 TestList few_tests_success_list, few_tests_failure_list;
 
-TEST_EX(FewTestsSuccess_1, few_tests_success_list)
+TEST_EX(FewTestsSuccess_1, few_tests_success_list, true)
 {
     CHECK_EQUAL(0,0);
     CHECK_NOT_EQUAL(0,1);
@@ -63,7 +93,7 @@ TEST_EX(FewTestsSuccess_1, few_tests_success_list)
     CHECK_GREATER(1,0);
 }
 
-TEST_EX(FewTestsSuccess_2, few_tests_success_list)
+TEST_EX(FewTestsSuccess_2, few_tests_success_list, true)
 {
     CHECK_EQUAL(0,0);
     CHECK_NOT_EQUAL(0,1);
@@ -72,7 +102,7 @@ TEST_EX(FewTestsSuccess_2, few_tests_success_list)
     CHECK_GREATER(1,0);
 }
 
-TEST_EX(FewTestsSuccess_3, few_tests_success_list)
+TEST_EX(FewTestsSuccess_3, few_tests_success_list, true)
 {
     CHECK_EQUAL(0,0);
     CHECK_NOT_EQUAL(0,1);
@@ -80,7 +110,7 @@ TEST_EX(FewTestsSuccess_3, few_tests_success_list)
     CHECK_GREATER(1,0);
 }
 
-TEST_EX(FewTestsFailure_1, few_tests_failure_list)
+TEST_EX(FewTestsFailure_1, few_tests_failure_list, true)
 {
     CHECK_EQUAL(0,0);
     CHECK_NOT_EQUAL(0,1);
@@ -88,7 +118,7 @@ TEST_EX(FewTestsFailure_1, few_tests_failure_list)
     CHECK_GREATER(1,0);
 }
 
-TEST_EX(FewTestsFailure_2, few_tests_failure_list)
+TEST_EX(FewTestsFailure_2, few_tests_failure_list, true)
 {
     CHECK_EQUAL(0,0);
     CHECK_NOT_EQUAL(0,1);
@@ -97,7 +127,7 @@ TEST_EX(FewTestsFailure_2, few_tests_failure_list)
     CHECK_GREATER(1,0);
 }
 
-TEST_EX(FewTestsFailure_3, few_tests_failure_list)
+TEST_EX(FewTestsFailure_3, few_tests_failure_list, true)
 {
     CHECK_EQUAL(0,0);
     CHECK_NOT_EQUAL(0,1);
@@ -108,7 +138,7 @@ TEST_EX(FewTestsFailure_3, few_tests_failure_list)
 
 TestList mixed_list;
 
-TEST_EX(Mixed_1_X, mixed_list)
+TEST_EX(Mixed_1_X, mixed_list, true)
 {
     CHECK_EQUAL(0,0);
     CHECK_NOT_EQUAL(0,1);
@@ -116,7 +146,7 @@ TEST_EX(Mixed_1_X, mixed_list)
     CHECK_GREATER(1,0);
 }
 
-TEST_EX(Mixed_2_Y, mixed_list)
+TEST_EX(Mixed_2_Y, mixed_list, true)
 {
     CHECK_EQUAL(0,0);
     CHECK_EQUAL(0,1);         // <--- Failure
@@ -124,18 +154,18 @@ TEST_EX(Mixed_2_Y, mixed_list)
     CHECK_GREATER(1,0);
 }
 
-TEST_EX(Mixed_3_X, mixed_list)
+TEST_EX(Mixed_3_X, mixed_list, true)
 {
 }
 
-TEST_EX(Mixed_4_Y, mixed_list)
+TEST_EX(Mixed_4_Y, mixed_list, true)
 {
     CHECK_NOT_EQUAL(0,0);     // <--- Failure
     CHECK_EQUAL(0,1);         // <--- Failure
     CHECK_GREATER_EQUAL(0,1); // <--- Failure
 }
 
-TEST_EX(Mixed_5_X, mixed_list)
+TEST_EX(Mixed_5_X, mixed_list, true)
 {
     CHECK_NOT_EQUAL(0,0);     // <--- Failure
     CHECK_NOT_EQUAL(0,1);
@@ -143,11 +173,11 @@ TEST_EX(Mixed_5_X, mixed_list)
     CHECK_GREATER(1,0);
 }
 
-TEST_EX(Mixed_6_Y, mixed_list)
+TEST_EX(Mixed_6_Y, mixed_list, true)
 {
 }
 
-TEST_EX(Mixed_7_Y, mixed_list)
+TEST_EX(Mixed_7_Y, mixed_list, true)
 {
     CHECK_EQUAL(0,0);
     CHECK_NOT_EQUAL(0,1);
@@ -158,7 +188,7 @@ TEST_EX(Mixed_7_Y, mixed_list)
 
 TestList success_list, failure_list;
 
-TEST_EX(Success_Bool, success_list) // Test #1, accum checks = 0 + 13 = 13
+TEST_EX(Success_Bool, success_list, true) // Test #1, accum checks = 0 + 13 = 13
 {
     CHECK(true);
     CHECK_EQUAL(false, false);
@@ -175,7 +205,7 @@ TEST_EX(Success_Bool, success_list) // Test #1, accum checks = 0 + 13 = 13
     CHECK_GREATER_EQUAL(true, true);
 }
 
-TEST_EX(Failure_Bool, failure_list) // Test #1, accum checks = 0 + 13 = 13
+TEST_EX(Failure_Bool, failure_list, true) // Test #1, accum checks = 0 + 13 = 13
 {
     CHECK(false);
     CHECK_EQUAL(false, true);
@@ -192,7 +222,7 @@ TEST_EX(Failure_Bool, failure_list) // Test #1, accum checks = 0 + 13 = 13
     CHECK_GREATER_EQUAL(false, true);
 }
 
-TEST_EX(Success_Int, success_list) // Test #2, accum checks = 13 + 12 = 25
+TEST_EX(Success_Int, success_list, true) // Test #2, accum checks = 13 + 12 = 25
 {
     CHECK_EQUAL(1,1);
     CHECK_EQUAL(2,2);
@@ -208,7 +238,7 @@ TEST_EX(Success_Int, success_list) // Test #2, accum checks = 13 + 12 = 25
     CHECK_GREATER_EQUAL(2,2);
 }
 
-TEST_EX(Failure_Int, failure_list) // Test #2, accum checks = 13 + 12 = 25
+TEST_EX(Failure_Int, failure_list, true) // Test #2, accum checks = 13 + 12 = 25
 {
     CHECK_EQUAL(1,2);
     CHECK_EQUAL(2,1);
@@ -224,7 +254,7 @@ TEST_EX(Failure_Int, failure_list) // Test #2, accum checks = 13 + 12 = 25
     CHECK_GREATER_EQUAL(1,2);
 }
 
-TEST_EX(Success_Float, success_list) // Test #3, accum checks = 25 + 32 = 57
+TEST_EX(Success_Float, success_list, true) // Test #3, accum checks = 25 + 32 = 57
 {
     CHECK_EQUAL(3.1, 3.1);
     CHECK_EQUAL(3.2, 3.2);
@@ -265,7 +295,7 @@ TEST_EX(Success_Float, success_list) // Test #3, accum checks = 25 + 32 = 57
     CHECK_DEFINITELY_GREATER(-0.49, -1.00, eps);  // Min error = 0.5
 }
 
-TEST_EX(Failure_Float, failure_list) // Test #3, accum checks = 25 + 52 = 77
+TEST_EX(Failure_Float, failure_list, true) // Test #3, accum checks = 25 + 52 = 77
 {
     CHECK_EQUAL(3.1, 3.2);
     CHECK_EQUAL(3.2, 3.1);
@@ -326,7 +356,7 @@ TEST_EX(Failure_Float, failure_list) // Test #3, accum checks = 25 + 52 = 77
     CHECK_DEFINITELY_GREATER(-1.00, -0.49, eps);  // Min error = 0.5
 }
 
-TEST_EX(Success_String, success_list) // Test #4, accum checks = 57 + 16 = 73
+TEST_EX(Success_String, success_list, true) // Test #4, accum checks = 57 + 16 = 73
 {
     const char* s_1 = "";
     const char* s_2 = "x";
@@ -355,7 +385,7 @@ TEST_EX(Success_String, success_list) // Test #4, accum checks = 57 + 16 = 73
     CHECK_GREATER_EQUAL(const_cast<const char*>(t_1.get()), const_cast<const char*>(t_2.get()));
 }
 
-TEST_EX(Failure_String, failure_list) // Test #4, accum checks = 77 + 16 = 93
+TEST_EX(Failure_String, failure_list, true) // Test #4, accum checks = 77 + 16 = 93
 {
     const char* s_1 = "";
     const char* s_2 = "x";
@@ -384,7 +414,7 @@ TEST_EX(Failure_String, failure_list) // Test #4, accum checks = 77 + 16 = 93
     CHECK_GREATER(const_cast<const char*>(t_1.get()), const_cast<const char*>(t_2.get()));
 }
 
-TEST_EX(Success_Pointer, success_list) // Test #5, accum checks = 73 + 12 = 85
+TEST_EX(Success_Pointer, success_list, true) // Test #5, accum checks = 73 + 12 = 85
 {
     int i;
     int* p_1 = 0;
@@ -403,7 +433,7 @@ TEST_EX(Success_Pointer, success_list) // Test #5, accum checks = 73 + 12 = 85
     CHECK_GREATER_EQUAL(p_2, p_2);
 }
 
-TEST_EX(Failure_Pointer, failure_list) // Test #5, accum checks = 93 + 12 = 105
+TEST_EX(Failure_Pointer, failure_list, true) // Test #5, accum checks = 93 + 12 = 105
 {
     int i;
     int* p_1 = 0;
@@ -445,13 +475,13 @@ void throw_nothing()
 {
 }
 
-TEST_EX(Success_Exception, success_list) // Test #6, accum checks = 85 + 2 = 87
+TEST_EX(Success_Exception, success_list, true) // Test #6, accum checks = 85 + 2 = 87
 {
     CHECK_THROW(throw_foo(), FooException);
     CHECK_THROW(throw_bar(), BarException);
 }
 
-TEST_EX(Failure_Exception, failure_list) // Test #6, accum checks = 105 + 2 = 107
+TEST_EX(Failure_Exception, failure_list, true) // Test #6, accum checks = 105 + 2 = 107
 {
     CHECK_THROW(throw_nothing(), FooException);
     CHECK_THROW(throw_nothing(), BarException);
