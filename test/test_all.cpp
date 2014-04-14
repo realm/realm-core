@@ -225,10 +225,10 @@ bool run_tests()
 #endif
     if (xml) {
         string path = "";
-        if (TIGHTDB_ANDROID) {
-            PlatformConfig* platform_config = PlatformConfig::Instance();
-            path += platform_config->get_path();
-        }
+#ifdef TIGHTDB_MOBILE
+        PlatformConfig* platform_config = PlatformConfig::Instance();
+        path = platform_config->get_path();
+#endif
         string xml_path = path + "unit-test-report.xml";
         xml_file.open(xml_path.c_str());
         reporter.reset(create_xml_reporter(xml_file));
