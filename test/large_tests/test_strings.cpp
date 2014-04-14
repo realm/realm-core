@@ -64,7 +64,7 @@ string randstring(Random& random)
 TEST_IF(Strings_Monkey2, TEST_DURATION >= 1)
 {
     uint64_t ITER = 16 * 5000 * TEST_DURATION * TEST_DURATION * TEST_DURATION;
-    uint64_t seed = 123;
+    int seed = 123;
 
     VerifiedString a;
     Array res;
