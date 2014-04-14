@@ -480,6 +480,22 @@ Query& Query::not_equal(size_t column_ndx, StringData value, bool case_sensitive
 
 // Aggregates =================================================================================
 
+size_t Query::peek_tableview(size_t tv_index) const
+{
+    TIGHTDB_ASSERT(m_tableview);
+    TIGHTDB_ASSERT(tv_index < m_tableview->size());
+
+    size_t tablerow = m_tableview->get_source_ndx(tv_index);
+
+    size_t r;
+    if (first.size() > 0 && first[0])
+        r = first[0]->find_first(tablerow, tablerow + 1);
+    else
+        r = tablerow;
+
+    return r;
+}
+
 template <Action action, typename T, typename R, class ColType>
 R Query::aggregate(R (ColType::*aggregateMethod)(size_t start, size_t end, size_t limit) const,
                     size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
@@ -521,10 +537,9 @@ R Query::aggregate(R (ColType::*aggregateMethod)(size_t start, size_t end, size_
         }
         else {
             for (size_t t = start; t < end && st.m_match_count < limit; t++) {
-                size_t tablerow = m_tableview->get_source_ndx(t);
-                size_t r = FindInternal(tablerow, tablerow + 1);
+                size_t r = peek_tableview(t);
                 if (r != not_found)
-                    st.match<action, false>(r, 0, source_column.get_next(tablerow));
+                    st.match<action, false>(r, 0, source_column.get_next(m_tableview->get_source_ndx(t)));
             }
         }
 
@@ -749,7 +764,7 @@ size_t Query::find(size_t begin)
     Init(*m_table);
 
     // User created query with no criteria; return first
-    if (first.size() == 0 || first[0] == 0) {
+    if (first.size() == 0 || first[0] == null_ptr) {
         if (m_tableview)
             return m_tableview->size() == 0 ? not_found : begin;
         else
@@ -759,8 +774,7 @@ size_t Query::find(size_t begin)
     if (m_tableview) {
         size_t end = m_tableview->size();
         for (size_t begin2 = begin; begin < end; begin++) {
-            size_t tablerow = m_tableview->get_source_ndx(begin2);
-            size_t res = first[0]->find_first(tablerow, tablerow + 1);
+            size_t res = peek_tableview(begin2);
             if (res != not_found)
                 return begin2;
         }
@@ -798,8 +812,7 @@ TableView Query::find_all(size_t start, size_t end, size_t limit)
 
     if (m_tableview) {
         for (size_t begin = start; begin < end && ret.size() < limit; begin++) {
-            size_t tablerow = m_tableview->get_source_ndx(begin);
-            size_t res = first[0]->find_first(tablerow, tablerow + 1);
+            size_t res = peek_tableview(begin);
             if (res != not_found)
                 ret.get_ref_column().add(res);
         }
@@ -822,7 +835,7 @@ size_t Query::count(size_t start, size_t end, size_t limit) const
     if (end == size_t(-1))
         end = m_tableview ? m_tableview->size() : m_table->size();
 
-    if ((first.size() == 0 || first[0] == 0) && !m_tableview) {
+    if (first.size() == 0 || first[0] == 0) {
         // User created query with no criteria; count all
         return (limit < end - start ? limit : end - start);
     }
@@ -832,8 +845,7 @@ size_t Query::count(size_t start, size_t end, size_t limit) const
 
     if (m_tableview) {
         for (size_t begin = start; begin < end && cnt < limit; begin++) {
-            size_t tablerow = m_tableview->get_source_ndx(begin);
-            size_t res = FindInternal(tablerow, tablerow + 1);
+            size_t res = peek_tableview(begin);
             if (res != not_found)
                 cnt++;
         }
@@ -861,20 +873,16 @@ size_t Query::remove(size_t start, size_t end, size_t limit)
     size_t results = 0;
 
     if (m_tableview) {
-        Array a = m_tableview->get_ref_column();
-
         for (;;) {
-            if (start + results == a.size() || start + results == end || results == limit)
+            if (start + results == end || results == limit)
                 return results;
 
             Init(*m_table);
-
-            size_t tablerow = a[start + results];
-            size_t r = FindInternal(tablerow, tablerow + 1);
+            size_t r = peek_tableview(start + results);
             if (r != not_found) {
                 m_table->remove(r);
+                m_tableview->get_ref_column().adjust_ge(m_tableview->get_source_ndx(start + results), -1);
                 results++;
-                a.adjust_ge(tablerow, -1);
             }
             else {
                 return results;

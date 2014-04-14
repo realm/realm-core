@@ -1851,9 +1851,6 @@ TEST(Query_OnTableView)
         OneIntTable::View v = oti.where().first.not_equal(0).find_all(lbound, ubound, limit);
         size_t cnt2 = oti.where().tableview(v).first.equal(1).count();
 
-        if(cnt1 != cnt2)
-            cerr << iter << " ";
-
         CHECK_EQUAL(cnt1, cnt2);
     }
 }
@@ -1862,7 +1859,6 @@ TEST(Query_OnTableView_where)
 {
     Random random;
 
-    // Mostly intended to test the Array::FindGTE method
     for (int iter = 0; iter < 100 * (1 + TEST_DURATION * TEST_DURATION * TEST_DURATION * TEST_DURATION * TEST_DURATION); iter++) {
         random.seed(164);
         OneIntTable oti;
@@ -1887,9 +1883,6 @@ TEST(Query_OnTableView_where)
 
         OneIntTable::View v = oti.where().first.not_equal(0).find_all(lbound, ubound, limit);
         size_t cnt2 = oti.where(&v).first.equal(1).count();
-
-        if (cnt1 != cnt2)
-            cerr << iter << " ";
 
         CHECK_EQUAL(cnt1, cnt2);
     }
@@ -2779,8 +2772,8 @@ TEST(Query_DeleteLimit_where)
     ttt.add(4, 10);
     ttt.add(5, 00);
 
-    TwoIntTable::View q = ttt.where().second.greater_equal(0).find_all();
-    TwoIntTable::Query q2 = ttt.where().second.greater_equal(0);
+    TwoIntTable::View v = ttt.where().second.greater_equal(0).find_all();
+    TwoIntTable::Query q2 = ttt.where(&v).second.greater_equal(0);
 
     size_t r = q2.remove(1, 4, 2);
 
@@ -3370,7 +3363,7 @@ TEST(Query_Sort_And_Requery_Untyped1)
     CHECK_EQUAL(8, tv3.get_int(0, 2)); // 8, 9 (sort order) instead of 9, 8 (table order)
     CHECK_EQUAL(9, tv3.get_int(0, 3));
 
-    // Test that remove() maintains internal sorted order array of TableView
+    // Test remove() 
     tv3.remove(0);
     Query q4 = table.where(&tv3).not_equal(1, "X");
     TableView tv4 = q4.find_all();
