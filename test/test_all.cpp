@@ -11,6 +11,7 @@
 
 #include <tightdb/util/features.h>
 #include <tightdb/util/unique_ptr.hpp>
+#include <tightdb/util/features.h>
 #include <tightdb.hpp>
 #include <tightdb/utilities.hpp>
 #include <tightdb/version.hpp>
@@ -250,10 +251,21 @@ bool run_tests()
 
     // Set up reporter
     ofstream xml_file;
+    bool xml;
+#ifdef TIGHTDB_MOBILE
+    xml = true;
+#else
     const char* xml_str = getenv("UNITTEST_XML");
-    bool xml = (xml_str && strlen(xml_str) != 0);
+    xml = (xml_str && strlen(xml_str) != 0);
+#endif
     if (xml) {
-        xml_file.open("unit-test-report.xml");
+        string path = "";
+#ifdef TIGHTDB_MOBILE
+        PlatformConfig* platform_config = PlatformConfig::Instance();
+        path = platform_config->get_path();
+#endif
+        string xml_path = path + "unit-test-report.xml";
+        xml_file.open(xml_path.c_str());
         reporter.reset(create_xml_reporter(xml_file));
     }
     else {
