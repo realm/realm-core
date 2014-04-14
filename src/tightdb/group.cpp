@@ -11,7 +11,9 @@
 #include <tightdb/utilities.hpp>
 #include <tightdb/group_writer.hpp>
 #include <tightdb/group.hpp>
-#include <pthread.h>
+#ifdef TIGHTDB_ENABLE_REPLICATION
+#  include <tightdb/replication.hpp>
+#endif
 
 using namespace std;
 using namespace tightdb;

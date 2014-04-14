@@ -386,52 +386,14 @@ inline bool SharedGroup::is_attached() const TIGHTDB_NOEXCEPT
     return m_file_map.is_attached();
 }
 
-inline Group& SharedGroup::begin_write()
-{
-    if (m_transactions_are_pinned) {
-        throw std::runtime_error("Write transactions are not allowed while transactions are pinned");
-    }
-
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    if (Replication* repl = m_group.get_replication()) {
-        repl->begin_write_transact(*this); // Throws
-        try {
-            do_begin_write();
-        }
-        catch (...) {
-            repl->rollback_write_transact(*this);
-            throw;
-        }
-        return m_group;
-    }
-#endif
-
-    do_begin_write();
-
-    return m_group;
-}
-
-
-#ifdef TIGHTDB_ENABLE_REPLICATION
-
 inline SharedGroup::SharedGroup(Replication& repl):
     m_group(Group::shared_tag()), m_version(std::numeric_limits<std::size_t>::max()),
     m_transactions_are_pinned(false)
 {
     open(repl);
 }
-
-inline void SharedGroup::open(Replication& repl)
-{
-    TIGHTDB_ASSERT(!is_attached());
-    std::string file = repl.get_database_path();
-    bool no_create   = false;
-    DurabilityLevel dlevel = durability_Full;
-    open(file, no_create, dlevel); // Throws
-    m_group.set_replication(&repl);
-}
-
-#endif // TIGHTDB_ENABLE_REPLICATION
+#endif
 
 
 } // namespace tightdb

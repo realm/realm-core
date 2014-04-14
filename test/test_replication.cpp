@@ -7,6 +7,9 @@
 #include <tightdb/util/features.h>
 #include <tightdb/util/unique_ptr.hpp>
 #include <tightdb/util/file.hpp>
+#ifdef TIGHTDB_ENABLE_REPLICATION
+#  include <tightdb/replication.hpp>
+#endif
 
 #include "test.hpp"
 
@@ -61,12 +64,12 @@ public:
             delete[] i->data();
     }
 
-    void replay_transacts(SharedGroup& target)
+    void replay_transacts(SharedGroup& target, ostream* replay_log = 0)
     {
         typedef TransactLogs::const_iterator iter;
         iter end = m_transact_logs.end();
         for (iter i = m_transact_logs.begin(); i != end; ++i)
-            apply_transact_log(i->data(), i->size(), target);
+            apply_transact_log(i->data(), i->size(), target, replay_log);
     }
 
 private:
@@ -82,10 +85,19 @@ private:
     TransactLogs m_transact_logs;
 };
 
-TIGHTDB_TABLE_1(MyTable,
+TIGHTDB_TABLE_1(MySubtable,
                 i, Int)
 
-} // anonymous namespace
+TIGHTDB_TABLE_9(MyTable,
+                my_int,       Int,
+                my_bool,      Bool,
+                my_float,     Float,
+                my_double,    Double,
+                my_string,    String,
+                my_binary,    Binary,
+                my_date_time, DateTime,
+                my_table,     Subtable<MySubtable>,
+                my_mixed,     Mixed)
 
 
 TEST(Replication_General)
@@ -104,13 +116,13 @@ TEST(Replication_General)
         {
             WriteTransaction wt(sg_1);
             MyTable::Ref table = wt.get_table<MyTable>("my_table");
-            table[0].i = 9;
+            table[0].my_int = 9;
             wt.commit();
         }
         {
             WriteTransaction wt(sg_1);
             MyTable::Ref table = wt.get_table<MyTable>("my_table");
-            table[0].i = 10;
+            table[0].my_int = 10;
             wt.commit();
         }
 
@@ -125,6 +137,7 @@ TEST(Replication_General)
     }
 }
 
+} // anonymous namespace
 
 #endif // TIGHTDB_ENABLE_REPLICATION
 #endif // TEST_REPLICATION

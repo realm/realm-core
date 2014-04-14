@@ -9,6 +9,9 @@
 #include <tightdb/group_writer.hpp>
 #include <tightdb/group_shared.hpp>
 #include <tightdb/group_writer.hpp>
+#ifdef TIGHTDB_ENABLE_REPLICATION
+#  include <tightdb/replication.hpp>
+#endif
 
 #ifndef _WIN32
 #  include <sys/wait.h>
@@ -104,7 +107,7 @@ const int max_wait_for_daemon_start = 500;
 // - The design forces release/acquire style synchronization on every
 //   begin_read/end_read. This feels like a bit too much, because *only* a write
 //   transaction ever changes memory contents. Read transactions do not communicate,
-//   so with the right scheme, synchronization should only be proportional to the 
+//   so with the right scheme, synchronization should only be proportional to the
 //   number of write transactions, not all transactions. The original design achieved
 //   this by ONLY synchronizing on the put_pos (case 3 above), BUT the following
 //   problems forced the addition of further synchronization:
@@ -144,7 +147,7 @@ template<typename T> bool atomic_one_if_zero(Atomic<T>& counter)
     if (old_val != 0) {
         counter.fetch_sub_relaxed(1);
         return false;
-    } 
+    }
     return true;
 }
 
@@ -163,7 +166,7 @@ public:
     // Entries from after put_pos up till (not including) old_pos
     // are free entries and must have a count of ONE.
     // Cleanup is performed by starting at old_pos and incrementing
-    // (atomically) from 0 to 1 and moving the put_pos. It stops 
+    // (atomically) from 0 to 1 and moving the put_pos. It stops
     // if count is non-zero. This approach requires that only a single thread
     // at a time tries to perform cleanup. This is ensured by doing the cleanup
     // as part of write transactions, where mutual exclusion is assured by the
@@ -173,8 +176,8 @@ public:
         uint_fast64_t filesize;
         uint_fast64_t current_top;
         // The count field acts as synchronization point for accesses to the above
-        // fields. A succesfull inc implies acquire wrt memory consistency. 
-        // Release is triggered by explicitly storing into count whenever a 
+        // fields. A succesfull inc implies acquire wrt memory consistency.
+        // Release is triggered by explicitly storing into count whenever a
         // new entry has been initialized.
         mutable Atomic<uint_fast32_t> count;
         uint_fast32_t next;
@@ -196,24 +199,24 @@ public:
         put_pos.store_release( 0 );
     }
 
-    void dump() 
+    void dump()
     {
         uint_fast32_t i = old_pos;
         cout << "--- " << endl;
          while (i != put_pos.load_relaxed()) {
-            cout << "  used " << i << " : " 
+            cout << "  used " << i << " : "
                  << data[i].count.load_relaxed() << " | "
                  << data[i].version
                  << endl;
             i = data[i].next;
         }
-        cout << "  LAST " << i << " : " 
+        cout << "  LAST " << i << " : "
              << data[i].count.load_relaxed() << " | "
              << data[i].version
              << endl;
         i = data[i].next;
         while (i != old_pos) {
-            cout << "  free " << i << " : " 
+            cout << "  free " << i << " : "
                  << data[i].count.load_relaxed() << " | "
                  << data[i].version
                  << endl;
@@ -240,7 +243,7 @@ public:
     }
 
     static size_t compute_required_space(uint_fast32_t num_entries)  TIGHTDB_NOEXCEPT
-    { 
+    {
         // get space required for given number of entries beyond the initial count.
         // NB: this not the size of the ringbuffer, it is the size minus whatever was
         // the initial size.
@@ -330,7 +333,7 @@ private:
 
 
 
-struct SharedGroup::SharedInfo 
+struct SharedGroup::SharedInfo
 {
 
     Atomic<uint16_t> init_complete; // indicates lock file has valid content
@@ -350,7 +353,7 @@ struct SharedGroup::SharedInfo
     Ringbuffer readers;
     SharedInfo(ref_type top_ref, size_t file_size, DurabilityLevel);
     ~SharedInfo() TIGHTDB_NOEXCEPT {}
-    uint_fast64_t get_current_version_unchecked() const 
+    uint_fast64_t get_current_version_unchecked() const
     {
         return readers.get_last().version;
     }
@@ -409,11 +412,12 @@ void spawn_daemon(const string& file)
 
         // close all descriptors:
         int i;
-        for (i=m-1;i>=0;--i) close(i);
-        i=::open("/dev/null",O_RDWR);
+        for (i=m-1;i>=0;--i)
+            close(i);
+        i = ::open("/dev/null",O_RDWR);
 #ifdef TIGHTDB_ENABLE_LOGFILE
         // FIXME: Do we want to always open the log file? Should it be configurable?
-        i=::open((file+".log").c_str(),O_RDWR | O_CREAT | O_APPEND | O_SYNC, S_IRWXU);
+        i = ::open((file+".log").c_str(),O_RDWR | O_CREAT | O_APPEND | O_SYNC, S_IRWXU);
 #else
         i = dup(i);
 #endif
@@ -624,7 +628,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
             new (info) SharedInfo(top_ref, file_size, dlevel); // Throws
             // we need a thread-local copy of the number of ringbuffer entries in order
             // to detect concurrent expansion of the ringbuffer.
-            m_local_max_entry = info->readers.get_num_entries(); 
+            m_local_max_entry = info->readers.get_num_entries();
 
             // Set initial version so we can track if other instances
             // change the db
@@ -744,6 +748,21 @@ void SharedGroup::open(const string& path, bool no_create_file,
     }
 #endif
 }
+
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+
+void SharedGroup::open(Replication& repl)
+{
+    TIGHTDB_ASSERT(!is_attached());
+    string file = repl.get_database_path();
+    bool no_create   = false;
+    DurabilityLevel dlevel = durability_Full;
+    open(file, no_create, dlevel); // Throws
+    m_group.set_replication(&repl);
+}
+
+#endif
 
 
 SharedGroup::~SharedGroup() TIGHTDB_NOEXCEPT
@@ -993,23 +1012,21 @@ void SharedGroup::do_async_commits()
 }
 #endif // _WIN32
 
+
 void SharedGroup::grab_readlock(ref_type& new_top_ref, size_t& new_file_size, bool& same_as_before)
 {
     do {
         SharedInfo* r_info = m_reader_map.get_addr();
         m_reader_idx = r_info->readers.last();
         if (grow_reader_mapping(m_reader_idx)) { // throws
-            
             // remapping takes time, so retry with a fresh entry
             continue;
         }
         const Ringbuffer::ReadCount& r = r_info->readers.get(m_reader_idx);
         // if the entry is stale and has been cleared by the cleanup process,
         // we need to start all over again. This is extremely unlikely, but possible.
-        if (! atomic_double_inc_if_even(r.count)) { // <-- most of the exec time spent here!
-            
+        if (! atomic_double_inc_if_even(r.count)) // <-- most of the exec time spent here!
             continue;
-        }
         same_as_before = m_version == r.version;
         m_version      = r.version;
         new_top_ref    = to_size_t(r.current_top);
@@ -1019,6 +1036,7 @@ void SharedGroup::grab_readlock(ref_type& new_top_ref, size_t& new_file_size, bo
     } while (1);
 }
 
+
 const Group& SharedGroup::begin_read()
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Ready);
@@ -1027,7 +1045,7 @@ const Group& SharedGroup::begin_read()
 
         m_group.reattach_from_retained_data();
 
-    } 
+    }
     else {
 
         ref_type new_top_ref = 0;
@@ -1056,12 +1074,14 @@ const Group& SharedGroup::begin_read()
     return m_group;
 }
 
+
 void SharedGroup::release_readlock() TIGHTDB_NOEXCEPT
 {
     SharedInfo* r_info = m_reader_map.get_addr();
     const Ringbuffer::ReadCount& r = r_info->readers.get(m_reader_idx);
     atomic_double_dec(r.count); // <-- most of the exec time spent here
 }
+
 
 void SharedGroup::end_read() TIGHTDB_NOEXCEPT
 {
@@ -1081,10 +1101,35 @@ void SharedGroup::end_read() TIGHTDB_NOEXCEPT
 }
 
 
+Group& SharedGroup::begin_write()
+{
+    if (m_transactions_are_pinned)
+        throw runtime_error("Write transactions are not allowed while transactions are pinned");
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    if (Replication* repl = m_group.get_replication()) {
+        repl->begin_write_transact(*this); // Throws
+        try {
+            do_begin_write();
+        }
+        catch (...) {
+            repl->rollback_write_transact(*this);
+            throw;
+        }
+        return m_group;
+    }
+#endif
+
+    do_begin_write();
+
+    return m_group;
+}
+
+
 void SharedGroup::do_begin_write()
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Ready);
-    
+
     SharedInfo* info = m_file_map.get_addr();
 
     // Get write lock
@@ -1276,7 +1321,7 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
     out.set_versions(new_version, readlock_version);
     // Recursively write all changed arrays to end of file
     ref_type new_top_ref = out.write_group(); // Throws
-    // cout << "Writing version " << new_version << ", Topptr " << new_top_ref 
+    // cout << "Writing version " << new_version << ", Topptr " << new_top_ref
     //     << " Readlock at version " << readlock_version << endl;
     // In durability_Full mode, we just use the file as backing for
     // the shared memory. So we never actually flush the data to disk
@@ -1300,7 +1345,7 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
             r_info = m_reader_map.get_addr();
             m_local_max_entry = entries;
             r_info->readers.expand_to(entries);
-        } 
+        }
         Ringbuffer::ReadCount& r = r_info->readers.get_next();
         r.current_top = new_top_ref;
         r.filesize    = new_file_size;
