@@ -14,6 +14,7 @@
 #endif
 
 #include <tightdb.hpp>
+#include <tightdb/util/features.h>
 #include <tightdb/util/unique_ptr.hpp>
 #include <tightdb/util/bind.hpp>
 #include <tightdb/util/terminate.hpp>
@@ -68,6 +69,12 @@ TEST(Shared_Unattached)
 
 
 namespace {
+
+#if TIGHTDB_ANDROID
+bool allow_async = false;
+#else
+bool allow_async = true;
+#endif
 
 TIGHTDB_TABLE_4(TestTableShared,
                 first,  Int,
@@ -1498,7 +1505,7 @@ TEST(Shared_ClearColumnWithBasicArrayRootLeaf)
 // disable shared async on windows
 #ifndef _WIN32
 // Todo. Keywords: winbug
-TEST(Shared_Async)
+TEST_IF(Shared_Async, allow_async)
 {
     SHARED_GROUP_TEST_PATH(path);
 
@@ -1722,7 +1729,7 @@ void multiprocess(TestResults& test_results, string path, int num_procs, size_t 
 } // anonymous namespace
 
 
-TEST(Shared_Multiprocess)
+TEST_IF(Shared_AsyncMultiprocess, allow_async)
 {
     SHARED_GROUP_TEST_PATH(path);
     SHARED_GROUP_TEST_PATH(alone_path);
