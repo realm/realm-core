@@ -72,7 +72,7 @@ Of course make sure the device is set to developer mode and connected.
 You can of course tap the app icon. Alternatively you can do it from the command line:
 
 ```
-$ adb shell am start -a android.intent.action.MAIN -m com.tightdb.test/android.app.NativeActivity
+$ adb shell am start -a android.intent.action.MAIN -n com.tightdb.test/android.app.NativeActivity
 ```
 
 ## See the logs
