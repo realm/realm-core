@@ -306,7 +306,7 @@ void Table::do_remove_column(const Descriptor& desc, size_t column_ndx)
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     if (Replication* repl = root_table.get_repl())
-        repl->remove_column(desc, column_ndx); // Throws
+        repl->erase_column(desc, column_ndx); // Throws
 #endif
 }
 
@@ -1254,7 +1254,7 @@ void Table::do_remove(size_t ndx)
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
-        repl->remove_row(this, ndx); // Throws
+        repl->erase_row(this, ndx); // Throws
 #endif
 }
 
@@ -1290,7 +1290,7 @@ void Table::insert_subtable(size_t col_ndx, size_t row_ndx, const Table* table)
     // FIXME: Replication is not yet able to handle copying insertion of non-empty tables.
 #ifdef TIGHTDB_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
-        repl->insert_value(this, col_ndx, row_ndx, Replication::subtable_tag()); // Throws
+        repl->insert_cell(this, col_ndx, row_ndx, Replication::subtable_tag()); // Throws
 #endif
 }
 
@@ -1307,7 +1307,7 @@ void Table::set_subtable(size_t col_ndx, size_t row_ndx, const Table* table)
     // FIXME: Replication is not yet able to handle copying insertion of non-empty tables.
 #ifdef TIGHTDB_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
-        repl->set_value(this, col_ndx, row_ndx, Replication::subtable_tag()); // Throws
+        repl->set_cell(this, col_ndx, row_ndx, Replication::subtable_tag()); // Throws
 #endif
 }
 
@@ -1324,7 +1324,7 @@ void Table::insert_mixed_subtable(size_t col_ndx, size_t row_ndx, const Table* t
     // FIXME: Replication is not yet able to handle copuing insertion of non-empty tables.
 #ifdef TIGHTDB_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
-        repl->insert_value(this, col_ndx, row_ndx, Replication::subtable_tag()); // Throws
+        repl->insert_cell(this, col_ndx, row_ndx, Replication::subtable_tag()); // Throws
 #endif
 }
 
@@ -1341,7 +1341,7 @@ void Table::set_mixed_subtable(size_t col_ndx, size_t row_ndx, const Table* t)
     // FIXME: Replication is not yet able to handle copying assignment of non-empty tables.
 #ifdef TIGHTDB_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
-        repl->set_value(this, col_ndx, row_ndx, Replication::subtable_tag()); // Throws
+        repl->set_cell(this, col_ndx, row_ndx, Replication::subtable_tag()); // Throws
 #endif
 }
 
@@ -1412,7 +1412,7 @@ void Table::clear_subtable(size_t col_idx, size_t row_idx)
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
         if (Replication* repl = get_repl())
-            repl->set_value(this, col_idx, row_idx, Replication::subtable_tag()); // Throws
+            repl->set_cell(this, col_idx, row_idx, Replication::subtable_tag()); // Throws
 #endif
     }
     else if (type == col_type_Mixed) {
@@ -1421,7 +1421,7 @@ void Table::clear_subtable(size_t col_idx, size_t row_idx)
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
         if (Replication* repl = get_repl())
-            repl->set_value(this, col_idx, row_idx, Mixed(Mixed::subtable_tag())); // Throws
+            repl->set_cell(this, col_idx, row_idx, Mixed(Mixed::subtable_tag())); // Throws
 #endif
     }
     else {
@@ -1472,7 +1472,7 @@ void Table::set_int(size_t column_ndx, size_t ndx, int64_t value)
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
-        repl->set_value(this, column_ndx, ndx, value); // Throws
+        repl->set_cell(this, column_ndx, ndx, value); // Throws
 #endif
 }
 
@@ -1510,7 +1510,7 @@ void Table::set_bool(size_t column_ndx, size_t ndx, bool value)
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
-        repl->set_value(this, column_ndx, ndx, int(value)); // Throws
+        repl->set_cell(this, column_ndx, ndx, int(value)); // Throws
 #endif
 }
 
@@ -1535,7 +1535,7 @@ void Table::set_datetime(size_t column_ndx, size_t ndx, DateTime value)
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
-        repl->set_value(this, column_ndx, ndx, value.get_datetime()); // Throws
+        repl->set_cell(this, column_ndx, ndx, value.get_datetime()); // Throws
 #endif
 }
 
@@ -1549,7 +1549,7 @@ void Table::insert_int(size_t column_ndx, size_t ndx, int64_t value)
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
-        repl->insert_value(this, column_ndx, ndx, value); // Throws
+        repl->insert_cell(this, column_ndx, ndx, value); // Throws
 #endif
 }
 
@@ -1573,7 +1573,7 @@ void Table::set_float(size_t column_ndx, size_t ndx, float value)
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
-        repl->set_value(this, column_ndx, ndx, value); // Throws
+        repl->set_cell(this, column_ndx, ndx, value); // Throws
 #endif
 }
 
@@ -1587,7 +1587,7 @@ void Table::insert_float(size_t column_ndx, size_t ndx, float value)
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
-        repl->insert_value(this, column_ndx, ndx, value); // Throws
+        repl->insert_cell(this, column_ndx, ndx, value); // Throws
 #endif
 }
 
@@ -1611,7 +1611,7 @@ void Table::set_double(size_t column_ndx, size_t ndx, double value)
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
-        repl->set_value(this, column_ndx, ndx, value); // Throws
+        repl->set_cell(this, column_ndx, ndx, value); // Throws
 #endif
 }
 
@@ -1625,7 +1625,7 @@ void Table::insert_double(size_t column_ndx, size_t ndx, double value)
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
-        repl->insert_value(this, column_ndx, ndx, value); // Throws
+        repl->insert_cell(this, column_ndx, ndx, value); // Throws
 #endif
 }
 
@@ -1664,7 +1664,7 @@ void Table::set_string(size_t column_ndx, size_t ndx, StringData value)
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
-        repl->set_value(this, column_ndx, ndx, value); // Throws
+        repl->set_cell(this, column_ndx, ndx, value); // Throws
 #endif
 }
 
@@ -1686,7 +1686,7 @@ void Table::insert_string(size_t column_ndx, size_t ndx, StringData value)
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
-        repl->insert_value(this, column_ndx, ndx, value); // Throws
+        repl->insert_cell(this, column_ndx, ndx, value); // Throws
 #endif
 }
 
@@ -1710,7 +1710,7 @@ void Table::set_binary(size_t column_ndx, size_t ndx, BinaryData value)
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
-        repl->set_value(this, column_ndx, ndx, value); // Throws
+        repl->set_cell(this, column_ndx, ndx, value); // Throws
 #endif
 }
 
@@ -1724,7 +1724,7 @@ void Table::insert_binary(size_t column_ndx, size_t ndx, BinaryData value)
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
-        repl->insert_value(this, column_ndx, ndx, value); // Throws
+        repl->insert_cell(this, column_ndx, ndx, value); // Throws
 #endif
 }
 
@@ -1810,7 +1810,7 @@ void Table::set_mixed(size_t column_ndx, size_t ndx, Mixed value)
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
-        repl->set_value(this, column_ndx, ndx, value); // Throws
+        repl->set_cell(this, column_ndx, ndx, value); // Throws
 #endif
 }
 
@@ -1854,7 +1854,7 @@ void Table::insert_mixed(size_t column_ndx, size_t ndx, Mixed value)
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
-        repl->insert_value(this, column_ndx, ndx, value); // Throws
+        repl->insert_cell(this, column_ndx, ndx, value); // Throws
 #endif
 }
 
