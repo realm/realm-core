@@ -30,15 +30,13 @@
 #include <tightdb/util/safe_int_ops.hpp>
 #include <tightdb/util/buffer.hpp>
 #include <tightdb/util/file.hpp>
-#include <tightdb/mixed.hpp>
+#include <tightdb/group.hpp>
+#include <tightdb/descriptor.hpp>
+#include <tightdb/group.hpp>
+#include <tightdb/group_shared.hpp>
 
 namespace tightdb {
 
-
-class Spec;
-class Table;
-class Group;
-class SharedGroup;
 
 
 // FIXME: Be careful about the possibility of one modification functions being called by another where both do transaction logging.
@@ -145,10 +143,9 @@ public:
     struct subtable_tag {};
 
     void new_top_level_table(StringData name);
-    void insert_column (const Table*, const Spec*, std::size_t column_ndx,
-                        DataType type, StringData name);
-    void remove_column (const Table*, const Spec*, std::size_t column_ndx);
-    void rename_column (const Table*, const Spec*, std::size_t column_ndx, StringData name);
+    void insert_column(const Descriptor&, std::size_t column_ndx, DataType type, StringData name);
+    void remove_column(const Descriptor&, std::size_t column_ndx);
+    void rename_column(const Descriptor&, std::size_t column_ndx, StringData name);
 
     template<class T>
     void set_value(const Table*, std::size_t column_ndx, std::size_t ndx, T value);
@@ -274,8 +271,8 @@ private:
     void check_table(const Table*);
     void select_table(const Table*); // Deselects a selected spec
 
-    void check_spec(const Table*, const Spec*);
-    void select_spec(const Table*, const Spec*); // Table must *not* have shared type descriptor
+    void check_desc(const Descriptor& desc);
+    void select_desc(const Descriptor& desc);
 
     void string_cmd(char cmd, std::size_t column_ndx, std::size_t ndx,
                     const char* data, std::size_t size);
@@ -338,7 +335,8 @@ protected:
 
     virtual void handle_transact_log(const char* data, std::size_t size) = 0;
 
-    static void apply_transact_log(const char* data, std::size_t size, SharedGroup& target);
+    static void apply_transact_log(const char* data, std::size_t size, SharedGroup& target,
+                                   std::ostream* apply_log = 0);
 
 private:
     const std::string m_database_file;
@@ -559,10 +557,10 @@ inline void Replication::check_table(const Table* t)
 }
 
 
-inline void Replication::check_spec(const Table* t, const Spec* s)
+inline void Replication::check_desc(const Descriptor& desc)
 {
-    if (s != m_selected_spec)
-        select_spec(t,s); // Throws
+    if (desc.m_spec != m_selected_spec)
+        select_desc(desc); // Throws
 }
 
 
@@ -636,25 +634,24 @@ inline void Replication::new_top_level_table(StringData name)
 }
 
 
-inline void Replication::insert_column(const Table* table, const Spec* spec,
-                                       std::size_t column_ndx, DataType type, StringData name)
+inline void Replication::insert_column(const Descriptor& desc, std::size_t column_ndx,
+                                       DataType type, StringData name)
 {
-    check_spec(table, spec); // Throws
+    check_desc(desc); // Throws
     simple_cmd('O', util::tuple(column_ndx, int(type), name.size())); // Throws
     transact_log_append(name.data(), name.size()); // Throws
 }
 
-inline void Replication::remove_column(const Table* table, const Spec* spec,
-                                       std::size_t column_ndx)
+inline void Replication::remove_column(const Descriptor& desc, std::size_t column_ndx)
 {
-    check_spec(table, spec); // Throws
+    check_desc(desc); // Throws
     simple_cmd('P', util::tuple(column_ndx)); // Throws
 }
 
-inline void Replication::rename_column(const Table* table, const Spec* spec,
-                                       std::size_t column_ndx, StringData name)
+inline void Replication::rename_column(const Descriptor& desc, std::size_t column_ndx,
+                                       StringData name)
 {
-    check_spec(table, spec); // Throws
+    check_desc(desc); // Throws
     simple_cmd('Q', util::tuple(column_ndx, name.size())); // Throws
     transact_log_append(name.data(), name.size()); // Throws
 }

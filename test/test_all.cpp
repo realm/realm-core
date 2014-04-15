@@ -11,6 +11,7 @@
 
 #include <tightdb/util/features.h>
 #include <tightdb/util/unique_ptr.hpp>
+#include <tightdb/util/features.h>
 #include <tightdb.hpp>
 #include <tightdb/utilities.hpp>
 #include <tightdb/version.hpp>
@@ -35,6 +36,41 @@ using namespace tightdb::test_util::unit_test;
 
 
 namespace {
+
+const char* file_order[] = {
+    "test_self.cpp",
+
+    // tightdb/util/
+    "test_safe_int_ops.cpp",
+    "test_file*.cpp",
+    "test_thread.cpp",
+    "test_utf8.cpp",
+
+    // /tightdb/ (helpers)
+    "test_string_data.cpp",
+    "test_binary_data.cpp",
+
+    // /tightdb/impl/ (detail)
+    "test_alloc*.cpp",
+    "test_array*.cpp",
+    "test_column*.cpp",
+    "test_index*.cpp",
+    "test_destroy_guard.cpp",
+
+    // /tightdb/ (main API)
+    "test_version.cpp",
+    "test_table*.cpp",
+    "test_descriptor*.cpp",
+    "test_query*.cpp",
+    "test_group*.cpp",
+    "test_shared*.cpp",
+    "test_transactions*.cpp",
+    "test_replication*.cpp",
+
+    "test_lang_bind.cpp",
+
+    "large_tests*.cpp"
+};
 
 
 void fix_async_daemon_path()
@@ -215,10 +251,21 @@ bool run_tests()
 
     // Set up reporter
     ofstream xml_file;
+    bool xml;
+#ifdef TIGHTDB_MOBILE
+    xml = true;
+#else
     const char* xml_str = getenv("UNITTEST_XML");
-    bool xml = (xml_str && strlen(xml_str) != 0);
+    xml = (xml_str && strlen(xml_str) != 0);
+#endif
     if (xml) {
-        xml_file.open("unit-test-report.xml");
+        string path = "";
+#ifdef TIGHTDB_MOBILE
+        PlatformConfig* platform_config = PlatformConfig::Instance();
+        path = platform_config->get_path();
+#endif
+        string xml_path = path + "unit-test-report.xml";
+        xml_file.open(xml_path.c_str());
         reporter.reset(create_xml_reporter(xml_file));
     }
     else {
@@ -261,6 +308,7 @@ bool run_tests()
 
     // Run
     TestList& list = get_default_test_list();
+    list.sort(PatternBasedFileOrder(file_order));
     bool success = list.run(reporter.get(), filter.get(), num_threads, shuffle);
 
     if (test_only)

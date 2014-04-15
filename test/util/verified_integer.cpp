@@ -1,18 +1,11 @@
-#ifndef VER_INT_H
-#define VER_INT_H
-
-#include <vector>
-#include <string>
 #include <algorithm>
-#ifdef _MSC_VER
-#  include <win32\stdint.h>
-#endif
-#include <stdio.h>
+
 #include "verified_integer.hpp"
 
 using namespace std;
 using namespace tightdb;
 using namespace tightdb::test_util;
+
 
 void VerifiedInteger::verify_neighbours(size_t ndx)
 {
@@ -198,5 +191,3 @@ void VerifiedInteger::destroy()
 {
     u.destroy();
 }
-
-#endif

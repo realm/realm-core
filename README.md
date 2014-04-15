@@ -100,10 +100,10 @@ The following programs will be installed:
 
     /usr/local/bin/tightdb-import
     /usr/local/bin/tightdb-import-dbg
-    /usr/local/bin/tightdbd
-    /usr/local/bin/tightdbd-dbg
     /usr/local/bin/tightdb-config
     /usr/local/bin/tightdb-config-dbg
+    /usr/local/libexec/tightdbd
+    /usr/local/libexec/tightdbd-dbg
 
 The `tightdb-import` tool lets you load files containing
 comma-separated values into TightDB. The next two are used

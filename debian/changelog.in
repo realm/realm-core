@@ -1,3 +1,10 @@
+libtightdb (0.6.0~@CODENAME@-1) UNRELEASED; urgency=low
+
+  * Tracking upstream release.
+
+ -- Emanuele Zattin <emanuele.zattin@switch-gears.dk>  Thu, 10 Apr 2014 10:14:57 +0200
+
+
 libtightdb (0.5.0~@CODENAME@-1) UNRELEASED; urgency=low
 
   * Tracking upstream release.

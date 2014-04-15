@@ -361,6 +361,10 @@ private:
     friend class util::bind_ptr<Descriptor>;
     friend class util::bind_ptr<const Descriptor>;
     friend class Table;
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    friend class Replication;
+#endif
 };
 
 

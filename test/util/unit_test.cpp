@@ -109,7 +109,7 @@ public:
         for (test_iter i_1 = m_tests.begin(); i_1 != tests_end; ++i_1) {
             const test& t = i_1->second;
             m_out <<
-                "  <test suite=\"default\" "
+                "  <test suite=\""<< t.m_details.suite_name <<"\" "
                 "name=\"" << t.m_details.test_name << "\" "
                 "time=\"" << t.m_elapsed_seconds << "\"";
             if (t.m_failures.empty()) {
@@ -151,7 +151,7 @@ protected:
 
 class WildcardFilter: public Filter {
 public:
-    WildcardFilter(const std::string& filter)
+    WildcardFilter(const string& filter)
     {
         bool exclude = false;
         typedef string::const_iterator iter;
@@ -261,17 +261,27 @@ public:
 };
 
 
-void TestList::add(Test& test, const char* name, const char* file, long line)
+void TestList::add(Test& test, const char* suite, const char* name, const char* file, long line)
 {
     test.test_results.m_test = &test;
     test.test_results.m_list = this;
-    TestDetails& details = test.test_details;
     long index = long(m_tests.size());
+    TestDetails& details = test.test_details;
     details.test_index  = index;
+    details.suite_name  = suite;
     details.test_name   = name;
     details.file_name   = file;
     details.line_number = line;
     m_tests.push_back(&test);
+}
+
+void TestList::reassign_indexes()
+{
+    long n = long(m_tests.size());
+    for (long i = 0; i != n; ++i) {
+        Test* test = m_tests[i];
+        test->test_details.test_index = i;
+    }
 }
 
 void TestList::ExecContext::run()
@@ -327,11 +337,16 @@ bool TestList::run(Reporter* reporter, Filter* filter, int num_threads, bool shu
         throw runtime_error("Bad number of threads");
 
     SharedContext shared(reporter_2);
-    size_t num_tests = m_tests.size();
+    size_t num_tests = m_tests.size(), num_disabled = 0;
     for (size_t i = 0; i != num_tests; ++i) {
         Test* test = m_tests[i];
-        if (!filter || filter->include(test->test_details))
-            shared.m_tests.push_back(test);
+        if (!test->test_enabled()) {
+            ++num_disabled;
+            continue;
+        }
+        if (filter && !filter->include(test->test_details))
+            continue;
+        shared.m_tests.push_back(test);
     }
 
     if (shuffle) {
@@ -368,7 +383,8 @@ bool TestList::run(Reporter* reporter, Filter* filter, int num_threads, bool shu
     Summary summary;
     summary.num_included_tests = long(shared.m_tests.size());
     summary.num_failed_tests   = num_failed_tests;
-    summary.num_excluded_tests = long(num_tests) - summary.num_included_tests;
+    summary.num_excluded_tests = long(num_tests - num_disabled) - summary.num_included_tests;
+    summary.num_disabled_tests = long(num_disabled);
     summary.num_checks         = num_checks;
     summary.num_failed_checks  = num_failed_checks;
     summary.elapsed_seconds    = timer.get_elapsed_time();
@@ -455,7 +471,7 @@ void TestResults::inexact_compare_failed(const char* file, long line, const char
                                          long double eps)
 {
     ostringstream out;
-    out.precision(std::numeric_limits<long double>::digits10 + 1);
+    out.precision(numeric_limits<long double>::digits10 + 1);
     out << macro_name<<"("<<a_text<<", "<<b_text<<", "<<eps_text<<") "
         "failed with ("<<a<<", "<<b<<", "<<eps<<")";
     check_failed(file, line, out.str());
@@ -485,6 +501,71 @@ void Reporter::end(const TestDetails&, double)
 
 void Reporter::summary(const Summary&)
 {
+}
+
+
+class PatternBasedFileOrder::state: public RefCountBase {
+public:
+    typedef map<TestDetails*, int> major_map;
+    major_map m_major_map;
+
+    typedef vector<wildcard_pattern> patterns;
+    patterns m_patterns;
+
+    state(const char** patterns_begin, const char** patterns_end)
+    {
+        for (const char** i = patterns_begin; i != patterns_end; ++i)
+            m_patterns.push_back(wildcard_pattern(*i));
+    }
+
+    ~state() TIGHTDB_NOEXCEPT
+    {
+    }
+
+    int get_major(TestDetails* details)
+    {
+        major_map::const_iterator i = m_major_map.find(details);
+        if (i != m_major_map.end())
+            return i->second;
+        patterns::const_iterator j = m_patterns.begin(), end = m_patterns.end();
+        while (j != end && !j->match(details->file_name))
+            ++j;
+        int major = int(j - m_patterns.begin());
+        m_major_map[details] = major;
+        return major;
+    }
+};
+
+bool PatternBasedFileOrder::operator()(TestDetails* a, TestDetails* b)
+{
+    int major_a = m_wrap.m_state->get_major(a);
+    int major_b = m_wrap.m_state->get_major(b);
+    if (major_a < major_b)
+        return true;
+    if (major_a > major_b)
+        return false;
+    int i = strcmp(a->file_name, b->file_name);
+    return i < 0 || (i == 0 && a->test_index < b->test_index);
+}
+
+PatternBasedFileOrder::wrap::wrap(const char** patterns_begin, const char** patterns_end):
+    m_state(new state(patterns_begin, patterns_end))
+{
+}
+
+PatternBasedFileOrder::wrap::~wrap()
+{
+}
+
+PatternBasedFileOrder::wrap::wrap(const wrap& w):
+    m_state(w.m_state)
+{
+}
+
+PatternBasedFileOrder::wrap& PatternBasedFileOrder::wrap::operator=(const wrap& w)
+{
+    m_state = w.m_state;
+    return *this;
 }
 
 
