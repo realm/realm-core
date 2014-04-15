@@ -228,6 +228,12 @@ public:
         LockFileButNoData(const std::string& msg) : std::runtime_error(msg) {}
     };
 
+    // Get a number identifying the version of the database made available
+    // for the last transaction started by begin_read or begin_write
+    uint_fast64_t get_last_transaction_version()
+    {
+        return m_version;
+    }
 private:
     struct SharedInfo;
 
