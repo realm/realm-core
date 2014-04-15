@@ -223,18 +223,30 @@
     <ClCompile Include="..\..\test\util\test_path.cpp">
       <Filter>test\util</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\test\large_tests\test_column_large.cpp" />
-    <ClCompile Include="..\..\test\large_tests\test_strings.cpp" />
-    <ClCompile Include="..\..\test\util\verified_integer.cpp" />
-    <ClCompile Include="..\..\test\util\verified_string.cpp" />
     <ClCompile Include="..\..\test\main.cpp" />
     <ClCompile Include="..\..\test\performance\matrix.cpp" />
-    <ClCompile Include="..\..\test\test_alloc.cpp" />
-    <ClCompile Include="..\..\test\test_array.cpp" />
     <ClCompile Include="..\..\test\util\random.cpp">
       <Filter>test\util</Filter>
     </ClCompile>
     <ClCompile Include="..\..\test\test_all.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\test\test_alloc.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\test\test_array.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\test\large_tests\test_column_large.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\test\large_tests\test_strings.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\test\util\verified_integer.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\test\util\verified_string.cpp">
       <Filter>test</Filter>
     </ClCompile>
   </ItemGroup>
