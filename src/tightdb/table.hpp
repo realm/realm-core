@@ -755,6 +755,9 @@ private:
     // operation fails, and also when one transaction is ended and a
     // new one is started.
     void detach() TIGHTDB_NOEXCEPT;
+    void detach_offspring() TIGHTDB_NOEXCEPT;
+    void fake_detached() TIGHTDB_NOEXCEPT;
+    void re_attach() TIGHTDB_NOEXCEPT;
 
     /// Detach all attached subtable accessors.
     void detach_subtable_accessors() TIGHTDB_NOEXCEPT;
@@ -1347,6 +1350,21 @@ public:
     static void update_from_parent(Table& table, std::size_t old_baseline) TIGHTDB_NOEXCEPT
     {
         table.update_from_parent(old_baseline);
+    }
+
+    static void fake_detached(Table& table) TIGHTDB_NOEXCEPT
+    {
+        table.fake_detached();
+    }
+
+    static void re_attach(Table& table) TIGHTDB_NOEXCEPT
+    {
+        table.re_attach();
+    }
+
+    static void detach_offspring(Table& table) TIGHTDB_NOEXCEPT
+    {
+        table.detach_offspring();
     }
 
     static void detach(Table& table) TIGHTDB_NOEXCEPT

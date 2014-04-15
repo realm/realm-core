@@ -242,19 +242,29 @@ void Group::detach_table_accessors() TIGHTDB_NOEXCEPT
 
 void Group::detach() TIGHTDB_NOEXCEPT
 {
-    detach_but_retain_data();
+    m_is_attached = false;
     complete_detach();
 }
 
 void Group::detach_but_retain_data() TIGHTDB_NOEXCEPT
 {
-    m_is_attached = false;
-    detach_table_accessors();
-    m_table_accessors.clear();
+    if (m_is_attached) {
+        m_is_attached = false;
+        typedef table_accessors::const_iterator iter;
+        iter end = m_table_accessors.end();
+        for (iter i = m_table_accessors.begin(); i != end; ++i) {
+            if (Table* t = *i) {
+                _impl::TableFriend::fake_detached(*t);
+                _impl::TableFriend::detach_offspring(*t);
+            }
+        }
+    }
 }
 
 void Group::complete_detach() TIGHTDB_NOEXCEPT
 {
+    detach_table_accessors();
+    m_table_accessors.clear();
     m_top.detach();
     m_tables.detach();
     m_table_names.detach();
@@ -606,6 +616,13 @@ void Group::reattach_from_retained_data()
     TIGHTDB_ASSERT(!is_attached());
     TIGHTDB_ASSERT(m_top.is_attached());
     m_is_attached = true;
+    typedef table_accessors::const_iterator iter;
+    iter end = m_table_accessors.end();
+    for (iter i = m_table_accessors.begin(); i != end; ++i) {
+        if (Table* t = *i) {
+            _impl::TableFriend::re_attach(*t);
+        }
+    }
 }
 
 void Group::update_from_shared(ref_type new_top_ref, size_t new_file_size)
