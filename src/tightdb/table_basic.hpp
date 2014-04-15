@@ -27,6 +27,7 @@
 #include <tightdb/util/meta.hpp>
 #include <tightdb/util/tuple.hpp>
 #include <tightdb/table.hpp>
+#include <tightdb/descriptor.hpp>
 #include <tightdb/query.hpp>
 #include <tightdb/table_accessors.hpp>
 #include <tightdb/table_view_basic.hpp>
@@ -282,12 +283,11 @@ private:
     static void set_dynamic_spec(Table& table)
     {
         using namespace tightdb::util;
-        tightdb::Spec* spec = _impl::TableFriend::get_spec(table);
+        DescriptorRef desc = table.get_descriptor(); // Throws
         const int num_cols = TypeCount<typename Spec::Columns>::value;
         StringData dyn_col_names[num_cols];
         Spec::dyn_col_names(dyn_col_names);
-        ForEachType<typename Spec::Columns, _impl::AddCol>::exec(&table, spec, dyn_col_names);
-        _impl::TableFriend::update_table_from_spec(table);
+        ForEachType<typename Spec::Columns, _impl::AddCol>::exec(&*desc, dyn_col_names); // Throws
     }
 
     static bool matches_dynamic_spec(const tightdb::Spec* spec) TIGHTDB_NOEXCEPT
@@ -452,28 +452,26 @@ template<> struct GetColumnTypeId<Mixed> {
 
 
 template<class Type, int col_idx> struct AddCol {
-    static void exec(Table* table, Spec* spec, const StringData* col_names)
+    static void exec(Descriptor* desc, const StringData* col_names)
     {
-        TIGHTDB_ASSERT(col_idx == spec->get_column_count());
-        _impl::TableFriend::add_column_to_spec(*table, *spec, GetColumnTypeId<Type>::id,
-                                               col_names[col_idx]); // Throws
+        TIGHTDB_ASSERT(col_idx == desc->get_column_count());
+        desc->add_column(GetColumnTypeId<Type>::id, col_names[col_idx]); // Throws
     }
 };
 
 // AddCol specialization for subtables
 template<class Subtab, int col_idx> struct AddCol<SpecBase::Subtable<Subtab>, col_idx> {
-    static void exec(Table* table, Spec* spec, const StringData* col_names)
+    static void exec(Descriptor* desc, const StringData* col_names)
     {
+        TIGHTDB_ASSERT(col_idx == desc->get_column_count());
+        DescriptorRef subdesc;
+        desc->add_column(type_Table, col_names[col_idx], &subdesc); // Throws
         using namespace tightdb::util;
-        TIGHTDB_ASSERT(col_idx == spec->get_column_count());
-        _impl::TableFriend::add_column_to_spec(*table, *spec, type_Table,
-                                               col_names[col_idx]); // Throws
-        Spec subspec = spec->get_subtable_spec(col_idx);
-        const int num_cols = TypeCount<typename Subtab::spec_type::Columns>::value;
-        StringData dyn_col_names[num_cols];
-        Subtab::spec_type::dyn_col_names(dyn_col_names);
+        const int num_subcols = TypeCount<typename Subtab::spec_type::Columns>::value;
+        StringData subcol_names[num_subcols];
+        Subtab::spec_type::dyn_col_names(subcol_names);
         typedef typename Subtab::Columns Subcolumns;
-        ForEachType<Subcolumns, _impl::AddCol>::exec(table, &subspec, dyn_col_names);
+        ForEachType<Subcolumns, _impl::AddCol>::exec(&*subdesc, subcol_names); // Throws
     }
 };
 

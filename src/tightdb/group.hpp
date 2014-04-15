@@ -216,12 +216,13 @@ public:
     /// Get the table with the specified name (or at the specified
     /// idnex) from this group.
     ///
-    /// The non-const versions of this function will create a table
-    /// with the specified name if one does not already exist. The
-    /// const versions will not.
+    /// The non-const versions of this function, that take a name as
+    /// argument, will create a table with the specified name if one
+    /// does not already exist. The other versions will not.
     ///
     /// It is an error to call one of the const-qualified versions for
-    /// a table that does not already exist. Doing so will result in
+    /// a table that does not already exist. The same is true for the
+    /// versions taking and index as argument. Doing so will result in
     /// undefined behavior.
     ///
     /// The non-template versions will return dynamically typed table
@@ -232,16 +233,17 @@ public:
     /// table whose dynamic type does not match the specified static
     /// type. Doing so will result in undefined behavior.
     ///
-    /// New tables created by the non-const non-template version will
-    /// have no columns initially. New tables created by the non-const
-    /// template version will have a dynamic type (set of columns)
-    /// that matches the specifed static type.
+    /// New tables created by non-template versions will have no
+    /// columns initially. New tables created by template versions
+    /// will have a dynamic type (set of columns) that matches the
+    /// specifed static type.
     ///
     /// \tparam T An instance of the BasicTable<> class template.
+    TableRef      get_table(std::size_t table_ndx);
+    ConstTableRef get_table(std::size_t table_ndx) const;
     TableRef      get_table(StringData name);
     TableRef      get_table(StringData name, bool& was_created);
     ConstTableRef get_table(StringData name) const;
-    ConstTableRef get_table(std::size_t table_ndx) const;
     template<class T> typename T::Ref      get_table(StringData name);
     template<class T> typename T::ConstRef get_table(StringData name) const;
     //@}
@@ -566,6 +568,16 @@ template<class T> inline const T* Group::get_table_ptr(StringData name) const
     return static_cast<const T*>(table);
 }
 
+inline TableRef Group::get_table(std::size_t table_ndx)
+{
+    return get_table_by_ndx(table_ndx)->get_table_ref();
+}
+
+inline ConstTableRef Group::get_table(std::size_t table_ndx) const
+{
+    return get_table_by_ndx(table_ndx)->get_table_ref();
+}
+
 inline TableRef Group::get_table(StringData name)
 {
     return get_table_ptr(name)->get_table_ref();
@@ -581,11 +593,6 @@ inline ConstTableRef Group::get_table(StringData name) const
 {
     TIGHTDB_ASSERT(has_table(name));
     return get_table_ptr(name)->get_table_ref();
-}
-
-inline ConstTableRef Group::get_table(std::size_t table_ndx) const
-{
-    return get_table_by_ndx(table_ndx)->get_table_ref();
 }
 
 template<class T> inline typename T::Ref Group::get_table(StringData name)
