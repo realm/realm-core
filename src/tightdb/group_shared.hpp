@@ -228,6 +228,46 @@ public:
         LockFileButNoData(const std::string& msg) : std::runtime_error(msg) {}
     };
 
+    // If read transactions are pinned, it is illegal to start a write transaction, and
+    // any attempt to do so will throw an exception:
+    class WriteTransactionWhilePinned : public std::exception {
+    public:
+        const char* what() const TIGHTDB_NOEXCEPT_OR_NOTHROW TIGHTDB_OVERRIDE 
+        { 
+            return "Starting a write transaction while pinned"; 
+        }
+    };
+
+    // While read transactions are pinned, it is illegal to call pin_read_transaction(),
+    // and any attempt to do so will throw:
+    class PinWhilePinned : public std::exception {
+    public:
+        const char* what() const TIGHTDB_NOEXCEPT_OR_NOTHROW TIGHTDB_OVERRIDE 
+        { 
+            return "Transactions are already pinned"; 
+        }
+    };
+
+    // While read transactions are NOT pinned, it is illegal to call unpin_read_transaction(),
+    // and any attempt to do so will throw:
+    class UnpinWhileUnpinned : public std::exception {
+    public:
+        const char* what() const TIGHTDB_NOEXCEPT_OR_NOTHROW TIGHTDB_OVERRIDE 
+        { 
+            return "Transactions are already unpinned"; 
+        }
+    };
+
+    // It is illegal to pin or unpin read transactions while inside a transaction:
+    class PinOrUnpinInTransaction : public std::exception {
+    public:
+        const char* what() const TIGHTDB_NOEXCEPT_OR_NOTHROW 
+        { 
+            return "You cannot pin or unpin while a transaction is in progress"; 
+        }
+    };
+
+
 private:
     struct SharedInfo;
 
@@ -389,7 +429,7 @@ inline bool SharedGroup::is_attached() const TIGHTDB_NOEXCEPT
 inline Group& SharedGroup::begin_write()
 {
     if (m_transactions_are_pinned) {
-        throw std::runtime_error("Write transactions are not allowed while transactions are pinned");
+        throw WriteTransactionWhilePinned();
     }
 
 #ifdef TIGHTDB_ENABLE_REPLICATION

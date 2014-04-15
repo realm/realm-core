@@ -1943,7 +1943,7 @@ TEST(Shared_PinnedTransactions)
         bool is_ok = false;
         try {
             sg2.pin_read_transactions();
-        } catch (runtime_error&) {
+        } catch (SharedGroup::PinWhilePinned&) {
             is_ok = true;
         }
         CHECK(is_ok);
@@ -1953,7 +1953,7 @@ TEST(Shared_PinnedTransactions)
         bool is_ok = false;
         try {
             sg2.unpin_read_transactions();
-        } catch (runtime_error&) {
+        } catch (SharedGroup::UnpinWhileUnpinned&) {
             is_ok = true;
         }
         CHECK(is_ok);
@@ -1963,7 +1963,7 @@ TEST(Shared_PinnedTransactions)
         bool is_ok = false;
         try {
             sg1.pin_read_transactions();
-        } catch (runtime_error&) {
+        } catch (SharedGroup::PinOrUnpinInTransaction&) {
             is_ok = true;
         }
         CHECK(is_ok);
@@ -1975,7 +1975,7 @@ TEST(Shared_PinnedTransactions)
             bool is_ok = false;
             try {
                 sg1.unpin_read_transactions();
-            } catch (runtime_error&) {
+            } catch (SharedGroup::PinOrUnpinInTransaction&) {
                 is_ok = true;
             }
             CHECK(is_ok);
@@ -1987,7 +1987,7 @@ TEST(Shared_PinnedTransactions)
         bool is_ok = false;
         try {
             WriteTransaction rt(sg1);
-        } catch (runtime_error&) {
+        } catch (SharedGroup::WriteTransactionWhilePinned&) {
             is_ok = true;
         }
         CHECK(is_ok);
