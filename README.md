@@ -356,7 +356,8 @@ to a nonempty value to disable the conversion to PDF.
 
 ### Linux Mint 15, 16, 17, Ubuntu 10.04, 12.04, 13.04, 13.10, 14.04
 
-    sudo apt-get install texlive-latex-base texlive-latex-extra pandoc
+    sudo apt-get install texlive-latex-base texlive-latex-extra texlive-fonts-recommended
+    sudo apt-get install pandoc
 
 ### Fedora 17
 
