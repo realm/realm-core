@@ -51,7 +51,8 @@ void Replication::select_table(const Table* table)
     size_t* end;
     for (;;) {
         begin = m_subtab_path_buf.data();
-        end = table->record_subtable_path(begin, begin+m_subtab_path_buf.size());
+        end   = begin + m_subtab_path_buf.size();
+        end = _impl::TableFriend::record_subtable_path(*table, begin, end);
         if (end)
             break;
         size_t new_size = m_subtab_path_buf.size();
@@ -67,7 +68,7 @@ void Replication::select_table(const Table* table)
     const size_t level = (end - begin) / 2;
     buf = encode_int(buf, level);
     for (;;) {
-        for (int i=0; i<max_elems_per_chunk; ++i) {
+        for (int i = 0; i < max_elems_per_chunk; ++i) {
             buf = encode_int(buf, *--end);
             if (begin == end)
                 goto good;
@@ -83,16 +84,16 @@ good:
 }
 
 
-void Replication::select_spec(const Table* table, const Spec* spec)
+void Replication::select_desc(const Descriptor& desc)
 {
-    TIGHTDB_ASSERT(!table->has_shared_type());
-    check_table(table);
+    check_table(&*desc.m_root_table);
     size_t* begin;
     size_t* end;
     for (;;) {
         begin = m_subtab_path_buf.data();
-        end = table->record_subspec_path(*spec, begin, begin+m_subtab_path_buf.size());
-        if (end)
+        end   = begin + m_subtab_path_buf.size();
+        begin = desc.record_subdesc_path(begin, end);
+        if (begin)
             break;
         size_t new_size = m_subtab_path_buf.size();
         if (int_multiply_with_overflow_detect(new_size, 2))
@@ -100,17 +101,17 @@ void Replication::select_spec(const Table* table, const Spec* spec)
         m_subtab_path_buf.set_size(new_size); // Throws
     }
     char* buf;
-    const int max_elems_per_chunk = 8; // FIXME: Use smaller number when compiling in debug mode
+    int max_elems_per_chunk = 8; // FIXME: Use smaller number when compiling in debug mode
     transact_log_reserve(&buf, 1 + (1+max_elems_per_chunk)*max_enc_bytes_per_int); // Throws
     *buf++ = 'S';
-    const size_t level = end - begin;
+    size_t level = end - begin;
     buf = encode_int(buf, level);
     if (begin == end)
         goto good;
     for (;;) {
-        for (int i=0; i<max_elems_per_chunk; ++i) {
-            buf = encode_int(buf, *--end);
-            if (begin == end)
+        for (int i = 0; i < max_elems_per_chunk; ++i) {
+            buf = encode_int(buf, *begin);
+            if (++begin == end)
                 goto good;
         }
         transact_log_advance(buf);
@@ -119,7 +120,7 @@ void Replication::select_spec(const Table* table, const Spec* spec)
 
 good:
     transact_log_advance(buf);
-    m_selected_spec = spec;
+    m_selected_spec = desc.m_spec;
 }
 
 
@@ -190,12 +191,14 @@ private:
         switch (type) {
             case type_Int:
             case type_Bool:
-            case type_DateTime:
+            case type_Float:
+            case type_Double:
             case type_String:
             case type_Binary:
+            case type_DateTime:
             case type_Table:
-            case type_Mixed: return true;
-            default:         break;
+            case type_Mixed:
+                return true;
         }
         return false;
     }
@@ -293,7 +296,8 @@ void Replication::TransactLogApplier::read_string(StringBuffer& buf)
 template<bool insert>
 void Replication::TransactLogApplier::set_or_insert(size_t column_ndx, size_t ndx)
 {
-    switch (m_table->get_column_type(column_ndx)) {
+    DataType type = m_table->get_column_type(column_ndx);
+    switch (type) {
         case type_Int: {
             int64_t value = read_int<int64_t>(); // Throws
 #ifdef TIGHTDB_DEBUG
@@ -374,26 +378,6 @@ void Replication::TransactLogApplier::set_or_insert(size_t column_ndx, size_t nd
             }
             return;
         }
-        case type_DateTime: {
-            time_t value = read_int<time_t>(); // Throws
-#ifdef TIGHTDB_DEBUG
-            if (m_log) {
-                if (insert) {
-                    *m_log << "table->insert_datetime("<<column_ndx<<", "<<ndx<<", "<<value<<")\n";
-                }
-                else {
-                    *m_log << "table->set_datetime("<<column_ndx<<", "<<ndx<<", "<<value<<")\n";
-                }
-            }
-#endif
-            if (insert) {
-                m_table->insert_datetime(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
-            }
-            else {
-                m_table->set_datetime(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
-            }
-            return;
-        }
         case type_String: {
             read_string(m_string_buffer); // Throws
             StringData value(m_string_buffer.data(), m_string_buffer.size());
@@ -436,6 +420,26 @@ void Replication::TransactLogApplier::set_or_insert(size_t column_ndx, size_t nd
             }
             return;
         }
+        case type_DateTime: {
+            time_t value = read_int<time_t>(); // Throws
+#ifdef TIGHTDB_DEBUG
+            if (m_log) {
+                if (insert) {
+                    *m_log << "table->insert_datetime("<<column_ndx<<", "<<ndx<<", "<<value<<")\n";
+                }
+                else {
+                    *m_log << "table->set_datetime("<<column_ndx<<", "<<ndx<<", "<<value<<")\n";
+                }
+            }
+#endif
+            if (insert) {
+                m_table->insert_datetime(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+            }
+            else {
+                m_table->set_datetime(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+            }
+            return;
+        }
         case type_Table: {
 #ifdef TIGHTDB_DEBUG
             if (m_log) {
@@ -456,131 +460,73 @@ void Replication::TransactLogApplier::set_or_insert(size_t column_ndx, size_t nd
             return;
         }
         case type_Mixed: {
-            int type = read_int<int>(); // Throws
+            DataType type = DataType(read_int<int>()); // Throws
+            Mixed mixed;
             switch (type) {
                 case type_Int: {
                     int64_t value = read_int<int64_t>(); // Throws
-#ifdef TIGHTDB_DEBUG
-                    if (m_log) {
-                        if (insert) {
-                            *m_log << "table->insert_mixed("<<column_ndx<<", "<<ndx<<", "<<value<<")\n";
-                        }
-                        else {
-                            *m_log << "table->set_mixed("<<column_ndx<<", "<<ndx<<", "<<value<<")\n";
-                        }
-                    }
-#endif
-                    if (insert) {
-                        m_table->insert_mixed(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
-                    }
-                    else {
-                        m_table->set_mixed(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
-                    }
-                    return;
+                    mixed = value;
+                    goto mixed;
                 }
                 case type_Bool: {
                     bool value = read_int<bool>(); // Throws
-#ifdef TIGHTDB_DEBUG
-                    if (m_log) {
-                        if (insert) {
-                            *m_log << "table->insert_mixed("<<column_ndx<<", "<<ndx<<", "<<value<<")\n";
-                        }
-                        else {
-                            *m_log << "table->set_mixed("<<column_ndx<<", "<<ndx<<", "<<value<<")\n";
-                        }
-                    }
-#endif
-                    if (insert) {
-                        m_table->insert_mixed(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
-                    }
-                    else {
-                        m_table->set_mixed(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
-                    }
-                    return;
+                    mixed = value;
+                    goto mixed;
+                }
+                case type_Float: {
+                    float value = read_float(); // Throws
+                    mixed = value;
+                    goto mixed;
+                }
+                case type_Double: {
+                    double value = read_double(); // Throws
+                    mixed = value;
+                    goto mixed;
                 }
                 case type_DateTime: {
                     time_t value = read_int<time_t>(); // Throws
-#ifdef TIGHTDB_DEBUG
-                    if (m_log) {
-                        if (insert) {
-                            *m_log << "table->insert_mixed("<<column_ndx<<", "<<ndx<<", DateTime("<<value<<"))\n";
-                        }
-                        else {
-                            *m_log << "table->set_mixed("<<column_ndx<<", "<<ndx<<", DateTime("<<value<<"))\n";
-                        }
-                    }
-#endif
-                    if (insert) {
-                        m_table->insert_mixed(column_ndx, ndx, DateTime(value)); // FIXME: Memory allocation failure!!!
-                    }
-                    else {
-                        m_table->set_mixed(column_ndx, ndx, DateTime(value)); // FIXME: Memory allocation failure!!!
-                    }
-                    return;
+                    mixed = DateTime(value);
+                    goto mixed;
                 }
                 case type_String: {
                     read_string(m_string_buffer); // Throws
                     StringData value(m_string_buffer.data(), m_string_buffer.size());
-#ifdef TIGHTDB_DEBUG
-                    if (m_log) {
-                        if (insert) {
-                            *m_log << "table->insert_mixed("<<column_ndx<<", "<<ndx<<", \""<<value<<"\")\n";
-                        }
-                        else {
-                            *m_log << "table->set_mixed("<<column_ndx<<", "<<ndx<<", \""<<value<<"\")\n";
-                        }
-                    }
-#endif
-                    if (insert) {
-                        m_table->insert_mixed(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
-                    }
-                    else {
-                        m_table->set_mixed(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
-                    }
-                    return;
+                    mixed = value;
+                    goto mixed;
                 }
                 case type_Binary: {
                     read_string(m_string_buffer); // Throws
                     BinaryData value(m_string_buffer.data(), m_string_buffer.size());
-#ifdef TIGHTDB_DEBUG
-                    if (m_log) {
-                        if (insert) {
-                            *m_log << "table->insert_mixed("<<column_ndx<<", "<<ndx<<", BinaryData(...))\n";
-                        }
-                        else {
-                            *m_log << "table->set_mixed("<<column_ndx<<", "<<ndx<<", BinaryData(...))\n";
-                        }
-                    }
-#endif
-                    if (insert) {
-                        m_table->insert_mixed(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
-                    }
-                    else {
-                        m_table->set_mixed(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
-                    }
-                    return;
+                    mixed = value;
+                    goto mixed;
                 }
                 case type_Table: {
-#ifdef TIGHTDB_DEBUG
-                    if (m_log) {
-                        if (insert) {
-                            *m_log << "table->insert_mixed("<<column_ndx<<", "<<ndx<<", Mixed::subtable_tag())\n";
-                        }
-                        else {
-                            *m_log << "table->set_mixed("<<column_ndx<<", "<<ndx<<", Mixed::subtable_tag())\n";
-                        }
-                    }
-#endif
-                    if (insert) {
-                        m_table->insert_mixed(column_ndx, ndx, Mixed::subtable_tag()); // FIXME: Memory allocation failure!!!
-                    }
-                    else {
-                        m_table->set_mixed(column_ndx, ndx, Mixed::subtable_tag()); // FIXME: Memory allocation failure!!!
-                    }
-                    return;
+                    mixed = Mixed::subtable_tag();
+                    goto mixed;
                 }
+                case type_Mixed:
+                    break;
             }
             break;
+
+          mixed:
+#ifdef TIGHTDB_DEBUG
+            if (m_log) {
+                if (insert) {
+                    *m_log << "table->insert_mixed("<<column_ndx<<", "<<ndx<<", \""<<mixed<<"\")\n";
+                }
+                else {
+                    *m_log << "table->set_mixed("<<column_ndx<<", "<<ndx<<", \""<<mixed<<"\")\n";
+                }
+            }
+#endif
+            if (insert) {
+                m_table->insert_mixed(column_ndx, ndx, mixed); // FIXME: Memory allocation failure!!!
+            }
+            else {
+                m_table->set_mixed(column_ndx, ndx, mixed); // FIXME: Memory allocation failure!!!
+            }
+            return;
         }
     }
     throw BadTransactLog();
@@ -600,8 +546,8 @@ void Replication::TransactLogApplier::apply()
         if (!read_char(instr))
             break;
 //cerr << "["<<instr<<"]";
-        switch (instr) {
-            case 's': { // Set value
+        switch (Instruction(instr)) {
+            case instr_SetCell: {
                 size_t column_ndx = read_int<size_t>(); // Throws
                 size_t ndx = read_int<size_t>(); // Throws
                 if (!m_table)
@@ -612,10 +558,10 @@ void Replication::TransactLogApplier::apply()
                     goto bad_transact_log;
                 const bool insert = false;
                 set_or_insert<insert>(column_ndx, ndx); // Throws
-                break;
+                continue;
             }
 
-            case 'i': { // Insert value
+            case instr_InsertCell: {
                 size_t column_ndx = read_int<size_t>(); // Throws
                 size_t ndx = read_int<size_t>(); // Throws
                 if (!m_table)
@@ -626,10 +572,10 @@ void Replication::TransactLogApplier::apply()
                     goto bad_transact_log;
                 const bool insert = true;
                 set_or_insert<insert>(column_ndx, ndx); // Throws
-                break;
+                continue;
             }
 
-            case 'c': { // Row insert complete
+            case instr_RowInsertComplete: {
                 if (!m_table)
                     goto bad_transact_log;
 #ifdef TIGHTDB_DEBUG
@@ -637,10 +583,10 @@ void Replication::TransactLogApplier::apply()
                     *m_log << "table->insert_done()\n";
 #endif
                 m_table->insert_done(); // FIXME: May fail
-                break;
+                continue;
             }
 
-            case 'I': { // Insert empty rows
+            case instr_InsertEmptyRows: {
                 size_t ndx = read_int<size_t>(); // Throws
                 size_t num_rows = read_int<size_t>(); // Throws
                 if (!m_table || m_table->size() < ndx)
@@ -650,10 +596,10 @@ void Replication::TransactLogApplier::apply()
                     *m_log << "table->insert_empty_row("<<ndx<<", "<<num_rows<<")\n";
 #endif
                 m_table->insert_empty_row(ndx, num_rows); // FIXME: May fail
-                break;
+                continue;
             }
 
-            case 'R': { // Remove row
+            case instr_EraseRow: {
                 size_t ndx = read_int<size_t>(); // Throws
                 if (!m_table || m_table->size() < ndx)
                     goto bad_transact_log;
@@ -662,10 +608,10 @@ void Replication::TransactLogApplier::apply()
                     *m_log << "table->remove("<<ndx<<")\n";
 #endif
                 m_table->remove(ndx); // FIXME: May fail
-                break;
+                continue;
             }
 
-            case 'a': { // Add int to column
+            case instr_AddIntToColumn: {
                 size_t column_ndx = read_int<size_t>(); // Throws
                 if (!m_table)
                     goto bad_transact_log;
@@ -677,21 +623,21 @@ void Replication::TransactLogApplier::apply()
                     *m_log << "table->add_int("<<column_ndx<<", "<<value<<")\n";
 #endif
                 m_table->add_int(column_ndx, value); // FIXME: Memory allocation failure!!!
-                break;
+                continue;
             }
 
-            case 'T': { // Select table
+            case instr_SelectTable: {
                 int levels = read_int<int>(); // Throws
                 size_t ndx = read_int<size_t>(); // Throws
                 if (m_group.size() <= ndx)
                     goto bad_transact_log;
 #ifdef TIGHTDB_DEBUG
                 if (m_log)
-                    *m_log << "table = group->get_table_by_ndx("<<ndx<<")\n";
+                    *m_log << "table = group->get_table("<<ndx<<")\n";
 #endif
-                m_table = m_group.get_table_by_ndx(ndx)->get_table_ref();
+                m_table = m_group.get_table(ndx);
                 desc.reset();
-                for (int i=0; i<levels; ++i) {
+                for (int i = 0; i < levels; ++i) {
                     size_t column_ndx = read_int<size_t>(); // Throws
                     ndx = read_int<size_t>(); // Throws
                     if (column_ndx >= m_table->get_column_count())
@@ -715,10 +661,10 @@ void Replication::TransactLogApplier::apply()
                             goto bad_transact_log;
                     }
                 }
-                break;
+                continue;
             }
 
-            case 'C': { // Clear table
+            case instr_ClearTable: {
                 if (!m_table)
                     goto bad_transact_log;
 #ifdef TIGHTDB_DEBUG
@@ -726,10 +672,10 @@ void Replication::TransactLogApplier::apply()
                     *m_log << "table->clear()\n";
 #endif
                 m_table->clear(); // FIXME: Can probably fail!
-                break;
+                continue;
             }
 
-            case 'x': { // Add index to column
+            case instr_AddIndexToColumn: {
                 size_t column_ndx = read_int<size_t>(); // Throws
                 if (!m_table)
                     goto bad_transact_log;
@@ -742,10 +688,10 @@ void Replication::TransactLogApplier::apply()
                     *m_log << "table->set_index("<<column_ndx<<")\n";
 #endif
                 m_table->set_index(column_ndx); // FIXME: Memory allocation failure!!!
-                break;
+                continue;
             }
 
-            case 'O': { // Insert column into selected descriptor
+            case instr_InsertColumn: {
                 size_t column_ndx = read_int<size_t>(); // Throws
                 int type = read_int<int>(); // Throws
                 read_string(m_string_buffer); // Throws
@@ -761,10 +707,10 @@ void Replication::TransactLogApplier::apply()
                     *m_log << "desc->insert_column("<<column_ndx<<", "<<type<<", \""<<name<<"\")\n";
 #endif
                 _impl::TableFriend::insert_column(*desc, column_ndx, DataType(type), name);
-                break;
+                continue;
             }
 
-            case 'P': { // Remove column from selected descriptor
+            case instr_EraseColumn: {
                 size_t column_ndx = read_int<size_t>(); // Throws
                 if (!desc)
                     goto bad_transact_log;
@@ -775,10 +721,10 @@ void Replication::TransactLogApplier::apply()
                     *m_log << "desc->remove_column("<<column_ndx<<")\n";
 #endif
                 _impl::TableFriend::remove_column(*desc, column_ndx);
-                break;
+                continue;
             }
 
-            case 'Q': { // Rename column in selected descriptor
+            case instr_RenameColumn: {
                 size_t column_ndx = read_int<size_t>(); // Throws
                 read_string(m_string_buffer); // Throws
                 StringData name(m_string_buffer.data(), m_string_buffer.size());
@@ -791,10 +737,10 @@ void Replication::TransactLogApplier::apply()
                     *m_log << "desc->rename_column("<<column_ndx<<", \""<<name<<"\")\n";
 #endif
                 _impl::TableFriend::rename_column(*desc, column_ndx, name);
-                break;
+                continue;
             }
 
-            case 'S': { // Select descriptor from currently selected root table
+            case instr_SelectDescriptor: {
                 if (!m_table)
                     goto bad_transact_log;
                 if (m_table->has_shared_type())
@@ -805,20 +751,20 @@ void Replication::TransactLogApplier::apply()
 #endif
                 desc = m_table->get_descriptor();
                 int levels = read_int<int>(); // Throws
-                for (int i=0; i<levels; ++i) {
-                    size_t subdesc_ndx = read_int<size_t>(); // Throws
-                    if (subdesc_ndx >= _impl::TableFriend::get_num_subdescs(*desc))
+                for (int i = 0; i < levels; ++i) {
+                    size_t column_ndx = read_int<size_t>(); // Throws
+                    if (column_ndx >= desc->get_column_count())
                         goto bad_transact_log;
 #ifdef TIGHTDB_DEBUG
                     if (m_log)
-                        *m_log << "desc = desc->get_subdescriptor("<<subdesc_ndx<<")\n";
+                        *m_log << "desc = desc->get_subdescriptor("<<column_ndx<<")\n";
 #endif
-                    desc = desc->get_subdescriptor(subdesc_ndx);
+                    desc = desc->get_subdescriptor(column_ndx);
                 }
-                break;
+                continue;
             }
 
-            case 'N': { // New top level table
+            case instr_NewGroupLevelTable: {
                 read_string(m_string_buffer); // Throws
                 StringData name(m_string_buffer.data(), m_string_buffer.size());
                 if (m_group.has_table(name))
@@ -828,10 +774,10 @@ void Replication::TransactLogApplier::apply()
                     *m_log << "group->create_new_table(\""<<name<<"\")\n";
 #endif
                 m_group.create_new_table(name); // Throws
-                break;
+                continue;
             }
 
-            case 'Z': { // Optimize table
+            case instr_OptimizeTable: {
                 if (!m_table)
                     goto bad_transact_log;
                 if (m_table->has_shared_type())
@@ -841,12 +787,11 @@ void Replication::TransactLogApplier::apply()
                     *m_log << "table->optimize()\n";
 #endif
                 m_table->optimize(); // FIXME: May fail
-                break;
+                continue;
             }
-
-        default:
-            goto bad_transact_log;
         }
+
+        goto bad_transact_log;
     }
 
     return;
@@ -887,11 +832,12 @@ public:
 
 } // anonymous namespace
 
-void TrivialReplication::apply_transact_log(const char* data, size_t size, SharedGroup& target)
+void TrivialReplication::apply_transact_log(const char* data, size_t size, SharedGroup& target,
+                                            ostream* log)
 {
     InputStreamImpl in(data, size);
     WriteTransaction wt(target); // Throws
-    Replication::apply_transact_log(in, wt.get_group()); // Throws
+    Replication::apply_transact_log(in, wt.get_group(), log); // Throws
     wt.commit(); // Throws
 }
 

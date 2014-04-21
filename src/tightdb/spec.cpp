@@ -19,6 +19,7 @@ Spec::~Spec() TIGHTDB_NOEXCEPT
 #endif
 }
 
+
 void Spec::init(MemRef mem, ArrayParent* parent, size_t ndx_in_parent) TIGHTDB_NOEXCEPT
 {
     m_top.init_from_mem(mem);
@@ -49,6 +50,7 @@ void Spec::init(MemRef mem, ArrayParent* parent, size_t ndx_in_parent) TIGHTDB_N
     }
 }
 
+
 void Spec::update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT
 {
     if (!m_top.update_from_parent(old_baseline))
@@ -64,6 +66,7 @@ void Spec::update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT
     if (m_top.size() > 4)
         m_enumkeys.update_from_parent(old_baseline);
 }
+
 
 MemRef Spec::create_empty_spec(Allocator& alloc)
 {
@@ -106,6 +109,7 @@ MemRef Spec::create_empty_spec(Allocator& alloc)
     return spec_set.get_mem();
 }
 
+
 void Spec::insert_column(size_t column_ndx, DataType type, StringData name, ColumnAttr attr)
 {
     TIGHTDB_ASSERT(column_ndx <= m_spec.size());
@@ -140,14 +144,14 @@ void Spec::insert_column(size_t column_ndx, DataType type, StringData name, Colu
         {
             MemRef subspec_mem = create_empty_spec(alloc); // Throws
             _impl::DeepArrayRefDestroyGuard dg(subspec_mem.m_ref, alloc);
-            size_t subspec_ndx = column_ndx == get_column_count() ?
-                get_num_subspecs() : get_subspec_ndx(column_ndx);
+            size_t subspec_ndx = get_subspec_ndx(column_ndx);
             int_fast64_t v(subspec_mem.m_ref); // FIXME: Dangerous cast (unsigned -> signed)
             m_subspecs.insert(subspec_ndx, v); // Throws
             dg.release();
         }
     }
 }
+
 
 void Spec::remove_column(size_t column_ndx)
 {
@@ -180,10 +184,11 @@ void Spec::remove_column(size_t column_ndx)
     m_attr.erase(column_ndx);  // Throws
 }
 
+
 size_t Spec::get_subspec_ndx(size_t column_ndx) const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(column_ndx < get_column_count());
-    TIGHTDB_ASSERT(get_column_type(column_ndx) == type_Table);
+    TIGHTDB_ASSERT(column_ndx <= get_column_count());
+    TIGHTDB_ASSERT(column_ndx == get_column_count() || get_column_type(column_ndx) == type_Table);
 
     // The m_subspecs array only keep info for subtables so we need to
     // count up to it's position
@@ -194,6 +199,7 @@ size_t Spec::get_subspec_ndx(size_t column_ndx) const TIGHTDB_NOEXCEPT
     }
     return subspec_ndx;
 }
+
 
 void Spec::upgrade_string_to_enum(size_t column_ndx, ref_type keys_ref,
                                   ArrayParent*& keys_parent, size_t& keys_ndx)
@@ -225,6 +231,7 @@ void Spec::upgrade_string_to_enum(size_t column_ndx, ref_type keys_ref,
     keys_ndx    = ins_pos;
 }
 
+
 size_t Spec::get_enumkeys_ndx(size_t column_ndx) const TIGHTDB_NOEXCEPT
 {
     // The enumkeys array only keep info for stringEnum columns
@@ -236,6 +243,7 @@ size_t Spec::get_enumkeys_ndx(size_t column_ndx) const TIGHTDB_NOEXCEPT
     }
     return pos;
 }
+
 
 ref_type Spec::get_enumkeys_ref(size_t column_ndx, ArrayParent** keys_parent, size_t* keys_ndx)
 {
@@ -250,6 +258,7 @@ ref_type Spec::get_enumkeys_ref(size_t column_ndx, ArrayParent** keys_parent, si
     return m_enumkeys.get_as_ref(enumkeys_ndx);
 }
 
+
 DataType Spec::get_column_type(size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < get_column_count());
@@ -262,6 +271,7 @@ DataType Spec::get_column_type(size_t ndx) const TIGHTDB_NOEXCEPT
 
     return DataType(type);
 }
+
 
 size_t Spec::get_column_pos(size_t column_ndx) const
 {
@@ -282,26 +292,6 @@ void Spec::get_column_info(size_t column_ndx, ColumnInfo& info) const TIGHTDB_NO
 {
     info.m_column_ref_ndx = get_column_pos(column_ndx);
     info.m_has_index = (get_column_attr(column_ndx) & col_attr_Indexed) != 0;
-}
-
-
-size_t* Spec::record_subspec_path(const Array& root_subspecs, size_t* begin,
-                                  size_t* end) const TIGHTDB_NOEXCEPT
-{
-    TIGHTDB_ASSERT(begin < end);
-    const Array* spec_set = &m_top;
-    size_t* i = begin;
-    for (;;) {
-        size_t subspec_ndx = spec_set->get_ndx_in_parent();
-        *i++ = subspec_ndx;
-        const Array* parent_subspecs = static_cast<const Array*>(spec_set->get_parent());
-        if (parent_subspecs == &root_subspecs)
-            break;
-        if (i == end)
-            return 0; // Error, not enough space in buffer
-        spec_set = static_cast<const Array*>(parent_subspecs->get_parent());
-    }
-    return i;
 }
 
 
@@ -328,6 +318,7 @@ void Spec::Verify() const
     TIGHTDB_ASSERT(m_names.get_ref() == m_top.get_as_ref(1));
     TIGHTDB_ASSERT(m_attr.get_ref() == m_top.get_as_ref(2));
 }
+
 
 void Spec::to_dot(ostream& out, StringData) const
 {

@@ -11,7 +11,9 @@
 #include <tightdb/utilities.hpp>
 #include <tightdb/group_writer.hpp>
 #include <tightdb/group.hpp>
-#include <pthread.h>
+#ifdef TIGHTDB_ENABLE_REPLICATION
+#  include <tightdb/replication.hpp>
+#endif
 
 using namespace std;
 using namespace tightdb;
@@ -305,7 +307,7 @@ ref_type Group::create_new_table(StringData name)
         try {
 #ifdef TIGHTDB_ENABLE_REPLICATION
             if (Replication* repl = m_alloc.get_replication())
-                repl->new_top_level_table(name); // Throws
+                repl->new_group_level_table(name); // Throws
 #endif
 
             // The rest is guaranteed not to throw
@@ -339,7 +341,7 @@ Table* Group::create_new_table_and_accessor(StringData name, SpecSetter spec_set
     // discard everything written to the log since this point. This
     // should probably be handled with a 'scoped guard'.
     if (Replication* repl = m_alloc.get_replication())
-        repl->new_top_level_table(name); // Throws
+        repl->new_group_level_table(name); // Throws
 #endif
 
     using namespace _impl;

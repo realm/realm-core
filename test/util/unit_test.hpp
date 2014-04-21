@@ -31,18 +31,30 @@
 #include <tightdb/util/features.h>
 #include <tightdb/util/type_traits.hpp>
 #include <tightdb/util/safe_int_ops.hpp>
+#include <tightdb/util/bind_ptr.hpp>
 
 
-#define TEST(name) \
-    TEST_EX(name, tightdb::test_util::unit_test::get_default_test_list())
+#define TEST(name) TEST_IF(name, true)
 
-#define TEST_EX(name, list) \
+/// Allows you to control whether the test will be enabled or
+/// disabled. The test will be compiled in both cases. You can pass
+/// any expression that would be a valid condition in an `if`
+/// statement. The expression is not evaluated until you call
+/// TestList::run(). This allows you to base the condition on global
+/// variables which can then be adjusted before calling
+/// TestList::run().
+#define TEST_IF(name, enabled) \
+    TEST_EX(name, tightdb::test_util::unit_test::get_default_test_list(), enabled)
+
+#define TEST_EX(name, list, enabled) \
     struct Tightdb_UnitTest__##name: tightdb::test_util::unit_test::Test { \
+        bool test_enabled() const { return bool(enabled); } \
         void test_run(); \
     }; \
     Tightdb_UnitTest__##name tightdb_unit_test__##name; \
     tightdb::test_util::unit_test::RegisterTest \
-        tightdb_unit_test_reg__##name((list), tightdb_unit_test__##name, #name, __FILE__, __LINE__); \
+        tightdb_unit_test_reg__##name((list), tightdb_unit_test__##name, \
+                                      "DefaultSuite", #name, __FILE__, __LINE__); \
     void Tightdb_UnitTest__##name::test_run()
 
 
@@ -128,6 +140,7 @@ class TestResults;
 
 struct TestDetails {
     long test_index;
+    const char* suite_name;
     const char* test_name;
     const char* file_name;
     long line_number;
@@ -138,6 +151,7 @@ struct Summary {
     long num_included_tests;
     long num_failed_tests;
     long num_excluded_tests;
+    long num_disabled_tests;
     long long num_checks;
     long long num_failed_checks;
     double elapsed_seconds;
@@ -163,18 +177,66 @@ public:
 
 class TestList {
 public:
-    void add(Test&, const char* name, const char* file, long line);
+    /// Call this function to change the underlying order of tests in
+    /// this list. The underlying order is the order reflected by
+    /// TestDetails::test_index. This is also the execution order
+    /// unless you ask for shuffling, or for multiple execution
+    /// threads when calling run().
+    ///
+    /// Within a particular translation unit, the default underlying
+    /// order is the order in which the tests occur in the source
+    /// file. The default underlying order of tests between
+    /// translation units is uncertain, but will in general depend on
+    /// the order in which the files are linked together. With a
+    /// suitable comparison operation, this function can be used to
+    /// eliminate the uncertainty of the underlying order. An example
+    /// of a suitable comparison operation would be one that uses the
+    /// file name as primary sorting criterium, and the original
+    /// underlying order (TestDetails::test_index) as secondary
+    /// criterium. See the class PatternBasedFileOrder for a slightly
+    /// more advanced alternative.
+    template<class Compare> void sort(Compare);
+
+    /// Run all the tests in this list (or a filtered subset of them).
     bool run(Reporter* = 0, Filter* = 0, int num_threads = 1, bool shuffle = false);
+
+    /// Called automatically when you use the `TEST` macro (or one of
+    /// its friends).
+    void add(Test&, const char* suite, const char* name, const char* file, long line);
+
 private:
+    class ExecContext;
+    template<class Compare> class CompareAdaptor;
+
     std::vector<Test*> m_tests;
 
-    class ExecContext;
+    void reassign_indexes();
+
     friend class TestResults;
 };
 
 TestList& get_default_test_list();
 
 
+
+struct PatternBasedFileOrder {
+    PatternBasedFileOrder(const char** patterns_begin, const char** patterns_end);
+
+    template<std::size_t N> PatternBasedFileOrder(const char* (&patterns)[N]);
+
+    bool operator()(TestDetails*, TestDetails*);
+
+private:
+    class state;
+    struct wrap {
+        util::bind_ptr<state> m_state;
+        wrap(const char** patterns_begin, const char** patterns_end);
+        ~wrap();
+        wrap(const wrap&);
+        wrap& operator=(const wrap&);
+    };
+    wrap m_wrap;
+};
 
 
 class SimpleReporter: public Reporter {
@@ -306,6 +368,7 @@ private:
 
 class Test {
 public:
+    virtual bool test_enabled() const = 0;
     virtual void test_run() = 0;
 
 protected:
@@ -313,6 +376,7 @@ protected:
     TestResults test_results;
     Test() {}
 
+private:
     friend class TestList;
     friend class TestResults;
 };
@@ -320,12 +384,51 @@ protected:
 
 
 
+// Implementation
+
 struct RegisterTest {
-    RegisterTest(TestList& list, Test& test, const char* name, const char* file, long line)
+    RegisterTest(TestList& list, Test& test, const char* suite,
+                 const char* name, const char* file, long line)
     {
-        list.add(test, name, file, line);
+        list.add(test, suite, name, file, line);
     }
 };
+
+
+template<class Compare> class TestList::CompareAdaptor {
+public:
+    CompareAdaptor(const Compare& compare):
+        m_compare(compare)
+    {
+    }
+
+    bool operator()(Test* a, Test* b)
+    {
+        return m_compare(&a->test_details, &b->test_details);
+    }
+
+private:
+    Compare m_compare;
+};
+
+template<class Compare> inline void TestList::sort(Compare compare)
+{
+    std::sort(m_tests.begin(), m_tests.end(), CompareAdaptor<Compare>(compare));
+    reassign_indexes();
+}
+
+
+inline PatternBasedFileOrder::PatternBasedFileOrder(const char** patterns_begin,
+                                                    const char** patterns_end):
+    m_wrap(patterns_begin, patterns_end)
+{
+}
+
+template<std::size_t N>
+inline PatternBasedFileOrder::PatternBasedFileOrder(const char* (&patterns)[N]):
+    m_wrap(patterns, patterns+N)
+{
+}
 
 
 template<class A, class B, bool both_are_integral> struct Compare {

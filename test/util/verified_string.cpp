@@ -1,15 +1,11 @@
-#include <vector>
-#include <string>
 #include <algorithm>
-#ifdef _MSC_VER
-#  include <win32\stdint.h>
-#endif
-#include <stdio.h>
-#include <tightdb/column_string.hpp>
+
 #include "verified_string.hpp"
 
 using namespace std;
 using namespace tightdb;
+using namespace tightdb::test_util;
+
 
 void VerifiedString::verify_neighbours(size_t ndx)
 {

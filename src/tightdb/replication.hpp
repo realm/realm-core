@@ -30,15 +30,13 @@
 #include <tightdb/util/safe_int_ops.hpp>
 #include <tightdb/util/buffer.hpp>
 #include <tightdb/util/file.hpp>
-#include <tightdb/mixed.hpp>
+#include <tightdb/group.hpp>
+#include <tightdb/descriptor.hpp>
+#include <tightdb/group.hpp>
+#include <tightdb/group_shared.hpp>
 
 namespace tightdb {
 
-
-class Spec;
-class Table;
-class Group;
-class SharedGroup;
 
 
 // FIXME: Be careful about the possibility of one modification functions being called by another where both do transaction logging.
@@ -124,49 +122,30 @@ public:
     /// occured.
     void clear_interrupt() TIGHTDB_NOEXCEPT;
 
-    // Transaction log instruction encoding:
-    //
-    //   N  New top level table
-    //   T  Select table
-    //   S  Select descriptor from currently selected root table
-    //   O  Insert column into selected descriptor
-    //   P  Remove column from selected descriptor
-    //   Q  Rename column in selected descriptor
-    //   s  Set value
-    //   i  Insert value
-    //   c  Row insert complete
-    //   I  Insert empty rows
-    //   R  Remove row
-    //   a  Add int to column
-    //   x  Add index to column
-    //   C  Clear table
-    //   Z  Optimize table
-
     struct subtable_tag {};
 
-    void new_top_level_table(StringData name);
-    void insert_column (const Table*, const Spec*, std::size_t column_ndx,
-                        DataType type, StringData name);
-    void remove_column (const Table*, const Spec*, std::size_t column_ndx);
-    void rename_column (const Table*, const Spec*, std::size_t column_ndx, StringData name);
+    void new_group_level_table(StringData name);
+    void insert_column(const Descriptor&, std::size_t column_ndx, DataType type, StringData name);
+    void erase_column(const Descriptor&, std::size_t column_ndx);
+    void rename_column(const Descriptor&, std::size_t column_ndx, StringData name);
 
     template<class T>
-    void set_value(const Table*, std::size_t column_ndx, std::size_t ndx, T value);
-    void set_value(const Table*, std::size_t column_ndx, std::size_t ndx, StringData value);
-    void set_value(const Table*, std::size_t column_ndx, std::size_t ndx, BinaryData value);
-    void set_value(const Table*, std::size_t column_ndx, std::size_t ndx, const Mixed& value);
-    void set_value(const Table*, std::size_t column_ndx, std::size_t ndx, subtable_tag);
+    void set_cell(const Table*, std::size_t column_ndx, std::size_t ndx, T value);
+    void set_cell(const Table*, std::size_t column_ndx, std::size_t ndx, StringData value);
+    void set_cell(const Table*, std::size_t column_ndx, std::size_t ndx, BinaryData value);
+    void set_cell(const Table*, std::size_t column_ndx, std::size_t ndx, const Mixed& value);
+    void set_cell(const Table*, std::size_t column_ndx, std::size_t ndx, subtable_tag);
 
     template<class T>
-    void insert_value(const Table*, std::size_t column_ndx, std::size_t ndx, T value);
-    void insert_value(const Table*, std::size_t column_ndx, std::size_t ndx, StringData value);
-    void insert_value(const Table*, std::size_t column_ndx, std::size_t ndx, BinaryData value);
-    void insert_value(const Table*, std::size_t column_ndx, std::size_t ndx, const Mixed& value);
-    void insert_value(const Table*, std::size_t column_ndx, std::size_t ndx, subtable_tag);
+    void insert_cell(const Table*, std::size_t column_ndx, std::size_t ndx, T value);
+    void insert_cell(const Table*, std::size_t column_ndx, std::size_t ndx, StringData value);
+    void insert_cell(const Table*, std::size_t column_ndx, std::size_t ndx, BinaryData value);
+    void insert_cell(const Table*, std::size_t column_ndx, std::size_t ndx, const Mixed& value);
+    void insert_cell(const Table*, std::size_t column_ndx, std::size_t ndx, subtable_tag);
 
     void row_insert_complete(const Table*);
     void insert_empty_rows(const Table*, std::size_t row_ndx, std::size_t num_rows);
-    void remove_row(const Table*, std::size_t row_ndx);
+    void erase_row(const Table*, std::size_t row_ndx);
     void add_int_to_column(const Table*, std::size_t column_ndx, int64_t value);
     void add_index_to_column(const Table*, std::size_t column_ndx);
     void clear_table(const Table*);
@@ -226,7 +205,7 @@ protected:
     /// and `m_transact_log_free_end` such that they refer to a chunk
     /// of free space whose size is at least \a n.
     ///
-    /// \param n The require amout of contiguous free space. Must be
+    /// \param n The required amount of contiguous free space. Must be
     /// small (probably not greater than 1024)
     virtual void do_transact_log_reserve(std::size_t n) = 0;
 
@@ -258,6 +237,25 @@ protected:
 private:
     struct TransactLogApplier;
 
+    /// Transaction log instruction encoding
+    enum Instruction {
+        instr_NewGroupLevelTable = 'N',
+        instr_SelectTable        = 'T',
+        instr_SetCell            = 's',
+        instr_InsertCell         = 'i',
+        instr_RowInsertComplete  = 'c',
+        instr_InsertEmptyRows    = 'I',
+        instr_EraseRow           = 'E', // Remove a row
+        instr_AddIntToColumn     = 'a', // Add an integer value to all cells in a column
+        instr_ClearTable         = 'C', // Remove all rows in selected table
+        instr_OptimizeTable      = 'Z',
+        instr_SelectDescriptor   = 'S', // Select descriptor from currently selected root table
+        instr_InsertColumn       = 'O', // Insert new column into to selected descriptor
+        instr_EraseColumn        = 'P', // Remove column to selected descriptor
+        instr_RenameColumn       = 'Q', // Rename column in selected descriptor
+        instr_AddIndexToColumn   = 'L'  // Add a lookup index to a column
+    };
+
     util::Buffer<std::size_t> m_subtab_path_buf;
 
     const Table* m_selected_table;
@@ -274,15 +272,15 @@ private:
     void check_table(const Table*);
     void select_table(const Table*); // Deselects a selected spec
 
-    void check_spec(const Table*, const Spec*);
-    void select_spec(const Table*, const Spec*); // Table must *not* have shared type descriptor
+    void check_desc(const Descriptor& desc);
+    void select_desc(const Descriptor& desc);
 
-    void string_cmd(char cmd, std::size_t column_ndx, std::size_t ndx,
+    void string_cmd(Instruction, std::size_t column_ndx, std::size_t ndx,
                     const char* data, std::size_t size);
 
-    void mixed_cmd(char cmd, std::size_t column_ndx, std::size_t ndx, const Mixed& value);
+    void mixed_cmd(Instruction, std::size_t column_ndx, std::size_t ndx, const Mixed& value);
 
-    template<class L> void simple_cmd(char cmd, const util::Tuple<L>& numbers);
+    template<class L> void simple_cmd(Instruction, const util::Tuple<L>& numbers);
 
     template<class> struct EncodeNumber;
 
@@ -338,7 +336,8 @@ protected:
 
     virtual void handle_transact_log(const char* data, std::size_t size) = 0;
 
-    static void apply_transact_log(const char* data, std::size_t size, SharedGroup& target);
+    static void apply_transact_log(const char* data, std::size_t size, SharedGroup& target,
+                                   std::ostream* apply_log = 0);
 
 private:
     const std::string m_database_file;
@@ -542,11 +541,12 @@ template<> struct Replication::EncodeNumber<double> {
 };
 
 
-template<class L> inline void Replication::simple_cmd(char cmd, const util::Tuple<L>& numbers)
+template<class L>
+inline void Replication::simple_cmd(Instruction instr, const util::Tuple<L>& numbers)
 {
     char* buf;
     transact_log_reserve(&buf, 1 + util::TypeCount<L>::value*max_enc_bytes_per_num); // Throws
-    *buf++ = cmd;
+    *buf++ = char(instr);
     util::for_each<EncodeNumber>(numbers, &buf);
     transact_log_advance(buf);
 }
@@ -559,185 +559,184 @@ inline void Replication::check_table(const Table* t)
 }
 
 
-inline void Replication::check_spec(const Table* t, const Spec* s)
+inline void Replication::check_desc(const Descriptor& desc)
 {
-    if (s != m_selected_spec)
-        select_spec(t,s); // Throws
+    if (desc.m_spec != m_selected_spec)
+        select_desc(desc); // Throws
 }
 
 
-inline void Replication::string_cmd(char cmd, std::size_t column_ndx,
+inline void Replication::string_cmd(Instruction instr, std::size_t column_ndx,
                                     std::size_t ndx, const char* data, std::size_t size)
 {
-    simple_cmd(cmd, util::tuple(column_ndx, ndx, size)); // Throws
+    simple_cmd(instr, util::tuple(column_ndx, ndx, size)); // Throws
     transact_log_append(data, size); // Throws
 }
 
 
-inline void Replication::mixed_cmd(char cmd, std::size_t column_ndx,
+inline void Replication::mixed_cmd(Instruction instr, std::size_t column_ndx,
                                    std::size_t ndx, const Mixed& value)
 {
+    DataType type = value.get_type();
     char* buf;
     transact_log_reserve(&buf, 1 + 4*max_enc_bytes_per_num); // Throws
-    *buf++ = cmd;
+    *buf++ = char(instr);
     buf = encode_int(buf, column_ndx);
     buf = encode_int(buf, ndx);
-    buf = encode_int(buf, int(value.get_type()));
-    switch (value.get_type()) {
-    case type_Int:
-        buf = encode_int(buf, value.get_int());
-        transact_log_advance(buf);
-        break;
-    case type_Bool:
-        buf = encode_int(buf, int(value.get_bool()));
-        transact_log_advance(buf);
-        break;
-    case type_Float:
-        buf = encode_float(buf, value.get_float());
-        transact_log_advance(buf);
-        break;
-    case type_Double:
-        buf = encode_double(buf, value.get_double());
-        transact_log_advance(buf);
-        break;
-    case type_DateTime:
-        buf = encode_int(buf, value.get_datetime().get_datetime());
-        transact_log_advance(buf);
-        break;
-    case type_String:
-        {
+    buf = encode_int(buf, int(type));
+    switch (type) {
+        case type_Int:
+            buf = encode_int(buf, value.get_int());
+            transact_log_advance(buf);
+            return;
+        case type_Bool:
+            buf = encode_int(buf, int(value.get_bool()));
+            transact_log_advance(buf);
+            return;
+        case type_Float:
+            buf = encode_float(buf, value.get_float());
+            transact_log_advance(buf);
+            return;
+        case type_Double:
+            buf = encode_double(buf, value.get_double());
+            transact_log_advance(buf);
+            return;
+        case type_DateTime:
+            buf = encode_int(buf, value.get_datetime().get_datetime());
+            transact_log_advance(buf);
+            return;
+        case type_String: {
             StringData data = value.get_string();
             buf = encode_int(buf, data.size());
             transact_log_advance(buf);
             transact_log_append(data.data(), data.size()); // Throws
+            return;
         }
-        break;
-    case type_Binary:
-        {
+        case type_Binary: {
             BinaryData data = value.get_binary();
             buf = encode_int(buf, data.size());
             transact_log_advance(buf);
             transact_log_append(data.data(), data.size()); // Throws
+            return;
         }
-        break;
-    case type_Table:
-        transact_log_advance(buf);
-        break;
-    default:
-        TIGHTDB_ASSERT(false);
+        case type_Table:
+            transact_log_advance(buf);
+            return;
+        case type_Mixed:
+            break;
     }
+    TIGHTDB_ASSERT(false);
 }
 
 
-inline void Replication::new_top_level_table(StringData name)
+inline void Replication::new_group_level_table(StringData name)
 {
-    simple_cmd('N', util::tuple(name.size())); // Throws
+    simple_cmd(instr_NewGroupLevelTable, util::tuple(name.size())); // Throws
     transact_log_append(name.data(), name.size()); // Throws
 }
 
 
-inline void Replication::insert_column(const Table* table, const Spec* spec,
-                                       std::size_t column_ndx, DataType type, StringData name)
+inline void Replication::insert_column(const Descriptor& desc, std::size_t column_ndx,
+                                       DataType type, StringData name)
 {
-    check_spec(table, spec); // Throws
-    simple_cmd('O', util::tuple(column_ndx, int(type), name.size())); // Throws
+    check_desc(desc); // Throws
+    simple_cmd(instr_InsertColumn, util::tuple(column_ndx, int(type), name.size())); // Throws
     transact_log_append(name.data(), name.size()); // Throws
 }
 
-inline void Replication::remove_column(const Table* table, const Spec* spec,
-                                       std::size_t column_ndx)
+inline void Replication::erase_column(const Descriptor& desc, std::size_t column_ndx)
 {
-    check_spec(table, spec); // Throws
-    simple_cmd('P', util::tuple(column_ndx)); // Throws
+    check_desc(desc); // Throws
+    simple_cmd(instr_EraseColumn, util::tuple(column_ndx)); // Throws
 }
 
-inline void Replication::rename_column(const Table* table, const Spec* spec,
-                                       std::size_t column_ndx, StringData name)
+inline void Replication::rename_column(const Descriptor& desc, std::size_t column_ndx,
+                                       StringData name)
 {
-    check_spec(table, spec); // Throws
-    simple_cmd('Q', util::tuple(column_ndx, name.size())); // Throws
+    check_desc(desc); // Throws
+    simple_cmd(instr_RenameColumn, util::tuple(column_ndx, name.size())); // Throws
     transact_log_append(name.data(), name.size()); // Throws
 }
 
 
 template<class T>
-inline void Replication::set_value(const Table* t, std::size_t column_ndx,
-                                   std::size_t ndx, T value)
+inline void Replication::set_cell(const Table* t, std::size_t column_ndx,
+                                  std::size_t ndx, T value)
 {
     check_table(t); // Throws
-    simple_cmd('s', util::tuple(column_ndx, ndx, value)); // Throws
+    simple_cmd(instr_SetCell, util::tuple(column_ndx, ndx, value)); // Throws
 }
 
-inline void Replication::set_value(const Table* t, std::size_t column_ndx,
-                                   std::size_t ndx, StringData value)
+inline void Replication::set_cell(const Table* t, std::size_t column_ndx,
+                                  std::size_t ndx, StringData value)
 {
     check_table(t); // Throws
-    string_cmd('s', column_ndx, ndx, value.data(), value.size()); // Throws
+    string_cmd(instr_SetCell, column_ndx, ndx, value.data(), value.size()); // Throws
 }
 
-inline void Replication::set_value(const Table* t, std::size_t column_ndx,
-                                   std::size_t ndx, BinaryData value)
+inline void Replication::set_cell(const Table* t, std::size_t column_ndx,
+                                  std::size_t ndx, BinaryData value)
 {
     check_table(t); // Throws
-    string_cmd('s', column_ndx, ndx, value.data(), value.size()); // Throws
+    string_cmd(instr_SetCell, column_ndx, ndx, value.data(), value.size()); // Throws
 }
 
-inline void Replication::set_value(const Table* t, std::size_t column_ndx,
-                                   std::size_t ndx, const Mixed& value)
+inline void Replication::set_cell(const Table* t, std::size_t column_ndx,
+                                  std::size_t ndx, const Mixed& value)
 {
     check_table(t); // Throws
-    mixed_cmd('s', column_ndx, ndx, value); // Throws
+    mixed_cmd(instr_SetCell, column_ndx, ndx, value); // Throws
 }
 
-inline void Replication::set_value(const Table* t, std::size_t column_ndx,
-                                   std::size_t ndx, subtable_tag)
+inline void Replication::set_cell(const Table* t, std::size_t column_ndx,
+                                  std::size_t ndx, subtable_tag)
 {
     check_table(t); // Throws
-    simple_cmd('s', util::tuple(column_ndx, ndx)); // Throws
+    simple_cmd(instr_SetCell, util::tuple(column_ndx, ndx)); // Throws
 }
 
 
 template<class T>
-inline void Replication::insert_value(const Table* t, std::size_t column_ndx,
-                                      std::size_t ndx, T value)
+inline void Replication::insert_cell(const Table* t, std::size_t column_ndx,
+                                     std::size_t ndx, T value)
 {
     check_table(t); // Throws
-    simple_cmd('i', util::tuple(column_ndx, ndx, value)); // Throws
+    simple_cmd(instr_InsertCell, util::tuple(column_ndx, ndx, value)); // Throws
 }
 
-inline void Replication::insert_value(const Table* t, std::size_t column_ndx,
-                                      std::size_t ndx, StringData value)
+inline void Replication::insert_cell(const Table* t, std::size_t column_ndx,
+                                     std::size_t ndx, StringData value)
 {
     check_table(t); // Throws
-    string_cmd('i', column_ndx, ndx, value.data(), value.size()); // Throws
+    string_cmd(instr_InsertCell, column_ndx, ndx, value.data(), value.size()); // Throws
 }
 
-inline void Replication::insert_value(const Table* t, std::size_t column_ndx,
-                                      std::size_t ndx, BinaryData value)
+inline void Replication::insert_cell(const Table* t, std::size_t column_ndx,
+                                     std::size_t ndx, BinaryData value)
 {
     check_table(t); // Throws
-    string_cmd('i', column_ndx, ndx, value.data(), value.size()); // Throws
+    string_cmd(instr_InsertCell, column_ndx, ndx, value.data(), value.size()); // Throws
 }
 
-inline void Replication::insert_value(const Table* t, std::size_t column_ndx,
-                                      std::size_t ndx, const Mixed& value)
+inline void Replication::insert_cell(const Table* t, std::size_t column_ndx,
+                                     std::size_t ndx, const Mixed& value)
 {
     check_table(t); // Throws
-    mixed_cmd('i', column_ndx, ndx, value); // Throws
+    mixed_cmd(instr_InsertCell, column_ndx, ndx, value); // Throws
 }
 
-inline void Replication::insert_value(const Table* t, std::size_t column_ndx,
-                                      std::size_t ndx, subtable_tag)
+inline void Replication::insert_cell(const Table* t, std::size_t column_ndx,
+                                     std::size_t ndx, subtable_tag)
 {
     check_table(t); // Throws
-    simple_cmd('i', util::tuple(column_ndx, ndx)); // Throws
+    simple_cmd(instr_InsertCell, util::tuple(column_ndx, ndx)); // Throws
 }
 
 
 inline void Replication::row_insert_complete(const Table* t)
 {
     check_table(t); // Throws
-    simple_cmd('c', util::tuple()); // Throws
+    simple_cmd(instr_RowInsertComplete, util::tuple()); // Throws
 }
 
 
@@ -745,42 +744,42 @@ inline void Replication::insert_empty_rows(const Table* t, std::size_t row_ndx,
                                            std::size_t num_rows)
 {
     check_table(t); // Throws
-    simple_cmd('I', util::tuple(row_ndx, num_rows)); // Throws
+    simple_cmd(instr_InsertEmptyRows, util::tuple(row_ndx, num_rows)); // Throws
 }
 
 
-inline void Replication::remove_row(const Table* t, std::size_t row_ndx)
+inline void Replication::erase_row(const Table* t, std::size_t row_ndx)
 {
     check_table(t); // Throws
-    simple_cmd('R', util::tuple(row_ndx)); // Throws
+    simple_cmd(instr_EraseRow, util::tuple(row_ndx)); // Throws
 }
 
 
 inline void Replication::add_int_to_column(const Table* t, std::size_t column_ndx, int64_t value)
 {
     check_table(t); // Throws
-    simple_cmd('a', util::tuple(column_ndx, value)); // Throws
+    simple_cmd(instr_AddIntToColumn, util::tuple(column_ndx, value)); // Throws
 }
 
 
 inline void Replication::add_index_to_column(const Table* t, std::size_t column_ndx)
 {
     check_table(t); // Throws
-    simple_cmd('x', util::tuple(column_ndx)); // Throws
+    simple_cmd(instr_AddIndexToColumn, util::tuple(column_ndx)); // Throws
 }
 
 
 inline void Replication::clear_table(const Table* t)
 {
     check_table(t); // Throws
-    simple_cmd('C', util::tuple()); // Throws
+    simple_cmd(instr_ClearTable, util::tuple()); // Throws
 }
 
 
 inline void Replication::optimize_table(const Table* t)
 {
     check_table(t); // Throws
-    simple_cmd('Z', util::tuple()); // Throws
+    simple_cmd(instr_OptimizeTable, util::tuple()); // Throws
 }
 
 

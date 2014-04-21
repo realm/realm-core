@@ -29,11 +29,17 @@ each of our major platforms:
     sudo apt-get install python-cheetah
     sudo apt-get install libproc-dev
 
-### Ubuntu 13.04, Linux Mint 15
+### Linux Mint 15, 16, Ubuntu 13.04, 13.10
 
     sudo apt-get install build-essential
     sudo apt-get install python-cheetah
     sudo apt-get install libprocps0-dev
+
+### Linux Mint 17, Ubuntu 14.04
+
+    sudo apt-get install build-essential
+    sudo apt-get install python-cheetah
+    sudo apt-get install libprocps3-dev
 
 ### Fedora 17, 18, 19, 20, Amazon Linux 2012.09
 
@@ -100,10 +106,10 @@ The following programs will be installed:
 
     /usr/local/bin/tightdb-import
     /usr/local/bin/tightdb-import-dbg
-    /usr/local/bin/tightdbd
-    /usr/local/bin/tightdbd-dbg
     /usr/local/bin/tightdb-config
     /usr/local/bin/tightdb-config-dbg
+    /usr/local/libexec/tightdbd
+    /usr/local/libexec/tightdbd-dbg
 
 The `tightdb-import` tool lets you load files containing
 comma-separated values into TightDB. The next two are used
@@ -348,9 +354,10 @@ platforms, however, Pandoc installation is unfeasible (e.g. Amazon
 Linux). In those cases you may set `TIGHTDB_DISABLE_MARKDOWN_TO_PDF`
 to a nonempty value to disable the conversion to PDF.
 
-### Ubuntu 10.04, 12.04, and 13.04
+### Linux Mint 15, 16, 17, Ubuntu 10.04, 12.04, 13.04, 13.10, 14.04
 
-    sudo apt-get install texlive-latex-base texlive-latex-extra pandoc
+    sudo apt-get install texlive-latex-base texlive-latex-extra texlive-fonts-recommended
+    sudo apt-get install pandoc
 
 ### Fedora 17
 

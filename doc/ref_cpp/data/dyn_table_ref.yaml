@@ -1014,6 +1014,7 @@ CATEGORIES :
                  This method will return a view with distinct rows for a given column
                  (first matching row for each unique value in the column).
                  The rows are returned as a {@link class_dyn_tableview} object.
+                 The given column must a String column, and the column must be indexed.
       SIGNATURE: |
                  TableView      distinct(size_t column_ndx);
                  ConstTableView distinct(size_t column_ndx) const;

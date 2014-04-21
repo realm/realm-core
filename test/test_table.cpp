@@ -20,8 +20,36 @@ using namespace tightdb::util;
 using namespace tightdb::test_util;
 using unit_test::TestResults;
 
-// Note: You can now temporarely declare unit tests with the ONLY(TestName) macro instead of TEST(TestName). This
-// will disable all unit tests except these. Remember to undo your temporary changes before committing.
+
+// Test independence and thread-safety
+// -----------------------------------
+//
+// All tests must be thread safe and independent of each other. This
+// is required because it allows for both shuffling of the execution
+// order and for parallelized testing.
+//
+// In particular, avoid using std::rand() since it is not guaranteed
+// to be thread safe. Instead use the API offered in
+// `test/util/random.hpp`.
+//
+// All files created in tests must use the TEST_PATH macro (or one of
+// its friends) to obtain a suitable file system path. See
+// `test/util/test_path.hpp`.
+//
+//
+// Debugging and the ONLY() macro
+// ------------------------------
+//
+// A simple way of disabling all tests except one called `Foo`, is to
+// replace TEST(Foo) with ONLY(Foo) and then recompile and rerun the
+// test suite. Note that you can also use filtering by setting the
+// environment varible `UNITTEST_FILTER`. See `README.md` for more on
+// this.
+//
+// Another way to debug a particular test, is to copy that test into
+// `experiments/testcase.cpp` and then run `sh build.sh
+// check-testcase` (or one of its friends) from the command line.
+
 
 namespace {
 
@@ -826,17 +854,19 @@ TEST(Table_ToString)
     stringstream ss;
     table.to_string(ss);
     const string result = ss.str();
+    PlatformConfig* platform_config = PlatformConfig::Instance();
+    string file_name = platform_config->get_resource_path();
 #if _MSC_VER
-    const char* file_name = "expect_string-win.txt";
+    file_name += "expect_string-win.txt";
 #else
-    const char* file_name = "expect_string.txt";
+    file_name += "expect_string.txt";
 #endif
 #if GENERATE   // enable to generate testfile - check it manually
-    ofstream test_file(file_name, ios::out);
+    ofstream test_file(file_name.c_str(), ios::out);
     test_file << result;
     cerr << "to_string() test:\n" << result << endl;
 #else
-    ifstream test_file(file_name, ios::in);
+    ifstream test_file(file_name.c_str(), ios::in);
     CHECK(!test_file.fail());
     string expected;
     expected.assign( istreambuf_iterator<char>(test_file),
@@ -860,21 +890,23 @@ TEST(Table_JsonAllData)
     stringstream ss;
     table.to_json(ss);
     const string json = ss.str();
+    PlatformConfig* platform_config = PlatformConfig::Instance();
+    string file_name = platform_config->get_resource_path();
 #if _MSC_VER
-    const char* file_name = "expect_json-win.json";
+    file_name += "expect_json-win.json";
 #else
-    const char* file_name = "expect_json.json";
+    file_name += "expect_json.json";
 #endif
 #if GENERATE
         // Generate the testdata to compare. After doing this,
         // verify that the output is correct with a json validator:
         // http://jsonformatter.curiousconcept.com/
     cerr << "JSON:" << json << "\n";
-    ofstream test_file(file_name, ios::out | ios::binary);
+    ofstream test_file(file_name.c_str(), ios::out | ios::binary);
     test_file << json;
 #else
     string expected;
-    ifstream test_file(file_name, ios::in | ios::binary);
+    ifstream test_file(file_name.c_str(), ios::in | ios::binary);
     CHECK(!test_file.fail());
     getline(test_file,expected);
     CHECK_EQUAL(true, json == expected);
