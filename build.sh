@@ -22,7 +22,7 @@ export TIGHTDB_HOME
 MODE="$1"
 [ $# -gt 0 ] && shift
 
-# enabling replication support in core, now required for ios/objective-c
+# enabling replication support in core, now required for objective-c/ios
 export TIGHTDB_ENABLE_REPLICATION=1
 
 # Extensions corresponding with additional GIT repositories
