@@ -296,7 +296,8 @@ void Replication::TransactLogApplier::read_string(StringBuffer& buf)
 template<bool insert>
 void Replication::TransactLogApplier::set_or_insert(size_t column_ndx, size_t ndx)
 {
-    switch (m_table->get_column_type(column_ndx)) {
+    DataType type = m_table->get_column_type(column_ndx);
+    switch (type) {
         case type_Int: {
             int64_t value = read_int<int64_t>(); // Throws
 #ifdef TIGHTDB_DEBUG
@@ -545,8 +546,8 @@ void Replication::TransactLogApplier::apply()
         if (!read_char(instr))
             break;
 //cerr << "["<<instr<<"]";
-        switch (instr) {
-            case 's': { // Set value
+        switch (Instruction(instr)) {
+            case instr_SetCell: {
                 size_t column_ndx = read_int<size_t>(); // Throws
                 size_t ndx = read_int<size_t>(); // Throws
                 if (!m_table)
@@ -557,10 +558,10 @@ void Replication::TransactLogApplier::apply()
                     goto bad_transact_log;
                 const bool insert = false;
                 set_or_insert<insert>(column_ndx, ndx); // Throws
-                break;
+                continue;
             }
 
-            case 'i': { // Insert value
+            case instr_InsertCell: {
                 size_t column_ndx = read_int<size_t>(); // Throws
                 size_t ndx = read_int<size_t>(); // Throws
                 if (!m_table)
@@ -571,10 +572,10 @@ void Replication::TransactLogApplier::apply()
                     goto bad_transact_log;
                 const bool insert = true;
                 set_or_insert<insert>(column_ndx, ndx); // Throws
-                break;
+                continue;
             }
 
-            case 'c': { // Row insert complete
+            case instr_RowInsertComplete: {
                 if (!m_table)
                     goto bad_transact_log;
 #ifdef TIGHTDB_DEBUG
@@ -582,10 +583,10 @@ void Replication::TransactLogApplier::apply()
                     *m_log << "table->insert_done()\n";
 #endif
                 m_table->insert_done(); // FIXME: May fail
-                break;
+                continue;
             }
 
-            case 'I': { // Insert empty rows
+            case instr_InsertEmptyRows: {
                 size_t ndx = read_int<size_t>(); // Throws
                 size_t num_rows = read_int<size_t>(); // Throws
                 if (!m_table || m_table->size() < ndx)
@@ -595,10 +596,10 @@ void Replication::TransactLogApplier::apply()
                     *m_log << "table->insert_empty_row("<<ndx<<", "<<num_rows<<")\n";
 #endif
                 m_table->insert_empty_row(ndx, num_rows); // FIXME: May fail
-                break;
+                continue;
             }
 
-            case 'R': { // Remove row
+            case instr_EraseRow: {
                 size_t ndx = read_int<size_t>(); // Throws
                 if (!m_table || m_table->size() < ndx)
                     goto bad_transact_log;
@@ -607,10 +608,10 @@ void Replication::TransactLogApplier::apply()
                     *m_log << "table->remove("<<ndx<<")\n";
 #endif
                 m_table->remove(ndx); // FIXME: May fail
-                break;
+                continue;
             }
 
-            case 'a': { // Add int to column
+            case instr_AddIntToColumn: {
                 size_t column_ndx = read_int<size_t>(); // Throws
                 if (!m_table)
                     goto bad_transact_log;
@@ -622,10 +623,10 @@ void Replication::TransactLogApplier::apply()
                     *m_log << "table->add_int("<<column_ndx<<", "<<value<<")\n";
 #endif
                 m_table->add_int(column_ndx, value); // FIXME: Memory allocation failure!!!
-                break;
+                continue;
             }
 
-            case 'T': { // Select table
+            case instr_SelectTable: {
                 int levels = read_int<int>(); // Throws
                 size_t ndx = read_int<size_t>(); // Throws
                 if (m_group.size() <= ndx)
@@ -660,10 +661,10 @@ void Replication::TransactLogApplier::apply()
                             goto bad_transact_log;
                     }
                 }
-                break;
+                continue;
             }
 
-            case 'C': { // Clear table
+            case instr_ClearTable: {
                 if (!m_table)
                     goto bad_transact_log;
 #ifdef TIGHTDB_DEBUG
@@ -671,10 +672,10 @@ void Replication::TransactLogApplier::apply()
                     *m_log << "table->clear()\n";
 #endif
                 m_table->clear(); // FIXME: Can probably fail!
-                break;
+                continue;
             }
 
-            case 'x': { // Add index to column
+            case instr_AddIndexToColumn: {
                 size_t column_ndx = read_int<size_t>(); // Throws
                 if (!m_table)
                     goto bad_transact_log;
@@ -687,10 +688,10 @@ void Replication::TransactLogApplier::apply()
                     *m_log << "table->set_index("<<column_ndx<<")\n";
 #endif
                 m_table->set_index(column_ndx); // FIXME: Memory allocation failure!!!
-                break;
+                continue;
             }
 
-            case 'O': { // Insert column into selected descriptor
+            case instr_InsertColumn: {
                 size_t column_ndx = read_int<size_t>(); // Throws
                 int type = read_int<int>(); // Throws
                 read_string(m_string_buffer); // Throws
@@ -706,10 +707,10 @@ void Replication::TransactLogApplier::apply()
                     *m_log << "desc->insert_column("<<column_ndx<<", "<<type<<", \""<<name<<"\")\n";
 #endif
                 _impl::TableFriend::insert_column(*desc, column_ndx, DataType(type), name);
-                break;
+                continue;
             }
 
-            case 'P': { // Remove column from selected descriptor
+            case instr_EraseColumn: {
                 size_t column_ndx = read_int<size_t>(); // Throws
                 if (!desc)
                     goto bad_transact_log;
@@ -720,10 +721,10 @@ void Replication::TransactLogApplier::apply()
                     *m_log << "desc->remove_column("<<column_ndx<<")\n";
 #endif
                 _impl::TableFriend::remove_column(*desc, column_ndx);
-                break;
+                continue;
             }
 
-            case 'Q': { // Rename column in selected descriptor
+            case instr_RenameColumn: {
                 size_t column_ndx = read_int<size_t>(); // Throws
                 read_string(m_string_buffer); // Throws
                 StringData name(m_string_buffer.data(), m_string_buffer.size());
@@ -736,10 +737,10 @@ void Replication::TransactLogApplier::apply()
                     *m_log << "desc->rename_column("<<column_ndx<<", \""<<name<<"\")\n";
 #endif
                 _impl::TableFriend::rename_column(*desc, column_ndx, name);
-                break;
+                continue;
             }
 
-            case 'S': { // Select descriptor from currently selected root table
+            case instr_SelectDescriptor: {
                 if (!m_table)
                     goto bad_transact_log;
                 if (m_table->has_shared_type())
@@ -760,10 +761,10 @@ void Replication::TransactLogApplier::apply()
 #endif
                     desc = desc->get_subdescriptor(column_ndx);
                 }
-                break;
+                continue;
             }
 
-            case 'N': { // New top level table
+            case instr_NewGroupLevelTable: {
                 read_string(m_string_buffer); // Throws
                 StringData name(m_string_buffer.data(), m_string_buffer.size());
                 if (m_group.has_table(name))
@@ -773,10 +774,10 @@ void Replication::TransactLogApplier::apply()
                     *m_log << "group->create_new_table(\""<<name<<"\")\n";
 #endif
                 m_group.create_new_table(name); // Throws
-                break;
+                continue;
             }
 
-            case 'Z': { // Optimize table
+            case instr_OptimizeTable: {
                 if (!m_table)
                     goto bad_transact_log;
                 if (m_table->has_shared_type())
@@ -786,12 +787,11 @@ void Replication::TransactLogApplier::apply()
                     *m_log << "table->optimize()\n";
 #endif
                 m_table->optimize(); // FIXME: May fail
-                break;
+                continue;
             }
-
-        default:
-            goto bad_transact_log;
         }
+
+        goto bad_transact_log;
     }
 
     return;

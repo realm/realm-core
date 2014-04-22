@@ -85,8 +85,16 @@ private:
     TransactLogs m_transact_logs;
 };
 
-TIGHTDB_TABLE_1(MySubtable,
+TIGHTDB_TABLE_1(MySubsubsubtable,
                 i, Int)
+
+TIGHTDB_TABLE_3(MySubsubtable,
+                a, Int,
+                b, Subtable<MySubsubsubtable>,
+                c, Int)
+
+TIGHTDB_TABLE_1(MySubtable,
+                t, Subtable<MySubsubtable>)
 
 TIGHTDB_TABLE_9(MyTable,
                 my_int,       Int,
@@ -96,7 +104,7 @@ TIGHTDB_TABLE_9(MyTable,
                 my_string,    String,
                 my_binary,    Binary,
                 my_date_time, DateTime,
-                my_table,     Subtable<MySubtable>,
+                my_subtable,  Subtable<MySubtable>,
                 my_mixed,     Mixed)
 
 
@@ -116,6 +124,18 @@ TEST(Replication_General)
         {
             WriteTransaction wt(sg_1);
             MyTable::Ref table = wt.get_table<MyTable>("my_table");
+            char buf[] = { '1' };
+            BinaryData bin(buf);
+            Mixed mix;
+            mix.set_int(1);
+            table->set(0, 1, true, 1.0f, 1.0, "x", bin, 727, 0, mix);
+            table->add(2, true, 2.0f, 2.0, "xx", bin, 728, 0, mix);
+            table->insert(0, 3, true, 3.0f, 3.0, "xxx", bin, 729, 0, mix);
+            wt.commit();
+        }
+        {
+            WriteTransaction wt(sg_1);
+            MyTable::Ref table = wt.get_table<MyTable>("my_table");
             table[0].my_int = 9;
             wt.commit();
         }
@@ -126,8 +146,10 @@ TEST(Replication_General)
             wt.commit();
         }
 
+        ostream* replay_log = 0;
+//        replay_log = &cout;
         SharedGroup sg_2(path_2);
-        repl.replay_transacts(sg_2);
+        repl.replay_transacts(sg_2, replay_log);
 
         {
             ReadTransaction rt_1(sg_1);
