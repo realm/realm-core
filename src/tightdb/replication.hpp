@@ -271,7 +271,7 @@ private:
         instr_OptimizeTable      = 26,
         instr_SelectDescriptor   = 27, // Select descriptor from currently selected root table
         instr_InsertColumn       = 28, // Insert new column into to selected descriptor
-        instr_EraseColumn        = 29, // Remove column to selected descriptor
+        instr_EraseColumn        = 29, // Remove column from selected descriptor
         instr_RenameColumn       = 30, // Rename column in selected descriptor
         instr_AddIndexToColumn   = 31  // Add a lookup index to a column
     };
