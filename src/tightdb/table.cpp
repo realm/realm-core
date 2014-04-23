@@ -20,6 +20,9 @@
 #include <tightdb/column_mixed.hpp>
 #include <tightdb/index_string.hpp>
 #include <tightdb/group.hpp>
+#ifdef TIGHTDB_ENABLE_REPLICATION
+#  include <tightdb/replication.hpp>
+#endif
 
 using namespace std;
 using namespace tightdb;
@@ -65,6 +68,7 @@ size_t Table::add_column(DataType type, StringData name, DescriptorRef* subdesc)
     return get_column_count() - 1;
 }
 
+
 void Table::insert_column(size_t column_ndx, DataType type, StringData name,
                           DescriptorRef* subdesc)
 {
@@ -72,11 +76,13 @@ void Table::insert_column(size_t column_ndx, DataType type, StringData name,
     get_descriptor()->insert_column(column_ndx, type, name, subdesc); // Throws
 }
 
+
 void Table::remove_column(size_t column_ndx)
 {
     TIGHTDB_ASSERT(!has_shared_type());
     get_descriptor()->remove_column(column_ndx); // Throws
 }
+
 
 void Table::rename_column(size_t column_ndx, StringData name)
 {
@@ -112,20 +118,24 @@ DescriptorRef Table::get_descriptor()
     return move(desc);
 }
 
+
 ConstDescriptorRef Table::get_descriptor() const
 {
     return const_cast<Table*>(this)->get_descriptor(); // Throws
 }
+
 
 DescriptorRef Table::get_subdescriptor(size_t column_ndx)
 {
     return get_descriptor()->get_subdescriptor(column_ndx); // Throws
 }
 
+
 ConstDescriptorRef Table::get_subdescriptor(size_t column_ndx) const
 {
     return get_descriptor()->get_subdescriptor(column_ndx); // Throws
 }
+
 
 DescriptorRef Table::get_subdescriptor(const path_vec& path)
 {
@@ -137,10 +147,12 @@ DescriptorRef Table::get_subdescriptor(const path_vec& path)
     return desc;
 }
 
+
 ConstDescriptorRef Table::get_subdescriptor(const path_vec& path) const
 {
     return const_cast<Table*>(this)->get_subdescriptor(path); // Throws
 }
+
 
 size_t Table::add_subcolumn(const path_vec& path, DataType type, StringData name)
 {
@@ -150,16 +162,19 @@ size_t Table::add_subcolumn(const path_vec& path, DataType type, StringData name
     return column_ndx;
 }
 
+
 void Table::insert_subcolumn(const path_vec& path, size_t column_ndx,
                              DataType type, StringData name)
 {
     get_subdescriptor(path)->insert_column(column_ndx, type, name); // Throws
 }
 
+
 void Table::remove_subcolumn(const path_vec& path, size_t column_ndx)
 {
     get_subdescriptor(path)->remove_column(column_ndx); // Throws
 }
+
 
 void Table::rename_subcolumn(const path_vec& path, size_t column_ndx, StringData name)
 {
@@ -186,6 +201,7 @@ void Table::init_from_ref(ref_type top_ref, ArrayParent* parent, size_t ndx_in_p
 
     cache_columns(); // Also initializes m_size
 }
+
 
 void Table::init_from_ref(ConstSubspecRef shared_spec, ref_type columns_ref,
                           ArrayParent* parent, size_t ndx_in_parent)
@@ -221,6 +237,7 @@ private:
     const DataType m_type;
 };
 
+
 struct Table::RemoveSubtableColumns: Table::SubtableUpdater {
     RemoveSubtableColumns(size_t i):
         m_column_ndx(i)
@@ -236,6 +253,7 @@ private:
     const size_t m_column_ndx;
 };
 
+
 void Table::do_insert_column(const Descriptor& desc, size_t column_ndx,
                              DataType type, StringData name)
 {
@@ -243,7 +261,7 @@ void Table::do_insert_column(const Descriptor& desc, size_t column_ndx,
 
     Table& root_table = *desc.m_root_table;
     TIGHTDB_ASSERT(!root_table.has_shared_type());
-    TIGHTDB_ASSERT(column_ndx <= desc.m_spec->get_column_count());
+    TIGHTDB_ASSERT(column_ndx <= desc.get_column_count());
 
     root_table.detach_subtable_accessors();
 
@@ -259,9 +277,11 @@ void Table::do_insert_column(const Descriptor& desc, size_t column_ndx,
     }
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    root_table.transact_log().insert_column(*desc.m_spec, column_ndx, type, name); // Throws
+    if (Replication* repl = root_table.get_repl())
+        repl->insert_column(desc, column_ndx, type, name); // Throws
 #endif
 }
+
 
 void Table::do_remove_column(const Descriptor& desc, size_t column_ndx)
 {
@@ -269,7 +289,7 @@ void Table::do_remove_column(const Descriptor& desc, size_t column_ndx)
 
     Table& root_table = *desc.m_root_table;
     TIGHTDB_ASSERT(!root_table.has_shared_type());
-    TIGHTDB_ASSERT(column_ndx < desc.m_spec->get_column_count());
+    TIGHTDB_ASSERT(column_ndx < desc.get_column_count());
 
     root_table.detach_subtable_accessors();
 
@@ -285,9 +305,11 @@ void Table::do_remove_column(const Descriptor& desc, size_t column_ndx)
     }
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    root_table.transact_log().remove_column(*desc.m_spec, column_ndx); // Throws
+    if (Replication* repl = root_table.get_repl())
+        repl->erase_column(desc, column_ndx); // Throws
 #endif
 }
+
 
 void Table::do_rename_column(const Descriptor& desc, size_t column_ndx, StringData name)
 {
@@ -295,19 +317,15 @@ void Table::do_rename_column(const Descriptor& desc, size_t column_ndx, StringDa
 
     Table& root_table = *desc.m_root_table;
     TIGHTDB_ASSERT(!root_table.has_shared_type());
-    TIGHTDB_ASSERT(column_ndx < desc.m_spec->get_column_count());
+    TIGHTDB_ASSERT(column_ndx < desc.get_column_count());
 
     root_table.detach_subtable_accessors();
     desc.m_spec->rename_column(column_ndx, name); // Throws
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    root_table.transact_log().rename_column(*desc.m_spec, column_ndx, name); // Throws
+    if (Replication* repl = root_table.get_repl())
+        repl->rename_column(desc, column_ndx, name); // Throws
 #endif
-}
-
-size_t Table::get_num_subdescs(const Descriptor& desc) TIGHTDB_NOEXCEPT
-{
-    return desc.m_spec->get_num_subspecs();
 }
 
 
@@ -462,6 +480,7 @@ void Table::update_subtables(const Descriptor& desc, SubtableUpdater& updater)
     }
 }
 
+
 void Table::update_subtables(const size_t* path_begin, const size_t* path_end,
                              SubtableUpdater& updater)
 {
@@ -591,7 +610,8 @@ void Table::create_columns()
 void Table::detach() TIGHTDB_NOEXCEPT
 {
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    transact_log().on_table_destroyed();
+    if (Replication* repl = get_repl())
+        repl->on_table_destroyed(this);
     m_spec.m_top.detach();
 #endif
 
@@ -606,8 +626,9 @@ void Table::detach() TIGHTDB_NOEXCEPT
     detach_subtable_accessors();
 
     destroy_column_accessors();
-    detach_views_except(NULL);
+    detach_views_except(0);
 }
+
 
 // Note about exception safety:
 // This function must be called with a view that is either 0, OR
@@ -631,13 +652,14 @@ void Table::detach_views_except(const TableViewBase* view) TIGHTDB_NOEXCEPT
     }
 }
 
+
 void Table::detach_subtable_accessors() TIGHTDB_NOEXCEPT
 {
     if (is_empty())
         return;
 
     size_t n = m_cols.size();
-    for (size_t i=0; i<n; ++i) {
+    for (size_t i = 0; i < n; ++i) {
         ColumnBase* c = reinterpret_cast<ColumnBase*>(uintptr_t(m_cols.get(i)));
         c->detach_subtable_accessors();
     }
@@ -661,6 +683,7 @@ void Table::instantiate_before_change()
     if (!m_columns.is_attached())
         create_columns();
 }
+
 
 void Table::cache_columns()
 {
@@ -805,7 +828,8 @@ Table::~Table() TIGHTDB_NOEXCEPT
     }
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    transact_log().on_table_destroyed();
+    if (Replication* repl = get_repl())
+        repl->on_table_destroyed(this);
     m_spec.m_top.detach();
 #endif
 
@@ -852,12 +876,14 @@ Table::~Table() TIGHTDB_NOEXCEPT
     m_top.destroy_deep();
 }
 
+
 bool Table::has_index(size_t column_ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     const ColumnBase& col = get_column_base(column_ndx);
     return col.has_index();
 }
+
 
 void Table::set_index(size_t column_ndx, bool update_spec)
 {
@@ -903,7 +929,8 @@ void Table::set_index(size_t column_ndx, bool update_spec)
         m_spec.set_column_attr(column_ndx, col_attr_Indexed);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    transact_log().add_index_to_column(column_ndx); // Throws
+    if (Replication* repl = get_repl())
+        repl->add_index_to_column(this, column_ndx); // Throws
 #endif
 }
 
@@ -916,6 +943,7 @@ ColumnBase& Table::get_column_base(size_t ndx)
     TIGHTDB_ASSERT(m_cols.size() == get_column_count());
     return *reinterpret_cast<ColumnBase*>(m_cols.get(ndx));
 }
+
 
 const ColumnBase& Table::get_column_base(size_t ndx) const TIGHTDB_NOEXCEPT
 {
@@ -1169,7 +1197,8 @@ size_t Table::add_empty_row(size_t num_rows)
     m_size += num_rows;
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    transact_log().insert_empty_rows(new_ndx, 1); // Throws
+    if (Replication* repl = get_repl())
+        repl->insert_empty_rows(this, new_ndx, 1); // Throws
 #endif
 
     return new_ndx;
@@ -1190,7 +1219,8 @@ void Table::insert_empty_row(size_t ndx, size_t num_rows)
     m_size += num_rows;
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    transact_log().insert_empty_rows(ndx, num_rows); // Throws
+    if (Replication* repl = get_repl())
+        repl->insert_empty_rows(this, ndx, num_rows); // Throws
 #endif
 }
 
@@ -1205,7 +1235,8 @@ void Table::clear()
     m_size = 0;
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    transact_log().clear_table(); // Throws
+    if (Replication* repl = get_repl())
+        repl->clear_table(this); // Throws
 #endif
 }
 
@@ -1222,7 +1253,8 @@ void Table::do_remove(size_t ndx)
     --m_size;
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    transact_log().remove_row(ndx); // Throws
+    if (Replication* repl = get_repl())
+        repl->erase_row(this, ndx); // Throws
 #endif
 }
 
@@ -1239,7 +1271,9 @@ void Table::move_last_over(size_t ndx)
     --m_size;
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    //TODO: transact_log().move_last_over(ndx); // Throws
+    // FIXME: Implement this
+//    if (Replication* repl = get_repl())
+//        repl->move_last_over(this, ndx); // Throws
 #endif
 }
 
@@ -1255,7 +1289,8 @@ void Table::insert_subtable(size_t col_ndx, size_t row_ndx, const Table* table)
 
     // FIXME: Replication is not yet able to handle copying insertion of non-empty tables.
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    transact_log().insert_value(col_ndx, row_ndx, Replication::subtable_tag()); // Throws
+    if (Replication* repl = get_repl())
+        repl->insert_table(this, col_ndx, row_ndx); // Throws
 #endif
 }
 
@@ -1271,7 +1306,8 @@ void Table::set_subtable(size_t col_ndx, size_t row_ndx, const Table* table)
 
     // FIXME: Replication is not yet able to handle copying insertion of non-empty tables.
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    transact_log().set_value(col_ndx, row_ndx, Replication::subtable_tag()); // Throws
+    if (Replication* repl = get_repl())
+        repl->set_table(this, col_ndx, row_ndx); // Throws
 #endif
 }
 
@@ -1287,7 +1323,8 @@ void Table::insert_mixed_subtable(size_t col_ndx, size_t row_ndx, const Table* t
 
     // FIXME: Replication is not yet able to handle copuing insertion of non-empty tables.
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    transact_log().insert_value(col_ndx, row_ndx, Replication::subtable_tag()); // Throws
+    if (Replication* repl = get_repl())
+        repl->insert_mixed(this, col_ndx, row_ndx, Mixed::subtable_tag()); // Throws
 #endif
 }
 
@@ -1303,7 +1340,8 @@ void Table::set_mixed_subtable(size_t col_ndx, size_t row_ndx, const Table* t)
 
     // FIXME: Replication is not yet able to handle copying assignment of non-empty tables.
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    transact_log().set_value(col_ndx, row_ndx, Replication::subtable_tag()); // Throws
+    if (Replication* repl = get_repl())
+        repl->set_mixed(this, col_ndx, row_ndx, Mixed::subtable_tag()); // Throws
 #endif
 }
 
@@ -1373,7 +1411,8 @@ void Table::clear_subtable(size_t col_idx, size_t row_idx)
         subtables.set(row_idx, 0);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-        transact_log().set_value(col_idx, row_idx, Replication::subtable_tag()); // Throws
+        if (Replication* repl = get_repl())
+            repl->set_table(this, col_idx, row_idx); // Throws
 #endif
     }
     else if (type == col_type_Mixed) {
@@ -1381,7 +1420,8 @@ void Table::clear_subtable(size_t col_idx, size_t row_idx)
         subtables.set_subtable(row_idx, 0);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-        transact_log().set_value(col_idx, row_idx, Mixed(Mixed::subtable_tag())); // Throws
+        if (Replication* repl = get_repl())
+            repl->set_mixed(this, col_idx, row_idx, Mixed::subtable_tag()); // Throws
 #endif
     }
     else {
@@ -1431,7 +1471,8 @@ void Table::set_int(size_t column_ndx, size_t ndx, int64_t value)
     column.set(ndx, value);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    transact_log().set_value(column_ndx, ndx, value); // Throws
+    if (Replication* repl = get_repl())
+        repl->set_int(this, column_ndx, ndx, value); // Throws
 #endif
 }
 
@@ -1442,7 +1483,8 @@ void Table::add_int(size_t column_ndx, int64_t value)
     get_column(column_ndx).adjust(value);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    transact_log().add_int_to_column(column_ndx, value); // Throws
+    if (Replication* repl = get_repl())
+        repl->add_int_to_column(this, column_ndx, value); // Throws
 #endif
 }
 
@@ -1467,7 +1509,8 @@ void Table::set_bool(size_t column_ndx, size_t ndx, bool value)
     column.set(ndx, value ? 1 : 0);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    transact_log().set_value(column_ndx, ndx, int(value)); // Throws
+    if (Replication* repl = get_repl())
+        repl->set_bool(this, column_ndx, ndx, value); // Throws
 #endif
 }
 
@@ -1491,7 +1534,8 @@ void Table::set_datetime(size_t column_ndx, size_t ndx, DateTime value)
     column.set(ndx, int64_t(value.get_datetime()));
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    transact_log().set_value(column_ndx, ndx, value.get_datetime()); // Throws
+    if (Replication* repl = get_repl())
+        repl->set_date_time(this, column_ndx, ndx, value); // Throws
 #endif
 }
 
@@ -1504,7 +1548,8 @@ void Table::insert_int(size_t column_ndx, size_t ndx, int64_t value)
     column.insert(ndx, value);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    transact_log().insert_value(column_ndx, ndx, value); // Throws
+    if (Replication* repl = get_repl())
+        repl->insert_int(this, column_ndx, ndx, value); // Throws
 #endif
 }
 
@@ -1527,7 +1572,8 @@ void Table::set_float(size_t column_ndx, size_t ndx, float value)
     column.set(ndx, value);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    transact_log().set_value(column_ndx, ndx, value); // Throws
+    if (Replication* repl = get_repl())
+        repl->set_float(this, column_ndx, ndx, value); // Throws
 #endif
 }
 
@@ -1540,7 +1586,8 @@ void Table::insert_float(size_t column_ndx, size_t ndx, float value)
     column.insert(ndx, value);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    transact_log().insert_value(column_ndx, ndx, value); // Throws
+    if (Replication* repl = get_repl())
+        repl->insert_float(this, column_ndx, ndx, value); // Throws
 #endif
 }
 
@@ -1563,7 +1610,8 @@ void Table::set_double(size_t column_ndx, size_t ndx, double value)
     column.set(ndx, value);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    transact_log().set_value(column_ndx, ndx, value); // Throws
+    if (Replication* repl = get_repl())
+        repl->set_double(this, column_ndx, ndx, value); // Throws
 #endif
 }
 
@@ -1576,7 +1624,8 @@ void Table::insert_double(size_t column_ndx, size_t ndx, double value)
     column.insert(ndx, value);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    transact_log().insert_value(column_ndx, ndx, value); // Throws
+    if (Replication* repl = get_repl())
+        repl->insert_double(this, column_ndx, ndx, value); // Throws
 #endif
 }
 
@@ -1614,7 +1663,8 @@ void Table::set_string(size_t column_ndx, size_t ndx, StringData value)
     }
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    transact_log().set_value(column_ndx, ndx, value); // Throws
+    if (Replication* repl = get_repl())
+        repl->set_string(this, column_ndx, ndx, value); // Throws
 #endif
 }
 
@@ -1635,7 +1685,8 @@ void Table::insert_string(size_t column_ndx, size_t ndx, StringData value)
     }
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    transact_log().insert_value(column_ndx, ndx, value); // Throws
+    if (Replication* repl = get_repl())
+        repl->insert_string(this, column_ndx, ndx, value); // Throws
 #endif
 }
 
@@ -1658,7 +1709,8 @@ void Table::set_binary(size_t column_ndx, size_t ndx, BinaryData value)
     column.set(ndx, value);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    transact_log().set_value(column_ndx, ndx, value); // Throws
+    if (Replication* repl = get_repl())
+        repl->set_binary(this, column_ndx, ndx, value); // Throws
 #endif
 }
 
@@ -1671,7 +1723,8 @@ void Table::insert_binary(size_t column_ndx, size_t ndx, BinaryData value)
     column.insert(ndx, value);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    transact_log().insert_value(column_ndx, ndx, value); // Throws
+    if (Replication* repl = get_repl())
+        repl->insert_binary(this, column_ndx, ndx, value); // Throws
 #endif
 }
 
@@ -1756,7 +1809,8 @@ void Table::set_mixed(size_t column_ndx, size_t ndx, Mixed value)
     }
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    transact_log().set_value(column_ndx, ndx, value); // Throws
+    if (Replication* repl = get_repl())
+        repl->set_mixed(this, column_ndx, ndx, value); // Throws
 #endif
 }
 
@@ -1799,7 +1853,8 @@ void Table::insert_mixed(size_t column_ndx, size_t ndx, Mixed value)
     }
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    transact_log().insert_value(column_ndx, ndx, value); // Throws
+    if (Replication* repl = get_repl())
+        repl->insert_mixed(this, column_ndx, ndx, value); // Throws
 #endif
 }
 
@@ -1809,7 +1864,8 @@ void Table::insert_done()
     ++m_size;
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    transact_log().row_insert_complete(); // Throws
+    if (Replication* repl = get_repl())
+        repl->row_insert_complete(this); // Throws
 #endif
 }
 
@@ -2724,7 +2780,8 @@ void Table::optimize()
     }
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    transact_log().optimize_table(); // Throws
+    if (Replication* repl = get_repl())
+        repl->optimize_table(this); // Throws
 #endif
 }
 

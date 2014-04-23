@@ -661,9 +661,9 @@ EOF
         exit 0
         ;;
 
-    "check-doc-examples")
+    "check"|"memcheck"|"check-"*|"memcheck-"*)
         auto_configure || exit 1
-        $MAKE check-doc-examples || exit 1
+        $MAKE "$MODE" || exit 1
         ;;
 
     "show-install")

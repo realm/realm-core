@@ -30,9 +30,6 @@
 #include <tightdb/spec.hpp>
 #include <tightdb/mixed.hpp>
 #include <tightdb/query.hpp>
-#ifdef TIGHTDB_ENABLE_REPLICATION
-#  include <tightdb/replication.hpp>
-#endif
 
 namespace tightdb {
 
@@ -45,13 +42,17 @@ template<class> class Columns;
 
 namespace _impl { class TableFriend; }
 
+#ifdef TIGHTDB_ENABLE_REPLICATION
+class Replication;
+#endif
+
 
 /// The Table class is non-polymorphic, that is, it has no virtual
 /// functions. This is important because it ensures that there is no
 /// run-time distinction between a Table instance and an instance of
 /// any variation of BasicTable<T>, and this, in turn, makes it valid
 /// to cast a pointer from Table to BasicTable<T> even when the
-/// instance is constructed as a Table. Of couse, this also assumes
+/// instance is constructed as a Table. Of course, this also assumes
 /// that BasicTable<> is non-polymorphic, has no destructor, and adds
 /// no extra data members.
 ///
@@ -660,8 +661,6 @@ private:
     static void do_remove_column(const Descriptor&, std::size_t column_ndx);
     static void do_rename_column(const Descriptor&, std::size_t column_ndx, StringData name);
 
-    static std::size_t get_num_subdescs(const Descriptor&) TIGHTDB_NOEXCEPT;
-
     struct InsertSubtableColumns;
     struct RemoveSubtableColumns;
 
@@ -826,23 +825,18 @@ private:
     /// new top array.
     ref_type clone(Allocator&) const;
 
-    // Condition: 1 <= end - begin
-    std::size_t* record_subspec_path(const Spec&, std::size_t* begin,
-                                     std::size_t* end) const TIGHTDB_NOEXCEPT;
-
-    // Condition: 1 <= end - begin
+    // Precondition: 1 <= end - begin
     std::size_t* record_subtable_path(std::size_t* begin,
                                       std::size_t* end) const TIGHTDB_NOEXCEPT;
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    struct LocalTransactLog;
-    LocalTransactLog transact_log() TIGHTDB_NOEXCEPT;
-    friend class Replication;
+    Replication* get_repl() TIGHTDB_NOEXCEPT;
 #endif
 
 #ifdef TIGHTDB_DEBUG
     void to_dot_internal(std::ostream&) const;
 #endif
+
     friend class SubtableNode;
     friend class _impl::TableFriend;
     friend class Query;
@@ -1180,16 +1174,6 @@ inline bool Table::is_degenerate() const TIGHTDB_NOEXCEPT
     return !m_columns.is_attached();
 }
 
-inline std::size_t* Table::record_subspec_path(const Spec& spec, std::size_t* begin,
-                                               std::size_t* end) const TIGHTDB_NOEXCEPT
-{
-    if (&spec != &m_spec) {
-        TIGHTDB_ASSERT(m_spec.m_subspecs.is_attached());
-        return spec.record_subspec_path(m_spec.m_subspecs, begin, end);
-    }
-    return begin;
-}
-
 inline std::size_t* Table::record_subtable_path(std::size_t* begin,
                                                 std::size_t* end) const TIGHTDB_NOEXCEPT
 {
@@ -1209,101 +1193,12 @@ inline std::size_t* Table::Parent::record_subtable_path(std::size_t* begin,
     return begin;
 }
 
-
 #ifdef TIGHTDB_ENABLE_REPLICATION
-
-struct Table::LocalTransactLog {
-    template<class T> void set_value(std::size_t column_ndx, std::size_t row_ndx, const T& value)
-    {
-        if (m_repl)
-            m_repl->set_value(m_table, column_ndx, row_ndx, value); // Throws
-    }
-
-    template<class T> void insert_value(std::size_t column_ndx, std::size_t row_ndx, const T& value)
-    {
-        if (m_repl)
-            m_repl->insert_value(m_table, column_ndx, row_ndx, value); // Throws
-    }
-
-    void row_insert_complete()
-    {
-        if (m_repl)
-            m_repl->row_insert_complete(m_table); // Throws
-    }
-
-    void insert_empty_rows(std::size_t row_ndx, std::size_t num_rows)
-    {
-        if (m_repl)
-            m_repl->insert_empty_rows(m_table, row_ndx, num_rows); // Throws
-    }
-
-    void remove_row(std::size_t row_ndx)
-    {
-        if (m_repl)
-            m_repl->remove_row(m_table, row_ndx); // Throws
-    }
-
-    void add_int_to_column(std::size_t column_ndx, int64_t value)
-    {
-        if (m_repl)
-            m_repl->add_int_to_column(m_table, column_ndx, value); // Throws
-    }
-
-    void add_index_to_column(std::size_t column_ndx)
-    {
-        if (m_repl)
-            m_repl->add_index_to_column(m_table, column_ndx); // Throws
-    }
-
-    void clear_table()
-    {
-        if (m_repl)
-            m_repl->clear_table(m_table); // Throws
-    }
-
-    void optimize_table()
-    {
-        if (m_repl)
-            m_repl->optimize_table(m_table); // Throws
-    }
-
-    void insert_column(const Spec& spec, std::size_t column_ndx, DataType type, StringData name)
-    {
-        if (m_repl)
-            m_repl->insert_column(m_table, &spec, column_ndx, type, name); // Throws
-    }
-
-    void remove_column(const Spec& spec, std::size_t column_ndx)
-    {
-        if (m_repl)
-            m_repl->remove_column(m_table, &spec, column_ndx); // Throws
-    }
-
-    void rename_column(const Spec& spec, std::size_t column_ndx, StringData name)
-    {
-        if (m_repl)
-            m_repl->rename_column(m_table, &spec, column_ndx,name); // Throws
-    }
-
-    void on_table_destroyed() TIGHTDB_NOEXCEPT
-    {
-        if (m_repl)
-            m_repl->on_table_destroyed(m_table);
-    }
-
-private:
-    Replication* const m_repl;
-    Table* const m_table;
-    LocalTransactLog(Replication* r, Table* t) TIGHTDB_NOEXCEPT: m_repl(r), m_table(t) {}
-    friend class Table;
-};
-
-inline Table::LocalTransactLog Table::transact_log() TIGHTDB_NOEXCEPT
+inline Replication* Table::get_repl() TIGHTDB_NOEXCEPT
 {
-    return LocalTransactLog(m_top.get_alloc().get_replication(), this);
+    return m_top.get_alloc().get_replication();
 }
-
-#endif // TIGHTDB_ENABLE_REPLICATION
+#endif
 
 
 class _impl::TableFriend {
@@ -1390,26 +1285,6 @@ public:
         return &table.m_spec;
     }
 
-    static void add_column_to_spec(Table& table, Spec& spec, DataType type, StringData name)
-    {
-        std::size_t column_ndx = spec.get_column_count();
-        spec.insert_column(column_ndx, type, name); // Throws
-#ifdef TIGHTDB_ENABLE_REPLICATION
-        table.transact_log().insert_column(spec, column_ndx, type, name); // Throws
-#else
-        static_cast<void>(table);
-#endif
-    }
-
-    static void update_table_from_spec(Table& table)
-    {
-        TIGHTDB_ASSERT(!table.has_shared_type());
-        TIGHTDB_ASSERT(table.m_columns.is_empty() &&
-                       table.m_cols.is_empty()); // only on initial creation
-        table.detach_subtable_accessors();
-        table.create_columns(); // Throws
-    }
-
     static std::size_t* record_subtable_path(const Table& table, std::size_t* begin,
                                              std::size_t* end) TIGHTDB_NOEXCEPT
     {
@@ -1430,11 +1305,6 @@ public:
     static void rename_column(const Descriptor& desc, std::size_t column_ndx, StringData name)
     {
         Table::do_rename_column(desc, column_ndx, name); // Throws
-    }
-
-    static std::size_t get_num_subdescs(const Descriptor& desc) TIGHTDB_NOEXCEPT
-    {
-        return Table::get_num_subdescs(desc);
     }
 
     static void clear_desc_ptr(const Table& table) TIGHTDB_NOEXCEPT

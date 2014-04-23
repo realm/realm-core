@@ -75,7 +75,6 @@ public:
 
     std::size_t get_subspec_ndx(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
     ref_type get_subspec_ref(std::size_t subspec_ndx) const TIGHTDB_NOEXCEPT;
-    std::size_t get_num_subspecs() const TIGHTDB_NOEXCEPT;
     SubspecRef get_subspec_by_ndx(std::size_t subspec_ndx) TIGHTDB_NOEXCEPT;
     ConstSubspecRef get_subspec_by_ndx(std::size_t subspec_ndx) const TIGHTDB_NOEXCEPT;
 
@@ -148,10 +147,6 @@ private:
 
     void get_column_info(std::size_t column_ndx, ColumnInfo&) const TIGHTDB_NOEXCEPT;
 
-    // Precondition: 1 <= end - begin
-    std::size_t* record_subspec_path(const Array& root_subspecs, std::size_t* begin,
-                                     std::size_t* end) const TIGHTDB_NOEXCEPT;
-
     // Returns false if the spec has no columns, otherwise it returns
     // true and sets `type` to the type of the first column.
     static bool get_first_column_type_from_ref(ref_type, Allocator&,
@@ -218,12 +213,6 @@ inline ref_type Spec::get_subspec_ref(std::size_t subspec_ndx) const TIGHTDB_NOE
     // by number of sub-table columns
     return m_subspecs.get_as_ref(subspec_ndx);
 }
-
-inline std::size_t Spec::get_num_subspecs() const TIGHTDB_NOEXCEPT
-{
-    return m_subspecs.is_attached() ? m_subspecs.size() : 0;
-}
-
 
 inline Spec::Spec(SubspecRef r) TIGHTDB_NOEXCEPT:
     m_top(r.m_parent->get_alloc()), m_spec(r.m_parent->get_alloc()),

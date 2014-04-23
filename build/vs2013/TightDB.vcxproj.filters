@@ -223,18 +223,30 @@
     <ClCompile Include="..\..\test\util\test_path.cpp">
       <Filter>test\util</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\test\large_tests\test_column_large.cpp" />
-    <ClCompile Include="..\..\test\large_tests\test_strings.cpp" />
-    <ClCompile Include="..\..\test\large_tests\verified_integer.cpp" />
-    <ClCompile Include="..\..\test\large_tests\verified_string.cpp" />
     <ClCompile Include="..\..\test\main.cpp" />
     <ClCompile Include="..\..\test\performance\matrix.cpp" />
-    <ClCompile Include="..\..\test\test_alloc.cpp" />
-    <ClCompile Include="..\..\test\test_array.cpp" />
     <ClCompile Include="..\..\test\util\random.cpp">
       <Filter>test\util</Filter>
     </ClCompile>
     <ClCompile Include="..\..\test\test_all.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\test\test_alloc.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\test\test_array.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\test\large_tests\test_column_large.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\test\large_tests\test_strings.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\test\util\verified_integer.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\test\util\verified_string.cpp">
       <Filter>test</Filter>
     </ClCompile>
   </ItemGroup>
@@ -245,10 +257,10 @@
     <ClInclude Include="..\..\test\testsettings.hpp">
       <Filter>test</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\test\large_tests\verified_integer.hpp">
+    <ClInclude Include="..\..\test\util\verified_integer.hpp">
       <Filter>test\large_tests</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\test\large_tests\verified_string.hpp">
+    <ClInclude Include="..\..\test\util\verified_string.hpp">
       <Filter>test\large_tests</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\tightdb\query_conditions.hpp">
