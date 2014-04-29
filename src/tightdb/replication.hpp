@@ -28,7 +28,9 @@
 #include <tightdb/util/assert.hpp>
 #include <tightdb/util/tuple.hpp>
 #include <tightdb/util/safe_int_ops.hpp>
+#include <tightdb/util/unique_ptr.hpp>
 #include <tightdb/util/buffer.hpp>
+#include <tightdb/util/string_buffer.hpp>
 #include <tightdb/util/file.hpp>
 #include <tightdb/group.hpp>
 #include <tightdb/descriptor.hpp>
@@ -159,6 +161,8 @@ public:
     void on_spec_destroyed(const Spec*) TIGHTDB_NOEXCEPT;
 
 
+    class TransactLogParser;
+
     class InputStream;
 
     class BadTransactLog; // Exception
@@ -239,7 +243,7 @@ protected:
     static version_type get_current_version(SharedGroup&);
 
 private:
-    struct TransactLogApplier;
+    class TransactLogApplier;
 
     /// Transaction log instruction encoding
     enum Instruction {
@@ -345,6 +349,43 @@ public:
     }
 };
 
+
+class Replication::TransactLogParser {
+public:
+    TransactLogParser(InputStream& transact_log);
+
+    ~TransactLogParser() TIGHTDB_NOEXCEPT;
+
+    template<class InstructionHandler> void parse(InstructionHandler&);
+
+private:
+    InputStream& m_input;
+    static const std::size_t m_input_buffer_size = 4096; // FIXME: Use smaller number when compiling in debug mode
+    util::UniquePtr<char[]> m_input_buffer;
+    const char* m_input_begin;
+    const char* m_input_end;
+    util::StringBuffer m_string_buffer;
+    static const int m_max_levels = 1024;
+    util::Buffer<std::size_t> m_path;
+
+    template<class T> T read_int();
+
+    void read_bytes(char* data, std::size_t size);
+
+    float read_float();
+    double read_double();
+
+    void read_string(util::StringBuffer&);
+    void read_mixed(Mixed*);
+
+    // Returns false if no more input was available
+    bool fill_input_buffer();
+
+    // Returns false if no input was available
+    bool read_char(char&);
+
+    bool is_valid_column_type(int type);
+};
 
 
 class TrivialReplication: public Replication {
@@ -868,6 +909,485 @@ inline void Replication::on_spec_destroyed(const Spec* s) TIGHTDB_NOEXCEPT
 {
     if (m_selected_spec == s)
         m_selected_spec = 0;
+}
+
+
+inline Replication::TransactLogParser::TransactLogParser(Replication::InputStream& transact_log):
+    m_input(transact_log)
+{
+}
+
+
+inline Replication::TransactLogParser::~TransactLogParser() TIGHTDB_NOEXCEPT
+{
+}
+
+
+template<class InstructionHandler>
+void Replication::TransactLogParser::parse(InstructionHandler& handler)
+{
+    if (!m_input_buffer)
+        m_input_buffer.reset(new char[m_input_buffer_size]); // Throws
+    m_input_begin = m_input_end = m_input_buffer.get();
+
+    DescriptorRef desc;
+    for (;;) {
+        char instr;
+        if (!read_char(instr))
+            break;
+//cerr << "["<<promote(instr)<<"]";
+        switch (Instruction(instr)) {
+            case instr_SetInt: {
+                std::size_t col_ndx = read_int<std::size_t>(); // Throws
+                std::size_t row_ndx = read_int<std::size_t>(); // Throws
+                // FIXME: Don't depend on the existence of int64_t,
+                // but don't allow values to use more than 64 bits
+                // either.
+                int_fast64_t value = read_int<int64_t>(); // Throws
+                if (!handler.set_int(col_ndx, row_ndx, value)) // Throws
+                    goto bad_transact_log;
+                continue;
+            }
+            case instr_SetBool: {
+                std::size_t col_ndx = read_int<std::size_t>(); // Throws
+                std::size_t row_ndx = read_int<std::size_t>(); // Throws
+                bool value = read_int<bool>(); // Throws
+                if (!handler.set_bool(col_ndx, row_ndx, value)) // Throws
+                    goto bad_transact_log;
+                continue;
+            }
+            case instr_SetFloat: {
+                std::size_t col_ndx = read_int<std::size_t>(); // Throws
+                std::size_t row_ndx = read_int<std::size_t>(); // Throws
+                float value = read_float(); // Throws
+                if (!handler.set_float(col_ndx, row_ndx, value)) // Throws
+                    goto bad_transact_log;
+                continue;
+            }
+            case instr_SetDouble: {
+                std::size_t col_ndx = read_int<std::size_t>(); // Throws
+                std::size_t row_ndx = read_int<std::size_t>(); // Throws
+                double value = read_double(); // Throws
+                if (!handler.set_double(col_ndx, row_ndx, value)) // Throws
+                    goto bad_transact_log;
+                continue;
+            }
+            case instr_SetString: {
+                std::size_t col_ndx = read_int<std::size_t>(); // Throws
+                std::size_t row_ndx = read_int<std::size_t>(); // Throws
+                read_string(m_string_buffer); // Throws
+                StringData value(m_string_buffer.data(), m_string_buffer.size());
+                if (!handler.set_string(col_ndx, row_ndx, value)) // Throws
+                    goto bad_transact_log;
+                continue;
+            }
+            case instr_SetBinary: {
+                std::size_t col_ndx = read_int<std::size_t>(); // Throws
+                std::size_t row_ndx = read_int<std::size_t>(); // Throws
+                read_string(m_string_buffer); // Throws
+                BinaryData value(m_string_buffer.data(), m_string_buffer.size());
+                if (!handler.set_binary(col_ndx, row_ndx, value)) // Throws
+                    goto bad_transact_log;
+                continue;
+            }
+            case instr_SetDateTime: {
+                std::size_t col_ndx = read_int<std::size_t>(); // Throws
+                std::size_t row_ndx = read_int<std::size_t>(); // Throws
+                std::time_t value = read_int<std::time_t>(); // Throws
+                if (!handler.set_date_time(col_ndx, row_ndx, value)) // Throws
+                    goto bad_transact_log;
+                continue;
+            }
+            case instr_SetTable: {
+                std::size_t col_ndx = read_int<std::size_t>(); // Throws
+                std::size_t row_ndx = read_int<std::size_t>(); // Throws
+                if (!handler.set_table(col_ndx, row_ndx)) // Throws
+                    goto bad_transact_log;
+                continue;
+            }
+            case instr_SetMixed: {
+                std::size_t col_ndx = read_int<std::size_t>(); // Throws
+                std::size_t row_ndx = read_int<std::size_t>(); // Throws
+                Mixed value;
+                read_mixed(&value); // Throws
+                if (!handler.set_mixed(col_ndx, row_ndx, value)) // Throws
+                    goto bad_transact_log;
+                continue;
+            }
+            case instr_InsertInt: {
+                std::size_t col_ndx = read_int<std::size_t>(); // Throws
+                std::size_t row_ndx = read_int<std::size_t>(); // Throws
+                // FIXME: Don't depend on the existence of int64_t,
+                // but don't allow values to use more than 64 bits
+                // either.
+                int_fast64_t value = read_int<int64_t>(); // Throws
+                if (!handler.insert_int(col_ndx, row_ndx, value)) // Throws
+                    goto bad_transact_log;
+                continue;
+            }
+            case instr_InsertBool: {
+                std::size_t col_ndx = read_int<std::size_t>(); // Throws
+                std::size_t row_ndx = read_int<std::size_t>(); // Throws
+                bool value = read_int<bool>(); // Throws
+                if (!handler.insert_bool(col_ndx, row_ndx, value)) // Throws
+                    goto bad_transact_log;
+                continue;
+            }
+            case instr_InsertFloat: {
+                std::size_t col_ndx = read_int<std::size_t>(); // Throws
+                std::size_t row_ndx = read_int<std::size_t>(); // Throws
+                float value = read_float(); // Throws
+                if (!handler.insert_float(col_ndx, row_ndx, value)) // Throws
+                    goto bad_transact_log;
+                continue;
+            }
+            case instr_InsertDouble: {
+                std::size_t col_ndx = read_int<std::size_t>(); // Throws
+                std::size_t row_ndx = read_int<std::size_t>(); // Throws
+                double value = read_double(); // Throws
+                if (!handler.insert_double(col_ndx, row_ndx, value)) // Throws
+                    goto bad_transact_log;
+                continue;
+            }
+            case instr_InsertString: {
+                std::size_t col_ndx = read_int<std::size_t>(); // Throws
+                std::size_t row_ndx = read_int<std::size_t>(); // Throws
+                read_string(m_string_buffer); // Throws
+                StringData value(m_string_buffer.data(), m_string_buffer.size());
+                if (!handler.insert_string(col_ndx, row_ndx, value)) // Throws
+                    goto bad_transact_log;
+                continue;
+            }
+            case instr_InsertBinary: {
+                std::size_t col_ndx = read_int<std::size_t>(); // Throws
+                std::size_t row_ndx = read_int<std::size_t>(); // Throws
+                read_string(m_string_buffer); // Throws
+                BinaryData value(m_string_buffer.data(), m_string_buffer.size());
+                if (!handler.insert_binary(col_ndx, row_ndx, value)) // Throws
+                    goto bad_transact_log;
+                continue;
+            }
+            case instr_InsertDateTime: {
+                std::size_t col_ndx = read_int<std::size_t>(); // Throws
+                std::size_t row_ndx = read_int<std::size_t>(); // Throws
+                std::time_t value = read_int<std::time_t>(); // Throws
+                if (!handler.insert_date_time(col_ndx, row_ndx, value)) // Throws
+                    goto bad_transact_log;
+                continue;
+            }
+            case instr_InsertTable: {
+                std::size_t col_ndx = read_int<std::size_t>(); // Throws
+                std::size_t row_ndx = read_int<std::size_t>(); // Throws
+                if (!handler.insert_table(col_ndx, row_ndx)) // Throws
+                    goto bad_transact_log;
+                continue;
+            }
+            case instr_InsertMixed: {
+                std::size_t col_ndx = read_int<std::size_t>(); // Throws
+                std::size_t row_ndx = read_int<std::size_t>(); // Throws
+                Mixed value;
+                read_mixed(&value); // Throws
+                if (!handler.insert_mixed(col_ndx, row_ndx, value)) // Throws
+                    goto bad_transact_log;
+                continue;
+            }
+            case instr_RowInsertComplete: {
+                if (!handler.row_insert_complete()) // Throws
+                    goto bad_transact_log;
+                continue;
+            }
+            case instr_InsertEmptyRows: {
+                std::size_t row_ndx = read_int<std::size_t>(); // Throws
+                std::size_t num_rows = read_int<std::size_t>(); // Throws
+                if (!handler.insert_empty_rows(row_ndx, num_rows)) // Throws
+                    goto bad_transact_log;
+                continue;
+            }
+            case instr_EraseRow: {
+                std::size_t row_ndx = read_int<std::size_t>(); // Throws
+                if (!handler.erase_row(row_ndx)) // Throws
+                    goto bad_transact_log;
+                continue;
+            }
+            case instr_AddIntToColumn: {
+                std::size_t col_ndx = read_int<std::size_t>(); // Throws
+                // FIXME: Don't depend on the existence of int64_t,
+                // but don't allow values to use more than 64 bits
+                // either.
+                int_fast64_t value = read_int<int64_t>(); // Throws
+                if (!handler.add_int_to_column(col_ndx, value)) // Throws
+                    goto bad_transact_log;
+                continue;
+            }
+            case instr_SelectTable: {
+                int levels = read_int<int>(); // Throws
+                if (levels < 0 || levels > m_max_levels)
+                    goto bad_transact_log;
+                m_path.reserve(0, 2*levels); // Throws
+                std::size_t* path = m_path.data();
+                std::size_t group_level_ndx = read_int<std::size_t>(); // Throws
+                for (int i = 0; i != levels; ++i) {
+                    std::size_t col_ndx = read_int<std::size_t>(); // Throws
+                    std::size_t row_ndx = read_int<std::size_t>(); // Throws
+                    path[2*i + 0] = col_ndx;
+                    path[2*i + 1] = row_ndx;
+                }
+                if (!handler.select_table(group_level_ndx, levels, path)) // Throws
+                    goto bad_transact_log;
+                continue;
+            }
+            case instr_ClearTable: {
+                if (!handler.clear_table()) // Throws
+                    goto bad_transact_log;
+                continue;
+            }
+            case instr_AddIndexToColumn: {
+                std::size_t col_ndx = read_int<std::size_t>(); // Throws
+                if (!handler.add_index_to_column(col_ndx)) // Throws
+                    goto bad_transact_log;
+                continue;
+            }
+            case instr_InsertColumn: {
+                std::size_t col_ndx = read_int<std::size_t>(); // Throws
+                int type = read_int<int>(); // Throws
+                if (!is_valid_column_type(type))
+                    goto bad_transact_log;
+                read_string(m_string_buffer); // Throws
+                StringData name(m_string_buffer.data(), m_string_buffer.size());
+                if (!handler.insert_column(col_ndx, DataType(type), name)) // Throws
+                    goto bad_transact_log;
+                continue;
+            }
+            case instr_EraseColumn: {
+                std::size_t col_ndx = read_int<std::size_t>(); // Throws
+                if (!handler.erase_column(col_ndx)) // Throws
+                    goto bad_transact_log;
+                continue;
+            }
+            case instr_RenameColumn: {
+                std::size_t col_ndx = read_int<std::size_t>(); // Throws
+                read_string(m_string_buffer); // Throws
+                StringData name(m_string_buffer.data(), m_string_buffer.size());
+                if (!handler.rename_column(col_ndx, name)) // Throws
+                    goto bad_transact_log;
+                continue;
+            }
+            case instr_SelectDescriptor: {
+                int levels = read_int<int>(); // Throws
+                if (levels < 0 || levels > m_max_levels)
+                    goto bad_transact_log;
+                m_path.reserve(0, levels); // Throws
+                std::size_t* path = m_path.data();
+                for (int i = 0; i != levels; ++i) {
+                    std::size_t col_ndx = read_int<std::size_t>(); // Throws
+                    path[i] = col_ndx;
+                }
+                if (!handler.select_descriptor(levels, path)) // Throws
+                    goto bad_transact_log;
+                continue;
+            }
+            case instr_NewGroupLevelTable: {
+                read_string(m_string_buffer); // Throws
+                StringData name(m_string_buffer.data(), m_string_buffer.size());
+                if (!handler.new_group_level_table(name)) // Throws
+                    goto bad_transact_log;
+                continue;
+            }
+            case instr_OptimizeTable: {
+                if (!handler.optimize_table()) // Throws
+                    goto bad_transact_log;
+                continue;
+            }
+        }
+
+        goto bad_transact_log;
+    }
+
+    return;
+
+  bad_transact_log:
+    throw BadTransactLog();
+}
+
+
+template<class T> T Replication::TransactLogParser::read_int()
+{
+    T value = 0;
+    int part;
+    const int max_bytes = (std::numeric_limits<T>::digits+1+6)/7;
+    for (int i = 0; i != max_bytes; ++i) {
+        char c;
+        if (!read_char(c))
+            goto bad_transact_log;
+        part = static_cast<unsigned char>(c);
+        if (0xFF < part)
+            goto bad_transact_log; // Only the first 8 bits may be used in each byte
+        if ((part & 0x80) == 0) {
+            T p = part & 0x3F;
+            if (util::int_shift_left_with_overflow_detect(p, i*7))
+                goto bad_transact_log;
+            value |= p;
+            break;
+        }
+        if (i == max_bytes-1)
+            goto bad_transact_log; // Too many bytes
+        value |= T(part & 0x7F) << (i*7);
+    }
+    if (part & 0x40) {
+        // The real value is negative. Because 'value' is positive at
+        // this point, the following negation is guaranteed by C++11
+        // to never overflow. See C99+TC3 section 6.2.6.2 paragraph 2.
+        value = -value;
+        if (util::int_subtract_with_overflow_detect(value, 1))
+            goto bad_transact_log;
+    }
+    return value;
+
+  bad_transact_log:
+    throw BadTransactLog();
+}
+
+
+inline void Replication::TransactLogParser::read_bytes(char* data, std::size_t size)
+{
+    for (;;) {
+        const std::size_t avail = m_input_end - m_input_begin;
+        if (size <= avail)
+            break;
+        const char* to = m_input_begin + avail;
+        std::copy(m_input_begin, to, data);
+        if (!fill_input_buffer())
+            throw BadTransactLog();
+        data += avail;
+        size -= avail;
+    }
+    const char* to = m_input_begin + size;
+    std::copy(m_input_begin, to, data);
+    m_input_begin = to;
+}
+
+
+inline float Replication::TransactLogParser::read_float()
+{
+    TIGHTDB_STATIC_ASSERT(std::numeric_limits<float>::is_iec559 &&
+                          sizeof (float) * std::numeric_limits<unsigned char>::digits == 32,
+                          "Unsupported 'float' representation");
+    float value;
+    read_bytes(reinterpret_cast<char*>(&value), sizeof value); // Throws
+    return value;
+}
+
+
+inline double Replication::TransactLogParser::read_double()
+{
+    TIGHTDB_STATIC_ASSERT(std::numeric_limits<double>::is_iec559 &&
+                          sizeof (double) * std::numeric_limits<unsigned char>::digits == 64,
+                          "Unsupported 'double' representation");
+    double value;
+    read_bytes(reinterpret_cast<char*>(&value), sizeof value); // Throws
+    return value;
+}
+
+
+inline void Replication::TransactLogParser::read_string(util::StringBuffer& buf)
+{
+    buf.clear();
+    std::size_t size = read_int<std::size_t>(); // Throws
+    buf.resize(size); // Throws
+    read_bytes(buf.data(), size);
+}
+
+
+inline void Replication::TransactLogParser::read_mixed(Mixed* mixed)
+{
+    DataType type = DataType(read_int<int>()); // Throws
+    switch (type) {
+        case type_Int: {
+            // FIXME: Don't depend on the existence of
+            // int64_t, but don't allow values to use more
+            // than 64 bits either.
+            int_fast64_t value = read_int<int64_t>(); // Throws
+            mixed->set_int(value);
+            return;
+        }
+        case type_Bool: {
+            bool value = read_int<bool>(); // Throws
+            mixed->set_bool(value);
+            return;
+        }
+        case type_Float: {
+            float value = read_float(); // Throws
+            mixed->set_float(value);
+            return;
+        }
+        case type_Double: {
+            double value = read_double(); // Throws
+            mixed->set_double(value);
+            return;
+        }
+        case type_DateTime: {
+            std::time_t value = read_int<std::time_t>(); // Throws
+            mixed->set_datetime(value);
+            return;
+        }
+        case type_String: {
+            read_string(m_string_buffer); // Throws
+            StringData value(m_string_buffer.data(), m_string_buffer.size());
+            mixed->set_string(value);
+            return;
+        }
+        case type_Binary: {
+            read_string(m_string_buffer); // Throws
+            BinaryData value(m_string_buffer.data(), m_string_buffer.size());
+            mixed->set_binary(value);
+            return;
+        }
+        case type_Table: {
+            *mixed = Mixed::subtable_tag();
+            return;
+        }
+        case type_Mixed:
+            break;
+    }
+    TIGHTDB_ASSERT(false);
+}
+
+
+inline bool Replication::TransactLogParser::fill_input_buffer()
+{
+    const std::size_t n = m_input.read(m_input_buffer.get(), m_input_buffer_size);
+    if (n == 0)
+        return false;
+    m_input_begin = m_input_buffer.get();
+    m_input_end   = m_input_begin + n;
+    return true;
+}
+
+
+inline bool Replication::TransactLogParser::read_char(char& c)
+{
+    if (m_input_begin == m_input_end && !fill_input_buffer())
+        return false;
+    c = *m_input_begin++;
+    return true;
+}
+
+
+inline bool Replication::TransactLogParser::is_valid_column_type(int type)
+{
+    switch (type) {
+        case type_Int:
+        case type_Bool:
+        case type_Float:
+        case type_Double:
+        case type_String:
+        case type_Binary:
+        case type_DateTime:
+        case type_Table:
+        case type_Mixed:
+            return true;
+    }
+    return false;
 }
 
 
