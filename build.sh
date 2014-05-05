@@ -611,7 +611,7 @@ EOF
             echo "Framework for iOS can only be generated under Mac OS X."
             exit 0
         fi
-        BASENAME="TightdbCore"
+        BASENAME="RealmCore"
         FRAMEWORK="$BASENAME.framework"
         mkdir -p "$FRAMEWORK/Headers" || exit 1
         if [ ! -f "$IPHONE_DIR/libtightdb-ios.a" ]; then
