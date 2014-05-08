@@ -158,6 +158,9 @@ public:
     Query& ends_with(size_t column_ndx, BinaryData value);
     Query& contains(size_t column_ndx, BinaryData value);
 
+    // Negation
+    Query& Not();
+
     // Grouping
     Query& group();
     Query& end_group();
@@ -168,7 +171,7 @@ public:
     Query& and_query(Query q);
     Query operator||(Query q);
     Query operator&&(Query q);
-
+    Query operator!();
 
 
     // Searching
@@ -224,6 +227,7 @@ protected:
     bool   is_initialized() const;
     size_t FindInternal(size_t start=0, size_t end=size_t(-1)) const;
     void   UpdatePointers(ParentNode* p, ParentNode** newnode);
+    void HandlePendingNot();
 
     static bool  comp(const std::pair<size_t, size_t>& a, const std::pair<size_t, size_t>& b);
 
@@ -255,7 +259,7 @@ public:
     std::vector<ParentNode**> update_override;
     std::vector<ParentNode**> subtables;
     std::vector<ParentNode*> all_nodes;
-
+    std::vector<bool> pending_not;
 
 private:
     template <class TColumnType> Query& equal(size_t column_ndx1, size_t column_ndx2);

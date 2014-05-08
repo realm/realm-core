@@ -28,6 +28,7 @@ Type conversion/promotion semantics is the same as in the C++ expressions, e.g f
 Grammar:
 -----------------------------------------------------------------------------------------------------------------------
     Expression:         Subexpr2<T>  Compare<Cond, T>  Subexpr2<T>
+                        operator! Expression
 
     Subexpr2<T>:        Value<T>
                         Columns<T>
@@ -183,16 +184,6 @@ template<class T1, class T2, bool b> struct Common<T1, T2, true , false, b> {
 };
 
 
-class Expression : public Query
-{
-public:
-    Expression() {}
-
-    virtual size_t find_first(size_t start, size_t end) const = 0;
-    virtual void set_table(const Table* table) = 0;
-    virtual ~Expression() {}
-};
-
 class ValueBase
 {
 public:
@@ -202,6 +193,17 @@ public:
     virtual void export_int64_t(ValueBase& destination) const = 0;
     virtual void export_double(ValueBase& destination) const = 0;
     virtual void import(const ValueBase& destination) = 0;
+};
+
+class Expression : public Query
+{
+public:
+    Expression() {}
+
+    virtual size_t find_first(size_t start, size_t end) const = 0;
+    virtual void set_table(const Table* table) = 0;
+    virtual const Table* get_table() = 0;
+    virtual ~Expression() {}
 };
 
 class Subexpr

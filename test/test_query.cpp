@@ -248,8 +248,20 @@ TEST(Query_NextGenSyntax)
     match = ("hello" != untyped.column<String>(4)).find();
     CHECK(match == 1);
 
+    match = (!("hello" == untyped.column<String>(4))).find();
+    CHECK(match == 1);
+
     match = (untyped.column<String>(4) != StringData("hello")).find();
     CHECK(match == 1);
+
+    match = (!(untyped.column<String>(4) == StringData("hello"))).find();
+    CHECK(match == 1);
+
+    match = (!(!(untyped.column<String>(4) != StringData("hello")))).find();
+    CHECK(match == 1);
+
+
+    
 
     // This is a demonstration of fallback to old query_engine for the specific cases where it's possible
     // because old engine is faster. This will return a ->less(...) query
@@ -271,6 +283,11 @@ TEST(Query_NextGenSyntax)
     // Small typed table test:
     match = (typed.column().second + 100 > 120 && typed.column().first > 2).find();
     CHECK(match == 1);
+
+    // internal negation (rewrite of test above):
+    match = (!(!(typed.column().second + 100 > 120) || !(typed.column().first > 2))).find();
+    CHECK(match == 1);
+
 
     // Untyped &&
 
@@ -757,7 +774,7 @@ TEST(Query_MergeQueries)
     table.set_int(0, 2, 30);
     table.set_int(1, 2, 20);
 
-    // Must evaluate as if and_query is inside paranthesis, that is, (first == 1 || first == 20) && second == 30
+    // Must evaluate as if and_query is inside paranthesis, that is, (first == 10 || first == 20) && second == 30
     tightdb::Query q1_0 = table.where().equal(0, 10).Or().equal(0, 20);
     tightdb::Query q2_0 = table.where().and_query(q1_0).equal(1, 30);
 
@@ -765,7 +782,86 @@ TEST(Query_MergeQueries)
     CHECK_EQUAL(1, c);
 }
 
+TEST(NotQueries)
+{
+    // test Not vs And, Or, Groups.
+    Table table;
+    table.add_column(type_Int, "first");
+    table.add_column(type_Int, "second");
 
+    table.add_empty_row(3);
+    table.set_int(0, 0, 10);
+    table.set_int(1, 0, 20);
+
+    table.set_int(0, 1, 20);
+    table.set_int(1, 1, 30);
+
+    table.set_int(0, 2, 30);
+    table.set_int(1, 2, 20);
+
+    // should apply not to single term, leading to query "not A" with two matching entries:
+    tightdb::Query q0 = table.where().Not().equal(0,10);
+    CHECK_EQUAL(2,q0.count());
+
+    // grouping, after not
+    tightdb::Query q0b = table.where().Not().group().equal(0,10).end_group();
+    CHECK_EQUAL(2,q0b.count());
+
+    // grouping, surrounding not
+    tightdb::Query q0c = table.where().group().Not().equal(0,10).end_group();
+    CHECK_EQUAL(2,q0c.count());
+
+    // nested nots (implicit grouping)
+    tightdb::Query q0d = table.where().Not().Not().equal(0,10);
+    CHECK_EQUAL(1,q0d.count());  // FAILS
+
+    tightdb::Query q0e = table.where().Not().Not().Not().equal(0,10);
+    CHECK_EQUAL(2,q0e.count());  // FAILS
+
+    // just checking the above
+    tightdb::Query q0f = table.where().Not().not_equal(0,10);
+    CHECK_EQUAL(1,q0f.count());
+
+    tightdb::Query q0g = table.where().Not().Not().not_equal(0,10);
+    CHECK_EQUAL(2,q0g.count());   // FAILS
+
+    tightdb::Query q0h = table.where().not_equal(0,10);
+    CHECK_EQUAL(2,q0h.count());
+
+    // should apply not to first term, leading to query "not A and A", which is obviously empty:
+    tightdb::Query q1 = table.where().Not().equal(0,10).equal(0,10);
+    CHECK_EQUAL(0,q1.count());
+
+    // should apply not to first term, leading to query "not A and A", which is obviously empty:
+    tightdb::Query q1b = table.where().group().Not().equal(0,10).end_group().equal(0,10);
+    CHECK_EQUAL(0,q1b.count());
+
+    // should apply not to first term, leading to query "not A and A", which is obviously empty:
+    tightdb::Query q1c = table.where().Not().group().equal(0,10).end_group().equal(0,10);
+    CHECK_EQUAL(0,q1c.count());
+
+
+    // should apply not to second term, leading to query "A and not A", which is obviously empty:
+    tightdb::Query q2 = table.where().equal(0,10).Not().equal(0,10);
+    CHECK_EQUAL(0,q2.count()); // FAILS
+
+    // should apply not to second term, leading to query "A and not A", which is obviously empty:
+    tightdb::Query q2b = table.where().equal(0,10).group().Not().equal(0,10).end_group();
+    CHECK_EQUAL(0,q2b.count());
+
+    // should apply not to second term, leading to query "A and not A", which is obviously empty:
+    tightdb::Query q2c = table.where().equal(0,10).Not().group().equal(0,10).end_group();
+    CHECK_EQUAL(0,q2c.count()); // FAILS
+
+
+    // should apply not to both terms, leading to query "not A and not A", which has 2 members
+    tightdb::Query q3 = table.where().Not().equal(0,10).Not().equal(0,10);
+    CHECK_EQUAL(2,q3.count());  // FAILS
+
+    // applying not to an empty query is forbidden
+    tightdb::Query q4 = table.where();
+    CHECK_THROW(!q4, runtime_error);
+}
 
 
 
@@ -2699,6 +2795,21 @@ TEST(Query_Simple)
     TupleTableType::View tv1 = q1.find_all();
     CHECK_EQUAL(1, tv1.size());
     CHECK_EQUAL(1, tv1.get_source_ndx(0));
+}
+
+TEST(TestQueryNot)
+{
+    TupleTableType ttt;
+
+    ttt.add(1, "a");
+    ttt.add(2, "a");
+    ttt.add(3, "X");
+
+    TupleTableType::Query q1 = ttt.where().Not().second.equal("a");
+
+    TupleTableType::View tv1 = q1.find_all();
+    CHECK_EQUAL(1, tv1.size());
+    CHECK_EQUAL(2, tv1.get_source_ndx(0));
 }
 
 TEST(Query_SimpleBugDetect)
