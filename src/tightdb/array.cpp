@@ -12,6 +12,7 @@
 #include <tightdb/util/tuple.hpp>
 #include <tightdb/utilities.hpp>
 #include <tightdb/array.hpp>
+#include <tightdb/array_basic.hpp>
 #include <tightdb/impl/destroy_guard.hpp>
 #include <tightdb/column.hpp>
 #include <tightdb/query_conditions.hpp>
@@ -557,6 +558,17 @@ void Array::truncate(size_t size)
     TIGHTDB_ASSERT(is_attached());
     TIGHTDB_ASSERT(size <= m_size);
 
+    // FIXME: BasicArray<> currently does not work if the width is set
+    // to zero, so it must override Array::truncate(). In the future
+    // it is expected that BasicArray<> will be improved by allowing
+    // for width to be zero when all the values are known to be zero
+    // (until the first non-zero value is added). The upshot of this
+    // would be that the size of the array in memory would remain tiny
+    // regardless of the number of elements it constains, as long as
+    // all those elements are zero.
+    TIGHTDB_ASSERT(!dynamic_cast<ArrayFloat*>(this));
+    TIGHTDB_ASSERT(!dynamic_cast<ArrayDouble*>(this));
+
     copy_on_write(); // Throws
 
     // Update size in accessor and in header. This leaves the capacity
@@ -578,6 +590,10 @@ void Array::truncate_and_destroy_children(size_t size)
 {
     TIGHTDB_ASSERT(is_attached());
     TIGHTDB_ASSERT(size <= m_size);
+
+    // FIXME: See FIXME in truncate().
+    TIGHTDB_ASSERT(!dynamic_cast<ArrayFloat*>(this));
+    TIGHTDB_ASSERT(!dynamic_cast<ArrayDouble*>(this));
 
     copy_on_write(); // Throws
 
@@ -1672,11 +1688,6 @@ template<size_t width> void Array::set_width() TIGHTDB_NOEXCEPT
 
     Finder fl =  &Array::find<Less, act_ReturnFirst, width>;
     m_finder[cond_Less] = fl;
-}
-
-template<size_t w> int64_t Array::Get(size_t ndx) const TIGHTDB_NOEXCEPT
-{
-    return GetUniversal<w>(m_data, ndx);
 }
 
 // This method reads 8 concecutive values into res[8], starting from index 'ndx'. It's allowed for the 8 values to

@@ -132,7 +132,7 @@ namespace query
     /// Encoding of pointer dereferencing operation.
     struct Deref {
         static const char* sym() { return "*"; }
-        template<class A> struct Result { typedef typename DerefType<A>::type type; };
+        template<class A> struct Result { typedef typename RemovePointer<A>::type type; };
         template<class A> static typename Result<A>::type eval(const A& a) { return *a; }
     };
 

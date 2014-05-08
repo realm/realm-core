@@ -5,19 +5,45 @@
 #include <algorithm>
 #include <queue>
 
-#include <UnitTest++.h>
-
 #include <tightdb/util/bind.hpp>
 #include <tightdb/util/thread.hpp>
 
-#include "testsettings.hpp"
+#include "test.hpp"
 
 using namespace std;
 using namespace tightdb;
 using namespace tightdb::util;
 
-// Note: You can now temporarely declare unit tests with the ONLY(TestName) macro instead of TEST(TestName). This
-// will disable all unit tests except these. Remember to undo your temporary changes before committing.
+
+// Test independence and thread-safety
+// -----------------------------------
+//
+// All tests must be thread safe and independent of each other. This
+// is required because it allows for both shuffling of the execution
+// order and for parallelized testing.
+//
+// In particular, avoid using std::rand() since it is not guaranteed
+// to be thread safe. Instead use the API offered in
+// `test/util/random.hpp`.
+//
+// All files created in tests must use the TEST_PATH macro (or one of
+// its friends) to obtain a suitable file system path. See
+// `test/util/test_path.hpp`.
+//
+//
+// Debugging and the ONLY() macro
+// ------------------------------
+//
+// A simple way of disabling all tests except one called `Foo`, is to
+// replace TEST(Foo) with ONLY(Foo) and then recompile and rerun the
+// test suite. Note that you can also use filtering by setting the
+// environment varible `UNITTEST_FILTER`. See `README.md` for more on
+// this.
+//
+// Another way to debug a particular test, is to copy that test into
+// `experiments/testcase.cpp` and then run `sh build.sh
+// check-testcase` (or one of its friends) from the command line.
+
 
 namespace {
 
@@ -34,7 +60,7 @@ struct Shared {
     void increment_10000_times()
     {
         for (int i=0; i<10000; ++i) {
-            Mutex::Lock lock(m_mutex);
+            LockGuard lock(m_mutex);
             ++m_value;
         }
     }
@@ -42,7 +68,7 @@ struct Shared {
     void increment_10000_times2()
     {
         for (int i=0; i<10000; ++i) {
-            Mutex::Lock lock(m_mutex);
+            LockGuard lock(m_mutex);
             // Create a time window where thread interference can take place. Problem with ++m_value is that it
             // could assemble into 'inc [addr]' which has very tiny gap
             double f = m_value;
@@ -91,7 +117,7 @@ public:
 
     bool get(int& value)
     {
-        Mutex::Lock lock(m_mutex);
+        LockGuard lock(m_mutex);
         for (;;) {
             if (!m_queue.empty())
                 break;
@@ -109,7 +135,7 @@ public:
 
     void put(int value)
     {
-        Mutex::Lock lock(m_mutex);
+        LockGuard lock(m_mutex);
         while (m_queue.size() == max_queue_size)
             m_nonfull.wait(lock); // Wait for consumer
         bool was_empty = m_queue.empty();
@@ -120,7 +146,7 @@ public:
 
     void close()
     {
-        Mutex::Lock lock(m_mutex);
+        LockGuard lock(m_mutex);
         m_closed = true;
         m_nonempty_or_closed.notify_all(); // Resume all waiting consumers
     }
@@ -184,10 +210,10 @@ TEST(Thread_MutexLock)
 {
     Mutex mutex;
     {
-        Mutex::Lock lock(mutex);
+        LockGuard lock(mutex);
     }
     {
-        Mutex::Lock lock(mutex);
+        LockGuard lock(mutex);
     }
 }
 
@@ -196,10 +222,10 @@ TEST(Thread_ProcessSharedMutex)
 {
     Mutex mutex((Mutex::process_shared_tag()));
     {
-        Mutex::Lock lock(mutex);
+        LockGuard lock(mutex);
     }
     {
-        Mutex::Lock lock(mutex);
+        LockGuard lock(mutex);
     }
 }
 
@@ -230,9 +256,8 @@ TEST(Thread_CriticalSection2)
 }
 
 
-#ifdef TEST_ROBUSTNESS
 // Todo. Not supported on Windows in particular? Keywords: winbug
-TEST(Thread_RobustMutex)
+TEST_IF(Thread_RobustMutex, TEST_THREAD_ROBUSTNESS)
 {
     // Abort if robust mutexes are not supported on the current
     // platform. Otherwise we would probably get into a dead-lock.
@@ -299,7 +324,7 @@ TEST(Thread_RobustMutex)
 }
 
 
-TEST(Thread_DeathDuringRecovery)
+TEST_IF(Thread_DeathDuringRecovery, TEST_THREAD_ROBUSTNESS)
 {
     // Abort if robust mutexes are not supported on the current
     // platform. Otherwise we would probably get into a dead-lock.
@@ -370,8 +395,6 @@ TEST(Thread_DeathDuringRecovery)
     robust.m_mutex.unlock();
 }
 
-#endif // TEST_ROBUSTNESS
-
 
 TEST(Thread_CondVar)
 {
@@ -400,4 +423,4 @@ TEST(Thread_CondVar)
     }
 }
 
-#endif
+#endif // TEST_THREAD

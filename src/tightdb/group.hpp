@@ -199,6 +199,8 @@ public:
     /// Returns the number of tables in this group.
     std::size_t size() const;
 
+    /// Get the name of the table at the specified index within this
+    /// group.
     StringData get_table_name(std::size_t table_ndx) const;
 
     /// Check whether this group has a table with the specified name.
@@ -211,14 +213,16 @@ public:
     template<class T> bool has_table(StringData name) const;
 
     //@{
-    /// Get the table with the specified name from this group.
+    /// Get the table with the specified name (or at the specified
+    /// idnex) from this group.
     ///
-    /// The non-const versions of this function will create a table
-    /// with the specified name if one does not already exist. The
-    /// const versions will not.
+    /// The non-const versions of this function, that take a name as
+    /// argument, will create a table with the specified name if one
+    /// does not already exist. The other versions will not.
     ///
     /// It is an error to call one of the const-qualified versions for
-    /// a table that does not already exist. Doing so will result in
+    /// a table that does not already exist. The same is true for the
+    /// versions taking and index as argument. Doing so will result in
     /// undefined behavior.
     ///
     /// The non-template versions will return dynamically typed table
@@ -229,12 +233,14 @@ public:
     /// table whose dynamic type does not match the specified static
     /// type. Doing so will result in undefined behavior.
     ///
-    /// New tables created by the non-const non-template version will
-    /// have no columns initially. New tables created by the non-const
-    /// template version will have a dynamic type (set of columns)
-    /// that matches the specifed static type.
+    /// New tables created by non-template versions will have no
+    /// columns initially. New tables created by template versions
+    /// will have a dynamic type (set of columns) that matches the
+    /// specifed static type.
     ///
     /// \tparam T An instance of the BasicTable<> class template.
+    TableRef      get_table(std::size_t table_ndx);
+    ConstTableRef get_table(std::size_t table_ndx) const;
     TableRef      get_table(StringData name);
     TableRef      get_table(StringData name, bool& was_created);
     ConstTableRef get_table(StringData name) const;
@@ -320,6 +326,7 @@ private:
     typedef std::vector<Table*> table_accessors;
     mutable table_accessors m_table_accessors;
     const bool m_is_shared;
+    bool m_is_attached;
     std::size_t m_readlock_version;
 
     struct shared_tag {};
@@ -330,7 +337,11 @@ private:
 
     void init_array_parents() TIGHTDB_NOEXCEPT;
     void detach() TIGHTDB_NOEXCEPT;
+    void detach_but_retain_data() TIGHTDB_NOEXCEPT;
+    void complete_detach() TIGHTDB_NOEXCEPT;
     void init_shared();
+    void reattach_from_retained_data();
+    inline bool may_reattach_if_same_version() { return m_top.is_attached(); }
 
     /// Recursively update refs stored in all cached array
     /// accessors. This includes cached array accessors in any
@@ -409,7 +420,7 @@ private:
 inline Group::Group():
     m_alloc(), // Throws
     m_top(m_alloc), m_tables(m_alloc), m_table_names(m_alloc), m_free_positions(m_alloc),
-    m_free_lengths(m_alloc), m_free_versions(m_alloc), m_is_shared(false)
+    m_free_lengths(m_alloc), m_free_versions(m_alloc), m_is_shared(false), m_is_attached(false)
 {
     init_array_parents();
     m_alloc.attach_empty(); // Throws
@@ -420,7 +431,7 @@ inline Group::Group():
 inline Group::Group(const std::string& file, OpenMode mode):
     m_alloc(), // Throws
     m_top(m_alloc), m_tables(m_alloc), m_table_names(m_alloc), m_free_positions(m_alloc),
-    m_free_lengths(m_alloc), m_free_versions(m_alloc), m_is_shared(false)
+    m_free_lengths(m_alloc), m_free_versions(m_alloc), m_is_shared(false), m_is_attached(false)
 {
     init_array_parents();
     open(file, mode); // Throws
@@ -429,7 +440,7 @@ inline Group::Group(const std::string& file, OpenMode mode):
 inline Group::Group(BinaryData buffer, bool take_ownership):
     m_alloc(), // Throws
     m_top(m_alloc), m_tables(m_alloc), m_table_names(m_alloc), m_free_positions(m_alloc),
-    m_free_lengths(m_alloc), m_free_versions(m_alloc), m_is_shared(false)
+    m_free_lengths(m_alloc), m_free_versions(m_alloc), m_is_shared(false), m_is_attached(false)
 {
     init_array_parents();
     open(buffer, take_ownership); // Throws
@@ -438,7 +449,7 @@ inline Group::Group(BinaryData buffer, bool take_ownership):
 inline Group::Group(unattached_tag) TIGHTDB_NOEXCEPT:
     m_alloc(), // Throws
     m_top(m_alloc), m_tables(m_alloc), m_table_names(m_alloc), m_free_positions(m_alloc),
-    m_free_lengths(m_alloc), m_free_versions(m_alloc), m_is_shared(false)
+    m_free_lengths(m_alloc), m_free_versions(m_alloc), m_is_shared(false), m_is_attached(false)
 {
     init_array_parents();
 }
@@ -446,7 +457,7 @@ inline Group::Group(unattached_tag) TIGHTDB_NOEXCEPT:
 inline Group::Group(shared_tag) TIGHTDB_NOEXCEPT:
     m_alloc(), // Throws
     m_top(m_alloc), m_tables(m_alloc), m_table_names(m_alloc), m_free_positions(m_alloc),
-    m_free_lengths(m_alloc), m_free_versions(m_alloc), m_is_shared(true)
+    m_free_lengths(m_alloc), m_free_versions(m_alloc), m_is_shared(true), m_is_attached(false)
 {
     init_array_parents();
 }
@@ -464,7 +475,7 @@ inline void Group::init_array_parents() TIGHTDB_NOEXCEPT
 
 inline bool Group::is_attached() const TIGHTDB_NOEXCEPT
 {
-    return m_top.is_attached();
+    return m_is_attached;
 }
 
 inline bool Group::is_empty() const TIGHTDB_NOEXCEPT
@@ -555,6 +566,16 @@ template<class T> inline const T* Group::get_table_ptr(StringData name) const
     const Table* table = get_table_ptr(name); // Throws
     TIGHTDB_ASSERT(!table || T::matches_dynamic_spec(_impl::TableFriend::get_spec(*table)));
     return static_cast<const T*>(table);
+}
+
+inline TableRef Group::get_table(std::size_t table_ndx)
+{
+    return get_table_by_ndx(table_ndx)->get_table_ref();
+}
+
+inline ConstTableRef Group::get_table(std::size_t table_ndx) const
+{
+    return get_table_by_ndx(table_ndx)->get_table_ref();
 }
 
 inline TableRef Group::get_table(StringData name)

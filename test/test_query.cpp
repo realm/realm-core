@@ -2,21 +2,51 @@
 #ifdef TEST_QUERY
 
 #include <cstdlib> // itoa()
+#include <limits>
 #include <vector>
-
-#include <UnitTest++.h>
 
 #include <tightdb.hpp>
 #include <tightdb/lang_bind_helper.hpp>
 #include <tightdb/column.hpp>
 #include <tightdb/query_engine.hpp>
 
+#include "test.hpp"
+
 using namespace std;
 using namespace tightdb;
 using namespace tightdb::util;
+using namespace tightdb::test_util;
 
-// Note: You can now temporarely declare unit tests with the ONLY(TestName) macro instead of TEST(TestName). This
-// will disable all unit tests except these. Remember to undo your temporary changes before committing.
+
+// Test independence and thread-safety
+// -----------------------------------
+//
+// All tests must be thread safe and independent of each other. This
+// is required because it allows for both shuffling of the execution
+// order and for parallelized testing.
+//
+// In particular, avoid using std::rand() since it is not guaranteed
+// to be thread safe. Instead use the API offered in
+// `test/util/random.hpp`.
+//
+// All files created in tests must use the TEST_PATH macro (or one of
+// its friends) to obtain a suitable file system path. See
+// `test/util/test_path.hpp`.
+//
+//
+// Debugging and the ONLY() macro
+// ------------------------------
+//
+// A simple way of disabling all tests except one called `Foo`, is to
+// replace TEST(Foo) with ONLY(Foo) and then recompile and rerun the
+// test suite. Note that you can also use filtering by setting the
+// environment varible `UNITTEST_FILTER`. See `README.md` for more on
+// this.
+//
+// Another way to debug a particular test, is to copy that test into
+// `experiments/testcase.cpp` and then run `sh build.sh
+// check-testcase` (or one of its friends) from the command line.
+
 
 namespace {
 
@@ -123,7 +153,7 @@ TEST(Query_NoConditions)
     }
 }
 
-TEST(TestQueryCount)
+TEST(Query_Count)
 {
     // Intended to test QueryState::match<pattern = true>(); which is only triggered if:
     // * Table size is large enough to have SSE-aligned or bithack-aligned rows (this requires
@@ -133,16 +163,17 @@ TEST(TestQueryCount)
     //   and if there exists > 1 conditions, 'pattern' is currently not supported - but could easily be
     //   extended to support it)
 
+    Random random(random_int<unsigned long>()); // Seed from slow global generator
     for(int j = 0; j < 100; j++) {
         Table table;
         table.add_column(type_Int, "i");
 
         size_t count = 0;
-        size_t rows = rand() % (5 * TIGHTDB_MAX_LIST_SIZE); // to cross some leaf boundaries
+        size_t rows = random.draw_int_mod(5 * TIGHTDB_MAX_LIST_SIZE); // to cross some leaf boundaries
 
-        for(size_t i = 0; i < rows; i++) {
+        for(size_t i = 0; i < rows; ++i) {
             table.add_empty_row();
-            int64_t val = rand() % 5;
+            int64_t val = random.draw_int_mod(5);
             table.set_int(0, i, val);
             if(val == 2)
                 count++;
@@ -155,7 +186,7 @@ TEST(TestQueryCount)
 }
 
 
-TEST(NextGenSyntaxTypedString)
+TEST(Query_NextGenSyntaxTypedString)
 {
     Books books;
 
@@ -178,7 +209,7 @@ TEST(NextGenSyntaxTypedString)
     CHECK_EQUAL(1, match);
 }
 
-TEST(NextGenSyntax)
+TEST(Query_NextGenSyntax)
 {
     volatile size_t match;
 
@@ -438,14 +469,15 @@ TEST(NextGenSyntax)
     delete first2;
 }
 
-TEST(NextGenSyntaxMonkey0)
+TEST(Query_NextGenSyntaxMonkey0)
 {
     // Intended to test eval() for columns in query_expression.hpp which fetch 8 values at a time. This test varies
     // table size to test out-of-bounds bugs.
 
+    Random random(random_int<unsigned long>()); // Seed from slow global generator
     for(int iter = 1; iter < 100 + TEST_DURATION * 10000; iter++)
     {
-        const size_t rows = 1 + rand() % (2 * TIGHTDB_MAX_LIST_SIZE);
+        const size_t rows = 1 + random.draw_int_mod(2 * TIGHTDB_MAX_LIST_SIZE);
         Table table;
 
         // Two different row types prevents fallback to query_engine (good because we want to test query_expression)
@@ -456,9 +488,9 @@ TEST(NextGenSyntaxMonkey0)
         for(size_t r = 0; r < rows; r++) {
             table.add_empty_row();
             // using '% iter' tests different bitwidths
-            table.set_int(0, r, rand() % iter);
-            table.set_float(1, r, float(rand() % iter));
-            if(rand() % 2 == 0)
+            table.set_int(0, r, random.draw_int_mod(iter));
+            table.set_float(1, r, float(random.draw_int_mod(iter)));
+            if(random.draw_bool())
                 table.set_string(2, r, "a");
             else
                 table.set_string(2, r, "b");
@@ -481,8 +513,8 @@ TEST(NextGenSyntaxMonkey0)
         tvpos = 0;
 
         // with start and limit
-        size_t start = rand() % rows;
-        size_t limit = rand() % rows;
+        size_t start = random.draw_int_mod(rows);
+        size_t limit = random.draw_int_mod(rows);
         tv = q.find_all(start, size_t(-1), limit);
         tvpos = 0;
         for(size_t r = 0; r < rows; r++) {
@@ -496,13 +528,14 @@ TEST(NextGenSyntaxMonkey0)
 
 }
 
-TEST(NextGenSyntaxMonkey)
+TEST(Query_NextGenSyntaxMonkey)
 {
-    for(int iter = 1; iter < 20 * (TEST_DURATION * TEST_DURATION * TEST_DURATION + 1); iter++)
-    {
+    Random random(random_int<unsigned long>()); // Seed from slow global generator
+    for(int iter = 1; iter < 20 * (TEST_DURATION * TEST_DURATION * TEST_DURATION + 1); iter++) {
         // Keep at least '* 20' else some tests will give 0 matches and bad coverage
-        const size_t rows = 1 + ((size_t)rand() * (size_t)rand())
-            % (TIGHTDB_MAX_LIST_SIZE * 20 * (TEST_DURATION * TEST_DURATION * TEST_DURATION + 1));
+        const size_t rows =
+            1 + random.draw_int_mod<size_t>(TIGHTDB_MAX_LIST_SIZE * 20 *
+                                            (TEST_DURATION * TEST_DURATION * TEST_DURATION + 1));
         Table table;
         table.add_column(type_Int, "first");
         table.add_column(type_Int, "second");
@@ -511,9 +544,9 @@ TEST(NextGenSyntaxMonkey)
         for(size_t r = 0; r < rows; r++) {
             table.add_empty_row();
             // using '% iter' tests different bitwidths
-            table.set_int(0, r, rand() % iter);
-            table.set_int(1, r, rand() % iter);
-            table.set_int(2, r, rand() % iter);
+            table.set_int(0, r, random.draw_int_mod(iter));
+            table.set_int(1, r, random.draw_int_mod(iter));
+            table.set_int(2, r, random.draw_int_mod(iter));
         }
 
         size_t tvpos;
@@ -639,7 +672,7 @@ TEST(NextGenSyntaxMonkey)
 }
 
 
-TEST(LimitUntyped)
+TEST(Query_LimitUntyped)
 {
     Table table;
     table.add_column(type_Int, "first1");
@@ -665,7 +698,7 @@ TEST(LimitUntyped)
 }
 
 
-TEST(MergeQueriesOverloads)
+TEST(Query_MergeQueriesOverloads)
 {
     // Tests && and || overloads of Query class
     Table table;
@@ -724,7 +757,7 @@ TEST(MergeQueriesOverloads)
 }
 
 
-TEST(MergeQueries)
+TEST(Query_MergeQueries)
 {
     // test OR vs AND precedence
     Table table;
@@ -832,10 +865,10 @@ TEST(NotQueries)
 
 
 
-TEST(MergeQueriesMonkey)
+TEST(Query_MergeQueriesMonkey)
 {
-    for(int iter = 0; iter < 5; iter++)
-    {
+    Random random(random_int<unsigned long>()); // Seed from slow global generator
+    for(int iter = 0; iter < 5; iter++) {
         const size_t rows = TIGHTDB_MAX_LIST_SIZE * 4;
         Table table;
         table.add_column(type_Int, "first");
@@ -844,9 +877,9 @@ TEST(MergeQueriesMonkey)
 
         for(size_t r = 0; r < rows; r++) {
             table.add_empty_row();
-            table.set_int(0, r, rand() % 3);
-            table.set_int(1, r, rand() % 3);
-            table.set_int(2, r, rand() % 3);
+            table.set_int(0, r, random.draw_int_mod(3));
+            table.set_int(1, r, random.draw_int_mod(3));
+            table.set_int(2, r, random.draw_int_mod(3));
         }
 
         size_t tvpos;
@@ -1010,10 +1043,10 @@ TEST(MergeQueriesMonkey)
 
 
 
-TEST(MergeQueriesMonkeyOverloads)
+TEST(Query_MergeQueriesMonkeyOverloads)
 {
-    for(int iter = 0; iter < 5; iter++)
-    {
+    Random random(random_int<unsigned long>()); // Seed from slow global generator
+    for(int iter = 0; iter < 5; iter++) {
         const size_t rows = TIGHTDB_MAX_LIST_SIZE * 4;
         Table table;
         table.add_column(type_Int, "first");
@@ -1023,9 +1056,9 @@ TEST(MergeQueriesMonkeyOverloads)
 
         for(size_t r = 0; r < rows; r++) {
             table.add_empty_row();
-            table.set_int(0, r, rand() % 3);
-            table.set_int(1, r, rand() % 3);
-            table.set_int(2, r, rand() % 3);
+            table.set_int(0, r, random.draw_int_mod(3));
+            table.set_int(1, r, random.draw_int_mod(3));
+            table.set_int(2, r, random.draw_int_mod(3));
         }
 
         size_t tvpos;
@@ -1117,7 +1150,7 @@ TEST(MergeQueriesMonkeyOverloads)
 }
 
 
-TEST(CountLimit)
+TEST(Query_CountLimit)
 {
     PeopleTable2 table;
 
@@ -1144,7 +1177,7 @@ TEST(CountLimit)
     CHECK_EQUAL(1, count3);
 }
 
-TEST(QueryExpressions0)
+TEST(Query_Expressions0)
 {
 /*
     We have following variables to vary in the tests:
@@ -1359,7 +1392,7 @@ TEST(QueryExpressions0)
 
 }
 
-TEST(LimitUntyped2)
+TEST(Query_LimitUntyped2)
 {
     Table table;
     table.add_column(type_Int, "first1");
@@ -1498,9 +1531,11 @@ TEST(LimitUntyped2)
 }
 
 
-TEST(TestQueryStrIndexCrash)
+TEST(Query_StrIndexCrash)
 {
     // Rasmus "8" index crash
+    Random random(random_int<unsigned long>()); // Seed from slow global generator
+
     for(int iter = 0; iter < 5; ++iter) {
         Group group;
         TableRef table = group.get_table("test");
@@ -1509,7 +1544,7 @@ TEST(TestQueryStrIndexCrash)
         size_t eights = 0;
 
         for(int i = 0; i < TIGHTDB_MAX_LIST_SIZE * 2; ++i) {
-            int v = rand() % 10;
+            int v = random.draw_int_mod(10);
             if(v == 8) {
                 eights++;
             }
@@ -1532,8 +1567,10 @@ TEST(TestQueryStrIndexCrash)
 }
 
 
-TEST(QueryTwoColsEqualVaryWidthAndValues)
+TEST(Query_TwoColsEqualVaryWidthAndValues)
 {
+    Random random(random_int<unsigned long>()); // Seed from slow global generator
+
     vector<size_t> ints1;
     vector<size_t> ints2;
     vector<size_t> ints3;
@@ -1566,22 +1603,22 @@ TEST(QueryTwoColsEqualVaryWidthAndValues)
         // Important thing to test is different bitwidths because we might use SSE and/or bithacks on 64-bit blocks
 
         // Both are bytes
-        table.set_int(0, i, rand() % 100);
-        table.set_int(1, i, rand() % 100);
+        table.set_int(0, i, random.draw_int_mod(100));
+        table.set_int(1, i, random.draw_int_mod(100));
 
         // Second column widest
-        table.set_int(2, i, rand() % 10);
-        table.set_int(3, i, rand() % 100);
+        table.set_int(2, i, random.draw_int_mod(10));
+        table.set_int(3, i, random.draw_int_mod(100));
 
         // First column widest
-        table.set_int(4, i, rand() % 100);
-        table.set_int(5, i, rand() % 10);
+        table.set_int(4, i, random.draw_int_mod(100));
+        table.set_int(5, i, random.draw_int_mod(10));
 
-        table.set_float(6, i, float(rand() % 10));
-        table.set_float(7, i, float(rand() % 10));
+        table.set_float(6, i, float(random.draw_int_mod(10)));
+        table.set_float(7, i, float(random.draw_int_mod(10)));
 
-        table.set_double(8, i, double(rand() % 10));
-        table.set_double(9, i, double(rand() % 10));
+        table.set_double(8, i, double(random.draw_int_mod(10)));
+        table.set_double(9, i, double(random.draw_int_mod(10)));
 
         if (table.get_int(0, i) == table.get_int(1, i))
             ints1.push_back(i);
@@ -1629,7 +1666,7 @@ TEST(QueryTwoColsEqualVaryWidthAndValues)
         CHECK_EQUAL(doubles[t], t5.get_source_ndx(t));
 }
 
-TEST(QueryTwoColsVaryOperators)
+TEST(Query_TwoColsVaryOperators)
 {
     vector<size_t> ints1;
     vector<size_t> floats;
@@ -1696,7 +1733,7 @@ TEST(QueryTwoColsVaryOperators)
 
 
 
-TEST(QueryTwoCols0)
+TEST(Query_TwoCols0)
 {
     Table table;
     table.add_column(type_Int, "first1");
@@ -1717,7 +1754,7 @@ TEST(QueryTwoCols0)
 }
 
 
-TEST(QueryTwoColsNoRows)
+TEST(Query_TwoColsNoRows)
 {
     Table table;
     table.add_column(type_Int, "first1");
@@ -1728,8 +1765,10 @@ TEST(QueryTwoColsNoRows)
 }
 
 
-TEST(TestQueryHuge)
+TEST(Query_Huge)
 {
+    Random random;
+
 #if TEST_DURATION == 0
     for (int N = 0; N < 1; N++) {
 #elif TEST_DURATION == 1
@@ -1739,7 +1778,10 @@ TEST(TestQueryHuge)
 #elif TEST_DURATION == 3
     for (int N = 0; N < 10000; N++) {
 #endif
-        srand(N + 123);    // Makes you reproduce a bug in a certain run, without having to run all successive runs
+
+        // Makes you reproduce a bug in a certain run, without having
+        // to run all successive runs
+        random.seed(N + 123);
 
         TripleTable tt;
         TripleTable::View v;
@@ -1763,64 +1805,64 @@ TEST(TestQueryHuge)
         size_t res7 = 0;
         size_t res8 = 0;
 
-        size_t start = rand() % 3000;
-        size_t end = start + rand() % (3000 - start);
+        size_t start = random.draw_int_mod(3000);
+        size_t end = start + random.draw_int_mod(3000 - start);
         size_t limit;
-        if(rand() % 2 == 0)
-            limit = rand() % 5000;
+        if(random.draw_bool())
+            limit = random.draw_int_mod(5000);
         else
             limit = size_t(-1);
 
 
-        size_t blocksize = rand() % 800 + 1;
+        size_t blocksize = random.draw_int_mod(800) + 1;
 
         for (size_t row = 0; row < 3000; row++) {
 
             if (row % blocksize == 0) {
-                long1 = (rand() % 2 == 0);
-                long2 = (rand() % 2 == 0);
+                long1 = random.draw_bool();
+                long2 = random.draw_bool();
 
-                if (rand() % 2 == 0) {
-                    mdist1 = rand() % 500 + 1;
-                    mdist2 = rand() % 500 + 1;
-                    mdist3 = rand() % 500 + 1;
+                if (random.draw_bool()) {
+                    mdist1 = random.draw_int(1, 500);
+                    mdist2 = random.draw_int(1, 500);
+                    mdist3 = random.draw_int(1, 500);
                 }
                 else {
-                    mdist1 = rand() % 5 + 1;
-                    mdist2 = rand() % 5 + 1;
-                    mdist3 = rand() % 5 + 1;
+                    mdist1 = random.draw_int(1, 5);
+                    mdist2 = random.draw_int(1, 5);
+                    mdist3 = random.draw_int(1, 5);
                 }
             }
 
             tt.add_empty_row();
 
             if (long1) {
-                if (rand() % mdist1 == 0)
+                if (random.draw_int_mod(mdist1) == 0)
                     first = "longlonglonglonglonglonglong A";
                 else
                     first = "longlonglonglonglonglonglong B";
             }
             else {
-                if (rand() % mdist1 == 0)
+                if (random.draw_int_mod(mdist1) == 0)
                     first = "A";
                 else
                     first = "B";
             }
 
             if (long2) {
-                if (rand() % mdist2 == 0)
+                if (random.draw_int_mod(mdist2) == 0)
                     second = "longlonglonglonglonglonglong A";
                 else
                     second = "longlonglonglonglonglonglong B";
             }
             else {
-                if (rand() % mdist2 == 0)
+                if (random.draw_int_mod(mdist2) == 0)
                     second = "A";
                 else
                     second = "B";
             }
 
-            if (rand() % mdist3 == 0)
+            if (random.draw_int_mod(mdist3) == 0)
                 third = 1;
             else
                 third = 2;
@@ -1902,21 +1944,23 @@ TEST(TestQueryHuge)
     }
 }
 
-TEST(TestQueryOnTableView)
+TEST(Query_OnTableView)
 {
+    Random random;
+
     // Mostly intended to test the Array::FindGTE method
     for(int iter = 0; iter < 100 * (1 + TEST_DURATION * TEST_DURATION * TEST_DURATION * TEST_DURATION * TEST_DURATION); iter++) {
-        srand(164);
+        random.seed(164);
         OneIntTable oti;
         size_t cnt1 = 0;
         size_t cnt0 = 0;
-        size_t limit = rand() % (TIGHTDB_MAX_LIST_SIZE * 10 + 1);
+        size_t limit = random.draw_int_max(TIGHTDB_MAX_LIST_SIZE * 10);
 
-        size_t lbound = rand() % (TIGHTDB_MAX_LIST_SIZE * 10);
-        size_t ubound = lbound + rand() % (TIGHTDB_MAX_LIST_SIZE * 10 - lbound);
+        size_t lbound = random.draw_int_mod(TIGHTDB_MAX_LIST_SIZE * 10);
+        size_t ubound = lbound + random.draw_int_mod(TIGHTDB_MAX_LIST_SIZE * 10 - lbound);
 
         for(size_t i = 0; i < TIGHTDB_MAX_LIST_SIZE * 10; i++) {
-            int v = rand() % 3;
+            int v = random.draw_int_mod(3);
 
             if(v == 1 && i >= lbound && i < ubound && cnt0 < limit)
                 cnt1++;
@@ -1940,11 +1984,13 @@ TEST(TestQueryOnTableView)
 
 }
 
-TEST(TestQueryStrIndex3)
+TEST(Query_StrIndex3)
 {
     // Create two columns where query match-density varies alot throughout the rows. This forces the query engine to
     // jump back and forth between the two conditions and test edge cases in these transitions. Tests combinations of
     // linear scan, enum and index
+
+    Random random(random_int<unsigned long>()); // Seed from slow global generator
 
 #ifdef TIGHTDB_DEBUG
     for (int N = 0; N < 4; N++) {
@@ -1964,30 +2010,34 @@ TEST(TestQueryStrIndex3)
 #endif
             // 1/500 match probability because we want possibility for a 1000 sized leaf to contain 0 matches (important
             // edge case)
-            int f1 = rand() % TIGHTDB_MAX_LIST_SIZE / 2 + 1;
-            int f2 = rand() % TIGHTDB_MAX_LIST_SIZE / 2 + 1;
-            bool longstrings = (rand() % 5 == 1);
+            int f1 = random.draw_int_mod(TIGHTDB_MAX_LIST_SIZE) / 2 + 1;
+            int f2 = random.draw_int_mod(TIGHTDB_MAX_LIST_SIZE) / 2 + 1;
+            bool longstrings = random.chance(1,5);
 
             // 2200 entries with that probability to fill out two concecutive 1000 sized leaves with above probability,
             // plus a remainder (edge case)
             for (int j = 0; j < TIGHTDB_MAX_LIST_SIZE * 2 + TIGHTDB_MAX_LIST_SIZE / 5; j++) {
-                if (rand() % f1 == 0)
-                    if (rand() % f2 == 0) {
+                if (random.chance(1, f1)) {
+                    if (random.chance(1, f2)) {
                         ttt.add(0, longstrings ? "AAAAAAAAAAAAAAAAAAAAAAAA" : "AA");
                         if (!longstrings) {
                             n++;
                             vec.push_back(row);
                         }
                     }
-                    else
+                    else {
                         ttt.add(0, "BB");
-                else
-                    if (rand() % f2 == 0)
+                    }
+                }
+                else {
+                    if (random.chance(1, f2)) {
                         ttt.add(1, "AA");
-                    else
+                    }
+                    else {
                         ttt.add(1, "BB");
-
-                row++;
+                    }
+                }
+                ++row;
             }
         }
 
@@ -2045,7 +2095,7 @@ TEST(TestQueryStrIndex3)
 }
 
 
-TEST(TestQueryStrIndex2)
+TEST(Query_StrIndex2)
 {
     TupleTableType ttt;
 
@@ -2068,8 +2118,9 @@ TEST(TestQueryStrIndex2)
 }
 
 
-TEST(TestQueryStrEnum)
+TEST(Query_StrEnum)
 {
+    Random random(random_int<unsigned long>()); // Seed from slow global generator
     TupleTableType ttt;
 
     int aa;
@@ -2079,7 +2130,7 @@ TEST(TestQueryStrEnum)
         ttt.clear();
         aa = 0;
         for (size_t t = 0; t < TIGHTDB_MAX_LIST_SIZE * 2; ++t) {
-            if (rand() % 3 == 0) {
+            if (random.chance(1,3)) {
                 ttt.add(1, "AA");
                 ++aa;
             }
@@ -2094,8 +2145,10 @@ TEST(TestQueryStrEnum)
 }
 
 
-TEST(TestQueryStrIndex)
+TEST(Query_StrIndex)
 {
+    Random random(random_int<unsigned long>()); // Seed from slow global generator
+
 #ifdef TIGHTDB_DEBUG
     size_t itera = 4;
     size_t iterb = 100;
@@ -2111,7 +2164,7 @@ TEST(TestQueryStrIndex)
         TupleTableType ttt;
         aa = 0;
         for (size_t t = 0; t < iterb; t++) {
-            if (rand() % 3 == 0) {
+            if (random.chance(1,3)) {
                 ttt.add(1, "AA");
                 aa++;
             }
@@ -2135,44 +2188,43 @@ TEST(TestQueryStrIndex)
 }
 
 
-TEST(Group_GameAnalytics)
+TEST(Query_GameAnalytics)
 {
+    GROUP_TEST_PATH(path);
+    Random random(random_int<unsigned long>()); // Seed from slow global generator
     {
         Group g;
         GATable::Ref t = g.get_table<GATable>("firstevents");
 
         for (size_t i = 0; i < 100; ++i) {
-            const int64_t r1 = rand() % 100;
-            const int64_t r2 = rand() % 100;
+            int64_t r1 = random.draw_int_mod(100);
+            int64_t r2 = random.draw_int_mod(100);
 
             t->add("10", "US", "1.0", r1, r2);
         }
         t->optimize();
-        File::try_remove("ga_test.tightdb");
-        g.write("ga_test.tightdb");
+        g.write(path);
     }
 
-    Group g("ga_test.tightdb");
+    Group g(path);
     GATable::Ref t = g.get_table<GATable>("firstevents");
 
     GATable::Query q = t->where().country.equal("US");
 
     size_t c1 = 0;
-    for (size_t i = 0; i < 100; ++i) {
+    for (size_t i = 0; i < 100; ++i)
         c1 += t->column().country.count("US");
-    }
 
     size_t c2 = 0;
-    for (size_t i = 0; i < 100; ++i) {
+    for (size_t i = 0; i < 100; ++i)
         c2 += q.count();
-    }
 
     CHECK_EQUAL(c1, t->size() * 100);
     CHECK_EQUAL(c1, c2);
 }
 
 
-TEST(TestQueryFloat3)
+TEST(Query_Float3)
 {
     FloatTable3 t;
 
@@ -2219,7 +2271,7 @@ TEST(TestQueryFloat3)
     CHECK_EQUAL(15, a8);
 }
 
-TEST(TestTableViewSum)
+TEST(Query_TableViewSum)
 {
     TableViewSum ttt;
 
@@ -2241,7 +2293,7 @@ TEST(TestTableViewSum)
 }
 
 
-TEST(TestQueryJavaMinimumCrash)
+TEST(Query_JavaMinimumCrash)
 {
     // Test that triggers a bug that was discovered through Java intnerface and has been fixed
     PHPMinimumCrash ttt;
@@ -2258,7 +2310,7 @@ TEST(TestQueryJavaMinimumCrash)
 
 
 
-TEST(TestQueryFloat4)
+TEST(Query_Float4)
 {
     FloatTable3 t;
 
@@ -2280,7 +2332,7 @@ TEST(TestQueryFloat4)
     CHECK_EQUAL(12345.0, a4);
 }
 
-TEST(TestQueryFloat)
+TEST(Query_Float)
 {
     FloatTable t;
 
@@ -2317,32 +2369,34 @@ TEST(TestQueryFloat)
     CHECK_EQUAL(3, t.where().col_double.less(2.22).count());
     CHECK_EQUAL(4, t.where().col_double.between(2.20, 2.22).count());
 
+    double epsilon = numeric_limits<double>::epsilon();
+
     // ------ Test sum()
     // ... NO conditions
     double sum1_d = 2.20 + 2.21 + 2.22 + 2.20 + 3.20;
-    CHECK_EQUAL(sum1_d, t.where().col_double.sum());
+    CHECK_APPROXIMATELY_EQUAL(sum1_d, t.where().col_double.sum(), 10*epsilon);
 
     // Note: sum of float is calculated by having a double aggregate to where each float is added
     // (thereby getting casted to double).
     double sum1_f = double(1.10f) + double(1.13f) + double(1.13f) + double(1.10f) + double(1.20f);
     double res = t.where().col_float.sum();
-    CHECK_EQUAL(sum1_f, res);
+    CHECK_APPROXIMATELY_EQUAL(sum1_f, res, 10*epsilon);
 
     // ... with conditions
     double sum2_f = double(1.13f) + double(1.20f);
     double sum2_d = 2.21 + 3.20;
     FloatTable::Query q2 = t.where().col_float.between(1.13f, 1.20f).col_double.not_equal(2.22);
-    CHECK_EQUAL(sum2_d, q2.col_double.sum());
-    CHECK_EQUAL(sum2_f, q2.col_float.sum());
+    CHECK_APPROXIMATELY_EQUAL(sum2_f, q2.col_float.sum(), 10*epsilon);
+    CHECK_APPROXIMATELY_EQUAL(sum2_d, q2.col_double.sum(), 10*epsilon);
 
     // ------ Test average()
 
     // ... NO conditions
-    CHECK_EQUAL(sum1_f/5, t.where().col_float.average());
-    CHECK_EQUAL(sum1_d/5, t.where().col_double.average());
+    CHECK_APPROXIMATELY_EQUAL(sum1_f/5, t.where().col_float.average(), 10*epsilon);
+    CHECK_APPROXIMATELY_EQUAL(sum1_d/5, t.where().col_double.average(), 10*epsilon);
     // ... with conditions
-    CHECK_EQUAL(sum2_f/2, q2.col_float.average());
-    CHECK_EQUAL(sum2_d/2, q2.col_double.average());
+    CHECK_APPROXIMATELY_EQUAL(sum2_f/2, q2.col_float.average(), 10*epsilon);
+    CHECK_APPROXIMATELY_EQUAL(sum2_d/2, q2.col_double.average(), 10*epsilon);
 
     // -------- Test minimum(), maximum()
 
@@ -2382,7 +2436,7 @@ TEST(TestQueryFloat)
 }
 
 
-TEST(TestDateQuery)
+TEST(Query_DateQuery)
 {
     PeopleTable table;
 
@@ -2398,7 +2452,7 @@ TEST(TestDateQuery)
 }
 
 
-TEST(TestQueryStrIndexed_enum)
+TEST(Query_StrIndexedEnum)
 {
     TupleTableType ttt;
 
@@ -2429,7 +2483,7 @@ TEST(TestQueryStrIndexed_enum)
 }
 
 
-TEST(TestQueryStrIndexed_non_enum)
+TEST(Query_StrIndexedNonEnum)
 {
     TupleTableType ttt;
 
@@ -2457,7 +2511,7 @@ TEST(TestQueryStrIndexed_non_enum)
     CHECK_EQUAL(10*2, tv.size());
 }
 
-TEST(TestQueryFindAll_Contains2_2)
+TEST(Query_FindAllContains2_2)
 {
     TupleTableType ttt;
 
@@ -2489,7 +2543,7 @@ TEST(TestQueryFindAll_Contains2_2)
     CHECK_EQUAL(5, tv2.get_source_ndx(2));
 }
 
-TEST(TestQuery_sum_new_aggregates)
+TEST(Query_SumNewAggregates)
 {
     // test the new ACTION_FIND_PATTERN() method in array
     OneIntTable t;
@@ -2507,7 +2561,7 @@ TEST(TestQuery_sum_new_aggregates)
 }
 
 
-TEST(TestQuery_sum_min_max_avg_foreign_col)
+TEST(Query_SumMinMaxAvgForeignCol)
 {
     TwoIntTable t;
     t.add(1, 10);
@@ -2519,7 +2573,7 @@ TEST(TestQuery_sum_min_max_avg_foreign_col)
 }
 
 
-TEST(TestAggregateSingleCond)
+TEST(Query_AggregateSingleCond)
 {
     OneIntTable ttt;
 
@@ -2543,7 +2597,7 @@ TEST(TestAggregateSingleCond)
     CHECK_EQUAL(9, s);
 }
 
-TEST(TestQueryFindAll_range1)
+TEST(Query_FindAllRange1)
 {
     TupleTableType ttt;
 
@@ -2566,24 +2620,25 @@ TEST(TestQueryFindAll_range1)
 }
 
 
-TEST(TestQueryFindAll_range_or_monkey2)
+TEST(Query_FindAllRangeOrMonkey2)
 {
     const size_t ROWS = 20;
     const size_t ITER = 100;
 
-    for (size_t u = 0; u < ITER; u++)
-    {
+    Random random(random_int<unsigned long>()); // Seed from slow global generator
+
+    for (size_t u = 0; u < ITER; u++) {
         TwoIntTable tit;
         Array a;
-        size_t start = rand() % (ROWS + 1);
-        size_t end = start + rand() % (ROWS + 1);
+        size_t start = random.draw_int_max(ROWS);
+        size_t end = start + random.draw_int_max(ROWS);
 
         if (end > ROWS)
             end = ROWS;
 
         for (size_t t = 0; t < ROWS; t++) {
-            int64_t r1 = rand() % 10;
-            int64_t r2 = rand() % 10;
+            int64_t r1 = random.draw_int_mod(10);
+            int64_t r2 = random.draw_int_mod(10);
             tit.add(r1, r2);
         }
 
@@ -2591,9 +2646,8 @@ TEST(TestQueryFindAll_range_or_monkey2)
         TwoIntTable::View tv1 = q1.find_all(start, end);
 
         for (size_t t = start; t < end; t++) {
-            if ((tit[t].first == 3 || tit[t].first == 7) && tit[t].second > 5) {
+            if ((tit[t].first == 3 || tit[t].first == 7) && tit[t].second > 5)
                 a.add(t);
-            }
         }
         size_t s1 = a.size();
         size_t s2 = tv1.size();
@@ -2611,7 +2665,7 @@ TEST(TestQueryFindAll_range_or_monkey2)
 
 
 
-TEST(TestQueryFindAll_range_or)
+TEST(Query_FindAllRangeOr)
 {
     TupleTableType ttt;
 
@@ -2637,7 +2691,7 @@ TEST(TestQueryFindAll_range_or)
 }
 
 
-TEST(TestQuerySimpleStr)
+TEST(Query_SimpleStr)
 {
     TupleTableType ttt;
 
@@ -2653,7 +2707,7 @@ TEST(TestQuerySimpleStr)
     CHECK_EQUAL(4, c);
 }
 
-TEST(TestQueryDelete)
+TEST(Query_Delete)
 {
     TupleTableType ttt;
 
@@ -2683,7 +2737,7 @@ TEST(TestQueryDelete)
     CHECK_EQUAL(0, ttt.size());
 }
 
-TEST(TestQueryDeleteRange)
+TEST(Query_DeleteRange)
 {
     TupleTableType ttt;
 
@@ -2704,7 +2758,7 @@ TEST(TestQueryDeleteRange)
     CHECK_EQUAL(5, ttt[2].first);
 }
 
-TEST(TestQueryDeleteLimit)
+TEST(Query_DeleteLimit)
 {
     TupleTableType ttt;
 
@@ -2728,7 +2782,7 @@ TEST(TestQueryDeleteLimit)
 
 
 
-TEST(TestQuerySimple)
+TEST(Query_Simple)
 {
     TupleTableType ttt;
 
@@ -2758,7 +2812,7 @@ TEST(TestQueryNot)
     CHECK_EQUAL(2, tv1.get_source_ndx(0));
 }
 
-TEST(TestQuerySimpleBUGdetect)
+TEST(Query_SimpleBugDetect)
 {
     TupleTableType ttt;
     ttt.add(1, "a");
@@ -2778,7 +2832,7 @@ TEST(TestQuerySimpleBUGdetect)
 }
 
 
-TEST(TestQuerySubtable)
+TEST(Query_Subtable)
 {
     Group group;
     TableRef table = group.get_table("test");
@@ -2888,11 +2942,11 @@ TEST(TestQuerySubtable)
     CHECK_EQUAL(2, t4.get_source_ndx(1));
 }
 
-TEST(TestQuerySubtable_bug)
+TEST(Query_SubtableBug)
 {
     Group group;
     TableRef table = group.get_table("test");
-    
+
     // Create specification with sub-table
     table->add_column(type_Int,   "col 0");
     DescriptorRef sub;
@@ -2937,7 +2991,7 @@ TEST(Query_SubtableViewSizeBug)
 }
 */
 
-TEST(TestQuerySort1)
+TEST(Query_Sort1)
 {
     TupleTableType ttt;
 
@@ -2971,13 +3025,15 @@ TEST(TestQuerySort1)
 
 
 
-TEST(TestQuerySort_QuickSort)
+TEST(Query_QuickSort)
 {
+    Random random(random_int<unsigned long>()); // Seed from slow global generator
+
     // Triggers QuickSort because range > len
     TupleTableType ttt;
 
     for (size_t t = 0; t < 1000; t++)
-        ttt.add(rand() % 1100, "a"); // 0
+        ttt.add(random.draw_int_mod(1100), "a"); // 0
 
     TupleTableType::Query q = ttt.where();
     TupleTableType::View tv = q.find_all();
@@ -2989,13 +3045,15 @@ TEST(TestQuerySort_QuickSort)
     }
 }
 
-TEST(TestQuerySort_CountSort)
+TEST(Query_CountSort)
 {
+    Random random(random_int<unsigned long>()); // Seed from slow global generator
+
     // Triggers CountSort because range <= len
     TupleTableType ttt;
 
     for (size_t t = 0; t < 1000; t++)
-        ttt.add(rand() % 900, "a"); // 0
+        ttt.add(random.draw_int_mod(900), "a"); // 0
 
     TupleTableType::Query q = ttt.where();
     TupleTableType::View tv = q.find_all();
@@ -3008,12 +3066,14 @@ TEST(TestQuerySort_CountSort)
 }
 
 
-TEST(TestQuerySort_Descending)
+TEST(Query_SortDescending)
 {
+    Random random(random_int<unsigned long>()); // Seed from slow global generator
+
     TupleTableType ttt;
 
     for (size_t t = 0; t < 1000; t++)
-        ttt.add(rand() % 1100, "a"); // 0
+        ttt.add(random.draw_int_mod(1100), "a"); // 0
 
     TupleTableType::Query q = ttt.where();
     TupleTableType::View tv = q.find_all();
@@ -3026,7 +3086,7 @@ TEST(TestQuerySort_Descending)
 }
 
 
-TEST(TestQuerySort_Dates)
+TEST(Query_SortDates)
 {
     Table table;
     table.add_column(type_DateTime, "first");
@@ -3053,7 +3113,7 @@ TEST(TestQuerySort_Dates)
 }
 
 
-TEST(TestQuerySort_Bools)
+TEST(Query_SortBools)
 {
     Table table;
     table.add_column(type_Bool, "first");
@@ -3074,7 +3134,7 @@ TEST(TestQuerySort_Bools)
     CHECK(tv.get_bool(0, 2) == true);
 }
 
-TEST(TestQueryThreads)
+TEST(Query_Threads)
 {
     TupleTableType ttt;
 
@@ -3106,7 +3166,7 @@ TEST(TestQueryThreads)
 }
 
 
-TEST(TestQueryLongString)
+TEST(Query_LongString)
 {
     TupleTableType ttt;
 
@@ -3138,7 +3198,7 @@ TEST(TestQueryLongString)
 }
 
 
-TEST(TestQueryLongEnum)
+TEST(Query_LongEnum)
 {
     TupleTableType ttt;
 
@@ -3170,7 +3230,7 @@ TEST(TestQueryLongEnum)
     }
 }
 
-TEST(TestQueryBigString)
+TEST(Query_BigString)
 {
     TupleTableType ttt;
     ttt.add(1, "a");
@@ -3186,7 +3246,7 @@ TEST(TestQueryBigString)
     CHECK_EQUAL(2, res3);
 }
 
-TEST(TestQuerySimple2)
+TEST(Query_Simple2)
 {
     TupleTableType ttt;
 
@@ -3209,7 +3269,7 @@ TEST(TestQuerySimple2)
 }
 
 
-TEST(TestQueryLimit)
+TEST(Query_Limit)
 {
     TupleTableType ttt;
 
@@ -3256,7 +3316,7 @@ TEST(TestQueryLimit)
 }
 
 
-TEST(TestQueryFindNext)
+TEST(Query_FindNext)
 {
     TupleTableType ttt;
 
@@ -3289,7 +3349,7 @@ TEST(TestQueryFindNext)
 }
 
 
-TEST(TestQueryFindNextBackwards)
+TEST(Query_FindNextBackwards)
 {
     TupleTableType ttt;
 
@@ -3312,8 +3372,10 @@ TEST(TestQueryFindNextBackwards)
 
 // Begin search at arbitrary positions for *same* query object (other tests in this test_query file test same thing,
 // but for independent query objects) to test if leaf cacher works correctly (can go backwards, etc).
-TEST(TestQueryFindRandom)
+TEST(Query_FindRandom)
 {
+    Random random(random_int<unsigned long>()); // Seed from slow global generator
+
     TupleTableType ttt;
     int64_t search = TIGHTDB_MAX_LIST_SIZE / 2;
     size_t rows = TIGHTDB_MAX_LIST_SIZE * 20;
@@ -3322,13 +3384,13 @@ TEST(TestQueryFindRandom)
     for(size_t i = 0; i < rows; i++) {
         // This value distribution makes us sometimes cross a leaf boundary, and sometimes not, with both having
         // a fair probability of happening
-        ttt.add(rand() % TIGHTDB_MAX_LIST_SIZE, "X");
+        ttt.add(random.draw_int_mod(TIGHTDB_MAX_LIST_SIZE), "X");
     }
 
     TupleTableType::Query q = ttt.where().first.equal(search);
 
     for(size_t t = 0; t < 100; t++) {
-        size_t begin = rand() % rows;
+        size_t begin = random.draw_int_mod(rows);
         size_t res = q.find(begin);
 
         // Find correct match position manually in a for-loop
@@ -3346,7 +3408,7 @@ TEST(TestQueryFindRandom)
 
 }
 
-TEST(TestQueryFindNext2)
+TEST(Query_FindNext2)
 {
     TupleTableType ttt;
 
@@ -3364,7 +3426,7 @@ TEST(TestQueryFindNext2)
     CHECK_EQUAL(6, res1);
 }
 
-TEST(TestQueryFindAll1)
+TEST(Query_FindAll1)
 {
     TupleTableType ttt;
 
@@ -3387,7 +3449,7 @@ TEST(TestQueryFindAll1)
 
 }
 
-TEST(TestQueryFindAll2)
+TEST(Query_FindAll2)
 {
     TupleTableType ttt;
 
@@ -3404,7 +3466,7 @@ TEST(TestQueryFindAll2)
     CHECK_EQUAL(6, tv2.get_source_ndx(0));
 }
 
-TEST(TestQueryFindAllBetween)
+TEST(Query_FindAllBetween)
 {
     TupleTableType ttt;
 
@@ -3425,7 +3487,7 @@ TEST(TestQueryFindAllBetween)
 }
 
 
-TEST(TestQueryFindAll_Range)
+TEST(Query_FindAllRange)
 {
     TupleTableType ttt;
 
@@ -3439,7 +3501,7 @@ TEST(TestQueryFindAll_Range)
 }
 
 
-TEST(TestQueryFindAll_Or)
+TEST(Query_FindAllOr)
 {
     TupleTableType ttt;
 
@@ -3461,7 +3523,7 @@ TEST(TestQueryFindAll_Or)
 }
 
 
-TEST(TestQueryFindAll_Parans1)
+TEST(Query_FindAllParens1)
 {
     TupleTableType ttt;
 
@@ -3481,7 +3543,7 @@ TEST(TestQueryFindAll_Parans1)
 }
 
 
-TEST(TestQueryFindAll_OrParan)
+TEST(Query_FindAllOrParan)
 {
     TupleTableType ttt;
 
@@ -3504,7 +3566,7 @@ TEST(TestQueryFindAll_OrParan)
 }
 
 
-TEST(TestQueryFindAll_OrNested0)
+TEST(Query_FindAllOrNested0)
 {
     TupleTableType ttt;
 
@@ -3525,7 +3587,7 @@ TEST(TestQueryFindAll_OrNested0)
     CHECK_EQUAL(6, tv1.get_source_ndx(1));
 }
 
-TEST(TestQueryFindAll_OrNested)
+TEST(Query_FindAllOrNested)
 {
     TupleTableType ttt;
 
@@ -3546,7 +3608,7 @@ TEST(TestQueryFindAll_OrNested)
     CHECK_EQUAL(7, tv1.get_source_ndx(2));
 }
 
-TEST(TestQueryFindAll_OrPHP)
+TEST(Query_FindAllOrPHP)
 {
     TupleTableType ttt;
 
@@ -3560,7 +3622,7 @@ TEST(TestQueryFindAll_OrPHP)
     CHECK_EQUAL(0, tv1.get_source_ndx(0));
 }
 
-TEST(TestQueryFindAllOr)
+TEST(Query_FindAllOr2)
 {
     TupleTableType ttt;
 
@@ -3578,7 +3640,7 @@ TEST(TestQueryFindAllOr)
 
 
 
-TEST(TestQueryFindAll_Parans2)
+TEST(Query_FindAllParens2)
 {
     TupleTableType ttt;
 
@@ -3599,7 +3661,7 @@ TEST(TestQueryFindAll_Parans2)
     CHECK_EQUAL(6, tv1.get_source_ndx(2));
 }
 
-TEST(TestQueryFindAll_Parans4)
+TEST(Query_FindAllParens4)
 {
     TupleTableType ttt;
 
@@ -3618,7 +3680,7 @@ TEST(TestQueryFindAll_Parans4)
 }
 
 
-TEST(TestQueryFindAll_Bool)
+TEST(Query_FindAllBool)
 {
     BoolTupleTable btt;
 
@@ -3638,7 +3700,7 @@ TEST(TestQueryFindAll_Bool)
     CHECK_EQUAL(3, tv2.get_source_ndx(1));
 }
 
-TEST(TestQueryFindAll_Begins)
+TEST(Query_FindAllBegins)
 {
     TupleTableType ttt;
 
@@ -3653,7 +3715,7 @@ TEST(TestQueryFindAll_Begins)
     CHECK_EQUAL(2, tv1.get_source_ndx(1));
 }
 
-TEST(TestQueryFindAll_Ends)
+TEST(Query_FindAllEnds)
 {
 
     TupleTableType ttt;
@@ -3669,7 +3731,7 @@ TEST(TestQueryFindAll_Ends)
 }
 
 
-TEST(TestQueryFindAll_Contains)
+TEST(Query_FindAllContains)
 {
     TupleTableType ttt;
 
@@ -3690,7 +3752,7 @@ TEST(TestQueryFindAll_Contains)
     CHECK_EQUAL(3, tv1.get_source_ndx(3));
 }
 
-TEST(TestQuery_Binary)
+TEST(Query_Binary)
 {
     TupleTableTypeBin t;
 
@@ -3764,7 +3826,7 @@ TEST(TestQuery_Binary)
 }
 
 
-TEST(TestQueryEnums)
+TEST(Query_Enums)
 {
     TupleTableType table;
 
@@ -3800,7 +3862,7 @@ TEST(TestQueryEnums)
 #define ua  "\x0c3\x0a5"         // danish lower case a with ring above (as in blaabaergroed)
 #define uad "\x061\x0cc\x08a"    // decomposed form (a (41) followed by ring)
 
-TEST(TestQueryCaseSensitivity)
+TEST(Query_CaseSensitivity)
 {
     TupleTableType ttt;
 
@@ -3816,7 +3878,7 @@ TEST(TestQueryCaseSensitivity)
 
 #if (defined(_WIN32) || defined(__WIN32__) || defined(_WIN64))
 
-TEST(TestQueryUnicode2)
+TEST(Query_Unicode2)
 {
     TupleTableType ttt;
 
@@ -3843,7 +3905,7 @@ TEST(TestQueryUnicode2)
     CHECK_EQUAL(1, tv3.get_source_ndx(0));
 }
 
-TEST(TestQueryUnicode3)
+TEST(Query_Unicode3)
 {
     TupleTableType ttt;
 
@@ -3879,7 +3941,7 @@ TEST(TestQueryUnicode3)
 
 #endif
 
-TEST(TestQueryFindAll_BeginsUNICODE)
+TEST(Query_FindAllBeginsUnicode)
 {
     TupleTableType ttt;
 
@@ -3895,7 +3957,7 @@ TEST(TestQueryFindAll_BeginsUNICODE)
 }
 
 
-TEST(TestQueryFindAll_EndsUNICODE)
+TEST(Query_FindAllEndsUnicode)
 {
     TupleTableType ttt;
 
@@ -3915,7 +3977,7 @@ TEST(TestQueryFindAll_EndsUNICODE)
 }
 
 
-TEST(TestQueryFindAll_ContainsUNICODE)
+TEST(Query_FindAllContainsUnicode)
 {
     TupleTableType ttt;
 
@@ -3944,7 +4006,7 @@ TEST(TestQueryFindAll_ContainsUNICODE)
     CHECK_EQUAL(3, tv2.get_source_ndx(3));
 }
 
-TEST(TestQuerySyntaxCheck)
+TEST(Query_SyntaxCheck)
 {
     TupleTableType ttt;
     string s;
@@ -3989,7 +4051,7 @@ TEST(TestQuerySyntaxCheck)
 */
 }
 
-TEST(TestQuerySubtableSyntaxCheck)
+TEST(Query_SubtableSyntaxCheck)
 {
     Group group;
     TableRef table = group.get_table("test");
@@ -4069,7 +4131,7 @@ TEST(TestQuerySubtableSyntaxCheck)
     CHECK(s != "");
 }
 
-TEST(TestTV)
+TEST(Query_TestTV)
 {
     TupleTableType t;
     t.add(1, "a");
@@ -4088,7 +4150,7 @@ TEST(TestTV)
     CHECK_EQUAL(1, q4.count());
 }
 
-TEST(TestQuery_sum_min_max_avg)
+TEST(Query_SumMinMaxAvg)
 {
     TupleTableType t;
     t.add(1, "a");
@@ -4126,7 +4188,7 @@ TEST(TestQuery_sum_min_max_avg)
     CHECK_EQUAL(3, cnt);
 }
 
-TEST(TestQuery_avg)
+TEST(Query_Avg)
 {
     TupleTableType t;
     size_t cnt;
@@ -4146,7 +4208,7 @@ TEST(TestQuery_avg)
     CHECK_EQUAL(30,t.where().first.average(NULL, 1, 2));     // second
 }
 
-TEST(TestQuery_avg2)
+TEST(Query_Avg2)
 {
     TupleTableType t;
     size_t cnt;
@@ -4186,7 +4248,7 @@ TEST(TestQuery_avg2)
 }
 
 
-TEST(TestQuery_OfByOne)
+TEST(Query_OfByOne)
 {
     TupleTableType t;
     for (size_t i = 0; i < TIGHTDB_MAX_LIST_SIZE * 2; ++i) {
@@ -4218,7 +4280,7 @@ TEST(TestQuery_OfByOne)
     CHECK_EQUAL(last_pos, res);
 }
 
-TEST(TestQuery_Const)
+TEST(Query_Const)
 {
     TupleTableType t;
     t.add(10, "a");
@@ -4248,7 +4310,7 @@ TIGHTDB_TABLE_4(EmployeeTable,
 
 } // anonymous namespace
 
-TEST(TestQuery_Subtables_Typed)
+TEST(Query_SubtablesTyped)
 {
     // Create table
     EmployeeTable employees;
@@ -4271,7 +4333,7 @@ TEST(TestQuery_Subtables_Typed)
 }
 
 
-TEST(TestQuery_AllTypes_DynamicallyTyped)
+TEST(Query_AllTypesDynamicallyTyped)
 {
     Table table;
     DescriptorRef sub1;
@@ -4362,7 +4424,7 @@ TIGHTDB_TABLE_9(TestQueryAllTypes,
                 mixed_col,  Mixed)
 }
 
-TEST(TestQuery_AllTypes_StaticallyTyped)
+TEST(Query_AllTypesStaticallyTyped)
 {
     TestQueryAllTypes table;
 
@@ -4409,7 +4471,7 @@ TEST(TestQuery_AllTypes_StaticallyTyped)
 }
 
 
-TEST(Query_ref_counting)
+TEST(Query_RefCounting)
 {
     Table* t = LangBindHelper::new_table();
     t->add_column(type_Int, "myint");

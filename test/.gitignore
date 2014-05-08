@@ -9,15 +9,6 @@
 /large_tests/*.gcno
 /large_tests/*.gcda
 
-/UnitTest++/libUnitTest++.a
-/UnitTest++/TestUnitTest++
-/UnitTest++/src/*.d
-/UnitTest++/src/*.o
-/UnitTest++/src/Posix/*.d
-/UnitTest++/src/Posix/*.o
-/UnitTest++/src/tests/*.d
-/UnitTest++/src/tests/*.o
-
 /tightdb-tests
 /tightdb-tests-dbg
 /tightdb-tests-cov
@@ -25,9 +16,5 @@
 /benchmark/x64
 /benchmark
 
-# Transient databases
-*.tightdb
-*.tightdb.lock
-
 # Jenkins unit test reports
-unit-test-report.xml
+/unit-test-report.xml

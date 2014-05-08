@@ -512,7 +512,7 @@ protected:
 class ListviewNode: public ParentNode {
 public:
     ListviewNode(const Array& arr) : m_arr(arr), m_max(0), m_next(0), m_size(arr.size()) {m_child = 0; m_dT = 0.0;}
-    ~ListviewNode() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
+    ~ListviewNode() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {  }
 
     void init(const Table& table) TIGHTDB_OVERRIDE
     {

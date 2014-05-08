@@ -17,12 +17,8 @@ If you are going to modify the TightDB core library, you will need
 Cheetah for Python (http://www.cheetahtemplate.org). It is needed
 because some source files are generated from Cheetah templates.
 
-To run the test suite, you will need "UnitTest++"
-(http://unittest-cpp.sourceforge.net), however, a bundled fallback
-version will be used if `pkg-config unittest++ --exists` fails.
-
-Finally, to run the benchmarking suite (make benchmark) on Linux, you
-will need the development part of the 'procps' library.
+To run the benchmarking suite (make benchmark) on Linux, you will need
+the development part of the 'procps' library.
 
 The following is a suggestion of how to install the prerequisites on
 each of our major platforms:
@@ -31,15 +27,19 @@ each of our major platforms:
 
     sudo apt-get install build-essential
     sudo apt-get install python-cheetah
-    sudo apt-get install libunittest++-dev
     sudo apt-get install libproc-dev
 
-### Ubuntu 13.04, Linux Mint 15
+### Linux Mint 15, 16, Ubuntu 13.04, 13.10
 
     sudo apt-get install build-essential
     sudo apt-get install python-cheetah
-    sudo apt-get install libunittest++-dev
     sudo apt-get install libprocps0-dev
+
+### Linux Mint 17, Ubuntu 14.04
+
+    sudo apt-get install build-essential
+    sudo apt-get install python-cheetah
+    sudo apt-get install libprocps3-dev
 
 ### Fedora 17, 18, 19, 20, Amazon Linux 2012.09
 
@@ -94,7 +94,7 @@ Except for `tightdb.hpp` which is installed as:
 
     /usr/local/include/tightdb.hpp
 
-The following libraries are installed:
+The following libraries will be installed:
 
     /usr/local/lib/libtightdb.so
     /usr/local/lib/libtightdb-dbg.so
@@ -102,14 +102,14 @@ The following libraries are installed:
 
 Note: '.so' is replaced by '.dylib' on OS X.
 
-The following programs are installed:
+The following programs will be installed:
 
     /usr/local/bin/tightdb-import
     /usr/local/bin/tightdb-import-dbg
-    /usr/local/bin/tightdbd
-    /usr/local/bin/tightdbd-dbg
     /usr/local/bin/tightdb-config
     /usr/local/bin/tightdb-config-dbg
+    /usr/local/libexec/tightdbd
+    /usr/local/libexec/tightdbd-dbg
 
 The `tightdb-import` tool lets you load files containing
 comma-separated values into TightDB. The next two are used
@@ -126,8 +126,6 @@ Here is a more comple set of build-related commands:
     sh build.sh config
     sh build.sh clean
     sh build.sh build
-    sh build.sh test
-    sh build.sh test-debug
     sh build.sh show-install
     sudo sh build.sh install
     sh build.sh test-intalled
@@ -202,7 +200,67 @@ available for installation to the end-user:
 
     TIGHTDB_ENABLE_REPLICATION=1 sh build.sh bin-dist all
 
-### Memory debugging
+
+
+Testing
+-------
+
+The core library comes with a suite of unite tests. You can run it in
+one of the following ways:
+
+    sh build.sh test
+    sh build.sh test-debug
+    sh build.sh memtest
+    sh build.sh memtest-debug
+
+The `mem` versions will run the suite inside Valgrind.
+
+There are a number of environment variable that can be use the
+customize the execution. For example, here is how to run only the
+`Foo` test and those whose names start with `Bar`, then how run all
+tests whose names start with `Foo`, except `Foo2` and those whose
+names end with an `X`:
+
+    UNITTEST_FILTER="Foo Bar*" sh build.sh test-debug
+    UNITTEST_FILTER="Foo* - Foo2 *X" sh build.sh test-debug
+
+These are the available variables:
+
+ - `UNITTEST_FILTER` can be used to exclude one or more tests from a
+   particular run. For more information about the syntax, see the
+   documentation of
+   `tightdb::test_util::unit_test::create_wildcard_filter()` in
+   `test/util/unit_test.hpp`.
+
+ - Set `UNITTEST_PROGRESS` to a non-empty value to enable reporting of
+   progress (write the name of each test as it is executed).
+
+ - If you set `UNITTEST_SHUFFLE` to a non-empty value, the tests will
+   be executed in a random order. This requires, of course, that all
+   executed tests are independant of each other. Note that unless you
+   also set `UNITTEST_REANDOM_SEED=random`, you will get the same
+   random order in each sucessive run.
+
+ - You may set `UNITTEST_REANDOM_SEED` to `random` or to some unsigned
+   integer (at least 32 bits will be accepted). If you specify
+   `random`, the global pseudorandom number generator will be seeded
+   with a nondeterministic value (one that generally will be different
+   in each sucessive run). If you specify an integer, it will be
+   seeded with that integer.
+
+ - Set `UNITTEST_THREADS` to the number of test threads to use. The
+   default is 1. Using more than one thread requires that all executed
+   tests are thread-safe and independant of each other.
+
+ - Set `UNITTEST_KEEP_FILES` to a non-empty value to disable automatic
+   removal of test files.
+
+ - Set `UNITTEST_XML` to a non-empty value to dump the test results to
+   an XML file. For details, see
+   `tightdb::test_util::unit_test::create_xml_reporter()` in
+   `test/util/unit_test.hpp`.
+
+Memory debugging:
 
 TightDB currently allows for uninitialized data to be written to a
 database file. This is not an error (technically), but it does cause
@@ -211,6 +269,7 @@ testing and debugging, set `TIGHTDB_ENABLE_ALLOC_SET_ZERO` to a
 nonempty value during configuration as in the following example:
 
     TIGHTDB_ENABLE_ALLOC_SET_ZERO=1 sh build.sh config
+
 
 
 Packaging for Debian/Ubuntu
@@ -295,9 +354,10 @@ platforms, however, Pandoc installation is unfeasible (e.g. Amazon
 Linux). In those cases you may set `TIGHTDB_DISABLE_MARKDOWN_TO_PDF`
 to a nonempty value to disable the conversion to PDF.
 
-### Ubuntu 10.04, 12.04, and 13.04
+### Linux Mint 15, 16, 17, Ubuntu 10.04, 12.04, 13.04, 13.10, 14.04
 
-    sudo apt-get install texlive-latex-base texlive-latex-extra pandoc
+    sudo apt-get install texlive-latex-base texlive-latex-extra texlive-fonts-recommended
+    sudo apt-get install pandoc
 
 ### Fedora 17
 
@@ -307,7 +367,7 @@ to a nonempty value to disable the conversion to PDF.
 
     sudo yum install pandoc-pdf texlive
 
-## Mac OS X 10.7, 10.8, and 10.9
+### Mac OS X 10.7, 10.8, and 10.9
 
 Install Pandoc and XeLaTeX (aka MacTeX) by following the instructions
 on http://johnmacfarlane.net/pandoc/installing.html. This boils down

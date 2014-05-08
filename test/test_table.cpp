@@ -2,32 +2,63 @@
 #ifdef TEST_TABLE
 
 #include <algorithm>
+#include <limits>
 #include <string>
 #include <fstream>
 #include <ostream>
 
-
-#include <UnitTest++.h>
-
 #include <tightdb.hpp>
 #include <tightdb/lang_bind_helper.hpp>
 
-#include "testsettings.hpp"
 #include "util/misc.hpp"
+
+#include "test.hpp"
 
 using namespace std;
 using namespace tightdb;
 using namespace tightdb::util;
-using namespace test_util;
+using namespace tightdb::test_util;
+using unit_test::TestResults;
 
-// Note: You can now temporarely declare unit tests with the ONLY(TestName) macro instead of TEST(TestName). This
-// will disable all unit tests except these. Remember to undo your temporary changes before committing.
+
+// Test independence and thread-safety
+// -----------------------------------
+//
+// All tests must be thread safe and independent of each other. This
+// is required because it allows for both shuffling of the execution
+// order and for parallelized testing.
+//
+// In particular, avoid using std::rand() since it is not guaranteed
+// to be thread safe. Instead use the API offered in
+// `test/util/random.hpp`.
+//
+// All files created in tests must use the TEST_PATH macro (or one of
+// its friends) to obtain a suitable file system path. See
+// `test/util/test_path.hpp`.
+//
+//
+// Debugging and the ONLY() macro
+// ------------------------------
+//
+// A simple way of disabling all tests except one called `Foo`, is to
+// replace TEST(Foo) with ONLY(Foo) and then recompile and rerun the
+// test suite. Note that you can also use filtering by setting the
+// environment varible `UNITTEST_FILTER`. See `README.md` for more on
+// this.
+//
+// Another way to debug a particular test, is to copy that test into
+// `experiments/testcase.cpp` and then run `sh build.sh
+// check-testcase` (or one of its friends) from the command line.
+
 
 namespace {
+
 TIGHTDB_TABLE_2(TupleTableType,
                 first,  Int,
                 second, String)
-}
+
+} // anonymous namespace
+
 
 #ifdef JAVA_MANY_COLUMNS_CRASH
 
@@ -45,7 +76,7 @@ TIGHTDB_TABLE_7(MainTableType,
                 zipCode, String,
                 events, Subtable<SubtableType>)
 
-TEST(ManyColumnsCrash2)
+TEST(Table_ManyColumnsCrash2)
 {
     // Trying to reproduce Java crash.
     for (int a = 0; a < 10; a++)
@@ -80,9 +111,9 @@ TEST(ManyColumnsCrash2)
     }
 }
 
-#endif
+#endif // JAVA_MANY_COLUMNS_CRASH
 
-TEST(DeleteCrash)
+TEST(Table_DeleteCrash)
 {
     Group group;
     TableRef table = group.get_table("test");
@@ -106,7 +137,7 @@ TEST(DeleteCrash)
 }
 
 
-TEST(TestOptimizeCrash)
+TEST(Table_OptimizeCrash)
 {
     // This will crash at the .add() method
     TupleTableType ttt;
@@ -116,7 +147,7 @@ TEST(TestOptimizeCrash)
     ttt.add(1, "AA");
 }
 
-TEST(Table1)
+TEST(Table_1)
 {
     Table table;
     table.add_column(type_Int, "first");
@@ -155,7 +186,7 @@ TEST(Table1)
 #endif
 }
 
-TEST(Table_floats)
+TEST(Table_Floats)
 {
     Table table;
     table.add_column(type_Float, "first");
@@ -206,7 +237,7 @@ TIGHTDB_TABLE_4(TestTable,
 
 } // anonymous namespace
 
-TEST(Table2)
+TEST(Table_2)
 {
     TestTable table;
 
@@ -223,7 +254,7 @@ TEST(Table2)
 #endif
 }
 
-TEST(Table3)
+TEST(Table_3)
 {
     TestTable table;
 
@@ -252,12 +283,14 @@ TEST(Table3)
 }
 
 namespace {
+
 TIGHTDB_TABLE_2(TestTableEnum,
                 first,      Enum<Days>,
                 second,     String)
+
 } // anonymous namespace
 
-TEST(Table4)
+TEST(Table_4)
 {
     TestTableEnum table;
 
@@ -278,12 +311,14 @@ TEST(Table4)
 }
 
 namespace {
+
 TIGHTDB_TABLE_2(TestTableFloats,
                 first,      Float,
                 second,     Double)
+
 } // anonymous namespace
 
-TEST(Table_float2)
+TEST(Table_Float2)
 {
     TestTableFloats table;
 
@@ -589,7 +624,7 @@ TEST(Table_HighLevelCopy)
 }
 
 
-TEST(Table_Delete_All_Types)
+TEST(Table_DeleteAllTypes)
 {
     Table table;
     setup_multi_table(table, 15, 2);
@@ -614,15 +649,17 @@ TEST(Table_Delete_All_Types)
 #endif
 }
 
-TEST(Table_Move_All_Types)
+TEST(Table_MoveAllTypes)
 {
+    Random random(random_int<unsigned long>()); // Seed from slow global generator
+
     Table table;
     setup_multi_table(table, 15, 2);
     table.set_index(6);
 
     while (table.size() > 1) {
         size_t size = table.size();
-        size_t ndx = size_t(rand()) % (size-1);
+        size_t ndx = random.draw_int_mod(size-1);
 
         table.move_last_over(ndx);
 
@@ -775,7 +812,7 @@ TEST(Table_DegenerateSubtableSearchAndAggregate)
     CHECK_EQUAL(0, res);
 }
 
-TEST(Table_range)
+TEST(Table_Range)
 {
     Table table;
     table.add_column(type_Int, "int");
@@ -788,7 +825,7 @@ TEST(Table_range)
         CHECK_EQUAL(int64_t(i+10), tv.get_int(0, i));
 }
 
-TEST(Table_range_const)
+TEST(Table_RangeConst)
 {
     Group group;
     {
@@ -809,7 +846,7 @@ TEST(Table_range_const)
 // enable to generate testfiles for to_string and json below
 #define GENERATE 0
 
-TEST(Table_test_to_string)
+TEST(Table_ToString)
 {
     Table table;
     setup_multi_table(table, 15, 6);
@@ -817,32 +854,35 @@ TEST(Table_test_to_string)
     stringstream ss;
     table.to_string(ss);
     const string result = ss.str();
+    PlatformConfig* platform_config = PlatformConfig::Instance();
+    string file_name = platform_config->get_resource_path();
 #if _MSC_VER
-    const char* filename = "expect_string-win.txt";
+    file_name += "expect_string-win.txt";
 #else
-    const char* filename = "expect_string.txt";
+    file_name += "expect_string.txt";
 #endif
 #if GENERATE   // enable to generate testfile - check it manually
-    ofstream testFile(filename, ios::out);
-    testFile << result;
+    ofstream test_file(file_name.c_str(), ios::out);
+    test_file << result;
     cerr << "to_string() test:\n" << result << endl;
 #else
-    ifstream testFile(filename, ios::in);
-    CHECK(!testFile.fail());
+    ifstream test_file(file_name.c_str(), ios::in);
+    CHECK(!test_file.fail());
     string expected;
-    expected.assign( istreambuf_iterator<char>(testFile),
+    expected.assign( istreambuf_iterator<char>(test_file),
                      istreambuf_iterator<char>() );
     bool test_ok = test_util::equal_without_cr(result, expected);
     CHECK_EQUAL(true, test_ok);
     if (!test_ok) {
-        ofstream testFile("expect_string.error.txt", ios::out | ios::binary);
-        testFile << result;
-        cerr << "\n error result in 'expect_string.error.txt'\n";
+        TEST_PATH(path);
+        File out(path, File::mode_Write);
+        out.write(result);
+        cerr << "\n error result in '"<<string(path)<<"'\n";
     }
 #endif
 }
 
-TEST(Table_test_json_all_data)
+TEST(Table_JsonAllData)
 {
     Table table;
     setup_multi_table(table, 15, 2);
@@ -850,35 +890,38 @@ TEST(Table_test_json_all_data)
     stringstream ss;
     table.to_json(ss);
     const string json = ss.str();
+    PlatformConfig* platform_config = PlatformConfig::Instance();
+    string file_name = platform_config->get_resource_path();
 #if _MSC_VER
-    const char* filename = "expect_json-win.json";
+    file_name += "expect_json-win.json";
 #else
-    const char* filename = "expect_json.json";
+    file_name += "expect_json.json";
 #endif
 #if GENERATE
         // Generate the testdata to compare. After doing this,
         // verify that the output is correct with a json validator:
         // http://jsonformatter.curiousconcept.com/
     cerr << "JSON:" << json << "\n";
-    ofstream testFile(filename, ios::out | ios::binary);
-    testFile << json;
+    ofstream test_file(file_name.c_str(), ios::out | ios::binary);
+    test_file << json;
 #else
     string expected;
-    ifstream testFile(filename, ios::in | ios::binary);
-    CHECK(!testFile.fail());
-    getline(testFile,expected);
+    ifstream test_file(file_name.c_str(), ios::in | ios::binary);
+    CHECK(!test_file.fail());
+    getline(test_file,expected);
     CHECK_EQUAL(true, json == expected);
     if (json != expected) {
-        ofstream testFile("expect_json.error.json", ios::out | ios::binary);
-        testFile << json;
-        cerr << "\n error result in 'expect_json.error.json'\n";
+        TEST_PATH(path);
+        File out(path, File::mode_Write);
+        out.write(json);
+        cerr << "\n error result in '"<<string(path)<<"'\n";
     }
 #endif
 }
 
 
 /* DISABLED BECAUSE IT FAILS - A PULL REQUEST WILL BE MADE WHERE IT IS REENABLED!
-TEST(Table_test_row_to_string)
+TEST(Table_RowToString)
 {
     // Create table with all column types
     Table table;
@@ -888,8 +931,8 @@ TEST(Table_test_row_to_string)
     table.row_to_string(1, ss);
     const string row_str = ss.str();
 #if 0
-    ofstream testFile("row_to_string.txt", ios::out);
-    testFile << row_str;
+    ofstream test_file("row_to_string.txt", ios::out);
+    test_file << row_str;
 #endif
 
     string expected = "    int   bool                 date           float          double   string              string_long  string_enum     binary  mixed  tables\n"
@@ -904,7 +947,7 @@ TEST(Table_test_row_to_string)
 }
 
 
-TEST(Table_Find_Int)
+TEST(Table_FindInt)
 {
     TestTable table;
 
@@ -924,7 +967,7 @@ TEST(Table_Find_Int)
 
 
 /*
-TEST(Table6)
+TEST(Table_6)
 {
     TestTableEnum table;
 
@@ -951,7 +994,7 @@ TEST(Table6)
 */
 
 
-TEST(Table_FindAll_Int)
+TEST(Table_FindAllInt)
 {
     TestTable table;
 
@@ -985,7 +1028,7 @@ TEST(Table_FindAll_Int)
 #endif
 }
 
-TEST(Table_Sorted_Int)
+TEST(Table_SortedInt)
 {
     TestTable table;
 
@@ -1020,7 +1063,51 @@ TEST(Table_Sorted_Int)
 #endif
 }
 
-TEST(Table_Index_String)
+TEST(Table_Sorted_Query)
+{
+    TestTable table;
+    
+    table.add(0, 10, true, Wed); // 0: 4
+    table.add(0, 20, false, Wed); // 1: 7
+    table.add(0,  0, false, Wed); // 2: 0
+    table.add(0, 40, false, Wed); // 3: 8
+    table.add(0, 15, false, Wed); // 4: 6
+    table.add(0, 11, true, Wed); // 5: 5
+    table.add(0,  6, true, Wed); // 6: 3
+    table.add(0,  4, true, Wed); // 7: 2
+    table.add(0, 99, true, Wed); // 8: 9
+    table.add(0,  2, true, Wed); // 9: 1
+    
+    // Count booleans
+    size_t count_original = table.where().third.equal(false).count();
+    CHECK_EQUAL(4, count_original);
+    
+    // Get a view containing the complete table
+    TestTable::View v = table.column().first.find_all(0);
+    CHECK_EQUAL(table.size(), v.size());
+    
+    // Count booleans
+    size_t count_view = table.where().tableview(v).third.equal(false).count();
+    CHECK_EQUAL(4, count_view);
+    
+    TestTable::View v_sorted = table.column().second.get_sorted_view();
+    CHECK_EQUAL(table.size(), v_sorted.size());
+    
+    bool got_exception = false;
+    try {
+        // Verify that a sorted view cannot form the basis of a new query
+        size_t count_view_sorted = table.where().tableview(v_sorted).third.equal(false).count();
+        CHECK_EQUAL(4, count_view_sorted);
+    } catch (runtime_error) {
+        got_exception = true;
+    }
+    CHECK_EQUAL(true, got_exception);
+#ifdef TIGHTDB_DEBUG
+    table.Verify();
+#endif
+}
+
+TEST(Table_IndexString)
 {
     TestTableEnum table;
 
@@ -1052,7 +1139,7 @@ TEST(Table_Index_String)
     CHECK_EQUAL(2, c1);
 }
 
-TEST(Table_Index_String_Twice)
+TEST(Table_IndexStringTwice)
 {
     TestTableEnum table;
 
@@ -1072,9 +1159,11 @@ TEST(Table_Index_String_Twice)
 }
 
 namespace {
+
 TIGHTDB_TABLE_2(LookupTable,
                 first,  String,
                 second, Int)
+
 } // anonymous namespace
 
 TEST(Table_Lookup)
@@ -1131,10 +1220,12 @@ TEST(Table_Lookup)
 }
 
 namespace {
+
 TIGHTDB_TABLE_1(TestSubtableLookup2,
                 str, String)
 TIGHTDB_TABLE_1(TestSubtableLookup1,
                 subtab, Subtable<TestSubtableLookup2>)
+
 } // anonymous namespace
 
 
@@ -1187,7 +1278,7 @@ TEST(Table_Distinct)
 }
 
 /*
-TEST(Table_Index_Int)
+TEST(Table_IndexInt)
 {
     TestTable table;
 
@@ -1273,14 +1364,16 @@ TEST(Table_Index_Int)
 */
 
 namespace {
+
 TIGHTDB_TABLE_4(TestTableAE,
                 first,  Int,
                 second, String,
                 third,  Bool,
                 fourth, Enum<Days>)
+
 } // anonymous namespace
 
-TEST(TableAutoEnumeration)
+TEST(Table_AutoEnumeration)
 {
     TestTableAE table;
 
@@ -1335,7 +1428,7 @@ TEST(TableAutoEnumeration)
 }
 
 
-TEST(TableAutoEnumerationFindFindAll)
+TEST(Table_AutoEnumerationFindFindAll)
 {
     TestTableAE table;
 
@@ -1362,14 +1455,16 @@ TEST(TableAutoEnumerationFindFindAll)
 }
 
 namespace {
+
 TIGHTDB_TABLE_4(TestTableEnum4,
                 col1, String,
                 col2, String,
                 col3, String,
                 col4, String)
+
 } // anonymous namespace
 
-TEST(TableAutoEnumerationOptimize)
+TEST(Table_AutoEnumerationOptimize)
 {
     TestTableEnum4 t;
 
@@ -1412,10 +1507,12 @@ TEST(TableAutoEnumerationOptimize)
 }
 
 namespace {
+
 TIGHTDB_TABLE_1(TestSubtabEnum2,
                 str, String)
 TIGHTDB_TABLE_1(TestSubtabEnum1,
                 subtab, Subtable<TestSubtabEnum2>)
+
 } // anonymous namespace
 
 TEST(Table_OptimizeSubtable)
@@ -1566,15 +1663,15 @@ TEST(Table_Spec)
     }
 
     // Write the group to disk
-    File::try_remove("subtables.tightdb");
-    group.write("subtables.tightdb");
+    GROUP_TEST_PATH(path);
+    group.write(path);
 
     // Read back tables
     {
-        Group fromDisk("subtables.tightdb", Group::mode_ReadOnly);
-        TableRef fromDiskTable = fromDisk.get_table("test");
+        Group from_disk(path, Group::mode_ReadOnly);
+        TableRef from_disk_table = from_disk.get_table("test");
 
-        TableRef subtable2 = fromDiskTable->get_subtable(2, 0);
+        TableRef subtable2 = from_disk_table->get_subtable(2, 0);
 
         CHECK_EQUAL(1,      subtable2->size());
         CHECK_EQUAL(42,     subtable2->get_int(0, 0));
@@ -1582,7 +1679,7 @@ TEST(Table_Spec)
     }
 }
 
-TEST(Table_Spec_ColumnPath)
+TEST(Table_SpecColumnPath)
 {
     Group group;
     TableRef table = group.get_table("test");
@@ -1620,7 +1717,7 @@ TEST(Table_Spec_ColumnPath)
     }
 }
 
-TEST(Table_Spec_RenameColumns)
+TEST(Table_SpecRenameColumns)
 {
     Group group;
     TableRef table = group.get_table("test");
@@ -1670,7 +1767,7 @@ TEST(Table_Spec_RenameColumns)
     }
 }
 
-TEST(Table_Spec_DeleteColumns)
+TEST(Table_SpecDeleteColumns)
 {
     Group group;
     TableRef table = group.get_table("test");
@@ -1788,7 +1885,7 @@ TEST(Table_Spec_DeleteColumns)
 }
 
 
-TEST(Table_Spec_AddColumns)
+TEST(Table_SpecAddColumns)
 {
     Group group;
     TableRef table = group.get_table("test");
@@ -1921,7 +2018,7 @@ TEST(Table_Spec_AddColumns)
 }
 
 
-TEST(Table_Spec_DeleteColumnsBug)
+TEST(Table_SpecDeleteColumnsBug)
 {
     TableRef table = Table::create();
 
@@ -2526,7 +2623,7 @@ TEST(Table_DateAndBinary)
 }
 
 // Test for a specific bug found: Calling clear on a group with a table with a subtable
-TEST(Table_Test_Clear_With_Subtable_AND_Group)
+TEST(Table_ClearWithSubtableAndGroup)
 {
     Group group;
     TableRef table = group.get_table("test");
@@ -2564,7 +2661,8 @@ TEST(Table_Test_Clear_With_Subtable_AND_Group)
 
 
 //set a subtable in an already exisitng row by providing an existing subtable as the example to copy
-TEST(Table_SetSubTableByExample)
+// FIXME: Do we need both this one and Table_SetSubTableByExample2?
+TEST(Table_SetSubTableByExample1)
 {
     Group group;
     TableRef table = group.get_table("test");
@@ -2617,7 +2715,8 @@ TEST(Table_SetSubTableByExample)
 }
 
 //In the tableview class, set a subtable in an already exisitng row by providing an existing subtable as the example to copy
-TEST(TableView_SetSubTableByExample)
+// FIXME: Do we need both this one and Table_SetSubTableByExample1?
+TEST(Table_SetSubTableByExample2)
 {
     Group group;
     TableRef table = group.get_table("test");
@@ -2767,7 +2866,7 @@ TEST(Table_Aggregates)
     for (int i = 0; i < TBL_SIZE; i++) {
         table.add(5987654, 4.0f, 3.0);
         i_sum += 5987654;
-        f_sum += double(4.0f);
+        f_sum += 4.0f;
         d_sum += 3.0;
     }
     table.add(1, 1.1f, 1.2);
@@ -2778,6 +2877,8 @@ TEST(Table_Aggregates)
     d_sum += 1.2 + 12.0 + 3.0;
     double size = TBL_SIZE + 3;
 
+    double epsilon = numeric_limits<double>::epsilon();
+
     // minimum
     CHECK_EQUAL(1, table.column().c_int.minimum());
     CHECK_EQUAL(1.1f, table.column().c_float.minimum());
@@ -2787,14 +2888,13 @@ TEST(Table_Aggregates)
     CHECK_EQUAL(11.0f, table.column().c_float.maximum());
     CHECK_EQUAL(12.0, table.column().c_double.maximum());
     // sum
-    CHECK_EQUAL(i_sum, table.column().c_int.sum());
-    CHECK_EQUAL(f_sum, table.column().c_float.sum());
-    CHECK_EQUAL(d_sum, table.column().c_double.sum());
+    CHECK_APPROXIMATELY_EQUAL(double(i_sum), double(table.column().c_int.sum()), 10*epsilon);
+    CHECK_APPROXIMATELY_EQUAL(f_sum, table.column().c_float.sum(),  10*epsilon);
+    CHECK_APPROXIMATELY_EQUAL(d_sum, table.column().c_double.sum(), 10*epsilon);
     // average
-    CHECK_EQUAL(double(i_sum)/size, table.column().c_int.average());
-    CHECK_EQUAL(double(f_sum)/size, table.column().c_float.average());
-    // almost_equal because of double/float imprecision
-    CHECK(almost_equal(double(d_sum)/size, table.column().c_double.average()));
+    CHECK_APPROXIMATELY_EQUAL(i_sum/size, table.column().c_int.average(),    10*epsilon);
+    CHECK_APPROXIMATELY_EQUAL(f_sum/size, table.column().c_float.average(),  10*epsilon);
+    CHECK_APPROXIMATELY_EQUAL(d_sum/size, table.column().c_double.average(), 10*epsilon);
 }
 
 namespace {
@@ -2873,7 +2973,7 @@ TIGHTDB_TABLE_3(TablePivotAgg,
 
 } // anonymous namespace
 
-TEST(Table_pivot)
+TEST(Table_Pivot)
 {
     size_t count = 1717;
     TablePivotAgg table;
@@ -2952,7 +3052,8 @@ TEST(Table_pivot)
 
 namespace {
 
-void compare_table_with_slice(const Table& table, const Table& slice, size_t offset, size_t size)
+void compare_table_with_slice(TestResults& test_results, const Table& table,
+                              const Table& slice, size_t offset, size_t size)
 {
     ConstDescriptorRef table_desc = table.get_descriptor();
     ConstDescriptorRef slice_desc = slice.get_descriptor();
@@ -3065,7 +3166,8 @@ void compare_table_with_slice(const Table& table, const Table& slice, size_t off
 }
 
 
-void test_write_slice_name(const Table& table, StringData expect_name, bool override_name)
+void test_write_slice_name(TestResults& test_results, const Table& table,
+                           StringData expect_name, bool override_name)
 {
     size_t offset = 0, size = 0;
     ostringstream out;
@@ -3083,7 +3185,8 @@ void test_write_slice_name(const Table& table, StringData expect_name, bool over
     CHECK(slice);
 }
 
-void test_write_slice_contents(const Table& table, size_t offset, size_t size)
+void test_write_slice_contents(TestResults& test_results, const Table& table,
+                               size_t offset, size_t size)
 {
     ostringstream out;
     table.write(out, offset, size);
@@ -3100,27 +3203,27 @@ void test_write_slice_contents(const Table& table, size_t offset, size_t size)
             size_2 = remaining_size;
         CHECK_EQUAL(size_2, slice->size());
         if (size_2 == slice->size())
-            compare_table_with_slice(table, *slice, offset, size_2);
+            compare_table_with_slice(test_results, table, *slice, offset, size_2);
     }
 }
 
-} // namespace
+} // anonymous namespace
 
 TEST(Table_WriteSlice)
 {
     // check that the name of the written table is as expected
     {
         Table table;
-        test_write_slice_name(table, "",    false);
-        test_write_slice_name(table, "foo", true); // Override
-        test_write_slice_name(table, "",    true); // Override
+        test_write_slice_name(test_results, table, "",    false);
+        test_write_slice_name(test_results, table, "foo", true); // Override
+        test_write_slice_name(test_results, table, "",    true); // Override
     }
     {
         Group group;
         TableRef table = group.get_table("test");
-        test_write_slice_name(*table, "test", false);
-        test_write_slice_name(*table, "foo",  true); // Override
-        test_write_slice_name(*table, "",     true); // Override
+        test_write_slice_name(test_results, *table, "test", false);
+        test_write_slice_name(test_results, *table, "foo",  true); // Override
+        test_write_slice_name(test_results, *table, "",     true); // Override
     }
 
     // Run through a 3-D matrix of table sizes, slice offsets, and
@@ -3146,7 +3249,7 @@ TEST(Table_WriteSlice)
                 int size = table_sizes[size_i];
                 // This also checks that the range can extend beyond
                 // end of table
-                test_write_slice_contents(*table, offset, size);
+                test_write_slice_contents(test_results, *table, offset, size);
                 if (offset + size > table_size)
                     break;
             }

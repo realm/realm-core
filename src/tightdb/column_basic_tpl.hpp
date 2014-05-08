@@ -248,7 +248,7 @@ public:
     {
         MemRef mem = BasicArray<T>::create_array(size, m_alloc); // Throws
         T* tp = reinterpret_cast<T*>(Array::get_data_from_header(mem.m_addr));
-        std::fill(tp, tp + size, 0);
+        std::fill(tp, tp + size, T());
         return mem.m_ref;
     }
 private:

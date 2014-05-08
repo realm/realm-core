@@ -2,75 +2,126 @@
 #ifdef TEST_COLUMN_FLOAT
 
 #include <iostream>
-#include <UnitTest++.h>
+
 #include <tightdb/column_basic.hpp>
 
-using namespace tightdb;
+#include "test.hpp"
 
-template <typename T, size_t N> inline
-size_t SizeOfArray( const T(&)[ N ] )
-{
-  return N;
-}
+using namespace tightdb;
+using test_util::unit_test::TestResults;
+
+
+// Test independence and thread-safety
+// -----------------------------------
+//
+// All tests must be thread safe and independent of each other. This
+// is required because it allows for both shuffling of the execution
+// order and for parallelized testing.
+//
+// In particular, avoid using std::rand() since it is not guaranteed
+// to be thread safe. Instead use the API offered in
+// `test/util/random.hpp`.
+//
+// All files created in tests must use the TEST_PATH macro (or one of
+// its friends) to obtain a suitable file system path. See
+// `test/util/test_path.hpp`.
+//
+//
+// Debugging and the ONLY() macro
+// ------------------------------
+//
+// A simple way of disabling all tests except one called `Foo`, is to
+// replace TEST(Foo) with ONLY(Foo) and then recompile and rerun the
+// test suite. Note that you can also use filtering by setting the
+// environment varible `UNITTEST_FILTER`. See `README.md` for more on
+// this.
+//
+// Another way to debug a particular test, is to copy that test into
+// `experiments/testcase.cpp` and then run `sh build.sh
+// check-testcase` (or one of its friends) from the command line.
+
 
 namespace {
-float floatVal[] = {0.0f,
-                   1.0f,
-                   2.12345f,
-                   12345.12f,
-                   -12345.12f
-                  };
-const size_t floatValLen = SizeOfArray(floatVal);
 
-double doubleVal[] = {0.0,
-                      1.0,
-                      2.12345,
-                      12345.12,
-                      -12345.12
-                     };
-const size_t doubleValLen = SizeOfArray(doubleVal);
+template<class T, size_t N> inline size_t size_of_array(T(&)[N])
+{
+    return N;
+}
 
-} //namespace
+// Article about comparing floats:
+// http://randomascii.wordpress.com/2012/02/25/comparing-floating-point-numbers-2012-edition/
+
+float float_values[] = {
+    0.0f,
+    1.0f,
+    2.12345f,
+    12345.12f,
+    -12345.12f
+};
+const size_t num_float_values = size_of_array(float_values);
+
+double double_values[] = {
+    0.0,
+    1.0,
+    2.12345,
+    12345.12,
+    -12345.12
+};
+const size_t num_double_values = size_of_array(double_values);
+
+} // anonymous namespace
+
 
 template <class C>
-void BasicColumn_IsEmpty()
+void BasicColumn_IsEmpty(TestResults& test_results)
 {
     C c;
     CHECK(c.is_empty());
     CHECK_EQUAL(0U, c.size());
     c.destroy();
 }
-TEST(ColumnFloat_IsEmpty) { BasicColumn_IsEmpty<ColumnFloat>(); }
-TEST(ColumnDouble_IsEmpty){ BasicColumn_IsEmpty<ColumnDouble>(); }
+TEST(ColumnFloat_IsEmpty)
+{
+    BasicColumn_IsEmpty<ColumnFloat>(test_results);
+}
+TEST(ColumnDouble_IsEmpty)
+{
+    BasicColumn_IsEmpty<ColumnDouble>(test_results);
+}
 
 
 template <class C, typename T>
-void BasicColumn_AddGet(T val[], size_t valLen)
+void BasicColumn_AddGet(TestResults& test_results, T values[], size_t num_values)
 {
     C c;
-    for (size_t i=0; i<valLen; ++i) {
-        c.add(val[i]);
+    for (size_t i = 0; i < num_values; ++i) {
+        c.add(values[i]);
 
         CHECK_EQUAL(i+1, c.size());
 
-        for (size_t j=0; j<i; ++j) {
-            CHECK_EQUAL(val[j], c.get(j));
-        }
+        for (size_t j = 0; j < i; ++j)
+            CHECK_EQUAL(values[j], c.get(j));
     }
 
     c.destroy();
 }
-TEST(ColumnFloat_AddGet) { BasicColumn_AddGet<ColumnFloat, float>(floatVal, floatValLen); }
-TEST(ColumnDouble_AddGet){ BasicColumn_AddGet<ColumnDouble, double>(doubleVal, doubleValLen); }
+TEST(ColumnFloat_AddGet)
+{
+    BasicColumn_AddGet<ColumnFloat, float>(test_results, float_values, num_float_values);
+}
+TEST(ColumnDouble_AddGet)
+{
+    BasicColumn_AddGet<ColumnDouble, double>(test_results, double_values, num_double_values);
+}
 
 
 template <class C, typename T>
-void BasicColumn_Clear()
+void BasicColumn_Clear(TestResults& test_results)
 {
     C c;
     CHECK(c.is_empty());
 
-    for (size_t i=0; i<100; ++i)
+    for (size_t i = 0; i < 100; ++i)
         c.add();
     CHECK(!c.is_empty());
 
@@ -79,17 +130,23 @@ void BasicColumn_Clear()
 
     c.destroy();
 }
-TEST(ColumnFloat_Clear) { BasicColumn_Clear<ColumnFloat, float>(); }
-TEST(ColumnDouble_Clear){ BasicColumn_Clear<ColumnDouble, double>(); }
+TEST(ColumnFloat_Clear)
+{
+    BasicColumn_Clear<ColumnFloat, float>(test_results);
+}
+TEST(ColumnDouble_Clear)
+{
+    BasicColumn_Clear<ColumnDouble, double>(test_results);
+}
 
 
 template <class C, typename T>
-void BasicColumn_Set(T val[], size_t valLen)
+void BasicColumn_Set(TestResults& test_results, T values[], size_t num_values)
 {
     C c;
-    for (size_t i=0; i<valLen; ++i)
-        c.add(val[i]);
-    CHECK_EQUAL(valLen, c.size());
+    for (size_t i = 0; i < num_values; ++i)
+        c.add(values[i]);
+    CHECK_EQUAL(num_values, c.size());
 
     T v0 = T(1.6);
     T v3 = T(-987.23);
@@ -98,69 +155,82 @@ void BasicColumn_Set(T val[], size_t valLen)
     c.set(3, v3);
     CHECK_EQUAL(v3, c.get(3));
 
-    CHECK_EQUAL(val[1], c.get(1));
-    CHECK_EQUAL(val[2], c.get(2));
-    CHECK_EQUAL(val[4], c.get(4));
+    CHECK_EQUAL(values[1], c.get(1));
+    CHECK_EQUAL(values[2], c.get(2));
+    CHECK_EQUAL(values[4], c.get(4));
 
     c.destroy();
 }
-TEST(ColumnFloat_Set) { BasicColumn_Set<ColumnFloat, float>(floatVal, floatValLen); }
-TEST(ColumnDouble_Set){ BasicColumn_Set<ColumnDouble, double>(doubleVal, doubleValLen); }
+TEST(ColumnFloat_Set)
+{
+    BasicColumn_Set<ColumnFloat, float>(test_results, float_values, num_float_values);
+}
+TEST(ColumnDouble_Set)
+{
+    BasicColumn_Set<ColumnDouble, double>(test_results, double_values, num_double_values);
+}
 
 
 template <class C, typename T>
-void BasicColumn_Insert(T val[], size_t valLen)
+void BasicColumn_Insert(TestResults& test_results, T values[], size_t num_values)
 {
-    (void)valLen;
+    static_cast<void>(num_values);
 
     C c;
 
     // Insert in empty column
-    c.insert(0, val[0]);
-    CHECK_EQUAL(val[0], c.get(0));
+    c.insert(0, values[0]);
+    CHECK_EQUAL(values[0], c.get(0));
     CHECK_EQUAL(1, c.size());
 
     // Insert in top
-    c.insert(0, val[1]);
-    CHECK_EQUAL(val[1], c.get(0));
-    CHECK_EQUAL(val[0], c.get(1));
+    c.insert(0, values[1]);
+    CHECK_EQUAL(values[1], c.get(0));
+    CHECK_EQUAL(values[0], c.get(1));
     CHECK_EQUAL(2, c.size());
 
     // Insert in middle
-    c.insert(1, val[2]);
-    CHECK_EQUAL(val[1], c.get(0));
-    CHECK_EQUAL(val[2], c.get(1));
-    CHECK_EQUAL(val[0], c.get(2));
+    c.insert(1, values[2]);
+    CHECK_EQUAL(values[1], c.get(0));
+    CHECK_EQUAL(values[2], c.get(1));
+    CHECK_EQUAL(values[0], c.get(2));
     CHECK_EQUAL(3, c.size());
 
     // Insert at buttom
-    c.insert(3, val[3]);
-    CHECK_EQUAL(val[1], c.get(0));
-    CHECK_EQUAL(val[2], c.get(1));
-    CHECK_EQUAL(val[0], c.get(2));
-    CHECK_EQUAL(val[3], c.get(3));
+    c.insert(3, values[3]);
+    CHECK_EQUAL(values[1], c.get(0));
+    CHECK_EQUAL(values[2], c.get(1));
+    CHECK_EQUAL(values[0], c.get(2));
+    CHECK_EQUAL(values[3], c.get(3));
     CHECK_EQUAL(4, c.size());
 
     // Insert at top
-    c.insert(0, val[4]);
-    CHECK_EQUAL(val[4], c.get(0));
-    CHECK_EQUAL(val[1], c.get(1));
-    CHECK_EQUAL(val[2], c.get(2));
-    CHECK_EQUAL(val[0], c.get(3));
-    CHECK_EQUAL(val[3], c.get(4));
+    c.insert(0, values[4]);
+    CHECK_EQUAL(values[4], c.get(0));
+    CHECK_EQUAL(values[1], c.get(1));
+    CHECK_EQUAL(values[2], c.get(2));
+    CHECK_EQUAL(values[0], c.get(3));
+    CHECK_EQUAL(values[3], c.get(4));
     CHECK_EQUAL(5, c.size());
 
     c.destroy();
 }
-TEST(ColumnFloat_Insert) { BasicColumn_Insert<ColumnFloat, float>(floatVal, floatValLen); }
-TEST(ColumnDouble_Insert){ BasicColumn_Insert<ColumnDouble, double>(doubleVal, doubleValLen); }
+TEST(ColumnFloat_Insert)
+{
+    BasicColumn_Insert<ColumnFloat, float>(test_results, float_values, num_float_values);
+}
+TEST(ColumnDouble_Insert)
+{
+    BasicColumn_Insert<ColumnDouble, double>(test_results, double_values, num_double_values);
+}
 
 
 template <class C, typename T>
-void BasicColumn_Aggregates(T val[], size_t valLen)
+void BasicColumn_Aggregates(TestResults& test_results, T values[], size_t num_values)
 {
-    (void)valLen;
-    (void)val;
+    static_cast<void>(test_results);
+    static_cast<void>(num_values);
+    static_cast<void>(values);
 
     C c;
 
@@ -172,48 +242,54 @@ void BasicColumn_Aggregates(T val[], size_t valLen)
 
    c.destroy();
 }
-TEST(ColumnFloat_Aggregates) { BasicColumn_Aggregates<ColumnFloat, float>(floatVal, floatValLen); }
-TEST(ColumnDouble_Aggregates){ BasicColumn_Aggregates<ColumnDouble, double>(doubleVal, doubleValLen); }
+TEST(ColumnFloat_Aggregates)
+{
+    BasicColumn_Aggregates<ColumnFloat, float>(test_results, float_values, num_float_values);
+}
+TEST(ColumnDouble_Aggregates)
+{
+    BasicColumn_Aggregates<ColumnDouble, double>(test_results, double_values, num_double_values);
+}
 
 
 template <class C, typename T>
-void BasicColumn_Delete(T val[], size_t valLen)
+void BasicColumn_Delete(TestResults& test_results, T values[], size_t num_values)
 {
     C c;
-    for (size_t i=0; i<valLen; ++i)
-        c.add(val[i]);
+    for (size_t i = 0; i < num_values; ++i)
+        c.add(values[i]);
     CHECK_EQUAL(5, c.size());
-    CHECK_EQUAL(val[0], c.get(0));
-    CHECK_EQUAL(val[1], c.get(1));
-    CHECK_EQUAL(val[2], c.get(2));
-    CHECK_EQUAL(val[3], c.get(3));
-    CHECK_EQUAL(val[4], c.get(4));
+    CHECK_EQUAL(values[0], c.get(0));
+    CHECK_EQUAL(values[1], c.get(1));
+    CHECK_EQUAL(values[2], c.get(2));
+    CHECK_EQUAL(values[3], c.get(3));
+    CHECK_EQUAL(values[4], c.get(4));
 
     // Delete first
     c.erase(0, 0 == c.size()-1);
     CHECK_EQUAL(4, c.size());
-    CHECK_EQUAL(val[1], c.get(0));
-    CHECK_EQUAL(val[2], c.get(1));
-    CHECK_EQUAL(val[3], c.get(2));
-    CHECK_EQUAL(val[4], c.get(3));
+    CHECK_EQUAL(values[1], c.get(0));
+    CHECK_EQUAL(values[2], c.get(1));
+    CHECK_EQUAL(values[3], c.get(2));
+    CHECK_EQUAL(values[4], c.get(3));
 
     // Delete middle
     c.erase(2, 2 == c.size()-1);
     CHECK_EQUAL(3, c.size());
-    CHECK_EQUAL(val[1], c.get(0));
-    CHECK_EQUAL(val[2], c.get(1));
-    CHECK_EQUAL(val[4], c.get(2));
+    CHECK_EQUAL(values[1], c.get(0));
+    CHECK_EQUAL(values[2], c.get(1));
+    CHECK_EQUAL(values[4], c.get(2));
 
     // Delete last
     c.erase(2, 2 == c.size()-1);
     CHECK_EQUAL(2, c.size());
-    CHECK_EQUAL(val[1], c.get(0));
-    CHECK_EQUAL(val[2], c.get(1));
+    CHECK_EQUAL(values[1], c.get(0));
+    CHECK_EQUAL(values[2], c.get(1));
 
     // Delete single
     c.erase(0, 0 == c.size()-1);
     CHECK_EQUAL(1, c.size());
-    CHECK_EQUAL(val[2], c.get(0));
+    CHECK_EQUAL(values[2], c.get(0));
 
     // Delete all
     c.erase(0, 0 == c.size()-1);
@@ -221,8 +297,14 @@ void BasicColumn_Delete(T val[], size_t valLen)
 
     c.destroy();
 }
-TEST(ColumnFloat_Delete) { BasicColumn_Delete<ColumnFloat, float>(floatVal, floatValLen); }
-TEST(ColumnDouble_Delete){ BasicColumn_Delete<ColumnDouble, double>(doubleVal, doubleValLen); }
+TEST(ColumnFloat_Delete)
+{
+    BasicColumn_Delete<ColumnFloat, float>(test_results, float_values, num_float_values);
+}
+TEST(ColumnDouble_Delete)
+{
+    BasicColumn_Delete<ColumnDouble, double>(test_results, double_values, num_double_values);
+}
 
 TEST(ColumnDouble_InitOfEmptyColumn)
 {
@@ -244,8 +326,8 @@ TEST(ColumnFloat_InitOfEmptyColumn)
     t.add_column(type_Float, "works");
     t.add_column(type_Float, "works also");
     t.add_empty_row();
-    t.set_float(0,0,1.1);
-    t.set_float(1,0,2.2);
+    t.set_float(0,0,1.1f);
+    t.set_float(1,0,2.2f);
     t.remove_column(1);
     t.add_empty_row();
     t.add_column(type_Float, "doesn't work");
@@ -314,8 +396,8 @@ TEST(ColumnMixed_InitOfEmptyColumn)
     t.add_column(type_Mixed, "works");
     t.add_column(type_Mixed, "works also");
     t.add_empty_row();
-    t.set_mixed(0,0, new Mixed(1.1));
-    t.set_mixed(1,0, new Mixed(2.2));
+    t.set_mixed(0,0, Mixed(1.1));
+    t.set_mixed(1,0, Mixed(2.2));
     t.remove_column(1);
     t.add_empty_row();
     t.add_column(type_Mixed, "doesn't work");

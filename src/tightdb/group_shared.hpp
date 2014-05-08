@@ -156,7 +156,7 @@ public:
     void reserve(std::size_t size_in_bytes);
 
     // Has db been modified since last transaction?
-    bool has_changed() const TIGHTDB_NOEXCEPT;
+    bool has_changed();
 
     // Read transactions
     const Group& begin_read();
@@ -166,6 +166,41 @@ public:
     Group& begin_write();
     void commit();
     void rollback() TIGHTDB_NOEXCEPT;
+
+
+    // Pinned transactions:
+
+    // Shared group can work with either pinned or unpinned read transactions.
+    // - With unpinned read transactions, each new read transaction will refer
+    //   to the latest database state.
+    // - With pinned read transactions, each new read transaction will refer
+    //   to the database state as it was, when pin_read_transactions() was called,
+    //   ignoring further changes until shared group is either unpinned or
+    //   pinned again to a new state.
+    // Default is to use unpinned read transactions.
+    //
+    // You can only pin read transactions. You must unpin before starting a
+    // write transaction.
+    //
+    // Note that a write transaction can proceed via one SharedGroup, while
+    // read transactions are pinned via another SharedGroup that is attached
+    // to the same database. It is important to understand that each such
+    // write transaction will allocate resources (memory and/or disk), which
+    // will not be freed until the pinning is ended. For this reason, one should
+    // be careful to avoid long lived pinnings on databases that also see many
+    // write transactions.
+
+    // Pin subsequent read transactions to the current state. It is illegal
+    // to use pin_read_transactions() while a transaction is in progress. Returns true,
+    // if transactions are pinned to a new version of the database, false
+    // if there are no changes.
+    bool pin_read_transactions();
+
+    // Unpin, i.e. allow subsequent read transactions to refer to whatever
+    // is the current state when they are initiated. It is illegal to use
+    // unpin_read_transactions() while a transaction is in progress.
+    void unpin_read_transactions();
+
 
 #ifdef TIGHTDB_DEBUG
     void test_ringbuf();
@@ -193,24 +228,31 @@ public:
         LockFileButNoData(const std::string& msg) : std::runtime_error(msg) {}
     };
 
+    // Get a number identifying the version of the database made available
+    // for the last transaction started by begin_read or begin_write
+    uint_fast64_t get_last_transaction_version()
+    {
+        return m_version;
+    }
 private:
     struct SharedInfo;
 
     // Member variables
     Group      m_group;
-    uint64_t   m_version;
+    uint_fast64_t   m_version;
+    uint_fast32_t   m_reader_idx;
+    uint_fast32_t   m_local_max_entry;
     util::File m_file;
     util::File::Map<SharedInfo> m_file_map; // Never remapped
     util::File::Map<SharedInfo> m_reader_map;
     std::string m_file_path;
-
     enum TransactStage {
         transact_Ready,
         transact_Reading,
         transact_Writing
     };
     TransactStage m_transact_stage;
-
+    bool m_transactions_are_pinned;
     struct ReadCount;
 
     // Ring buffer managment
@@ -226,15 +268,21 @@ private:
     void        ringbuf_put(const ReadCount& v);
     void        ringbuf_expand();
 
+    void grab_readlock(ref_type& new_top_ref, size_t& new_file_size, bool& same_as_before);
+    void release_readlock() TIGHTDB_NOEXCEPT;
     void do_begin_write();
 
     // Must be called only by someone that has a lock on the write
     // mutex.
-    uint64_t get_current_version() TIGHTDB_NOEXCEPT;
+    uint_fast64_t get_current_version();
+
+    // make sure the given index is within the currently mapped area.
+    // if not, expand the mapped area. Returns true if the area is expanded.
+    bool grow_reader_mapping(uint_fast32_t index);
 
     // Must be called only by someone that has a lock on the write
     // mutex.
-    void low_level_commit(uint64_t new_version);
+    void low_level_commit(uint_fast64_t new_version);
 
     void do_async_commits();
 
@@ -327,13 +375,15 @@ private:
 // Implementation:
 
 inline SharedGroup::SharedGroup(const std::string& file, bool no_create, DurabilityLevel dlevel):
-    m_group(Group::shared_tag()), m_version(std::numeric_limits<std::size_t>::max())
+    m_group(Group::shared_tag()), m_version(std::numeric_limits<std::size_t>::max()),
+    m_transactions_are_pinned(false)
 {
     open(file, no_create, dlevel);
 }
 
 inline SharedGroup::SharedGroup(unattached_tag) TIGHTDB_NOEXCEPT:
-    m_group(Group::shared_tag()), m_version(std::numeric_limits<std::size_t>::max())
+    m_group(Group::shared_tag()), m_version(std::numeric_limits<std::size_t>::max()),
+    m_transactions_are_pinned(false)
 {
 }
 
@@ -342,47 +392,14 @@ inline bool SharedGroup::is_attached() const TIGHTDB_NOEXCEPT
     return m_file_map.is_attached();
 }
 
-inline Group& SharedGroup::begin_write()
-{
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    if (Replication* repl = m_group.get_replication()) {
-        repl->begin_write_transact(*this); // Throws
-        try {
-            do_begin_write();
-        }
-        catch (...) {
-            repl->rollback_write_transact(*this);
-            throw;
-        }
-        return m_group;
-    }
-#endif
-
-    do_begin_write();
-
-    return m_group;
-}
-
-
-#ifdef TIGHTDB_ENABLE_REPLICATION
-
 inline SharedGroup::SharedGroup(Replication& repl):
-    m_group(Group::shared_tag()), m_version(std::numeric_limits<std::size_t>::max())
+    m_group(Group::shared_tag()), m_version(std::numeric_limits<std::size_t>::max()),
+    m_transactions_are_pinned(false)
 {
     open(repl);
 }
-
-inline void SharedGroup::open(Replication& repl)
-{
-    TIGHTDB_ASSERT(!is_attached());
-    std::string file = repl.get_database_path();
-    bool no_create   = false;
-    DurabilityLevel dlevel = durability_Full;
-    open(file, no_create, dlevel); // Throws
-    m_group.set_replication(&repl);
-}
-
-#endif // TIGHTDB_ENABLE_REPLICATION
+#endif
 
 
 } // namespace tightdb

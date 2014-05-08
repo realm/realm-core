@@ -11,7 +11,7 @@ TIGHTDB_TABLE_2(Books,
                 title, String,
                 author, String)
 
-int main(int argc, char *argv[]) {
+int main(int, char*[]) {
     // Create group
     Group g1;
 

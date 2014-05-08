@@ -209,6 +209,7 @@ void TableViewBase::sort(size_t column, bool Ascending)
 
     if (m_refs.size() == 0)
         return;
+    m_is_in_index_order = false;
 
     Array vals;
     Array ref;
@@ -343,10 +344,8 @@ void TableView::remove(size_t ndx)
 
     // Decrement row indexes greater than or equal to ndx
     //
-    // FIXME: I believe this should have been 'real_ndx', not 'ndx'
-    //
     // FIXME: Dangerous cast below: unsigned -> signed
-    m_refs.adjust_ge(int_fast64_t(ndx), -1);
+    m_refs.adjust_ge(int_fast64_t(real_ndx), -1);
 }
 
 
