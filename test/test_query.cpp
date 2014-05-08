@@ -825,10 +825,9 @@ TEST(NotQueries)
     tightdb::Query q3 = table.where().Not().equal(0,10).Not().equal(0,10);
     CHECK_EQUAL(2,q3.count());  // FAILS
 
-    // applying not to an empty query should be possible
+    // applying not to an empty query is forbidden
     tightdb::Query q4 = table.where();
-    tightdb::Query q4b = !q4;
-    tightdb::TableView tv = q4b.find_all();
+    CHECK_THROW(!q4, runtime_error);
 }
 
 

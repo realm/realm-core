@@ -724,16 +724,16 @@ Query& Query::Not()
 {
     NotNode* const p = new NotNode;
     all_nodes.push_back(p);
-    if (first[first.size()-1] == 0) {
+    if (first[first.size()-1] == null_ptr) {
         first[first.size()-1] = p;
     }
-    if (update[update.size()-1] != 0) {
+    if (update[update.size()-1] != null_ptr) {
         *update[update.size()-1] = p;
     }
     group();
     pending_not[pending_not.size()-1] = true;
     // value for update for sub-condition
-    update[update.size()-2] = 0;
+    update[update.size()-2] = null_ptr;
     update[update.size()-1] = &p->m_cond;
     // pending value for update, once the sub-condition ends:
     update_override[update_override.size()-1] = &p->m_child;
@@ -1149,6 +1149,8 @@ Query Query::operator&&(Query q)
 
 Query Query::operator!()
 {
+    if (first[0] == null_ptr)
+        throw runtime_error("negation of empty query is not supported");
     Query q(*this->m_table);
     q.Not();
     q.and_query(*this);
