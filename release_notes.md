@@ -96,6 +96,10 @@ Format:
 . Any other notes ....                   (internal changes)
 
 
+2014-05-08 (Finn Schiermer Andersen)
++ Added negation to the query engine.
+
+
 2014-04-01 (Kristian Spangsege)
 + New framework with support for parallelized unit testing replaces UnitTest++. See section 'Testing' in `README.md`.
 
@@ -149,6 +153,7 @@ Format:
 ! Fixed bug in Query with subtables. Whith empty subtables query returned incorrect results.
   In debug mode it could assert when querying a subtable with more columns than the base table.
 
+>>>>>>> 1e936d3c43874f7e49231aa69c34bdbd67e5f0e9
 
 2014-01-23 (Kenneth Geisshirt)
 ! Fixed bug: Subtable queries is validated by Query::validate(). An invalid subtable query can lead to a segfault.

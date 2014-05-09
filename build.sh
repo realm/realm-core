@@ -2312,12 +2312,17 @@ EOF
         ;;
 
     *)
-        echo "Unspecified or bad mode '$MODE'" 1>&2
-        echo "Available modes are: config clean build build-config-progs build-iphone build-android build-ios-framework test test-debug show-install install uninstall test-installed wipe-installed" 1>&2
-        echo "As well as: install-prod install-devel uninstall-prod uninstall-devel dist-copy" 1>&2
-        echo "As well as: src-dist bin-dist dist-deb dist-status dist-pull dist-checkout" 1>&2
-        echo "As well as: dist-config dist-clean dist-build dist-build-iphone dist-test dist-test-debug dist-install dist-uninstall dist-test-installed" 1>&2
-        echo "As well as: get-version set-version copy-tools" 1>&2
+        cat 1>&2 << EOF
+Unspecified or bad mode '$MODE'.
+Available modes are:
+    config clean build build-config-progs build-iphone build-android
+    build-ios-framework test test-debug show-install install uninstall
+    test-installed wipe-installed install-prod install-devel uninstall-prod
+    uninstall-devel dist-copy src-dist bin-dist dist-deb dist-status
+    dist-pull dist-checkout dist-config dist-clean dist-build
+    dist-build-iphone dist-test dist-test-debug dist-install dist-uninstall
+    dist-test-installed get-version set-version copy-tools
+EOF
         exit 1
         ;;
 esac
