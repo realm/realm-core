@@ -405,6 +405,18 @@ CATEGORIES :
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_dyn_query_or
+  - g_dyn_query_not:
+      NAME     : Not
+      DESCR    : &g_dyn_query_not_descr
+                 The query is negated. Negation of an empty query is illegal and will throw.
+      SUMMARY  : &g_dyn_query_not_summary
+                 Logical-not.
+      RETURN:
+        TYPES  : Query
+        DESCR  : *g_dyn_query_return_query_object_descr
+      EXAMPLES:
+      - DESCR  :
+        CODE   : ex_cpp_dyn_query_not
   - g_dyn_query_subtable:
       NAME     : subtable
       DESCR    : &g_dyn_query_subtable_descr
