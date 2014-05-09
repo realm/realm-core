@@ -5,6 +5,7 @@
 #include <limits>
 #include <stdexcept>
 #include <string>
+#include <iostream>
 
 #include <tightdb/util/assert.hpp>
 #include <tightdb/util/unique_ptr.hpp>
@@ -48,6 +49,102 @@ using namespace tightdb::util;
 
 
 namespace {
+
+const char* uY = "\x0CE\x0AB";              // greek capital letter upsilon with dialytika (U+03AB)
+const char* uYd = "\x0CE\x0A5\x0CC\x088";    // decomposed form (Y followed by two dots)
+const char* uy = "\x0CF\x08B";              // greek small letter upsilon with dialytika (U+03AB)
+const char* uyd = "\x0cf\x085\x0CC\x088";    // decomposed form (Y followed by two dots)
+
+const char* uA = "\x0c3\x085";         // danish capital A with ring above (as in BLAABAERGROED)
+const char* uAd = "\x041\x0cc\x08a";    // decomposed form (A (41) followed by ring)
+const char* ua = "\x0c3\x0a5";         // danish lower case a with ring above (as in blaabaergroed)
+const char* uad = "\x061\x0cc\x08a";    // decomposed form (a (41) followed by ring)
+
+const char* uAE = "\xc3\x86"; // danish upper case AE
+const char* uae = "\xc3\xa6"; // danish lower case ae
+
+TEST(Compare_Core_ASCII) {
+    // Useful line for creating new unit test cases:
+    // bool ret = std::locale("us_EN")(string("a"), string("b"));
+
+    set_string_compare_method(0, null_ptr);
+
+    // simplest test
+    CHECK_EQUAL(true, utf8_compare("a", "b"));
+    CHECK_EQUAL(false, utf8_compare("b", "a"));
+    CHECK_EQUAL(false, utf8_compare("a", "a"));
+
+    // length makes a difference
+    CHECK_EQUAL(true, utf8_compare("aaaa", "b"));
+    CHECK_EQUAL(true, utf8_compare("a", "bbbb"));
+
+    CHECK_EQUAL(true, utf8_compare("a", "aaaa"));
+    CHECK_EQUAL(false, utf8_compare("aaaa", "a"));
+
+    // change one letter to upper case; must sort the same
+    CHECK_EQUAL(true, utf8_compare("A", "b"));
+    CHECK_EQUAL(false, utf8_compare("b", "A"));
+    CHECK_EQUAL(false, utf8_compare("A", "A"));
+
+    CHECK_EQUAL(true, utf8_compare("AAAA", "b"));
+    CHECK_EQUAL(true, utf8_compare("A", "b"));
+
+    CHECK_EQUAL(false, utf8_compare("A", "aaaa"));
+    CHECK_EQUAL(false, utf8_compare("AAAA", "a"));
+
+    // change other letter to upper case; must still sort the same
+    CHECK_EQUAL(true, utf8_compare("a", "B"));
+    CHECK_EQUAL(false, utf8_compare("B", "a"));
+
+    CHECK_EQUAL(true, utf8_compare("aaaa", "B"));
+    CHECK_EQUAL(true, utf8_compare("a", "BBBB"));
+
+    CHECK_EQUAL(true, utf8_compare("a", "AAAA"));
+    CHECK_EQUAL(true, utf8_compare("aaaa", "A"));
+
+    // now test casing for same letters
+    CHECK_EQUAL(true, utf8_compare("a", "A"));
+    CHECK_EQUAL(false, utf8_compare("A", "a"));
+
+    // length is same, but string1 is lower case; string1 comes first
+    CHECK_EQUAL(true, utf8_compare("aaaa", "AAAA"));
+    CHECK_EQUAL(false, utf8_compare("AAAA", "aaaa"));
+
+    // string2 is shorter, but string1 is lower case; lower case comes fist
+    CHECK_EQUAL(true, utf8_compare("aaaa", "A"));
+    CHECK_EQUAL(false, utf8_compare("A", "aaaa"));
+}
+
+
+TEST(Compare_Core_utf8) 
+{
+    // Useful line for creating new unit test cases:
+    // bool ret = std::locale("us_EN")(string("a"), string("b"));
+
+    set_string_compare_method(0, null_ptr);
+
+    // simplest test
+    CHECK_EQUAL(false, utf8_compare(uae, uae));
+    CHECK_EQUAL(false, utf8_compare(uAE, uAE));
+
+    CHECK_EQUAL(true, utf8_compare(uae, ua));
+    CHECK_EQUAL(false, utf8_compare(ua, uae));
+
+    CHECK_EQUAL(false, utf8_compare(uAE, uae));
+
+    CHECK_EQUAL(true, utf8_compare(uae, uA));
+    CHECK_EQUAL(false, utf8_compare(uA, uAE));
+}
+
+TEST(Compare_Core_utf8_exploitsafe)
+{
+    // Test that invalid utf8 won't access memory beyond Realm payload
+
+    set_string_compare_method(0, null_ptr);
+
+    CHECK_EQUAL(false, utf8_compare(uae, uae));
+
+}
 
 template<class Int> struct IntChar {
     typedef Int int_type;

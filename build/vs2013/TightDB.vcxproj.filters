@@ -458,6 +458,12 @@
     <ClInclude Include="..\..\src\tightdb\version.hpp">
       <Filter>src\include</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\tightdb\util\terminate.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\tightdb\string_data.hpp">
+      <Filter>src</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="pthreads">

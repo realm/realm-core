@@ -25,10 +25,57 @@
 
 #include <tightdb/util/safe_int_ops.hpp>
 #include <tightdb/string_data.hpp>
+#include <tightdb/util/features.h>
+#include <tightdb/utilities.hpp>
+
+#if TIGHTDB_HAVE_CXX11
+#include <locale>
+#endif
 
 namespace tightdb {
+
+extern StringCompareCallback string_compare_callback;
+extern char string_compare_method;
+
+// Different countries ('locales') have different sorting order for strings and letters. Because there unfortunatly 
+// doesn't exist any unified standardized way to compare strings in C++ on multiple platforms, we need this method.
+// 
+// It determins how sorting a TableView by a String column must take place. The 'method' argument can be:
+//
+// 0: Fast core-only compare (no OS/framework calls). LIMITATIONS: Works only upto 'Latin Extended 2' (unicodes 
+// 0...591). Also, sorting order is according to 'en_US' so it may be slightly inaccurate for some countries.
+// 'callback' argument is ignored. 
+//
+// Return value: Always 'true'
+//
+// 1: Native C++11 method if core is compiled as C++11 (asserts upon sort otherwise). Gives precise sorting according 
+// to user's current locale. LIMITATIONS: Works only on Linux, MacOS and Windows. Does NOT work on iOS (due to only 'C'
+// locale being available in CoreFoundation). Unknown if works on Windows Phone / Android.
+//
+// Return value: 'true' if supported, otherwise 'false' (if so, then previous setting, if any, is preserved).
+//
+// 2: Callback method. Language binding / C++ user must provide a utf-8 callback method of prototype: 
+// bool callback(const char* string1, const char* string2) where 'callback' must return bool(string1 < string2).
+//
+// Return value: Always 'true'
+// 
+// Default is method = 0 if the function is never called
+//
+// NOT THREAD SAFE! Call once during initialization or make sure it's not called simultaneously with different arguments
+bool set_string_compare_method(char method, StringCompareCallback callback);
+
 namespace util {
 
+// Return size in bytes of utf8 character. No error checking
+size_t sequence_length(char lead);
+
+// Return bool(string1 < string2)
+bool utf8_compare(StringData string1, StringData string2);
+
+// Return unicode value of character. 
+uint32_t utf8value(const char* character);
+
+inline bool equal_sequence(const char*& begin, const char* end, const char* begin2);
 
 // FIXME: The current approach to case insensitive comparison requires
 // that case mappings can be done in a way that does not change he
@@ -123,10 +170,6 @@ template<class Char16, class Traits16 = std::char_traits<Char16> > struct Utf8x1
     /// not be used for general UTF-16 validation.
     static std::size_t find_utf8_buf_size(const Char16*& in_begin, const Char16* in_end);
 };
-
-
-
-
 
 // -------------------------------------------------------------------
 
@@ -422,8 +465,6 @@ inline std::size_t Utf8x16<Char16, Traits16>::find_utf8_buf_size(const Char16*& 
     in_begin  = in;
     return num_out;
 }
-
-
 } // namespace util
 } // namespace tightdb
 
