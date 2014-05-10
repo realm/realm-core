@@ -48,9 +48,8 @@ void android_main(struct android_app* state)
     AAssetDir_close(assetDir);
     LOGI("Copying of asset files completed");
 
-    tightdb::test_util::PlatformConfig* platform_config = tightdb::test_util::PlatformConfig::Instance();
-    platform_config->set_path(inDataPath + "/");
-    platform_config->set_resource_path(inDataPath + "/");
+    tightdb::test_util::set_test_path_prefix(inDataPath + "/");
+    tightdb::test_util::set_test_resource_path(inDataPath + "/");
 
     LOGI("Starting unit tests...");
 
