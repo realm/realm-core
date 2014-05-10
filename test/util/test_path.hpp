@@ -45,23 +45,16 @@ namespace test_util {
 /// before any TestPathGuard object is created.
 void keep_test_files();
 
+/// By default, test files are placed in the current working
+/// directory. Use this function to set a path prefix. The specified
+/// prefix must contain a final `/`.
+void set_test_path_prefix(const std::string&);
+
 std::string get_test_path(const unit_test::TestDetails&, const char* suffix);
 
-class PlatformConfig {
-public:
-    static PlatformConfig* Instance();
-    std::string get_path();
-    void set_path(std::string);
-    std::string get_resource_path();
-    void set_resource_path(std::string);
-private:
-    PlatformConfig(){};
-    PlatformConfig(PlatformConfig const&){}; // Private copy constructor
-    PlatformConfig& operator=(PlatformConfig const&); // Private assignment operator
-    static PlatformConfig* instance;
-    std::string test_path;
-    std::string test_resource_path;
-};
+std::string get_test_resource_path();
+void set_test_resource_path(const std::string&);
+
 
 /// Constructor and destructor removes file if it exists.
 class TestPathGuard {
