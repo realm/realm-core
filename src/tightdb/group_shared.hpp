@@ -165,6 +165,7 @@ public:
     // Write transactions
     Group& begin_write();
     void commit();
+    void commit_and_continue_as_read();
     void rollback() TIGHTDB_NOEXCEPT;
 
 
@@ -271,6 +272,7 @@ private:
     void grab_readlock(ref_type& new_top_ref, size_t& new_file_size, bool& same_as_before);
     void release_readlock() TIGHTDB_NOEXCEPT;
     void do_begin_write();
+    void do_commit();
 
     // Must be called only by someone that has a lock on the write
     // mutex.

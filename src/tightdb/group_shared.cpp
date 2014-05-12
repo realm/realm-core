@@ -1162,8 +1162,22 @@ void SharedGroup::do_begin_write()
     m_transact_stage = transact_Writing;
 }
 
-
 void SharedGroup::commit()
+{
+    do_commit();
+
+    end_read();
+    // complete detach 
+    // (end_read allows group to retain data, but accessors become invalid after commit):
+    m_group.complete_detach();
+}
+
+void SharedGroup::commit_and_continue_as_read()
+{
+    do_commit();
+}
+
+void SharedGroup::do_commit()
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Writing);
 
@@ -1208,9 +1222,6 @@ void SharedGroup::commit()
 
     // downgrade to a read transaction (if not, assert in end_read)
     m_transact_stage = transact_Reading;
-    end_read();
-    // complete detach (end_read allows group to retain data, but is becomes invalid after commit):
-    m_group.complete_detach();
     // Release write lock
     info->writemutex.unlock();
 }
