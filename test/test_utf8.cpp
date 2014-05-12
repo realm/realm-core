@@ -49,15 +49,15 @@ using namespace tightdb::util;
 
 namespace {
 
-const char* uY = "\x0CE\x0AB";              // greek capital letter upsilon with dialytika (U+03AB)
-const char* uYd = "\x0CE\x0A5\x0CC\x088";    // decomposed form (Y followed by two dots)
-const char* uy = "\x0CF\x08B";              // greek small letter upsilon with dialytika (U+03AB)
-const char* uyd = "\x0cf\x085\x0CC\x088";    // decomposed form (Y followed by two dots)
+//const char* uY = "\x0CE\x0AB";              // greek capital letter upsilon with dialytika (U+03AB)
+//const char* uYd = "\x0CE\x0A5\x0CC\x088";    // decomposed form (Y followed by two dots)
+//const char* uy = "\x0CF\x08B";              // greek small letter upsilon with dialytika (U+03AB)
+//const char* uyd = "\x0cf\x085\x0CC\x088";    // decomposed form (Y followed by two dots)
 
 const char* uA = "\x0c3\x085";         // danish capital A with ring above (as in BLAABAERGROED)
-const char* uAd = "\x041\x0cc\x08a";    // decomposed form (A (41) followed by ring)
+//const char* uAd = "\x041\x0cc\x08a";    // decomposed form (A (41) followed by ring)
 const char* ua = "\x0c3\x0a5";         // danish lower case a with ring above (as in blaabaergroed)
-const char* uad = "\x061\x0cc\x08a";    // decomposed form (a (41) followed by ring)
+//const char* uad = "\x061\x0cc\x08a";    // decomposed form (a (41) followed by ring)
 
 const char* uAE = "\xc3\x86"; // danish upper case AE
 const char* uae = "\xc3\xa6"; // danish lower case ae
@@ -161,6 +161,9 @@ TEST(Compare_Core_utf8_invalid)
     char invalid2[] = "\xfc";
     char spurious2[] = "bbbbbbbbbbbbbbbb";
 
+    static_cast<void>(spurious1);
+    static_cast<void>(spurious2);
+
     set_string_compare_method(0, null_ptr);
     StringData i1 = StringData(invalid1);
     StringData i2 = StringData(invalid2);
@@ -171,7 +174,7 @@ TEST(Compare_Core_utf8_invalid)
     CHECK_EQUAL(ret, utf8_compare(i2, i1)); // must sort the same as before regardless of succeeding data
 }
 
-ONLY(Compare_Core_utf8_invalid_crash)
+TEST(Compare_Core_utf8_invalid_crash)
 {
     // See if we can crash Realm with random data
     char str1[20];
