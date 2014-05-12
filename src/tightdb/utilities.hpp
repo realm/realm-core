@@ -58,6 +58,8 @@
 
 namespace tightdb {
 
+typedef bool(*StringCompareCallback)(const char* string1, const char* string2);
+
 extern signed char sse_support;
 extern signed char avx_support;
 
