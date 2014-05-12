@@ -10,7 +10,6 @@
 #include <tightdb/util/assert.hpp>
 #include <tightdb/util/unique_ptr.hpp>
 #include <tightdb/util/utf8.hpp>
-
 #include "test.hpp"
 
 using namespace std;
@@ -170,6 +169,26 @@ TEST(Compare_Core_utf8_invalid)
     // that return value is arbitrary for invalid utf8
     bool ret = utf8_compare(i1, i2);
     CHECK_EQUAL(ret, utf8_compare(i2, i1)); // must sort the same as before regardless of succeeding data
+}
+
+ONLY(Compare_Core_utf8_invalid_crash)
+{
+    // See if we can crash Realm with random data
+    char str1[20];
+    char str2[20];
+    using namespace tightdb::test_util;
+    Random r;
+
+    set_string_compare_method(0, null_ptr);
+
+    for (size_t t = 0; t < 10000; t++) {
+        for (size_t i = 0; i < sizeof(str1); i++) {
+            str1[i] = r.draw_int(0, 255);
+            str2[i] = r.draw_int(0, 255);
+        }
+        utf8_compare(str1, str2);
+        utf8_compare(str2, str1);
+    }
 }
 
 TEST(Compare_Core_utf8_zero)
