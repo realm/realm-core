@@ -17,9 +17,9 @@
 #include <clocale>
 
 #ifdef _MSC_VER
-#include <codecvt>
+    #include <codecvt>
 #else
-#include <locale>
+    #include <locale>
 #endif
 
 #endif

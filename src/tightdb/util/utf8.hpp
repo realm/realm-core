@@ -54,7 +54,7 @@ extern char string_compare_method;
 //
 // Return value: Always 'true'
 //
-// 1: Native C++11 method if core is compiled as C++11 (asserts upon sort otherwise). Gives precise sorting according 
+// 1: Native C++11 method if core is compiled as C++11. Gives precise sorting according 
 // to user's current locale. LIMITATIONS: Currently works only on Windows and on Linux with clang. Does NOT work on 
 // iOS (due to only 'C' locale being available in CoreFoundation, which puts 'Z' before 'a'). Unknown if works on 
 // Windows Phone / Android. Furthermore it does NOT work on Linux with gcc 4.7 or 4.8 (lack of c++11 feature that 
