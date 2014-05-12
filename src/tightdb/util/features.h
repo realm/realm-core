@@ -53,7 +53,7 @@
 #endif
 
 
-#if __cplusplus >= 201103 || __GXX_EXPERIMENTAL_CXX0X__
+#if __cplusplus >= 201103 || __GXX_EXPERIMENTAL_CXX0X__ || _MSC_VER >= 1700
 #  define TIGHTDB_HAVE_CXX11 1
 #endif
 
