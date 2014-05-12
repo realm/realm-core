@@ -43,6 +43,8 @@ namespace tightdb {
 signed char sse_support = -1;
 signed char avx_support = -1;
 
+StringCompareCallback string_compare_callback = null_ptr;
+char string_compare_method = 0;
 
 void cpuid_init()
 {
