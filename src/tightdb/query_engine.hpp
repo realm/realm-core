@@ -91,7 +91,7 @@ AggregateState      State of the aggregate - contains a state variable that stor
 #include <algorithm>
 
 #include <tightdb/util/meta.hpp>
-#include <tightdb/util/utf8.hpp>
+#include <tightdb/unicode.hpp>
 #include <tightdb/utilities.hpp>
 #include <tightdb/table.hpp>
 #include <tightdb/table_view.hpp>
