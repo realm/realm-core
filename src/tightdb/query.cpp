@@ -37,6 +37,7 @@ void Query::Create()
     update.push_back(0);
     update_override.push_back(0);
     first.push_back(0);
+    pending_not.push_back(false);
 #if TIGHTDB_MULTITHREAD_QUERY
     m_threadcount = 0;
 #endif
@@ -51,6 +52,7 @@ Query::Query(const Query& copy)
     update = copy.update;
     update_override = copy.update_override;
     first = copy.first;
+    pending_not = copy.pending_not;
     error_code = copy.error_code;
     m_tableview = copy.m_tableview;
 #if TIGHTDB_MULTITHREAD_QUERY
@@ -347,8 +349,10 @@ Query& Query::less(size_t column_ndx, int64_t value)
 }
 Query& Query::between(size_t column_ndx, int64_t from, int64_t to)
 {
+    group();
     greater_equal(column_ndx, from);
     less_equal(column_ndx, to);
+    end_group();
     return *this;
 }
 Query& Query::equal(size_t column_ndx, bool value)
@@ -385,8 +389,10 @@ Query& Query::less(size_t column_ndx, float value)
 }
 Query& Query::between(size_t column_ndx, float from, float to)
 {
+    group();
     greater_equal(column_ndx, from);
     less_equal(column_ndx, to);
+    end_group();
     return *this;
 }
 
@@ -418,8 +424,10 @@ Query& Query::less(size_t column_ndx, double value)
 }
 Query& Query::between(size_t column_ndx, double from, double to)
 {
+    group();
     greater_equal(column_ndx, from);
     less_equal(column_ndx, to);
+    end_group();
     return *this;
 }
 
@@ -539,7 +547,7 @@ R Query::aggregate(R (ColType::*aggregateMethod)(size_t start, size_t end, size_
             for (size_t t = start; t < end && st.m_match_count < limit; t++) {
                 size_t r = peek_tableview(t);
                 if (r != not_found)
-                    st.match<action, false>(r, 0, source_column.get_next(m_tableview->get_source_ndx(t)));
+                    st.template match<action, false>(r, 0, source_column.get_next(m_tableview->get_source_ndx(t)));
             }
         }
 
@@ -690,6 +698,7 @@ Query& Query::group()
     update.push_back(0);
     update_override.push_back(0);
     first.push_back(0);
+    pending_not.push_back(false);
     return *this;
 }
 Query& Query::end_group()
@@ -699,21 +708,72 @@ Query& Query::end_group()
         return *this;
     }
 
+    // append first node in current group to surrounding group. If an Or node was met,
+    // it will have manipulated first, so that it (the Or node) is the first node in the
+    // current group.
     if (update[update.size()-2] != 0)
         *update[update.size()-2] = first[first.size()-1];
 
+    // similarly, if the surrounding group is empty, simply make first node of current group,
+    // the first node of the surrounding group.
     if (first[first.size()-2] == 0)
         first[first.size()-2] = first[first.size()-1];
 
+    // the update back link for the surrounding group must be updated to support
+    // the linking in of nodes that follows. If the node we are adding to the surrounding
+    // context has taken control of the nodes in the inner group, then we set up an
+    // update to a field inside it - if not, then we just copy the last update in the
+    // current group into the surrounding group. So: the update override is used to override
+    // the normal sequential linking in of nodes, producing e.g. the structure used for
+    // OrNodes and NotNodes.
     if (update_override[update_override.size()-1] != 0)
         update[update.size() - 2] = update_override[update_override.size()-1];
     else if (update[update.size()-1] != 0)
         update[update.size() - 2] = update[update.size()-1];
 
     first.pop_back();
+    pending_not.pop_back();
     update.pop_back();
     update_override.pop_back();
+    HandlePendingNot();
     return *this;
+}
+
+// Not creates an implicit group to capture the term that we want to negate.
+Query& Query::Not()
+{
+    NotNode* const p = new NotNode;
+    all_nodes.push_back(p);
+    if (first[first.size()-1] == null_ptr) {
+        first[first.size()-1] = p;
+    }
+    if (update[update.size()-1] != null_ptr) {
+        *update[update.size()-1] = p;
+    }
+    group();
+    pending_not[pending_not.size()-1] = true;
+    // value for update for sub-condition
+    update[update.size()-2] = null_ptr;
+    update[update.size()-1] = &p->m_cond;
+    // pending value for update, once the sub-condition ends:
+    update_override[update_override.size()-1] = &p->m_child;
+    return *this;
+}
+
+// And-terms must end by calling HandlePendingNot. This will check if a negation is pending,
+// and if so, it will end the implicit group created to hold the term to negate. Note that
+// end_group itself will recurse into HandlePendingNot if multiple implicit groups are nested
+// within each other.
+void Query::HandlePendingNot()
+{
+    if (pending_not.size() > 1 && pending_not[pending_not.size()-1]) {
+        // we are inside group(s) implicitly created to handle a not, so pop it/them:
+        // but first, prevent the pop from linking the current node into the surrounding
+        // context - the current node is instead hanging of from the previously added NotNode's
+        // m_cond field.
+        // update[update.size()-1] = 0;
+        end_group();
+    }
 }
 
 Query& Query::Or()
@@ -1096,13 +1156,16 @@ bool Query::comp(const pair<size_t, size_t>& a, const pair<size_t, size_t>& b)
 void Query::UpdatePointers(ParentNode* p, ParentNode** newnode)
 {
     all_nodes.push_back(p);
-    if (first[first.size()-1] == 0)
+    if (first[first.size()-1] == 0) {
         first[first.size()-1] = p;
+    }
 
-    if (update[update.size()-1] != 0)
+    if (update[update.size()-1] != 0) {
         *update[update.size()-1] = p;
-
+    }
     update[update.size()-1] = newnode;
+
+    HandlePendingNot();
 }
 
 /* ********************************************************************************************************************
@@ -1150,4 +1213,15 @@ Query Query::operator&&(Query q)
     q2.and_query(q);
 
     return q2;
+}
+
+
+Query Query::operator!()
+{
+    if (first[0] == null_ptr)
+        throw runtime_error("negation of empty query is not supported");
+    Query q(*this->m_table);
+    q.Not();
+    q.and_query(*this);
+    return q;
 }

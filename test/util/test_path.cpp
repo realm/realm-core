@@ -10,6 +10,9 @@ namespace {
 
 bool keep_files = false;
 
+string path_prefix;
+string resource_path;
+
 } // anonymous namespace
 
 namespace tightdb {
@@ -21,46 +24,30 @@ void keep_test_files()
     keep_files = true;
 }
 
-
 string get_test_path(const TestDetails& test_details, const char* suffix)
 {
-    string path = "";
-    PlatformConfig* platform_config = PlatformConfig::Instance();
-    path += platform_config->get_path();
+    string path = path_prefix;
     path += test_details.test_name;
     path += suffix;
     return path;
 }
 
-PlatformConfig* PlatformConfig::instance = NULL;
-
-PlatformConfig* PlatformConfig::Instance() {
-    if (!instance) {
-        instance = new PlatformConfig();
-        instance->set_path("");
-        instance->set_resource_path("");
-    }
-
-    return instance;
+void set_test_path_prefix(const string& prefix)
+{
+    path_prefix = prefix;
 }
 
-std::string PlatformConfig::get_path() {
-    return test_path;
+string get_test_resource_path()
+{
+    return resource_path;
 }
 
-void PlatformConfig::set_path(std::string path) {
-    test_path = path;
+void set_test_resource_path(const string& path)
+{
+    resource_path = path;
 }
 
-std::string PlatformConfig::get_resource_path() {
-    return test_resource_path;
-}
-
-void PlatformConfig::set_resource_path(std::string path) {
-    test_resource_path = path;
-}
-
-TestPathGuard::TestPathGuard(const std::string& path):
+TestPathGuard::TestPathGuard(const string& path):
     m_path(path)
 {
     File::try_remove(m_path);
@@ -79,7 +66,7 @@ TestPathGuard::~TestPathGuard() TIGHTDB_NOEXCEPT
 }
 
 
-SharedGroupTestPathGuard::SharedGroupTestPathGuard(const std::string& path):
+SharedGroupTestPathGuard::SharedGroupTestPathGuard(const string& path):
     TestPathGuard(path)
 {
     File::try_remove(m_path+".lock");

@@ -854,8 +854,7 @@ TEST(Table_ToString)
     stringstream ss;
     table.to_string(ss);
     const string result = ss.str();
-    PlatformConfig* platform_config = PlatformConfig::Instance();
-    string file_name = platform_config->get_resource_path();
+    string file_name = get_test_resource_path();
 #if _MSC_VER
     file_name += "expect_string-win.txt";
 #else
@@ -890,8 +889,7 @@ TEST(Table_JsonAllData)
     stringstream ss;
     table.to_json(ss);
     const string json = ss.str();
-    PlatformConfig* platform_config = PlatformConfig::Instance();
-    string file_name = platform_config->get_resource_path();
+    string file_name = get_test_resource_path();
 #if _MSC_VER
     file_name += "expect_json-win.json";
 #else
