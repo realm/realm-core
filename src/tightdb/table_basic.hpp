@@ -379,7 +379,7 @@ public:
                                                   std::size_t end   = std::size_t(-1),
                                                   std::size_t limit = std::size_t(-1)) const
     {
-        return m_impl.find_all(start, end);
+        return m_impl.find_all(start, end, limit);
     }
 
     std::size_t count(std::size_t start = 0,
