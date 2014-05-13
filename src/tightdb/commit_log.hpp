@@ -17,18 +17,21 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
+#ifndef TIGHTDB_COMMIT_LOG_HPP
+#define TIGHTDB_COMMIT_LOG_HPP
 
 #include <exception>
 
 #include <tightdb/replication.hpp>
+#include <tightdb/binary_data.hpp>
 
 namespace tightdb {
 
 
 class WriteLogRegistryInterface {
 public:
-    typedef tightdb::Replication::version_type version_type;
-    struct CommitEntry { std::size_t sz; char* data; };
+    // keep this in sync with shared group.
+    typedef uint_fast64_t version_type;
   
     // Add a commit for a given version:
     // The registry takes ownership of the buffer data.
@@ -44,15 +47,17 @@ public:
     // version 'from'.
     virtual void unregister_interest(version_type from) = 0;
 
-    // Get an array of commits for a version range - ]from..to]
-    // The array will have exactly 'to' - 'from' entries.
-    // The caller takes ownership of the array of commits, but not of the
+    // Fill an array with commits for a version range - ]from..to]
+    // The array is allocated by the caller and must have at least 'to' - 'from' entries.
+    // The caller retains ownership of the array of commits, but not of the
     // buffers pointed to by each commit in the array. Ownership of the
     // buffers remains with the WriteLogRegistry.
-    virtual CommitEntry* get_commit_entries(version_type from, version_type to) = 0;
+    virtual void get_commit_entries(version_type from, version_type to, BinaryData*) = 0;
 
     // This also unregisters interest in the same version range.
     virtual void release_commit_entries(version_type from, version_type to) = 0;
 };
 
 } // namespace tightdb
+
+#endif // TIGHTDB_COMMIT_LOG_HPP
