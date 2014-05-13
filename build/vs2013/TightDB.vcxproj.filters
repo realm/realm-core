@@ -249,6 +249,9 @@
     <ClCompile Include="..\..\test\util\verified_string.cpp">
       <Filter>test</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\tightdb\unicode.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\win32\pthread\pthread.h">
@@ -463,6 +466,9 @@
     </ClInclude>
     <ClInclude Include="..\..\src\tightdb\string_data.hpp">
       <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\tightdb\unicode.hpp">
+      <Filter>src\include</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

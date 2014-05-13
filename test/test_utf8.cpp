@@ -10,6 +10,7 @@
 #include <tightdb/util/assert.hpp>
 #include <tightdb/util/unique_ptr.hpp>
 #include <tightdb/util/utf8.hpp>
+#include <tightdb/unicode.hpp>
 #include "test.hpp"
 
 using namespace std;

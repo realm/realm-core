@@ -991,8 +991,8 @@ public:
         char* upper = new char[6 * v.size()];
         char* lower = new char[6 * v.size()];
 
-        bool b1 = util::case_map(v, lower, false);
-        bool b2 = util::case_map(v, upper, true);
+        bool b1 = case_map(v, lower, false);
+        bool b2 = case_map(v, upper, true);
         if (!b1 || !b2)
             error_code = "Malformed UTF-8: " + std::string(v);
 

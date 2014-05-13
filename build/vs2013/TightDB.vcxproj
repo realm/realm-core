@@ -600,6 +600,7 @@
     <ClCompile Include="..\..\src\tightdb\column_string_enum.cpp" />
     <ClCompile Include="..\..\src\tightdb\column_table.cpp" />
     <ClCompile Include="..\..\src\tightdb\descriptor.cpp" />
+    <ClCompile Include="..\..\src\tightdb\unicode.cpp" />
     <ClCompile Include="..\..\src\tightdb\util\file.cpp" />
     <ClCompile Include="..\..\src\tightdb\importer.cpp" />
     <ClCompile Include="..\..\src\tightdb\importer_tool.cpp">
@@ -1068,6 +1069,7 @@
     <ClInclude Include="..\..\src\tightdb\importer.hpp" />
     <ClInclude Include="..\..\src\tightdb\query_expression.hpp" />
     <ClInclude Include="..\..\src\tightdb\string_data.hpp" />
+    <ClInclude Include="..\..\src\tightdb\unicode.hpp" />
     <ClInclude Include="..\..\src\tightdb\util\terminate.hpp" />
     <ClInclude Include="..\..\src\tightdb\util\unique_ptr.hpp" />
     <ClInclude Include="..\..\src\tightdb\util\bind_ptr.hpp" />

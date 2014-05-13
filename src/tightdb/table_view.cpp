@@ -227,7 +227,7 @@ template <class T> bool compare(T v1, T v2)
 
 template <> bool compare<StringData>(StringData v1, StringData v2)
 {
-    bool ret = util::utf8_compare(v1.data(), v2.data());
+    bool ret = utf8_compare(v1.data(), v2.data());
     return ret;
 }
 
