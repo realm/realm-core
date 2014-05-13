@@ -21,6 +21,7 @@ static const mode_t MS_MODE_MASK = 0x0000ffff;
 
 #include <tightdb.hpp>
 #include <tightdb/util/file.hpp>
+#include <tightdb/column_link.hpp>
 
 #include "test.hpp"
 
@@ -1295,6 +1296,100 @@ TEST(Group_StockBug)
         table->Verify();
         group.commit();
     }
+}
+
+TEST(Group_Links)
+{
+    GROUP_TEST_PATH(path);
+
+    {
+        Group group;
+
+        size_t table1_ndx = 0;
+        TestTableGroup::Ref table1 = group.get_table<TestTableGroup>("table1");
+        table1->add("test1", 1, true, Mon);
+        table1->add("test2", 2, false, Tue);
+        table1->add("test3", 3, true, Wed);
+
+        // create table with links to table1
+        size_t table2_ndx = 1;
+        TableRef table2 = group.get_table("table2");
+        size_t col_link = table2->add_column_link("link", table1_ndx);
+        CHECK_EQUAL(table1, table2->get_link_target(col_link));
+
+        // add a few links
+        table2->insert_link(col_link, 0, 1);
+        table2->insert_done();
+
+        table2->insert_link(col_link, 1, 0);
+        table2->insert_done();
+
+        // Verify that links were set correctly
+        size_t link_ndx1 = table2->get_link(col_link, 0);
+        size_t link_ndx2 = table2->get_link(col_link, 1);
+        CHECK_EQUAL(1, link_ndx1);
+        CHECK_EQUAL(0, link_ndx2);
+
+        // Verify backlinks
+        CHECK_EQUAL(1, table1->get_backlink_count(0, table2_ndx, col_link));
+        CHECK_EQUAL(1, table1->get_backlink(0, table2_ndx, col_link, 0));
+        CHECK_EQUAL(1, table1->get_backlink_count(1, table2_ndx, col_link));
+        CHECK_EQUAL(0, table1->get_backlink(1, table2_ndx, col_link, 0));
+        CHECK_EQUAL(0, table1->get_backlink_count(2, table2_ndx, col_link));
+
+        // Change a link to point to a new location
+        table2->set_link(col_link, 1, 2);
+
+        size_t link_ndx3 = table2->get_link(col_link, 1);
+        CHECK_EQUAL(2, link_ndx3);
+        CHECK_EQUAL(0, table1->get_backlink_count(0, table2_ndx, col_link));
+        CHECK_EQUAL(1, table1->get_backlink_count(2, table2_ndx, col_link));
+        CHECK_EQUAL(1, table1->get_backlink(2, table2_ndx, col_link, 0));
+
+        //CHECK_EQUAL("test2", table2->get_link_accessor<TestTableGroup>(0, 0).first);
+        //CHECK_EQUAL(2, table2->get_link_accessor<TestTableGroup>(0, 0).second);
+
+        //CHECK_EQUAL("test1", table2->get_link_accessor<TestTableGroup>(0, 1).first);
+        //CHECK_EQUAL(1, table2->get_link_accessor<TestTableGroup>(0, 1).second);
+
+        // Delete a link. Note that links only work with unordered
+        // top-level tables, so you have to delete with move_last_over
+        table2->move_last_over(0);
+
+        // Verify that delete went correctly
+        CHECK_EQUAL(1, table2->size());
+        CHECK_EQUAL(2, table2->get_link(col_link, 0));
+
+        CHECK_EQUAL(0, table1->get_backlink_count(0, table2_ndx, col_link));
+        CHECK_EQUAL(0, table1->get_backlink_count(1, table2_ndx, col_link));
+        CHECK_EQUAL(1, table1->get_backlink_count(2, table2_ndx, col_link));
+        CHECK_EQUAL(0, table1->get_backlink(2, table2_ndx, col_link, 0));
+
+        // Nullify a link
+        table2->nullify_link(col_link, 0);
+        CHECK(table2->is_null_link(col_link, 0));
+        CHECK_EQUAL(0, table1->get_backlink_count(2, table2_ndx, col_link));
+
+        group.write(path);
+    }
+/*
+    // Reopen same group from disk
+    {
+        Group group(path);
+
+        TestTableGroup::Ref table1 = group.get_table<TestTableGroup>("table1");
+        TableRef table2 = group.get_table("table2");
+
+        // Verify that we are pointing to the right table
+        CHECK_EQUAL(table1, table2->get_link_target(0));
+
+        // Verify that links are still correct
+        size_t link_ndx1 = table2->get_link(0, 0);
+        size_t link_ndx2 = table2->get_link(0, 1);
+        CHECK_EQUAL(1, link_ndx1);
+        CHECK_EQUAL(2, link_ndx2);
+    }
+ */
 }
 
 #ifdef TIGHTDB_DEBUG

@@ -37,6 +37,8 @@ class TableView;
 class TableViewBase;
 class ConstTableView;
 class StringIndex;
+class Group;
+class ColumnBackLink;
 
 template<class> class Columns;
 
@@ -180,6 +182,7 @@ public:
     /// \sa get_descriptor()
     /// \sa Descriptor::add_column()
     std::size_t add_column(DataType type, StringData name, DescriptorRef* subdesc = 0);
+    std::size_t add_column_link(StringData name, std::size_t target_table_ndx);
     void insert_column(std::size_t column_ndx, DataType type, StringData name,
                        DescriptorRef* subdesc = 0);
     void remove_column(std::size_t column_ndx);
@@ -299,6 +302,7 @@ public:
     /// specified index must be strictly less than `N-1`, where `N` is
     /// the number of rows in the table.
     void move_last_over(std::size_t ndx);
+
     // Insert row
     // NOTE: You have to insert values in ALL columns followed by insert_done().
     void insert_int(std::size_t column_ndx, std::size_t row_ndx, int64_t value);
@@ -311,6 +315,7 @@ public:
     void insert_binary(std::size_t column_ndx, std::size_t row_ndx, BinaryData value);
     void insert_subtable(std::size_t column_ndx, std::size_t row_ndx); // Insert empty table
     void insert_mixed(std::size_t column_ndx, std::size_t row_ndx, Mixed value);
+    void insert_link(std::size_t column_ndx, std::size_t row_ndx, std::size_t target_row_ndx);
     void insert_done();
 
     // Get cell values
@@ -323,6 +328,11 @@ public:
     BinaryData  get_binary(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
     Mixed       get_mixed(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
     DataType    get_mixed_type(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
+    std::size_t get_link(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
+    TableRef    get_link_target(std::size_t column_ndx) TIGHTDB_NOEXCEPT;
+
+    //template<class T>
+    //typename T::RowAccessor get_link_accessor(std::size_t column_ndx, std::size_t row_ndx);
 
     // Set cell values
     void set_int(std::size_t column_ndx, std::size_t row_ndx, int64_t value);
@@ -334,6 +344,10 @@ public:
     void set_string(std::size_t column_ndx, std::size_t row_ndx, StringData value);
     void set_binary(std::size_t column_ndx, std::size_t row_ndx, BinaryData value);
     void set_mixed(std::size_t column_ndx, std::size_t row_ndx, Mixed value);
+    void set_link(std::size_t column_ndx, std::size_t row_ndx, std::size_t target_row_ndx);
+
+    bool is_null_link(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
+    void nullify_link(std::size_t column_ndx, std::size_t row_ndx);
 
 
     void add_int(std::size_t column_ndx, int64_t value);
@@ -363,6 +377,10 @@ public:
     size_t         get_subtable_size(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
     void           clear_subtable(std::size_t column_ndx, std::size_t row_ndx);
 
+    // Backlinks
+    std::size_t get_backlink_count(std::size_t row_ndx, std::size_t source_table_ndx, std::size_t source_column_ndx) const TIGHTDB_NOEXCEPT;
+    std::size_t get_backlink(std::size_t row_ndx, std::size_t source_table_ndx, std::size_t source_column_ndx, std::size_t backlink_ndx) const TIGHTDB_NOEXCEPT;
+
     //@{
     /// If this accessor is attached to a subtable, then that subtable
     /// has a parent table, and the subtable either resides in a
@@ -375,6 +393,7 @@ public:
     /// returns the index of this table within the group. Otherwise
     /// this table is a free-standing table, get_parent_table()
     /// returns null, and get_index_in_parent() returns tightdb::npos.
+    Group* get_parent_group() TIGHTDB_NOEXCEPT;
     TableRef get_parent_table() TIGHTDB_NOEXCEPT;
     ConstTableRef get_parent_table() const TIGHTDB_NOEXCEPT;
     std::size_t get_index_in_parent() const TIGHTDB_NOEXCEPT;
@@ -589,6 +608,10 @@ protected:
     void insert_into(Table* parent, std::size_t col_ndx, std::size_t row_ndx) const;
 
     void set_into_mixed(Table* parent, std::size_t col_ndx, std::size_t row_ndx) const;
+
+    void initialize_link_targets();
+    void create_backlinks_column(std::size_t source_table_ndx, std::size_t source_table_column_ndx);
+    ColumnBackLink& get_backlink_column(std::size_t source_table_ndx, std::size_t source_table_column_ndx);
 
 private:
     class SliceWriter;
@@ -893,6 +916,8 @@ protected:
     // column in a parent table.
     virtual Table* get_parent_table(std::size_t* column_ndx_out = 0) const TIGHTDB_NOEXCEPT;
 
+    virtual Group* get_parent_group() TIGHTDB_NOEXCEPT {return NULL;}
+
     // Must be called whenever a child table accessor is destroyed.
     virtual void child_accessor_destroyed(std::size_t child_ndx) TIGHTDB_NOEXCEPT = 0;
 
@@ -1193,7 +1218,18 @@ inline std::size_t* Table::Parent::record_subtable_path(std::size_t* begin,
 {
     return begin;
 }
+/*
+template<class T>
+typename T::RowAccessor Table::get_link_accessor(std::size_t column_ndx, std::size_t row_ndx)
+{
+    size_t row_pos_in_target = get_link(column_ndx, row_ndx);
+    TableRef target_table = get_link_target(column_ndx);
 
+    Table* table = &*target_table;
+    T* typed_table = static_cast<T*>(table);
+    return typed_table[row_pos_in_target];
+}
+*/
 #ifdef TIGHTDB_ENABLE_REPLICATION
 inline Replication* Table::get_repl() TIGHTDB_NOEXCEPT
 {
@@ -1312,6 +1348,11 @@ public:
     {
         TIGHTDB_ASSERT(!table.has_shared_type());
         table.m_descriptor = 0;
+    }
+
+    static void initialize_link_targets(Table& table) TIGHTDB_NOEXCEPT
+    {
+        table.initialize_link_targets();
     }
 };
 

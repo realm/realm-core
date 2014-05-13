@@ -80,6 +80,9 @@ public:
     using Table::insert_empty_row;
     using Table::aggregate;
 
+    using Table::get_backlink_count;
+    using Table::get_backlink;
+
     BasicTable(Allocator& alloc = Allocator::get_default()): Table(alloc)
     {
         set_dynamic_spec(*this);

@@ -3064,6 +3064,7 @@ void compare_table_with_slice(TestResults& test_results, const Table& table,
         DataType type = table.get_column_type(col_i);
         switch (type) {
             case type_Int:
+            case type_Link:
                 for (size_t i = 0; i != size; ++i) {
                     int_fast64_t v_1 = table.get_int(col_i, offset + i);
                     int_fast64_t v_2 = slice.get_int(col_i, i);
@@ -3154,6 +3155,7 @@ void compare_table_with_slice(TestResults& test_results, const Table& table,
                                 break;
                             }
                             case type_Mixed:
+                            case type_Link:
                                 TIGHTDB_ASSERT(false);
                         }
                     }

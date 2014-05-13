@@ -279,6 +279,8 @@ bool ColumnMixed::compare_mixed(const ColumnMixed& c) const
                 break;
             }
             case type_Mixed:
+            case type_Link:
+            case type_BackLink:
                 TIGHTDB_ASSERT(false);
                 break;
         }

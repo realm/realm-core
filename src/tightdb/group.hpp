@@ -315,6 +315,9 @@ public:
     void Verify() const {}
 #endif
 
+protected:
+    Group* get_parent_group() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {return this;}
+
 private:
     SlabAlloc m_alloc;
     Array m_top;
@@ -389,7 +392,7 @@ private:
 
     Table* get_table_by_ndx(std::size_t ndx);
     const Table* get_table_by_ndx(std::size_t ndx) const;
-    ref_type create_new_table(StringData name);
+    //ref_type create_new_table(StringData name);
     Table* create_new_table_and_accessor(StringData name, SpecSetter);
 
     void detach_table_accessors() TIGHTDB_NOEXCEPT;
