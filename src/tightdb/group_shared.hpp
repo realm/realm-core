@@ -24,6 +24,7 @@
 
 #include <tightdb/util/features.h>
 #include <tightdb/group.hpp>
+#include <tightdb/commit_log.hpp>
 
 namespace tightdb {
 
@@ -158,16 +159,45 @@ public:
     // Has db been modified since last transaction?
     bool has_changed();
 
-    // Read transactions
+    // Transactions:
+
+    // Begin a new read transaction. Accessors obtained prior to this point
+    // are invalid (if they weren't already) and new accessors must be
+    // obtained from the group returned.
     const Group& begin_read();
+
+    // End a read transaction. Accessors are detached.
     void end_read() TIGHTDB_NOEXCEPT;
 
-    // Write transactions
-    Group& begin_write();
-    void commit();
-    void commit_and_continue_as_read();
-    void rollback() TIGHTDB_NOEXCEPT;
+    // Advance the current read transaction to include latest state.
+    // All accessors are retained and synchronized to the new state
+    // according to the (to be) defined operational transform.
+    void advance_read(WriteLogRegistryInterface* write_logs);
 
+    // Begin a new write transaction. Accessors obtained prior to this point
+    // are invalid (if they weren't already) and new accessors must be
+    // obtained from the group returned. It is illegal to call begin_write
+    // inside an active transaction.
+    Group& begin_write();
+
+    // Promote the current read transaction to a write transaction.
+    // CAUTION: This also synchronizes with latest state of the database,
+    // including synchronization of all accessors.
+    // FIXME: A version of this which does NOT synchronize with latest
+    // state will be made available later, once we are able to merge commits.
+    void promote_to_write(WriteLogRegistryInterface* write_logs);
+
+    // End the current write transaction. All accessors are detached.
+    void commit();
+
+    // End the current write transaction and transition atomically into
+    // a read transaction, WITHOUT synchronizing to external changes
+    // to data. All accessors are retained and continue to reflect the
+    // state at commit. 
+    void commit_and_continue_as_read();
+
+    // End the current write transaction. All accessors are detached.
+    void rollback() TIGHTDB_NOEXCEPT;
 
     // Pinned transactions:
 
