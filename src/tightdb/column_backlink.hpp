@@ -47,6 +47,7 @@ public:
     void        set_source_column(ColumnLink& column);
     //std::size_t get_source_column();
 
+    void add_row();
     void move_last_over(std::size_t ndx) TIGHTDB_OVERRIDE;
 
 private:
@@ -87,6 +88,11 @@ inline TableRef ColumnBackLink::get_source_table()
 inline void ColumnBackLink::set_source_column(ColumnLink& column)
 {
     m_source_column = &column;
+}
+
+inline void ColumnBackLink::add_row()
+{
+    Column::add(0);
 }
 /*
 inline std::size_t ColumnBackLink::get_source_column()

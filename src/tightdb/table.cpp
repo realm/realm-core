@@ -2086,6 +2086,20 @@ void Table::insert_done()
     detach_views_except(NULL);
     ++m_size;
 
+    // If the table has backlinks, the columns containing them will
+    // not be exposed to the users. So we have to manually extend them
+    // after inserts. Note that you can onlt have backlinks on unordered
+    // tables, so inserts will only be used for appends.
+    if (m_spec.has_backlinks()) {
+        size_t backlinks_start = m_spec.get_public_column_count();
+        size_t column_count = m_spec.get_column_count();
+
+        for (size_t i = backlinks_start; i < column_count; ++i) {
+            ColumnBackLink& column = get_column<ColumnBackLink, col_type_BackLink>(i);
+            column.add_row();
+        }
+    }
+
 #ifdef TIGHTDB_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
         repl->row_insert_complete(this); // Throws

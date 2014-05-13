@@ -88,6 +88,7 @@ public:
     // Links
     void set_link_target_table(std::size_t column_ndx, std::size_t table_ndx);
     std::size_t get_link_target_table(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
+    bool has_backlinks() const TIGHTDB_NOEXCEPT;
     void set_backlink_source_column(std::size_t column_ndx, std::size_t source_column_ndx);
     std::size_t get_backlink_source_column(std::size_t column_ndx) const  TIGHTDB_NOEXCEPT;
     std::size_t find_backlink_column(size_t source_table_ndx, size_t source_column_ndx) const TIGHTDB_NOEXCEPT;
@@ -381,6 +382,12 @@ inline bool Spec::get_first_column_type_from_ref(ref_type top_ref, Allocator& al
         return false;
     type = ColumnType(Array::get(types_header, 0));
     return true;
+}
+
+inline bool Spec::has_backlinks() const TIGHTDB_NOEXCEPT
+{
+    // backlinks are always last and do not have names
+    return m_names.size() < m_spec.size();
 }
 
 

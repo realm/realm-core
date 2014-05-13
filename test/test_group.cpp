@@ -1370,6 +1370,12 @@ TEST(Group_Links)
         CHECK(table2->is_null_link(col_link, 0));
         CHECK_EQUAL(0, table1->get_backlink_count(2, table2_ndx, col_link));
 
+        // Add a new row to target table and verify that backlinks are
+        // tracked for it as well
+        table1->add("test4", 4, false, Thu);
+        CHECK_EQUAL(0, table1->get_backlink_count(3, table2_ndx, col_link));
+
+
         group.write(path);
     }
 /*
