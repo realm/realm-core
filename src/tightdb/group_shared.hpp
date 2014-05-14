@@ -263,15 +263,22 @@ public:
     // for the last transaction started by begin_read or begin_write
     uint_fast64_t get_last_transaction_version()
     {
-        return m_version;
+        return m_readlock.m_version;
     }
 private:
     struct SharedInfo;
+    struct ReadLockInfo {
+        uint_fast64_t   m_version;
+        uint_fast32_t   m_reader_idx;
+        ref_type        m_top_ref;
+        size_t          m_file_size;
+        ReadLockInfo() : m_version(std::numeric_limits<std::size_t>::max()), 
+                         m_reader_idx(0), m_top_ref(0), m_file_size(0) {};
+    };
 
     // Member variables
     Group      m_group;
-    uint_fast64_t   m_version;
-    uint_fast32_t   m_reader_idx;
+    ReadLockInfo m_readlock;
     uint_fast32_t   m_local_max_entry;
     util::File m_file;
     util::File::Map<SharedInfo> m_file_map; // Never remapped
@@ -299,8 +306,18 @@ private:
     void        ringbuf_put(const ReadCount& v);
     void        ringbuf_expand();
 
-    void grab_readlock(ref_type& new_top_ref, size_t& new_file_size, bool& same_as_before);
-    void release_readlock() TIGHTDB_NOEXCEPT;
+    // Grab the latest readlock and update readlock info. Compare latest against
+    // current (before updating) and determine if the version is the same as before.
+    // As a side effect update memory mapping to ensure that the ringbuffer entries
+    // referenced in the readlock info is accessible.
+    // The caller may provide an uninitialized readlock in which case same_as_before
+    // is given an undefined value.
+    void grab_latest_readlock(ReadLockInfo& readlock, bool& same_as_before);
+
+    // Release a specific readlock. The readlock info MUST have been obtained by a
+    // call to grab_latest_readlock().
+    void release_readlock(ReadLockInfo& readlock) TIGHTDB_NOEXCEPT;
+
     void do_begin_write();
     void do_commit();
 
@@ -407,14 +424,14 @@ private:
 // Implementation:
 
 inline SharedGroup::SharedGroup(const std::string& file, bool no_create, DurabilityLevel dlevel):
-    m_group(Group::shared_tag()), m_version(std::numeric_limits<std::size_t>::max()),
+    m_group(Group::shared_tag()),
     m_transactions_are_pinned(false)
 {
     open(file, no_create, dlevel);
 }
 
 inline SharedGroup::SharedGroup(unattached_tag) TIGHTDB_NOEXCEPT:
-    m_group(Group::shared_tag()), m_version(std::numeric_limits<std::size_t>::max()),
+    m_group(Group::shared_tag()),
     m_transactions_are_pinned(false)
 {
 }
@@ -426,7 +443,7 @@ inline bool SharedGroup::is_attached() const TIGHTDB_NOEXCEPT
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
 inline SharedGroup::SharedGroup(Replication& repl):
-    m_group(Group::shared_tag()), m_version(std::numeric_limits<std::size_t>::max()),
+    m_group(Group::shared_tag()),
     m_transactions_are_pinned(false)
 {
     open(repl);

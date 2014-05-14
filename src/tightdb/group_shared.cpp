@@ -577,7 +577,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
 
         SharedInfo* info = m_file_map.get_addr();
         m_local_max_entry = 0;
-        m_version = 0;
+        m_readlock.m_version = 0;
         SlabAlloc& alloc = m_group.m_alloc;
 
         // If we are the process that *Created* the coordination buffer, we are obliged to
@@ -632,7 +632,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
 
             // Set initial version so we can track if other instances
             // change the db
-            m_version = info->get_current_version_unchecked();
+            m_readlock.m_version = info->get_current_version_unchecked();
 
 #ifndef _WIN32
             // In async mode we need a separate process to do the async commits
@@ -832,14 +832,12 @@ bool SharedGroup::pin_read_transactions()
         throw runtime_error("pinning transactions not allowed inside a transaction");
     }
     bool same_as_before;
-    ref_type pinned_top_ref;
-    size_t pinned_file_size;
-    grab_readlock(pinned_top_ref, pinned_file_size, same_as_before);
+    grab_latest_readlock(m_readlock, same_as_before);
 
     // Make sure the group is up-to-date.
     // A zero ref means that the file has just been created.
     try {
-        m_group.update_from_shared(pinned_top_ref, pinned_file_size); // Throws
+        m_group.update_from_shared(m_readlock.m_top_ref, m_readlock.m_file_size); // Throws
     }
     catch (...) {
         end_read();
@@ -859,12 +857,12 @@ void SharedGroup::unpin_read_transactions()
         throw runtime_error("unpinning transactions not allowed inside a transaction");
     }
     m_transactions_are_pinned = false;
-    release_readlock();
+    release_readlock(m_readlock);
 }
 
 bool SharedGroup::has_changed()
 {
-    bool changed = m_version != get_current_version();
+    bool changed = m_readlock.m_version != get_current_version();
     return changed;
 }
 
@@ -887,8 +885,7 @@ void SharedGroup::do_async_commits()
     // processes that that they can start commiting to the db.
     begin_read();
     // we must treat version and version_index the same way:
-    uint_fast64_t last_version = m_version;
-    uint_fast32_t last_version_index = m_reader_idx;
+    ReadLockInfo last_readlock = m_readlock;
 
     info->free_write_slots = max_write_slots;
     info->init_complete.store_release(2); // allow waiting clients to proceed
@@ -934,25 +931,16 @@ void SharedGroup::do_async_commits()
 
             begin_read();
 
-            uint_fast64_t current_version = m_version;
-            uint_fast32_t current_version_index = m_reader_idx;
-            size_t current_top_ref = m_group.m_top.get_ref();
-#ifdef TIGHTDB_ENABLE_LOGFILE
-            cerr << "(version " << m_version << " from "
-                 << last_version << ", topptr " << current_top_ref << ")";
-            // cannot do this: info->readers.dump();
-#endif
+            ReadLockInfo current_readlock = m_readlock;
 
             GroupWriter writer(m_group);
-            writer.commit(current_top_ref);
+            writer.commit(current_readlock.m_top_ref);
 
             // Now we can release the version that was previously commited
             // to disk and just keep the lock on the latest version.
-            m_version = last_version;
-            m_reader_idx = last_version_index;
+            m_readlock = last_readlock;
             end_read();
-            last_version = current_version;
-            last_version_index = current_version_index;
+            last_readlock = m_readlock;
 #ifdef TIGHTDB_ENABLE_LOGFILE
             cerr << "..and Done" << endl;
 #endif
@@ -1013,24 +1001,24 @@ void SharedGroup::do_async_commits()
 #endif // _WIN32
 
 
-void SharedGroup::grab_readlock(ref_type& new_top_ref, size_t& new_file_size, bool& same_as_before)
+void SharedGroup::grab_latest_readlock(ReadLockInfo& readlock, bool& same_as_before)
 {
     do {
         SharedInfo* r_info = m_reader_map.get_addr();
-        m_reader_idx = r_info->readers.last();
-        if (grow_reader_mapping(m_reader_idx)) { // throws
+        readlock.m_reader_idx = r_info->readers.last();
+        if (grow_reader_mapping(readlock.m_reader_idx)) { // throws
             // remapping takes time, so retry with a fresh entry
             continue;
         }
-        const Ringbuffer::ReadCount& r = r_info->readers.get(m_reader_idx);
+        const Ringbuffer::ReadCount& r = r_info->readers.get(readlock.m_reader_idx);
         // if the entry is stale and has been cleared by the cleanup process,
         // we need to start all over again. This is extremely unlikely, but possible.
         if (! atomic_double_inc_if_even(r.count)) // <-- most of the exec time spent here!
             continue;
-        same_as_before = m_version == r.version;
-        m_version      = r.version;
-        new_top_ref    = to_size_t(r.current_top);
-        new_file_size  = to_size_t(r.filesize);
+        same_as_before = readlock.m_version == r.version;
+        readlock.m_version      = r.version;
+        readlock.m_top_ref    = to_size_t(r.current_top);
+        readlock.m_file_size  = to_size_t(r.filesize);
         return;
 
     } while (1);
@@ -1048,10 +1036,8 @@ const Group& SharedGroup::begin_read()
     }
     else {
 
-        ref_type new_top_ref = 0;
-        size_t new_file_size = 0;
         bool same_version_as_before;
-        grab_readlock(new_top_ref, new_file_size, same_version_as_before);
+        grab_latest_readlock(m_readlock, same_version_as_before);
 
         if (same_version_as_before && m_group.may_reattach_if_same_version()) {
 
@@ -1061,7 +1047,7 @@ const Group& SharedGroup::begin_read()
             // Make sure the group is up-to-date.
             // A zero ref means that the file has just been created.
             try {
-                m_group.update_from_shared(new_top_ref, new_file_size); // Throws
+                m_group.update_from_shared(m_readlock.m_top_ref, m_readlock.m_file_size); // Throws
             }
             catch (...) {
                 end_read();
@@ -1075,10 +1061,10 @@ const Group& SharedGroup::begin_read()
 }
 
 
-void SharedGroup::release_readlock() TIGHTDB_NOEXCEPT
+void SharedGroup::release_readlock(ReadLockInfo& readlock) TIGHTDB_NOEXCEPT
 {
     SharedInfo* r_info = m_reader_map.get_addr();
-    const Ringbuffer::ReadCount& r = r_info->readers.get(m_reader_idx);
+    const Ringbuffer::ReadCount& r = r_info->readers.get(readlock.m_reader_idx);
     atomic_double_dec(r.count); // <-- most of the exec time spent here
 }
 
@@ -1089,15 +1075,82 @@ void SharedGroup::end_read() TIGHTDB_NOEXCEPT
         return;
 
     TIGHTDB_ASSERT(m_transact_stage == transact_Reading);
-    TIGHTDB_ASSERT(m_version != numeric_limits<size_t>::max());
+    TIGHTDB_ASSERT(m_readlock.m_version != numeric_limits<size_t>::max());
 
     if (! m_transactions_are_pinned) {
-        release_readlock();
+        release_readlock(m_readlock);
     }
 
     // The read may have allocated some temporary state
     m_group.detach_but_retain_data();
     m_transact_stage = transact_Ready;
+}
+
+
+void SharedGroup::advance_read(WriteLogRegistryInterface* log_registry)
+
+{
+    TIGHTDB_ASSERT(m_transact_stage == transact_Reading);
+
+    TIGHTDB_ASSERT(!m_transactions_are_pinned);
+
+    ReadLockInfo old_readlock = m_readlock;
+    bool has_changed;
+
+    // advance current readlock while holding onto old one.
+    grab_latest_readlock(m_readlock, has_changed); // Throws
+    release_readlock(old_readlock);
+
+    if (!has_changed)
+        return;
+
+    // If the new top-ref is zero, then the previous top-ref must have
+    // been zero too, and we are still seing an empty TightDB file
+    // (note that this is possible even if the version has
+    // changed). The purpose of the early-out in this case, is to
+    // retain the temporary arrays that were created earlier by
+    // Group::init_for_transact() to put the group accessor into a
+    // valid state.
+    if (m_readlock.m_top_ref == 0)
+
+        return;
+
+    // When the new top-ref is not zero, but the previous one was, the
+    // temporary group arrays, which were created earlier, will no
+    // longer be needed. For efficiency, however, we will just leave
+    // them in place by not calling
+    // SlabAlloc::reset_free_space_tracking() here. This is not a
+    // problem, beacuse SlabAlloc::reset_free_space_tracking() will be
+    // called later if a new transaction is ever started.
+
+    // FIXME: Consider the possible consequences in case an exception
+    // is thrown after this point
+
+    // Update memory mapping if database file has grown
+    if (m_readlock.m_file_size > m_group.m_alloc.get_baseline())
+
+        m_group.m_alloc.remap(m_readlock.m_file_size); // Throws
+
+    m_group.init_from_ref(m_readlock.m_top_ref);
+
+
+    // We know that the log_registry already knows about the new_version,
+    // because in order for us to get the new version when we grab the
+    // readlock, the new version must have been entered into the ringbuffer.
+    // commit allways updates the replication log BEFORE updating the ringbuffer.
+    BinaryData* logs = new BinaryData[m_readlock.m_version - old_readlock.m_version];
+    log_registry->get_commit_entries(old_readlock.m_version, m_readlock.m_version, logs);
+
+    // TODO: Replication::advance_transact(m_group, logs, logs + (m_readlock.m_version - old_readlock.m_version));
+
+    delete[] logs;
+    log_registry->release_commit_entries(old_readlock.m_version, m_readlock.m_version);
+
+
+// TableFriendMethods:
+// Table* find_subtable_accessor(col_ndx, row_ndx); // Returns null if none
+
+// set_dirty(bool dirty);
 }
 
 
@@ -1364,8 +1417,13 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
         r_info->readers.use_next();
     }
 
-    // Save last version for has_changed()
-    m_version = new_version;
+    // advance readlock but dont update accessors:
+    // As this is done under lock, along with the addition above of the newest commit,
+    // we know for certain that the readlock we will grab WILL refer to our own newly
+    // completed commit.
+    release_readlock(m_readlock);
+    bool has_changed;
+    grab_latest_readlock(m_readlock, has_changed);
 }
 
 
