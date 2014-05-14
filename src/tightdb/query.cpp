@@ -94,12 +94,13 @@ Query& Query::expression(Expression* compare, bool auto_delete)
 // Makes query search only in rows contained in tv
 Query& Query::tableview(const TableView& tv)
 {
-    const Array& arr = tv.get_ref_column();
-    return tableview(arr, tv.m_is_in_index_order); // throw
+    //    const Array& arr = tv.get_ref_column();
+    //const Array arr = tv.get_ref_column().get_as_array();
+    return tableview(tv.get_ref_column(), tv.m_is_in_index_order); // throw
 }
 
 // Makes query search only in rows contained in tv
-Query& Query::tableview(const Array& arr, bool is_in_index_order)
+Query& Query::tableview(const Column& arr, bool is_in_index_order)
 {
     if (!is_in_index_order) {
         throw runtime_error("Sorted views cannot be used in queries");
@@ -849,6 +850,7 @@ TableView Query::find_all(size_t start, size_t end, size_t limit)
     // Use single threading
     TableView tv(*m_table);
     QueryState<int64_t> st;
+//    st.init(act_FindAll, &tv.get_ref_column(), limit);
     st.init(act_FindAll, &tv.get_ref_column(), limit);
     aggregate_internal(act_FindAll, ColumnTypeTraits<int64_t>::id, first[0], &st, start, end, NULL);
     return tv;

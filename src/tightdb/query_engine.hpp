@@ -511,7 +511,7 @@ protected:
 // correctly.
 class ListviewNode: public ParentNode {
 public:
-    ListviewNode(const Array& arr) : m_arr(arr), m_max(0), m_next(0), m_size(arr.size()) {m_child = 0; m_dT = 0.0;}
+    ListviewNode(const Column& arr) : m_arr(arr), m_max(0), m_next(0), m_size(arr.size()) {m_child = 0; m_dT = 0.0;}
     ~ListviewNode() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {  }
 
     void init(const Table& table) TIGHTDB_OVERRIDE
@@ -531,7 +531,7 @@ public:
     size_t find_first_local(size_t start, size_t end)  TIGHTDB_OVERRIDE
     {
         // Simply return next TableView item which is >= start
-        size_t r = m_arr.FindGTE(start, m_next);
+        size_t r = m_arr.find_gte(start, m_next);
         if (r >= end)
             return not_found;
 
@@ -540,7 +540,7 @@ public:
     }
 
 protected:
-    const Array& m_arr;
+    const Column& m_arr;
     size_t m_max;
     size_t m_next;
     size_t m_size;

@@ -84,7 +84,7 @@ TEST_IF(ColumnLarge_Less, TEST_DURATION >= 2)
         // before and after)
         size_t LEN2 = 64 * 8 / (a.get_width() == 0 ? 1 : a.get_width());
 
-        Array akku;
+        Column akku;
         QueryState<int64_t> state;
         state.m_state = int64_t(&akku);
 
@@ -268,7 +268,7 @@ TEST_IF(ColumnLarge_Monkey2, TEST_DURATION >= 2)
 
     Random random(seed);
     VerifiedInteger a(random);
-    Array res;
+    Column res;
 
     int trend = 5;
 

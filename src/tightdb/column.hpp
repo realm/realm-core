@@ -123,6 +123,9 @@ public:
     const Array* GetBlock(std::size_t ndx, Array& arr, std::size_t& off,
                           bool use_retval = false) const TIGHTDB_NOEXCEPT;
 
+    inline void detach(void);
+    inline bool is_attached(void);
+
     static std::size_t get_size_from_type_and_ref(ColumnType, ref_type, Allocator&) TIGHTDB_NOEXCEPT;
 
     // These assume that the right column compile-time type has been
@@ -269,7 +272,7 @@ public:
     void adjust_ge(int_fast64_t limit, int_fast64_t diff);
 
     size_t find_first(int64_t value, std::size_t begin = 0, std::size_t end = npos) const;
-    void find_all(Array& result, int64_t value,
+    void find_all(Column& result, int64_t value,
                   std::size_t begin = 0, std::size_t end = npos) const;
 
     //@{
@@ -280,8 +283,13 @@ public:
     std::size_t upper_bound_int(int64_t value) const TIGHTDB_NOEXCEPT;
     //@}
 
+    // return first element E for which E >= target or return -1 if none. Array must be sorted
+    size_t find_gte(int64_t target, size_t start) const;
+
     /// Compare two columns for equality.
     bool compare_int(const Column&) const;
+
+    Array get_as_array(void) const;
 
     static ref_type create(Array::Type leaf_type, std::size_t size, int_fast64_t value,
                            Allocator&);
@@ -330,6 +338,17 @@ private:
 
 
 // Implementation:
+
+inline void ColumnBase::detach(void)
+{
+    m_array->detach();
+}
+
+inline bool ColumnBase::is_attached(void)
+{
+    return m_array->is_attached();
+}
+
 
 inline void ColumnBase::adjust_column_index(int) TIGHTDB_NOEXCEPT
 {
@@ -443,6 +462,15 @@ inline ref_type ColumnBase::create(std::size_t size, Allocator& alloc, CreateHan
 }
 
 
+inline Array Column::get_as_array() const
+{
+    Array a;
+    for (size_t t = 0; t < size(); t++) {
+        a.add(get(t));
+    }
+    return a;
+}
+
 inline Column::Column(Allocator& alloc):
     ColumnBase(new Array(Array::type_Normal, null_ptr, 0, alloc))
 {
@@ -542,6 +570,23 @@ inline std::size_t Column::upper_bound_int(int64_t value) const TIGHTDB_NOEXCEPT
     return ColumnBase::upper_bound(*this, value);
 }
 
+// For a *sorted* Column, return first element E for which E >= target or return -1 if none
+inline size_t Column::find_gte(int64_t target, size_t start) const
+{
+    // fixme: slow reference implementation. See Array::FindGTE for faster version
+    size_t ref = 0;
+    size_t idx;
+    for (idx = start; idx < size(); ++idx) {
+        if (get(idx) >= target) {
+            ref = idx;
+            break;
+        }
+    }
+    if (idx == size())
+        ref = not_found;
+
+    return ref;
+}
 
 } // namespace tightdb
 

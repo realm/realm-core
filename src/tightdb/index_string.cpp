@@ -428,7 +428,7 @@ size_t StringIndex::find_first(StringData value) const
     return m_array->IndexStringFindFirst(value, m_target_column, m_get_func);
 }
 
-void StringIndex::find_all(Array& result, StringData value) const
+void StringIndex::find_all(Column& result, StringData value) const
 {
     // Use direct access method
     return m_array->IndexStringFindAll(result, value, m_target_column, m_get_func);
@@ -448,7 +448,7 @@ size_t StringIndex::count(StringData value) const
     return m_array->IndexStringCount(value, m_target_column, m_get_func);
 }
 
-void StringIndex::distinct(Array& result) const
+void StringIndex::distinct(Column& result) const
 {
     Allocator& alloc = m_array->get_alloc();
     const size_t count = m_array->size();
@@ -707,7 +707,7 @@ void StringIndex::NodeAddKey(ref_type ref)
 
 void StringIndex::verify_entries(const AdaptiveStringColumn& column) const
 {
-    Array results;
+    Column results;
 
     size_t count = column.size();
     for (size_t i = 0; i < count; ++i) {

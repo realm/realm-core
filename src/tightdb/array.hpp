@@ -532,7 +532,7 @@ public:
 
     typedef StringData (*StringGetter)(void*, std::size_t); // Pre-declare getter function from string index
     size_t IndexStringFindFirst(StringData value, void* column, StringGetter get_func) const;
-    void   IndexStringFindAll(Array& result, StringData value, void* column, StringGetter get_func) const;
+    void   IndexStringFindAll(Column& result, StringData value, void* column, StringGetter get_func) const;
     size_t IndexStringCount(StringData value, void* column, StringGetter get_func) const;
     FindRes IndexStringFindAllNoCopy(StringData value, size_t& res_ref, void* column, StringGetter get_func) const;
 
@@ -703,7 +703,7 @@ public:
     std::size_t find_first(int64_t value, std::size_t start = 0,
                            std::size_t end = std::size_t(-1)) const;
 
-    void find_all(Array& result, int64_t value, std::size_t col_offset = 0,
+    void find_all(Column& result, int64_t value, std::size_t col_offset = 0,
                   std::size_t begin = 0, std::size_t end = std::size_t(-1)) const;
 
     std::size_t find_first(int64_t value, std::size_t begin = 0,
@@ -1209,7 +1209,7 @@ public:
             return false;
     }
 
-    void init(Action action, Array* akku, size_t limit)
+    void init(Action action, Column* akku, size_t limit)
     {
         m_match_count = 0;
         m_limit = limit;
@@ -1267,7 +1267,7 @@ public:
             m_match_count = size_t(m_state);
         }
         else if (action == act_FindAll)
-            (reinterpret_cast<Array*>(m_state))->add(index);
+            (reinterpret_cast<Column*>(m_state))->add(index);
         else if (action == act_ReturnFirst) {
             m_state = index;
             return false;

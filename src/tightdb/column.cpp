@@ -937,7 +937,7 @@ size_t Column::find_first(int64_t value, size_t begin, size_t end) const
     return not_found;
 }
 
-void Column::find_all(Array& result, int64_t value, size_t begin, size_t end) const
+void Column::find_all(Column& result, int64_t value, size_t begin, size_t end) const
 {
     TIGHTDB_ASSERT(begin <= size());
     TIGHTDB_ASSERT(end == npos || (begin <= end && end <= size()));

@@ -54,7 +54,7 @@ namespace {
 void has_zero_byte(TestResults& test_results, int64_t value, size_t reps)
 {
     Array a;
-    Array r;
+    Column r;
 
     for (size_t i = 0; i < reps - 1; ++i)
         a.add(value);
@@ -614,7 +614,7 @@ TEST(Array_Sort)
 TEST(Array_FindAllInt0)
 {
     Array a;
-    Array r;
+    Column r;
 
     const int value = 0;
     const int vReps = 5;
@@ -642,7 +642,7 @@ TEST(Array_FindAllInt0)
 TEST(Array_FindAllInt1)
 {
     Array a;
-    Array r;
+    Column r;
 
     const int value = 1;
     const int vReps = 5;
@@ -673,7 +673,7 @@ TEST(Array_FindAllInt1)
 TEST(Array_FindAllInt2)
 {
     Array a;
-    Array r;
+    Column r;
 
     const int value = 3;
     const int vReps = 5;
@@ -704,7 +704,7 @@ TEST(Array_FindAllInt2)
 TEST(Array_FindAllInt3)
 {
     Array a;
-    Array r;
+    Column r;
 
     const int value = 10;
     const int vReps = 5;
@@ -735,7 +735,7 @@ TEST(Array_FindAllInt3)
 TEST(Array_FindAllInt4)
 {
     Array a;
-    Array r;
+    Column r;
 
     const int value = 20;
     const int vReps = 5;
@@ -767,7 +767,7 @@ TEST(Array_FindAllInt4)
 TEST(Array_FindAllInt5)
 {
     Array a;
-    Array r;
+    Column r;
 
     const int value = 303;
     const int vReps = 5;
@@ -799,7 +799,7 @@ TEST(Array_FindAllInt5)
 TEST(Array_FindAllInt6)
 {
     Array a;
-    Array r;
+    Column r;
 
     const int value = 70000;
     const int vReps = 5;
@@ -831,7 +831,7 @@ TEST(Array_FindAllInt6)
 TEST(Array_FindAllInt7)
 {
     Array a;
-    Array r;
+    Column r;
 
     const int64_t value = 4300000003ULL;
     const int vReps = 5;

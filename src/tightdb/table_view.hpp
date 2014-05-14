@@ -23,6 +23,7 @@
 #include <iostream>
 
 #include <tightdb/table.hpp>
+#include <tightdb/column.hpp>
 
 namespace tightdb {
 
@@ -116,7 +117,7 @@ public:
 protected:
     // Null if, and only if, the view is detached
     mutable TableRef m_table;
-    Array m_refs;
+    Column m_refs;
     bool m_is_in_index_order;
 
     /// Construct null view (no memory allocated).
@@ -135,8 +136,8 @@ protected:
 
     void move_assign(TableViewBase*) TIGHTDB_NOEXCEPT;
 
-    Array& get_ref_column() TIGHTDB_NOEXCEPT;
-    const Array& get_ref_column() const TIGHTDB_NOEXCEPT;
+    Column& get_ref_column() TIGHTDB_NOEXCEPT;
+    const Column& get_ref_column() const TIGHTDB_NOEXCEPT;
 
     template<class R, class V> static R find_all_integer(V*, std::size_t, int64_t);
     template<class R, class V> static R find_all_float(V*, std::size_t, float);
@@ -343,7 +344,7 @@ inline TableViewBase::TableViewBase(Table* parent):
 
 inline TableViewBase::TableViewBase(const TableViewBase& tv):
     m_table(tv.m_table), 
-    m_refs(tv.m_refs, Allocator::get_default()),
+    m_refs(tv.m_refs/*, Allocator::get_default() fixme, review*/),
     m_is_in_index_order(tv.m_is_in_index_order)
 {
     if (m_table)
@@ -361,7 +362,7 @@ inline TableViewBase::TableViewBase(TableViewBase* tv) TIGHTDB_NOEXCEPT:
         m_table->register_view(this);
     }
     tv->m_table = TableRef();
-    tv->m_refs.detach();
+//    tv->m_refs.detach(); fixme: review: seems like the move in 'm_refs(tv->m_refs)' will detach m_refs
 }
 
 inline TableViewBase::~TableViewBase() TIGHTDB_NOEXCEPT
@@ -392,16 +393,27 @@ inline void TableViewBase::move_assign(TableViewBase* tv) TIGHTDB_NOEXCEPT
         // the implementation of the "registry of views" in Table.
         m_table->register_view(this);
     }
-    m_refs.move_assign(tv->m_refs);
+
+//    memcpy(&m_refs, &tv->m_refs, sizeof(m_refs));
+//    tv->detach();
+    m_refs.clear();
+    for (size_t t = 0; t < tv->size(); t++)
+        m_refs.add(tv->get_source_ndx(t));
+        
+    //    m_refs.move_assign(tv->m_refs); fixmetv
+
+//    m_refs 
+
+
     m_is_in_index_order = tv->m_is_in_index_order;
 }
 
-inline Array& TableViewBase::get_ref_column() TIGHTDB_NOEXCEPT
+inline Column& TableViewBase::get_ref_column() TIGHTDB_NOEXCEPT
 {
     return m_refs;
 }
 
-inline const Array& TableViewBase::get_ref_column() const TIGHTDB_NOEXCEPT
+inline const Column& TableViewBase::get_ref_column() const TIGHTDB_NOEXCEPT
 {
     return m_refs;
 }

@@ -2713,7 +2713,7 @@ size_t Array::upper_bound_int(int64_t value) const TIGHTDB_NOEXCEPT
 }
 
 
-void Array::find_all(Array& result, int64_t value, size_t col_offset, size_t begin, size_t end) const
+void Array::find_all(Column& result, int64_t value, size_t col_offset, size_t begin, size_t end) const
 {
     TIGHTDB_ASSERT(begin <= size());
     TIGHTDB_ASSERT(end == npos || (begin <= end && end <= size()));
@@ -2726,7 +2726,7 @@ void Array::find_all(Array& result, int64_t value, size_t col_offset, size_t beg
 
     QueryState<int64_t> state;
     state.init(act_FindAll, &result, static_cast<size_t>(-1));
-//    state.m_state = reinterpret_cast<int64_t>(&result);
+    state.m_state = reinterpret_cast<int64_t>(&result);
 
     TIGHTDB_TEMPEX3(find, Equal, act_FindAll, m_width, (value, begin, end, col_offset, &state, CallbackDummy()));
 
@@ -2994,7 +2994,7 @@ top:
 }
 
 
-void Array::IndexStringFindAll(Array& result, StringData value, void* column, StringGetter get_func) const
+void Array::IndexStringFindAll(Column& result, StringData value, void* column, StringGetter get_func) const
 {
     StringData value_2 = value;
     const char* data = m_data;

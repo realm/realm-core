@@ -272,6 +272,7 @@ void TableViewBase::sort(size_t column, bool Ascending)
 // Simple pivot aggregate method. Experimental! Please do not document method publicly.
 void TableViewBase::aggregate(size_t group_by_column, size_t aggr_column, Table::AggrType op, Table& result) const
 {
+    // fixmetv
     m_table->aggregate(group_by_column, aggr_column, op, result, &m_refs);
 }
 
@@ -340,7 +341,7 @@ void TableView::remove(size_t ndx)
     m_table->from_view_remove(real_ndx, this);
 
     // Update refs
-    m_refs.erase(ndx);
+    m_refs.erase(ndx, ndx == size() - 1); //fixmetv, 'last' argument
 
     // Decrement row indexes greater than or equal to ndx
     //
@@ -352,7 +353,7 @@ void TableView::remove(size_t ndx)
 void TableView::clear()
 {
     TIGHTDB_ASSERT(m_table);
-    m_refs.sort();
+//    m_refs.sort(); fixmetv
 
     // Delete all referenced rows in source table
     // (in reverse order to avoid index drift)
