@@ -1087,8 +1087,36 @@ void SharedGroup::end_read() TIGHTDB_NOEXCEPT
 }
 
 
-void SharedGroup::advance_read(WriteLogRegistryInterface* log_registry)
+void SharedGroup::promote_to_write(WriteLogRegistryInterface* write_logs)
+{
+    if (m_transactions_are_pinned)
+        throw runtime_error("Write transactions are not allowed while transactions are pinned");
 
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    if (Replication* repl = m_group.get_replication()) {
+        repl->begin_write_transact(*this); // Throws
+        try {
+            do_begin_write();
+            advance_read(write_logs);
+        }
+        catch (...) {
+            repl->rollback_write_transact(*this);
+            throw;
+        }
+        m_transact_stage = transact_Writing;
+        return;
+    }
+#endif
+
+    do_begin_write();
+
+    // Advance to latest state (accessor update)
+    advance_read(write_logs);
+    m_transact_stage = transact_Writing;
+}
+
+
+void SharedGroup::advance_read(WriteLogRegistryInterface* log_registry)
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Reading);
 
@@ -1137,7 +1165,7 @@ void SharedGroup::advance_read(WriteLogRegistryInterface* log_registry)
     // We know that the log_registry already knows about the new_version,
     // because in order for us to get the new version when we grab the
     // readlock, the new version must have been entered into the ringbuffer.
-    // commit allways updates the replication log BEFORE updating the ringbuffer.
+    // commit always updates the replication log BEFORE updating the ringbuffer.
     BinaryData* logs = new BinaryData[m_readlock.m_version - old_readlock.m_version];
     log_registry->get_commit_entries(old_readlock.m_version, m_readlock.m_version, logs);
 
@@ -1164,16 +1192,22 @@ Group& SharedGroup::begin_write()
         repl->begin_write_transact(*this); // Throws
         try {
             do_begin_write();
+            begin_read();
         }
         catch (...) {
             repl->rollback_write_transact(*this);
             throw;
         }
+        m_transact_stage = transact_Writing;
         return m_group;
     }
 #endif
 
     do_begin_write();
+
+    // A write transaction implies a read transaction...
+    begin_read();
+    m_transact_stage = transact_Writing;
 
     return m_group;
 }
@@ -1210,9 +1244,6 @@ void SharedGroup::do_begin_write()
     }
 #endif
 
-    // A write transaction implies a read transaction...
-    begin_read();
-    m_transact_stage = transact_Writing;
 }
 
 void SharedGroup::commit()
@@ -1272,6 +1303,14 @@ void SharedGroup::do_commit()
 
         low_level_commit(new_version); // Throws
     }
+
+    // advance readlock but dont update accessors:
+    // As this is done under lock, along with the addition above of the newest commit,
+    // we know for certain that the readlock we will grab WILL refer to our own newly
+    // completed commit.
+    release_readlock(m_readlock);
+    bool has_changed;
+    grab_latest_readlock(m_readlock, has_changed);
 
     // downgrade to a read transaction (if not, assert in end_read)
     m_transact_stage = transact_Reading;
@@ -1417,13 +1456,6 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
         r_info->readers.use_next();
     }
 
-    // advance readlock but dont update accessors:
-    // As this is done under lock, along with the addition above of the newest commit,
-    // we know for certain that the readlock we will grab WILL refer to our own newly
-    // completed commit.
-    release_readlock(m_readlock);
-    bool has_changed;
-    grab_latest_readlock(m_readlock, has_changed);
 }
 
 
