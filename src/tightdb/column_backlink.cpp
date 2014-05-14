@@ -189,7 +189,7 @@ void ColumnBackLink::erase(std::size_t row_ndx, bool is_last)
     TIGHTDB_ASSERT(is_last);
 
     nullify_links(row_ndx, false);
-    Column::erase(row_ndx, true);
+    Column::erase(row_ndx, is_last);
 }
 
 void ColumnBackLink::clear()

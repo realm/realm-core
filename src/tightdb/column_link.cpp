@@ -83,7 +83,7 @@ void ColumnLink::erase(std::size_t row_ndx, bool is_last)
     // Remove backlinks to deleted row
     remove_backlinks(row_ndx);
 
-    Column::erase(row_ndx, true);
+    Column::erase(row_ndx, is_last);
 }
 
 void ColumnLink::clear()
