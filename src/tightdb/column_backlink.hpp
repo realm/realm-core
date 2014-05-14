@@ -25,7 +25,7 @@
 
 namespace tightdb {
 
-class ColumnBackLink: public Column {
+class ColumnBackLink: public Column, public ArrayParent {
 public:
     ColumnBackLink(ref_type, ArrayParent* = 0, std::size_t ndx_in_parent = 0,
                              Allocator& = Allocator::get_default()); // Throws
@@ -45,15 +45,23 @@ public:
     void        set_source_table(TableRef table);
     TableRef    get_source_table();
     void        set_source_column(ColumnLink& column);
-    //std::size_t get_source_column();
 
     void add_row();
     void clear() TIGHTDB_OVERRIDE;
     void move_last_over(std::size_t ndx) TIGHTDB_OVERRIDE;
     void erase(std::size_t ndx, bool is_last) TIGHTDB_OVERRIDE;
 
+protected:
+    void update_child_ref(std::size_t child_ndx, ref_type new_ref) TIGHTDB_OVERRIDE;
+    ref_type get_child_ref(std::size_t child_ndx) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+#ifdef TIGHTDB_DEBUG
+    // Used only by Array::to_dot().
+    std::pair<ref_type, std::size_t>
+    get_to_dot_parent(std::size_t ndx_in_parent) const TIGHTDB_OVERRIDE;
+#endif
+
 private:
-    void nullify_links(std::size_t row_ndx);
+    void nullify_links(std::size_t row_ndx, bool do_destroy);
 
     TableRef    m_source_table;
     ColumnLink* m_source_column;
