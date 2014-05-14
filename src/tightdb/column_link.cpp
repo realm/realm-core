@@ -48,16 +48,21 @@ void ColumnLink::nullify_link(size_t row_ndx)
     Column::set(row_ndx, 0);
 }
 
-void ColumnLink::move_last_over(size_t row_ndx)
+void ColumnLink::remove_backlinks(size_t row_ndx)
 {
-    TIGHTDB_ASSERT(row_ndx+1 < size());
-
-    // Remove backlinks to deleted row
     size_t ref = Column::get(row_ndx);
     if (ref != 0) {
         size_t old_target_row_ndx = ref - 1;
         m_backlinks->remove_backlink(old_target_row_ndx, row_ndx);
     }
+}
+
+void ColumnLink::move_last_over(size_t row_ndx)
+{
+    TIGHTDB_ASSERT(row_ndx+1 < size());
+
+    // Remove backlinks to deleted row
+    remove_backlinks(row_ndx);
 
     // Update backlinks to last row to point to its new position
     size_t last_row_ndx = size()-1;
@@ -69,6 +74,25 @@ void ColumnLink::move_last_over(size_t row_ndx)
 
     // Do the actual move
     Column::move_last_over(row_ndx);
+}
+
+void ColumnLink::erase(std::size_t row_ndx, bool is_last)
+{
+    TIGHTDB_ASSERT(is_last);
+
+    // Remove backlinks to deleted row
+    remove_backlinks(row_ndx);
+
+    Column::erase(row_ndx, true);
+}
+
+void ColumnLink::clear()
+{
+    size_t count = size();
+    for (size_t i = 0; i < count; ++i) {
+        remove_backlinks(i);
+    }
+    Column::clear();
 }
 
 

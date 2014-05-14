@@ -847,12 +847,12 @@ void Column::move_last_over(size_t ndx)
     TIGHTDB_ASSERT(ndx+1 < size());
 
     size_t last_ndx = size() - 1;
-    int64_t v = get(last_ndx);
+    int64_t v = Column::get(last_ndx);
 
-    set(ndx, v); // Throws
+    Column::set(ndx, v); // Throws
 
     bool is_last = true;
-    erase(last_ndx, is_last); // Throws
+    Column::erase(last_ndx, is_last); // Throws
 }
 
 

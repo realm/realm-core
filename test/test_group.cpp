@@ -1435,6 +1435,75 @@ TEST(Group_Links)
         size_t link_ndx1 = table2->get_link(0, 0);
         CHECK_EQUAL(4, link_ndx1);
     }
+
+    // Test deletes
+    {
+        Group group;
+
+        size_t table1_ndx = 0;
+        TestTableGroup::Ref table1 = group.get_table<TestTableGroup>("table1");
+        table1->add("test1", 1, true,  Mon);
+        table1->add("test2", 2, false, Tue);
+        table1->add("test3", 3, true,  Wed);
+
+        // create table with links to table1
+        size_t table2_ndx = 1;
+        TableRef table2 = group.get_table("table2");
+        size_t col_link = table2->add_column_link("link", table1_ndx);
+        CHECK_EQUAL(table1, table2->get_link_target(col_link));
+
+        // add a few links
+        table2->insert_link(col_link, 0, 1);
+        table2->insert_done();
+        table2->insert_link(col_link, 1, 0);
+        table2->insert_done();
+
+        while (!table2->is_empty()) {
+            table2->move_last_over(0);
+        }
+
+        CHECK(table2->is_empty());
+        CHECK_EQUAL(0, table1->get_backlink_count(0, table2_ndx, col_link));
+        CHECK_EQUAL(0, table1->get_backlink_count(2, table2_ndx, col_link));
+
+        // add links again
+        table2->insert_link(col_link, 0, 1);
+        table2->insert_done();
+        table2->insert_link(col_link, 1, 0);
+        table2->insert_done();
+
+        // remove all rows in target table
+        while (!table1->is_empty()) {
+            table1->move_last_over(0);
+        }
+
+        // verify that originating links was nullified
+        CHECK(table2->is_null_link(col_link, 0));
+        CHECK(table2->is_null_link(col_link, 1));
+
+        // add target rows again with links
+        table1->add("test1", 1, true,  Mon);
+        table1->add("test2", 2, false, Tue);
+        table1->add("test3", 3, true,  Wed);
+        table2->set_link(col_link, 0, 1);
+        table2->set_link(col_link, 1, 0);
+
+        // clear entire table and make sure backlinks are removed as well
+        table2->clear();
+        CHECK_EQUAL(0, table1->get_backlink_count(0, table2_ndx, col_link));
+        CHECK_EQUAL(0, table1->get_backlink_count(2, table2_ndx, col_link));
+
+        // add links again
+        table2->insert_link(col_link, 0, 1);
+        table2->insert_done();
+        table2->insert_link(col_link, 1, 0);
+        table2->insert_done();
+
+        // clear target table and make sure links are nullified
+        table1->clear();
+        CHECK(table2->is_null_link(col_link, 0));
+        CHECK(table2->is_null_link(col_link, 1));
+    }
 }
 
 #ifdef TIGHTDB_DEBUG

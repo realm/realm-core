@@ -316,7 +316,7 @@ public:
 #endif
 
 protected:
-    Group* get_parent_group() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {return this;}
+    bool is_parent_group() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {return true;}
 
 private:
     SlabAlloc m_alloc;

@@ -1378,7 +1378,7 @@ void Table::insert_empty_row(size_t ndx, size_t num_rows)
 void Table::clear()
 {
     detach_views_except(NULL);
-    size_t n = get_column_count();
+    size_t n = m_spec.get_column_count();
     for (size_t i = 0; i != n; ++i) {
         ColumnBase& column = get_column_base(i);
         column.clear();
@@ -1396,7 +1396,7 @@ void Table::do_remove(size_t ndx)
     TIGHTDB_ASSERT(ndx < m_size);
     bool is_last = ndx == m_size - 1;
 
-    size_t n = get_column_count();
+    size_t n = m_spec.get_column_count();
     for (size_t i = 0; i != n; ++i) {
         ColumnBase& column = get_column_base(i);
         column.erase(ndx, is_last);
@@ -1411,13 +1411,22 @@ void Table::do_remove(size_t ndx)
 
 void Table::move_last_over(size_t ndx)
 {
-    TIGHTDB_ASSERT(ndx+1 < m_size);
+    TIGHTDB_ASSERT(ndx < m_size);
     detach_views_except(NULL);
 
-    size_t n = get_column_count();
-    for (size_t i = 0; i != n; ++i) {
-        ColumnBase& column = get_column_base(i);
-        column.move_last_over(ndx);
+    size_t n = m_spec.get_column_count();
+    if (ndx+1 == m_size) {
+        // if it is the last item, we can just remove it
+        for (size_t i = 0; i < n; ++i) {
+            ColumnBase& column = get_column_base(i);
+            column.erase(ndx, true);
+        }
+    }
+    else {
+        for (size_t i = 0; i < n; ++i) {
+            ColumnBase& column = get_column_base(i);
+            column.move_last_over(ndx);
+        }
     }
     --m_size;
 
@@ -1588,9 +1597,10 @@ Group* Table::get_parent_group() const TIGHTDB_NOEXCEPT
     ArrayParent* array_parent = m_top.get_parent();
     if (!array_parent)
         return NULL;
-    TIGHTDB_ASSERT(dynamic_cast<Parent*>(array_parent));
-    Group* table_parent = static_cast<Group*>(array_parent);
-    Group* parent = table_parent->get_parent_group();
+    if (!array_parent->is_parent_group())
+        return NULL;
+
+    Group* parent = static_cast<Group*>(array_parent);
     return parent;
 }
 

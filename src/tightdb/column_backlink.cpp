@@ -100,10 +100,8 @@ void ColumnBackLink::update_backlink(std::size_t row_ndx, std::size_t old_row_nd
     TIGHTDB_ASSERT(false);
 }
 
-void ColumnBackLink::move_last_over(std::size_t row_ndx)
+void ColumnBackLink::nullify_links(std::size_t row_ndx)
 {
-    TIGHTDB_ASSERT(row_ndx+1 < size());
-
     // Nullify all links pointing to the row being deleted
     int64_t ref = Column::get(row_ndx);
     if (ref != 0) {
@@ -119,11 +117,19 @@ void ColumnBackLink::move_last_over(std::size_t row_ndx)
             //sub_column.destroy_deep();
         }
     }
+}
+
+void ColumnBackLink::move_last_over(std::size_t row_ndx)
+{
+    TIGHTDB_ASSERT(row_ndx+1 < size());
+
+    // Nullify all links pointing to the row being deleted
+    nullify_links(row_ndx);
 
     // Update all links to the last row to point to the new row instead
     size_t last_row_ndx = size()-1;
-    size_t ref2 = Column::get(last_row_ndx);
-    if (ref2 != 0) {
+    size_t ref = Column::get(last_row_ndx);
+    if (ref != 0) {
         if (ref & 1) {
             uint64_t row_ref = uint64_t(ref) >> 1;
             m_source_column->do_update_link(row_ref, row_ndx);
@@ -135,8 +141,28 @@ void ColumnBackLink::move_last_over(std::size_t row_ndx)
     }
 
     // Do the actual move
-    Column::set(row_ndx, ref2);
-    bool is_last = true;
-    Column::erase(last_row_ndx, is_last);
+    Column::set(row_ndx, ref);
+    Column::erase(last_row_ndx, true);
+}
+
+void ColumnBackLink::erase(std::size_t row_ndx, bool is_last)
+{
+    TIGHTDB_ASSERT(is_last);
+
+    nullify_links(row_ndx);
+    Column::erase(row_ndx, true);
+}
+
+void ColumnBackLink::clear()
+{
+    size_t count = size();
+    for (size_t i = 0; i < count; ++i) {
+        nullify_links(i);
+    }
+    Column::clear();
+    Column::clear();
+    // FIXME: This one is needed because Column::clear() forgets about
+    // the leaf type. A better solution should probably be found.
+    m_array->set_type(Array::type_HasRefs);
 }
 

@@ -48,9 +48,13 @@ public:
     //std::size_t get_source_column();
 
     void add_row();
+    void clear() TIGHTDB_OVERRIDE;
     void move_last_over(std::size_t ndx) TIGHTDB_OVERRIDE;
+    void erase(std::size_t ndx, bool is_last) TIGHTDB_OVERRIDE;
 
 private:
+    void nullify_links(std::size_t row_ndx);
+
     TableRef    m_source_table;
     ColumnLink* m_source_column;
 };

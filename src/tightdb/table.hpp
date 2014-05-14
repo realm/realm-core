@@ -394,7 +394,7 @@ public:
     /// this table is a free-standing table, get_parent_table()
     /// returns null, and get_index_in_parent() returns tightdb::npos.
     bool is_linkable() const TIGHTDB_NOEXCEPT;
-    Group* get_parent_group() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    Group* get_parent_group() const TIGHTDB_NOEXCEPT;
     TableRef get_parent_table() TIGHTDB_NOEXCEPT;
     ConstTableRef get_parent_table() const TIGHTDB_NOEXCEPT;
     std::size_t get_index_in_parent() const TIGHTDB_NOEXCEPT;
@@ -917,8 +917,6 @@ protected:
     // `*column_ndx_out` when , and only when this table parent is a
     // column in a parent table.
     virtual Table* get_parent_table(std::size_t* column_ndx_out = 0) const TIGHTDB_NOEXCEPT;
-
-    virtual Group* get_parent_group() const TIGHTDB_NOEXCEPT {return NULL;}
 
     // Must be called whenever a child table accessor is destroyed.
     virtual void child_accessor_destroyed(std::size_t child_ndx) TIGHTDB_NOEXCEPT = 0;
