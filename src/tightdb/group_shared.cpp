@@ -1089,6 +1089,8 @@ void SharedGroup::end_read() TIGHTDB_NOEXCEPT
 
 void SharedGroup::promote_to_write(WriteLogRegistryInterface* write_logs)
 {
+    TIGHTDB_ASSERT(m_transact_stage == transact_Reading);
+
     if (m_transactions_are_pinned)
         throw runtime_error("Write transactions are not allowed while transactions are pinned");
 
@@ -1184,6 +1186,8 @@ void SharedGroup::advance_read(WriteLogRegistryInterface* log_registry)
 
 Group& SharedGroup::begin_write()
 {
+    TIGHTDB_ASSERT(m_transact_stage == transact_Ready);
+
     if (m_transactions_are_pinned)
         throw runtime_error("Write transactions are not allowed while transactions are pinned");
 
@@ -1215,8 +1219,6 @@ Group& SharedGroup::begin_write()
 
 void SharedGroup::do_begin_write()
 {
-    TIGHTDB_ASSERT(m_transact_stage == transact_Ready);
-
     SharedInfo* info = m_file_map.get_addr();
 
     // Get write lock
@@ -1262,6 +1264,26 @@ void SharedGroup::commit_and_continue_as_read()
 
     // TODO: update all pending accessors to new refs
     // consult group::commit for inspiration
+
+    // Mark all managed space (beyond the attached file) as free.
+    //
+    // FIXME: Perform this as part of m_alloc.remap(), but that
+    // requires that we always call remap().
+    m_group.m_alloc.reset_free_space_tracking(); // Throws
+
+    size_t old_baseline = m_group.m_alloc.get_baseline();
+
+    // Remap file if it has grown
+    if (m_readlock.m_file_size > old_baseline) {
+
+        // FIXME: Not sure if this test is correct in this context
+        if (m_group.m_alloc.remap(m_readlock.m_file_size)) { // Throws
+            // The file was mapped to a new address, so all array
+            // accessors must be updated.
+            old_baseline = 0;
+        }
+    }
+    m_group.update_refs(m_readlock.m_top_ref, old_baseline);
 }
 
 void SharedGroup::do_commit()
@@ -1458,7 +1480,6 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
         r.version     = new_version;
         r_info->readers.use_next();
     }
-
 }
 
 
