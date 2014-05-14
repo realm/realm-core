@@ -1259,6 +1259,9 @@ void SharedGroup::commit()
 void SharedGroup::commit_and_continue_as_read()
 {
     do_commit();
+
+    // TODO: update all pending accessors to new refs
+    // consult group::commit for inspiration
 }
 
 void SharedGroup::do_commit()
@@ -1279,7 +1282,7 @@ void SharedGroup::do_commit()
     {
         uint_fast64_t new_version;
 #ifdef TIGHTDB_ENABLE_REPLICATION
-        // It is essential that if Replicatin::commit_write_transact()
+        // It is essential that if Replication::commit_write_transact()
         // fails, then the transaction is not completed. A subsequent call
         // to rollback() must roll it back.
         if (Replication* repl = m_group.get_replication()) {

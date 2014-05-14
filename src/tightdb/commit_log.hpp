@@ -58,6 +58,17 @@ public:
     virtual void release_commit_entries(version_type from, version_type to) = 0;
 };
 
+
+// Obtain the WriteLogRegistry for a specific filepath. Create it, if it doesn't exist.
+WriteLogRegistryInterface* getWriteLogs(std::string filepath);
+
+// Create a writelog collector and associate it with a filepath. You'll need one writelog
+// collector for each shared group. Commits from writelog collectors for a specific filepath 
+// may later be obtained through the WriteLogRegistry associated with said filepath.
+Replication* makeWriteLogCollector(std::string filepath, 
+                                   WriteLogRegistryInterface* registry);
+
+
 } // namespace tightdb
 
 #endif // TIGHTDB_COMMIT_LOG_HPP
