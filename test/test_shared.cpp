@@ -2084,4 +2084,21 @@ TEST(Shared_ReserveDiskSpace)
     }
 }
 
+#ifdef TIGHTDB_ENABLE_REPLICATION
+TEST(Shared_Implicit_Transactions)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    {
+        WriteLogRegistryInterface* wlr = getWriteLogs(path);
+        Replication* repl = makeWriteLogCollector(path, wlr);
+        SharedGroup sg(*repl);
+        sg.begin_read();
+        sg.advance_read(wlr);
+        sg.promote_to_write(wlr);
+        sg.commit_and_continue_as_read();
+        sg.end_read();
+    }
+}
+#endif // ENABLE_REPLICATION
+
 #endif // TEST_SHARED
