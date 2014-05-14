@@ -368,6 +368,16 @@ size_t Spec::find_backlink_column(size_t source_table_ndx, size_t source_column_
     return not_found;
 }
 
+void Spec::update_backlink_column_ref(size_t source_table_ndx, size_t old_column_ndx, size_t new_column_ndx)
+{
+    size_t column_ndx = find_backlink_column(source_table_ndx, old_column_ndx);
+    TIGHTDB_ASSERT(column_ndx != not_found);
+
+    size_t backlink_info_ndx = get_subspec_ndx(column_ndx);
+    int64_t tagged_column_ndx = (new_column_ndx << 1) + 1;
+    m_subspecs.set(backlink_info_ndx+1, tagged_column_ndx);
+}
+
 DataType Spec::get_column_type(size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < get_column_count());

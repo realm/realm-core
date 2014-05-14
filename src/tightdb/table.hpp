@@ -393,7 +393,8 @@ public:
     /// returns the index of this table within the group. Otherwise
     /// this table is a free-standing table, get_parent_table()
     /// returns null, and get_index_in_parent() returns tightdb::npos.
-    Group* get_parent_group() TIGHTDB_NOEXCEPT;
+    bool is_linkable() const TIGHTDB_NOEXCEPT;
+    Group* get_parent_group() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     TableRef get_parent_table() TIGHTDB_NOEXCEPT;
     ConstTableRef get_parent_table() const TIGHTDB_NOEXCEPT;
     std::size_t get_index_in_parent() const TIGHTDB_NOEXCEPT;
@@ -612,6 +613,7 @@ protected:
     void initialize_link_targets();
     void create_backlinks_column(std::size_t source_table_ndx, std::size_t source_table_column_ndx);
     ColumnBackLink& get_backlink_column(std::size_t source_table_ndx, std::size_t source_table_column_ndx);
+    void update_backlink_column_ref(std::size_t source_table_ndx, std::size_t old_column_ndx, std::size_t new_column_ndx);
 
 private:
     class SliceWriter;
@@ -916,7 +918,7 @@ protected:
     // column in a parent table.
     virtual Table* get_parent_table(std::size_t* column_ndx_out = 0) const TIGHTDB_NOEXCEPT;
 
-    virtual Group* get_parent_group() TIGHTDB_NOEXCEPT {return NULL;}
+    virtual Group* get_parent_group() const TIGHTDB_NOEXCEPT {return NULL;}
 
     // Must be called whenever a child table accessor is destroyed.
     virtual void child_accessor_destroyed(std::size_t child_ndx) TIGHTDB_NOEXCEPT = 0;
@@ -949,6 +951,11 @@ inline bool Table::is_attached() const TIGHTDB_NOEXCEPT
     return m_columns.has_parent();
 }
 
+inline bool Table::is_linkable() const TIGHTDB_NOEXCEPT
+{
+    return (get_parent_group() != NULL);
+}
+
 inline StringData Table::get_name() const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(is_attached());
@@ -964,7 +971,7 @@ inline StringData Table::get_name() const TIGHTDB_NOEXCEPT
 inline std::size_t Table::get_column_count() const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(is_attached());
-    return m_spec.get_column_count();
+    return m_spec.get_public_column_count();
 }
 
 inline StringData Table::get_column_name(std::size_t ndx) const TIGHTDB_NOEXCEPT
@@ -981,13 +988,13 @@ inline std::size_t Table::get_column_index(StringData name) const TIGHTDB_NOEXCE
 
 inline ColumnType Table::get_real_column_type(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(ndx < get_column_count());
+    TIGHTDB_ASSERT(ndx < m_spec.get_column_count());
     return m_spec.get_real_column_type(ndx);
 }
 
 inline DataType Table::get_column_type(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(ndx < get_column_count());
+    TIGHTDB_ASSERT(ndx < m_spec.get_column_count());
     return m_spec.get_column_type(ndx);
 }
 
@@ -1193,6 +1200,11 @@ inline std::size_t Table::get_size_from_ref(ref_type top_ref, Allocator& alloc) 
     std::pair<int_least64_t, int_least64_t> p = Array::get_two(top_header, 0);
     ref_type spec_ref = to_ref(p.first), columns_ref = to_ref(p.second);
     return get_size_from_ref(spec_ref, columns_ref, alloc);
+}
+
+inline void Table::update_backlink_column_ref(std::size_t source_table_ndx, std::size_t old_column_ndx, std::size_t new_column_ndx)
+{
+    m_spec.update_backlink_column_ref(source_table_ndx, old_column_ndx, new_column_ndx);
 }
 
 inline bool Table::is_degenerate() const TIGHTDB_NOEXCEPT

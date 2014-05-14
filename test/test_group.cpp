@@ -1302,6 +1302,44 @@ TEST(Group_Links)
 {
     GROUP_TEST_PATH(path);
 
+    // Test adding and removing columns with links
+    {
+        Group group;
+
+        size_t table1_ndx = 0;
+        size_t table2_ndx = 1;
+        TableRef table1 = group.get_table("table1");
+        TableRef table2 = group.get_table("table2");
+
+        // table1 can link to table2
+        size_t col_link = table2->add_column_link("link", table1_ndx);
+
+        // add some more columns to table1 and table2
+        table1->add_column(type_String, "col1");
+        table2->add_column(type_String, "col1");
+
+        // add some rows
+        table1->add_empty_row();
+        table1->set_string(0, 0, "string1");
+        table1->add_empty_row();
+        table2->add_empty_row();
+        table2->add_empty_row();
+
+        size_t col_link2 = table1->add_column_link("link", table2_ndx);
+
+        // set some links
+        table1->set_link(col_link2, 0, 1);
+        CHECK_EQUAL(1, table2->get_backlink_count(1, table1_ndx, col_link2));
+        CHECK_EQUAL(0, table2->get_backlink(1, table1_ndx, col_link2, 0));
+
+        // insert new column at specific location (moving link column)
+        table1->insert_column(0, type_Int, "first");
+        size_t new_link_col_ndx = col_link2 + 1;
+        CHECK_EQUAL(1, table2->get_backlink_count(1, table1_ndx, new_link_col_ndx));
+        CHECK_EQUAL(0, table2->get_backlink(1, table1_ndx, new_link_col_ndx, 0));
+    }
+
+    // Test basic link operations
     {
         Group group;
 
@@ -1375,10 +1413,14 @@ TEST(Group_Links)
         table1->add("test4", 4, false, Thu);
         CHECK_EQUAL(0, table1->get_backlink_count(3, table2_ndx, col_link));
 
+        table1->add_empty_row();
+        CHECK_EQUAL(0, table1->get_backlink_count(4, table2_ndx, col_link));
+        table2->set_link(col_link, 0, 4);
+        CHECK_EQUAL(1, table1->get_backlink_count(4, table2_ndx, col_link));
 
         group.write(path);
     }
-/*
+
     // Reopen same group from disk
     {
         Group group(path);
@@ -1391,11 +1433,8 @@ TEST(Group_Links)
 
         // Verify that links are still correct
         size_t link_ndx1 = table2->get_link(0, 0);
-        size_t link_ndx2 = table2->get_link(0, 1);
-        CHECK_EQUAL(1, link_ndx1);
-        CHECK_EQUAL(2, link_ndx2);
+        CHECK_EQUAL(4, link_ndx1);
     }
- */
 }
 
 #ifdef TIGHTDB_DEBUG

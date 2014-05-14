@@ -66,8 +66,7 @@ template<> struct ColumnTypeTraits3<DateTime> {
 size_t Table::add_column(DataType type, StringData name, DescriptorRef* subdesc)
 {
     TIGHTDB_ASSERT(!has_shared_type());
-    get_descriptor()->add_column(type, name, subdesc); // Throws
-    return get_column_count() - 1;
+    return get_descriptor()->add_column(type, name, subdesc); // Throws
 }
 
 std::size_t Table::add_column_link(StringData name, size_t target_table_ndx)
@@ -509,7 +508,7 @@ void Table::insert_root_column(size_t column_ndx, DataType type, StringData name
             // C++11. Solve this by changing the type of
             // `Table::m_cols` to `std::vector<ColumnBase*>`. Also
             // change its name to `Table::m_column_accessors`.
-            m_cols.add(intptr_t(new_col.get())); // Throws
+            m_cols.insert(column_ndx, intptr_t(new_col.get())); // Throws
             new_col.release();
         }
         catch (...) {
@@ -521,6 +520,22 @@ void Table::insert_root_column(size_t column_ndx, DataType type, StringData name
         if (ref != 0)
             Array::destroy_deep(ref, alloc);
         throw;
+    }
+
+    // If we inserted before link columns, we have to update their
+    // backlinks to point to their new position
+    size_t columns_end = m_spec.get_public_column_count();
+    if (column_ndx+1 != columns_end && is_linkable()) {
+        size_t table_ndx = get_index_in_parent();
+        size_t first_moved_column = column_ndx+1;
+
+        for (size_t i = first_moved_column; i < columns_end; ++i) {
+            if (m_spec.get_real_column_type(i) == col_type_Link) {
+                ColumnLink& column = get_column<ColumnLink, col_type_Link>(i);
+                TableRef target_table = column.get_target_table();
+                target_table->update_backlink_column_ref(table_ndx, i-1, i);
+            }
+        }
     }
 }
 
@@ -1071,17 +1086,17 @@ void Table::set_index(size_t column_ndx, bool update_spec)
 
 ColumnBase& Table::get_column_base(size_t ndx)
 {
-    TIGHTDB_ASSERT(ndx < get_column_count());
+    TIGHTDB_ASSERT(ndx < m_spec.get_column_count());
     instantiate_before_change();
-    TIGHTDB_ASSERT(m_cols.size() == get_column_count());
+    TIGHTDB_ASSERT(m_cols.size() == m_spec.get_column_count());
     return *reinterpret_cast<ColumnBase*>(m_cols.get(ndx));
 }
 
 
 const ColumnBase& Table::get_column_base(size_t ndx) const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(ndx < get_column_count());
-    TIGHTDB_ASSERT(m_cols.size() == get_column_count());
+    TIGHTDB_ASSERT(ndx < m_spec.get_column_count());
+    TIGHTDB_ASSERT(m_cols.size() == m_spec.get_column_count());
     return *reinterpret_cast<ColumnBase*>(m_cols.get(ndx));
 }
 
@@ -1317,7 +1332,7 @@ const ColumnMixed& Table::get_column_mixed(size_t ndx) const TIGHTDB_NOEXCEPT
 
 size_t Table::add_empty_row(size_t num_rows)
 {
-    size_t n = get_column_count();
+    size_t n = m_spec.get_column_count();
 
     TIGHTDB_ASSERT(n > 0);
 
@@ -1566,13 +1581,15 @@ void Table::clear_subtable(size_t col_idx, size_t row_idx)
 }
 
 
-Group* Table::get_parent_group() TIGHTDB_NOEXCEPT
+Group* Table::get_parent_group() const TIGHTDB_NOEXCEPT
 {
     if (!m_top.is_attached())
         return NULL;
     ArrayParent* array_parent = m_top.get_parent();
+    if (!array_parent)
+        return NULL;
     TIGHTDB_ASSERT(dynamic_cast<Parent*>(array_parent));
-    Parent* table_parent = static_cast<Parent*>(array_parent);
+    Group* table_parent = static_cast<Group*>(array_parent);
     Group* parent = table_parent->get_parent_group();
     return parent;
 }
