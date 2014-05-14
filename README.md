@@ -271,6 +271,23 @@ nonempty value during configuration as in the following example:
     TIGHTDB_ENABLE_ALLOC_SET_ZERO=1 sh build.sh config
 
 
+Packaging for OS X
+-------------------
+
+You can create a framework for Mac OS X. The framework is useful when
+creating OS X application. The command is:
+
+    sh build.sh build-osx-framework
+
+
+Packaging for iOS
+-----------------
+
+You can create a framework for iOS. The framework is useful when
+creating apps for iPhone and iPad. The command is:
+
+    sh build.sh build-ios-framework
+
 
 Packaging for Debian/Ubuntu
 ---------------------------
