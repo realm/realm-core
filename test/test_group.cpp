@@ -1312,7 +1312,7 @@ TEST(Group_Links)
         TableRef table2 = group.get_table("table2");
 
         // table1 can link to table2
-        size_t col_link = table2->add_column_link("link", table1_ndx);
+        table2->add_column_link("link", table1_ndx);
 
         // add some more columns to table1 and table2
         table1->add_column(type_String, "col1");
@@ -1375,6 +1375,12 @@ TEST(Group_Links)
         CHECK_EQUAL(0, table1->get_backlink(1, table2_ndx, col_link, 0));
         CHECK_EQUAL(0, table1->get_backlink_count(2, table2_ndx, col_link));
 
+        // Follow links using typed accessors
+        CHECK_EQUAL("test2", table2->get_link_accessor<TestTableGroup>(0, 0).first);
+        CHECK_EQUAL(2, table2->get_link_accessor<TestTableGroup>(0, 0).second);
+        CHECK_EQUAL("test1", table2->get_link_accessor<TestTableGroup>(0, 1).first);
+        CHECK_EQUAL(1, table2->get_link_accessor<TestTableGroup>(0, 1).second);
+
         // Change a link to point to a new location
         table2->set_link(col_link, 1, 2);
 
@@ -1383,12 +1389,6 @@ TEST(Group_Links)
         CHECK_EQUAL(0, table1->get_backlink_count(0, table2_ndx, col_link));
         CHECK_EQUAL(1, table1->get_backlink_count(2, table2_ndx, col_link));
         CHECK_EQUAL(1, table1->get_backlink(2, table2_ndx, col_link, 0));
-
-        //CHECK_EQUAL("test2", table2->get_link_accessor<TestTableGroup>(0, 0).first);
-        //CHECK_EQUAL(2, table2->get_link_accessor<TestTableGroup>(0, 0).second);
-
-        //CHECK_EQUAL("test1", table2->get_link_accessor<TestTableGroup>(0, 1).first);
-        //CHECK_EQUAL(1, table2->get_link_accessor<TestTableGroup>(0, 1).second);
 
         // Delete a link. Note that links only work with unordered
         // top-level tables, so you have to delete with move_last_over

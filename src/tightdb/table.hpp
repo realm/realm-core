@@ -331,8 +331,8 @@ public:
     std::size_t get_link(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
     TableRef    get_link_target(std::size_t column_ndx) TIGHTDB_NOEXCEPT;
 
-    //template<class T>
-    //typename T::RowAccessor get_link_accessor(std::size_t column_ndx, std::size_t row_ndx);
+    template<class T>
+    typename T::RowAccessor get_link_accessor(std::size_t column_ndx, std::size_t row_ndx);
 
     // Set cell values
     void set_int(std::size_t column_ndx, std::size_t row_ndx, int64_t value);
@@ -1230,7 +1230,7 @@ inline std::size_t* Table::Parent::record_subtable_path(std::size_t* begin,
 {
     return begin;
 }
-/*
+
 template<class T>
 typename T::RowAccessor Table::get_link_accessor(std::size_t column_ndx, std::size_t row_ndx)
 {
@@ -1238,10 +1238,10 @@ typename T::RowAccessor Table::get_link_accessor(std::size_t column_ndx, std::si
     TableRef target_table = get_link_target(column_ndx);
 
     Table* table = &*target_table;
-    T* typed_table = static_cast<T*>(table);
-    return typed_table[row_pos_in_target];
+    T* typed_table = (T*)(table);
+    return (*typed_table)[row_pos_in_target];
 }
-*/
+
 #ifdef TIGHTDB_ENABLE_REPLICATION
 inline Replication* Table::get_repl() TIGHTDB_NOEXCEPT
 {
