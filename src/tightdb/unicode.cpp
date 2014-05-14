@@ -1,4 +1,23 @@
-#include <cstring>
+/*************************************************************************
+*
+* TIGHTDB CONFIDENTIAL
+* __________________
+*
+*  [2011] - [2014] TightDB Inc
+*  All Rights Reserved.
+*
+* NOTICE:  All information contained herein is, and remains
+* the property of TightDB Incorporated and its suppliers,
+* if any.  The intellectual and technical concepts contained
+* herein are proprietary to TightDB Incorporated
+* and its suppliers and may be covered by U.S. and Foreign Patents,
+* patents in process, and are protected by trade secret or copyright law.
+* Dissemination of this information or reproduction of this material
+* is strictly forbidden unless prior written permission is obtained
+* from TightDB Incorporated.
+*
+**************************************************************************/
+
 #include <algorithm>
 #include <vector>
 #include <iostream>
@@ -28,10 +47,9 @@ using namespace std;
 
 namespace tightdb {
 
-    bool set_string_compare_method(char method, StringCompareCallback callback)
+    bool set_string_compare_method(string_compare_method_t method, StringCompareCallback callback)
     {
-        TIGHTDB_ASSERT(method == 0 || method == 1 || method == 2);
-        if (method == 1) {
+        if (method == STRING_COMPARE_CPP11) {
 #ifdef TIGHTDB_HAVE_CXX11
             string l = std::locale("").name();
             // We cannot use C locale because it puts 'Z' before 'a'
@@ -42,7 +60,7 @@ namespace tightdb {
             return false;
 #endif
         }
-        else if (method == 2) {
+        else if (method == STRING_COMPARE_CALLBACK) {
             string_compare_callback = callback;
         }
 
@@ -74,12 +92,14 @@ namespace tightdb {
         if (begin[0] != begin2[0]) return false;
 
         size_t i = 1;
-        if (int(char_traits<char>::to_int_type(begin[0])) & 0x80) {
+        if (static_cast<int>(char_traits<char>::to_int_type(begin[0])) & 0x80) {
             // All following bytes matching '10xxxxxx' will be considered
             // as part of this character.
             while (begin + i != end) {
-                if ((int(char_traits<char>::to_int_type(begin[i])) & (0x80 + 0x40)) != 0x80) break;
-                if (begin[i] != begin2[i]) return false;
+                if ((static_cast<int>(char_traits<char>::to_int_type(begin[i])) & (0x80 + 0x40)) != 0x80)
+                    break;
+                if (begin[i] != begin2[i]) 
+                    return false;
                 ++i;
             }
         }
@@ -162,7 +182,7 @@ namespace tightdb {
             , 265, 264, 282, 283, 292, 321, 316, 339, 338, 350, 354, 361, 374, 376, 405, 421, 420, 423, 422, 431, 430, 440, 468, 467, 466, 469, 480, 479, 478, 481, 524, 523, 525, 528, 553, 552, 565, 564, 571, 579, 578, 580, 135, 142, 141, 589, 534, 85, 86, 87, 71, 225, 224, 223, 357, 356, 355, 380, 379, 378, 159, 158, 307, 306, 396, 395, 499, 498, 518, 517, 512, 511, 516, 515, 514, 513, 256, 174, 173, 170, 169, 573, 572, 281, 280, 275, 274, 335, 334, 404, 403, 415, 414, 577, 576, 329, 222, 221, 220, 269
             , 268, 293, 535, 367, 366, 172, 171, 180, 179, 411, 410, 176, 175, 178, 177, 253, 252, 255, 254, 318, 317, 320, 319, 417, 416, 419, 418, 450, 449, 452, 451, 520, 519, 522, 521, 464, 463, 483, 482, 261, 260, 289, 288, 377, 227, 427, 426, 567, 566, 155, 154, 249, 248, 409, 408, 413, 412, 392, 391, 407, 406, 547, 546, 358, 381, 485, 326, 219, 437, 168, 203, 202, 351, 484, 465, 568, 591, 590, 184, 510, 529, 251, 250, 331, 330, 436, 435, 448, 447, 551, 550 };
 
-        if (string_compare_method == 0) {
+        if (string_compare_method == STRING_COMPARE_CORE) {
             // Core-only method. Compares in us_EN locale (sorting may be slightly inaccurate in some countries). Will 
             // return arbitrary return value for invalid utf8 (silent error treatment). If one or both strings have 
             // unicodes beyond 'Latin Extended 2' (0...591), then the strings are compared by unicode value.
@@ -207,7 +227,7 @@ namespace tightdb {
 
             } while (true);
         }
-        else if (string_compare_method == 1) {
+        else if (string_compare_method == STRING_COMPARE_CPP11) {
             // C++11. Precise sorting in user's current locale. Arbitrary return value (silent error) for invalid utf8
 #if TIGHTDB_HAVE_CXX11
             wstring wstring1 = utf8_to_wstring(string1);
@@ -220,7 +240,7 @@ namespace tightdb {
             return false;
 #endif
         }
-        else if (string_compare_method == 2) {
+        else if (string_compare_method == STRING_COMPARE_CALLBACK) {
             // Callback method
             bool ret = string_compare_callback(s1, s2);
             return ret;
@@ -316,13 +336,15 @@ namespace tightdb {
         const char* end = begin + source.size();
         while (begin != end) {
             int n = static_cast<int>(sequence_length(*begin));
-            if (n == 0 || end - begin < n) return false;
+            if (n == 0 || end - begin < n) 
+                return false;
 
             wchar_t tmp[2]; // FIXME: Why no room for UTF-16 surrogate
 
 
             int n2 = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, begin, n, tmp, 1);
-            if (n2 == 0) return false;
+            if (n2 == 0) 
+                return false;
 
             TIGHTDB_ASSERT(0 < n2 && n2 <= 1);
             tmp[n2] = 0;
@@ -341,8 +363,9 @@ namespace tightdb {
             // the flag is specified, the function fails with error
             // ERROR_INVALID_FLAGS.
             DWORD flags = 0;
-            int n3 = WideCharToMultiByte(CP_UTF8, flags, tmp, 1, target, int(end - begin), 0, 0);
-            if (n3 == 0 && GetLastError() != ERROR_INSUFFICIENT_BUFFER) return false;
+            int n3 = WideCharToMultiByte(CP_UTF8, flags, tmp, 1, target, static_cast<int>(end - begin), 0, 0);
+            if (n3 == 0 && GetLastError() != ERROR_INSUFFICIENT_BUFFER) 
+                return false;
             if (n3 != n) {
                 copy(begin, begin + n, target); // Cannot handle different size, copy source
             }
@@ -394,7 +417,8 @@ namespace tightdb {
     {
         for (size_t i = 0; i != haystack.size(); ++i) {
             char c = haystack[i];
-            if (needle_lower[i] != c && needle_upper[i] != c) return false;
+            if (needle_lower[i] != c && needle_upper[i] != c) 
+                return false;
         }
 
         const char* begin = haystack.data();
@@ -402,7 +426,8 @@ namespace tightdb {
         const char* i = begin;
         while (i != end) {
             if (!equal_sequence(i, end, needle_lower + (i - begin)) &&
-                !equal_sequence(i, end, needle_upper + (i - begin))) return false;
+                !equal_sequence(i, end, needle_upper + (i - begin))) 
+                return false;
         }
         return true;
     }

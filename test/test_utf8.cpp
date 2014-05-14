@@ -70,7 +70,7 @@ TEST(Compare_Core_ASCII) {
     // Useful line for creating new unit test cases:
     // bool ret = std::locale("us_EN")(string("a"), string("b"));
 
-    set_string_compare_method(0, null_ptr);
+    set_string_compare_method(STRING_COMPARE_CORE, null_ptr);
 
     // simplest test
     CHECK_EQUAL(true, utf8_compare("a", "b"));
@@ -124,7 +124,7 @@ TEST(Compare_Core_utf8)
     // Useful line for creating new unit test cases:
     // bool ret = std::locale("us_EN")(string("a"), string("b"));
 
-    set_string_compare_method(0, null_ptr);
+    set_string_compare_method(STRING_COMPARE_CORE, null_ptr);
 
     // single utf16 code points (tests mostly Windows)
     CHECK_EQUAL(false, utf8_compare(uae, uae));
@@ -165,7 +165,7 @@ TEST(Compare_Core_utf8_invalid)
     static_cast<void>(spurious1);
     static_cast<void>(spurious2);
 
-    set_string_compare_method(0, null_ptr);
+    set_string_compare_method(STRING_COMPARE_CORE, null_ptr);
     StringData i1 = StringData(invalid1);
     StringData i2 = StringData(invalid2);
 
@@ -183,7 +183,7 @@ TEST(Compare_Core_utf8_invalid_crash)
     using namespace tightdb::test_util;
     Random r;
 
-    set_string_compare_method(0, null_ptr);
+    set_string_compare_method(STRING_COMPARE_CORE, null_ptr);
 
     for (size_t t = 0; t < 10000; t++) {
         for (size_t i = 0; i < sizeof(str1); i++) {

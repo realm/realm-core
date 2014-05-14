@@ -470,7 +470,7 @@ TEST(TableView_StringSort)
     CHECK_EQUAL("ZEBRA", v[3].first);
 
     // Should be exactly the same as above because 0 was default already
-    set_string_compare_method(0, null_ptr);
+    set_string_compare_method(STRING_COMPARE_CORE, null_ptr);
     v.column().first.sort();
     CHECK_EQUAL("alpha", v[0].first);
     CHECK_EQUAL("ALPHA", v[1].first);
@@ -485,7 +485,7 @@ TEST(TableView_StringSort)
     CHECK_EQUAL("ZEBRA", v[0].first);
 
     // Test if callback comparer works. Our callback is a primitive dummy-comparer
-    set_string_compare_method(2, &comparer);
+    set_string_compare_method(STRING_COMPARE_CALLBACK, &comparer);
     v.column().first.sort();
     CHECK_EQUAL("ALPHA", v[0].first);
     CHECK_EQUAL("ZEBRA", v[1].first);
@@ -495,7 +495,7 @@ TEST(TableView_StringSort)
     
     // Try C++11 method which uses current locale of the operating system to give precise sorting
     got_called = false;
-    bool available = set_string_compare_method(1, null_ptr);
+    bool available = set_string_compare_method(STRING_COMPARE_CPP11, null_ptr);
     if (available) {
         v.column().first.sort();
         CHECK_EQUAL("alpha", v[0].first);
@@ -506,7 +506,7 @@ TEST(TableView_StringSort)
     }
 
     // Set back to default for use by other unit tests
-    set_string_compare_method(0, null_ptr);
+    set_string_compare_method(STRING_COMPARE_CORE, null_ptr);
 }
 
 TEST(TableView_FloatDoubleSort)

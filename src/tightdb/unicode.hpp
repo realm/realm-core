@@ -34,6 +34,8 @@
 
 namespace tightdb {
 
+    enum string_compare_method_t { STRING_COMPARE_CORE, STRING_COMPARE_CPP11, STRING_COMPARE_CALLBACK } ;
+
     extern StringCompareCallback string_compare_callback;
     extern char string_compare_method;
 
@@ -71,7 +73,7 @@ namespace tightdb {
     //
     // NOT THREAD SAFE! Call once during initialization or make sure it's not called simultaneously with different arguments
     // The setting is remembered per-process; it does NOT need to be called prior to each sort
-    bool set_string_compare_method(char method, StringCompareCallback callback);
+    bool set_string_compare_method(string_compare_method_t method, StringCompareCallback callback);
 
 
     // Return size in bytes of utf8 character. No error checking
