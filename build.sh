@@ -661,7 +661,10 @@ EOF
 
     "check"|"memcheck"|"check-"*|"memcheck-"*)
         auto_configure || exit 1
+        export TIGHTDB_HAVE_CONFIG="1"
         $MAKE "$MODE" || exit 1
+        echo "Test passed"
+        exit 0
         ;;
 
     "show-install")

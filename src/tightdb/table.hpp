@@ -271,9 +271,10 @@ public:
     ///
     /// Please note that Table methods that modify the dynamic type
     /// directly, such as add_column(), are only allowed to be used on
-    /// tables with non-shared type. If you need to modify the shared
-    /// type of tables in a subtable column, you will have to obtain
-    /// access the the type descriptor associated with the column.
+    /// tables with non-shared type. If you need to modify a shared
+    /// type, you will have to do that through the descriptor returned
+    /// by get_descriptor(), but note that it will then affect all the
+    /// tables sharing that descriptor.
     ///
     /// \sa get_descriptor()
     /// \sa Descriptor::is_root()
