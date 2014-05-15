@@ -2097,15 +2097,40 @@ TEST(Shared_Implicit_Transactions)
             wt.get_table<TestTableShared>("table")->add_empty_row();
             wt.commit();
         }
+        Replication* repl2 = makeWriteLogCollector(path, wlr);
+        SharedGroup sg2(*repl2);
         Group& g = sg.begin_read();
         TestTableShared::Ref table = g.get_table<TestTableShared>("table");
-        for (int i = 0; i<10; i++) {
+        for (int i = 0; i<3; i++) {
+            {
+                // change table in other context
+                WriteTransaction wt(sg2);
+                wt.get_table<TestTableShared>("table")[0].first += 100;
+                wt.commit();
+            }
+            // verify we can't see the update
+            CHECK_EQUAL(i, table[0].first);
             sg.advance_read(wlr);
-            cout << table[0].first << " ";
+            // now we CAN see it, and through the same accessor
+            CHECK(table->is_attached());
+            CHECK_EQUAL(i + 100, table[0].first);
+            {
+                // change table in other context
+                WriteTransaction wt(sg2);
+                wt.get_table<TestTableShared>("table")[0].first += 10000;
+                wt.commit();
+            }
+            // can't see it:
+            CHECK_EQUAL(i + 100, table[0].first);
             sg.promote_to_write(wlr);
+            // CAN see it:
+            CHECK(table->is_attached());
+            CHECK_EQUAL(i + 10100, table[0].first);
+            table[0].first -= 10100;
             table[0].first += 1;
             sg.commit_and_continue_as_read();
-            cout << table[0].first << endl;
+            CHECK(table->is_attached());
+            CHECK_EQUAL(i+1, table[0].first);
         }
         sg.end_read();
     }

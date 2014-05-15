@@ -1124,13 +1124,13 @@ void SharedGroup::advance_read(WriteLogRegistryInterface* log_registry)
     TIGHTDB_ASSERT(!m_transactions_are_pinned);
 
     ReadLockInfo old_readlock = m_readlock;
-    bool has_changed;
+    bool same_as_before;
 
     // advance current readlock while holding onto old one.
-    grab_latest_readlock(m_readlock, has_changed); // Throws
+    grab_latest_readlock(m_readlock, same_as_before); // Throws
     release_readlock(old_readlock);
 
-    if (!has_changed)
+    if (same_as_before)
         return;
 
     // If the new top-ref is zero, then the previous top-ref must have
@@ -1155,11 +1155,15 @@ void SharedGroup::advance_read(WriteLogRegistryInterface* log_registry)
     // is thrown after this point
 
     // Update memory mapping if database file has grown
-    if (m_readlock.m_file_size > m_group.m_alloc.get_baseline())
+    size_t old_baseline = m_group.m_alloc.get_baseline();
+    if (m_readlock.m_file_size > old_baseline) {
         m_group.m_alloc.remap(m_readlock.m_file_size); // Throws
+        old_baseline = 0;
+    }
 
+    // counter intuitive that both of these appear to be needed:
     m_group.init_from_ref(m_readlock.m_top_ref);
-
+    m_group.update_refs(m_readlock.m_top_ref, 0); // using 0 here works!
 
     // We know that the log_registry already knows about the new_version,
     // because in order for us to get the new version when we grab the
@@ -1331,8 +1335,8 @@ void SharedGroup::do_commit()
     // we know for certain that the readlock we will grab WILL refer to our own newly
     // completed commit.
     release_readlock(m_readlock);
-    bool has_changed;
-    grab_latest_readlock(m_readlock, has_changed);
+    bool ignored;
+    grab_latest_readlock(m_readlock, ignored);
 
     // downgrade to a read transaction (if not, assert in end_read)
     m_transact_stage = transact_Reading;
