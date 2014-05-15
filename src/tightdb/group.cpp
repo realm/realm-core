@@ -126,7 +126,7 @@ void Group::create(bool add_free_versions)
 
 void Group::init_from_ref(ref_type top_ref) TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(!is_attached());
+//    TIGHTDB_ASSERT(!is_attached());
 
     m_top.init_from_ref(top_ref);
     size_t top_size = m_top.size();
@@ -565,8 +565,6 @@ void Group::commit()
 
 void Group::update_refs(ref_type top_ref, size_t old_baseline) TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(!m_free_versions.is_attached());
-
     // After Group::commit() we will always have free space tracking
     // info.
     TIGHTDB_ASSERT(m_top.size() >= 5);
