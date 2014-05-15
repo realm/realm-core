@@ -1025,7 +1025,7 @@ void SharedGroup::grab_latest_readlock(ReadLockInfo& readlock, bool& same_as_bef
 }
 
 
-const Group& SharedGroup::begin_read()
+Group& SharedGroup::begin_read()
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Ready);
 
@@ -1121,7 +1121,6 @@ void SharedGroup::promote_to_write(WriteLogRegistryInterface* write_logs)
 void SharedGroup::advance_read(WriteLogRegistryInterface* log_registry)
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Reading);
-
     TIGHTDB_ASSERT(!m_transactions_are_pinned);
 
     ReadLockInfo old_readlock = m_readlock;
@@ -1142,7 +1141,6 @@ void SharedGroup::advance_read(WriteLogRegistryInterface* log_registry)
     // Group::init_for_transact() to put the group accessor into a
     // valid state.
     if (m_readlock.m_top_ref == 0)
-
         return;
 
     // When the new top-ref is not zero, but the previous one was, the
@@ -1158,7 +1156,6 @@ void SharedGroup::advance_read(WriteLogRegistryInterface* log_registry)
 
     // Update memory mapping if database file has grown
     if (m_readlock.m_file_size > m_group.m_alloc.get_baseline())
-
         m_group.m_alloc.remap(m_readlock.m_file_size); // Throws
 
     m_group.init_from_ref(m_readlock.m_top_ref);

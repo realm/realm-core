@@ -2092,10 +2092,21 @@ TEST(Shared_Implicit_Transactions)
         WriteLogRegistryInterface* wlr = getWriteLogs(path);
         Replication* repl = makeWriteLogCollector(path, wlr);
         SharedGroup sg(*repl);
-        sg.begin_read();
-        sg.advance_read(wlr);
-        sg.promote_to_write(wlr);
-        sg.commit_and_continue_as_read();
+        {
+            WriteTransaction wt(sg);
+            wt.get_table<TestTableShared>("table")->add_empty_row();
+            wt.commit();
+        }
+        Group& g = sg.begin_read();
+        TestTableShared::Ref table = g.get_table<TestTableShared>("table");
+        for (int i = 0; i<10; i++) {
+            sg.advance_read(wlr);
+            cout << table[0].first << " ";
+            sg.promote_to_write(wlr);
+            table[0].first += 1;
+            sg.commit_and_continue_as_read();
+            cout << table[0].first << endl;
+        }
         sg.end_read();
     }
 }

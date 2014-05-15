@@ -126,7 +126,7 @@ void Group::create(bool add_free_versions)
 
 void Group::init_from_ref(ref_type top_ref) TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(!is_attached());
+//    TIGHTDB_ASSERT(!is_attached());
 
     m_top.init_from_ref(top_ref);
     size_t top_size = m_top.size();
