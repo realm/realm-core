@@ -643,6 +643,37 @@ EOF
         exit 0
         ;;
 
+    "test-on-ios")
+        
+        TEST_DIR="./test/ios/app"
+        rm -rf "$TEST_DIR" || exit 1
+        mkdir "$TEST_DIR" || exit 1
+
+        APP="iOSTestCoreApp"
+        TEST_APP="${APP}Tests"
+
+        APP_DIR="$TEST_DIR/$APP"
+        TEST_APP_DIR="$TEST_DIR/$TEST_APP"
+
+        # Copy the test files into the app tests subdirectory of the app
+        PASSIVE_SUBDIRS="$($MAKE -C ./test --no-print-directory get-passive-subdirs)" || exit 1
+        PASSIVE_SUBDIRS="$(echo "$PASSIVE_SUBDIRS" | sed -E 's/ +/|/g')" || exit 1
+        ## Naive copy, but avoid recursion (extra precaution) and passive subdirs.
+        (cd ./test && find -E . \
+            ! -iregex "^\./(ios|$PASSIVE_SUBDIRS)/.*$" \
+            -exec rsync -qR {} "../$TEST_APP_DIR" \;) || exit 1
+        ## Remove all but the source files.
+        find -E "$TEST_APP_DIR" -type f \
+            ! -iregex "^.*\.[ch](pp)?$" \
+            -exec rm {} \; || exit 1
+
+        # Gather resources
+        RESOURCES="$($MAKE -C ./test --no-print-directory get-test-resources)" || exit 1
+        (cd ./test && rsync $RESOURCES "../$TEST_APP_DIR") || exit 1
+
+        exit 0
+        ;;
+
     "memtest")
         auto_configure || exit 1
         export TIGHTDB_HAVE_CONFIG="1"
