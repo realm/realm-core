@@ -1,7 +1,9 @@
 SUBDIRS = util
 PASSIVE_SUBDIRS = test-tightdb test-sqlite3 test-stl performance \
 benchmark-insert-add benchmark-insert-get-set benchmark-prealloc \
-benchmark-index benchmark-transaction experiments
+benchmark-index benchmark-transaction experiments android ios
+
+RESOURCES=expect_json.json expect_string.txt
 
 DIR_DEPS          = util
 test_tightdb_DEPS = util
@@ -68,5 +70,10 @@ memcheck-testcase: check-norun/subdir/util
 memcheck-testcase-debug: check-debug-norun/subdir/util
 	@$(MAKE) -C experiments memcheck-debug
 
+.PHONY: get-test-resources get-passive-subdirs
+get-test-resources:
+	@echo $(RESOURCES)
+get-passive-subdirs:
+	@echo $(PASSIVE_SUBDIRS)
 
 include ../src/generic.mk
