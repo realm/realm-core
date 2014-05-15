@@ -274,7 +274,8 @@ nonempty value during configuration as in the following example:
 Packaging for OS X
 -------------------
 
-You can create a framework for Mac OS X. The framework is useful when
+You can create a framework for Mac OS X after you have built the
+core library (the `build` target). The framework is useful when
 creating OS X application. The command is:
 
     sh build.sh build-osx-framework
@@ -283,7 +284,8 @@ creating OS X application. The command is:
 Packaging for iOS
 -----------------
 
-You can create a framework for iOS. The framework is useful when
+You can create a framework for iOS after you have built the core
+library for iOS (the `build-iphone` target=. The framework is useful when
 creating apps for iPhone and iPad. The command is:
 
     sh build.sh build-ios-framework

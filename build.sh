@@ -616,7 +616,7 @@ EOF
         BASENAME="RealmCore"
         FRAMEWORK="$BASENAME.framework"
         rm -rf "$FRAMEWORK" || exit 1
-        rm -f realm-osx-*.zip || exit 1
+        rm -f realm-core-ios-*.zip || exit 1
 
         mkdir -p "$FRAMEWORK/Headers" || exit 1
         if [ ! -f "$IPHONE_DIR/libtightdb-ios.a" ]; then
@@ -629,8 +629,8 @@ EOF
         find "$FRAMEWORK/Headers" -iregex "^.*\.[ch]\(pp\)\{0,1\}$" \
             -exec sed -i '' -e "s/<tightdb\(.*\)>/<$BASENAME\/tightdb\1>/g" {} \; || exit 1
  
-        zip -r -q realm-ios-$realm_version.zip $FRAMEWORK || exit 1
-        echo "Core framework for iOS can be found under $FRAMEWORK and realm-ios-$realm_version.zip."
+        zip -r -q realm-core-ios-$realm_version.zip $FRAMEWORK || exit 1
+        echo "Core framework for iOS can be found under $FRAMEWORK and realm-core-ios-$realm_version.zip."
         exit 0
         ;;
 
@@ -644,7 +644,7 @@ EOF
         BASENAME="RealmCore"
         FRAMEWORK="$BASENAME.framework"
         rm -rf "$FRAMEWORK" || exit 1
-        rm -f realm-osx-*.zip || exit 1
+        rm -f realm-core-osx-*.zip || exit 1
 
         mkdir -p "$FRAMEWORK/Headers/tightdb" || exit 1
         if [ ! -f "src/tightdb/libtightdb.a" ]; then
@@ -662,8 +662,8 @@ EOF
         find "$FRAMEWORK/Headers" -iregex "^.*\.[ch]\(pp\)\{0,1\}$" \
             -exec sed -i '' -e "s/<tightdb\(.*\)>/<$BASENAME\/tightdb\1>/g" {} \; || exit 1
 
-        zip -r -q realm-osx-$realm_version.zip $FRAMEWORK || exit 1
-        echo "Core framework for OS X can be found under $FRAMEWORK and realm-osx-$realm_version.zip."
+        zip -r -q realm-core-osx-$realm_version.zip $FRAMEWORK || exit 1
+        echo "Core framework for OS X can be found under $FRAMEWORK and realm-core-osx-$realm_version.zip."
         exit 0
         ;;
 
