@@ -25,6 +25,9 @@
 		3658CE711921AC6F009A7085 /* column_backlink.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3658CE6F1921AC6F009A7085 /* column_backlink.cpp */; };
 		3658CE721921AC6F009A7085 /* column_backlink.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 3658CE701921AC6F009A7085 /* column_backlink.hpp */; };
 		3658CE771923E9EB009A7085 /* test_links.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3658CE731923E73F009A7085 /* test_links.cpp */; };
+		3658CE7A19245BE5009A7085 /* column_linklist.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3658CE7819245BE5009A7085 /* column_linklist.cpp */; };
+		3658CE7B19245BE5009A7085 /* column_linklist.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 3658CE7919245BE5009A7085 /* column_linklist.hpp */; };
+		3658CE7D19256CA1009A7085 /* column_linkbase.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 3658CE7C19256CA1009A7085 /* column_linkbase.hpp */; };
 		365CCE34157CC37D00172BF8 /* alloc_slab.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 365CCDF1157CC37D00172BF8 /* alloc_slab.cpp */; };
 		365CCE37157CC37D00172BF8 /* array_binary.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 365CCDF4157CC37D00172BF8 /* array_binary.cpp */; };
 		365CCE38157CC37D00172BF8 /* array_binary.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 365CCDF5157CC37D00172BF8 /* array_binary.hpp */; };
@@ -364,6 +367,9 @@
 		3658CE6F1921AC6F009A7085 /* column_backlink.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = column_backlink.cpp; path = tightdb/column_backlink.cpp; sourceTree = "<group>"; };
 		3658CE701921AC6F009A7085 /* column_backlink.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = column_backlink.hpp; path = tightdb/column_backlink.hpp; sourceTree = "<group>"; };
 		3658CE731923E73F009A7085 /* test_links.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = test_links.cpp; sourceTree = "<group>"; };
+		3658CE7819245BE5009A7085 /* column_linklist.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = column_linklist.cpp; path = tightdb/column_linklist.cpp; sourceTree = "<group>"; };
+		3658CE7919245BE5009A7085 /* column_linklist.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = column_linklist.hpp; path = tightdb/column_linklist.hpp; sourceTree = "<group>"; };
+		3658CE7C19256CA1009A7085 /* column_linkbase.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = column_linkbase.hpp; path = tightdb/column_linkbase.hpp; sourceTree = "<group>"; };
 		365CCDF1157CC37D00172BF8 /* alloc_slab.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = alloc_slab.cpp; path = tightdb/alloc_slab.cpp; sourceTree = "<group>"; };
 		365CCDF4157CC37D00172BF8 /* array_binary.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = array_binary.cpp; path = tightdb/array_binary.cpp; sourceTree = "<group>"; };
 		365CCDF5157CC37D00172BF8 /* array_binary.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = array_binary.hpp; path = tightdb/array_binary.hpp; sourceTree = "<group>"; };
@@ -634,8 +640,11 @@
 				365CCE03157CC37D00172BF8 /* column_binary.cpp */,
 				365CCE04157CC37D00172BF8 /* column_binary.hpp */,
 				365CCE05157CC37D00172BF8 /* column_fwd.hpp */,
+				3658CE7C19256CA1009A7085 /* column_linkbase.hpp */,
 				3658CE6B19209EDD009A7085 /* column_link.cpp */,
 				3658CE6C19209EDD009A7085 /* column_link.hpp */,
+				3658CE7819245BE5009A7085 /* column_linklist.cpp */,
+				3658CE7919245BE5009A7085 /* column_linklist.hpp */,
 				365CCE06157CC37D00172BF8 /* column_mixed.cpp */,
 				365CCE07157CC37D00172BF8 /* column_mixed.hpp */,
 				36EE6CC017F0F97300BA9635 /* column_mixed_tpl.hpp */,
@@ -934,9 +943,11 @@
 				52D7C47E1852A01700633748 /* bind.hpp in Headers */,
 				52D7C47F1852A01700633748 /* bind_ptr.hpp in Headers */,
 				52D7C4801852A01700633748 /* buffer.hpp in Headers */,
+				3658CE7B19245BE5009A7085 /* column_linklist.hpp in Headers */,
 				52D7C4811852A01700633748 /* features.h in Headers */,
 				52D7C4831852A01700633748 /* file.hpp in Headers */,
 				52D7C4841852A01700633748 /* logger.hpp in Headers */,
+				3658CE7D19256CA1009A7085 /* column_linkbase.hpp in Headers */,
 				52D7C4851852A01700633748 /* meta.hpp in Headers */,
 				52D7C4861852A01700633748 /* safe_int_ops.hpp in Headers */,
 				52D7C4881852A01700633748 /* string_buffer.hpp in Headers */,
@@ -1178,6 +1189,7 @@
 				365CCE49157CC37D00172BF8 /* column_mixed.cpp in Sources */,
 				365CCE4B157CC37D00172BF8 /* column_string_enum.cpp in Sources */,
 				365CCE4D157CC37D00172BF8 /* column_string.cpp in Sources */,
+				3658CE7A19245BE5009A7085 /* column_linklist.cpp in Sources */,
 				365CCE4F157CC37D00172BF8 /* column_table.cpp in Sources */,
 				365CCE53157CC37D00172BF8 /* column.cpp in Sources */,
 				365CCE57157CC37D00172BF8 /* group_writer.cpp in Sources */,

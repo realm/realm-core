@@ -379,6 +379,7 @@ inline std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, c
         case type_Table:    out << "subtable";                     break;
         case type_Mixed:
         case type_Link:
+        case type_LinkList:
         case type_BackLink:
             TIGHTDB_ASSERT(false);
     }

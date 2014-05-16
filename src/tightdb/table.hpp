@@ -145,8 +145,8 @@ public:
     /// These methods behave as if they were called on the descriptor
     /// returned by get_descriptor().
     std::size_t get_column_count() const TIGHTDB_NOEXCEPT;
-    DataType get_column_type(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
-    StringData get_column_name(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
+    DataType    get_column_type(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
+    StringData  get_column_name(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
     std::size_t get_column_index(StringData name) const TIGHTDB_NOEXCEPT;
     //@}
 
@@ -182,7 +182,7 @@ public:
     /// \sa get_descriptor()
     /// \sa Descriptor::add_column()
     std::size_t add_column(DataType type, StringData name, DescriptorRef* subdesc = 0);
-    std::size_t add_column_link(StringData name, std::size_t target_table_ndx);
+    std::size_t add_column_link(DataType type, StringData name, std::size_t target_table_ndx);
     void insert_column(std::size_t column_ndx, DataType type, StringData name,
                        DescriptorRef* subdesc = 0);
     void remove_column(std::size_t column_ndx);
@@ -316,6 +316,7 @@ public:
     void insert_subtable(std::size_t column_ndx, std::size_t row_ndx); // Insert empty table
     void insert_mixed(std::size_t column_ndx, std::size_t row_ndx, Mixed value);
     void insert_link(std::size_t column_ndx, std::size_t row_ndx, std::size_t target_row_ndx);
+    void insert_linklist(std::size_t column_ndx, std::size_t row_ndx); // Insert empty link list
     void insert_done();
 
     // Get cell values
@@ -346,9 +347,20 @@ public:
     void set_mixed(std::size_t column_ndx, std::size_t row_ndx, Mixed value);
     void set_link(std::size_t column_ndx, std::size_t row_ndx, std::size_t target_row_ndx);
 
+    // Links
     bool is_null_link(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
     void nullify_link(std::size_t column_ndx, std::size_t row_ndx);
 
+    // Link lists
+    bool linklist_has_links(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
+    std::size_t get_link_count(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
+    void linklist_add_link(std::size_t column_ndx, std::size_t row_ndx, std::size_t target_row_ndx);
+    void linklist_insert_link(std::size_t column_ndx, std::size_t row_ndx, std::size_t ins_pos, std::size_t target_row_ndx);
+    void linklist_remove_link(std::size_t column_ndx, std::size_t row_ndx, std::size_t link_ndx);
+    void linklist_remove_all_links(std::size_t column_ndx, std::size_t row_ndx);
+    void linklist_set_link(std::size_t column_ndx, std::size_t row_ndx, std::size_t link_ndx, std::size_t target_row_ndx);
+    void linklist_move_link(std::size_t column_ndx, std::size_t row_ndx, std::size_t old_pos, std::size_t new_pos);
+    std::size_t linklist_get_link(std::size_t column_ndx, std::size_t row_ndx, std::size_t link_ndx) const TIGHTDB_NOEXCEPT;
 
     void add_int(std::size_t column_ndx, int64_t value);
 

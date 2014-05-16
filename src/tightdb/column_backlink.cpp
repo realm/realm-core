@@ -13,7 +13,7 @@ using namespace tightdb;
 
 void ColumnBackLink::add_backlink(size_t row_ndx, size_t source_row_ndx)
 {
-    int64_t ref = Column::get(row_ndx);
+    size_t ref = Column::get(row_ndx);
 
     // If there is only a single backlink, it can be stored as
     // a tagged value
@@ -133,7 +133,7 @@ void ColumnBackLink::nullify_links(std::size_t row_ndx, bool do_destroy)
     if (ref != 0) {
         if (ref & 1) {
             uint64_t row_ref = uint64_t(ref) >> 1;
-            m_source_column->do_nullify_link(row_ref);
+            m_source_column->do_nullify_link(row_ref, row_ndx);
         }
         else {
             // nullify entire list of links
@@ -142,7 +142,7 @@ void ColumnBackLink::nullify_links(std::size_t row_ndx, bool do_destroy)
 
             for (size_t i = 0; i < count; ++i) {
                 size_t source_row_ref = col.get(i);
-                m_source_column->do_nullify_link(source_row_ref);
+                m_source_column->do_nullify_link(source_row_ref, row_ndx);
             }
 
             if (do_destroy) {
@@ -165,7 +165,7 @@ void ColumnBackLink::move_last_over(std::size_t row_ndx)
     if (ref != 0) {
         if (ref & 1) {
             uint64_t row_ref = uint64_t(ref) >> 1;
-            m_source_column->do_update_link(row_ref, row_ndx);
+            m_source_column->do_update_link(row_ref, last_row_ndx, row_ndx);
         }
         else {
             // update entire list of links
@@ -174,7 +174,7 @@ void ColumnBackLink::move_last_over(std::size_t row_ndx)
 
             for (size_t i = 0; i < count; ++i) {
                 size_t source_row_ref = col.get(i);
-                m_source_column->do_update_link(source_row_ref, row_ndx);
+                m_source_column->do_update_link(source_row_ref, last_row_ndx, row_ndx);
             }
         }
     }
@@ -222,5 +222,5 @@ std::pair<ref_type, size_t> ColumnBackLink::get_to_dot_parent(size_t ndx_in_pare
     return std::make_pair(p.first.m_ref, p.second);
 }
 
-#endif
+#endif //TIGHTDB_DEBUG
 

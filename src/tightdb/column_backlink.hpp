@@ -21,6 +21,7 @@
 #define TIGHTDB_COLUMN_BACKLINK_HPP
 
 #include <tightdb/column.hpp>
+#include <tightdb/column_linkbase.hpp>
 #include <tightdb/table.hpp>
 
 namespace tightdb {
@@ -29,6 +30,7 @@ class ColumnBackLink: public Column, public ArrayParent {
 public:
     ColumnBackLink(ref_type, ArrayParent* = 0, std::size_t ndx_in_parent = 0,
                              Allocator& = Allocator::get_default()); // Throws
+    ~ColumnBackLink() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
 
     static ref_type create(std::size_t size, Allocator&);
 
@@ -40,18 +42,18 @@ public:
     void remove_backlink(std::size_t row_ndx, std::size_t source_row_ndx);
     void update_backlink(std::size_t row_ndx, std::size_t old_row_ndx, std::size_t new_row_ndx);
 
-
-    // Source info
-    void        set_source_table(TableRef table);
-    TableRef    get_source_table();
-    void        set_source_column(ColumnLink& column);
-
     void add_row();
     void clear() TIGHTDB_OVERRIDE;
     void move_last_over(std::size_t ndx) TIGHTDB_OVERRIDE;
     void erase(std::size_t ndx, bool is_last) TIGHTDB_OVERRIDE;
 
+    // Source info
+    void        set_source_table(TableRef table);
+    TableRef    get_source_table();
+    void        set_source_column(ColumnLinkBase& column);
+
 protected:
+    // ArrayParent overrides
     void update_child_ref(std::size_t child_ndx, ref_type new_ref) TIGHTDB_OVERRIDE;
     ref_type get_child_ref(std::size_t child_ndx) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 #ifdef TIGHTDB_DEBUG
@@ -63,8 +65,8 @@ protected:
 private:
     void nullify_links(std::size_t row_ndx, bool do_destroy);
 
-    TableRef    m_source_table;
-    ColumnLink* m_source_column;
+    TableRef        m_source_table;
+    ColumnLinkBase* m_source_column;
 };
 
 
@@ -97,7 +99,7 @@ inline TableRef ColumnBackLink::get_source_table()
     return m_source_table;
 }
 
-inline void ColumnBackLink::set_source_column(ColumnLink& column)
+inline void ColumnBackLink::set_source_column(ColumnLinkBase& column)
 {
     m_source_column = &column;
 }
@@ -106,11 +108,6 @@ inline void ColumnBackLink::add_row()
 {
     Column::add(0);
 }
-/*
-inline std::size_t ColumnBackLink::get_source_column()
-{
-    return m_source_column;
-}*/
 
 
 } //namespace tightdb

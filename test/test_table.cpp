@@ -3156,12 +3156,14 @@ void compare_table_with_slice(TestResults& test_results, const Table& table,
                             }
                             case type_Mixed:
                             case type_Link:
+                            case type_LinkList:
                             case type_BackLink:
                                 TIGHTDB_ASSERT(false);
                         }
                     }
                 }
                 break;
+            case type_LinkList:
             case type_BackLink:
                 break;
         }

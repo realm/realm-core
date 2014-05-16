@@ -123,7 +123,7 @@ void Spec::insert_column(size_t column_ndx, DataType type, StringData name, Colu
     // FIXME: So far, attributes are never reported to the replication system
     m_attr.insert(column_ndx, attr); // Throws
 
-    if (type == type_Table || type == type_Link || type == type_BackLink) {
+    if (type == type_Table || type == type_Link  || type == type_LinkList || type == type_BackLink) {
         Allocator& alloc = m_top.get_alloc();
         // `m_subspecs` array is only present when the spec contains a subtable column
         if (!m_subspecs.is_attached()) {
@@ -153,7 +153,7 @@ void Spec::insert_column(size_t column_ndx, DataType type, StringData name, Colu
             m_subspecs.insert(subspec_ndx, v); // Throws
             dg.release();
         }
-        else if (type == type_Link) {
+        else if (type == type_Link || type == type_LinkList) {
             // Store ref (position) of target table
             // When we set the target it will be as a tagged integer (low bit set)
             // Since we don't know it yet we just store zero (null ref)
@@ -216,14 +216,18 @@ void Spec::remove_column(size_t column_ndx)
 size_t Spec::get_subspec_ndx(size_t column_ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(column_ndx <= get_column_count());
-    TIGHTDB_ASSERT(column_ndx == get_column_count() || get_column_type(column_ndx) == type_Table || get_column_type(column_ndx) == type_Link || get_column_type(column_ndx) == type_BackLink );
+    TIGHTDB_ASSERT(column_ndx == get_column_count()             ||
+                   get_column_type(column_ndx) == type_Table    ||
+                   get_column_type(column_ndx) == type_Link     ||
+                   get_column_type(column_ndx) == type_LinkList ||
+                   get_column_type(column_ndx) == type_BackLink );
 
     // The m_subspecs array only keep info for subtables so we need to
     // count up to it's position
     size_t subspec_ndx = 0;
     for (size_t i = 0; i != column_ndx; ++i) {
         ColumnType type = ColumnType(m_spec.get(i));
-        if (type == col_type_Table || type == col_type_Link) {
+        if (type == col_type_Table || type == col_type_Link || type == col_type_LinkList) {
             ++subspec_ndx;
         }
         else if (type == col_type_BackLink) {
@@ -295,6 +299,7 @@ void Spec::set_link_target_table(std::size_t column_ndx, std::size_t table_ndx)
 {
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     TIGHTDB_ASSERT(col_type_Link == get_real_column_type(column_ndx) ||
+                   col_type_LinkList == get_real_column_type(column_ndx) ||
                    col_type_BackLink == get_real_column_type(column_ndx));
 
     // position of target table is stored as tagged int
