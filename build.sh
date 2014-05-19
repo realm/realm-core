@@ -2343,7 +2343,7 @@ Unspecified or bad mode '$MODE'.
 Available modes are:
     config clean build build-config-progs build-iphone build-android
     build-ios-framework build-osx-framework
-    test test-debug show-install install uninstall
+    check check-debug show-install install uninstall
     test-installed wipe-installed install-prod install-devel uninstall-prod
     uninstall-devel dist-copy src-dist bin-dist dist-deb dist-status
     dist-pull dist-checkout dist-config dist-clean dist-build
