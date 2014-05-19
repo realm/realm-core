@@ -1139,28 +1139,6 @@ void SharedGroup::advance_read(WriteLogRegistryInterface* log_registry)
     if (m_readlock.m_top_ref == 0)
         return;
 
-    // When the new top-ref is not zero, but the previous one was, the
-    // temporary group arrays, which were created earlier, will no
-    // longer be needed. For efficiency, however, we will just leave
-    // them in place by not calling
-    // SlabAlloc::reset_free_space_tracking() here. This is not a
-    // problem, beacuse SlabAlloc::reset_free_space_tracking() will be
-    // called later if a new transaction is ever started.
-
-    // FIXME: Consider the possible consequences in case an exception
-    // is thrown after this point
-
-    // Update memory mapping if database file has grown
-    size_t old_baseline = m_group.m_alloc.get_baseline();
-    if (m_readlock.m_file_size > old_baseline) {
-        m_group.m_alloc.remap(m_readlock.m_file_size); // Throws
-        old_baseline = 0;
-    }
-
-    // counter intuitive that both of these appear to be needed:
-    m_group.init_from_ref(m_readlock.m_top_ref);
-    m_group.update_refs(m_readlock.m_top_ref, 0); // using 0 here works!
-
     // We know that the log_registry already knows about the new_version,
     // because in order for us to get the new version when we grab the
     // readlock, the new version must have been entered into the ringbuffer.
@@ -1200,9 +1178,9 @@ Group& SharedGroup::begin_write()
         }
         m_transact_stage = transact_Writing;
         // FIXME: Kristian moved free space reset here...
-        // if (m_readlock.m_version == 1) {
-        //    m_group.reset_freespace_tracking();
-        //}
+        if (m_readlock.m_version == 1) {
+            m_group.reset_freespace_tracking();
+        }
         return m_group;
     }
 #endif
@@ -1213,9 +1191,9 @@ Group& SharedGroup::begin_write()
     begin_read();
     m_transact_stage = transact_Writing;
     // FIXME: Kristian moved free space reset here...
-    // if (m_readlock.m_version == 1) {
-    //    m_group.reset_freespace_tracking();
-    // }
+    if (m_readlock.m_version == 1) {
+        m_group.reset_freespace_tracking();
+    }
 
     return m_group;
 }
