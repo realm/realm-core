@@ -90,7 +90,7 @@ public:
                                    const Table& source);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    typedef SharedGroup::TransactLogRegistry TransactLogRegistry;
+    typedef WriteLogRegistryInterface TransactLogRegistry;
 
     /// Calls sg.advance_read_transact(log_registry).
     static void advance_read_transact(SharedGroup& sg, TransactLogRegistry& log_registry);
@@ -227,7 +227,7 @@ inline void LangBindHelper::set_mixed_subtable(Table& parent, std::size_t col_nd
 inline void LangBindHelper::advance_read_transact(SharedGroup& sg,
                                                   TransactLogRegistry& log_registry)
 {
-    sg.advance_read(log_registry);
+    sg.advance_read(&log_registry);
 }
 
 #endif

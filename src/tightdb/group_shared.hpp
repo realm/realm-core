@@ -328,30 +328,6 @@ private:
 
     void do_async_commits();
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
-    class TransactLogRegistry {
-    public:
-        /// Get all transaction logs between the specified versions. The number
-        /// of requested logs is exactly `to_version - from_version`. If this
-        /// number is greater than zero, the first requested log is the one that
-        /// brings the database from `from_version` to `from_version +
-        /// 1`. References to the requested logs are store in successive entries
-        /// of `logs_buffer`. The calee retains ownership of the memory
-        /// referenced by those entries.
-        virtual void get(uint_fast64_t from_version, uint_fast64_t to_version,
-                         BinaryData* logs_buffer) TIGHTDB_NOEXCEPT = 0;
-
-        /// Declare no further interest in the transaction logs between the
-        /// specified versions.
-        virtual void release(uint_fast64_t from_version, uint_fast64_t to_version)
-            TIGHTDB_NOEXCEPT = 0;
-
-        virtual ~TransactLogRegistry() {}
-    };
-
-    void advance_read_transact(TransactLogRegistry&);
-#endif
-
     friend class ReadTransaction;
     friend class WriteTransaction;
     friend class LangBindHelper;

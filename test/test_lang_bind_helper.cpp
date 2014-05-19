@@ -116,6 +116,8 @@ class ShortCircuitTransactLogManager:
         public TrivialReplication,
         public LangBindHelper::TransactLogRegistry {
 public:
+    typedef Replication::version_type version_type;
+
     ShortCircuitTransactLogManager(const string& database_file):
         TrivialReplication(database_file)
     {
@@ -129,7 +131,7 @@ public:
             delete[] i->second.data();
     }
 
-    void handle_transact_log(const char* data, size_t size, version_type new_version)
+    void handle_transact_log(const char* data, size_t size, Replication::version_type new_version)
         TIGHTDB_OVERRIDE
     {
         UniquePtr<char[]> log(new char[size]); // Throws
@@ -138,7 +140,7 @@ public:
         log.release();
     }
 
-    void get(uint_fast64_t from_version, uint_fast64_t to_version, BinaryData* logs_buffer)
+    void get_commit_entries(uint_fast64_t from_version, uint_fast64_t to_version, BinaryData* logs_buffer)
         TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
     {
         size_t n = to_version - from_version;
@@ -148,7 +150,19 @@ public:
         }
     }
 
-    void release(uint_fast64_t, uint_fast64_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
+    void release_commit_entries(uint_fast64_t, uint_fast64_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
+    {
+    }
+
+    virtual void add_commit(version_type version, char* data, std::size_t sz)
+    {
+    }
+    
+    virtual void register_interest(version_type from)
+    {
+    }
+    
+    virtual void unregister_interest(version_type from)
     {
     }
 
