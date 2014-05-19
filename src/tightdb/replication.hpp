@@ -356,6 +356,44 @@ public:
 
     ~TransactLogParser() TIGHTDB_NOEXCEPT;
 
+    /// `InstructionHandler` must define the following member
+    /// functions:
+    ///
+    ///     bool new_group_level_table(StringData name)
+    ///     bool select_table(std::size_t group_level_ndx, int levels, const std::size_t* path)
+    ///     bool insert_empty_rows(std::size_t row_idx, std::size_t num_rows)
+    ///     bool erase_row(std::size_t row_idx)
+    ///     bool clear_table()
+    ///     bool insert_int(std::size_t col_idx, std::size_t row_idx, int_fast64_t)
+    ///     bool insert_bool(std::size_t col_idx, std::size_t row_idx, bool)
+    ///     bool insert_float(std::size_t col_idx, std::size_t row_idx, float)
+    ///     bool insert_double(std::size_t col_idx, std::size_t row_idx, double)
+    ///     bool insert_string(std::size_t col_idx, std::size_t row_idx, StringData)
+    ///     bool insert_binary(std::size_t col_idx, std::size_t row_idx, BinaryData)
+    ///     bool insert_date_time(std::size_t col_idx, std::size_t row_idx, DateTime)
+    ///     bool insert_table(std::size_t col_idx, std::size_t row_idx)
+    ///     bool insert_mixed(std::size_t col_idx, std::size_t row_idx, const Mixed&)
+    ///     bool row_insert_complete()
+    ///     bool set_int(std::size_t col_idx, std::std::size_t row_idx, int_fast64_t value)
+    ///     bool set_bool(std::size_t col_idx, std::size_t row_idx, bool value)
+    ///     bool set_float(std::size_t col_idx, std::size_t row_idx, float value)
+    ///     bool set_double(std::size_t col_idx, std::size_t row_idx, double value)
+    ///     bool set_string(std::size_t col_idx, std::size_t row_idx, StringData value)
+    ///     bool set_binary(std::size_t col_idx, std::size_t row_idx, BinaryData value)
+    ///     bool set_date_time(std::size_t col_idx, std::size_t row_idx, DateTime value)
+    ///     bool set_table(std::size_t col_idx, std::size_t row_idx)
+    ///     bool set_mixed(std::size_t col_idx, std::size_t row_idx, const Mixed& value)
+    ///     bool add_int_to_column(std::size_t col_idx, int_fast64_t value)
+    ///     bool optimize_table()
+    ///     bool select_descriptor(int levels, const std::size_t* path)
+    ///     bool insert_column(std::size_t col_idx, DataType, StringData value)
+    ///     bool erase_column(std::size_t col_idx)
+    ///     bool rename_column(std::size_t col_idx, StringData new_name)
+    ///     bool add_index_to_column(std::size_t col_idx)
+    ///
+    /// parse() promises that the path passed by reference to
+    /// InstructionHandler::select_descriptor() will remain valid
+    /// during subsequent calls to all descriptor modifying functions.
     template<class InstructionHandler> void parse(InstructionHandler&);
 
 private:
@@ -393,9 +431,12 @@ public:
     ~TrivialReplication() TIGHTDB_NOEXCEPT {}
 
 protected:
+    typedef Replication::version_type version_type;
+
     TrivialReplication(const std::string& database_file);
 
-    virtual void handle_transact_log(const char* data, std::size_t size) = 0;
+    virtual void handle_transact_log(const char* data, std::size_t size,
+                                     version_type new_version) = 0;
 
     static void apply_transact_log(const char* data, std::size_t size, SharedGroup& target,
                                    std::ostream* apply_log = 0);
@@ -622,7 +663,8 @@ inline void Replication::check_table(const Table* t)
 
 inline void Replication::check_desc(const Descriptor& desc)
 {
-    if (desc.m_spec != m_selected_spec)
+    typedef _impl::DescriptorFriend df;
+    if (df::get_spec(desc) != m_selected_spec)
         select_desc(desc); // Throws
 }
 
@@ -935,7 +977,7 @@ void Replication::TransactLogParser::parse(InstructionHandler& handler)
         char instr;
         if (!read_char(instr))
             break;
-//cerr << "["<<promote(instr)<<"]";
+//std::cerr << "["<<util::promote(instr)<<"]";
         switch (Instruction(instr)) {
             case instr_SetInt: {
                 std::size_t col_ndx = read_int<std::size_t>(); // Throws

@@ -24,6 +24,50 @@
 #  include <tightdb/replication.hpp>
 #endif
 
+
+// Minimal Accessor Hierarchy Consistency Guarantee
+//
+// The "Minimal Accessor Hierarchy Consistency Guarantee" means that the
+// following items are guaranteed to be valid (the list may not yet be
+// complete):
+//
+//  - The 'is_attached' property of array accessors (Array::m_data == 0).
+//
+//  - The 'parent' property of array accessors (Array::m_parent), but crucially,
+//    **not** the `index_in_parent` property.
+//
+//  - The list of table accessors in a group accessor
+//    (Group::m_table_accessors). All non-null pointers refer to existing table
+//    accessors.
+//
+//  - The list of column accessors in a table acccessor (Table::m_cols). All
+//    non-null pointers refer to existing column accessors.
+//
+//  - The 'root_array' property of a column accessor (ColumnBase::m_array). It
+//    always refers to an existing array accessor. The exact type of that array
+//    accessor must be determinable from the following properties of itself:
+//    `is_inner_bptree_node` (Array::m_is_inner_bptree_node), `has_refs`
+//    (Array::m_has_refs), and `context_flag` (Array::m_context_flag). This
+//    allows for a column accessor to be properly destroyed.
+//
+//  - The map of subtable accessors in a column acccessor
+//    (ColumnSubtableParent::m_subtable_map). All pointers refer to existing
+//    subtable accessors.
+//
+//  - The `descriptor` property of a table accesor (Table::m_descriptor). If it
+//    is not null, then it refers to an existing descriptor accessor.
+//
+//  - The map of subdescriptor accessors in a descriptor accessor
+//    (Descriptor::m_subdesc_map). All non-null pointers refer to existing
+//    dubdescriptor accessors.
+//
+//  - The `search_index` property of a column accesor
+//    (AdaptiveStringColumn::m_index, ColumnStringEnum::m_index). When it is
+//    non-null, it refers to an existing search index accessor.
+//
+// Note especially that this does **not** guarantee any correspondance between
+// the accessor hierarchy and any underlying structure of array nodes.
+
 using namespace std;
 using namespace tightdb;
 using namespace tightdb::util;
@@ -107,9 +151,10 @@ DescriptorRef Table::get_descriptor()
 
     DescriptorRef desc;
     if (!m_descriptor) {
-        desc.reset(new Descriptor); // Throws
+        typedef _impl::DescriptorFriend df;
+        desc.reset(df::create()); // Throws
         Descriptor* parent = 0;
-        desc->attach(this, parent, &m_spec);
+        df::attach(*desc, this, parent, &m_spec);
         m_descriptor = desc.get();
     }
     else {
@@ -194,12 +239,14 @@ void Table::init_from_ref(ref_type top_ref, ArrayParent* parent, size_t ndx_in_p
     ref_type columns_ref = m_top.get_as_ref(1);
 
     size_t spec_ndx_in_parent = 0;
-    m_spec.init(spec_ref, &m_top, spec_ndx_in_parent);
+    m_spec.set_parent(&m_top, spec_ndx_in_parent);
+    m_spec.init(spec_ref);
     m_columns.init_from_ref(columns_ref);
     size_t columns_ndx_in_parent = 1;
     m_columns.set_parent(&m_top, columns_ndx_in_parent);
 
-    cache_columns(); // Also initializes m_size
+    // Also initializes m_size
+    create_column_accessors(); // Throws
 }
 
 
@@ -212,7 +259,8 @@ void Table::init_from_ref(ConstSubspecRef shared_spec, ref_type columns_ref,
     // but it will have to create itself on first modification
     if (columns_ref != 0) {
         m_columns.init_from_ref(columns_ref);
-        cache_columns(); // Also initializes m_size
+        // Also initializes m_size
+        create_column_accessors(); // Throws
     }
     m_columns.set_parent(parent, ndx_in_parent);
 }
@@ -254,22 +302,24 @@ private:
 };
 
 
-void Table::do_insert_column(const Descriptor& desc, size_t column_ndx,
+void Table::do_insert_column(Descriptor& desc, size_t column_ndx,
                              DataType type, StringData name)
 {
     TIGHTDB_ASSERT(desc.is_attached());
 
-    Table& root_table = *desc.m_root_table;
+    typedef _impl::DescriptorFriend df;
+    Table& root_table = df::root_table(desc);
     TIGHTDB_ASSERT(!root_table.has_shared_type());
     TIGHTDB_ASSERT(column_ndx <= desc.get_column_count());
 
-    root_table.detach_subtable_accessors();
+    root_table.discard_row_and_subtable_accessors();
 
     if (desc.is_root()) {
         root_table.insert_root_column(column_ndx, type, name); // Throws
     }
     else {
-        desc.m_spec->insert_column(column_ndx, type, name); // Throws
+        Spec* spec = df::get_spec(desc);
+        spec->insert_column(column_ndx, type, name); // Throws
         if (!root_table.is_empty()) {
             InsertSubtableColumns updater(column_ndx, type);
             update_subtables(desc, updater); // Throws
@@ -283,21 +333,23 @@ void Table::do_insert_column(const Descriptor& desc, size_t column_ndx,
 }
 
 
-void Table::do_remove_column(const Descriptor& desc, size_t column_ndx)
+void Table::do_remove_column(Descriptor& desc, size_t column_ndx)
 {
     TIGHTDB_ASSERT(desc.is_attached());
 
-    Table& root_table = *desc.m_root_table;
+    typedef _impl::DescriptorFriend df;
+    Table& root_table = df::root_table(desc);
     TIGHTDB_ASSERT(!root_table.has_shared_type());
     TIGHTDB_ASSERT(column_ndx < desc.get_column_count());
 
-    root_table.detach_subtable_accessors();
+    root_table.discard_row_and_subtable_accessors();
 
     if (desc.is_root()) {
         root_table.remove_root_column(column_ndx); // Throws
     }
     else {
-        desc.m_spec->remove_column(column_ndx); // Throws
+        Spec* spec = df::get_spec(desc);
+        spec->remove_column(column_ndx); // Throws
         if (!root_table.is_empty()) {
             RemoveSubtableColumns updater(column_ndx);
             update_subtables(desc, updater); // Throws
@@ -311,16 +363,18 @@ void Table::do_remove_column(const Descriptor& desc, size_t column_ndx)
 }
 
 
-void Table::do_rename_column(const Descriptor& desc, size_t column_ndx, StringData name)
+void Table::do_rename_column(Descriptor& desc, size_t column_ndx, StringData name)
 {
     TIGHTDB_ASSERT(desc.is_attached());
 
-    Table& root_table = *desc.m_root_table;
+    typedef _impl::DescriptorFriend df;
+    Table& root_table = df::root_table(desc);
     TIGHTDB_ASSERT(!root_table.has_shared_type());
     TIGHTDB_ASSERT(column_ndx < desc.get_column_count());
 
-    root_table.detach_subtable_accessors();
-    desc.m_spec->rename_column(column_ndx, name); // Throws
+    root_table.discard_row_and_subtable_accessors();
+    Spec* spec = df::get_spec(desc);
+    spec->rename_column(column_ndx, name); // Throws
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     if (Replication* repl = root_table.get_repl())
@@ -331,6 +385,8 @@ void Table::do_rename_column(const Descriptor& desc, size_t column_ndx, StringDa
 
 void Table::insert_root_column(size_t column_ndx, DataType type, StringData name)
 {
+    m_search_index = 0;
+
     // Add the column to the spec
     m_spec.insert_column(column_ndx, type, name); // Throws
 
@@ -391,7 +447,7 @@ void Table::insert_root_column(size_t column_ndx, DataType type, StringData name
             // C++11. Solve this by changing the type of
             // `Table::m_cols` to `std::vector<ColumnBase*>`. Also
             // change its name to `Table::m_column_accessors`.
-            m_cols.add(intptr_t(new_col.get())); // Throws
+            m_cols.insert(column_ndx, intptr_t(new_col.get())); // Throws
             new_col.release();
         }
         catch (...) {
@@ -404,11 +460,17 @@ void Table::insert_root_column(size_t column_ndx, DataType type, StringData name
             Array::destroy_deep(ref, alloc);
         throw;
     }
+
+    // Update cached column indexes for subsequent column accessors
+    int ndx_in_parent_diff = 1;
+    adjust_column_index(column_ndx+1, ndx_in_parent_diff);
 }
 
 
 void Table::remove_root_column(size_t column_ndx)
 {
+    m_search_index = 0;
+
     Spec::ColumnInfo info;
     m_spec.get_column_info(column_ndx, info);
 
@@ -432,12 +494,12 @@ void Table::remove_root_column(size_t column_ndx)
     m_cols.erase(column_ndx);
 
     // Update cached column indexes for subsequent column accessors
-    int diff = -1, diff_in_parent = info.m_has_index ? -2 : -1;
-    adjust_column_index(column_ndx, diff, diff_in_parent);
+    int ndx_in_parent_diff = info.m_has_index ? -2 : -1;
+    adjust_column_index(column_ndx, ndx_in_parent_diff);
 
     // If there are no columns left, mark the table as empty
     if (get_column_count() == 0) {
-        detach_views_except(NULL);
+        detach_views_except(0);
         m_size = 0;
     }
 }
@@ -459,7 +521,7 @@ void Table::unregister_view(const TableViewBase* view) TIGHTDB_NOEXCEPT
 }
 
 
-void Table::update_subtables(const Descriptor& desc, SubtableUpdater& updater)
+void Table::update_subtables(Descriptor& desc, SubtableUpdater& updater)
 {
     size_t stat_buf[8];
     size_t size = sizeof stat_buf / sizeof *stat_buf;
@@ -467,9 +529,11 @@ void Table::update_subtables(const Descriptor& desc, SubtableUpdater& updater)
     size_t* end = begin + size;
     UniquePtr<size_t> dyn_buf;
     for (;;) {
-        begin = desc.record_subdesc_path(begin, end);
+        typedef _impl::DescriptorFriend df;
+        begin = df::record_subdesc_path(desc, begin, end);
         if (TIGHTDB_LIKELY(begin)) {
-            desc.m_root_table->update_subtables(begin, end, updater); // Throws
+            Table& root_table = df::root_table(desc);
+            root_table.update_subtables(begin, end, updater); // Throws
             return;
         }
         if (int_multiply_with_overflow_detect(size, 2))
@@ -510,6 +574,38 @@ void Table::update_subtables(const size_t* path_begin, const size_t* path_end,
             TableRef subtable(subtables.get_subtable_ptr(i)); // Throws
             subtable->update_subtables(path_begin+1, path_end, updater); // Throws
         }
+    }
+}
+
+
+void Table::update_accessors(const size_t* col_path_begin, const size_t* col_path_end,
+                             AccessorUpdater& updater)
+{
+    // This function must be able to operate with only the Minimal Accessor
+    // Hierarchy Consistency Guarantee. This means, in particular, that it
+    // cannot access the underlying array structure.
+
+    TIGHTDB_ASSERT(is_attached());
+
+    if (col_path_begin == col_path_end) {
+        updater.update(*this); // Throws
+        return;
+    }
+    updater.update_parent(*this); // Throws
+
+    size_t col_ndx = col_path_begin[0];
+    // If this table is not a degenerate subtable, then `col_ndx` must be a
+    // valid index into `m_cols`.
+    TIGHTDB_ASSERT(!m_columns.is_attached() || col_ndx < m_cols.size());
+
+    // Early-out if this accessor refers to a degenerate subtable
+    if (m_cols.is_empty())
+        return;
+
+    if (ColumnBase* col = reinterpret_cast<ColumnBase*>(m_cols.get(col_ndx))) {
+        TIGHTDB_ASSERT(dynamic_cast<ColumnTable*>(col));
+        ColumnTable* col_2 = static_cast<ColumnTable*>(col);
+        col_2->update_table_accessors(col_path_begin+1, col_path_end, updater); // Throws
     }
 }
 
@@ -609,23 +705,27 @@ void Table::create_columns()
 
 void Table::detach() TIGHTDB_NOEXCEPT
 {
+    // This function must be able to operate with only the Minimal Accessor
+    // Hierarchy Consistency Guarantee. This means, in particular, that it
+    // cannot access the underlying array structure.
+
 #ifdef TIGHTDB_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
         repl->on_table_destroyed(this);
     m_spec.m_top.detach();
 #endif
 
-    detach_desc_accessor();
+    discard_desc_accessor();
 
     // This prevents the destructor from deallocating the underlying
     // memory structure, and from attempting to notify the parent. It
     // also causes is_attached() to return false.
     m_columns.set_parent(0,0);
 
-    // Detach all offspring accessors
-    detach_subtable_accessors();
+    discard_row_and_subtable_accessors();
 
     destroy_column_accessors();
+    m_cols.destroy();
     detach_views_except(0);
 }
 
@@ -645,33 +745,37 @@ void Table::detach_views_except(const TableViewBase* view) TIGHTDB_NOEXCEPT
     }
     m_views.clear();
     if (view) {
-        // can NOT except, because if the view is not 0, it must
-        // have been in the registry before  AND since clear does
-        // not release memory, no new memory is needed for push_back:
+        // Can **not** throw, because if the view is not 0, it must
+        // have been in the registry before AND since clear does not
+        // release memory, no new memory is needed for push_back:
         m_views.push_back(view);
     }
 }
 
 
-void Table::detach_subtable_accessors() TIGHTDB_NOEXCEPT
+void Table::discard_row_and_subtable_accessors() TIGHTDB_NOEXCEPT
 {
-    if (is_empty())
-        return;
+    // This function must be able to operate with only the Minimal Accessor
+    // Hierarchy Consistency Guarantee. This means, in particular, that it
+    // cannot access the underlying array structure.
+
+    // FIXME: Detach and remove all row accessors.
 
     size_t n = m_cols.size();
     for (size_t i = 0; i < n; ++i) {
-        ColumnBase* c = reinterpret_cast<ColumnBase*>(uintptr_t(m_cols.get(i)));
-        c->detach_subtable_accessors();
+        if (ColumnBase* col = reinterpret_cast<ColumnBase*>(uintptr_t(m_cols.get(i))))
+            col->detach_subtable_accessors();
     }
 }
 
 
-void Table::detach_desc_accessor() TIGHTDB_NOEXCEPT
+void Table::discard_desc_accessor() TIGHTDB_NOEXCEPT
 {
     if (m_descriptor) {
         // Must hold a reliable reference count while detaching
         DescriptorRef desc(m_descriptor);
-        desc->detach();
+        typedef _impl::DescriptorFriend df;
+        df::detach(*desc);
         m_descriptor = 0;
     }
 }
@@ -681,134 +785,99 @@ void Table::instantiate_before_change()
 {
     // Empty (zero-ref'ed) tables need to be instantiated before first modification
     if (!m_columns.is_attached())
-        create_columns();
+        create_columns(); // Throws
 }
 
 
-void Table::cache_columns()
+ColumnBase* Table::create_column_accessor(ColumnType col_type, size_t col_ndx, size_t ndx_in_parent)
+{
+    ref_type ref = m_columns.get_as_ref(ndx_in_parent);
+    Allocator& alloc = m_columns.get_alloc();
+    switch (col_type) {
+        case type_Int:
+        case type_Bool:
+        case type_DateTime:
+            return new Column(ref, &m_columns, ndx_in_parent, alloc); // Throws
+        case type_Float:
+            return new ColumnFloat(ref, &m_columns, ndx_in_parent, alloc); // Throws
+        case type_Double:
+            return new ColumnDouble(ref, &m_columns, ndx_in_parent, alloc); // Throws
+        case type_String:
+            return new AdaptiveStringColumn(ref, &m_columns, ndx_in_parent, alloc); // Throws
+        case type_Binary:
+            return new ColumnBinary(ref, &m_columns, ndx_in_parent, alloc); // Throws
+        case col_type_StringEnum: {
+            ArrayParent* keys_parent;
+            size_t keys_ndx_in_parent;
+            ref_type keys_ref =
+                m_spec.get_enumkeys_ref(col_ndx, &keys_parent, &keys_ndx_in_parent);
+            return new ColumnStringEnum(keys_ref, ref, &m_columns, ndx_in_parent,
+                                        keys_parent, keys_ndx_in_parent, alloc); // Throws
+        }
+        case type_Table:
+            return new ColumnTable(alloc, this, col_ndx, &m_columns, ndx_in_parent, ref); // Throws
+        case type_Mixed:
+            return new ColumnMixed(alloc, this, col_ndx, &m_columns, ndx_in_parent, ref); // Throws
+        case col_type_Reserved1:
+        case col_type_Reserved4:
+            // These have no function yet and are therefore unexpected.
+            break;
+    }
+    TIGHTDB_ASSERT(false);
+    return 0;
+}
+
+
+void Table::create_column_accessors()
 {
     TIGHTDB_ASSERT(m_cols.is_empty()); // only done on creation
 
-    Allocator& alloc = m_columns.get_alloc();
-    size_t num_rows = size_t(-1);
     size_t ndx_in_parent = 0;
+    size_t num_cols = m_spec.get_column_count();
+    for (size_t col_ndx = 0; col_ndx < num_cols; ++col_ndx) {
+        ColumnType col_type = m_spec.get_real_column_type(col_ndx);
+        ColumnBase* col = create_column_accessor(col_type, col_ndx, ndx_in_parent); // Throws
+        // FIXME: Memory leak if the following addition statement fails. This
+        // problem disappears as soon as m_cols is changed to be of std::vector
+        // type. When that happens `m_cols` must be resized to num_cols
+        // initially. This also means the column accessors can be null in m_cols
+        // in other cases than during Group::advance_transact().
+        m_cols.add(intptr_t(col));
 
-    // Cache columns
-    size_t num_columns = m_spec.get_column_count();
-    for (size_t i = 0; i < num_columns; ++i) {
-        ColumnType type = m_spec.get_real_column_type(i);
-        ColumnAttr attr = m_spec.get_column_attr(i);
-        ref_type ref = m_columns.get_as_ref(ndx_in_parent);
-
-        ColumnBase* new_col = 0;
-        size_t col_size = size_t(-1);
-        switch (type) {
-            case type_Int:
-            case type_Bool:
-            case type_DateTime: {
-                Column* c = new Column(ref, &m_columns, ndx_in_parent, alloc);
-                col_size = c->size();
-                new_col = c;
-                break;
-            }
-            case type_Float: {
-                ColumnFloat* c = new ColumnFloat(ref, &m_columns, ndx_in_parent, alloc);
-                col_size = c->size();
-                new_col = c;
-            }
-                break;
-            case type_Double: {
-                ColumnDouble* c = new ColumnDouble(ref, &m_columns, ndx_in_parent, alloc);
-                col_size = c->size();
-                new_col = c;
-                break;
-            }
-            case type_String: {
-                AdaptiveStringColumn* c =
-                    new AdaptiveStringColumn(ref, &m_columns, ndx_in_parent, alloc);
-                col_size = c->size();
-                new_col = c;
-                break;
-            }
-            case type_Binary: {
-                ColumnBinary* c = new ColumnBinary(ref, &m_columns, ndx_in_parent, alloc);
-                col_size = c->size();
-                new_col = c;
-                break;
-            }
-            case col_type_StringEnum: {
-                ArrayParent* keys_parent;
-                size_t keys_ndx;
-                ref_type keys_ref = m_spec.get_enumkeys_ref(ndx_in_parent, &keys_parent, &keys_ndx);
-                ref_type values_ref = m_columns.get_as_ref(ndx_in_parent);
-
-                ColumnStringEnum* c =
-                    new ColumnStringEnum(keys_ref, values_ref, &m_columns,
-                                         ndx_in_parent, keys_parent, keys_ndx, alloc);
-                col_size = c->size();
-                new_col = c;
-                break;
-            }
-            case type_Table: {
-                size_t column_ndx = m_cols.size();
-                ColumnTable* c =
-                    new ColumnTable(alloc, this, column_ndx, &m_columns, ndx_in_parent, ref);
-                col_size = c->size();
-                new_col = c;
-                break;
-            }
-            case type_Mixed: {
-                size_t column_ndx = m_cols.size();
-                ColumnMixed* c =
-                    new ColumnMixed(alloc, this, column_ndx, &m_columns, ndx_in_parent, ref);
-                col_size = c->size();
-                new_col = c;
-                break;
-            }
-
-            case col_type_Reserved1:
-            case col_type_Reserved4:
-                // These have no function yet and are therefore
-                // unexpected.
-                TIGHTDB_ASSERT(false);
-                break;
-        }
-
-        TIGHTDB_ASSERT(new_col);
-
-        m_cols.add(reinterpret_cast<intptr_t>(new_col)); // FIXME: intptr_t is not guaranteed to exists, even in C++11
-
-        // Atributes on columns may define that they come with an index
+        // Atributes on columns may define that they come with a search index
+        ColumnAttr attr = m_spec.get_column_attr(col_ndx);
         if (attr != col_attr_None) {
             TIGHTDB_ASSERT(attr == col_attr_Indexed); // only attribute supported for now
-            TIGHTDB_ASSERT(type == col_type_String ||
-                           type == col_type_StringEnum);  // index only for strings
+            TIGHTDB_ASSERT(col_type == col_type_String ||
+                           col_type == col_type_StringEnum);  // index only for strings
 
-            size_t pndx = ndx_in_parent + 1;
-            ref_type index_ref = m_columns.get_as_ref(pndx);
-            new_col->set_index_ref(index_ref, &m_columns, pndx);
+            ref_type index_ref = m_columns.get_as_ref(ndx_in_parent + 1);
+            col->set_index_ref(index_ref, &m_columns, ndx_in_parent + 1); // Throws
 
-            ++ndx_in_parent; // advance one matchcount pos to account for index
-        }
-
-        // Set table size
-        // (and verify that all column are same size)
-        if (num_rows == size_t(-1)) {
-            num_rows = col_size;
-        }
-        else {
-            TIGHTDB_ASSERT(num_rows == col_size);
+            // A search index occupies one slot in m_columns.
+            ++ndx_in_parent;
         }
 
         ++ndx_in_parent;
     }
 
-    if (num_rows != size_t(-1))
-        m_size = num_rows;
+    // Set table size
+    if (num_cols == 0) {
+        m_size = 0;
+    }
+    else {
+        ColumnBase* first_col = reinterpret_cast<ColumnBase*>(m_cols.get(0));
+        m_size = first_col->size();
+    }
 }
+
 
 void Table::destroy_column_accessors() TIGHTDB_NOEXCEPT
 {
+    // This function must be able to operate with only the Minimal Accessor
+    // Hierarchy Consistency Guarantee. This means, in particular, that it
+    // cannot access the underlying array structure.
+
     TIGHTDB_ASSERT(m_cols.is_attached());
 
     size_t n = m_cols.size();
@@ -816,11 +885,17 @@ void Table::destroy_column_accessors() TIGHTDB_NOEXCEPT
         ColumnBase* column = reinterpret_cast<ColumnBase*>(m_cols.get(i));
         delete column;
     }
-    m_cols.destroy();
+    m_cols.clear();
 }
+
 
 Table::~Table() TIGHTDB_NOEXCEPT
 {
+    // Whenever this is not a free-standing table, the destructor must be able
+    // to operate with only the Minimal Accessor Hierarchy Consistency
+    // Guarantee. This means, in particular, that it cannot access the
+    // underlying structure of array nodes.
+
     if (!is_attached()) {
         // This table has been detached.
         TIGHTDB_ASSERT(m_ref_count == 0);
@@ -834,15 +909,16 @@ Table::~Table() TIGHTDB_NOEXCEPT
 #endif
 
     if (!m_top.is_attached()) {
-        // This is a table with a shared spec, and its lifetime is
-        // managed by reference counting, so we must let our parent
-        // know about our demise.
+        // This is a subtable with a shared spec, and its lifetime is managed by
+        // reference counting, so we must let the parent know about the demise
+        // of this subtable.
         ArrayParent* parent = m_columns.get_parent();
         TIGHTDB_ASSERT(parent);
         TIGHTDB_ASSERT(m_ref_count == 0);
         TIGHTDB_ASSERT(dynamic_cast<Parent*>(parent));
-        static_cast<Parent*>(parent)->child_accessor_destroyed(m_columns.get_ndx_in_parent());
+        static_cast<Parent*>(parent)->child_accessor_destroyed(this);
         destroy_column_accessors();
+        m_cols.destroy();
         return;
     }
 
@@ -852,8 +928,9 @@ Table::~Table() TIGHTDB_NOEXCEPT
         // counting, so we must let our parent know about our demise.
         TIGHTDB_ASSERT(m_ref_count == 0);
         TIGHTDB_ASSERT(dynamic_cast<Parent*>(parent));
-        static_cast<Parent*>(parent)->child_accessor_destroyed(m_top.get_ndx_in_parent());
+        static_cast<Parent*>(parent)->child_accessor_destroyed(this);
         destroy_column_accessors();
+        m_cols.destroy();
         return;
     }
 
@@ -872,6 +949,7 @@ Table::~Table() TIGHTDB_NOEXCEPT
     }
     else {
         destroy_column_accessors();
+        m_cols.destroy();
     }
     m_top.destroy_deep();
 }
@@ -891,6 +969,8 @@ void Table::set_index(size_t column_ndx, bool update_spec)
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     if (has_index(column_ndx))
         return;
+
+    m_search_index = 0;
 
     ColumnType ct = get_real_column_type(column_ndx);
     Spec::ColumnInfo info;
@@ -921,8 +1001,8 @@ void Table::set_index(size_t column_ndx, bool update_spec)
 
     // Insert ref into columns list after the owning column
     m_columns.insert(column_pos+1, index_ref);
-    int diff = 0, diff_in_parent = 1;
-    adjust_column_index(column_ndx+1, diff, diff_in_parent);
+    int ndx_in_parent_diff = 1;
+    adjust_column_index(column_ndx+1, ndx_in_parent_diff);
 
     // Update spec
     if (update_spec)
@@ -935,6 +1015,47 @@ void Table::set_index(size_t column_ndx, bool update_spec)
 }
 
 
+
+// FIXME:
+//
+// Note the two versions of get_column_base(). The difference between
+// them is that the non-const version calls
+// instantiate_before_change(). This is because a table accessor can
+// be created for a subtable that does not yet exist (top-ref = 0),
+// and in that case instantiate_before_change() will create the
+// missing subtable.
+//
+// While this on-demand creation of "degenerate" subtables is
+// desirebale, the fact that the feature is integrated into
+// get_column_base() has turned out to be a bad idea. The problem is
+// that every method that calls get_column_base() must also exist in
+// two versions, and this applies recursivly all the way out to the
+// public methods such as get_subtable().
+//
+// Rather than having two entirely distinct versions of
+// get_subtable(), the const-propagating version should really be a
+// thin wrapper around the non-const version. That would be good for
+// two reasons, it would reduce the amount of code, and it would make
+// it clear to the reader that the two versions really do exactly the
+// same thing, apart from the const-propagation. Since get_subtable()
+// takes a row index as argument, and a degenerate subtable has no
+// rows, there is no way that a valid call to non-const get_subtable()
+// can ever end up instantiating a degenrate subtable, so the two
+// versions of it perform the exact same function.
+//
+// Note also that the only Table methods that can ever end up
+// instantiating a degenerate table, are those that insert rows,
+// because row insertion is the only valid modifying operation on a
+// degenerate subtable.
+//
+// The right thing to do, is therefore to remove the
+// instantiate_before_change() call from get_column_base(), and add it
+// to the methods that insert rows. This in turn will allow us to
+// collapse a large number of methods that currently exist in two
+// versions.
+//
+// Note: get_subtable_ptr() has now been collapsed to one version, but
+// the suggested change will still be a significant improvement.
 
 ColumnBase& Table::get_column_base(size_t ndx)
 {
@@ -1226,7 +1347,7 @@ void Table::insert_empty_row(size_t ndx, size_t num_rows)
 
 void Table::clear()
 {
-    detach_views_except(NULL);
+    detach_views_except(0);
     size_t n = get_column_count();
     for (size_t i = 0; i != n; ++i) {
         ColumnBase& column = get_column_base(i);
@@ -1346,82 +1467,97 @@ void Table::set_mixed_subtable(size_t col_ndx, size_t row_ndx, const Table* t)
 }
 
 
-Table* Table::get_subtable_ptr(size_t col_idx, size_t row_idx)
+Table* Table::get_subtable_accessor(size_t col_ndx, size_t row_ndx) TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(col_idx < get_column_count());
-    TIGHTDB_ASSERT(row_idx < m_size);
+    // This function must be able to operate with only the Minimal Accessor
+    // Hierarchy Consistency Guarantee. This means, in particular, that it
+    // cannot access the underlying array structure.
 
-    ColumnType type = get_real_column_type(col_idx);
+    TIGHTDB_ASSERT(is_attached());
+    // If this table is not a degenerate subtable, then `col_ndx` must be a
+    // valid index into `m_cols`.
+    TIGHTDB_ASSERT(!m_columns.is_attached() || col_ndx < m_cols.size());
+    if (ColumnBase* col = reinterpret_cast<ColumnBase*>(m_cols.get(col_ndx)))
+        return col->get_subtable_accessor(row_ndx);
+    return 0;
+}
+
+
+void Table::discard_subtable_accessor(size_t col_ndx, size_t row_ndx) TIGHTDB_NOEXCEPT
+{
+    // This function must be able to operate with only the Minimal Accessor
+    // Hierarchy Consistency Guarantee. This means, in particular, that it
+    // cannot access the underlying array structure.
+
+    TIGHTDB_ASSERT(is_attached());
+    // If this table is not a degenerate subtable, then `col_ndx` must be a
+    // valid index into `m_cols`.
+    TIGHTDB_ASSERT(!m_columns.is_attached() || col_ndx < m_cols.size());
+    if (ColumnBase* col = reinterpret_cast<ColumnBase*>(m_cols.get(col_ndx)))
+        col->discard_subtable_accessor(row_ndx);
+}
+
+
+Table* Table::get_subtable_ptr(size_t col_ndx, size_t row_ndx)
+{
+    TIGHTDB_ASSERT(col_ndx < get_column_count());
+    TIGHTDB_ASSERT(row_ndx < m_size);
+
+    ColumnType type = get_real_column_type(col_ndx);
     if (type == col_type_Table) {
-        ColumnTable& subtables = get_column_table(col_idx);
-        return subtables.get_subtable_ptr(row_idx);
+        ColumnTable& subtables = get_column_table(col_ndx);
+        return subtables.get_subtable_ptr(row_ndx); // Throws
     }
     if (type == col_type_Mixed) {
-        ColumnMixed& subtables = get_column_mixed(col_idx);
-        return subtables.get_subtable_ptr(row_idx);
+        ColumnMixed& subtables = get_column_mixed(col_ndx);
+        return subtables.get_subtable_ptr(row_ndx); // Throws
     }
     TIGHTDB_ASSERT(false);
     return 0;
 }
 
-const Table* Table::get_subtable_ptr(size_t col_idx, size_t row_idx) const
-{
-    TIGHTDB_ASSERT(col_idx < get_column_count());
-    TIGHTDB_ASSERT(row_idx < m_size);
 
-    ColumnType type = get_real_column_type(col_idx);
+size_t Table::get_subtable_size(size_t col_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(col_ndx < get_column_count());
+    TIGHTDB_ASSERT(row_ndx < m_size);
+
+    ColumnType type = get_real_column_type(col_ndx);
     if (type == col_type_Table) {
-        const ColumnTable& subtables = get_column_table(col_idx);
-        return subtables.get_subtable_ptr(row_idx);
+        const ColumnTable& subtables = get_column_table(col_ndx);
+        return subtables.get_subtable_size(row_ndx);
     }
     if (type == col_type_Mixed) {
-        const ColumnMixed& subtables = get_column_mixed(col_idx);
-        return subtables.get_subtable_ptr(row_idx);
+        const ColumnMixed& subtables = get_column_mixed(col_ndx);
+        return subtables.get_subtable_size(row_ndx);
     }
     TIGHTDB_ASSERT(false);
     return 0;
 }
 
-size_t Table::get_subtable_size(size_t col_idx, size_t row_idx) const TIGHTDB_NOEXCEPT
+
+void Table::clear_subtable(size_t col_ndx, size_t row_ndx)
 {
-    TIGHTDB_ASSERT(col_idx < get_column_count());
-    TIGHTDB_ASSERT(row_idx < m_size);
+    TIGHTDB_ASSERT(col_ndx < get_column_count());
+    TIGHTDB_ASSERT(row_ndx <= m_size);
 
-    ColumnType type = get_real_column_type(col_idx);
+    ColumnType type = get_real_column_type(col_ndx);
     if (type == col_type_Table) {
-        const ColumnTable& subtables = get_column_table(col_idx);
-        return subtables.get_subtable_size(row_idx);
-    }
-    if (type == col_type_Mixed) {
-        const ColumnMixed& subtables = get_column_mixed(col_idx);
-        return subtables.get_subtable_size(row_idx);
-    }
-    TIGHTDB_ASSERT(false);
-    return 0;
-}
-
-void Table::clear_subtable(size_t col_idx, size_t row_idx)
-{
-    TIGHTDB_ASSERT(col_idx < get_column_count());
-    TIGHTDB_ASSERT(row_idx <= m_size);
-
-    ColumnType type = get_real_column_type(col_idx);
-    if (type == col_type_Table) {
-        ColumnTable& subtables = get_column_table(col_idx);
-        subtables.set(row_idx, 0);
+        ColumnTable& subtables = get_column_table(col_ndx);
+        subtables.set(row_ndx, 0);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
         if (Replication* repl = get_repl())
-            repl->set_table(this, col_idx, row_idx); // Throws
+            repl->set_table(this, col_ndx, row_ndx); // Throws
 #endif
     }
     else if (type == col_type_Mixed) {
-        ColumnMixed& subtables = get_column_mixed(col_idx);
-        subtables.set_subtable(row_idx, 0);
+        ColumnMixed& subtables = get_column_mixed(col_ndx);
+        subtables.set_subtable(row_ndx, 0);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
         if (Replication* repl = get_repl())
-            repl->set_mixed(this, col_idx, row_idx, Mixed::subtable_tag()); // Throws
+            repl->set_mixed(this, col_ndx, row_ndx, Mixed::subtable_tag()); // Throws
 #endif
     }
     else {
@@ -1430,15 +1566,17 @@ void Table::clear_subtable(size_t col_idx, size_t row_idx)
 }
 
 
-TableRef Table::get_parent_table() TIGHTDB_NOEXCEPT
+TableRef Table::get_parent_table(size_t* column_ndx_out) TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(is_attached());
     const Array& real_top = m_top.is_attached() ? m_top : m_columns;
-    ArrayParent* array_parent = real_top.get_parent();
-    TIGHTDB_ASSERT(dynamic_cast<Parent*>(array_parent));
-    Parent* table_parent = static_cast<Parent*>(array_parent);
-    Table* parent = table_parent->get_parent_table();
-    return parent ? TableRef(parent) : TableRef();
+    if (ArrayParent* array_parent = real_top.get_parent()) {
+        TIGHTDB_ASSERT(dynamic_cast<Parent*>(array_parent));
+        Parent* table_parent = static_cast<Parent*>(array_parent);
+        if (Table* parent = table_parent->get_parent_table(column_ndx_out))
+            return TableRef(parent);
+    }
+    return TableRef();
 }
 
 
@@ -2058,11 +2196,12 @@ double Table::maximum_double(size_t column_ndx) const
 
 size_t Table::lookup(StringData value) const
 {
+    // Early-out if this is a degenerate subtable
     if(!m_columns.is_attached())
         return not_found;
 
     // First time we do a lookup we check if we can cache the index
-    if (!m_lookup_index) {
+    if (!m_search_index) {
         if (get_column_count() < 1)
             return not_found; // no column to lookup in
 
@@ -2073,7 +2212,7 @@ size_t Table::lookup(StringData value) const
                 return column.find_first(value);
             }
             else {
-                m_lookup_index = &column.get_index();
+                m_search_index = &column.get_index();
             }
         }
         else if (type == col_type_StringEnum) {
@@ -2082,7 +2221,7 @@ size_t Table::lookup(StringData value) const
                 return column.find_first(value);
             }
             else {
-                m_lookup_index = &column.get_index();
+                m_search_index = &column.get_index();
             }
         }
         else {
@@ -2091,7 +2230,7 @@ size_t Table::lookup(StringData value) const
     }
 
     // Do lookup directly on cached index
-    return m_lookup_index->find_first(value);
+    return m_search_index->find_first(value);
 }
 
 template <class T> size_t Table::find_first(size_t column_ndx, T value) const
@@ -2817,10 +2956,8 @@ public:
         ref_type spec_ref;
         {
             MemRef mem = m_table.m_spec.m_top.clone_deep(alloc); // Throws
-            ArrayParent* parent = 0;
-            size_t ndx_in_parent = 0;
             Spec spec(alloc);
-            spec.init(mem, parent, ndx_in_parent); // Throws
+            spec.init(mem); // Throws
             _impl::DestroyGuard<Spec> dg(&spec);
             size_t n = spec.get_column_count();
             for (size_t i = 0; i != n; ++i) {
@@ -2900,14 +3037,14 @@ void Table::write(ostream& out, size_t offset, size_t size, StringData override_
 }
 
 
-void Table::adjust_column_index(size_t column_ndx_begin, int diff, int diff_in_parent)
+void Table::adjust_column_index(size_t column_ndx_begin, int ndx_in_parent_diff)
     TIGHTDB_NOEXCEPT
 {
-    size_t n = m_cols.size();
-    for (size_t i = column_ndx_begin; i != n; ++i) {
-        ColumnBase* column = reinterpret_cast<ColumnBase*>(m_cols.get(i));
-        column->get_root_array()->adjust_ndx_in_parent(diff_in_parent);
-        column->adjust_column_index(diff);
+    size_t num_cols = m_cols.size();
+    for (size_t col_ndx = column_ndx_begin; col_ndx != num_cols; ++col_ndx) {
+        ColumnBase* column = reinterpret_cast<ColumnBase*>(m_cols.get(col_ndx));
+        column->get_root_array()->adjust_ndx_in_parent(ndx_in_parent_diff);
+        column->update_column_index(col_ndx, m_spec);
     }
 }
 
@@ -3486,6 +3623,206 @@ Table* Table::Parent::get_parent_table(size_t*) const TIGHTDB_NOEXCEPT
 }
 
 
+void Table::adj_accessors_insert_rows(size_t row_ndx, size_t num_rows) TIGHTDB_NOEXCEPT
+{
+    // This function must be able to operate with only the Minimal Accessor
+    // Hierarchy Consistency Guarantee. This means, in particular, that it
+    // cannot access the underlying array structure.
+
+    // FIXME: Add num_rows to row index in all row accessors whose row
+    // index is greater than or equal to row_ndx.
+    size_t n = m_cols.size();
+    for (size_t i = 0; i != n; ++i) {
+        if (ColumnBase* col = reinterpret_cast<ColumnBase*>(m_cols.get(i)))
+            col->adj_accessors_insert_rows(row_ndx, num_rows);
+    }
+}
+
+
+void Table::adj_accessors_erase_row(size_t row_ndx) TIGHTDB_NOEXCEPT
+{
+    // This function must be able to operate with only the Minimal Accessor
+    // Hierarchy Consistency Guarantee. This means, in particular, that it
+    // cannot access the underlying array structure.
+
+    // FIXME: Decrement row index in all row accessors whose row index
+    // is greater than (or equal to) row_ndx.
+    size_t n = m_cols.size();
+    for (size_t i = 0; i != n; ++i) {
+        if (ColumnBase* col = reinterpret_cast<ColumnBase*>(m_cols.get(i)))
+            col->adj_accessors_erase_row(row_ndx);
+    }
+}
+
+
+void Table::adj_clear_nonroot() TIGHTDB_NOEXCEPT
+{
+    // This function must be able to operate with only the Minimal Accessor
+    // Hierarchy Consistency Guarantee. This means, in particular, that it
+    // cannot access the underlying array structure.
+
+    discard_row_and_subtable_accessors();
+    destroy_column_accessors();
+    m_columns.detach();
+}
+
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+
+void Table::recursive_mark_dirty() TIGHTDB_NOEXCEPT
+{
+    // This function must be able to operate with only the Minimal Accessor
+    // Hierarchy Consistency Guarantee. This means, in particular, that it
+    // cannot access the underlying array structure.
+
+    m_dirty = true;
+
+    size_t n = m_cols.size();
+    for (size_t i = 0; i != n; ++i) {
+        if (ColumnBase* col = reinterpret_cast<ColumnBase*>(m_cols.get(i)))
+            col->recursive_mark_table_accessors_dirty();
+    }
+}
+
+
+void Table::insert_null_column_accessor(size_t col_ndx)
+{
+    // This function must be able to operate with only the Minimal Accessor
+    // Hierarchy Consistency Guarantee. This means, in particular, that it
+    // cannot access the underlying array structure.
+
+    TIGHTDB_ASSERT(is_attached());
+    bool not_degenerate = m_columns.is_attached();
+    if (not_degenerate) {
+        TIGHTDB_ASSERT(col_ndx <= m_cols.size());
+        m_cols.insert(col_ndx, 0); // Throws
+    }
+}
+
+
+void Table::erase_column_accessor(size_t col_ndx) TIGHTDB_NOEXCEPT
+{
+    // This function must be able to operate with only the Minimal Accessor
+    // Hierarchy Consistency Guarantee. This means, in particular, that it
+    // cannot access the underlying array structure.
+
+    TIGHTDB_ASSERT(is_attached());
+    bool not_degenerate = m_columns.is_attached();
+    if (not_degenerate) {
+        TIGHTDB_ASSERT(col_ndx < m_cols.size());
+        if (ColumnBase* col = reinterpret_cast<ColumnBase*>(m_cols.get(col_ndx))) {
+            col->detach_subtable_accessors();
+            delete col;
+        }
+        m_cols.erase(col_ndx);
+    }
+}
+
+
+void Table::refresh_after_advance_transact(size_t ndx_in_parent, size_t spec_ndx_in_parent)
+{
+    TIGHTDB_ASSERT(is_attached());
+    if (m_top.is_attached()) {
+        // Root table (independent descriptor)
+        m_top.set_ndx_in_parent(ndx_in_parent);
+        if (!m_dirty)
+            return;
+        m_top.init_from_parent();
+        m_spec.init_from_parent();
+        m_columns.init_from_parent();
+    }
+    else {
+        // Subtable with shared descriptor
+        m_spec.set_ndx_in_parent(spec_ndx_in_parent);
+        m_columns.set_ndx_in_parent(ndx_in_parent);
+        if (!m_dirty)
+            return;
+        m_spec.init_from_parent();
+
+        // If the underlying table was degenerate, then `m_cols` must still be
+        // empty.
+        TIGHTDB_ASSERT(m_columns.is_attached() || m_cols.is_empty());
+
+        ref_type columns_ref = m_columns.get_ref_from_parent();
+        if (columns_ref != 0) {
+            if (!m_columns.is_attached()) {
+                // The underlying table is no longer degenerate
+                size_t num_cols = m_spec.get_column_count();
+                // FIXME: Should be m_col_accessors.resize(num_cols);
+                for (size_t i = 0; i < num_cols; ++i)
+                    m_cols.add(0); // Throws
+            }
+            m_columns.init_from_ref(columns_ref);
+        }
+        else {
+            // The underlying table is still degenerate
+            TIGHTDB_ASSERT(!m_columns.is_attached());
+        }
+    }
+    m_search_index = 0;
+
+    size_t col_ndx_in_parent = 0; // Index in Table::m_columns
+    size_t num_cols = m_cols.size();
+    for (size_t col_ndx = 0; col_ndx != num_cols; ++col_ndx) {
+        ColumnBase* col = reinterpret_cast<ColumnBase*>(m_cols.get(col_ndx));
+
+        // If the current column accessor is AdaptiveStringColumn, but the
+        // underlying column has been upgraded to an enumerated strings column,
+        // then we need to replace the accessor with an instance of
+        // ColumnStringEnum.
+        if (col && col->is_string_col()) {
+            ColumnType col_type = m_spec.get_real_column_type(col_ndx);
+            if (col_type == col_type_StringEnum) {
+                delete col;
+                col = 0;
+                // We need to store null in `m_cols` to avoid a crash during
+                // destruction of the table accessor in case an error occurs
+                // before the refresh operation is complete.
+                m_cols.set(col_ndx, 0);
+            }
+        }
+
+        if (col) {
+            // Refresh the column accessor
+            col->get_root_array()->set_ndx_in_parent(col_ndx_in_parent);
+            col->refresh_after_advance_transact(col_ndx, m_spec); // Throws
+        }
+        else {
+            ColumnType col_type = m_spec.get_real_column_type(col_ndx);
+            col = create_column_accessor(col_type, col_ndx, col_ndx_in_parent); // Throws
+            // FIXME: Memory leak if the following assignment statement
+            // fails. This problem disappears as soon as m_cols is changed to be
+            // of std::vector type.
+            m_cols.set(col_ndx, intptr_t(col));
+        }
+
+        // If the column was equipped column with search index, create the
+        // search index accessor.
+        ColumnAttr attr = m_spec.get_column_attr(col_ndx);
+        bool has_search_index = attr & col_attr_Indexed;
+        if (has_search_index && !col->has_index()) {
+            ref_type ref = m_columns.get_as_ref(col_ndx_in_parent+1);
+            col->set_index_ref(ref, &m_columns, col_ndx_in_parent+1); // Throws
+        }
+
+        col_ndx_in_parent += (has_search_index ? 2 : 1);
+    }
+
+    // Set table size
+    if (num_cols == 0) {
+        m_size = 0;
+    }
+    else {
+        ColumnBase* first_col = reinterpret_cast<ColumnBase*>(m_cols.get(0));
+        m_size = first_col->size();
+    }
+
+    m_dirty = false;
+}
+
+#endif // TIGHTDB_ENABLE_REPLICATION
+
+
 #ifdef TIGHTDB_DEBUG
 
 void Table::Verify() const
@@ -3497,23 +3834,16 @@ void Table::Verify() const
     if (m_top.is_attached())
         m_top.Verify();
     m_columns.Verify();
-    if (m_columns.is_attached()) {
-        size_t n = get_column_count();
-        TIGHTDB_ASSERT(n == m_cols.size());
-
-        for (size_t i = 0; i != n; ++i) {
-            const ColumnBase& column = get_column_base(i);
-            TIGHTDB_ASSERT(column.size() == m_size);
-            column.Verify();
-        }
-    }
-
     m_spec.Verify();
 
-    // FIXME: It is a waste of time to check the allocator for each
-    // table in a group.
-    Allocator& alloc = m_columns.get_alloc();
-    alloc.Verify();
+    size_t n = m_spec.get_column_count();
+    TIGHTDB_ASSERT(n == m_cols.size());
+
+    for (size_t i = 0; i != n; ++i) {
+        const ColumnBase& column = get_column_base(i);
+        column.Verify();
+        TIGHTDB_ASSERT(column.size() == m_size);
+    }
 }
 
 

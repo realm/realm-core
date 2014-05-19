@@ -611,8 +611,13 @@ EOF
             echo "Framework for iOS can only be generated under Mac OS X."
             exit 0
         fi
+
+        realm_version="$(sh build.sh get-version)"
         BASENAME="RealmCore"
         FRAMEWORK="$BASENAME.framework"
+        rm -rf "$FRAMEWORK" || exit 1
+        rm -f realm-core-ios-*.zip || exit 1
+
         mkdir -p "$FRAMEWORK/Headers" || exit 1
         if [ ! -f "$IPHONE_DIR/libtightdb-ios.a" ]; then
             echo "\"$IPHONE_DIR/libtightdb-ios.a\" missing."
@@ -623,9 +628,46 @@ EOF
         cp -r "$IPHONE_DIR/include/"* "$FRAMEWORK/Headers/" || exit 1
         find "$FRAMEWORK/Headers" -iregex "^.*\.[ch]\(pp\)\{0,1\}$" \
             -exec sed -i '' -e "s/<tightdb\(.*\)>/<$BASENAME\/tightdb\1>/g" {} \; || exit 1
-        echo "Core framework for iOS can be found under $FRAMEWORK."
+ 
+        zip -r -q realm-core-ios-$realm_version.zip $FRAMEWORK || exit 1
+        echo "Core framework for iOS can be found under $FRAMEWORK and realm-core-ios-$realm_version.zip."
         exit 0
         ;;
+
+    "build-osx-framework")
+        if [ "$OS" != "Darwin" ]; then
+            echo "Framework for OS X can only be generated under Mac OS X."
+            exit 0
+        fi
+
+        realm_version="$(sh build.sh get-version)"
+        BASENAME="RealmCore"
+        FRAMEWORK="$BASENAME.framework"
+        rm -rf "$FRAMEWORK" || exit 1
+        rm -f realm-core-osx-*.zip || exit 1
+
+        mkdir -p "$FRAMEWORK/Headers/tightdb" || exit 1
+        if [ ! -f "src/tightdb/libtightdb.a" ]; then
+            echo "\"src/tightdb/libtightdb.a\" missing."
+            echo "Did you forget to build?"
+            exit 1
+        fi
+
+        cp "src/tightdb/libtightdb.a" "$FRAMEWORK/$BASENAME" || exit 1
+        cp "src/tightdb.hpp" "$FRAMEWORK/Headers/tightdb.hpp" || exit 1
+        for header in $(cd "src/tightdb" && $MAKE --no-print-directory get-inst-headers); do
+            mkdir -p "$(dirname "$FRAMEWORK/Headers/tightdb/$header")" || exit 1
+            cp "src/tightdb/$header" "$FRAMEWORK/Headers/tightdb/$header" || exit 1
+        done
+        find "$FRAMEWORK/Headers" -iregex "^.*\.[ch]\(pp\)\{0,1\}$" \
+            -exec sed -i '' -e "s/<tightdb\(.*\)>/<$BASENAME\/tightdb\1>/g" {} \; || exit 1
+
+        zip -r -q realm-core-osx-$realm_version.zip $FRAMEWORK || exit 1
+        echo "Core framework for OS X can be found under $FRAMEWORK and realm-core-osx-$realm_version.zip."
+        exit 0
+        ;;
+
+
 
     "test")
         auto_configure || exit 1
@@ -664,6 +706,22 @@ EOF
         export TIGHTDB_HAVE_CONFIG="1"
         $MAKE "$MODE" || exit 1
         echo "Test passed"
+        exit 0
+        ;;
+
+    "gdb")
+        auto_configure || exit 1
+        export TIGHTDB_HAVE_CONFIG="1"
+        $MAKE check-debug-norun || exit 1
+        (cd "test" && gdb tightdb-tests-dbg)
+        exit 0
+        ;;
+
+    "gdb-testcase")
+        auto_configure || exit 1
+        export TIGHTDB_HAVE_CONFIG="1"
+        $MAKE check-testcase-debug-norun || exit 1
+        (cd "test/experiments" && gdb testcase-dbg)
         exit 0
         ;;
 
@@ -2319,7 +2377,8 @@ EOF
 Unspecified or bad mode '$MODE'.
 Available modes are:
     config clean build build-config-progs build-iphone build-android
-    build-ios-framework test test-debug show-install install uninstall
+    build-ios-framework build-osx-framework
+    test test-debug show-install install uninstall
     test-installed wipe-installed install-prod install-devel uninstall-prod
     uninstall-devel dist-copy src-dist bin-dist dist-deb dist-status
     dist-pull dist-checkout dist-config dist-clean dist-build
