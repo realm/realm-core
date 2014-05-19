@@ -1091,16 +1091,6 @@ TEST(Table_SortedQuery)
     TestTable::View v_sorted = table.column().second.get_sorted_view();
     CHECK_EQUAL(table.size(), v_sorted.size());
 
-    bool got_exception = false;
-    try {
-        // Verify that a sorted view cannot form the basis of a new query
-        size_t count_view_sorted = table.where().tableview(v_sorted).third.equal(false).count();
-        CHECK_EQUAL(4, count_view_sorted);
-    } catch (runtime_error) {
-        got_exception = true;
-    }
-    CHECK_EQUAL(true, got_exception);
- 
 #ifdef TIGHTDB_DEBUG
     table.Verify();
 #endif
