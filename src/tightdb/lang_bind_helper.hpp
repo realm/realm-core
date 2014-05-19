@@ -227,7 +227,7 @@ inline void LangBindHelper::set_mixed_subtable(Table& parent, std::size_t col_nd
 inline void LangBindHelper::advance_read_transact(SharedGroup& sg,
                                                   TransactLogRegistry& log_registry)
 {
-    sg.advance_read_transact(log_registry);
+    sg.advance_read(log_registry);
 }
 
 #endif
