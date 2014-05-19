@@ -91,7 +91,7 @@ AggregateState      State of the aggregate - contains a state variable that stor
 #include <algorithm>
 
 #include <tightdb/util/meta.hpp>
-#include <tightdb/util/utf8.hpp>
+#include <tightdb/unicode.hpp>
 #include <tightdb/utilities.hpp>
 #include <tightdb/table.hpp>
 #include <tightdb/table_view.hpp>
@@ -991,8 +991,8 @@ public:
         char* upper = new char[6 * v.size()];
         char* lower = new char[6 * v.size()];
 
-        bool b1 = util::case_map(v, lower, false);
-        bool b2 = util::case_map(v, upper, true);
+        bool b1 = case_map(v, lower, false);
+        bool b2 = case_map(v, upper, true);
         if (!b1 || !b2)
             error_code = "Malformed UTF-8: " + std::string(v);
 
