@@ -15,6 +15,13 @@ TESTS := $(wildcard test_*.cpp large_tests/*.cpp)
 tightdb_tests_SOURCES = $(TESTS) main.cpp
 tightdb_tests_LIBS    = util/test-util.a
 
+# Run test suite inside `gdb`
+.PHONY: gdb gdb-debug
+gdb: check-norun
+	gdb tightdb-tests
+gdb-debug: check-debug-norun
+	gdb tightdb-tests-dbg
+
 .PHONY: benchmark
 benchmark: check-norun/subdir/test-tightdb check-norun/subdir/test-sqlite3 check-norun/subdir/test-stl
 	@echo ""
@@ -58,18 +65,20 @@ benchmark-transaction: check-norun/subdir/util
 	@$(MAKE) -C benchmark-transaction check-norun
 
 # Build and run whatever is in experiements/testcase.cpp
-.PHONY: check-testcase check-testcase-debug check-testcase-debug-norun
-.PHONY: memcheck-testcase memcheck-testcase-debug
+.PHONY: check-testcase check-testcase-debug memcheck-testcase memcheck-testcase-debug
+.PHONY: gdb-testcase gdb-testcase-debug
 check-testcase: check-norun/subdir/util
 	@$(MAKE) -C experiments check
 check-testcase-debug: check-debug-norun/subdir/util
 	@$(MAKE) -C experiments check-debug
-check-testcase-debug-norun: check-debug-norun/subdir/util
-	@$(MAKE) -C experiments check-debug-norun
 memcheck-testcase: check-norun/subdir/util
 	@$(MAKE) -C experiments memcheck
 memcheck-testcase-debug: check-debug-norun/subdir/util
 	@$(MAKE) -C experiments memcheck-debug
+gdb-testcase: check-norun/subdir/util
+	@$(MAKE) -C experiments gdb-testcase
+gdb-testcase-debug: check-debug-norun/subdir/util
+	@$(MAKE) -C experiments gdb-testcase-debug
 
 
 include ../src/generic.mk
