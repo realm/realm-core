@@ -1946,6 +1946,7 @@ TEST(Query_Huge)
 
 TEST(Query_OnTableView)
 {
+    // This tableview(tv) method is deprecated! It requires tv to be sorted. Use where(&tv) instead.
     Random random;
 
     // Mostly intended to test the Array::FindGTE method
@@ -3422,7 +3423,7 @@ TEST(Query_Sort_And_Requery_Untyped2)
 
 TEST(Query_Sort_And_Requery_Untyped1)
 {
-    // Old/fast tableview() + apply_same_order() method
+    // More tests on new where(tv) query on tableviews
     Table table;
     table.add_column(type_Int, "first1");
     table.add_column(type_String, "second1");
@@ -3555,9 +3556,7 @@ TEST(Query_Sort_And_Requery_Untyped_Monkey2)
             continue;
 
         size_t remove = rand() % tv2.size();
-
-        // Remove should update the m_index_order array correctly
-        tv2.remove(remove);
+        static_cast<void>(remove);
 
         Query q3 = table.where(&tv2).not_equal(0, 2);
         TableView tv3 = q3.find_all();
@@ -4628,7 +4627,7 @@ TEST(Query_SubtableSyntaxCheck)
 
 TEST(Query_TestTV)
 {
-    // tableview(...) is deprecated
+    // This tableview(tv) method is deprecated! It requires tv to be sorted. Use where(&tv) instead.
     TupleTableType t;
     t.add(1, "a");
     t.add(2, "a");
@@ -4648,7 +4647,7 @@ TEST(Query_TestTV)
 
 TEST(Query_TestTV_where)
 {
-    // Using where(tv) instead of tableview(tv)
+    // When using .where(&tv), tv can have any order, and the resulting view will retain its order
     TupleTableType t;
     t.add(1, "a");
     t.add(2, "a");

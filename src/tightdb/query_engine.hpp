@@ -91,7 +91,7 @@ AggregateState      State of the aggregate - contains a state variable that stor
 #include <algorithm>
 
 #include <tightdb/util/meta.hpp>
-#include <tightdb/util/utf8.hpp>
+#include <tightdb/unicode.hpp>
 #include <tightdb/utilities.hpp>
 #include <tightdb/table.hpp>
 #include <tightdb/table_view.hpp>
@@ -515,11 +515,7 @@ public:
     // Return the n'th table row index contained in the TableView.
     size_t tableindex(size_t n)
     {
-        // If TableView is sorted increasingly, then simply return m_refs[n].
-        // If TableView is non-sorted, then go through its ordere array to return the same as it would have returned if it
-        // had been sorted
-        size_t n2 = m_tv.m_is_in_index_order ? n : m_tv.get_index_order_column().get(n);
-        return to_size_t(m_tv.get_ref_column().get(n2));
+        return to_size_t(m_tv.get_ref_column().get(n));
     }
 
     void init(const Table& table) TIGHTDB_OVERRIDE
@@ -540,12 +536,7 @@ public:
     {
         // Simply return index of first table row which is >= start
         size_t r;
-        if (m_tv.m_is_in_index_order) {
-            r = m_tv.get_ref_column().FindGTE(start, m_next, null_ptr);
-        }
-        else {
-            r = m_tv.get_ref_column().FindGTE(start, m_next, &m_tv.get_index_order_column());
-        }
+        r = m_tv.get_ref_column().FindGTE(start, m_next, null_ptr);
 
         if (r >= end)
             return not_found;
@@ -1008,8 +999,8 @@ public:
         char* upper = new char[6 * v.size()];
         char* lower = new char[6 * v.size()];
 
-        bool b1 = util::case_map(v, lower, false);
-        bool b2 = util::case_map(v, upper, true);
+        bool b1 = case_map(v, lower, false);
+        bool b2 = case_map(v, upper, true);
         if (!b1 || !b2)
             error_code = "Malformed UTF-8: " + std::string(v);
 

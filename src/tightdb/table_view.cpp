@@ -1,6 +1,7 @@
 #include <tightdb/table_view.hpp>
 #include <tightdb/column.hpp>
 #include <tightdb/column_basic.hpp>
+#include <tightdb/util/utf8.hpp>
 
 using namespace std;
 using namespace tightdb;
@@ -200,136 +201,151 @@ size_t TableViewBase::count_double(size_t column_ndx, double target) const
     return aggregate<act_Count, double, size_t, ColumnDouble>(NULL, column_ndx, target);
 }
 
-// Put items in 'this' in same order as 'order'. Requirements: 'this' must be a subset of 'order'. Also, both 
-// TableViews must have coherent m_is_in_index_order and m_index_order members. O(n*log(n)) for n = 
-// order.size().
-//
-// Rationale: find_all() always returns an increasingly sorted TableView. If you have once called
-// res = ...tableview(tv).find_all() you can call this method to give 'res' the same sort order as 'tv'
-void TableViewBase::apply_same_order(TableViewBase& order)
+namespace tightdb {
+
+    template <> StringData TableViewBase::GetValue<StringData>(size_t row, size_t column) const
+    {
+        return get_string(column, row);
+    }
+
+    template <> float TableViewBase::GetValue<float>(size_t row, size_t column) const
+    {
+        return get_float(column, row);
+    }
+
+    template <> double TableViewBase::GetValue<double>(size_t row, size_t column) const
+    {
+        return get_double(column, row);
+    }
+}
+
+// Fixme, 'compare' is workaround because using utf8.hpp inside '<' operator of StringData gives circular reference
+template <class T> bool compare(T v1, T v2)
 {
-    // Both are increasingly, hence already have same order
-    if (m_is_in_index_order && order.m_is_in_index_order)
-        return;
-    
-    Array& sorted = order.get_index_order_column();
-    Array& view = order.get_ref_column();
-    Array res;
+    return v1 < v2;
+}
 
-    TIGHTDB_ASSERT(order.m_is_in_index_order || sorted.size() == view.size());
-    TIGHTDB_ASSERT(m_is_in_index_order || get_index_order_column().size() == get_ref_column().size());
+template <> bool compare<StringData>(StringData v1, StringData v2)
+{
+    bool ret = utf8_compare(v1.data(), v2.data());
+    return ret;
+}
 
-    // Add same number of entries as in 'order', mark all as non-existing (-1)
-    for (size_t t = 0; t < view.size(); t++)
-        res.add(-1);
-
-    size_t index = 0;
-    for (size_t t = 0; t < m_refs.size(); t++) {
-
-        // Take next element in 'this' and find it in 'order'
-        while (view.get(order.m_is_in_index_order ? index : sorted[index]) <
-               m_refs[m_is_in_index_order ? t : get_index_order_column().get(t)]) {
-            index++;
-        }
-
-        TIGHTDB_ASSERT(view.get(order.m_is_in_index_order ? index : sorted[index]) == 
-                       m_refs[m_is_in_index_order ? t : get_index_order_column().get(t)]);
-
-        // Add found element to 'res' (overwriting the -1)
-        size_t a = order.m_is_in_index_order ? index : sorted[index];
-        size_t b = m_refs[m_is_in_index_order ? t : get_index_order_column().get(t)];
-        res.set(a, b);
+template <class T> struct Comparer
+{
+    Comparer(size_t column, bool ascend, TableViewBase& tv) : m_column(column), m_ascending(ascend), m_tv(tv) {}
+    bool operator() (size_t i, size_t j) const {
+        T v1 = m_tv.GetValue<T>(i, m_column);
+        T v2 = m_tv.GetValue<T>(j, m_column);
+        bool b = compare(v1, v2);
+        return m_ascending ? b : !b;
     }
 
-    // Copy all items from res to m_refs, skipping those marked as non-existing (-1)
+    size_t m_column;
+    bool m_ascending;
+    TableViewBase& m_tv;
+};
+
+// Sort m_refs with std::sort using Comparer as predicate
+template <class T> void TableViewBase::sort(size_t column, bool ascending)
+{
+    vector<size_t> v, v2;
+    for (size_t t = 0; t < size(); t++) {
+        v.push_back(t);
+        v2.push_back(get_source_ndx(t));
+    }
+    std::stable_sort(v.begin(), v.end(), Comparer<T>(column, ascending, *this));
     m_refs.clear();
-    for (size_t t = 0; t < res.size(); t++) {
-        if (res[t] != -1)
-            m_refs.add(res[t]);
-    }
-
-    m_is_in_index_order = false;
-    // Todo, see if we can avoid this rebuild which runs O(n*log(n)) quicksort.
-    rebuild_index_order_column();
+    for (size_t t = 0; t < v.size(); t++)
+        m_refs.add(v2[v[t]]);
 }
 
 void TableViewBase::sort(size_t column, bool Ascending)
 {
     TIGHTDB_ASSERT(m_table);
-    TIGHTDB_ASSERT(m_table->get_column_type(column) == type_Int  ||
-                   m_table->get_column_type(column) == type_DateTime ||
-                   m_table->get_column_type(column) == type_Bool);
+
+    DataType type = m_table->get_column_type(column);
+
+    TIGHTDB_ASSERT(type == type_Int  ||
+                   type == type_DateTime ||
+                   type == type_Bool ||
+                   type == type_Float ||
+                   type == type_Double ||
+                   type == type_String);
 
     if (m_refs.size() == 0)
         return;
-    m_is_in_index_order = false;
-
-    Array vals;
-    Array ref;
+    
     Array result;
 
-    //ref.Preset(0, m_refs.size() - 1, m_refs.size());
-    for (size_t t = 0; t < m_refs.size(); t++)
-        ref.add(t);
-
-    // Extract all values from the Column and put them in an Array because Array is much faster to operate on
-    // with rand access (we have ~log(n) accesses to each element, so using 1 additional read to speed up the rest is faster)
-    if (m_table->get_column_type(column) == type_Int) {
-        for (size_t t = 0; t < m_refs.size(); t++) {
-            int64_t v = m_table->get_int(column, size_t(m_refs.get(t)));
-            vals.add(v);
-        }
+    if (type == type_Float) {
+        sort<float>(column, Ascending);
     }
-    else if (m_table->get_column_type(column) == type_DateTime) {
-        for (size_t t = 0; t < m_refs.size(); t++) {
-            size_t idx = size_t(m_refs.get(t));
-            int64_t v = int64_t(m_table->get_datetime(column, idx).get_datetime());
-            vals.add(v);
-        }
+    else if (type == type_Double) {
+        sort<double>(column, Ascending);
     }
-    else if (m_table->get_column_type(column) == type_Bool) {
-        for (size_t t = 0; t < m_refs.size(); t++) {
-            size_t idx = size_t(m_refs.get(t));
-            int64_t v = int64_t(m_table->get_bool(column, idx));
-            vals.add(v);
-        }
-    }
-
-    vals.ReferenceSort(ref);
-    vals.destroy();
-
-    for (size_t t = 0; t < m_refs.size(); t++) {
-        size_t r  = to_size_t(ref.get(t));
-        size_t rr = to_size_t(m_refs.get(r));
-        result.add(rr);
-    }
-
-    // Copy result to m_refs (todo, there might be a shortcut)
-    m_refs.clear();
-    if (Ascending) {
-        for (size_t t = 0; t < ref.size(); t++) {
-            size_t v = to_size_t(result.get(t));
-            m_refs.add(v);
-        }
+    else if (type == type_String) {
+        sort<tightdb::StringData>(column, Ascending);
     }
     else {
-        for (size_t t = 0; t < ref.size(); t++) {
-            size_t v = to_size_t(result.get(ref.size() - t - 1));
-            m_refs.add(v);
+
+        Array vals;
+        Array ref;
+
+        //ref.Preset(0, m_refs.size() - 1, m_refs.size());
+        for (size_t t = 0; t < m_refs.size(); t++)
+            ref.add(t);
+
+        // Extract all values from the Column and put them in an Array because Array is much faster to operate on
+        // with rand access (we have ~log(n) accesses to each element, so using 1 additional read to speed up the rest is faster)
+        if (type == type_Int) {
+            for (size_t t = 0; t < m_refs.size(); t++) {
+                int64_t v = m_table->get_int(column, size_t(m_refs.get(t)));
+                vals.add(v);
+            }
         }
+        else if (type == type_DateTime) {
+            for (size_t t = 0; t < m_refs.size(); t++) {
+                size_t idx = size_t(m_refs.get(t));
+                int64_t v = int64_t(m_table->get_datetime(column, idx).get_datetime());
+                vals.add(v);
+            }
+        }
+        else if (type == type_Bool) {
+            for (size_t t = 0; t < m_refs.size(); t++) {
+                size_t idx = size_t(m_refs.get(t));
+                int64_t v = int64_t(m_table->get_bool(column, idx));
+                vals.add(v);
+            }
+        }
+
+        vals.ReferenceSort(ref);
+        vals.destroy();
+
+        for (size_t t = 0; t < m_refs.size(); t++) {
+            size_t r = to_size_t(ref.get(t));
+            size_t rr = to_size_t(m_refs.get(r));
+            result.add(rr);
+        }
+
+        // Copy result to m_refs (todo, there might be a shortcut)
+        m_refs.clear();
+        if (Ascending) {
+            for (size_t t = 0; t < ref.size(); t++) {
+                size_t v = to_size_t(result.get(t));
+                m_refs.add(v);
+            }
+        }
+        else {
+            for (size_t t = 0; t < ref.size(); t++) {
+                size_t v = to_size_t(result.get(ref.size() - t - 1));
+                m_refs.add(v);
+            }
+        }
+        result.destroy();
+        ref.destroy();
     }
 
-
-    for (size_t t = 0; t < ref.size(); t++) {
-        m_index_order.add(0);
-    }
-
-    for (size_t t = 0; t < ref.size(); t++) {
-        m_index_order.set(ref[t], t);
-    }
-
-    result.destroy();
-    ref.destroy();
 }
 
 // Simple pivot aggregate method. Experimental! Please do not document method publicly.
@@ -409,20 +425,6 @@ void TableView::remove(size_t ndx)
     //
     // O(n) for n = this->size(). FIXME: Dangerous cast below: unsigned -> signed
     m_refs.adjust_ge(int_fast64_t(real_ndx), -1);
-
-    if (!m_is_in_index_order) {
-        // Delete reference in m_index_order
-        size_t t;
-        for (t = 0; t < m_index_order.size(); t++) {
-            if (to_size_t(m_index_order.get(t)) == ndx) {
-                m_index_order.erase(t);
-                m_index_order.adjust_ge(int_fast64_t(ndx), -1);
-                break;
-            }
-        }
-        TIGHTDB_ASSERT(t <= m_index_order.size()); // Ensure the reference in m_index_order was actually found
-    }
-
 }
 
 
@@ -439,6 +441,4 @@ void TableView::clear()
     }
 
     m_refs.clear();
-    m_index_order.clear();
-    m_is_in_index_order = false;
 }

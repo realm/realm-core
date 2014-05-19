@@ -26,9 +26,7 @@
 
 namespace tightdb {
 
-
 using std::size_t;
-
 
 /// Common base class for TableView and ConstTableView.
 class TableViewBase {
@@ -115,18 +113,13 @@ public:
     void to_string(std::ostream&, std::size_t limit = 500) const;
     void row_to_string(std::size_t row_ndx, std::ostream&) const;
 
+    // todo, uninvestigated compiler error message if we make GetValue protected and declare Comparer friend
+    template <class T> T GetValue(size_t row, size_t column) const;
+
 protected:
     // Null if, and only if, the view is detached
     mutable TableRef m_table;
     Array m_refs;
-
-    // If m_is_in_index_order == false, then this array must contain pointers into m_refs such that the items pointed 
-    // at are in increasingly sorted order. m_index_order must be maintained upon modifying m_refs (that is, upon 
-    // TableView::remove() and future modifying methods).
-    mutable Array m_index_order;
-
-    // If m_is_in_index_order == true, then m_index_order has no requirements and can be empty.
-    bool m_is_in_index_order;
 
     /// Construct null view (no memory allocated).
     TableViewBase();
@@ -146,8 +139,6 @@ protected:
 
     Array& get_ref_column() TIGHTDB_NOEXCEPT;
     const Array& get_ref_column() const TIGHTDB_NOEXCEPT;
-    Array& get_index_order_column() const TIGHTDB_NOEXCEPT;
-    void rebuild_index_order_column() const TIGHTDB_NOEXCEPT;
 
     template<class R, class V> static R find_all_integer(V*, std::size_t, int64_t);
     template<class R, class V> static R find_all_float(V*, std::size_t, float);
@@ -157,7 +148,7 @@ protected:
 private:
     void detach() const TIGHTDB_NOEXCEPT;
     std::size_t find_first_integer(std::size_t column_ndx, int64_t value) const;
-
+    template <class T> void sort(size_t column, bool ascending);
     friend class Table;
     friend class Query;
 };
@@ -170,7 +161,6 @@ inline void TableViewBase::detach() const TIGHTDB_NOEXCEPT
 
 
 class ConstTableView;
-
 
 
 /// A TableView gives read and write access to the parent table.
@@ -343,20 +333,19 @@ inline std::size_t TableViewBase::get_source_ndx(std::size_t row_ndx) const TIGH
 }
 
 inline TableViewBase::TableViewBase():
-    m_refs(Allocator::get_default()), m_is_in_index_order(true)
+    m_refs(Allocator::get_default())
 {
 }
 
 inline TableViewBase::TableViewBase(Table* parent):
-    m_table(parent->get_table_ref()), m_is_in_index_order(true)
+    m_table(parent->get_table_ref())
 {
     parent->register_view(this);
 }
 
 inline TableViewBase::TableViewBase(const TableViewBase& tv):
     m_table(tv.m_table), 
-    m_refs(tv.m_refs, Allocator::get_default()),
-    m_is_in_index_order(tv.m_is_in_index_order)
+    m_refs(tv.m_refs, Allocator::get_default())
 {
     if (m_table)
         m_table->register_view(this);
@@ -364,8 +353,7 @@ inline TableViewBase::TableViewBase(const TableViewBase& tv):
 
 inline TableViewBase::TableViewBase(TableViewBase* tv) TIGHTDB_NOEXCEPT:
     m_table(tv->m_table), 
-    m_refs(tv->m_refs), // Note: This is a moving copy
-    m_is_in_index_order(tv->m_is_in_index_order)
+    m_refs(tv->m_refs) // Note: This is a moving copy
 {
     if (m_table) {
         m_table->unregister_view(tv);
@@ -405,7 +393,6 @@ inline void TableViewBase::move_assign(TableViewBase* tv) TIGHTDB_NOEXCEPT
         m_table->register_view(this);
     }
     m_refs.move_assign(tv->m_refs);
-    m_is_in_index_order = tv->m_is_in_index_order;
 }
 
 inline Array& TableViewBase::get_ref_column() TIGHTDB_NOEXCEPT
@@ -418,19 +405,6 @@ inline const Array& TableViewBase::get_ref_column() const TIGHTDB_NOEXCEPT
     return m_refs;
 }
 
-inline Array& TableViewBase::get_index_order_column() const TIGHTDB_NOEXCEPT
-{
-    return m_index_order;
-}
-
-inline void TableViewBase::rebuild_index_order_column() const TIGHTDB_NOEXCEPT
-{
-    m_index_order.clear();
-    for (size_t t = 0; t < m_refs.size(); t++) {
-        m_index_order.add(t);
-    }
-    m_refs.ReferenceSort(m_index_order);
-}
 
 #define TIGHTDB_ASSERT_COLUMN(column_ndx)                                   \
     TIGHTDB_ASSERT(m_table);                                                \
