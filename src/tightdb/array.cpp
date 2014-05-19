@@ -653,15 +653,22 @@ void Array::set_all_to_zero()
 }
 
 
-// return first element E for which E >= target or return -1 if none. Array must be sorted
-size_t Array::FindGTE(int64_t target, size_t start) const
+// If indirection == null_ptr, then return lowest 'i' for which for which this->get(i) >= target or -1 if none. If
+// indirection == null_ptr then 'this' must be sorted increasingly.
+//
+// If indirection exists, then return lowest 'i' for which this->get(indirection->get(i)) >= target or -1 if none.
+// If indirection exists, then 'this' can be non-sorted, but 'indirection' must point into 'this' such that the values
+// pointed at are sorted increasingly
+//
+// This method is mostly used by query_engine to enumerate table row indexes in increasing order through a TableView
+size_t Array::FindGTE(int64_t target, size_t start, const Array* indirection) const
 {
 #if TIGHTDB_DEBUG
     // Reference implementation to illustrate and test behaviour
     size_t ref = 0;
     size_t idx;
     for (idx = start; idx < m_size; ++idx) {
-        if (get(idx) >= target) {
+        if (get(indirection ? indirection->get(idx) : idx) >= target) {
             ref = idx;
             break;
         }
@@ -678,12 +685,12 @@ size_t Array::FindGTE(int64_t target, size_t start) const
     }
 
     if (start + 2 < m_size) {
-        if (get(start) >= target) {
+        if (get(indirection ? indirection->get(start) : start) >= target) {
             ret = start;
             goto exit;
         }
         ++start;
-        if (get(start) >= target) {
+        if (get(indirection ? indirection->get(start) : start) >= target) {
             ret = start;
             goto exit;
         }
@@ -691,7 +698,7 @@ size_t Array::FindGTE(int64_t target, size_t start) const
     }
 
     // Todo, use templated get<width> from this point for performance
-    if (target > get(m_size - 1)) {
+    if (target > get(indirection ? indirection->get(m_size - 1) : m_size - 1)) {
         ret = not_found;
         goto exit;
     }
@@ -700,7 +707,7 @@ size_t Array::FindGTE(int64_t target, size_t start) const
     add = 1;
 
     for (;;) {
-        if (start + add < m_size && get(start + add) < target)
+        if (start + add < m_size && get(indirection ? indirection->get(start + add) : start + add) < target)
             start += add;
         else
             break;
@@ -722,7 +729,7 @@ size_t Array::FindGTE(int64_t target, size_t start) const
     orig_high = high;
     while (high - start > 1) {
         size_t probe = (start + high) / 2; // FIXME: Prone to overflow - see lower_bound() for a solution
-        int64_t v = get(probe);
+        int64_t v = get(indirection ? indirection->get(probe) : probe);
         if (v < target)
             start = probe;
         else
@@ -1762,7 +1769,7 @@ void Array::sort()
 
 // Find max and min value, but break search if difference exceeds 'maxdiff' (in which case *min and *max is set to 0)
 // Useful for counting-sort functions
-template<size_t w>bool Array::MinMax(size_t from, size_t to, uint64_t maxdiff, int64_t *min, int64_t *max)
+template<size_t w>bool Array::MinMax(size_t from, size_t to, uint64_t maxdiff, int64_t *min, int64_t *max) const
 {
     int64_t min2;
     int64_t max2;
@@ -1800,18 +1807,15 @@ template<size_t w>bool Array::MinMax(size_t from, size_t to, uint64_t maxdiff, i
 
 // Take index pointers to elements as argument and sort the pointers according to values they point at. Leave m_array untouched. The ref array
 // is allowed to contain fewer elements than m_array.
-void Array::ReferenceSort(Array& ref)
+void Array::ReferenceSort(Array& ref) const
 {
     TIGHTDB_TEMPEX(ReferenceSort, m_width, (ref));
 }
 
-template<size_t w>void Array::ReferenceSort(Array& ref)
+template<size_t w>void Array::ReferenceSort(Array& ref) const
 {
     if (m_size < 2)
         return;
-
-    int64_t min;
-    int64_t max;
 
     // in avg case QuickSort is O(n*log(n)) and CountSort O(n + range), and memory usage is sizeof(size_t)*range for CountSort.
     // So we chose range < m_size as treshold for deciding which to use
@@ -1819,15 +1823,19 @@ template<size_t w>void Array::ReferenceSort(Array& ref)
     // If range isn't suited for CountSort, it's *probably* discovered very early, within first few values, in most practical cases,
     // and won't add much wasted work. Max wasted work is O(n) which isn't much compared to QuickSort.
 
+//    int64_t min;
+//    int64_t max;
 //  bool b = MinMax<w>(0, m_size, m_size, &min, &max); // auto detect
 //  bool b = MinMax<w>(0, m_size, -1, &min, &max); // force count sort
-    bool b = MinMax<w>(0, m_size, 0, &min, &max); // force quicksort
+//  bool b = MinMax<w>(0, m_size, 0, &min, &max); // force quicksort
 
+    /*
+    // Count sort disabled for simplicity/stability
     if (b) {
         Array res;
         Array count;
 
-        // Todo, Preset crashes for unknown reasons but would be faster.
+//        Todo, Preset crashes for unknown reasons but would be faster.
 //      res.Preset(0, m_size, m_size);
 //      count.Preset(0, m_size, max - min + 1);
 
@@ -1862,7 +1870,9 @@ template<size_t w>void Array::ReferenceSort(Array& ref)
         res.destroy();
         count.destroy();
     }
-    else {
+    else
+    */
+    {
         ReferenceQuickSort(ref);
     }
 }
@@ -1921,12 +1931,12 @@ template<size_t w> void Array::sort()
     return;
 }
 
-void Array::ReferenceQuickSort(Array& ref)
+void Array::ReferenceQuickSort(Array& ref) const
 {
     TIGHTDB_TEMPEX(ReferenceQuickSort, m_width, (0, m_size - 1, ref));
 }
 
-template<size_t w> void Array::ReferenceQuickSort(size_t lo, size_t hi, Array& ref)
+template<size_t w> void Array::ReferenceQuickSort(size_t lo, size_t hi, Array& ref) const
 {
     // Quicksort based on
     // http://www.inf.fh-flensburg.de/lang/algorithmen/sortieren/quick/quicken.htm
