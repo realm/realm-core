@@ -394,18 +394,14 @@ inline void TableViewBase::move_assign(TableViewBase* tv) TIGHTDB_NOEXCEPT
         m_table->register_view(this);
     }
 
-//    memcpy(&m_refs, &tv->m_refs, sizeof(m_refs));
-//    tv->detach();
     m_refs.clear();
     for (size_t t = 0; t < tv->size(); t++)
         m_refs.add(tv->get_source_ndx(t));
         
+    tv->m_refs.destroy();
+
     //    m_refs.move_assign(tv->m_refs); fixmetv
 
-//    m_refs 
-
-
-    m_is_in_index_order = tv->m_is_in_index_order;
 }
 
 inline Column& TableViewBase::get_ref_column() TIGHTDB_NOEXCEPT

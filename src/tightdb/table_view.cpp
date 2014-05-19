@@ -354,6 +354,7 @@ void TableView::clear()
 {
     TIGHTDB_ASSERT(m_table);
 //    m_refs.sort(); fixmetv
+    
 
     // Delete all referenced rows in source table
     // (in reverse order to avoid index drift)

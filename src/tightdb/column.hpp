@@ -289,8 +289,6 @@ public:
     /// Compare two columns for equality.
     bool compare_int(const Column&) const;
 
-    Array get_as_array(void) const;
-
     static ref_type create(Array::Type leaf_type, std::size_t size, int_fast64_t value,
                            Allocator&);
 
@@ -459,16 +457,6 @@ inline ref_type ColumnBase::create(std::size_t size, Allocator& alloc, CreateHan
     std::size_t rest_size = size;
     std::size_t fixed_height = 0; // Not fixed
     return build(&rest_size, fixed_height, alloc, handler);
-}
-
-
-inline Array Column::get_as_array() const
-{
-    Array a;
-    for (size_t t = 0; t < size(); t++) {
-        a.add(get(t));
-    }
-    return a;
 }
 
 inline Column::Column(Allocator& alloc):
