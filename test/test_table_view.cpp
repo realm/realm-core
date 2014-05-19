@@ -60,6 +60,11 @@ TIGHTDB_TABLE_2(TestTableDate,
                 first, DateTime,
                 second, Int)
 
+TIGHTDB_TABLE_2(TestTableFloatDouble,
+                first, Float,
+                second, Double)
+
+
 } // anonymous namespace
 
 
@@ -433,6 +438,136 @@ TEST(TableView_FindAllString)
     CHECK_EQUAL(1, v2.get_source_ndx(0));
     CHECK_EQUAL(2, v2.get_source_ndx(1));
 }
+
+
+// primitive C locale comparer. But that's OK since all we want to test is if the callback is invoked
+bool got_called = false;
+bool comparer(const char* s1, const char* s2)
+{
+    got_called = true;
+    return *s1 < *s2;  
+}
+
+TEST(TableView_StringSort)
+{
+    // WARNING: Do not use the C++11 method (set_string_compare_method(1)) on Windows 8.1 because it has a bug that 
+    // takes length in count when sorting ("b" comes before "aaaa"). Bug is not present in Windows 7.
+
+    // Test of handling of unicode takes place in test_utf8.cpp
+    TestTableString table;
+
+    table.add("alpha");
+    table.add("zebra");
+    table.add("ALPHA");
+    table.add("ZEBRA");
+
+    // Core-only is default comparer
+    TestTableString::View v = table.where().find_all();
+    v.column().first.sort();
+    CHECK_EQUAL("alpha", v[0].first);
+    CHECK_EQUAL("ALPHA", v[1].first);
+    CHECK_EQUAL("zebra", v[2].first);
+    CHECK_EQUAL("ZEBRA", v[3].first);
+
+    // Should be exactly the same as above because 0 was default already
+    set_string_compare_method(STRING_COMPARE_CORE, null_ptr);
+    v.column().first.sort();
+    CHECK_EQUAL("alpha", v[0].first);
+    CHECK_EQUAL("ALPHA", v[1].first);
+    CHECK_EQUAL("zebra", v[2].first);
+    CHECK_EQUAL("ZEBRA", v[3].first);
+
+    // Test descending mode
+    v.column().first.sort(false);
+    CHECK_EQUAL("alpha", v[3].first);
+    CHECK_EQUAL("ALPHA", v[2].first);
+    CHECK_EQUAL("zebra", v[1].first);
+    CHECK_EQUAL("ZEBRA", v[0].first);
+
+    // Test if callback comparer works. Our callback is a primitive dummy-comparer
+    set_string_compare_method(STRING_COMPARE_CALLBACK, &comparer);
+    v.column().first.sort();
+    CHECK_EQUAL("ALPHA", v[0].first);
+    CHECK_EQUAL("ZEBRA", v[1].first);
+    CHECK_EQUAL("alpha", v[2].first);
+    CHECK_EQUAL("zebra", v[3].first);
+    CHECK_EQUAL(true, got_called);
+    
+    // Try C++11 method which uses current locale of the operating system to give precise sorting
+    got_called = false;
+    bool available = set_string_compare_method(STRING_COMPARE_CPP11, null_ptr);
+    if (available) {
+        v.column().first.sort();
+        CHECK_EQUAL("alpha", v[0].first);
+        CHECK_EQUAL("ALPHA", v[1].first);
+        CHECK_EQUAL("zebra", v[2].first);
+        CHECK_EQUAL("ZEBRA", v[3].first);
+        CHECK_EQUAL(false, got_called);
+    }
+
+    // Set back to default for use by other unit tests
+    set_string_compare_method(STRING_COMPARE_CORE, null_ptr);
+}
+
+TEST(TableView_FloatDoubleSort)
+{
+    TestTableFloatDouble t;
+
+    t.add(1.0f, 10.0);
+    t.add(3.0f, 30.0);
+    t.add(2.0f, 20.0);
+    t.add(0.0f, 5.0);
+
+    TestTableFloatDouble::View tv = t.where().find_all();
+    tv.column().first.sort();
+
+    CHECK_EQUAL(0.0f, tv[0].first);
+    CHECK_EQUAL(1.0f, tv[1].first);
+    CHECK_EQUAL(2.0f, tv[2].first);
+    CHECK_EQUAL(3.0f, tv[3].first);
+
+    tv.column().second.sort();
+    CHECK_EQUAL(5.0f, tv[0].second);
+    CHECK_EQUAL(10.0f, tv[1].second);
+    CHECK_EQUAL(20.0f, tv[2].second);
+    CHECK_EQUAL(30.0f, tv[3].second);
+}
+
+TEST(TableView_DoubleSortPrecision)
+{
+    // Detect if sorting algorithm accidentially casts doubles to float somewhere so that precision gets lost 
+    TestTableFloatDouble t;
+
+    double d1 = 100000000000.0;
+    double d2 = 100000000001.0;
+
+    // When casted to float, they are equal
+    float f1 = static_cast<float>(d1);
+    float f2 = static_cast<float>(d2);
+
+    // If this check fails, it's a bug in this unit test, not in Realm
+    CHECK_EQUAL(f1, f2); 
+
+    // First verify that our unit is guaranteed to find such a bug; that is, test if such a cast is guaranteed to give
+    // bad sorting order. This is not granted, because an unstable sorting algorithm could *by chance* give the 
+    // correct sorting order. Fortunatly we use std::stable_sort which must maintain order on draws.
+    t.add(f2, d2);
+    t.add(f1, d1);
+
+    TestTableFloatDouble::View tv = t.where().find_all();
+    tv.column().first.sort();
+
+    // Sort should be stable
+    CHECK_EQUAL(f2, tv[0].first);
+    CHECK_EQUAL(f1, tv[1].first);
+
+    // If sort is stable, and compare makes a draw because the doubles are accidentially casted to float in Realm, then
+    // original order would be maintained. Check that it's not maintained:
+    tv.column().second.sort();
+    CHECK_EQUAL(d1, tv[0].second);
+    CHECK_EQUAL(d2, tv[1].second);
+}
+
 
 TEST(TableView_Delete)
 {

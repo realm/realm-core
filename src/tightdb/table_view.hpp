@@ -27,9 +27,7 @@
 
 namespace tightdb {
 
-
 using std::size_t;
-
 
 /// Common base class for TableView and ConstTableView.
 class TableViewBase {
@@ -114,6 +112,9 @@ public:
     void to_string(std::ostream&, std::size_t limit = 500) const;
     void row_to_string(std::size_t row_ndx, std::ostream&) const;
 
+    // todo, uninvestigated compiler error message if we make GetValue protected and declare Comparer friend
+    template <class T> T GetValue(size_t row, size_t column) const;
+
 protected:
     // Null if, and only if, the view is detached
     mutable TableRef m_table;
@@ -147,7 +148,7 @@ protected:
 private:
     void detach() const TIGHTDB_NOEXCEPT;
     std::size_t find_first_integer(std::size_t column_ndx, int64_t value) const;
-
+    template <class T> void sort(size_t column, bool ascending);
     friend class Table;
     friend class Query;
 };
@@ -160,7 +161,6 @@ inline void TableViewBase::detach() const TIGHTDB_NOEXCEPT
 
 
 class ConstTableView;
-
 
 
 /// A TableView gives read and write access to the parent table.
