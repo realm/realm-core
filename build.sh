@@ -709,6 +709,22 @@ EOF
         exit 0
         ;;
 
+    "gdb")
+        auto_configure || exit 1
+        export TIGHTDB_HAVE_CONFIG="1"
+        $MAKE check-debug-norun || exit 1
+        (cd "test" && gdb tightdb-tests-dbg)
+        exit 0
+        ;;
+
+    "gdb-testcase")
+        auto_configure || exit 1
+        export TIGHTDB_HAVE_CONFIG="1"
+        $MAKE check-testcase-debug-norun || exit 1
+        (cd "test/experiments" && gdb testcase-dbg)
+        exit 0
+        ;;
+
     "show-install")
         temp_dir="$(mktemp -d /tmp/tightdb.show-install.XXXX)" || exit 1
         mkdir "$temp_dir/fake-root" || exit 1

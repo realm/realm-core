@@ -1061,10 +1061,10 @@ TEST(Table_SortedInt)
 #endif
 }
 
-TEST(Table_Sorted_Query)
+TEST(Table_SortedQuery)
 {
     TestTable table;
-    
+
     table.add(0, 10, true, Wed); // 0: 4
     table.add(0, 20, false, Wed); // 1: 7
     table.add(0,  0, false, Wed); // 2: 0
@@ -1075,22 +1075,22 @@ TEST(Table_Sorted_Query)
     table.add(0,  4, true, Wed); // 7: 2
     table.add(0, 99, true, Wed); // 8: 9
     table.add(0,  2, true, Wed); // 9: 1
-    
+
     // Count booleans
     size_t count_original = table.where().third.equal(false).count();
     CHECK_EQUAL(4, count_original);
-    
+
     // Get a view containing the complete table
     TestTable::View v = table.column().first.find_all(0);
     CHECK_EQUAL(table.size(), v.size());
-    
+
     // Count booleans
     size_t count_view = table.where().tableview(v).third.equal(false).count();
     CHECK_EQUAL(4, count_view);
-    
+
     TestTable::View v_sorted = table.column().second.get_sorted_view();
     CHECK_EQUAL(table.size(), v_sorted.size());
-    
+
     bool got_exception = false;
     try {
         // Verify that a sorted view cannot form the basis of a new query
@@ -3253,6 +3253,93 @@ TEST(Table_WriteSlice)
             }
         }
     }
+}
+
+
+TEST(Table_Parent)
+{
+    TableRef table = Table::create();
+    CHECK_EQUAL(TableRef(), table->get_parent_table());
+    CHECK_EQUAL(tightdb::npos, table->get_index_in_parent());
+
+    DescriptorRef subdesc;
+    table->add_column(type_Table, "", &subdesc);
+    table->add_column(type_Mixed, "");
+    subdesc->add_column(type_Int, "");
+    table->add_empty_row(2);
+    table->set_mixed(1, 0, Mixed::subtable_tag());
+    table->set_mixed(1, 1, Mixed::subtable_tag());
+
+    TableRef subtab;
+    size_t column_ndx = 0;
+
+    subtab = table->get_subtable(0,0);
+    CHECK_EQUAL(table, subtab->get_parent_table(&column_ndx));
+    CHECK_EQUAL(0, column_ndx);
+    CHECK_EQUAL(0, subtab->get_index_in_parent());
+
+    subtab = table->get_subtable(0,1);
+    CHECK_EQUAL(table, subtab->get_parent_table(&column_ndx));
+    CHECK_EQUAL(0, column_ndx);
+    CHECK_EQUAL(1, subtab->get_index_in_parent());
+
+    subtab = table->get_subtable(1,0);
+    CHECK_EQUAL(table, subtab->get_parent_table(&column_ndx));
+    CHECK_EQUAL(1, column_ndx);
+    CHECK_EQUAL(0, subtab->get_index_in_parent());
+
+    subtab = table->get_subtable(1,1);
+    CHECK_EQUAL(table, subtab->get_parent_table(&column_ndx));
+    CHECK_EQUAL(1, column_ndx);
+    CHECK_EQUAL(1, subtab->get_index_in_parent());
+
+    // Check that column indexes are properly adjusted after new
+    // column is insert.
+    table->insert_column(0, type_Int, "");
+
+    subtab = table->get_subtable(1,0);
+    CHECK_EQUAL(table, subtab->get_parent_table(&column_ndx));
+    CHECK_EQUAL(1, column_ndx);
+    CHECK_EQUAL(0, subtab->get_index_in_parent());
+
+    subtab = table->get_subtable(1,1);
+    CHECK_EQUAL(table, subtab->get_parent_table(&column_ndx));
+    CHECK_EQUAL(1, column_ndx);
+    CHECK_EQUAL(1, subtab->get_index_in_parent());
+
+    subtab = table->get_subtable(2,0);
+    CHECK_EQUAL(table, subtab->get_parent_table(&column_ndx));
+    CHECK_EQUAL(2, column_ndx);
+    CHECK_EQUAL(0, subtab->get_index_in_parent());
+
+    subtab = table->get_subtable(2,1);
+    CHECK_EQUAL(table, subtab->get_parent_table(&column_ndx));
+    CHECK_EQUAL(2, column_ndx);
+    CHECK_EQUAL(1, subtab->get_index_in_parent());
+
+    // Check that column indexes are properly adjusted after inserted
+    // column is removed.
+    table->remove_column(0);
+
+    subtab = table->get_subtable(0,0);
+    CHECK_EQUAL(table, subtab->get_parent_table(&column_ndx));
+    CHECK_EQUAL(0, column_ndx);
+    CHECK_EQUAL(0, subtab->get_index_in_parent());
+
+    subtab = table->get_subtable(0,1);
+    CHECK_EQUAL(table, subtab->get_parent_table(&column_ndx));
+    CHECK_EQUAL(0, column_ndx);
+    CHECK_EQUAL(1, subtab->get_index_in_parent());
+
+    subtab = table->get_subtable(1,0);
+    CHECK_EQUAL(table, subtab->get_parent_table(&column_ndx));
+    CHECK_EQUAL(1, column_ndx);
+    CHECK_EQUAL(0, subtab->get_index_in_parent());
+
+    subtab = table->get_subtable(1,1);
+    CHECK_EQUAL(table, subtab->get_parent_table(&column_ndx));
+    CHECK_EQUAL(1, column_ndx);
+    CHECK_EQUAL(1, subtab->get_index_in_parent());
 }
 
 

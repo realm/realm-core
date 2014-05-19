@@ -20,10 +20,9 @@ Spec::~Spec() TIGHTDB_NOEXCEPT
 }
 
 
-void Spec::init(MemRef mem, ArrayParent* parent, size_t ndx_in_parent) TIGHTDB_NOEXCEPT
+void Spec::init(MemRef mem) TIGHTDB_NOEXCEPT
 {
     m_top.init_from_mem(mem);
-    m_top.set_parent(parent, ndx_in_parent);
     size_t top_size = m_top.size();
     TIGHTDB_ASSERT(top_size >= 3 && top_size <= 5);
 
@@ -34,7 +33,7 @@ void Spec::init(MemRef mem, ArrayParent* parent, size_t ndx_in_parent) TIGHTDB_N
     m_attr.init_from_ref(m_top.get_as_ref(2));
     m_attr.set_parent(&m_top, 2);
 
-    // SubSpecs array is only there and valid when there are subtables
+    // Subspecs array is only there and valid when there are subtables
     // if there are enumkey, but no subtables yet it will be a zero-ref
     if (top_size >= 4) {
         if (ref_type ref = m_top.get_as_ref(3)) {
@@ -236,16 +235,17 @@ size_t Spec::get_enumkeys_ndx(size_t column_ndx) const TIGHTDB_NOEXCEPT
 {
     // The enumkeys array only keep info for stringEnum columns
     // so we need to count up to it's position
-    size_t pos = 0;
+    size_t enumkeys_ndx = 0;
     for (size_t i = 0; i < column_ndx; ++i) {
         if (ColumnType(m_spec.get(i)) == col_type_StringEnum)
-            ++pos;
+            ++enumkeys_ndx;
     }
-    return pos;
+    return enumkeys_ndx;
 }
 
 
-ref_type Spec::get_enumkeys_ref(size_t column_ndx, ArrayParent** keys_parent, size_t* keys_ndx)
+ref_type Spec::get_enumkeys_ref(size_t column_ndx, ArrayParent** keys_parent,
+                                size_t* keys_ndx) TIGHTDB_NOEXCEPT
 {
     size_t enumkeys_ndx = get_enumkeys_ndx(column_ndx);
 

@@ -58,11 +58,14 @@ benchmark-transaction: check-norun/subdir/util
 	@$(MAKE) -C benchmark-transaction check-norun
 
 # Build and run whatever is in experiements/testcase.cpp
-.PHONY: check-testcase check-testcase-debug memcheck-testcase memcheck-testcase-debug
+.PHONY: check-testcase check-testcase-debug check-testcase-debug-norun
+.PHONY: memcheck-testcase memcheck-testcase-debug
 check-testcase: check-norun/subdir/util
 	@$(MAKE) -C experiments check
 check-testcase-debug: check-debug-norun/subdir/util
 	@$(MAKE) -C experiments check-debug
+check-testcase-debug-norun: check-debug-norun/subdir/util
+	@$(MAKE) -C experiments check-debug-norun
 memcheck-testcase: check-norun/subdir/util
 	@$(MAKE) -C experiments memcheck
 memcheck-testcase-debug: check-debug-norun/subdir/util

@@ -73,9 +73,9 @@ public:
     }
 
 private:
-    void handle_transact_log(const char* data, size_t size) TIGHTDB_OVERRIDE
+    void handle_transact_log(const char* data, size_t size, version_type) TIGHTDB_OVERRIDE
     {
-        UniquePtr<char> log(new char[size]); // Throws
+        UniquePtr<char[]> log(new char[size]); // Throws
         copy(data, data+size, log.get());
         m_transact_logs.push_back(BinaryData(log.get(), size)); // Throws
         log.release();

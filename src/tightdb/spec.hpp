@@ -81,8 +81,9 @@ public:
     // Auto Enumerated string columns
     void upgrade_string_to_enum(std::size_t column_ndx, ref_type keys_ref,
                                 ArrayParent*& keys_parent, std::size_t& keys_ndx);
-    ref_type get_enumkeys_ref(std::size_t column_ndx,
-                              ArrayParent** keys_parent = 0, std::size_t* keys_ndx = 0);
+    std::size_t get_enumkeys_ndx(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
+    ref_type get_enumkeys_ref(std::size_t column_ndx, ArrayParent** keys_parent = 0,
+                              std::size_t* keys_ndx = 0) TIGHTDB_NOEXCEPT;
 
     // Get position in column list adjusted for indexes
     // (since index refs are stored alongside column refs in
@@ -94,30 +95,37 @@ public:
 
     void destroy() TIGHTDB_NOEXCEPT;
 
+    void set_ndx_in_parent(std::size_t) TIGHTDB_NOEXCEPT;
+
 #ifdef TIGHTDB_DEBUG
     void Verify() const; // Must be upper case to avoid conflict with macro in ObjC
     void to_dot(std::ostream&, StringData title = StringData()) const;
 #endif
 
 private:
-    // Member variables
+    // Underlying array structure.
+    //
+    // FIXME: Rename `m_spec` to `m_types`.
     Array m_top;
-    Array m_spec;
-    ArrayString m_names;
-    Array m_attr;
-    Array m_subspecs;
-    Array m_enumkeys;
+    Array m_spec;        // 1st slot in m_top
+    ArrayString m_names; // 2sn slot in m_top
+    Array m_attr;        // 3rd slot in m_top
+    Array m_subspecs;    // 4th slot in m_top (optional)
+    Array m_enumkeys;    // 5th slot in m_top (optional)
 
     Spec(Allocator&) TIGHTDB_NOEXCEPT; // Uninitialized
-    Spec(Allocator&, MemRef, ArrayParent*, std::size_t ndx_in_parent);
+    Spec(Allocator&, MemRef, ArrayParent*, std::size_t ndx_in_parent) TIGHTDB_NOEXCEPT;
 
     // FIXME: Deprecated. The constructor must not allocate anything
     // that the destructor does not deallocate.
     Spec(Allocator&, ArrayParent*, std::size_t ndx_in_parent);
 
-    void init(ref_type, ArrayParent*, std::size_t ndx_in_parent) TIGHTDB_NOEXCEPT;
-    void init(MemRef, ArrayParent*, std::size_t ndx_in_parent) TIGHTDB_NOEXCEPT;
+    void init(ref_type) TIGHTDB_NOEXCEPT;
+    void init(MemRef) TIGHTDB_NOEXCEPT;
     void init(SubspecRef) TIGHTDB_NOEXCEPT;
+
+    // Similar in function to Array::init_from_parent().
+    void init_from_parent() TIGHTDB_NOEXCEPT;
 
     ref_type get_ref() const TIGHTDB_NOEXCEPT;
 
@@ -132,8 +140,6 @@ private:
 
     void set_column_type(std::size_t column_ndx, ColumnType type);
     void set_column_attr(std::size_t column_ndx, ColumnAttr attr);
-
-    size_t get_enumkeys_ndx(size_t column_ndx) const TIGHTDB_NOEXCEPT;
 
     /// Construct an empty spec and return just the reference to the
     /// underlying memory.
@@ -235,15 +241,22 @@ inline Spec::Spec(Allocator& alloc, ArrayParent* parent, std::size_t ndx_in_pare
     m_enumkeys(alloc)
 {
     MemRef mem = create_empty_spec(alloc); // Throws
-    init(mem, parent, ndx_in_parent);
+    m_top.set_parent(parent, ndx_in_parent);
+    init(mem);
 }
 
-// Create Spec from ref
-inline Spec::Spec(Allocator& alloc, MemRef mem, ArrayParent* parent, std::size_t ndx_in_parent):
-    m_top(alloc), m_spec(alloc), m_names(alloc), m_attr(alloc), m_subspecs(alloc),
+// Attach to preexisting Spec
+inline Spec::Spec(Allocator& alloc, MemRef mem, ArrayParent* parent,
+                  std::size_t ndx_in_parent) TIGHTDB_NOEXCEPT:
+    m_top(alloc),
+    m_spec(alloc),
+    m_names(alloc),
+    m_attr(alloc),
+    m_subspecs(alloc),
     m_enumkeys(alloc)
 {
-    init(mem, parent, ndx_in_parent);
+    m_top.set_parent(parent, ndx_in_parent);
+    init(mem);
 }
 
 
@@ -273,21 +286,33 @@ inline ConstSubspecRef Spec::get_subspec_by_ndx(std::size_t subspec_ndx) const T
     return const_cast<Spec*>(this)->get_subspec_by_ndx(subspec_ndx);
 }
 
-inline void Spec::init(ref_type ref, ArrayParent* parent, size_t ndx_in_parent) TIGHTDB_NOEXCEPT
+inline void Spec::init(ref_type ref) TIGHTDB_NOEXCEPT
 {
     MemRef mem(ref, get_alloc());
-    init(mem, parent, ndx_in_parent);
+    init(mem);
 }
 
 inline void Spec::init(SubspecRef r) TIGHTDB_NOEXCEPT
 {
+    m_top.set_parent(r.m_parent, r.m_ndx_in_parent);
     ref_type ref = r.m_parent->get_as_ref(r.m_ndx_in_parent);
-    init(ref, r.m_parent, r.m_ndx_in_parent);
+    init(ref);
+}
+
+inline void Spec::init_from_parent() TIGHTDB_NOEXCEPT
+{
+    ref_type ref = m_top.get_ref_from_parent();
+    init(ref);
 }
 
 inline void Spec::destroy() TIGHTDB_NOEXCEPT
 {
     m_top.destroy_deep();
+}
+
+inline void Spec::set_ndx_in_parent(std::size_t ndx) TIGHTDB_NOEXCEPT
+{
+    m_top.set_ndx_in_parent(ndx);
 }
 
 inline ref_type Spec::get_ref() const TIGHTDB_NOEXCEPT

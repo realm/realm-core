@@ -84,13 +84,14 @@ good:
 
 void Replication::select_desc(const Descriptor& desc)
 {
-    check_table(&*desc.m_root_table);
+    typedef _impl::DescriptorFriend df;
+    check_table(&df::root_table(desc));
     size_t* begin;
     size_t* end;
     for (;;) {
         begin = m_subtab_path_buf.data();
         end   = begin + m_subtab_path_buf.size();
-        begin = desc.record_subdesc_path(begin, end);
+        begin = df::record_subdesc_path(desc, begin, end);
         if (begin)
             break;
         size_t new_size = m_subtab_path_buf.size();
@@ -118,7 +119,7 @@ void Replication::select_desc(const Descriptor& desc)
 
 good:
     transact_log_advance(buf);
-    m_selected_spec = desc.m_spec;
+    m_selected_spec = df::get_spec(desc);
 }
 
 
@@ -439,8 +440,8 @@ public:
         if (m_log)
             *m_log << "table = group->get_table("<<group_level_ndx<<")\n";
 #endif
-        m_table = m_group.get_table(group_level_ndx); // Throws
         m_desc.reset();
+        m_table = m_group.get_table(group_level_ndx); // Throws
         for (int i = 0; i < levels; ++i) {
             size_t col_ndx = path[2*i + 0];
             size_t row_ndx = path[2*i + 1];
@@ -713,8 +714,9 @@ TrivialReplication::do_commit_write_transact(SharedGroup&, version_type orig_ver
 {
     char* data = m_transact_log_buffer.data();
     size_t size = m_transact_log_free_begin - data;
-    handle_transact_log(data, size); // Throws
-    return orig_version + 1;
+    version_type new_version = orig_version + 1;
+    handle_transact_log(data, size, new_version); // Throws
+    return new_version;
 }
 
 void TrivialReplication::do_rollback_write_transact(SharedGroup&) TIGHTDB_NOEXCEPT
