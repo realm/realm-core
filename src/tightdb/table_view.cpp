@@ -342,10 +342,9 @@ void TableViewBase::sort(size_t column, bool Ascending)
                 m_refs.add(v);
             }
         }
-        result.destroy();
         ref.destroy();
     }
-
+    result.destroy();
 }
 
 // Simple pivot aggregate method. Experimental! Please do not document method publicly.
