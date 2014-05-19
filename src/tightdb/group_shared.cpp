@@ -1168,7 +1168,8 @@ void SharedGroup::advance_read(WriteLogRegistryInterface* log_registry)
     UniquePtr<BinaryData[]> 
         logs(new BinaryData[m_readlock.m_version-old_readlock.m_version]); // Throws
 
-    log_registry->get_commit_entries(old_readlock.m_version, m_readlock.m_version, logs);
+    log_registry->get_commit_entries(old_readlock.m_version, 
+                                     m_readlock.m_version, logs.get());
 
     m_group.advance_transact(m_readlock.m_top_ref, m_readlock.m_file_size, 
                              logs.get(),
