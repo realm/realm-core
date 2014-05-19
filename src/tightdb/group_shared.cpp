@@ -1199,6 +1199,10 @@ Group& SharedGroup::begin_write()
             throw;
         }
         m_transact_stage = transact_Writing;
+        // FIXME: Kristian moved free space reset here...
+        // if (m_readlock.m_version == 1) {
+        //    m_group.reset_freespace_tracking();
+        //}
         return m_group;
     }
 #endif
@@ -1208,6 +1212,10 @@ Group& SharedGroup::begin_write()
     // A write transaction implies a read transaction...
     begin_read();
     m_transact_stage = transact_Writing;
+    // FIXME: Kristian moved free space reset here...
+    // if (m_readlock.m_version == 1) {
+    //    m_group.reset_freespace_tracking();
+    // }
 
     return m_group;
 }
@@ -1241,7 +1249,6 @@ void SharedGroup::do_begin_write()
         info->balancemutex.unlock();
     }
 #endif
-    // FIXME: Kristian moved free space reset here...
 }
 
 void SharedGroup::commit()
@@ -1313,7 +1320,10 @@ void SharedGroup::do_commit()
 #else
         new_version = r_info->get_current_version_unchecked() + 1;
 #endif
-
+        // FIXME: place where we previously called init_shared:
+        // if (m_readlock.m_version == 2) {
+        //     m_group.reset_freespace_tracking(); // throws
+        // }
         low_level_commit(new_version); // Throws
     }
 
