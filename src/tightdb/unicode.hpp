@@ -37,7 +37,7 @@ namespace tightdb {
     enum string_compare_method_t { STRING_COMPARE_CORE, STRING_COMPARE_CPP11, STRING_COMPARE_CALLBACK } ;
 
     extern StringCompareCallback string_compare_callback;
-    extern char string_compare_method;
+    extern string_compare_method_t string_compare_method;
 
     // Description for set_string_compare_method():
     //

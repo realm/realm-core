@@ -275,7 +275,6 @@ void TableViewBase::sort(size_t column, bool Ascending)
 
     if (m_refs.size() == 0)
         return;
-    m_is_in_index_order = false;
     
     Array result;
 
@@ -346,6 +345,7 @@ void TableViewBase::sort(size_t column, bool Ascending)
         result.destroy();
         ref.destroy();
     }
+
 }
 
 // Simple pivot aggregate method. Experimental! Please do not document method publicly.
@@ -408,7 +408,7 @@ void TableViewBase::row_to_string(size_t row_ndx, ostream& out) const
     m_table->to_string_row(get_source_ndx(row_ndx), out, widths);
 }
 
-
+// O(n) for n = this->size()
 void TableView::remove(size_t ndx)
 {
     TIGHTDB_ASSERT(m_table);
@@ -423,7 +423,7 @@ void TableView::remove(size_t ndx)
 
     // Decrement row indexes greater than or equal to ndx
     //
-    // FIXME: Dangerous cast below: unsigned -> signed
+    // O(n) for n = this->size(). FIXME: Dangerous cast below: unsigned -> signed
     m_refs.adjust_ge(int_fast64_t(real_ndx), -1);
 }
 

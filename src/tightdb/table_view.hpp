@@ -98,6 +98,8 @@ public:
     // a runtime exception.
     void sort(size_t column_ndx, bool ascending = true);
 
+    void apply_same_order(TableViewBase& order);
+    
     // Simple pivot aggregate method. Experimental! Please do not
     // document method publicly.
     void aggregate(size_t group_by_column, size_t aggr_column,
@@ -118,7 +120,6 @@ protected:
     // Null if, and only if, the view is detached
     mutable TableRef m_table;
     Array m_refs;
-    bool m_is_in_index_order;
 
     /// Construct null view (no memory allocated).
     TableViewBase();
@@ -253,6 +254,7 @@ private:
     friend class Table;
     friend class Query;
     friend class TableViewBase;
+    friend class ListviewNode;
 };
 
 
@@ -331,20 +333,19 @@ inline std::size_t TableViewBase::get_source_ndx(std::size_t row_ndx) const TIGH
 }
 
 inline TableViewBase::TableViewBase():
-    m_refs(Allocator::get_default()), m_is_in_index_order(true)
+    m_refs(Allocator::get_default())
 {
 }
 
 inline TableViewBase::TableViewBase(Table* parent):
-    m_table(parent->get_table_ref()), m_is_in_index_order(true)
+    m_table(parent->get_table_ref())
 {
     parent->register_view(this);
 }
 
 inline TableViewBase::TableViewBase(const TableViewBase& tv):
     m_table(tv.m_table), 
-    m_refs(tv.m_refs, Allocator::get_default()),
-    m_is_in_index_order(tv.m_is_in_index_order)
+    m_refs(tv.m_refs, Allocator::get_default())
 {
     if (m_table)
         m_table->register_view(this);
@@ -352,8 +353,7 @@ inline TableViewBase::TableViewBase(const TableViewBase& tv):
 
 inline TableViewBase::TableViewBase(TableViewBase* tv) TIGHTDB_NOEXCEPT:
     m_table(tv->m_table), 
-    m_refs(tv->m_refs), // Note: This is a moving copy
-    m_is_in_index_order(tv->m_is_in_index_order)
+    m_refs(tv->m_refs) // Note: This is a moving copy
 {
     if (m_table) {
         m_table->unregister_view(tv);
@@ -393,7 +393,6 @@ inline void TableViewBase::move_assign(TableViewBase* tv) TIGHTDB_NOEXCEPT
         m_table->register_view(this);
     }
     m_refs.move_assign(tv->m_refs);
-    m_is_in_index_order = tv->m_is_in_index_order;
 }
 
 inline Array& TableViewBase::get_ref_column() TIGHTDB_NOEXCEPT
@@ -405,7 +404,6 @@ inline const Array& TableViewBase::get_ref_column() const TIGHTDB_NOEXCEPT
 {
     return m_refs;
 }
-
 
 
 #define TIGHTDB_ASSERT_COLUMN(column_ndx)                                   \

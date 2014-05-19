@@ -45,7 +45,7 @@ signed char sse_support = -1;
 signed char avx_support = -1;
 
 StringCompareCallback string_compare_callback = null_ptr;
-char string_compare_method = STRING_COMPARE_CORE;
+string_compare_method_t string_compare_method = STRING_COMPARE_CORE;
 
 void cpuid_init()
 {
