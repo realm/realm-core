@@ -577,7 +577,7 @@ public:
     std::size_t upper_bound_int(int64_t value) const TIGHTDB_NOEXCEPT;
     //@}
 
-    std::size_t FindGTE(int64_t target, std::size_t start) const;
+    std::size_t FindGTE(int64_t target, std::size_t start, const Array* indirection) const;
     void Preset(int64_t min, int64_t max, std::size_t count);
     void Preset(std::size_t bitwidth, std::size_t count);
 
@@ -586,7 +586,7 @@ public:
     bool maximum(int64_t& result, std::size_t start = 0, std::size_t end = std::size_t(-1)) const;
     bool minimum(int64_t& result, std::size_t start = 0, std::size_t end = std::size_t(-1)) const;
     void sort();
-    void ReferenceSort(Array& ref);
+    void ReferenceSort(Array& ref) const;
 
     /// This information is guaranteed to be cached in the array accessor.
     bool is_inner_bptree_node() const TIGHTDB_NOEXCEPT;
@@ -963,15 +963,15 @@ private:
     typedef bool (*CallbackDummy)(int64_t);
 
     template<size_t w> bool MinMax(size_t from, size_t to, uint64_t maxdiff,
-                                   int64_t* min, int64_t* max);
+                                   int64_t* min, int64_t* max) const;
     Array& operator=(const Array&) {return *this;} // not allowed
     template<size_t w> void QuickSort(size_t lo, size_t hi);
     void QuickSort(size_t lo, size_t hi);
-    void ReferenceQuickSort(Array& ref);
-    template<size_t w> void ReferenceQuickSort(size_t lo, size_t hi, Array& ref);
+    void ReferenceQuickSort(Array& ref) const;
+    template<size_t w> void ReferenceQuickSort(size_t lo, size_t hi, Array& ref) const;
 
     template<size_t w> void sort();
-    template<size_t w> void ReferenceSort(Array& ref);
+    template<size_t w> void ReferenceSort(Array& ref) const;
 
     template<size_t w> int64_t sum(size_t start, size_t end) const;
 
