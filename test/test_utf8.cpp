@@ -174,7 +174,7 @@ TEST(Compare_Core_utf8_invalid)
     bool ret = utf8_compare(i1, i2);
     CHECK_EQUAL(ret, utf8_compare(i2, i1)); // must sort the same as before regardless of succeeding data
 }
-
+/* shows uninitialized data access i Valgrind (by design). Disabled until supressed or we find another way to test
 TEST(Compare_Core_utf8_invalid_crash)
 {
     // See if we can crash Realm with random data
@@ -194,7 +194,7 @@ TEST(Compare_Core_utf8_invalid_crash)
         utf8_compare(str2, str1);
     }
 }
-
+*/
 TEST(Compare_Core_utf8_zero)
 {
     // Realm must support 0 characters in utf8 strings
