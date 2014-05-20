@@ -81,16 +81,21 @@ public:
     ///
     /// \param no_create Fail if the file does not already exist.
     ///
-    /// \param bool skip_validate Skip validation of file header. In a
-    /// set of overlapping SharedGroups, only the first one (the one
-    /// that creates/initlializes the coordination file) may validate
-    /// the header, otherwise it will result in a race condition.
+    /// \param skip_validate Skip validation of file header. In a set
+    /// of overlapping SharedGroups, only the first one (the one that
+    /// creates/initlializes the coordination file) may validate the
+    /// header, otherwise it will result in a race condition.
+    ///
+    /// \param get_version If specified and `skip_validate` is not
+    /// true, store the file format version number into the referenced
+    /// integer. Otherwise fail if the file format version is not
+    /// exactly as expected.
     ///
     /// \return The `ref` of the root node, or zero if there is none.
     ///
     /// \throw util::File::AccessError
     ref_type attach_file(const std::string& path, bool is_shared, bool read_only, bool no_create,
-                         bool skip_validate);
+                         bool skip_validate, int* get_version = 0);
 
     /// Attach this allocator to the specified memory buffer.
     ///
@@ -102,7 +107,7 @@ public:
     /// \sa own_buffer()
     ///
     /// \throw InvalidDatabase
-    ref_type attach_buffer(char* data, std::size_t size);
+    ref_type attach_buffer(char* data, std::size_t size, int* get_version = 0);
 
     /// Attach this allocator to an empty buffer.
     ///
@@ -305,7 +310,7 @@ private:
     /// Throws if free-lists are no longer valid.
     const FreeSpace& get_free_read_only() const;
 
-    bool validate_buffer(const char* data, std::size_t len, ref_type& top_ref);
+    bool validate_buffer(const char* data, std::size_t len, ref_type& top_ref, int* get_version);
 
     void do_prepare_for_update(char* mutable_data);
 

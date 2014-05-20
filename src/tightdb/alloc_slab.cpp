@@ -351,7 +351,7 @@ char* SlabAlloc::do_translate(ref_type ref) const TIGHTDB_NOEXCEPT
 
 
 ref_type SlabAlloc::attach_file(const string& path, bool is_shared, bool read_only, bool no_create,
-                                bool skip_validate)
+                                bool skip_validate, int* get_version)
 {
     TIGHTDB_ASSERT(!is_attached());
 
@@ -413,7 +413,7 @@ ref_type SlabAlloc::attach_file(const string& path, bool is_shared, bool read_on
         m_file_on_streaming_form = false; // May be updated by validate_buffer()
         if (!skip_validate) {
             // Verify the data structures
-            if (!validate_buffer(map.get_addr(), size, top_ref))
+            if (!validate_buffer(map.get_addr(), size, top_ref, get_version))
                 goto invalid_database;
         }
 
@@ -430,14 +430,14 @@ ref_type SlabAlloc::attach_file(const string& path, bool is_shared, bool read_on
 }
 
 
-ref_type SlabAlloc::attach_buffer(char* data, size_t size)
+ref_type SlabAlloc::attach_buffer(char* data, size_t size, int* get_version)
 {
     TIGHTDB_ASSERT(!is_attached());
 
     // Verify the data structures
     m_file_on_streaming_form = false; // May be updated by validate_buffer()
     ref_type top_ref;
-    if (!validate_buffer(data, size, top_ref))
+    if (!validate_buffer(data, size, top_ref, get_version))
         throw InvalidDatabase();
 
     m_data        = data;
@@ -464,7 +464,7 @@ void SlabAlloc::attach_empty()
 }
 
 
-bool SlabAlloc::validate_buffer(const char* data, size_t size, ref_type& top_ref)
+bool SlabAlloc::validate_buffer(const char* data, size_t size, ref_type& top_ref, int* get_version)
 {
     // Verify that size is sane and 8-byte aligned
     if (size < sizeof (Header) || size % 8 != 0)
@@ -487,8 +487,13 @@ bool SlabAlloc::validate_buffer(const char* data, size_t size, ref_type& top_ref
 
     // Byte 4 and 5 (depending on valid_part) in the info block is version
     int version = static_cast<unsigned char>(file_header[16 + 4 + valid_part]);
-    if (version != current_file_format_version)
-        return false; // unsupported version
+    if (get_version) {
+        *get_version = version;
+    }
+    else {
+        if (version != current_file_format_version)
+            return false; // unsupported version
+    }
 
     // Top_ref should always point within buffer
     const uint64_t* top_refs = reinterpret_cast<const uint64_t*>(data);

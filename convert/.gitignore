@@ -1,0 +1,13 @@
+/*.d
+/*.o
+
+# Coverage data
+/*.gcno
+/*.gcda
+
+/tightdb-convert
+/tightdb-convert-noinst
+/tightdb-convert-dbg
+/tightdb-convert-dbg-noinst
+/tightdb-convert-cov
+/tightdb-convert-cov-noinst
