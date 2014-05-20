@@ -56,6 +56,9 @@ public:
 
     // This also unregisters interest in the same version range.
     virtual void release_commit_entries(version_type from, version_type to) = 0;
+
+    // dtor
+    virtual ~WriteLogRegistryInterface() {}
 };
 
 

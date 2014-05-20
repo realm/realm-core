@@ -37,6 +37,7 @@ public:
     WriteLogRegistryInterface* get(std::string filepath);
     void add(std::string filepath, WriteLogRegistryInterface* registry);
     void remove(std::string filepath);
+    ~RegistryRegistry();
 private:
     util::Mutex m_mutex;
     std::map<std::string, WriteLogRegistryInterface*> m_registries;
@@ -78,6 +79,7 @@ class WriteLogRegistry : public WriteLogRegistryInterface
     struct CommitEntry { std::size_t sz; char* data; };
 public:
     WriteLogRegistry();
+    ~WriteLogRegistry();
   
     // Add a commit for a given version:
     // The registry takes ownership of the buffer data.
@@ -133,6 +135,16 @@ WriteLogRegistryInterface* RegistryRegistry::get(std::string filepath)
     return result;
 }
 
+RegistryRegistry::~RegistryRegistry()
+{
+    std::map<std::string, WriteLogRegistryInterface*>::iterator iter;
+    iter = m_registries.begin();
+    while (iter != m_registries.end()) {
+        delete iter->second;
+        iter->second = 0;
+        ++iter;
+    }
+}
 
 void RegistryRegistry::add(std::string filepath, WriteLogRegistryInterface* registry)
 {
@@ -157,6 +169,16 @@ WriteLogRegistry::WriteLogRegistry()
      m_array_start = 0;
 }
 
+
+WriteLogRegistry::~WriteLogRegistry()
+{
+    for (size_t i = 0; i < m_commits.size(); i++) {
+        if (m_commits[i].data) {
+            delete[] m_commits[i].data;
+            m_commits[i].data = 0;
+        }
+    }
+}
 
 void WriteLogRegistry::add_commit(version_type version, char* data, std::size_t sz)
 {
