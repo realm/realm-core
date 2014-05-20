@@ -551,7 +551,6 @@ protected:
     size_t m_size;
 
     const TableView& m_tv;
-    Array m_arr;
 };
 
 // For conditions on a subtable (encapsulated in subtable()...end_subtable()). These return the parent row as match if and
