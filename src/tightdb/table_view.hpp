@@ -346,7 +346,7 @@ inline TableViewBase::TableViewBase(Table* parent):
 
 inline TableViewBase::TableViewBase(const TableViewBase& tv):
     m_table(tv.m_table), 
-    m_refs(tv.m_refs/*, Allocator::get_default() fixme, review*/)
+    m_refs(tv.m_refs)
 {
     if (m_table)
         m_table->register_view(this);
@@ -354,7 +354,7 @@ inline TableViewBase::TableViewBase(const TableViewBase& tv):
 
 inline TableViewBase::TableViewBase(TableViewBase* tv) TIGHTDB_NOEXCEPT:
     m_table(tv->m_table), 
-    m_refs(tv->m_refs) // Note: This is a moving copy
+    m_refs(tv->m_refs) // Note: This is a moving copy. It detaches m_refs, so no need for explicit detach later
 {
     if (m_table) {
         m_table->unregister_view(tv);
@@ -362,7 +362,6 @@ inline TableViewBase::TableViewBase(TableViewBase* tv) TIGHTDB_NOEXCEPT:
         m_table->register_view(this);
     }
     tv->m_table = TableRef();
-//    tv->m_refs.detach(); fixme: review: seems like the move in 'm_refs(tv->m_refs)' will detach m_refs
 }
 
 inline TableViewBase::~TableViewBase() TIGHTDB_NOEXCEPT

@@ -1965,6 +1965,7 @@ inline MemRef Array::clone_deep(Allocator& target_alloc) const
 
 inline void Array::move_assign(Array& a) TIGHTDB_NOEXCEPT
 {
+    TIGHTDB_ASSERT(&get_alloc() == &a.get_alloc());
     // FIXME: Be carefull with the old parent info here. Should it be
     // copied?
 

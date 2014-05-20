@@ -287,11 +287,9 @@ void BasicArray<T>::find_all(Column* result, T value, std::size_t add_offset,
     for (;;) {
         first = this->find(value, first + 1, end);
         if (first == not_found)
-            break;
+            break;            
 
-        Array a;
-        a.add_to_column(result, first + add_offset);
-//        result.add(first + add_offset);
+        Array::add_to_column(result, first + add_offset);
     }
 }
 
