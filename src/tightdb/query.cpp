@@ -879,10 +879,8 @@ TableView Query::find_all(size_t start, size_t end, size_t limit)
     }
     else {
         QueryState<int64_t> st;
-        Array arr;
-        st.init(act_FindAll, &arr, limit);
+        st.init(act_FindAll, &ret.get_ref_column(), limit);
         aggregate_internal(act_FindAll, ColumnTypeTraits<int64_t>::id, first[0], &st, start, end, NULL);
-        ret.get_ref_column().append_from_array(arr);
     }
 
     return ret;

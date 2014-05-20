@@ -280,7 +280,7 @@ inline std::size_t BasicArray<T>::find_first(T value, std::size_t begin, std::si
 }
 
 template<class T>
-void BasicArray<T>::find_all(Array& result, T value, std::size_t add_offset,
+void BasicArray<T>::find_all(Column* result, T value, std::size_t add_offset,
                              std::size_t begin, std::size_t end) const
 {
     std::size_t first = begin - 1;
@@ -288,7 +288,10 @@ void BasicArray<T>::find_all(Array& result, T value, std::size_t add_offset,
         first = this->find(value, first + 1, end);
         if (first == not_found)
             break;
-        result.add(first + add_offset);
+
+        Array a;
+        a.add_to_column(result, first + add_offset);
+//        result.add(first + add_offset);
     }
 }
 

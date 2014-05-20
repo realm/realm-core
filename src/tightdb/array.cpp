@@ -444,6 +444,11 @@ void Array::move_backward(size_t begin, size_t end, size_t dest_end)
     copy_backward(begin_2, end_2, dest_end_2);
 }
 
+void Array::add_to_column(Column* column, int64_t value) 
+{
+    column->add(value);
+}
+
 void Array::set(size_t ndx, int64_t value)
 {
     TIGHTDB_ASSERT(ndx < m_size);
@@ -2722,7 +2727,7 @@ size_t Array::upper_bound_int(int64_t value) const TIGHTDB_NOEXCEPT
 }
 
 
-void Array::find_all(Array& result, int64_t value, size_t col_offset, size_t begin, size_t end) const
+void Array::find_all(Column* result, int64_t value, size_t col_offset, size_t begin, size_t end) const
 {
     TIGHTDB_ASSERT(begin <= size());
     TIGHTDB_ASSERT(end == npos || (begin <= end && end <= size()));
@@ -2734,9 +2739,7 @@ void Array::find_all(Array& result, int64_t value, size_t col_offset, size_t beg
         return; // FIXME: Why do we have to check and early-out here?
 
     QueryState<int64_t> state;
-    state.init(act_FindAll, &result, static_cast<size_t>(-1));
-    state.m_state = reinterpret_cast<int64_t>(&result);
-
+    state.init(act_FindAll, result, static_cast<size_t>(-1));
     TIGHTDB_TEMPEX3(find, Equal, act_FindAll, m_width, (value, begin, end, col_offset, &state, CallbackDummy()));
 
     return;

@@ -944,9 +944,7 @@ void Column::find_all(Column& result, int64_t value, size_t begin, size_t end) c
 
     if (root_is_leaf()) {
         size_t leaf_offset = 0;
-        Array arr;
-        m_array->find_all(arr, value, leaf_offset, begin, end); // Throws
-        result.append_from_array(arr);
+        m_array->find_all(&result, value, leaf_offset, begin, end); // Throws
         return;
     }
 
@@ -964,9 +962,7 @@ void Column::find_all(Column& result, int64_t value, size_t begin, size_t end) c
         size_t ndx_in_leaf = p.second;
         size_t leaf_offset = ndx_in_tree - ndx_in_leaf;
         size_t end_in_leaf = min(leaf.size(), end - leaf_offset);
-        Array arr;
-        leaf.find_all(arr, value, leaf_offset, ndx_in_leaf, end_in_leaf); // Throws
-        result.append_from_array(arr);
+        leaf.find_all(&result, value, leaf_offset, ndx_in_leaf, end_in_leaf); // Throws
         ndx_in_tree = leaf_offset + end_in_leaf;
     }
 }

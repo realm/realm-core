@@ -398,9 +398,7 @@ void BasicColumn<T>::find_all(Column &result, T value, std::size_t begin, std::s
 
     if (root_is_leaf()) {
         std::size_t leaf_offset = 0;
-        Array arr;
-        static_cast<BasicArray<T>*>(m_array)->find_all(arr, value, leaf_offset, begin, end); // Throws
-        result.append_from_array(arr);
+        static_cast<BasicArray<T>*>(m_array)->find_all(&result, value, leaf_offset, begin, end); // Throws
         return;
     }
 
@@ -417,9 +415,7 @@ void BasicColumn<T>::find_all(Column &result, T value, std::size_t begin, std::s
         std::size_t ndx_in_leaf = p.second;
         std::size_t leaf_offset = ndx_in_tree - ndx_in_leaf;
         std::size_t end_in_leaf = std::min(leaf.size(), end - leaf_offset);
-        Array arr;
-        leaf.find_all(arr, value, leaf_offset, ndx_in_leaf, end_in_leaf); // Throws
-        result.append_from_array(arr);
+        leaf.find_all(&result, value, leaf_offset, ndx_in_leaf, end_in_leaf); // Throws
         ndx_in_tree = leaf_offset + end_in_leaf;
     }
 }
