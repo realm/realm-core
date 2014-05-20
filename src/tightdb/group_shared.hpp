@@ -186,7 +186,7 @@ public:
     // Begin a new read transaction. Accessors obtained prior to this point
     // are invalid (if they weren't already) and new accessors must be
     // obtained from the group returned.
-    Group& begin_read();
+    const Group& begin_read();
 
     // End a read transaction. Accessors are detached.
     void end_read() TIGHTDB_NOEXCEPT;

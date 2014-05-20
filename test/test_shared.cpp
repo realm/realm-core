@@ -2091,6 +2091,7 @@ TEST(Shared_Implicit_Transactions)
     SHARED_GROUP_TEST_PATH(path);
     {
         WriteLogRegistryInterface* wlr = getWriteLogs(path);
+        wlr->register_interest(0);
         Replication* repl = makeWriteLogCollector(path, wlr);
         SharedGroup sg(*repl);
         {
@@ -2100,9 +2101,9 @@ TEST(Shared_Implicit_Transactions)
         }
         Replication* repl2 = makeWriteLogCollector(path, wlr);
         SharedGroup sg2(*repl2);
-        Group& g = sg.begin_read();
+        Group& g = const_cast<Group&>(sg.begin_read());
         TestTableShared::Ref table = g.get_table<TestTableShared>("table");
-        for (int i = 0; i<3; i++) {
+        for (int i = 0; i<100; i++) {
             {
                 // change table in other context
                 WriteTransaction wt(sg2);
