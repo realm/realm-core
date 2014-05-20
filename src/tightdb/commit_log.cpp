@@ -100,10 +100,10 @@ public:
     // The caller takes ownership of the array of commits, but not of the
     // buffers pointed to by each commit in the array. Ownership of the
     // buffers remains with the WriteLogRegistry.
-    void get_commit_entries(version_type from, version_type to, BinaryData* commits);
+    void get_commit_entries(version_type from, version_type to, BinaryData* commits) TIGHTDB_NOEXCEPT;
 
     // This also unregisters interest in the same version range.
-    void release_commit_entries(version_type from, version_type to);
+    void release_commit_entries(version_type from, version_type to) TIGHTDB_NOEXCEPT;
 private:
     // cleanup and release unreferenced buffers. Buffers might be big, so
     // we release them asap. Only to be called under lock.
@@ -222,6 +222,7 @@ void WriteLogRegistry::unregister_interest(version_type from)
 
 
 void WriteLogRegistry::get_commit_entries(version_type from, version_type to, BinaryData* commits)
+TIGHTDB_NOEXCEPT
 {
     util::LockGuard lock(m_mutex);
 
@@ -233,7 +234,7 @@ void WriteLogRegistry::get_commit_entries(version_type from, version_type to, Bi
 }
     
 
-void WriteLogRegistry::release_commit_entries(version_type from, version_type to)
+void WriteLogRegistry::release_commit_entries(version_type from, version_type to) TIGHTDB_NOEXCEPT
 {
     util::LockGuard lock(m_mutex);
     for (size_t idx = 0; idx < to - from; idx++) {

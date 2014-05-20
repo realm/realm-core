@@ -1082,7 +1082,7 @@ void SharedGroup::end_read() TIGHTDB_NOEXCEPT
 }
 
 
-void SharedGroup::promote_to_write(WriteLogRegistryInterface* write_logs)
+void SharedGroup::promote_to_write(TransactLogRegistry* write_logs)
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Reading);
 
@@ -1114,7 +1114,7 @@ void SharedGroup::promote_to_write(WriteLogRegistryInterface* write_logs)
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
 
-void SharedGroup::advance_read(WriteLogRegistryInterface* log_registry)
+void SharedGroup::advance_read(TransactLogRegistry* log_registry)
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Reading);
     TIGHTDB_ASSERT(!m_transactions_are_pinned);

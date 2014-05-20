@@ -90,7 +90,7 @@ public:
                                    const Table& source);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    typedef WriteLogRegistryInterface TransactLogRegistry;
+    typedef SharedGroup::TransactLogRegistry TransactLogRegistry;
 
     /// Calls sg.advance_read_transact(log_registry).
     static void advance_read_transact(SharedGroup& sg, TransactLogRegistry& log_registry);

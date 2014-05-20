@@ -24,11 +24,12 @@
 
 #include <tightdb/replication.hpp>
 #include <tightdb/binary_data.hpp>
+#include <tightdb/group_shared.hpp>
 
 namespace tightdb {
 
 
-class WriteLogRegistryInterface {
+class WriteLogRegistryInterface : public SharedGroup::TransactLogRegistry {
 public:
     // keep this in sync with shared group.
     typedef uint_fast64_t version_type;
@@ -52,10 +53,10 @@ public:
     // The caller retains ownership of the array of commits, but not of the
     // buffers pointed to by each commit in the array. Ownership of the
     // buffers remains with the WriteLogRegistry.
-    virtual void get_commit_entries(version_type from, version_type to, BinaryData*) = 0;
+    virtual void get_commit_entries(version_type from, version_type to, BinaryData*) TIGHTDB_NOEXCEPT = 0;
 
     // This also unregisters interest in the same version range.
-    virtual void release_commit_entries(version_type from, version_type to) = 0;
+    virtual void release_commit_entries(version_type from, version_type to) TIGHTDB_NOEXCEPT = 0;
 
     // dtor
     virtual ~WriteLogRegistryInterface() {}
