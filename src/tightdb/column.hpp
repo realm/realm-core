@@ -239,7 +239,25 @@ public:
     Column(const Column&); // FIXME: Constness violation
     ~Column() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
-    bool IsIntColumn() const TIGHTDB_NOEXCEPT { return true; }
+    // 'this' and 'column' must use same allocator
+    void move_assign(Column& column)
+    {
+        // fixme, we need a better way to compare allocators
+        TIGHTDB_ASSERT(&column.get_alloc() == &get_alloc());
+
+        // destroy() and detach() are redundant with the Array::move_assign(), but they exist for completeness to avoid
+        // bugs if Array::move_assign() should change behaviour (e.g. no longer call destroy_deep(), etc.).
+        destroy();
+        get_root_array()->move_assign(*column.get_root_array());
+        column.detach();
+    }
+
+    // This method exists because Array::find_all() cannot take a Column as destination argument because the class is 
+    // incomplete at compile time of array.hpp. The method lets you convert an Array into a Column in an easy way.
+    // todo, it's slow!
+    inline void append_from_array(Array& from);
+        
+    bool IsIntColumn() const TIGHTDB_NOEXCEPT{ return true; }
 
     std::size_t size() const TIGHTDB_NOEXCEPT;
     bool is_empty() const TIGHTDB_NOEXCEPT { return size() == 0; }
@@ -493,6 +511,14 @@ inline Column::Column(Array* root): ColumnBase(root) {}
 inline Column::~Column() TIGHTDB_NOEXCEPT
 {
     delete m_array;
+}
+
+inline void Column::append_from_array(Array& from)
+{
+    for (size_t t = 0; t < from.size(); t++) {
+        add(from.get(t));
+    }
+    from.destroy();
 }
 
 inline std::size_t Column::size() const TIGHTDB_NOEXCEPT

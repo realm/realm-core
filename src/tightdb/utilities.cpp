@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include <tightdb/utilities.hpp>
+#include <tightdb/unicode.hpp>
 
 #ifdef TIGHTDB_COMPILER_SSE
 #  ifdef _MSC_VER
@@ -43,6 +44,8 @@ namespace tightdb {
 signed char sse_support = -1;
 signed char avx_support = -1;
 
+StringCompareCallback string_compare_callback = null_ptr;
+string_compare_method_t string_compare_method = STRING_COMPARE_CORE;
 
 void cpuid_init()
 {

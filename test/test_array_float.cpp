@@ -406,7 +406,7 @@ void BasicArray_Find(TestResults& test_results)
     CHECK_EQUAL(4,          f.find_first(T(1.1), 1, 5));    // skip first match, end at last match
 
     // Find all
-    Column res_arr;
+    Array res_arr;
     f.find_all(res_arr, T(1.1), 0);
     CHECK_EQUAL(2, res_arr.size());
     CHECK_EQUAL(0, res_arr.get(0));

@@ -84,7 +84,7 @@ TEST_IF(ColumnLarge_Less, TEST_DURATION >= 2)
         // before and after)
         size_t LEN2 = 64 * 8 / (a.get_width() == 0 ? 1 : a.get_width());
 
-        Column akku;
+        Array akku;
         QueryState<int64_t> state;
         state.m_state = int64_t(&akku);
 
