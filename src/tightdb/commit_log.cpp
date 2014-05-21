@@ -77,46 +77,63 @@ protected:
 class WriteLogRegistry : public WriteLogRegistryInterface
 {
     struct CommitEntry { std::size_t sz; char* data; };
+    struct Interest {
+        version_type last_seen_version; 
+        int next_free_entry; // free-list ptr, terminated by -1
+    };
 public:
     WriteLogRegistry();
     ~WriteLogRegistry();
   
-    // Add a commit for a given version:
-    // The registry takes ownership of the buffer data.
     void add_commit(version_type version, char* data, std::size_t sz);
-    
-    // The registry retains commit buffers for as long as there is a
-    // registered interest:
-    
-    // Register an interest in commits following version 'from'
-    void register_interest(version_type from);
-    
-    // Register that you are no longer interested in commits following
-    // version 'from'.
-    void unregister_interest(version_type from);
-
-    // Get an array of commits for a version range - ]from..to]
-    // The array will have exactly 'to' - 'from' entries.
-    // The caller takes ownership of the array of commits, but not of the
-    // buffers pointed to by each commit in the array. Ownership of the
-    // buffers remains with the WriteLogRegistry.
     void get_commit_entries(version_type from, version_type to, BinaryData* commits) TIGHTDB_NOEXCEPT;
+    virtual int register_interest(); 
+    virtual void unregister_interest(int interest_registration_id);
+    virtual void release_commit_entries(int interest_registration_id, 
+                                        version_type to) TIGHTDB_NOEXCEPT;
 
-    // This also unregisters interest in the same version range.
-    void release_commit_entries(version_type from, version_type to) TIGHTDB_NOEXCEPT;
 private:
     // cleanup and release unreferenced buffers. Buffers might be big, so
     // we release them asap. Only to be called under lock.
     void cleanup();
-    std::vector<CommitEntry> m_commits;
-    std::vector<int> m_interest_counts;
-    int m_future_interest_count;
-    version_type m_array_start;
-    version_type m_last_forgotten_version;
-    version_type m_newest_version;
+
+    // Get the index into the arrays for the selected version.
+    size_t to_index(version_type version) { return version - m_array_start; }
+    version_type to_version(size_t idx)   { return idx + m_array_start; }
+    bool is_a_known_commit(version_type version);
+    bool is_interesting(version_type version);
+    version_type newest_version() { return to_version(m_commits.size() + to_index(m_oldest_version)); }
+
+    // the Moooootex :-)
     util::Mutex m_mutex;
+
+    // array holding all commits. Array start with version 'm_array_start',
+    // valid entries stretches from 'm_oldest_version' to the end of the array.
+    std::vector<CommitEntry> m_commits;
+    version_type m_array_start;
+    version_type m_oldest_version;
+
+    // array of all expressed interests - one record for each.
+    std::vector<Interest> m_interests;
+    int m_interest_free_list; // -1 for empty
+    int m_laziest_reader; // -1 for empty, otherwise index of the
+    // interest record with lowest 'last_seen_version'.
 };
 
+
+bool WriteLogRegistry::is_a_known_commit(version_type version)
+{
+    return (version >= m_oldest_version && version <= newest_version());
+}
+
+bool WriteLogRegistry::is_interesting(version_type version)
+{
+    if (m_laziest_reader == -1)
+        return false;
+    if (version > m_interests[m_laziest_reader].last_seen_version)
+        return true;
+    return false;
+}
 
 Replication* makeWriteLogCollector(std::string database_name, WriteLogRegistryInterface* registry)
 {
@@ -163,10 +180,12 @@ void RegistryRegistry::remove(std::string filepath)
 
 WriteLogRegistry::WriteLogRegistry()
 {
-     m_future_interest_count = 0;
-     m_last_forgotten_version = 0;
-     m_newest_version = 0;
+     m_oldest_version = 0;
+     // a version of 0 is never added, so having m_oldest_version==0 indicates that no version
+     // has been added yet.
      m_array_start = 0;
+     m_interest_free_list = -1;
+     m_laziest_reader = -1;
 }
 
 
@@ -183,41 +202,49 @@ WriteLogRegistry::~WriteLogRegistry()
 void WriteLogRegistry::add_commit(version_type version, char* data, std::size_t sz)
 {
     util::LockGuard lock(m_mutex);
+
+    // if no one is interested, discard data immediately
+    if (!is_interesting(version)) {
+        delete[] data;
+        return;
+    }
+
     // we assume that commits are entered in version order.
-    TIGHTDB_ASSERT(m_newest_version == 0 || version == 1 + m_newest_version);
-    if (m_newest_version == 0) {
+    TIGHTDB_ASSERT(m_oldest_version == 0 || version == 1 + newest_version());
+    if (m_oldest_version == 0) {
         m_array_start = version;
-        m_last_forgotten_version = version - 1;
+        m_oldest_version = version;
     }
     CommitEntry ce = { sz, data };
     m_commits.push_back(ce);
-    m_interest_counts.push_back(m_future_interest_count);
-    m_newest_version = version;
 }
     
 
-void WriteLogRegistry::register_interest(version_type from)
+int WriteLogRegistry::register_interest()
 {
     util::LockGuard lock(m_mutex);
-    // from is assumed to be within the range of commits already registered
-    size_t idx = from + 1 - m_array_start;
-    while (idx < m_interest_counts.size()) {
-        m_interest_counts[idx] += 1;
+    unsigned int retval;
+    if (m_interest_free_list != -1) {
+        retval = m_interest_free_list;
+        m_interest_free_list = m_interests[m_interest_free_list].next_free_entry;
+        m_interests[retval].last_seen_version = 0;
+    } 
+    else {
+        Interest i;
+        i.last_seen_version = 0;
+        m_interests.push_back(i);
+        retval = m_interests.size() -1;
     }
-    m_future_interest_count += 1;
+    m_laziest_reader = retval;
+    return retval;
 }
     
 
-void WriteLogRegistry::unregister_interest(version_type from)
+void WriteLogRegistry::unregister_interest(int interest_registration_id)
 {
     util::LockGuard lock(m_mutex);
-    // from is assumed to be within the range of commits already registered
-    size_t idx = from + 1 - m_array_start;
-    while (idx < m_interest_counts.size()) {
-        m_interest_counts[idx] -= 1;
-    }
-    m_future_interest_count -= 1;
-    cleanup();
+    if (interest_registration_id == m_laziest_reader)
+        cleanup();
 }
 
 
@@ -226,35 +253,45 @@ TIGHTDB_NOEXCEPT
 {
     util::LockGuard lock(m_mutex);
 
-    for (size_t idx = 0; idx < to - from; idx++) {
-        
-        WriteLogRegistry::CommitEntry* entry = & m_commits[ idx + 1 + from - m_array_start];
+    for (version_type version = from+1; version <= to; version++) {
+        TIGHTDB_ASSERT(is_interesting(version));
+        TIGHTDB_ASSERT(is_a_known_commit(version));
+        size_t idx = to_index(version);
+        WriteLogRegistry::CommitEntry* entry = & m_commits[ idx ];
         commits[idx].set(entry->data, entry->sz);
     }
 }
     
 
-void WriteLogRegistry::release_commit_entries(version_type from, version_type to) TIGHTDB_NOEXCEPT
+void WriteLogRegistry::release_commit_entries(int interest_registration_id, 
+                                              version_type to) TIGHTDB_NOEXCEPT
 {
     util::LockGuard lock(m_mutex);
-    for (size_t idx = 0; idx < to - from; idx++) {
-        m_interest_counts[ idx + 1 + from - m_array_start ] -= 1;
-    }
-    cleanup();
+    m_interests[interest_registration_id].last_seen_version = to;
+    if (interest_registration_id == m_laziest_reader)
+        cleanup();
 }
 
 
 void WriteLogRegistry::cleanup()
 {
-    size_t idx = m_last_forgotten_version - m_array_start + 1;
+    // locate laziest reader as it may have changed - take care to handle lack of readers
+    version_type earliest;
+/*
+  REDO 
+
+
+    size_t idx = to_index(m_last_forgotten_version) + 1;
     while (idx < m_interest_counts.size() &&  m_interest_counts[idx] == 0) {
 
-        delete[] m_commits[idx].data;
+        if (m_commits[idx].data)
+            delete[] m_commits[idx].data;
         m_commits[idx].data = 0;
         m_commits[idx].sz = 0;
         ++idx;
     }
-    m_last_forgotten_version = idx + m_array_start - 1;
+    m_oldest_version = to_version(idx);
+
     if (idx > (m_interest_counts.size()+1) >> 1) {
             
         // more than half of the housekeeping arrays are free, so we'll
@@ -263,12 +300,9 @@ void WriteLogRegistry::cleanup()
                   &m_commits[m_newest_version + 1 - m_array_start],
                   &m_commits[0]);
         m_commits.resize(m_newest_version - m_last_forgotten_version);
-        std::copy(&m_interest_counts[idx],
-                  &m_interest_counts[m_newest_version + 1 - m_array_start],
-                  &m_interest_counts[0]);
-        m_interest_counts.resize(m_newest_version - m_last_forgotten_version);
         m_array_start = m_last_forgotten_version + 1;
     }
+*/
 }
 
 

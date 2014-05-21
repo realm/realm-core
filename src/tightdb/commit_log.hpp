@@ -29,7 +29,7 @@
 namespace tightdb {
 
 
-class WriteLogRegistryInterface : public SharedGroup::TransactLogRegistry {
+class WriteLogRegistryInterface {
 public:
     // keep this in sync with shared group.
     typedef uint_fast64_t version_type;
@@ -41,12 +41,13 @@ public:
     // The registry retains commit buffers for as long as there is a
     // registered interest:
     
-    // Register an interest in commits following version 'from'
-    virtual void register_interest(version_type from) = 0;
-    
-    // Register that you are no longer interested in commits following
-    // version 'from'.
-    virtual void unregister_interest(version_type from) = 0;
+    // Register interest in new commits. Returns an integer id, which you must
+    // use to unregister again.
+    virtual int register_interest() = 0; 
+
+    // Register that you are no longer interested in commits. Provide the index
+    // assigned during the call to 'register_interest'
+    virtual void unregister_interest(int interest_registration_id) = 0;
 
     // Fill an array with commits for a version range - ]from..to]
     // The array is allocated by the caller and must have at least 'to' - 'from' entries.
@@ -56,7 +57,8 @@ public:
     virtual void get_commit_entries(version_type from, version_type to, BinaryData*) TIGHTDB_NOEXCEPT = 0;
 
     // This also unregisters interest in the same version range.
-    virtual void release_commit_entries(version_type from, version_type to) TIGHTDB_NOEXCEPT = 0;
+    virtual void release_commit_entries(int interest_registration_id, 
+                                        version_type to) TIGHTDB_NOEXCEPT = 0;
 
     // dtor
     virtual ~WriteLogRegistryInterface() {}
