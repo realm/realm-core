@@ -1,6 +1,7 @@
 #include <tightdb/table_view.hpp>
 #include <tightdb/column.hpp>
 #include <tightdb/column_basic.hpp>
+#include <tightdb/util/utf8.hpp>
 
 using namespace std;
 using namespace tightdb;
@@ -200,73 +201,150 @@ size_t TableViewBase::count_double(size_t column_ndx, double target) const
     return aggregate<act_Count, double, size_t, ColumnDouble>(NULL, column_ndx, target);
 }
 
+namespace tightdb {
+
+    template <> StringData TableViewBase::GetValue<StringData>(size_t row, size_t column) const
+    {
+        return get_string(column, row);
+    }
+
+    template <> float TableViewBase::GetValue<float>(size_t row, size_t column) const
+    {
+        return get_float(column, row);
+    }
+
+    template <> double TableViewBase::GetValue<double>(size_t row, size_t column) const
+    {
+        return get_double(column, row);
+    }
+}
+
+// Fixme, 'compare' is workaround because using utf8.hpp inside '<' operator of StringData gives circular reference
+template <class T> bool compare(T v1, T v2)
+{
+    return v1 < v2;
+}
+
+template <> bool compare<StringData>(StringData v1, StringData v2)
+{
+    bool ret = utf8_compare(v1.data(), v2.data());
+    return ret;
+}
+
+template <class T> struct Comparer
+{
+    Comparer(size_t column, bool ascend, TableViewBase& tv) : m_column(column), m_ascending(ascend), m_tv(tv) {}
+    bool operator() (size_t i, size_t j) const {
+        T v1 = m_tv.GetValue<T>(i, m_column);
+        T v2 = m_tv.GetValue<T>(j, m_column);
+        bool b = compare(v1, v2);
+        return m_ascending ? b : !b;
+    }
+
+    size_t m_column;
+    bool m_ascending;
+    TableViewBase& m_tv;
+};
+
+// Sort m_refs with std::sort using Comparer as predicate
+template <class T> void TableViewBase::sort(size_t column, bool ascending)
+{
+    vector<size_t> v, v2;
+    for (size_t t = 0; t < size(); t++) {
+        v.push_back(t);
+        v2.push_back(get_source_ndx(t));
+    }
+    std::stable_sort(v.begin(), v.end(), Comparer<T>(column, ascending, *this));
+    m_refs.clear();
+    for (size_t t = 0; t < v.size(); t++)
+        m_refs.add(v2[v[t]]);
+}
+
 void TableViewBase::sort(size_t column, bool Ascending)
 {
     TIGHTDB_ASSERT(m_table);
-    TIGHTDB_ASSERT(m_table->get_column_type(column) == type_Int  ||
-                   m_table->get_column_type(column) == type_DateTime ||
-                   m_table->get_column_type(column) == type_Bool);
+
+    DataType type = m_table->get_column_type(column);
+
+    TIGHTDB_ASSERT(type == type_Int  ||
+                   type == type_DateTime ||
+                   type == type_Bool ||
+                   type == type_Float ||
+                   type == type_Double ||
+                   type == type_String);
 
     if (m_refs.size() == 0)
         return;
-    m_is_in_index_order = false;
-
-    Array vals;
-    Array ref;
+    
     Array result;
 
-    //ref.Preset(0, m_refs.size() - 1, m_refs.size());
-    for (size_t t = 0; t < m_refs.size(); t++)
-        ref.add(t);
-
-    // Extract all values from the Column and put them in an Array because Array is much faster to operate on
-    // with rand access (we have ~log(n) accesses to each element, so using 1 additional read to speed up the rest is faster)
-    if (m_table->get_column_type(column) == type_Int) {
-        for (size_t t = 0; t < m_refs.size(); t++) {
-            int64_t v = m_table->get_int(column, size_t(m_refs.get(t)));
-            vals.add(v);
-        }
+    if (type == type_Float) {
+        sort<float>(column, Ascending);
     }
-    else if (m_table->get_column_type(column) == type_DateTime) {
-        for (size_t t = 0; t < m_refs.size(); t++) {
-            size_t idx = size_t(m_refs.get(t));
-            int64_t v = int64_t(m_table->get_datetime(column, idx).get_datetime());
-            vals.add(v);
-        }
+    else if (type == type_Double) {
+        sort<double>(column, Ascending);
     }
-    else if (m_table->get_column_type(column) == type_Bool) {
-        for (size_t t = 0; t < m_refs.size(); t++) {
-            size_t idx = size_t(m_refs.get(t));
-            int64_t v = int64_t(m_table->get_bool(column, idx));
-            vals.add(v);
-        }
-    }
-
-    vals.ReferenceSort(ref);
-    vals.destroy();
-
-    for (size_t t = 0; t < m_refs.size(); t++) {
-        size_t r  = to_size_t(ref.get(t));
-        size_t rr = to_size_t(m_refs.get(r));
-        result.add(rr);
-    }
-
-    // Copy result to m_refs (todo, there might be a shortcut)
-    m_refs.clear();
-    if (Ascending) {
-        for (size_t t = 0; t < ref.size(); t++) {
-            size_t v = to_size_t(result.get(t));
-            m_refs.add(v);
-        }
+    else if (type == type_String) {
+        sort<tightdb::StringData>(column, Ascending);
     }
     else {
-        for (size_t t = 0; t < ref.size(); t++) {
-            size_t v = to_size_t(result.get(ref.size() - t - 1));
-            m_refs.add(v);
+
+        Array vals;
+        Array ref;
+
+        //ref.Preset(0, m_refs.size() - 1, m_refs.size());
+        for (size_t t = 0; t < m_refs.size(); t++)
+            ref.add(t);
+
+        // Extract all values from the Column and put them in an Array because Array is much faster to operate on
+        // with rand access (we have ~log(n) accesses to each element, so using 1 additional read to speed up the rest is faster)
+        if (type == type_Int) {
+            for (size_t t = 0; t < m_refs.size(); t++) {
+                int64_t v = m_table->get_int(column, size_t(m_refs.get(t)));
+                vals.add(v);
+            }
         }
+        else if (type == type_DateTime) {
+            for (size_t t = 0; t < m_refs.size(); t++) {
+                size_t idx = size_t(m_refs.get(t));
+                int64_t v = int64_t(m_table->get_datetime(column, idx).get_datetime());
+                vals.add(v);
+            }
+        }
+        else if (type == type_Bool) {
+            for (size_t t = 0; t < m_refs.size(); t++) {
+                size_t idx = size_t(m_refs.get(t));
+                int64_t v = int64_t(m_table->get_bool(column, idx));
+                vals.add(v);
+            }
+        }
+
+        vals.ReferenceSort(ref);
+        vals.destroy();
+
+        for (size_t t = 0; t < m_refs.size(); t++) {
+            size_t r = to_size_t(ref.get(t));
+            size_t rr = to_size_t(m_refs.get(r));
+            result.add(rr);
+        }
+
+        // Copy result to m_refs (todo, there might be a shortcut)
+        m_refs.clear();
+        if (Ascending) {
+            for (size_t t = 0; t < ref.size(); t++) {
+                size_t v = to_size_t(result.get(t));
+                m_refs.add(v);
+            }
+        }
+        else {
+            for (size_t t = 0; t < ref.size(); t++) {
+                size_t v = to_size_t(result.get(ref.size() - t - 1));
+                m_refs.add(v);
+            }
+        }
+        ref.destroy();
     }
     result.destroy();
-    ref.destroy();
 }
 
 // Simple pivot aggregate method. Experimental! Please do not document method publicly.
@@ -329,7 +407,7 @@ void TableViewBase::row_to_string(size_t row_ndx, ostream& out) const
     m_table->to_string_row(get_source_ndx(row_ndx), out, widths);
 }
 
-
+// O(n) for n = this->size()
 void TableView::remove(size_t ndx)
 {
     TIGHTDB_ASSERT(m_table);
@@ -344,7 +422,7 @@ void TableView::remove(size_t ndx)
 
     // Decrement row indexes greater than or equal to ndx
     //
-    // FIXME: Dangerous cast below: unsigned -> signed
+    // O(n) for n = this->size(). FIXME: Dangerous cast below: unsigned -> signed
     m_refs.adjust_ge(int_fast64_t(real_ndx), -1);
 }
 
