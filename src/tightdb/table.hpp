@@ -26,6 +26,7 @@
 #include <tightdb/util/tuple.hpp>
 #include <tightdb/column_fwd.hpp>
 #include <tightdb/table_ref.hpp>
+#include <tightdb/row.hpp>
 #include <tightdb/descriptor_fwd.hpp>
 #include <tightdb/spec.hpp>
 #include <tightdb/mixed.hpp>
@@ -291,6 +292,12 @@ public:
     std::size_t size() const TIGHTDB_NOEXCEPT;
     void        clear();
 
+    typedef BasicRowExpr<Table> RowExpr;
+    typedef BasicRowExpr<const Table> ConstRowExpr;
+
+    RowExpr operator[](std::size_t row_ndx) TIGHTDB_NOEXCEPT;
+    ConstRowExpr operator[](std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
+
     // Row handling
     std::size_t add_empty_row(std::size_t num_rows = 1);
     void        insert_empty_row(std::size_t row_ndx, std::size_t num_rows = 1);
@@ -328,7 +335,7 @@ public:
     DataType    get_mixed_type(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
 
     // Set cell values
-    void set_int(std::size_t column_ndx, std::size_t row_ndx, int64_t value);
+    void set_int(std::size_t column_ndx, std::size_t row_ndx, int_fast64_t value);
     void set_bool(std::size_t column_ndx, std::size_t row_ndx, bool value);
     void set_datetime(std::size_t column_ndx, std::size_t row_ndx, DateTime value);
     template<class E> void set_enum(std::size_t column_ndx, std::size_t row_ndx, E value);
@@ -655,6 +662,9 @@ private:
     // Table view instances
     mutable std::vector<const TableViewBase*> m_views;
 
+    typedef std::vector<RowBase*> row_accessors;
+    mutable row_accessors m_row_accessors;
+
 #ifdef TIGHTDB_ENABLE_REPLICATION
     // Used only in connection with
     // SharedGroup::advance_read_transact().
@@ -812,8 +822,8 @@ private:
     // new one is started.
     void detach() TIGHTDB_NOEXCEPT;
 
-    /// Detach and remove all attached row and subtable accessors.
-    void discard_row_and_subtable_accessors() TIGHTDB_NOEXCEPT;
+    /// Detach and remove all attached subtable accessors.
+    void discard_subtable_accessors() TIGHTDB_NOEXCEPT;
 
     // Detach the type descriptor accessor if it exists.
     void discard_desc_accessor() TIGHTDB_NOEXCEPT;
@@ -824,6 +834,10 @@ private:
     void register_view(const TableViewBase* view);
     void unregister_view(const TableViewBase* view) TIGHTDB_NOEXCEPT;
     void detach_views_except(const TableViewBase* view) TIGHTDB_NOEXCEPT;
+
+    void register_row_accessor(RowBase*) const;
+    void unregister_row_accessor(RowBase*) const TIGHTDB_NOEXCEPT;
+    void discard_row_accessors() TIGHTDB_NOEXCEPT;
 
     class UnbindGuard;
 
@@ -922,12 +936,13 @@ private:
     template<class T> friend class Columns;
     friend class ParentNode;
     template<class> friend class SequentialGetter;
+    friend class RowBase;
 };
 
 
 inline void Table::remove(std::size_t row_ndx)
 {
-    detach_views_except(NULL);
+    detach_views_except(0);
     do_remove(row_ndx);
 }
 
@@ -1154,7 +1169,7 @@ inline Table::Table(ref_count_tag, ConstSubspecRef shared_spec, ref_type columns
 
 inline void Table::set_index(std::size_t column_ndx)
 {
-    discard_row_and_subtable_accessors();
+    discard_subtable_accessors();
     set_index(column_ndx, true);
 }
 
@@ -1185,6 +1200,18 @@ inline bool Table::is_empty() const TIGHTDB_NOEXCEPT
 inline std::size_t Table::size() const TIGHTDB_NOEXCEPT
 {
     return m_size;
+}
+
+inline Table::RowExpr Table::operator[](std::size_t row_ndx) TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(row_ndx < size());
+    return RowExpr(this, row_ndx);
+}
+
+inline Table::ConstRowExpr Table::operator[](std::size_t row_ndx) const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(row_ndx < size());
+    return ConstRowExpr(this, row_ndx);
 }
 
 inline const Table* Table::get_subtable_ptr(std::size_t col_ndx, std::size_t row_ndx) const
@@ -1344,9 +1371,14 @@ public:
         table.detach();
     }
 
-    static void discard_row_and_subtable_accessors(Table& table) TIGHTDB_NOEXCEPT
+    static void discard_row_accessors(Table& table) TIGHTDB_NOEXCEPT
     {
-        table.discard_row_and_subtable_accessors();
+        table.discard_row_accessors();
+    }
+
+    static void discard_subtable_accessors(Table& table) TIGHTDB_NOEXCEPT
+    {
+        table.discard_subtable_accessors();
     }
 
     static void discard_subtable_accessor(Table& table, std::size_t col_ndx, std::size_t row_ndx)

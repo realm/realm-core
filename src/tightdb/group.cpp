@@ -868,8 +868,10 @@ public:
     bool clear_table() TIGHTDB_NOEXCEPT
     {
         typedef _impl::TableFriend tf;
-        if (m_table)
-            tf::discard_row_and_subtable_accessors(*m_table);
+        if (m_table) {
+            tf::discard_row_accessors(*m_table);
+            tf::discard_subtable_accessors(*m_table);
+        }
         return true;
     }
 
