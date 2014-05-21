@@ -3571,7 +3571,7 @@ TEST(Table_RowAccessor)
         row_1.set_subtable (7, 0);
         row_1.set_mixed    (8, Mixed());
 
-        Mixed mix_subtab(Mixed::subtable_tag());
+        Mixed mix_subtab((Mixed::subtable_tag()));
 
         CHECK_EQUAL(5651,            table.get_int      (0,0));
         CHECK_EQUAL(true,            table.get_bool     (1,0));
