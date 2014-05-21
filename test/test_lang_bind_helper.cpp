@@ -1726,7 +1726,378 @@ TEST(LangBindHelper_AdvanceReadTransact_Descriptor)
 
 TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
 {
-    // FIXME: Implement this
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg(path);
+    ShortCircuitTransactLogManager tlm(path);
+    SharedGroup sg_w(tlm);
+
+    // Start a read transaction (to be repeatedly advanced)
+    ReadTransaction rt(sg);
+    const Group& group = rt.get_group();
+    CHECK_EQUAL(0, group.size());
+
+    // Create a table with two rows
+    {
+        WriteTransaction wt(sg_w);
+        TableRef parent_w = wt.get_table("parent");
+        parent_w->add_column(type_Int, "a");
+        parent_w->add_empty_row(2);
+        parent_w->set_int(0, 0, 27);
+        parent_w->set_int(0, 1, 227);
+        wt.commit();
+    }
+    LangBindHelper::advance_read_transact(sg, tlm);
+    group.Verify();
+    ConstTableRef parent = rt.get_table("parent");
+    CHECK_EQUAL(2, parent->size());
+    ConstRow row_1 = (*parent)[0];
+    ConstRow row_2 = (*parent)[1];
+    CHECK(row_1.is_attached());
+    CHECK(row_2.is_attached());
+    CHECK_EQUAL(parent.get(), &(row_1.get_table()));
+    CHECK_EQUAL(parent.get(), &(row_2.get_table()));
+    CHECK_EQUAL(0, row_1.get_index());
+    CHECK_EQUAL(1, row_2.get_index());
+
+    // Check that row insertion does not detach the row accessors, and that the
+    // row indexes is properly adjusted
+    {
+        WriteTransaction wt(sg_w);
+        TableRef parent_w = wt.get_table("parent");
+        parent_w->insert_empty_row(1); // Between
+        parent_w->add_empty_row();     // After
+        parent_w->insert_empty_row(0); // Before
+        wt.commit();
+    }
+    LangBindHelper::advance_read_transact(sg, tlm);
+    group.Verify();
+    CHECK_EQUAL(5, parent->size());
+    CHECK(row_1.is_attached());
+    CHECK(row_2.is_attached());
+    CHECK_EQUAL(parent.get(), &(row_1.get_table()));
+    CHECK_EQUAL(parent.get(), &(row_2.get_table()));
+    CHECK_EQUAL(1, row_1.get_index());
+    CHECK_EQUAL(3, row_2.get_index());
+    CHECK_EQUAL(27,  row_1.get_int(0));
+    CHECK_EQUAL(227, row_2.get_int(0));
+    {
+        WriteTransaction wt(sg_w);
+        TableRef parent_w = wt.get_table("parent");
+        parent_w->insert_empty_row(1); // Immediately before row_1
+        parent_w->insert_empty_row(5); // Immediately after  row_2
+        parent_w->insert_empty_row(3); // Immediately after  row_1
+        parent_w->insert_empty_row(5); // Immediately before row_2
+        wt.commit();
+    }
+    LangBindHelper::advance_read_transact(sg, tlm);
+    group.Verify();
+    CHECK_EQUAL(9, parent->size());
+    CHECK(row_1.is_attached());
+    CHECK(row_2.is_attached());
+    CHECK_EQUAL(parent.get(), &(row_1.get_table()));
+    CHECK_EQUAL(parent.get(), &(row_2.get_table()));
+    CHECK_EQUAL(2, row_1.get_index());
+    CHECK_EQUAL(6, row_2.get_index());
+    CHECK_EQUAL(27,  row_1.get_int(0));
+    CHECK_EQUAL(227, row_2.get_int(0));
+
+    // Check that removal of rows (other than row_1 and row_2) does not detach
+    // the row accessors, and that the row indexes is properly adjusted
+    {
+        WriteTransaction wt(sg_w);
+        TableRef parent_w = wt.get_table("parent");
+        parent_w->remove(3); // Immediately after  row_1
+        parent_w->remove(1); // Immediately before row_1
+        parent_w->remove(3); // Immediately before row_2
+        parent_w->remove(4); // Immediately after  row_2
+        wt.commit();
+    }
+    LangBindHelper::advance_read_transact(sg, tlm);
+    group.Verify();
+    CHECK_EQUAL(5, parent->size());
+    CHECK(row_1.is_attached());
+    CHECK(row_2.is_attached());
+    CHECK_EQUAL(parent.get(), &(row_1.get_table()));
+    CHECK_EQUAL(parent.get(), &(row_2.get_table()));
+    CHECK_EQUAL(1, row_1.get_index());
+    CHECK_EQUAL(3, row_2.get_index());
+    CHECK_EQUAL(27,  row_1.get_int(0));
+    CHECK_EQUAL(227, row_2.get_int(0));
+    {
+        WriteTransaction wt(sg_w);
+        TableRef parent_w = wt.get_table("parent");
+        parent_w->remove(4); // After
+        parent_w->remove(0); // Before
+        parent_w->remove(1); // Between
+        wt.commit();
+    }
+    LangBindHelper::advance_read_transact(sg, tlm);
+    group.Verify();
+    CHECK_EQUAL(2, parent->size());
+    CHECK(row_1.is_attached());
+    CHECK(row_2.is_attached());
+    CHECK_EQUAL(parent.get(), &(row_1.get_table()));
+    CHECK_EQUAL(parent.get(), &(row_2.get_table()));
+    CHECK_EQUAL(0, row_1.get_index());
+    CHECK_EQUAL(1, row_2.get_index());
+    CHECK_EQUAL(27,  row_1.get_int(0));
+    CHECK_EQUAL(227, row_2.get_int(0));
+
+    // Check that removal of first row detaches row_1
+    {
+        WriteTransaction wt(sg_w);
+        TableRef parent_w = wt.get_table("parent");
+        parent_w->remove(0);
+        wt.commit();
+    }
+    LangBindHelper::advance_read_transact(sg, tlm);
+    group.Verify();
+    CHECK_EQUAL(1, parent->size());
+    CHECK(!row_1.is_attached());
+    CHECK(row_2.is_attached());
+    CHECK_EQUAL(parent.get(), &(row_2.get_table()));
+    CHECK_EQUAL(0, row_2.get_index());
+    CHECK_EQUAL(227, row_2.get_int(0));
+    // Restore first row and recover row_1
+    {
+        WriteTransaction wt(sg_w);
+        TableRef parent_w = wt.get_table("parent");
+        parent_w->insert_empty_row(0);
+        parent_w->set_int(0, 0, 27);
+        wt.commit();
+    }
+    LangBindHelper::advance_read_transact(sg, tlm);
+    group.Verify();
+    CHECK_EQUAL(2, parent->size());
+    row_1 = (*parent)[0];
+    CHECK(row_1.is_attached());
+    CHECK(row_2.is_attached());
+    CHECK_EQUAL(parent.get(), &(row_1.get_table()));
+    CHECK_EQUAL(parent.get(), &(row_2.get_table()));
+    CHECK_EQUAL(0, row_1.get_index());
+    CHECK_EQUAL(1, row_2.get_index());
+    CHECK_EQUAL(27,  row_1.get_int(0));
+    CHECK_EQUAL(227, row_2.get_int(0));
+
+    // Check that removal of second row detaches row_2
+    {
+        WriteTransaction wt(sg_w);
+        TableRef parent_w = wt.get_table("parent");
+        parent_w->remove(1);
+        wt.commit();
+    }
+    LangBindHelper::advance_read_transact(sg, tlm);
+    group.Verify();
+    CHECK_EQUAL(1, parent->size());
+    CHECK(row_1.is_attached());
+    CHECK(!row_2.is_attached());
+    CHECK_EQUAL(parent.get(), &(row_1.get_table()));
+    CHECK_EQUAL(0, row_1.get_index());
+    CHECK_EQUAL(27, row_1.get_int(0));
+    // Restore second row and recover row_2
+    {
+        WriteTransaction wt(sg_w);
+        TableRef parent_w = wt.get_table("parent");
+        parent_w->add_empty_row();
+        parent_w->set_int(0, 1, 227);
+        wt.commit();
+    }
+    LangBindHelper::advance_read_transact(sg, tlm);
+    group.Verify();
+    CHECK_EQUAL(2, parent->size());
+    row_2 = (*parent)[1];
+    CHECK(row_1.is_attached());
+    CHECK(row_2.is_attached());
+    CHECK_EQUAL(parent.get(), &(row_1.get_table()));
+    CHECK_EQUAL(parent.get(), &(row_2.get_table()));
+    CHECK_EQUAL(0, row_1.get_index());
+    CHECK_EQUAL(1, row_2.get_index());
+    CHECK_EQUAL(27,  row_1.get_int(0));
+    CHECK_EQUAL(227, row_2.get_int(0));
+
+    // Check that descriptor modifications do not affect the row accessors (as
+    // long as we do not remove the last column)
+    {
+        WriteTransaction wt(sg_w);
+        TableRef parent_w = wt.get_table("parent");
+        parent_w->add_column(type_String, "x");
+        parent_w->insert_column(0, type_Float, "y");
+        wt.commit();
+    }
+    LangBindHelper::advance_read_transact(sg, tlm);
+    group.Verify();
+    CHECK_EQUAL(2, parent->size());
+    CHECK(row_1.is_attached());
+    CHECK(row_2.is_attached());
+    CHECK_EQUAL(parent.get(), &(row_1.get_table()));
+    CHECK_EQUAL(parent.get(), &(row_2.get_table()));
+    CHECK_EQUAL(0, row_1.get_index());
+    CHECK_EQUAL(1, row_2.get_index());
+    CHECK_EQUAL(27,  row_1.get_int(1));
+    CHECK_EQUAL(227, row_2.get_int(1));
+    {
+        WriteTransaction wt(sg_w);
+        TableRef parent_w = wt.get_table("parent");
+        parent_w->remove_column(0);
+        parent_w->remove_column(1);
+        wt.commit();
+    }
+    LangBindHelper::advance_read_transact(sg, tlm);
+    group.Verify();
+    CHECK_EQUAL(2, parent->size());
+    CHECK(row_1.is_attached());
+    CHECK(row_2.is_attached());
+    CHECK_EQUAL(parent.get(), &(row_1.get_table()));
+    CHECK_EQUAL(parent.get(), &(row_2.get_table()));
+    CHECK_EQUAL(0, row_1.get_index());
+    CHECK_EQUAL(1, row_2.get_index());
+    CHECK_EQUAL(27,  row_1.get_int(0));
+    CHECK_EQUAL(227, row_2.get_int(0));
+
+    // Check that removal of the last column detaches all row accessors
+    {
+        WriteTransaction wt(sg_w);
+        TableRef parent_w = wt.get_table("parent");
+        parent_w->remove_column(0);
+        wt.commit();
+    }
+    LangBindHelper::advance_read_transact(sg, tlm);
+    group.Verify();
+    CHECK_EQUAL(0, parent->get_column_count());
+    CHECK_EQUAL(0, parent->size());
+    CHECK(!row_1.is_attached());
+    CHECK(!row_2.is_attached());
+    // Restore rows and recover row accessors
+    {
+        WriteTransaction wt(sg_w);
+        TableRef parent_w = wt.get_table("parent");
+        parent_w->add_column(type_Int, "a");
+        parent_w->add_empty_row(2);
+        parent_w->set_int(0, 0, 27);
+        parent_w->set_int(0, 1, 227);
+        wt.commit();
+    }
+    LangBindHelper::advance_read_transact(sg, tlm);
+    group.Verify();
+    CHECK_EQUAL(2, parent->size());
+    row_1 = (*parent)[0];
+    row_2 = (*parent)[1];
+    CHECK(row_1.is_attached());
+    CHECK(row_2.is_attached());
+    CHECK_EQUAL(parent.get(), &(row_1.get_table()));
+    CHECK_EQUAL(parent.get(), &(row_2.get_table()));
+    CHECK_EQUAL(0, row_1.get_index());
+    CHECK_EQUAL(1, row_2.get_index());
+
+    // Check that clearing of the table detaches all row accessors
+    {
+        WriteTransaction wt(sg_w);
+        TableRef parent_w = wt.get_table("parent");
+        parent_w->clear();
+        wt.commit();
+    }
+    LangBindHelper::advance_read_transact(sg, tlm);
+    group.Verify();
+    CHECK_EQUAL(0, parent->size());
+    CHECK(!row_1.is_attached());
+    CHECK(!row_2.is_attached());
+}
+
+
+TEST(LangBindHelper_AdvanceReadTransact_SubtableRowAccessors)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg(path);
+    ShortCircuitTransactLogManager tlm(path);
+    SharedGroup sg_w(tlm);
+
+    // Start a read transaction (to be repeatedly advanced)
+    ReadTransaction rt(sg);
+    const Group& group = rt.get_group();
+    CHECK_EQUAL(0, group.size());
+
+    // Create a mixed and a regular subtable each with one row
+    {
+        WriteTransaction wt(sg_w);
+        TableRef parent_w = wt.get_table("parent");
+        parent_w->add_column(type_Mixed, "a");
+        parent_w->add_column(type_Table, "b");
+        DescriptorRef subdesc = parent_w->get_subdescriptor(1);
+        subdesc->add_column(type_Int, "regular");
+        parent_w->add_empty_row();
+        parent_w->set_mixed(0, 0, Mixed::subtable_tag());
+        TableRef mixed_w = parent_w->get_subtable(0,0);
+        mixed_w->add_column(type_Int, "mixed");
+        mixed_w->add_empty_row();
+        mixed_w->set_int(0, 0, 19);
+        TableRef regular_w = parent_w->get_subtable(1,0);
+        regular_w->add_empty_row();
+        regular_w->set_int(0, 0, 29);
+        wt.commit();
+    }
+    LangBindHelper::advance_read_transact(sg, tlm);
+    group.Verify();
+    ConstTableRef parent = rt.get_table("parent");
+    ConstTableRef mixed   = parent->get_subtable(0,0);
+    ConstTableRef regular = parent->get_subtable(1,0);
+    CHECK(mixed   && mixed->is_attached()   && mixed->size()   == 1);
+    CHECK(regular && regular->is_attached() && regular->size() == 1);
+    ConstRow row_m = (*mixed)[0];
+    ConstRow row_r = (*regular)[0];
+    CHECK_EQUAL(19, row_m.get_int(0));
+    CHECK_EQUAL(29, row_r.get_int(0));
+
+    // Check that all row accessors in a mixed subtable are detached if the
+    // subtable is overridden
+    {
+        WriteTransaction wt(sg_w);
+        TableRef parent_w = wt.get_table("parent");
+        parent_w->set_mixed(0, 0, Mixed("foo"));
+        wt.commit();
+    }
+    LangBindHelper::advance_read_transact(sg, tlm);
+    group.Verify();
+    CHECK(!mixed->is_attached());
+    CHECK(regular->is_attached());
+    CHECK(!row_m.is_attached());
+    CHECK(row_r.is_attached());
+    // Restore mixed
+    {
+        WriteTransaction wt(sg_w);
+        TableRef parent_w = wt.get_table("parent");
+        parent_w->set_mixed(0, 0, Mixed::subtable_tag());
+        TableRef mixed_w = parent_w->get_subtable(0,0);
+        mixed_w->add_column(type_Int, "mixed_2");
+        mixed_w->add_empty_row();
+        mixed_w->set_int(0, 0, 19);
+        wt.commit();
+    }
+    LangBindHelper::advance_read_transact(sg, tlm);
+    group.Verify();
+    mixed = parent->get_subtable(0,0);
+    CHECK(mixed);
+    CHECK(mixed->is_attached());
+    CHECK(regular->is_attached());
+    CHECK_EQUAL(1, mixed->size());
+    CHECK_EQUAL(1, regular->size());
+    row_m = (*mixed)[0];
+    CHECK_EQUAL(19, row_m.get_int(0));
+    CHECK_EQUAL(29, row_r.get_int(0));
+
+    // Check that all row accessors in a regular subtable are detached if the
+    // subtable is overridden
+    {
+        WriteTransaction wt(sg_w);
+        TableRef parent_w = wt.get_table("parent");
+        parent_w->set_subtable(1, 0, 0); // Clear
+        wt.commit();
+    }
+    LangBindHelper::advance_read_transact(sg, tlm);
+    group.Verify();
+    CHECK(mixed->is_attached());
+    CHECK(regular->is_attached());
+    CHECK(row_m.is_attached());
+    CHECK(!row_r.is_attached());
 }
 
 

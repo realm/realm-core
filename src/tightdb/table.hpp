@@ -295,6 +295,12 @@ public:
     typedef BasicRowExpr<Table> RowExpr;
     typedef BasicRowExpr<const Table> ConstRowExpr;
 
+    RowExpr front() TIGHTDB_NOEXCEPT;
+    ConstRowExpr front() const TIGHTDB_NOEXCEPT;
+
+    RowExpr back() TIGHTDB_NOEXCEPT;
+    ConstRowExpr back() const TIGHTDB_NOEXCEPT;
+
     RowExpr operator[](std::size_t row_ndx) TIGHTDB_NOEXCEPT;
     ConstRowExpr operator[](std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
 
@@ -1200,6 +1206,30 @@ inline bool Table::is_empty() const TIGHTDB_NOEXCEPT
 inline std::size_t Table::size() const TIGHTDB_NOEXCEPT
 {
     return m_size;
+}
+
+inline Table::RowExpr Table::front() TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(!is_empty());
+    return RowExpr(this, 0);
+}
+
+inline Table::ConstRowExpr Table::front() const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(!is_empty());
+    return ConstRowExpr(this, 0);
+}
+
+inline Table::RowExpr Table::back() TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(!is_empty());
+    return RowExpr(this, m_size-1);
+}
+
+inline Table::ConstRowExpr Table::back() const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(!is_empty());
+    return ConstRowExpr(this, m_size-1);
 }
 
 inline Table::RowExpr Table::operator[](std::size_t row_ndx) TIGHTDB_NOEXCEPT

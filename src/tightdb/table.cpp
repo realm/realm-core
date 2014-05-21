@@ -553,7 +553,7 @@ void Table::discard_row_accessors() TIGHTDB_NOEXCEPT
     typedef row_accessors::const_iterator iter;
     iter end = m_row_accessors.end();
     for (iter i = m_row_accessors.begin(); i != end; ++i)
-        (*i)->m_table.reset();
+        (*i)->m_table.reset(); // Detach
     m_row_accessors.clear();
 }
 
@@ -3675,12 +3675,24 @@ void Table::adj_accessors_insert_rows(size_t row_ndx, size_t num_rows) TIGHTDB_N
     // Hierarchy Consistency Guarantee. This means, in particular, that it
     // cannot access the underlying array structure.
 
-    // FIXME: Add num_rows to row index in all row accessors whose row
-    // index is greater than or equal to row_ndx.
-    size_t n = m_cols.size();
-    for (size_t i = 0; i != n; ++i) {
-        if (ColumnBase* col = reinterpret_cast<ColumnBase*>(m_cols.get(i)))
-            col->adj_accessors_insert_rows(row_ndx, num_rows);
+    // Adjust row accessors
+    {
+        typedef row_accessors::const_iterator iter;
+        iter end = m_row_accessors.end();
+        for (iter i = m_row_accessors.begin(); i != end; ++i) {
+            RowBase* row = *i;
+            if (row->m_row_ndx >= row_ndx)
+                row->m_row_ndx += num_rows;
+        }
+    }
+
+    // Adjust subtable accessors
+    {
+        size_t n = m_cols.size();
+        for (size_t i = 0; i != n; ++i) {
+            if (ColumnBase* col = reinterpret_cast<ColumnBase*>(m_cols.get(i)))
+                col->adj_accessors_insert_rows(row_ndx, num_rows);
+        }
     }
 }
 
@@ -3691,12 +3703,33 @@ void Table::adj_accessors_erase_row(size_t row_ndx) TIGHTDB_NOEXCEPT
     // Hierarchy Consistency Guarantee. This means, in particular, that it
     // cannot access the underlying array structure.
 
-    // FIXME: Decrement row index in all row accessors whose row index
-    // is greater than (or equal to) row_ndx.
-    size_t n = m_cols.size();
-    for (size_t i = 0; i != n; ++i) {
-        if (ColumnBase* col = reinterpret_cast<ColumnBase*>(m_cols.get(i)))
-            col->adj_accessors_erase_row(row_ndx);
+    // Adjust row accessors
+    {
+        typedef row_accessors::iterator iter;
+        iter end = m_row_accessors.end();
+        iter i = m_row_accessors.begin();
+        while (i != end) {
+            RowBase* row = *i;
+            if (row->m_row_ndx == row_ndx) {
+                row->m_table.reset(); // Detach
+                // Move last over
+                *i = *--end;
+                m_row_accessors.pop_back();
+                continue;
+            }
+            if (row->m_row_ndx > row_ndx)
+                --row->m_row_ndx;
+            ++i;
+        }
+    }
+
+    // Adjust subtable accessors
+    {
+        size_t n = m_cols.size();
+        for (size_t i = 0; i != n; ++i) {
+            if (ColumnBase* col = reinterpret_cast<ColumnBase*>(m_cols.get(i)))
+                col->adj_accessors_erase_row(row_ndx);
+        }
     }
 }
 
@@ -3762,6 +3795,10 @@ void Table::erase_column_accessor(size_t col_ndx) TIGHTDB_NOEXCEPT
             delete col;
         }
         m_cols.erase(col_ndx);
+
+        // If we removed the last column, we need to discard all row accessors
+        if (m_cols.is_empty())
+            discard_row_accessors();
     }
 }
 
@@ -3883,13 +3920,31 @@ void Table::Verify() const
     m_columns.Verify();
     m_spec.Verify();
 
-    size_t n = m_spec.get_column_count();
-    TIGHTDB_ASSERT(n == m_cols.size());
 
-    for (size_t i = 0; i != n; ++i) {
-        const ColumnBase& column = get_column_base(i);
-        column.Verify();
-        TIGHTDB_ASSERT(column.size() == m_size);
+    // Verify row accessors
+    {
+        typedef row_accessors::const_iterator iter;
+        iter end = m_row_accessors.end();
+        for (iter i = m_row_accessors.begin(); i != end; ++i) {
+            RowBase* row = *i;
+            // Check that each row accessor occurs only once
+            TIGHTDB_ASSERT(find(i+1, end, row) == end);
+            // Check that it is attached to this table
+            TIGHTDB_ASSERT(row->m_table.get() == this);
+            // Check that its row index is not out of bounds
+            TIGHTDB_ASSERT(row->m_row_ndx < size());
+        }
+    }
+
+    // Verify column accessors
+    {
+        size_t n = m_spec.get_column_count();
+        TIGHTDB_ASSERT(n == m_cols.size());
+        for (size_t i = 0; i != n; ++i) {
+            const ColumnBase& column = get_column_base(i);
+            column.Verify();
+            TIGHTDB_ASSERT(column.size() == m_size);
+        }
     }
 }
 

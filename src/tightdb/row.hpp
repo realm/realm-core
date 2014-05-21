@@ -30,6 +30,16 @@ namespace tightdb {
 template<class> class BasicRow;
 
 
+/// This class is a "mixin" and contains the common set of functions for several
+/// distinct row-like classes.
+///
+/// There is a direct and natural correspondance between the function in this
+/// class and functions in Table of the same name. For example:
+///
+///    table[i].get_int(j) == table.get_int(i,j)
+///
+/// \sa Table
+/// \sa BasicRow
 template<class T, class R> class RowFuncs {
 public:
     int_fast64_t get_int(std::size_t col_ndx) const TIGHTDB_NOEXCEPT;
@@ -56,6 +66,11 @@ public:
     void set_mixed(std::size_t col_ndx, Mixed value);
     void set_mixed_subtable(std::size_t col_ndx, const Table* value);
 
+    std::size_t get_column_count() const TIGHTDB_NOEXCEPT;
+    DataType get_column_type(std::size_t col_ndx) const TIGHTDB_NOEXCEPT;
+    StringData get_column_name(std::size_t col_ndx) const TIGHTDB_NOEXCEPT;
+    std::size_t get_column_index(StringData name) const TIGHTDB_NOEXCEPT;
+
 private:
     typedef T table_type;
 
@@ -64,6 +79,18 @@ private:
 };
 
 
+/// This class is a special kind of row accessor. It differes from a real row
+/// accessor (BasicRow) by having a trivial and fast copy constructor. It is
+/// supposed to be used as the return type of functions such as
+/// Table::operator[](), and then to be used as a basis for constructing a real
+/// row accessor. Objects of this class are intended to only ever exist as
+/// temporaries.
+///
+/// In contrast to a real row accessor, objects of this class do not keep the
+/// parent table "alive", nor are they maintained (adjusted) across row
+/// insertions and row removals like real row accessors are.
+///
+/// \sa BasicRow
 template<class T> class BasicRowExpr:
         public RowFuncs<T, BasicRowExpr<T> > {
 public:
@@ -111,6 +138,35 @@ protected:
 };
 
 
+/// An accessor class for table rows (a.k.a. a "row accessor").
+///
+/// For as long as it remains attached, a row accessor will keep the parent
+/// table accessor alive. In case the lifetime of the parent table is not
+/// managed by reference counting (such as when the table is an automatic
+/// variable on the stack), the descrution of the table will cause all remaining
+/// row accessors to be detached.
+///
+/// While attached, a row accessor is bound to a particular row of the parent
+/// table. If that row is removed, the accesssor becomes detached. If rows are
+/// inserted or removed before it (at lower row index), then the accessor is
+/// automatically adjusted to account for the change in index of the row to
+/// which the accessor is bound. In other words, a row accessor is bound to the
+/// contents of a row, not to a row index.
+///
+/// Row accessors are created as follows:
+///
+///     Row row       = table[7];  // 8th row of `table`
+///     ConstRow crow = ctable[2]; // 3rd row of const `ctable`
+///     Row first_row = table.front();
+///     Row last_row  = table.back();
+///
+/// Note: The automatic adjustment of row accessors is currently not completely
+/// implemented. During a write transaction, if rows are inserted anywhere into,
+/// or removed anywhere from a table, all row accessors attached to that table
+/// will be detached.
+///
+/// FIXME: Remove the note above when the "automatic adjustment of row
+/// accessors" is complete.
 template<class T> class BasicRow:
         private RowBase,
         public RowFuncs<T, BasicRow<T> > {
@@ -281,6 +337,30 @@ template<class T, class R>
 inline void RowFuncs<T,R>::set_mixed_subtable(std::size_t col_ndx, const Table* value)
 {
     get_table().set_mixed_subtable(col_ndx, get_row_ndx(), value); // Throws
+}
+
+template<class T, class R>
+inline std::size_t RowFuncs<T,R>::get_column_count() const TIGHTDB_NOEXCEPT
+{
+    return get_table().get_column_count();
+}
+
+template<class T, class R>
+inline DataType RowFuncs<T,R>::get_column_type(std::size_t col_ndx) const TIGHTDB_NOEXCEPT
+{
+    return get_table().get_column_type(col_ndx);
+}
+
+template<class T, class R>
+inline StringData RowFuncs<T,R>::get_column_name(std::size_t col_ndx) const TIGHTDB_NOEXCEPT
+{
+    return get_table().get_column_name(col_ndx);
+}
+
+template<class T, class R>
+inline std::size_t RowFuncs<T,R>::get_column_index(StringData name) const TIGHTDB_NOEXCEPT
+{
+    return get_table().get_column_index(name);
 }
 
 template<class T, class R> inline T& RowFuncs<T,R>::get_table() const TIGHTDB_NOEXCEPT

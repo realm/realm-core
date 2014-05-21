@@ -3378,8 +3378,8 @@ TEST(Table_RowAccessor)
 {
     Table table;
     DescriptorRef subdesc;
-    table.add_column(type_Int,      "");
-    table.add_column(type_Bool,     "");
+    table.add_column(type_Int,      "int");
+    table.add_column(type_Bool,     "bool");
     table.add_column(type_Float,    "");
     table.add_column(type_Double,   "");
     table.add_column(type_String,   "");
@@ -3400,6 +3400,11 @@ TEST(Table_RowAccessor)
     one_subtab.add_empty_row(1);
     one_subtab.set_int(0, 0, 19);
 
+    Table two_subtab;
+    two_subtab.add_column(type_Int, "i");
+    two_subtab.add_empty_row(1);
+    two_subtab.set_int(0, 0, 29);
+
     table.set_int      (0, 1, 4923);
     table.set_bool     (1, 1, true);
     table.set_float    (2, 1, 5298.0f);
@@ -3410,10 +3415,98 @@ TEST(Table_RowAccessor)
     table.set_subtable (7, 1, &one_subtab);
     table.set_mixed    (8, 1, Mixed("mix"));
 
+    // Check getters for `RowExpr`
+    {
+        CHECK_EQUAL(9,         table[0].get_column_count());
+        CHECK_EQUAL(type_Int,  table[0].get_column_type(0));
+        CHECK_EQUAL(type_Bool, table[0].get_column_type(1));
+        CHECK_EQUAL("int",     table[0].get_column_name(0));
+        CHECK_EQUAL("bool",    table[0].get_column_name(1));
+        CHECK_EQUAL(0,         table[0].get_column_index("int"));
+        CHECK_EQUAL(1,         table[0].get_column_index("bool"));
+
+        CHECK_EQUAL(int_fast64_t(),  table[0].get_int           (0));
+        CHECK_EQUAL(bool(),          table[0].get_bool          (1));
+        CHECK_EQUAL(float(),         table[0].get_float         (2));
+        CHECK_EQUAL(double(),        table[0].get_double        (3));
+        CHECK_EQUAL(StringData(),    table[0].get_string        (4));
+        CHECK_EQUAL(BinaryData(),    table[0].get_binary        (5));
+        CHECK_EQUAL(DateTime(),      table[0].get_datetime      (6));
+        CHECK_EQUAL(0,               table[0].get_subtable_size (7));
+        CHECK_EQUAL(int_fast64_t(),  table[0].get_mixed         (8));
+        CHECK_EQUAL(type_Int,        table[0].get_mixed_type    (8));
+
+        CHECK_EQUAL(4923,            table[1].get_int           (0));
+        CHECK_EQUAL(true,            table[1].get_bool          (1));
+        CHECK_EQUAL(5298.0f,         table[1].get_float         (2));
+        CHECK_EQUAL(2169.0,          table[1].get_double        (3));
+        CHECK_EQUAL("str",           table[1].get_string        (4));
+        CHECK_EQUAL(bin,             table[1].get_binary        (5));
+        CHECK_EQUAL(DateTime(7739),  table[1].get_datetime      (6));
+        CHECK_EQUAL(1,               table[1].get_subtable_size (7));
+        CHECK_EQUAL("mix",           table[1].get_mixed         (8));
+        CHECK_EQUAL(type_String,     table[1].get_mixed_type    (8));
+
+        TableRef subtab_0 = table[0].get_subtable(7);
+        CHECK(*subtab_0 == empty_subtab);
+        TableRef subtab_1 = table[1].get_subtable(7);
+        CHECK_EQUAL(19, subtab_1->get_int(0,0));
+        CHECK(*subtab_1 == one_subtab);
+    }
+
+    // Check getters for `ConstRowExpr`
+    {
+        const Table& const_table = table;
+
+        CHECK_EQUAL(9,         const_table[0].get_column_count());
+        CHECK_EQUAL(type_Int,  const_table[0].get_column_type(0));
+        CHECK_EQUAL(type_Bool, const_table[0].get_column_type(1));
+        CHECK_EQUAL("int",     const_table[0].get_column_name(0));
+        CHECK_EQUAL("bool",    const_table[0].get_column_name(1));
+        CHECK_EQUAL(0,         const_table[0].get_column_index("int"));
+        CHECK_EQUAL(1,         const_table[0].get_column_index("bool"));
+
+        CHECK_EQUAL(int_fast64_t(),  const_table[0].get_int           (0));
+        CHECK_EQUAL(bool(),          const_table[0].get_bool          (1));
+        CHECK_EQUAL(float(),         const_table[0].get_float         (2));
+        CHECK_EQUAL(double(),        const_table[0].get_double        (3));
+        CHECK_EQUAL(StringData(),    const_table[0].get_string        (4));
+        CHECK_EQUAL(BinaryData(),    const_table[0].get_binary        (5));
+        CHECK_EQUAL(DateTime(),      const_table[0].get_datetime      (6));
+        CHECK_EQUAL(0,               const_table[0].get_subtable_size (7));
+        CHECK_EQUAL(int_fast64_t(),  const_table[0].get_mixed         (8));
+        CHECK_EQUAL(type_Int,        const_table[0].get_mixed_type    (8));
+
+        CHECK_EQUAL(4923,            const_table[1].get_int           (0));
+        CHECK_EQUAL(true,            const_table[1].get_bool          (1));
+        CHECK_EQUAL(5298.0f,         const_table[1].get_float         (2));
+        CHECK_EQUAL(2169.0,          const_table[1].get_double        (3));
+        CHECK_EQUAL("str",           const_table[1].get_string        (4));
+        CHECK_EQUAL(bin,             const_table[1].get_binary        (5));
+        CHECK_EQUAL(DateTime(7739),  const_table[1].get_datetime      (6));
+        CHECK_EQUAL(1,               const_table[1].get_subtable_size (7));
+        CHECK_EQUAL("mix",           const_table[1].get_mixed         (8));
+        CHECK_EQUAL(type_String,     const_table[1].get_mixed_type    (8));
+
+        ConstTableRef subtab_0 = const_table[0].get_subtable(7);
+        CHECK(*subtab_0 == empty_subtab);
+        ConstTableRef subtab_1 = const_table[1].get_subtable(7);
+        CHECK_EQUAL(19, subtab_1->get_int(0,0));
+        CHECK(*subtab_1 == one_subtab);
+    }
+
     // Check getters for `Row`
     {
         Row row_0 = table[0];
         Row row_1 = table[1];
+
+        CHECK_EQUAL(9,         row_0.get_column_count());
+        CHECK_EQUAL(type_Int,  row_0.get_column_type(0));
+        CHECK_EQUAL(type_Bool, row_0.get_column_type(1));
+        CHECK_EQUAL("int",     row_0.get_column_name(0));
+        CHECK_EQUAL("bool",    row_0.get_column_name(1));
+        CHECK_EQUAL(0,         row_0.get_column_index("int"));
+        CHECK_EQUAL(1,         row_0.get_column_index("bool"));
 
         CHECK_EQUAL(int_fast64_t(),  row_0.get_int           (0));
         CHECK_EQUAL(bool(),          row_0.get_bool          (1));
@@ -3546,7 +3639,7 @@ TEST(Table_RowAccessor)
         CHECK(*subtab_1 == one_subtab);
     }
 
-    // Check row setters
+    // Check setters for `Row`
     {
         Row row_0 = table[0];
         Row row_1 = table[1];
@@ -3598,7 +3691,7 @@ TEST(Table_RowAccessor)
         CHECK(*subtab_1 == empty_subtab);
 
         row_0.set_mixed_subtable(8, 0);
-        row_1.set_mixed_subtable(8, &one_subtab);
+        row_1.set_mixed_subtable(8, &two_subtab);
         subtab_0 = table.get_subtable(8,0);
         subtab_1 = table.get_subtable(8,1);
         CHECK(subtab_0);
@@ -3606,15 +3699,78 @@ TEST(Table_RowAccessor)
         CHECK(subtab_0->is_attached());
         CHECK(subtab_1->is_attached());
         CHECK(*subtab_0 == Table());
+        CHECK_EQUAL(29, subtab_1->get_int(0,0));
+        CHECK(*subtab_1 == two_subtab);
+    }
+
+    // Check setters for `RowExpr`
+    {
+        table[0].set_int      (0, int_fast64_t());
+        table[0].set_bool     (1, bool());
+        table[0].set_float    (2, float());
+        table[0].set_double   (3, double());
+        table[0].set_string   (4, StringData());
+        table[0].set_binary   (5, BinaryData());
+        table[0].set_datetime (6, DateTime());
+        table[0].set_subtable (7, 0);
+        table[0].set_mixed    (8, Mixed());
+
+        table[1].set_int      (0, 5651);
+        table[1].set_bool     (1, true);
+        table[1].set_float    (2, 8397.0f);
+        table[1].set_double   (3, 1937.0);
+        table[1].set_string   (4, "foo");
+        table[1].set_binary   (5, bin);
+        table[1].set_datetime (6, DateTime(9992));
+        table[1].set_subtable (7, &one_subtab);
+        table[1].set_mixed    (8, Mixed(3637.0f));
+
+        Mixed mix_subtab((Mixed::subtable_tag()));
+
+        CHECK_EQUAL(int_fast64_t(),  table.get_int      (0,0));
+        CHECK_EQUAL(bool(),          table.get_bool     (1,0));
+        CHECK_EQUAL(float(),         table.get_float    (2,0));
+        CHECK_EQUAL(double(),        table.get_double   (3,0));
+        CHECK_EQUAL(StringData(),    table.get_string   (4,0));
+        CHECK_EQUAL(BinaryData(),    table.get_binary   (5,0));
+        CHECK_EQUAL(DateTime(),      table.get_datetime (6,0));
+        CHECK_EQUAL(int_fast64_t(),  table.get_mixed    (8,0));
+
+        CHECK_EQUAL(5651,            table.get_int      (0,1));
+        CHECK_EQUAL(true,            table.get_bool     (1,1));
+        CHECK_EQUAL(8397.0f,         table.get_float    (2,1));
+        CHECK_EQUAL(1937.0,          table.get_double   (3,1));
+        CHECK_EQUAL("foo",           table.get_string   (4,1));
+        CHECK_EQUAL(bin,             table.get_binary   (5,1));
+        CHECK_EQUAL(DateTime(9992),  table.get_datetime (6,1));
+        CHECK_EQUAL(3637.0f,         table.get_mixed    (8,1));
+
+        TableRef subtab_0 = table.get_subtable(7,0);
+        CHECK(*subtab_0 == empty_subtab);
+        TableRef subtab_1 = table.get_subtable(7,1);
         CHECK_EQUAL(19, subtab_1->get_int(0,0));
         CHECK(*subtab_1 == one_subtab);
+
+        table[0].set_mixed_subtable(8, &two_subtab);
+        table[1].set_mixed_subtable(8, 0);
+        subtab_0 = table.get_subtable(8,0);
+        subtab_1 = table.get_subtable(8,1);
+        CHECK(subtab_0);
+        CHECK(subtab_1);
+        CHECK(subtab_0->is_attached());
+        CHECK(subtab_1->is_attached());
+        CHECK_EQUAL(29, subtab_0->get_int(0,0));
+        CHECK(*subtab_0 == two_subtab);
+        CHECK(*subtab_1 == Table());
     }
 
     // Check that we can also create ConstRow's from `const Table`
     {
         const Table& const_table = table;
         ConstRow row_0 = const_table[0];
-        CHECK_EQUAL(5651, row_0.get_int(0));
+        ConstRow row_1 = const_table[1];
+        CHECK_EQUAL(0,    row_0.get_int(0));
+        CHECK_EQUAL(5651, row_1.get_int(0));
     }
 
     // Check that we can get the table and the row index from a Row
