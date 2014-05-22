@@ -709,6 +709,7 @@ EOF
             ! -iregex "^\./(ios|$PASSIVE_SUBDIRS)/.*$" \
             -a -iregex "^.*\.[ch](pp)?$" \
             -exec rsync -qR {} "../$TEST_APP_DIR" \;) || exit 1
+        rm "$TEST_APP_DIR/main.cpp"
 
         # Gather resources
         RESOURCES="$($MAKE -C ./test --no-print-directory get-test-resources)" || exit 1
