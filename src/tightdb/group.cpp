@@ -863,11 +863,21 @@ public:
         return true;
     }
 
-    bool clear_table() TIGHTDB_NOEXCEPT
+    bool move_last_over(size_t target_row_ndx, size_t last_row_ndx) TIGHTDB_NOEXCEPT
     {
         typedef _impl::TableFriend tf;
         if (m_table)
-            tf::discard_row_and_subtable_accessors(*m_table);
+            tf::adj_accessors_move_last_over(*m_table, target_row_ndx, last_row_ndx);
+        return true;
+    }
+
+    bool clear_table() TIGHTDB_NOEXCEPT
+    {
+        typedef _impl::TableFriend tf;
+        if (m_table) {
+            tf::discard_row_accessors(*m_table);
+            tf::discard_subtable_accessors(*m_table);
+        }
         return true;
     }
 

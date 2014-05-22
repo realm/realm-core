@@ -154,10 +154,11 @@ public:
     /// function does nothing.
     virtual void discard_subtable_accessor(std::size_t row_ndx) TIGHTDB_NOEXCEPT;
 
-    virtual void adj_accessors_insert_rows(std::size_t row_ndx,
-                                           std::size_t num_rows) TIGHTDB_NOEXCEPT;
-
+    virtual void adj_accessors_insert_rows(std::size_t row_ndx, std::size_t num_rows)
+        TIGHTDB_NOEXCEPT;
     virtual void adj_accessors_erase_row(std::size_t row_ndx) TIGHTDB_NOEXCEPT;
+    virtual void adj_accessors_move_last_over(std::size_t target_row_ndx, std::size_t last_row_ndx)
+        TIGHTDB_NOEXCEPT;
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     virtual void recursive_mark_table_accessors_dirty() TIGHTDB_NOEXCEPT;
@@ -409,6 +410,11 @@ inline void ColumnBase::adj_accessors_insert_rows(std::size_t, std::size_t) TIGH
 }
 
 inline void ColumnBase::adj_accessors_erase_row(std::size_t) TIGHTDB_NOEXCEPT
+{
+    // Noop
+}
+
+inline void ColumnBase::adj_accessors_move_last_over(std::size_t, std::size_t) TIGHTDB_NOEXCEPT
 {
     // Noop
 }

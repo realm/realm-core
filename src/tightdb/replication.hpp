@@ -43,8 +43,6 @@ namespace tightdb {
 
 // FIXME: Be careful about the possibility of one modification functions being called by another where both do transaction logging.
 
-// FIXME: How to handle unordered tables. Will it introduce nondeterminism in actual order such that indices cannot be considered equal across replication instances?
-
 // FIXME: The current table/subtable selection scheme assumes that a TableRef of a subtable is not accessed after any modification of one of its ancestor tables.
 
 // FIXME: Checking on same Table* requires that ~Table checks and nullifies on match. Another option would be to store m_selected_table as a TableRef. Yet another option would be to assign unique identifiers to each Table instance vial Allocator. Yet another option would be to explicitely invalidate subtables recursively when parent is modified.
@@ -125,35 +123,36 @@ public:
     void clear_interrupt() TIGHTDB_NOEXCEPT;
 
     void new_group_level_table(StringData name);
-    void insert_column(const Descriptor&, std::size_t column_ndx, DataType type, StringData name);
-    void erase_column(const Descriptor&, std::size_t column_ndx);
-    void rename_column(const Descriptor&, std::size_t column_ndx, StringData name);
+    void insert_column(const Descriptor&, std::size_t col_ndx, DataType type, StringData name);
+    void erase_column(const Descriptor&, std::size_t col_ndx);
+    void rename_column(const Descriptor&, std::size_t col_ndx, StringData name);
 
-    void set_int(const Table*, std::size_t column_ndx, std::size_t ndx, int_fast64_t value);
-    void set_bool(const Table*, std::size_t column_ndx, std::size_t ndx, bool value);
-    void set_float(const Table*, std::size_t column_ndx, std::size_t ndx, float value);
-    void set_double(const Table*, std::size_t column_ndx, std::size_t ndx, double value);
-    void set_string(const Table*, std::size_t column_ndx, std::size_t ndx, StringData value);
-    void set_binary(const Table*, std::size_t column_ndx, std::size_t ndx, BinaryData value);
-    void set_date_time(const Table*, std::size_t column_ndx, std::size_t ndx, DateTime value);
-    void set_table(const Table*, std::size_t column_ndx, std::size_t ndx);
-    void set_mixed(const Table*, std::size_t column_ndx, std::size_t ndx, const Mixed& value);
+    void set_int(const Table*, std::size_t col_ndx, std::size_t ndx, int_fast64_t value);
+    void set_bool(const Table*, std::size_t col_ndx, std::size_t ndx, bool value);
+    void set_float(const Table*, std::size_t col_ndx, std::size_t ndx, float value);
+    void set_double(const Table*, std::size_t col_ndx, std::size_t ndx, double value);
+    void set_string(const Table*, std::size_t col_ndx, std::size_t ndx, StringData value);
+    void set_binary(const Table*, std::size_t col_ndx, std::size_t ndx, BinaryData value);
+    void set_date_time(const Table*, std::size_t col_ndx, std::size_t ndx, DateTime value);
+    void set_table(const Table*, std::size_t col_ndx, std::size_t ndx);
+    void set_mixed(const Table*, std::size_t col_ndx, std::size_t ndx, const Mixed& value);
 
-    void insert_int(const Table*, std::size_t column_ndx, std::size_t ndx, int_fast64_t value);
-    void insert_bool(const Table*, std::size_t column_ndx, std::size_t ndx, bool value);
-    void insert_float(const Table*, std::size_t column_ndx, std::size_t ndx, float value);
-    void insert_double(const Table*, std::size_t column_ndx, std::size_t ndx, double value);
-    void insert_string(const Table*, std::size_t column_ndx, std::size_t ndx, StringData value);
-    void insert_binary(const Table*, std::size_t column_ndx, std::size_t ndx, BinaryData value);
-    void insert_date_time(const Table*, std::size_t column_ndx, std::size_t ndx, DateTime value);
-    void insert_table(const Table*, std::size_t column_ndx, std::size_t ndx);
-    void insert_mixed(const Table*, std::size_t column_ndx, std::size_t ndx, const Mixed& value);
+    void insert_int(const Table*, std::size_t col_ndx, std::size_t ndx, int_fast64_t value);
+    void insert_bool(const Table*, std::size_t col_ndx, std::size_t ndx, bool value);
+    void insert_float(const Table*, std::size_t col_ndx, std::size_t ndx, float value);
+    void insert_double(const Table*, std::size_t col_ndx, std::size_t ndx, double value);
+    void insert_string(const Table*, std::size_t col_ndx, std::size_t ndx, StringData value);
+    void insert_binary(const Table*, std::size_t col_ndx, std::size_t ndx, BinaryData value);
+    void insert_date_time(const Table*, std::size_t col_ndx, std::size_t ndx, DateTime value);
+    void insert_table(const Table*, std::size_t col_ndx, std::size_t ndx);
+    void insert_mixed(const Table*, std::size_t col_ndx, std::size_t ndx, const Mixed& value);
 
     void row_insert_complete(const Table*);
     void insert_empty_rows(const Table*, std::size_t row_ndx, std::size_t num_rows);
     void erase_row(const Table*, std::size_t row_ndx);
-    void add_int_to_column(const Table*, std::size_t column_ndx, int_fast64_t value);
-    void add_index_to_column(const Table*, std::size_t column_ndx);
+    void move_last_over(const Table*, std::size_t target_row_ndx, std::size_t last_row_ndx);
+    void add_int_to_column(const Table*, std::size_t col_ndx, int_fast64_t value);
+    void add_index_to_column(const Table*, std::size_t col_ndx);
     void clear_table(const Table*);
     void optimize_table(const Table*);
 
@@ -270,14 +269,15 @@ private:
         instr_RowInsertComplete  = 21,
         instr_InsertEmptyRows    = 22,
         instr_EraseRow           = 23, // Remove a row
-        instr_AddIntToColumn     = 24, // Add an integer value to all cells in a column
-        instr_ClearTable         = 25, // Remove all rows in selected table
-        instr_OptimizeTable      = 26,
-        instr_SelectDescriptor   = 27, // Select descriptor from currently selected root table
-        instr_InsertColumn       = 28, // Insert new column into to selected descriptor
-        instr_EraseColumn        = 29, // Remove column from selected descriptor
-        instr_RenameColumn       = 30, // Rename column in selected descriptor
-        instr_AddIndexToColumn   = 31  // Add a lookup index to a column
+        instr_MoveLastOver       = 24, // Remove a row by replacing it with the last row
+        instr_AddIntToColumn     = 25, // Add an integer value to all cells in a column
+        instr_ClearTable         = 26, // Remove all rows in selected table
+        instr_OptimizeTable      = 27,
+        instr_SelectDescriptor   = 28, // Select descriptor from currently selected root table
+        instr_InsertColumn       = 29, // Insert new column into to selected descriptor
+        instr_EraseColumn        = 30, // Remove column from selected descriptor
+        instr_RenameColumn       = 31, // Rename column in selected descriptor
+        instr_AddIndexToColumn   = 32  // Add a search index to a column
     };
 
     util::Buffer<std::size_t> m_subtab_path_buf;
@@ -299,10 +299,10 @@ private:
     void check_desc(const Descriptor& desc);
     void select_desc(const Descriptor& desc);
 
-    void string_cmd(Instruction, std::size_t column_ndx, std::size_t ndx,
+    void string_cmd(Instruction, std::size_t col_ndx, std::size_t ndx,
                     const char* data, std::size_t size);
 
-    void mixed_cmd(Instruction, std::size_t column_ndx, std::size_t ndx, const Mixed& value);
+    void mixed_cmd(Instruction, std::size_t col_ndx, std::size_t ndx, const Mixed& value);
 
     template<class L> void simple_cmd(Instruction, const util::Tuple<L>& numbers);
 
@@ -361,35 +361,36 @@ public:
     ///
     ///     bool new_group_level_table(StringData name)
     ///     bool select_table(std::size_t group_level_ndx, int levels, const std::size_t* path)
-    ///     bool insert_empty_rows(std::size_t row_idx, std::size_t num_rows)
-    ///     bool erase_row(std::size_t row_idx)
+    ///     bool insert_empty_rows(std::size_t row_ndx, std::size_t num_rows)
+    ///     bool erase_row(std::size_t row_ndx)
+    ///     bool move_last_over(std::size_t target_row_ndx, std::size_t last_row_ndx)
     ///     bool clear_table()
-    ///     bool insert_int(std::size_t col_idx, std::size_t row_idx, int_fast64_t)
-    ///     bool insert_bool(std::size_t col_idx, std::size_t row_idx, bool)
-    ///     bool insert_float(std::size_t col_idx, std::size_t row_idx, float)
-    ///     bool insert_double(std::size_t col_idx, std::size_t row_idx, double)
-    ///     bool insert_string(std::size_t col_idx, std::size_t row_idx, StringData)
-    ///     bool insert_binary(std::size_t col_idx, std::size_t row_idx, BinaryData)
-    ///     bool insert_date_time(std::size_t col_idx, std::size_t row_idx, DateTime)
-    ///     bool insert_table(std::size_t col_idx, std::size_t row_idx)
-    ///     bool insert_mixed(std::size_t col_idx, std::size_t row_idx, const Mixed&)
+    ///     bool insert_int(std::size_t col_ndx, std::size_t row_ndx, int_fast64_t)
+    ///     bool insert_bool(std::size_t col_ndx, std::size_t row_ndx, bool)
+    ///     bool insert_float(std::size_t col_ndx, std::size_t row_ndx, float)
+    ///     bool insert_double(std::size_t col_ndx, std::size_t row_ndx, double)
+    ///     bool insert_string(std::size_t col_ndx, std::size_t row_ndx, StringData)
+    ///     bool insert_binary(std::size_t col_ndx, std::size_t row_ndx, BinaryData)
+    ///     bool insert_date_time(std::size_t col_ndx, std::size_t row_ndx, DateTime)
+    ///     bool insert_table(std::size_t col_ndx, std::size_t row_ndx)
+    ///     bool insert_mixed(std::size_t col_ndx, std::size_t row_ndx, const Mixed&)
     ///     bool row_insert_complete()
-    ///     bool set_int(std::size_t col_idx, std::std::size_t row_idx, int_fast64_t value)
-    ///     bool set_bool(std::size_t col_idx, std::size_t row_idx, bool value)
-    ///     bool set_float(std::size_t col_idx, std::size_t row_idx, float value)
-    ///     bool set_double(std::size_t col_idx, std::size_t row_idx, double value)
-    ///     bool set_string(std::size_t col_idx, std::size_t row_idx, StringData value)
-    ///     bool set_binary(std::size_t col_idx, std::size_t row_idx, BinaryData value)
-    ///     bool set_date_time(std::size_t col_idx, std::size_t row_idx, DateTime value)
-    ///     bool set_table(std::size_t col_idx, std::size_t row_idx)
-    ///     bool set_mixed(std::size_t col_idx, std::size_t row_idx, const Mixed& value)
-    ///     bool add_int_to_column(std::size_t col_idx, int_fast64_t value)
+    ///     bool set_int(std::size_t col_ndx, std::std::size_t row_ndx, int_fast64_t value)
+    ///     bool set_bool(std::size_t col_ndx, std::size_t row_ndx, bool value)
+    ///     bool set_float(std::size_t col_ndx, std::size_t row_ndx, float value)
+    ///     bool set_double(std::size_t col_ndx, std::size_t row_ndx, double value)
+    ///     bool set_string(std::size_t col_ndx, std::size_t row_ndx, StringData value)
+    ///     bool set_binary(std::size_t col_ndx, std::size_t row_ndx, BinaryData value)
+    ///     bool set_date_time(std::size_t col_ndx, std::size_t row_ndx, DateTime value)
+    ///     bool set_table(std::size_t col_ndx, std::size_t row_ndx)
+    ///     bool set_mixed(std::size_t col_ndx, std::size_t row_ndx, const Mixed& value)
+    ///     bool add_int_to_column(std::size_t col_ndx, int_fast64_t value)
     ///     bool optimize_table()
     ///     bool select_descriptor(int levels, const std::size_t* path)
-    ///     bool insert_column(std::size_t col_idx, DataType, StringData value)
-    ///     bool erase_column(std::size_t col_idx)
-    ///     bool rename_column(std::size_t col_idx, StringData new_name)
-    ///     bool add_index_to_column(std::size_t col_idx)
+    ///     bool insert_column(std::size_t col_ndx, DataType, StringData value)
+    ///     bool erase_column(std::size_t col_ndx)
+    ///     bool rename_column(std::size_t col_ndx, StringData new_name)
+    ///     bool add_index_to_column(std::size_t col_ndx)
     ///
     /// parse() promises that the path passed by reference to
     /// InstructionHandler::select_descriptor() will remain valid
@@ -669,22 +670,22 @@ inline void Replication::check_desc(const Descriptor& desc)
 }
 
 
-inline void Replication::string_cmd(Instruction instr, std::size_t column_ndx,
+inline void Replication::string_cmd(Instruction instr, std::size_t col_ndx,
                                     std::size_t ndx, const char* data, std::size_t size)
 {
-    simple_cmd(instr, util::tuple(column_ndx, ndx, size)); // Throws
+    simple_cmd(instr, util::tuple(col_ndx, ndx, size)); // Throws
     transact_log_append(data, size); // Throws
 }
 
 
-inline void Replication::mixed_cmd(Instruction instr, std::size_t column_ndx,
+inline void Replication::mixed_cmd(Instruction instr, std::size_t col_ndx,
                                    std::size_t ndx, const Mixed& value)
 {
     DataType type = value.get_type();
     char* buf;
     transact_log_reserve(&buf, 1 + 4*max_enc_bytes_per_num); // Throws
     *buf++ = char(instr);
-    buf = encode_int(buf, column_ndx);
+    buf = encode_int(buf, col_ndx);
     buf = encode_int(buf, ndx);
     buf = encode_int(buf, int(type));
     switch (type) {
@@ -739,154 +740,154 @@ inline void Replication::new_group_level_table(StringData name)
 }
 
 
-inline void Replication::insert_column(const Descriptor& desc, std::size_t column_ndx,
+inline void Replication::insert_column(const Descriptor& desc, std::size_t col_ndx,
                                        DataType type, StringData name)
 {
     check_desc(desc); // Throws
-    simple_cmd(instr_InsertColumn, util::tuple(column_ndx, int(type), name.size())); // Throws
+    simple_cmd(instr_InsertColumn, util::tuple(col_ndx, int(type), name.size())); // Throws
     transact_log_append(name.data(), name.size()); // Throws
 }
 
-inline void Replication::erase_column(const Descriptor& desc, std::size_t column_ndx)
+inline void Replication::erase_column(const Descriptor& desc, std::size_t col_ndx)
 {
     check_desc(desc); // Throws
-    simple_cmd(instr_EraseColumn, util::tuple(column_ndx)); // Throws
+    simple_cmd(instr_EraseColumn, util::tuple(col_ndx)); // Throws
 }
 
-inline void Replication::rename_column(const Descriptor& desc, std::size_t column_ndx,
+inline void Replication::rename_column(const Descriptor& desc, std::size_t col_ndx,
                                        StringData name)
 {
     check_desc(desc); // Throws
-    simple_cmd(instr_RenameColumn, util::tuple(column_ndx, name.size())); // Throws
+    simple_cmd(instr_RenameColumn, util::tuple(col_ndx, name.size())); // Throws
     transact_log_append(name.data(), name.size()); // Throws
 }
 
 
-inline void Replication::set_int(const Table* t, std::size_t column_ndx,
+inline void Replication::set_int(const Table* t, std::size_t col_ndx,
                                  std::size_t ndx, int_fast64_t value)
 {
     check_table(t); // Throws
-    simple_cmd(instr_SetInt, util::tuple(column_ndx, ndx, value)); // Throws
+    simple_cmd(instr_SetInt, util::tuple(col_ndx, ndx, value)); // Throws
 }
 
-inline void Replication::set_bool(const Table* t, std::size_t column_ndx,
+inline void Replication::set_bool(const Table* t, std::size_t col_ndx,
                                   std::size_t ndx, bool value)
 {
     check_table(t); // Throws
-    simple_cmd(instr_SetBool, util::tuple(column_ndx, ndx, value)); // Throws
+    simple_cmd(instr_SetBool, util::tuple(col_ndx, ndx, value)); // Throws
 }
 
-inline void Replication::set_float(const Table* t, std::size_t column_ndx,
+inline void Replication::set_float(const Table* t, std::size_t col_ndx,
                                    std::size_t ndx, float value)
 {
     check_table(t); // Throws
-    simple_cmd(instr_SetFloat, util::tuple(column_ndx, ndx, value)); // Throws
+    simple_cmd(instr_SetFloat, util::tuple(col_ndx, ndx, value)); // Throws
 }
 
-inline void Replication::set_double(const Table* t, std::size_t column_ndx,
+inline void Replication::set_double(const Table* t, std::size_t col_ndx,
                                     std::size_t ndx, double value)
 {
     check_table(t); // Throws
-    simple_cmd(instr_SetDouble, util::tuple(column_ndx, ndx, value)); // Throws
+    simple_cmd(instr_SetDouble, util::tuple(col_ndx, ndx, value)); // Throws
 }
 
-inline void Replication::set_string(const Table* t, std::size_t column_ndx,
+inline void Replication::set_string(const Table* t, std::size_t col_ndx,
                                     std::size_t ndx, StringData value)
 {
     check_table(t); // Throws
-    string_cmd(instr_SetString, column_ndx, ndx, value.data(), value.size()); // Throws
+    string_cmd(instr_SetString, col_ndx, ndx, value.data(), value.size()); // Throws
 }
 
-inline void Replication::set_binary(const Table* t, std::size_t column_ndx,
+inline void Replication::set_binary(const Table* t, std::size_t col_ndx,
                                     std::size_t ndx, BinaryData value)
 {
     check_table(t); // Throws
-    string_cmd(instr_SetBinary, column_ndx, ndx, value.data(), value.size()); // Throws
+    string_cmd(instr_SetBinary, col_ndx, ndx, value.data(), value.size()); // Throws
 }
 
-inline void Replication::set_date_time(const Table* t, std::size_t column_ndx,
+inline void Replication::set_date_time(const Table* t, std::size_t col_ndx,
                                        std::size_t ndx, DateTime value)
 {
     check_table(t); // Throws
-    simple_cmd(instr_SetDateTime, util::tuple(column_ndx, ndx, value.get_datetime())); // Throws
+    simple_cmd(instr_SetDateTime, util::tuple(col_ndx, ndx, value.get_datetime())); // Throws
 }
 
-inline void Replication::set_table(const Table* t, std::size_t column_ndx,
+inline void Replication::set_table(const Table* t, std::size_t col_ndx,
                                    std::size_t ndx)
 {
     check_table(t); // Throws
-    simple_cmd(instr_SetTable, util::tuple(column_ndx, ndx)); // Throws
+    simple_cmd(instr_SetTable, util::tuple(col_ndx, ndx)); // Throws
 }
 
-inline void Replication::set_mixed(const Table* t, std::size_t column_ndx,
+inline void Replication::set_mixed(const Table* t, std::size_t col_ndx,
                                    std::size_t ndx, const Mixed& value)
 {
     check_table(t); // Throws
-    mixed_cmd(instr_SetMixed, column_ndx, ndx, value); // Throws
+    mixed_cmd(instr_SetMixed, col_ndx, ndx, value); // Throws
 }
 
 
-inline void Replication::insert_int(const Table* t, std::size_t column_ndx,
+inline void Replication::insert_int(const Table* t, std::size_t col_ndx,
                                     std::size_t ndx, int_fast64_t value)
 {
     check_table(t); // Throws
-    simple_cmd(instr_InsertInt, util::tuple(column_ndx, ndx, value)); // Throws
+    simple_cmd(instr_InsertInt, util::tuple(col_ndx, ndx, value)); // Throws
 }
 
-inline void Replication::insert_bool(const Table* t, std::size_t column_ndx,
+inline void Replication::insert_bool(const Table* t, std::size_t col_ndx,
                                      std::size_t ndx, bool value)
 {
     check_table(t); // Throws
-    simple_cmd(instr_InsertBool, util::tuple(column_ndx, ndx, value)); // Throws
+    simple_cmd(instr_InsertBool, util::tuple(col_ndx, ndx, value)); // Throws
 }
 
-inline void Replication::insert_float(const Table* t, std::size_t column_ndx,
+inline void Replication::insert_float(const Table* t, std::size_t col_ndx,
                                       std::size_t ndx, float value)
 {
     check_table(t); // Throws
-    simple_cmd(instr_InsertFloat, util::tuple(column_ndx, ndx, value)); // Throws
+    simple_cmd(instr_InsertFloat, util::tuple(col_ndx, ndx, value)); // Throws
 }
 
-inline void Replication::insert_double(const Table* t, std::size_t column_ndx,
+inline void Replication::insert_double(const Table* t, std::size_t col_ndx,
                                        std::size_t ndx, double value)
 {
     check_table(t); // Throws
-    simple_cmd(instr_InsertDouble, util::tuple(column_ndx, ndx, value)); // Throws
+    simple_cmd(instr_InsertDouble, util::tuple(col_ndx, ndx, value)); // Throws
 }
 
-inline void Replication::insert_string(const Table* t, std::size_t column_ndx,
+inline void Replication::insert_string(const Table* t, std::size_t col_ndx,
                                        std::size_t ndx, StringData value)
 {
     check_table(t); // Throws
-    string_cmd(instr_InsertString, column_ndx, ndx, value.data(), value.size()); // Throws
+    string_cmd(instr_InsertString, col_ndx, ndx, value.data(), value.size()); // Throws
 }
 
-inline void Replication::insert_binary(const Table* t, std::size_t column_ndx,
+inline void Replication::insert_binary(const Table* t, std::size_t col_ndx,
                                        std::size_t ndx, BinaryData value)
 {
     check_table(t); // Throws
-    string_cmd(instr_InsertBinary, column_ndx, ndx, value.data(), value.size()); // Throws
+    string_cmd(instr_InsertBinary, col_ndx, ndx, value.data(), value.size()); // Throws
 }
 
-inline void Replication::insert_date_time(const Table* t, std::size_t column_ndx,
+inline void Replication::insert_date_time(const Table* t, std::size_t col_ndx,
                                           std::size_t ndx, DateTime value)
 {
     check_table(t); // Throws
-    simple_cmd(instr_InsertDateTime, util::tuple(column_ndx, ndx, value.get_datetime())); // Throws
+    simple_cmd(instr_InsertDateTime, util::tuple(col_ndx, ndx, value.get_datetime())); // Throws
 }
 
-inline void Replication::insert_table(const Table* t, std::size_t column_ndx,
+inline void Replication::insert_table(const Table* t, std::size_t col_ndx,
                                       std::size_t ndx)
 {
     check_table(t); // Throws
-    simple_cmd(instr_InsertTable, util::tuple(column_ndx, ndx)); // Throws
+    simple_cmd(instr_InsertTable, util::tuple(col_ndx, ndx)); // Throws
 }
 
-inline void Replication::insert_mixed(const Table* t, std::size_t column_ndx,
+inline void Replication::insert_mixed(const Table* t, std::size_t col_ndx,
                                       std::size_t ndx, const Mixed& value)
 {
     check_table(t); // Throws
-    mixed_cmd(instr_InsertMixed, column_ndx, ndx, value); // Throws
+    mixed_cmd(instr_InsertMixed, col_ndx, ndx, value); // Throws
 }
 
 
@@ -912,17 +913,25 @@ inline void Replication::erase_row(const Table* t, std::size_t row_ndx)
 }
 
 
-inline void Replication::add_int_to_column(const Table* t, std::size_t column_ndx, int_fast64_t value)
+inline void Replication::move_last_over(const Table* t, std::size_t target_row_ndx,
+                                        std::size_t last_row_ndx)
 {
     check_table(t); // Throws
-    simple_cmd(instr_AddIntToColumn, util::tuple(column_ndx, value)); // Throws
+    simple_cmd(instr_MoveLastOver, util::tuple(target_row_ndx, last_row_ndx)); // Throws
 }
 
 
-inline void Replication::add_index_to_column(const Table* t, std::size_t column_ndx)
+inline void Replication::add_int_to_column(const Table* t, std::size_t col_ndx, int_fast64_t value)
 {
     check_table(t); // Throws
-    simple_cmd(instr_AddIndexToColumn, util::tuple(column_ndx)); // Throws
+    simple_cmd(instr_AddIntToColumn, util::tuple(col_ndx, value)); // Throws
+}
+
+
+inline void Replication::add_index_to_column(const Table* t, std::size_t col_ndx)
+{
+    check_table(t); // Throws
+    simple_cmd(instr_AddIndexToColumn, util::tuple(col_ndx)); // Throws
 }
 
 
@@ -1148,6 +1157,13 @@ void Replication::TransactLogParser::parse(InstructionHandler& handler)
             case instr_EraseRow: {
                 std::size_t row_ndx = read_int<std::size_t>(); // Throws
                 if (!handler.erase_row(row_ndx)) // Throws
+                    goto bad_transact_log;
+                continue;
+            }
+            case instr_MoveLastOver: {
+                std::size_t target_row_ndx = read_int<std::size_t>(); // Throws
+                std::size_t last_row_ndx = read_int<std::size_t>(); // Throws
+                if (!handler.move_last_over(target_row_ndx, last_row_ndx)) // Throws
                     goto bad_transact_log;
                 continue;
             }

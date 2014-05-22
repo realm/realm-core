@@ -624,6 +624,7 @@
     <ClCompile Include="..\..\src\tightdb\spec.cpp" />
     <ClCompile Include="..\..\src\tightdb\util\string_buffer.cpp" />
     <ClCompile Include="..\..\src\tightdb\table.cpp" />
+    <ClCompile Include="..\..\src\tightdb\row.cpp" />
     <ClCompile Include="..\..\src\tightdb\table_view.cpp" />
     <ClCompile Include="..\..\src\tightdb\util\terminate.cpp" />
     <ClCompile Include="..\..\src\tightdb\util\utf8.cpp" />
@@ -1107,6 +1108,7 @@
     <ClInclude Include="..\..\src\tightdb\static_assert.hpp" />
     <ClInclude Include="..\..\src\tightdb\util\string_buffer.hpp" />
     <ClInclude Include="..\..\src\tightdb\table.hpp" />
+    <ClInclude Include="..\..\src\tightdb\row.hpp" />
     <ClInclude Include="..\..\src\tightdb\table_accessors.hpp" />
     <ClInclude Include="..\..\src\tightdb\table_basic.hpp" />
     <ClInclude Include="..\..\src\tightdb\table_macros.hpp" />

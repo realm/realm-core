@@ -58,6 +58,12 @@ inline void ColumnMixed::adj_accessors_erase_row(std::size_t row_ndx) TIGHTDB_NO
     m_data->adj_accessors_erase_row(row_ndx);
 }
 
+inline void ColumnMixed::adj_accessors_move_last_over(std::size_t target_row_ndx,
+                                                      std::size_t last_row_ndx) TIGHTDB_NOEXCEPT
+{
+    m_data->adj_accessors_move_last_over(target_row_ndx, last_row_ndx);
+}
+
 inline ref_type ColumnMixed::get_subtable_ref(std::size_t row_ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(row_ndx < m_types->size());

@@ -128,9 +128,9 @@ TEST(Replication_General)
             BinaryData bin(buf);
             Mixed mix;
             mix.set_int(1);
-            table->set(0, 1, true, 1.0f, 1.0, "x", bin, 727, 0, mix);
-            table->add(2, true, 2.0f, 2.0, "xx", bin, 728, 0, mix);
-            table->insert(0, 3, true, 3.0f, 3.0, "xxx", bin, 729, 0, mix);
+            table->set    (0, 2, true, 2.0f, 2.0, "xx",  bin, 728, 0, mix);
+            table->add       (3, true, 3.0f, 3.0, "xxx", bin, 729, 0, mix);
+            table->insert (0, 1, true, 1.0f, 1.0, "x",   bin, 727, 0, mix);
             wt.commit();
         }
         {
@@ -145,6 +145,24 @@ TEST(Replication_General)
             table[0].my_int = 10;
             wt.commit();
         }
+        // Test Table::move_last_over()
+        {
+            WriteTransaction wt(sg_1);
+            MyTable::Ref table = wt.get_table<MyTable>("my_table");
+            char buf[] = { '9' };
+            BinaryData bin(buf);
+            Mixed mix;
+            mix.set_float(9.0f);
+            table->insert (2, 8, false, 8.0f, 8.0, "y8", bin, 282, 0, mix);
+            table->insert (1, 9, false, 9.0f, 9.0, "y9", bin, 292, 0, mix);
+            wt.commit();
+        }
+        {
+            WriteTransaction wt(sg_1);
+            MyTable::Ref table = wt.get_table<MyTable>("my_table");
+            table->move_last_over(1);
+            wt.commit();
+        }
 
         ostream* replay_log = 0;
 //        replay_log = &cout;
@@ -154,7 +172,15 @@ TEST(Replication_General)
         {
             ReadTransaction rt_1(sg_1);
             ReadTransaction rt_2(sg_2);
+            rt_1.get_group().Verify();
+            rt_2.get_group().Verify();
             CHECK(rt_1.get_group() == rt_2.get_group());
+            MyTable::ConstRef table = rt_2.get_table<MyTable>("my_table");
+            CHECK_EQUAL(4, table->size());
+            CHECK_EQUAL(10, table[0].my_int);
+            CHECK_EQUAL(3,  table[1].my_int);
+            CHECK_EQUAL(2,  table[2].my_int);
+            CHECK_EQUAL(8,  table[3].my_int);
         }
     }
 }
