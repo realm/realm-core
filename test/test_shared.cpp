@@ -2090,16 +2090,15 @@ TEST(Shared_Implicit_Transactions)
 {
     SHARED_GROUP_TEST_PATH(path);
     {
-        WriteLogRegistryInterface* wlr = getWriteLogs(path);
-        wlr->register_interest(0);
-        Replication* repl = makeWriteLogCollector(path, wlr);
+        SharedGroup::TransactLogRegistry* wlr = getWriteLogs(path);
+        Replication* repl = makeWriteLogCollector(path);
         SharedGroup sg(*repl);
         {
             WriteTransaction wt(sg);
             wt.get_table<TestTableShared>("table")->add_empty_row();
             wt.commit();
         }
-        Replication* repl2 = makeWriteLogCollector(path, wlr);
+        Replication* repl2 = makeWriteLogCollector(path);
         SharedGroup sg2(*repl2);
         Group& g = const_cast<Group&>(sg.begin_read());
         TestTableShared::Ref table = g.get_table<TestTableShared>("table");

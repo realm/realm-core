@@ -30,56 +30,14 @@
 
 namespace tightdb {
 
+typedef uint_fast64_t version_type;
 
-
-class RegistryRegistry {
-public:
-    WriteLogRegistryInterface* get(std::string filepath);
-    void add(std::string filepath, WriteLogRegistryInterface* registry);
-    void remove(std::string filepath);
-    ~RegistryRegistry();
-private:
-    util::Mutex m_mutex;
-    std::map<std::string, WriteLogRegistryInterface*> m_registries;
-};
-
-RegistryRegistry globalRegistry;
-
-
-WriteLogRegistryInterface* getWriteLogs(std::string filepath)
-{
-    return globalRegistry.get(filepath);
-}
-
-
-class WriteLogCollector : public Replication
-{
-public:
-    WriteLogCollector(std::string database_name, 
-		      WriteLogRegistryInterface* registry);
-    ~WriteLogCollector() TIGHTDB_NOEXCEPT {};
-    std::string do_get_database_path() TIGHTDB_OVERRIDE { return m_database_name; }
-    void do_begin_write_transact(SharedGroup& sg) TIGHTDB_OVERRIDE;
-    version_type do_commit_write_transact(SharedGroup& sg, version_type orig_version) TIGHTDB_OVERRIDE;
-    void do_rollback_write_transact(SharedGroup& sg) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-    void do_interrupt() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {};
-    void do_clear_interrupt() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {};
-    void do_transact_log_reserve(std::size_t sz) TIGHTDB_OVERRIDE;
-    void do_transact_log_append(const char* data, std::size_t size) TIGHTDB_OVERRIDE;
-    void transact_log_reserve(std::size_t n) TIGHTDB_OVERRIDE;
-protected:
-    std::string m_database_name;
-    util::Buffer<char> m_transact_log_buffer;
-    WriteLogRegistryInterface* m_registry;
-};
-
-
-class WriteLogRegistry : public WriteLogRegistryInterface
+class WriteLogRegistry
 {
     struct CommitEntry { std::size_t sz; char* data; };
     struct Interest {
         version_type last_seen_version; 
-        int next_free_entry; // free-list ptr, terminated by -1
+        int next_free_entry; // free-list ptr, terminated by -1, in-use indicated by -2
     };
 public:
     WriteLogRegistry();
@@ -87,10 +45,10 @@ public:
   
     void add_commit(version_type version, char* data, std::size_t sz);
     void get_commit_entries(version_type from, version_type to, BinaryData* commits) TIGHTDB_NOEXCEPT;
-    virtual int register_interest(); 
-    virtual void unregister_interest(int interest_registration_id);
-    virtual void release_commit_entries(int interest_registration_id, 
-                                        version_type to) TIGHTDB_NOEXCEPT;
+    int register_interest(); 
+    void unregister_interest(int interest_registration_id);
+    void release_commit_entries(int interest_registration_id, 
+                                version_type to) TIGHTDB_NOEXCEPT;
 
 private:
     // cleanup and release unreferenced buffers. Buffers might be big, so
@@ -102,7 +60,9 @@ private:
     version_type to_version(size_t idx)   { return idx + m_array_start; }
     bool is_a_known_commit(version_type version);
     bool is_interesting(version_type version);
-    version_type newest_version() { return to_version(m_commits.size() + to_index(m_oldest_version)); }
+    version_type newest_version() { 
+        return to_version(m_commits.size() + to_index(m_oldest_version) - 1 ); 
+    }
 
     // the Moooootex :-)
     util::Mutex m_mutex;
@@ -134,49 +94,6 @@ bool WriteLogRegistry::is_interesting(version_type version)
         return true;
     return false;
 }
-
-Replication* makeWriteLogCollector(std::string database_name, WriteLogRegistryInterface* registry)
-{
-  return  new WriteLogCollector(database_name, registry);
-}
-
-WriteLogRegistryInterface* RegistryRegistry::get(std::string filepath)
-{
-    util::LockGuard lock(m_mutex);
-    std::map<std::string, WriteLogRegistryInterface*>::iterator iter;
-    iter = m_registries.find(filepath);
-    if (iter != m_registries.end())
-        return iter->second;
-    WriteLogRegistryInterface* result = new WriteLogRegistry;
-    m_registries[filepath] = result;
-    return result;
-}
-
-RegistryRegistry::~RegistryRegistry()
-{
-    std::map<std::string, WriteLogRegistryInterface*>::iterator iter;
-    iter = m_registries.begin();
-    while (iter != m_registries.end()) {
-        delete iter->second;
-        iter->second = 0;
-        ++iter;
-    }
-}
-
-void RegistryRegistry::add(std::string filepath, WriteLogRegistryInterface* registry)
-{
-    util::LockGuard lock(m_mutex);
-    m_registries[filepath] = registry;
-}
-
-
-void RegistryRegistry::remove(std::string filepath)
-{
-    util::LockGuard lock(m_mutex);
-    m_registries.erase(filepath);
-}
-
-
 
 WriteLogRegistry::WriteLogRegistry()
 {
@@ -235,6 +152,7 @@ int WriteLogRegistry::register_interest()
         m_interests.push_back(i);
         retval = m_interests.size() -1;
     }
+    m_interests[retval].next_free_entry = -2; // mark as in-use
     m_laziest_reader = retval;
     return retval;
 }
@@ -243,6 +161,8 @@ int WriteLogRegistry::register_interest()
 void WriteLogRegistry::unregister_interest(int interest_registration_id)
 {
     util::LockGuard lock(m_mutex);
+    m_interests[interest_registration_id].next_free_entry = m_interest_free_list;
+    m_interest_free_list = interest_registration_id;
     if (interest_registration_id == m_laziest_reader)
         cleanup();
 }
@@ -276,34 +196,182 @@ void WriteLogRegistry::release_commit_entries(int interest_registration_id,
 void WriteLogRegistry::cleanup()
 {
     // locate laziest reader as it may have changed - take care to handle lack of readers
-    version_type earliest;
-/*
-  REDO 
+    version_type earliest = newest_version() + 1; // as this version is not present, noone can have seen it
+    m_laziest_reader = -1;
+    for (size_t i = 0; i < m_interests.size(); i++) {
+        if (m_interests[i].next_free_entry != -2 && m_interests[i].last_seen_version < earliest) {
+            m_laziest_reader = i;
+            earliest = m_interests[i].last_seen_version;
+        }
+    }
 
-
-    size_t idx = to_index(m_last_forgotten_version) + 1;
-    while (idx < m_interest_counts.size() &&  m_interest_counts[idx] == 0) {
-
+    // cleanup retained versions up to and including the earliest/oldest version seen by all
+    if (m_laziest_reader == -1)
+        earliest = newest_version();
+    for (version_type version = m_oldest_version; version <= earliest; version++) {
+        size_t idx = to_index(version);
         if (m_commits[idx].data)
             delete[] m_commits[idx].data;
         m_commits[idx].data = 0;
         m_commits[idx].sz = 0;
-        ++idx;
     }
-    m_oldest_version = to_version(idx);
 
-    if (idx > (m_interest_counts.size()+1) >> 1) {
-            
-        // more than half of the housekeeping arrays are free, so we'll
-        // shift contents down and resize the arrays.
-        std::copy(&m_commits[idx],
-                  &m_commits[m_newest_version + 1 - m_array_start],
-                  &m_commits[0]);
-        m_commits.resize(m_newest_version - m_last_forgotten_version);
-        m_array_start = m_last_forgotten_version + 1;
+    if (m_laziest_reader == -1) {
+        m_oldest_version = 0;
+        m_array_start = 0;
+        m_commits.resize(0);
+    } else {
+        m_oldest_version = earliest + 1;
+
+        if (to_index(m_oldest_version) > (m_commits.size() >> 1)) {
+            // more than half of the commit array is free, so we'll
+            // shift contents down and resize the array.
+            size_t copy_start_idx = to_index(m_oldest_version);
+            std::copy(& m_commits[ copy_start_idx ],
+                      & m_commits[ m_commits.size() + 1 ],
+                      & m_commits[ 0 ]);
+            m_commits.resize(m_commits.size() - copy_start_idx + 1);
+            m_array_start = m_oldest_version;
+        }
     }
-*/
 }
+
+
+
+
+
+
+
+class RegistryRegistry {
+public:
+    WriteLogRegistry* get(std::string filepath);
+    void add(std::string filepath, WriteLogRegistry* registry);
+    void remove(std::string filepath);
+    ~RegistryRegistry();
+private:
+    util::Mutex m_mutex;
+    std::map<std::string, WriteLogRegistry*> m_registries;
+};
+
+
+WriteLogRegistry* RegistryRegistry::get(std::string filepath)
+{
+    util::LockGuard lock(m_mutex);
+    std::map<std::string, WriteLogRegistry*>::iterator iter;
+    iter = m_registries.find(filepath);
+    if (iter != m_registries.end())
+        return iter->second;
+    WriteLogRegistry* result = new WriteLogRegistry;
+    m_registries[filepath] = result;
+    return result;
+}
+
+RegistryRegistry::~RegistryRegistry()
+{
+    std::map<std::string, WriteLogRegistry*>::iterator iter;
+    iter = m_registries.begin();
+    while (iter != m_registries.end()) {
+        delete iter->second;
+        iter->second = 0;
+        ++iter;
+    }
+}
+
+void RegistryRegistry::add(std::string filepath, WriteLogRegistry* registry)
+{
+    util::LockGuard lock(m_mutex);
+    m_registries[filepath] = registry;
+}
+
+
+void RegistryRegistry::remove(std::string filepath)
+{
+    util::LockGuard lock(m_mutex);
+    m_registries.erase(filepath);
+}
+
+
+RegistryRegistry globalRegistry;
+
+
+
+
+
+class TransactLogRegistryImpl : public SharedGroup::TransactLogRegistry {
+private:
+    WriteLogRegistry* m_registry;
+    int m_interest_key;
+public:
+    TransactLogRegistryImpl(WriteLogRegistry* registry) : m_registry(registry)
+    {
+        m_interest_key = registry->register_interest();
+    }
+
+    ~TransactLogRegistryImpl()
+    {
+        m_registry->unregister_interest(m_interest_key);
+    }
+
+    virtual void get_commit_entries(uint_fast64_t from_version, uint_fast64_t to_version,
+                                    BinaryData* logs_buffer) TIGHTDB_NOEXCEPT
+    {
+        m_registry->get_commit_entries(from_version, to_version, logs_buffer);
+    }
+
+    virtual void release_commit_entries(uint_fast64_t from_version, 
+                                        uint_fast64_t to_version) TIGHTDB_NOEXCEPT
+    {
+        m_registry->release_commit_entries(m_interest_key, to_version);
+    }
+};
+
+
+
+
+SharedGroup::TransactLogRegistry* getWriteLogs(std::string filepath)
+{
+    return new TransactLogRegistryImpl(globalRegistry.get(filepath));
+}
+
+
+
+
+
+
+
+class WriteLogCollector : public Replication
+{
+public:
+    WriteLogCollector(std::string database_name, 
+		      WriteLogRegistry* registry);
+    ~WriteLogCollector() TIGHTDB_NOEXCEPT {};
+    std::string do_get_database_path() TIGHTDB_OVERRIDE { return m_database_name; }
+    void do_begin_write_transact(SharedGroup& sg) TIGHTDB_OVERRIDE;
+    version_type do_commit_write_transact(SharedGroup& sg, version_type orig_version) TIGHTDB_OVERRIDE;
+    void do_rollback_write_transact(SharedGroup& sg) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void do_interrupt() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {};
+    void do_clear_interrupt() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {};
+    void do_transact_log_reserve(std::size_t sz) TIGHTDB_OVERRIDE;
+    void do_transact_log_append(const char* data, std::size_t size) TIGHTDB_OVERRIDE;
+    void transact_log_reserve(std::size_t n) TIGHTDB_OVERRIDE;
+protected:
+    std::string m_database_name;
+    util::Buffer<char> m_transact_log_buffer;
+    WriteLogRegistry* m_registry;
+};
+
+
+Replication* makeWriteLogCollector(std::string database_name)
+{
+    WriteLogRegistry* registry = globalRegistry.get(database_name);
+    return  new WriteLogCollector(database_name, registry);
+}
+
+
+
+
+
+
 
 
 void WriteLogCollector::do_begin_write_transact(SharedGroup& sg) TIGHTDB_OVERRIDE
@@ -358,7 +426,7 @@ void WriteLogCollector::transact_log_reserve(std::size_t n) TIGHTDB_OVERRIDE
 }
 
 
-WriteLogCollector::WriteLogCollector(std::string database_name, WriteLogRegistryInterface* registry)
+WriteLogCollector::WriteLogCollector(std::string database_name, WriteLogRegistry* registry)
 {
     m_database_name = database_name;
     m_registry = registry;

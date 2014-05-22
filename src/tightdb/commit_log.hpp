@@ -29,50 +29,17 @@
 namespace tightdb {
 
 
-class WriteLogRegistryInterface {
-public:
-    // keep this in sync with shared group.
-    typedef uint_fast64_t version_type;
-  
-    // Add a commit for a given version:
-    // The registry takes ownership of the buffer data.
-    virtual void add_commit(version_type version, char* data, std::size_t sz) = 0;
-    
-    // The registry retains commit buffers for as long as there is a
-    // registered interest:
-    
-    // Register interest in new commits. Returns an integer id, which you must
-    // use to unregister again.
-    virtual int register_interest() = 0; 
-
-    // Register that you are no longer interested in commits. Provide the index
-    // assigned during the call to 'register_interest'
-    virtual void unregister_interest(int interest_registration_id) = 0;
-
-    // Fill an array with commits for a version range - ]from..to]
-    // The array is allocated by the caller and must have at least 'to' - 'from' entries.
-    // The caller retains ownership of the array of commits, but not of the
-    // buffers pointed to by each commit in the array. Ownership of the
-    // buffers remains with the WriteLogRegistry.
-    virtual void get_commit_entries(version_type from, version_type to, BinaryData*) TIGHTDB_NOEXCEPT = 0;
-
-    // This also unregisters interest in the same version range.
-    virtual void release_commit_entries(int interest_registration_id, 
-                                        version_type to) TIGHTDB_NOEXCEPT = 0;
-
-    // dtor
-    virtual ~WriteLogRegistryInterface() {}
-};
-
-
-// Obtain the WriteLogRegistry for a specific filepath. Create it, if it doesn't exist.
-WriteLogRegistryInterface* getWriteLogs(std::string filepath);
+// Obtain the TransactLogRegistry for a specific filepath. Create it, if it doesn't exist.
+// The library retains ownership (and thus responsibility for deallocation) of the Registry.
+// Deallocation will happen at application termination.
+SharedGroup::TransactLogRegistry* getWriteLogs(std::string filepath);
 
 // Create a writelog collector and associate it with a filepath. You'll need one writelog
 // collector for each shared group. Commits from writelog collectors for a specific filepath 
-// may later be obtained through the WriteLogRegistry associated with said filepath.
-Replication* makeWriteLogCollector(std::string filepath, 
-                                   WriteLogRegistryInterface* registry);
+// may later be obtained through the TransactLogRegistry associated with said filepath.
+// The caller assumes ownership of the writelog collector and must destroy it, but only AFTER
+// destruction of the shared group using it.
+Replication* makeWriteLogCollector(std::string filepath);
 
 
 } // namespace tightdb
