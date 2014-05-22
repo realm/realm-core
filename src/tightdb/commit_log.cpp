@@ -172,13 +172,15 @@ void WriteLogRegistry::get_commit_entries(version_type from, version_type to, Bi
 TIGHTDB_NOEXCEPT
 {
     util::LockGuard lock(m_mutex);
+    size_t dest_idx = 0;
 
     for (version_type version = from+1; version <= to; version++) {
         TIGHTDB_ASSERT(is_interesting(version));
         TIGHTDB_ASSERT(is_a_known_commit(version));
         size_t idx = to_index(version);
         WriteLogRegistry::CommitEntry* entry = & m_commits[ idx ];
-        commits[idx].set(entry->data, entry->sz);
+        commits[dest_idx].set(entry->data, entry->sz);
+        dest_idx++;
     }
 }
     
@@ -199,16 +201,19 @@ void WriteLogRegistry::cleanup()
     version_type earliest = newest_version() + 1; // as this version is not present, noone can have seen it
     m_laziest_reader = -1;
     for (size_t i = 0; i < m_interests.size(); i++) {
-        if (m_interests[i].next_free_entry != -2 && m_interests[i].last_seen_version < earliest) {
+        if (m_interests[i].next_free_entry == -2 && m_interests[i].last_seen_version < earliest) {
             m_laziest_reader = i;
             earliest = m_interests[i].last_seen_version;
         }
     }
 
     // cleanup retained versions up to and including the earliest/oldest version seen by all
+    size_t last_to_clean;
     if (m_laziest_reader == -1)
-        earliest = newest_version();
-    for (version_type version = m_oldest_version; version <= earliest; version++) {
+        last_to_clean = newest_version();
+    else
+        last_to_clean = earliest;
+    for (version_type version = m_oldest_version; version <= last_to_clean; version++) {
         size_t idx = to_index(version);
         if (m_commits[idx].data)
             delete[] m_commits[idx].data;
@@ -216,12 +221,13 @@ void WriteLogRegistry::cleanup()
         m_commits[idx].sz = 0;
     }
 
-    if (m_laziest_reader == -1) {
+    if (m_laziest_reader == -1 || last_to_clean == newest_version()) {
+        // no interest, or no buffered commits:
         m_oldest_version = 0;
         m_array_start = 0;
         m_commits.resize(0);
     } else {
-        m_oldest_version = earliest + 1;
+        m_oldest_version = last_to_clean + 1;
 
         if (to_index(m_oldest_version) > (m_commits.size() >> 1)) {
             // more than half of the commit array is free, so we'll
