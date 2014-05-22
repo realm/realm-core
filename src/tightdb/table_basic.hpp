@@ -214,8 +214,8 @@ public:
 
 
     class Query;
-    Query       where() {return Query(*this);}
-    Query where() const {return Query(*this);}
+    Query       where(typename BasicTable<Spec>::View* tv = null_ptr) { return Query(*this, tv ? tv->get_impl() : null_ptr); }
+    Query where(typename BasicTable<Spec>::View* tv = null_ptr) const { return Query(*this, tv ? tv->get_impl() : null_ptr); }
 
     /// Compare two tables for equality. Two tables are equal if, and
     /// only if, they contain the same rows in the same order, that
@@ -351,7 +351,6 @@ public:
         return *this;
     }
 
-
     Query& group() { m_impl.group(); return *this; }
 
     Query& end_group() { m_impl.end_group(); return *this; }
@@ -400,8 +399,8 @@ public:
     std::string validate() { return m_impl.validate(); }
 
 protected:
-    Query(const BasicTable<Spec>& table):
-        Spec::template ColNames<QueryCol, Query*>(this), m_impl(table) {}
+    Query(const BasicTable<Spec>& table, TableViewBase* tv):
+        Spec::template ColNames<QueryCol, Query*>(this), m_impl(table, tv) {}
 
 private:
     tightdb::Query m_impl;
