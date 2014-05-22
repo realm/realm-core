@@ -30,8 +30,8 @@ namespace tightdb {
 
 
 // Obtain the TransactLogRegistry for a specific filepath. Create it, if it doesn't exist.
-// The library retains ownership (and thus responsibility for deallocation) of the Registry.
-// Deallocation will happen at application termination.
+// You need to obtain seperate instances for each shared group that needs to update accessors.
+// The caller assumes ownership of the registry and must destroy it to avoid space leaks.
 SharedGroup::TransactLogRegistry* getWriteLogs(std::string filepath);
 
 // Create a writelog collector and associate it with a filepath. You'll need one writelog

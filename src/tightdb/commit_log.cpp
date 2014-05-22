@@ -316,6 +316,7 @@ public:
     ~TransactLogRegistryImpl()
     {
         m_registry->unregister_interest(m_interest_key);
+        m_registry = 0;
     }
 
     virtual void get_commit_entries(uint_fast64_t from_version, uint_fast64_t to_version,

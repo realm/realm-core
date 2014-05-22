@@ -2136,6 +2136,7 @@ TEST(Shared_Implicit_Transactions)
         sg.end_read();
         delete repl2;
         delete repl;
+        delete wlr;
     }
 }
 #endif // ENABLE_REPLICATION
