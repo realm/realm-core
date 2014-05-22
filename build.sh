@@ -645,7 +645,7 @@ EOF
 
     "test-on-ios")
         
-        TEST_DIR="./test/ios/app"
+        TEST_DIR="test/ios/app"
         rm -rf "$TEST_DIR" || exit 1
         mkdir "$TEST_DIR" || exit 1
 
@@ -655,7 +655,7 @@ EOF
         APP_DIR="$TEST_DIR/$APP"
         TEST_APP_DIR="$TEST_DIR/$TEST_APP"
 
-        # Copy the test files into the app tests subdirectory of the app
+        # Copy the test files into the app tests subdirectory
         PASSIVE_SUBDIRS="$($MAKE -C ./test --no-print-directory get-passive-subdirs)" || exit 1
         PASSIVE_SUBDIRS="$(echo "$PASSIVE_SUBDIRS" | sed -E 's/ +/|/g')" || exit 1
         ## Naive copy, but avoid recursion (extra precaution) and passive subdirs.
@@ -671,6 +671,28 @@ EOF
         RESOURCES="$($MAKE -C ./test --no-print-directory get-test-resources)" || exit 1
         (cd ./test && rsync $RESOURCES "../$TEST_APP_DIR") || exit 1
 
+        ## Replace all test includes with framework includes.
+        find "$TEST_APP_DIR" -type f -exec sed -i '' \
+            -e "s/<tightdb\(.*\)>/<RealmCore\/tightdb\1>/g" {} \; || exit 1
+
+        # Create an XCTestCase
+        (cat "test/ios/template/AppTests/AppTests.mm" | sed "s/\$TEST_APP/$TEST_APP/g" \
+            > "$TEST_APP_DIR/$TEST_APP.mm") || exit 1
+
+        ## Set up frameworks.
+        FRAMEWORK="RealmCore.framework"
+        rm -rf "$APP_DIR/$FRAMEWORK" || exit 1
+        cp -r "../tightdb/$FRAMEWORK" "$TEST_DIR/$FRAMEWORK"
+
+        ## Initialize app directory
+        cp -r "test/ios/template/App" "$APP_DIR"
+        mv "$APP_DIR/App-Info.plist" "$APP_DIR/$APP-Info.plist"
+        mv "$APP_DIR/App-Prefix.pch" "$APP_DIR/$APP-Prefix.pch"
+
+        ## Gather all the test sources in a Python-friendly format.
+        TEST_APP_SOURCES=$(cd $TEST_DIR && find "$TEST_APP" -type f | \
+            sed -E 's/^(.*)$/                "\1",/')
+        echo $TEST_APP_SOURCES
         exit 0
         ;;
 
