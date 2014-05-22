@@ -96,6 +96,10 @@ Format:
 . Any other notes ....                   (internal changes)
 
 
+2014-05-14 (Lasse Reinhold)
++ Lets you sort a TableView according to a Float, Double or String column (only integral column types possible before)
+
+
 2014-05-08 (Finn Schiermer Andersen)
 + Added negation to the query engine.
 
