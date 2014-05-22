@@ -414,6 +414,22 @@ public:
         return false;
     }
 
+    bool move_last_over(size_t target_row_ndx, size_t last_row_ndx)
+    {
+        if (TIGHTDB_LIKELY(m_table)) {
+            if (TIGHTDB_LIKELY(target_row_ndx < last_row_ndx &&
+                               last_row_ndx+1 == m_table->size())) {
+#ifdef TIGHTDB_DEBUG
+                if (m_log)
+                    *m_log << "table->move_last_over("<<target_row_ndx<<")\n";
+#endif
+                m_table->move_last_over(target_row_ndx); // Throws
+                return true;
+            }
+        }
+        return false;
+    }
+
     bool add_int_to_column(size_t col_ndx, int_fast64_t value)
     {
         if (TIGHTDB_LIKELY(m_table)) {

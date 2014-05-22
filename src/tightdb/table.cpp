@@ -1423,23 +1423,24 @@ void Table::do_remove(size_t ndx)
 #endif
 }
 
-void Table::move_last_over(size_t ndx)
+void Table::move_last_over(size_t target_row_ndx)
 {
-    TIGHTDB_ASSERT(ndx+1 < m_size);
+    TIGHTDB_ASSERT(target_row_ndx+1 < m_size);
     discard_row_accessors();
     detach_views_except(0);
 
     size_t n = get_column_count();
     for (size_t i = 0; i != n; ++i) {
         ColumnBase& column = get_column_base(i);
-        column.move_last_over(ndx);
+        column.move_last_over(target_row_ndx);
     }
     --m_size;
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    // FIXME: Implement this
-//    if (Replication* repl = get_repl())
-//        repl->move_last_over(this, ndx); // Throws
+    if (Replication* repl = get_repl()) {
+        size_t last_row_ndx = m_size;
+        repl->move_last_over(this, target_row_ndx, last_row_ndx); // Throws
+    }
 #endif
 }
 
@@ -3729,6 +3730,44 @@ void Table::adj_accessors_erase_row(size_t row_ndx) TIGHTDB_NOEXCEPT
         for (size_t i = 0; i != n; ++i) {
             if (ColumnBase* col = reinterpret_cast<ColumnBase*>(m_cols.get(i)))
                 col->adj_accessors_erase_row(row_ndx);
+        }
+    }
+}
+
+
+void Table::adj_accessors_move_last_over(size_t target_row_ndx, size_t last_row_ndx)
+    TIGHTDB_NOEXCEPT
+{
+    // This function must be able to operate with only the Minimal Accessor
+    // Hierarchy Consistency Guarantee. This means, in particular, that it
+    // cannot access the underlying array structure.
+
+    // Adjust row accessors
+    {
+        typedef row_accessors::iterator iter;
+        iter end = m_row_accessors.end();
+        iter i = m_row_accessors.begin();
+        while (i != end) {
+            RowBase* row = *i;
+            if (row->m_row_ndx == target_row_ndx) {
+                row->m_table.reset(); // Detach
+                // Move last over in list of accessors
+                *i = *--end;
+                m_row_accessors.pop_back();
+                continue;
+            }
+            if (row->m_row_ndx == last_row_ndx)
+                row->m_row_ndx = target_row_ndx;
+            ++i;
+        }
+    }
+
+    // Adjust subtable accessors
+    {
+        size_t n = m_cols.size();
+        for (size_t i = 0; i != n; ++i) {
+            if (ColumnBase* col = reinterpret_cast<ColumnBase*>(m_cols.get(i)))
+                col->adj_accessors_move_last_over(target_row_ndx, last_row_ndx);
         }
     }
 }

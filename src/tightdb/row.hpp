@@ -33,10 +33,17 @@ template<class> class BasicRow;
 /// This class is a "mixin" and contains the common set of functions for several
 /// distinct row-like classes.
 ///
-/// There is a direct and natural correspondance between the function in this
+/// There is a direct and natural correspondance between the functions in this
 /// class and functions in Table of the same name. For example:
 ///
-///    table[i].get_int(j) == table.get_int(i,j)
+///     table[i].get_int(j) == table.get_int(i,j)
+///
+/// \tparam T A const or non-const table type (currebntly either `Table` or
+/// `const Table`).
+///
+/// \tparam R A specific row accessor class (BasicRow or BasicRowExpr) providing
+/// members `T& impl_get_table() const` and `std::size_t impl_get_row_ndx()
+/// const`. Neither are allowed to throw.
 ///
 /// \sa Table
 /// \sa BasicRow
@@ -72,18 +79,16 @@ public:
     std::size_t get_column_index(StringData name) const TIGHTDB_NOEXCEPT;
 
 private:
-    typedef T table_type;
-
-    table_type& get_table() const TIGHTDB_NOEXCEPT;
+    T& get_table() const TIGHTDB_NOEXCEPT;
     std::size_t get_row_ndx() const TIGHTDB_NOEXCEPT;
 };
 
 
 /// This class is a special kind of row accessor. It differes from a real row
-/// accessor (BasicRow) by having a trivial and fast copy constructor. It is
-/// supposed to be used as the return type of functions such as
-/// Table::operator[](), and then to be used as a basis for constructing a real
-/// row accessor. Objects of this class are intended to only ever exist as
+/// accessor (BasicRow) by having a trivial and fast copy constructor and
+/// descructor. It is supposed to be used as the return type of functions such
+/// as Table::operator[](), and then to be used as a basis for constructing a
+/// real row accessor. Objects of this class are intended to only ever exist as
 /// temporaries.
 ///
 /// In contrast to a real row accessor, objects of this class do not keep the
@@ -153,12 +158,18 @@ protected:
 /// which the accessor is bound. In other words, a row accessor is bound to the
 /// contents of a row, not to a row index.
 ///
-/// Row accessors are created as follows:
+/// Row accessors are created and used as follows:
 ///
 ///     Row row       = table[7];  // 8th row of `table`
 ///     ConstRow crow = ctable[2]; // 3rd row of const `ctable`
 ///     Row first_row = table.front();
 ///     Row last_row  = table.back();
+///
+///     float v = row.get_float(1); // Get the float in the 2nd column
+///     row.set_string(0, "foo");   // Update the string in the 1st column
+///
+///     Table* t = row.get_table();      // The parent table
+///     std::size_t i = row.get_index(); // The current row index
 ///
 /// Note: The automatic adjustment of row accessors is currently not completely
 /// implemented. During a write transaction, if rows are inserted anywhere into,
@@ -167,6 +178,8 @@ protected:
 ///
 /// FIXME: Remove the note above when the "automatic adjustment of row
 /// accessors" is complete.
+///
+/// \sa RowFuncs
 template<class T> class BasicRow:
         private RowBase,
         public RowFuncs<T, BasicRow<T> > {
@@ -182,12 +195,19 @@ public:
 
     ~BasicRow() TIGHTDB_NOEXCEPT;
 
+    /// Returns true if, and only if this accessor is currently bound to a row.
     bool is_attached() const TIGHTDB_NOEXCEPT;
 
+    /// Detach this accessor from whatever it was attached to. This function has
+    /// no effect if the accessor was already detached (idempotency).
     void detach() TIGHTDB_NOEXCEPT;
 
-    table_type& get_table() const TIGHTDB_NOEXCEPT;
+    //// The table cotaining the row to which this accessor is currently
+    /// bound. For a detached accessor, the returned value is null.
+    table_type* get_table() const TIGHTDB_NOEXCEPT;
 
+    /// The index of the row to which this accessor is currently bound. For a
+    /// detached accessor, the returned value is unspecified.
     std::size_t get_index() const TIGHTDB_NOEXCEPT;
 
 private:
@@ -446,9 +466,9 @@ template<class T> inline void BasicRow<T>::detach() TIGHTDB_NOEXCEPT
     RowBase::detach();
 }
 
-template<class T> inline T& BasicRow<T>::get_table() const TIGHTDB_NOEXCEPT
+template<class T> inline T* BasicRow<T>::get_table() const TIGHTDB_NOEXCEPT
 {
-    return *m_table;
+    return &*m_table;
 }
 
 template<class T> inline std::size_t BasicRow<T>::get_index() const TIGHTDB_NOEXCEPT

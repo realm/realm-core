@@ -41,8 +41,8 @@ public:
 #endif
 
     void adj_accessors_insert_rows(std::size_t, std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-
     void adj_accessors_erase_row(std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void adj_accessors_move_last_over(std::size_t, std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
     void update_from_parent(std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
@@ -91,6 +91,10 @@ protected:
         // Returns true if, and only if an entry was found and removed, and it
         // was the last entry in the map.
         bool adj_erase_row(std::size_t row_ndx) TIGHTDB_NOEXCEPT;
+        // Returns true if, and only if an entry was found and removed, and it
+        // was the last entry in the map.
+        bool adj_move_last_over(std::size_t target_row_ndx, std::size_t last_row_ndx)
+            TIGHTDB_NOEXCEPT;
         void update_accessors(const std::size_t* col_path_begin, const std::size_t* col_path_end,
                               _impl::TableFriend::AccessorUpdater&);
 #ifdef TIGHTDB_ENABLE_REPLICATION
@@ -296,6 +300,20 @@ inline void ColumnSubtableParent::adj_accessors_erase_row(std::size_t row_ndx) T
     // cannot access the underlying array structure.
 
     bool last_entry_removed = m_subtable_map.adj_erase_row(row_ndx);
+    typedef _impl::TableFriend tf;
+    if (last_entry_removed)
+        tf::unbind_ref(*m_table);
+}
+
+inline void ColumnSubtableParent::adj_accessors_move_last_over(std::size_t target_row_ndx,
+                                                               std::size_t last_row_ndx)
+    TIGHTDB_NOEXCEPT
+{
+    // This function must be able to operate with only the Minimal Accessor
+    // Hierarchy Consistency Guarantee. This means, in particular, that it
+    // cannot access the underlying array structure.
+
+    bool last_entry_removed = m_subtable_map.adj_move_last_over(target_row_ndx, last_row_ndx);
     typedef _impl::TableFriend tf;
     if (last_entry_removed)
         tf::unbind_ref(*m_table);

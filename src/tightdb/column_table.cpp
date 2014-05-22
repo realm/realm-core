@@ -138,11 +138,7 @@ bool ColumnSubtableParent::SubtableMap::detach_and_remove(size_t subtable_ndx) T
     typedef _impl::TableFriend tf;
     tf::detach(*table);
 
-    --end;
-    // If the discarded accessor is not the last entry, we
-    // need to move the last entry over
-    if (i != end)
-        *i = *end;
+    *i = *--end; // Move last over
     m_entries.pop_back();
     return m_entries.empty();
 }
@@ -159,11 +155,7 @@ bool ColumnSubtableParent::SubtableMap::remove(Table* subtable) TIGHTDB_NOEXCEPT
             break;
         ++i;
     }
-    --end;
-    // If the discarded accessor is not the last entry, we
-    // need to move the last entry over
-    if (i != end)
-        *i = *end;
+    *i = *--end; // Move last over
     m_entries.pop_back();
     return m_entries.empty();
 }
@@ -213,12 +205,65 @@ bool ColumnSubtableParent::SubtableMap::adj_erase_row(size_t row_ndx) TIGHTDB_NO
     TableRef table(i->m_table);
     typedef _impl::TableFriend tf;
     tf::detach(*table);
-    --end;
-    // If the discarded accessor is not the last entry, we need to
-    // move the last entry over
-    if (i != end)
-        *i = *end;
+
+    *i = *--end; // Move last over
     m_entries.pop_back();
+    return m_entries.empty();
+}
+
+
+bool ColumnSubtableParent::SubtableMap::adj_move_last_over(size_t target_row_ndx,
+                                                           size_t last_row_ndx) TIGHTDB_NOEXCEPT
+{
+    bool target_seen = false, last_seen = false;
+    typedef entries::iterator iter;
+    iter i = m_entries.begin(), end = m_entries.end();
+    for (;;) {
+        if (i == end)
+            return false;
+        if (i->m_subtable_ndx == target_row_ndx)
+            goto target; // Jump A
+        if (i->m_subtable_ndx == last_row_ndx)
+            goto last;   // Jump B
+        ++i;
+    }
+
+  last:
+    i->m_subtable_ndx = target_row_ndx;
+    if (target_seen)
+        goto check_empty;
+    for (;;) {
+        ++i;
+        if (i == end)
+            return false;
+        if (i->m_subtable_ndx == target_row_ndx) {
+            last_seen = true; // Because of Jump B
+            goto target;
+        }
+    }
+
+  target:
+    {
+        // Must hold a counted reference while detaching
+        TableRef table(i->m_table);
+        typedef _impl::TableFriend tf;
+        tf::detach(*table);
+        *i = *--end; // Move last over in m_entries
+        m_entries.pop_back();
+    }
+    if (last_seen)
+        goto check_empty;
+    for (;;) {
+        if (i == end)
+            break;
+        if (i->m_subtable_ndx == last_row_ndx) {
+            target_seen = true; // Because of Jump A
+            goto last;
+        }
+        ++i;
+    }
+
+  check_empty:
     return m_entries.empty();
 }
 

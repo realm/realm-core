@@ -1754,8 +1754,8 @@ TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
     ConstRow row_2 = (*parent)[1];
     CHECK(row_1.is_attached());
     CHECK(row_2.is_attached());
-    CHECK_EQUAL(parent.get(), &(row_1.get_table()));
-    CHECK_EQUAL(parent.get(), &(row_2.get_table()));
+    CHECK_EQUAL(parent.get(), row_1.get_table());
+    CHECK_EQUAL(parent.get(), row_2.get_table());
     CHECK_EQUAL(0, row_1.get_index());
     CHECK_EQUAL(1, row_2.get_index());
 
@@ -1774,8 +1774,8 @@ TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
     CHECK_EQUAL(5, parent->size());
     CHECK(row_1.is_attached());
     CHECK(row_2.is_attached());
-    CHECK_EQUAL(parent.get(), &(row_1.get_table()));
-    CHECK_EQUAL(parent.get(), &(row_2.get_table()));
+    CHECK_EQUAL(parent.get(), row_1.get_table());
+    CHECK_EQUAL(parent.get(), row_2.get_table());
     CHECK_EQUAL(1, row_1.get_index());
     CHECK_EQUAL(3, row_2.get_index());
     CHECK_EQUAL(27,  row_1.get_int(0));
@@ -1794,8 +1794,8 @@ TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
     CHECK_EQUAL(9, parent->size());
     CHECK(row_1.is_attached());
     CHECK(row_2.is_attached());
-    CHECK_EQUAL(parent.get(), &(row_1.get_table()));
-    CHECK_EQUAL(parent.get(), &(row_2.get_table()));
+    CHECK_EQUAL(parent.get(), row_1.get_table());
+    CHECK_EQUAL(parent.get(), row_2.get_table());
     CHECK_EQUAL(2, row_1.get_index());
     CHECK_EQUAL(6, row_2.get_index());
     CHECK_EQUAL(27,  row_1.get_int(0));
@@ -1817,8 +1817,8 @@ TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
     CHECK_EQUAL(5, parent->size());
     CHECK(row_1.is_attached());
     CHECK(row_2.is_attached());
-    CHECK_EQUAL(parent.get(), &(row_1.get_table()));
-    CHECK_EQUAL(parent.get(), &(row_2.get_table()));
+    CHECK_EQUAL(parent.get(), row_1.get_table());
+    CHECK_EQUAL(parent.get(), row_2.get_table());
     CHECK_EQUAL(1, row_1.get_index());
     CHECK_EQUAL(3, row_2.get_index());
     CHECK_EQUAL(27,  row_1.get_int(0));
@@ -1836,8 +1836,8 @@ TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
     CHECK_EQUAL(2, parent->size());
     CHECK(row_1.is_attached());
     CHECK(row_2.is_attached());
-    CHECK_EQUAL(parent.get(), &(row_1.get_table()));
-    CHECK_EQUAL(parent.get(), &(row_2.get_table()));
+    CHECK_EQUAL(parent.get(), row_1.get_table());
+    CHECK_EQUAL(parent.get(), row_2.get_table());
     CHECK_EQUAL(0, row_1.get_index());
     CHECK_EQUAL(1, row_2.get_index());
     CHECK_EQUAL(27,  row_1.get_int(0));
@@ -1855,7 +1855,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
     CHECK_EQUAL(1, parent->size());
     CHECK(!row_1.is_attached());
     CHECK(row_2.is_attached());
-    CHECK_EQUAL(parent.get(), &(row_2.get_table()));
+    CHECK_EQUAL(parent.get(), row_2.get_table());
     CHECK_EQUAL(0, row_2.get_index());
     CHECK_EQUAL(227, row_2.get_int(0));
     // Restore first row and recover row_1
@@ -1872,8 +1872,8 @@ TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
     row_1 = (*parent)[0];
     CHECK(row_1.is_attached());
     CHECK(row_2.is_attached());
-    CHECK_EQUAL(parent.get(), &(row_1.get_table()));
-    CHECK_EQUAL(parent.get(), &(row_2.get_table()));
+    CHECK_EQUAL(parent.get(), row_1.get_table());
+    CHECK_EQUAL(parent.get(), row_2.get_table());
     CHECK_EQUAL(0, row_1.get_index());
     CHECK_EQUAL(1, row_2.get_index());
     CHECK_EQUAL(27,  row_1.get_int(0));
@@ -1891,7 +1891,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
     CHECK_EQUAL(1, parent->size());
     CHECK(row_1.is_attached());
     CHECK(!row_2.is_attached());
-    CHECK_EQUAL(parent.get(), &(row_1.get_table()));
+    CHECK_EQUAL(parent.get(), row_1.get_table());
     CHECK_EQUAL(0, row_1.get_index());
     CHECK_EQUAL(27, row_1.get_int(0));
     // Restore second row and recover row_2
@@ -1908,8 +1908,8 @@ TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
     row_2 = (*parent)[1];
     CHECK(row_1.is_attached());
     CHECK(row_2.is_attached());
-    CHECK_EQUAL(parent.get(), &(row_1.get_table()));
-    CHECK_EQUAL(parent.get(), &(row_2.get_table()));
+    CHECK_EQUAL(parent.get(), row_1.get_table());
+    CHECK_EQUAL(parent.get(), row_2.get_table());
     CHECK_EQUAL(0, row_1.get_index());
     CHECK_EQUAL(1, row_2.get_index());
     CHECK_EQUAL(27,  row_1.get_int(0));
@@ -1929,8 +1929,8 @@ TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
     CHECK_EQUAL(2, parent->size());
     CHECK(row_1.is_attached());
     CHECK(row_2.is_attached());
-    CHECK_EQUAL(parent.get(), &(row_1.get_table()));
-    CHECK_EQUAL(parent.get(), &(row_2.get_table()));
+    CHECK_EQUAL(parent.get(), row_1.get_table());
+    CHECK_EQUAL(parent.get(), row_2.get_table());
     CHECK_EQUAL(0, row_1.get_index());
     CHECK_EQUAL(1, row_2.get_index());
     CHECK_EQUAL(27,  row_1.get_int(1));
@@ -1947,8 +1947,8 @@ TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
     CHECK_EQUAL(2, parent->size());
     CHECK(row_1.is_attached());
     CHECK(row_2.is_attached());
-    CHECK_EQUAL(parent.get(), &(row_1.get_table()));
-    CHECK_EQUAL(parent.get(), &(row_2.get_table()));
+    CHECK_EQUAL(parent.get(), row_1.get_table());
+    CHECK_EQUAL(parent.get(), row_2.get_table());
     CHECK_EQUAL(0, row_1.get_index());
     CHECK_EQUAL(1, row_2.get_index());
     CHECK_EQUAL(27,  row_1.get_int(0));
@@ -1984,8 +1984,8 @@ TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
     row_2 = (*parent)[1];
     CHECK(row_1.is_attached());
     CHECK(row_2.is_attached());
-    CHECK_EQUAL(parent.get(), &(row_1.get_table()));
-    CHECK_EQUAL(parent.get(), &(row_2.get_table()));
+    CHECK_EQUAL(parent.get(), row_1.get_table());
+    CHECK_EQUAL(parent.get(), row_2.get_table());
     CHECK_EQUAL(0, row_1.get_index());
     CHECK_EQUAL(1, row_2.get_index());
 
@@ -2103,8 +2103,328 @@ TEST(LangBindHelper_AdvanceReadTransact_SubtableRowAccessors)
 
 TEST(LangBindHelper_AdvanceReadTransact_MoveLastOver)
 {
-    // FIXME: Check that both subtable and row accessors are detached on target row.
-    // FIXME: Check that both subtable and row accessors are retained even when they are moved over.
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg(path);
+    ShortCircuitTransactLogManager tlm(path);
+    SharedGroup sg_w(tlm);
+
+    // Start a read transaction (to be repeatedly advanced)
+    ReadTransaction rt(sg);
+    const Group& group = rt.get_group();
+    CHECK_EQUAL(0, group.size());
+
+    // Create three parent tables, each with with 5 rows, and each row
+    // containing one regular and one mixed subtable
+    {
+        WriteTransaction wt(sg_w);
+        for (int i = 0; i < 3; ++i) {
+            const char* table_name = i == 0 ? "parent_1" : i == 1 ? "parent_2" : "parent_3";
+            TableRef parent_w = wt.get_table(table_name);
+            parent_w->add_column(type_Table, "a");
+            parent_w->add_column(type_Mixed, "b");
+            DescriptorRef subdesc = parent_w->get_subdescriptor(0);
+            subdesc->add_column(type_Int, "regular");
+            parent_w->add_empty_row(5);
+            for (int i = 0; i < 5; ++i) {
+                TableRef regular_w = parent_w->get_subtable(0,i);
+                regular_w->add_empty_row();
+                regular_w->set_int(0, 0, 10 + i);
+                parent_w->set_mixed(1, i, Mixed::subtable_tag());
+                TableRef mixed_w = parent_w->get_subtable(1,i);
+                mixed_w->add_column(type_Int, "mixed");
+                mixed_w->add_empty_row();
+                mixed_w->set_int(0, 0, 20 + i);
+            }
+        }
+        wt.commit();
+    }
+    LangBindHelper::advance_read_transact(sg, tlm);
+    group.Verify();
+
+    // Use first table to check with accessors on row indexes 0, 1, and 4, but
+    // none at index 2 and 3.
+    {
+        ConstTableRef parent = rt.get_table("parent_1");
+        ConstRow row_0 = (*parent)[0];
+        ConstRow row_1 = (*parent)[1];
+        ConstRow row_4 = (*parent)[4];
+        ConstTableRef regular_0 = parent->get_subtable(0,0);
+        ConstTableRef regular_1 = parent->get_subtable(0,1);
+        ConstTableRef regular_4 = parent->get_subtable(0,4);
+        ConstTableRef   mixed_0 = parent->get_subtable(1,0);
+        ConstTableRef   mixed_1 = parent->get_subtable(1,1);
+        ConstTableRef   mixed_4 = parent->get_subtable(1,4);
+        CHECK(row_0.is_attached());
+        CHECK(row_1.is_attached());
+        CHECK(row_4.is_attached());
+        CHECK_EQUAL(0, row_0.get_index());
+        CHECK_EQUAL(1, row_1.get_index());
+        CHECK_EQUAL(4, row_4.get_index());
+        CHECK(regular_0->is_attached());
+        CHECK(regular_1->is_attached());
+        CHECK(regular_4->is_attached());
+        CHECK_EQUAL(10, regular_0->get_int(0,0));
+        CHECK_EQUAL(11, regular_1->get_int(0,0));
+        CHECK_EQUAL(14, regular_4->get_int(0,0));
+        CHECK(mixed_0 && mixed_0->is_attached());
+        CHECK(mixed_1 && mixed_1->is_attached());
+        CHECK(mixed_4 && mixed_4->is_attached());
+        CHECK_EQUAL(20, mixed_0->get_int(0,0));
+        CHECK_EQUAL(21, mixed_1->get_int(0,0));
+        CHECK_EQUAL(24, mixed_4->get_int(0,0));
+
+        // Perform two 'move last over' operations which brings the number of
+        // rows down from 5 to 3
+        {
+            WriteTransaction wt(sg_w);
+            TableRef parent_w = wt.get_table("parent_1");
+            parent_w->move_last_over(2); // Move row at index 4 to index 2
+            parent_w->move_last_over(0); // Move row at index 3 to index 0
+            wt.commit();
+        }
+        LangBindHelper::advance_read_transact(sg, tlm);
+        group.Verify();
+        CHECK(!row_0.is_attached());
+        CHECK(row_1.is_attached());
+        CHECK(row_4.is_attached());
+        CHECK_EQUAL(1, row_1.get_index());
+        CHECK_EQUAL(2, row_4.get_index());
+        CHECK(!regular_0->is_attached());
+        CHECK(regular_1->is_attached());
+        CHECK(regular_4->is_attached());
+        CHECK_EQUAL(11, regular_1->get_int(0,0));
+        CHECK_EQUAL(14, regular_4->get_int(0,0));
+        CHECK_EQUAL(regular_1, parent->get_subtable(0,1));
+        CHECK_EQUAL(regular_4, parent->get_subtable(0,2));
+        CHECK(!mixed_0->is_attached());
+        CHECK(mixed_1->is_attached());
+        CHECK(mixed_4->is_attached());
+        CHECK_EQUAL(21, mixed_1->get_int(0,0));
+        CHECK_EQUAL(24, mixed_4->get_int(0,0));
+        CHECK_EQUAL(mixed_1, parent->get_subtable(1,1));
+        CHECK_EQUAL(mixed_4, parent->get_subtable(1,2));
+
+        // Perform two more 'move last over' operations which brings the number
+        // of rows down from 3 to 1
+        {
+            WriteTransaction wt(sg_w);
+            TableRef parent_w = wt.get_table("parent_1");
+            parent_w->move_last_over(1); // Move row at index 2 to index 1
+            parent_w->move_last_over(0); // Move row at index 1 to index 0
+            wt.commit();
+        }
+        LangBindHelper::advance_read_transact(sg, tlm);
+        group.Verify();
+        CHECK(!row_0.is_attached());
+        CHECK(!row_1.is_attached());
+        CHECK(row_4.is_attached());
+        CHECK_EQUAL(0, row_4.get_index());
+        CHECK(!regular_0->is_attached());
+        CHECK(!regular_1->is_attached());
+        CHECK(regular_4->is_attached());
+        CHECK_EQUAL(14, regular_4->get_int(0,0));
+        CHECK_EQUAL(regular_4, parent->get_subtable(0,0));
+        CHECK(!mixed_0->is_attached());
+        CHECK(!mixed_1->is_attached());
+        CHECK(mixed_4->is_attached());
+        CHECK_EQUAL(24, mixed_4->get_int(0,0));
+        CHECK_EQUAL(mixed_4, parent->get_subtable(1,0));
+    }
+
+    // Use second table to check with accessors on row indexes 0, 2, and 3, but
+    // none at index 1 and 4.
+    {
+        ConstTableRef parent = rt.get_table("parent_2");
+        ConstRow row_0 = (*parent)[0];
+        ConstRow row_2 = (*parent)[2];
+        ConstRow row_3 = (*parent)[3];
+        ConstTableRef regular_0 = parent->get_subtable(0,0);
+        ConstTableRef regular_2 = parent->get_subtable(0,2);
+        ConstTableRef regular_3 = parent->get_subtable(0,3);
+        ConstTableRef   mixed_0 = parent->get_subtable(1,0);
+        ConstTableRef   mixed_2 = parent->get_subtable(1,2);
+        ConstTableRef   mixed_3 = parent->get_subtable(1,3);
+        CHECK(row_0.is_attached());
+        CHECK(row_2.is_attached());
+        CHECK(row_3.is_attached());
+        CHECK_EQUAL(0, row_0.get_index());
+        CHECK_EQUAL(2, row_2.get_index());
+        CHECK_EQUAL(3, row_3.get_index());
+        CHECK(regular_0->is_attached());
+        CHECK(regular_2->is_attached());
+        CHECK(regular_3->is_attached());
+        CHECK_EQUAL(10, regular_0->get_int(0,0));
+        CHECK_EQUAL(12, regular_2->get_int(0,0));
+        CHECK_EQUAL(13, regular_3->get_int(0,0));
+        CHECK(mixed_0 && mixed_0->is_attached());
+        CHECK(mixed_2 && mixed_2->is_attached());
+        CHECK(mixed_3 && mixed_3->is_attached());
+        CHECK_EQUAL(20, mixed_0->get_int(0,0));
+        CHECK_EQUAL(22, mixed_2->get_int(0,0));
+        CHECK_EQUAL(23, mixed_3->get_int(0,0));
+
+        // Perform two 'move last over' operations which brings the number of
+        // rows down from 5 to 3
+        {
+            WriteTransaction wt(sg_w);
+            TableRef parent_w = wt.get_table("parent_2");
+            parent_w->move_last_over(2); // Move row at index 4 to index 2
+            parent_w->move_last_over(0); // Move row at index 3 to index 0
+            wt.commit();
+        }
+        LangBindHelper::advance_read_transact(sg, tlm);
+        group.Verify();
+        CHECK(!row_0.is_attached());
+        CHECK(!row_2.is_attached());
+        CHECK(row_3.is_attached());
+        CHECK_EQUAL(0, row_3.get_index());
+        CHECK(!regular_0->is_attached());
+        CHECK(!regular_2->is_attached());
+        CHECK(regular_3->is_attached());
+        CHECK_EQUAL(13, regular_3->get_int(0,0));
+        CHECK_EQUAL(regular_3, parent->get_subtable(0,0));
+        CHECK(!mixed_0->is_attached());
+        CHECK(!mixed_2->is_attached());
+        CHECK(mixed_3->is_attached());
+        CHECK_EQUAL(23, mixed_3->get_int(0,0));
+        CHECK_EQUAL(mixed_3, parent->get_subtable(1,0));
+
+        // Perform one more 'move last over' operation which brings the number
+        // of rows down from 3 to 2
+        {
+            WriteTransaction wt(sg_w);
+            TableRef parent_w = wt.get_table("parent_2");
+            parent_w->move_last_over(1); // Move row at index 2 to index 1
+            wt.commit();
+        }
+        LangBindHelper::advance_read_transact(sg, tlm);
+        group.Verify();
+        CHECK(!row_0.is_attached());
+        CHECK(!row_2.is_attached());
+        CHECK(row_3.is_attached());
+        CHECK_EQUAL(0, row_3.get_index());
+        CHECK(!regular_0->is_attached());
+        CHECK(!regular_2->is_attached());
+        CHECK(regular_3->is_attached());
+        CHECK_EQUAL(13, regular_3->get_int(0,0));
+        CHECK_EQUAL(regular_3, parent->get_subtable(0,0));
+        CHECK(!mixed_0->is_attached());
+        CHECK(!mixed_2->is_attached());
+        CHECK(mixed_3->is_attached());
+        CHECK_EQUAL(23, mixed_3->get_int(0,0));
+        CHECK_EQUAL(mixed_3, parent->get_subtable(1,0));
+
+        // Perform one final 'move last over' operation which brings the number
+        // of rows down from 2 to 1
+        {
+            WriteTransaction wt(sg_w);
+            TableRef parent_w = wt.get_table("parent_2");
+            parent_w->move_last_over(0); // Move row at index 1 to index 0
+            wt.commit();
+        }
+        LangBindHelper::advance_read_transact(sg, tlm);
+        group.Verify();
+        CHECK(!row_0.is_attached());
+        CHECK(!row_2.is_attached());
+        CHECK(!row_3.is_attached());
+        CHECK(!regular_0->is_attached());
+        CHECK(!regular_2->is_attached());
+        CHECK(!regular_3->is_attached());
+        CHECK(!mixed_0->is_attached());
+        CHECK(!mixed_2->is_attached());
+        CHECK(!mixed_3->is_attached());
+    }
+
+    // Use third table to check with accessors on row indexes 1 and 3, but none
+    // at index 0, 2, and 4.
+    {
+        ConstTableRef parent = rt.get_table("parent_3");
+        ConstRow row_1 = (*parent)[1];
+        ConstRow row_3 = (*parent)[3];
+        ConstTableRef regular_1 = parent->get_subtable(0,1);
+        ConstTableRef regular_3 = parent->get_subtable(0,3);
+        ConstTableRef   mixed_1 = parent->get_subtable(1,1);
+        ConstTableRef   mixed_3 = parent->get_subtable(1,3);
+        CHECK(row_1.is_attached());
+        CHECK(row_3.is_attached());
+        CHECK_EQUAL(1, row_1.get_index());
+        CHECK_EQUAL(3, row_3.get_index());
+        CHECK(regular_1->is_attached());
+        CHECK(regular_3->is_attached());
+        CHECK_EQUAL(11, regular_1->get_int(0,0));
+        CHECK_EQUAL(13, regular_3->get_int(0,0));
+        CHECK(mixed_1 && mixed_1->is_attached());
+        CHECK(mixed_3 && mixed_3->is_attached());
+        CHECK_EQUAL(21, mixed_1->get_int(0,0));
+        CHECK_EQUAL(23, mixed_3->get_int(0,0));
+
+        // Perform two 'move last over' operations which brings the number of
+        // rows down from 5 to 3
+        {
+            WriteTransaction wt(sg_w);
+            TableRef parent_w = wt.get_table("parent_3");
+            parent_w->move_last_over(2); // Move row at index 4 to index 2
+            parent_w->move_last_over(0); // Move row at index 3 to index 0
+            wt.commit();
+        }
+        LangBindHelper::advance_read_transact(sg, tlm);
+        group.Verify();
+        CHECK(row_1.is_attached());
+        CHECK(row_3.is_attached());
+        CHECK_EQUAL(1, row_1.get_index());
+        CHECK_EQUAL(0, row_3.get_index());
+        CHECK(regular_1->is_attached());
+        CHECK(regular_3->is_attached());
+        CHECK_EQUAL(11, regular_1->get_int(0,0));
+        CHECK_EQUAL(13, regular_3->get_int(0,0));
+        CHECK_EQUAL(regular_1, parent->get_subtable(0,1));
+        CHECK_EQUAL(regular_3, parent->get_subtable(0,0));
+        CHECK(mixed_1->is_attached());
+        CHECK(mixed_3->is_attached());
+        CHECK_EQUAL(21, mixed_1->get_int(0,0));
+        CHECK_EQUAL(23, mixed_3->get_int(0,0));
+        CHECK_EQUAL(mixed_1, parent->get_subtable(1,1));
+        CHECK_EQUAL(mixed_3, parent->get_subtable(1,0));
+
+        // Perform one more 'move last over' operation which brings the number
+        // of rows down from 3 to 2
+        {
+            WriteTransaction wt(sg_w);
+            TableRef parent_w = wt.get_table("parent_3");
+            parent_w->move_last_over(1); // Move row at index 2 to index 1
+            wt.commit();
+        }
+        LangBindHelper::advance_read_transact(sg, tlm);
+        group.Verify();
+        CHECK(!row_1.is_attached());
+        CHECK(row_3.is_attached());
+        CHECK_EQUAL(0, row_3.get_index());
+        CHECK(!regular_1->is_attached());
+        CHECK(regular_3->is_attached());
+        CHECK_EQUAL(13, regular_3->get_int(0,0));
+        CHECK_EQUAL(regular_3, parent->get_subtable(0,0));
+        CHECK(!mixed_1->is_attached());
+        CHECK(mixed_3->is_attached());
+        CHECK_EQUAL(23, mixed_3->get_int(0,0));
+        CHECK_EQUAL(mixed_3, parent->get_subtable(1,0));
+
+        // Perform one final 'move last over' operation which brings the number
+        // of rows down from 2 to 1
+        {
+            WriteTransaction wt(sg_w);
+            TableRef parent_w = wt.get_table("parent_3");
+            parent_w->move_last_over(0); // Move row at index 1 to index 0
+            wt.commit();
+        }
+        LangBindHelper::advance_read_transact(sg, tlm);
+        group.Verify();
+        CHECK(!row_1.is_attached());
+        CHECK(!row_3.is_attached());
+        CHECK(!regular_1->is_attached());
+        CHECK(!regular_3->is_attached());
+        CHECK(!mixed_1->is_attached());
+        CHECK(!mixed_3->is_attached());
+    }
 }
 
 #endif // TIGHTDB_ENABLE_REPLICATION

@@ -3777,8 +3777,8 @@ TEST(Table_RowAccessor)
     {
         Row row_0 = table[0];
         Row row_1 = table[1];
-        CHECK_EQUAL(&table, &(row_0.get_table()));
-        CHECK_EQUAL(&table, &(row_1.get_table()));
+        CHECK_EQUAL(&table, row_0.get_table());
+        CHECK_EQUAL(&table, row_1.get_table());
         CHECK_EQUAL(0, row_0.get_index());
         CHECK_EQUAL(1, row_1.get_index());
     }
