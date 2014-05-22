@@ -150,7 +150,7 @@ public:
         }
     }
 
-    void release_commit_entries(uint_fast64_t, uint_fast64_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
+    void release_commit_entries(uint_fast64_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
     {
     }
 

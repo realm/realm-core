@@ -1153,7 +1153,7 @@ void SharedGroup::advance_read(TransactLogRegistry* log_registry)
                              logs.get(),
                              logs.get() + (m_readlock.m_version-old_readlock.m_version)); // Throws
 
-    log_registry->release_commit_entries(old_readlock.m_version, m_readlock.m_version);
+    log_registry->release_commit_entries(m_readlock.m_version);
 }
 
 #endif // TIGHTDB_ENABLE_REPLICATION
@@ -1177,7 +1177,6 @@ Group& SharedGroup::begin_write()
             throw;
         }
         m_transact_stage = transact_Writing;
-        // FIXME: Kristian moved free space reset here...
         if (m_readlock.m_version == 1) {
             m_group.reset_freespace_tracking();
         }
@@ -1190,7 +1189,6 @@ Group& SharedGroup::begin_write()
     // A write transaction implies a read transaction...
     begin_read();
     m_transact_stage = transact_Writing;
-    // FIXME: Kristian moved free space reset here...
     if (m_readlock.m_version == 1) {
         m_group.reset_freespace_tracking();
     }
@@ -1298,10 +1296,6 @@ void SharedGroup::do_commit()
 #else
         new_version = r_info->get_current_version_unchecked() + 1;
 #endif
-        // FIXME: place where we previously called init_shared:
-        // if (m_readlock.m_version == 2) {
-        //     m_group.reset_freespace_tracking(); // throws
-        // }
         low_level_commit(new_version); // Throws
     }
 

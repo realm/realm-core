@@ -325,8 +325,7 @@ public:
         m_registry->get_commit_entries(from_version, to_version, logs_buffer);
     }
 
-    virtual void release_commit_entries(uint_fast64_t from_version, 
-                                        uint_fast64_t to_version) TIGHTDB_NOEXCEPT
+    virtual void release_commit_entries(uint_fast64_t to_version) TIGHTDB_NOEXCEPT
     {
         m_registry->release_commit_entries(m_interest_key, to_version);
     }

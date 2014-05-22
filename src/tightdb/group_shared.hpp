@@ -81,8 +81,7 @@ public:
 
         /// Declare no further interest in the transaction logs between the
         /// specified versions.
-        virtual void release_commit_entries(uint_fast64_t from_version, uint_fast64_t to_version)
-            TIGHTDB_NOEXCEPT = 0;
+        virtual void release_commit_entries(uint_fast64_t to_version) TIGHTDB_NOEXCEPT = 0;
         virtual ~TransactLogRegistry() {}
     };
 #endif
