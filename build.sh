@@ -645,6 +645,7 @@ EOF
 
     "test-on-ios")
         
+        TMPL_DIR="test/ios/template"
         TEST_DIR="test/ios/app"
         rm -rf "$TEST_DIR" || exit 1
         mkdir "$TEST_DIR" || exit 1
@@ -658,41 +659,69 @@ EOF
         # Copy the test files into the app tests subdirectory
         PASSIVE_SUBDIRS="$($MAKE -C ./test --no-print-directory get-passive-subdirs)" || exit 1
         PASSIVE_SUBDIRS="$(echo "$PASSIVE_SUBDIRS" | sed -E 's/ +/|/g')" || exit 1
-        ## Naive copy, but avoid recursion (extra precaution) and passive subdirs.
+        # Naive copy, i.e. copy everything.
+        ## Avoid recursion (extra precaution) and passive subdirs.
+        ## Avoid non-source-code files.
+        ## Retain directory structure.
         (cd ./test && find -E . \
             ! -iregex "^\./(ios|$PASSIVE_SUBDIRS)/.*$" \
+            -a -iregex "^.*\.[ch](pp)?$" \
             -exec rsync -qR {} "../$TEST_APP_DIR" \;) || exit 1
-        ## Remove all but the source files.
-        find -E "$TEST_APP_DIR" -type f \
-            ! -iregex "^.*\.[ch](pp)?$" \
-            -exec rm {} \; || exit 1
 
         # Gather resources
         RESOURCES="$($MAKE -C ./test --no-print-directory get-test-resources)" || exit 1
         (cd ./test && rsync $RESOURCES "../$TEST_APP_DIR") || exit 1
+        RESOURCES="$(echo "$RESOURCES" | sed -E "s/(^| )/\1$TEST_APP\//g")" || exit 1
 
-        ## Replace all test includes with framework includes.
+        # Replace all dynamic includes with framework includes.
         find "$TEST_APP_DIR" -type f -exec sed -i '' \
             -e "s/<tightdb\(.*\)>/<RealmCore\/tightdb\1>/g" {} \; || exit 1
 
         # Create an XCTestCase
-        (cat "test/ios/template/AppTests/AppTests.mm" | sed "s/\$TEST_APP/$TEST_APP/g" \
-            > "$TEST_APP_DIR/$TEST_APP.mm") || exit 1
+        . "$TMPL_DIR/AppTests/AppTests.mm.sh"
 
-        ## Set up frameworks.
+        # Set up frameworks.
         FRAMEWORK="RealmCore.framework"
         rm -rf "$APP_DIR/$FRAMEWORK" || exit 1
-        cp -r "../tightdb/$FRAMEWORK" "$TEST_DIR/$FRAMEWORK"
+        cp -r "../tightdb/$FRAMEWORK" "$TEST_DIR/$FRAMEWORK" || exit 1
 
-        ## Initialize app directory
-        cp -r "test/ios/template/App" "$APP_DIR"
-        mv "$APP_DIR/App-Info.plist" "$APP_DIR/$APP-Info.plist"
-        mv "$APP_DIR/App-Prefix.pch" "$APP_DIR/$APP-Prefix.pch"
+        # Initialize app directory
+        cp -r "test/ios/template/App" "$APP_DIR" || exit 1
+        mv "$APP_DIR/App-Info.plist" "$APP_DIR/$APP-Info.plist" || exit 1
+        mv "$APP_DIR/App-Prefix.pch" "$APP_DIR/$APP-Prefix.pch" || exit 1
 
-        ## Gather all the test sources in a Python-friendly format.
+        # Gather all the test sources in a Python-friendly format.
+        ## The indentation is to make it look pretty in the Gyp file.
         TEST_APP_SOURCES=$(cd $TEST_DIR && find "$TEST_APP" -type f | \
-            sed -E 's/^(.*)$/                "\1",/')
-        echo $TEST_APP_SOURCES
+            sed -E "s/^(.*)$/                '\1',/") || exit 1
+        RESOURCES="$(echo "$RESOURCES" | sed -E "s/ /', '/g")" || exit 1
+
+        # Generate a Gyp file.
+        . "$TMPL_DIR/App.gyp.sh"
+
+        # Run gyp, generating an .xcodeproj folder with a project.pbxproj file.
+        gyp --depth="$TEST_DIR" "$TEST_DIR/$APP.gyp" || exit 1
+
+        ## Collect the main app id from the project.pbxproj file.
+        APP_ID=$(cat "$TEST_DIR/$APP.xcodeproj/project.pbxproj" | tr -d '\n' | \
+            egrep -o "remoteGlobalIDString.*?remoteInfo = $APP;" | \
+            head -n 1 | \
+            sed 's/remoteGlobalIDString = \([A-F0-9]*\);.*/\1/') || exit 1
+
+        ## Collect the test app id from the project.pbxproj file.
+        TEST_APP_ID=$(cat "$TEST_DIR/$APP.xcodeproj/project.pbxproj" | tr -d '\n' | \
+            egrep -o "remoteGlobalIDString.*?remoteInfo = $TEST_APP;" | \
+            head -n 1 | \
+            sed 's/remoteGlobalIDString = \([A-F0-9]*\);.*/\1/') || exit 1
+
+        ## Generate a scheme with a test action.
+        USER=$(whoami)
+        mkdir -p "$TEST_DIR/$APP.xcodeproj/xcuserdata"
+        mkdir -p "$TEST_DIR/$APP.xcodeproj/xcuserdata/$USER.xcuserdatad"
+        mkdir -p "$TEST_DIR/$APP.xcodeproj/xcuserdata/$USER.xcuserdatad/xcschemes"
+
+        . "$TMPL_DIR/App.scheme.sh"
+
         exit 0
         ;;
 
