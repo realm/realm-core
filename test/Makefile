@@ -1,7 +1,8 @@
 SUBDIRS = util
 PASSIVE_SUBDIRS = test-tightdb test-sqlite3 test-stl performance \
 benchmark-insert-add benchmark-insert-get-set benchmark-prealloc \
-benchmark-index benchmark-transaction experiments
+benchmark-index benchmark-transaction experiments benchmark-sqlite \
+benchmark-stl benchmark-tightdb
 
 DIR_DEPS          = util
 test_tightdb_DEPS = util
