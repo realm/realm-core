@@ -73,7 +73,7 @@ private:
 // Implementation
 
 inline ColumnBackLink::ColumnBackLink(ref_type ref, ArrayParent* parent, std::size_t ndx_in_parent, Allocator& alloc):
-    Column(ref, parent, ndx_in_parent, alloc), m_source_column(NULL)
+    Column(ref, parent, ndx_in_parent, alloc), m_source_column(null_ptr)
 {
 }
 
@@ -90,7 +90,7 @@ inline bool ColumnBackLink::has_backlinks(std::size_t ndx) const TIGHTDB_NOEXCEP
 
 inline void ColumnBackLink::set_source_table(TableRef table)
 {
-    TIGHTDB_ASSERT(m_source_table.get() == NULL);
+    TIGHTDB_ASSERT(m_source_table.get() == null_ptr);
     m_source_table = table;
 }
 

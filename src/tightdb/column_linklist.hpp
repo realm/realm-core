@@ -81,12 +81,12 @@ private:
 // Implementation
 
 inline ColumnLinkList::ColumnLinkList(ref_type ref, ArrayParent* parent, std::size_t ndx_in_parent, Allocator& alloc):
-    Column(ref, parent, ndx_in_parent, alloc), m_backlinks(NULL)
+    Column(ref, parent, ndx_in_parent, alloc), m_backlinks(null_ptr)
 {
 }
 
 inline ColumnLinkList::ColumnLinkList(Allocator& alloc):
-    Column(Array::type_HasRefs, alloc), m_backlinks(NULL)
+    Column(Array::type_HasRefs, alloc), m_backlinks(null_ptr)
 {
 }
 
@@ -115,13 +115,13 @@ inline size_t ColumnLinkList::get_link(std::size_t row_ndx, std::size_t link_ndx
 {
     TIGHTDB_ASSERT(link_ndx < get_link_count(row_ndx));
     ref_type ref = Column::get_as_ref(row_ndx);
-    Column col(ref, NULL, 0, get_alloc());
+    Column col(ref, null_ptr, 0, get_alloc());
     return col.get(link_ndx);
 }
 
 inline void ColumnLinkList::set_target_table(TableRef table)
 {
-    TIGHTDB_ASSERT(m_target_table.get() == NULL);
+    TIGHTDB_ASSERT(m_target_table.get() == null_ptr);
     m_target_table = table;
 }
 

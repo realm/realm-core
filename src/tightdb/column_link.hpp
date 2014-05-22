@@ -68,12 +68,12 @@ private:
 // Implementation
 
 inline ColumnLink::ColumnLink(ref_type ref, ArrayParent* parent, std::size_t ndx_in_parent, Allocator& alloc):
-    Column(ref, parent, ndx_in_parent, alloc), m_backlinks(NULL)
+    Column(ref, parent, ndx_in_parent, alloc), m_backlinks(null_ptr)
 {
 }
 
 inline ColumnLink::ColumnLink(Allocator& alloc):
-    Column(alloc), m_backlinks(NULL)
+    Column(alloc), m_backlinks(null_ptr)
 {
 }
 
@@ -85,7 +85,7 @@ inline ref_type ColumnLink::create(std::size_t size, Allocator& alloc)
 
 inline void ColumnLink::set_target_table(TableRef table)
 {
-    TIGHTDB_ASSERT(m_target_table.get() == NULL);
+    TIGHTDB_ASSERT(m_target_table.get() == null_ptr);
     m_target_table = table;
 }
 

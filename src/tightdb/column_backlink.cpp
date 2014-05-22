@@ -1,10 +1,22 @@
-//
-//  column_backlink.cpp
-//  tightdb
-//
-//  Created by Alexander Stigsen on 5/12/14.
-//  Copyright (c) 2014 TightDB. All rights reserved.
-//
+/*************************************************************************
+ *
+ * TIGHTDB CONFIDENTIAL
+ * __________________
+ *
+ *  [2011] - [2012] TightDB Inc
+ *  All Rights Reserved.
+ *
+ * NOTICE:  All information contained herein is, and remains
+ * the property of TightDB Incorporated and its suppliers,
+ * if any.  The intellectual and technical concepts contained
+ * herein are proprietary to TightDB Incorporated
+ * and its suppliers and may be covered by U.S. and Foreign Patents,
+ * patents in process, and are protected by trade secret or copyright law.
+ * Dissemination of this information or reproduction of this material
+ * is strictly forbidden unless prior written permission is obtained
+ * from TightDB Incorporated.
+ *
+ **************************************************************************/
 
 #include <tightdb/column_backlink.hpp>
 #include <tightdb/column_link.hpp>
@@ -31,7 +43,7 @@ void ColumnBackLink::add_backlink(size_t row_ndx, size_t source_row_ndx)
         ref_type col_ref = Column::create(Array::type_Normal, 0, 0, get_alloc());
         Column col(col_ref, this, row_ndx, get_alloc());
 
-        uint64_t existing_source_ndx = uint64_t(ref) >> 1;
+        size_t existing_source_ndx = (ref >> 1);
         col.add(existing_source_ndx);
         col.add(source_row_ndx);
 
@@ -46,7 +58,7 @@ void ColumnBackLink::add_backlink(size_t row_ndx, size_t source_row_ndx)
 
 std::size_t ColumnBackLink::get_backlink_count(size_t row_ndx) const TIGHTDB_NOEXCEPT
 {
-    int64_t ref = Column::get(row_ndx);
+    size_t ref = Column::get(row_ndx);
 
     if (ref == 0)
         return 0;
@@ -60,26 +72,26 @@ std::size_t ColumnBackLink::get_backlink_count(size_t row_ndx) const TIGHTDB_NOE
 
 std::size_t ColumnBackLink::get_backlink(size_t row_ndx, size_t backlink_ndx) const TIGHTDB_NOEXCEPT
 {
-    int64_t ref = Column::get(row_ndx);
+    size_t ref = Column::get(row_ndx);
     TIGHTDB_ASSERT(ref != 0);
 
     if (ref & 1) {
         TIGHTDB_ASSERT(backlink_ndx == 0);
 
-        uint64_t row_ref = uint64_t(ref) >> 1;
+        size_t row_ref = (ref >> 1);
         return row_ref;
     }
 
     // return ref from list
     //TODO: optimize with direct access
     TIGHTDB_ASSERT(backlink_ndx < ColumnBase::get_size_from_ref(ref, get_alloc()));
-    Column col(ref, NULL, 0, get_alloc());
+    Column col(ref, null_ptr, 0, get_alloc());
     return col.get(backlink_ndx);
 }
 
 void ColumnBackLink::remove_backlink(size_t row_ndx, size_t source_row_ndx)
 {
-    int64_t ref = Column::get(row_ndx);
+    size_t ref = Column::get(row_ndx);
     TIGHTDB_ASSERT(ref != 0);
 
     // If there is only a single backlink, it can be stored as
@@ -109,11 +121,11 @@ void ColumnBackLink::remove_backlink(size_t row_ndx, size_t source_row_ndx)
 }
 
 void ColumnBackLink::update_backlink(std::size_t row_ndx, std::size_t old_row_ndx, std::size_t new_row_ndx) {
-    int64_t ref = Column::get(row_ndx);
+    size_t ref = Column::get(row_ndx);
     TIGHTDB_ASSERT(ref != 0);
 
     if (ref & 1) {
-        TIGHTDB_ASSERT((ref >> 1) == (int64_t)old_row_ndx);
+        TIGHTDB_ASSERT((ref >> 1) == old_row_ndx);
         size_t tagged_ndx = (new_row_ndx << 1) + 1;
         Column::set(row_ndx, tagged_ndx);
         return;
@@ -129,15 +141,15 @@ void ColumnBackLink::update_backlink(std::size_t row_ndx, std::size_t old_row_nd
 void ColumnBackLink::nullify_links(std::size_t row_ndx, bool do_destroy)
 {
     // Nullify all links pointing to the row being deleted
-    int64_t ref = Column::get(row_ndx);
+    size_t ref = Column::get(row_ndx);
     if (ref != 0) {
         if (ref & 1) {
-            uint64_t row_ref = uint64_t(ref) >> 1;
+            size_t row_ref = (ref >> 1);
             m_source_column->do_nullify_link(row_ref, row_ndx);
         }
         else {
             // nullify entire list of links
-            Column col(ref, NULL, 0, get_alloc());
+            Column col(ref, null_ptr, 0, get_alloc());
             size_t count = col.size();
 
             for (size_t i = 0; i < count; ++i) {
@@ -164,12 +176,12 @@ void ColumnBackLink::move_last_over(std::size_t row_ndx)
     size_t ref = Column::get(last_row_ndx);
     if (ref != 0) {
         if (ref & 1) {
-            uint64_t row_ref = uint64_t(ref) >> 1;
+            size_t row_ref = (ref >> 1);
             m_source_column->do_update_link(row_ref, last_row_ndx, row_ndx);
         }
         else {
             // update entire list of links
-            Column col(ref, NULL, 0, get_alloc());
+            Column col(ref, null_ptr, 0, get_alloc());
             size_t count = col.size();
 
             for (size_t i = 0; i < count; ++i) {
