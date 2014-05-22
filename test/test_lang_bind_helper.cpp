@@ -154,18 +154,6 @@ public:
     {
     }
 
-    virtual void add_commit(version_type version, char* data, std::size_t sz)
-    {
-    }
-    
-    virtual void register_interest(version_type from)
-    {
-    }
-    
-    virtual void unregister_interest(version_type from)
-    {
-    }
-
 private:
     typedef map<uint_fast64_t, BinaryData> TransactLogs;
     TransactLogs m_transact_logs;
