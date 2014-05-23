@@ -20,10 +20,11 @@
 
 #include "../util/demangle.hpp"
 #include "../util/thread_wrapper.hpp"
-
+#include "../util/random.hpp"
 #include "../test.hpp"
 
 using namespace std;
 using namespace tightdb;
 using namespace tightdb::util;
 using namespace tightdb::_impl;
+using namespace tightdb::test_util;
