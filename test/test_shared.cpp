@@ -2084,4 +2084,36 @@ TEST(Shared_ReserveDiskSpace)
     }
 }
 
+
+namespace {
+
+
+TIGHTDB_TABLE_1(TestTableInts,
+                first,  Int)
+
+
+}
+
+TEST(Shared_Random_Inserts_Crash)
+{
+    Random random(random_int<unsigned long>());
+    SHARED_GROUP_TEST_PATH(path);
+    {
+    
+        SharedGroup sg(path);
+
+        for (int i=0; i<1000; i++)
+        {
+            WriteTransaction wt(sg);
+            TestTableInts::Ref tr = wt.get_table<TestTableInts>("table");
+            
+            int idx = (tr->size()==0) ? 0 : (random.draw_int_mod(tr->size()));
+            cout << "size: " << tr->size() << " idx: " << idx << endl;
+            tr->insert(idx,0);
+            wt.commit();
+        }
+    }
+}
+
+
 #endif // TEST_SHARED
