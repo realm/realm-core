@@ -15,6 +15,7 @@
 
 #include <tightdb.hpp>
 #include <tightdb/util/features.h>
+#include <tightdb/util/safe_int_ops.hpp>
 #include <tightdb/util/unique_ptr.hpp>
 #include <tightdb/util/bind.hpp>
 #include <tightdb/util/terminate.hpp>
@@ -2083,5 +2084,35 @@ TEST(Shared_ReserveDiskSpace)
         }
     }
 }
+
+
+TEST(Shared_ArrayEraseBug)
+{
+    // This test only makes sense when we can insert a number of rows
+    // equal to the square of the maximum B+-tree node size.
+    size_t max_node_size = TIGHTDB_MAX_LIST_SIZE;
+    size_t max_node_size_squared = max_node_size;
+    if (int_multiply_with_overflow_detect(max_node_size_squared, max_node_size))
+        return;
+
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg(path);
+    {
+        WriteTransaction wt(sg);
+        TableRef table = wt.get_table("table");
+        table->add_column(type_Int, "");
+        for (size_t i = 0; i < max_node_size_squared; ++i)
+            table->insert_empty_row(0);
+        wt.commit();
+    }
+    {
+        WriteTransaction wt(sg);
+        TableRef table = wt.get_table("table");
+        size_t row_ndx = max_node_size_squared - max_node_size - max_node_size/2;
+        table->insert_empty_row(row_ndx);
+        wt.commit();
+    }
+}
+
 
 #endif // TEST_SHARED
