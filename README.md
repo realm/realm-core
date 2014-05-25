@@ -238,10 +238,10 @@ These are the available variables:
  - If you set `UNITTEST_SHUFFLE` to a non-empty value, the tests will
    be executed in a random order. This requires, of course, that all
    executed tests are independant of each other. Note that unless you
-   also set `UNITTEST_REANDOM_SEED=random`, you will get the same
+   also set `UNITTEST_RANDOM_SEED=random`, you will get the same
    random order in each sucessive run.
 
- - You may set `UNITTEST_REANDOM_SEED` to `random` or to some unsigned
+ - You may set `UNITTEST_RANDOM_SEED` to `random` or to some unsigned
    integer (at least 32 bits will be accepted). If you specify
    `random`, the global pseudorandom number generator will be seeded
    with a nondeterministic value (one that generally will be different
