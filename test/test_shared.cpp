@@ -15,6 +15,7 @@
 
 #include <tightdb.hpp>
 #include <tightdb/util/features.h>
+#include <tightdb/util/safe_int_ops.hpp>
 #include <tightdb/util/unique_ptr.hpp>
 #include <tightdb/util/bind.hpp>
 #include <tightdb/util/terminate.hpp>
@@ -2085,33 +2086,31 @@ TEST(Shared_ReserveDiskSpace)
 }
 
 
-namespace {
-
-
-TIGHTDB_TABLE_1(TestTableInts,
-                first,  Int)
-
-
-}
-
-TEST(Shared_Random_Inserts_Crash)
+TEST(Shared_ArrayEraseBug)
 {
-    Random random(random_int<unsigned long>());
-    SHARED_GROUP_TEST_PATH(path);
-    {
-    
-        SharedGroup sg(path);
+    // This test only makes sense when we can insert a number of rows
+    // equal to the square of the maximum B+-tree node size.
+    size_t max_node_size = TIGHTDB_MAX_LIST_SIZE;
+    size_t max_node_size_squared = max_node_size;
+    if (int_multiply_with_overflow_detect(max_node_size_squared, max_node_size))
+        return;
 
-        for (int i=0; i<1000; i++)
-        {
-            WriteTransaction wt(sg);
-            TestTableInts::Ref tr = wt.get_table<TestTableInts>("table");
-            
-            int idx = (tr->size()==0) ? 0 : (random.draw_int_mod(tr->size()));
-            cout << "size: " << tr->size() << " idx: " << idx << endl;
-            tr->insert(idx,0);
-            wt.commit();
-        }
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg(path);
+    {
+        WriteTransaction wt(sg);
+        TableRef table = wt.get_table("table");
+        table->add_column(type_Int, "");
+        for (size_t i = 0; i < max_node_size_squared; ++i)
+            table->insert_empty_row(0);
+        wt.commit();
+    }
+    {
+        WriteTransaction wt(sg);
+        TableRef table = wt.get_table("table");
+        size_t row_ndx = max_node_size_squared - max_node_size - max_node_size/2;
+        table->insert_empty_row(row_ndx);
+        wt.commit();
     }
 }
 
