@@ -434,7 +434,7 @@ void TableView::clear()
     // sort m_refs
     vector<size_t> v;
     for (size_t t = 0; t < size(); t++)
-        v.push_back(to_ref(m_refs.get(t)));
+        v.push_back(to_size_t(m_refs.get(t)));
     std::sort(v.begin(), v.end());
 
     // Delete all referenced rows in source table
