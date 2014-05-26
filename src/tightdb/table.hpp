@@ -1107,7 +1107,10 @@ template<class T> inline Columns<T> Table::column(std::size_t column)
 {
     std::vector<size_t> tmp = m_link_chain;
     m_link_chain.clear();
-    return Columns<T>(column, this, tmp);
+    if (tmp.size() > 0)
+        return Columns<T>(column, this, tmp[0]);
+    else
+        return Columns<T>(column, this);
 }
 
 inline Table Table::link(size_t link_column)

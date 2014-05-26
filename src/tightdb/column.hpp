@@ -240,16 +240,7 @@ public:
     ~Column() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
     // 'this' and 'column' must use same allocator
-    void move_assign(Column& column)
-    {
-        TIGHTDB_ASSERT(&column.get_alloc() == &get_alloc());
-        // destroy() and detach() are redundant with the Array::move_assign(), but they exist for completeness to avoid
-        // bugs if Array::move_assign() should change behaviour (e.g. no longer call destroy_deep(), etc.).
-        destroy();
-        get_root_array()->move_assign(*column.get_root_array());
-        column.detach();
-    }
-        
+    void move_assign(Column& column);
     bool IsIntColumn() const TIGHTDB_NOEXCEPT{ return true; }
 
     std::size_t size() const TIGHTDB_NOEXCEPT;

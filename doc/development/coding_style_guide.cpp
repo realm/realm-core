@@ -3,7 +3,7 @@
 //
 
 
-// Lines should never exceed 120 characters ---------------------------------------------------------------------------
+// Lines should never exceed 118 characters --------------------------------------------------------------------------
 
 
 // Macro names use uppercase and have "TIGHTDB_" as prefix. Non-macro

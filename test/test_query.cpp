@@ -1,5 +1,3 @@
-#if 1
-
 #include "testsettings.hpp"
 #ifdef TEST_QUERY
 
@@ -5065,6 +5063,3 @@ TEST(Query_RefCounting)
 }
 
 #endif // TEST_QUERY
-
-
-#endif

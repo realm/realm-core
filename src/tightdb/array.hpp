@@ -1518,14 +1518,14 @@ inline void Array::erase(std::size_t ndx)
 
 inline void Array::erase(std::size_t begin, std::size_t end)
 {
-    // This can throw, but only if array is currently in read-only
-    // memory.
-    if (begin != end)
+    if (begin != end) {
+        // This can throw, but only if array is currently in read-only memory.
         move(end, size(), begin); // Throws
 
-    // Update size (also in header)
-    m_size -= end - begin;
-    set_header_size(m_size);
+        // Update size (also in header)
+        m_size -= end - begin;
+        set_header_size(m_size);
+    }
 }
 
 inline void Array::clear()
