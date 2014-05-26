@@ -690,12 +690,12 @@ size_t Array::FindGTE(int64_t target, size_t start, const Array* indirection) co
     }
 
     if (start + 2 < m_size) {
-        if (get(indirection ? to_ref(indirection->get(start)) : start) >= target) {
+        if (get(indirection ? to_size_t(indirection->get(start)) : start) >= target) {
             ret = start;
             goto exit;
         }
         ++start;
-        if (get(indirection ? to_ref(indirection->get(start)) : start) >= target) {
+        if (get(indirection ? to_size_t(indirection->get(start)) : start) >= target) {
             ret = start;
             goto exit;
         }
@@ -703,7 +703,7 @@ size_t Array::FindGTE(int64_t target, size_t start, const Array* indirection) co
     }
 
     // Todo, use templated get<width> from this point for performance
-    if (target > get(indirection ? to_ref(indirection->get(m_size - 1)) : m_size - 1)) {
+    if (target > get(indirection ? to_size_t(indirection->get(m_size - 1)) : m_size - 1)) {
         ret = not_found;
         goto exit;
     }
@@ -712,7 +712,7 @@ size_t Array::FindGTE(int64_t target, size_t start, const Array* indirection) co
     add = 1;
 
     for (;;) {
-        if (start + add < m_size && get(indirection ? to_ref(indirection->get(start + add)) : start + add) < target)
+        if (start + add < m_size && get(indirection ? to_size_t(indirection->get(start + add)) : start + add) < target)
             start += add;
         else
             break;
@@ -734,7 +734,7 @@ size_t Array::FindGTE(int64_t target, size_t start, const Array* indirection) co
     orig_high = high;
     while (high - start > 1) {
         size_t probe = (start + high) / 2; // FIXME: Prone to overflow - see lower_bound() for a solution
-        int64_t v = get(indirection ? to_ref(indirection->get(probe)) : probe);
+        int64_t v = get(indirection ? to_size_t(indirection->get(probe)) : probe);
         if (v < target)
             start = probe;
         else
