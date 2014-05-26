@@ -50,13 +50,13 @@ public:
 
     std::size_t count(StringData value) const;
     size_t find_first(StringData value, std::size_t begin = 0, std::size_t end = npos) const;
-    void find_all(Array& res, StringData value,
+    void find_all(Column& res, StringData value,
                   std::size_t begin = 0, std::size_t end = npos) const;
     FindRes find_all_indexref(StringData value, std::size_t& dst) const;
 
     std::size_t count(std::size_t key_index) const;
     std::size_t find_first(std::size_t key_index, std::size_t begin=0, std::size_t end=-1) const;
-    void find_all(Array& res, std::size_t key_index, std::size_t begin=0, std::size_t end=-1) const;
+    void find_all(Column& res, std::size_t key_index, std::size_t begin = 0, std::size_t end = -1) const;
 
     //@{
 

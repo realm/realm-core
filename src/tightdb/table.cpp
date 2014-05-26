@@ -2272,7 +2272,7 @@ TableView Table::get_distinct_view(size_t column_ndx)
     TIGHTDB_ASSERT(has_index(column_ndx));
 
     TableView tv(*this);
-    Array& refs = tv.get_ref_column();
+    Column& refs = tv.get_ref_column();
 
     if(m_columns.is_attached()) {
         ColumnType type = get_real_column_type(column_ndx);
@@ -2304,7 +2304,7 @@ TableView Table::get_sorted_view(size_t column_ndx, bool ascending)
 
     if(m_columns.is_attached()) {
         // Insert refs to all rows in table
-        Array& refs = tv.get_ref_column();
+        Column& refs = tv.get_ref_column();
         size_t count = size();
         for (size_t i = 0; i < count; ++i) {
             refs.add(i);
@@ -2383,7 +2383,7 @@ size_t get_group_ndx_blocked(size_t i, AggrState& state, Table& result)
 } //namespace
 
 // Simple pivot aggregate method. Experimental! Please do not document method publicly.
-void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, Table& result, const Array* viewrefs) const
+void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, Table& result, const Column* viewrefs) const
 {
     TIGHTDB_ASSERT(result.is_empty() && result.get_column_count() == 0);
     TIGHTDB_ASSERT(group_by_column < m_columns.size());
@@ -2623,7 +2623,7 @@ TableView Table::get_range_view(size_t begin, size_t end)
 
     TableView ctv(*this);
     if (m_columns.is_attached()) {
-        Array& refs = ctv.get_ref_column();
+        Column& refs = ctv.get_ref_column();
         for (size_t i = begin; i < end; ++i)
             refs.add(i);
     }

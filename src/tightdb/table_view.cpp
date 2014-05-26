@@ -418,7 +418,7 @@ void TableView::remove(size_t ndx)
     m_table->from_view_remove(real_ndx, this);
 
     // Update refs
-    m_refs.erase(ndx);
+    m_refs.erase(ndx, ndx == size() - 1);
 
     // Decrement row indexes greater than or equal to ndx
     //
@@ -430,12 +430,17 @@ void TableView::remove(size_t ndx)
 void TableView::clear()
 {
     TIGHTDB_ASSERT(m_table);
-    m_refs.sort();
+
+    // sort m_refs
+    vector<size_t> v;
+    for (size_t t = 0; t < size(); t++)
+        v.push_back(to_ref(m_refs.get(t)));
+    std::sort(v.begin(), v.end());
 
     // Delete all referenced rows in source table
     // (in reverse order to avoid index drift)
     for (size_t i = m_refs.size(); i != 0; --i) {
-        size_t ndx = size_t(m_refs.get(i-1));
+        size_t ndx = size_t(v[i-1]);
         m_table->from_view_remove(ndx, this);
     }
 
