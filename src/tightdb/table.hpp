@@ -502,6 +502,8 @@ public:
     // FIXME: We need a ConstQuery class or runtime check against modifications in read transaction.
     Query where(TableViewBase* tv = null_ptr) const { return Query(*this, tv); }
 
+    Table link(size_t link_column);
+    
     // Optimizing
     void optimize();
 
@@ -603,6 +605,8 @@ private:
 
     // Number of rows in this table
     std::size_t m_size;
+
+    std::vector<size_t> m_link_chain;
 
     // On-disk format
     Array m_top;
@@ -1088,10 +1092,42 @@ inline TableRef Table::copy(Allocator& alloc) const
     return table->get_table_ref();
 }
 
+
+
+
+
+
+
+
+
+
+
+
 template<class T> inline Columns<T> Table::column(std::size_t column)
 {
-    return Columns<T>(column, this);
+    std::vector<size_t> tmp = m_link_chain;
+    m_link_chain.clear();
+    return Columns<T>(column, this, tmp);
 }
+
+inline Table Table::link(size_t link_column)
+{
+    m_link_chain.push_back(link_column);
+    return *this;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 inline bool Table::is_empty() const TIGHTDB_NOEXCEPT
 {

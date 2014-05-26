@@ -184,15 +184,17 @@ template<class T1, class T2, bool b> struct Common<T1, T2, true , false, b> {
 };
 
 
-class ValueBase
+struct ValueBase
 {
-public:
     static const size_t elements = 8;
     virtual void export_int(ValueBase& destination) const = 0;
     virtual void export_float(ValueBase& destination) const = 0;
     virtual void export_int64_t(ValueBase& destination) const = 0;
     virtual void export_double(ValueBase& destination) const = 0;
     virtual void import(const ValueBase& destination) = 0;
+
+    size_t m_rows;
+    size_t m_values;
 };
 
 class Expression : public Query
@@ -227,7 +229,7 @@ public:
         return null_ptr;
     }
 
-    virtual void evaluate(size_t index, ValueBase& destination) = 0;
+    virtual size_t evaluate(size_t index, ValueBase& destination) = 0;
 };
 
 class ColumnsBase {};
@@ -243,16 +245,20 @@ template <class TCond, class T, class TLeft = Subexpr, class TRight = Subexpr> c
 template<class T> class Value : public ValueBase, public Subexpr2<T>
 {
 public:
-    Value() {}
+    Value() {
+        ValueBase::m_rows = 8;
+    }
 
     Value(T v)
     {
+        ValueBase::m_rows = 8;
         std::fill(m_v, m_v + ValueBase::elements, v);
     }
 
-    void evaluate(size_t, ValueBase& destination)
+    size_t evaluate(size_t, ValueBase& destination)
     {
         destination.import(*this);
+        return 0;
     }
 
     template <class TOperator> TIGHTDB_FORCEINLINE void fun(const Value* left, const Value* right)
@@ -312,27 +318,30 @@ public:
     }
 
     // Given a TCond (==, !=, >, <, >=, <=) and two Value<T>, return index of first match
-    template <class TCond> TIGHTDB_FORCEINLINE size_t static compare(Value<T>* left, Value<T>* right)
+    template <class TCond> TIGHTDB_FORCEINLINE static size_t compare(Value<T>* left, Value<T>* right)
     {
         TCond c;
-
-        // 665 ms unrolled vs 698 for loop (vs2010)
-        if (c(left->m_v[0], right->m_v[0]))
-            return 0;
-        else if (c(left->m_v[1], right->m_v[1]))
-            return 1;
-        else if (c(left->m_v[2], right->m_v[2]))
-            return 2;
-        else if (c(left->m_v[3], right->m_v[3]))
-            return 3;
-        else if (c(left->m_v[4], right->m_v[4]))
-            return 4;
-        else if (c(left->m_v[5], right->m_v[5]))
-            return 5;
-        else if (c(left->m_v[6], right->m_v[6]))
-            return 6;
-        else if (c(left->m_v[7], right->m_v[7]))
-            return 7;
+        if (left->m_rows > 1 && right->m_rows > 1) {
+            for (size_t r = 0; r < left->ValueBase::m_values; r++) {
+                if (c(left->m_v[r], right->m_v[r]))
+                    return r;
+            }
+        }
+        else if (left->m_rows == 1 && right->m_rows == 1) {
+            // many-to-many not supported yet
+        }
+        else if (left->m_rows == 1) {
+            for (size_t r = 0; r < left->ValueBase::m_values; r++) {
+                if (c(left->m_v[0], right->m_v[r]))
+                    return 0;
+            }
+        }
+        else if (right->m_rows == 1) {
+            for (size_t l = 0; l < left->ValueBase::m_values; l++) {
+                if (c(left->m_v[l], right->m_v[0]))
+                    return 0;
+            }
+        }
 
         return ValueBase::elements; // no match
     }
@@ -719,6 +728,12 @@ public:
         set_table(table);
     }
 
+    explicit Columns(size_t column, const Table* table, std::vector<size_t> link_chain) : m_table(null_ptr), m_link_chain(link_chain)
+    {
+        m_column = column;
+        set_table(table);
+    }
+
     explicit Columns() : m_table(null_ptr) { }
 
     explicit Columns(size_t column) : m_table(null_ptr)
@@ -736,17 +751,19 @@ public:
         return m_table;
     }
 
-    virtual void evaluate(size_t index, ValueBase& destination)
+    virtual size_t evaluate(size_t index, ValueBase& destination)
     {
         static_cast<void>(index);
         static_cast<void>(destination);
         // String column conditions use fallback to old query_engine.hpp, hence bypassing all the query_expression.hpp
         // pathways like this method.
         TIGHTDB_ASSERT(false);
+        return 0;
     }
 
     const Table* m_table;
     size_t m_column;
+    std::vector<size_t> m_link_chain;
 };
 
 // String == Columns<String>
@@ -780,6 +797,12 @@ template <class T> class Columns : public Subexpr2<T>, public ColumnsBase
 {
 public:
     explicit Columns(size_t column, const Table* table) : m_table(null_ptr), sg(null_ptr)
+    {
+        m_column = column;
+        set_table(table);
+    }
+
+    explicit Columns(size_t column, const Table* table, size_t link_column) : m_table(null_ptr), sg(null_ptr), m_link_column(link_column)
     {
         m_column = column;
         set_table(table);
@@ -822,7 +845,13 @@ public:
     }
 
     // Load 8 elements from Column into destination
-    void evaluate(size_t index, ValueBase& destination) {
+    size_t evaluate(size_t index, ValueBase& destination) {
+        if (m_link_column != static_cast<size_t>(-1)) {
+
+            return 0;
+        }
+
+
         Value<T> v;
         sg->cache_next(index);
         size_t colsize = sg->m_column->size();
@@ -840,6 +869,7 @@ public:
                 v.m_v[t] = sg->get_next(index + t);
         }
         destination.import(v);
+        return 0;
     }
 
     // m_table is redundant with ColumnAccessorBase<>::m_table, but is in order to decrease class dependency/entanglement
@@ -847,6 +877,8 @@ public:
     size_t m_column;
 private:
     SequentialGetter<T>* sg;
+    const Table* m_link_table;
+    size_t m_link_column;
 };
 
 
@@ -876,12 +908,13 @@ public:
     }
 
     // destination = operator(left)
-    void evaluate(size_t index, ValueBase& destination) {
+    size_t evaluate(size_t index, ValueBase& destination) {
         Value<T> result;
         Value<T> left;
         m_left.evaluate(index, left);
         result.template fun<oper>(&left);
         destination.import(result);
+        return 0;
     }
 
 private:
@@ -930,7 +963,7 @@ public:
     }
 
     // destination = operator(left, right)
-    void evaluate(size_t index, ValueBase& destination) {
+    size_t evaluate(size_t index, ValueBase& destination) {
         Value<T> result;
         Value<T> left;
         Value<T> right;
@@ -938,6 +971,7 @@ public:
         m_right.evaluate(index, right);
         result.template fun<oper>(&left, &right);
         destination.import(result);
+        return 0;
     }
 
 private:

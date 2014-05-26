@@ -217,6 +217,23 @@ TEST(Query_NextGenSyntax)
 
     // Setup untyped table
     Table untyped;
+    Table untyped2;
+
+    
+    
+
+    untyped.link(3).column<Int>(2) == 53;
+
+
+//    untyped.link(3).column<Int>(3) > untyped.column<int>(1);
+   
+    // untyped.link(untyped2).column<Int>(3) > untyped.column<int>(1);
+
+
+
+
+
+
     untyped.add_column(type_Int, "firs1");
     untyped.add_column(type_Float, "second");
     untyped.add_column(type_Double, "third");
@@ -470,7 +487,7 @@ TEST(Query_NextGenSyntax)
     delete second2;
     delete first2;
 }
-/*
+
 TEST(Query_NextGenSyntaxMonkey0)
 {
     // Intended to test eval() for columns in query_expression.hpp which fetch 8 values at a time. This test varies
@@ -672,7 +689,7 @@ TEST(Query_NextGenSyntaxMonkey)
 
     }
 }
-*/
+
 
 TEST(Query_LimitUntyped)
 {
@@ -1532,7 +1549,7 @@ TEST(Query_LimitUntyped2)
     CHECK_EQUAL(1, cnt);
 }
 
-/*
+
 TEST(Query_StrIndexCrash)
 {
     // Rasmus "8" index crash
@@ -1567,7 +1584,7 @@ TEST(Query_StrIndexCrash)
         CHECK_EQUAL(eights, v.size());
     }
 }
-*/
+
 
 TEST(Query_TwoColsEqualVaryWidthAndValues)
 {
@@ -1765,7 +1782,7 @@ TEST(Query_TwoColsNoRows)
     CHECK_EQUAL(not_found, table.where().equal_int(size_t(0), size_t(1)).find());
     CHECK_EQUAL(not_found, table.where().not_equal_int(size_t(0), size_t(1)).find());
 }
-/*
+
 
 TEST(Query_Huge)
 {
@@ -1946,7 +1963,7 @@ TEST(Query_Huge)
     }
 }
 
-*/
+
 
 TEST(Query_OnTableView)
 {

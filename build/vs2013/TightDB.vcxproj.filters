@@ -470,6 +470,9 @@
     <ClInclude Include="..\..\src\tightdb\unicode.hpp">
       <Filter>src\include</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\tightdb\impl\output_stream.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="pthreads">
