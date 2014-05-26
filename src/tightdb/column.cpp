@@ -686,6 +686,16 @@ struct AdjustLeafElem: Array::UpdateHandler {
 
 } // anonymous namespace
 
+void Column::move_assign(Column& column)
+{
+    TIGHTDB_ASSERT(&column.get_alloc() == &get_alloc());
+    // destroy() and detach() are redundant with the Array::move_assign(), but they exist for completeness to avoid
+    // bugs if Array::move_assign() should change behaviour (e.g. no longer call destroy_deep(), etc.).
+    destroy();
+    get_root_array()->move_assign(*column.get_root_array());
+    column.detach();
+}
+
 void Column::set(size_t ndx, int64_t value)
 {
     TIGHTDB_ASSERT(ndx < size());
