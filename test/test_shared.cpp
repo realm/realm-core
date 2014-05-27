@@ -82,6 +82,9 @@ TIGHTDB_TABLE_4(TestTableShared,
                 third,  Bool,
                 fourth, String)
 
+TIGHTDB_TABLE_1(TestTableInts,
+                first,  Int)
+
 } // anonymous namespace
 
 
@@ -963,7 +966,6 @@ TEST(Shared_WriterThreads)
         SharedGroup sg(path);
 
         const size_t thread_count = 10;
-
         // Create first table in group
         {
             WriteTransaction wt(sg);
@@ -2137,6 +2139,82 @@ TEST(Shared_Implicit_Transactions)
         delete repl2;
         delete repl;
         delete wlr;
+    }
+}
+
+namespace {
+void writer_thread(string path)
+{
+    Random random(random_int<unsigned long>());
+    
+    //Replication* repl = makeWriteLogCollector(path);
+    //SharedGroup sg(*repl);
+    SharedGroup sg(path);
+    srand(100);
+    for (int i=0; i<1000; i++)
+    {
+        WriteTransaction wt(sg);
+        TestTableInts::Ref tr = wt.get_table<TestTableInts>("table");
+
+        int idx = (tr->size()==0) ? 0 : (random.draw_int_mod(tr->size()));
+        cout << "size: " << tr->size() << " idx: " << idx << endl;
+/*
+        if (tr[idx].first == 42) {
+            tr[idx].second = tr[idx].second + 1;
+        }
+        else {
+            // tr->insert(idx, 0, 0);
+        }
+*/
+        tr->insert(idx,0);
+        wt.commit();
+    }
+    // delete repl;
+}
+
+}
+
+TEST(Shared_Implicit_Transactions_Multiple_Trackers)
+{
+    const int write_thread_count = 1;
+    SHARED_GROUP_TEST_PATH(path);
+    {
+/*
+        SharedGroup::TransactLogRegistry* wlr = getWriteLogs(path);
+        Replication* repl = makeWriteLogCollector(path);
+        SharedGroup sg(*repl);
+*/
+        {
+/*
+            WriteTransaction wt(sg);
+            TestTableInts::Ref tr = wt.get_table<TestTableInts>("table");
+            for (int i=0; i<200; i++)
+                tr->add_empty_row();
+            tr[100].first = 42;
+            wt.commit();
+*/
+        }
+        writer_thread(path);
+
+        Thread threads[write_thread_count];
+        for (int i = 0; i < write_thread_count; ++i)
+            threads[i].start(bind(&writer_thread, string(path)));
+
+        // Wait for all threads to complete
+        for (int i = 0; i < write_thread_count; ++i)
+            threads[i].join();
+/*
+        Replication* repl2 = makeWriteLogCollector(path);
+        SharedGroup sg2(*repl2);
+
+        //Group& g = const_cast<Group&>(sg.begin_read());
+
+        // cleanup
+        sg.end_read();
+        delete repl2;
+        delete repl;
+        delete wlr;
+*/
     }
 }
 #endif // ENABLE_REPLICATION

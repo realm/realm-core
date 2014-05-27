@@ -206,6 +206,8 @@ void WriteLogRegistry::cleanup()
             earliest = m_interests[i].last_seen_version;
         }
     }
+    // bail out early if no versions are registered
+    if (m_oldest_version == 0) return;
 
     // cleanup retained versions up to and including the earliest/oldest version seen by all
     size_t last_to_clean;
