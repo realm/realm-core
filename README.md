@@ -133,31 +133,31 @@ Here is a more comple set of build-related commands:
 
 
 
-Building for iPhone
--------------------
+Building for iOS
+----------------
 
 On Mac OS X it is possible to build a version of the TightDB core
 library for iOS (the iPhone OS). It requires that the iPhoneOS and
 iPhoneSimulator SDKs for Xcode are installed.
 
 Run the following command to build the TightDB core library for
-iPhone:
+iPhone/iOS:
 
     sh build.sh build-iphone
 
 This produces the following files and directories:
 
-    iphone-lib/include/
-    iphone-lib/libtightdb-ios.a
-    iphone-lib/libtightdb-ios-dbg.a
-    iphone-lib/tightdb-config
-    iphone-lib/tightdb-config-dbg
+    ../realm-objc/realm-core/include/
+    ../realm-objc/realm-core/libtightdb-ios.a
+    ../realm-objc/realm-core/libtightdb-ios-dbg.a
+    ../realm-objc/realm-core/tightdb-config
+    ../realm-objc/realm-core/tightdb-config-dbg
 
 The `include` directory holds a copy of the header files, which are
 identical to the ones installed by `sh build.sh install`. There are
 two versions of the static library, one that is compiled with
 optimization, and one that is compiled for debugging. Each one
-contains code compiled for both iPhone and for the iPhone
+contains code compiled for both iOS and for the iOS
 simulator. Each one also comes with a `config` program that can be
 used to enquire about required compiler and linker flags.
 
