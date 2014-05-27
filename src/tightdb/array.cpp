@@ -188,9 +188,10 @@ void Array::init_from_mem(MemRef mem) TIGHTDB_NOEXCEPT
 
     // Parse header
     m_is_inner_bptree_node = get_is_inner_bptree_node_from_header(header);
-    m_has_refs = get_hasrefs_from_header(header);
-    m_width    = get_width_from_header(header);
-    m_size     = get_size_from_header(header);
+    m_has_refs             = get_hasrefs_from_header(header);
+    m_context_flag         = get_context_flag_from_header(header);
+    m_width                = get_width_from_header(header);
+    m_size                 = get_size_from_header(header);
 
     // Capacity is how many items there are room for
     bool is_read_only = m_alloc.is_read_only(mem.m_ref);
@@ -298,8 +299,7 @@ MemRef Array::slice(size_t offset, size_t size, Allocator& target_alloc) const
     Array slice(target_alloc);
     _impl::DeepArrayDestroyGuard dg(&slice);
     Type type = get_type();
-    bool context_flag = get_context_flag();
-    slice.create(type, context_flag); // Throws
+    slice.create(type, m_context_flag); // Throws
     size_t begin = offset;
     size_t end   = offset + size;
     for (size_t i = begin; i != end; ++i) {
@@ -320,8 +320,7 @@ MemRef Array::slice_and_clone_children(size_t offset, size_t size, Allocator& ta
     Array slice(target_alloc);
     _impl::DeepArrayDestroyGuard dg(&slice);
     Type type = get_type();
-    bool context_flag = get_context_flag();
-    slice.create(type, context_flag); // Throws
+    slice.create(type, m_context_flag); // Throws
     _impl::DeepArrayRefDestroyGuard dg_2(target_alloc);
     size_t begin = offset;
     size_t end   = offset + size;
@@ -3678,16 +3677,13 @@ void elim_superfluous_bptree_root(Array* root, MemRef parent_mem,
             // This child is an inner node, and is the closest one to
             // the root that has more than one child, so make it the
             // new root.
-            if (ArrayParent* parent_of_root = root->get_parent()) {
-                size_t ndx_in_parent = root->get_ndx_in_parent();
-                parent_of_root->update_child_ref(ndx_in_parent, child_ref); // Throws
-            }
+            root->init_from_ref(child_ref);
+            root->update_parent(); // Throws
             // From this point on, the height reduction operation
             // cannot be aborted without leaking memory, so the rest
             // of the operation must proceed without throwing. This
             // includes retrocursive completion of earlier invocations
             // of this function.
-            root->init_from_ref(child_ref);
         }
         else {
             // This child is an inner node, but has itself just one
