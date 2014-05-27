@@ -324,7 +324,8 @@ public:
 private:
     SlabAlloc m_alloc;
 
-    // Underlying array structure.
+    // Underlying array structure. Third slot in m_top is the "logical file
+    // size".
     Array m_top;
     Array m_tables;            // 2nd slot in m_top
     ArrayString m_table_names; // 1st slot in m_top

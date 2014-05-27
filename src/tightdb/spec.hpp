@@ -108,7 +108,7 @@ private:
     // FIXME: Rename `m_spec` to `m_types`.
     Array m_top;
     Array m_spec;        // 1st slot in m_top
-    ArrayString m_names; // 2sn slot in m_top
+    ArrayString m_names; // 2nd slot in m_top
     Array m_attr;        // 3rd slot in m_top
     Array m_subspecs;    // 4th slot in m_top (optional)
     Array m_enumkeys;    // 5th slot in m_top (optional)

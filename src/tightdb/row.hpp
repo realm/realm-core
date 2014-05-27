@@ -38,7 +38,7 @@ template<class> class BasicRow;
 ///
 ///     table[i].get_int(j) == table.get_int(i,j)
 ///
-/// \tparam T A const or non-const table type (currebntly either `Table` or
+/// \tparam T A const or non-const table type (currently either `Table` or
 /// `const Table`).
 ///
 /// \tparam R A specific row accessor class (BasicRow or BasicRowExpr) providing
@@ -148,8 +148,8 @@ protected:
 /// For as long as it remains attached, a row accessor will keep the parent
 /// table accessor alive. In case the lifetime of the parent table is not
 /// managed by reference counting (such as when the table is an automatic
-/// variable on the stack), the descrution of the table will cause all remaining
-/// row accessors to be detached.
+/// variable on the stack), the destruction of the table will cause all
+/// remaining row accessors to be detached.
 ///
 /// While attached, a row accessor is bound to a particular row of the parent
 /// table. If that row is removed, the accesssor becomes detached. If rows are
