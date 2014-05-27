@@ -113,7 +113,7 @@ inline size_t ColumnLinkList::get_link_count(std::size_t row_ndx) const TIGHTDB_
     return ColumnBase::get_size_from_ref(ref, get_alloc());
 }
 
-Column ColumnLinkList::get_ref_column(std::size_t row_ndx)
+inline Column ColumnLinkList::get_ref_column(std::size_t row_ndx)
 {
     ref_type ref = Column::get_as_ref(row_ndx);
     TIGHTDB_ASSERT(ref != 0);
