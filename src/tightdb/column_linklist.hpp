@@ -39,6 +39,8 @@ public:
     bool   has_links(std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
     size_t get_link_count(std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
 
+    Column get_ref_column(std::size_t row_ndx);
+
     // Manual link manipulation methods. These should be replaced
     // with just returning a LinkView class.
     size_t get_link(std::size_t row_ndx, std::size_t link_ndx) const TIGHTDB_NOEXCEPT;
@@ -109,6 +111,14 @@ inline size_t ColumnLinkList::get_link_count(std::size_t row_ndx) const TIGHTDB_
         return 0;
     }
     return ColumnBase::get_size_from_ref(ref, get_alloc());
+}
+
+Column ColumnLinkList::get_ref_column(std::size_t row_ndx)
+{
+    ref_type ref = Column::get_as_ref(row_ndx);
+    TIGHTDB_ASSERT(ref != 0);
+
+    return Column(ref, this, row_ndx, get_alloc());
 }
 
 inline size_t ColumnLinkList::get_link(std::size_t row_ndx, std::size_t link_ndx) const TIGHTDB_NOEXCEPT
