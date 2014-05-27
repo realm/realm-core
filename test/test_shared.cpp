@@ -2502,8 +2502,4 @@ TEST(Shared_ArrayEraseBug)
     }
 }
 
-<<<<<<< HEAD
-
-=======
->>>>>>> cf9b6b4896ffcceed1189e64b8d452f66a780539
 #endif // TEST_SHARED
