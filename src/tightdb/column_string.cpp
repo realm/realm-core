@@ -675,7 +675,7 @@ size_t AdaptiveStringColumn::find_first(StringData value, size_t begin, size_t e
 }
 
 
-void AdaptiveStringColumn::find_all(Array& result, StringData value, size_t begin, size_t end) const
+void AdaptiveStringColumn::find_all(Column& result, StringData value, size_t begin, size_t end) const
 {
     TIGHTDB_ASSERT(begin <= size());
     TIGHTDB_ASSERT(end == npos || (begin <= end && end <= size()));

@@ -392,7 +392,7 @@ TEST(ColumnString_Basic)
     c.clear();
 
     {
-        Array col;
+        Column col;
 
         c.add("40 chars  40 chars  40 chars  40 chars  ");
         c.add("baz");
@@ -412,7 +412,7 @@ TEST(ColumnString_Basic)
     c.clear();
 
     {
-        Array col;
+        Column col;
 
         c.add("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ");
         c.add("baz");
@@ -557,7 +557,7 @@ TEST(ColumnString_AutoEnumerateIndex)
     size_t res1 = e.find_first("nonexist");
     CHECK_EQUAL(not_found, res1);
 
-    Array results;
+    Column results;
     e.find_all(results, "nonexist");
     CHECK(results.is_empty());
 
@@ -659,7 +659,7 @@ TEST(ColumnString_AutoEnumerateIndexReuse)
 TEST(ColumnString_FindAllExpand)
 {
     AdaptiveStringColumn asc;
-    Array c;
+    Column c;
 
     asc.add("HEJ");
     asc.add("sdfsd");
@@ -703,7 +703,7 @@ TEST(ColumnString_FindAllExpand)
 TEST(ColumnString_FindAllRangesLong)
 {
     AdaptiveStringColumn asc;
-    Array c;
+    Column c;
 
     // 17 elements, to test node splits with TIGHTDB_MAX_LIST_SIZE = 3 or other small number
     asc.add("HEJSA"); // 0
@@ -757,7 +757,7 @@ TEST(ColumnString_FindAllRangesLong)
 TEST(ColumnString_FindAllRanges)
 {
     AdaptiveStringColumn asc;
-    Array c;
+    Column c;
 
     // 17 elements, to test node splits with TIGHTDB_MAX_LIST_SIZE = 3 or other small number
     asc.add("HEJSA"); // 0

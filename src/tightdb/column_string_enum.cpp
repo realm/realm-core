@@ -128,7 +128,7 @@ size_t ColumnStringEnum::count(StringData value) const
     return Column::count(key_ndx);
 }
 
-void ColumnStringEnum::find_all(Array& res, StringData value, size_t begin, size_t end) const
+void ColumnStringEnum::find_all(Column& res, StringData value, size_t begin, size_t end) const
 {
     if (m_index && begin == 0 && end == size_t(-1))
         return m_index->find_all(res, value);
@@ -139,7 +139,7 @@ void ColumnStringEnum::find_all(Array& res, StringData value, size_t begin, size
     Column::find_all(res, key_ndx, begin, end);
 }
 
-void ColumnStringEnum::find_all(Array& res, size_t key_ndx, size_t begin, size_t end) const
+void ColumnStringEnum::find_all(Column& res, size_t key_ndx, size_t begin, size_t end) const
 {
     if (key_ndx == size_t(-1))
         return;

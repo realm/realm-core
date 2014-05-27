@@ -406,14 +406,14 @@ void BasicArray_Find(TestResults& test_results)
     CHECK_EQUAL(4,          f.find_first(T(1.1), 1, 5));    // skip first match, end at last match
 
     // Find all
-    Array res_arr;
-    f.find_all(res_arr, T(1.1), 0);
+    Column res_arr;
+    f.find_all(&res_arr, T(1.1), 0);
     CHECK_EQUAL(2, res_arr.size());
     CHECK_EQUAL(0, res_arr.get(0));
     CHECK_EQUAL(4, res_arr.get(1));
     // Find all, range limited -> no match
     res_arr.clear();
-    f.find_all(res_arr, T(1.1), 0, 1, 4);
+    f.find_all(&res_arr, T(1.1), 0, 1, 4);
     CHECK_EQUAL(0, res_arr.size());
     res_arr.destroy();
 
