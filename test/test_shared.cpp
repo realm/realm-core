@@ -2148,75 +2148,103 @@ namespace {
 void writer_thread(string path)
 {
     Random random(random_int<unsigned long>());
-    
-    //Replication* repl = makeWriteLogCollector(path);
-    //SharedGroup sg(*repl);
-    SharedGroup sg(path);
-    srand(100);
-    for (int i=0; i<1000; i++)
+    Replication* repl = makeWriteLogCollector(path);
+    SharedGroup sg(*repl);
+    for (int i=0; i<100; i++)
     {
         WriteTransaction wt(sg);
         TestTableInts::Ref tr = wt.get_table<TestTableInts>("table");
 
         int idx = (tr->size()==0) ? 0 : (random.draw_int_mod(tr->size()));
-        cout << "size: " << tr->size() << " idx: " << idx << endl;
-/*
+
         if (tr[idx].first == 42) {
-            tr[idx].second = tr[idx].second + 1;
+            // do nothing
         }
         else {
-            // tr->insert(idx, 0, 0);
+            tr->insert(idx, 0);
         }
-*/
-        tr->insert(idx,0);
         wt.commit();
     }
-    // delete repl;
+    delete repl;
+}
+
+void reader_thread(TestResults* test_results_ptr, string path)
+{
+    TestResults& test_results = *test_results_ptr;
+    Random random(random_int<unsigned long>());
+    
+    Replication* repl = makeWriteLogCollector(path);
+    SharedGroup::TransactLogRegistry* wlr = getWriteLogs(path);
+    SharedGroup sg(*repl);
+    Group& g = const_cast<Group&>(sg.begin_read());
+    TableRef tr = g.get_table("table");
+    Query q = tr->where().equal(0, 42);
+    int idx = q.find();
+    Row r = (*tr)[idx];
+    while (1)
+    {
+        int val = r.get_int(0);
+        if (val == 43) break;
+        CHECK_EQUAL(42, val);            
+        sg.advance_read(wlr);
+    }
+    sg.end_read();
+    delete wlr;
+    delete repl;
 }
 
 }
 
 TEST(Shared_Implicit_Transactions_Multiple_Trackers)
 {
-    const int write_thread_count = 1;
+    const int write_thread_count = 13;
+    const int read_thread_count = 1;
+
     SHARED_GROUP_TEST_PATH(path);
     {
-/*
-        SharedGroup::TransactLogRegistry* wlr = getWriteLogs(path);
         Replication* repl = makeWriteLogCollector(path);
         SharedGroup sg(*repl);
-*/
         {
-/*
             WriteTransaction wt(sg);
-            TestTableInts::Ref tr = wt.get_table<TestTableInts>("table");
+            TableRef tr = wt.get_table("table");
+            tr->add_column(type_Int, "first");
             for (int i=0; i<200; i++)
                 tr->add_empty_row();
-            tr[100].first = 42;
+            tr->set_int(0, 100, 42);
             wt.commit();
-*/
+
         }
-        writer_thread(path);
-
-        Thread threads[write_thread_count];
-        for (int i = 0; i < write_thread_count; ++i)
-            threads[i].start(bind(&writer_thread, string(path)));
-
-        // Wait for all threads to complete
+        Thread threads[write_thread_count + read_thread_count];
+        int i;
+        // SharedGroup::TransactLogRegistry* wlr = getWriteLogs(path);
+        for (i = 0; i < write_thread_count; ++i)
+            threads[i].start(bind(writer_thread, string(path)));
+        sched_yield();
+        for (i = 0; i < read_thread_count; ++i)
+            threads[write_thread_count + i].start(bind(reader_thread, &test_results, string(path)));
+ 
+        // Wait for all writer threads to complete
         for (int i = 0; i < write_thread_count; ++i)
             threads[i].join();
-/*
-        Replication* repl2 = makeWriteLogCollector(path);
-        SharedGroup sg2(*repl2);
 
-        //Group& g = const_cast<Group&>(sg.begin_read());
+        // signal to all readers to complete
+        {
+            std::cout << "Terminating" << std::endl;
+            WriteTransaction wt(sg);
+            TableRef tr = wt.get_table("table");
+            Query q = tr->where().equal(0, 42);
+            int idx = q.find();
+            tr->set_int(0, idx, 43);
+            wt.commit();
+        }
+        // Wait for all reader threads to complete
+        for (int i = 0; i < read_thread_count; ++i)
+            threads[write_thread_count + i].join();
 
         // cleanup
         sg.end_read();
-        delete repl2;
+        //delete wlr;
         delete repl;
-        delete wlr;
-*/
     }
 }
 #endif // ENABLE_REPLICATION
