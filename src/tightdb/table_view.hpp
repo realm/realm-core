@@ -53,6 +53,11 @@ public:
     BinaryData  get_binary(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
     Mixed       get_mixed(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
     DataType    get_mixed_type(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
+    std::size_t get_link(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
+    TableRef    get_link_target(std::size_t column_ndx) TIGHTDB_NOEXCEPT;
+
+    // Links
+    bool is_null_link(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
 
     // Subtables
     size_t      get_subtable_size(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
@@ -216,7 +221,10 @@ public:
     void set_binary(size_t column_ndx, size_t row_ndx, BinaryData value);
     void set_mixed(size_t column_ndx, size_t row_ndx, Mixed value);
     void set_subtable(size_t column_ndx,size_t row_ndx, const Table* table);
+    void set_link(std::size_t column_ndx, std::size_t row_ndx, std::size_t target_row_ndx);
     void add_int(size_t column_ndx, int64_t value);
+
+    void nullify_link(std::size_t column_ndx, std::size_t row_ndx);
 
     // Deleting
     void clear();
@@ -550,6 +558,27 @@ inline size_t TableViewBase::get_subtable_size(size_t column_ndx, size_t row_ndx
 
     const size_t real_ndx = size_t(m_refs.get(row_ndx));
     return m_table->get_subtable_size(column_ndx, real_ndx);
+}
+
+inline std::size_t TableViewBase::get_link(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Link);
+
+    const size_t real_ndx = size_t(m_refs.get(row_ndx));
+    return m_table->get_link(column_ndx, real_ndx);
+}
+
+inline TableRef TableViewBase::get_link_target(std::size_t column_ndx) TIGHTDB_NOEXCEPT
+{
+    return m_table->get_link_target(column_ndx);
+}
+
+inline bool TableViewBase::is_null_link(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Link);
+
+    const size_t real_ndx = size_t(m_refs.get(row_ndx));
+    return m_table->is_null_link(column_ndx, real_ndx);
 }
 
 
@@ -945,6 +974,20 @@ inline void TableView::set_subtable(size_t column_ndx, size_t row_ndx, const Tab
     TIGHTDB_ASSERT_INDEX_AND_TYPE_TABLE_OR_MIXED(column_ndx, row_ndx);
     const size_t real_ndx = size_t(m_refs.get(row_ndx));
     m_table->set_subtable(column_ndx, real_ndx, value);
+}
+
+inline void TableView::set_link(std::size_t column_ndx, std::size_t row_ndx, std::size_t target_row_ndx)
+{
+    TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Link);
+    const size_t real_ndx = size_t(m_refs.get(row_ndx));
+    m_table->set_link(column_ndx, real_ndx, target_row_ndx);
+}
+
+inline void TableView::nullify_link(std::size_t column_ndx, std::size_t row_ndx)
+{
+    TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Link);
+    const size_t real_ndx = size_t(m_refs.get(row_ndx));
+    m_table->nullify_link(column_ndx, real_ndx);
 }
 
 
