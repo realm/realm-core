@@ -381,16 +381,15 @@ private:
 
 // Implementation:
 
-inline void ColumnBase::detach(void)
+inline void ColumnBase::detach()
 {
     m_array->detach();
 }
 
-inline bool ColumnBase::is_attached(void)
+inline bool ColumnBase::is_attached()
 {
     return m_array->is_attached();
 }
-
 
 inline bool ColumnBase::is_string_col() const TIGHTDB_NOEXCEPT
 {

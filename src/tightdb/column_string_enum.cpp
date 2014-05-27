@@ -286,7 +286,7 @@ void ColumnStringEnum::refresh_after_advance_transact(size_t col_ndx, const Spec
         // could be as non-trivial as it is in the case of
         // ColumnBinary::refresh_after_advance_transact(). For that reason, the
         // current work-around is to simply recreate the search index.
-       bool use_workaround = true;
+        bool use_workaround = true;
         if (use_workaround) {
             delete m_index;
             m_index = 0;

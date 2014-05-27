@@ -215,52 +215,53 @@ bool ColumnSubtableParent::SubtableMap::adj_erase_row(size_t row_ndx) TIGHTDB_NO
 bool ColumnSubtableParent::SubtableMap::adj_move_last_over(size_t target_row_ndx,
                                                            size_t last_row_ndx) TIGHTDB_NOEXCEPT
 {
-    bool target_seen = false, last_seen = false;
+    // Search for either index in a tight loop for speed
+    bool last_seen = false;
     typedef entries::iterator iter;
     iter i = m_entries.begin(), end = m_entries.end();
     for (;;) {
         if (i == end)
             return false;
         if (i->m_subtable_ndx == target_row_ndx)
-            goto target; // Jump A
+            goto target;
         if (i->m_subtable_ndx == last_row_ndx)
-            goto last;   // Jump B
+            break;
         ++i;
     }
 
-  last:
+    // Move subtable accessor at `last_row_ndx`, then look for `target_row_ndx`
     i->m_subtable_ndx = target_row_ndx;
-    if (target_seen)
-        goto check_empty;
     for (;;) {
         ++i;
         if (i == end)
             return false;
-        if (i->m_subtable_ndx == target_row_ndx) {
-            last_seen = true; // Because of Jump B
-            goto target;
-        }
+        if (i->m_subtable_ndx == target_row_ndx)
+            break;
     }
+    last_seen = true;
 
+    // Detach and remove original subtable accessor at `target_row_ndx`, then
+    // look for `last_row_ndx
   target:
     {
         // Must hold a counted reference while detaching
         TableRef table(i->m_table);
         typedef _impl::TableFriend tf;
         tf::detach(*table);
-        *i = *--end; // Move last over in m_entries
+        // Delete entry by moving last over (faster and avoids invalidating
+        // iterators)
+        *i = *--end;
         m_entries.pop_back();
     }
-    if (last_seen)
-        goto check_empty;
-    for (;;) {
-        if (i == end)
-            break;
-        if (i->m_subtable_ndx == last_row_ndx) {
-            target_seen = true; // Because of Jump A
-            goto last;
+    if (!last_seen) {
+        for (;;) {
+            if (i == end)
+                goto check_empty;
+            if (i->m_subtable_ndx == last_row_ndx)
+                break;
+            ++i;
         }
-        ++i;
+        i->m_subtable_ndx = target_row_ndx;
     }
 
   check_empty:

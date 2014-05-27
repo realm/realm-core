@@ -381,23 +381,21 @@ public:
     void clear_subtable(std::size_t column_ndx, std::size_t row_ndx);
 
     //@{
-    /// If this accessor is attached to a subtable, then that subtable
-    /// has a parent table, and the subtable either resides in a
-    /// column of type `table` or of type `mixed` in that parent. In
-    /// that case get_parent_table() returns a reference to the
-    /// accessor assocaited with the parent, and get_index_in_parent()
-    /// returns the index of the row in which the subtable
-    /// resides. Otherwise, if this table is a group-level table,
-    /// get_parent_table() returns null and get_index_in_parent()
-    /// returns the index of this table within the group. Otherwise
-    /// this table is a free-standing table, get_parent_table()
-    /// returns null, and get_index_in_parent() returns tightdb::npos.
+    /// If this accessor is attached to a subtable, then that subtable has a
+    /// parent table, and the subtable either resides in a column of type
+    /// `table` or of type `mixed` in that parent. In that case
+    /// get_parent_table() returns a reference to the accessor associated with
+    /// the parent, and get_index_in_parent() returns the index of the row in
+    /// which the subtable resides. Otherwise, if this table is a group-level
+    /// table, get_parent_table() returns null and get_index_in_parent() returns
+    /// the index of this table within the group. Otherwise this table is a
+    /// free-standing table, get_parent_table() returns null, and
+    /// get_index_in_parent() returns tightdb::npos.
     ///
-    /// If this accessor is attached to a subtable, and \a
-    /// column_ndx_out is specified, then `*column_ndx_out` is set to
-    /// the index of the column of the parent table in which the
-    /// subtable resides. If this accessor is not attached to a
-    /// subtable, then `*column_ndx_out` will retain its original
+    /// If this accessor is attached to a subtable, and \a column_ndx_out is
+    /// specified, then `*column_ndx_out` is set to the index of the column of
+    /// the parent table in which the subtable resides. If this accessor is not
+    /// attached to a subtable, then `*column_ndx_out` will retain its original
     /// value upon return.
     TableRef get_parent_table(std::size_t* column_ndx_out = 0) TIGHTDB_NOEXCEPT;
     ConstTableRef get_parent_table(std::size_t* column_ndx_out = 0) const TIGHTDB_NOEXCEPT;
