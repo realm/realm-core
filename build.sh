@@ -608,20 +608,20 @@ EOF
 
    "build-ios-tgz")
         if [ "$OS" != "Darwin" ]; then
-            echo "tar.gz for iOS can only be generated under Mac OS X."
+            echo "tar.gz for iOS can only be generated under OS X."
             exit 0
         fi
 
         realm_version="$(sh build.sh get-version)"
         BASENAME="realm_core"
-	rm -rf "$BASENAME"
-	rm -f realm-core-ios-*.tgz
-	mkdir -p "$BASENAME/include"
-	mkdir -p "$BASENAME/lib"
-	cp "$IPHONE_DIR/libtightdb-ios.a" "$BASENAME/lib"
-	cp "$IPHONE_DIR/libtightdb-ios-dbg.a" "$BASENAME/lib"
-        cp -r "$IPHONE_DIR/include/"* "$BASENAME/include" 
-        tar czf realm-core-ios.tar.gz "$BASENAME"
+        rm -rf "$BASENAME" || exit 1
+        rm -f realm-core-ios-*.tgz || exit 1
+        mkdir -p "$BASENAME/include" || exit 1
+        mkdir -p "$BASENAME/lib" || exit 1
+        cp "$IPHONE_DIR/libtightdb-ios.a" "$BASENAME/lib" || exit 1
+        cp "$IPHONE_DIR/libtightdb-ios-dbg.a" "$BASENAME/lib" || exit 1
+        cp -r "$IPHONE_DIR/include/"* "$BASENAME/include" || exit 1
+        tar czf realm-core-ios.tar.gz "$BASENAME" || exit 1
         exit 0
         ;;
 
