@@ -34,7 +34,7 @@ PLATFORMS="iphone"
 
 IPHONE_EXTENSIONS="objc"
 IPHONE_PLATFORMS="iPhoneOS iPhoneSimulator"
-IPHONE_DIR="iphone-lib"
+IPHONE_DIR="../realm-objc/realm-core"
 
 ANDROID_DIR="android-lib"
 ANDROID_PLATFORMS="arm arm-v7a mips x86"
@@ -604,6 +604,25 @@ EOF
         temp_dir="$(mktemp -d /tmp/tightdb.build-android.XXXX)" || exit 1
         (cd "src/tightdb" && tar czf "$temp_dir/headers.tar.gz" $inst_headers) || exit 1
         (cd "$TIGHTDB_HOME/$ANDROID_DIR/include/tightdb" && tar xzmf "$temp_dir/headers.tar.gz") || exit 1
+        ;;
+
+   "build-ios-tgz")
+        if [ "$OS" != "Darwin" ]; then
+            echo "tar.gz for iOS can only be generated under Mac OS X."
+            exit 0
+        fi
+
+        realm_version="$(sh build.sh get-version)"
+        BASENAME="realm_core"
+	rm -rf "$BASENAME"
+	rm -f realm-core-ios-*.tgz
+	mkdir -p "$BASENAME/include"
+	mkdir -p "$BASENAME/lib"
+	cp "$IPHONE_DIR/libtightdb-ios.a" "$BASENAME/lib"
+	cp "$IPHONE_DIR/libtightdb-ios-dbg.a" "$BASENAME/lib"
+        cp -r "$IPHONE_DIR/include/"* "$BASENAME/include" 
+        tar czf realm-core-ios.tar.gz "$BASENAME"
+        exit 0
         ;;
 
    "build-ios-framework")
