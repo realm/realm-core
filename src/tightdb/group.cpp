@@ -720,6 +720,10 @@ public:
                 const char* data = m_logs_begin->data() + offset;
                 size_t size_2 = min(m_curr_buf_remaining_size, size);
                 m_curr_buf_remaining_size -= size_2;
+                // FIXME: Eliminate the need for copying by changing the API of
+                // Replication::InputStream such that blocks can be handed over
+                // without copying. This is a straight forward change, but the
+                // result is going to be more complicated and less conventional.
                 copy(data, data + size_2, buffer);
                 return size_2;
             }

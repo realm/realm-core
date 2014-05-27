@@ -1180,25 +1180,7 @@ void AdaptiveStringColumn::refresh_after_advance_transact(size_t col_ndx, const 
     if (m_index) {
         size_t ndx_in_parent = m_array->get_ndx_in_parent();
         m_index->get_root_array()->set_ndx_in_parent(ndx_in_parent + 1);
-        // FIXME: The cached root array needs to be refreshed; however, it is
-        // unkown to me (Kristian) whether the root node can change between
-        // different Array-like classes. If it can, then the refresh operation
-        // could be as non-trivial as it is in the case of
-        // ColumnBinary::refresh_after_advance_transact(). For that reason, the
-        // current work-around is to simply recreate the search index.
-        bool use_workaround = true;
-        if (use_workaround) {
-            delete m_index;
-            m_index = 0;
-            ref_type ref = m_index->get_root_array()->get_ref_from_parent();
-            ArrayParent* parent = m_index->get_root_array()->get_parent();
-            Allocator& alloc = m_array->get_alloc();
-            m_index = new StringIndex(ref, parent, ndx_in_parent+1, this,
-                                      &get_string, alloc); // Throws
-        }
-        else {
-            m_index->refresh_after_advance_transact(col_ndx, spec); // Throws
-        }
+        m_index->refresh_after_advance_transact(col_ndx, spec); // Throws
     }
 }
 
