@@ -455,15 +455,14 @@ std::size_t BasicColumn<T>::find_first(T value, std::size_t begin, std::size_t e
 }
 
 template<class T>
-void BasicColumn<T>::find_all(Array &result, T value, std::size_t begin, std::size_t end) const
+void BasicColumn<T>::find_all(Column &result, T value, std::size_t begin, std::size_t end) const
 {
     TIGHTDB_ASSERT(begin <= size());
     TIGHTDB_ASSERT(end == npos || (begin <= end && end <= size()));
 
     if (root_is_leaf()) {
         std::size_t leaf_offset = 0;
-        static_cast<BasicArray<T>*>(m_array)->
-            find_all(result, value, leaf_offset, begin, end); // Throws
+        static_cast<BasicArray<T>*>(m_array)->find_all(&result, value, leaf_offset, begin, end); // Throws
         return;
     }
 
@@ -480,7 +479,7 @@ void BasicColumn<T>::find_all(Array &result, T value, std::size_t begin, std::si
         std::size_t ndx_in_leaf = p.second;
         std::size_t leaf_offset = ndx_in_tree - ndx_in_leaf;
         std::size_t end_in_leaf = std::min(leaf.size(), end - leaf_offset);
-        leaf.find_all(result, value, leaf_offset, ndx_in_leaf, end_in_leaf); // Throws
+        leaf.find_all(&result, value, leaf_offset, ndx_in_leaf, end_in_leaf); // Throws
         ndx_in_tree = leaf_offset + end_in_leaf;
     }
 }

@@ -78,13 +78,13 @@ TEST_IF(ColumnLarge_Less, TEST_DURATION >= 2)
         Array a;
         for (size_t t = 0; t < LEN; t++)
             a.add(v[w]);
-
+        
         // to create at least 64 bytes of data (2 * 128-bit SSE chunks
         // + 64 bit chunk before and after + some unaligned data
         // before and after)
         size_t LEN2 = 64 * 8 / (a.get_width() == 0 ? 1 : a.get_width());
 
-        Array akku;
+        Column akku;
         QueryState<int64_t> state;
         state.m_state = int64_t(&akku);
 
@@ -268,7 +268,7 @@ TEST_IF(ColumnLarge_Monkey2, TEST_DURATION >= 2)
 
     Random random(seed);
     VerifiedInteger a(random);
-    Array res;
+    Column res;
 
     int trend = 5;
 

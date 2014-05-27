@@ -469,6 +469,7 @@ TEST(Query_NextGenSyntax)
     delete first2;
 }
 
+
 TEST(Query_NextGenSyntaxMonkey0)
 {
     // Intended to test eval() for columns in query_expression.hpp which fetch 8 values at a time. This test varies
@@ -1943,6 +1944,7 @@ TEST(Query_Huge)
         }
     }
 }
+
 
 TEST(Query_OnTableView)
 {

@@ -38,6 +38,7 @@ C++ (core)
 * Fixed bug in TableView::remove() causing crash or undefined behaviour.
 * Fixed bugs in Table::insert_column() and Table::remove_column() causing crash or undefined behaviour.
 * Fixed corruption bug when a string enumeration column follows a column with attached search index (index flavor mixup).
+* Fixed in Array::erase() causing crash in certain row insertion scenarios.
 
 ### API breaking changes:
 

@@ -47,7 +47,7 @@ public:
     void erase(std::size_t ndx);
     void clear();
     size_t find_first(int64_t value);
-    void find_all(Array &c, int64_t value, std::size_t start = 0, std::size_t end = -1);
+    void find_all(Column &c, int64_t value, std::size_t start = 0, std::size_t end = -1);
     std::size_t size();
     int64_t sum(std::size_t start = 0, std::size_t end = -1);
     int64_t maximum(std::size_t start = 0, std::size_t end = -1);

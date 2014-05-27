@@ -341,11 +341,6 @@ public:
     Query(const Query& q): Spec::template ColNames<QueryCol, Query*>(this), m_impl(q.m_impl) {}
     ~Query() TIGHTDB_NOEXCEPT {}
 
-    Query& tableview(const Array& arr) { m_impl.tableview(arr); return *this; }
-
-// Query& Query::tableview(const TableView& tv)
-// Query& Query::tableview(const Array &arr)
-
     Query& tableview(const typename BasicTable<Spec>::View& v)
     {
         m_impl.tableview(*v.get_impl());
