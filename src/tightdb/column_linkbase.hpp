@@ -17,31 +17,27 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_DATA_TYPE_HPP
-#define TIGHTDB_DATA_TYPE_HPP
+#ifndef TIGHTDB_COLUMN_LINKBASE_HPP
+#define TIGHTDB_COLUMN_LINKBASE_HPP
+
+#include <tightdb/table.hpp>
 
 namespace tightdb {
 
-// Note: Value assignments must be kept in sync with <tightdb/column_type.h>
-// Note: Value assignments must be kept in sync with <tightdb/c/data_type.h>
-// Note: Value assignments must be kept in sync with <tightdb/objc/type.h>
-// Note: Value assignments must be kept in sync with "com/tightdb/ColumnType.java"
-enum DataType {
-    type_Int        =  0,
-    type_Bool       =  1,
-    type_Float      =  9,
-    type_Double     = 10,
-    type_String     =  2,
-    type_Binary     =  4,
-    type_DateTime   =  7,
-    type_Table      =  5,
-    type_Mixed      =  6,
-    type_Link       = 12,
-    type_LinkList   = 13,
-    type_BackLink   = 14
+class ColumnBackLink;
+
+// Abstract base class for columns containing links
+class ColumnLinkBase
+{
+public:
+    virtual void set_target_table(TableRef table) = 0;
+    virtual TableRef get_target_table() = 0;
+    virtual void set_backlink_column(ColumnBackLink& backlinks) = 0;
+
+    virtual void do_nullify_link(std::size_t row_ndx, std::size_t old_target_row_ndx) = 0;
+    virtual void do_update_link(std::size_t row_ndx, std::size_t old_target_row_ndx, std::size_t new_target_row_ndx) = 0;
 };
 
+} //namespace tightdb
 
-} // namespace tightdb
-
-#endif // TIGHTDB_DATA_TYPE_HPP
+#endif //TIGHTDB_COLUMN_LINKBASE_HPP

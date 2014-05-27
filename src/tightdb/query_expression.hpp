@@ -247,11 +247,13 @@ template<class T> class Value : public ValueBase, public Subexpr2<T>
 public:
     Value() {
         ValueBase::m_rows = 8;
+        ValueBase::m_values = 8;
     }
 
     Value(T v)
     {
         ValueBase::m_rows = 8;
+        ValueBase::m_values = 8;
         std::fill(m_v, m_v + ValueBase::elements, v);
     }
 
@@ -329,14 +331,17 @@ public:
         }
         else if (left->m_rows == 1 && right->m_rows == 1) {
             // many-to-many not supported yet
+            TIGHTDB_ASSERT(false);
         }
         else if (left->m_rows == 1) {
+            TIGHTDB_ASSERT(false);
             for (size_t r = 0; r < left->ValueBase::m_values; r++) {
                 if (c(left->m_v[0], right->m_v[r]))
                     return 0;
             }
         }
         else if (right->m_rows == 1) {
+            TIGHTDB_ASSERT(false);
             for (size_t l = 0; l < left->ValueBase::m_values; l++) {
                 if (c(left->m_v[l], right->m_v[0]))
                     return 0;
@@ -722,13 +727,13 @@ template <class T> UnaryOperator<Pow<T> >& power (Subexpr2<T>& left) {
 template <> class Columns<StringData> : public Subexpr
 {
 public:
-    explicit Columns(size_t column, const Table* table) : m_table(null_ptr)
+    explicit Columns(size_t column, const Table* table) : m_table(null_ptr), m_link_column(static_cast<size_t>(-1))
     {
         m_column = column;
         set_table(table);
     }
 
-    explicit Columns(size_t column, const Table* table, std::vector<size_t> link_chain) : m_table(null_ptr), m_link_chain(link_chain)
+    explicit Columns(size_t column, const Table* table, size_t link_column) : m_table(null_ptr), m_link_column(link_column)
     {
         m_column = column;
         set_table(table);
@@ -763,7 +768,7 @@ public:
 
     const Table* m_table;
     size_t m_column;
-    std::vector<size_t> m_link_chain;
+    size_t m_link_column;
 };
 
 // String == Columns<String>
@@ -796,7 +801,7 @@ template <class T> Query operator != (const Columns<StringData>& left, T right) 
 template <class T> class Columns : public Subexpr2<T>, public ColumnsBase
 {
 public:
-    explicit Columns(size_t column, const Table* table) : m_table(null_ptr), sg(null_ptr)
+    explicit Columns(size_t column, const Table* table) : m_table(null_ptr), sg(null_ptr), m_link_column(static_cast<size_t>(-1))
     {
         m_column = column;
         set_table(table);
@@ -808,9 +813,9 @@ public:
         set_table(table);
     }
 
-    explicit Columns() : m_table(null_ptr), sg(null_ptr) { }
+    explicit Columns() : m_table(null_ptr), sg(null_ptr), m_link_column(static_cast<size_t>(-1)) { }
 
-    explicit Columns(size_t column) : m_table(null_ptr), m_column(column), sg(null_ptr) { }
+    explicit Columns(size_t column) : m_table(null_ptr), m_column(column), sg(null_ptr), m_link_column(static_cast<size_t>(-1)) { }
 
     ~Columns()
     {
@@ -847,10 +852,9 @@ public:
     // Load 8 elements from Column into destination
     size_t evaluate(size_t index, ValueBase& destination) {
         if (m_link_column != static_cast<size_t>(-1)) {
-
+            TIGHTDB_ASSERT(false);
             return 0;
         }
-
 
         Value<T> v;
         sg->cache_next(index);

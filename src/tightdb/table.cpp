@@ -18,8 +18,12 @@
 #include <tightdb/column_binary.hpp>
 #include <tightdb/column_table.hpp>
 #include <tightdb/column_mixed.hpp>
+#include <tightdb/column_link.hpp>
+#include <tightdb/column_linklist.hpp>
+#include <tightdb/column_backlink.hpp>
 #include <tightdb/index_string.hpp>
 #include <tightdb/group.hpp>
+#include <tightdb/link_view.hpp>
 #ifdef TIGHTDB_ENABLE_REPLICATION
 #  include <tightdb/replication.hpp>
 #endif
@@ -60,14 +64,141 @@ template<> struct ColumnTypeTraits3<DateTime> {
 
 // -- Table ---------------------------------------------------------------------------------
 
+LinkView Table::links(size_t link_column, size_t row_ndx)
+{
+    ColumnLinkList& column = get_column<ColumnLinkList, col_type_LinkList>(link_column);
+    LinkView lw(column);
+    return lw;
+}
 
 size_t Table::add_column(DataType type, StringData name, DescriptorRef* subdesc)
 {
     TIGHTDB_ASSERT(!has_shared_type());
-    get_descriptor()->add_column(type, name, subdesc); // Throws
-    return get_column_count() - 1;
+    return get_descriptor()->add_column(type, name, subdesc); // Throws
 }
 
+std::size_t Table::add_column_link(DataType type, StringData name, size_t target_table_ndx)
+{
+    TIGHTDB_ASSERT(type == type_Link || type == type_LinkList);
+
+    // links only work for top-level tables from groups
+    TIGHTDB_ASSERT(!has_shared_type());
+    TIGHTDB_ASSERT(get_parent_group());
+
+    DescriptorRef desc = get_descriptor();
+    size_t column_ndx = desc->add_column(type, name, 0); // Throws
+    m_spec.set_link_target_table(column_ndx, target_table_ndx);
+
+    // Create backlinks in target table
+    Table* target_table = get_parent_group()->get_table_by_ndx(target_table_ndx);
+    size_t current_table_ndx = get_index_in_parent();
+    target_table->create_backlinks_column(current_table_ndx, column_ndx);
+
+    if (type == type_Link) {
+        // Column needs target table to create accessors
+        ColumnLink& column = get_column<ColumnLink, col_type_Link>(column_ndx);
+        column.set_target_table(target_table->get_table_ref());
+        column.set_backlink_column(target_table->get_backlink_column(current_table_ndx, column_ndx));
+    }
+    else {
+        // Column needs target table to create accessors
+        ColumnLinkList& column = get_column<ColumnLinkList, col_type_LinkList>(column_ndx);
+        column.set_target_table(target_table->get_table_ref());
+        column.set_backlink_column(target_table->get_backlink_column(current_table_ndx, column_ndx));
+    }
+
+    return column_ndx;
+}
+
+void Table::create_backlinks_column(size_t source_table_ndx, size_t source_table_column_ndx)
+{
+    // links only work for top-level tables from groups
+    TIGHTDB_ASSERT(!has_shared_type());
+    TIGHTDB_ASSERT(get_parent_group());
+
+    DescriptorRef desc = get_descriptor();
+    size_t column_ndx = desc->add_column(type_BackLink, "", 0); // Throws
+    m_spec.set_link_target_table(column_ndx, source_table_ndx);
+    m_spec.set_backlink_source_column(column_ndx, source_table_column_ndx);
+
+    // Column needs source table to create accessors
+    Table* source_table = get_parent_group()->get_table_by_ndx(source_table_ndx);
+    ColumnBackLink& column = get_column<ColumnBackLink, col_type_BackLink>(column_ndx);
+    column.set_source_table(source_table->get_table_ref());
+
+    DataType col_type = source_table->get_column_type(source_table_column_ndx);
+    TIGHTDB_ASSERT(col_type == type_Link || col_type == type_LinkList);
+    if (col_type == type_Link) {
+        ColumnLink& source_column = source_table->get_column<ColumnLink, col_type_Link>(source_table_column_ndx);
+        column.set_source_column(source_column);
+    }
+    else  {
+        ColumnLinkList& source_column = source_table->get_column<ColumnLinkList, col_type_LinkList>(source_table_column_ndx);
+        column.set_source_column(source_column);
+    }
+}
+
+ColumnBackLink& Table::get_backlink_column(std::size_t source_table_ndx, std::size_t source_table_column_ndx) {
+    size_t column_ndx = m_spec.find_backlink_column(source_table_ndx, source_table_column_ndx);
+    return get_column<ColumnBackLink, col_type_BackLink>(column_ndx);
+}
+
+size_t Table::get_backlink_count(size_t row_ndx, size_t source_table_ndx, size_t source_column_ndx) const TIGHTDB_NOEXCEPT
+{
+    size_t column_ndx = m_spec.find_backlink_column(source_table_ndx, source_column_ndx);
+    const ColumnBackLink& column = get_column<ColumnBackLink, col_type_BackLink>(column_ndx);
+
+    return column.get_backlink_count(row_ndx);
+}
+
+size_t Table::get_backlink(size_t row_ndx, size_t source_table_ndx, size_t source_column_ndx, size_t backlink_ndx) const TIGHTDB_NOEXCEPT
+{
+    size_t column_ndx = m_spec.find_backlink_column(source_table_ndx, source_column_ndx);
+    const ColumnBackLink& column = get_column<ColumnBackLink, col_type_BackLink>(column_ndx);
+
+    return column.get_backlink(row_ndx, backlink_ndx);
+}
+
+void Table::initialize_link_targets()
+{
+    // links only work for top-level tables from groups
+    TIGHTDB_ASSERT(!has_shared_type());
+    TIGHTDB_ASSERT(get_parent_group());
+
+    DescriptorRef desc = get_descriptor();
+    Spec* spec = desc->m_spec;
+    size_t column_count = spec->get_column_count();
+    size_t current_table_ndx = get_index_in_parent();
+
+    for (size_t i = 0; i < column_count; ++i) {
+        ColumnType column_type = spec->get_real_column_type(i);
+
+        if (column_type == col_type_Link) {
+            // Get the target table from group
+            size_t target_table_ndx = spec->get_link_target_table(i);
+            Table* target_table = get_parent_group()->get_table_by_ndx(target_table_ndx);
+
+            // Set target table in column
+            ColumnLink& column = get_column<ColumnLink, col_type_Link>(i);
+            column.set_target_table(target_table->get_table_ref());
+            column.set_backlink_column(target_table->get_backlink_column(current_table_ndx, i));
+        }
+        else if (column_type == col_type_BackLink) {
+            // Get the source table from group
+            size_t source_table_ndx = spec->get_link_target_table(i);
+            Table* source_table = get_parent_group()->get_table_by_ndx(source_table_ndx);
+
+            // Get the columns the links originate from
+            size_t source_column_ndx = spec->get_backlink_source_column(i);
+            ColumnLink& source_column = source_table->get_column<ColumnLink, col_type_Link>(source_column_ndx);
+
+            // Set target table in column
+            ColumnBackLink& column = get_column<ColumnBackLink, col_type_BackLink>(i);
+            column.set_source_table(source_table->get_table_ref());
+            column.set_source_column(source_column);
+        }
+    }
+}
 
 void Table::insert_column(size_t column_ndx, DataType type, StringData name,
                           DescriptorRef* subdesc)
@@ -353,6 +484,23 @@ void Table::insert_root_column(size_t column_ndx, DataType type, StringData name
                 new_col.reset(new Column(ref, parent, ndx_in_parent, alloc)); // Throws
                 goto add;
             }
+            case type_Link: {
+                ref = ColumnLink::create(size(), alloc); // Throws
+                new_col.reset(new ColumnLink(ref, parent, ndx_in_parent, alloc)); // Throws
+                goto add;
+            }
+            case type_LinkList: {
+                ref = ColumnLinkList::create(size(), alloc); // Throws
+                new_col.reset(new ColumnLinkList(ref, parent, ndx_in_parent, alloc)); // Throws
+                goto add;
+            }
+            case type_BackLink: {
+                TIGHTDB_ASSERT(column_ndx == m_columns.size());
+
+                ref = ColumnBackLink::create(size(), alloc); // Throws
+                new_col.reset(new ColumnBackLink(ref, parent, ndx_in_parent, alloc)); // Throws
+                goto add;
+            }
             case type_Float:
                 ref = ColumnFloat::create(size(), alloc); // Throws
                 new_col.reset(new ColumnFloat(ref, parent, ndx_in_parent, alloc)); // Throws
@@ -391,7 +539,7 @@ void Table::insert_root_column(size_t column_ndx, DataType type, StringData name
             // C++11. Solve this by changing the type of
             // `Table::m_cols` to `std::vector<ColumnBase*>`. Also
             // change its name to `Table::m_column_accessors`.
-            m_cols.add(intptr_t(new_col.get())); // Throws
+            m_cols.insert(column_ndx, intptr_t(new_col.get())); // Throws
             new_col.release();
         }
         catch (...) {
@@ -403,6 +551,22 @@ void Table::insert_root_column(size_t column_ndx, DataType type, StringData name
         if (ref != 0)
             Array::destroy_deep(ref, alloc);
         throw;
+    }
+
+    // If we inserted before link columns, we have to update their
+    // backlinks to point to their new position
+    size_t columns_end = m_spec.get_public_column_count();
+    if (column_ndx+1 != columns_end && is_linkable()) {
+        size_t table_ndx = get_index_in_parent();
+        size_t first_moved_column = column_ndx+1;
+
+        for (size_t i = first_moved_column; i < columns_end; ++i) {
+            if (m_spec.get_real_column_type(i) == col_type_Link) {
+                ColumnLink& column = get_column<ColumnLink, col_type_Link>(i);
+                TableRef target_table = column.get_target_table();
+                target_table->update_backlink_column_ref(table_ndx, i-1, i);
+            }
+        }
     }
 }
 
@@ -545,6 +709,20 @@ void Table::create_columns()
                 new_col = c;
                 break;
             }
+            case type_Link: {
+                ColumnLink* c = new ColumnLink(alloc);
+                m_columns.add(c->get_ref());
+                c->set_parent(&m_columns, ref_pos);
+                new_col = c;
+                break;
+            }
+            case type_LinkList: {
+                ColumnLinkList* c = new ColumnLinkList(alloc);
+                m_columns.add(c->get_ref());
+                c->set_parent(&m_columns, ref_pos);
+                new_col = c;
+                break;
+            }
             case type_Float: {
                 ColumnFloat* c = new ColumnFloat(alloc);
                 m_columns.add(c->get_ref());
@@ -590,7 +768,10 @@ void Table::create_columns()
                 break;
             }
 
-            default:
+            case col_type_StringEnum:
+            case col_type_Reserved1:
+            case col_type_Reserved4:
+            case col_type_BackLink:
                 TIGHTDB_ASSERT(false);
         }
 
@@ -709,6 +890,28 @@ void Table::cache_columns()
                 Column* c = new Column(ref, &m_columns, ndx_in_parent, alloc);
                 col_size = c->size();
                 new_col = c;
+                break;
+            }
+            case type_Link: {
+                ColumnLink* c = new ColumnLink(ref, &m_columns, ndx_in_parent, alloc);
+                col_size = c->size();
+                new_col = c;
+                // set target table will be set by group after entire table has been created
+                break;
+            }
+            case type_LinkList: {
+                ColumnLinkList* c = new ColumnLinkList(ref, &m_columns, ndx_in_parent, alloc);
+                col_size = c->size();
+                new_col = c;
+                // set target table will be set by group after entire table has been created
+                break;
+            }
+            case type_BackLink: {
+                ColumnBackLink* c = new ColumnBackLink(ref, &m_columns, ndx_in_parent, alloc);
+                col_size = c->size();
+                new_col = c;
+
+                //source table will be set by group after entire table has been created
                 break;
             }
             case type_Float: {
@@ -938,17 +1141,17 @@ void Table::set_index(size_t column_ndx, bool update_spec)
 
 ColumnBase& Table::get_column_base(size_t ndx)
 {
-    TIGHTDB_ASSERT(ndx < get_column_count());
+    TIGHTDB_ASSERT(ndx < m_spec.get_column_count());
     instantiate_before_change();
-    TIGHTDB_ASSERT(m_cols.size() == get_column_count());
+    TIGHTDB_ASSERT(m_cols.size() == m_spec.get_column_count());
     return *reinterpret_cast<ColumnBase*>(m_cols.get(ndx));
 }
 
 
 const ColumnBase& Table::get_column_base(size_t ndx) const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(ndx < get_column_count());
-    TIGHTDB_ASSERT(m_cols.size() == get_column_count());
+    TIGHTDB_ASSERT(ndx < m_spec.get_column_count());
+    TIGHTDB_ASSERT(m_cols.size() == m_spec.get_column_count());
     return *reinterpret_cast<ColumnBase*>(m_cols.get(ndx));
 }
 
@@ -1017,6 +1220,10 @@ ref_type Table::create_column(DataType column_type, size_t size, Allocator& allo
             int_fast64_t value = 0;
             return Column::create(Array::type_Normal, size, value, alloc); // Throws
         }
+        case type_Link:
+            return ColumnLink::create(size, alloc); // Throws
+        case type_LinkList:
+            return ColumnLinkList::create(size, alloc); // Throws
         case type_Float:
             return ColumnFloat::create(size, alloc); // Throws
         case type_Double:
@@ -1027,9 +1234,11 @@ ref_type Table::create_column(DataType column_type, size_t size, Allocator& allo
             return ColumnBinary::create(size, alloc); // Throws
         case type_Table:
             return ColumnTable::create(size, alloc); // Throws
-        case type_Mixed: {
+        case type_Mixed:
             return ColumnMixed::create(size, alloc); // Throws
-        }
+        case type_BackLink:
+            TIGHTDB_ASSERT(false);
+            return 0;
     }
 
     TIGHTDB_ASSERT(false);
@@ -1181,7 +1390,7 @@ const ColumnMixed& Table::get_column_mixed(size_t ndx) const TIGHTDB_NOEXCEPT
 
 size_t Table::add_empty_row(size_t num_rows)
 {
-    size_t n = get_column_count();
+    size_t n = m_spec.get_column_count();
 
     TIGHTDB_ASSERT(n > 0);
 
@@ -1227,7 +1436,7 @@ void Table::insert_empty_row(size_t ndx, size_t num_rows)
 void Table::clear()
 {
     detach_views_except(NULL);
-    size_t n = get_column_count();
+    size_t n = m_spec.get_column_count();
     for (size_t i = 0; i != n; ++i) {
         ColumnBase& column = get_column_base(i);
         column.clear();
@@ -1245,7 +1454,7 @@ void Table::do_remove(size_t ndx)
     TIGHTDB_ASSERT(ndx < m_size);
     bool is_last = ndx == m_size - 1;
 
-    size_t n = get_column_count();
+    size_t n = m_spec.get_column_count();
     for (size_t i = 0; i != n; ++i) {
         ColumnBase& column = get_column_base(i);
         column.erase(ndx, is_last);
@@ -1260,13 +1469,22 @@ void Table::do_remove(size_t ndx)
 
 void Table::move_last_over(size_t ndx)
 {
-    TIGHTDB_ASSERT(ndx+1 < m_size);
+    TIGHTDB_ASSERT(ndx < m_size);
     detach_views_except(NULL);
 
-    size_t n = get_column_count();
-    for (size_t i = 0; i != n; ++i) {
-        ColumnBase& column = get_column_base(i);
-        column.move_last_over(ndx);
+    size_t n = m_spec.get_column_count();
+    if (ndx+1 == m_size) {
+        // if it is the last item, we can just remove it
+        for (size_t i = 0; i < n; ++i) {
+            ColumnBase& column = get_column_base(i);
+            column.erase(ndx, true);
+        }
+    }
+    else {
+        for (size_t i = 0; i < n; ++i) {
+            ColumnBase& column = get_column_base(i);
+            column.move_last_over(ndx);
+        }
     }
     --m_size;
 
@@ -1430,6 +1648,21 @@ void Table::clear_subtable(size_t col_idx, size_t row_idx)
 }
 
 
+Group* Table::get_parent_group() const TIGHTDB_NOEXCEPT
+{
+    if (!m_top.is_attached())
+        return NULL;
+    ArrayParent* array_parent = m_top.get_parent();
+    if (!array_parent)
+        return NULL;
+    if (!array_parent->is_parent_group())
+        return NULL;
+
+    Group* parent = static_cast<Group*>(array_parent);
+    return parent;
+}
+
+
 TableRef Table::get_parent_table() TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(is_attached());
@@ -1487,7 +1720,6 @@ void Table::add_int(size_t column_ndx, int64_t value)
         repl->add_int_to_column(this, column_ndx, value); // Throws
 #endif
 }
-
 
 bool Table::get_bool(size_t column_ndx, size_t ndx) const TIGHTDB_NOEXCEPT
 {
@@ -1755,6 +1987,9 @@ Mixed Table::get_mixed(size_t column_ndx, size_t ndx) const TIGHTDB_NOEXCEPT
         case type_Table:
             return Mixed::subtable_tag();
         case type_Mixed:
+        case type_Link:
+        case type_LinkList:
+        case type_BackLink:
             break;
     }
     TIGHTDB_ASSERT(false);
@@ -1804,6 +2039,9 @@ void Table::set_mixed(size_t column_ndx, size_t ndx, Mixed value)
             column.set_subtable(ndx, 0);
             break;
         case type_Mixed:
+        case type_Link:
+        case type_LinkList:
+        case type_BackLink:
             TIGHTDB_ASSERT(false);
             break;
     }
@@ -1848,6 +2086,9 @@ void Table::insert_mixed(size_t column_ndx, size_t ndx, Mixed value)
             column.insert_subtable(ndx, 0);
             break;
         case type_Mixed:
+        case type_Link:
+        case type_LinkList:
+        case type_BackLink:
             TIGHTDB_ASSERT(false);
             break;
     }
@@ -1858,10 +2099,207 @@ void Table::insert_mixed(size_t column_ndx, size_t ndx, Mixed value)
 #endif
 }
 
+size_t Table::get_link(size_t column_ndx, size_t ndx) const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(column_ndx < get_column_count());
+    TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_Link);
+    TIGHTDB_ASSERT(ndx < m_size);
+
+    const ColumnLink& column = get_column<ColumnLink, col_type_Link>(column_ndx);
+    return column.get_link(ndx);
+}
+
+TableRef Table::get_link_target(size_t column_ndx) TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(column_ndx < get_column_count());
+    TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_Link ||
+                   get_real_column_type(column_ndx) == col_type_LinkList);
+
+    if (get_real_column_type(column_ndx) == col_type_Link) {
+        ColumnLink& column = get_column<ColumnLink, col_type_Link>(column_ndx);
+        return column.get_target_table();
+    }
+    else {
+        ColumnLinkList& column = get_column<ColumnLinkList, col_type_LinkList>(column_ndx);
+        return column.get_target_table();
+    }
+}
+
+void Table::set_link(size_t column_ndx, size_t ndx, size_t target_row_ndx)
+{
+    TIGHTDB_ASSERT(column_ndx < get_column_count());
+    TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_Link);
+    TIGHTDB_ASSERT(ndx < m_size);
+
+    ColumnLink& column = get_column<ColumnLink, col_type_Link>(column_ndx);
+    column.set_link(ndx, target_row_ndx);
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    if (Replication* repl = get_repl())
+        repl->set_int(this, column_ndx, ndx, target_row_ndx); // Throws
+#endif
+}
+
+void Table::insert_link(size_t column_ndx, size_t ndx, size_t target_row_ndx)
+{
+    TIGHTDB_ASSERT(column_ndx < get_column_count());
+    TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_Link);
+    TIGHTDB_ASSERT(ndx == m_size); // can only append to unorded tables
+
+    ColumnLink& column = get_column<ColumnLink, col_type_Link>(column_ndx);
+    column.insert_link(ndx, target_row_ndx);
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    if (Replication* repl = get_repl())
+        repl->insert_int(this, column_ndx, ndx, target_row_ndx); // Throws
+#endif
+}
+
+bool Table::is_null_link(size_t column_ndx, size_t ndx) const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(column_ndx < get_column_count());
+    TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_Link);
+    TIGHTDB_ASSERT(ndx <= m_size);
+
+    const ColumnLink& column = get_column<ColumnLink, col_type_Link>(column_ndx);
+    return column.is_null_link(ndx);
+}
+
+void Table::nullify_link(size_t column_ndx, size_t ndx)
+{
+    TIGHTDB_ASSERT(column_ndx < get_column_count());
+    TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_Link);
+    TIGHTDB_ASSERT(ndx <= m_size);
+
+    ColumnLink& column = get_column<ColumnLink, col_type_Link>(column_ndx);
+    column.nullify_link(ndx);
+}
+
+void Table::insert_linklist(size_t column_ndx, size_t ndx)
+{
+    TIGHTDB_ASSERT(column_ndx < get_column_count());
+    TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_LinkList);
+    TIGHTDB_ASSERT(ndx == m_size); // can only append to unorded tables
+    (void)ndx;
+
+    ColumnLinkList& column = get_column<ColumnLinkList, col_type_LinkList>(column_ndx);
+    column.add();
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    if (Replication* repl = get_repl())
+        repl->insert_int(this, column_ndx, ndx, target_row_ndx); // Throws
+#endif
+}
+
+bool Table::linklist_has_links(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(column_ndx < get_column_count());
+    TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_LinkList);
+    TIGHTDB_ASSERT(row_ndx <= m_size);
+
+    const ColumnLinkList& column = get_column<ColumnLinkList, col_type_LinkList>(column_ndx);
+    return column.has_links(row_ndx);
+}
+
+size_t Table::get_link_count(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(column_ndx < get_column_count());
+    TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_LinkList);
+    TIGHTDB_ASSERT(row_ndx <= m_size);
+
+    const ColumnLinkList& column = get_column<ColumnLinkList, col_type_LinkList>(column_ndx);
+    return column.get_link_count(row_ndx);
+}
+
+void Table::linklist_add_link(size_t column_ndx, size_t row_ndx, size_t target_row_ndx)
+{
+    TIGHTDB_ASSERT(column_ndx < get_column_count());
+    TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_LinkList);
+    TIGHTDB_ASSERT(row_ndx <= m_size);
+
+    ColumnLinkList& column = get_column<ColumnLinkList, col_type_LinkList>(column_ndx);
+    column.add_link(row_ndx, target_row_ndx);
+}
+
+void Table::linklist_insert_link(size_t column_ndx, size_t row_ndx, size_t ins_pos, size_t target_row_ndx)
+{
+    TIGHTDB_ASSERT(column_ndx < get_column_count());
+    TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_LinkList);
+    TIGHTDB_ASSERT(row_ndx <= m_size);
+
+    ColumnLinkList& column = get_column<ColumnLinkList, col_type_LinkList>(column_ndx);
+    column.insert_link(row_ndx, ins_pos, target_row_ndx);
+}
+
+void Table::linklist_remove_link(size_t column_ndx, size_t row_ndx, size_t link_ndx)
+{
+    TIGHTDB_ASSERT(column_ndx < get_column_count());
+    TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_LinkList);
+    TIGHTDB_ASSERT(row_ndx <= m_size);
+
+    ColumnLinkList& column = get_column<ColumnLinkList, col_type_LinkList>(column_ndx);
+    column.remove_link(row_ndx, link_ndx);
+}
+
+void Table::linklist_remove_all_links(size_t column_ndx, size_t row_ndx)
+{
+    TIGHTDB_ASSERT(column_ndx < get_column_count());
+    TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_LinkList);
+    TIGHTDB_ASSERT(row_ndx <= m_size);
+
+    ColumnLinkList& column = get_column<ColumnLinkList, col_type_LinkList>(column_ndx);
+    column.remove_all_links(row_ndx);
+}
+
+void Table::linklist_set_link(size_t column_ndx, size_t row_ndx, size_t link_ndx, size_t target_row_ndx)
+{
+    TIGHTDB_ASSERT(column_ndx < get_column_count());
+    TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_LinkList);
+    TIGHTDB_ASSERT(row_ndx <= m_size);
+
+    ColumnLinkList& column = get_column<ColumnLinkList, col_type_LinkList>(column_ndx);
+    column.set_link(row_ndx, link_ndx, target_row_ndx);
+}
+
+void Table::linklist_move_link(std::size_t column_ndx, std::size_t row_ndx, std::size_t old_pos, std::size_t new_pos)
+{
+    TIGHTDB_ASSERT(column_ndx < get_column_count());
+    TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_LinkList);
+    TIGHTDB_ASSERT(row_ndx <= m_size);
+
+    ColumnLinkList& column = get_column<ColumnLinkList, col_type_LinkList>(column_ndx);
+    column.move_link(row_ndx, old_pos, new_pos);
+}
+
+size_t Table::linklist_get_link(size_t column_ndx, size_t row_ndx, size_t link_ndx) const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(column_ndx < get_column_count());
+    TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_LinkList);
+    TIGHTDB_ASSERT(row_ndx <= m_size);
+
+    const ColumnLinkList& column = get_column<ColumnLinkList, col_type_LinkList>(column_ndx);
+    return column.get_link(row_ndx, link_ndx);
+}
+
+
 void Table::insert_done()
 {
     detach_views_except(NULL);
     ++m_size;
+
+    // If the table has backlinks, the columns containing them will
+    // not be exposed to the users. So we have to manually extend them
+    // after inserts. Note that you can onlt have backlinks on unordered
+    // tables, so inserts will only be used for appends.
+    if (m_spec.has_backlinks()) {
+        size_t backlinks_start = m_spec.get_public_column_count();
+        size_t column_count = m_spec.get_column_count();
+
+        for (size_t i = backlinks_start; i < column_count; ++i) {
+            ColumnBackLink& column = get_column<ColumnBackLink, col_type_BackLink>(i);
+            column.add_row();
+        }
+    }
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
@@ -3056,12 +3494,25 @@ void Table::to_json_row(size_t row_ndx, ostream& out) const
                             break;
                         case type_Table:
                         case type_Mixed:
+                        case type_Link:
+                        case type_LinkList:
+                        case type_BackLink:
                             TIGHTDB_ASSERT(false);
                             break;
                     }
                 }
                 break;
             }
+            case type_Link:
+                // TODO: print entire linked row
+                out << "\"Link to: " << get_link(i, row_ndx) << "\"";
+                break;
+            case type_LinkList:
+                // TODO: print entire list of linked row
+                //out << "\"Link to: " << get_int(i, row_ndx) << "\"";
+                break;
+            case type_BackLink:
+                TIGHTDB_ASSERT(false);
         }
     }
     out << "}";
@@ -3213,11 +3664,20 @@ void Table::to_string_header(ostream& out, vector<size_t>& widths) const
                         }
                         case type_Table:
                         case type_Mixed:
+                        case type_Link:
+                        case type_LinkList:
+                        case type_BackLink:
                             TIGHTDB_ASSERT(false);
                             break;
                     }
                 }
                 break;
+            case type_Link:
+            case type_LinkList:
+                width = 5;
+                break;
+            case type_BackLink:
+                TIGHTDB_ASSERT(false);
         }
         // Set width to max of column name and the longest value
         size_t name_len = name.size();
@@ -3329,12 +3789,24 @@ void Table::to_string_row(size_t row_ndx, ostream& out, const vector<size_t>& wi
                             break;
                         case type_Table:
                         case type_Mixed:
+                        case type_Link:
+                        case type_LinkList:
+                        case type_BackLink:
                             TIGHTDB_ASSERT(false);
                             break;
                     }
                 }
                 break;
             }
+            case type_Link:
+                // TODO: print linked row
+                out << get_link(col, row_ndx);
+                break;
+            case type_LinkList:
+                // TODO: print number of links in list
+                break;
+            case type_BackLink:
+                TIGHTDB_ASSERT(false);
         }
     }
     out << "\n";

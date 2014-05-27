@@ -243,6 +243,7 @@ template<class Op> void col_type_deleg(Op& op, ColumnType type)
         case col_type_Int:
         case col_type_Bool:
         case col_type_DateTime:
+        case col_type_Link:
             op.template call<Column>();
             return;
         case col_type_String:
@@ -268,6 +269,8 @@ template<class Op> void col_type_deleg(Op& op, ColumnType type)
             return;
         case col_type_Reserved1:
         case col_type_Reserved4:
+        case col_type_LinkList:
+        case col_type_BackLink:
             break;
     }
     TIGHTDB_ASSERT(false);
@@ -856,12 +859,12 @@ void Column::move_last_over(size_t ndx)
     TIGHTDB_ASSERT(ndx+1 < size());
 
     size_t last_ndx = size() - 1;
-    int64_t v = get(last_ndx);
+    int64_t v = Column::get(last_ndx);
 
-    set(ndx, v); // Throws
+    Column::set(ndx, v); // Throws
 
     bool is_last = true;
-    erase(last_ndx, is_last); // Throws
+    Column::erase(last_ndx, is_last); // Throws
 }
 
 

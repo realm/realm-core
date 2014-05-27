@@ -186,6 +186,8 @@ public:
     // FIXME: Must be protected. Solve problem by having the Array constructor, that creates a new array, call it.
     virtual void update_child_ref(std::size_t child_ndx, ref_type new_ref) = 0;
 
+    virtual bool is_parent_group() const TIGHTDB_NOEXCEPT {return false;}
+
 protected:
     virtual ref_type get_child_ref(std::size_t child_ndx) const TIGHTDB_NOEXCEPT = 0;
 
