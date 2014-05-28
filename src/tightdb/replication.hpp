@@ -728,6 +728,12 @@ inline void Replication::mixed_cmd(Instruction instr, std::size_t col_ndx,
             return;
         case type_Mixed:
             break;
+        case type_Link:
+        case type_LinkList:
+        case type_BackLink:
+            // FIXME: Need to handle new link types here
+            TIGHTDB_ASSERT(false);
+            break;
     }
     TIGHTDB_ASSERT(false);
 }
@@ -1405,6 +1411,12 @@ inline void Replication::TransactLogParser::read_mixed(Mixed* mixed)
             return;
         }
         case type_Mixed:
+            break;
+        case type_Link:
+        case type_LinkList:
+        case type_BackLink:
+            // FIXME: Need to handle new link types here
+            TIGHTDB_ASSERT(false);
             break;
     }
     TIGHTDB_ASSERT(false);
