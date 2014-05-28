@@ -119,7 +119,7 @@ inline void ColumnLink::insert_link(std::size_t row_ndx, std::size_t target_row_
     m_backlinks->add_backlink(target_row_ndx, row_ndx);
 }
 
-    inline void ColumnLink::do_nullify_link(std::size_t row_ndx, std::size_t)
+inline void ColumnLink::do_nullify_link(std::size_t row_ndx, std::size_t)
 {
     Column::set(row_ndx, 0);
 }

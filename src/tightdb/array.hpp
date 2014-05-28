@@ -183,8 +183,6 @@ class ArrayParent
 public:
     virtual ~ArrayParent() TIGHTDB_NOEXCEPT {}
 
-    virtual bool is_parent_group() const TIGHTDB_NOEXCEPT {return false;}
-
 protected:
     virtual void update_child_ref(std::size_t child_ndx, ref_type new_ref) = 0;
 

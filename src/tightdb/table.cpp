@@ -123,7 +123,7 @@ std::size_t Table::add_column_link(DataType type, StringData name, size_t target
     TIGHTDB_ASSERT(get_parent_group());
 
     DescriptorRef desc = get_descriptor();
-    size_t column_ndx = desc->add_column(type, name, 0); // Throws
+    size_t column_ndx = desc->add_column(type, name); // Throws
     m_spec.set_link_target_table(column_ndx, target_table_ndx);
 
     // Create backlinks in target table
@@ -154,7 +154,7 @@ void Table::create_backlinks_column(size_t source_table_ndx, size_t source_table
     TIGHTDB_ASSERT(get_parent_group());
 
     DescriptorRef desc = get_descriptor();
-    size_t column_ndx = desc->add_column(type_BackLink, "", 0); // Throws
+    size_t column_ndx = desc->add_column(type_BackLink, ""); // Throws
     m_spec.set_link_target_table(column_ndx, source_table_ndx);
     m_spec.set_backlink_source_column(column_ndx, source_table_column_ndx);
 
@@ -166,21 +166,25 @@ void Table::create_backlinks_column(size_t source_table_ndx, size_t source_table
     DataType col_type = source_table->get_column_type(source_table_column_ndx);
     TIGHTDB_ASSERT(col_type == type_Link || col_type == type_LinkList);
     if (col_type == type_Link) {
-        ColumnLink& source_column = source_table->get_column<ColumnLink, col_type_Link>(source_table_column_ndx);
+        ColumnLink& source_column = source_table->get_column<ColumnLink,
+                                                             col_type_Link>(source_table_column_ndx);
         column.set_source_column(source_column);
     }
     else  {
-        ColumnLinkList& source_column = source_table->get_column<ColumnLinkList, col_type_LinkList>(source_table_column_ndx);
+        ColumnLinkList& source_column = source_table->get_column<ColumnLinkList,
+                                                                 col_type_LinkList>(source_table_column_ndx);
         column.set_source_column(source_column);
     }
 }
 
-ColumnBackLink& Table::get_backlink_column(std::size_t source_table_ndx, std::size_t source_table_column_ndx) {
+ColumnBackLink& Table::get_backlink_column(std::size_t source_table_ndx, std::size_t source_table_column_ndx)
+{
     size_t column_ndx = m_spec.find_backlink_column(source_table_ndx, source_table_column_ndx);
     return get_column<ColumnBackLink, col_type_BackLink>(column_ndx);
 }
 
-size_t Table::get_backlink_count(size_t row_ndx, size_t source_table_ndx, size_t source_column_ndx) const TIGHTDB_NOEXCEPT
+size_t Table::get_backlink_count(size_t row_ndx, size_t source_table_ndx, size_t source_column_ndx)
+    const TIGHTDB_NOEXCEPT
 {
     size_t column_ndx = m_spec.find_backlink_column(source_table_ndx, source_column_ndx);
     const ColumnBackLink& column = get_column<ColumnBackLink, col_type_BackLink>(column_ndx);
@@ -188,7 +192,8 @@ size_t Table::get_backlink_count(size_t row_ndx, size_t source_table_ndx, size_t
     return column.get_backlink_count(row_ndx);
 }
 
-size_t Table::get_backlink(size_t row_ndx, size_t source_table_ndx, size_t source_column_ndx, size_t backlink_ndx) const TIGHTDB_NOEXCEPT
+size_t Table::get_backlink(size_t row_ndx, size_t source_table_ndx, size_t source_column_ndx, size_t backlink_ndx)
+    const TIGHTDB_NOEXCEPT
 {
     size_t column_ndx = m_spec.find_backlink_column(source_table_ndx, source_column_ndx);
     const ColumnBackLink& column = get_column<ColumnBackLink, col_type_BackLink>(column_ndx);
@@ -1819,15 +1824,14 @@ void Table::clear_subtable(size_t col_ndx, size_t row_ndx)
 Group* Table::get_parent_group() const TIGHTDB_NOEXCEPT
 {
     if (!m_top.is_attached())
-        return NULL;
-    ArrayParent* array_parent = m_top.get_parent();
-    if (!array_parent)
-        return NULL;
-    if (!array_parent->is_parent_group())
-        return NULL;
+        return null_ptr;
 
-    Group* parent = static_cast<Group*>(array_parent);
-    return parent;
+    Parent* parent = static_cast<Parent*>(m_top.get_parent()); // ArrayParent guaranteed to be Table::Parent
+    if (!parent || !parent->is_parent_group())
+        return null_ptr;
+
+    Group* group = static_cast<Group*>(parent);
+    return group;
 }
 
 
@@ -2461,7 +2465,7 @@ void Table::insert_done()
 
     // If the table has backlinks, the columns containing them will
     // not be exposed to the users. So we have to manually extend them
-    // after inserts. Note that you can onlt have backlinks on unordered
+    // after inserts. Note that you can only have backlinks on unordered
     // tables, so inserts will only be used for appends.
     if (m_spec.has_backlinks()) {
         size_t backlinks_start = m_spec.get_public_column_count();

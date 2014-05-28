@@ -314,8 +314,8 @@ public:
     void        remove_last();
 
     /// Move the last row to the specified index. This overwrites the target row
-    /// and reduces the number of rows by one. The specified index must be
-    /// strictly less than `N-1`, where `N` is the number of rows in the table.
+    /// and reduces the number of rows by one. If the target row is the last one
+    /// it will just be deleted.
     void move_last_over(std::size_t target_row_ndx);
 
     // Insert row
@@ -426,12 +426,14 @@ public:
     /// the parent table in which the subtable resides. If this accessor is not
     /// attached to a subtable, then `*column_ndx_out` will retain its original
     /// value upon return.
-    bool is_linkable() const TIGHTDB_NOEXCEPT;
-    Group* get_parent_group() const TIGHTDB_NOEXCEPT;
     TableRef get_parent_table(std::size_t* column_ndx_out = 0) TIGHTDB_NOEXCEPT;
     ConstTableRef get_parent_table(std::size_t* column_ndx_out = 0) const TIGHTDB_NOEXCEPT;
     std::size_t get_index_in_parent() const TIGHTDB_NOEXCEPT;
     //@}
+
+    // Only top-level (with a group as parent) unordered tables are linkable
+    bool is_linkable() const TIGHTDB_NOEXCEPT;
+    Group* get_parent_group() const TIGHTDB_NOEXCEPT;
 
     // Aggregate functions
     std::size_t count_int(std::size_t column_ndx, int64_t value) const;
@@ -1013,6 +1015,10 @@ public:
 
 protected:
     virtual StringData get_child_name(std::size_t child_ndx) const TIGHTDB_NOEXCEPT;
+
+    /// Returns true if this parent is a Group (i.e. the child is a
+    /// top-level table.
+    virtual bool is_parent_group() const TIGHTDB_NOEXCEPT {return false;}
 
     /// If this table parent is a column of some parent table, then this
     /// function must return the pointer to the parent table, otherwise it must
