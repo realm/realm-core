@@ -612,8 +612,7 @@ void Table::insert_root_column(size_t column_ndx, DataType type, StringData name
     int ndx_in_parent_diff = 1;
     adjust_column_index(column_ndx+1, ndx_in_parent_diff);
 
-    // FIXME: PossibleLinkMergeConflict: Should we loop over columns twice?
-    // FIXME: PossibleLinkMergeConflict: What if the code below throws?
+    // FIXME: What if the code below throws?
 
     // If we inserted before link columns, we have to update their
     // backlinks to point to their new position

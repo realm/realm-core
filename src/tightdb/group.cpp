@@ -283,8 +283,6 @@ Table* Group::get_table_by_ndx(size_t ndx)
     return table;
 }
 
-
-// FIXME: PossibleLinkMergeConflict Group::create_new_table() was commented out in the links branch. Was there a good reason?
 ref_type Group::create_new_table(StringData name)
 {
     // FIXME: This function is exception safe under the assumption
