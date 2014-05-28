@@ -611,24 +611,6 @@ void Table::insert_root_column(size_t column_ndx, DataType type, StringData name
     // Update cached column indexes for subsequent column accessors
     int ndx_in_parent_diff = 1;
     adjust_column_index(column_ndx+1, ndx_in_parent_diff);
-
-    // FIXME: What if the code below throws?
-
-    // If we inserted before link columns, we have to update their
-    // backlinks to point to their new position
-    size_t columns_end = m_spec.get_public_column_count();
-    if (column_ndx+1 != columns_end && is_linkable()) {
-        size_t table_ndx = get_index_in_parent();
-        size_t first_moved_column = column_ndx+1;
-
-        for (size_t i = first_moved_column; i < columns_end; ++i) {
-            if (m_spec.get_real_column_type(i) == col_type_Link) {
-                ColumnLink& column = get_column<ColumnLink, col_type_Link>(i);
-                TableRef target_table = column.get_target_table();
-                target_table->update_backlink_column_ref(table_ndx, i-1, i);
-            }
-        }
-    }
 }
 
 
@@ -3520,6 +3502,16 @@ void Table::adjust_column_index(size_t column_ndx_begin, int ndx_in_parent_diff)
         ColumnBase* column = reinterpret_cast<ColumnBase*>(m_cols.get(col_ndx));
         column->get_root_array()->adjust_ndx_in_parent(ndx_in_parent_diff);
         column->update_column_index(col_ndx, m_spec);
+
+        // If we modified before link columns, we have to update their
+        // backlinks to point to their new position
+        ColumnType type = m_spec.get_real_column_type(col_ndx);
+        if (type == col_type_Link || type == col_type_LinkList) {
+            size_t table_ndx = get_index_in_parent();
+            ColumnLinkBase* col = static_cast<ColumnLinkBase*>(column);
+            TableRef target_table = col->get_target_table();
+            target_table->update_backlink_column_ref(table_ndx, col_ndx-ndx_in_parent_diff, col_ndx);
+        }
     }
 }
 

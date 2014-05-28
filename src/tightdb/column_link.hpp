@@ -33,7 +33,7 @@ namespace tightdb {
 ///
 /// The individual values in the column are row positions in the target
 /// table (offset with one to allow zero to indicate null links)
-class ColumnLink: public Column, public ColumnLinkBase {
+class ColumnLink: public ColumnLinkBase {
 public:
     ColumnLink(ref_type ref, ArrayParent* parent = 0, std::size_t ndx_in_parent = 0,
                     Allocator& alloc = Allocator::get_default()); // Throws
@@ -74,12 +74,12 @@ private:
 // Implementation
 
 inline ColumnLink::ColumnLink(ref_type ref, ArrayParent* parent, std::size_t ndx_in_parent, Allocator& alloc):
-    Column(ref, parent, ndx_in_parent, alloc), m_backlinks(null_ptr)
+    ColumnLinkBase(ref, parent, ndx_in_parent, alloc), m_backlinks(null_ptr)
 {
 }
 
 inline ColumnLink::ColumnLink(Allocator& alloc):
-    Column(alloc), m_backlinks(null_ptr)
+    ColumnLinkBase(alloc), m_backlinks(null_ptr)
 {
 }
 
