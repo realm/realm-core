@@ -67,7 +67,7 @@ const char* file_order[] = {
     "test_transactions*.cpp",
     "test_replication*.cpp",
 
-    "test_lang_bind.cpp",
+    "test_lang_bind_helper.cpp",
 
     "large_tests*.cpp"
 };
