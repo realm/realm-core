@@ -20,6 +20,8 @@
 #ifndef TIGHTDB_COMMIT_LOG_HPP
 #define TIGHTDB_COMMIT_LOG_HPP
 
+#ifdef TIGHTDB_ENABLE_REPLICATION
+
 #include <exception>
 
 #include <tightdb/replication.hpp>
@@ -43,5 +45,7 @@ Replication* makeWriteLogCollector(std::string filepath);
 
 
 } // namespace tightdb
+
+#endif // TIGHTDB_ENABLE_REPLICATION
 
 #endif // TIGHTDB_COMMIT_LOG_HPP

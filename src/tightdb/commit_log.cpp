@@ -27,6 +27,7 @@
 #include <tightdb/commit_log.hpp>
 
 #include <tightdb/replication.hpp>
+#ifdef TIGHTDB_ENABLE_REPLICATION
 
 namespace tightdb {
 
@@ -465,3 +466,4 @@ WriteLogCollector::WriteLogCollector(std::string database_name, WriteLogRegistry
 }
 
 } // namespace tightdb
+#endif // TIGHTDB_ENABLE_REPLICATION
