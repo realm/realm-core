@@ -1082,7 +1082,7 @@ void SharedGroup::end_read() TIGHTDB_NOEXCEPT
 }
 
 
-void SharedGroup::promote_to_write(TransactLogRegistry* write_logs)
+void SharedGroup::promote_to_write(TransactLogRegistry& write_logs)
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Reading);
 
@@ -1114,7 +1114,7 @@ void SharedGroup::promote_to_write(TransactLogRegistry* write_logs)
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
 
-void SharedGroup::advance_read(TransactLogRegistry* log_registry)
+void SharedGroup::advance_read(TransactLogRegistry& log_registry)
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Reading);
     TIGHTDB_ASSERT(!m_transactions_are_pinned);
@@ -1146,14 +1146,14 @@ void SharedGroup::advance_read(TransactLogRegistry* log_registry)
     UniquePtr<BinaryData[]> 
         logs(new BinaryData[m_readlock.m_version-old_readlock.m_version]); // Throws
 
-    log_registry->get_commit_entries(old_readlock.m_version, 
-                                     m_readlock.m_version, logs.get());
-
+    log_registry.get_commit_entries(old_readlock.m_version, 
+                                    m_readlock.m_version, logs.get());
+    
     m_group.advance_transact(m_readlock.m_top_ref, m_readlock.m_file_size, 
                              logs.get(),
                              logs.get() + (m_readlock.m_version-old_readlock.m_version)); // Throws
 
-    log_registry->release_commit_entries(m_readlock.m_version);
+    log_registry.release_commit_entries(m_readlock.m_version);
 }
 
 #endif // TIGHTDB_ENABLE_REPLICATION

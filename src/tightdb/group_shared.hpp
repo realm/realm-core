@@ -334,14 +334,14 @@ private:
     // Advance the current read transaction to include latest state.
     // All accessors are retained and synchronized to the new state
     // according to the (to be) defined operational transform.
-    void advance_read(TransactLogRegistry* write_logs);
+    void advance_read(TransactLogRegistry& write_logs);
 
     // Promote the current read transaction to a write transaction.
     // CAUTION: This also synchronizes with latest state of the database,
     // including synchronization of all accessors.
     // FIXME: A version of this which does NOT synchronize with latest
     // state will be made available later, once we are able to merge commits.
-    void promote_to_write(TransactLogRegistry* write_logs);
+    void promote_to_write(TransactLogRegistry& write_logs);
 
     // End the current write transaction and transition atomically into
     // a read transaction, WITHOUT synchronizing to external changes

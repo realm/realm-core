@@ -93,9 +93,8 @@ public:
     typedef SharedGroup::TransactLogRegistry TransactLogRegistry;
 
     /// Wrappers - forward calls to shared group. A bit like NSA. Circumventing privacy :-)
-    static void advance_read_transact(SharedGroup& sg, TransactLogRegistry& log_registry);
-    static void advance_read(SharedGroup& sg, TransactLogRegistry* write_logs);
-    static void promote_to_write(SharedGroup& sg, TransactLogRegistry* write_logs);
+    static void advance_read(SharedGroup& sg, TransactLogRegistry& write_logs);
+    static void promote_to_write(SharedGroup& sg, TransactLogRegistry& write_logs);
     static void commit_and_continue_as_read(SharedGroup& sg);
 
     friend class ReadTransaction;
@@ -230,20 +229,14 @@ inline void LangBindHelper::set_mixed_subtable(Table& parent, std::size_t col_nd
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
 
-inline void LangBindHelper::advance_read_transact(SharedGroup& sg,
-                                                  TransactLogRegistry& log_registry)
-{
-    sg.advance_read(&log_registry);
-}
-
 inline void LangBindHelper::advance_read(SharedGroup& sg,
-                                         TransactLogRegistry* log_registry)
+                                         TransactLogRegistry& log_registry)
 {
     sg.advance_read(log_registry);
 }
 
 inline void LangBindHelper::promote_to_write(SharedGroup& sg,
-                                             TransactLogRegistry* log_registry)
+                                             TransactLogRegistry& log_registry)
 {
     sg.promote_to_write(log_registry);
 }
