@@ -581,7 +581,7 @@ bool SlabAlloc::remap(size_t file_size)
     // free space information below, it would be more efficient to
     // start by erasing the free space information, then remap, then
     // rebuild the free space information. This way, Group::commit()
-    // and Group::update_from_shared() no longer have to call
+    // and Group::init_for_transact() no longer have to call
     // SlabAlloc::reset_free_space_tracking().
 
     void* addr =

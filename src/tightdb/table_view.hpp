@@ -23,12 +23,11 @@
 #include <iostream>
 
 #include <tightdb/table.hpp>
+#include <tightdb/column.hpp>
 
 namespace tightdb {
 
-
 using std::size_t;
-
 
 /// Common base class for TableView and ConstTableView.
 class TableViewBase {
@@ -100,6 +99,8 @@ public:
     // a runtime exception.
     void sort(size_t column_ndx, bool ascending = true);
 
+    void apply_same_order(TableViewBase& order);
+    
     // Simple pivot aggregate method. Experimental! Please do not
     // document method publicly.
     void aggregate(size_t group_by_column, size_t aggr_column,
@@ -113,11 +114,13 @@ public:
     void to_string(std::ostream&, std::size_t limit = 500) const;
     void row_to_string(std::size_t row_ndx, std::ostream&) const;
 
+    // todo, uninvestigated compiler error message if we make GetValue protected and declare Comparer friend
+    template <class T> T GetValue(size_t row, size_t column) const;
+
 protected:
     // Null if, and only if, the view is detached
     mutable TableRef m_table;
-    Array m_refs;
-    bool m_is_in_index_order;
+    Column m_refs;
 
     /// Construct null view (no memory allocated).
     TableViewBase();
@@ -135,8 +138,8 @@ protected:
 
     void move_assign(TableViewBase*) TIGHTDB_NOEXCEPT;
 
-    Array& get_ref_column() TIGHTDB_NOEXCEPT;
-    const Array& get_ref_column() const TIGHTDB_NOEXCEPT;
+    Column& get_ref_column() TIGHTDB_NOEXCEPT;
+    const Column& get_ref_column() const TIGHTDB_NOEXCEPT;
 
     template<class R, class V> static R find_all_integer(V*, std::size_t, int64_t);
     template<class R, class V> static R find_all_float(V*, std::size_t, float);
@@ -146,7 +149,7 @@ protected:
 private:
     void detach() const TIGHTDB_NOEXCEPT;
     std::size_t find_first_integer(std::size_t column_ndx, int64_t value) const;
-
+    template <class T> void sort(size_t column, bool ascending);
     friend class Table;
     friend class Query;
 };
@@ -159,7 +162,6 @@ inline void TableViewBase::detach() const TIGHTDB_NOEXCEPT
 
 
 class ConstTableView;
-
 
 
 /// A TableView gives read and write access to the parent table.
@@ -253,6 +255,7 @@ private:
     friend class Table;
     friend class Query;
     friend class TableViewBase;
+    friend class ListviewNode;
 };
 
 
@@ -331,20 +334,19 @@ inline std::size_t TableViewBase::get_source_ndx(std::size_t row_ndx) const TIGH
 }
 
 inline TableViewBase::TableViewBase():
-    m_refs(Allocator::get_default()), m_is_in_index_order(true)
+    m_refs(Allocator::get_default())
 {
 }
 
 inline TableViewBase::TableViewBase(Table* parent):
-    m_table(parent->get_table_ref()), m_is_in_index_order(true)
+    m_table(parent->get_table_ref())
 {
     parent->register_view(this);
 }
 
 inline TableViewBase::TableViewBase(const TableViewBase& tv):
     m_table(tv.m_table), 
-    m_refs(tv.m_refs, Allocator::get_default()),
-    m_is_in_index_order(tv.m_is_in_index_order)
+    m_refs(tv.m_refs)
 {
     if (m_table)
         m_table->register_view(this);
@@ -352,8 +354,7 @@ inline TableViewBase::TableViewBase(const TableViewBase& tv):
 
 inline TableViewBase::TableViewBase(TableViewBase* tv) TIGHTDB_NOEXCEPT:
     m_table(tv->m_table), 
-    m_refs(tv->m_refs), // Note: This is a moving copy
-    m_is_in_index_order(tv->m_is_in_index_order)
+    m_refs(tv->m_refs) // Note: This is a moving copy. It detaches m_refs, so no need for explicit detach later
 {
     if (m_table) {
         m_table->unregister_view(tv);
@@ -361,7 +362,6 @@ inline TableViewBase::TableViewBase(TableViewBase* tv) TIGHTDB_NOEXCEPT:
         m_table->register_view(this);
     }
     tv->m_table = TableRef();
-    tv->m_refs.detach();
 }
 
 inline TableViewBase::~TableViewBase() TIGHTDB_NOEXCEPT
@@ -392,20 +392,19 @@ inline void TableViewBase::move_assign(TableViewBase* tv) TIGHTDB_NOEXCEPT
         // the implementation of the "registry of views" in Table.
         m_table->register_view(this);
     }
+
     m_refs.move_assign(tv->m_refs);
-    m_is_in_index_order = tv->m_is_in_index_order;
 }
 
-inline Array& TableViewBase::get_ref_column() TIGHTDB_NOEXCEPT
+inline Column& TableViewBase::get_ref_column() TIGHTDB_NOEXCEPT
 {
     return m_refs;
 }
 
-inline const Array& TableViewBase::get_ref_column() const TIGHTDB_NOEXCEPT
+inline const Column& TableViewBase::get_ref_column() const TIGHTDB_NOEXCEPT
 {
     return m_refs;
 }
-
 
 
 #define TIGHTDB_ASSERT_COLUMN(column_ndx)                                   \

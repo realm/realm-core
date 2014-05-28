@@ -23,6 +23,7 @@
 #include <stdint.h>
 #include <cstdlib>
 #include <cstdlib> // size_t
+#include <algorithm>
 
 #ifdef _MSC_VER
 #  include <win32/types.h>
@@ -57,6 +58,8 @@
 #endif
 
 namespace tightdb {
+
+typedef bool(*StringCompareCallback)(const char* string1, const char* string2);
 
 extern signed char sse_support;
 extern signed char avx_support;

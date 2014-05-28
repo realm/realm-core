@@ -188,9 +188,10 @@ void Array::init_from_mem(MemRef mem) TIGHTDB_NOEXCEPT
 
     // Parse header
     m_is_inner_bptree_node = get_is_inner_bptree_node_from_header(header);
-    m_has_refs = get_hasrefs_from_header(header);
-    m_width    = get_width_from_header(header);
-    m_size     = get_size_from_header(header);
+    m_has_refs             = get_hasrefs_from_header(header);
+    m_context_flag         = get_context_flag_from_header(header);
+    m_width                = get_width_from_header(header);
+    m_size                 = get_size_from_header(header);
 
     // Capacity is how many items there are room for
     bool is_read_only = m_alloc.is_read_only(mem.m_ref);
@@ -298,8 +299,7 @@ MemRef Array::slice(size_t offset, size_t size, Allocator& target_alloc) const
     Array slice(target_alloc);
     _impl::DeepArrayDestroyGuard dg(&slice);
     Type type = get_type();
-    bool context_flag = get_context_flag();
-    slice.create(type, context_flag); // Throws
+    slice.create(type, m_context_flag); // Throws
     size_t begin = offset;
     size_t end   = offset + size;
     for (size_t i = begin; i != end; ++i) {
@@ -320,8 +320,7 @@ MemRef Array::slice_and_clone_children(size_t offset, size_t size, Allocator& ta
     Array slice(target_alloc);
     _impl::DeepArrayDestroyGuard dg(&slice);
     Type type = get_type();
-    bool context_flag = get_context_flag();
-    slice.create(type, context_flag); // Throws
+    slice.create(type, m_context_flag); // Throws
     _impl::DeepArrayRefDestroyGuard dg_2(target_alloc);
     size_t begin = offset;
     size_t end   = offset + size;
@@ -444,6 +443,10 @@ void Array::move_backward(size_t begin, size_t end, size_t dest_end)
     copy_backward(begin_2, end_2, dest_end_2);
 }
 
+void Array::add_to_column(Column* column, int64_t value) 
+{
+    column->add(value);
+}
 
 void Array::set(size_t ndx, int64_t value)
 {
@@ -654,15 +657,22 @@ void Array::set_all_to_zero()
 }
 
 
-// return first element E for which E >= target or return -1 if none. Array must be sorted
-size_t Array::FindGTE(int64_t target, size_t start) const
+// If indirection == null_ptr, then return lowest 'i' for which for which this->get(i) >= target or -1 if none. If
+// indirection == null_ptr then 'this' must be sorted increasingly.
+//
+// If indirection exists, then return lowest 'i' for which this->get(indirection->get(i)) >= target or -1 if none.
+// If indirection exists, then 'this' can be non-sorted, but 'indirection' must point into 'this' such that the values
+// pointed at are sorted increasingly
+//
+// This method is mostly used by query_engine to enumerate table row indexes in increasing order through a TableView
+size_t Array::FindGTE(int64_t target, size_t start, const Array* indirection) const
 {
 #if TIGHTDB_DEBUG
     // Reference implementation to illustrate and test behaviour
     size_t ref = 0;
     size_t idx;
     for (idx = start; idx < m_size; ++idx) {
-        if (get(idx) >= target) {
+        if (get(indirection ? indirection->get(idx) : idx) >= target) {
             ref = idx;
             break;
         }
@@ -679,12 +689,12 @@ size_t Array::FindGTE(int64_t target, size_t start) const
     }
 
     if (start + 2 < m_size) {
-        if (get(start) >= target) {
+        if (get(indirection ? to_size_t(indirection->get(start)) : start) >= target) {
             ret = start;
             goto exit;
         }
         ++start;
-        if (get(start) >= target) {
+        if (get(indirection ? to_size_t(indirection->get(start)) : start) >= target) {
             ret = start;
             goto exit;
         }
@@ -692,7 +702,7 @@ size_t Array::FindGTE(int64_t target, size_t start) const
     }
 
     // Todo, use templated get<width> from this point for performance
-    if (target > get(m_size - 1)) {
+    if (target > get(indirection ? to_size_t(indirection->get(m_size - 1)) : m_size - 1)) {
         ret = not_found;
         goto exit;
     }
@@ -701,7 +711,7 @@ size_t Array::FindGTE(int64_t target, size_t start) const
     add = 1;
 
     for (;;) {
-        if (start + add < m_size && get(start + add) < target)
+        if (start + add < m_size && get(indirection ? to_size_t(indirection->get(start + add)) : start + add) < target)
             start += add;
         else
             break;
@@ -723,7 +733,7 @@ size_t Array::FindGTE(int64_t target, size_t start) const
     orig_high = high;
     while (high - start > 1) {
         size_t probe = (start + high) / 2; // FIXME: Prone to overflow - see lower_bound() for a solution
-        int64_t v = get(probe);
+        int64_t v = get(indirection ? to_size_t(indirection->get(probe)) : probe);
         if (v < target)
             start = probe;
         else
@@ -1763,7 +1773,7 @@ void Array::sort()
 
 // Find max and min value, but break search if difference exceeds 'maxdiff' (in which case *min and *max is set to 0)
 // Useful for counting-sort functions
-template<size_t w>bool Array::MinMax(size_t from, size_t to, uint64_t maxdiff, int64_t *min, int64_t *max)
+template<size_t w>bool Array::MinMax(size_t from, size_t to, uint64_t maxdiff, int64_t *min, int64_t *max) const
 {
     int64_t min2;
     int64_t max2;
@@ -1801,18 +1811,15 @@ template<size_t w>bool Array::MinMax(size_t from, size_t to, uint64_t maxdiff, i
 
 // Take index pointers to elements as argument and sort the pointers according to values they point at. Leave m_array untouched. The ref array
 // is allowed to contain fewer elements than m_array.
-void Array::ReferenceSort(Array& ref)
+void Array::ReferenceSort(Array& ref) const
 {
     TIGHTDB_TEMPEX(ReferenceSort, m_width, (ref));
 }
 
-template<size_t w>void Array::ReferenceSort(Array& ref)
+template<size_t w>void Array::ReferenceSort(Array& ref) const
 {
     if (m_size < 2)
         return;
-
-    int64_t min;
-    int64_t max;
 
     // in avg case QuickSort is O(n*log(n)) and CountSort O(n + range), and memory usage is sizeof(size_t)*range for CountSort.
     // So we chose range < m_size as treshold for deciding which to use
@@ -1820,15 +1827,19 @@ template<size_t w>void Array::ReferenceSort(Array& ref)
     // If range isn't suited for CountSort, it's *probably* discovered very early, within first few values, in most practical cases,
     // and won't add much wasted work. Max wasted work is O(n) which isn't much compared to QuickSort.
 
+//    int64_t min;
+//    int64_t max;
 //  bool b = MinMax<w>(0, m_size, m_size, &min, &max); // auto detect
 //  bool b = MinMax<w>(0, m_size, -1, &min, &max); // force count sort
-    bool b = MinMax<w>(0, m_size, 0, &min, &max); // force quicksort
+//  bool b = MinMax<w>(0, m_size, 0, &min, &max); // force quicksort
 
+    /*
+    // Count sort disabled for simplicity/stability
     if (b) {
         Array res;
         Array count;
 
-        // Todo, Preset crashes for unknown reasons but would be faster.
+//        Todo, Preset crashes for unknown reasons but would be faster.
 //      res.Preset(0, m_size, m_size);
 //      count.Preset(0, m_size, max - min + 1);
 
@@ -1863,7 +1874,9 @@ template<size_t w>void Array::ReferenceSort(Array& ref)
         res.destroy();
         count.destroy();
     }
-    else {
+    else
+    */
+    {
         ReferenceQuickSort(ref);
     }
 }
@@ -1922,12 +1935,12 @@ template<size_t w> void Array::sort()
     return;
 }
 
-void Array::ReferenceQuickSort(Array& ref)
+void Array::ReferenceQuickSort(Array& ref) const
 {
     TIGHTDB_TEMPEX(ReferenceQuickSort, m_width, (0, m_size - 1, ref));
 }
 
-template<size_t w> void Array::ReferenceQuickSort(size_t lo, size_t hi, Array& ref)
+template<size_t w> void Array::ReferenceQuickSort(size_t lo, size_t hi, Array& ref) const
 {
     // Quicksort based on
     // http://www.inf.fh-flensburg.de/lang/algorithmen/sortieren/quick/quicken.htm
@@ -2713,7 +2726,7 @@ size_t Array::upper_bound_int(int64_t value) const TIGHTDB_NOEXCEPT
 }
 
 
-void Array::find_all(Array& result, int64_t value, size_t col_offset, size_t begin, size_t end) const
+void Array::find_all(Column* result, int64_t value, size_t col_offset, size_t begin, size_t end) const
 {
     TIGHTDB_ASSERT(begin <= size());
     TIGHTDB_ASSERT(end == npos || (begin <= end && end <= size()));
@@ -2725,9 +2738,7 @@ void Array::find_all(Array& result, int64_t value, size_t col_offset, size_t beg
         return; // FIXME: Why do we have to check and early-out here?
 
     QueryState<int64_t> state;
-    state.init(act_FindAll, &result, static_cast<size_t>(-1));
-//    state.m_state = reinterpret_cast<int64_t>(&result);
-
+    state.init(act_FindAll, result, static_cast<size_t>(-1));
     TIGHTDB_TEMPEX3(find, Equal, act_FindAll, m_width, (value, begin, end, col_offset, &state, CallbackDummy()));
 
     return;
@@ -2994,7 +3005,7 @@ top:
 }
 
 
-void Array::IndexStringFindAll(Array& result, StringData value, void* column, StringGetter get_func) const
+void Array::IndexStringFindAll(Column& result, StringData value, void* column, StringGetter get_func) const
 {
     StringData value_2 = value;
     const char* data = m_data;
@@ -3666,16 +3677,13 @@ void elim_superfluous_bptree_root(Array* root, MemRef parent_mem,
             // This child is an inner node, and is the closest one to
             // the root that has more than one child, so make it the
             // new root.
-            if (ArrayParent* parent_of_root = root->get_parent()) {
-                size_t ndx_in_parent = root->get_ndx_in_parent();
-                parent_of_root->update_child_ref(ndx_in_parent, child_ref); // Throws
-            }
+            root->init_from_ref(child_ref);
+            root->update_parent(); // Throws
             // From this point on, the height reduction operation
             // cannot be aborted without leaking memory, so the rest
             // of the operation must proceed without throwing. This
             // includes retrocursive completion of earlier invocations
             // of this function.
-            root->init_from_ref(child_ref);
         }
         else {
             // This child is an inner node, but has itself just one

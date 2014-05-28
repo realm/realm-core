@@ -23,7 +23,7 @@
 #include <stdint.h>
 #include <string>
 
-#include <tightdb/util/utf8.hpp>
+#include <tightdb/unicode.hpp>
 #include <tightdb/binary_data.hpp>
 
 namespace tightdb {
@@ -79,7 +79,7 @@ struct NotEqual {
 struct ContainsIns {
     bool operator()(StringData v1, const char* v1_upper, const char* v1_lower, StringData v2) const
     {
-        return util::search_case_fold(v2, v1_upper, v1_lower, v1.size()) != v2.size();
+        return search_case_fold(v2, v1_upper, v1_lower, v1.size()) != v2.size();
     }
     static const int condition = -1;
 };
@@ -88,7 +88,7 @@ struct ContainsIns {
 struct BeginsWithIns {
     bool operator()(StringData v1, const char* v1_upper, const char* v1_lower, StringData v2) const
     {
-        return v1.size() <= v2.size() && util::equal_case_fold(v2.prefix(v1.size()), v1_upper, v1_lower);
+        return v1.size() <= v2.size() && equal_case_fold(v2.prefix(v1.size()), v1_upper, v1_lower);
     }
     static const int condition = -1;
 };
@@ -97,7 +97,7 @@ struct BeginsWithIns {
 struct EndsWithIns {
     bool operator()(StringData v1, const char* v1_upper, const char* v1_lower, StringData v2) const
     {
-        return v1.size() <= v2.size() && util::equal_case_fold(v2.suffix(v1.size()), v1_upper, v1_lower);
+        return v1.size() <= v2.size() && equal_case_fold(v2.suffix(v1.size()), v1_upper, v1_lower);
     }
     static const int condition = -1;
 };
@@ -105,7 +105,7 @@ struct EndsWithIns {
 struct EqualIns {
     bool operator()(StringData v1, const char* v1_upper, const char* v1_lower, StringData v2) const
     {
-        return v1.size() == v2.size() && util::equal_case_fold(v2, v1_upper, v1_lower);
+        return v1.size() == v2.size() && equal_case_fold(v2, v1_upper, v1_lower);
     }
     static const int condition = -1;
 };
@@ -113,7 +113,7 @@ struct EqualIns {
 struct NotEqualIns {
     bool operator()(StringData v1, const char* v1_upper, const char* v1_lower, StringData v2) const
     {
-        return v1.size() != v2.size() || !util::equal_case_fold(v2, v1_upper, v1_lower);
+        return v1.size() != v2.size() || !equal_case_fold(v2, v1_upper, v1_lower);
     }
     static const int condition = -1;
 };

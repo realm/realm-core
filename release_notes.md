@@ -32,11 +32,13 @@ x.x.x Release notes (yyyy—MM-dd)    <<<------------ PLEASE NOTE, THIS IS THE N
 
 C++ (core)
 -----------
-Adding Table::get_index_in_parent() and Group::get_table(std::size_t table_ndx). They were needed for implicit transactions.
 
 ### Bugfixes:
 
-* Fixed bug in TableView::remove(), causing crash or undefined behaviour.
+* Fixed bug in TableView::remove() causing crash or undefined behaviour.
+* Fixed bugs in Table::insert_column() and Table::remove_column() causing crash or undefined behaviour.
+* Fixed corruption bug when a string enumeration column follows a column with attached search index (index flavor mixup).
+* Fixed in Array::erase() causing crash in certain row insertion scenarios.
 
 ### API breaking changes:
 
@@ -44,7 +46,8 @@ Adding Table::get_index_in_parent() and Group::get_table(std::size_t table_ndx).
 
 ### Enhancements:
 
-* `???`
+* Adding Table::get_index_in_parent() and Group::get_table(std::size_t table_ndx). They were needed for implicit transactions.
+* Table::get_parent_table() can now also return the index of the column in the parent.
 
 -----------
 
@@ -94,6 +97,10 @@ Format:
 + Added feature ....                     (user visible new feature     - passed on to release notes)
 - Removed/deprecated feature/method .... (user visible removed feature - passed on to release notes)
 . Any other notes ....                   (internal changes)
+
+
+2014-05-14 (Lasse Reinhold)
++ Lets you sort a TableView according to a Float, Double or String column (only integral column types possible before)
 
 
 2014-05-08 (Finn Schiermer Andersen)

@@ -208,10 +208,10 @@ Testing
 The core library comes with a suite of unite tests. You can run it in
 one of the following ways:
 
-    sh build.sh test
-    sh build.sh test-debug
-    sh build.sh memtest
-    sh build.sh memtest-debug
+    sh build.sh check
+    sh build.sh check-debug
+    sh build.sh memcheck
+    sh build.sh memcheck-debug
 
 The `mem` versions will run the suite inside Valgrind.
 
@@ -221,8 +221,8 @@ customize the execution. For example, here is how to run only the
 tests whose names start with `Foo`, except `Foo2` and those whose
 names end with an `X`:
 
-    UNITTEST_FILTER="Foo Bar*" sh build.sh test-debug
-    UNITTEST_FILTER="Foo* - Foo2 *X" sh build.sh test-debug
+    UNITTEST_FILTER="Foo Bar*" sh build.sh check-debug
+    UNITTEST_FILTER="Foo* - Foo2 *X" sh build.sh check-debug
 
 These are the available variables:
 
@@ -238,10 +238,10 @@ These are the available variables:
  - If you set `UNITTEST_SHUFFLE` to a non-empty value, the tests will
    be executed in a random order. This requires, of course, that all
    executed tests are independant of each other. Note that unless you
-   also set `UNITTEST_REANDOM_SEED=random`, you will get the same
+   also set `UNITTEST_RANDOM_SEED=random`, you will get the same
    random order in each sucessive run.
 
- - You may set `UNITTEST_REANDOM_SEED` to `random` or to some unsigned
+ - You may set `UNITTEST_RANDOM_SEED` to `random` or to some unsigned
    integer (at least 32 bits will be accepted). If you specify
    `random`, the global pseudorandom number generator will be seeded
    with a nondeterministic value (one that generally will be different
@@ -270,6 +270,25 @@ nonempty value during configuration as in the following example:
 
     TIGHTDB_ENABLE_ALLOC_SET_ZERO=1 sh build.sh config
 
+
+Packaging for OS X
+-------------------
+
+You can create a framework for Mac OS X after you have built the
+core library (the `build` target). The framework is useful when
+creating OS X application. The command is:
+
+    sh build.sh build-osx-framework
+
+
+Packaging for iOS
+-----------------
+
+You can create a framework for iOS after you have built the core
+library for iOS (the `build-iphone` target=. The framework is useful when
+creating apps for iPhone and iPad. The command is:
+
+    sh build.sh build-ios-framework
 
 
 Packaging for Debian/Ubuntu

@@ -436,7 +436,7 @@ TEST(ArrayString_Basic)
 
     c.clear();
 
-    Array col;
+    Column col;
 
     // first, middle and end
     c.add("foobar");

@@ -307,7 +307,7 @@ size_t ArrayString::find_first(StringData value, size_t begin, size_t end) const
     return not_found;
 }
 
-void ArrayString::find_all(Array& result, StringData value, size_t add_offset,
+void ArrayString::find_all(Column& result, StringData value, size_t add_offset,
                            size_t begin, size_t end)
 {
     size_t begin_2 = begin;

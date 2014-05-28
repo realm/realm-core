@@ -54,7 +54,7 @@ namespace {
 void has_zero_byte(TestResults& test_results, int64_t value, size_t reps)
 {
     Array a;
-    Array r;
+    Column r;
 
     for (size_t i = 0; i < reps - 1; ++i)
         a.add(value);
@@ -65,7 +65,7 @@ void has_zero_byte(TestResults& test_results, int64_t value, size_t reps)
     CHECK_EQUAL(a.size() - 1, t);
 
     r.clear();
-    a.find_all(r, 0);
+    a.find_all(&r, 0);
     CHECK_EQUAL(int64_t(a.size() - 1), r.get(0));
 
     // Cleanup
@@ -614,7 +614,7 @@ TEST(Array_Sort)
 TEST(Array_FindAllInt0)
 {
     Array a;
-    Array r;
+    Column r;
 
     const int value = 0;
     const int vReps = 5;
@@ -623,7 +623,7 @@ TEST(Array_FindAllInt0)
         a.add(0);
     }
 
-    a.find_all(r, value);
+    a.find_all(&r, value);
     CHECK_EQUAL(vReps, r.size());
 
     size_t i = 0;
@@ -642,7 +642,7 @@ TEST(Array_FindAllInt0)
 TEST(Array_FindAllInt1)
 {
     Array a;
-    Array r;
+    Column r;
 
     const int value = 1;
     const int vReps = 5;
@@ -654,7 +654,7 @@ TEST(Array_FindAllInt1)
         a.add(0);
     }
 
-    a.find_all(r, value);
+    a.find_all(&r, value);
     CHECK_EQUAL(vReps, r.size());
 
     size_t i = 0;
@@ -673,7 +673,7 @@ TEST(Array_FindAllInt1)
 TEST(Array_FindAllInt2)
 {
     Array a;
-    Array r;
+    Column r;
 
     const int value = 3;
     const int vReps = 5;
@@ -685,7 +685,7 @@ TEST(Array_FindAllInt2)
         a.add(3);
     }
 
-    a.find_all(r, value);
+    a.find_all(&r, value);
     CHECK_EQUAL(vReps, r.size());
 
     size_t i = 0;
@@ -704,7 +704,7 @@ TEST(Array_FindAllInt2)
 TEST(Array_FindAllInt3)
 {
     Array a;
-    Array r;
+    Column r;
 
     const int value = 10;
     const int vReps = 5;
@@ -716,7 +716,7 @@ TEST(Array_FindAllInt3)
         a.add(13);
     }
 
-    a.find_all(r, value);
+    a.find_all(&r, value);
     CHECK_EQUAL(vReps, r.size());
 
     size_t i = 0;
@@ -735,7 +735,7 @@ TEST(Array_FindAllInt3)
 TEST(Array_FindAllInt4)
 {
     Array a;
-    Array r;
+    Column r;
 
     const int value = 20;
     const int vReps = 5;
@@ -748,7 +748,7 @@ TEST(Array_FindAllInt4)
         a.add(23);
     }
 
-    a.find_all(r, value);
+    a.find_all(&r, value);
     CHECK_EQUAL(vReps, r.size());
 
     size_t i = 0;
@@ -767,7 +767,7 @@ TEST(Array_FindAllInt4)
 TEST(Array_FindAllInt5)
 {
     Array a;
-    Array r;
+    Column r;
 
     const int value = 303;
     const int vReps = 5;
@@ -780,7 +780,7 @@ TEST(Array_FindAllInt5)
         a.add(303);
     }
 
-    a.find_all(r, value);
+    a.find_all(&r, value);
     CHECK_EQUAL(vReps, r.size());
 
     size_t i = 0;
@@ -799,7 +799,7 @@ TEST(Array_FindAllInt5)
 TEST(Array_FindAllInt6)
 {
     Array a;
-    Array r;
+    Column r;
 
     const int value = 70000;
     const int vReps = 5;
@@ -812,7 +812,7 @@ TEST(Array_FindAllInt6)
         a.add(70003);
     }
 
-    a.find_all(r, value);
+    a.find_all(&r, value);
     CHECK_EQUAL(vReps, r.size());
 
     size_t i = 0;
@@ -831,7 +831,7 @@ TEST(Array_FindAllInt6)
 TEST(Array_FindAllInt7)
 {
     Array a;
-    Array r;
+    Column r;
 
     const int64_t value = 4300000003ULL;
     const int vReps = 5;
@@ -844,7 +844,7 @@ TEST(Array_FindAllInt7)
         a.add(4300000003ULL);
     }
 
-    a.find_all(r, value);
+    a.find_all(&r, value);
     CHECK_EQUAL(vReps, r.size());
 
     size_t i = 0;

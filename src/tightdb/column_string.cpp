@@ -188,7 +188,8 @@ StringIndex& AdaptiveStringColumn::create_index()
 void AdaptiveStringColumn::set_index_ref(ref_type ref, ArrayParent* parent, size_t ndx_in_parent)
 {
     TIGHTDB_ASSERT(!m_index);
-    m_index = new StringIndex(ref, parent, ndx_in_parent, this, &get_string, m_array->get_alloc());
+    m_index = new StringIndex(ref, parent, ndx_in_parent, this, &get_string,
+                              m_array->get_alloc()); // Throws
 }
 
 
@@ -674,7 +675,7 @@ size_t AdaptiveStringColumn::find_first(StringData value, size_t begin, size_t e
 }
 
 
-void AdaptiveStringColumn::find_all(Array& result, StringData value, size_t begin, size_t end) const
+void AdaptiveStringColumn::find_all(Column& result, StringData value, size_t begin, size_t end) const
 {
     TIGHTDB_ASSERT(begin <= size());
     TIGHTDB_ASSERT(end == npos || (begin <= end && end <= size()));
@@ -1158,6 +1159,133 @@ ref_type AdaptiveStringColumn::write(size_t slice_offset, size_t slice_size,
 }
 
 
+void AdaptiveStringColumn::update_column_index(size_t new_col_ndx, const Spec& spec)
+    TIGHTDB_NOEXCEPT
+{
+    ColumnBase::update_column_index(new_col_ndx, spec);
+    if (m_index) {
+        size_t ndx_in_parent = m_array->get_ndx_in_parent();
+        m_index->get_root_array()->set_ndx_in_parent(ndx_in_parent + 1);
+    }
+}
+
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+
+void AdaptiveStringColumn::refresh_after_advance_transact(size_t col_ndx, const Spec& spec)
+{
+    refresh_root_after_advance_transact(); // Throws
+
+    // Refresh search index
+    if (m_index) {
+        size_t ndx_in_parent = m_array->get_ndx_in_parent();
+        m_index->get_root_array()->set_ndx_in_parent(ndx_in_parent + 1);
+        m_index->refresh_after_advance_transact(col_ndx, spec); // Throws
+    }
+}
+
+
+void AdaptiveStringColumn::refresh_root_after_advance_transact()
+{
+    // The type of the cached root array accessor may no longer match the
+    // underlying root node. In that case we need to replace it. Note that when
+    // the root node is an inner B+-tree node, then only the top array accessor
+    // of that node is cached. The top array accessor of an inner B+-tree node
+    // is of type Array.
+
+    ref_type root_ref = m_array->get_ref_from_parent();
+    MemRef root_mem(root_ref, m_array->get_alloc());
+    bool new_root_is_leaf   = !Array::get_is_inner_bptree_node_from_header(root_mem.m_addr);
+    bool new_root_is_small  = !Array::get_hasrefs_from_header(root_mem.m_addr);
+    bool new_root_is_medium = !Array::get_context_flag_from_header(root_mem.m_addr);
+    bool old_root_is_leaf   = !m_array->is_inner_bptree_node();
+    bool old_root_is_small  = !m_array->has_refs();
+    bool old_root_is_medium = !m_array->get_context_flag();
+
+    bool root_type_changed = old_root_is_leaf != new_root_is_leaf ||
+        (old_root_is_leaf && (old_root_is_small != new_root_is_small ||
+                              (!old_root_is_small && old_root_is_medium != new_root_is_medium)));
+    if (!root_type_changed) {
+        // Keep, but refresh old root accessor
+        if (old_root_is_leaf) {
+            if (old_root_is_small) {
+                // Root is 'small strings' leaf
+                ArrayString* root = static_cast<ArrayString*>(m_array);
+                root->init_from_parent();
+                return;
+            }
+            if (old_root_is_medium) {
+                // Root is 'medium strings' leaf
+                ArrayStringLong* root = static_cast<ArrayStringLong*>(m_array);
+                root->init_from_parent();
+                return;
+            }
+            // Root is 'big strings' leaf
+            ArrayBigBlobs* root = static_cast<ArrayBigBlobs*>(m_array);
+            root->init_from_parent();
+            return;
+        }
+        // Root is inner node
+        Array* root = m_array;
+        root->init_from_parent();
+        return;
+    }
+
+    // Create new root accessor
+    Array* new_root;
+    ArrayParent* parent = m_array->get_parent();
+    size_t ndx_in_parent = m_array->get_ndx_in_parent();
+    Allocator& alloc = m_array->get_alloc();
+    if (new_root_is_leaf) {
+        if (new_root_is_small) {
+            // New root is 'small strings' leaf
+            new_root = new ArrayString(root_mem, parent, ndx_in_parent, alloc); // Throws
+        }
+        else if (new_root_is_medium) {
+            // New root is 'medium strings' leaf
+            new_root = new ArrayStringLong(root_mem, parent, ndx_in_parent, alloc); // Throws
+        }
+        else {
+            // New root is 'big strings' leaf
+            new_root = new ArrayBigBlobs(root_mem, parent, ndx_in_parent, alloc); // Throws
+        }
+    }
+    else {
+        // New root is inner node
+        new_root = new Array(root_mem, parent, ndx_in_parent, alloc); // Throws
+    }
+
+    // Destroy old root accessor
+    if (old_root_is_leaf) {
+        if (old_root_is_small) {
+            // Old root is 'small strings' leaf
+            ArrayString* old_root = static_cast<ArrayString*>(m_array);
+            delete old_root;
+        }
+        else if (old_root_is_medium) {
+            // Old root is 'medium strings' leaf
+            ArrayStringLong* old_root = static_cast<ArrayStringLong*>(m_array);
+            delete old_root;
+        }
+        else {
+            // Old root is 'big strings' leaf
+            ArrayBigBlobs* old_root = static_cast<ArrayBigBlobs*>(m_array);
+            delete old_root;
+        }
+    }
+    else {
+        // Old root is inner node
+        Array* old_root = m_array;
+        delete old_root;
+    }
+
+    // Instate new root
+    m_array = new_root;
+}
+
+#endif // TIGHTDB_ENABLE_REPLICATION
+
+
 #ifdef TIGHTDB_DEBUG
 
 namespace {
@@ -1214,8 +1342,10 @@ void AdaptiveStringColumn::Verify() const
         m_array->verify_bptree(&verify_leaf);
     }
 
-    if (m_index)
+    if (m_index) {
+        m_index->Verify();
         m_index->verify_entries(*this);
+    }
 }
 
 
