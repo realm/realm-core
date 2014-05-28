@@ -2150,7 +2150,7 @@ void writer_thread(string path)
     Random random(random_int<unsigned long>());
     Replication* repl = makeWriteLogCollector(path);
     SharedGroup sg(*repl);
-    for (int i=0; i<100; i++)
+    for (int i=0; i<10; i++)
     {
         WriteTransaction wt(sg);
         TestTableInts::Ref tr = wt.get_table<TestTableInts>("table");
@@ -2164,6 +2164,7 @@ void writer_thread(string path)
             tr->insert(idx, 0);
         }
         wt.commit();
+        sched_yield();
     }
     delete repl;
 }
@@ -2185,7 +2186,9 @@ void reader_thread(TestResults* test_results_ptr, string path)
     {
         int val = r.get_int(0);
         if (val == 43) break;
-        CHECK_EQUAL(42, val);            
+        CHECK_EQUAL(42, val);    
+        while (!sg.has_changed())
+            sched_yield();
         sg.advance_read(wlr);
     }
     sg.end_read();
@@ -2197,7 +2200,7 @@ void reader_thread(TestResults* test_results_ptr, string path)
 
 TEST(Shared_Implicit_Transactions_Multiple_Trackers)
 {
-    const int write_thread_count = 7;
+    const int write_thread_count = 3;
     const int read_thread_count = 3;
 
     SHARED_GROUP_TEST_PATH(path);
@@ -2229,7 +2232,6 @@ TEST(Shared_Implicit_Transactions_Multiple_Trackers)
 
         // signal to all readers to complete
         {
-            std::cout << "Terminating" << std::endl;
             WriteTransaction wt(sg);
             TableRef tr = wt.get_table("table");
             Query q = tr->where().equal(0, 42);
