@@ -124,10 +124,13 @@ void WriteLogRegistry::add_commit(version_type version, char* data, std::size_t 
 {
     util::LockGuard lock(m_mutex);
     //std::cerr << "adding version " << version << std::endl;
-    // if no one is interested, discard data immediately
+    // if no one is interested, cleanup earlier commits, but add the new one.
+    // this prevents a race condition whereby a writing threads first commit
+    // is discarded because it occurs before a reader expresses interest, BUT
+    // the writer catches up and so the reader sees the commit in the database,
+    // but is unable to obtain the associated commit log.
     if (!is_anybody_interested(version)) {
-        delete[] data;
-        return;
+        cleanup();
     }
 
     if (!holds_some_commits()) {
@@ -256,9 +259,8 @@ void WriteLogRegistry::cleanup()
         if (to_index(m_oldest_version) > (m_commits.size() >> 1)) {
             // more than half of the commit array is free, so we'll
             // shift contents down and resize the array.
-            size_t copy_start_idx = to_index(m_oldest_version);
-            std::copy(& m_commits[ copy_start_idx ],
-                      & m_commits[ m_commits.size() + 1 ],
+            std::copy(& m_commits[ to_index(m_oldest_version) ],
+                      & m_commits[ to_index(m_newest_version) + 1 ],
                       & m_commits[ 0 ]);
             m_commits.resize(m_newest_version - m_oldest_version + 1);
             m_array_start = m_oldest_version;

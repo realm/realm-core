@@ -2197,8 +2197,8 @@ void reader_thread(TestResults* test_results_ptr, string path)
 
 TEST(Shared_Implicit_Transactions_Multiple_Trackers)
 {
-    const int write_thread_count = 13;
-    const int read_thread_count = 1;
+    const int write_thread_count = 7;
+    const int read_thread_count = 3;
 
     SHARED_GROUP_TEST_PATH(path);
     {
