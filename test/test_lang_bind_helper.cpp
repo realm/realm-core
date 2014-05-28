@@ -8,6 +8,8 @@
 #include <tightdb/descriptor.hpp>
 #ifdef TIGHTDB_ENABLE_REPLICATION
 #  include <tightdb/replication.hpp>
+#  include <tightdb/commit_log.hpp>
+#  include <tightdb/util/bind.hpp>
 #endif
 
 #include "test.hpp"
@@ -15,6 +17,8 @@
 using namespace std;
 using namespace tightdb;
 using namespace tightdb::util;
+using namespace tightdb::test_util;
+using unit_test::TestResults;
 
 
 // Test independence and thread-safety
@@ -111,6 +115,15 @@ TEST(LangBindHelper_SetSubtable)
 #ifdef TIGHTDB_ENABLE_REPLICATION
 
 namespace {
+
+TIGHTDB_TABLE_4(TestTableShared,
+                first,  Int,
+                second, Int,
+                third,  Bool,
+                fourth, String)
+
+TIGHTDB_TABLE_1(TestTableInts,
+                first,  Int)
 
 class ShortCircuitTransactLogManager:
         public TrivialReplication,
@@ -2428,6 +2441,169 @@ TEST(LangBindHelper_AdvanceReadTransact_MoveLastOver)
         CHECK(!mixed_3->is_attached());
     }
 }
+
+
+
+TEST(Shared_Implicit_Transactions)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    {
+        SharedGroup::TransactLogRegistry* wlr = getWriteLogs(path);
+        Replication* repl = makeWriteLogCollector(path);
+        SharedGroup sg(*repl);
+        {
+            WriteTransaction wt(sg);
+            wt.get_table<TestTableShared>("table")->add_empty_row();
+            wt.commit();
+        }
+        Replication* repl2 = makeWriteLogCollector(path);
+        SharedGroup sg2(*repl2);
+        Group& g = const_cast<Group&>(sg.begin_read());
+        TestTableShared::Ref table = g.get_table<TestTableShared>("table");
+        for (int i = 0; i<100; i++) {
+            {
+                // change table in other context
+                WriteTransaction wt(sg2);
+                wt.get_table<TestTableShared>("table")[0].first += 100;
+                wt.commit();
+            }
+            // verify we can't see the update
+            CHECK_EQUAL(i, table[0].first);
+            LangBindHelper::advance_read(sg, wlr);
+            // now we CAN see it, and through the same accessor
+            CHECK(table->is_attached());
+            CHECK_EQUAL(i + 100, table[0].first);
+            {
+                // change table in other context
+                WriteTransaction wt(sg2);
+                wt.get_table<TestTableShared>("table")[0].first += 10000;
+                wt.commit();
+            }
+            // can't see it:
+            CHECK_EQUAL(i + 100, table[0].first);
+            LangBindHelper::promote_to_write(sg, wlr);
+            // CAN see it:
+            CHECK(table->is_attached());
+            CHECK_EQUAL(i + 10100, table[0].first);
+            table[0].first -= 10100;
+            table[0].first += 1;
+            LangBindHelper::commit_and_continue_as_read(sg);
+            CHECK(table->is_attached());
+            CHECK_EQUAL(i+1, table[0].first);
+        }
+        sg.end_read();
+        delete repl2;
+        delete repl;
+        delete wlr;
+    }
+}
+
+namespace {
+void writer_thread(string path)
+{
+    Random random(random_int<unsigned long>());
+    Replication* repl = makeWriteLogCollector(path);
+    SharedGroup sg(*repl);
+    for (int i=0; i<10; i++)
+    {
+        WriteTransaction wt(sg);
+        TestTableInts::Ref tr = wt.get_table<TestTableInts>("table");
+
+        int idx = (tr->size()==0) ? 0 : (random.draw_int_mod(tr->size()));
+
+        if (tr[idx].first == 42) {
+            // do nothing
+        }
+        else {
+            tr->insert(idx, 0);
+        }
+        wt.commit();
+        sched_yield();
+    }
+    delete repl;
+}
+
+void reader_thread(TestResults* test_results_ptr, string path)
+{
+    TestResults& test_results = *test_results_ptr;
+    Random random(random_int<unsigned long>());
+    
+    Replication* repl = makeWriteLogCollector(path);
+    SharedGroup::TransactLogRegistry* wlr = getWriteLogs(path);
+    SharedGroup sg(*repl);
+    Group& g = const_cast<Group&>(sg.begin_read());
+    TableRef tr = g.get_table("table");
+    Query q = tr->where().equal(0, 42);
+    int idx = q.find();
+    Row r = (*tr)[idx];
+    while (1)
+    {
+        int val = r.get_int(0);
+        if (val == 43) break;
+        CHECK_EQUAL(42, val);    
+        while (!sg.has_changed())
+            sched_yield();
+        LangBindHelper::advance_read(sg, wlr);
+    }
+    sg.end_read();
+    delete wlr;
+    delete repl;
+}
+
+}
+
+TEST(Shared_Implicit_Transactions_Multiple_Trackers)
+{
+    const int write_thread_count = 3;
+    const int read_thread_count = 3;
+
+    SHARED_GROUP_TEST_PATH(path);
+    {
+        Replication* repl = makeWriteLogCollector(path);
+        SharedGroup sg(*repl);
+        {
+            WriteTransaction wt(sg);
+            TableRef tr = wt.get_table("table");
+            tr->add_column(type_Int, "first");
+            for (int i=0; i<200; i++)
+                tr->add_empty_row();
+            tr->set_int(0, 100, 42);
+            wt.commit();
+
+        }
+        Thread threads[write_thread_count + read_thread_count];
+        int i;
+        // SharedGroup::TransactLogRegistry* wlr = getWriteLogs(path);
+        for (i = 0; i < write_thread_count; ++i)
+            threads[i].start(bind(writer_thread, string(path)));
+        sched_yield();
+        for (i = 0; i < read_thread_count; ++i)
+            threads[write_thread_count + i].start(bind(reader_thread, &test_results, string(path)));
+ 
+        // Wait for all writer threads to complete
+        for (int i = 0; i < write_thread_count; ++i)
+            threads[i].join();
+
+        // signal to all readers to complete
+        {
+            WriteTransaction wt(sg);
+            TableRef tr = wt.get_table("table");
+            Query q = tr->where().equal(0, 42);
+            int idx = q.find();
+            tr->set_int(0, idx, 43);
+            wt.commit();
+        }
+        // Wait for all reader threads to complete
+        for (int i = 0; i < read_thread_count; ++i)
+            threads[write_thread_count + i].join();
+
+        // cleanup
+        sg.end_read();
+        //delete wlr;
+        delete repl;
+    }
+}
+
 
 #endif // TIGHTDB_ENABLE_REPLICATION
 
