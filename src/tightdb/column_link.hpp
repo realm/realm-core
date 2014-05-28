@@ -27,6 +27,12 @@
 
 namespace tightdb {
 
+/// An link column (ColumnLink) is a single B+-tree, and the root of
+/// the column is the root of the B+-tree. All leaf nodes are single
+/// arrays of type Array.
+///
+/// The individual values in the column are row positions in the target
+/// table (offset with one to allow zero to indicate null links)
 class ColumnLink: public Column, public ColumnLinkBase {
 public:
     ColumnLink(ref_type ref, ArrayParent* parent = 0, std::size_t ndx_in_parent = 0,

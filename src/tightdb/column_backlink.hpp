@@ -26,6 +26,13 @@
 
 namespace tightdb {
 
+/// A column of backlinks (ColumnBackLink) is a single B+-tree, and the root of
+/// the column is the root of the B+-tree. All leaf nodes are single arrays of
+/// type Array with the hasRefs bit set.
+///
+/// The individual values in the column are either refs to Columns containing
+/// the row positions in the source table that links to it, or in the case where
+/// there is a single link, a tagged ref encoding the source row position.
 class ColumnBackLink: public Column, public ArrayParent {
 public:
     ColumnBackLink(ref_type, ArrayParent* = 0, std::size_t ndx_in_parent = 0,
