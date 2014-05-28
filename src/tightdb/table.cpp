@@ -67,7 +67,7 @@ template<> struct ColumnTypeTraits3<DateTime> {
 LinkView Table::links(size_t link_column, size_t row_ndx)
 {
     ColumnLinkList& column = get_column<ColumnLinkList, col_type_LinkList>(link_column);
-    LinkView lw(column);
+    LinkView lw(column, row_ndx);
     return lw;
 }
 
