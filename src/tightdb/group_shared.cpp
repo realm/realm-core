@@ -1081,6 +1081,7 @@ void SharedGroup::end_read() TIGHTDB_NOEXCEPT
     m_transact_stage = transact_Ready;
 }
 
+#ifdef TIGHTDB_ENABLE_REPLICATION
 
 void SharedGroup::promote_to_write(TransactLogRegistry& write_logs)
 {
@@ -1112,7 +1113,6 @@ void SharedGroup::promote_to_write(TransactLogRegistry& write_logs)
     m_transact_stage = transact_Writing;
 }
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
 
 void SharedGroup::advance_read(TransactLogRegistry& log_registry)
 {
@@ -1237,6 +1237,8 @@ void SharedGroup::commit()
     m_group.complete_detach();
 }
 
+#ifdef TIGHTDB_ENABLE_REPLICATION
+
 void SharedGroup::commit_and_continue_as_read()
 {
     do_commit();
@@ -1264,6 +1266,7 @@ void SharedGroup::commit_and_continue_as_read()
     }
     m_group.update_refs(m_readlock.m_top_ref, old_baseline);
 }
+#endif
 
 void SharedGroup::do_commit()
 {

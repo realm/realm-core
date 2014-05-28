@@ -331,6 +331,8 @@ private:
 
     void do_async_commits();
 
+#ifdef TIGHTDB_ENABLE_REPLICATION
+
     // Advance the current read transaction to include latest state.
     // All accessors are retained and synchronized to the new state
     // according to the (to be) defined operational transform.
@@ -348,7 +350,7 @@ private:
     // to data. All accessors are retained and continue to reflect the
     // state at commit. 
     void commit_and_continue_as_read();
-
+#endif
     friend class ReadTransaction;
     friend class WriteTransaction;
     friend class LangBindHelper;
