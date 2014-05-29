@@ -446,3 +446,8 @@ void TableView::clear()
 
     m_refs.clear();
 }
+
+void TableViewBase::do_sync() const
+{
+    // do nothing yet
+}

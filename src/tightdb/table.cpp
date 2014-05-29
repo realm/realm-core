@@ -472,7 +472,6 @@ void Table::do_insert_column(Descriptor& desc, size_t column_ndx,
 
 void Table::do_remove_column(Descriptor& desc, size_t column_ndx)
 {
-    bump_version();
     TIGHTDB_ASSERT(desc.is_attached());
 
     typedef _impl::DescriptorFriend df;
@@ -503,7 +502,6 @@ void Table::do_remove_column(Descriptor& desc, size_t column_ndx)
 
 void Table::do_rename_column(Descriptor& desc, size_t column_ndx, StringData name)
 {
-    bump_version();
     TIGHTDB_ASSERT(desc.is_attached());
 
     typedef _impl::DescriptorFriend df;
@@ -2467,7 +2465,6 @@ size_t Table::linklist_get_link(size_t column_ndx, size_t row_ndx, size_t link_n
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_LinkList);
     TIGHTDB_ASSERT(row_ndx <= m_size);
-    bump_version();
 
     const ColumnLinkList& column = get_column<ColumnLinkList, col_type_LinkList>(column_ndx);
     return column.get_link(row_ndx, link_ndx);
