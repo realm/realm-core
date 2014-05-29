@@ -105,6 +105,7 @@ AggregateState      State of the aggregate - contains a state variable that stor
 #include <tightdb/array_string.hpp>
 
 #include <iostream>
+#include <map>
 
 #if _MSC_FULL_VER >= 160040219
 #  include <immintrin.h>
@@ -477,6 +478,28 @@ public:
             return m_child->validate();
     }
 
+    ParentNode(const ParentNode& from)
+    {
+        m_child = from.m_child;
+        m_children = from.m_children;
+        m_condition_column_idx = from.m_condition_column_idx;
+        m_conds = from.m_conds;
+        m_dD = from.m_dD;
+        m_dT = from.m_dT;
+        m_probes = from.m_probes;
+        m_matches = from.m_matches;
+    }
+
+    virtual ParentNode* clone() = 0;
+
+    virtual void translate_pointers(std::map<ParentNode*, ParentNode*> mapping)
+    {
+        m_child = mapping[m_child];
+        for (size_t i = 0; i < m_children.size(); ++i)
+            m_children[i] = mapping[m_children[i]];
+    }
+
+
     ParentNode* m_child;
     std::vector<ParentNode*>m_children;
     size_t m_condition_column_idx; // Column of search criteria
@@ -543,6 +566,24 @@ public:
 
         m_next = r;
         return tableindex(r);
+    }
+
+    virtual ParentNode* clone()
+    {
+        return new ListviewNode(*this);
+    }
+
+    virtual void translate_pointers(std::map<ParentNode*, ParentNode*> mapping)
+    {
+        ParentNode::translate_pointers(mapping);
+    }
+
+    ListviewNode(const ListviewNode& from) 
+        : ParentNode(from), m_tv(from.m_tv)
+    {
+        m_max = from.m_max;
+        m_next = from.m_next;
+        m_size = from.m_size;
     }
 
 protected:
@@ -616,6 +657,24 @@ public:
     ParentNode* child_criteria()
     {
         return m_child2;
+    }
+
+    virtual ParentNode* clone()
+    {
+        return new SubtableNode(*this);
+    }
+
+    virtual void translate_pointers(std::map<ParentNode*, ParentNode*> mapping)
+    {
+        ParentNode::translate_pointers(mapping);
+        m_child2 = mapping[m_child2];
+    }
+
+    SubtableNode(const SubtableNode& from) 
+        : ParentNode(from)
+    {
+        m_child2 = from.m_child2;
+        m_column = from.m_column;
     }
 
     ParentNode* m_child2;
