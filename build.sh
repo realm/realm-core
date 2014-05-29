@@ -772,6 +772,14 @@ EOF
         exit 0
         ;;
 
+    "leak-test-ios-app")
+        # Prerequisites: build-test-ios-app
+        # For more documentation, see test/ios/README.md
+        (cd "test/ios/app" && instruments -t ../template/Leaks.tracetemplate \
+            -w "tightdb's iPad" iOSTestCoreApp)
+        exit 0
+        ;;
+
     "gdb"|"gdb-debug"|\
     "gdb-testcase"|"gdb-testcase-debug"|\
     "performance"|"benchmark"|"benchmark-"*|\

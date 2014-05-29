@@ -8,7 +8,8 @@ contents of this subdirectory, we use GYP to generate fresh XCode projects.
 (See also the build-test-ios-app target in build.sh.)
 
 The XCode project can then be "tested" to run the tests on device, using either
-XCode, or xcodebuild. (See also the test-ios-app target in build.sh.)
+XCode, xcodebuild (see also the test-ios-app target in build.sh), instruments
+(see also the leak-test-ios-app target in build.sh).
 
 ## Implementation Details
 
