@@ -22,12 +22,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		TraceAndTestImpact.testsettings = TraceAndTestImpact.testsettings
 	EndProjectSection
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "benchmark-stl", "..\..\test\benchmark-stl\benchmark-stl.vcxproj", "{54618B78-8356-44A7-8860-18A455509A86}"
-EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "benchmark-tightdb", "..\..\test\benchmark-tightdb\benchmark-tightdb.vcxproj", "{64D11991-F0F0-470D-B230-48410066090E}"
-EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "benchmark-sqlite", "..\..\test\benchmark-sqlite\benchmark-sqlite.vcxproj", "{69AAE70E-B352-433B-B6E9-1AEEC438B49C}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		csv debug|Win32 = csv debug|Win32
@@ -126,70 +120,6 @@ Global
 		{C485A179-016D-4A21-AA14-1970BA070154}.Static lib, release|Win32.ActiveCfg = Release|x64
 		{C485A179-016D-4A21-AA14-1970BA070154}.Static lib, release|x64.ActiveCfg = Release|x64
 		{C485A179-016D-4A21-AA14-1970BA070154}.Static lib, release|x64.Build.0 = Release|x64
-		{54618B78-8356-44A7-8860-18A455509A86}.csv debug|Win32.ActiveCfg = Release|x64
-		{54618B78-8356-44A7-8860-18A455509A86}.csv debug|x64.ActiveCfg = Release|x64
-		{54618B78-8356-44A7-8860-18A455509A86}.csv debug|x64.Build.0 = Release|x64
-		{54618B78-8356-44A7-8860-18A455509A86}.csv release|Win32.ActiveCfg = Release|x64
-		{54618B78-8356-44A7-8860-18A455509A86}.csv release|x64.ActiveCfg = Release|x64
-		{54618B78-8356-44A7-8860-18A455509A86}.csv release|x64.Build.0 = Release|x64
-		{54618B78-8356-44A7-8860-18A455509A86}.Debug|Win32.ActiveCfg = Debug|Win32
-		{54618B78-8356-44A7-8860-18A455509A86}.Debug|Win32.Build.0 = Debug|Win32
-		{54618B78-8356-44A7-8860-18A455509A86}.Debug|x64.ActiveCfg = Debug|x64
-		{54618B78-8356-44A7-8860-18A455509A86}.Debug|x64.Build.0 = Debug|x64
-		{54618B78-8356-44A7-8860-18A455509A86}.Release|Win32.ActiveCfg = Release|Win32
-		{54618B78-8356-44A7-8860-18A455509A86}.Release|Win32.Build.0 = Release|Win32
-		{54618B78-8356-44A7-8860-18A455509A86}.Release|x64.ActiveCfg = Release|x64
-		{54618B78-8356-44A7-8860-18A455509A86}.Release|x64.Build.0 = Release|x64
-		{54618B78-8356-44A7-8860-18A455509A86}.Static lib, debug|Win32.ActiveCfg = Release|x64
-		{54618B78-8356-44A7-8860-18A455509A86}.Static lib, debug|x64.ActiveCfg = Release|x64
-		{54618B78-8356-44A7-8860-18A455509A86}.Static lib, debug|x64.Build.0 = Release|x64
-		{54618B78-8356-44A7-8860-18A455509A86}.Static lib, release|Win32.ActiveCfg = Release|x64
-		{54618B78-8356-44A7-8860-18A455509A86}.Static lib, release|x64.ActiveCfg = Release|x64
-		{54618B78-8356-44A7-8860-18A455509A86}.Static lib, release|x64.Build.0 = Release|x64
-		{64D11991-F0F0-470D-B230-48410066090E}.csv debug|Win32.ActiveCfg = Release|Win32
-		{64D11991-F0F0-470D-B230-48410066090E}.csv debug|Win32.Build.0 = Release|Win32
-		{64D11991-F0F0-470D-B230-48410066090E}.csv debug|x64.ActiveCfg = Release|x64
-		{64D11991-F0F0-470D-B230-48410066090E}.csv debug|x64.Build.0 = Release|x64
-		{64D11991-F0F0-470D-B230-48410066090E}.csv release|Win32.ActiveCfg = Release|Win32
-		{64D11991-F0F0-470D-B230-48410066090E}.csv release|Win32.Build.0 = Release|Win32
-		{64D11991-F0F0-470D-B230-48410066090E}.csv release|x64.ActiveCfg = Release|x64
-		{64D11991-F0F0-470D-B230-48410066090E}.csv release|x64.Build.0 = Release|x64
-		{64D11991-F0F0-470D-B230-48410066090E}.Debug|Win32.ActiveCfg = Debug|Win32
-		{64D11991-F0F0-470D-B230-48410066090E}.Debug|Win32.Build.0 = Debug|Win32
-		{64D11991-F0F0-470D-B230-48410066090E}.Debug|x64.ActiveCfg = Debug|x64
-		{64D11991-F0F0-470D-B230-48410066090E}.Debug|x64.Build.0 = Debug|x64
-		{64D11991-F0F0-470D-B230-48410066090E}.Release|Win32.ActiveCfg = Release|Win32
-		{64D11991-F0F0-470D-B230-48410066090E}.Release|Win32.Build.0 = Release|Win32
-		{64D11991-F0F0-470D-B230-48410066090E}.Release|x64.ActiveCfg = Release|x64
-		{64D11991-F0F0-470D-B230-48410066090E}.Release|x64.Build.0 = Release|x64
-		{64D11991-F0F0-470D-B230-48410066090E}.Static lib, debug|Win32.ActiveCfg = Release|Win32
-		{64D11991-F0F0-470D-B230-48410066090E}.Static lib, debug|Win32.Build.0 = Release|Win32
-		{64D11991-F0F0-470D-B230-48410066090E}.Static lib, debug|x64.ActiveCfg = Release|x64
-		{64D11991-F0F0-470D-B230-48410066090E}.Static lib, debug|x64.Build.0 = Release|x64
-		{64D11991-F0F0-470D-B230-48410066090E}.Static lib, release|Win32.ActiveCfg = Release|Win32
-		{64D11991-F0F0-470D-B230-48410066090E}.Static lib, release|Win32.Build.0 = Release|Win32
-		{64D11991-F0F0-470D-B230-48410066090E}.Static lib, release|x64.ActiveCfg = Release|x64
-		{64D11991-F0F0-470D-B230-48410066090E}.Static lib, release|x64.Build.0 = Release|x64
-		{69AAE70E-B352-433B-B6E9-1AEEC438B49C}.csv debug|Win32.ActiveCfg = Release|x64
-		{69AAE70E-B352-433B-B6E9-1AEEC438B49C}.csv debug|x64.ActiveCfg = Release|x64
-		{69AAE70E-B352-433B-B6E9-1AEEC438B49C}.csv debug|x64.Build.0 = Release|x64
-		{69AAE70E-B352-433B-B6E9-1AEEC438B49C}.csv release|Win32.ActiveCfg = Release|x64
-		{69AAE70E-B352-433B-B6E9-1AEEC438B49C}.csv release|x64.ActiveCfg = Release|x64
-		{69AAE70E-B352-433B-B6E9-1AEEC438B49C}.csv release|x64.Build.0 = Release|x64
-		{69AAE70E-B352-433B-B6E9-1AEEC438B49C}.Debug|Win32.ActiveCfg = Debug|Win32
-		{69AAE70E-B352-433B-B6E9-1AEEC438B49C}.Debug|Win32.Build.0 = Debug|Win32
-		{69AAE70E-B352-433B-B6E9-1AEEC438B49C}.Debug|x64.ActiveCfg = Debug|x64
-		{69AAE70E-B352-433B-B6E9-1AEEC438B49C}.Debug|x64.Build.0 = Debug|x64
-		{69AAE70E-B352-433B-B6E9-1AEEC438B49C}.Release|Win32.ActiveCfg = Release|Win32
-		{69AAE70E-B352-433B-B6E9-1AEEC438B49C}.Release|Win32.Build.0 = Release|Win32
-		{69AAE70E-B352-433B-B6E9-1AEEC438B49C}.Release|x64.ActiveCfg = Release|x64
-		{69AAE70E-B352-433B-B6E9-1AEEC438B49C}.Release|x64.Build.0 = Release|x64
-		{69AAE70E-B352-433B-B6E9-1AEEC438B49C}.Static lib, debug|Win32.ActiveCfg = Release|x64
-		{69AAE70E-B352-433B-B6E9-1AEEC438B49C}.Static lib, debug|x64.ActiveCfg = Release|x64
-		{69AAE70E-B352-433B-B6E9-1AEEC438B49C}.Static lib, debug|x64.Build.0 = Release|x64
-		{69AAE70E-B352-433B-B6E9-1AEEC438B49C}.Static lib, release|Win32.ActiveCfg = Release|x64
-		{69AAE70E-B352-433B-B6E9-1AEEC438B49C}.Static lib, release|x64.ActiveCfg = Release|x64
-		{69AAE70E-B352-433B-B6E9-1AEEC438B49C}.Static lib, release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -198,9 +128,6 @@ Global
 		{6DF07480-ECC6-4116-860A-818B9D2BA7B3} = {ED0C49D7-6CFD-4B05-BA18-7C6E98A994C8}
 		{9C49632F-A4C9-471E-B643-42472DBF13B9} = {ED0C49D7-6CFD-4B05-BA18-7C6E98A994C8}
 		{C485A179-016D-4A21-AA14-1970BA070154} = {ED0C49D7-6CFD-4B05-BA18-7C6E98A994C8}
-		{54618B78-8356-44A7-8860-18A455509A86} = {ED0C49D7-6CFD-4B05-BA18-7C6E98A994C8}
-		{64D11991-F0F0-470D-B230-48410066090E} = {ED0C49D7-6CFD-4B05-BA18-7C6E98A994C8}
-		{69AAE70E-B352-433B-B6E9-1AEEC438B49C} = {ED0C49D7-6CFD-4B05-BA18-7C6E98A994C8}
 	EndGlobalSection
 	GlobalSection(TestCaseManagementSettings) = postSolution
 		CategoryFile = TightDB.vsmdi

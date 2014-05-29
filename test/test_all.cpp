@@ -69,7 +69,7 @@ const char* file_order[] = {
     "test_links.cpp",
     "test_link_view.cpp",
 
-    "test_lang_bind.cpp",
+    "test_lang_bind_helper.cpp",
 
     "large_tests*.cpp"
 };
@@ -261,11 +261,7 @@ bool run_tests()
     xml = (xml_str && strlen(xml_str) != 0);
 #endif
     if (xml) {
-        string path = "";
-#ifdef TIGHTDB_MOBILE
-        PlatformConfig* platform_config = PlatformConfig::Instance();
-        path = platform_config->get_path();
-#endif
+        string path = get_test_path_prefix();
         string xml_path = path + "unit-test-report.xml";
         xml_file.open(xml_path.c_str());
         reporter.reset(create_xml_reporter(xml_file));

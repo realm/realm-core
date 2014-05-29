@@ -1080,6 +1080,22 @@ ref_type Column::write(size_t slice_offset, size_t slice_size,
 }
 
 
+#ifdef TIGHTDB_ENABLE_REPLICATION
+
+void Column::refresh_after_advance_transact(size_t, const Spec&)
+{
+    // With this type of column (Column), `m_array` is always an
+    // instance of Array. This is true becasue all leafs are instances
+    // of Array, and when the root is an inner B+-tree node, only the
+    // top array of the inner node is cached. This means that we never
+    // have to change the type of the cached root array with this type
+    // of column.
+    m_array->init_from_parent();
+}
+
+#endif // TIGHTDB_ENABLE_REPLICATION
+
+
 #ifdef TIGHTDB_DEBUG
 
 namespace {

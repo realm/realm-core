@@ -126,34 +126,27 @@ void Group::create(bool add_free_versions)
 
 void Group::init_from_ref(ref_type top_ref) TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(!is_attached());
-
     m_top.init_from_ref(top_ref);
     size_t top_size = m_top.size();
     TIGHTDB_ASSERT(top_size >= 3);
 
-    ref_type names_ref = m_top.get_as_ref(0);
-    ref_type tables_ref = m_top.get_as_ref(1);
-    m_table_names.init_from_ref(names_ref);
-    m_tables.init_from_ref(tables_ref);
+    m_table_names.init_from_parent();
+    m_tables.init_from_parent();
     m_is_attached = true;
 
     // Note that the third slot is the logical file size.
 
-    // File created by Group::write() do not have free space markers
-    // at all, and files that are not shared does not need version
-    // info for free space.
+    // Files created by Group::write() do not have free-space
+    // tracking, and files that are accessed via a stan-along Group do
+    // not need version information for free-space tracking.
     if (top_size > 3) {
         TIGHTDB_ASSERT(top_size >= 5);
-        ref_type free_positions_ref = m_top.get_as_ref(3);
-        ref_type free_sizes_ref     = m_top.get_as_ref(4);
-        m_free_positions.init_from_ref(free_positions_ref);
-        m_free_lengths.init_from_ref(free_sizes_ref);
+        m_free_positions.init_from_parent();
+        m_free_lengths.init_from_parent();
 
         if (m_is_shared && top_size > 5) {
             TIGHTDB_ASSERT(top_size >= 7);
-            ref_type free_versions_ref = m_top.get_as_ref(5);
-            m_free_versions.init_from_ref(free_versions_ref);
+            m_free_versions.init_from_parent();
             // Note that the seventh slot is the database version
             // (a.k.a. transaction count,) which is not yet used for
             // anything.
@@ -162,7 +155,7 @@ void Group::init_from_ref(ref_type top_ref) TIGHTDB_NOEXCEPT
 }
 
 
-void Group::init_shared()
+void Group::reset_freespace_tracking()
 {
     TIGHTDB_ASSERT(m_top.is_attached());
     TIGHTDB_ASSERT(m_is_attached);
@@ -189,7 +182,7 @@ void Group::init_shared()
     }
     TIGHTDB_ASSERT(m_top.size() >= 5);
 
-    // Files that have nevner been modified via SharedGroup do not
+    // Files that have never been modified via SharedGroup do not
     // have version tracking for the free lists
     if (m_top.size() == 5) {
         // FIXME: There is a risk that this one is already allocated,
@@ -290,7 +283,6 @@ Table* Group::get_table_by_ndx(size_t ndx)
     return table;
 }
 
-/*
 ref_type Group::create_new_table(StringData name)
 {
     // FIXME: This function is exception safe under the assumption
@@ -327,7 +319,7 @@ ref_type Group::create_new_table(StringData name)
         throw;
     }
 }
-*/
+
 
 Table* Group::create_new_table_and_accessor(StringData name, SpecSetter spec_setter)
 {
@@ -614,15 +606,14 @@ void Group::reattach_from_retained_data()
     m_is_attached = true;
 }
 
-void Group::update_from_shared(ref_type new_top_ref, size_t new_file_size)
+void Group::init_for_transact(ref_type new_top_ref, size_t new_file_size)
 {
     TIGHTDB_ASSERT(new_top_ref < new_file_size);
     TIGHTDB_ASSERT(!is_attached());
 
-    if (m_top.is_attached()) {
-
+    if (m_top.is_attached())
         complete_detach();
-    }
+
     // Make all managed memory beyond the attached file available
     // again.
     //
@@ -634,8 +625,14 @@ void Group::update_from_shared(ref_type new_top_ref, size_t new_file_size)
     if (new_file_size > m_alloc.get_baseline())
         m_alloc.remap(new_file_size); // Throws
 
-    // If our last look at the file was when it
-    // was empty, we may have to re-create the group
+    // If the file is empty (probably because it was just created) we
+    // need to create a new empty group. If this happens at the
+    // beginning of a 'read' transaction (as opposed to at the
+    // beginning of a 'write' transaction), the creation of the group
+    // serves only to put the group accessor into a valid state, and
+    // the allocated memory will be discarded when the 'read'
+    // transaction ends (actually not until a new transaction is
+    // started).
     if (new_top_ref == 0) {
         bool add_free_versions = true;
         create(add_free_versions); // Throws
@@ -651,9 +648,9 @@ bool Group::operator==(const Group& g) const
     size_t n = size();
     if (n != g.size())
         return false;
-    for (size_t i=0; i<n; ++i) {
-        const Table* t1 = get_table_by_ndx(i);
-        const Table* t2 = g.get_table_by_ndx(i);
+    for (size_t i = 0; i < n; ++i) {
+        const Table* t1 = get_table_by_ndx(i); // Throws
+        const Table* t2 = g.get_table_by_ndx(i); // Throws
         if (*t1 != *t2)
             return false;
     }
@@ -699,11 +696,485 @@ void Group::to_string(ostream& out) const
 }
 
 
+#ifdef TIGHTDB_ENABLE_REPLICATION
+
+namespace {
+
+class MultiLogInputStream: public Replication::InputStream {
+public:
+    MultiLogInputStream(const BinaryData* logs_begin, const BinaryData* logs_end):
+        m_logs_begin(logs_begin), m_logs_end(logs_end)
+    {
+        if (m_logs_begin != m_logs_end)
+            m_curr_buf_remaining_size = m_logs_begin->size();
+    }
+
+    ~MultiLogInputStream() TIGHTDB_OVERRIDE
+    {
+    }
+
+    size_t read(char* buffer, size_t size) TIGHTDB_OVERRIDE
+    {
+        if (m_logs_begin == m_logs_end)
+            return 0;
+        for (;;) {
+            if (m_curr_buf_remaining_size > 0) {
+                size_t offset = m_logs_begin->size() - m_curr_buf_remaining_size;
+                const char* data = m_logs_begin->data() + offset;
+                size_t size_2 = min(m_curr_buf_remaining_size, size);
+                m_curr_buf_remaining_size -= size_2;
+                // FIXME: Eliminate the need for copying by changing the API of
+                // Replication::InputStream such that blocks can be handed over
+                // without copying. This is a straight forward change, but the
+                // result is going to be more complicated and less conventional.
+                copy(data, data + size_2, buffer);
+                return size_2;
+            }
+
+            ++m_logs_begin;
+            if (m_logs_begin == m_logs_end)
+                return 0;
+            m_curr_buf_remaining_size = m_logs_begin->size();
+        }
+    }
+
+private:
+    const BinaryData* m_logs_begin;
+    const BinaryData* m_logs_end;
+    size_t m_curr_buf_remaining_size;
+};
+
+
+class MarkDirtyUpdater: public _impl::TableFriend::AccessorUpdater {
+public:
+    void update(Table& table) TIGHTDB_OVERRIDE
+    {
+        typedef _impl::TableFriend tf;
+        tf::mark_dirty(table);
+    }
+
+    void update_parent(Table& table) TIGHTDB_OVERRIDE
+    {
+        typedef _impl::TableFriend tf;
+        tf::mark_dirty(table);
+    }
+
+    size_t m_col_ndx;
+    DataType m_type;
+};
+
+
+class InsertColumnUpdater: public _impl::TableFriend::AccessorUpdater {
+public:
+    InsertColumnUpdater(size_t col_ndx):
+        m_col_ndx(col_ndx)
+    {
+    }
+
+    void update(Table& table) TIGHTDB_OVERRIDE
+    {
+        typedef _impl::TableFriend tf;
+        tf::insert_null_column_accessor(table, m_col_ndx);
+    }
+
+    void update_parent(Table&) TIGHTDB_OVERRIDE
+    {
+    }
+
+private:
+    size_t m_col_ndx;
+};
+
+
+class EraseColumnUpdater: public _impl::TableFriend::AccessorUpdater {
+public:
+    EraseColumnUpdater(size_t col_ndx):
+        m_col_ndx(col_ndx)
+    {
+    }
+
+    void update(Table& table) TIGHTDB_OVERRIDE
+    {
+        typedef _impl::TableFriend tf;
+        tf::erase_column_accessor(table, m_col_ndx);
+    }
+
+    void update_parent(Table&) TIGHTDB_OVERRIDE
+    {
+    }
+
+private:
+    size_t m_col_ndx;
+};
+
+} // anonymous namespace
+
+
+// This class must be able to operate with only the Minimal Accessor Hierarchy
+// Consistency Guarantee. This means, in particular, that it cannot access the
+// underlying array structure.
+//
+// FIXME: There is currently no checking on valid instruction arguments such as
+// column index within bounds. Consider whether we can trust the contents of the
+// transaction log enough to skip chese checks.
+class Group::TransactAdvancer {
+public:
+    TransactAdvancer(Group& group):
+        m_group(group)
+    {
+    }
+
+    bool new_group_level_table(StringData) TIGHTDB_NOEXCEPT
+    {
+        m_group.m_table_accessors.push_back(0); // Throws
+        return true;
+    }
+
+    bool select_table(size_t group_level_ndx, int levels, const size_t* path) TIGHTDB_NOEXCEPT
+    {
+        m_table.reset();
+        if (group_level_ndx < m_group.m_table_accessors.size()) {
+            if (Table* table = m_group.m_table_accessors[group_level_ndx]) {
+                const size_t* path_begin = path;
+                const size_t* path_end = path_begin + 2*levels;
+                for (;;) {
+                    typedef _impl::TableFriend tf;
+                    tf::mark_dirty(*table);
+                    if (path_begin == path_end) {
+                        m_table.reset(table);
+                        break;
+                    }
+                    size_t col_ndx = path_begin[0];
+                    size_t row_ndx = path_begin[1];
+                    table = tf::get_subtable_accessor(*table, col_ndx, row_ndx);
+                    if (!table)
+                        break;
+                    path_begin += 2;
+                }
+            }
+        }
+        return true;
+    }
+
+    bool insert_empty_rows(size_t row_ndx, size_t num_rows) TIGHTDB_NOEXCEPT
+    {
+        typedef _impl::TableFriend tf;
+        if (m_table)
+            tf::adj_accessors_insert_rows(*m_table, row_ndx, num_rows);
+        return true;
+    }
+
+    bool erase_row(size_t row_ndx) TIGHTDB_NOEXCEPT
+    {
+        typedef _impl::TableFriend tf;
+        if (m_table)
+            tf::adj_accessors_erase_row(*m_table, row_ndx);
+        return true;
+    }
+
+    bool move_last_over(size_t target_row_ndx, size_t last_row_ndx) TIGHTDB_NOEXCEPT
+    {
+        typedef _impl::TableFriend tf;
+        if (m_table)
+            tf::adj_accessors_move_last_over(*m_table, target_row_ndx, last_row_ndx);
+        return true;
+    }
+
+    bool clear_table() TIGHTDB_NOEXCEPT
+    {
+        typedef _impl::TableFriend tf;
+        if (m_table) {
+            tf::discard_row_accessors(*m_table);
+            tf::discard_subtable_accessors(*m_table);
+        }
+        return true;
+    }
+
+    bool insert_int(size_t col_ndx, size_t row_ndx, int_fast64_t) TIGHTDB_NOEXCEPT
+    {
+        if (col_ndx == 0)
+            insert_empty_rows(row_ndx, 1);
+        return true;
+    }
+
+    bool insert_bool(size_t col_ndx, size_t row_ndx, bool) TIGHTDB_NOEXCEPT
+    {
+        if (col_ndx == 0)
+            insert_empty_rows(row_ndx, 1);
+        return true;
+    }
+
+    bool insert_float(size_t col_ndx, size_t row_ndx, float) TIGHTDB_NOEXCEPT
+    {
+        if (col_ndx == 0)
+            insert_empty_rows(row_ndx, 1);
+        return true;
+    }
+
+    bool insert_double(size_t col_ndx, size_t row_ndx, double) TIGHTDB_NOEXCEPT
+    {
+        if (col_ndx == 0)
+            insert_empty_rows(row_ndx, 1);
+        return true;
+    }
+
+    bool insert_string(size_t col_ndx, size_t row_ndx, StringData) TIGHTDB_NOEXCEPT
+    {
+        if (col_ndx == 0)
+            insert_empty_rows(row_ndx, 1);
+        return true;
+    }
+
+    bool insert_binary(size_t col_ndx, size_t row_ndx, BinaryData) TIGHTDB_NOEXCEPT
+    {
+        if (col_ndx == 0)
+            insert_empty_rows(row_ndx, 1);
+        return true;
+    }
+
+    bool insert_date_time(size_t col_ndx, size_t row_ndx, DateTime) TIGHTDB_NOEXCEPT
+    {
+        if (col_ndx == 0)
+            insert_empty_rows(row_ndx, 1);
+        return true;
+    }
+
+    bool insert_table(size_t col_ndx, size_t row_ndx) TIGHTDB_NOEXCEPT
+    {
+        if (col_ndx == 0)
+            insert_empty_rows(row_ndx, 1);
+        return true;
+    }
+
+    bool insert_mixed(size_t col_ndx, size_t row_ndx, const Mixed&) TIGHTDB_NOEXCEPT
+    {
+        if (col_ndx == 0)
+            insert_empty_rows(row_ndx, 1);
+        return true;
+    }
+
+    bool row_insert_complete() TIGHTDB_NOEXCEPT
+    {
+        return true; // Noop
+    }
+
+    bool set_int(size_t, size_t, int_fast64_t) TIGHTDB_NOEXCEPT
+    {
+        return true; // Noop
+    }
+
+    bool set_bool(size_t, size_t, bool) TIGHTDB_NOEXCEPT
+    {
+        return true; // Noop
+    }
+
+    bool set_float(size_t, size_t, float) TIGHTDB_NOEXCEPT
+    {
+        return true; // Noop
+    }
+
+    bool set_double(size_t, size_t, double) TIGHTDB_NOEXCEPT
+    {
+        return true; // Noop
+    }
+
+    bool set_string(size_t, size_t, StringData) TIGHTDB_NOEXCEPT
+    {
+        return true; // Noop
+    }
+
+    bool set_binary(size_t, size_t, BinaryData) TIGHTDB_NOEXCEPT
+    {
+        return true; // Noop
+    }
+
+    bool set_date_time(size_t, size_t, DateTime) TIGHTDB_NOEXCEPT
+    {
+        return true; // Noop
+    }
+
+    bool set_table(size_t col_ndx, size_t row_ndx)
+    {
+        if (m_table) {
+            typedef _impl::TableFriend tf;
+            if (Table* subtab = tf::get_subtable_accessor(*m_table, col_ndx, row_ndx)) {
+                tf::mark_dirty(*subtab);
+                tf::adj_clear_nonroot(*subtab);
+            }
+        }
+        return true;
+    }
+
+    bool set_mixed(size_t col_ndx, size_t row_ndx, const Mixed&)
+    {
+        typedef _impl::TableFriend tf;
+        if (m_table)
+            tf::discard_subtable_accessor(*m_table, col_ndx, row_ndx);
+        return true;
+    }
+
+    bool add_int_to_column(size_t, int_fast64_t) TIGHTDB_NOEXCEPT
+    {
+        return true; // Noop
+    }
+
+    bool optimize_table() TIGHTDB_NOEXCEPT
+    {
+        return true; // Noop
+    }
+
+    bool select_descriptor(int levels, const size_t* path)
+    {
+        m_desc.reset();
+        if (m_table) {
+            TIGHTDB_ASSERT(!m_table->has_shared_type());
+            typedef _impl::TableFriend tf;
+            Descriptor* desc = tf::get_root_table_desc_accessor(*m_table);
+            int i = 0;
+            while (desc) {
+                if (i >= levels) {
+                    m_desc.reset(desc);
+                    break;
+                }
+                typedef _impl::DescriptorFriend df;
+                size_t col_ndx = path[i];
+                desc = df::get_subdesc_accessor(*desc, col_ndx);
+                ++i;
+            }
+            m_desc_path_begin = path;
+            m_desc_path_end = path + levels;
+            MarkDirtyUpdater updater;
+            tf::update_accessors(*m_table, m_desc_path_begin, m_desc_path_end, updater);
+        }
+        return true;
+    }
+
+    bool insert_column(size_t col_ndx, DataType, StringData)
+    {
+        if (m_table) {
+            typedef _impl::TableFriend tf;
+            InsertColumnUpdater updater(col_ndx);
+            tf::update_accessors(*m_table, m_desc_path_begin, m_desc_path_end, updater);
+        }
+        typedef _impl::DescriptorFriend df;
+        if (m_desc)
+            df::adj_insert_column(*m_desc, col_ndx);
+        return true;
+    }
+
+    bool erase_column(size_t col_ndx)
+    {
+        if (m_table) {
+            typedef _impl::TableFriend tf;
+            EraseColumnUpdater updater(col_ndx);
+            tf::update_accessors(*m_table, m_desc_path_begin, m_desc_path_end, updater);
+        }
+        typedef _impl::DescriptorFriend df;
+        if (m_desc)
+            df::adj_erase_column(*m_desc, col_ndx);
+        return true;
+    }
+
+    bool rename_column(size_t, StringData) TIGHTDB_NOEXCEPT
+    {
+        return true; // Noop
+    }
+
+    bool add_index_to_column(size_t) TIGHTDB_NOEXCEPT
+    {
+        return true; // Noop
+    }
+
+private:
+    Group& m_group;
+    TableRef m_table;
+    DescriptorRef m_desc;
+    const size_t* m_desc_path_begin;
+    const size_t* m_desc_path_end;
+};
+
+
+void Group::advance_transact(ref_type new_top_ref, size_t new_file_size,
+                             const BinaryData* logs_begin, const BinaryData* logs_end)
+{
+    // The purpose of this function is to refresh all attached accessors after
+    // the underlying node structure has undergone arbitrary change, such as
+    // when a read transaction has been advanced to a later snapshot of the
+    // database.
+    //
+    // Initially, when this function is invoked, we cannot assume any
+    // correspondance between the accessor state and the underlying node
+    // structure, but we can assume the Minimal Accessor Hierarchy Consistency
+    // Guarantee.
+    //
+    // For each transaction log instruction, the accessor state is modified in a
+    // way that maintains the Minimal Accessor Hierarchy Consistency Guarantee
+    // (Group::TransactAdvancer). When all instructions are accounted for, the
+    // accessor state has the additional property of being in structual
+    // correspondance to the underlying node structure. At this point, we can
+    // reliably refresh each accessor recursively, starting from the root (the
+    // group).
+    //
+    // While the Minimal Accessor Hierarchy Consistency Guarantee does not
+    // guarantee anything about the state of the 'ndx_in_parent' property of any
+    // array accessor, we can in this case assume that many of them are still
+    // correct. The exceptions are; the top array accessor of root tables
+    // (Table::m_top), the column array accessor of subtables with shared
+    // descriptor (Table::m_columns), the top array accessor of spec objects of
+    // subtables with shared descriptor (Table::m_spec.m_top), the root array
+    // accessor of table level columns (*Table::m_cols[]->m_array). The root
+    // array accessor of the subcolumn of unique strings in an enumerated string
+    // column (*ColumnStringEnum::m_keys.m_array), and finally, the root array
+    // accessor of search indexes (*Table::m_cols[]->m_index->m_array).
+
+    MultiLogInputStream in(logs_begin, logs_end);
+    Replication::TransactLogParser parser(in);
+    TransactAdvancer advancer(*this);
+    parser.parse(advancer); // Throws
+
+    // Update memory mapping if database file has grown
+    if (new_file_size > m_alloc.get_baseline()) {
+        m_alloc.reset_free_space_tracking(); // Throws
+        m_alloc.remap(new_file_size); // Throws
+        // The file was mapped to a new address, so all array accessors must be
+        // updated.
+        mark_all_table_accessors_dirty();
+    }
+
+    init_from_ref(new_top_ref);
+
+    // Refresh all remaining dirty table accessors
+    size_t num_tables = m_table_accessors.size();
+    for (size_t table_ndx = 0; table_ndx != num_tables; ++table_ndx) {
+        if (Table* table = m_table_accessors[table_ndx]) {
+            typedef _impl::TableFriend tf;
+            size_t spec_ndx_in_parent = 0; // Ignored because these are root tables
+            tf::refresh_after_advance_transact(*table, table_ndx, spec_ndx_in_parent); // Throws
+        }
+    }
+}
+
+void Group::mark_all_table_accessors_dirty()
+{
+    size_t num_tables = m_table_accessors.size();
+    for (size_t table_ndx = 0; table_ndx != num_tables; ++table_ndx) {
+        if (Table* table = m_table_accessors[table_ndx]) {
+            typedef _impl::TableFriend tf;
+            tf::recursive_mark_dirty(*table); // Also all subtable accessors
+        }
+    }
+}
+
+#endif // TIGHTDB_ENABLE_REPLICATION
+
+
 #ifdef TIGHTDB_DEBUG
 
 void Group::Verify() const
 {
     TIGHTDB_ASSERT(is_attached());
+
+    m_alloc.Verify();
 
     // Verify free lists
     if (m_free_positions.is_attached()) {
@@ -829,6 +1300,7 @@ pair<ref_type, size_t> Group::get_to_dot_parent(size_t ndx_in_parent) const
 }
 
 
+/*
 void Group::zero_free_space(size_t file_size, size_t readlock_version)
 {
     static_cast<void>(readlock_version); // FIXME: Why is this parameter not used?
@@ -851,5 +1323,6 @@ void Group::zero_free_space(size_t file_size, size_t readlock_version)
         fill(p, p+len, 0);
     }
 }
+*/
 
 #endif // TIGHTDB_DEBUG

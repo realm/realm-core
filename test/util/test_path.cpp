@@ -37,6 +37,11 @@ void set_test_path_prefix(const string& prefix)
     path_prefix = prefix;
 }
 
+string get_test_path_prefix()
+{
+    return path_prefix;
+}
+
 string get_test_resource_path()
 {
     return resource_path;
