@@ -2444,7 +2444,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MoveLastOver)
 
 
 
-TEST(Shared_Implicit_Transactions)
+TEST(LangBindHelper_Implicit_Transactions)
 {
     SHARED_GROUP_TEST_PATH(path);
     {
@@ -2546,7 +2546,7 @@ void reader_thread(TestResults* test_results_ptr, string path)
 
 }
 
-TEST(Shared_Implicit_Transactions_Multiple_Trackers)
+TEST(LangBindHelper_Implicit_Transactions_Multiple_Trackers)
 {
     const int write_thread_count = 3;
     const int read_thread_count = 3;
