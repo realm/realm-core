@@ -29,7 +29,9 @@
 #include <tightdb/replication.hpp>
 #ifdef TIGHTDB_ENABLE_REPLICATION
 
-namespace tightdb {
+namespace {
+
+using namespace tightdb;
 
 typedef uint_fast64_t version_type;
 
@@ -323,10 +325,6 @@ void RegistryRegistry::remove(std::string filepath)
 
 RegistryRegistry globalRegistry;
 
-
-
-
-
 class TransactLogRegistryImpl : public LangBindHelper::TransactLogRegistry {
 private:
     WriteLogRegistry* m_registry;
@@ -358,15 +356,6 @@ public:
 
 
 
-LangBindHelper::TransactLogRegistry* getWriteLogs(std::string filepath)
-{
-    return new TransactLogRegistryImpl(globalRegistry.get(filepath));
-}
-
-
-
-
-
 
 
 class WriteLogCollector : public Replication
@@ -389,13 +378,6 @@ protected:
     util::Buffer<char> m_transact_log_buffer;
     WriteLogRegistry* m_registry;
 };
-
-
-Replication* makeWriteLogCollector(std::string database_name)
-{
-    WriteLogRegistry* registry = globalRegistry.get(database_name);
-    return  new WriteLogCollector(database_name, registry);
-}
 
 
 
@@ -461,6 +443,28 @@ WriteLogCollector::WriteLogCollector(std::string database_name, WriteLogRegistry
     m_database_name = database_name;
     m_registry = registry;
 }
+
+
+}  // end anonymous namespace
+
+namespace tightdb {
+
+
+
+
+LangBindHelper::TransactLogRegistry* getWriteLogs(std::string filepath)
+{
+    return new TransactLogRegistryImpl(globalRegistry.get(filepath));
+}
+
+
+Replication* makeWriteLogCollector(std::string database_name)
+{
+    WriteLogRegistry* registry = globalRegistry.get(database_name);
+    return  new WriteLogCollector(database_name, registry);
+}
+
+
 
 } // namespace tightdb
 #endif // TIGHTDB_ENABLE_REPLICATION
