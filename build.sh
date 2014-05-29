@@ -682,7 +682,9 @@ EOF
         ;;
 
     "build-test-ios-app")
-        
+        # Prerequisites: build-iphone, build-ios-framework
+        # For more documentation, see test/ios/README.md
+
         TMPL_DIR="test/ios/template"
         TEST_DIR="test/ios/app"
         rm -rf "$TEST_DIR/"* || exit 1
@@ -759,6 +761,14 @@ EOF
 
         . "$TMPL_DIR/App.scheme.sh"
 
+        exit 0
+        ;;
+
+    "test-ios-app")
+        # Prerequisites: build-test-ios-app
+        # For more documentation, see test/ios/README.md
+        (cd "test/ios/app" && xcodebuild test -scheme iOSTestCoreApp \
+            -destination "platform=iOS,name=tightdb's iPad")
         exit 0
         ;;
 
