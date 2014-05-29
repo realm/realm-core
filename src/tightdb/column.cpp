@@ -243,6 +243,7 @@ template<class Op> void col_type_deleg(Op& op, ColumnType type)
         case col_type_Int:
         case col_type_Bool:
         case col_type_DateTime:
+        case col_type_Link:
             op.template call<Column>();
             return;
         case col_type_String:
@@ -268,6 +269,8 @@ template<class Op> void col_type_deleg(Op& op, ColumnType type)
             return;
         case col_type_Reserved1:
         case col_type_Reserved4:
+        case col_type_LinkList:
+        case col_type_BackLink:
             break;
     }
     TIGHTDB_ASSERT(false);
@@ -856,12 +859,12 @@ void Column::move_last_over(size_t ndx)
     TIGHTDB_ASSERT(ndx+1 < size());
 
     size_t last_ndx = size() - 1;
-    int64_t v = get(last_ndx);
+    int64_t v = Column::get(last_ndx);
 
-    set(ndx, v); // Throws
+    Column::set(ndx, v); // Throws
 
     bool is_last = true;
-    erase(last_ndx, is_last); // Throws
+    Column::erase(last_ndx, is_last); // Throws
 }
 
 
@@ -1075,6 +1078,22 @@ ref_type Column::write(size_t slice_offset, size_t slice_size,
     }
     return ref;
 }
+
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+
+void Column::refresh_after_advance_transact(size_t, const Spec&)
+{
+    // With this type of column (Column), `m_array` is always an
+    // instance of Array. This is true becasue all leafs are instances
+    // of Array, and when the root is an inner B+-tree node, only the
+    // top array of the inner node is cached. This means that we never
+    // have to change the type of the cached root array with this type
+    // of column.
+    m_array->init_from_parent();
+}
+
+#endif // TIGHTDB_ENABLE_REPLICATION
 
 
 #ifdef TIGHTDB_DEBUG

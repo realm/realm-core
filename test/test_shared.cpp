@@ -2006,6 +2006,7 @@ TEST(Shared_MultipleRollbacks)
     sg.rollback();
 }
 
+
 TEST(Shared_MultipleEndReads)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -2086,6 +2087,231 @@ TEST(Shared_ReserveDiskSpace)
 }
 
 
+TEST(Shared_MovingEnumStringColumn)
+{
+    // Test that the 'index in parent' property of the column of unique strings
+    // in a ColumnStringEnum is properly adjusted when other string enumeration
+    // columns are inserted or removed before it. Note that the parent of the
+    // column of unique strings in a ColumnStringEnum is a child of an array
+    // node in the Spec class.
+
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg(path);
+
+    {
+        WriteTransaction wt(sg);
+        TableRef table = wt.get_table("foo");
+        table->add_column(type_String, "");
+        table->add_empty_row(64);
+        for (int i = 0; i < 64; ++i)
+            table->set_string(0, i, "foo");
+        table->optimize();
+        CHECK_EQUAL(1, table->get_descriptor()->get_num_unique_values(0));
+        wt.commit();
+    }
+    // Insert new string enumeration column
+    {
+        WriteTransaction wt(sg);
+        TableRef table = wt.get_table("foo");
+        CHECK_EQUAL(1, table->get_descriptor()->get_num_unique_values(0));
+        table->insert_column(0, type_String, "");
+        for (int i = 0; i < 64; ++i)
+            table->set_string(0, i, i%2 == 0 ? "a" : "b");
+        table->optimize();
+        wt.get_group().Verify();
+        CHECK_EQUAL(2, table->get_descriptor()->get_num_unique_values(0));
+        CHECK_EQUAL(1, table->get_descriptor()->get_num_unique_values(1));
+        table->set_string(1, 0, "bar0");
+        table->set_string(1, 1, "bar1");
+        wt.get_group().Verify();
+        CHECK_EQUAL(2, table->get_descriptor()->get_num_unique_values(0));
+        CHECK_EQUAL(3, table->get_descriptor()->get_num_unique_values(1));
+        wt.commit();
+    }
+    {
+        ReadTransaction rt(sg);
+        rt.get_group().Verify();
+        ConstTableRef table = rt.get_table("foo");
+        CHECK_EQUAL(2, table->get_descriptor()->get_num_unique_values(0));
+        CHECK_EQUAL(3, table->get_descriptor()->get_num_unique_values(1));
+        for (int i = 0; i < 64; ++i) {
+            string value = table->get_string(0, i);
+            if (i%2 == 0) {
+                CHECK_EQUAL("a", value);
+            }
+            else {
+                CHECK_EQUAL("b", value);
+            }
+            value = table->get_string(1, i);
+            if (i == 0) {
+                CHECK_EQUAL("bar0", value);
+            }
+            else if (i == 1) {
+                CHECK_EQUAL("bar1", value);
+            }
+            else {
+                CHECK_EQUAL("foo", value);
+            }
+        }
+    }
+    // Remove the recently inserted string enumeration column
+    {
+        WriteTransaction wt(sg);
+        wt.get_group().Verify();
+        TableRef table = wt.get_table("foo");
+        CHECK_EQUAL(2, table->get_descriptor()->get_num_unique_values(0));
+        CHECK_EQUAL(3, table->get_descriptor()->get_num_unique_values(1));
+        table->remove_column(0);
+        wt.get_group().Verify();
+        CHECK_EQUAL(3, table->get_descriptor()->get_num_unique_values(0));
+        table->set_string(0, 2, "bar2");
+        wt.get_group().Verify();
+        CHECK_EQUAL(4, table->get_descriptor()->get_num_unique_values(0));
+        wt.commit();
+    }
+    {
+        ReadTransaction rt(sg);
+        rt.get_group().Verify();
+        ConstTableRef table = rt.get_table("foo");
+        CHECK_EQUAL(4, table->get_descriptor()->get_num_unique_values(0));
+        for (int i = 0; i < 64; ++i) {
+            string value = table->get_string(0, i);
+            if (i == 0) {
+                CHECK_EQUAL("bar0", value);
+            }
+            else if (i == 1) {
+                CHECK_EQUAL("bar1", value);
+            }
+            else if (i == 2) {
+                CHECK_EQUAL("bar2", value);
+            }
+            else {
+                CHECK_EQUAL("foo", value);
+            }
+        }
+    }
+}
+
+
+TEST(Shared_MovingSearchIndex)
+{
+    // Test that the 'index in parent' property of search indexes is properly
+    // adjusted when columns are inserted or removed at a lower column_index.
+
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg(path);
+
+    // Create a regular string column and an enumeration strings column, and
+    // equip both with search indexes.
+    {
+        WriteTransaction wt(sg);
+        TableRef table = wt.get_table("foo");
+        table->add_column(type_String, "regular");
+        table->add_column(type_String, "enum");
+        table->add_empty_row(64);
+        for (int i = 0; i < 64; ++i) {
+            ostringstream out;
+            out << "foo" << i;
+            table->set_string(0, i, out.str());
+            table->set_string(1, i, "bar");
+        }
+        table->set_string(1, 63, "bar63");
+        table->optimize();
+        CHECK_EQUAL(0, table->get_descriptor()->get_num_unique_values(0));
+        CHECK_EQUAL(2, table->get_descriptor()->get_num_unique_values(1));
+        table->set_index(0);
+        table->set_index(1);
+        wt.get_group().Verify();
+        CHECK_EQUAL(62, table->find_first_string(0, "foo62"));
+        CHECK_EQUAL(63, table->find_first_string(1, "bar63"));
+        wt.commit();
+    }
+    // Insert a new column before the two string columns.
+    {
+        WriteTransaction wt(sg);
+        TableRef table = wt.get_table("foo");
+        CHECK_EQUAL(0, table->get_descriptor()->get_num_unique_values(0));
+        CHECK_EQUAL(2, table->get_descriptor()->get_num_unique_values(1));
+        CHECK_EQUAL(62, table->find_first_string(0, "foo62"));
+        CHECK_EQUAL(63, table->find_first_string(1, "bar63"));
+        table->insert_column(0, type_Int, "i");
+        wt.get_group().Verify();
+        CHECK_EQUAL(0, table->get_descriptor()->get_num_unique_values(1));
+        CHECK_EQUAL(2, table->get_descriptor()->get_num_unique_values(2));
+        CHECK_EQUAL(62, table->find_first_string(1, "foo62"));
+        CHECK_EQUAL(63, table->find_first_string(2, "bar63"));
+        table->set_string(1, 0, "foo_X");
+        table->set_string(2, 0, "bar_X");
+        wt.get_group().Verify();
+        CHECK_EQUAL(0, table->get_descriptor()->get_num_unique_values(1));
+        CHECK_EQUAL(3, table->get_descriptor()->get_num_unique_values(2));
+        CHECK_EQUAL(tightdb::not_found, table->find_first_string(1, "bad"));
+        CHECK_EQUAL(tightdb::not_found, table->find_first_string(2, "bad"));
+        CHECK_EQUAL(0,  table->find_first_string(1, "foo_X"));
+        CHECK_EQUAL(31, table->find_first_string(1, "foo31"));
+        CHECK_EQUAL(61, table->find_first_string(1, "foo61"));
+        CHECK_EQUAL(62, table->find_first_string(1, "foo62"));
+        CHECK_EQUAL(63, table->find_first_string(1, "foo63"));
+        CHECK_EQUAL(0,  table->find_first_string(2, "bar_X"));
+        CHECK_EQUAL(1,  table->find_first_string(2, "bar"));
+        CHECK_EQUAL(63, table->find_first_string(2, "bar63"));
+        wt.commit();
+    }
+    // Remove the recently inserted column
+    {
+        WriteTransaction wt(sg);
+        TableRef table = wt.get_table("foo");
+        CHECK(table->has_index(1) && table->has_index(2));
+        CHECK_EQUAL(0, table->get_descriptor()->get_num_unique_values(1));
+        CHECK_EQUAL(3, table->get_descriptor()->get_num_unique_values(2));
+        CHECK_EQUAL(tightdb::not_found, table->find_first_string(1, "bad"));
+        CHECK_EQUAL(tightdb::not_found, table->find_first_string(2, "bad"));
+        CHECK_EQUAL(0,  table->find_first_string(1, "foo_X"));
+        CHECK_EQUAL(31, table->find_first_string(1, "foo31"));
+        CHECK_EQUAL(61, table->find_first_string(1, "foo61"));
+        CHECK_EQUAL(62, table->find_first_string(1, "foo62"));
+        CHECK_EQUAL(63, table->find_first_string(1, "foo63"));
+        CHECK_EQUAL(0,  table->find_first_string(2, "bar_X"));
+        CHECK_EQUAL(1,  table->find_first_string(2, "bar"));
+        CHECK_EQUAL(63, table->find_first_string(2, "bar63"));
+        table->remove_column(0);
+        wt.get_group().Verify();
+        CHECK(table->has_index(0) && table->has_index(1));
+        CHECK_EQUAL(0, table->get_descriptor()->get_num_unique_values(0));
+        CHECK_EQUAL(3, table->get_descriptor()->get_num_unique_values(1));
+        CHECK_EQUAL(tightdb::not_found, table->find_first_string(0, "bad"));
+        CHECK_EQUAL(tightdb::not_found, table->find_first_string(1, "bad"));
+        CHECK_EQUAL(0,  table->find_first_string(0, "foo_X"));
+        CHECK_EQUAL(31, table->find_first_string(0, "foo31"));
+        CHECK_EQUAL(61, table->find_first_string(0, "foo61"));
+        CHECK_EQUAL(62, table->find_first_string(0, "foo62"));
+        CHECK_EQUAL(63, table->find_first_string(0, "foo63"));
+        CHECK_EQUAL(0,  table->find_first_string(1, "bar_X"));
+        CHECK_EQUAL(1,  table->find_first_string(1, "bar"));
+        CHECK_EQUAL(63, table->find_first_string(1, "bar63"));
+        table->set_string(0, 1, "foo_Y");
+        table->set_string(1, 1, "bar_Y");
+        wt.get_group().Verify();
+        CHECK(table->has_index(0) && table->has_index(1));
+        CHECK_EQUAL(0, table->get_descriptor()->get_num_unique_values(0));
+        CHECK_EQUAL(4, table->get_descriptor()->get_num_unique_values(1));
+        CHECK_EQUAL(tightdb::not_found, table->find_first_string(0, "bad"));
+        CHECK_EQUAL(tightdb::not_found, table->find_first_string(1, "bad"));
+        CHECK_EQUAL(0,  table->find_first_string(0, "foo_X"));
+        CHECK_EQUAL(1,  table->find_first_string(0, "foo_Y"));
+        CHECK_EQUAL(31, table->find_first_string(0, "foo31"));
+        CHECK_EQUAL(61, table->find_first_string(0, "foo61"));
+        CHECK_EQUAL(62, table->find_first_string(0, "foo62"));
+        CHECK_EQUAL(63, table->find_first_string(0, "foo63"));
+        CHECK_EQUAL(0,  table->find_first_string(1, "bar_X"));
+        CHECK_EQUAL(1,  table->find_first_string(1, "bar_Y"));
+        CHECK_EQUAL(2,  table->find_first_string(1, "bar"));
+        CHECK_EQUAL(63, table->find_first_string(1, "bar63"));
+        wt.commit();
+    }
+}
+
+
 TEST(Shared_ArrayEraseBug)
 {
     // This test only makes sense when we can insert a number of rows
@@ -2113,6 +2339,5 @@ TEST(Shared_ArrayEraseBug)
         wt.commit();
     }
 }
-
 
 #endif // TEST_SHARED

@@ -652,7 +652,7 @@ EOF
         cp -r "$IPHONE_DIR/include/"* "$FRAMEWORK/Headers/" || exit 1
         find "$FRAMEWORK/Headers" -iregex "^.*\.[ch]\(pp\)\{0,1\}$" \
             -exec sed -i '' -e "s/<tightdb\(.*\)>/<$BASENAME\/tightdb\1>/g" {} \; || exit 1
- 
+
         zip -r -q realm-core-ios-$realm_version.zip $FRAMEWORK || exit 1
         echo "Core framework for iOS can be found under $FRAMEWORK and realm-core-ios-$realm_version.zip."
         exit 0
@@ -691,45 +691,26 @@ EOF
         exit 0
         ;;
 
-
-
-    "test")
-        auto_configure || exit 1
-        export TIGHTDB_HAVE_CONFIG="1"
-        $MAKE check || exit 1
-        echo "Test passed"
-        exit 0
-        ;;
-
-    "test-debug")
-        auto_configure || exit 1
-        export TIGHTDB_HAVE_CONFIG="1"
-        $MAKE check-debug || exit 1
-        echo "Test passed"
-        exit 0
-        ;;
-
-    "memtest")
-        auto_configure || exit 1
-        export TIGHTDB_HAVE_CONFIG="1"
-        $MAKE memcheck || exit 1
-        echo "Test passed"
-        exit 0
-        ;;
-
-    "memtest-debug")
-        auto_configure || exit 1
-        export TIGHTDB_HAVE_CONFIG="1"
-        $MAKE memcheck-debug || exit 1
-        echo "Test passed"
-        exit 0
-        ;;
-
-    "check"|"memcheck"|"check-"*|"memcheck-"*)
+    "test"|"test-debug"|\
+    "check"|"check-debug"|\
+    "memcheck"|"memcheck-debug"|\
+    "check-doc-examples"|\
+    "check-testcase"|"check-testcase-debug"|\
+    "memcheck-testcase"|"memcheck-testcase-debug")
         auto_configure || exit 1
         export TIGHTDB_HAVE_CONFIG="1"
         $MAKE "$MODE" || exit 1
         echo "Test passed"
+        exit 0
+        ;;
+
+    "gdb"|"gdb-debug"|\
+    "gdb-testcase"|"gdb-testcase-debug"|\
+    "performance"|"benchmark"|"benchmark-"*|\
+    "lcov"|"gcovr")
+        auto_configure || exit 1
+        export TIGHTDB_HAVE_CONFIG="1"
+        $MAKE "$MODE" || exit 1
         exit 0
         ;;
 
@@ -2386,7 +2367,7 @@ Unspecified or bad mode '$MODE'.
 Available modes are:
     config clean build build-config-progs build-iphone build-android
     build-ios-framework build-osx-framework
-    test test-debug show-install install uninstall
+    check check-debug show-install install uninstall
     test-installed wipe-installed install-prod install-devel uninstall-prod
     uninstall-devel dist-copy src-dist bin-dist dist-deb dist-status
     dist-pull dist-checkout dist-config dist-clean dist-build
