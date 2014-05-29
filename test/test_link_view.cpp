@@ -18,7 +18,7 @@ using namespace std;
 using namespace tightdb;
 using namespace test_util;
 
-ONLY(LinkView_Basic)
+TEST(LinkView_Basic)
 {
     {
         Group group;
@@ -66,4 +66,47 @@ ONLY(LinkView_Basic)
         CHECK_EQUAL(600, lv.get_int(0, 0));
     }
 }
+
+TEST(LinkView_Query)
+{
+    Group group;
+
+    size_t table1_ndx = 0;
+    size_t table2_ndx = 1;
+    TableRef table1 = group.get_table("table1");
+    TableRef table2 = group.get_table("table2");
+
+    // add some more columns to table1 and table2
+    table1->add_column(type_Int, "col1");
+    table2->add_column(type_Int, "col1");
+
+    // add some rows
+    table1->add_empty_row();
+    table1->set_int(0, 0, 100);
+    table1->add_empty_row();
+    table1->set_int(0, 1, 200);
+    table1->add_empty_row();
+    table1->set_int(0, 2, 300);
+
+    table2->add_empty_row();
+    table2->set_int(0, 0, 400);
+    table2->add_empty_row();
+    table2->set_int(0, 1, 500);
+    table2->add_empty_row();
+    table2->set_int(0, 2, 600);
+
+    size_t col_link2 = table1->add_column_link(type_LinkList, "link", table2_ndx); // todo, rename to add_link_column() ?
+
+    // set some links
+
+    table1->linklist_add_link(col_link2, 1, 1);
+
+    table1->linklist_add_link(col_link2, 1, 1);
+    table1->linklist_add_link(col_link2, 1, 2);
+
+    size_t match = (table1->link(col_link2).column<Int>(0) > 550).find();
+    CHECK_EQUAL(1, match);
+
+}
+
 #endif

@@ -126,7 +126,8 @@ Caveats, notes and todos
 // unit tests are indeed simple enough to fallback to old query_engine, query_expression gets low test coverage. Undef
 // flag to get higher query_expression test coverage. This is a good idea to try out each time you develop on/modify
 // query_expression.
-#define TIGHTDB_OLDQUERY_FALLBACK
+
+//#define TIGHTDB_OLDQUERY_FALLBACK
 
 // namespace tightdb {
 
@@ -193,7 +194,7 @@ struct ValueBase
     virtual void export_double(ValueBase& destination) const = 0;
     virtual void import(const ValueBase& destination) = 0;
 
-    size_t m_rows;
+    bool is_link;
     size_t m_values;
 };
 
@@ -245,16 +246,32 @@ template <class TCond, class T, class TLeft = Subexpr, class TRight = Subexpr> c
 template<class T> class Value : public ValueBase, public Subexpr2<T>
 {
 public:
-    Value() {
-        ValueBase::m_rows = 8;
-        ValueBase::m_values = 8;
+    Value() : Value(0) { }
+    Value(T v) : Value(false, ValueBase::elements, v) { }
+    Value(bool link, size_t values) : Value(link, values, 0) { }
+
+    Value(bool link, size_t values, T v)
+    {
+        m_v = null_ptr;
+        init(link, values, v);
     }
 
-    Value(T v)
-    {
-        ValueBase::m_rows = 8;
-        ValueBase::m_values = 8;
-        std::fill(m_v, m_v + ValueBase::elements, v);
+    ~Value() {
+        delete m_v;
+        m_v = null_ptr;
+    }
+
+    void init(bool link, size_t values, T v) {
+        if (m_v) {
+            delete m_v;
+            m_v = null_ptr;
+        }
+        ValueBase::is_link = link;
+        ValueBase::m_values = values;
+        if (m_values > 0) {
+            m_v = new T[m_values];
+            std::fill(m_v, m_v + ValueBase::m_values, v);
+        }
     }
 
     size_t evaluate(size_t, ValueBase& destination)
@@ -266,14 +283,14 @@ public:
     template <class TOperator> TIGHTDB_FORCEINLINE void fun(const Value* left, const Value* right)
     {
         TOperator o;
-        for (size_t t = 0; t < ValueBase::elements; t++)
+        for (size_t t = 0; t < ValueBase::m_values; t++)
             m_v[t] = o(left->m_v[t], right->m_v[t]);
     }
 
     template <class TOperator> TIGHTDB_FORCEINLINE void fun(const Value* value)
     {
         TOperator o;
-        for (size_t t = 0; t < ValueBase::elements; t++)
+        for (size_t t = 0; t < ValueBase::m_values; t++)
             m_v[t] = o(value->m_v[t]);
     }
 
@@ -281,7 +298,10 @@ public:
     template<class D> TIGHTDB_FORCEINLINE void export2(ValueBase& destination) const
     {
         Value<D>& d = static_cast<Value<D>&>(destination);
-        for (size_t t = 0; t < ValueBase::elements; t++)
+
+        d.init(ValueBase::is_link, ValueBase::m_values, 0);
+
+        for (size_t t = 0; t < ValueBase::m_values; t++)
             d.m_v[t] = static_cast<D>(m_v[t]);
     }
 
@@ -323,44 +343,52 @@ public:
     template <class TCond> TIGHTDB_FORCEINLINE static size_t compare(Value<T>* left, Value<T>* right)
     {
         TCond c;
-        if (left->m_rows > 1 && right->m_rows > 1) {
-            for (size_t r = 0; r < left->ValueBase::m_values; r++) {
-                if (c(left->m_v[r], right->m_v[r]))
-                    return r;
+        if (!left->is_link && !right->is_link) {
+            size_t min = left->ValueBase::m_values < right->ValueBase::m_values ? left->ValueBase::m_values : right->ValueBase::m_values;
+            for (size_t m = 0; m < min; m++) {
+                if (c(left->m_v[m], right->m_v[m]))
+                    return m;
             }
         }
-        else if (left->m_rows == 1 && right->m_rows == 1) {
+        else if (left->is_link && right->is_link) {
             // many-to-many not supported yet
             TIGHTDB_ASSERT(false);
         }
-        else if (left->m_rows == 1) {
-            TIGHTDB_ASSERT(false);
-            for (size_t r = 0; r < left->ValueBase::m_values; r++) {
+        else if (!left->is_link && right->is_link) {
+            for (size_t r = 0; r < right->ValueBase::m_values; r++) {
                 if (c(left->m_v[0], right->m_v[r]))
                     return 0;
             }
         }
-        else if (right->m_rows == 1) {
-            TIGHTDB_ASSERT(false);
+        else if (left->is_link && !right->is_link) {
             for (size_t l = 0; l < left->ValueBase::m_values; l++) {
                 if (c(left->m_v[l], right->m_v[0]))
                     return 0;
             }
         }
 
-        return ValueBase::elements; // no match
+        return not_found; // no match
     }
 
     virtual Subexpr& clone()
     {
         Value<T>& n = *new Value<T>();
+        
+        // Copy members
         n = *this;
+
+        // Alloc and copy payload
+        n.m_v = new T[m_values];
+        memcpy(n.m_v, m_v, sizeof(T) * m_values);
+
         return n;
     }
 
     // Performance note: Declaring values as separately named members generates faster (10% or so) code in VS2010,
     // compared to array, even if the array accesses elements individually instead of in for-loops.
-    T m_v[elements];
+//    T m_v[elements];
+
+    T *m_v;
 };
 
 class ColumnAccessorBase;
@@ -807,10 +835,12 @@ public:
         set_table(table);
     }
 
-    explicit Columns(size_t column, const Table* table, size_t link_column) : m_table(null_ptr), sg(null_ptr), m_link_column(link_column)
+    explicit Columns(size_t column, Table* table, size_t link_column) : m_table(null_ptr), sg(null_ptr), m_link_column(link_column)
     {
-        m_column = column;
-        set_table(table);
+        m_column = column; // todo, initializer list
+        m_column_linklist = &table->get_column<ColumnLinkList, col_type_LinkList>(link_column);
+        TableRef linked_table = m_column_linklist->get_target_table();
+        set_table(linked_table.get());
     }
 
     explicit Columns() : m_table(null_ptr), sg(null_ptr), m_link_column(static_cast<size_t>(-1)) { }
@@ -852,28 +882,49 @@ public:
     // Load 8 elements from Column into destination
     size_t evaluate(size_t index, ValueBase& destination) {
         if (m_link_column != static_cast<size_t>(-1)) {
-            TIGHTDB_ASSERT(false);
+
+            if (m_column_linklist->get_link_count(index) == 0) {
+                Value<T> v(true, 0);
+                destination.import(v);
+                return 0;
+            }
+
+            Column links = m_column_linklist->get_ref_column(index);           
+            Value<T> v(true, links.size());
+
+            for (size_t t = 0; t < links.size(); t++) {
+                size_t link_to = links.get(t);
+                sg->cache_next(link_to); // todo, needed?
+                v.m_v[t] = sg->get_next(link_to);
+            }
+            destination.import(v);
             return 0;
         }
 
-        Value<T> v;
         sg->cache_next(index);
         size_t colsize = sg->m_column->size();
 
         if (util::SameType<T, int64_t>::value && index + ValueBase::elements < sg->m_leaf_end) {
+            Value<T> v;
             // int64_t leaves have a get_chunk optimization that returns 8 int64_t values at once
             sg->m_array_ptr->get_chunk(index - sg->m_leaf_start, static_cast<Value<int64_t>*>(static_cast<ValueBase*>(&v))->m_v);
+            destination.import(v);
+            return 0;
         }
         else {
             // To make Valgrind happy we must initialize all elements in v even if Column ends earlier. Todo, benchmark
             // if an unconditional zero out is faster
-            if (index + ValueBase::elements >= sg->m_leaf_end)
-                v = Value<T>(static_cast<T>(0));
-            for (size_t t = 0; t < ValueBase::elements && index + t < colsize; t++)
+            size_t rows = colsize - index;
+            if (rows > ValueBase::elements)
+                rows = ValueBase::elements;
+
+            Value<T> v(false, rows);
+            for (size_t t = 0; t < rows; t++)
                 v.m_v[t] = sg->get_next(index + t);
+
+            destination.import(v);
+            return 0;
         }
-        destination.import(v);
-        return 0;
     }
 
     // m_table is redundant with ColumnAccessorBase<>::m_table, but is in order to decrease class dependency/entanglement
@@ -883,6 +934,8 @@ private:
     SequentialGetter<T>* sg;
     const Table* m_link_table;
     size_t m_link_column;
+
+    ColumnLinkList* m_column_linklist;
 };
 
 
@@ -1037,14 +1090,18 @@ public:
         Value<T> right;
         Value<T> left;
 
-        for (; start < end; start += ValueBase::elements) {
+        for (; start < end;) {
             m_left.evaluate(start, left);
             m_right.evaluate(start, right);
             match = Value<T>::template compare<TCond>(&left, &right);
 
             // Note the second condition that tests if match position in chunk exceeds column length
-            if (match != ValueBase::elements && start + match < end)
+            if (match != not_found && start + match < end)
                 return start + match;
+            
+            size_t processed = right.m_values < left.m_values ? right.m_values : left.m_values;
+            size_t rows = (left.is_link || right.is_link) ? 1 : processed;
+            start += rows;
         }
 
         return not_found; // no match
