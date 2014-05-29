@@ -516,7 +516,8 @@ EOF
             platform="$(printf "%s\n" "$x" | cut -d: -f1)" || exit 1
             sdk="$(printf "%s\n" "$x" | cut -d: -f2)" || exit 1
             archs="$(printf "%s\n" "$x" | cut -d: -f3 | sed 's/,/ /g')" || exit 1
-            cflags_arch="-mios-version-min=5.0"
+            cflags_arch=""
+            #cflags_arch="-mios-version-min=5.0"
             for y in $archs; do
                 word_list_append "cflags_arch" "-arch $y" || exit 1
             done
@@ -680,12 +681,12 @@ EOF
         exit 0
         ;;
 
-    "test-on-ios")
+    "build-test-ios-app")
         
         TMPL_DIR="test/ios/template"
         TEST_DIR="test/ios/app"
-        rm -rf "$TEST_DIR" || exit 1
-        mkdir "$TEST_DIR" || exit 1
+        rm -rf "$TEST_DIR/"* || exit 1
+        mkdir -p "$TEST_DIR" || exit 1
 
         APP="iOSTestCoreApp"
         TEST_APP="${APP}Tests"
@@ -716,12 +717,14 @@ EOF
             -e "s/<tightdb\(.*\)>/<RealmCore\/tightdb\1>/g" {} \; || exit 1
 
         # Create an XCTestCase
-        . "$TMPL_DIR/AppTests/AppTests.mm.sh"
+        #. "$TMPL_DIR/AppTests/AppTests.mm.sh"
 
         # Set up frameworks.
         FRAMEWORK="RealmCore.framework"
+        #FRAMEWORK="libtightdb-ios.a"
         rm -rf "$APP_DIR/$FRAMEWORK" || exit 1
         cp -r "../tightdb/$FRAMEWORK" "$TEST_DIR/$FRAMEWORK" || exit 1
+        #cp -r "../tightdb/iphone-lib/$FRAMEWORK" "$TEST_DIR/$FRAMEWORK" || exit 1
 
         # Initialize app directory
         cp -r "test/ios/template/App" "$APP_DIR" || exit 1
@@ -730,8 +733,10 @@ EOF
 
         # Gather all the test sources in a Python-friendly format.
         ## The indentation is to make it look pretty in the Gyp file.
-        TEST_APP_SOURCES=$(cd $TEST_DIR && find "$TEST_APP" -type f | \
+        APP_SOURCES=$(cd $TEST_DIR && find "$TEST_APP" -type f | \
             sed -E "s/^(.*)$/                '\1',/") || exit 1
+        TEST_APP_SOURCES="$APP_SOURCES"
+        #TEST_APP_SOURCES="$APP_SOURCES'$TEST_APP.mm',"
         RESOURCES="$(echo "$RESOURCES" | sed -E "s/ /', '/g")" || exit 1
 
         # Generate a Gyp file.

@@ -37,7 +37,7 @@ cat >"$TEST_DIR/$APP.gyp" <<EOF
                 '$APP/AppDelegate.h',
                 '$APP/AppDelegate.mm',
                 '$APP/main.m',
-$TEST_APP_SOURCES
+$APP_SOURCES
             ],
             'mac_bundle_resources': [
                 '$APP/Images.xcassets',
@@ -69,7 +69,7 @@ $TEST_APP_SOURCES
                 '$APP'
             ],
             'include_dirs': [
-                './$TEST_APP/**'
+                '$TEST_APP/**'
             ],
             'xcode_settings': {
                 'SDKROOT': 'iphoneos',
