@@ -1090,7 +1090,7 @@ TEST(Table_SortedQuery)
 
     TestTable::View v_sorted = table.column().second.get_sorted_view();
     CHECK_EQUAL(table.size(), v_sorted.size());
- 
+
 #ifdef TIGHTDB_DEBUG
     table.Verify();
 #endif
