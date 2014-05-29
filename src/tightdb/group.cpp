@@ -275,10 +275,13 @@ Table* Group::get_table_by_ndx(size_t ndx)
         table = _impl::TableFriend::create_ref_counted(m_alloc, ref, this, ndx); // Throws
         m_table_accessors[ndx] = table;
         _impl::TableFriend::bind_ref(*table); // Increase reference count from 0 to 1
+
+        // The link targets in the table has to be initialized
+        // after creation to avoid circular initializations
+        _impl::TableFriend::initialize_link_targets(*table);
     }
     return table;
 }
-
 
 ref_type Group::create_new_table(StringData name)
 {

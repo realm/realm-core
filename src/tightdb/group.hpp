@@ -321,6 +321,9 @@ public:
     void Verify() const {}
 #endif
 
+protected:
+    bool is_parent_group() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {return true;}
+
 private:
     SlabAlloc m_alloc;
 

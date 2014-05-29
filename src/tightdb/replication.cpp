@@ -664,6 +664,12 @@ private:
                 return "Table";
             case type_Mixed:
                 return "Mixed";
+            case type_Link:
+                return "Link";
+            case type_LinkList:
+                return "LinkList";
+            case type_BackLink:
+                return "BackLink";
         }
         TIGHTDB_ASSERT(false);
         return 0;

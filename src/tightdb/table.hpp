@@ -38,6 +38,8 @@ class TableView;
 class TableViewBase;
 class ConstTableView;
 class StringIndex;
+class Group;
+class ColumnBackLink;
 
 template<class> class Columns;
 
@@ -144,8 +146,8 @@ public:
     /// These methods behave as if they were called on the descriptor
     /// returned by get_descriptor().
     std::size_t get_column_count() const TIGHTDB_NOEXCEPT;
-    DataType get_column_type(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
-    StringData get_column_name(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
+    DataType    get_column_type(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
+    StringData  get_column_name(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
     std::size_t get_column_index(StringData name) const TIGHTDB_NOEXCEPT;
     //@}
 
@@ -181,6 +183,7 @@ public:
     /// \sa get_descriptor()
     /// \sa Descriptor::add_column()
     std::size_t add_column(DataType type, StringData name, DescriptorRef* subdesc = 0);
+    std::size_t add_column_link(DataType type, StringData name, std::size_t target_table_ndx);
     void insert_column(std::size_t column_ndx, DataType type, StringData name,
                        DescriptorRef* subdesc = 0);
     void remove_column(std::size_t column_ndx);
@@ -311,8 +314,8 @@ public:
     void        remove_last();
 
     /// Move the last row to the specified index. This overwrites the target row
-    /// and reduces the number of rows by one. The specified index must be
-    /// strictly less than `N-1`, where `N` is the number of rows in the table.
+    /// and reduces the number of rows by one. If the target row is the last one
+    /// it will just be deleted.
     void move_last_over(std::size_t target_row_ndx);
 
     // Insert row
@@ -327,6 +330,8 @@ public:
     void insert_binary(std::size_t column_ndx, std::size_t row_ndx, BinaryData value);
     void insert_subtable(std::size_t column_ndx, std::size_t row_ndx); // Insert empty table
     void insert_mixed(std::size_t column_ndx, std::size_t row_ndx, Mixed value);
+    void insert_link(std::size_t column_ndx, std::size_t row_ndx, std::size_t target_row_ndx);
+    void insert_linklist(std::size_t column_ndx, std::size_t row_ndx); // Insert empty link list
     void insert_done();
 
     // Get cell values
@@ -339,6 +344,11 @@ public:
     BinaryData  get_binary(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
     Mixed       get_mixed(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
     DataType    get_mixed_type(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
+    std::size_t get_link(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
+    TableRef    get_link_target(std::size_t column_ndx) TIGHTDB_NOEXCEPT;
+
+    template<class T>
+    typename T::RowAccessor get_link_accessor(std::size_t column_ndx, std::size_t row_ndx);
 
     // Set cell values
     void set_int(std::size_t column_ndx, std::size_t row_ndx, int_fast64_t value);
@@ -350,7 +360,22 @@ public:
     void set_string(std::size_t column_ndx, std::size_t row_ndx, StringData value);
     void set_binary(std::size_t column_ndx, std::size_t row_ndx, BinaryData value);
     void set_mixed(std::size_t column_ndx, std::size_t row_ndx, Mixed value);
+    void set_link(std::size_t column_ndx, std::size_t row_ndx, std::size_t target_row_ndx);
 
+    // Links
+    bool is_null_link(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
+    void nullify_link(std::size_t column_ndx, std::size_t row_ndx);
+
+    // Link lists
+    bool linklist_has_links(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
+    std::size_t get_link_count(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
+    void linklist_add_link(std::size_t column_ndx, std::size_t row_ndx, std::size_t target_row_ndx);
+    void linklist_insert_link(std::size_t column_ndx, std::size_t row_ndx, std::size_t ins_pos, std::size_t target_row_ndx);
+    void linklist_remove_link(std::size_t column_ndx, std::size_t row_ndx, std::size_t link_ndx);
+    void linklist_remove_all_links(std::size_t column_ndx, std::size_t row_ndx);
+    void linklist_set_link(std::size_t column_ndx, std::size_t row_ndx, std::size_t link_ndx, std::size_t target_row_ndx);
+    void linklist_move_link(std::size_t column_ndx, std::size_t row_ndx, std::size_t old_pos, std::size_t new_pos);
+    std::size_t linklist_get_link(std::size_t column_ndx, std::size_t row_ndx, std::size_t link_ndx) const TIGHTDB_NOEXCEPT;
 
     void add_int(std::size_t column_ndx, int64_t value);
 
@@ -380,6 +405,10 @@ public:
         const TIGHTDB_NOEXCEPT;
     void clear_subtable(std::size_t column_ndx, std::size_t row_ndx);
 
+    // Backlinks
+    std::size_t get_backlink_count(std::size_t row_ndx, std::size_t source_table_ndx, std::size_t source_column_ndx) const TIGHTDB_NOEXCEPT;
+    std::size_t get_backlink(std::size_t row_ndx, std::size_t source_table_ndx, std::size_t source_column_ndx, std::size_t backlink_ndx) const TIGHTDB_NOEXCEPT;
+
     //@{
     /// If this accessor is attached to a subtable, then that subtable has a
     /// parent table, and the subtable either resides in a column of type
@@ -402,11 +431,15 @@ public:
     std::size_t get_index_in_parent() const TIGHTDB_NOEXCEPT;
     //@}
 
+    // Only top-level (with a group as parent) unordered tables are linkable
+    bool is_linkable() const TIGHTDB_NOEXCEPT;
+    Group* get_parent_group() const TIGHTDB_NOEXCEPT;
+
     // Aggregate functions
-    std::size_t  count_int(std::size_t column_ndx, int64_t value) const;
-    std::size_t  count_string(std::size_t column_ndx, StringData value) const;
-    std::size_t  count_float(std::size_t column_ndx, float value) const;
-    std::size_t  count_double(std::size_t column_ndx, double value) const;
+    std::size_t count_int(std::size_t column_ndx, int64_t value) const;
+    std::size_t count_string(std::size_t column_ndx, StringData value) const;
+    std::size_t count_float(std::size_t column_ndx, float value) const;
+    std::size_t count_double(std::size_t column_ndx, double value) const;
 
     int64_t sum_int(std::size_t column_ndx) const;
     double  sum_float(std::size_t column_ndx) const;
@@ -612,6 +645,11 @@ protected:
     void insert_into(Table* parent, std::size_t col_ndx, std::size_t row_ndx) const;
 
     void set_into_mixed(Table* parent, std::size_t col_ndx, std::size_t row_ndx) const;
+
+    void initialize_link_targets();
+    void create_backlinks_column(std::size_t source_table_ndx, std::size_t source_table_column_ndx);
+    ColumnBackLink& get_backlink_column(std::size_t source_table_ndx, std::size_t source_table_column_ndx);
+    void update_backlink_column_ref(std::size_t source_table_ndx, std::size_t old_column_ndx, std::size_t new_column_ndx);
 
 private:
     class SliceWriter;
@@ -978,6 +1016,10 @@ public:
 protected:
     virtual StringData get_child_name(std::size_t child_ndx) const TIGHTDB_NOEXCEPT;
 
+    /// Returns true if this parent is a Group (i.e. the child is a
+    /// top-level table.
+    virtual bool is_parent_group() const TIGHTDB_NOEXCEPT {return false;}
+
     /// If this table parent is a column of some parent table, then this
     /// function must return the pointer to the parent table, otherwise it must
     /// return null.
@@ -1020,6 +1062,11 @@ inline bool Table::is_attached() const TIGHTDB_NOEXCEPT
     return m_columns.has_parent();
 }
 
+inline bool Table::is_linkable() const TIGHTDB_NOEXCEPT
+{
+    return (get_parent_group() != NULL);
+}
+
 inline StringData Table::get_name() const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(is_attached());
@@ -1035,7 +1082,7 @@ inline StringData Table::get_name() const TIGHTDB_NOEXCEPT
 inline std::size_t Table::get_column_count() const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(is_attached());
-    return m_spec.get_column_count();
+    return m_spec.get_public_column_count();
 }
 
 inline StringData Table::get_column_name(std::size_t ndx) const TIGHTDB_NOEXCEPT
@@ -1052,13 +1099,13 @@ inline std::size_t Table::get_column_index(StringData name) const TIGHTDB_NOEXCE
 
 inline ColumnType Table::get_real_column_type(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(ndx < get_column_count());
+    TIGHTDB_ASSERT(ndx < m_spec.get_column_count());
     return m_spec.get_real_column_type(ndx);
 }
 
 inline DataType Table::get_column_type(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(ndx < get_column_count());
+    TIGHTDB_ASSERT(ndx < m_spec.get_column_count());
     return m_spec.get_column_type(ndx);
 }
 
@@ -1319,6 +1366,11 @@ inline std::size_t Table::get_size_from_ref(ref_type top_ref, Allocator& alloc) 
     return get_size_from_ref(spec_ref, columns_ref, alloc);
 }
 
+inline void Table::update_backlink_column_ref(std::size_t source_table_ndx, std::size_t old_column_ndx, std::size_t new_column_ndx)
+{
+    m_spec.update_backlink_column_ref(source_table_ndx, old_column_ndx, new_column_ndx);
+}
+
 inline bool Table::is_degenerate() const TIGHTDB_NOEXCEPT
 {
     return !m_columns.is_attached();
@@ -1341,6 +1393,17 @@ inline std::size_t* Table::Parent::record_subtable_path(std::size_t* begin,
                                                         std::size_t*) TIGHTDB_NOEXCEPT
 {
     return begin;
+}
+
+template<class T>
+typename T::RowAccessor Table::get_link_accessor(std::size_t column_ndx, std::size_t row_ndx)
+{
+    size_t row_pos_in_target = get_link(column_ndx, row_ndx);
+    TableRef target_table = get_link_target(column_ndx);
+
+    Table* table = &*target_table;
+    T* typed_table = (T*)(table);
+    return (*typed_table)[row_pos_in_target];
 }
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
@@ -1548,6 +1611,11 @@ public:
         table.refresh_after_advance_transact(ndx_in_parent, spec_ndx_in_parent); // Throws
     }
 #endif
+
+    static void initialize_link_targets(Table& table) TIGHTDB_NOEXCEPT
+    {
+        table.initialize_link_targets();
+    }
 };
 
 
