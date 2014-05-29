@@ -188,9 +188,10 @@ void Array::init_from_mem(MemRef mem) TIGHTDB_NOEXCEPT
 
     // Parse header
     m_is_inner_bptree_node = get_is_inner_bptree_node_from_header(header);
-    m_has_refs = get_hasrefs_from_header(header);
-    m_width    = get_width_from_header(header);
-    m_size     = get_size_from_header(header);
+    m_has_refs             = get_hasrefs_from_header(header);
+    m_context_flag         = get_context_flag_from_header(header);
+    m_width                = get_width_from_header(header);
+    m_size                 = get_size_from_header(header);
 
     // Capacity is how many items there are room for
     bool is_read_only = m_alloc.is_read_only(mem.m_ref);
@@ -298,8 +299,7 @@ MemRef Array::slice(size_t offset, size_t size, Allocator& target_alloc) const
     Array slice(target_alloc);
     _impl::DeepArrayDestroyGuard dg(&slice);
     Type type = get_type();
-    bool context_flag = get_context_flag();
-    slice.create(type, context_flag); // Throws
+    slice.create(type, m_context_flag); // Throws
     size_t begin = offset;
     size_t end   = offset + size;
     for (size_t i = begin; i != end; ++i) {
@@ -320,8 +320,7 @@ MemRef Array::slice_and_clone_children(size_t offset, size_t size, Allocator& ta
     Array slice(target_alloc);
     _impl::DeepArrayDestroyGuard dg(&slice);
     Type type = get_type();
-    bool context_flag = get_context_flag();
-    slice.create(type, context_flag); // Throws
+    slice.create(type, m_context_flag); // Throws
     _impl::DeepArrayRefDestroyGuard dg_2(target_alloc);
     size_t begin = offset;
     size_t end   = offset + size;
@@ -444,6 +443,10 @@ void Array::move_backward(size_t begin, size_t end, size_t dest_end)
     copy_backward(begin_2, end_2, dest_end_2);
 }
 
+void Array::add_to_column(Column* column, int64_t value) 
+{
+    column->add(value);
+}
 
 void Array::set(size_t ndx, int64_t value)
 {
@@ -686,12 +689,12 @@ size_t Array::FindGTE(int64_t target, size_t start, const Array* indirection) co
     }
 
     if (start + 2 < m_size) {
-        if (get(indirection ? indirection->get(start) : start) >= target) {
+        if (get(indirection ? to_size_t(indirection->get(start)) : start) >= target) {
             ret = start;
             goto exit;
         }
         ++start;
-        if (get(indirection ? indirection->get(start) : start) >= target) {
+        if (get(indirection ? to_size_t(indirection->get(start)) : start) >= target) {
             ret = start;
             goto exit;
         }
@@ -699,7 +702,7 @@ size_t Array::FindGTE(int64_t target, size_t start, const Array* indirection) co
     }
 
     // Todo, use templated get<width> from this point for performance
-    if (target > get(indirection ? indirection->get(m_size - 1) : m_size - 1)) {
+    if (target > get(indirection ? to_size_t(indirection->get(m_size - 1)) : m_size - 1)) {
         ret = not_found;
         goto exit;
     }
@@ -708,7 +711,7 @@ size_t Array::FindGTE(int64_t target, size_t start, const Array* indirection) co
     add = 1;
 
     for (;;) {
-        if (start + add < m_size && get(indirection ? indirection->get(start + add) : start + add) < target)
+        if (start + add < m_size && get(indirection ? to_size_t(indirection->get(start + add)) : start + add) < target)
             start += add;
         else
             break;
@@ -730,7 +733,7 @@ size_t Array::FindGTE(int64_t target, size_t start, const Array* indirection) co
     orig_high = high;
     while (high - start > 1) {
         size_t probe = (start + high) / 2; // FIXME: Prone to overflow - see lower_bound() for a solution
-        int64_t v = get(indirection ? indirection->get(probe) : probe);
+        int64_t v = get(indirection ? to_size_t(indirection->get(probe)) : probe);
         if (v < target)
             start = probe;
         else
@@ -2723,7 +2726,7 @@ size_t Array::upper_bound_int(int64_t value) const TIGHTDB_NOEXCEPT
 }
 
 
-void Array::find_all(Array& result, int64_t value, size_t col_offset, size_t begin, size_t end) const
+void Array::find_all(Column* result, int64_t value, size_t col_offset, size_t begin, size_t end) const
 {
     TIGHTDB_ASSERT(begin <= size());
     TIGHTDB_ASSERT(end == npos || (begin <= end && end <= size()));
@@ -2735,9 +2738,7 @@ void Array::find_all(Array& result, int64_t value, size_t col_offset, size_t beg
         return; // FIXME: Why do we have to check and early-out here?
 
     QueryState<int64_t> state;
-    state.init(act_FindAll, &result, static_cast<size_t>(-1));
-//    state.m_state = reinterpret_cast<int64_t>(&result);
-
+    state.init(act_FindAll, result, static_cast<size_t>(-1));
     TIGHTDB_TEMPEX3(find, Equal, act_FindAll, m_width, (value, begin, end, col_offset, &state, CallbackDummy()));
 
     return;
@@ -3004,7 +3005,7 @@ top:
 }
 
 
-void Array::IndexStringFindAll(Array& result, StringData value, void* column, StringGetter get_func) const
+void Array::IndexStringFindAll(Column& result, StringData value, void* column, StringGetter get_func) const
 {
     StringData value_2 = value;
     const char* data = m_data;
@@ -3676,16 +3677,13 @@ void elim_superfluous_bptree_root(Array* root, MemRef parent_mem,
             // This child is an inner node, and is the closest one to
             // the root that has more than one child, so make it the
             // new root.
-            if (ArrayParent* parent_of_root = root->get_parent()) {
-                size_t ndx_in_parent = root->get_ndx_in_parent();
-                parent_of_root->update_child_ref(ndx_in_parent, child_ref); // Throws
-            }
+            root->init_from_ref(child_ref);
+            root->update_parent(); // Throws
             // From this point on, the height reduction operation
             // cannot be aborted without leaking memory, so the rest
             // of the operation must proceed without throwing. This
             // includes retrocursive completion of earlier invocations
             // of this function.
-            root->init_from_ref(child_ref);
         }
         else {
             // This child is an inner node, but has itself just one

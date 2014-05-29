@@ -424,14 +424,14 @@ TEST(StringIndex_Distinct)
 
     // Get view of unique values
     // (sorted in alphabetical order, each ref to first match)
-    Array result;
+    Column result;
     ndx.distinct(result);
 
     CHECK_EQUAL(4, result.size());
-    CHECK_EQUAL(1, result[0]); // s2 = Brian
-    CHECK_EQUAL(0, result[1]); // s1 = John
-    CHECK_EQUAL(3, result[2]); // s3 = Samantha
-    CHECK_EQUAL(6, result[3]); // s4 = Tom
+    CHECK_EQUAL(1, result.get(0)); // s2 = Brian
+    CHECK_EQUAL(0, result.get(1)); // s1 = John
+    CHECK_EQUAL(3, result.get(2)); // s3 = Samantha
+    CHECK_EQUAL(6, result.get(3)); // s4 = Tom
 
     // Clean up
     result.destroy();
