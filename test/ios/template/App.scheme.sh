@@ -5,26 +5,6 @@ cat >"$TEST_DIR/$APP.xcodeproj/xcuserdata/$USER.xcuserdatad/xcschemes/$APP.xcsch
 <Scheme
    LastUpgradeVersion = "0500"
    version = "1.3">
-   <BuildAction
-      parallelizeBuildables = "YES"
-      buildImplicitDependencies = "YES">
-      <BuildActionEntries>
-         <BuildActionEntry
-            buildForTesting = "YES"
-            buildForRunning = "YES"
-            buildForProfiling = "YES"
-            buildForArchiving = "YES"
-            buildForAnalyzing = "YES">
-            <BuildableReference
-               BuildableIdentifier = "primary"
-               BlueprintIdentifier = "$APP_ID"
-               BuildableName = "$APP.app"
-               BlueprintName = "$APP"
-               ReferencedContainer = "container:$APP.xcodeproj">
-            </BuildableReference>
-         </BuildActionEntry>
-      </BuildActionEntries>
-   </BuildAction>
    <TestAction
       selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB"
       selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
