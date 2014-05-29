@@ -716,15 +716,10 @@ EOF
         find "$TEST_APP_DIR" -type f -exec sed -i '' \
             -e "s/<tightdb\(.*\)>/<RealmCore\/tightdb\1>/g" {} \; || exit 1
 
-        # Create an XCTestCase
-        #. "$TMPL_DIR/AppTests/AppTests.mm.sh"
-
         # Set up frameworks.
         FRAMEWORK="RealmCore.framework"
-        #FRAMEWORK="libtightdb-ios.a"
         rm -rf "$APP_DIR/$FRAMEWORK" || exit 1
         cp -r "../tightdb/$FRAMEWORK" "$TEST_DIR/$FRAMEWORK" || exit 1
-        #cp -r "../tightdb/iphone-lib/$FRAMEWORK" "$TEST_DIR/$FRAMEWORK" || exit 1
 
         # Initialize app directory
         cp -r "test/ios/template/App" "$APP_DIR" || exit 1
@@ -736,7 +731,6 @@ EOF
         APP_SOURCES=$(cd $TEST_DIR && find "$TEST_APP" -type f | \
             sed -E "s/^(.*)$/                '\1',/") || exit 1
         TEST_APP_SOURCES="$APP_SOURCES"
-        #TEST_APP_SOURCES="$APP_SOURCES'$TEST_APP.mm',"
         RESOURCES="$(echo "$RESOURCES" | sed -E "s/ /', '/g")" || exit 1
 
         # Generate a Gyp file.

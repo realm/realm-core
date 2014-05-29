@@ -8,6 +8,10 @@
 
 #import "AppDelegate.h"
 #include "test_all.hpp"
+#include <iostream>
+#include <fstream>
+
+using namespace std;
 
 @implementation AppDelegate
 
@@ -23,6 +27,11 @@
      changeCurrentDirectoryPath:(NSTemporaryDirectory())];
     test_all(0, NULL);
     
+    cout << "====================" << endl;
+    ifstream if_xml("unit-test-report.xml", ios_base::binary);
+    cout << if_xml.rdbuf();
+    if_xml.close();
+    cout << "====================" << endl;
     return YES;
 }
 
