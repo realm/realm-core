@@ -532,6 +532,11 @@ EOF
         lipo "$temp_dir/platforms"/*/"libtightdb.a"     -create -output "$IPHONE_DIR/libtightdb-ios.a"     || exit 1
         echo "Creating '$IPHONE_DIR/libtightdb-ios-dbg.a'"
         lipo "$temp_dir/platforms"/*/"libtightdb-dbg.a" -create -output "$IPHONE_DIR/libtightdb-ios-dbg.a" || exit 1
+        for x in $iphone_sdks; do
+            platform="$(printf "%s\n" "$x" | cut -d: -f1)" || exit 1
+            cp "src/tightdb/libtightdb-$platform.a" "$IPHONE_DIR" || exit 1
+            cp "src/tightdb/libtightdb-$platform-dbg.a" "$IPHONE_DIR" || exit 1
+        done
         echo "Copying headers to '$IPHONE_DIR/include'"
         mkdir -p "$IPHONE_DIR/include" || exit 1
         cp "src/tightdb.hpp" "$IPHONE_DIR/include/" || exit 1
