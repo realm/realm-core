@@ -21,7 +21,6 @@ static const mode_t MS_MODE_MASK = 0x0000ffff;
 
 #include <tightdb.hpp>
 #include <tightdb/util/file.hpp>
-#include <tightdb/column_link.hpp>
 
 #include "test.hpp"
 
