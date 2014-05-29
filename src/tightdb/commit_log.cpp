@@ -124,7 +124,6 @@ WriteLogRegistry::~WriteLogRegistry()
 void WriteLogRegistry::add_commit(version_type version, char* data, std::size_t sz)
 {
     util::LockGuard lock(m_mutex);
-    //std::cerr << "adding version " << version << std::endl;
     // if no one is interested, cleanup earlier commits, but add the new one.
     // this prevents a race condition whereby a writing threads first commit
     // is discarded because it occurs before a reader expresses interest, BUT
@@ -183,14 +182,13 @@ TIGHTDB_NOEXCEPT
 {
     util::LockGuard lock(m_mutex);
     size_t dest_idx = 0;
-    //std::cerr << "get_version " << from << " .. " << to << std::endl;
     for (version_type version = from+1; version <= to; version++) {
         TIGHTDB_ASSERT(is_anybody_interested(version));
         TIGHTDB_ASSERT(is_a_known_commit(version));
         size_t idx = to_index(version);
         TIGHTDB_ASSERT(idx < m_commits.size());
         WriteLogRegistry::CommitEntry* entry = & m_commits[ idx ];
-        commits[dest_idx].set(entry->data, entry->sz);
+        commits[dest_idx] = BinaryData(entry->data, entry->sz);
         dest_idx++;
     }
 }
@@ -236,7 +234,6 @@ void WriteLogRegistry::cleanup()
         if (earliest == 0)
             last_to_clean = m_oldest_version - 1;
     }
-    //std::cerr << "cleaning versions " << m_oldest_version << " .. " << last_to_clean << std::endl;
     // do the actual cleanup, releasing commits in range [m_oldest_version .. last_to_clean]:
     for (version_type version = m_oldest_version; version <= last_to_clean; version++) {
         size_t idx = to_index(version);

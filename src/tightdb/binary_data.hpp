@@ -49,7 +49,6 @@ public:
 
     ~BinaryData() TIGHTDB_NOEXCEPT {}
 
-    void set(const char* data, std::size_t size) { m_data = data; m_size = size; }
     char operator[](std::size_t i) const TIGHTDB_NOEXCEPT { return m_data[i]; }
 
     const char* data() const TIGHTDB_NOEXCEPT { return m_data; }
