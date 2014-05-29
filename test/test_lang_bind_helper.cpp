@@ -2448,7 +2448,7 @@ TEST(Shared_Implicit_Transactions)
 {
     SHARED_GROUP_TEST_PATH(path);
     {
-        UniquePtr<SharedGroup::TransactLogRegistry> wlr(getWriteLogs(path));
+        UniquePtr<LangBindHelper::TransactLogRegistry> wlr(getWriteLogs(path));
         UniquePtr<Replication> repl(makeWriteLogCollector(path));
         SharedGroup sg(*repl);
         {
@@ -2525,7 +2525,7 @@ void reader_thread(TestResults* test_results_ptr, string path)
     Random random(random_int<unsigned long>());
     
     UniquePtr<Replication> repl(makeWriteLogCollector(path));
-    UniquePtr<SharedGroup::TransactLogRegistry> wlr(getWriteLogs(path));
+    UniquePtr<LangBindHelper::TransactLogRegistry> wlr(getWriteLogs(path));
     SharedGroup sg(*repl);
     Group& g = const_cast<Group&>(sg.begin_read());
     TableRef tr = g.get_table("table");

@@ -26,7 +26,7 @@
 
 #include <tightdb/replication.hpp>
 #include <tightdb/binary_data.hpp>
-#include <tightdb/group_shared.hpp>
+#include <tightdb/lang_bind_helper.hpp>
 
 namespace tightdb {
 
@@ -34,7 +34,7 @@ namespace tightdb {
 // Obtain the TransactLogRegistry for a specific filepath. Create it, if it doesn't exist.
 // You need to obtain seperate instances for each shared group that needs to update accessors.
 // The caller assumes ownership of the registry and must destroy it to avoid space leaks.
-SharedGroup::TransactLogRegistry* getWriteLogs(std::string filepath);
+LangBindHelper::TransactLogRegistry* getWriteLogs(std::string filepath);
 
 // Create a writelog collector and associate it with a filepath. You'll need one writelog
 // collector for each shared group. Commits from writelog collectors for a specific filepath 

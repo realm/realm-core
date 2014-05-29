@@ -327,7 +327,7 @@ RegistryRegistry globalRegistry;
 
 
 
-class TransactLogRegistryImpl : public SharedGroup::TransactLogRegistry {
+class TransactLogRegistryImpl : public LangBindHelper::TransactLogRegistry {
 private:
     WriteLogRegistry* m_registry;
     int m_interest_key;
@@ -358,7 +358,7 @@ public:
 
 
 
-SharedGroup::TransactLogRegistry* getWriteLogs(std::string filepath)
+LangBindHelper::TransactLogRegistry* getWriteLogs(std::string filepath)
 {
     return new TransactLogRegistryImpl(globalRegistry.get(filepath));
 }
