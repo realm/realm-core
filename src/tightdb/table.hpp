@@ -711,6 +711,10 @@ private:
     // Used only in connection with
     // SharedGroup::advance_read_transact().
     bool m_dirty;
+    uint_fast64_t m_version;
+    inline void bump_version() { ++m_version; }
+#else
+    inline void bump_version() {}
 #endif
 
     /// Disable copying assignment.
@@ -988,12 +992,14 @@ inline void Table::remove(std::size_t row_ndx)
 {
     detach_views_except(0);
     do_remove(row_ndx);
+    bump_version();
 }
 
 inline void Table::from_view_remove(std::size_t row_ndx, TableViewBase* view)
 {
     detach_views_except(view);
     do_remove(row_ndx);
+    bump_version();
 }
 
 inline void Table::remove_last()
@@ -1181,6 +1187,7 @@ inline Table::Table(Allocator& alloc):
 {
 #ifdef TIGHTDB_ENABLE_REPLICATION
     m_dirty = false;
+    m_version = 0;
 #endif
     ref_type ref = create_empty_table(alloc); // Throws
     init_from_ref(ref, null_ptr, 0);
@@ -1192,6 +1199,7 @@ inline Table::Table(const Table& t, Allocator& alloc):
 {
 #ifdef TIGHTDB_ENABLE_REPLICATION
     m_dirty = false;
+    m_version = 0;
 #endif
     ref_type ref = t.clone(alloc); // Throws
     init_from_ref(ref, null_ptr, 0);
@@ -1204,6 +1212,7 @@ inline Table::Table(ref_count_tag, Allocator& alloc, ref_type top_ref,
 {
 #ifdef TIGHTDB_ENABLE_REPLICATION
     m_dirty = false;
+    m_version = 0;
 #endif
     init_from_ref(top_ref, parent, ndx_in_parent);
 }
@@ -1215,6 +1224,7 @@ inline Table::Table(ref_count_tag, ConstSubspecRef shared_spec, ref_type columns
 {
 #ifdef TIGHTDB_ENABLE_REPLICATION
     m_dirty = false;
+    m_version = 0;
 #endif
     init_from_ref(shared_spec, columns_ref, parent, ndx_in_parent);
 }
@@ -1224,6 +1234,7 @@ inline void Table::set_index(std::size_t column_ndx)
 {
     discard_subtable_accessors();
     set_index(column_ndx, true);
+    bump_version();
 }
 
 inline TableRef Table::create(Allocator& alloc)
@@ -1321,6 +1332,7 @@ template<class E>
 inline void Table::set_enum(std::size_t column_ndx, std::size_t row_ndx, E value)
 {
     set_int(column_ndx, row_ndx, value);
+    bump_version();
 }
 
 inline TableRef Table::get_subtable(std::size_t column_ndx, std::size_t row_ndx)

@@ -111,12 +111,14 @@ template<> struct ColumnTypeTraits3<DateTime> {
 size_t Table::add_column(DataType type, StringData name, DescriptorRef* subdesc)
 {
     TIGHTDB_ASSERT(!has_shared_type());
+    bump_version();
     return get_descriptor()->add_column(type, name, subdesc); // Throws
 }
 
 std::size_t Table::add_column_link(DataType type, StringData name, size_t target_table_ndx)
 {
     TIGHTDB_ASSERT(type == type_Link || type == type_LinkList);
+    bump_version();
 
     // links only work for top-level tables from groups
     TIGHTDB_ASSERT(!has_shared_type());
@@ -254,6 +256,7 @@ void Table::insert_column(size_t column_ndx, DataType type, StringData name,
 void Table::remove_column(size_t column_ndx)
 {
     TIGHTDB_ASSERT(!has_shared_type());
+    bump_version();
     get_descriptor()->remove_column(column_ndx); // Throws
 }
 
@@ -261,6 +264,7 @@ void Table::remove_column(size_t column_ndx)
 void Table::rename_column(size_t column_ndx, StringData name)
 {
     TIGHTDB_ASSERT(!has_shared_type());
+    bump_version();
     get_descriptor()->rename_column(column_ndx, name); // Throws
 }
 
@@ -331,6 +335,7 @@ ConstDescriptorRef Table::get_subdescriptor(const path_vec& path) const
 
 size_t Table::add_subcolumn(const path_vec& path, DataType type, StringData name)
 {
+    bump_version();
     DescriptorRef desc = get_subdescriptor(path); // Throws
     size_t column_ndx = desc->get_column_count();
     desc->insert_column(column_ndx, type, name); // Throws
@@ -347,12 +352,14 @@ void Table::insert_subcolumn(const path_vec& path, size_t column_ndx,
 
 void Table::remove_subcolumn(const path_vec& path, size_t column_ndx)
 {
+    bump_version();
     get_subdescriptor(path)->remove_column(column_ndx); // Throws
 }
 
 
 void Table::rename_subcolumn(const path_vec& path, size_t column_ndx, StringData name)
 {
+    bump_version();
     get_subdescriptor(path)->rename_column(column_ndx, name); // Throws
 }
 
@@ -465,6 +472,7 @@ void Table::do_insert_column(Descriptor& desc, size_t column_ndx,
 
 void Table::do_remove_column(Descriptor& desc, size_t column_ndx)
 {
+    bump_version();
     TIGHTDB_ASSERT(desc.is_attached());
 
     typedef _impl::DescriptorFriend df;
@@ -495,6 +503,7 @@ void Table::do_remove_column(Descriptor& desc, size_t column_ndx)
 
 void Table::do_rename_column(Descriptor& desc, size_t column_ndx, StringData name)
 {
+    bump_version();
     TIGHTDB_ASSERT(desc.is_attached());
 
     typedef _impl::DescriptorFriend df;
@@ -616,6 +625,7 @@ void Table::insert_root_column(size_t column_ndx, DataType type, StringData name
 
 void Table::remove_root_column(size_t column_ndx)
 {
+    bump_version();
     m_search_index = 0;
 
     Spec::ColumnInfo info;
@@ -769,6 +779,7 @@ void Table::update_accessors(const size_t* col_path_begin, const size_t* col_pat
     // Hierarchy Consistency Guarantee. This means, in particular, that it
     // cannot access the underlying array structure.
 
+    bump_version();
     TIGHTDB_ASSERT(is_attached());
 
     if (col_path_begin == col_path_end) {
@@ -1174,6 +1185,7 @@ bool Table::has_index(size_t column_ndx) const TIGHTDB_NOEXCEPT
 
 void Table::set_index(size_t column_ndx, bool update_spec)
 {
+    bump_version();
     TIGHTDB_ASSERT(!has_shared_type());
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     if (has_index(column_ndx))
@@ -1517,6 +1529,7 @@ const ColumnMixed& Table::get_column_mixed(size_t ndx) const TIGHTDB_NOEXCEPT
 
 size_t Table::add_empty_row(size_t num_rows)
 {
+    bump_version();
     discard_row_accessors();
 
     size_t n = m_spec.get_column_count();
@@ -1544,6 +1557,7 @@ size_t Table::add_empty_row(size_t num_rows)
 
 void Table::insert_empty_row(size_t ndx, size_t num_rows)
 {
+    bump_version();
     discard_row_accessors();
 
     size_t ndx2 = ndx + num_rows; // FIXME: Should we check for overflow?
@@ -1566,8 +1580,8 @@ void Table::insert_empty_row(size_t ndx, size_t num_rows)
 
 void Table::clear()
 {
+    bump_version();
     discard_row_accessors();
-    detach_views_except(0);
 
     size_t n = m_spec.get_column_count();
     for (size_t i = 0; i != n; ++i) {
@@ -1585,6 +1599,7 @@ void Table::clear()
 void Table::do_remove(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx < m_size);
+    bump_version();
     discard_row_accessors();
 
     bool is_last = ndx == m_size - 1;
@@ -1606,7 +1621,7 @@ void Table::do_remove(size_t ndx)
 void Table::move_last_over(size_t target_row_ndx)
 {
     TIGHTDB_ASSERT(target_row_ndx < m_size);
-    detach_views_except(0);
+    bump_version();
 
     // FIXME: PossibleLinkMergeConflict: `target_row_ndx` is now allowed to be equal to m_size-1. How does Group::TransactAdvancer deal with that?
 
@@ -1657,6 +1672,7 @@ void Table::set_subtable(size_t col_ndx, size_t row_ndx, const Table* table)
     TIGHTDB_ASSERT(col_ndx < get_column_count());
     TIGHTDB_ASSERT(get_real_column_type(col_ndx) == col_type_Table);
     TIGHTDB_ASSERT(row_ndx < m_size);
+    bump_version();
 
     ColumnTable& subtables = get_column_table(col_ndx);
     subtables.set(row_ndx, table);
@@ -1691,6 +1707,7 @@ void Table::set_mixed_subtable(size_t col_ndx, size_t row_ndx, const Table* t)
     TIGHTDB_ASSERT(col_ndx < get_column_count());
     TIGHTDB_ASSERT(get_real_column_type(col_ndx) == col_type_Mixed);
     TIGHTDB_ASSERT(row_ndx < m_size);
+    bump_version();
 
     ColumnMixed& mixed_col = get_column_mixed(col_ndx);
     mixed_col.set_subtable(row_ndx, t);
@@ -1776,6 +1793,7 @@ void Table::clear_subtable(size_t col_ndx, size_t row_ndx)
 {
     TIGHTDB_ASSERT(col_ndx < get_column_count());
     TIGHTDB_ASSERT(row_ndx <= m_size);
+    bump_version();
 
     ColumnType type = get_real_column_type(col_ndx);
     if (type == col_type_Table) {
@@ -1854,6 +1872,7 @@ void Table::set_int(size_t column_ndx, size_t ndx, int_fast64_t value)
 {
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     TIGHTDB_ASSERT(ndx < m_size);
+    bump_version();
 
     Column& column = get_column(column_ndx);
     column.set(ndx, value);
@@ -1868,6 +1887,7 @@ void Table::add_int(size_t column_ndx, int64_t value)
 {
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_Int);
+    bump_version();
     get_column(column_ndx).adjust(value);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
@@ -1891,6 +1911,7 @@ void Table::set_bool(size_t column_ndx, size_t ndx, bool value)
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_Bool);
     TIGHTDB_ASSERT(ndx < m_size);
+    bump_version();
 
     Column& column = get_column(column_ndx);
     column.set(ndx, value ? 1 : 0);
@@ -1916,6 +1937,7 @@ void Table::set_datetime(size_t column_ndx, size_t ndx, DateTime value)
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_DateTime);
     TIGHTDB_ASSERT(ndx < m_size);
+    bump_version();
 
     Column& column = get_column(column_ndx);
     column.set(ndx, int64_t(value.get_datetime()));
@@ -1954,6 +1976,7 @@ void Table::set_float(size_t column_ndx, size_t ndx, float value)
 {
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     TIGHTDB_ASSERT(ndx < m_size);
+    bump_version();
 
     ColumnFloat& column = get_column_float(column_ndx);
     column.set(ndx, value);
@@ -1992,6 +2015,7 @@ void Table::set_double(size_t column_ndx, size_t ndx, double value)
 {
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     TIGHTDB_ASSERT(ndx < m_size);
+    bump_version();
 
     ColumnDouble& column = get_column_double(column_ndx);
     column.set(ndx, value);
@@ -2037,6 +2061,7 @@ void Table::set_string(size_t column_ndx, size_t ndx, StringData value)
 {
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     TIGHTDB_ASSERT(ndx < m_size);
+    bump_version();
 
     ColumnType type = get_real_column_type(column_ndx);
     if (type == col_type_String) {
@@ -2091,6 +2116,7 @@ void Table::set_binary(size_t column_ndx, size_t ndx, BinaryData value)
 {
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     TIGHTDB_ASSERT(ndx < m_size);
+    bump_version();
 
     ColumnBinary& column = get_column_binary(column_ndx);
     column.set(ndx, value);
@@ -2164,6 +2190,7 @@ void Table::set_mixed(size_t column_ndx, size_t ndx, Mixed value)
 {
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     TIGHTDB_ASSERT(ndx < m_size);
+    bump_version();
 
     ColumnMixed& column = get_column_mixed(column_ndx);
     DataType type = value.get_type();
@@ -2285,6 +2312,7 @@ void Table::set_link(size_t column_ndx, size_t ndx, size_t target_row_ndx)
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_Link);
     TIGHTDB_ASSERT(ndx < m_size);
+    bump_version();
 
     ColumnLink& column = get_column<ColumnLink, col_type_Link>(column_ndx);
     column.set_link(ndx, target_row_ndx);
@@ -2325,6 +2353,7 @@ void Table::nullify_link(size_t column_ndx, size_t ndx)
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_Link);
     TIGHTDB_ASSERT(ndx <= m_size);
+    bump_version();
 
     ColumnLink& column = get_column<ColumnLink, col_type_Link>(column_ndx);
     column.nullify_link(ndx);
@@ -2372,6 +2401,7 @@ void Table::linklist_add_link(size_t column_ndx, size_t row_ndx, size_t target_r
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_LinkList);
     TIGHTDB_ASSERT(row_ndx <= m_size);
+    bump_version();
 
     ColumnLinkList& column = get_column<ColumnLinkList, col_type_LinkList>(column_ndx);
     column.add_link(row_ndx, target_row_ndx);
@@ -2382,6 +2412,7 @@ void Table::linklist_insert_link(size_t column_ndx, size_t row_ndx, size_t ins_p
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_LinkList);
     TIGHTDB_ASSERT(row_ndx <= m_size);
+    bump_version();
 
     ColumnLinkList& column = get_column<ColumnLinkList, col_type_LinkList>(column_ndx);
     column.insert_link(row_ndx, ins_pos, target_row_ndx);
@@ -2392,6 +2423,7 @@ void Table::linklist_remove_link(size_t column_ndx, size_t row_ndx, size_t link_
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_LinkList);
     TIGHTDB_ASSERT(row_ndx <= m_size);
+    bump_version();
 
     ColumnLinkList& column = get_column<ColumnLinkList, col_type_LinkList>(column_ndx);
     column.remove_link(row_ndx, link_ndx);
@@ -2402,6 +2434,7 @@ void Table::linklist_remove_all_links(size_t column_ndx, size_t row_ndx)
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_LinkList);
     TIGHTDB_ASSERT(row_ndx <= m_size);
+    bump_version();
 
     ColumnLinkList& column = get_column<ColumnLinkList, col_type_LinkList>(column_ndx);
     column.remove_all_links(row_ndx);
@@ -2412,6 +2445,7 @@ void Table::linklist_set_link(size_t column_ndx, size_t row_ndx, size_t link_ndx
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_LinkList);
     TIGHTDB_ASSERT(row_ndx <= m_size);
+    bump_version();
 
     ColumnLinkList& column = get_column<ColumnLinkList, col_type_LinkList>(column_ndx);
     column.set_link(row_ndx, link_ndx, target_row_ndx);
@@ -2422,6 +2456,7 @@ void Table::linklist_move_link(std::size_t column_ndx, std::size_t row_ndx, std:
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_LinkList);
     TIGHTDB_ASSERT(row_ndx <= m_size);
+    bump_version();
 
     ColumnLinkList& column = get_column<ColumnLinkList, col_type_LinkList>(column_ndx);
     column.move_link(row_ndx, old_pos, new_pos);
@@ -2432,6 +2467,7 @@ size_t Table::linklist_get_link(size_t column_ndx, size_t row_ndx, size_t link_n
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_LinkList);
     TIGHTDB_ASSERT(row_ndx <= m_size);
+    bump_version();
 
     const ColumnLinkList& column = get_column<ColumnLinkList, col_type_LinkList>(column_ndx);
     return column.get_link(row_ndx, link_ndx);
@@ -2440,8 +2476,8 @@ size_t Table::linklist_get_link(size_t column_ndx, size_t row_ndx, size_t link_n
 
 void Table::insert_done()
 {
+    bump_version();
     discard_row_accessors();
-    detach_views_except(0);
     ++m_size;
 
     // If the table has backlinks, the columns containing them will
@@ -4298,6 +4334,7 @@ void Table::erase_column_accessor(size_t col_ndx) TIGHTDB_NOEXCEPT
 
 void Table::refresh_after_advance_transact(size_t ndx_in_parent, size_t spec_ndx_in_parent)
 {
+    bump_version();
     TIGHTDB_ASSERT(is_attached());
     if (m_top.is_attached()) {
         // Root table (independent descriptor)
