@@ -23,6 +23,7 @@
 #include <tightdb/column_backlink.hpp>
 #include <tightdb/index_string.hpp>
 #include <tightdb/group.hpp>
+#include <tightdb/link_view.hpp>
 #ifdef TIGHTDB_ENABLE_REPLICATION
 #  include <tightdb/replication.hpp>
 #endif
@@ -2347,6 +2348,16 @@ void Table::insert_linklist(size_t column_ndx, size_t ndx)
 #endif
 }
 
+LinkViewRef Table::get_linklist(std::size_t column_ndx, std::size_t row_ndx)
+{
+    TIGHTDB_ASSERT(column_ndx < get_column_count());
+    TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_LinkList);
+    TIGHTDB_ASSERT(row_ndx <= m_size);
+
+    ColumnLinkList& column = get_column<ColumnLinkList, col_type_LinkList>(column_ndx);
+    return column.get_link_view(row_ndx);
+}
+
 bool Table::linklist_has_links(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(column_ndx < get_column_count());
@@ -2366,77 +2377,6 @@ size_t Table::get_link_count(size_t column_ndx, size_t row_ndx) const TIGHTDB_NO
     const ColumnLinkList& column = get_column<ColumnLinkList, col_type_LinkList>(column_ndx);
     return column.get_link_count(row_ndx);
 }
-
-void Table::linklist_add_link(size_t column_ndx, size_t row_ndx, size_t target_row_ndx)
-{
-    TIGHTDB_ASSERT(column_ndx < get_column_count());
-    TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_LinkList);
-    TIGHTDB_ASSERT(row_ndx <= m_size);
-
-    ColumnLinkList& column = get_column<ColumnLinkList, col_type_LinkList>(column_ndx);
-    column.add_link(row_ndx, target_row_ndx);
-}
-
-void Table::linklist_insert_link(size_t column_ndx, size_t row_ndx, size_t ins_pos, size_t target_row_ndx)
-{
-    TIGHTDB_ASSERT(column_ndx < get_column_count());
-    TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_LinkList);
-    TIGHTDB_ASSERT(row_ndx <= m_size);
-
-    ColumnLinkList& column = get_column<ColumnLinkList, col_type_LinkList>(column_ndx);
-    column.insert_link(row_ndx, ins_pos, target_row_ndx);
-}
-
-void Table::linklist_remove_link(size_t column_ndx, size_t row_ndx, size_t link_ndx)
-{
-    TIGHTDB_ASSERT(column_ndx < get_column_count());
-    TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_LinkList);
-    TIGHTDB_ASSERT(row_ndx <= m_size);
-
-    ColumnLinkList& column = get_column<ColumnLinkList, col_type_LinkList>(column_ndx);
-    column.remove_link(row_ndx, link_ndx);
-}
-
-void Table::linklist_remove_all_links(size_t column_ndx, size_t row_ndx)
-{
-    TIGHTDB_ASSERT(column_ndx < get_column_count());
-    TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_LinkList);
-    TIGHTDB_ASSERT(row_ndx <= m_size);
-
-    ColumnLinkList& column = get_column<ColumnLinkList, col_type_LinkList>(column_ndx);
-    column.remove_all_links(row_ndx);
-}
-
-void Table::linklist_set_link(size_t column_ndx, size_t row_ndx, size_t link_ndx, size_t target_row_ndx)
-{
-    TIGHTDB_ASSERT(column_ndx < get_column_count());
-    TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_LinkList);
-    TIGHTDB_ASSERT(row_ndx <= m_size);
-
-    ColumnLinkList& column = get_column<ColumnLinkList, col_type_LinkList>(column_ndx);
-    column.set_link(row_ndx, link_ndx, target_row_ndx);
-}
-
-void Table::linklist_move_link(std::size_t column_ndx, std::size_t row_ndx, std::size_t old_pos, std::size_t new_pos)
-{
-    TIGHTDB_ASSERT(column_ndx < get_column_count());
-    TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_LinkList);
-    TIGHTDB_ASSERT(row_ndx <= m_size);
-
-    ColumnLinkList& column = get_column<ColumnLinkList, col_type_LinkList>(column_ndx);
-    column.move_link(row_ndx, old_pos, new_pos);
-}
-
-size_t Table::linklist_get_link(size_t column_ndx, size_t row_ndx, size_t link_ndx) const TIGHTDB_NOEXCEPT
-{
-    TIGHTDB_ASSERT(column_ndx < get_column_count());
-    TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_LinkList);
-    TIGHTDB_ASSERT(row_ndx <= m_size);
-
-    const ColumnLinkList& column = get_column<ColumnLinkList, col_type_LinkList>(column_ndx);
-    return column.get_link(row_ndx, link_ndx);
-}
-
 
 void Table::insert_done()
 {

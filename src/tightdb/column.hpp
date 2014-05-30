@@ -308,6 +308,7 @@ public:
 
     void erase(std::size_t ndx, bool is_last) TIGHTDB_OVERRIDE;
     void move_last_over(std::size_t ndx) TIGHTDB_OVERRIDE;
+    void destroy_subtree(size_t ndx, bool clear_value=true);
 
     void adjust(int_fast64_t diff);
     void adjust_ge(int_fast64_t limit, int_fast64_t diff);
