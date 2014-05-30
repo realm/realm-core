@@ -53,15 +53,14 @@ public:
     bool is_empty() const TIGHTDB_NOEXCEPT { return size() == 0; }
 
     T get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
-    void add() TIGHTDB_OVERRIDE { add(0); }
-    void add(T value);
+    void add(T value = T());
     void set(std::size_t ndx, T value);
-    void insert(std::size_t ndx) TIGHTDB_OVERRIDE { insert(ndx, 0); }
-    void insert(std::size_t ndx, T value);
+    void insert(std::size_t ndx, T value = T());
+
+    void insert(std::size_t, std::size_t, bool) TIGHTDB_OVERRIDE;
     void erase(std::size_t ndx, bool is_last) TIGHTDB_OVERRIDE;
     void clear() TIGHTDB_OVERRIDE;
-    // Experimental. Overwrites the row at ndx with the last row and removes the last row. For unordered tables.
-    void move_last_over(std::size_t ndx) TIGHTDB_OVERRIDE;
+    void move_last_over(std::size_t, std::size_t) TIGHTDB_OVERRIDE;
 
     std::size_t count(T value) const;
 
@@ -93,9 +92,7 @@ public:
     ref_type write(std::size_t, std::size_t, std::size_t,
                    _impl::OutputStream&) const TIGHTDB_OVERRIDE;
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
-    void refresh_after_advance_transact(std::size_t, const Spec&) TIGHTDB_OVERRIDE;
-#endif
+    void refresh_accessor_tree(std::size_t, const Spec&) TIGHTDB_OVERRIDE;
 
 #ifdef TIGHTDB_DEBUG
     void Verify() const TIGHTDB_OVERRIDE;
@@ -107,7 +104,8 @@ public:
 private:
     std::size_t do_get_size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return size(); }
 
-    void do_insert(std::size_t ndx, T value);
+    /// \param row_ndx Must be `tightdb::npos` if appending.
+    void do_insert(std::size_t row_ndx, T value, std::size_t num_rows);
 
     // Called by Array::bptree_insert().
     static ref_type leaf_insert(MemRef leaf_mem, ArrayParent&, std::size_t ndx_in_parent,

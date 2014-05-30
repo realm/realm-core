@@ -156,7 +156,7 @@ protected:
 /// inserted or removed before it (at lower row index), then the accessor is
 /// automatically adjusted to account for the change in index of the row to
 /// which the accessor is bound. In other words, a row accessor is bound to the
-/// contents of a row, not to a row index.
+/// contents of a row, not to a row index. See also is_attached().
 ///
 /// Row accessors are created and used as follows:
 ///
@@ -195,7 +195,20 @@ public:
 
     ~BasicRow() TIGHTDB_NOEXCEPT;
 
-    /// Returns true if, and only if this accessor is currently bound to a row.
+    /// Returns true if, and only if this accessor is currently attached to a
+    /// row.
+    ///
+    /// A row accesor may get detached from the underlying row for various
+    /// reasons (see below). When it does, it no longer refers to anything, and
+    /// can no longer be used, except for calling is_attached(). The
+    /// consequences of calling other methods on a detached row accessor are
+    /// undefined. Row accessors obtained by calling functions in the TightDB
+    /// API are always in the 'attached' state immediately upon return from
+    /// those functions.
+    ///
+    /// A row accessor becomes detached if the underlying row is removed, if the
+    /// associated table accessor becomes detached, or if the detach() method is
+    /// called. A row accessor does not become detached for any other reason.
     bool is_attached() const TIGHTDB_NOEXCEPT;
 
     /// Detach this accessor from whatever it was attached to. This function has
@@ -217,6 +230,10 @@ private:
     // Make impl_get_table() and impl_get_row_ndx() accessible from
     // RowFuncs<T>::get_table() and RowFuncs<T>::get_row_ndx().
     friend class RowFuncs<T, BasicRow<T> >;
+
+    // Make m_table and m_col_ndx accessible from BasicRow(const BasicRow<U>&)
+    // for any U.
+    template<class> friend class BasicRow;
 };
 
 typedef BasicRow<Table> Row;
@@ -425,29 +442,29 @@ template<class T> inline BasicRow<T>::BasicRow() TIGHTDB_NOEXCEPT
 
 template<class T> template<class U> inline BasicRow<T>::BasicRow(BasicRowExpr<U> expr)
 {
-    T& table = *expr.m_table;
-    attach(const_cast<Table*>(&table), expr.m_row_ndx); // Throws
+    T* table = expr.m_table; // Check that pointer types are compatible
+    attach(const_cast<Table*>(table), expr.m_row_ndx); // Throws
 }
 
 template<class T> template<class U> inline BasicRow<T>::BasicRow(const BasicRow<U>& row)
 {
-    T& table = *row.m_table;
-    attach(const_cast<Table*>(&table), row.m_row_ndx); // Throws
+    T* table = row.m_table.get(); // Check that pointer types are compatible
+    attach(const_cast<Table*>(table), row.m_row_ndx); // Throws
 }
 
 template<class T> template<class U>
 inline BasicRow<T>& BasicRow<T>::operator=(BasicRowExpr<U> expr)
 {
-    T& table = *expr.m_table;
-    reattach(const_cast<Table*>(&table), expr.m_row_ndx); // Throws
+    T* table = expr.m_table; // Check that pointer types are compatible
+    reattach(const_cast<Table*>(table), expr.m_row_ndx); // Throws
     return *this;
 }
 
 template<class T> template<class U>
 inline BasicRow<T>& BasicRow<T>::operator=(BasicRow<U> row)
 {
-    T& table = *row.m_table;
-    reattach(const_cast<Table*>(&table), row.m_row_ndx); // Throws
+    T* table = row.m_table.get(); // Check that pointer types are compatible
+    reattach(const_cast<Table*>(table), row.m_row_ndx); // Throws
     return *this;
 }
 
