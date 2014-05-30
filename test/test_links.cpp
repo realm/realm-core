@@ -458,6 +458,7 @@ TEST(Links_LinkList_Backlinks)
     target->add("test3", 3, true,  Wed);
 
     // create table with links to target table
+    size_t source_table_ndx = 1;
     TableRef source = group.get_table("source");
     size_t col_link = source->add_column_link(type_LinkList, "links", target_table_ndx);
     CHECK_EQUAL(target, source->get_link_target(col_link));
@@ -466,7 +467,6 @@ TEST(Links_LinkList_Backlinks)
     source->insert_done();
 
     LinkViewRef links = source->get_linklist(col_link, 0);
-
     links->add_link(2);
     links->add_link(1);
     links->add_link(0);
@@ -480,6 +480,45 @@ TEST(Links_LinkList_Backlinks)
     // remove all
     target->clear();
     CHECK_EQUAL(0, source->get_link_count(col_link, 0));
+    CHECK(links->is_empty());
+
+    // re-add rows to target
+    target->add("test1", 1, true,  Mon);
+    target->add("test2", 2, false, Tue);
+    target->add("test3", 3, true,  Wed);
+
+    // add more rows with links
+    source->add_empty_row();
+    source->add_empty_row();
+    LinkViewRef links1 = source->get_linklist(col_link, 1);
+    LinkViewRef links2 = source->get_linklist(col_link, 2);
+
+    // add links from each row
+    links->add_link(2);
+    links1->add_link(1);
+    links2->add_link(0);
+
+    // Verify backlinks
+    CHECK_EQUAL(1, target->get_backlink_count(0, source_table_ndx, col_link));
+    CHECK_EQUAL(2, target->get_backlink(0, source_table_ndx, col_link, 0));
+    CHECK_EQUAL(1, target->get_backlink_count(1, source_table_ndx, col_link));
+    CHECK_EQUAL(1, target->get_backlink(1, source_table_ndx, col_link, 0));
+    CHECK_EQUAL(1, target->get_backlink_count(2, source_table_ndx, col_link));
+    CHECK_EQUAL(0, target->get_backlink(2, source_table_ndx, col_link, 0));
+
+    // delete a row and make sure backlinks are updated
+    source->move_last_over(0);
+    CHECK_EQUAL(1, target->get_backlink_count(0, source_table_ndx, col_link));
+    CHECK_EQUAL(0, target->get_backlink(0, source_table_ndx, col_link, 0));
+    CHECK_EQUAL(1, target->get_backlink_count(1, source_table_ndx, col_link));
+    CHECK_EQUAL(1, target->get_backlink(1, source_table_ndx, col_link, 0));
+    CHECK_EQUAL(0, target->get_backlink_count(2, source_table_ndx, col_link));
+
+    // remove all link lists and make sure backlinks are updated
+    source->clear();
+    CHECK_EQUAL(0, target->get_backlink_count(0, source_table_ndx, col_link));
+    CHECK_EQUAL(0, target->get_backlink_count(1, source_table_ndx, col_link));
+    CHECK_EQUAL(0, target->get_backlink_count(2, source_table_ndx, col_link));
 }
 
 TEST(Links_LinkList_AccessorUpdates)

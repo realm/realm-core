@@ -35,20 +35,61 @@ ColumnLinkList::~ColumnLinkList() TIGHTDB_NOEXCEPT
 
 void ColumnLinkList::clear()
 {
+    // Remove all backlinks to the delete rows
+    size_t rowcount = size();
+    for (size_t r = 0; r < rowcount; ++r) {
+        ref_type ref = Column::get_as_ref(r);
+        if (ref == 0)
+            continue;
+
+        const Column linkcol(ref, null_ptr, 0, get_alloc());
+        size_t count = linkcol.size();
+        for (size_t i = 0; i < count; ++i) {
+            size_t old_target_row_ndx = linkcol.get(i);
+            m_backlinks->remove_backlink(old_target_row_ndx, r);
+        }
+    }
+
+    // Do the actual deletion
+    Column::clear();
+
     // Detach all accessors
     std::vector<LinkView*>::iterator end = m_views.end();
     for (std::vector<LinkView*>::iterator p = m_views.begin(); p != end; ++p) {
         (*p)->detach();
     }
     m_views.clear();
-
-    Column::clear();
-
-    //TODO: update backlinks
 }
 
 void ColumnLinkList::move_last_over(std::size_t ndx)
 {
+    // Remove backlinks to the delete row
+    ref_type ref = Column::get_as_ref(ndx);
+    if (ref) {
+        const Column linkcol(ref, null_ptr, 0, get_alloc());
+        size_t count = linkcol.size();
+        for (size_t i = 0; i < count; ++i) {
+            size_t old_target_row_ndx = linkcol.get(i);
+            m_backlinks->remove_backlink(old_target_row_ndx, ndx);
+        }
+    }
+
+    // Update backlinks to last row to point to its new position
+    size_t last_row_ndx = size()-1;
+    ref_type ref2 = Column::get_as_ref(last_row_ndx);
+    if (ref2) {
+        const Column linkcol(ref2, null_ptr, 0, get_alloc());
+        size_t count = linkcol.size();
+        for (size_t i = 0; i < count; ++i) {
+            size_t old_target_row_ndx = linkcol.get(i);
+            m_backlinks->update_backlink(old_target_row_ndx, last_row_ndx, ndx);
+        }
+    }
+
+    // Do the actual delete and move
+    Column::destroy_subtree(ndx, false);
+    Column::move_last_over(ndx);
+
     // Detach accessors to the deleted row
     std::vector<LinkView*>::iterator end = m_views.end();
     for (std::vector<LinkView*>::iterator p = m_views.begin(); p != end; ++p) {
@@ -60,19 +101,13 @@ void ColumnLinkList::move_last_over(std::size_t ndx)
     }
 
     // Update accessors to the moved row
-    size_t last_row = size()-1;
     end = m_views.end();
     for (std::vector<LinkView*>::iterator p = m_views.begin(); p != end; ++p) {
-        if ((*p)->m_row_ndx == last_row) {
+        if ((*p)->m_row_ndx == last_row_ndx) {
             (*p)->set_parent_row(ndx);
             break;
         }
     }
-
-    Column::destroy_subtree(ndx, false);
-    Column::move_last_over(ndx);
-
-    //TODO: update backlinks
 }
 
 void ColumnLinkList::erase(std::size_t ndx, bool is_last)
