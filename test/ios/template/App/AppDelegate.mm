@@ -32,6 +32,8 @@ using namespace std;
     cout << if_xml.rdbuf();
     if_xml.close();
     cout << "====================" << endl;
+
+    [[NSThread mainThread] cancel];
     return YES;
 }
 
