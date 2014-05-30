@@ -131,6 +131,11 @@ Caveats, notes and todos
 
 // namespace tightdb {
 
+template <class T> T minimum(T a, T b)
+{
+    return a < b ? a : b;
+}
+
 // FIXME, this needs to exist elsewhere
 typedef int64_t             Int;
 typedef bool                Bool;
@@ -187,14 +192,18 @@ template<class T1, class T2, bool b> struct Common<T1, T2, true , false, b> {
 
 struct ValueBase
 {
-    static const size_t elements = 8;
+    static const size_t default_size = 8;
     virtual void export_int(ValueBase& destination) const = 0;
     virtual void export_float(ValueBase& destination) const = 0;
     virtual void export_int64_t(ValueBase& destination) const = 0;
     virtual void export_double(ValueBase& destination) const = 0;
     virtual void import(const ValueBase& destination) = 0;
 
-    bool is_link;
+    // If true, all values in the class come from a link of a single field in the parent table (m_table). If 
+    // false, then values come from successive rows of m_table (query operations are operated on in bulks for speed)
+    bool from_link;
+
+    // Number of values stored in the class. 
     size_t m_values;
 };
 
@@ -242,13 +251,24 @@ template <class oper, class TLeft = Subexpr, class TRight = Subexpr> class Opera
 template <class oper, class TLeft = Subexpr> class UnaryOperator;
 template <class TCond, class T, class TLeft = Subexpr, class TRight = Subexpr> class Compare;
 
-// Stores 8 values of type T. Can also exchange data with other ValueBase of different types
+// Stores N values of type T. Can also exchange data with other ValueBase of different types
 template<class T> class Value : public ValueBase, public Subexpr2<T>
 {
 public:
-    Value() : Value(0) { }
-    Value(T v) : Value(false, ValueBase::elements, v) { }
-    Value(bool link, size_t values) : Value(link, values, 0) { }
+    Value() 
+    { 
+        m_v = null_ptr;
+        init(false, ValueBase::default_size, 0); 
+    }
+    Value(T v) 
+    {
+        m_v = null_ptr;
+        init(false, ValueBase::default_size, v);
+    }
+    Value(bool link, size_t values) {
+        m_v = null_ptr;
+        init(link, values, 0);
+    }
 
     Value(bool link, size_t values, T v)
     {
@@ -257,16 +277,16 @@ public:
     }
 
     ~Value() {
-        delete m_v;
+        delete[] m_v;
         m_v = null_ptr;
     }
 
     void init(bool link, size_t values, T v) {
         if (m_v) {
-            delete m_v;
+            delete[] m_v;
             m_v = null_ptr;
         }
-        ValueBase::is_link = link;
+        ValueBase::from_link = link;
         ValueBase::m_values = values;
         if (m_values > 0) {
             m_v = new T[m_values];
@@ -283,14 +303,15 @@ public:
     template <class TOperator> TIGHTDB_FORCEINLINE void fun(const Value* left, const Value* right)
     {
         TOperator o;
-        for (size_t t = 0; t < ValueBase::m_values; t++)
+        size_t vals = minimum(left->m_values, right->m_values);
+        for (size_t t = 0; t < vals; t++)
             m_v[t] = o(left->m_v[t], right->m_v[t]);
     }
 
     template <class TOperator> TIGHTDB_FORCEINLINE void fun(const Value* value)
     {
         TOperator o;
-        for (size_t t = 0; t < ValueBase::m_values; t++)
+        for (size_t t = 0; t < value->m_values; t++)
             m_v[t] = o(value->m_v[t]);
     }
 
@@ -299,7 +320,7 @@ public:
     {
         Value<D>& d = static_cast<Value<D>&>(destination);
 
-        d.init(ValueBase::is_link, ValueBase::m_values, 0);
+        d.init(ValueBase::from_link, ValueBase::m_values, 0);
 
         for (size_t t = 0; t < ValueBase::m_values; t++)
             d.m_v[t] = static_cast<D>(m_v[t]);
@@ -343,24 +364,31 @@ public:
     template <class TCond> TIGHTDB_FORCEINLINE static size_t compare(Value<T>* left, Value<T>* right)
     {
         TCond c;
-        if (!left->is_link && !right->is_link) {
-            size_t min = left->ValueBase::m_values < right->ValueBase::m_values ? left->ValueBase::m_values : right->ValueBase::m_values;
+
+        if (!left->from_link && !right->from_link) {
+            // Traditional bulk operation on multiple rows of the parent table (m_table). No links
+            size_t min = minimum(left->ValueBase::m_values, right->ValueBase::m_values);
             for (size_t m = 0; m < min; m++) {
                 if (c(left->m_v[m], right->m_v[m]))
                     return m;
             }
         }
-        else if (left->is_link && right->is_link) {
-            // many-to-many not supported yet
+        else if (left->from_link && right->from_link) {
+            // Many-to-many links not supported yet. Need to specify behaviour
             TIGHTDB_ASSERT(false);
         }
-        else if (!left->is_link && right->is_link) {
+        else if (!left->from_link && right->from_link) {
+            // Right values come from link. Left must be a single field. Semantics: Match if at least 1 
+            // linked-to-value fulfills the criteria
+            TIGHTDB_ASSERT(left->m_values == 0 || left->m_values == ValueBase::default_size);
             for (size_t r = 0; r < right->ValueBase::m_values; r++) {
                 if (c(left->m_v[0], right->m_v[r]))
                     return 0;
             }
         }
-        else if (left->is_link && !right->is_link) {
+        else if (left->from_link && !right->from_link) {
+            // Same as above, right left values coming from links
+            TIGHTDB_ASSERT(right->m_values == 0 || right->m_values == ValueBase::default_size);
             for (size_t l = 0; l < left->ValueBase::m_values; l++) {
                 if (c(left->m_v[l], right->m_v[0]))
                     return 0;
@@ -373,20 +401,21 @@ public:
     virtual Subexpr& clone()
     {
         Value<T>& n = *new Value<T>();
-        
-        // Copy members
-        n = *this;
 
-        // Alloc and copy payload
-        n.m_v = new T[m_values];
+        // Copy all members, except the m_v pointer which the Value constructor allocated
+        T* tmp = n.m_v;
+        n = *this;
+        n.m_v = tmp;
+
+        // Copy payload
         memcpy(n.m_v, m_v, sizeof(T) * m_values);
 
         return n;
     }
 
     // Performance note: Declaring values as separately named members generates faster (10% or so) code in VS2010,
-    // compared to array, even if the array accesses elements individually instead of in for-loops.
-//    T m_v[elements];
+    // compared to array, even if the array accesses default_size individually instead of in for-loops.
+//    T m_v[default_size];
 
     T *m_v;
 };
@@ -879,7 +908,7 @@ public:
         return m_table;
     }
 
-    // Load 8 elements from Column into destination
+    // Load 8 default_size from Column into destination
     size_t evaluate(size_t index, ValueBase& destination) {
         if (m_link_column != static_cast<size_t>(-1)) {
 
@@ -904,21 +933,22 @@ public:
         sg->cache_next(index);
         size_t colsize = sg->m_column->size();
 
-        if (util::SameType<T, int64_t>::value && index + ValueBase::elements < sg->m_leaf_end) {
+        if (util::SameType<T, int64_t>::value && index + ValueBase::default_size < sg->m_leaf_end) {
             Value<T> v;
+            TIGHTDB_ASSERT(ValueBase::default_size == 8); // If you want to modify 'default_size' then update Array::get_chunk()
             // int64_t leaves have a get_chunk optimization that returns 8 int64_t values at once
             sg->m_array_ptr->get_chunk(index - sg->m_leaf_start, static_cast<Value<int64_t>*>(static_cast<ValueBase*>(&v))->m_v);
             destination.import(v);
             return 0;
         }
         else {
-            // To make Valgrind happy we must initialize all elements in v even if Column ends earlier. Todo, benchmark
+            // To make Valgrind happy we must initialize all default_size in v even if Column ends earlier. Todo, benchmark
             // if an unconditional zero out is faster
             size_t rows = colsize - index;
-            if (rows > ValueBase::elements)
-                rows = ValueBase::elements;
-
+            if (rows > ValueBase::default_size)
+                rows = ValueBase::default_size;
             Value<T> v(false, rows);
+
             for (size_t t = 0; t < rows; t++)
                 v.m_v[t] = sg->get_next(index + t);
 
@@ -1078,7 +1108,7 @@ public:
         const Table* l = m_left.get_table();
         const Table* r = m_right.get_table();
 
-        // Queries do not support multiple different tables; all tables must be the same.
+        // All main tables in each subexpression of a query (table.columns() or table.link()) must be the same.
         TIGHTDB_ASSERT(l == null_ptr || r == null_ptr || l == r);
 
         // null_ptr pointer means expression which isn't yet associated with any table, or is a Value<T>
@@ -1099,8 +1129,8 @@ public:
             if (match != not_found && start + match < end)
                 return start + match;
             
-            size_t processed = right.m_values < left.m_values ? right.m_values : left.m_values;
-            size_t rows = (left.is_link || right.is_link) ? 1 : processed;
+            size_t processed = minimum(right.m_values, left.m_values);
+            size_t rows = (left.from_link || right.from_link) ? 1 : processed;
             start += rows;
         }
 

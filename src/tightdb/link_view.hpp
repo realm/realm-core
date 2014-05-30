@@ -36,11 +36,11 @@ public:
 
     // This entire constructor/class is just an experiment to figure out how things must work    
     LinkView(ColumnLinkList& link_column, size_t link_row) :
+        TableViewBase(link_column.get_target_table().get()),
         m_links_column(link_column.get_ref_column(link_row)),
         m_link_row(link_row),
-        m_linklist_column(link_column),
-        TableViewBase(link_column.get_target_table().get())
-    {        
+        m_linklist_column(link_column)
+    {
         // Make TableViewBase store separate Column with default allocator (detached from database payload)
         m_refs.clear();
         for (size_t t = 0; t < m_links_column.size(); t++)
