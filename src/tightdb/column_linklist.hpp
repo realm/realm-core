@@ -52,16 +52,6 @@ public:
 
     LinkViewRef get_link_view(std::size_t row_ndx);
 
-    // Manual link manipulation methods. These should be replaced
-    // with just returning a LinkView class.
-    size_t get_link(std::size_t row_ndx, std::size_t link_ndx) const TIGHTDB_NOEXCEPT;
-    void   set_link(std::size_t row_ndx, std::size_t link_ndx, std::size_t target_row_ndx);
-    void   add_link(std::size_t row_ndx, std::size_t target_row_ndx);
-    void   insert_link(std::size_t row_ndx, std::size_t ins_pos, std::size_t target_row_ndx);
-    void   move_link(std::size_t row_ndx, std::size_t old_link_ndx, std::size_t new_link_ndx);
-    void   remove_link(std::size_t row_ndx, std::size_t link_ndx);
-    void   remove_all_links(std::size_t row_ndx);
-
     void clear() TIGHTDB_OVERRIDE;
     void move_last_over(std::size_t ndx) TIGHTDB_OVERRIDE;
     void erase(std::size_t ndx, bool is_last) TIGHTDB_OVERRIDE;
@@ -131,14 +121,6 @@ inline size_t ColumnLinkList::get_link_count(std::size_t row_ndx) const TIGHTDB_
         return 0;
     }
     return ColumnBase::get_size_from_ref(ref, get_alloc());
-}
-
-inline size_t ColumnLinkList::get_link(std::size_t row_ndx, std::size_t link_ndx) const TIGHTDB_NOEXCEPT
-{
-    TIGHTDB_ASSERT(link_ndx < get_link_count(row_ndx));
-    ref_type ref = Column::get_as_ref(row_ndx);
-    Column col(ref, null_ptr, 0, get_alloc());
-    return col.get(link_ndx);
 }
 
 inline void ColumnLinkList::set_target_table(TableRef table)
