@@ -20,7 +20,9 @@
 
 #include "column_linklist.hpp"
 
+using namespace std;
 using namespace tightdb;
+
 
 void ColumnLinkList::add_link(size_t row_ndx, size_t target_row_ndx)
 {
@@ -190,10 +192,10 @@ ref_type ColumnLinkList::get_child_ref(size_t child_ndx) const TIGHTDB_NOEXCEPT
 
 #ifdef TIGHTDB_DEBUG
 
-std::pair<ref_type, size_t> ColumnLinkList::get_to_dot_parent(size_t ndx_in_parent) const
+pair<ref_type, size_t> ColumnLinkList::get_to_dot_parent(size_t ndx_in_parent) const
 {
-    std::pair<MemRef, size_t> p = m_array->get_bptree_leaf(ndx_in_parent);
-    return std::make_pair(p.first.m_ref, p.second);
+    pair<MemRef, size_t> p = m_array->get_bptree_leaf(ndx_in_parent);
+    return make_pair(p.first.m_ref, p.second);
 }
 
 #endif //TIGHTDB_DEBUG

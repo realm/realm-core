@@ -227,6 +227,8 @@ public:
     void set(std::size_t ndx, const Table*);
     void clear_table(std::size_t ndx);
 
+    using ColumnSubtableParent::insert;
+
     void clear() TIGHTDB_OVERRIDE;
     void erase(std::size_t, bool) TIGHTDB_OVERRIDE;
     void move_last_over(std::size_t, std::size_t) TIGHTDB_OVERRIDE;

@@ -20,7 +20,9 @@
 
 #include "column_link.hpp"
 
+using namespace std;
 using namespace tightdb;
+
 
 void ColumnLink::set_link(size_t row_ndx, size_t target_row_ndx)
 {
@@ -76,7 +78,7 @@ void ColumnLink::move_last_over(size_t target_row_ndx, size_t last_row_ndx)
     Column::move_last_over(target_row_ndx, last_row_ndx);
 }
 
-void ColumnLink::erase(std::size_t row_ndx, bool is_last)
+void ColumnLink::erase(size_t row_ndx, bool is_last)
 {
     TIGHTDB_ASSERT(is_last);
 
