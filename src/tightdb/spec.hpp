@@ -63,6 +63,7 @@ public:
 
     // Column info
     std::size_t get_column_count() const TIGHTDB_NOEXCEPT;
+    std::size_t get_public_column_count() const TIGHTDB_NOEXCEPT;
     DataType get_column_type(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
     ColumnType get_real_column_type(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
     StringData get_column_name(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
@@ -84,6 +85,15 @@ public:
     std::size_t get_enumkeys_ndx(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
     ref_type get_enumkeys_ref(std::size_t column_ndx, ArrayParent** keys_parent = 0,
                               std::size_t* keys_ndx = 0) TIGHTDB_NOEXCEPT;
+
+    // Links
+    void set_link_target_table(std::size_t column_ndx, std::size_t table_ndx);
+    std::size_t get_link_target_table(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
+    bool has_backlinks() const TIGHTDB_NOEXCEPT;
+    void set_backlink_source_column(std::size_t column_ndx, std::size_t source_column_ndx);
+    std::size_t get_backlink_source_column(std::size_t column_ndx) const  TIGHTDB_NOEXCEPT;
+    std::size_t find_backlink_column(std::size_t source_table_ndx, std::size_t source_column_ndx) const TIGHTDB_NOEXCEPT;
+    void update_backlink_column_ref(std::size_t source_table_ndx, std::size_t old_column_ndx, std::size_t new_column_ndx);
 
     // Get position in column list adjusted for indexes
     // (since index refs are stored alongside column refs in
@@ -333,6 +343,14 @@ inline void Spec::rename_column(std::size_t column_ndx, StringData new_name)
 
 inline std::size_t Spec::get_column_count() const TIGHTDB_NOEXCEPT
 {
+    // This is the total count of columns, including backlinks (not public)
+    return m_spec.size();
+}
+
+inline std::size_t Spec::get_public_column_count() const TIGHTDB_NOEXCEPT
+{
+    // Backlinks are the last columns, and do not have names, so getting
+    // the number of names gives us the count of user facing columns
     return m_names.size();
 }
 
@@ -390,6 +408,12 @@ inline bool Spec::get_first_column_type_from_ref(ref_type top_ref, Allocator& al
         return false;
     type = ColumnType(Array::get(types_header, 0));
     return true;
+}
+
+inline bool Spec::has_backlinks() const TIGHTDB_NOEXCEPT
+{
+    // backlinks are always last and do not have names
+    return m_names.size() < m_spec.size();
 }
 
 

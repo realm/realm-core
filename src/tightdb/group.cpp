@@ -275,10 +275,13 @@ Table* Group::get_table_by_ndx(size_t ndx)
         table = _impl::TableFriend::create_ref_counted(m_alloc, ref, this, ndx); // Throws
         m_table_accessors[ndx] = table;
         _impl::TableFriend::bind_ref(*table); // Increase reference count from 0 to 1
+
+        // The link targets in the table has to be initialized
+        // after creation to avoid circular initializations
+        _impl::TableFriend::initialize_link_targets(*table);
     }
     return table;
 }
-
 
 ref_type Group::create_new_table(StringData name)
 {
@@ -558,8 +561,6 @@ void Group::commit()
 
 void Group::update_refs(ref_type top_ref, size_t old_baseline) TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(!m_free_versions.is_attached());
-
     // After Group::commit() we will always have free space tracking
     // info.
     TIGHTDB_ASSERT(m_top.size() >= 5);

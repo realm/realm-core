@@ -657,9 +657,9 @@ TEST(Table_MoveAllTypes)
     setup_multi_table(table, 15, 2);
     table.set_index(6);
 
-    while (table.size() >= 2) {
+    while (!table.is_empty()) {
         size_t size = table.size();
-        size_t target_row_ndx = random.draw_int_mod(size-1);
+        size_t target_row_ndx = random.draw_int_mod(size);
         table.move_last_over(target_row_ndx);
         table.Verify();
     }
@@ -1086,7 +1086,7 @@ TEST(Table_SortedQuery)
 
     TestTable::View v_sorted = table.column().second.get_sorted_view();
     CHECK_EQUAL(table.size(), v_sorted.size());
- 
+
 #ifdef TIGHTDB_DEBUG
     table.Verify();
 #endif
@@ -3056,6 +3056,7 @@ void compare_table_with_slice(TestResults& test_results, const Table& table,
         DataType type = table.get_column_type(col_i);
         switch (type) {
             case type_Int:
+            case type_Link:
                 for (size_t i = 0; i != size; ++i) {
                     int_fast64_t v_1 = table.get_int(col_i, offset + i);
                     int_fast64_t v_2 = slice.get_int(col_i, i);
@@ -3146,10 +3147,16 @@ void compare_table_with_slice(TestResults& test_results, const Table& table,
                                 break;
                             }
                             case type_Mixed:
+                            case type_Link:
+                            case type_LinkList:
+                            case type_BackLink:
                                 TIGHTDB_ASSERT(false);
                         }
                     }
                 }
+                break;
+            case type_LinkList:
+            case type_BackLink:
                 break;
         }
     }

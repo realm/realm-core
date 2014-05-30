@@ -190,8 +190,7 @@ protected:
 
 #ifdef TIGHTDB_DEBUG
     // Used only by Array::to_dot().
-    virtual std::pair<ref_type, std::size_t>
-    get_to_dot_parent(std::size_t ndx_in_parent) const = 0;
+    virtual std::pair<ref_type, std::size_t> get_to_dot_parent(std::size_t ndx_in_parent) const = 0;
 #endif
 
     friend class Array;

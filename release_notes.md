@@ -48,6 +48,7 @@ C++ (core)
 
 ### Enhancements:
 
+* Added support for links and lists of links as column types, to enable relationships between tables.
 * Adding Table::get_index_in_parent() and Group::get_table(std::size_t table_ndx). They were needed for implicit transactions.
 * Table::get_parent_table() can now also return the index of the column in the parent.
 * Support for row accessors.
