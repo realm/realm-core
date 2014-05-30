@@ -12,8 +12,7 @@ cat >"$TEST_DIR/$APP.gyp" <<EOF
             '\$(SDKROOT)/Developer/Library/Frameworks',
             '\$(PROJECT_DIR)',
         ],
-        'CODE_SIGN_IDENTITY[sdk=iphoneos*]': 'iPhone Developer: Oleksandr(Alex Shturmov (CB4YV2W7W5)',
-        #'CODE_SIGN_IDENTITY[sdk=iphoneos*]': 'iOS Developer: Oleksandr(Alex Shturmov (Tightdb Denmark ApS)',
+        'CODE_SIGN_IDENTITY[sdk=iphoneos*]': 'iPhone Developer',
         'CLANG_ENABLE_OBJC_ARC': 'YES',
     },
     'target_defaults': {
