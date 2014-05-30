@@ -727,6 +727,22 @@ public:
         m_matches = 0;
     }
 
+    virtual void translate_pointers(std::map<ParentNode*, ParentNode*> mapping)
+    {
+        ParentNode::translate_pointers(mapping);
+    }
+
+    IntegerNodeBase(const IntegerNodeBase& from) 
+        : ParentNode(from)
+    {
+        // state is transient/only valid during search, no need to copy
+        m_child = 0;
+        m_conds = 0;
+        m_dT = 1.0 / 4.0;
+        m_probes = 0;
+        m_matches = 0;
+    }
+
     size_t m_last_local_match;
     Array m_array;
     size_t m_leaf_start;
@@ -925,6 +941,24 @@ public:
         return not_found;
     }
 
+    virtual ParentNode* clone()
+    {
+        return new IntegerNode<TConditionValue, TConditionFunction>(*this);
+    }
+
+    virtual void translate_pointers(std::map<ParentNode*, ParentNode*> mapping)
+    {
+        IntegerNodeBase::translate_pointers(mapping);
+    }
+
+    IntegerNode(const IntegerNode& from) 
+        : IntegerNodeBase(from)
+    {
+        m_value = from.m_value;
+        m_condition_column = from.m_condition_column;
+        m_find_callback_specialized = from.m_find_callback_specialized;
+    }
+
     TConditionValue m_value;
 
 protected:
@@ -971,6 +1005,24 @@ public:
                 return s;
         }
         return not_found;
+    }
+
+
+    virtual ParentNode* clone()
+    {
+        return new FloatDoubleNode(*this);
+    }
+
+    virtual void translate_pointers(std::map<ParentNode*, ParentNode*> mapping)
+    {
+        ParentNode::translate_pointers(mapping);
+    }
+
+    FloatDoubleNode(const FloatDoubleNode& from) 
+        : ParentNode(from)
+    {
+        m_value = from.m_value;
+        // m_condition_column is not copied
     }
 
 protected:
@@ -1022,6 +1074,25 @@ public:
         return not_found;
     }
 
+    virtual ParentNode* clone()
+    {
+        return new BinaryNode(*this);
+    }
+
+    virtual void translate_pointers(std::map<ParentNode*, ParentNode*> mapping)
+    {
+        ParentNode::translate_pointers(mapping);
+    }
+
+    BinaryNode(const BinaryNode& from) 
+        : ParentNode(from)
+    {
+        m_value = from.m_value;
+        m_condition_column = from.m_condition_column;
+        m_column_type = from.m_column_type;
+    }
+
+
 protected:
 private:
     BinaryData m_value;
@@ -1031,9 +1102,7 @@ protected:
 };
 
 
-
-// Conditions for strings. Note that Equal is specialized later in this file!
-template <class TConditionFunction> class StringNode: public ParentNode {
+class StringNodeBase : public ParentNode {
 public:
     template <Action TAction>
     int64_t find_all(Column*, size_t, size_t, size_t, size_t)
@@ -1041,8 +1110,7 @@ public:
         TIGHTDB_ASSERT(false);
         return 0;
     }
-
-    StringNode(StringData v, size_t column)
+    StringNodeBase(StringData v, size_t column)
     {
         m_condition_column_idx = column;
         m_child = 0;
@@ -1054,41 +1122,21 @@ public:
         char* data = new char[6 * v.size()]; // FIXME: Arithmetic is prone to overflow
         memcpy(data, v.data(), v.size());
         m_value = StringData(data, v.size());
-        char* upper = new char[6 * v.size()];
-        char* lower = new char[6 * v.size()];
-
-        bool b1 = case_map(v, lower, false);
-        bool b2 = case_map(v, upper, true);
-        if (!b1 || !b2)
-            error_code = "Malformed UTF-8: " + std::string(v);
-
-        m_ucase = upper;
-        m_lcase = lower;
     }
 
-    ~StringNode() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
+    ~StringNodeBase() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
     {
         delete[] m_value.data();
-        delete[] m_ucase;
-        delete[] m_lcase;
-
-        clear_leaf_state();
     }
 
     void init(const Table& table) TIGHTDB_OVERRIDE
     {
-        clear_leaf_state();
-
-        m_dD = 100.0;
         m_probes = 0;
         m_matches = 0;
         m_end_s = 0;
         m_table = &table;
         m_condition_column = &get_column_base(table, m_condition_column_idx);
         m_column_type = get_real_column_type(table, m_condition_column_idx);
-
-        if (m_child)
-            m_child->init(table);
     }
 
     void clear_leaf_state()
@@ -1112,6 +1160,71 @@ public:
       delete_done:
         m_leaf = 0;
     }
+
+    StringNodeBase(const StringNodeBase& from) 
+        : ParentNode(from)
+    {
+        m_value = from.m_value;
+        m_condition_column = from.m_condition_column;
+        m_column_type = from.m_column_type;
+        m_leaf = from.m_leaf;
+        m_leaf_type = from.m_leaf_type;
+        m_end_s = from.m_end_s;
+        m_leaf_start = from.m_leaf_start;
+    }
+
+protected:
+    StringData m_value;
+
+    const ColumnBase* m_condition_column;
+    ColumnType m_column_type;
+
+    ArrayParent *m_leaf;
+
+    AdaptiveStringColumn::LeafType m_leaf_type;
+    size_t m_end_s;
+    size_t m_leaf_start;
+
+};
+
+// Conditions for strings. Note that Equal is specialized later in this file!
+template <class TConditionFunction> class StringNode: public StringNodeBase {
+public:
+    StringNode(StringData v, size_t column) : StringNodeBase(v,column)
+    {
+        char* upper = new char[6 * v.size()];
+        char* lower = new char[6 * v.size()];
+
+        bool b1 = case_map(v, lower, false);
+        bool b2 = case_map(v, upper, true);
+        if (!b1 || !b2)
+            error_code = "Malformed UTF-8: " + std::string(v);
+
+        m_ucase = upper;
+        m_lcase = lower;
+    }
+
+    ~StringNode() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
+    {
+        delete[] m_ucase;
+        delete[] m_lcase;
+
+        clear_leaf_state();
+    }
+
+
+    void init(const Table& table) TIGHTDB_OVERRIDE
+    {
+        clear_leaf_state();
+
+        m_dD = 100.0;
+
+        StringNodeBase::init(table);
+
+        if (m_child)
+            m_child->init(table);
+    }
+
 
     size_t find_first_local(size_t start, size_t end) TIGHTDB_OVERRIDE
     {
@@ -1153,46 +1266,30 @@ public:
         return not_found;
     }
 
-private:
-    StringData m_value;
-    const char* m_lcase;
-    const char* m_ucase;
+    virtual ParentNode* clone()
+    {
+        return new StringNode<TConditionFunction>(*this);
+    }
+
+    virtual void translate_pointers(std::map<ParentNode*, ParentNode*> mapping)
+    {
+        StringNodeBase::translate_pointers(mapping);
+    }
+
 
 protected:
-    const ColumnBase* m_condition_column;
-    ColumnType m_column_type;
-
-    ArrayParent *m_leaf;
-
-    AdaptiveStringColumn::LeafType m_leaf_type;
-    size_t m_end_s;
-//    size_t m_first_s;
-    size_t m_leaf_start;
+    const char* m_lcase;
+    const char* m_ucase;
 };
 
 
 
 // Specialization for Equal condition on Strings - we specialize because we can utilize indexes (if they exist) for Equal.
 // Future optimization: make specialization for greater, notequal, etc
-template<> class StringNode<Equal>: public ParentNode {
+template<> class StringNode<Equal>: public StringNodeBase {
 public:
-    template <Action TAction>
-    int64_t find_all(Column*, size_t, size_t, size_t, size_t)
+    StringNode(StringData v, size_t column): StringNodeBase(v,column), m_key_ndx(size_t(-1))
     {
-        TIGHTDB_ASSERT(false);
-        return 0;
-    }
-
-    StringNode(StringData v, size_t column): m_key_ndx(size_t(-1))
-    {
-        m_condition_column_idx = column;
-        m_child = 0;
-        // FIXME: Store this in std::string instead.
-        // FIXME: Why are the sizes 6 times the required size?
-        char* data = new char[6 * v.size()]; // FIXME: Arithmetic is prone to overflow
-        memcpy(data, v.data(), v.size());
-        m_value = StringData(data, v.size());
-        m_leaf = null_ptr;
         m_index_getter = 0;
         m_index_matches = 0;
         m_index_matches_destroy = false;
@@ -1203,28 +1300,6 @@ public:
         delete[] m_value.data();
         clear_leaf_state();
         m_index.destroy();
-    }
-
-    void clear_leaf_state()
-    {
-        if (!m_leaf)
-            return;
-
-        switch (m_leaf_type) {
-            case AdaptiveStringColumn::leaf_type_Small:
-                delete static_cast<ArrayString*>(m_leaf);
-                goto delete_done;
-            case AdaptiveStringColumn::leaf_type_Medium:
-                delete static_cast<ArrayStringLong*>(m_leaf);
-                goto delete_done;
-            case AdaptiveStringColumn::leaf_type_Big:
-                delete static_cast<ArrayBigBlobs*>(m_leaf);
-                goto delete_done;
-        }
-        TIGHTDB_ASSERT(false);
-
-      delete_done:
-        m_leaf = 0;
     }
 
     void deallocate() TIGHTDB_NOEXCEPT
@@ -1249,10 +1324,7 @@ public:
     {
         deallocate();
         m_dD = 10.0;
-        m_leaf_end = 0;
-        m_table = &table;
-        m_condition_column = &get_column_base(table, m_condition_column_idx);
-        m_column_type = get_real_column_type(table, m_condition_column_idx);
+        StringNodeBase::init(table);
 
         if (m_column_type == col_type_StringEnum) {
             m_dT = 1.0;
@@ -1392,6 +1464,18 @@ public:
         return not_found;
     }
 
+public:
+    virtual ParentNode* clone()
+    {
+        return new StringNode<Equal>(*this);
+    }
+
+    virtual void translate_pointers(std::map<ParentNode*, ParentNode*> mapping)
+    {
+        StringNodeBase::translate_pointers(mapping);
+    }
+
+
 private:
     inline BinaryData str_to_bin(const StringData& s) TIGHTDB_NOEXCEPT
     {
@@ -1517,6 +1601,32 @@ public:
         return "";
     }
 
+    virtual ParentNode* clone()
+    {
+        return new OrNode(*this);
+    }
+
+    virtual void translate_pointers(std::map<ParentNode*, ParentNode*> mapping)
+    {
+        ParentNode::translate_pointers(mapping);
+        m_cond[0] = mapping[m_cond[0]];
+        m_cond[1] = mapping[m_cond[1]];
+    }
+
+    OrNode(const OrNode& from) 
+        : ParentNode(from)
+    {
+        // here we are just copying the pointers - they'll be remapped by "translate_pointers"
+        m_cond[0] = from.m_cond[0];
+        m_cond[1] = from.m_cond[1];
+        m_last[0] = from.m_last[0];
+        m_last[1] = from.m_last[1];
+        m_was_match[0] = from.m_was_match[0];
+        m_was_match[1] = from.m_was_match[1];
+    }
+
+
+
     ParentNode* m_cond[2];
 private:
     size_t m_last[2];
@@ -1602,6 +1712,26 @@ public:
         if (s != "")
             return s;
         return "";
+    }
+
+    virtual ParentNode* clone()
+    {
+        return new NotNode(*this);
+    }
+
+    virtual void translate_pointers(std::map<ParentNode*, ParentNode*> mapping)
+    {
+        ParentNode::translate_pointers(mapping);
+        m_cond = mapping[m_cond];
+    }
+
+    NotNode(const NotNode& from) 
+        : ParentNode(from)
+    {
+        // here we are just copying the pointers - they'll be remapped by "translate_pointers"
+        m_cond = from.m_cond;
+        m_last = from.m_last;
+        m_was_match = from.m_was_match;
     }
 
     ParentNode* m_cond;
@@ -1691,6 +1821,29 @@ public:
         return not_found;
     }
 
+    virtual ParentNode* clone()
+    {
+        return new TwoColumnsNode<TConditionValue, TConditionFunction>(*this);
+    }
+
+    virtual void translate_pointers(std::map<ParentNode*, ParentNode*> mapping)
+    {
+        ParentNode::translate_pointers(mapping);
+    }
+
+    TwoColumnsNode(const TwoColumnsNode& from) 
+        : ParentNode(from)
+    {
+        m_value = from.m_value;
+        m_condition_column = from.m_condition_column;
+        m_column_type = from.m_column_type;
+        m_condition_column_idx1 = from.m_condition_column_idx1;
+        m_condition_column_idx2 = from.m_condition_column_idx2;
+        // NOT copied:
+        // m_getter1 = from.m_getter1;
+        // m_getter2 = from.m_getter2;
+    }
+
 protected:
     BinaryData m_value;
     const ColumnBinary* m_condition_column;
@@ -1738,6 +1891,25 @@ public:
         size_t res = m_compare->find_first(start, end);
         return res;
     }
+
+    virtual ParentNode* clone()
+    {
+        return new ExpressionNode(*this);
+    }
+
+    virtual void translate_pointers(std::map<ParentNode*, ParentNode*> mapping)
+    {
+        ParentNode::translate_pointers(mapping);
+    }
+
+    ExpressionNode(const ExpressionNode& from) 
+        : ParentNode(from)
+    {
+        m_auto_delete = from.m_auto_delete;
+        m_compare = from.m_compare;
+    }
+
+
 
     bool m_auto_delete;
     Expression* m_compare;
