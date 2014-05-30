@@ -1735,7 +1735,7 @@ void Table::move_last_over(size_t target_row_ndx)
     // FIXME: PossibleLinkMergeConflict: `target_row_ndx` is now allowed to be equal to m_size-1. How does Group::TransactAdvancer deal with that?
 
     size_t last_row_ndx = m_size - 1;
-    size_t num_cols = get_column_count();
+    size_t num_cols = m_spec.get_column_count();
     if (target_row_ndx != last_row_ndx) {
         for (size_t col_ndx = 0; col_ndx != num_cols; ++col_ndx) {
             ColumnBase& column = get_column_base(col_ndx);
