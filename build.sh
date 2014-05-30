@@ -682,8 +682,10 @@ EOF
         ;;
 
     "build-test-ios-app")
-        # Prerequisites: build-iphone, build-ios-framework
         # For more documentation, see test/ios/README.md
+
+        sh build.sh build-iphone
+        sh build.sh build-ios-framework
 
         TMPL_DIR="test/ios/template"
         TEST_DIR="test/ios/app"
@@ -760,6 +762,9 @@ EOF
         mkdir -p "$TEST_DIR/$APP.xcodeproj/xcuserdata/$USER.xcuserdatad/xcschemes"
 
         . "$TMPL_DIR/App.scheme.sh"
+
+        echo "The app is now available under $TEST_DIR."
+        echo "Use sh build.sh (leak-)test-ios-app to run the app on device."
 
         exit 0
         ;;
@@ -2449,6 +2454,9 @@ Available modes are:
     dist-pull dist-checkout dist-config dist-clean dist-build
     dist-build-iphone dist-test dist-test-debug dist-install dist-uninstall
     dist-test-installed get-version set-version copy-tools
+    build-test-ios-app: build an iOS app for testing core on device
+    test-ios-app: execute the core tests on device
+    leak-test-ios-app: execute the core tests on device, monitor for leaks
 EOF
         exit 1
         ;;
