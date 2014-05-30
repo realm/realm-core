@@ -51,7 +51,7 @@ C++ (core)
 * Adding Table::get_index_in_parent() and Group::get_table(std::size_t table_ndx). They were needed for implicit transactions.
 * Table::get_parent_table() can now also return the index of the column in the parent.
 * Support for row accessors.
-* Row and subtable accessors are now retained and properly adjusted when the parent table is modified (except descriptor modifications).
+* Table, row, and descriptor accessors are now generally retained and properly adjusted when the parent table is modified.
 
 -----------
 
