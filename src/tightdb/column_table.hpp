@@ -269,7 +269,7 @@ inline void ColumnSubtableParent::insert(std::size_t row_ndx, std::size_t num_ro
     do_insert(row_ndx_2, value, num_rows); // Throws
 }
 
-inline void ColumnSubtableParent::erase(std::size_t row_ndx, bool is_last) TIGHTDB_OVERRIDE
+inline void ColumnSubtableParent::erase(std::size_t row_ndx, bool is_last)
 {
     Column::erase(row_ndx, is_last); // Throws
 
@@ -281,7 +281,7 @@ inline void ColumnSubtableParent::erase(std::size_t row_ndx, bool is_last) TIGHT
 }
 
 inline void ColumnSubtableParent::move_last_over(std::size_t target_row_ndx,
-                                                 std::size_t last_row_ndx) TIGHTDB_OVERRIDE
+                                                 std::size_t last_row_ndx)
 {
     Column::move_last_over(target_row_ndx, last_row_ndx); // Throws
 
