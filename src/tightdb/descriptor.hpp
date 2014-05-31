@@ -66,8 +66,12 @@ namespace _impl { class DescriptorFriend; }
 /// \sa Table::get_descriptor()
 class Descriptor {
 public:
-    /// Get the number of columns in the assocaited tables.
+    /// Get the number of columns in the associated tables.
     std::size_t get_column_count() const TIGHTDB_NOEXCEPT;
+
+    /// Get the number of columns in the associated tables.
+    /// (including hidden columns like backlinks)
+    std::size_t get_internal_column_count() const TIGHTDB_NOEXCEPT;
 
     /// Get the type of the column at the specified index.
     ///
@@ -388,6 +392,12 @@ inline std::size_t Descriptor::get_column_count() const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(is_attached());
     return m_spec->get_public_column_count();
+}
+
+inline std::size_t Descriptor::get_internal_column_count() const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(is_attached());
+    return m_spec->get_column_count();
 }
 
 inline StringData Descriptor::get_column_name(std::size_t ndx) const TIGHTDB_NOEXCEPT

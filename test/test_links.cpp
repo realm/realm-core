@@ -315,6 +315,35 @@ TEST(Links_Multi)
     CHECK(table2->is_null_link(col_link, 3));
 }
 
+ONLY(Links_MultiToSame)
+{
+    Group group;
+
+    size_t table1_ndx = 0;
+    TestTableLinks::Ref table1 = group.get_table<TestTableLinks>("table1");
+    table1->add("test1", 1, true,  Mon);
+    table1->add("test2", 2, false, Tue);
+    table1->add("test3", 3, true,  Wed);
+
+    // create table with multiple links to table1
+    size_t table2_ndx = 1;
+    TableRef table2 = group.get_table("table2");
+    size_t col_link1 = table2->add_column_link(type_Link, "link1", table1_ndx);
+    size_t col_link2 = table2->add_column_link(type_Link, "link2", table1_ndx);
+    CHECK_EQUAL(table1, table2->get_link_target(col_link1));
+    CHECK_EQUAL(table1, table2->get_link_target(col_link2));
+
+    table2->add_empty_row();
+    table2->set_link(col_link1, 0, 0);
+    table2->set_link(col_link2, 0, 0);
+    CHECK_EQUAL(1, table1->get_backlink_count(0, table2_ndx, col_link1));
+    CHECK_EQUAL(1, table1->get_backlink_count(0, table2_ndx, col_link2));
+
+    table2->move_last_over(0);
+    CHECK_EQUAL(0, table1->get_backlink_count(0, table2_ndx, col_link1));
+    CHECK_EQUAL(0, table1->get_backlink_count(0, table2_ndx, col_link2));
+}
+
 TEST(Links_LinkList_TableOps)
 {
     Group group;
