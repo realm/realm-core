@@ -67,7 +67,7 @@ TEST_IF(Strings_Monkey2, TEST_DURATION >= 1)
     int seed = 123;
 
     VerifiedString a;
-    Array res;
+    Column res;
 
     Random random(seed);
     int trend = 5;

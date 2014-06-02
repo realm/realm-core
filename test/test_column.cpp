@@ -520,7 +520,7 @@ TEST(Column_Sort)
 TEST(Column_FindAllIntMin)
 {
     Column c;
-    Array r;
+    Column r;
 
     const int value = 0;
     const int reps = 5;
@@ -547,7 +547,7 @@ TEST(Column_FindAllIntMin)
 TEST(Column_FindAllIntMax)
 {
     Column c;
-    Array r;
+    Column r;
 
     const int64_t value = 4300000003ULL;
     const int reps = 5;

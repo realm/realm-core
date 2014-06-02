@@ -243,6 +243,7 @@ template<class Op> void col_type_deleg(Op& op, ColumnType type)
         case col_type_Int:
         case col_type_Bool:
         case col_type_DateTime:
+        case col_type_Link:
             op.template call<Column>();
             return;
         case col_type_String:
@@ -268,6 +269,8 @@ template<class Op> void col_type_deleg(Op& op, ColumnType type)
             return;
         case col_type_Reserved1:
         case col_type_Reserved4:
+        case col_type_LinkList:
+        case col_type_BackLink:
             break;
     }
     TIGHTDB_ASSERT(false);
@@ -686,6 +689,16 @@ struct AdjustLeafElem: Array::UpdateHandler {
 
 } // anonymous namespace
 
+void Column::move_assign(Column& column)
+{
+    TIGHTDB_ASSERT(&column.get_alloc() == &get_alloc());
+    // destroy() and detach() are redundant with the Array::move_assign(), but they exist for completeness to avoid
+    // bugs if Array::move_assign() should change behaviour (e.g. no longer call destroy_deep(), etc.).
+    destroy();
+    get_root_array()->move_assign(*column.get_root_array());
+    column.detach();
+}
+
 void Column::set(size_t ndx, int64_t value)
 {
     TIGHTDB_ASSERT(ndx < size());
@@ -846,12 +859,12 @@ void Column::move_last_over(size_t ndx)
     TIGHTDB_ASSERT(ndx+1 < size());
 
     size_t last_ndx = size() - 1;
-    int64_t v = get(last_ndx);
+    int64_t v = Column::get(last_ndx);
 
-    set(ndx, v); // Throws
+    Column::set(ndx, v); // Throws
 
     bool is_last = true;
-    erase(last_ndx, is_last); // Throws
+    Column::erase(last_ndx, is_last); // Throws
 }
 
 
@@ -937,14 +950,14 @@ size_t Column::find_first(int64_t value, size_t begin, size_t end) const
     return not_found;
 }
 
-void Column::find_all(Array& result, int64_t value, size_t begin, size_t end) const
+void Column::find_all(Column& result, int64_t value, size_t begin, size_t end) const
 {
     TIGHTDB_ASSERT(begin <= size());
     TIGHTDB_ASSERT(end == npos || (begin <= end && end <= size()));
 
     if (root_is_leaf()) {
         size_t leaf_offset = 0;
-        m_array->find_all(result, value, leaf_offset, begin, end); // Throws
+        m_array->find_all(&result, value, leaf_offset, begin, end); // Throws
         return;
     }
 
@@ -962,7 +975,7 @@ void Column::find_all(Array& result, int64_t value, size_t begin, size_t end) co
         size_t ndx_in_leaf = p.second;
         size_t leaf_offset = ndx_in_tree - ndx_in_leaf;
         size_t end_in_leaf = min(leaf.size(), end - leaf_offset);
-        leaf.find_all(result, value, leaf_offset, ndx_in_leaf, end_in_leaf); // Throws
+        leaf.find_all(&result, value, leaf_offset, ndx_in_leaf, end_in_leaf); // Throws
         ndx_in_tree = leaf_offset + end_in_leaf;
     }
 }
@@ -1065,6 +1078,22 @@ ref_type Column::write(size_t slice_offset, size_t slice_size,
     }
     return ref;
 }
+
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+
+void Column::refresh_after_advance_transact(size_t, const Spec&)
+{
+    // With this type of column (Column), `m_array` is always an
+    // instance of Array. This is true becasue all leafs are instances
+    // of Array, and when the root is an inner B+-tree node, only the
+    // top array of the inner node is cached. This means that we never
+    // have to change the type of the cached root array with this type
+    // of column.
+    m_array->init_from_parent();
+}
+
+#endif // TIGHTDB_ENABLE_REPLICATION
 
 
 #ifdef TIGHTDB_DEBUG

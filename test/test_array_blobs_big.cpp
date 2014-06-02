@@ -1,4 +1,5 @@
 #include <tightdb/array_blobs_big.hpp>
+#include <tightdb/column.hpp>
 
 #include "test.hpp"
 
@@ -244,7 +245,7 @@ TEST(ArrayBigBlobs_Basic)
 
     CHECK_EQUAL(3, c.find_first(BinaryData("baz")));
 
-    Array results;
+    Column results;
     c.find_all(results, BinaryData("foobar"));
     CHECK_EQUAL(3, results.size());
 

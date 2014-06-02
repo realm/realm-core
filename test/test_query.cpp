@@ -469,6 +469,7 @@ TEST(Query_NextGenSyntax)
     delete first2;
 }
 
+
 TEST(Query_NextGenSyntaxMonkey0)
 {
     // Intended to test eval() for columns in query_expression.hpp which fetch 8 values at a time. This test varies
@@ -1943,6 +1944,7 @@ TEST(Query_Huge)
         }
     }
 }
+
 
 TEST(Query_OnTableView)
 {
@@ -3518,7 +3520,7 @@ TEST(Query_Sort_And_Requery_Untyped1)
 TEST(Query_Sort_And_Requery_Untyped_Monkey2)
 {
     // New where(tableview) method
-    for (int iter = 0; iter < 100; iter++) {
+    for (int iter = 0; iter < 1; iter++) {
         size_t b;
         Table table;
         table.add_column(type_Int, "first1");
