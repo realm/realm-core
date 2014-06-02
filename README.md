@@ -147,11 +147,11 @@ iPhone/iOS:
 
 This produces the following files and directories:
 
-    ../realm-objc/realm-core/include/
-    ../realm-objc/realm-core/libtightdb-ios.a
-    ../realm-objc/realm-core/libtightdb-ios-dbg.a
-    ../realm-objc/realm-core/tightdb-config
-    ../realm-objc/realm-core/tightdb-config-dbg
+    iphone-lib/include/
+    iphone-lib/libtightdb-ios.a
+    iphone-lib/libtightdb-ios-dbg.a
+    iphone-lib/tightdb-config
+    iphone-lib/tightdb-config-dbg
 
 The `include` directory holds a copy of the header files, which are
 identical to the ones installed by `sh build.sh install`. There are
@@ -161,7 +161,8 @@ contains code compiled for both iOS and for the iOS
 simulator. Each one also comes with a `config` program that can be
 used to enquire about required compiler and linker flags.
 
-
+If you need to use the core library for development of the Objective C
+binding, consider running `sh build.sh build-objc`.
 
 Configuration
 -------------

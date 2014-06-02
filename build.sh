@@ -34,7 +34,7 @@ PLATFORMS="iphone"
 
 IPHONE_EXTENSIONS="objc"
 IPHONE_PLATFORMS="iPhoneOS iPhoneSimulator"
-IPHONE_DIR="../realm-objc/realm-core"
+IPHONE_DIR="iphone-lib"
 
 ANDROID_DIR="android-lib"
 ANDROID_PLATFORMS="arm arm-v7a mips x86"
@@ -532,11 +532,6 @@ EOF
         lipo "$temp_dir/platforms"/*/"libtightdb.a"     -create -output "$IPHONE_DIR/libtightdb-ios.a"     || exit 1
         echo "Creating '$IPHONE_DIR/libtightdb-ios-dbg.a'"
         lipo "$temp_dir/platforms"/*/"libtightdb-dbg.a" -create -output "$IPHONE_DIR/libtightdb-ios-dbg.a" || exit 1
-        for x in $iphone_sdks; do
-            platform="$(printf "%s\n" "$x" | cut -d: -f1)" || exit 1
-            cp "src/tightdb/libtightdb-$platform.a" "$IPHONE_DIR" || exit 1
-            cp "src/tightdb/libtightdb-$platform-dbg.a" "$IPHONE_DIR" || exit 1
-        done
         echo "Copying headers to '$IPHONE_DIR/include'"
         mkdir -p "$IPHONE_DIR/include" || exit 1
         cp "src/tightdb.hpp" "$IPHONE_DIR/include/" || exit 1
@@ -611,7 +606,7 @@ EOF
         (cd "$TIGHTDB_HOME/$ANDROID_DIR/include/tightdb" && tar xzmf "$temp_dir/headers.tar.gz") || exit 1
         ;;
 
-   "build-ios-tgz")
+   "build-objc")
         if [ "$OS" != "Darwin" ]; then
             echo "tar.gz for iOS can only be generated under OS X."
             exit 0
@@ -620,13 +615,21 @@ EOF
         realm_version="$(sh build.sh get-version)"
         BASENAME="realm_core"
         rm -rf "$BASENAME" || exit 1
-        rm -f realm-core-ios-*.tgz || exit 1
+        rm -f realm-core-$realm_version.zip || exit 1
         mkdir -p "$BASENAME/include" || exit 1
-        mkdir -p "$BASENAME/lib" || exit 1
-        cp "$IPHONE_DIR/libtightdb-ios.a" "$BASENAME/lib" || exit 1
-        cp "$IPHONE_DIR/libtightdb-ios-dbg.a" "$BASENAME/lib" || exit 1
+        cp "$IPHONE_DIR/libtightdb-ios.a" "$BASENAME" || exit 1
+        cp "$IPHONE_DIR/libtightdb-ios-dbg.a" "$BASENAME" || exit 1
         cp -r "$IPHONE_DIR/include/"* "$BASENAME/include" || exit 1
-        tar czf realm-core-ios.tar.gz "$BASENAME" || exit 1
+        for x in $iphone_sdks; do
+            platform="$(printf "%s\n" "$x" | cut -d: -f1)" || exit 1
+            cp "src/tightdb/libtightdb-$platform.a" "$BASENAME" || exit 1
+            cp "src/tightdb/libtightdb-$platform-dbg.a" "$BASENAME" || exit 1
+        done
+        cp src/tightdb/*dylib $BASENAME || exit 1        
+        zip -r -q realm-core-$realm_version.zip $BASENAME || exit 1
+        mkdir -p ../realm-objc || exit 1
+        rm -rf ../realm-objc/realm-core || exit 1 
+        (cd ../realm-objc && unzip -qq ../tightdb/realm-core-$realm_version.zip) || exit 1 
         exit 0
         ;;
 
@@ -2366,7 +2369,7 @@ EOF
 Unspecified or bad mode '$MODE'.
 Available modes are:
     config clean build build-config-progs build-iphone build-android
-    build-ios-framework build-osx-framework
+    build-ios-framework build-osx-framework build-objc
     check check-debug show-install install uninstall
     test-installed wipe-installed install-prod install-devel uninstall-prod
     uninstall-devel dist-copy src-dist bin-dist dist-deb dist-status
