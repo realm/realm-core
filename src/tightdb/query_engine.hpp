@@ -1134,8 +1134,12 @@ public:
         m_probes = 0;
         m_matches = 0;
         m_end_s = 0;
+        m_leaf = 0;
+        m_leaf_start = 0;
+        m_leaf_end = 0;
         m_table = &table;
         m_condition_column = &get_column_base(table, m_condition_column_idx);
+        std::cerr << m_condition_column << " - " << m_condition_column->has_index() << std::endl;
         m_column_type = get_real_column_type(table, m_condition_column_idx);
     }
 
@@ -1164,6 +1168,7 @@ public:
     StringNodeBase(const StringNodeBase& from) 
         : ParentNode(from)
     {
+        TIGHTDB_ASSERT(false);
         m_value = from.m_value;
         m_condition_column = from.m_condition_column;
         m_column_type = from.m_column_type;
@@ -1179,11 +1184,12 @@ protected:
     const ColumnBase* m_condition_column;
     ColumnType m_column_type;
 
+    // Used for linear scan through short/long-string
     ArrayParent *m_leaf;
-
     AdaptiveStringColumn::LeafType m_leaf_type;
     size_t m_end_s;
     size_t m_leaf_start;
+    size_t m_leaf_end;
 
 };
 
@@ -1297,8 +1303,8 @@ public:
     ~StringNode() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
     {
         deallocate();
-        delete[] m_value.data();
-        clear_leaf_state();
+        //delete[] m_value.data();
+        //clear_leaf_state(); <-- already called in deallocate
         m_index.destroy();
     }
 
@@ -1444,6 +1450,7 @@ public:
                             m_leaf_end = m_leaf_start + static_cast<ArrayStringLong*>(m_leaf)->size();
                         else
                             m_leaf_end = m_leaf_start + static_cast<ArrayBigBlobs*>(m_leaf)->size();
+                        TIGHTDB_ASSERT(m_leaf);
                     }
                     size_t end2 = (end > m_leaf_end ? m_leaf_end - m_leaf_start : end - m_leaf_start);
 
@@ -1482,22 +1489,12 @@ private:
         return BinaryData(s.data(), s.size());
     }
 
-    StringData m_value;
-    const ColumnBase* m_condition_column;
-    ColumnType m_column_type;
     size_t m_key_ndx;
     Array m_index;
     size_t last_indexed;
 
     // Used for linear scan through enum-string
     SequentialGetter<int64_t> m_cse;
-
-    // Used for linear scan through short/long-string
-    ArrayParent* m_leaf;
-    AdaptiveStringColumn::LeafType m_leaf_type;
-    size_t m_leaf_end;
-//    size_t m_first_s;
-    size_t m_leaf_start;
 
     // Used for index lookup
     Column* m_index_matches;
