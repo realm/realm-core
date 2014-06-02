@@ -477,5 +477,68 @@ TEST(Links_LinkList_Backlinks)
     CHECK_EQUAL(0, source->get_link_count(col_link, 0));
 }
 
+TEST(Links_Transactions)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg(path);
+
+    size_t dog_table  = 0;
+    size_t name_col   = 0;
+    size_t dog_col    = 1;
+    size_t tim_row    = 0;
+    size_t harvey_row = 0;
+
+    {
+        WriteTransaction group(sg);
+
+        // Create dogs table
+        TableRef dogs = group.get_table("dogs");
+        dogs->add_column(type_String, "dogName");
+
+        // Create owners table
+        TableRef owners = group.get_table("owners");
+        owners->add_column(type_String, "name");
+        owners->add_column_link(type_Link, "dog", dog_table);
+
+        // Insert a single dog
+        dogs->insert_string(name_col, harvey_row, "Harvey");
+        dogs->insert_done();
+
+        // Insert an owner with link to dog
+        owners->insert_string(name_col, tim_row, "Tim");
+        owners->insert_link(dog_col, tim_row, harvey_row);
+        owners->insert_done();
+
+        group.commit();
+    }
+
+    {
+        ReadTransaction group(sg);
+
+        // Verify that owner links to dog
+        ConstTableRef owners = group.get_table("owners");
+        CHECK(!owners->is_null_link(dog_col, tim_row));
+        CHECK_EQUAL(harvey_row, owners->get_link(dog_col, tim_row));
+    }
+
+    {
+        WriteTransaction group(sg);
+
+        // Delete dog
+        TableRef dogs = group.get_table("dogs");
+        dogs->move_last_over(harvey_row);
+
+        group.commit();
+    }
+
+    {
+        ReadTransaction group(sg);
+
+        // Verify that link from owner was nullified
+        ConstTableRef owners = group.get_table("owners");
+        CHECK(owners->is_null_link(dog_col, tim_row));
+    }
+}
+
 
 #endif // TEST_GROUP

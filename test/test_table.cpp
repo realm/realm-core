@@ -649,6 +649,7 @@ TEST(Table_DeleteAllTypes)
 #endif
 }
 
+
 TEST(Table_MoveAllTypes)
 {
     Random random(random_int<unsigned long>()); // Seed from slow global generator
@@ -657,15 +658,11 @@ TEST(Table_MoveAllTypes)
     setup_multi_table(table, 15, 2);
     table.set_index(6);
 
-    while (table.size() > 1) {
+    while (!table.is_empty()) {
         size_t size = table.size();
-        size_t ndx = random.draw_int_mod(size-1);
-
-        table.move_last_over(ndx);
-
-#ifdef TIGHTDB_DEBUG
+        size_t target_row_ndx = random.draw_int_mod(size);
+        table.move_last_over(target_row_ndx);
         table.Verify();
-#endif
     }
 }
 
@@ -1090,7 +1087,7 @@ TEST(Table_SortedQuery)
 
     TestTable::View v_sorted = table.column().second.get_sorted_view();
     CHECK_EQUAL(table.size(), v_sorted.size());
- 
+
 #ifdef TIGHTDB_DEBUG
     table.Verify();
 #endif
