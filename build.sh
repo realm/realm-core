@@ -613,7 +613,7 @@ EOF
         fi
 
         realm_version="$(sh build.sh get-version)"
-        BASENAME="realm_core"
+        BASENAME="realm-core"
         rm -rf "$BASENAME" || exit 1
         rm -f realm-core-$realm_version.zip || exit 1
         mkdir -p "$BASENAME/include" || exit 1
