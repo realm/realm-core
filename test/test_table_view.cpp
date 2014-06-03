@@ -392,6 +392,28 @@ TEST(TableView_Find)
 }
 
 
+TEST(TableView_Follows_Changes)
+{
+    TestTableInt table;
+    table.add(1);
+    TestTableInt::Query q = table.where().first.equal(1);
+    TestTableInt::View v = q.find_all();
+    CHECK_EQUAL(1, v.size());
+    CHECK_EQUAL(1, v[0].first);
+    table.add(1);
+    CHECK_EQUAL(2, v.size());
+    CHECK_EQUAL(1, v[0].first);
+    CHECK_EQUAL(1, v[1].first);
+    table[0].first = 7;
+    CHECK_EQUAL(1, v.size());
+    CHECK_EQUAL(1, v[0].first);
+    table[1].first = 7;
+    CHECK_EQUAL(0, v.size());
+    table[1].first = 1;
+    CHECK_EQUAL(1, v.size());
+    CHECK_EQUAL(1, v[0].first);
+}
+
 TEST(TableView_FindAll)
 {
     TestTableInt table;
