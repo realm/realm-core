@@ -986,6 +986,7 @@ private:
     friend class TableViewBase;
     friend class TableView;
     template<class T> friend class Columns;
+    friend class Columns<StringData>;
     friend class ParentNode;
     template<class> friend class SequentialGetter;
     friend class RowBase;

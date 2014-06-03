@@ -197,6 +197,7 @@ struct ValueBase
     virtual void export_float(ValueBase& destination) const = 0;
     virtual void export_int64_t(ValueBase& destination) const = 0;
     virtual void export_double(ValueBase& destination) const = 0;
+    virtual void export_StringData(ValueBase& destination) const = 0;
     virtual void import(const ValueBase& destination) = 0;
 
     // If true, all values in the class come from a link of a single field in the parent table (m_table). If 
@@ -315,13 +316,12 @@ public:
             m_v[t] = o(value->m_v[t]);
     }
 
+
     // Below import and export methods are for type conversion between float, double, int64_t, etc.
     template<class D> TIGHTDB_FORCEINLINE void export2(ValueBase& destination) const
     {
         Value<D>& d = static_cast<Value<D>&>(destination);
-
         d.init(ValueBase::from_link, ValueBase::m_values, 0);
-
         for (size_t t = 0; t < ValueBase::m_values; t++)
             d.m_v[t] = static_cast<D>(m_v[t]);
     }
@@ -345,6 +345,13 @@ public:
     {
         export2<double>(destination);
     }
+    TIGHTDB_FORCEINLINE void export_StringData(ValueBase& destination) const
+    {
+        Value<StringData>& d = static_cast<Value<StringData>&>(destination);
+        d.init(ValueBase::from_link, ValueBase::m_values, 0);
+        for (size_t t = 0; t < ValueBase::m_values; t++)
+            d.m_v[t] = *reinterpret_cast<StringData*>(&m_v[t]);
+    }
 
     TIGHTDB_FORCEINLINE void import(const ValueBase& source)
     {
@@ -356,6 +363,8 @@ public:
             source.export_double(*this);
         else if (util::SameType<T, int64_t>::value)
             source.export_int64_t(*this);
+        else if (util::SameType<T, StringData>::value)
+            source.export_StringData(*this);
         else
             TIGHTDB_ASSERT(false);
     }
@@ -423,7 +432,7 @@ public:
 class ColumnAccessorBase;
 
 
-// Handle cases where left side is a constant (int, float, int64_t, double)
+// Handle cases where left side is a constant (int, float, int64_t, double, StringData)
 template <class L, class Cond, class R> Query create (L left, const Subexpr2<R>& right)
 {
     // Purpose of below code is to intercept the creation of a condition and test if it's supported by the old
@@ -462,7 +471,7 @@ template <class L, class Cond, class R> Query create (L left, const Subexpr2<R>&
 #endif
     {
         // Return query_expression.hpp node
-        return *new Compare<Cond, typename Common<R, float>::type>(*new Value<L>(left), const_cast<Subexpr2<R>&>(right).clone(), true);
+        return *new Compare<Cond, typename Common<L, R>::type>(*new Value<L>(left), const_cast<Subexpr2<R>&>(right).clone(), true);
     }
 }
 
@@ -633,7 +642,7 @@ public:
 // With this wrapper class we can define just 20 overloads inside Overloads<L, R> instead of 4 * 20 = 80. Todo: We can
 // consider if it's simpler/better to remove this class completely and just list all 80 overloads manually anyway.
 template <class T> class Subexpr2 : public Subexpr, public Overloads<T, const char*>, public Overloads<T, int>, public
-                                    Overloads<T, float>, public Overloads<T, double>, public Overloads<T, int64_t>
+    Overloads<T, float>, public Overloads<T, double>, public Overloads<T, int64_t>, public Overloads<T, StringData>
 {
 public:
     virtual ~Subexpr2() {};
@@ -781,26 +790,36 @@ template <class T> UnaryOperator<Pow<T> >& power (Subexpr2<T>& left) {
 
 
 // Handling of String columns. These support only == and != compare operators. No 'arithmetic' operators (+, etc).
-template <> class Columns<StringData> : public Subexpr
+template <> class Columns<StringData> : public Subexpr2<StringData>
 {
 public:
-    explicit Columns(size_t column, const Table* table) : m_table(null_ptr), m_link_column(static_cast<size_t>(-1))
+    explicit Columns(size_t column, const Table* table) : m_table(null_ptr), m_link_column(not_found)
     {
         m_column = column;
         set_table(table);
     }
 
-    explicit Columns(size_t column, const Table* table, size_t link_column) : m_table(null_ptr), m_link_column(link_column)
+    explicit Columns(size_t column, Table* table, size_t link_column) : m_table(null_ptr), m_link_column(link_column)
     {
-        m_column = column;
-        set_table(table);
+        m_column = column; // todo, initializer list
+        m_column_linklist = &table->get_column<ColumnLinkList, col_type_LinkList>(link_column);
+        TableRef linked_table = m_column_linklist->get_target_table();
+        set_table(linked_table.get());
+
     }
 
-    explicit Columns() : m_table(null_ptr) { }
+    explicit Columns() : m_table(null_ptr), m_link_column(not_found) { }
 
-    explicit Columns(size_t column) : m_table(null_ptr)
+    explicit Columns(size_t column) : m_table(null_ptr), m_link_column(not_found)
     {
         m_column = column;
+    }
+
+    virtual Subexpr& clone()
+    {
+        Columns<StringData>& n = *new Columns<StringData>();
+        n = *this;
+        return n;
     }
 
     virtual void set_table(const Table* table)
@@ -812,20 +831,38 @@ public:
     {
         return m_table;
     }
-
+    
     virtual size_t evaluate(size_t index, ValueBase& destination)
     {
-        static_cast<void>(index);
-        static_cast<void>(destination);
-        // String column conditions use fallback to old query_engine.hpp, hence bypassing all the query_expression.hpp
-        // pathways like this method.
-        TIGHTDB_ASSERT(false);
-        return 0;
+        Value<StringData>& d = static_cast<Value<StringData>&>(destination);
+        
+        if (m_link_column != static_cast<size_t>(-1)) {
+            Column links = m_column_linklist->get_ref_column(index);
+            Value<StringData> v(true, links.size());
+
+            for (size_t t = 0; t < links.size(); t++) {
+                size_t link_to = links.get(t);
+                v.m_v[t] = m_table->get_string(m_column, link_to);
+            }
+            destination.import(v);
+            
+            return 0;
+
+
+        }
+        else {
+
+            for (size_t t = 0; t < destination.m_values && index + t < m_table->size(); t++) {
+                d.m_v[t] = m_table->get_string(m_column, index + t);
+            }
+            return 0;
+        }
     }
 
     const Table* m_table;
     size_t m_column;
     size_t m_link_column;
+    ColumnLinkList* m_column_linklist;
 };
 
 // String == Columns<String>
@@ -841,9 +878,29 @@ template <class T> Query operator != (T left, const Columns<StringData>& right) 
 // Columns<String> == String
 template <class T> Query operator == (const Columns<StringData>& left, T right) {
     const Table* t = const_cast<Columns<StringData>*>(&left)->get_table();
+
+    Value<StringData> r(right);
+
+    Columns<StringData>& l1 = const_cast<Columns<StringData>&>(left);
+
+    Subexpr2<StringData>& l2 = static_cast<Subexpr2<StringData>&>(l1);
+
+
+    return *new Compare<Equal, StringData>
+        (
+        r.clone()
+    ,
+        l2.clone()
+
+        , true);
+   
+    /*
+
     Query q = Query(*t);
     q.equal(left.m_column, right);
     return q;
+    */
+
 }
 
 // Columns<String> != String
@@ -929,31 +986,32 @@ public:
             destination.import(v);
             return 0;
         }
-
-        sg->cache_next(index);
-        size_t colsize = sg->m_column->size();
-
-        if (util::SameType<T, int64_t>::value && index + ValueBase::default_size < sg->m_leaf_end) {
-            Value<T> v;
-            TIGHTDB_ASSERT(ValueBase::default_size == 8); // If you want to modify 'default_size' then update Array::get_chunk()
-            // int64_t leaves have a get_chunk optimization that returns 8 int64_t values at once
-            sg->m_array_ptr->get_chunk(index - sg->m_leaf_start, static_cast<Value<int64_t>*>(static_cast<ValueBase*>(&v))->m_v);
-            destination.import(v);
-            return 0;
-        }
         else {
-            // To make Valgrind happy we must initialize all default_size in v even if Column ends earlier. Todo, benchmark
-            // if an unconditional zero out is faster
-            size_t rows = colsize - index;
-            if (rows > ValueBase::default_size)
-                rows = ValueBase::default_size;
-            Value<T> v(false, rows);
+            sg->cache_next(index);
+            size_t colsize = sg->m_column->size();
 
-            for (size_t t = 0; t < rows; t++)
-                v.m_v[t] = sg->get_next(index + t);
+            if (util::SameType<T, int64_t>::value && index + ValueBase::default_size < sg->m_leaf_end) {
+                Value<T> v;
+                TIGHTDB_ASSERT(ValueBase::default_size == 8); // If you want to modify 'default_size' then update Array::get_chunk()
+                // int64_t leaves have a get_chunk optimization that returns 8 int64_t values at once
+                sg->m_array_ptr->get_chunk(index - sg->m_leaf_start, static_cast<Value<int64_t>*>(static_cast<ValueBase*>(&v))->m_v);
+                destination.import(v);
+                return 0;
+            }
+            else {
+                // To make Valgrind happy we must initialize all default_size in v even if Column ends earlier. Todo, benchmark
+                // if an unconditional zero out is faster
+                size_t rows = colsize - index;
+                if (rows > ValueBase::default_size)
+                    rows = ValueBase::default_size;
+                Value<T> v(false, rows);
 
-            destination.import(v);
-            return 0;
+                for (size_t t = 0; t < rows; t++)
+                    v.m_v[t] = sg->get_next(index + t);
+
+                destination.import(v);
+                return 0;
+            }
         }
     }
 
@@ -962,7 +1020,6 @@ public:
     size_t m_column;
 private:
     SequentialGetter<T>* sg;
-    const Table* m_link_table;
     size_t m_link_column;
 
     ColumnLinkList* m_column_linklist;
@@ -1124,12 +1181,12 @@ public:
             m_left.evaluate(start, left);
             m_right.evaluate(start, right);
             match = Value<T>::template compare<TCond>(&left, &right);
+            size_t processed = minimum(right.m_values, left.m_values);
 
             // Note the second condition that tests if match position in chunk exceeds column length
-            if (match != not_found && start + match < end)
+            if (match != not_found && start + match < end && match < processed)
                 return start + match;
             
-            size_t processed = minimum(right.m_values, left.m_values);
             size_t rows = (left.from_link || right.from_link) ? 1 : processed;
             start += rows;
         }

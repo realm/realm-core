@@ -78,7 +78,9 @@ TEST(LinkView_Query)
 
     // add some more columns to table1 and table2
     table1->add_column(type_Int, "col1");
+
     table2->add_column(type_Int, "col1");
+    table2->add_column(type_String, "str2");
 
     // add some rows
     table1->add_empty_row();
@@ -90,22 +92,34 @@ TEST(LinkView_Query)
 
     table2->add_empty_row();
     table2->set_int(0, 0, 400);
+    table2->set_string(1, 0, "hello");
     table2->add_empty_row();
     table2->set_int(0, 1, 500);
+    table2->set_string(1, 1, "world");
     table2->add_empty_row();
     table2->set_int(0, 2, 600);
+    table2->set_string(1, 2, "!");
 
     size_t col_link2 = table1->add_column_link(type_LinkList, "link", table2_ndx); // todo, rename to add_link_column() ?
 
     // set some links
 
-    table1->linklist_add_link(col_link2, 1, 1);
+    table1->linklist_add_link(col_link2, 0, 1);
 
     table1->linklist_add_link(col_link2, 1, 1);
     table1->linklist_add_link(col_link2, 1, 2);
 
-    size_t match = (table1->link(col_link2).column<Int>(0) > 550).find();
+    size_t match;
+
+    match = (table1->link(col_link2).column<Int>(0) > 550).find();
     CHECK_EQUAL(1, match);
+
+    match = (table2->column<String>(1) == "world").find();
+    CHECK_EQUAL(1, match);
+
+    match = (table1->link(col_link2).column<String>(1) == "!").find();
+    CHECK_EQUAL(1, match);
+
 
 }
 
