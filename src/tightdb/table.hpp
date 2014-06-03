@@ -302,6 +302,9 @@ public:
     typedef BasicRowExpr<Table> RowExpr;
     typedef BasicRowExpr<const Table> ConstRowExpr;
 
+    RowExpr get(std::size_t row_ndx) TIGHTDB_NOEXCEPT;
+    ConstRowExpr get(std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
+
     RowExpr front() TIGHTDB_NOEXCEPT;
     ConstRowExpr front() const TIGHTDB_NOEXCEPT;
 
@@ -349,7 +352,9 @@ public:
     Mixed       get_mixed(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
     DataType    get_mixed_type(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
     std::size_t get_link(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
-    TableRef    get_link_target(std::size_t column_ndx) TIGHTDB_NOEXCEPT;
+
+    TableRef get_link_target(std::size_t column_ndx) TIGHTDB_NOEXCEPT;
+    ConstTableRef get_link_target(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
 
     template<class T>
     typename T::RowAccessor get_link_accessor(std::size_t column_ndx, std::size_t row_ndx);
@@ -1286,40 +1291,46 @@ inline std::size_t Table::size() const TIGHTDB_NOEXCEPT
     return m_size;
 }
 
-inline Table::RowExpr Table::front() TIGHTDB_NOEXCEPT
-{
-    TIGHTDB_ASSERT(!is_empty());
-    return RowExpr(this, 0);
-}
-
-inline Table::ConstRowExpr Table::front() const TIGHTDB_NOEXCEPT
-{
-    TIGHTDB_ASSERT(!is_empty());
-    return ConstRowExpr(this, 0);
-}
-
-inline Table::RowExpr Table::back() TIGHTDB_NOEXCEPT
-{
-    TIGHTDB_ASSERT(!is_empty());
-    return RowExpr(this, m_size-1);
-}
-
-inline Table::ConstRowExpr Table::back() const TIGHTDB_NOEXCEPT
-{
-    TIGHTDB_ASSERT(!is_empty());
-    return ConstRowExpr(this, m_size-1);
-}
-
-inline Table::RowExpr Table::operator[](std::size_t row_ndx) TIGHTDB_NOEXCEPT
+inline Table::RowExpr Table::get(std::size_t row_ndx) TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(row_ndx < size());
     return RowExpr(this, row_ndx);
 }
 
-inline Table::ConstRowExpr Table::operator[](std::size_t row_ndx) const TIGHTDB_NOEXCEPT
+inline Table::ConstRowExpr Table::get(std::size_t row_ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(row_ndx < size());
     return ConstRowExpr(this, row_ndx);
+}
+
+inline Table::RowExpr Table::front() TIGHTDB_NOEXCEPT
+{
+    return get(0);
+}
+
+inline Table::ConstRowExpr Table::front() const TIGHTDB_NOEXCEPT
+{
+    return get(0);
+}
+
+inline Table::RowExpr Table::back() TIGHTDB_NOEXCEPT
+{
+    return get(m_size-1);
+}
+
+inline Table::ConstRowExpr Table::back() const TIGHTDB_NOEXCEPT
+{
+    return get(m_size-1);
+}
+
+inline Table::RowExpr Table::operator[](std::size_t row_ndx) TIGHTDB_NOEXCEPT
+{
+    return get(row_ndx);
+}
+
+inline Table::ConstRowExpr Table::operator[](std::size_t row_ndx) const TIGHTDB_NOEXCEPT
+{
+    return get(row_ndx);
 }
 
 inline std::size_t Table::add_empty_row(std::size_t num_rows)
@@ -1353,6 +1364,11 @@ inline void Table::insert_enum(std::size_t column_ndx, std::size_t row_ndx, E va
 inline void Table::insert_subtable(std::size_t col_ndx, std::size_t row_ndx)
 {
     insert_subtable(col_ndx, row_ndx, 0); // Null stands for an empty table
+}
+
+inline ConstTableRef Table::get_link_target(std::size_t col_ndx) const TIGHTDB_NOEXCEPT
+{
+    return const_cast<Table*>(this)->get_link_target(col_ndx);
 }
 
 template<class E>

@@ -53,7 +53,6 @@ public:
     Mixed       get_mixed(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
     DataType    get_mixed_type(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
     std::size_t get_link(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
-    TableRef    get_link_target(std::size_t column_ndx) TIGHTDB_NOEXCEPT;
 
     // Links
     bool is_null_link(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
@@ -105,7 +104,7 @@ public:
     void sort(size_t column_ndx, bool ascending = true);
 
     void apply_same_order(TableViewBase& order);
-    
+
     // Simple pivot aggregate method. Experimental! Please do not
     // document method publicly.
     void aggregate(size_t group_by_column, size_t aggr_column,
@@ -207,10 +206,17 @@ public:
     TableView& operator=(TableView);
     friend TableView move(TableView& tv) { return TableView(&tv); }
 
-    // Subtables
-    TableRef      get_subtable(size_t column_ndx, size_t row_ndx);
-    ConstTableRef get_subtable(size_t column_ndx, size_t row_ndx) const;
-    void          clear_subtable(size_t column_ndx, size_t row_ndx);
+    // Rows
+    typedef BasicRowExpr<Table> RowExpr;
+    typedef BasicRowExpr<const Table> ConstRowExpr;
+    RowExpr get(std::size_t row_ndx) TIGHTDB_NOEXCEPT;
+    ConstRowExpr get(std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
+    RowExpr front() TIGHTDB_NOEXCEPT;
+    ConstRowExpr front() const TIGHTDB_NOEXCEPT;
+    RowExpr back() TIGHTDB_NOEXCEPT;
+    ConstRowExpr back() const TIGHTDB_NOEXCEPT;
+    RowExpr operator[](std::size_t row_ndx) TIGHTDB_NOEXCEPT;
+    ConstRowExpr operator[](std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
 
     // Setting values
     void set_int(size_t column_ndx, size_t row_ndx, int64_t value);
@@ -226,6 +232,14 @@ public:
     void set_link(std::size_t column_ndx, std::size_t row_ndx, std::size_t target_row_ndx);
     void add_int(size_t column_ndx, int64_t value);
 
+    // Subtables
+    TableRef      get_subtable(size_t column_ndx, size_t row_ndx);
+    ConstTableRef get_subtable(size_t column_ndx, size_t row_ndx) const;
+    void          clear_subtable(size_t column_ndx, size_t row_ndx);
+
+    // Links
+    TableRef get_link_target(std::size_t column_ndx) TIGHTDB_NOEXCEPT;
+    ConstTableRef get_link_target(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
     void nullify_link(std::size_t column_ndx, std::size_t row_ndx);
 
     // Deleting
@@ -289,8 +303,18 @@ public:
     ConstTableView(TableView);
     ConstTableView& operator=(TableView);
 
-    // Getting values
+    // Rows
+    typedef BasicRowExpr<const Table> ConstRowExpr;
+    ConstRowExpr get(std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
+    ConstRowExpr front() const TIGHTDB_NOEXCEPT;
+    ConstRowExpr back() const TIGHTDB_NOEXCEPT;
+    ConstRowExpr operator[](std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
+
+    // Subtables
     ConstTableRef get_subtable(size_t column_ndx, size_t row_ndx) const;
+
+    // Links
+    ConstTableRef get_link_target(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
 
     // Searching (Int and String)
     ConstTableView find_all_int(size_t column_ndx, int64_t value) const;
@@ -353,7 +377,7 @@ inline TableViewBase::TableViewBase(Table* parent):
 }
 
 inline TableViewBase::TableViewBase(const TableViewBase& tv):
-    m_table(tv.m_table), 
+    m_table(tv.m_table),
     m_refs(tv.m_refs)
 {
     if (m_table)
@@ -361,7 +385,7 @@ inline TableViewBase::TableViewBase(const TableViewBase& tv):
 }
 
 inline TableViewBase::TableViewBase(TableViewBase* tv) TIGHTDB_NOEXCEPT:
-    m_table(tv->m_table), 
+    m_table(tv->m_table),
     m_refs(tv->m_refs) // Note: This is a moving copy. It detaches m_refs, so no need for explicit detach later
 {
     if (m_table) {
@@ -418,6 +442,10 @@ inline const Column& TableViewBase::get_ref_column() const TIGHTDB_NOEXCEPT
 #define TIGHTDB_ASSERT_COLUMN(column_ndx)                                   \
     TIGHTDB_ASSERT(m_table);                                                \
     TIGHTDB_ASSERT(column_ndx < m_table->get_column_count());
+
+#define TIGHTDB_ASSERT_ROW(row_ndx)                                         \
+    TIGHTDB_ASSERT(m_table);                                                \
+    TIGHTDB_ASSERT(row_ndx < m_refs.size());
 
 #define TIGHTDB_ASSERT_COLUMN_AND_TYPE(column_ndx, column_type)             \
     TIGHTDB_ASSERT_COLUMN(column_ndx)                                       \
@@ -559,7 +587,8 @@ inline size_t TableViewBase::get_subtable_size(size_t column_ndx, size_t row_ndx
     return m_table->get_subtable_size(column_ndx, real_ndx);
 }
 
-inline std::size_t TableViewBase::get_link(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT
+inline std::size_t TableViewBase::get_link(std::size_t column_ndx, std::size_t row_ndx) const
+    TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Link);
 
@@ -567,12 +596,23 @@ inline std::size_t TableViewBase::get_link(std::size_t column_ndx, std::size_t r
     return m_table->get_link(column_ndx, real_ndx);
 }
 
-inline TableRef TableViewBase::get_link_target(std::size_t column_ndx) TIGHTDB_NOEXCEPT
+inline TableRef TableView::get_link_target(std::size_t column_ndx) TIGHTDB_NOEXCEPT
 {
     return m_table->get_link_target(column_ndx);
 }
 
-inline bool TableViewBase::is_null_link(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT
+inline ConstTableRef TableView::get_link_target(std::size_t column_ndx) const TIGHTDB_NOEXCEPT
+{
+    return m_table->get_link_target(column_ndx);
+}
+
+inline ConstTableRef ConstTableView::get_link_target(std::size_t column_ndx) const TIGHTDB_NOEXCEPT
+{
+    return m_table->get_link_target(column_ndx);
+}
+
+inline bool TableViewBase::is_null_link(std::size_t column_ndx, std::size_t row_ndx) const
+    TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Link);
 
@@ -856,6 +896,80 @@ inline ConstTableView ConstTableView::find_all_datetime(size_t column_ndx, DateT
 {
     TIGHTDB_ASSERT_COLUMN_AND_TYPE(column_ndx, type_DateTime);
     return find_all_integer(column_ndx, int64_t(value.get_datetime()));
+}
+
+
+// Rows
+
+
+inline TableView::RowExpr TableView::get(std::size_t row_ndx) TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT_ROW(row_ndx);
+    std::size_t real_ndx = std::size_t(m_refs.get(row_ndx));
+    return m_table->get(real_ndx);
+}
+
+inline TableView::ConstRowExpr TableView::get(std::size_t row_ndx) const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT_ROW(row_ndx);
+    std::size_t real_ndx = std::size_t(m_refs.get(row_ndx));
+    return m_table->get(real_ndx);
+}
+
+inline ConstTableView::ConstRowExpr ConstTableView::get(std::size_t row_ndx) const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT_ROW(row_ndx);
+    std::size_t real_ndx = std::size_t(m_refs.get(row_ndx));
+    return m_table->get(real_ndx);
+}
+
+inline TableView::RowExpr TableView::front() TIGHTDB_NOEXCEPT
+{
+    return get(0);
+}
+
+inline TableView::ConstRowExpr TableView::front() const TIGHTDB_NOEXCEPT
+{
+    return get(0);
+}
+
+inline ConstTableView::ConstRowExpr ConstTableView::front() const TIGHTDB_NOEXCEPT
+{
+    return get(0);
+}
+
+inline TableView::RowExpr TableView::back() TIGHTDB_NOEXCEPT
+{
+    std::size_t last_row_ndx = size() - 1;
+    return get(last_row_ndx);
+}
+
+inline TableView::ConstRowExpr TableView::back() const TIGHTDB_NOEXCEPT
+{
+    std::size_t last_row_ndx = size() - 1;
+    return get(last_row_ndx);
+}
+
+inline ConstTableView::ConstRowExpr ConstTableView::back() const TIGHTDB_NOEXCEPT
+{
+    std::size_t last_row_ndx = size() - 1;
+    return get(last_row_ndx);
+}
+
+inline TableView::RowExpr TableView::operator[](std::size_t row_ndx) TIGHTDB_NOEXCEPT
+{
+    return get(row_ndx);
+}
+
+inline TableView::ConstRowExpr TableView::operator[](std::size_t row_ndx) const TIGHTDB_NOEXCEPT
+{
+    return get(row_ndx);
+}
+
+inline ConstTableView::ConstRowExpr
+ConstTableView::operator[](std::size_t row_ndx) const TIGHTDB_NOEXCEPT
+{
+    return get(row_ndx);
 }
 
 
