@@ -447,7 +447,10 @@ void TableView::clear()
     m_refs.clear();
 }
 
+#ifdef TIGHTDB_ENABLE_REPLICATION
+
 void TableViewBase::do_sync() const
 {
     // do nothing yet
 }
+#endif // TIGHTDB_ENABLE_REPLICATION

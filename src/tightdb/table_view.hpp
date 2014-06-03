@@ -24,6 +24,7 @@
 
 #include <tightdb/table.hpp>
 #include <tightdb/column.hpp>
+#include <tightdb/util/features.h>
 
 namespace tightdb {
 
