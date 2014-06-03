@@ -25,7 +25,6 @@
 #include <tightdb/table.hpp>
 #include <tightdb/table_view.hpp>
 #include <tightdb/group.hpp>
-#include <tightdb/group_shared.hpp>
 
 namespace tightdb {
 
@@ -88,13 +87,6 @@ public:
     /// Calls parent.set_mixed_subtable(col_ndx, row_ndx, &source).
     static void set_mixed_subtable(Table& parent, std::size_t col_ndx, std::size_t row_ndx,
                                    const Table& source);
-
-#ifdef TIGHTDB_ENABLE_REPLICATION
-    typedef SharedGroup::TransactLogRegistry TransactLogRegistry;
-
-    /// Calls sg.advance_read_transact(log_registry).
-    static void advance_read_transact(SharedGroup& sg, TransactLogRegistry& log_registry);
-#endif
 
     /// Returns the name of the specified data type as follows:
     ///
@@ -222,15 +214,6 @@ inline void LangBindHelper::set_mixed_subtable(Table& parent, std::size_t col_nd
     parent.set_mixed_subtable(col_ndx, row_ndx, &source);
 }
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
-
-inline void LangBindHelper::advance_read_transact(SharedGroup& sg,
-                                                  TransactLogRegistry& log_registry)
-{
-    sg.advance_read_transact(log_registry);
-}
-
-#endif
 
 } // namespace tightdb
 

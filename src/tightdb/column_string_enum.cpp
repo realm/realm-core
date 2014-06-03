@@ -237,14 +237,11 @@ StringIndex& ColumnStringEnum::create_index()
     return *m_index;
 }
 
-
 void ColumnStringEnum::set_index_ref(ref_type ref, ArrayParent* parent, size_t ndx_in_parent)
 {
     TIGHTDB_ASSERT(!m_index);
-    m_index = new StringIndex(ref, parent, ndx_in_parent, this, &get_string,
-                              m_array->get_alloc()); // Throws
+    m_index = new StringIndex(ref, parent, ndx_in_parent, this, &get_string, m_array->get_alloc());
 }
-
 
 void ColumnStringEnum::install_index(StringIndex* index) TIGHTDB_NOEXCEPT
 {
@@ -255,65 +252,12 @@ void ColumnStringEnum::install_index(StringIndex* index) TIGHTDB_NOEXCEPT
 }
 
 
-void ColumnStringEnum::update_column_index(size_t new_col_ndx, const Spec& spec) TIGHTDB_NOEXCEPT
-{
-    Column::update_column_index(new_col_ndx, spec);
-    std::size_t ndx_is_spec_enumkeys = spec.get_enumkeys_ndx(new_col_ndx);
-    m_keys.get_root_array()->set_ndx_in_parent(ndx_is_spec_enumkeys);
-    if (m_index) {
-        size_t ndx_in_parent = m_array->get_ndx_in_parent();
-        m_index->get_root_array()->set_ndx_in_parent(ndx_in_parent + 1);
-    }
-}
-
-
-#ifdef TIGHTDB_ENABLE_REPLICATION
-
-void ColumnStringEnum::refresh_after_advance_transact(size_t col_ndx, const Spec& spec)
-{
-    Column::refresh_after_advance_transact(col_ndx, spec);
-    size_t ndx_is_spec_enumkeys = spec.get_enumkeys_ndx(col_ndx);
-    m_keys.get_root_array()->set_ndx_in_parent(ndx_is_spec_enumkeys);
-    m_keys.refresh_after_advance_transact(0, spec);
-
-    // Refresh search index
-    if (m_index) {
-        size_t ndx_in_parent = m_array->get_ndx_in_parent();
-        m_index->get_root_array()->set_ndx_in_parent(ndx_in_parent + 1);
-        // FIXME: The cached root array needs to be refreshed; however, it is
-        // unkown to me (Kristian) whether the root node can change between
-        // different Array-like classes. If it can, then the refresh operation
-        // could be as non-trivial as it is in the case of
-        // ColumnBinary::refresh_after_advance_transact(). For that reason, the
-        // current work-around is to simply recreate the search index.
-        bool use_workaround = true;
-        if (use_workaround) {
-            delete m_index;
-            m_index = 0;
-            ref_type ref = m_index->get_root_array()->get_ref_from_parent();
-            ArrayParent* parent = m_index->get_root_array()->get_parent();
-            Allocator& alloc = m_array->get_alloc();
-            m_index = new StringIndex(ref, parent, ndx_in_parent+1, this,
-                                      &get_string, alloc); // Throws
-        }
-        else {
-            m_index->refresh_after_advance_transact(col_ndx, spec); // Throws
-        }
-    }
-}
-
-#endif // TIGHTDB_ENABLE_REPLICATION
-
-
 #ifdef TIGHTDB_DEBUG
 
 void ColumnStringEnum::Verify() const
 {
     m_keys.Verify();
     Column::Verify();
-
-    if (m_index)
-        m_index->Verify();
 }
 
 void ColumnStringEnum::to_dot(ostream& out, StringData title) const

@@ -388,19 +388,6 @@ TEST(Descriptor_Subtables)
 }
 
 
-TEST(Descriptor_Subtables2)
-{
-    TableRef table = Table::create();
-    table->add_column(type_Table, "");
-    table->add_empty_row(1);
-    TableRef subtab = table->get_subtable(0,0);
-    DescriptorRef subdesc = subtab->get_descriptor();
-    table->remove_column(0);
-    CHECK(!subtab->is_attached());
-    CHECK(!subdesc->is_attached());
-}
-
-
 TEST(Descriptor_DeeplyNested)
 {
     // Build a long branch of subtable columns

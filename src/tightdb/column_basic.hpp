@@ -23,6 +23,10 @@
 #include <tightdb/column.hpp>
 #include <tightdb/array_basic.hpp>
 
+//
+// A BasicColumn can currently only be used for simple unstructured types like float, double.
+//
+
 namespace tightdb {
 
 template<class T> struct AggReturnType {
@@ -33,12 +37,6 @@ template<> struct AggReturnType<float> {
 };
 
 
-/// A basic column (BasicColumn<T>) is a single B+-tree, and the root
-/// of the column is the root of the B+-tree. All leaf nodes are
-/// single arrays of type BasicArray<T>.
-///
-/// A basic column can currently only be used for simple unstructured
-/// types like float, double.
 template<class T>
 class BasicColumn: public ColumnBase {
 public:
@@ -92,10 +90,6 @@ public:
     // Overrriding method in ColumnBase
     ref_type write(std::size_t, std::size_t, std::size_t,
                    _impl::OutputStream&) const TIGHTDB_OVERRIDE;
-
-#ifdef TIGHTDB_ENABLE_REPLICATION
-    void refresh_after_advance_transact(std::size_t, const Spec&) TIGHTDB_OVERRIDE;
-#endif
 
 #ifdef TIGHTDB_DEBUG
     void Verify() const TIGHTDB_OVERRIDE;

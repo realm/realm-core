@@ -31,19 +31,6 @@ namespace tightdb {
 // Pre-declarations
 class StringIndex;
 
-
-/// A string column (AdaptiveStringColumn) is a single B+-tree, and
-/// the root of the column is the root of the B+-tree. Leaf nodes are
-/// either of type ArrayString (array of small strings),
-/// ArrayStringLong (array of medium strings), or ArrayBigBlobs (array
-/// of big strings).
-///
-/// A string column can optionally be equipped with a search index. If
-/// it is, then the root ref of the index is stored in
-/// Table::m_columns immediately after the root ref of the string
-/// column.
-///
-/// FIXME: Rename AdaptiveStringColumn to StringColumn
 class AdaptiveStringColumn: public ColumnBase {
 public:
     typedef StringData value_type;
@@ -87,7 +74,7 @@ public:
     // Index
     bool has_index() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return m_index != 0; }
     void set_index_ref(ref_type, ArrayParent*, std::size_t ndx_in_parent) TIGHTDB_OVERRIDE;
-    const StringIndex& get_index() const TIGHTDB_NOEXCEPT { return *m_index; }
+    const StringIndex& get_index() const { return *m_index; }
     StringIndex* release_index() TIGHTDB_NOEXCEPT;
     StringIndex& create_index();
 
@@ -115,15 +102,6 @@ public:
                    _impl::OutputStream&) const TIGHTDB_OVERRIDE;
 
     void update_from_parent(std::size_t old_baseline) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-
-    bool is_string_col() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-
-    void update_column_index(std::size_t, const Spec&) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-
-#ifdef TIGHTDB_ENABLE_REPLICATION
-    void refresh_after_advance_transact(std::size_t, const Spec&) TIGHTDB_OVERRIDE;
-#endif
-
 #ifdef TIGHTDB_DEBUG
     void Verify() const TIGHTDB_OVERRIDE;
     void to_dot(std::ostream&, StringData title) const TIGHTDB_OVERRIDE;
@@ -151,10 +129,6 @@ private:
     /// necessary. Returns the type of the root leaf as it is upon
     /// return.
     LeafType upgrade_root_leaf(std::size_t value_size);
-
-#ifdef TIGHTDB_ENABLE_REPLICATION
-    void refresh_root_after_advance_transact();
-#endif
 
 #ifdef TIGHTDB_DEBUG
     void leaf_to_dot(MemRef, ArrayParent*, std::size_t ndx_in_parent,
@@ -260,11 +234,6 @@ inline void AdaptiveStringColumn::update_from_parent(std::size_t old_baseline) T
     }
     // Non-leaf root
     m_array->update_from_parent(old_baseline);
-}
-
-inline bool AdaptiveStringColumn::is_string_col() const TIGHTDB_NOEXCEPT
-{
-    return true;
 }
 
 } // namespace tightdb

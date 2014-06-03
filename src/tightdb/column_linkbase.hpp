@@ -27,15 +27,9 @@ namespace tightdb {
 class ColumnBackLink;
 
 // Abstract base class for columns containing links
-class ColumnLinkBase : public Column
+class ColumnLinkBase
 {
 public:
-    explicit ColumnLinkBase(Allocator& a) : Column(a) {}
-    ColumnLinkBase(Array::Type t, Allocator& a) : Column(t, a) {}
-    explicit ColumnLinkBase(ref_type r, ArrayParent* p = 0, std::size_t ndx_in_parent = 0,
-                    Allocator& a = Allocator::get_default())
-    : Column(r, p, ndx_in_parent, a) {}
-
     virtual void set_target_table(TableRef table) = 0;
     virtual TableRef get_target_table() = 0;
     virtual void set_backlink_column(ColumnBackLink& backlinks) = 0;

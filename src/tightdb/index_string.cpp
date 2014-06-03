@@ -26,7 +26,7 @@ Array* StringIndex::create_node(Allocator& alloc, bool is_leaf)
 
     // Mark that this is part of index
     // (as opposed to columns under leaves)
-    top->set_context_flag(true);
+    top->set_is_index_node(true);
 
     // Add subcolumns for leaves
     Array values(Array::type_Normal, 0, 0, alloc);
@@ -383,7 +383,7 @@ bool StringIndex::LeafInsert(size_t row_ndx, key_type key, size_t offset, String
 
     // If there alrady is a list of matches, we see if we fit there
     // or it has to be split into a sub-index
-    if (!Array::get_context_flag_from_header(alloc.translate(to_ref(ref)))) {
+    if (!Array::is_index_node(to_ref(ref), alloc)) {
         Column sub(to_ref(ref), m_array, ins_pos_refs, alloc);
 
         size_t r1 = size_t(sub.get(0));
@@ -472,7 +472,7 @@ void StringIndex::distinct(Column& result) const
             }
             else {
                 // A real ref either points to a list or a sub-index
-                if (Array::get_context_flag_from_header(alloc.translate(to_ref(ref)))) {
+                if (Array::is_index_node(to_ref(ref), alloc)) {
                     const StringIndex ndx(to_ref(ref), m_array, i, m_target_column, m_get_func, alloc);
                     ndx.distinct(result);
                 }
@@ -514,7 +514,7 @@ void StringIndex::UpdateRefs(size_t pos, int diff)
             }
             else {
                 // A real ref either points to a list or a sub-index
-                if (Array::get_context_flag_from_header(alloc.translate(to_ref(ref)))) {
+                if (Array::is_index_node(to_ref(ref), alloc)) {
                     StringIndex ndx(to_ref(ref), m_array, i, m_target_column, m_get_func, alloc);
                     ndx.UpdateRefs(pos, diff);
                 }
@@ -602,7 +602,7 @@ void StringIndex::DoDelete(size_t row_ndx, StringData value, size_t offset)
         }
         else {
             // A real ref either points to a list or a sub-index
-            if (Array::get_context_flag_from_header(alloc.translate(to_ref(ref)))) {
+            if (Array::is_index_node(to_ref(ref), alloc)) {
                 StringIndex subNdx(to_ref(ref), m_array, pos_refs, m_target_column, m_get_func, alloc);
                 subNdx.DoDelete(row_ndx, value, offset+4);
 
@@ -662,7 +662,7 @@ void StringIndex::do_update_ref(StringData value, size_t row_ndx, size_t new_row
         }
         else {
             // A real ref either points to a list or a sub-index
-            if (Array::get_context_flag_from_header(alloc.translate(to_ref(ref)))) {
+            if (Array::is_index_node(to_ref(ref), alloc)) {
                 StringIndex subNdx(to_ref(ref), m_array, pos_refs, m_target_column, m_get_func, alloc);
                 subNdx.do_update_ref(value, row_ndx, new_row_ndx, offset+4);
             }
@@ -704,13 +704,6 @@ void StringIndex::NodeAddKey(ref_type ref)
 
 
 #ifdef TIGHTDB_DEBUG
-
-void StringIndex::Verify() const
-{
-    m_array->Verify();
-
-    // FIXME: Extend verification along the lines of Column::Verify().
-}
 
 void StringIndex::verify_entries(const AdaptiveStringColumn& column) const
 {
@@ -756,7 +749,7 @@ void StringIndex::to_dot_2(ostream& out, StringData title) const
 
 void StringIndex::array_to_dot(ostream& out, const Array& array)
 {
-    if (!array.get_context_flag()) {
+    if (!array.is_index_node()) {
         Column col(array.get_ref(), array.get_parent(), array.get_ndx_in_parent(), array.get_alloc());
         col.to_dot(out, "ref_list");
         return;

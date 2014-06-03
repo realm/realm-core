@@ -32,12 +32,11 @@ x.x.x Release notes (yyyy—MM-dd)    <<<------------ PLEASE NOTE, THIS IS THE N
 
 C++ (core)
 -----------
+Adding Table::get_index_in_parent() and Group::get_table(std::size_t table_ndx). They were needed for implicit transactions.
 
 ### Bugfixes:
 
-* Fixed bug in TableView::remove() causing crash or undefined behaviour.
-* Fixed bugs in Table::insert_column() and Table::remove_column() causing crash or undefined behaviour.
-* Fixed corruption bug when a string enumeration column follows a column with attached search index (index flavor mixup).
+* Fixed bug in TableView::remove(), causing crash or undefined behaviour.
 * Fixed in Array::erase() causing crash in certain row insertion scenarios.
 
 ### API breaking changes:
@@ -46,9 +45,7 @@ C++ (core)
 
 ### Enhancements:
 
-* Added support for links and lists of links as column types, to enable relationships between tables.
-* Adding Table::get_index_in_parent() and Group::get_table(std::size_t table_ndx). They were needed for implicit transactions.
-* Table::get_parent_table() can now also return the index of the column in the parent.
+* `???`
 
 -----------
 

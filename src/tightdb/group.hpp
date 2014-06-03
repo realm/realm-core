@@ -301,13 +301,6 @@ public:
     /// Compare two groups for inequality. See operator==().
     bool operator!=(const Group& g) const { return !(*this == g); }
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
-    class TransactAdvancer;
-    void advance_transact(ref_type new_top_ref, std::size_t new_file_size,
-                          const BinaryData* logs_begin, const BinaryData* logs_end);
-    void mark_all_table_accessors_dirty();
-#endif
-
 #ifdef TIGHTDB_DEBUG
     void Verify() const; // Uncapitalized 'verify' cannot be used due to conflict with macro in Obj-C
     void print() const;
@@ -317,6 +310,7 @@ public:
     void to_dot(std::ostream&) const;
     void to_dot() const; // To std::cerr (for GDB)
     void to_dot(const char* file_path) const;
+    void zero_free_space(std::size_t file_size, std::size_t readlock_version);
 #else
     void Verify() const {}
 #endif
@@ -326,20 +320,17 @@ protected:
 
 private:
     SlabAlloc m_alloc;
-
-    // Underlying array structure. Third slot in m_top is the "logical file
-    // size".
     Array m_top;
-    Array m_tables;            // 2nd slot in m_top
-    ArrayString m_table_names; // 1st slot in m_top
-    Array m_free_positions;    // 4th slot in m_top (optional)
-    Array m_free_lengths;      // 5th slot in m_top (optional)
-    Array m_free_versions;     // 6th slot in m_top (optional)
-
+    Array m_tables;            // Second slot in m_top
+    ArrayString m_table_names; // First slot in m_top
+    Array m_free_positions;    // Fourth slot in m_top
+    Array m_free_lengths;      // Fifth slot in m_top
+    Array m_free_versions;     // Sixth slot in m_top
     typedef std::vector<Table*> table_accessors;
     mutable table_accessors m_table_accessors;
     const bool m_is_shared;
     bool m_is_attached;
+    std::size_t m_readlock_version;
 
     struct shared_tag {};
     Group(shared_tag) TIGHTDB_NOEXCEPT;
@@ -351,12 +342,9 @@ private:
     void detach() TIGHTDB_NOEXCEPT;
     void detach_but_retain_data() TIGHTDB_NOEXCEPT;
     void complete_detach() TIGHTDB_NOEXCEPT;
-
-    /// Add or clear array nodes for free-space tracking.
-    void reset_freespace_tracking();
-
+    void init_shared();
     void reattach_from_retained_data();
-    bool may_reattach_if_same_version() const TIGHTDB_NOEXCEPT;
+    inline bool may_reattach_if_same_version() { return m_top.is_attached(); }
 
     /// Recursively update refs stored in all cached array
     /// accessors. This includes cached array accessors in any
@@ -367,8 +355,7 @@ private:
     /// commits via shared group.
     void update_refs(ref_type top_ref, std::size_t old_baseline) TIGHTDB_NOEXCEPT;
 
-    /// Reinitialize group for a new read or write transaction.
-    void init_for_transact(ref_type new_top_ref, std::size_t new_file_size);
+    void update_from_shared(ref_type new_top_ref, std::size_t new_file_size);
 
     // Overriding method in ArrayParent
     void update_child_ref(std::size_t, ref_type) TIGHTDB_OVERRIDE;
@@ -380,7 +367,7 @@ private:
     StringData get_child_name(std::size_t) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
     // Overriding method in Table::Parent
-    void child_accessor_destroyed(Table*) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void child_accessor_destroyed(std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
     class TableWriter;
     class DefaultTableWriter;
@@ -405,7 +392,7 @@ private:
 
     Table* get_table_by_ndx(std::size_t ndx);
     const Table* get_table_by_ndx(std::size_t ndx) const;
-    ref_type create_new_table(StringData name);
+    //ref_type create_new_table(StringData name);
     Table* create_new_table_and_accessor(StringData name, SpecSetter);
 
     void detach_table_accessors() TIGHTDB_NOEXCEPT;
@@ -489,11 +476,6 @@ inline void Group::init_array_parents() TIGHTDB_NOEXCEPT
     // Seventh slot is "database version" (a.k.a. transaction number)
 }
 
-inline bool Group::may_reattach_if_same_version() const TIGHTDB_NOEXCEPT
-{
-    return m_top.is_attached();
-}
-
 inline bool Group::is_attached() const TIGHTDB_NOEXCEPT
 {
     return m_is_attached;
@@ -535,7 +517,7 @@ template<class T> inline bool Group::has_table(StringData name) const
     std::size_t ndx = m_table_names.find_first(name);
     if (ndx == not_found)
         return false;
-    const Table* table = get_table_by_ndx(ndx); // Throws
+    const Table* table = get_table_by_ndx(ndx);
     return T::matches_dynamic_spec(_impl::TableFriend::get_spec(*table));
 }
 
@@ -591,12 +573,12 @@ template<class T> inline const T* Group::get_table_ptr(StringData name) const
 
 inline TableRef Group::get_table(std::size_t table_ndx)
 {
-    return get_table_by_ndx(table_ndx)->get_table_ref(); // Throws
+    return get_table_by_ndx(table_ndx)->get_table_ref();
 }
 
 inline ConstTableRef Group::get_table(std::size_t table_ndx) const
 {
-    return get_table_by_ndx(table_ndx)->get_table_ref(); // Throws
+    return get_table_by_ndx(table_ndx)->get_table_ref();
 }
 
 inline TableRef Group::get_table(StringData name)
@@ -629,7 +611,7 @@ template<class T> inline typename T::ConstRef Group::get_table(StringData name) 
 
 inline const Table* Group::get_table_by_ndx(std::size_t ndx) const
 {
-    return const_cast<Group*>(this)->get_table_by_ndx(ndx); // Throws
+    return const_cast<Group*>(this)->get_table_by_ndx(ndx);
 }
 
 inline void Group::update_child_ref(std::size_t child_ndx, ref_type new_ref)
@@ -647,7 +629,7 @@ inline StringData Group::get_child_name(std::size_t child_ndx) const TIGHTDB_NOE
     return m_table_names.get(child_ndx);
 }
 
-inline void Group::child_accessor_destroyed(Table*) TIGHTDB_NOEXCEPT
+inline void Group::child_accessor_destroyed(std::size_t) TIGHTDB_NOEXCEPT
 {
     // Ignore
 }
@@ -670,7 +652,7 @@ template<class S> void Group::to_json(S& out) const
 
     for (std::size_t i = 0; i < m_tables.size(); ++i) {
         StringData name = m_table_names.get(i);
-        ConstTableRef table = get_table(i);
+        const Table* table = get_table_by_ndx(i);
 
         if (i) out << ",";
         out << "\"" << name << "\"";

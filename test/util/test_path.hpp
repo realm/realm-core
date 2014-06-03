@@ -49,7 +49,6 @@ void keep_test_files();
 /// directory. Use this function to set a path prefix. The specified
 /// prefix must contain a final `/`.
 void set_test_path_prefix(const std::string&);
-std::string get_test_path_prefix();
 
 std::string get_test_path(const unit_test::TestDetails&, const char* suffix);
 

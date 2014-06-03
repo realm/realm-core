@@ -60,17 +60,6 @@ TEST(Links_Columns)
     size_t new_link_col_ndx = col_link2 + 1;
     CHECK_EQUAL(1, table2->get_backlink_count(1, table1_ndx, new_link_col_ndx));
     CHECK_EQUAL(0, table2->get_backlink(1, table1_ndx, new_link_col_ndx, 0));
-
-    // add one more column (moving link column)
-    table1->insert_column(1, type_Int, "second");
-    size_t new_link_col_ndx2 = new_link_col_ndx + 1;
-    CHECK_EQUAL(1, table2->get_backlink_count(1, table1_ndx, new_link_col_ndx2));
-    CHECK_EQUAL(0, table2->get_backlink(1, table1_ndx, new_link_col_ndx2, 0));
-
-    // remove a column (moving link column back)
-    table1->remove_column(0);
-    CHECK_EQUAL(1, table2->get_backlink_count(1, table1_ndx, new_link_col_ndx));
-    CHECK_EQUAL(0, table2->get_backlink(1, table1_ndx, new_link_col_ndx, 0));
 }
 
 TEST(Links_Basic)

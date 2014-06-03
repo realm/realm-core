@@ -3,7 +3,6 @@
 #include <limits>
 #include <vector>
 #include <map>
-#include <sstream>
 #include <fstream>
 #include <iostream>
 
@@ -18,10 +17,6 @@
 #include <tightdb/column_mixed.hpp>
 #include <tightdb/array_binary.hpp>
 #include <tightdb/array_string_long.hpp>
-#include <tightdb/lang_bind_helper.hpp>
-#ifdef TIGHTDB_ENABLE_REPLICATION
-#  include <tightdb/replication.hpp>
-#endif
 
 #include "../test.hpp"
 #include "../util/demangle.hpp"

@@ -84,14 +84,13 @@ good:
 
 void Replication::select_desc(const Descriptor& desc)
 {
-    typedef _impl::DescriptorFriend df;
-    check_table(&df::root_table(desc));
+    check_table(&*desc.m_root_table);
     size_t* begin;
     size_t* end;
     for (;;) {
         begin = m_subtab_path_buf.data();
         end   = begin + m_subtab_path_buf.size();
-        begin = df::record_subdesc_path(desc, begin, end);
+        begin = desc.record_subdesc_path(begin, end);
         if (begin)
             break;
         size_t new_size = m_subtab_path_buf.size();
@@ -119,7 +118,7 @@ void Replication::select_desc(const Descriptor& desc)
 
 good:
     transact_log_advance(buf);
-    m_selected_spec = df::get_spec(desc);
+    m_selected_spec = desc.m_spec;
 }
 
 
@@ -414,22 +413,6 @@ public:
         return false;
     }
 
-    bool move_last_over(size_t target_row_ndx, size_t last_row_ndx)
-    {
-        if (TIGHTDB_LIKELY(m_table)) {
-            if (TIGHTDB_LIKELY(target_row_ndx < last_row_ndx &&
-                               last_row_ndx+1 == m_table->size())) {
-#ifdef TIGHTDB_DEBUG
-                if (m_log)
-                    *m_log << "table->move_last_over("<<target_row_ndx<<")\n";
-#endif
-                m_table->move_last_over(target_row_ndx); // Throws
-                return true;
-            }
-        }
-        return false;
-    }
-
     bool add_int_to_column(size_t col_ndx, int_fast64_t value)
     {
         if (TIGHTDB_LIKELY(m_table)) {
@@ -456,8 +439,8 @@ public:
         if (m_log)
             *m_log << "table = group->get_table("<<group_level_ndx<<")\n";
 #endif
-        m_desc.reset();
         m_table = m_group.get_table(group_level_ndx); // Throws
+        m_desc.reset();
         for (int i = 0; i < levels; ++i) {
             size_t col_ndx = path[2*i + 0];
             size_t row_ndx = path[2*i + 1];
@@ -664,12 +647,6 @@ private:
                 return "Table";
             case type_Mixed:
                 return "Mixed";
-            case type_Link:
-                return "Link";
-            case type_LinkList:
-                return "LinkList";
-            case type_BackLink:
-                return "BackLink";
         }
         TIGHTDB_ASSERT(false);
         return 0;
@@ -736,9 +713,8 @@ TrivialReplication::do_commit_write_transact(SharedGroup&, version_type orig_ver
 {
     char* data = m_transact_log_buffer.data();
     size_t size = m_transact_log_free_begin - data;
-    version_type new_version = orig_version + 1;
-    handle_transact_log(data, size, new_version); // Throws
-    return new_version;
+    handle_transact_log(data, size); // Throws
+    return orig_version + 1;
 }
 
 void TrivialReplication::do_rollback_write_transact(SharedGroup&) TIGHTDB_NOEXCEPT
