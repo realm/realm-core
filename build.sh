@@ -625,7 +625,6 @@ EOF
             cp "src/tightdb/libtightdb-$platform.a" "$BASENAME" || exit 1
             cp "src/tightdb/libtightdb-$platform-dbg.a" "$BASENAME" || exit 1
         done
-        cp src/tightdb/*dylib $BASENAME || exit 1
         cp src/tightdb/libtightdb.a $BASENAME || exit 1
         zip -r -q realm-core-$realm_version.zip $BASENAME || exit 1
         mkdir -p ../realm-objc || exit 1
