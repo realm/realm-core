@@ -854,17 +854,16 @@ void Column::erase(size_t ndx, bool is_last)
 }
 
 
-void Column::move_last_over(size_t ndx)
+void Column::move_last_over(size_t target_row_ndx, size_t last_row_ndx)
 {
-    TIGHTDB_ASSERT(ndx+1 < size());
+    TIGHTDB_ASSERT(target_row_ndx < last_row_ndx);
+    TIGHTDB_ASSERT(last_row_ndx + 1 == size());
 
-    size_t last_ndx = size() - 1;
-    int64_t v = Column::get(last_ndx);
-
-    Column::set(ndx, v); // Throws
+    int_fast64_t value = get(last_row_ndx);
+    Column::set(target_row_ndx, value); // Throws
 
     bool is_last = true;
-    Column::erase(last_ndx, is_last); // Throws
+    Column::erase(last_row_ndx, is_last); // Throws
 }
 
 
@@ -994,28 +993,30 @@ bool Column::compare_int(const Column& c) const
 }
 
 
-void Column::do_insert(size_t ndx, int64_t value)
+void Column::do_insert(size_t row_ndx, int_fast64_t value, size_t num_rows)
 {
-    TIGHTDB_ASSERT(ndx == npos || ndx < size());
+    TIGHTDB_ASSERT(row_ndx == tightdb::npos || row_ndx < size());
     ref_type new_sibling_ref;
     Array::TreeInsert<Column> state;
-    if (root_is_leaf()) {
-        TIGHTDB_ASSERT(ndx == npos || ndx < TIGHTDB_MAX_LIST_SIZE);
-        new_sibling_ref = m_array->bptree_leaf_insert(ndx, value, state);
-    }
-    else {
-        state.m_value = value;
-        if (ndx == npos) {
-            new_sibling_ref = m_array->bptree_append(state);
+    for (size_t i = 0; i != num_rows; ++i) {
+        size_t row_ndx_2 = row_ndx == tightdb::npos ? tightdb::npos : row_ndx + i;
+        if (root_is_leaf()) {
+            TIGHTDB_ASSERT(row_ndx_2 == tightdb::npos || row_ndx_2 < TIGHTDB_MAX_LIST_SIZE);
+            new_sibling_ref = m_array->bptree_leaf_insert(row_ndx_2, value, state); // Throws
         }
         else {
-            new_sibling_ref = m_array->bptree_insert(ndx, state);
+            state.m_value = value;
+            if (row_ndx_2 == tightdb::npos) {
+                new_sibling_ref = m_array->bptree_append(state); // Throws
+            }
+            else {
+                new_sibling_ref = m_array->bptree_insert(row_ndx_2, state); // Throws
+            }
         }
-    }
-
-    if (TIGHTDB_UNLIKELY(new_sibling_ref)) {
-        bool is_append = ndx == npos;
-        introduce_new_root(new_sibling_ref, state, is_append);
+        if (TIGHTDB_UNLIKELY(new_sibling_ref)) {
+            bool is_append = row_ndx_2 == tightdb::npos;
+            introduce_new_root(new_sibling_ref, state, is_append); // Throws
+        }
     }
 }
 
@@ -1080,20 +1081,15 @@ ref_type Column::write(size_t slice_offset, size_t slice_size,
 }
 
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
-
-void Column::refresh_after_advance_transact(size_t, const Spec&)
+void Column::refresh_accessor_tree(size_t, const Spec&)
 {
-    // With this type of column (Column), `m_array` is always an
-    // instance of Array. This is true becasue all leafs are instances
-    // of Array, and when the root is an inner B+-tree node, only the
-    // top array of the inner node is cached. This means that we never
-    // have to change the type of the cached root array with this type
-    // of column.
+    // With this type of column (Column), `m_array` is always an instance of
+    // Array. This is true because all leafs are instances of Array, and when
+    // the root is an inner B+-tree node, only the top array of the inner node
+    // is cached. This means that we never have to change the type of the cached
+    // root array.
     m_array->init_from_parent();
 }
-
-#endif // TIGHTDB_ENABLE_REPLICATION
 
 
 #ifdef TIGHTDB_DEBUG

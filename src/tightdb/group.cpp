@@ -772,7 +772,7 @@ public:
     void update(Table& table) TIGHTDB_OVERRIDE
     {
         typedef _impl::TableFriend tf;
-        tf::insert_null_column_accessor(table, m_col_ndx);
+        tf::adj_insert_column(table, m_col_ndx); // Throws
     }
 
     void update_parent(Table&) TIGHTDB_OVERRIDE
@@ -794,7 +794,7 @@ public:
     void update(Table& table) TIGHTDB_OVERRIDE
     {
         typedef _impl::TableFriend tf;
-        tf::erase_column_accessor(table, m_col_ndx);
+        tf::adj_erase_column(table, m_col_ndx);
     }
 
     void update_parent(Table&) TIGHTDB_OVERRIDE
@@ -1102,28 +1102,17 @@ void Group::advance_transact(ref_type new_top_ref, size_t new_file_size,
     //
     // Initially, when this function is invoked, we cannot assume any
     // correspondance between the accessor state and the underlying node
-    // structure, but we can assume the Minimal Accessor Hierarchy Consistency
-    // Guarantee.
+    // structure. All we can assume is the Minimal Accessor Hierarchy
+    // Consistency Guarantee, which ensures that the group can be destroyed
+    // without corruption or memory leaks.
     //
     // For each transaction log instruction, the accessor state is modified in a
     // way that maintains the Minimal Accessor Hierarchy Consistency Guarantee
     // (Group::TransactAdvancer). When all instructions are accounted for, the
     // accessor state has the additional property of being in structual
-    // correspondance to the underlying node structure. At this point, we can
-    // reliably refresh each accessor recursively, starting from the root (the
-    // group).
-    //
-    // While the Minimal Accessor Hierarchy Consistency Guarantee does not
-    // guarantee anything about the state of the 'ndx_in_parent' property of any
-    // array accessor, we can in this case assume that many of them are still
-    // correct. The exceptions are; the top array accessor of root tables
-    // (Table::m_top), the column array accessor of subtables with shared
-    // descriptor (Table::m_columns), the top array accessor of spec objects of
-    // subtables with shared descriptor (Table::m_spec.m_top), the root array
-    // accessor of table level columns (*Table::m_cols[]->m_array). The root
-    // array accessor of the subcolumn of unique strings in an enumerated string
-    // column (*ColumnStringEnum::m_keys.m_array), and finally, the root array
-    // accessor of search indexes (*Table::m_cols[]->m_index->m_array).
+    // correspondance to the underlying node structure (the Accessor Hierarchy
+    // Correspondence Requirement). At that point, we can reliably refresh each
+    // accessor recursively, starting from the root (the group).
 
     MultiLogInputStream in(logs_begin, logs_end);
     Replication::TransactLogParser parser(in);
@@ -1146,8 +1135,7 @@ void Group::advance_transact(ref_type new_top_ref, size_t new_file_size,
     for (size_t table_ndx = 0; table_ndx != num_tables; ++table_ndx) {
         if (Table* table = m_table_accessors[table_ndx]) {
             typedef _impl::TableFriend tf;
-            size_t spec_ndx_in_parent = 0; // Ignored because these are root tables
-            tf::refresh_after_advance_transact(*table, table_ndx, spec_ndx_in_parent); // Throws
+            tf::refresh_accessor_tree(*table, table_ndx); // Throws
         }
     }
 }

@@ -172,103 +172,6 @@ void ColumnSubtableParent::SubtableMap::update_from_parent(size_t old_baseline)
 }
 
 
-void ColumnSubtableParent::SubtableMap::adj_insert_rows(size_t row_ndx, size_t num_rows)
-    TIGHTDB_NOEXCEPT
-{
-    typedef entries::iterator iter;
-    iter end = m_entries.end();
-    for (iter i = m_entries.begin(); i != end; ++i) {
-        if (i->m_subtable_ndx >= row_ndx)
-            i->m_subtable_ndx += num_rows;
-    }
-}
-
-
-bool ColumnSubtableParent::SubtableMap::adj_erase_row(size_t row_ndx) TIGHTDB_NOEXCEPT
-{
-    typedef entries::iterator iter;
-    iter end = m_entries.end();
-    iter i = end;
-    for (iter j = m_entries.begin(); j != end; ++j) {
-        if (j->m_subtable_ndx > row_ndx) {
-            --j->m_subtable_ndx;
-        }
-        else if (j->m_subtable_ndx == row_ndx) {
-            TIGHTDB_ASSERT(i == end); // Subtable accessors are unique
-            i = j;
-        }
-    }
-    if (i == end)
-        return false; // Not found, so nothing changed
-
-    // Must hold a counted reference while detaching
-    TableRef table(i->m_table);
-    typedef _impl::TableFriend tf;
-    tf::detach(*table);
-
-    *i = *--end; // Move last over
-    m_entries.pop_back();
-    return m_entries.empty();
-}
-
-
-bool ColumnSubtableParent::SubtableMap::adj_move_last_over(size_t target_row_ndx,
-                                                           size_t last_row_ndx) TIGHTDB_NOEXCEPT
-{
-    // Search for either index in a tight loop for speed
-    bool last_seen = false;
-    typedef entries::iterator iter;
-    iter i = m_entries.begin(), end = m_entries.end();
-    for (;;) {
-        if (i == end)
-            return false;
-        if (i->m_subtable_ndx == target_row_ndx)
-            goto target;
-        if (i->m_subtable_ndx == last_row_ndx)
-            break;
-        ++i;
-    }
-
-    // Move subtable accessor at `last_row_ndx`, then look for `target_row_ndx`
-    i->m_subtable_ndx = target_row_ndx;
-    for (;;) {
-        ++i;
-        if (i == end)
-            return false;
-        if (i->m_subtable_ndx == target_row_ndx)
-            break;
-    }
-    last_seen = true;
-
-    // Detach and remove original subtable accessor at `target_row_ndx`, then
-    // look for `last_row_ndx
-  target:
-    {
-        // Must hold a counted reference while detaching
-        TableRef table(i->m_table);
-        typedef _impl::TableFriend tf;
-        tf::detach(*table);
-        // Delete entry by moving last over (faster and avoids invalidating
-        // iterators)
-        *i = *--end;
-        m_entries.pop_back();
-    }
-    if (!last_seen) {
-        for (;;) {
-            if (i == end)
-                goto check_empty;
-            if (i->m_subtable_ndx == last_row_ndx)
-                break;
-            ++i;
-        }
-        i->m_subtable_ndx = target_row_ndx;
-    }
-
-  check_empty:
-    return m_entries.empty();
-}
-
-
 void ColumnSubtableParent::SubtableMap::
 update_accessors(const size_t* col_path_begin, const size_t* col_path_end,
                  _impl::TableFriend::AccessorUpdater& updater)
@@ -284,8 +187,6 @@ update_accessors(const size_t* col_path_begin, const size_t* col_path_end,
 }
 
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
-
 void ColumnSubtableParent::SubtableMap::recursive_mark_dirty() TIGHTDB_NOEXCEPT
 {
     typedef entries::const_iterator iter;
@@ -297,7 +198,8 @@ void ColumnSubtableParent::SubtableMap::recursive_mark_dirty() TIGHTDB_NOEXCEPT
     }
 }
 
-void ColumnSubtableParent::SubtableMap::refresh_after_advance_transact(size_t spec_ndx_in_parent)
+
+void ColumnSubtableParent::SubtableMap::refresh_accessor_tree(size_t spec_ndx_in_parent)
 {
     typedef entries::const_iterator iter;
     iter end = m_entries.end();
@@ -305,11 +207,10 @@ void ColumnSubtableParent::SubtableMap::refresh_after_advance_transact(size_t sp
         // Must hold a counted reference while refreshing
         TableRef table(i->m_table);
         typedef _impl::TableFriend tf;
-        tf::refresh_after_advance_transact(*table, i->m_subtable_ndx, spec_ndx_in_parent);
+        tf::set_shared_subspec_ndx_in_parent(*table, spec_ndx_in_parent);
+        tf::refresh_accessor_tree(*table, i->m_subtable_ndx);
     }
 }
-
-#endif // TIGHTDB_ENABLE_REPLICATION
 
 
 #ifdef TIGHTDB_DEBUG
@@ -340,80 +241,86 @@ size_t ColumnTable::get_subtable_size(size_t ndx) const TIGHTDB_NOEXCEPT
 }
 
 
-void ColumnTable::add()
+void ColumnTable::add(const Table* subtable)
 {
-    add(0); // Null-pointer indicates empty table
-}
-
-
-void ColumnTable::insert(size_t ndx)
-{
-    insert(ndx, 0); // Null-pointer indicates empty table
-}
-
-
-void ColumnTable::insert(size_t ndx, const Table* subtable)
-{
-    TIGHTDB_ASSERT(ndx <= size());
-    detach_subtable_accessors();
-
     ref_type columns_ref = 0;
-    if (subtable)
+    if (subtable && !subtable->is_empty())
         columns_ref = clone_table_columns(subtable); // Throws
 
-    Column::insert(ndx, columns_ref); // Throws
+    std::size_t row_ndx = tightdb::npos;
+    int_fast64_t value = int_fast64_t(columns_ref);
+    std::size_t num_rows = 1;
+    do_insert(row_ndx, value, num_rows); // Throws
 }
 
 
-void ColumnTable::set(size_t ndx, const Table* subtable)
+void ColumnTable::insert(size_t row_ndx, const Table* subtable)
 {
-    TIGHTDB_ASSERT(ndx < size());
-    detach_subtable_accessors();
-    destroy_subtable(ndx);
+    ref_type columns_ref = 0;
+    if (subtable && !subtable->is_empty())
+        columns_ref = clone_table_columns(subtable); // Throws
+
+    std::size_t size = this->size(); // Slow
+    TIGHTDB_ASSERT(row_ndx <= size);
+    std::size_t row_ndx_2 = row_ndx == size ? tightdb::npos : row_ndx;
+    int_fast64_t value = int_fast64_t(columns_ref);
+    std::size_t num_rows = 1;
+    do_insert(row_ndx_2, value, num_rows); // Throws
+}
+
+
+void ColumnTable::set(size_t row_ndx, const Table* subtable)
+{
+    TIGHTDB_ASSERT(row_ndx < size());
+    destroy_subtable(row_ndx);
 
     ref_type columns_ref = 0;
-    if (subtable)
-        columns_ref = clone_table_columns(subtable);
+    if (subtable && !subtable->is_empty())
+        columns_ref = clone_table_columns(subtable); // Throws
 
-    Column::set(ndx, columns_ref);
-}
+    int_fast64_t value = int_fast64_t(columns_ref);
+    Column::set(row_ndx, value); // Throws
 
-
-void ColumnTable::erase(size_t ndx, bool is_last)
-{
-    TIGHTDB_ASSERT(ndx < size());
-    detach_subtable_accessors();
-    destroy_subtable(ndx);
-    Column::erase(ndx, is_last);
+    // Refresh the accessors, if present
+    if (Table* table = m_subtable_map.find(row_ndx)) {
+        TableRef table_2;
+        table_2.reset(table); // Must hold counted reference
+        typedef _impl::TableFriend tf;
+        tf::discard_row_accessors(*table_2);
+        tf::discard_subtable_accessors(*table_2);
+        tf::mark_dirty(*table_2);
+        tf::refresh_accessor_tree(*table_2, row_ndx);
+    }
 }
 
 
 void ColumnTable::clear()
 {
     detach_subtable_accessors();
-    Column::clear();
-    // FIXME: This one is needed because Column::clear() forgets about
-    // the leaf type. A better solution should probably be found.
+    Column::clear(); // Throws
+    // FIXME: This one is needed because Column::clear() forgets about the leaf
+    // type. A better solution should probably be sought after.
     m_array->set_type(Array::type_HasRefs);
 }
 
 
-void ColumnTable::move_last_over(size_t ndx)
+void ColumnTable::erase(size_t row_ndx, bool is_last)
 {
-    TIGHTDB_ASSERT(ndx+1 < size());
-    detach_subtable_accessors();
-    destroy_subtable(ndx);
-
-    size_t last_ndx = size() - 1;
-    int_fast64_t v = get(last_ndx);
-    Column::set(ndx, v);
-
-    bool is_last = true;
-    Column::erase(last_ndx, is_last);
+    TIGHTDB_ASSERT(row_ndx < size());
+    destroy_subtable(row_ndx);
+    ColumnSubtableParent::erase(row_ndx, is_last); // Throws
 }
 
 
-void ColumnTable::destroy_subtable(size_t ndx)
+void ColumnTable::move_last_over(size_t target_row_ndx, size_t last_row_ndx)
+{
+    TIGHTDB_ASSERT(target_row_ndx < size());
+    destroy_subtable(target_row_ndx);
+    ColumnSubtableParent::move_last_over(target_row_ndx, last_row_ndx); // Throws
+}
+
+
+void ColumnTable::destroy_subtable(size_t ndx) TIGHTDB_NOEXCEPT
 {
     ref_type columns_ref = get_as_ref(ndx);
     if (columns_ref == 0)

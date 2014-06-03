@@ -343,7 +343,7 @@ public:
     /// are always detached when the transaction ends.
     ///
     /// Returns true if, and only if the array has changed. If the array has not
-    /// cahnged, then its children are guaranteed to also not have changed.
+    /// changed, then its children are guaranteed to also not have changed.
     bool update_from_parent(std::size_t old_baseline) TIGHTDB_NOEXCEPT;
 
     /// Change the type of an already attached array node.

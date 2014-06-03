@@ -98,17 +98,16 @@ void BasicColumn<T>::clear()
 }
 
 template<class T>
-void BasicColumn<T>::move_last_over(std::size_t ndx)
+void BasicColumn<T>::move_last_over(std::size_t target_row_ndx, std::size_t last_row_ndx)
 {
-    TIGHTDB_ASSERT(ndx+1 < size());
+    TIGHTDB_ASSERT(target_row_ndx < last_row_ndx);
+    TIGHTDB_ASSERT(last_row_ndx + 1 == size());
 
-    std::size_t last_ndx = size() - 1;
-    T v = get(last_ndx);
-
-    set(ndx, v);
+    T value = get(last_row_ndx);
+    set(target_row_ndx, value); // Throws
 
     bool is_last = true;
-    erase(last_ndx, is_last);
+    erase(last_row_ndx, is_last); // Throws
 }
 
 
@@ -152,18 +151,29 @@ void BasicColumn<T>::set(std::size_t ndx, T value)
     m_array->update_bptree_elem(ndx, set_leaf_elem); // Throws
 }
 
-template<class T>
-void BasicColumn<T>::add(T value)
+template<class T> inline void BasicColumn<T>::add(T value)
 {
-    do_insert(npos, value);
+    std::size_t row_ndx = tightdb::npos;
+    std::size_t num_rows = 1;
+    do_insert(row_ndx, value, num_rows); // Throws
 }
 
-template<class T>
-void BasicColumn<T>::insert(std::size_t ndx, T value)
+template<class T> inline void BasicColumn<T>::insert(std::size_t row_ndx, T value)
 {
-    TIGHTDB_ASSERT(ndx <= size());
-    if (size() <= ndx) ndx = npos;
-    do_insert(ndx, value);
+    std::size_t size = this->size(); // Slow
+    TIGHTDB_ASSERT(row_ndx <= size);
+    std::size_t row_ndx_2 = row_ndx == size ? tightdb::npos : row_ndx;
+    std::size_t num_rows = 1;
+    do_insert(row_ndx_2, value, num_rows); // Throws
+}
+
+// Implementing pure virtual method of ColumnBase.
+template<class T>
+inline void BasicColumn<T>::insert(std::size_t row_ndx, std::size_t num_rows, bool is_append)
+{
+    std::size_t row_ndx_2 = is_append ? tightdb::npos : row_ndx;
+    T value = T();
+    do_insert(row_ndx_2, value, num_rows); // Throws
 }
 
 template<class T>
@@ -298,10 +308,7 @@ template<class T> ref_type BasicColumn<T>::write(size_t slice_offset, size_t sli
 }
 
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
-
-template<class T>
-void BasicColumn<T>::refresh_after_advance_transact(std::size_t, const Spec&)
+template<class T> void BasicColumn<T>::refresh_accessor_tree(std::size_t, const Spec&)
 {
     // The type of the cached root array accessor may no longer match the
     // underlying root node. In that case we need to replace it. Note that when
@@ -358,8 +365,6 @@ void BasicColumn<T>::refresh_after_advance_transact(std::size_t, const Spec&)
     // Instate new root
     m_array = new_root;
 }
-
-#endif // TIGHTDB_ENABLE_REPLICATION
 
 
 #ifdef TIGHTDB_DEBUG
@@ -495,17 +500,20 @@ typename BasicColumn<T>::SumType BasicColumn<T>::sum(std::size_t begin, std::siz
 {
     return ColumnBase::aggregate<T, SumType, act_Sum, None>(0, begin, end, limit);
 }
-template<class T> T BasicColumn<T>::minimum(std::size_t begin, std::size_t end, std::size_t limit) const
+template<class T>
+T BasicColumn<T>::minimum(std::size_t begin, std::size_t end, std::size_t limit) const
 {
     return ColumnBase::aggregate<T, T, act_Min, None>(0, begin, end, limit);
 }
 
-template<class T> T BasicColumn<T>::maximum(std::size_t begin, std::size_t end, std::size_t limit) const
+template<class T>
+T BasicColumn<T>::maximum(std::size_t begin, std::size_t end, std::size_t limit) const
 {
     return ColumnBase::aggregate<T, T, act_Max, None>(0, begin, end, limit);
 }
 
-template<class T> double BasicColumn<T>::average(std::size_t begin, std::size_t end, std::size_t limit) const
+template<class T>
+double BasicColumn<T>::average(std::size_t begin, std::size_t end, std::size_t limit) const
 {
     if (end == npos)
         end = size();
@@ -519,29 +527,31 @@ template<class T> double BasicColumn<T>::average(std::size_t begin, std::size_t 
     return avg;
 }
 
-template<class T> inline void BasicColumn<T>::do_insert(std::size_t ndx, T value)
+template<class T> void BasicColumn<T>::do_insert(std::size_t row_ndx, T value, std::size_t num_rows)
 {
-    TIGHTDB_ASSERT(ndx == npos || ndx < size());
+    TIGHTDB_ASSERT(row_ndx == tightdb::npos || row_ndx < size());
     ref_type new_sibling_ref;
     Array::TreeInsert<BasicColumn<T> > state;
-    if (root_is_leaf()) {
-        TIGHTDB_ASSERT(ndx == npos || ndx < TIGHTDB_MAX_LIST_SIZE);
-        BasicArray<T>* leaf = static_cast<BasicArray<T>*>(m_array);
-        new_sibling_ref = leaf->bptree_leaf_insert(ndx, value, state);
-    }
-    else {
-        state.m_value = value;
-        if (ndx == npos) {
-            new_sibling_ref = m_array->bptree_append(state);
+    for (std::size_t i = 0; i != num_rows; ++i) {
+        std::size_t row_ndx_2 = row_ndx == tightdb::npos ? tightdb::npos : row_ndx + i;
+        if (root_is_leaf()) {
+            TIGHTDB_ASSERT(row_ndx_2 == tightdb::npos || row_ndx_2 < TIGHTDB_MAX_LIST_SIZE);
+            BasicArray<T>* leaf = static_cast<BasicArray<T>*>(m_array);
+            new_sibling_ref = leaf->bptree_leaf_insert(row_ndx_2, value, state);
         }
         else {
-            new_sibling_ref = m_array->bptree_insert(ndx, state);
+            state.m_value = value;
+            if (row_ndx_2 == tightdb::npos) {
+                new_sibling_ref = m_array->bptree_append(state); // Throws
+            }
+            else {
+                new_sibling_ref = m_array->bptree_insert(row_ndx_2, state); // Throws
+            }
         }
-    }
-
-    if (TIGHTDB_UNLIKELY(new_sibling_ref)) {
-        bool is_append = ndx == npos;
-        introduce_new_root(new_sibling_ref, state, is_append);
+        if (TIGHTDB_UNLIKELY(new_sibling_ref)) {
+            bool is_append = row_ndx_2 == tightdb::npos;
+            introduce_new_root(new_sibling_ref, state, is_append); // Throws
+        }
     }
 }
 
