@@ -28,7 +28,7 @@ void LinkView::insert_link(std::size_t ins_pos, std::size_t target_row_ndx)
     TIGHTDB_ASSERT(is_attached());
     TIGHTDB_ASSERT(m_refs || ins_pos == 0);
     TIGHTDB_ASSERT(!m_refs || ins_pos <= m_refs->size());
-    TIGHTDB_ASSERT(target_row_ndx < m_table->size());
+    TIGHTDB_ASSERT(target_row_ndx < m_column.get_target_table()->size());
 
     // if there are no links yet, we have to create list
     if (!m_refs) {
@@ -47,7 +47,7 @@ void LinkView::set_link(std::size_t row_ndx, std::size_t target_row_ndx)
 {
     TIGHTDB_ASSERT(is_attached());
     TIGHTDB_ASSERT(m_refs && row_ndx < m_refs->size());
-    TIGHTDB_ASSERT(target_row_ndx < m_table->size());
+    TIGHTDB_ASSERT(target_row_ndx < m_column.get_target_table()->size());
 
     // update backlinks
     size_t old_target_row_ndx = m_refs->get(row_ndx);

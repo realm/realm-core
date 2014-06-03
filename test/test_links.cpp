@@ -315,7 +315,7 @@ TEST(Links_Multi)
     CHECK(table2->is_null_link(col_link, 3));
 }
 
-ONLY(Links_MultiToSame)
+TEST(Links_MultiToSame)
 {
     Group group;
 
