@@ -313,6 +313,7 @@ std::size_t Spec::get_link_target_table(std::size_t column_ndx) const TIGHTDB_NO
 {
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     TIGHTDB_ASSERT(col_type_Link == get_real_column_type(column_ndx) ||
+                   col_type_LinkList == get_real_column_type(column_ndx) ||
                    col_type_BackLink == get_real_column_type(column_ndx));
 
     // position of target table is stored as tagged int in the

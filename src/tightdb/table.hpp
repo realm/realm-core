@@ -40,6 +40,7 @@ class ConstTableView;
 class StringIndex;
 class Group;
 class ColumnBackLink;
+class ColumnLinkBase;
 class LinkView;
 
 typedef util::bind_ptr<LinkView> LinkViewRef;
@@ -888,6 +889,7 @@ private:
 
     const ColumnBase& get_column_base(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
     ColumnBase& get_column_base(std::size_t column_ndx);
+    ColumnLinkBase& get_column_linkbase(size_t ndx);
     template <class T, ColumnType col_type> T& get_column(std::size_t ndx);
     template <class T, ColumnType col_type> const T& get_column(std::size_t ndx) const TIGHTDB_NOEXCEPT;
     Column& get_column(std::size_t column_ndx);

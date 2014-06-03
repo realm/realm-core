@@ -217,13 +217,13 @@ void Table::initialize_link_targets()
     for (size_t i = 0; i < column_count; ++i) {
         ColumnType column_type = spec->get_real_column_type(i);
 
-        if (column_type == col_type_Link) {
+        if (column_type == col_type_Link || column_type == col_type_LinkList) {
             // Get the target table from group
             size_t target_table_ndx = spec->get_link_target_table(i);
             Table* target_table = get_parent_group()->get_table_by_ndx(target_table_ndx);
 
             // Set target table in column
-            ColumnLink& column = get_column<ColumnLink, col_type_Link>(i);
+            ColumnLinkBase& column = get_column_linkbase(i);
             column.set_target_table(target_table->get_table_ref());
             column.set_backlink_column(target_table->get_backlink_column(current_table_ndx, i));
         }
@@ -234,7 +234,7 @@ void Table::initialize_link_targets()
 
             // Get the columns the links originate from
             size_t source_column_ndx = spec->get_backlink_source_column(i);
-            ColumnLink& source_column = source_table->get_column<ColumnLink, col_type_Link>(source_column_ndx);
+            ColumnLinkBase& source_column = source_table->get_column_linkbase(source_column_ndx);
 
             // Set target table in column
             ColumnBackLink& column = get_column<ColumnBackLink, col_type_BackLink>(i);
@@ -1281,6 +1281,19 @@ const ColumnBase& Table::get_column_base(size_t ndx) const TIGHTDB_NOEXCEPT
     TIGHTDB_ASSERT(ndx < m_spec.get_column_count());
     TIGHTDB_ASSERT(m_cols.size() == m_spec.get_column_count());
     return *reinterpret_cast<ColumnBase*>(m_cols.get(ndx));
+}
+
+ColumnLinkBase& Table::get_column_linkbase(size_t ndx)
+{
+    TIGHTDB_ASSERT(ndx < m_spec.get_column_count());
+    TIGHTDB_ASSERT(m_spec.get_column_type(ndx) == type_Link ||
+                   m_spec.get_column_type(ndx) == type_LinkList);
+    instantiate_before_change();
+    TIGHTDB_ASSERT(m_cols.size() == m_spec.get_column_count());
+
+    ColumnBase* colbase = reinterpret_cast<ColumnBase*>(m_cols.get(ndx));
+    ColumnLinkBase* column = static_cast<ColumnLinkBase*>(colbase);
+    return *column;
 }
 
 
