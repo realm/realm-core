@@ -57,6 +57,8 @@ public:
     Query(const Table& table, TableViewBase* tv = null_ptr);
     Query();
     Query(const Query& copy); // FIXME: Try to remove this
+    struct TCopyExpressionTag {};
+    Query(const Query& copy, const TCopyExpressionTag&);
     ~Query() TIGHTDB_NOEXCEPT;
 
     Query& expression(Expression* compare, bool auto_delete = false);

@@ -63,6 +63,27 @@ Query::Query(const Query& copy)
     do_delete = true;
 }
 
+Query::Query(const Query& copy, const TCopyExpressionTag&) 
+{
+    Create();
+    std::map<ParentNode*, ParentNode*> node_mapping;
+    std::vector<ParentNode*>::const_iterator i;
+    for (i = copy.all_nodes.begin(); i != copy.all_nodes.end(); ++i) {
+        ParentNode* new_node = (*i)->clone();
+        all_nodes.push_back(new_node);
+        node_mapping[ *i ] = new_node;
+    }
+    for (i = all_nodes.begin(); i != all_nodes.end(); ++i) {
+        (*i)->translate_pointers(node_mapping);
+    }
+    if (all_nodes.size() > 0) {
+        first.push_back(all_nodes[0]);
+    }
+    m_table = copy.m_table;
+    m_tableview = copy.m_tableview;
+}
+
+
 Query::~Query() TIGHTDB_NOEXCEPT
 {
 #if TIGHTDB_MULTITHREAD_QUERY

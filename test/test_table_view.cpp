@@ -394,24 +394,33 @@ TEST(TableView_Find)
 
 TEST(TableView_Follows_Changes)
 {
-    TestTableInt table;
-    table.add(1);
-    TestTableInt::Query q = table.where().first.equal(1);
-    TestTableInt::View v = q.find_all();
+    Table table;
+    table.add_column(type_Int, "first");
+    table.add_empty_row();
+    table.set_int(0,0,1);
+    Query q = table.where().equal(0,1);
+    TableView v = q.find_all();
     CHECK_EQUAL(1, v.size());
-    CHECK_EQUAL(1, v[0].first);
-    table.add(1);
+    CHECK_EQUAL(1, v.get_int(0,0));
+
+    // low level sanity check that we can copy a query and run the copy:
+    Query q2(q,Query::TCopyExpressionTag());
+    TableView v2 = q2.find_all();
+
+    // now the fun begins
+    table.add_empty_row();
+    table.set_int(0,1,1);
     CHECK_EQUAL(2, v.size());
-    CHECK_EQUAL(1, v[0].first);
-    CHECK_EQUAL(1, v[1].first);
-    table[0].first = 7;
+    CHECK_EQUAL(1, v.get_int(0,1));
+    CHECK_EQUAL(1, v.get_int(1,1));
+    table.set_int(0,0,7);
     CHECK_EQUAL(1, v.size());
-    CHECK_EQUAL(1, v[0].first);
-    table[1].first = 7;
+    CHECK_EQUAL(1, v.get_int(0,0));
+    table.set_int(0,1,7);
     CHECK_EQUAL(0, v.size());
-    table[1].first = 1;
+    table.set_int(0,1,1);
     CHECK_EQUAL(1, v.size());
-    CHECK_EQUAL(1, v[0].first);
+    CHECK_EQUAL(1, v.get_int(0,0));
 }
 
 TEST(TableView_FindAll)
