@@ -27,7 +27,13 @@
 
 namespace tightdb {
 
-class ColumnLink: public Column, public ColumnLinkBase {
+/// An link column (ColumnLink) is a single B+-tree, and the root of
+/// the column is the root of the B+-tree. All leaf nodes are single
+/// arrays of type Array.
+///
+/// The individual values in the column are row positions in the target
+/// table (offset with one to allow zero to indicate null links)
+class ColumnLink: public ColumnLinkBase {
 public:
     ColumnLink(ref_type ref, ArrayParent* parent = 0, std::size_t ndx_in_parent = 0,
                     Allocator& alloc = Allocator::get_default()); // Throws
@@ -68,12 +74,12 @@ private:
 // Implementation
 
 inline ColumnLink::ColumnLink(ref_type ref, ArrayParent* parent, std::size_t ndx_in_parent, Allocator& alloc):
-    Column(ref, parent, ndx_in_parent, alloc), m_backlinks(null_ptr)
+    ColumnLinkBase(ref, parent, ndx_in_parent, alloc), m_backlinks(null_ptr)
 {
 }
 
 inline ColumnLink::ColumnLink(Allocator& alloc):
-    Column(alloc), m_backlinks(null_ptr)
+    ColumnLinkBase(alloc), m_backlinks(null_ptr)
 {
 }
 
@@ -119,7 +125,7 @@ inline void ColumnLink::insert_link(std::size_t row_ndx, std::size_t target_row_
     m_backlinks->add_backlink(target_row_ndx, row_ndx);
 }
 
-    inline void ColumnLink::do_nullify_link(std::size_t row_ndx, std::size_t)
+inline void ColumnLink::do_nullify_link(std::size_t row_ndx, std::size_t)
 {
     Column::set(row_ndx, 0);
 }

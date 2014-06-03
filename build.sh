@@ -606,6 +606,33 @@ EOF
         (cd "$TIGHTDB_HOME/$ANDROID_DIR/include/tightdb" && tar xzmf "$temp_dir/headers.tar.gz") || exit 1
         ;;
 
+   "build-objc")
+        if [ "$OS" != "Darwin" ]; then
+            echo "tar.gz for iOS can only be generated under OS X."
+            exit 0
+        fi
+
+        realm_version="$(sh build.sh get-version)"
+        BASENAME="realm-core"
+        rm -rf "$BASENAME" || exit 1
+        rm -f realm-core-$realm_version.zip || exit 1
+        mkdir -p "$BASENAME/include" || exit 1
+        cp "$IPHONE_DIR/libtightdb-ios.a" "$BASENAME" || exit 1
+        cp "$IPHONE_DIR/libtightdb-ios-dbg.a" "$BASENAME" || exit 1
+        cp -r "$IPHONE_DIR/include/"* "$BASENAME/include" || exit 1
+        for x in $iphone_sdks; do
+            platform="$(printf "%s\n" "$x" | cut -d: -f1)" || exit 1
+            cp "src/tightdb/libtightdb-$platform.a" "$BASENAME" || exit 1
+            cp "src/tightdb/libtightdb-$platform-dbg.a" "$BASENAME" || exit 1
+        done
+        cp src/tightdb/*dylib $BASENAME || exit 1        
+        zip -r -q realm-core-$realm_version.zip $BASENAME || exit 1
+        mkdir -p ../realm-objc || exit 1
+        rm -rf ../realm-objc/realm-core || exit 1 
+        (cd ../realm-objc && unzip -qq ../tightdb/realm-core-$realm_version.zip) || exit 1 
+        exit 0
+        ;;
+
    "build-ios-framework")
         if [ "$OS" != "Darwin" ]; then
             echo "Framework for iOS can only be generated under Mac OS X."
@@ -628,7 +655,7 @@ EOF
         cp -r "$IPHONE_DIR/include/"* "$FRAMEWORK/Headers/" || exit 1
         find "$FRAMEWORK/Headers" -iregex "^.*\.[ch]\(pp\)\{0,1\}$" \
             -exec sed -i '' -e "s/<tightdb\(.*\)>/<$BASENAME\/tightdb\1>/g" {} \; || exit 1
- 
+
         zip -r -q realm-core-ios-$realm_version.zip $FRAMEWORK || exit 1
         echo "Core framework for iOS can be found under $FRAMEWORK and realm-core-ios-$realm_version.zip."
         exit 0
@@ -667,45 +694,26 @@ EOF
         exit 0
         ;;
 
-
-
-    "test")
-        auto_configure || exit 1
-        export TIGHTDB_HAVE_CONFIG="1"
-        $MAKE check || exit 1
-        echo "Test passed"
-        exit 0
-        ;;
-
-    "test-debug")
-        auto_configure || exit 1
-        export TIGHTDB_HAVE_CONFIG="1"
-        $MAKE check-debug || exit 1
-        echo "Test passed"
-        exit 0
-        ;;
-
-    "memtest")
-        auto_configure || exit 1
-        export TIGHTDB_HAVE_CONFIG="1"
-        $MAKE memcheck || exit 1
-        echo "Test passed"
-        exit 0
-        ;;
-
-    "memtest-debug")
-        auto_configure || exit 1
-        export TIGHTDB_HAVE_CONFIG="1"
-        $MAKE memcheck-debug || exit 1
-        echo "Test passed"
-        exit 0
-        ;;
-
-    "check"|"memcheck"|"check-"*|"memcheck-"*)
+    "test"|"test-debug"|\
+    "check"|"check-debug"|\
+    "memcheck"|"memcheck-debug"|\
+    "check-doc-examples"|\
+    "check-testcase"|"check-testcase-debug"|\
+    "memcheck-testcase"|"memcheck-testcase-debug")
         auto_configure || exit 1
         export TIGHTDB_HAVE_CONFIG="1"
         $MAKE "$MODE" || exit 1
         echo "Test passed"
+        exit 0
+        ;;
+
+    "gdb"|"gdb-debug"|\
+    "gdb-testcase"|"gdb-testcase-debug"|\
+    "performance"|"benchmark"|"benchmark-"*|\
+    "lcov"|"gcovr")
+        auto_configure || exit 1
+        export TIGHTDB_HAVE_CONFIG="1"
+        $MAKE "$MODE" || exit 1
         exit 0
         ;;
 
@@ -2361,8 +2369,8 @@ EOF
 Unspecified or bad mode '$MODE'.
 Available modes are:
     config clean build build-config-progs build-iphone build-android
-    build-ios-framework build-osx-framework
-    test test-debug show-install install uninstall
+    build-ios-framework build-osx-framework build-objc
+    check check-debug show-install install uninstall
     test-installed wipe-installed install-prod install-devel uninstall-prod
     uninstall-devel dist-copy src-dist bin-dist dist-deb dist-status
     dist-pull dist-checkout dist-config dist-clean dist-build

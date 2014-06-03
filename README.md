@@ -133,15 +133,15 @@ Here is a more comple set of build-related commands:
 
 
 
-Building for iPhone
--------------------
+Building for iOS
+----------------
 
 On Mac OS X it is possible to build a version of the TightDB core
 library for iOS (the iPhone OS). It requires that the iPhoneOS and
 iPhoneSimulator SDKs for Xcode are installed.
 
 Run the following command to build the TightDB core library for
-iPhone:
+iPhone/iOS:
 
     sh build.sh build-iphone
 
@@ -157,11 +157,12 @@ The `include` directory holds a copy of the header files, which are
 identical to the ones installed by `sh build.sh install`. There are
 two versions of the static library, one that is compiled with
 optimization, and one that is compiled for debugging. Each one
-contains code compiled for both iPhone and for the iPhone
+contains code compiled for both iOS and for the iOS
 simulator. Each one also comes with a `config` program that can be
 used to enquire about required compiler and linker flags.
 
-
+If you need to use the core library for development of the Objective C
+binding, consider running `sh build.sh build-objc`.
 
 Configuration
 -------------
@@ -208,10 +209,10 @@ Testing
 The core library comes with a suite of unite tests. You can run it in
 one of the following ways:
 
-    sh build.sh test
-    sh build.sh test-debug
-    sh build.sh memtest
-    sh build.sh memtest-debug
+    sh build.sh check
+    sh build.sh check-debug
+    sh build.sh memcheck
+    sh build.sh memcheck-debug
 
 The `mem` versions will run the suite inside Valgrind.
 
@@ -221,8 +222,8 @@ customize the execution. For example, here is how to run only the
 tests whose names start with `Foo`, except `Foo2` and those whose
 names end with an `X`:
 
-    UNITTEST_FILTER="Foo Bar*" sh build.sh test-debug
-    UNITTEST_FILTER="Foo* - Foo2 *X" sh build.sh test-debug
+    UNITTEST_FILTER="Foo Bar*" sh build.sh check-debug
+    UNITTEST_FILTER="Foo* - Foo2 *X" sh build.sh check-debug
 
 These are the available variables:
 

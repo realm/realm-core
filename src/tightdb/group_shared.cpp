@@ -577,7 +577,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
 
         SharedInfo* info = m_file_map.get_addr();
         m_local_max_entry = 0;
-        m_version = 0;
+        m_readlock.m_version = 0;
         SlabAlloc& alloc = m_group.m_alloc;
 
         // If we are the process that *Created* the coordination buffer, we are obliged to
@@ -632,7 +632,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
 
             // Set initial version so we can track if other instances
             // change the db
-            m_version = info->get_current_version_unchecked();
+            m_readlock.m_version = info->get_current_version_unchecked();
 
 #ifndef _WIN32
             // In async mode we need a separate process to do the async commits
@@ -832,14 +832,12 @@ bool SharedGroup::pin_read_transactions()
         throw runtime_error("pinning transactions not allowed inside a transaction");
     }
     bool same_as_before;
-    ref_type pinned_top_ref;
-    size_t pinned_file_size;
-    grab_readlock(pinned_top_ref, pinned_file_size, same_as_before);
+    grab_latest_readlock(m_readlock, same_as_before);
 
-    // Make sure the group is up-to-date.
-    // A zero ref means that the file has just been created.
+    // Prepare the group for a new transaction. A zero top ref means
+    // that the file has just been created.
     try {
-        m_group.update_from_shared(pinned_top_ref, pinned_file_size); // Throws
+        m_group.init_for_transact(m_readlock.m_top_ref, m_readlock.m_file_size); // Throws
     }
     catch (...) {
         end_read();
@@ -859,12 +857,12 @@ void SharedGroup::unpin_read_transactions()
         throw runtime_error("unpinning transactions not allowed inside a transaction");
     }
     m_transactions_are_pinned = false;
-    release_readlock();
+    release_readlock(m_readlock);
 }
 
 bool SharedGroup::has_changed()
 {
-    bool changed = m_version != get_current_version();
+    bool changed = m_readlock.m_version != get_current_version();
     return changed;
 }
 
@@ -885,10 +883,9 @@ void SharedGroup::do_async_commits()
     // overwritten by commits being made to memory by others.
     // Note that taking this lock also signals to the other
     // processes that that they can start commiting to the db.
-    begin_read();
+    begin_read(); // Throws
     // we must treat version and version_index the same way:
-    uint_fast64_t last_version = m_version;
-    uint_fast32_t last_version_index = m_reader_idx;
+    ReadLockInfo last_readlock = m_readlock;
 
     info->free_write_slots = max_write_slots;
     info->init_complete.store_release(2); // allow waiting clients to proceed
@@ -932,27 +929,18 @@ void SharedGroup::do_async_commits()
             // to commit to disk.
             m_transact_stage = transact_Ready; // FAKE stage to prevent begin_read from failing
 
-            begin_read();
+            begin_read(); // Throws
 
-            uint_fast64_t current_version = m_version;
-            uint_fast32_t current_version_index = m_reader_idx;
-            size_t current_top_ref = m_group.m_top.get_ref();
-#ifdef TIGHTDB_ENABLE_LOGFILE
-            cerr << "(version " << m_version << " from "
-                 << last_version << ", topptr " << current_top_ref << ")";
-            // cannot do this: info->readers.dump();
-#endif
+            ReadLockInfo current_readlock = m_readlock;
 
             GroupWriter writer(m_group);
-            writer.commit(current_top_ref);
+            writer.commit(current_readlock.m_top_ref);
 
             // Now we can release the version that was previously commited
             // to disk and just keep the lock on the latest version.
-            m_version = last_version;
-            m_reader_idx = last_version_index;
+            m_readlock = last_readlock;
             end_read();
-            last_version = current_version;
-            last_version_index = current_version_index;
+            last_readlock = m_readlock;
 #ifdef TIGHTDB_ENABLE_LOGFILE
             cerr << "..and Done" << endl;
 #endif
@@ -1013,27 +1001,26 @@ void SharedGroup::do_async_commits()
 #endif // _WIN32
 
 
-void SharedGroup::grab_readlock(ref_type& new_top_ref, size_t& new_file_size, bool& same_as_before)
+void SharedGroup::grab_latest_readlock(ReadLockInfo& readlock, bool& same_as_before)
 {
-    do {
+    for (;;) {
         SharedInfo* r_info = m_reader_map.get_addr();
-        m_reader_idx = r_info->readers.last();
-        if (grow_reader_mapping(m_reader_idx)) { // throws
+        readlock.m_reader_idx = r_info->readers.last();
+        if (grow_reader_mapping(readlock.m_reader_idx)) { // throws
             // remapping takes time, so retry with a fresh entry
             continue;
         }
-        const Ringbuffer::ReadCount& r = r_info->readers.get(m_reader_idx);
+        const Ringbuffer::ReadCount& r = r_info->readers.get(readlock.m_reader_idx);
         // if the entry is stale and has been cleared by the cleanup process,
         // we need to start all over again. This is extremely unlikely, but possible.
         if (! atomic_double_inc_if_even(r.count)) // <-- most of the exec time spent here!
             continue;
-        same_as_before = m_version == r.version;
-        m_version      = r.version;
-        new_top_ref    = to_size_t(r.current_top);
-        new_file_size  = to_size_t(r.filesize);
+        same_as_before = readlock.m_version == r.version;
+        readlock.m_version      = r.version;
+        readlock.m_top_ref    = to_size_t(r.current_top);
+        readlock.m_file_size  = to_size_t(r.filesize);
         return;
-
-    } while (1);
+    }
 }
 
 
@@ -1042,26 +1029,20 @@ const Group& SharedGroup::begin_read()
     TIGHTDB_ASSERT(m_transact_stage == transact_Ready);
 
     if (m_transactions_are_pinned) {
-
         m_group.reattach_from_retained_data();
-
     }
     else {
 
-        ref_type new_top_ref = 0;
-        size_t new_file_size = 0;
         bool same_version_as_before;
-        grab_readlock(new_top_ref, new_file_size, same_version_as_before);
-
+        grab_latest_readlock(m_readlock, same_version_as_before);
         if (same_version_as_before && m_group.may_reattach_if_same_version()) {
-
             m_group.reattach_from_retained_data();
         }
         else {
-            // Make sure the group is up-to-date.
-            // A zero ref means that the file has just been created.
+            // Prepare the group for a new transaction. A zero top ref
+            // means that the file has just been created.
             try {
-                m_group.update_from_shared(new_top_ref, new_file_size); // Throws
+                m_group.init_for_transact(m_readlock.m_top_ref, m_readlock.m_file_size); // Throws
             }
             catch (...) {
                 end_read();
@@ -1075,10 +1056,10 @@ const Group& SharedGroup::begin_read()
 }
 
 
-void SharedGroup::release_readlock() TIGHTDB_NOEXCEPT
+void SharedGroup::release_readlock(ReadLockInfo& readlock) TIGHTDB_NOEXCEPT
 {
     SharedInfo* r_info = m_reader_map.get_addr();
-    const Ringbuffer::ReadCount& r = r_info->readers.get(m_reader_idx);
+    const Ringbuffer::ReadCount& r = r_info->readers.get(readlock.m_reader_idx);
     atomic_double_dec(r.count); // <-- most of the exec time spent here
 }
 
@@ -1089,10 +1070,10 @@ void SharedGroup::end_read() TIGHTDB_NOEXCEPT
         return;
 
     TIGHTDB_ASSERT(m_transact_stage == transact_Reading);
-    TIGHTDB_ASSERT(m_version != numeric_limits<size_t>::max());
+    TIGHTDB_ASSERT(m_readlock.m_version != numeric_limits<size_t>::max());
 
     if (! m_transactions_are_pinned) {
-        release_readlock();
+        release_readlock(m_readlock);
     }
 
     // The read may have allocated some temporary state
@@ -1100,9 +1081,12 @@ void SharedGroup::end_read() TIGHTDB_NOEXCEPT
     m_transact_stage = transact_Ready;
 }
 
+#ifdef TIGHTDB_ENABLE_REPLICATION
 
-Group& SharedGroup::begin_write()
+void SharedGroup::promote_to_write(TransactLogRegistry& write_logs)
 {
+    TIGHTDB_ASSERT(m_transact_stage == transact_Reading);
+
     if (m_transactions_are_pinned)
         throw runtime_error("Write transactions are not allowed while transactions are pinned");
 
@@ -1111,10 +1095,90 @@ Group& SharedGroup::begin_write()
         repl->begin_write_transact(*this); // Throws
         try {
             do_begin_write();
+            advance_read(write_logs);
         }
         catch (...) {
             repl->rollback_write_transact(*this);
             throw;
+        }
+        m_transact_stage = transact_Writing;
+        return;
+    }
+#endif
+
+    do_begin_write();
+
+    // Advance to latest state (accessor update)
+    advance_read(write_logs);
+    m_transact_stage = transact_Writing;
+}
+
+
+void SharedGroup::advance_read(TransactLogRegistry& log_registry)
+{
+    TIGHTDB_ASSERT(m_transact_stage == transact_Reading);
+    TIGHTDB_ASSERT(!m_transactions_are_pinned);
+
+    ReadLockInfo old_readlock = m_readlock;
+    bool same_as_before;
+
+    // advance current readlock while holding onto old one.
+    grab_latest_readlock(m_readlock, same_as_before); // Throws
+    release_readlock(old_readlock);
+
+    if (same_as_before)
+        return;
+
+    // If the new top-ref is zero, then the previous top-ref must have
+    // been zero too, and we are still seing an empty TightDB file
+    // (note that this is possible even if the version has
+    // changed). The purpose of the early-out in this case, is to
+    // retain the temporary arrays that were created earlier by
+    // Group::init_for_transact() to put the group accessor into a
+    // valid state.
+    if (m_readlock.m_top_ref == 0)
+        return;
+
+    // We know that the log_registry already knows about the new_version,
+    // because in order for us to get the new version when we grab the
+    // readlock, the new version must have been entered into the ringbuffer.
+    // commit always updates the replication log BEFORE updating the ringbuffer.
+    UniquePtr<BinaryData[]> 
+        logs(new BinaryData[m_readlock.m_version-old_readlock.m_version]); // Throws
+
+    log_registry.get_commit_entries(old_readlock.m_version, 
+                                    m_readlock.m_version, logs.get());
+    
+    m_group.advance_transact(m_readlock.m_top_ref, m_readlock.m_file_size, 
+                             logs.get(),
+                             logs.get() + (m_readlock.m_version-old_readlock.m_version)); // Throws
+
+    log_registry.release_commit_entries(m_readlock.m_version);
+}
+
+#endif // TIGHTDB_ENABLE_REPLICATION
+
+Group& SharedGroup::begin_write()
+{
+    TIGHTDB_ASSERT(m_transact_stage == transact_Ready);
+
+    if (m_transactions_are_pinned)
+        throw runtime_error("Write transactions are not allowed while transactions are pinned");
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    if (Replication* repl = m_group.get_replication()) {
+        repl->begin_write_transact(*this); // Throws
+        try {
+            do_begin_write();
+            begin_read();
+        }
+        catch (...) {
+            repl->rollback_write_transact(*this);
+            throw;
+        }
+        m_transact_stage = transact_Writing;
+        if (m_readlock.m_version == 1) {
+            m_group.reset_freespace_tracking();
         }
         return m_group;
     }
@@ -1122,14 +1186,19 @@ Group& SharedGroup::begin_write()
 
     do_begin_write();
 
+    // A write transaction implies a read transaction...
+    begin_read();
+    m_transact_stage = transact_Writing;
+    if (m_readlock.m_version == 1) {
+        m_group.reset_freespace_tracking();
+    }
+
     return m_group;
 }
 
 
 void SharedGroup::do_begin_write()
 {
-    TIGHTDB_ASSERT(m_transact_stage == transact_Ready);
-
     SharedInfo* info = m_file_map.get_addr();
 
     // Get write lock
@@ -1156,14 +1225,50 @@ void SharedGroup::do_begin_write()
         info->balancemutex.unlock();
     }
 #endif
-
-    // A write transaction implies a read transaction...
-    begin_read();
-    m_transact_stage = transact_Writing;
 }
 
-
 void SharedGroup::commit()
+{
+    do_commit();
+
+    end_read();
+    // complete detach 
+    // (end_read allows group to retain data, but accessors become invalid after commit):
+    m_group.complete_detach();
+}
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+
+void SharedGroup::commit_and_continue_as_read()
+{
+    do_commit();
+
+    // TODO: update all pending accessors to new refs
+    // consult group::commit for inspiration
+
+    // Mark all managed space (beyond the attached file) as free.
+    //
+    // FIXME: Perform this as part of m_alloc.remap(), but that
+    // requires that we always call remap().
+    m_group.m_alloc.reset_free_space_tracking(); // Throws
+
+    size_t old_baseline = m_group.m_alloc.get_baseline();
+
+    // Remap file if it has grown
+    if (m_readlock.m_file_size > old_baseline) {
+
+        // FIXME: Not sure if this test is correct in this context
+        if (m_group.m_alloc.remap(m_readlock.m_file_size)) { // Throws
+            // The file was mapped to a new address, so all array
+            // accessors must be updated.
+            old_baseline = 0;
+        }
+    }
+    m_group.update_refs(m_readlock.m_top_ref, old_baseline);
+}
+#endif
+
+void SharedGroup::do_commit()
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Writing);
 
@@ -1181,7 +1286,7 @@ void SharedGroup::commit()
     {
         uint_fast64_t new_version;
 #ifdef TIGHTDB_ENABLE_REPLICATION
-        // It is essential that if Replicatin::commit_write_transact()
+        // It is essential that if Replication::commit_write_transact()
         // fails, then the transaction is not completed. A subsequent call
         // to rollback() must roll it back.
         if (Replication* repl = m_group.get_replication()) {
@@ -1194,23 +1299,19 @@ void SharedGroup::commit()
 #else
         new_version = r_info->get_current_version_unchecked() + 1;
 #endif
-        // Reset version tracking in group if we are
-        // starting from a new lock file
-        if (new_version == 2) {
-            // The reason this is not done in begin_write is that a rollback will
-            // leave the versioning unchanged, hence a new begin_write following
-            // a rollback would call init_shared again.
-            m_group.init_shared();
-        }
-
         low_level_commit(new_version); // Throws
     }
 
+    // advance readlock but dont update accessors:
+    // As this is done under lock, along with the addition above of the newest commit,
+    // we know for certain that the readlock we will grab WILL refer to our own newly
+    // completed commit.
+    release_readlock(m_readlock);
+    bool ignored;
+    grab_latest_readlock(m_readlock, ignored);
+
     // downgrade to a read transaction (if not, assert in end_read)
     m_transact_stage = transact_Reading;
-    end_read();
-    // complete detach (end_read allows group to retain data, but is becomes invalid after commit):
-    m_group.complete_detach();
     // Release write lock
     info->writemutex.unlock();
 }
@@ -1249,17 +1350,15 @@ void SharedGroup::rollback() TIGHTDB_NOEXCEPT
 bool SharedGroup::grow_reader_mapping(uint_fast32_t index)
 {
     if (index >= m_local_max_entry) {
-
         // handle mapping expansion if required
         SharedInfo* r_info = m_reader_map.get_addr();
         m_local_max_entry = r_info->readers.get_num_entries();
-        size_t infosize = sizeof(SharedInfo) + r_info->readers.compute_required_space(m_local_max_entry);
+        size_t info_size = sizeof(SharedInfo) + r_info->readers.compute_required_space(m_local_max_entry);
         // cout << "Growing reader mapping to " << infosize << endl;
-        m_reader_map.remap(m_file, util::File::access_ReadWrite, infosize); // Throws
+        m_reader_map.remap(m_file, util::File::access_ReadWrite, info_size); // Throws
         return true;
     }
-    else
-        return false;
+    return false;
 }
 
 uint_fast64_t SharedGroup::get_current_version()
@@ -1278,7 +1377,8 @@ uint_fast64_t SharedGroup::get_current_version()
             // the mapping to fit.
             r_info = m_reader_map.get_addr();
             index = r_info->readers.last();
-        } while (grow_reader_mapping(index)); // throws
+        }
+        while (grow_reader_mapping(index)); // throws
 
         // now (double) increment the read count so that no-one cleans up the entry
         // while we read it.
@@ -1317,7 +1417,6 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
     TIGHTDB_ASSERT(readlock_version <= new_version);
     // info->readers.dump();
     GroupWriter out(m_group); // Throws
-    m_group.m_readlock_version = readlock_version;
     out.set_versions(new_version, readlock_version);
     // Recursively write all changed arrays to end of file
     ref_type new_top_ref = out.write_group(); // Throws
@@ -1352,9 +1451,6 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
         r.version     = new_version;
         r_info->readers.use_next();
     }
-
-    // Save last version for has_changed()
-    m_version = new_version;
 }
 
 

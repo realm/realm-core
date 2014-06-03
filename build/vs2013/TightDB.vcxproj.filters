@@ -70,6 +70,9 @@
     <ClCompile Include="..\..\src\tightdb\table.cpp">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\tightdb\row.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\src\tightdb\util\utf8.cpp">
       <Filter>src</Filter>
     </ClCompile>
@@ -297,6 +300,9 @@
       <Filter>src\include</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\tightdb\table.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\tightdb\row.hpp">
       <Filter>src\include</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\tightdb\table_accessors.hpp">
