@@ -171,14 +171,6 @@ protected:
 ///     Table* t = row.get_table();      // The parent table
 ///     std::size_t i = row.get_index(); // The current row index
 ///
-/// Note: The automatic adjustment of row accessors is currently not completely
-/// implemented. During a write transaction, if rows are inserted anywhere into,
-/// or removed anywhere from a table, all row accessors attached to that table
-/// will be detached.
-///
-/// FIXME: Remove the note above when the "automatic adjustment of row
-/// accessors" is complete.
-///
 /// \sa RowFuncs
 template<class T> class BasicRow:
         private RowBase,

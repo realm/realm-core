@@ -97,18 +97,17 @@ public:
 
     ~Table() TIGHTDB_NOEXCEPT;
 
-    /// Construct a new freestanding top-level table with dynamic
-    /// lifetime.
+    /// Construct a new freestanding top-level table with dynamic lifetime.
     static TableRef create(Allocator& = Allocator::get_default());
 
-    /// Construct a copy of the specified table as a new freestanding
-    /// top-level table with dynamic lifetime.
+    /// Construct a copy of the specified table as a new freestanding top-level
+    /// table with dynamic lifetime.
     TableRef copy(Allocator& = Allocator::get_default()) const;
 
     /// Returns true if, and only if this accessor is currently attached to an
     /// underlying table.
     ///
-    /// A table accesor may get detached from the underlying row for various
+    /// A table accessor may get detached from the underlying row for various
     /// reasons (see below). When it does, it no longer refers to anything, and
     /// can no longer be used, except for calling is_attached(). The
     /// consequences of calling other methods on a detached table accessor are
@@ -121,34 +120,28 @@ public:
     /// detached if the underlying table is removed from the group (not
     /// currently possible), or when the group accessor is destroyed. A subtable
     /// accessor becomes detached if the underlying subtable is removed, or if
-    /// the parent table accessor is detached. A subtable accessor also becomes
-    /// detached if it descends from a root table (one with independent
-    /// descriptor, see has_shared_type()), and the corresponding root
-    /// descriptor, or a subdescriptor descending from that root descriptor, is
-    /// modified. A table accessor does not become detached for any other reason
-    /// than those mentioned here.
+    /// the parent table accessor is detached. A table accessor does not become
+    /// detached for any other reason than those mentioned here.
     ///
-    /// FIXME: High level language bindings will probably want to be
-    /// able to explicitely detach a group and all tables of that
-    /// group if any modifying operation fails (e.g. memory allocation
-    /// failure) (and something similar for freestanding tables) since
-    /// that leaves the group in state where any further access is
-    /// disallowed. This way they will be able to reliably intercept
-    /// any attempt at accessing such a failed group.
+    /// FIXME: High level language bindings will probably want to be able to
+    /// explicitely detach a group and all tables of that group if any modifying
+    /// operation fails (e.g. memory allocation failure) (and something similar
+    /// for freestanding tables) since that leaves the group in state where any
+    /// further access is disallowed. This way they will be able to reliably
+    /// intercept any attempt at accessing such a failed group.
     ///
-    /// FIXME: The C++ documentation must state that if any modifying
-    /// operation on a group (incl. tables, subtables, and specs) or
-    /// on a free standing table (incl. subtables and specs) fails,
-    /// then any further access to that group (except ~Group()) or
-    /// freestanding table (except ~Table()) has undefined behaviour
-    /// and is considered an error on behalf of the application. Note
-    /// that even Table::is_attached() is disallowed in this case.
+    /// FIXME: The C++ documentation must state that if any modifying operation
+    /// on a group (incl. tables, subtables, and specs) or on a free standing
+    /// table (incl. subtables and specs) fails, then any further access to that
+    /// group (except ~Group()) or freestanding table (except ~Table()) has
+    /// undefined behaviour and is considered an error on behalf of the
+    /// application. Note that even Table::is_attached() is disallowed in this
+    /// case.
     bool is_attached() const TIGHTDB_NOEXCEPT;
 
-    /// Get the name of this table, if it has any. Tables have names
-    /// when, and only when they are direct members of groups. For a
-    /// table of any other kind, this function returns the empty
-    /// string.
+    /// Get the name of this table, if it has any. Tables have names when, and
+    /// only when they are direct members of groups. For a table of any other
+    /// kind, this function returns the empty string.
     StringData get_name() const TIGHTDB_NOEXCEPT;
 
     //@{
@@ -698,7 +691,7 @@ private:
     // For this scheme to work, it must be (and is) possible to create a table
     // accessor that refers to a degenerate subtable. A table accessor (instance
     // of `Table`) refers to a degenerate subtable if, and only if `m_columns`
-    // is attached.
+    // is unattached.
     //
     // FIXME: The fact that `m_columns` may be detached means that many
     // functions (even non-modifying functions) need to check for that before
