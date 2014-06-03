@@ -282,6 +282,7 @@ public:
 
     ~Descriptor() TIGHTDB_NOEXCEPT;
 
+
 private:
     TableRef m_root_table; // Table associated with root descriptor. Detached iff null.
     DescriptorRef m_parent; // Null iff detached or root descriptor.

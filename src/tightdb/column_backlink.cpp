@@ -21,7 +21,9 @@
 #include <tightdb/column_backlink.hpp>
 #include <tightdb/column_link.hpp>
 
+using namespace std;
 using namespace tightdb;
+
 
 void ColumnBackLink::add_backlink(size_t row_ndx, size_t source_row_ndx)
 {
@@ -56,7 +58,7 @@ void ColumnBackLink::add_backlink(size_t row_ndx, size_t source_row_ndx)
     col.add(source_row_ndx);
 }
 
-std::size_t ColumnBackLink::get_backlink_count(size_t row_ndx) const TIGHTDB_NOEXCEPT
+size_t ColumnBackLink::get_backlink_count(size_t row_ndx) const TIGHTDB_NOEXCEPT
 {
     size_t ref = Column::get(row_ndx);
 
@@ -70,7 +72,7 @@ std::size_t ColumnBackLink::get_backlink_count(size_t row_ndx) const TIGHTDB_NOE
     return ColumnBase::get_size_from_ref(ref, get_alloc());
 }
 
-std::size_t ColumnBackLink::get_backlink(size_t row_ndx, size_t backlink_ndx) const TIGHTDB_NOEXCEPT
+size_t ColumnBackLink::get_backlink(size_t row_ndx, size_t backlink_ndx) const TIGHTDB_NOEXCEPT
 {
     size_t ref = Column::get(row_ndx);
     TIGHTDB_ASSERT(ref != 0);
@@ -120,7 +122,7 @@ void ColumnBackLink::remove_backlink(size_t row_ndx, size_t source_row_ndx)
     }
 }
 
-void ColumnBackLink::update_backlink(std::size_t row_ndx, std::size_t old_row_ndx, std::size_t new_row_ndx) {
+void ColumnBackLink::update_backlink(size_t row_ndx, size_t old_row_ndx, size_t new_row_ndx) {
     size_t ref = Column::get(row_ndx);
     TIGHTDB_ASSERT(ref != 0);
 
@@ -138,7 +140,7 @@ void ColumnBackLink::update_backlink(std::size_t row_ndx, std::size_t old_row_nd
     col.set(ref_pos, new_row_ndx);
 }
 
-void ColumnBackLink::nullify_links(std::size_t row_ndx, bool do_destroy)
+void ColumnBackLink::nullify_links(size_t row_ndx, bool do_destroy)
 {
     // Nullify all links pointing to the row being deleted
     size_t ref = Column::get(row_ndx);
@@ -164,20 +166,20 @@ void ColumnBackLink::nullify_links(std::size_t row_ndx, bool do_destroy)
     }
 }
 
-void ColumnBackLink::move_last_over(std::size_t row_ndx)
+void ColumnBackLink::move_last_over(size_t target_row_ndx, size_t last_row_ndx)
 {
-    TIGHTDB_ASSERT(row_ndx+1 < size());
+    TIGHTDB_ASSERT(target_row_ndx < last_row_ndx);
+    TIGHTDB_ASSERT(last_row_ndx + 1 == size());
 
     // Nullify all links pointing to the row being deleted
-    nullify_links(row_ndx, true);
+    nullify_links(target_row_ndx, true);
 
     // Update all links to the last row to point to the new row instead
-    size_t last_row_ndx = size()-1;
     size_t ref = Column::get(last_row_ndx);
     if (ref != 0) {
         if (ref & 1) {
             size_t row_ref = (ref >> 1);
-            m_source_column->do_update_link(row_ref, last_row_ndx, row_ndx);
+            m_source_column->do_update_link(row_ref, last_row_ndx, target_row_ndx);
         }
         else {
             // update entire list of links
@@ -186,17 +188,17 @@ void ColumnBackLink::move_last_over(std::size_t row_ndx)
 
             for (size_t i = 0; i < count; ++i) {
                 size_t source_row_ref = col.get(i);
-                m_source_column->do_update_link(source_row_ref, last_row_ndx, row_ndx);
+                m_source_column->do_update_link(source_row_ref, last_row_ndx, target_row_ndx);
             }
         }
     }
 
     // Do the actual move
-    Column::set(row_ndx, ref);
+    Column::set(target_row_ndx, ref);
     Column::erase(last_row_ndx, true);
 }
 
-void ColumnBackLink::erase(std::size_t row_ndx, bool is_last)
+void ColumnBackLink::erase(size_t row_ndx, bool is_last)
 {
     TIGHTDB_ASSERT(is_last);
 
@@ -228,10 +230,10 @@ ref_type ColumnBackLink::get_child_ref(size_t child_ndx) const TIGHTDB_NOEXCEPT
 
 #ifdef TIGHTDB_DEBUG
 
-std::pair<ref_type, size_t> ColumnBackLink::get_to_dot_parent(size_t ndx_in_parent) const
+pair<ref_type, size_t> ColumnBackLink::get_to_dot_parent(size_t ndx_in_parent) const
 {
-    std::pair<MemRef, size_t> p = m_array->get_bptree_leaf(ndx_in_parent);
-    return std::make_pair(p.first.m_ref, p.second);
+    pair<MemRef, size_t> p = m_array->get_bptree_leaf(ndx_in_parent);
+    return make_pair(p.first.m_ref, p.second);
 }
 
 #endif //TIGHTDB_DEBUG

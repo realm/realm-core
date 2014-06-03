@@ -20,7 +20,9 @@
 
 #include "column_linklist.hpp"
 
+using namespace std;
 using namespace tightdb;
+
 
 void ColumnLinkList::add_link(size_t row_ndx, size_t target_row_ndx)
 {
@@ -137,20 +139,17 @@ void ColumnLinkList::move_link(size_t row_ndx, size_t old_link_ndx, size_t new_l
     col.insert(ins_pos, target_row_ndx);
 }
 
-void ColumnLinkList::clear()
+void ColumnLinkList::move_last_over(size_t target_row_ndx, size_t last_row_ndx)
 {
-    Column::clear();
+    // FIXME: Leaking underlying array nodes here.
+    Column::move_last_over(target_row_ndx, last_row_ndx);
 }
 
-void ColumnLinkList::move_last_over(std::size_t ndx)
-{
-    Column::move_last_over(ndx);
-}
-
-void ColumnLinkList::erase(std::size_t ndx, bool is_last)
+void ColumnLinkList::erase(size_t row_ndx, bool is_last)
 {
     TIGHTDB_ASSERT(is_last);
-    Column::erase(ndx, is_last);
+    // FIXME: Leaking underlying array nodes here.
+    Column::erase(row_ndx, is_last);
 }
 
 void ColumnLinkList::do_nullify_link(size_t row_ndx, size_t old_target_row_ndx)
@@ -170,7 +169,7 @@ void ColumnLinkList::do_nullify_link(size_t row_ndx, size_t old_target_row_ndx)
     }
 }
 
-void ColumnLinkList::do_update_link(size_t row_ndx, size_t old_target_row_ndx, std::size_t new_target_row_ndx)
+void ColumnLinkList::do_update_link(size_t row_ndx, size_t old_target_row_ndx, size_t new_target_row_ndx)
 {
     ref_type ref = Column::get_as_ref(row_ndx);
     Column col(ref, this, row_ndx, get_alloc());
@@ -193,10 +192,10 @@ ref_type ColumnLinkList::get_child_ref(size_t child_ndx) const TIGHTDB_NOEXCEPT
 
 #ifdef TIGHTDB_DEBUG
 
-std::pair<ref_type, size_t> ColumnLinkList::get_to_dot_parent(size_t ndx_in_parent) const
+pair<ref_type, size_t> ColumnLinkList::get_to_dot_parent(size_t ndx_in_parent) const
 {
-    std::pair<MemRef, size_t> p = m_array->get_bptree_leaf(ndx_in_parent);
-    return std::make_pair(p.first.m_ref, p.second);
+    pair<MemRef, size_t> p = m_array->get_bptree_leaf(ndx_in_parent);
+    return make_pair(p.first.m_ref, p.second);
 }
 
 #endif //TIGHTDB_DEBUG

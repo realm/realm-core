@@ -492,8 +492,10 @@ TEST(TableView_StringSort)
     CHECK_EQUAL("alpha", v[2].first);
     CHECK_EQUAL("zebra", v[3].first);
     CHECK_EQUAL(true, got_called);
-    
-    // Try C++11 method which uses current locale of the operating system to give precise sorting
+
+#ifdef _MSC_VER
+    // Try C++11 method which uses current locale of the operating system to give precise sorting. This C++11 feature
+    // is currently (mid 2014) only supported by Visual Studio
     got_called = false;
     bool available = set_string_compare_method(STRING_COMPARE_CPP11, null_ptr);
     if (available) {
@@ -504,6 +506,7 @@ TEST(TableView_StringSort)
         CHECK_EQUAL("ZEBRA", v[3].first);
         CHECK_EQUAL(false, got_called);
     }
+#endif
 
     // Set back to default for use by other unit tests
     set_string_compare_method(STRING_COMPARE_CORE, null_ptr);

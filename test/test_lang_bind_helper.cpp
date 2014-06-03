@@ -8,6 +8,8 @@
 #include <tightdb/descriptor.hpp>
 #ifdef TIGHTDB_ENABLE_REPLICATION
 #  include <tightdb/replication.hpp>
+#  include <tightdb/commit_log.hpp>
+#  include <tightdb/util/bind.hpp>
 #endif
 
 #include "test.hpp"
@@ -15,6 +17,8 @@
 using namespace std;
 using namespace tightdb;
 using namespace tightdb::util;
+using namespace tightdb::test_util;
+using unit_test::TestResults;
 
 
 // Test independence and thread-safety
@@ -112,10 +116,21 @@ TEST(LangBindHelper_SetSubtable)
 
 namespace {
 
+TIGHTDB_TABLE_4(TestTableShared,
+                first,  Int,
+                second, Int,
+                third,  Bool,
+                fourth, String)
+
+TIGHTDB_TABLE_1(TestTableInts,
+                first,  Int)
+
 class ShortCircuitTransactLogManager:
         public TrivialReplication,
         public LangBindHelper::TransactLogRegistry {
 public:
+    typedef Replication::version_type version_type;
+
     ShortCircuitTransactLogManager(const string& database_file):
         TrivialReplication(database_file)
     {
@@ -129,7 +144,7 @@ public:
             delete[] i->second.data();
     }
 
-    void handle_transact_log(const char* data, size_t size, version_type new_version)
+    void handle_transact_log(const char* data, size_t size, Replication::version_type new_version)
         TIGHTDB_OVERRIDE
     {
         UniquePtr<char[]> log(new char[size]); // Throws
@@ -138,7 +153,7 @@ public:
         log.release();
     }
 
-    void get(uint_fast64_t from_version, uint_fast64_t to_version, BinaryData* logs_buffer)
+    void get_commit_entries(uint_fast64_t from_version, uint_fast64_t to_version, BinaryData* logs_buffer)
         TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
     {
         size_t n = to_version - from_version;
@@ -148,7 +163,7 @@ public:
         }
     }
 
-    void release(uint_fast64_t, uint_fast64_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
+    void release_commit_entries(uint_fast64_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
     {
     }
 
@@ -173,7 +188,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
     CHECK_EQUAL(0, group.size());
 
     // Try to advance without anything having happened
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     CHECK_EQUAL(0, group.size());
 
@@ -182,7 +197,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
         WriteTransaction wt(sg_w);
         wt.commit();
     }
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     CHECK_EQUAL(0, group.size());
 
@@ -191,7 +206,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
         WriteTransaction wt(sg_w);
         // Implicit rollback
     }
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     CHECK_EQUAL(0, group.size());
 
@@ -201,7 +216,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
         TableRef foo_w = wt.get_table("bad");
         // Implicit rollback
     }
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     CHECK_EQUAL(0, group.size());
 
@@ -213,7 +228,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
         foo_w->add_empty_row();
         wt.commit();
     }
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     CHECK_EQUAL(1, group.size());
     ConstTableRef foo = group.get_table("foo");
@@ -234,7 +249,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
         foo_w->set_string(1, 1, "b");
         wt.commit();
     }
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     CHECK_EQUAL(2, foo->get_column_count());
     CHECK_EQUAL(type_Int, foo->get_column_type(0));
@@ -247,7 +262,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
     CHECK_EQUAL(foo, group.get_table("foo"));
 
     // Again, with no change
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     CHECK_EQUAL(2, foo->get_column_count());
     CHECK_EQUAL(type_Int, foo->get_column_type(0));
@@ -287,7 +302,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
         wt.commit();
     }
 
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     CHECK_EQUAL(2, group.size());
     CHECK_EQUAL(2, foo->get_column_count());
@@ -314,7 +329,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
         bar_w->clear();
         wt.commit();
     }
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     CHECK_EQUAL(2, group.size());
     CHECK(foo->is_attached());
@@ -345,7 +360,7 @@ TEST(LangBindHelper_AdvanceReadTransact_ColumnRootTypeChange)
     const Group& group = rt.get_group();
     CHECK_EQUAL(0, group.size());
 
-    // Create a table string and one for other types
+    // Create a table for strings and one for other types
     {
         WriteTransaction wt(sg_w);
         TableRef strings_w = wt.get_table("strings");
@@ -361,7 +376,7 @@ TEST(LangBindHelper_AdvanceReadTransact_ColumnRootTypeChange)
         other_w->add_empty_row();
         wt.commit();
     }
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     CHECK_EQUAL(2, group.size());
     ConstTableRef strings = group.get_table("strings");
@@ -443,7 +458,7 @@ TEST(LangBindHelper_AdvanceReadTransact_ColumnRootTypeChange)
             strings_w->set_mixed  (3, 0, bin_mix);
             wt.commit();
         }
-        LangBindHelper::advance_read_transact(sg, tlm);
+        LangBindHelper::advance_read(sg, tlm);
         group.Verify();
         CHECK_EQUAL(2, group.size());
         CHECK(strings->is_attached());
@@ -482,7 +497,7 @@ TEST(LangBindHelper_AdvanceReadTransact_ColumnRootTypeChange)
         other_w->set_subtable (2, (leaf_x4p16-16)/3+3, 0); // FIXME: Set something
         wt.commit();
     }
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     CHECK_EQUAL(2, group.size());
     CHECK(other->is_attached());
@@ -512,7 +527,7 @@ TEST(LangBindHelper_AdvanceReadTransact_ColumnRootTypeChange)
         other_w->set_subtable (2, 0, 0); // FIXME: Set something
         wt.commit();
     }
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     CHECK_EQUAL(2, group.size());
     CHECK(other->is_attached());
@@ -568,7 +583,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
         parent_w->add_empty_row();
         wt.commit();
     }
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     CHECK_EQUAL(1, group.size());
     ConstTableRef parent = group.get_table("parent");
@@ -592,7 +607,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
         subtab_0_0_w->add_empty_row();
         wt.commit();
     }
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     CHECK_EQUAL(2, parent->get_column_count());
     CHECK_EQUAL(type_Table, parent->get_column_type(0));
@@ -626,7 +641,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
         subdesc->add_column(type_Double, "d");
         wt.commit();
     }
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     CHECK_EQUAL(2, subtab_0_0->get_column_count());
     CHECK_EQUAL(type_Int,   subtab_0_0->get_column_type(0));
@@ -663,7 +678,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
         parent_w->add_empty_row();
         wt.commit();
     }
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     CHECK_EQUAL(3, parent->size());
     CHECK(subtab_0_0->is_attached());
@@ -693,7 +708,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
         subtab_1_1_w->set_double (1, 0, 11111.0);
         wt.commit();
     }
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     CHECK_EQUAL(3, parent->get_column_count());
     CHECK_EQUAL(type_Table, parent->get_column_type(0));
@@ -731,7 +746,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
         subtab_1_1_w->set_double (1, 0, 11112.0);
         wt.commit();
     }
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     CHECK_EQUAL(4, parent->get_column_count());
     CHECK_EQUAL(type_Table, parent->get_column_type(0));
@@ -769,7 +784,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
         subtab_1_1_w->set_double (1, 0, 11113.0);
         wt.commit();
     }
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     CHECK_EQUAL(5, parent->get_column_count());
     CHECK_EQUAL(type_Table, parent->get_column_type(0));
@@ -809,7 +824,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
         subtab_1_1_w->set_double (1, 0, 11114.0);
         wt.commit();
     }
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     CHECK_EQUAL(4, parent->get_column_count());
     CHECK_EQUAL(type_Table, parent->get_column_type(0));
@@ -844,7 +859,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
         subtab_1_1_w->set_double (1, 0, 11115.0);
         wt.commit();
     }
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     CHECK_EQUAL(3, parent->get_column_count());
     CHECK_EQUAL(type_Table, parent->get_column_type(0));
@@ -874,7 +889,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
         subtab_1_1_w->set_double (1, 0, 11116.0);
         wt.commit();
     }
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     CHECK_EQUAL(2, parent->get_column_count());
     CHECK_EQUAL(type_Table, parent->get_column_type(0));
@@ -899,7 +914,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
         subtab_0_0_w->set_float (1, 0, 10017.0f);
         wt.commit();
     }
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     CHECK_EQUAL(2, parent->get_column_count());
     CHECK_EQUAL(1, parent->size());
@@ -920,7 +935,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
         subtab_0_0_w->set_float (1, 0, 10018.0f);
         wt.commit();
     }
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     CHECK_EQUAL(1, parent->get_column_count());
     CHECK_EQUAL(1, parent->size());
@@ -939,7 +954,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
         parent_w->clear_subtable(0,0);
         wt.commit();
     }
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     CHECK_EQUAL(1, parent->get_column_count());
     CHECK_EQUAL(1, parent->size());
@@ -955,7 +970,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
         parent_w->clear();
         wt.commit();
     }
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     CHECK_EQUAL(1, parent->get_column_count());
     CHECK_EQUAL(0, parent->size());
@@ -977,7 +992,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
         subtab_1_1_w->set_string(0, 0, "pneumonoultramicroscopicsilicovolcanoconiosis");
         wt.commit();
     }
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     CHECK_EQUAL(2, parent->get_column_count());
     CHECK_EQUAL(2, parent->size());
@@ -1001,7 +1016,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
         parent_w->remove_column(0);
         wt.commit();
     }
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     CHECK_EQUAL(1, parent->get_column_count());
     CHECK_EQUAL(1, parent->size());
@@ -1026,7 +1041,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
         subtab_1_1_w->set_string(0, 0, "supercalifragilisticexpialidocious");
         wt.commit();
     }
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     subtab_0_0 = parent->get_subtable(0,0);
     subtab_0_1 = parent->get_subtable(0,1);
@@ -1038,7 +1053,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
         parent_w->clear();
         wt.commit();
     }
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     CHECK_EQUAL(2, parent->get_column_count());
     CHECK_EQUAL(0, parent->size());
@@ -1058,7 +1073,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
         subtab_0_0_w->set_string(0, 0, "brahmaputra");
         wt.commit();
     }
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     CHECK_EQUAL(1, parent->get_column_count());
     CHECK_EQUAL(type_Table, parent->get_column_type(0));
@@ -1077,7 +1092,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
         parent_w->remove(0);
         wt.commit();
     }
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     CHECK_EQUAL(1, parent->get_column_count());
     CHECK_EQUAL(0, parent->size());
@@ -1093,7 +1108,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
         subtab_0_0_w->set_string(0, 0, "baikonur");
         wt.commit();
     }
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     CHECK_EQUAL(1, parent->get_column_count());
     CHECK_EQUAL(type_Table, parent->get_column_type(0));
@@ -1112,7 +1127,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
         parent_w->remove_column(0);
         wt.commit();
     }
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     CHECK_EQUAL(0, parent->get_column_count());
     CHECK_EQUAL(0, parent->size());
@@ -1143,7 +1158,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedSubtables)
         subtab_0_0_w->add_column(type_Int, "x");
         wt.commit();
     }
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     CHECK_EQUAL(1, group.size());
     ConstTableRef parent = group.get_table("parent");
@@ -1174,7 +1189,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedSubtables)
         subtab_1_1_w->add_column(type_Int, "x");
         wt.commit();
     }
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     CHECK_EQUAL(2, parent->get_column_count());
     CHECK_EQUAL(type_Mixed, parent->get_column_type(0));
@@ -1211,7 +1226,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedSubtables)
         subtab_1_1_w->add_column(type_Double, "d");
         wt.commit();
     }
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     CHECK_EQUAL(2, subtab_0_0->get_column_count());
     CHECK_EQUAL(type_Int,   subtab_0_0->get_column_type(0));
@@ -1248,7 +1263,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedSubtables)
         parent_w->add_empty_row();
         wt.commit();
     }
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     CHECK_EQUAL(3, parent->size());
     CHECK(subtab_0_0->is_attached());
@@ -1278,7 +1293,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedSubtables)
         subtab_1_1_w->set_double (1, 0, 11111.0);
         wt.commit();
     }
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     CHECK_EQUAL(3, parent->get_column_count());
     CHECK_EQUAL(type_Table, parent->get_column_type(0));
@@ -1319,7 +1334,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedSubtables)
         subtab_1_1_w->set_double (1, 0, 11112.0);
         wt.commit();
     }
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     CHECK_EQUAL(4, parent->get_column_count());
     CHECK_EQUAL(type_Table, parent->get_column_type(0));
@@ -1357,7 +1372,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedSubtables)
         subtab_1_1_w->set_double (1, 0, 11113.0);
         wt.commit();
     }
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     CHECK_EQUAL(5, parent->get_column_count());
     CHECK_EQUAL(type_Table, parent->get_column_type(0));
@@ -1397,7 +1412,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedSubtables)
         subtab_1_1_w->set_double (1, 0, 11114.0);
         wt.commit();
     }
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     CHECK_EQUAL(4, parent->get_column_count());
     CHECK_EQUAL(type_Table, parent->get_column_type(0));
@@ -1432,7 +1447,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedSubtables)
         subtab_1_1_w->set_double (1, 0, 11115.0);
         wt.commit();
     }
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     CHECK_EQUAL(3, parent->get_column_count());
     CHECK_EQUAL(type_Mixed, parent->get_column_type(0));
@@ -1462,7 +1477,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedSubtables)
         subtab_1_1_w->set_double (1, 0, 11116.0);
         wt.commit();
     }
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     CHECK_EQUAL(2, parent->get_column_count());
     CHECK_EQUAL(type_Mixed, parent->get_column_type(0));
@@ -1487,7 +1502,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedSubtables)
         subtab_0_0_w->set_float (1, 0, 10017.0f);
         wt.commit();
     }
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     CHECK_EQUAL(2, parent->get_column_count());
     CHECK_EQUAL(1, parent->size());
@@ -1508,7 +1523,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedSubtables)
         subtab_0_0_w->set_float (1, 0, 10018.0f);
         wt.commit();
     }
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     CHECK_EQUAL(1, parent->get_column_count());
     CHECK_EQUAL(1, parent->size());
@@ -1527,7 +1542,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedSubtables)
         parent_w->clear_subtable(0,0);
         wt.commit();
     }
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     CHECK_EQUAL(1, parent->get_column_count());
     CHECK_EQUAL(1, parent->size());
@@ -1540,7 +1555,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedSubtables)
         parent_w->clear();
         wt.commit();
     }
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     CHECK_EQUAL(1, parent->get_column_count());
     CHECK_EQUAL(0, parent->size());
@@ -1562,7 +1577,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedSubtables)
         subtab_1_1_w->set_string(0, 0, "pneumonoultramicroscopicsilicovolcanoconiosis");
         wt.commit();
     }
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     CHECK_EQUAL(2, parent->get_column_count());
     CHECK_EQUAL(2, parent->size());
@@ -1586,7 +1601,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedSubtables)
         parent_w->remove_column(0);
         wt.commit();
     }
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     CHECK_EQUAL(1, parent->get_column_count());
     CHECK_EQUAL(1, parent->size());
@@ -1614,7 +1629,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedSubtables)
         subtab_1_1_w->set_string(0, 0, "supercalifragilisticexpialidocious");
         wt.commit();
     }
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     subtab_0_0 = parent->get_subtable(0,0);
     subtab_0_1 = parent->get_subtable(0,1);
@@ -1626,7 +1641,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedSubtables)
         parent_w->clear();
         wt.commit();
     }
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     CHECK_EQUAL(2, parent->get_column_count());
     CHECK_EQUAL(0, parent->size());
@@ -1648,7 +1663,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedSubtables)
         subtab_0_0_w->set_string(0, 0, "brahmaputra");
         wt.commit();
     }
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     CHECK_EQUAL(1, parent->get_column_count());
     CHECK_EQUAL(type_Mixed, parent->get_column_type(0));
@@ -1667,7 +1682,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedSubtables)
         parent_w->remove(0);
         wt.commit();
     }
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     CHECK_EQUAL(1, parent->get_column_count());
     CHECK_EQUAL(0, parent->size());
@@ -1685,7 +1700,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedSubtables)
         subtab_0_0_w->set_string(0, 0, "baikonur");
         wt.commit();
     }
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     CHECK_EQUAL(1, parent->get_column_count());
     CHECK_EQUAL(type_Mixed, parent->get_column_type(0));
@@ -1704,7 +1719,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedSubtables)
         parent_w->remove_column(0);
         wt.commit();
     }
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     CHECK_EQUAL(0, parent->get_column_count());
     CHECK_EQUAL(0, parent->size());
@@ -1746,7 +1761,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
         parent_w->set_int(0, 1, 227);
         wt.commit();
     }
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     ConstTableRef parent = rt.get_table("parent");
     CHECK_EQUAL(2, parent->size());
@@ -1769,7 +1784,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
         parent_w->insert_empty_row(0); // Before
         wt.commit();
     }
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     CHECK_EQUAL(5, parent->size());
     CHECK(row_1.is_attached());
@@ -1789,7 +1804,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
         parent_w->insert_empty_row(5); // Immediately before row_2
         wt.commit();
     }
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     CHECK_EQUAL(9, parent->size());
     CHECK(row_1.is_attached());
@@ -1812,7 +1827,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
         parent_w->remove(4); // Immediately after  row_2
         wt.commit();
     }
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     CHECK_EQUAL(5, parent->size());
     CHECK(row_1.is_attached());
@@ -1831,7 +1846,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
         parent_w->remove(1); // Between
         wt.commit();
     }
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     CHECK_EQUAL(2, parent->size());
     CHECK(row_1.is_attached());
@@ -1850,7 +1865,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
         parent_w->remove(0);
         wt.commit();
     }
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     CHECK_EQUAL(1, parent->size());
     CHECK(!row_1.is_attached());
@@ -1866,7 +1881,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
         parent_w->set_int(0, 0, 27);
         wt.commit();
     }
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     CHECK_EQUAL(2, parent->size());
     row_1 = (*parent)[0];
@@ -1886,7 +1901,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
         parent_w->remove(1);
         wt.commit();
     }
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     CHECK_EQUAL(1, parent->size());
     CHECK(row_1.is_attached());
@@ -1902,7 +1917,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
         parent_w->set_int(0, 1, 227);
         wt.commit();
     }
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     CHECK_EQUAL(2, parent->size());
     row_2 = (*parent)[1];
@@ -1924,7 +1939,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
         parent_w->insert_column(0, type_Float, "y");
         wt.commit();
     }
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     CHECK_EQUAL(2, parent->size());
     CHECK(row_1.is_attached());
@@ -1942,7 +1957,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
         parent_w->remove_column(1);
         wt.commit();
     }
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     CHECK_EQUAL(2, parent->size());
     CHECK(row_1.is_attached());
@@ -1961,7 +1976,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
         parent_w->remove_column(0);
         wt.commit();
     }
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     CHECK_EQUAL(0, parent->get_column_count());
     CHECK_EQUAL(0, parent->size());
@@ -1977,7 +1992,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
         parent_w->set_int(0, 1, 227);
         wt.commit();
     }
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     CHECK_EQUAL(2, parent->size());
     row_1 = (*parent)[0];
@@ -1996,7 +2011,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
         parent_w->clear();
         wt.commit();
     }
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     CHECK_EQUAL(0, parent->size());
     CHECK(!row_1.is_attached());
@@ -2035,7 +2050,7 @@ TEST(LangBindHelper_AdvanceReadTransact_SubtableRowAccessors)
         regular_w->set_int(0, 0, 29);
         wt.commit();
     }
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     ConstTableRef parent = rt.get_table("parent");
     ConstTableRef mixed   = parent->get_subtable(0,0);
@@ -2055,7 +2070,7 @@ TEST(LangBindHelper_AdvanceReadTransact_SubtableRowAccessors)
         parent_w->set_mixed(0, 0, Mixed("foo"));
         wt.commit();
     }
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     CHECK(!mixed->is_attached());
     CHECK(regular->is_attached());
@@ -2072,7 +2087,7 @@ TEST(LangBindHelper_AdvanceReadTransact_SubtableRowAccessors)
         mixed_w->set_int(0, 0, 19);
         wt.commit();
     }
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     mixed = parent->get_subtable(0,0);
     CHECK(mixed);
@@ -2092,7 +2107,7 @@ TEST(LangBindHelper_AdvanceReadTransact_SubtableRowAccessors)
         parent_w->set_subtable(1, 0, 0); // Clear
         wt.commit();
     }
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
     CHECK(mixed->is_attached());
     CHECK(regular->is_attached());
@@ -2125,20 +2140,20 @@ TEST(LangBindHelper_AdvanceReadTransact_MoveLastOver)
             DescriptorRef subdesc = parent_w->get_subdescriptor(0);
             subdesc->add_column(type_Int, "regular");
             parent_w->add_empty_row(5);
-            for (int i = 0; i < 5; ++i) {
-                TableRef regular_w = parent_w->get_subtable(0,i);
+            for (int row_ndx = 0; row_ndx < 5; ++row_ndx) {
+                TableRef regular_w = parent_w->get_subtable(0, row_ndx);
                 regular_w->add_empty_row();
-                regular_w->set_int(0, 0, 10 + i);
-                parent_w->set_mixed(1, i, Mixed::subtable_tag());
-                TableRef mixed_w = parent_w->get_subtable(1,i);
+                regular_w->set_int(0, 0, 10 + row_ndx);
+                parent_w->set_mixed(1, row_ndx, Mixed::subtable_tag());
+                TableRef mixed_w = parent_w->get_subtable(1, row_ndx);
                 mixed_w->add_column(type_Int, "mixed");
                 mixed_w->add_empty_row();
-                mixed_w->set_int(0, 0, 20 + i);
+                mixed_w->set_int(0, 0, 20 + row_ndx);
             }
         }
         wt.commit();
     }
-    LangBindHelper::advance_read_transact(sg, tlm);
+    LangBindHelper::advance_read(sg, tlm);
     group.Verify();
 
     // Use first table to check with accessors on row indexes 0, 1, and 4, but
@@ -2182,7 +2197,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MoveLastOver)
             parent_w->move_last_over(0); // Move row at index 3 to index 0
             wt.commit();
         }
-        LangBindHelper::advance_read_transact(sg, tlm);
+        LangBindHelper::advance_read(sg, tlm);
         group.Verify();
         CHECK(!row_0.is_attached());
         CHECK(row_1.is_attached());
@@ -2213,7 +2228,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MoveLastOver)
             parent_w->move_last_over(0); // Move row at index 1 to index 0
             wt.commit();
         }
-        LangBindHelper::advance_read_transact(sg, tlm);
+        LangBindHelper::advance_read(sg, tlm);
         group.Verify();
         CHECK(!row_0.is_attached());
         CHECK(!row_1.is_attached());
@@ -2272,7 +2287,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MoveLastOver)
             parent_w->move_last_over(0); // Move row at index 3 to index 0
             wt.commit();
         }
-        LangBindHelper::advance_read_transact(sg, tlm);
+        LangBindHelper::advance_read(sg, tlm);
         group.Verify();
         CHECK(!row_0.is_attached());
         CHECK(!row_2.is_attached());
@@ -2297,7 +2312,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MoveLastOver)
             parent_w->move_last_over(1); // Move row at index 2 to index 1
             wt.commit();
         }
-        LangBindHelper::advance_read_transact(sg, tlm);
+        LangBindHelper::advance_read(sg, tlm);
         group.Verify();
         CHECK(!row_0.is_attached());
         CHECK(!row_2.is_attached());
@@ -2322,7 +2337,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MoveLastOver)
             parent_w->move_last_over(0); // Move row at index 1 to index 0
             wt.commit();
         }
-        LangBindHelper::advance_read_transact(sg, tlm);
+        LangBindHelper::advance_read(sg, tlm);
         group.Verify();
         CHECK(!row_0.is_attached());
         CHECK(!row_2.is_attached());
@@ -2367,7 +2382,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MoveLastOver)
             parent_w->move_last_over(0); // Move row at index 3 to index 0
             wt.commit();
         }
-        LangBindHelper::advance_read_transact(sg, tlm);
+        LangBindHelper::advance_read(sg, tlm);
         group.Verify();
         CHECK(row_1.is_attached());
         CHECK(row_3.is_attached());
@@ -2394,7 +2409,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MoveLastOver)
             parent_w->move_last_over(1); // Move row at index 2 to index 1
             wt.commit();
         }
-        LangBindHelper::advance_read_transact(sg, tlm);
+        LangBindHelper::advance_read(sg, tlm);
         group.Verify();
         CHECK(!row_1.is_attached());
         CHECK(row_3.is_attached());
@@ -2416,7 +2431,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MoveLastOver)
             parent_w->move_last_over(0); // Move row at index 1 to index 0
             wt.commit();
         }
-        LangBindHelper::advance_read_transact(sg, tlm);
+        LangBindHelper::advance_read(sg, tlm);
         group.Verify();
         CHECK(!row_1.is_attached());
         CHECK(!row_3.is_attached());
@@ -2426,6 +2441,160 @@ TEST(LangBindHelper_AdvanceReadTransact_MoveLastOver)
         CHECK(!mixed_3->is_attached());
     }
 }
+
+
+
+TEST(LangBindHelper_Implicit_Transactions)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    {
+        UniquePtr<LangBindHelper::TransactLogRegistry> wlr(getWriteLogs(path));
+        UniquePtr<Replication> repl(makeWriteLogCollector(path));
+        SharedGroup sg(*repl);
+        {
+            WriteTransaction wt(sg);
+            wt.get_table<TestTableShared>("table")->add_empty_row();
+            wt.commit();
+        }
+        UniquePtr<Replication> repl2(makeWriteLogCollector(path));
+        SharedGroup sg2(*repl2);
+        Group& g = const_cast<Group&>(sg.begin_read());
+        TestTableShared::Ref table = g.get_table<TestTableShared>("table");
+        for (int i = 0; i<100; i++) {
+            {
+                // change table in other context
+                WriteTransaction wt(sg2);
+                wt.get_table<TestTableShared>("table")[0].first += 100;
+                wt.commit();
+            }
+            // verify we can't see the update
+            CHECK_EQUAL(i, table[0].first);
+            LangBindHelper::advance_read(sg, *wlr);
+            // now we CAN see it, and through the same accessor
+            CHECK(table->is_attached());
+            CHECK_EQUAL(i + 100, table[0].first);
+            {
+                // change table in other context
+                WriteTransaction wt(sg2);
+                wt.get_table<TestTableShared>("table")[0].first += 10000;
+                wt.commit();
+            }
+            // can't see it:
+            CHECK_EQUAL(i + 100, table[0].first);
+            LangBindHelper::promote_to_write(sg, *wlr);
+            // CAN see it:
+            CHECK(table->is_attached());
+            CHECK_EQUAL(i + 10100, table[0].first);
+            table[0].first -= 10100;
+            table[0].first += 1;
+            LangBindHelper::commit_and_continue_as_read(sg);
+            CHECK(table->is_attached());
+            CHECK_EQUAL(i+1, table[0].first);
+        }
+        sg.end_read();
+    }
+}
+
+namespace {
+void writer_thread(string path)
+{
+    Random random(random_int<unsigned long>());
+    UniquePtr<Replication> repl(makeWriteLogCollector(path));
+    SharedGroup sg(*repl);
+    for (int i=0; i<10; i++)
+    {
+        WriteTransaction wt(sg);
+        TestTableInts::Ref tr = wt.get_table<TestTableInts>("table");
+
+        int idx = (tr->size()==0) ? 0 : (random.draw_int_mod(tr->size()));
+
+        if (tr[idx].first == 42) {
+            // do nothing
+        }
+        else {
+            tr->insert(idx, 0);
+        }
+        wt.commit();
+        sched_yield();
+    }
+}
+
+void reader_thread(TestResults* test_results_ptr, string path)
+{
+    TestResults& test_results = *test_results_ptr;
+    Random random(random_int<unsigned long>());
+    
+    UniquePtr<Replication> repl(makeWriteLogCollector(path));
+    UniquePtr<LangBindHelper::TransactLogRegistry> wlr(getWriteLogs(path));
+    SharedGroup sg(*repl);
+    Group& g = const_cast<Group&>(sg.begin_read());
+    TableRef tr = g.get_table("table");
+    Query q = tr->where().equal(0, 42);
+    int idx = q.find();
+    Row r = (*tr)[idx];
+    while (1)
+    {
+        int val = r.get_int(0);
+        if (val == 43) break;
+        CHECK_EQUAL(42, val);    
+        while (!sg.has_changed())
+            sched_yield();
+        LangBindHelper::advance_read(sg, *wlr);
+    }
+    sg.end_read();
+}
+
+}
+
+TEST(LangBindHelper_Implicit_Transactions_Multiple_Trackers)
+{
+    const int write_thread_count = 3;
+    const int read_thread_count = 3;
+
+    SHARED_GROUP_TEST_PATH(path);
+    {
+        UniquePtr<Replication> repl(makeWriteLogCollector(path));
+        SharedGroup sg(*repl);
+        {
+            WriteTransaction wt(sg);
+            TableRef tr = wt.get_table("table");
+            tr->add_column(type_Int, "first");
+            for (int i=0; i<200; i++)
+                tr->add_empty_row();
+            tr->set_int(0, 100, 42);
+            wt.commit();
+
+        }
+        Thread threads[write_thread_count + read_thread_count];
+        int i;
+        for (i = 0; i < write_thread_count; ++i)
+            threads[i].start(bind(writer_thread, string(path)));
+        sched_yield();
+        for (i = 0; i < read_thread_count; ++i)
+            threads[write_thread_count + i].start(bind(reader_thread, &test_results, string(path)));
+ 
+        // Wait for all writer threads to complete
+        for (int i = 0; i < write_thread_count; ++i)
+            threads[i].join();
+
+        // signal to all readers to complete
+        {
+            WriteTransaction wt(sg);
+            TableRef tr = wt.get_table("table");
+            Query q = tr->where().equal(0, 42);
+            int idx = q.find();
+            tr->set_int(0, idx, 43);
+            wt.commit();
+        }
+        // Wait for all reader threads to complete
+        for (int i = 0; i < read_thread_count; ++i)
+            threads[write_thread_count + i].join();
+
+        // cleanup
+        sg.end_read();
+    }
+}
+
 
 #endif // TIGHTDB_ENABLE_REPLICATION
 

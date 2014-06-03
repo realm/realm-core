@@ -21,7 +21,7 @@
 #include <tightdb/util/terminate.hpp>
 #include <tightdb/util/file.hpp>
 #include <tightdb/util/thread.hpp>
-
+#include <tightdb/commit_log.hpp>
 #include "util/thread_wrapper.hpp"
 
 #include "test.hpp"
@@ -964,7 +964,6 @@ TEST(Shared_WriterThreads)
         SharedGroup sg(path);
 
         const size_t thread_count = 10;
-
         // Create first table in group
         {
             WriteTransaction wt(sg);

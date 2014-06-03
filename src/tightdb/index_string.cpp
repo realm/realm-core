@@ -55,16 +55,19 @@ void StringIndex::set(size_t ndx, StringData old_value, StringData new_value)
 {
     bool is_last = true; // To avoid updating refs
     erase(ndx, old_value, is_last);
-    insert(ndx, new_value, is_last);
+    insert(ndx, new_value, 1, is_last);
 }
 
-void StringIndex::insert(size_t row_ndx, StringData value, bool is_last)
+void StringIndex::insert(size_t row_ndx, StringData value, size_t num_rows, bool is_append)
 {
-    // If it is last item in column, we don't have to update refs
-    if (!is_last)
-        UpdateRefs(row_ndx, 1);
+    for (size_t i = 0; i < num_rows; ++i) {
+        size_t row_ndx_2 = row_ndx + i;
+        // If it is last item in column, we don't have to update refs
+        if (!is_append)
+            UpdateRefs(row_ndx_2, 1);
 
-    InsertWithOffset(row_ndx, 0, value);
+        InsertWithOffset(row_ndx_2, 0, value);
+    }
 }
 
 void StringIndex::InsertWithOffset(size_t row_ndx, size_t offset, StringData value)

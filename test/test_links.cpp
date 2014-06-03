@@ -20,7 +20,7 @@ TIGHTDB_TABLE_4(TestTableLinks,
                 second, Int,
                 third,  Bool,
                 fourth, Enum<Days>)
-    
+
 } // Anonymous namespace
 
 TEST(Links_Columns)

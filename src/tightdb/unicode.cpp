@@ -151,7 +151,7 @@ namespace tightdb {
 
     wstring utf8_to_wstring(StringData str)
     {
-#if TIGHTDB_HAVE_CXX11
+#if TIGHTDB_HAVE_CXX11 && defined(_MSC_VER)
         // __STDC_UTF_16__ seems not to work
         TIGHTDB_STATIC_ASSERT(sizeof(wchar_t) == 2, "Expected Windows to use utf16");
         std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> utf8conv;

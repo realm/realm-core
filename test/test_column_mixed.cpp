@@ -346,7 +346,7 @@ TEST(ColumnMixed_Mixed)
 }
 
 
-TEST(ColumnMixed_Subtable_Size)
+TEST(ColumnMixed_SubtableSize)
 {
     ColumnMixed c;
     c.insert_subtable(0, 0);

@@ -58,9 +58,8 @@ public:
     void   remove_link(std::size_t row_ndx, std::size_t link_ndx);
     void   remove_all_links(std::size_t row_ndx);
 
-    void clear() TIGHTDB_OVERRIDE;
-    void move_last_over(std::size_t ndx) TIGHTDB_OVERRIDE;
-    void erase(std::size_t ndx, bool is_last) TIGHTDB_OVERRIDE;
+    void erase(std::size_t, bool) TIGHTDB_OVERRIDE;
+    void move_last_over(std::size_t, std::size_t) TIGHTDB_OVERRIDE;
 
     // ColumnLinkBase overrides
     void set_target_table(TableRef table) TIGHTDB_OVERRIDE;

@@ -92,8 +92,13 @@ public:
 #ifdef TIGHTDB_ENABLE_REPLICATION
     typedef SharedGroup::TransactLogRegistry TransactLogRegistry;
 
-    /// Calls sg.advance_read_transact(log_registry).
-    static void advance_read_transact(SharedGroup& sg, TransactLogRegistry& log_registry);
+    /// Wrappers - forward calls to shared group. A bit like NSA. Circumventing privacy :-)
+    static void advance_read(SharedGroup& sg, TransactLogRegistry& write_logs);
+    static void promote_to_write(SharedGroup& sg, TransactLogRegistry& write_logs);
+    static void commit_and_continue_as_read(SharedGroup& sg);
+
+    friend class ReadTransaction;
+    friend class WriteTransaction;
 #endif
 
     /// Returns the name of the specified data type as follows:
@@ -224,11 +229,23 @@ inline void LangBindHelper::set_mixed_subtable(Table& parent, std::size_t col_nd
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
 
-inline void LangBindHelper::advance_read_transact(SharedGroup& sg,
-                                                  TransactLogRegistry& log_registry)
+inline void LangBindHelper::advance_read(SharedGroup& sg,
+                                         TransactLogRegistry& log_registry)
 {
-    sg.advance_read_transact(log_registry);
+    sg.advance_read(log_registry);
 }
+
+inline void LangBindHelper::promote_to_write(SharedGroup& sg,
+                                             TransactLogRegistry& log_registry)
+{
+    sg.promote_to_write(log_registry);
+}
+
+inline void LangBindHelper::commit_and_continue_as_read(SharedGroup& sg)
+{
+    sg.commit_and_continue_as_read();
+}
+
 
 #endif
 

@@ -35,7 +35,7 @@ column.cpp column_string.cpp column_string_enum.cpp column_binary.cpp column_tab
 column_mixed.cpp column_link.cpp column_linklist.cpp column_backlink.cpp spec.cpp \
 impl/output_stream.cpp table.cpp table_view.cpp row.cpp descriptor.cpp group.cpp group_writer.cpp \
 group_shared.cpp $(REPLICATION_CPP) index_string.cpp query.cpp lang_bind_helper.cpp importer.cpp \
-version.cpp unicode.cpp
+commit_log.cpp version.cpp unicode.cpp
 
 # Format: CURRENT[:REVISION[:AGE]]
 #
