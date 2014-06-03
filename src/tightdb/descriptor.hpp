@@ -69,10 +69,6 @@ public:
     /// Get the number of columns in the associated tables.
     std::size_t get_column_count() const TIGHTDB_NOEXCEPT;
 
-    /// Get the number of columns in the associated tables.
-    /// (including hidden columns like backlinks)
-    std::size_t get_internal_column_count() const TIGHTDB_NOEXCEPT;
-
     /// Get the type of the column at the specified index.
     ///
     /// The consequences of specifying a column index that is out of
@@ -375,6 +371,10 @@ private:
     // return null.
     Descriptor* get_subdesc_accessor(std::size_t column_ndx) TIGHTDB_NOEXCEPT;
 
+    /// Get the number of columns in the associated tables.
+    /// (including hidden columns like backlinks)
+    std::size_t get_internal_column_count() const TIGHTDB_NOEXCEPT;
+
     void adj_insert_column(std::size_t col_ndx) TIGHTDB_NOEXCEPT;
     void adj_erase_column(std::size_t col_ndx) TIGHTDB_NOEXCEPT;
 
@@ -585,6 +585,11 @@ public:
     static void adj_erase_column(Descriptor& desc, std::size_t col_ndx) TIGHTDB_NOEXCEPT
     {
         desc.adj_erase_column(col_ndx);
+    }
+
+    static std::size_t get_internal_column_count(Descriptor& desc) TIGHTDB_NOEXCEPT
+    {
+        return desc.get_internal_column_count();
     }
 };
 

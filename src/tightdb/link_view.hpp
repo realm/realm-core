@@ -44,18 +44,18 @@ public:
 
     // Getting links
     Table::RowExpr operator[](std::size_t row_ndx) TIGHTDB_NOEXCEPT;
-    Table::RowExpr get_link(std::size_t row_ndx) TIGHTDB_NOEXCEPT;
+    Table::RowExpr get(std::size_t row_ndx) TIGHTDB_NOEXCEPT;
     std::size_t get_target_row(std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
 
     // Modifiers
-    void add_link(std::size_t target_row_ndx);
-    void insert_link(std::size_t ins_pos, std::size_t target_row_ndx);
-    void set_link(std::size_t row_ndx, std::size_t target_row_ndx);
-    void move_link(size_t old_link_ndx, size_t new_link_ndx);
-    void remove_link(std::size_t row_ndx);
-    void remove_all_links();
+    void add(std::size_t target_row_ndx);
+    void insert(std::size_t ins_pos, std::size_t target_row_ndx);
+    void set(std::size_t row_ndx, std::size_t target_row_ndx);
+    void move(size_t old_link_ndx, size_t new_link_ndx);
+    void remove(std::size_t row_ndx);
+    void clear();
 
-protected:
+private:
     friend class ColumnLinkList;
     friend class util::bind_ptr<LinkView>;
 
@@ -102,8 +102,6 @@ inline void LinkView::unbind_ref() const TIGHTDB_NOEXCEPT
 {
     if (--m_ref_count > 0)
         return;
-
-    if (is_attached())
 
     delete this;
 }
@@ -162,7 +160,7 @@ inline std::size_t LinkView::size() const TIGHTDB_NOEXCEPT
     return m_refs->size();
 }
 
-inline Table::RowExpr LinkView::get_link(std::size_t row_ndx) TIGHTDB_NOEXCEPT
+inline Table::RowExpr LinkView::get(std::size_t row_ndx) TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(is_attached());
     TIGHTDB_ASSERT(m_refs);
@@ -174,7 +172,7 @@ inline Table::RowExpr LinkView::get_link(std::size_t row_ndx) TIGHTDB_NOEXCEPT
 
 inline Table::RowExpr LinkView::operator[](std::size_t row_ndx) TIGHTDB_NOEXCEPT
 {
-    return get_link(row_ndx);
+    return get(row_ndx);
 }
 
 inline std::size_t LinkView::get_target_row(std::size_t row_ndx) const TIGHTDB_NOEXCEPT
@@ -186,11 +184,11 @@ inline std::size_t LinkView::get_target_row(std::size_t row_ndx) const TIGHTDB_N
     return m_refs->get(row_ndx);
 }
 
-inline void LinkView::add_link(std::size_t target_row_ndx)
+inline void LinkView::add(std::size_t target_row_ndx)
 {
     TIGHTDB_ASSERT(is_attached());
     size_t ins_pos = (m_refs) ? m_refs->size() : 0;
-    insert_link(ins_pos, target_row_ndx);
+    insert(ins_pos, target_row_ndx);
 }
 
 } // namespace tightdb

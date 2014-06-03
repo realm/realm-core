@@ -441,7 +441,7 @@ void Table::do_insert_column(Descriptor& desc, size_t column_ndx,
     typedef _impl::DescriptorFriend df;
     Table& root_table = df::root_table(desc);
     TIGHTDB_ASSERT(!root_table.has_shared_type());
-    TIGHTDB_ASSERT(column_ndx <= desc.get_internal_column_count());
+    TIGHTDB_ASSERT(column_ndx <= df::get_internal_column_count(desc));
 
     root_table.discard_subtable_accessors();
 

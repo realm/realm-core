@@ -24,6 +24,7 @@
 #include <tightdb/column_linkbase.hpp>
 #include <tightdb/table.hpp>
 #include <tightdb/column_backlink.hpp>
+#include <vector>
 
 namespace tightdb {
 
@@ -61,7 +62,7 @@ public:
     TableRef get_target_table() TIGHTDB_OVERRIDE;
     void set_backlink_column(ColumnBackLink& backlinks) TIGHTDB_OVERRIDE;
 
-protected:
+private:
     friend class ColumnBackLink;
     friend class LinkView;
 
@@ -83,7 +84,6 @@ protected:
     get_to_dot_parent(std::size_t ndx_in_parent) const TIGHTDB_OVERRIDE;
 #endif
 
-private:
     TableRef m_target_table;
     ColumnBackLink* m_backlinks;
     std::vector<LinkView*> m_views;

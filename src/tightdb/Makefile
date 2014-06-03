@@ -10,7 +10,8 @@ column_fwd.hpp spec.hpp impl/destroy_guard.hpp impl/output_stream.hpp datetime.h
 string_data.hpp binary_data.hpp mixed.hpp table.hpp table_ref.hpp table_basic_fwd.hpp \
 table_accessors.hpp table_basic.hpp table_view.hpp table_view_basic.hpp table_macros.hpp row.hpp \
 descriptor_fwd.hpp descriptor.hpp group.hpp group_shared.hpp $(REPLICATION_HPP) query.hpp \
-query_conditions.hpp lang_bind_helper.hpp tightdb_nmmintrin.h importer.hpp version.hpp unicode.hpp
+query_conditions.hpp lang_bind_helper.hpp tightdb_nmmintrin.h importer.hpp version.hpp unicode.hpp \
+link_view.hpp column_linklist.hpp column_linkbase.hpp column_backlink.hpp
 
 nobase_subinclude_HEADERS_EXTRA_UNINSTALL = *.h *.hpp util/*.h util/*.hpp impl/*.h impl/*.hpp
 

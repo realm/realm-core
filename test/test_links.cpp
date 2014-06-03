@@ -409,9 +409,9 @@ TEST(Links_LinkList_Basics)
     LinkViewRef links = source->get_linklist(col_link, 0);
 
     // add several links to a single linklist
-    links->add_link(2);
-    links->add_link(1);
-    links->add_link(0);
+    links->add(2);
+    links->add(1);
+    links->add(0);
     CHECK(source->linklist_has_links(col_link, 0));
     CHECK_EQUAL(3, links->size());
     CHECK_EQUAL(2, links->get_target_row(0));
@@ -428,7 +428,7 @@ TEST(Links_LinkList_Basics)
     CHECK_EQUAL(0, target->get_backlink(2, source_table_ndx, col_link, 0));
 
     // insert a link at a specific position in the linklist
-    links->insert_link(1, 2);
+    links->insert(1, 2);
     CHECK_EQUAL(4, source->get_link_count(col_link, 0));
     CHECK_EQUAL(2, links->get_target_row(0));
     CHECK_EQUAL(2, links->get_target_row(1));
@@ -440,7 +440,7 @@ TEST(Links_LinkList_Basics)
     CHECK_EQUAL(0, target->get_backlink(2, source_table_ndx, col_link, 1));
 
     // change one link to another
-    links->set_link(0, 1);
+    links->set(0, 1);
     CHECK_EQUAL(4, source->get_link_count(col_link, 0));
     CHECK_EQUAL(1, links->get_target_row(0));
     CHECK_EQUAL(2, links->get_target_row(1));
@@ -456,7 +456,7 @@ TEST(Links_LinkList_Basics)
     CHECK_EQUAL(0, target->get_backlink(2, source_table_ndx, col_link, 0));
 
     // move a link
-    links->move_link(3, 0);
+    links->move(3, 0);
     CHECK_EQUAL(4, source->get_link_count(col_link, 0));
     CHECK_EQUAL(0, links->get_target_row(0));
     CHECK_EQUAL(1, links->get_target_row(1));
@@ -464,12 +464,12 @@ TEST(Links_LinkList_Basics)
     CHECK_EQUAL(1, links->get_target_row(3));
 
     // remove a link
-    links->remove_link(0);
+    links->remove(0);
     CHECK_EQUAL(3, source->get_link_count(col_link, 0));
     CHECK_EQUAL(0, target->get_backlink_count(0, source_table_ndx, col_link));
 
     // remove all links
-    links->remove_all_links();
+    links->clear();
     CHECK(!source->linklist_has_links(col_link, 0));
     CHECK_EQUAL(0, target->get_backlink_count(0, source_table_ndx, col_link));
     CHECK_EQUAL(0, target->get_backlink_count(1, source_table_ndx, col_link));
@@ -496,9 +496,9 @@ TEST(Links_LinkList_Backlinks)
     source->insert_done();
 
     LinkViewRef links = source->get_linklist(col_link, 0);
-    links->add_link(2);
-    links->add_link(1);
-    links->add_link(0);
+    links->add(2);
+    links->add(1);
+    links->add(0);
 
     // remove a target row and check that source links are removed as well
     target->move_last_over(1);
@@ -523,9 +523,9 @@ TEST(Links_LinkList_Backlinks)
     LinkViewRef links2 = source->get_linklist(col_link, 2);
 
     // add links from each row
-    links->add_link(2);
-    links1->add_link(1);
-    links2->add_link(0);
+    links->add(2);
+    links1->add(1);
+    links2->add(0);
 
     // Verify backlinks
     CHECK_EQUAL(1, target->get_backlink_count(0, source_table_ndx, col_link));
@@ -573,19 +573,19 @@ TEST(Links_LinkList_AccessorUpdates)
     source->insert_done();
 
     LinkViewRef links0 = source->get_linklist(col_link, 0);
-    links0->add_link(2);
-    links0->add_link(1);
-    links0->add_link(0);
+    links0->add(2);
+    links0->add(1);
+    links0->add(0);
 
     LinkViewRef links1 = source->get_linklist(col_link, 1);
-    links1->add_link(2);
-    links1->add_link(1);
-    links1->add_link(0);
+    links1->add(2);
+    links1->add(1);
+    links1->add(0);
 
     LinkViewRef links2 = source->get_linklist(col_link, 2);
-    links2->add_link(2);
-    links2->add_link(1);
-    links2->add_link(0);
+    links2->add(2);
+    links2->add(1);
+    links2->add(0);
 
     CHECK_EQUAL(0, links0->get_parent_row());
     CHECK_EQUAL(1, links1->get_parent_row());

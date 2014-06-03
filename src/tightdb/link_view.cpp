@@ -23,7 +23,7 @@
 
 using namespace tightdb;
 
-void LinkView::insert_link(std::size_t ins_pos, std::size_t target_row_ndx)
+void LinkView::insert(std::size_t ins_pos, std::size_t target_row_ndx)
 {
     TIGHTDB_ASSERT(is_attached());
     TIGHTDB_ASSERT(m_refs || ins_pos == 0);
@@ -43,7 +43,7 @@ void LinkView::insert_link(std::size_t ins_pos, std::size_t target_row_ndx)
     m_column.add_backlink(target_row_ndx, m_row_ndx);
 }
 
-void LinkView::set_link(std::size_t row_ndx, std::size_t target_row_ndx)
+void LinkView::set(std::size_t row_ndx, std::size_t target_row_ndx)
 {
     TIGHTDB_ASSERT(is_attached());
     TIGHTDB_ASSERT(m_refs && row_ndx < m_refs->size());
@@ -57,7 +57,7 @@ void LinkView::set_link(std::size_t row_ndx, std::size_t target_row_ndx)
     m_refs->set(row_ndx, target_row_ndx);
 }
 
-void LinkView::move_link(size_t old_link_ndx, size_t new_link_ndx)
+void LinkView::move(size_t old_link_ndx, size_t new_link_ndx)
 {
     TIGHTDB_ASSERT(is_attached());
     TIGHTDB_ASSERT(m_refs);
@@ -74,7 +74,7 @@ void LinkView::move_link(size_t old_link_ndx, size_t new_link_ndx)
     m_refs->insert(ins_pos, target_row_ndx);
 }
 
-void LinkView::remove_link(std::size_t row_ndx)
+void LinkView::remove(std::size_t row_ndx)
 {
     TIGHTDB_ASSERT(is_attached());
     TIGHTDB_ASSERT(m_refs && row_ndx < m_refs->size());
@@ -93,7 +93,7 @@ void LinkView::remove_link(std::size_t row_ndx)
     }
 }
 
-void LinkView::remove_all_links()
+void LinkView::clear()
 {
     TIGHTDB_ASSERT(is_attached());
 
