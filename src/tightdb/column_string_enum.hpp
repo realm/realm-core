@@ -60,15 +60,15 @@ public:
     void destroy() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
     StringData get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
-    void add(StringData value);
     void set(std::size_t ndx, StringData value);
-    void insert(std::size_t ndx, StringData value);
+    void add(StringData value = StringData());
+    void insert(std::size_t ndx, StringData value = StringData());
+
+    void insert(std::size_t, std::size_t, bool) TIGHTDB_OVERRIDE;
     void erase(std::size_t ndx, bool is_last) TIGHTDB_OVERRIDE;
     void clear() TIGHTDB_OVERRIDE;
 
     using Column::move_last_over;
-    using Column::add;
-    using Column::insert;
 
     std::size_t count(StringData value) const;
     size_t find_first(StringData value, std::size_t begin = 0, std::size_t end = npos) const;
@@ -106,9 +106,7 @@ public:
 
     void update_column_index(std::size_t, const Spec&) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
-    void refresh_after_advance_transact(std::size_t, const Spec&) TIGHTDB_OVERRIDE;
-#endif
+    void refresh_accessor_tree(std::size_t, const Spec&) TIGHTDB_OVERRIDE;
 
 #ifdef TIGHTDB_DEBUG
     void Verify() const TIGHTDB_OVERRIDE; // Must be upper case to avoid conflict with macro in ObjC
@@ -126,6 +124,21 @@ private:
     // Member variables
     AdaptiveStringColumn m_keys;
     StringIndex* m_index;
+
+    /// If you are appending and have the size of the column readily available,
+    /// call the 4 argument version instead. If you are not appending, either
+    /// one is fine.
+    ///
+    /// \param row_ndx Must be `tightdb::npos` if appending.
+    void do_insert(std::size_t row_ndx, StringData value, std::size_t num_rows);
+
+    /// If you are appending and you do not have the size of the column readily
+    /// available, call the 3 argument version instead. If you are not
+    /// appending, either one is fine.
+    ///
+    /// \param is_append Must be true if, and only if `row_ndx` is equal to the
+    /// size of the column (before insertion).
+    void do_insert(std::size_t row_ndx, StringData value, std::size_t num_rows, bool is_append);
 };
 
 
@@ -141,6 +154,28 @@ inline StringData ColumnStringEnum::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
     return m_keys.get(key_ndx);
 }
 
+inline void ColumnStringEnum::add(StringData value)
+{
+    std::size_t row_ndx = tightdb::npos;
+    std::size_t num_rows = 1;
+    do_insert(row_ndx, value, num_rows); // Throws
+}
+
+inline void ColumnStringEnum::insert(std::size_t row_ndx, StringData value)
+{
+    std::size_t size = this->size();
+    TIGHTDB_ASSERT(row_ndx <= size);
+    std::size_t num_rows = 1;
+    bool is_append = row_ndx == size;
+    do_insert(row_ndx, value, num_rows, is_append); // Throws
+}
+
+// Overriding virtual method of Column.
+inline void ColumnStringEnum::insert(std::size_t row_ndx, std::size_t num_rows, bool is_append)
+{
+    StringData value = StringData();
+    do_insert(row_ndx, value, num_rows, is_append); // Throws
+}
 
 inline std::size_t ColumnStringEnum::lower_bound_string(StringData value) const TIGHTDB_NOEXCEPT
 {

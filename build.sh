@@ -608,7 +608,7 @@ EOF
 
    "build-objc")
         if [ "$OS" != "Darwin" ]; then
-            echo "tar.gz for iOS can only be generated under OS X."
+            echo "zip for iOS/OSX can only be generated under OS X."
             exit 0
         fi
 
@@ -625,11 +625,11 @@ EOF
             cp "src/tightdb/libtightdb-$platform.a" "$BASENAME" || exit 1
             cp "src/tightdb/libtightdb-$platform-dbg.a" "$BASENAME" || exit 1
         done
-        cp src/tightdb/*dylib $BASENAME || exit 1        
+        cp src/tightdb/libtightdb.a $BASENAME || exit 1
         zip -r -q realm-core-$realm_version.zip $BASENAME || exit 1
         mkdir -p ../realm-objc || exit 1
-        rm -rf ../realm-objc/realm-core || exit 1 
-        (cd ../realm-objc && unzip -qq ../tightdb/realm-core-$realm_version.zip) || exit 1 
+        rm -rf ../realm-objc/realm-core || exit 1
+        (cd ../realm-objc && unzip -qq ../tightdb/realm-core-$realm_version.zip) || exit 1
         exit 0
         ;;
 

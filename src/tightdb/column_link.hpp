@@ -50,8 +50,8 @@ public:
     void nullify_link(std::size_t row_ndx);
 
     void clear() TIGHTDB_OVERRIDE;
-    void move_last_over(std::size_t ndx) TIGHTDB_OVERRIDE;
-    void erase(std::size_t ndx, bool is_last) TIGHTDB_OVERRIDE;
+    void erase(std::size_t, bool) TIGHTDB_OVERRIDE;
+    void move_last_over(std::size_t, std::size_t) TIGHTDB_OVERRIDE;
 
     // ColumnLinkBase overrides
     void set_target_table(TableRef table) TIGHTDB_OVERRIDE;
@@ -62,7 +62,7 @@ protected:
     friend class ColumnBackLink;
     void do_nullify_link(std::size_t row_ndx, std::size_t old_target_row_ndx);
     void do_update_link(std::size_t row_ndx, std::size_t old_target_row_ndx, std::size_t new_target_row_ndx);
-    
+
 private:
     void remove_backlinks(size_t row_ndx);
 

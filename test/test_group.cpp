@@ -1139,6 +1139,21 @@ TEST(Group_CommitSubtableMixed)
 }
 
 
+TEST(Group_CommitDegenerateSubtable)
+{
+    GROUP_TEST_PATH(path);
+    Group group(path, Group::mode_ReadWrite);
+    TableRef table = group.get_table("parent");
+    table->add_column(type_Table, "");
+    table->get_subdescriptor(0)->add_column(type_Int, "");
+    table->add_empty_row();
+    TableRef subtab = table->get_subtable(0,0);
+    CHECK(subtab->is_degenerate());
+    group.commit();
+    CHECK(subtab->is_degenerate());
+}
+
+
 namespace {
 
 TIGHTDB_TABLE_3(TestTableGroup2,
@@ -1202,7 +1217,7 @@ TEST(Group_ToJSON)
     CHECK_EQUAL("{\"test\":[{\"first\":\"jeff\",\"second\":1,\"third\":true,\"fourth\":2},{\"first\":\"jim\",\"second\":1,\"third\":true,\"fourth\":2}]}", str);
 }
 
-TEST(Group_toString)
+TEST(Group_ToString)
 {
     Group g;
     TestTableGroup::Ref table = g.get_table<TestTableGroup>("test");
@@ -1296,6 +1311,7 @@ TEST(Group_StockBug)
         group.commit();
     }
 }
+
 
 #ifdef TIGHTDB_DEBUG
 #ifdef TIGHTDB_TO_DOT

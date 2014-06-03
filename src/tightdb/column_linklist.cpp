@@ -21,6 +21,7 @@
 #include <tightdb/column_linklist.hpp>
 #include <tightdb/link_view.hpp>
 
+using namespace std;
 using namespace tightdb;
 
 ColumnLinkList::~ColumnLinkList() TIGHTDB_NOEXCEPT
@@ -61,39 +62,38 @@ void ColumnLinkList::clear()
     m_views.clear();
 }
 
-void ColumnLinkList::move_last_over(std::size_t ndx)
+void ColumnLinkList::move_last_over(size_t target_row_ndx, size_t last_row_ndx)
 {
     // Remove backlinks to the delete row
-    ref_type ref = Column::get_as_ref(ndx);
+    ref_type ref = Column::get_as_ref(target_row_ndx);
     if (ref) {
         const Column linkcol(ref, null_ptr, 0, get_alloc());
         size_t count = linkcol.size();
         for (size_t i = 0; i < count; ++i) {
             size_t old_target_row_ndx = linkcol.get(i);
-            m_backlinks->remove_backlink(old_target_row_ndx, ndx);
+            m_backlinks->remove_backlink(old_target_row_ndx, target_row_ndx);
         }
     }
 
     // Update backlinks to last row to point to its new position
-    size_t last_row_ndx = size()-1;
     ref_type ref2 = Column::get_as_ref(last_row_ndx);
     if (ref2) {
         const Column linkcol(ref2, null_ptr, 0, get_alloc());
         size_t count = linkcol.size();
         for (size_t i = 0; i < count; ++i) {
             size_t old_target_row_ndx = linkcol.get(i);
-            m_backlinks->update_backlink(old_target_row_ndx, last_row_ndx, ndx);
+            m_backlinks->update_backlink(old_target_row_ndx, last_row_ndx, target_row_ndx);
         }
     }
 
     // Do the actual delete and move
-    Column::destroy_subtree(ndx, false);
-    Column::move_last_over(ndx);
+    Column::destroy_subtree(target_row_ndx, false);
+    Column::move_last_over(target_row_ndx, last_row_ndx);
 
     // Detach accessors to the deleted row
     std::vector<LinkView*>::iterator end = m_views.end();
     for (std::vector<LinkView*>::iterator p = m_views.begin(); p != end; ++p) {
-        if ((*p)->m_row_ndx == ndx) {
+        if ((*p)->m_row_ndx == target_row_ndx) {
             (*p)->detach();
             m_views.erase(p);
             break;
@@ -104,7 +104,7 @@ void ColumnLinkList::move_last_over(std::size_t ndx)
     end = m_views.end();
     for (std::vector<LinkView*>::iterator p = m_views.begin(); p != end; ++p) {
         if ((*p)->m_row_ndx == last_row_ndx) {
-            (*p)->set_parent_row(ndx);
+            (*p)->set_parent_row(target_row_ndx);
             break;
         }
     }
@@ -171,10 +171,10 @@ ref_type ColumnLinkList::get_child_ref(size_t child_ndx) const TIGHTDB_NOEXCEPT
 
 #ifdef TIGHTDB_DEBUG
 
-std::pair<ref_type, size_t> ColumnLinkList::get_to_dot_parent(size_t ndx_in_parent) const
+pair<ref_type, size_t> ColumnLinkList::get_to_dot_parent(size_t ndx_in_parent) const
 {
-    std::pair<MemRef, size_t> p = m_array->get_bptree_leaf(ndx_in_parent);
-    return std::make_pair(p.first.m_ref, p.second);
+    pair<MemRef, size_t> p = m_array->get_bptree_leaf(ndx_in_parent);
+    return make_pair(p.first.m_ref, p.second);
 }
 
 #endif //TIGHTDB_DEBUG
