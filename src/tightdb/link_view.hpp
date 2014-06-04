@@ -122,7 +122,7 @@ inline void LinkView::update_column_ptr(Column* refs)
 
 inline bool LinkView::is_attached() const TIGHTDB_NOEXCEPT
 {
-    return bool(m_table);
+    return static_cast<bool>(m_table);
 }
 
 inline std::size_t LinkView::get_parent_row() const TIGHTDB_NOEXCEPT
