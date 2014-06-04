@@ -26,6 +26,7 @@
 #include <tightdb/util/tuple.hpp>
 #include <tightdb/column_fwd.hpp>
 #include <tightdb/table_ref.hpp>
+#include <tightdb/link_view_fwd.hpp>
 #include <tightdb/row.hpp>
 #include <tightdb/descriptor_fwd.hpp>
 #include <tightdb/spec.hpp>
@@ -41,9 +42,6 @@ class StringIndex;
 class Group;
 class ColumnBackLink;
 class ColumnLinkBase;
-class LinkView;
-
-typedef util::bind_ptr<LinkView> LinkViewRef;
 
 template<class> class Columns;
 
@@ -191,7 +189,7 @@ public:
     /// \sa get_descriptor()
     /// \sa Descriptor::add_column()
     std::size_t add_column(DataType type, StringData name, DescriptorRef* subdesc = 0);
-    std::size_t add_column_link(DataType type, StringData name, std::size_t target_table_ndx);
+    std::size_t add_column_link(DataType type, StringData name, Table& target_table);
     void insert_column(std::size_t column_ndx, DataType type, StringData name,
                        DescriptorRef* subdesc = 0);
     void remove_column(std::size_t column_ndx);
@@ -413,8 +411,11 @@ public:
     void clear_subtable(std::size_t column_ndx, std::size_t row_ndx);
 
     // Backlinks
-    std::size_t get_backlink_count(std::size_t row_ndx, std::size_t source_table_ndx, std::size_t source_column_ndx) const TIGHTDB_NOEXCEPT;
-    std::size_t get_backlink(std::size_t row_ndx, std::size_t source_table_ndx, std::size_t source_column_ndx, std::size_t backlink_ndx) const TIGHTDB_NOEXCEPT;
+    std::size_t get_backlink_count(std::size_t row_ndx, const Table& source_table,
+                                   std::size_t source_column_ndx) const TIGHTDB_NOEXCEPT;
+    std::size_t get_backlink(std::size_t row_ndx, const Table& source_table,
+                             std::size_t source_column_ndx, std::size_t backlink_ndx) const
+        TIGHTDB_NOEXCEPT;
 
     //@{
     /// If this accessor is attached to a subtable, then that subtable has a
