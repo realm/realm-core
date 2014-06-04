@@ -58,16 +58,17 @@ public:
     void clear() TIGHTDB_OVERRIDE;
 
     // ColumnLinkBase overrides
-    void set_target_table(TableRef table) TIGHTDB_OVERRIDE;
-    TableRef get_target_table() TIGHTDB_OVERRIDE;
-    void set_backlink_column(ColumnBackLink& backlinks) TIGHTDB_OVERRIDE;
+    void set_target_table(TableRef table) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    TableRef get_target_table() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void set_backlink_column(ColumnBackLink& backlinks) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
 private:
     friend class ColumnBackLink;
     friend class LinkView;
 
     void do_nullify_link(std::size_t row_ndx, std::size_t old_target_row_ndx);
-    void do_update_link(std::size_t row_ndx, std::size_t old_target_row_ndx, std::size_t new_target_row_ndx);
+    void do_update_link(std::size_t row_ndx, std::size_t old_target_row_ndx,
+                        std::size_t new_target_row_ndx);
 
     void unregister_linkview(const LinkView& view);
     ref_type get_row_ref(std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
@@ -92,7 +93,8 @@ private:
 
 // Implementation
 
-inline ColumnLinkList::ColumnLinkList(ref_type ref, ArrayParent* parent, std::size_t ndx_in_parent, Allocator& alloc):
+inline ColumnLinkList::ColumnLinkList(ref_type ref, ArrayParent* parent, std::size_t ndx_in_parent,
+                                      Allocator& alloc):
     ColumnLinkBase(ref, parent, ndx_in_parent, alloc), m_backlinks(null_ptr)
 {
 }
@@ -123,18 +125,18 @@ inline size_t ColumnLinkList::get_link_count(std::size_t row_ndx) const TIGHTDB_
     return ColumnBase::get_size_from_ref(ref, get_alloc());
 }
 
-inline void ColumnLinkList::set_target_table(TableRef table)
+inline void ColumnLinkList::set_target_table(TableRef table) TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(m_target_table.get() == null_ptr);
     m_target_table = table;
 }
 
-inline TableRef ColumnLinkList::get_target_table()
+inline TableRef ColumnLinkList::get_target_table() TIGHTDB_NOEXCEPT
 {
     return m_target_table;
 }
 
-inline void ColumnLinkList::set_backlink_column(ColumnBackLink& backlinks)
+inline void ColumnLinkList::set_backlink_column(ColumnBackLink& backlinks) TIGHTDB_NOEXCEPT
 {
     m_backlinks = &backlinks;
 }
