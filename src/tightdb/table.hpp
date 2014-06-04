@@ -712,6 +712,9 @@ private:
     typedef std::vector<RowBase*> row_accessors;
     mutable row_accessors m_row_accessors;
 
+    // Used for queries: Items are added with link() method during buildup of query
+    std::vector<size_t> m_link_chain;
+
 #ifdef TIGHTDB_ENABLE_REPLICATION
     // Used only in connection with
     // SharedGroup::advance_read_transact().
@@ -1249,14 +1252,15 @@ inline TableRef Table::copy(Allocator& alloc) const
 // For use by queries
 template<class T> inline Columns<T> Table::column(std::size_t column)
 {
+    // links to links not yet supported
+    TIGHTDB_ASSERT(m_link_chain.size() < 2);
+
     std::vector<size_t> tmp = m_link_chain;
     m_link_chain.clear();
-    if (tmp.size() == 1)
-        return Columns<T>(column, this, tmp[0]);
-    else if (tmp.size() == 0)
+    if (tmp.size() == 0)
         return Columns<T>(column, this);
     else
-        TIGHTDB_ASSERT(false); // can currently only follow 1 link
+        return Columns<T>(column, this, tmp[0]);
 }
 
 // For use by queries
