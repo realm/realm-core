@@ -385,8 +385,6 @@ public:
     bool linklist_has_links(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
     std::size_t get_link_count(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
 
-    LinkView links(size_t link_column, size_t row_ndx);
-
     void add_int(std::size_t column_ndx, int64_t value);
 
     /// Assumes that the specified column is a subtable column (in

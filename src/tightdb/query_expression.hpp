@@ -240,7 +240,7 @@ public:
         return null_ptr;
     }
 
-    virtual size_t evaluate(size_t index, ValueBase& destination) = 0;
+    virtual void evaluate(size_t index, ValueBase& destination) = 0;
 };
 
 class ColumnsBase {};
@@ -531,10 +531,9 @@ public:
         }
     }
 
-    size_t evaluate(size_t, ValueBase& destination)
+    void evaluate(size_t, ValueBase& destination)
     {
         destination.import(*this);
-        return 0;
     }
 
     template <class TOperator> TIGHTDB_FORCEINLINE void fun(const Value* left, const Value* right)
@@ -856,7 +855,7 @@ public:
         return m_table;
     }
     
-    virtual size_t evaluate(size_t index, ValueBase& destination)
+    virtual void evaluate(size_t index, ValueBase& destination)
     {
         Value<StringData>& d = static_cast<Value<StringData>&>(destination);
         
@@ -872,13 +871,11 @@ public:
                     v.m_v[t] = m_table->get_string(m_column, link_to);
                 }
                 destination.import(v);
-                return 0;
             }
             else {
                 // No links in list; create empty Value (Value with m_values == 0)
                 Value<StringData> v(true, 0);
                 destination.import(v);
-                return 0;
             }
         }
         else if (m_column_single_link) {  
@@ -886,7 +883,6 @@ public:
                 // Null link; create empty Value (Value with m_values == 0)
                 Value<StringData> v(true, 0);
                 destination.import(v);
-                return 0;
             }
             else {
                 // Pick out the 1 value that the link is pointing at
@@ -894,7 +890,6 @@ public:
                 StringData val = m_table->get_string(m_column, lnk);
                 Value<StringData> v(false, 1, val);
                 destination.import(v);
-                return 0;
             }
         }
         else {
@@ -902,7 +897,6 @@ public:
             for (size_t t = 0; t < destination.m_values && index + t < m_table->size(); t++) {
                 d.m_v[t] = m_table->get_string(m_column, index + t);
             }
-            return 0;
         }
     }
 
@@ -1009,13 +1003,12 @@ public:
     }
 
     // Load values from Column into destination
-    size_t evaluate(size_t index, ValueBase& destination) {
+    void evaluate(size_t index, ValueBase& destination) {
         if (m_column_linklist) {
             if (m_column_linklist->get_link_count(index) == 0) {
                 // No links in list; create empty Value (Value with m_values == 0)
                 Value<T> v(true, 0);
                 destination.import(v);
-                return 0;
             }
             else {
                 // LinkList with more than 0 values. Create Value with payload for all fields
@@ -1028,7 +1021,6 @@ public:
                     v.m_v[t] = sg->get_next(link_to);
                 }
                 destination.import(v);
-                return 0;
             }
         }
         else if (m_column_single_link) {
@@ -1036,7 +1028,6 @@ public:
                 // Null link; create empty Value (Value with m_values == 0)
                 Value<T> v(true, 0);
                 destination.import(v);
-                return 0;
             }
             else {
                 // Pick out the 1 value that the link is pointing at
@@ -1045,7 +1036,6 @@ public:
                 T val = sg->get_next(lnk);
                 Value<T> v(false, 1, val);
                 destination.import(v);
-                return 0;
             }
         }
         else {
@@ -1059,7 +1049,6 @@ public:
                 // int64_t leaves have a get_chunk optimization that returns 8 int64_t values at once
                 sg->m_array_ptr->get_chunk(index - sg->m_leaf_start, static_cast<Value<int64_t>*>(static_cast<ValueBase*>(&v))->m_v);
                 destination.import(v);
-                return 0;
             }
             else {
                 // To make Valgrind happy we must initialize all default_size in v even if Column ends earlier. Todo, benchmark
@@ -1073,7 +1062,6 @@ public:
                     v.m_v[t] = sg->get_next(index + t);
 
                 destination.import(v);
-                return 0;
             }
         }
     }
@@ -1121,13 +1109,12 @@ public:
     }
 
     // destination = operator(left)
-    size_t evaluate(size_t index, ValueBase& destination) {
+    void evaluate(size_t index, ValueBase& destination) {
         Value<T> result;
         Value<T> left;
         m_left.evaluate(index, left);
         result.template fun<oper>(&left);
         destination.import(result);
-        return 0;
     }
 
 private:
@@ -1176,7 +1163,7 @@ public:
     }
 
     // destination = operator(left, right)
-    size_t evaluate(size_t index, ValueBase& destination) {
+    void evaluate(size_t index, ValueBase& destination) {
         Value<T> result;
         Value<T> left;
         Value<T> right;
@@ -1184,7 +1171,6 @@ public:
         m_right.evaluate(index, right);
         result.template fun<oper>(&left, &right);
         destination.import(result);
-        return 0;
     }
 
 private:
