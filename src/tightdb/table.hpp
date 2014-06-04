@@ -40,6 +40,10 @@ class ConstTableView;
 class StringIndex;
 class Group;
 class ColumnBackLink;
+class ColumnLinkBase;
+class LinkView;
+
+typedef util::bind_ptr<LinkView> LinkViewRef;
 
 template<class> class Columns;
 
@@ -376,15 +380,9 @@ public:
     void nullify_link(std::size_t column_ndx, std::size_t row_ndx);
 
     // Link lists
+    LinkViewRef get_linklist(std::size_t column_ndx, std::size_t row_ndx);
     bool linklist_has_links(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
     std::size_t get_link_count(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
-    void linklist_add_link(std::size_t column_ndx, std::size_t row_ndx, std::size_t target_row_ndx);
-    void linklist_insert_link(std::size_t column_ndx, std::size_t row_ndx, std::size_t ins_pos, std::size_t target_row_ndx);
-    void linklist_remove_link(std::size_t column_ndx, std::size_t row_ndx, std::size_t link_ndx);
-    void linklist_remove_all_links(std::size_t column_ndx, std::size_t row_ndx);
-    void linklist_set_link(std::size_t column_ndx, std::size_t row_ndx, std::size_t link_ndx, std::size_t target_row_ndx);
-    void linklist_move_link(std::size_t column_ndx, std::size_t row_ndx, std::size_t old_pos, std::size_t new_pos);
-    std::size_t linklist_get_link(std::size_t column_ndx, std::size_t row_ndx, std::size_t link_ndx) const TIGHTDB_NOEXCEPT;
 
     void add_int(std::size_t column_ndx, int64_t value);
 
@@ -900,6 +898,7 @@ private:
 
     const ColumnBase& get_column_base(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
     ColumnBase& get_column_base(std::size_t column_ndx);
+    ColumnLinkBase& get_column_linkbase(size_t ndx);
     template <class T, ColumnType col_type> T& get_column(std::size_t ndx);
     template <class T, ColumnType col_type> const T& get_column(std::size_t ndx) const TIGHTDB_NOEXCEPT;
     Column& get_column(std::size_t column_ndx);

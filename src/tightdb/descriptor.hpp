@@ -66,7 +66,7 @@ namespace _impl { class DescriptorFriend; }
 /// \sa Table::get_descriptor()
 class Descriptor {
 public:
-    /// Get the number of columns in the assocaited tables.
+    /// Get the number of columns in the associated tables.
     std::size_t get_column_count() const TIGHTDB_NOEXCEPT;
 
     /// Get the type of the column at the specified index.
@@ -372,6 +372,10 @@ private:
     // return null.
     Descriptor* get_subdesc_accessor(std::size_t column_ndx) TIGHTDB_NOEXCEPT;
 
+    /// Get the number of columns in the associated tables.
+    /// (including hidden columns like backlinks)
+    std::size_t get_internal_column_count() const TIGHTDB_NOEXCEPT;
+
     void adj_insert_column(std::size_t col_ndx) TIGHTDB_NOEXCEPT;
     void adj_erase_column(std::size_t col_ndx) TIGHTDB_NOEXCEPT;
 
@@ -389,6 +393,12 @@ inline std::size_t Descriptor::get_column_count() const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(is_attached());
     return m_spec->get_public_column_count();
+}
+
+inline std::size_t Descriptor::get_internal_column_count() const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(is_attached());
+    return m_spec->get_column_count();
 }
 
 inline StringData Descriptor::get_column_name(std::size_t ndx) const TIGHTDB_NOEXCEPT
@@ -576,6 +586,11 @@ public:
     static void adj_erase_column(Descriptor& desc, std::size_t col_ndx) TIGHTDB_NOEXCEPT
     {
         desc.adj_erase_column(col_ndx);
+    }
+
+    static std::size_t get_internal_column_count(Descriptor& desc) TIGHTDB_NOEXCEPT
+    {
+        return desc.get_internal_column_count();
     }
 };
 
