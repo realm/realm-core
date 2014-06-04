@@ -452,5 +452,8 @@ void TableView::clear()
 void TableViewBase::do_sync() const
 {
     // do nothing yet
+    m_query.find_all(*(const_cast<TableViewBase*>(this)), m_start, m_end, m_limit);
+    cerr << "sync'ed" << endl;
+    m_last_seen_version = m_table->m_version;
 }
 #endif // TIGHTDB_ENABLE_REPLICATION

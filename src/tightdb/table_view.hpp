@@ -128,13 +128,17 @@ protected:
     mutable TableRef m_table;
     Column m_refs;
     Query m_query;
+    // parameters for findall, needed to rerun the query
+    size_t m_start;
+    size_t m_end;
+    size_t m_limit;
 
     /// Construct null view (no memory allocated).
     TableViewBase();
 
     /// Construct empty view, ready for addition of row indices.
     TableViewBase(Table* parent);
-    TableViewBase(Table* parent, Query& query);
+    TableViewBase(Table* parent, Query& query, size_t start, size_t end, size_t limit);
 
     /// Copy constructor.
     TableViewBase(const TableViewBase&);
@@ -268,7 +272,7 @@ public:
 
 private:
     TableView(Table& parent);
-    TableView(Table& parent, Query& query);
+    TableView(Table& parent, Query& query, size_t start, size_t end, size_t limit);
     TableView(TableView* tv) TIGHTDB_NOEXCEPT;
 
     TableView find_all_integer(size_t column_ndx, int64_t value);
@@ -376,13 +380,16 @@ inline TableViewBase::TableViewBase(Table* parent):
     parent->register_view(this);
 }
 
-inline TableViewBase::TableViewBase(Table* parent, Query& query):
+inline TableViewBase::TableViewBase(Table* parent, Query& query, size_t start, size_t end, size_t limit):
     m_table(parent->get_table_ref()), m_query(query, Query::TCopyExpressionTag())
 {
 #ifdef TIGHTDB_ENABLE_REPLICATION
     m_last_seen_version = m_table ? m_table->m_version : 0;
 #endif
     parent->register_view(this);
+    m_start = start;
+    m_end = end;
+    m_limit = limit;
 }
 
 inline TableViewBase::TableViewBase(const TableViewBase& tv):
@@ -777,8 +784,8 @@ inline TableView::TableView(Table& parent):
 {
 }
 
-inline TableView::TableView(Table& parent, Query& query):
-    TableViewBase(&parent, query)
+inline TableView::TableView(Table& parent, Query& query, size_t start, size_t end, size_t limit):
+    TableViewBase(&parent, query, start, end, limit)
 {
 }
 

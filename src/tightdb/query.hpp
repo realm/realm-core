@@ -265,11 +265,14 @@ private:
     void aggregate_internal(Action TAction, DataType TSourceColumn,
                             ParentNode* pn, QueryStateBase* st, 
                             size_t start, size_t end, SequentialGetterBase* source_column) const;
+    void find_all(TableViewBase& tv, 
+                  size_t start=0, size_t end=size_t(-1), size_t limit=size_t(-1)) const;
 
     friend class Table;
     template <typename T> friend class BasicTable;
     friend class XQueryAccessorInt;
     friend class XQueryAccessorString;
+    friend class TableViewBase;
 };
 
 // Implementation:

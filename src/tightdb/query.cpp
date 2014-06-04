@@ -869,11 +869,10 @@ size_t Query::find(size_t begin)
     }
 }
 
-
-TableView Query::find_all(size_t start, size_t end, size_t limit)
+void Query::find_all(TableViewBase& ret, size_t start, size_t end, size_t limit) const
 {
     if (limit == 0 || m_table->is_degenerate())
-        return TableView(*m_table, *this);
+        return;
 
     TIGHTDB_ASSERT(start <= m_table->size());
 
@@ -884,13 +883,10 @@ TableView Query::find_all(size_t start, size_t end, size_t limit)
 
     // User created query with no criteria; return everything
     if (first.size() == 0 || first[0] == 0) {
-        TableView tv(*m_table, *this);
         for (size_t i = start; i < end && i - start < limit; i++)
-            tv.get_ref_column().add(m_tableview ? m_tableview->get_source_ndx(i) : i);
-        return tv;
+            ret.get_ref_column().add(m_tableview ? m_tableview->get_source_ndx(i) : i);
+        return;
     }
-
-    TableView ret(*m_table, *this);
 
     if (m_tableview) {
         for (size_t begin = start; begin < end && ret.size() < limit; begin++) {
@@ -904,7 +900,12 @@ TableView Query::find_all(size_t start, size_t end, size_t limit)
         st.init(act_FindAll, &ret.get_ref_column(), limit);
         aggregate_internal(act_FindAll, ColumnTypeTraits<int64_t>::id, first[0], &st, start, end, NULL);
     }
+}
 
+TableView Query::find_all(size_t start, size_t end, size_t limit)
+{
+    TableView ret(*m_table, *this, start, end, limit);
+    find_all(ret, start, end, limit);
     return ret;
 }
 
