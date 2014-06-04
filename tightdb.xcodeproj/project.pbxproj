@@ -90,6 +90,8 @@
 		36A1DC9316C3F34B0086A836 /* lang_bind_helper.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 52113CDD16C27EF800C301FB /* lang_bind_helper.cpp */; };
 		36A1DC9C16C3F3F40086A836 /* table_basic_fwd.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 36A1DC9B16C3F3F40086A836 /* table_basic_fwd.hpp */; };
 		36A1DC9D16C3F3F40086A836 /* table_basic_fwd.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 36A1DC9B16C3F3F40086A836 /* table_basic_fwd.hpp */; };
+		36AA59E81937552000D691E0 /* link_view.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 36AA59E61937552000D691E0 /* link_view.cpp */; };
+		36AA59E91937552000D691E0 /* link_view.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 36AA59E71937552000D691E0 /* link_view.hpp */; };
 		36AB350D17E78DA900EC5744 /* string_data.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 36AB350C17E78DA900EC5744 /* string_data.hpp */; };
 		36AD7F9917FB94F800F046FC /* libtightdb.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 3647E0E714209E6B00D56FD7 /* libtightdb.a */; };
 		36AD7FA217FB959A00F046FC /* tightdbd.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 36AD7FA117FB959A00F046FC /* tightdbd.cpp */; };
@@ -432,6 +434,8 @@
 		368063361445AD9200283774 /* test_group.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = test_group.cpp; sourceTree = "<group>"; };
 		368063391446D12A00283774 /* test_alloc.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = test_alloc.cpp; sourceTree = "<group>"; };
 		36A1DC9B16C3F3F40086A836 /* table_basic_fwd.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = table_basic_fwd.hpp; path = tightdb/table_basic_fwd.hpp; sourceTree = "<group>"; };
+		36AA59E61937552000D691E0 /* link_view.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = link_view.cpp; path = tightdb/link_view.cpp; sourceTree = "<group>"; };
+		36AA59E71937552000D691E0 /* link_view.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = link_view.hpp; path = tightdb/link_view.hpp; sourceTree = "<group>"; };
 		36AB350C17E78DA900EC5744 /* string_data.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = string_data.hpp; path = tightdb/string_data.hpp; sourceTree = "<group>"; };
 		36AD7F9E17FB94F800F046FC /* tightdbd-dbg-noinst */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "tightdbd-dbg-noinst"; sourceTree = BUILT_PRODUCTS_DIR; };
 		36AD7FA117FB959A00F046FC /* tightdbd.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = tightdbd.cpp; path = tightdb/tightdbd.cpp; sourceTree = "<group>"; };
@@ -682,6 +686,8 @@
 				36E67FC915A2EDDB00D131FB /* index_string.hpp */,
 				52113CDD16C27EF800C301FB /* lang_bind_helper.cpp */,
 				365CCE1A157CC37D00172BF8 /* lang_bind_helper.hpp */,
+				36AA59E61937552000D691E0 /* link_view.cpp */,
+				36AA59E71937552000D691E0 /* link_view.hpp */,
 				365CCE1C157CC37D00172BF8 /* mixed.hpp */,
 				365CCE1D157CC37D00172BF8 /* query_conditions.hpp */,
 				365CCE1E157CC37D00172BF8 /* query_engine.hpp */,
@@ -970,6 +976,7 @@
 				52D7C48D1852A01700633748 /* tuple.hpp in Headers */,
 				52D7C48E1852A01700633748 /* type_list.hpp in Headers */,
 				52D7C48F1852A01700633748 /* unique_ptr.hpp in Headers */,
+				36AA59E91937552000D691E0 /* link_view.hpp in Headers */,
 				52D7C4911852A01700633748 /* utf8.hpp in Headers */,
 				5267884E189AB4D7009CDE7D /* descriptor.hpp in Headers */,
 				52678850189AB4EA009CDE7D /* descriptor_fwd.hpp in Headers */,
@@ -1200,6 +1207,7 @@
 				365CCE3D157CC37D00172BF8 /* array_string.cpp in Sources */,
 				522EA515192C4C4E002AD3B6 /* row.cpp in Sources */,
 				365CCE3F157CC37D00172BF8 /* array.cpp in Sources */,
+				36AA59E81937552000D691E0 /* link_view.cpp in Sources */,
 				365CCE46157CC37D00172BF8 /* column_binary.cpp in Sources */,
 				365CCE49157CC37D00172BF8 /* column_mixed.cpp in Sources */,
 				365CCE4B157CC37D00172BF8 /* column_string_enum.cpp in Sources */,
@@ -1468,6 +1476,10 @@
 				GCC_WARN_ABOUT_RETURN_TYPE = YES;
 				GCC_WARN_SHADOW = NO;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/src/tightdb",
+				);
 				PRODUCT_NAME = tightdb;
 			};
 			name = Debug;
@@ -1482,6 +1494,10 @@
 				GCC_WARN_ABOUT_RETURN_TYPE = YES;
 				GCC_WARN_SHADOW = NO;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/src/tightdb",
+				);
 				PRODUCT_NAME = tightdb;
 			};
 			name = Release;
