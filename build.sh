@@ -500,6 +500,18 @@ EOF
         exit 0
         ;;
 
+    "build-osx")
+        auto_configure || exit 1
+        export TIGHTDB_HAVE_CONFIG="1"
+        (
+            cd src/tightdb
+            export TIGHTDB_ENABLE_FAT_BINARIES="1"
+            $MAKE libtightdb.a EXTRA_CFLAGS="-fPIC -DPIC" || exit 1
+            $MAKE libtightdb-dbg.a EXTRA_CFLAGS="-fPIC -DPIC" || exit 1
+        ) || exit 1
+        exit 0
+        ;;
+
     "build-iphone")
         auto_configure || exit 1
         export TIGHTDB_HAVE_CONFIG="1"
