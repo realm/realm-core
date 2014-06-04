@@ -82,7 +82,7 @@ private:
 
 // Implementation
 
-inline LinkView::LinkView(ColumnLinkList& column, std::size_t row_ndx) : m_row_ndx(row_ndx), m_table(column.get_target_table()), m_column(column), m_refs(null_ptr)
+inline LinkView::LinkView(ColumnLinkList& column, std::size_t row_ndx) : m_row_ndx(row_ndx), m_table(column.get_target_table()), m_column(column), m_refs(null_ptr), m_ref_count(0)
 {
     ref_type ref = column.get_row_ref(row_ndx);
     if (ref) {
