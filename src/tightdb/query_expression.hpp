@@ -817,6 +817,7 @@ public:
     {
         TableRef linked_table;
 
+        // Link column can be either LinkList or single Link
         ColumnType type = table->get_real_column_type(link_column);
         if (type == col_type_LinkList) {
             m_column_linklist = &table->get_column<ColumnLinkList, col_type_LinkList>(link_column);
@@ -860,9 +861,9 @@ public:
         Value<StringData>& d = static_cast<Value<StringData>&>(destination);
         
         if (m_column_linklist) {
-
             if (m_column_linklist->has_links(index))
             {
+                // LinkList with more than 0 values. Create Value with payload for all fields
                 Column links = m_column_linklist->get_ref_column(index);
                 Value<StringData> v(true, links.size());
 
@@ -874,18 +875,21 @@ public:
                 return 0;
             }
             else {
+                // No links in list; create empty Value (Value with m_values == 0)
                 Value<StringData> v(true, 0);
                 destination.import(v);
                 return 0;
             }
         }
-        else if (m_column_single_link) {            
+        else if (m_column_single_link) {  
             if (m_column_single_link->is_null_link(index)) {
+                // Null link; create empty Value (Value with m_values == 0)
                 Value<StringData> v(true, 0);
                 destination.import(v);
                 return 0;
             }
             else {
+                // Pick out the 1 value that the link is pointing at
                 size_t lnk = m_column_single_link->get_link(index);
                 StringData val = m_table->get_string(m_column, lnk);
                 Value<StringData> v(false, 1, val);
@@ -894,7 +898,7 @@ public:
             }
         }
         else {
-
+            // Not a link column
             for (size_t t = 0; t < destination.m_values && index + t < m_table->size(); t++) {
                 d.m_v[t] = m_table->get_string(m_column, index + t);
             }
@@ -911,7 +915,7 @@ public:
     // Pointer to Link column object if it's a Link column; otherwise null_ptr
     ColumnLink* m_column_single_link;
 
-    // Column index of payload column of above table
+    // Column index of payload column of m_table
     size_t m_column;
 };
 
@@ -946,11 +950,13 @@ public:
         set_table(table);
     }
 
+    // Todo: Constructor almost identical with that of Columns<StringData>; simplify
     explicit Columns(size_t column, Table* table, size_t link_column) : m_table(null_ptr), sg(null_ptr), 
         m_column_linklist(null_ptr), m_column_single_link(null_ptr), m_column(column)
     {
         TableRef linked_table;
 
+        // Link column can be either LinkList or single Link
         ColumnType type = table->get_real_column_type(link_column);
         if (type == col_type_LinkList) {
             m_column_linklist = &table->get_column<ColumnLinkList, col_type_LinkList>(link_column);
@@ -1002,34 +1008,38 @@ public:
         return m_table;
     }
 
-    // Load 8 default_size from Column into destination
+    // Load values from Column into destination
     size_t evaluate(size_t index, ValueBase& destination) {
         if (m_column_linklist) {
-
             if (m_column_linklist->get_link_count(index) == 0) {
-                Value<T> v(true, 0);
-                destination.import(v);
-                return 0;
-            }
-
-            Column links = m_column_linklist->get_ref_column(index);           
-            Value<T> v(true, links.size());
-
-            for (size_t t = 0; t < links.size(); t++) {
-                size_t link_to = links.get(t);
-                sg->cache_next(link_to); // todo, needed?
-                v.m_v[t] = sg->get_next(link_to);
-            }
-            destination.import(v);
-            return 0;
-        }
-        else if (m_column_single_link) {
-            if (m_column_single_link->is_null_link(index)) {
+                // No links in list; create empty Value (Value with m_values == 0)
                 Value<T> v(true, 0);
                 destination.import(v);
                 return 0;
             }
             else {
+                // LinkList with more than 0 values. Create Value with payload for all fields
+                Column links = m_column_linklist->get_ref_column(index);
+                Value<T> v(true, links.size());
+
+                for (size_t t = 0; t < links.size(); t++) {
+                    size_t link_to = links.get(t);
+                    sg->cache_next(link_to); // todo, needed?
+                    v.m_v[t] = sg->get_next(link_to);
+                }
+                destination.import(v);
+                return 0;
+            }
+        }
+        else if (m_column_single_link) {
+            if (m_column_single_link->is_null_link(index)) {
+                // Null link; create empty Value (Value with m_values == 0)
+                Value<T> v(true, 0);
+                destination.import(v);
+                return 0;
+            }
+            else {
+                // Pick out the 1 value that the link is pointing at
                 size_t lnk = m_column_single_link->get_link(index);
                 sg->cache_next(lnk);
                 T val = sg->get_next(lnk);
@@ -1039,6 +1049,7 @@ public:
             }
         }
         else {
+            // Not a Link column
             sg->cache_next(index);
             size_t colsize = sg->m_column->size();
 
@@ -1079,7 +1090,7 @@ public:
     // Pointer to Link column object if it's a Link column; otherwise null_ptr
     ColumnLink* m_column_single_link;
 
-
+    // Column index of payload column of m_table
     size_t m_column;
 };
 
