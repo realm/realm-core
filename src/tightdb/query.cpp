@@ -67,6 +67,7 @@ Query::Query(const Query& copy, const TCopyExpressionTag&)
 {
     Create();
     std::map<ParentNode*, ParentNode*> node_mapping;
+    node_mapping[ null_ptr ] = null_ptr;
     std::vector<ParentNode*>::const_iterator i;
     for (i = copy.all_nodes.begin(); i != copy.all_nodes.end(); ++i) {
         ParentNode* new_node = (*i)->clone();
@@ -872,7 +873,7 @@ size_t Query::find(size_t begin)
 TableView Query::find_all(size_t start, size_t end, size_t limit)
 {
     if (limit == 0 || m_table->is_degenerate())
-        return TableView(*m_table);
+        return TableView(*m_table, *this);
 
     TIGHTDB_ASSERT(start <= m_table->size());
 
@@ -883,13 +884,13 @@ TableView Query::find_all(size_t start, size_t end, size_t limit)
 
     // User created query with no criteria; return everything
     if (first.size() == 0 || first[0] == 0) {
-        TableView tv(*m_table);
+        TableView tv(*m_table, *this);
         for (size_t i = start; i < end && i - start < limit; i++)
             tv.get_ref_column().add(m_tableview ? m_tableview->get_source_ndx(i) : i);
         return tv;
     }
 
-    TableView ret(*m_table);
+    TableView ret(*m_table, *this);
 
     if (m_tableview) {
         for (size_t begin = start; begin < end && ret.size() < limit; begin++) {

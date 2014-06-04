@@ -1168,8 +1168,9 @@ public:
     StringNodeBase(const StringNodeBase& from) 
         : ParentNode(from)
     {
-        TIGHTDB_ASSERT(false);
-        m_value = from.m_value;
+        char* data = new char[from.m_value.size()];
+        memcpy(data, from.m_value.data(), from.m_value.size());
+        m_value = StringData(data, from.m_value.size());
         m_condition_column = from.m_condition_column;
         m_column_type = from.m_column_type;
         m_leaf = from.m_leaf;
@@ -1303,9 +1304,6 @@ public:
     ~StringNode() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
     {
         deallocate();
-        //delete[] m_value.data();
-        //clear_leaf_state(); <-- already called in deallocate
-        m_index.destroy();
     }
 
     void deallocate() TIGHTDB_NOEXCEPT
@@ -1344,7 +1342,6 @@ public:
         }
 
         if (m_condition_column->has_index()) {
-            m_index.clear();
 
             FindRes fr;
             size_t index_ref;
@@ -1490,7 +1487,6 @@ private:
     }
 
     size_t m_key_ndx;
-    Array m_index;
     size_t last_indexed;
 
     // Used for linear scan through enum-string

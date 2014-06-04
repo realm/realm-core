@@ -127,12 +127,14 @@ protected:
     // Null if, and only if, the view is detached
     mutable TableRef m_table;
     Column m_refs;
+    Query m_query;
 
     /// Construct null view (no memory allocated).
     TableViewBase();
 
     /// Construct empty view, ready for addition of row indices.
     TableViewBase(Table* parent);
+    TableViewBase(Table* parent, Query& query);
 
     /// Copy constructor.
     TableViewBase(const TableViewBase&);
@@ -152,7 +154,7 @@ protected:
     template<class R, class V> static R find_all_double(V*, std::size_t, double);
     template<class R, class V> static R find_all_string(V*, std::size_t, StringData);
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    uint_fast64_t m_last_seen_version;
+    mutable uint_fast64_t m_last_seen_version;
     void do_sync() const;
     inline void sync_if_needed() const {
         if (m_table == 0 || m_last_seen_version != m_table->m_version) {
@@ -266,6 +268,7 @@ public:
 
 private:
     TableView(Table& parent);
+    TableView(Table& parent, Query& query);
     TableView(TableView* tv) TIGHTDB_NOEXCEPT;
 
     TableView find_all_integer(size_t column_ndx, int64_t value);
@@ -373,9 +376,18 @@ inline TableViewBase::TableViewBase(Table* parent):
     parent->register_view(this);
 }
 
+inline TableViewBase::TableViewBase(Table* parent, Query& query):
+    m_table(parent->get_table_ref()), m_query(query, Query::TCopyExpressionTag())
+{
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    m_last_seen_version = m_table ? m_table->m_version : 0;
+#endif
+    parent->register_view(this);
+}
+
 inline TableViewBase::TableViewBase(const TableViewBase& tv):
     m_table(tv.m_table), 
-    m_refs(tv.m_refs)    
+    m_refs(tv.m_refs)
 {
 #ifdef TIGHTDB_ENABLE_REPLICATION
     m_last_seen_version = tv.m_last_seen_version;
@@ -762,6 +774,11 @@ inline const Table& ConstTableView::get_parent() const TIGHTDB_NOEXCEPT
 
 inline TableView::TableView(Table& parent):
     TableViewBase(&parent)
+{
+}
+
+inline TableView::TableView(Table& parent, Query& query):
+    TableViewBase(&parent, query)
 {
 }
 
