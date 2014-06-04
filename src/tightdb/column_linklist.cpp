@@ -18,167 +18,145 @@
  *
  **************************************************************************/
 
-#include "column_linklist.hpp"
+#include <tightdb/column_linklist.hpp>
+#include <tightdb/link_view.hpp>
 
+using namespace std;
 using namespace tightdb;
 
-void ColumnLinkList::add_link(size_t row_ndx, size_t target_row_ndx)
+ColumnLinkList::~ColumnLinkList() TIGHTDB_NOEXCEPT
 {
-    ref_type ref = Column::get_as_ref(row_ndx);
-
-    // if there are no links yet, we have to create list
-    if (ref == 0) {
-        ref_type col_ref = Column::create(Array::type_Normal, 0, 0, get_alloc());
-        Column col(col_ref, this, row_ndx, get_alloc());
-
-        col.add(target_row_ndx);
-        Column::set(row_ndx, col_ref);
+    // Detach all accessors
+    std::vector<LinkView*>::iterator end = m_views.end();
+    for (std::vector<LinkView*>::iterator p = m_views.begin(); p != end; ++p) {
+        (*p)->detach();
     }
-    else {
-        // Otherwise just add to existing list
-        Column col(ref, this, row_ndx, get_alloc());
-        col.add(target_row_ndx);
-    }
-
-    m_backlinks->add_backlink(target_row_ndx, row_ndx);
-}
-
-void ColumnLinkList::insert_link(size_t row_ndx, size_t ins_pos, size_t target_row_ndx)
-{
-    ref_type ref = Column::get_as_ref(row_ndx);
-
-    // if there are no links yet, we have to create list
-    if (ref == 0) {
-        TIGHTDB_ASSERT(ins_pos == 0);
-        ref_type col_ref = Column::create(Array::type_Normal, 0, 0, get_alloc());
-        Column col(col_ref, this, row_ndx, get_alloc());
-
-        col.add(target_row_ndx);
-        Column::set(row_ndx, col_ref);
-    }
-    else {
-        // Otherwise just add to existing list
-        Column col(ref, this, row_ndx, get_alloc());
-        col.insert(ins_pos, target_row_ndx);
-    }
-
-    m_backlinks->add_backlink(target_row_ndx, row_ndx);
-}
-
-void ColumnLinkList::remove_link(size_t row_ndx, size_t link_ndx)
-{
-    ref_type ref = Column::get_as_ref(row_ndx);
-    TIGHTDB_ASSERT(ref != 0);
-    Column col(ref, this, row_ndx, get_alloc());
-    TIGHTDB_ASSERT(row_ndx < col.size());
-
-    // update backlinks
-    size_t target_row_ndx = col.get(link_ndx);
-    m_backlinks->remove_backlink(target_row_ndx, row_ndx);
-
-    bool is_last = (link_ndx+1 == col.size());
-    col.erase(link_ndx, is_last);
-
-    if (col.is_empty()) {
-        col.destroy();
-        Column::set(row_ndx, 0);
-    }
-}
-
-void ColumnLinkList::remove_all_links(size_t row_ndx)
-{
-    ref_type ref = Column::get_as_ref(row_ndx);
-    if (ref == 0)
-        return;
-
-    Column col(ref, this, row_ndx, get_alloc());
-
-    // Update backlinks
-    size_t count = col.size();
-    for (size_t i = 0; i < count; ++i) {
-        size_t target_row_ndx = col.get(i);
-        m_backlinks->remove_backlink(target_row_ndx, row_ndx);
-    }
-
-    col.destroy();
-    Column::set(row_ndx, 0);
-}
-
-void ColumnLinkList::set_link(size_t row_ndx, size_t link_ndx, size_t target_row_ndx)
-{
-    ref_type ref = Column::get_as_ref(row_ndx);
-    TIGHTDB_ASSERT(ref != 0);
-    Column col(ref, this, row_ndx, get_alloc());
-    TIGHTDB_ASSERT(link_ndx < col.size());
-
-    // update backlinks
-    size_t old_target_row_ndx = col.get(link_ndx);
-    m_backlinks->remove_backlink(old_target_row_ndx, row_ndx);
-    m_backlinks->add_backlink(target_row_ndx, row_ndx);
-
-    col.set(link_ndx, target_row_ndx);
-}
-
-void ColumnLinkList::move_link(size_t row_ndx, size_t old_link_ndx, size_t new_link_ndx)
-{
-    ref_type ref = Column::get_as_ref(row_ndx);
-    TIGHTDB_ASSERT(ref != 0);
-    Column col(ref, this, row_ndx, get_alloc());
-    TIGHTDB_ASSERT(old_link_ndx < col.size());
-    TIGHTDB_ASSERT(new_link_ndx <= col.size());
-
-    if (old_link_ndx == new_link_ndx)
-        return;
-    size_t ins_pos = (new_link_ndx <= old_link_ndx) ? new_link_ndx : new_link_ndx-1;
-
-    size_t target_row_ndx = col.get(old_link_ndx);
-    bool is_last = (old_link_ndx+1 == col.size());
-    col.erase(old_link_ndx, is_last);
-    col.insert(ins_pos, target_row_ndx);
+    m_views.clear();
 }
 
 void ColumnLinkList::clear()
 {
+    // Remove all backlinks to the delete rows
+    size_t rowcount = size();
+    for (size_t r = 0; r < rowcount; ++r) {
+        ref_type ref = Column::get_as_ref(r);
+        if (ref == 0)
+            continue;
+
+        const Column linkcol(ref, null_ptr, 0, get_alloc());
+        size_t count = linkcol.size();
+        for (size_t i = 0; i < count; ++i) {
+            size_t old_target_row_ndx = linkcol.get(i);
+            m_backlinks->remove_backlink(old_target_row_ndx, r);
+        }
+    }
+
+    // Do the actual deletion
     Column::clear();
+
+    // Detach all accessors
+    std::vector<LinkView*>::iterator end = m_views.end();
+    for (std::vector<LinkView*>::iterator p = m_views.begin(); p != end; ++p) {
+        (*p)->detach();
+    }
+    m_views.clear();
 }
 
-void ColumnLinkList::move_last_over(std::size_t ndx)
+void ColumnLinkList::move_last_over(size_t target_row_ndx, size_t last_row_ndx)
 {
-    Column::move_last_over(ndx);
+    // Remove backlinks to the delete row
+    ref_type ref = Column::get_as_ref(target_row_ndx);
+    if (ref) {
+        const Column linkcol(ref, null_ptr, 0, get_alloc());
+        size_t count = linkcol.size();
+        for (size_t i = 0; i < count; ++i) {
+            size_t old_target_row_ndx = linkcol.get(i);
+            m_backlinks->remove_backlink(old_target_row_ndx, target_row_ndx);
+        }
+    }
+
+    // Update backlinks to last row to point to its new position
+    ref_type ref2 = Column::get_as_ref(last_row_ndx);
+    if (ref2) {
+        const Column linkcol(ref2, null_ptr, 0, get_alloc());
+        size_t count = linkcol.size();
+        for (size_t i = 0; i < count; ++i) {
+            size_t old_target_row_ndx = linkcol.get(i);
+            m_backlinks->update_backlink(old_target_row_ndx, last_row_ndx, target_row_ndx);
+        }
+    }
+
+    // Do the actual delete and move
+    Column::destroy_subtree(target_row_ndx, false);
+    Column::move_last_over(target_row_ndx, last_row_ndx);
+
+    // Detach accessors to the deleted row
+    std::vector<LinkView*>::iterator end = m_views.end();
+    for (std::vector<LinkView*>::iterator p = m_views.begin(); p != end; ++p) {
+        if ((*p)->m_row_ndx == target_row_ndx) {
+            (*p)->detach();
+            m_views.erase(p);
+            break;
+        }
+    }
+
+    // Update accessors to the moved row
+    end = m_views.end();
+    for (std::vector<LinkView*>::iterator p = m_views.begin(); p != end; ++p) {
+        if ((*p)->m_row_ndx == last_row_ndx) {
+            (*p)->set_parent_row(target_row_ndx);
+            break;
+        }
+    }
 }
 
 void ColumnLinkList::erase(std::size_t ndx, bool is_last)
 {
     TIGHTDB_ASSERT(is_last);
+
+    // Detach accessors to the deleted row
+    std::vector<LinkView*>::iterator end = m_views.end();
+    for (std::vector<LinkView*>::iterator p = m_views.begin(); p != end; ++p) {
+        if ((*p)->m_row_ndx == ndx) {
+            (*p)->detach();
+            m_views.erase(p);
+            break;
+        }
+    }
+
+    Column::destroy_subtree(ndx, false);
     Column::erase(ndx, is_last);
+
+    //TODO: update backlinks
 }
 
 void ColumnLinkList::do_nullify_link(size_t row_ndx, size_t old_target_row_ndx)
 {
-    ref_type ref = Column::get_as_ref(row_ndx);
-    Column col(ref, this, row_ndx, get_alloc());
-
-    size_t pos = col.find_first(old_target_row_ndx);
-    TIGHTDB_ASSERT(pos != not_found);
-
-    bool is_last = (pos+1 == col.size());
-    col.erase(pos, is_last);
-
-    if (col.is_empty()) {
-        col.destroy();
-        Column::set(row_ndx, 0);
-    }
+    LinkViewRef links = get_link_view(row_ndx);
+    links->do_nullify_link(old_target_row_ndx);
 }
 
 void ColumnLinkList::do_update_link(size_t row_ndx, size_t old_target_row_ndx, std::size_t new_target_row_ndx)
 {
-    ref_type ref = Column::get_as_ref(row_ndx);
-    Column col(ref, this, row_ndx, get_alloc());
+    LinkViewRef links = get_link_view(row_ndx);
+    links->do_update_link(old_target_row_ndx, new_target_row_ndx);
+}
 
-    size_t pos = col.find_first(old_target_row_ndx);
-    TIGHTDB_ASSERT(pos != not_found);
+LinkViewRef ColumnLinkList::get_link_view(std::size_t row_ndx)
+{
+    TIGHTDB_ASSERT(row_ndx < size());
 
-    col.set(pos, new_target_row_ndx);
+    // Check if we already have a linkview for this row
+    std::vector<LinkView*>::iterator end = m_views.end();
+    for (std::vector<LinkView*>::iterator p = m_views.begin(); p != end; ++p) {
+        if ((*p)->m_row_ndx == row_ndx) {
+            return LinkViewRef(*p);
+        }
+    }
+
+    LinkView* view = new LinkView(*this, row_ndx);
+    m_views.push_back(view);
+    return LinkViewRef(view);
 }
 
 void ColumnLinkList::update_child_ref(size_t child_ndx, ref_type new_ref)
@@ -193,10 +171,10 @@ ref_type ColumnLinkList::get_child_ref(size_t child_ndx) const TIGHTDB_NOEXCEPT
 
 #ifdef TIGHTDB_DEBUG
 
-std::pair<ref_type, size_t> ColumnLinkList::get_to_dot_parent(size_t ndx_in_parent) const
+pair<ref_type, size_t> ColumnLinkList::get_to_dot_parent(size_t ndx_in_parent) const
 {
-    std::pair<MemRef, size_t> p = m_array->get_bptree_leaf(ndx_in_parent);
-    return std::make_pair(p.first.m_ref, p.second);
+    pair<MemRef, size_t> p = m_array->get_bptree_leaf(ndx_in_parent);
+    return make_pair(p.first.m_ref, p.second);
 }
 
 #endif //TIGHTDB_DEBUG

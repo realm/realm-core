@@ -41,6 +41,10 @@ class ConstTableView;
 class StringIndex;
 class Group;
 class ColumnBackLink;
+class ColumnLinkBase;
+class LinkView;
+
+typedef util::bind_ptr<LinkView> LinkViewRef;
 
 template<class> class Columns;
 
@@ -98,47 +102,51 @@ public:
 
     ~Table() TIGHTDB_NOEXCEPT;
 
-    /// Construct a new freestanding top-level table with dynamic
-    /// lifetime.
+    /// Construct a new freestanding top-level table with dynamic lifetime.
     static TableRef create(Allocator& = Allocator::get_default());
 
-    /// Construct a copy of the specified table as a new freestanding
-    /// top-level table with dynamic lifetime.
+    /// Construct a copy of the specified table as a new freestanding top-level
+    /// table with dynamic lifetime.
     TableRef copy(Allocator& = Allocator::get_default()) const;
 
-    /// A table accessor that is no longer attached must not be
-    /// accessed in any way except by calling is_attached(). A table
-    /// accessor that is obtained from a Group becomes detached if its
-    /// group accessor is destroyed. This is also true for any
-    /// subtable accessor that is obtained indirectly from a group. A
-    /// subtable accessor will generally become detached if its parent
-    /// table is modified. On the other hand, calling a const member
-    /// function on a parent table accessor will never detach its
-    /// subtable accessors. An accessor for a freestanding table will
-    /// never become detached. An accessor for a subtable of a
-    /// freestanding table may become detached.
+    /// Returns true if, and only if this accessor is currently attached to an
+    /// underlying table.
     ///
-    /// FIXME: High level language bindings will probably want to be
-    /// able to explicitely detach a group and all tables of that
-    /// group if any modifying operation fails (e.g. memory allocation
-    /// failure) (and something similar for freestanding tables) since
-    /// that leaves the group in state where any further access is
-    /// disallowed. This way they will be able to reliably intercept
-    /// any attempt at accessing such a failed group.
+    /// A table accessor may get detached from the underlying row for various
+    /// reasons (see below). When it does, it no longer refers to anything, and
+    /// can no longer be used, except for calling is_attached(). The
+    /// consequences of calling other methods on a detached table accessor are
+    /// undefined. Table accessors obtained by calling functions in the TightDB
+    /// API are always in the 'attached' state immediately upon return from
+    /// those functions.
     ///
-    /// FIXME: The C++ documentation must state that if any modifying
-    /// operation on a group (incl. tables, subtables, and specs) or
-    /// on a free standing table (incl. subtables and specs) fails,
-    /// then any further access to that group (except ~Group()) or
-    /// freestanding table (except ~Table()) has undefined behaviour
-    /// and is considered an error on behalf of the application. Note
-    /// that even Table::is_attached() is disallowed in this case.
+    /// A table accessor of a free-standing table never becomes detached (except
+    /// during its eventual destruction). A group-level table accessor becomes
+    /// detached if the underlying table is removed from the group (not
+    /// currently possible), or when the group accessor is destroyed. A subtable
+    /// accessor becomes detached if the underlying subtable is removed, or if
+    /// the parent table accessor is detached. A table accessor does not become
+    /// detached for any other reason than those mentioned here.
+    ///
+    /// FIXME: High level language bindings will probably want to be able to
+    /// explicitely detach a group and all tables of that group if any modifying
+    /// operation fails (e.g. memory allocation failure) (and something similar
+    /// for freestanding tables) since that leaves the group in state where any
+    /// further access is disallowed. This way they will be able to reliably
+    /// intercept any attempt at accessing such a failed group.
+    ///
+    /// FIXME: The C++ documentation must state that if any modifying operation
+    /// on a group (incl. tables, subtables, and specs) or on a free standing
+    /// table (incl. subtables and specs) fails, then any further access to that
+    /// group (except ~Group()) or freestanding table (except ~Table()) has
+    /// undefined behaviour and is considered an error on behalf of the
+    /// application. Note that even Table::is_attached() is disallowed in this
+    /// case.
     bool is_attached() const TIGHTDB_NOEXCEPT;
 
-    /// Get the name of this table, if it has any. Tables have names
-    /// when, and only when they are direct members of groups. For a
-    /// table of any other kind, this function returns the empty
-    /// string.
+    /// Get the name of this table, if it has any. Tables have names when, and
+    /// only when they are direct members of groups. For a table of any other
+    /// kind, this function returns the empty string.
     StringData get_name() const TIGHTDB_NOEXCEPT;
 
     //@{
@@ -299,6 +307,9 @@ public:
     typedef BasicRowExpr<Table> RowExpr;
     typedef BasicRowExpr<const Table> ConstRowExpr;
 
+    RowExpr get(std::size_t row_ndx) TIGHTDB_NOEXCEPT;
+    ConstRowExpr get(std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
+
     RowExpr front() TIGHTDB_NOEXCEPT;
     ConstRowExpr front() const TIGHTDB_NOEXCEPT;
 
@@ -346,7 +357,9 @@ public:
     Mixed       get_mixed(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
     DataType    get_mixed_type(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
     std::size_t get_link(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
-    TableRef    get_link_target(std::size_t column_ndx) TIGHTDB_NOEXCEPT;
+
+    TableRef get_link_target(std::size_t column_ndx) TIGHTDB_NOEXCEPT;
+    ConstTableRef get_link_target(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
 
     template<class T>
     typename T::RowAccessor get_link_accessor(std::size_t column_ndx, std::size_t row_ndx);
@@ -368,15 +381,9 @@ public:
     void nullify_link(std::size_t column_ndx, std::size_t row_ndx);
 
     // Link lists
+    LinkViewRef get_linklist(std::size_t column_ndx, std::size_t row_ndx);
     bool linklist_has_links(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
     std::size_t get_link_count(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
-    void linklist_add_link(std::size_t column_ndx, std::size_t row_ndx, std::size_t target_row_ndx);
-    void linklist_insert_link(std::size_t column_ndx, std::size_t row_ndx, std::size_t ins_pos, std::size_t target_row_ndx);
-    void linklist_remove_link(std::size_t column_ndx, std::size_t row_ndx, std::size_t link_ndx);
-    void linklist_remove_all_links(std::size_t column_ndx, std::size_t row_ndx);
-    void linklist_set_link(std::size_t column_ndx, std::size_t row_ndx, std::size_t link_ndx, std::size_t target_row_ndx);
-    void linklist_move_link(std::size_t column_ndx, std::size_t row_ndx, std::size_t old_pos, std::size_t new_pos);
-    std::size_t linklist_get_link(std::size_t column_ndx, std::size_t row_ndx, std::size_t link_ndx) const TIGHTDB_NOEXCEPT;
 
     LinkView links(size_t link_column, size_t row_ndx);
 
@@ -617,6 +624,13 @@ public:
     /// Compare two tables for inequality. See operator==().
     bool operator!=(const Table& t) const;
 
+    /// A subtable in a column of type 'table' (which shares descriptor with
+    /// other subtables in the same column) is initially in a degenerate state
+    /// where it takes up a minimal amout of space. This function returns true
+    /// if, and only if the table accessor is attached to such a subtable. This
+    /// function is mainly intended for debugging purposes.
+    bool is_degenerate() const TIGHTDB_NOEXCEPT;
+
     // Debug
 #ifdef TIGHTDB_DEBUG
     void Verify() const; // Must be upper case to avoid conflict with macro in ObjC
@@ -670,15 +684,36 @@ private:
     // Underlying array structure. `m_top` is in use only for root tables; that
     // is, for tables with independent descriptor. `m_columns` contains a ref
     // for each column and search index in order of the columns. A search index
-    // ref alwasy occurs immediately after the ref of the column to which the
+    // ref always occurs immediately after the ref of the column to which the
     // search index belongs.
+    //
+    // A subtable column (a column of type `type_table`) is essentially just a
+    // column of 'refs' pointing to the root node of each subtable.
+    //
+    // To save space in the database file, a subtable in such a column always
+    // starts out in a degenerate form where nothing is allocated on its behalf,
+    // and a null 'ref' is stored in the corresponding slot of the column. A
+    // subtable remains in this degenerate state until the first row is added to
+    // the subtable.
+    //
+    // For this scheme to work, it must be (and is) possible to create a table
+    // accessor that refers to a degenerate subtable. A table accessor (instance
+    // of `Table`) refers to a degenerate subtable if, and only if `m_columns`
+    // is unattached.
+    //
+    // FIXME: The fact that `m_columns` may be detached means that many
+    // functions (even non-modifying functions) need to check for that before
+    // accessing the contents of the table. This incurs a runtime
+    // overhead. Consider whether this overhead can be eliminated by having
+    // `Table::m_columns` always attached to something, and then detect the
+    // degenerate state in a different way.
     Array m_top;
     Array m_columns; // 2nd slot in m_top (for root tables)
-    Spec m_spec;     // 1st slot in m_top  (for root tables)
+    Spec m_spec;     // 1st slot in m_top (for root tables)
 
-    // Is empty when the table accessor refers to a degenerate subtable,
-    // otherwise it contains precisely one column accessor for each column in
-    // the table, in order.
+    // Is empty when the table accessor is attached to a degenerate subtable
+    // (unattached `m_columns`), otherwise it contains precisely one column
+    // accessor for each column in the table, in order.
     //
     // In some cases an entry may contain null. This is currently possible only
     // in connection with Group::advance_transact(), but it means that several
@@ -762,7 +797,6 @@ private:
     void init_from_ref(ConstSubspecRef shared_spec, ref_type columns_ref,
                        ArrayParent* parent, std::size_t ndx_in_parent);
 
-    // Detaches all subtable accessors
     static void do_insert_column(Descriptor&, std::size_t column_ndx,
                                  DataType type, StringData name);
     static void do_remove_column(Descriptor&, std::size_t column_ndx);
@@ -776,11 +810,12 @@ private:
 
     struct SubtableUpdater {
         virtual void update(const ColumnTable&, std::size_t row_ndx, Array& subcolumns) = 0;
+        virtual void update_accessor(Table&, std::size_t row_ndx) = 0;
         virtual ~SubtableUpdater() {}
     };
-    static void update_subtables(Descriptor&, SubtableUpdater&);
-    void update_subtables(const std::size_t* path_begin, const std::size_t* path_end,
-                          SubtableUpdater&);
+    static void update_subtables(Descriptor&, SubtableUpdater*);
+    void update_subtables(const std::size_t* col_path_begin, const std::size_t* col_path_end,
+                          SubtableUpdater*);
 
     struct AccessorUpdater {
         virtual void update(Table&) = 0;
@@ -794,34 +829,6 @@ private:
     ColumnBase* create_column_accessor(ColumnType, std::size_t col_ndx, std::size_t ndx_in_parent);
     void create_column_accessors();
     void destroy_column_accessors() TIGHTDB_NOEXCEPT;
-
-    /// A subtable column (a column of type `type_table`) is
-    /// essentially just a column of 'refs' pointing to the root node
-    /// of each subtable.
-    ///
-    /// To save space in the database file, a subtable in such a
-    /// column always starts out in a degenerate form where nothing is
-    /// allocated on its behalf, and a null 'ref' is stored in the
-    /// corresponding slot of the column. A subtable remains in this
-    /// degenrate state until the first row is added to the subtable.
-    ///
-    /// For this scheme to work, it must be (and is) possible to
-    /// create a table accessor that refers to a degenerate
-    /// subtable. A table accessor (instance of `Table`) refers to a
-    /// degenerate subtable if, and only if the 'columns' array
-    /// accessor member (`Table::m_columns`) is attached.
-    ///
-    /// This function returns true if, and only if `Table::m_columns`
-    /// in detached.
-    ///
-    /// FIXME: The fact that `Table::m_columns` may be detached means
-    /// that many functions (even non-modifying functions) need to
-    /// check for that before accessing the contents of the
-    /// table. This incurs a runtime overhead. Consider whether this
-    /// overhead can be eliminated by having `Table::m_columns` always
-    /// attached to something, and then detect the degenerate state in
-    /// a different way.
-    bool is_degenerate() const TIGHTDB_NOEXCEPT;
 
     /// Called in the context of Group::commit() to ensure that
     /// attached table accessors stay valid across a commit. Please
@@ -899,6 +906,7 @@ private:
 
     const ColumnBase& get_column_base(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
     ColumnBase& get_column_base(std::size_t column_ndx);
+    ColumnLinkBase& get_column_linkbase(size_t ndx);
     template <class T, ColumnType col_type> T& get_column(std::size_t ndx);
     template <class T, ColumnType col_type> const T& get_column(std::size_t ndx) const TIGHTDB_NOEXCEPT;
     Column& get_column(std::size_t column_ndx);
@@ -956,23 +964,51 @@ private:
 
     void discard_subtable_accessor(std::size_t col_ndx, std::size_t row_ndx) TIGHTDB_NOEXCEPT;
 
-    void adj_accessors_insert_rows(std::size_t row_ndx, std::size_t num_rows) TIGHTDB_NOEXCEPT;
-    void adj_accessors_erase_row(std::size_t row_ndx) TIGHTDB_NOEXCEPT;
-    void adj_accessors_move_last_over(std::size_t target_row_ndx, std::size_t last_row_ndx)
+    void adj_row_acc_insert_rows(std::size_t row_ndx, std::size_t num_rows) TIGHTDB_NOEXCEPT;
+    void adj_subtab_acc_insert_rows(std::size_t row_ndx, std::size_t num_rows) TIGHTDB_NOEXCEPT;
+    void adj_row_acc_erase_row(std::size_t row_ndx) TIGHTDB_NOEXCEPT;
+    void adj_subtab_acc_erase_row(std::size_t row_ndx) TIGHTDB_NOEXCEPT;
+    void adj_row_acc_move_last_over(std::size_t target_row_ndx, std::size_t last_row_ndx)
+        TIGHTDB_NOEXCEPT;
+    void adj_subtab_acc_move_last_over(std::size_t target_row_ndx, std::size_t last_row_ndx)
         TIGHTDB_NOEXCEPT;
     void adj_clear_nonroot() TIGHTDB_NOEXCEPT;
+    void adj_insert_column(std::size_t col_ndx);
+    void adj_erase_column(std::size_t col_ndx) TIGHTDB_NOEXCEPT;
+
+    void mark_dirty() TIGHTDB_NOEXCEPT;
+    void recursive_mark_dirty() TIGHTDB_NOEXCEPT;
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     Replication* get_repl() TIGHTDB_NOEXCEPT;
-
-    void recursive_mark_dirty() TIGHTDB_NOEXCEPT;
-    void insert_null_column_accessor(std::size_t col_ndx);
-    void erase_column_accessor(std::size_t col_ndx) TIGHTDB_NOEXCEPT;
-
-    /// \param spec_ndx_in_parent Ignored for root tables; that is, for tables
-    /// with independent descriptor.
-    void refresh_after_advance_transact(std::size_t ndx_in_parent, std::size_t spec_ndx_in_parent);
 #endif
+
+    /// Refresh the dirty part of the accessor subtree rooted at this table
+    /// accessor.
+    ///
+    /// The following conditions are necessary and sufficient for the proper
+    /// operation of this function:
+    ///
+    ///  - The parent accessor is in a valid state (already refreshed). If the
+    ///    parent is a group, then the group accessor (excluding its table
+    ///    accessors) must be in a valid state. If the parent is a table, then
+    ///    the table accessor (excluding its subtable accessors) must be in a
+    ///    valid state.
+    ///
+    ///  - Every table accessor in the subtree (this one, or one of its
+    ///    descendants) is marked dirty if it needs to be refreshed, or if it
+    ///    has a descendant accessor that needs to be refreshed.
+    ///
+    ///  - This table accessor, as well as all its descendant accessors, are in
+    ///    a collective state that satisfies the Accessor Hierarchy
+    ///    Correspondence Guarantee with respect to the root ref stored in the
+    ///    parent.
+    ///
+    ///  - If this table has shared descriptor, then the `index in parent`
+    ///    property of the contained spec accessor is valid.
+    void refresh_accessor_tree(std::size_t ndx_in_parent);
+
+    void set_ndx_in_parent(std::size_t ndx_in_parent) TIGHTDB_NOEXCEPT;
 
 #ifdef TIGHTDB_DEBUG
     void to_dot_internal(std::ostream&) const;
@@ -1231,7 +1267,6 @@ inline Table::Table(ref_count_tag, ConstSubspecRef shared_spec, ref_type columns
 
 inline void Table::set_index(std::size_t column_ndx)
 {
-    discard_subtable_accessors();
     set_index(column_ndx, true);
 }
 
@@ -1280,40 +1315,53 @@ inline std::size_t Table::size() const TIGHTDB_NOEXCEPT
     return m_size;
 }
 
-inline Table::RowExpr Table::front() TIGHTDB_NOEXCEPT
-{
-    TIGHTDB_ASSERT(!is_empty());
-    return RowExpr(this, 0);
-}
-
-inline Table::ConstRowExpr Table::front() const TIGHTDB_NOEXCEPT
-{
-    TIGHTDB_ASSERT(!is_empty());
-    return ConstRowExpr(this, 0);
-}
-
-inline Table::RowExpr Table::back() TIGHTDB_NOEXCEPT
-{
-    TIGHTDB_ASSERT(!is_empty());
-    return RowExpr(this, m_size-1);
-}
-
-inline Table::ConstRowExpr Table::back() const TIGHTDB_NOEXCEPT
-{
-    TIGHTDB_ASSERT(!is_empty());
-    return ConstRowExpr(this, m_size-1);
-}
-
-inline Table::RowExpr Table::operator[](std::size_t row_ndx) TIGHTDB_NOEXCEPT
+inline Table::RowExpr Table::get(std::size_t row_ndx) TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(row_ndx < size());
     return RowExpr(this, row_ndx);
 }
 
-inline Table::ConstRowExpr Table::operator[](std::size_t row_ndx) const TIGHTDB_NOEXCEPT
+inline Table::ConstRowExpr Table::get(std::size_t row_ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(row_ndx < size());
     return ConstRowExpr(this, row_ndx);
+}
+
+inline Table::RowExpr Table::front() TIGHTDB_NOEXCEPT
+{
+    return get(0);
+}
+
+inline Table::ConstRowExpr Table::front() const TIGHTDB_NOEXCEPT
+{
+    return get(0);
+}
+
+inline Table::RowExpr Table::back() TIGHTDB_NOEXCEPT
+{
+    return get(m_size-1);
+}
+
+inline Table::ConstRowExpr Table::back() const TIGHTDB_NOEXCEPT
+{
+    return get(m_size-1);
+}
+
+inline Table::RowExpr Table::operator[](std::size_t row_ndx) TIGHTDB_NOEXCEPT
+{
+    return get(row_ndx);
+}
+
+inline Table::ConstRowExpr Table::operator[](std::size_t row_ndx) const TIGHTDB_NOEXCEPT
+{
+    return get(row_ndx);
+}
+
+inline std::size_t Table::add_empty_row(std::size_t num_rows)
+{
+    std::size_t row_ndx = m_size;
+    insert_empty_row(row_ndx, num_rows); // Throws
+    return row_ndx; // Return index of first new row
 }
 
 inline const Table* Table::get_subtable_ptr(std::size_t col_ndx, std::size_t row_ndx) const
@@ -1340,6 +1388,11 @@ inline void Table::insert_enum(std::size_t column_ndx, std::size_t row_ndx, E va
 inline void Table::insert_subtable(std::size_t col_ndx, std::size_t row_ndx)
 {
     insert_subtable(col_ndx, row_ndx, 0); // Null stands for an empty table
+}
+
+inline ConstTableRef Table::get_link_target(std::size_t col_ndx) const TIGHTDB_NOEXCEPT
+{
+    return const_cast<Table*>(this)->get_link_target(col_ndx);
 }
 
 template<class E>
@@ -1373,6 +1426,11 @@ inline bool Table::operator!=(const Table& t) const
     return !(*this == t); // Throws
 }
 
+inline bool Table::is_degenerate() const TIGHTDB_NOEXCEPT
+{
+    return !m_columns.is_attached();
+}
+
 inline void Table::insert_into(Table* parent, std::size_t col_ndx, std::size_t row_ndx) const
 {
     parent->insert_subtable(col_ndx, row_ndx, this);
@@ -1391,14 +1449,11 @@ inline std::size_t Table::get_size_from_ref(ref_type top_ref, Allocator& alloc) 
     return get_size_from_ref(spec_ref, columns_ref, alloc);
 }
 
-inline void Table::update_backlink_column_ref(std::size_t source_table_ndx, std::size_t old_column_ndx, std::size_t new_column_ndx)
+inline void Table::update_backlink_column_ref(std::size_t source_table_ndx,
+                                              std::size_t old_column_ndx,
+                                              std::size_t new_column_ndx)
 {
     m_spec.update_backlink_column_ref(source_table_ndx, old_column_ndx, new_column_ndx);
-}
-
-inline bool Table::is_degenerate() const TIGHTDB_NOEXCEPT
-{
-    return !m_columns.is_attached();
 }
 
 inline std::size_t* Table::record_subtable_path(std::size_t* begin,
@@ -1431,12 +1486,31 @@ typename T::RowAccessor Table::get_link_accessor(std::size_t column_ndx, std::si
     return (*typed_table)[row_pos_in_target];
 }
 
+inline void Table::mark_dirty() TIGHTDB_NOEXCEPT
+{
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    m_dirty = true;
+#endif
+}
+
 #ifdef TIGHTDB_ENABLE_REPLICATION
 inline Replication* Table::get_repl() TIGHTDB_NOEXCEPT
 {
     return m_top.get_alloc().get_replication();
 }
 #endif
+
+inline void Table::set_ndx_in_parent(std::size_t ndx_in_parent) TIGHTDB_NOEXCEPT
+{
+    if (m_top.is_attached()) {
+        // Root table (independent descriptor)
+        m_top.set_ndx_in_parent(ndx_in_parent);
+    }
+    else {
+        // Subtable with shared descriptor
+        m_columns.set_ndx_in_parent(ndx_in_parent);
+    }
+}
 
 
 // The purpose of this class is to give internal access to some, but
@@ -1578,23 +1652,46 @@ public:
     static void adj_accessors_insert_rows(Table& table, std::size_t row_ndx,
                                           std::size_t num_rows) TIGHTDB_NOEXCEPT
     {
-        table.adj_accessors_insert_rows(row_ndx, num_rows);
+        table.adj_row_acc_insert_rows(row_ndx, num_rows);
+        table.adj_subtab_acc_insert_rows(row_ndx, num_rows);
     }
 
     static void adj_accessors_erase_row(Table& table, std::size_t row_ndx) TIGHTDB_NOEXCEPT
     {
-        table.adj_accessors_erase_row(row_ndx);
+        table.adj_row_acc_erase_row(row_ndx);
+        table.adj_subtab_acc_erase_row(row_ndx);
     }
 
     static void adj_accessors_move_last_over(Table& table, std::size_t target_row_ndx,
                                              std::size_t last_row_ndx) TIGHTDB_NOEXCEPT
     {
-        table.adj_accessors_move_last_over(target_row_ndx, last_row_ndx);
+        table.adj_row_acc_move_last_over(target_row_ndx, last_row_ndx);
+        table.adj_subtab_acc_move_last_over(target_row_ndx, last_row_ndx);
     }
 
     static void adj_clear_nonroot(Table& table) TIGHTDB_NOEXCEPT
     {
         table.adj_clear_nonroot();
+    }
+
+    static void adj_insert_column(Table& table, std::size_t col_ndx)
+    {
+        table.adj_insert_column(col_ndx); // Throws
+    }
+
+    static void adj_erase_column(Table& table, std::size_t col_ndx) TIGHTDB_NOEXCEPT
+    {
+        table.adj_erase_column(col_ndx);
+    }
+
+    static void mark_dirty(Table& table) TIGHTDB_NOEXCEPT
+    {
+        table.mark_dirty();
+    }
+
+    static void recursive_mark_dirty(Table& table) TIGHTDB_NOEXCEPT
+    {
+        table.recursive_mark_dirty();
     }
 
     static Descriptor* get_root_table_desc_accessor(Table& root_table) TIGHTDB_NOEXCEPT
@@ -1609,33 +1706,21 @@ public:
         table.update_accessors(col_path_begin, col_path_end, updatder); // Throws
     }
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
-    static void mark_dirty(Table& table) TIGHTDB_NOEXCEPT
+    static void refresh_accessor_tree(Table& table, std::size_t ndx_in_parent)
     {
-        table.m_dirty = true;
+        table.refresh_accessor_tree(ndx_in_parent); // Throws
     }
 
-    static void recursive_mark_dirty(Table& table) TIGHTDB_NOEXCEPT
+    static void set_ndx_in_parent(Table& table, std::size_t ndx_in_parent) TIGHTDB_NOEXCEPT
     {
-        table.recursive_mark_dirty();
+        table.set_ndx_in_parent(ndx_in_parent);
     }
 
-    static void insert_null_column_accessor(Table& table, std::size_t col_ndx)
+    static void set_shared_subspec_ndx_in_parent(Table& table, std::size_t spec_ndx_in_parent)
+        TIGHTDB_NOEXCEPT
     {
-        table.insert_null_column_accessor(col_ndx); // Throws
+        table.m_spec.set_ndx_in_parent(spec_ndx_in_parent);
     }
-
-    static void erase_column_accessor(Table& table, std::size_t col_ndx) TIGHTDB_NOEXCEPT
-    {
-        table.erase_column_accessor(col_ndx);
-    }
-
-    static void refresh_after_advance_transact(Table& table, std::size_t ndx_in_parent,
-                                               std::size_t spec_ndx_in_parent)
-    {
-        table.refresh_after_advance_transact(ndx_in_parent, spec_ndx_in_parent); // Throws
-    }
-#endif
 
     static void initialize_link_targets(Table& table) TIGHTDB_NOEXCEPT
     {

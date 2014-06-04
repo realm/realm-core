@@ -58,10 +58,15 @@ TEST(LinkList_Query)
 
     // set some links
 
-    table1->linklist_add_link(col_link2, 0, 1);
+//    table1->linklist_add_link(col_link2, 0, 1);
 
-    table1->linklist_add_link(col_link2, 1, 1);
-    table1->linklist_add_link(col_link2, 1, 2);
+   
+
+    table1->insert_link(col_link2, 0, 1);
+    table1->insert_done();
+
+    table1->insert_link(col_link2, 1, 1);
+    table1->insert_link(col_link2, 1, 2);
 
     size_t match;
 

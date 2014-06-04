@@ -864,11 +864,11 @@ public:
             if (m_column_linklist->has_links(index))
             {
                 // LinkList with more than 0 values. Create Value with payload for all fields
-                Column links = m_column_linklist->get_ref_column(index);
-                Value<StringData> v(true, links.size());
+                LinkViewRef links = m_column_linklist->get_link_view(index);
+                Value<StringData> v(true, links->size());
 
-                for (size_t t = 0; t < links.size(); t++) {
-                    size_t link_to = links.get(t);
+                for (size_t t = 0; t < links->size(); t++) {
+                    size_t link_to = links->get_target_row(t);
                     v.m_v[t] = m_table->get_string(m_column, link_to);
                 }
                 destination.import(v);
@@ -1019,11 +1019,11 @@ public:
             }
             else {
                 // LinkList with more than 0 values. Create Value with payload for all fields
-                Column links = m_column_linklist->get_ref_column(index);
-                Value<T> v(true, links.size());
+                LinkViewRef links = m_column_linklist->get_link_view(index);
+                Value<T> v(true, links->size());
 
-                for (size_t t = 0; t < links.size(); t++) {
-                    size_t link_to = links.get(t);
+                for (size_t t = 0; t < links->size(); t++) {
+                    size_t link_to = links->get_target_row(t);
                     sg->cache_next(link_to); // todo, needed?
                     v.m_v[t] = sg->get_next(link_to);
                 }

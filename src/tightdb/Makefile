@@ -10,7 +10,8 @@ column_fwd.hpp spec.hpp impl/destroy_guard.hpp impl/output_stream.hpp datetime.h
 string_data.hpp binary_data.hpp mixed.hpp table.hpp table_ref.hpp table_basic_fwd.hpp \
 table_accessors.hpp table_basic.hpp table_view.hpp table_view_basic.hpp table_macros.hpp row.hpp \
 descriptor_fwd.hpp descriptor.hpp group.hpp group_shared.hpp $(REPLICATION_HPP) query.hpp \
-query_conditions.hpp lang_bind_helper.hpp tightdb_nmmintrin.h importer.hpp version.hpp unicode.hpp
+query_conditions.hpp lang_bind_helper.hpp tightdb_nmmintrin.h importer.hpp version.hpp unicode.hpp \
+commit_log.hpp link_view.hpp column_linklist.hpp column_linkbase.hpp column_backlink.hpp
 
 nobase_subinclude_HEADERS_EXTRA_UNINSTALL = *.h *.hpp util/*.h util/*.hpp impl/*.h impl/*.hpp
 
@@ -32,7 +33,7 @@ libtightdb_a_SOURCES = util/terminate.cpp util/string_buffer.cpp util/memory_str
 util/thread.cpp util/file.cpp util/utf8.cpp utilities.cpp alloc.cpp alloc_slab.cpp array.cpp \
 array_string.cpp array_string_long.cpp array_binary.cpp array_blob.cpp array_blobs_big.cpp \
 column.cpp column_string.cpp column_string_enum.cpp column_binary.cpp column_table.cpp \
-column_mixed.cpp column_link.cpp column_linklist.cpp column_backlink.cpp spec.cpp \
+column_mixed.cpp column_link.cpp column_linklist.cpp column_backlink.cpp link_view.cpp spec.cpp \
 impl/output_stream.cpp table.cpp table_view.cpp row.cpp descriptor.cpp group.cpp group_writer.cpp \
 group_shared.cpp $(REPLICATION_CPP) index_string.cpp query.cpp lang_bind_helper.cpp importer.cpp \
 commit_log.cpp version.cpp unicode.cpp

@@ -22,6 +22,8 @@ export TIGHTDB_HOME
 MODE="$1"
 [ $# -gt 0 ] && shift
 
+# enabling replication support in core, now required for objective-c/ios
+export TIGHTDB_ENABLE_REPLICATION=1
 
 # Extensions corresponding with additional GIT repositories
 EXTENSIONS="java python ruby objc node php c gui"
@@ -500,6 +502,18 @@ EOF
         exit 0
         ;;
 
+    "build-osx")
+        auto_configure || exit 1
+        export TIGHTDB_HAVE_CONFIG="1"
+        (
+            cd src/tightdb
+            export TIGHTDB_ENABLE_FAT_BINARIES="1"
+            $MAKE libtightdb.a EXTRA_CFLAGS="-fPIC -DPIC" || exit 1
+            $MAKE libtightdb-dbg.a EXTRA_CFLAGS="-fPIC -DPIC" || exit 1
+        ) || exit 1
+        exit 0
+        ;;
+
     "build-iphone")
         auto_configure || exit 1
         export TIGHTDB_HAVE_CONFIG="1"
@@ -608,7 +622,7 @@ EOF
 
    "build-objc")
         if [ "$OS" != "Darwin" ]; then
-            echo "tar.gz for iOS can only be generated under OS X."
+            echo "zip for iOS/OSX can only be generated under OS X."
             exit 0
         fi
 
@@ -625,11 +639,11 @@ EOF
             cp "src/tightdb/libtightdb-$platform.a" "$BASENAME" || exit 1
             cp "src/tightdb/libtightdb-$platform-dbg.a" "$BASENAME" || exit 1
         done
-        cp src/tightdb/*dylib $BASENAME || exit 1        
+        cp src/tightdb/libtightdb.a $BASENAME || exit 1
         zip -r -q realm-core-$realm_version.zip $BASENAME || exit 1
         mkdir -p ../realm-objc || exit 1
-        rm -rf ../realm-objc/realm-core || exit 1 
-        (cd ../realm-objc && unzip -qq ../tightdb/realm-core-$realm_version.zip) || exit 1 
+        rm -rf ../realm-objc/realm-core || exit 1
+        (cd ../realm-objc && unzip -qq ../tightdb/realm-core-$realm_version.zip) || exit 1
         exit 0
         ;;
 

@@ -105,6 +105,7 @@ AggregateState      State of the aggregate - contains a state variable that stor
 #include <tightdb/array_string.hpp>
 #include <tightdb/column_linklist.hpp>
 #include <tightdb/column_link.hpp>
+#include <tightdb/link_view.hpp>
 
 #include <iostream>
 

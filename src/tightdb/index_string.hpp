@@ -39,7 +39,7 @@ public:
 
     bool is_empty() const;
 
-    void insert(size_t row_ndx, StringData value, bool is_last = false);
+    void insert(size_t row_ndx, StringData value, size_t num_rows, bool is_append);
     void set(size_t row_ndx, StringData oldValue, StringData new_value);
     void erase(size_t row_ndx, StringData value, bool is_last = false);
     void clear() TIGHTDB_OVERRIDE;
