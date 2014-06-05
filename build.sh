@@ -626,26 +626,26 @@ EOF
             exit 0
         fi
 
-	# the user can specify where to find realm-objc repository
-	realm_objc_dir="$1"
-	if [ -z "$realm_objc_dir" ]; then
-	    realm_objc_dir="../realm-objc"
-	fi
+        # the user can specify where to find realm-objc repository
+        realm_objc_dir="$1"
+        if [ -z "$realm_objc_dir" ]; then
+            realm_objc_dir="../realm-objc"
+        fi
 
-	# has build-iphone been run?
-	if ! [ -e "iphone-lib/libtightdb-ios.a" ]; then
-	    echo "You must run 'sh build.sh build-iphone' before proceeding."
-	    exit 0
-	fi
+        # has build-iphone been run?
+        if ! [ -e "iphone-lib/libtightdb-ios.a" ]; then
+            echo "You must run 'sh build.sh build-iphone' before proceeding."
+            exit 0
+        fi
 
-	# has build-osx been run?
-	if ! [ -e "src/tightdb/libtightdb-dbg.a" ]; then
-	    echo "You must run 'sh build.sh build-osx' before proceeding."
-	    exit 0
-	fi
+        # has build-osx been run?
+        if ! [ -e "src/tightdb/libtightdb-dbg.a" ]; then
+            echo "You must run 'sh build.sh build-osx' before proceeding."
+            exit 0
+        fi
 
-	echo "Copying files"
-	tmpdir=$(mktemp -d /tmp/$$.XXXXXX) || exit 1
+        echo "Copying files"
+        tmpdir=$(mktemp -d /tmp/$$.XXXXXX) || exit 1
         realm_version="$(sh build.sh get-version)" || exit 1
         BASENAME="core"
         rm -f "$BASENAME-$realm_version.zip" || exit 1
@@ -661,18 +661,18 @@ EOF
         cp src/tightdb/libtightdb.a "$tmpdir/$BASENAME" || exit 1
         cp src/tightdb/libtightdb-dbg.a "$tmpdir/$BASENAME" || exit 1
 
-	echo "Create zip file: '$BASENAME-$realm_version.zip'"
+        echo "Create zip file: '$BASENAME-$realm_version.zip'"
         (cd $tmpdir && zip -r -q "$BASENAME-$realm_version.zip" "$BASENAME") || exit 1
-	mv "$tmpdir/$BASENAME-$realm_version.zip" . || exit 1
+        mv "$tmpdir/$BASENAME-$realm_version.zip" . || exit 1
 
-	echo "Unzipping in '$realm_objc_dir'"
+        echo "Unzipping in '$realm_objc_dir'"
         mkdir -p "$realm_objc_dir" || exit 1
         rm -rf "$realm_objc_dir/$BASENAME" || exit 1
-	cur_dir="$(pwd)"
+        cur_dir="$(pwd)"
         (cd "$realm_objc_dir" && unzip -qq "$cur_dir/$BASENAME-$realm_version.zip") || exit 1
 
-	rm -rf "$tmpdir" || exit 1
-	echo "Done"
+        rm -rf "$tmpdir" || exit 1
+        echo "Done"
         exit 0
         ;;
 
