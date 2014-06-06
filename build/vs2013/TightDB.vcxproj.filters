@@ -231,6 +231,9 @@
     <ClCompile Include="..\..\test\util\random.cpp">
       <Filter>test\util</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\test\util\resource_limits.cpp">
+      <Filter>test\util</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\test\test_all.cpp">
       <Filter>test</Filter>
     </ClCompile>
