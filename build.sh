@@ -626,24 +626,53 @@ EOF
             exit 0
         fi
 
-        realm_version="$(sh build.sh get-version)"
-        BASENAME="realm-core"
-        rm -rf "$BASENAME" || exit 1
-        rm -f realm-core-$realm_version.zip || exit 1
-        mkdir -p "$BASENAME/include" || exit 1
-        cp "$IPHONE_DIR/libtightdb-ios.a" "$BASENAME" || exit 1
-        cp "$IPHONE_DIR/libtightdb-ios-dbg.a" "$BASENAME" || exit 1
-        cp -r "$IPHONE_DIR/include/"* "$BASENAME/include" || exit 1
+        # the user can specify where to find realm-objc repository
+        realm_objc_dir="$1"
+        if [ -z "$realm_objc_dir" ]; then
+            realm_objc_dir="../realm-objc"
+        fi
+
+        # has build-iphone been run?
+        if ! [ -e "iphone-lib/libtightdb-ios.a" ]; then
+            echo "You must run 'sh build.sh build-iphone' before proceeding."
+            exit 0
+        fi
+
+        # has build-osx been run?
+        if ! [ -e "src/tightdb/libtightdb-dbg.a" ]; then
+            echo "You must run 'sh build.sh build-osx' before proceeding."
+            exit 0
+        fi
+
+        echo "Copying files"
+        tmpdir=$(mktemp -d /tmp/$$.XXXXXX) || exit 1
+        realm_version="$(sh build.sh get-version)" || exit 1
+        BASENAME="core"
+        rm -f "$BASENAME-$realm_version.zip" || exit 1
+        mkdir -p "$tmpdir/$BASENAME/include" || exit 1
+        cp "$IPHONE_DIR/libtightdb-ios.a" "$tmpdir/$BASENAME" || exit 1
+        cp "$IPHONE_DIR/libtightdb-ios-dbg.a" "$tmpdir/$BASENAME" || exit 1
+        cp -r "$IPHONE_DIR/include/"* "$tmpdir/$BASENAME/include" || exit 1
         for x in $iphone_sdks; do
             platform="$(printf "%s\n" "$x" | cut -d: -f1)" || exit 1
-            cp "src/tightdb/libtightdb-$platform.a" "$BASENAME" || exit 1
-            cp "src/tightdb/libtightdb-$platform-dbg.a" "$BASENAME" || exit 1
+            cp "src/tightdb/libtightdb-$platform.a" "$tmpdir/$BASENAME" || exit 1
+            cp "src/tightdb/libtightdb-$platform-dbg.a" "$tmpdir/$BASENAME" || exit 1
         done
-        cp src/tightdb/libtightdb.a $BASENAME || exit 1
-        zip -r -q realm-core-$realm_version.zip $BASENAME || exit 1
-        mkdir -p ../realm-objc || exit 1
-        rm -rf ../realm-objc/realm-core || exit 1
-        (cd ../realm-objc && unzip -qq ../tightdb/realm-core-$realm_version.zip) || exit 1
+        cp src/tightdb/libtightdb.a "$tmpdir/$BASENAME" || exit 1
+        cp src/tightdb/libtightdb-dbg.a "$tmpdir/$BASENAME" || exit 1
+
+        echo "Create zip file: '$BASENAME-$realm_version.zip'"
+        (cd $tmpdir && zip -r -q "$BASENAME-$realm_version.zip" "$BASENAME") || exit 1
+        mv "$tmpdir/$BASENAME-$realm_version.zip" . || exit 1
+
+        echo "Unzipping in '$realm_objc_dir'"
+        mkdir -p "$realm_objc_dir" || exit 1
+        rm -rf "$realm_objc_dir/$BASENAME" || exit 1
+        cur_dir="$(pwd)"
+        (cd "$realm_objc_dir" && unzip -qq "$cur_dir/$BASENAME-$realm_version.zip") || exit 1
+
+        rm -rf "$tmpdir" || exit 1
+        echo "Done"
         exit 0
         ;;
 
