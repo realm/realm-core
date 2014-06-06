@@ -379,7 +379,7 @@ public:
 
     // Link lists
     LinkViewRef get_linklist(std::size_t column_ndx, std::size_t row_ndx);
-    bool linklist_has_links(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
+    bool linklist_is_empty(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
     std::size_t get_link_count(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
 
     void add_int(std::size_t column_ndx, int64_t value);

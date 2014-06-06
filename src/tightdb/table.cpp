@@ -2498,14 +2498,14 @@ LinkViewRef Table::get_linklist(std::size_t column_ndx, std::size_t row_ndx)
     return column.get_link_view(row_ndx);
 }
 
-bool Table::linklist_has_links(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT
+bool Table::linklist_is_empty(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_LinkList);
     TIGHTDB_ASSERT(row_ndx <= m_size);
 
     const ColumnLinkList& column = get_column<ColumnLinkList, col_type_LinkList>(column_ndx);
-    return column.has_links(row_ndx);
+    return !column.has_links(row_ndx);
 }
 
 size_t Table::get_link_count(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT

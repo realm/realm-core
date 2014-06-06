@@ -72,7 +72,7 @@ public:
     bool is_null_link(std::size_t col_ndx) const TIGHTDB_NOEXCEPT;
     LinkViewRef get_linklist(std::size_t col_ndx);
     ConstLinkViewRef get_linklist(std::size_t col_ndx) const;
-    bool linklist_has_links(std::size_t col_ndx) const TIGHTDB_NOEXCEPT;
+    bool linklist_is_empty(std::size_t col_ndx) const TIGHTDB_NOEXCEPT;
     std::size_t get_link_count(std::size_t col_ndx) const TIGHTDB_NOEXCEPT;
     Mixed get_mixed(std::size_t col_ndx) const TIGHTDB_NOEXCEPT;
     DataType get_mixed_type(std::size_t col_ndx) const TIGHTDB_NOEXCEPT;
@@ -344,9 +344,9 @@ RowFuncs<T,R>::get_linklist(std::size_t col_ndx) const
 }
 
 template<class T, class R>
-inline bool RowFuncs<T,R>::linklist_has_links(std::size_t col_ndx) const TIGHTDB_NOEXCEPT
+inline bool RowFuncs<T,R>::linklist_is_empty(std::size_t col_ndx) const TIGHTDB_NOEXCEPT
 {
-    return get_table().linklist_has_links(col_ndx, get_row_ndx());
+    return get_table().linklist_is_empty(col_ndx, get_row_ndx());
 }
 
 template<class T, class R>

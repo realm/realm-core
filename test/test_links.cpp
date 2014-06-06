@@ -350,7 +350,7 @@ TEST(Links_LinkList_TableOps)
 
     source->insert_linklist(col_link, 0);
     source->insert_done();
-    CHECK(!source->linklist_has_links(col_link, 0));
+    CHECK(source->linklist_is_empty(col_link, 0));
     CHECK_EQUAL(0, source->get_link_count(col_link, 0));
 
     // add some more rows and test that they can be deleted
@@ -399,7 +399,7 @@ TEST(Links_LinkList_Basics)
     links->add(2);
     links->add(1);
     links->add(0);
-    CHECK(source->linklist_has_links(col_link, 0));
+    CHECK(!source->linklist_is_empty(col_link, 0));
     CHECK_EQUAL(3, links->size());
     CHECK_EQUAL(2, links->get_target_row(0));
     CHECK_EQUAL(1, links->get_target_row(1));
@@ -457,7 +457,7 @@ TEST(Links_LinkList_Basics)
 
     // remove all links
     links->clear();
-    CHECK(!source->linklist_has_links(col_link, 0));
+    CHECK(source->linklist_is_empty(col_link, 0));
     CHECK_EQUAL(0, target->get_backlink_count(0, *source, col_link));
     CHECK_EQUAL(0, target->get_backlink_count(1, *source, col_link));
     CHECK_EQUAL(0, target->get_backlink_count(2, *source, col_link));

@@ -4555,8 +4555,8 @@ TEST(Table_RowAccessorLinks)
     Row source_row_2 = source_table->get(1);
     CHECK(source_row_1.is_null_link(0));
     CHECK(source_row_2.is_null_link(0));
-    CHECK(!source_row_1.linklist_has_links(1));
-    CHECK(!source_row_2.linklist_has_links(1));
+    CHECK(source_row_1.linklist_is_empty(1));
+    CHECK(source_row_2.linklist_is_empty(1));
     CHECK_EQUAL(0, source_row_1.get_link_count(1));
     CHECK_EQUAL(0, source_row_2.get_link_count(1));
     CHECK_EQUAL(0, target_table->get(7).get_backlink_count(*source_table, 0));
@@ -4590,8 +4590,8 @@ TEST(Table_RowAccessorLinks)
     link_list_1->add(15);
     link_list_2->add(11);
     link_list_2->add(15);
-    CHECK(source_row_1.linklist_has_links(1));
-    CHECK(source_row_2.linklist_has_links(1));
+    CHECK(!source_row_1.linklist_is_empty(1));
+    CHECK(!source_row_2.linklist_is_empty(1));
     CHECK_EQUAL(1, source_row_1.get_link_count(1));
     CHECK_EQUAL(2, source_row_2.get_link_count(1));
     CHECK_EQUAL(1, target_table->get(11).get_backlink_count(*source_table, 1));
@@ -4604,8 +4604,8 @@ TEST(Table_RowAccessorLinks)
     // Clear link lists
     link_list_1->clear();
     link_list_2->clear();
-    CHECK(!source_row_1.linklist_has_links(1));
-    CHECK(!source_row_2.linklist_has_links(1));
+    CHECK(source_row_1.linklist_is_empty(1));
+    CHECK(source_row_2.linklist_is_empty(1));
     CHECK_EQUAL(0, source_row_1.get_link_count(1));
     CHECK_EQUAL(0, source_row_2.get_link_count(1));
     CHECK_EQUAL(0, target_table->get(11).get_backlink_count(*source_table, 1));
