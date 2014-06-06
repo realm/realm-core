@@ -309,10 +309,9 @@ private:
     // other Specs are also derived from Table.
     template<class> friend class BasicTable;
 
-    // These allow util::bind_ptr to know that this class is derived
-    // from Table.
-    friend class util::bind_ptr<BasicTable>;
-    friend class util::bind_ptr<const BasicTable>;
+    // This one allows util::bind_ptr to know that all BasicTable template
+    // instantiations are derived from Table.
+    template<class> friend class util::bind_ptr;
 
     // These allow BasicTableRef to refer to RowAccessor and
     // ConstRowAccessor.

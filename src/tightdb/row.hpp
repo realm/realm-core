@@ -22,8 +22,10 @@
 
 #include <stdint.h>
 
+#include <tightdb/util/type_traits.hpp>
 #include <tightdb/mixed.hpp>
 #include <tightdb/table_ref.hpp>
+#include <tightdb/link_view_fwd.hpp>
 
 namespace tightdb {
 
@@ -49,6 +51,13 @@ template<class> class BasicRow;
 /// \sa BasicRow
 template<class T, class R> class RowFuncs {
 public:
+    typedef BasicTableRef<T> TableRef; // Same as ConstTableRef if `T` is 'const'
+    typedef BasicTableRef<const T> ConstTableRef;
+
+    typedef typename util::CopyConst<T, LinkView>::type L;
+    typedef util::bind_ptr<L> LinkViewRef; // // Same as ConstLinkViewRef if `T` is 'const'
+    typedef util::bind_ptr<const L> ConstLinkViewRef;
+
     int_fast64_t get_int(std::size_t col_ndx) const TIGHTDB_NOEXCEPT;
     bool get_bool(std::size_t col_ndx) const TIGHTDB_NOEXCEPT;
     float get_float(std::size_t col_ndx) const TIGHTDB_NOEXCEPT;
@@ -56,9 +65,15 @@ public:
     StringData get_string(std::size_t col_ndx) const TIGHTDB_NOEXCEPT;
     BinaryData get_binary(std::size_t col_ndx) const TIGHTDB_NOEXCEPT;
     DateTime get_datetime(std::size_t col_ndx) const TIGHTDB_NOEXCEPT;
-    BasicTableRef<T> get_subtable(std::size_t col_ndx);
-    BasicTableRef<const T> get_subtable(std::size_t col_ndx) const;
+    TableRef get_subtable(std::size_t col_ndx);
+    ConstTableRef get_subtable(std::size_t col_ndx) const;
     std::size_t get_subtable_size(std::size_t col_ndx) const TIGHTDB_NOEXCEPT;
+    std::size_t get_link(std::size_t col_ndx) const TIGHTDB_NOEXCEPT;
+    bool is_null_link(std::size_t col_ndx) const TIGHTDB_NOEXCEPT;
+    LinkViewRef get_linklist(std::size_t col_ndx);
+    ConstLinkViewRef get_linklist(std::size_t col_ndx) const;
+    bool linklist_is_empty(std::size_t col_ndx) const TIGHTDB_NOEXCEPT;
+    std::size_t get_link_count(std::size_t col_ndx) const TIGHTDB_NOEXCEPT;
     Mixed get_mixed(std::size_t col_ndx) const TIGHTDB_NOEXCEPT;
     DataType get_mixed_type(std::size_t col_ndx) const TIGHTDB_NOEXCEPT;
 
@@ -70,8 +85,15 @@ public:
     void set_binary(std::size_t col_ndx, BinaryData value);
     void set_datetime(std::size_t col_ndx, DateTime value);
     void set_subtable(std::size_t col_ndx, const Table* value);
+    void set_link(std::size_t col_ndx, std::size_t value);
+    void nullify_link(std::size_t col_ndx);
     void set_mixed(std::size_t col_ndx, Mixed value);
     void set_mixed_subtable(std::size_t col_ndx, const Table* value);
+
+    std::size_t get_backlink_count(const Table& src_table,
+                                   std::size_t src_col_ndx) const TIGHTDB_NOEXCEPT;
+    std::size_t get_backlink(const Table& src_table, std::size_t src_col_ndx,
+                             std::size_t backlink_ndx) const TIGHTDB_NOEXCEPT;
 
     std::size_t get_column_count() const TIGHTDB_NOEXCEPT;
     DataType get_column_type(std::size_t col_ndx) const TIGHTDB_NOEXCEPT;
@@ -79,7 +101,8 @@ public:
     std::size_t get_column_index(StringData name) const TIGHTDB_NOEXCEPT;
 
 private:
-    T& get_table() const TIGHTDB_NOEXCEPT;
+    T& get_table() TIGHTDB_NOEXCEPT;
+    const T& get_table() const TIGHTDB_NOEXCEPT;
     std::size_t get_row_ndx() const TIGHTDB_NOEXCEPT;
 };
 
@@ -279,13 +302,13 @@ inline DateTime RowFuncs<T,R>::get_datetime(std::size_t col_ndx) const TIGHTDB_N
 }
 
 template<class T, class R>
-inline BasicTableRef<T> RowFuncs<T,R>::get_subtable(std::size_t col_ndx)
+inline typename RowFuncs<T,R>::TableRef RowFuncs<T,R>::get_subtable(std::size_t col_ndx)
 {
     return get_table().get_subtable(col_ndx, get_row_ndx()); // Throws
 }
 
 template<class T, class R>
-inline BasicTableRef<const T> RowFuncs<T,R>::get_subtable(std::size_t col_ndx) const
+inline typename RowFuncs<T,R>::ConstTableRef RowFuncs<T,R>::get_subtable(std::size_t col_ndx) const
 {
     return get_table().get_subtable(col_ndx, get_row_ndx()); // Throws
 }
@@ -293,7 +316,43 @@ inline BasicTableRef<const T> RowFuncs<T,R>::get_subtable(std::size_t col_ndx) c
 template<class T, class R>
 inline std::size_t RowFuncs<T,R>::get_subtable_size(std::size_t col_ndx) const TIGHTDB_NOEXCEPT
 {
-    return get_table().get_subtable_size(col_ndx, get_row_ndx()); // Throws
+    return get_table().get_subtable_size(col_ndx, get_row_ndx());
+}
+
+template<class T, class R>
+inline std::size_t RowFuncs<T,R>::get_link(std::size_t col_ndx) const TIGHTDB_NOEXCEPT
+{
+    return get_table().get_link(col_ndx, get_row_ndx());
+}
+
+template<class T, class R>
+inline bool RowFuncs<T,R>::is_null_link(std::size_t col_ndx) const TIGHTDB_NOEXCEPT
+{
+    return get_table().is_null_link(col_ndx, get_row_ndx());
+}
+
+template<class T, class R>
+inline typename RowFuncs<T,R>::LinkViewRef RowFuncs<T,R>::get_linklist(std::size_t col_ndx)
+{
+    return get_table().get_linklist(col_ndx, get_row_ndx()); // Throws
+}
+
+template<class T, class R> inline typename RowFuncs<T,R>::ConstLinkViewRef
+RowFuncs<T,R>::get_linklist(std::size_t col_ndx) const
+{
+    return get_table().get_linklist(col_ndx, get_row_ndx()); // Throws
+}
+
+template<class T, class R>
+inline bool RowFuncs<T,R>::linklist_is_empty(std::size_t col_ndx) const TIGHTDB_NOEXCEPT
+{
+    return get_table().linklist_is_empty(col_ndx, get_row_ndx());
+}
+
+template<class T, class R>
+inline std::size_t RowFuncs<T,R>::get_link_count(std::size_t col_ndx) const TIGHTDB_NOEXCEPT
+{
+    return get_table().get_link_count(col_ndx, get_row_ndx());
 }
 
 template<class T, class R>
@@ -357,6 +416,18 @@ inline void RowFuncs<T,R>::set_subtable(std::size_t col_ndx, const Table* value)
 }
 
 template<class T, class R>
+inline void RowFuncs<T,R>::set_link(std::size_t col_ndx, std::size_t value)
+{
+    get_table().set_link(col_ndx, get_row_ndx(), value); // Throws
+}
+
+template<class T, class R>
+inline void RowFuncs<T,R>::nullify_link(std::size_t col_ndx)
+{
+    get_table().nullify_link(col_ndx, get_row_ndx()); // Throws
+}
+
+template<class T, class R>
 inline void RowFuncs<T,R>::set_mixed(std::size_t col_ndx, Mixed value)
 {
     get_table().set_mixed(col_ndx, get_row_ndx(), value); // Throws
@@ -366,6 +437,20 @@ template<class T, class R>
 inline void RowFuncs<T,R>::set_mixed_subtable(std::size_t col_ndx, const Table* value)
 {
     get_table().set_mixed_subtable(col_ndx, get_row_ndx(), value); // Throws
+}
+
+template<class T, class R> inline std::size_t
+RowFuncs<T,R>::get_backlink_count(const Table& src_table, std::size_t src_col_ndx) const
+    TIGHTDB_NOEXCEPT
+{
+    return get_table().get_backlink_count(get_row_ndx(), src_table, src_col_ndx);
+}
+
+template<class T, class R>
+inline std::size_t RowFuncs<T,R>::get_backlink(const Table& src_table, std::size_t src_col_ndx,
+                                               std::size_t backlink_ndx) const TIGHTDB_NOEXCEPT
+{
+    return get_table().get_backlink(get_row_ndx(), src_table, src_col_ndx, backlink_ndx);
 }
 
 template<class T, class R>
@@ -392,7 +477,12 @@ inline std::size_t RowFuncs<T,R>::get_column_index(StringData name) const TIGHTD
     return get_table().get_column_index(name);
 }
 
-template<class T, class R> inline T& RowFuncs<T,R>::get_table() const TIGHTDB_NOEXCEPT
+template<class T, class R> inline T& RowFuncs<T,R>::get_table() TIGHTDB_NOEXCEPT
+{
+    return static_cast<const R*>(this)->impl_get_table();
+}
+
+template<class T, class R> inline const T& RowFuncs<T,R>::get_table() const TIGHTDB_NOEXCEPT
 {
     return static_cast<const R*>(this)->impl_get_table();
 }
