@@ -1087,7 +1087,10 @@ public:
     BinaryNode(const BinaryNode& from) 
         : ParentNode(from)
     {
-        m_value = from.m_value;
+        // FIXME: Store this in std::string instead.
+        char* data = new char[from.m_value.size()];
+        memcpy(data, from.m_value.data(), from.m_value.size());
+        m_value = BinaryData(data, from.m_value.size());
         m_condition_column = from.m_condition_column;
         m_column_type = from.m_column_type;
     }
@@ -1139,7 +1142,6 @@ public:
         m_leaf_end = 0;
         m_table = &table;
         m_condition_column = &get_column_base(table, m_condition_column_idx);
-        std::cerr << m_condition_column << " - " << m_condition_column->has_index() << std::endl;
         m_column_type = get_real_column_type(table, m_condition_column_idx);
     }
 
@@ -1173,10 +1175,10 @@ public:
         m_value = StringData(data, from.m_value.size());
         m_condition_column = from.m_condition_column;
         m_column_type = from.m_column_type;
-        m_leaf = from.m_leaf;
+        m_leaf = 0;
         m_leaf_type = from.m_leaf_type;
-        m_end_s = from.m_end_s;
-        m_leaf_start = from.m_leaf_start;
+        m_end_s = 0;
+        m_leaf_start = 0;
     }
 
 protected:
@@ -1283,7 +1285,16 @@ public:
         StringNodeBase::translate_pointers(mapping);
     }
 
-
+    StringNode(const StringNode& from) : StringNodeBase(from)
+    {
+        size_t sz = 6 * m_value.size();
+        char* lcase = new char[sz];
+        char* ucase = new char[sz];
+        memcpy(lcase, from.m_lcase, sz);
+        memcpy(ucase, from.m_ucase, sz);
+        m_lcase = lcase;
+        m_ucase = ucase;
+    }
 protected:
     const char* m_lcase;
     const char* m_ucase;
@@ -1895,10 +1906,12 @@ public:
         ParentNode::translate_pointers(mapping);
     }
 
-    ExpressionNode(const ExpressionNode& from) 
+    ExpressionNode(ExpressionNode& from) 
         : ParentNode(from)
     {
-        m_auto_delete = from.m_auto_delete;
+        // FIXME! We take over any ownership. This is most likely not correct.
+        m_auto_delete = from.m_auto_delete; // shared ownership? deep copy?
+        from.m_auto_delete = false;
         m_compare = from.m_compare;
     }
 

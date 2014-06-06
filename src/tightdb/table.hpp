@@ -1022,14 +1022,12 @@ private:
 
 inline void Table::remove(std::size_t row_ndx)
 {
-    detach_views_except(0);
     do_remove(row_ndx);
     bump_version();
 }
 
-inline void Table::from_view_remove(std::size_t row_ndx, TableViewBase* view)
+inline void Table::from_view_remove(std::size_t row_ndx, TableViewBase*)
 {
-    detach_views_except(view);
     do_remove(row_ndx);
     bump_version();
 }

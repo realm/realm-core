@@ -410,6 +410,7 @@ void TableViewBase::row_to_string(size_t row_ndx, ostream& out) const
 // O(n) for n = this->size()
 void TableView::remove(size_t ndx)
 {
+    sync_if_needed();
     TIGHTDB_ASSERT(m_table);
     TIGHTDB_ASSERT(ndx < m_refs.size());
 
@@ -430,7 +431,7 @@ void TableView::remove(size_t ndx)
 void TableView::clear()
 {
     TIGHTDB_ASSERT(m_table);
-
+    sync_if_needed();
     // sort m_refs
     vector<size_t> v;
     for (size_t t = 0; t < size(); t++)
@@ -451,9 +452,22 @@ void TableView::clear()
 
 void TableViewBase::do_sync() const
 {
-    // do nothing yet
-    m_query.find_all(*(const_cast<TableViewBase*>(this)), m_start, m_end, m_limit);
-    cerr << "sync'ed" << endl;
-    m_last_seen_version = m_table->m_version;
+    // precondition: m_table is attached
+    if (m_query.m_table == 0) {
+        // no valid query
+        m_last_seen_version = m_table->m_version;
+        cerr << "no valid query, not sync'ed" << endl;
+    }
+    else  {
+        // valid query, so clear earlier results and reexecute it.
+        m_refs.clear();
+        // now we are going to do something naughty!
+        // find_all needs to call size() on the tableview. But if we're
+        // out of sync, size() will then call do_sync and we'll have an infinite regress
+        // SO: fake that we're up to date BEFORE calling find_all.
+        m_last_seen_version = m_table->m_version;
+        m_query.find_all(*(const_cast<TableViewBase*>(this)), m_start, m_end, m_limit);
+        cerr << "sync'ed" << endl;
+    }
 }
 #endif // TIGHTDB_ENABLE_REPLICATION

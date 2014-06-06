@@ -78,7 +78,7 @@ Query::Query(const Query& copy, const TCopyExpressionTag&)
         (*i)->translate_pointers(node_mapping);
     }
     if (all_nodes.size() > 0) {
-        first.push_back(all_nodes[0]);
+        first[0] = all_nodes[0];
     }
     m_table = copy.m_table;
     m_tableview = copy.m_tableview;
@@ -871,6 +871,7 @@ size_t Query::find(size_t begin)
 
 void Query::find_all(TableViewBase& ret, size_t start, size_t end, size_t limit) const
 {
+    std::cerr << "Findall " << &ret << std::endl;
     if (limit == 0 || m_table->is_degenerate())
         return;
 
@@ -878,6 +879,9 @@ void Query::find_all(TableViewBase& ret, size_t start, size_t end, size_t limit)
 
     Init(*m_table);
 
+    if (m_tableview)
+        m_tableview->sync_if_needed();
+    std::cerr << "        ->findall" << std::endl;
     if (end == size_t(-1))
         end = m_tableview ? m_tableview->size() : m_table->size();
 

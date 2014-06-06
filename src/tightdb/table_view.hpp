@@ -99,10 +99,6 @@ public:
     DateTime maximum_datetime(size_t column_ndx) const;
     DateTime minimum_datetime(size_t column_ndx) const;
 
-    // Sort the view according to the specified column and the
-    // specified direction. IMPORTANT: Once you've sorted a view,
-    // it cannot be used in queries. Trying to do so will trigger
-    // a runtime exception.
     void sort(size_t column_ndx, bool ascending = true);
 
     void apply_same_order(TableViewBase& order);
@@ -126,7 +122,7 @@ public:
 protected:
     // Null if, and only if, the view is detached
     mutable TableRef m_table;
-    Column m_refs;
+    mutable Column m_refs;
     Query m_query;
     // parameters for findall, needed to rerun the query
     size_t m_start;
@@ -161,9 +157,21 @@ protected:
     mutable uint_fast64_t m_last_seen_version;
     void do_sync() const;
     inline void sync_if_needed() const {
-        if (m_table == 0 || m_last_seen_version != m_table->m_version) {
-            do_sync();
+        if (m_table) {
+            std::cerr << this << ".sync_if_needed(), seen " << m_last_seen_version 
+                      << " compared to " << m_table->m_version << std::endl;
+            if (m_query.m_tableview)
+                std::cerr << "       - with associated tableview at "
+                          << m_query.m_tableview << " at version "
+                          << m_query.m_tableview->m_last_seen_version
+                          << std::endl;
+            if (m_last_seen_version != m_table->m_version) {
+                do_sync();
+            }
         }
+        else
+            std::cerr << this << ".sync_if_needed(), seen " << m_last_seen_version 
+                      << "but m_table is not valid" << std::endl;
     }
 #else
     inline void sync_if_needed() const {};
@@ -393,7 +401,7 @@ inline TableViewBase::TableViewBase(Table* parent, Query& query, size_t start, s
 }
 
 inline TableViewBase::TableViewBase(const TableViewBase& tv):
-    m_table(tv.m_table), 
+    m_table(tv.m_table),
     m_refs(tv.m_refs)
 {
 #ifdef TIGHTDB_ENABLE_REPLICATION
@@ -404,7 +412,7 @@ inline TableViewBase::TableViewBase(const TableViewBase& tv):
 }
 
 inline TableViewBase::TableViewBase(TableViewBase* tv) TIGHTDB_NOEXCEPT:
-    m_table(tv->m_table), 
+    m_table(tv->m_table),
     m_refs(tv->m_refs) // Note: This is a moving copy. It detaches m_refs, so no need for explicit detach later
 {
 #ifdef TIGHTDB_ENABLE_REPLICATION

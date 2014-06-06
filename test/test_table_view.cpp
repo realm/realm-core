@@ -408,11 +408,13 @@ TEST(TableView_Follows_Changes)
     TableView v2 = q2.find_all();
 
     // now the fun begins
+    CHECK_EQUAL(1, v.size());
     table.add_empty_row();
+    CHECK_EQUAL(1, v.size());
     table.set_int(0,1,1);
     CHECK_EQUAL(2, v.size());
+    CHECK_EQUAL(1, v.get_int(0,0));
     CHECK_EQUAL(1, v.get_int(0,1));
-    CHECK_EQUAL(1, v.get_int(1,1));
     table.set_int(0,0,7);
     CHECK_EQUAL(1, v.size());
     CHECK_EQUAL(1, v.get_int(0,0));

@@ -3411,7 +3411,14 @@ TEST(Query_Sort_And_Requery_Untyped2)
     CHECK_EQUAL(9, tv3.get_int(0, 3));
 
     // Test that remove() maintains order
+    std::cerr << "trigger A" << std::endl;
     tv3.remove(0);
+    std::cerr << "trigger B" << std::endl;
+    CHECK_EQUAL(3, tv3.size());
+    CHECK_EQUAL(1, tv3.get_int(0, 0));
+    CHECK_EQUAL(8, tv3.get_int(0, 1)); // 8, 9 (sort order) instead of 9, 8 (table order)
+    CHECK_EQUAL(9, tv3.get_int(0, 2));
+
     Query q4 = table.where(&tv3).not_equal(1, "X");
     TableView tv4 = q4.find_all();
 

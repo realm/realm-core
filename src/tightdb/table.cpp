@@ -1700,7 +1700,6 @@ void Table::clear()
 {
     TIGHTDB_ASSERT(is_attached());
     bump_version();
-    detach_views_except(0);
 
     size_t num_cols = m_spec.get_column_count();
     for (size_t col_ndx = 0; col_ndx != num_cols; ++col_ndx) {
@@ -2598,7 +2597,6 @@ size_t Table::linklist_get_link(size_t column_ndx, size_t row_ndx, size_t link_n
 void Table::insert_done()
 {
     bump_version();
-    detach_views_except(0);
 
     size_t row_ndx = m_size;
     size_t num_rows = 1;
