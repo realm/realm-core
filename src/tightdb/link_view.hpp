@@ -155,7 +155,7 @@ inline Table::RowExpr LinkView::get(std::size_t row_ndx) TIGHTDB_NOEXCEPT
     TIGHTDB_ASSERT(m_refs.is_attached());
     TIGHTDB_ASSERT(row_ndx < m_refs.size());
 
-    std::size_t real_row_ndx = m_refs.get(row_ndx);
+    std::size_t real_row_ndx = to_size_t(m_refs.get(row_ndx));
     return (*m_table)[real_row_ndx];
 }
 
@@ -170,7 +170,7 @@ inline std::size_t LinkView::get_target_row(std::size_t row_ndx) const TIGHTDB_N
     TIGHTDB_ASSERT(m_refs.is_attached());
     TIGHTDB_ASSERT(row_ndx < m_refs.size());
 
-    return m_refs.get(row_ndx);
+    return to_size_t(m_refs.get(row_ndx));
 }
 
 inline void LinkView::add(std::size_t target_row_ndx)
