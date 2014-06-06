@@ -528,6 +528,13 @@ TEST(Links_LinkList_Backlinks)
     CHECK_EQUAL(1, target->get_backlink(1, *source, col_link, 0));
     CHECK_EQUAL(0, target->get_backlink_count(2, *source, col_link));
 
+    // delete last row and make sure backlinks are updated
+    source->move_last_over(1);
+    CHECK_EQUAL(1, target->get_backlink_count(0, source_table_ndx, col_link));
+    CHECK_EQUAL(0, target->get_backlink(0, source_table_ndx, col_link, 0));
+    CHECK_EQUAL(0, target->get_backlink_count(1, source_table_ndx, col_link));
+    CHECK_EQUAL(0, target->get_backlink_count(2, source_table_ndx, col_link));
+
     // remove all link lists and make sure backlinks are updated
     source->clear();
     CHECK_EQUAL(0, target->get_backlink_count(0, *source, col_link));
