@@ -26,7 +26,7 @@
 #ifdef TIGHTDB_DEBUG
 #  include <tightdb/util/terminate.hpp>
 #  define TIGHTDB_ASSERT(condition) \
-    (condition ? static_cast<void>(0) : \
+    ((condition) ? static_cast<void>(0) :                               \
      tightdb::util::terminate("Assertion failed: " #condition, __FILE__, __LINE__))
 #else
 #  define TIGHTDB_ASSERT(condition) static_cast<void>(0)

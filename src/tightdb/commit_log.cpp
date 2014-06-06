@@ -68,7 +68,6 @@ private:
     bool is_a_known_commit(version_type version);
     bool is_anybody_interested(version_type version);
 
-    // the Moooootex :-)
     util::Mutex m_mutex;
 
     // array holding all commits. Array start with version 'm_array_start',
@@ -372,7 +371,7 @@ public:
     void do_clear_interrupt() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {};
     void do_transact_log_reserve(std::size_t sz) TIGHTDB_OVERRIDE;
     void do_transact_log_append(const char* data, std::size_t size) TIGHTDB_OVERRIDE;
-    void transact_log_reserve(std::size_t n) TIGHTDB_OVERRIDE;
+    void transact_log_reserve(std::size_t n);
 protected:
     std::string m_database_name;
     util::Buffer<char> m_transact_log_buffer;
@@ -386,7 +385,7 @@ protected:
 
 
 
-void WriteLogCollector::do_begin_write_transact(SharedGroup& sg) TIGHTDB_OVERRIDE
+void WriteLogCollector::do_begin_write_transact(SharedGroup& sg)
 {
     static_cast<void>(sg);
     m_transact_log_free_begin = m_transact_log_buffer.data();
@@ -396,7 +395,7 @@ void WriteLogCollector::do_begin_write_transact(SharedGroup& sg) TIGHTDB_OVERRID
 
 WriteLogCollector::version_type 
 WriteLogCollector::do_commit_write_transact(SharedGroup& sg, 
-	WriteLogCollector::version_type orig_version) TIGHTDB_OVERRIDE
+	WriteLogCollector::version_type orig_version)
 {
     static_cast<void>(sg);
     char* data     = m_transact_log_buffer.release();
@@ -407,27 +406,27 @@ WriteLogCollector::do_commit_write_transact(SharedGroup& sg,
 }
 
 
-void WriteLogCollector::do_rollback_write_transact(SharedGroup& sg) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
+void WriteLogCollector::do_rollback_write_transact(SharedGroup& sg) TIGHTDB_NOEXCEPT
 {
     // not used in this setting
     static_cast<void>(sg);
 }
 
 
-void WriteLogCollector::do_transact_log_reserve(std::size_t sz) TIGHTDB_OVERRIDE
+void WriteLogCollector::do_transact_log_reserve(std::size_t sz)
 {
     transact_log_reserve(sz);
 }
 
 
-void WriteLogCollector::do_transact_log_append(const char* data, std::size_t size) TIGHTDB_OVERRIDE
+void WriteLogCollector::do_transact_log_append(const char* data, std::size_t size)
 {
     transact_log_reserve(size);
     m_transact_log_free_begin = std::copy(data, data+size, m_transact_log_free_begin);
 }
 
 
-void WriteLogCollector::transact_log_reserve(std::size_t n) TIGHTDB_OVERRIDE
+void WriteLogCollector::transact_log_reserve(std::size_t n)
 {
     char* data = m_transact_log_buffer.data();
     std::size_t size = m_transact_log_free_begin - data;
