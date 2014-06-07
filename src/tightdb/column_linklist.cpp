@@ -112,7 +112,23 @@ void ColumnLinkList::move_last_over(size_t target_row_ndx, size_t last_row_ndx)
 
 void ColumnLinkList::erase(std::size_t ndx, bool is_last)
 {
+    TIGHTDB_ASSERT(ndx+1 == size());
     TIGHTDB_ASSERT(is_last);
+
+    // Remove backlinks to the delete row
+    ref_type ref = Column::get_as_ref(ndx);
+    if (ref) {
+        const Column linkcol(ref, null_ptr, 0, get_alloc());
+        size_t count = linkcol.size();
+        for (size_t i = 0; i < count; ++i) {
+            size_t old_target_row_ndx = linkcol.get(i);
+            m_backlinks->remove_backlink(old_target_row_ndx, ndx);
+        }
+    }
+
+    // Do the actual delete
+    Column::destroy_subtree(ndx, false);
+    Column::erase(ndx, is_last);
 
     // Detach accessors to the deleted row
     std::vector<LinkView*>::iterator end = m_views.end();
@@ -123,11 +139,6 @@ void ColumnLinkList::erase(std::size_t ndx, bool is_last)
             break;
         }
     }
-
-    Column::destroy_subtree(ndx, false);
-    Column::erase(ndx, is_last);
-
-    //TODO: update backlinks
 }
 
 void ColumnLinkList::do_nullify_link(size_t row_ndx, size_t old_target_row_ndx)
