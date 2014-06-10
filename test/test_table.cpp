@@ -2784,14 +2784,17 @@ TEST(Table_SetSubTableByExample2)
 
     // Verify the sub table is empty
     {
+        cerr << "gylle 1" << endl;
         TableRef subtable = view.get_subtable(2, 0);
         CHECK(subtable->is_empty());
 
         //add a subtable into the second table row (first view row), resembling the sub we just created
         view.set_subtable(2,0,&sub);
+        cerr << "gylle 2" << endl;
 
         TableRef subtable2 = view.get_subtable(2, 0);//fetch back the subtable from the view
 
+        CHECK_EQUAL(false, subtable->is_empty());
         CHECK_EQUAL(42,     subtable2->get_int(0, 0));
         CHECK_EQUAL("forty two", subtable2->get_string(1, 0));
         CHECK_EQUAL(3,     subtable2->get_int(0, 1));
