@@ -478,12 +478,12 @@ bool got_called = false;
 bool comparer(const char* s1, const char* s2)
 {
     got_called = true;
-    return *s1 < *s2;  
+    return *s1 < *s2;
 }
 
 TEST(TableView_StringSort)
 {
-    // WARNING: Do not use the C++11 method (set_string_compare_method(1)) on Windows 8.1 because it has a bug that 
+    // WARNING: Do not use the C++11 method (set_string_compare_method(1)) on Windows 8.1 because it has a bug that
     // takes length in count when sorting ("b" comes before "aaaa"). Bug is not present in Windows 7.
 
     // Test of handling of unicode takes place in test_utf8.cpp
@@ -571,7 +571,7 @@ TEST(TableView_FloatDoubleSort)
 
 TEST(TableView_DoubleSortPrecision)
 {
-    // Detect if sorting algorithm accidentially casts doubles to float somewhere so that precision gets lost 
+    // Detect if sorting algorithm accidentially casts doubles to float somewhere so that precision gets lost
     TestTableFloatDouble t;
 
     double d1 = 100000000000.0;
@@ -582,10 +582,10 @@ TEST(TableView_DoubleSortPrecision)
     float f2 = static_cast<float>(d2);
 
     // If this check fails, it's a bug in this unit test, not in Realm
-    CHECK_EQUAL(f1, f2); 
+    CHECK_EQUAL(f1, f2);
 
     // First verify that our unit is guaranteed to find such a bug; that is, test if such a cast is guaranteed to give
-    // bad sorting order. This is not granted, because an unstable sorting algorithm could *by chance* give the 
+    // bad sorting order. This is not granted, because an unstable sorting algorithm could *by chance* give the
     // correct sorting order. Fortunatly we use std::stable_sort which must maintain order on draws.
     t.add(f2, d2);
     t.add(f1, d1);
@@ -1124,6 +1124,7 @@ TEST(TableView_RefCounting)
     CHECK_EQUAL(s, "just a test string");
 }
 
+
 TEST(TableView_DynPivot)
 {
     TableRef table = Table::create();
@@ -1172,6 +1173,23 @@ TEST(TableView_DynPivot)
     CHECK_EQUAL(2, result_count2.size());
     CHECK_EQUAL(half, result_count2.get_int(1, 0));
     CHECK_EQUAL(half, result_count2.get_int(1, 1));
+}
+
+
+TEST(TableView_RowAccessor)
+{
+    Table table;
+    table.add_column(type_Int, "");
+    table.add_empty_row();
+    table.set_int(0, 0, 703);
+    TableView tv = table.where().find_all();
+    Row row = tv[0];
+    CHECK_EQUAL(703, row.get_int(0));
+    ConstRow crow = tv[0];
+    CHECK_EQUAL(703, crow.get_int(0));
+    ConstTableView ctv = table.where().find_all();
+    ConstRow crow_2 = ctv[0];
+    CHECK_EQUAL(703, crow_2.get_int(0));
 }
 
 

@@ -853,6 +853,27 @@ void Column::erase(size_t ndx, bool is_last)
     Array::erase_bptree_elem(m_array, ndx_2, handler); // Throws
 }
 
+void Column::destroy_subtree(size_t ndx, bool clear_value)
+{
+    ref_type ref = get_as_ref(ndx);
+
+    // Null-refs indicate empty sub-trees
+    if (ref == 0)
+        return;
+
+    // A ref is always 8-byte aligned, so the lowest bit
+    // cannot be set. If it is, it means that it should not be
+    // interpreted as a ref.
+    if (ref % 2 != 0)
+        return;
+
+    // Delete sub-tree
+    Allocator& alloc = get_alloc();
+    Array::destroy_deep(ref, alloc);
+
+    if (clear_value)
+        set(ndx, 0);
+}
 
 void Column::move_last_over(size_t target_row_ndx, size_t last_row_ndx)
 {

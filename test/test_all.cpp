@@ -18,6 +18,7 @@
 
 #include "test_all.hpp"
 #include "util/timer.hpp"
+#include "util/resource_limits.hpp"
 
 #include "test.hpp"
 
@@ -72,6 +73,23 @@ const char* file_order[] = {
 
     "large_tests*.cpp"
 };
+
+
+void fix_max_open_files()
+{
+    if (system_has_rlimit(resource_NumOpenFiles)) {
+        long soft_limit = get_soft_rlimit(resource_NumOpenFiles);
+        if (soft_limit >= 0) {
+            long hard_limit = get_hard_rlimit(resource_NumOpenFiles);
+            long new_soft_limit = hard_limit < 0 ? 4096 : hard_limit;
+            if (new_soft_limit > soft_limit) {
+                set_soft_rlimit(resource_NumOpenFiles, new_soft_limit);
+                cout << "\n"
+                    "MaxOpenFiles: "<<soft_limit<<" --> "<<new_soft_limit<<"\n";
+            }
+        }
+    }
+}
 
 
 void fix_async_daemon_path()
@@ -324,6 +342,7 @@ int test_all(int argc, char* argv[])
 {
     bool no_error_exit_staus = 2 <= argc && strcmp(argv[1], "--no-error-exitcode") == 0;
 
+    fix_max_open_files();
     fix_async_daemon_path();
     display_build_config();
 

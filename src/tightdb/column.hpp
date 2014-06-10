@@ -115,7 +115,7 @@ public:
                           bool use_retval = false) const TIGHTDB_NOEXCEPT;
 
     inline void detach(void);
-    inline bool is_attached(void);
+    inline bool is_attached(void) const TIGHTDB_NOEXCEPT;
 
     static std::size_t get_size_from_type_and_ref(ColumnType, ref_type, Allocator&) TIGHTDB_NOEXCEPT;
 
@@ -324,6 +324,7 @@ public:
     void insert(std::size_t, std::size_t, bool) TIGHTDB_OVERRIDE;
     void erase(std::size_t ndx, bool is_last) TIGHTDB_OVERRIDE;
     void move_last_over(std::size_t, std::size_t) TIGHTDB_OVERRIDE;
+    void destroy_subtree(size_t ndx, bool clear_value=true);
 
     void adjust(int_fast64_t diff);
     void adjust_ge(int_fast64_t limit, int_fast64_t diff);
@@ -401,7 +402,7 @@ inline void ColumnBase::detach()
     m_array->detach();
 }
 
-inline bool ColumnBase::is_attached()
+inline bool ColumnBase::is_attached() const TIGHTDB_NOEXCEPT
 {
     return m_array->is_attached();
 }
@@ -574,6 +575,12 @@ inline Column::Column(Array::Type type, ArrayParent* parent, std::size_t ndx_in_
 inline Column::Column(ref_type ref, ArrayParent* parent, std::size_t ndx_in_parent,
                       Allocator& alloc):
     ColumnBase(new Array(ref, parent, ndx_in_parent, alloc)) {}
+
+inline Column::Column(ArrayParent* parent, std::size_t ndx_in_parent, Allocator& alloc) :
+    ColumnBase(new Array(alloc))
+{
+    set_parent(parent, ndx_in_parent);
+}
 
 inline Column::Column(const Column& column): ColumnBase(column.m_array)
 {

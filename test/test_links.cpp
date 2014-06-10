@@ -29,13 +29,11 @@ TEST(Links_Columns)
 
     Group group;
 
-    size_t table1_ndx = 0;
-    size_t table2_ndx = 1;
     TableRef table1 = group.get_table("table1");
     TableRef table2 = group.get_table("table2");
 
     // table1 can link to table2
-    table2->add_column_link(type_Link, "link", table1_ndx);
+    table2->add_column_link(type_Link, "link", *table1);
 
     // add some more columns to table1 and table2
     table1->add_column(type_String, "col1");
@@ -48,29 +46,29 @@ TEST(Links_Columns)
     table2->add_empty_row();
     table2->add_empty_row();
 
-    size_t col_link2 = table1->add_column_link(type_Link, "link", table2_ndx);
+    size_t col_link2 = table1->add_column_link(type_Link, "link", *table2);
 
     // set some links
     table1->set_link(col_link2, 0, 1);
-    CHECK_EQUAL(1, table2->get_backlink_count(1, table1_ndx, col_link2));
-    CHECK_EQUAL(0, table2->get_backlink(1, table1_ndx, col_link2, 0));
+    CHECK_EQUAL(1, table2->get_backlink_count(1, *table1, col_link2));
+    CHECK_EQUAL(0, table2->get_backlink(1, *table1, col_link2, 0));
 
     // insert new column at specific location (moving link column)
     table1->insert_column(0, type_Int, "first");
     size_t new_link_col_ndx = col_link2 + 1;
-    CHECK_EQUAL(1, table2->get_backlink_count(1, table1_ndx, new_link_col_ndx));
-    CHECK_EQUAL(0, table2->get_backlink(1, table1_ndx, new_link_col_ndx, 0));
+    CHECK_EQUAL(1, table2->get_backlink_count(1, *table1, new_link_col_ndx));
+    CHECK_EQUAL(0, table2->get_backlink(1, *table1, new_link_col_ndx, 0));
 
     // add one more column (moving link column)
     table1->insert_column(1, type_Int, "second");
     size_t new_link_col_ndx2 = new_link_col_ndx + 1;
-    CHECK_EQUAL(1, table2->get_backlink_count(1, table1_ndx, new_link_col_ndx2));
-    CHECK_EQUAL(0, table2->get_backlink(1, table1_ndx, new_link_col_ndx2, 0));
+    CHECK_EQUAL(1, table2->get_backlink_count(1, *table1, new_link_col_ndx2));
+    CHECK_EQUAL(0, table2->get_backlink(1, *table1, new_link_col_ndx2, 0));
 
     // remove a column (moving link column back)
     table1->remove_column(0);
-    CHECK_EQUAL(1, table2->get_backlink_count(1, table1_ndx, new_link_col_ndx));
-    CHECK_EQUAL(0, table2->get_backlink(1, table1_ndx, new_link_col_ndx, 0));
+    CHECK_EQUAL(1, table2->get_backlink_count(1, *table1, new_link_col_ndx));
+    CHECK_EQUAL(0, table2->get_backlink(1, *table1, new_link_col_ndx, 0));
 }
 
 TEST(Links_Basic)
@@ -81,16 +79,14 @@ TEST(Links_Basic)
     {
         Group group;
 
-        size_t table1_ndx = 0;
         TestTableLinks::Ref table1 = group.get_table<TestTableLinks>("table1");
         table1->add("test1", 1, true, Mon);
         table1->add("test2", 2, false, Tue);
         table1->add("test3", 3, true, Wed);
 
         // create table with links to table1
-        size_t table2_ndx = 1;
         TableRef table2 = group.get_table("table2");
-        size_t col_link = table2->add_column_link(type_Link, "link", table1_ndx);
+        size_t col_link = table2->add_column_link(type_Link, "link", *TableRef(table1));
         CHECK_EQUAL(table1, table2->get_link_target(col_link));
 
         // add a few links
@@ -107,11 +103,11 @@ TEST(Links_Basic)
         CHECK_EQUAL(0, link_ndx2);
 
         // Verify backlinks
-        CHECK_EQUAL(1, table1->get_backlink_count(0, table2_ndx, col_link));
-        CHECK_EQUAL(1, table1->get_backlink(0, table2_ndx, col_link, 0));
-        CHECK_EQUAL(1, table1->get_backlink_count(1, table2_ndx, col_link));
-        CHECK_EQUAL(0, table1->get_backlink(1, table2_ndx, col_link, 0));
-        CHECK_EQUAL(0, table1->get_backlink_count(2, table2_ndx, col_link));
+        CHECK_EQUAL(1, table1->get_backlink_count(0, *table2, col_link));
+        CHECK_EQUAL(1, table1->get_backlink(0, *table2, col_link, 0));
+        CHECK_EQUAL(1, table1->get_backlink_count(1, *table2, col_link));
+        CHECK_EQUAL(0, table1->get_backlink(1, *table2, col_link, 0));
+        CHECK_EQUAL(0, table1->get_backlink_count(2, *table2, col_link));
 
         // Follow links using typed accessors
         CHECK_EQUAL("test2", table2->get_link_accessor<TestTableLinks>(0, 0).first);
@@ -124,9 +120,9 @@ TEST(Links_Basic)
 
         size_t link_ndx3 = table2->get_link(col_link, 1);
         CHECK_EQUAL(2, link_ndx3);
-        CHECK_EQUAL(0, table1->get_backlink_count(0, table2_ndx, col_link));
-        CHECK_EQUAL(1, table1->get_backlink_count(2, table2_ndx, col_link));
-        CHECK_EQUAL(1, table1->get_backlink(2, table2_ndx, col_link, 0));
+        CHECK_EQUAL(0, table1->get_backlink_count(0, *table2, col_link));
+        CHECK_EQUAL(1, table1->get_backlink_count(2, *table2, col_link));
+        CHECK_EQUAL(1, table1->get_backlink(2, *table2, col_link, 0));
 
         // Delete a link. Note that links only work with unordered
         // top-level tables, so you have to delete with move_last_over
@@ -136,25 +132,25 @@ TEST(Links_Basic)
         CHECK_EQUAL(1, table2->size());
         CHECK_EQUAL(2, table2->get_link(col_link, 0));
 
-        CHECK_EQUAL(0, table1->get_backlink_count(0, table2_ndx, col_link));
-        CHECK_EQUAL(0, table1->get_backlink_count(1, table2_ndx, col_link));
-        CHECK_EQUAL(1, table1->get_backlink_count(2, table2_ndx, col_link));
-        CHECK_EQUAL(0, table1->get_backlink(2, table2_ndx, col_link, 0));
+        CHECK_EQUAL(0, table1->get_backlink_count(0, *table2, col_link));
+        CHECK_EQUAL(0, table1->get_backlink_count(1, *table2, col_link));
+        CHECK_EQUAL(1, table1->get_backlink_count(2, *table2, col_link));
+        CHECK_EQUAL(0, table1->get_backlink(2, *table2, col_link, 0));
 
         // Nullify a link
         table2->nullify_link(col_link, 0);
         CHECK(table2->is_null_link(col_link, 0));
-        CHECK_EQUAL(0, table1->get_backlink_count(2, table2_ndx, col_link));
+        CHECK_EQUAL(0, table1->get_backlink_count(2, *table2, col_link));
 
         // Add a new row to target table and verify that backlinks are
         // tracked for it as well
         table1->add("test4", 4, false, Thu);
-        CHECK_EQUAL(0, table1->get_backlink_count(3, table2_ndx, col_link));
+        CHECK_EQUAL(0, table1->get_backlink_count(3, *table2, col_link));
 
         table1->add_empty_row();
-        CHECK_EQUAL(0, table1->get_backlink_count(4, table2_ndx, col_link));
+        CHECK_EQUAL(0, table1->get_backlink_count(4, *table2, col_link));
         table2->set_link(col_link, 0, 4);
-        CHECK_EQUAL(1, table1->get_backlink_count(4, table2_ndx, col_link));
+        CHECK_EQUAL(1, table1->get_backlink_count(4, *table2, col_link));
 
         group.write(path);
     }
@@ -179,16 +175,14 @@ TEST(Links_Deletes)
 {
     Group group;
 
-    size_t table1_ndx = 0;
     TestTableLinks::Ref table1 = group.get_table<TestTableLinks>("table1");
     table1->add("test1", 1, true,  Mon);
     table1->add("test2", 2, false, Tue);
     table1->add("test3", 3, true,  Wed);
 
     // create table with links to table1
-    size_t table2_ndx = 1;
     TableRef table2 = group.get_table("table2");
-    size_t col_link = table2->add_column_link(type_Link, "link", table1_ndx);
+    size_t col_link = table2->add_column_link(type_Link, "link", *TableRef(table1));
     CHECK_EQUAL(table1, table2->get_link_target(col_link));
 
     // add a few links
@@ -202,8 +196,8 @@ TEST(Links_Deletes)
     }
 
     CHECK(table2->is_empty());
-    CHECK_EQUAL(0, table1->get_backlink_count(0, table2_ndx, col_link));
-    CHECK_EQUAL(0, table1->get_backlink_count(2, table2_ndx, col_link));
+    CHECK_EQUAL(0, table1->get_backlink_count(0, *table2, col_link));
+    CHECK_EQUAL(0, table1->get_backlink_count(2, *table2, col_link));
 
     // add links again
     table2->insert_link(col_link, 0, 1);
@@ -229,8 +223,8 @@ TEST(Links_Deletes)
 
     // clear entire table and make sure backlinks are removed as well
     table2->clear();
-    CHECK_EQUAL(0, table1->get_backlink_count(0, table2_ndx, col_link));
-    CHECK_EQUAL(0, table1->get_backlink_count(2, table2_ndx, col_link));
+    CHECK_EQUAL(0, table1->get_backlink_count(0, *table2, col_link));
+    CHECK_EQUAL(0, table1->get_backlink_count(2, *table2, col_link));
 
     // add links again
     table2->insert_link(col_link, 0, 1);
@@ -249,16 +243,14 @@ TEST(Links_Multi)
     // Multiple links to same rows
     Group group;
 
-    size_t table1_ndx = 0;
     TestTableLinks::Ref table1 = group.get_table<TestTableLinks>("table1");
     table1->add("test1", 1, true,  Mon);
     table1->add("test2", 2, false, Tue);
     table1->add("test3", 3, true,  Wed);
 
     // create table with links to table1
-    size_t table2_ndx = 1;
     TableRef table2 = group.get_table("table2");
-    size_t col_link = table2->add_column_link(type_Link, "link", table1_ndx);
+    size_t col_link = table2->add_column_link(type_Link, "link", *TableRef(table1));
     CHECK_EQUAL(table1, table2->get_link_target(col_link));
 
     // add a few links pointing to same row
@@ -269,21 +261,21 @@ TEST(Links_Multi)
     table2->insert_link(col_link, 2, 1);
     table2->insert_done();
 
-    CHECK_EQUAL(3, table1->get_backlink_count(1, table2_ndx, col_link));
-    CHECK_EQUAL(0, table1->get_backlink(1, table2_ndx, col_link, 0));
-    CHECK_EQUAL(1, table1->get_backlink(1, table2_ndx, col_link, 1));
-    CHECK_EQUAL(2, table1->get_backlink(1, table2_ndx, col_link, 2));
+    CHECK_EQUAL(3, table1->get_backlink_count(1, *table2, col_link));
+    CHECK_EQUAL(0, table1->get_backlink(1, *table2, col_link, 0));
+    CHECK_EQUAL(1, table1->get_backlink(1, *table2, col_link, 1));
+    CHECK_EQUAL(2, table1->get_backlink(1, *table2, col_link, 2));
 
     // nullify a link
     table2->nullify_link(col_link, 1);
-    CHECK_EQUAL(2, table1->get_backlink_count(1, table2_ndx, col_link));
-    CHECK_EQUAL(0, table1->get_backlink(1, table2_ndx, col_link, 0));
-    CHECK_EQUAL(2, table1->get_backlink(1, table2_ndx, col_link, 1));
+    CHECK_EQUAL(2, table1->get_backlink_count(1, *table2, col_link));
+    CHECK_EQUAL(0, table1->get_backlink(1, *table2, col_link, 0));
+    CHECK_EQUAL(2, table1->get_backlink(1, *table2, col_link, 1));
 
     // nullify one more to reduce to one link (test re-inlining)
     table2->nullify_link(col_link, 0);
-    CHECK_EQUAL(1, table1->get_backlink_count(1, table2_ndx, col_link));
-    CHECK_EQUAL(2, table1->get_backlink(1, table2_ndx, col_link, 0));
+    CHECK_EQUAL(1, table1->get_backlink_count(1, *table2, col_link));
+    CHECK_EQUAL(2, table1->get_backlink(1, *table2, col_link, 0));
 
     // re-add links
     table2->set_link(col_link, 0, 1);
@@ -291,9 +283,9 @@ TEST(Links_Multi)
 
     // remove a row
     table2->move_last_over(0);
-    CHECK_EQUAL(2, table1->get_backlink_count(1, table2_ndx, col_link));
-    CHECK_EQUAL(0, table1->get_backlink(1, table2_ndx, col_link, 0));
-    CHECK_EQUAL(1, table1->get_backlink(1, table2_ndx, col_link, 1));
+    CHECK_EQUAL(2, table1->get_backlink_count(1, *table2, col_link));
+    CHECK_EQUAL(0, table1->get_backlink(1, *table2, col_link, 0));
+    CHECK_EQUAL(1, table1->get_backlink(1, *table2, col_link, 1));
 
     // add some more links and see that they get nullified when the target
     // is removed
@@ -301,25 +293,51 @@ TEST(Links_Multi)
     table2->insert_done();
     table2->insert_link(col_link, 3, 2);
     table2->insert_done();
-    CHECK_EQUAL(2, table1->get_backlink_count(2, table2_ndx, col_link));
+    CHECK_EQUAL(2, table1->get_backlink_count(2, *table2, col_link));
 
     table1->move_last_over(1);
     CHECK(table2->is_null_link(col_link, 0));
     CHECK(table2->is_null_link(col_link, 1));
     CHECK(!table2->is_null_link(col_link, 2));
     CHECK(!table2->is_null_link(col_link, 3));
-    
+
     // remove all rows from target and verify that links get nullified
     table1->clear();
     CHECK(table2->is_null_link(col_link, 2));
     CHECK(table2->is_null_link(col_link, 3));
 }
 
+TEST(Links_MultiToSame)
+{
+    Group group;
+
+    TestTableLinks::Ref table1 = group.get_table<TestTableLinks>("table1");
+    table1->add("test1", 1, true,  Mon);
+    table1->add("test2", 2, false, Tue);
+    table1->add("test3", 3, true,  Wed);
+
+    // create table with multiple links to table1
+    TableRef table2 = group.get_table("table2");
+    size_t col_link1 = table2->add_column_link(type_Link, "link1", *TableRef(table1));
+    size_t col_link2 = table2->add_column_link(type_Link, "link2", *TableRef(table1));
+    CHECK_EQUAL(table1, table2->get_link_target(col_link1));
+    CHECK_EQUAL(table1, table2->get_link_target(col_link2));
+
+    table2->add_empty_row();
+    table2->set_link(col_link1, 0, 0);
+    table2->set_link(col_link2, 0, 0);
+    CHECK_EQUAL(1, table1->get_backlink_count(0, *table2, col_link1));
+    CHECK_EQUAL(1, table1->get_backlink_count(0, *table2, col_link2));
+
+    table2->move_last_over(0);
+    CHECK_EQUAL(0, table1->get_backlink_count(0, *table2, col_link1));
+    CHECK_EQUAL(0, table1->get_backlink_count(0, *table2, col_link2));
+}
+
 TEST(Links_LinkList_TableOps)
 {
     Group group;
 
-    size_t target_table_ndx = 0;
     TestTableLinks::Ref target = group.get_table<TestTableLinks>("target");
     target->add("test1", 1, true,  Mon);
     target->add("test2", 2, false, Tue);
@@ -327,12 +345,12 @@ TEST(Links_LinkList_TableOps)
 
     // create table with links to target table
     TableRef source = group.get_table("source");
-    size_t col_link = source->add_column_link(type_LinkList, "links", target_table_ndx);
+    size_t col_link = source->add_column_link(type_LinkList, "links", *TableRef(target));
     CHECK_EQUAL(target, source->get_link_target(col_link));
 
     source->insert_linklist(col_link, 0);
     source->insert_done();
-    CHECK(!source->linklist_has_links(col_link, 0));
+    CHECK(source->linklist_is_empty(col_link, 0));
     CHECK_EQUAL(0, source->get_link_count(col_link, 0));
 
     // add some more rows and test that they can be deleted
@@ -362,93 +380,93 @@ TEST(Links_LinkList_Basics)
 {
     Group group;
 
-    size_t target_table_ndx = 0;
     TestTableLinks::Ref target = group.get_table<TestTableLinks>("target");
     target->add("test1", 1, true,  Mon);
     target->add("test2", 2, false, Tue);
     target->add("test3", 3, true,  Wed);
 
     // create table with links to target table
-    size_t source_table_ndx = 1;
     TableRef source = group.get_table("source");
-    size_t col_link = source->add_column_link(type_LinkList, "links", target_table_ndx);
+    size_t col_link = source->add_column_link(type_LinkList, "links", *TableRef(target));
     CHECK_EQUAL(target, source->get_link_target(col_link));
 
     source->insert_linklist(col_link, 0);
     source->insert_done();
 
+    LinkViewRef links = source->get_linklist(col_link, 0);
+
     // add several links to a single linklist
-    source->linklist_add_link(col_link, 0, 2);
-    source->linklist_add_link(col_link, 0, 1);
-    source->linklist_add_link(col_link, 0, 0);
-    CHECK(source->linklist_has_links(col_link, 0));
-    CHECK_EQUAL(3, source->get_link_count(col_link, 0));
-    CHECK_EQUAL(2, source->linklist_get_link(col_link, 0, 0));
-    CHECK_EQUAL(1, source->linklist_get_link(col_link, 0, 1));
-    CHECK_EQUAL(0, source->linklist_get_link(col_link, 0, 2));
+    links->add(2);
+    links->add(1);
+    links->add(0);
+    CHECK(!source->linklist_is_empty(col_link, 0));
+    CHECK_EQUAL(3, links->size());
+    CHECK_EQUAL(2, links->get_target_row(0));
+    CHECK_EQUAL(1, links->get_target_row(1));
+    CHECK_EQUAL(0, links->get_target_row(2));
+    CHECK_EQUAL(Wed, (Days)(*links)[0].get_int(3));
 
     // verify that backlinks was set correctly
-    CHECK_EQUAL(1, target->get_backlink_count(0, source_table_ndx, col_link));
-    CHECK_EQUAL(0, target->get_backlink(0, source_table_ndx, col_link, 0));
-    CHECK_EQUAL(1, target->get_backlink_count(1, source_table_ndx, col_link));
-    CHECK_EQUAL(0, target->get_backlink(1, source_table_ndx, col_link, 0));
-    CHECK_EQUAL(1, target->get_backlink_count(2, source_table_ndx, col_link));
-    CHECK_EQUAL(0, target->get_backlink(2, source_table_ndx, col_link, 0));
+    CHECK_EQUAL(1, target->get_backlink_count(0, *source, col_link));
+    CHECK_EQUAL(0, target->get_backlink(0, *source, col_link, 0));
+    CHECK_EQUAL(1, target->get_backlink_count(1, *source, col_link));
+    CHECK_EQUAL(0, target->get_backlink(1, *source, col_link, 0));
+    CHECK_EQUAL(1, target->get_backlink_count(2, *source, col_link));
+    CHECK_EQUAL(0, target->get_backlink(2, *source, col_link, 0));
 
     // insert a link at a specific position in the linklist
-    source->linklist_insert_link(col_link, 0, 1, 2);
+    links->insert(1, 2);
     CHECK_EQUAL(4, source->get_link_count(col_link, 0));
-    CHECK_EQUAL(2, source->linklist_get_link(col_link, 0, 0));
-    CHECK_EQUAL(2, source->linklist_get_link(col_link, 0, 1));
-    CHECK_EQUAL(1, source->linklist_get_link(col_link, 0, 2));
-    CHECK_EQUAL(0, source->linklist_get_link(col_link, 0, 3));
+    CHECK_EQUAL(2, links->get_target_row(0));
+    CHECK_EQUAL(2, links->get_target_row(1));
+    CHECK_EQUAL(1, links->get_target_row(2));
+    CHECK_EQUAL(0, links->get_target_row(3));
 
-    CHECK_EQUAL(2, target->get_backlink_count(2, source_table_ndx, col_link));
-    CHECK_EQUAL(0, target->get_backlink(2, source_table_ndx, col_link, 0));
-    CHECK_EQUAL(0, target->get_backlink(2, source_table_ndx, col_link, 1));
+    CHECK_EQUAL(2, target->get_backlink_count(2, *source, col_link));
+    CHECK_EQUAL(0, target->get_backlink(2, *source, col_link, 0));
+    CHECK_EQUAL(0, target->get_backlink(2, *source, col_link, 1));
 
     // change one link to another
-    source->linklist_set_link(col_link, 0, 0, 1);
+    links->set(0, 1);
     CHECK_EQUAL(4, source->get_link_count(col_link, 0));
-    CHECK_EQUAL(1, source->linklist_get_link(col_link, 0, 0));
-    CHECK_EQUAL(2, source->linklist_get_link(col_link, 0, 1));
-    CHECK_EQUAL(1, source->linklist_get_link(col_link, 0, 2));
-    CHECK_EQUAL(0, source->linklist_get_link(col_link, 0, 3));
+    CHECK_EQUAL(1, links->get_target_row(0));
+    CHECK_EQUAL(2, links->get_target_row(1));
+    CHECK_EQUAL(1, links->get_target_row(2));
+    CHECK_EQUAL(0, links->get_target_row(3));
 
-    CHECK_EQUAL(1, target->get_backlink_count(0, source_table_ndx, col_link));
-    CHECK_EQUAL(0, target->get_backlink(0, source_table_ndx, col_link, 0));
-    CHECK_EQUAL(2, target->get_backlink_count(1, source_table_ndx, col_link));
-    CHECK_EQUAL(0, target->get_backlink(1, source_table_ndx, col_link, 0));
-    CHECK_EQUAL(0, target->get_backlink(1, source_table_ndx, col_link, 1));
-    CHECK_EQUAL(1, target->get_backlink_count(2, source_table_ndx, col_link));
-    CHECK_EQUAL(0, target->get_backlink(2, source_table_ndx, col_link, 0));
+    CHECK_EQUAL(1, target->get_backlink_count(0, *source, col_link));
+    CHECK_EQUAL(0, target->get_backlink(0, *source, col_link, 0));
+    CHECK_EQUAL(2, target->get_backlink_count(1, *source, col_link));
+    CHECK_EQUAL(0, target->get_backlink(1, *source, col_link, 0));
+    CHECK_EQUAL(0, target->get_backlink(1, *source, col_link, 1));
+    CHECK_EQUAL(1, target->get_backlink_count(2, *source, col_link));
+    CHECK_EQUAL(0, target->get_backlink(2, *source, col_link, 0));
 
     // move a link
-    source->linklist_move_link(col_link, 0, 3, 0);
+    links->move(3, 0);
     CHECK_EQUAL(4, source->get_link_count(col_link, 0));
-    CHECK_EQUAL(0, source->linklist_get_link(col_link, 0, 0));
-    CHECK_EQUAL(1, source->linklist_get_link(col_link, 0, 1));
-    CHECK_EQUAL(2, source->linklist_get_link(col_link, 0, 2));
-    CHECK_EQUAL(1, source->linklist_get_link(col_link, 0, 3));
+    CHECK_EQUAL(0, links->get_target_row(0));
+    CHECK_EQUAL(1, links->get_target_row(1));
+    CHECK_EQUAL(2, links->get_target_row(2));
+    CHECK_EQUAL(1, links->get_target_row(3));
 
     // remove a link
-    source->linklist_remove_link(col_link, 0, 0);
+    links->remove(0);
     CHECK_EQUAL(3, source->get_link_count(col_link, 0));
-    CHECK_EQUAL(0, target->get_backlink_count(0, source_table_ndx, col_link));
+    CHECK_EQUAL(0, target->get_backlink_count(0, *source, col_link));
 
     // remove all links
-    source->linklist_remove_all_links(col_link, 0);
-    CHECK(!source->linklist_has_links(col_link, 0));
-    CHECK_EQUAL(0, target->get_backlink_count(0, source_table_ndx, col_link));
-    CHECK_EQUAL(0, target->get_backlink_count(1, source_table_ndx, col_link));
-    CHECK_EQUAL(0, target->get_backlink_count(2, source_table_ndx, col_link));
+    links->clear();
+    CHECK(source->linklist_is_empty(col_link, 0));
+    CHECK_EQUAL(0, target->get_backlink_count(0, *source, col_link));
+    CHECK_EQUAL(0, target->get_backlink_count(1, *source, col_link));
+    CHECK_EQUAL(0, target->get_backlink_count(2, *source, col_link));
 }
 
 TEST(Links_LinkList_Backlinks)
 {
     Group group;
 
-    size_t target_table_ndx = 0;
     TestTableLinks::Ref target = group.get_table<TestTableLinks>("target");
     target->add("test1", 1, true,  Mon);
     target->add("test2", 2, false, Tue);
@@ -456,25 +474,129 @@ TEST(Links_LinkList_Backlinks)
 
     // create table with links to target table
     TableRef source = group.get_table("source");
-    size_t col_link = source->add_column_link(type_LinkList, "links", target_table_ndx);
+    size_t col_link = source->add_column_link(type_LinkList, "links", *TableRef(target));
     CHECK_EQUAL(target, source->get_link_target(col_link));
 
     source->insert_linklist(col_link, 0);
     source->insert_done();
 
-    source->linklist_add_link(col_link, 0, 2);
-    source->linklist_add_link(col_link, 0, 1);
-    source->linklist_add_link(col_link, 0, 0);
+    LinkViewRef links = source->get_linklist(col_link, 0);
+    links->add(2);
+    links->add(1);
+    links->add(0);
 
     // remove a target row and check that source links are removed as well
     target->move_last_over(1);
     CHECK_EQUAL(2, source->get_link_count(col_link, 0));
-    CHECK_EQUAL(1, source->linklist_get_link(col_link, 0, 0));
-    CHECK_EQUAL(0, source->linklist_get_link(col_link, 0, 1));
+    CHECK_EQUAL(1, links->get_target_row(0));
+    CHECK_EQUAL(0, links->get_target_row(1));
 
     // remove all
     target->clear();
     CHECK_EQUAL(0, source->get_link_count(col_link, 0));
+    CHECK(links->is_empty());
+
+    // re-add rows to target
+    target->add("test1", 1, true,  Mon);
+    target->add("test2", 2, false, Tue);
+    target->add("test3", 3, true,  Wed);
+
+    // add more rows with links
+    source->add_empty_row();
+    source->add_empty_row();
+    LinkViewRef links1 = source->get_linklist(col_link, 1);
+    LinkViewRef links2 = source->get_linklist(col_link, 2);
+
+    // add links from each row
+    links->add(2);
+    links1->add(1);
+    links2->add(0);
+
+    // Verify backlinks
+    CHECK_EQUAL(1, target->get_backlink_count(0, *source, col_link));
+    CHECK_EQUAL(2, target->get_backlink(0, *source, col_link, 0));
+    CHECK_EQUAL(1, target->get_backlink_count(1, *source, col_link));
+    CHECK_EQUAL(1, target->get_backlink(1, *source, col_link, 0));
+    CHECK_EQUAL(1, target->get_backlink_count(2, *source, col_link));
+    CHECK_EQUAL(0, target->get_backlink(2, *source, col_link, 0));
+
+    // delete a row and make sure backlinks are updated
+    source->move_last_over(0);
+    CHECK_EQUAL(1, target->get_backlink_count(0, *source, col_link));
+    CHECK_EQUAL(0, target->get_backlink(0, *source, col_link, 0));
+    CHECK_EQUAL(1, target->get_backlink_count(1, *source, col_link));
+    CHECK_EQUAL(1, target->get_backlink(1, *source, col_link, 0));
+    CHECK_EQUAL(0, target->get_backlink_count(2, *source, col_link));
+
+    // delete last row and make sure backlinks are updated
+    source->move_last_over(1);
+    CHECK_EQUAL(1, target->get_backlink_count(0, *source, col_link));
+    CHECK_EQUAL(0, target->get_backlink(0, *source, col_link, 0));
+    CHECK_EQUAL(0, target->get_backlink_count(1, *source, col_link));
+    CHECK_EQUAL(0, target->get_backlink_count(2, *source, col_link));
+
+    // remove all link lists and make sure backlinks are updated
+    source->clear();
+    CHECK_EQUAL(0, target->get_backlink_count(0, *source, col_link));
+    CHECK_EQUAL(0, target->get_backlink_count(1, *source, col_link));
+    CHECK_EQUAL(0, target->get_backlink_count(2, *source, col_link));
+}
+
+TEST(Links_LinkList_AccessorUpdates)
+{
+    Group group;
+
+    TestTableLinks::Ref target = group.get_table<TestTableLinks>("target");
+    target->add("test1", 1, true,  Mon);
+    target->add("test2", 2, false, Tue);
+    target->add("test3", 3, true,  Wed);
+
+    // create table with links to target table
+    TableRef source = group.get_table("source");
+    size_t col_link = source->add_column_link(type_LinkList, "links", *TableRef(target));
+    CHECK_EQUAL(target, source->get_link_target(col_link));
+
+    source->insert_linklist(col_link, 0);
+    source->insert_done();
+    source->insert_linklist(col_link, 1);
+    source->insert_done();
+    source->insert_linklist(col_link, 2);
+    source->insert_done();
+
+    LinkViewRef links0 = source->get_linklist(col_link, 0);
+    links0->add(2);
+    links0->add(1);
+    links0->add(0);
+
+    LinkViewRef links1 = source->get_linklist(col_link, 1);
+    links1->add(2);
+    links1->add(1);
+    links1->add(0);
+
+    LinkViewRef links2 = source->get_linklist(col_link, 2);
+    links2->add(2);
+    links2->add(1);
+    links2->add(0);
+
+    CHECK_EQUAL(0, links0->get_parent_row());
+    CHECK_EQUAL(1, links1->get_parent_row());
+    CHECK_EQUAL(2, links2->get_parent_row());
+
+    // get the same linkview twice
+    LinkViewRef links2again = source->get_linklist(col_link, 2);
+    CHECK_EQUAL(links2->get_parent_row(), links2again->get_parent_row());
+
+    // delete a row and make sure involved accessors are updated
+    source->move_last_over(0);
+    CHECK_EQUAL(false, links0->is_attached());
+    CHECK_EQUAL(0, links2->get_parent_row());
+    CHECK_EQUAL(0, links2again->get_parent_row());
+
+    // clear and make sure all accessors get detached
+    source->clear();
+    CHECK_EQUAL(false, links1->is_attached());
+    CHECK_EQUAL(false, links2->is_attached());
+    CHECK_EQUAL(false, links2again->is_attached());
 }
 
 TEST(Links_Transactions)
@@ -482,7 +604,6 @@ TEST(Links_Transactions)
     SHARED_GROUP_TEST_PATH(path);
     SharedGroup sg(path);
 
-    size_t dog_table  = 0;
     size_t name_col   = 0;
     size_t dog_col    = 1;
     size_t tim_row    = 0;
@@ -498,7 +619,7 @@ TEST(Links_Transactions)
         // Create owners table
         TableRef owners = group.get_table("owners");
         owners->add_column(type_String, "name");
-        owners->add_column_link(type_Link, "dog", dog_table);
+        owners->add_column_link(type_Link, "dog", *dogs);
 
         // Insert a single dog
         dogs->insert_string(name_col, harvey_row, "Harvey");

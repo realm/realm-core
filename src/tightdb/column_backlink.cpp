@@ -109,7 +109,7 @@ void ColumnBackLink::remove_backlink(size_t row_ndx, size_t source_row_ndx)
     Column col(ref, this, row_ndx, get_alloc());
     size_t ref_pos = col.find_first(source_row_ndx);
     TIGHTDB_ASSERT(ref_pos != not_found);
-    bool is_last = (ref_pos+1 == size());
+    bool is_last = (ref_pos+1 == col.size());
     col.erase(ref_pos, is_last);
 
     // if there is only one ref left we can inline it as tagged value
