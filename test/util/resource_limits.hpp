@@ -3,7 +3,7 @@
  * TIGHTDB CONFIDENTIAL
  * __________________
  *
- *  [2011] - [2013] TightDB Inc
+ *  [2011] - [2012] TightDB Inc
  *  All Rights Reserved.
  *
  * NOTICE:  All information contained herein is, and remains
@@ -17,34 +17,31 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_VERSION_HPP
-#define TIGHTDB_VERSION_HPP
-
-#include <string>
-#include <sstream>
-
-#define TIGHTDB_VER_MAJOR 0
-#define TIGHTDB_VER_MINOR 21
-#define TIGHTDB_VER_PATCH 0
+#ifndef TIGHTDB_TEST_UTIL_RESOURCE_LIMITS_HPP
+#define TIGHTDB_TEST_UTIL_RESOURCE_LIMITS_HPP
 
 namespace tightdb {
+namespace test_util {
 
-enum Feature {
-    feature_Debug,
-    feature_Replication
+
+enum Resource {
+    resource_NumOpenFiles
 };
 
-class Version {
-public:
-    static int get_major() { return TIGHTDB_VER_MAJOR; }
-    static int get_minor() { return TIGHTDB_VER_MINOR; }
-    static int get_patch() { return TIGHTDB_VER_PATCH; }
-    static std::string get_version();
-    static bool is_at_least(int major, int minor, int patch);
-    static bool has_feature(Feature feature);
-};
+bool system_has_rlimit(Resource) TIGHTDB_NOEXCEPT;
+
+//@{
+
+/// Get or set resouce limits. A negative value means 'unlimited' both when
+/// getting and when setting.
+long get_hard_rlimit(Resource);
+long get_soft_rlimit(Resource);
+void set_soft_rlimit(Resource, long value);
+
+//@}
 
 
-} // namespace tigthdb
+} // namespace test_util
+} // namespace tightdb
 
-#endif // TIGHTDB_VERSION_HPP
+#endif // TIGHTDB_TEST_UTIL_RESOURCE_LIMITS_HPP
