@@ -4260,6 +4260,7 @@ void Table::adj_row_acc_erase_row(size_t row_ndx) TIGHTDB_NOEXCEPT
             // Move last over
             *i = *--end;
             m_row_accessors.pop_back();
+            end = m_row_accessors.end();
             continue;
         }
         if (row->m_row_ndx > row_ndx)
@@ -4302,6 +4303,7 @@ void Table::adj_row_acc_move_last_over(size_t target_row_ndx, size_t last_row_nd
             // Move last over in list of accessors
             *i = *--end;
             m_row_accessors.pop_back();
+            end = m_row_accessors.end();
             continue;
         }
         if (row->m_row_ndx == last_row_ndx)

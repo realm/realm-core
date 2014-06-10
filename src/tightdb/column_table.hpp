@@ -474,6 +474,7 @@ bool ColumnSubtableParent::SubtableMap::adj_move_last_over(std::size_t target_ro
         // iterators)
         *i = *--end;
         m_entries.pop_back();
+        end = m_entries.end();
     }
     if (!last_seen) {
         for (;;) {
