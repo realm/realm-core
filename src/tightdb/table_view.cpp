@@ -421,7 +421,7 @@ void TableView::remove(size_t ndx)
     // Delete row in source table
     const size_t real_ndx = size_t(m_refs.get(ndx));
     m_table->from_view_remove(real_ndx, this);
-
+    m_last_seen_version = m_table->m_version;
     // Update refs
     m_refs.erase(ndx, ndx == size() - 1);
 
@@ -429,6 +429,7 @@ void TableView::remove(size_t ndx)
     //
     // O(n) for n = this->size(). FIXME: Dangerous cast below: unsigned -> signed
     m_refs.adjust_ge(int_fast64_t(real_ndx), -1);
+
 }
 
 
