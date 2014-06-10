@@ -158,20 +158,10 @@ protected:
     void do_sync() const;
     inline void sync_if_needed() const {
         if (m_table) {
-            std::cerr << this << ".sync_if_needed(), seen " << m_last_seen_version 
-                      << " compared to " << m_table->m_version << std::endl;
-            if (m_query.m_tableview)
-                std::cerr << "       - with associated tableview at "
-                          << m_query.m_tableview << " at version "
-                          << m_query.m_tableview->m_last_seen_version
-                          << std::endl;
             if (m_last_seen_version != m_table->m_version) {
                 do_sync();
             }
         }
-        else
-            std::cerr << this << ".sync_if_needed(), seen " << m_last_seen_version 
-                      << "but m_table is not valid" << std::endl;
     }
 #else
     inline void sync_if_needed() const {};

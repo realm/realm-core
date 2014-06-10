@@ -467,7 +467,6 @@ void TableViewBase::do_sync() const
         // SO: fake that we're up to date BEFORE calling find_all.
         m_last_seen_version = m_table->m_version;
         m_query.find_all(*(const_cast<TableViewBase*>(this)), m_start, m_end, m_limit);
-        cerr << "sync'ed" << endl;
     }
 }
 #endif // TIGHTDB_ENABLE_REPLICATION
