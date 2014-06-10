@@ -451,6 +451,7 @@ void TableView::clear()
     }
 
     m_refs.clear();
+    m_last_seen_version = m_table->m_version;
 }
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
@@ -461,7 +462,10 @@ void TableViewBase::do_sync()
     if (m_query.m_table == 0) {
         // no valid query
         m_last_seen_version = m_table->m_version;
-        cerr << "no valid query, not sync'ed" << endl;
+        m_refs.clear();
+        for (size_t i=0; i<m_table->size(); i++)
+            m_refs.add(i);
+        cerr << "ref to entire table" << endl;
     }
     else  {
         // valid query, so clear earlier results and reexecute it.
@@ -472,8 +476,8 @@ void TableViewBase::do_sync()
         // SO: fake that we're up to date BEFORE calling find_all.
         m_last_seen_version = m_table->m_version;
         m_query.find_all(*(const_cast<TableViewBase*>(this)), m_start, m_end, m_limit);
-        if (m_auto_sort)
-            sort(m_sort_index, m_ascending);
     }
+    if (m_auto_sort)
+        sort(m_sort_index, m_ascending);
 }
 #endif // TIGHTDB_ENABLE_REPLICATION

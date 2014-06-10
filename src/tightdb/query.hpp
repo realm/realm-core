@@ -60,6 +60,7 @@ public:
     struct TCopyExpressionTag {};
     Query(const Query& copy, const TCopyExpressionTag&);
     ~Query() TIGHTDB_NOEXCEPT;
+    void move_assign(Query& query);
 
     Query& expression(Expression* compare, bool auto_delete = false);
     Expression* get_expression();

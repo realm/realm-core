@@ -63,6 +63,25 @@ Query::Query(const Query& copy)
     do_delete = true;
 }
 
+void Query::move_assign(Query& copy)
+{
+    m_table = copy.m_table;
+    all_nodes = copy.all_nodes;
+    update = copy.update;
+    update_override = copy.update_override;
+    first = copy.first;
+    pending_not = copy.pending_not;
+    error_code = copy.error_code;
+    m_tableview = copy.m_tableview;
+#if TIGHTDB_MULTITHREAD_QUERY
+    m_threadcount = copy.m_threadcount;
+#endif
+    //    copy.first[0] = 0;
+    copy.do_delete = false;
+    do_delete = true;
+    copy.m_table = TableRef();
+}
+
 Query::Query(const Query& copy, const TCopyExpressionTag&) 
 {
     Create();
