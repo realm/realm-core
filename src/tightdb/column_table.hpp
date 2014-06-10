@@ -438,27 +438,31 @@ bool ColumnSubtableParent::SubtableMap::adj_move_last_over(std::size_t target_ro
 
     // Search for either index in a tight loop for speed
     bool last_seen = false;
-    typedef entries::iterator iter;
-    iter i = m_entries.begin(), end = m_entries.end();
+    std::size_t i = 0, n = m_entries.size();
     for (;;) {
-        if (i == end)
+        if (i == n)
             return false;
-        if (i->m_subtable_ndx == target_row_ndx)
+        const entry& e = m_entries[i];
+        if (e.m_subtable_ndx == target_row_ndx)
             goto target;
-        if (i->m_subtable_ndx == last_row_ndx)
+        if (e.m_subtable_ndx == last_row_ndx)
             break;
         ++i;
     }
 
     // Move subtable accessor at `last_row_ndx`, then look for `target_row_ndx`
-    i->m_subtable_ndx = target_row_ndx;
-    if (fix_ndx_in_parent)
-        tf::set_ndx_in_parent(*(i->m_table), i->m_subtable_ndx);
+    {
+        entry& e = m_entries[i];
+        e.m_subtable_ndx = target_row_ndx;
+        if (fix_ndx_in_parent)
+            tf::set_ndx_in_parent(*(e.m_table), e.m_subtable_ndx);
+    }
     for (;;) {
         ++i;
-        if (i == end)
+        if (i == n)
             return false;
-        if (i->m_subtable_ndx == target_row_ndx)
+        const entry& e = m_entries[i];
+        if (e.m_subtable_ndx == target_row_ndx)
             break;
     }
     last_seen = true;
@@ -467,26 +471,30 @@ bool ColumnSubtableParent::SubtableMap::adj_move_last_over(std::size_t target_ro
     // look for `last_row_ndx
   target:
     {
+        entry& e = m_entries[i];
         // Must hold a counted reference while detaching
-        TableRef table(i->m_table);
+        TableRef table(e.m_table);
         tf::detach(*table);
         // Delete entry by moving last over (faster and avoids invalidating
         // iterators)
-        *i = *--end;
+        e = m_entries[--n];
         m_entries.pop_back();
-        end = m_entries.end();
     }
     if (!last_seen) {
         for (;;) {
-            if (i == end)
+            if (i == n)
                 goto check_empty;
-            if (i->m_subtable_ndx == last_row_ndx)
+            const entry& e = m_entries[i];
+            if (e.m_subtable_ndx == last_row_ndx)
                 break;
             ++i;
         }
-        i->m_subtable_ndx = target_row_ndx;
-        if (fix_ndx_in_parent)
-            tf::set_ndx_in_parent(*(i->m_table), target_row_ndx);
+        {
+            entry& e = m_entries[i];
+            e.m_subtable_ndx = target_row_ndx;
+            if (fix_ndx_in_parent)
+                tf::set_ndx_in_parent(*(e.m_table), target_row_ndx);
+        }
     }
 
   check_empty:

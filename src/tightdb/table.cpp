@@ -4250,17 +4250,14 @@ void Table::adj_row_acc_erase_row(size_t row_ndx) TIGHTDB_NOEXCEPT
     // cannot access the underlying array structure.
 
     // Adjust row accessors after removal of a row
-    typedef row_accessors::iterator iter;
-    iter end = m_row_accessors.end();
-    iter i = m_row_accessors.begin();
-    while (i != end) {
-        RowBase* row = *i;
+    size_t i = 0, n = m_row_accessors.size();
+    while (i != n) {
+        RowBase*& row = m_row_accessors[i];
         if (row->m_row_ndx == row_ndx) {
             row->m_table.reset(); // Detach
             // Move last over
-            *i = *--end;
+            row = m_row_accessors[--n];
             m_row_accessors.pop_back();
-            end = m_row_accessors.end();
             continue;
         }
         if (row->m_row_ndx > row_ndx)
@@ -4293,17 +4290,14 @@ void Table::adj_row_acc_move_last_over(size_t target_row_ndx, size_t last_row_nd
     // cannot access the underlying array structure.
 
     // Adjust row accessors after 'move last over' removal of a row
-    typedef row_accessors::iterator iter;
-    iter end = m_row_accessors.end();
-    iter i = m_row_accessors.begin();
-    while (i != end) {
-        RowBase* row = *i;
+    size_t i = 0, n = m_row_accessors.size();
+    while (i != n) {
+        RowBase*& row = m_row_accessors[i];
         if (row->m_row_ndx == target_row_ndx) {
             row->m_table.reset(); // Detach
             // Move last over in list of accessors
-            *i = *--end;
+            row = m_row_accessors[--n];
             m_row_accessors.pop_back();
-            end = m_row_accessors.end();
             continue;
         }
         if (row->m_row_ndx == last_row_ndx)
