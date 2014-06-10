@@ -297,11 +297,11 @@ TEST(TableView_IsAttached)
     CHECK_EQUAL(true, v2.is_attached());
     v.remove_last();
     CHECK_EQUAL(true, v.is_attached());
-    CHECK_EQUAL(false, v2.is_attached());
+    CHECK_EQUAL(true, v2.is_attached());
 
     table.remove_last();
-    CHECK_EQUAL(false, v.is_attached());
-    CHECK_EQUAL(false, v2.is_attached());
+    CHECK_EQUAL(true, v.is_attached());
+    CHECK_EQUAL(true, v2.is_attached());
 }
 
 TEST(TableView_Max)

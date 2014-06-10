@@ -122,11 +122,16 @@ protected:
     // Null if, and only if, the view is detached
     mutable TableRef m_table;
     mutable Column m_refs;
+    mutable uint_fast64_t m_last_seen_version;
     Query m_query;
     // parameters for findall, needed to rerun the query
     size_t m_start;
     size_t m_end;
     size_t m_limit;
+    // parameters for sorting after query rerun
+    bool m_auto_sort;
+    bool m_ascending;
+    size_t m_sort_index;
 
     /// Construct null view (no memory allocated).
     TableViewBase();
@@ -153,12 +158,12 @@ protected:
     template<class R, class V> static R find_all_double(V*, std::size_t, double);
     template<class R, class V> static R find_all_string(V*, std::size_t, StringData);
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    mutable uint_fast64_t m_last_seen_version;
-    void do_sync() const;
+    void do_sync();
     inline void sync_if_needed() const {
         if (m_table) {
             if (m_last_seen_version != m_table->m_version) {
-                do_sync();
+                // FIXME: Is this a reasonable handling of constness?
+                const_cast<TableViewBase*>(this)->do_sync();
             }
         }
     }
@@ -389,6 +394,7 @@ inline TableViewBase::TableViewBase():
     m_refs(Allocator::get_default())
 #ifdef TIGHTDB_ENABLE_REPLICATION
     , m_last_seen_version(0)
+    , m_auto_sort(false)
 #endif
 {
 }
@@ -398,6 +404,7 @@ inline TableViewBase::TableViewBase(Table* parent):
 {
 #ifdef TIGHTDB_ENABLE_REPLICATION
     m_last_seen_version = m_table ? m_table->m_version : 0;
+    m_auto_sort = false;
 #endif
     parent->register_view(this);
 }
@@ -407,6 +414,7 @@ inline TableViewBase::TableViewBase(Table* parent, Query& query, size_t start, s
 {
 #ifdef TIGHTDB_ENABLE_REPLICATION
     m_last_seen_version = m_table ? m_table->m_version : 0;
+    m_auto_sort = false;
 #endif
     parent->register_view(this);
     m_start = start;
@@ -420,6 +428,9 @@ inline TableViewBase::TableViewBase(const TableViewBase& tv):
 {
 #ifdef TIGHTDB_ENABLE_REPLICATION
     m_last_seen_version = tv.m_last_seen_version;
+    m_auto_sort = tv.m_auto_sort;
+    m_ascending = tv.m_ascending;
+    m_sort_index = tv.m_sort_index;
 #endif
     if (m_table)
         m_table->register_view(this);
@@ -431,6 +442,9 @@ inline TableViewBase::TableViewBase(TableViewBase* tv) TIGHTDB_NOEXCEPT:
 {
 #ifdef TIGHTDB_ENABLE_REPLICATION
     m_last_seen_version = tv->m_last_seen_version;
+    m_auto_sort = tv->m_auto_sort;
+    m_ascending = tv->m_ascending;
+    m_sort_index = tv->m_sort_index;
 #endif
     if (m_table) {
         m_table->unregister_view(tv);

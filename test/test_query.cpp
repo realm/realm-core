@@ -3414,6 +3414,7 @@ TEST(Query_Sort_And_Requery_Untyped2)
     std::cerr << "trigger A" << std::endl;
     tv3.remove(0);
     std::cerr << "trigger B" << std::endl;
+    CHECK_EQUAL(6, tv.size());
     CHECK_EQUAL(3, tv3.size());
     CHECK_EQUAL(1, tv3.get_int(0, 0));
     CHECK_EQUAL(8, tv3.get_int(0, 1)); // 8, 9 (sort order) instead of 9, 8 (table order)
