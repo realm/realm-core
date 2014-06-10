@@ -54,19 +54,18 @@ TEST(LinkList_Query)
     table2->set_int(0, 2, 600);
     table2->set_string(1, 2, "!");
 
-    size_t col_link2 = table1->add_column_link(type_LinkList, "link", table2_ndx); // todo, rename to add_link_column() ?
+    size_t col_link2 = table1->add_column_link(type_LinkList, "link", *table2);
 
     // set some links
+    LinkViewRef links1;
+    
+    links1 = table1->get_linklist(col_link2, 0);
+    links1->add(1);
 
-//    table1->linklist_add_link(col_link2, 0, 1);
+    links1 = table1->get_linklist(col_link2, 1);
+    links1->add(1);
+    links1->add(2);
 
-   
-
-    table1->insert_link(col_link2, 0, 1);
-    table1->insert_done();
-
-    table1->insert_link(col_link2, 1, 1);
-    table1->insert_link(col_link2, 1, 2);
 
     size_t match;
 
@@ -133,7 +132,7 @@ TEST(SingleLink_Query)
     table2->set_int(0, 2, 600);
     table2->set_string(1, 2, "!");
 
-    size_t col_link2 = table1->add_column_link(type_Link, "link", table2_ndx); 
+    size_t col_link2 = table1->add_column_link(type_Link, "link", *table2); 
 
     // set some links
 
@@ -152,8 +151,6 @@ TEST(SingleLink_Query)
     match = (table1->link(col_link2).column<String>(1) == "foobar").find();
     CHECK_EQUAL(not_found, match);
 
-    //    match = (table1->column<String>(1) == table1->column<String>(1)  ).find(); // not yet implemented
-    //    CHECK_EQUAL(1, match);
 
 }
 
