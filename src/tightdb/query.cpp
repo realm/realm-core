@@ -897,8 +897,6 @@ void Query::find_all(TableViewBase& ret, size_t start, size_t end, size_t limit)
 
     Init(*m_table);
 
-    if (m_tableview)
-        m_tableview->sync_if_needed();
     if (end == size_t(-1))
         end = m_tableview ? m_tableview->size() : m_table->size();
 

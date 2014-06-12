@@ -412,15 +412,19 @@ TEST(TableView_Follows_Changes)
     table.add_empty_row();
     CHECK_EQUAL(1, v.size());
     table.set_int(0,1,1);
+    v.sync_if_needed();
     CHECK_EQUAL(2, v.size());
     CHECK_EQUAL(1, v.get_int(0,0));
     CHECK_EQUAL(1, v.get_int(0,1));
     table.set_int(0,0,7);
+    v.sync_if_needed();
     CHECK_EQUAL(1, v.size());
     CHECK_EQUAL(1, v.get_int(0,0));
     table.set_int(0,1,7);
+    v.sync_if_needed();
     CHECK_EQUAL(0, v.size());
     table.set_int(0,1,1);
+    v.sync_if_needed();
     CHECK_EQUAL(1, v.size());
     CHECK_EQUAL(1, v.get_int(0,0));
 }
