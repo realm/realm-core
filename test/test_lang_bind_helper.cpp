@@ -2549,15 +2549,20 @@ void reader_thread(TestResults* test_results_ptr, string path)
     Query q = tr->where().equal(0, 42);
     int idx = q.find();
     Row r = (*tr)[idx];
+    TableView tv = q.find_all();
     while (1)
     {
         int val = r.get_int(0);
+        tv.sync_if_needed();
         if (val == 43) break;
-        CHECK_EQUAL(42, val);    
+        CHECK_EQUAL(42, val);
+        CHECK_EQUAL(1,tv.size());
+        CHECK_EQUAL(42, tv.get_int(0,0));
         while (!sg.has_changed())
             sched_yield();
         LangBindHelper::advance_read(sg, *wlr);
     }
+    CHECK_EQUAL(0,tv.size());
     sg.end_read();
 }
 
