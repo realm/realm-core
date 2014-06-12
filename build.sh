@@ -855,8 +855,12 @@ EOF
     "leak-test-ios-app")
         # Prerequisites: build-test-ios-app
         # For more documentation, see test/ios/README.md
+        DEV="tightdb's iPad"
+        if [ $# -ne 0 ]; then
+            DEV="$@"
+        fi
         (cd "test/ios/app" && instruments -t ../template/Leaks.tracetemplate \
-            -w "tightdb's iPad" iOSTestCoreApp)
+            -w "$DEV" iOSTestCoreApp)
         exit 0
         ;;
 
