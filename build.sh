@@ -842,8 +842,13 @@ EOF
     "test-ios-app")
         # Prerequisites: build-test-ios-app
         # For more documentation, see test/ios/README.md
-        (cd "test/ios/app" && xcodebuild test -scheme iOSTestCoreApp \
-            -destination "platform=iOS,name=tightdb's iPad")
+        (cd "test/ios/app" &&
+            if [ $# -eq 0 ]; then
+                xcodebuild test -scheme iOSTestCoreApp \
+                    -destination "platform=iOS,name=tightdb's iPad"
+            else
+                xcodebuild test -scheme iOSTestCoreApp "$@"
+            fi)
         exit 0
         ;;
 
