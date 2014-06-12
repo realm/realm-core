@@ -112,6 +112,23 @@ TEST(LangBindHelper_SetSubtable)
 }
 
 
+TEST(LangBindHelper_LinkView)
+{
+    Group group;
+    TableRef source = group.get_table("source");
+    TableRef target = group.get_table("target");
+    source->add_column_link(type_LinkList, "", *target);
+    target->add_column(type_Int, "");
+    source->add_empty_row();
+    target->add_empty_row();
+    Row row = source->get(0);
+    LinkView* link_view = LangBindHelper::get_linklist_ptr(row, 0);
+    link_view->add(0);
+    LangBindHelper::unbind_linklist_ptr(link_view);
+    CHECK_EQUAL(1, source->get_link_count(0,0));
+}
+
+
 #ifdef TIGHTDB_ENABLE_REPLICATION
 
 namespace {

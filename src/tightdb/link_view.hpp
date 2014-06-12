@@ -56,9 +56,6 @@ public:
     void clear();
 
 private:
-    friend class ColumnLinkList;
-    friend class util::bind_ptr<LinkView>;
-
     // constructor (protected since it can only be used by friends)
     LinkView(ColumnLinkList& column, std::size_t row_ndx);
 
@@ -77,6 +74,10 @@ private:
     ColumnLinkList& m_column;
     Column          m_refs;
     mutable size_t  m_ref_count;
+
+    friend class ColumnLinkList;
+    friend class util::bind_ptr<LinkView>;
+    friend class LangBindHelper;
 };
 
 // Implementation
