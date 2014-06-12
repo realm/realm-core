@@ -480,7 +480,7 @@ template<class Subtab, int col_idx> struct AddCol<SpecBase::Subtable<Subtab>, co
 template<class Type, int col_idx> struct CmpColType {
     static bool exec(const Spec* spec, const StringData* col_names)
     {
-        return GetColumnTypeId<Type>::id != spec->get_column_type(col_idx) ||
+        return GetColumnTypeId<Type>::id != spec->get_public_column_type(col_idx) ||
             col_names[col_idx] != spec->get_column_name(col_idx);
     }
 };
@@ -489,7 +489,7 @@ template<class Type, int col_idx> struct CmpColType {
 template<class Subtab, int col_idx> struct CmpColType<SpecBase::Subtable<Subtab>, col_idx> {
     static bool exec(const Spec* spec, const StringData* col_names)
     {
-        if (spec->get_column_type(col_idx) != type_Table ||
+        if (spec->get_column_type(col_idx) != col_type_Table ||
             col_names[col_idx] != spec->get_column_name(col_idx)) return true;
         const Spec subspec = const_cast<Spec*>(spec)->get_subtable_spec(col_idx);
         return !Subtab::matches_dynamic_spec(&subspec);

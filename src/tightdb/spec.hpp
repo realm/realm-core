@@ -39,7 +39,7 @@ public:
 
     Allocator& get_alloc() const TIGHTDB_NOEXCEPT;
 
-    void insert_column(std::size_t column_ndx, DataType type, StringData name,
+    void insert_column(std::size_t column_ndx, ColumnType type, StringData name,
                        ColumnAttr attr = col_attr_None);
     void rename_column(std::size_t column_ndx, StringData new_name);
 
@@ -64,8 +64,8 @@ public:
     // Column info
     std::size_t get_column_count() const TIGHTDB_NOEXCEPT;
     std::size_t get_public_column_count() const TIGHTDB_NOEXCEPT;
-    DataType get_column_type(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
-    ColumnType get_real_column_type(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
+    DataType get_public_column_type(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
+    ColumnType get_column_type(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
     StringData get_column_name(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
 
     /// Returns std::size_t(-1) if the specified column is not found.
@@ -273,7 +273,7 @@ inline Spec::Spec(Allocator& alloc, MemRef mem, ArrayParent* parent,
 inline SubspecRef Spec::get_subtable_spec(std::size_t column_ndx) TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(column_ndx < get_column_count());
-    TIGHTDB_ASSERT(get_column_type(column_ndx) == type_Table);
+    TIGHTDB_ASSERT(get_column_type(column_ndx) == col_type_Table);
     std::size_t subspec_ndx = get_subspec_ndx(column_ndx);
     return SubspecRef(&m_subspecs, subspec_ndx);
 }
@@ -281,7 +281,7 @@ inline SubspecRef Spec::get_subtable_spec(std::size_t column_ndx) TIGHTDB_NOEXCE
 inline ConstSubspecRef Spec::get_subtable_spec(std::size_t column_ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(column_ndx < get_column_count());
-    TIGHTDB_ASSERT(get_column_type(column_ndx) == type_Table);
+    TIGHTDB_ASSERT(get_column_type(column_ndx) == col_type_Table);
     std::size_t subspec_ndx = get_subspec_ndx(column_ndx);
     return ConstSubspecRef(&m_subspecs, subspec_ndx);
 }
@@ -354,7 +354,7 @@ inline std::size_t Spec::get_public_column_count() const TIGHTDB_NOEXCEPT
     return m_names.size();
 }
 
-inline ColumnType Spec::get_real_column_type(std::size_t ndx) const TIGHTDB_NOEXCEPT
+inline ColumnType Spec::get_column_type(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < get_column_count());
     return ColumnType(m_spec.get(ndx));
