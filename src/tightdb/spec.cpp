@@ -109,20 +109,22 @@ MemRef Spec::create_empty_spec(Allocator& alloc)
 }
 
 
-void Spec::insert_column(size_t column_ndx, DataType type, StringData name, ColumnAttr attr)
+void Spec::insert_column(size_t column_ndx, ColumnType type, StringData name, ColumnAttr attr)
 {
     TIGHTDB_ASSERT(column_ndx <= m_spec.size());
 
     // Backlinks should always be appended to end
-    TIGHTDB_ASSERT(column_ndx == m_spec.size() || type != type_BackLink);
+    TIGHTDB_ASSERT(column_ndx == m_spec.size() || type != col_type_BackLink);
 
-    if (type != type_BackLink) // backlinks do not have names
+    if (type != col_type_BackLink) // backlinks do not have names
         m_names.insert(column_ndx, name); // Throws
     m_spec.insert(column_ndx, type); // Throws
     // FIXME: So far, attributes are never reported to the replication system
     m_attr.insert(column_ndx, attr); // Throws
 
-    if (type == type_Table || type == type_Link  || type == type_LinkList || type == type_BackLink) {
+    bool has_subspec = type == col_type_Table || type == col_type_Link ||
+        type == col_type_LinkList || type == col_type_BackLink;
+    if (has_subspec) {
         Allocator& alloc = m_top.get_alloc();
         // `m_subspecs` array is only present when the spec contains a subtable column
         if (!m_subspecs.is_attached()) {
@@ -143,7 +145,7 @@ void Spec::insert_column(size_t column_ndx, DataType type, StringData name, Colu
             dg.release();
         }
 
-        if (type == type_Table) {
+        if (type == col_type_Table) {
             // Add a new empty spec to `m_subspecs`
             MemRef subspec_mem = create_empty_spec(alloc); // Throws
             _impl::DeepArrayRefDestroyGuard dg(subspec_mem.m_ref, alloc);
@@ -152,14 +154,14 @@ void Spec::insert_column(size_t column_ndx, DataType type, StringData name, Colu
             m_subspecs.insert(subspec_ndx, v); // Throws
             dg.release();
         }
-        else if (type == type_Link || type == type_LinkList) {
+        else if (type == col_type_Link || type == col_type_LinkList) {
             // Store ref (position) of target table
             // When we set the target it will be as a tagged integer (low bit set)
             // Since we don't know it yet we just store zero (null ref)
             size_t subspec_ndx = get_subspec_ndx(column_ndx);
             m_subspecs.insert(subspec_ndx, 0); // Throws
         }
-        else if (type == type_BackLink) {
+        else if (type == col_type_BackLink) {
             // Store ref (position) of source table and source column
             // When we set the target it will be as a tagged integer (low bit set)
             // Since we don't know it yet we just store zero (null ref)
@@ -215,11 +217,11 @@ void Spec::remove_column(size_t column_ndx)
 size_t Spec::get_subspec_ndx(size_t column_ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(column_ndx <= get_column_count());
-    TIGHTDB_ASSERT(column_ndx == get_column_count()             ||
-                   get_column_type(column_ndx) == type_Table    ||
-                   get_column_type(column_ndx) == type_Link     ||
-                   get_column_type(column_ndx) == type_LinkList ||
-                   get_column_type(column_ndx) == type_BackLink );
+    TIGHTDB_ASSERT(column_ndx == get_column_count() ||
+                   get_column_type(column_ndx) == col_type_Table    ||
+                   get_column_type(column_ndx) == col_type_Link     ||
+                   get_column_type(column_ndx) == col_type_LinkList ||
+                   get_column_type(column_ndx) == col_type_BackLink );
 
     // The m_subspecs array only keep info for subtables so we need to
     // count up to it's position
@@ -240,7 +242,7 @@ size_t Spec::get_subspec_ndx(size_t column_ndx) const TIGHTDB_NOEXCEPT
 void Spec::upgrade_string_to_enum(size_t column_ndx, ref_type keys_ref,
                                   ArrayParent*& keys_parent, size_t& keys_ndx)
 {
-    TIGHTDB_ASSERT(get_column_type(column_ndx) == type_String);
+    TIGHTDB_ASSERT(get_column_type(column_ndx) == col_type_String);
 
     // Create the enumkeys list if needed
     if (!m_enumkeys.is_attached()) {
@@ -298,9 +300,9 @@ ref_type Spec::get_enumkeys_ref(size_t column_ndx, ArrayParent** keys_parent,
 void Spec::set_link_target_table(std::size_t column_ndx, std::size_t table_ndx)
 {
     TIGHTDB_ASSERT(column_ndx < get_column_count());
-    TIGHTDB_ASSERT(col_type_Link == get_real_column_type(column_ndx) ||
-                   col_type_LinkList == get_real_column_type(column_ndx) ||
-                   col_type_BackLink == get_real_column_type(column_ndx));
+    TIGHTDB_ASSERT(get_column_type(column_ndx) == col_type_Link ||
+                   get_column_type(column_ndx) == col_type_LinkList ||
+                   get_column_type(column_ndx) == col_type_BackLink);
 
     // position of target table is stored as tagged int
     size_t tagged_ndx = (table_ndx << 1) + 1;
@@ -312,9 +314,9 @@ void Spec::set_link_target_table(std::size_t column_ndx, std::size_t table_ndx)
 std::size_t Spec::get_link_target_table(std::size_t column_ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(column_ndx < get_column_count());
-    TIGHTDB_ASSERT(col_type_Link == get_real_column_type(column_ndx) ||
-                   col_type_LinkList == get_real_column_type(column_ndx) ||
-                   col_type_BackLink == get_real_column_type(column_ndx));
+    TIGHTDB_ASSERT(get_column_type(column_ndx) == col_type_Link ||
+                   get_column_type(column_ndx) == col_type_LinkList ||
+                   get_column_type(column_ndx) == col_type_BackLink);
 
     // position of target table is stored as tagged int in the
     // subspecs array
@@ -329,7 +331,7 @@ std::size_t Spec::get_link_target_table(std::size_t column_ndx) const TIGHTDB_NO
 void Spec::set_backlink_source_column(std::size_t column_ndx, std::size_t source_column_ndx)
 {
     TIGHTDB_ASSERT(column_ndx < get_column_count());
-    TIGHTDB_ASSERT(col_type_BackLink == get_real_column_type(column_ndx));
+    TIGHTDB_ASSERT(get_column_type(column_ndx) == col_type_BackLink);
 
     // position of target table is stored as tagged int
     size_t tagged_ndx = (source_column_ndx << 1) + 1;
@@ -341,7 +343,7 @@ void Spec::set_backlink_source_column(std::size_t column_ndx, std::size_t source
 std::size_t Spec::get_backlink_source_column(std::size_t column_ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(column_ndx < get_column_count());
-    TIGHTDB_ASSERT(col_type_BackLink == get_real_column_type(column_ndx));
+    TIGHTDB_ASSERT(get_column_type(column_ndx) == col_type_BackLink);
 
     // source column is stored as second tagged int in the subspecs array
     size_t subspec_ndx = get_subspec_ndx(column_ndx);
@@ -384,11 +386,11 @@ void Spec::update_backlink_column_ref(size_t source_table_ndx, size_t old_column
     m_subspecs.set(backlink_info_ndx+1, tagged_column_ndx);
 }
 
-DataType Spec::get_column_type(size_t ndx) const TIGHTDB_NOEXCEPT
+DataType Spec::get_public_column_type(size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < get_column_count());
 
-    ColumnType type = get_real_column_type(ndx);
+    ColumnType type = get_column_type(ndx);
 
     // Hide internal types
     if (type == col_type_StringEnum)
