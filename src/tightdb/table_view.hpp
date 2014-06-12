@@ -118,12 +118,34 @@ public:
     // todo, uninvestigated compiler error message if we make GetValue protected and declare Comparer friend
     template <class T> T GetValue(size_t row, size_t column) const;
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    inline void sync_if_needed() const {
-        if (m_table) {
-            if (m_last_seen_version != m_table->m_version) {
-                // FIXME: Is this a reasonable handling of constness?
-                const_cast<TableViewBase*>(this)->do_sync();
-            }
+    // Determine if the view is 'in sync' with the underlying table
+    // as well as other views used to generate the view. Note that updates
+    // through views maintains synchronization between view and table.
+    // It doesnt by itself maintain other views as well. So if a view
+    // is generated from another view (not a table), updates may cause 
+    // that view to be outdated, AND as the generated view depends upon
+    // it, it too will become outdated.
+    inline bool is_in_sync() const TIGHTDB_NOEXCEPT
+    {
+        return bool(m_table) 
+            && (m_last_seen_version == m_table->m_version)
+            && ((m_query.m_tableview)
+                ? m_query.m_tableview->is_in_sync()
+                : true);
+    }
+    // Synchronize a view to match a table or tableview from which it
+    // has been derived. Synchronization is achieved by rerunning the
+    // query used to generate the view. If derived from another view, that
+    // view will be synchronized as well.
+    //
+    // "live" or "reactive" views are implemented by calling sync_if_needed
+    // before any of the other acces-methods whenever the view may have become
+    // outdated.
+    inline void sync_if_needed() const 
+    {
+        if (!is_in_sync()) {
+            // FIXME: Is this a reasonable handling of constness?
+            const_cast<TableViewBase*>(this)->do_sync();
         }
     }
 #else
