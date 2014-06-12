@@ -218,138 +218,115 @@ size_t Table::add_column(DataType type, StringData name, DescriptorRef* subdesc)
     return get_descriptor()->add_column(type, name, subdesc); // Throws
 }
 
-std::size_t Table::add_column_link(DataType type, StringData name, Table& target_table)
+
+size_t Table::add_column_link(DataType type, StringData name, Table& target)
 {
-    TIGHTDB_ASSERT(type == type_Link || type == type_LinkList);
-
-    // links only work for top-level tables from groups
-    TIGHTDB_ASSERT(!has_shared_type());
-    TIGHTDB_ASSERT(get_parent_group());
-
-    DescriptorRef desc = get_descriptor();
-    size_t column_ndx = desc->add_column(type, name); // Throws
-    size_t target_table_ndx = target_table.get_index_in_parent();
-    m_spec.set_link_target_table(column_ndx, target_table_ndx);
-
-    // Create backlinks in target table
-    size_t current_table_ndx = get_index_in_parent();
-    target_table.create_backlinks_column(current_table_ndx, column_ndx);
-
-    if (type == type_Link) {
-        // Column needs target table to create accessors
-        ColumnLink& column = get_column<ColumnLink, col_type_Link>(column_ndx);
-        column.set_target_table(target_table.get_table_ref());
-        column.set_backlink_column(target_table.get_backlink_column(current_table_ndx, column_ndx));
-    }
-    else {
-        // Column needs target table to create accessors
-        ColumnLinkList& column = get_column<ColumnLinkList, col_type_LinkList>(column_ndx);
-        column.set_target_table(target_table.get_table_ref());
-        column.set_backlink_column(target_table.get_backlink_column(current_table_ndx, column_ndx));
-    }
-
-    return column_ndx;
+    return get_descriptor()->add_column_link(type, name, target); // Throws
 }
 
-void Table::create_backlinks_column(size_t source_table_ndx, size_t source_table_column_ndx)
+
+void Table::insert_column_link(size_t column_ndx, DataType type, StringData name, Table& target)
+{
+    get_descriptor()->insert_column_link(column_ndx, type, name, target); // Throws
+}
+
+
+void Table::create_backlinks_column(Table& origin, size_t origin_col_ndx,
+                                    ColumnType origin_col_type)
 {
     // links only work for top-level tables from groups
     TIGHTDB_ASSERT(!has_shared_type());
     TIGHTDB_ASSERT(get_parent_group());
 
-    DescriptorRef desc = get_descriptor();
-    size_t col_ndx = m_spec.get_column_count();
-    insert_root_column(col_ndx, col_type_BackLink, ""); // Throws
-    m_spec.set_link_target_table(col_ndx, source_table_ndx);
-    m_spec.set_backlink_source_column(col_ndx, source_table_column_ndx);
+    size_t backlink_col_ndx = m_spec.get_column_count();
+    Table* link_target_table = 0;
+    insert_root_column(backlink_col_ndx, col_type_BackLink, "", link_target_table); // Throws
+    size_t origin_table_ndx = origin.get_index_in_parent();
+    m_spec.set_link_target_table(backlink_col_ndx, origin_table_ndx); // Throws
+    m_spec.set_backlink_origin_column(backlink_col_ndx, origin_col_ndx); // Throws
 
-    // Column needs source table to create accessors
-    Table* source_table = get_parent_group()->get_table_by_ndx(source_table_ndx);
-    ColumnBackLink& column = get_column<ColumnBackLink, col_type_BackLink>(col_ndx);
-    column.set_source_table(source_table->get_table_ref());
+    ColumnBackLink& backlink_col = get_column<ColumnBackLink, col_type_BackLink>(backlink_col_ndx);
+    backlink_col.set_origin_table(origin);
 
-    DataType col_type = source_table->get_column_type(source_table_column_ndx);
-    TIGHTDB_ASSERT(col_type == type_Link || col_type == type_LinkList);
-    if (col_type == type_Link) {
-        ColumnLink& source_column =
-            source_table->get_column<ColumnLink, col_type_Link>(source_table_column_ndx);
-        column.set_source_column(source_column);
+    TIGHTDB_ASSERT(origin_col_type == col_type_Link || origin_col_type == col_type_LinkList);
+    if (origin_col_type == col_type_Link) {
+        ColumnLink& origin_col = origin.get_column<ColumnLink, col_type_Link>(origin_col_ndx);
+        backlink_col.set_origin_column(origin_col);
     }
     else  {
-        ColumnLinkList& source_column =
-            source_table->get_column<ColumnLinkList, col_type_LinkList>(source_table_column_ndx);
-        column.set_source_column(source_column);
+        ColumnLinkList& origin_col =
+            origin.get_column<ColumnLinkList, col_type_LinkList>(origin_col_ndx);
+        backlink_col.set_origin_column(origin_col);
     }
 }
 
-ColumnBackLink& Table::get_backlink_column(std::size_t source_table_ndx,
-                                           std::size_t source_table_column_ndx)
+
+ColumnBackLink& Table::get_backlink_column(size_t origin_table_ndx,
+                                           size_t origin_col_ndx) TIGHTDB_NOEXCEPT
 {
-    size_t column_ndx = m_spec.find_backlink_column(source_table_ndx, source_table_column_ndx);
-    return get_column<ColumnBackLink, col_type_BackLink>(column_ndx);
+    size_t backlink_col_ndx = m_spec.find_backlink_column(origin_table_ndx, origin_col_ndx);
+    return get_column<ColumnBackLink, col_type_BackLink>(backlink_col_ndx);
 }
 
-size_t Table::get_backlink_count(size_t row_ndx, const Table& source_table,
-                                 size_t source_column_ndx) const TIGHTDB_NOEXCEPT
-{
-    size_t source_table_ndx = source_table.get_index_in_parent();
-    size_t column_ndx = m_spec.find_backlink_column(source_table_ndx, source_column_ndx);
-    const ColumnBackLink& column = get_column<ColumnBackLink, col_type_BackLink>(column_ndx);
 
-    return column.get_backlink_count(row_ndx);
+size_t Table::get_backlink_count(size_t row_ndx, const Table& origin,
+                                 size_t origin_col_ndx) const TIGHTDB_NOEXCEPT
+{
+    size_t origin_table_ndx = origin.get_index_in_parent();
+    size_t backlink_col_ndx = m_spec.find_backlink_column(origin_table_ndx, origin_col_ndx);
+    const ColumnBackLink& backlink_col =
+        get_column<ColumnBackLink, col_type_BackLink>(backlink_col_ndx);
+    return backlink_col.get_backlink_count(row_ndx);
 }
 
-size_t Table::get_backlink(size_t row_ndx, const Table& source_table, size_t source_column_ndx,
+
+size_t Table::get_backlink(size_t row_ndx, const Table& origin, size_t origin_col_ndx,
                            size_t backlink_ndx) const TIGHTDB_NOEXCEPT
 {
-    size_t source_table_ndx = source_table.get_index_in_parent();
-    size_t column_ndx = m_spec.find_backlink_column(source_table_ndx, source_column_ndx);
-    const ColumnBackLink& column = get_column<ColumnBackLink, col_type_BackLink>(column_ndx);
-
-    return column.get_backlink(row_ndx, backlink_ndx);
+    size_t origin_table_ndx = origin.get_index_in_parent();
+    size_t backlink_col_ndx = m_spec.find_backlink_column(origin_table_ndx, origin_col_ndx);
+    const ColumnBackLink& backlink_col =
+        get_column<ColumnBackLink, col_type_BackLink>(backlink_col_ndx);
+    return backlink_col.get_backlink(row_ndx, backlink_ndx);
 }
 
-void Table::initialize_link_targets()
+
+void Table::initialize_link_targets(Group& group, size_t table_ndx)
 {
-    // links only work for top-level tables from groups
+    // Links only work for group-level tables
     TIGHTDB_ASSERT(!has_shared_type());
     TIGHTDB_ASSERT(get_parent_group());
 
-    DescriptorRef desc = get_descriptor();
-    typedef _impl::DescriptorFriend df;
-    Spec* spec = df::get_spec(*desc);
-    size_t column_count = spec->get_column_count();
-    size_t current_table_ndx = get_index_in_parent();
-
-    for (size_t i = 0; i < column_count; ++i) {
-        ColumnType column_type = spec->get_column_type(i);
-
+    size_t n = m_spec.get_column_count();
+    for (size_t i = 0; i < n; ++i) {
+        ColumnType column_type = m_spec.get_column_type(i);
         if (column_type == col_type_Link || column_type == col_type_LinkList) {
             // Get the target table from group
-            size_t target_table_ndx = spec->get_link_target_table(i);
-            Table* target_table = get_parent_group()->get_table_by_ndx(target_table_ndx);
+            size_t target_table_ndx = m_spec.get_link_target_table(i);
+            Table* target_table = group.get_table_by_ndx(target_table_ndx); // Throws
 
             // Set target table in column
             ColumnLinkBase& column = get_column_linkbase(i);
-            column.set_target_table(target_table->get_table_ref());
-            column.set_backlink_column(target_table->get_backlink_column(current_table_ndx, i));
+            column.set_target_table(*target_table);
+            column.set_backlink_column(target_table->get_backlink_column(table_ndx, i));
         }
         else if (column_type == col_type_BackLink) {
-            // Get the source table from group
-            size_t source_table_ndx = spec->get_link_target_table(i);
-            Table* source_table = get_parent_group()->get_table_by_ndx(source_table_ndx);
+            // Get the origin table from group
+            size_t origin_table_ndx = m_spec.get_link_target_table(i);
+            Table* origin_table = group.get_table_by_ndx(origin_table_ndx); // Throws
 
             // Get the columns the links originate from
-            size_t source_column_ndx = spec->get_backlink_source_column(i);
-            ColumnLinkBase& source_column = source_table->get_column_linkbase(source_column_ndx);
+            size_t origin_col_ndx = m_spec.get_backlink_origin_column(i);
+            ColumnLinkBase& origin_col = origin_table->get_column_linkbase(origin_col_ndx);
 
-            // Set target table in column
-            ColumnBackLink& column = get_column<ColumnBackLink, col_type_BackLink>(i);
-            column.set_source_table(source_table->get_table_ref());
-            column.set_source_column(source_column);
+            // Set origination info in backlink column
+            ColumnBackLink& backlink_col = get_column<ColumnBackLink, col_type_BackLink>(i);
+            backlink_col.set_origin_table(*origin_table);
+            backlink_col.set_origin_column(origin_col);
         }
     }
 }
+
 
 void Table::insert_column(size_t column_ndx, DataType type, StringData name,
                           DescriptorRef* subdesc)
@@ -552,18 +529,18 @@ private:
 };
 
 
-void Table::do_insert_column(Descriptor& desc, size_t column_ndx,
-                             DataType type, StringData name)
+void Table::do_insert_column(Descriptor& desc, size_t column_ndx, DataType type,
+                             StringData name, Table* link_target_table)
 {
     TIGHTDB_ASSERT(desc.is_attached());
 
     typedef _impl::DescriptorFriend df;
     Table& root_table = df::root_table(desc);
     TIGHTDB_ASSERT(!root_table.has_shared_type());
-    TIGHTDB_ASSERT(column_ndx <= df::get_internal_column_count(desc));
 
     if (desc.is_root()) {
-        root_table.insert_root_column(column_ndx, ColumnType(type), name); // Throws
+        root_table.insert_root_column(column_ndx, ColumnType(type), name,
+                                      link_target_table); // Throws
     }
     else {
         Spec* spec = df::get_spec(desc);
@@ -576,7 +553,7 @@ void Table::do_insert_column(Descriptor& desc, size_t column_ndx,
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     if (Replication* repl = root_table.get_repl())
-        repl->insert_column(desc, column_ndx, type, name); // Throws
+        repl->insert_column(desc, column_ndx, type, name, link_target_table); // Throws
 #endif
 }
 
@@ -637,8 +614,10 @@ void Table::do_rename_column(Descriptor& desc, size_t column_ndx, StringData nam
 }
 
 
-void Table::insert_root_column(size_t col_ndx, ColumnType col_type, StringData name)
+void Table::insert_root_column(size_t col_ndx, ColumnType col_type, StringData name,
+                               Table* link_target_table)
 {
+    // Back-link columns can only be appended, never inserted
     TIGHTDB_ASSERT(col_type != col_type_BackLink || col_ndx == m_columns.size());
 
     m_search_index = 0;
@@ -649,16 +628,34 @@ void Table::insert_root_column(size_t col_ndx, ColumnType col_type, StringData n
     Spec::ColumnInfo info;
     m_spec.get_column_info(col_ndx, info);
     size_t ndx_in_parent = info.m_column_ref_ndx;
-
     ref_type ref = create_column(col_type, m_size, m_columns.get_alloc()); // Throws
     m_columns.insert(ndx_in_parent, ref); // Throws
-    UniquePtr<ColumnBase> col(create_column_accessor(col_type, col_ndx, ndx_in_parent)); // Throws
-    m_cols.insert(col_ndx, intptr_t(col.get())); // Throws
-    col.release();
+    ColumnBase* col = create_column_accessor(col_type, col_ndx, ndx_in_parent); // Throws
+    {
+        UniquePtr<ColumnBase> guard(col);
+        m_cols.insert(col_ndx, intptr_t(col)); // Throws
+        guard.release();
+    }
 
     // Update cached column indexes for subsequent column accessors
     int ndx_in_parent_diff = 1;
     adjust_column_index(col_ndx+1, ndx_in_parent_diff);
+
+    if (link_target_table) {
+        size_t target_table_ndx = link_target_table->get_index_in_parent();
+        m_spec.set_link_target_table(col_ndx, target_table_ndx); // Throws
+
+        link_target_table->create_backlinks_column(*this, col_ndx, col_type); // Throws
+
+        size_t origin_table_ndx = get_index_in_parent();
+        ColumnBackLink& backlink_col =
+            link_target_table->get_backlink_column(origin_table_ndx, col_ndx);
+
+        // Origin column needs target table to create accessors
+        ColumnLinkBase& origin_col = static_cast<ColumnLinkBase&>(*col);
+        origin_col.set_target_table(*link_target_table);
+        origin_col.set_backlink_column(backlink_col);
+    }
 }
 
 
@@ -708,8 +705,8 @@ void Table::unregister_view(const TableViewBase* view) TIGHTDB_NOEXCEPT
 {
     // Fixme: O(n) may be unacceptable - if so, put and maintain
     // iterator or index in TableViewBase.
-    std::vector<const TableViewBase*>::iterator it;
-    std::vector<const TableViewBase*>::iterator end = m_views.end();
+    vector<const TableViewBase*>::iterator it;
+    vector<const TableViewBase*>::iterator end = m_views.end();
     for (it = m_views.begin(); it != end; ++it) {
         if (*it == view) {
             *it = m_views.back();
@@ -1015,8 +1012,8 @@ void Table::detach() TIGHTDB_NOEXCEPT
 // already present in the view registry, Otherwise it may throw.
 void Table::detach_views_except(const TableViewBase* view) TIGHTDB_NOEXCEPT
 {
-    std::vector<const TableViewBase*>::iterator end = m_views.end();
-    std::vector<const TableViewBase*>::iterator it = m_views.begin();
+    vector<const TableViewBase*>::iterator end = m_views.end();
+    vector<const TableViewBase*>::iterator it = m_views.begin();
     while (it != end) {
         const TableViewBase* v = *it;
         if (v != view)
@@ -1103,7 +1100,7 @@ ColumnBase* Table::create_column_accessor(ColumnType col_type, size_t col_ndx, s
             // Target table will be set by group after entire table has been created
             return new ColumnLinkList(ref, &m_columns, ndx_in_parent, alloc); // Throws
         case col_type_BackLink:
-            // Source table will be set by group after entire table has been created
+            // Origin table will be set by group after entire table has been created
             return new ColumnBackLink(ref, &m_columns, ndx_in_parent, alloc); // Throws
         case col_type_Reserved1:
         case col_type_Reserved4:
@@ -2412,7 +2409,7 @@ void Table::insert_linklist(size_t column_ndx, size_t ndx)
 #endif
 }
 
-LinkViewRef Table::get_linklist(std::size_t column_ndx, std::size_t row_ndx)
+LinkViewRef Table::get_linklist(size_t column_ndx, size_t row_ndx)
 {
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_LinkList);
@@ -2824,12 +2821,12 @@ ConstTableView Table::find_all_double(size_t column_ndx, double value) const
 
 TableView Table::find_all_datetime(size_t column_ndx, DateTime value)
 {
-    return find_all<int64_t>(column_ndx, static_cast<int64_t>(value.get_datetime()));
+    return find_all<int64_t>(column_ndx, int64_t(value.get_datetime()));
 }
 
 ConstTableView Table::find_all_datetime(size_t column_ndx, DateTime value) const
 {
-    return const_cast<Table*>(this)->find_all<int64_t>(column_ndx, static_cast<int64_t>(value.get_datetime()));
+    return const_cast<Table*>(this)->find_all<int64_t>(column_ndx, int64_t(value.get_datetime()));
 }
 
 TableView Table::find_all_string(size_t column_ndx, StringData value)
@@ -2987,7 +2984,8 @@ size_t get_group_ndx_blocked(size_t i, AggrState& state, Table& result)
 } //namespace
 
 // Simple pivot aggregate method. Experimental! Please do not document method publicly.
-void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, Table& result, const Column* viewrefs) const
+void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, Table& result,
+                      const Column* viewrefs) const
 {
     TIGHTDB_ASSERT(result.is_empty() && result.get_column_count() == 0);
     TIGHTDB_ASSERT(group_by_column < m_columns.size());
@@ -3103,7 +3101,8 @@ void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, T
                     size_t ndx = (*get_group_ndx_fnc)(i, state, result);
                     int64_t value = src_column.get(i);
                     if (state.added_row) {
-                        dst_column.set(ndx, value); // Set the real value, to overwrite the default value
+                        // Set the real value, to overwrite the default value
+                        dst_column.set(ndx, value);
                         state.added_row = false;
                     }
                     else {
@@ -3120,7 +3119,8 @@ void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, T
                     size_t ndx = (*get_group_ndx_fnc)(i, state, result);
                     int64_t value = src_column.get(i);
                     if (state.added_row) {
-                        dst_column.set(ndx, value); // Set the real value, to overwrite the default value
+                        // Set the real value, to overwrite the default value
+                        dst_column.set(ndx, value);
                         state.added_row = false;
                     }
                     else {
@@ -3191,7 +3191,8 @@ void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, T
                     size_t ndx = (*get_group_ndx_fnc)(i, state, result);
                     int64_t value = src_column.get(i);
                     if (state.added_row) {
-                        dst_column.set(ndx, value); // Set the real value, to overwrite the default value
+                        // Set the real value, to overwrite the default value
+                        dst_column.set(ndx, value);
                         state.added_row = false;
                     }
                     else {
@@ -3206,7 +3207,8 @@ void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, T
                     size_t ndx = (*get_group_ndx_fnc)(i, state, result);
                     int64_t value = src_column.get(i);
                     if (state.added_row) {
-                        dst_column.set(ndx, value); // Set the real value, to overwrite the default value
+                        // Set the real value, to overwrite the default value
+                        dst_column.set(ndx, value);
                         state.added_row = false;
                     }
                     else {
@@ -3427,7 +3429,8 @@ public:
             size_t n = spec.get_column_count();
             for (size_t i = 0; i != n; ++i) {
                 ColumnAttr attr = spec.get_column_attr(i);
-                attr = ColumnAttr(attr & ~col_attr_Indexed); // Remove any index specifying attributes
+                // Remove any index specifying attributes
+                attr = ColumnAttr(attr & ~col_attr_Indexed);
                 spec.set_column_attr(i, attr); // Throws
             }
             size_t pos = spec.m_top.write(out); // Throws
@@ -3518,7 +3521,8 @@ void Table::adjust_column_index(size_t column_ndx_begin, int ndx_in_parent_diff)
             size_t table_ndx = get_index_in_parent();
             ColumnLinkBase* col = static_cast<ColumnLinkBase*>(column);
             TableRef target_table = col->get_target_table();
-            target_table->update_backlink_column_ref(table_ndx, col_ndx-ndx_in_parent_diff, col_ndx);
+            target_table->update_backlink_column_ref(table_ndx, col_ndx-ndx_in_parent_diff,
+                                                     col_ndx);
         }
     }
 }
@@ -3680,11 +3684,11 @@ void Table::to_json_row(size_t row_ndx, ostream& out) const
                 break;
             }
             case type_Link:
-                // TODO: print entire linked row
+                // FIXME: print entire linked row
                 out << "\"Link to: " << get_link(i, row_ndx) << "\"";
                 break;
             case type_LinkList:
-                // TODO: print entire list of linked row
+                // FIXME: print entire list of linked row
                 //out << "\"Link to: " << get_int(i, row_ndx) << "\"";
                 break;
         }
@@ -3969,11 +3973,11 @@ void Table::to_string_row(size_t row_ndx, ostream& out, const vector<size_t>& wi
                 break;
             }
             case type_Link:
-                // TODO: print linked row
+                // FIXME: print linked row
                 out << get_link(col, row_ndx);
                 break;
             case type_LinkList:
-                // TODO: print number of links in list
+                // FIXME: print number of links in list
                 break;
         }
     }

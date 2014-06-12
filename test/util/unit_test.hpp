@@ -288,55 +288,55 @@ Filter* create_wildcard_filter(const std::string&);
 
 class TestResults {
 public:
-    void check(bool cond, const char* file, long line, const char* cond_text);
+    bool check(bool cond, const char* file, long line, const char* cond_text);
 
     template<class A, class B>
-    void check_compare(bool cond, const A& a, const B& b,
+    bool check_compare(bool cond, const A& a, const B& b,
                        const char* file, long line, const char* macro_name,
                        const char* a_text, const char* b_text);
 
-    void check_inexact_compare(bool cond, long double a, long double b,
+    bool check_inexact_compare(bool cond, long double a, long double b,
                                long double eps, const char* file, long line,
                                const char* macro_name, const char* a_text,
                                const char* b_text, const char* eps_text);
 
     template<class A, class B>
-    void check_equal(const A& a, const B& b, const char* file, long line,
+    bool check_equal(const A& a, const B& b, const char* file, long line,
                      const char* a_text, const char* b_text);
 
     template<class A, class B>
-    void check_not_equal(const A& a, const B& b, const char* file, long line,
+    bool check_not_equal(const A& a, const B& b, const char* file, long line,
                          const char* a_text, const char* b_text);
 
     template<class A, class B>
-    void check_less(const A& a, const B& b, const char* file, long line,
+    bool check_less(const A& a, const B& b, const char* file, long line,
                     const char* a_text, const char* b_text);
 
     template<class A, class B>
-    void check_less_equal(const A& a, const B& b, const char* file, long line,
+    bool check_less_equal(const A& a, const B& b, const char* file, long line,
                           const char* a_text, const char* b_text);
 
     template<class A, class B>
-    void check_greater(const A& a, const B& b, const char* file, long line,
+    bool check_greater(const A& a, const B& b, const char* file, long line,
                        const char* a_text, const char* b_text);
 
     template<class A, class B>
-    void check_greater_equal(const A& a, const B& b, const char* file, long line,
+    bool check_greater_equal(const A& a, const B& b, const char* file, long line,
                              const char* a_text, const char* b_text);
 
-    void check_approximately_equal(long double a, long double b, long double eps,
+    bool check_approximately_equal(long double a, long double b, long double eps,
                                    const char* file, long line, const char* a_text,
                                    const char* b_text, const char* eps_text);
 
-    void check_essentially_equal(long double a, long double b, long double eps,
+    bool check_essentially_equal(long double a, long double b, long double eps,
                                  const char* file, long line, const char* a_text,
                                  const char* b_text, const char* eps_text);
 
-    void check_definitely_less(long double a, long double b, long double eps,
+    bool check_definitely_less(long double a, long double b, long double eps,
                                const char* file, long line, const char* a_text,
                                const char* b_text, const char* eps_text);
 
-    void check_definitely_greater(long double a, long double b, long double eps,
+    bool check_definitely_greater(long double a, long double b, long double eps,
                                   const char* file, long line, const char* a_text,
                                   const char* b_text, const char* eps_text);
 
@@ -524,7 +524,7 @@ template<class T> void to_string(const T& value, std::string& str)
 }
 
 
-inline void TestResults::check(bool cond, const char* file, long line, const char* cond_text)
+inline bool TestResults::check(bool cond, const char* file, long line, const char* cond_text)
 {
     if (TIGHTDB_LIKELY(cond)) {
         check_succeeded();
@@ -532,10 +532,11 @@ inline void TestResults::check(bool cond, const char* file, long line, const cha
     else {
         cond_failed(file, line, cond_text);
     }
+    return cond;
 }
 
 template<class A, class B>
-inline void TestResults::check_compare(bool cond, const A& a, const B& b,
+inline bool TestResults::check_compare(bool cond, const A& a, const B& b,
                                        const char* file, long line, const char* macro_name,
                                        const char* a_text, const char* b_text)
 {
@@ -548,9 +549,10 @@ inline void TestResults::check_compare(bool cond, const A& a, const B& b,
         to_string(b, b_val);
         compare_failed(file, line, macro_name, a_text, b_text, a_val, b_val);
     }
+    return cond;
 }
 
-inline void TestResults::check_inexact_compare(bool cond, long double a, long double b,
+inline bool TestResults::check_inexact_compare(bool cond, long double a, long double b,
                                                long double eps, const char* file, long line,
                                                const char* macro_name, const char* a_text,
                                                const char* b_text, const char* eps_text)
@@ -561,100 +563,101 @@ inline void TestResults::check_inexact_compare(bool cond, long double a, long do
     else {
         inexact_compare_failed(file, line, macro_name, a_text, b_text, eps_text, a, b, eps);
     }
+    return cond;
 }
 
 template<class A, class B>
-inline void TestResults::check_equal(const A& a, const B& b,
+inline bool TestResults::check_equal(const A& a, const B& b,
                                      const char* file, long line,
                                      const char* a_text, const char* b_text)
 {
     bool cond = equal(a,b);
-    check_compare(cond, a, b, file, line, "CHECK_EQUAL", a_text, b_text);
+    return check_compare(cond, a, b, file, line, "CHECK_EQUAL", a_text, b_text);
 }
 
 template<class A, class B>
-inline void TestResults::check_not_equal(const A& a, const B& b,
+inline bool TestResults::check_not_equal(const A& a, const B& b,
                                          const char* file, long line,
                                          const char* a_text, const char* b_text)
 {
     bool cond = !equal(a,b);
-    check_compare(cond, a, b, file, line, "CHECK_NOT_EQUAL", a_text, b_text);
+    return check_compare(cond, a, b, file, line, "CHECK_NOT_EQUAL", a_text, b_text);
 }
 
 template<class A, class B>
-inline void TestResults::check_less(const A& a, const B& b,
+inline bool TestResults::check_less(const A& a, const B& b,
                                     const char* file, long line,
                                     const char* a_text, const char* b_text)
 {
     bool cond = less(a,b);
-    check_compare(cond, a, b, file, line, "CHECK_LESS", a_text, b_text);
+    return check_compare(cond, a, b, file, line, "CHECK_LESS", a_text, b_text);
 }
 
 template<class A, class B>
-inline void TestResults::check_less_equal(const A& a, const B& b,
+inline bool TestResults::check_less_equal(const A& a, const B& b,
                                           const char* file, long line,
                                           const char* a_text, const char* b_text)
 {
     bool cond = !less(b,a); // Note: Reverse operand order
-    check_compare(cond, a, b, file, line, "CHECK_LESS_EQUAL", a_text, b_text);
+    return check_compare(cond, a, b, file, line, "CHECK_LESS_EQUAL", a_text, b_text);
 }
 
 template<class A, class B>
-inline void TestResults::check_greater(const A& a, const B& b,
+inline bool TestResults::check_greater(const A& a, const B& b,
                                        const char* file, long line,
                                        const char* a_text, const char* b_text)
 {
     bool cond = less(b,a); // Note: Reverse operand order
-    check_compare(cond, a, b, file, line, "CHECK_GREATER", a_text, b_text);
+    return check_compare(cond, a, b, file, line, "CHECK_GREATER", a_text, b_text);
 }
 
 template<class A, class B>
-inline void TestResults::check_greater_equal(const A& a, const B& b,
+inline bool TestResults::check_greater_equal(const A& a, const B& b,
                                              const char* file, long line,
                                              const char* a_text, const char* b_text)
 {
     bool cond = !less(a,b);
-    check_compare(cond, a, b, file, line, "CHECK_GREATER_EQUAL", a_text, b_text);
+    return check_compare(cond, a, b, file, line, "CHECK_GREATER_EQUAL", a_text, b_text);
 }
 
-inline void TestResults::check_approximately_equal(long double a, long double b,
+inline bool TestResults::check_approximately_equal(long double a, long double b,
                                                    long double eps, const char* file, long line,
                                                    const char* a_text, const char* b_text,
                                                    const char* eps_text)
 {
     bool cond = approximately_equal(a, b, eps);
-    check_inexact_compare(cond, a, b, eps, file, line, "CHECK_APPROXIMATELY_EQUAL",
-                          a_text, b_text, eps_text);
+    return check_inexact_compare(cond, a, b, eps, file, line, "CHECK_APPROXIMATELY_EQUAL",
+                                 a_text, b_text, eps_text);
 }
 
-inline void TestResults::check_essentially_equal(long double a, long double b,
+inline bool TestResults::check_essentially_equal(long double a, long double b,
                                                  long double eps, const char* file, long line,
                                                  const char* a_text, const char* b_text,
                                                  const char* eps_text)
 {
     bool cond = essentially_equal(a, b, eps);
-    check_inexact_compare(cond, a, b, eps, file, line, "CHECK_ESSENTIALLY_EQUAL",
-                          a_text, b_text, eps_text);
+    return check_inexact_compare(cond, a, b, eps, file, line, "CHECK_ESSENTIALLY_EQUAL",
+                                 a_text, b_text, eps_text);
 }
 
-inline void TestResults::check_definitely_less(long double a, long double b,
+inline bool TestResults::check_definitely_less(long double a, long double b,
                                                long double eps, const char* file, long line,
                                                const char* a_text, const char* b_text,
                                                const char* eps_text)
 {
     bool cond = definitely_less(a, b, eps);
-    check_inexact_compare(cond, a, b, eps, file, line, "CHECK_DEFINITELY_LESS",
-                          a_text, b_text, eps_text);
+    return check_inexact_compare(cond, a, b, eps, file, line, "CHECK_DEFINITELY_LESS",
+                                 a_text, b_text, eps_text);
 }
 
-inline void TestResults::check_definitely_greater(long double a, long double b,
+inline bool TestResults::check_definitely_greater(long double a, long double b,
                                                   long double eps, const char* file, long line,
                                                   const char* a_text, const char* b_text,
                                                   const char* eps_text)
 {
     bool cond = definitely_less(b, a, eps); // Note: Reverse operand order
-    check_inexact_compare(cond, a, b, eps, file, line, "CHECK_DEFINITELY_GREATER",
-                          a_text, b_text, eps_text);
+    return check_inexact_compare(cond, a, b, eps, file, line, "CHECK_DEFINITELY_GREATER",
+                                 a_text, b_text, eps_text);
 }
 
 
