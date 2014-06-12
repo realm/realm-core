@@ -24,6 +24,7 @@
 
 #include <tightdb/table.hpp>
 #include <tightdb/table_view.hpp>
+#include <tightdb/link_view.hpp>
 #include <tightdb/group.hpp>
 #include <tightdb/group_shared.hpp>
 
@@ -89,16 +90,16 @@ public:
     static void set_mixed_subtable(Table& parent, std::size_t col_ndx, std::size_t row_ndx,
                                    const Table& source);
 
+    static LinkView* get_linklist_ptr(Row&, std::size_t col_ndx);
+    static void unbind_linklist_ptr(LinkView*);
+
 #ifdef TIGHTDB_ENABLE_REPLICATION
     typedef SharedGroup::TransactLogRegistry TransactLogRegistry;
 
     /// Wrappers - forward calls to shared group. A bit like NSA. Circumventing privacy :-)
-    static void advance_read(SharedGroup& sg, TransactLogRegistry& write_logs);
-    static void promote_to_write(SharedGroup& sg, TransactLogRegistry& write_logs);
-    static void commit_and_continue_as_read(SharedGroup& sg);
-
-    friend class ReadTransaction;
-    friend class WriteTransaction;
+    static void advance_read(SharedGroup&, TransactLogRegistry& write_logs);
+    static void promote_to_write(SharedGroup&, TransactLogRegistry& write_logs);
+    static void commit_and_continue_as_read(SharedGroup&);
 #endif
 
     /// Returns the name of the specified data type as follows:
@@ -225,6 +226,18 @@ inline void LangBindHelper::set_mixed_subtable(Table& parent, std::size_t col_nd
                                                std::size_t row_ndx, const Table& source)
 {
     parent.set_mixed_subtable(col_ndx, row_ndx, &source);
+}
+
+inline LinkView* LangBindHelper::get_linklist_ptr(Row& row, std::size_t col_ndx)
+{
+    LinkViewRef link_view = row.get_linklist(col_ndx);
+    link_view->bind_ref();
+    return &*link_view;
+}
+
+inline void LangBindHelper::unbind_linklist_ptr(LinkView* link_view)
+{
+   link_view->unbind_ref();
 }
 
 #ifdef TIGHTDB_ENABLE_REPLICATION

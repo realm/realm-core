@@ -3,7 +3,7 @@
  * TIGHTDB CONFIDENTIAL
  * __________________
  *
- *  [2011] - [2012] TightDB Inc
+ *  [2011] - [2014] TightDB Inc
  *  All Rights Reserved.
  *
  * NOTICE:  All information contained herein is, and remains
@@ -17,12 +17,16 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_HPP
-#define TIGHTDB_HPP
+#ifndef TIGHTDB_LINK_VIEW_FWD_HPP
+#define TIGHTDB_LINK_VIEW_FWD_HPP
 
-#include <tightdb/group_shared.hpp>
-#include <tightdb/table_macros.hpp>
-#include <tightdb/descriptor.hpp>
-#include <tightdb/link_view.hpp>
+#include <tightdb/util/bind_ptr.hpp>
 
-#endif // TIGHTDB_HPP
+namespace tightdb {
+
+class LinkView;
+typedef util::bind_ptr<LinkView> LinkViewRef;
+
+} // namespace tightdb
+
+#endif // TIGHTDB_LINK_VIEW_FWD_HPP

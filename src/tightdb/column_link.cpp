@@ -20,7 +20,9 @@
 
 #include "column_link.hpp"
 
+using namespace std;
 using namespace tightdb;
+
 
 void ColumnLink::set_link(size_t row_ndx, size_t target_row_ndx)
 {
@@ -57,26 +59,26 @@ void ColumnLink::remove_backlinks(size_t row_ndx)
     }
 }
 
-void ColumnLink::move_last_over(size_t row_ndx)
+void ColumnLink::move_last_over(size_t target_row_ndx, size_t last_row_ndx)
 {
-    TIGHTDB_ASSERT(row_ndx+1 < size());
+    TIGHTDB_ASSERT(target_row_ndx < last_row_ndx);
+    TIGHTDB_ASSERT(last_row_ndx + 1 == size());
 
     // Remove backlinks to deleted row
-    remove_backlinks(row_ndx);
+    remove_backlinks(target_row_ndx);
 
     // Update backlinks to last row to point to its new position
-    size_t last_row_ndx = size()-1;
     size_t ref2 = Column::get(last_row_ndx);
     if (ref2 != 0) {
         size_t last_target_row_ndx = ref2 - 1;
-        m_backlinks->update_backlink(last_target_row_ndx, last_row_ndx, row_ndx);
+        m_backlinks->update_backlink(last_target_row_ndx, last_row_ndx, target_row_ndx);
     }
 
     // Do the actual move
-    Column::move_last_over(row_ndx);
+    Column::move_last_over(target_row_ndx, last_row_ndx);
 }
 
-void ColumnLink::erase(std::size_t row_ndx, bool is_last)
+void ColumnLink::erase(size_t row_ndx, bool is_last)
 {
     TIGHTDB_ASSERT(is_last);
 

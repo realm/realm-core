@@ -17,12 +17,31 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_HPP
-#define TIGHTDB_HPP
+#ifndef TIGHTDB_TEST_UTIL_RESOURCE_LIMITS_HPP
+#define TIGHTDB_TEST_UTIL_RESOURCE_LIMITS_HPP
 
-#include <tightdb/group_shared.hpp>
-#include <tightdb/table_macros.hpp>
-#include <tightdb/descriptor.hpp>
-#include <tightdb/link_view.hpp>
+namespace tightdb {
+namespace test_util {
 
-#endif // TIGHTDB_HPP
+
+enum Resource {
+    resource_NumOpenFiles
+};
+
+bool system_has_rlimit(Resource) TIGHTDB_NOEXCEPT;
+
+//@{
+
+/// Get or set resouce limits. A negative value means 'unlimited' both when
+/// getting and when setting.
+long get_hard_rlimit(Resource);
+long get_soft_rlimit(Resource);
+void set_soft_rlimit(Resource, long value);
+
+//@}
+
+
+} // namespace test_util
+} // namespace tightdb
+
+#endif // TIGHTDB_TEST_UTIL_RESOURCE_LIMITS_HPP

@@ -112,6 +112,23 @@ TEST(LangBindHelper_SetSubtable)
 }
 
 
+TEST(LangBindHelper_LinkView)
+{
+    Group group;
+    TableRef source = group.get_table("source");
+    TableRef target = group.get_table("target");
+    source->add_column_link(type_LinkList, "", *target);
+    target->add_column(type_Int, "");
+    source->add_empty_row();
+    target->add_empty_row();
+    Row row = source->get(0);
+    LinkView* link_view = LangBindHelper::get_linklist_ptr(row, 0);
+    link_view->add(0);
+    LangBindHelper::unbind_linklist_ptr(link_view);
+    CHECK_EQUAL(1, source->get_link_count(0,0));
+}
+
+
 #ifdef TIGHTDB_ENABLE_REPLICATION
 
 namespace {
@@ -360,7 +377,7 @@ TEST(LangBindHelper_AdvanceReadTransact_ColumnRootTypeChange)
     const Group& group = rt.get_group();
     CHECK_EQUAL(0, group.size());
 
-    // Create a table string and one for other types
+    // Create a table for strings and one for other types
     {
         WriteTransaction wt(sg_w);
         TableRef strings_w = wt.get_table("strings");
@@ -2140,15 +2157,15 @@ TEST(LangBindHelper_AdvanceReadTransact_MoveLastOver)
             DescriptorRef subdesc = parent_w->get_subdescriptor(0);
             subdesc->add_column(type_Int, "regular");
             parent_w->add_empty_row(5);
-            for (int i = 0; i < 5; ++i) {
-                TableRef regular_w = parent_w->get_subtable(0,i);
+            for (int row_ndx = 0; row_ndx < 5; ++row_ndx) {
+                TableRef regular_w = parent_w->get_subtable(0, row_ndx);
                 regular_w->add_empty_row();
-                regular_w->set_int(0, 0, 10 + i);
-                parent_w->set_mixed(1, i, Mixed::subtable_tag());
-                TableRef mixed_w = parent_w->get_subtable(1,i);
+                regular_w->set_int(0, 0, 10 + row_ndx);
+                parent_w->set_mixed(1, row_ndx, Mixed::subtable_tag());
+                TableRef mixed_w = parent_w->get_subtable(1, row_ndx);
                 mixed_w->add_column(type_Int, "mixed");
                 mixed_w->add_empty_row();
-                mixed_w->set_int(0, 0, 20 + i);
+                mixed_w->set_int(0, 0, 20 + row_ndx);
             }
         }
         wt.commit();

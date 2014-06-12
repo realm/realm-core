@@ -40,18 +40,14 @@ class Column;
 /// Base class for all column types.
 class ColumnBase {
 public:
-    /// Get the number of entries in this column.
+    /// Get the number of entries in this column. This operation is relatively
+    /// slow.
     std::size_t size() const TIGHTDB_NOEXCEPT { return do_get_size(); }
 
-    /// True if size is zero.
-    bool is_empty() const TIGHTDB_NOEXCEPT { return size() == 0; }
-
-    /// Add an entry to this column using the columns default value.
-    virtual void add() = 0;
-
-    /// Insert an entry into this column using the columns default
-    /// value.
-    virtual void insert(std::size_t ndx) = 0;
+    /// Insert the specified number of default values into this column starting
+    /// at the specified row index. Set `is_append` to true if, and only if
+    /// `row_ndx` is equal to the size of the column (before insertion).
+    virtual void insert(std::size_t row_ndx, std::size_t num_rows, bool is_append) = 0;
 
     /// Remove all entries from this column.
     virtual void clear() = 0;
@@ -62,9 +58,11 @@ public:
     /// B+-tree.
     virtual void erase(std::size_t ndx, bool is_last) = 0;
 
-    /// Move the last element to the specified index. This reduces the
-    /// number of elements by one.
-    virtual void move_last_over(std::size_t ndx) = 0;
+    /// Move the last element to the specified target index. This reduces the
+    /// number of elements by one. The specified last row index must always be
+    /// one less than the number of rows in the column. The target index must
+    /// always be strictly less that the last index.
+    virtual void move_last_over(std::size_t target_row_ndx, std::size_t last_row_ndx) = 0;
 
     virtual bool IsIntColumn() const TIGHTDB_NOEXCEPT { return false; }
 
@@ -117,7 +115,7 @@ public:
                           bool use_retval = false) const TIGHTDB_NOEXCEPT;
 
     inline void detach(void);
-    inline bool is_attached(void);
+    inline bool is_attached(void) const TIGHTDB_NOEXCEPT;
 
     static std::size_t get_size_from_type_and_ref(ColumnType, ref_type, Allocator&) TIGHTDB_NOEXCEPT;
 
@@ -157,16 +155,35 @@ public:
     /// function does nothing.
     virtual void discard_subtable_accessor(std::size_t row_ndx) TIGHTDB_NOEXCEPT;
 
-    virtual void adj_accessors_insert_rows(std::size_t row_ndx, std::size_t num_rows)
-        TIGHTDB_NOEXCEPT;
-    virtual void adj_accessors_erase_row(std::size_t row_ndx) TIGHTDB_NOEXCEPT;
-    virtual void adj_accessors_move_last_over(std::size_t target_row_ndx, std::size_t last_row_ndx)
-        TIGHTDB_NOEXCEPT;
+    virtual void adj_subtab_acc_insert_rows(std::size_t row_ndx,
+                                            std::size_t num_rows) TIGHTDB_NOEXCEPT;
+    virtual void adj_subtab_acc_erase_row(std::size_t row_ndx) TIGHTDB_NOEXCEPT;
+    virtual void adj_subtab_acc_move_last_over(std::size_t target_row_ndx,
+                                               std::size_t last_row_ndx) TIGHTDB_NOEXCEPT;
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
-    virtual void recursive_mark_table_accessors_dirty() TIGHTDB_NOEXCEPT;
-    virtual void refresh_after_advance_transact(std::size_t new_col_ndx, const Spec&) = 0;
-#endif
+    virtual void recursive_mark_dirty() TIGHTDB_NOEXCEPT;
+
+    /// Refresh the dirty part of the accessor subtree rooted at this column
+    /// accessor.
+    ///
+    /// The following conditions are necessary and sufficient for the proper
+    /// operation of this function:
+    ///
+    ///  - The parent table accessor (excluding its column accessors) is in a
+    ///    valid state (already refreshed).
+    ///
+    ///  - Every subtable accessor in the subtree is marked dirty if it needs to
+    ///    be refreshed, or if it has a descendant accessor that needs to be
+    ///    refreshed.
+    ///
+    ///  - This column accessor, as well as all its descendant accessors, are in
+    ///    a collective state that satisfies the Accessor Hierarchy
+    ///    Correspondence Guarantee with respect to the root ref stored in the
+    ///    parent (`Table::m_columns`).
+    ///
+    ///  - The 'index in parent' property of the cached root array
+    ///    (`m_array->m_ndx_in_parent`) is valid.
+    virtual void refresh_accessor_tree(std::size_t new_col_ndx, const Spec&) = 0;
 
 #ifdef TIGHTDB_DEBUG
     // Must be upper case to avoid conflict with macro in Objective-C
@@ -291,10 +308,8 @@ public:
     int64_t back() const TIGHTDB_NOEXCEPT { return get(size()-1); }
     void set(std::size_t ndx, int64_t value);
     void adjust(std::size_t ndx, int64_t diff);
-    void insert(std::size_t ndx) TIGHTDB_OVERRIDE { insert(ndx, 0); }
-    void insert(std::size_t ndx, int64_t value);
-    void add() TIGHTDB_OVERRIDE { add(0); }
-    void add(int64_t value);
+    void add(int_fast64_t value = 0);
+    void insert(std::size_t ndx, int_fast64_t value = 0);
 
     std::size_t count(int64_t target) const;
     int64_t sum(std::size_t start = 0, std::size_t end = -1, size_t limit = size_t(-1)) const;
@@ -306,8 +321,10 @@ public:
     // is Array::type_HasRefs.
     void clear() TIGHTDB_OVERRIDE;
 
+    void insert(std::size_t, std::size_t, bool) TIGHTDB_OVERRIDE;
     void erase(std::size_t ndx, bool is_last) TIGHTDB_OVERRIDE;
-    void move_last_over(std::size_t ndx) TIGHTDB_OVERRIDE;
+    void move_last_over(std::size_t, std::size_t) TIGHTDB_OVERRIDE;
+    void destroy_subtree(size_t ndx, bool clear_value=true);
 
     void adjust(int_fast64_t diff);
     void adjust_ge(int_fast64_t limit, int_fast64_t diff);
@@ -337,9 +354,10 @@ public:
     ref_type write(std::size_t, std::size_t, std::size_t,
                    _impl::OutputStream&) const TIGHTDB_OVERRIDE;
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
-    void refresh_after_advance_transact(std::size_t, const Spec&) TIGHTDB_OVERRIDE;
-#endif
+    /// \param row_ndx Must be `tightdb::npos` if appending.
+    void do_insert(std::size_t row_ndx, int_fast64_t value, std::size_t num_rows);
+
+    void refresh_accessor_tree(std::size_t, const Spec&) TIGHTDB_OVERRIDE;
 
 #ifdef TIGHTDB_DEBUG
     virtual void Verify() const TIGHTDB_OVERRIDE;
@@ -361,8 +379,6 @@ protected:
 
 private:
     Column &operator=(const Column&); // not allowed
-
-    void do_insert(std::size_t ndx, int64_t value);
 
     // Called by Array::bptree_insert().
     static ref_type leaf_insert(MemRef leaf_mem, ArrayParent&, std::size_t ndx_in_parent,
@@ -386,7 +402,7 @@ inline void ColumnBase::detach()
     m_array->detach();
 }
 
-inline bool ColumnBase::is_attached()
+inline bool ColumnBase::is_attached() const TIGHTDB_NOEXCEPT
 {
     return m_array->is_attached();
 }
@@ -422,29 +438,25 @@ inline void ColumnBase::discard_subtable_accessor(std::size_t) TIGHTDB_NOEXCEPT
     // Noop
 }
 
-inline void ColumnBase::adj_accessors_insert_rows(std::size_t, std::size_t) TIGHTDB_NOEXCEPT
+inline void ColumnBase::adj_subtab_acc_insert_rows(std::size_t, std::size_t) TIGHTDB_NOEXCEPT
 {
     // Noop
 }
 
-inline void ColumnBase::adj_accessors_erase_row(std::size_t) TIGHTDB_NOEXCEPT
+inline void ColumnBase::adj_subtab_acc_erase_row(std::size_t) TIGHTDB_NOEXCEPT
 {
     // Noop
 }
 
-inline void ColumnBase::adj_accessors_move_last_over(std::size_t, std::size_t) TIGHTDB_NOEXCEPT
+inline void ColumnBase::adj_subtab_acc_move_last_over(std::size_t, std::size_t) TIGHTDB_NOEXCEPT
 {
     // Noop
 }
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
-
-inline void ColumnBase::recursive_mark_table_accessors_dirty() TIGHTDB_NOEXCEPT
+inline void ColumnBase::recursive_mark_dirty() TIGHTDB_NOEXCEPT
 {
     // Noop
 }
-
-#endif
 
 inline void ColumnBase::set_parent(ArrayParent* parent, std::size_t ndx_in_parent) TIGHTDB_NOEXCEPT
 {
@@ -564,6 +576,12 @@ inline Column::Column(ref_type ref, ArrayParent* parent, std::size_t ndx_in_pare
                       Allocator& alloc):
     ColumnBase(new Array(ref, parent, ndx_in_parent, alloc)) {}
 
+inline Column::Column(ArrayParent* parent, std::size_t ndx_in_parent, Allocator& alloc) :
+    ColumnBase(new Array(alloc))
+{
+    set_parent(parent, ndx_in_parent);
+}
+
 inline Column::Column(const Column& column): ColumnBase(column.m_array)
 {
     // FIXME: Unfortunate hidden constness violation here
@@ -602,17 +620,28 @@ inline ref_type Column::get_as_ref(std::size_t ndx) const TIGHTDB_NOEXCEPT
     return to_ref(get(ndx));
 }
 
-inline void Column::add(int64_t value)
+inline void Column::add(int_fast64_t value)
 {
-    do_insert(npos, value);
+    std::size_t row_ndx = tightdb::npos;
+    std::size_t num_rows = 1;
+    do_insert(row_ndx, value, num_rows); // Throws
 }
 
-inline void Column::insert(std::size_t ndx, int64_t value)
+inline void Column::insert(std::size_t row_ndx, int_fast64_t value)
 {
-    TIGHTDB_ASSERT(ndx <= size());
-    if (size() <= ndx)
-        ndx = npos;
-    do_insert(ndx, value);
+    std::size_t size = this->size(); // Slow
+    TIGHTDB_ASSERT(row_ndx <= size);
+    std::size_t row_ndx_2 = row_ndx == size ? tightdb::npos : row_ndx;
+    std::size_t num_rows = 1;
+    do_insert(row_ndx_2, value, num_rows); // Throws
+}
+
+// Implementing pure virtual method of ColumnBase.
+inline void Column::insert(std::size_t row_ndx, std::size_t num_rows, bool is_append)
+{
+    std::size_t row_ndx_2 = is_append ? tightdb::npos : row_ndx;
+    int_fast64_t value = 0;
+    do_insert(row_ndx_2, value, num_rows); // Throws
 }
 
 TIGHTDB_FORCEINLINE

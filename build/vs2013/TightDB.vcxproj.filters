@@ -73,9 +73,6 @@
     <ClCompile Include="..\..\src\tightdb\row.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\tightdb\util\utf8.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\src\tightdb\alloc.cpp">
       <Filter>src</Filter>
     </ClCompile>
@@ -229,6 +226,9 @@
     <ClCompile Include="..\..\test\main.cpp" />
     <ClCompile Include="..\..\test\performance\matrix.cpp" />
     <ClCompile Include="..\..\test\util\random.cpp">
+      <Filter>test\util</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\test\util\resource_limits.cpp">
       <Filter>test\util</Filter>
     </ClCompile>
     <ClCompile Include="..\..\test\test_all.cpp">

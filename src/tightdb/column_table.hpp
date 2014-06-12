@@ -33,16 +33,19 @@ namespace tightdb {
 /// Base class for any type of column that can contain subtables.
 class ColumnSubtableParent: public Column, public Table::Parent {
 public:
+    void insert(std::size_t, std::size_t, bool) TIGHTDB_OVERRIDE;
+    void erase(std::size_t, bool) TIGHTDB_OVERRIDE;
+    void move_last_over(std::size_t, std::size_t) TIGHTDB_OVERRIDE;
+
     void update_column_index(std::size_t, const Spec&) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
-    void recursive_mark_table_accessors_dirty() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-    void refresh_after_advance_transact(std::size_t, const Spec&) TIGHTDB_OVERRIDE;
-#endif
+    void recursive_mark_dirty() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
-    void adj_accessors_insert_rows(std::size_t, std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-    void adj_accessors_erase_row(std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-    void adj_accessors_move_last_over(std::size_t, std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void adj_subtab_acc_insert_rows(std::size_t, std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void adj_subtab_acc_erase_row(std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void adj_subtab_acc_move_last_over(std::size_t, std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+
+    void refresh_accessor_tree(std::size_t, const Spec&) TIGHTDB_OVERRIDE;
 
     void update_from_parent(std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
@@ -87,20 +90,20 @@ protected:
         // was the last entry in the map.
         bool remove(Table*) TIGHTDB_NOEXCEPT;
         void update_from_parent(std::size_t old_baseline) const TIGHTDB_NOEXCEPT;
+        template<bool fix_ndx_in_parent>
         void adj_insert_rows(std::size_t row_ndx, std::size_t num_rows) TIGHTDB_NOEXCEPT;
         // Returns true if, and only if an entry was found and removed, and it
         // was the last entry in the map.
-        bool adj_erase_row(std::size_t row_ndx) TIGHTDB_NOEXCEPT;
+        template<bool fix_ndx_in_parent> bool adj_erase_row(std::size_t row_ndx) TIGHTDB_NOEXCEPT;
         // Returns true if, and only if an entry was found and removed, and it
         // was the last entry in the map.
+        template<bool fix_ndx_in_parent>
         bool adj_move_last_over(std::size_t target_row_ndx, std::size_t last_row_ndx)
             TIGHTDB_NOEXCEPT;
         void update_accessors(const std::size_t* col_path_begin, const std::size_t* col_path_end,
                               _impl::TableFriend::AccessorUpdater&);
-#ifdef TIGHTDB_ENABLE_REPLICATION
         void recursive_mark_dirty() TIGHTDB_NOEXCEPT;
-        void refresh_after_advance_transact(std::size_t spec_ndx_in_parent);
-#endif
+        void refresh_accessor_tree(std::size_t spec_ndx_in_parent);
     private:
         struct entry {
             std::size_t m_subtable_ndx;
@@ -162,6 +165,9 @@ protected:
     void update_table_accessors(const std::size_t* col_path_begin, const std::size_t* col_path_end,
                                 _impl::TableFriend::AccessorUpdater&);
 
+    /// \param row_ndx Must be `tightdb::npos` if appending.
+    void do_insert(std::size_t row_ndx, int_fast64_t value, std::size_t num_rows);
+
 #ifdef TIGHTDB_DEBUG
     std::pair<ref_type, std::size_t>
     get_to_dot_parent(std::size_t ndx_in_parent) const TIGHTDB_OVERRIDE;
@@ -216,26 +222,23 @@ public:
     // have the same data type (as returned by
     // Table::get_column_type()).
 
-    void add() TIGHTDB_OVERRIDE;
-    void add(const Table*);
-    void insert(std::size_t ndx) TIGHTDB_OVERRIDE;
-    void insert(std::size_t ndx, const Table*);
+    void add(const Table* value = 0);
+    void insert(std::size_t ndx, const Table* value = 0);
     void set(std::size_t ndx, const Table*);
-    void erase(std::size_t ndx, bool is_last) TIGHTDB_OVERRIDE;
     void clear_table(std::size_t ndx);
 
-    void clear() TIGHTDB_OVERRIDE;
+    using ColumnSubtableParent::insert;
 
-    void move_last_over(std::size_t ndx) TIGHTDB_OVERRIDE;
+    void clear() TIGHTDB_OVERRIDE;
+    void erase(std::size_t, bool) TIGHTDB_OVERRIDE;
+    void move_last_over(std::size_t, std::size_t) TIGHTDB_OVERRIDE;
 
     /// Compare two subtable columns for equality.
     bool compare_table(const ColumnTable&) const;
 
     void update_column_index(std::size_t, const Spec&) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
-    void refresh_after_advance_transact(std::size_t, const Spec&) TIGHTDB_OVERRIDE;
-#endif
+    void refresh_accessor_tree(std::size_t, const Spec&) TIGHTDB_OVERRIDE;
 
 #ifdef TIGHTDB_DEBUG
     void Verify() const TIGHTDB_OVERRIDE; // Must be upper case to avoid conflict with macro in ObjC
@@ -249,7 +252,7 @@ private:
 
     std::size_t get_subspec_ndx() const TIGHTDB_NOEXCEPT;
 
-    void destroy_subtable(std::size_t ndx);
+    void destroy_subtable(std::size_t ndx) TIGHTDB_NOEXCEPT;
 
     void do_detach_subtable_accessors() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 };
@@ -260,6 +263,38 @@ private:
 
 // Implementation
 
+// Overriding virtual method of Column.
+inline void ColumnSubtableParent::insert(std::size_t row_ndx, std::size_t num_rows, bool is_append)
+{
+    std::size_t row_ndx_2 = is_append ? tightdb::npos : row_ndx;
+    int_fast64_t value = 0;
+    do_insert(row_ndx_2, value, num_rows); // Throws
+}
+
+inline void ColumnSubtableParent::erase(std::size_t row_ndx, bool is_last)
+{
+    Column::erase(row_ndx, is_last); // Throws
+
+    const bool fix_ndx_in_parent = true;
+    bool last_entry_removed = m_subtable_map.adj_erase_row<fix_ndx_in_parent>(row_ndx);
+    typedef _impl::TableFriend tf;
+    if (last_entry_removed)
+        tf::unbind_ref(*m_table);
+}
+
+inline void ColumnSubtableParent::move_last_over(std::size_t target_row_ndx,
+                                                 std::size_t last_row_ndx)
+{
+    Column::move_last_over(target_row_ndx, last_row_ndx); // Throws
+
+    const bool fix_ndx_in_parent = true;
+    bool last_entry_removed =
+        m_subtable_map.adj_move_last_over<fix_ndx_in_parent>(target_row_ndx, last_row_ndx);
+    typedef _impl::TableFriend tf;
+    if (last_entry_removed)
+        tf::unbind_ref(*m_table);
+}
+
 inline void ColumnSubtableParent::update_column_index(std::size_t new_col_ndx, const Spec& spec)
     TIGHTDB_NOEXCEPT
 {
@@ -267,53 +302,52 @@ inline void ColumnSubtableParent::update_column_index(std::size_t new_col_ndx, c
     m_column_ndx = new_col_ndx;
 }
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
-
-inline void ColumnSubtableParent::recursive_mark_table_accessors_dirty() TIGHTDB_NOEXCEPT
+inline void ColumnSubtableParent::recursive_mark_dirty() TIGHTDB_NOEXCEPT
 {
     m_subtable_map.recursive_mark_dirty();
 }
 
-inline void ColumnSubtableParent::refresh_after_advance_transact(std::size_t col_ndx,
-                                                                 const Spec& spec)
+inline void ColumnSubtableParent::refresh_accessor_tree(std::size_t col_ndx, const Spec& spec)
 {
-    Column::refresh_after_advance_transact(col_ndx, spec); // Throws
+    Column::refresh_accessor_tree(col_ndx, spec); // Throws
     m_column_ndx = col_ndx;
 }
 
-#endif // TIGHTDB_ENABLE_REPLICATION
-
-inline void ColumnSubtableParent::adj_accessors_insert_rows(std::size_t row_ndx,
-                                                            std::size_t num_rows) TIGHTDB_NOEXCEPT
+inline void ColumnSubtableParent::adj_subtab_acc_insert_rows(std::size_t row_ndx,
+                                                             std::size_t num_rows) TIGHTDB_NOEXCEPT
 {
     // This function must be able to operate with only the Minimal Accessor
     // Hierarchy Consistency Guarantee. This means, in particular, that it
     // cannot access the underlying array structure.
 
-    m_subtable_map.adj_insert_rows(row_ndx, num_rows);
+    const bool fix_ndx_in_parent = false;
+    m_subtable_map.adj_insert_rows<fix_ndx_in_parent>(row_ndx, num_rows);
 }
 
-inline void ColumnSubtableParent::adj_accessors_erase_row(std::size_t row_ndx) TIGHTDB_NOEXCEPT
+inline void ColumnSubtableParent::adj_subtab_acc_erase_row(std::size_t row_ndx) TIGHTDB_NOEXCEPT
 {
     // This function must be able to operate with only the Minimal Accessor
     // Hierarchy Consistency Guarantee. This means, in particular, that it
     // cannot access the underlying array structure.
 
-    bool last_entry_removed = m_subtable_map.adj_erase_row(row_ndx);
+    const bool fix_ndx_in_parent = false;
+    bool last_entry_removed = m_subtable_map.adj_erase_row<fix_ndx_in_parent>(row_ndx);
     typedef _impl::TableFriend tf;
     if (last_entry_removed)
         tf::unbind_ref(*m_table);
 }
 
-inline void ColumnSubtableParent::adj_accessors_move_last_over(std::size_t target_row_ndx,
-                                                               std::size_t last_row_ndx)
+inline void ColumnSubtableParent::adj_subtab_acc_move_last_over(std::size_t target_row_ndx,
+                                                                std::size_t last_row_ndx)
     TIGHTDB_NOEXCEPT
 {
     // This function must be able to operate with only the Minimal Accessor
     // Hierarchy Consistency Guarantee. This means, in particular, that it
     // cannot access the underlying array structure.
 
-    bool last_entry_removed = m_subtable_map.adj_move_last_over(target_row_ndx, last_row_ndx);
+    const bool fix_ndx_in_parent = false;
+    bool last_entry_removed =
+        m_subtable_map.adj_move_last_over<fix_ndx_in_parent>(target_row_ndx, last_row_ndx);
     typedef _impl::TableFriend tf;
     if (last_entry_removed)
         tf::unbind_ref(*m_table);
@@ -348,6 +382,123 @@ inline void ColumnSubtableParent::SubtableMap::add(std::size_t subtable_ndx, Tab
     e.m_subtable_ndx = subtable_ndx;
     e.m_table        = table;
     m_entries.push_back(e);
+}
+
+template<bool fix_ndx_in_parent>
+void ColumnSubtableParent::SubtableMap::adj_insert_rows(std::size_t row_ndx, std::size_t num_rows)
+    TIGHTDB_NOEXCEPT
+{
+    typedef entries::iterator iter;
+    iter end = m_entries.end();
+    for (iter i = m_entries.begin(); i != end; ++i) {
+        if (i->m_subtable_ndx >= row_ndx) {
+            i->m_subtable_ndx += num_rows;
+            typedef _impl::TableFriend tf;
+            if (fix_ndx_in_parent)
+                tf::set_ndx_in_parent(*(i->m_table), i->m_subtable_ndx);
+        }
+    }
+}
+
+template<bool fix_ndx_in_parent>
+bool ColumnSubtableParent::SubtableMap::adj_erase_row(std::size_t row_ndx) TIGHTDB_NOEXCEPT
+{
+    typedef _impl::TableFriend tf;
+    typedef entries::iterator iter;
+    iter end = m_entries.end();
+    iter erase = end;
+    for (iter i = m_entries.begin(); i != end; ++i) {
+        if (i->m_subtable_ndx > row_ndx) {
+            --i->m_subtable_ndx;
+            if (fix_ndx_in_parent)
+                tf::set_ndx_in_parent(*(i->m_table), i->m_subtable_ndx);
+        }
+        else if (i->m_subtable_ndx == row_ndx) {
+            TIGHTDB_ASSERT(erase == end); // Subtable accessors are unique
+            erase = i;
+        }
+    }
+    if (erase == end)
+        return false; // Not found, so nothing changed
+
+    // Must hold a counted reference while detaching
+    TableRef table(erase->m_table);
+    tf::detach(*table);
+
+    *erase = *--end; // Move last over
+    m_entries.pop_back();
+    return m_entries.empty();
+}
+
+template<bool fix_ndx_in_parent>
+bool ColumnSubtableParent::SubtableMap::adj_move_last_over(std::size_t target_row_ndx,
+                                                           std::size_t last_row_ndx) TIGHTDB_NOEXCEPT
+{
+    typedef _impl::TableFriend tf;
+
+    // Search for either index in a tight loop for speed
+    bool last_seen = false;
+    std::size_t i = 0, n = m_entries.size();
+    for (;;) {
+        if (i == n)
+            return false;
+        const entry& e = m_entries[i];
+        if (e.m_subtable_ndx == target_row_ndx)
+            goto target;
+        if (e.m_subtable_ndx == last_row_ndx)
+            break;
+        ++i;
+    }
+
+    // Move subtable accessor at `last_row_ndx`, then look for `target_row_ndx`
+    {
+        entry& e = m_entries[i];
+        e.m_subtable_ndx = target_row_ndx;
+        if (fix_ndx_in_parent)
+            tf::set_ndx_in_parent(*(e.m_table), e.m_subtable_ndx);
+    }
+    for (;;) {
+        ++i;
+        if (i == n)
+            return false;
+        const entry& e = m_entries[i];
+        if (e.m_subtable_ndx == target_row_ndx)
+            break;
+    }
+    last_seen = true;
+
+    // Detach and remove original subtable accessor at `target_row_ndx`, then
+    // look for `last_row_ndx
+  target:
+    {
+        entry& e = m_entries[i];
+        // Must hold a counted reference while detaching
+        TableRef table(e.m_table);
+        tf::detach(*table);
+        // Delete entry by moving last over (faster and avoids invalidating
+        // iterators)
+        e = m_entries[--n];
+        m_entries.pop_back();
+    }
+    if (!last_seen) {
+        for (;;) {
+            if (i == n)
+                goto check_empty;
+            const entry& e = m_entries[i];
+            if (e.m_subtable_ndx == last_row_ndx)
+                break;
+            ++i;
+        }
+        {
+            entry& e = m_entries[i];
+            e.m_subtable_ndx = target_row_ndx;
+            if (fix_ndx_in_parent)
+                tf::set_ndx_in_parent(*(e.m_table), target_row_ndx);
+        }
+    }
+
+  check_empty:
+    return m_entries.empty();
 }
 
 inline ColumnSubtableParent::ColumnSubtableParent(Allocator& alloc,
@@ -421,6 +572,17 @@ update_table_accessors(const std::size_t* col_path_begin, const std::size_t* col
     m_subtable_map.update_accessors(col_path_begin, col_path_end, updater); // Throws
 }
 
+inline void ColumnSubtableParent::do_insert(std::size_t row_ndx, int_fast64_t value,
+                                            std::size_t num_rows)
+{
+    Column::do_insert(row_ndx, value, num_rows); // Throws
+    bool is_append = row_ndx == tightdb::npos;
+    if (!is_append) {
+        const bool fix_ndx_in_parent = true;
+        m_subtable_map.adj_insert_rows<fix_ndx_in_parent>(row_ndx, num_rows);
+    }
+}
+
 
 inline void ColumnTable::update_column_index(std::size_t new_col_ndx, const Spec& spec)
     TIGHTDB_NOEXCEPT
@@ -447,21 +609,12 @@ inline const Table* ColumnTable::get_subtable_ptr(std::size_t subtable_ndx) cons
     return const_cast<ColumnTable*>(this)->get_subtable_ptr(subtable_ndx);
 }
 
-inline void ColumnTable::add(const Table* subtable)
+inline void ColumnTable::refresh_accessor_tree(std::size_t col_ndx, const Spec& spec)
 {
-    insert(size(), subtable);
-}
-
-#ifdef TIGHTDB_ENABLE_REPLICATION
-
-inline void ColumnTable::refresh_after_advance_transact(std::size_t col_ndx, const Spec& spec)
-{
-    ColumnSubtableParent::refresh_after_advance_transact(col_ndx, spec); // Throws
+    ColumnSubtableParent::refresh_accessor_tree(col_ndx, spec); // Throws
     m_subspec_ndx = spec.get_subspec_ndx(col_ndx);
-    m_subtable_map.refresh_after_advance_transact(m_subspec_ndx); // Throws
+    m_subtable_map.refresh_accessor_tree(m_subspec_ndx); // Throws
 }
-
-#endif // TIGHTDB_ENABLE_REPLICATION
 
 inline std::size_t ColumnTable::get_subspec_ndx() const TIGHTDB_NOEXCEPT
 {

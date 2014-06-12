@@ -22,6 +22,8 @@ export TIGHTDB_HOME
 MODE="$1"
 [ $# -gt 0 ] && shift
 
+# enabling replication support in core, now required for objective-c/ios
+export TIGHTDB_ENABLE_REPLICATION=1
 
 # Extensions corresponding with additional GIT repositories
 EXTENSIONS="java python ruby objc node php c gui"
@@ -500,6 +502,18 @@ EOF
         exit 0
         ;;
 
+    "build-osx")
+        auto_configure || exit 1
+        export TIGHTDB_HAVE_CONFIG="1"
+        (
+            cd src/tightdb
+            export TIGHTDB_ENABLE_FAT_BINARIES="1"
+            TIGHTDB_ENABLE_FAT_BINARIES="1" $MAKE libtightdb.a EXTRA_CFLAGS="-fPIC -DPIC" || exit 1
+            TIGHTDB_ENABLE_FAT_BINARIES="1" $MAKE libtightdb-dbg.a EXTRA_CFLAGS="-fPIC -DPIC" || exit 1
+        ) || exit 1
+        exit 0
+        ;;
+
     "build-iphone")
         auto_configure || exit 1
         export TIGHTDB_HAVE_CONFIG="1"
@@ -517,7 +531,7 @@ EOF
             sdk="$(printf "%s\n" "$x" | cut -d: -f2)" || exit 1
             archs="$(printf "%s\n" "$x" | cut -d: -f3 | sed 's/,/ /g')" || exit 1
             cflags_arch=""
-            #cflags_arch="-mios-version-min=5.0"
+            #cflags_arch="-mios-version-min=5.0 -stdlib=libc++"
             for y in $archs; do
                 word_list_append "cflags_arch" "-arch $y" || exit 1
             done
@@ -605,6 +619,62 @@ EOF
         temp_dir="$(mktemp -d /tmp/tightdb.build-android.XXXX)" || exit 1
         (cd "src/tightdb" && tar czf "$temp_dir/headers.tar.gz" $inst_headers) || exit 1
         (cd "$TIGHTDB_HOME/$ANDROID_DIR/include/tightdb" && tar xzmf "$temp_dir/headers.tar.gz") || exit 1
+        ;;
+
+   "build-objc")
+        if [ "$OS" != "Darwin" ]; then
+            echo "zip for iOS/OSX can only be generated under OS X."
+            exit 0
+        fi
+
+        # the user can specify where to find realm-objc repository
+        realm_objc_dir="$1"
+        if [ -z "$realm_objc_dir" ]; then
+            realm_objc_dir="../realm-objc"
+        fi
+
+        # has build-iphone been run?
+        if ! [ -e "iphone-lib/libtightdb-ios.a" ]; then
+            echo "You must run 'sh build.sh build-iphone' before proceeding."
+            exit 0
+        fi
+
+        # has build-osx been run?
+        if ! [ -e "src/tightdb/libtightdb-dbg.a" ]; then
+            echo "You must run 'sh build.sh build-osx' before proceeding."
+            exit 0
+        fi
+
+        echo "Copying files"
+        tmpdir=$(mktemp -d /tmp/$$.XXXXXX) || exit 1
+        realm_version="$(sh build.sh get-version)" || exit 1
+        BASENAME="core"
+        rm -f "$BASENAME-$realm_version.zip" || exit 1
+        mkdir -p "$tmpdir/$BASENAME/include" || exit 1
+        cp "$IPHONE_DIR/libtightdb-ios.a" "$tmpdir/$BASENAME" || exit 1
+        cp "$IPHONE_DIR/libtightdb-ios-dbg.a" "$tmpdir/$BASENAME" || exit 1
+        cp -r "$IPHONE_DIR/include/"* "$tmpdir/$BASENAME/include" || exit 1
+        for x in $iphone_sdks; do
+            platform="$(printf "%s\n" "$x" | cut -d: -f1)" || exit 1
+            cp "src/tightdb/libtightdb-$platform.a" "$tmpdir/$BASENAME" || exit 1
+            cp "src/tightdb/libtightdb-$platform-dbg.a" "$tmpdir/$BASENAME" || exit 1
+        done
+        cp src/tightdb/libtightdb.a "$tmpdir/$BASENAME" || exit 1
+        cp src/tightdb/libtightdb-dbg.a "$tmpdir/$BASENAME" || exit 1
+
+        echo "Create zip file: '$BASENAME-$realm_version.zip'"
+        (cd $tmpdir && zip -r -q "$BASENAME-$realm_version.zip" "$BASENAME") || exit 1
+        mv "$tmpdir/$BASENAME-$realm_version.zip" . || exit 1
+
+        echo "Unzipping in '$realm_objc_dir'"
+        mkdir -p "$realm_objc_dir" || exit 1
+        rm -rf "$realm_objc_dir/$BASENAME" || exit 1
+        cur_dir="$(pwd)"
+        (cd "$realm_objc_dir" && unzip -qq "$cur_dir/$BASENAME-$realm_version.zip") || exit 1
+
+        rm -rf "$tmpdir" || exit 1
+        echo "Done"
+        exit 0
         ;;
 
    "build-ios-framework")
@@ -2447,7 +2517,7 @@ EOF
 Unspecified or bad mode '$MODE'.
 Available modes are:
     config clean build build-config-progs build-iphone build-android
-    build-ios-framework build-osx-framework
+    build-ios-framework build-osx-framework build-objc
     check check-debug show-install install uninstall
     test-installed wipe-installed install-prod install-devel uninstall-prod
     uninstall-devel dist-copy src-dist bin-dist dist-deb dist-status

@@ -627,7 +627,6 @@
     <ClCompile Include="..\..\src\tightdb\row.cpp" />
     <ClCompile Include="..\..\src\tightdb\table_view.cpp" />
     <ClCompile Include="..\..\src\tightdb\util\terminate.cpp" />
-    <ClCompile Include="..\..\src\tightdb\util\utf8.cpp" />
     <ClCompile Include="..\..\src\tightdb\utilities.cpp" />
     <ClCompile Include="..\..\src\tightdb\lang_bind_helper.cpp" />
     <ClCompile Include="..\..\src\tightdb\version.cpp" />
@@ -1044,6 +1043,7 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="..\..\test\util\random.cpp" />
+    <ClCompile Include="..\..\test\util\resource_limits.cpp" />
     <ClCompile Include="..\..\test\util\test_only.cpp" />
     <ClCompile Include="..\..\test\util\test_path.cpp" />
     <ClCompile Include="..\..\test\util\timer.cpp" />
