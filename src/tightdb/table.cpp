@@ -2873,15 +2873,7 @@ size_t Table::find_first_binary(size_t, BinaryData) const
 
 template <class T> TableView Table::find_all(size_t column_ndx, T value)
 {
-    TIGHTDB_ASSERT(!m_columns.is_attached() || column_ndx < m_columns.size());
-    TableView tv(*this);
-
-    if(m_columns.is_attached()) {
-        typedef typename ColumnTypeTraits3<T>::column_type ColType;
-        const ColType& column = get_column<ColType, ColumnTypeTraits3<T>::ct_id>(column_ndx);
-        column.find_all(tv.get_ref_column(), value);
-    }
-    return tv;
+    return where().equal(column_ndx, value).find_all();
 }
 
 
@@ -2938,23 +2930,7 @@ ConstTableView Table::find_all_datetime(size_t column_ndx, DateTime value) const
 
 TableView Table::find_all_string(size_t column_ndx, StringData value)
 {
-    TIGHTDB_ASSERT(!m_columns.is_attached() || column_ndx < m_columns.size());
-
-    ColumnType type = get_real_column_type(column_ndx);
-    TableView tv(*this);
-
-    if(m_columns.is_attached()) {
-        if (type == col_type_String) {
-            const AdaptiveStringColumn& column = get_column_string(column_ndx);
-            column.find_all(tv.get_ref_column(), value);
-        }
-        else {
-            TIGHTDB_ASSERT(type == col_type_StringEnum);
-            const ColumnStringEnum& column = get_column_string_enum(column_ndx);
-            column.find_all(tv.get_ref_column(), value);
-        }
-    }
-    return tv;
+    return where().equal(column_ndx, value).find_all();
 }
 
 ConstTableView Table::find_all_string(size_t column_ndx, StringData value) const
@@ -2976,6 +2952,7 @@ ConstTableView Table::find_all_binary(size_t, BinaryData) const
 
 TableView Table::get_distinct_view(size_t column_ndx)
 {
+    // FIXME: lacks support for reactive updates
     TIGHTDB_ASSERT(!m_columns.is_attached() || column_ndx < m_columns.size());
     TIGHTDB_ASSERT(has_index(column_ndx));
 
@@ -3006,21 +2983,8 @@ ConstTableView Table::get_distinct_view(size_t column_ndx) const
 
 TableView Table::get_sorted_view(size_t column_ndx, bool ascending)
 {
-    TIGHTDB_ASSERT(!m_columns.is_attached() || column_ndx < m_columns.size());
-
-    TableView tv(*this);
-
-    if(m_columns.is_attached()) {
-        // Insert refs to all rows in table
-        Column& refs = tv.get_ref_column();
-        size_t count = size();
-        for (size_t i = 0; i < count; ++i) {
-            refs.add(i);
-        }
-
-        // Sort the refs based on the given column
-        tv.sort(column_ndx, ascending);
-    }
+    TableView tv = where().find_all();
+    tv.sort(column_ndx, ascending);
     return tv;
 }
 
