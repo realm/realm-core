@@ -22,7 +22,6 @@ TEST(LinkList_Query)
 {
     Group group;
 
-    size_t table2_ndx = 1;
     TableRef table1 = group.get_table("table1");
     TableRef table2 = group.get_table("table2");
 
@@ -100,7 +99,6 @@ TEST(SingleLink_Query)
 {
     Group group;
 
-    size_t table2_ndx = 1;
     TableRef table1 = group.get_table("table1");
     TableRef table2 = group.get_table("table2");
 

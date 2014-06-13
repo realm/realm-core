@@ -127,7 +127,7 @@ Caveats, notes and todos
 // flag to get higher query_expression test coverage. This is a good idea to try out each time you develop on/modify
 // query_expression.
 
-//#define TIGHTDB_OLDQUERY_FALLBACK
+#define TIGHTDB_OLDQUERY_FALLBACK
 
 // namespace tightdb {
 
@@ -143,6 +143,31 @@ typedef tightdb::DateTime   DateTime;
 typedef float               Float;
 typedef double              Double;
 typedef tightdb::StringData String;
+
+// Return StringData if either T or U is StringData, else return T. See description of usage in export2().
+template<class T, class U> struct EitherIsString
+{
+    typedef T type;
+};
+
+template<class T> struct EitherIsString<T, StringData>
+{
+    typedef StringData type;
+};
+
+// Hack to avoid template instantiation errors. See create(). Todo, see if we can simplify OnlyNumberic and 
+// EitherIsString somehow
+template<class T> struct OnlyNumeric
+{
+    static T get(T in) { return in; }
+    typedef T type;
+};
+
+template<> struct OnlyNumeric<StringData>
+{
+    static int get(StringData in) { return 0; }
+    typedef StringData type;
+};
 
 
 template<class T>struct Plus {
@@ -266,23 +291,27 @@ template <class L, class Cond, class R> Query create (L left, const Subexpr2<R>&
     // This method intercepts only Value <cond> Subexpr2. Interception of Subexpr2 <cond> Subexpr is elsewhere.
 
 #ifdef TIGHTDB_OLDQUERY_FALLBACK // if not defined, then never fallback to query_engine.hpp; always use query_expression
+    OnlyNumeric<L> num;
+    static_cast<void>(num);
+
     const Columns<R>* column = dynamic_cast<const Columns<R>*>(&right);
-    if (column && (std::numeric_limits<L>::is_integer) && (std::numeric_limits<R>::is_integer)) {
+    if (column && (std::numeric_limits<L>::is_integer) && (std::numeric_limits<R>::is_integer) && 
+        !column->m_column_linklist && !column->m_column_single_link) {
         const Table* t = (const_cast<Columns<R>*>(column))->get_table();
         Query q = Query(*t);
 
         if (util::SameType<Cond, Less>::value)
-            q.greater(column->m_column, left);
+            q.greater(column->m_column, num.get(left));
         else if (util::SameType<Cond, Greater>::value)
-            q.less(column->m_column, left);
+            q.less(column->m_column, num.get(left));
         else if (util::SameType<Cond, Equal>::value)
-            q.equal(column->m_column, left);
+            q.equal(column->m_column, num.get(left));
         else if (util::SameType<Cond, NotEqual>::value)
-            q.not_equal(column->m_column, left);
+            q.not_equal(column->m_column, num.get(left));
         else if (util::SameType<Cond, LessEqual>::value)
-            q.greater_equal(column->m_column, left);
+            q.greater_equal(column->m_column, num.get(left));
         else if (util::SameType<Cond, GreaterEqual>::value)
-            q.less_equal(column->m_column, left);
+            q.less_equal(column->m_column, num.get(left));
         else {
             // query_engine.hpp does not support this Cond. Please either add support for it in query_engine.hpp or
             // fallback to using use 'return *new Compare<>' instead.
@@ -475,18 +504,6 @@ public:
     #define TDB_U(o) TDB_U2(int, o) TDB_U2(float, o) TDB_U2(double, o) TDB_U2(int64_t, o) TDB_U2(StringData, o)
     TDB_U(+) TDB_U(-) TDB_U(*) TDB_U(/) TDB_U(>) TDB_U(<) TDB_U(==) TDB_U(!=) TDB_U(>=) TDB_U(<=)
 };
-
-// Return StringData if either T or U is StringData, else return T. See description of usage in export2().
-template<class T, class U> struct EitherIsString 
-{
-    typedef T type;
-};
-
-template<class T> struct EitherIsString<T, StringData> 
-{
-    typedef StringData type;
-};
-
 
 // Stores N values of type T. Can also exchange data with other ValueBase of different types
 template<class T> class Value : public ValueBase, public Subexpr2<T>
