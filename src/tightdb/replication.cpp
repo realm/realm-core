@@ -668,8 +668,6 @@ private:
                 return "Link";
             case type_LinkList:
                 return "LinkList";
-            case type_BackLink:
-                return "BackLink";
         }
         TIGHTDB_ASSERT(false);
         return 0;

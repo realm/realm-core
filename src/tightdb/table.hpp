@@ -804,7 +804,7 @@ private:
     struct InsertSubtableColumns;
     struct RemoveSubtableColumns;
 
-    void insert_root_column(std::size_t column_ndx, DataType type, StringData name);
+    void insert_root_column(std::size_t column_ndx, ColumnType, StringData name);
     void remove_root_column(std::size_t column_ndx);
 
     struct SubtableUpdater {
@@ -939,7 +939,7 @@ private:
     /// Create a column of the specified type, fill it with the
     /// specified number of default values, and return just the
     /// reference to the underlying memory.
-    static ref_type create_column(DataType column_type, size_t num_default_values, Allocator&);
+    static ref_type create_column(ColumnType column_type, size_t num_default_values, Allocator&);
 
     /// Construct a copy of the columns array of this table using the
     /// specified allocator and return just the ref to that array.
@@ -1144,13 +1144,13 @@ inline std::size_t Table::get_column_index(StringData name) const TIGHTDB_NOEXCE
 inline ColumnType Table::get_real_column_type(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < m_spec.get_column_count());
-    return m_spec.get_real_column_type(ndx);
+    return m_spec.get_column_type(ndx);
 }
 
 inline DataType Table::get_column_type(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < m_spec.get_column_count());
-    return m_spec.get_column_type(ndx);
+    return m_spec.get_public_column_type(ndx);
 }
 
 template <class C, ColumnType coltype>

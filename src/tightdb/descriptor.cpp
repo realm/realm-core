@@ -34,7 +34,7 @@ DescriptorRef Descriptor::get_subdescriptor(size_t column_ndx)
 size_t Descriptor::get_num_unique_values(size_t column_ndx) const
 {
     TIGHTDB_ASSERT(is_attached());
-    ColumnType col_type = m_spec->get_real_column_type(column_ndx);
+    ColumnType col_type = m_spec->get_column_type(column_ndx);
     if (col_type != col_type_StringEnum)
         return 0;
     ref_type ref = m_spec->get_enumkeys_ref(column_ndx);

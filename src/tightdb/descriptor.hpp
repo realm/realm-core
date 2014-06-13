@@ -410,7 +410,7 @@ inline StringData Descriptor::get_column_name(std::size_t ndx) const TIGHTDB_NOE
 inline DataType Descriptor::get_column_type(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(is_attached());
-    return m_spec->get_column_type(ndx);
+    return m_spec->get_public_column_type(ndx);
 }
 
 inline std::size_t Descriptor::get_column_index(StringData name) const TIGHTDB_NOEXCEPT
@@ -421,7 +421,7 @@ inline std::size_t Descriptor::get_column_index(StringData name) const TIGHTDB_N
 
 inline std::size_t Descriptor::add_column(DataType type, StringData name, DescriptorRef* subdesc)
 {
-    std::size_t column_ndx = (type == type_BackLink) ? m_spec->get_column_count() : m_spec->get_public_column_count();
+    std::size_t column_ndx = m_spec->get_public_column_count();
     insert_column(column_ndx, type, name, subdesc); // Throws
     return column_ndx;
 }

@@ -257,13 +257,14 @@ void Table::create_backlinks_column(size_t source_table_ndx, size_t source_table
     TIGHTDB_ASSERT(get_parent_group());
 
     DescriptorRef desc = get_descriptor();
-    size_t column_ndx = desc->add_column(type_BackLink, ""); // Throws
-    m_spec.set_link_target_table(column_ndx, source_table_ndx);
-    m_spec.set_backlink_source_column(column_ndx, source_table_column_ndx);
+    size_t col_ndx = m_spec.get_column_count();
+    insert_root_column(col_ndx, col_type_BackLink, ""); // Throws
+    m_spec.set_link_target_table(col_ndx, source_table_ndx);
+    m_spec.set_backlink_source_column(col_ndx, source_table_column_ndx);
 
     // Column needs source table to create accessors
     Table* source_table = get_parent_group()->get_table_by_ndx(source_table_ndx);
-    ColumnBackLink& column = get_column<ColumnBackLink, col_type_BackLink>(column_ndx);
+    ColumnBackLink& column = get_column<ColumnBackLink, col_type_BackLink>(col_ndx);
     column.set_source_table(source_table->get_table_ref());
 
     DataType col_type = source_table->get_column_type(source_table_column_ndx);
@@ -320,7 +321,7 @@ void Table::initialize_link_targets()
     size_t current_table_ndx = get_index_in_parent();
 
     for (size_t i = 0; i < column_count; ++i) {
-        ColumnType column_type = spec->get_real_column_type(i);
+        ColumnType column_type = spec->get_column_type(i);
 
         if (column_type == col_type_Link || column_type == col_type_LinkList) {
             // Get the target table from group
@@ -511,7 +512,7 @@ struct Table::InsertSubtableColumns: SubtableUpdater {
     {
         size_t subtable_size = subtables.get_subtable_size(row_ndx);
         Allocator& alloc = subcolumns.get_alloc();
-        ref_type column_ref = create_column(m_type, subtable_size, alloc); // Throws
+        ref_type column_ref = create_column(ColumnType(m_type), subtable_size, alloc); // Throws
         _impl::DeepArrayRefDestroyGuard dg(column_ref, alloc);
         subcolumns.insert(m_column_ndx, column_ref); // Throws
         dg.release();
@@ -561,11 +562,11 @@ void Table::do_insert_column(Descriptor& desc, size_t column_ndx,
     TIGHTDB_ASSERT(column_ndx <= df::get_internal_column_count(desc));
 
     if (desc.is_root()) {
-        root_table.insert_root_column(column_ndx, type, name); // Throws
+        root_table.insert_root_column(column_ndx, ColumnType(type), name); // Throws
     }
     else {
         Spec* spec = df::get_spec(desc);
-        spec->insert_column(column_ndx, type, name); // Throws
+        spec->insert_column(column_ndx, ColumnType(type), name); // Throws
         if (!root_table.is_empty()) {
             InsertSubtableColumns updater(column_ndx, type);
             update_subtables(desc, &updater); // Throws
@@ -635,104 +636,28 @@ void Table::do_rename_column(Descriptor& desc, size_t column_ndx, StringData nam
 }
 
 
-void Table::insert_root_column(size_t column_ndx, DataType type, StringData name)
+void Table::insert_root_column(size_t col_ndx, ColumnType col_type, StringData name)
 {
+    TIGHTDB_ASSERT(col_type != col_type_BackLink || col_ndx == m_columns.size());
+
     m_search_index = 0;
 
     // Add the column to the spec
-    m_spec.insert_column(column_ndx, type, name); // Throws
+    m_spec.insert_column(col_ndx, col_type, name); // Throws
 
     Spec::ColumnInfo info;
-    m_spec.get_column_info(column_ndx, info);
-
-    Allocator& alloc = m_columns.get_alloc();
-    ref_type ref = 0;
-    Array* parent = &m_columns;
+    m_spec.get_column_info(col_ndx, info);
     size_t ndx_in_parent = info.m_column_ref_ndx;
-    UniquePtr<ColumnBase> new_col;
 
-    try {
-        switch (type) {
-            case type_Int:
-            case type_Bool:
-            case type_DateTime: {
-                int_fast64_t value = 0;
-                ref = Column::create(Array::type_Normal, size(), value, alloc); // Throws
-                new_col.reset(new Column(ref, parent, ndx_in_parent, alloc)); // Throws
-                goto add;
-            }
-            case type_Link: {
-                ref = ColumnLink::create(size(), alloc); // Throws
-                new_col.reset(new ColumnLink(ref, parent, ndx_in_parent, alloc)); // Throws
-                goto add;
-            }
-            case type_LinkList: {
-                ref = ColumnLinkList::create(size(), alloc); // Throws
-                new_col.reset(new ColumnLinkList(ref, parent, ndx_in_parent, alloc)); // Throws
-                goto add;
-            }
-            case type_BackLink: {
-                TIGHTDB_ASSERT(column_ndx == m_columns.size());
-
-                ref = ColumnBackLink::create(size(), alloc); // Throws
-                new_col.reset(new ColumnBackLink(ref, parent, ndx_in_parent, alloc)); // Throws
-                goto add;
-            }
-            case type_Float:
-                ref = ColumnFloat::create(size(), alloc); // Throws
-                new_col.reset(new ColumnFloat(ref, parent, ndx_in_parent, alloc)); // Throws
-                goto add;
-            case type_Double:
-                ref = ColumnDouble::create(size(), alloc); // Throws
-                new_col.reset(new ColumnDouble(ref, parent, ndx_in_parent, alloc)); // Throws
-                goto add;
-            case type_String:
-                ref = AdaptiveStringColumn::create(size(), alloc); // Throws
-                new_col.reset(new AdaptiveStringColumn(ref, parent, ndx_in_parent,
-                                                       alloc)); // Throws
-                goto add;
-            case type_Binary:
-                ref = ColumnBinary::create(size(), alloc); // Throws
-                new_col.reset(new ColumnBinary(ref, parent, ndx_in_parent, alloc)); // Throws
-                goto add;
-            case type_Table: {
-                ref = ColumnTable::create(size(), alloc); // Throws
-                new_col.reset(new ColumnTable(alloc, this, column_ndx, parent, ndx_in_parent,
-                                              ref)); // Throws
-                goto add;
-            }
-            case type_Mixed:
-                ref = ColumnMixed::create(size(), alloc); // Throws
-                new_col.reset(new ColumnMixed(alloc, this, column_ndx, parent, ndx_in_parent,
-                                              ref)); // Throws
-                goto add;
-        }
-        TIGHTDB_ASSERT(false);
-
-      add:
-        m_columns.insert(ndx_in_parent, new_col->get_ref()); // Throws
-        try {
-            // FIXME: intptr_t is not guaranteed to exists, even in
-            // C++11. Solve this by changing the type of
-            // `Table::m_cols` to `std::vector<ColumnBase*>`. Also
-            // change its name to `Table::m_column_accessors`.
-            m_cols.insert(column_ndx, intptr_t(new_col.get())); // Throws
-            new_col.release();
-        }
-        catch (...) {
-            m_columns.erase(ndx_in_parent); // Guaranteed to not throw
-            throw;
-        }
-    }
-    catch (...) {
-        if (ref != 0)
-            Array::destroy_deep(ref, alloc);
-        throw;
-    }
+    ref_type ref = create_column(col_type, m_size, m_columns.get_alloc()); // Throws
+    m_columns.insert(ndx_in_parent, ref); // Throws
+    UniquePtr<ColumnBase> col(create_column_accessor(col_type, col_ndx, ndx_in_parent)); // Throws
+    m_cols.insert(col_ndx, intptr_t(col.get())); // Throws
+    col.release();
 
     // Update cached column indexes for subsequent column accessors
     int ndx_in_parent_diff = 1;
-    adjust_column_index(column_ndx+1, ndx_in_parent_diff);
+    adjust_column_index(col_ndx+1, ndx_in_parent_diff);
 }
 
 
@@ -962,7 +887,7 @@ void Table::create_columns()
     // Add the newly defined columns
     size_t n = m_spec.get_column_count();
     for (size_t i=0; i<n; ++i) {
-        ColumnType type = m_spec.get_real_column_type(i);
+        ColumnType type = m_spec.get_column_type(i);
         ColumnAttr attr = m_spec.get_column_attr(i);
         size_t ref_pos =  m_columns.size();
         ColumnBase* new_col = 0;
@@ -1170,13 +1095,13 @@ ColumnBase* Table::create_column_accessor(ColumnType col_type, size_t col_ndx, s
             return new ColumnTable(alloc, this, col_ndx, &m_columns, ndx_in_parent, ref); // Throws
         case col_type_Mixed:
             return new ColumnMixed(alloc, this, col_ndx, &m_columns, ndx_in_parent, ref); // Throws
-        case type_Link:
+        case col_type_Link:
             // Target table will be set by group after entire table has been created
             return new ColumnLink(ref, &m_columns, ndx_in_parent, alloc); // Throws
-        case type_LinkList:
+        case col_type_LinkList:
             // Target table will be set by group after entire table has been created
             return new ColumnLinkList(ref, &m_columns, ndx_in_parent, alloc); // Throws
-        case type_BackLink:
+        case col_type_BackLink:
             // Source table will be set by group after entire table has been created
             return new ColumnBackLink(ref, &m_columns, ndx_in_parent, alloc); // Throws
         case col_type_Reserved1:
@@ -1196,7 +1121,7 @@ void Table::create_column_accessors()
     size_t ndx_in_parent = 0;
     size_t num_cols = m_spec.get_column_count();
     for (size_t col_ndx = 0; col_ndx < num_cols; ++col_ndx) {
-        ColumnType col_type = m_spec.get_real_column_type(col_ndx);
+        ColumnType col_type = m_spec.get_column_type(col_ndx);
         ColumnBase* col = create_column_accessor(col_type, col_ndx, ndx_in_parent); // Throws
         // FIXME: Memory leak if the following addition statement fails. This
         // problem disappears as soon as m_cols is changed to be of std::vector
@@ -1437,8 +1362,8 @@ const ColumnBase& Table::get_column_base(size_t ndx) const TIGHTDB_NOEXCEPT
 ColumnLinkBase& Table::get_column_linkbase(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx < m_spec.get_column_count());
-    TIGHTDB_ASSERT(m_spec.get_column_type(ndx) == type_Link ||
-                   m_spec.get_column_type(ndx) == type_LinkList);
+    TIGHTDB_ASSERT(m_spec.get_column_type(ndx) == col_type_Link ||
+                   m_spec.get_column_type(ndx) == col_type_LinkList);
     instantiate_before_change();
     TIGHTDB_ASSERT(m_cols.size() == m_spec.get_column_count());
 
@@ -1448,13 +1373,13 @@ ColumnLinkBase& Table::get_column_linkbase(size_t ndx)
 }
 
 
-void Table::validate_column_type(const ColumnBase& column, ColumnType coltype, size_t ndx) const
+void Table::validate_column_type(const ColumnBase& column, ColumnType col_type, size_t ndx) const
 {
-    if (coltype == col_type_Int || coltype == col_type_DateTime || coltype == col_type_Bool) {
+    if (col_type == col_type_Int || col_type == col_type_DateTime || col_type == col_type_Bool) {
         TIGHTDB_ASSERT(column.IsIntColumn());
     }
     else {
-        TIGHTDB_ASSERT(coltype == get_real_column_type(ndx));
+        TIGHTDB_ASSERT(col_type == get_real_column_type(ndx));
     }
     static_cast<void>(column);
     static_cast<void>(ndx);
@@ -1503,36 +1428,38 @@ ref_type Table::create_empty_table(Allocator& alloc)
 }
 
 
-ref_type Table::create_column(DataType column_type, size_t size, Allocator& alloc)
+ref_type Table::create_column(ColumnType col_type, size_t size, Allocator& alloc)
 {
-    switch (column_type) {
-        case type_Int:
-        case type_Bool:
-        case type_DateTime: {
+    switch (col_type) {
+        case col_type_Int:
+        case col_type_Bool:
+        case col_type_DateTime: {
             int_fast64_t value = 0;
             return Column::create(Array::type_Normal, size, value, alloc); // Throws
         }
-        case type_Link:
-            return ColumnLink::create(size, alloc); // Throws
-        case type_LinkList:
-            return ColumnLinkList::create(size, alloc); // Throws
-        case type_Float:
+        case col_type_Float:
             return ColumnFloat::create(size, alloc); // Throws
-        case type_Double:
+        case col_type_Double:
             return ColumnDouble::create(size, alloc); // Throws
-        case type_String:
+        case col_type_String:
             return AdaptiveStringColumn::create(size, alloc); // Throws
-        case type_Binary:
+        case col_type_Binary:
             return ColumnBinary::create(size, alloc); // Throws
-        case type_Table:
+        case col_type_Table:
             return ColumnTable::create(size, alloc); // Throws
-        case type_Mixed:
+        case col_type_Mixed:
             return ColumnMixed::create(size, alloc); // Throws
-        case type_BackLink:
-            TIGHTDB_ASSERT(false);
-            return 0;
+        case col_type_Link:
+            return ColumnLink::create(size, alloc); // Throws
+        case col_type_LinkList:
+            return ColumnLinkList::create(size, alloc); // Throws
+        case col_type_BackLink:
+            return ColumnBackLink::create(size, alloc); // Throws
+        case col_type_StringEnum:
+        case col_type_Reserved1:
+        case col_type_Reserved4:
+            break;
     }
-
     TIGHTDB_ASSERT(false);
     return 0;
 }
@@ -2284,7 +2211,6 @@ Mixed Table::get_mixed(size_t column_ndx, size_t ndx) const TIGHTDB_NOEXCEPT
         case type_Mixed:
         case type_Link:
         case type_LinkList:
-        case type_BackLink:
             break;
     }
     TIGHTDB_ASSERT(false);
@@ -2336,7 +2262,6 @@ void Table::set_mixed(size_t column_ndx, size_t ndx, Mixed value)
         case type_Mixed:
         case type_Link:
         case type_LinkList:
-        case type_BackLink:
             TIGHTDB_ASSERT(false);
             break;
     }
@@ -2383,7 +2308,6 @@ void Table::insert_mixed(size_t column_ndx, size_t ndx, Mixed value)
         case type_Mixed:
         case type_Link:
         case type_LinkList:
-        case type_BackLink:
             TIGHTDB_ASSERT(false);
             break;
     }
@@ -3588,7 +3512,7 @@ void Table::adjust_column_index(size_t column_ndx_begin, int ndx_in_parent_diff)
 
         // If we modified before link columns, we have to update their
         // backlinks to point to their new position
-        ColumnType type = m_spec.get_real_column_type(col_ndx);
+        ColumnType type = m_spec.get_column_type(col_ndx);
         if (type == col_type_Link || type == col_type_LinkList) {
             size_t table_ndx = get_index_in_parent();
             ColumnLinkBase* col = static_cast<ColumnLinkBase*>(column);
@@ -3748,7 +3672,6 @@ void Table::to_json_row(size_t row_ndx, ostream& out) const
                         case type_Mixed:
                         case type_Link:
                         case type_LinkList:
-                        case type_BackLink:
                             TIGHTDB_ASSERT(false);
                             break;
                     }
@@ -3763,8 +3686,6 @@ void Table::to_json_row(size_t row_ndx, ostream& out) const
                 // TODO: print entire list of linked row
                 //out << "\"Link to: " << get_int(i, row_ndx) << "\"";
                 break;
-            case type_BackLink:
-                TIGHTDB_ASSERT(false);
         }
     }
     out << "}";
@@ -3918,7 +3839,6 @@ void Table::to_string_header(ostream& out, vector<size_t>& widths) const
                         case type_Mixed:
                         case type_Link:
                         case type_LinkList:
-                        case type_BackLink:
                             TIGHTDB_ASSERT(false);
                             break;
                     }
@@ -3928,8 +3848,6 @@ void Table::to_string_header(ostream& out, vector<size_t>& widths) const
             case type_LinkList:
                 width = 5;
                 break;
-            case type_BackLink:
-                TIGHTDB_ASSERT(false);
         }
         // Set width to max of column name and the longest value
         size_t name_len = name.size();
@@ -4043,7 +3961,6 @@ void Table::to_string_row(size_t row_ndx, ostream& out, const vector<size_t>& wi
                         case type_Mixed:
                         case type_Link:
                         case type_LinkList:
-                        case type_BackLink:
                             TIGHTDB_ASSERT(false);
                             break;
                     }
@@ -4057,8 +3974,6 @@ void Table::to_string_row(size_t row_ndx, ostream& out, const vector<size_t>& wi
             case type_LinkList:
                 // TODO: print number of links in list
                 break;
-            case type_BackLink:
-                TIGHTDB_ASSERT(false);
         }
     }
     out << "\n";
@@ -4249,15 +4164,13 @@ void Table::adj_row_acc_erase_row(size_t row_ndx) TIGHTDB_NOEXCEPT
     // cannot access the underlying array structure.
 
     // Adjust row accessors after removal of a row
-    typedef row_accessors::iterator iter;
-    iter end = m_row_accessors.end();
-    iter i = m_row_accessors.begin();
-    while (i != end) {
-        RowBase* row = *i;
+    size_t i = 0, n = m_row_accessors.size();
+    while (i != n) {
+        RowBase*& row = m_row_accessors[i];
         if (row->m_row_ndx == row_ndx) {
             row->m_table.reset(); // Detach
             // Move last over
-            *i = *--end;
+            row = m_row_accessors[--n];
             m_row_accessors.pop_back();
             continue;
         }
@@ -4291,15 +4204,13 @@ void Table::adj_row_acc_move_last_over(size_t target_row_ndx, size_t last_row_nd
     // cannot access the underlying array structure.
 
     // Adjust row accessors after 'move last over' removal of a row
-    typedef row_accessors::iterator iter;
-    iter end = m_row_accessors.end();
-    iter i = m_row_accessors.begin();
-    while (i != end) {
-        RowBase* row = *i;
+    size_t i = 0, n = m_row_accessors.size();
+    while (i != n) {
+        RowBase*& row = m_row_accessors[i];
         if (row->m_row_ndx == target_row_ndx) {
             row->m_table.reset(); // Detach
             // Move last over in list of accessors
-            *i = *--end;
+            row = m_row_accessors[--n];
             m_row_accessors.pop_back();
             continue;
         }
@@ -4449,7 +4360,7 @@ void Table::refresh_accessor_tree(size_t ndx_in_parent)
         // then we need to replace the accessor with an instance of
         // ColumnStringEnum.
         if (col && col->is_string_col()) {
-            ColumnType col_type = m_spec.get_real_column_type(col_ndx);
+            ColumnType col_type = m_spec.get_column_type(col_ndx);
             if (col_type == col_type_StringEnum) {
                 delete col;
                 col = 0;
@@ -4466,7 +4377,7 @@ void Table::refresh_accessor_tree(size_t ndx_in_parent)
             col->refresh_accessor_tree(col_ndx, m_spec); // Throws
         }
         else {
-            ColumnType col_type = m_spec.get_real_column_type(col_ndx);
+            ColumnType col_type = m_spec.get_column_type(col_ndx);
             col = create_column_accessor(col_type, col_ndx, col_ndx_in_parent); // Throws
             // FIXME: Memory leak if the following assignment statement
             // fails. This problem disappears as soon as m_cols is changed to be

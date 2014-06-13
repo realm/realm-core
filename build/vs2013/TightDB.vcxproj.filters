@@ -73,9 +73,6 @@
     <ClCompile Include="..\..\src\tightdb\row.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\tightdb\util\utf8.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\src\tightdb\alloc.cpp">
       <Filter>src</Filter>
     </ClCompile>
