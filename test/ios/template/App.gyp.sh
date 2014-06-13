@@ -23,7 +23,7 @@ cat >"$TEST_DIR/$APP.gyp" <<EOF
     'target_defaults': {
         'link_settings': {
             'libraries': [
-                '\$(SDKROOT)/usr/lib/libstdc++.6.dylib',
+                '\$(SDKROOT)/usr/lib/libc++.dylib',
                 '\$(DEVELOPER_DIR)/Library/Frameworks/XCTest.framework',
                 '\$(SDKROOT)/System/Library/Frameworks/Foundation.framework',
                 '\$(SDKROOT)/System/Library/Frameworks/CoreGraphics.framework',
