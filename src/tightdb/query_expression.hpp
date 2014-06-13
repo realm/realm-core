@@ -165,7 +165,7 @@ template<class T> struct OnlyNumeric
 
 template<> struct OnlyNumeric<StringData>
 {
-    static int get(StringData in) { return 0; }
+    static int get(StringData in) { static_cast<void>(in); return 0; }
     typedef StringData type;
 };
 
