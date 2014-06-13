@@ -63,6 +63,47 @@ Query::Query(const Query& copy)
     do_delete = true;
 }
 
+void Query::move_assign(Query& copy)
+{
+    m_table = copy.m_table;
+    all_nodes = copy.all_nodes;
+    update = copy.update;
+    update_override = copy.update_override;
+    first = copy.first;
+    pending_not = copy.pending_not;
+    error_code = copy.error_code;
+    m_tableview = copy.m_tableview;
+#if TIGHTDB_MULTITHREAD_QUERY
+    m_threadcount = copy.m_threadcount;
+#endif
+    //    copy.first[0] = 0;
+    copy.do_delete = false;
+    do_delete = true;
+    copy.m_table = TableRef();
+}
+
+Query::Query(const Query& copy, const TCopyExpressionTag&) 
+{
+    Create();
+    std::map<ParentNode*, ParentNode*> node_mapping;
+    node_mapping[ null_ptr ] = null_ptr;
+    std::vector<ParentNode*>::const_iterator i;
+    for (i = copy.all_nodes.begin(); i != copy.all_nodes.end(); ++i) {
+        ParentNode* new_node = (*i)->clone();
+        all_nodes.push_back(new_node);
+        node_mapping[ *i ] = new_node;
+    }
+    for (i = all_nodes.begin(); i != all_nodes.end(); ++i) {
+        (*i)->translate_pointers(node_mapping);
+    }
+    if (all_nodes.size() > 0) {
+        first[0] = all_nodes[0];
+    }
+    m_table = copy.m_table;
+    m_tableview = copy.m_tableview;
+}
+
+
 Query::~Query() TIGHTDB_NOEXCEPT
 {
 #if TIGHTDB_MULTITHREAD_QUERY
@@ -847,11 +888,10 @@ size_t Query::find(size_t begin)
     }
 }
 
-
-TableView Query::find_all(size_t start, size_t end, size_t limit)
+void Query::find_all(TableViewBase& ret, size_t start, size_t end, size_t limit) const
 {
     if (limit == 0 || m_table->is_degenerate())
-        return TableView(*m_table);
+        return;
 
     TIGHTDB_ASSERT(start <= m_table->size());
 
@@ -862,13 +902,10 @@ TableView Query::find_all(size_t start, size_t end, size_t limit)
 
     // User created query with no criteria; return everything
     if (first.size() == 0 || first[0] == 0) {
-        TableView tv(*m_table);
         for (size_t i = start; i < end && i - start < limit; i++)
-            tv.get_ref_column().add(m_tableview ? m_tableview->get_source_ndx(i) : i);
-        return tv;
+            ret.get_ref_column().add(m_tableview ? m_tableview->get_source_ndx(i) : i);
+        return;
     }
-
-    TableView ret(*m_table);
 
     if (m_tableview) {
         for (size_t begin = start; begin < end && ret.size() < limit; begin++) {
@@ -882,7 +919,12 @@ TableView Query::find_all(size_t start, size_t end, size_t limit)
         st.init(act_FindAll, &ret.get_ref_column(), limit);
         aggregate_internal(act_FindAll, ColumnTypeTraits<int64_t>::id, first[0], &st, start, end, NULL);
     }
+}
 
+TableView Query::find_all(size_t start, size_t end, size_t limit)
+{
+    TableView ret(*m_table, *this, start, end, limit);
+    find_all(ret, start, end, limit);
     return ret;
 }
 

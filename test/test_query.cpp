@@ -3283,6 +3283,22 @@ TEST(Query_Sort_And_Requery_Untyped2)
 
     // Test that remove() maintains order
     tv3.remove(0);
+    // q5 and q3 should behave the same.
+    Query q5 = table.where(&tv2).not_equal(1, "X");
+    TableView tv5 = q5.find_all();
+    tv5.sync_if_needed(); // you may think tv5 is in sync, BUT it was generated from tv2 which wasn't
+    // Note the side effect - as tv5 depends on ... on tv2 etc, all views are synchronized.
+    CHECK_EQUAL(3, tv5.size());
+    CHECK_EQUAL(1, tv5.get_int(0, 0));
+    CHECK_EQUAL(8, tv5.get_int(0, 1)); // 8, 9 (sort order) instead of 9, 8 (table order)
+    CHECK_EQUAL(9, tv5.get_int(0, 2));
+
+    CHECK_EQUAL(6, tv.size());
+    CHECK_EQUAL(3, tv3.size());
+    CHECK_EQUAL(1, tv3.get_int(0, 0));
+    CHECK_EQUAL(8, tv3.get_int(0, 1)); // 8, 9 (sort order) instead of 9, 8 (table order)
+    CHECK_EQUAL(9, tv3.get_int(0, 2));
+
     Query q4 = table.where(&tv3).not_equal(1, "X");
     TableView tv4 = q4.find_all();
 
