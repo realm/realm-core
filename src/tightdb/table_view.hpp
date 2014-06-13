@@ -546,9 +546,9 @@ inline TableViewBase::TableViewBase(TableViewBase* tv) TIGHTDB_NOEXCEPT:
     // version number so that we can later trigger a sync if needed.
     m_last_seen_version = tv->m_last_seen_version;
     m_auto_sort = tv->m_auto_sort;
-    m_start = tv.m_start;
-    m_end = tv.m_end;
-    m_limit = tv.m_limit;
+    m_start = tv->m_start;
+    m_end = tv->m_end;
+    m_limit = tv->m_limit;
     m_ascending = tv->m_ascending;
     m_sort_index = tv->m_sort_index;
 #endif
