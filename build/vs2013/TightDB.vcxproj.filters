@@ -273,6 +273,12 @@
     <ClCompile Include="..\..\test\test_links.cpp">
       <Filter>test</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\tightdb\commit_log.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\tightdb\replication.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\win32\pthread\pthread.h">
@@ -510,6 +516,9 @@
       <Filter>src\include</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\tightdb\link_view.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\tightdb\commit_log.hpp">
       <Filter>src\include</Filter>
     </ClInclude>
   </ItemGroup>
