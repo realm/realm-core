@@ -465,7 +465,7 @@ void TableView::clear()
 void TableViewBase::do_sync() 
 {
     // precondition: m_table is attached
-    if (m_query.m_table == 0) {
+    if (!m_query.m_table) {
         // no valid query
         m_last_seen_version = m_table->m_version;
         m_refs.clear();
