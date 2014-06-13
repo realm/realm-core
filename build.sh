@@ -681,7 +681,10 @@ EOF
             echo "Framework for iOS can only be generated under Mac OS X."
             exit 0
         fi
-
+        DEBUG=
+        if [ "$1" == "-DEBUG" ]; then
+            DEBUG=1
+        fi
         realm_version="$(sh build.sh get-version)"
         BASENAME="RealmCore"
         FRAMEWORK="$BASENAME.framework"
@@ -694,7 +697,11 @@ EOF
             echo "Did you forget to build-iphone?"
             exit 1
         fi
-        cp "$IPHONE_DIR/libtightdb-ios.a" "$FRAMEWORK/$BASENAME" || exit 1
+        if [ -z "$DEBUG" ]; then
+            cp "$IPHONE_DIR/libtightdb-ios.a" "$FRAMEWORK/$BASENAME" || exit 1
+        else
+            cp "$IPHONE_DIR/libtightdb-ios-dbg.a" "$FRAMEWORK/$BASENAME" || exit 1
+        fi
         cp -r "$IPHONE_DIR/include/"* "$FRAMEWORK/Headers/" || exit 1
         find "$FRAMEWORK/Headers" -iregex "^.*\.[ch]\(pp\)\{0,1\}$" \
             -exec sed -i '' -e "s/<tightdb\(.*\)>/<$BASENAME\/tightdb\1>/g" {} \; || exit 1
@@ -753,8 +760,12 @@ EOF
     "build-test-ios-app")
         # For more documentation, see test/ios/README.md
 
+        if [ "$1" == "-DEBUG" ]; then
+            OTHER_CPLUSPLUSFLAGS="'-DTIGHTDB_DEBUG'"
+        fi
+
         sh build.sh build-iphone
-        sh build.sh build-ios-framework
+        sh build.sh build-ios-framework $1
 
         TMPL_DIR="test/ios/template"
         TEST_DIR="test/ios/app"

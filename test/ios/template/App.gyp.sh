@@ -14,6 +14,11 @@ cat >"$TEST_DIR/$APP.gyp" <<EOF
         ],
         'CODE_SIGN_IDENTITY[sdk=iphoneos*]': 'iPhone Developer',
         'CLANG_ENABLE_OBJC_ARC': 'YES',
+        'OTHER_CPLUSPLUSFLAGS': [
+            '\$(OTHER_CFLAGS)' ,
+            '-DTIGHTDB_HAVE_CONFIG',
+            $OTHER_CPLUSPLUSFLAGS
+        ]
     },
     'target_defaults': {
         'link_settings': {
