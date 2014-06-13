@@ -594,12 +594,16 @@
     <ClCompile Include="..\..\src\tightdb\array_string.cpp" />
     <ClCompile Include="..\..\src\tightdb\array_string_long.cpp" />
     <ClCompile Include="..\..\src\tightdb\column.cpp" />
+    <ClCompile Include="..\..\src\tightdb\column_backlink.cpp" />
     <ClCompile Include="..\..\src\tightdb\column_binary.cpp" />
+    <ClCompile Include="..\..\src\tightdb\column_link.cpp" />
+    <ClCompile Include="..\..\src\tightdb\column_linklist.cpp" />
     <ClCompile Include="..\..\src\tightdb\column_mixed.cpp" />
     <ClCompile Include="..\..\src\tightdb\column_string.cpp" />
     <ClCompile Include="..\..\src\tightdb\column_string_enum.cpp" />
     <ClCompile Include="..\..\src\tightdb\column_table.cpp" />
     <ClCompile Include="..\..\src\tightdb\descriptor.cpp" />
+    <ClCompile Include="..\..\src\tightdb\link_view.cpp" />
     <ClCompile Include="..\..\src\tightdb\unicode.cpp" />
     <ClCompile Include="..\..\src\tightdb\util\file.cpp" />
     <ClCompile Include="..\..\src\tightdb\importer.cpp" />
@@ -656,6 +660,8 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
     </ClCompile>
+    <ClCompile Include="..\..\test\test_links.cpp" />
+    <ClCompile Include="..\..\test\test_link_view.cpp" />
     <ClCompile Include="..\..\test\util\verified_integer.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
@@ -1065,9 +1071,15 @@
     <ClInclude Include="..\..\src\tightdb\array_string.hpp" />
     <ClInclude Include="..\..\src\tightdb\array_string_long.hpp" />
     <ClInclude Include="..\..\src\tightdb\binary_data.hpp" />
+    <ClInclude Include="..\..\src\tightdb\column_backlink.hpp" />
+    <ClInclude Include="..\..\src\tightdb\column_link.hpp" />
+    <ClInclude Include="..\..\src\tightdb\column_linkbase.hpp" />
+    <ClInclude Include="..\..\src\tightdb\column_linklist.hpp" />
     <ClInclude Include="..\..\src\tightdb\descriptor.hpp" />
     <ClInclude Include="..\..\src\tightdb\descriptor_fwd.hpp" />
+    <ClInclude Include="..\..\src\tightdb\impl\output_stream.hpp" />
     <ClInclude Include="..\..\src\tightdb\importer.hpp" />
+    <ClInclude Include="..\..\src\tightdb\link_view.hpp" />
     <ClInclude Include="..\..\src\tightdb\query_expression.hpp" />
     <ClInclude Include="..\..\src\tightdb\string_data.hpp" />
     <ClInclude Include="..\..\src\tightdb\unicode.hpp" />

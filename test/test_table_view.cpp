@@ -653,6 +653,10 @@ TEST(TableView_Stacked)
     TableView tv2 = tv.find_all_int(1,2);
     CHECK_EQUAL(1,tv2.size()); //evaluates tv2.size to 1 which is expected
     CHECK_EQUAL("B",tv2.get_string(2,0)); //evalates get_string(2,0) to "A" which is not expected
+
+
+    
+
 }
 
 
