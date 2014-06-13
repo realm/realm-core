@@ -258,9 +258,13 @@ void WriteLogRegistry::cleanup()
         if (to_index(m_oldest_version) > (m_commits.size() >> 1)) {
             // more than half of the commit array is free, so we'll
             // shift contents down and resize the array.
-            std::copy(& m_commits[ to_index(m_oldest_version) ],
-                      & m_commits[ to_index(m_newest_version) + 1 ],
-                      & m_commits[ 0 ]);
+
+            size_t begin = to_index(m_oldest_version);
+            size_t end = to_index(m_newest_version) + 1;
+
+            std::copy(m_commits.begin() + begin,
+                      m_commits.begin() + end,
+                      m_commits.begin());
             m_commits.resize(m_newest_version - m_oldest_version + 1);
             m_array_start = m_oldest_version;
         }
