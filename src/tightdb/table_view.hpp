@@ -66,26 +66,29 @@ using std::size_t;
 // changes to a table (even through the view itself) will cause the view to go
 // out of sync, it is important to understand how to use views that are out of sync.
 //
-// At the moment, the *only* operation on a view that is guaranteed to keep an
-// already synchronized view in sync is "remove". This guarantee may be extended
+// At the moment, the *only* operations on a view that are guaranteed to keep an
+// already synchronized view in sync is "remove" and "clear". This guarantee may be extended
 // in future revisions to cover more operations.
 //
 // Use of views which are out of sync:
 //
 // Without calls to sync_if_needed, a view behaves like an array of references to table
 // entries. Changes to the underlying table done after generating the view will *not*
-// cause changes to this array. It stays as generated (except for the remove operation 
-// which will remove references in the view along with data in the table). 
+// cause changes to this array. It stays as generated (except for the remove/clear operation
+// which will remove references in the view coordinated with data in the table).
 //
 // Say you want to find all employees with a salary below a limit and raise their salaries 
-// to the limit, you could do (pseudocode):
+// to the limit (pseudocode):
 //
 //    view = table.where().less_than(salary_column,limit).find_all();
 //    for (size_t i = 0; i < view.size(); ++i)
 //        view.set_int(salary_column, i, limit);
 //
 // here, the view goes out of sync at the very first iteration AND THIS IS WHAT YOU WANT!
-// Changes to the table may cause the changed entries to no longer qualify for being in
+//
+// Why?
+//
+// Because changes to the table may cause the changed entries to no longer qualify for being in
 // the view. If you synchronized the view on each iteration, the changed entry would be
 // removed from the view and the code above would end up only raising the salary for every
 // other employee instead of all of them.

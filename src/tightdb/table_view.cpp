@@ -416,11 +416,15 @@ void TableView::remove(size_t ndx)
 {
     TIGHTDB_ASSERT(m_table);
     TIGHTDB_ASSERT(ndx < m_refs.size());
+    bool sync_to_keep = m_last_seen_version == m_table->m_version;
 
     // Delete row in source table
     const size_t real_ndx = size_t(m_refs.get(ndx));
     m_table->from_view_remove(real_ndx, this);
-    m_last_seen_version = m_table->m_version;
+    // It is important to not accidentally bring us in sync, if we were
+    // not in sync to start with:
+    if (sync_to_keep)
+        m_last_seen_version = m_table->m_version;
     // Update refs
     m_refs.erase(ndx, ndx == size() - 1);
 
@@ -440,6 +444,7 @@ void TableView::clear()
     for (size_t t = 0; t < size(); t++)
         v.push_back(to_size_t(m_refs.get(t)));
     std::sort(v.begin(), v.end());
+    bool sync_to_keep = m_last_seen_version == m_table->m_version;
 
     // Delete all referenced rows in source table
     // (in reverse order to avoid index drift)
@@ -449,7 +454,10 @@ void TableView::clear()
     }
 
     m_refs.clear();
-    m_last_seen_version = m_table->m_version;
+    // It is important to not accidentally bring us in sync, if we were
+    // not in sync to start with:
+    if (sync_to_keep)
+        m_last_seen_version = m_table->m_version;
 }
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
