@@ -262,7 +262,7 @@
       </PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
-      <AdditionalOptions>/DPTW32_STATIC_LIB /DTIGHTDB_DEBUG %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/DPTW32_STATIC_LIB /DTIGHTDB_DEBUG /DTIGHTDB_ENABLE_REPLICATION %(AdditionalOptions)</AdditionalOptions>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
     </ClCompile>
     <Link>
@@ -335,7 +335,7 @@
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <CompileAs>CompileAsCpp</CompileAs>
-      <AdditionalOptions>/DPTW32_STATIC_LIB /DTIGHTDB_DEBUG %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/DPTW32_STATIC_LIB /DTIGHTDB_DEBUG /DTIGHTDB_ENABLE_REPLICATION %(AdditionalOptions)</AdditionalOptions>
       <CompileAsManaged>false</CompileAsManaged>
       <DisableLanguageExtensions>false</DisableLanguageExtensions>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
@@ -420,7 +420,7 @@
       </PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
-      <AdditionalOptions>/DPTW32_STATIC_LIB %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/DPTW32_STATIC_LIB /DTIGHTDB_ENABLE_REPLICATION %(AdditionalOptions)</AdditionalOptions>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
       <BrowseInformation>true</BrowseInformation>
     </ClCompile>
@@ -507,7 +507,7 @@
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
-      <AdditionalOptions>/DPTW32_STATIC_LIB %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/DPTW32_STATIC_LIB /DTIGHTDB_ENABLE_REPLICATION %(AdditionalOptions)</AdditionalOptions>
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <BufferSecurityCheck>false</BufferSecurityCheck>
     </ClCompile>
@@ -602,8 +602,10 @@
     <ClCompile Include="..\..\src\tightdb\column_string.cpp" />
     <ClCompile Include="..\..\src\tightdb\column_string_enum.cpp" />
     <ClCompile Include="..\..\src\tightdb\column_table.cpp" />
+    <ClCompile Include="..\..\src\tightdb\commit_log.cpp" />
     <ClCompile Include="..\..\src\tightdb\descriptor.cpp" />
     <ClCompile Include="..\..\src\tightdb\link_view.cpp" />
+    <ClCompile Include="..\..\src\tightdb\replication.cpp" />
     <ClCompile Include="..\..\src\tightdb\unicode.cpp" />
     <ClCompile Include="..\..\src\tightdb\util\file.cpp" />
     <ClCompile Include="..\..\src\tightdb\importer.cpp" />
@@ -1075,6 +1077,7 @@
     <ClInclude Include="..\..\src\tightdb\column_link.hpp" />
     <ClInclude Include="..\..\src\tightdb\column_linkbase.hpp" />
     <ClInclude Include="..\..\src\tightdb\column_linklist.hpp" />
+    <ClInclude Include="..\..\src\tightdb\commit_log.hpp" />
     <ClInclude Include="..\..\src\tightdb\descriptor.hpp" />
     <ClInclude Include="..\..\src\tightdb\descriptor_fwd.hpp" />
     <ClInclude Include="..\..\src\tightdb\impl\output_stream.hpp" />
