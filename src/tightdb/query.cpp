@@ -10,12 +10,6 @@
 using namespace std;
 using namespace tightdb;
 
-#if TIGHTDB_MULTITHREAD_QUERY
-namespace {
-const size_t thread_chunk_size = 1000;
-}
-#endif
-
 Query::Query() : m_tableview(null_ptr)
 {
     Create();
@@ -38,9 +32,6 @@ void Query::Create()
     update_override.push_back(0);
     first.push_back(0);
     pending_not.push_back(false);
-#if TIGHTDB_MULTITHREAD_QUERY
-    m_threadcount = 0;
-#endif
     do_delete = true;
 }
 
@@ -55,16 +46,18 @@ Query::Query(const Query& copy)
     pending_not = copy.pending_not;
     error_code = copy.error_code;
     m_tableview = copy.m_tableview;
-#if TIGHTDB_MULTITHREAD_QUERY
-    m_threadcount = copy.m_threadcount;
-#endif
-    //    copy.first[0] = 0;
     copy.do_delete = false;
     do_delete = true;
 }
 
 void Query::move_assign(Query& copy)
 {
+    if (do_delete) {
+        for (size_t t = 0; t < all_nodes.size(); t++) {
+            delete all_nodes[t];
+        }
+    }
+
     m_table = copy.m_table;
     all_nodes = copy.all_nodes;
     update = copy.update;
@@ -73,10 +66,6 @@ void Query::move_assign(Query& copy)
     pending_not = copy.pending_not;
     error_code = copy.error_code;
     m_tableview = copy.m_tableview;
-#if TIGHTDB_MULTITHREAD_QUERY
-    m_threadcount = copy.m_threadcount;
-#endif
-    //    copy.first[0] = 0;
     copy.do_delete = false;
     do_delete = true;
     copy.m_table = TableRef();
@@ -101,16 +90,16 @@ Query::Query(const Query& copy, const TCopyExpressionTag&)
     }
     m_table = copy.m_table;
     m_tableview = copy.m_tableview;
+
+    for (size_t t = 0; t < update.size(); t++) {
+        update[t] = &first[0];
+    }
+
 }
 
 
 Query::~Query() TIGHTDB_NOEXCEPT
 {
-#if TIGHTDB_MULTITHREAD_QUERY
-    for (size_t i = 0; i < m_threadcount; i++)
-        pthread_detach(threads[i]);
-#endif
-
     if (do_delete) {
         for (size_t t = 0; t < all_nodes.size(); t++) {
             ParentNode *p = all_nodes[t];
