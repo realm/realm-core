@@ -528,10 +528,6 @@ private:
 
 
 struct Table::RenameSubtableColumns: SubtableUpdater {
-    RenameSubtableColumns(size_t i):
-        m_column_ndx(i)
-    {
-    }
     void update(const ColumnTable&, size_t, Array&) TIGHTDB_OVERRIDE
     {
     }
@@ -540,8 +536,6 @@ struct Table::RenameSubtableColumns: SubtableUpdater {
         table.mark_dirty();
         table.refresh_accessor_tree(row_ndx);
     }
-private:
-    const size_t m_column_ndx;
 };
 
 
@@ -619,7 +613,7 @@ void Table::do_rename_column(Descriptor& desc, size_t column_ndx, StringData nam
     }
     else {
         if (!root_table.is_empty()) {
-            RenameSubtableColumns updater(column_ndx);
+            RenameSubtableColumns updater;
             update_subtables(desc, &updater); // Throws
         }
     }

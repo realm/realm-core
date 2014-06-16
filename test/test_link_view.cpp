@@ -57,7 +57,7 @@ TEST(LinkList_Query)
 
     // set some links
     LinkViewRef links1;
-    
+
     links1 = table1->get_linklist(col_link2, 0);
     links1->add(1);
 
@@ -90,12 +90,11 @@ TEST(LinkList_Query)
 
     //    match = (table1->column<String>(1) == table1->column<String>(1)  ).find(); // not yet implemented
     //    CHECK_EQUAL(1, match);
-
 }
 
 
 
-TEST(SingleLink_Query)
+TEST(LinkList_QuerySingle)
 {
     Group group;
 
@@ -130,7 +129,7 @@ TEST(SingleLink_Query)
     table2->set_int(0, 2, 600);
     table2->set_string(1, 2, "!");
 
-    size_t col_link2 = table1->add_column_link(type_Link, "link", *table2); 
+    size_t col_link2 = table1->add_column_link(type_Link, "link", *table2);
 
     // set some links
 
@@ -148,9 +147,6 @@ TEST(SingleLink_Query)
     // See if NULL-link can be handled (3'rd row doesn't have any link)
     match = (table1->link(col_link2).column<String>(1) == "foobar").find();
     CHECK_EQUAL(not_found, match);
-
-
 }
-
 
 #endif
