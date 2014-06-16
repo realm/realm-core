@@ -736,7 +736,7 @@ public:
     }
 
     IntegerNodeBase(const IntegerNodeBase& from) 
-        : ParentNode(from)
+        : ParentNode(from), m_array(Array::no_prealloc_tag())
     {
         // state is transient/only valid during search, no need to copy
         m_child = 0;
