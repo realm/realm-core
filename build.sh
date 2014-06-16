@@ -793,8 +793,8 @@ EOF
 
         # Gather resources
         RESOURCES="$($MAKE -C ./test --no-print-directory get-test-resources)" || exit 1
-        (cd ./test && rsync $RESOURCES "../$TEST_APP_DIR") || exit 1
-        RESOURCES="$(echo "$RESOURCES" | sed -E "s/(^| )/\1$TEST_APP\//g")" || exit 1
+        (cd ./test && rsync $RESOURCES "../$APP_DIR") || exit 1
+        RESOURCES="$(echo "$RESOURCES" | sed -E "s/(^| )/\1$APP\//g")" || exit 1
 
         # Replace all dynamic includes with framework includes.
         find "$TEST_APP_DIR" -type f -exec sed -i '' \
@@ -804,9 +804,9 @@ EOF
         FRAMEWORK="RealmCore.framework"
         rm -rf "$APP_DIR/$FRAMEWORK" || exit 1
         cp -r "../tightdb/$FRAMEWORK" "$TEST_DIR/$FRAMEWORK" || exit 1
-
+        
         # Initialize app directory
-        cp -r "test/ios/template/App" "$APP_DIR" || exit 1
+        cp -r "test/ios/template/App/"* "$APP_DIR" || exit 1
         mv "$APP_DIR/App-Info.plist" "$APP_DIR/$APP-Info.plist" || exit 1
         mv "$APP_DIR/App-Prefix.pch" "$APP_DIR/$APP-Prefix.pch" || exit 1
 
@@ -816,7 +816,7 @@ EOF
             sed -E "s/^(.*)$/                '\1',/") || exit 1
         TEST_APP_SOURCES="$APP_SOURCES"
         RESOURCES="$(echo "$RESOURCES" | sed -E "s/ /', '/g")" || exit 1
-
+        
         # Generate a Gyp file.
         . "$TMPL_DIR/App.gyp.sh"
 

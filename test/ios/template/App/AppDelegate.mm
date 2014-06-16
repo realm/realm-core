@@ -8,10 +8,13 @@
 
 #import "AppDelegate.h"
 #include "test_all.hpp"
+#include "util/test_path.hpp"
 #include <iostream>
 #include <fstream>
+#include <string>
 
 using namespace std;
+using namespace tightdb::test_util;
 
 @implementation AppDelegate
 
@@ -22,13 +25,20 @@ using namespace std;
     self.window.backgroundColor = [UIColor whiteColor];
     [self.window makeKeyAndVisible];
     
-    // Change working directory to somewhere we can write.
-    [[NSFileManager defaultManager]
-     changeCurrentDirectoryPath:(NSTemporaryDirectory())];
+    // Set the path prefix.
+    string path_prefix = [NSTemporaryDirectory() UTF8String];
+    set_test_path_prefix(path_prefix);
+
+    // Set the resource path.
+    string resource_path = ((string)[[[NSBundle mainBundle] resourcePath] UTF8String]) + "/";
+    set_test_resource_path(resource_path);
+
+    // Run the tests.
     test_all(0, NULL);
     
+    // Report to stdout.
     cout << "====================" << endl;
-    ifstream if_xml("unit-test-report.xml", ios_base::binary);
+    ifstream if_xml(path_prefix + "unit-test-report.xml", ios_base::binary);
     cout << if_xml.rdbuf();
     if_xml.close();
     cout << "====================" << endl;
