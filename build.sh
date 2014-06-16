@@ -2543,9 +2543,9 @@ Available modes are:
     dist-pull dist-checkout dist-config dist-clean dist-build
     dist-build-iphone dist-test dist-test-debug dist-install dist-uninstall
     dist-test-installed get-version set-version copy-tools
-    build-test-ios-app: build an iOS app for testing core on device
-    test-ios-app: execute the core tests on device
-    leak-test-ios-app: execute the core tests on device, monitor for leaks
+    build-test-ios-app - build an iOS app for testing core on device
+    test-ios-app - execute the core tests on device
+    leak-test-ios-app - execute the core tests on device, monitor for leaks
 EOF
         exit 1
         ;;
