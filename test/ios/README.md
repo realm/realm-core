@@ -3,14 +3,34 @@
 In order to test core on device, we need an iOS app, and hence an XCode
 project.
 
+The common workflow is:
+
+$ sh build.sh build-test-ios-app
+$ sh build.sh test-ios-app
+
+The first builds an XCode project. The second tests the XCode project on a
+device using xcodebuild.
+
 Since the test files can be expected to be changed more quickly than the
 contents of this subdirectory, we use GYP to generate fresh XCode projects.
 (See also the build-test-ios-app target in build.sh.)
 
 The XCode project can then be "tested" to run the tests on device, using either
 XCode, xcodebuild (see also the test-ios-app target in build.sh), Instruments,
-or (the command-line) instruments (see also the leak-test-ios-app target in
+or the command-line instruments (see also the leak-test-ios-app target in
 build.sh).
+
+The "revertability" to graphical tools is useful for debuggning, in which case,
+you should specify specify the additional flag -DEBUG to the build-test-ios-app
+target, e.g.
+
+$ sh build.sh build-test-ios-app -DEBUG
+
+You can also specify a list of options for xcodebuild, e.g.
+
+$ sh build.sh test-ios-app -destination "platform=iOS,name=tightdb's iPad"
+
+The above is the default target for test-ios-app.
 
 ## Implementation Details
 
