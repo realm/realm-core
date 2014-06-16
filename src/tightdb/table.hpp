@@ -805,6 +805,7 @@ private:
 
     struct InsertSubtableColumns;
     struct RemoveSubtableColumns;
+    struct RenameSubtableColumns;
 
     void insert_root_column(std::size_t column_ndx, ColumnType, StringData name,
                             Table* link_target_table);

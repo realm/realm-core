@@ -617,7 +617,7 @@ void Table::do_rename_column(Descriptor& desc, size_t column_ndx, StringData nam
     if (desc.is_root()) {
         root_table.bump_version();
     }
-    else
+    else {
         if (!root_table.is_empty()) {
             RenameSubtableColumns updater(column_ndx);
             update_subtables(desc, &updater); // Throws
