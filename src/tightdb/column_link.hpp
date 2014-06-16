@@ -114,7 +114,7 @@ inline bool ColumnLink::is_null_link(std::size_t row_ndx) const TIGHTDB_NOEXCEPT
 inline size_t ColumnLink::get_link(std::size_t row_ndx) const TIGHTDB_NOEXCEPT
 {
     // Row pos is offset by one, to allow null refs
-    return Column::get(row_ndx) - 1;
+    return to_size_t(Column::get(row_ndx) - 1);
 }
 
 inline void ColumnLink::insert_link(std::size_t row_ndx, std::size_t target_row_ndx)

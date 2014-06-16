@@ -2792,6 +2792,7 @@ TEST(Table_SetSubTableByExample2)
 
         TableRef subtable2 = view.get_subtable(2, 0);//fetch back the subtable from the view
 
+        CHECK_EQUAL(false, subtable->is_empty());
         CHECK_EQUAL(42,     subtable2->get_int(0, 0));
         CHECK_EQUAL("forty two", subtable2->get_string(1, 0));
         CHECK_EQUAL(3,     subtable2->get_int(0, 1));

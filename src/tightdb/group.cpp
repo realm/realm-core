@@ -587,6 +587,8 @@ void Group::update_refs(ref_type top_ref, size_t old_baseline) TIGHTDB_NOEXCEPT
     m_table_names.update_from_parent(old_baseline);
     m_free_positions.update_from_parent(old_baseline);
     m_free_lengths.update_from_parent(old_baseline);
+    if (m_is_shared)
+        m_free_versions.update_from_parent(old_baseline);
 
     // If m_tables has not been modfied we don't
     // need to update attached table accessors
