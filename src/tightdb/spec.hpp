@@ -90,10 +90,12 @@ public:
     void set_link_target_table(std::size_t column_ndx, std::size_t table_ndx);
     std::size_t get_link_target_table(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
     bool has_backlinks() const TIGHTDB_NOEXCEPT;
-    void set_backlink_source_column(std::size_t column_ndx, std::size_t source_column_ndx);
-    std::size_t get_backlink_source_column(std::size_t column_ndx) const  TIGHTDB_NOEXCEPT;
-    std::size_t find_backlink_column(std::size_t source_table_ndx, std::size_t source_column_ndx) const TIGHTDB_NOEXCEPT;
-    void update_backlink_column_ref(std::size_t source_table_ndx, std::size_t old_column_ndx, std::size_t new_column_ndx);
+    void set_backlink_origin_column(std::size_t backlink_col_ndx, std::size_t origin_col_ndx);
+    std::size_t get_backlink_origin_column(std::size_t backlink_col_ndx) const  TIGHTDB_NOEXCEPT;
+    std::size_t find_backlink_column(std::size_t origin_table_ndx,
+                                     std::size_t origin_col_ndx) const TIGHTDB_NOEXCEPT;
+    void update_backlink_column_ref(std::size_t origin_table_ndx, std::size_t old_column_ndx,
+                                    std::size_t new_column_ndx);
 
     // Get position in column list adjusted for indexes
     // (since index refs are stored alongside column refs in

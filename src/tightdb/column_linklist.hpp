@@ -58,9 +58,9 @@ public:
     void clear() TIGHTDB_OVERRIDE;
 
     // ColumnLinkBase overrides
-    void set_target_table(TableRef table) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void set_target_table(Table&) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     TableRef get_target_table() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-    void set_backlink_column(ColumnBackLink& backlinks) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void set_backlink_column(ColumnBackLink&) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
 private:
     friend class ColumnBackLink;
@@ -125,10 +125,10 @@ inline size_t ColumnLinkList::get_link_count(std::size_t row_ndx) const TIGHTDB_
     return ColumnBase::get_size_from_ref(ref, get_alloc());
 }
 
-inline void ColumnLinkList::set_target_table(TableRef table) TIGHTDB_NOEXCEPT
+inline void ColumnLinkList::set_target_table(Table& table) TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(m_target_table.get() == null_ptr);
-    m_target_table = table;
+    TIGHTDB_ASSERT(!m_target_table);
+    m_target_table = table.get_table_ref();
 }
 
 inline TableRef ColumnLinkList::get_target_table() TIGHTDB_NOEXCEPT

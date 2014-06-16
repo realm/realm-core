@@ -170,8 +170,10 @@ public:
     /// consequences of calling any of these functions for a table
     /// with shared dynamic type are undefined.
     ///
-    /// Apart from that, these methods behave as if they were called
-    /// on the descriptor returned by get_descriptor().
+    /// Apart from that, these methods behave as if they were called on the
+    /// descriptor returned by get_descriptor(). Note especially that the
+    /// `_link` suffixed functions must be used when inserting link-type
+    /// columns.
     ///
     /// If you need to change the shared dynamic type of the subtables
     /// in a subtable column, consider using the API offered by the
@@ -183,16 +185,17 @@ public:
     /// subtable column, and stores a reference to its accessor in
     /// `*subdesc`.
     ///
-    /// \return The value returned by add_column(), is the index of
-    /// the added column.
+    /// \return The value returned by add_column() and add_column_link(), is the
+    /// index of the added column.
     ///
     /// \sa has_shared_type()
     /// \sa get_descriptor()
-    /// \sa Descriptor::add_column()
+    /// \sa Descriptor
     std::size_t add_column(DataType type, StringData name, DescriptorRef* subdesc = 0);
-    std::size_t add_column_link(DataType type, StringData name, Table& target_table);
     void insert_column(std::size_t column_ndx, DataType type, StringData name,
                        DescriptorRef* subdesc = 0);
+    std::size_t add_column_link(DataType type, StringData name, Table& target);
+    void insert_column_link(std::size_t column_ndx, DataType type, StringData name, Table& target);
     void remove_column(std::size_t column_ndx);
     void rename_column(std::size_t column_ndx, StringData new_name);
     //@}
@@ -412,10 +415,10 @@ public:
     void clear_subtable(std::size_t column_ndx, std::size_t row_ndx);
 
     // Backlinks
-    std::size_t get_backlink_count(std::size_t row_ndx, const Table& source_table,
-                                   std::size_t source_column_ndx) const TIGHTDB_NOEXCEPT;
-    std::size_t get_backlink(std::size_t row_ndx, const Table& source_table,
-                             std::size_t source_column_ndx, std::size_t backlink_ndx) const
+    std::size_t get_backlink_count(std::size_t row_ndx, const Table& origin,
+                                   std::size_t origin_col_ndx) const TIGHTDB_NOEXCEPT;
+    std::size_t get_backlink(std::size_t row_ndx, const Table& origin,
+                             std::size_t origin_col_ndx, std::size_t backlink_ndx) const
         TIGHTDB_NOEXCEPT;
 
     //@{
@@ -664,18 +667,8 @@ protected:
 
     void set_into_mixed(Table* parent, std::size_t col_ndx, std::size_t row_ndx) const;
 
-    void initialize_link_targets();
-    void create_backlinks_column(std::size_t source_table_ndx, std::size_t source_table_column_ndx);
-    ColumnBackLink& get_backlink_column(std::size_t source_table_ndx, std::size_t source_table_column_ndx);
-    void update_backlink_column_ref(std::size_t source_table_ndx, std::size_t old_column_ndx, std::size_t new_column_ndx);
-
 private:
     class SliceWriter;
-
-    // view management support:
-    void from_view_remove(std::size_t row_ndx, TableViewBase* view); // FIXME: Please rename to remove_by_view()
-
-    void do_remove(std::size_t row_ndx);
 
     // Number of rows in this table
     std::size_t m_size;
@@ -800,15 +793,22 @@ private:
     void init_from_ref(ConstSubspecRef shared_spec, ref_type columns_ref,
                        ArrayParent* parent, std::size_t ndx_in_parent);
 
-    static void do_insert_column(Descriptor&, std::size_t column_ndx,
-                                 DataType type, StringData name);
+    // view management support:
+    void from_view_remove(std::size_t row_ndx, TableViewBase* view); // FIXME: Please rename to remove_by_view()
+
+    void do_remove(std::size_t row_ndx);
+
+    static void do_insert_column(Descriptor&, std::size_t column_ndx, DataType type,
+                                 StringData name, Table* link_target_table);
     static void do_remove_column(Descriptor&, std::size_t column_ndx);
     static void do_rename_column(Descriptor&, std::size_t column_ndx, StringData name);
 
     struct InsertSubtableColumns;
     struct RemoveSubtableColumns;
+    struct RenameSubtableColumns;
 
-    void insert_root_column(std::size_t column_ndx, ColumnType, StringData name);
+    void insert_root_column(std::size_t column_ndx, ColumnType, StringData name,
+                            Table* link_target_table);
     void remove_root_column(std::size_t column_ndx);
 
     struct SubtableUpdater {
@@ -956,6 +956,17 @@ private:
     /// using the specified allocator and return just the ref to the
     /// new top array.
     ref_type clone(Allocator&) const;
+
+    /// True for `type_Link` and `type_LinkList`.
+    static bool is_link_type(DataType) TIGHTDB_NOEXCEPT;
+
+    void initialize_link_targets(Group&, std::size_t table_ndx);
+    void create_backlinks_column(Table& origin, std::size_t origin_col_ndx,
+                                 ColumnType origin_col_type);
+    ColumnBackLink& get_backlink_column(std::size_t origin_table_ndx,
+                                        std::size_t origin_col_ndx) TIGHTDB_NOEXCEPT;
+    void update_backlink_column_ref(std::size_t origin_table_ndx, std::size_t old_col_ndx,
+                                    std::size_t new_col_ndx);
 
     // Precondition: 1 <= end - begin
     std::size_t* record_subtable_path(std::size_t* begin,
@@ -1458,11 +1469,16 @@ inline std::size_t Table::get_size_from_ref(ref_type top_ref, Allocator& alloc) 
     return get_size_from_ref(spec_ref, columns_ref, alloc);
 }
 
-inline void Table::update_backlink_column_ref(std::size_t source_table_ndx,
+inline bool Table::is_link_type(DataType type) TIGHTDB_NOEXCEPT
+{
+    return type == type_Link || type == type_LinkList;
+}
+
+inline void Table::update_backlink_column_ref(std::size_t origin_table_ndx,
                                               std::size_t old_column_ndx,
                                               std::size_t new_column_ndx)
 {
-    m_spec.update_backlink_column_ref(source_table_ndx, old_column_ndx, new_column_ndx);
+    m_spec.update_backlink_column_ref(origin_table_ndx, old_column_ndx, new_column_ndx);
 }
 
 inline std::size_t* Table::record_subtable_path(std::size_t* begin,
@@ -1630,10 +1646,10 @@ public:
         return table.record_subtable_path(begin, end);
     }
 
-    static void insert_column(Descriptor& desc, std::size_t column_ndx,
-                              DataType type, StringData name)
+    static void insert_column(Descriptor& desc, std::size_t column_ndx, DataType type,
+                              StringData name, Table* link_target_table)
     {
-        Table::do_insert_column(desc, column_ndx, type, name); // Throws
+        Table::do_insert_column(desc, column_ndx, type, name, link_target_table); // Throws
     }
 
     static void remove_column(Descriptor& desc, std::size_t column_ndx)
@@ -1731,9 +1747,14 @@ public:
         table.m_spec.set_ndx_in_parent(spec_ndx_in_parent);
     }
 
-    static void initialize_link_targets(Table& table) TIGHTDB_NOEXCEPT
+    static bool is_link_type(DataType type) TIGHTDB_NOEXCEPT
     {
-        table.initialize_link_targets();
+        return Table::is_link_type(type);
+    }
+
+    static void initialize_link_targets(Table& table, Group& group, std::size_t table_ndx)
+    {
+        table.initialize_link_targets(group, table_ndx); // Throws
     }
 };
 

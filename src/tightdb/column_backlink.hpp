@@ -31,8 +31,8 @@ namespace tightdb {
 /// type Array with the hasRefs bit set.
 ///
 /// The individual values in the column are either refs to Columns containing
-/// the row positions in the source table that links to it, or in the case where
-/// there is a single link, a tagged ref encoding the source row position.
+/// the row indexes in the origin table that links to it, or in the case where
+/// there is a single link, a tagged ref encoding the origin row position.
 class ColumnBackLink: public Column, public ArrayParent {
 public:
     ColumnBackLink(ref_type, ArrayParent* = 0, std::size_t ndx_in_parent = 0,
@@ -45,8 +45,8 @@ public:
     std::size_t get_backlink_count(std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
     std::size_t get_backlink(std::size_t row_ndx, std::size_t backlink_ndx) const TIGHTDB_NOEXCEPT;
 
-    void add_backlink(std::size_t row_ndx, std::size_t source_row_ndx);
-    void remove_backlink(std::size_t row_ndx, std::size_t source_row_ndx);
+    void add_backlink(std::size_t row_ndx, std::size_t origin_row_ndx);
+    void remove_backlink(std::size_t row_ndx, std::size_t origin_row_ndx);
     void update_backlink(std::size_t row_ndx, std::size_t old_row_ndx, std::size_t new_row_ndx);
 
     void add_row();
@@ -55,10 +55,10 @@ public:
     void erase(std::size_t, bool) TIGHTDB_OVERRIDE;
     void move_last_over(std::size_t, std::size_t) TIGHTDB_OVERRIDE;
 
-    // Source info
-    void        set_source_table(TableRef table);
-    TableRef    get_source_table();
-    void        set_source_column(ColumnLinkBase& column);
+    // Link origination info
+    void set_origin_table(Table&) TIGHTDB_NOEXCEPT;
+    TableRef get_origin_table() const TIGHTDB_NOEXCEPT;
+    void set_origin_column(ColumnLinkBase&) TIGHTDB_NOEXCEPT;
 
 protected:
     // ArrayParent overrides
@@ -73,15 +73,17 @@ protected:
 private:
     void nullify_links(std::size_t row_ndx, bool do_destroy);
 
-    TableRef        m_source_table;
-    ColumnLinkBase* m_source_column;
+    TableRef        m_origin_table;
+    ColumnLinkBase* m_origin_column;
 };
 
 
 // Implementation
 
-inline ColumnBackLink::ColumnBackLink(ref_type ref, ArrayParent* parent, std::size_t ndx_in_parent, Allocator& alloc):
-    Column(ref, parent, ndx_in_parent, alloc), m_source_column(null_ptr)
+inline ColumnBackLink::ColumnBackLink(ref_type ref, ArrayParent* parent, std::size_t ndx_in_parent,
+                                      Allocator& alloc):
+    Column(ref, parent, ndx_in_parent, alloc),
+    m_origin_column(null_ptr)
 {
 }
 
@@ -96,20 +98,20 @@ inline bool ColumnBackLink::has_backlinks(std::size_t ndx) const TIGHTDB_NOEXCEP
     return Column::get(ndx) != 0;
 }
 
-inline void ColumnBackLink::set_source_table(TableRef table)
+inline void ColumnBackLink::set_origin_table(Table& table) TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(m_source_table.get() == null_ptr);
-    m_source_table = table;
+    TIGHTDB_ASSERT(!m_origin_table);
+    m_origin_table = table.get_table_ref();
 }
 
-inline TableRef ColumnBackLink::get_source_table()
+inline TableRef ColumnBackLink::get_origin_table() const TIGHTDB_NOEXCEPT
 {
-    return m_source_table;
+    return m_origin_table;
 }
 
-inline void ColumnBackLink::set_source_column(ColumnLinkBase& column)
+inline void ColumnBackLink::set_origin_column(ColumnLinkBase& column) TIGHTDB_NOEXCEPT
 {
-    m_source_column = &column;
+    m_origin_column = &column;
 }
 
 inline void ColumnBackLink::add_row()
