@@ -47,7 +47,7 @@ C++ (core)
 * `???`
 
 ### Enhancements:
-
+* Supports links in queries, like (table1->link(3).column<Int>(0) > 550).find();
 * Added support for links and lists of links as column types, to enable relationships between tables.
 * Adding Table::get_index_in_parent() and Group::get_table(std::size_t table_ndx). They were needed for implicit transactions.
 * Table::get_parent_table() can now also return the index of the column in the parent.
@@ -58,7 +58,7 @@ C++ (core)
 
 ### Internals:
 
-* `???`
+* TableView now creates and stores a deep-copy of its query, in order for the view to refresh itself
 
 ----------------------------------------------
 
