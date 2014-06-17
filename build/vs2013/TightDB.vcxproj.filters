@@ -267,9 +267,6 @@
     <ClCompile Include="..\..\src\tightdb\link_view.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\test\test_link_view.cpp">
-      <Filter>test</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\test\test_links.cpp">
       <Filter>test</Filter>
     </ClCompile>
@@ -278,6 +275,9 @@
     </ClCompile>
     <ClCompile Include="..\..\src\tightdb\replication.cpp">
       <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\test\test_link_query_view.cpp">
+      <Filter>test</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

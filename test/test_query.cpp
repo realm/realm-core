@@ -1989,6 +1989,41 @@ TEST(Query_OnTableView)
 
 }
 
+TEST(Query_OnTableView_where)
+{
+    Random random;
+
+    for (int iter = 0; iter < 100 * (1 + TEST_DURATION * TEST_DURATION * TEST_DURATION * TEST_DURATION * TEST_DURATION); iter++) {
+        random.seed(164);
+        OneIntTable oti;
+        size_t cnt1 = 0;
+        size_t cnt0 = 0;
+        size_t limit = random.draw_int_max(TIGHTDB_MAX_LIST_SIZE * 10);
+
+        size_t lbound = random.draw_int_mod(TIGHTDB_MAX_LIST_SIZE * 10);
+        size_t ubound = lbound + random.draw_int_mod(TIGHTDB_MAX_LIST_SIZE * 10 - lbound);
+
+        for (size_t i = 0; i < TIGHTDB_MAX_LIST_SIZE * 10; i++) {
+            int v = random.draw_int_mod(3);
+
+            if (v == 1 && i >= lbound && i < ubound && cnt0 < limit)
+                cnt1++;
+
+            if (v != 0 && i >= lbound && i < ubound)
+                cnt0++;
+
+            oti.add(v);
+        }
+
+        OneIntTable::View v = oti.where().first.not_equal(0).find_all(lbound, ubound, limit);
+        size_t cnt2 = oti.where(&v).first.equal(1).count();
+
+        CHECK_EQUAL(cnt1, cnt2);
+    }
+}
+
+
+
 TEST(Query_StrIndex3)
 {
     // Create two columns where query match-density varies alot throughout the rows. This forces the query engine to
@@ -2272,6 +2307,56 @@ TEST(Query_Float3)
     int64_t a7 = q7.col_int.sum();
     CHECK_EQUAL(15, a7);
     FloatTable3::Query q8 = t.where().col_int.greater(3).col_int.less(7);
+    int64_t a8 = q8.col_int.sum();
+    CHECK_EQUAL(15, a8);
+}
+
+TEST(Query_Float3_where)
+{
+    // Sum on query on tableview
+    FloatTable3 t;
+
+    t.add(float(1.1), double(2.1), 1);
+    t.add(float(1.2), double(2.2), 2);
+    t.add(float(1.3), double(2.3), 3);
+    t.add(float(1.4), double(2.4), 4); // match
+    t.add(float(1.5), double(2.5), 5); // match
+    t.add(float(1.6), double(2.6), 6); // match
+    t.add(float(1.7), double(2.7), 7);
+    t.add(float(1.8), double(2.8), 8);
+    t.add(float(1.9), double(2.9), 9);
+
+    FloatTable3::View v = t.where().find_all();
+
+    FloatTable3::Query q1 = t.where(&v).col_float.greater(1.35f).col_double.less(2.65);
+    int64_t a1 = q1.col_int.sum();
+    CHECK_EQUAL(15, a1);
+
+    FloatTable3::Query q2 = t.where(&v).col_double.less(2.65).col_float.greater(1.35f);
+    int64_t a2 = q2.col_int.sum();
+    CHECK_EQUAL(15, a2);
+
+    FloatTable3::Query q3 = t.where(&v).col_double.less(2.65).col_float.greater(1.35f);
+    double a3 = q3.col_float.sum();
+    double sum3 = double(1.4f) + double(1.5f) + double(1.6f);
+    CHECK_EQUAL(sum3, a3);
+
+    FloatTable3::Query q4 = t.where(&v).col_float.greater(1.35f).col_double.less(2.65);
+    double a4 = q4.col_float.sum();
+    CHECK_EQUAL(sum3, a4);
+
+    FloatTable3::Query q5 = t.where(&v).col_int.greater_equal(4).col_double.less(2.65);
+    double a5 = q5.col_float.sum();
+    CHECK_EQUAL(sum3, a5);
+
+    FloatTable3::Query q6 = t.where(&v).col_double.less(2.65).col_int.greater_equal(4);
+    double a6 = q6.col_float.sum();
+    CHECK_EQUAL(sum3, a6);
+
+    FloatTable3::Query q7 = t.where(&v).col_int.greater(3).col_int.less(7);
+    int64_t a7 = q7.col_int.sum();
+    CHECK_EQUAL(15, a7);
+    FloatTable3::Query q8 = t.where(&v).col_int.greater(3).col_int.less(7);
     int64_t a8 = q8.col_int.sum();
     CHECK_EQUAL(15, a8);
 }
@@ -2754,6 +2839,29 @@ TEST(Query_DeleteRange)
     ttt.add(5, "X");
 
     TupleTableType::Query q = ttt.where().second.equal("X");
+    size_t r = q.remove(1, 4);
+
+    CHECK_EQUAL(3, r);
+    CHECK_EQUAL(3, ttt.size());
+    CHECK_EQUAL(0, ttt[0].first);
+    CHECK_EQUAL(4, ttt[1].first);
+    CHECK_EQUAL(5, ttt[2].first);
+}
+
+TEST(Query_DeleteRange_where)
+{
+    TupleTableType ttt;
+
+    ttt.add(0, "X");
+    ttt.add(1, "X");
+    ttt.add(2, "X");
+    ttt.add(3, "X");
+    ttt.add(4, "X");
+    ttt.add(5, "X");
+
+    TupleTableType::View tv = ttt.where().second.equal("X").find_all();
+    TupleTableType::Query q = ttt.where(&tv).second.equal("X");
+
     size_t r = q.remove(1, 4);
 
     CHECK_EQUAL(3, r);
@@ -4538,6 +4646,26 @@ TEST(Query_TestTV)
     CHECK_EQUAL(1, q4.count());
 }
 
+TEST(Query_TestTV_where)
+{
+    // When using .where(&tv), tv can have any order, and the resulting view will retain its order
+    TupleTableType t;
+    t.add(1, "a");
+    t.add(2, "a");
+    t.add(3, "c");
+
+    TupleTableType::View v = t.where().first.greater(1).find_all();
+
+    TupleTableType::Query q1 = t.where(&v);
+    CHECK_EQUAL(2, q1.count());
+
+    TupleTableType::Query q3 = t.where(&v).second.equal("a");
+    CHECK_EQUAL(1, q3.count());
+
+    TupleTableType::Query q4 = t.where(&v).first.between(3, 6);
+    CHECK_EQUAL(1, q4.count());
+}
+
 TEST(Query_SumMinMaxAvg)
 {
     TupleTableType t;
@@ -4573,6 +4701,46 @@ TEST(Query_SumMinMaxAvg)
     CHECK_EQUAL(6, t.where().first.sum(&cnt, 0, 3));
     CHECK_EQUAL(3, cnt);
     CHECK_EQUAL(6, t.where().first.sum(&cnt, 0, size_t(-1)));
+    CHECK_EQUAL(3, cnt);
+}
+
+TEST(Query_SumMinMaxAvg_where)
+{
+    TupleTableType t;
+    t.add(1, "a");
+    t.add(2, "b");
+    t.add(3, "c");
+
+    TupleTableType::View v = t.where().find_all();
+
+    CHECK_EQUAL(6, t.where(&v).first.sum());
+    CHECK_EQUAL(1, t.where(&v).first.minimum());
+    CHECK_EQUAL(3, t.where(&v).first.maximum());
+    CHECK_EQUAL(2, t.where(&v).first.average());
+
+    size_t cnt;
+    CHECK_EQUAL(0, t.where(&v).first.sum(&cnt, 0, 0));
+    CHECK_EQUAL(0, cnt);
+    CHECK_EQUAL(0, t.where(&v).first.sum(&cnt, 1, 1));
+    CHECK_EQUAL(0, cnt);
+    CHECK_EQUAL(0, t.where(&v).first.sum(&cnt, 2, 2));
+    CHECK_EQUAL(0, cnt);
+
+    CHECK_EQUAL(1, t.where(&v).first.sum(&cnt, 0, 1));
+    CHECK_EQUAL(1, cnt);
+    CHECK_EQUAL(2, t.where(&v).first.sum(&cnt, 1, 2));
+    CHECK_EQUAL(1, cnt);
+    CHECK_EQUAL(3, t.where(&v).first.sum(&cnt, 2, 3));
+    CHECK_EQUAL(1, cnt);
+
+    CHECK_EQUAL(3, t.where(&v).first.sum(&cnt, 0, 2));
+    CHECK_EQUAL(2, cnt);
+    CHECK_EQUAL(5, t.where(&v).first.sum(&cnt, 1, 3));
+    CHECK_EQUAL(2, cnt);
+
+    CHECK_EQUAL(6, t.where(&v).first.sum(&cnt, 0, 3));
+    CHECK_EQUAL(3, cnt);
+    CHECK_EQUAL(6, t.where(&v).first.sum(&cnt, 0, size_t(-1)));
     CHECK_EQUAL(3, cnt);
 }
 
