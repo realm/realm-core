@@ -3258,9 +3258,9 @@ TEST(Query_SortDates)
     tv.sort(0);
 
     CHECK(tv.size() == 3);
-    CHECK(tv.get_datetime(0, 0) == 1000);
-    CHECK(tv.get_datetime(0, 1) == 2000);
-    CHECK(tv.get_datetime(0, 2) == 3000);
+    CHECK(tv.get_datetime(0, 0) == DateTime(1000));
+    CHECK(tv.get_datetime(0, 1) == DateTime(2000));
+    CHECK(tv.get_datetime(0, 2) == DateTime(3000));
 }
 
 

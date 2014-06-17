@@ -32,7 +32,7 @@ public:
 
     /// Construct from the number of seconds since Jan 1 00:00:00 UTC
     /// 1970.
-    DateTime(std::time_t d) TIGHTDB_NOEXCEPT: m_time(d) {}
+    DateTime(std::time_t d) TIGHTDB_NOEXCEPT : m_time(d) {}
 
     ~DateTime() TIGHTDB_NOEXCEPT {}
 
@@ -67,13 +67,11 @@ public:
     template<class Ch, class Tr>
     friend std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, const DateTime&);
 
-protected:
+private:
     // This is used by query_expression.hpp to generalize its templates and simplify the code *alot*; it is needed 
     // because DateTime is internally stored in an int64_t column.
-    explicit operator time_t() TIGHTDB_NOEXCEPT
-    {
-        return m_time;
-    }
+    operator time_t() TIGHTDB_NOEXCEPT;
+
 
 private:
     std::time_t m_time; // Seconds since Jan 1 00:00:00 UTC 1970.
@@ -97,6 +95,11 @@ inline bool operator!=(const DateTime& a, const DateTime& b) TIGHTDB_NOEXCEPT
 inline bool operator<(const DateTime& a, const DateTime& b) TIGHTDB_NOEXCEPT
 {
     return a.m_time < b.m_time;
+}
+
+inline DateTime::operator time_t() TIGHTDB_NOEXCEPT
+{
+    return m_time;
 }
 
 inline DateTime::DateTime(int year, int month, int day, int hours, int minutes, int seconds):
