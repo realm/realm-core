@@ -5022,13 +5022,4 @@ TEST(Query_RefCounting)
     CHECK_EQUAL(1, tv.size());
 }
 
-
-
-
-
-
-
-
-
-
 #endif // TEST_QUERY
