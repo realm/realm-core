@@ -67,13 +67,19 @@ public:
     template<class Ch, class Tr>
     friend std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, const DateTime&);
 
+protected:
+    // This is used by query_expression.hpp to generalize its templates and simplify the code *alot*; it is needed 
+    // because DateTime is internally stored in an int64_t column.
+    explicit operator time_t() TIGHTDB_NOEXCEPT
+    {
+        return m_time;
+    }
+
 private:
     std::time_t m_time; // Seconds since Jan 1 00:00:00 UTC 1970.
-
     static std::time_t assemble(int year, int month, int day, int hours, int minutes, int seconds);
+    template <typename T> friend class Value;
 };
-
-
 
 
 // Implementation:
