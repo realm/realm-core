@@ -1303,7 +1303,7 @@ bool Replication::TransactLogParser::do_parse(InstructionHandler& handler)
 template<class T> T Replication::TransactLogParser::read_int()
 {
     T value = 0;
-    int part;
+    int part = 0;
     const int max_bytes = (std::numeric_limits<T>::digits+1+6)/7;
     for (int i = 0; i != max_bytes; ++i) {
         char c;
