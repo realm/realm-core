@@ -37,8 +37,7 @@ enum DataType {
     type_Table      =  5,
     type_Mixed      =  6,
     type_Link       = 12,
-    type_LinkList   = 13,
-    type_BackLink   = 14
+    type_LinkList   = 13
 };
 
 

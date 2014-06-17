@@ -516,17 +516,29 @@ public:
         return false;
     }
 
-    bool insert_column(size_t col_ndx, DataType type, StringData name)
+    bool insert_column(size_t col_ndx, DataType type, StringData name,
+                       size_t link_target_table_ndx)
     {
         if (TIGHTDB_LIKELY(m_desc)) {
             if (TIGHTDB_LIKELY(col_ndx <= m_desc->get_column_count())) {
+                typedef _impl::TableFriend tf;
 #ifdef TIGHTDB_DEBUG
                 if (m_log) {
-                    *m_log << "desc->insert_column("<<col_ndx<<", "<<type_to_str(type)<<", "
-                        "\""<<name<<"\")\n";
+                    if (tf::is_link_type(type)) {
+                        *m_log << "desc->insert_column_link("<<col_ndx<<", "
+                            ""<<type_to_str(type)<<", \""<<name<<"\", "
+                            "group->get_table("<<link_target_table_ndx<<"))\n";
+                    }
+                    else {
+                        *m_log << "desc->insert_column("<<col_ndx<<", "<<type_to_str(type)<<", "
+                            "\""<<name<<"\")\n";
+                    }
                 }
 #endif
-                _impl::TableFriend::insert_column(*m_desc, col_ndx, type, name); // Throws
+                Table* link_target_table = 0;
+                if (tf::is_link_type(type))
+                    link_target_table = m_group.get_table_by_ndx(link_target_table_ndx); // Throws
+                tf::insert_column(*m_desc, col_ndx, type, name, link_target_table); // Throws
                 return true;
             }
         }
@@ -668,8 +680,6 @@ private:
                 return "Link";
             case type_LinkList:
                 return "LinkList";
-            case type_BackLink:
-                return "BackLink";
         }
         TIGHTDB_ASSERT(false);
         return 0;
