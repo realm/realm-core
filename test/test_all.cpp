@@ -1,3 +1,8 @@
+#define USE_VLD
+#if defined(_MSC_VER) && defined(_DEBUG) && defined(USE_VLD)
+#  include "C:\\Program Files (x86)\\Visual Leak Detector\\include\\vld.h"
+#endif
+
 #include <cstring>
 #include <cstdlib>
 #include <algorithm>
@@ -21,13 +26,6 @@
 #include "util/resource_limits.hpp"
 
 #include "test.hpp"
-
-
-// #define USE_VLD
-#if defined(_MSC_VER) && defined(_DEBUG) && defined(USE_VLD)
-#  include "C:\\Program Files (x86)\\Visual Leak Detector\\include\\vld.h"
-#endif
-
 
 using namespace std;
 using namespace tightdb;

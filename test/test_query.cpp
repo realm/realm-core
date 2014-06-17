@@ -126,6 +126,11 @@ namespace {
         author, String,
         pages, Int)
 
+        TIGHTDB_TABLE_3(Types,
+        ints, Int,
+        strings, String,
+        doubles, Double)
+
 } // anonymous namespace
 
 
@@ -3391,6 +3396,22 @@ TEST(Query_Sort_And_Requery_Untyped2)
 
     // Test that remove() maintains order
     tv3.remove(0);
+    // q5 and q3 should behave the same.
+    Query q5 = table.where(&tv2).not_equal(1, "X");
+    TableView tv5 = q5.find_all();
+    tv5.sync_if_needed(); // you may think tv5 is in sync, BUT it was generated from tv2 which wasn't
+    // Note the side effect - as tv5 depends on ... on tv2 etc, all views are synchronized.
+    CHECK_EQUAL(3, tv5.size());
+    CHECK_EQUAL(1, tv5.get_int(0, 0));
+    CHECK_EQUAL(8, tv5.get_int(0, 1)); // 8, 9 (sort order) instead of 9, 8 (table order)
+    CHECK_EQUAL(9, tv5.get_int(0, 2));
+
+    CHECK_EQUAL(6, tv.size());
+    CHECK_EQUAL(3, tv3.size());
+    CHECK_EQUAL(1, tv3.get_int(0, 0));
+    CHECK_EQUAL(8, tv3.get_int(0, 1)); // 8, 9 (sort order) instead of 9, 8 (table order)
+    CHECK_EQUAL(9, tv3.get_int(0, 2));
+
     Query q4 = table.where(&tv3).not_equal(1, "X");
     TableView tv4 = q4.find_all();
 
@@ -5021,5 +5042,138 @@ TEST(Query_RefCounting)
     TableView tv = q.find_all();
     CHECK_EQUAL(1, tv.size());
 }
+
+
+TEST(Query_DeepCopy)
+{
+    // NOTE: You can only create a copy of a fully constructed; i.e. you cannot copy a query which is missing an 
+    // end_group(). Run Query::validate() to see if it's fully constructed.
+    
+    Types t;
+
+    t.add(1, "1", 1.1);
+    t.add(2, "2", 2.2);
+    t.add(3, "3", 3.3);
+    t.add(4, "4", 4.4);
+
+    Query q = t.column().ints > 2 + 0; // + 0 makes query_expression node instead of query_engine.
+
+
+    // Test if we can execute a copy
+    Query q2 = Query(q, Query::TCopyExpressionTag());
+
+    CHECK_EQUAL(2, q2.find());
+
+
+    // See if we can execute a copy of a delted query (copy should not contain references to original)
+    Query* q3 = new Query(q, Query::TCopyExpressionTag());
+    Query* q4 = new Query(*q3, Query::TCopyExpressionTag());
+    delete q3;
+    
+
+    // Attempt to overwrite memory of the deleted q3 by allocating various sized objects so that a spurious execution
+    // of methods on q3 can be detected (by making unit test crash).
+    char* tmp[1000];
+    for (size_t t = 0; t < sizeof(tmp) / sizeof(tmp[0]); t++) {
+        tmp[t] = new char[t];
+        memset(tmp[t], 0, t);
+    }
+    for (size_t t = 0; t < sizeof(tmp) / sizeof(tmp[0]); t++) {
+        delete[] tmp[t];
+    }
+
+    CHECK_EQUAL(2, q4->find());
+    delete q4;
+
+
+    // See if we can append a criteria to a query
+    Query q5 = t.column().ints > 2 + 0; // + 0 makes query_expression node instead of query_engine
+    q5.greater(2, 4.0);
+    CHECK_EQUAL(3, q5.find());
+
+
+    // See if we can append a criteria to a copy without modifying the original (copy should not contain references
+    // to original). Tests query_expression integer node.
+    Query q6 = t.column().ints > 2 + 0; // + 0 makes query_expression node instead of query_engine
+    Query q7 = Query(q6, Query::TCopyExpressionTag());
+
+    q7.greater(2, 4.0);
+    CHECK_EQUAL(3, q7.find());
+    CHECK_EQUAL(2, q6.find());
+
+
+    // See if we can append a criteria to a copy without modifying the original (copy should not contain references
+    // to original). Tests query_engine integer node.
+    Query q8 = t.column().ints > 2;
+    Query q9 = Query(q8, Query::TCopyExpressionTag());
+
+    q9.greater(2, 4.0);
+    CHECK_EQUAL(3, q9.find());
+    CHECK_EQUAL(2, q8.find());
+
+
+    // See if we can append a criteria to a copy without modifying the original (copy should not contain references
+    // to original). Tests query_engine string node.
+    Query q10 = t.column().strings != "2";
+    Query q11 = Query(q10, Query::TCopyExpressionTag());
+
+    q11.greater(2, 4.0);
+    CHECK_EQUAL(3, q11.find());
+    CHECK_EQUAL(0, q10.find());
+}
+
+TEST(Query_TableViewMoveAssign1)
+{
+    Types t;
+
+    t.add(1, "1", 1.1);
+    t.add(2, "2", 2.2);
+    t.add(3, "3", 3.3);
+    t.add(4, "4", 4.4);
+
+    // temporary query is created, then q makes and stores a deep copy and then temporary is destructed
+    Query q = t.column().ints > 2 + 0; // + 0 makes query_expression node instead of query_engine
+
+    // now deep copy should be destructed and replaced by new temporary      
+    TableView tv = q.find_all();
+
+    // the original should still work; destruction of temporaries and deep copies should have no references
+    // to original
+    tv = q.find_all();    
+}
+
+TEST(Query_TableViewMoveAssignLeak2)
+{
+    Types t;
+
+    t.add(1, "1", 1.1);
+    t.add(2, "2", 2.2);
+    t.add(3, "3", 3.3);
+    t.add(4, "4", 4.4);
+
+    Query q = t.column().ints > 2 + 0 && t.column().strings == "4";
+    TableView tv = q.find_all();
+
+    tv = q.find_all();
+}
+
+TEST(Query_DeepCopyLeak1)
+{
+    // NOTE: You can only create a copy of a fully constructed; i.e. you cannot copy a query which is missing an 
+    // end_group(). Run Query::validate() to see if it's fully constructed.
+
+    Types t;
+
+    t.add(1, "1", 1.1);
+    t.add(2, "2", 2.2);
+    t.add(3, "3", 3.3);
+    t.add(4, "4", 4.4);
+
+    // See if copying of a mix of query_expression and query_engine nodes will leak
+    Query q = !(t.column().ints > 2 + 0 && t.column().ints > 2 && t.column().doubles > 2.2) || t.column().ints == 4 || t.column().ints == 4 + 0;
+    Query q2 = Query(q, Query::TCopyExpressionTag());
+    Query q3 = Query(q2, Query::TCopyExpressionTag());
+}
+
 
 #endif // TEST_QUERY

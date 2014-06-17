@@ -25,14 +25,14 @@ using namespace std;
 using namespace tightdb;
 
 
-void ColumnBackLink::add_backlink(size_t row_ndx, size_t source_row_ndx)
+void ColumnBackLink::add_backlink(size_t row_ndx, size_t origin_row_ndx)
 {
     size_t ref = Column::get(row_ndx);
 
     // If there is only a single backlink, it can be stored as
     // a tagged value
     if (ref == 0) {
-        size_t tagged_ndx = (source_row_ndx << 1) + 1;
+        size_t tagged_ndx = (origin_row_ndx << 1) + 1;
         Column::set(row_ndx, tagged_ndx);
         return;
     }
@@ -45,9 +45,9 @@ void ColumnBackLink::add_backlink(size_t row_ndx, size_t source_row_ndx)
         ref_type col_ref = Column::create(Array::type_Normal, 0, 0, get_alloc());
         Column col(col_ref, this, row_ndx, get_alloc());
 
-        size_t existing_source_ndx = (ref >> 1);
-        col.add(existing_source_ndx);
-        col.add(source_row_ndx);
+        size_t existing_origin_ndx = (ref >> 1);
+        col.add(existing_origin_ndx);
+        col.add(origin_row_ndx);
 
         Column::set(row_ndx, col_ref);
         return;
@@ -55,7 +55,7 @@ void ColumnBackLink::add_backlink(size_t row_ndx, size_t source_row_ndx)
 
     // Otherwise just add to existing list
     Column col(ref, this, row_ndx, get_alloc());
-    col.add(source_row_ndx);
+    col.add(origin_row_ndx);
 }
 
 size_t ColumnBackLink::get_backlink_count(size_t row_ndx) const TIGHTDB_NOEXCEPT
@@ -91,7 +91,7 @@ size_t ColumnBackLink::get_backlink(size_t row_ndx, size_t backlink_ndx) const T
     return col.get(backlink_ndx);
 }
 
-void ColumnBackLink::remove_backlink(size_t row_ndx, size_t source_row_ndx)
+void ColumnBackLink::remove_backlink(size_t row_ndx, size_t origin_row_ndx)
 {
     size_t ref = Column::get(row_ndx);
     TIGHTDB_ASSERT(ref != 0);
@@ -99,7 +99,7 @@ void ColumnBackLink::remove_backlink(size_t row_ndx, size_t source_row_ndx)
     // If there is only a single backlink, it can be stored as
     // a tagged value
     if (ref & 1) {
-        TIGHTDB_ASSERT(get_backlink(row_ndx, 0) == source_row_ndx);
+        TIGHTDB_ASSERT(get_backlink(row_ndx, 0) == origin_row_ndx);
         Column::set(row_ndx, 0);
         return;
     }
@@ -107,7 +107,7 @@ void ColumnBackLink::remove_backlink(size_t row_ndx, size_t source_row_ndx)
     // if there is a list of backlinks we have to find
     // the right one and remove it.
     Column col(ref, this, row_ndx, get_alloc());
-    size_t ref_pos = col.find_first(source_row_ndx);
+    size_t ref_pos = col.find_first(origin_row_ndx);
     TIGHTDB_ASSERT(ref_pos != not_found);
     bool is_last = (ref_pos+1 == col.size());
     col.erase(ref_pos, is_last);
@@ -147,7 +147,7 @@ void ColumnBackLink::nullify_links(size_t row_ndx, bool do_destroy)
     if (ref != 0) {
         if (ref & 1) {
             size_t row_ref = (ref >> 1);
-            m_source_column->do_nullify_link(row_ref, row_ndx);
+            m_origin_column->do_nullify_link(row_ref, row_ndx);
         }
         else {
             // nullify entire list of links
@@ -155,8 +155,8 @@ void ColumnBackLink::nullify_links(size_t row_ndx, bool do_destroy)
             size_t count = col.size();
 
             for (size_t i = 0; i < count; ++i) {
-                size_t source_row_ref = col.get(i);
-                m_source_column->do_nullify_link(source_row_ref, row_ndx);
+                size_t origin_row_ref = col.get(i);
+                m_origin_column->do_nullify_link(origin_row_ref, row_ndx);
             }
 
             if (do_destroy) {
@@ -179,7 +179,7 @@ void ColumnBackLink::move_last_over(size_t target_row_ndx, size_t last_row_ndx)
     if (ref != 0) {
         if (ref & 1) {
             size_t row_ref = (ref >> 1);
-            m_source_column->do_update_link(row_ref, last_row_ndx, target_row_ndx);
+            m_origin_column->do_update_link(row_ref, last_row_ndx, target_row_ndx);
         }
         else {
             // update entire list of links
@@ -187,8 +187,8 @@ void ColumnBackLink::move_last_over(size_t target_row_ndx, size_t last_row_ndx)
             size_t count = col.size();
 
             for (size_t i = 0; i < count; ++i) {
-                size_t source_row_ref = col.get(i);
-                m_source_column->do_update_link(source_row_ref, last_row_ndx, target_row_ndx);
+                size_t origin_row_ref = col.get(i);
+                m_origin_column->do_update_link(origin_row_ref, last_row_ndx, target_row_ndx);
             }
         }
     }

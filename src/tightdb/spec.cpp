@@ -162,7 +162,7 @@ void Spec::insert_column(size_t column_ndx, ColumnType type, StringData name, Co
             m_subspecs.insert(subspec_ndx, 0); // Throws
         }
         else if (type == col_type_BackLink) {
-            // Store ref (position) of source table and source column
+            // Store ref (position) of origin table and origin column
             // When we set the target it will be as a tagged integer (low bit set)
             // Since we don't know it yet we just store zero (null ref)
             size_t subspec_ndx = get_subspec_ndx(column_ndx);
@@ -190,12 +190,12 @@ void Spec::remove_column(size_t column_ndx)
     }
     else if (type == col_type_Link) {
         size_t subspec_ndx = get_subspec_ndx(column_ndx);
-        m_subspecs.erase(subspec_ndx); // source table ref  : Throws
+        m_subspecs.erase(subspec_ndx); // origin table ref  : Throws
     }
     else if (type == col_type_BackLink) {
         size_t subspec_ndx = get_subspec_ndx(column_ndx);
-        m_subspecs.erase(subspec_ndx); // source table ref  : Throws
-        m_subspecs.erase(subspec_ndx); // source column ref : Throws
+        m_subspecs.erase(subspec_ndx); // origin table ref  : Throws
+        m_subspecs.erase(subspec_ndx); // origin column ref : Throws
     }
     else if (type == col_type_StringEnum) {
         // Enum columns do also have a separate key list
@@ -297,7 +297,7 @@ ref_type Spec::get_enumkeys_ref(size_t column_ndx, ArrayParent** keys_parent,
     return m_enumkeys.get_as_ref(enumkeys_ndx);
 }
 
-void Spec::set_link_target_table(std::size_t column_ndx, std::size_t table_ndx)
+void Spec::set_link_target_table(size_t column_ndx, size_t table_ndx)
 {
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     TIGHTDB_ASSERT(get_column_type(column_ndx) == col_type_Link ||
@@ -308,10 +308,10 @@ void Spec::set_link_target_table(std::size_t column_ndx, std::size_t table_ndx)
     size_t tagged_ndx = (table_ndx << 1) + 1;
 
     size_t subspec_ndx = get_subspec_ndx(column_ndx);
-    m_subspecs.set(subspec_ndx, tagged_ndx);
+    m_subspecs.set(subspec_ndx, tagged_ndx); // Throws
 }
 
-std::size_t Spec::get_link_target_table(std::size_t column_ndx) const TIGHTDB_NOEXCEPT
+size_t Spec::get_link_target_table(size_t column_ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     TIGHTDB_ASSERT(get_column_type(column_ndx) == col_type_Link ||
@@ -328,40 +328,41 @@ std::size_t Spec::get_link_target_table(std::size_t column_ndx) const TIGHTDB_NO
     return table_ref;
 }
 
-void Spec::set_backlink_source_column(std::size_t column_ndx, std::size_t source_column_ndx)
+void Spec::set_backlink_origin_column(size_t backlink_col_ndx, size_t origin_col_ndx)
 {
-    TIGHTDB_ASSERT(column_ndx < get_column_count());
-    TIGHTDB_ASSERT(get_column_type(column_ndx) == col_type_BackLink);
+    TIGHTDB_ASSERT(backlink_col_ndx < get_column_count());
+    TIGHTDB_ASSERT(get_column_type(backlink_col_ndx) == col_type_BackLink);
 
     // position of target table is stored as tagged int
-    size_t tagged_ndx = (source_column_ndx << 1) + 1;
+    size_t tagged_ndx = (origin_col_ndx << 1) + 1;
 
-    size_t subspec_ndx = get_subspec_ndx(column_ndx);
-    m_subspecs.set(subspec_ndx+1, tagged_ndx);
+    size_t subspec_ndx = get_subspec_ndx(backlink_col_ndx);
+    m_subspecs.set(subspec_ndx+1, tagged_ndx); // Throws
 }
 
-std::size_t Spec::get_backlink_source_column(std::size_t column_ndx) const TIGHTDB_NOEXCEPT
+size_t Spec::get_backlink_origin_column(size_t backlink_col_ndx) const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(column_ndx < get_column_count());
-    TIGHTDB_ASSERT(get_column_type(column_ndx) == col_type_BackLink);
+    TIGHTDB_ASSERT(backlink_col_ndx < get_column_count());
+    TIGHTDB_ASSERT(get_column_type(backlink_col_ndx) == col_type_BackLink);
 
-    // source column is stored as second tagged int in the subspecs array
-    size_t subspec_ndx = get_subspec_ndx(column_ndx);
+    // Origin column is stored as second tagged int in the subspecs array
+    size_t subspec_ndx = get_subspec_ndx(backlink_col_ndx);
     int64_t tagged_value = m_subspecs.get(subspec_ndx+1);
     TIGHTDB_ASSERT(tagged_value != 0); // can't retrieve it if never set
 
-    uint64_t source_column_ndx = uint64_t(tagged_value) >> 1;
-    return source_column_ndx;
+    size_t origin_col_ndx = size_t(uint64_t(tagged_value) >> 1);
+    return origin_col_ndx;
 }
 
-size_t Spec::find_backlink_column(size_t source_table_ndx, size_t source_column_ndx) const TIGHTDB_NOEXCEPT
+size_t Spec::find_backlink_column(size_t origin_table_ndx, size_t origin_col_ndx) const
+    TIGHTDB_NOEXCEPT
 {
     size_t backlinks_column_start = m_names.size();
     size_t backlinks_start = get_subspec_ndx(backlinks_column_start);
     size_t count = m_subspecs.size();
 
-    int64_t tagged_table_ndx = (source_table_ndx << 1) + 1;
-    int64_t tagged_column_ndx = (source_column_ndx << 1) + 1;
+    int64_t tagged_table_ndx = (origin_table_ndx << 1) + 1;
+    int64_t tagged_column_ndx = (origin_col_ndx << 1) + 1;
 
     for (size_t i = backlinks_start; i < count; i += 2) {
         if (m_subspecs.get(i)   == tagged_table_ndx &&
@@ -376,9 +377,10 @@ size_t Spec::find_backlink_column(size_t source_table_ndx, size_t source_column_
     return not_found;
 }
 
-void Spec::update_backlink_column_ref(size_t source_table_ndx, size_t old_column_ndx, size_t new_column_ndx)
+void Spec::update_backlink_column_ref(size_t origin_table_ndx, size_t old_column_ndx,
+                                      size_t new_column_ndx)
 {
-    size_t column_ndx = find_backlink_column(source_table_ndx, old_column_ndx);
+    size_t column_ndx = find_backlink_column(origin_table_ndx, old_column_ndx);
     TIGHTDB_ASSERT(column_ndx != not_found);
 
     size_t backlink_info_ndx = get_subspec_ndx(column_ndx);
@@ -436,14 +438,13 @@ bool Spec::operator==(const Spec& spec) const TIGHTDB_NOEXCEPT
 
 void Spec::Verify() const
 {
-    size_t column_count = get_column_count();
-    TIGHTDB_ASSERT(column_count == m_names.size());
-    TIGHTDB_ASSERT(column_count == m_spec.size());
-    TIGHTDB_ASSERT(column_count == m_attr.size());
+    TIGHTDB_ASSERT(m_names.size() == get_public_column_count());
+    TIGHTDB_ASSERT(m_spec.size()  == get_column_count());
+    TIGHTDB_ASSERT(m_attr.size()  == get_column_count());
 
-    TIGHTDB_ASSERT(m_spec.get_ref() == m_top.get_as_ref(0));
+    TIGHTDB_ASSERT(m_spec.get_ref()  == m_top.get_as_ref(0));
     TIGHTDB_ASSERT(m_names.get_ref() == m_top.get_as_ref(1));
-    TIGHTDB_ASSERT(m_attr.get_ref() == m_top.get_as_ref(2));
+    TIGHTDB_ASSERT(m_attr.get_ref()  == m_top.get_as_ref(2));
 }
 
 
