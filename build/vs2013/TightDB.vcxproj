@@ -663,7 +663,7 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="..\..\test\test_links.cpp" />
-    <ClCompile Include="..\..\test\test_link_view.cpp" />
+    <ClCompile Include="..\..\test\test_link_query_view.cpp" />
     <ClCompile Include="..\..\test\util\verified_integer.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
