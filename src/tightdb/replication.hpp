@@ -32,7 +32,6 @@
 #include <tightdb/util/buffer.hpp>
 #include <tightdb/util/string_buffer.hpp>
 #include <tightdb/util/file.hpp>
-#include <tightdb/group.hpp>
 #include <tightdb/descriptor.hpp>
 #include <tightdb/group.hpp>
 #include <tightdb/group_shared.hpp>
@@ -123,7 +122,8 @@ public:
     void clear_interrupt() TIGHTDB_NOEXCEPT;
 
     void new_group_level_table(StringData name);
-    void insert_column(const Descriptor&, std::size_t col_ndx, DataType type, StringData name);
+    void insert_column(const Descriptor&, std::size_t col_ndx, DataType type, StringData name,
+                       Table* link_target_table);
     void erase_column(const Descriptor&, std::size_t col_ndx);
     void rename_column(const Descriptor&, std::size_t col_ndx, StringData name);
 
@@ -306,6 +306,8 @@ private:
 
     template<class L> void simple_cmd(Instruction, const util::Tuple<L>& numbers);
 
+    template<class T> inline void append_num(T value);
+
     template<class> struct EncodeNumber;
 
     template<class T> static char* encode_int(char* ptr, T value);
@@ -387,7 +389,8 @@ public:
     ///     bool add_int_to_column(std::size_t col_ndx, int_fast64_t value)
     ///     bool optimize_table()
     ///     bool select_descriptor(int levels, const std::size_t* path)
-    ///     bool insert_column(std::size_t col_ndx, DataType, StringData value)
+    ///     bool insert_column(std::size_t col_ndx, DataType, StringData value,
+    ///                        std::size_t link_target_table_ndx)
     ///     bool erase_column(std::size_t col_ndx)
     ///     bool rename_column(std::size_t col_ndx, StringData new_name)
     ///     bool add_index_to_column(std::size_t col_ndx)
@@ -406,6 +409,8 @@ private:
     util::StringBuffer m_string_buffer;
     static const int m_max_levels = 1024;
     util::Buffer<std::size_t> m_path;
+
+    template<class InstructionHandler> bool do_parse(InstructionHandler&);
 
     template<class T> T read_int();
 
@@ -655,6 +660,15 @@ inline void Replication::simple_cmd(Instruction instr, const util::Tuple<L>& num
 }
 
 
+template<class T> inline void Replication::append_num(T value)
+{
+    char* buf;
+    transact_log_reserve(&buf, max_enc_bytes_per_num); // Throws
+    EncodeNumber<T>()(value, &buf);
+    transact_log_advance(buf);
+}
+
+
 inline void Replication::check_table(const Table* t)
 {
     if (t != m_selected_table)
@@ -730,7 +744,6 @@ inline void Replication::mixed_cmd(Instruction instr, std::size_t col_ndx,
             break;
         case type_Link:
         case type_LinkList:
-        case type_BackLink:
             // FIXME: Need to handle new link types here
             TIGHTDB_ASSERT(false);
             break;
@@ -746,12 +759,16 @@ inline void Replication::new_group_level_table(StringData name)
 }
 
 
-inline void Replication::insert_column(const Descriptor& desc, std::size_t col_ndx,
-                                       DataType type, StringData name)
+inline void Replication::insert_column(const Descriptor& desc, std::size_t col_ndx, DataType type,
+                                       StringData name, Table* link_target_table)
 {
     check_desc(desc); // Throws
     simple_cmd(instr_InsertColumn, util::tuple(col_ndx, int(type), name.size())); // Throws
     transact_log_append(name.data(), name.size()); // Throws
+    if (link_target_table) {
+        std::size_t target_table_ndx = link_target_table->get_index_in_parent();
+        append_num(target_table_ndx); // Throws
+    }
 }
 
 inline void Replication::erase_column(const Descriptor& desc, std::size_t col_ndx)
@@ -983,6 +1000,13 @@ inline Replication::TransactLogParser::~TransactLogParser() TIGHTDB_NOEXCEPT
 template<class InstructionHandler>
 void Replication::TransactLogParser::parse(InstructionHandler& handler)
 {
+    if (!do_parse(handler))
+        throw BadTransactLog();
+}
+
+template<class InstructionHandler>
+bool Replication::TransactLogParser::do_parse(InstructionHandler& handler)
+{
     if (!m_input_buffer)
         m_input_buffer.reset(new char[m_input_buffer_size]); // Throws
     m_input_begin = m_input_end = m_input_buffer.get();
@@ -992,7 +1016,7 @@ void Replication::TransactLogParser::parse(InstructionHandler& handler)
         char instr;
         if (!read_char(instr))
             break;
-//std::cerr << "["<<util::promote(instr)<<"]";
+// std::cerr << "["<<util::promote(instr)<<"]";
         switch (Instruction(instr)) {
             case instr_SetInt: {
                 std::size_t col_ndx = read_int<std::size_t>(); // Throws
@@ -1002,7 +1026,7 @@ void Replication::TransactLogParser::parse(InstructionHandler& handler)
                 // either.
                 int_fast64_t value = read_int<int64_t>(); // Throws
                 if (!handler.set_int(col_ndx, row_ndx, value)) // Throws
-                    goto bad_transact_log;
+                    return false;
                 continue;
             }
             case instr_SetBool: {
@@ -1010,7 +1034,7 @@ void Replication::TransactLogParser::parse(InstructionHandler& handler)
                 std::size_t row_ndx = read_int<std::size_t>(); // Throws
                 bool value = read_int<bool>(); // Throws
                 if (!handler.set_bool(col_ndx, row_ndx, value)) // Throws
-                    goto bad_transact_log;
+                    return false;
                 continue;
             }
             case instr_SetFloat: {
@@ -1018,7 +1042,7 @@ void Replication::TransactLogParser::parse(InstructionHandler& handler)
                 std::size_t row_ndx = read_int<std::size_t>(); // Throws
                 float value = read_float(); // Throws
                 if (!handler.set_float(col_ndx, row_ndx, value)) // Throws
-                    goto bad_transact_log;
+                    return false;
                 continue;
             }
             case instr_SetDouble: {
@@ -1026,7 +1050,7 @@ void Replication::TransactLogParser::parse(InstructionHandler& handler)
                 std::size_t row_ndx = read_int<std::size_t>(); // Throws
                 double value = read_double(); // Throws
                 if (!handler.set_double(col_ndx, row_ndx, value)) // Throws
-                    goto bad_transact_log;
+                    return false;
                 continue;
             }
             case instr_SetString: {
@@ -1035,7 +1059,7 @@ void Replication::TransactLogParser::parse(InstructionHandler& handler)
                 read_string(m_string_buffer); // Throws
                 StringData value(m_string_buffer.data(), m_string_buffer.size());
                 if (!handler.set_string(col_ndx, row_ndx, value)) // Throws
-                    goto bad_transact_log;
+                    return false;
                 continue;
             }
             case instr_SetBinary: {
@@ -1044,7 +1068,7 @@ void Replication::TransactLogParser::parse(InstructionHandler& handler)
                 read_string(m_string_buffer); // Throws
                 BinaryData value(m_string_buffer.data(), m_string_buffer.size());
                 if (!handler.set_binary(col_ndx, row_ndx, value)) // Throws
-                    goto bad_transact_log;
+                    return false;
                 continue;
             }
             case instr_SetDateTime: {
@@ -1052,14 +1076,14 @@ void Replication::TransactLogParser::parse(InstructionHandler& handler)
                 std::size_t row_ndx = read_int<std::size_t>(); // Throws
                 std::time_t value = read_int<std::time_t>(); // Throws
                 if (!handler.set_date_time(col_ndx, row_ndx, value)) // Throws
-                    goto bad_transact_log;
+                    return false;
                 continue;
             }
             case instr_SetTable: {
                 std::size_t col_ndx = read_int<std::size_t>(); // Throws
                 std::size_t row_ndx = read_int<std::size_t>(); // Throws
                 if (!handler.set_table(col_ndx, row_ndx)) // Throws
-                    goto bad_transact_log;
+                    return false;
                 continue;
             }
             case instr_SetMixed: {
@@ -1068,7 +1092,7 @@ void Replication::TransactLogParser::parse(InstructionHandler& handler)
                 Mixed value;
                 read_mixed(&value); // Throws
                 if (!handler.set_mixed(col_ndx, row_ndx, value)) // Throws
-                    goto bad_transact_log;
+                    return false;
                 continue;
             }
             case instr_InsertInt: {
@@ -1079,7 +1103,7 @@ void Replication::TransactLogParser::parse(InstructionHandler& handler)
                 // either.
                 int_fast64_t value = read_int<int64_t>(); // Throws
                 if (!handler.insert_int(col_ndx, row_ndx, value)) // Throws
-                    goto bad_transact_log;
+                    return false;
                 continue;
             }
             case instr_InsertBool: {
@@ -1087,7 +1111,7 @@ void Replication::TransactLogParser::parse(InstructionHandler& handler)
                 std::size_t row_ndx = read_int<std::size_t>(); // Throws
                 bool value = read_int<bool>(); // Throws
                 if (!handler.insert_bool(col_ndx, row_ndx, value)) // Throws
-                    goto bad_transact_log;
+                    return false;
                 continue;
             }
             case instr_InsertFloat: {
@@ -1095,7 +1119,7 @@ void Replication::TransactLogParser::parse(InstructionHandler& handler)
                 std::size_t row_ndx = read_int<std::size_t>(); // Throws
                 float value = read_float(); // Throws
                 if (!handler.insert_float(col_ndx, row_ndx, value)) // Throws
-                    goto bad_transact_log;
+                    return false;
                 continue;
             }
             case instr_InsertDouble: {
@@ -1103,7 +1127,7 @@ void Replication::TransactLogParser::parse(InstructionHandler& handler)
                 std::size_t row_ndx = read_int<std::size_t>(); // Throws
                 double value = read_double(); // Throws
                 if (!handler.insert_double(col_ndx, row_ndx, value)) // Throws
-                    goto bad_transact_log;
+                    return false;
                 continue;
             }
             case instr_InsertString: {
@@ -1112,7 +1136,7 @@ void Replication::TransactLogParser::parse(InstructionHandler& handler)
                 read_string(m_string_buffer); // Throws
                 StringData value(m_string_buffer.data(), m_string_buffer.size());
                 if (!handler.insert_string(col_ndx, row_ndx, value)) // Throws
-                    goto bad_transact_log;
+                    return false;
                 continue;
             }
             case instr_InsertBinary: {
@@ -1121,7 +1145,7 @@ void Replication::TransactLogParser::parse(InstructionHandler& handler)
                 read_string(m_string_buffer); // Throws
                 BinaryData value(m_string_buffer.data(), m_string_buffer.size());
                 if (!handler.insert_binary(col_ndx, row_ndx, value)) // Throws
-                    goto bad_transact_log;
+                    return false;
                 continue;
             }
             case instr_InsertDateTime: {
@@ -1129,14 +1153,14 @@ void Replication::TransactLogParser::parse(InstructionHandler& handler)
                 std::size_t row_ndx = read_int<std::size_t>(); // Throws
                 std::time_t value = read_int<std::time_t>(); // Throws
                 if (!handler.insert_date_time(col_ndx, row_ndx, value)) // Throws
-                    goto bad_transact_log;
+                    return false;
                 continue;
             }
             case instr_InsertTable: {
                 std::size_t col_ndx = read_int<std::size_t>(); // Throws
                 std::size_t row_ndx = read_int<std::size_t>(); // Throws
                 if (!handler.insert_table(col_ndx, row_ndx)) // Throws
-                    goto bad_transact_log;
+                    return false;
                 continue;
             }
             case instr_InsertMixed: {
@@ -1145,32 +1169,32 @@ void Replication::TransactLogParser::parse(InstructionHandler& handler)
                 Mixed value;
                 read_mixed(&value); // Throws
                 if (!handler.insert_mixed(col_ndx, row_ndx, value)) // Throws
-                    goto bad_transact_log;
+                    return false;
                 continue;
             }
             case instr_RowInsertComplete: {
                 if (!handler.row_insert_complete()) // Throws
-                    goto bad_transact_log;
+                    return false;
                 continue;
             }
             case instr_InsertEmptyRows: {
                 std::size_t row_ndx = read_int<std::size_t>(); // Throws
                 std::size_t num_rows = read_int<std::size_t>(); // Throws
                 if (!handler.insert_empty_rows(row_ndx, num_rows)) // Throws
-                    goto bad_transact_log;
+                    return false;
                 continue;
             }
             case instr_EraseRow: {
                 std::size_t row_ndx = read_int<std::size_t>(); // Throws
                 if (!handler.erase_row(row_ndx)) // Throws
-                    goto bad_transact_log;
+                    return false;
                 continue;
             }
             case instr_MoveLastOver: {
                 std::size_t target_row_ndx = read_int<std::size_t>(); // Throws
                 std::size_t last_row_ndx = read_int<std::size_t>(); // Throws
                 if (!handler.move_last_over(target_row_ndx, last_row_ndx)) // Throws
-                    goto bad_transact_log;
+                    return false;
                 continue;
             }
             case instr_AddIntToColumn: {
@@ -1180,13 +1204,13 @@ void Replication::TransactLogParser::parse(InstructionHandler& handler)
                 // either.
                 int_fast64_t value = read_int<int64_t>(); // Throws
                 if (!handler.add_int_to_column(col_ndx, value)) // Throws
-                    goto bad_transact_log;
+                    return false;
                 continue;
             }
             case instr_SelectTable: {
                 int levels = read_int<int>(); // Throws
                 if (levels < 0 || levels > m_max_levels)
-                    goto bad_transact_log;
+                    return false;
                 m_path.reserve(0, 2*levels); // Throws
                 std::size_t* path = m_path.data();
                 std::size_t group_level_ndx = read_int<std::size_t>(); // Throws
@@ -1197,35 +1221,40 @@ void Replication::TransactLogParser::parse(InstructionHandler& handler)
                     path[2*i + 1] = row_ndx;
                 }
                 if (!handler.select_table(group_level_ndx, levels, path)) // Throws
-                    goto bad_transact_log;
+                    return false;
                 continue;
             }
             case instr_ClearTable: {
                 if (!handler.clear_table()) // Throws
-                    goto bad_transact_log;
+                    return false;
                 continue;
             }
             case instr_AddIndexToColumn: {
                 std::size_t col_ndx = read_int<std::size_t>(); // Throws
                 if (!handler.add_index_to_column(col_ndx)) // Throws
-                    goto bad_transact_log;
+                    return false;
                 continue;
             }
             case instr_InsertColumn: {
                 std::size_t col_ndx = read_int<std::size_t>(); // Throws
                 int type = read_int<int>(); // Throws
                 if (!is_valid_column_type(type))
-                    goto bad_transact_log;
+                    return false;
                 read_string(m_string_buffer); // Throws
                 StringData name(m_string_buffer.data(), m_string_buffer.size());
-                if (!handler.insert_column(col_ndx, DataType(type), name)) // Throws
-                    goto bad_transact_log;
+                std::size_t link_target_table_ndx = 0;
+                typedef _impl::TableFriend tf;
+                if (tf::is_link_type(DataType(type)))
+                    link_target_table_ndx = read_int<std::size_t>(); // Throws
+                if (!handler.insert_column(col_ndx, DataType(type), name,
+                                           link_target_table_ndx)) // Throws
+                    return false;
                 continue;
             }
             case instr_EraseColumn: {
                 std::size_t col_ndx = read_int<std::size_t>(); // Throws
                 if (!handler.erase_column(col_ndx)) // Throws
-                    goto bad_transact_log;
+                    return false;
                 continue;
             }
             case instr_RenameColumn: {
@@ -1233,13 +1262,13 @@ void Replication::TransactLogParser::parse(InstructionHandler& handler)
                 read_string(m_string_buffer); // Throws
                 StringData name(m_string_buffer.data(), m_string_buffer.size());
                 if (!handler.rename_column(col_ndx, name)) // Throws
-                    goto bad_transact_log;
+                    return false;
                 continue;
             }
             case instr_SelectDescriptor: {
                 int levels = read_int<int>(); // Throws
                 if (levels < 0 || levels > m_max_levels)
-                    goto bad_transact_log;
+                    return false;
                 m_path.reserve(0, levels); // Throws
                 std::size_t* path = m_path.data();
                 for (int i = 0; i != levels; ++i) {
@@ -1247,37 +1276,34 @@ void Replication::TransactLogParser::parse(InstructionHandler& handler)
                     path[i] = col_ndx;
                 }
                 if (!handler.select_descriptor(levels, path)) // Throws
-                    goto bad_transact_log;
+                    return false;
                 continue;
             }
             case instr_NewGroupLevelTable: {
                 read_string(m_string_buffer); // Throws
                 StringData name(m_string_buffer.data(), m_string_buffer.size());
                 if (!handler.new_group_level_table(name)) // Throws
-                    goto bad_transact_log;
+                    return false;
                 continue;
             }
             case instr_OptimizeTable: {
                 if (!handler.optimize_table()) // Throws
-                    goto bad_transact_log;
+                    return false;
                 continue;
             }
         }
 
-        goto bad_transact_log;
+        return false;
     }
 
-    return;
-
-  bad_transact_log:
-    throw BadTransactLog();
+    return true;
 }
 
 
 template<class T> T Replication::TransactLogParser::read_int()
 {
     T value = 0;
-    int part;
+    int part = 0;
     const int max_bytes = (std::numeric_limits<T>::digits+1+6)/7;
     for (int i = 0; i != max_bytes; ++i) {
         char c;
@@ -1414,7 +1440,6 @@ inline void Replication::TransactLogParser::read_mixed(Mixed* mixed)
             break;
         case type_Link:
         case type_LinkList:
-        case type_BackLink:
             // FIXME: Need to handle new link types here
             TIGHTDB_ASSERT(false);
             break;
@@ -1445,7 +1470,7 @@ inline bool Replication::TransactLogParser::read_char(char& c)
 
 inline bool Replication::TransactLogParser::is_valid_column_type(int type)
 {
-    switch (type) {
+    switch (DataType(type)) {
         case type_Int:
         case type_Bool:
         case type_Float:
@@ -1455,6 +1480,8 @@ inline bool Replication::TransactLogParser::is_valid_column_type(int type)
         case type_DateTime:
         case type_Table:
         case type_Mixed:
+        case type_Link:
+        case type_LinkList:
             return true;
     }
     return false;

@@ -228,8 +228,9 @@ void Group::detach_table_accessors() TIGHTDB_NOEXCEPT
     iter end = m_table_accessors.end();
     for (iter i = m_table_accessors.begin(); i != end; ++i) {
         if (Table* t = *i) {
-            _impl::TableFriend::detach(*t);
-            _impl::TableFriend::unbind_ref(*t);
+            typedef _impl::TableFriend tf;
+            tf::detach(*t);
+            tf::unbind_ref(*t);
         }
     }
 }
@@ -271,14 +272,19 @@ Table* Group::get_table_by_ndx(size_t ndx)
     // Get table from cache if exists, else create
     Table* table = m_table_accessors[ndx];
     if (!table) {
+        typedef _impl::TableFriend tf;
         ref_type ref = m_tables.get_as_ref(ndx);
-        table = _impl::TableFriend::create_ref_counted(m_alloc, ref, this, ndx); // Throws
+        table = tf::create_ref_counted(m_alloc, ref, this, ndx); // Throws
         m_table_accessors[ndx] = table;
-        _impl::TableFriend::bind_ref(*table); // Increase reference count from 0 to 1
+
+        // Increase reference count from 0 to 1 to make the group accessor keep
+        // the table accessor alive. This extra reference count will be revoked
+        // during destruction of the group accessor.
+        tf::bind_ref(*table);
 
         // The link targets in the table has to be initialized
         // after creation to avoid circular initializations
-        _impl::TableFriend::initialize_link_targets(*table);
+        tf::initialize_link_targets(*table, *this, ndx); // Throws
     }
     return table;
 }
@@ -581,6 +587,8 @@ void Group::update_refs(ref_type top_ref, size_t old_baseline) TIGHTDB_NOEXCEPT
     m_table_names.update_from_parent(old_baseline);
     m_free_positions.update_from_parent(old_baseline);
     m_free_lengths.update_from_parent(old_baseline);
+    if (m_is_shared)
+        m_free_versions.update_from_parent(old_baseline);
 
     // If m_tables has not been modfied we don't
     // need to update attached table accessors
@@ -1047,7 +1055,7 @@ public:
         return true;
     }
 
-    bool insert_column(size_t col_ndx, DataType, StringData)
+    bool insert_column(size_t col_ndx, DataType, StringData, size_t)
     {
         if (m_table) {
             typedef _impl::TableFriend tf;

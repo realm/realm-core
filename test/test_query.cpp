@@ -50,81 +50,86 @@ using namespace tightdb::test_util;
 
 namespace {
 
-TIGHTDB_TABLE_2(TwoIntTable,
-                first,  Int,
-                second, Int)
+    TIGHTDB_TABLE_2(TwoIntTable,
+        first, Int,
+        second, Int)
 
-TIGHTDB_TABLE_1(SingleStringTable,
-                first, String)
+        TIGHTDB_TABLE_1(SingleStringTable,
+        first, String)
 
-TIGHTDB_TABLE_3(TripleTable,
-                first, String,
-                second, String,
-                third, Int)
+        TIGHTDB_TABLE_3(TripleTable,
+        first, String,
+        second, String,
+        third, Int)
 
-TIGHTDB_TABLE_1(OneIntTable,
-                first,  Int)
+        TIGHTDB_TABLE_1(OneIntTable,
+        first, Int)
 
-TIGHTDB_TABLE_2(TupleTableType,
-                first,  Int,
-                second, String)
+        TIGHTDB_TABLE_2(TupleTableType,
+        first, Int,
+        second, String)
 
-TIGHTDB_TABLE_2(TupleTableTypeBin,
-                first,  Int,
-                second, Binary)
+        TIGHTDB_TABLE_2(TupleTableTypeBin,
+        first, Int,
+        second, Binary)
 
-TIGHTDB_TABLE_2(BoolTupleTable,
-                first,  Int,
-                second, Bool)
+        TIGHTDB_TABLE_2(BoolTupleTable,
+        first, Int,
+        second, Bool)
 
-TIGHTDB_TABLE_5(PeopleTable,
-                name,  String,
-                age,   Int,
-                male,  Bool,
-                hired, DateTime,
-                photo, Binary)
+        TIGHTDB_TABLE_5(PeopleTable,
+        name, String,
+        age, Int,
+        male, Bool,
+        hired, DateTime,
+        photo, Binary)
 
-TIGHTDB_TABLE_2(FloatTable,
-                col_float,  Float,
-                col_double, Double)
+        TIGHTDB_TABLE_2(FloatTable,
+        col_float, Float,
+        col_double, Double)
 
-TIGHTDB_TABLE_3(FloatTable3,
-                col_float,  Float,
-                col_double, Double,
-                col_int, Int)
+        TIGHTDB_TABLE_3(FloatTable3,
+        col_float, Float,
+        col_double, Double,
+        col_int, Int)
 
-TIGHTDB_TABLE_3(PHPMinimumCrash,
-                firstname,  String,
-                lastname, String,
-                salary, Int)
+        TIGHTDB_TABLE_3(PHPMinimumCrash,
+        firstname, String,
+        lastname, String,
+        salary, Int)
 
-TIGHTDB_TABLE_3(TableViewSum,
-                col_float,  Float,
-                col_double, Double,
-                col_int, Int)
+        TIGHTDB_TABLE_3(TableViewSum,
+        col_float, Float,
+        col_double, Double,
+        col_int, Int)
 
-TIGHTDB_TABLE_5(GATable,
-                     user_id, String,
-                     country, String,
-                     build,   String,
-                     event_1, Int,
-                     event_2, Int)
+        TIGHTDB_TABLE_5(GATable,
+        user_id, String,
+        country, String,
+        build, String,
+        event_1, Int,
+        event_2, Int)
 
-TIGHTDB_TABLE_2(PeopleTable2,
-                name, String,
-                age, Int)
+        TIGHTDB_TABLE_2(PeopleTable2,
+        name, String,
+        age, Int)
 
-TIGHTDB_TABLE_5(ThreeColTable,
-    first,  Int,
-    second, Float,
-    third, Double,
-    fourth, Bool,
-    fifth, String)
+        TIGHTDB_TABLE_5(ThreeColTable,
+        first, Int,
+        second, Float,
+        third, Double,
+        fourth, Bool,
+        fifth, String)
 
-TIGHTDB_TABLE_3(Books,
-                title,  String,
-                author, String,
-                pages, Int)
+        TIGHTDB_TABLE_3(Books,
+        title, String,
+        author, String,
+        pages, Int)
+
+        TIGHTDB_TABLE_3(Types,
+        ints, Int,
+        strings, String,
+        doubles, Double)
 
 } // anonymous namespace
 
@@ -164,18 +169,18 @@ TEST(Query_Count)
     //   extended to support it)
 
     Random random(random_int<unsigned long>()); // Seed from slow global generator
-    for(int j = 0; j < 100; j++) {
+    for (int j = 0; j < 100; j++) {
         Table table;
         table.add_column(type_Int, "i");
 
         size_t count = 0;
         size_t rows = random.draw_int_mod(5 * TIGHTDB_MAX_LIST_SIZE); // to cross some leaf boundaries
 
-        for(size_t i = 0; i < rows; ++i) {
+        for (size_t i = 0; i < rows; ++i) {
             table.add_empty_row();
             int64_t val = random.draw_int_mod(5);
             table.set_int(0, i, val);
-            if(val == 2)
+            if (val == 2)
                 count++;
         }
 
@@ -261,7 +266,7 @@ TEST(Query_NextGenSyntax)
     CHECK(match == 1);
 
 
-    
+
 
     // This is a demonstration of fallback to old query_engine for the specific cases where it's possible
     // because old engine is faster. This will return a ->less(...) query
@@ -469,14 +474,13 @@ TEST(Query_NextGenSyntax)
     delete first2;
 }
 
-
 TEST(Query_NextGenSyntaxMonkey0)
 {
     // Intended to test eval() for columns in query_expression.hpp which fetch 8 values at a time. This test varies
     // table size to test out-of-bounds bugs.
 
     Random random(random_int<unsigned long>()); // Seed from slow global generator
-    for(int iter = 1; iter < 100 + TEST_DURATION * 10000; iter++)
+    for (int iter = 1; iter < 100 + TEST_DURATION * 10000; iter++)
     {
         const size_t rows = 1 + random.draw_int_mod(2 * TIGHTDB_MAX_LIST_SIZE);
         Table table;
@@ -486,12 +490,12 @@ TEST(Query_NextGenSyntaxMonkey0)
         table.add_column(type_Float, "second");
         table.add_column(type_String, "third");
 
-        for(size_t r = 0; r < rows; r++) {
+        for (size_t r = 0; r < rows; r++) {
             table.add_empty_row();
             // using '% iter' tests different bitwidths
             table.set_int(0, r, random.draw_int_mod(iter));
             table.set_float(1, r, float(random.draw_int_mod(iter)));
-            if(random.draw_bool())
+            if (random.draw_bool())
                 table.set_string(2, r, "a");
             else
                 table.set_string(2, r, "b");
@@ -504,8 +508,8 @@ TEST(Query_NextGenSyntaxMonkey0)
         // without start or limit
         tightdb::TableView tv = q.find_all();
         tvpos = 0;
-        for(size_t r = 0; r < rows; r++) {
-            if(table.get_int(0, r) > table.get_float(1, r) && table.get_string(2, r) == "a") {
+        for (size_t r = 0; r < rows; r++) {
+            if (table.get_int(0, r) > table.get_float(1, r) && table.get_string(2, r) == "a") {
                 tvpos++;
             }
         }
@@ -518,8 +522,8 @@ TEST(Query_NextGenSyntaxMonkey0)
         size_t limit = random.draw_int_mod(rows);
         tv = q.find_all(start, size_t(-1), limit);
         tvpos = 0;
-        for(size_t r = 0; r < rows; r++) {
-            if(r >= start && tvpos < limit && table.get_int(0, r) > table.get_float(1, r) && table.get_string(2, r) == "a") {
+        for (size_t r = 0; r < rows; r++) {
+            if (r >= start && tvpos < limit && table.get_int(0, r) > table.get_float(1, r) && table.get_string(2, r) == "a") {
                 tvpos++;
             }
         }
@@ -532,17 +536,17 @@ TEST(Query_NextGenSyntaxMonkey0)
 TEST(Query_NextGenSyntaxMonkey)
 {
     Random random(random_int<unsigned long>()); // Seed from slow global generator
-    for(int iter = 1; iter < 20 * (TEST_DURATION * TEST_DURATION * TEST_DURATION + 1); iter++) {
+    for (int iter = 1; iter < 20 * (TEST_DURATION * TEST_DURATION * TEST_DURATION + 1); iter++) {
         // Keep at least '* 20' else some tests will give 0 matches and bad coverage
         const size_t rows =
             1 + random.draw_int_mod<size_t>(TIGHTDB_MAX_LIST_SIZE * 20 *
-                                            (TEST_DURATION * TEST_DURATION * TEST_DURATION + 1));
+            (TEST_DURATION * TEST_DURATION * TEST_DURATION + 1));
         Table table;
         table.add_column(type_Int, "first");
         table.add_column(type_Int, "second");
         table.add_column(type_Int, "third");
 
-        for(size_t r = 0; r < rows; r++) {
+        for (size_t r = 0; r < rows; r++) {
             table.add_empty_row();
             // using '% iter' tests different bitwidths
             table.set_int(0, r, random.draw_int_mod(iter));
@@ -557,8 +561,8 @@ TEST(Query_NextGenSyntaxMonkey)
         tightdb::Query q2_0 = table.column<int64_t>(1) == 1;
         tightdb::TableView tv_0 = q2_0.find_all();
         tvpos = 0;
-        for(size_t r = 0; r < rows; r++) {
-            if(table.get_int(1, r) == 1) {
+        for (size_t r = 0; r < rows; r++) {
+            if (table.get_int(1, r) == 1) {
                 CHECK_EQUAL(r, tv_0.get_source_ndx(tvpos));
                 tvpos++;
             }
@@ -569,8 +573,8 @@ TEST(Query_NextGenSyntaxMonkey)
         tightdb::Query q2_1 = (table.column<int64_t>(0) == 0 || table.column<int64_t>(0) == 1) && table.column<int64_t>(1) == 1;
         tightdb::TableView tv_1 = q2_1.find_all();
         tvpos = 0;
-        for(size_t r = 0; r < rows; r++) {
-            if((table.get_int(0, r) == 0 || table.get_int(0, r) == 1) && table.get_int(1, r) == 1) {
+        for (size_t r = 0; r < rows; r++) {
+            if ((table.get_int(0, r) == 0 || table.get_int(0, r) == 1) && table.get_int(1, r) == 1) {
                 CHECK_EQUAL(r, tv_1.get_source_ndx(tvpos));
                 tvpos++;
             }
@@ -582,8 +586,8 @@ TEST(Query_NextGenSyntaxMonkey)
         tightdb::Query q2_2 = table.column<int64_t>(0) == 0 || (table.column<int64_t>(0) == 1 && table.column<int64_t>(1) == 1);
         tightdb::TableView tv_2 = q2_2.find_all();
         tvpos = 0;
-        for(size_t r = 0; r < rows; r++) {
-            if(table.get_int(0, r) == 0 || (table.get_int(0, r) == 1 && table.get_int(1, r) == 1)) {
+        for (size_t r = 0; r < rows; r++) {
+            if (table.get_int(0, r) == 0 || (table.get_int(0, r) == 1 && table.get_int(1, r) == 1)) {
                 CHECK_EQUAL(r, tv_2.get_source_ndx(tvpos));
                 tvpos++;
             }
@@ -595,8 +599,8 @@ TEST(Query_NextGenSyntaxMonkey)
         tightdb::Query q4_8 = table.column<int64_t>(1) == 0 && (table.column<int64_t>(0) == 0 || table.column<int64_t>(0) == 2);
         tightdb::TableView tv_8 = q4_8.find_all();
         tvpos = 0;
-        for(size_t r = 0; r < rows; r++) {
-            if(table.get_int(1, r) == 0 && ((table.get_int(0, r) == 0) || table.get_int(0, r) == 2)) {
+        for (size_t r = 0; r < rows; r++) {
+            if (table.get_int(1, r) == 0 && ((table.get_int(0, r) == 0) || table.get_int(0, r) == 2)) {
                 CHECK_EQUAL(r, tv_8.get_source_ndx(tvpos));
                 tvpos++;
             }
@@ -608,8 +612,8 @@ TEST(Query_NextGenSyntaxMonkey)
         tightdb::Query q3_7 = (table.column<int64_t>(0) == 0 || table.column<int64_t>(0) == 2) && (table.column<int64_t>(0) == 1 || table.column<int64_t>(1) == 1);
         tightdb::TableView tv_7 = q3_7.find_all();
         tvpos = 0;
-        for(size_t r = 0; r < rows; r++) {
-            if((table.get_int(0, r) == 0 || table.get_int(0, r) == 2) && (table.get_int(0, r) == 1 || table.get_int(1, r) == 1)) {
+        for (size_t r = 0; r < rows; r++) {
+            if ((table.get_int(0, r) == 0 || table.get_int(0, r) == 2) && (table.get_int(0, r) == 1 || table.get_int(1, r) == 1)) {
                 CHECK_EQUAL(r, tv_7.get_source_ndx(tvpos));
                 tvpos++;
             }
@@ -621,8 +625,8 @@ TEST(Query_NextGenSyntaxMonkey)
         tightdb::Query q4_7 = (table.column<int64_t>(0) == 0 || table.column<int64_t>(0) == 2) || (table.column<int64_t>(0) == 1 || table.column<int64_t>(1) == 1);
         tightdb::TableView tv_10 = q4_7.find_all();
         tvpos = 0;
-        for(size_t r = 0; r < rows; r++) {
-            if((table.get_int(0, r) == 0 || table.get_int(0, r) == 2) || (table.get_int(0, r) == 1 || table.get_int(1, r) == 1)) {
+        for (size_t r = 0; r < rows; r++) {
+            if ((table.get_int(0, r) == 0 || table.get_int(0, r) == 2) || (table.get_int(0, r) == 1 || table.get_int(1, r) == 1)) {
                 CHECK_EQUAL(r, tv_10.get_source_ndx(tvpos));
                 tvpos++;
             }
@@ -636,8 +640,8 @@ TEST(Query_NextGenSyntaxMonkey)
         tightdb::Query q20 = table.column<int64_t>(0) == 0 || table.column<int64_t>(0) == 2 || table.column<int64_t>(0) == 1 || table.column<int64_t>(1) == 1;
         tv = q20.find_all();
         tvpos = 0;
-        for(size_t r = 0; r < rows; r++) {
-            if(table.get_int(0, r) == 0 || table.get_int(0, r) == 2 || table.get_int(0, r) == 1 || table.get_int(1, r) == 1) {
+        for (size_t r = 0; r < rows; r++) {
+            if (table.get_int(0, r) == 0 || table.get_int(0, r) == 2 || table.get_int(0, r) == 1 || table.get_int(1, r) == 1) {
                 CHECK_EQUAL(r, tv.get_source_ndx(tvpos));
                 tvpos++;
             }
@@ -649,8 +653,8 @@ TEST(Query_NextGenSyntaxMonkey)
         tightdb::Query q21 = table.column<int64_t>(0) * 2 > table.column<int64_t>(1) / 2 + table.column<int64_t>(2) + 1;
         tv = q21.find_all();
         tvpos = 0;
-        for(size_t r = 0; r < rows; r++) {
-            if(table.get_int(0, r) * 2 > table.get_int(1, r) / 2 + table.get_int(2, r) + 1) {
+        for (size_t r = 0; r < rows; r++) {
+            if (table.get_int(0, r) * 2 > table.get_int(1, r) / 2 + table.get_int(2, r) + 1) {
                 CHECK_EQUAL(r, tv.get_source_ndx(tvpos));
                 tvpos++;
             }
@@ -661,8 +665,8 @@ TEST(Query_NextGenSyntaxMonkey)
         tightdb::Query q22 = table.column<int64_t>(0) * 2 > table.column<int64_t>(1) / 2 + table.column<int64_t>(2) + 1 + table.column<int64_t>(2) - table.column<int64_t>(2) + table.column<int64_t>(2) - table.column<int64_t>(2) + table.column<int64_t>(2) - table.column<int64_t>(2) + table.column<int64_t>(2) - table.column<int64_t>(2) + table.column<int64_t>(2) - table.column<int64_t>(2);
         tv = q22.find_all();
         tvpos = 0;
-        for(size_t r = 0; r < rows; r++) {
-            if(table.get_int(0, r) * 2 > table.get_int(1, r) / 2 + table.get_int(2, r) + 1) {
+        for (size_t r = 0; r < rows; r++) {
+            if (table.get_int(0, r) * 2 > table.get_int(1, r) / 2 + table.get_int(2, r) + 1) {
                 CHECK_EQUAL(r, tv.get_source_ndx(tvpos));
                 tvpos++;
             }
@@ -720,7 +724,7 @@ TEST(Query_MergeQueriesOverloads)
 
 
 
-        // q1_0 && q2_0
+    // q1_0 && q2_0
     tightdb::Query q1_110 = table.where().equal(0, 20);
     tightdb::Query q2_110 = table.where().equal(1, 30);
     tightdb::Query q3_110 = q1_110.and_query(q2_110);
@@ -801,63 +805,63 @@ TEST(NotQueries)
     table.set_int(1, 2, 20);
 
     // should apply not to single term, leading to query "not A" with two matching entries:
-    tightdb::Query q0 = table.where().Not().equal(0,10);
-    CHECK_EQUAL(2,q0.count());
+    tightdb::Query q0 = table.where().Not().equal(0, 10);
+    CHECK_EQUAL(2, q0.count());
 
     // grouping, after not
-    tightdb::Query q0b = table.where().Not().group().equal(0,10).end_group();
-    CHECK_EQUAL(2,q0b.count());
+    tightdb::Query q0b = table.where().Not().group().equal(0, 10).end_group();
+    CHECK_EQUAL(2, q0b.count());
 
     // grouping, surrounding not
-    tightdb::Query q0c = table.where().group().Not().equal(0,10).end_group();
-    CHECK_EQUAL(2,q0c.count());
+    tightdb::Query q0c = table.where().group().Not().equal(0, 10).end_group();
+    CHECK_EQUAL(2, q0c.count());
 
     // nested nots (implicit grouping)
-    tightdb::Query q0d = table.where().Not().Not().equal(0,10);
-    CHECK_EQUAL(1,q0d.count());  // FAILS
+    tightdb::Query q0d = table.where().Not().Not().equal(0, 10);
+    CHECK_EQUAL(1, q0d.count());  // FAILS
 
-    tightdb::Query q0e = table.where().Not().Not().Not().equal(0,10);
-    CHECK_EQUAL(2,q0e.count());  // FAILS
+    tightdb::Query q0e = table.where().Not().Not().Not().equal(0, 10);
+    CHECK_EQUAL(2, q0e.count());  // FAILS
 
     // just checking the above
-    tightdb::Query q0f = table.where().Not().not_equal(0,10);
-    CHECK_EQUAL(1,q0f.count());
+    tightdb::Query q0f = table.where().Not().not_equal(0, 10);
+    CHECK_EQUAL(1, q0f.count());
 
-    tightdb::Query q0g = table.where().Not().Not().not_equal(0,10);
-    CHECK_EQUAL(2,q0g.count());   // FAILS
+    tightdb::Query q0g = table.where().Not().Not().not_equal(0, 10);
+    CHECK_EQUAL(2, q0g.count());   // FAILS
 
-    tightdb::Query q0h = table.where().not_equal(0,10);
-    CHECK_EQUAL(2,q0h.count());
-
-    // should apply not to first term, leading to query "not A and A", which is obviously empty:
-    tightdb::Query q1 = table.where().Not().equal(0,10).equal(0,10);
-    CHECK_EQUAL(0,q1.count());
+    tightdb::Query q0h = table.where().not_equal(0, 10);
+    CHECK_EQUAL(2, q0h.count());
 
     // should apply not to first term, leading to query "not A and A", which is obviously empty:
-    tightdb::Query q1b = table.where().group().Not().equal(0,10).end_group().equal(0,10);
-    CHECK_EQUAL(0,q1b.count());
+    tightdb::Query q1 = table.where().Not().equal(0, 10).equal(0, 10);
+    CHECK_EQUAL(0, q1.count());
 
     // should apply not to first term, leading to query "not A and A", which is obviously empty:
-    tightdb::Query q1c = table.where().Not().group().equal(0,10).end_group().equal(0,10);
-    CHECK_EQUAL(0,q1c.count());
+    tightdb::Query q1b = table.where().group().Not().equal(0, 10).end_group().equal(0, 10);
+    CHECK_EQUAL(0, q1b.count());
+
+    // should apply not to first term, leading to query "not A and A", which is obviously empty:
+    tightdb::Query q1c = table.where().Not().group().equal(0, 10).end_group().equal(0, 10);
+    CHECK_EQUAL(0, q1c.count());
 
 
     // should apply not to second term, leading to query "A and not A", which is obviously empty:
-    tightdb::Query q2 = table.where().equal(0,10).Not().equal(0,10);
-    CHECK_EQUAL(0,q2.count()); // FAILS
+    tightdb::Query q2 = table.where().equal(0, 10).Not().equal(0, 10);
+    CHECK_EQUAL(0, q2.count()); // FAILS
 
     // should apply not to second term, leading to query "A and not A", which is obviously empty:
-    tightdb::Query q2b = table.where().equal(0,10).group().Not().equal(0,10).end_group();
-    CHECK_EQUAL(0,q2b.count());
+    tightdb::Query q2b = table.where().equal(0, 10).group().Not().equal(0, 10).end_group();
+    CHECK_EQUAL(0, q2b.count());
 
     // should apply not to second term, leading to query "A and not A", which is obviously empty:
-    tightdb::Query q2c = table.where().equal(0,10).Not().group().equal(0,10).end_group();
-    CHECK_EQUAL(0,q2c.count()); // FAILS
+    tightdb::Query q2c = table.where().equal(0, 10).Not().group().equal(0, 10).end_group();
+    CHECK_EQUAL(0, q2c.count()); // FAILS
 
 
     // should apply not to both terms, leading to query "not A and not A", which has 2 members
-    tightdb::Query q3 = table.where().Not().equal(0,10).Not().equal(0,10);
-    CHECK_EQUAL(2,q3.count());  // FAILS
+    tightdb::Query q3 = table.where().Not().equal(0, 10).Not().equal(0, 10);
+    CHECK_EQUAL(2, q3.count());  // FAILS
 
     // applying not to an empty query is forbidden
     tightdb::Query q4 = table.where();
@@ -869,14 +873,14 @@ TEST(NotQueries)
 TEST(Query_MergeQueriesMonkey)
 {
     Random random(random_int<unsigned long>()); // Seed from slow global generator
-    for(int iter = 0; iter < 5; iter++) {
+    for (int iter = 0; iter < 5; iter++) {
         const size_t rows = TIGHTDB_MAX_LIST_SIZE * 4;
         Table table;
         table.add_column(type_Int, "first");
         table.add_column(type_Int, "second");
         table.add_column(type_Int, "third");
 
-        for(size_t r = 0; r < rows; r++) {
+        for (size_t r = 0; r < rows; r++) {
             table.add_empty_row();
             table.set_int(0, r, random.draw_int_mod(3));
             table.set_int(1, r, random.draw_int_mod(3));
@@ -890,8 +894,8 @@ TEST(Query_MergeQueriesMonkey)
         tightdb::Query q2_0 = table.where().and_query(q1_0);
         tightdb::TableView tv_0 = q2_0.find_all();
         tvpos = 0;
-        for(size_t r = 0; r < rows; r++) {
-            if(table.get_int(1, r) == 1) {
+        for (size_t r = 0; r < rows; r++) {
+            if (table.get_int(1, r) == 1) {
                 CHECK_EQUAL(r, tv_0.get_source_ndx(tvpos));
                 tvpos++;
             }
@@ -902,8 +906,8 @@ TEST(Query_MergeQueriesMonkey)
         tightdb::Query q2_1 = table.where().group().equal(0, 0).Or().equal(0, 1).end_group().and_query(q1_1);
         tightdb::TableView tv_1 = q2_1.find_all();
         tvpos = 0;
-        for(size_t r = 0; r < rows; r++) {
-            if((table.get_int(0, r) == 0 || table.get_int(0, r) == 1) && table.get_int(1, r) == 1) {
+        for (size_t r = 0; r < rows; r++) {
+            if ((table.get_int(0, r) == 0 || table.get_int(0, r) == 1) && table.get_int(1, r) == 1) {
                 CHECK_EQUAL(r, tv_1.get_source_ndx(tvpos));
                 tvpos++;
             }
@@ -914,8 +918,8 @@ TEST(Query_MergeQueriesMonkey)
         tightdb::Query q2_2 = table.where().equal(0, 0).Or().equal(0, 1).and_query(q1_2);
         tightdb::TableView tv_2 = q2_2.find_all();
         tvpos = 0;
-        for(size_t r = 0; r < rows; r++) {
-            if(table.get_int(0, r) == 0 || (table.get_int(0, r) == 1 && table.get_int(1, r) == 1)) {
+        for (size_t r = 0; r < rows; r++) {
+            if (table.get_int(0, r) == 0 || (table.get_int(0, r) == 1 && table.get_int(1, r) == 1)) {
                 CHECK_EQUAL(r, tv_2.get_source_ndx(tvpos));
                 tvpos++;
             }
@@ -926,8 +930,8 @@ TEST(Query_MergeQueriesMonkey)
         tightdb::Query q2_3 = table.where().and_query(q1_3).Or().equal(0, 1).equal(1, 1);
         tightdb::TableView tv_3 = q2_3.find_all();
         tvpos = 0;
-        for(size_t r = 0; r < rows; r++) {
-            if(table.get_int(0, r) == 0 || (table.get_int(0, r) == 1 && table.get_int(1, r) == 1)) {
+        for (size_t r = 0; r < rows; r++) {
+            if (table.get_int(0, r) == 0 || (table.get_int(0, r) == 1 && table.get_int(1, r) == 1)) {
                 CHECK_EQUAL(r, tv_3.get_source_ndx(tvpos));
                 tvpos++;
             }
@@ -939,8 +943,8 @@ TEST(Query_MergeQueriesMonkey)
         tightdb::Query q1_4 = table.where().equal(0, 0).Or().and_query(q2_4);
         tightdb::TableView tv_4 = q1_4.find_all();
         tvpos = 0;
-        for(size_t r = 0; r < rows; r++) {
-            if(table.get_int(0, r) == 0 || (table.get_int(0, r) == 1 && table.get_int(1, r) == 1)) {
+        for (size_t r = 0; r < rows; r++) {
+            if (table.get_int(0, r) == 0 || (table.get_int(0, r) == 1 && table.get_int(1, r) == 1)) {
                 CHECK_EQUAL(r, tv_4.get_source_ndx(tvpos));
                 tvpos++;
             }
@@ -953,8 +957,8 @@ TEST(Query_MergeQueriesMonkey)
         tightdb::Query q3_5 = table.where().and_query(q2_5).Or().and_query(q1_5);
         tightdb::TableView tv_5 = q3_5.find_all();
         tvpos = 0;
-        for(size_t r = 0; r < rows; r++) {
-            if((table.get_int(0, r) == 0 || table.get_int(0, r) == 2) || (table.get_int(0, r) == 1 && table.get_int(1, r) == 1)) {
+        for (size_t r = 0; r < rows; r++) {
+            if ((table.get_int(0, r) == 0 || table.get_int(0, r) == 2) || (table.get_int(0, r) == 1 && table.get_int(1, r) == 1)) {
                 CHECK_EQUAL(r, tv_5.get_source_ndx(tvpos));
                 tvpos++;
             }
@@ -967,8 +971,8 @@ TEST(Query_MergeQueriesMonkey)
         tightdb::Query q3_6 = table.where().and_query(q1_6).and_query(q2_6);
         tightdb::TableView tv_6 = q3_6.find_all();
         tvpos = 0;
-        for(size_t r = 0; r < rows; r++) {
-            if(table.get_int(0, r) == 0 && table.get_int(1, r) == 1) {
+        for (size_t r = 0; r < rows; r++) {
+            if (table.get_int(0, r) == 0 && table.get_int(1, r) == 1) {
                 CHECK_EQUAL(r, tv_6.get_source_ndx(tvpos));
                 tvpos++;
             }
@@ -980,8 +984,8 @@ TEST(Query_MergeQueriesMonkey)
         tightdb::Query q3_7 = table.where().and_query(q2_7).and_query(q1_7);
         tightdb::TableView tv_7 = q3_7.find_all();
         tvpos = 0;
-        for(size_t r = 0; r < rows; r++) {
-            if((table.get_int(0, r) == 0 || table.get_int(0, r) == 2) && (table.get_int(0, r) == 1 || table.get_int(1, r) == 1)) {
+        for (size_t r = 0; r < rows; r++) {
+            if ((table.get_int(0, r) == 0 || table.get_int(0, r) == 2) && (table.get_int(0, r) == 1 || table.get_int(1, r) == 1)) {
                 CHECK_EQUAL(r, tv_7.get_source_ndx(tvpos));
                 tvpos++;
             }
@@ -995,8 +999,8 @@ TEST(Query_MergeQueriesMonkey)
         tightdb::Query q4_8 = table.where().equal(1, 0).and_query(q3_8);
         tightdb::TableView tv_8 = q4_8.find_all();
         tvpos = 0;
-        for(size_t r = 0; r < rows; r++) {
-            if(table.get_int(1, r) == 0 && ((table.get_int(0, r) == 0) || table.get_int(0, r) == 2)) {
+        for (size_t r = 0; r < rows; r++) {
+            if (table.get_int(1, r) == 0 && ((table.get_int(0, r) == 0) || table.get_int(0, r) == 2)) {
                 CHECK_EQUAL(r, tv_8.get_source_ndx(tvpos));
                 tvpos++;
             }
@@ -1012,8 +1016,8 @@ TEST(Query_MergeQueriesMonkey)
         tightdb::Query q4_9 = table.where().equal(1, 0).and_query(q3_9);
         tightdb::TableView tv_9 = q4_9.find_all();
         tvpos = 0;
-        for(size_t r = 0; r < rows; r++) {
-            if(table.get_int(1, r) == 0 && ((table.get_int(0, r) == 0) || table.get_int(0, r) == 2)) {
+        for (size_t r = 0; r < rows; r++) {
+            if (table.get_int(1, r) == 0 && ((table.get_int(0, r) == 0) || table.get_int(0, r) == 2)) {
                 CHECK_EQUAL(r, tv_9.get_source_ndx(tvpos));
                 tvpos++;
             }
@@ -1029,8 +1033,8 @@ TEST(Query_MergeQueriesMonkey)
         tightdb::Query q4_10 = table.where().and_query(q3_10);
         tightdb::TableView tv_10 = q4_10.find_all();
         tvpos = 0;
-        for(size_t r = 0; r < rows; r++) {
-            if(table.get_int(0, r) == 0) {
+        for (size_t r = 0; r < rows; r++) {
+            if (table.get_int(0, r) == 0) {
                 CHECK_EQUAL(r, tv_10.get_source_ndx(tvpos));
                 tvpos++;
             }
@@ -1047,7 +1051,7 @@ TEST(Query_MergeQueriesMonkey)
 TEST(Query_MergeQueriesMonkeyOverloads)
 {
     Random random(random_int<unsigned long>()); // Seed from slow global generator
-    for(int iter = 0; iter < 5; iter++) {
+    for (int iter = 0; iter < 5; iter++) {
         const size_t rows = TIGHTDB_MAX_LIST_SIZE * 4;
         Table table;
         table.add_column(type_Int, "first");
@@ -1055,7 +1059,7 @@ TEST(Query_MergeQueriesMonkeyOverloads)
         table.add_column(type_Int, "third");
 
 
-        for(size_t r = 0; r < rows; r++) {
+        for (size_t r = 0; r < rows; r++) {
             table.add_empty_row();
             table.set_int(0, r, random.draw_int_mod(3));
             table.set_int(1, r, random.draw_int_mod(3));
@@ -1070,8 +1074,8 @@ TEST(Query_MergeQueriesMonkeyOverloads)
         tightdb::Query q2_0 = table.where() && q1_0;
         tightdb::TableView tv_0 = q2_0.find_all();
         tvpos = 0;
-        for(size_t r = 0; r < rows; r++) {
-            if(table.get_int(1, r) == 1) {
+        for (size_t r = 0; r < rows; r++) {
+            if (table.get_int(1, r) == 1) {
                 CHECK_EQUAL(r, tv_0.get_source_ndx(tvpos));
                 tvpos++;
             }
@@ -1083,8 +1087,8 @@ TEST(Query_MergeQueriesMonkeyOverloads)
         tightdb::Query q2_10 = q1_10 && table.where();
         tightdb::TableView tv_10 = q2_10.find_all();
         tvpos = 0;
-        for(size_t r = 0; r < rows; r++) {
-            if(table.get_int(1, r) == 1) {
+        for (size_t r = 0; r < rows; r++) {
+            if (table.get_int(1, r) == 1) {
                 CHECK_EQUAL(r, tv_10.get_source_ndx(tvpos));
                 tvpos++;
             }
@@ -1099,8 +1103,8 @@ TEST(Query_MergeQueriesMonkeyOverloads)
 
         tightdb::TableView tv_1 = q5_1.find_all();
         tvpos = 0;
-        for(size_t r = 0; r < rows; r++) {
-            if((table.get_int(0, r) == 0 || table.get_int(0, r) == 1) && table.get_int(1, r) == 1) {
+        for (size_t r = 0; r < rows; r++) {
+            if ((table.get_int(0, r) == 0 || table.get_int(0, r) == 1) && table.get_int(1, r) == 1) {
                 CHECK_EQUAL(r, tv_1.get_source_ndx(tvpos));
                 tvpos++;
             }
@@ -1110,8 +1114,8 @@ TEST(Query_MergeQueriesMonkeyOverloads)
         tightdb::Query q1_20 = table.where().equal(0, 0).Or().equal(0, 1) && table.where().equal(1, 1);
         tightdb::TableView tv_20 = q1_20.find_all();
         tvpos = 0;
-        for(size_t r = 0; r < rows; r++) {
-            if((table.get_int(0, r) == 0 || table.get_int(0, r) == 1) && table.get_int(1, r) == 1) {
+        for (size_t r = 0; r < rows; r++) {
+            if ((table.get_int(0, r) == 0 || table.get_int(0, r) == 1) && table.get_int(1, r) == 1) {
                 CHECK_EQUAL(r, tv_20.get_source_ndx(tvpos));
                 tvpos++;
             }
@@ -1124,8 +1128,8 @@ TEST(Query_MergeQueriesMonkeyOverloads)
         tightdb::Query q4_3 = q1_3 || (q2_3 && q3_3);
         tightdb::TableView tv_3 = q4_3.find_all();
         tvpos = 0;
-        for(size_t r = 0; r < rows; r++) {
-            if(table.get_int(0, r) == 0 || (table.get_int(0, r) == 1 && table.get_int(1, r) == 1)) {
+        for (size_t r = 0; r < rows; r++) {
+            if (table.get_int(0, r) == 0 || (table.get_int(0, r) == 1 && table.get_int(1, r) == 1)) {
                 CHECK_EQUAL(r, tv_3.get_source_ndx(tvpos));
                 tvpos++;
             }
@@ -1138,8 +1142,8 @@ TEST(Query_MergeQueriesMonkeyOverloads)
         tightdb::Query q4_30 = table.where().equal(0, 0) || (table.where().equal(0, 1) && q3_30);
         tightdb::TableView tv_30 = q4_30.find_all();
         tvpos = 0;
-        for(size_t r = 0; r < rows; r++) {
-            if(table.get_int(0, r) == 0 || (table.get_int(0, r) == 1 && table.get_int(1, r) == 1)) {
+        for (size_t r = 0; r < rows; r++) {
+            if (table.get_int(0, r) == 0 || (table.get_int(0, r) == 1 && table.get_int(1, r) == 1)) {
                 CHECK_EQUAL(r, tv_30.get_source_ndx(tvpos));
                 tvpos++;
             }
@@ -1155,11 +1159,11 @@ TEST(Query_CountLimit)
 {
     PeopleTable2 table;
 
-    table.add("Mary",  14);
-    table.add("Joe",   17);
+    table.add("Mary", 14);
+    table.add("Joe", 17);
     table.add("Alice", 42);
-    table.add("Jack",  22);
-    table.add("Bob",   50);
+    table.add("Jack", 22);
+    table.add("Bob", 50);
     table.add("Frank", 12);
 
     // Select rows where age < 18
@@ -1180,7 +1184,7 @@ TEST(Query_CountLimit)
 
 TEST(Query_Expressions0)
 {
-/*
+    /*
     We have following variables to vary in the tests:
 
     left        right
@@ -1190,7 +1194,7 @@ TEST(Query_Expressions0)
     float       int         double      int64_t
 
     Many of them are combined and tested together in equality classes below
-*/
+    */
     Table table;
     table.add_column(type_Int, "first1");
     table.add_column(type_Float, "second1");
@@ -1537,21 +1541,21 @@ TEST(Query_StrIndexCrash)
     // Rasmus "8" index crash
     Random random(random_int<unsigned long>()); // Seed from slow global generator
 
-    for(int iter = 0; iter < 5; ++iter) {
+    for (int iter = 0; iter < 5; ++iter) {
         Group group;
         TableRef table = group.get_table("test");
         table->add_column(type_String, "first");
 
         size_t eights = 0;
 
-        for(int i = 0; i < TIGHTDB_MAX_LIST_SIZE * 2; ++i) {
+        for (int i = 0; i < TIGHTDB_MAX_LIST_SIZE * 2; ++i) {
             int v = random.draw_int_mod(10);
-            if(v == 8) {
+            if (v == 8) {
                 eights++;
             }
             char dst[100];
             memset(dst, 0, sizeof(dst));
-            sprintf(dst,"%d",v);
+            sprintf(dst, "%d", v);
             table->insert_string(0, i, dst);
             table->insert_done();
         }
@@ -1809,7 +1813,7 @@ TEST(Query_Huge)
         size_t start = random.draw_int_mod(3000);
         size_t end = start + random.draw_int_mod(3000 - start);
         size_t limit;
-        if(random.draw_bool())
+        if (random.draw_bool())
             limit = random.draw_int_mod(5000);
         else
             limit = size_t(-1);
@@ -1868,9 +1872,9 @@ TEST(Query_Huge)
             else
                 third = 2;
 
-            tt[row].first  = first;
+            tt[row].first = first;
             tt[row].second = second;
-            tt[row].third  = third;
+            tt[row].third = third;
 
             if ((row >= start && row < end && limit > res1) && (first == "A" && second == "A" && third == 1))
                 res1++;
@@ -1945,14 +1949,12 @@ TEST(Query_Huge)
     }
 }
 
-
 TEST(Query_OnTableView)
 {
-    // This tableview(tv) method is deprecated! It requires tv to be sorted. Use where(&tv) instead.
     Random random;
 
     // Mostly intended to test the Array::FindGTE method
-    for(int iter = 0; iter < 100 * (1 + TEST_DURATION * TEST_DURATION * TEST_DURATION * TEST_DURATION * TEST_DURATION); iter++) {
+    for (int iter = 0; iter < 100 * (1 + TEST_DURATION * TEST_DURATION * TEST_DURATION * TEST_DURATION * TEST_DURATION); iter++) {
         random.seed(164);
         OneIntTable oti;
         size_t cnt1 = 0;
@@ -1962,13 +1964,13 @@ TEST(Query_OnTableView)
         size_t lbound = random.draw_int_mod(TIGHTDB_MAX_LIST_SIZE * 10);
         size_t ubound = lbound + random.draw_int_mod(TIGHTDB_MAX_LIST_SIZE * 10 - lbound);
 
-        for(size_t i = 0; i < TIGHTDB_MAX_LIST_SIZE * 10; i++) {
+        for (size_t i = 0; i < TIGHTDB_MAX_LIST_SIZE * 10; i++) {
             int v = random.draw_int_mod(3);
 
-            if(v == 1 && i >= lbound && i < ubound && cnt0 < limit)
+            if (v == 1 && i >= lbound && i < ubound && cnt0 < limit)
                 cnt1++;
 
-            if(v != 0 && i >= lbound && i < ubound )
+            if (v != 0 && i >= lbound && i < ubound)
                 cnt0++;
 
             oti.add(v);
@@ -1977,8 +1979,14 @@ TEST(Query_OnTableView)
         OneIntTable::View v = oti.where().first.not_equal(0).find_all(lbound, ubound, limit);
         size_t cnt2 = oti.where().tableview(v).first.equal(1).count();
 
+        if (cnt1 != cnt2)
+            cerr << iter << " ";
+
         CHECK_EQUAL(cnt1, cnt2);
+
+
     }
+
 }
 
 TEST(Query_OnTableView_where)
@@ -2015,6 +2023,7 @@ TEST(Query_OnTableView_where)
 }
 
 
+
 TEST(Query_StrIndex3)
 {
     // Create two columns where query match-density varies alot throughout the rows. This forces the query engine to
@@ -2043,7 +2052,7 @@ TEST(Query_StrIndex3)
             // edge case)
             int f1 = random.draw_int_mod(TIGHTDB_MAX_LIST_SIZE) / 2 + 1;
             int f2 = random.draw_int_mod(TIGHTDB_MAX_LIST_SIZE) / 2 + 1;
-            bool longstrings = random.chance(1,5);
+            bool longstrings = random.chance(1, 5);
 
             // 2200 entries with that probability to fill out two concecutive 1000 sized leaves with above probability,
             // plus a remainder (edge case)
@@ -2161,7 +2170,7 @@ TEST(Query_StrEnum)
         ttt.clear();
         aa = 0;
         for (size_t t = 0; t < TIGHTDB_MAX_LIST_SIZE * 2; ++t) {
-            if (random.chance(1,3)) {
+            if (random.chance(1, 3)) {
                 ttt.add(1, "AA");
                 ++aa;
             }
@@ -2195,7 +2204,7 @@ TEST(Query_StrIndex)
         TupleTableType ttt;
         aa = 0;
         for (size_t t = 0; t < iterb; t++) {
-            if (random.chance(1,3)) {
+            if (random.chance(1, 3)) {
                 ttt.add(1, "AA");
                 aa++;
             }
@@ -2301,8 +2310,6 @@ TEST(Query_Float3)
     int64_t a8 = q8.col_int.sum();
     CHECK_EQUAL(15, a8);
 }
-
-
 
 TEST(Query_Float3_where)
 {
@@ -2457,29 +2464,29 @@ TEST(Query_Float)
     // ------ Test sum()
     // ... NO conditions
     double sum1_d = 2.20 + 2.21 + 2.22 + 2.20 + 3.20;
-    CHECK_APPROXIMATELY_EQUAL(sum1_d, t.where().col_double.sum(), 10*epsilon);
+    CHECK_APPROXIMATELY_EQUAL(sum1_d, t.where().col_double.sum(), 10 * epsilon);
 
     // Note: sum of float is calculated by having a double aggregate to where each float is added
     // (thereby getting casted to double).
     double sum1_f = double(1.10f) + double(1.13f) + double(1.13f) + double(1.10f) + double(1.20f);
     double res = t.where().col_float.sum();
-    CHECK_APPROXIMATELY_EQUAL(sum1_f, res, 10*epsilon);
+    CHECK_APPROXIMATELY_EQUAL(sum1_f, res, 10 * epsilon);
 
     // ... with conditions
     double sum2_f = double(1.13f) + double(1.20f);
     double sum2_d = 2.21 + 3.20;
     FloatTable::Query q2 = t.where().col_float.between(1.13f, 1.20f).col_double.not_equal(2.22);
-    CHECK_APPROXIMATELY_EQUAL(sum2_f, q2.col_float.sum(), 10*epsilon);
-    CHECK_APPROXIMATELY_EQUAL(sum2_d, q2.col_double.sum(), 10*epsilon);
+    CHECK_APPROXIMATELY_EQUAL(sum2_f, q2.col_float.sum(), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(sum2_d, q2.col_double.sum(), 10 * epsilon);
 
     // ------ Test average()
 
     // ... NO conditions
-    CHECK_APPROXIMATELY_EQUAL(sum1_f/5, t.where().col_float.average(), 10*epsilon);
-    CHECK_APPROXIMATELY_EQUAL(sum1_d/5, t.where().col_double.average(), 10*epsilon);
+    CHECK_APPROXIMATELY_EQUAL(sum1_f / 5, t.where().col_float.average(), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(sum1_d / 5, t.where().col_double.average(), 10 * epsilon);
     // ... with conditions
-    CHECK_APPROXIMATELY_EQUAL(sum2_f/2, q2.col_float.average(), 10*epsilon);
-    CHECK_APPROXIMATELY_EQUAL(sum2_d/2, q2.col_double.average(), 10*epsilon);
+    CHECK_APPROXIMATELY_EQUAL(sum2_f / 2, q2.col_float.average(), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(sum2_d / 2, q2.col_double.average(), 10 * epsilon);
 
     // -------- Test minimum(), maximum()
 
@@ -2523,13 +2530,13 @@ TEST(Query_DateQuery)
 {
     PeopleTable table;
 
-    table.add("Mary",  28, false, tightdb::DateTime(2012,  1, 24), tightdb::BinaryData("bin \0\n data 1", 13));
-    table.add("Frank", 56, true,  tightdb::DateTime(2008,  4, 15), tightdb::BinaryData("bin \0\n data 2", 13));
-    table.add("Bob",   24, true,  tightdb::DateTime(2010, 12,  1), tightdb::BinaryData("bin \0\n data 3", 13));
+    table.add("Mary", 28, false, tightdb::DateTime(2012, 1, 24), tightdb::BinaryData("bin \0\n data 1", 13));
+    table.add("Frank", 56, true, tightdb::DateTime(2008, 4, 15), tightdb::BinaryData("bin \0\n data 2", 13));
+    table.add("Bob", 24, true, tightdb::DateTime(2010, 12, 1), tightdb::BinaryData("bin \0\n data 3", 13));
 
     // Find people where hired year == 2012 (hour:minute:second is default initialized to 00:00:00)
     PeopleTable::View view5 = table.where().hired.greater_equal(tightdb::DateTime(2012, 1, 1).get_datetime())
-                                           .hired.less(         tightdb::DateTime(2013, 1, 1).get_datetime()).find_all();
+        .hired.less(tightdb::DateTime(2013, 1, 1).get_datetime()).find_all();
     CHECK_EQUAL(1, view5.size());
     CHECK_EQUAL("Mary", view5[0].name);
 }
@@ -2553,7 +2560,7 @@ TEST(Query_StrIndexedEnum)
     ttt.column().second.set_index();
 
     int64_t s = ttt.where().second.equal("a").first.sum();
-    CHECK_EQUAL(10*11, s);
+    CHECK_EQUAL(10 * 11, s);
 
     s = ttt.where().second.equal("a").first.equal(10).first.sum();
     CHECK_EQUAL(100, s);
@@ -2562,7 +2569,7 @@ TEST(Query_StrIndexedEnum)
     CHECK_EQUAL(100, s);
 
     TupleTableType::View tv = ttt.where().second.equal("a").find_all();
-    CHECK_EQUAL(10*2, tv.size());
+    CHECK_EQUAL(10 * 2, tv.size());
 }
 
 
@@ -2582,7 +2589,7 @@ TEST(Query_StrIndexedNonEnum)
     ttt.column().second.set_index();
 
     int64_t s = ttt.where().second.equal("a").first.sum();
-    CHECK_EQUAL(10*11, s);
+    CHECK_EQUAL(10 * 11, s);
 
     s = ttt.where().second.equal("a").first.equal(10).first.sum();
     CHECK_EQUAL(100, s);
@@ -2591,7 +2598,7 @@ TEST(Query_StrIndexedNonEnum)
     CHECK_EQUAL(100, s);
 
     TupleTableType::View tv = ttt.where().second.equal("a").find_all();
-    CHECK_EQUAL(10*2, tv.size());
+    CHECK_EQUAL(10 * 2, tv.size());
 }
 
 TEST(Query_FindAllContains2_2)
@@ -2608,7 +2615,7 @@ TEST(Query_FindAllContains2_2)
     ttt.add(7, "fobar");
     ttt.add(8, "oobar");
 
-// FIXME: UTF-8 case handling is only implemented on msw for now
+    // FIXME: UTF-8 case handling is only implemented on msw for now
     TupleTableType::Query q1 = ttt.where().second.contains("foO", false);
     TupleTableType::View tv1 = q1.find_all();
     CHECK_EQUAL(6, tv1.size());
@@ -2887,29 +2894,6 @@ TEST(Query_DeleteLimit)
 }
 
 
-TEST(Query_DeleteLimit_where)
-{
-    TwoIntTable ttt;
-
-    ttt.add(0, 50);
-    ttt.add(1, 40);
-    ttt.add(2, 30);
-    ttt.add(3, 20);
-    ttt.add(4, 10);
-    ttt.add(5, 00);
-
-    TwoIntTable::View v = ttt.where().second.greater_equal(0).find_all();
-    TwoIntTable::Query q2 = ttt.where(&v).second.greater_equal(0);
-
-    size_t r = q2.remove(1, 4, 2);
-
-    CHECK_EQUAL(2, r);
-    CHECK_EQUAL(4, ttt.size());
-    CHECK_EQUAL(0, ttt[0].first);
-    CHECK_EQUAL(3, ttt[1].first);
-    CHECK_EQUAL(4, ttt[2].first);
-    CHECK_EQUAL(5, ttt[3].first);
-}
 
 TEST(Query_Simple)
 {
@@ -2968,11 +2952,11 @@ TEST(Query_Subtable)
 
     // Create specification with sub-table
     DescriptorRef sub_1;
-    table->add_column(type_Int,    "first");
+    table->add_column(type_Int, "first");
     table->add_column(type_String, "second");
-    table->add_column(type_Table,  "third", &sub_1);
-    sub_1->add_column(type_Int,      "sub_first");
-    sub_1->add_column(type_String,   "sub_second");
+    table->add_column(type_Table, "third", &sub_1);
+    sub_1->add_column(type_Int, "sub_first");
+    sub_1->add_column(type_String, "sub_second");
     sub_1.reset();
 
     CHECK_EQUAL(3, table->get_column_count());
@@ -3077,15 +3061,15 @@ TEST(Query_SubtableBug)
     TableRef table = group.get_table("test");
 
     // Create specification with sub-table
-    table->add_column(type_Int,   "col 0");
+    table->add_column(type_Int, "col 0");
     DescriptorRef sub;
     table->add_column(type_Table, "col 1", &sub);
     sub->add_column(type_Int, "sub 0");
     sub->add_column(type_String, "sub 1");
-    sub->add_column(type_Bool,   "sub 2");
+    sub->add_column(type_Bool, "sub 2");
     CHECK_EQUAL(2, table->get_column_count());
 
-    for (int i=0; i<5; i++) {
+    for (int i = 0; i<5; i++) {
         table->insert_int(0, i, 100);
         table->insert_subtable(1, i);
         table->insert_done();
@@ -3110,13 +3094,13 @@ TEST(Query_SubtableBug)
 // Disabled because assert has now been added to disallow adding rows when no columns exist
 TEST(Query_SubtableViewSizeBug)
 {
-    Table table;
-    table.add_column(type_Table, "subtab");
-    table.add_empty_row(1);
-    TableRef subtab = table.get_subtable(0,0);
-    subtab->add_empty_row(1);
-    TableView subview = subtab->where().find_all();
-    CHECK_EQUAL(1, subview.size());
+Table table;
+table.add_column(type_Table, "subtab");
+table.add_empty_row(1);
+TableRef subtab = table.get_subtable(0,0);
+subtab->add_empty_row(1);
+TableView subview = subtab->where().find_all();
+CHECK_EQUAL(1, subview.size());
 }
 */
 
@@ -3170,7 +3154,7 @@ TEST(Query_QuickSort)
 
     CHECK(tv.size() == 1000);
     for (size_t t = 1; t < tv.size(); t++) {
-        CHECK(tv[t].first >= tv[t-1].first);
+        CHECK(tv[t].first >= tv[t - 1].first);
     }
 }
 
@@ -3190,7 +3174,7 @@ TEST(Query_CountSort)
 
     CHECK(tv.size() == 1000);
     for (size_t t = 1; t < tv.size(); t++) {
-        CHECK(tv[t].first >= tv[t-1].first);
+        CHECK(tv[t].first >= tv[t - 1].first);
     }
 }
 
@@ -3210,7 +3194,7 @@ TEST(Query_SortDescending)
 
     CHECK(tv.size() == 1000);
     for (size_t t = 1; t < tv.size(); t++) {
-        CHECK(tv[t].first <= tv[t-1].first);
+        CHECK(tv[t].first <= tv[t - 1].first);
     }
 }
 
@@ -3412,6 +3396,22 @@ TEST(Query_Sort_And_Requery_Untyped2)
 
     // Test that remove() maintains order
     tv3.remove(0);
+    // q5 and q3 should behave the same.
+    Query q5 = table.where(&tv2).not_equal(1, "X");
+    TableView tv5 = q5.find_all();
+    tv5.sync_if_needed(); // you may think tv5 is in sync, BUT it was generated from tv2 which wasn't
+    // Note the side effect - as tv5 depends on ... on tv2 etc, all views are synchronized.
+    CHECK_EQUAL(3, tv5.size());
+    CHECK_EQUAL(1, tv5.get_int(0, 0));
+    CHECK_EQUAL(8, tv5.get_int(0, 1)); // 8, 9 (sort order) instead of 9, 8 (table order)
+    CHECK_EQUAL(9, tv5.get_int(0, 2));
+
+    CHECK_EQUAL(6, tv.size());
+    CHECK_EQUAL(3, tv3.size());
+    CHECK_EQUAL(1, tv3.get_int(0, 0));
+    CHECK_EQUAL(8, tv3.get_int(0, 1)); // 8, 9 (sort order) instead of 9, 8 (table order)
+    CHECK_EQUAL(9, tv3.get_int(0, 2));
+
     Query q4 = table.where(&tv3).not_equal(1, "X");
     TableView tv4 = q4.find_all();
 
@@ -3655,8 +3655,8 @@ TEST(Query_Threads)
 
     CHECK_EQUAL(30, tv.size());
     for (int i = 0; i < 30; i++) {
-        const size_t expected = i*7*10 + 14 + 1;
-        const size_t actual   = tv.get_source_ndx(i);
+        const size_t expected = i * 7 * 10 + 14 + 1;
+        const size_t actual = tv.get_source_ndx(i);
         CHECK_EQUAL(expected, actual);
     }
 }
@@ -3687,8 +3687,8 @@ TEST(Query_LongString)
 
     CHECK_EQUAL(30, tv.size());
     for (int i = 0; i < 30; i++) {
-        const size_t expected = i*7*10 + 14 + 1;
-        const size_t actual   = tv.get_source_ndx(i);
+        const size_t expected = i * 7 * 10 + 14 + 1;
+        const size_t actual = tv.get_source_ndx(i);
         CHECK_EQUAL(expected, actual);
     }
 }
@@ -3720,8 +3720,8 @@ TEST(Query_LongEnum)
 
     CHECK_EQUAL(30, tv.size());
     for (int i = 0; i < 30; i++) {
-        const size_t expected = i*7*10 + 14 + 1;
-        const size_t actual   = tv.get_source_ndx(i);
+        const size_t expected = i * 7 * 10 + 14 + 1;
+        const size_t actual = tv.get_source_ndx(i);
         CHECK_EQUAL(expected, actual);
     }
 }
@@ -3850,7 +3850,7 @@ TEST(Query_FindNextBackwards)
     TupleTableType ttt;
 
     // Create multiple leaves
-    for(size_t i = 0; i < TIGHTDB_MAX_LIST_SIZE * 4; i++) {
+    for (size_t i = 0; i < TIGHTDB_MAX_LIST_SIZE * 4; i++) {
         ttt.add(6, "X");
         ttt.add(7, "X");
     }
@@ -3877,7 +3877,7 @@ TEST(Query_FindRandom)
     size_t rows = TIGHTDB_MAX_LIST_SIZE * 20;
 
     // Create multiple leaves
-    for(size_t i = 0; i < rows; i++) {
+    for (size_t i = 0; i < rows; i++) {
         // This value distribution makes us sometimes cross a leaf boundary, and sometimes not, with both having
         // a fair probability of happening
         ttt.add(random.draw_int_mod(TIGHTDB_MAX_LIST_SIZE), "X");
@@ -3885,14 +3885,14 @@ TEST(Query_FindRandom)
 
     TupleTableType::Query q = ttt.where().first.equal(search);
 
-    for(size_t t = 0; t < 100; t++) {
+    for (size_t t = 0; t < 100; t++) {
         size_t begin = random.draw_int_mod(rows);
         size_t res = q.find(begin);
 
         // Find correct match position manually in a for-loop
         size_t expected = not_found;
-        for(size_t u = begin; u < rows; u++) {
-            if(ttt.column().first[u] == search) {
+        for (size_t u = begin; u < rows; u++) {
+            if (ttt.column().first[u] == search) {
                 expected = u;
                 break;
             }
@@ -4261,44 +4261,44 @@ TEST(Query_Binary)
 
     const char bin_2[4] = { 6, 6, 6, 6 }; // Not occuring above
 
-    t.add(0, BinaryData(bin +  0, 16));
-    t.add(0, BinaryData(bin +  0, 32));
-    t.add(0, BinaryData(bin +  0, 48));
-    t.add(0, BinaryData(bin +  0, 64));
+    t.add(0, BinaryData(bin + 0, 16));
+    t.add(0, BinaryData(bin + 0, 32));
+    t.add(0, BinaryData(bin + 0, 48));
+    t.add(0, BinaryData(bin + 0, 64));
     t.add(0, BinaryData(bin + 16, 48));
     t.add(0, BinaryData(bin + 32, 32));
     t.add(0, BinaryData(bin + 48, 16));
     t.add(0, BinaryData(bin + 24, 16)); // The "odd ball"
-    t.add(0, BinaryData(bin +  0, 32)); // Repeat an entry
+    t.add(0, BinaryData(bin + 0, 32)); // Repeat an entry
 
     CHECK_EQUAL(0, t.where().second.equal(BinaryData(bin + 16, 16)).count());
-    CHECK_EQUAL(1, t.where().second.equal(BinaryData(bin +  0, 16)).count());
+    CHECK_EQUAL(1, t.where().second.equal(BinaryData(bin + 0, 16)).count());
     CHECK_EQUAL(1, t.where().second.equal(BinaryData(bin + 48, 16)).count());
-    CHECK_EQUAL(2, t.where().second.equal(BinaryData(bin +  0, 32)).count());
+    CHECK_EQUAL(2, t.where().second.equal(BinaryData(bin + 0, 32)).count());
 
     CHECK_EQUAL(9, t.where().second.not_equal(BinaryData(bin + 16, 16)).count());
-    CHECK_EQUAL(8, t.where().second.not_equal(BinaryData(bin +  0, 16)).count());
+    CHECK_EQUAL(8, t.where().second.not_equal(BinaryData(bin + 0, 16)).count());
 
-    CHECK_EQUAL(0, t.where().second.begins_with(BinaryData(bin +  8, 16)).count());
+    CHECK_EQUAL(0, t.where().second.begins_with(BinaryData(bin + 8, 16)).count());
     CHECK_EQUAL(1, t.where().second.begins_with(BinaryData(bin + 16, 16)).count());
-    CHECK_EQUAL(4, t.where().second.begins_with(BinaryData(bin +  0, 32)).count());
-    CHECK_EQUAL(5, t.where().second.begins_with(BinaryData(bin +  0, 16)).count());
+    CHECK_EQUAL(4, t.where().second.begins_with(BinaryData(bin + 0, 32)).count());
+    CHECK_EQUAL(5, t.where().second.begins_with(BinaryData(bin + 0, 16)).count());
     CHECK_EQUAL(1, t.where().second.begins_with(BinaryData(bin + 48, 16)).count());
-    CHECK_EQUAL(9, t.where().second.begins_with(BinaryData(bin + 0,   0)).count());
+    CHECK_EQUAL(9, t.where().second.begins_with(BinaryData(bin + 0, 0)).count());
 
     CHECK_EQUAL(0, t.where().second.ends_with(BinaryData(bin + 40, 16)).count());
     CHECK_EQUAL(1, t.where().second.ends_with(BinaryData(bin + 32, 16)).count());
     CHECK_EQUAL(3, t.where().second.ends_with(BinaryData(bin + 32, 32)).count());
     CHECK_EQUAL(4, t.where().second.ends_with(BinaryData(bin + 48, 16)).count());
-    CHECK_EQUAL(1, t.where().second.ends_with(BinaryData(bin +  0, 16)).count());
-    CHECK_EQUAL(9, t.where().second.ends_with(BinaryData(bin + 64,  0)).count());
+    CHECK_EQUAL(1, t.where().second.ends_with(BinaryData(bin + 0, 16)).count());
+    CHECK_EQUAL(9, t.where().second.ends_with(BinaryData(bin + 64, 0)).count());
 
     CHECK_EQUAL(0, t.where().second.contains(BinaryData(bin_2)).count());
-    CHECK_EQUAL(5, t.where().second.contains(BinaryData(bin +  0, 16)).count());
+    CHECK_EQUAL(5, t.where().second.contains(BinaryData(bin + 0, 16)).count());
     CHECK_EQUAL(5, t.where().second.contains(BinaryData(bin + 16, 16)).count());
     CHECK_EQUAL(4, t.where().second.contains(BinaryData(bin + 24, 16)).count());
     CHECK_EQUAL(4, t.where().second.contains(BinaryData(bin + 32, 16)).count());
-    CHECK_EQUAL(9, t.where().second.contains(BinaryData(bin +  0,  0)).count());
+    CHECK_EQUAL(9, t.where().second.contains(BinaryData(bin + 0, 0)).count());
 
     {
         TupleTableTypeBin::View tv = t.where().second.equal(BinaryData(bin + 0, 32)).find_all();
@@ -4535,16 +4535,16 @@ TEST(Query_SyntaxCheck)
     s = q6.validate();
     CHECK(s != "");
 
-// FIXME: Work is currently underway to fully support locale
-// indenepdent case folding as defined by Unicode. Reenable this test
-// when is becomes available.
-/*
+    // FIXME: Work is currently underway to fully support locale
+    // indenepdent case folding as defined by Unicode. Reenable this test
+    // when is becomes available.
+    /*
     TupleTableType::Query q7 = ttt.where().second.equal("\xa0", false);
-#ifdef TIGHTDB_DEBUG
+    #ifdef TIGHTDB_DEBUG
     s = q7.Verify();
     CHECK(s != "");
-#endif
-*/
+    #endif
+    */
 }
 
 TEST(Query_SubtableSyntaxCheck)
@@ -4555,10 +4555,10 @@ TEST(Query_SubtableSyntaxCheck)
 
     // Create specification with sub-table
     DescriptorRef subdesc;
-    table->add_column(type_Int,    "first");
+    table->add_column(type_Int, "first");
     table->add_column(type_String, "second");
-    table->add_column(type_Table,  "third", &subdesc);
-    subdesc->add_column(type_Int,    "sub_first");
+    table->add_column(type_Table, "third", &subdesc);
+    subdesc->add_column(type_Int, "sub_first");
     subdesc->add_column(type_String, "sub_second");
 
     // Main table
@@ -4629,7 +4629,6 @@ TEST(Query_SubtableSyntaxCheck)
 
 TEST(Query_TestTV)
 {
-    // This tableview(tv) method is deprecated! It requires tv to be sorted. Use where(&tv) instead.
     TupleTableType t;
     t.add(1, "a");
     t.add(2, "a");
@@ -4666,7 +4665,6 @@ TEST(Query_TestTV_where)
     TupleTableType::Query q4 = t.where(&v).first.between(3, 6);
     CHECK_EQUAL(1, q4.count());
 }
-
 
 TEST(Query_SumMinMaxAvg)
 {
@@ -4757,13 +4755,13 @@ TEST(Query_Avg)
 
     CHECK_EQUAL(0, t.where().first.average(NULL, 0, 0));     // none
     CHECK_EQUAL(0, t.where().first.average(NULL, 1, 1));     // none
-    CHECK_EQUAL(20,t.where().first.average(NULL, 0, 2));     // both
-    CHECK_EQUAL(20,t.where().first.average(NULL, 0, -1));     // both
+    CHECK_EQUAL(20, t.where().first.average(NULL, 0, 2));     // both
+    CHECK_EQUAL(20, t.where().first.average(NULL, 0, -1));     // both
 
-    CHECK_EQUAL(10,t.where().first.average(&cnt, 0, 1));     // first
+    CHECK_EQUAL(10, t.where().first.average(&cnt, 0, 1));     // first
 
-    CHECK_EQUAL(30,t.where().first.sum(NULL, 1, 2));     // second
-    CHECK_EQUAL(30,t.where().first.average(NULL, 1, 2));     // second
+    CHECK_EQUAL(30, t.where().first.sum(NULL, 1, 2));     // second
+    CHECK_EQUAL(30, t.where().first.average(NULL, 1, 2));     // second
 }
 
 TEST(Query_Avg2)
@@ -4820,10 +4818,10 @@ TEST(Query_OfByOne)
     t[0].first = 1; // reset
 
     // Before split
-    t[TIGHTDB_MAX_LIST_SIZE-1].first = 0;
+    t[TIGHTDB_MAX_LIST_SIZE - 1].first = 0;
     res = t.where().first.equal(0).find();
-    CHECK_EQUAL(TIGHTDB_MAX_LIST_SIZE-1, res);
-    t[TIGHTDB_MAX_LIST_SIZE-1].first = 1; // reset
+    CHECK_EQUAL(TIGHTDB_MAX_LIST_SIZE - 1, res);
+    t[TIGHTDB_MAX_LIST_SIZE - 1].first = 1; // reset
 
     // After split
     t[TIGHTDB_MAX_LIST_SIZE].first = 0;
@@ -4832,7 +4830,7 @@ TEST(Query_OfByOne)
     t[TIGHTDB_MAX_LIST_SIZE].first = 1; // reset
 
     // Before end
-    const size_t last_pos = (TIGHTDB_MAX_LIST_SIZE*2)-1;
+    const size_t last_pos = (TIGHTDB_MAX_LIST_SIZE * 2) - 1;
     t[last_pos].first = 0;
     res = t.where().first.equal(0).find();
     CHECK_EQUAL(last_pos, res);
@@ -4856,15 +4854,15 @@ TEST(Query_Const)
 
 namespace {
 
-TIGHTDB_TABLE_2(PhoneTable,
-                type,   String,
-                number, String)
+    TIGHTDB_TABLE_2(PhoneTable,
+        type, String,
+        number, String)
 
-TIGHTDB_TABLE_4(EmployeeTable,
-                name,   String,
-                age,    Int,
-                hired,  Bool,
-                phones, Subtable<PhoneTable>)
+        TIGHTDB_TABLE_4(EmployeeTable,
+        name, String,
+        age, Int,
+        hired, Bool,
+        phones, Subtable<PhoneTable>)
 
 } // anonymous namespace
 
@@ -4895,16 +4893,16 @@ TEST(Query_AllTypesDynamicallyTyped)
 {
     Table table;
     DescriptorRef sub1;
-    table.add_column(type_Bool,     "boo");
-    table.add_column(type_Int,      "int");
-    table.add_column(type_Float,    "flt");
-    table.add_column(type_Double,   "dbl");
-    table.add_column(type_String,   "str");
-    table.add_column(type_Binary,   "bin");
+    table.add_column(type_Bool, "boo");
+    table.add_column(type_Int, "int");
+    table.add_column(type_Float, "flt");
+    table.add_column(type_Double, "dbl");
+    table.add_column(type_String, "str");
+    table.add_column(type_Binary, "bin");
     table.add_column(type_DateTime, "dat");
-    table.add_column(type_Table,    "tab", &sub1);
-    table.add_column(type_Mixed,    "mix");
-    sub1->add_column(type_Int,        "sub_int");
+    table.add_column(type_Table, "tab", &sub1);
+    table.add_column(type_Mixed, "mix");
+    sub1->add_column(type_Int, "sub_int");
     sub1.reset();
 
     const char bin[4] = { 0, 1, 2, 3 };
@@ -4915,27 +4913,27 @@ TEST(Query_AllTypesDynamicallyTyped)
     Mixed mix_subtab((Mixed::subtable_tag()));
 
     table.add_empty_row();
-    table.set_bool    (0, 0, false);
-    table.set_int     (1, 0, 54);
-    table.set_float   (2, 0, 0.7f);
-    table.set_double  (3, 0, 0.8);
-    table.set_string  (4, 0, "foo");
-    table.set_binary  (5, 0, bin1);
+    table.set_bool(0, 0, false);
+    table.set_int(1, 0, 54);
+    table.set_float(2, 0, 0.7f);
+    table.set_double(3, 0, 0.8);
+    table.set_string(4, 0, "foo");
+    table.set_binary(5, 0, bin1);
     table.set_datetime(6, 0, 0);
-    table.set_mixed   (8, 0, mix_int);
+    table.set_mixed(8, 0, mix_int);
 
     table.add_empty_row();
-    table.set_bool    (0, 1, true);
-    table.set_int     (1, 1, 506);
-    table.set_float   (2, 1, 7.7f);
-    table.set_double  (3, 1, 8.8);
-    table.set_string  (4, 1, "banach");
-    table.set_binary  (5, 1, bin2);
+    table.set_bool(0, 1, true);
+    table.set_int(1, 1, 506);
+    table.set_float(2, 1, 7.7f);
+    table.set_double(3, 1, 8.8);
+    table.set_string(4, 1, "banach");
+    table.set_binary(5, 1, bin2);
     table.set_datetime(6, 1, time_now);
     TableRef subtab = table.get_subtable(7, 1);
     subtab->add_empty_row();
     subtab->set_int(0, 0, 100);
-    table.set_mixed  (8, 1, mix_subtab);
+    table.set_mixed(8, 1, mix_subtab);
 
     CHECK_EQUAL(1, table.where().equal(0, false).count());
     CHECK_EQUAL(1, table.where().equal(1, int64_t(54)).count());
@@ -4944,8 +4942,8 @@ TEST(Query_AllTypesDynamicallyTyped)
     CHECK_EQUAL(1, table.where().equal(4, "foo").count());
     CHECK_EQUAL(1, table.where().equal(5, bin1).count());
     CHECK_EQUAL(1, table.where().equal_datetime(6, 0).count());
-//    CHECK_EQUAL(1, table.where().equal(7, subtab).count());
-//    CHECK_EQUAL(1, table.where().equal(8, mix_int).count());
+    //    CHECK_EQUAL(1, table.where().equal(7, subtab).count());
+    //    CHECK_EQUAL(1, table.where().equal(8, mix_int).count());
 
     Query query = table.where().equal(0, false);
 
@@ -4967,19 +4965,19 @@ TEST(Query_AllTypesDynamicallyTyped)
 
 
 namespace {
-TIGHTDB_TABLE_1(TestQuerySub,
-                age,  Int)
+    TIGHTDB_TABLE_1(TestQuerySub,
+        age, Int)
 
-TIGHTDB_TABLE_9(TestQueryAllTypes,
-                bool_col,   Bool,
-                int_col,    Int,
-                float_col,  Float,
-                double_col, Double,
-                string_col, String,
-                binary_col, Binary,
-                date_col,   DateTime,
-                table_col,  Subtable<TestQuerySub>,
-                mixed_col,  Mixed)
+        TIGHTDB_TABLE_9(TestQueryAllTypes,
+        bool_col, Bool,
+        int_col, Int,
+        float_col, Float,
+        double_col, Double,
+        string_col, String,
+        binary_col, Binary,
+        date_col, DateTime,
+        table_col, Subtable<TestQuerySub>,
+        mixed_col, Mixed)
 }
 
 TEST(Query_AllTypesStaticallyTyped)
@@ -4995,8 +4993,8 @@ TEST(Query_AllTypesStaticallyTyped)
     Mixed mix_int(int64_t(1));
     Mixed mix_subtab((Mixed::subtable_tag()));
 
-    table.add(false,  54, 0.7f, 0.8, "foo",    bin1, 0,        0,       mix_int);
-    table.add(true,  506, 7.7f, 8.8, "banach", bin2, time_now, &subtab, mix_subtab);
+    table.add(false, 54, 0.7f, 0.8, "foo", bin1, 0, 0, mix_int);
+    table.add(true, 506, 7.7f, 8.8, "banach", bin2, time_now, &subtab, mix_subtab);
 
     CHECK_EQUAL(1, table.where().bool_col.equal(false).count());
     CHECK_EQUAL(1, table.where().int_col.equal(54).count());
@@ -5005,10 +5003,10 @@ TEST(Query_AllTypesStaticallyTyped)
     CHECK_EQUAL(1, table.where().string_col.equal("foo").count());
     CHECK_EQUAL(1, table.where().binary_col.equal(bin1).count());
     CHECK_EQUAL(1, table.where().date_col.equal(0).count());
-//    CHECK_EQUAL(1, table.where().table_col.equal(subtab).count());
-//    CHECK_EQUAL(1, table.where().mixed_col.equal(mix_int).count());
-// FIXME: It's not possible to construct a subtable query. .table_col.subtable() does not return an object with 'age':
-//    CHECK_EQUAL(1, table.where().table_col.subtable().age.end_subtable().count());
+    //    CHECK_EQUAL(1, table.where().table_col.equal(subtab).count());
+    //    CHECK_EQUAL(1, table.where().mixed_col.equal(mix_int).count());
+    // FIXME: It's not possible to construct a subtable query. .table_col.subtable() does not return an object with 'age':
+    //    CHECK_EQUAL(1, table.where().table_col.subtable().age.end_subtable().count());
 
     TestQueryAllTypes::Query query = table.where().bool_col.equal(false);
 
@@ -5044,5 +5042,138 @@ TEST(Query_RefCounting)
     TableView tv = q.find_all();
     CHECK_EQUAL(1, tv.size());
 }
+
+
+TEST(Query_DeepCopy)
+{
+    // NOTE: You can only create a copy of a fully constructed; i.e. you cannot copy a query which is missing an 
+    // end_group(). Run Query::validate() to see if it's fully constructed.
+    
+    Types t;
+
+    t.add(1, "1", 1.1);
+    t.add(2, "2", 2.2);
+    t.add(3, "3", 3.3);
+    t.add(4, "4", 4.4);
+
+    Query q = t.column().ints > 2 + 0; // + 0 makes query_expression node instead of query_engine.
+
+
+    // Test if we can execute a copy
+    Query q2 = Query(q, Query::TCopyExpressionTag());
+
+    CHECK_EQUAL(2, q2.find());
+
+
+    // See if we can execute a copy of a delted query (copy should not contain references to original)
+    Query* q3 = new Query(q, Query::TCopyExpressionTag());
+    Query* q4 = new Query(*q3, Query::TCopyExpressionTag());
+    delete q3;
+    
+
+    // Attempt to overwrite memory of the deleted q3 by allocating various sized objects so that a spurious execution
+    // of methods on q3 can be detected (by making unit test crash).
+    char* tmp[1000];
+    for (size_t t = 0; t < sizeof(tmp) / sizeof(tmp[0]); t++) {
+        tmp[t] = new char[t];
+        memset(tmp[t], 0, t);
+    }
+    for (size_t t = 0; t < sizeof(tmp) / sizeof(tmp[0]); t++) {
+        delete[] tmp[t];
+    }
+
+    CHECK_EQUAL(2, q4->find());
+    delete q4;
+
+
+    // See if we can append a criteria to a query
+    Query q5 = t.column().ints > 2 + 0; // + 0 makes query_expression node instead of query_engine
+    q5.greater(2, 4.0);
+    CHECK_EQUAL(3, q5.find());
+
+
+    // See if we can append a criteria to a copy without modifying the original (copy should not contain references
+    // to original). Tests query_expression integer node.
+    Query q6 = t.column().ints > 2 + 0; // + 0 makes query_expression node instead of query_engine
+    Query q7 = Query(q6, Query::TCopyExpressionTag());
+
+    q7.greater(2, 4.0);
+    CHECK_EQUAL(3, q7.find());
+    CHECK_EQUAL(2, q6.find());
+
+
+    // See if we can append a criteria to a copy without modifying the original (copy should not contain references
+    // to original). Tests query_engine integer node.
+    Query q8 = t.column().ints > 2;
+    Query q9 = Query(q8, Query::TCopyExpressionTag());
+
+    q9.greater(2, 4.0);
+    CHECK_EQUAL(3, q9.find());
+    CHECK_EQUAL(2, q8.find());
+
+
+    // See if we can append a criteria to a copy without modifying the original (copy should not contain references
+    // to original). Tests query_engine string node.
+    Query q10 = t.column().strings != "2";
+    Query q11 = Query(q10, Query::TCopyExpressionTag());
+
+    q11.greater(2, 4.0);
+    CHECK_EQUAL(3, q11.find());
+    CHECK_EQUAL(0, q10.find());
+}
+
+TEST(Query_TableViewMoveAssign1)
+{
+    Types t;
+
+    t.add(1, "1", 1.1);
+    t.add(2, "2", 2.2);
+    t.add(3, "3", 3.3);
+    t.add(4, "4", 4.4);
+
+    // temporary query is created, then q makes and stores a deep copy and then temporary is destructed
+    Query q = t.column().ints > 2 + 0; // + 0 makes query_expression node instead of query_engine
+
+    // now deep copy should be destructed and replaced by new temporary      
+    TableView tv = q.find_all();
+
+    // the original should still work; destruction of temporaries and deep copies should have no references
+    // to original
+    tv = q.find_all();    
+}
+
+TEST(Query_TableViewMoveAssignLeak2)
+{
+    Types t;
+
+    t.add(1, "1", 1.1);
+    t.add(2, "2", 2.2);
+    t.add(3, "3", 3.3);
+    t.add(4, "4", 4.4);
+
+    Query q = t.column().ints > 2 + 0 && t.column().strings == "4";
+    TableView tv = q.find_all();
+
+    tv = q.find_all();
+}
+
+TEST(Query_DeepCopyLeak1)
+{
+    // NOTE: You can only create a copy of a fully constructed; i.e. you cannot copy a query which is missing an 
+    // end_group(). Run Query::validate() to see if it's fully constructed.
+
+    Types t;
+
+    t.add(1, "1", 1.1);
+    t.add(2, "2", 2.2);
+    t.add(3, "3", 3.3);
+    t.add(4, "4", 4.4);
+
+    // See if copying of a mix of query_expression and query_engine nodes will leak
+    Query q = !(t.column().ints > 2 + 0 && t.column().ints > 2 && t.column().doubles > 2.2) || t.column().ints == 4 || t.column().ints == 4 + 0;
+    Query q2 = Query(q, Query::TCopyExpressionTag());
+    Query q3 = Query(q2, Query::TCopyExpressionTag());
+}
+
 
 #endif // TEST_QUERY

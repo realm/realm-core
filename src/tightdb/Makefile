@@ -21,8 +21,8 @@ nobase_subinclude_HEADERS_EXTRA_UNINSTALL = *.h *.hpp util/*.h util/*.hpp impl/*
 nobase_subinclude_HEADERS += array_basic.hpp array_basic_tpl.hpp array_binary.hpp array_blob.hpp \
 array_blobs_big.hpp array_string_long.hpp column.hpp column_tpl.hpp column_basic.hpp \
 column_basic_tpl.hpp column_binary.hpp column_string_enum.hpp column_string.hpp column_table.hpp \
-column_linklist.hpp column_linkbase.hpp column_backlink.hpp column_mixed.hpp column_mixed_tpl.hpp \
-group_writer.hpp index_string.hpp query_engine.hpp query_expression.hpp
+column_link.hpp column_linklist.hpp column_linkbase.hpp column_backlink.hpp column_mixed.hpp \
+column_mixed_tpl.hpp group_writer.hpp index_string.hpp query_engine.hpp query_expression.hpp
 
 lib_LIBRARIES    = libtightdb.a
 libexec_PROGRAMS = tightdbd

@@ -30,7 +30,6 @@ const char* LangBindHelper::get_data_type_name(DataType type) TIGHTDB_NOEXCEPT
         case type_Mixed:    return "mixed";
         case type_Link:     return "link";
         case type_LinkList: return "linklist";
-        case type_BackLink: return "backlink";
     }
     TIGHTDB_ASSERT(false);
     return "int";

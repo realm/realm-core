@@ -297,11 +297,11 @@ TEST(TableView_IsAttached)
     CHECK_EQUAL(true, v2.is_attached());
     v.remove_last();
     CHECK_EQUAL(true, v.is_attached());
-    CHECK_EQUAL(false, v2.is_attached());
+    CHECK_EQUAL(true, v2.is_attached());
 
     table.remove_last();
-    CHECK_EQUAL(false, v.is_attached());
-    CHECK_EQUAL(false, v2.is_attached());
+    CHECK_EQUAL(true, v.is_attached());
+    CHECK_EQUAL(true, v2.is_attached());
 }
 
 TEST(TableView_Max)
@@ -391,6 +391,43 @@ TEST(TableView_Find)
     CHECK_EQUAL(1, r);
 }
 
+
+TEST(TableView_Follows_Changes)
+{
+    Table table;
+    table.add_column(type_Int, "first");
+    table.add_empty_row();
+    table.set_int(0,0,1);
+    Query q = table.where().equal(0,1);
+    TableView v = q.find_all();
+    CHECK_EQUAL(1, v.size());
+    CHECK_EQUAL(1, v.get_int(0,0));
+
+    // low level sanity check that we can copy a query and run the copy:
+    Query q2(q,Query::TCopyExpressionTag());
+    TableView v2 = q2.find_all();
+
+    // now the fun begins
+    CHECK_EQUAL(1, v.size());
+    table.add_empty_row();
+    CHECK_EQUAL(1, v.size());
+    table.set_int(0,1,1);
+    v.sync_if_needed();
+    CHECK_EQUAL(2, v.size());
+    CHECK_EQUAL(1, v.get_int(0,0));
+    CHECK_EQUAL(1, v.get_int(0,1));
+    table.set_int(0,0,7);
+    v.sync_if_needed();
+    CHECK_EQUAL(1, v.size());
+    CHECK_EQUAL(1, v.get_int(0,0));
+    table.set_int(0,1,7);
+    v.sync_if_needed();
+    CHECK_EQUAL(0, v.size());
+    table.set_int(0,1,1);
+    v.sync_if_needed();
+    CHECK_EQUAL(1, v.size());
+    CHECK_EQUAL(1, v.get_int(0,0));
+}
 
 TEST(TableView_FindAll)
 {
@@ -653,6 +690,10 @@ TEST(TableView_Stacked)
     TableView tv2 = tv.find_all_int(1,2);
     CHECK_EQUAL(1,tv2.size()); //evaluates tv2.size to 1 which is expected
     CHECK_EQUAL("B",tv2.get_string(2,0)); //evalates get_string(2,0) to "A" which is not expected
+
+
+    
+
 }
 
 

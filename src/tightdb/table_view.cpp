@@ -264,6 +264,10 @@ void TableViewBase::sort(size_t column, bool Ascending)
 {
     TIGHTDB_ASSERT(m_table);
 
+    m_auto_sort = true;
+    m_ascending = Ascending;
+    m_sort_index = column;
+
     DataType type = m_table->get_column_type(column);
 
     TIGHTDB_ASSERT(type == type_Int  ||
@@ -412,11 +416,15 @@ void TableView::remove(size_t ndx)
 {
     TIGHTDB_ASSERT(m_table);
     TIGHTDB_ASSERT(ndx < m_refs.size());
+    bool sync_to_keep = m_last_seen_version == m_table->m_version;
 
     // Delete row in source table
     const size_t real_ndx = size_t(m_refs.get(ndx));
     m_table->from_view_remove(real_ndx, this);
-
+    // It is important to not accidentally bring us in sync, if we were
+    // not in sync to start with:
+    if (sync_to_keep)
+        m_last_seen_version = m_table->m_version;
     // Update refs
     m_refs.erase(ndx, ndx == size() - 1);
 
@@ -424,18 +432,19 @@ void TableView::remove(size_t ndx)
     //
     // O(n) for n = this->size(). FIXME: Dangerous cast below: unsigned -> signed
     m_refs.adjust_ge(int_fast64_t(real_ndx), -1);
+
 }
 
 
 void TableView::clear()
 {
     TIGHTDB_ASSERT(m_table);
-
     // sort m_refs
     vector<size_t> v;
     for (size_t t = 0; t < size(); t++)
         v.push_back(to_size_t(m_refs.get(t)));
     std::sort(v.begin(), v.end());
+    bool sync_to_keep = m_last_seen_version == m_table->m_version;
 
     // Delete all referenced rows in source table
     // (in reverse order to avoid index drift)
@@ -445,4 +454,39 @@ void TableView::clear()
     }
 
     m_refs.clear();
+    // It is important to not accidentally bring us in sync, if we were
+    // not in sync to start with:
+    if (sync_to_keep)
+        m_last_seen_version = m_table->m_version;
 }
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+
+void TableViewBase::do_sync() 
+{
+    // precondition: m_table is attached
+    if (!m_query.m_table) {
+        // no valid query
+        m_last_seen_version = m_table->m_version;
+        m_refs.clear();
+        for (size_t i=0; i<m_table->size(); i++)
+            m_refs.add(i);
+        cerr << "ref to entire table" << endl;
+    }
+    else  {
+        // valid query, so clear earlier results and reexecute it.
+        m_refs.clear();
+        // now we are going to do something naughty!
+        if (m_query.m_tableview)
+            m_query.m_tableview->sync_if_needed();
+        // and more:
+        // find_all needs to call size() on the tableview. But if we're
+        // out of sync, size() will then call do_sync and we'll have an infinite regress
+        // SO: fake that we're up to date BEFORE calling find_all.
+        m_last_seen_version = m_table->m_version;
+        m_query.find_all(*(const_cast<TableViewBase*>(this)), m_start, m_end, m_limit);
+    }
+    if (m_auto_sort)
+        sort(m_sort_index, m_ascending);
+}
+#endif // TIGHTDB_ENABLE_REPLICATION

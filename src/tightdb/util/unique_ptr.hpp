@@ -38,11 +38,12 @@ public:
     void reset(T* = 0);
     T* release() TIGHTDB_NOEXCEPT;
 
-protected:
+#ifdef TIGHTDB_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
+    explicit operator bool() const TIGHTDB_NOEXCEPT;
+#else
     typedef T* UniquePtr::*unspecified_bool_type;
-
-public:
     operator unspecified_bool_type() const TIGHTDB_NOEXCEPT;
+#endif
 
 private:
     UniquePtr(const UniquePtr&); // Hide
@@ -74,10 +75,28 @@ public:
     void swap(UniquePtr&) TIGHTDB_NOEXCEPT;
 
     using UniquePtr<T,D>::get;
-    using UniquePtr<T,D>::operator*;
     using UniquePtr<T,D>::reset;
     using UniquePtr<T,D>::release;
+
+#ifdef __clang__
+    // Clang has a bug that causes it to effectively ignore the 'using' declaration.
+    T& operator*() const TIGHTDB_NOEXCEPT;
+#else
+    using UniquePtr<T,D>::operator*;
+#endif
+
+#ifdef TIGHTDB_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
+    using UniquePtr<T,D>::operator bool;
+#else
+#  ifdef __clang__
+    // Clang 3.0 and 3.1 has a bug that causes it to effectively
+    // ignore the 'using' declaration.
+    typedef typename UniquePtr<T,D>::unspecified_bool_type unspecified_bool_type;
+    operator unspecified_bool_type() const TIGHTDB_NOEXCEPT;
+#  else
     using UniquePtr<T,D>::operator typename UniquePtr<T,D>::unspecified_bool_type;
+#  endif
+#endif
 };
 
 
@@ -126,6 +145,14 @@ template<class T, class D> inline T& UniquePtr<T,D>::operator*() const TIGHTDB_N
     return *m_ptr;
 }
 
+#ifdef __clang__
+template<class T, class D>
+inline T& UniquePtr<T[],D>::operator*() const TIGHTDB_NOEXCEPT
+{
+    return UniquePtr<T,D>::operator*();
+}
+#endif // __clang__
+
 template<class T, class D>
 inline T& UniquePtr<T[],D>::operator[](std::size_t i) const TIGHTDB_NOEXCEPT
 {
@@ -159,11 +186,31 @@ template<class T, class D> inline T* UniquePtr<T,D>::release() TIGHTDB_NOEXCEPT
     return p;
 }
 
+#ifdef TIGHTDB_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
+
+template<class T, class D>
+inline UniquePtr<T,D>::operator bool() const TIGHTDB_NOEXCEPT
+{
+    return m_ptr != 0;
+}
+
+#else // ! TIGHTDB_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
+
 template<class T, class D>
 inline UniquePtr<T,D>::operator unspecified_bool_type() const TIGHTDB_NOEXCEPT
 {
     return m_ptr ? &UniquePtr::m_ptr : 0;
 }
+
+#  ifdef __clang__
+template<class T, class D>
+inline UniquePtr<T[],D>::operator unspecified_bool_type() const TIGHTDB_NOEXCEPT
+{
+    return UniquePtr<T,D>::operator unspecified_bool_type();
+}
+#  endif // __clang__
+
+#endif // ! TIGHTDB_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
 
 template<class T, class D> inline void swap(UniquePtr<T,D>& p, UniquePtr<T,D>& q) TIGHTDB_NOEXCEPT
 {
