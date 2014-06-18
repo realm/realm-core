@@ -772,6 +772,7 @@ EOF
 
         # Copy the test files into the app tests subdirectory
         PASSIVE_SUBDIRS="$($MAKE -C ./test --no-print-directory get-passive-subdirs)" || exit 1
+        PASSIVE_SUBDIRS="$PASSIVE_SUBDIRS android ios" # dirty skip
         PASSIVE_SUBDIRS="$(echo "$PASSIVE_SUBDIRS" | sed -E 's/ +/|/g')" || exit 1
         # Naive copy, i.e. copy everything.
         ## Avoid recursion (extra precaution) and passive subdirs.
