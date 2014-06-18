@@ -1,6 +1,6 @@
 # On-Target Unit-Testing [iOS]
 
-In order to test core on device, we need an iOS app, and hence an XCode
+In order to test core on device, we need an iOS app, and hence an Xcode
 project.
 
 The common workflow is:
@@ -8,25 +8,48 @@ The common workflow is:
 $ sh build.sh build-test-ios-app
 $ sh build.sh test-ios-app
 
-The first builds an XCode project. The second tests the XCode project on a
+The first builds an Xcode project. The second tests the Xcode project on a
 device using xcodebuild.
 
 Since the test files can be expected to be changed more quickly than the
-contents of this subdirectory, we use GYP to generate fresh XCode projects.
+contents of this subdirectory, we use GYP to generate fresh Xcode projects.
 (See also the build-test-ios-app target in build.sh.)
 
-The XCode project can then be "tested" to run the tests on device, using either
-XCode, xcodebuild (see also the test-ios-app target in build.sh), Instruments,
+The Xcode project can then be "tested" to run the tests on device, using either
+Xcode, xcodebuild (see also the test-ios-app target in build.sh), Instruments,
 or the command-line instruments (see also the leak-test-ios-app target in
 build.sh).
 
+## build-test-ios-app options
+
+### -d
+
 The "revertability" to graphical tools is useful for debuggning, in which case,
-you should specify specify the additional flag -DEBUG to the build-test-ios-app
+you should specify specify the additional flag -d to the build-test-ios-app
 target, e.g.
 
-$ sh build.sh build-test-ios-app -DEBUG
+$ sh build.sh build-test-ios-app -d
 
-You can also specify a list of options for xcodebuild, e.g.
+### -a
+
+By default, the Xcode project built, builds the app for all standard
+architectures, including 64-bit architectures. (Currently, armv7, armv7s, and
+arm64.) This means that the app is compiled and tested for all of these
+architectures when you do test-ios-app.
+
+We have thus far failed to figure out a way to report the target architecture
+to stdout before or after we test for a particular one. We've posted a question
+about this on StackOverflow: http://stackoverflow.com/questions/23934862/.
+
+In the meanwhile, you can specify the target archtecture (or a space-separated
+list thereof) as an option, e.g.
+
+$ sh build.sh build-test-ios-app -a armv7
+$ sh build.sh build-test-ios-app -a "armv7 armv7s"
+
+## test-ios-app options
+
+test-ios-app forwards all options that you add to xcodebuild. So you can e.g.
 
 $ sh build.sh test-ios-app -destination "platform=iOS,name=tightdb's iPad"
 
@@ -51,10 +74,3 @@ using an inspector, or using a test scheme.
 
 * We also redirect the XML output to standard out since there is seemingly no
 easy way of fetching XML files from an iOS device.
-
-Note, the tests are run (seemingly) multiple times. They are really run once
-for each target architecture. At the time of writing, this is armv7, armv7s,
-arm64. We have thus far failed to figure out a way to report the target
-architecture to stdout before or after we test for a particular target
-architecture. We've posted a question about this on StackOverflow:
-http://stackoverflow.com/questions/23934862/.

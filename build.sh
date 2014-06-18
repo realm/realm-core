@@ -41,6 +41,25 @@ IPHONE_DIR="iphone-lib"
 ANDROID_DIR="android-lib"
 ANDROID_PLATFORMS="arm arm-v7a mips x86"
 
+usage()
+{
+    cat 1>&2 << EOF
+Unspecified or bad mode '$MODE'.
+Available modes are:
+    config clean build build-config-progs build-iphone build-android
+    build-osx-framework build-objc
+    check check-debug show-install install uninstall
+    test-installed wipe-installed install-prod install-devel uninstall-prod
+    uninstall-devel dist-copy src-dist bin-dist dist-deb dist-status
+    dist-pull dist-checkout dist-config dist-clean dist-build
+    dist-build-iphone dist-test dist-test-debug dist-install dist-uninstall
+    dist-test-installed get-version set-version copy-tools
+    build-test-ios-app:     build an iOS app for testing core on device
+    test-ios-app:           execute the core tests on device
+    leak-test-ios-app:      execute the core tests on device, monitor for leaks
+EOF
+}
+
 map_ext_name_to_dir()
 {
     local ext_name
@@ -723,11 +742,20 @@ EOF
         ;;
 
     "build-test-ios-app")
-        # For more documentation, see test/ios/README.md
-        DEBUG=
-        if [ "$1" == "-DEBUG" ]; then
-            DEBUG=1
-        fi
+        # For more documentation, see test/ios/README.md.
+
+        ARCHS="\$(ARCHS_STANDARD_INCLUDING_64_BIT)"
+        while getopts da: OPT; do
+            case $OPT in
+                d)  DEBUG=1
+                    ;;
+                a)  ARCHS=$OPTARG
+                    ;;
+                *)  usage
+                    exit 1
+                    ;;
+            esac
+        done
 
         sh build.sh build-iphone
 
@@ -786,7 +814,10 @@ EOF
         APP_SOURCES=$(cd $TEST_DIR && find "$TEST_APP" -type f | \
             sed -E "s/^(.*)$/                '\1',/") || exit 1
         TEST_APP_SOURCES="$APP_SOURCES"
-        RESOURCES="$(echo "$RESOURCES" | sed -E "s/ /', '/g")" || exit 1
+
+        # Prepare for GYP
+        ARCHS="$(echo "'$ARCHS'," | sed -E "s/ /', '/g")" || exit 1
+        RESOURCES="$(echo "'$RESOURCES'," | sed -E "s/ /', '/g")" || exit 1
         
         # Generate a Gyp file.
         . "$TMPL_DIR/App.gyp.sh"
@@ -2502,22 +2533,7 @@ EOF
         exit 0
         ;;
 
-    *)
-        cat 1>&2 << EOF
-Unspecified or bad mode '$MODE'.
-Available modes are:
-    config clean build build-config-progs build-iphone build-android
-    build-osx-framework build-objc
-    check check-debug show-install install uninstall
-    test-installed wipe-installed install-prod install-devel uninstall-prod
-    uninstall-devel dist-copy src-dist bin-dist dist-deb dist-status
-    dist-pull dist-checkout dist-config dist-clean dist-build
-    dist-build-iphone dist-test dist-test-debug dist-install dist-uninstall
-    dist-test-installed get-version set-version copy-tools
-    build-test-ios-app:     build an iOS app for testing core on device
-    test-ios-app:           execute the core tests on device
-    leak-test-ios-app:      execute the core tests on device, monitor for leaks
-EOF
+    *)  usage
         exit 1
         ;;
 esac
