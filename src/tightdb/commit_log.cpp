@@ -226,6 +226,7 @@ void WriteLogRegistry::get_commit_entries(int interest_registration_id, version_
 {
     util::LockGuard lock(m_mutex);
     size_t dest_idx = 0;
+    static_cast<void>(interest_registration_id);
     TIGHTDB_ASSERT(m_interests[interest_registration_id].next_free_entry == InterestInUse);
     TIGHTDB_ASSERT(from >= m_interests[interest_registration_id].last_seen_version);
     for (version_type version = from+1; version <= to; version++) {
