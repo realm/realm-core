@@ -2568,6 +2568,41 @@ void reader_thread(TestResults* test_results_ptr, string path)
 
 }
 
+TEST(LangBindHelper_Implicit_Transactions_Over_SharedGroup_Destruction)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    {
+        // we hold on to write log collector and registry across a complete
+        // shutdown/initialization of shared group.
+        UniquePtr<Replication> repl(makeWriteLogCollector(path));
+        UniquePtr<LangBindHelper::TransactLogRegistry> wlr(getWriteLogs(path));
+        {
+            SharedGroup sg(*repl);
+            {
+                WriteTransaction wt(sg);
+                TableRef tr = wt.get_table("table");
+                tr->add_column(type_Int, "first");
+                for (int i=0; i<20; i++)
+                    tr->add_empty_row();
+                wt.commit();
+            }
+            // no valid shared group anymore
+        }
+        {
+            UniquePtr<Replication> repl(makeWriteLogCollector(path));
+            UniquePtr<LangBindHelper::TransactLogRegistry> wlr(getWriteLogs(path));
+            SharedGroup sg(*repl);
+            {
+                WriteTransaction wt(sg);
+                TableRef tr = wt.get_table("table");
+                for (int i=0; i<20; i++)
+                    tr->add_empty_row();
+                wt.commit();
+            }
+        }
+    }
+}
+
 TEST(LangBindHelper_Implicit_Transactions_Multiple_Trackers)
 {
     const int write_thread_count = 3;

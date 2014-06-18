@@ -153,7 +153,6 @@ void WriteLogRegistry::add_commit(version_type version, char* data, std::size_t 
         // [1] This is valid because a reset of the versioning numbers can occur ONLY
         // when the *first* instance of shared group is created, so by definition all
         // earlier instances referring to the same database must have been deleted.
-        std::cerr << "Going back in time" << std::endl;
         for (size_t interest_id = 0; interest_id < m_interests.size(); ++interest_id) {
             if (m_interests[interest_id].next_free_entry == InterestInUse
                 && m_interests[interest_id].last_seen_version >= 2)
