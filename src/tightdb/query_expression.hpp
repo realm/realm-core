@@ -218,6 +218,7 @@ template<class T1, class T2, bool b> struct Common<T1, T2, true , false, b> {
 struct ValueBase
 {
     static const size_t default_size = 8;
+    virtual void export_bool(ValueBase& destination) const = 0;
     virtual void export_int(ValueBase& destination) const = 0;
     virtual void export_float(ValueBase& destination) const = 0;
     virtual void export_int64_t(ValueBase& destination) const = 0;
@@ -586,6 +587,11 @@ public:
         }
     }
 
+    TIGHTDB_FORCEINLINE void export_bool(ValueBase& destination) const
+    {
+        export2<bool>(destination);
+    }
+
     TIGHTDB_FORCEINLINE void export_int64_t(ValueBase& destination) const
     {
         export2<int64_t>(destination);
@@ -614,6 +620,8 @@ public:
     {
         if (util::SameType<T, int>::value)
             source.export_int(*this);
+        else if (util::SameType<T, bool>::value)
+            source.export_bool(*this);
         else if (util::SameType<T, float>::value)
             source.export_float(*this);
         else if (util::SameType<T, double>::value)
