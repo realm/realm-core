@@ -28,9 +28,12 @@ cat >"$TEST_DIR/$APP.gyp" <<EOF
                 '\$(SDKROOT)/System/Library/Frameworks/Foundation.framework',
                 '\$(SDKROOT)/System/Library/Frameworks/CoreGraphics.framework',
                 '\$(SDKROOT)/System/Library/Frameworks/UIKit.framework',
-                '$FRAMEWORK',
+                $FRAMEWORKS
             ],
         },
+        'include_dirs': [
+            $HEADER_SEARCH_PATHS
+        ]
     },
     'targets': [
         {
@@ -48,7 +51,7 @@ $APP_SOURCES
                 '$APP/en.lproj/InfoPlist.strings',
                 '$APP/$APP-Info.plist',
                 '$APP/$APP-Prefix.pch',
-                '$RESOURCES'
+                '$RESOURCES',
             ],
             'include_dirs': [
                 '$TEST_APP/**'

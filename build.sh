@@ -759,13 +759,12 @@ EOF
 
     "build-test-ios-app")
         # For more documentation, see test/ios/README.md
-
+        DEBUG=
         if [ "$1" == "-DEBUG" ]; then
-            OTHER_CPLUSPLUSFLAGS="'-DTIGHTDB_DEBUG'"
+            DEBUG=1
         fi
 
         sh build.sh build-iphone
-        sh build.sh build-ios-framework $1
 
         TMPL_DIR="test/ios/template"
         TEST_DIR="test/ios/app"
@@ -796,14 +795,21 @@ EOF
         (cd ./test && rsync $RESOURCES "../$APP_DIR") || exit 1
         RESOURCES="$(echo "$RESOURCES" | sed -E "s/(^| )/\1$APP\//g")" || exit 1
 
-        # Replace all dynamic includes with framework includes.
-        find "$TEST_APP_DIR" -type f -exec sed -i '' \
-            -e "s/<tightdb\(.*\)>/<RealmCore\/tightdb\1>/g" {} \; || exit 1
+        # Set up frameworks, or rather, static libraries.
+        rm -rf "$TEST_DIR/$IPHONE_DIR" || exit 1
+        cp -r "../tightdb/$IPHONE_DIR" "$TEST_DIR/$IPHONE_DIR" || exit 1
+        if [ -n "$DEBUG" ]; then
+            FRAMEWORK="$IPHONE_DIR/libtightdb-ios-dbg.a"
+        else
+            FRAMEWORK="$IPHONE_DIR/libtightdb-ios.a"
+        fi
+        FRAMEWORKS="'$FRAMEWORK'"
+        HEADER_SEARCH_PATHS="'$IPHONE_DIR/include/**'"
 
-        # Set up frameworks.
-        FRAMEWORK="RealmCore.framework"
-        rm -rf "$APP_DIR/$FRAMEWORK" || exit 1
-        cp -r "../tightdb/$FRAMEWORK" "$TEST_DIR/$FRAMEWORK" || exit 1
+        # Other flags
+        if [ -n "$DEBUG" ]; then
+            OTHER_CPLUSPLUSFLAGS="'-DTIGHTDB_DEBUG'"
+        fi
         
         # Initialize app directory
         cp -r "test/ios/template/App/"* "$APP_DIR" || exit 1
