@@ -49,11 +49,32 @@ $ sh build.sh build-test-ios-app -a "armv7 armv7s"
 
 ## test-ios-app options
 
-test-ios-app forwards all options that you add to xcodebuild. So you can e.g.
+test-ios-app forwards all options that you add to xcodebuild. See XCODEBUILD(1)
+for more details.
+
+### -destination
+
+This specifies which iOS device the app should be tested. The available
+platforms are iOS, and iOS Simulator. In either casem you need a device name,
+these are listed in Xcode. Examples:
 
 $ sh build.sh test-ios-app -destination "platform=iOS,name=tightdb's iPad"
+$ sh build.sh test-ios-app -destination "platform=iOS Simulator,name=iPad"
 
-The above is the default target for test-ios-app.
+The first example above is the default.
+
+### -arch
+
+This is an alternative to specifying -a for build-test-ios-app, with the
+exception that you can't specify multiple architectures. It follows that this:
+
+$ sh build.sh build-test-ios-app -a armv7
+$ sh build.sh test-ios-app
+
+Has the same effect as this:
+
+$ sh build.sh build-test-ios-app
+$ sh build.sh test-ios-app -arch armv7
 
 ## Implementation Details
 

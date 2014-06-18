@@ -4,7 +4,7 @@ cat >"$TEST_DIR/$APP.gyp" <<EOF
 {
     'xcode_settings': {
         'ARCHS': [
-            '\$(ARCHS_STANDARD_INCLUDING_64_BIT)',
+            $ARCHS
         ],
         'SDKROOT': 'iphoneos',
         'TARGETED_DEVICE_FAMILY': '_BASENAME1,2', # iPhone/iPad
@@ -51,7 +51,7 @@ $APP_SOURCES
                 '$APP/en.lproj/InfoPlist.strings',
                 '$APP/$APP-Info.plist',
                 '$APP/$APP-Prefix.pch',
-                '$RESOURCES',
+                $RESOURCES
             ],
             'include_dirs': [
                 '$TEST_APP/**'
