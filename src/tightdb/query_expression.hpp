@@ -218,6 +218,7 @@ template<class T1, class T2, bool b> struct Common<T1, T2, true , false, b> {
 struct ValueBase
 {
     static const size_t default_size = 8;
+    virtual void export_bool(ValueBase& destination) const = 0;
     virtual void export_int(ValueBase& destination) const = 0;
     virtual void export_float(ValueBase& destination) const = 0;
     virtual void export_int64_t(ValueBase& destination) const = 0;
@@ -405,7 +406,7 @@ public:
             const Table* t = (const_cast<Columns<R>*>(left_col))->get_table();
             Query q = Query(*t);
 
-            if (std::numeric_limits<L>::is_integer) {
+            if (std::numeric_limits<L>::is_integer || util::SameType<L, DateTime>::value) {
                 if (util::SameType<Cond, Less>::value)
                     q.less_int(left_col->m_column, right_col->m_column);
                 else if (util::SameType<Cond, Greater>::value)
@@ -495,13 +496,14 @@ public:
 // With this wrapper class we can define just 20 overloads inside Overloads<L, R> instead of 5 * 20 = 100. Todo: We can
 // consider if it's simpler/better to remove this class completely and just list all 100 overloads manually anyway.
 template <class T> class Subexpr2 : public Subexpr, public Overloads<T, const char*>, public Overloads<T, int>, public
-    Overloads<T, float>, public Overloads<T, double>, public Overloads<T, int64_t>, public Overloads<T, StringData>
+    Overloads<T, float>, public Overloads<T, double>, public Overloads<T, int64_t>, public Overloads<T, StringData>,
+    public Overloads<T, bool>, public Overloads<T, DateTime>
 {
 public:
     virtual ~Subexpr2() {};
 
     #define TDB_U2(t, o) using Overloads<T, t>::operator o;
-    #define TDB_U(o) TDB_U2(int, o) TDB_U2(float, o) TDB_U2(double, o) TDB_U2(int64_t, o) TDB_U2(StringData, o)
+    #define TDB_U(o) TDB_U2(int, o) TDB_U2(float, o) TDB_U2(double, o) TDB_U2(int64_t, o) TDB_U2(StringData, o) TDB_U2(bool, o) TDB_U2(DateTime, o)
     TDB_U(+) TDB_U(-) TDB_U(*) TDB_U(/) TDB_U(>) TDB_U(<) TDB_U(==) TDB_U(!=) TDB_U(>=) TDB_U(<=)
 };
 
@@ -585,6 +587,11 @@ public:
         }
     }
 
+    TIGHTDB_FORCEINLINE void export_bool(ValueBase& destination) const
+    {
+        export2<bool>(destination);
+    }
+
     TIGHTDB_FORCEINLINE void export_int64_t(ValueBase& destination) const
     {
         export2<int64_t>(destination);
@@ -613,6 +620,8 @@ public:
     {
         if (util::SameType<T, int>::value)
             source.export_int(*this);
+        else if (util::SameType<T, bool>::value)
+            source.export_bool(*this);
         else if (util::SameType<T, float>::value)
             source.export_float(*this);
         else if (util::SameType<T, double>::value)
