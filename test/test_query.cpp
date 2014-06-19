@@ -787,7 +787,7 @@ TEST(Query_MergeQueries)
     CHECK_EQUAL(1, c);
 }
 
-TEST(NotQueries)
+TEST(Query_Not)
 {
     // test Not vs And, Or, Groups.
     Table table;
@@ -2948,7 +2948,7 @@ TEST(Query_Simple)
     CHECK_EQUAL(1, tv1.get_source_ndx(0));
 }
 
-TEST(TestQueryNot)
+TEST(Query_Not2)
 {
     TupleTableType ttt;
 

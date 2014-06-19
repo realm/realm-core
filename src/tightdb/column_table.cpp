@@ -68,9 +68,9 @@ Table* ColumnTable::get_subtable_ptr(size_t subtable_ndx)
 
 void ColumnSubtableParent::child_accessor_destroyed(Table* child) TIGHTDB_NOEXCEPT
 {
-    // This function must be able to operate with only the Minimal Accessor
-    // Hierarchy Consistency Guarantee. This means, in particular, that it
-    // cannot access the underlying array structure.
+    // This function must assume no more than minimal consistency of the
+    // accessor hierarchy. This means in particular that it cannot access the
+    // underlying node structure. See AccessorConcistncyLevels.
 
     // Note that due to the possibility of a failure during child creation, it
     // is possible that the calling child is not in the map.

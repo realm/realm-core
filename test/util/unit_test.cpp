@@ -603,8 +603,12 @@ void SimpleReporter::summary(const Summary& summary)
             "out of "<<summary.num_checks<<" checks failed).\n";
     }
     cout << "Test time: "<<Timer::format(summary.elapsed_seconds)<<"\n";
-    if (summary.num_excluded_tests != 0)
+    if (summary.num_excluded_tests == 1) {
+        cout << "\nNote: One test was excluded!\n";
+    }
+    else if (summary.num_excluded_tests > 1) {
         cout << "\nNote: "<<summary.num_excluded_tests<<" tests were excluded!\n";
+    }
 }
 
 

@@ -20,17 +20,15 @@
 #ifndef TIGHTDB_LINK_VIEW_HPP
 #define TIGHTDB_LINK_VIEW_HPP
 
-#include <tightdb/table.hpp>
+#include <tightdb/util/bind_ptr.hpp>
 #include <tightdb/column.hpp>
 #include <tightdb/column_linklist.hpp>
-#include <tightdb/util/bind_ptr.hpp>
+#include <tightdb/link_view_fwd.hpp>
+#include <tightdb/table.hpp>
 
 namespace tightdb {
 
 class ColumnLinkList;
-class LinkView;
-
-typedef util::bind_ptr<LinkView> LinkViewRef;
 
 class LinkView {
 public:
@@ -41,6 +39,9 @@ public:
     // Size info
     bool is_empty() const TIGHTDB_NOEXCEPT;
     std::size_t size() const TIGHTDB_NOEXCEPT;
+
+    bool operator==(const LinkView&) const TIGHTDB_NOEXCEPT;
+    bool operator!=(const LinkView&) const TIGHTDB_NOEXCEPT;
 
     // Getting links
     Table::RowExpr operator[](std::size_t row_ndx) TIGHTDB_NOEXCEPT;
@@ -77,12 +78,18 @@ private:
 
     friend class ColumnLinkList;
     friend class util::bind_ptr<LinkView>;
+    friend class util::bind_ptr<const LinkView>;
     friend class LangBindHelper;
 };
 
 // Implementation
 
-inline LinkView::LinkView(ColumnLinkList& column, std::size_t row_ndx) : m_row_ndx(row_ndx), m_table(column.get_target_table()), m_column(column), m_refs(&column, row_ndx, column.get_alloc()), m_ref_count(0)
+inline LinkView::LinkView(ColumnLinkList& column, std::size_t row_ndx):
+    m_row_ndx(row_ndx),
+    m_table(column.get_target_table()->get_table_ref()),
+    m_column(column),
+    m_refs(&column, row_ndx, column.get_alloc()),
+    m_ref_count(0)
 {
     ref_type ref = column.get_row_ref(row_ndx);
     if (ref) {
@@ -148,6 +155,20 @@ inline std::size_t LinkView::size() const TIGHTDB_NOEXCEPT
         return 0;
 
     return m_refs.size();
+}
+
+inline bool LinkView::operator==(const LinkView& link_list) const TIGHTDB_NOEXCEPT
+{
+    if (m_table->get_index_in_parent() != link_list.m_table->get_index_in_parent())
+        return false;
+    if (!m_refs.is_attached() || m_refs.is_empty())
+        return !link_list.m_refs.is_attached() || link_list.m_refs.is_empty();
+    return link_list.m_refs.is_attached() && m_refs.compare_int(link_list.m_refs);
+}
+
+inline bool LinkView::operator!=(const LinkView& link_list) const TIGHTDB_NOEXCEPT
+{
+    return !(*this == link_list);
 }
 
 inline Table::RowExpr LinkView::get(std::size_t row_ndx) TIGHTDB_NOEXCEPT

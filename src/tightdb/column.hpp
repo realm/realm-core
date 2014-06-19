@@ -155,11 +155,11 @@ public:
     /// function does nothing.
     virtual void discard_subtable_accessor(std::size_t row_ndx) TIGHTDB_NOEXCEPT;
 
-    virtual void adj_subtab_acc_insert_rows(std::size_t row_ndx,
-                                            std::size_t num_rows) TIGHTDB_NOEXCEPT;
-    virtual void adj_subtab_acc_erase_row(std::size_t row_ndx) TIGHTDB_NOEXCEPT;
-    virtual void adj_subtab_acc_move_last_over(std::size_t target_row_ndx,
-                                               std::size_t last_row_ndx) TIGHTDB_NOEXCEPT;
+    virtual void adj_accessors_insert_rows(std::size_t row_ndx,
+                                           std::size_t num_rows) TIGHTDB_NOEXCEPT;
+    virtual void adj_accessors_erase_row(std::size_t row_ndx) TIGHTDB_NOEXCEPT;
+    virtual void adj_accessors_move_last_over(std::size_t target_row_ndx,
+                                              std::size_t last_row_ndx) TIGHTDB_NOEXCEPT;
 
     virtual void recursive_mark_dirty() TIGHTDB_NOEXCEPT;
 
@@ -177,9 +177,9 @@ public:
     ///    refreshed.
     ///
     ///  - This column accessor, as well as all its descendant accessors, are in
-    ///    a collective state that satisfies the Accessor Hierarchy
-    ///    Correspondence Guarantee with respect to the root ref stored in the
-    ///    parent (`Table::m_columns`).
+    ///    structural correspondence with the underlying node hierarchy whose
+    ///    root ref is stored in the parent (`Table::m_columns`) (see
+    ///    AccessorConsistencyLevels).
     ///
     ///  - The 'index in parent' property of the cached root array
     ///    (`m_array->m_ndx_in_parent`) is valid.
@@ -203,8 +203,8 @@ protected:
 
     virtual std::size_t do_get_size() const TIGHTDB_NOEXCEPT = 0;
 
-    // Must be able to operate with only the Minimal Accessor Hierarchy
-    // Consistency Guarantee.
+    // Must not assume more than minimal consistency (see
+    // AccessorConsistencyLevels).
     virtual void do_detach_subtable_accessors() TIGHTDB_NOEXCEPT {}
 
     //@{
@@ -345,7 +345,7 @@ public:
     size_t find_gte(int64_t target, size_t start) const;
 
     /// Compare two columns for equality.
-    bool compare_int(const Column&) const;
+    bool compare_int(const Column&) const TIGHTDB_NOEXCEPT;
 
     static ref_type create(Array::Type leaf_type, std::size_t size, int_fast64_t value,
                            Allocator&);
@@ -438,17 +438,17 @@ inline void ColumnBase::discard_subtable_accessor(std::size_t) TIGHTDB_NOEXCEPT
     // Noop
 }
 
-inline void ColumnBase::adj_subtab_acc_insert_rows(std::size_t, std::size_t) TIGHTDB_NOEXCEPT
+inline void ColumnBase::adj_accessors_insert_rows(std::size_t, std::size_t) TIGHTDB_NOEXCEPT
 {
     // Noop
 }
 
-inline void ColumnBase::adj_subtab_acc_erase_row(std::size_t) TIGHTDB_NOEXCEPT
+inline void ColumnBase::adj_accessors_erase_row(std::size_t) TIGHTDB_NOEXCEPT
 {
     // Noop
 }
 
-inline void ColumnBase::adj_subtab_acc_move_last_over(std::size_t, std::size_t) TIGHTDB_NOEXCEPT
+inline void ColumnBase::adj_accessors_move_last_over(std::size_t, std::size_t) TIGHTDB_NOEXCEPT
 {
     // Noop
 }

@@ -254,6 +254,30 @@ public:
         return false;
     }
 
+    bool set_link(size_t col_ndx, size_t row_ndx, std::size_t value)
+    {
+        if (TIGHTDB_LIKELY(check_set_cell(col_ndx, row_ndx))) {
+#ifdef TIGHTDB_DEBUG
+            if (m_log) {
+                if (value == 0) {
+                    *m_log << "table->nullify_link("<<col_ndx<<", "<<row_ndx<<")\n";
+                }
+                else {
+                    *m_log << "table->set_link("<<col_ndx<<", "<<row_ndx<<", "<<(value-1)<<")\n";
+                }
+            }
+#endif
+            if (value == 0) {
+                m_table->nullify_link(col_ndx, row_ndx); // Throws
+            }
+            else {
+                m_table->set_link(col_ndx, row_ndx, value-1); // Throws
+            }
+            return true;
+        }
+        return false;
+    }
+
     bool insert_int(size_t col_ndx, size_t row_ndx, int_fast64_t value)
     {
         if (TIGHTDB_LIKELY(check_insert_cell(col_ndx, row_ndx))) {
@@ -366,6 +390,33 @@ public:
                 *m_log << "table->insert_mixed("<<col_ndx<<", "<<row_ndx<<", "<<value<<")\n";
 #endif
             m_table->insert_mixed(col_ndx, row_ndx, value); // Throws
+            return true;
+        }
+        return false;
+    }
+
+    bool insert_link(size_t col_ndx, size_t row_ndx, std::size_t value)
+    {
+        TIGHTDB_ASSERT(value > 0); // Not yet any support for inserting null links
+        if (TIGHTDB_LIKELY(check_insert_cell(col_ndx, row_ndx))) {
+#ifdef TIGHTDB_DEBUG
+            if (m_log)
+                *m_log << "table->insert_link("<<col_ndx<<", "<<row_ndx<<", "<<(value-1)<<")\n";
+#endif
+            m_table->insert_link(col_ndx, row_ndx, value-1); // Throws
+            return true;
+        }
+        return false;
+    }
+
+    bool insert_link_list(size_t col_ndx, size_t row_ndx)
+    {
+        if (TIGHTDB_LIKELY(check_insert_cell(col_ndx, row_ndx))) {
+#ifdef TIGHTDB_DEBUG
+            if (m_log)
+                *m_log << "table->insert_link_list("<<col_ndx<<", "<<row_ndx<<")\n";
+#endif
+            m_table->insert_linklist(col_ndx, row_ndx); // Throws
             return true;
         }
         return false;
@@ -659,27 +710,27 @@ private:
     {
         switch (type) {
             case type_Int:
-                return "Tnt";
+                return "type_Int";
             case type_Bool:
-                return "Bool";
+                return "type_Bool";
             case type_Float:
-                return "Float";
+                return "type_Float";
             case type_Double:
-                return "Double";
+                return "type_Double";
             case type_String:
-                return "String";
+                return "type_String";
             case type_Binary:
-                return "Binary";
+                return "type_Binary";
             case type_DateTime:
-                return "DataTime";
+                return "type_DataTime";
             case type_Table:
-                return "Table";
+                return "type_Table";
             case type_Mixed:
-                return "Mixed";
+                return "type_Mixed";
             case type_Link:
-                return "Link";
+                return "type_Link";
             case type_LinkList:
-                return "LinkList";
+                return "type_LinkList";
         }
         TIGHTDB_ASSERT(false);
         return 0;
