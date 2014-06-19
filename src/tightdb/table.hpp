@@ -41,8 +41,10 @@ class TableViewBase;
 class ConstTableView;
 class StringIndex;
 class Group;
-class ColumnBackLink;
 class ColumnLinkBase;
+class ColumnLink;
+class ColumnLinkList;
+class ColumnBackLink;
 
 template<class> class Columns;
 
@@ -382,6 +384,7 @@ public:
     void nullify_link(std::size_t column_ndx, std::size_t row_ndx);
 
     // Link lists
+    ConstLinkViewRef get_linklist(std::size_t column_ndx, std::size_t row_ndx) const;
     LinkViewRef get_linklist(std::size_t column_ndx, std::size_t row_ndx);
     bool linklist_is_empty(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
     std::size_t get_link_count(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
@@ -570,7 +573,7 @@ public:
     Query where(TableViewBase* tv = null_ptr) const { return Query(*this, tv); }
 
     Table& link(size_t link_column);
-    
+
     // Optimizing
     void optimize();
 
@@ -658,9 +661,9 @@ protected:
     /// See non-const get_subtable_ptr().
     const Table* get_subtable_ptr(std::size_t col_ndx, std::size_t row_ndx) const;
 
-    /// Compare the rows of two tables under the assumption that the
-    /// two tables have the same spec, and therefore the same sequence
-    /// of columns.
+    /// Compare the rows of two tables under the assumption that the two tables
+    /// have the same number of columns, and the same data type at each column
+    /// index (as expressed through the DataType enum).
     bool compare_rows(const Table&) const;
 
     void insert_into(Table* parent, std::size_t col_ndx, std::size_t row_ndx) const;
@@ -909,7 +912,6 @@ private:
 
     const ColumnBase& get_column_base(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
     ColumnBase& get_column_base(std::size_t column_ndx);
-    ColumnLinkBase& get_column_linkbase(size_t ndx);
     template <class T, ColumnType col_type> T& get_column(std::size_t ndx);
     template <class T, ColumnType col_type> const T& get_column(std::size_t ndx) const TIGHTDB_NOEXCEPT;
     Column& get_column(std::size_t column_ndx);
@@ -928,13 +930,25 @@ private:
     const ColumnTable& get_column_table(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
     ColumnMixed& get_column_mixed(std::size_t column_ndx);
     const ColumnMixed& get_column_mixed(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
+    const ColumnLinkBase& get_column_link_base(std::size_t ndx) const TIGHTDB_NOEXCEPT;
+    ColumnLinkBase& get_column_link_base(std::size_t ndx);
+    const ColumnLink& get_column_link(std::size_t ndx) const TIGHTDB_NOEXCEPT;
+    ColumnLink& get_column_link(std::size_t ndx);
+    const ColumnLinkList& get_column_link_list(std::size_t ndx) const TIGHTDB_NOEXCEPT;
+    ColumnLinkList& get_column_link_list(std::size_t ndx);
+    const ColumnBackLink& get_column_back_link(std::size_t ndx) const TIGHTDB_NOEXCEPT;
+    ColumnBackLink& get_column_back_link(std::size_t ndx);
 
     void instantiate_before_change();
-    void validate_column_type(const ColumnBase& column, ColumnType expected_type, std::size_t ndx) const;
+    void validate_column_type(const ColumnBase& column, ColumnType expected_type,
+                              std::size_t ndx) const;
 
     static std::size_t get_size_from_ref(ref_type top_ref, Allocator&) TIGHTDB_NOEXCEPT;
     static std::size_t get_size_from_ref(ref_type spec_ref, ref_type columns_ref,
                                          Allocator&) TIGHTDB_NOEXCEPT;
+
+    const Table* get_parent_table_ptr(std::size_t* column_ndx_out = 0) const TIGHTDB_NOEXCEPT;
+    Table* get_parent_table_ptr(std::size_t* column_ndx_out = 0) TIGHTDB_NOEXCEPT;
 
     /// Create an empty table with independent spec and return just
     /// the reference to the underlying memory.
@@ -961,8 +975,7 @@ private:
     static bool is_link_type(DataType) TIGHTDB_NOEXCEPT;
 
     void initialize_link_targets(Group&, std::size_t table_ndx);
-    void create_backlinks_column(Table& origin, std::size_t origin_col_ndx,
-                                 ColumnType origin_col_type);
+    void create_backlinks_column(Table& origin, std::size_t origin_col_ndx);
     ColumnBackLink& get_backlink_column(std::size_t origin_table_ndx,
                                         std::size_t origin_col_ndx) TIGHTDB_NOEXCEPT;
     void update_backlink_column_ref(std::size_t origin_table_ndx, std::size_t old_col_ndx,
@@ -972,19 +985,34 @@ private:
     std::size_t* record_subtable_path(std::size_t* begin,
                                       std::size_t* end) const TIGHTDB_NOEXCEPT;
 
-    /// Get a pointer to the accessor of the specified subtable if the
-    /// accessor exists, otherwise this function return null.
+    /// Check if an accessor exists for the specified subtable. If it does,
+    /// return a pointer to it, otherwise return null. This function assumes
+    /// that the specified column index in a valid index into `m_cols` but does
+    /// not otherwise assume more than minimal accessor consistency (see
+    /// AccessorConsistencyLevels.)
     Table* get_subtable_accessor(std::size_t col_ndx, std::size_t row_ndx) TIGHTDB_NOEXCEPT;
+
+    /// Unless the column accessor is missing, this function returns the
+    /// accessor for the target table of the specified link-type column. The
+    /// column accessor is said to be missing if `m_cols[col_ndx]` is null, and
+    /// this can happen only during certain operations such as the updating of
+    /// the accessor tree when a read transaction is advanced. Note that for
+    /// link type columns, the target table accessor exists when, and only when
+    /// the origin table accessor exists. This function assumes that the
+    /// specified column index in a valid index into `m_cols` and that the
+    /// column is a link-type column. Beyond that, it assume nothing more than
+    /// minimal accessor consistency (see AccessorConsistencyLevels.)
+    Table* get_link_target_table_accessor(std::size_t col_ndx) TIGHTDB_NOEXCEPT;
 
     void discard_subtable_accessor(std::size_t col_ndx, std::size_t row_ndx) TIGHTDB_NOEXCEPT;
 
-    void adj_row_acc_insert_rows(std::size_t row_ndx, std::size_t num_rows) TIGHTDB_NOEXCEPT;
-    void adj_subtab_acc_insert_rows(std::size_t row_ndx, std::size_t num_rows) TIGHTDB_NOEXCEPT;
-    void adj_row_acc_erase_row(std::size_t row_ndx) TIGHTDB_NOEXCEPT;
-    void adj_subtab_acc_erase_row(std::size_t row_ndx) TIGHTDB_NOEXCEPT;
-    void adj_row_acc_move_last_over(std::size_t target_row_ndx, std::size_t last_row_ndx)
+    void adj_accessors_insert_rows(std::size_t row_ndx, std::size_t num_rows) TIGHTDB_NOEXCEPT;
+    void adj_accessors_erase_row(std::size_t row_ndx) TIGHTDB_NOEXCEPT;
+    void adj_accessors_move_last_over(std::size_t target_row_ndx, std::size_t last_row_ndx)
         TIGHTDB_NOEXCEPT;
-    void adj_subtab_acc_move_last_over(std::size_t target_row_ndx, std::size_t last_row_ndx)
+    void adj_row_acc_insert_rows(std::size_t row_ndx, std::size_t num_rows) TIGHTDB_NOEXCEPT;
+    void adj_row_acc_erase_row(std::size_t row_ndx) TIGHTDB_NOEXCEPT;
+    void adj_row_acc_move_last_over(std::size_t target_row_ndx, std::size_t last_row_ndx)
         TIGHTDB_NOEXCEPT;
     void adj_clear_nonroot() TIGHTDB_NOEXCEPT;
     void adj_insert_column(std::size_t col_ndx);
@@ -992,6 +1020,7 @@ private:
 
     void mark_dirty() TIGHTDB_NOEXCEPT;
     void recursive_mark_dirty() TIGHTDB_NOEXCEPT;
+    void regressive_mark_dirty() TIGHTDB_NOEXCEPT; // Towards root
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     Replication* get_repl() TIGHTDB_NOEXCEPT;
@@ -1014,9 +1043,8 @@ private:
     ///    has a descendant accessor that needs to be refreshed.
     ///
     ///  - This table accessor, as well as all its descendant accessors, are in
-    ///    a collective state that satisfies the Accessor Hierarchy
-    ///    Correspondence Guarantee with respect to the root ref stored in the
-    ///    parent.
+    ///    structural correspondence with the underlying node hierarchy whose
+    ///    root ref is stored in the parent (see AccessorConsistencyLevels).
     ///
     ///  - If this table has shared descriptor, then the `index in parent`
     ///    property of the contained spec accessor is valid.
@@ -1091,8 +1119,8 @@ protected:
     /// Must be called whenever a child table accessor is about to be destroyed.
     ///
     /// Note that the argument is a pointer to the child Table rather than its
-    /// `ndx_in_parent` property. This is because it must be able to operate
-    /// with only the Minimal Accessor Hierarchy Consistency Guarantee.
+    /// `ndx_in_parent` property. This is because only minimal accessor
+    /// consistency can be assumed by this function.
     virtual void child_accessor_destroyed(Table* child) TIGHTDB_NOEXCEPT = 0;
 
     virtual std::size_t* record_subtable_path(std::size_t* begin,
@@ -1168,24 +1196,26 @@ inline DataType Table::get_column_type(std::size_t ndx) const TIGHTDB_NOEXCEPT
     return m_spec.get_public_column_type(ndx);
 }
 
-template <class C, ColumnType coltype>
+template <class C, ColumnType col_type>
 C& Table::get_column(std::size_t ndx)
 {
-    ColumnBase& column = get_column_base(ndx);
+    ColumnBase& col = get_column_base(ndx);
 #ifdef TIGHTDB_DEBUG
-    validate_column_type(column, coltype, ndx);
+    validate_column_type(col, col_type, ndx);
 #endif
-    return static_cast<C&>(column);
+    TIGHTDB_ASSERT(dynamic_cast<C*>(&col));
+    return static_cast<C&>(col);
 }
 
-template <class C, ColumnType coltype>
+template <class C, ColumnType col_type>
 const C& Table::get_column(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
-    const ColumnBase& column = get_column_base(ndx);
+    const ColumnBase& col = get_column_base(ndx);
 #ifdef TIGHTDB_DEBUG
-    validate_column_type(column, coltype, ndx);
+    validate_column_type(col, col_type, ndx);
 #endif
-    return static_cast<const C&>(column);
+    TIGHTDB_ASSERT(dynamic_cast<const C*>(&col));
+    return static_cast<const C&>(col);
 }
 
 inline bool Table::has_shared_type() const TIGHTDB_NOEXCEPT
@@ -1433,7 +1463,12 @@ inline ConstTableRef Table::get_subtable(std::size_t column_ndx, std::size_t row
 
 inline ConstTableRef Table::get_parent_table(std::size_t* column_ndx_out) const TIGHTDB_NOEXCEPT
 {
-    return const_cast<Table*>(this)->get_parent_table(column_ndx_out);
+    return ConstTableRef(get_parent_table_ptr(column_ndx_out));
+}
+
+inline TableRef Table::get_parent_table(std::size_t* column_ndx_out) TIGHTDB_NOEXCEPT
+{
+    return TableRef(get_parent_table_ptr(column_ndx_out));
 }
 
 inline bool Table::operator==(const Table& t) const
@@ -1467,6 +1502,12 @@ inline std::size_t Table::get_size_from_ref(ref_type top_ref, Allocator& alloc) 
     std::pair<int_least64_t, int_least64_t> p = Array::get_two(top_header, 0);
     ref_type spec_ref = to_ref(p.first), columns_ref = to_ref(p.second);
     return get_size_from_ref(spec_ref, columns_ref, alloc);
+}
+
+inline Table* Table::get_parent_table_ptr(std::size_t* column_ndx_out) TIGHTDB_NOEXCEPT
+{
+    const Table* parent = const_cast<const Table*>(this)->get_parent_table_ptr(column_ndx_out);
+    return const_cast<Table*>(parent);
 }
 
 inline bool Table::is_link_type(DataType type) TIGHTDB_NOEXCEPT
@@ -1674,24 +1715,26 @@ public:
         return table.get_subtable_accessor(col_ndx, row_ndx);
     }
 
+    static Table* get_link_target_table_accessor(Table& table, std::size_t col_ndx) TIGHTDB_NOEXCEPT
+    {
+        return table.get_link_target_table_accessor(col_ndx);
+    }
+
     static void adj_accessors_insert_rows(Table& table, std::size_t row_ndx,
                                           std::size_t num_rows) TIGHTDB_NOEXCEPT
     {
-        table.adj_row_acc_insert_rows(row_ndx, num_rows);
-        table.adj_subtab_acc_insert_rows(row_ndx, num_rows);
+        table.adj_accessors_insert_rows(row_ndx, num_rows);
     }
 
     static void adj_accessors_erase_row(Table& table, std::size_t row_ndx) TIGHTDB_NOEXCEPT
     {
-        table.adj_row_acc_erase_row(row_ndx);
-        table.adj_subtab_acc_erase_row(row_ndx);
+        table.adj_accessors_erase_row(row_ndx);
     }
 
     static void adj_accessors_move_last_over(Table& table, std::size_t target_row_ndx,
                                              std::size_t last_row_ndx) TIGHTDB_NOEXCEPT
     {
-        table.adj_row_acc_move_last_over(target_row_ndx, last_row_ndx);
-        table.adj_subtab_acc_move_last_over(target_row_ndx, last_row_ndx);
+        table.adj_accessors_move_last_over(target_row_ndx, last_row_ndx);
     }
 
     static void adj_clear_nonroot(Table& table) TIGHTDB_NOEXCEPT
@@ -1717,6 +1760,11 @@ public:
     static void recursive_mark_dirty(Table& table) TIGHTDB_NOEXCEPT
     {
         table.recursive_mark_dirty();
+    }
+
+    static void regressive_mark_dirty(Table& table) TIGHTDB_NOEXCEPT
+    {
+        table.regressive_mark_dirty();
     }
 
     static Descriptor* get_root_table_desc_accessor(Table& root_table) TIGHTDB_NOEXCEPT

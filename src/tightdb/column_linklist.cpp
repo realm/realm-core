@@ -24,29 +24,33 @@
 using namespace std;
 using namespace tightdb;
 
+
 ColumnLinkList::~ColumnLinkList() TIGHTDB_NOEXCEPT
 {
     // Detach all accessors
-    std::vector<LinkView*>::iterator end = m_views.end();
-    for (std::vector<LinkView*>::iterator p = m_views.begin(); p != end; ++p) {
-        (*p)->detach();
+    typedef views::const_iterator iter;
+    iter end = m_views.end();
+    for (iter i = m_views.begin(); i != end; ++i) {
+        LinkView* link_list = *i;
+        link_list->detach();
     }
     m_views.clear();
 }
 
+
 void ColumnLinkList::clear()
 {
     // Remove all backlinks to the delete rows
-    size_t rowcount = size();
-    for (size_t r = 0; r < rowcount; ++r) {
+    size_t row_count = size();
+    for (size_t r = 0; r < row_count; ++r) {
         ref_type ref = Column::get_as_ref(r);
         if (ref == 0)
             continue;
 
-        const Column linkcol(ref, null_ptr, 0, get_alloc());
-        size_t count = linkcol.size();
-        for (size_t i = 0; i < count; ++i) {
-            size_t old_target_row_ndx = linkcol.get(i);
+        Column link_col(ref, null_ptr, 0, get_alloc());
+        size_t n = link_col.size();
+        for (size_t i = 0; i < n; ++i) {
+            size_t old_target_row_ndx = link_col.get(i);
             m_backlinks->remove_backlink(old_target_row_ndx, r);
         }
     }
@@ -55,12 +59,15 @@ void ColumnLinkList::clear()
     Column::clear();
 
     // Detach all accessors
-    std::vector<LinkView*>::iterator end = m_views.end();
-    for (std::vector<LinkView*>::iterator p = m_views.begin(); p != end; ++p) {
-        (*p)->detach();
+    typedef views::const_iterator iter;
+    iter end = m_views.end();
+    for (iter i = m_views.begin(); i != end; ++i) {
+        LinkView* link_list = *i;
+        link_list->detach();
     }
     m_views.clear();
 }
+
 
 void ColumnLinkList::move_last_over(size_t target_row_ndx, size_t last_row_ndx)
 {
@@ -91,26 +98,35 @@ void ColumnLinkList::move_last_over(size_t target_row_ndx, size_t last_row_ndx)
     Column::move_last_over(target_row_ndx, last_row_ndx);
 
     // Detach accessors to the deleted row
-    std::vector<LinkView*>::iterator end = m_views.end();
-    for (std::vector<LinkView*>::iterator p = m_views.begin(); p != end; ++p) {
-        if ((*p)->m_row_ndx == target_row_ndx) {
-            (*p)->detach();
-            m_views.erase(p);
-            break;
+    {
+        typedef views::iterator iter;
+        iter end = m_views.end();
+        for (iter i = m_views.begin(); i != end; ++i) {
+            LinkView* link_list = *i;
+            if (link_list->m_row_ndx == target_row_ndx) {
+                link_list->detach();
+                m_views.erase(i);
+                break;
+            }
         }
     }
 
     // Update accessors to the moved row
-    end = m_views.end();
-    for (std::vector<LinkView*>::iterator p = m_views.begin(); p != end; ++p) {
-        if ((*p)->m_row_ndx == last_row_ndx) {
-            (*p)->set_parent_row(target_row_ndx);
-            break;
+    {
+        typedef views::const_iterator iter;
+        iter end = m_views.end();
+        for (iter i = m_views.begin(); i != end; ++i) {
+            LinkView* link_list = *i;
+            if (link_list->m_row_ndx == last_row_ndx) {
+                link_list->set_parent_row(target_row_ndx);
+                break;
+            }
         }
     }
 }
 
-void ColumnLinkList::erase(std::size_t ndx, bool is_last)
+
+void ColumnLinkList::erase(size_t ndx, bool is_last)
 {
     TIGHTDB_ASSERT(ndx+1 == size());
     TIGHTDB_ASSERT(is_last);
@@ -131,54 +147,77 @@ void ColumnLinkList::erase(std::size_t ndx, bool is_last)
     Column::erase(ndx, is_last);
 
     // Detach accessors to the deleted row
-    std::vector<LinkView*>::iterator end = m_views.end();
-    for (std::vector<LinkView*>::iterator p = m_views.begin(); p != end; ++p) {
-        if ((*p)->m_row_ndx == ndx) {
-            (*p)->detach();
-            m_views.erase(p);
+    typedef views::iterator iter;
+    iter end = m_views.end();
+    for (iter i = m_views.begin(); i != end; ++i) {
+        LinkView* link_list = *i;
+        if (link_list->m_row_ndx == ndx) {
+            link_list->detach();
+            m_views.erase(i);
             break;
         }
     }
 }
 
+
+bool ColumnLinkList::compare_link_list(const ColumnLinkList& c) const
+{
+    size_t n = size();
+    if (c.size() != n)
+        return false;
+    for (size_t i = 0; i < n; ++i) {
+        if (*get(i) != *c.get(i))
+            return false;
+    }
+    return true;
+}
+
+
 void ColumnLinkList::do_nullify_link(size_t row_ndx, size_t old_target_row_ndx)
 {
-    LinkViewRef links = get_link_view(row_ndx);
+    LinkViewRef links = get(row_ndx);
     links->do_nullify_link(old_target_row_ndx);
 }
 
-void ColumnLinkList::do_update_link(size_t row_ndx, size_t old_target_row_ndx, std::size_t new_target_row_ndx)
+
+void ColumnLinkList::do_update_link(size_t row_ndx, size_t old_target_row_ndx, size_t new_target_row_ndx)
 {
-    LinkViewRef links = get_link_view(row_ndx);
+    LinkViewRef links = get(row_ndx);
     links->do_update_link(old_target_row_ndx, new_target_row_ndx);
 }
 
-LinkViewRef ColumnLinkList::get_link_view(std::size_t row_ndx)
+
+LinkView* ColumnLinkList::get_ptr(size_t row_ndx) const
 {
     TIGHTDB_ASSERT(row_ndx < size());
 
     // Check if we already have a linkview for this row
-    std::vector<LinkView*>::iterator end = m_views.end();
-    for (std::vector<LinkView*>::iterator p = m_views.begin(); p != end; ++p) {
-        if ((*p)->m_row_ndx == row_ndx) {
-            return LinkViewRef(*p);
-        }
+    typedef views::const_iterator iter;
+    iter end = m_views.end();
+    for (iter i = m_views.begin(); i != end; ++i) {
+        LinkView* link_list = *i;
+        if (link_list->m_row_ndx == row_ndx)
+            return link_list;
     }
 
-    LinkView* view = new LinkView(*this, row_ndx);
-    m_views.push_back(view);
-    return LinkViewRef(view);
+    m_views.reserve(m_views.size() + 1); // Throws
+    LinkView* link_list = new LinkView(const_cast<ColumnLinkList&>(*this), row_ndx); // Throws
+    m_views.push_back(link_list); // Not throwing due to space reservation
+    return link_list;
 }
+
 
 void ColumnLinkList::update_child_ref(size_t child_ndx, ref_type new_ref)
 {
     Column::set(child_ndx, new_ref);
 }
 
+
 ref_type ColumnLinkList::get_child_ref(size_t child_ndx) const TIGHTDB_NOEXCEPT
 {
     return Column::get(child_ndx);
 }
+
 
 #ifdef TIGHTDB_DEBUG
 
@@ -189,4 +228,3 @@ pair<ref_type, size_t> ColumnLinkList::get_to_dot_parent(size_t ndx_in_parent) c
 }
 
 #endif //TIGHTDB_DEBUG
-

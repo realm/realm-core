@@ -2461,7 +2461,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MoveLastOver)
 
 
 
-TEST(LangBindHelper_Implicit_Transactions)
+TEST(LangBindHelper_ImplicitTransactions)
 {
     SHARED_GROUP_TEST_PATH(path);
     {
@@ -2540,7 +2540,7 @@ void reader_thread(TestResults* test_results_ptr, string path)
 {
     TestResults& test_results = *test_results_ptr;
     Random random(random_int<unsigned long>());
-    
+
     UniquePtr<Replication> repl(makeWriteLogCollector(path));
     UniquePtr<LangBindHelper::TransactLogRegistry> wlr(getWriteLogs(path));
     SharedGroup sg(*repl);
@@ -2568,7 +2568,8 @@ void reader_thread(TestResults* test_results_ptr, string path)
 
 }
 
-TEST(LangBindHelper_Implicit_Transactions_Over_SharedGroup_Destruction)
+
+TEST(LangBindHelper_ImplicitTransactions_OverSharedGroupDestruction)
 {
     SHARED_GROUP_TEST_PATH(path);
     {
@@ -2603,7 +2604,8 @@ TEST(LangBindHelper_Implicit_Transactions_Over_SharedGroup_Destruction)
     }
 }
 
-TEST(LangBindHelper_Implicit_Transactions_Multiple_Trackers)
+
+TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
 {
     const int write_thread_count = 3;
     const int read_thread_count = 3;
@@ -2629,7 +2631,7 @@ TEST(LangBindHelper_Implicit_Transactions_Multiple_Trackers)
         sched_yield();
         for (i = 0; i < read_thread_count; ++i)
             threads[write_thread_count + i].start(bind(reader_thread, &test_results, string(path)));
- 
+
         // Wait for all writer threads to complete
         for (int i = 0; i < write_thread_count; ++i)
             threads[i].join();

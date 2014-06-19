@@ -20,11 +20,13 @@
 #ifndef TIGHTDB_COLUMN_LINKLIST_HPP
 #define TIGHTDB_COLUMN_LINKLIST_HPP
 
+#include <algorithm>
+#include <vector>
+
 #include <tightdb/column.hpp>
 #include <tightdb/column_linkbase.hpp>
 #include <tightdb/table.hpp>
 #include <tightdb/column_backlink.hpp>
-#include <vector>
 
 namespace tightdb {
 
@@ -51,24 +53,25 @@ public:
     bool   has_links(std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
     size_t get_link_count(std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
 
-    LinkViewRef get_link_view(std::size_t row_ndx);
+    ConstLinkViewRef get(std::size_t row_ndx) const;
+    LinkViewRef get(std::size_t row_ndx);
 
     void erase(std::size_t, bool) TIGHTDB_OVERRIDE;
     void move_last_over(std::size_t, std::size_t) TIGHTDB_OVERRIDE;
     void clear() TIGHTDB_OVERRIDE;
 
-    // ColumnLinkBase overrides
-    void set_target_table(Table&) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-    TableRef get_target_table() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-    void set_backlink_column(ColumnBackLink&) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    /// Compare two columns for equality.
+    bool compare_link_list(const ColumnLinkList&) const;
 
 private:
     friend class ColumnBackLink;
     friend class LinkView;
 
-    void do_nullify_link(std::size_t row_ndx, std::size_t old_target_row_ndx);
+    LinkView* get_ptr(std::size_t row_ndx) const;
+
+    void do_nullify_link(std::size_t row_ndx, std::size_t old_target_row_ndx) TIGHTDB_OVERRIDE;
     void do_update_link(std::size_t row_ndx, std::size_t old_target_row_ndx,
-                        std::size_t new_target_row_ndx);
+                        std::size_t new_target_row_ndx) TIGHTDB_OVERRIDE;
 
     void unregister_linkview(const LinkView& view);
     ref_type get_row_ref(std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
@@ -85,9 +88,8 @@ private:
     get_to_dot_parent(std::size_t ndx_in_parent) const TIGHTDB_OVERRIDE;
 #endif
 
-    TableRef m_target_table;
-    ColumnBackLink* m_backlinks;
-    std::vector<LinkView*> m_views;
+    typedef std::vector<LinkView*> views;
+    mutable views m_views;
 };
 
 
@@ -95,12 +97,12 @@ private:
 
 inline ColumnLinkList::ColumnLinkList(ref_type ref, ArrayParent* parent, std::size_t ndx_in_parent,
                                       Allocator& alloc):
-    ColumnLinkBase(ref, parent, ndx_in_parent, alloc), m_backlinks(null_ptr)
+    ColumnLinkBase(ref, parent, ndx_in_parent, alloc)
 {
 }
 
 inline ColumnLinkList::ColumnLinkList(Allocator& alloc):
-    ColumnLinkBase(Array::type_HasRefs, alloc), m_backlinks(null_ptr)
+    ColumnLinkBase(Array::type_HasRefs, alloc)
 {
 }
 
@@ -119,30 +121,26 @@ inline bool ColumnLinkList::has_links(std::size_t row_ndx) const TIGHTDB_NOEXCEP
 inline size_t ColumnLinkList::get_link_count(std::size_t row_ndx) const TIGHTDB_NOEXCEPT
 {
     ref_type ref = Column::get_as_ref(row_ndx);
-    if (ref == 0) {
+    if (ref == 0)
         return 0;
-    }
     return ColumnBase::get_size_from_ref(ref, get_alloc());
 }
 
-inline void ColumnLinkList::set_target_table(Table& table) TIGHTDB_NOEXCEPT
+inline ConstLinkViewRef ColumnLinkList::get(std::size_t row_ndx) const
 {
-    TIGHTDB_ASSERT(!m_target_table);
-    m_target_table = table.get_table_ref();
+    LinkView* link_list = get_ptr(row_ndx); // Throws
+    return ConstLinkViewRef(link_list);
 }
 
-inline TableRef ColumnLinkList::get_target_table() TIGHTDB_NOEXCEPT
+inline LinkViewRef ColumnLinkList::get(std::size_t row_ndx)
 {
-    return m_target_table;
+    LinkView* link_list = get_ptr(row_ndx); // Throws
+    return LinkViewRef(link_list);
 }
 
-inline void ColumnLinkList::set_backlink_column(ColumnBackLink& backlinks) TIGHTDB_NOEXCEPT
+inline void ColumnLinkList::unregister_linkview(const LinkView& view)
 {
-    m_backlinks = &backlinks;
-}
-
-inline void ColumnLinkList::unregister_linkview(const LinkView& view) {
-    std::vector<LinkView*>::iterator p = std::find(m_views.begin(), m_views.end(), &view);
+    views::iterator p = std::find(m_views.begin(), m_views.end(), &view);
     TIGHTDB_ASSERT(p != m_views.end());
     m_views.erase(p);
 }

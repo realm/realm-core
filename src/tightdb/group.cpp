@@ -816,13 +816,15 @@ private:
 } // anonymous namespace
 
 
-// This class must be able to operate with only the Minimal Accessor Hierarchy
-// Consistency Guarantee. This means, in particular, that it cannot access the
-// underlying array structure.
+// In general, this class cannot assume more than minimal accessor consistency
+// (See AccessorConcistncyLevels), it can however assume that replication
+// instruction arguments are meaningfull with respect to the current state of
+// the accessor hierarchy. For example, a column index argument of `i` is known
+// to refer to the `i`'th entry of Table::m_cols.
 //
 // FIXME: There is currently no checking on valid instruction arguments such as
 // column index within bounds. Consider whether we can trust the contents of the
-// transaction log enough to skip chese checks.
+// transaction log enough to skip these checks.
 class Group::TransactAdvancer {
 public:
     TransactAdvancer(Group& group):
@@ -864,6 +866,9 @@ public:
 
     bool insert_empty_rows(size_t row_ndx, size_t num_rows) TIGHTDB_NOEXCEPT
     {
+        // In tables with link-type columns, all row insertion happens after the
+        // last row. Because of that, and because the inserted links will be
+        // null-links, there is no need to mark link-target tables as dirty.
         typedef _impl::TableFriend tf;
         if (m_table)
             tf::adj_accessors_insert_rows(*m_table, row_ndx, num_rows);
@@ -872,6 +877,10 @@ public:
 
     bool erase_row(size_t row_ndx) TIGHTDB_NOEXCEPT
     {
+        // This operation can not occur for tables with link-type columns.For
+        // such tables, rows can only be removed by means of the "move last
+        // over" operation. Because of that, there are no link-target tables to
+        // be marked dirty here.
         typedef _impl::TableFriend tf;
         if (m_table)
             tf::adj_accessors_erase_row(*m_table, row_ndx);
@@ -959,6 +968,20 @@ public:
         return true;
     }
 
+    bool insert_link(size_t col_ndx, size_t row_ndx, size_t) TIGHTDB_NOEXCEPT
+    {
+        if (col_ndx == 0)
+            insert_empty_rows(row_ndx, 1);
+       return true;
+    }
+
+    bool insert_link_list(size_t col_ndx, size_t row_ndx) TIGHTDB_NOEXCEPT
+    {
+        if (col_ndx == 0)
+            insert_empty_rows(row_ndx, 1);
+        return true;
+    }
+
     bool row_insert_complete() TIGHTDB_NOEXCEPT
     {
         return true; // Noop
@@ -999,7 +1022,7 @@ public:
         return true; // Noop
     }
 
-    bool set_table(size_t col_ndx, size_t row_ndx)
+    bool set_table(size_t col_ndx, size_t row_ndx) TIGHTDB_NOEXCEPT
     {
         if (m_table) {
             typedef _impl::TableFriend tf;
@@ -1011,11 +1034,37 @@ public:
         return true;
     }
 
-    bool set_mixed(size_t col_ndx, size_t row_ndx, const Mixed&)
+    bool set_mixed(size_t col_ndx, size_t row_ndx, const Mixed&) TIGHTDB_NOEXCEPT
     {
         typedef _impl::TableFriend tf;
         if (m_table)
             tf::discard_subtable_accessor(*m_table, col_ndx, row_ndx);
+        return true;
+    }
+
+    bool set_link(size_t col_ndx, size_t, size_t) TIGHTDB_NOEXCEPT
+    {
+        // When links are changed, the link-target table is also affected and
+        // its accessor must therefore be marked dirty too. Indeed, when it
+        // exists, the link-target table accessor must be marked dirty
+        // regardless of whether an accessor exists for the origin table (i.e.,
+        // regardless of whether `m_table` is null or not.) This would seem to
+        // pose a problem, because there is no easy way to identify the
+        // link-target table when there is no accessor for the origin
+        // table. Fortunately, due to the fact that back-link column accessors
+        // refer to the origin table accessor (and vice versa), it follows that
+        // the link-target table accessor exists if, and only if then origin
+        // table accessor exists.
+        //
+        // get_link_target_table_accessor() will return null if the
+        // m_table->m_cols[col_ndx] is null, but this can happen only when the
+        // column was inserted earlier during this transaction advance, and in
+        // that case, we have already marked the target table accesor dirty.
+        typedef _impl::TableFriend tf;
+        if (m_table) {
+            if (Table* target = tf::get_link_target_table_accessor(*m_table, col_ndx))
+                tf::regressive_mark_dirty(*target);
+        }
         return true;
     }
 
@@ -1055,12 +1104,22 @@ public:
         return true;
     }
 
-    bool insert_column(size_t col_ndx, DataType, StringData, size_t)
+    bool insert_column(size_t col_ndx, DataType type, StringData, size_t link_target_table_ndx)
     {
         if (m_table) {
             typedef _impl::TableFriend tf;
             InsertColumnUpdater updater(col_ndx);
             tf::update_accessors(*m_table, m_desc_path_begin, m_desc_path_end, updater);
+
+            // See comments on link handling in TransactAdvancer::set_link().
+            //
+            // FIXME: when the table refreshing process creates missing
+            // link-type column accessors, it must also create back-link column
+            // accessors and insert them into the link-target table accessor.
+            if (tf::is_link_type(type)) {
+                if (Table* target = m_group.get_table_by_ndx(link_target_table_ndx))
+                    tf::regressive_mark_dirty(*target);
+            }
         }
         typedef _impl::DescriptorFriend df;
         if (m_desc)
@@ -1071,6 +1130,10 @@ public:
     bool erase_column(size_t col_ndx)
     {
         if (m_table) {
+            // FIXME: If column is link-type, then back-link column accessor in
+            // target table must be removed too, and the target table accessor
+            // must be marked dirty. This probably requires that column type and
+            // link-target table index are added to the EraseColumn instruction.
             typedef _impl::TableFriend tf;
             EraseColumnUpdater updater(col_ndx);
             tf::update_accessors(*m_table, m_desc_path_begin, m_desc_path_end, updater);
@@ -1110,17 +1173,12 @@ void Group::advance_transact(ref_type new_top_ref, size_t new_file_size,
     //
     // Initially, when this function is invoked, we cannot assume any
     // correspondance between the accessor state and the underlying node
-    // structure. All we can assume is the Minimal Accessor Hierarchy
-    // Consistency Guarantee, which ensures that the group can be destroyed
-    // without corruption or memory leaks.
-    //
-    // For each transaction log instruction, the accessor state is modified in a
-    // way that maintains the Minimal Accessor Hierarchy Consistency Guarantee
-    // (Group::TransactAdvancer). When all instructions are accounted for, the
-    // accessor state has the additional property of being in structual
-    // correspondance to the underlying node structure (the Accessor Hierarchy
-    // Correspondence Requirement). At that point, we can reliably refresh each
-    // accessor recursively, starting from the root (the group).
+    // structure. We can assume that the hierarchy is in a state of minimal
+    // consistency, and that it can be brought to a state of structural
+    // correspondace using information in the replication logs. At that point,
+    // we can reliably refresh the accessor hierarchy
+    // (Table::refresh_accessor_tree()) to bring it back to a fully concsistent
+    // state. See AccessorConsistencyLevels.
 
     MultiLogInputStream in(logs_begin, logs_end);
     Replication::TransactLogParser parser(in);

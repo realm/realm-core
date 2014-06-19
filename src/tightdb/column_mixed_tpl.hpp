@@ -47,21 +47,21 @@ inline void ColumnMixed::update_column_index(std::size_t new_col_ndx, const Spec
         m_binary_data->update_column_index(new_col_ndx, spec);
 }
 
-inline void ColumnMixed::adj_subtab_acc_insert_rows(std::size_t row_ndx,
-                                                    std::size_t num_rows) TIGHTDB_NOEXCEPT
+inline void ColumnMixed::adj_accessors_insert_rows(std::size_t row_ndx,
+                                                   std::size_t num_rows) TIGHTDB_NOEXCEPT
 {
-    m_data->adj_subtab_acc_insert_rows(row_ndx, num_rows);
+    m_data->adj_accessors_insert_rows(row_ndx, num_rows);
 }
 
-inline void ColumnMixed::adj_subtab_acc_erase_row(std::size_t row_ndx) TIGHTDB_NOEXCEPT
+inline void ColumnMixed::adj_accessors_erase_row(std::size_t row_ndx) TIGHTDB_NOEXCEPT
 {
-    m_data->adj_subtab_acc_erase_row(row_ndx);
+    m_data->adj_accessors_erase_row(row_ndx);
 }
 
-inline void ColumnMixed::adj_subtab_acc_move_last_over(std::size_t target_row_ndx,
-                                                       std::size_t last_row_ndx) TIGHTDB_NOEXCEPT
+inline void ColumnMixed::adj_accessors_move_last_over(std::size_t target_row_ndx,
+                                                      std::size_t last_row_ndx) TIGHTDB_NOEXCEPT
 {
-    m_data->adj_subtab_acc_move_last_over(target_row_ndx, last_row_ndx);
+    m_data->adj_accessors_move_last_over(target_row_ndx, last_row_ndx);
 }
 
 inline ref_type ColumnMixed::get_subtable_ref(std::size_t row_ndx) const TIGHTDB_NOEXCEPT
