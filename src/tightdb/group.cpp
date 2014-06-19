@@ -1175,10 +1175,36 @@ void Group::advance_transact(ref_type new_top_ref, size_t new_file_size,
     // correspondance between the accessor state and the underlying node
     // structure. We can assume that the hierarchy is in a state of minimal
     // consistency, and that it can be brought to a state of structural
-    // correspondace using information in the replication logs. At that point,
-    // we can reliably refresh the accessor hierarchy
+    // correspondace using information in the transaction logs. When structural
+    // correspondace is achieved, we can reliably refresh the accessor hierarchy
     // (Table::refresh_accessor_tree()) to bring it back to a fully concsistent
     // state. See AccessorConsistencyLevels.
+    //
+    // Much of the information in the transaction logs is not used in this
+    // process, because the changes have already been applied to the underlying
+    // node structure. All we need to do here is to bring the accessors back
+    // into a state where they correctly reflect the underlying structure (or
+    // detach them if the underlying entity has been removed.)
+    //
+    // The consequences of the changes in the transaction logs can be divided
+    // into two types; those that need to be applied to the accessors
+    // immediately (Table::adj_insert_column()), and those that can be "lumped
+    // together" and deduced automatically during a final accessor refresh
+    // operation (Table::refresh_accessor_tree()).
+    //
+    // Most transaction log instructions have consequences of both types. For
+    // example, when an "insert column" instruction is seen, we must immediately
+    // shift the positions of all existing columns accessors after the point of
+    // insertion. For practical reasons, and for efficiency, we will just insert
+    // a null pointer into `Table::m_cols` at this time, and then postpone the
+    // creation of the column accessor to the final per-table accessor refresh
+    // operation.
+    //
+    // The final per-table refresh operation visits each table accessor
+    // recursively starting from the roots (group-level tables). It relies the
+    // the per-table accessor dirty flags (Table::m_dirty) to prune the
+    // traversal to the set of accessors that were touched by the changes in the
+    // transaction logs.
 
     MultiLogInputStream in(logs_begin, logs_end);
     Replication::TransactLogParser parser(in);

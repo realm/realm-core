@@ -52,11 +52,11 @@
 /// No correspondence between the accessor states and the underlying node
 /// structure can be assumed, but all parent and child accessor references are
 /// valid (i.e., not dangling). There are specific additional guarantees, but
-/// only on some parts of the internal accessors states, and on some parts of
-/// the structural state.
+/// only on some parts of the internal accessors states, and only on some parts
+/// of the structural state.
 ///
-/// This is the **maximum** level of consistency that may be assumed after a
-/// library function fails by throwing an unexpected exception (such as
+/// This is the level of consistency is the **maximum** that may be assumed
+/// after a library function fails by throwing an unexpected exception (such as
 /// std::bad_alloc), and it is the **minimum** level of consistency that is
 /// needed to be able to properly destroy the accessor objects (manually, or as
 /// a result of stack unwinding).
@@ -123,7 +123,7 @@
 ///  - The map of subtable accessors in a column acccessor
 ///    (ColumnSubtableParent::m_subtable_map). All pointers refer to existing
 ///    subtable accessors, but it is not required that the set of subtable
-///    accessors refferenced from a particular parent P conincide with the set
+///    accessors referenced from a particular parent P conincide with the set
 ///    of subtables accessors specifying P as parent.
 ///
 ///  - The `descriptor` property of a table accesor (Table::m_descriptor). If it
@@ -131,7 +131,7 @@
 ///
 ///  - The map of subdescriptor accessors in a descriptor accessor
 ///    (Descriptor::m_subdesc_map). All non-null pointers refer to existing
-///    dubdescriptor accessors.
+///    subdescriptor accessors.
 ///
 ///  - The `search_index` property of a column accesor
 ///    (AdaptiveStringColumn::m_index, ColumnStringEnum::m_index). When it is
@@ -142,12 +142,12 @@
 /// ---------------------------------------------------------------------
 ///
 /// This section defines what it means for an accessor hierarchy to be
-/// "Structurally Correspondent".It applies to a set of accessors rooted in a
+/// "Structurally Correspondent". It applies to a set of accessors rooted in a
 /// common group. The general idea is that the structure of the accessors must
 /// match the underlying structure to such an extent that there is never any
-/// doubt about which underlying node that corresponds with a aprticular
-/// accessor. It is assumed that the // accessor tree, and the underlying node
-/// structure are structurally sound // individually.
+/// doubt about which underlying node that corresponds with a particular
+/// accessor. It is assumed that the accessor tree, and the underlying node
+/// structure are structurally sound individually.
 ///
 /// With this level of correspondence, it is possible to reattach the accessor
 /// tree to the underlying node structure (Table::refresh_accessor_tree()).
@@ -213,7 +213,7 @@
 ///    descriptor" with respect to that underlying subspec.
 ///
 /// The 'ndx_in_parent' property of most array accessors is required to be
-/// valid. There exceptions are:
+/// valid. The exceptions are:
 ///
 ///  - The top array accessor of root tables (Table::m_top). Root tables are
 ///    tables with independent descriptor.
@@ -233,9 +233,8 @@
 ///  - The root array accessor of search indexes
 ///    (*Table::m_cols[]->m_index->m_array).
 ///
-/// Note that the Accessor Hierarchy Correspondence Requirement trivially
-/// includes the Minimal Accessor Hierarchy Consistency Guarantee, since the
-/// latter it an invariant.
+/// Note that Structural Correspondence trivially includes Minimal Consistency,
+/// since the latter it an invariant.
 
 
 using namespace std;

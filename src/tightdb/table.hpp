@@ -746,9 +746,10 @@ private:
     std::vector<size_t> m_link_chain;
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    // Used only in connection with
-    // SharedGroup::advance_read_transact().
+    /// Used only in connection with Group::advance_transact() and
+    /// Table::refresh_accessor_tree().
     bool m_dirty;
+
     mutable uint_fast64_t m_version;
     inline void bump_version() const { ++m_version; }
 #else
