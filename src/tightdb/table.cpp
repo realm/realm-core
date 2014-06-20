@@ -2538,7 +2538,6 @@ LinkViewRef Table::get_linklist(size_t col_ndx, size_t row_ndx)
     TIGHTDB_ASSERT(row_ndx < m_size);
     // FIXME: this looks wrong! It should instead be the modifying operations of
     // LinkView that bump the change count of the containing table.
-    bump_version();
     ColumnLinkList& column = get_column_link_list(col_ndx);
     return column.get(row_ndx);
 }
@@ -2546,7 +2545,6 @@ LinkViewRef Table::get_linklist(size_t col_ndx, size_t row_ndx)
 bool Table::linklist_is_empty(size_t col_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(row_ndx < m_size);
-    bump_version();
     const ColumnLinkList& column = get_column_link_list(col_ndx);
     return !column.has_links(row_ndx);
 }

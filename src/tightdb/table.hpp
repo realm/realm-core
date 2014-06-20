@@ -751,7 +751,14 @@ private:
     bool m_dirty;
 
     mutable uint_fast64_t m_version;
-    inline void bump_version() const { ++m_version; }
+    inline void bump_version() const 
+    { 
+        ++m_version;
+        ConstTableRef tr = get_parent_table();
+        if (tr) {
+            tr->bump_version();
+        }
+    }
 #else
     inline void bump_version() const {}
 #endif
@@ -1064,6 +1071,7 @@ private:
     friend class LangBindHelper;
     friend class TableViewBase;
     friend class TableView;
+    friend class LinkView;
     template<class T> friend class Columns;
     friend class Columns<StringData>;
     friend class ParentNode;
