@@ -205,7 +205,7 @@ TEST(Replication_Links)
     }
 
     ostream* replay_log = 0;
-    replay_log = &cout;
+//    replay_log = &cout;
     SharedGroup sg_2(path_2);
     repl.replay_transacts(sg_2, replay_log);
 
