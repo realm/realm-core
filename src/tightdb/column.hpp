@@ -163,6 +163,7 @@ public:
 
     virtual void recursive_mark() TIGHTDB_NOEXCEPT;
 
+    virtual void bump_version_on_linked_table() { }
     /// Refresh the dirty part of the accessor subtree rooted at this column
     /// accessor.
     ///

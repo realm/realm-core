@@ -32,6 +32,7 @@
 #include <tightdb/spec.hpp>
 #include <tightdb/mixed.hpp>
 #include <tightdb/query.hpp>
+#include <tightdb/column.hpp>
 
 namespace tightdb {
 
@@ -748,16 +749,27 @@ private:
 #ifdef TIGHTDB_ENABLE_REPLICATION
     /// Used only in connection with Group::advance_transact() and
     /// Table::refresh_accessor_tree().
-    bool m_mark;
+    mutable bool m_mark;
 
     mutable uint_fast64_t m_version;
     inline void bump_version() const 
     { 
+        if (m_mark) {
+            return;
+        }
         ++m_version;
         ConstTableRef tr = get_parent_table();
         if (tr) {
             tr->bump_version();
         }
+        // recurse through linked tables, use m_mark to avoid infinite recursion
+        m_mark = true;
+        size_t limit = m_cols.size();
+        for (size_t i = 0; i < limit; ++i) {
+            ColumnBase* cb = reinterpret_cast<ColumnBase*>(m_cols.get(i));
+            cb->bump_version_on_linked_table();
+        }
+        m_mark = false;
     }
 #else
     inline void bump_version() const {}
@@ -1077,6 +1089,7 @@ private:
     friend class ParentNode;
     template<class> friend class SequentialGetter;
     friend class RowBase;
+    friend class ColumnLinkBase;
 };
 
 

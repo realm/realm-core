@@ -45,7 +45,7 @@ public:
     void adj_accessors_insert_rows(std::size_t, std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     void adj_accessors_erase_row(std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     void adj_accessors_move_last_over(std::size_t, std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-
+    void bump_version_on_linked_table();
 protected:
     TableRef m_target_table;
     ColumnBackLink* m_backlinks;
@@ -55,6 +55,12 @@ protected:
 
 
 // Implementation
+
+inline void ColumnLinkBase::bump_version_on_linked_table()
+{ 
+    if (m_target_table) 
+        m_target_table->bump_version(); 
+}
 
 inline ColumnLinkBase::ColumnLinkBase(Allocator& alloc):
     Column(alloc),
