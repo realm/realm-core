@@ -305,7 +305,7 @@ public:
     class TransactAdvancer;
     void advance_transact(ref_type new_top_ref, std::size_t new_file_size,
                           const BinaryData* logs_begin, const BinaryData* logs_end);
-    void mark_all_table_accessors_dirty();
+    void mark_all_table_accessors();
 #endif
 
 #ifdef TIGHTDB_DEBUG

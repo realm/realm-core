@@ -756,13 +756,13 @@ public:
     void update(Table& table) TIGHTDB_OVERRIDE
     {
         typedef _impl::TableFriend tf;
-        tf::mark_dirty(table);
+        tf::mark(table);
     }
 
     void update_parent(Table& table) TIGHTDB_OVERRIDE
     {
         typedef _impl::TableFriend tf;
-        tf::mark_dirty(table);
+        tf::mark(table);
     }
 
     size_t m_col_ndx;
@@ -847,7 +847,7 @@ public:
                 const size_t* path_end = path_begin + 2*levels;
                 for (;;) {
                     typedef _impl::TableFriend tf;
-                    tf::mark_dirty(*table);
+                    tf::mark(*table);
                     if (path_begin == path_end) {
                         m_table.reset(table);
                         break;
@@ -1027,7 +1027,7 @@ public:
         if (m_table) {
             typedef _impl::TableFriend tf;
             if (Table* subtab = tf::get_subtable_accessor(*m_table, col_ndx, row_ndx)) {
-                tf::mark_dirty(*subtab);
+                tf::mark(*subtab);
                 tf::adj_clear_nonroot(*subtab);
             }
         }
@@ -1063,7 +1063,7 @@ public:
         typedef _impl::TableFriend tf;
         if (m_table) {
             if (Table* target = tf::get_link_target_table_accessor(*m_table, col_ndx))
-                tf::regressive_mark_dirty(*target);
+                tf::regressive_mark(*target);
         }
         return true;
     }
@@ -1118,7 +1118,7 @@ public:
             // accessors and insert them into the link-target table accessor.
             if (tf::is_link_type(type)) {
                 if (Table* target = m_group.get_table_by_ndx(link_target_table_ndx))
-                    tf::regressive_mark_dirty(*target);
+                    tf::regressive_mark(*target);
             }
         }
         typedef _impl::DescriptorFriend df;
@@ -1217,7 +1217,7 @@ void Group::advance_transact(ref_type new_top_ref, size_t new_file_size,
         m_alloc.remap(new_file_size); // Throws
         // The file was mapped to a new address, so all array accessors must be
         // updated.
-        mark_all_table_accessors_dirty();
+        mark_all_table_accessors();
     }
 
     init_from_ref(new_top_ref);
@@ -1232,13 +1232,13 @@ void Group::advance_transact(ref_type new_top_ref, size_t new_file_size,
     }
 }
 
-void Group::mark_all_table_accessors_dirty()
+void Group::mark_all_table_accessors()
 {
     size_t num_tables = m_table_accessors.size();
     for (size_t table_ndx = 0; table_ndx != num_tables; ++table_ndx) {
         if (Table* table = m_table_accessors[table_ndx]) {
             typedef _impl::TableFriend tf;
-            tf::recursive_mark_dirty(*table); // Also all subtable accessors
+            tf::recursive_mark(*table); // Also all subtable accessors
         }
     }
 }

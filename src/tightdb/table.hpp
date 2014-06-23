@@ -748,7 +748,7 @@ private:
 #ifdef TIGHTDB_ENABLE_REPLICATION
     /// Used only in connection with Group::advance_transact() and
     /// Table::refresh_accessor_tree().
-    bool m_dirty;
+    bool m_mark;
 
     mutable uint_fast64_t m_version;
     inline void bump_version() const 
@@ -1026,15 +1026,15 @@ private:
     void adj_insert_column(std::size_t col_ndx);
     void adj_erase_column(std::size_t col_ndx) TIGHTDB_NOEXCEPT;
 
-    void mark_dirty() TIGHTDB_NOEXCEPT;
-    void recursive_mark_dirty() TIGHTDB_NOEXCEPT;
-    void regressive_mark_dirty() TIGHTDB_NOEXCEPT; // Towards root
+    void mark() TIGHTDB_NOEXCEPT;
+    void recursive_mark() TIGHTDB_NOEXCEPT;
+    void regressive_mark() TIGHTDB_NOEXCEPT; // Towards root
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     Replication* get_repl() TIGHTDB_NOEXCEPT;
 #endif
 
-    /// Refresh the dirty part of the accessor subtree rooted at this table
+    /// Refresh the marked part of the accessor subtree rooted at this table
     /// accessor.
     ///
     /// The following conditions are necessary and sufficient for the proper
@@ -1047,7 +1047,7 @@ private:
     ///    valid state.
     ///
     ///  - Every table accessor in the subtree (this one, or one of its
-    ///    descendants) is marked dirty if it needs to be refreshed, or if it
+    ///    descendants) is marked if it needs to be refreshed, or if it
     ///    has a descendant accessor that needs to be refreshed.
     ///
     ///  - This table accessor, as well as all its descendant accessors, are in
@@ -1278,7 +1278,7 @@ inline Table::Table(Allocator& alloc):
     m_descriptor(0)
 {
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    m_dirty = false;
+    m_mark = false;
     m_version = 0;
 #endif
     ref_type ref = create_empty_table(alloc); // Throws
@@ -1290,7 +1290,7 @@ inline Table::Table(const Table& t, Allocator& alloc):
     m_descriptor(0)
 {
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    m_dirty = false;
+    m_mark = false;
     m_version = 0;
 #endif
     ref_type ref = t.clone(alloc); // Throws
@@ -1303,7 +1303,7 @@ inline Table::Table(ref_count_tag, Allocator& alloc, ref_type top_ref,
     m_descriptor(0)
 {
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    m_dirty = false;
+    m_mark = false;
     m_version = 0;
 #endif
     init_from_ref(top_ref, parent, ndx_in_parent);
@@ -1315,7 +1315,7 @@ inline Table::Table(ref_count_tag, ConstSubspecRef shared_spec, ref_type columns
     m_spec(shared_spec.get_alloc()), m_ref_count(0), m_search_index(0), m_descriptor(0)
 {
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    m_dirty = false;
+    m_mark = false;
     m_version = 0;
 #endif
     init_from_ref(shared_spec, columns_ref, parent, ndx_in_parent);
@@ -1561,10 +1561,10 @@ typename T::RowAccessor Table::get_link_accessor(std::size_t column_ndx, std::si
     return (*typed_table)[row_pos_in_target];
 }
 
-inline void Table::mark_dirty() TIGHTDB_NOEXCEPT
+inline void Table::mark() TIGHTDB_NOEXCEPT
 {
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    m_dirty = true;
+    m_mark = true;
 #endif
 }
 
@@ -1761,19 +1761,19 @@ public:
         table.adj_erase_column(col_ndx);
     }
 
-    static void mark_dirty(Table& table) TIGHTDB_NOEXCEPT
+    static void mark(Table& table) TIGHTDB_NOEXCEPT
     {
-        table.mark_dirty();
+        table.mark();
     }
 
-    static void recursive_mark_dirty(Table& table) TIGHTDB_NOEXCEPT
+    static void recursive_mark(Table& table) TIGHTDB_NOEXCEPT
     {
-        table.recursive_mark_dirty();
+        table.recursive_mark();
     }
 
-    static void regressive_mark_dirty(Table& table) TIGHTDB_NOEXCEPT
+    static void regressive_mark(Table& table) TIGHTDB_NOEXCEPT
     {
-        table.regressive_mark_dirty();
+        table.regressive_mark();
     }
 
     static Descriptor* get_root_table_desc_accessor(Table& root_table) TIGHTDB_NOEXCEPT
