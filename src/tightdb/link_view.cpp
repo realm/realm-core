@@ -128,7 +128,6 @@ void LinkView::do_nullify_link(std::size_t old_target_row_ndx)
         m_refs.destroy();
         m_column.set_row_ref(m_row_ndx, 0);
     }
-    m_table->bump_version();
 }
 
 void LinkView::do_update_link(size_t old_target_row_ndx, std::size_t new_target_row_ndx)
@@ -139,5 +138,4 @@ void LinkView::do_update_link(size_t old_target_row_ndx, std::size_t new_target_
     TIGHTDB_ASSERT(pos != not_found);
 
     m_refs.set(pos, new_target_row_ndx);
-    m_table->bump_version();
 }
