@@ -47,7 +47,7 @@ usage()
 Unspecified or bad mode '$MODE'.
 Available modes are:
     config clean build build-config-progs build-iphone build-android
-    build-osx-framework build-objc
+    build-osx-framework build-cocoa
     check check-debug show-install install uninstall
     test-installed wipe-installed install-prod install-devel uninstall-prod
     uninstall-devel dist-copy src-dist bin-dist dist-deb dist-status
@@ -639,16 +639,16 @@ EOF
         (cd "$TIGHTDB_HOME/$ANDROID_DIR/include/tightdb" && tar xzmf "$temp_dir/headers.tar.gz") || exit 1
         ;;
 
-   "build-objc")
+   "build-cocoa")
         if [ "$OS" != "Darwin" ]; then
             echo "zip for iOS/OSX can only be generated under OS X."
             exit 0
         fi
 
-        # the user can specify where to find realm-objc repository
-        realm_objc_dir="$1"
-        if [ -z "$realm_objc_dir" ]; then
-            realm_objc_dir="../realm-objc"
+        # the user can specify where to find realm-cocoa repository
+        realm_cocoa_dir="$1"
+        if [ -z "$realm_cocoa_dir" ]; then
+            realm_cocoa_dir="../realm-cocoa"
         fi
 
         # has build-iphone been run?
@@ -684,11 +684,11 @@ EOF
         (cd $tmpdir && zip -r -q "$BASENAME-$realm_version.zip" "$BASENAME") || exit 1
         mv "$tmpdir/$BASENAME-$realm_version.zip" . || exit 1
 
-        echo "Unzipping in '$realm_objc_dir'"
-        mkdir -p "$realm_objc_dir" || exit 1
-        rm -rf "$realm_objc_dir/$BASENAME" || exit 1
+        echo "Unzipping in '$realm_cocoa_dir'"
+        mkdir -p "$realm_cocoa_dir" || exit 1
+        rm -rf "$realm_cocoa_dir/$BASENAME" || exit 1
         cur_dir="$(pwd)"
-        (cd "$realm_objc_dir" && unzip -qq "$cur_dir/$BASENAME-$realm_version.zip") || exit 1
+        (cd "$realm_cocoa_dir" && unzip -qq "$cur_dir/$BASENAME-$realm_version.zip") || exit 1
 
         rm -rf "$tmpdir" || exit 1
         echo "Done"
