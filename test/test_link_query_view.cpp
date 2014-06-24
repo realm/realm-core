@@ -18,7 +18,43 @@ using namespace std;
 using namespace tightdb;
 using namespace test_util;
 
-TEST(LinkList_Query)
+TEST(LinkList_Basic1)
+{
+    Group group;
+
+    TableRef table1 = group.get_table("table1");
+    TableRef table2 = group.get_table("table2");
+
+    // add some more columns to table1 and table2
+    table1->add_column(type_Int, "col1");
+    table1->add_column(type_String, "str1");
+
+    // add some rows
+    table1->add_empty_row();
+    table1->set_int(0, 0, 100);
+    table1->set_string(1, 0, "foo");
+    table1->add_empty_row();
+    table1->set_int(0, 1, 200);
+    table1->set_string(1, 1, "!");
+    table1->add_empty_row();
+    table1->set_int(0, 2, 300);
+    table1->set_string(1, 2, "bar");
+
+    size_t col_link2 = table2->add_column_link(type_Link, "link", *table1);
+    table2->add_empty_row();
+    table2->add_empty_row();
+
+    table2->set_link(col_link2, 0, 1);
+    table2->set_link(col_link2, 1, 2);
+
+    Query q = table2->link(col_link2).column<String>(1) == "!";
+    TableView tv = q.find_all();
+
+    Query q2 = table2->link(col_link2).column<Int>(0) == 200;
+    TableView tv2 = q2.find_all();
+}
+
+TEST(LinkList_Basic2)
 {
     Group group;
 
@@ -75,13 +111,25 @@ TEST(LinkList_Query)
     match = (table2->column<String>(1) == "world").find();
     CHECK_EQUAL(1, match);
 
+    match = (table2->column<Int>(0) == 500).find();
+    CHECK_EQUAL(1, match);
+
     match = (table1->link(col_link2).column<String>(1) == "!").find();
+    CHECK_EQUAL(1, match);
+
+    match = (table1->link(col_link2).column<Int>(0) == 600).find();
     CHECK_EQUAL(1, match);
 
     match = (table1->link(col_link2).column<String>(1) == "world").find();
     CHECK_EQUAL(0, match);
 
+    match = (table1->link(col_link2).column<Int>(0) == 500).find();
+    CHECK_EQUAL(0, match);
+
     match = (table1->link(col_link2).column<String>(1) == "world").find(1);
+    CHECK_EQUAL(1, match);
+
+    match = (table1->link(col_link2).column<Int>(0) == 500).find(1);
     CHECK_EQUAL(1, match);
 
     // Test link lists with 0 entries (3'rd row has no links)

@@ -240,7 +240,7 @@ public:
     Expression() {}
 
     virtual size_t find_first(size_t start, size_t end) const = 0;
-    virtual void set_table(const Table* table) = 0;
+    virtual void set_table() = 0;
     virtual const Table* get_table() = 0;
     virtual ~Expression() {}
 };
@@ -257,7 +257,7 @@ public:
     }
 
     // Recursively set table pointers for all Columns object in the expression tree. Used for late binding of table
-    virtual void set_table(const Table*) {}
+    virtual void set_table() {}
 
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression and
     // binds it to a Query at a later time
@@ -853,13 +853,13 @@ template <class T> UnaryOperator<Pow<T> >& power (Subexpr2<T>& left) {
 template <> class Columns<StringData> : public Subexpr2<StringData>
 {
 public:
-    explicit Columns(size_t column, const Table* table) : m_table(null_ptr), m_column_linklist(null_ptr),
+    explicit Columns(size_t column, const Table* table) : m_table_linked_from(null_ptr), m_table(null_ptr), m_column_linklist(null_ptr),
         m_column_single_link(null_ptr), m_column(column)
     {
-        set_table(table);
+        m_table = table;
     }
 
-    explicit Columns(size_t column, Table* table, size_t link_column) : m_table(null_ptr),
+    explicit Columns(size_t column, Table* table, size_t link_column) : m_table_linked_from(null_ptr), m_table(null_ptr),
         m_column_linklist(null_ptr), m_column_single_link(null_ptr), m_column(column)
     {
         TableRef linked_table;
@@ -875,13 +875,14 @@ public:
             linked_table.reset(m_column_single_link->get_target_table());
         }
 
-        set_table(linked_table.get());
+        m_table = linked_table.get();
+        m_table_linked_from = table;
     }
 
-    explicit Columns() : m_table(null_ptr), m_column_linklist(null_ptr), m_column_single_link(null_ptr) { }
+    explicit Columns() : m_table_linked_from(null_ptr), m_table(null_ptr), m_column_linklist(null_ptr), m_column_single_link(null_ptr) { }
 
 
-    explicit Columns(size_t column) : m_table(null_ptr), m_column_linklist(null_ptr), m_column_single_link(null_ptr),
+    explicit Columns(size_t column) : m_table_linked_from(null_ptr), m_table(null_ptr), m_column_linklist(null_ptr), m_column_single_link(null_ptr),
         m_column(column)
     {
     }
@@ -893,14 +894,9 @@ public:
         return n;
     }
 
-    virtual void set_table(const Table* table)
-    {
-        m_table = table;
-    }
-
     virtual const Table* get_table()
     {
-        return m_table;
+        return m_table_linked_from ? m_table_linked_from : m_table;
     }
 
     virtual void evaluate(size_t index, ValueBase& destination)
@@ -948,6 +944,8 @@ public:
         }
     }
 
+    const Table* m_table_linked_from;
+
     // Pointer to payload table (which is the linked-to table if this is a link column) used for condition operator
     const Table* m_table;
 
@@ -986,15 +984,15 @@ template <class T> Query operator != (const Columns<StringData>& left, T right) 
 template <class T> class Columns : public Subexpr2<T>, public ColumnsBase
 {
 public:
-    explicit Columns(size_t column, const Table* table) : m_table(null_ptr), sg(null_ptr),
+    explicit Columns(size_t column, const Table* table) : m_table_linked_from(null_ptr), m_table(null_ptr), sg(null_ptr),
         m_column_linklist(null_ptr), m_column_single_link(null_ptr), m_column(column)
     {
-        set_table(table);
+        m_table = table;
     }
 
     // Todo: Constructor almost identical with that of Columns<StringData>; simplify
-    explicit Columns(size_t column, Table* table, size_t link_column) : m_table(null_ptr), sg(null_ptr),
-        m_column_linklist(null_ptr), m_column_single_link(null_ptr), m_column(column)
+    explicit Columns(size_t column, Table* table, size_t link_column) : m_table_linked_from(null_ptr), 
+        m_table(null_ptr), sg(null_ptr), m_column_linklist(null_ptr), m_column_single_link(null_ptr), m_column(column)
     {
         TableRef linked_table;
 
@@ -1009,14 +1007,15 @@ public:
             linked_table.reset(m_column_single_link->get_target_table());
         }
 
-        set_table(linked_table.get());
+        m_table = linked_table.get();
+        m_table_linked_from = table;
     }
 
-    explicit Columns() : m_table(null_ptr), sg(null_ptr), m_column_linklist(null_ptr),
+    explicit Columns() : m_table_linked_from(null_ptr), m_table(null_ptr), sg(null_ptr), m_column_linklist(null_ptr),
                          m_column_single_link(null_ptr) { }
 
-    explicit Columns(size_t column) : m_table(null_ptr), sg(null_ptr), m_column_linklist(null_ptr),
-        m_column_single_link(null_ptr), m_column(column) {}
+    explicit Columns(size_t column) : m_table_linked_from(null_ptr), m_table(null_ptr), sg(null_ptr), 
+        m_column_linklist(null_ptr), m_column_single_link(null_ptr), m_column(column) {}
 
     ~Columns()
     {
@@ -1033,11 +1032,10 @@ public:
     }
 
     // Recursively set table pointers for all Columns object in the expression tree. Used for late binding of table
-    virtual void set_table(const Table* table)
+    virtual void set_table()
     {
-        m_table = table;
         typedef typename ColumnTypeTraits<T>::column_type ColType;
-        const ColType* c = static_cast<const ColType*>(&table->get_column_base(m_column));
+        const ColType* c = static_cast<const ColType*>(&m_table->get_column_base(m_column));
         if (sg == null_ptr)
             sg = new SequentialGetter<T>();
         sg->init(c);
@@ -1047,7 +1045,7 @@ public:
     // binds it to a Query at a later time
     virtual const Table* get_table()
     {
-        return m_table;
+        return m_table_linked_from ? m_table_linked_from : m_table;
     }
 
     // Load values from Column into destination
@@ -1114,6 +1112,8 @@ public:
         }
     }
 
+    const Table* m_table_linked_from;
+
     // m_table is redundant with ColumnAccessorBase<>::m_table, but is in order to decrease class dependency/entanglement
     const Table* m_table;
 
@@ -1143,9 +1143,9 @@ public:
     }
 
     // Recursively set table pointers for all Columns object in the expression tree. Used for late binding of table
-    void set_table(const Table* table)
+    void set_table()
     {
-        m_left.set_table(table);
+        m_left.set_table();
     }
 
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression and
@@ -1191,10 +1191,10 @@ public:
     }
 
     // Recursively set table pointers for all Columns object in the expression tree. Used for late binding of table
-    void set_table(const Table* table)
+    void set_table()
     {
-        m_left.set_table(table);
-        m_right.set_table(table);
+        m_left.set_table();
+        m_right.set_table();
     }
 
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression and
@@ -1257,10 +1257,10 @@ public:
     }
 
     // Recursively set table pointers for all Columns object in the expression tree. Used for late binding of table
-    void set_table(const Table* table)
+    void set_table()
     {
-        m_left.set_table(table);
-        m_right.set_table(table);
+        m_left.set_table();
+        m_right.set_table();
     }
 
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression and
