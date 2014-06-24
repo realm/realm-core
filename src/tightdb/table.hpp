@@ -20,7 +20,6 @@
 #ifndef TIGHTDB_TABLE_HPP
 #define TIGHTDB_TABLE_HPP
 
-#include <iostream>
 #include <utility>
 
 #include <tightdb/util/features.h>
@@ -757,7 +756,6 @@ private:
     inline void bump_version() const 
     { 
         if (m_mark2) {
-            std::cerr << "Already marked (circular dep)" << std::endl;
             return;
         }
         ++m_version;
