@@ -651,17 +651,8 @@ EOF
             realm_cocoa_dir="../realm-cocoa"
         fi
 
-        # has build-iphone been run?
-        if ! [ -e "iphone-lib/libtightdb-ios.a" ]; then
-            echo "You must run 'sh build.sh build-iphone' before proceeding."
-            exit 0
-        fi
-
-        # has build-osx been run?
-        if ! [ -e "src/tightdb/libtightdb-dbg.a" ]; then
-            echo "You must run 'sh build.sh build-osx' before proceeding."
-            exit 0
-        fi
+        sh build.sh build-osx || exit 1
+        sh build.sh build-iphone || exit 1
 
         echo "Copying files"
         tmpdir=$(mktemp -d /tmp/$$.XXXXXX) || exit 1
