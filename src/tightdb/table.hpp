@@ -20,6 +20,7 @@
 #ifndef TIGHTDB_TABLE_HPP
 #define TIGHTDB_TABLE_HPP
 
+#include <iostream>
 #include <utility>
 
 #include <tightdb/util/features.h>
@@ -750,11 +751,13 @@ private:
     /// Used only in connection with Group::advance_transact() and
     /// Table::refresh_accessor_tree().
     mutable bool m_mark;
+    mutable bool m_mark2;
 
     mutable uint_fast64_t m_version;
     inline void bump_version() const 
     { 
-        if (m_mark) {
+        if (m_mark2) {
+            std::cerr << "Already marked (circular dep)" << std::endl;
             return;
         }
         ++m_version;
@@ -763,13 +766,15 @@ private:
             tr->bump_version();
         }
         // recurse through linked tables, use m_mark to avoid infinite recursion
-        m_mark = true;
+        m_mark2 = true;
         size_t limit = m_cols.size();
         for (size_t i = 0; i < limit; ++i) {
             ColumnBase* cb = reinterpret_cast<ColumnBase*>(m_cols.get(i));
-            cb->bump_version_on_linked_table();
+            if (cb) {
+                cb->bump_version_on_linked_table();
+            }
         }
-        m_mark = false;
+        m_mark2 = false;
     }
 #else
     inline void bump_version() const {}
@@ -1089,7 +1094,7 @@ private:
     friend class ParentNode;
     template<class> friend class SequentialGetter;
     friend class RowBase;
-    friend class ColumnLinkBase;
+    friend class ColumnBackLink;
 };
 
 
@@ -1292,6 +1297,7 @@ inline Table::Table(Allocator& alloc):
 {
 #ifdef TIGHTDB_ENABLE_REPLICATION
     m_mark = false;
+    m_mark2 = false;
     m_version = 0;
 #endif
     ref_type ref = create_empty_table(alloc); // Throws
@@ -1304,6 +1310,7 @@ inline Table::Table(const Table& t, Allocator& alloc):
 {
 #ifdef TIGHTDB_ENABLE_REPLICATION
     m_mark = false;
+    m_mark2 = false;
     m_version = 0;
 #endif
     ref_type ref = t.clone(alloc); // Throws
@@ -1317,6 +1324,7 @@ inline Table::Table(ref_count_tag, Allocator& alloc, ref_type top_ref,
 {
 #ifdef TIGHTDB_ENABLE_REPLICATION
     m_mark = false;
+    m_mark2 = false;
     m_version = 0;
 #endif
     init_from_ref(top_ref, parent, ndx_in_parent);
@@ -1329,6 +1337,7 @@ inline Table::Table(ref_count_tag, ConstSubspecRef shared_spec, ref_type columns
 {
 #ifdef TIGHTDB_ENABLE_REPLICATION
     m_mark = false;
+    m_mark2 = false;
     m_version = 0;
 #endif
     init_from_ref(shared_spec, columns_ref, parent, ndx_in_parent);
