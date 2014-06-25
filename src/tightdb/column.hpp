@@ -161,7 +161,8 @@ public:
     virtual void adj_accessors_move_last_over(std::size_t target_row_ndx,
                                               std::size_t last_row_ndx) TIGHTDB_NOEXCEPT;
 
-    virtual void recursive_mark_dirty() TIGHTDB_NOEXCEPT;
+    virtual void recursive_mark() TIGHTDB_NOEXCEPT;
+    virtual void bump_version_on_linked_table() TIGHTDB_NOEXCEPT { }
 
     /// Refresh the dirty part of the accessor subtree rooted at this column
     /// accessor.
@@ -453,7 +454,7 @@ inline void ColumnBase::adj_accessors_move_last_over(std::size_t, std::size_t) T
     // Noop
 }
 
-inline void ColumnBase::recursive_mark_dirty() TIGHTDB_NOEXCEPT
+inline void ColumnBase::recursive_mark() TIGHTDB_NOEXCEPT
 {
     // Noop
 }

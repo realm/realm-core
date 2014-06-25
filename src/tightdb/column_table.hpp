@@ -39,7 +39,7 @@ public:
 
     void update_column_index(std::size_t, const Spec&) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
-    void recursive_mark_dirty() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void recursive_mark() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
     void adj_accessors_insert_rows(std::size_t, std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     void adj_accessors_erase_row(std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
@@ -102,7 +102,7 @@ protected:
             TIGHTDB_NOEXCEPT;
         void update_accessors(const std::size_t* col_path_begin, const std::size_t* col_path_end,
                               _impl::TableFriend::AccessorUpdater&);
-        void recursive_mark_dirty() TIGHTDB_NOEXCEPT;
+        void recursive_mark() TIGHTDB_NOEXCEPT;
         void refresh_accessor_tree(std::size_t spec_ndx_in_parent);
     private:
         struct entry {
@@ -302,9 +302,9 @@ inline void ColumnSubtableParent::update_column_index(std::size_t new_col_ndx, c
     m_column_ndx = new_col_ndx;
 }
 
-inline void ColumnSubtableParent::recursive_mark_dirty() TIGHTDB_NOEXCEPT
+inline void ColumnSubtableParent::recursive_mark() TIGHTDB_NOEXCEPT
 {
-    m_subtable_map.recursive_mark_dirty();
+    m_subtable_map.recursive_mark();
 }
 
 inline void ColumnSubtableParent::refresh_accessor_tree(std::size_t col_ndx, const Spec& spec)

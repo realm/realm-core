@@ -69,6 +69,7 @@ protected:
     std::pair<ref_type, std::size_t>
     get_to_dot_parent(std::size_t ndx_in_parent) const TIGHTDB_OVERRIDE;
 #endif
+    void bump_version_on_linked_table() TIGHTDB_NOEXCEPT;
 
 private:
     void nullify_links(std::size_t row_ndx, bool do_destroy);
@@ -79,6 +80,11 @@ private:
 
 
 // Implementation
+
+inline void ColumnBackLink::bump_version_on_linked_table() TIGHTDB_NOEXCEPT
+{
+    _impl::TableFriend::bump_version(*m_origin_table);
+}
 
 inline ColumnBackLink::ColumnBackLink(ref_type ref, ArrayParent* parent, std::size_t ndx_in_parent,
                                       Allocator& alloc):

@@ -187,14 +187,14 @@ update_accessors(const size_t* col_path_begin, const size_t* col_path_end,
 }
 
 
-void ColumnSubtableParent::SubtableMap::recursive_mark_dirty() TIGHTDB_NOEXCEPT
+void ColumnSubtableParent::SubtableMap::recursive_mark() TIGHTDB_NOEXCEPT
 {
     typedef entries::const_iterator iter;
     iter end = m_entries.end();
     for (iter i = m_entries.begin(); i != end; ++i) {
         TableRef table(i->m_table);
         typedef _impl::TableFriend tf;
-        tf::recursive_mark_dirty(*table);
+        tf::recursive_mark(*table);
     }
 }
 
@@ -288,7 +288,7 @@ void ColumnTable::set(size_t row_ndx, const Table* subtable)
         typedef _impl::TableFriend tf;
         tf::discard_row_accessors(*table_2);
         tf::discard_subtable_accessors(*table_2);
-        tf::mark_dirty(*table_2);
+        tf::mark(*table_2);
         tf::refresh_accessor_tree(*table_2, row_ndx);
     }
 }

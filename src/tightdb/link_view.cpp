@@ -39,7 +39,7 @@ void LinkView::insert(std::size_t ins_pos, std::size_t target_row_ndx)
     }
 
     m_refs.insert(ins_pos, target_row_ndx);
-
+    m_table->bump_version();
     m_column.add_backlink(target_row_ndx, m_row_ndx);
 }
 
@@ -53,6 +53,7 @@ void LinkView::set(std::size_t row_ndx, std::size_t target_row_ndx)
     size_t old_target_row_ndx = m_refs.get(row_ndx);
     m_column.remove_backlink(old_target_row_ndx, m_row_ndx);
     m_column.add_backlink(target_row_ndx, m_row_ndx);
+    m_table->bump_version();
 
     m_refs.set(row_ndx, target_row_ndx);
 }
@@ -72,6 +73,7 @@ void LinkView::move(size_t old_link_ndx, size_t new_link_ndx)
     bool is_last = (old_link_ndx+1 == m_refs.size());
     m_refs.erase(old_link_ndx, is_last);
     m_refs.insert(ins_pos, target_row_ndx);
+    m_table->bump_version();
 }
 
 void LinkView::remove(std::size_t row_ndx)
@@ -90,6 +92,7 @@ void LinkView::remove(std::size_t row_ndx)
         m_refs.detach();
         m_column.set_row_ref(m_row_ndx, 0);
     }
+    m_table->bump_version();
 }
 
 void LinkView::clear()
@@ -108,6 +111,7 @@ void LinkView::clear()
 
     m_refs.destroy();
     m_column.set_row_ref(m_row_ndx, 0);
+    m_table->bump_version();
 }
 
 void LinkView::do_nullify_link(std::size_t old_target_row_ndx)
