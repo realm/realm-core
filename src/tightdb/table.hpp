@@ -1086,7 +1086,7 @@ inline void Table::bump_version() const
     m_mark2 = true;
     size_t limit = m_cols.size();
     for (size_t i = 0; i < limit; ++i) {
-        ColumnBase* cb = reinterpret_cast<ColumnBase*>(m_cols.get(i));
+        ColumnBase* cb = m_cols[i];
         if (cb) {
             cb->bump_version_on_linked_table();
         }
