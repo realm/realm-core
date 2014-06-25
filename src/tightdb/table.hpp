@@ -1102,13 +1102,11 @@ inline void Table::bump_version() const
 inline void Table::remove(std::size_t row_ndx)
 {
     do_remove(row_ndx);
-    bump_version();
 }
 
 inline void Table::from_view_remove(std::size_t row_ndx, TableViewBase*)
 {
     do_remove(row_ndx);
-    bump_version();
 }
 
 inline void Table::remove_last()
