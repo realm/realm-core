@@ -4478,7 +4478,6 @@ void Table::refresh_accessor_tree(size_t ndx_in_parent)
         }
     }
     m_search_index = 0;
-    bump_version();
 
     size_t col_ndx_in_parent = 0; // Index in Table::m_columns
     size_t num_cols = m_cols.size();
@@ -4540,6 +4539,8 @@ void Table::refresh_accessor_tree(size_t ndx_in_parent)
 #ifdef TIGHTDB_ENABLE_REPLICATION
     m_mark = false;
 #endif
+
+    bump_version();
 }
 
 
