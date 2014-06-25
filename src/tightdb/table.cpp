@@ -4506,9 +4506,6 @@ void Table::refresh_accessor_tree(size_t ndx_in_parent)
         else {
             ColumnType col_type = m_spec.get_column_type(col_ndx);
             col = create_column_accessor(col_type, col_ndx, col_ndx_in_parent); // Throws
-            // FIXME: Memory leak if the following assignment statement
-            // fails. This problem disappears as soon as m_cols is changed to be
-            // of std::vector type.
             m_cols[col_ndx] = col;
         }
 
