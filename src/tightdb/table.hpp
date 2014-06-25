@@ -32,6 +32,7 @@
 #include <tightdb/spec.hpp>
 #include <tightdb/mixed.hpp>
 #include <tightdb/query.hpp>
+#include <tightdb/column.hpp>
 
 namespace tightdb {
 
@@ -744,10 +745,11 @@ private:
 #ifdef TIGHTDB_ENABLE_REPLICATION
     /// Used only in connection with Group::advance_transact() and
     /// Table::refresh_accessor_tree().
-    bool m_dirty;
+    mutable bool m_mark;
+    mutable bool m_mark2;
 
     mutable uint_fast64_t m_version;
-    inline void bump_version() const { ++m_version; }
+    void bump_version() const;
 #else
     inline void bump_version() const {}
 #endif
@@ -1015,15 +1017,15 @@ private:
     void adj_insert_column(std::size_t col_ndx);
     void adj_erase_column(std::size_t col_ndx) TIGHTDB_NOEXCEPT;
 
-    void mark_dirty() TIGHTDB_NOEXCEPT;
-    void recursive_mark_dirty() TIGHTDB_NOEXCEPT;
-    void regressive_mark_dirty() TIGHTDB_NOEXCEPT; // Towards root
+    void mark() TIGHTDB_NOEXCEPT;
+    void recursive_mark() TIGHTDB_NOEXCEPT;
+    void regressive_mark() TIGHTDB_NOEXCEPT; // Towards root
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     Replication* get_repl() TIGHTDB_NOEXCEPT;
 #endif
 
-    /// Refresh the dirty part of the accessor subtree rooted at this table
+    /// Refresh the marked part of the accessor subtree rooted at this table
     /// accessor.
     ///
     /// The following conditions are necessary and sufficient for the proper
@@ -1036,7 +1038,7 @@ private:
     ///    valid state.
     ///
     ///  - Every table accessor in the subtree (this one, or one of its
-    ///    descendants) is marked dirty if it needs to be refreshed, or if it
+    ///    descendants) is marked if it needs to be refreshed, or if it
     ///    has a descendant accessor that needs to be refreshed.
     ///
     ///  - This table accessor, as well as all its descendant accessors, are in
@@ -1060,6 +1062,7 @@ private:
     friend class LangBindHelper;
     friend class TableViewBase;
     friend class TableView;
+    friend class LinkView;
     template<class T> friend class Columns;
     friend class Columns<StringData>;
     friend class ParentNode;
@@ -1068,16 +1071,38 @@ private:
 };
 
 
+#ifdef TIGHTDB_ENABLE_REPLICATION
+inline void Table::bump_version() const 
+{ 
+    if (m_mark2) {
+        return;
+    }
+    ++m_version;
+    ConstTableRef tr = get_parent_table();
+    if (tr) {
+        tr->bump_version();
+    }
+    // recurse through linked tables, use m_mark to avoid infinite recursion
+    m_mark2 = true;
+    size_t limit = m_cols.size();
+    for (size_t i = 0; i < limit; ++i) {
+        ColumnBase* cb = reinterpret_cast<ColumnBase*>(m_cols.get(i));
+        if (cb) {
+            cb->bump_version_on_linked_table();
+        }
+    }
+    m_mark2 = false;
+}
+#endif
+
 inline void Table::remove(std::size_t row_ndx)
 {
     do_remove(row_ndx);
-    bump_version();
 }
 
 inline void Table::from_view_remove(std::size_t row_ndx, TableViewBase*)
 {
     do_remove(row_ndx);
-    bump_version();
 }
 
 inline void Table::remove_last()
@@ -1266,7 +1291,8 @@ inline Table::Table(Allocator& alloc):
     m_descriptor(0)
 {
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    m_dirty = false;
+    m_mark = false;
+    m_mark2 = false;
     m_version = 0;
 #endif
     ref_type ref = create_empty_table(alloc); // Throws
@@ -1278,7 +1304,8 @@ inline Table::Table(const Table& t, Allocator& alloc):
     m_descriptor(0)
 {
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    m_dirty = false;
+    m_mark = false;
+    m_mark2 = false;
     m_version = 0;
 #endif
     ref_type ref = t.clone(alloc); // Throws
@@ -1291,7 +1318,8 @@ inline Table::Table(ref_count_tag, Allocator& alloc, ref_type top_ref,
     m_descriptor(0)
 {
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    m_dirty = false;
+    m_mark = false;
+    m_mark2 = false;
     m_version = 0;
 #endif
     init_from_ref(top_ref, parent, ndx_in_parent);
@@ -1303,7 +1331,8 @@ inline Table::Table(ref_count_tag, ConstSubspecRef shared_spec, ref_type columns
     m_spec(shared_spec.get_alloc()), m_ref_count(0), m_search_index(0), m_descriptor(0)
 {
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    m_dirty = false;
+    m_mark = false;
+    m_mark2 = false;
     m_version = 0;
 #endif
     init_from_ref(shared_spec, columns_ref, parent, ndx_in_parent);
@@ -1549,10 +1578,10 @@ typename T::RowAccessor Table::get_link_accessor(std::size_t column_ndx, std::si
     return (*typed_table)[row_pos_in_target];
 }
 
-inline void Table::mark_dirty() TIGHTDB_NOEXCEPT
+inline void Table::mark() TIGHTDB_NOEXCEPT
 {
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    m_dirty = true;
+    m_mark = true;
 #endif
 }
 
@@ -1749,19 +1778,19 @@ public:
         table.adj_erase_column(col_ndx);
     }
 
-    static void mark_dirty(Table& table) TIGHTDB_NOEXCEPT
+    static void mark(Table& table) TIGHTDB_NOEXCEPT
     {
-        table.mark_dirty();
+        table.mark();
     }
 
-    static void recursive_mark_dirty(Table& table) TIGHTDB_NOEXCEPT
+    static void recursive_mark(Table& table) TIGHTDB_NOEXCEPT
     {
-        table.recursive_mark_dirty();
+        table.recursive_mark();
     }
 
-    static void regressive_mark_dirty(Table& table) TIGHTDB_NOEXCEPT
+    static void regressive_mark(Table& table) TIGHTDB_NOEXCEPT
     {
-        table.regressive_mark_dirty();
+        table.regressive_mark();
     }
 
     static Descriptor* get_root_table_desc_accessor(Table& root_table) TIGHTDB_NOEXCEPT
@@ -1800,6 +1829,11 @@ public:
     static void initialize_link_targets(Table& table, Group& group, std::size_t table_ndx)
     {
         table.initialize_link_targets(group, table_ndx); // Throws
+    }
+
+    static inline void bump_version(Table& table)
+    {
+        table.bump_version();
     }
 };
 

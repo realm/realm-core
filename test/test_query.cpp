@@ -420,7 +420,8 @@ TEST(Query_NextGenSyntax)
     match = (u0 + u1 > 40).find();
     CHECK(match == 1);
 
-
+    // No longer supported
+    /*
     // Flexible language binding style
     Subexpr* first = new Columns<int64_t>(0);
     Subexpr* second = new Columns<float>(1);
@@ -472,6 +473,8 @@ TEST(Query_NextGenSyntax)
     delete third2;
     delete second2;
     delete first2;
+    */
+
 }
 
 TEST(Query_NextGenSyntaxMonkey0)

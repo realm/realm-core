@@ -547,7 +547,7 @@ struct Table::InsertSubtableColumns: SubtableUpdater {
     void update_accessor(Table& table, size_t row_ndx) TIGHTDB_OVERRIDE
     {
         table.adj_insert_column(m_column_ndx); // Throws
-        table.mark_dirty();
+        table.mark();
         table.refresh_accessor_tree(row_ndx);
     }
 private:
@@ -570,7 +570,7 @@ struct Table::RemoveSubtableColumns: SubtableUpdater {
     void update_accessor(Table& table, size_t row_ndx) TIGHTDB_OVERRIDE
     {
         table.adj_erase_column(m_column_ndx);
-        table.mark_dirty();
+        table.mark();
         table.refresh_accessor_tree(row_ndx);
     }
 private:
@@ -584,7 +584,7 @@ struct Table::RenameSubtableColumns: SubtableUpdater {
     }
     void update_accessor(Table& table, size_t row_ndx) TIGHTDB_OVERRIDE
     {
-        table.mark_dirty();
+        table.mark();
         table.refresh_accessor_tree(row_ndx);
     }
 };
@@ -2535,7 +2535,6 @@ LinkViewRef Table::get_linklist(size_t col_ndx, size_t row_ndx)
     TIGHTDB_ASSERT(row_ndx < m_size);
     // FIXME: this looks wrong! It should instead be the modifying operations of
     // LinkView that bump the change count of the containing table.
-    bump_version();
     ColumnLinkList& column = get_column_link_list(col_ndx);
     return column.get(row_ndx);
 }
@@ -2543,7 +2542,6 @@ LinkViewRef Table::get_linklist(size_t col_ndx, size_t row_ndx)
 bool Table::linklist_is_empty(size_t col_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(row_ndx < m_size);
-    bump_version();
     const ColumnLinkList& column = get_column_link_list(col_ndx);
     return !column.has_links(row_ndx);
 }
@@ -4396,23 +4394,23 @@ void Table::adj_erase_column(size_t col_ndx) TIGHTDB_NOEXCEPT
 }
 
 
-void Table::recursive_mark_dirty() TIGHTDB_NOEXCEPT
+void Table::recursive_mark() TIGHTDB_NOEXCEPT
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
     // underlying node structure. See AccessorConcistncyLevels.
 
-    mark_dirty();
+    mark();
 
     size_t n = m_cols.size();
     for (size_t i = 0; i != n; ++i) {
         if (ColumnBase* col = m_cols[i])
-            col->recursive_mark_dirty();
+            col->recursive_mark();
     }
 }
 
 
-void Table::regressive_mark_dirty() TIGHTDB_NOEXCEPT
+void Table::regressive_mark() TIGHTDB_NOEXCEPT
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
@@ -4421,9 +4419,9 @@ void Table::regressive_mark_dirty() TIGHTDB_NOEXCEPT
 #ifdef TIGHTDB_ENABLE_REPLICATION
     Table* table = this;
     for (;;) {
-        if (table->m_dirty)
+        if (table->m_mark)
             break;
-        table->m_dirty = true;
+        table->m_mark = true;
         table = get_parent_table_ptr();
         if (!table)
             break;
@@ -4439,7 +4437,7 @@ void Table::refresh_accessor_tree(size_t ndx_in_parent)
         // Root table (independent descriptor)
         m_top.set_ndx_in_parent(ndx_in_parent);
 #ifdef TIGHTDB_ENABLE_REPLICATION
-        if (!m_dirty)
+        if (!m_mark)
             return;
 #endif
         m_top.init_from_parent();
@@ -4450,7 +4448,7 @@ void Table::refresh_accessor_tree(size_t ndx_in_parent)
         // Subtable with shared descriptor
         m_columns.set_ndx_in_parent(ndx_in_parent);
 #ifdef TIGHTDB_ENABLE_REPLICATION
-        if (!m_dirty)
+        if (!m_mark)
             return;
 #endif
         m_spec.init_from_parent();
@@ -4475,7 +4473,6 @@ void Table::refresh_accessor_tree(size_t ndx_in_parent)
         }
     }
     m_search_index = 0;
-    bump_version();
 
     size_t col_ndx_in_parent = 0; // Index in Table::m_columns
     size_t num_cols = m_cols.size();
@@ -4532,8 +4529,10 @@ void Table::refresh_accessor_tree(size_t ndx_in_parent)
 
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    m_dirty = false;
+    m_mark = false;
 #endif
+
+    bump_version();
 }
 
 

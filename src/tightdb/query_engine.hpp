@@ -1888,7 +1888,7 @@ public:
 
     void init(const Table& table)  TIGHTDB_OVERRIDE
     {
-        m_compare->set_table(&table);
+        m_compare->set_table();
         if (m_child)
             m_child->init(table);
     }

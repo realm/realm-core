@@ -45,7 +45,6 @@ public:
     void adj_accessors_insert_rows(std::size_t, std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     void adj_accessors_erase_row(std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     void adj_accessors_move_last_over(std::size_t, std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-
 protected:
     TableRef m_target_table;
     ColumnBackLink* m_backlinks;
@@ -94,7 +93,7 @@ inline void ColumnLinkBase::set_backlink_column(ColumnBackLink& backlinks) TIGHT
 inline void ColumnLinkBase::adj_accessors_insert_rows(std::size_t, std::size_t) TIGHTDB_NOEXCEPT
 {
     typedef _impl::TableFriend tf;
-    tf::mark_dirty(*m_target_table);
+    tf::mark(*m_target_table);
 }
 
 inline void ColumnLinkBase::adj_accessors_erase_row(std::size_t) TIGHTDB_NOEXCEPT
@@ -106,7 +105,7 @@ inline void ColumnLinkBase::adj_accessors_erase_row(std::size_t) TIGHTDB_NOEXCEP
 inline void ColumnLinkBase::adj_accessors_move_last_over(std::size_t, std::size_t) TIGHTDB_NOEXCEPT
 {
     typedef _impl::TableFriend tf;
-    tf::mark_dirty(*m_target_table);
+    tf::mark(*m_target_table);
 }
 
 
