@@ -1091,6 +1091,12 @@ inline void Table::bump_version() const
     size_t limit = m_cols.size();
     for (size_t i = 0; i < limit; ++i) {
         ColumnBase* cb = reinterpret_cast<ColumnBase*>(m_cols.get(i));
+        // we may meet a null pointer in place of a backlink column, pending
+        // replacement with a new one. This can happen ONLY when creation of the corresponding
+        // forward link column in the origin table is pending as well. In this
+        // case it is ok to just ignore the zeroed backlink column, because the origin
+        // table is guaranteed to also be refreshed/marked dirty and hence have it's
+        // version bumped.
         if (cb) {
             cb->bump_version_on_linked_table();
         }
