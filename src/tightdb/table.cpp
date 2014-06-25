@@ -4465,8 +4465,6 @@ void Table::refresh_accessor_tree(size_t ndx_in_parent)
                 // The underlying table is no longer degenerate
                 size_t num_cols = m_spec.get_column_count();
                 m_cols.resize(num_cols); // throws
-                for (size_t i = 0; i < num_cols; ++i)
-                    m_cols[i] = 0;
             }
             m_columns.init_from_ref(columns_ref);
         }
