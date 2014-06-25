@@ -83,7 +83,7 @@ private:
 
 inline void ColumnBackLink::bump_version_on_linked_table() TIGHTDB_NOEXCEPT
 {
-    m_origin_table->bump_version();
+    _impl::TableFriend::bump_version(*m_origin_table);
 }
 
 inline ColumnBackLink::ColumnBackLink(ref_type ref, ArrayParent* parent, std::size_t ndx_in_parent,

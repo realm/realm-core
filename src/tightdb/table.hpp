@@ -753,27 +753,7 @@ private:
     mutable bool m_mark2;
 
     mutable uint_fast64_t m_version;
-    inline void bump_version() const 
-    { 
-        if (m_mark2) {
-            return;
-        }
-        ++m_version;
-        ConstTableRef tr = get_parent_table();
-        if (tr) {
-            tr->bump_version();
-        }
-        // recurse through linked tables, use m_mark to avoid infinite recursion
-        m_mark2 = true;
-        size_t limit = m_cols.size();
-        for (size_t i = 0; i < limit; ++i) {
-            ColumnBase* cb = reinterpret_cast<ColumnBase*>(m_cols.get(i));
-            if (cb) {
-                cb->bump_version_on_linked_table();
-            }
-        }
-        m_mark2 = false;
-    }
+    void bump_version() const;
 #else
     inline void bump_version() const {}
 #endif
@@ -1092,9 +1072,32 @@ private:
     friend class ParentNode;
     template<class> friend class SequentialGetter;
     friend class RowBase;
-    friend class ColumnBackLink;
 };
 
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+inline void Table::bump_version() const 
+{ 
+    if (m_mark2) {
+        return;
+    }
+    ++m_version;
+    ConstTableRef tr = get_parent_table();
+    if (tr) {
+        tr->bump_version();
+    }
+    // recurse through linked tables, use m_mark to avoid infinite recursion
+    m_mark2 = true;
+    size_t limit = m_cols.size();
+    for (size_t i = 0; i < limit; ++i) {
+        ColumnBase* cb = reinterpret_cast<ColumnBase*>(m_cols.get(i));
+        if (cb) {
+            cb->bump_version_on_linked_table();
+        }
+    }
+    m_mark2 = false;
+}
+#endif
 
 inline void Table::remove(std::size_t row_ndx)
 {
@@ -1832,6 +1835,11 @@ public:
     static void initialize_link_targets(Table& table, Group& group, std::size_t table_ndx)
     {
         table.initialize_link_targets(group, table_ndx); // Throws
+    }
+
+    static inline void bump_version(Table& table)
+    {
+        table.bump_version();
     }
 };
 
