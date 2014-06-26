@@ -1221,7 +1221,7 @@ void Group::advance_transact(ref_type new_top_ref, size_t new_file_size,
     }
 
     init_from_ref(new_top_ref);
-
+    m_top.get_alloc().bump_global_version();
     // Refresh all remaining dirty table accessors
     size_t num_tables = m_table_accessors.size();
     for (size_t table_ndx = 0; table_ndx != num_tables; ++table_ndx) {

@@ -162,8 +162,31 @@ protected:
     virtual char* do_translate(ref_type ref) const TIGHTDB_NOEXCEPT = 0;
 
     Allocator() TIGHTDB_NOEXCEPT;
+private:
+    uint_fast64_t table_versioning_counter;
+    uint_fast64_t bump_global_version() TIGHTDB_NOEXCEPT;
+    bool should_propagate_version(uint_fast64_t& local_version) TIGHTDB_NOEXCEPT;
+
+    friend class Table;
+    friend class Group;
 };
 
+inline uint_fast64_t Allocator::bump_global_version() TIGHTDB_NOEXCEPT
+{
+    ++table_versioning_counter;
+    return table_versioning_counter;
+}
+
+inline bool Allocator::should_propagate_version(uint_fast64_t& local_version) TIGHTDB_NOEXCEPT
+{
+    if (local_version != table_versioning_counter) {
+        local_version = table_versioning_counter;
+        return true;
+    }
+    else {
+        return false;
+    }
+}
 
 
 
@@ -249,6 +272,7 @@ inline Allocator::Allocator() TIGHTDB_NOEXCEPT
 #ifdef TIGHTDB_DEBUG
     m_watch = 0;
 #endif
+    table_versioning_counter = 0;
 }
 
 inline Allocator::~Allocator() TIGHTDB_NOEXCEPT

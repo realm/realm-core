@@ -750,12 +750,10 @@ private:
     /// Used only in connection with Group::advance_transact() and
     /// Table::refresh_accessor_tree().
     mutable bool m_mark;
-    mutable bool m_mark2;
-
     mutable uint_fast64_t m_version;
-    void bump_version() const;
+    void bump_version(bool bump_global = true) const;
 #else
-    inline void bump_version() const {}
+    inline void bump_version(bool) const {}
 #endif
 
     /// Disable copying assignment.
@@ -1076,32 +1074,33 @@ private:
 
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-inline void Table::bump_version() const 
+inline void Table::bump_version(bool bump_global) const 
 { 
-    if (m_mark2) {
-        return;
+    if (bump_global) {
+        // this is only set on initial entry through an operation on the same table.
+        // recursive calls (via parent or via backlinks) must be done with bump_global=false.
+        m_top.get_alloc().bump_global_version();
     }
-    ++m_version;
-    ConstTableRef tr = get_parent_table();
-    if (tr) {
-        tr->bump_version();
-    }
-    // recurse through linked tables, use m_mark to avoid infinite recursion
-    m_mark2 = true;
-    size_t limit = m_cols.size();
-    for (size_t i = 0; i < limit; ++i) {
-        ColumnBase* cb = reinterpret_cast<ColumnBase*>(m_cols.get(i));
-        // we may meet a null pointer in place of a backlink column, pending
-        // replacement with a new one. This can happen ONLY when creation of the corresponding
-        // forward link column in the origin table is pending as well. In this
-        // case it is ok to just ignore the zeroed backlink column, because the origin
-        // table is guaranteed to also be refreshed/marked dirty and hence have it's
-        // version bumped.
-        if (cb) {
-            cb->bump_version_on_linked_table();
+    if (m_top.get_alloc().should_propagate_version(m_version)) {
+        ConstTableRef tr = get_parent_table();
+        if (tr) {
+            tr->bump_version(false);
+        }
+        // recurse through linked tables, use m_mark to avoid infinite recursion
+        size_t limit = m_cols.size();
+        for (size_t i = 0; i < limit; ++i) {
+            ColumnBase* cb = reinterpret_cast<ColumnBase*>(m_cols.get(i));
+            // we may meet a null pointer in place of a backlink column, pending
+            // replacement with a new one. This can happen ONLY when creation of the corresponding
+            // forward link column in the origin table is pending as well. In this
+            // case it is ok to just ignore the zeroed backlink column, because the origin
+            // table is guaranteed to also be refreshed/marked dirty and hence have it's
+            // version bumped.
+            if (cb) {
+                cb->bump_version_on_linked_table();
+            }
         }
     }
-    m_mark2 = false;
 }
 #endif
 
@@ -1843,7 +1842,9 @@ public:
 
     static inline void bump_version(Table& table)
     {
-        table.bump_version();
+        // calls going through tablefriend are always part of a recursion, so shouldn't
+        // bump the global counter
+        table.bump_version(false);
     }
 };
 

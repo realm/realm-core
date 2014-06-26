@@ -1320,6 +1320,7 @@ void Table::set_index(size_t column_ndx, bool update_spec)
         return;
 
     m_search_index = 0;
+    // FIXME: can this ever change the outcome of a query?
     bump_version();
 
     ColumnType ct = get_real_column_type(column_ndx);
@@ -4540,7 +4541,7 @@ void Table::refresh_accessor_tree(size_t ndx_in_parent)
     m_mark = false;
 #endif
 
-    bump_version();
+    bump_version(false);
 }
 
 
