@@ -1301,7 +1301,6 @@ inline Table::Table(Allocator& alloc):
 {
 #ifdef TIGHTDB_ENABLE_REPLICATION
     m_mark = false;
-    m_mark2 = false;
     m_version = 0;
 #endif
     ref_type ref = create_empty_table(alloc); // Throws
@@ -1314,7 +1313,6 @@ inline Table::Table(const Table& t, Allocator& alloc):
 {
 #ifdef TIGHTDB_ENABLE_REPLICATION
     m_mark = false;
-    m_mark2 = false;
     m_version = 0;
 #endif
     ref_type ref = t.clone(alloc); // Throws
@@ -1328,7 +1326,6 @@ inline Table::Table(ref_count_tag, Allocator& alloc, ref_type top_ref,
 {
 #ifdef TIGHTDB_ENABLE_REPLICATION
     m_mark = false;
-    m_mark2 = false;
     m_version = 0;
 #endif
     init_from_ref(top_ref, parent, ndx_in_parent);
@@ -1341,7 +1338,6 @@ inline Table::Table(ref_count_tag, ConstSubspecRef shared_spec, ref_type columns
 {
 #ifdef TIGHTDB_ENABLE_REPLICATION
     m_mark = false;
-    m_mark2 = false;
     m_version = 0;
 #endif
     init_from_ref(shared_spec, columns_ref, parent, ndx_in_parent);
