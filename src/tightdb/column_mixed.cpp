@@ -134,7 +134,7 @@ ColumnMixed::MixedColType ColumnMixed::clear_value(size_t row_ndx, MixedColType 
 
 void ColumnMixed::clear()
 {
-    detach_subtable_accessors();
+    discard_child_accessors();
     m_types->clear(); // Throws
     m_data->clear(); // Throws
     if (m_binary_data)
@@ -293,9 +293,9 @@ bool ColumnMixed::compare_mixed(const ColumnMixed& c) const
     return true;
 }
 
-void ColumnMixed::do_detach_subtable_accessors() TIGHTDB_NOEXCEPT
+void ColumnMixed::do_discard_child_accessors() TIGHTDB_NOEXCEPT
 {
-    detach_subtable_accessors();
+    discard_child_accessors();
 }
 
 ref_type ColumnMixed::create(size_t size, Allocator& alloc)

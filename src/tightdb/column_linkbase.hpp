@@ -90,8 +90,14 @@ inline void ColumnLinkBase::set_backlink_column(ColumnBackLink& backlinks) TIGHT
     m_backlinks = &backlinks;
 }
 
-inline void ColumnLinkBase::adj_accessors_insert_rows(std::size_t, std::size_t) TIGHTDB_NOEXCEPT
+inline void ColumnLinkBase::adj_accessors_insert_rows(std::size_t row_ndx,
+                                                      std::size_t num_rows) TIGHTDB_NOEXCEPT
 {
+    Column::adj_accessors_insert_rows(row_ndx, num_rows);
+
+    // For tables with link-type columns, the insertion point must be after all
+    // existsing rows, but since the inserted link can be non-null, the target
+    // table must still be marked dirty.
     typedef _impl::TableFriend tf;
     tf::mark(*m_target_table);
 }
@@ -102,8 +108,11 @@ inline void ColumnLinkBase::adj_accessors_erase_row(std::size_t) TIGHTDB_NOEXCEP
     TIGHTDB_ASSERT(false);
 }
 
-inline void ColumnLinkBase::adj_accessors_move_last_over(std::size_t, std::size_t) TIGHTDB_NOEXCEPT
+inline void ColumnLinkBase::adj_accessors_move_last_over(std::size_t target_row_ndx,
+                                                         std::size_t last_row_ndx) TIGHTDB_NOEXCEPT
 {
+    Column::adj_accessors_move_last_over(target_row_ndx, last_row_ndx);
+
     typedef _impl::TableFriend tf;
     tf::mark(*m_target_table);
 }

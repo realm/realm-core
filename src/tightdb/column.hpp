@@ -142,7 +142,7 @@ public:
     /// when the transaction ends.
     virtual void update_from_parent(std::size_t old_baseline) TIGHTDB_NOEXCEPT;
 
-    void detach_subtable_accessors() TIGHTDB_NOEXCEPT;
+    void discard_child_accessors() TIGHTDB_NOEXCEPT;
 
     /// For columns that are able to contain subtables, this function returns
     /// the pointer to the subtable accessor at the specified row index if it
@@ -206,7 +206,7 @@ protected:
 
     // Must not assume more than minimal consistency (see
     // AccessorConsistencyLevels).
-    virtual void do_detach_subtable_accessors() TIGHTDB_NOEXCEPT {}
+    virtual void do_discard_child_accessors() TIGHTDB_NOEXCEPT {}
 
     //@{
     /// \tparam L Any type with an appropriate `value_type`, %size(),
@@ -424,9 +424,9 @@ inline void ColumnBase::update_column_index(std::size_t, const Spec&) TIGHTDB_NO
     // Noop
 }
 
-inline void ColumnBase::detach_subtable_accessors() TIGHTDB_NOEXCEPT
+inline void ColumnBase::discard_child_accessors() TIGHTDB_NOEXCEPT
 {
-    do_detach_subtable_accessors();
+    do_discard_child_accessors();
 }
 
 inline Table* ColumnBase::get_subtable_accessor(std::size_t) const TIGHTDB_NOEXCEPT

@@ -88,10 +88,10 @@ public:
 
     // Links
     void set_link_target_table(std::size_t column_ndx, std::size_t table_ndx);
-    std::size_t get_link_target_table(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
+    std::size_t get_opposite_link_table_ndx(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
     bool has_backlinks() const TIGHTDB_NOEXCEPT;
     void set_backlink_origin_column(std::size_t backlink_col_ndx, std::size_t origin_col_ndx);
-    std::size_t get_backlink_origin_column(std::size_t backlink_col_ndx) const  TIGHTDB_NOEXCEPT;
+    std::size_t get_origin_column_ndx(std::size_t backlink_col_ndx) const  TIGHTDB_NOEXCEPT;
     std::size_t find_backlink_column(std::size_t origin_table_ndx,
                                      std::size_t origin_col_ndx) const TIGHTDB_NOEXCEPT;
     void update_backlink_column_ref(std::size_t origin_table_ndx, std::size_t old_column_ndx,

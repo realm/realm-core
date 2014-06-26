@@ -147,7 +147,7 @@ public:
     /// Compare two mixed columns for equality.
     bool compare_mixed(const ColumnMixed&) const;
 
-    void detach_subtable_accessors() TIGHTDB_NOEXCEPT;
+    void discard_child_accessors() TIGHTDB_NOEXCEPT;
 
     static ref_type create(std::size_t num_default_values, Allocator&);
 
@@ -225,7 +225,7 @@ private:
     void insert_pos_neg(std::size_t ndx, int_fast64_t value, MixedColType pos_type,
                         MixedColType neg_type);
 
-    void do_detach_subtable_accessors() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void do_discard_child_accessors() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
 #ifdef TIGHTDB_DEBUG
     void leaf_to_dot(MemRef, ArrayParent*, std::size_t,

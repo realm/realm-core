@@ -578,19 +578,19 @@ TEST(Links_LinkList_AccessorUpdates)
     links2->add(1);
     links2->add(0);
 
-    CHECK_EQUAL(0, links0->get_parent_row());
-    CHECK_EQUAL(1, links1->get_parent_row());
-    CHECK_EQUAL(2, links2->get_parent_row());
+    CHECK_EQUAL(0, links0->get_origin_row_index());
+    CHECK_EQUAL(1, links1->get_origin_row_index());
+    CHECK_EQUAL(2, links2->get_origin_row_index());
 
     // get the same linkview twice
     LinkViewRef links2again = source->get_linklist(col_link, 2);
-    CHECK_EQUAL(links2->get_parent_row(), links2again->get_parent_row());
+    CHECK_EQUAL(links2->get_origin_row_index(), links2again->get_origin_row_index());
 
     // delete a row and make sure involved accessors are updated
     source->move_last_over(0);
     CHECK_EQUAL(false, links0->is_attached());
-    CHECK_EQUAL(0, links2->get_parent_row());
-    CHECK_EQUAL(0, links2again->get_parent_row());
+    CHECK_EQUAL(0, links2->get_origin_row_index());
+    CHECK_EQUAL(0, links2again->get_origin_row_index());
 
     // clear and make sure all accessors get detached
     source->clear();
@@ -660,6 +660,5 @@ TEST(Links_Transactions)
         CHECK(owners->is_null_link(dog_col, tim_row));
     }
 }
-
 
 #endif // TEST_GROUP
