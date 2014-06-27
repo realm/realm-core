@@ -295,7 +295,7 @@ void Table::create_backlinks_column(Table& origin, size_t origin_col_ndx)
 {
     // Links only work for group-level tables
     TIGHTDB_ASSERT(!has_shared_type());
-    TIGHTDB_ASSERT(get_parent_group());
+    TIGHTDB_ASSERT(is_group_level());
 
     size_t backlink_col_ndx = m_spec.get_column_count();
     Table* link_target_table = 0;
@@ -304,7 +304,7 @@ void Table::create_backlinks_column(Table& origin, size_t origin_col_ndx)
     m_spec.set_link_target_table(backlink_col_ndx, origin_table_ndx); // Throws
     m_spec.set_backlink_origin_column(backlink_col_ndx, origin_col_ndx); // Throws
 
-    ColumnBackLink& backlink_col = get_column_back_link(backlink_col_ndx);
+    ColumnBackLink& backlink_col = get_column_backlink(backlink_col_ndx);
     backlink_col.set_origin_table(origin);
 
     ColumnLinkBase& origin_col = origin.get_column_link_base(origin_col_ndx);
@@ -316,7 +316,7 @@ ColumnBackLink& Table::get_backlink_column(size_t origin_table_ndx,
                                            size_t origin_col_ndx) TIGHTDB_NOEXCEPT
 {
     size_t backlink_col_ndx = m_spec.find_backlink_column(origin_table_ndx, origin_col_ndx);
-    return get_column_back_link(backlink_col_ndx);
+    return get_column_backlink(backlink_col_ndx);
 }
 
 
@@ -325,7 +325,7 @@ size_t Table::get_backlink_count(size_t row_ndx, const Table& origin,
 {
     size_t origin_table_ndx = origin.get_index_in_parent();
     size_t backlink_col_ndx = m_spec.find_backlink_column(origin_table_ndx, origin_col_ndx);
-    const ColumnBackLink& backlink_col = get_column_back_link(backlink_col_ndx);
+    const ColumnBackLink& backlink_col = get_column_backlink(backlink_col_ndx);
     return backlink_col.get_backlink_count(row_ndx);
 }
 
@@ -335,7 +335,7 @@ size_t Table::get_backlink(size_t row_ndx, const Table& origin, size_t origin_co
 {
     size_t origin_table_ndx = origin.get_index_in_parent();
     size_t backlink_col_ndx = m_spec.find_backlink_column(origin_table_ndx, origin_col_ndx);
-    const ColumnBackLink& backlink_col = get_column_back_link(backlink_col_ndx);
+    const ColumnBackLink& backlink_col = get_column_backlink(backlink_col_ndx);
     return backlink_col.get_backlink(row_ndx, backlink_ndx);
 }
 
@@ -344,36 +344,48 @@ void Table::initialize_link_targets(Group& group, size_t table_ndx)
 {
     // Links only work for group-level tables
     TIGHTDB_ASSERT(!has_shared_type());
-    TIGHTDB_ASSERT(get_parent_group());
+    TIGHTDB_ASSERT(is_group_level());
 
     size_t n = m_spec.get_column_count();
     for (size_t i = 0; i < n; ++i) {
         ColumnType column_type = m_spec.get_column_type(i);
         if (column_type == col_type_Link || column_type == col_type_LinkList) {
             // Get the target table from group
-            size_t target_table_ndx = m_spec.get_link_target_table(i);
+            size_t target_table_ndx = m_spec.get_opposite_link_table_ndx(i);
             Table* target_table = group.get_table_by_ndx(target_table_ndx); // Throws
 
             // Set target table in column
-            ColumnLinkBase& column = get_column_link_base(i);
-            column.set_target_table(*target_table);
-            column.set_backlink_column(target_table->get_backlink_column(table_ndx, i));
+            ColumnLinkBase& link_col = get_column_link_base(i);
+            link_col.set_target_table(*target_table);
+            link_col.set_backlink_column(target_table->get_backlink_column(table_ndx, i));
         }
         else if (column_type == col_type_BackLink) {
             // Get the origin table from group
-            size_t origin_table_ndx = m_spec.get_link_target_table(i);
+            size_t origin_table_ndx = m_spec.get_opposite_link_table_ndx(i);
             Table* origin_table = group.get_table_by_ndx(origin_table_ndx); // Throws
 
             // Get the columns the links originate from
-            size_t origin_col_ndx = m_spec.get_backlink_origin_column(i);
+            size_t origin_col_ndx = m_spec.get_origin_column_ndx(i);
             ColumnLinkBase& origin_col = origin_table->get_column_link_base(origin_col_ndx);
 
             // Set origination info in backlink column
-            ColumnBackLink& backlink_col = get_column_back_link(i);
+            ColumnBackLink& backlink_col = get_column_backlink(i);
             backlink_col.set_origin_table(*origin_table);
             backlink_col.set_origin_column(origin_col);
         }
     }
+}
+
+
+void Table::connect_opposite_link_columns(size_t link_col_ndx, Table& target_table,
+                                          size_t backlink_col_ndx) TIGHTDB_NOEXCEPT
+{
+    ColumnLinkBase& link_col = get_column_link_base(link_col_ndx);
+    ColumnBackLink& backlink_col = target_table.get_column_backlink(backlink_col_ndx);
+    link_col.set_target_table(target_table);
+    link_col.set_backlink_column(backlink_col);
+    backlink_col.set_origin_table(*this);
+    backlink_col.set_origin_column(link_col);
 }
 
 
@@ -723,16 +735,16 @@ void Table::insert_root_column(size_t col_ndx, ColumnType col_type, StringData n
 }
 
 
-void Table::remove_root_column(size_t column_ndx)
+void Table::remove_root_column(size_t col_ndx)
 {
     m_search_index = 0;
     bump_version();
 
     Spec::ColumnInfo info;
-    m_spec.get_column_info(column_ndx, info);
+    m_spec.get_column_info(col_ndx, info);
 
     // Remove the column from the spec
-    m_spec.remove_column(column_ndx); // Throws
+    m_spec.remove_column(col_ndx); // Throws
 
     // Remove and destroy the ref from m_columns
     ref_type column_ref = m_columns.get_as_ref(info.m_column_ref_ndx);
@@ -747,15 +759,13 @@ void Table::remove_root_column(size_t column_ndx)
     }
 
     // Delete the column accessor
-    ColumnBase* col = m_cols[column_ndx];
-    col->detach_subtable_accessors();
-    delete col;
+    delete m_cols[col_ndx];
 
-    m_cols.erase(m_cols.begin() + column_ndx);
+    m_cols.erase(m_cols.begin() + col_ndx);
 
     // Update cached column indexes for subsequent column accessors
     int ndx_in_parent_diff = info.m_has_index ? -2 : -1;
-    adjust_column_index(column_ndx, ndx_in_parent_diff);
+    adjust_column_index(col_ndx, ndx_in_parent_diff);
 
     // If there are no columns left, mark the table as empty
     if (get_column_count() == 0) {
@@ -1064,9 +1074,7 @@ void Table::detach() TIGHTDB_NOEXCEPT
     // also causes is_attached() to return false.
     m_columns.set_parent(0,0);
 
-    discard_row_accessors();
-    discard_subtable_accessors();
-
+    discard_child_accessors();
     destroy_column_accessors();
     m_cols.clear();
     // FSA: m_cols.destroy();
@@ -1097,16 +1105,18 @@ void Table::detach_views_except(const TableViewBase* view) TIGHTDB_NOEXCEPT
 }
 
 
-void Table::discard_subtable_accessors() TIGHTDB_NOEXCEPT
+void Table::discard_child_accessors() TIGHTDB_NOEXCEPT
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
     // underlying node structure. See AccessorConcistncyLevels.
 
+    discard_row_accessors();
+
     size_t n = m_cols.size();
     for (size_t i = 0; i < n; ++i) {
         if (ColumnBase* col = m_cols[i])
-            col->detach_subtable_accessors();
+            col->discard_child_accessors();
     }
 }
 
@@ -1539,12 +1549,12 @@ ColumnLinkList& Table::get_column_link_list(size_t ndx)
     return get_column<ColumnLinkList, col_type_LinkList>(ndx);
 }
 
-const ColumnBackLink& Table::get_column_back_link(size_t ndx) const TIGHTDB_NOEXCEPT
+const ColumnBackLink& Table::get_column_backlink(size_t ndx) const TIGHTDB_NOEXCEPT
 {
     return get_column<ColumnBackLink, col_type_BackLink>(ndx);
 }
 
-ColumnBackLink& Table::get_column_back_link(size_t ndx)
+ColumnBackLink& Table::get_column_backlink(size_t ndx)
 {
     return get_column<ColumnBackLink, col_type_BackLink>(ndx);
 }
@@ -1774,8 +1784,6 @@ void Table::move_last_over(size_t target_row_ndx)
     TIGHTDB_ASSERT(target_row_ndx < m_size);
     bump_version();
 
-    // FIXME: PossibleLinkMergeConflict: `target_row_ndx` is now allowed to be equal to m_size-1. How does Group::TransactAdvancer deal with that?
-
     size_t last_row_ndx = m_size - 1;
     size_t num_cols = m_spec.get_column_count();
     if (target_row_ndx != last_row_ndx) {
@@ -1990,15 +1998,14 @@ void Table::clear_subtable(size_t col_ndx, size_t row_ndx)
 
 Group* Table::get_parent_group() const TIGHTDB_NOEXCEPT
 {
+    TIGHTDB_ASSERT(is_attached());
     if (!m_top.is_attached())
-        return null_ptr;
-
+        return 0; // Subtable with shared descriptor
     Parent* parent = static_cast<Parent*>(m_top.get_parent()); // ArrayParent guaranteed to be Table::Parent
-    if (!parent || !parent->is_parent_group())
-        return null_ptr;
-
-    Group* group = static_cast<Group*>(parent);
-    return group;
+    if (!parent)
+        return 0; // Free-standing table
+    // Null if subtable with independent descriptor (in mixed column)
+    return parent->get_parent_group();
 }
 
 
@@ -2573,7 +2580,7 @@ void Table::insert_done()
         size_t column_count = m_spec.get_column_count();
 
         for (size_t i = backlinks_start; i < column_count; ++i) {
-            ColumnBackLink& column = get_column_back_link(i);
+            ColumnBackLink& column = get_column_backlink(i);
             column.add_row();
         }
     }
@@ -4219,7 +4226,13 @@ StringData Table::Parent::get_child_name(size_t) const TIGHTDB_NOEXCEPT
 }
 
 
-Table* Table::Parent::get_parent_table(size_t*) const TIGHTDB_NOEXCEPT
+Group* Table::Parent::get_parent_group() TIGHTDB_NOEXCEPT
+{
+    return 0;
+}
+
+
+Table* Table::Parent::get_parent_table(size_t*) TIGHTDB_NOEXCEPT
 {
     return 0;
 }
@@ -4349,8 +4362,7 @@ void Table::adj_clear_nonroot() TIGHTDB_NOEXCEPT
     // accessor hierarchy. This means in particular that it cannot access the
     // underlying node structure. See AccessorConcistncyLevels.
 
-    discard_row_accessors();
-    discard_subtable_accessors();
+    discard_child_accessors();
     destroy_column_accessors();
     m_columns.detach();
 }
@@ -4381,10 +4393,8 @@ void Table::adj_erase_column(size_t col_ndx) TIGHTDB_NOEXCEPT
     bool not_degenerate = m_columns.is_attached();
     if (not_degenerate) {
         TIGHTDB_ASSERT(col_ndx < m_cols.size());
-        if (ColumnBase* col = m_cols[col_ndx]) {
-            col->detach_subtable_accessors();
+        if (ColumnBase* col = m_cols[col_ndx])
             delete col;
-        }
         m_cols.erase(m_cols.begin() + col_ndx);
 
         // If we removed the last column, we need to discard all row accessors
@@ -4407,26 +4417,6 @@ void Table::recursive_mark() TIGHTDB_NOEXCEPT
         if (ColumnBase* col = m_cols[i])
             col->recursive_mark();
     }
-}
-
-
-void Table::regressive_mark() TIGHTDB_NOEXCEPT
-{
-    // This function must assume no more than minimal consistency of the
-    // accessor hierarchy. This means in particular that it cannot access the
-    // underlying node structure. See AccessorConcistncyLevels.
-
-#ifdef TIGHTDB_ENABLE_REPLICATION
-    Table* table = this;
-    for (;;) {
-        if (table->m_mark)
-            break;
-        table->m_mark = true;
-        table = get_parent_table_ptr();
-        if (!table)
-            break;
-    }
-#endif
 }
 
 
@@ -4504,10 +4494,37 @@ void Table::refresh_accessor_tree(size_t ndx_in_parent)
             ColumnType col_type = m_spec.get_column_type(col_ndx);
             col = create_column_accessor(col_type, col_ndx, col_ndx_in_parent); // Throws
             m_cols[col_ndx] = col;
+            // In the case of a link-type column, we must establish a connection
+            // between it and the corresponding backlink column. This, however,
+            // cannot be done until both the origin and the target table
+            // accessor have been sufficiently refreshed. The solution is to
+            // attempt the connection establishment when the link coumn is
+            // created, and when the backlink column is created. In both cases,
+            // if the opposite table accessor is still dirty, the connection
+            // stablishent is postponed.
+            if (is_link_type(col_type)) {
+                Group* group = get_parent_group();
+                size_t target_table_ndx = m_spec.get_opposite_link_table_ndx(col_ndx);
+                Table* target_table = group->get_table_by_ndx(target_table_ndx); // Throws
+                if (!target_table->is_marked()) {
+                    size_t backlink_col_ndx =
+                        target_table->m_spec.find_backlink_column(ndx_in_parent, col_ndx);
+                    connect_opposite_link_columns(col_ndx, *target_table, backlink_col_ndx);
+                }
+            }
+            else if (col_type == col_type_BackLink) {
+                Group* group = get_parent_group();
+                size_t origin_table_ndx = m_spec.get_opposite_link_table_ndx(col_ndx);
+                Table* origin_table = group->get_table_by_ndx(origin_table_ndx); // Throws
+                if (!origin_table->is_marked()) {
+                    size_t link_col_ndx = m_spec.get_origin_column_ndx(col_ndx);
+                    origin_table->connect_opposite_link_columns(link_col_ndx, *this, col_ndx);
+                }
+            }
         }
 
-        // If the column was equipped column with search index, create the
-        // search index accessor.
+        // If there is no search index accesor, but the column has been equipped
+        // with a search index, create the accessor now.
         ColumnAttr attr = m_spec.get_column_attr(col_ndx);
         bool has_search_index = attr & col_attr_Indexed;
         if (has_search_index && !col->has_index()) {

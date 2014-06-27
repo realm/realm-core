@@ -103,9 +103,9 @@ inline const Table* ColumnMixed::get_subtable_ptr(std::size_t subtable_ndx) cons
     return const_cast<ColumnMixed*>(this)->get_subtable_ptr(subtable_ndx);
 }
 
-inline void ColumnMixed::detach_subtable_accessors() TIGHTDB_NOEXCEPT
+inline void ColumnMixed::discard_child_accessors() TIGHTDB_NOEXCEPT
 {
-    m_data->detach_subtable_accessors();
+    m_data->discard_child_accessors();
 }
 
 

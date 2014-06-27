@@ -244,13 +244,6 @@ TEST(Replication_Links)
         rt_1.get_group().Verify();
         rt_2.get_group().Verify();
         CHECK(rt_1.get_group() == rt_2.get_group());
-/*
-        ConstTableRef origin = rt_2.get_table("origin");
-        if (CHECK_EQUAL(2, origin->get_column_count())) {
-            CHECK_EQUAL(type_Link,     origin->get_column_type(0));
-            CHECK_EQUAL(type_LinkList, origin->get_column_type(1));
-        }
-*/
     }
 }
 

@@ -25,19 +25,6 @@ using namespace std;
 using namespace tightdb;
 
 
-ColumnLinkList::~ColumnLinkList() TIGHTDB_NOEXCEPT
-{
-    // Detach all accessors
-    typedef views::const_iterator iter;
-    iter end = m_views.end();
-    for (iter i = m_views.begin(); i != end; ++i) {
-        LinkView* link_list = *i;
-        link_list->detach();
-    }
-    m_views.clear();
-}
-
-
 void ColumnLinkList::clear()
 {
     // Remove all backlinks to the delete rows
@@ -59,13 +46,11 @@ void ColumnLinkList::clear()
     Column::clear();
 
     // Detach all accessors
-    typedef views::const_iterator iter;
-    iter end = m_views.end();
-    for (iter i = m_views.begin(); i != end; ++i) {
-        LinkView* link_list = *i;
-        link_list->detach();
-    }
-    m_views.clear();
+    typedef list_accessors::const_iterator iter;
+    iter end = m_list_accessors.end();
+    for (iter i = m_list_accessors.begin(); i != end; ++i)
+        i->m_list->detach();
+    m_list_accessors.clear();
 }
 
 
@@ -97,63 +82,38 @@ void ColumnLinkList::move_last_over(size_t target_row_ndx, size_t last_row_ndx)
     Column::destroy_subtree(target_row_ndx, false);
     Column::move_last_over(target_row_ndx, last_row_ndx);
 
-    // Detach accessors to the deleted row
-    {
-        typedef views::iterator iter;
-        iter end = m_views.end();
-        for (iter i = m_views.begin(); i != end; ++i) {
-            LinkView* link_list = *i;
-            if (link_list->m_row_ndx == target_row_ndx) {
-                link_list->detach();
-                m_views.erase(i);
-                break;
-            }
-        }
-    }
-
-    // Update accessors to the moved row
-    {
-        typedef views::const_iterator iter;
-        iter end = m_views.end();
-        for (iter i = m_views.begin(); i != end; ++i) {
-            LinkView* link_list = *i;
-            if (link_list->m_row_ndx == last_row_ndx) {
-                link_list->set_parent_row(target_row_ndx);
-                break;
-            }
-        }
-    }
+    const bool fix_ndx_in_parent = true;
+    adj_move_last_over<fix_ndx_in_parent>(target_row_ndx, last_row_ndx);
 }
 
 
-void ColumnLinkList::erase(size_t ndx, bool is_last)
+void ColumnLinkList::erase(size_t row_ndx, bool is_last)
 {
-    TIGHTDB_ASSERT(ndx+1 == size());
+    TIGHTDB_ASSERT(row_ndx+1 == size());
     TIGHTDB_ASSERT(is_last);
 
     // Remove backlinks to the delete row
-    ref_type ref = Column::get_as_ref(ndx);
+    ref_type ref = Column::get_as_ref(row_ndx);
     if (ref) {
         const Column linkcol(ref, null_ptr, 0, get_alloc());
         size_t count = linkcol.size();
         for (size_t i = 0; i < count; ++i) {
             size_t old_target_row_ndx = linkcol.get(i);
-            m_backlinks->remove_backlink(old_target_row_ndx, ndx);
+            m_backlinks->remove_backlink(old_target_row_ndx, row_ndx);
         }
     }
 
     // Do the actual delete
-    Column::destroy_subtree(ndx, false);
-    Column::erase(ndx, is_last);
+    Column::destroy_subtree(row_ndx, false);
+    Column::erase(row_ndx, is_last);
 
-    // Detach accessors to the deleted row
-    typedef views::iterator iter;
-    iter end = m_views.end();
-    for (iter i = m_views.begin(); i != end; ++i) {
-        LinkView* link_list = *i;
-        if (link_list->m_row_ndx == ndx) {
-            link_list->detach();
-            m_views.erase(i);
+    // Detach accessor, if any
+    typedef list_accessors::iterator iter;
+    iter end = m_list_accessors.end();
+    for (iter i = m_list_accessors.begin(); i != end; ++i) {
+        if (i->m_row_ndx == row_ndx) {
+            i->m_list->detach();
+            m_list_accessors.erase(i);
             break;
         }
     }
@@ -192,18 +152,19 @@ LinkView* ColumnLinkList::get_ptr(size_t row_ndx) const
     TIGHTDB_ASSERT(row_ndx < size());
 
     // Check if we already have a linkview for this row
-    typedef views::const_iterator iter;
-    iter end = m_views.end();
-    for (iter i = m_views.begin(); i != end; ++i) {
-        LinkView* link_list = *i;
-        if (link_list->m_row_ndx == row_ndx)
-            return link_list;
+    typedef list_accessors::const_iterator iter;
+    iter end = m_list_accessors.end();
+    for (iter i = m_list_accessors.begin(); i != end; ++i) {
+        if (i->m_row_ndx == row_ndx)
+            return i->m_list;
     }
 
-    m_views.reserve(m_views.size() + 1); // Throws
-    LinkView* link_list = new LinkView(const_cast<ColumnLinkList&>(*this), row_ndx); // Throws
-    m_views.push_back(link_list); // Not throwing due to space reservation
-    return link_list;
+    m_list_accessors.reserve(m_list_accessors.size() + 1); // Throws
+    list_entry entry;
+    entry.m_row_ndx = row_ndx;
+    entry.m_list = new LinkView(const_cast<ColumnLinkList&>(*this), row_ndx); // Throws
+    m_list_accessors.push_back(entry); // Not throwing due to space reservation
+    return entry.m_list;
 }
 
 
@@ -216,6 +177,99 @@ void ColumnLinkList::update_child_ref(size_t child_ndx, ref_type new_ref)
 ref_type ColumnLinkList::get_child_ref(size_t child_ndx) const TIGHTDB_NOEXCEPT
 {
     return Column::get(child_ndx);
+}
+
+
+void ColumnLinkList::discard_child_accessors() TIGHTDB_NOEXCEPT
+{
+    typedef list_accessors::const_iterator iter;
+    iter end = m_list_accessors.end();
+    for (iter i = m_list_accessors.begin(); i != end; ++i)
+        i->m_list->detach();
+    m_list_accessors.clear();
+}
+
+void ColumnLinkList::refresh_accessor_tree(size_t, const Spec&)
+{
+    typedef list_accessors::const_iterator iter;
+    iter end = m_list_accessors.end();
+    for (iter i = m_list_accessors.begin(); i != end; ++i)
+        i->m_list->refresh_accessor_tree(i->m_row_ndx);
+}
+
+void ColumnLinkList::adj_accessors_move_last_over(size_t target_row_ndx,
+                                                  size_t last_row_ndx) TIGHTDB_NOEXCEPT
+{
+    ColumnLinkBase::adj_accessors_move_last_over(target_row_ndx, last_row_ndx);
+
+    const bool fix_ndx_in_parent = false;
+    adj_move_last_over<fix_ndx_in_parent>(target_row_ndx, last_row_ndx);
+}
+
+template<bool fix_ndx_in_parent>
+void ColumnLinkList::adj_move_last_over(size_t target_row_ndx,
+                                        size_t last_row_ndx) TIGHTDB_NOEXCEPT
+{
+    // Search for either index in a tight loop for speed
+    bool last_seen = false;
+    size_t i = 0, n = m_list_accessors.size();
+    for (;;) {
+        if (i == n)
+            return;
+        const list_entry& e = m_list_accessors[i];
+        if (e.m_row_ndx == target_row_ndx)
+            goto target;
+        if (e.m_row_ndx == last_row_ndx)
+            break;
+        ++i;
+    }
+
+    // Move list accessor at `last_row_ndx`, then look for `target_row_ndx`
+    {
+        list_entry& e = m_list_accessors[i];
+        e.m_row_ndx = target_row_ndx;
+        if (fix_ndx_in_parent)
+            e.m_list->set_origin_row_index(target_row_ndx);
+    }
+    for (;;) {
+        ++i;
+        if (i == n)
+            return;
+        const list_entry& e = m_list_accessors[i];
+        if (e.m_row_ndx == target_row_ndx)
+            break;
+    }
+    last_seen = true;
+
+    // Detach and remove original list accessor at `target_row_ndx`, then
+    // look for `last_row_ndx
+  target:
+    {
+        list_entry& e = m_list_accessors[i];
+        // Must hold a counted reference while detaching
+        LinkViewRef list(e.m_list);
+        list->detach();
+        // Delete entry by moving last over (faster and avoids invalidating
+        // iterators)
+        e = m_list_accessors[--n];
+        m_list_accessors.pop_back();
+    }
+    if (!last_seen) {
+        for (;;) {
+            if (i == n)
+                return;
+            const list_entry& e = m_list_accessors[i];
+            if (e.m_row_ndx == last_row_ndx)
+                break;
+            ++i;
+        }
+        {
+            list_entry& e = m_list_accessors[i];
+            e.m_row_ndx = target_row_ndx;
+            if (fix_ndx_in_parent)
+                e.m_list->set_origin_row_index(target_row_ndx);
+        }
+    }
 }
 
 

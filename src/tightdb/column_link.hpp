@@ -26,7 +26,7 @@
 
 namespace tightdb {
 
-/// An link column is an extension of an integer column (Column) and maintains
+/// A link column is an extension of an integer column (Column) and maintains
 /// its node structure.
 ///
 /// The individual values in a link column are indexes of rows in the target

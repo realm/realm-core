@@ -414,7 +414,7 @@ inline void Descriptor::insert_column(std::size_t column_ndx, DataType type, Str
     typedef _impl::TableFriend tf;
     TIGHTDB_ASSERT(is_attached());
     TIGHTDB_ASSERT(column_ndx <= get_column_count());
-    TIGHTDB_ASSERT(!tf::is_link_type(type));
+    TIGHTDB_ASSERT(!tf::is_link_type(ColumnType(type)));
 
     Table* link_target_table = 0;
     tf::insert_column(*this, column_ndx, type, name, link_target_table); // Throws
@@ -436,11 +436,10 @@ inline void Descriptor::insert_column_link(std::size_t column_ndx, DataType type
     typedef _impl::TableFriend tf;
     TIGHTDB_ASSERT(is_attached());
     TIGHTDB_ASSERT(column_ndx <= get_column_count());
-    TIGHTDB_ASSERT(tf::is_link_type(type));
-    // Referring table must be a group-level table
-    TIGHTDB_ASSERT(is_root() && get_root_table()->get_parent_group());
-    // Target table must be a group-level table
-    TIGHTDB_ASSERT(target.get_parent_group());
+    TIGHTDB_ASSERT(tf::is_link_type(ColumnType(type)));
+    // Both origin and target must be group-level tables
+    TIGHTDB_ASSERT(is_root() && get_root_table()->is_group_level());
+    TIGHTDB_ASSERT(target.is_group_level());
 
     tf::insert_column(*this, column_ndx, type, name, &target); // Throws
     adj_insert_column(column_ndx);
