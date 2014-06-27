@@ -748,6 +748,17 @@ private:
     /// Table::refresh_accessor_tree().
     mutable bool m_mark;
     mutable uint_fast64_t m_version;
+
+    /// Update the version of this table and all tables which have links to it.
+    /// This causes all views referring to those tables to go out of sync, so that
+    /// calls to sync_if_needed() will bring the view up to date by reexecuting the
+    /// query.
+    ///
+    /// \param bump_global chooses whether the global versioning counter must be
+    /// bumped first as part of the update. This is the normal mode of operation,
+    /// when a change is made to the table. When calling recursively (following links
+    /// or going to the parent table), the parameter should be set to false to correctly
+    /// prune traversal.
     void bump_version(bool bump_global = true) const;
 #else
     inline void bump_version(bool bump_global = true) const { static_cast<void>(bump_global); }

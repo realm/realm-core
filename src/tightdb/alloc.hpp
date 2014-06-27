@@ -170,7 +170,7 @@ protected:
     uint_fast64_t m_table_versioning_counter;
 
     /// Bump the global version counter. This method should be called when
-    /// version bumping is initiated. Then following calls to "should_propagate_version"
+    /// version bumping is initiated. Then following calls to should_propagate_version()
     /// can be used to prune the version bumping.
     uint_fast64_t bump_global_version() TIGHTDB_NOEXCEPT;
 
