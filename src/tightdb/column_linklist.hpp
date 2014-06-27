@@ -25,6 +25,7 @@
 #include <tightdb/table.hpp>
 #include <tightdb/column_backlink.hpp>
 #include <vector>
+#include <iostream>
 
 namespace tightdb {
 
@@ -61,6 +62,8 @@ public:
     void set_target_table(Table&) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     TableRef get_target_table() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     void set_backlink_column(ColumnBackLink&) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+
+    void to_json_row(size_t row_ndx, std::ostream& out) const;
 
 private:
     friend class ColumnBackLink;

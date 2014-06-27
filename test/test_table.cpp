@@ -903,6 +903,9 @@ TEST(Table_JsonAllData)
     ifstream test_file(file_name.c_str(), ios::in | ios::binary);
     CHECK(!test_file.fail());
     getline(test_file,expected);
+    cerr << "\n\n\n";
+    cerr << json;
+    cerr << "\n\n\n";
     CHECK_EQUAL(true, json == expected);
     if (json != expected) {
         TEST_PATH(path);
@@ -911,6 +914,175 @@ TEST(Table_JsonAllData)
         cerr << "\n error result in '"<<string(path)<<"'\n";
     }
 #endif
+}
+
+
+/*
+
+
+table.to_json(stream, link_depth = 0):
+    Don't follow any links. If there is a link column, simply print its lists of row indexes as integers
+
+table.to_json(stream, link_depth = -1):
+    Follow links to infinite depth, but only follow each link exactly once. Not suitable if cycles exist, 
+
+
+
+
+
+
+
+
+
+*/
+
+TEST(Table_json_linklist1)
+{
+    Group group;
+
+    TableRef table1 = group.get_table("table1");
+    TableRef table2 = group.get_table("table2");
+    TableRef table3 = group.get_table("table3");
+
+    // add some more columns to table1 and table2
+    table1->add_column(type_Int, "col1");
+    table1->add_column(type_String, "str1");
+
+    table2->add_column(type_Int, "col1");
+    table2->add_column(type_String, "str2");
+
+    table3->add_column(type_Int, "col1");
+    table3->add_column(type_String, "str2");
+
+    // add some rows
+    table1->add_empty_row(3);
+    table1->set_int(0, 0, 100);
+    table1->set_string(1, 0, "foo");
+    table1->set_int(0, 1, 200);
+    table1->set_string(1, 1, "!");
+    table1->set_int(0, 2, 300);
+    table1->set_string(1, 2, "bar");
+
+    table2->add_empty_row(3);
+    table2->set_int(0, 0, 400);
+    table2->set_string(1, 0, "hello");
+    table2->set_int(0, 1, 500);
+    table2->set_string(1, 1, "world");
+    table2->set_int(0, 2, 600);
+    table2->set_string(1, 2, "!");
+
+    table3->add_empty_row(3);
+    table3->set_int(0, 0, 700);
+    table3->set_string(1, 0, "baz");
+    table3->set_int(0, 1, 800);
+    table3->set_string(1, 1, "test");
+    table3->set_int(0, 2, 900);
+    table3->set_string(1, 2, "hi");
+
+    size_t col_link2 = table1->add_column_link(type_LinkList, "linkA", *table2);
+    size_t col_link3 = table1->add_column_link(type_LinkList, "linkB", *table3);
+
+    // set some links
+    LinkViewRef links1;
+
+    links1 = table1->get_linklist(col_link2, 0);
+    links1->add(1);
+
+    links1 = table1->get_linklist(col_link2, 1);
+    links1->add(1);
+    links1->add(2);
+
+    links1 = table1->get_linklist(col_link3, 0);
+    links1->add(0);
+    links1->add(2);
+
+    Table* new1 = new Table(*table2);
+    
+    // create json
+    stringstream ss;
+    table1->to_json(ss);
+    const string json = ss.str();
+
+     cerr << "\n\n" << json << "\n\n";
+
+}
+
+
+ONLY(Table_json_linklist_cycle)
+{
+    Group group;
+
+    TableRef table1 = group.get_table("table1");
+    TableRef table2 = group.get_table("table2");
+
+    table1->add_column(type_String, "str1");
+    table2->add_column(type_String, "str2");
+
+    // add some rows
+    table1->add_empty_row(2);
+    table1->set_string(0, 0, "hello");
+    table1->set_string(0, 1, "world");
+    
+    table2->add_empty_row(1);
+    table2->set_string(0, 0, "foo");
+
+    size_t col_link1 = table1->add_column_link(type_LinkList, "linkA", *table2);
+    size_t col_link2 = table2->add_column_link(type_LinkList, "linkB", *table1);
+
+    // set some links
+    LinkViewRef links1;
+    LinkViewRef links2;
+
+    links1 = table1->get_linklist(col_link1, 0);
+    links1->add(0);
+
+    links2 = table2->get_linklist(col_link2, 0);
+    links2->add(0);
+
+    // create json
+    stringstream ss;
+    map<string, string> m;
+    m["str1"] = "STR1";
+    m["linkA"] = "LINKA";
+    m["table1"] = "TABLE1";
+
+    table1->to_json(ss, 5, &m);
+    const string json = ss.str();
+
+    cerr << "\n\n" << json << "\n\n";
+}
+
+TEST(Table_json_link_cycles)
+{
+    Group group;
+
+    TableRef table1 = group.get_table("table1");
+    TableRef table2 = group.get_table("table2");
+
+    table1->add_column(type_String, "str1");
+    table2->add_column(type_String, "str2");
+
+    // add some rows
+    table1->add_empty_row(2);
+    table1->set_string(0, 0, "hello");
+    table1->set_string(0, 1, "world");
+
+    table2->add_empty_row(1);
+    table2->set_string(0, 0, "foo");
+
+    size_t col_link1 = table1->add_column_link(type_Link, "linkA", *table2);
+    size_t col_link2 = table2->add_column_link(type_Link, "linkB", *table1);
+
+    // set some links
+    table1->set_link(col_link1, 0, 0);
+    table2->set_link(col_link2, 0, 0);
+
+    // create json
+    stringstream ss;
+    table1->to_json(ss, true);
+    const string json = ss.str();
+
+    // cerr << "\n\n" << json << "\n\n";
 }
 
 

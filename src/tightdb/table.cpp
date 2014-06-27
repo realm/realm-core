@@ -3553,20 +3553,14 @@ void Table::update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT
 
 
 // to JSON: ------------------------------------------
-
-void Table::to_json(ostream& out) const
+void Table::to_json_row(std::size_t row_ndx, std::ostream& out, size_t link_depth, std::map<std::string, std::string>* renames) const
 {
-    // Represent table as list of objects
-    out << "[";
+    std::map<std::string, std::string> renames2;
+    if (!renames)
+        renames = &renames2;
 
-    size_t row_count = size();
-    for (size_t r = 0; r < row_count; ++r) {
-        if (r > 0)
-            out << ",";
-        to_json_row(r, out);
-    }
-
-    out << "]";
+    vector<ref_type> followed;
+    to_json_row(row_ndx, out, link_depth, *renames, followed);
 }
 
 
@@ -3603,8 +3597,22 @@ template<class T> void out_floats(ostream& out, T value)
 
 } // anonymous namespace
 
+void Table::to_json(std::ostream& out, size_t link_depth, std::map<std::string, std::string>* renames) const
+{
+    // Represent table as list of objects
+    out << "[";
 
-void Table::to_json_row(size_t row_ndx, ostream& out) const
+    size_t row_count = size();
+    for (size_t r = 0; r < row_count; ++r) {
+        if (r > 0)
+            out << ",";
+        to_json_row(r, out, link_depth, renames);
+    }
+
+    out << "]";
+}
+
+void Table::to_json_row(std::size_t row_ndx, std::ostream& out, size_t link_depth, std::map<std::string, std::string> renames, std::vector<ref_type> followed) const
 {
     out << "{";
     size_t column_count = get_column_count();
@@ -3613,86 +3621,155 @@ void Table::to_json_row(size_t row_ndx, ostream& out) const
             out << ",";
 
         StringData name = get_column_name(i);
+        if (renames[name] != "")
+            name = renames[name];
+
         out << "\"" << name << "\":";
 
         DataType type = get_column_type(i);
         switch (type) {
-            case type_Int:
-                out << get_int(i, row_ndx);
-                break;
-            case type_Bool:
-                out << (get_bool(i, row_ndx) ? "true" : "false");
-                break;
-            case type_Float:
-                out_floats<float>(out, get_float(i, row_ndx));
-                break;
-            case type_Double:
-                out_floats<double>(out, get_double(i, row_ndx));
-                break;
-            case type_String:
-                out << "\"" << get_string(i, row_ndx) << "\"";
-                break;
-            case type_DateTime:
-                out << "\""; out_datetime(out, get_datetime(i, row_ndx)); out << "\"";
-                break;
-            case type_Binary:
-                out << "\""; out_binary(out, get_binary(i, row_ndx)); out << "\"";
-                break;
-            case type_Table:
+        case type_Int:
+            out << get_int(i, row_ndx);
+            break;
+        case type_Bool:
+            out << (get_bool(i, row_ndx) ? "true" : "false");
+            break;
+        case type_Float:
+            out_floats<float>(out, get_float(i, row_ndx));
+            break;
+        case type_Double:
+            out_floats<double>(out, get_double(i, row_ndx));
+            break;
+        case type_String:
+            out << "\"" << get_string(i, row_ndx) << "\"";
+            break;
+        case type_DateTime:
+            out << "\""; out_datetime(out, get_datetime(i, row_ndx)); out << "\"";
+            break;
+        case type_Binary:
+            out << "\""; out_binary(out, get_binary(i, row_ndx)); out << "\"";
+            break;
+        case type_Table:
+            get_subtable(i, row_ndx)->to_json(out);
+            break;
+        case type_Mixed:
+        {
+            DataType mtype = get_mixed_type(i, row_ndx);
+            if (mtype == type_Table) {
                 get_subtable(i, row_ndx)->to_json(out);
-                break;
-            case type_Mixed:
-            {
-                DataType mtype = get_mixed_type(i, row_ndx);
-                if (mtype == type_Table) {
-                    get_subtable(i, row_ndx)->to_json(out);
+            }
+            else {
+                Mixed m = get_mixed(i, row_ndx);
+                switch (mtype) {
+                case type_Int:
+                    out << m.get_int();
+                    break;
+                case type_Bool:
+                    out << (m.get_bool() ? "true" : "false");
+                    break;
+                case type_Float:
+                    out_floats<float>(out, m.get_float());
+                    break;
+                case type_Double:
+                    out_floats<double>(out, m.get_double());
+                    break;
+                case type_String:
+                    out << "\"" << m.get_string() << "\"";
+                    break;
+                case type_DateTime:
+                    out << "\""; out_datetime(out, m.get_datetime()); out << "\"";
+                    break;
+                case type_Binary:
+                    out << "\""; out_binary(out, m.get_binary()); out << "\"";
+                    break;
+                case type_Table:
+                case type_Mixed:
+                case type_Link:
+                case type_LinkList:
+                    TIGHTDB_ASSERT(false);
+                    break;
                 }
-                else {
-                    Mixed m = get_mixed(i, row_ndx);
-                    switch (mtype) {
-                        case type_Int:
-                            out << m.get_int();
-                            break;
-                        case type_Bool:
-                            out << (m.get_bool() ? "true" : "false");
-                            break;
-                        case type_Float:
-                            out_floats<float>(out, m.get_float());
-                            break;
-                        case type_Double:
-                            out_floats<double>(out, m.get_double());
-                            break;
-                        case type_String:
-                            out << "\"" << m.get_string() << "\"";
-                            break;
-                        case type_DateTime:
-                            out << "\""; out_datetime(out, m.get_datetime()); out << "\"";
-                            break;
-                        case type_Binary:
-                            out << "\""; out_binary(out, m.get_binary()); out << "\"";
-                            break;
-                        case type_Table:
-                        case type_Mixed:
-                        case type_Link:
-                        case type_LinkList:
-                            TIGHTDB_ASSERT(false);
-                            break;
+            }
+            break;
+        }
+        case type_Link:
+        {
+            ColumnLinkBase& clb = const_cast<Table*>(this)->get_column_linkbase(i);
+
+            // Test if link must be followed; link_depth == -1 means follow all links exactly 1 time, and 
+            // link_depth >= 0 means follow link_depth links from table on which to_json() was called
+            if ((link_depth == static_cast<size_t>(-1) &&
+                std::find(followed.begin(), followed.end(), clb.get_ref()) == followed.end())
+                || (followed.size() < link_depth)) {
+
+                followed.push_back(clb.get_ref());
+                ColumnLink& cl = static_cast<ColumnLink&>(clb);
+                TableRef table = cl.get_target_table();
+
+                if (!cl.is_null_link(row_ndx)) {
+                    if (link_depth > 0) {
+                        out << "[";
+                        table->to_json_row(cl.get_link(row_ndx), out, link_depth, renames, followed);
+                        out << "]";
+                    }
+                    else {
+                        out << "\"" << cl.get_link(row_ndx) << "\"";
+                        break;
                     }
                 }
-                break;
+                else {
+                    out << "[]";
+                }
             }
-            case type_Link:
-                // FIXME: print entire linked row
-                out << "\"Link to: " << get_link(i, row_ndx) << "\"";
-                break;
-            case type_LinkList:
-                // FIXME: print entire list of linked row
-                //out << "\"Link to: " << get_int(i, row_ndx) << "\"";
-                break;
+            else {
+                // this was a link column that had already been followed; emit empty link list
+                out << "[]";
+            }
+            break;
         }
+        case type_LinkList:
+        {
+            ColumnLinkBase& clb = const_cast<Table*>(this)->get_column_linkbase(i);
+
+            // Test if link must be followed; link_depth == -1 means follow all links exactly 1 time, and 
+            // link_depth >= 0 means follow link_depth links from table on which to_json() was called
+            if ((link_depth == static_cast<size_t>(-1) &&
+                std::find(followed.begin(), followed.end(), clb.get_ref()) == followed.end())
+                || (followed.size() < link_depth)) {
+
+                followed.push_back(clb.get_ref());
+                ColumnLinkList& cll = static_cast<ColumnLinkList&>(clb);
+                TableRef table = cll.get_target_table();
+                LinkViewRef lv = cll.get_link_view(row_ndx);
+
+                if (link_depth > 0) {
+                    out << "[";
+                    for (size_t link = 0; link < lv->size(); link++) {
+                        if (link > 0)
+                            out << ", ";
+                        table->to_json_row(lv->get_target_row(link), out, link_depth, renames, followed);
+                    }
+                    out << "]";
+                }
+                else {
+                    out << "{table: \"" << cll.get_target_table()->get_name() << "\", rows: [";
+                    cll.to_json_row(row_ndx, out);
+                    out << "]}";
+                    break;
+                }
+            }
+            else {
+                // this was a link column that had already been followed; emit empty link list
+                out << "[]";
+            }
+            break;
+        }
+        } // switch ends
     }
     out << "}";
 }
+
+
 
 
 // to_string --------------------------------------------------
