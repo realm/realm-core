@@ -322,7 +322,7 @@ public:
 #endif
 
 protected:
-    bool is_parent_group() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {return true;}
+    Group* get_parent_group() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
 private:
     SlabAlloc m_alloc;
@@ -468,6 +468,11 @@ inline Group::Group(unattached_tag) TIGHTDB_NOEXCEPT:
     m_free_lengths(m_alloc), m_free_versions(m_alloc), m_is_shared(false), m_is_attached(false)
 {
     init_array_parents();
+}
+
+inline Group* Group::get_parent_group() TIGHTDB_NOEXCEPT
+{
+    return this;
 }
 
 inline Group::Group(shared_tag) TIGHTDB_NOEXCEPT:

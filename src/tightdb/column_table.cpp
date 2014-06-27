@@ -86,7 +86,7 @@ void ColumnSubtableParent::child_accessor_destroyed(Table* child) TIGHTDB_NOEXCE
 }
 
 
-Table* ColumnSubtableParent::get_parent_table(size_t* column_ndx_out) const TIGHTDB_NOEXCEPT
+Table* ColumnSubtableParent::get_parent_table(size_t* column_ndx_out) TIGHTDB_NOEXCEPT
 {
     if (column_ndx_out)
         *column_ndx_out = m_column_ndx;
@@ -286,8 +286,7 @@ void ColumnTable::set(size_t row_ndx, const Table* subtable)
         TableRef table_2;
         table_2.reset(table); // Must hold counted reference
         typedef _impl::TableFriend tf;
-        tf::discard_row_accessors(*table_2);
-        tf::discard_subtable_accessors(*table_2);
+        tf::discard_child_accessors(*table_2);
         tf::mark(*table_2);
         tf::refresh_accessor_tree(*table_2, row_ndx);
     }
@@ -296,7 +295,7 @@ void ColumnTable::set(size_t row_ndx, const Table* subtable)
 
 void ColumnTable::clear()
 {
-    detach_subtable_accessors();
+    discard_child_accessors();
     Column::clear(); // Throws
     // FIXME: This one is needed because Column::clear() forgets about the leaf
     // type. A better solution should probably be sought after.
@@ -348,9 +347,9 @@ bool ColumnTable::compare_table(const ColumnTable& c) const
 }
 
 
-void ColumnTable::do_detach_subtable_accessors() TIGHTDB_NOEXCEPT
+void ColumnTable::do_discard_child_accessors() TIGHTDB_NOEXCEPT
 {
-    detach_subtable_accessors();
+    discard_child_accessors();
 }
 
 

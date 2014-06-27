@@ -60,6 +60,10 @@ public:
     TableRef get_origin_table() const TIGHTDB_NOEXCEPT;
     void set_origin_column(ColumnLinkBase&) TIGHTDB_NOEXCEPT;
 
+    void adj_accessors_insert_rows(std::size_t, std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void adj_accessors_erase_row(std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void adj_accessors_move_last_over(std::size_t, std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+
 protected:
     // ArrayParent overrides
     void update_child_ref(std::size_t child_ndx, ref_type new_ref) TIGHTDB_OVERRIDE;
@@ -123,6 +127,30 @@ inline void ColumnBackLink::set_origin_column(ColumnLinkBase& column) TIGHTDB_NO
 inline void ColumnBackLink::add_row()
 {
     Column::add(0);
+}
+
+inline void ColumnBackLink::adj_accessors_insert_rows(std::size_t row_ndx,
+                                                      std::size_t num_rows) TIGHTDB_NOEXCEPT
+{
+    Column::adj_accessors_insert_rows(row_ndx, num_rows);
+
+    // For tables with link-type columns, the insertion point must be after all
+    // existsing rows, so the origin table cannot be affected by this change.
+}
+
+inline void ColumnBackLink::adj_accessors_erase_row(std::size_t) TIGHTDB_NOEXCEPT
+{
+    // Rows cannot be erased this way in tables with link-type columns
+    TIGHTDB_ASSERT(false);
+}
+
+inline void ColumnBackLink::adj_accessors_move_last_over(std::size_t target_row_ndx,
+                                                         std::size_t last_row_ndx) TIGHTDB_NOEXCEPT
+{
+    Column::adj_accessors_move_last_over(target_row_ndx, last_row_ndx);
+
+    typedef _impl::TableFriend tf;
+    tf::mark(*m_origin_table);
 }
 
 
