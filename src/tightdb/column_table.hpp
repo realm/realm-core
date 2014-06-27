@@ -49,9 +49,9 @@ public:
 
     void update_from_parent(std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
-    void detach_subtable_accessors() TIGHTDB_NOEXCEPT;
+    void discard_child_accessors() TIGHTDB_NOEXCEPT;
 
-    ~ColumnSubtableParent() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
+    ~ColumnSubtableParent() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
     static ref_type create(std::size_t size, Allocator&);
 
@@ -144,7 +144,7 @@ protected:
     ref_type get_child_ref(std::size_t) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
     // Overriding method in Table::Parent
-    Table* get_parent_table(std::size_t*) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    Table* get_parent_table(std::size_t*) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
     // Overriding method in Table::Parent
     void child_accessor_destroyed(Table*) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
@@ -254,7 +254,7 @@ private:
 
     void destroy_subtable(std::size_t ndx) TIGHTDB_NOEXCEPT;
 
-    void do_detach_subtable_accessors() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void do_discard_child_accessors() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 };
 
 
@@ -527,11 +527,16 @@ inline ref_type ColumnSubtableParent::get_child_ref(std::size_t child_ndx) const
     return get_as_ref(child_ndx);
 }
 
-inline void ColumnSubtableParent::detach_subtable_accessors() TIGHTDB_NOEXCEPT
+inline void ColumnSubtableParent::discard_child_accessors() TIGHTDB_NOEXCEPT
 {
     bool last_entry_removed = m_subtable_map.detach_and_remove_all();
     if (last_entry_removed && m_table)
         _impl::TableFriend::unbind_ref(*m_table);
+}
+
+inline ColumnSubtableParent::~ColumnSubtableParent() TIGHTDB_NOEXCEPT
+{
+    discard_child_accessors();
 }
 
 inline bool ColumnSubtableParent::compare_subtable_rows(const Table& a, const Table& b)

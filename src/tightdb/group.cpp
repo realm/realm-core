@@ -300,7 +300,8 @@ ref_type Group::create_new_table(StringData name)
     // matters.
 
     using namespace _impl;
-    DeepArrayRefDestroyGuard ref_dg(TableFriend::create_empty_table(m_alloc), m_alloc); // Throws
+    typedef TableFriend tf;
+    DeepArrayRefDestroyGuard ref_dg(tf::create_empty_table(m_alloc), m_alloc); // Throws
     size_t ndx = m_tables.size();
     TIGHTDB_ASSERT(ndx == m_table_names.size());
     m_tables.insert(ndx, ref_dg.get()); // Throws
@@ -347,19 +348,19 @@ Table* Group::create_new_table_and_accessor(StringData name, SpecSetter spec_set
 #endif
 
     using namespace _impl;
-    DeepArrayRefDestroyGuard ref_dg(TableFriend::create_empty_table(m_alloc), m_alloc); // Throws
-    typedef TableFriend::UnbindGuard TableUnbindGuard;
-    TableUnbindGuard table_ug(TableFriend::create_ref_counted(m_alloc, ref_dg.get(),
-                                                              null_ptr, 0)); // Throws
+    typedef TableFriend tf;
+    DeepArrayRefDestroyGuard ref_dg(tf::create_empty_table(m_alloc), m_alloc); // Throws
+    typedef tf::UnbindGuard TableUnbindGuard;
+    TableUnbindGuard table_ug(tf::create_ref_counted(m_alloc, ref_dg.get(), null_ptr, 0)); // Throws
 
     // The table accessor owns the ref until the point below where a
     // parent is set in Table::m_top.
     ref_type ref = ref_dg.release();
-    TableFriend::bind_ref(*table_ug); // Increase reference count from 0 to 1
+    tf::bind_ref(*table_ug); // Increase reference count from 0 to 1
 
     size_t ndx = m_tables.size();
     m_table_accessors.resize(ndx+1); // Throws
-    TableFriend::set_top_parent(*table_ug, this, ndx);
+    tf::set_top_parent(*table_ug, this, ndx);
     try {
         if (spec_setter)
             (*spec_setter)(*table_ug); // Throws
@@ -379,7 +380,7 @@ Table* Group::create_new_table_and_accessor(StringData name, SpecSetter spec_set
         }
     }
     catch (...) {
-        TableFriend::set_top_parent(*table_ug, 0, 0);
+        tf::set_top_parent(*table_ug, 0, 0);
         throw;
     }
 }
@@ -600,8 +601,9 @@ void Group::update_refs(ref_type top_ref, size_t old_baseline) TIGHTDB_NOEXCEPT
     typedef table_accessors::const_iterator iter;
     iter end = m_table_accessors.end();
     for (iter i = m_table_accessors.begin(); i != end; ++i) {
+        typedef _impl::TableFriend tf;
         if (Table* table = *i)
-            _impl::TableFriend::update_from_parent(*table, old_baseline);
+            tf::update_from_parent(*table, old_baseline);
     }
 }
 
@@ -898,10 +900,8 @@ public:
     bool clear_table() TIGHTDB_NOEXCEPT
     {
         typedef _impl::TableFriend tf;
-        if (m_table) {
-            tf::discard_row_accessors(*m_table);
-            tf::discard_subtable_accessors(*m_table);
-        }
+        if (m_table)
+            tf::discard_child_accessors(*m_table);
         return true;
     }
 
@@ -1063,7 +1063,7 @@ public:
         typedef _impl::TableFriend tf;
         if (m_table) {
             if (Table* target = tf::get_link_target_table_accessor(*m_table, col_ndx))
-                tf::regressive_mark(*target);
+                tf::mark(*target);
         }
         return true;
     }
@@ -1116,9 +1116,10 @@ public:
             // FIXME: when the table refreshing process creates missing
             // link-type column accessors, it must also create back-link column
             // accessors and insert them into the link-target table accessor.
-            if (tf::is_link_type(type)) {
-                if (Table* target = m_group.get_table_by_ndx(link_target_table_ndx))
-                    tf::regressive_mark(*target);
+            if (tf::is_link_type(ColumnType(type))) {
+                Table* target = m_group.get_table_by_ndx(link_target_table_ndx); // Throws
+                tf::adj_add_column(*target); // Throws
+                tf::mark(*target);
             }
         }
         typedef _impl::DescriptorFriend df;
@@ -1150,6 +1151,42 @@ public:
     }
 
     bool add_index_to_column(size_t) TIGHTDB_NOEXCEPT
+    {
+        return true; // Noop
+    }
+
+    bool select_link_list(size_t col_ndx, size_t) TIGHTDB_NOEXCEPT
+    {
+        // See comments on link handling in TransactAdvancer::set_link().
+        typedef _impl::TableFriend tf;
+        if (m_table) {
+            if (Table* target = tf::get_link_target_table_accessor(*m_table, col_ndx))
+                tf::mark(*target);
+        }
+        return true; // Noop
+    }
+
+    bool link_list_set(size_t, size_t) TIGHTDB_NOEXCEPT
+    {
+        return true; // Noop
+    }
+
+    bool link_list_insert(size_t, size_t) TIGHTDB_NOEXCEPT
+    {
+        return true; // Noop
+    }
+
+    bool link_list_move(size_t, size_t) TIGHTDB_NOEXCEPT
+    {
+        return true; // Noop
+    }
+
+    bool link_list_erase(size_t) TIGHTDB_NOEXCEPT
+    {
+        return true; // Noop
+    }
+
+    bool link_list_clear() TIGHTDB_NOEXCEPT
     {
         return true; // Noop
     }

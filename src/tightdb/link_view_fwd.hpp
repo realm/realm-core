@@ -27,6 +27,7 @@ namespace tightdb {
 class LinkView;
 typedef util::bind_ptr<LinkView> LinkViewRef;
 typedef util::bind_ptr<const LinkView> ConstLinkViewRef;
+namespace _impl { class LinkListFriend; }
 
 } // namespace tightdb
 

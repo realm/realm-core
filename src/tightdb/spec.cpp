@@ -311,14 +311,14 @@ void Spec::set_link_target_table(size_t column_ndx, size_t table_ndx)
     m_subspecs.set(subspec_ndx, tagged_ndx); // Throws
 }
 
-size_t Spec::get_link_target_table(size_t column_ndx) const TIGHTDB_NOEXCEPT
+size_t Spec::get_opposite_link_table_ndx(size_t column_ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     TIGHTDB_ASSERT(get_column_type(column_ndx) == col_type_Link ||
                    get_column_type(column_ndx) == col_type_LinkList ||
                    get_column_type(column_ndx) == col_type_BackLink);
 
-    // position of target table is stored as tagged int in the
+    // Group-level index of opposite table is stored as tagged int in the
     // subspecs array
     size_t subspec_ndx = get_subspec_ndx(column_ndx);
     int64_t tagged_value = m_subspecs.get(subspec_ndx);
@@ -340,7 +340,7 @@ void Spec::set_backlink_origin_column(size_t backlink_col_ndx, size_t origin_col
     m_subspecs.set(subspec_ndx+1, tagged_ndx); // Throws
 }
 
-size_t Spec::get_backlink_origin_column(size_t backlink_col_ndx) const TIGHTDB_NOEXCEPT
+size_t Spec::get_origin_column_ndx(size_t backlink_col_ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(backlink_col_ndx < get_column_count());
     TIGHTDB_ASSERT(get_column_type(backlink_col_ndx) == col_type_BackLink);
