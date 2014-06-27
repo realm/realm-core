@@ -599,7 +599,7 @@ TEST(Links_LinkList_AccessorUpdates)
     CHECK_EQUAL(false, links2again->is_attached());
 }
 
-TEST(Link_Circular_Accessors)
+TEST(Links_CircularAccessors)
 {
     SHARED_GROUP_TEST_PATH(path);
     SharedGroup sg(path);
