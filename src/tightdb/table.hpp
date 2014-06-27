@@ -749,7 +749,7 @@ private:
     mutable uint_fast64_t m_version;
     void bump_version(bool bump_global = true) const;
 #else
-    inline void bump_version(bool) const {}
+    inline void bump_version(bool bump_global = true) const { static_cast<void>(bump_global); }
 #endif
 
     /// Disable copying assignment.
