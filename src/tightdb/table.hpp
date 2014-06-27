@@ -718,11 +718,7 @@ private:
     // and ~Table(), and functiones called on behalf of
     // Group::advance_transact().
     //
-    // FIXME: Change to `std::vector<ColumnBase*> m_col_accessors`. When this is
-    // done, it is expected that it will be able to contain null-entries in
-    // other cases than during Group::advance_transact(), but only after a
-    // memory allocation failure.
-    Array m_cols;
+    std::vector<ColumnBase*> m_cols;
 
     mutable std::size_t m_ref_count;
     mutable const StringIndex* m_search_index;
@@ -1089,7 +1085,7 @@ inline void Table::bump_version(bool bump_global) const
         // recurse through linked tables, use m_mark to avoid infinite recursion
         size_t limit = m_cols.size();
         for (size_t i = 0; i < limit; ++i) {
-            ColumnBase* cb = reinterpret_cast<ColumnBase*>(m_cols.get(i));
+            ColumnBase* cb = m_cols[i];
             // we may meet a null pointer in place of a backlink column, pending
             // replacement with a new one. This can happen ONLY when creation of the corresponding
             // forward link column in the origin table is pending as well. In this
