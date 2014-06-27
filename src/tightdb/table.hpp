@@ -1090,7 +1090,7 @@ inline void Table::bump_version(bool bump_global) const
     if (m_top.get_alloc().should_propagate_version(m_version)) {
         ConstTableRef tr = get_parent_table();
         if (tr) {
-            tr->bump_version(false);
+            tr->bump_version(/* bump_global: */ false);
         }
         // recurse through linked tables, use m_mark to avoid infinite recursion
         size_t limit = m_cols.size();
@@ -1855,7 +1855,7 @@ public:
     {
         // calls going through tablefriend are always part of a recursion, so shouldn't
         // bump the global counter
-        table.bump_version(false);
+        table.bump_version( /* bump_global: */ false);
     }
 
     static std::size_t find_column(const Table& table, const ColumnBase* col)
