@@ -42,6 +42,9 @@ public:
     friend bool operator==(const DateTime&, const DateTime&) TIGHTDB_NOEXCEPT;
     friend bool operator!=(const DateTime&, const DateTime&) TIGHTDB_NOEXCEPT;
     friend bool operator< (const DateTime&, const DateTime&) TIGHTDB_NOEXCEPT;
+    friend bool operator<= (const DateTime&, const DateTime&) TIGHTDB_NOEXCEPT;
+    friend bool operator> (const DateTime&, const DateTime&) TIGHTDB_NOEXCEPT;
+    friend bool operator>= (const DateTime&, const DateTime&) TIGHTDB_NOEXCEPT;
 
     /// Construct from broken down local time.
     ///
@@ -95,6 +98,21 @@ inline bool operator!=(const DateTime& a, const DateTime& b) TIGHTDB_NOEXCEPT
 inline bool operator<(const DateTime& a, const DateTime& b) TIGHTDB_NOEXCEPT
 {
     return a.m_time < b.m_time;
+}
+
+inline bool operator<=(const DateTime& a, const DateTime& b) TIGHTDB_NOEXCEPT
+{
+    return a.m_time <= b.m_time;
+}
+
+inline bool operator>(const DateTime& a, const DateTime& b) TIGHTDB_NOEXCEPT
+{
+    return a.m_time > b.m_time;
+}
+
+inline bool operator>=(const DateTime& a, const DateTime& b) TIGHTDB_NOEXCEPT
+{
+    return a.m_time >= b.m_time;
 }
 
 inline DateTime::operator time_t() TIGHTDB_NOEXCEPT
