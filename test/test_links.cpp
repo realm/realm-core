@@ -599,6 +599,29 @@ TEST(Links_LinkList_AccessorUpdates)
     CHECK_EQUAL(false, links2again->is_attached());
 }
 
+TEST(Links_CircularAccessors)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg(path);
+    {
+        WriteTransaction wt(sg);
+        TableRef table1 = wt.get_table("table1");
+        TableRef table2 = wt.get_table("table2");
+        table1->add_column_link(type_Link, "link", *table2);
+        table2->add_column_link(type_Link, "link", *table1);
+        CHECK_EQUAL(table1, table2->get_link_target(0));
+        CHECK_EQUAL(table2, table1->get_link_target(0));
+        wt.commit();
+    }
+    {
+        WriteTransaction wt(sg);
+        TableRef table1 = wt.get_table("table1");
+        TableRef table2 = wt.get_table("table2");
+        CHECK_EQUAL(table1, table2->get_link_target(0));
+        CHECK_EQUAL(table2, table1->get_link_target(0));
+    }
+}
+
 TEST(Links_Transactions)
 {
     SHARED_GROUP_TEST_PATH(path);
