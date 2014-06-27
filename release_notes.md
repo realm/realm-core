@@ -44,7 +44,7 @@ C++ (core)
 
 ### API breaking changes:
 
-* `???`
+* Views can now be be kept synchronized with changes to the tables used to generate the view, use `TableView::sync_if_needed()` to do so. Views are no longer detached when the table they have been generated from are changed. Instead they just go out of sync. See further description in `src/tightdb/table_view.hpp`.
 
 ### Enhancements:
 * Supports links in queries, like `(table1->link(3).column<Int>(0) > 550).find()`.
