@@ -4550,7 +4550,7 @@ void Table::refresh_accessor_tree(size_t ndx_in_parent)
     m_mark = false;
 #endif
 
-    bump_version(false);
+    bump_version(/* bump_global: */ false);
 }
 
 

@@ -162,21 +162,21 @@ protected:
     virtual char* do_translate(ref_type ref) const TIGHTDB_NOEXCEPT = 0;
 
     Allocator() TIGHTDB_NOEXCEPT;
-private:
+
     // FIXME: This really doesn't belong in an allocator, but it is the best
     // place for now, because every table has a pointer leading here. It would
     // be more obvious to place it in Group, but that would add a runtime overhead,
     // and access is time critical.
-    uint_fast64_t table_versioning_counter;
+    uint_fast64_t m_table_versioning_counter;
 
-    // Bump the global version counter. This method should be called when
-    // version bumping is initiated. Then following calls to "should_propagate_version"
-    // can be used to prune the version bumping.
+    /// Bump the global version counter. This method should be called when
+    /// version bumping is initiated. Then following calls to "should_propagate_version"
+    /// can be used to prune the version bumping.
     uint_fast64_t bump_global_version() TIGHTDB_NOEXCEPT;
 
-    // Determine if the "local_version" is out of sync, so that it should
-    // be updated. In that case: also update it. Called from Table::bump_version
-    // to control propagation of version updates on tables within the group.
+    /// Determine if the "local_version" is out of sync, so that it should
+    /// be updated. In that case: also update it. Called from Table::bump_version
+    /// to control propagation of version updates on tables within the group.
     bool should_propagate_version(uint_fast64_t& local_version) TIGHTDB_NOEXCEPT;
 
     friend class Table;
@@ -185,14 +185,14 @@ private:
 
 inline uint_fast64_t Allocator::bump_global_version() TIGHTDB_NOEXCEPT
 {
-    ++table_versioning_counter;
-    return table_versioning_counter;
+    ++m_table_versioning_counter;
+    return m_table_versioning_counter;
 }
 
 inline bool Allocator::should_propagate_version(uint_fast64_t& local_version) TIGHTDB_NOEXCEPT
 {
-    if (local_version != table_versioning_counter) {
-        local_version = table_versioning_counter;
+    if (local_version != m_table_versioning_counter) {
+        local_version = m_table_versioning_counter;
         return true;
     }
     else {
@@ -284,7 +284,7 @@ inline Allocator::Allocator() TIGHTDB_NOEXCEPT
 #ifdef TIGHTDB_DEBUG
     m_watch = 0;
 #endif
-    table_versioning_counter = 0;
+    m_table_versioning_counter = 0;
 }
 
 inline Allocator::~Allocator() TIGHTDB_NOEXCEPT
