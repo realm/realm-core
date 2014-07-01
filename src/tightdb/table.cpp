@@ -3624,7 +3624,7 @@ void Table::to_json(std::ostream& out, size_t link_depth, std::map<std::string, 
     out << "]";
 }
 
-void Table::to_json_row(std::size_t row_ndx, std::ostream& out, size_t link_depth, std::map<std::string, std::string> renames, std::vector<ref_type> followed) const
+void Table::to_json_row(std::size_t row_ndx, std::ostream& out, size_t link_depth, std::map<std::string, std::string>& renames, std::vector<ref_type>& followed) const
 {
     out << "{";
     size_t column_count = get_column_count();
@@ -3712,14 +3712,16 @@ void Table::to_json_row(std::size_t row_ndx, std::ostream& out, size_t link_dept
 
             if (!cl.is_null_link(row_ndx)) {
                 ref_type lnk = clb.get_ref();
-                if (link_depth == 0 || (link_depth == not_found && std::find(followed.begin(), followed.end(), lnk) != followed.end())) {
+                if ((link_depth == 0) || 
+                    (link_depth == not_found && std::find(followed.begin(), followed.end(), lnk) != followed.end())) {
                     out << "\"" << cl.get_link(row_ndx) << "\"";
                     break;
                 }
                 else {
                     out << "[";
                     followed.push_back(clb.get_ref());
-                    table->to_json_row(cl.get_link(row_ndx), out, link_depth == not_found ? not_found : link_depth - 1, renames, followed);
+                    size_t new_depth = link_depth == not_found ? not_found : link_depth - 1;
+                    table->to_json_row(cl.get_link(row_ndx), out, new_depth, renames, followed);
                     out << "]";
                 }
             }
@@ -3737,7 +3739,8 @@ void Table::to_json_row(std::size_t row_ndx, std::ostream& out, size_t link_dept
             LinkViewRef lv = cll.get_link_view(row_ndx);
 
             ref_type lnk = clb.get_ref();
-            if (link_depth == 0 || (link_depth == not_found && std::find(followed.begin(), followed.end(), lnk) != followed.end())) {
+            if ((link_depth == 0) || 
+                (link_depth == not_found && std::find(followed.begin(), followed.end(), lnk) != followed.end())) {
                 out << "{\"table\": \"" << cll.get_target_table()->get_name() << "\", \"rows\": [";
                 cll.to_json_row(row_ndx, out);
                 out << "]}";
@@ -3749,7 +3752,8 @@ void Table::to_json_row(std::size_t row_ndx, std::ostream& out, size_t link_dept
                     if (link > 0)
                         out << ", ";
                     followed.push_back(lnk);
-                    table->to_json_row(lv->get_target_row(link), out, link_depth == not_found ? not_found : link_depth - 1, renames, followed);
+                    size_t new_depth = link_depth == not_found ? not_found : link_depth - 1;
+                    table->to_json_row(lv->get_target_row(link), out, new_depth, renames, followed);
                 }
                 out << "]";
             }

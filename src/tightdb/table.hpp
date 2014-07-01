@@ -743,8 +743,9 @@ private:
     // Used for queries: Items are added with link() method during buildup of query
     std::vector<size_t> m_link_chain;
 
-    // recursive method called by to_json, to follow links
-    void to_json(std::ostream& out, size_t link_depth, std::map<std::string, std::string> renames, std::vector<ref_type> followed) const;
+    // recursive methods called by to_json, to follow links
+    void to_json(std::ostream& out, size_t link_depth, std::map<std::string, std::string>& renames, std::vector<ref_type>& followed) const;
+    void to_json_row(std::size_t row_ndx, std::ostream& out, size_t link_depth, std::map<std::string, std::string>& renames, std::vector<ref_type>& followed) const;
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     // Used only in connection with
@@ -861,9 +862,6 @@ private:
 
     // Support function for conversions
     void to_json_row(std::size_t row_ndx, std::ostream& out, size_t link_depth = 0, std::map<std::string, std::string>* renames = null_ptr) const;
-    // todo make private
-    void to_json_row(std::size_t row_ndx, std::ostream& out, size_t link_depth, std::map<std::string, std::string> renames, std::vector<ref_type> followed) const;
-
     void to_string_header(std::ostream& out, std::vector<std::size_t>& widths) const;
     void to_string_row(std::size_t row_ndx, std::ostream& out,
                        const std::vector<std::size_t>& widths) const;
