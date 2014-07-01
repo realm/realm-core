@@ -57,6 +57,7 @@ const char* file_order[] = {
     "test_destroy_guard.cpp",
 
     // /tightdb/ (main API)
+    "test_json.cpp",
     "test_version.cpp",
     "test_table*.cpp",
     "test_descriptor*.cpp",
@@ -340,6 +341,12 @@ bool run_tests()
 int test_all(int argc, char* argv[])
 {
     bool no_error_exit_staus = 2 <= argc && strcmp(argv[1], "--no-error-exitcode") == 0;
+
+#ifdef _MSC_VER
+    // we're in /build/ on Windows if we're in the Visual Studio IDE
+    set_test_resource_path("../../test/");
+    set_test_path_prefix("../../test/");
+#endif
 
     fix_max_open_files();
     fix_async_daemon_path();

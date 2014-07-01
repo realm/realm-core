@@ -667,6 +667,9 @@ template<class S> void Group::to_json(S& out, size_t link_depth, std::map<std::s
         return;
     }
 
+    std::map<std::string, std::string> renames2;
+    renames = renames ? renames : &renames2;
+
     out << "{";
 
     for (std::size_t i = 0; i < m_tables.size(); ++i) {
@@ -680,7 +683,7 @@ template<class S> void Group::to_json(S& out, size_t link_depth, std::map<std::s
         if (i) out << ",";
         out << "\"" << name << "\"";
         out << ":";
-        table->to_json(out, link_depth);
+        table->to_json(out, link_depth, renames);
     }
 
     out << "}";
