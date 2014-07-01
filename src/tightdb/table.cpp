@@ -285,9 +285,9 @@ size_t Table::add_column_link(DataType type, StringData name, Table& target)
 }
 
 
-void Table::insert_column_link(size_t column_ndx, DataType type, StringData name, Table& target)
+void Table::insert_column_link(size_t col_ndx, DataType type, StringData name, Table& target)
 {
-    get_descriptor()->insert_column_link(column_ndx, type, name, target); // Throws
+    get_descriptor()->insert_column_link(col_ndx, type, name, target); // Throws
 }
 
 
@@ -389,25 +389,25 @@ void Table::connect_opposite_link_columns(size_t link_col_ndx, Table& target_tab
 }
 
 
-void Table::insert_column(size_t column_ndx, DataType type, StringData name,
+void Table::insert_column(size_t col_ndx, DataType type, StringData name,
                           DescriptorRef* subdesc)
 {
     TIGHTDB_ASSERT(!has_shared_type());
-    get_descriptor()->insert_column(column_ndx, type, name, subdesc); // Throws
+    get_descriptor()->insert_column(col_ndx, type, name, subdesc); // Throws
 }
 
 
-void Table::remove_column(size_t column_ndx)
+void Table::remove_column(size_t col_ndx)
 {
     TIGHTDB_ASSERT(!has_shared_type());
-    get_descriptor()->remove_column(column_ndx); // Throws
+    get_descriptor()->remove_column(col_ndx); // Throws
 }
 
 
-void Table::rename_column(size_t column_ndx, StringData name)
+void Table::rename_column(size_t col_ndx, StringData name)
 {
     TIGHTDB_ASSERT(!has_shared_type());
-    get_descriptor()->rename_column(column_ndx, name); // Throws
+    get_descriptor()->rename_column(col_ndx, name); // Throws
 }
 
 
@@ -419,10 +419,10 @@ DescriptorRef Table::get_descriptor()
         ArrayParent* array_parent = m_columns.get_parent();
         TIGHTDB_ASSERT(dynamic_cast<Parent*>(array_parent));
         Parent* table_parent = static_cast<Parent*>(array_parent);
-        size_t column_ndx = 0;
-        Table* parent = table_parent->get_parent_table(&column_ndx);
+        size_t col_ndx = 0;
+        Table* parent = table_parent->get_parent_table(&col_ndx);
         TIGHTDB_ASSERT(parent);
-        return parent->get_descriptor()->get_subdescriptor(column_ndx); // Throws
+        return parent->get_descriptor()->get_subdescriptor(col_ndx); // Throws
     }
 
     DescriptorRef desc;
@@ -446,15 +446,15 @@ ConstDescriptorRef Table::get_descriptor() const
 }
 
 
-DescriptorRef Table::get_subdescriptor(size_t column_ndx)
+DescriptorRef Table::get_subdescriptor(size_t col_ndx)
 {
-    return get_descriptor()->get_subdescriptor(column_ndx); // Throws
+    return get_descriptor()->get_subdescriptor(col_ndx); // Throws
 }
 
 
-ConstDescriptorRef Table::get_subdescriptor(size_t column_ndx) const
+ConstDescriptorRef Table::get_subdescriptor(size_t col_ndx) const
 {
-    return get_descriptor()->get_subdescriptor(column_ndx); // Throws
+    return get_descriptor()->get_subdescriptor(col_ndx); // Throws
 }
 
 
@@ -478,28 +478,28 @@ ConstDescriptorRef Table::get_subdescriptor(const path_vec& path) const
 size_t Table::add_subcolumn(const path_vec& path, DataType type, StringData name)
 {
     DescriptorRef desc = get_subdescriptor(path); // Throws
-    size_t column_ndx = desc->get_column_count();
-    desc->insert_column(column_ndx, type, name); // Throws
-    return column_ndx;
+    size_t col_ndx = desc->get_column_count();
+    desc->insert_column(col_ndx, type, name); // Throws
+    return col_ndx;
 }
 
 
-void Table::insert_subcolumn(const path_vec& path, size_t column_ndx,
+void Table::insert_subcolumn(const path_vec& path, size_t col_ndx,
                              DataType type, StringData name)
 {
-    get_subdescriptor(path)->insert_column(column_ndx, type, name); // Throws
+    get_subdescriptor(path)->insert_column(col_ndx, type, name); // Throws
 }
 
 
-void Table::remove_subcolumn(const path_vec& path, size_t column_ndx)
+void Table::remove_subcolumn(const path_vec& path, size_t col_ndx)
 {
-    get_subdescriptor(path)->remove_column(column_ndx); // Throws
+    get_subdescriptor(path)->remove_column(col_ndx); // Throws
 }
 
 
-void Table::rename_subcolumn(const path_vec& path, size_t column_ndx, StringData name)
+void Table::rename_subcolumn(const path_vec& path, size_t col_ndx, StringData name)
 {
-    get_subdescriptor(path)->rename_column(column_ndx, name); // Throws
+    get_subdescriptor(path)->rename_column(col_ndx, name); // Throws
 }
 
 
@@ -602,7 +602,7 @@ struct Table::RenameSubtableColumns: SubtableUpdater {
 };
 
 
-void Table::do_insert_column(Descriptor& desc, size_t column_ndx, DataType type,
+void Table::do_insert_column(Descriptor& desc, size_t col_ndx, DataType type,
                              StringData name, Table* link_target_table)
 {
     TIGHTDB_ASSERT(desc.is_attached());
@@ -612,64 +612,67 @@ void Table::do_insert_column(Descriptor& desc, size_t column_ndx, DataType type,
     TIGHTDB_ASSERT(!root_table.has_shared_type());
 
     if (desc.is_root()) {
-        root_table.insert_root_column(column_ndx, ColumnType(type), name,
+        root_table.insert_root_column(col_ndx, ColumnType(type), name,
                                       link_target_table); // Throws
     }
     else {
         Spec* spec = df::get_spec(desc);
-        spec->insert_column(column_ndx, ColumnType(type), name); // Throws
+        spec->insert_column(col_ndx, ColumnType(type), name); // Throws
         if (!root_table.is_empty()) {
-            InsertSubtableColumns updater(column_ndx, type);
+            InsertSubtableColumns updater(col_ndx, type);
             update_subtables(desc, &updater); // Throws
         }
     }
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     if (Replication* repl = root_table.get_repl())
-        repl->insert_column(desc, column_ndx, type, name, link_target_table); // Throws
+        repl->insert_column(desc, col_ndx, type, name, link_target_table); // Throws
 #endif
 }
 
 
-void Table::do_remove_column(Descriptor& desc, size_t column_ndx)
+void Table::do_remove_column(Descriptor& desc, size_t col_ndx)
 {
     TIGHTDB_ASSERT(desc.is_attached());
 
     typedef _impl::DescriptorFriend df;
     Table& root_table = df::root_table(desc);
     TIGHTDB_ASSERT(!root_table.has_shared_type());
-    TIGHTDB_ASSERT(column_ndx < desc.get_column_count());
+    TIGHTDB_ASSERT(col_ndx < desc.get_column_count());
+
+    // No support for removal of link-type columns yet
+    TIGHTDB_ASSERT(!is_link_type(ColumnType(desc.get_column_type(col_ndx))));
 
     if (desc.is_root()) {
-        root_table.remove_root_column(column_ndx); // Throws
+        root_table.remove_root_column(col_ndx); // Throws
     }
     else {
         Spec* spec = df::get_spec(desc);
-        spec->remove_column(column_ndx); // Throws
+        spec->remove_column(col_ndx); // Throws
         if (!root_table.is_empty()) {
-            RemoveSubtableColumns updater(column_ndx);
+            RemoveSubtableColumns updater(col_ndx);
             update_subtables(desc, &updater); // Throws
         }
     }
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     if (Replication* repl = root_table.get_repl())
-        repl->erase_column(desc, column_ndx); // Throws
+        repl->erase_column(desc, col_ndx); // Throws
 #endif
 }
 
 
-void Table::do_rename_column(Descriptor& desc, size_t column_ndx, StringData name)
+void Table::do_rename_column(Descriptor& desc, size_t col_ndx, StringData name)
 {
     TIGHTDB_ASSERT(desc.is_attached());
 
     typedef _impl::DescriptorFriend df;
     Table& root_table = df::root_table(desc);
     TIGHTDB_ASSERT(!root_table.has_shared_type());
-    TIGHTDB_ASSERT(column_ndx < desc.get_column_count());
+    TIGHTDB_ASSERT(col_ndx < desc.get_column_count());
 
     Spec* spec = df::get_spec(desc);
-    spec->rename_column(column_ndx, name); // Throws
+    spec->rename_column(col_ndx, name); // Throws
 
     if (desc.is_root()) {
         root_table.bump_version();
@@ -683,7 +686,7 @@ void Table::do_rename_column(Descriptor& desc, size_t column_ndx, StringData nam
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     if (Replication* repl = root_table.get_repl())
-        repl->rename_column(desc, column_ndx, name); // Throws
+        repl->rename_column(desc, col_ndx, name); // Throws
 #endif
 }
 
@@ -858,10 +861,10 @@ void Table::update_subtables(const size_t* col_path_begin, const size_t* col_pat
     size_t col_path_size = col_path_end - col_path_begin;
     TIGHTDB_ASSERT(col_path_size >= 1);
 
-    size_t column_ndx = *col_path_begin;
-    TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_Table);
+    size_t col_ndx = *col_path_begin;
+    TIGHTDB_ASSERT(get_real_column_type(col_ndx) == col_type_Table);
 
-    ColumnTable& subtables = get_column_table(column_ndx); // Throws
+    ColumnTable& subtables = get_column_table(col_ndx); // Throws
     size_t num_rows = size();
     bool is_parent_of_modify_level = col_path_size == 1;
     for (size_t row_ndx = 0; row_ndx < num_rows; ++row_ndx) {
@@ -1018,16 +1021,16 @@ void Table::create_columns()
                 break;
             }
             case type_Table: {
-                size_t column_ndx = m_cols.size();
-                ColumnTable* c = new ColumnTable(alloc, this, column_ndx);
+                size_t col_ndx = m_cols.size();
+                ColumnTable* c = new ColumnTable(alloc, this, col_ndx);
                 m_columns.add(c->get_ref());
                 c->set_parent(&m_columns, ref_pos);
                 new_col = c;
                 break;
             }
             case type_Mixed: {
-                size_t column_ndx = m_cols.size();
-                ColumnMixed* c = new ColumnMixed(alloc, this, column_ndx);
+                size_t col_ndx = m_cols.size();
+                ColumnMixed* c = new ColumnMixed(alloc, this, col_ndx);
                 m_columns.add(c->get_ref());
                 c->set_parent(&m_columns, ref_pos);
                 new_col = c;
@@ -1048,8 +1051,8 @@ void Table::create_columns()
         // Atributes on columns may define that they come with an index
         if (attr != col_attr_None) {
             TIGHTDB_ASSERT(attr == col_attr_Indexed); // only supported attr so far
-            size_t column_ndx = m_cols.size()-1;
-            set_index(column_ndx, false);
+            size_t col_ndx = m_cols.size()-1;
+            set_index(col_ndx, false);
         }
     }
 }
@@ -1310,34 +1313,34 @@ Table::~Table() TIGHTDB_NOEXCEPT
 }
 
 
-bool Table::has_index(size_t column_ndx) const TIGHTDB_NOEXCEPT
+bool Table::has_index(size_t col_ndx) const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(column_ndx < get_column_count());
-    const ColumnBase& col = get_column_base(column_ndx);
+    TIGHTDB_ASSERT(col_ndx < get_column_count());
+    const ColumnBase& col = get_column_base(col_ndx);
     return col.has_index();
 }
 
 
-void Table::set_index(size_t column_ndx, bool update_spec)
+void Table::set_index(size_t col_ndx, bool update_spec)
 {
     TIGHTDB_ASSERT(!has_shared_type());
-    TIGHTDB_ASSERT(column_ndx < get_column_count());
+    TIGHTDB_ASSERT(col_ndx < get_column_count());
 
-    if (has_index(column_ndx))
+    if (has_index(col_ndx))
         return;
 
     m_search_index = 0;
     // FIXME: can this ever change the outcome of a query?
     bump_version();
 
-    ColumnType ct = get_real_column_type(column_ndx);
+    ColumnType ct = get_real_column_type(col_ndx);
     Spec::ColumnInfo info;
-    m_spec.get_column_info(column_ndx, info);
+    m_spec.get_column_info(col_ndx, info);
     size_t column_pos = info.m_column_ref_ndx;
     ref_type index_ref = 0;
 
     if (ct == col_type_String) {
-        AdaptiveStringColumn& col = get_column_string(column_ndx);
+        AdaptiveStringColumn& col = get_column_string(col_ndx);
 
         // Create the index
         StringIndex& index = col.create_index();
@@ -1345,7 +1348,7 @@ void Table::set_index(size_t column_ndx, bool update_spec)
         index_ref = index.get_ref();
     }
     else if (ct == col_type_StringEnum) {
-        ColumnStringEnum& col = get_column_string_enum(column_ndx);
+        ColumnStringEnum& col = get_column_string_enum(col_ndx);
 
         // Create the index
         StringIndex& index = col.create_index();
@@ -1360,15 +1363,15 @@ void Table::set_index(size_t column_ndx, bool update_spec)
     // Insert ref into columns list after the owning column
     m_columns.insert(column_pos+1, index_ref);
     int ndx_in_parent_diff = 1;
-    adjust_column_index(column_ndx+1, ndx_in_parent_diff);
+    adjust_column_index(col_ndx+1, ndx_in_parent_diff);
 
     // Update spec
     if (update_spec)
-        m_spec.set_column_attr(column_ndx, col_attr_Indexed);
+        m_spec.set_column_attr(col_ndx, col_attr_Indexed);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
-        repl->add_index_to_column(this, column_ndx); // Throws
+        repl->add_index_to_column(this, col_ndx); // Throws
 #endif
 }
 
