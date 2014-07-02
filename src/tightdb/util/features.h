@@ -35,11 +35,6 @@
 #  endif
 #endif
 
-// define this to reduce code footprint - eliminates certain code paths
-// which provide the ultimate in runtime performance but at the cost of
-// extensive code expansion.
-#define TIGHTDB_REDUCE_SIZE
-
 /* This one is needed to allow tightdb-config to know whether a
  * nondefault value is in effect. */
 #ifdef TIGHTDB_DEBUG
