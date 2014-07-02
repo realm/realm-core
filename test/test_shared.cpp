@@ -1501,8 +1501,9 @@ TEST(Shared_ClearColumnWithBasicArrayRootLeaf)
 }
 
 
-// disable shared async on windows
-#ifndef _WIN32
+// disable shared async on windows and any Apple operating system
+// TODO: enable async daemon for OS X - think how to do it in XCode (no issue for build.sh)
+#if !defined(_WIN32) && !defined(__APPLE__)
 // Todo. Keywords: winbug
 TEST_IF(Shared_Async, allow_async)
 {

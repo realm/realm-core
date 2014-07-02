@@ -1106,6 +1106,7 @@
 			buildPhases = (
 				3647E0FF1420E4D800D56FD7 /* Sources */,
 				3647E1011420E4D800D56FD7 /* CopyFiles */,
+				4222F3041964103400EC86A5 /* Copy JSON files */,
 				3647E1001420E4D800D56FD7 /* Frameworks */,
 			);
 			buildRules = (
@@ -1221,6 +1222,23 @@
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		4222F3041964103400EC86A5 /* Copy JSON files */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Copy JSON files";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "cp -a ${PROJECT_DIR}/test/*.json ${BUILD_DIR}/${CONFIGURATION}\ncp -a ${PROJECT_DIR}/test/expect_string.txt ${BUILD_DIR}/${CONFIGURATION}";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		3647E0E314209E6B00D56FD7 /* Sources */ = {
