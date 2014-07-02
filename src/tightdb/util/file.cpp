@@ -48,7 +48,7 @@ string get_errno_msg(const char* prefix, int err)
         return buffer.str();
     }
 
-#elif _GNU_SOURCE && ! defined ANDROID// GNU specific version <string.h>
+#elif _GNU_SOURCE && !TIGHTDB_ANDROID // GNU specific version <string.h>
 
     // Note that Linux provides the GNU specific version even though
     // it sets _POSIX_C_SOURCE >= 200112L.
@@ -957,6 +957,39 @@ bool File::try_remove(const string& path)
         case EISDIR: // Returned by Linux when path refers to a directory
         case ENOTDIR:
             throw AccessError(msg);
+        default:
+            throw runtime_error(msg);
+    }
+}
+
+
+void File::move(const string& old_path, const string& new_path)
+{
+    int r = rename(old_path.c_str(), new_path.c_str());
+    if (r == 0)
+        return;
+    int err = errno; // Eliminate any risk of clobbering
+    string msg = get_errno_msg("rename() failed: ", err);
+    switch (err) {
+        case EACCES:
+        case EROFS:
+        case ETXTBSY:
+        case EBUSY:
+        case EPERM:
+        case EEXIST:
+        case ENOTEMPTY:
+            throw PermissionDenied(msg);
+        case ENOENT:
+            throw File::NotFound(msg);
+        case ELOOP:
+        case EMLINK:
+        case ENAMETOOLONG:
+        case EINVAL:
+        case EISDIR:
+        case ENOTDIR:
+            throw AccessError(msg);
+        case ENOSPC:
+            throw ResourceAllocError(msg);
         default:
             throw runtime_error(msg);
     }

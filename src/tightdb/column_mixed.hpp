@@ -36,6 +36,16 @@ namespace tightdb {
 // Pre-declarations
 class ColumnBinary;
 
+
+/// A mixed column (ColumnMixed) is composed of three subcolumns. The
+/// first subcolumn is an integer column (Column) and stores value
+/// types. The second one stores values and is a subtable parent
+/// column (ColumnSubtableParent), which is a subclass of an integer
+/// column (Column). The last one is a binary column (ColumnBinary)
+/// and stores additional data for values of type string or binary
+/// data. The last subcolumn is optional. The root of a mixed column
+/// is an array node of type Array that stores the root refs of the
+/// subcolumns.
 class ColumnMixed: public ColumnBase {
 public:
     /// Create a free-standing mixed column.
@@ -68,7 +78,13 @@ public:
 
     ~ColumnMixed() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
-    void update_from_parent(std::size_t old_baseline) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void update_column_index(std::size_t, const Spec&) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+
+    void adj_accessors_insert_rows(std::size_t, std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void adj_accessors_erase_row(std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void adj_accessors_move_last_over(std::size_t, std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+
+    void update_from_parent(std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
     DataType get_type(std::size_t ndx) const TIGHTDB_NOEXCEPT;
     std::size_t size() const TIGHTDB_NOEXCEPT { return m_types->size(); }
@@ -84,16 +100,26 @@ public:
 
     /// The returned array ref is zero if the specified row does not
     /// contain a subtable.
-    ref_type get_subtable_ref(std::size_t row_idx) const TIGHTDB_NOEXCEPT;
+    ref_type get_subtable_ref(std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
 
     /// The returned size is zero if the specified row does not
     /// contain a subtable.
-    std::size_t get_subtable_size(std::size_t row_idx) const TIGHTDB_NOEXCEPT;
+    std::size_t get_subtable_size(std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
 
-    /// Returns null if the specified row does not contain a subtable,
-    /// otherwise the returned table pointer must end up being wrapped
-    /// by an instance of BasicTableRef.
-    Table* get_subtable_ptr(std::size_t row_idx) const;
+    Table* get_subtable_accessor(std::size_t row_ndx) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+
+    void discard_subtable_accessor(std::size_t row_ndx) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+
+    /// If the value at the specified index is a subtable, return a
+    /// pointer to that accessor for that subtable. Otherwise return
+    /// null. The accessor will be created if it does not already
+    /// exist.
+    ///
+    /// The returned table pointer must **always** end up being
+    /// wrapped in some instantiation of BasicTableRef<>.
+    Table* get_subtable_ptr(std::size_t row_ndx);
+
+    const Table* get_subtable_ptr(std::size_t subtable_ndx) const;
 
     void set_int(std::size_t ndx, int64_t value);
     void set_bool(std::size_t ndx, bool value);
@@ -102,7 +128,7 @@ public:
     void set_double(std::size_t ndx, double value);
     void set_string(std::size_t ndx, StringData value);
     void set_binary(std::size_t ndx, BinaryData value);
-    void set_subtable(std::size_t ndx, const Table*);
+    void set_subtable(std::size_t ndx, const Table* value);
 
     void insert_int(std::size_t ndx, int64_t value);
     void insert_bool(std::size_t ndx, bool value);
@@ -111,26 +137,29 @@ public:
     void insert_double(std::size_t ndx, double value);
     void insert_string(std::size_t ndx, StringData value);
     void insert_binary(std::size_t ndx, BinaryData value);
-    void insert_subtable(std::size_t ndx, const Table*);
+    void insert_subtable(std::size_t ndx, const Table* value);
 
-    void add() TIGHTDB_OVERRIDE { insert_int(size(), 0); }
-    void insert(std::size_t ndx) TIGHTDB_OVERRIDE { insert_int(ndx, 0); }
     void clear() TIGHTDB_OVERRIDE;
-    void erase(std::size_t ndx, bool is_last) TIGHTDB_OVERRIDE;
-    void move_last_over(std::size_t ndx) TIGHTDB_OVERRIDE;
+    void insert(std::size_t, std::size_t, bool) TIGHTDB_OVERRIDE;
+    void erase(std::size_t, bool) TIGHTDB_OVERRIDE;
+    void move_last_over(std::size_t, std::size_t) TIGHTDB_OVERRIDE;
 
     /// Compare two mixed columns for equality.
     bool compare_mixed(const ColumnMixed&) const;
 
-    void detach_subtable_accessors() TIGHTDB_NOEXCEPT;
+    void discard_child_accessors() TIGHTDB_NOEXCEPT;
 
     static ref_type create(std::size_t num_default_values, Allocator&);
 
     static std::size_t get_size_from_ref(ref_type root_ref, Allocator&) TIGHTDB_NOEXCEPT;
 
-    // Overrriding method in ColumnBase
+    // Overriding method in ColumnBase
     ref_type write(std::size_t, std::size_t, std::size_t,
                    _impl::OutputStream&) const TIGHTDB_OVERRIDE;
+
+    void recursive_mark() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+
+    void refresh_accessor_tree(std::size_t, const Spec&) TIGHTDB_OVERRIDE;
 
 #ifdef TIGHTDB_DEBUG
     void Verify() const TIGHTDB_OVERRIDE; // Must be upper case to avoid conflict with macro in ObjC
@@ -183,15 +212,20 @@ private:
                 ArrayParent*, std::size_t ndx_in_parent, ref_type);
     void init_binary_data_column();
 
-    void clear_value(std::size_t ndx, MixedColType new_type);
+    MixedColType clear_value(std::size_t ndx, MixedColType new_type); // Returns old type
+    void clear_value_and_discard_subtab_acc(std::size_t ndx, MixedColType new_type);
 
     // Get/set/insert 64-bit values in m_data/m_types
     int64_t get_value(std::size_t ndx) const TIGHTDB_NOEXCEPT;
     void set_value(std::size_t ndx, int64_t value, MixedColType);
-    void insert_int64(std::size_t ndx, int64_t value, MixedColType pos_type, MixedColType neg_type);
     void set_int64(std::size_t ndx, int64_t value, MixedColType pos_type, MixedColType neg_type);
 
-    void do_detach_subtable_accessors() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void insert_value(std::size_t row_ndx, int_fast64_t types_value, int_fast64_t data_value);
+    void insert_int(std::size_t ndx, int_fast64_t value, MixedColType type);
+    void insert_pos_neg(std::size_t ndx, int_fast64_t value, MixedColType pos_type,
+                        MixedColType neg_type);
+
+    void do_discard_child_accessors() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
 #ifdef TIGHTDB_DEBUG
     void leaf_to_dot(MemRef, ArrayParent*, std::size_t,
@@ -203,12 +237,23 @@ private:
 class ColumnMixed::RefsColumn: public ColumnSubtableParent {
 public:
     RefsColumn(Allocator& alloc, Table* table, std::size_t column_ndx):
-        ColumnSubtableParent(alloc, table, column_ndx) {}
+        ColumnSubtableParent(alloc, table, column_ndx)
+    {
+    }
+
     RefsColumn(Allocator& alloc, Table* table, std::size_t column_ndx,
                ArrayParent* parent, std::size_t ndx_in_parent, ref_type ref):
-        ColumnSubtableParent(alloc, table, column_ndx, parent, ndx_in_parent, ref) {}
+        ColumnSubtableParent(alloc, table, column_ndx, parent, ndx_in_parent, ref)
+    {
+    }
+
     ~RefsColumn() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
+
     using ColumnSubtableParent::get_subtable_ptr;
+
+    void refresh_accessor_tree(std::size_t, const Spec&) TIGHTDB_OVERRIDE;
+
+    friend class ColumnMixed;
 };
 
 

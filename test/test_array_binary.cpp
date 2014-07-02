@@ -3,28 +3,46 @@
 
 #include <tightdb/array_binary.hpp>
 
-#include "util/unit_test.hpp"
-#include "util/test_only.hpp"
+#include "test.hpp"
 
 using namespace tightdb;
 
-// Note: You can now temporarely declare unit tests with the ONLY(TestName) macro instead of TEST(TestName). This
-// will disable all unit tests except these. Remember to undo your temporary changes before committing.
 
-namespace {
+// Test independence and thread-safety
+// -----------------------------------
+//
+// All tests must be thread safe and independent of each other. This
+// is required because it allows for both shuffling of the execution
+// order and for parallelized testing.
+//
+// In particular, avoid using std::rand() since it is not guaranteed
+// to be thread safe. Instead use the API offered in
+// `test/util/random.hpp`.
+//
+// All files created in tests must use the TEST_PATH macro (or one of
+// its friends) to obtain a suitable file system path. See
+// `test/util/test_path.hpp`.
+//
+//
+// Debugging and the ONLY() macro
+// ------------------------------
+//
+// A simple way of disabling all tests except one called `Foo`, is to
+// replace TEST(Foo) with ONLY(Foo) and then recompile and rerun the
+// test suite. Note that you can also use filtering by setting the
+// environment varible `UNITTEST_FILTER`. See `README.md` for more on
+// this.
+//
+// Another way to debug a particular test, is to copy that test into
+// `experiments/testcase.cpp` and then run `sh build.sh
+// check-testcase` (or one of its friends) from the command line.
 
-struct db_setup_binary {
-    static ArrayBinary c;
-};
 
-ArrayBinary db_setup_binary::c;
-
-} // anonnymous namespace
-
-
-TEST(ArrayBinary_MultiEmpty)
+TEST(ArrayBinary_Basic)
 {
-    ArrayBinary& c = db_setup_binary::c;
+    ArrayBinary c;
+
+    // TEST(ArrayBinary_MultiEmpty)
 
     c.add(BinaryData("", 0));
     c.add(BinaryData("", 0));
@@ -41,11 +59,9 @@ TEST(ArrayBinary_MultiEmpty)
     CHECK_EQUAL(0, c.get(3).size());
     CHECK_EQUAL(0, c.get(4).size());
     CHECK_EQUAL(0, c.get(5).size());
-}
 
-TEST(ArrayBinary_Set)
-{
-    ArrayBinary& c = db_setup_binary::c;
+
+    // TEST(ArrayBinary_Set)
 
     c.set(0, BinaryData("hey", 4));
 
@@ -58,11 +74,9 @@ TEST(ArrayBinary_Set)
     CHECK_EQUAL(0, c.get(3).size());
     CHECK_EQUAL(0, c.get(4).size());
     CHECK_EQUAL(0, c.get(5).size());
-}
 
-TEST(ArrayBinary_Add)
-{
-    ArrayBinary& c = db_setup_binary::c;
+
+    // TEST(ArrayBinary_Add)
 
     c.clear();
     CHECK_EQUAL(0, c.size());
@@ -78,11 +92,9 @@ TEST(ArrayBinary_Add)
     CHECK_EQUAL(4, c.get(0).size());
     CHECK_EQUAL(5, c.get(1).size());
     CHECK_EQUAL(2, c.size());
-}
 
-TEST(ArrayBinary_Set2)
-{
-    ArrayBinary& c = db_setup_binary::c;
+
+    // TEST(ArrayBinary_Set2)
 
     // {shrink, grow} x {first, middle, last, single}
     c.clear();
@@ -135,11 +147,10 @@ TEST(ArrayBinary_Set2)
     CHECK_EQUAL("x", c.get(1).data());
     CHECK_EQUAL("pq", c.get(2).data());
     CHECK_EQUAL(3, c.size());
-}
 
-TEST(ArrayBinary_Insert)
-{
-    ArrayBinary& c = db_setup_binary::c;
+
+    // TEST(ArrayBinary_Insert)
+
     c.clear();
 
     c.insert(0, BinaryData("abc", 4)); // single
@@ -171,11 +182,10 @@ TEST(ArrayBinary_Insert)
     CHECK_EQUAL("d", c.get(3).data());
     CHECK_EQUAL("ef", c.get(4).data());
     CHECK_EQUAL(5, c.size());
-}
 
-TEST(ArrayBinary_Erase)
-{
-    ArrayBinary& c = db_setup_binary::c;
+
+    // TEST(ArrayBinary_Erase)
+
     c.clear();
 
     c.add(BinaryData("a", 2));
@@ -209,13 +219,10 @@ TEST(ArrayBinary_Erase)
     c.erase(0); // all
     CHECK_EQUAL(0, c.size());
     CHECK(c.is_empty());
-}
 
-TEST(ArrayBinary_Destroy)
-{
-    ArrayBinary& c = db_setup_binary::c;
 
-    // clean up (ALWAYS PUT THIS LAST)
+    // TEST(ArrayBinary_Destroy)
+
     c.destroy();
 }
 

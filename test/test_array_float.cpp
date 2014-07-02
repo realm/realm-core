@@ -4,10 +4,40 @@
 #include <tightdb/array_basic.hpp>
 #include <tightdb/column.hpp>
 
-#include "util/unit_test.hpp"
-#include "util/test_only.hpp"
+#include "test.hpp"
 
 using namespace tightdb;
+using test_util::unit_test::TestResults;
+
+
+// Test independence and thread-safety
+// -----------------------------------
+//
+// All tests must be thread safe and independent of each other. This
+// is required because it allows for both shuffling of the execution
+// order and for parallelized testing.
+//
+// In particular, avoid using std::rand() since it is not guaranteed
+// to be thread safe. Instead use the API offered in
+// `test/util/random.hpp`.
+//
+// All files created in tests must use the TEST_PATH macro (or one of
+// its friends) to obtain a suitable file system path. See
+// `test/util/test_path.hpp`.
+//
+//
+// Debugging and the ONLY() macro
+// ------------------------------
+//
+// A simple way of disabling all tests except one called `Foo`, is to
+// replace TEST(Foo) with ONLY(Foo) and then recompile and rerun the
+// test suite. Note that you can also use filtering by setting the
+// environment varible `UNITTEST_FILTER`. See `README.md` for more on
+// this.
+//
+// Another way to debug a particular test, is to copy that test into
+// `experiments/testcase.cpp` and then run `sh build.sh
+// check-testcase` (or one of its friends) from the command line.
 
 
 namespace {
@@ -20,23 +50,23 @@ template<class T, size_t N> inline size_t size_of_array(T(&)[N])
 // Article about comparing floats:
 // http://randomascii.wordpress.com/2012/02/25/comparing-floating-point-numbers-2012-edition/
 
-float float_val[] = {
+float float_values[] = {
     0.0f,
     1.0f,
     2.12345f,
     12345.12f,
     -12345.12f
 };
-const size_t float_val_len = size_of_array(float_val);
+const size_t num_float_values = size_of_array(float_values);
 
-double double_val[] = {
+double double_values[] = {
     0.0,
     1.0,
     2.12345,
     12345.12,
     -12345.12
 };
-const size_t double_val_len = size_of_array(double_val);
+const size_t num_double_values = size_of_array(double_values);
 
 } // anonymous namespace
 
@@ -44,16 +74,16 @@ const size_t double_val_len = size_of_array(double_val);
 // TODO: Add test of full range of floats.
 
 template <class C, typename T>
-void BasicArray_AddGet(T val[], size_t valLen)
+void BasicArray_AddGet(TestResults& test_results, T values[], size_t num_values)
 {
     C f;
-    for (size_t i=0; i<valLen; ++i) {
-        f.add(val[i]);
+    for (size_t i=0; i<num_values; ++i) {
+        f.add(values[i]);
 
         CHECK_EQUAL(i+1, f.size());
 
         for (size_t j=0; j<i; ++j) {
-            CHECK_EQUAL(val[j], f.get(j));
+            CHECK_EQUAL(values[j], f.get(j));
         }
     }
 
@@ -62,22 +92,28 @@ void BasicArray_AddGet(T val[], size_t valLen)
 
     f.destroy();    // cleanup
 }
-TEST(ArrayFloat_AddGet) { BasicArray_AddGet<ArrayFloat, float>(float_val, float_val_len); }
-TEST(ArrayDouble_AddGet){ BasicArray_AddGet<ArrayDouble, double>(double_val, double_val_len); }
+TEST(ArrayFloat_AddGet)
+{
+    BasicArray_AddGet<ArrayFloat, float>(test_results, float_values, num_float_values);
+}
+TEST(ArrayDouble_AddGet)
+{
+    BasicArray_AddGet<ArrayDouble, double>(test_results, double_values, num_double_values);
+}
 
 
 template <class C, typename T>
-void BasicArray_AddManyValues()
+void BasicArray_AddManyValues(TestResults& test_results)
 {
     C f;
-    const size_t repeats = 1100;
-    for (size_t i=0; i<repeats; ++i) {
+    size_t repeats = 1100;
+    for (size_t i = 0; i < repeats; ++i) {
         f.add(T(i));
         T val = f.get(i);
         CHECK_EQUAL(T(i), val);
         CHECK_EQUAL(i+1, f.size());
     }
-    for (size_t i=0; i<repeats; ++i) {
+    for (size_t i = 0; i < repeats; ++i) {
         T val = f.get(i);
         CHECK_EQUAL(T(i), val);
     }
@@ -87,14 +123,20 @@ void BasicArray_AddManyValues()
 
     f.destroy();    // cleanup
 }
-TEST(ArrayFloat_AddManyValues) { BasicArray_AddManyValues<ArrayFloat, float>(); }
-TEST(ArrayDouble_AddManyValues){ BasicArray_AddManyValues<ArrayDouble, double>(); }
+TEST(ArrayFloat_AddManyValues)
+{
+    BasicArray_AddManyValues<ArrayFloat, float>(test_results);
+}
+TEST(ArrayDouble_AddManyValues)
+{
+    BasicArray_AddManyValues<ArrayDouble, double>(test_results);
+}
 
 template <class C, typename T>
-void BasicArray_Delete()
+void BasicArray_Delete(TestResults& test_results)
 {
     C f;
-    for (size_t i=0; i<5; ++i)
+    for (size_t i = 0; i < 5; ++i)
         f.add( T(i) );
 
     // Delete first
@@ -128,41 +170,53 @@ void BasicArray_Delete()
 
     f.destroy();    // cleanup
 }
-TEST(ArrayFloat_Delete) { BasicArray_Delete<ArrayFloat, float>(); }
-TEST(ArrayDouble_Delete){ BasicArray_Delete<ArrayDouble, double>(); }
+TEST(ArrayFloat_Delete)
+{
+    BasicArray_Delete<ArrayFloat, float>(test_results);
+}
+TEST(ArrayDouble_Delete)
+{
+    BasicArray_Delete<ArrayDouble, double>(test_results);
+}
 
 
 template <class C, typename T>
-void BasicArray_Set(T val[], size_t valLen)
+void BasicArray_Set(TestResults& test_results, T values[], size_t num_values)
 {
     C f;
     CHECK_EQUAL(0, f.size());
-    for (size_t i=0; i<valLen; ++i)
-        f.add(val[i]);
-    CHECK_EQUAL(valLen, f.size());
+    for (size_t i = 0; i < num_values; ++i)
+        f.add(values[i]);
+    CHECK_EQUAL(num_values, f.size());
 
     f.set(0, T(1.6));
     CHECK_EQUAL(T(1.6), f.get(0));
     f.set(3, T(987.23));
     CHECK_EQUAL(T(987.23), f.get(3));
 
-    CHECK_EQUAL(val[1], f.get(1));
-    CHECK_EQUAL(val[2], f.get(2));
-    CHECK_EQUAL(val[4], f.get(4));
-    CHECK_EQUAL(valLen, f.size());
+    CHECK_EQUAL(values[1], f.get(1));
+    CHECK_EQUAL(values[2], f.get(2));
+    CHECK_EQUAL(values[4], f.get(4));
+    CHECK_EQUAL(num_values, f.size());
 
     f.destroy();    // cleanup
 }
-TEST(ArrayFloat_Set) { BasicArray_Set<ArrayFloat, float>(float_val, float_val_len); }
-TEST(ArrayDouble_Set){ BasicArray_Set<ArrayDouble, double>(double_val, double_val_len); }
+TEST(ArrayFloat_Set)
+{
+    BasicArray_Set<ArrayFloat, float>(test_results, float_values, num_float_values);
+}
+TEST(ArrayDouble_Set)
+{
+    BasicArray_Set<ArrayDouble, double>(test_results, double_values, num_double_values);
+}
 
 
 template <class C, typename T>
-void BasicArray_Insert()
+void BasicArray_Insert(TestResults& test_results)
 {
     C f;
-    const T v0 = T(123.970);
-    const T v1 = T(-321.971);
+    T v0 = T(123.970);
+    T v1 = T(-321.971);
     T v2 = T(555.972);
     T v3 = T(-999.973);
 
@@ -194,19 +248,25 @@ void BasicArray_Insert()
 
     f.destroy();    // cleanup
 }
-TEST(ArrayFloat_Insert) { BasicArray_Insert<ArrayFloat, float>(); }
-TEST(ArrayDouble_Insert){ BasicArray_Insert<ArrayDouble, double>(); }
+TEST(ArrayFloat_Insert)
+{
+    BasicArray_Insert<ArrayFloat, float>(test_results);
+}
+TEST(ArrayDouble_Insert)
+{
+    BasicArray_Insert<ArrayDouble, double>(test_results);
+}
 
 #if 0
 // sum() is unused by other classes
 template <class C, typename T>
-void BasicArray_Sum()
+void BasicArray_Sum(TestResults& test_results)
 {
     C f;
 
     T values[] = { T(1.1), T(2.2), T(3.3), T(4.4), T(5.5)};
     double sum = 0.0;
-    for (size_t i=0; i<5; ++i) {
+    for (size_t i = 0; i < 5; ++i) {
         f.add(values[i]);
         sum += values[i];
     }
@@ -224,12 +284,18 @@ void BasicArray_Sum()
     CHECK_EQUAL(double(values[2]), f.sum(2, 3));
     f.destroy();    // cleanup
 }
-TEST(ArrayFloat_Sum) { BasicArray_Sum<ArrayFloat, float>(); }
-TEST(ArrayDouble_Sum){ BasicArray_Sum<ArrayDouble, double>(); }
+TEST(ArrayFloat_Sum)
+{
+    BasicArray_Sum<ArrayFloat, float>(test_results);
+}
+TEST(ArrayDouble_Sum)
+{
+    BasicArray_Sum<ArrayDouble, double>(test_results);
+}
 #endif
 
 template <class C, typename T>
-void BasicArray_Minimum()
+void BasicArray_Minimum(TestResults& test_results)
 {
     C f;
     T res = T();
@@ -237,9 +303,8 @@ void BasicArray_Minimum()
     CHECK_EQUAL(false, f.minimum(res));
 
     T values[] = { T(1.1), T(2.2), T(-1.0), T(5.5), T(4.4)};
-    for (size_t i=0; i<5; ++i) {
+    for (size_t i = 0; i < 5; ++i)
         f.add(values[i]);
-    }
     CHECK_EQUAL(5, f.size());
 
     // middle match in all
@@ -260,12 +325,18 @@ void BasicArray_Minimum()
 
     f.destroy();    // cleanup
 }
-TEST(ArrayFloat_Minimum) { BasicArray_Minimum<ArrayFloat, float>(); }
-TEST(ArrayDouble_Minimum){ BasicArray_Minimum<ArrayDouble, double>(); }
+TEST(ArrayFloat_Minimum)
+{
+    BasicArray_Minimum<ArrayFloat, float>(test_results);
+}
+TEST(ArrayDouble_Minimum)
+{
+    BasicArray_Minimum<ArrayDouble, double>(test_results);
+}
 
 
 template <class C, typename T>
-void BasicArray_Maximum()
+void BasicArray_Maximum(TestResults& test_results)
 {
     C f;
     T res = T();
@@ -273,9 +344,8 @@ void BasicArray_Maximum()
     CHECK_EQUAL(false, f.maximum(res));
 
     T values[] = { T(1.1), T(2.2), T(-1.0), T(5.5), T(4.4)};
-    for (size_t i=0; i<5; ++i) {
+    for (size_t i = 0; i < 5; ++i)
         f.add(values[i]);
-    }
     CHECK_EQUAL(5, f.size());
 
     // middle match in all
@@ -296,12 +366,18 @@ void BasicArray_Maximum()
 
     f.destroy();    // cleanup
 }
-TEST(ArrayFloat_Maximum) { BasicArray_Maximum<ArrayFloat, float>(); }
-TEST(ArrayDouble_Maximum){ BasicArray_Maximum<ArrayDouble, double>(); }
+TEST(ArrayFloat_Maximum)
+{
+    BasicArray_Maximum<ArrayFloat, float>(test_results);
+}
+TEST(ArrayDouble_Maximum)
+{
+    BasicArray_Maximum<ArrayDouble, double>(test_results);
+}
 
 
 template <class C, typename T>
-void BasicArray_Find()
+void BasicArray_Find(TestResults& test_results)
 {
     C f;
 
@@ -310,7 +386,7 @@ void BasicArray_Find()
 
     // Add some values
     T values[] = { T(1.1), T(2.2), T(-1.0), T(5.5), T(1.1), T(4.4) };
-    for (size_t i=0; i<6; ++i)
+    for (size_t i = 0; i < 6; ++i)
         f.add(values[i]);
 
     // Find (full range: start=0, end=-1)
@@ -330,25 +406,31 @@ void BasicArray_Find()
     CHECK_EQUAL(4,          f.find_first(T(1.1), 1, 5));    // skip first match, end at last match
 
     // Find all
-    Array resArr;
-    f.find_all(resArr, T(1.1), 0);
-    CHECK_EQUAL(2, resArr.size());
-    CHECK_EQUAL(0, resArr.get(0));
-    CHECK_EQUAL(4, resArr.get(1));
+    Column res_arr;
+    f.find_all(&res_arr, T(1.1), 0);
+    CHECK_EQUAL(2, res_arr.size());
+    CHECK_EQUAL(0, res_arr.get(0));
+    CHECK_EQUAL(4, res_arr.get(1));
     // Find all, range limited -> no match
-    resArr.clear();
-    f.find_all(resArr, T(1.1), 0, 1, 4);
-    CHECK_EQUAL(0, resArr.size());
-    resArr.destroy();
+    res_arr.clear();
+    f.find_all(&res_arr, T(1.1), 0, 1, 4);
+    CHECK_EQUAL(0, res_arr.size());
+    res_arr.destroy();
 
     f.destroy();    // cleanup
 }
-TEST(ArrayFloat_Find) { BasicArray_Find<ArrayFloat, float>(); }
-TEST(ArrayDouble_Find){ BasicArray_Find<ArrayDouble, double>(); }
+TEST(ArrayFloat_Find)
+{
+    BasicArray_Find<ArrayFloat, float>(test_results);
+}
+TEST(ArrayDouble_Find)
+{
+    BasicArray_Find<ArrayDouble, double>(test_results);
+}
 
 
 template <class C, typename T>
-void BasicArray_Count()
+void BasicArray_Count(TestResults& test_results)
 {
     C f;
 
@@ -358,9 +440,9 @@ void BasicArray_Count()
     // Add some values
     //                0       1        2       3       4       5
     T values[] = { T(1.1), T(2.2), T(-1.0), T(5.5), T(1.1), T(4.4)};
-    for (size_t i=0; i<6; ++i) {
+    for (size_t i = 0; i < 6; ++i)
         f.add(values[i]);
-    }
+
     // count full range
     CHECK_EQUAL(0, f.count(T(0.0)));
     CHECK_EQUAL(1, f.count(T(4.4)));
@@ -379,12 +461,18 @@ void BasicArray_Count()
 
     f.destroy();    // cleanup
 }
-TEST(ArrayFloat_Count) { BasicArray_Count<ArrayFloat, float>(); }
-TEST(ArrayDouble_Count){ BasicArray_Count<ArrayDouble, double>(); }
+TEST(ArrayFloat_Count)
+{
+    BasicArray_Count<ArrayFloat, float>(test_results);
+}
+TEST(ArrayDouble_Count)
+{
+    BasicArray_Count<ArrayDouble, double>(test_results);
+}
 
 
 template <class C, typename T>
-void BasicArray_Compare()
+void BasicArray_Compare(TestResults& test_results)
 {
     C f1, f2;
 
@@ -394,7 +482,7 @@ void BasicArray_Compare()
 
     // Add some values
     T values[] = { T(1.1), T(2.2), T(-1.0), T(5.5), T(1.1), T(4.4)};
-    for (size_t i=0; i<6; ++i) {
+    for (size_t i = 0; i < 6; ++i) {
         f1.add(values[i]);
         f2.add(values[i]);
         CHECK_EQUAL(true, f1.compare(f2));
@@ -409,7 +497,13 @@ void BasicArray_Compare()
     f1.destroy();    // cleanup
     f2.destroy();
 }
-TEST(ArrayFloat_Compare) { BasicArray_Compare<ArrayFloat, float>(); }
-TEST(ArrayDouble_Compare){ BasicArray_Compare<ArrayDouble, double>(); }
+TEST(ArrayFloat_Compare)
+{
+    BasicArray_Compare<ArrayFloat, float>(test_results);
+}
+TEST(ArrayDouble_Compare)
+{
+    BasicArray_Compare<ArrayDouble, double>(test_results);
+}
 
 #endif // TEST_ARRAY_FLOAT

@@ -5,29 +5,46 @@
 #include <tightdb/column_string_enum.hpp>
 #include <tightdb/index_string.hpp>
 
-#include "util/unit_test.hpp"
-#include "util/test_only.hpp"
+#include "test.hpp"
 
 using namespace tightdb;
 
-// Note: You can now temporarely declare unit tests with the ONLY(TestName) macro instead of TEST(TestName). This
-// will disable all unit tests except these. Remember to undo your temporary changes before committing.
+
+// Test independence and thread-safety
+// -----------------------------------
+//
+// All tests must be thread safe and independent of each other. This
+// is required because it allows for both shuffling of the execution
+// order and for parallelized testing.
+//
+// In particular, avoid using std::rand() since it is not guaranteed
+// to be thread safe. Instead use the API offered in
+// `test/util/random.hpp`.
+//
+// All files created in tests must use the TEST_PATH macro (or one of
+// its friends) to obtain a suitable file system path. See
+// `test/util/test_path.hpp`.
+//
+//
+// Debugging and the ONLY() macro
+// ------------------------------
+//
+// A simple way of disabling all tests except one called `Foo`, is to
+// replace TEST(Foo) with ONLY(Foo) and then recompile and rerun the
+// test suite. Note that you can also use filtering by setting the
+// environment varible `UNITTEST_FILTER`. See `README.md` for more on
+// this.
+//
+// Another way to debug a particular test, is to copy that test into
+// `experiments/testcase.cpp` and then run `sh build.sh
+// check-testcase` (or one of its friends) from the command line.
 
 
-namespace {
-
-struct db_setup_column_string {
-    static AdaptiveStringColumn c;
-};
-
-AdaptiveStringColumn db_setup_column_string::c;
-
-} // anonymous namespace
-
-
-TEST(ColumnString_MultiEmpty)
+TEST(ColumnString_Basic)
 {
-    AdaptiveStringColumn& c = db_setup_column_string::c;
+    AdaptiveStringColumn c;
+
+    // TEST(ColumnString_MultiEmpty)
 
     c.add("");
     c.add("");
@@ -43,12 +60,9 @@ TEST(ColumnString_MultiEmpty)
     CHECK_EQUAL("", c.get(3));
     CHECK_EQUAL("", c.get(4));
     CHECK_EQUAL("", c.get(5));
-}
 
 
-TEST(ColumnString_SetExpand4)
-{
-    AdaptiveStringColumn& c = db_setup_column_string::c;
+    // TEST(ColumnString_SetExpand4)
 
     c.set(0, "hey");
 
@@ -59,11 +73,9 @@ TEST(ColumnString_SetExpand4)
     CHECK_EQUAL("", c.get(3));
     CHECK_EQUAL("", c.get(4));
     CHECK_EQUAL("", c.get(5));
-}
 
-TEST(ColumnString_SetExpand8)
-{
-    AdaptiveStringColumn& c = db_setup_column_string::c;
+
+    // TEST(ColumnString_SetExpand8)
 
     c.set(1, "test");
 
@@ -74,50 +86,45 @@ TEST(ColumnString_SetExpand8)
     CHECK_EQUAL("", c.get(3));
     CHECK_EQUAL("", c.get(4));
     CHECK_EQUAL("", c.get(5));
-}
 
-TEST(ColumnString_Add0)
-{
-    AdaptiveStringColumn& c = db_setup_column_string::c;
+
+    // TEST(ColumnString_Add0)
+
     c.clear();
     c.add();
     CHECK_EQUAL("", c.get(0));
     CHECK_EQUAL(1, c.size());
-}
 
-TEST(ColumnString_Add1)
-{
-    AdaptiveStringColumn& c = db_setup_column_string::c;
+
+    // TEST(ColumnString_Add1)
+
     c.add("a");
     CHECK_EQUAL("",  c.get(0));
     CHECK_EQUAL("a", c.get(1));
     CHECK_EQUAL(2, c.size());
-}
 
-TEST(ColumnString_Add2)
-{
-    AdaptiveStringColumn& c = db_setup_column_string::c;
+
+    // TEST(ColumnString_Add2)
+
     c.add("bb");
     CHECK_EQUAL("",   c.get(0));
     CHECK_EQUAL("a",  c.get(1));
     CHECK_EQUAL("bb", c.get(2));
     CHECK_EQUAL(3, c.size());
-}
 
-TEST(ColumnString_Add3)
-{
-    AdaptiveStringColumn& c = db_setup_column_string::c;
+
+    // TEST(ColumnString_Add3)
+
     c.add("ccc");
     CHECK_EQUAL("",    c.get(0));
     CHECK_EQUAL("a",   c.get(1));
     CHECK_EQUAL("bb",  c.get(2));
     CHECK_EQUAL("ccc", c.get(3));
     CHECK_EQUAL(4, c.size());
-}
 
-TEST(ColumnString_Add4)
-{
-    AdaptiveStringColumn& c = db_setup_column_string::c;
+
+    // TEST(ColumnString_Add4)
+
     c.add("dddd");
     CHECK_EQUAL("",     c.get(0));
     CHECK_EQUAL("a",    c.get(1));
@@ -125,11 +132,10 @@ TEST(ColumnString_Add4)
     CHECK_EQUAL("ccc",  c.get(3));
     CHECK_EQUAL("dddd", c.get(4));
     CHECK_EQUAL(5, c.size());
-}
 
-TEST(ColumnString_Add8)
-{
-    AdaptiveStringColumn& c = db_setup_column_string::c;
+
+    // TEST(ColumnString_Add8)
+
     c.add("eeeeeeee");
     CHECK_EQUAL("",     c.get(0));
     CHECK_EQUAL("a",    c.get(1));
@@ -138,11 +144,10 @@ TEST(ColumnString_Add8)
     CHECK_EQUAL("dddd", c.get(4));
     CHECK_EQUAL("eeeeeeee", c.get(5));
     CHECK_EQUAL(6, c.size());
-}
 
-TEST(ColumnString_Add16)
-{
-    AdaptiveStringColumn& c = db_setup_column_string::c;
+
+    // TEST(ColumnString_Add16)
+
     c.add("ffffffffffffffff");
     CHECK_EQUAL("",     c.get(0));
     CHECK_EQUAL("a",    c.get(1));
@@ -152,11 +157,9 @@ TEST(ColumnString_Add16)
     CHECK_EQUAL("eeeeeeee", c.get(5));
     CHECK_EQUAL("ffffffffffffffff", c.get(6));
     CHECK_EQUAL(7, c.size());
-}
 
-TEST(ColumnString_Add32)
-{
-    AdaptiveStringColumn& c = db_setup_column_string::c;
+
+    // TEST(ColumnString_Add32)
 
     c.add("gggggggggggggggggggggggggggggggg");
 
@@ -169,11 +172,9 @@ TEST(ColumnString_Add32)
     CHECK_EQUAL("ffffffffffffffff", c.get(6));
     CHECK_EQUAL("gggggggggggggggggggggggggggggggg", c.get(7));
     CHECK_EQUAL(8, c.size());
-}
 
-TEST(ColumnString_Add64)
-{
-    AdaptiveStringColumn& c = db_setup_column_string::c;
+
+    // TEST(ColumnString_Add64)
 
     // Add a string longer than 64 bytes to trigger long strings
     c.add("xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx");
@@ -188,12 +189,9 @@ TEST(ColumnString_Add64)
     CHECK_EQUAL("gggggggggggggggggggggggggggggggg", c.get(7));
     CHECK_EQUAL("xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx", c.get(8));
     CHECK_EQUAL(9, c.size());
-}
 
 
-TEST(ColumnString_Set1)
-{
-    AdaptiveStringColumn& c = db_setup_column_string::c;
+    // TEST(ColumnString_Set1)
 
     c.set(0, "ccc");
     c.set(1, "bb");
@@ -211,11 +209,9 @@ TEST(ColumnString_Set1)
     CHECK_EQUAL("ffffffffffffffff", c.get(6));
     CHECK_EQUAL("gggggggggggggggggggggggggggggggg", c.get(7));
     CHECK_EQUAL("xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx", c.get(8));
-}
 
-TEST(ColumnString_Insert1)
-{
-    AdaptiveStringColumn& c = db_setup_column_string::c;
+
+    // TEST(ColumnString_Insert1)
 
     // Insert in middle
     c.insert(4, "xx");
@@ -232,11 +228,9 @@ TEST(ColumnString_Insert1)
     CHECK_EQUAL("ffffffffffffffff", c.get(7));
     CHECK_EQUAL("gggggggggggggggggggggggggggggggg", c.get(8));
     CHECK_EQUAL("xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx", c.get(9));
-}
 
-TEST(ColumnString_Delete1)
-{
-    AdaptiveStringColumn& c = db_setup_column_string::c;
+
+    // TEST(ColumnString_Delete1)
 
     // Delete from end
     c.erase(9, 9 == c.size()-1);
@@ -252,11 +246,9 @@ TEST(ColumnString_Delete1)
     CHECK_EQUAL("eeeeeeee", c.get(6));
     CHECK_EQUAL("ffffffffffffffff", c.get(7));
     CHECK_EQUAL("gggggggggggggggggggggggggggggggg", c.get(8));
-}
 
-TEST(ColumnString_Delete2)
-{
-    AdaptiveStringColumn& c = db_setup_column_string::c;
+
+    // TEST(ColumnString_Delete2)
 
     // Delete from top
     c.erase(0, 0 == c.size()-1);
@@ -271,11 +263,9 @@ TEST(ColumnString_Delete2)
     CHECK_EQUAL("eeeeeeee", c.get(5));
     CHECK_EQUAL("ffffffffffffffff", c.get(6));
     CHECK_EQUAL("gggggggggggggggggggggggggggggggg", c.get(7));
-}
 
-TEST(ColumnString_Delete3)
-{
-    AdaptiveStringColumn& c = db_setup_column_string::c;
+
+    // TEST(ColumnString_Delete3)
 
     // Delete from middle
     c.erase(3, 3 == c.size()-1);
@@ -289,11 +279,9 @@ TEST(ColumnString_Delete3)
     CHECK_EQUAL("eeeeeeee", c.get(4));
     CHECK_EQUAL("ffffffffffffffff", c.get(5));
     CHECK_EQUAL("gggggggggggggggggggggggggggggggg", c.get(6));
-}
 
-TEST(ColumnString_DeleteAll)
-{
-    AdaptiveStringColumn& c = db_setup_column_string::c;
+
+    // TEST(ColumnString_DeleteAll)
 
     // Delete all items one at a time
     c.erase(0, 0 == c.size()-1);
@@ -312,11 +300,9 @@ TEST(ColumnString_DeleteAll)
     CHECK_EQUAL(0, c.size());
 
     CHECK(c.is_empty());
-}
 
-TEST(ColumnString_Insert2)
-{
-    AdaptiveStringColumn& c = db_setup_column_string::c;
+
+    // TEST(ColumnString_Insert2)
 
     // Create new list
     c.clear();
@@ -334,11 +320,9 @@ TEST(ColumnString_Insert2)
     CHECK_EQUAL("c",     c.get(3));
     CHECK_EQUAL("d",     c.get(4));
     CHECK_EQUAL(5, c.size());
-}
 
-TEST(ColumnString_Insert3)
-{
-    AdaptiveStringColumn& c = db_setup_column_string::c;
+
+    // TEST(ColumnString_Insert3)
 
     // Insert in middle with expansion
     c.insert(3, "xxxxxxxxxx");
@@ -350,7 +334,104 @@ TEST(ColumnString_Insert3)
     CHECK_EQUAL("c",     c.get(4));
     CHECK_EQUAL("d",     c.get(5));
     CHECK_EQUAL(6, c.size());
+
+
+    // TEST(ColumnString_SetLeafToLong)
+
+    // Test "Replace string array with long string array" when doing
+    // it through LeafSet()
+    c.clear();
+
+    {
+        Column col;
+
+        c.add("foobar");
+        c.add("bar abc");
+        c.add("baz");
+
+        c.set(1, "40 chars  40 chars  40 chars  40 chars  ");
+
+        CHECK_EQUAL(c.size(), c.size());
+        CHECK_EQUAL("foobar", c.get(0));
+        CHECK_EQUAL("40 chars  40 chars  40 chars  40 chars  ", c.get(1));
+        CHECK_EQUAL("baz", c.get(2));
+
+        col.destroy();
+    }
+
+
+    // TEST(ColumnString_SetLeafToBig)
+
+    // Test "Replace string array with long string array" when doing
+    // it through LeafSet()
+    c.clear();
+
+    {
+        Column col;
+
+        c.add("foobar");
+        c.add("bar abc");
+        c.add("baz");
+
+        c.set(1, "70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ");
+
+        CHECK_EQUAL(c.size(), c.size());
+        CHECK_EQUAL("foobar", c.get(0));
+        CHECK_EQUAL("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ",
+                    c.get(1));
+        CHECK_EQUAL("baz", c.get(2));
+
+        col.destroy();
+    }
+
+
+    // TEST(ColumnString_FindAjacentLong)
+
+    // Test against a bug where FindWithLen() would fail finding
+    // ajacent hits
+    c.clear();
+
+    {
+        Column col;
+
+        c.add("40 chars  40 chars  40 chars  40 chars  ");
+        c.add("baz");
+        c.add("baz");
+        c.add("foo");
+
+        c.find_all(col, "baz");
+
+        CHECK_EQUAL(2, col.size());
+
+        col.destroy();
+    }
+
+
+    // TEST(ColumnString_FindAjacentBig)
+
+    c.clear();
+
+    {
+        Column col;
+
+        c.add("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ");
+        c.add("baz");
+        c.add("baz");
+        c.add("foo");
+
+        c.find_all(col, "baz");
+
+        CHECK_EQUAL(2, col.size());
+
+        col.destroy();
+    }
+
+
+    // TEST(ColumnString_Destroy)
+
+    c.destroy();
 }
+
 
 TEST(ColumnString_Find1)
 {
@@ -476,7 +557,7 @@ TEST(ColumnString_AutoEnumerateIndex)
     size_t res1 = e.find_first("nonexist");
     CHECK_EQUAL(not_found, res1);
 
-    Array results;
+    Column results;
     e.find_all(results, "nonexist");
     CHECK(results.is_empty());
 
@@ -575,97 +656,10 @@ TEST(ColumnString_AutoEnumerateIndexReuse)
 #endif // !defined DISABLE_INDEX
 
 
-// Test "Replace string array with long string array" when doing it through LeafSet()
-TEST(ColumnString_SetLeafToLong)
-{
-    AdaptiveStringColumn& c = db_setup_column_string::c;
-    c.clear();
-
-    Column col;
-
-    c.add("foobar");
-    c.add("bar abc");
-    c.add("baz");
-
-    c.set(1, "40 chars  40 chars  40 chars  40 chars  ");
-
-    CHECK_EQUAL(c.size(), c.size());
-    CHECK_EQUAL("foobar", c.get(0));
-    CHECK_EQUAL("40 chars  40 chars  40 chars  40 chars  ", c.get(1));
-    CHECK_EQUAL("baz", c.get(2));
-
-    // Cleanup
-    col.destroy();
-}
-
-// Test "Replace string array with long string array" when doing it through LeafSet()
-TEST(ColumnString_SetLeafToBig)
-{
-    AdaptiveStringColumn& c = db_setup_column_string::c;
-    c.clear();
-
-    Column col;
-
-    c.add("foobar");
-    c.add("bar abc");
-    c.add("baz");
-
-    c.set(1, "70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ");
-
-    CHECK_EQUAL(c.size(), c.size());
-    CHECK_EQUAL("foobar", c.get(0));
-    CHECK_EQUAL("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ", c.get(1));
-    CHECK_EQUAL("baz", c.get(2));
-
-    // Cleanup
-    col.destroy();
-}
-
-// Test against a bug where FindWithLen() would fail finding ajacent hits
-TEST(ColumnString_FindAjacentLong)
-{
-    AdaptiveStringColumn& c = db_setup_column_string::c;
-    c.clear();
-
-    Array col;
-
-    c.add("40 chars  40 chars  40 chars  40 chars  ");
-    c.add("baz");
-    c.add("baz");
-    c.add("foo");
-
-    c.find_all(col, "baz");
-
-    CHECK_EQUAL(2, col.size());
-
-    // Cleanup
-    col.destroy();
-}
-
-TEST(ColumnString_FindAjacentBig)
-{
-    AdaptiveStringColumn& c = db_setup_column_string::c;
-    c.clear();
-
-    Array col;
-
-    c.add("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ");
-    c.add("baz");
-    c.add("baz");
-    c.add("foo");
-
-    c.find_all(col, "baz");
-
-    CHECK_EQUAL(2, col.size());
-
-    // Cleanup
-    col.destroy();
-}
-
 TEST(ColumnString_FindAllExpand)
 {
     AdaptiveStringColumn asc;
-    Array c;
+    Column c;
 
     asc.add("HEJ");
     asc.add("sdfsd");
@@ -709,7 +703,7 @@ TEST(ColumnString_FindAllExpand)
 TEST(ColumnString_FindAllRangesLong)
 {
     AdaptiveStringColumn asc;
-    Array c;
+    Column c;
 
     // 17 elements, to test node splits with TIGHTDB_MAX_LIST_SIZE = 3 or other small number
     asc.add("HEJSA"); // 0
@@ -763,7 +757,7 @@ TEST(ColumnString_FindAllRangesLong)
 TEST(ColumnString_FindAllRanges)
 {
     AdaptiveStringColumn asc;
-    Array c;
+    Column c;
 
     // 17 elements, to test node splits with TIGHTDB_MAX_LIST_SIZE = 3 or other small number
     asc.add("HEJSA"); // 0
@@ -836,19 +830,16 @@ TEST(ColumnString_Count)
     asc.add("15");
     asc.add("HEJSA"); // 16
 
-    const size_t count = asc.count("HEJSA");
-    CHECK_EQUAL(9, count);
+    CHECK_EQUAL(9, asc.count("HEJSA"));
 
     // Create StringEnum
     size_t keys;
     size_t values;
-    const bool res = asc.auto_enumerate(keys, values);
-    CHECK(res);
+    CHECK(asc.auto_enumerate(keys, values));
     ColumnStringEnum e(keys, values);
 
     // Check that enumerated column return same result
-    const size_t ecount = e.count("HEJSA");
-    CHECK_EQUAL(9, ecount);
+    CHECK_EQUAL(9, e.count("HEJSA"));
 
     // Clean-up
     asc.destroy();
@@ -889,19 +880,19 @@ TEST(ColumnString_Index)
     static_cast<void>(ndx);
 #endif
 
-    const size_t count0 = asc.count("HEJ");
-    const size_t count1 = asc.count("HEJSA");
-    const size_t count2 = asc.count("1");
-    const size_t count3 = asc.count("15");
+    size_t count0 = asc.count("HEJ");
+    size_t count1 = asc.count("HEJSA");
+    size_t count2 = asc.count("1");
+    size_t count3 = asc.count("15");
     CHECK_EQUAL(0, count0);
     CHECK_EQUAL(9, count1);
     CHECK_EQUAL(1, count2);
     CHECK_EQUAL(1, count3);
 
-    const size_t ndx0 = asc.find_first("HEJS");
-    const size_t ndx1 = asc.find_first("HEJSA");
-    const size_t ndx2 = asc.find_first("1");
-    const size_t ndx3 = asc.find_first("15");
+    size_t ndx0 = asc.find_first("HEJS");
+    size_t ndx1 = asc.find_first("HEJSA");
+    size_t ndx2 = asc.find_first("1");
+    size_t ndx3 = asc.find_first("15");
     CHECK_EQUAL(not_found, ndx0);
     CHECK_EQUAL(0, ndx1);
     CHECK_EQUAL(1, ndx2);
@@ -910,10 +901,10 @@ TEST(ColumnString_Index)
     // Set some values
     asc.set(1, "one");
     asc.set(15, "fifteen");
-    const size_t set1 = asc.find_first("1");
-    const size_t set2 = asc.find_first("15");
-    const size_t set3 = asc.find_first("one");
-    const size_t set4 = asc.find_first("fifteen");
+    size_t set1 = asc.find_first("1");
+    size_t set2 = asc.find_first("15");
+    size_t set3 = asc.find_first("one");
+    size_t set4 = asc.find_first("fifteen");
     CHECK_EQUAL(not_found, set1);
     CHECK_EQUAL(not_found, set2);
     CHECK_EQUAL(1, set3);
@@ -923,9 +914,9 @@ TEST(ColumnString_Index)
     asc.insert(0, "top");
     asc.insert(8, "middle");
     asc.add("bottom");
-    const size_t ins1 = asc.find_first("top");
-    const size_t ins2 = asc.find_first("middle");
-    const size_t ins3 = asc.find_first("bottom");
+    size_t ins1 = asc.find_first("top");
+    size_t ins2 = asc.find_first("middle");
+    size_t ins3 = asc.find_first("bottom");
     CHECK_EQUAL(0, ins1);
     CHECK_EQUAL(8, ins2);
     CHECK_EQUAL(19, ins3);
@@ -934,11 +925,11 @@ TEST(ColumnString_Index)
     asc.erase(0,  0  == asc.size()-1);  // top
     asc.erase(7,  7  == asc.size()-1);  // middle
     asc.erase(17, 17 == asc.size()-1); // bottom
-    const size_t del1 = asc.find_first("top");
-    const size_t del2 = asc.find_first("middle");
-    const size_t del3 = asc.find_first("bottom");
-    const size_t del4 = asc.find_first("HEJSA");
-    const size_t del5 = asc.find_first("fifteen");
+    size_t del1 = asc.find_first("top");
+    size_t del2 = asc.find_first("middle");
+    size_t del3 = asc.find_first("bottom");
+    size_t del4 = asc.find_first("HEJSA");
+    size_t del5 = asc.find_first("fifteen");
     CHECK_EQUAL(not_found, del1);
     CHECK_EQUAL(not_found, del2);
     CHECK_EQUAL(not_found, del3);
@@ -947,8 +938,8 @@ TEST(ColumnString_Index)
 
     // Remove all
     asc.clear();
-    const size_t c1 = asc.find_first("HEJSA");
-    const size_t c2 = asc.find_first("fifteen");
+    size_t c1 = asc.find_first("HEJSA");
+    size_t c2 = asc.find_first("fifteen");
     CHECK_EQUAL(not_found, c1);
     CHECK_EQUAL(not_found, c2);
 
@@ -957,14 +948,5 @@ TEST(ColumnString_Index)
 }
 
 #endif // !defined DISABLE_INDEX
-
-
-TEST(ColumnString_Destroy)
-{
-    AdaptiveStringColumn& c = db_setup_column_string::c;
-
-    // clean up (ALWAYS PUT THIS LAST)
-    c.destroy();
-}
 
 #endif // TEST_COLUMN_STRING

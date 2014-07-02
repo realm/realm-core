@@ -1,11 +1,11 @@
-
+#include <tightdb/util/features.h>
 #include <tightdb/version.hpp>
 
 using namespace tightdb;
 using namespace std;
 
 
-string Version::get_version() 
+string Version::get_version()
 {
     stringstream ss;
     ss << get_major() << "." << get_minor() << "." << get_patch();

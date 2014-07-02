@@ -14,20 +14,52 @@
 #endif
 
 #include <tightdb.hpp>
+#include <tightdb/util/features.h>
+#include <tightdb/util/safe_int_ops.hpp>
+#include <tightdb/util/unique_ptr.hpp>
 #include <tightdb/util/bind.hpp>
 #include <tightdb/util/terminate.hpp>
 #include <tightdb/util/file.hpp>
 #include <tightdb/util/thread.hpp>
+#include "util/thread_wrapper.hpp"
 
-#include "util/unit_test.hpp"
-#include "util/test_only.hpp"
+#include "test.hpp"
 
 using namespace std;
 using namespace tightdb;
 using namespace tightdb::util;
+using namespace tightdb::test_util;
+using unit_test::TestResults;
 
-// Note: You can now temporarely declare unit tests with the ONLY(TestName) macro instead of TEST(TestName). This
-// will disable all unit tests except these. Remember to undo your temporary changes before committing.
+
+// Test independence and thread-safety
+// -----------------------------------
+//
+// All tests must be thread safe and independent of each other. This
+// is required because it allows for both shuffling of the execution
+// order and for parallelized testing.
+//
+// In particular, avoid using std::rand() since it is not guaranteed
+// to be thread safe. Instead use the API offered in
+// `test/util/random.hpp`.
+//
+// All files created in tests must use the TEST_PATH macro (or one of
+// its friends) to obtain a suitable file system path. See
+// `test/util/test_path.hpp`.
+//
+//
+// Debugging and the ONLY() macro
+// ------------------------------
+//
+// A simple way of disabling all tests except one called `Foo`, is to
+// replace TEST(Foo) with ONLY(Foo) and then recompile and rerun the
+// test suite. Note that you can also use filtering by setting the
+// environment varible `UNITTEST_FILTER`. See `README.md` for more on
+// this.
+//
+// Another way to debug a particular test, is to copy that test into
+// `experiments/testcase.cpp` and then run `sh build.sh
+// check-testcase` (or one of its friends) from the command line.
 
 
 TEST(Shared_Unattached)
@@ -37,6 +69,12 @@ TEST(Shared_Unattached)
 
 
 namespace {
+
+#if TIGHTDB_ANDROID
+bool allow_async = false;
+#else
+bool allow_async = true;
+#endif
 
 TIGHTDB_TABLE_4(TestTableShared,
                 first,  Int,
@@ -49,67 +87,51 @@ TIGHTDB_TABLE_4(TestTableShared,
 
 TEST(Shared_NoCreateCleanupLockFileAfterFailure)
 {
-    // Delete old files if there
-    File::try_remove("test_shared.tightdb");
-    File::try_remove("test_shared.tightdb.lock"); // also the info file
-    bool ok = false;
-    try {
-        SharedGroup sg("test_shared.tightdb", true, SharedGroup::durability_Full);
-        // Expect exception here (due to no_create=true above)
-        CHECK(false);
-    }
-    catch (runtime_error &) {
-        ok = true;
-    }
-    CHECK(ok);
+    SHARED_GROUP_TEST_PATH(path);
 
-    // Verify no .lock file is left.
-    CHECK( !File::exists("test_shared.tightdb") );
-    CHECK( !File::exists("test_shared.tightdb.lock") );    //     <========= FAILS
+    bool no_create = true;
+    CHECK_THROW(SharedGroup(path, no_create, SharedGroup::durability_Full), File::NotFound);
+
+    CHECK(!File::exists(path));
+
+    // Verify that the `lock` file is not left behind
+    CHECK(!File::exists(path.get_lock_path()));
 }
 
-
+// FIXME: The following test seems really weird. The previous test
+// checks that no `lock` file is left behind, yet this test seems to
+// anticipate a case where it is left behind. What is going on?
 TEST(Shared_NoCreateCleanupLockFileAfterFailure2)
 {
-    // Delete old files if there
-    File::try_remove("test_shared.tightdb");
-    File::try_remove("test_shared.tightdb.lock"); // also the info file
-    bool ok = false;
-    try {
-        SharedGroup sg("test_shared.tightdb", true, SharedGroup::durability_Full);
-        // Expect exception here (due to no_create=true above)
-        CHECK(false);
-    }
-    catch (runtime_error &) {
-        ok = true;
-    }
-    CHECK(ok);
+    SHARED_GROUP_TEST_PATH(path);
 
-    CHECK( !File::exists("test_shared.tightdb") );
-    if (File::exists("test_shared.tightdb.lock") )
-    {
+    bool no_create = true;
+    CHECK_THROW(SharedGroup(path, no_create, SharedGroup::durability_Full), File::NotFound);
+
+    CHECK(!File::exists(path));
+
+    if (!File::exists(path.get_lock_path())) {
         try {
-            // Let's see if any leftover .lock file is correctly removed or reinitialized
-            SharedGroup sg("test_shared.tightdb", false, SharedGroup::durability_Full);
+            // Let's see if any leftover `lock` file is correctly removed or reinitialized
+            no_create = false;
+            SharedGroup sg(path, no_create, SharedGroup::durability_Full);
         }
-        catch (runtime_error &) {
+        catch (runtime_error&) {
             CHECK(false);
         }
     }
-    CHECK( !File::exists("test_shared.tightdb.lock") );
 
+    // Verify that the `lock` file is not left behind
+    CHECK(!File::exists(path.get_lock_path()));
 }
 
 
 TEST(Shared_Initial)
 {
-    // Delete old files if there
-    File::try_remove("test_shared.tightdb");
-    File::try_remove("test_shared.tightdb.lock"); // also the info file
-
+    SHARED_GROUP_TEST_PATH(path);
     {
         // Create a new shared db
-        SharedGroup sg("test_shared.tightdb");
+        SharedGroup sg(path);
 
         // Verify that new group is empty
         {
@@ -117,36 +139,26 @@ TEST(Shared_Initial)
             CHECK(rt.get_group().is_empty());
         }
 
-#ifdef TIGHTDB_DEBUG
-        // Also do a basic ringbuffer test
-        sg.test_ringbuf();
-#endif
     }
 
-    // Verify that lock file was deleted after use
-    CHECK(!File::exists("test_shared.tightdb.lock"));
+    // Verify that the `lock` file is not left behind
+    CHECK(!File::exists(path.get_lock_path()));
 }
 
 
 TEST(Shared_StaleLockFileFaked)
 {
-    // Delete old files if there
-    File::try_remove("test_shared.tightdb");
-    File::try_remove("test_shared.tightdb.lock"); // also the info file
-    bool ok = false;
+    SHARED_GROUP_TEST_PATH(path);
     {
         // create fake lock file
-        std::ofstream dst("test_shared.tightdb.lock", std::ios::binary);
+        File lock(path.get_lock_path(), File::mode_Write);
         const char buf[] = { 0, 0, 0, 0 };
-        dst.write(buf, 4);
+        lock.write(buf);
     }
-    try {
-        SharedGroup sg("test_shared.tightdb", false, SharedGroup::durability_Full);
-    }
-    catch (SharedGroup::PresumablyStaleLockFile& ) {
-        ok = true; // this should happen on all platforms
-    }
-    CHECK(ok);
+    bool no_create = false;
+    CHECK_THROW(SharedGroup(path, no_create, SharedGroup::durability_Full),
+                SharedGroup::PresumablyStaleLockFile);
+    File::try_remove(path.get_lock_path());
 }
 
 
@@ -154,48 +166,46 @@ TEST(Shared_StaleLockFileFaked)
 // At the moment this test does not work on windows when run as a virtual machine.
 TEST(Shared_StaleLockFileRenamed)
 {
-    // Delete old files if there
-    File::try_remove("test_shared.tightdb");
-    File::try_remove("test_shared.tightdb.lock"); // also the info file
-
+    SHARED_GROUP_TEST_PATH(path);
+    string lock_path   = path.get_lock_path();
+    string lock_path_2 = path.get_lock_path() + ".backup";
+    File::try_remove(lock_path_2);
+    bool no_create = false;
     {
         // create lock file
-        SharedGroup sg("test_shared.tightdb", false, SharedGroup::durability_Full);
+        SharedGroup sg(path, no_create, SharedGroup::durability_Full);
 #ifdef _WIN32
-        const char* a = "test_shared.tightdb.lock.backup";
-        const char* b = "test_shared.tightdb.lock";
-        if (!CreateHardLinkA(a, b, NULL)) {  // requires ntfs to work
+        // Requires ntfs to work
+        if (!CreateHardLinkA(lock_path_2.c_str(), lock_path.c_str(), 0)) {
             cerr << "Creating a hard link failed, test abandoned" << endl;
             return;
         }
 #else
-        if (link("test_shared.tightdb.lock","test_shared.tightdb.lock.backup")) {
+        if (link(lock_path.c_str(), lock_path_2.c_str())) {
             cerr << "Creating a hard link failed, test abandoned" << endl;
             return;
-        };
+        }
 #endif
     }
-    rename("test_shared.tightdb.lock.backup","test_shared.tightdb.lock");
-    try {
-        SharedGroup sg("test_shared.tightdb", false, SharedGroup::durability_Full);
+    File::move(lock_path_2, lock_path);
+    // FIXME: Why is it ok to replace the lock file with a new file?
+    // Why must it be ok? Explanation is needed here!
+    {
+        SharedGroup sg(path, no_create, SharedGroup::durability_Full);
     }
-    catch (SharedGroup::PresumablyStaleLockFile&) {
-        CHECK(false);
-    }
-    // lock file should be gone when we get here:
-    CHECK(File::exists("test_shared.tightdb.lock") == false);
+
+    // Verify that the `lock` file is not left behind
+    CHECK(!File::exists(lock_path));
 }
 
 
 TEST(Shared_InitialMem)
 {
-    // Delete old files if there
-    File::try_remove("test_shared.tightdb");
-    File::try_remove("test_shared.tightdb.lock"); // also the info file
-
+    SHARED_GROUP_TEST_PATH(path);
     {
         // Create a new shared db
-        SharedGroup sg("test_shared.tightdb", false, SharedGroup::durability_MemOnly);
+        bool no_create = false;
+        SharedGroup sg(path, no_create, SharedGroup::durability_MemOnly);
 
         // Verify that new group is empty
         {
@@ -203,32 +213,27 @@ TEST(Shared_InitialMem)
             CHECK(rt.get_group().is_empty());
         }
 
-#ifdef TIGHTDB_DEBUG
-        // Also do a basic ringbuffer test
-        sg.test_ringbuf();
-#endif
     }
 
-    // Verify that both db and lock file was deleted after use
-    CHECK(!File::exists("test_shared.tightdb"));
-    CHECK(!File::exists("test_shared.tightdb.lock"));
+    // In MemOnly mode, the database file must be automatically
+    // removed.
+    CHECK(!File::exists(path));
 
+    // Verify that the `lock` file is not left behind
+    CHECK(!File::exists(path.get_lock_path()));
 }
 
 
 TEST(Shared_Initial2)
 {
-    // Delete old files if there
-    File::try_remove("test_shared.tightdb");
-    File::try_remove("test_shared.tightdb.lock"); // also the info file
-
+    SHARED_GROUP_TEST_PATH(path);
     {
         // Create a new shared db
-        SharedGroup sg("test_shared.tightdb");
+        SharedGroup sg(path);
 
         {
             // Open the same db again (in empty state)
-            SharedGroup sg2("test_shared.tightdb");
+            SharedGroup sg2(path);
 
             // Verify that new group is empty
             {
@@ -259,24 +264,22 @@ TEST(Shared_Initial2)
         }
     }
 
-    // Verify that lock file was deleted after use
-    CHECK(!File::exists("test_shared.tightdb.lock"));
+    // Verify that the `lock` file is not left behind
+    CHECK(!File::exists(path.get_lock_path()));
 }
 
 
 TEST(Shared_Initial2_Mem)
 {
-    // Delete old files if there
-    File::try_remove("test_shared.tightdb");
-    File::try_remove("test_shared.tightdb.lock"); // also the info file
-
+    SHARED_GROUP_TEST_PATH(path);
     {
         // Create a new shared db
-        SharedGroup sg("test_shared.tightdb", false, SharedGroup::durability_MemOnly);
+        bool no_create = false;
+        SharedGroup sg(path, no_create, SharedGroup::durability_MemOnly);
 
         {
             // Open the same db again (in empty state)
-            SharedGroup sg2("test_shared.tightdb", false, SharedGroup::durability_MemOnly);
+            SharedGroup sg2(path, no_create, SharedGroup::durability_MemOnly);
 
             // Verify that new group is empty
             {
@@ -307,20 +310,17 @@ TEST(Shared_Initial2_Mem)
         }
     }
 
-    // Verify that both db and lock file was deleted after use
-    CHECK(!File::exists("test_shared.tightdb"));
-    CHECK(!File::exists("test_shared.tightdb.lock"));
+    // Verify that the `lock` file is not left behind
+    CHECK(!File::exists(path.get_lock_path()));
 }
+
 
 TEST(Shared_1)
 {
-    // Delete old files if there
-    File::try_remove("test_shared.tightdb");
-    File::try_remove("test_shared.tightdb.lock"); // also the info file
-
+    SHARED_GROUP_TEST_PATH(path);
     {
         // Create a new shared db
-        SharedGroup sg("test_shared.tightdb");
+        SharedGroup sg(path);
 
         // Create first table in group
         {
@@ -332,7 +332,7 @@ TEST(Shared_1)
         }
 
         // Open same db again
-        SharedGroup sg2("test_shared.tightdb");
+        SharedGroup sg2(path);
         {
             ReadTransaction rt(sg2);
             rt.get_group().Verify();
@@ -404,18 +404,15 @@ TEST(Shared_1)
     }
 
     // Verify that lock file was deleted after use
-    CHECK(!File::exists("test_shared.tightdb.lock"));
+    CHECK(!File::exists(path.get_lock_path()));
 }
 
 TEST(Shared_Rollback)
 {
-    // Delete old files if there
-    File::try_remove("test_shared.tightdb");
-    File::try_remove("test_shared.tightdb.lock"); // also the info file
-
+    SHARED_GROUP_TEST_PATH(path);
     {
         // Create a new shared db
-        SharedGroup sg("test_shared.tightdb");
+        SharedGroup sg(path);
 
         // Create first table in group (but rollback)
         {
@@ -477,18 +474,15 @@ TEST(Shared_Rollback)
     }
 
     // Verify that lock file was deleted after use
-    CHECK(!File::exists("test_shared.tightdb.lock"));
+    CHECK(!File::exists(path.get_lock_path()));
 }
 
 TEST(Shared_Writes)
 {
-    // Delete old files if there
-    File::try_remove("test_shared.tightdb");
-    File::try_remove("test_shared.tightdb.lock"); // also the info file
-
+    SHARED_GROUP_TEST_PATH(path);
     {
         // Create a new shared db
-        SharedGroup sg("test_shared.tightdb");
+        SharedGroup sg(path);
 
         // Create first table in group
         {
@@ -519,134 +513,118 @@ TEST(Shared_Writes)
     }
 
     // Verify that lock file was deleted after use
-    CHECK(!File::exists("test_shared.tightdb.lock"));
+    CHECK(!File::exists(path.get_lock_path()));
 }
 
 
 TEST(Shared_AddColumnToSubspec)
 {
-    File::try_remove("test.tightdb");
-    File::try_remove("test.tightdb.lock");
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg(path);
 
+    // Create table with a non-empty subtable
     {
-        SharedGroup sg("test.tightdb");
-
-        // Create table with a non-empty subtable
-        {
-            WriteTransaction wt(sg);
-            TableRef table = wt.get_table("table");
-            DescriptorRef sub_1;
-            table->add_column(type_Table, "subtable", &sub_1);
-            sub_1->add_column(type_Int,   "int");
-            table->add_empty_row();
-            TableRef subtable = table->get_subtable(0,0);
-            subtable->add_empty_row();
-            subtable->set_int(0, 0, 789);
-            wt.commit();
-        }
-
-        // Modify subtable spec, then access the subtable. This is to
-        // see that the subtable column accessor continues to work
-        // after the subspec has been modified.
-        {
-            WriteTransaction wt(sg);
-            TableRef table = wt.get_table("table");
-            DescriptorRef subdesc = table->get_subdescriptor(0);
-            subdesc->add_column(type_Int, "int_2");
-            TableRef subtable = table->get_subtable(0,0);
-            CHECK_EQUAL(2, subtable->get_column_count());
-            CHECK_EQUAL(type_Int, subtable->get_column_type(0));
-            CHECK_EQUAL(type_Int, subtable->get_column_type(1));
-            CHECK_EQUAL(1, subtable->size());
-            CHECK_EQUAL(789, subtable->get_int(0,0));
-            subtable->add_empty_row();
-            CHECK_EQUAL(2, subtable->size());
-            subtable->set_int(1, 1, 654);
-            CHECK_EQUAL(654, subtable->get_int(1,1));
-            wt.commit();
-        }
-
-        // Check that the subtable continues to have the right
-        // contents
-        {
-            ReadTransaction rt(sg);
-            ConstTableRef table = rt.get_table("table");
-            ConstTableRef subtable = table->get_subtable(0,0);
-            CHECK_EQUAL(2, subtable->get_column_count());
-            CHECK_EQUAL(type_Int, subtable->get_column_type(0));
-            CHECK_EQUAL(type_Int, subtable->get_column_type(1));
-            CHECK_EQUAL(2, subtable->size());
-            CHECK_EQUAL(789, subtable->get_int(0,0));
-            CHECK_EQUAL(0,   subtable->get_int(0,1));
-            CHECK_EQUAL(0,   subtable->get_int(1,0));
-            CHECK_EQUAL(654, subtable->get_int(1,1));
-        }
+        WriteTransaction wt(sg);
+        TableRef table = wt.get_table("table");
+        DescriptorRef sub_1;
+        table->add_column(type_Table, "subtable", &sub_1);
+        sub_1->add_column(type_Int,   "int");
+        table->add_empty_row();
+        TableRef subtable = table->get_subtable(0,0);
+        subtable->add_empty_row();
+        subtable->set_int(0, 0, 789);
+        wt.commit();
     }
 
-    File::remove("test.tightdb");
+    // Modify subtable spec, then access the subtable. This is to see
+    // that the subtable column accessor continues to work after the
+    // subspec has been modified.
+    {
+        WriteTransaction wt(sg);
+        TableRef table = wt.get_table("table");
+        DescriptorRef subdesc = table->get_subdescriptor(0);
+        subdesc->add_column(type_Int, "int_2");
+        TableRef subtable = table->get_subtable(0,0);
+        CHECK_EQUAL(2, subtable->get_column_count());
+        CHECK_EQUAL(type_Int, subtable->get_column_type(0));
+        CHECK_EQUAL(type_Int, subtable->get_column_type(1));
+        CHECK_EQUAL(1, subtable->size());
+        CHECK_EQUAL(789, subtable->get_int(0,0));
+        subtable->add_empty_row();
+        CHECK_EQUAL(2, subtable->size());
+        subtable->set_int(1, 1, 654);
+        CHECK_EQUAL(654, subtable->get_int(1,1));
+        wt.commit();
+    }
+
+    // Check that the subtable continues to have the right contents
+    {
+        ReadTransaction rt(sg);
+        ConstTableRef table = rt.get_table("table");
+        ConstTableRef subtable = table->get_subtable(0,0);
+        CHECK_EQUAL(2, subtable->get_column_count());
+        CHECK_EQUAL(type_Int, subtable->get_column_type(0));
+        CHECK_EQUAL(type_Int, subtable->get_column_type(1));
+        CHECK_EQUAL(2, subtable->size());
+        CHECK_EQUAL(789, subtable->get_int(0,0));
+        CHECK_EQUAL(0,   subtable->get_int(0,1));
+        CHECK_EQUAL(0,   subtable->get_int(1,0));
+        CHECK_EQUAL(654, subtable->get_int(1,1));
+    }
 }
 
 
 TEST(Shared_RemoveColumnBeforeSubtableColumn)
 {
-    File::try_remove("test.tightdb");
-    File::try_remove("test.tightdb.lock");
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg(path);
 
+    // Create table with a non-empty subtable in a subtable column
+    // that is preceded by another column
     {
-        SharedGroup sg("test.tightdb");
-
-        // Create table with a non-empty subtable in a subtable column
-        // that is preceded by another column
-        {
-            WriteTransaction wt(sg);
-            DescriptorRef sub_1;
-            TableRef table = wt.get_table("table");
-            table->add_column(type_Int,   "int");
-            table->add_column(type_Table, "subtable", &sub_1);
-            sub_1->add_column(type_Int,   "int");
-            table->add_empty_row();
-            TableRef subtable = table->get_subtable(1,0);
-            subtable->add_empty_row();
-            subtable->set_int(0, 0, 789);
-            wt.commit();
-        }
-
-        // Remove a column that precedes the subtable column
-        {
-            WriteTransaction wt(sg);
-            TableRef table = wt.get_table("table");
-            table->remove_column(0);
-            TableRef subtable = table->get_subtable(0,0);
-            CHECK_EQUAL(1, subtable->get_column_count());
-            CHECK_EQUAL(type_Int, subtable->get_column_type(0));
-            CHECK_EQUAL(1, subtable->size());
-            CHECK_EQUAL(789, subtable->get_int(0,0));
-            subtable->add_empty_row();
-            CHECK_EQUAL(2, subtable->size());
-            subtable->set_int(0, 1, 654);
-            CHECK_EQUAL(654, subtable->get_int(0,1));
-            wt.commit();
-        }
-
-        // Check that the subtable continues to have the right
-        // contents
-        {
-            ReadTransaction rt(sg);
-            ConstTableRef table = rt.get_table("table");
-            ConstTableRef subtable = table->get_subtable(0,0);
-            CHECK_EQUAL(1, subtable->get_column_count());
-            CHECK_EQUAL(type_Int, subtable->get_column_type(0));
-            CHECK_EQUAL(2, subtable->size());
-            CHECK_EQUAL(789, subtable->get_int(0,0));
-            CHECK_EQUAL(654, subtable->get_int(0,1));
-        }
+        WriteTransaction wt(sg);
+        DescriptorRef sub_1;
+        TableRef table = wt.get_table("table");
+        table->add_column(type_Int,   "int");
+        table->add_column(type_Table, "subtable", &sub_1);
+        sub_1->add_column(type_Int,   "int");
+        table->add_empty_row();
+        TableRef subtable = table->get_subtable(1,0);
+        subtable->add_empty_row();
+        subtable->set_int(0, 0, 789);
+        wt.commit();
     }
 
-    File::remove("test.tightdb");
+    // Remove a column that precedes the subtable column
+    {
+        WriteTransaction wt(sg);
+        TableRef table = wt.get_table("table");
+        table->remove_column(0);
+        TableRef subtable = table->get_subtable(0,0);
+        CHECK_EQUAL(1, subtable->get_column_count());
+        CHECK_EQUAL(type_Int, subtable->get_column_type(0));
+        CHECK_EQUAL(1, subtable->size());
+        CHECK_EQUAL(789, subtable->get_int(0,0));
+        subtable->add_empty_row();
+        CHECK_EQUAL(2, subtable->size());
+        subtable->set_int(0, 1, 654);
+        CHECK_EQUAL(654, subtable->get_int(0,1));
+        wt.commit();
+    }
+
+    // Check that the subtable continues to have the right contents
+    {
+        ReadTransaction rt(sg);
+        ConstTableRef table = rt.get_table("table");
+        ConstTableRef subtable = table->get_subtable(0,0);
+        CHECK_EQUAL(1, subtable->get_column_count());
+        CHECK_EQUAL(type_Int, subtable->get_column_type(0));
+        CHECK_EQUAL(2, subtable->size());
+        CHECK_EQUAL(789, subtable->get_int(0,0));
+        CHECK_EQUAL(654, subtable->get_int(0,1));
+    }
 }
 
-
-#if TEST_DURATION > 0
 
 TEST(Shared_ManyReaders)
 {
@@ -679,10 +657,10 @@ TEST(Shared_ManyReaders)
     for (int round = 0; round < num_rounds; ++round) {
         int N = rounds[round];
 
-        File::try_remove("test.tightdb");
-        File::try_remove("test.tightdb.lock");
+        SHARED_GROUP_TEST_PATH(path);
 
-        SharedGroup root_sg("test.tightdb", false, SharedGroup::durability_MemOnly);
+        bool no_create = false;
+        SharedGroup root_sg(path, no_create, SharedGroup::durability_MemOnly);
 
         // Add two tables
         {
@@ -700,7 +678,7 @@ TEST(Shared_ManyReaders)
 
         // Create 8*N shared group accessors
         for (int i = 0; i < 8*N; ++i)
-            shared_groups[i].reset(new SharedGroup("test.tightdb", false, SharedGroup::durability_MemOnly));
+            shared_groups[i].reset(new SharedGroup(path, no_create, SharedGroup::durability_MemOnly));
 
         // Initiate 2*N read transactions with progressive changes
         for (int i = 0; i < 2*N; ++i) {
@@ -870,7 +848,7 @@ TEST(Shared_ManyReaders)
 
         // Check final state via new shared group
         {
-            SharedGroup sg("test.tightdb", false, SharedGroup::durability_MemOnly);
+            SharedGroup sg(path, no_create, SharedGroup::durability_MemOnly);
             ReadTransaction rt(sg);
             rt.get_group().Verify();
             ConstTableRef test_1 = rt.get_table("test_1");
@@ -887,7 +865,7 @@ TEST(Shared_ManyReaders)
         }
     }
 }
-#endif
+
 
 namespace {
 
@@ -897,10 +875,8 @@ TIGHTDB_TABLE_1(MyTable_SpecialOrder, first,  Int)
 
 TEST(Shared_WritesSpecialOrder)
 {
-    File::try_remove("test.tightdb");
-    File::try_remove("test.tightdb.lock");
-
-    SharedGroup sg("test.tightdb");
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg(path);
 
     const int num_rows = 5; // FIXME: Should be strictly greater than TIGHTDB_MAX_LIST_SIZE, but that takes a loooooong time!
     const int num_reps = 25;
@@ -940,10 +916,12 @@ TEST(Shared_WritesSpecialOrder)
 
 namespace  {
 
-void increment_entry_thread(size_t row_ndx)
+void writer_threads_thread(TestResults* test_results_ptr, string path, size_t row_ndx)
 {
+    TestResults& test_results = *test_results_ptr;
+
     // Open shared db
-    SharedGroup sg("test_shared.tightdb");
+    SharedGroup sg(path);
 
     for (size_t i = 0; i < 100; ++i) {
         // Increment cell
@@ -979,38 +957,31 @@ void increment_entry_thread(size_t row_ndx)
 
 TEST(Shared_WriterThreads)
 {
-    // Delete old files if there
-    File::try_remove("test_shared.tightdb");
-    File::try_remove("test_shared.tightdb.lock"); // also the info file
-
+    SHARED_GROUP_TEST_PATH(path);
     {
         // Create a new shared db
-        SharedGroup sg("test_shared.tightdb");
+        SharedGroup sg(path);
 
         const size_t thread_count = 10;
-
         // Create first table in group
         {
             WriteTransaction wt(sg);
             wt.get_group().Verify();
             TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
-            for (size_t i = 0; i < thread_count; ++i) {
+            for (size_t i = 0; i < thread_count; ++i)
                 t1->add(0, 2, false, "test");
-            }
             wt.commit();
         }
 
         Thread threads[thread_count];
 
         // Create all threads
-        for (size_t i = 0; i < thread_count; ++i) {
-            threads[i].start(bind(&increment_entry_thread, i));
-        }
+        for (size_t i = 0; i < thread_count; ++i)
+            threads[i].start(bind(&writer_threads_thread, &test_results, string(path), i));
 
         // Wait for all threads to complete
-        for (size_t i = 0; i < thread_count; ++i) {
+        for (size_t i = 0; i < thread_count; ++i)
             threads[i].join();
-        }
 
         // Verify that the changes were made
         {
@@ -1026,7 +997,7 @@ TEST(Shared_WriterThreads)
     }
 
     // Verify that lock file was deleted after use
-    CHECK(!File::exists("test_shared.tightdb.lock"));
+    CHECK(!File::exists(path.get_lock_path()));
 }
 
 
@@ -1042,7 +1013,7 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
     // This test can only be conducted by spawning independent
     // processes which can then be terminated individually.
 
-    File::try_remove("test.tightdb");
+    SHARED_GROUP_TEST_PATH(path);
 
     for (int i = 0; i < 10; ++i) {
         pid_t pid = fork();
@@ -1050,7 +1021,7 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
             TIGHTDB_TERMINATE("fork() failed");
         if (pid == 0) {
             // Child
-            SharedGroup sg("test.tightdb");
+            SharedGroup sg(path);
             WriteTransaction wt(sg);
             wt.get_group().Verify();
             TableRef table = wt.get_table("alpha");
@@ -1071,7 +1042,7 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
 
         // Check that we can continue without dead-locking
         {
-            SharedGroup sg("test.tightdb");
+            SharedGroup sg(path);
             WriteTransaction wt(sg);
             wt.get_group().Verify();
             TableRef table = wt.get_table("beta");
@@ -1086,7 +1057,7 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
     }
 
     {
-        SharedGroup sg("test.tightdb");
+        SharedGroup sg(path);
         ReadTransaction rt(sg);
         rt.get_group().Verify();
         CHECK(!rt.has_table("alpha"));
@@ -1094,8 +1065,6 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
         ConstTableRef table = rt.get_table("beta");
         CHECK_EQUAL(10, table->get_int(0,0));
     }
-
-    File::remove("test.tightdb");
 }
 
 #endif // defined TEST_ROBUSTNESS && defined ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE
@@ -1103,9 +1072,8 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
 
 TEST(Shared_FormerErrorCase1)
 {
-    File::try_remove("test_shared.tightdb");
-    File::try_remove("test_shared.tightdb.lock");
-    SharedGroup sg("test_shared.tightdb");
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg(path);
     {
         DescriptorRef sub_1, sub_2;
         WriteTransaction wt(sg);
@@ -1254,11 +1222,9 @@ TIGHTDB_TABLE_1(FormerErrorCase2_Table,
 
 TEST(Shared_FormerErrorCase2)
 {
-    File::try_remove("test_shared.tightdb");
-    File::try_remove("test_shared.tightdb.lock");
-
+    SHARED_GROUP_TEST_PATH(path);
     for (int i=0; i<10; ++i) {
-        SharedGroup sg("test_shared.tightdb");
+        SharedGroup sg(path);
         {
             WriteTransaction wt(sg);
             wt.get_group().Verify();
@@ -1286,121 +1252,110 @@ TIGHTDB_TABLE_1(OverAllocTable,
 TEST(Shared_SpaceOveruse)
 {
 #if TEST_DURATION < 1
-    const int n_outer = 300;
-    const int n_inner = 21;
+    int n_outer = 300;
+    int n_inner = 21;
 #else
-    const int n_outer = 3000;
-    const int n_inner = 42;
+    int n_outer = 3000;
+    int n_inner = 42;
 #endif
 
     // Many transactions
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg(path);
+
+    // Do a lot of sequential transactions
+    for (int i = 0; i != n_outer; ++i) {
+        WriteTransaction wt(sg);
+        wt.get_group().Verify();
+        OverAllocTable::Ref table = wt.get_table<OverAllocTable>("my_table");
+        for (int j = 0; j != n_inner; ++j)
+            table->add("x");
+        wt.commit();
+    }
+
+    // Verify that all was added correctly
     {
-        File::try_remove("over_alloc_1.tightdb");
-        File::try_remove("over_alloc_1.tightdb.lock");
-        SharedGroup sg("over_alloc_1.tightdb");
+        ReadTransaction rt(sg);
+        rt.get_group().Verify();
+        OverAllocTable::ConstRef table = rt.get_table<OverAllocTable>("my_table");
 
-        // Do a lot of sequential transactions
-        for (int i = 0; i < n_outer; ++i) {
-            WriteTransaction wt(sg);
-            wt.get_group().Verify();
-            OverAllocTable::Ref table = wt.get_table<OverAllocTable>("my_table");
-            for (int j = 0; j < n_inner; ++j) {
-                table->add("x");
-            }
-            wt.commit();
-        }
+        size_t n = table->size();
+        CHECK_EQUAL(n_outer * n_inner, n);
 
-        // Verify that all was added correctly
-        {
-            ReadTransaction rt(sg);
-            rt.get_group().Verify();
-            OverAllocTable::ConstRef table = rt.get_table<OverAllocTable>("my_table");
+        for (size_t i = 0; i != n; ++i)
+            CHECK_EQUAL("x", table[i].text);
 
-            const size_t count = table->size();
-            CHECK_EQUAL(n_outer * n_inner, count);
-
-            for (size_t i = 0; i < count; ++i) {
-                CHECK_EQUAL("x", table[i].text);
-            }
-
-            table->Verify();
-        }
+        table->Verify();
     }
 }
 
 
 TEST(Shared_Notifications)
 {
-    // Delete old files if there
-    File::try_remove("test_shared.tightdb");
-    File::try_remove("test_shared.tightdb.lock"); // also the info file
+    // Create a new shared db
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg(path);
+
+    // No other instance have changed db since last transaction
+    CHECK(!sg.has_changed());
 
     {
-        // Create a new shared db
-        SharedGroup sg("test_shared.tightdb");
+        // Open the same db again (in empty state)
+        SharedGroup sg2(path);
 
-        // No other instance have changed db since last transaction
-        CHECK(!sg.has_changed());
-
+        // Verify that new group is empty
         {
-            // Open the same db again (in empty state)
-            SharedGroup sg2("test_shared.tightdb");
-
-            // Verify that new group is empty
-            {
-                ReadTransaction rt(sg2);
-                CHECK(rt.get_group().is_empty());
-            }
-
-            // No other instance have changed db since last transaction
-            CHECK(!sg2.has_changed());
-
-            // Add a new table
-            {
-                WriteTransaction wt(sg2);
-                wt.get_group().Verify();
-                TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
-                t1->add(1, 2, false, "test");
-                wt.commit();
-            }
-        }
-
-        // Db has been changed by other instance
-        CHECK(sg.has_changed());
-
-        // Verify that the new table has been added
-        {
-            ReadTransaction rt(sg);
-            rt.get_group().Verify();
-            TestTableShared::ConstRef t1 = rt.get_table<TestTableShared>("test");
-            CHECK_EQUAL(1, t1->size());
-            CHECK_EQUAL(1, t1[0].first);
-            CHECK_EQUAL(2, t1[0].second);
-            CHECK_EQUAL(false, t1[0].third);
-            CHECK_EQUAL("test", t1[0].fourth);
+            ReadTransaction rt(sg2);
+            CHECK(rt.get_group().is_empty());
         }
 
         // No other instance have changed db since last transaction
-        CHECK(!sg.has_changed());
+        CHECK(!sg2.has_changed());
+
+        // Add a new table
+        {
+            WriteTransaction wt(sg2);
+            wt.get_group().Verify();
+            TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
+            t1->add(1, 2, false, "test");
+            wt.commit();
+        }
     }
+
+    // Db has been changed by other instance
+    CHECK(sg.has_changed());
+
+    // Verify that the new table has been added
+    {
+        ReadTransaction rt(sg);
+        rt.get_group().Verify();
+        TestTableShared::ConstRef t1 = rt.get_table<TestTableShared>("test");
+        CHECK_EQUAL(1, t1->size());
+        CHECK_EQUAL(1, t1[0].first);
+        CHECK_EQUAL(2, t1[0].second);
+        CHECK_EQUAL(false, t1[0].third);
+        CHECK_EQUAL("test", t1[0].fourth);
+    }
+
+    // No other instance have changed db since last transaction
+    CHECK(!sg.has_changed());
 }
+
 
 TEST(Shared_FromSerialized)
 {
-    // Delete old files if there
-    File::try_remove("test_shared.tightdb");
-    File::try_remove("test_shared.tightdb.lock"); // also the info file
+    SHARED_GROUP_TEST_PATH(path);
 
     // Create new group and serialize to disk
     {
         Group g1;
         TestTableShared::Ref t1 = g1.get_table<TestTableShared>("test");
         t1->add(1, 2, false, "test");
-        g1.write("test_shared.tightdb");
+        g1.write(path);
     }
 
     // Open same file as shared group
-    SharedGroup sg("test_shared.tightdb");
+    SharedGroup sg(path);
 
     // Verify that contents is there when shared
     {
@@ -1415,12 +1370,11 @@ TEST(Shared_FromSerialized)
     }
 }
 
-#if TEST_DURATION > 2
-TEST(Shared_StringIndexBug1)
+
+TEST_IF(Shared_StringIndexBug1, TEST_DURATION >= 3)
 {
-    File::try_remove("test.tightdb");
-    File::try_remove("test.tightdb.lock");
-    SharedGroup db("test.tightdb");
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup db(path);
 
     {
         Group& group = db.begin_write();
@@ -1441,13 +1395,12 @@ TEST(Shared_StringIndexBug1)
         db.commit();
     }
 }
-#endif
+
 
 TEST(Shared_StringIndexBug2)
 {
-    File::try_remove("test.tightdb");
-    File::try_remove("test.tightdb.lock");
-    SharedGroup sg("test.tightdb");
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg(path);
 
     {
         WriteTransaction wt(sg);
@@ -1467,18 +1420,19 @@ TEST(Shared_StringIndexBug2)
 
 
 namespace {
-void rand_str(char* res, size_t len) {
-    for (size_t i = 0; i < len; ++i) {
-        res[i] = 'a' + rand() % 10;
-    }
+
+void rand_str(Random& random, char* res, size_t len)
+{
+    for (size_t i = 0; i < len; ++i)
+        res[i] = char(int('a') + random.draw_int_mod(10));
 }
+
 } // anonymous namespace
 
 TEST(Shared_StringIndexBug3)
 {
-    File::try_remove("indexbug.tightdb");
-    File::try_remove("indexbug.tightdb.lock");
-    SharedGroup db("indexbug.tightdb");
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup db(path);
 
     {
         Group& group = db.begin_write();
@@ -1488,10 +1442,11 @@ TEST(Shared_StringIndexBug3)
         db.commit();
     }
 
+    Random random(random_int<unsigned long>()); // Seed from slow global generator
     size_t transactions = 0;
 
     for (size_t n = 0; n < 100; ++n) {
-        const uint64_t action = rand() % 1000;
+        const uint64_t action = random.draw_int_mod(1000);
 
         transactions++;
 
@@ -1500,7 +1455,7 @@ TEST(Shared_StringIndexBug3)
             Group& group = db.begin_write();
             TableRef table = group.get_table("users");
             if (table->size() > 0) {
-                size_t del = rand() % table->size();
+                size_t del = random.draw_int_mod(table->size());
                 //cerr << "-" << del << ": " << table->get_string(0, del) << endl;
                 table->remove(del);
                 table->Verify();
@@ -1513,7 +1468,7 @@ TEST(Shared_StringIndexBug3)
             TableRef table = group.get_table("users");
             table->add_empty_row();
             char txt[100];
-            rand_str(txt, 8);
+            rand_str(random, txt, 8);
             txt[8] = 0;
             //cerr << "+" << txt << endl;
             table->set_string(0, table->size() - 1, txt);
@@ -1526,9 +1481,7 @@ TEST(Shared_StringIndexBug3)
 
 TEST(Shared_ClearColumnWithBasicArrayRootLeaf)
 {
-    const char* path = "tightdb.tightdb";
-    File::try_remove(path);
-
+    SHARED_GROUP_TEST_PATH(path);
     {
         SharedGroup sg(path);
         WriteTransaction wt(sg);
@@ -1539,7 +1492,6 @@ TEST(Shared_ClearColumnWithBasicArrayRootLeaf)
         test->set_double(0, 0, 727.2);
         wt.commit();
     }
-
     {
         SharedGroup sg(path);
         ReadTransaction rt(sg);
@@ -1552,36 +1504,34 @@ TEST(Shared_ClearColumnWithBasicArrayRootLeaf)
 // disable shared async on windows
 #ifndef _WIN32
 // Todo. Keywords: winbug
-TEST(Shared_Async)
+TEST_IF(Shared_Async, allow_async)
 {
-    // Clean up old state
-    File::try_remove("asynctest.tightdb");
-    File::try_remove("asynctest.tightdb.lock");
+    SHARED_GROUP_TEST_PATH(path);
 
     // Do some changes in a async db
     {
-        SharedGroup db("asynctest.tightdb", false, SharedGroup::durability_Async);
+        bool no_create = false;
+        SharedGroup db(path, no_create, SharedGroup::durability_Async);
 
-        for (size_t n = 0; n < 100; ++n) {
-            //printf("t %d\n", (int)n);
+        for (size_t i = 0; i < 100; ++i) {
+//            cout << "t "<<n<<"\n";
             WriteTransaction wt(db);
             wt.get_group().Verify();
             TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
-            t1->add(1, n, false, "test");
+            t1->add(1, i, false, "test");
             wt.commit();
         }
     }
 
     // Wait for async_commit process to shutdown
-    while (File::exists("asynctest.tightdb.lock")) {
+    while (File::exists(path.get_lock_path()))
         sleep(1);
-    }
 
     // Read the db again in normal mode to verify
     {
-        SharedGroup db("asynctest.tightdb");
+        SharedGroup db(path);
 
-        for (size_t n = 0; n < 100; ++n) {
+        for (size_t i = 0; i < 100; ++i) {
             ReadTransaction rt(db);
             rt.get_group().Verify();
             TestTableShared::ConstRef t1 = rt.get_table<TestTableShared>("test");
@@ -1593,72 +1543,56 @@ TEST(Shared_Async)
 
 namespace  {
 
-#define INCREMENTS 100
+#define multiprocess_increments 100
 
-void* IncrementEntry(void* arg)
+void multiprocess_thread(TestResults* test_results_ptr, string path, size_t row_ndx)
 {
-    try
-    {
-        const size_t row_ndx = (size_t)arg;
+    TestResults& test_results = *test_results_ptr;
 
-        // Open shared db
-        SharedGroup sg("test_shared.tightdb",
-                       false, SharedGroup::durability_Async );
+    // Open shared db
+    bool no_create = false;
+    SharedGroup sg(path, no_create, SharedGroup::durability_Async);
 
-        for (size_t i = 0; i < INCREMENTS; ++i) {
+    for (size_t i = 0; i != multiprocess_increments; ++i) {
+        // Increment cell
+        {
 
-            // Increment cell
-            {
-
-                WriteTransaction wt(sg);
-                wt.get_group().Verify();
-                TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
-                t1[row_ndx].first += 1;
-                // FIXME: For some reason this takes ages when running
-                // inside valgrind, it is probably due to the "extreme
-                // overallocation" bug. The 1000 transactions performed
-                // here can produce a final database file size of more
-                // than 1 GiB. Really! And that is a table with only 10
-                // rows. It is about 1 MiB per transaction.
-                wt.commit();
-            }
-            // Verify in new transaction so that we interleave
-            // read and write transactions
-
-            {
-                ReadTransaction rt(sg);
-                rt.get_group().Verify();
-                TestTableShared::ConstRef t = rt.get_table<TestTableShared>("test");
-
-                const int64_t v = t[row_ndx].first;
-                const int64_t expected = i+1;
-                CHECK_EQUAL(expected, v);
-            }
-
+            WriteTransaction wt(sg);
+            wt.get_group().Verify();
+            TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
+            t1[row_ndx].first += 1;
+            // FIXME: For some reason this takes ages when running
+            // inside valgrind, it is probably due to the "extreme
+            // overallocation" bug. The 1000 transactions performed
+            // here can produce a final database file size of more
+            // than 1 GiB. Really! And that is a table with only 10
+            // rows. It is about 1 MiB per transaction.
+            wt.commit();
         }
+        // Verify in new transaction so that we interleave
+        // read and write transactions
+        {
+            ReadTransaction rt(sg);
+            rt.get_group().Verify();
+            TestTableShared::ConstRef t = rt.get_table<TestTableShared>("test");
 
-    } catch (runtime_error e) {
-        printf("Thread exiting due to runtime exception\n");
-        printf("what(): %s\n", e.what());
-    } catch (...) {
-        printf("Thread exiting for unknown reason\n");
-        printf("\n");
+            int64_t v = t[row_ndx].first;
+            int64_t expected = i+1;
+            CHECK_EQUAL(expected, v);
+        }
     }
-    return 0;
 }
 
 
-void make_table(size_t rows)
+void multiprocess_make_table(string path, string lock_path, string alone_path, size_t rows)
 {
-    File::try_remove("test_shared.tightdb");
-    File::try_remove("test_shared.tightdb.log");
-    File::try_remove("test_alone.tightdb");
     // Create first table in group
 #if 1
-#if 0
+    static_cast<void>(alone_path);
+#  if 0
     {
-        SharedGroup sgr("test_shared.tightdb");
-        SharedGroup sgw("test_shared.tightdb");
+        SharedGroup sgr(path);
+        SharedGroup sgw(path);
         {
             ReadTransaction rt0(sgr);
             WriteTransaction wt0(sgw);
@@ -1680,10 +1614,10 @@ void make_table(size_t rows)
         }
         wt2.commit();
     }
-#else
-#if 0
+#  else
+#    if 0
     {
-        SharedGroup sg("test_shared.tightdb");
+        SharedGroup sg(path);
         WriteTransaction wt(sg);
         TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
         for (size_t i = 0; i < rows; ++i) {
@@ -1691,10 +1625,10 @@ void make_table(size_t rows)
         }
         wt.commit();
     }
-#else
+#    else
     {
-        SharedGroup sg("test_shared.tightdb",
-                       false, SharedGroup::durability_Async);
+        bool no_create = false;
+        SharedGroup sg(path, no_create, SharedGroup::durability_Async);
         WriteTransaction wt(sg);
         TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
         for (size_t i = 0; i < rows; ++i) {
@@ -1702,77 +1636,75 @@ void make_table(size_t rows)
         }
         wt.commit();
     }
-#endif
-#endif
+#    endif
+#  endif
     // Wait for async_commit process to shutdown
-    while (File::exists("test_shared.tightdb.lock")) {
+    while (File::exists(lock_path))
         usleep(100);
-    }
 #else
     {
-        Group g("test_alone.tightdb", Group::mode_ReadWrite);
+        Group g(alone_path, Group::mode_ReadWrite);
         TestTableShared::Ref t1 = g.get_table<TestTableShared>("test");
-        for (size_t i = 0; i < rows; ++i) {
+        for (size_t i = 0; i < rows; ++i)
             t1->add(0, 2, false, "test");
-        }
         printf("Writing db\n");
         g.commit();
     }
 #endif
 }
 
-void multi_threaded(size_t thread_count, size_t base)
+void multiprocess_threaded(TestResults& test_results, string path, size_t num_threads, size_t base)
 {
     // Do some changes in a async db
+    UniquePtr<test_util::ThreadWrapper[]> threads;
+    threads.reset(new test_util::ThreadWrapper[num_threads]);
+
+    // Start threads
+    for (size_t i = 0; i != num_threads; ++i)
+        threads[i].start(bind(&multiprocess_thread, &test_results, path, base+i));
+
+    // Wait for threads to finish
+    for (size_t i = 0; i != num_threads; ++i) {
+        bool thread_has_thrown = false;
+        string except_msg;
+        if (threads[i].join(except_msg)) {
+            cerr << "Exception thrown in thread "<<i<<": "<<except_msg<<"\n";
+            thread_has_thrown = true;
+        }
+        CHECK(!thread_has_thrown);
+    }
+
+    // Verify that the changes were made
     {
+        bool no_create = false;
+        SharedGroup sg(path, no_create, SharedGroup::durability_Async);
+        ReadTransaction rt(sg);
+        rt.get_group().Verify();
+        TestTableShared::ConstRef t = rt.get_table<TestTableShared>("test");
 
-        pthread_t* threads = new pthread_t[thread_count];
-
-        // Create all threads
-        for (size_t i = 0; i < thread_count; ++i) {
-            const int rc = pthread_create(&threads[i], NULL, IncrementEntry, (void*)(i+base));
-            CHECK_EQUAL(0, rc);
-        }
-
-        // Wait for all threads to complete
-        for (size_t i = 0; i < thread_count; ++i) {
-            const int rc = pthread_join(threads[i], NULL);
-            CHECK_EQUAL(0, rc);
-        }
-
-        delete[] threads;
-
-        // Verify that the changes were made
-        {
-            SharedGroup sg("test_shared.tightdb",
-                           false, SharedGroup::durability_Async);
-            ReadTransaction rt(sg);
-            rt.get_group().Verify();
-            TestTableShared::ConstRef t = rt.get_table<TestTableShared>("test");
-
-            for (size_t i = 0; i < thread_count; ++i) {
-                const int64_t v = t[i+base].first;
-                CHECK_EQUAL(INCREMENTS, v);
-            }
+        for (size_t i = 0; i != num_threads; ++i) {
+            int64_t v = t[i+base].first;
+            CHECK_EQUAL(multiprocess_increments, v);
         }
     }
 }
 
-void validate_and_clear(size_t rows, int result)
+void multiprocess_validate_and_clear(TestResults& test_results, string path, string lock_path,
+                                     size_t rows, int result)
 {
     // Wait for async_commit process to shutdown
-    while (File::exists("test_shared.tightdb.lock")) {
+    while (File::exists(lock_path))
         usleep(100);
-    }
+
     // Verify - once more, in sync mode - that the changes were made
     {
-        SharedGroup sg("test_shared.tightdb");
+        SharedGroup sg(path);
         WriteTransaction wt(sg);
         wt.get_group().Verify();
         TestTableShared::Ref t = wt.get_table<TestTableShared>("test");
 
-        for (size_t i = 0; i < rows; ++i) {
-            const int64_t v = t[i].first;
+        for (size_t i = 0; i != rows; ++i) {
+            int64_t v = t[i].first;
             t[i].first = 0;
             CHECK_EQUAL(result, v);
         }
@@ -1780,46 +1712,53 @@ void validate_and_clear(size_t rows, int result)
     }
 }
 
-void multi_process(int numprocs, size_t numthreads)
+void multiprocess(TestResults& test_results, string path, int num_procs, size_t num_threads)
 {
-    for (int i=0; i<numprocs; i++) {
-        if (fork()==0) {
-            multi_threaded(numthreads, i*numthreads);
-            exit(0);
+    for (int i = 0; i != num_procs; ++i) {
+        if (fork() == 0) {
+            multiprocess_threaded(test_results, path, num_threads, i*num_threads);
+            _exit(0);
         }
     }
     int status = 0;
-    for (int i=0; i<numprocs; i++) wait(&status);
+    for (int i = 0; i != num_procs; ++i)
+        wait(&status);
 }
 
 } // anonymous namespace
 
 
-TEST(Shared_Multiprocess)
+TEST_IF(Shared_AsyncMultiprocess, allow_async)
 {
+    SHARED_GROUP_TEST_PATH(path);
+    SHARED_GROUP_TEST_PATH(alone_path);
+
     // wait for any daemon hanging around to exit
-    File::try_remove("test_shared.tightdb.lock");
-    usleep(100);
+    usleep(100); // FIXME: Weird! Is this really acceptable?
 
 #if TEST_DURATION < 1
-    make_table(4);
+    multiprocess_make_table(path, path.get_lock_path(), alone_path, 4);
 
-    multi_threaded(2,0);
-    validate_and_clear(2, INCREMENTS);
+    multiprocess_threaded(test_results, path, 2, 0);
+    multiprocess_validate_and_clear(test_results, path, path.get_lock_path(),
+                                    2, multiprocess_increments);
 
-    for (int k=1; k<3; k++) {
-        multi_process(2,2);
-        validate_and_clear(4,INCREMENTS);
+    for (int k = 1; k < 3; ++k) {
+        multiprocess(test_results, path, 2, 2);
+        multiprocess_validate_and_clear(test_results, path, path.get_lock_path(),
+                                        4, multiprocess_increments);
     }
 #else
-    make_table(100);
+    multiprocess_make_table(path, path.get_lock_path(), alone_path, 100);
 
-    multi_threaded(10,0);
-    validate_and_clear(10, INCREMENTS);
+    multiprocess_threaded(test_results, path, 10, 0);
+    multiprocess_validate_and_clear(test_results, path, path.get_lock_path(),
+                                    10, multiprocess_increments);
 
-    for (int k=1; k<10; k++) {
-        multi_process(10,10);
-        validate_and_clear(100,INCREMENTS);
+    for (int k = 1; k < 10; ++k) {
+        multiprocess(test_results, path, 10, 10);
+        multiprocess_validate_and_clear(test_results, path, path.get_lock_path(),
+                                        100, multiprocess_increments);
     }
 #endif
 }
@@ -1829,42 +1768,42 @@ TEST(Shared_Multiprocess)
 
 TEST(Shared_MixedWithNonShared)
 {
-    File::try_remove("test.tightdb");
+    SHARED_GROUP_TEST_PATH(path);
     {
         // Create empty file without free-space tracking
         Group g;
-        g.write("test.tightdb");
+        g.write(path);
     }
     {
         // See if we can modify with non-shared group
-        Group g("test.tightdb", Group::mode_ReadWrite);
+        Group g(path, Group::mode_ReadWrite);
         g.get_table("foo"); // Add table "foo"
         g.commit();
     }
 
-    File::try_remove("test.tightdb");
+    File::try_remove(path);
     {
         // Create non-empty file without free-space tracking
         Group g;
         g.get_table("x");
-        g.write("test.tightdb");
+        g.write(path);
     }
     {
         // See if we can modify with non-shared group
-        Group g("test.tightdb", Group::mode_ReadWrite);
+        Group g(path, Group::mode_ReadWrite);
         g.get_table("foo"); // Add table "foo"
         g.commit();
     }
 
-    File::try_remove("test.tightdb");
+    File::try_remove(path);
     {
         // Create empty file without free-space tracking
         Group g;
-        g.write("test.tightdb");
+        g.write(path);
     }
     {
         // See if we can read and modify with shared group
-        SharedGroup sg("test.tightdb");
+        SharedGroup sg(path);
         {
             ReadTransaction rt(sg);
             rt.get_group().Verify();
@@ -1878,16 +1817,16 @@ TEST(Shared_MixedWithNonShared)
         }
     }
 
-    File::try_remove("test.tightdb");
+    File::try_remove(path);
     {
         // Create non-empty file without free-space tracking
         Group g;
         g.get_table("x");
-        g.write("test.tightdb");
+        g.write(path);
     }
     {
         // See if we can read and modify with shared group
-        SharedGroup sg("test.tightdb");
+        SharedGroup sg(path);
         {
             ReadTransaction rt(sg);
             rt.get_group().Verify();
@@ -1901,7 +1840,7 @@ TEST(Shared_MixedWithNonShared)
         }
     }
     {
-        SharedGroup sg("test.tightdb");
+        SharedGroup sg(path);
         {
             ReadTransaction rt(sg);
             rt.get_group().Verify();
@@ -1910,18 +1849,18 @@ TEST(Shared_MixedWithNonShared)
     }
     {
         // Access using non-shared group
-        Group g("test.tightdb", Group::mode_ReadWrite);
+        Group g(path, Group::mode_ReadWrite);
         g.commit();
     }
     {
         // Modify using non-shared group
-        Group g("test.tightdb", Group::mode_ReadWrite);
+        Group g(path, Group::mode_ReadWrite);
         g.get_table("bar"); // Add table "bar"
         g.commit();
     }
     {
         // See if we can still acces using shared group
-        SharedGroup sg("test.tightdb");
+        SharedGroup sg(path);
         {
             ReadTransaction rt(sg);
             rt.get_group().Verify();
@@ -1937,21 +1876,21 @@ TEST(Shared_MixedWithNonShared)
         }
     }
     {
-        SharedGroup sg("test.tightdb");
+        SharedGroup sg(path);
         {
             ReadTransaction rt(sg);
             rt.get_group().Verify();
             CHECK(rt.has_table("baz"));
         }
     }
-    File::remove("test.tightdb");
 }
 
-TEST(GroupShared_PinnedTransactions)
+
+TEST(Shared_PinnedTransactions)
 {
-    File::try_remove("test.tightdb");
-    SharedGroup sg1("test.tightdb");
-    SharedGroup sg2("test.tightdb");
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg1(path);
+    SharedGroup sg2(path);
     {
         // initially, always say that the db has changed
         bool changed = sg2.pin_read_transactions();
@@ -2058,26 +1997,21 @@ TEST(GroupShared_PinnedTransactions)
 
 TEST(Shared_MultipleRollbacks)
 {
-    File::try_remove("test.tightdb");
-    {
-        SharedGroup sg("test.tightdb");
-        sg.begin_write();
-        sg.rollback();
-        sg.rollback();
-    }
-    File::remove("test.tightdb");
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg(path);
+    sg.begin_write();
+    sg.rollback();
+    sg.rollback();
 }
+
 
 TEST(Shared_MultipleEndReads)
 {
-    File::try_remove("test.tightdb");
-    {
-        SharedGroup sg("test.tightdb");
-        sg.begin_read();
-        sg.end_read();
-        sg.end_read();
-    }
-    File::remove("test.tightdb");
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg(path);
+    sg.begin_read();
+    sg.end_read();
+    sg.end_read();
 }
 
 
@@ -2088,23 +2022,23 @@ TEST(Shared_ReserveDiskSpace)
     if (!File::is_prealloc_supported())
         return;
 
-    File::try_remove("test.tightdb");
+    SHARED_GROUP_TEST_PATH(path);
     {
-        SharedGroup sg("test.tightdb");
-        size_t orig_file_size = size_t(File("test.tightdb").get_size());
+        SharedGroup sg(path);
+        size_t orig_file_size = size_t(File(path).get_size());
 
         // Check that reserve() does not change the file size if the
         // specified size is less than the actual file size.
         size_t reserve_size_1 = orig_file_size / 2;
         sg.reserve(reserve_size_1);
-        size_t new_file_size_1 = size_t(File("test.tightdb").get_size());
+        size_t new_file_size_1 = size_t(File(path).get_size());
         CHECK_EQUAL(orig_file_size, new_file_size_1);
 
         // Check that reserve() does not change the file size if the
         // specified size is equal to the actual file size.
         size_t reserve_size_2 = orig_file_size;
         sg.reserve(reserve_size_2);
-        size_t new_file_size_2 = size_t(File("test.tightdb").get_size());
+        size_t new_file_size_2 = size_t(File(path).get_size());
         CHECK_EQUAL(orig_file_size, new_file_size_2);
 
         // Check that reserve() does change the file size if the
@@ -2112,7 +2046,7 @@ TEST(Shared_ReserveDiskSpace)
         // that the new size is at least as big as the requested size.
         size_t reserve_size_3 = orig_file_size + 1;
         sg.reserve(reserve_size_3);
-        size_t new_file_size_3 = size_t(File("test.tightdb").get_size());
+        size_t new_file_size_3 = size_t(File(path).get_size());
         CHECK(new_file_size_3 >= reserve_size_3);
 
         // Check that disk space reservation is independent of transactions
@@ -2122,25 +2056,25 @@ TEST(Shared_ReserveDiskSpace)
             wt.get_table<TestTableShared>("table_1")->add_empty_row(2000);
             wt.commit();
         }
-        orig_file_size = size_t(File("test.tightdb").get_size());
+        orig_file_size = size_t(File(path).get_size());
         size_t reserve_size_4 = 2 * orig_file_size + 1;
         sg.reserve(reserve_size_4);
-        size_t new_file_size_4 = size_t(File("test.tightdb").get_size());
+        size_t new_file_size_4 = size_t(File(path).get_size());
         CHECK(new_file_size_4 >= reserve_size_4);
         WriteTransaction wt(sg);
         wt.get_group().Verify();
         wt.get_table<TestTableShared>("table_2")->add_empty_row(2000);
-        orig_file_size = size_t(File("test.tightdb").get_size());
+        orig_file_size = size_t(File(path).get_size());
         size_t reserve_size_5 = orig_file_size + 333;
         sg.reserve(reserve_size_5);
-        size_t new_file_size_5 = size_t(File("test.tightdb").get_size());
+        size_t new_file_size_5 = size_t(File(path).get_size());
         CHECK(new_file_size_5 >= reserve_size_5);
         wt.get_table<TestTableShared>("table_3")->add_empty_row(2000);
         wt.commit();
-        orig_file_size = size_t(File("test.tightdb").get_size());
+        orig_file_size = size_t(File(path).get_size());
         size_t reserve_size_6 = orig_file_size + 459;
         sg.reserve(reserve_size_6);
-        size_t new_file_size_6 = size_t(File("test.tightdb").get_size());
+        size_t new_file_size_6 = size_t(File(path).get_size());
         CHECK(new_file_size_6 >= reserve_size_6);
         {
             WriteTransaction wt(sg);
@@ -2148,7 +2082,260 @@ TEST(Shared_ReserveDiskSpace)
             wt.commit();
         }
     }
-    File::remove("test.tightdb");
+}
+
+
+TEST(Shared_MovingEnumStringColumn)
+{
+    // Test that the 'index in parent' property of the column of unique strings
+    // in a ColumnStringEnum is properly adjusted when other string enumeration
+    // columns are inserted or removed before it. Note that the parent of the
+    // column of unique strings in a ColumnStringEnum is a child of an array
+    // node in the Spec class.
+
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg(path);
+
+    {
+        WriteTransaction wt(sg);
+        TableRef table = wt.get_table("foo");
+        table->add_column(type_String, "");
+        table->add_empty_row(64);
+        for (int i = 0; i < 64; ++i)
+            table->set_string(0, i, "foo");
+        table->optimize();
+        CHECK_EQUAL(1, table->get_descriptor()->get_num_unique_values(0));
+        wt.commit();
+    }
+    // Insert new string enumeration column
+    {
+        WriteTransaction wt(sg);
+        TableRef table = wt.get_table("foo");
+        CHECK_EQUAL(1, table->get_descriptor()->get_num_unique_values(0));
+        table->insert_column(0, type_String, "");
+        for (int i = 0; i < 64; ++i)
+            table->set_string(0, i, i%2 == 0 ? "a" : "b");
+        table->optimize();
+        wt.get_group().Verify();
+        CHECK_EQUAL(2, table->get_descriptor()->get_num_unique_values(0));
+        CHECK_EQUAL(1, table->get_descriptor()->get_num_unique_values(1));
+        table->set_string(1, 0, "bar0");
+        table->set_string(1, 1, "bar1");
+        wt.get_group().Verify();
+        CHECK_EQUAL(2, table->get_descriptor()->get_num_unique_values(0));
+        CHECK_EQUAL(3, table->get_descriptor()->get_num_unique_values(1));
+        wt.commit();
+    }
+    {
+        ReadTransaction rt(sg);
+        rt.get_group().Verify();
+        ConstTableRef table = rt.get_table("foo");
+        CHECK_EQUAL(2, table->get_descriptor()->get_num_unique_values(0));
+        CHECK_EQUAL(3, table->get_descriptor()->get_num_unique_values(1));
+        for (int i = 0; i < 64; ++i) {
+            string value = table->get_string(0, i);
+            if (i%2 == 0) {
+                CHECK_EQUAL("a", value);
+            }
+            else {
+                CHECK_EQUAL("b", value);
+            }
+            value = table->get_string(1, i);
+            if (i == 0) {
+                CHECK_EQUAL("bar0", value);
+            }
+            else if (i == 1) {
+                CHECK_EQUAL("bar1", value);
+            }
+            else {
+                CHECK_EQUAL("foo", value);
+            }
+        }
+    }
+    // Remove the recently inserted string enumeration column
+    {
+        WriteTransaction wt(sg);
+        wt.get_group().Verify();
+        TableRef table = wt.get_table("foo");
+        CHECK_EQUAL(2, table->get_descriptor()->get_num_unique_values(0));
+        CHECK_EQUAL(3, table->get_descriptor()->get_num_unique_values(1));
+        table->remove_column(0);
+        wt.get_group().Verify();
+        CHECK_EQUAL(3, table->get_descriptor()->get_num_unique_values(0));
+        table->set_string(0, 2, "bar2");
+        wt.get_group().Verify();
+        CHECK_EQUAL(4, table->get_descriptor()->get_num_unique_values(0));
+        wt.commit();
+    }
+    {
+        ReadTransaction rt(sg);
+        rt.get_group().Verify();
+        ConstTableRef table = rt.get_table("foo");
+        CHECK_EQUAL(4, table->get_descriptor()->get_num_unique_values(0));
+        for (int i = 0; i < 64; ++i) {
+            string value = table->get_string(0, i);
+            if (i == 0) {
+                CHECK_EQUAL("bar0", value);
+            }
+            else if (i == 1) {
+                CHECK_EQUAL("bar1", value);
+            }
+            else if (i == 2) {
+                CHECK_EQUAL("bar2", value);
+            }
+            else {
+                CHECK_EQUAL("foo", value);
+            }
+        }
+    }
+}
+
+
+TEST(Shared_MovingSearchIndex)
+{
+    // Test that the 'index in parent' property of search indexes is properly
+    // adjusted when columns are inserted or removed at a lower column_index.
+
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg(path);
+
+    // Create a regular string column and an enumeration strings column, and
+    // equip both with search indexes.
+    {
+        WriteTransaction wt(sg);
+        TableRef table = wt.get_table("foo");
+        table->add_column(type_String, "regular");
+        table->add_column(type_String, "enum");
+        table->add_empty_row(64);
+        for (int i = 0; i < 64; ++i) {
+            ostringstream out;
+            out << "foo" << i;
+            table->set_string(0, i, out.str());
+            table->set_string(1, i, "bar");
+        }
+        table->set_string(1, 63, "bar63");
+        table->optimize();
+        CHECK_EQUAL(0, table->get_descriptor()->get_num_unique_values(0));
+        CHECK_EQUAL(2, table->get_descriptor()->get_num_unique_values(1));
+        table->set_index(0);
+        table->set_index(1);
+        wt.get_group().Verify();
+        CHECK_EQUAL(62, table->find_first_string(0, "foo62"));
+        CHECK_EQUAL(63, table->find_first_string(1, "bar63"));
+        wt.commit();
+    }
+    // Insert a new column before the two string columns.
+    {
+        WriteTransaction wt(sg);
+        TableRef table = wt.get_table("foo");
+        CHECK_EQUAL(0, table->get_descriptor()->get_num_unique_values(0));
+        CHECK_EQUAL(2, table->get_descriptor()->get_num_unique_values(1));
+        CHECK_EQUAL(62, table->find_first_string(0, "foo62"));
+        CHECK_EQUAL(63, table->find_first_string(1, "bar63"));
+        table->insert_column(0, type_Int, "i");
+        wt.get_group().Verify();
+        CHECK_EQUAL(0, table->get_descriptor()->get_num_unique_values(1));
+        CHECK_EQUAL(2, table->get_descriptor()->get_num_unique_values(2));
+        CHECK_EQUAL(62, table->find_first_string(1, "foo62"));
+        CHECK_EQUAL(63, table->find_first_string(2, "bar63"));
+        table->set_string(1, 0, "foo_X");
+        table->set_string(2, 0, "bar_X");
+        wt.get_group().Verify();
+        CHECK_EQUAL(0, table->get_descriptor()->get_num_unique_values(1));
+        CHECK_EQUAL(3, table->get_descriptor()->get_num_unique_values(2));
+        CHECK_EQUAL(tightdb::not_found, table->find_first_string(1, "bad"));
+        CHECK_EQUAL(tightdb::not_found, table->find_first_string(2, "bad"));
+        CHECK_EQUAL(0,  table->find_first_string(1, "foo_X"));
+        CHECK_EQUAL(31, table->find_first_string(1, "foo31"));
+        CHECK_EQUAL(61, table->find_first_string(1, "foo61"));
+        CHECK_EQUAL(62, table->find_first_string(1, "foo62"));
+        CHECK_EQUAL(63, table->find_first_string(1, "foo63"));
+        CHECK_EQUAL(0,  table->find_first_string(2, "bar_X"));
+        CHECK_EQUAL(1,  table->find_first_string(2, "bar"));
+        CHECK_EQUAL(63, table->find_first_string(2, "bar63"));
+        wt.commit();
+    }
+    // Remove the recently inserted column
+    {
+        WriteTransaction wt(sg);
+        TableRef table = wt.get_table("foo");
+        CHECK(table->has_index(1) && table->has_index(2));
+        CHECK_EQUAL(0, table->get_descriptor()->get_num_unique_values(1));
+        CHECK_EQUAL(3, table->get_descriptor()->get_num_unique_values(2));
+        CHECK_EQUAL(tightdb::not_found, table->find_first_string(1, "bad"));
+        CHECK_EQUAL(tightdb::not_found, table->find_first_string(2, "bad"));
+        CHECK_EQUAL(0,  table->find_first_string(1, "foo_X"));
+        CHECK_EQUAL(31, table->find_first_string(1, "foo31"));
+        CHECK_EQUAL(61, table->find_first_string(1, "foo61"));
+        CHECK_EQUAL(62, table->find_first_string(1, "foo62"));
+        CHECK_EQUAL(63, table->find_first_string(1, "foo63"));
+        CHECK_EQUAL(0,  table->find_first_string(2, "bar_X"));
+        CHECK_EQUAL(1,  table->find_first_string(2, "bar"));
+        CHECK_EQUAL(63, table->find_first_string(2, "bar63"));
+        table->remove_column(0);
+        wt.get_group().Verify();
+        CHECK(table->has_index(0) && table->has_index(1));
+        CHECK_EQUAL(0, table->get_descriptor()->get_num_unique_values(0));
+        CHECK_EQUAL(3, table->get_descriptor()->get_num_unique_values(1));
+        CHECK_EQUAL(tightdb::not_found, table->find_first_string(0, "bad"));
+        CHECK_EQUAL(tightdb::not_found, table->find_first_string(1, "bad"));
+        CHECK_EQUAL(0,  table->find_first_string(0, "foo_X"));
+        CHECK_EQUAL(31, table->find_first_string(0, "foo31"));
+        CHECK_EQUAL(61, table->find_first_string(0, "foo61"));
+        CHECK_EQUAL(62, table->find_first_string(0, "foo62"));
+        CHECK_EQUAL(63, table->find_first_string(0, "foo63"));
+        CHECK_EQUAL(0,  table->find_first_string(1, "bar_X"));
+        CHECK_EQUAL(1,  table->find_first_string(1, "bar"));
+        CHECK_EQUAL(63, table->find_first_string(1, "bar63"));
+        table->set_string(0, 1, "foo_Y");
+        table->set_string(1, 1, "bar_Y");
+        wt.get_group().Verify();
+        CHECK(table->has_index(0) && table->has_index(1));
+        CHECK_EQUAL(0, table->get_descriptor()->get_num_unique_values(0));
+        CHECK_EQUAL(4, table->get_descriptor()->get_num_unique_values(1));
+        CHECK_EQUAL(tightdb::not_found, table->find_first_string(0, "bad"));
+        CHECK_EQUAL(tightdb::not_found, table->find_first_string(1, "bad"));
+        CHECK_EQUAL(0,  table->find_first_string(0, "foo_X"));
+        CHECK_EQUAL(1,  table->find_first_string(0, "foo_Y"));
+        CHECK_EQUAL(31, table->find_first_string(0, "foo31"));
+        CHECK_EQUAL(61, table->find_first_string(0, "foo61"));
+        CHECK_EQUAL(62, table->find_first_string(0, "foo62"));
+        CHECK_EQUAL(63, table->find_first_string(0, "foo63"));
+        CHECK_EQUAL(0,  table->find_first_string(1, "bar_X"));
+        CHECK_EQUAL(1,  table->find_first_string(1, "bar_Y"));
+        CHECK_EQUAL(2,  table->find_first_string(1, "bar"));
+        CHECK_EQUAL(63, table->find_first_string(1, "bar63"));
+        wt.commit();
+    }
+}
+
+
+TEST(Shared_ArrayEraseBug)
+{
+    // This test only makes sense when we can insert a number of rows
+    // equal to the square of the maximum B+-tree node size.
+    size_t max_node_size = TIGHTDB_MAX_LIST_SIZE;
+    size_t max_node_size_squared = max_node_size;
+    if (int_multiply_with_overflow_detect(max_node_size_squared, max_node_size))
+        return;
+
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg(path);
+    {
+        WriteTransaction wt(sg);
+        TableRef table = wt.get_table("table");
+        table->add_column(type_Int, "");
+        for (size_t i = 0; i < max_node_size_squared; ++i)
+            table->insert_empty_row(0);
+        wt.commit();
+    }
+    {
+        WriteTransaction wt(sg);
+        TableRef table = wt.get_table("table");
+        size_t row_ndx = max_node_size_squared - max_node_size - max_node_size/2;
+        table->insert_empty_row(row_ndx);
+        wt.commit();
+    }
 }
 
 #endif // TEST_SHARED

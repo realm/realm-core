@@ -22,15 +22,42 @@ static const mode_t MS_MODE_MASK = 0x0000ffff;
 #include <tightdb.hpp>
 #include <tightdb/util/file.hpp>
 
-#include "util/unit_test.hpp"
-#include "util/test_only.hpp"
+#include "test.hpp"
 
 using namespace std;
 using namespace tightdb;
 using namespace tightdb::util;
 
-// Note: You can now temporarely declare unit tests with the ONLY(TestName) macro instead of TEST(TestName). This
-// will disable all unit tests except these. Remember to undo your temporary changes before committing.
+
+// Test independence and thread-safety
+// -----------------------------------
+//
+// All tests must be thread safe and independent of each other. This
+// is required because it allows for both shuffling of the execution
+// order and for parallelized testing.
+//
+// In particular, avoid using std::rand() since it is not guaranteed
+// to be thread safe. Instead use the API offered in
+// `test/util/random.hpp`.
+//
+// All files created in tests must use the TEST_PATH macro (or one of
+// its friends) to obtain a suitable file system path. See
+// `test/util/test_path.hpp`.
+//
+//
+// Debugging and the ONLY() macro
+// ------------------------------
+//
+// A simple way of disabling all tests except one called `Foo`, is to
+// replace TEST(Foo) with ONLY(Foo) and then recompile and rerun the
+// test suite. Note that you can also use filtering by setting the
+// environment varible `UNITTEST_FILTER`. See `README.md` for more on
+// this.
+//
+// Another way to debug a particular test, is to copy that test into
+// `experiments/testcase.cpp` and then run `sh build.sh
+// check-testcase` (or one of its friends) from the command line.
+
 
 namespace {
 
@@ -54,96 +81,89 @@ TEST(Group_Unattached)
 
 TEST(Group_OpenFile)
 {
-    File::try_remove("test.tightdb");
+    GROUP_TEST_PATH(path);
 
     {
         Group group((Group::unattached_tag()));
-        group.open("test.tightdb", Group::mode_ReadWrite);
+        group.open(path, Group::mode_ReadWrite);
         CHECK(group.is_attached());
     }
 
     {
         Group group((Group::unattached_tag()));
-        group.open("test.tightdb", Group::mode_ReadWriteNoCreate);
+        group.open(path, Group::mode_ReadWriteNoCreate);
         CHECK(group.is_attached());
     }
 
     {
         Group group((Group::unattached_tag()));
-        group.open("test.tightdb", Group::mode_ReadOnly);
+        group.open(path, Group::mode_ReadOnly);
         CHECK(group.is_attached());
     }
-
-    File::remove("test.tightdb");
 }
 
 
 TEST(Group_Permissions)
 {
 #ifndef _WIN32
-    if(getuid() != 0) {
-#endif
-        util::File::try_remove("test.tightdb");
-        {
-            Group group1;
-            TableRef t1 = group1.get_table("table1");
-            t1->add_column(type_String, "s");
-            t1->add_column(type_Int,    "i");
-            for(size_t i=0; i<4; ++i) {
-                t1->insert_string(0, i, "a");
-                t1->insert_int(1, i, 3);
-                t1->insert_done();
-            }
-            group1.write("test.tightdb");
-        }
-
-    #ifdef _WIN32
-        _chmod("test.tightdb", S_IWUSR & MS_MODE_MASK);
-    #else
-        chmod("test.tightdb", S_IWUSR);
-    #endif
-
-        {
-            Group group2((Group::unattached_tag()));
-            CHECK_THROW(group2.open("test.tightdb", Group::mode_ReadOnly), util::File::PermissionDenied);
-            CHECK(!group2.has_table("table1"));  // is not attached
-        }
-        util::File::try_remove("test.tightdb");
-#ifndef _WIN32
-    } else {
-        cout << "Group_Permissions test skipped because you are running it as root" << endl << endl;
+    if(getuid() == 0) {
+        cout << "Group_Permissions test skipped because you are running it as root\n\n";
+        return;
     }
 #endif
+
+    GROUP_TEST_PATH(path);
+    {
+        Group group1;
+        TableRef t1 = group1.get_table("table1");
+        t1->add_column(type_String, "s");
+        t1->add_column(type_Int,    "i");
+        for(size_t i=0; i<4; ++i) {
+            t1->insert_string(0, i, "a");
+            t1->insert_int(1, i, 3);
+            t1->insert_done();
+        }
+        group1.write(path);
+    }
+
+#ifdef _WIN32
+    _chmod(path.c_str(), S_IWUSR & MS_MODE_MASK);
+#else
+    chmod(path.c_str(), S_IWUSR);
+#endif
+
+    {
+        Group group2((Group::unattached_tag()));
+        CHECK_THROW(group2.open(path, Group::mode_ReadOnly), File::PermissionDenied);
+        CHECK(!group2.has_table("table1"));  // is not attached
+    }
 }
 
 
 
 TEST(Group_BadFile)
 {
-    File::try_remove("test.tightdb");
-    File::try_remove("test2.tightdb");
+    GROUP_TEST_PATH(path_1);
+    GROUP_TEST_PATH(path_2);
 
     {
-        File file("test.tightdb", File::mode_Append);
+        File file(path_1, File::mode_Append);
         file.write("foo");
     }
 
     {
         Group group((Group::unattached_tag()));
-        CHECK_THROW(group.open("test.tightdb", Group::mode_ReadOnly), InvalidDatabase);
+        CHECK_THROW(group.open(path_1, Group::mode_ReadOnly), InvalidDatabase);
         CHECK(!group.is_attached());
-        CHECK_THROW(group.open("test.tightdb", Group::mode_ReadOnly), InvalidDatabase); // Again
+        CHECK_THROW(group.open(path_1, Group::mode_ReadOnly), InvalidDatabase); // Again
         CHECK(!group.is_attached());
-        CHECK_THROW(group.open("test.tightdb", Group::mode_ReadWrite), InvalidDatabase);
+        CHECK_THROW(group.open(path_1, Group::mode_ReadWrite), InvalidDatabase);
         CHECK(!group.is_attached());
-        CHECK_THROW(group.open("test.tightdb", Group::mode_ReadWriteNoCreate), InvalidDatabase);
+        CHECK_THROW(group.open(path_1, Group::mode_ReadWriteNoCreate), InvalidDatabase);
         CHECK(!group.is_attached());
-        group.open("test2.tightdb", Group::mode_ReadWrite); // This one must work
+        group.open(path_2, Group::mode_ReadWrite); // This one must work
         CHECK(group.is_attached());
     }
-
-    File::remove("test.tightdb");
-    File::remove("test2.tightdb");
 }
 
 
@@ -153,19 +173,18 @@ TEST(Group_OpenBuffer)
     UniquePtr<char[]> buffer;
     size_t buffer_size;
     {
-        File::try_remove("test.tightdb");
+        GROUP_TEST_PATH(path);
         {
             Group group;
-            group.write("test.tightdb");
+            group.write(path);
         }
         {
-            File file("test.tightdb");
+            File file(path);
             buffer_size = size_t(file.get_size());
             buffer.reset(static_cast<char*>(malloc(buffer_size)));
             CHECK(bool(buffer));
             file.read(buffer.get(), buffer_size);
         }
-        File::remove("test.tightdb");
     }
 
 
@@ -189,7 +208,7 @@ TEST(Group_OpenBuffer)
 
 TEST(Group_BadBuffer)
 {
-    File::try_remove("test.tightdb");
+    GROUP_TEST_PATH(path);
 
     // Produce an invalid buffer
     char buffer[32];
@@ -209,11 +228,9 @@ TEST(Group_BadBuffer)
         CHECK(!group.is_attached());
         // Check that the group is still able to attach to a file,
         // even after failures.
-        group.open("test.tightdb", Group::mode_ReadWrite);
+        group.open(path, Group::mode_ReadWrite);
         CHECK(group.is_attached());
     }
-
-    File::remove("test.tightdb");
 }
 
 
@@ -304,11 +321,11 @@ TEST(Group_TableAccessorLeftBehind)
 
 TEST(Group_Invalid1)
 {
-    File::try_remove("table_test.tightdb");
+    GROUP_TEST_PATH(path);
 
     // Try to open non-existing file
     // (read-only files have to exists to before opening)
-    CHECK_THROW(Group("table_test.tightdb"), File::NotFound);
+    CHECK_THROW(Group(path), File::NotFound);
 }
 
 TEST(Group_Invalid2)
@@ -324,119 +341,117 @@ TEST(Group_Invalid2)
 
 TEST(Group_Overwrite)
 {
-    File::try_remove("test_overwrite.tightdb");
+    GROUP_TEST_PATH(path);
     {
         Group g;
-        g.write("test_overwrite.tightdb");
-        CHECK_THROW(g.write("test_overwrite.tightdb"), File::Exists);
+        g.write(path);
+        CHECK_THROW(g.write(path), File::Exists);
     }
     {
-        Group g("test_overwrite.tightdb");
-        CHECK_THROW(g.write("test_overwrite.tightdb"), File::Exists);
+        Group g(path);
+        CHECK_THROW(g.write(path), File::Exists);
     }
     {
         Group g;
-        File::try_remove("test_overwrite.tightdb");
-        g.write("test_overwrite.tightdb");
+        File::try_remove(path);
+        g.write(path);
     }
 }
 
 TEST(Group_Serialize0)
 {
-    File::try_remove("table_test.tightdb");
+    GROUP_TEST_PATH(path);
+    {
+        // Create empty group and serialize to disk
+        Group to_disk;
+        to_disk.write(path);
 
-    // Create empty group and serialize to disk
-    Group to_disk;
-    to_disk.write("table_test.tightdb");
+        // Load the group
+        Group from_disk(path);
 
-    // Load the group
-    Group from_disk("table_test.tightdb");
+        // Create new table in group
+        TestTableGroup::Ref t = from_disk.get_table<TestTableGroup>("test");
 
-    // Create new table in group
-    TestTableGroup::Ref t = from_disk.get_table<TestTableGroup>("test");
+        CHECK_EQUAL(4, t->get_column_count());
+        CHECK_EQUAL(0, t->size());
 
-    CHECK_EQUAL(4, t->get_column_count());
-    CHECK_EQUAL(0, t->size());
+        // Modify table
+        t->add("Test",  1, true, Wed);
 
-    // Modify table
-    t->add("Test",  1, true, Wed);
-
-    CHECK_EQUAL("Test", t[0].first);
-    CHECK_EQUAL(1,      t[0].second);
-    CHECK_EQUAL(true,   t[0].third);
-    CHECK_EQUAL(Wed,    t[0].fourth);
-}
-
-TEST(Group_Read0)
-{
-    // Load the group and let it clean up without loading
-    // any tables
-    Group g("table_test.tightdb");
+        CHECK_EQUAL("Test", t[0].first);
+        CHECK_EQUAL(1,      t[0].second);
+        CHECK_EQUAL(true,   t[0].third);
+        CHECK_EQUAL(Wed,    t[0].fourth);
+    }
+    {
+        // Load the group and let it clean up without loading
+        // any tables
+        Group g(path);
+    }
 }
 
 
 TEST(Group_Serialize1)
 {
-    // Create group with one table
-    Group to_disk;
-    TestTableGroup::Ref table = to_disk.get_table<TestTableGroup>("test");
-    table->add("",  1, true, Wed);
-    table->add("", 15, true, Wed);
-    table->add("", 10, true, Wed);
-    table->add("", 20, true, Wed);
-    table->add("", 11, true, Wed);
-    table->add("", 45, true, Wed);
-    table->add("", 10, true, Wed);
-    table->add("",  0, true, Wed);
-    table->add("", 30, true, Wed);
-    table->add("",  9, true, Wed);
+    GROUP_TEST_PATH(path);
+    {
+        // Create group with one table
+        Group to_disk;
+        TestTableGroup::Ref table = to_disk.get_table<TestTableGroup>("test");
+        table->add("",  1, true, Wed);
+        table->add("", 15, true, Wed);
+        table->add("", 10, true, Wed);
+        table->add("", 20, true, Wed);
+        table->add("", 11, true, Wed);
+        table->add("", 45, true, Wed);
+        table->add("", 10, true, Wed);
+        table->add("",  0, true, Wed);
+        table->add("", 30, true, Wed);
+        table->add("",  9, true, Wed);
 
 #ifdef TIGHTDB_DEBUG
-    to_disk.Verify();
+        to_disk.Verify();
 #endif
 
-    // Delete old file if there
-    File::try_remove("table_test.tightdb");
+        // Serialize to disk
+        to_disk.write(path);
 
-    // Serialize to disk
-    to_disk.write("table_test.tightdb");
+        // Load the table
+        Group from_disk(path);
+        TestTableGroup::Ref t = from_disk.get_table<TestTableGroup>("test");
 
-    // Load the table
-    Group from_disk("table_test.tightdb");
-    TestTableGroup::Ref t = from_disk.get_table<TestTableGroup>("test");
+        CHECK_EQUAL(4, t->get_column_count());
+        CHECK_EQUAL(10, t->size());
 
-    CHECK_EQUAL(4, t->get_column_count());
-    CHECK_EQUAL(10, t->size());
+        // Verify that original values are there
+        CHECK(*table == *t);
 
-    // Verify that original values are there
-    CHECK(*table == *t);
+        // Modify both tables
+        table[0].first = "test";
+        t[0].first = "test";
+        table->insert(5, "hello", 100, false, Mon);
+        t->insert(5, "hello", 100, false, Mon);
+        table->remove(1);
+        t->remove(1);
 
-    // Modify both tables
-    table[0].first = "test";
-    t[0].first = "test";
-    table->insert(5, "hello", 100, false, Mon);
-    t->insert(5, "hello", 100, false, Mon);
-    table->remove(1);
-    t->remove(1);
-
-    // Verify that both changed correctly
-    CHECK(*table == *t);
+        // Verify that both changed correctly
+        CHECK(*table == *t);
 #ifdef TIGHTDB_DEBUG
-    to_disk.Verify();
-    from_disk.Verify();
+        to_disk.Verify();
+        from_disk.Verify();
 #endif
-}
-
-
-TEST(Group_Read1)
-{
-    // Load the group and let it clean up without loading
-    // any tables
-    Group g("table_test.tightdb");
+    }
+    {
+        // Load the group and let it clean up without loading
+        // any tables
+        Group g(path);
+    }
 }
 
 TEST(Group_Serialize2)
 {
+    GROUP_TEST_PATH(path);
+
     // Create group with two tables
     Group to_disk;
     TestTableGroup::Ref table1 = to_disk.get_table<TestTableGroup>("test1");
@@ -452,18 +467,13 @@ TEST(Group_Serialize2)
     to_disk.Verify();
 #endif
 
-    // Delete old file if there
-    File::try_remove("table_test.tightdb");
-
     // Serialize to disk
-    to_disk.write("table_test.tightdb");
+    to_disk.write(path);
 
     // Load the tables
-    Group from_disk("table_test.tightdb");
+    Group from_disk(path);
     TestTableGroup::Ref t1 = from_disk.get_table<TestTableGroup>("test1");
     TestTableGroup::Ref t2 = from_disk.get_table<TestTableGroup>("test2");
-    static_cast<void>(t2);
-    static_cast<void>(t1);
 
     // Verify that original values are there
     CHECK(*table1 == *t1);
@@ -477,6 +487,8 @@ TEST(Group_Serialize2)
 
 TEST(Group_Serialize3)
 {
+    GROUP_TEST_PATH(path);
+
     // Create group with one table (including long strings
     Group to_disk;
     TestTableGroup::Ref table = to_disk.get_table<TestTableGroup>("test");
@@ -487,16 +499,12 @@ TEST(Group_Serialize3)
     to_disk.Verify();
 #endif
 
-    // Delete old file if there
-    File::try_remove("table_test.tightdb");
-
     // Serialize to disk
-    to_disk.write("table_test.tightdb");
+    to_disk.write(path);
 
     // Load the table
-    Group from_disk("table_test.tightdb");
+    Group from_disk(path);
     TestTableGroup::Ref t = from_disk.get_table<TestTableGroup>("test");
-    static_cast<void>(t);
 
     // Verify that original values are there
     CHECK(*table == *t);
@@ -643,11 +651,10 @@ TEST(Group_Serialize_All)
 
 TEST(Group_Persist)
 {
-    // Delete old file if there
-    File::try_remove("testdb.tightdb");
+    GROUP_TEST_PATH(path);
 
     // Create new database
-    Group db("testdb.tightdb", Group::mode_ReadWrite);
+    Group db(path, Group::mode_ReadWrite);
 
     // Insert some data
     TableRef table = db.get_table("test");
@@ -707,6 +714,9 @@ TEST(Group_Persist)
 
 TEST(Group_Subtable)
 {
+    GROUP_TEST_PATH(path_1);
+    GROUP_TEST_PATH(path_2);
+
     int n = 1;
 
     Group g;
@@ -799,11 +809,10 @@ TEST(Group_Subtable)
         }
     }
 
-    File::try_remove("subtables.tightdb");
-    g.write("subtables.tightdb");
+    g.write(path_1);
 
     // Read back tables
-    Group g2("subtables.tightdb");
+    Group g2(path_1);
     TableRef table2 = g2.get_table("test");
 
     for (int i=0; i<n; ++i) {
@@ -893,11 +902,10 @@ TEST(Group_Subtable)
         }
     }
 
-    File::try_remove("subtables2.tightdb");
-    g2.write("subtables2.tightdb");
+    g2.write(path_2);
 
     // Read back tables
-    Group g3("subtables2.tightdb");
+    Group g3(path_2);
     TableRef table3 = g2.get_table("test");
 
     for (int i=0; i<n; ++i) {
@@ -944,6 +952,12 @@ TEST(Group_Subtable)
 
 TEST(Group_MultiLevelSubtables)
 {
+    GROUP_TEST_PATH(path_1);
+    GROUP_TEST_PATH(path_2);
+    GROUP_TEST_PATH(path_3);
+    GROUP_TEST_PATH(path_4);
+    GROUP_TEST_PATH(path_5);
+
     {
         Group g;
         TableRef table = g.get_table("test");
@@ -974,13 +988,12 @@ TEST(Group_MultiLevelSubtables)
             b->add_column(type_Int, "int");
             b->add_empty_row();
         }
-        File::try_remove("subtables.tightdb");
-        g.write("subtables.tightdb");
+        g.write(path_1);
     }
 
     // Non-mixed
     {
-        Group g("subtables.tightdb");
+        Group g(path_1);
         TableRef table = g.get_table("test");
         // Get A as subtable
         TableRef a = table->get_subtable(1, 0);
@@ -998,11 +1011,10 @@ TEST(Group_MultiLevelSubtables)
         // get a second ref to B (compare)
         CHECK_EQUAL(a->get_subtable(1, 0), b);
         CHECK_EQUAL(a->get_subtable(1, 0)->get_int(0,0), 6661012);
-        File::try_remove("subtables2.tightdb");
-        g.write("subtables2.tightdb");
+        g.write(path_2);
     }
     {
-        Group g("subtables2.tightdb");
+        Group g(path_2);
         TableRef table = g.get_table("test");
         // Get A as subtable
         TableRef a = table->get_subtable(1, 0);
@@ -1018,13 +1030,12 @@ TEST(Group_MultiLevelSubtables)
         // Get third ref to B and verify last mod
         b = a->get_subtable(1, 0);
         CHECK_EQUAL(a->get_subtable(1, 0)->get_int(0,0), 6661013);
-        File::try_remove("subtables3.tightdb");
-        g.write("subtables3.tightdb");
+        g.write(path_3);
     }
 
     // Mixed
     {
-        Group g("subtables3.tightdb");
+        Group g(path_3);
         TableRef table = g.get_table("test");
         // Get A as subtable
         TableRef a = table->get_subtable(2, 0);
@@ -1042,11 +1053,10 @@ TEST(Group_MultiLevelSubtables)
         // get a second ref to B (compare)
         CHECK_EQUAL(a->get_subtable(1, 0), b);
         CHECK_EQUAL(a->get_subtable(1, 0)->get_int(0,0), 6661012);
-        File::try_remove("subtables4.tightdb");
-        g.write("subtables4.tightdb");
+        g.write(path_4);
     }
     {
-        Group g("subtables4.tightdb");
+        Group g(path_4);
         TableRef table = g.get_table("test");
         // Get A as subtable
         TableRef a = table->get_subtable(2, 0);
@@ -1062,16 +1072,15 @@ TEST(Group_MultiLevelSubtables)
         // Get third ref to B and verify last mod
         b = a->get_subtable(1, 0);
         CHECK_EQUAL(a->get_subtable(1, 0)->get_int(0,0), 6661013);
-        File::try_remove("subtables5.tightdb");
-        g.write("subtables5.tightdb");
+        g.write(path_5);
     }
 }
 
 
 TEST(Group_CommitSubtable)
 {
-    File::try_remove("test.tightdb");
-    Group group("test.tightdb", Group::mode_ReadWrite);
+    GROUP_TEST_PATH(path);
+    Group group(path, Group::mode_ReadWrite);
 
     TableRef table = group.get_table("test");
     DescriptorRef sub_1;
@@ -1101,8 +1110,8 @@ TEST(Group_CommitSubtable)
 
 TEST(Group_CommitSubtableMixed)
 {
-    File::try_remove("test.tightdb");
-    Group group("test.tightdb", Group::mode_ReadWrite);
+    GROUP_TEST_PATH(path);
+    Group group(path, Group::mode_ReadWrite);
 
     TableRef table = group.get_table("test");
     table->add_column(type_Mixed, "mixed");
@@ -1127,6 +1136,21 @@ TEST(Group_CommitSubtableMixed)
     subtable = table->get_subtable(0,0);
     subtable->add_empty_row();
     group.commit();
+}
+
+
+TEST(Group_CommitDegenerateSubtable)
+{
+    GROUP_TEST_PATH(path);
+    Group group(path, Group::mode_ReadWrite);
+    TableRef table = group.get_table("parent");
+    table->add_column(type_Table, "");
+    table->get_subdescriptor(0)->add_column(type_Int, "");
+    table->add_empty_row();
+    TableRef subtab = table->get_subtable(0,0);
+    CHECK(subtab->is_degenerate());
+    group.commit();
+    CHECK(subtab->is_degenerate());
 }
 
 
@@ -1193,7 +1217,7 @@ TEST(Group_ToJSON)
     CHECK_EQUAL("{\"test\":[{\"first\":\"jeff\",\"second\":1,\"third\":true,\"fourth\":2},{\"first\":\"jim\",\"second\":1,\"third\":true,\"fourth\":2}]}", str);
 }
 
-TEST(Group_toString)
+TEST(Group_ToString)
 {
     Group g;
     TestTableGroup::Ref table = g.get_table<TestTableGroup>("test");
@@ -1273,10 +1297,10 @@ TEST(Group_StockBug)
     // the bug was fixed in pr 351. In release mode, it crashes
     // the application. To get an assert in debug mode, the max
     // list size should be set to 1000.
-    File::try_remove("test.tightdb");
-    Group group("test.tightdb", Group::mode_ReadWrite);
+    GROUP_TEST_PATH(path);
+    Group group(path, Group::mode_ReadWrite);
 
-    TableRef table  = group.get_table("stocks");
+    TableRef table = group.get_table("stocks");
     table->add_column(type_String, "ticker");
 
     for (size_t i = 0; i < 100; ++i) {
@@ -1287,6 +1311,7 @@ TEST(Group_StockBug)
         group.commit();
     }
 }
+
 
 #ifdef TIGHTDB_DEBUG
 #ifdef TIGHTDB_TO_DOT

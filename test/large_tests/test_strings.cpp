@@ -1,41 +1,58 @@
 #include <tightdb/column.hpp>
 
 #include "../util/number_names.hpp"
-#include "../util/unit_test.hpp"
-#include "../util/test_only.hpp"
+#include "../util/verified_string.hpp"
 
 #include "../testsettings.hpp"
-
-#include "verified_string.hpp"
-
-#if TEST_DURATION > 0
+#include "../test.hpp"
 
 using namespace std;
 using namespace tightdb;
+using namespace tightdb::test_util;
+
+
+// Test independence and thread-safety
+// -----------------------------------
+//
+// All tests must be thread safe and independent of each other. This
+// is required because it allows for both shuffling of the execution
+// order and for parallelized testing.
+//
+// In particular, avoid using std::rand() since it is not guaranteed
+// to be thread safe. Instead use the API offered in
+// `test/util/random.hpp`.
+//
+// All files created in tests must use the TEST_PATH macro (or one of
+// its friends) to obtain a suitable file system path. See
+// `test/util/test_path.hpp`.
+//
+//
+// Debugging and the ONLY() macro
+// ------------------------------
+//
+// A simple way of disabling all tests except one called `Foo`, is to
+// replace TEST(Foo) with ONLY(Foo) and then recompile and rerun the
+// test suite. Note that you can also use filtering by setting the
+// environment varible `UNITTEST_FILTER`. See `README.md` for more on
+// this.
+//
+// Another way to debug a particular test, is to copy that test into
+// `experiments/testcase.cpp` and then run `sh build.sh
+// check-testcase` (or one of its friends) from the command line.
+
 
 namespace {
 
-// Support functions for monkey test
-uint64_t rand2(int bitwidth = 64)
-{
-    uint64_t i = int64_t(rand()) * int64_t(rand()) * int64_t(rand()) * int64_t(rand()) * int64_t(rand());
-    if (bitwidth < 64) {
-        uint64_t mask = ((1ULL << bitwidth) - 1ULL);
-        i &= mask;
-    }
-    return i;
-}
-
-string randstring(void)
+string randstring(Random& random)
 {
     // If there are in the order of TIGHTDB_MAX_LIST_SIZE different strings, then we'll get a good
     // distribution btw. arrays with no matches and arrays with multiple matches, when
     // testing Find/FindAll
-    int64_t t = (rand() % 100) * 100;
-    size_t len = (rand() % 10) * 100 + 1;
+    int64_t t = random.draw_int_mod(100) * 100;
+    size_t len = random.draw_int_mod(10) * 100 + 1;
     string s;
     while (s.length() < len)
-        s += test_util::number_name(t);
+        s += number_name(t);
 
     s = s.substr(0, len);
     return s;
@@ -43,42 +60,44 @@ string randstring(void)
 
 } // anonymous namespace
 
-TEST(Strings_Monkey2)
+
+TEST_IF(Strings_Monkey2, TEST_DURATION >= 1)
 {
-    const uint64_t ITER = 16 * 5000 * TEST_DURATION * TEST_DURATION * TEST_DURATION;
-    const uint64_t SEED = 123;
+    uint64_t ITER = 16 * 5000 * TEST_DURATION * TEST_DURATION * TEST_DURATION;
+    int seed = 123;
 
     VerifiedString a;
-    Array res;
+    Column res;
 
-    srand(SEED);
-    unsigned int trend = 5;
+    Random random(seed);
+    int trend = 5;
 
     for (size_t iter = 0; iter < ITER; iter++) {
 
-//          if (rand() % 10 == 0) printf("Input bitwidth around ~%d, , a.Size()=%d\n", (int)current_bitwidth, (int)a.Size());
+//        if (random.chance(1, 10))
+//            cout << "Input bitwidth around ~"<<current_bitwidth<<", , a.Size()="<<a.size()<<"\n";
 
-        if (!(rand2() % (ITER / 100))) {
-            trend = unsigned(rand2()) % 10;
+        if (random.draw_int_mod(ITER / 100) == 0) {
+            trend = random.draw_int_mod(10);
 
-            a.find_first(randstring().c_str());
-            a.find_all(res, randstring().c_str());
+            a.find_first(randstring(random));
+            a.find_all(res, randstring(random));
         }
 
-        if (rand2() % 10 > trend && a.size() < ITER / 100) {
-            if (rand2() % 2 == 0) {
+        if (random.draw_int_mod(10) > trend && a.size() < ITER / 100) {
+            if (random.draw_bool()) {
                 // Insert
-                size_t pos = rand2() % (a.size() + 1);
-                a.insert(pos, randstring().c_str());
+                size_t pos = random.draw_int_max(a.size());
+                a.insert(pos, randstring(random));
             }
             else {
                 // Add
-                a.add(randstring().c_str());
+                a.add(randstring(random));
             }
         }
         else if (a.size() > 0) {
             // Delete
-            size_t i = rand2() % a.size();
+            size_t i = random.draw_int_mod(a.size());
             a.erase(i);
         }
     }
@@ -87,5 +106,3 @@ TEST(Strings_Monkey2)
     a.destroy();
     res.destroy();
 }
-
-#endif // TEST_DURATION > 0

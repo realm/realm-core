@@ -111,6 +111,7 @@ public:
 protected:
     template<class, int, class, bool> friend class _impl::FieldAccessor;
     template<class, int, class> friend class _impl::MixedFieldAccessorBase;
+    template<class Spec> friend class BasicTable;
 
     Impl m_impl;
 
@@ -166,6 +167,9 @@ public:
     void clear() { Base::m_impl.clear(); }
     void remove(size_t ndx) { Base::m_impl.remove(ndx); }
     void remove_last() { Base::m_impl.remove_last(); }
+
+    // Resort after requery
+    void apply_same_order(BasicTableView& order) { Base::m_impl.apply_same_order(order.m_impl); };
 
     Tab& get_parent() TIGHTDB_NOEXCEPT
     {

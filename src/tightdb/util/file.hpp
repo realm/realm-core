@@ -348,11 +348,12 @@ public:
     /// it is, this function has undefined behaviour. Note that an
     /// open memory map of the file counts as "the file being open".
     ///
-    /// \throw AccessError If the file could not be removed. If the
-    /// reason corresponds to one of the exception types that are
-    /// derived from AccessError, the derived exception type is thrown
-    /// (as long as the underlying system provides the information to
-    /// unambiguously distinguish that particular reason).
+    /// \throw AccessError If the specified directory entry could not
+    /// be removed. If the reason corresponds to one of the exception
+    /// types that are derived from AccessError, the derived exception
+    /// type is thrown (as long as the underlying system provides the
+    /// information to unambiguously distinguish that particular
+    /// reason).
     static void remove(const std::string& path);
 
     /// Same as remove() except that this one returns false, rather
@@ -360,6 +361,19 @@ public:
     /// exist. If the file did exist, and was deleted, this function
     /// returns true.
     static bool try_remove(const std::string& path);
+
+    /// Change the path of a directory entry. This can be used to
+    /// rename a file, and/or to move it from one directory to
+    /// another. This function is equivalent to std::rename(const
+    /// char*, const char*).
+    ///
+    /// \throw AccessError If the path of the directory entry could
+    /// not be changed. If the reason corresponds to one of the
+    /// exception types that are derived from AccessError, the derived
+    /// exception type is thrown (as long as the underlying system
+    /// provides the information to unambiguously distinguish that
+    /// particular reason).
+    static void move(const std::string& old_path, const std::string& new_path);
 
     /// Check whether two open file descriptors refer to the same
     /// underlying file, that is, if writing via one of them, will
@@ -532,7 +546,6 @@ public:
 
     friend class UnmapGuard;
 };
-
 
 
 class File::CloseGuard {

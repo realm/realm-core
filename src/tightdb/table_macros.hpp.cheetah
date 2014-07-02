@@ -98,37 +98,37 @@ type${j+1} name${j+1}%slurp
 %end for
 ) \
         { \
-            ::tightdb::BasicTable<Table##Spec>* const t = \
+            ::tightdb::BasicTable<Table##Spec>* const _tightdb_t = \
                 static_cast< ::tightdb::BasicTable<Table##Spec>* >(this); \
-            t->add((::tightdb::util::tuple()%slurp
+            _tightdb_t->add((::tightdb::util::tuple()%slurp
 %for $j in range($num_cols)
 , name${j+1}%slurp
 %end for
 )); \
         } \
-        void insert(std::size_t _i%slurp
+        void insert(std::size_t _tightdb_i%slurp
 %for $j in range($num_cols)
 , type${j+1} name${j+1}%slurp
 %end for
 ) \
         { \
-            ::tightdb::BasicTable<Table##Spec>* const t = \
+            ::tightdb::BasicTable<Table##Spec>* const _tightdb_t = \
                 static_cast< ::tightdb::BasicTable<Table##Spec>* >(this); \
-            t->insert(_i, (::tightdb::util::tuple()%slurp
+            _tightdb_t->insert(_tightdb_i, (::tightdb::util::tuple()%slurp
 %for $j in range($num_cols)
 , name${j+1}%slurp
 %end for
 )); \
         } \
-        void set(std::size_t _i%slurp
+        void set(std::size_t _tightdb_i%slurp
 %for $j in range($num_cols)
 , type${j+1} name${j+1}%slurp
 %end for
 ) \
         { \
-            ::tightdb::BasicTable<Table##Spec>* const t = \
+            ::tightdb::BasicTable<Table##Spec>* const _tightdb_t = \
                 static_cast< ::tightdb::BasicTable<Table##Spec>* >(this); \
-            t->set(_i, (::tightdb::util::tuple()%slurp
+            _tightdb_t->set(_tightdb_i, (::tightdb::util::tuple()%slurp
 %for $j in range($num_cols)
 , name${j+1}%slurp
 %end for

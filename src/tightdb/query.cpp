@@ -10,24 +10,18 @@
 using namespace std;
 using namespace tightdb;
 
-#if TIGHTDB_MULTITHREAD_QUERY
-namespace {
-const size_t thread_chunk_size = 1000;
-}
-#endif
-
-Query::Query()
+Query::Query() : m_tableview(null_ptr)
 {
     Create();
 //    expression(static_cast<Expression*>(this));
 }
 
-Query::Query(Table& table) : m_table(table.get_table_ref())
+Query::Query(Table& table, TableViewBase* tv) : m_table(table.get_table_ref()), m_tableview(tv)
 {
     Create();
 }
 
-Query::Query(const Table& table) : m_table((const_cast<Table&>(table)).get_table_ref())
+Query::Query(const Table& table, TableViewBase* tv) : m_table((const_cast<Table&>(table)).get_table_ref()), m_tableview(tv)
 {
     Create();
 }
@@ -37,9 +31,7 @@ void Query::Create()
     update.push_back(0);
     update_override.push_back(0);
     first.push_back(0);
-#if TIGHTDB_MULTITHREAD_QUERY
-    m_threadcount = 0;
-#endif
+    pending_not.push_back(false);
     do_delete = true;
 }
 
@@ -51,22 +43,63 @@ Query::Query(const Query& copy)
     update = copy.update;
     update_override = copy.update_override;
     first = copy.first;
+    pending_not = copy.pending_not;
     error_code = copy.error_code;
-#if TIGHTDB_MULTITHREAD_QUERY
-    m_threadcount = copy.m_threadcount;
-#endif
-    //    copy.first[0] = 0;
+    m_tableview = copy.m_tableview;
     copy.do_delete = false;
     do_delete = true;
 }
 
+void Query::move_assign(Query& copy)
+{
+    if (do_delete) {
+        for (size_t t = 0; t < all_nodes.size(); t++) {
+            delete all_nodes[t];
+        }
+    }
+
+    m_table = copy.m_table;
+    all_nodes = copy.all_nodes;
+    update = copy.update;
+    update_override = copy.update_override;
+    first = copy.first;
+    pending_not = copy.pending_not;
+    error_code = copy.error_code;
+    m_tableview = copy.m_tableview;
+    copy.do_delete = false;
+    do_delete = true;
+    copy.m_table = TableRef();
+}
+
+Query::Query(const Query& copy, const TCopyExpressionTag&) 
+{
+    Create();
+    std::map<ParentNode*, ParentNode*> node_mapping;
+    node_mapping[ null_ptr ] = null_ptr;
+    std::vector<ParentNode*>::const_iterator i;
+    for (i = copy.all_nodes.begin(); i != copy.all_nodes.end(); ++i) {
+        ParentNode* new_node = (*i)->clone();
+        all_nodes.push_back(new_node);
+        node_mapping[ *i ] = new_node;
+    }
+    for (i = all_nodes.begin(); i != all_nodes.end(); ++i) {
+        (*i)->translate_pointers(node_mapping);
+    }
+    if (all_nodes.size() > 0) {
+        first[0] = all_nodes[0];
+    }
+    m_table = copy.m_table;
+    m_tableview = copy.m_tableview;
+
+    for (size_t t = 0; t < update.size(); t++) {
+        update[t] = &first[0];
+    }
+
+}
+
+
 Query::~Query() TIGHTDB_NOEXCEPT
 {
-#if TIGHTDB_MULTITHREAD_QUERY
-    for (size_t i = 0; i < m_threadcount; i++)
-        pthread_detach(threads[i]);
-#endif
-
     if (do_delete) {
         for (size_t t = 0; t < all_nodes.size(); t++) {
             ParentNode *p = all_nodes[t];
@@ -92,21 +125,10 @@ Query& Query::expression(Expression* compare, bool auto_delete)
 // Makes query search only in rows contained in tv
 Query& Query::tableview(const TableView& tv)
 {
-    const Array& arr = tv.get_ref_column();
-    return tableview(arr, tv.m_is_in_index_order); // throw
-}
-
-// Makes query search only in rows contained in tv
-Query& Query::tableview(const Array& arr, bool is_in_index_order)
-{
-    if (!is_in_index_order) {
-        throw runtime_error("Sorted views cannot be used in queries");
-    }
-    ParentNode* const p = new ListviewNode(arr);
+    ParentNode* const p = new ListviewNode(tv);
     UpdatePointers(p, &p->m_child);
     return *this;
 }
-
 
 // Binary
 Query& Query::equal(size_t column_ndx, BinaryData b)
@@ -357,8 +379,10 @@ Query& Query::less(size_t column_ndx, int64_t value)
 }
 Query& Query::between(size_t column_ndx, int64_t from, int64_t to)
 {
+    group();
     greater_equal(column_ndx, from);
     less_equal(column_ndx, to);
+    end_group();
     return *this;
 }
 Query& Query::equal(size_t column_ndx, bool value)
@@ -395,8 +419,10 @@ Query& Query::less(size_t column_ndx, float value)
 }
 Query& Query::between(size_t column_ndx, float from, float to)
 {
+    group();
     greater_equal(column_ndx, from);
     less_equal(column_ndx, to);
+    end_group();
     return *this;
 }
 
@@ -428,8 +454,10 @@ Query& Query::less(size_t column_ndx, double value)
 }
 Query& Query::between(size_t column_ndx, double from, double to)
 {
+    group();
     greater_equal(column_ndx, from);
     less_equal(column_ndx, to);
+    end_group();
     return *this;
 }
 
@@ -490,6 +518,22 @@ Query& Query::not_equal(size_t column_ndx, StringData value, bool case_sensitive
 
 // Aggregates =================================================================================
 
+size_t Query::peek_tableview(size_t tv_index) const
+{
+    TIGHTDB_ASSERT(m_tableview);
+    TIGHTDB_ASSERT(tv_index < m_tableview->size());
+
+    size_t tablerow = m_tableview->get_source_ndx(tv_index);
+
+    size_t r;
+    if (first.size() > 0 && first[0])
+        r = first[0]->find_first(tablerow, tablerow + 1);
+    else
+        r = tablerow;
+
+    return r;
+}
+
 template <Action action, typename T, typename R, class ColType>
 R Query::aggregate(R (ColType::*aggregateMethod)(size_t start, size_t end, size_t limit) const,
                     size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
@@ -501,12 +545,12 @@ R Query::aggregate(R (ColType::*aggregateMethod)(size_t start, size_t end, size_
     }
 
     if (end == size_t(-1))
-        end = m_table->size();
+        end = m_tableview ? m_tableview->size() : m_table->size();
 
     const ColType& column =
         m_table->get_column<ColType, ColumnType(ColumnTypeTraits<T>::id)>(column_ndx);
 
-    if (first.size() == 0 || first[0] == 0) {
+    if ((first.size() == 0 || first[0] == 0) && !m_tableview) {
 
         // No criteria, so call aggregate METHODS directly on columns
         // - this bypasses the query system and is faster
@@ -519,21 +563,30 @@ R Query::aggregate(R (ColType::*aggregateMethod)(size_t start, size_t end, size_
     }
     else {
 
-        // Aggregate with criteria - goest through the nodes in the query system
+        // Aggregate with criteria - goes through the nodes in the query system
         Init(*m_table);
         QueryState<R> st;
         st.init(action, null_ptr, limit);
 
         SequentialGetter<T> source_column(*m_table, column_ndx);
 
-        aggregate_internal(action, ColumnTypeTraits<T>::id, first[0],&st, start, end, &source_column);
+        if (!m_tableview) {
+            aggregate_internal(action, ColumnTypeTraits<T>::id, first[0], &st, start, end, &source_column);
+        }
+        else {
+            for (size_t t = start; t < end && st.m_match_count < limit; t++) {
+                size_t r = peek_tableview(t);
+                if (r != not_found)
+                    st.template match<action, false>(r, 0, source_column.get_next(m_tableview->get_source_ndx(t)));
+            }
+        }
+
         if (resultcount) {
             *resultcount = st.m_match_count;
         }
         return st.m_state;
     }
 }
-
 
     /**************************************************************************************************************
     *                                                                                                             *
@@ -675,6 +728,7 @@ Query& Query::group()
     update.push_back(0);
     update_override.push_back(0);
     first.push_back(0);
+    pending_not.push_back(false);
     return *this;
 }
 Query& Query::end_group()
@@ -684,21 +738,72 @@ Query& Query::end_group()
         return *this;
     }
 
+    // append first node in current group to surrounding group. If an Or node was met,
+    // it will have manipulated first, so that it (the Or node) is the first node in the
+    // current group.
     if (update[update.size()-2] != 0)
         *update[update.size()-2] = first[first.size()-1];
 
+    // similarly, if the surrounding group is empty, simply make first node of current group,
+    // the first node of the surrounding group.
     if (first[first.size()-2] == 0)
         first[first.size()-2] = first[first.size()-1];
 
+    // the update back link for the surrounding group must be updated to support
+    // the linking in of nodes that follows. If the node we are adding to the surrounding
+    // context has taken control of the nodes in the inner group, then we set up an
+    // update to a field inside it - if not, then we just copy the last update in the
+    // current group into the surrounding group. So: the update override is used to override
+    // the normal sequential linking in of nodes, producing e.g. the structure used for
+    // OrNodes and NotNodes.
     if (update_override[update_override.size()-1] != 0)
         update[update.size() - 2] = update_override[update_override.size()-1];
     else if (update[update.size()-1] != 0)
         update[update.size() - 2] = update[update.size()-1];
 
     first.pop_back();
+    pending_not.pop_back();
     update.pop_back();
     update_override.pop_back();
+    HandlePendingNot();
     return *this;
+}
+
+// Not creates an implicit group to capture the term that we want to negate.
+Query& Query::Not()
+{
+    NotNode* const p = new NotNode;
+    all_nodes.push_back(p);
+    if (first[first.size()-1] == null_ptr) {
+        first[first.size()-1] = p;
+    }
+    if (update[update.size()-1] != null_ptr) {
+        *update[update.size()-1] = p;
+    }
+    group();
+    pending_not[pending_not.size()-1] = true;
+    // value for update for sub-condition
+    update[update.size()-2] = null_ptr;
+    update[update.size()-1] = &p->m_cond;
+    // pending value for update, once the sub-condition ends:
+    update_override[update_override.size()-1] = &p->m_child;
+    return *this;
+}
+
+// And-terms must end by calling HandlePendingNot. This will check if a negation is pending,
+// and if so, it will end the implicit group created to hold the term to negate. Note that
+// end_group itself will recurse into HandlePendingNot if multiple implicit groups are nested
+// within each other.
+void Query::HandlePendingNot()
+{
+    if (pending_not.size() > 1 && pending_not[pending_not.size()-1]) {
+        // we are inside group(s) implicitly created to handle a not, so pop it/them:
+        // but first, prevent the pop from linking the current node into the surrounding
+        // context - the current node is instead hanging of from the previously added NotNode's
+        // m_cond field.
+        // update[update.size()-1] = 0;
+        end_group();
+    }
 }
 
 Query& Query::Or()
@@ -739,59 +844,86 @@ Query& Query::end_subtable()
 }
 
 // todo, add size_t end? could be useful
-size_t Query::find(size_t begin_at_table_row)
+size_t Query::find(size_t begin)
 {
-    if(m_table->is_degenerate())
+    if (m_table->is_degenerate())
         return not_found;
 
-    TIGHTDB_ASSERT(begin_at_table_row <= m_table->size());
+    TIGHTDB_ASSERT(begin <= m_table->size());
 
     Init(*m_table);
 
     // User created query with no criteria; return first
-    if (first.size() == 0 || first[0] == 0) {
-        return m_table->size() == 0 ? not_found : begin_at_table_row;
+    if (first.size() == 0 || first[0] == null_ptr) {
+        if (m_tableview)
+            return m_tableview->size() == 0 ? not_found : begin;
+        else
+            return m_table->size() == 0 ? not_found : begin;
     }
 
-    const size_t end = m_table->size();
-    const size_t res = first[0]->find_first(begin_at_table_row, end);
-
-    return (res == end) ? not_found : res;
+    if (m_tableview) {
+        size_t end = m_tableview->size();
+        for (size_t begin2 = begin; begin < end; begin++) {
+            size_t res = peek_tableview(begin2);
+            if (res != not_found)
+                return begin2;
+        }
+        return not_found;
+    }
+    else {
+        size_t end = m_table->size();
+        size_t res = first[0]->find_first(begin, end);
+        return (res == end) ? not_found : res;
+    }
 }
 
-TableView Query::find_all(size_t start, size_t end, size_t limit)
+void Query::find_all(TableViewBase& ret, size_t start, size_t end, size_t limit) const
 {
-    if(limit == 0 || m_table->is_degenerate())
-        return TableView(*m_table);
+    if (limit == 0 || m_table->is_degenerate())
+        return;
 
     TIGHTDB_ASSERT(start <= m_table->size());
 
     Init(*m_table);
 
     if (end == size_t(-1))
-        end = m_table->size();
+        end = m_tableview ? m_tableview->size() : m_table->size();
 
     // User created query with no criteria; return everything
     if (first.size() == 0 || first[0] == 0) {
-        TableView tv(*m_table);
-        for (size_t i = start; i < end && i - start < limit; i++)
-            tv.get_ref_column().add(i);
-        return tv;
+        Column& refs = ret.get_ref_column();
+        size_t end_pos = (limit != size_t(-1)) ? min(end, start + limit) : end;
+
+        if (m_tableview) {
+            for (size_t i = start; i < end_pos; ++i)
+                refs.add(m_tableview->get_source_ndx(i));
+        }
+        else {
+            for (size_t i = start; i < end_pos; ++i)
+                refs.add(i);
+        }
+        return;
     }
 
-#if TIGHTDB_MULTITHREAD_QUERY
-    if (m_threadcount > 0) {
-        // Use multithreading
-        return find_all_multi(start, end);
+    if (m_tableview) {
+        for (size_t begin = start; begin < end && ret.size() < limit; begin++) {
+            size_t res = peek_tableview(begin);
+            if (res != not_found)
+                ret.get_ref_column().add(res);
+        }
     }
-#endif
+    else {
+        QueryState<int64_t> st;
+        st.init(act_FindAll, &ret.get_ref_column(), limit);
+        aggregate_internal(act_FindAll, ColumnTypeTraits<int64_t>::id, first[0], &st, start, end, NULL);
+    }
+}
 
-    // Use single threading
-    TableView tv(*m_table);
-    QueryState<int64_t> st;
-    st.init(act_FindAll, &tv.get_ref_column(), limit);
-    aggregate_internal(act_FindAll, ColumnTypeTraits<int64_t>::id, first[0], &st, start, end, NULL);
-    return tv;
+TableView Query::find_all(size_t start, size_t end, size_t limit)
+{
+    TableView ret(*m_table, *this, start, end, limit);
+    find_all(ret, start, end, limit);
+    return ret;
 }
 
 
@@ -801,7 +933,7 @@ size_t Query::count(size_t start, size_t end, size_t limit) const
         return 0;
 
     if (end == size_t(-1))
-        end = m_table->size();
+        end = m_tableview ? m_tableview->size() : m_table->size();
 
     if (first.size() == 0 || first[0] == 0) {
         // User created query with no criteria; count all
@@ -809,10 +941,23 @@ size_t Query::count(size_t start, size_t end, size_t limit) const
     }
 
     Init(*m_table);
-    QueryState<int64_t> st;
-    st.init(act_Count, null_ptr, limit);
-    aggregate_internal(act_Count, ColumnTypeTraits<int64_t>::id, first[0], &st, start, end, NULL);
-    return size_t(st.m_state);
+    size_t cnt = 0;
+
+    if (m_tableview) {
+        for (size_t begin = start; begin < end && cnt < limit; begin++) {
+            size_t res = peek_tableview(begin);
+            if (res != not_found)
+                cnt++;
+        }
+    }
+    else {
+        QueryState<int64_t> st;
+        st.init(act_Count, null_ptr, limit);
+        aggregate_internal(act_Count, ColumnTypeTraits<int64_t>::id, first[0], &st, start, end, NULL);
+        cnt = size_t(st.m_state);
+    }
+
+    return cnt;
 }
 
 
@@ -823,23 +968,42 @@ size_t Query::remove(size_t start, size_t end, size_t limit)
         return 0;
 
     if (end == not_found)
-        end = m_table->size();
+        end = m_tableview ? m_tableview->size() : m_table->size();
 
-    size_t r = start;
     size_t results = 0;
 
-    for (;;) {
-        // Every remove invalidates the array cache in the nodes
-        // so we have to re-initialize it before searching
-        Init(*m_table);
+    if (m_tableview) {
+        for (;;) {
+            if (start + results == end || results == limit)
+                return results;
 
-        r = FindInternal(r, end - results);
-        if (r == not_found || r == m_table->size() || results == limit)
-            break;
-        ++results;
-        m_table->remove(r);
+            Init(*m_table);
+            size_t r = peek_tableview(start + results);
+            if (r != not_found) {
+                m_table->remove(r);
+                m_tableview->get_ref_column().adjust_ge(m_tableview->get_source_ndx(start + results), -1);
+                results++;
+            }
+            else {
+                return results;
+            }
+        }
     }
-    return results;
+    else {
+        size_t r = start;
+        for (;;) {
+            // Every remove invalidates the array cache in the nodes
+            // so we have to re-initialize it before searching
+            Init(*m_table);
+
+            r = FindInternal(r, end - results);
+            if (r == not_found || r == m_table->size() || results == limit)
+                break;
+            ++results;
+            m_table->remove(r);
+        }
+        return results;
+    }
 }
 
 #if TIGHTDB_MULTITHREAD_QUERY
@@ -1032,13 +1196,16 @@ bool Query::comp(const pair<size_t, size_t>& a, const pair<size_t, size_t>& b)
 void Query::UpdatePointers(ParentNode* p, ParentNode** newnode)
 {
     all_nodes.push_back(p);
-    if (first[first.size()-1] == 0)
+    if (first[first.size()-1] == 0) {
         first[first.size()-1] = p;
+    }
 
-    if (update[update.size()-1] != 0)
+    if (update[update.size()-1] != 0) {
         *update[update.size()-1] = p;
-
+    }
     update[update.size()-1] = newnode;
+
+    HandlePendingNot();
 }
 
 /* ********************************************************************************************************************
@@ -1086,4 +1253,15 @@ Query Query::operator&&(Query q)
     q2.and_query(q);
 
     return q2;
+}
+
+
+Query Query::operator!()
+{
+    if (first[0] == null_ptr)
+        throw runtime_error("negation of empty query is not supported");
+    Query q(*this->m_table);
+    q.Not();
+    q.and_query(*this);
+    return q;
 }

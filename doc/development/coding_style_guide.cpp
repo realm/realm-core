@@ -3,7 +3,7 @@
 //
 
 
-// Lines should never exceed 120 characters ---------------------------------------------------------------------------
+// Lines should never exceed 118 characters --------------------------------------------------------------------------
 
 
 // Macro names use uppercase and have "TIGHTDB_" as prefix. Non-macro
@@ -38,8 +38,6 @@ my_type my_func()
 
     if (...)
         return ...;
-    else
-        return ...;
 
     // No space between type and '*' or '&'
     int* foo1 = ...;
@@ -49,7 +47,7 @@ my_type my_func()
     const int foo3 = ...;
 
     // ... but not when 'const' operates on a pointer type
-    const int* foo3 = ...; // 'const' operates in 'int' not 'int*'
+    const int* foo3 = ...; // 'const' operates on 'int' not 'int*'
     int* const foo4 = ...; // 'const' operates on 'int*'
     int* const* const foo5 = ...;
 }
@@ -94,10 +92,10 @@ namespace my_namespace {
 
 template<class T> class MyClass: public Base {
 public:
-    MyClass(...): Base(...), m_bar(7), ... { ... }
-
     MyClass(...):
-        Base(...), m_bar(7), ...
+        Base(...),
+        m_bar(7),
+        ...
     {
         // ...
     }
@@ -148,3 +146,29 @@ private:
     // Friends
 };
 
+
+// About FIXMEs:
+//
+// A FIXME conveys information about a known issue or shortcoming. It
+// may also include information on how to fix the problem, and on
+// possible conflicts with anticipated future features.
+//
+// A FIXME is often added in the following situations:
+//
+// - While working on, or studying a particular part of the code you
+//   uncover an issue or a shortcoming. Additionally, you may have
+//   gained an understanding of how to fix it.
+//
+// - While implementing a new feature, you are forced to cut a corner,
+//   but you have some good ideas about how to continue later, and/or
+//   you may have knowledge about a certain planned feature that would
+//   require a more complete solution.
+//
+// A FIXME is generally not about a bug or an error, and is should
+// generally not be considered a task either. Is is simply a memo to
+// oneself or to some other developer who is going to work on the code
+// at some later point in time.
+//
+// A FIXME should never be deleted unless by somebody who understands
+// the mening of it and knows that the problem is fixed, or has
+// otherwise diappeard.

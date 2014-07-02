@@ -524,7 +524,11 @@ inline void CondVar::notify_all() TIGHTDB_NOEXCEPT
 }
 
 
-// Support for simple atomic variables with release and acquire semantics
+// Support for simple atomic variables, inspired by C++11 atomics, but incomplete.
+//
+// The level of support provided is driven by the need of the tightdb library.
+// It is not meant to provide full support for atomics, but it is meant to be
+// the place where we put low level code related to atomic variables.
 //
 // Useful for non-blocking data structures.
 //
@@ -532,8 +536,21 @@ inline void CondVar::notify_all() TIGHTDB_NOEXCEPT
 // of the variables, and ensures that the compiler will not optimize away
 // relevant instructions.
 //
-// Use it only on naturally aligned and naturally atomic objects,
-// should work on integers and pointers on all machines.
+// This template can only be used for types for which the underlying hardware
+// guarantees atomic reads and writes. On almost any machine in production,
+// this includes all types with the size of a machine word (or machine register) 
+// or less, except bit fields.
+// 
+// FIXME: This leaves it to the user of the software to ascertain that the
+// hardware lives up to the requirement. The long term goal should be to provide
+// atomicity in a way which will cause compilation to fail if the underlying
+// platform is not guaranteed to support the requirements given by the use of
+// the primitives.
+//
+// FIXME: The current implementation provides the functionality required for the
+// tightdb library, but *not* all the functionality often provided by atomics.
+// (see C++11 atomics for an example). We'll add additional functionality as
+// the need arises.
 //
 // Usage: For non blocking data structures, you need to wrap any synchronization
 // variables using the Atomic template. Variables which are not used for
@@ -541,17 +558,14 @@ inline void CondVar::notify_all() TIGHTDB_NOEXCEPT
 // is done using the store and load methods declared here, memory barriers will
 // ensure a consistent view of the other variables.
 //
-// Technical note: The intent is to provide acquire semantics on load and release
-// semantics on store. This means that things like Petersons algorithm cannot be
-// implemented using these primitive, because it requires sequential consistency.
-//
 // Prior to gcc 4.7 there was no portable ways of providing acquire/release semantics,
 // so for earlier versions we fall back to sequential consistency.
 // As some architectures, most notably x86, provide release and acquire semantics
 // in hardware, this is somewhat annoying, because we will use a full memory barrier
-// where no-one is needed. FIXME: introduce x86 specific optimization to avoid the
-// memory barrier!
-
+// where no-one is needed.
+//
+// FIXME: introduce x86 specific optimization to avoid the memory
+// barrier!
 template<class T>
 class Atomic
 {
@@ -569,10 +583,13 @@ public:
     T load() const;
     T load_acquire() const;
     T load_relaxed() const;
+    T fetch_sub_relaxed(T v);
+    T fetch_sub_release(T v);
+    T fetch_add_acquire(T v);
     void store(T value);
     void store_release(T value);
     void store_relaxed(T value);
-    bool compare_and_swap(T oldvalue, T newvalue);
+    bool compare_and_swap(T& oldvalue, T newvalue);
 private:
     // the following is not supported
     Atomic(Atomic<T>&);
@@ -615,6 +632,24 @@ inline T Atomic<T>::load_relaxed() const
 }
 
 template<typename T>
+inline T Atomic<T>::fetch_sub_relaxed(T v)
+{
+    return state.fetch_sub(v, std::memory_order_relaxed);
+}
+
+template<typename T>
+inline T Atomic<T>::fetch_sub_release(T v)
+{
+    return state.fetch_sub(v, std::memory_order_release);
+}
+
+template<typename T>
+inline T Atomic<T>::fetch_add_acquire(T v)
+{
+    return state.fetch_add(v, std::memory_order_acquire);
+}
+
+template<typename T>
 inline void Atomic<T>::store(T value)
 {
     state.store(value);
@@ -633,7 +668,7 @@ inline void Atomic<T>::store_relaxed(T value)
 }
 
 template<typename T>
-inline bool Atomic<T>::compare_and_swap(T oldvalue, T newvalue)
+inline bool Atomic<T>::compare_and_swap(T& oldvalue, T newvalue)
 {
     return state.compare_exchange_weak(oldvalue, newvalue);
 }
@@ -733,6 +768,39 @@ inline T Atomic<T>::load() const
 }
 
 template<typename T>
+inline T Atomic<T>::fetch_sub_relaxed(T v)
+{
+#if TIGHTDB_HAVE_AT_LEAST_GCC(4, 7)
+    return __atomic_fetch_sub(&state, v, __ATOMIC_RELAXED);
+#else
+    return __sync_fetch_and_sub(&state, v);
+#endif
+}
+
+template<typename T>
+inline T Atomic<T>::fetch_sub_release(T v)
+{
+#if TIGHTDB_HAVE_AT_LEAST_GCC(4, 7)
+    return __atomic_fetch_sub(&state, v, __ATOMIC_RELEASE);
+#else
+    return __sync_fetch_and_sub(&state, v);
+#endif
+}
+
+
+template<typename T>
+inline T Atomic<T>::fetch_add_acquire(T v)
+{
+#if TIGHTDB_HAVE_AT_LEAST_GCC(4, 7)
+    return __atomic_fetch_add(&state, v, __ATOMIC_ACQUIRE);
+#else
+    return __sync_fetch_and_add(&state, v);
+#endif
+}
+
+
+
+template<typename T>
 inline void Atomic<T>::store(T value)
 {
 #if TIGHTDB_HAVE_AT_LEAST_GCC(4, 7)
@@ -780,63 +848,22 @@ inline void Atomic<T>::store_relaxed(T value)
 }
 
 template<typename T>
-inline bool Atomic<T>::compare_and_swap(T oldvalue, T newvalue)
+inline bool Atomic<T>::compare_and_swap(T& oldvalue, T newvalue)
 {
-    return __sync_bool_compare_and_swap(&state, oldvalue, newvalue);
+#if TIGHTDB_HAVE_AT_LEAST_GCC(4, 7)
+    return __atomic_compare_exchange_n(&state, &oldvalue, newvalue, false, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE);
+#else
+    T ov = oldvalue;
+    oldvalue = __sync_val_compare_and_swap(&state, oldvalue, newvalue);
+    return (ov == oldvalue);
+    
+#endif
 }
 
 
 #endif // GCC
 #endif // C++11 else
 
-// Template Relaxed is used to mark a variable as used for interthread
-// communication with relaxed semantics, i.e. no guarantee of atomicity
-// and no guarantee of ordering. It does guarantee, however, that reads
-// cannot be cached in a register inside a tight loop.
-
-template<class T>
-class Relaxed
-{
-public:
-    inline Relaxed()
-    {
-        state = 0;
-    }
-
-    inline Relaxed(T init_value)
-    {
-        state = init_value;
-    }
-
-    T load_relaxed() const
-    {
-#ifdef __GNUC__
-        asm volatile("" : : : "memory");
-#endif
-        return state;
-    }
-    void store_relaxed(T value)
-    {
-        state = value;
-#ifdef __GNUC__
-        asm volatile("" : : : "memory");
-#endif
-    }
-private:
-    // the following is not supported
-    Relaxed(Relaxed<T>&);
-    Relaxed<T>& operator=(const Relaxed<T>&);
-
-#ifdef _MSC_VER
-    volatile T state;
-#else
-#ifdef __GNUC__
-    T state;
-#else
-#error "Unsupported use of Relaxed on this compiler"
-#endif
-#endif
-};
 
 
 } // namespace util

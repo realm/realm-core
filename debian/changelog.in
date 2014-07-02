@@ -1,3 +1,45 @@
+libtightdb (0.22.0~@CODENAME@-1) UNRELEASED; urgency=low
+
+  * Tracking upstream release.
+
+ -- Emanuele Zattin <ez@realm.io>  Fri, 13 Jun 2014 13:31:27 +0200
+
+
+libtightdb (0.21.0~@CODENAME@-1) UNRELEASED; urgency=low
+
+  * Tracking upstream release.
+
+ -- Emanuele Zattin <emanuele.zattin@switch-gears.dk>  Fri, 06 Jun 2014 22:34:52 +0200
+
+
+libtightdb (0.20.0~@CODENAME@-1) UNRELEASED; urgency=low
+
+  * Tracking upstream release.
+
+ -- Emanuele Zattin <ez@realm.io>  Wed, 28 May 2014 14:47:32 +0200
+
+
+libtightdb (0.10.0~@CODENAME@-1) UNRELEASED; urgency=low
+
+  * Tracking upstream release.
+
+ -- Emanuele Zattin <ez@tightdb.com>  Wed, 23 Apr 2014 11:53:55 +0200
+
+
+libtightdb (0.6.0~@CODENAME@-1) UNRELEASED; urgency=low
+
+  * Tracking upstream release.
+
+ -- Emanuele Zattin <emanuele.zattin@switch-gears.dk>  Thu, 10 Apr 2014 10:14:57 +0200
+
+
+libtightdb (0.5.0~@CODENAME@-1) UNRELEASED; urgency=low
+
+  * Tracking upstream release.
+
+ -- Emanuele Zattin <ez@tightdb.com>  Tue, 01 Apr 2014 13:52:40 +0200
+
+
 libtightdb (0.4.0~@CODENAME@-1) UNRELEASED; urgency=low
 
   * Tracking upstream release.

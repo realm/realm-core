@@ -1,71 +1,19 @@
 #include <tightdb/util/unique_ptr.hpp>
 #include <tightdb/descriptor.hpp>
+#include <tightdb/column_string.hpp>
 
 using namespace tightdb;
 using namespace tightdb::util;
 
 
-void Descriptor::insert_column(size_t column_ndx, DataType type, StringData name,
-                               DescriptorRef* subdesc)
-{
-    TIGHTDB_ASSERT(is_attached());
-    _impl::TableFriend::insert_column(*this, column_ndx, type, name); // Throws
-
-    // Adjust the column indexes of subdescriptor accessors at higher
-    // column indexes.
-    typedef subdesc_map::iterator iter;
-    iter end = m_subdesc_map.end();
-    for (iter i = m_subdesc_map.begin(); i != end; ++i) {
-        if (i->m_column_ndx >= column_ndx)
-            ++i->m_column_ndx;
-    }
-
-    if (subdesc && type == type_Table)
-        *subdesc = get_subdescriptor(column_ndx);
-}
-
-
-void Descriptor::remove_column(size_t column_ndx)
-{
-    TIGHTDB_ASSERT(is_attached());
-    _impl::TableFriend::remove_column(*this, column_ndx); // Throws
-
-    // If it exists, remove and detach the subdescriptor accessor
-    // associated with the removed column. Also adjust the column
-    // indexes of subdescriptor accessors at higher column indexes.
-    typedef subdesc_map::iterator iter;
-    iter end = m_subdesc_map.end();
-    iter erase = end;
-    for (iter i = m_subdesc_map.begin(); i != end; ++i) {
-        if (i->m_column_ndx == column_ndx) {
-            // Must hold a reliable reference count while detaching
-            DescriptorRef desc(i->m_subdesc);
-            desc->detach();
-            erase = i;
-        }
-        else if (i->m_column_ndx > column_ndx) {
-            --i->m_column_ndx; // Account for the removed column
-        }
-    }
-    if (erase != end)
-        m_subdesc_map.erase(erase);
-}
-
-
 DescriptorRef Descriptor::get_subdescriptor(size_t column_ndx)
 {
-    TIGHTDB_ASSERT(is_attached());
-
     DescriptorRef subdesc;
 
     // Reuse the the descriptor accessor if it is already in the map
-    typedef subdesc_map::iterator iter;
-    iter end = m_subdesc_map.end();
-    for (iter i = m_subdesc_map.begin(); i != end; ++i) {
-        if (i->m_column_ndx == column_ndx) {
-            subdesc.reset(i->m_subdesc);
-            goto out;
-        }
+    if (Descriptor* d = get_subdesc_accessor(column_ndx)) {
+        subdesc.reset(d);
+        goto out;
     }
 
     // Create a new descriptor accessor
@@ -83,6 +31,18 @@ DescriptorRef Descriptor::get_subdescriptor(size_t column_ndx)
 }
 
 
+size_t Descriptor::get_num_unique_values(size_t column_ndx) const
+{
+    TIGHTDB_ASSERT(is_attached());
+    ColumnType col_type = m_spec->get_column_type(column_ndx);
+    if (col_type != col_type_StringEnum)
+        return 0;
+    ref_type ref = m_spec->get_enumkeys_ref(column_ndx);
+    AdaptiveStringColumn col(ref, 0, 0, m_spec->get_alloc()); // Throws
+    return col.size();
+}
+
+
 Descriptor::~Descriptor() TIGHTDB_NOEXCEPT
 {
     if (!is_attached())
@@ -93,7 +53,7 @@ Descriptor::~Descriptor() TIGHTDB_NOEXCEPT
         m_parent.reset();
     }
     else {
-        _impl::TableFriend::clear_desc_ptr(*m_root_table);
+        _impl::TableFriend::clear_root_table_desc(*m_root_table);
     }
     m_root_table.reset();
 }
@@ -163,4 +123,55 @@ size_t* Descriptor::record_subdesc_path(size_t* begin, size_t* end) const TIGHTD
         *--begin_2 = column_ndx;
         desc = parent;
     }
+}
+
+
+Descriptor* Descriptor::get_subdesc_accessor(size_t column_ndx) TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(is_attached());
+
+    typedef subdesc_map::iterator iter;
+    iter end = m_subdesc_map.end();
+    for (iter i = m_subdesc_map.begin(); i != end; ++i) {
+        if (i->m_column_ndx == column_ndx)
+            return i->m_subdesc;
+    }
+    return 0;
+}
+
+
+void Descriptor::adj_insert_column(size_t col_ndx) TIGHTDB_NOEXCEPT
+{
+    // Adjust the column indexes of subdescriptor accessors at higher
+    // column indexes.
+    typedef subdesc_map::iterator iter;
+    iter end = m_subdesc_map.end();
+    for (iter i = m_subdesc_map.begin(); i != end; ++i) {
+        if (i->m_column_ndx >= col_ndx)
+            ++i->m_column_ndx;
+    }
+}
+
+
+void Descriptor::adj_erase_column(size_t col_ndx) TIGHTDB_NOEXCEPT
+{
+    // If it exists, remove and detach the subdescriptor accessor
+    // associated with the removed column. Also adjust the column
+    // indexes of subdescriptor accessors at higher column indexes.
+    typedef subdesc_map::iterator iter;
+    iter end = m_subdesc_map.end();
+    iter erase = end;
+    for (iter i = m_subdesc_map.begin(); i != end; ++i) {
+        if (i->m_column_ndx == col_ndx) {
+            // Must hold a reliable reference count while detaching
+            DescriptorRef desc(i->m_subdesc);
+            desc->detach();
+            erase = i;
+        }
+        else if (i->m_column_ndx > col_ndx) {
+            --i->m_column_ndx; // Account for the removed column
+        }
+    }
+    if (erase != end)
+        m_subdesc_map.erase(erase);
 }

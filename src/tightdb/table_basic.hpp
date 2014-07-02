@@ -27,6 +27,7 @@
 #include <tightdb/util/meta.hpp>
 #include <tightdb/util/tuple.hpp>
 #include <tightdb/table.hpp>
+#include <tightdb/descriptor.hpp>
 #include <tightdb/query.hpp>
 #include <tightdb/table_accessors.hpp>
 #include <tightdb/table_view_basic.hpp>
@@ -73,11 +74,15 @@ public:
     using Table::clear;
     using Table::remove;
     using Table::remove_last;
+    using Table::move_last_over;
     using Table::optimize;
     using Table::lookup;
     using Table::add_empty_row;
     using Table::insert_empty_row;
     using Table::aggregate;
+
+    using Table::get_backlink_count;
+    using Table::get_backlink;
 
     BasicTable(Allocator& alloc = Allocator::get_default()): Table(alloc)
     {
@@ -124,16 +129,17 @@ private:
         typedef _impl::FieldAccessor<BasicTable, col_idx, value_type, false> type;
     };
     typedef std::pair<BasicTable*, std::size_t> FieldInit;
-    typedef typename Spec::template ColNames<Field, FieldInit> RowAccessor;
 
     template<int col_idx> struct ConstField {
         typedef typename util::TypeAt<typename Spec::Columns, col_idx>::type value_type;
         typedef _impl::FieldAccessor<const BasicTable, col_idx, value_type, true> type;
     };
     typedef std::pair<const BasicTable*, std::size_t> ConstFieldInit;
-    typedef typename Spec::template ColNames<ConstField, ConstFieldInit> ConstRowAccessor;
 
 public:
+    typedef typename Spec::template ColNames<Field, FieldInit> RowAccessor;
+    typedef typename Spec::template ColNames<ConstField, ConstFieldInit> ConstRowAccessor;
+
     RowAccessor operator[](std::size_t row_idx) TIGHTDB_NOEXCEPT
     {
         return RowAccessor(std::make_pair(this, row_idx));
@@ -213,8 +219,8 @@ public:
 
 
     class Query;
-    Query       where() {return Query(*this);}
-    Query where() const {return Query(*this);}
+    Query       where(typename BasicTable<Spec>::View* tv = null_ptr) { return Query(*this, tv ? tv->get_impl() : null_ptr); }
+    Query where(typename BasicTable<Spec>::View* tv = null_ptr) const { return Query(*this, tv ? tv->get_impl() : null_ptr); }
 
     /// Compare two tables for equality. Two tables are equal if, and
     /// only if, they contain the same rows in the same order, that
@@ -282,12 +288,11 @@ private:
     static void set_dynamic_spec(Table& table)
     {
         using namespace tightdb::util;
-        tightdb::Spec* spec = _impl::TableFriend::get_spec(table);
+        DescriptorRef desc = table.get_descriptor(); // Throws
         const int num_cols = TypeCount<typename Spec::Columns>::value;
         StringData dyn_col_names[num_cols];
         Spec::dyn_col_names(dyn_col_names);
-        ForEachType<typename Spec::Columns, _impl::AddCol>::exec(&table, spec, dyn_col_names);
-        _impl::TableFriend::update_table_from_spec(table);
+        ForEachType<typename Spec::Columns, _impl::AddCol>::exec(&*desc, dyn_col_names); // Throws
     }
 
     static bool matches_dynamic_spec(const tightdb::Spec* spec) TIGHTDB_NOEXCEPT
@@ -304,10 +309,9 @@ private:
     // other Specs are also derived from Table.
     template<class> friend class BasicTable;
 
-    // These allow util::bind_ptr to know that this class is derived
-    // from Table.
-    friend class util::bind_ptr<BasicTable>;
-    friend class util::bind_ptr<const BasicTable>;
+    // This one allows util::bind_ptr to know that all BasicTable template
+    // instantiations are derived from Table.
+    template<class> friend class util::bind_ptr;
 
     // These allow BasicTableRef to refer to RowAccessor and
     // ConstRowAccessor.
@@ -340,17 +344,11 @@ public:
     Query(const Query& q): Spec::template ColNames<QueryCol, Query*>(this), m_impl(q.m_impl) {}
     ~Query() TIGHTDB_NOEXCEPT {}
 
-    Query& tableview(const Array& arr) { m_impl.tableview(arr); return *this; }
-
-// Query& Query::tableview(const TableView& tv)
-// Query& Query::tableview(const Array &arr)
-
     Query& tableview(const typename BasicTable<Spec>::View& v)
     {
         m_impl.tableview(*v.get_impl());
         return *this;
     }
-
 
     Query& group() { m_impl.group(); return *this; }
 
@@ -361,6 +359,8 @@ public:
     Query& expression(Expression* exp) { m_impl.expression(exp); return *this; }
 
     Query& Or() { m_impl.Or(); return *this; }
+
+    Query& Not() { m_impl.Not(); return *this; }
 
     std::size_t find(std::size_t begin_at_table_row = 0)
     {
@@ -398,8 +398,8 @@ public:
     std::string validate() { return m_impl.validate(); }
 
 protected:
-    Query(const BasicTable<Spec>& table):
-        Spec::template ColNames<QueryCol, Query*>(this), m_impl(table) {}
+    Query(const BasicTable<Spec>& table, TableViewBase* tv):
+        Spec::template ColNames<QueryCol, Query*>(this), m_impl(table, tv) {}
 
 private:
     tightdb::Query m_impl;
@@ -452,28 +452,26 @@ template<> struct GetColumnTypeId<Mixed> {
 
 
 template<class Type, int col_idx> struct AddCol {
-    static void exec(Table* table, Spec* spec, const StringData* col_names)
+    static void exec(Descriptor* desc, const StringData* col_names)
     {
-        TIGHTDB_ASSERT(col_idx == spec->get_column_count());
-        _impl::TableFriend::add_column_to_spec(*table, *spec, GetColumnTypeId<Type>::id,
-                                               col_names[col_idx]); // Throws
+        TIGHTDB_ASSERT(col_idx == desc->get_column_count());
+        desc->add_column(GetColumnTypeId<Type>::id, col_names[col_idx]); // Throws
     }
 };
 
 // AddCol specialization for subtables
 template<class Subtab, int col_idx> struct AddCol<SpecBase::Subtable<Subtab>, col_idx> {
-    static void exec(Table* table, Spec* spec, const StringData* col_names)
+    static void exec(Descriptor* desc, const StringData* col_names)
     {
+        TIGHTDB_ASSERT(col_idx == desc->get_column_count());
+        DescriptorRef subdesc;
+        desc->add_column(type_Table, col_names[col_idx], &subdesc); // Throws
         using namespace tightdb::util;
-        TIGHTDB_ASSERT(col_idx == spec->get_column_count());
-        _impl::TableFriend::add_column_to_spec(*table, *spec, type_Table,
-                                               col_names[col_idx]); // Throws
-        Spec subspec = spec->get_subtable_spec(col_idx);
-        const int num_cols = TypeCount<typename Subtab::spec_type::Columns>::value;
-        StringData dyn_col_names[num_cols];
-        Subtab::spec_type::dyn_col_names(dyn_col_names);
+        const int num_subcols = TypeCount<typename Subtab::spec_type::Columns>::value;
+        StringData subcol_names[num_subcols];
+        Subtab::spec_type::dyn_col_names(subcol_names);
         typedef typename Subtab::Columns Subcolumns;
-        ForEachType<Subcolumns, _impl::AddCol>::exec(table, &subspec, dyn_col_names);
+        ForEachType<Subcolumns, _impl::AddCol>::exec(&*subdesc, subcol_names); // Throws
     }
 };
 
@@ -482,7 +480,7 @@ template<class Subtab, int col_idx> struct AddCol<SpecBase::Subtable<Subtab>, co
 template<class Type, int col_idx> struct CmpColType {
     static bool exec(const Spec* spec, const StringData* col_names)
     {
-        return GetColumnTypeId<Type>::id != spec->get_column_type(col_idx) ||
+        return GetColumnTypeId<Type>::id != spec->get_public_column_type(col_idx) ||
             col_names[col_idx] != spec->get_column_name(col_idx);
     }
 };
@@ -491,7 +489,7 @@ template<class Type, int col_idx> struct CmpColType {
 template<class Subtab, int col_idx> struct CmpColType<SpecBase::Subtable<Subtab>, col_idx> {
     static bool exec(const Spec* spec, const StringData* col_names)
     {
-        if (spec->get_column_type(col_idx) != type_Table ||
+        if (spec->get_column_type(col_idx) != col_type_Table ||
             col_names[col_idx] != spec->get_column_name(col_idx)) return true;
         const Spec subspec = const_cast<Spec*>(spec)->get_subtable_spec(col_idx);
         return !Subtab::matches_dynamic_spec(&subspec);

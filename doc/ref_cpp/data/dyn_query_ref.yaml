@@ -405,6 +405,18 @@ CATEGORIES :
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_dyn_query_or
+  - g_dyn_query_not:
+      NAME     : Not
+      DESCR    : &g_dyn_query_not_descr
+                 The query is negated. Negation of an empty query is illegal and will throw.
+      SUMMARY  : &g_dyn_query_not_summary
+                 Logical-not.
+      RETURN:
+        TYPES  : Query
+        DESCR  : *g_dyn_query_return_query_object_descr
+      EXAMPLES:
+      - DESCR  :
+        CODE   : ex_cpp_dyn_query_not
   - g_dyn_query_subtable:
       NAME     : subtable
       DESCR    : &g_dyn_query_subtable_descr
@@ -477,11 +489,11 @@ CATEGORIES :
       NAME     : find
       DESCR    : &g_dyn_query_find_descr
                  >
-                 This will find the first row index that fulfils the query condition. Use the return
+                 This will find the first row index from the provided row index that fulfills the query condition. Use the return
                  value + 1 as parameter for successive calls to iterate through
                  matching rows.
       SUMMARY  : &g_dyn_query_find_summary
-                 Find first matching row.
+                 Find first matching row from an index.
       PARAMS:
       - NAME   : begin_row
         TYPES  : size_t

@@ -1,7 +1,8 @@
 check_LIBRARIES = test-util.a
 
-test_util_a_SOURCES = demangle.cpp mem.cpp timer.cpp benchmark_results.cpp wildcard.cpp \
-unit_test.cpp test_only.cpp misc.cpp
+test_util_a_SOURCES = demangle.cpp mem.cpp timer.cpp random.cpp benchmark_results.cpp \
+wildcard.cpp unit_test.cpp test_path.cpp test_only.cpp misc.cpp verified_integer.cpp \
+verified_string.cpp resource_limits.cpp
 
 test_util_a_LIBS = ../../src/tightdb/libtightdb.a
 

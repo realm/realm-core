@@ -29,11 +29,17 @@ each of our major platforms:
     sudo apt-get install python-cheetah
     sudo apt-get install libproc-dev
 
-### Ubuntu 13.04, Linux Mint 15
+### Linux Mint 15, 16, Ubuntu 13.04, 13.10
 
     sudo apt-get install build-essential
     sudo apt-get install python-cheetah
     sudo apt-get install libprocps0-dev
+
+### Linux Mint 17, Ubuntu 14.04
+
+    sudo apt-get install build-essential
+    sudo apt-get install python-cheetah
+    sudo apt-get install libprocps3-dev
 
 ### Fedora 17, 18, 19, 20, Amazon Linux 2012.09
 
@@ -100,10 +106,10 @@ The following programs will be installed:
 
     /usr/local/bin/tightdb-import
     /usr/local/bin/tightdb-import-dbg
-    /usr/local/bin/tightdbd
-    /usr/local/bin/tightdbd-dbg
     /usr/local/bin/tightdb-config
     /usr/local/bin/tightdb-config-dbg
+    /usr/local/libexec/tightdbd
+    /usr/local/libexec/tightdbd-dbg
 
 The `tightdb-import` tool lets you load files containing
 comma-separated values into TightDB. The next two are used
@@ -127,15 +133,15 @@ Here is a more comple set of build-related commands:
 
 
 
-Building for iPhone
--------------------
+Building for iOS
+----------------
 
 On Mac OS X it is possible to build a version of the TightDB core
 library for iOS (the iPhone OS). It requires that the iPhoneOS and
 iPhoneSimulator SDKs for Xcode are installed.
 
 Run the following command to build the TightDB core library for
-iPhone:
+iPhone/iOS:
 
     sh build.sh build-iphone
 
@@ -151,11 +157,12 @@ The `include` directory holds a copy of the header files, which are
 identical to the ones installed by `sh build.sh install`. There are
 two versions of the static library, one that is compiled with
 optimization, and one that is compiled for debugging. Each one
-contains code compiled for both iPhone and for the iPhone
+contains code compiled for both iOS and for the iOS
 simulator. Each one also comes with a `config` program that can be
 used to enquire about required compiler and linker flags.
 
-
+If you need to use the core library for development of the Objective C
+binding, consider running `sh build.sh build-objc`.
 
 Configuration
 -------------
@@ -202,20 +209,23 @@ Testing
 The core library comes with a suite of unite tests. You can run it in
 one of the following ways:
 
-    sh build.sh test
-    sh build.sh test-debug
-    sh build.sh memtest
-    sh build.sh memtest-debug
+    sh build.sh check
+    sh build.sh check-debug
+    sh build.sh memcheck
+    sh build.sh memcheck-debug
 
 The `mem` versions will run the suite inside Valgrind.
 
 There are a number of environment variable that can be use the
 customize the execution. For example, here is how to run only the
-query related tests, and report progress along the way:
+`Foo` test and those whose names start with `Bar`, then how run all
+tests whose names start with `Foo`, except `Foo2` and those whose
+names end with an `X`:
 
-    UNITTEST_FILTER="Query_*" UNITTEST_PROGRESS=1 sh build.sh test-debug
+    UNITTEST_FILTER="Foo Bar*" sh build.sh check-debug
+    UNITTEST_FILTER="Foo* - Foo2 *X" sh build.sh check-debug
 
-These variables are available:
+These are the available variables:
 
  - `UNITTEST_FILTER` can be used to exclude one or more tests from a
    particular run. For more information about the syntax, see the
@@ -226,8 +236,28 @@ These variables are available:
  - Set `UNITTEST_PROGRESS` to a non-empty value to enable reporting of
    progress (write the name of each test as it is executed).
 
- - Set `UNITTEST_XML` to a non-empty value to dump the test results
-   into an XML file. For details, see
+ - If you set `UNITTEST_SHUFFLE` to a non-empty value, the tests will
+   be executed in a random order. This requires, of course, that all
+   executed tests are independant of each other. Note that unless you
+   also set `UNITTEST_RANDOM_SEED=random`, you will get the same
+   random order in each sucessive run.
+
+ - You may set `UNITTEST_RANDOM_SEED` to `random` or to some unsigned
+   integer (at least 32 bits will be accepted). If you specify
+   `random`, the global pseudorandom number generator will be seeded
+   with a nondeterministic value (one that generally will be different
+   in each sucessive run). If you specify an integer, it will be
+   seeded with that integer.
+
+ - Set `UNITTEST_THREADS` to the number of test threads to use. The
+   default is 1. Using more than one thread requires that all executed
+   tests are thread-safe and independant of each other.
+
+ - Set `UNITTEST_KEEP_FILES` to a non-empty value to disable automatic
+   removal of test files.
+
+ - Set `UNITTEST_XML` to a non-empty value to dump the test results to
+   an XML file. For details, see
    `tightdb::test_util::unit_test::create_xml_reporter()` in
    `test/util/unit_test.hpp`.
 
@@ -241,6 +271,25 @@ nonempty value during configuration as in the following example:
 
     TIGHTDB_ENABLE_ALLOC_SET_ZERO=1 sh build.sh config
 
+
+Packaging for OS X
+-------------------
+
+You can create a framework for Mac OS X after you have built the
+core library (the `build` target). The framework is useful when
+creating OS X application. The command is:
+
+    sh build.sh build-osx-framework
+
+
+Packaging for iOS
+-----------------
+
+You can create a framework for iOS after you have built the core
+library for iOS (the `build-iphone` target=. The framework is useful when
+creating apps for iPhone and iPad. The command is:
+
+    sh build.sh build-ios-framework
 
 
 Packaging for Debian/Ubuntu
@@ -325,9 +374,10 @@ platforms, however, Pandoc installation is unfeasible (e.g. Amazon
 Linux). In those cases you may set `TIGHTDB_DISABLE_MARKDOWN_TO_PDF`
 to a nonempty value to disable the conversion to PDF.
 
-### Ubuntu 10.04, 12.04, and 13.04
+### Linux Mint 15, 16, 17, Ubuntu 10.04, 12.04, 13.04, 13.10, 14.04
 
-    sudo apt-get install texlive-latex-base texlive-latex-extra pandoc
+    sudo apt-get install texlive-latex-base texlive-latex-extra texlive-fonts-recommended
+    sudo apt-get install pandoc
 
 ### Fedora 17
 

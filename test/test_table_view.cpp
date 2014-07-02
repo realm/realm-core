@@ -9,15 +9,43 @@
 #include <tightdb/table_macros.hpp>
 
 #include "util/misc.hpp"
-#include "util/unit_test.hpp"
-#include "util/test_only.hpp"
+
+#include "test.hpp"
 
 using namespace std;
 using namespace tightdb;
 using namespace test_util;
 
-// Note: You can now temporarely declare unit tests with the ONLY(TestName) macro instead of TEST(TestName). This
-// will disable all unit tests except these. Remember to undo your temporary changes before committing.
+
+// Test independence and thread-safety
+// -----------------------------------
+//
+// All tests must be thread safe and independent of each other. This
+// is required because it allows for both shuffling of the execution
+// order and for parallelized testing.
+//
+// In particular, avoid using std::rand() since it is not guaranteed
+// to be thread safe. Instead use the API offered in
+// `test/util/random.hpp`.
+//
+// All files created in tests must use the TEST_PATH macro (or one of
+// its friends) to obtain a suitable file system path. See
+// `test/util/test_path.hpp`.
+//
+//
+// Debugging and the ONLY() macro
+// ------------------------------
+//
+// A simple way of disabling all tests except one called `Foo`, is to
+// replace TEST(Foo) with ONLY(Foo) and then recompile and rerun the
+// test suite. Note that you can also use filtering by setting the
+// environment varible `UNITTEST_FILTER`. See `README.md` for more on
+// this.
+//
+// Another way to debug a particular test, is to copy that test into
+// `experiments/testcase.cpp` and then run `sh build.sh
+// check-testcase` (or one of its friends) from the command line.
+
 
 namespace {
 
@@ -31,6 +59,11 @@ TIGHTDB_TABLE_2(TestTableInt2,
 TIGHTDB_TABLE_2(TestTableDate,
                 first, DateTime,
                 second, Int)
+
+TIGHTDB_TABLE_2(TestTableFloatDouble,
+                first, Float,
+                second, Double)
+
 
 } // anonymous namespace
 
@@ -264,11 +297,11 @@ TEST(TableView_IsAttached)
     CHECK_EQUAL(true, v2.is_attached());
     v.remove_last();
     CHECK_EQUAL(true, v.is_attached());
-    CHECK_EQUAL(false, v2.is_attached());
+    CHECK_EQUAL(true, v2.is_attached());
 
     table.remove_last();
-    CHECK_EQUAL(false, v.is_attached());
-    CHECK_EQUAL(false, v2.is_attached());
+    CHECK_EQUAL(true, v.is_attached());
+    CHECK_EQUAL(true, v2.is_attached());
 }
 
 TEST(TableView_Max)
@@ -359,6 +392,43 @@ TEST(TableView_Find)
 }
 
 
+TEST(TableView_Follows_Changes)
+{
+    Table table;
+    table.add_column(type_Int, "first");
+    table.add_empty_row();
+    table.set_int(0,0,1);
+    Query q = table.where().equal(0,1);
+    TableView v = q.find_all();
+    CHECK_EQUAL(1, v.size());
+    CHECK_EQUAL(1, v.get_int(0,0));
+
+    // low level sanity check that we can copy a query and run the copy:
+    Query q2(q,Query::TCopyExpressionTag());
+    TableView v2 = q2.find_all();
+
+    // now the fun begins
+    CHECK_EQUAL(1, v.size());
+    table.add_empty_row();
+    CHECK_EQUAL(1, v.size());
+    table.set_int(0,1,1);
+    v.sync_if_needed();
+    CHECK_EQUAL(2, v.size());
+    CHECK_EQUAL(1, v.get_int(0,0));
+    CHECK_EQUAL(1, v.get_int(0,1));
+    table.set_int(0,0,7);
+    v.sync_if_needed();
+    CHECK_EQUAL(1, v.size());
+    CHECK_EQUAL(1, v.get_int(0,0));
+    table.set_int(0,1,7);
+    v.sync_if_needed();
+    CHECK_EQUAL(0, v.size());
+    table.set_int(0,1,1);
+    v.sync_if_needed();
+    CHECK_EQUAL(1, v.size());
+    CHECK_EQUAL(1, v.get_int(0,0));
+}
+
 TEST(TableView_FindAll)
 {
     TestTableInt table;
@@ -405,6 +475,139 @@ TEST(TableView_FindAllString)
     CHECK_EQUAL(1, v2.get_source_ndx(0));
     CHECK_EQUAL(2, v2.get_source_ndx(1));
 }
+
+
+// primitive C locale comparer. But that's OK since all we want to test is if the callback is invoked
+bool got_called = false;
+bool comparer(const char* s1, const char* s2)
+{
+    got_called = true;
+    return *s1 < *s2;
+}
+
+TEST(TableView_StringSort)
+{
+    // WARNING: Do not use the C++11 method (set_string_compare_method(1)) on Windows 8.1 because it has a bug that
+    // takes length in count when sorting ("b" comes before "aaaa"). Bug is not present in Windows 7.
+
+    // Test of handling of unicode takes place in test_utf8.cpp
+    TestTableString table;
+
+    table.add("alpha");
+    table.add("zebra");
+    table.add("ALPHA");
+    table.add("ZEBRA");
+
+    // Core-only is default comparer
+    TestTableString::View v = table.where().find_all();
+    v.column().first.sort();
+    CHECK_EQUAL("alpha", v[0].first);
+    CHECK_EQUAL("ALPHA", v[1].first);
+    CHECK_EQUAL("zebra", v[2].first);
+    CHECK_EQUAL("ZEBRA", v[3].first);
+
+    // Should be exactly the same as above because 0 was default already
+    set_string_compare_method(STRING_COMPARE_CORE, null_ptr);
+    v.column().first.sort();
+    CHECK_EQUAL("alpha", v[0].first);
+    CHECK_EQUAL("ALPHA", v[1].first);
+    CHECK_EQUAL("zebra", v[2].first);
+    CHECK_EQUAL("ZEBRA", v[3].first);
+
+    // Test descending mode
+    v.column().first.sort(false);
+    CHECK_EQUAL("alpha", v[3].first);
+    CHECK_EQUAL("ALPHA", v[2].first);
+    CHECK_EQUAL("zebra", v[1].first);
+    CHECK_EQUAL("ZEBRA", v[0].first);
+
+    // Test if callback comparer works. Our callback is a primitive dummy-comparer
+    set_string_compare_method(STRING_COMPARE_CALLBACK, &comparer);
+    v.column().first.sort();
+    CHECK_EQUAL("ALPHA", v[0].first);
+    CHECK_EQUAL("ZEBRA", v[1].first);
+    CHECK_EQUAL("alpha", v[2].first);
+    CHECK_EQUAL("zebra", v[3].first);
+    CHECK_EQUAL(true, got_called);
+
+#ifdef _MSC_VER
+    // Try C++11 method which uses current locale of the operating system to give precise sorting. This C++11 feature
+    // is currently (mid 2014) only supported by Visual Studio
+    got_called = false;
+    bool available = set_string_compare_method(STRING_COMPARE_CPP11, null_ptr);
+    if (available) {
+        v.column().first.sort();
+        CHECK_EQUAL("alpha", v[0].first);
+        CHECK_EQUAL("ALPHA", v[1].first);
+        CHECK_EQUAL("zebra", v[2].first);
+        CHECK_EQUAL("ZEBRA", v[3].first);
+        CHECK_EQUAL(false, got_called);
+    }
+#endif
+
+    // Set back to default for use by other unit tests
+    set_string_compare_method(STRING_COMPARE_CORE, null_ptr);
+}
+
+TEST(TableView_FloatDoubleSort)
+{
+    TestTableFloatDouble t;
+
+    t.add(1.0f, 10.0);
+    t.add(3.0f, 30.0);
+    t.add(2.0f, 20.0);
+    t.add(0.0f, 5.0);
+
+    TestTableFloatDouble::View tv = t.where().find_all();
+    tv.column().first.sort();
+
+    CHECK_EQUAL(0.0f, tv[0].first);
+    CHECK_EQUAL(1.0f, tv[1].first);
+    CHECK_EQUAL(2.0f, tv[2].first);
+    CHECK_EQUAL(3.0f, tv[3].first);
+
+    tv.column().second.sort();
+    CHECK_EQUAL(5.0f, tv[0].second);
+    CHECK_EQUAL(10.0f, tv[1].second);
+    CHECK_EQUAL(20.0f, tv[2].second);
+    CHECK_EQUAL(30.0f, tv[3].second);
+}
+
+TEST(TableView_DoubleSortPrecision)
+{
+    // Detect if sorting algorithm accidentially casts doubles to float somewhere so that precision gets lost
+    TestTableFloatDouble t;
+
+    double d1 = 100000000000.0;
+    double d2 = 100000000001.0;
+
+    // When casted to float, they are equal
+    float f1 = static_cast<float>(d1);
+    float f2 = static_cast<float>(d2);
+
+    // If this check fails, it's a bug in this unit test, not in Realm
+    CHECK_EQUAL(f1, f2);
+
+    // First verify that our unit is guaranteed to find such a bug; that is, test if such a cast is guaranteed to give
+    // bad sorting order. This is not granted, because an unstable sorting algorithm could *by chance* give the
+    // correct sorting order. Fortunatly we use std::stable_sort which must maintain order on draws.
+    t.add(f2, d2);
+    t.add(f1, d1);
+
+    TestTableFloatDouble::View tv = t.where().find_all();
+    tv.column().first.sort();
+
+    // Sort should be stable
+    CHECK_EQUAL(f2, tv[0].first);
+    CHECK_EQUAL(f1, tv[1].first);
+
+    // If sort is stable, and compare makes a draw because the doubles are accidentially casted to float in Realm, then
+    // original order would be maintained. Check that it's not maintained:
+    tv.column().second.sort();
+    CHECK_EQUAL(d1, tv[0].second);
+    CHECK_EQUAL(d2, tv[1].second);
+}
+
 
 TEST(TableView_Delete)
 {
@@ -487,6 +690,10 @@ TEST(TableView_Stacked)
     TableView tv2 = tv.find_all_int(1,2);
     CHECK_EQUAL(1,tv2.size()); //evaluates tv2.size to 1 which is expected
     CHECK_EQUAL("B",tv2.get_string(2,0)); //evalates get_string(2,0) to "A" which is not expected
+
+
+    
+
 }
 
 
@@ -925,6 +1132,7 @@ TEST(TableView_RefCounting)
     CHECK_EQUAL(s, "just a test string");
 }
 
+
 TEST(TableView_DynPivot)
 {
     TableRef table = Table::create();
@@ -973,6 +1181,23 @@ TEST(TableView_DynPivot)
     CHECK_EQUAL(2, result_count2.size());
     CHECK_EQUAL(half, result_count2.get_int(1, 0));
     CHECK_EQUAL(half, result_count2.get_int(1, 1));
+}
+
+
+TEST(TableView_RowAccessor)
+{
+    Table table;
+    table.add_column(type_Int, "");
+    table.add_empty_row();
+    table.set_int(0, 0, 703);
+    TableView tv = table.where().find_all();
+    Row row = tv[0];
+    CHECK_EQUAL(703, row.get_int(0));
+    ConstRow crow = tv[0];
+    CHECK_EQUAL(703, crow.get_int(0));
+    ConstTableView ctv = table.where().find_all();
+    ConstRow crow_2 = ctv[0];
+    CHECK_EQUAL(703, crow_2.get_int(0));
 }
 
 

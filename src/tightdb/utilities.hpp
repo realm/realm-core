@@ -23,6 +23,7 @@
 #include <stdint.h>
 #include <cstdlib>
 #include <cstdlib> // size_t
+#include <algorithm>
 
 #ifdef _MSC_VER
 #  include <win32/types.h>
@@ -57,6 +58,8 @@
 #endif
 
 namespace tightdb {
+
+typedef bool(*StringCompareCallback)(const char* string1, const char* string2);
 
 extern signed char sse_support;
 extern signed char avx_support;
@@ -159,8 +162,7 @@ bool safe_equal(InputIterator1 first1, InputIterator1 last1, InputIterator2 firs
 #if defined(_MSC_VER) && defined(_DEBUG)
 
     // Windows has a special check in debug mode against passing null
-    // pointer to std::equal(). This conflicts with the C++
-    // standard. For details, see
+    // pointer to std::equal(). It's uncertain if this is allowed by the C++ standard. For details, see
     // http://stackoverflow.com/questions/19120779/is-char-p-0-stdequalp-p-p-well-defined-according-to-the-c-standard.
     // Below check 'first1==last1' is to prevent failure in debug mode.
     return (first1 == last1 || std::equal(first1, last1, first2));

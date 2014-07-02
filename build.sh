@@ -22,6 +22,8 @@ export TIGHTDB_HOME
 MODE="$1"
 [ $# -gt 0 ] && shift
 
+# enabling replication support in core, now required for objective-c/ios
+export TIGHTDB_ENABLE_REPLICATION=1
 
 # Extensions corresponding with additional GIT repositories
 EXTENSIONS="java python ruby objc node php c gui"
@@ -38,6 +40,25 @@ IPHONE_DIR="iphone-lib"
 
 ANDROID_DIR="android-lib"
 ANDROID_PLATFORMS="arm arm-v7a mips x86"
+
+usage()
+{
+    cat 1>&2 << EOF
+Unspecified or bad mode '$MODE'.
+Available modes are:
+    config clean build build-config-progs build-iphone build-android
+    build-osx-framework build-cocoa
+    check check-debug show-install install uninstall
+    test-installed wipe-installed install-prod install-devel uninstall-prod
+    uninstall-devel dist-copy src-dist bin-dist dist-deb dist-status
+    dist-pull dist-checkout dist-config dist-clean dist-build
+    dist-build-iphone dist-test dist-test-debug dist-install dist-uninstall
+    dist-test-installed get-version set-version copy-tools
+    build-test-ios-app:     build an iOS app for testing core on device
+    test-ios-app:           execute the core tests on device
+    leak-test-ios-app:      execute the core tests on device, monitor for leaks
+EOF
+}
 
 map_ext_name_to_dir()
 {
@@ -124,6 +145,10 @@ if ! printf "%s\n" "$MODE" | grep -q '^\(src-\|bin-\)\?dist'; then
     if [ "$NUM_PROCESSORS" ]; then
         word_list_prepend MAKEFLAGS "-j$NUM_PROCESSORS" || exit 1
         export MAKEFLAGS
+
+        if ! [ "$UNITTEST_THREADS" ]; then
+            export UNITTEST_THREADS="$NUM_PROCESSORS"
+        fi
     fi
 fi
 IS_REDHAT_DERIVATIVE=""
@@ -496,6 +521,18 @@ EOF
         exit 0
         ;;
 
+    "build-osx")
+        auto_configure || exit 1
+        export TIGHTDB_HAVE_CONFIG="1"
+        (
+            cd src/tightdb
+            export TIGHTDB_ENABLE_FAT_BINARIES="1"
+            TIGHTDB_ENABLE_FAT_BINARIES="1" $MAKE libtightdb.a EXTRA_CFLAGS="-fPIC -DPIC" || exit 1
+            TIGHTDB_ENABLE_FAT_BINARIES="1" $MAKE libtightdb-dbg.a EXTRA_CFLAGS="-fPIC -DPIC" || exit 1
+        ) || exit 1
+        exit 0
+        ;;
+
     "build-iphone")
         auto_configure || exit 1
         export TIGHTDB_HAVE_CONFIG="1"
@@ -512,7 +549,7 @@ EOF
             platform="$(printf "%s\n" "$x" | cut -d: -f1)" || exit 1
             sdk="$(printf "%s\n" "$x" | cut -d: -f2)" || exit 1
             archs="$(printf "%s\n" "$x" | cut -d: -f3 | sed 's/,/ /g')" || exit 1
-            cflags_arch=""
+            cflags_arch="-stdlib=libc++"
             for y in $archs; do
                 word_list_append "cflags_arch" "-arch $y" || exit 1
             done
@@ -602,41 +639,243 @@ EOF
         (cd "$TIGHTDB_HOME/$ANDROID_DIR/include/tightdb" && tar xzmf "$temp_dir/headers.tar.gz") || exit 1
         ;;
 
-    "test")
+   "build-cocoa")
+        if [ "$OS" != "Darwin" ]; then
+            echo "zip for iOS/OSX can only be generated under OS X."
+            exit 0
+        fi
+
+        # the user can specify where to find realm-cocoa repository
+        realm_cocoa_dir="$1"
+        if [ -z "$realm_cocoa_dir" ]; then
+            realm_cocoa_dir="../realm-cocoa"
+        fi
+
+        sh build.sh build-osx || exit 1
+        sh build.sh build-iphone || exit 1
+
+        echo "Copying files"
+        tmpdir=$(mktemp -d /tmp/$$.XXXXXX) || exit 1
+        realm_version="$(sh build.sh get-version)" || exit 1
+        BASENAME="core"
+        rm -f "$BASENAME-$realm_version.zip" || exit 1
+        mkdir -p "$tmpdir/$BASENAME/include" || exit 1
+        cp "$IPHONE_DIR/libtightdb-ios.a" "$tmpdir/$BASENAME" || exit 1
+        cp "$IPHONE_DIR/libtightdb-ios-dbg.a" "$tmpdir/$BASENAME" || exit 1
+        cp -r "$IPHONE_DIR/include/"* "$tmpdir/$BASENAME/include" || exit 1
+        for x in $iphone_sdks; do
+            platform="$(printf "%s\n" "$x" | cut -d: -f1)" || exit 1
+            cp "src/tightdb/libtightdb-$platform.a" "$tmpdir/$BASENAME" || exit 1
+            cp "src/tightdb/libtightdb-$platform-dbg.a" "$tmpdir/$BASENAME" || exit 1
+        done
+        cp src/tightdb/libtightdb.a "$tmpdir/$BASENAME" || exit 1
+        cp src/tightdb/libtightdb-dbg.a "$tmpdir/$BASENAME" || exit 1
+
+        echo "Create zip file: '$BASENAME-$realm_version.zip'"
+        (cd $tmpdir && zip -r -q "$BASENAME-$realm_version.zip" "$BASENAME") || exit 1
+        mv "$tmpdir/$BASENAME-$realm_version.zip" . || exit 1
+
+        echo "Unzipping in '$realm_cocoa_dir'"
+        mkdir -p "$realm_cocoa_dir" || exit 1
+        rm -rf "$realm_cocoa_dir/$BASENAME" || exit 1
+        cur_dir="$(pwd)"
+        (cd "$realm_cocoa_dir" && unzip -qq "$cur_dir/$BASENAME-$realm_version.zip") || exit 1
+
+        rm -rf "$tmpdir" || exit 1
+        echo "Done"
+        exit 0
+        ;;
+
+      "build-osx-framework")
+        if [ "$OS" != "Darwin" ]; then
+            echo "Framework for OS X can only be generated under Mac OS X."
+            exit 0
+        fi
+
+        realm_version="$(sh build.sh get-version)"
+        BASENAME="RealmCore"
+        FRAMEWORK="$BASENAME.framework"
+        rm -rf "$FRAMEWORK" || exit 1
+        rm -f realm-core-osx-*.zip || exit 1
+
+        mkdir -p "$FRAMEWORK/Headers/tightdb" || exit 1
+        if [ ! -f "src/tightdb/libtightdb.a" ]; then
+            echo "\"src/tightdb/libtightdb.a\" missing."
+            echo "Did you forget to build?"
+            exit 1
+        fi
+
+        cp "src/tightdb/libtightdb.a" "$FRAMEWORK/$BASENAME" || exit 1
+        cp "src/tightdb.hpp" "$FRAMEWORK/Headers/tightdb.hpp" || exit 1
+        for header in $(cd "src/tightdb" && $MAKE --no-print-directory get-inst-headers); do
+            mkdir -p "$(dirname "$FRAMEWORK/Headers/tightdb/$header")" || exit 1
+            cp "src/tightdb/$header" "$FRAMEWORK/Headers/tightdb/$header" || exit 1
+        done
+        find "$FRAMEWORK/Headers" -iregex "^.*\.[ch]\(pp\)\{0,1\}$" \
+            -exec sed -i '' -e "s/<tightdb\(.*\)>/<$BASENAME\/tightdb\1>/g" {} \; || exit 1
+
+        zip -r -q realm-core-osx-$realm_version.zip $FRAMEWORK || exit 1
+        echo "Core framework for OS X can be found under $FRAMEWORK and realm-core-osx-$realm_version.zip."
+        exit 0
+        ;;
+
+    "test"|"test-debug"|\
+    "check"|"check-debug"|\
+    "memcheck"|"memcheck-debug"|\
+    "check-doc-examples"|\
+    "check-testcase"|"check-testcase-debug"|\
+    "memcheck-testcase"|"memcheck-testcase-debug")
         auto_configure || exit 1
         export TIGHTDB_HAVE_CONFIG="1"
-        $MAKE check || exit 1
+        $MAKE "$MODE" || exit 1
         echo "Test passed"
         exit 0
         ;;
 
-    "test-debug")
-        auto_configure || exit 1
-        export TIGHTDB_HAVE_CONFIG="1"
-        $MAKE check-debug || exit 1
-        echo "Test passed"
+    "build-test-ios-app")
+        # For more documentation, see test/ios/README.md.
+
+        ARCHS="\$(ARCHS_STANDARD_INCLUDING_64_BIT)"
+        while getopts da: OPT; do
+            case $OPT in
+                d)  DEBUG=1
+                    ;;
+                a)  ARCHS=$OPTARG
+                    ;;
+                *)  usage
+                    exit 1
+                    ;;
+            esac
+        done
+
+        sh build.sh build-iphone
+
+        TMPL_DIR="test/ios/template"
+        TEST_DIR="test/ios/app"
+        rm -rf "$TEST_DIR/"* || exit 1
+        mkdir -p "$TEST_DIR" || exit 1
+
+        APP="iOSTestCoreApp"
+        TEST_APP="${APP}Tests"
+
+        APP_DIR="$TEST_DIR/$APP"
+        TEST_APP_DIR="$TEST_DIR/$TEST_APP"
+
+        # Copy the test files into the app tests subdirectory
+        PASSIVE_SUBDIRS="$($MAKE -C ./test --no-print-directory get-passive-subdirs)" || exit 1
+        PASSIVE_SUBDIRS="$PASSIVE_SUBDIRS android ios" # dirty skip
+        PASSIVE_SUBDIRS="$(echo "$PASSIVE_SUBDIRS" | sed -E 's/ +/|/g')" || exit 1
+        # Naive copy, i.e. copy everything.
+        ## Avoid recursion (extra precaution) and passive subdirs.
+        ## Avoid non-source-code files.
+        ## Retain directory structure.
+        (cd ./test && find -E . \
+            ! -iregex "^\./(ios|$PASSIVE_SUBDIRS)/.*$" \
+            -a -iregex "^.*\.[ch](pp)?$" \
+            -exec rsync -qR {} "../$TEST_APP_DIR" \;) || exit 1
+        rm "$TEST_APP_DIR/main.cpp"
+
+        # Gather resources
+        RESOURCES="$($MAKE -C ./test --no-print-directory get-test-resources)" || exit 1
+        (cd ./test && rsync $RESOURCES "../$APP_DIR") || exit 1
+        RESOURCES="$(echo "$RESOURCES" | sed -E "s/(^| )/\1$APP\//g")" || exit 1
+
+        # Set up frameworks, or rather, static libraries.
+        rm -rf "$TEST_DIR/$IPHONE_DIR" || exit 1
+        cp -r "../tightdb/$IPHONE_DIR" "$TEST_DIR/$IPHONE_DIR" || exit 1
+        if [ -n "$DEBUG" ]; then
+            FRAMEWORK="$IPHONE_DIR/libtightdb-ios-dbg.a"
+        else
+            FRAMEWORK="$IPHONE_DIR/libtightdb-ios.a"
+        fi
+        FRAMEWORKS="'$FRAMEWORK'"
+        HEADER_SEARCH_PATHS="'$IPHONE_DIR/include/**'"
+
+        # Other flags
+        if [ -n "$DEBUG" ]; then
+            OTHER_CPLUSPLUSFLAGS="'-DTIGHTDB_DEBUG'"
+        fi
+        
+        # Initialize app directory
+        cp -r "test/ios/template/App/"* "$APP_DIR" || exit 1
+        mv "$APP_DIR/App-Info.plist" "$APP_DIR/$APP-Info.plist" || exit 1
+        mv "$APP_DIR/App-Prefix.pch" "$APP_DIR/$APP-Prefix.pch" || exit 1
+
+        # Gather all the test sources in a Python-friendly format.
+        ## The indentation is to make it look pretty in the Gyp file.
+        APP_SOURCES=$(cd $TEST_DIR && find "$TEST_APP" -type f | \
+            sed -E "s/^(.*)$/                '\1',/") || exit 1
+        TEST_APP_SOURCES="$APP_SOURCES"
+
+        # Prepare for GYP
+        ARCHS="$(echo "'$ARCHS'," | sed -E "s/ /', '/g")" || exit 1
+        RESOURCES="$(echo "'$RESOURCES'," | sed -E "s/ /', '/g")" || exit 1
+        
+        # Generate a Gyp file.
+        . "$TMPL_DIR/App.gyp.sh"
+
+        # Run gyp, generating an .xcodeproj folder with a project.pbxproj file.
+        gyp --depth="$TEST_DIR" "$TEST_DIR/$APP.gyp" || exit 1
+
+        ## Collect the main app id from the project.pbxproj file.
+        APP_ID=$(cat "$TEST_DIR/$APP.xcodeproj/project.pbxproj" | tr -d '\n' | \
+            egrep -o "remoteGlobalIDString.*?remoteInfo = $APP;" | \
+            head -n 1 | \
+            sed 's/remoteGlobalIDString = \([A-F0-9]*\);.*/\1/') || exit 1
+
+        ## Collect the test app id from the project.pbxproj file.
+        TEST_APP_ID=$(cat "$TEST_DIR/$APP.xcodeproj/project.pbxproj" | tr -d '\n' | \
+            egrep -o "remoteGlobalIDString.*?remoteInfo = $TEST_APP;" | \
+            head -n 1 | \
+            sed 's/remoteGlobalIDString = \([A-F0-9]*\);.*/\1/') || exit 1
+
+        ## Generate a scheme with a test action.
+        USER=$(whoami)
+        mkdir -p "$TEST_DIR/$APP.xcodeproj/xcuserdata"
+        mkdir -p "$TEST_DIR/$APP.xcodeproj/xcuserdata/$USER.xcuserdatad"
+        mkdir -p "$TEST_DIR/$APP.xcodeproj/xcuserdata/$USER.xcuserdatad/xcschemes"
+
+        . "$TMPL_DIR/App.scheme.sh"
+
+        echo "The app is now available under $TEST_DIR."
+        echo "Use sh build.sh (leak-)test-ios-app to run the app on device."
+
         exit 0
         ;;
 
-    "memtest")
-        auto_configure || exit 1
-        export TIGHTDB_HAVE_CONFIG="1"
-        $MAKE memcheck || exit 1
-        echo "Test passed"
+    "test-ios-app")
+        # Prerequisites: build-test-ios-app
+        # For more documentation, see test/ios/README.md
+        (cd "test/ios/app" &&
+            if [ $# -eq 0 ]; then
+                xcodebuild test -scheme iOSTestCoreApp \
+                    -destination "platform=iOS,name=tightdb's iPad"
+            else
+                xcodebuild test -scheme iOSTestCoreApp "$@"
+            fi)
         exit 0
         ;;
 
-    "memtest-debug")
-        auto_configure || exit 1
-        export TIGHTDB_HAVE_CONFIG="1"
-        $MAKE memcheck-debug || exit 1
-        echo "Test passed"
+    "leak-test-ios-app")
+        # Prerequisites: build-test-ios-app
+        # For more documentation, see test/ios/README.md
+        DEV="tightdb's iPad"
+        if [ $# -ne 0 ]; then
+            DEV="$@"
+        fi
+        (cd "test/ios/app" && instruments -t ../template/Leaks.tracetemplate \
+            -w "$DEV" iOSTestCoreApp)
         exit 0
         ;;
 
-    "check-doc-examples")
+    "gdb"|"gdb-debug"|\
+    "gdb-testcase"|"gdb-testcase-debug"|\
+    "performance"|"benchmark"|"benchmark-"*|\
+    "lcov"|"gcovr")
         auto_configure || exit 1
-        $MAKE check-doc-examples || exit 1
+        export TIGHTDB_HAVE_CONFIG="1"
+        $MAKE "$MODE" || exit 1
+        exit 0
         ;;
 
     "show-install")
@@ -2286,13 +2525,7 @@ EOF
         exit 0
         ;;
 
-    *)
-        echo "Unspecified or bad mode '$MODE'" 1>&2
-        echo "Available modes are: config clean build build-config-progs build-iphone build-android test test-debug show-install install uninstall test-installed wipe-installed" 1>&2
-        echo "As well as: install-prod install-devel uninstall-prod uninstall-devel dist-copy" 1>&2
-        echo "As well as: src-dist bin-dist dist-deb dist-status dist-pull dist-checkout" 1>&2
-        echo "As well as: dist-config dist-clean dist-build dist-build-iphone dist-test dist-test-debug dist-install dist-uninstall dist-test-installed" 1>&2
-        echo "As well as: get-version set-version copy-tools" 1>&2
+    *)  usage
         exit 1
         ;;
 esac

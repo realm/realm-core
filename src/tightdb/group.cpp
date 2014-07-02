@@ -11,7 +11,9 @@
 #include <tightdb/utilities.hpp>
 #include <tightdb/group_writer.hpp>
 #include <tightdb/group.hpp>
-#include <pthread.h>
+#ifdef TIGHTDB_ENABLE_REPLICATION
+#  include <tightdb/replication.hpp>
+#endif
 
 using namespace std;
 using namespace tightdb;
@@ -124,34 +126,27 @@ void Group::create(bool add_free_versions)
 
 void Group::init_from_ref(ref_type top_ref) TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(!is_attached());
-
     m_top.init_from_ref(top_ref);
     size_t top_size = m_top.size();
     TIGHTDB_ASSERT(top_size >= 3);
 
-    ref_type names_ref = m_top.get_as_ref(0);
-    ref_type tables_ref = m_top.get_as_ref(1);
-    m_table_names.init_from_ref(names_ref);
-    m_tables.init_from_ref(tables_ref);
+    m_table_names.init_from_parent();
+    m_tables.init_from_parent();
     m_is_attached = true;
 
     // Note that the third slot is the logical file size.
 
-    // File created by Group::write() do not have free space markers
-    // at all, and files that are not shared does not need version
-    // info for free space.
+    // Files created by Group::write() do not have free-space
+    // tracking, and files that are accessed via a stan-along Group do
+    // not need version information for free-space tracking.
     if (top_size > 3) {
         TIGHTDB_ASSERT(top_size >= 5);
-        ref_type free_positions_ref = m_top.get_as_ref(3);
-        ref_type free_sizes_ref     = m_top.get_as_ref(4);
-        m_free_positions.init_from_ref(free_positions_ref);
-        m_free_lengths.init_from_ref(free_sizes_ref);
+        m_free_positions.init_from_parent();
+        m_free_lengths.init_from_parent();
 
         if (m_is_shared && top_size > 5) {
             TIGHTDB_ASSERT(top_size >= 7);
-            ref_type free_versions_ref = m_top.get_as_ref(5);
-            m_free_versions.init_from_ref(free_versions_ref);
+            m_free_versions.init_from_parent();
             // Note that the seventh slot is the database version
             // (a.k.a. transaction count,) which is not yet used for
             // anything.
@@ -160,7 +155,7 @@ void Group::init_from_ref(ref_type top_ref) TIGHTDB_NOEXCEPT
 }
 
 
-void Group::init_shared()
+void Group::reset_freespace_tracking()
 {
     TIGHTDB_ASSERT(m_top.is_attached());
     TIGHTDB_ASSERT(m_is_attached);
@@ -187,7 +182,7 @@ void Group::init_shared()
     }
     TIGHTDB_ASSERT(m_top.size() >= 5);
 
-    // Files that have nevner been modified via SharedGroup do not
+    // Files that have never been modified via SharedGroup do not
     // have version tracking for the free lists
     if (m_top.size() == 5) {
         // FIXME: There is a risk that this one is already allocated,
@@ -233,8 +228,9 @@ void Group::detach_table_accessors() TIGHTDB_NOEXCEPT
     iter end = m_table_accessors.end();
     for (iter i = m_table_accessors.begin(); i != end; ++i) {
         if (Table* t = *i) {
-            _impl::TableFriend::detach(*t);
-            _impl::TableFriend::unbind_ref(*t);
+            typedef _impl::TableFriend tf;
+            tf::detach(*t);
+            tf::unbind_ref(*t);
         }
     }
 }
@@ -276,14 +272,22 @@ Table* Group::get_table_by_ndx(size_t ndx)
     // Get table from cache if exists, else create
     Table* table = m_table_accessors[ndx];
     if (!table) {
+        typedef _impl::TableFriend tf;
         ref_type ref = m_tables.get_as_ref(ndx);
-        table = _impl::TableFriend::create_ref_counted(m_alloc, ref, this, ndx); // Throws
+        table = tf::create_ref_counted(m_alloc, ref, this, ndx); // Throws
         m_table_accessors[ndx] = table;
-        _impl::TableFriend::bind_ref(*table); // Increase reference count from 0 to 1
+
+        // Increase reference count from 0 to 1 to make the group accessor keep
+        // the table accessor alive. This extra reference count will be revoked
+        // during destruction of the group accessor.
+        tf::bind_ref(*table);
+
+        // The link targets in the table has to be initialized
+        // after creation to avoid circular initializations
+        tf::initialize_link_targets(*table, *this, ndx); // Throws
     }
     return table;
 }
-
 
 ref_type Group::create_new_table(StringData name)
 {
@@ -296,7 +300,8 @@ ref_type Group::create_new_table(StringData name)
     // matters.
 
     using namespace _impl;
-    DeepArrayRefDestroyGuard ref_dg(TableFriend::create_empty_table(m_alloc), m_alloc); // Throws
+    typedef TableFriend tf;
+    DeepArrayRefDestroyGuard ref_dg(tf::create_empty_table(m_alloc), m_alloc); // Throws
     size_t ndx = m_tables.size();
     TIGHTDB_ASSERT(ndx == m_table_names.size());
     m_tables.insert(ndx, ref_dg.get()); // Throws
@@ -305,7 +310,7 @@ ref_type Group::create_new_table(StringData name)
         try {
 #ifdef TIGHTDB_ENABLE_REPLICATION
             if (Replication* repl = m_alloc.get_replication())
-                repl->new_top_level_table(name); // Throws
+                repl->new_group_level_table(name); // Throws
 #endif
 
             // The rest is guaranteed not to throw
@@ -339,23 +344,23 @@ Table* Group::create_new_table_and_accessor(StringData name, SpecSetter spec_set
     // discard everything written to the log since this point. This
     // should probably be handled with a 'scoped guard'.
     if (Replication* repl = m_alloc.get_replication())
-        repl->new_top_level_table(name); // Throws
+        repl->new_group_level_table(name); // Throws
 #endif
 
     using namespace _impl;
-    DeepArrayRefDestroyGuard ref_dg(TableFriend::create_empty_table(m_alloc), m_alloc); // Throws
-    typedef TableFriend::UnbindGuard TableUnbindGuard;
-    TableUnbindGuard table_ug(TableFriend::create_ref_counted(m_alloc, ref_dg.get(),
-                                                              null_ptr, 0)); // Throws
+    typedef TableFriend tf;
+    DeepArrayRefDestroyGuard ref_dg(tf::create_empty_table(m_alloc), m_alloc); // Throws
+    typedef tf::UnbindGuard TableUnbindGuard;
+    TableUnbindGuard table_ug(tf::create_ref_counted(m_alloc, ref_dg.get(), null_ptr, 0)); // Throws
 
     // The table accessor owns the ref until the point below where a
     // parent is set in Table::m_top.
     ref_type ref = ref_dg.release();
-    TableFriend::bind_ref(*table_ug); // Increase reference count from 0 to 1
+    tf::bind_ref(*table_ug); // Increase reference count from 0 to 1
 
     size_t ndx = m_tables.size();
     m_table_accessors.resize(ndx+1); // Throws
-    TableFriend::set_top_parent(*table_ug, this, ndx);
+    tf::set_top_parent(*table_ug, this, ndx);
     try {
         if (spec_setter)
             (*spec_setter)(*table_ug); // Throws
@@ -375,7 +380,7 @@ Table* Group::create_new_table_and_accessor(StringData name, SpecSetter spec_set
         }
     }
     catch (...) {
-        TableFriend::set_top_parent(*table_ug, 0, 0);
+        tf::set_top_parent(*table_ug, 0, 0);
         throw;
     }
 }
@@ -563,8 +568,6 @@ void Group::commit()
 
 void Group::update_refs(ref_type top_ref, size_t old_baseline) TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(!m_free_versions.is_attached());
-
     // After Group::commit() we will always have free space tracking
     // info.
     TIGHTDB_ASSERT(m_top.size() >= 5);
@@ -585,6 +588,8 @@ void Group::update_refs(ref_type top_ref, size_t old_baseline) TIGHTDB_NOEXCEPT
     m_table_names.update_from_parent(old_baseline);
     m_free_positions.update_from_parent(old_baseline);
     m_free_lengths.update_from_parent(old_baseline);
+    if (m_is_shared)
+        m_free_versions.update_from_parent(old_baseline);
 
     // If m_tables has not been modfied we don't
     // need to update attached table accessors
@@ -596,8 +601,9 @@ void Group::update_refs(ref_type top_ref, size_t old_baseline) TIGHTDB_NOEXCEPT
     typedef table_accessors::const_iterator iter;
     iter end = m_table_accessors.end();
     for (iter i = m_table_accessors.begin(); i != end; ++i) {
+        typedef _impl::TableFriend tf;
         if (Table* table = *i)
-            _impl::TableFriend::update_from_parent(*table, old_baseline);
+            tf::update_from_parent(*table, old_baseline);
     }
 }
 
@@ -608,15 +614,14 @@ void Group::reattach_from_retained_data()
     m_is_attached = true;
 }
 
-void Group::update_from_shared(ref_type new_top_ref, size_t new_file_size)
+void Group::init_for_transact(ref_type new_top_ref, size_t new_file_size)
 {
     TIGHTDB_ASSERT(new_top_ref < new_file_size);
     TIGHTDB_ASSERT(!is_attached());
 
-    if (m_top.is_attached()) {
-
+    if (m_top.is_attached())
         complete_detach();
-    }
+
     // Make all managed memory beyond the attached file available
     // again.
     //
@@ -628,8 +633,14 @@ void Group::update_from_shared(ref_type new_top_ref, size_t new_file_size)
     if (new_file_size > m_alloc.get_baseline())
         m_alloc.remap(new_file_size); // Throws
 
-    // If our last look at the file was when it
-    // was empty, we may have to re-create the group
+    // If the file is empty (probably because it was just created) we
+    // need to create a new empty group. If this happens at the
+    // beginning of a 'read' transaction (as opposed to at the
+    // beginning of a 'write' transaction), the creation of the group
+    // serves only to put the group accessor into a valid state, and
+    // the allocated memory will be discarded when the 'read'
+    // transaction ends (actually not until a new transaction is
+    // started).
     if (new_top_ref == 0) {
         bool add_free_versions = true;
         create(add_free_versions); // Throws
@@ -645,9 +656,9 @@ bool Group::operator==(const Group& g) const
     size_t n = size();
     if (n != g.size())
         return false;
-    for (size_t i=0; i<n; ++i) {
-        const Table* t1 = get_table_by_ndx(i);
-        const Table* t2 = g.get_table_by_ndx(i);
+    for (size_t i = 0; i < n; ++i) {
+        const Table* t1 = get_table_by_ndx(i); // Throws
+        const Table* t2 = g.get_table_by_ndx(i); // Throws
         if (*t1 != *t2)
             return false;
     }
@@ -693,11 +704,592 @@ void Group::to_string(ostream& out) const
 }
 
 
+#ifdef TIGHTDB_ENABLE_REPLICATION
+
+namespace {
+
+class MultiLogInputStream: public Replication::InputStream {
+public:
+    MultiLogInputStream(const BinaryData* logs_begin, const BinaryData* logs_end):
+        m_logs_begin(logs_begin), m_logs_end(logs_end)
+    {
+        if (m_logs_begin != m_logs_end)
+            m_curr_buf_remaining_size = m_logs_begin->size();
+    }
+
+    ~MultiLogInputStream() TIGHTDB_OVERRIDE
+    {
+    }
+
+    size_t read(char* buffer, size_t size) TIGHTDB_OVERRIDE
+    {
+        if (m_logs_begin == m_logs_end)
+            return 0;
+        for (;;) {
+            if (m_curr_buf_remaining_size > 0) {
+                size_t offset = m_logs_begin->size() - m_curr_buf_remaining_size;
+                const char* data = m_logs_begin->data() + offset;
+                size_t size_2 = min(m_curr_buf_remaining_size, size);
+                m_curr_buf_remaining_size -= size_2;
+                // FIXME: Eliminate the need for copying by changing the API of
+                // Replication::InputStream such that blocks can be handed over
+                // without copying. This is a straight forward change, but the
+                // result is going to be more complicated and less conventional.
+                copy(data, data + size_2, buffer);
+                return size_2;
+            }
+
+            ++m_logs_begin;
+            if (m_logs_begin == m_logs_end)
+                return 0;
+            m_curr_buf_remaining_size = m_logs_begin->size();
+        }
+    }
+
+private:
+    const BinaryData* m_logs_begin;
+    const BinaryData* m_logs_end;
+    size_t m_curr_buf_remaining_size;
+};
+
+
+class MarkDirtyUpdater: public _impl::TableFriend::AccessorUpdater {
+public:
+    void update(Table& table) TIGHTDB_OVERRIDE
+    {
+        typedef _impl::TableFriend tf;
+        tf::mark(table);
+    }
+
+    void update_parent(Table& table) TIGHTDB_OVERRIDE
+    {
+        typedef _impl::TableFriend tf;
+        tf::mark(table);
+    }
+
+    size_t m_col_ndx;
+    DataType m_type;
+};
+
+
+class InsertColumnUpdater: public _impl::TableFriend::AccessorUpdater {
+public:
+    InsertColumnUpdater(size_t col_ndx):
+        m_col_ndx(col_ndx)
+    {
+    }
+
+    void update(Table& table) TIGHTDB_OVERRIDE
+    {
+        typedef _impl::TableFriend tf;
+        tf::adj_insert_column(table, m_col_ndx); // Throws
+    }
+
+    void update_parent(Table&) TIGHTDB_OVERRIDE
+    {
+    }
+
+private:
+    size_t m_col_ndx;
+};
+
+
+class EraseColumnUpdater: public _impl::TableFriend::AccessorUpdater {
+public:
+    EraseColumnUpdater(size_t col_ndx):
+        m_col_ndx(col_ndx)
+    {
+    }
+
+    void update(Table& table) TIGHTDB_OVERRIDE
+    {
+        typedef _impl::TableFriend tf;
+        tf::adj_erase_column(table, m_col_ndx);
+    }
+
+    void update_parent(Table&) TIGHTDB_OVERRIDE
+    {
+    }
+
+private:
+    size_t m_col_ndx;
+};
+
+} // anonymous namespace
+
+
+// In general, this class cannot assume more than minimal accessor consistency
+// (See AccessorConcistncyLevels), it can however assume that replication
+// instruction arguments are meaningfull with respect to the current state of
+// the accessor hierarchy. For example, a column index argument of `i` is known
+// to refer to the `i`'th entry of Table::m_cols.
+//
+// FIXME: There is currently no checking on valid instruction arguments such as
+// column index within bounds. Consider whether we can trust the contents of the
+// transaction log enough to skip these checks.
+class Group::TransactAdvancer {
+public:
+    TransactAdvancer(Group& group):
+        m_group(group)
+    {
+    }
+
+    bool new_group_level_table(StringData) TIGHTDB_NOEXCEPT
+    {
+        m_group.m_table_accessors.push_back(0); // Throws
+        return true;
+    }
+
+    bool select_table(size_t group_level_ndx, int levels, const size_t* path) TIGHTDB_NOEXCEPT
+    {
+        m_table.reset();
+        if (group_level_ndx < m_group.m_table_accessors.size()) {
+            if (Table* table = m_group.m_table_accessors[group_level_ndx]) {
+                const size_t* path_begin = path;
+                const size_t* path_end = path_begin + 2*levels;
+                for (;;) {
+                    typedef _impl::TableFriend tf;
+                    tf::mark(*table);
+                    if (path_begin == path_end) {
+                        m_table.reset(table);
+                        break;
+                    }
+                    size_t col_ndx = path_begin[0];
+                    size_t row_ndx = path_begin[1];
+                    table = tf::get_subtable_accessor(*table, col_ndx, row_ndx);
+                    if (!table)
+                        break;
+                    path_begin += 2;
+                }
+            }
+        }
+        return true;
+    }
+
+    bool insert_empty_rows(size_t row_ndx, size_t num_rows) TIGHTDB_NOEXCEPT
+    {
+        // In tables with link-type columns, all row insertion happens after the
+        // last row. Because of that, and because the inserted links will be
+        // null-links, there is no need to mark link-target tables as dirty.
+        typedef _impl::TableFriend tf;
+        if (m_table)
+            tf::adj_accessors_insert_rows(*m_table, row_ndx, num_rows);
+        return true;
+    }
+
+    bool erase_row(size_t row_ndx) TIGHTDB_NOEXCEPT
+    {
+        // This operation can not occur for tables with link-type columns.For
+        // such tables, rows can only be removed by means of the "move last
+        // over" operation. Because of that, there are no link-target tables to
+        // be marked dirty here.
+        typedef _impl::TableFriend tf;
+        if (m_table)
+            tf::adj_accessors_erase_row(*m_table, row_ndx);
+        return true;
+    }
+
+    bool move_last_over(size_t target_row_ndx, size_t last_row_ndx) TIGHTDB_NOEXCEPT
+    {
+        typedef _impl::TableFriend tf;
+        if (m_table)
+            tf::adj_accessors_move_last_over(*m_table, target_row_ndx, last_row_ndx);
+        return true;
+    }
+
+    bool clear_table() TIGHTDB_NOEXCEPT
+    {
+        typedef _impl::TableFriend tf;
+        if (m_table)
+            tf::discard_child_accessors(*m_table);
+        return true;
+    }
+
+    bool insert_int(size_t col_ndx, size_t row_ndx, int_fast64_t) TIGHTDB_NOEXCEPT
+    {
+        if (col_ndx == 0)
+            insert_empty_rows(row_ndx, 1);
+        return true;
+    }
+
+    bool insert_bool(size_t col_ndx, size_t row_ndx, bool) TIGHTDB_NOEXCEPT
+    {
+        if (col_ndx == 0)
+            insert_empty_rows(row_ndx, 1);
+        return true;
+    }
+
+    bool insert_float(size_t col_ndx, size_t row_ndx, float) TIGHTDB_NOEXCEPT
+    {
+        if (col_ndx == 0)
+            insert_empty_rows(row_ndx, 1);
+        return true;
+    }
+
+    bool insert_double(size_t col_ndx, size_t row_ndx, double) TIGHTDB_NOEXCEPT
+    {
+        if (col_ndx == 0)
+            insert_empty_rows(row_ndx, 1);
+        return true;
+    }
+
+    bool insert_string(size_t col_ndx, size_t row_ndx, StringData) TIGHTDB_NOEXCEPT
+    {
+        if (col_ndx == 0)
+            insert_empty_rows(row_ndx, 1);
+        return true;
+    }
+
+    bool insert_binary(size_t col_ndx, size_t row_ndx, BinaryData) TIGHTDB_NOEXCEPT
+    {
+        if (col_ndx == 0)
+            insert_empty_rows(row_ndx, 1);
+        return true;
+    }
+
+    bool insert_date_time(size_t col_ndx, size_t row_ndx, DateTime) TIGHTDB_NOEXCEPT
+    {
+        if (col_ndx == 0)
+            insert_empty_rows(row_ndx, 1);
+        return true;
+    }
+
+    bool insert_table(size_t col_ndx, size_t row_ndx) TIGHTDB_NOEXCEPT
+    {
+        if (col_ndx == 0)
+            insert_empty_rows(row_ndx, 1);
+        return true;
+    }
+
+    bool insert_mixed(size_t col_ndx, size_t row_ndx, const Mixed&) TIGHTDB_NOEXCEPT
+    {
+        if (col_ndx == 0)
+            insert_empty_rows(row_ndx, 1);
+        return true;
+    }
+
+    bool insert_link(size_t col_ndx, size_t row_ndx, size_t) TIGHTDB_NOEXCEPT
+    {
+        if (col_ndx == 0)
+            insert_empty_rows(row_ndx, 1);
+       return true;
+    }
+
+    bool insert_link_list(size_t col_ndx, size_t row_ndx) TIGHTDB_NOEXCEPT
+    {
+        if (col_ndx == 0)
+            insert_empty_rows(row_ndx, 1);
+        return true;
+    }
+
+    bool row_insert_complete() TIGHTDB_NOEXCEPT
+    {
+        return true; // Noop
+    }
+
+    bool set_int(size_t, size_t, int_fast64_t) TIGHTDB_NOEXCEPT
+    {
+        return true; // Noop
+    }
+
+    bool set_bool(size_t, size_t, bool) TIGHTDB_NOEXCEPT
+    {
+        return true; // Noop
+    }
+
+    bool set_float(size_t, size_t, float) TIGHTDB_NOEXCEPT
+    {
+        return true; // Noop
+    }
+
+    bool set_double(size_t, size_t, double) TIGHTDB_NOEXCEPT
+    {
+        return true; // Noop
+    }
+
+    bool set_string(size_t, size_t, StringData) TIGHTDB_NOEXCEPT
+    {
+        return true; // Noop
+    }
+
+    bool set_binary(size_t, size_t, BinaryData) TIGHTDB_NOEXCEPT
+    {
+        return true; // Noop
+    }
+
+    bool set_date_time(size_t, size_t, DateTime) TIGHTDB_NOEXCEPT
+    {
+        return true; // Noop
+    }
+
+    bool set_table(size_t col_ndx, size_t row_ndx) TIGHTDB_NOEXCEPT
+    {
+        if (m_table) {
+            typedef _impl::TableFriend tf;
+            if (Table* subtab = tf::get_subtable_accessor(*m_table, col_ndx, row_ndx)) {
+                tf::mark(*subtab);
+                tf::adj_clear_nonroot(*subtab);
+            }
+        }
+        return true;
+    }
+
+    bool set_mixed(size_t col_ndx, size_t row_ndx, const Mixed&) TIGHTDB_NOEXCEPT
+    {
+        typedef _impl::TableFriend tf;
+        if (m_table)
+            tf::discard_subtable_accessor(*m_table, col_ndx, row_ndx);
+        return true;
+    }
+
+    bool set_link(size_t col_ndx, size_t, size_t) TIGHTDB_NOEXCEPT
+    {
+        // When links are changed, the link-target table is also affected and
+        // its accessor must therefore be marked dirty too. Indeed, when it
+        // exists, the link-target table accessor must be marked dirty
+        // regardless of whether an accessor exists for the origin table (i.e.,
+        // regardless of whether `m_table` is null or not.) This would seem to
+        // pose a problem, because there is no easy way to identify the
+        // link-target table when there is no accessor for the origin
+        // table. Fortunately, due to the fact that back-link column accessors
+        // refer to the origin table accessor (and vice versa), it follows that
+        // the link-target table accessor exists if, and only if then origin
+        // table accessor exists.
+        //
+        // get_link_target_table_accessor() will return null if the
+        // m_table->m_cols[col_ndx] is null, but this can happen only when the
+        // column was inserted earlier during this transaction advance, and in
+        // that case, we have already marked the target table accesor dirty.
+        typedef _impl::TableFriend tf;
+        if (m_table) {
+            if (Table* target = tf::get_link_target_table_accessor(*m_table, col_ndx))
+                tf::mark(*target);
+        }
+        return true;
+    }
+
+    bool add_int_to_column(size_t, int_fast64_t) TIGHTDB_NOEXCEPT
+    {
+        return true; // Noop
+    }
+
+    bool optimize_table() TIGHTDB_NOEXCEPT
+    {
+        return true; // Noop
+    }
+
+    bool select_descriptor(int levels, const size_t* path)
+    {
+        m_desc.reset();
+        if (m_table) {
+            TIGHTDB_ASSERT(!m_table->has_shared_type());
+            typedef _impl::TableFriend tf;
+            Descriptor* desc = tf::get_root_table_desc_accessor(*m_table);
+            int i = 0;
+            while (desc) {
+                if (i >= levels) {
+                    m_desc.reset(desc);
+                    break;
+                }
+                typedef _impl::DescriptorFriend df;
+                size_t col_ndx = path[i];
+                desc = df::get_subdesc_accessor(*desc, col_ndx);
+                ++i;
+            }
+            m_desc_path_begin = path;
+            m_desc_path_end = path + levels;
+            MarkDirtyUpdater updater;
+            tf::update_accessors(*m_table, m_desc_path_begin, m_desc_path_end, updater);
+        }
+        return true;
+    }
+
+    bool insert_column(size_t col_ndx, DataType type, StringData, size_t link_target_table_ndx)
+    {
+        if (m_table) {
+            typedef _impl::TableFriend tf;
+            InsertColumnUpdater updater(col_ndx);
+            tf::update_accessors(*m_table, m_desc_path_begin, m_desc_path_end, updater);
+
+            // See comments on link handling in TransactAdvancer::set_link().
+            //
+            // FIXME: when the table refreshing process creates missing
+            // link-type column accessors, it must also create back-link column
+            // accessors and insert them into the link-target table accessor.
+            if (tf::is_link_type(ColumnType(type))) {
+                Table* target = m_group.get_table_by_ndx(link_target_table_ndx); // Throws
+                tf::adj_add_column(*target); // Throws
+                tf::mark(*target);
+            }
+        }
+        typedef _impl::DescriptorFriend df;
+        if (m_desc)
+            df::adj_insert_column(*m_desc, col_ndx);
+        return true;
+    }
+
+    bool erase_column(size_t col_ndx)
+    {
+        if (m_table) {
+            // FIXME: If column is link-type, then back-link column accessor in
+            // target table must be removed too, and the target table accessor
+            // must be marked dirty. This probably requires that column type and
+            // link-target table index are added to the EraseColumn instruction.
+            typedef _impl::TableFriend tf;
+            EraseColumnUpdater updater(col_ndx);
+            tf::update_accessors(*m_table, m_desc_path_begin, m_desc_path_end, updater);
+        }
+        typedef _impl::DescriptorFriend df;
+        if (m_desc)
+            df::adj_erase_column(*m_desc, col_ndx);
+        return true;
+    }
+
+    bool rename_column(size_t, StringData) TIGHTDB_NOEXCEPT
+    {
+        return true; // Noop
+    }
+
+    bool add_index_to_column(size_t) TIGHTDB_NOEXCEPT
+    {
+        return true; // Noop
+    }
+
+    bool select_link_list(size_t col_ndx, size_t) TIGHTDB_NOEXCEPT
+    {
+        // See comments on link handling in TransactAdvancer::set_link().
+        typedef _impl::TableFriend tf;
+        if (m_table) {
+            if (Table* target = tf::get_link_target_table_accessor(*m_table, col_ndx))
+                tf::mark(*target);
+        }
+        return true; // Noop
+    }
+
+    bool link_list_set(size_t, size_t) TIGHTDB_NOEXCEPT
+    {
+        return true; // Noop
+    }
+
+    bool link_list_insert(size_t, size_t) TIGHTDB_NOEXCEPT
+    {
+        return true; // Noop
+    }
+
+    bool link_list_move(size_t, size_t) TIGHTDB_NOEXCEPT
+    {
+        return true; // Noop
+    }
+
+    bool link_list_erase(size_t) TIGHTDB_NOEXCEPT
+    {
+        return true; // Noop
+    }
+
+    bool link_list_clear() TIGHTDB_NOEXCEPT
+    {
+        return true; // Noop
+    }
+
+private:
+    Group& m_group;
+    TableRef m_table;
+    DescriptorRef m_desc;
+    const size_t* m_desc_path_begin;
+    const size_t* m_desc_path_end;
+};
+
+
+void Group::advance_transact(ref_type new_top_ref, size_t new_file_size,
+                             const BinaryData* logs_begin, const BinaryData* logs_end)
+{
+    // The purpose of this function is to refresh all attached accessors after
+    // the underlying node structure has undergone arbitrary change, such as
+    // when a read transaction has been advanced to a later snapshot of the
+    // database.
+    //
+    // Initially, when this function is invoked, we cannot assume any
+    // correspondance between the accessor state and the underlying node
+    // structure. We can assume that the hierarchy is in a state of minimal
+    // consistency, and that it can be brought to a state of structural
+    // correspondace using information in the transaction logs. When structural
+    // correspondace is achieved, we can reliably refresh the accessor hierarchy
+    // (Table::refresh_accessor_tree()) to bring it back to a fully concsistent
+    // state. See AccessorConsistencyLevels.
+    //
+    // Much of the information in the transaction logs is not used in this
+    // process, because the changes have already been applied to the underlying
+    // node structure. All we need to do here is to bring the accessors back
+    // into a state where they correctly reflect the underlying structure (or
+    // detach them if the underlying entity has been removed.)
+    //
+    // The consequences of the changes in the transaction logs can be divided
+    // into two types; those that need to be applied to the accessors
+    // immediately (Table::adj_insert_column()), and those that can be "lumped
+    // together" and deduced automatically during a final accessor refresh
+    // operation (Table::refresh_accessor_tree()).
+    //
+    // Most transaction log instructions have consequences of both types. For
+    // example, when an "insert column" instruction is seen, we must immediately
+    // shift the positions of all existing columns accessors after the point of
+    // insertion. For practical reasons, and for efficiency, we will just insert
+    // a null pointer into `Table::m_cols` at this time, and then postpone the
+    // creation of the column accessor to the final per-table accessor refresh
+    // operation.
+    //
+    // The final per-table refresh operation visits each table accessor
+    // recursively starting from the roots (group-level tables). It relies the
+    // the per-table accessor dirty flags (Table::m_dirty) to prune the
+    // traversal to the set of accessors that were touched by the changes in the
+    // transaction logs.
+
+    MultiLogInputStream in(logs_begin, logs_end);
+    Replication::TransactLogParser parser(in);
+    TransactAdvancer advancer(*this);
+    parser.parse(advancer); // Throws
+
+    // Update memory mapping if database file has grown
+    if (new_file_size > m_alloc.get_baseline()) {
+        m_alloc.reset_free_space_tracking(); // Throws
+        m_alloc.remap(new_file_size); // Throws
+        // The file was mapped to a new address, so all array accessors must be
+        // updated.
+        mark_all_table_accessors();
+    }
+
+    init_from_ref(new_top_ref);
+    m_top.get_alloc().bump_global_version();
+    // Refresh all remaining dirty table accessors
+    size_t num_tables = m_table_accessors.size();
+    for (size_t table_ndx = 0; table_ndx != num_tables; ++table_ndx) {
+        if (Table* table = m_table_accessors[table_ndx]) {
+            typedef _impl::TableFriend tf;
+            tf::refresh_accessor_tree(*table, table_ndx); // Throws
+        }
+    }
+}
+
+void Group::mark_all_table_accessors()
+{
+    size_t num_tables = m_table_accessors.size();
+    for (size_t table_ndx = 0; table_ndx != num_tables; ++table_ndx) {
+        if (Table* table = m_table_accessors[table_ndx]) {
+            typedef _impl::TableFriend tf;
+            tf::recursive_mark(*table); // Also all subtable accessors
+        }
+    }
+}
+
+#endif // TIGHTDB_ENABLE_REPLICATION
+
+
 #ifdef TIGHTDB_DEBUG
 
 void Group::Verify() const
 {
     TIGHTDB_ASSERT(is_attached());
+
+    m_alloc.Verify();
 
     // Verify free lists
     if (m_free_positions.is_attached()) {
@@ -823,6 +1415,7 @@ pair<ref_type, size_t> Group::get_to_dot_parent(size_t ndx_in_parent) const
 }
 
 
+/*
 void Group::zero_free_space(size_t file_size, size_t readlock_version)
 {
     static_cast<void>(readlock_version); // FIXME: Why is this parameter not used?
@@ -845,5 +1438,6 @@ void Group::zero_free_space(size_t file_size, size_t readlock_version)
         fill(p, p+len, 0);
     }
 }
+*/
 
 #endif // TIGHTDB_DEBUG

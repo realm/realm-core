@@ -5,6 +5,7 @@
 #endif
 
 #include <tightdb/array_blobs_big.hpp>
+#include <tightdb/column.hpp>
 
 
 using namespace std;
@@ -89,7 +90,7 @@ size_t ArrayBigBlobs::find_first(BinaryData value, bool is_string,
 }
 
 
-void ArrayBigBlobs::find_all(Array& result, BinaryData value, bool is_string, size_t add_offset,
+void ArrayBigBlobs::find_all(Column& result, BinaryData value, bool is_string, size_t add_offset,
                              size_t begin, size_t end)
 {
     size_t begin_2 = begin;

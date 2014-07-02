@@ -56,7 +56,7 @@
 #endif
 
 
-#if __cplusplus >= 201103 || __GXX_EXPERIMENTAL_CXX0X__
+#if __cplusplus >= 201103 || __GXX_EXPERIMENTAL_CXX0X__ || _MSC_VER >= 1700
 #  define TIGHTDB_HAVE_CXX11 1
 #endif
 
@@ -105,13 +105,11 @@
 /* Support for C++11 <atomic>.
  *
  * FIXME: Somehow MSVC 11 (2012) fails when <atomic> is included in thread.cpp. */
-#ifndef _MSC_VER
 #  if TIGHTDB_HAVE_CXX11 && TIGHTDB_HAVE_AT_LEAST_GCC(4, 4) || \
     TIGHTDB_HAVE_CXX11 && _LIBCPP_VERSION >= 1001 || \
-    TIGHTDB_HAVE_AT_LEAST_MSVC_11_2012
+    TIGHTDB_HAVE_AT_LEAST_MSVC_12_2013
 #    define TIGHTDB_HAVE_CXX11_ATOMIC 1
 #  endif
-#endif
 
 
 /* Support for C++11 variadic templates. */
@@ -253,6 +251,26 @@
     #define TIGHTDB_FORCEINLINE __forceinline
 #else
     #define TIGHTDB_FORCEINLINE inline
+#endif
+
+
+#if defined ANDROID
+#  define TIGHTDB_ANDROID 1
+#endif
+
+
+#if defined __APPLE__ && defined __MACH__
+/* Apple OSX and iOS (Darwin). */
+#  include <TargetConditionals.h>
+#  if TARGET_OS_IPHONE == 1
+/* Device (iPhone or iPad) or simulator. */
+#    define TIGHTDB_IOS 1
+#  endif
+#endif
+
+
+#if TIGHTDB_ANDROID || TIGHTDB_IOS
+#  define TIGHTDB_MOBILE 1
 #endif
 
 

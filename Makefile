@@ -4,12 +4,18 @@ test_DEPS = src
 PASSIVE_SUBDIRS = doc/ref_cpp/examples
 doc_ref_cpp_examples_DEPS = src
 
-# Continue support for obsolete `test`-based goal names.
-# You should use the new `check`-based names instead.
+# Continue support for obsolete `test`-based goal names.  You should use the new
+# `check`-based names instead.
+.PHONY: test test-debug
 test: check
 test-debug: check-debug
-memtest: memcheck
-memtest-debug: memcheck-debug
+
+# Run test suite inside `gdb`
+.PHONY: gdb gdb-debug
+gdb: check-norun/subdir/src
+	@$(MAKE) -C test gdb
+gdb-debug: check-debug-norun/subdir/src
+	@$(MAKE) -C test gdb-debug
 
 # Build and run documentation examples
 .PHONY: check-doc-examples
@@ -66,6 +72,7 @@ gcovr: check-cover
 
 # Build and run whatever is in test/experiements/testcase.cpp
 .PHONY: check-testcase check-testcase-debug memcheck-testcase memcheck-testcase-debug
+.PHONY: gdb-testcase gdb-testcase-debug
 check-testcase: check-norun/subdir/src
 	@$(MAKE) -C test check-testcase
 check-testcase-debug: check-debug-norun/subdir/src
@@ -74,9 +81,10 @@ memcheck-testcase: check-norun/subdir/src
 	@$(MAKE) -C test memcheck-testcase
 memcheck-testcase-debug: check-debug-norun/subdir/src
 	@$(MAKE) -C test memcheck-testcase-debug
-.PHONY: testcase testcase-debug
-testcase: check-testcase
-testcase-debug: check-testcase-debug
+gdb-testcase: check-norun/subdir/src
+	@$(MAKE) -C test gdb-testcase
+gdb-testcase-debug: check-debug-norun/subdir/src
+	@$(MAKE) -C test gdb-testcase-debug
 
 # Used by build.sh
 .PHONY: get-exec-prefix get-includedir get-bindir get-libdir get-libexecdir

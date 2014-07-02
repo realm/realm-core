@@ -6,14 +6,41 @@
 #include <tightdb/array_blob.hpp>
 #include <tightdb/column_string.hpp>
 
-#include "util/unit_test.hpp"
-#include "util/test_only.hpp"
+#include "test.hpp"
 
 using namespace std;
 using namespace tightdb;
 
-// Note: You can now temporarely declare unit tests with the ONLY(TestName) macro instead of TEST(TestName). This
-// will disable all unit tests except these. Remember to undo your temporary changes before committing.
+
+// Test independence and thread-safety
+// -----------------------------------
+//
+// All tests must be thread safe and independent of each other. This
+// is required because it allows for both shuffling of the execution
+// order and for parallelized testing.
+//
+// In particular, avoid using std::rand() since it is not guaranteed
+// to be thread safe. Instead use the API offered in
+// `test/util/random.hpp`.
+//
+// All files created in tests must use the TEST_PATH macro (or one of
+// its friends) to obtain a suitable file system path. See
+// `test/util/test_path.hpp`.
+//
+//
+// Debugging and the ONLY() macro
+// ------------------------------
+//
+// A simple way of disabling all tests except one called `Foo`, is to
+// replace TEST(Foo) with ONLY(Foo) and then recompile and rerun the
+// test suite. Note that you can also use filtering by setting the
+// environment varible `UNITTEST_FILTER`. See `README.md` for more on
+// this.
+//
+// Another way to debug a particular test, is to copy that test into
+// `experiments/testcase.cpp` and then run `sh build.sh
+// check-testcase` (or one of its friends) from the command line.
+
 
 TEST(ArrayBlob_AddEmpty)
 {
@@ -25,17 +52,18 @@ TEST(ArrayBlob_AddEmpty)
     blob.destroy();
 }
 
+
 TEST(ArrayBlob_General)
 {
     ArrayBlob blob;
 
-    const char* const t1 = "aaa";
-    const char* const t2 = "bbbbbb";
-    const char* const t3 = "ccccccccccc";
-    const char* const t4 = "xxx";
-    const size_t l1 = strlen(t1)+1;
-    const size_t l2 = strlen(t2)+1;
-    const size_t l3 = strlen(t3)+1;
+    const char* t1 = "aaa";
+    const char* t2 = "bbbbbb";
+    const char* t3 = "ccccccccccc";
+    const char* t4 = "xxx";
+    size_t l1 = strlen(t1) + 1;
+    size_t l2 = strlen(t2) + 1;
+    size_t l3 = strlen(t3) + 1;
 
     // Test add
     blob.add(t1, l1);
@@ -83,6 +111,7 @@ TEST(ArrayBlob_General)
     // Cleanup
     blob.destroy();
 }
+
 
 TEST(ArrayBlob_AdaptiveStringLeak)
 {

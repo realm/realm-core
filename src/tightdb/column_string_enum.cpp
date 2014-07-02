@@ -52,11 +52,6 @@ void ColumnStringEnum::update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT
     m_keys.update_from_parent(old_baseline);
 }
 
-void ColumnStringEnum::add(StringData value)
-{
-    insert(Column::size(), value);
-}
-
 void ColumnStringEnum::set(size_t ndx, StringData value)
 {
     TIGHTDB_ASSERT(ndx < Column::size());
@@ -74,18 +69,32 @@ void ColumnStringEnum::set(size_t ndx, StringData value)
     Column::set(ndx, key_ndx);
 }
 
-void ColumnStringEnum::insert(size_t ndx, StringData value)
-{
-    TIGHTDB_ASSERT(ndx <= Column::size());
 
+void ColumnStringEnum::do_insert(size_t row_ndx, StringData value, size_t num_rows)
+{
     size_t key_ndx = GetKeyNdxOrAdd(value);
-    Column::insert(ndx, key_ndx);
+    int_fast64_t value_2 = int_fast64_t(key_ndx);
+    Column::do_insert(row_ndx, value_2, num_rows); // Throws
 
     if (m_index) {
-        bool is_last = ndx+1 == size();
-        m_index->insert(ndx, value, is_last);
+        bool is_append = row_ndx == tightdb::npos;
+        size_t row_ndx_2 = is_append ? size() - num_rows : row_ndx;
+        m_index->insert(row_ndx_2, value, num_rows, is_append); // Throws
     }
 }
+
+
+void ColumnStringEnum::do_insert(size_t row_ndx, StringData value, size_t num_rows, bool is_append)
+{
+    size_t key_ndx = GetKeyNdxOrAdd(value);
+    size_t row_ndx_2 = is_append ? tightdb::npos : row_ndx;
+    int_fast64_t value_2 = int_fast64_t(key_ndx);
+    Column::do_insert(row_ndx_2, value_2, num_rows); // Throws
+
+    if (m_index)
+        m_index->insert(row_ndx, value, num_rows, is_append); // Throws
+}
+
 
 void ColumnStringEnum::erase(size_t ndx, bool is_last)
 {
@@ -128,7 +137,7 @@ size_t ColumnStringEnum::count(StringData value) const
     return Column::count(key_ndx);
 }
 
-void ColumnStringEnum::find_all(Array& res, StringData value, size_t begin, size_t end) const
+void ColumnStringEnum::find_all(Column& res, StringData value, size_t begin, size_t end) const
 {
     if (m_index && begin == 0 && end == size_t(-1))
         return m_index->find_all(res, value);
@@ -139,7 +148,7 @@ void ColumnStringEnum::find_all(Array& res, StringData value, size_t begin, size
     Column::find_all(res, key_ndx, begin, end);
 }
 
-void ColumnStringEnum::find_all(Array& res, size_t key_ndx, size_t begin, size_t end) const
+void ColumnStringEnum::find_all(Column& res, size_t key_ndx, size_t begin, size_t end) const
 {
     if (key_ndx == size_t(-1))
         return;
@@ -184,14 +193,13 @@ size_t ColumnStringEnum::GetKeyNdx(StringData value) const
 size_t ColumnStringEnum::GetKeyNdxOrAdd(StringData value)
 {
     size_t res = m_keys.find_first(value);
-    if (res != size_t(-1))
+    if (res != tightdb::not_found)
         return res;
-    else {
-        // Add key if it does not exist
-        size_t pos = m_keys.size();
-        m_keys.add(value);
-        return pos;
-    }
+
+    // Add key if it does not exist
+    size_t pos = m_keys.size();
+    m_keys.add(value);
+    return pos;
 }
 
 bool ColumnStringEnum::compare_string(const AdaptiveStringColumn& c) const
@@ -224,24 +232,28 @@ StringIndex& ColumnStringEnum::create_index()
     TIGHTDB_ASSERT(!m_index);
 
     // Create new index
-    m_index = new StringIndex(this, &get_string, m_array->get_alloc());
+    m_index = new StringIndex(this, &get_string, m_array->get_alloc()); // Throws
 
     // Populate the index
-    size_t n = size();
-    for (size_t i = 0; i != n; ++i) {
-        StringData value = get(i);
-        bool is_last = true;
-        m_index->insert(i, value, is_last);
+    size_t num_rows = size();
+    for (size_t row_ndx = 0; row_ndx != num_rows; ++row_ndx) {
+        StringData value = get(row_ndx);
+        size_t num_rows = 1;
+        bool is_append = true;
+        m_index->insert(row_ndx, value, num_rows, is_append); // Throws
     }
 
     return *m_index;
 }
 
+
 void ColumnStringEnum::set_index_ref(ref_type ref, ArrayParent* parent, size_t ndx_in_parent)
 {
     TIGHTDB_ASSERT(!m_index);
-    m_index = new StringIndex(ref, parent, ndx_in_parent, this, &get_string, m_array->get_alloc());
+    m_index = new StringIndex(ref, parent, ndx_in_parent, this, &get_string,
+                              m_array->get_alloc()); // Throws
 }
+
 
 void ColumnStringEnum::install_index(StringIndex* index) TIGHTDB_NOEXCEPT
 {
@@ -252,12 +264,61 @@ void ColumnStringEnum::install_index(StringIndex* index) TIGHTDB_NOEXCEPT
 }
 
 
+void ColumnStringEnum::update_column_index(size_t new_col_ndx, const Spec& spec) TIGHTDB_NOEXCEPT
+{
+    Column::update_column_index(new_col_ndx, spec);
+    std::size_t ndx_is_spec_enumkeys = spec.get_enumkeys_ndx(new_col_ndx);
+    m_keys.get_root_array()->set_ndx_in_parent(ndx_is_spec_enumkeys);
+    if (m_index) {
+        size_t ndx_in_parent = m_array->get_ndx_in_parent();
+        m_index->get_root_array()->set_ndx_in_parent(ndx_in_parent + 1);
+    }
+}
+
+
+void ColumnStringEnum::refresh_accessor_tree(size_t col_ndx, const Spec& spec)
+{
+    Column::refresh_accessor_tree(col_ndx, spec);
+    size_t ndx_is_spec_enumkeys = spec.get_enumkeys_ndx(col_ndx);
+    m_keys.get_root_array()->set_ndx_in_parent(ndx_is_spec_enumkeys);
+    m_keys.refresh_accessor_tree(0, spec);
+
+    // Refresh search index
+    if (m_index) {
+        size_t ndx_in_parent = m_array->get_ndx_in_parent();
+        m_index->get_root_array()->set_ndx_in_parent(ndx_in_parent + 1);
+        // FIXME: The cached root array needs to be refreshed; however, it is
+        // unkown to me (Kristian) whether the root node can change between
+        // different Array-like classes. If it can, then the refresh operation
+        // could be as non-trivial as it is in the case of
+        // ColumnBinary::refresh_accessor_tree(). For that reason, the current
+        // work-around is to simply recreate the search index.
+        bool use_workaround = true;
+        if (use_workaround) {
+            delete m_index;
+            m_index = 0;
+            ref_type ref = m_index->get_root_array()->get_ref_from_parent();
+            ArrayParent* parent = m_index->get_root_array()->get_parent();
+            Allocator& alloc = m_array->get_alloc();
+            m_index = new StringIndex(ref, parent, ndx_in_parent+1, this,
+                                      &get_string, alloc); // Throws
+        }
+        else {
+            m_index->refresh_accessor_tree(col_ndx, spec); // Throws
+        }
+    }
+}
+
+
 #ifdef TIGHTDB_DEBUG
 
 void ColumnStringEnum::Verify() const
 {
     m_keys.Verify();
     Column::Verify();
+
+    if (m_index)
+        m_index->Verify();
 }
 
 void ColumnStringEnum::to_dot(ostream& out, StringData title) const

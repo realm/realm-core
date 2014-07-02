@@ -11,16 +11,45 @@
 #include <tightdb/lang_bind_helper.hpp>
 
 #include "util/misc.hpp"
-#include "util/unit_test.hpp"
-#include "util/test_only.hpp"
+
+#include "test.hpp"
 
 using namespace std;
 using namespace tightdb;
 using namespace tightdb::util;
-using namespace test_util;
+using namespace tightdb::test_util;
+using unit_test::TestResults;
 
-// Note: You can now temporarely declare unit tests with the ONLY(TestName) macro instead of TEST(TestName). This
-// will disable all unit tests except these. Remember to undo your temporary changes before committing.
+
+// Test independence and thread-safety
+// -----------------------------------
+//
+// All tests must be thread safe and independent of each other. This
+// is required because it allows for both shuffling of the execution
+// order and for parallelized testing.
+//
+// In particular, avoid using std::rand() since it is not guaranteed
+// to be thread safe. Instead use the API offered in
+// `test/util/random.hpp`.
+//
+// All files created in tests must use the TEST_PATH macro (or one of
+// its friends) to obtain a suitable file system path. See
+// `test/util/test_path.hpp`.
+//
+//
+// Debugging and the ONLY() macro
+// ------------------------------
+//
+// A simple way of disabling all tests except one called `Foo`, is to
+// replace TEST(Foo) with ONLY(Foo) and then recompile and rerun the
+// test suite. Note that you can also use filtering by setting the
+// environment varible `UNITTEST_FILTER`. See `README.md` for more on
+// this.
+//
+// Another way to debug a particular test, is to copy that test into
+// `experiments/testcase.cpp` and then run `sh build.sh
+// check-testcase` (or one of its friends) from the command line.
+
 
 namespace {
 
@@ -421,7 +450,6 @@ void setup_multi_table(Table& table, size_t rows, size_t sub_rows,
 
     table.add_empty_row(rows);
 
-    // Add some rows
     for (size_t i = 0; i < rows; ++i) {
         int64_t sign = (i%2 == 0) ? 1 : -1;
         table.set_int(0, i, int64_t(i*sign));
@@ -620,21 +648,20 @@ TEST(Table_DeleteAllTypes)
 #endif
 }
 
+
 TEST(Table_MoveAllTypes)
 {
+    Random random(random_int<unsigned long>()); // Seed from slow global generator
+
     Table table;
     setup_multi_table(table, 15, 2);
     table.set_index(6);
 
-    while (table.size() > 1) {
+    while (!table.is_empty()) {
         size_t size = table.size();
-        size_t ndx = size_t(rand()) % (size-1);
-
-        table.move_last_over(ndx);
-
-#ifdef TIGHTDB_DEBUG
+        size_t target_row_ndx = random.draw_int_mod(size);
+        table.move_last_over(target_row_ndx);
         table.Verify();
-#endif
     }
 }
 
@@ -823,32 +850,34 @@ TEST(Table_ToString)
     stringstream ss;
     table.to_string(ss);
     const string result = ss.str();
+    string file_name = get_test_resource_path();
 #if _MSC_VER
-    const char* filename = "expect_string-win.txt";
+    file_name += "expect_string-win.txt";
 #else
-    const char* filename = "expect_string.txt";
+    file_name += "expect_string.txt";
 #endif
 #if GENERATE   // enable to generate testfile - check it manually
-    ofstream testFile(filename, ios::out);
-    testFile << result;
+    ofstream test_file(file_name.c_str(), ios::out);
+    test_file << result;
     cerr << "to_string() test:\n" << result << endl;
 #else
-    ifstream testFile(filename, ios::in);
-    CHECK(!testFile.fail());
+    ifstream test_file(file_name.c_str(), ios::in);
+    CHECK(!test_file.fail());
     string expected;
-    expected.assign( istreambuf_iterator<char>(testFile),
+    expected.assign( istreambuf_iterator<char>(test_file),
                      istreambuf_iterator<char>() );
     bool test_ok = test_util::equal_without_cr(result, expected);
     CHECK_EQUAL(true, test_ok);
     if (!test_ok) {
-        ofstream testFile("expect_string.error.txt", ios::out | ios::binary);
-        testFile << result;
-        cerr << "\n error result in 'expect_string.error.txt'\n";
+        TEST_PATH(path);
+        File out(path, File::mode_Write);
+        out.write(result);
+        cerr << "\n error result in '"<<string(path)<<"'\n";
     }
 #endif
 }
 
-TEST(Table_JsonAllAata)
+TEST(Table_JsonAllData)
 {
     Table table;
     setup_multi_table(table, 15, 2);
@@ -856,28 +885,30 @@ TEST(Table_JsonAllAata)
     stringstream ss;
     table.to_json(ss);
     const string json = ss.str();
+    string file_name = get_test_resource_path();
 #if _MSC_VER
-    const char* filename = "expect_json-win.json";
+    file_name += "expect_json-win.json";
 #else
-    const char* filename = "expect_json.json";
+    file_name += "expect_json.json";
 #endif
 #if GENERATE
         // Generate the testdata to compare. After doing this,
         // verify that the output is correct with a json validator:
         // http://jsonformatter.curiousconcept.com/
     cerr << "JSON:" << json << "\n";
-    ofstream testFile(filename, ios::out | ios::binary);
-    testFile << json;
+    ofstream test_file(file_name.c_str(), ios::out | ios::binary);
+    test_file << json;
 #else
     string expected;
-    ifstream testFile(filename, ios::in | ios::binary);
-    CHECK(!testFile.fail());
-    getline(testFile,expected);
+    ifstream test_file(file_name.c_str(), ios::in | ios::binary);
+    CHECK(!test_file.fail());
+    getline(test_file,expected);
     CHECK_EQUAL(true, json == expected);
     if (json != expected) {
-        ofstream testFile("expect_json.error.json", ios::out | ios::binary);
-        testFile << json;
-        cerr << "\n error result in 'expect_json.error.json'\n";
+        TEST_PATH(path);
+        File out(path, File::mode_Write);
+        out.write(json);
+        cerr << "\n error result in '"<<string(path)<<"'\n";
     }
 #endif
 }
@@ -894,8 +925,8 @@ TEST(Table_RowToString)
     table.row_to_string(1, ss);
     const string row_str = ss.str();
 #if 0
-    ofstream testFile("row_to_string.txt", ios::out);
-    testFile << row_str;
+    ofstream test_file("row_to_string.txt", ios::out);
+    test_file << row_str;
 #endif
 
     string expected = "    int   bool                 date           float          double   string              string_long  string_enum     binary  mixed  tables\n"
@@ -1026,10 +1057,10 @@ TEST(Table_SortedInt)
 #endif
 }
 
-TEST(Table_Sorted_Query)
+TEST(Table_SortedQuery)
 {
     TestTable table;
-    
+
     table.add(0, 10, true, Wed); // 0: 4
     table.add(0, 20, false, Wed); // 1: 7
     table.add(0,  0, false, Wed); // 2: 0
@@ -1040,35 +1071,65 @@ TEST(Table_Sorted_Query)
     table.add(0,  4, true, Wed); // 7: 2
     table.add(0, 99, true, Wed); // 8: 9
     table.add(0,  2, true, Wed); // 9: 1
-    
+
     // Count booleans
     size_t count_original = table.where().third.equal(false).count();
     CHECK_EQUAL(4, count_original);
-    
+
     // Get a view containing the complete table
     TestTable::View v = table.column().first.find_all(0);
     CHECK_EQUAL(table.size(), v.size());
-    
+
     // Count booleans
     size_t count_view = table.where().tableview(v).third.equal(false).count();
     CHECK_EQUAL(4, count_view);
-    
+
     TestTable::View v_sorted = table.column().second.get_sorted_view();
     CHECK_EQUAL(table.size(), v_sorted.size());
-    
-    bool got_exception = false;
-    try {
-        // Verify that a sorted view cannot form the basis of a new query
-        size_t count_view_sorted = table.where().tableview(v_sorted).third.equal(false).count();
-        CHECK_EQUAL(4, count_view_sorted);
-    } catch (runtime_error) {
-        got_exception = true;
-    }
-    CHECK_EQUAL(true, got_exception);
+
 #ifdef TIGHTDB_DEBUG
     table.Verify();
 #endif
 }
+
+
+TEST(Table_Sorted_Query_where)
+{
+    // Using where(tv) instead of tableview(tv)
+    TestTable table;
+
+    table.add(0, 10, true, Wed); // 0: 4
+    table.add(0, 20, false, Wed); // 1: 7
+    table.add(0, 0, false, Wed); // 2: 0
+    table.add(0, 40, false, Wed); // 3: 8
+    table.add(0, 15, false, Wed); // 4: 6
+    table.add(0, 11, true, Wed); // 5: 5
+    table.add(0, 6, true, Wed); // 6: 3
+    table.add(0, 4, true, Wed); // 7: 2
+    table.add(0, 99, true, Wed); // 8: 9
+    table.add(0, 2, true, Wed); // 9: 1
+
+    // Count booleans
+    size_t count_original = table.where().third.equal(false).count();
+    CHECK_EQUAL(4, count_original);
+
+    // Get a view containing the complete table
+    TestTable::View v = table.column().first.find_all(0);
+    CHECK_EQUAL(table.size(), v.size());
+
+    // Count booleans
+    size_t count_view = table.where(&v).third.equal(false).count();
+    CHECK_EQUAL(4, count_view);
+
+    TestTable::View v_sorted = table.column().second.get_sorted_view();
+    CHECK_EQUAL(table.size(), v_sorted.size());
+
+#ifdef TIGHTDB_DEBUG
+    table.Verify();
+#endif
+}
+
+
 
 TEST(Table_IndexString)
 {
@@ -1626,15 +1687,15 @@ TEST(Table_Spec)
     }
 
     // Write the group to disk
-    File::try_remove("subtables.tightdb");
-    group.write("subtables.tightdb");
+    GROUP_TEST_PATH(path);
+    group.write(path);
 
     // Read back tables
     {
-        Group fromDisk("subtables.tightdb", Group::mode_ReadOnly);
-        TableRef fromDiskTable = fromDisk.get_table("test");
+        Group from_disk(path, Group::mode_ReadOnly);
+        TableRef from_disk_table = from_disk.get_table("test");
 
-        TableRef subtable2 = fromDiskTable->get_subtable(2, 0);
+        TableRef subtable2 = from_disk_table->get_subtable(2, 0);
 
         CHECK_EQUAL(1,      subtable2->size());
         CHECK_EQUAL(42,     subtable2->get_int(0, 0));
@@ -2240,50 +2301,50 @@ TEST(Table_SubtableSizeAndClear)
     table.add_column(type_Mixed, "mixed");
     subdesc->add_column(type_Int,  "int");
 
-    table.insert_subtable(0, 0);
+    table.insert_subtable(0,0);
     table.insert_mixed(1, 0, false);
     table.insert_done();
 
-    table.insert_subtable(0, 1);
+    table.insert_subtable(0,1);
     table.insert_mixed(1, 1, Mixed::subtable_tag());
     table.insert_done();
 
-    CHECK_EQUAL(table.get_subtable_size(0,0), 0); // Subtable column
-    CHECK_EQUAL(table.get_subtable_size(1,0), 0); // Mixed column, bool value
-    CHECK_EQUAL(table.get_subtable_size(1,1), 0); // Mixed column, table value
+    CHECK_EQUAL(0, table.get_subtable_size(0,0)); // Subtable column
+    CHECK_EQUAL(0, table.get_subtable_size(1,0)); // Mixed column, bool value
+    CHECK_EQUAL(0, table.get_subtable_size(1,1)); // Mixed column, table value
 
-    CHECK(table.get_subtable(0, 0));  // Subtable column
-    CHECK(!table.get_subtable(1, 0)); // Mixed column, bool value, must return NULL
-    CHECK(table.get_subtable(1, 1));  // Mixed column, table value
+    CHECK(table.get_subtable(0,0));  // Subtable column
+    CHECK(!table.get_subtable(1,0)); // Mixed column, bool value, must return NULL
+    CHECK(table.get_subtable(1,1));  // Mixed column, table value
 
     table.set_mixed(1, 0, Mixed::subtable_tag());
     table.set_mixed(1, 1, false);
-    CHECK(table.get_subtable(1, 0));
-    CHECK(!table.get_subtable(1, 1));
+    CHECK(table.get_subtable(1,0));
+    CHECK(!table.get_subtable(1,1));
 
-    TableRef subtab1 = table.get_subtable(0, 0);
-    TableRef subtab2 = table.get_subtable(1, 0);
+    TableRef subtab1 = table.get_subtable(0,0);
+    TableRef subtab2 = table.get_subtable(1,0);
     subtab2->add_column(type_Int, "int");
 
-    CHECK_EQUAL(table.get_subtable_size(1, 0), 0);
-    CHECK(table.get_subtable(1, 0));
+    CHECK_EQUAL(0, table.get_subtable_size(1,0));
+    CHECK(table.get_subtable(1,0));
 
-    subtab1->insert_int(0, 0, 0);
+    subtab1->insert_int(0,0,0);
     subtab1->insert_done();
 
-    subtab2->insert_int(0, 0, 0);
+    subtab2->insert_int(0,0,0);
     subtab2->insert_done();
 
-    CHECK_EQUAL(table.get_subtable_size(0,0), 1);
-    CHECK_EQUAL(table.get_subtable_size(1,0), 1);
+    CHECK_EQUAL(1, table.get_subtable_size(0,0));
+    CHECK_EQUAL(1, table.get_subtable_size(1,0));
 
-    table.clear_subtable(0, 0);
-    table.clear_subtable(1, 0);
+    table.clear_subtable(0,0);
+    table.clear_subtable(1,0);
 
-    CHECK_EQUAL(table.get_subtable_size(0,0), 0);
-    CHECK_EQUAL(table.get_subtable_size(1,0), 0);
+    CHECK_EQUAL(0, table.get_subtable_size(0,0));
+    CHECK_EQUAL(0, table.get_subtable_size(1,0));
 
-    CHECK(table.get_subtable(1, 0));
+    CHECK(table.get_subtable(1,0));
 }
 
 
@@ -2731,6 +2792,7 @@ TEST(Table_SetSubTableByExample2)
 
         TableRef subtable2 = view.get_subtable(2, 0);//fetch back the subtable from the view
 
+        CHECK_EQUAL(false, subtable->is_empty());
         CHECK_EQUAL(42,     subtable2->get_int(0, 0));
         CHECK_EQUAL("forty two", subtable2->get_string(1, 0));
         CHECK_EQUAL(3,     subtable2->get_int(0, 1));
@@ -2745,40 +2807,6 @@ TEST(Table_SetSubTableByExample2)
     }
 }
 
-
-
-TEST(Table_SubtableWithParentChange)
-{
-    // FIXME: Also check that when a freestanding table is destroyed, it invalidates all its subtable wrappers.
-    // FIXME: Also check that there is no memory corruption or bad read if a non-null TableRef outlives its root table or group.
-    MyTable3 table;
-    table.add();
-    table.add();
-    MyTable2::Ref subtab = table[1].subtab;
-    subtab->add(7, 0);
-    CHECK(table.is_attached());
-    CHECK(subtab->is_attached());
-    CHECK_EQUAL(subtab, MyTable2::Ref(table[1].subtab));
-    CHECK_EQUAL(table[1].subtab[0].val, 7);
-    CHECK_EQUAL(subtab[0].val, 7);
-    CHECK(subtab->is_attached());
-#ifdef TIGHTDB_DEBUG
-    table.Verify();
-    subtab->Verify();
-#endif
-    CHECK(table.is_attached());
-    CHECK(subtab->is_attached());
-    table.insert(0, 0);
-    CHECK(table.is_attached());
-    CHECK(!subtab->is_attached());
-    subtab = table[2].subtab;
-    CHECK(subtab->is_attached());
-    table.remove(1);
-    CHECK(!subtab->is_attached());
-    subtab = table[1].subtab;
-    CHECK(table.is_attached());
-    CHECK(subtab->is_attached());
-}
 
 TEST(Table_HasSharedSpec)
 {
@@ -2851,7 +2879,7 @@ TEST(Table_Aggregates)
     CHECK_EQUAL(11.0f, table.column().c_float.maximum());
     CHECK_EQUAL(12.0, table.column().c_double.maximum());
     // sum
-    CHECK_APPROXIMATELY_EQUAL(i_sum, table.column().c_int.sum(),    10*epsilon);
+    CHECK_APPROXIMATELY_EQUAL(double(i_sum), double(table.column().c_int.sum()), 10*epsilon);
     CHECK_APPROXIMATELY_EQUAL(f_sum, table.column().c_float.sum(),  10*epsilon);
     CHECK_APPROXIMATELY_EQUAL(d_sum, table.column().c_double.sum(), 10*epsilon);
     // average
@@ -3015,7 +3043,8 @@ TEST(Table_Pivot)
 
 namespace {
 
-void compare_table_with_slice(const Table& table, const Table& slice, size_t offset, size_t size)
+void compare_table_with_slice(TestResults& test_results, const Table& table,
+                              const Table& slice, size_t offset, size_t size)
 {
     ConstDescriptorRef table_desc = table.get_descriptor();
     ConstDescriptorRef slice_desc = slice.get_descriptor();
@@ -3028,6 +3057,7 @@ void compare_table_with_slice(const Table& table, const Table& slice, size_t off
         DataType type = table.get_column_type(col_i);
         switch (type) {
             case type_Int:
+            case type_Link:
                 for (size_t i = 0; i != size; ++i) {
                     int_fast64_t v_1 = table.get_int(col_i, offset + i);
                     int_fast64_t v_2 = slice.get_int(col_i, i);
@@ -3118,17 +3148,22 @@ void compare_table_with_slice(const Table& table, const Table& slice, size_t off
                                 break;
                             }
                             case type_Mixed:
+                            case type_Link:
+                            case type_LinkList:
                                 TIGHTDB_ASSERT(false);
                         }
                     }
                 }
+                break;
+            case type_LinkList:
                 break;
         }
     }
 }
 
 
-void test_write_slice_name(const Table& table, StringData expect_name, bool override_name)
+void test_write_slice_name(TestResults& test_results, const Table& table,
+                           StringData expect_name, bool override_name)
 {
     size_t offset = 0, size = 0;
     ostringstream out;
@@ -3146,7 +3181,8 @@ void test_write_slice_name(const Table& table, StringData expect_name, bool over
     CHECK(slice);
 }
 
-void test_write_slice_contents(const Table& table, size_t offset, size_t size)
+void test_write_slice_contents(TestResults& test_results, const Table& table,
+                               size_t offset, size_t size)
 {
     ostringstream out;
     table.write(out, offset, size);
@@ -3163,27 +3199,28 @@ void test_write_slice_contents(const Table& table, size_t offset, size_t size)
             size_2 = remaining_size;
         CHECK_EQUAL(size_2, slice->size());
         if (size_2 == slice->size())
-            compare_table_with_slice(table, *slice, offset, size_2);
+            compare_table_with_slice(test_results, table, *slice, offset, size_2);
     }
 }
 
 } // anonymous namespace
+
 
 TEST(Table_WriteSlice)
 {
     // check that the name of the written table is as expected
     {
         Table table;
-        test_write_slice_name(table, "",    false);
-        test_write_slice_name(table, "foo", true); // Override
-        test_write_slice_name(table, "",    true); // Override
+        test_write_slice_name(test_results, table, "",    false);
+        test_write_slice_name(test_results, table, "foo", true); // Override
+        test_write_slice_name(test_results, table, "",    true); // Override
     }
     {
         Group group;
         TableRef table = group.get_table("test");
-        test_write_slice_name(*table, "test", false);
-        test_write_slice_name(*table, "foo",  true); // Override
-        test_write_slice_name(*table, "",     true); // Override
+        test_write_slice_name(test_results, *table, "test", false);
+        test_write_slice_name(test_results, *table, "foo",  true); // Override
+        test_write_slice_name(test_results, *table, "",     true); // Override
     }
 
     // Run through a 3-D matrix of table sizes, slice offsets, and
@@ -3209,7 +3246,7 @@ TEST(Table_WriteSlice)
                 int size = table_sizes[size_i];
                 // This also checks that the range can extend beyond
                 // end of table
-                test_write_slice_contents(*table, offset, size);
+                test_write_slice_contents(test_results, *table, offset, size);
                 if (offset + size > table_size)
                     break;
             }
@@ -3217,5 +3254,2047 @@ TEST(Table_WriteSlice)
     }
 }
 
+
+TEST(Table_Parent)
+{
+    TableRef table = Table::create();
+    CHECK_EQUAL(TableRef(), table->get_parent_table());
+    CHECK_EQUAL(tightdb::npos, table->get_index_in_parent());
+
+    DescriptorRef subdesc;
+    table->add_column(type_Table, "", &subdesc);
+    table->add_column(type_Mixed, "");
+    subdesc->add_column(type_Int, "");
+    table->add_empty_row(2);
+    table->set_mixed(1, 0, Mixed::subtable_tag());
+    table->set_mixed(1, 1, Mixed::subtable_tag());
+
+    TableRef subtab;
+    size_t column_ndx = 0;
+
+    subtab = table->get_subtable(0,0);
+    CHECK_EQUAL(table, subtab->get_parent_table(&column_ndx));
+    CHECK_EQUAL(0, column_ndx);
+    CHECK_EQUAL(0, subtab->get_index_in_parent());
+
+    subtab = table->get_subtable(0,1);
+    CHECK_EQUAL(table, subtab->get_parent_table(&column_ndx));
+    CHECK_EQUAL(0, column_ndx);
+    CHECK_EQUAL(1, subtab->get_index_in_parent());
+
+    subtab = table->get_subtable(1,0);
+    CHECK_EQUAL(table, subtab->get_parent_table(&column_ndx));
+    CHECK_EQUAL(1, column_ndx);
+    CHECK_EQUAL(0, subtab->get_index_in_parent());
+
+    subtab = table->get_subtable(1,1);
+    CHECK_EQUAL(table, subtab->get_parent_table(&column_ndx));
+    CHECK_EQUAL(1, column_ndx);
+    CHECK_EQUAL(1, subtab->get_index_in_parent());
+
+    // Check that column indexes are properly adjusted after new
+    // column is insert.
+    table->insert_column(0, type_Int, "");
+
+    subtab = table->get_subtable(1,0);
+    CHECK_EQUAL(table, subtab->get_parent_table(&column_ndx));
+    CHECK_EQUAL(1, column_ndx);
+    CHECK_EQUAL(0, subtab->get_index_in_parent());
+
+    subtab = table->get_subtable(1,1);
+    CHECK_EQUAL(table, subtab->get_parent_table(&column_ndx));
+    CHECK_EQUAL(1, column_ndx);
+    CHECK_EQUAL(1, subtab->get_index_in_parent());
+
+    subtab = table->get_subtable(2,0);
+    CHECK_EQUAL(table, subtab->get_parent_table(&column_ndx));
+    CHECK_EQUAL(2, column_ndx);
+    CHECK_EQUAL(0, subtab->get_index_in_parent());
+
+    subtab = table->get_subtable(2,1);
+    CHECK_EQUAL(table, subtab->get_parent_table(&column_ndx));
+    CHECK_EQUAL(2, column_ndx);
+    CHECK_EQUAL(1, subtab->get_index_in_parent());
+
+    // Check that column indexes are properly adjusted after inserted
+    // column is removed.
+    table->remove_column(0);
+
+    subtab = table->get_subtable(0,0);
+    CHECK_EQUAL(table, subtab->get_parent_table(&column_ndx));
+    CHECK_EQUAL(0, column_ndx);
+    CHECK_EQUAL(0, subtab->get_index_in_parent());
+
+    subtab = table->get_subtable(0,1);
+    CHECK_EQUAL(table, subtab->get_parent_table(&column_ndx));
+    CHECK_EQUAL(0, column_ndx);
+    CHECK_EQUAL(1, subtab->get_index_in_parent());
+
+    subtab = table->get_subtable(1,0);
+    CHECK_EQUAL(table, subtab->get_parent_table(&column_ndx));
+    CHECK_EQUAL(1, column_ndx);
+    CHECK_EQUAL(0, subtab->get_index_in_parent());
+
+    subtab = table->get_subtable(1,1);
+    CHECK_EQUAL(table, subtab->get_parent_table(&column_ndx));
+    CHECK_EQUAL(1, column_ndx);
+    CHECK_EQUAL(1, subtab->get_index_in_parent());
+}
+
+
+TEST(Table_RegularSubtablesRetain)
+{
+    // Create one degenerate subtable
+    TableRef parent = Table::create();
+    DescriptorRef subdesc;
+    parent->add_column(type_Table, "a", &subdesc);
+    subdesc->add_column(type_Int, "x");
+    parent->add_empty_row();
+    CHECK_EQUAL(1, parent->get_column_count());
+    CHECK_EQUAL(type_Table, parent->get_column_type(0));
+    CHECK_EQUAL(1, parent->size());
+    TableRef subtab_0_0 = parent->get_subtable(0,0);
+    CHECK_EQUAL(1, subtab_0_0->get_column_count());
+    CHECK_EQUAL(type_Int, subtab_0_0->get_column_type(0));
+    CHECK_EQUAL(0, subtab_0_0->size());
+
+    // Expand to 4 subtables in a 2-by-2 parent.
+    parent->add_column(type_Table, "b", &subdesc);
+    subdesc->add_column(type_Int, "x");
+    parent->add_empty_row();
+    subtab_0_0->add_empty_row();
+    CHECK_EQUAL(2, parent->get_column_count());
+    CHECK_EQUAL(type_Table, parent->get_column_type(0));
+    CHECK_EQUAL(type_Table, parent->get_column_type(1));
+    CHECK_EQUAL(2, parent->size());
+    CHECK(subtab_0_0->is_attached());
+    CHECK_EQUAL(1, subtab_0_0->get_column_count());
+    CHECK_EQUAL(type_Int, subtab_0_0->get_column_type(0));
+    CHECK_EQUAL(1, subtab_0_0->size());
+    TableRef subtab_0_1 = parent->get_subtable(0,1);
+    CHECK_EQUAL(1, subtab_0_1->get_column_count());
+    CHECK_EQUAL(type_Int, subtab_0_1->get_column_type(0));
+    CHECK_EQUAL(0, subtab_0_1->size());
+    TableRef subtab_1_0 = parent->get_subtable(1,0);
+    CHECK_EQUAL(1, subtab_1_0->get_column_count());
+    CHECK_EQUAL(type_Int, subtab_1_0->get_column_type(0));
+    CHECK_EQUAL(0, subtab_1_0->size());
+    TableRef subtab_1_1 = parent->get_subtable(1,1);
+    CHECK_EQUAL(1, subtab_1_1->get_column_count());
+    CHECK_EQUAL(type_Int, subtab_1_1->get_column_type(0));
+    CHECK_EQUAL(0, subtab_1_1->size());
+
+    // Check that subtables get their specs correctly updated
+    subdesc = parent->get_subdescriptor(0);
+    subdesc->add_column(type_Float, "f");
+    subdesc = parent->get_subdescriptor(1);
+    subdesc->add_column(type_Double, "d");
+    CHECK_EQUAL(2, subtab_0_0->get_column_count());
+    CHECK_EQUAL(type_Int,   subtab_0_0->get_column_type(0));
+    CHECK_EQUAL(type_Float, subtab_0_0->get_column_type(1));
+    CHECK_EQUAL("x", subtab_0_0->get_column_name(0));
+    CHECK_EQUAL("f", subtab_0_0->get_column_name(1));
+    CHECK_EQUAL(2, subtab_0_1->get_column_count());
+    CHECK_EQUAL(type_Int,   subtab_0_1->get_column_type(0));
+    CHECK_EQUAL(type_Float, subtab_0_1->get_column_type(1));
+    CHECK_EQUAL("x", subtab_0_1->get_column_name(0));
+    CHECK_EQUAL("f", subtab_0_1->get_column_name(1));
+    CHECK_EQUAL(2, subtab_1_0->get_column_count());
+    CHECK_EQUAL(type_Int,    subtab_1_0->get_column_type(0));
+    CHECK_EQUAL(type_Double, subtab_1_0->get_column_type(1));
+    CHECK_EQUAL("x", subtab_1_0->get_column_name(0));
+    CHECK_EQUAL("d", subtab_1_0->get_column_name(1));
+    CHECK_EQUAL(2, subtab_1_1->get_column_count());
+    CHECK_EQUAL(type_Int,    subtab_1_1->get_column_type(0));
+    CHECK_EQUAL(type_Double, subtab_1_1->get_column_type(1));
+    CHECK_EQUAL("x", subtab_1_1->get_column_name(0));
+    CHECK_EQUAL("d", subtab_1_1->get_column_name(1));
+
+    // Check that cell changes in subtables are visible
+    subtab_1_1->add_empty_row();
+    subtab_0_0->set_int    (0, 0, 10000);
+    subtab_0_0->set_float  (1, 0, 10010.0f);
+    subtab_1_1->set_int    (0, 0, 11100);
+    subtab_1_1->set_double (1, 0, 11110.0);
+    parent->add_empty_row();
+    CHECK_EQUAL(3, parent->size());
+    CHECK(subtab_0_0->is_attached());
+    CHECK(subtab_0_1->is_attached());
+    CHECK(subtab_1_0->is_attached());
+    CHECK(subtab_1_1->is_attached());
+    CHECK_EQUAL(1, subtab_0_0->size());
+    CHECK_EQUAL(0, subtab_0_1->size());
+    CHECK_EQUAL(0, subtab_1_0->size());
+    CHECK_EQUAL(1, subtab_1_1->size());
+    CHECK_EQUAL(10000,    subtab_0_0->get_int    (0,0));
+    CHECK_EQUAL(10010.0f, subtab_0_0->get_float  (1,0));
+    CHECK_EQUAL(11100,    subtab_1_1->get_int    (0,0));
+    CHECK_EQUAL(11110.0,  subtab_1_1->get_double (1,0));
+
+    // Insert a row and a column before all the subtables
+    parent->insert_column(0, type_Table, "dummy_1");
+    parent->insert_empty_row(0);
+    subtab_0_0->set_int    (0, 0, 10001);
+    subtab_0_0->set_float  (1, 0, 10011.0f);
+    subtab_1_1->set_int    (0, 0, 11101);
+    subtab_1_1->set_double (1, 0, 11111.0);
+    CHECK_EQUAL(3, parent->get_column_count());
+    CHECK_EQUAL(type_Table, parent->get_column_type(0));
+    CHECK_EQUAL(type_Table, parent->get_column_type(1));
+    CHECK_EQUAL(type_Table, parent->get_column_type(2));
+    CHECK_EQUAL(4, parent->size());
+    CHECK(subtab_0_0->is_attached());
+    CHECK(subtab_0_1->is_attached());
+    CHECK(subtab_1_0->is_attached());
+    CHECK(subtab_1_1->is_attached());
+    CHECK_EQUAL(1, subtab_0_0->size());
+    CHECK_EQUAL(0, subtab_0_1->size());
+    CHECK_EQUAL(0, subtab_1_0->size());
+    CHECK_EQUAL(1, subtab_1_1->size());
+    CHECK_EQUAL(10001,    subtab_0_0->get_int    (0,0));
+    CHECK_EQUAL(10011.0f, subtab_0_0->get_float  (1,0));
+    CHECK_EQUAL(11101,    subtab_1_1->get_int    (0,0));
+    CHECK_EQUAL(11111.0,  subtab_1_1->get_double (1,0));
+    CHECK_EQUAL(subtab_0_0, parent->get_subtable(1,1));
+    CHECK_EQUAL(subtab_0_1, parent->get_subtable(1,2));
+    CHECK_EQUAL(subtab_1_0, parent->get_subtable(2,1));
+    CHECK_EQUAL(subtab_1_1, parent->get_subtable(2,2));
+
+    // Insert a row and a column between the subtables
+    parent->insert_column(2, type_Int, "dummy_2");
+    parent->insert_empty_row(2);
+    subtab_0_0->set_int    (0, 0, 10002);
+    subtab_0_0->set_float  (1, 0, 10012.0f);
+    subtab_1_1->set_int    (0, 0, 11102);
+    subtab_1_1->set_double (1, 0, 11112.0);
+    CHECK_EQUAL(4, parent->get_column_count());
+    CHECK_EQUAL(type_Table, parent->get_column_type(0));
+    CHECK_EQUAL(type_Table, parent->get_column_type(1));
+    CHECK_EQUAL(type_Int,   parent->get_column_type(2));
+    CHECK_EQUAL(type_Table, parent->get_column_type(3));
+    CHECK_EQUAL(5, parent->size());
+    CHECK(subtab_0_0->is_attached());
+    CHECK(subtab_0_1->is_attached());
+    CHECK(subtab_1_0->is_attached());
+    CHECK(subtab_1_1->is_attached());
+    CHECK_EQUAL(1, subtab_0_0->size());
+    CHECK_EQUAL(0, subtab_0_1->size());
+    CHECK_EQUAL(0, subtab_1_0->size());
+    CHECK_EQUAL(1, subtab_1_1->size());
+    CHECK_EQUAL(10002,    subtab_0_0->get_int    (0,0));
+    CHECK_EQUAL(10012.0f, subtab_0_0->get_float  (1,0));
+    CHECK_EQUAL(11102,    subtab_1_1->get_int    (0,0));
+    CHECK_EQUAL(11112.0,  subtab_1_1->get_double (1,0));
+    CHECK_EQUAL(subtab_0_0, parent->get_subtable(1,1));
+    CHECK_EQUAL(subtab_0_1, parent->get_subtable(1,3));
+    CHECK_EQUAL(subtab_1_0, parent->get_subtable(3,1));
+    CHECK_EQUAL(subtab_1_1, parent->get_subtable(3,3));
+
+    // Insert a column after the subtables
+    parent->insert_column(4, type_Table, "dummy_3");
+    subtab_0_0->set_int    (0, 0, 10003);
+    subtab_0_0->set_float  (1, 0, 10013.0f);
+    subtab_1_1->set_int    (0, 0, 11103);
+    subtab_1_1->set_double (1, 0, 11113.0);
+    CHECK_EQUAL(5, parent->get_column_count());
+    CHECK_EQUAL(type_Table, parent->get_column_type(0));
+    CHECK_EQUAL(type_Table, parent->get_column_type(1));
+    CHECK_EQUAL(type_Int,   parent->get_column_type(2));
+    CHECK_EQUAL(type_Table, parent->get_column_type(3));
+    CHECK_EQUAL(type_Table, parent->get_column_type(4));
+    CHECK_EQUAL(5, parent->size());
+    CHECK(subtab_0_0->is_attached());
+    CHECK(subtab_0_1->is_attached());
+    CHECK(subtab_1_0->is_attached());
+    CHECK(subtab_1_1->is_attached());
+    CHECK_EQUAL(1, subtab_0_0->size());
+    CHECK_EQUAL(0, subtab_0_1->size());
+    CHECK_EQUAL(0, subtab_1_0->size());
+    CHECK_EQUAL(1, subtab_1_1->size());
+    CHECK_EQUAL(10003,    subtab_0_0->get_int    (0,0));
+    CHECK_EQUAL(10013.0f, subtab_0_0->get_float  (1,0));
+    CHECK_EQUAL(11103,    subtab_1_1->get_int    (0,0));
+    CHECK_EQUAL(11113.0,  subtab_1_1->get_double (1,0));
+    CHECK_EQUAL(subtab_0_0, parent->get_subtable(1,1));
+    CHECK_EQUAL(subtab_0_1, parent->get_subtable(1,3));
+    CHECK_EQUAL(subtab_1_0, parent->get_subtable(3,1));
+    CHECK_EQUAL(subtab_1_1, parent->get_subtable(3,3));
+
+    // Remove the row and the column between the subtables
+    parent->remove_column(2);
+    parent->remove(2);
+    subtab_0_0->set_int    (0, 0, 10004);
+    subtab_0_0->set_float  (1, 0, 10014.0f);
+    subtab_1_1->set_int    (0, 0, 11104);
+    subtab_1_1->set_double (1, 0, 11114.0);
+    CHECK_EQUAL(4, parent->get_column_count());
+    CHECK_EQUAL(type_Table, parent->get_column_type(0));
+    CHECK_EQUAL(type_Table, parent->get_column_type(1));
+    CHECK_EQUAL(type_Table, parent->get_column_type(2));
+    CHECK_EQUAL(type_Table, parent->get_column_type(3));
+    CHECK_EQUAL(4, parent->size());
+    CHECK_EQUAL(1, subtab_0_0->size());
+    CHECK_EQUAL(0, subtab_0_1->size());
+    CHECK_EQUAL(0, subtab_1_0->size());
+    CHECK_EQUAL(1, subtab_1_1->size());
+    CHECK_EQUAL(10004,    subtab_0_0->get_int    (0,0));
+    CHECK_EQUAL(10014.0f, subtab_0_0->get_float  (1,0));
+    CHECK_EQUAL(11104,    subtab_1_1->get_int    (0,0));
+    CHECK_EQUAL(11114.0,  subtab_1_1->get_double (1,0));
+    CHECK_EQUAL(subtab_0_0, parent->get_subtable(1,1));
+    CHECK_EQUAL(subtab_0_1, parent->get_subtable(1,2));
+    CHECK_EQUAL(subtab_1_0, parent->get_subtable(2,1));
+    CHECK_EQUAL(subtab_1_1, parent->get_subtable(2,2));
+
+    // Remove the row and the column before the subtables
+    parent->remove_column(0);
+    parent->remove(0);
+    subtab_0_0->set_int    (0, 0, 10005);
+    subtab_0_0->set_float  (1, 0, 10015.0f);
+    subtab_1_1->set_int    (0, 0, 11105);
+    subtab_1_1->set_double (1, 0, 11115.0);
+    CHECK_EQUAL(3, parent->get_column_count());
+    CHECK_EQUAL(type_Table, parent->get_column_type(0));
+    CHECK_EQUAL(type_Table, parent->get_column_type(1));
+    CHECK_EQUAL(type_Table, parent->get_column_type(2));
+    CHECK_EQUAL(3, parent->size());
+    CHECK_EQUAL(10005,    subtab_0_0->get_int    (0,0));
+    CHECK_EQUAL(10015.0f, subtab_0_0->get_float  (1,0));
+    CHECK_EQUAL(11105,    subtab_1_1->get_int    (0,0));
+    CHECK_EQUAL(11115.0,  subtab_1_1->get_double (1,0));
+    CHECK_EQUAL(subtab_0_0, parent->get_subtable(0,0));
+    CHECK_EQUAL(subtab_0_1, parent->get_subtable(0,1));
+    CHECK_EQUAL(subtab_1_0, parent->get_subtable(1,0));
+    CHECK_EQUAL(subtab_1_1, parent->get_subtable(1,1));
+
+    // Remove the row and the column after the subtables
+    parent->remove_column(2);
+    parent->remove(2);
+    subtab_0_0->set_int    (0, 0, 10006);
+    subtab_0_0->set_float  (1, 0, 10016.0f);
+    subtab_1_1->set_int    (0, 0, 11106);
+    subtab_1_1->set_double (1, 0, 11116.0);
+    CHECK_EQUAL(2, parent->get_column_count());
+    CHECK_EQUAL(type_Table, parent->get_column_type(0));
+    CHECK_EQUAL(type_Table, parent->get_column_type(1));
+    CHECK_EQUAL(2, parent->size());
+    CHECK_EQUAL(10006,    subtab_0_0->get_int    (0,0));
+    CHECK_EQUAL(10016.0f, subtab_0_0->get_float  (1,0));
+    CHECK_EQUAL(11106,    subtab_1_1->get_int    (0,0));
+    CHECK_EQUAL(11116.0,  subtab_1_1->get_double (1,0));
+    CHECK_EQUAL(subtab_0_0, parent->get_subtable(0,0));
+    CHECK_EQUAL(subtab_0_1, parent->get_subtable(0,1));
+    CHECK_EQUAL(subtab_1_0, parent->get_subtable(1,0));
+    CHECK_EQUAL(subtab_1_1, parent->get_subtable(1,1));
+
+    // Check that subtable accessors are detached when the subtables are removed
+    parent->remove(1);
+    subtab_0_0->set_int   (0, 0, 10007);
+    subtab_0_0->set_float (1, 0, 10017.0f);
+    CHECK_EQUAL(2, parent->get_column_count());
+    CHECK_EQUAL(1, parent->size());
+    CHECK( subtab_0_0->is_attached());
+    CHECK(!subtab_0_1->is_attached());
+    CHECK( subtab_1_0->is_attached());
+    CHECK(!subtab_1_1->is_attached());
+    CHECK_EQUAL(10007,    subtab_0_0->get_int   (0,0));
+    CHECK_EQUAL(10017.0f, subtab_0_0->get_float (1,0));
+    CHECK_EQUAL(subtab_0_0, parent->get_subtable(0,0));
+    CHECK_EQUAL(subtab_1_0, parent->get_subtable(1,0));
+    parent->remove_column(1);
+    subtab_0_0->set_int   (0, 0, 10008);
+    subtab_0_0->set_float (1, 0, 10018.0f);
+    CHECK_EQUAL(1, parent->get_column_count());
+    CHECK_EQUAL(1, parent->size());
+    CHECK( subtab_0_0->is_attached());
+    CHECK(!subtab_0_1->is_attached());
+    CHECK(!subtab_1_0->is_attached());
+    CHECK(!subtab_1_1->is_attached());
+    CHECK_EQUAL(10008,    subtab_0_0->get_int   (0,0));
+    CHECK_EQUAL(10018.0f, subtab_0_0->get_float (1,0));
+    CHECK_EQUAL(subtab_0_0, parent->get_subtable(0,0));
+
+    // Clear subtable
+    parent->clear_subtable(0,0);
+    CHECK_EQUAL(1, parent->get_column_count());
+    CHECK_EQUAL(1, parent->size());
+    CHECK(subtab_0_0->is_attached());
+    CHECK_EQUAL(2, subtab_0_0->get_column_count());
+    CHECK_EQUAL(0, subtab_0_0->size());
+    CHECK_EQUAL(subtab_0_0, parent->get_subtable(0,0));
+
+    // Clear parent table
+    parent->clear();
+    CHECK_EQUAL(1, parent->get_column_count());
+    CHECK_EQUAL(0, parent->size());
+    CHECK(!subtab_0_0->is_attached());
+    CHECK(!subtab_0_1->is_attached());
+    CHECK(!subtab_1_0->is_attached());
+    CHECK(!subtab_1_1->is_attached());
+
+    // Insert 4 new subtables, then remove some of them in a different way
+    parent->add_column(type_Table, "c", &subdesc);
+    subdesc->add_column(type_String, "x");
+    parent->add_empty_row(2);
+    subtab_0_0 = parent->get_subtable(0,0);
+    subtab_0_1 = parent->get_subtable(0,1);
+    subtab_1_0 = parent->get_subtable(1,0);
+    subtab_1_1 = parent->get_subtable(1,1);
+    subtab_1_1->add_empty_row();
+    subtab_1_1->set_string(0, 0, "pneumonoultramicroscopicsilicovolcanoconiosis");
+    CHECK_EQUAL(2, parent->get_column_count());
+    CHECK_EQUAL(2, parent->size());
+    CHECK(subtab_0_0->is_attached());
+    CHECK(subtab_0_1->is_attached());
+    CHECK(subtab_1_0->is_attached());
+    CHECK(subtab_1_1->is_attached());
+    CHECK_EQUAL(0, subtab_0_0->size());
+    CHECK_EQUAL(0, subtab_0_1->size());
+    CHECK_EQUAL(0, subtab_1_0->size());
+    CHECK_EQUAL(1, subtab_1_1->size());
+    CHECK_EQUAL("pneumonoultramicroscopicsilicovolcanoconiosis", subtab_1_1->get_string(0,0));
+    parent->remove(0);
+    parent->remove_column(0);
+    CHECK_EQUAL(1, parent->get_column_count());
+    CHECK_EQUAL(1, parent->size());
+    subtab_1_1 = parent->get_subtable(0,0);
+    CHECK(!subtab_0_0->is_attached());
+    CHECK(!subtab_0_1->is_attached());
+    CHECK(!subtab_1_0->is_attached());
+    CHECK( subtab_1_1->is_attached());
+    CHECK_EQUAL(1, subtab_1_1->size());
+    CHECK_EQUAL("pneumonoultramicroscopicsilicovolcanoconiosis", subtab_1_1->get_string(0,0));
+
+    // Insert 2x2 new subtables, then remove them all together
+    parent->add_column(type_Table, "d", &subdesc);
+    subdesc->add_column(type_String, "x");
+    parent->add_empty_row(2);
+    subtab_0_0 = parent->get_subtable(0,0);
+    subtab_0_1 = parent->get_subtable(0,1);
+    subtab_1_0 = parent->get_subtable(1,0);
+    subtab_1_1 = parent->get_subtable(1,1);
+    subtab_1_1->add_empty_row();
+    subtab_1_1->set_string(0, 0, "supercalifragilisticexpialidocious");
+    parent->clear();
+    CHECK_EQUAL(2, parent->get_column_count());
+    CHECK_EQUAL(0, parent->size());
+    CHECK(!subtab_0_0->is_attached());
+    CHECK(!subtab_0_1->is_attached());
+    CHECK(!subtab_1_0->is_attached());
+    CHECK(!subtab_1_1->is_attached());
+
+    // Insert 1x1 new subtable, then remove it by removing the last row
+    parent->add_empty_row(1);
+    parent->remove_column(0);
+    subtab_0_0 = parent->get_subtable(0,0);
+    subtab_0_0->add_empty_row(1);
+    subtab_0_0->set_string(0, 0, "brahmaputra");
+    CHECK_EQUAL(1, parent->get_column_count());
+    CHECK_EQUAL(type_Table, parent->get_column_type(0));
+    CHECK_EQUAL("d", parent->get_column_name(0));
+    CHECK_EQUAL(1, parent->size());
+    CHECK(subtab_0_0->is_attached());
+    CHECK_EQUAL(1, subtab_0_0->get_column_count());
+    CHECK_EQUAL(type_String, subtab_0_0->get_column_type(0));
+    CHECK_EQUAL("x", subtab_0_0->get_column_name(0));
+    CHECK_EQUAL(1, subtab_0_0->size());
+    CHECK_EQUAL("brahmaputra", subtab_0_0->get_string(0,0));
+    parent->remove(0);
+    CHECK_EQUAL(1, parent->get_column_count());
+    CHECK_EQUAL(0, parent->size());
+    CHECK(!subtab_0_0->is_attached());
+
+    // Insert 1x1 new subtable, then remove it by removing the last column
+    parent->add_empty_row(1);
+    subtab_0_0 = parent->get_subtable(0,0);
+    subtab_0_0->add_empty_row(1);
+    subtab_0_0->set_string(0, 0, "baikonur");
+    CHECK_EQUAL(1, parent->get_column_count());
+    CHECK_EQUAL(type_Table, parent->get_column_type(0));
+    CHECK_EQUAL("d", parent->get_column_name(0));
+    CHECK_EQUAL(1, parent->size());
+    CHECK(subtab_0_0->is_attached());
+    CHECK_EQUAL(1, subtab_0_0->get_column_count());
+    CHECK_EQUAL(type_String, subtab_0_0->get_column_type(0));
+    CHECK_EQUAL("x", subtab_0_0->get_column_name(0));
+    CHECK_EQUAL(1, subtab_0_0->size());
+    CHECK_EQUAL("baikonur", subtab_0_0->get_string(0,0));
+    parent->remove_column(0);
+    CHECK_EQUAL(0, parent->get_column_count());
+    CHECK_EQUAL(0, parent->size());
+    CHECK(!subtab_0_0->is_attached());
+}
+
+
+TEST(Table_MixedSubtablesRetain)
+{
+    // Create one degenerate subtable
+    TableRef parent = Table::create();
+    parent->add_column(type_Mixed, "a");
+    parent->add_empty_row();
+    parent->set_mixed(0, 0, Mixed::subtable_tag());
+    TableRef subtab_0_0 = parent->get_subtable(0,0);
+    subtab_0_0->add_column(type_Int, "x");
+    CHECK_EQUAL(1, parent->get_column_count());
+    CHECK_EQUAL(type_Mixed, parent->get_column_type(0));
+    CHECK_EQUAL(1, parent->size());
+    CHECK_EQUAL(1, subtab_0_0->get_column_count());
+    CHECK_EQUAL(type_Int, subtab_0_0->get_column_type(0));
+    CHECK_EQUAL(0, subtab_0_0->size());
+
+    // Expand to 4 subtables in a 2-by-2 parent.
+    subtab_0_0->add_empty_row();
+    parent->add_column(type_Mixed, "b");
+    parent->set_mixed(1, 0, Mixed::subtable_tag());
+    TableRef subtab_1_0 = parent->get_subtable(1,0);
+    subtab_1_0->add_column(type_Int, "x");
+    parent->add_empty_row();
+    parent->set_mixed(0, 1, Mixed::subtable_tag());
+    TableRef subtab_0_1 = parent->get_subtable(0,1);
+    subtab_0_1->add_column(type_Int, "x");
+    parent->set_mixed(1, 1, Mixed::subtable_tag());
+    TableRef subtab_1_1 = parent->get_subtable(1,1);
+    subtab_1_1->add_column(type_Int, "x");
+    CHECK_EQUAL(2, parent->get_column_count());
+    CHECK_EQUAL(type_Mixed, parent->get_column_type(0));
+    CHECK_EQUAL(type_Mixed, parent->get_column_type(1));
+    CHECK_EQUAL(2, parent->size());
+    CHECK(subtab_0_0->is_attached());
+    CHECK_EQUAL(1, subtab_0_0->get_column_count());
+    CHECK_EQUAL(type_Int, subtab_0_0->get_column_type(0));
+    CHECK_EQUAL(1, subtab_0_0->size());
+    CHECK_EQUAL(1, subtab_0_1->get_column_count());
+    CHECK_EQUAL(type_Int, subtab_0_1->get_column_type(0));
+    CHECK_EQUAL(0, subtab_0_1->size());
+    CHECK_EQUAL(1, subtab_1_0->get_column_count());
+    CHECK_EQUAL(type_Int, subtab_1_0->get_column_type(0));
+    CHECK_EQUAL(0, subtab_1_0->size());
+    CHECK_EQUAL(1, subtab_1_1->get_column_count());
+    CHECK_EQUAL(type_Int, subtab_1_1->get_column_type(0));
+    CHECK_EQUAL(0, subtab_1_1->size());
+
+    // Check that subtables get their specs correctly updated
+    subtab_0_0->add_column(type_Float,  "f");
+    subtab_0_1->add_column(type_Float,  "f");
+    subtab_1_0->add_column(type_Double, "d");
+    subtab_1_1->add_column(type_Double, "d");
+    CHECK_EQUAL(2, subtab_0_0->get_column_count());
+    CHECK_EQUAL(type_Int,   subtab_0_0->get_column_type(0));
+    CHECK_EQUAL(type_Float, subtab_0_0->get_column_type(1));
+    CHECK_EQUAL("x", subtab_0_0->get_column_name(0));
+    CHECK_EQUAL("f", subtab_0_0->get_column_name(1));
+    CHECK_EQUAL(2, subtab_0_1->get_column_count());
+    CHECK_EQUAL(type_Int,   subtab_0_1->get_column_type(0));
+    CHECK_EQUAL(type_Float, subtab_0_1->get_column_type(1));
+    CHECK_EQUAL("x", subtab_0_1->get_column_name(0));
+    CHECK_EQUAL("f", subtab_0_1->get_column_name(1));
+    CHECK_EQUAL(2, subtab_1_0->get_column_count());
+    CHECK_EQUAL(type_Int,    subtab_1_0->get_column_type(0));
+    CHECK_EQUAL(type_Double, subtab_1_0->get_column_type(1));
+    CHECK_EQUAL("x", subtab_1_0->get_column_name(0));
+    CHECK_EQUAL("d", subtab_1_0->get_column_name(1));
+    CHECK_EQUAL(2, subtab_1_1->get_column_count());
+    CHECK_EQUAL(type_Int,    subtab_1_1->get_column_type(0));
+    CHECK_EQUAL(type_Double, subtab_1_1->get_column_type(1));
+    CHECK_EQUAL("x", subtab_1_1->get_column_name(0));
+    CHECK_EQUAL("d", subtab_1_1->get_column_name(1));
+
+    // Check that cell changes in subtables are visible
+    subtab_1_1->add_empty_row();
+    subtab_0_0->set_int    (0, 0, 10000);
+    subtab_0_0->set_float  (1, 0, 10010.0f);
+    subtab_1_1->set_int    (0, 0, 11100);
+    subtab_1_1->set_double (1, 0, 11110.0);
+    parent->add_empty_row();
+    CHECK_EQUAL(3, parent->size());
+    CHECK(subtab_0_0->is_attached());
+    CHECK(subtab_0_1->is_attached());
+    CHECK(subtab_1_0->is_attached());
+    CHECK(subtab_1_1->is_attached());
+    CHECK_EQUAL(1, subtab_0_0->size());
+    CHECK_EQUAL(0, subtab_0_1->size());
+    CHECK_EQUAL(0, subtab_1_0->size());
+    CHECK_EQUAL(1, subtab_1_1->size());
+    CHECK_EQUAL(10000,    subtab_0_0->get_int    (0,0));
+    CHECK_EQUAL(10010.0f, subtab_0_0->get_float  (1,0));
+    CHECK_EQUAL(11100,    subtab_1_1->get_int    (0,0));
+    CHECK_EQUAL(11110.0,  subtab_1_1->get_double (1,0));
+
+    // Insert a row and a column before all the subtables
+    parent->insert_column(0, type_Table, "dummy_1");
+    parent->insert_empty_row(0);
+    subtab_0_0->set_int    (0, 0, 10001);
+    subtab_0_0->set_float  (1, 0, 10011.0f);
+    subtab_1_1->set_int    (0, 0, 11101);
+    subtab_1_1->set_double (1, 0, 11111.0);
+    CHECK_EQUAL(3, parent->get_column_count());
+    CHECK_EQUAL(type_Table, parent->get_column_type(0));
+    CHECK_EQUAL(type_Mixed, parent->get_column_type(1));
+    CHECK_EQUAL(type_Mixed, parent->get_column_type(2));
+    CHECK_EQUAL(4, parent->size());
+    CHECK(subtab_0_0->is_attached());
+    CHECK(subtab_0_1->is_attached());
+    CHECK(subtab_1_0->is_attached());
+    CHECK(subtab_1_1->is_attached());
+    CHECK_EQUAL(1, subtab_0_0->size());
+    CHECK_EQUAL(0, subtab_0_1->size());
+    CHECK_EQUAL(0, subtab_1_0->size());
+    CHECK_EQUAL(1, subtab_1_1->size());
+    CHECK_EQUAL(10001,    subtab_0_0->get_int    (0,0));
+    CHECK_EQUAL(10011.0f, subtab_0_0->get_float  (1,0));
+    CHECK_EQUAL(11101,    subtab_1_1->get_int    (0,0));
+    CHECK_EQUAL(11111.0,  subtab_1_1->get_double (1,0));
+    CHECK_EQUAL(subtab_0_0, parent->get_subtable(1,1));
+    CHECK_EQUAL(subtab_0_1, parent->get_subtable(1,2));
+    CHECK_EQUAL(subtab_1_0, parent->get_subtable(2,1));
+    CHECK_EQUAL(subtab_1_1, parent->get_subtable(2,2));
+
+    // Insert a row and a column between the subtables
+    parent->insert_column(2, type_Int, "dummy_2");
+    parent->insert_empty_row(2);
+    parent->set_mixed(3, 2, "Lopadotemachoselachogaleokranioleipsanodrimhypotrimmatosilphio"
+                        "paraomelitokatakechy­menokichlepikossyphophattoperisteralektryonopte"
+                        "kephalliokigklopeleiolagoiosiraiobaphetraganopterygon");
+    subtab_0_0->set_int    (0, 0, 10002);
+    subtab_0_0->set_float  (1, 0, 10012.0f);
+    subtab_1_1->set_int    (0, 0, 11102);
+    subtab_1_1->set_double (1, 0, 11112.0);
+    CHECK_EQUAL(4, parent->get_column_count());
+    CHECK_EQUAL(type_Table, parent->get_column_type(0));
+    CHECK_EQUAL(type_Mixed, parent->get_column_type(1));
+    CHECK_EQUAL(type_Int,   parent->get_column_type(2));
+    CHECK_EQUAL(type_Mixed, parent->get_column_type(3));
+    CHECK_EQUAL(5, parent->size());
+    CHECK(subtab_0_0->is_attached());
+    CHECK(subtab_0_1->is_attached());
+    CHECK(subtab_1_0->is_attached());
+    CHECK(subtab_1_1->is_attached());
+    CHECK_EQUAL(1, subtab_0_0->size());
+    CHECK_EQUAL(0, subtab_0_1->size());
+    CHECK_EQUAL(0, subtab_1_0->size());
+    CHECK_EQUAL(1, subtab_1_1->size());
+    CHECK_EQUAL(10002,    subtab_0_0->get_int    (0,0));
+    CHECK_EQUAL(10012.0f, subtab_0_0->get_float  (1,0));
+    CHECK_EQUAL(11102,    subtab_1_1->get_int    (0,0));
+    CHECK_EQUAL(11112.0,  subtab_1_1->get_double (1,0));
+    CHECK_EQUAL(subtab_0_0, parent->get_subtable(1,1));
+    CHECK_EQUAL(subtab_0_1, parent->get_subtable(1,3));
+    CHECK_EQUAL(subtab_1_0, parent->get_subtable(3,1));
+    CHECK_EQUAL(subtab_1_1, parent->get_subtable(3,3));
+
+    // Insert a column after the subtables
+    parent->insert_column(4, type_Table, "dummy_3");
+    subtab_0_0->set_int    (0, 0, 10003);
+    subtab_0_0->set_float  (1, 0, 10013.0f);
+    subtab_1_1->set_int    (0, 0, 11103);
+    subtab_1_1->set_double (1, 0, 11113.0);
+    CHECK_EQUAL(5, parent->get_column_count());
+    CHECK_EQUAL(type_Table, parent->get_column_type(0));
+    CHECK_EQUAL(type_Mixed, parent->get_column_type(1));
+    CHECK_EQUAL(type_Int,   parent->get_column_type(2));
+    CHECK_EQUAL(type_Mixed, parent->get_column_type(3));
+    CHECK_EQUAL(type_Table, parent->get_column_type(4));
+    CHECK_EQUAL(5, parent->size());
+    CHECK(subtab_0_0->is_attached());
+    CHECK(subtab_0_1->is_attached());
+    CHECK(subtab_1_0->is_attached());
+    CHECK(subtab_1_1->is_attached());
+    CHECK_EQUAL(1, subtab_0_0->size());
+    CHECK_EQUAL(0, subtab_0_1->size());
+    CHECK_EQUAL(0, subtab_1_0->size());
+    CHECK_EQUAL(1, subtab_1_1->size());
+    CHECK_EQUAL(10003,    subtab_0_0->get_int    (0,0));
+    CHECK_EQUAL(10013.0f, subtab_0_0->get_float  (1,0));
+    CHECK_EQUAL(11103,    subtab_1_1->get_int    (0,0));
+    CHECK_EQUAL(11113.0,  subtab_1_1->get_double (1,0));
+    CHECK_EQUAL(subtab_0_0, parent->get_subtable(1,1));
+    CHECK_EQUAL(subtab_0_1, parent->get_subtable(1,3));
+    CHECK_EQUAL(subtab_1_0, parent->get_subtable(3,1));
+    CHECK_EQUAL(subtab_1_1, parent->get_subtable(3,3));
+
+    // Remove the row and the column between the subtables
+    parent->remove_column(2);
+    parent->remove(2);
+    subtab_0_0->set_int    (0, 0, 10004);
+    subtab_0_0->set_float  (1, 0, 10014.0f);
+    subtab_1_1->set_int    (0, 0, 11104);
+    subtab_1_1->set_double (1, 0, 11114.0);
+    CHECK_EQUAL(4, parent->get_column_count());
+    CHECK_EQUAL(type_Table, parent->get_column_type(0));
+    CHECK_EQUAL(type_Mixed, parent->get_column_type(1));
+    CHECK_EQUAL(type_Mixed, parent->get_column_type(2));
+    CHECK_EQUAL(type_Table, parent->get_column_type(3));
+    CHECK_EQUAL(4, parent->size());
+    CHECK_EQUAL(1, subtab_0_0->size());
+    CHECK_EQUAL(0, subtab_0_1->size());
+    CHECK_EQUAL(0, subtab_1_0->size());
+    CHECK_EQUAL(1, subtab_1_1->size());
+    CHECK_EQUAL(10004,    subtab_0_0->get_int    (0,0));
+    CHECK_EQUAL(10014.0f, subtab_0_0->get_float  (1,0));
+    CHECK_EQUAL(11104,    subtab_1_1->get_int    (0,0));
+    CHECK_EQUAL(11114.0,  subtab_1_1->get_double (1,0));
+    CHECK_EQUAL(subtab_0_0, parent->get_subtable(1,1));
+    CHECK_EQUAL(subtab_0_1, parent->get_subtable(1,2));
+    CHECK_EQUAL(subtab_1_0, parent->get_subtable(2,1));
+    CHECK_EQUAL(subtab_1_1, parent->get_subtable(2,2));
+
+    // Remove the row and the column before the subtables
+    parent->remove_column(0);
+    parent->remove(0);
+    subtab_0_0->set_int    (0, 0, 10005);
+    subtab_0_0->set_float  (1, 0, 10015.0f);
+    subtab_1_1->set_int    (0, 0, 11105);
+    subtab_1_1->set_double (1, 0, 11115.0);
+    CHECK_EQUAL(3, parent->get_column_count());
+    CHECK_EQUAL(type_Mixed, parent->get_column_type(0));
+    CHECK_EQUAL(type_Mixed, parent->get_column_type(1));
+    CHECK_EQUAL(type_Table, parent->get_column_type(2));
+    CHECK_EQUAL(3, parent->size());
+    CHECK_EQUAL(10005,    subtab_0_0->get_int    (0,0));
+    CHECK_EQUAL(10015.0f, subtab_0_0->get_float  (1,0));
+    CHECK_EQUAL(11105,    subtab_1_1->get_int    (0,0));
+    CHECK_EQUAL(11115.0,  subtab_1_1->get_double (1,0));
+    CHECK_EQUAL(subtab_0_0, parent->get_subtable(0,0));
+    CHECK_EQUAL(subtab_0_1, parent->get_subtable(0,1));
+    CHECK_EQUAL(subtab_1_0, parent->get_subtable(1,0));
+    CHECK_EQUAL(subtab_1_1, parent->get_subtable(1,1));
+
+    // Remove the row and the column after the subtables
+    parent->remove_column(2);
+    parent->remove(2);
+    subtab_0_0->set_int    (0, 0, 10006);
+    subtab_0_0->set_float  (1, 0, 10016.0f);
+    subtab_1_1->set_int    (0, 0, 11106);
+    subtab_1_1->set_double (1, 0, 11116.0);
+    CHECK_EQUAL(2, parent->get_column_count());
+    CHECK_EQUAL(type_Mixed, parent->get_column_type(0));
+    CHECK_EQUAL(type_Mixed, parent->get_column_type(1));
+    CHECK_EQUAL(2, parent->size());
+    CHECK_EQUAL(10006,    subtab_0_0->get_int    (0,0));
+    CHECK_EQUAL(10016.0f, subtab_0_0->get_float  (1,0));
+    CHECK_EQUAL(11106,    subtab_1_1->get_int    (0,0));
+    CHECK_EQUAL(11116.0,  subtab_1_1->get_double (1,0));
+    CHECK_EQUAL(subtab_0_0, parent->get_subtable(0,0));
+    CHECK_EQUAL(subtab_0_1, parent->get_subtable(0,1));
+    CHECK_EQUAL(subtab_1_0, parent->get_subtable(1,0));
+    CHECK_EQUAL(subtab_1_1, parent->get_subtable(1,1));
+
+    // Check that subtable accessors are detached when the subtables are removed
+    parent->remove(1);
+    subtab_0_0->set_int   (0, 0, 10007);
+    subtab_0_0->set_float (1, 0, 10017.0f);
+    CHECK_EQUAL(2, parent->get_column_count());
+    CHECK_EQUAL(1, parent->size());
+    CHECK( subtab_0_0->is_attached());
+    CHECK(!subtab_0_1->is_attached());
+    CHECK( subtab_1_0->is_attached());
+    CHECK(!subtab_1_1->is_attached());
+    CHECK_EQUAL(10007,    subtab_0_0->get_int   (0,0));
+    CHECK_EQUAL(10017.0f, subtab_0_0->get_float (1,0));
+    CHECK_EQUAL(subtab_0_0, parent->get_subtable(0,0));
+    CHECK_EQUAL(subtab_1_0, parent->get_subtable(1,0));
+    parent->remove_column(1);
+    subtab_0_0->set_int   (0, 0, 10008);
+    subtab_0_0->set_float (1, 0, 10018.0f);
+    CHECK_EQUAL(1, parent->get_column_count());
+    CHECK_EQUAL(1, parent->size());
+    CHECK( subtab_0_0->is_attached());
+    CHECK(!subtab_0_1->is_attached());
+    CHECK(!subtab_1_0->is_attached());
+    CHECK(!subtab_1_1->is_attached());
+    CHECK_EQUAL(10008,    subtab_0_0->get_int   (0,0));
+    CHECK_EQUAL(10018.0f, subtab_0_0->get_float (1,0));
+    CHECK_EQUAL(subtab_0_0, parent->get_subtable(0,0));
+
+    // Remove subtable
+    parent->clear_subtable(0,0);
+    CHECK_EQUAL(1, parent->get_column_count());
+    CHECK_EQUAL(1, parent->size());
+    CHECK(!subtab_0_0->is_attached());
+
+    // Clear parent table
+    parent->clear();
+    CHECK_EQUAL(1, parent->get_column_count());
+    CHECK_EQUAL(0, parent->size());
+    CHECK(!subtab_0_0->is_attached());
+
+    // Insert 4 new subtables, then remove some of them in a different way
+    parent->add_column(type_Mixed, "c");
+    parent->add_empty_row(2);
+    parent->set_mixed(0, 0, Mixed::subtable_tag());
+    parent->set_mixed(0, 1, Mixed::subtable_tag());
+    parent->set_mixed(1, 0, Mixed::subtable_tag());
+    parent->set_mixed(1, 1, Mixed::subtable_tag());
+    subtab_0_0 = parent->get_subtable(0,0);
+    subtab_0_1 = parent->get_subtable(0,1);
+    subtab_1_0 = parent->get_subtable(1,0);
+    subtab_1_1 = parent->get_subtable(1,1);
+    CHECK(subtab_0_0);
+    CHECK(subtab_0_1);
+    CHECK(subtab_1_0);
+    CHECK(subtab_1_1);
+    subtab_1_1->add_column(type_String, "x");
+    subtab_1_1->add_empty_row();
+    subtab_1_1->set_string(0, 0, "pneumonoultramicroscopicsilicovolcanoconiosis");
+    CHECK_EQUAL(2, parent->get_column_count());
+    CHECK_EQUAL(2, parent->size());
+    CHECK(subtab_0_0->is_attached());
+    CHECK(subtab_0_1->is_attached());
+    CHECK(subtab_1_0->is_attached());
+    CHECK(subtab_1_1->is_attached());
+    CHECK_EQUAL(0, subtab_0_0->size());
+    CHECK_EQUAL(0, subtab_0_1->size());
+    CHECK_EQUAL(0, subtab_1_0->size());
+    CHECK_EQUAL(1, subtab_1_1->size());
+    CHECK_EQUAL("pneumonoultramicroscopicsilicovolcanoconiosis", subtab_1_1->get_string(0,0));
+    parent->remove(0);
+    parent->remove_column(0);
+    CHECK_EQUAL(1, parent->get_column_count());
+    CHECK_EQUAL(1, parent->size());
+    subtab_1_1 = parent->get_subtable(0,0);
+    CHECK(!subtab_0_0->is_attached());
+    CHECK(!subtab_0_1->is_attached());
+    CHECK(!subtab_1_0->is_attached());
+    CHECK( subtab_1_1->is_attached());
+    CHECK_EQUAL(1, subtab_1_1->size());
+    CHECK_EQUAL("pneumonoultramicroscopicsilicovolcanoconiosis", subtab_1_1->get_string(0,0));
+
+    // Insert 2x2 new subtables, then remove them all together
+    parent->add_column(type_Mixed, "d");
+    parent->add_empty_row(2);
+    parent->set_mixed(0, 0, Mixed::subtable_tag());
+    parent->set_mixed(0, 1, Mixed::subtable_tag());
+    parent->set_mixed(1, 0, Mixed::subtable_tag());
+    parent->set_mixed(1, 1, Mixed::subtable_tag());
+    subtab_0_0 = parent->get_subtable(0,0);
+    subtab_0_1 = parent->get_subtable(0,1);
+    subtab_1_0 = parent->get_subtable(1,0);
+    subtab_1_1 = parent->get_subtable(1,1);
+    subtab_1_1->add_column(type_String, "x");
+    subtab_1_1->add_empty_row();
+    subtab_1_1->set_string(0, 0, "supercalifragilisticexpialidocious");
+    parent->clear();
+    CHECK_EQUAL(2, parent->get_column_count());
+    CHECK_EQUAL(0, parent->size());
+    CHECK(!subtab_0_0->is_attached());
+    CHECK(!subtab_0_1->is_attached());
+    CHECK(!subtab_1_0->is_attached());
+    CHECK(!subtab_1_1->is_attached());
+
+    // Insert 1x1 new subtable, then remove it by removing the last row
+    parent->add_empty_row(1);
+    parent->remove_column(0);
+    parent->set_mixed(0, 0, Mixed::subtable_tag());
+    subtab_0_0 = parent->get_subtable(0,0);
+    subtab_0_0->add_column(type_String, "x");
+    subtab_0_0->add_empty_row(1);
+    subtab_0_0->set_string(0, 0, "brahmaputra");
+    CHECK_EQUAL(1, parent->get_column_count());
+    CHECK_EQUAL(type_Mixed, parent->get_column_type(0));
+    CHECK_EQUAL("d", parent->get_column_name(0));
+    CHECK_EQUAL(1, parent->size());
+    CHECK(subtab_0_0->is_attached());
+    CHECK_EQUAL(1, subtab_0_0->get_column_count());
+    CHECK_EQUAL(type_String, subtab_0_0->get_column_type(0));
+    CHECK_EQUAL("x", subtab_0_0->get_column_name(0));
+    CHECK_EQUAL(1, subtab_0_0->size());
+    CHECK_EQUAL("brahmaputra", subtab_0_0->get_string(0,0));
+    parent->remove(0);
+    CHECK_EQUAL(1, parent->get_column_count());
+    CHECK_EQUAL(0, parent->size());
+    CHECK(!subtab_0_0->is_attached());
+
+    // Insert 1x1 new subtable, then remove it by removing the last column
+    parent->add_empty_row(1);
+    parent->set_mixed(0, 0, Mixed::subtable_tag());
+    subtab_0_0 = parent->get_subtable(0,0);
+    subtab_0_0->add_column(type_String, "x");
+    subtab_0_0->add_empty_row(1);
+    subtab_0_0->set_string(0, 0, "baikonur");
+    CHECK_EQUAL(1, parent->get_column_count());
+    CHECK_EQUAL(type_Mixed, parent->get_column_type(0));
+    CHECK_EQUAL("d", parent->get_column_name(0));
+    CHECK_EQUAL(1, parent->size());
+    CHECK(subtab_0_0->is_attached());
+    CHECK_EQUAL(1, subtab_0_0->get_column_count());
+    CHECK_EQUAL(type_String, subtab_0_0->get_column_type(0));
+    CHECK_EQUAL("x", subtab_0_0->get_column_name(0));
+    CHECK_EQUAL(1, subtab_0_0->size());
+    CHECK_EQUAL("baikonur", subtab_0_0->get_string(0,0));
+    parent->remove_column(0);
+    CHECK_EQUAL(0, parent->get_column_count());
+    CHECK_EQUAL(0, parent->size());
+    CHECK(!subtab_0_0->is_attached());
+}
+
+
+TEST(Table_RowAccessor)
+{
+    Table table;
+    DescriptorRef subdesc;
+    table.add_column(type_Int,      "int");
+    table.add_column(type_Bool,     "bool");
+    table.add_column(type_Float,    "");
+    table.add_column(type_Double,   "");
+    table.add_column(type_String,   "");
+    table.add_column(type_Binary,   "");
+    table.add_column(type_DateTime, "");
+    table.add_column(type_Table,    "", &subdesc);
+    table.add_column(type_Mixed,    "");
+    subdesc->add_column(type_Int, "i");
+    table.add_empty_row(2);
+
+    BinaryData bin("bin", 3);
+
+    Table empty_subtab;
+    empty_subtab.add_column(type_Int, "i");
+
+    Table one_subtab;
+    one_subtab.add_column(type_Int, "i");
+    one_subtab.add_empty_row(1);
+    one_subtab.set_int(0, 0, 19);
+
+    Table two_subtab;
+    two_subtab.add_column(type_Int, "i");
+    two_subtab.add_empty_row(1);
+    two_subtab.set_int(0, 0, 29);
+
+    table.set_int      (0, 1, 4923);
+    table.set_bool     (1, 1, true);
+    table.set_float    (2, 1, 5298.0f);
+    table.set_double   (3, 1, 2169.0);
+    table.set_string   (4, 1, "str");
+    table.set_binary   (5, 1, bin);
+    table.set_datetime (6, 1, 7739);
+    table.set_subtable (7, 1, &one_subtab);
+    table.set_mixed    (8, 1, Mixed("mix"));
+
+    // Check getters for `RowExpr`
+    {
+        CHECK_EQUAL(9,         table[0].get_column_count());
+        CHECK_EQUAL(type_Int,  table[0].get_column_type(0));
+        CHECK_EQUAL(type_Bool, table[0].get_column_type(1));
+        CHECK_EQUAL("int",     table[0].get_column_name(0));
+        CHECK_EQUAL("bool",    table[0].get_column_name(1));
+        CHECK_EQUAL(0,         table[0].get_column_index("int"));
+        CHECK_EQUAL(1,         table[0].get_column_index("bool"));
+
+        CHECK_EQUAL(int_fast64_t(),  table[0].get_int           (0));
+        CHECK_EQUAL(bool(),          table[0].get_bool          (1));
+        CHECK_EQUAL(float(),         table[0].get_float         (2));
+        CHECK_EQUAL(double(),        table[0].get_double        (3));
+        CHECK_EQUAL(StringData(),    table[0].get_string        (4));
+        CHECK_EQUAL(BinaryData(),    table[0].get_binary        (5));
+        CHECK_EQUAL(DateTime(),      table[0].get_datetime      (6));
+        CHECK_EQUAL(0,               table[0].get_subtable_size (7));
+        CHECK_EQUAL(int_fast64_t(),  table[0].get_mixed         (8));
+        CHECK_EQUAL(type_Int,        table[0].get_mixed_type    (8));
+
+        CHECK_EQUAL(4923,            table[1].get_int           (0));
+        CHECK_EQUAL(true,            table[1].get_bool          (1));
+        CHECK_EQUAL(5298.0f,         table[1].get_float         (2));
+        CHECK_EQUAL(2169.0,          table[1].get_double        (3));
+        CHECK_EQUAL("str",           table[1].get_string        (4));
+        CHECK_EQUAL(bin,             table[1].get_binary        (5));
+        CHECK_EQUAL(DateTime(7739),  table[1].get_datetime      (6));
+        CHECK_EQUAL(1,               table[1].get_subtable_size (7));
+        CHECK_EQUAL("mix",           table[1].get_mixed         (8));
+        CHECK_EQUAL(type_String,     table[1].get_mixed_type    (8));
+
+        TableRef subtab_0 = table[0].get_subtable(7);
+        CHECK(*subtab_0 == empty_subtab);
+        TableRef subtab_1 = table[1].get_subtable(7);
+        CHECK_EQUAL(19, subtab_1->get_int(0,0));
+        CHECK(*subtab_1 == one_subtab);
+    }
+
+    // Check getters for `ConstRowExpr`
+    {
+        const Table& const_table = table;
+
+        CHECK_EQUAL(9,         const_table[0].get_column_count());
+        CHECK_EQUAL(type_Int,  const_table[0].get_column_type(0));
+        CHECK_EQUAL(type_Bool, const_table[0].get_column_type(1));
+        CHECK_EQUAL("int",     const_table[0].get_column_name(0));
+        CHECK_EQUAL("bool",    const_table[0].get_column_name(1));
+        CHECK_EQUAL(0,         const_table[0].get_column_index("int"));
+        CHECK_EQUAL(1,         const_table[0].get_column_index("bool"));
+
+        CHECK_EQUAL(int_fast64_t(),  const_table[0].get_int           (0));
+        CHECK_EQUAL(bool(),          const_table[0].get_bool          (1));
+        CHECK_EQUAL(float(),         const_table[0].get_float         (2));
+        CHECK_EQUAL(double(),        const_table[0].get_double        (3));
+        CHECK_EQUAL(StringData(),    const_table[0].get_string        (4));
+        CHECK_EQUAL(BinaryData(),    const_table[0].get_binary        (5));
+        CHECK_EQUAL(DateTime(),      const_table[0].get_datetime      (6));
+        CHECK_EQUAL(0,               const_table[0].get_subtable_size (7));
+        CHECK_EQUAL(int_fast64_t(),  const_table[0].get_mixed         (8));
+        CHECK_EQUAL(type_Int,        const_table[0].get_mixed_type    (8));
+
+        CHECK_EQUAL(4923,            const_table[1].get_int           (0));
+        CHECK_EQUAL(true,            const_table[1].get_bool          (1));
+        CHECK_EQUAL(5298.0f,         const_table[1].get_float         (2));
+        CHECK_EQUAL(2169.0,          const_table[1].get_double        (3));
+        CHECK_EQUAL("str",           const_table[1].get_string        (4));
+        CHECK_EQUAL(bin,             const_table[1].get_binary        (5));
+        CHECK_EQUAL(DateTime(7739),  const_table[1].get_datetime      (6));
+        CHECK_EQUAL(1,               const_table[1].get_subtable_size (7));
+        CHECK_EQUAL("mix",           const_table[1].get_mixed         (8));
+        CHECK_EQUAL(type_String,     const_table[1].get_mixed_type    (8));
+
+        ConstTableRef subtab_0 = const_table[0].get_subtable(7);
+        CHECK(*subtab_0 == empty_subtab);
+        ConstTableRef subtab_1 = const_table[1].get_subtable(7);
+        CHECK_EQUAL(19, subtab_1->get_int(0,0));
+        CHECK(*subtab_1 == one_subtab);
+    }
+
+    // Check getters for `Row`
+    {
+        Row row_0 = table[0];
+        Row row_1 = table[1];
+
+        CHECK_EQUAL(9,         row_0.get_column_count());
+        CHECK_EQUAL(type_Int,  row_0.get_column_type(0));
+        CHECK_EQUAL(type_Bool, row_0.get_column_type(1));
+        CHECK_EQUAL("int",     row_0.get_column_name(0));
+        CHECK_EQUAL("bool",    row_0.get_column_name(1));
+        CHECK_EQUAL(0,         row_0.get_column_index("int"));
+        CHECK_EQUAL(1,         row_0.get_column_index("bool"));
+
+        CHECK_EQUAL(int_fast64_t(),  row_0.get_int           (0));
+        CHECK_EQUAL(bool(),          row_0.get_bool          (1));
+        CHECK_EQUAL(float(),         row_0.get_float         (2));
+        CHECK_EQUAL(double(),        row_0.get_double        (3));
+        CHECK_EQUAL(StringData(),    row_0.get_string        (4));
+        CHECK_EQUAL(BinaryData(),    row_0.get_binary        (5));
+        CHECK_EQUAL(DateTime(),      row_0.get_datetime      (6));
+        CHECK_EQUAL(0,               row_0.get_subtable_size (7));
+        CHECK_EQUAL(int_fast64_t(),  row_0.get_mixed         (8));
+        CHECK_EQUAL(type_Int,        row_0.get_mixed_type    (8));
+
+        CHECK_EQUAL(4923,            row_1.get_int           (0));
+        CHECK_EQUAL(true,            row_1.get_bool          (1));
+        CHECK_EQUAL(5298.0f,         row_1.get_float         (2));
+        CHECK_EQUAL(2169.0,          row_1.get_double        (3));
+        CHECK_EQUAL("str",           row_1.get_string        (4));
+        CHECK_EQUAL(bin,             row_1.get_binary        (5));
+        CHECK_EQUAL(DateTime(7739),  row_1.get_datetime      (6));
+        CHECK_EQUAL(1,               row_1.get_subtable_size (7));
+        CHECK_EQUAL("mix",           row_1.get_mixed         (8));
+        CHECK_EQUAL(type_String,     row_1.get_mixed_type    (8));
+
+        TableRef subtab_0 = row_0.get_subtable(7);
+        CHECK(*subtab_0 == empty_subtab);
+        TableRef subtab_1 = row_1.get_subtable(7);
+        CHECK_EQUAL(19, subtab_1->get_int(0,0));
+        CHECK(*subtab_1 == one_subtab);
+    }
+
+    // Check getters for `const Row`
+    {
+        const Row row_0 = table[0];
+        const Row row_1 = table[1];
+
+        CHECK_EQUAL(int_fast64_t(),  row_0.get_int           (0));
+        CHECK_EQUAL(bool(),          row_0.get_bool          (1));
+        CHECK_EQUAL(float(),         row_0.get_float         (2));
+        CHECK_EQUAL(double(),        row_0.get_double        (3));
+        CHECK_EQUAL(StringData(),    row_0.get_string        (4));
+        CHECK_EQUAL(BinaryData(),    row_0.get_binary        (5));
+        CHECK_EQUAL(DateTime(),      row_0.get_datetime      (6));
+        CHECK_EQUAL(0,               row_0.get_subtable_size (7));
+        CHECK_EQUAL(int_fast64_t(),  row_0.get_mixed         (8));
+        CHECK_EQUAL(type_Int,        row_0.get_mixed_type    (8));
+
+        CHECK_EQUAL(4923,            row_1.get_int           (0));
+        CHECK_EQUAL(true,            row_1.get_bool          (1));
+        CHECK_EQUAL(5298.0f,         row_1.get_float         (2));
+        CHECK_EQUAL(2169.0,          row_1.get_double        (3));
+        CHECK_EQUAL("str",           row_1.get_string        (4));
+        CHECK_EQUAL(bin,             row_1.get_binary        (5));
+        CHECK_EQUAL(DateTime(7739),  row_1.get_datetime      (6));
+        CHECK_EQUAL(1,               row_1.get_subtable_size (7));
+        CHECK_EQUAL("mix",           row_1.get_mixed         (8));
+        CHECK_EQUAL(type_String,     row_1.get_mixed_type    (8));
+
+        ConstTableRef subtab_0 = row_0.get_subtable(7);
+        CHECK(*subtab_0 == empty_subtab);
+        ConstTableRef subtab_1 = row_1.get_subtable(7);
+        CHECK_EQUAL(19, subtab_1->get_int(0,0));
+        CHECK(*subtab_1 == one_subtab);
+    }
+
+    // Check getters for `ConstRow`
+    {
+        ConstRow row_0 = table[0];
+        ConstRow row_1 = table[1];
+
+        CHECK_EQUAL(int_fast64_t(),  row_0.get_int           (0));
+        CHECK_EQUAL(bool(),          row_0.get_bool          (1));
+        CHECK_EQUAL(float(),         row_0.get_float         (2));
+        CHECK_EQUAL(double(),        row_0.get_double        (3));
+        CHECK_EQUAL(StringData(),    row_0.get_string        (4));
+        CHECK_EQUAL(BinaryData(),    row_0.get_binary        (5));
+        CHECK_EQUAL(DateTime(),      row_0.get_datetime      (6));
+        CHECK_EQUAL(0,               row_0.get_subtable_size (7));
+        CHECK_EQUAL(int_fast64_t(),  row_0.get_mixed         (8));
+        CHECK_EQUAL(type_Int,        row_0.get_mixed_type    (8));
+
+        CHECK_EQUAL(4923,            row_1.get_int           (0));
+        CHECK_EQUAL(true,            row_1.get_bool          (1));
+        CHECK_EQUAL(5298.0f,         row_1.get_float         (2));
+        CHECK_EQUAL(2169.0,          row_1.get_double        (3));
+        CHECK_EQUAL("str",           row_1.get_string        (4));
+        CHECK_EQUAL(bin,             row_1.get_binary        (5));
+        CHECK_EQUAL(DateTime(7739),  row_1.get_datetime      (6));
+        CHECK_EQUAL(1,               row_1.get_subtable_size (7));
+        CHECK_EQUAL("mix",           row_1.get_mixed         (8));
+        CHECK_EQUAL(type_String,     row_1.get_mixed_type    (8));
+
+        ConstTableRef subtab_0 = row_0.get_subtable(7);
+        CHECK(*subtab_0 == empty_subtab);
+        ConstTableRef subtab_1 = row_1.get_subtable(7);
+        CHECK_EQUAL(19, subtab_1->get_int(0,0));
+        CHECK(*subtab_1 == one_subtab);
+    }
+
+    // Check getters for `const ConstRow` (double constness)
+    {
+        const ConstRow row_0 = table[0];
+        const ConstRow row_1 = table[1];
+
+        CHECK_EQUAL(int_fast64_t(),  row_0.get_int           (0));
+        CHECK_EQUAL(bool(),          row_0.get_bool          (1));
+        CHECK_EQUAL(float(),         row_0.get_float         (2));
+        CHECK_EQUAL(double(),        row_0.get_double        (3));
+        CHECK_EQUAL(StringData(),    row_0.get_string        (4));
+        CHECK_EQUAL(BinaryData(),    row_0.get_binary        (5));
+        CHECK_EQUAL(DateTime(),      row_0.get_datetime      (6));
+        CHECK_EQUAL(0,               row_0.get_subtable_size (7));
+        CHECK_EQUAL(int_fast64_t(),  row_0.get_mixed         (8));
+        CHECK_EQUAL(type_Int,        row_0.get_mixed_type    (8));
+
+        CHECK_EQUAL(4923,            row_1.get_int           (0));
+        CHECK_EQUAL(true,            row_1.get_bool          (1));
+        CHECK_EQUAL(5298.0f,         row_1.get_float         (2));
+        CHECK_EQUAL(2169.0,          row_1.get_double        (3));
+        CHECK_EQUAL("str",           row_1.get_string        (4));
+        CHECK_EQUAL(bin,             row_1.get_binary        (5));
+        CHECK_EQUAL(DateTime(7739),  row_1.get_datetime      (6));
+        CHECK_EQUAL(1,               row_1.get_subtable_size (7));
+        CHECK_EQUAL("mix",           row_1.get_mixed         (8));
+        CHECK_EQUAL(type_String,     row_1.get_mixed_type    (8));
+
+        ConstTableRef subtab_0 = row_0.get_subtable(7);
+        CHECK(*subtab_0 == empty_subtab);
+        ConstTableRef subtab_1 = row_1.get_subtable(7);
+        CHECK_EQUAL(19, subtab_1->get_int(0,0));
+        CHECK(*subtab_1 == one_subtab);
+    }
+
+    // Check setters for `Row`
+    {
+        Row row_0 = table[0];
+        Row row_1 = table[1];
+
+        row_0.set_int      (0, 5651);
+        row_0.set_bool     (1, true);
+        row_0.set_float    (2, 8397.0f);
+        row_0.set_double   (3, 1937.0);
+        row_0.set_string   (4, "foo");
+        row_0.set_binary   (5, bin);
+        row_0.set_datetime (6, DateTime(9992));
+        row_0.set_subtable (7, &one_subtab);
+        row_0.set_mixed    (8, Mixed(3637.0f));
+
+        row_1.set_int      (0, int_fast64_t());
+        row_1.set_bool     (1, bool());
+        row_1.set_float    (2, float());
+        row_1.set_double   (3, double());
+        row_1.set_string   (4, StringData());
+        row_1.set_binary   (5, BinaryData());
+        row_1.set_datetime (6, DateTime());
+        row_1.set_subtable (7, 0);
+        row_1.set_mixed    (8, Mixed());
+
+        Mixed mix_subtab((Mixed::subtable_tag()));
+
+        CHECK_EQUAL(5651,            table.get_int      (0,0));
+        CHECK_EQUAL(true,            table.get_bool     (1,0));
+        CHECK_EQUAL(8397.0f,         table.get_float    (2,0));
+        CHECK_EQUAL(1937.0,          table.get_double   (3,0));
+        CHECK_EQUAL("foo",           table.get_string   (4,0));
+        CHECK_EQUAL(bin,             table.get_binary   (5,0));
+        CHECK_EQUAL(DateTime(9992),  table.get_datetime (6,0));
+        CHECK_EQUAL(3637.0f,         table.get_mixed    (8,0));
+
+        CHECK_EQUAL(int_fast64_t(),  table.get_int      (0,1));
+        CHECK_EQUAL(bool(),          table.get_bool     (1,1));
+        CHECK_EQUAL(float(),         table.get_float    (2,1));
+        CHECK_EQUAL(double(),        table.get_double   (3,1));
+        CHECK_EQUAL(StringData(),    table.get_string   (4,1));
+        CHECK_EQUAL(BinaryData(),    table.get_binary   (5,1));
+        CHECK_EQUAL(DateTime(),      table.get_datetime (6,1));
+        CHECK_EQUAL(int_fast64_t(),  table.get_mixed    (8,1));
+
+        TableRef subtab_0 = table.get_subtable(7,0);
+        CHECK_EQUAL(19, subtab_0->get_int(0,0));
+        CHECK(*subtab_0 == one_subtab);
+        TableRef subtab_1 = table.get_subtable(7,1);
+        CHECK(*subtab_1 == empty_subtab);
+
+        row_0.set_mixed_subtable(8, 0);
+        row_1.set_mixed_subtable(8, &two_subtab);
+        subtab_0 = table.get_subtable(8,0);
+        subtab_1 = table.get_subtable(8,1);
+        CHECK(subtab_0);
+        CHECK(subtab_1);
+        CHECK(subtab_0->is_attached());
+        CHECK(subtab_1->is_attached());
+        CHECK(*subtab_0 == Table());
+        CHECK_EQUAL(29, subtab_1->get_int(0,0));
+        CHECK(*subtab_1 == two_subtab);
+    }
+
+    // Check setters for `RowExpr`
+    {
+        table[0].set_int      (0, int_fast64_t());
+        table[0].set_bool     (1, bool());
+        table[0].set_float    (2, float());
+        table[0].set_double   (3, double());
+        table[0].set_string   (4, StringData());
+        table[0].set_binary   (5, BinaryData());
+        table[0].set_datetime (6, DateTime());
+        table[0].set_subtable (7, 0);
+        table[0].set_mixed    (8, Mixed());
+
+        table[1].set_int      (0, 5651);
+        table[1].set_bool     (1, true);
+        table[1].set_float    (2, 8397.0f);
+        table[1].set_double   (3, 1937.0);
+        table[1].set_string   (4, "foo");
+        table[1].set_binary   (5, bin);
+        table[1].set_datetime (6, DateTime(9992));
+        table[1].set_subtable (7, &one_subtab);
+        table[1].set_mixed    (8, Mixed(3637.0f));
+
+        Mixed mix_subtab((Mixed::subtable_tag()));
+
+        CHECK_EQUAL(int_fast64_t(),  table.get_int      (0,0));
+        CHECK_EQUAL(bool(),          table.get_bool     (1,0));
+        CHECK_EQUAL(float(),         table.get_float    (2,0));
+        CHECK_EQUAL(double(),        table.get_double   (3,0));
+        CHECK_EQUAL(StringData(),    table.get_string   (4,0));
+        CHECK_EQUAL(BinaryData(),    table.get_binary   (5,0));
+        CHECK_EQUAL(DateTime(),      table.get_datetime (6,0));
+        CHECK_EQUAL(int_fast64_t(),  table.get_mixed    (8,0));
+
+        CHECK_EQUAL(5651,            table.get_int      (0,1));
+        CHECK_EQUAL(true,            table.get_bool     (1,1));
+        CHECK_EQUAL(8397.0f,         table.get_float    (2,1));
+        CHECK_EQUAL(1937.0,          table.get_double   (3,1));
+        CHECK_EQUAL("foo",           table.get_string   (4,1));
+        CHECK_EQUAL(bin,             table.get_binary   (5,1));
+        CHECK_EQUAL(DateTime(9992),  table.get_datetime (6,1));
+        CHECK_EQUAL(3637.0f,         table.get_mixed    (8,1));
+
+        TableRef subtab_0 = table.get_subtable(7,0);
+        CHECK(*subtab_0 == empty_subtab);
+        TableRef subtab_1 = table.get_subtable(7,1);
+        CHECK_EQUAL(19, subtab_1->get_int(0,0));
+        CHECK(*subtab_1 == one_subtab);
+
+        table[0].set_mixed_subtable(8, &two_subtab);
+        table[1].set_mixed_subtable(8, 0);
+        subtab_0 = table.get_subtable(8,0);
+        subtab_1 = table.get_subtable(8,1);
+        CHECK(subtab_0);
+        CHECK(subtab_1);
+        CHECK(subtab_0->is_attached());
+        CHECK(subtab_1->is_attached());
+        CHECK_EQUAL(29, subtab_0->get_int(0,0));
+        CHECK(*subtab_0 == two_subtab);
+        CHECK(*subtab_1 == Table());
+    }
+
+    // Check that we can also create ConstRow's from `const Table`
+    {
+        const Table& const_table = table;
+        ConstRow row_0 = const_table[0];
+        ConstRow row_1 = const_table[1];
+        CHECK_EQUAL(0,    row_0.get_int(0));
+        CHECK_EQUAL(5651, row_1.get_int(0));
+    }
+
+    // Check that we can get the table and the row index from a Row
+    {
+        Row row_0 = table[0];
+        Row row_1 = table[1];
+        CHECK_EQUAL(&table, row_0.get_table());
+        CHECK_EQUAL(&table, row_1.get_table());
+        CHECK_EQUAL(0, row_0.get_index());
+        CHECK_EQUAL(1, row_1.get_index());
+    }
+}
+
+
+TEST(Table_RowAccessorLinks)
+{
+    Group group;
+    TableRef target_table = group.get_table("target");
+    target_table->add_column(type_Int, "");
+    target_table->add_empty_row(16);
+    TableRef source_table = group.get_table("source");
+    source_table->add_column_link(type_Link, "", *target_table);
+    source_table->add_column_link(type_LinkList, "", *target_table);
+    source_table->add_empty_row(2);
+
+    Row source_row_1 = source_table->get(0);
+    Row source_row_2 = source_table->get(1);
+    CHECK(source_row_1.is_null_link(0));
+    CHECK(source_row_2.is_null_link(0));
+    CHECK(source_row_1.linklist_is_empty(1));
+    CHECK(source_row_2.linklist_is_empty(1));
+    CHECK_EQUAL(0, source_row_1.get_link_count(1));
+    CHECK_EQUAL(0, source_row_2.get_link_count(1));
+    CHECK_EQUAL(0, target_table->get(7).get_backlink_count(*source_table, 0));
+    CHECK_EQUAL(0, target_table->get(13).get_backlink_count(*source_table, 0));
+    CHECK_EQUAL(0, target_table->get(11).get_backlink_count(*source_table, 1));
+    CHECK_EQUAL(0, target_table->get(15).get_backlink_count(*source_table, 1));
+
+    // Set links
+    source_row_1.set_link(0, 7);
+    source_row_2.set_link(0, 13);
+    CHECK(!source_row_1.is_null_link(0));
+    CHECK(!source_row_2.is_null_link(0));
+    CHECK_EQUAL(7,  source_row_1.get_link(0));
+    CHECK_EQUAL(13, source_row_2.get_link(0));
+    CHECK_EQUAL(1, target_table->get(7).get_backlink_count(*source_table, 0));
+    CHECK_EQUAL(1, target_table->get(13).get_backlink_count(*source_table, 0));
+    CHECK_EQUAL(0, target_table->get(7).get_backlink(*source_table, 0, 0));
+    CHECK_EQUAL(1, target_table->get(13).get_backlink(*source_table, 0, 0));
+
+    // Nullify links
+    source_row_1.nullify_link(0);
+    source_row_2.nullify_link(0);
+    CHECK(source_row_1.is_null_link(0));
+    CHECK(source_row_2.is_null_link(0));
+    CHECK_EQUAL(0, target_table->get(7).get_backlink_count(*source_table, 0));
+    CHECK_EQUAL(0, target_table->get(13).get_backlink_count(*source_table, 0));
+
+    // Add stuff to link lists
+    LinkViewRef link_list_1 = source_row_1.get_linklist(1);
+    LinkViewRef link_list_2 = source_row_2.get_linklist(1);
+    link_list_1->add(15);
+    link_list_2->add(11);
+    link_list_2->add(15);
+    CHECK(!source_row_1.linklist_is_empty(1));
+    CHECK(!source_row_2.linklist_is_empty(1));
+    CHECK_EQUAL(1, source_row_1.get_link_count(1));
+    CHECK_EQUAL(2, source_row_2.get_link_count(1));
+    CHECK_EQUAL(1, target_table->get(11).get_backlink_count(*source_table, 1));
+    CHECK_EQUAL(2, target_table->get(15).get_backlink_count(*source_table, 1));
+    CHECK_EQUAL(1, target_table->get(11).get_backlink(*source_table, 1, 0));
+    size_t back_link_1 = target_table->get(15).get_backlink(*source_table, 1, 0);
+    size_t back_link_2 = target_table->get(15).get_backlink(*source_table, 1, 1);
+    CHECK((back_link_1 == 0 && back_link_2 == 1) || (back_link_1 == 1 && back_link_2 == 0));
+
+    // Clear link lists
+    link_list_1->clear();
+    link_list_2->clear();
+    CHECK(source_row_1.linklist_is_empty(1));
+    CHECK(source_row_2.linklist_is_empty(1));
+    CHECK_EQUAL(0, source_row_1.get_link_count(1));
+    CHECK_EQUAL(0, source_row_2.get_link_count(1));
+    CHECK_EQUAL(0, target_table->get(11).get_backlink_count(*source_table, 1));
+    CHECK_EQUAL(0, target_table->get(15).get_backlink_count(*source_table, 1));
+}
+
+
+TEST(Table_RowAccessorDetach)
+{
+    Table table;
+    table.add_column(type_Int, "");
+    table.add_empty_row();
+    Row row = table[0];
+    CHECK(row.is_attached());
+    row.detach();
+    CHECK(!row.is_attached());
+    row = table[0];
+    CHECK(row.is_attached());
+}
+
+
+TEST(Table_RowAccessorCopyAndAssign)
+{
+    Table table;
+    const Table& ctable = table;
+    table.add_column(type_Int, "");
+    table.add_empty_row(3);
+    table.set_int(0, 0, 750);
+    table.set_int(0, 1, 751);
+    table.set_int(0, 2, 752);
+
+    {
+        // Check copy construction of row accessor from row expression
+        Row       row_1 =  table[0]; // Copy construct `Row` from `RowExpr`
+        ConstRow crow_1 =  table[1]; // Copy construct `ConstRow` from `RowExpr`
+        ConstRow crow_2 = ctable[2]; // Copy construct `ConstRow` from `ConstRowExpr`
+        CHECK(row_1.is_attached());
+        CHECK(crow_1.is_attached());
+        CHECK(crow_2.is_attached());
+        CHECK_EQUAL(&table,  row_1.get_table());
+        CHECK_EQUAL(&table, crow_1.get_table());
+        CHECK_EQUAL(&table, crow_2.get_table());
+        CHECK_EQUAL(0,  row_1.get_index());
+        CHECK_EQUAL(1, crow_1.get_index());
+        CHECK_EQUAL(2, crow_2.get_index());
+
+        // Check copy construction of row accessor from other row accessor
+        Row drow_1;
+        ConstRow dcrow_1;
+        CHECK(!drow_1.is_attached());
+        CHECK(!dcrow_1.is_attached());
+        Row      drow_2  = drow_1;  // Copy construct `Row` from detached `Row`
+        ConstRow dcrow_2 = drow_1;  // Copy construct `ConstRow` from detached `Row`
+        ConstRow dcrow_3 = dcrow_1; // Copy construct `ConstRow` from detached `ConstRow`
+        Row      row_2   = row_1;   // Copy construct `Row` from attached `Row`
+        ConstRow crow_3  = row_1;   // Copy construct `ConstRow` from attached `Row`
+        ConstRow crow_4  = crow_1;  // Copy construct `ConstRow` from attached `ConstRow`
+        CHECK(!drow_2.is_attached());
+        CHECK(!dcrow_2.is_attached());
+        CHECK(!dcrow_3.is_attached());
+        CHECK(row_2.is_attached());
+        CHECK(crow_3.is_attached());
+        CHECK(crow_4.is_attached());
+        CHECK(!drow_2.get_table());
+        CHECK(!dcrow_2.get_table());
+        CHECK(!dcrow_3.get_table());
+        CHECK_EQUAL(&table, row_2.get_table());
+        CHECK_EQUAL(&table, crow_3.get_table());
+        CHECK_EQUAL(&table, crow_4.get_table());
+        CHECK_EQUAL(0, row_2.get_index());
+        CHECK_EQUAL(0, crow_3.get_index());
+        CHECK_EQUAL(1, crow_4.get_index());
+    }
+    table.Verify();
+
+    // Check assignment of row expression to row accessor
+    {
+        Row row;
+        ConstRow crow_1, crow_2;
+        row    =  table[0]; // Assign `RowExpr` to detached `Row`
+        crow_1 =  table[1]; // Assign `RowExpr` to detached `ConstRow`
+        crow_2 = ctable[2]; // Assign `ConstRowExpr` to detached `ConstRow`
+        CHECK(row.is_attached());
+        CHECK(crow_1.is_attached());
+        CHECK(crow_2.is_attached());
+        CHECK_EQUAL(&table,  row.get_table());
+        CHECK_EQUAL(&table, crow_1.get_table());
+        CHECK_EQUAL(&table, crow_2.get_table());
+        CHECK_EQUAL(0,  row.get_index());
+        CHECK_EQUAL(1, crow_1.get_index());
+        CHECK_EQUAL(2, crow_2.get_index());
+        row    =  table[1]; // Assign `RowExpr` to attached `Row`
+        crow_1 =  table[2]; // Assign `RowExpr` to attached `ConstRow`
+        crow_2 = ctable[0]; // Assign `ConstRowExpr` to attached `ConstRow`
+        CHECK(row.is_attached());
+        CHECK(crow_1.is_attached());
+        CHECK(crow_2.is_attached());
+        CHECK_EQUAL(&table,  row.get_table());
+        CHECK_EQUAL(&table, crow_1.get_table());
+        CHECK_EQUAL(&table, crow_2.get_table());
+        CHECK_EQUAL(1,  row.get_index());
+        CHECK_EQUAL(2, crow_1.get_index());
+        CHECK_EQUAL(0, crow_2.get_index());
+    }
+
+    // Check assignment of row accessor to row accessor
+    {
+        Row drow, row_1;
+        ConstRow dcrow, crow_1, crow_2;
+        row_1  = row_1;  // Assign detached `Row` to self
+        crow_1 = crow_1; // Assign detached `ConstRow` to self
+        CHECK(!row_1.is_attached());
+        CHECK(!crow_1.is_attached());
+        row_1  = drow;  // Assign detached `Row` to detached `Row`
+        crow_1 = drow;  // Assign detached `Row` to detached `ConstRow`
+        crow_2 = dcrow; // Assign detached `ConstRow` to detached `ConstRow`
+        CHECK(!row_1.is_attached());
+        CHECK(!crow_1.is_attached());
+        CHECK(!crow_2.is_attached());
+        Row       row_2 = table[0];
+        Row       row_3 = table[1];
+        ConstRow crow_3 = table[2];
+        CHECK(row_2.is_attached());
+        CHECK(row_3.is_attached());
+        CHECK(crow_3.is_attached());
+        CHECK_EQUAL(&table,  row_2.get_table());
+        CHECK_EQUAL(&table,  row_3.get_table());
+        CHECK_EQUAL(&table, crow_3.get_table());
+        CHECK_EQUAL(0,  row_2.get_index());
+        CHECK_EQUAL(1,  row_3.get_index());
+        CHECK_EQUAL(2, crow_3.get_index());
+        row_1  =  row_2; // Assign attached `Row` to detached `Row`
+        crow_1 =  row_3; // Assign attached `Row` to detached `ConstRow`
+        crow_2 = crow_3; // Assign attached `ConstRow` to detached `ConstRow`
+        CHECK(row_1.is_attached());
+        CHECK(crow_1.is_attached());
+        CHECK(crow_2.is_attached());
+        CHECK_EQUAL(&table,  row_1.get_table());
+        CHECK_EQUAL(&table, crow_1.get_table());
+        CHECK_EQUAL(&table, crow_2.get_table());
+        CHECK_EQUAL(0,  row_1.get_index());
+        CHECK_EQUAL(1, crow_1.get_index());
+        CHECK_EQUAL(2, crow_2.get_index());
+        row_1  = row_1;  // Assign attached `Row` to self
+        crow_1 = crow_1; // Assign attached `ConstRow` to self
+        CHECK(row_1.is_attached());
+        CHECK(crow_1.is_attached());
+        CHECK_EQUAL(&table,  row_1.get_table());
+        CHECK_EQUAL(&table, crow_1.get_table());
+        CHECK_EQUAL(0,  row_1.get_index());
+        CHECK_EQUAL(1, crow_1.get_index());
+        Row       row_4 = table[2];
+        Row       row_5 = table[0];
+        ConstRow crow_4 = table[1];
+        row_1  =  row_4; // Assign attached `Row` to attached `Row`
+        crow_1 =  row_5; // Assign attached `Row` to attached `ConstRow`
+        crow_2 = crow_4; // Assign attached `ConstRow` to attached `ConstRow`
+        CHECK(row_1.is_attached());
+        CHECK(crow_1.is_attached());
+        CHECK(crow_2.is_attached());
+        CHECK_EQUAL(&table,  row_1.get_table());
+        CHECK_EQUAL(&table, crow_1.get_table());
+        CHECK_EQUAL(&table, crow_2.get_table());
+        CHECK_EQUAL(2,  row_1.get_index());
+        CHECK_EQUAL(0, crow_1.get_index());
+        CHECK_EQUAL(1, crow_2.get_index());
+        row_1  = drow;  // Assign detached `Row` to attached `Row`
+        crow_1 = drow;  // Assign detached `Row` to attached `ConstRow`
+        crow_2 = dcrow; // Assign detached `ConstRow` to attached `ConstRow`
+        CHECK(!row_1.is_attached());
+        CHECK(!crow_1.is_attached());
+        CHECK(!crow_2.is_attached());
+    }
+}
+
+
+TEST(Table_RowAccessorRetain)
+{
+    // Create a table with two rows
+    TableRef parent = Table::create();
+    parent->add_column(type_Int, "a");
+    parent->add_empty_row(2);
+    parent->set_int(0, 0, 27);
+    parent->set_int(0, 1, 227);
+    parent->Verify();
+    CHECK_EQUAL(2, parent->size());
+    ConstRow row_1 = (*parent)[0];
+    ConstRow row_2 = (*parent)[1];
+    CHECK(row_1.is_attached());
+    CHECK(row_2.is_attached());
+    CHECK_EQUAL(parent.get(), row_1.get_table());
+    CHECK_EQUAL(parent.get(), row_2.get_table());
+    CHECK_EQUAL(0, row_1.get_index());
+    CHECK_EQUAL(1, row_2.get_index());
+
+    // Check that row insertion does not detach the row accessors, and that the
+    // row indexes is properly adjusted
+    parent->insert_empty_row(1); // Between
+    parent->add_empty_row();     // After
+    parent->insert_empty_row(0); // Before
+    parent->Verify();
+    CHECK_EQUAL(5, parent->size());
+    CHECK(row_1.is_attached());
+    CHECK(row_2.is_attached());
+    CHECK_EQUAL(parent.get(), row_1.get_table());
+    CHECK_EQUAL(parent.get(), row_2.get_table());
+    CHECK_EQUAL(1, row_1.get_index());
+    CHECK_EQUAL(3, row_2.get_index());
+    CHECK_EQUAL(27,  row_1.get_int(0));
+    CHECK_EQUAL(227, row_2.get_int(0));
+    parent->insert_empty_row(1); // Immediately before row_1
+    parent->insert_empty_row(5); // Immediately after  row_2
+    parent->insert_empty_row(3); // Immediately after  row_1
+    parent->insert_empty_row(5); // Immediately before row_2
+    parent->Verify();
+    CHECK_EQUAL(9, parent->size());
+    CHECK(row_1.is_attached());
+    CHECK(row_2.is_attached());
+    CHECK_EQUAL(parent.get(), row_1.get_table());
+    CHECK_EQUAL(parent.get(), row_2.get_table());
+    CHECK_EQUAL(2, row_1.get_index());
+    CHECK_EQUAL(6, row_2.get_index());
+    CHECK_EQUAL(27,  row_1.get_int(0));
+    CHECK_EQUAL(227, row_2.get_int(0));
+
+    // Check that removal of rows (other than row_1 and row_2) does not detach
+    // the row accessors, and that the row indexes is properly adjusted
+    parent->remove(3); // Immediately after  row_1
+    parent->remove(1); // Immediately before row_1
+    parent->remove(3); // Immediately before row_2
+    parent->remove(4); // Immediately after  row_2
+    parent->Verify();
+    CHECK_EQUAL(5, parent->size());
+    CHECK(row_1.is_attached());
+    CHECK(row_2.is_attached());
+    CHECK_EQUAL(parent.get(), row_1.get_table());
+    CHECK_EQUAL(parent.get(), row_2.get_table());
+    CHECK_EQUAL(1, row_1.get_index());
+    CHECK_EQUAL(3, row_2.get_index());
+    CHECK_EQUAL(27,  row_1.get_int(0));
+    CHECK_EQUAL(227, row_2.get_int(0));
+    parent->remove(4); // After
+    parent->remove(0); // Before
+    parent->remove(1); // Between
+    parent->Verify();
+    CHECK_EQUAL(2, parent->size());
+    CHECK(row_1.is_attached());
+    CHECK(row_2.is_attached());
+    CHECK_EQUAL(parent.get(), row_1.get_table());
+    CHECK_EQUAL(parent.get(), row_2.get_table());
+    CHECK_EQUAL(0, row_1.get_index());
+    CHECK_EQUAL(1, row_2.get_index());
+    CHECK_EQUAL(27,  row_1.get_int(0));
+    CHECK_EQUAL(227, row_2.get_int(0));
+
+    // Check that removal of first row detaches row_1
+    parent->remove(0);
+    parent->Verify();
+    CHECK_EQUAL(1, parent->size());
+    CHECK(!row_1.is_attached());
+    CHECK(row_2.is_attached());
+    CHECK_EQUAL(parent.get(), row_2.get_table());
+    CHECK_EQUAL(0, row_2.get_index());
+    CHECK_EQUAL(227, row_2.get_int(0));
+    // Restore first row and recover row_1
+    parent->insert_empty_row(0);
+    parent->set_int(0, 0, 27);
+    parent->Verify();
+    CHECK_EQUAL(2, parent->size());
+    row_1 = (*parent)[0];
+    CHECK(row_1.is_attached());
+    CHECK(row_2.is_attached());
+    CHECK_EQUAL(parent.get(), row_1.get_table());
+    CHECK_EQUAL(parent.get(), row_2.get_table());
+    CHECK_EQUAL(0, row_1.get_index());
+    CHECK_EQUAL(1, row_2.get_index());
+    CHECK_EQUAL(27,  row_1.get_int(0));
+    CHECK_EQUAL(227, row_2.get_int(0));
+
+    // Check that removal of second row detaches row_2
+    parent->remove(1);
+    parent->Verify();
+    CHECK_EQUAL(1, parent->size());
+    CHECK(row_1.is_attached());
+    CHECK(!row_2.is_attached());
+    CHECK_EQUAL(parent.get(), row_1.get_table());
+    CHECK_EQUAL(0, row_1.get_index());
+    CHECK_EQUAL(27, row_1.get_int(0));
+    // Restore second row and recover row_2
+    parent->add_empty_row();
+    parent->set_int(0, 1, 227);
+    parent->Verify();
+    CHECK_EQUAL(2, parent->size());
+    row_2 = (*parent)[1];
+    CHECK(row_1.is_attached());
+    CHECK(row_2.is_attached());
+    CHECK_EQUAL(parent.get(), row_1.get_table());
+    CHECK_EQUAL(parent.get(), row_2.get_table());
+    CHECK_EQUAL(0, row_1.get_index());
+    CHECK_EQUAL(1, row_2.get_index());
+    CHECK_EQUAL(27,  row_1.get_int(0));
+    CHECK_EQUAL(227, row_2.get_int(0));
+
+    // Check that descriptor modifications do not affect the row accessors (as
+    // long as we do not remove the last column)
+    parent->add_column(type_String, "x");
+    parent->insert_column(0, type_Float, "y");
+    parent->Verify();
+    CHECK_EQUAL(2, parent->size());
+    CHECK(row_1.is_attached());
+    CHECK(row_2.is_attached());
+    CHECK_EQUAL(parent.get(), row_1.get_table());
+    CHECK_EQUAL(parent.get(), row_2.get_table());
+    CHECK_EQUAL(0, row_1.get_index());
+    CHECK_EQUAL(1, row_2.get_index());
+    CHECK_EQUAL(27,  row_1.get_int(1));
+    CHECK_EQUAL(227, row_2.get_int(1));
+    parent->remove_column(0);
+    parent->remove_column(1);
+    parent->Verify();
+    CHECK_EQUAL(2, parent->size());
+    CHECK(row_1.is_attached());
+    CHECK(row_2.is_attached());
+    CHECK_EQUAL(parent.get(), row_1.get_table());
+    CHECK_EQUAL(parent.get(), row_2.get_table());
+    CHECK_EQUAL(0, row_1.get_index());
+    CHECK_EQUAL(1, row_2.get_index());
+    CHECK_EQUAL(27,  row_1.get_int(0));
+    CHECK_EQUAL(227, row_2.get_int(0));
+
+    // Check that removal of the last column detaches all row accessors
+    parent->remove_column(0);
+    parent->Verify();
+    CHECK_EQUAL(0, parent->get_column_count());
+    CHECK_EQUAL(0, parent->size());
+    CHECK(!row_1.is_attached());
+    CHECK(!row_2.is_attached());
+    // Restore rows and recover row accessors
+    parent->add_column(type_Int, "a");
+    parent->add_empty_row(2);
+    parent->set_int(0, 0, 27);
+    parent->set_int(0, 1, 227);
+    parent->Verify();
+    CHECK_EQUAL(2, parent->size());
+    row_1 = (*parent)[0];
+    row_2 = (*parent)[1];
+    CHECK(row_1.is_attached());
+    CHECK(row_2.is_attached());
+    CHECK_EQUAL(parent.get(), row_1.get_table());
+    CHECK_EQUAL(parent.get(), row_2.get_table());
+    CHECK_EQUAL(0, row_1.get_index());
+    CHECK_EQUAL(1, row_2.get_index());
+
+    // Check that clearing of the table detaches all row accessors
+    parent->clear();
+    parent->Verify();
+    CHECK_EQUAL(0, parent->size());
+    CHECK(!row_1.is_attached());
+    CHECK(!row_2.is_attached());
+}
+
+
+TEST(Table_SubtableRowAccessorsRetain)
+{
+    // Create a mixed and a regular subtable each with one row
+    TableRef parent = Table::create();
+    parent->add_column(type_Mixed, "a");
+    parent->add_column(type_Table, "b");
+    DescriptorRef subdesc = parent->get_subdescriptor(1);
+    subdesc->add_column(type_Int, "regular");
+    parent->add_empty_row();
+    parent->set_mixed(0, 0, Mixed::subtable_tag());
+    TableRef mixed = parent->get_subtable(0,0);
+    CHECK(mixed && mixed->is_attached());
+    mixed->add_column(type_Int, "mixed");
+    mixed->add_empty_row();
+    mixed->set_int(0, 0, 19);
+    TableRef regular = parent->get_subtable(1,0);
+    CHECK(regular && regular->is_attached());
+    regular->add_empty_row();
+    regular->set_int(0, 0, 29);
+    CHECK(mixed->size()   == 1);
+    CHECK(regular->size() == 1);
+    ConstRow row_m = (*mixed)[0];
+    ConstRow row_r = (*regular)[0];
+    CHECK_EQUAL(19, row_m.get_int(0));
+    CHECK_EQUAL(29, row_r.get_int(0));
+
+    // Check that all row accessors in a mixed subtable are detached if the
+    // subtable is overridden
+    parent->set_mixed(0, 0, Mixed("foo"));
+    CHECK(!mixed->is_attached());
+    CHECK(regular->is_attached());
+    CHECK(!row_m.is_attached());
+    CHECK(row_r.is_attached());
+    // Restore mixed
+    parent->set_mixed(0, 0, Mixed::subtable_tag());
+    mixed = parent->get_subtable(0,0);
+    CHECK(mixed);
+    CHECK(mixed->is_attached());
+    mixed->add_column(type_Int, "mixed_2");
+    mixed->add_empty_row();
+    mixed->set_int(0, 0, 19);
+    CHECK(regular->is_attached());
+    CHECK_EQUAL(1, mixed->size());
+    CHECK_EQUAL(1, regular->size());
+    row_m = (*mixed)[0];
+    CHECK_EQUAL(19, row_m.get_int(0));
+    CHECK_EQUAL(29, row_r.get_int(0));
+
+    // Check that all row accessors in a regular subtable are detached if the
+    // subtable is overridden
+    parent->set_subtable(1, 0, 0); // Clear
+    CHECK(mixed->is_attached());
+    CHECK(regular->is_attached());
+    CHECK(row_m.is_attached());
+    CHECK(!row_r.is_attached());
+}
+
+
+TEST(Table_MoveLastOverRetain)
+{
+    // Create three parent tables, each with with 5 rows, and each row
+    // containing one regular and one mixed subtable
+    TableRef parent_1, parent_2, parent_3;
+    for (int i = 0; i < 3; ++i) {
+        TableRef& parent = i == 0 ? parent_1 : i == 1 ? parent_2 : parent_3;
+        parent = Table::create();
+        parent->add_column(type_Table, "a");
+        parent->add_column(type_Mixed, "b");
+        DescriptorRef subdesc = parent->get_subdescriptor(0);
+        subdesc->add_column(type_Int, "regular");
+        parent->add_empty_row(5);
+        for (int row_ndx = 0; row_ndx < 5; ++row_ndx) {
+            TableRef regular = parent->get_subtable(0, row_ndx);
+            regular->add_empty_row();
+            regular->set_int(0, 0, 10 + row_ndx);
+            parent->set_mixed(1, row_ndx, Mixed::subtable_tag());
+            TableRef mixed = parent->get_subtable(1, row_ndx);
+            mixed->add_column(type_Int, "mixed");
+            mixed->add_empty_row();
+            mixed->set_int(0, 0, 20 + row_ndx);
+        }
+    }
+
+    // Use first table to check with accessors on row indexes 0, 1, and 4, but
+    // none at index 2 and 3.
+    {
+        TableRef parent = parent_1;
+        ConstRow row_0 = (*parent)[0];
+        ConstRow row_1 = (*parent)[1];
+        ConstRow row_4 = (*parent)[4];
+        TableRef regular_0 = parent->get_subtable(0,0);
+        TableRef regular_1 = parent->get_subtable(0,1);
+        TableRef regular_4 = parent->get_subtable(0,4);
+        TableRef   mixed_0 = parent->get_subtable(1,0);
+        TableRef   mixed_1 = parent->get_subtable(1,1);
+        TableRef   mixed_4 = parent->get_subtable(1,4);
+        CHECK(row_0.is_attached());
+        CHECK(row_1.is_attached());
+        CHECK(row_4.is_attached());
+        CHECK_EQUAL(0, row_0.get_index());
+        CHECK_EQUAL(1, row_1.get_index());
+        CHECK_EQUAL(4, row_4.get_index());
+        CHECK(regular_0->is_attached());
+        CHECK(regular_1->is_attached());
+        CHECK(regular_4->is_attached());
+        CHECK_EQUAL(10, regular_0->get_int(0,0));
+        CHECK_EQUAL(11, regular_1->get_int(0,0));
+        CHECK_EQUAL(14, regular_4->get_int(0,0));
+        CHECK(mixed_0 && mixed_0->is_attached());
+        CHECK(mixed_1 && mixed_1->is_attached());
+        CHECK(mixed_4 && mixed_4->is_attached());
+        CHECK_EQUAL(20, mixed_0->get_int(0,0));
+        CHECK_EQUAL(21, mixed_1->get_int(0,0));
+        CHECK_EQUAL(24, mixed_4->get_int(0,0));
+
+        // Perform two 'move last over' operations which brings the number of
+        // rows down from 5 to 3
+        parent->move_last_over(2); // Move row at index 4 to index 2
+        parent->move_last_over(0); // Move row at index 3 to index 0
+        CHECK(!row_0.is_attached());
+        CHECK(row_1.is_attached());
+        CHECK(row_4.is_attached());
+        CHECK_EQUAL(1, row_1.get_index());
+        CHECK_EQUAL(2, row_4.get_index());
+        CHECK(!regular_0->is_attached());
+        CHECK(regular_1->is_attached());
+        CHECK(regular_4->is_attached());
+        CHECK_EQUAL(11, regular_1->get_int(0,0));
+        CHECK_EQUAL(14, regular_4->get_int(0,0));
+        CHECK_EQUAL(regular_1, parent->get_subtable(0,1));
+        CHECK_EQUAL(regular_4, parent->get_subtable(0,2));
+        CHECK(!mixed_0->is_attached());
+        CHECK(mixed_1->is_attached());
+        CHECK(mixed_4->is_attached());
+        CHECK_EQUAL(21, mixed_1->get_int(0,0));
+        CHECK_EQUAL(24, mixed_4->get_int(0,0));
+        CHECK_EQUAL(mixed_1, parent->get_subtable(1,1));
+        CHECK_EQUAL(mixed_4, parent->get_subtable(1,2));
+
+        // Perform two more 'move last over' operations which brings the number
+        // of rows down from 3 to 1
+        parent->move_last_over(1); // Move row at index 2 to index 1
+        parent->move_last_over(0); // Move row at index 1 to index 0
+        CHECK(!row_0.is_attached());
+        CHECK(!row_1.is_attached());
+        CHECK(row_4.is_attached());
+        CHECK_EQUAL(0, row_4.get_index());
+        CHECK(!regular_0->is_attached());
+        CHECK(!regular_1->is_attached());
+        CHECK(regular_4->is_attached());
+        CHECK_EQUAL(14, regular_4->get_int(0,0));
+        CHECK_EQUAL(regular_4, parent->get_subtable(0,0));
+        CHECK(!mixed_0->is_attached());
+        CHECK(!mixed_1->is_attached());
+        CHECK(mixed_4->is_attached());
+        CHECK_EQUAL(24, mixed_4->get_int(0,0));
+        CHECK_EQUAL(mixed_4, parent->get_subtable(1,0));
+    }
+
+    // Use second table to check with accessors on row indexes 0, 2, and 3, but
+    // none at index 1 and 4.
+    {
+        TableRef parent = parent_2;
+        ConstRow row_0 = (*parent)[0];
+        ConstRow row_2 = (*parent)[2];
+        ConstRow row_3 = (*parent)[3];
+        TableRef regular_0 = parent->get_subtable(0,0);
+        TableRef regular_2 = parent->get_subtable(0,2);
+        TableRef regular_3 = parent->get_subtable(0,3);
+        TableRef   mixed_0 = parent->get_subtable(1,0);
+        TableRef   mixed_2 = parent->get_subtable(1,2);
+        TableRef   mixed_3 = parent->get_subtable(1,3);
+        CHECK(row_0.is_attached());
+        CHECK(row_2.is_attached());
+        CHECK(row_3.is_attached());
+        CHECK_EQUAL(0, row_0.get_index());
+        CHECK_EQUAL(2, row_2.get_index());
+        CHECK_EQUAL(3, row_3.get_index());
+        CHECK(regular_0->is_attached());
+        CHECK(regular_2->is_attached());
+        CHECK(regular_3->is_attached());
+        CHECK_EQUAL(10, regular_0->get_int(0,0));
+        CHECK_EQUAL(12, regular_2->get_int(0,0));
+        CHECK_EQUAL(13, regular_3->get_int(0,0));
+        CHECK(mixed_0 && mixed_0->is_attached());
+        CHECK(mixed_2 && mixed_2->is_attached());
+        CHECK(mixed_3 && mixed_3->is_attached());
+        CHECK_EQUAL(20, mixed_0->get_int(0,0));
+        CHECK_EQUAL(22, mixed_2->get_int(0,0));
+        CHECK_EQUAL(23, mixed_3->get_int(0,0));
+
+        // Perform two 'move last over' operations which brings the number of
+        // rows down from 5 to 3
+        parent->move_last_over(2); // Move row at index 4 to index 2
+        parent->move_last_over(0); // Move row at index 3 to index 0
+        CHECK(!row_0.is_attached());
+        CHECK(!row_2.is_attached());
+        CHECK(row_3.is_attached());
+        CHECK_EQUAL(0, row_3.get_index());
+        CHECK(!regular_0->is_attached());
+        CHECK(!regular_2->is_attached());
+        CHECK(regular_3->is_attached());
+        CHECK_EQUAL(13, regular_3->get_int(0,0));
+        CHECK_EQUAL(regular_3, parent->get_subtable(0,0));
+        CHECK(!mixed_0->is_attached());
+        CHECK(!mixed_2->is_attached());
+        CHECK(mixed_3->is_attached());
+        CHECK_EQUAL(23, mixed_3->get_int(0,0));
+        CHECK_EQUAL(mixed_3, parent->get_subtable(1,0));
+
+        // Perform one more 'move last over' operation which brings the number
+        // of rows down from 3 to 2
+        parent->move_last_over(1); // Move row at index 2 to index 1
+        CHECK(!row_0.is_attached());
+        CHECK(!row_2.is_attached());
+        CHECK(row_3.is_attached());
+        CHECK_EQUAL(0, row_3.get_index());
+        CHECK(!regular_0->is_attached());
+        CHECK(!regular_2->is_attached());
+        CHECK(regular_3->is_attached());
+        CHECK_EQUAL(13, regular_3->get_int(0,0));
+        CHECK_EQUAL(regular_3, parent->get_subtable(0,0));
+        CHECK(!mixed_0->is_attached());
+        CHECK(!mixed_2->is_attached());
+        CHECK(mixed_3->is_attached());
+        CHECK_EQUAL(23, mixed_3->get_int(0,0));
+        CHECK_EQUAL(mixed_3, parent->get_subtable(1,0));
+
+        // Perform one final 'move last over' operation which brings the number
+        // of rows down from 2 to 1
+        parent->move_last_over(0); // Move row at index 1 to index 0
+        CHECK(!row_0.is_attached());
+        CHECK(!row_2.is_attached());
+        CHECK(!row_3.is_attached());
+        CHECK(!regular_0->is_attached());
+        CHECK(!regular_2->is_attached());
+        CHECK(!regular_3->is_attached());
+        CHECK(!mixed_0->is_attached());
+        CHECK(!mixed_2->is_attached());
+        CHECK(!mixed_3->is_attached());
+    }
+
+    // Use third table to check with accessors on row indexes 1 and 3, but none
+    // at index 0, 2, and 4.
+    {
+        TableRef parent = parent_3;
+        ConstRow row_1 = (*parent)[1];
+        ConstRow row_3 = (*parent)[3];
+        TableRef regular_1 = parent->get_subtable(0,1);
+        TableRef regular_3 = parent->get_subtable(0,3);
+        TableRef   mixed_1 = parent->get_subtable(1,1);
+        TableRef   mixed_3 = parent->get_subtable(1,3);
+        CHECK(row_1.is_attached());
+        CHECK(row_3.is_attached());
+        CHECK_EQUAL(1, row_1.get_index());
+        CHECK_EQUAL(3, row_3.get_index());
+        CHECK(regular_1->is_attached());
+        CHECK(regular_3->is_attached());
+        CHECK_EQUAL(11, regular_1->get_int(0,0));
+        CHECK_EQUAL(13, regular_3->get_int(0,0));
+        CHECK(mixed_1 && mixed_1->is_attached());
+        CHECK(mixed_3 && mixed_3->is_attached());
+        CHECK_EQUAL(21, mixed_1->get_int(0,0));
+        CHECK_EQUAL(23, mixed_3->get_int(0,0));
+
+        // Perform two 'move last over' operations which brings the number of
+        // rows down from 5 to 3
+        parent->move_last_over(2); // Move row at index 4 to index 2
+        parent->move_last_over(0); // Move row at index 3 to index 0
+        CHECK(row_1.is_attached());
+        CHECK(row_3.is_attached());
+        CHECK_EQUAL(1, row_1.get_index());
+        CHECK_EQUAL(0, row_3.get_index());
+        CHECK(regular_1->is_attached());
+        CHECK(regular_3->is_attached());
+        CHECK_EQUAL(11, regular_1->get_int(0,0));
+        CHECK_EQUAL(13, regular_3->get_int(0,0));
+        CHECK_EQUAL(regular_1, parent->get_subtable(0,1));
+        CHECK_EQUAL(regular_3, parent->get_subtable(0,0));
+        CHECK(mixed_1->is_attached());
+        CHECK(mixed_3->is_attached());
+        CHECK_EQUAL(21, mixed_1->get_int(0,0));
+        CHECK_EQUAL(23, mixed_3->get_int(0,0));
+        CHECK_EQUAL(mixed_1, parent->get_subtable(1,1));
+        CHECK_EQUAL(mixed_3, parent->get_subtable(1,0));
+
+        // Perform one more 'move last over' operation which brings the number
+        // of rows down from 3 to 2
+        parent->move_last_over(1); // Move row at index 2 to index 1
+        CHECK(!row_1.is_attached());
+        CHECK(row_3.is_attached());
+        CHECK_EQUAL(0, row_3.get_index());
+        CHECK(!regular_1->is_attached());
+        CHECK(regular_3->is_attached());
+        CHECK_EQUAL(13, regular_3->get_int(0,0));
+        CHECK_EQUAL(regular_3, parent->get_subtable(0,0));
+        CHECK(!mixed_1->is_attached());
+        CHECK(mixed_3->is_attached());
+        CHECK_EQUAL(23, mixed_3->get_int(0,0));
+        CHECK_EQUAL(mixed_3, parent->get_subtable(1,0));
+
+        // Perform one final 'move last over' operation which brings the number
+        // of rows down from 2 to 1
+        parent->move_last_over(0); // Move row at index 1 to index 0
+        CHECK(!row_1.is_attached());
+        CHECK(!row_3.is_attached());
+        CHECK(!regular_1->is_attached());
+        CHECK(!regular_3->is_attached());
+        CHECK(!mixed_1->is_attached());
+        CHECK(!mixed_3->is_attached());
+    }
+}
+
+
+TEST(Table_EnumStringInsertEmptyRow)
+{
+    Table table;
+    table.add_column(type_String, "");
+    table.add_empty_row(128);
+    for (int i = 0; i < 128; ++i)
+        table.set_string(0, i, "foo");
+    DescriptorRef desc = table.get_descriptor();
+    CHECK_EQUAL(0, desc->get_num_unique_values(0));
+    table.optimize();
+    // Make sure we now have an enumerated strings column
+    CHECK_EQUAL(1, desc->get_num_unique_values(0));
+    table.add_empty_row();
+    CHECK_EQUAL("", table.get_string(0, 128));
+}
 
 #endif // TEST_TABLE

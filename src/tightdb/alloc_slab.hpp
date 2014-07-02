@@ -275,7 +275,7 @@ private:
     char* m_data;
     AttachMode m_attach_mode;
 
-    /// If a file of buffer is currently attached and validation was
+    /// If a file or buffer is currently attached and validation was
     /// not skipped during attachement, this flag is true if, and only
     /// if the attached file has a footer specifying the top-ref, that
     /// is, if the file is on the streaming form. This member is

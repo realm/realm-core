@@ -5,6 +5,7 @@
 #include <tightdb.hpp>
 
 #include "../util/timer.hpp"
+#include "../util/random.hpp"
 #include "../util/benchmark_results.hpp"
 
 using namespace std;
@@ -69,17 +70,18 @@ int main()
         random_insert_order.push_back(rand() % (i+1));
         random_erase_order.push_back(rand() % (target_size-i));
     }
-    random_shuffle(random_order.begin(), random_order.end());
+    Random random;
+    random.shuffle(random_order.begin(), random_order.end());
 
     IntTable tables_1[num_tables], tables_2[num_tables];
 
     int_fast64_t dummy = 0;
 
     int max_lead_text_size = 26;
-    test_util::BenchmarkResults results(max_lead_text_size);
+    BenchmarkResults results(max_lead_text_size);
 
-    test_util::Timer timer_total(test_util::Timer::type_UserTime);
-    test_util::Timer timer(test_util::Timer::type_UserTime);
+    Timer timer_total(Timer::type_UserTime);
+    Timer timer(Timer::type_UserTime);
     {
         timer.reset();
         for (int i = 0; i != num_tables; ++i)

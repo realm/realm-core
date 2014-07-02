@@ -3,47 +3,74 @@
 
 #include <limits>
 
+#include <tightdb/util/unique_ptr.hpp>
 #include <tightdb/column_mixed.hpp>
 
-#include "util/unit_test.hpp"
-#include "util/test_only.hpp"
+#include "test.hpp"
 
 using namespace std;
 using namespace tightdb;
+using namespace tightdb::util;
 
-// Note: You can now temporarely declare unit tests with the ONLY(TestName) macro instead of TEST(TestName). This
-// will disable all unit tests except these. Remember to undo your temporary changes before committing.
+
+// Test independence and thread-safety
+// -----------------------------------
+//
+// All tests must be thread safe and independent of each other. This
+// is required because it allows for both shuffling of the execution
+// order and for parallelized testing.
+//
+// In particular, avoid using std::rand() since it is not guaranteed
+// to be thread safe. Instead use the API offered in
+// `test/util/random.hpp`.
+//
+// All files created in tests must use the TEST_PATH macro (or one of
+// its friends) to obtain a suitable file system path. See
+// `test/util/test_path.hpp`.
+//
+//
+// Debugging and the ONLY() macro
+// ------------------------------
+//
+// A simple way of disabling all tests except one called `Foo`, is to
+// replace TEST(Foo) with ONLY(Foo) and then recompile and rerun the
+// test suite. Note that you can also use filtering by setting the
+// environment varible `UNITTEST_FILTER`. See `README.md` for more on
+// this.
+//
+// Another way to debug a particular test, is to copy that test into
+// `experiments/testcase.cpp` and then run `sh build.sh
+// check-testcase` (or one of its friends) from the command line.
+
 
 TEST(ColumnMixed_Int)
 {
     ColumnMixed c;
-    int64_t maxval = numeric_limits<int64_t>::max();
-    int64_t minval = numeric_limits<int64_t>::min();
-    int64_t allbit = 0xFFFFFFFFFFFFFFFFULL; // FIXME: Undefined cast from unsigned to signed
+    int64_t max_val = numeric_limits<int64_t>::max();
+    int64_t min_val = numeric_limits<int64_t>::min();
+    int64_t all_bit = 0xFFFFFFFFFFFFFFFFULL; // FIXME: Undefined cast from unsigned to signed
 
-    c.insert_int(0,     2);
-    c.insert_int(1, minval);
-    c.insert_int(2, maxval);
-    c.insert_int(3, allbit);
+    c.insert_int(0,       2);
+    c.insert_int(1, min_val);
+    c.insert_int(2, max_val);
+    c.insert_int(3, all_bit);
     CHECK_EQUAL(4, c.size());
 
-    for (size_t i = 0; i < c.size(); ++i) {
+    for (size_t i = 0; i < c.size(); ++i)
         CHECK_EQUAL(type_Int, c.get_type(i));
-    }
 
-    CHECK_EQUAL(     2, c.get_int(0));
-    CHECK_EQUAL(minval, c.get_int(1));
-    CHECK_EQUAL(maxval, c.get_int(2));
-    CHECK_EQUAL(allbit, c.get_int(3));
+    CHECK_EQUAL(      2, c.get_int(0));
+    CHECK_EQUAL(min_val, c.get_int(1));
+    CHECK_EQUAL(max_val, c.get_int(2));
+    CHECK_EQUAL(all_bit, c.get_int(3));
 
     c.set_int(0,    400);
     c.set_int(1,      0);
     c.set_int(2, -99999);
     c.set_int(3,      1);
 
-    for (size_t i = 0; i < c.size(); ++i) {
+    for (size_t i = 0; i < c.size(); ++i)
         CHECK_EQUAL(type_Int, c.get_type(i));
-    }
 
     CHECK_EQUAL(   400, c.get_int(0));
     CHECK_EQUAL(     0, c.get_int(1));
@@ -61,8 +88,9 @@ TEST(ColumnMixed_Float)
 
     uint32_t v = 0xFFFFFFFF;
     float f = float(v);
-    float fval1[] = {0.0f, 100.123f, -111.222f, f};
-    float fval2[] = {-0.0f, -100.123f, numeric_limits<float>::max(), numeric_limits<float>::min()};
+    float fval1[] = { 0.0f, 100.123f, -111.222f, f };
+    float fval2[] = { -0.0f, -100.123f, numeric_limits<float>::max(),
+                      numeric_limits<float>::min() };
 
     // Test insert
     for (size_t i=0; i<4; ++i)
@@ -71,7 +99,7 @@ TEST(ColumnMixed_Float)
 
     for (size_t i = 0; i < c.size(); ++i) {
         CHECK_EQUAL(type_Float, c.get_type(i));
-        CHECK_EQUAL( fval1[i], c.get_float(i));
+        CHECK_EQUAL(fval1[i], c.get_float(i));
     }
 
     // Set to new values - ensure sign is changed
@@ -80,7 +108,7 @@ TEST(ColumnMixed_Float)
 
     for (size_t i = 0; i < c.size(); ++i) {
         CHECK_EQUAL(type_Float, c.get_type(i));
-        CHECK_EQUAL( fval2[i], c.get_float(i));
+        CHECK_EQUAL(fval2[i], c.get_float(i));
     }
     CHECK_EQUAL(4, c.size());
 
@@ -98,15 +126,14 @@ TEST(ColumnMixed_Double)
     double fval2[] = {-1.0, -100.123, numeric_limits<double>::max(), numeric_limits<double>::min()};
 
     // Test insert
-    for (size_t i=0; i<4; ++i) {
+    for (size_t i=0; i<4; ++i)
         c.insert_double(i, fval1[i]);
-    }
     CHECK_EQUAL(4, c.size());
 
     for (size_t i = 0; i < c.size(); ++i) {
         CHECK_EQUAL(type_Double, c.get_type(i));
         double v = c.get_double(i);
-        CHECK_EQUAL( fval1[i], v);
+        CHECK_EQUAL(fval1[i], v);
     }
 
     // Set to new values - ensure sign is changed
@@ -116,11 +143,12 @@ TEST(ColumnMixed_Double)
     CHECK_EQUAL(4, c.size());
     for (size_t i = 0; i < c.size(); ++i) {
         CHECK_EQUAL(type_Double, c.get_type(i));
-        CHECK_EQUAL( fval2[i], c.get_double(i));
+        CHECK_EQUAL(fval2[i], c.get_double(i));
     }
 
     c.destroy();
 }
+
 
 TEST(ColumnMixed_Bool)
 {
@@ -131,9 +159,8 @@ TEST(ColumnMixed_Bool)
     c.insert_bool(2, true);
     CHECK_EQUAL(3, c.size());
 
-    for (size_t i = 0; i < c.size(); ++i) {
+    for (size_t i = 0; i < c.size(); ++i)
         CHECK_EQUAL(type_Bool, c.get_type(i));
-    }
 
     CHECK_EQUAL(true,  c.get_bool(0));
     CHECK_EQUAL(false, c.get_bool(1));
@@ -144,9 +171,8 @@ TEST(ColumnMixed_Bool)
     c.set_bool(2, false);
     CHECK_EQUAL(3, c.size());
 
-    for (size_t i = 0; i < c.size(); ++i) {
+    for (size_t i = 0; i < c.size(); ++i)
         CHECK_EQUAL(type_Bool, c.get_type(i));
-    }
 
     CHECK_EQUAL(false, c.get_bool(0));
     CHECK_EQUAL(true,  c.get_bool(1));
@@ -154,6 +180,7 @@ TEST(ColumnMixed_Bool)
 
     c.destroy();
 }
+
 
 TEST(ColumnMixed_Date)
 {
@@ -164,9 +191,8 @@ TEST(ColumnMixed_Date)
     c.insert_datetime(2, 20000);
     CHECK_EQUAL(3, c.size());
 
-    for (size_t i = 0; i < c.size(); ++i) {
+    for (size_t i = 0; i < c.size(); ++i)
         CHECK_EQUAL(type_DateTime, c.get_type(i));
-    }
 
     CHECK_EQUAL(    2, c.get_datetime(0));
     CHECK_EQUAL(  100, c.get_datetime(1));
@@ -176,9 +202,8 @@ TEST(ColumnMixed_Date)
     c.set_datetime(1,     0);
     c.set_datetime(2, 99999);
 
-    for (size_t i = 0; i < c.size(); ++i) {
+    for (size_t i = 0; i < c.size(); ++i)
         CHECK_EQUAL(type_DateTime, c.get_type(i));
-    }
 
     CHECK_EQUAL(  400, c.get_datetime(0));
     CHECK_EQUAL(    0, c.get_datetime(1));
@@ -187,6 +212,7 @@ TEST(ColumnMixed_Date)
 
     c.destroy();
 }
+
 
 TEST(ColumnMixed_String)
 {
@@ -197,9 +223,8 @@ TEST(ColumnMixed_String)
     c.insert_string(2, "ccccccc");
     CHECK_EQUAL(3, c.size());
 
-    for (size_t i = 0; i < c.size(); ++i) {
+    for (size_t i = 0; i < c.size(); ++i)
         CHECK_EQUAL(type_String, c.get_type(i));
-    }
 
     CHECK_EQUAL("aaa",     c.get_string(0));
     CHECK_EQUAL("bbbbb",   c.get_string(1));
@@ -210,9 +235,8 @@ TEST(ColumnMixed_String)
     c.set_string(2, "eeeeeeeee");
     CHECK_EQUAL(3, c.size());
 
-    for (size_t i = 0; i < c.size(); ++i) {
+    for (size_t i = 0; i < c.size(); ++i)
         CHECK_EQUAL(type_String, c.get_type(i));
-    }
 
     CHECK_EQUAL("dd",        c.get_string(0));
     CHECK_EQUAL("",          c.get_string(1));
@@ -220,6 +244,7 @@ TEST(ColumnMixed_String)
 
     c.destroy();
 }
+
 
 TEST(ColumnMixed_Binary)
 {
@@ -230,9 +255,8 @@ TEST(ColumnMixed_Binary)
     c.insert_binary(2, BinaryData("ccccccc", 8));
     CHECK_EQUAL(3, c.size());
 
-    for (size_t i = 0; i < c.size(); ++i) {
+    for (size_t i = 0; i < c.size(); ++i)
         CHECK_EQUAL(type_Binary, c.get_type(i));
-    }
 
     CHECK_EQUAL("aaa",     c.get_binary(0).data());
     CHECK_EQUAL("bbbbb",   c.get_binary(1).data());
@@ -243,9 +267,8 @@ TEST(ColumnMixed_Binary)
     c.set_binary(2, BinaryData("eeeeeeeee", 10));
     CHECK_EQUAL(3, c.size());
 
-    for (size_t i = 0; i < c.size(); ++i) {
+    for (size_t i = 0; i < c.size(); ++i)
         CHECK_EQUAL(type_Binary, c.get_type(i));
-    }
 
     CHECK_EQUAL("dd",        c.get_binary(0).data());
     CHECK_EQUAL("",          c.get_binary(1).data());
@@ -253,6 +276,7 @@ TEST(ColumnMixed_Binary)
 
     c.destroy();
 }
+
 
 TEST(ColumnMixed_Table)
 {
@@ -262,19 +286,17 @@ TEST(ColumnMixed_Table)
     c.insert_subtable(1, 0);
     CHECK_EQUAL(2, c.size());
 
-    for (size_t i = 0; i < c.size(); ++i) {
+    for (size_t i = 0; i < c.size(); ++i)
         CHECK_EQUAL(type_Table, c.get_type(i));
-    }
 
-    Table* const t1 = c.get_subtable_ptr(0);
-    Table* const t2 = c.get_subtable_ptr(1);
+    UniquePtr<Table> t1(c.get_subtable_ptr(0));
+    UniquePtr<Table> t2(c.get_subtable_ptr(1));
     CHECK(t1->is_empty());
     CHECK(t2->is_empty());
-    delete t1;
-    delete t2;
 
     c.destroy();
 }
+
 
 TEST(ColumnMixed_Mixed)
 {
@@ -285,7 +307,7 @@ TEST(ColumnMixed_Mixed)
     c.insert_bool(0, false);
     c.insert_datetime(0, 23423);
     c.insert_string(0, "Hello");
-    c.insert_binary(0, BinaryData("binary", 7));
+    c.insert_binary(0, BinaryData("binary"));
     c.insert_subtable(0, 0);
     c.insert_float(0, 1.124f);
     c.insert_double(0, 1234.124);
@@ -305,7 +327,7 @@ TEST(ColumnMixed_Mixed)
     c.set_bool(1, false);
     c.set_datetime(2, 23423);
     c.set_string(3, "Hello");
-    c.set_binary(4, BinaryData("binary", 7));
+    c.set_binary(4, BinaryData("binary"));
     c.set_subtable(5, 0);
     c.set_float(6, 1.124f);
     c.set_double(7, 1234.124);
@@ -324,7 +346,7 @@ TEST(ColumnMixed_Mixed)
 }
 
 
-TEST(ColumnMixed_Subtable_Size)
+TEST(ColumnMixed_SubtableSize)
 {
     ColumnMixed c;
     c.insert_subtable(0, 0);
@@ -337,20 +359,20 @@ TEST(ColumnMixed_Subtable_Size)
     CHECK_EQUAL( 0, c.get_subtable_size(0));
 
     {    // Empty table (no columns)
-        TableRef const t1 = c.get_subtable_ptr(1)->get_table_ref();
+        TableRef t1 = c.get_subtable_ptr(1)->get_table_ref();
         CHECK(t1->is_empty());
         CHECK_EQUAL( 0, c.get_subtable_size(1));
     }
 
     {   // Empty table (1 column, no rows)
-        TableRef const t2 = c.get_subtable_ptr(2)->get_table_ref();
+        TableRef t2 = c.get_subtable_ptr(2)->get_table_ref();
         CHECK(t2->is_empty());
         t2->add_column(type_Int, "col1");
         CHECK_EQUAL( 0, c.get_subtable_size(2));
     }
-    
+
     {   // Table with rows
-        TableRef const t3 = c.get_subtable_ptr(3)->get_table_ref();
+        TableRef t3 = c.get_subtable_ptr(3)->get_table_ref();
         CHECK(t3->is_empty());
         t3->add_column(type_Int, "col1");
         t3->add_empty_row(10);
@@ -358,7 +380,7 @@ TEST(ColumnMixed_Subtable_Size)
     }
 
     {   // Table with mixed column first
-        TableRef const t4 = c.get_subtable_ptr(4)->get_table_ref();
+        TableRef t4 = c.get_subtable_ptr(4)->get_table_ref();
         CHECK(t4->is_empty());
         t4->add_column(type_Mixed, "col1");
         t4->add_empty_row(10);
@@ -369,5 +391,6 @@ TEST(ColumnMixed_Subtable_Size)
 
     c.destroy();
 }
+
 
 #endif // TEST_COLUMN_MIXED

@@ -6,15 +6,47 @@
 #include <map>
 #include <iostream>
 
+#include <tightdb/util/features.h>
 #include <tightdb/util/bind.hpp>
 #include <tightdb/util/thread.hpp>
 #include <tightdb/util/file.hpp>
+#include <tightdb/util/features.h>
 
-#include "util/unit_test.hpp"
-#include "util/test_only.hpp"
+#include "test.hpp"
 
 using namespace std;
 using namespace tightdb::util;
+
+
+// Test independence and thread-safety
+// -----------------------------------
+//
+// All tests must be thread safe and independent of each other. This
+// is required because it allows for both shuffling of the execution
+// order and for parallelized testing.
+//
+// In particular, avoid using std::rand() since it is not guaranteed
+// to be thread safe. Instead use the API offered in
+// `test/util/random.hpp`.
+//
+// All files created in tests must use the TEST_PATH macro (or one of
+// its friends) to obtain a suitable file system path. See
+// `test/util/test_path.hpp`.
+//
+//
+// Debugging and the ONLY() macro
+// ------------------------------
+//
+// A simple way of disabling all tests except one called `Foo`, is to
+// replace TEST(Foo) with ONLY(Foo) and then recompile and rerun the
+// test suite. Note that you can also use filtering by setting the
+// environment varible `UNITTEST_FILTER`. See `README.md` for more on
+// this.
+//
+// Another way to debug a particular test, is to copy that test into
+// `experiments/testcase.cpp` and then run `sh build.sh
+// check-testcase` (or one of its friends) from the command line.
+
 
 namespace {
 
@@ -56,9 +88,9 @@ void master()
     }
 }
 
-void slave(int ndx)
+void slave(int ndx, string path)
 {
-    File file("test_file_locks.test", File::mode_Write);
+    File file(path, File::mode_Write);
     for (int i = 0; i != num_rounds; ++i) {
         bool good_lock = file.try_lock_exclusive();
         if (good_lock)
@@ -78,6 +110,7 @@ void slave(int ndx)
 
 } // anonymous namespace
 
+#ifndef TIGHTDB_IOS
 
 // The assumption is that if multiple processes try to place an
 // exclusive lock on a file in a non-blocking fashion, then at least
@@ -87,16 +120,16 @@ void slave(int ndx)
 // test, but it is probably the best we can do.
 TEST(File_NoSpuriousTryLockFailures)
 {
+    TEST_PATH(path);
+
     Thread slaves[num_slaves];
     for (int i = 0; i != num_slaves; ++i) {
         slaves_run[i] = false;
-        slaves[i].start(bind(&slave, i));
+        slaves[i].start(bind(&slave, i, string(path)));
     }
     master();
     for (int i = 0; i != num_slaves; ++i)
         slaves[i].join();
-
-    File::try_remove("test_file_locks.test");
 
 /*
     typedef map<int, int>::const_iterator iter;
@@ -108,5 +141,7 @@ TEST(File_NoSpuriousTryLockFailures)
     // Check that there are no cases where no one got the lock
     CHECK_EQUAL(0, results[0]);
 }
+
+#endif // TIGHTDB_IOS
 
 #endif // TEST_FILE_LOCKS

@@ -171,14 +171,15 @@ StringIndex& AdaptiveStringColumn::create_index()
     TIGHTDB_ASSERT(!m_index);
 
     // Create new index
-    m_index = new StringIndex(this, &get_string, m_array->get_alloc());
+    m_index = new StringIndex(this, &get_string, m_array->get_alloc()); // Throws
 
     // Populate the index
-    size_t n = size();
-    for (size_t i = 0; i != n; ++i) {
-        StringData value = get(i);
-        bool is_last = true;
-        m_index->insert(i, value, is_last);
+    size_t num_rows = size();
+    for (size_t row_ndx = 0; row_ndx != num_rows; ++row_ndx) {
+        StringData value = get(row_ndx);
+        size_t num_rows = 1;
+        bool is_append = true;
+        m_index->insert(row_ndx, value, num_rows, is_append); // Throws
     }
 
     return *m_index;
@@ -188,7 +189,8 @@ StringIndex& AdaptiveStringColumn::create_index()
 void AdaptiveStringColumn::set_index_ref(ref_type ref, ArrayParent* parent, size_t ndx_in_parent)
 {
     TIGHTDB_ASSERT(!m_index);
-    m_index = new StringIndex(ref, parent, ndx_in_parent, this, &get_string, m_array->get_alloc());
+    m_index = new StringIndex(ref, parent, ndx_in_parent, this, &get_string,
+                              m_array->get_alloc()); // Throws
 }
 
 
@@ -464,7 +466,7 @@ void AdaptiveStringColumn::erase(size_t ndx, bool is_last)
 }
 
 
-void AdaptiveStringColumn::move_last_over(size_t ndx)
+void AdaptiveStringColumn::move_last_over(size_t target_row_ndx, size_t last_row_ndx)
 {
     // FIXME: ExceptionSafety: The current implementation of this
     // function is not exception-safe, and it is hard to see how to
@@ -478,24 +480,24 @@ void AdaptiveStringColumn::move_last_over(size_t ndx)
     // that avoids the intermediate copy. This approach is also likely
     // to be necesseray for exception safety.
 
-    TIGHTDB_ASSERT(ndx+1 < size());
+    TIGHTDB_ASSERT(target_row_ndx < last_row_ndx);
+    TIGHTDB_ASSERT(last_row_ndx + 1 == size());
 
-    size_t last_ndx = size() - 1;
-    StringData value = get(last_ndx);
+    StringData value = get(last_row_ndx);
 
     // Copying string data from a column to itself requires an
     // intermediate copy of the data (constr:bptree-copy-to-self).
-    UniquePtr<char[]> buffer(new char[value.size()]);
+    UniquePtr<char[]> buffer(new char[value.size()]); // Throws
     copy(value.data(), value.data()+value.size(), buffer.get());
     StringData copy_of_value(buffer.get(), value.size());
 
     if (m_index) {
         // remove the value to be overwritten from index
-        StringData old_target_val = get(ndx);
-        m_index->erase(ndx, old_target_val, true);
+        StringData old_target_val = get(target_row_ndx);
+        m_index->erase(target_row_ndx, old_target_val, true); // Throws
 
         // update index to point to new location
-        m_index->update_ref(copy_of_value, last_ndx, ndx);
+        m_index->update_ref(copy_of_value, last_row_ndx, target_row_ndx); // Throws
     }
 
     bool root_is_leaf = !m_array->is_inner_bptree_node();
@@ -504,30 +506,30 @@ void AdaptiveStringColumn::move_last_over(size_t ndx)
         if (!long_strings) {
             // Small strings root leaf
             ArrayString* leaf = static_cast<ArrayString*>(m_array);
-            leaf->set(ndx, copy_of_value); // Throws
-            leaf->erase(last_ndx); // Throws
+            leaf->set(target_row_ndx, copy_of_value); // Throws
+            leaf->erase(last_row_ndx); // Throws
             return;
         }
         bool is_big = m_array->get_context_flag();
         if (!is_big) {
             // Medium strings root leaf
             ArrayStringLong* leaf = static_cast<ArrayStringLong*>(m_array);
-            leaf->set(ndx, copy_of_value); // Throws
-            leaf->erase(last_ndx); // Throws
+            leaf->set(target_row_ndx, copy_of_value); // Throws
+            leaf->erase(last_row_ndx); // Throws
             return;
         }
         // Big strings root leaf
         ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array);
-        leaf->set_string(ndx, copy_of_value); // Throws
-        leaf->erase(last_ndx); // Throws
+        leaf->set_string(target_row_ndx, copy_of_value); // Throws
+        leaf->erase(last_row_ndx); // Throws
         return;
     }
 
     // Non-leaf root
     SetLeafElem set_leaf_elem(m_array->get_alloc(), copy_of_value);
-    m_array->update_bptree_elem(ndx, set_leaf_elem); // Throws
+    m_array->update_bptree_elem(target_row_ndx, set_leaf_elem); // Throws
     EraseLeafElem erase_leaf_elem(*this);
-    Array::erase_bptree_elem(m_array, npos, erase_leaf_elem); // Throws
+    Array::erase_bptree_elem(m_array, tightdb::npos, erase_leaf_elem); // Throws
 }
 
 
@@ -674,7 +676,7 @@ size_t AdaptiveStringColumn::find_first(StringData value, size_t begin, size_t e
 }
 
 
-void AdaptiveStringColumn::find_all(Array& result, StringData value, size_t begin, size_t end) const
+void AdaptiveStringColumn::find_all(Column& result, StringData value, size_t begin, size_t end) const
 {
     TIGHTDB_ASSERT(begin <= size());
     TIGHTDB_ASSERT(end == npos || (begin <= end && end <= size()));
@@ -880,57 +882,76 @@ bool AdaptiveStringColumn::compare_string(const AdaptiveStringColumn& c) const
 }
 
 
-void AdaptiveStringColumn::do_insert(size_t ndx, StringData value)
+void AdaptiveStringColumn::do_insert(size_t row_ndx, StringData value, size_t num_rows)
 {
-    TIGHTDB_ASSERT(ndx == npos || ndx < size());
+    bptree_insert(row_ndx, value, num_rows); // Throws
+
+    if (m_index) {
+        bool is_append = row_ndx == tightdb::npos;
+        size_t row_ndx_2 = is_append ? size() - num_rows : row_ndx;
+        m_index->insert(row_ndx_2, value, num_rows, is_append); // Throws
+    }
+}
+
+
+void AdaptiveStringColumn::do_insert(size_t row_ndx, StringData value, size_t num_rows, bool is_append)
+{
+    size_t row_ndx_2 = is_append ? tightdb::npos : row_ndx;
+    bptree_insert(row_ndx_2, value, num_rows); // Throws
+
+    if (m_index)
+        m_index->insert(row_ndx, value, num_rows, is_append); // Throws
+}
+
+
+void AdaptiveStringColumn::bptree_insert(size_t row_ndx, StringData value, size_t num_rows)
+{
+    TIGHTDB_ASSERT(row_ndx == tightdb::npos || row_ndx < size());
     ref_type new_sibling_ref;
     Array::TreeInsert<AdaptiveStringColumn> state;
-    if (root_is_leaf()) {
-        TIGHTDB_ASSERT(ndx == npos || ndx < TIGHTDB_MAX_LIST_SIZE);
-        LeafType leaf_type = upgrade_root_leaf(value.size()); // Throws
-        switch (leaf_type) {
-            case leaf_type_Small: {
-                // Small strings root leaf
-                ArrayString* leaf = static_cast<ArrayString*>(m_array);
-                new_sibling_ref = leaf->bptree_leaf_insert(ndx, value, state); // Throws
-                goto insert_done;
+    for (size_t i = 0; i != num_rows; ++i) {
+        size_t row_ndx_2 = row_ndx == tightdb::npos ? tightdb::npos : row_ndx + i;
+        if (root_is_leaf()) {
+            TIGHTDB_ASSERT(row_ndx_2 == tightdb::npos || row_ndx_2 < TIGHTDB_MAX_LIST_SIZE);
+            LeafType leaf_type = upgrade_root_leaf(value.size()); // Throws
+            switch (leaf_type) {
+                case leaf_type_Small: {
+                    // Small strings root leaf
+                    ArrayString* leaf = static_cast<ArrayString*>(m_array);
+                    new_sibling_ref = leaf->bptree_leaf_insert(row_ndx_2, value, state); // Throws
+                    goto insert_done;
+                }
+                case leaf_type_Medium: {
+                    // Medium strings root leaf
+                    ArrayStringLong* leaf = static_cast<ArrayStringLong*>(m_array);
+                    new_sibling_ref = leaf->bptree_leaf_insert(row_ndx_2, value, state); // Throws
+                    goto insert_done;
+                }
+                case leaf_type_Big: {
+                    // Big strings root leaf
+                    ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array);
+                    new_sibling_ref =
+                        leaf->bptree_leaf_insert_string(row_ndx_2, value, state); // Throws
+                    goto insert_done;
+                }
             }
-            case leaf_type_Medium: {
-                // Medium strings root leaf
-                ArrayStringLong* leaf = static_cast<ArrayStringLong*>(m_array);
-                new_sibling_ref = leaf->bptree_leaf_insert(ndx, value, state); // Throws
-                goto insert_done;
-            }
-            case leaf_type_Big: {
-                // Big strings root leaf
-                ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array);
-                new_sibling_ref = leaf->bptree_leaf_insert_string(ndx, value, state); // Throws
-                goto insert_done;
-            }
+            TIGHTDB_ASSERT(false);
         }
-        TIGHTDB_ASSERT(false);
-    }
 
-    // Non-leaf root
-    state.m_value = value;
-    if (ndx == npos) {
-        new_sibling_ref = m_array->bptree_append(state); // Throws
-    }
-    else {
-        new_sibling_ref = m_array->bptree_insert(ndx, state); // Throws
-    }
+        // Non-leaf root
+        state.m_value = value;
+        if (row_ndx_2 == tightdb::npos) {
+            new_sibling_ref = m_array->bptree_append(state); // Throws
+        }
+        else {
+            new_sibling_ref = m_array->bptree_insert(row_ndx_2, state); // Throws
+        }
 
-  insert_done:
-    if (TIGHTDB_UNLIKELY(new_sibling_ref)) {
-        bool is_append = ndx == npos;
-        introduce_new_root(new_sibling_ref, state, is_append); // Throws
-    }
-
-    // Update index
-    if (m_index) {
-        bool is_last = ndx == npos;
-        size_t real_ndx = is_last ? size()-1 : ndx;
-        m_index->insert(real_ndx, value, is_last); // Throws
+      insert_done:
+        if (TIGHTDB_UNLIKELY(new_sibling_ref)) {
+            bool is_append = row_ndx_2 == tightdb::npos;
+            introduce_new_root(new_sibling_ref, state, is_append); // Throws
+        }
     }
 }
 
@@ -1158,6 +1179,129 @@ ref_type AdaptiveStringColumn::write(size_t slice_offset, size_t slice_size,
 }
 
 
+void AdaptiveStringColumn::update_column_index(size_t new_col_ndx, const Spec& spec)
+    TIGHTDB_NOEXCEPT
+{
+    ColumnBase::update_column_index(new_col_ndx, spec);
+    if (m_index) {
+        size_t ndx_in_parent = m_array->get_ndx_in_parent();
+        m_index->get_root_array()->set_ndx_in_parent(ndx_in_parent + 1);
+    }
+}
+
+
+void AdaptiveStringColumn::refresh_accessor_tree(size_t col_ndx, const Spec& spec)
+{
+    refresh_root_accessor(); // Throws
+
+    // Refresh search index
+    if (m_index) {
+        size_t ndx_in_parent = m_array->get_ndx_in_parent();
+        m_index->get_root_array()->set_ndx_in_parent(ndx_in_parent + 1);
+        m_index->refresh_accessor_tree(col_ndx, spec); // Throws
+    }
+}
+
+
+void AdaptiveStringColumn::refresh_root_accessor()
+{
+    // The type of the cached root array accessor may no longer match the
+    // underlying root node. In that case we need to replace it. Note that when
+    // the root node is an inner B+-tree node, then only the top array accessor
+    // of that node is cached. The top array accessor of an inner B+-tree node
+    // is of type Array.
+
+    ref_type root_ref = m_array->get_ref_from_parent();
+    MemRef root_mem(root_ref, m_array->get_alloc());
+    bool new_root_is_leaf   = !Array::get_is_inner_bptree_node_from_header(root_mem.m_addr);
+    bool new_root_is_small  = !Array::get_hasrefs_from_header(root_mem.m_addr);
+    bool new_root_is_medium = !Array::get_context_flag_from_header(root_mem.m_addr);
+    bool old_root_is_leaf   = !m_array->is_inner_bptree_node();
+    bool old_root_is_small  = !m_array->has_refs();
+    bool old_root_is_medium = !m_array->get_context_flag();
+
+    bool root_type_changed = old_root_is_leaf != new_root_is_leaf ||
+        (old_root_is_leaf && (old_root_is_small != new_root_is_small ||
+                              (!old_root_is_small && old_root_is_medium != new_root_is_medium)));
+    if (!root_type_changed) {
+        // Keep, but refresh old root accessor
+        if (old_root_is_leaf) {
+            if (old_root_is_small) {
+                // Root is 'small strings' leaf
+                ArrayString* root = static_cast<ArrayString*>(m_array);
+                root->init_from_parent();
+                return;
+            }
+            if (old_root_is_medium) {
+                // Root is 'medium strings' leaf
+                ArrayStringLong* root = static_cast<ArrayStringLong*>(m_array);
+                root->init_from_parent();
+                return;
+            }
+            // Root is 'big strings' leaf
+            ArrayBigBlobs* root = static_cast<ArrayBigBlobs*>(m_array);
+            root->init_from_parent();
+            return;
+        }
+        // Root is inner node
+        Array* root = m_array;
+        root->init_from_parent();
+        return;
+    }
+
+    // Create new root accessor
+    Array* new_root;
+    ArrayParent* parent = m_array->get_parent();
+    size_t ndx_in_parent = m_array->get_ndx_in_parent();
+    Allocator& alloc = m_array->get_alloc();
+    if (new_root_is_leaf) {
+        if (new_root_is_small) {
+            // New root is 'small strings' leaf
+            new_root = new ArrayString(root_mem, parent, ndx_in_parent, alloc); // Throws
+        }
+        else if (new_root_is_medium) {
+            // New root is 'medium strings' leaf
+            new_root = new ArrayStringLong(root_mem, parent, ndx_in_parent, alloc); // Throws
+        }
+        else {
+            // New root is 'big strings' leaf
+            new_root = new ArrayBigBlobs(root_mem, parent, ndx_in_parent, alloc); // Throws
+        }
+    }
+    else {
+        // New root is inner node
+        new_root = new Array(root_mem, parent, ndx_in_parent, alloc); // Throws
+    }
+
+    // Destroy old root accessor
+    if (old_root_is_leaf) {
+        if (old_root_is_small) {
+            // Old root is 'small strings' leaf
+            ArrayString* old_root = static_cast<ArrayString*>(m_array);
+            delete old_root;
+        }
+        else if (old_root_is_medium) {
+            // Old root is 'medium strings' leaf
+            ArrayStringLong* old_root = static_cast<ArrayStringLong*>(m_array);
+            delete old_root;
+        }
+        else {
+            // Old root is 'big strings' leaf
+            ArrayBigBlobs* old_root = static_cast<ArrayBigBlobs*>(m_array);
+            delete old_root;
+        }
+    }
+    else {
+        // Old root is inner node
+        Array* old_root = m_array;
+        delete old_root;
+    }
+
+    // Instate new root
+    m_array = new_root;
+}
+
+
 #ifdef TIGHTDB_DEBUG
 
 namespace {
@@ -1214,8 +1358,10 @@ void AdaptiveStringColumn::Verify() const
         m_array->verify_bptree(&verify_leaf);
     }
 
-    if (m_index)
+    if (m_index) {
+        m_index->Verify();
         m_index->verify_entries(*this);
+    }
 }
 
 

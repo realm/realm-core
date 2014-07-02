@@ -104,7 +104,7 @@ public:
     T* operator->() const TIGHTDB_NOEXCEPT { return m_ptr; }
 
 #ifdef TIGHTDB_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
-    explicit operator bool() const TIGHTDB_NOEXCEPT { return m_ptr; }
+    explicit operator bool() const TIGHTDB_NOEXCEPT { return m_ptr != 0; }
 #else
     typedef T* bind_ptr::*unspecified_bool_type;
     operator unspecified_bool_type() const TIGHTDB_NOEXCEPT { return m_ptr ? &bind_ptr::m_ptr : 0; }

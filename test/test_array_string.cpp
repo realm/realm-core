@@ -4,29 +4,46 @@
 #include <tightdb/array_string.hpp>
 #include <tightdb/column.hpp>
 
-#include "util/unit_test.hpp"
-#include "util/test_only.hpp"
+#include "test.hpp"
 
 using namespace tightdb;
 
-// Note: You can now temporarely declare unit tests with the ONLY(TestName) macro instead of TEST(TestName). This
-// will disable all unit tests except these. Remember to undo your temporary changes before committing.
+
+// Test independence and thread-safety
+// -----------------------------------
+//
+// All tests must be thread safe and independent of each other. This
+// is required because it allows for both shuffling of the execution
+// order and for parallelized testing.
+//
+// In particular, avoid using std::rand() since it is not guaranteed
+// to be thread safe. Instead use the API offered in
+// `test/util/random.hpp`.
+//
+// All files created in tests must use the TEST_PATH macro (or one of
+// its friends) to obtain a suitable file system path. See
+// `test/util/test_path.hpp`.
+//
+//
+// Debugging and the ONLY() macro
+// ------------------------------
+//
+// A simple way of disabling all tests except one called `Foo`, is to
+// replace TEST(Foo) with ONLY(Foo) and then recompile and rerun the
+// test suite. Note that you can also use filtering by setting the
+// environment varible `UNITTEST_FILTER`. See `README.md` for more on
+// this.
+//
+// Another way to debug a particular test, is to copy that test into
+// `experiments/testcase.cpp` and then run `sh build.sh
+// check-testcase` (or one of its friends) from the command line.
 
 
-namespace {
-
-struct db_setup_string {
-    static ArrayString c;
-};
-
-ArrayString db_setup_string::c;
-
-} // anonnymous namespace
-
-
-TEST(ArrayString_MultiEmpty)
+TEST(ArrayString_Basic)
 {
-    ArrayString& c = db_setup_string::c;
+    ArrayString c;
+
+    // TEST(ArrayString_MultiEmpty)
 
     c.add("");
     c.add("");
@@ -42,11 +59,9 @@ TEST(ArrayString_MultiEmpty)
     CHECK_EQUAL("", c.get(3));
     CHECK_EQUAL("", c.get(4));
     CHECK_EQUAL("", c.get(5));
-}
 
-TEST(ArrayString_SetEmpty1)
-{
-    ArrayString& c = db_setup_string::c;
+
+    // TEST(ArrayString_SetEmpty1)
 
     c.set(0, "");
 
@@ -57,28 +72,23 @@ TEST(ArrayString_SetEmpty1)
     CHECK_EQUAL("", c.get(3));
     CHECK_EQUAL("", c.get(4));
     CHECK_EQUAL("", c.get(5));
-}
 
-TEST(ArrayString_Erase0)
-{
-    ArrayString& c = db_setup_string::c;
+
+    // TEST(ArrayString_Erase0)
+
     c.erase(5);
-}
 
-TEST(ArrayString_Insert0)
-{
-    ArrayString& c = db_setup_string::c;
+
+    // TEST(ArrayString_Insert0)
 
     // Intention: Insert a non-empty string into an array that is not
     // empty but contains only empty strings (and only ever have
     // contained empty strings). The insertion is not at the end of
     // the array.
     c.insert(0, "x");
-}
 
-TEST(ArrayString_SetEmpty2)
-{
-    ArrayString& c = db_setup_string::c;
+
+    // TEST(ArrayString_SetEmpty2)
 
     c.set(0, "");
     c.set(5, "");
@@ -90,11 +100,10 @@ TEST(ArrayString_SetEmpty2)
     CHECK_EQUAL("", c.get(3));
     CHECK_EQUAL("", c.get(4));
     CHECK_EQUAL("", c.get(5));
-}
 
-TEST(ArrayString_Clear)
-{
-    ArrayString& c = db_setup_string::c;
+
+    // TEST(ArrayString_Clear)
+
     c.clear();
 
     c.add("");
@@ -111,11 +120,9 @@ TEST(ArrayString_Clear)
     CHECK_EQUAL("", c.get(3));
     CHECK_EQUAL("", c.get(4));
     CHECK_EQUAL("", c.get(5));
-}
 
-TEST(ArrayString_Find1)
-{
-    ArrayString& c = db_setup_string::c;
+
+    // TEST(ArrayString_Find1)
 
     CHECK_EQUAL(6, c.size());
     CHECK_EQUAL("", c.get(0));
@@ -126,11 +133,9 @@ TEST(ArrayString_Find1)
     CHECK_EQUAL(size_t(-1), c.find_first("x"));
     CHECK_EQUAL(5, c.find_first("", 5));
     CHECK_EQUAL(size_t(-1), c.find_first("", 6));
-}
 
-TEST(ArrayString_SetExpand4)
-{
-    ArrayString& c = db_setup_string::c;
+
+    // TEST(ArrayString_SetExpand4)
 
     c.set(0, "hey");
 
@@ -141,20 +146,16 @@ TEST(ArrayString_SetExpand4)
     CHECK_EQUAL("", c.get(3));
     CHECK_EQUAL("", c.get(4));
     CHECK_EQUAL("", c.get(5));
-}
 
-TEST(ArrayString_Find2)
-{
-    ArrayString& c = db_setup_string::c;
+
+    // TEST(ArrayString_Find2)
 
     // Intention: Search for non-empty string P that is not in then
     // array, but the array does contain a string where P is a prefix.
     CHECK_EQUAL(size_t(-1), c.find_first("he"));
-}
 
-TEST(ArrayString_SetExpand8)
-{
-    ArrayString& c = db_setup_string::c;
+
+    // TEST(ArrayString_SetExpand8)
 
     c.set(1, "test");
 
@@ -165,42 +166,35 @@ TEST(ArrayString_SetExpand8)
     CHECK_EQUAL("", c.get(3));
     CHECK_EQUAL("", c.get(4));
     CHECK_EQUAL("", c.get(5));
-}
 
-TEST(ArrayString_Add0)
-{
-    ArrayString& c = db_setup_string::c;
+
+    // TEST(ArrayString_Add0)
+
     c.clear();
 
     c.add();
     CHECK_EQUAL("", c.get(0));
     CHECK_EQUAL(1, c.size());
-}
 
-TEST(ArrayString_Add1)
-{
-    ArrayString& c = db_setup_string::c;
+
+    // TEST(ArrayString_Add1)
 
     c.add("a");
     CHECK_EQUAL("",  c.get(0));
     CHECK_EQUAL("a", c.get(1));
     CHECK_EQUAL(2, c.size());
-}
 
-TEST(ArrayString_Add2)
-{
-    ArrayString& c = db_setup_string::c;
+
+    // TEST(ArrayString_Add2)
 
     c.add("bb");
     CHECK_EQUAL("",   c.get(0));
     CHECK_EQUAL("a",  c.get(1));
     CHECK_EQUAL("bb", c.get(2));
     CHECK_EQUAL(3, c.size());
-}
 
-TEST(ArrayString_Add3)
-{
-    ArrayString& c = db_setup_string::c;
+
+    // TEST(ArrayString_Add3)
 
     c.add("ccc");
     CHECK_EQUAL("",    c.get(0));
@@ -208,11 +202,9 @@ TEST(ArrayString_Add3)
     CHECK_EQUAL("bb",  c.get(2));
     CHECK_EQUAL("ccc", c.get(3));
     CHECK_EQUAL(4, c.size());
-}
 
-TEST(ArrayString_Add4)
-{
-    ArrayString& c = db_setup_string::c;
+
+    // TEST(ArrayString_Add4)
 
     c.add("dddd");
     CHECK_EQUAL("",     c.get(0));
@@ -221,11 +213,9 @@ TEST(ArrayString_Add4)
     CHECK_EQUAL("ccc",  c.get(3));
     CHECK_EQUAL("dddd", c.get(4));
     CHECK_EQUAL(5, c.size());
-}
 
-TEST(ArrayString_Add8)
-{
-    ArrayString& c = db_setup_string::c;
+
+    // TEST(ArrayString_Add8)
 
     c.add("eeeeeeee");
     CHECK_EQUAL("",     c.get(0));
@@ -235,11 +225,9 @@ TEST(ArrayString_Add8)
     CHECK_EQUAL("dddd", c.get(4));
     CHECK_EQUAL("eeeeeeee", c.get(5));
     CHECK_EQUAL(6, c.size());
-}
 
-TEST(ArrayString_Add16)
-{
-    ArrayString& c = db_setup_string::c;
+
+    // TEST(ArrayString_Add16)
 
     c.add("ffffffffffffffff");
     CHECK_EQUAL("",     c.get(0));
@@ -250,11 +238,9 @@ TEST(ArrayString_Add16)
     CHECK_EQUAL("eeeeeeee", c.get(5));
     CHECK_EQUAL("ffffffffffffffff", c.get(6));
     CHECK_EQUAL(7, c.size());
-}
 
-TEST(ArrayString_Add32)
-{
-    ArrayString& c = db_setup_string::c;
+
+    // TEST(ArrayString_Add32)
 
     c.add("gggggggggggggggggggggggggggggggg");
 
@@ -267,11 +253,9 @@ TEST(ArrayString_Add32)
     CHECK_EQUAL("ffffffffffffffff", c.get(6));
     CHECK_EQUAL("gggggggggggggggggggggggggggggggg", c.get(7));
     CHECK_EQUAL(8, c.size());
-}
 
-TEST(ArrayString_Set1)
-{
-    ArrayString& c = db_setup_string::c;
+
+    // TEST(ArrayString_Set1)
 
     c.set(0, "ccc");
     c.set(1, "bb");
@@ -287,11 +271,9 @@ TEST(ArrayString_Set1)
     CHECK_EQUAL("ffffffffffffffff", c.get(6));
     CHECK_EQUAL("gggggggggggggggggggggggggggggggg", c.get(7));
     CHECK_EQUAL(8, c.size());
-}
 
-TEST(ArrayString_Insert1)
-{
-    ArrayString& c = db_setup_string::c;
+
+    // TEST(ArrayString_Insert1)
 
     // Insert in middle
     c.insert(4, "xx");
@@ -306,11 +288,9 @@ TEST(ArrayString_Insert1)
     CHECK_EQUAL("ffffffffffffffff", c.get(7));
     CHECK_EQUAL("gggggggggggggggggggggggggggggggg", c.get(8));
     CHECK_EQUAL(9, c.size());
-}
 
-TEST(ArrayString_Erase1)
-{
-    ArrayString& c = db_setup_string::c;
+
+    // TEST(ArrayString_Erase1)
 
     // Erase from end
     c.erase(8);
@@ -324,11 +304,9 @@ TEST(ArrayString_Erase1)
     CHECK_EQUAL("eeeeeeee", c.get(6));
     CHECK_EQUAL("ffffffffffffffff", c.get(7));
     CHECK_EQUAL(8, c.size());
-}
 
-TEST(ArrayString_Erase2)
-{
-    ArrayString& c = db_setup_string::c;
+
+    // TEST(ArrayString_Erase2)
 
     // Erase from top
     c.erase(0);
@@ -341,11 +319,9 @@ TEST(ArrayString_Erase2)
     CHECK_EQUAL("eeeeeeee", c.get(5));
     CHECK_EQUAL("ffffffffffffffff", c.get(6));
     CHECK_EQUAL(7, c.size());
-}
 
-TEST(ArrayString_Erase3)
-{
-    ArrayString& c = db_setup_string::c;
+
+    // TEST(ArrayString_Erase3)
 
     // Erase from middle
     c.erase(3);
@@ -357,11 +333,9 @@ TEST(ArrayString_Erase3)
     CHECK_EQUAL("eeeeeeee", c.get(4));
     CHECK_EQUAL("ffffffffffffffff", c.get(5));
     CHECK_EQUAL(6, c.size());
-}
 
-TEST(ArrayString_EraseAll)
-{
-    ArrayString& c = db_setup_string::c;
+
+    // TEST(ArrayString_EraseAll)
 
     // Erase all items one at a time
     c.erase(0);
@@ -373,11 +347,9 @@ TEST(ArrayString_EraseAll)
 
     CHECK(c.is_empty());
     CHECK_EQUAL(0, c.size());
-}
 
-TEST(ArrayString_Insert2)
-{
-    ArrayString& c = db_setup_string::c;
+
+    // TEST(ArrayString_Insert2)
 
     // Create new list
     c.clear();
@@ -395,11 +367,9 @@ TEST(ArrayString_Insert2)
     CHECK_EQUAL("c",     c.get(3));
     CHECK_EQUAL("d",     c.get(4));
     CHECK_EQUAL(5, c.size());
-}
 
-TEST(ArrayString_Insert3)
-{
-    ArrayString& c = db_setup_string::c;
+
+    // TEST(ArrayString_Insert3)
 
     // Insert in middle with expansion
     c.insert(3, "xxxxxxxxxx");
@@ -411,11 +381,9 @@ TEST(ArrayString_Insert3)
     CHECK_EQUAL("c",     c.get(4));
     CHECK_EQUAL("d",     c.get(5));
     CHECK_EQUAL(6, c.size());
-}
 
-TEST(ArrayString_Find3)
-{
-    ArrayString& c = db_setup_string::c;
+
+    // TEST(ArrayString_Find3)
 
     // Create new list
     c.clear();
@@ -425,69 +393,50 @@ TEST(ArrayString_Find3)
     c.add("d");
 
     // Search for last item (4 bytes width)
-    const size_t r = c.find_first("d");
+    CHECK_EQUAL(3, c.find_first("d"));
 
-    CHECK_EQUAL(3, r);
-}
 
-TEST(ArrayString_Find4)
-{
-    ArrayString& c = db_setup_string::c;
+    // TEST(ArrayString_Find4)
 
     // Expand to 8 bytes width
     c.add("eeeeee");
 
     // Search for last item
-    const size_t r = c.find_first("eeeeee");
+    CHECK_EQUAL(4, c.find_first("eeeeee"));
 
-    CHECK_EQUAL(4, r);
-}
 
-TEST(ArrayString_Find5)
-{
-    ArrayString& c = db_setup_string::c;
+    // TEST(ArrayString_Find5)
 
     // Expand to 16 bytes width
     c.add("ffffffffffff");
 
     // Search for last item
-    const size_t r = c.find_first("ffffffffffff");
+    CHECK_EQUAL(5, c.find_first("ffffffffffff"));
 
-    CHECK_EQUAL(5, r);
-}
 
-TEST(ArrayString_Find6)
-{
-    ArrayString& c = db_setup_string::c;
+    // TEST(ArrayString_Find6)
 
     // Expand to 32 bytes width
     c.add("gggggggggggggggggggggggg");
 
     // Search for last item
-    const size_t r = c.find_first("gggggggggggggggggggggggg");
+    CHECK_EQUAL(6, c.find_first("gggggggggggggggggggggggg"));
 
-    CHECK_EQUAL(6, r);
-}
 
-TEST(ArrayString_Find7)
-{
-    ArrayString& c = db_setup_string::c;
+    // TEST(ArrayString_Find7)
 
     // Expand to 64 bytes width
     c.add("hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh");
 
     // Search for last item
-    const size_t r = c.find_first("hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh");
+    CHECK_EQUAL(7, c.find_first("hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh"));
 
-    CHECK_EQUAL(7, r);
-}
 
-TEST(ArrayString_FindAll)
-{
-    ArrayString& c = db_setup_string::c;
+    // TEST(ArrayString_FindAll)
+
     c.clear();
 
-    Array col;
+    Column col;
 
     // first, middle and end
     c.add("foobar");
@@ -504,11 +453,10 @@ TEST(ArrayString_FindAll)
 
     // Cleanup
     col.destroy();
-}
 
-TEST(ArrayString_Count)
-{
-    ArrayString& c = db_setup_string::c;
+
+    // TEST(ArrayString_Count)
+
     c.clear();
 
     // first, middle and end
@@ -518,13 +466,11 @@ TEST(ArrayString_Count)
     c.add("baz");
     c.add("foobar");
 
-    const size_t count = c.count("foobar");
-    CHECK_EQUAL(3, count);
-}
+    CHECK_EQUAL(3, c.count("foobar"));
 
-TEST(ArrayString_WithZeroBytes)
-{
-    ArrayString& c = db_setup_string::c;
+
+    // TEST(ArrayString_WithZeroBytes)
+
     c.clear();
 
     const char buf_1[] = { 'a', 0, 'b', 0, 'c' };
@@ -542,15 +488,13 @@ TEST(ArrayString_WithZeroBytes)
     CHECK_EQUAL(StringData(buf_1, sizeof buf_1), c.get(0));
     CHECK_EQUAL(StringData(buf_2, sizeof buf_2), c.get(1));
     CHECK_EQUAL(StringData(buf_3, sizeof buf_3), c.get(2));
-}
 
-TEST(ArrayString_Destroy)
-{
-    ArrayString& c = db_setup_string::c;
 
-    // clean up (ALWAYS PUT THIS LAST)
+    // TEST(ArrayString_Destroy)
+
     c.destroy();
 }
+
 
 TEST(ArrayString_Compare)
 {
@@ -567,5 +511,6 @@ TEST(ArrayString_Compare)
     a.destroy();
     b.destroy();
 }
+
 
 #endif // TEST_ARRAY_STRING

@@ -23,10 +23,6 @@
 #include <tightdb/column.hpp>
 #include <tightdb/array_basic.hpp>
 
-//
-// A BasicColumn can currently only be used for simple unstructured types like float, double.
-//
-
 namespace tightdb {
 
 template<class T> struct AggReturnType {
@@ -37,6 +33,12 @@ template<> struct AggReturnType<float> {
 };
 
 
+/// A basic column (BasicColumn<T>) is a single B+-tree, and the root
+/// of the column is the root of the B+-tree. All leaf nodes are
+/// single arrays of type BasicArray<T>.
+///
+/// A basic column can currently only be used for simple unstructured
+/// types like float, double.
 template<class T>
 class BasicColumn: public ColumnBase {
 public:
@@ -51,15 +53,14 @@ public:
     bool is_empty() const TIGHTDB_NOEXCEPT { return size() == 0; }
 
     T get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
-    void add() TIGHTDB_OVERRIDE { add(0); }
-    void add(T value);
+    void add(T value = T());
     void set(std::size_t ndx, T value);
-    void insert(std::size_t ndx) TIGHTDB_OVERRIDE { insert(ndx, 0); }
-    void insert(std::size_t ndx, T value);
+    void insert(std::size_t ndx, T value = T());
+
+    void insert(std::size_t, std::size_t, bool) TIGHTDB_OVERRIDE;
     void erase(std::size_t ndx, bool is_last) TIGHTDB_OVERRIDE;
     void clear() TIGHTDB_OVERRIDE;
-    // Experimental. Overwrites the row at ndx with the last row and removes the last row. For unordered tables.
-    void move_last_over(std::size_t ndx) TIGHTDB_OVERRIDE;
+    void move_last_over(std::size_t, std::size_t) TIGHTDB_OVERRIDE;
 
     std::size_t count(T value) const;
 
@@ -73,7 +74,7 @@ public:
     T minimum(std::size_t begin = 0, std::size_t end = npos,
               std::size_t limit = std::size_t(-1)) const;
     std::size_t find_first(T value, std::size_t begin = 0 , std::size_t end = npos) const;
-    void find_all(Array& result, T value, std::size_t begin = 0, std::size_t end = npos) const;
+    void find_all(Column& result, T value, std::size_t begin = 0, std::size_t end = npos) const;
 
     //@{
     /// Find the lower/upper bound for the specified value assuming
@@ -91,6 +92,8 @@ public:
     ref_type write(std::size_t, std::size_t, std::size_t,
                    _impl::OutputStream&) const TIGHTDB_OVERRIDE;
 
+    void refresh_accessor_tree(std::size_t, const Spec&) TIGHTDB_OVERRIDE;
+
 #ifdef TIGHTDB_DEBUG
     void Verify() const TIGHTDB_OVERRIDE;
     void to_dot(std::ostream&, StringData title) const TIGHTDB_OVERRIDE;
@@ -101,7 +104,8 @@ public:
 private:
     std::size_t do_get_size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return size(); }
 
-    void do_insert(std::size_t ndx, T value);
+    /// \param row_ndx Must be `tightdb::npos` if appending.
+    void do_insert(std::size_t row_ndx, T value, std::size_t num_rows);
 
     // Called by Array::bptree_insert().
     static ref_type leaf_insert(MemRef leaf_mem, ArrayParent&, std::size_t ndx_in_parent,

@@ -28,6 +28,7 @@ Type conversion/promotion semantics is the same as in the C++ expressions, e.g f
 Grammar:
 -----------------------------------------------------------------------------------------------------------------------
     Expression:         Subexpr2<T>  Compare<Cond, T>  Subexpr2<T>
+                        operator! Expression
 
     Subexpr2<T>:        Value<T>
                         Columns<T>
@@ -125,9 +126,15 @@ Caveats, notes and todos
 // unit tests are indeed simple enough to fallback to old query_engine, query_expression gets low test coverage. Undef
 // flag to get higher query_expression test coverage. This is a good idea to try out each time you develop on/modify
 // query_expression.
+
 #define TIGHTDB_OLDQUERY_FALLBACK
 
 // namespace tightdb {
+
+template <class T> T minimum(T a, T b)
+{
+    return a < b ? a : b;
+}
 
 // FIXME, this needs to exist elsewhere
 typedef int64_t             Int;
@@ -136,6 +143,31 @@ typedef tightdb::DateTime   DateTime;
 typedef float               Float;
 typedef double              Double;
 typedef tightdb::StringData String;
+
+// Return StringData if either T or U is StringData, else return T. See description of usage in export2().
+template<class T, class U> struct EitherIsString
+{
+    typedef T type;
+};
+
+template<class T> struct EitherIsString<T, StringData>
+{
+    typedef StringData type;
+};
+
+// Hack to avoid template instantiation errors. See create(). Todo, see if we can simplify OnlyNumberic and
+// EitherIsString somehow
+template<class T> struct OnlyNumeric
+{
+    static T get(T in) { return in; }
+    typedef T type;
+};
+
+template<> struct OnlyNumeric<StringData>
+{
+    static int get(StringData in) { static_cast<void>(in); return 0; }
+    typedef StringData type;
+};
 
 
 template<class T>struct Plus {
@@ -183,25 +215,34 @@ template<class T1, class T2, bool b> struct Common<T1, T2, true , false, b> {
 };
 
 
+struct ValueBase
+{
+    static const size_t default_size = 8;
+    virtual void export_bool(ValueBase& destination) const = 0;
+    virtual void export_int(ValueBase& destination) const = 0;
+    virtual void export_float(ValueBase& destination) const = 0;
+    virtual void export_int64_t(ValueBase& destination) const = 0;
+    virtual void export_double(ValueBase& destination) const = 0;
+    virtual void export_StringData(ValueBase& destination) const = 0;
+    virtual void import(const ValueBase& destination) = 0;
+
+    // If true, all values in the class come from a link of a single field in the parent table (m_table). If
+    // false, then values come from successive rows of m_table (query operations are operated on in bulks for speed)
+    bool from_link;
+
+    // Number of values stored in the class.
+    size_t m_values;
+};
+
 class Expression : public Query
 {
 public:
     Expression() {}
 
     virtual size_t find_first(size_t start, size_t end) const = 0;
-    virtual void set_table(const Table* table) = 0;
+    virtual void set_table() = 0;
+    virtual const Table* get_table() = 0;
     virtual ~Expression() {}
-};
-
-class ValueBase
-{
-public:
-    static const size_t elements = 8;
-    virtual void export_int(ValueBase& destination) const = 0;
-    virtual void export_float(ValueBase& destination) const = 0;
-    virtual void export_int64_t(ValueBase& destination) const = 0;
-    virtual void export_double(ValueBase& destination) const = 0;
-    virtual void import(const ValueBase& destination) = 0;
 };
 
 class Subexpr
@@ -216,7 +257,7 @@ public:
     }
 
     // Recursively set table pointers for all Columns object in the expression tree. Used for late binding of table
-    virtual void set_table(const Table*) {}
+    virtual void set_table() {}
 
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression and
     // binds it to a Query at a later time
@@ -237,120 +278,11 @@ template <class oper, class TLeft = Subexpr, class TRight = Subexpr> class Opera
 template <class oper, class TLeft = Subexpr> class UnaryOperator;
 template <class TCond, class T, class TLeft = Subexpr, class TRight = Subexpr> class Compare;
 
-// Stores 8 values of type T. Can also exchange data with other ValueBase of different types
-template<class T> class Value : public ValueBase, public Subexpr2<T>
-{
-public:
-    Value() {}
-
-    Value(T v)
-    {
-        std::fill(m_v, m_v + ValueBase::elements, v);
-    }
-
-    void evaluate(size_t, ValueBase& destination)
-    {
-        destination.import(*this);
-    }
-
-    template <class TOperator> TIGHTDB_FORCEINLINE void fun(const Value* left, const Value* right)
-    {
-        TOperator o;
-        for (size_t t = 0; t < ValueBase::elements; t++)
-            m_v[t] = o(left->m_v[t], right->m_v[t]);
-    }
-
-    template <class TOperator> TIGHTDB_FORCEINLINE void fun(const Value* value)
-    {
-        TOperator o;
-        for (size_t t = 0; t < ValueBase::elements; t++)
-            m_v[t] = o(value->m_v[t]);
-    }
-
-    // Below import and export methods are for type conversion between float, double, int64_t, etc.
-    template<class D> TIGHTDB_FORCEINLINE void export2(ValueBase& destination) const
-    {
-        Value<D>& d = static_cast<Value<D>&>(destination);
-        for (size_t t = 0; t < ValueBase::elements; t++)
-            d.m_v[t] = static_cast<D>(m_v[t]);
-    }
-
-    TIGHTDB_FORCEINLINE void export_int64_t(ValueBase& destination) const
-    {
-        export2<int64_t>(destination);
-    }
-
-    TIGHTDB_FORCEINLINE void export_float(ValueBase& destination) const
-    {
-        export2<float>(destination);
-    }
-
-    TIGHTDB_FORCEINLINE void export_int(ValueBase& destination) const
-    {
-        export2<int>(destination);
-    }
-
-    TIGHTDB_FORCEINLINE void export_double(ValueBase& destination) const
-    {
-        export2<double>(destination);
-    }
-
-    TIGHTDB_FORCEINLINE void import(const ValueBase& source)
-    {
-        if (util::SameType<T, int>::value)
-            source.export_int(*this);
-        else if (util::SameType<T, float>::value)
-            source.export_float(*this);
-        else if (util::SameType<T, double>::value)
-            source.export_double(*this);
-        else if (util::SameType<T, int64_t>::value)
-            source.export_int64_t(*this);
-        else
-            TIGHTDB_ASSERT(false);
-    }
-
-    // Given a TCond (==, !=, >, <, >=, <=) and two Value<T>, return index of first match
-    template <class TCond> TIGHTDB_FORCEINLINE size_t static compare(Value<T>* left, Value<T>* right)
-    {
-        TCond c;
-
-        // 665 ms unrolled vs 698 for loop (vs2010)
-        if (c(left->m_v[0], right->m_v[0]))
-            return 0;
-        else if (c(left->m_v[1], right->m_v[1]))
-            return 1;
-        else if (c(left->m_v[2], right->m_v[2]))
-            return 2;
-        else if (c(left->m_v[3], right->m_v[3]))
-            return 3;
-        else if (c(left->m_v[4], right->m_v[4]))
-            return 4;
-        else if (c(left->m_v[5], right->m_v[5]))
-            return 5;
-        else if (c(left->m_v[6], right->m_v[6]))
-            return 6;
-        else if (c(left->m_v[7], right->m_v[7]))
-            return 7;
-
-        return ValueBase::elements; // no match
-    }
-
-    virtual Subexpr& clone()
-    {
-        Value<T>& n = *new Value<T>();
-        n = *this;
-        return n;
-    }
-
-    // Performance note: Declaring values as separately named members generates faster (10% or so) code in VS2010,
-    // compared to array, even if the array accesses elements individually instead of in for-loops.
-    T m_v[elements];
-};
 
 class ColumnAccessorBase;
 
 
-// Handle cases where left side is a constant (int, float, int64_t, double)
+// Handle cases where left side is a constant (int, float, int64_t, double, StringData)
 template <class L, class Cond, class R> Query create (L left, const Subexpr2<R>& right)
 {
     // Purpose of below code is to intercept the creation of a condition and test if it's supported by the old
@@ -360,23 +292,27 @@ template <class L, class Cond, class R> Query create (L left, const Subexpr2<R>&
     // This method intercepts only Value <cond> Subexpr2. Interception of Subexpr2 <cond> Subexpr is elsewhere.
 
 #ifdef TIGHTDB_OLDQUERY_FALLBACK // if not defined, then never fallback to query_engine.hpp; always use query_expression
+    OnlyNumeric<L> num;
+    static_cast<void>(num);
+
     const Columns<R>* column = dynamic_cast<const Columns<R>*>(&right);
-    if (column && (std::numeric_limits<L>::is_integer) && (std::numeric_limits<R>::is_integer)) {
+    if (column && (std::numeric_limits<L>::is_integer) && (std::numeric_limits<R>::is_integer) &&
+        !column->m_column_linklist && !column->m_column_single_link) {
         const Table* t = (const_cast<Columns<R>*>(column))->get_table();
         Query q = Query(*t);
 
         if (util::SameType<Cond, Less>::value)
-            q.greater(column->m_column, left);
+            q.greater(column->m_column, num.get(left));
         else if (util::SameType<Cond, Greater>::value)
-            q.less(column->m_column, left);
+            q.less(column->m_column, num.get(left));
         else if (util::SameType<Cond, Equal>::value)
-            q.equal(column->m_column, left);
+            q.equal(column->m_column, num.get(left));
         else if (util::SameType<Cond, NotEqual>::value)
-            q.not_equal(column->m_column, left);
+            q.not_equal(column->m_column, num.get(left));
         else if (util::SameType<Cond, LessEqual>::value)
-            q.greater_equal(column->m_column, left);
+            q.greater_equal(column->m_column, num.get(left));
         else if (util::SameType<Cond, GreaterEqual>::value)
-            q.less_equal(column->m_column, left);
+            q.less_equal(column->m_column, num.get(left));
         else {
             // query_engine.hpp does not support this Cond. Please either add support for it in query_engine.hpp or
             // fallback to using use 'return *new Compare<>' instead.
@@ -389,7 +325,7 @@ template <class L, class Cond, class R> Query create (L left, const Subexpr2<R>&
 #endif
     {
         // Return query_expression.hpp node
-        return *new Compare<Cond, typename Common<R, float>::type>(*new Value<L>(left), const_cast<Subexpr2<R>&>(right).clone(), true);
+        return *new Compare<Cond, typename Common<L, R>::type>(*new Value<L>(left), const_cast<Subexpr2<R>&>(right).clone(), true);
     }
 }
 
@@ -399,57 +335,71 @@ template <class L, class Cond, class R> Query create (L left, const Subexpr2<R>&
 // left-hand-side       operator                              right-hand-side
 // Subexpr2<L>          +, -, *, /, <, >, ==, !=, <=, >=      R, Subexpr2<R>
 //
-// For L = R = {int, int64_t, float, double}:
+// For L = R = {int, int64_t, float, double, StringData}:
 template <class L, class R> class Overloads
 {
     typedef typename Common<L, R>::type CommonType;
 public:
 
     // Arithmetic, right side constant
-    Operator<Plus<CommonType> >& operator + (R right) {
+    Operator<Plus<CommonType> >& operator + (R right)
+    {
        return *new Operator<Plus<CommonType> >(static_cast<Subexpr2<L>&>(*this).clone(), *new Value<R>(right), true);
     }
-    Operator<Minus<CommonType> >& operator - (R right) {
+    Operator<Minus<CommonType> >& operator - (R right)
+    {
        return *new Operator<Minus<CommonType> > (static_cast<Subexpr2<L>&>(*this).clone(), *new Value<R>(right), true);
     }
-    Operator<Mul<CommonType> >& operator * (R right) {
+    Operator<Mul<CommonType> >& operator * (R right)
+    {
        return *new Operator<Mul<CommonType> > (static_cast<Subexpr2<L>&>(*this).clone(), *new Value<R>(right), true);
     }
-    Operator<Div<CommonType> >& operator / (R right) {
+    Operator<Div<CommonType> >& operator / (R right)
+    {
         return *new Operator<Div<CommonType> > (static_cast<Subexpr2<L>&>(*this).clone(), *new Value<R>(right), true);
     }
 
     // Arithmetic, right side subexpression
-    Operator<Plus<CommonType> >& operator + (const Subexpr2<R>& right) {
+    Operator<Plus<CommonType> >& operator + (const Subexpr2<R>& right)
+    {
         return *new Operator<Plus<CommonType> > (static_cast<Subexpr2<L>&>(*this).clone(), const_cast<Subexpr2<R>&>(right).clone(), true);
     }
-    Operator<Minus<CommonType> >& operator - (const Subexpr2<R>& right) {
+    Operator<Minus<CommonType> >& operator - (const Subexpr2<R>& right)
+    {
         return *new Operator<Minus<CommonType> > (static_cast<Subexpr2<L>&>(*this).clone(), const_cast<Subexpr2<R>&>(right).clone(), true);
     }
-    Operator<Mul<CommonType> >& operator * (const Subexpr2<R>& right) {
+    Operator<Mul<CommonType> >& operator * (const Subexpr2<R>& right)
+    {
         return *new Operator<Mul<CommonType> > (static_cast<Subexpr2<L>&>(*this).clone(), const_cast<Subexpr2<R>&>(right).clone(), true);
     }
-    Operator<Div<CommonType> >& operator / (const Subexpr2<R>& right) {
+    Operator<Div<CommonType> >& operator / (const Subexpr2<R>& right)
+    {
         return *new Operator<Div<CommonType> > (static_cast<Subexpr2<L>&>(*this).clone(), const_cast<Subexpr2<R>&>(right).clone(), true);
     }
 
     // Compare, right side constant
-    Query operator > (R right) {
+    Query operator > (R right)
+    {
         return create<R, Less, L>(right, static_cast<Subexpr2<L>&>(*this));
     }
-    Query operator < (R right) {
+    Query operator < (R right)
+    {
         return create<R, Greater, L>(right, static_cast<Subexpr2<L>&>(*this));
     }
-    Query operator >= (R right) {
+    Query operator >= (R right)
+    {
         return create<R, LessEqual, L>(right, static_cast<Subexpr2<L>&>(*this));
     }
-    Query operator <= (R right) {
+    Query operator <= (R right)
+    {
         return create<R, GreaterEqual, L>(right, static_cast<Subexpr2<L>&>(*this));
     }
-    Query operator == (R right) {
+    Query operator == (R right)
+    {
         return create<R, Equal, L>(right, static_cast<Subexpr2<L>&>(*this));
     }
-    Query operator != (R right) {
+    Query operator != (R right)
+    {
         return create<R, NotEqual, L>(right, static_cast<Subexpr2<L>&>(*this));
     }
 
@@ -470,7 +420,7 @@ public:
             const Table* t = (const_cast<Columns<R>*>(left_col))->get_table();
             Query q = Query(*t);
 
-            if (std::numeric_limits<L>::is_integer) {
+            if (std::numeric_limits<L>::is_integer || util::SameType<L, DateTime>::value) {
                 if (util::SameType<Cond, Less>::value)
                     q.less_int(left_col->m_column, right_col->m_column);
                 else if (util::SameType<Cond, Greater>::value)
@@ -537,37 +487,229 @@ public:
     }
 
     // Compare, right side subexpression
-    Query operator == (const Subexpr2<R>& right) {
+    Query operator == (const Subexpr2<R>& right)
+    {
         return create2<Equal>(right);
     }
-    Query operator != (const Subexpr2<R>& right) {
+    Query operator != (const Subexpr2<R>& right)
+    {
         return create2<NotEqual>(right);
     }
-    Query operator > (const Subexpr2<R>& right) {
+    Query operator > (const Subexpr2<R>& right)
+    {
         return create2<Greater>(right);
     }
-    Query operator < (const Subexpr2<R>& right) {
+    Query operator < (const Subexpr2<R>& right)
+    {
         return create2<Less>(right);
     }
-    Query operator >= (const Subexpr2<R>& right) {
+    Query operator >= (const Subexpr2<R>& right)
+    {
         return create2<GreaterEqual>(right);
     }
-    Query operator <= (const Subexpr2<R>& right) {
+    Query operator <= (const Subexpr2<R>& right)
+    {
         return create2<LessEqual>(right);
     }
 };
 
-// With this wrapper class we can define just 20 overloads inside Overloads<L, R> instead of 4 * 20 = 80. Todo: We can
-// consider if it's simpler/better to remove this class completely and just list all 80 overloads manually anyway.
+// With this wrapper class we can define just 20 overloads inside Overloads<L, R> instead of 5 * 20 = 100. Todo: We can
+// consider if it's simpler/better to remove this class completely and just list all 100 overloads manually anyway.
 template <class T> class Subexpr2 : public Subexpr, public Overloads<T, const char*>, public Overloads<T, int>, public
-                                    Overloads<T, float>, public Overloads<T, double>, public Overloads<T, int64_t>
+    Overloads<T, float>, public Overloads<T, double>, public Overloads<T, int64_t>, public Overloads<T, StringData>,
+    public Overloads<T, bool>, public Overloads<T, DateTime>
 {
 public:
     virtual ~Subexpr2() {};
 
     #define TDB_U2(t, o) using Overloads<T, t>::operator o;
-    #define TDB_U(o) TDB_U2(int, o) TDB_U2(float, o) TDB_U2(double, o) TDB_U2(int64_t, o)
+    #define TDB_U(o) TDB_U2(int, o) TDB_U2(float, o) TDB_U2(double, o) TDB_U2(int64_t, o) TDB_U2(StringData, o) TDB_U2(bool, o) TDB_U2(DateTime, o)
     TDB_U(+) TDB_U(-) TDB_U(*) TDB_U(/) TDB_U(>) TDB_U(<) TDB_U(==) TDB_U(!=) TDB_U(>=) TDB_U(<=)
+};
+
+// Stores N values of type T. Can also exchange data with other ValueBase of different types
+template<class T> class Value : public ValueBase, public Subexpr2<T>
+{
+public:
+    Value()
+    {
+        m_v = null_ptr;
+        init(false, ValueBase::default_size, 0);
+    }
+    Value(T v)
+    {
+        m_v = null_ptr;
+        init(false, ValueBase::default_size, v);
+    }
+    Value(bool link, size_t values)
+    {
+        m_v = null_ptr;
+        init(link, values, 0);
+    }
+
+    Value(bool link, size_t values, T v)
+    {
+        m_v = null_ptr;
+        init(link, values, v);
+    }
+
+    ~Value()
+    {
+        delete[] m_v;
+        m_v = null_ptr;
+    }
+
+    void init(bool link, size_t values, T v) {
+        if (m_v) {
+            delete[] m_v;
+            m_v = null_ptr;
+        }
+        ValueBase::from_link = link;
+        ValueBase::m_values = values;
+        if (m_values > 0) {
+            m_v = new T[m_values];
+            std::fill(m_v, m_v + ValueBase::m_values, v);
+        }
+    }
+
+    void evaluate(size_t, ValueBase& destination)
+    {
+        destination.import(*this);
+    }
+
+    template <class TOperator> TIGHTDB_FORCEINLINE void fun(const Value* left, const Value* right)
+    {
+        TOperator o;
+        size_t vals = minimum(left->m_values, right->m_values);
+        for (size_t t = 0; t < vals; t++)
+            m_v[t] = o(left->m_v[t], right->m_v[t]);
+    }
+
+    template <class TOperator> TIGHTDB_FORCEINLINE void fun(const Value* value)
+    {
+        TOperator o;
+        for (size_t t = 0; t < value->m_values; t++)
+            m_v[t] = o(value->m_v[t]);
+    }
+
+
+    // Below import and export methods are for type conversion between float, double, int64_t, etc.
+    template<class D> TIGHTDB_FORCEINLINE void export2(ValueBase& destination) const
+    {
+        // export2 is also instantiated for impossible conversions like T = StringData, D = int64_t. These are never
+        // performed at runtime but still result in compiler errors. We therefore introduce EitherIsString which turns
+        // both T and D into StringData if just one of them are
+        typedef typename EitherIsString <D, T>::type dst_t;
+        typedef typename EitherIsString <T, D>::type src_t;
+        Value<dst_t>& d = static_cast<Value<dst_t>&>(destination);
+        d.init(ValueBase::from_link, ValueBase::m_values, 0);
+        for (size_t t = 0; t < ValueBase::m_values; t++) {
+            src_t* source = reinterpret_cast<src_t*>(m_v);
+            d.m_v[t] = static_cast<dst_t>(source[t]);
+        }
+    }
+
+    TIGHTDB_FORCEINLINE void export_bool(ValueBase& destination) const
+    {
+        export2<bool>(destination);
+    }
+
+    TIGHTDB_FORCEINLINE void export_int64_t(ValueBase& destination) const
+    {
+        export2<int64_t>(destination);
+    }
+
+    TIGHTDB_FORCEINLINE void export_float(ValueBase& destination) const
+    {
+        export2<float>(destination);
+    }
+
+    TIGHTDB_FORCEINLINE void export_int(ValueBase& destination) const
+    {
+        export2<int>(destination);
+    }
+
+    TIGHTDB_FORCEINLINE void export_double(ValueBase& destination) const
+    {
+        export2<double>(destination);
+    }
+    TIGHTDB_FORCEINLINE void export_StringData(ValueBase& destination) const
+    {
+        export2<StringData>(destination); 
+    }
+
+    TIGHTDB_FORCEINLINE void import(const ValueBase& source)
+    {
+        if (util::SameType<T, int>::value)
+            source.export_int(*this);
+        else if (util::SameType<T, bool>::value)
+            source.export_bool(*this);
+        else if (util::SameType<T, float>::value)
+            source.export_float(*this);
+        else if (util::SameType<T, double>::value)
+            source.export_double(*this);
+        else if (util::SameType<T, int64_t>::value)
+            source.export_int64_t(*this);
+        else if (util::SameType<T, StringData>::value)
+            source.export_StringData(*this);
+        else
+            TIGHTDB_ASSERT(false);
+    }
+
+    // Given a TCond (==, !=, >, <, >=, <=) and two Value<T>, return index of first match
+    template <class TCond> TIGHTDB_FORCEINLINE static size_t compare(Value<T>* left, Value<T>* right)
+    {
+        TCond c;
+
+        if (!left->from_link && !right->from_link) {
+            // Compare values one-by-one (one value is one row; no links)
+            size_t min = minimum(left->ValueBase::m_values, right->ValueBase::m_values);
+            for (size_t m = 0; m < min; m++) {
+                if (c(left->m_v[m], right->m_v[m]))
+                    return m;
+            }
+        }
+        else if (left->from_link && right->from_link) {
+            // Many-to-many links not supported yet. Need to specify behaviour
+            TIGHTDB_ASSERT(false);
+        }
+        else if (!left->from_link && right->from_link) {
+            // Right values come from link. Left must come from single row. Semantics: Match if at least 1 
+            // linked-to-value fulfills the condition
+            TIGHTDB_ASSERT(left->m_values == 0 || left->m_values == ValueBase::default_size);
+            for (size_t r = 0; r < right->ValueBase::m_values; r++) {
+                if (c(left->m_v[0], right->m_v[r]))
+                    return 0;
+            }
+        }
+        else if (left->from_link && !right->from_link) {
+            // Same as above, right left values coming from links
+            TIGHTDB_ASSERT(right->m_values == 0 || right->m_values == ValueBase::default_size);
+            for (size_t l = 0; l < left->ValueBase::m_values; l++) {
+                if (c(left->m_v[l], right->m_v[0]))
+                    return 0;
+            }
+        }
+
+        return not_found; // no match
+    }
+
+    virtual Subexpr& clone()
+    {
+        Value<T>& n = *new Value<T>();
+
+        // Copy all members, except the m_v pointer which the above Value constructor allocated
+        T* tmp = n.m_v;
+        n = *this;
+        n.m_v = tmp;
+
+        // Copy payload
+        memcpy(n.m_v, m_v, sizeof(T)* m_values);
+
+        return n;
+    }
+
+    T *m_v;
 };
 
 
@@ -708,44 +850,116 @@ template <class T> UnaryOperator<Pow<T> >& power (Subexpr2<T>& left) {
 
 
 // Handling of String columns. These support only == and != compare operators. No 'arithmetic' operators (+, etc).
-template <> class Columns<StringData> : public Subexpr
+template <> class Columns<StringData> : public Subexpr2<StringData>
 {
 public:
-    explicit Columns(size_t column, const Table* table) : m_table(null_ptr)
-    {
-        m_column = column;
-        set_table(table);
-    }
-
-    explicit Columns() : m_table(null_ptr) { }
-
-    explicit Columns(size_t column) : m_table(null_ptr)
-    {
-        m_column = column;
-    }
-
-    virtual void set_table(const Table* table)
+    explicit Columns(size_t column, const Table* table) : m_table_linked_from(null_ptr), m_table(null_ptr), m_column_linklist(null_ptr),
+        m_column_single_link(null_ptr), m_column(column)
     {
         m_table = table;
     }
 
+    explicit Columns(size_t column, Table* table, size_t link_column) : m_table_linked_from(null_ptr), m_table(null_ptr),
+        m_column_linklist(null_ptr), m_column_single_link(null_ptr), m_column(column)
+    {
+        TableRef linked_table;
+
+        // Link column can be either LinkList or single Link
+        ColumnType type = table->get_real_column_type(link_column);
+        if (type == col_type_LinkList) {
+            m_column_linklist = &table->get_column<ColumnLinkList, col_type_LinkList>(link_column);
+            linked_table.reset(m_column_linklist->get_target_table());
+        }
+        else {
+            m_column_single_link = &table->get_column<ColumnLink, col_type_Link>(link_column);
+            linked_table.reset(m_column_single_link->get_target_table());
+        }
+
+        m_table = linked_table.get();
+        m_table_linked_from = table;
+    }
+
+    explicit Columns() : m_table_linked_from(null_ptr), m_table(null_ptr), m_column_linklist(null_ptr), m_column_single_link(null_ptr) { }
+
+
+    explicit Columns(size_t column) : m_table_linked_from(null_ptr), m_table(null_ptr), m_column_linklist(null_ptr), m_column_single_link(null_ptr),
+        m_column(column)
+    {
+    }
+
+    virtual Subexpr& clone()
+    {
+        Columns<StringData>& n = *new Columns<StringData>();
+        n = *this;
+        return n;
+    }
+
     virtual const Table* get_table()
     {
-        return m_table;
+        return m_table_linked_from ? m_table_linked_from : m_table;
     }
 
     virtual void evaluate(size_t index, ValueBase& destination)
     {
-        static_cast<void>(index);
-        static_cast<void>(destination);
-        // String column conditions use fallback to old query_engine.hpp, hence bypassing all the query_expression.hpp
-        // pathways like this method.
-        TIGHTDB_ASSERT(false);
+        Value<StringData>& d = static_cast<Value<StringData>&>(destination);
+
+        if (m_column_linklist) {
+            if (m_column_linklist->has_links(index))
+            {
+                // LinkList with more than 0 values. Create Value with payload for all fields
+                LinkViewRef links = m_column_linklist->get(index);
+                Value<StringData> v(true, links->size());
+
+                for (size_t t = 0; t < links->size(); t++) {
+                    size_t link_to = links->get_target_row(t);
+                    v.m_v[t] = m_table->get_string(m_column, link_to);
+                }
+                destination.import(v);
+            }
+            else {
+                // No links in list; create empty Value (Value with m_values == 0)
+                Value<StringData> v(true, 0);
+                destination.import(v);
+            }
+        }
+        else if (m_column_single_link) {  
+            if (m_column_single_link->is_null_link(index)) {
+                // Null link; create empty Value (Value with m_values == 0)
+                Value<StringData> v(true, 0);
+                destination.import(v);
+            }
+            else {
+                // Pick out the 1 value that the link is pointing at
+                size_t lnk = m_column_single_link->get_link(index);
+                StringData val = m_table->get_string(m_column, lnk);
+                Value<StringData> v(false, 1, val);
+                destination.import(v);
+            }
+        }
+        else {
+            // Not a link column
+            for (size_t t = 0; t < destination.m_values && index + t < m_table->size(); t++) {
+                d.m_v[t] = m_table->get_string(m_column, index + t);
+            }
+        }
     }
 
+    const Table* m_table_linked_from;
+
+    // Pointer to payload table (which is the linked-to table if this is a link column) used for condition operator
     const Table* m_table;
+
+    // Pointer to LinkList column object if it's a LinkList column; otherwise null_ptr
+    ColumnLinkList* m_column_linklist;
+
+    // Pointer to Link column object if it's a Link column; otherwise null_ptr
+    ColumnLink* m_column_single_link;
+
+    // Column index of payload column of m_table
     size_t m_column;
 };
+
+
 
 // String == Columns<String>
 template <class T> Query operator == (T left, const Columns<StringData>& right) {
@@ -759,33 +973,49 @@ template <class T> Query operator != (T left, const Columns<StringData>& right) 
 
 // Columns<String> == String
 template <class T> Query operator == (const Columns<StringData>& left, T right) {
-    const Table* t = const_cast<Columns<StringData>*>(&left)->get_table();
-    Query q = Query(*t);
-    q.equal(left.m_column, right);
-    return q;
+    return create<StringData, Equal, StringData>(right, left);
 }
 
 // Columns<String> != String
 template <class T> Query operator != (const Columns<StringData>& left, T right) {
-    const Table* t = const_cast<Columns<StringData>*>(&left)->get_table();
-    Query q = Query(*t);
-    q.not_equal(left.m_column, right);
-    return q;
+    return create<StringData, NotEqual, StringData>(right, left);
 }
-
 
 template <class T> class Columns : public Subexpr2<T>, public ColumnsBase
 {
 public:
-    explicit Columns(size_t column, const Table* table) : m_table(null_ptr), sg(null_ptr)
+    explicit Columns(size_t column, const Table* table) : m_table_linked_from(null_ptr), m_table(null_ptr), sg(null_ptr),
+        m_column_linklist(null_ptr), m_column_single_link(null_ptr), m_column(column)
     {
-        m_column = column;
-        set_table(table);
+        m_table = table;
     }
 
-    explicit Columns() : m_table(null_ptr), sg(null_ptr) { }
+    // Todo: Constructor almost identical with that of Columns<StringData>; simplify
+    explicit Columns(size_t column, Table* table, size_t link_column) : m_table_linked_from(null_ptr), 
+        m_table(null_ptr), sg(null_ptr), m_column_linklist(null_ptr), m_column_single_link(null_ptr), m_column(column)
+    {
+        TableRef linked_table;
 
-    explicit Columns(size_t column) : m_table(null_ptr), m_column(column), sg(null_ptr) { }
+        // Link column can be either LinkList or single Link
+        ColumnType type = table->get_real_column_type(link_column);
+        if (type == col_type_LinkList) {
+            m_column_linklist = &table->get_column<ColumnLinkList, col_type_LinkList>(link_column);
+            linked_table.reset(m_column_linklist->get_target_table());
+        }
+        else {
+            m_column_single_link = &table->get_column<ColumnLink, col_type_Link>(link_column);
+            linked_table.reset(m_column_single_link->get_target_table());
+        }
+
+        m_table = linked_table.get();
+        m_table_linked_from = table;
+    }
+
+    explicit Columns() : m_table_linked_from(null_ptr), m_table(null_ptr), sg(null_ptr), m_column_linklist(null_ptr),
+                         m_column_single_link(null_ptr) { }
+
+    explicit Columns(size_t column) : m_table_linked_from(null_ptr), m_table(null_ptr), sg(null_ptr), 
+        m_column_linklist(null_ptr), m_column_single_link(null_ptr), m_column(column) {}
 
     ~Columns()
     {
@@ -802,11 +1032,10 @@ public:
     }
 
     // Recursively set table pointers for all Columns object in the expression tree. Used for late binding of table
-    virtual void set_table(const Table* table)
+    virtual void set_table()
     {
-        m_table = table;
         typedef typename ColumnTypeTraits<T>::column_type ColType;
-        const ColType* c = static_cast<const ColType*>(&table->get_column_base(m_column));
+        const ColType* c = static_cast<const ColType*>(&m_table->get_column_base(m_column));
         if (sg == null_ptr)
             sg = new SequentialGetter<T>();
         sg->init(c);
@@ -816,35 +1045,89 @@ public:
     // binds it to a Query at a later time
     virtual const Table* get_table()
     {
-        return m_table;
+        return m_table_linked_from ? m_table_linked_from : m_table;
     }
 
-    // Load 8 elements from Column into destination
+    // Load values from Column into destination
     void evaluate(size_t index, ValueBase& destination) {
-        Value<T> v;
-        sg->cache_next(index);
-        size_t colsize = sg->m_column->size();
+        if (m_column_linklist) {
+            if (m_column_linklist->get_link_count(index) == 0) {
+                // No links in list; create empty Value (Value with m_values == 0)
+                Value<T> v(true, 0);
+                destination.import(v);
+            }
+            else {
+                // LinkList with more than 0 values. Create Value with payload for all fields
+                LinkViewRef links = m_column_linklist->get(index);
+                Value<T> v(true, links->size());
 
-        if (util::SameType<T, int64_t>::value && index + ValueBase::elements < sg->m_leaf_end) {
-            // int64_t leaves have a get_chunk optimization that returns 8 int64_t values at once
-            sg->m_array_ptr->get_chunk(index - sg->m_leaf_start, static_cast<Value<int64_t>*>(static_cast<ValueBase*>(&v))->m_v);
+                for (size_t t = 0; t < links->size(); t++) {
+                    size_t link_to = links->get_target_row(t);
+                    sg->cache_next(link_to); // todo, needed?
+                    v.m_v[t] = sg->get_next(link_to);
+                }
+                destination.import(v);
+            }
+        }
+        else if (m_column_single_link) {
+            if (m_column_single_link->is_null_link(index)) {
+                // Null link; create empty Value (Value with m_values == 0)
+                Value<T> v(true, 0);
+                destination.import(v);
+            }
+            else {
+                // Pick out the 1 value that the link is pointing at
+                size_t lnk = m_column_single_link->get_link(index);
+                sg->cache_next(lnk);
+                T val = sg->get_next(lnk);
+                Value<T> v(false, 1, val);
+                destination.import(v);
+            }
         }
         else {
-            // To make Valgrind happy we must initialize all elements in v even if Column ends earlier. Todo, benchmark
-            // if an unconditional zero out is faster
-            if (index + ValueBase::elements >= sg->m_leaf_end)
-                v = Value<T>(static_cast<T>(0));
-            for (size_t t = 0; t < ValueBase::elements && index + t < colsize; t++)
-                v.m_v[t] = sg->get_next(index + t);
+            // Not a Link column
+            sg->cache_next(index);
+            size_t colsize = sg->m_column->size();
+
+            if (util::SameType<T, int64_t>::value && index + ValueBase::default_size < sg->m_leaf_end) {
+                Value<T> v;
+                TIGHTDB_ASSERT(ValueBase::default_size == 8); // If you want to modify 'default_size' then update Array::get_chunk()
+                // int64_t leaves have a get_chunk optimization that returns 8 int64_t values at once
+                sg->m_array_ptr->get_chunk(index - sg->m_leaf_start, static_cast<Value<int64_t>*>(static_cast<ValueBase*>(&v))->m_v);
+                destination.import(v);
+            }
+            else {
+                // To make Valgrind happy we must initialize all default_size in v even if Column ends earlier. Todo, benchmark
+                // if an unconditional zero out is faster
+                size_t rows = colsize - index;
+                if (rows > ValueBase::default_size)
+                    rows = ValueBase::default_size;
+                Value<T> v(false, rows);
+
+                for (size_t t = 0; t < rows; t++)
+                    v.m_v[t] = sg->get_next(index + t);
+
+                destination.import(v);
+            }
         }
-        destination.import(v);
     }
+
+    const Table* m_table_linked_from;
 
     // m_table is redundant with ColumnAccessorBase<>::m_table, but is in order to decrease class dependency/entanglement
     const Table* m_table;
-    size_t m_column;
-private:
+
+    // Fast (leaf caching) value getter for payload column (column in table on which query condition is executed)
     SequentialGetter<T>* sg;
+
+    // Pointer to LinkList column object if it's a LinkList column; otherwise null_ptr
+    ColumnLinkList* m_column_linklist;
+
+    // Pointer to Link column object if it's a Link column; otherwise null_ptr
+    ColumnLink* m_column_single_link;
+
+    // Column index of payload column of m_table
+    size_t m_column;
 };
 
 
@@ -860,9 +1143,9 @@ public:
     }
 
     // Recursively set table pointers for all Columns object in the expression tree. Used for late binding of table
-    void set_table(const Table* table)
+    void set_table()
     {
-        m_left.set_table(table);
+        m_left.set_table();
     }
 
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression and
@@ -874,7 +1157,8 @@ public:
     }
 
     // destination = operator(left)
-    void evaluate(size_t index, ValueBase& destination) {
+    void evaluate(size_t index, ValueBase& destination)
+    {
         Value<T> result;
         Value<T> left;
         m_left.evaluate(index, left);
@@ -907,10 +1191,10 @@ public:
     }
 
     // Recursively set table pointers for all Columns object in the expression tree. Used for late binding of table
-    void set_table(const Table* table)
+    void set_table()
     {
-        m_left.set_table(table);
-        m_right.set_table(table);
+        m_left.set_table();
+        m_right.set_table();
     }
 
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression and
@@ -928,7 +1212,8 @@ public:
     }
 
     // destination = operator(left, right)
-    void evaluate(size_t index, ValueBase& destination) {
+    void evaluate(size_t index, ValueBase& destination)
+    {
         Value<T> result;
         Value<T> left;
         Value<T> right;
@@ -972,10 +1257,10 @@ public:
     }
 
     // Recursively set table pointers for all Columns object in the expression tree. Used for late binding of table
-    void set_table(const Table* table)
+    void set_table()
     {
-        m_left.set_table(table);
-        m_right.set_table(table);
+        m_left.set_table();
+        m_right.set_table();
     }
 
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression and
@@ -985,26 +1270,29 @@ public:
         const Table* l = m_left.get_table();
         const Table* r = m_right.get_table();
 
-        // Queries do not support multiple different tables; all tables must be the same.
+        // All main tables in each subexpression of a query (table.columns() or table.link()) must be the same.
         TIGHTDB_ASSERT(l == null_ptr || r == null_ptr || l == r);
 
         // null_ptr pointer means expression which isn't yet associated with any table, or is a Value<T>
         return l ? l : r;
     }
 
-    size_t find_first(size_t start, size_t end) const {
+    size_t find_first(size_t start, size_t end) const
+    {
         size_t match;
         Value<T> right;
         Value<T> left;
 
-        for (; start < end; start += ValueBase::elements) {
+        for (; start < end;) {
             m_left.evaluate(start, left);
             m_right.evaluate(start, right);
             match = Value<T>::template compare<TCond>(&left, &right);
 
-            // Note the second condition that tests if match position in chunk exceeds column length
-            if (match != ValueBase::elements && start + match < end)
+            if (match != not_found && match + start < end)
                 return start + match;
+
+            size_t rows = (left.from_link || right.from_link) ? 1 : minimum(right.m_values, left.m_values);
+            start += rows;
         }
 
         return not_found; // no match

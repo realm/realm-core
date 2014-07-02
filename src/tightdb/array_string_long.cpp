@@ -137,7 +137,7 @@ size_t ArrayStringLong::find_first(StringData value, size_t begin,
     return not_found;
 }
 
-void ArrayStringLong::find_all(Array& result, StringData value, size_t add_offset,
+void ArrayStringLong::find_all(Column& result, StringData value, size_t add_offset,
                               size_t begin, size_t end) const
 {
     size_t begin_2 = begin;

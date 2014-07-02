@@ -80,16 +80,110 @@ template<class T> struct IsIntegral;
 template<class T> struct IsFloatingPoint;
 
 
-/// Determine the type resulting from integral or floating-point
-/// promotion.
+/// Member `type` is the type resulting from integral or
+/// floating-point promotion of a value of type `T`.
 ///
 /// \note Enum types are supported only when the compiler supports the
 /// C++11 'decltype' feature.
-#ifdef TIGHTDB_HAVE_CXX11_DECLTYPE
-template<class T> struct Promote { typedef decltype(+T()) type; }; // FIXME: This is not performing floating-point promotion.
-#else // !TIGHTDB_HAVE_CXX11_DECLTYPE
 template<class T> struct Promote;
-template<> struct Promote<bool> { typedef int type; };
+
+
+/// Member `type` is the type of the result of a binary arithmetic (or
+/// bitwise) operation (+, -, *, /, %, |, &, ^) when applied to
+/// operands of type `A` and `B` respectively. The type of the result
+/// of a shift operation (<<, >>) can instead be found as the type
+/// resulting from integral promotion of the left operand. The type of
+/// the result of a unary arithmetic (or bitwise) operation can be
+/// found as the type resulting from integral promotion of the
+/// operand.
+///
+/// \note Enum types are supported only when the compiler supports the
+/// C++11 'decltype' feature.
+template<class A, class B> struct ArithBinOpType;
+
+
+/// Member `type` is `B` if `B` has more value bits than `A`,
+/// otherwise is is `A`.
+template<class A, class B> struct ChooseWidestInt;
+
+
+/// Member `type` is the first of `unsigned char`, `unsigned short`,
+/// `unsigned int`, `unsigned long`, and `unsigned long long` that has
+/// at least `bits` value bits.
+template<int bits> struct LeastUnsigned;
+
+
+/// Member `type` is `unsigned` if `unsigned` has at least `bits`
+/// value bits, otherwise it is the same as
+/// `LeastUnsigned<bits>::type`.
+template<int bits> struct FastestUnsigned;
+
+
+
+
+
+// Implementation
+
+} // namespace util
+
+namespace _impl {
+
+#ifndef TIGHTDB_HAVE_CXX11_TYPE_TRAITS
+
+template<class T> struct is_int { static const bool value = false; };
+template<> struct is_int<bool>               { static const bool value = true; };
+template<> struct is_int<char>               { static const bool value = true; };
+template<> struct is_int<signed char>        { static const bool value = true; };
+template<> struct is_int<unsigned char>      { static const bool value = true; };
+template<> struct is_int<wchar_t>            { static const bool value = true; };
+template<> struct is_int<short>              { static const bool value = true; };
+template<> struct is_int<unsigned short>     { static const bool value = true; };
+template<> struct is_int<int>                { static const bool value = true; };
+template<> struct is_int<unsigned>           { static const bool value = true; };
+template<> struct is_int<long>               { static const bool value = true; };
+template<> struct is_int<unsigned long>      { static const bool value = true; };
+template<> struct is_int<long long>          { static const bool value = true; };
+template<> struct is_int<unsigned long long> { static const bool value = true; };
+
+template<class T> struct is_float { static const bool value = false; };
+template<> struct is_float<float>       { static const bool value = true; };
+template<> struct is_float<double>      { static const bool value = true; };
+template<> struct is_float<long double> { static const bool value = true; };
+
+#endif // !TIGHTDB_HAVE_CXX11_TYPE_TRAITS
+
+} // namespace _impl
+
+
+namespace util {
+
+
+template<class T> struct IsIntegral {
+#ifdef TIGHTDB_HAVE_CXX11_TYPE_TRAITS
+    static const bool value = std::is_integral<T>::value;
+#else
+    static const bool value = _impl::is_int<typename RemoveCV<T>::type>::value;
+#endif
+};
+
+
+template<class T> struct IsFloatingPoint {
+#ifdef TIGHTDB_HAVE_CXX11_TYPE_TRAITS
+    static const bool value = std::is_floating_point<T>::value;
+#else
+    static const bool value = _impl::is_float<typename RemoveCV<T>::type>::value;
+#endif
+};
+
+
+#ifdef TIGHTDB_HAVE_CXX11_DECLTYPE
+template<class T> struct Promote {
+    typedef decltype(+T()) type; // FIXME: This is not performing floating-point promotion.
+};
+#else
+template<> struct Promote<bool> {
+    typedef int type;
+};
 template<> struct Promote<char> {
 private:
     static const bool cond =
@@ -153,20 +247,11 @@ template<> struct Promote<long double> { typedef long double type; };
 #endif // !TIGHTDB_HAVE_CXX11_DECLTYPE
 
 
-
-/// Determine the type of the result of a binary arithmetic (or
-/// bitwise) operation (+, -, *, /, %, |, &, ^). The type of the
-/// result of a shift operation (<<, >>) can instead be found as the
-/// type resulting from integral promotion of the left operand. The
-/// type of the result of a unary arithmetic (or bitwise) operation
-/// can be found as the type resulting from integral promotion of the
-/// operand.
-///
-/// \note Enum types are supported only when the compiler supports the
-/// C++11 'decltype' feature.
 #ifdef TIGHTDB_HAVE_CXX11_DECLTYPE
-template<class A, class B> struct ArithBinOpType { typedef decltype(A()+B()) type; };
-#else // !TIGHTDB_HAVE_CXX11_DECLTYPE
+template<class A, class B> struct ArithBinOpType {
+    typedef decltype(A()+B()) type;
+};
+#else
 template<class A, class B> struct ArithBinOpType {
 private:
     typedef typename Promote<A>::type A2;
@@ -195,9 +280,19 @@ public:
 #endif // !TIGHTDB_HAVE_CXX11_DECLTYPE
 
 
-/// Choose the first of `unsigned char`, `unsigned short`, `unsigned
-/// int`, `unsigned long`, and `unsigned long long` that has at least
-/// `bits` value bits.
+template<class A, class B> struct ChooseWidestInt {
+private:
+    typedef std::numeric_limits<A> lim_a;
+    typedef std::numeric_limits<B> lim_b;
+    TIGHTDB_STATIC_ASSERT(lim_a::is_specialized && lim_b::is_specialized,
+                          "std::numeric_limits<> must be specialized for both types");
+    TIGHTDB_STATIC_ASSERT(lim_a::is_integer && lim_b::is_integer,
+                          "Both types must be integers");
+public:
+    typedef typename CondType<(lim_a::digits >= lim_b::digits), A, B>::type type;
+};
+
+
 template<int bits> struct LeastUnsigned {
 private:
     typedef void                                          types_0;
@@ -224,73 +319,11 @@ public:
 };
 
 
-/// Choose `B` if `B` has more value bits than `A`, otherwise choose
-/// `A`.
-template<class A, class B> struct ChooseWidestInt {
+template<int bits> struct FastestUnsigned {
 private:
-    typedef std::numeric_limits<A> lim_a;
-    typedef std::numeric_limits<B> lim_b;
-    TIGHTDB_STATIC_ASSERT(lim_a::is_specialized && lim_b::is_specialized,
-                          "std::numeric_limits<> must be specialized for both types");
-    TIGHTDB_STATIC_ASSERT(lim_a::is_integer && lim_b::is_integer,
-                          "Both types must be integers");
+    typedef typename util::LeastUnsigned<bits>::type least_unsigned;
 public:
-    typedef typename CondType<(lim_a::digits >= lim_b::digits), A, B>::type type;
-};
-
-
-
-
-
-// Implementation
-
-} // namespace util
-
-namespace _impl {
-
-#ifndef TIGHTDB_HAVE_CXX11_TYPE_TRAITS
-
-template<class T> struct is_int { static const bool value = false; };
-template<> struct is_int<bool>               { static const bool value = true; };
-template<> struct is_int<char>               { static const bool value = true; };
-template<> struct is_int<signed char>        { static const bool value = true; };
-template<> struct is_int<unsigned char>      { static const bool value = true; };
-template<> struct is_int<wchar_t>            { static const bool value = true; };
-template<> struct is_int<short>              { static const bool value = true; };
-template<> struct is_int<unsigned short>     { static const bool value = true; };
-template<> struct is_int<int>                { static const bool value = true; };
-template<> struct is_int<unsigned>           { static const bool value = true; };
-template<> struct is_int<long>               { static const bool value = true; };
-template<> struct is_int<unsigned long>      { static const bool value = true; };
-template<> struct is_int<long long>          { static const bool value = true; };
-template<> struct is_int<unsigned long long> { static const bool value = true; };
-
-template<class T> struct is_float { static const bool value = false; };
-template<> struct is_float<float>       { static const bool value = true; };
-template<> struct is_float<double>      { static const bool value = true; };
-template<> struct is_float<long double> { static const bool value = true; };
-
-#endif // !TIGHTDB_HAVE_CXX11_TYPE_TRAITS
-
-} // namespace _impl
-
-
-namespace util {
-
-template<class T> struct IsIntegral {
-#ifdef TIGHTDB_HAVE_CXX11_TYPE_TRAITS
-    static const bool value = std::is_integral<T>::value;
-#else
-    static const bool value = _impl::is_int<typename RemoveCV<T>::type>::value;
-#endif
-};
-
-template<class T> struct IsFloatingPoint {
-#ifdef TIGHTDB_HAVE_CXX11_TYPE_TRAITS
-    static const bool value = std::is_floating_point<T>::value;
-#else
-    static const bool value = _impl::is_float<typename RemoveCV<T>::type>::value;
-#endif
+    typedef typename util::ChooseWidestInt<unsigned, least_unsigned>::type type;
 };
 
 

@@ -1,16 +1,48 @@
 #include "testsettings.hpp"
 #ifdef TEST_ALLOC
 
-#include <tightdb/alloc_slab.hpp>
+#include <string>
+
+#include <tightdb/util/unique_ptr.hpp>
 #include <tightdb/util/file.hpp>
+#include <tightdb/alloc_slab.hpp>
 
-#include "util/unit_test.hpp"
-#include "util/test_only.hpp"
+#include "test.hpp"
 
+using namespace std;
 using namespace tightdb;
+using namespace tightdb::util;
 
-// Note: You can now temporarely declare unit tests with the ONLY(TestName) macro instead of TEST(TestName). This
-// will disable all unit tests except these. Remember to undo your temporary changes before committing.
+
+// Test independence and thread-safety
+// -----------------------------------
+//
+// All tests must be thread safe and independent of each other. This
+// is required because it allows for both shuffling of the execution
+// order and for parallelized testing.
+//
+// In particular, avoid using std::rand() since it is not guaranteed
+// to be thread safe. Instead use the API offered in
+// `test/util/random.hpp`.
+//
+// All files created in tests must use the TEST_PATH macro (or one of
+// its friends) to obtain a suitable file system path. See
+// `test/util/test_path.hpp`.
+//
+//
+// Debugging and the ONLY() macro
+// ------------------------------
+//
+// A simple way of disabling all tests except one called `Foo`, is to
+// replace TEST(Foo) with ONLY(Foo) and then recompile and rerun the
+// test suite. Note that you can also use filtering by setting the
+// environment varible `UNITTEST_FILTER`. See `README.md` for more on
+// this.
+//
+// Another way to debug a particular test, is to copy that test into
+// `experiments/testcase.cpp` and then run `sh build.sh
+// check-testcase` (or one of its friends) from the command line.
+
 
 namespace {
 
@@ -63,40 +95,37 @@ TEST(Alloc_1)
 
 TEST(Alloc_AttachFile)
 {
-    util::File::try_remove("test.tightdb");
-
+    GROUP_TEST_PATH(path);
     {
         SlabAlloc alloc;
         bool is_shared     = false;
         bool read_only     = false;
         bool no_create     = false;
         bool skip_validate = false;
-        alloc.attach_file("test.tightdb", is_shared, read_only, no_create, skip_validate);
+        alloc.attach_file(path, is_shared, read_only, no_create, skip_validate);
         CHECK(alloc.is_attached());
         CHECK(alloc.nonempty_attachment());
         alloc.detach();
         CHECK(!alloc.is_attached());
-        alloc.attach_file("test.tightdb", is_shared, read_only, no_create, skip_validate);
+        alloc.attach_file(path, is_shared, read_only, no_create, skip_validate);
         CHECK(alloc.is_attached());
         alloc.detach();
         CHECK(!alloc.is_attached());
         read_only = true;
         no_create = true;
-        alloc.attach_file("test.tightdb", is_shared, read_only, no_create, skip_validate);
+        alloc.attach_file(path, is_shared, read_only, no_create, skip_validate);
         CHECK(alloc.is_attached());
     }
-
-    util::File::remove("test.tightdb");
 }
 
 
 TEST(Alloc_BadFile)
 {
-    util::File::try_remove("test.tightdb");
-    util::File::try_remove("test2.tightdb");
+    GROUP_TEST_PATH(path_1);
+    GROUP_TEST_PATH(path_2);
 
     {
-        util::File file("test.tightdb", util::File::mode_Append);
+        File file(path_1, File::mode_Append);
         file.write("foo");
     }
 
@@ -106,53 +135,52 @@ TEST(Alloc_BadFile)
         bool read_only     = true;
         bool no_create     = true;
         bool skip_validate = false;
-        CHECK_THROW(alloc.attach_file("test.tightdb", is_shared, read_only, no_create,
+        CHECK_THROW(alloc.attach_file(path_1, is_shared, read_only, no_create,
                                       skip_validate), InvalidDatabase);
         CHECK(!alloc.is_attached());
-        CHECK_THROW(alloc.attach_file("test.tightdb", is_shared, read_only, no_create,
+        CHECK_THROW(alloc.attach_file(path_1, is_shared, read_only, no_create,
                                       skip_validate), InvalidDatabase);
         CHECK(!alloc.is_attached());
         read_only = false;
         no_create = false;
-        CHECK_THROW(alloc.attach_file("test.tightdb", is_shared, read_only, no_create,
+        CHECK_THROW(alloc.attach_file(path_1, is_shared, read_only, no_create,
                                       skip_validate), InvalidDatabase);
         CHECK(!alloc.is_attached());
-        alloc.attach_file("test2.tightdb", is_shared, read_only, no_create, skip_validate);
+        alloc.attach_file(path_2, is_shared, read_only, no_create, skip_validate);
         CHECK(alloc.is_attached());
         alloc.detach();
         CHECK(!alloc.is_attached());
-        CHECK_THROW(alloc.attach_file("test.tightdb", is_shared, read_only, no_create,
+        CHECK_THROW(alloc.attach_file(path_1, is_shared, read_only, no_create,
                                       skip_validate), InvalidDatabase);
     }
-
-    util::File::remove("test.tightdb");
-    util::File::remove("test2.tightdb");
 }
 
 
 TEST(Alloc_AttachBuffer)
 {
+    GROUP_TEST_PATH(path);
+
     // Produce a valid buffer
-    util::UniquePtr<char[]> buffer;
+    UniquePtr<char[]> buffer;
     size_t buffer_size;
     {
-        util::File::try_remove("test.tightdb");
+        File::try_remove(path);
         {
             SlabAlloc alloc;
             bool is_shared     = false;
             bool read_only     = false;
             bool no_create     = false;
             bool skip_validate = false;
-            alloc.attach_file("test.tightdb", is_shared, read_only, no_create, skip_validate);
+            alloc.attach_file(path, is_shared, read_only, no_create, skip_validate);
         }
         {
-            util::File file("test.tightdb");
+            File file(path);
             buffer_size = size_t(file.get_size());
             buffer.reset(static_cast<char*>(malloc(buffer_size)));
             CHECK(bool(buffer));
             file.read(buffer.get(), buffer_size);
         }
-        util::File::remove("test.tightdb");
+        File::remove(path);
     }
 
     {
@@ -170,7 +198,7 @@ TEST(Alloc_AttachBuffer)
         bool read_only     = false;
         bool no_create     = false;
         bool skip_validate = false;
-        alloc.attach_file("test.tightdb", is_shared, read_only, no_create, skip_validate);
+        alloc.attach_file(path, is_shared, read_only, no_create, skip_validate);
         CHECK(alloc.is_attached());
         alloc.detach();
         CHECK(!alloc.is_attached());
@@ -186,7 +214,7 @@ TEST(Alloc_AttachBuffer)
 
 TEST(Alloc_BadBuffer)
 {
-    util::File::try_remove("test.tightdb");
+    GROUP_TEST_PATH(path);
 
     // Produce an invalid buffer
     char buffer[32];
@@ -203,15 +231,13 @@ TEST(Alloc_BadBuffer)
         bool read_only     = false;
         bool no_create     = false;
         bool skip_validate = false;
-        alloc.attach_file("test.tightdb", is_shared, read_only, no_create, skip_validate);
+        alloc.attach_file(path, is_shared, read_only, no_create, skip_validate);
         CHECK(alloc.is_attached());
         alloc.detach();
         CHECK(!alloc.is_attached());
         CHECK_THROW(alloc.attach_buffer(buffer, sizeof buffer), InvalidDatabase);
         CHECK(!alloc.is_attached());
     }
-
-    util::File::remove("test.tightdb");
 }
 
 #endif // TEST_ALLOC

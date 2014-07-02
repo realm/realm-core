@@ -27,6 +27,10 @@
 namespace tightdb {
 
 
+/// A binary column (ColumnBinary) is a single B+-tree, and the root
+/// of the column is the root of the B+-tree. Leaf nodes are either of
+/// type ArrayBinary (array of small blobs) or ArrayBigBlobs (array of
+/// big blobs).
 class ColumnBinary: public ColumnBase {
 public:
     typedef BinaryData value_type;
@@ -41,14 +45,14 @@ public:
 
     BinaryData get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
 
-    void add() TIGHTDB_OVERRIDE { add(BinaryData()); }
-    void add(BinaryData value);
+    void add(BinaryData value = BinaryData());
     void set(std::size_t ndx, BinaryData value, bool add_zero_term = false);
-    void insert(std::size_t ndx) TIGHTDB_OVERRIDE { insert(ndx, BinaryData()); }
-    void insert(std::size_t ndx, BinaryData value);
+    void insert(std::size_t ndx, BinaryData value = BinaryData());
+
+    void insert(std::size_t, std::size_t, bool) TIGHTDB_OVERRIDE;
     void erase(std::size_t ndx, bool is_last) TIGHTDB_OVERRIDE;
     void clear() TIGHTDB_OVERRIDE;
-    void move_last_over(std::size_t ndx) TIGHTDB_OVERRIDE;
+    void move_last_over(std::size_t, std::size_t) TIGHTDB_OVERRIDE;
 
     // Requires that the specified entry was inserted as StringData.
     StringData get_string(std::size_t ndx) const TIGHTDB_NOEXCEPT;
@@ -68,6 +72,8 @@ public:
     ref_type write(std::size_t, std::size_t, std::size_t,
                    _impl::OutputStream&) const TIGHTDB_OVERRIDE;
 
+    void refresh_accessor_tree(std::size_t, const Spec&) TIGHTDB_OVERRIDE;
+
 #ifdef TIGHTDB_DEBUG
     void Verify() const TIGHTDB_OVERRIDE;
     void to_dot(std::ostream&, StringData title) const TIGHTDB_OVERRIDE;
@@ -79,10 +85,9 @@ public:
 private:
     std::size_t do_get_size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return size(); }
 
-//    void add(StringData value) { add_string(value); }
-//    void set(std::size_t ndx, StringData value) { set_string(ndx, value); }
-
-    void do_insert(std::size_t ndx, BinaryData value, bool add_zero_term);
+    /// \param row_ndx Must be `tightdb::npos` if appending.
+    void do_insert(std::size_t row_ndx, BinaryData value, bool add_zero_term,
+                   std::size_t num_rows);
 
     // Called by Array::bptree_insert().
     static ref_type leaf_insert(MemRef leaf_mem, ArrayParent&, std::size_t ndx_in_parent,
@@ -197,32 +202,49 @@ inline void ColumnBinary::set_string(std::size_t ndx, StringData value)
 
 inline void ColumnBinary::add(BinaryData value)
 {
+    std::size_t row_ndx = tightdb::npos;
     bool add_zero_term = false;
-    do_insert(npos, value, add_zero_term);
+    std::size_t num_rows = 1;
+    do_insert(row_ndx, value, add_zero_term, num_rows); // Throws
 }
 
-inline void ColumnBinary::insert(std::size_t ndx, BinaryData value)
+inline void ColumnBinary::insert(std::size_t row_ndx, BinaryData value)
 {
-    TIGHTDB_ASSERT(ndx <= size());
-    if (size() <= ndx) ndx = npos;
+    std::size_t size = this->size(); // Slow
+    TIGHTDB_ASSERT(row_ndx <= size);
+    std::size_t row_ndx_2 = row_ndx == size ? tightdb::npos : row_ndx;
     bool add_zero_term = false;
-    do_insert(ndx, value, add_zero_term);
+    std::size_t num_rows = 1;
+    do_insert(row_ndx_2, value, add_zero_term, num_rows); // Throws
+}
+
+// Implementing pure virtual method of ColumnBase.
+inline void ColumnBinary::insert(std::size_t row_ndx, std::size_t num_rows, bool is_append)
+{
+    std::size_t row_ndx_2 = is_append ? tightdb::npos : row_ndx;
+    BinaryData value = BinaryData();
+    bool add_zero_term = false;
+    do_insert(row_ndx_2, value, add_zero_term, num_rows); // Throws
 }
 
 inline void ColumnBinary::add_string(StringData value)
 {
-    BinaryData bin(value.data(), value.size());
+    std::size_t row_ndx = tightdb::npos;
+    BinaryData value_2(value.data(), value.size());
     bool add_zero_term = true;
-    do_insert(npos, bin, add_zero_term);
+    std::size_t num_rows = 1;
+    do_insert(row_ndx, value_2, add_zero_term, num_rows); // Throws
 }
 
-inline void ColumnBinary::insert_string(std::size_t ndx, StringData value)
+inline void ColumnBinary::insert_string(std::size_t row_ndx, StringData value)
 {
-    TIGHTDB_ASSERT(ndx <= size());
-    if (size() <= ndx) ndx = npos;
-    BinaryData bin(value.data(), value.size());
-    bool add_zero_term = true;
-    do_insert(ndx, bin, add_zero_term);
+    std::size_t size = this->size(); // Slow
+    TIGHTDB_ASSERT(row_ndx <= size);
+    std::size_t row_ndx_2 = row_ndx == size ? tightdb::npos : row_ndx;
+    BinaryData value_2(value.data(), value.size());
+    bool add_zero_term = false;
+    std::size_t num_rows = 1;
+    do_insert(row_ndx_2, value_2, add_zero_term, num_rows); // Throws
 }
 
 inline std::size_t ColumnBinary::get_size_from_ref(ref_type root_ref,
