@@ -63,21 +63,8 @@ static bool generate_all = false;
 // All produced json is automatically checked for syntax regardless of
 // the setting of generate_all. This is done using the 'jsmn' parser.
 
-TIGHTDB_TABLE_2(TupleTableType,
-    first, Int,
-    second, String)
-
-enum Days { Mon, Tue, Wed, Thu, Fri, Sat, Sun };
-
-TIGHTDB_TABLE_4(TestTable,
-    first, Int,
-    second, Int,
-    third, Bool,
-    fourth, Enum<Days>)
-
-
-void setup_multi_table(Table& table, size_t rows, size_t sub_rows,
-    bool fixed_subtab_sizes = false)
+namespace {
+void setup_multi_table(Table& table, size_t rows, size_t sub_rows, bool fixed_subtab_sizes = false)
 {
     // Create table with all column types
     {
@@ -214,7 +201,7 @@ void setup_multi_table(Table& table, size_t rows, size_t sub_rows,
     // We also want a ColumnStringEnum
     table.optimize();
 }
-
+}
 
 bool json_test(string json, string expected_file, bool generate)
 {

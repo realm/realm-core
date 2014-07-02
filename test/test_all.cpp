@@ -37,6 +37,8 @@ using namespace tightdb::test_util::unit_test;
 namespace {
 
 const char* file_order[] = {
+    // The order of tests should be from "simple" to "complex" with repsect to Realm code coverage and 
+    // test complexity (i.e. allocator first, then array, then column, etc).
     "test_self.cpp",
 
     // tightdb/util/
@@ -61,13 +63,14 @@ const char* file_order[] = {
     "test_version.cpp",
     "test_table*.cpp",
     "test_descriptor*.cpp",
-    "test_query*.cpp",
     "test_group*.cpp",
     "test_shared*.cpp",
     "test_transactions*.cpp",
+    "test_query*.cpp",
     "test_replication*.cpp",
     "test_links.cpp",
     "test_link_query_view.cpp",
+    "test_json.cpp",
 
     "test_lang_bind_helper.cpp",
 

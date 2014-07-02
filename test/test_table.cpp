@@ -851,11 +851,7 @@ TEST(Table_ToString)
     table.to_string(ss);
     const string result = ss.str();
     string file_name = get_test_resource_path();
-#if _MSC_VER
-    file_name += "../../test/expect_string.txt";
-#else
     file_name += "expect_string.txt";
-#endif
 #if GENERATE   // enable to generate testfile - check it manually
     ofstream test_file(file_name.c_str(), ios::out);
     test_file << result;
