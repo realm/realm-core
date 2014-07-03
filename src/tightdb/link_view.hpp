@@ -57,7 +57,7 @@ public:
     void remove(std::size_t link_ndx);
     void clear();
 
-    // Find first row backed by source index
+    // Find first row linking to the source index in the target table
     std::size_t find_by_source_ndx(std::size_t source_ndx) const TIGHTDB_NOEXCEPT;
 
     Table& get_parent() TIGHTDB_NOEXCEPT;
