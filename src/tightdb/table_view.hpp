@@ -179,6 +179,9 @@ public:
     // Get row index in the source table this view is "looking" at.
     std::size_t get_source_ndx(std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
 
+    // Find first row backed by source index
+    std::size_t find_by_source_ndx(std::size_t source_ndx) const TIGHTDB_NOEXCEPT;
+
     // Conversion
     void to_json(std::ostream&) const;
     void to_string(std::ostream&, std::size_t limit = 500) const;
@@ -481,6 +484,12 @@ inline std::size_t TableViewBase::size() const TIGHTDB_NOEXCEPT
 inline std::size_t TableViewBase::get_source_ndx(std::size_t row_ndx) const TIGHTDB_NOEXCEPT
 {
     return to_size_t(m_refs.get(row_ndx));
+}
+
+inline std::size_t TableViewBase::find_by_source_ndx(std::size_t source_ndx) const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(source_ndx < m_table->size());
+    return m_refs.find_first(source_ndx);
 }
 
 inline TableViewBase::TableViewBase():

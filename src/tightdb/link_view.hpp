@@ -57,6 +57,12 @@ public:
     void remove(std::size_t link_ndx);
     void clear();
 
+    // Find first row backed by source index
+    std::size_t find_by_source_ndx(std::size_t source_ndx) const TIGHTDB_NOEXCEPT;
+
+    Table& get_parent() TIGHTDB_NOEXCEPT;
+    const Table& get_parent() const TIGHTDB_NOEXCEPT;
+
 private:
     TableRef        m_table;
     ColumnLinkList& m_column;
@@ -221,6 +227,28 @@ inline void LinkView::add(std::size_t target_row_ndx)
     size_t ins_pos = (m_refs.is_attached()) ? m_refs.size() : 0;
     insert(ins_pos, target_row_ndx);
 }
+
+inline std::size_t LinkView::find_by_source_ndx(std::size_t source_ndx) const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(is_attached());
+    TIGHTDB_ASSERT(source_ndx < m_table->size());
+
+    if (!m_refs.is_attached())
+        return not_found;
+
+    return m_refs.find_first(source_ndx);
+}
+
+inline Table& LinkView::get_parent() TIGHTDB_NOEXCEPT
+{
+    return *m_table;
+}
+
+inline const Table& LinkView::get_parent() const TIGHTDB_NOEXCEPT
+{
+    return *m_table;
+}
+
 
 inline void LinkView::refresh_accessor_tree(size_t new_row_ndx)
 {
