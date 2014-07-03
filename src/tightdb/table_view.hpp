@@ -179,7 +179,9 @@ public:
     // Get row index in the source table this view is "looking" at.
     std::size_t get_source_ndx(std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
 
-    // Find first row linking to the source index in the target table
+    /// Search this view for the specified source table row (specified by its
+    /// index in the source table). If found, the index of that row within this
+    /// view is returned, otherwise `tightdb::not_found` is returned.
     std::size_t find_by_source_ndx(std::size_t source_ndx) const TIGHTDB_NOEXCEPT;
 
     // Conversion

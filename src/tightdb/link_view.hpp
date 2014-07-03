@@ -57,16 +57,19 @@ public:
     void remove(std::size_t link_ndx);
     void clear();
 
-    // Find first row linking to the source index in the target table
-    std::size_t find_by_source_ndx(std::size_t source_ndx) const TIGHTDB_NOEXCEPT;
+    /// Search this list for a link to the specified target table row (specified
+    /// by its index in the target table). If found, the index of the link to
+    /// that row within this list is returned, otherwise `tightdb::not_found` is
+    /// returned.
+    std::size_t find(std::size_t target_row_ndx) const TIGHTDB_NOEXCEPT;
 
     Table& get_parent() TIGHTDB_NOEXCEPT;
     const Table& get_parent() const TIGHTDB_NOEXCEPT;
 
 private:
-    TableRef        m_table;
+    TableRef        m_table; // FIXME: Rename to `m_origin_table`
     ColumnLinkList& m_column;
-    Column          m_refs;
+    Column          m_refs; // FIXME: Rename to `m_links` or `m_target_rows` or `m_row_indexes` (a 'ref' is a different thing in the context of TightDB)
     mutable size_t  m_ref_count;
 
     // constructor (protected since it can only be used by friends)
@@ -228,15 +231,15 @@ inline void LinkView::add(std::size_t target_row_ndx)
     insert(ins_pos, target_row_ndx);
 }
 
-inline std::size_t LinkView::find_by_source_ndx(std::size_t source_ndx) const TIGHTDB_NOEXCEPT
+inline std::size_t LinkView::find(std::size_t target_row_ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(is_attached());
-    TIGHTDB_ASSERT(source_ndx < m_table->size());
+    TIGHTDB_ASSERT(target_row_ndx < m_column.get_target_table()->size());
 
     if (!m_refs.is_attached())
         return not_found;
 
-    return m_refs.find_first(source_ndx);
+    return m_refs.find_first(target_row_ndx);
 }
 
 inline Table& LinkView::get_parent() TIGHTDB_NOEXCEPT

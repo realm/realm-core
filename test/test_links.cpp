@@ -618,12 +618,12 @@ TEST(Links_LinkList_FindBySource)
     links->add(1);
     links->add(0);
 
-    CHECK_EQUAL(0, links->find_by_source_ndx(2));
-    CHECK_EQUAL(1, links->find_by_source_ndx(1));
-    CHECK_EQUAL(2, links->find_by_source_ndx(0));
+    CHECK_EQUAL(0, links->find(2));
+    CHECK_EQUAL(1, links->find(1));
+    CHECK_EQUAL(2, links->find(0));
 
     links->remove(0);
-    CHECK_EQUAL(not_found, links->find_by_source_ndx(2));
+    CHECK_EQUAL(not_found, links->find(2));
 }
 
 
