@@ -3798,9 +3798,9 @@ void Table::to_json_row(std::size_t row_ndx, std::ostream& out, size_t link_dept
         }
         case type_Link:
         {
-            ColumnLinkBase& clb = const_cast<Table*>(this)->get_column_linkbase(i);
+            ColumnLinkBase& clb = const_cast<Table*>(this)->get_column_link_base(i);
             ColumnLink& cl = static_cast<ColumnLink&>(clb);
-            TableRef table = cl.get_target_table();
+            Table* table = cl.get_target_table();
 
             if (!cl.is_null_link(row_ndx)) {
                 ref_type lnk = clb.get_ref();
@@ -3825,10 +3825,10 @@ void Table::to_json_row(std::size_t row_ndx, std::ostream& out, size_t link_dept
         }
         case type_LinkList:
         {
-            ColumnLinkBase& clb = const_cast<Table*>(this)->get_column_linkbase(i);
+            ColumnLinkBase& clb = const_cast<Table*>(this)->get_column_link_base(i);
             ColumnLinkList& cll = static_cast<ColumnLinkList&>(clb);
-            TableRef table = cll.get_target_table();
-            LinkViewRef lv = cll.get_link_view(row_ndx);
+            Table* table = cll.get_target_table();
+            LinkViewRef lv = cll.get(row_ndx);
 
             ref_type lnk = clb.get_ref();
             if ((link_depth == 0) || 
