@@ -1524,16 +1524,16 @@ public:
         return *Base::m_query;
     };
 
-    DateTime maximum(const Taboid& tab, std::size_t* resultcount=null_ptr, std::size_t start=0,
+    DateTime maximum(std::size_t* resultcount=null_ptr, std::size_t start=0,
                  std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1)) const
     {
-        return Base::m_query->m_impl.maximum_datetime(tab, col_idx, resultcount, start, end, limit);
+        return Base::m_query->m_impl.maximum_datetime(col_idx, resultcount, start, end, limit);
     }
 
-    DateTime minimum(const Taboid& tab, std::size_t* resultcount=null_ptr, std::size_t start=0,
+    DateTime minimum(std::size_t* resultcount=null_ptr, std::size_t start=0,
                  std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1)) const
     {
-        return Base::m_query->m_impl.minimum_datetime(tab, col_idx, resultcount, start, end, limit);
+        return Base::m_query->m_impl.minimum_datetime(col_idx, resultcount, start, end, limit);
     }
 };
 
