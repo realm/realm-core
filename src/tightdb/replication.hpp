@@ -1468,7 +1468,6 @@ bool Replication::TransactLogParser::do_parse(InstructionHandler& handler)
                 continue;
             }
             case instr_RemoveGroupLevelTable: {
-                read_string(m_string_buffer); // Throws
                 std::size_t table_ndx = read_int<std::size_t>();
                 if (!handler.remove_group_level_table(table_ndx)) // Throws
                     return false;
