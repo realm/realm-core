@@ -203,6 +203,10 @@ void Group::reset_freespace_tracking()
 
 Group::~Group() TIGHTDB_NOEXCEPT
 {
+    if (m_public_indices) {
+        delete[] m_public_indices;
+        m_public_indices = 0;
+    }
     if (!is_attached()) {
         if (m_top.is_attached())
             complete_detach();
@@ -289,6 +293,7 @@ Table* Group::get_table_by_ndx(size_t ndx)
     return table;
 }
 
+
 ref_type Group::create_new_table(StringData name)
 {
     // FIXME: This function is exception safe under the assumption
@@ -298,31 +303,49 @@ ref_type Group::create_new_table(StringData name)
     // is considered exception safe if it produces no visible
     // side-effects when it throws, at least not in any way that
     // matters.
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    // FIXME: ExceptionSafety: If this succeeds, but some of the
+    // following fails, then we must ask the replication instance to
+    // discard everything written to the log since this point. This
+    // should probably be handled with a 'scoped guard'.
+    if (Replication* repl = m_alloc.get_replication())
+        repl->new_group_level_table(name); // Throws
+#endif
+
+    size_t ndx;
+    bool reuse_entry;
+    if (m_public_indices && m_num_removed_entries) {
+        ndx = m_table_names.find_first(StringData("@@__DELETED_TABLE__@@"));
+        reuse_entry = true;
+    }
+    else {
+        ndx = m_tables.size();
+        reuse_entry = false;
+    }
+    if (m_public_indices) {
+        delete[] m_public_indices;
+        m_public_indices = 0;
+    }
 
     using namespace _impl;
     typedef TableFriend tf;
     DeepArrayRefDestroyGuard ref_dg(tf::create_empty_table(m_alloc), m_alloc); // Throws
-    size_t ndx = m_tables.size();
-    TIGHTDB_ASSERT(ndx == m_table_names.size());
-    m_tables.insert(ndx, ref_dg.get()); // Throws
+    TIGHTDB_ASSERT(m_tables.size() == m_table_names.size());
     try {
-        m_table_names.insert(ndx, name); // Throws
+        if (reuse_entry) m_tables.set(    ndx, ref_dg.get());
+        else             m_tables.insert( ndx, ref_dg.get());
         try {
-#ifdef TIGHTDB_ENABLE_REPLICATION
-            if (Replication* repl = m_alloc.get_replication())
-                repl->new_group_level_table(name); // Throws
-#endif
-
-            // The rest is guaranteed not to throw
+            if (reuse_entry) m_table_names.set(    ndx, name);
+            else             m_table_names.insert( ndx, name);
             return ref_dg.release();
-        }
+        } 
         catch (...) {
-            m_table_names.erase(ndx); // Guaranteed not to throw
+            if (reuse_entry) m_tables.set( ndx, 0);
+            else             m_tables.erase( ndx);
             throw;
         }
     }
-    catch (...) {
-        m_tables.erase(ndx); // Guaranteed not to throw
+    catch(...) {
         throw;
     }
 }
@@ -347,6 +370,21 @@ Table* Group::create_new_table_and_accessor(StringData name, SpecSetter spec_set
         repl->new_group_level_table(name); // Throws
 #endif
 
+    size_t ndx;
+    bool reuse_entry;
+    if (m_public_indices && m_num_removed_entries) {
+        ndx = m_table_names.find_first(StringData("@@__DELETED_TABLE__@@"));
+        reuse_entry = true;
+    }
+    else {
+        ndx = m_tables.size();
+        reuse_entry = false;
+    }
+    if (m_public_indices) {
+        delete[] m_public_indices;
+        m_public_indices = 0;
+    }
+
     using namespace _impl;
     typedef TableFriend tf;
     DeepArrayRefDestroyGuard ref_dg(tf::create_empty_table(m_alloc), m_alloc); // Throws
@@ -358,24 +396,33 @@ Table* Group::create_new_table_and_accessor(StringData name, SpecSetter spec_set
     ref_type ref = ref_dg.release();
     tf::bind_ref(*table_ug); // Increase reference count from 0 to 1
 
-    size_t ndx = m_tables.size();
-    m_table_accessors.resize(ndx+1); // Throws
     tf::set_top_parent(*table_ug, this, ndx);
     try {
         if (spec_setter)
             (*spec_setter)(*table_ug); // Throws
 
-        TIGHTDB_ASSERT(ndx == m_table_names.size());
-        m_tables.insert(ndx, ref); // Throws
+        TIGHTDB_ASSERT(m_tables.size() == m_table_names.size());
+        if (reuse_entry) m_tables.set(   ndx, ref);
+        else             m_tables.insert(ndx, ref); // Throws
         try {
-            m_table_names.insert(ndx, name); // Throws
-            // The rest is guaranteed not to throw
-            Table* table = table_ug.release();
-            m_table_accessors[ndx] = table;
-            return table;
+            if (reuse_entry) m_table_names.set(   ndx, name);
+            else             m_table_names.insert(ndx, name); // Throws
+            try {
+                Table* table = table_ug.get();
+                if (reuse_entry) m_table_accessors[ndx] = table;
+                else m_table_accessors.push_back(table); // Throws
+                table_ug.release();
+                return table;
+            } 
+            catch(...) {
+                if (reuse_entry) m_table_names.set( ndx, StringData("@@__DELETED_TABLE__@@"));
+                else             m_table_names.erase( ndx);
+                throw;
+            }
         }
         catch (...) {
-            m_tables.erase(ndx); // Guaranteed not to throw
+            if (reuse_entry) m_tables.set( ndx, 0);
+            else             m_tables.erase(ndx); // Guaranteed not to throw
             throw;
         }
     }

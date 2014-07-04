@@ -249,6 +249,30 @@ TEST(Group_Size)
     CHECK_EQUAL(2, g.size());
 }
 
+TEST(Group_RemoveTable)
+{
+    Group g;
+    TableRef t1 = g.get_table("alpha");
+    TableRef t2 = g.get_table("beta");
+    TableRef t3 = g.get_table("tau");
+    TableRef t4 = g.get_table("sigma");
+    CHECK_EQUAL(4, g.size());
+    g.rename_table("beta", "grappa");
+    CHECK_EQUAL(4, g.size());
+    g.remove_table("grappa");
+    CHECK_EQUAL(3, g.size());
+    CHECK_EQUAL(StringData("alpha"), g.get_table_name(0));
+    CHECK_EQUAL(StringData("tau"), g.get_table_name(1));
+    CHECK_EQUAL(StringData("sigma"), g.get_table_name(2));
+    TableRef t5 = g.get_table("beta");
+    CHECK_EQUAL(4, g.size());
+    CHECK_EQUAL(StringData("alpha"), g.get_table_name(0));
+    CHECK_EQUAL(StringData("beta"), g.get_table_name(1));
+    CHECK_EQUAL(StringData("tau"), g.get_table_name(2));
+    CHECK_EQUAL(StringData("sigma"), g.get_table_name(3));
+}
+
+
 TEST(Group_GetTable)
 {
     Group g;
