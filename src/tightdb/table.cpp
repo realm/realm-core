@@ -3645,20 +3645,14 @@ void Table::update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT
 
 
 // to JSON: ------------------------------------------
-
-void Table::to_json(ostream& out) const
+void Table::to_json_row(std::size_t row_ndx, std::ostream& out, size_t link_depth, std::map<std::string, 
+    std::string>* renames) const
 {
-    // Represent table as list of objects
-    out << "[";
+    std::map<std::string, std::string> renames2;
+    renames = renames ? renames : &renames2;
 
-    size_t row_count = size();
-    for (size_t r = 0; r < row_count; ++r) {
-        if (r > 0)
-            out << ",";
-        to_json_row(r, out);
-    }
-
-    out << "]";
+    vector<ref_type> followed;
+    to_json_row(row_ndx, out, link_depth, *renames, followed);
 }
 
 
@@ -3687,16 +3681,44 @@ inline void out_binary(ostream& out, const BinaryData bin)
 
 template<class T> void out_floats(ostream& out, T value)
 {
+    // fixme, windows prints exponent as 3 digits while *nix prints 2. We use _set_output_format()
+    // and restore it again with _set_output_format() because we're a library which must not permanently
+    // set modes that effect the application. However, this method of set/get is not thread safe! Must
+    // be fixed before releasing Windows versions of core.
+#if _MSC_VER
+    int oldformat = _get_output_format();
+    _set_output_format(_TWO_DIGIT_EXPONENT);
+#endif
     streamsize old = out.precision();
     out.precision(numeric_limits<T>::digits10 + 1);
     out << scientific << value;
     out.precision(old);
+
+#if _MSC_VER
+    _set_output_format(oldformat);
+#endif
+
 }
 
 } // anonymous namespace
 
+void Table::to_json(std::ostream& out, size_t link_depth, std::map<std::string, std::string>* renames) const
+{
+    // Represent table as list of objects
+    out << "[";
 
-void Table::to_json_row(size_t row_ndx, ostream& out) const
+    size_t row_count = size();
+    for (size_t r = 0; r < row_count; ++r) {
+        if (r > 0)
+            out << ",";
+        to_json_row(r, out, link_depth, renames);
+    }
+
+    out << "]";
+}
+
+void Table::to_json_row(std::size_t row_ndx, std::ostream& out, size_t link_depth, 
+    std::map<std::string, std::string>& renames, std::vector<ref_type>& followed) const
 {
     out << "{";
     size_t column_count = get_column_count();
@@ -3705,86 +3727,139 @@ void Table::to_json_row(size_t row_ndx, ostream& out) const
             out << ",";
 
         StringData name = get_column_name(i);
+        if (renames[name] != "")
+            name = renames[name];
+
         out << "\"" << name << "\":";
 
         DataType type = get_column_type(i);
         switch (type) {
-            case type_Int:
-                out << get_int(i, row_ndx);
-                break;
-            case type_Bool:
-                out << (get_bool(i, row_ndx) ? "true" : "false");
-                break;
-            case type_Float:
-                out_floats<float>(out, get_float(i, row_ndx));
-                break;
-            case type_Double:
-                out_floats<double>(out, get_double(i, row_ndx));
-                break;
-            case type_String:
-                out << "\"" << get_string(i, row_ndx) << "\"";
-                break;
-            case type_DateTime:
-                out << "\""; out_datetime(out, get_datetime(i, row_ndx)); out << "\"";
-                break;
-            case type_Binary:
-                out << "\""; out_binary(out, get_binary(i, row_ndx)); out << "\"";
-                break;
-            case type_Table:
+        case type_Int:
+            out << get_int(i, row_ndx);
+            break;
+        case type_Bool:
+            out << (get_bool(i, row_ndx) ? "true" : "false");
+            break;
+        case type_Float:
+            out_floats<float>(out, get_float(i, row_ndx));
+            break;
+        case type_Double:
+            out_floats<double>(out, get_double(i, row_ndx));
+            break;
+        case type_String:
+            out << "\"" << get_string(i, row_ndx) << "\"";
+            break;
+        case type_DateTime:
+            out << "\""; out_datetime(out, get_datetime(i, row_ndx)); out << "\"";
+            break;
+        case type_Binary:
+            out << "\""; out_binary(out, get_binary(i, row_ndx)); out << "\"";
+            break;
+        case type_Table:
+            get_subtable(i, row_ndx)->to_json(out);
+            break;
+        case type_Mixed:
+        {
+            DataType mtype = get_mixed_type(i, row_ndx);
+            if (mtype == type_Table) {
                 get_subtable(i, row_ndx)->to_json(out);
-                break;
-            case type_Mixed:
-            {
-                DataType mtype = get_mixed_type(i, row_ndx);
-                if (mtype == type_Table) {
-                    get_subtable(i, row_ndx)->to_json(out);
+            }
+            else {
+                Mixed m = get_mixed(i, row_ndx);
+                switch (mtype) {
+                case type_Int:
+                    out << m.get_int();
+                    break;
+                case type_Bool:
+                    out << (m.get_bool() ? "true" : "false");
+                    break;
+                case type_Float:
+                    out_floats<float>(out, m.get_float());
+                    break;
+                case type_Double:
+                    out_floats<double>(out, m.get_double());
+                    break;
+                case type_String:
+                    out << "\"" << m.get_string() << "\"";
+                    break;
+                case type_DateTime:
+                    out << "\""; out_datetime(out, m.get_datetime()); out << "\"";
+                    break;
+                case type_Binary:
+                    out << "\""; out_binary(out, m.get_binary()); out << "\"";
+                    break;
+                case type_Table:
+                case type_Mixed:
+                case type_Link:
+                case type_LinkList:
+                    TIGHTDB_ASSERT(false);
+                    break;
+                }
+            }
+            break;
+        }
+        case type_Link:
+        {
+            ColumnLinkBase& clb = const_cast<Table*>(this)->get_column_link_base(i);
+            ColumnLink& cl = static_cast<ColumnLink&>(clb);
+            Table* table = cl.get_target_table();
+
+            if (!cl.is_null_link(row_ndx)) {
+                ref_type lnk = clb.get_ref();
+                if ((link_depth == 0) || 
+                    (link_depth == not_found && std::find(followed.begin(), followed.end(), lnk) != followed.end())) {
+                    out << "\"" << cl.get_link(row_ndx) << "\"";
+                    break;
                 }
                 else {
-                    Mixed m = get_mixed(i, row_ndx);
-                    switch (mtype) {
-                        case type_Int:
-                            out << m.get_int();
-                            break;
-                        case type_Bool:
-                            out << (m.get_bool() ? "true" : "false");
-                            break;
-                        case type_Float:
-                            out_floats<float>(out, m.get_float());
-                            break;
-                        case type_Double:
-                            out_floats<double>(out, m.get_double());
-                            break;
-                        case type_String:
-                            out << "\"" << m.get_string() << "\"";
-                            break;
-                        case type_DateTime:
-                            out << "\""; out_datetime(out, m.get_datetime()); out << "\"";
-                            break;
-                        case type_Binary:
-                            out << "\""; out_binary(out, m.get_binary()); out << "\"";
-                            break;
-                        case type_Table:
-                        case type_Mixed:
-                        case type_Link:
-                        case type_LinkList:
-                            TIGHTDB_ASSERT(false);
-                            break;
-                    }
+                    out << "[";
+                    followed.push_back(clb.get_ref());
+                    size_t new_depth = link_depth == not_found ? not_found : link_depth - 1;
+                    table->to_json_row(cl.get_link(row_ndx), out, new_depth, renames, followed);
+                    out << "]";
                 }
+            }
+            else {
+                out << "[]";
+            }
+
+            break;
+        }
+        case type_LinkList:
+        {
+            ColumnLinkBase& clb = const_cast<Table*>(this)->get_column_link_base(i);
+            ColumnLinkList& cll = static_cast<ColumnLinkList&>(clb);
+            Table* table = cll.get_target_table();
+            LinkViewRef lv = cll.get(row_ndx);
+
+            ref_type lnk = clb.get_ref();
+            if ((link_depth == 0) || 
+                (link_depth == not_found && std::find(followed.begin(), followed.end(), lnk) != followed.end())) {
+                out << "{\"table\": \"" << cll.get_target_table()->get_name() << "\", \"rows\": [";
+                cll.to_json_row(row_ndx, out);
+                out << "]}";
                 break;
             }
-            case type_Link:
-                // FIXME: print entire linked row
-                out << "\"Link to: " << get_link(i, row_ndx) << "\"";
-                break;
-            case type_LinkList:
-                // FIXME: print entire list of linked row
-                //out << "\"Link to: " << get_int(i, row_ndx) << "\"";
-                break;
+            else {
+                out << "[";
+                for (size_t link = 0; link < lv->size(); link++) {
+                    if (link > 0)
+                        out << ", ";
+                    followed.push_back(lnk);
+                    size_t new_depth = link_depth == not_found ? not_found : link_depth - 1;
+                    table->to_json_row(lv->get_target_row(link), out, new_depth, renames, followed);
+                }
+                out << "]";
+            }
+
+            break;
         }
+        } // switch ends
     }
     out << "}";
 }
+
+
 
 
 // to_string --------------------------------------------------
@@ -3990,6 +4065,15 @@ void Table::to_string_row(size_t row_ndx, ostream& out, const vector<size_t>& wi
     out.width(row_ndx_width);
     out << row_ndx << ":";
 
+    // fixme, windows prints exponents as 3 digits while *nix prints 2. We use _set_output_format()
+    // and restore it again with _set_output_format() because we're a library which must not permanently
+    // set modes that effect the application. However, this method of set/get is not thread safe! Must
+    // be fixed before releasing Windows versions of core.
+#if _MSC_VER
+    int oldformat = _get_output_format();
+    _set_output_format(_TWO_DIGIT_EXPONENT);
+#endif
+
     for (size_t col = 0; col < column_count; ++col) {
         out << "  "; // spacing
         out.width(widths[col+1]);
@@ -4016,7 +4100,7 @@ void Table::to_string_row(size_t row_ndx, ostream& out, const vector<size_t>& wi
                 break;
             case type_Table:
                 out_table(out, get_subtable_size(col, row_ndx));
-                break;
+                break; 
             case type_Binary:
                 out.width(widths[col+1]-6); // adjust for " bytes" text
                 out << get_binary(col, row_ndx).size() << " bytes";
@@ -4071,6 +4155,11 @@ void Table::to_string_row(size_t row_ndx, ostream& out, const vector<size_t>& wi
                 break;
         }
     }
+
+#if _MSC_VER
+    _set_output_format(oldformat);
+#endif
+
     out << "\n";
 }
 

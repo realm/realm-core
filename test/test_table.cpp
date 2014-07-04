@@ -839,7 +839,7 @@ TEST(Table_RangeConst)
 }
 
 
-// enable to generate testfiles for to_string and json below
+// enable to generate testfiles for to_string below
 #define GENERATE 0
 
 TEST(Table_ToString)
@@ -851,11 +851,7 @@ TEST(Table_ToString)
     table.to_string(ss);
     const string result = ss.str();
     string file_name = get_test_resource_path();
-#if _MSC_VER
-    file_name += "expect_string-win.txt";
-#else
     file_name += "expect_string.txt";
-#endif
 #if GENERATE   // enable to generate testfile - check it manually
     ofstream test_file(file_name.c_str(), ios::out);
     test_file << result;
@@ -876,43 +872,6 @@ TEST(Table_ToString)
     }
 #endif
 }
-
-TEST(Table_JsonAllData)
-{
-    Table table;
-    setup_multi_table(table, 15, 2);
-
-    stringstream ss;
-    table.to_json(ss);
-    const string json = ss.str();
-    string file_name = get_test_resource_path();
-#if _MSC_VER
-    file_name += "expect_json-win.json";
-#else
-    file_name += "expect_json.json";
-#endif
-#if GENERATE
-        // Generate the testdata to compare. After doing this,
-        // verify that the output is correct with a json validator:
-        // http://jsonformatter.curiousconcept.com/
-    cerr << "JSON:" << json << "\n";
-    ofstream test_file(file_name.c_str(), ios::out | ios::binary);
-    test_file << json;
-#else
-    string expected;
-    ifstream test_file(file_name.c_str(), ios::in | ios::binary);
-    CHECK(!test_file.fail());
-    getline(test_file,expected);
-    CHECK_EQUAL(true, json == expected);
-    if (json != expected) {
-        TEST_PATH(path);
-        File out(path, File::mode_Write);
-        out.write(json);
-        cerr << "\n error result in '"<<string(path)<<"'\n";
-    }
-#endif
-}
-
 
 /* DISABLED BECAUSE IT FAILS - A PULL REQUEST WILL BE MADE WHERE IT IS REENABLED!
 TEST(Table_RowToString)

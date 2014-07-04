@@ -1200,5 +1200,24 @@ TEST(TableView_RowAccessor)
     CHECK_EQUAL(703, crow_2.get_int(0));
 }
 
+TEST(TableView_FindBySourceNdx)
+{
+    Table table;
+    table.add_column(type_Int, "");
+    table.add_empty_row();
+    table.add_empty_row();
+    table.add_empty_row();
+    table[0].set_int(0, 0);
+    table[1].set_int(0, 1);
+    table[2].set_int(0, 2);
+
+    TableView tv = table.where().find_all();
+    tv.sort(0, false);
+
+    CHECK_EQUAL(0, tv.find_by_source_ndx(2));
+    CHECK_EQUAL(1, tv.find_by_source_ndx(1));
+    CHECK_EQUAL(2, tv.find_by_source_ndx(0));
+}
+
 
 #endif // TEST_TABLE_VIEW

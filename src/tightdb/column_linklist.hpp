@@ -27,6 +27,7 @@
 #include <tightdb/column_linkbase.hpp>
 #include <tightdb/table.hpp>
 #include <tightdb/column_backlink.hpp>
+#include <iostream>
 
 namespace tightdb {
 
@@ -62,6 +63,8 @@ public:
 
     /// Compare two columns for equality.
     bool compare_link_list(const ColumnLinkList&) const;
+
+    void to_json_row(size_t row_ndx, std::ostream& out) const;
 
     void refresh_accessor_tree(std::size_t, const Spec&) TIGHTDB_OVERRIDE;
 

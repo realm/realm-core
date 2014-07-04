@@ -661,6 +661,12 @@ int64_t Query::maximum_int(size_t column_ndx, size_t* resultcount, size_t start,
 {
     return aggregate<act_Max, int64_t>(&Column::maximum, column_ndx, resultcount, start, end, limit);
 }
+
+DateTime Query::maximum_datetime(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
+{
+    return aggregate<act_Max, int64_t>(&Column::maximum, column_ndx, resultcount, start, end, limit);
+}
+
 float Query::maximum_float(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
     return aggregate<act_Max, float>(&ColumnFloat::maximum, column_ndx, resultcount, start, end, limit);
@@ -669,6 +675,7 @@ double Query::maximum_double(size_t column_ndx, size_t* resultcount, size_t star
 {
     return aggregate<act_Max, double>(&ColumnDouble::maximum, column_ndx, resultcount, start, end, limit);
 }
+
 
 // Minimum
 
@@ -684,6 +691,12 @@ double Query::minimum_double(size_t column_ndx, size_t* resultcount, size_t star
 {
     return aggregate<act_Min, double>(&ColumnDouble::minimum, column_ndx, resultcount, start, end, limit);
 }
+
+DateTime Query::minimum_datetime(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
+{
+    return aggregate<act_Min, int64_t>(&Column::minimum, column_ndx, resultcount, start, end, limit);
+}
+
 
 // Average
 

@@ -70,10 +70,13 @@ TEST(Shared_Unattached)
 
 namespace {
 
-#if TIGHTDB_ANDROID
-bool allow_async = false;
-#else
-bool allow_async = true;
+// async deamon does not start when launching unit tests from osx, so async is currently disabled on osx.
+#if !defined(_WIN32) && !defined(__APPLE__)
+    #if TIGHTDB_ANDROID
+        bool allow_async = false;
+    #else
+        bool allow_async = true;
+    #endif
 #endif
 
 TIGHTDB_TABLE_4(TestTableShared,
@@ -1501,8 +1504,9 @@ TEST(Shared_ClearColumnWithBasicArrayRootLeaf)
 }
 
 
-// disable shared async on windows
-#ifndef _WIN32
+// disable shared async on windows and any Apple operating system
+// TODO: enable async daemon for OS X - think how to do it in XCode (no issue for build.sh)
+#if !defined(_WIN32) && !defined(__APPLE__)
 // Todo. Keywords: winbug
 TEST_IF(Shared_Async, allow_async)
 {

@@ -47,12 +47,15 @@ C++ (core)
 * Views can now be be kept synchronized with changes to the tables used to generate the view, use `TableView::sync_if_needed()` to do so. Views are no longer detached when the table they have been generated from are changed. Instead they just go out of sync. See further description in `src/tightdb/table_view.hpp`.
 
 ### Enhancements:
+* Now supports links in Table::to_json. Please see unit tests in the new test_json.cpp file
+* Now supports DateTime Query::maximum_datetime() and DateTime Query::minimum_datetime()
 * Supports links in queries, like `(table1->link(3).column<Int>(0) > 550).find()`.
 * Added support for links and lists of links as column types, to enable relationships between tables.
 * Adding `Table::get_index_in_parent()` and `Group::get_table(std::size_t table_ndx)`. They were needed for implicit transactions.
 * `Table::get_parent_table()` can now also return the index of the column in the parent.
 * Support for row accessors.
 * Table, row, and descriptor accessors are now generally retained and properly adjusted when the parent table is modified.
+* Added methods to find rows by target in TableView and LinkView.
 
 -----------
 

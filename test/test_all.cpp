@@ -37,6 +37,8 @@ using namespace tightdb::test_util::unit_test;
 namespace {
 
 const char* file_order[] = {
+    // The order of tests should be from "simple" to "complex" with repsect to Realm code coverage and 
+    // test complexity (i.e. allocator first, then array, then column, etc).
     "test_self.cpp",
 
     // tightdb/util/
@@ -57,16 +59,18 @@ const char* file_order[] = {
     "test_destroy_guard.cpp",
 
     // /tightdb/ (main API)
+    "test_json.cpp",
     "test_version.cpp",
     "test_table*.cpp",
     "test_descriptor*.cpp",
-    "test_query*.cpp",
     "test_group*.cpp",
     "test_shared*.cpp",
     "test_transactions*.cpp",
+    "test_query*.cpp",
     "test_replication*.cpp",
     "test_links.cpp",
     "test_link_query_view.cpp",
+    "test_json.cpp",
 
     "test_lang_bind_helper.cpp",
 
@@ -340,6 +344,12 @@ bool run_tests()
 int test_all(int argc, char* argv[])
 {
     bool no_error_exit_staus = 2 <= argc && strcmp(argv[1], "--no-error-exitcode") == 0;
+
+#ifdef _MSC_VER
+    // we're in /build/ on Windows if we're in the Visual Studio IDE
+    set_test_resource_path("../../test/");
+    set_test_path_prefix("../../test/");
+#endif
 
     fix_max_open_files();
     fix_async_daemon_path();
