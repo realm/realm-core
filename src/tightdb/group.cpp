@@ -298,14 +298,15 @@ Table* Group::get_table_by_ndx(size_t ndx)
 void Group::remove_table(size_t table_ndx)
 {
     TIGHTDB_ASSERT(is_attached());
-    TIGHTDB_ASSERT(table_ndx < m_table_names.size());
+    TIGHTDB_ASSERT(table_ndx < m_tables.size());
     TIGHTDB_ASSERT(m_tables.get(table_ndx) != 0);
+    // FSA: check that there no backlinks in this table
+    // FSA: how do you actually delete the table data?
     m_tables.set(table_ndx, 0);
     Table* accessor = m_table_accessors[table_ndx];
     if (accessor) {
         // FSA: accessor->detach(); is private - what do you do then?
         // FSA: how do you delete the accessor itself? 
-        // FSA: how do you actually delete the table data?
         m_table_accessors[table_ndx] = 0;
     }
     --m_size;
@@ -922,7 +923,7 @@ public:
     bool remove_group_level_table(std::size_t table_ndx) TIGHTDB_NOEXCEPT
     {
         // actual change of data occurs in parallel, but we need to kill any accessor at table_ndx.
-        // FIXME! not done yet
+        // FSA: FIXME! not done yet
         static_cast<void>(table_ndx);
         return true;
     }
