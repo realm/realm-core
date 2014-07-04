@@ -71,7 +71,7 @@ TEST(Shared_Unattached)
 namespace {
 
 // async deamon does not start when launching unit tests from osx, so async is currently disabled on osx.
-#if defined(_WIN32) || defined(__APPLE__)
+#if !defined(_WIN32) && !defined(__APPLE__)
     #if TIGHTDB_ANDROID
         bool allow_async = false;
     #else
