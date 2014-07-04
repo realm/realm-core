@@ -272,8 +272,8 @@ link_depth >= 0:
     Follow all possible permitations of link paths that are at most link_depth links deep. A link can be taken any 
     number if times.
 
-A link which isn't followed (bottom of link_depth has been met, or link has already been followed with link_depth = -1)
-is printed as a simple sequence of integers of row indexes in the link column.
+A link which isn't followed (bottom of link_depth has been met, or link has already been followed with 
+    link_depth = -1) is printed as a simple sequence of integers of row indexes in the link column.
 */
 
 TEST(Test_json_linklist1)
