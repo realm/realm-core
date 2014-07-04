@@ -678,7 +678,7 @@ public:
     {
 #ifdef TIGHTDB_DEBUG
         if (m_log)
-            *m_log << "group->rename_table(\"" << table_ndx << ", " << new_name << "\")\n";
+            *m_log << "group->rename_table(" << table_ndx << ", \"" << new_name << "\")\n";
 #endif
         m_group.rename_table(table_ndx, new_name);
         return true;
@@ -688,7 +688,7 @@ public:
     {
 #ifdef TIGHTDB_DEBUG
         if (m_log)
-            *m_log << "group->remove_table(\"" << table_ndx << "\")\n";
+            *m_log << "group->remove_table(" << table_ndx << ")\n";
 #endif
         m_group.remove_table(table_ndx);
         return true;

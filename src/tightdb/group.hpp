@@ -372,9 +372,6 @@ private:
     bool m_is_attached;
     mutable std::size_t m_size;
 
-    void prepare_public_indexing() const;
-    std::size_t public_to_private_index(std::size_t public_index) const;
-
     struct shared_tag {};
     Group(shared_tag) TIGHTDB_NOEXCEPT;
 
