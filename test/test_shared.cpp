@@ -76,6 +76,10 @@ bool allow_async = false;
 bool allow_async = true;
 #endif
 
+// async deamon does not start when launching unit tests from osx, so async is currently disabled on osx. This
+// dummy function prevents 'unused variable' warning.
+void dummy() { static_cast<void>(allow_async); }
+
 TIGHTDB_TABLE_4(TestTableShared,
                 first,  Int,
                 second, Int,
