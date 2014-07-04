@@ -289,7 +289,7 @@ bool run_tests()
     else {
         const char* str = getenv("UNITTEST_PROGRESS");
         bool report_progress = str && strlen(str) != 0;
-        reporter.reset(new CustomReporter(true));
+        reporter.reset(new CustomReporter(report_progress));
     }
 
     // Set up filter
