@@ -196,11 +196,32 @@ public:
     /// group is zero.
     bool is_empty() const TIGHTDB_NOEXCEPT;
 
-    /// Returns the number of tables in this group.
+    /// Returns the number of tables in this group. This does NOT include
+    /// deleted tables. If you want to iterate through the tables, you
+    /// most likely want to use first_valid_index(), ending_index() 
+    /// and next_valid_index() instead.
     std::size_t size() const;
 
+    /// Get the first valid index. Tables in the group can be enumerated
+    /// by going through the range [first_valid_index() .. ending_index()[
+    /// but using next_valid_index() to iterate through only the valid indices.
+    /// first_valid_index() can also be used to validate an index. If the index
+    /// is valid, it is returned. If the index is invalid, the next valid index
+    /// is returned instead, or ending_index() if no more valid indices exist.
+    std::size_t first_valid_index(std::size_t index = 0) const;
+
+    /// Get the ending index. Valid indices are smaller than the ending index.
+    std::size_t ending_index() const;
+
+    /// Get the index of the next table. This skips any deleted tables.
+    /// The index provided as argument does not need to be a valid index.
+    /// If no next valid index exist, the ending_index() is returned. Note, 
+    /// This index is not a valid index.
+    std::size_t next_valid_index(std::size_t table_ndx) const;
+
     /// Get the name of the table at the specified index within this
-    /// group.
+    /// group. May return Deleted_table if there is no table at the
+    /// specified index.
     StringData get_table_name(std::size_t table_ndx) const;
 
     /// Check whether this group has a table with the specified name.
@@ -249,11 +270,12 @@ public:
     //@}
 
     /// Remove the table at specified index. This operation fails and throws
-    /// if the table is a link target of another table.
-    void remove_table(StringData name);
+    /// if the table is a link target of another table, OR if the index is invalid.
+    void remove_table(std::size_t table_ndx);
 
-    /// Rename the table at specified index.
-    void rename_table(StringData old_name, StringData new_name);
+    /// Rename the table at specified index. This operation fails and throws
+    /// if the index is invalid.
+    void rename_table(std::size_t table_ndx, StringData new_name);
 
     // Serialization
 
@@ -346,11 +368,7 @@ private:
     mutable table_accessors m_table_accessors;
     const bool m_is_shared;
     bool m_is_attached;
-    // the following fields are computed on demand, if either size() is
-    // called, or if an attempt is made to index the group using a public
-    // index.
-    mutable std::size_t* m_public_indices; // is 0 to indicate "not computed yet"
-    mutable std::size_t m_num_removed_entries; // number of removed entries.
+    mutable std::size_t m_size;
 
     void prepare_public_indexing() const;
     std::size_t public_to_private_index(std::size_t public_index) const;
@@ -453,7 +471,6 @@ inline Group::Group():
     m_free_lengths(m_alloc), m_free_versions(m_alloc), m_is_shared(false), m_is_attached(false)
 {
     init_array_parents();
-    m_public_indices = 0;
     m_alloc.attach_empty(); // Throws
     bool add_free_versions = false;
     create(add_free_versions); // Throws
@@ -465,7 +482,6 @@ inline Group::Group(const std::string& file, OpenMode mode):
     m_free_lengths(m_alloc), m_free_versions(m_alloc), m_is_shared(false), m_is_attached(false)
 {
     init_array_parents();
-    m_public_indices = 0;
     open(file, mode); // Throws
 }
 
@@ -475,7 +491,6 @@ inline Group::Group(BinaryData buffer, bool take_ownership):
     m_free_lengths(m_alloc), m_free_versions(m_alloc), m_is_shared(false), m_is_attached(false)
 {
     init_array_parents();
-    m_public_indices = 0;
     open(buffer, take_ownership); // Throws
 }
 
@@ -485,7 +500,6 @@ inline Group::Group(unattached_tag) TIGHTDB_NOEXCEPT:
     m_free_lengths(m_alloc), m_free_versions(m_alloc), m_is_shared(false), m_is_attached(false)
 {
     init_array_parents();
-    m_public_indices = 0;
 }
 
 inline Group* Group::get_parent_group() TIGHTDB_NOEXCEPT
@@ -499,13 +513,13 @@ inline Group::Group(shared_tag) TIGHTDB_NOEXCEPT:
     m_free_lengths(m_alloc), m_free_versions(m_alloc), m_is_shared(true), m_is_attached(false)
 {
     init_array_parents();
-    m_public_indices = 0;
 }
 
 inline void Group::init_array_parents() TIGHTDB_NOEXCEPT
 {
     m_table_names.set_parent(&m_top, 0);
     m_tables.set_parent(&m_top, 1);
+    m_size = 0;
     // Third slot is "logical file size"
     m_free_positions.set_parent(&m_top, 3);
     m_free_lengths.set_parent(&m_top, 4);
@@ -534,14 +548,12 @@ inline std::size_t Group::size() const
 {
     if (!is_attached())
         return 0;
-    prepare_public_indexing();
-    return m_table_names.size() - m_num_removed_entries;
+    return m_size;
 }
 
 inline StringData Group::get_table_name(std::size_t table_ndx) const
 {
     TIGHTDB_ASSERT(is_attached());
-    table_ndx = public_to_private_index(table_ndx);
     TIGHTDB_ASSERT(table_ndx < m_table_names.size());
     return m_table_names.get(table_ndx);
 }
@@ -564,64 +576,6 @@ template<class T> inline bool Group::has_table(StringData name) const
     const Table* table = get_table_by_ndx(ndx); // Throws
     return T::matches_dynamic_spec(_impl::TableFriend::get_spec(*table));
 }
-
-inline std::size_t Group::public_to_private_index(std::size_t public_index) const
-{
-    prepare_public_indexing();
-    return m_public_indices[public_index];
-}
-
-inline void Group::prepare_public_indexing() const
-{
-    if (m_public_indices == 0) {
-        // first count removed entries:
-        m_num_removed_entries = 0;
-        for (size_t i = 0; i < m_table_names.size(); ++i) {
-            if (m_table_names.get(i) == StringData("@@__DELETED_TABLE__@@")) {
-                ++m_num_removed_entries;
-            }
-        }
-        m_public_indices = new std::size_t[m_table_names.size() - m_num_removed_entries];
-        std::size_t public_index = 0;
-        for (size_t i = 0; i < m_table_names.size(); ++i) {
-            if (m_table_names.get(i) != StringData("@@__DELETED_TABLE__@@")) {
-                m_public_indices[public_index] = i;
-                ++public_index;
-            }
-        }
-    }
-}
-
-
-inline void Group::remove_table(StringData name)
-{
-    TIGHTDB_ASSERT(is_attached());
-    std::size_t table_ndx = m_table_names.find_first(name);
-    TIGHTDB_ASSERT(table_ndx < m_table_names.size());
-    TIGHTDB_ASSERT(m_table_names.get(table_ndx) != StringData("@@__DELETED_TABLE__@@"));
-    m_table_names.set(table_ndx, StringData("@@__DELETED_TABLE__@@"));
-    Table* accessor = m_table_accessors[table_ndx];
-    if (accessor) {
-        // FSA: accessor->detach(); is private - what do you do then?
-        // FSA: how do you delete the accessor itself? 
-        // FSA: how do you actually delete the table data?
-        m_table_accessors[table_ndx] = 0;
-    }
-    if (m_public_indices) {
-        delete[] m_public_indices;
-        m_public_indices = 0;
-    }
-}
-
-inline void Group::rename_table(StringData old_name, StringData new_name)
-{
-    TIGHTDB_ASSERT(is_attached());
-    std::size_t table_ndx = m_table_names.find_first(old_name);
-    TIGHTDB_ASSERT(table_ndx < m_table_names.size());
-    TIGHTDB_ASSERT(m_table_names.get(table_ndx) != StringData("@@__DELETED_TABLE__@@"));
-    m_table_names.set(table_ndx, new_name);
-}
-
 
 
 inline Table* Group::get_table_ptr(StringData name, SpecSetter spec_setter, bool& was_created)
@@ -676,13 +630,11 @@ template<class T> inline const T* Group::get_table_ptr(StringData name) const
 
 inline TableRef Group::get_table(std::size_t table_ndx)
 {
-    table_ndx = public_to_private_index(table_ndx);
     return get_table_by_ndx(table_ndx)->get_table_ref(); // Throws
 }
 
 inline ConstTableRef Group::get_table(std::size_t table_ndx) const
 {
-    table_ndx = public_to_private_index(table_ndx);
     return get_table_by_ndx(table_ndx)->get_table_ref(); // Throws
 }
 
@@ -738,6 +690,25 @@ inline void Group::child_accessor_destroyed(Table*) TIGHTDB_NOEXCEPT
 {
     // Ignore
 }
+
+inline std::size_t Group::first_valid_index(std::size_t table_ndx) const
+{
+    while (table_ndx < ending_index() && m_tables.get(table_ndx) == 0) ++table_ndx;
+    return table_ndx;
+}
+
+inline std::size_t Group::ending_index() const
+{
+    return m_table_names.size();
+}
+
+inline std::size_t Group::next_valid_index(std::size_t table_ndx) const
+{
+    return first_valid_index( table_ndx + 1 );
+}
+
+
+
 
 class Group::TableWriter {
 public:

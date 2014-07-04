@@ -674,6 +674,28 @@ public:
         return false;
     }
 
+    bool rename_group_level_table(std::size_t table_ndx, StringData new_name) TIGHTDB_NOEXCEPT
+    {
+#ifdef TIGHTDB_DEBUG
+        if (m_log)
+            *m_log << "group->rename_table(\"" << table_ndx << ", " << new_name << "\")\n";
+#endif
+        m_group.rename_table(table_ndx, new_name);
+        return true;
+    }
+
+    bool remove_group_level_table(std::size_t table_ndx) TIGHTDB_NOEXCEPT
+    {
+#ifdef TIGHTDB_DEBUG
+        if (m_log)
+            *m_log << "group->remove_table(\"" << table_ndx << "\")\n";
+#endif
+        m_group.remove_table(table_ndx);
+        return true;
+    }
+
+
+
     bool optimize_table()
     {
         if (TIGHTDB_LIKELY(m_table)) {

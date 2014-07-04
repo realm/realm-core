@@ -257,13 +257,13 @@ TEST(Group_RemoveTable)
     TableRef t3 = g.get_table("tau");
     TableRef t4 = g.get_table("sigma");
     CHECK_EQUAL(4, g.size());
-    g.rename_table("beta", "grappa");
+    g.rename_table(1, "grappa");
     CHECK_EQUAL(4, g.size());
-    g.remove_table("grappa");
+    g.remove_table(1);
     CHECK_EQUAL(3, g.size());
     CHECK_EQUAL(StringData("alpha"), g.get_table_name(0));
-    CHECK_EQUAL(StringData("tau"), g.get_table_name(1));
-    CHECK_EQUAL(StringData("sigma"), g.get_table_name(2));
+    CHECK_EQUAL(StringData("tau"), g.get_table_name(2));
+    CHECK_EQUAL(StringData("sigma"), g.get_table_name(3));
     TableRef t5 = g.get_table("beta");
     CHECK_EQUAL(4, g.size());
     CHECK_EQUAL(StringData("alpha"), g.get_table_name(0));

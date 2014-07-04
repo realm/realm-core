@@ -133,6 +133,11 @@ void Group::init_from_ref(ref_type top_ref) TIGHTDB_NOEXCEPT
     m_table_names.init_from_parent();
     m_tables.init_from_parent();
     m_is_attached = true;
+    m_size = 0;
+    std::size_t limit = ending_index();
+    for (std::size_t ndx = first_valid_index(); ndx < limit; ++ndx)
+        if (m_tables.get(ndx) != 0)
+            ++m_size;
 
     // Note that the third slot is the logical file size.
 
@@ -203,10 +208,6 @@ void Group::reset_freespace_tracking()
 
 Group::~Group() TIGHTDB_NOEXCEPT
 {
-    if (m_public_indices) {
-        delete[] m_public_indices;
-        m_public_indices = 0;
-    }
     if (!is_attached()) {
         if (m_top.is_attached())
             complete_detach();
@@ -294,6 +295,35 @@ Table* Group::get_table_by_ndx(size_t ndx)
 }
 
 
+void Group::remove_table(size_t table_ndx)
+{
+    TIGHTDB_ASSERT(is_attached());
+    TIGHTDB_ASSERT(table_ndx < m_table_names.size());
+    TIGHTDB_ASSERT(m_tables.get(table_ndx) != 0);
+    m_tables.set(table_ndx, 0);
+    Table* accessor = m_table_accessors[table_ndx];
+    if (accessor) {
+        // FSA: accessor->detach(); is private - what do you do then?
+        // FSA: how do you delete the accessor itself? 
+        // FSA: how do you actually delete the table data?
+        m_table_accessors[table_ndx] = 0;
+    }
+    --m_size;
+    if (Replication* repl = m_alloc.get_replication())
+        repl->remove_group_level_table(table_ndx); // Throws    
+}
+
+void Group::rename_table(std::size_t table_ndx, StringData new_name)
+{
+    TIGHTDB_ASSERT(is_attached());
+    TIGHTDB_ASSERT(table_ndx < m_table_names.size());
+    TIGHTDB_ASSERT(m_tables.get(table_ndx) != 0);
+    m_table_names.set(table_ndx, new_name);
+    if (Replication* repl = m_alloc.get_replication())
+        repl->rename_group_level_table(table_ndx, new_name); // Throws
+}
+
+
 ref_type Group::create_new_table(StringData name)
 {
     // FIXME: This function is exception safe under the assumption
@@ -314,19 +344,15 @@ ref_type Group::create_new_table(StringData name)
 
     size_t ndx;
     bool reuse_entry;
-    if (m_public_indices && m_num_removed_entries) {
-        ndx = m_table_names.find_first(StringData("@@__DELETED_TABLE__@@"));
+    if (m_size < m_tables.size()) {
+        ndx = m_tables.find_first(0);
+        TIGHTDB_ASSERT(ndx < m_tables.size());
         reuse_entry = true;
     }
     else {
         ndx = m_tables.size();
         reuse_entry = false;
     }
-    if (m_public_indices) {
-        delete[] m_public_indices;
-        m_public_indices = 0;
-    }
-
     using namespace _impl;
     typedef TableFriend tf;
     DeepArrayRefDestroyGuard ref_dg(tf::create_empty_table(m_alloc), m_alloc); // Throws
@@ -337,6 +363,7 @@ ref_type Group::create_new_table(StringData name)
         try {
             if (reuse_entry) m_table_names.set(    ndx, name);
             else             m_table_names.insert( ndx, name);
+            ++m_size;
             return ref_dg.release();
         } 
         catch (...) {
@@ -372,19 +399,15 @@ Table* Group::create_new_table_and_accessor(StringData name, SpecSetter spec_set
 
     size_t ndx;
     bool reuse_entry;
-    if (m_public_indices && m_num_removed_entries) {
-        ndx = m_table_names.find_first(StringData("@@__DELETED_TABLE__@@"));
+    if (m_size < m_tables.size()) {
+        ndx = m_tables.find_first(0);
+        TIGHTDB_ASSERT(ndx < m_tables.size());
         reuse_entry = true;
     }
     else {
         ndx = m_tables.size();
         reuse_entry = false;
     }
-    if (m_public_indices) {
-        delete[] m_public_indices;
-        m_public_indices = 0;
-    }
-
     using namespace _impl;
     typedef TableFriend tf;
     DeepArrayRefDestroyGuard ref_dg(tf::create_empty_table(m_alloc), m_alloc); // Throws
@@ -412,6 +435,7 @@ Table* Group::create_new_table_and_accessor(StringData name, SpecSetter spec_set
                 if (reuse_entry) m_table_accessors[ndx] = table;
                 else m_table_accessors.push_back(table); // Throws
                 table_ug.release();
+                ++m_size;
                 return table;
             } 
             catch(...) {
@@ -884,6 +908,22 @@ public:
     bool new_group_level_table(StringData) TIGHTDB_NOEXCEPT
     {
         m_group.m_table_accessors.push_back(0); // Throws
+        return true;
+    }
+
+    bool rename_group_level_table(std::size_t table_ndx, StringData new_name) TIGHTDB_NOEXCEPT
+    {
+        // do nothing - renaming is done by changing the data.
+        static_cast<void>(table_ndx);
+        static_cast<void>(new_name);
+        return true;
+    }
+
+    bool remove_group_level_table(std::size_t table_ndx) TIGHTDB_NOEXCEPT
+    {
+        // actual change of data occurs in parallel, but we need to kill any accessor at table_ndx.
+        // FIXME! not done yet
+        static_cast<void>(table_ndx);
         return true;
     }
 

@@ -122,6 +122,8 @@ public:
     void clear_interrupt() TIGHTDB_NOEXCEPT;
 
     void new_group_level_table(StringData name);
+    void rename_group_level_table(std::size_t table_ndx, StringData new_name);
+    void remove_group_level_table(std::size_t table_ndx);
     void insert_column(const Descriptor&, std::size_t col_ndx, DataType type, StringData name,
                        Table* link_target_table);
     void erase_column(const Descriptor&, std::size_t col_ndx);
@@ -296,7 +298,9 @@ private:
         instr_LinkListInsert     = 38, // Insert entry into link list
         instr_LinkListMove       = 39, // Move an entry within a link list
         instr_LinkListErase      = 40, // Remove an entry from a link list
-        instr_LinkListClear      = 41  // Ramove all entries from a link list
+        instr_LinkListClear      = 41,  // Remove all entries from a link list
+        instr_RemoveGroupLevelTable = 42,
+        instr_RenameGroupLevelTable = 43
     };
 
     util::Buffer<std::size_t> m_subtab_path_buf;
@@ -795,6 +799,17 @@ inline void Replication::new_group_level_table(StringData name)
 {
     simple_cmd(instr_NewGroupLevelTable, util::tuple(name.size())); // Throws
     transact_log_append(name.data(), name.size()); // Throws
+}
+
+inline void Replication::remove_group_level_table(std::size_t table_ndx)
+{
+    simple_cmd(instr_RemoveGroupLevelTable, util::tuple(table_ndx)); // Throws
+}
+
+inline void Replication::rename_group_level_table(std::size_t table_ndx, StringData new_name)
+{
+    simple_cmd(instr_RemoveGroupLevelTable, util::tuple(table_ndx, new_name.size())); // Throws
+    transact_log_append(new_name.data(), new_name.size()); // Throws
 }
 
 
@@ -1449,6 +1464,21 @@ bool Replication::TransactLogParser::do_parse(InstructionHandler& handler)
                 read_string(m_string_buffer); // Throws
                 StringData name(m_string_buffer.data(), m_string_buffer.size());
                 if (!handler.new_group_level_table(name)) // Throws
+                    return false;
+                continue;
+            }
+            case instr_RemoveGroupLevelTable: {
+                read_string(m_string_buffer); // Throws
+                std::size_t table_ndx = read_int<std::size_t>();
+                if (!handler.remove_group_level_table(table_ndx)) // Throws
+                    return false;
+                continue;
+            }
+            case instr_RenameGroupLevelTable: {
+                std::size_t table_ndx = read_int<std::size_t>();
+                read_string(m_string_buffer); // Throws
+                StringData new_name(m_string_buffer.data(), m_string_buffer.size());
+                if (!handler.rename_group_level_table(table_ndx, new_name)) // Throws
                     return false;
                 continue;
             }
