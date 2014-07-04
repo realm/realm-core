@@ -221,6 +221,30 @@ TEST(Replication_Links)
             CHECK_EQUAL(type_LinkList, origin->get_column_type(1));
         }
     }
+
+    {
+        WriteTransaction wt(sg_1);
+        TableRef origin = wt.get_table("origin");
+        TableRef target = wt.get_table("target");
+        target->add_column(type_Int, "i");
+        origin->add_empty_row(2);
+        target->add_empty_row(2);
+        origin->set_link(0, 0, 1);
+        origin->set_link(0, 1, 0);
+        target->set_int(0, 0, 5);
+        target->set_int(0, 1, 13);
+        wt.commit();
+    }
+
+    repl.replay_transacts(sg_2, replay_log);
+
+    {
+        ReadTransaction rt_1(sg_1);
+        ReadTransaction rt_2(sg_2);
+        rt_1.get_group().Verify();
+        rt_2.get_group().Verify();
+        CHECK(rt_1.get_group() == rt_2.get_group());
+    }
 }
 
 } // anonymous namespace

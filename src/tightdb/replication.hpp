@@ -136,6 +136,7 @@ public:
     void set_date_time(const Table*, std::size_t col_ndx, std::size_t ndx, DateTime value);
     void set_table(const Table*, std::size_t col_ndx, std::size_t ndx);
     void set_mixed(const Table*, std::size_t col_ndx, std::size_t ndx, const Mixed& value);
+    void set_link(const Table*, std::size_t col_ndx, std::size_t ndx, std::size_t value);
 
     void insert_int(const Table*, std::size_t col_ndx, std::size_t ndx, int_fast64_t value);
     void insert_bool(const Table*, std::size_t col_ndx, std::size_t ndx, bool value);
@@ -146,6 +147,8 @@ public:
     void insert_date_time(const Table*, std::size_t col_ndx, std::size_t ndx, DateTime value);
     void insert_table(const Table*, std::size_t col_ndx, std::size_t ndx);
     void insert_mixed(const Table*, std::size_t col_ndx, std::size_t ndx, const Mixed& value);
+    void insert_link(const Table*, std::size_t col_ndx, std::size_t ndx, std::size_t value);
+    void insert_link_list(const Table*, std::size_t col_ndx, std::size_t ndx);
 
     void row_insert_complete(const Table*);
     void insert_empty_rows(const Table*, std::size_t row_ndx, std::size_t num_rows);
@@ -156,8 +159,15 @@ public:
     void clear_table(const Table*);
     void optimize_table(const Table*);
 
+    void link_list_set(const LinkView&, std::size_t link_ndx, std::size_t value);
+    void link_list_insert(const LinkView&, std::size_t link_ndx, std::size_t value);
+    void link_list_move(const LinkView&, std::size_t old_link_ndx, std::size_t new_link_ndx);
+    void link_list_erase(const LinkView&, std::size_t link_ndx);
+    void link_list_clear(const LinkView&);
+
     void on_table_destroyed(const Table*) TIGHTDB_NOEXCEPT;
     void on_spec_destroyed(const Spec*) TIGHTDB_NOEXCEPT;
+    void on_link_list_destroyed(const LinkView&) TIGHTDB_NOEXCEPT;
 
 
     class TransactLogParser;
@@ -257,33 +267,43 @@ private:
         instr_SetDateTime        =  9,
         instr_SetTable           = 10,
         instr_SetMixed           = 11,
-        instr_InsertInt          = 12,
-        instr_InsertBool         = 13,
-        instr_InsertFloat        = 14,
-        instr_InsertDouble       = 15,
-        instr_InsertString       = 16,
-        instr_InsertBinary       = 17,
-        instr_InsertDateTime     = 18,
-        instr_InsertTable        = 19,
-        instr_InsertMixed        = 20,
-        instr_RowInsertComplete  = 21,
-        instr_InsertEmptyRows    = 22,
-        instr_EraseRow           = 23, // Remove a row
-        instr_MoveLastOver       = 24, // Remove a row by replacing it with the last row
-        instr_AddIntToColumn     = 25, // Add an integer value to all cells in a column
-        instr_ClearTable         = 26, // Remove all rows in selected table
-        instr_OptimizeTable      = 27,
-        instr_SelectDescriptor   = 28, // Select descriptor from currently selected root table
-        instr_InsertColumn       = 29, // Insert new column into to selected descriptor
-        instr_EraseColumn        = 30, // Remove column from selected descriptor
-        instr_RenameColumn       = 31, // Rename column in selected descriptor
-        instr_AddIndexToColumn   = 32  // Add a search index to a column
+        instr_SetLink            = 12,
+        instr_InsertInt          = 13,
+        instr_InsertBool         = 14,
+        instr_InsertFloat        = 15,
+        instr_InsertDouble       = 16,
+        instr_InsertString       = 17,
+        instr_InsertBinary       = 18,
+        instr_InsertDateTime     = 19,
+        instr_InsertTable        = 20,
+        instr_InsertMixed        = 21,
+        instr_InsertLink         = 22,
+        instr_InsertLinkList     = 23,
+        instr_RowInsertComplete  = 24,
+        instr_InsertEmptyRows    = 25,
+        instr_EraseRow           = 26, // Remove a row
+        instr_MoveLastOver       = 27, // Remove a row by replacing it with the last row
+        instr_AddIntToColumn     = 28, // Add an integer value to all cells in a column
+        instr_ClearTable         = 29, // Remove all rows in selected table
+        instr_OptimizeTable      = 30,
+        instr_SelectDescriptor   = 31, // Select descriptor from currently selected root table
+        instr_InsertColumn       = 32, // Insert new column into to selected descriptor
+        instr_EraseColumn        = 33, // Remove column from selected descriptor
+        instr_RenameColumn       = 34, // Rename column in selected descriptor
+        instr_AddIndexToColumn   = 35, // Add a search index to a column
+        instr_SelectLinkList     = 36,
+        instr_LinkListSet        = 37, // Assign to link list entry
+        instr_LinkListInsert     = 38, // Insert entry into link list
+        instr_LinkListMove       = 39, // Move an entry within a link list
+        instr_LinkListErase      = 40, // Remove an entry from a link list
+        instr_LinkListClear      = 41  // Ramove all entries from a link list
     };
 
     util::Buffer<std::size_t> m_subtab_path_buf;
 
-    const Table* m_selected_table;
-    const Spec*  m_selected_spec;
+    const Table*    m_selected_table;
+    const Spec*     m_selected_spec;
+    const LinkView* m_selected_link_list;
 
     /// \param n Must be small (probably not greater than 1024)
     void transact_log_reserve(char** buf, int n);
@@ -294,10 +314,13 @@ private:
     void transact_log_append(const char* data, std::size_t size);
 
     void check_table(const Table*);
-    void select_table(const Table*); // Deselects a selected spec
+    void select_table(const Table*); // Deselects a selected spec and selected link list
 
-    void check_desc(const Descriptor& desc);
-    void select_desc(const Descriptor& desc);
+    void check_desc(const Descriptor&);
+    void select_desc(const Descriptor&);
+
+    void check_link_list(const LinkView&);
+    void select_link_list(const LinkView&);
 
     void string_cmd(Instruction, std::size_t col_ndx, std::size_t ndx,
                     const char* data, std::size_t size);
@@ -376,24 +399,33 @@ public:
     ///     bool insert_date_time(std::size_t col_ndx, std::size_t row_ndx, DateTime)
     ///     bool insert_table(std::size_t col_ndx, std::size_t row_ndx)
     ///     bool insert_mixed(std::size_t col_ndx, std::size_t row_ndx, const Mixed&)
+    ///     bool insert_link(std::size_t col_ndx, std::size_t row_ndx, std::size_t)
+    ///     bool insert_link_list(std::size_t col_ndx, std::size_t row_ndx)
     ///     bool row_insert_complete()
-    ///     bool set_int(std::size_t col_ndx, std::std::size_t row_ndx, int_fast64_t value)
-    ///     bool set_bool(std::size_t col_ndx, std::size_t row_ndx, bool value)
-    ///     bool set_float(std::size_t col_ndx, std::size_t row_ndx, float value)
-    ///     bool set_double(std::size_t col_ndx, std::size_t row_ndx, double value)
-    ///     bool set_string(std::size_t col_ndx, std::size_t row_ndx, StringData value)
-    ///     bool set_binary(std::size_t col_ndx, std::size_t row_ndx, BinaryData value)
-    ///     bool set_date_time(std::size_t col_ndx, std::size_t row_ndx, DateTime value)
+    ///     bool set_int(std::size_t col_ndx, std::std::size_t row_ndx, int_fast64_t)
+    ///     bool set_bool(std::size_t col_ndx, std::size_t row_ndx, bool)
+    ///     bool set_float(std::size_t col_ndx, std::size_t row_ndx, float)
+    ///     bool set_double(std::size_t col_ndx, std::size_t row_ndx, double)
+    ///     bool set_string(std::size_t col_ndx, std::size_t row_ndx, StringData)
+    ///     bool set_binary(std::size_t col_ndx, std::size_t row_ndx, BinaryData)
+    ///     bool set_date_time(std::size_t col_ndx, std::size_t row_ndx, DateTime)
     ///     bool set_table(std::size_t col_ndx, std::size_t row_ndx)
-    ///     bool set_mixed(std::size_t col_ndx, std::size_t row_ndx, const Mixed& value)
+    ///     bool set_mixed(std::size_t col_ndx, std::size_t row_ndx, const Mixed&)
+    ///     bool set_link(std::size_t col_ndx, std::size_t row_ndx, std::size_t)
     ///     bool add_int_to_column(std::size_t col_ndx, int_fast64_t value)
     ///     bool optimize_table()
     ///     bool select_descriptor(int levels, const std::size_t* path)
-    ///     bool insert_column(std::size_t col_ndx, DataType, StringData value,
+    ///     bool insert_column(std::size_t col_ndx, DataType, StringData name,
     ///                        std::size_t link_target_table_ndx)
     ///     bool erase_column(std::size_t col_ndx)
     ///     bool rename_column(std::size_t col_ndx, StringData new_name)
     ///     bool add_index_to_column(std::size_t col_ndx)
+    ///     bool select_link_list(std::size_t col_ndx, std::size_t row_ndx)
+    ///     bool link_list_set(std::size_t link_ndx, std::size_t value)
+    ///     bool link_list_insert(std::size_t link_ndx, std::size_t value)
+    ///     bool link_list_move(std::size_t old_link_ndx, std::size_t new_link_ndx)
+    ///     bool link_list_erase(std::size_t link_ndx)
+    ///     bool link_list_clear()
     ///
     /// parse() promises that the path passed by reference to
     /// InstructionHandler::select_descriptor() will remain valid
@@ -428,7 +460,7 @@ private:
     // Returns false if no input was available
     bool read_char(char&);
 
-    bool is_valid_column_type(int type);
+    bool is_valid_data_type(int type);
 };
 
 
@@ -669,10 +701,10 @@ template<class T> inline void Replication::append_num(T value)
 }
 
 
-inline void Replication::check_table(const Table* t)
+inline void Replication::check_table(const Table* table)
 {
-    if (t != m_selected_table)
-        select_table(t); // Throws
+    if (table != m_selected_table)
+        select_table(table); // Throws
 }
 
 
@@ -681,6 +713,13 @@ inline void Replication::check_desc(const Descriptor& desc)
     typedef _impl::DescriptorFriend df;
     if (df::get_spec(desc) != m_selected_spec)
         select_desc(desc); // Throws
+}
+
+
+inline void Replication::check_link_list(const LinkView& list)
+{
+    if (&list != m_selected_link_list)
+        select_link_list(list); // Throws
 }
 
 
@@ -849,6 +888,13 @@ inline void Replication::set_mixed(const Table* t, std::size_t col_ndx,
     mixed_cmd(instr_SetMixed, col_ndx, ndx, value); // Throws
 }
 
+inline void Replication::set_link(const Table* t, std::size_t col_ndx,
+                                  std::size_t ndx, std::size_t value)
+{
+    check_table(t); // Throws
+    simple_cmd(instr_SetLink, util::tuple(col_ndx, ndx, value)); // Throws
+}
+
 
 inline void Replication::insert_int(const Table* t, std::size_t col_ndx,
                                     std::size_t ndx, int_fast64_t value)
@@ -913,6 +959,19 @@ inline void Replication::insert_mixed(const Table* t, std::size_t col_ndx,
     mixed_cmd(instr_InsertMixed, col_ndx, ndx, value); // Throws
 }
 
+inline void Replication::insert_link(const Table* t, std::size_t col_ndx,
+                                     std::size_t ndx, std::size_t value)
+{
+    check_table(t); // Throws
+    simple_cmd(instr_InsertLink, util::tuple(col_ndx, ndx, value)); // Throws
+}
+
+inline void Replication::insert_link_list(const Table* t, std::size_t col_ndx, std::size_t ndx)
+{
+    check_table(t); // Throws
+    simple_cmd(instr_InsertLinkList, util::tuple(col_ndx, ndx)); // Throws
+}
+
 
 inline void Replication::row_insert_complete(const Table* t)
 {
@@ -972,6 +1031,44 @@ inline void Replication::optimize_table(const Table* t)
 }
 
 
+inline void Replication::link_list_set(const LinkView& list, std::size_t link_ndx,
+                                       std::size_t value)
+{
+    check_link_list(list); // Throws
+    simple_cmd(instr_LinkListSet, util::tuple(link_ndx, value)); // Throws
+}
+
+
+inline void Replication::link_list_insert(const LinkView& list, std::size_t link_ndx,
+                                          std::size_t value)
+{
+    check_link_list(list); // Throws
+    simple_cmd(instr_LinkListInsert, util::tuple(link_ndx, value)); // Throws
+}
+
+
+inline void Replication::link_list_move(const LinkView& list, std::size_t old_link_ndx,
+                                        std::size_t new_link_ndx)
+{
+    check_link_list(list); // Throws
+    simple_cmd(instr_LinkListMove, util::tuple(old_link_ndx, new_link_ndx)); // Throws
+}
+
+
+inline void Replication::link_list_erase(const LinkView& list, std::size_t link_ndx)
+{
+    check_link_list(list); // Throws
+    simple_cmd(instr_LinkListErase, util::tuple(link_ndx)); // Throws
+}
+
+
+inline void Replication::link_list_clear(const LinkView& list)
+{
+    check_link_list(list); // Throws
+    simple_cmd(instr_LinkListClear, util::tuple()); // Throws
+}
+
+
 inline void Replication::on_table_destroyed(const Table* t) TIGHTDB_NOEXCEPT
 {
     if (m_selected_table == t)
@@ -983,6 +1080,13 @@ inline void Replication::on_spec_destroyed(const Spec* s) TIGHTDB_NOEXCEPT
 {
     if (m_selected_spec == s)
         m_selected_spec = 0;
+}
+
+
+inline void Replication::on_link_list_destroyed(const LinkView& list) TIGHTDB_NOEXCEPT
+{
+    if (m_selected_link_list == &list)
+        m_selected_link_list = 0;
 }
 
 
@@ -1095,6 +1199,14 @@ bool Replication::TransactLogParser::do_parse(InstructionHandler& handler)
                     return false;
                 continue;
             }
+            case instr_SetLink: {
+                std::size_t col_ndx = read_int<std::size_t>(); // Throws
+                std::size_t row_ndx = read_int<std::size_t>(); // Throws
+                std::size_t value = read_int<std::size_t>(); // Throws
+                if (!handler.set_link(col_ndx, row_ndx, value)) // Throws
+                    return false;
+                continue;
+            }
             case instr_InsertInt: {
                 std::size_t col_ndx = read_int<std::size_t>(); // Throws
                 std::size_t row_ndx = read_int<std::size_t>(); // Throws
@@ -1172,6 +1284,21 @@ bool Replication::TransactLogParser::do_parse(InstructionHandler& handler)
                     return false;
                 continue;
             }
+            case instr_InsertLink: {
+                std::size_t col_ndx = read_int<std::size_t>(); // Throws
+                std::size_t row_ndx = read_int<std::size_t>(); // Throws
+                std::size_t value = read_int<std::size_t>(); // Throws
+                if (!handler.insert_link(col_ndx, row_ndx, value)) // Throws
+                    return false;
+                continue;
+            }
+            case instr_InsertLinkList: {
+                std::size_t col_ndx = read_int<std::size_t>(); // Throws
+                std::size_t row_ndx = read_int<std::size_t>(); // Throws
+                if (!handler.insert_link_list(col_ndx, row_ndx)) // Throws
+                    return false;
+                continue;
+            }
             case instr_RowInsertComplete: {
                 if (!handler.row_insert_complete()) // Throws
                     return false;
@@ -1229,6 +1356,45 @@ bool Replication::TransactLogParser::do_parse(InstructionHandler& handler)
                     return false;
                 continue;
             }
+            case instr_LinkListSet: {
+                std::size_t link_ndx = read_int<std::size_t>(); // Throws
+                std::size_t value = read_int<std::size_t>(); // Throws
+                if (!handler.link_list_set(link_ndx, value)) // Throws
+                    return false;
+                continue;
+            }
+            case instr_LinkListInsert: {
+                std::size_t link_ndx = read_int<std::size_t>(); // Throws
+                std::size_t value = read_int<std::size_t>(); // Throws
+                if (!handler.link_list_insert(link_ndx, value)) // Throws
+                    return false;
+                continue;
+            }
+            case instr_LinkListMove: {
+                std::size_t old_link_ndx = read_int<std::size_t>(); // Throws
+                std::size_t new_link_ndx = read_int<std::size_t>(); // Throws
+                if (!handler.link_list_move(old_link_ndx, new_link_ndx)) // Throws
+                    return false;
+                continue;
+            }
+            case instr_LinkListErase: {
+                std::size_t link_ndx = read_int<std::size_t>(); // Throws
+                if (!handler.link_list_erase(link_ndx)) // Throws
+                    return false;
+                continue;
+            }
+            case instr_LinkListClear: {
+                if (!handler.link_list_clear()) // Throws
+                    return false;
+                continue;
+            }
+            case instr_SelectLinkList: {
+                std::size_t col_ndx = read_int<std::size_t>(); // Throws
+                std::size_t row_ndx = read_int<std::size_t>(); // Throws
+                if (!handler.select_link_list(col_ndx, row_ndx)) // Throws
+                    return false;
+                continue;
+            }
             case instr_AddIndexToColumn: {
                 std::size_t col_ndx = read_int<std::size_t>(); // Throws
                 if (!handler.add_index_to_column(col_ndx)) // Throws
@@ -1238,13 +1404,13 @@ bool Replication::TransactLogParser::do_parse(InstructionHandler& handler)
             case instr_InsertColumn: {
                 std::size_t col_ndx = read_int<std::size_t>(); // Throws
                 int type = read_int<int>(); // Throws
-                if (!is_valid_column_type(type))
+                if (!is_valid_data_type(type))
                     return false;
                 read_string(m_string_buffer); // Throws
                 StringData name(m_string_buffer.data(), m_string_buffer.size());
                 std::size_t link_target_table_ndx = 0;
                 typedef _impl::TableFriend tf;
-                if (tf::is_link_type(DataType(type)))
+                if (tf::is_link_type(ColumnType(type)))
                     link_target_table_ndx = read_int<std::size_t>(); // Throws
                 if (!handler.insert_column(col_ndx, DataType(type), name,
                                            link_target_table_ndx)) // Throws
@@ -1303,7 +1469,7 @@ bool Replication::TransactLogParser::do_parse(InstructionHandler& handler)
 template<class T> T Replication::TransactLogParser::read_int()
 {
     T value = 0;
-    int part;
+    int part = 0;
     const int max_bytes = (std::numeric_limits<T>::digits+1+6)/7;
     for (int i = 0; i != max_bytes; ++i) {
         char c;
@@ -1468,7 +1634,7 @@ inline bool Replication::TransactLogParser::read_char(char& c)
 }
 
 
-inline bool Replication::TransactLogParser::is_valid_column_type(int type)
+inline bool Replication::TransactLogParser::is_valid_data_type(int type)
 {
     switch (DataType(type)) {
         case type_Int:

@@ -29,150 +29,212 @@
 #  include <tightdb/replication.hpp>
 #endif
 
-
-// Minimal Accessor Hierarchy Consistency Guarantee (accessor destruction)
+/// \page AccessorConsistencyLevels
+///
+/// These are the three important levels of consistency of a hierarchy of
+/// TightDB accessors rooted in a common group accessor (tables, columns, rows,
+/// descriptors, arrays):
+///
+/// ### Fully Consistent Accessor Hierarchy (or just "Full Consistency")
+///
+/// All attached accessors are in a fully valid state and can be freely used by
+/// the application. From the point of view of the application, the accessor
+/// hierarchy remains in this state as long as no library function throws.
+///
+/// If a library function throws, and the exception is one that is considered
+/// part of the API, such as util::File::NotFound, then the accessor hierarchy
+/// remains fully consistent. In all other cases, such as when a library
+/// function fails because of memory exhaustion, and it throws std::bad_alloc,
+/// the application may no longer assume anything beyond minimal consistency.
+///
+/// ### Minimally Consistent Accessor Hierarchy (or just "Minimal Consistency")
+///
+/// No correspondence between the accessor states and the underlying node
+/// structure can be assumed, but all parent and child accessor references are
+/// valid (i.e., not dangling). There are specific additional guarantees, but
+/// only on some parts of the internal accessors states, and only on some parts
+/// of the structural state.
+///
+/// This is the level of consistency is the **maximum** that may be assumed
+/// after a library function fails by throwing an unexpected exception (such as
+/// std::bad_alloc), and it is the **minimum** level of consistency that is
+/// needed to be able to properly destroy the accessor objects (manually, or as
+/// a result of stack unwinding).
+///
+/// It is supposed to be a library-wide invariant that an accessor hierarchy is
+/// at least minimally consistent, but so far, only some parts of the library
+/// conform to it.
+///
+/// Note: With proper use, and maintenance of Minimal Consistency, it is
+/// possible to ensure that no memory is leaked after a group accessor is
+/// destroyed, even after a library function has failed because of memory
+/// exhaustion. This is possible because the underlying nodes are allocated in
+/// the context of the group, and they can all be freed by the group when it is
+/// destroyed. On the other hand, when working with free-standing tables, each
+/// underlying node is allocated individually on the heap, so in this case we
+/// cannot prevent memory leaks, because there is no way of knowing what to free
+/// when the table accessor is destroyed.
+///
+/// ### Structurally Correspondent Accessor Hierarchy (or simply "Structural Correspondence")
+///
+/// The structure of the accessor hierarchy is in agreement with the underlying
+/// node structure, but the refs (references to underlying nodes) are generally
+/// not valid, and certain other parts of the accessor states are also generally
+/// not valid. This state of consistency is important mainly during the
+/// advancing of read transactions (implicit transactions), and is not exposed
+/// to the application.
+///
+///
+/// Below is a detailed specification of the requirements for Minimal
+/// Consistency and for Structural Correspondence.
+///
+///
+/// Minimally Consistent Accessor Hierarchy (accessor destruction)
+/// --------------------------------------------------------------
+///
+/// This section defines a level of accessor consistency known as "Minimally
+/// Consistent Accessor Hierarchy". It applies to a set of accessors rooted in a
+/// common group. It does not imply any level of correspondance between the
+/// state of the accessors and the underlying node structure. It enables safe
+/// destruction of the accessor objects by requiring that the following items
+/// are valid (the list may not yet be complete):
+///
+///  - The 'is_attached' property of array accessors (Array::m_data == 0). For
+///    example, `Table::m_top` is attached if and only if that table accessor
+///    was attached to a table with independent dynamic type.
+///
+///  - The 'parent' property of array accessors (Array::m_parent), but
+///    crucially, **not** the `index_in_parent` property.
+///
+///  - The list of table accessors in a group accessor
+///    (Group::m_table_accessors). All non-null pointers refer to existing table
+///    accessors.
+///
+///  - The list of column accessors in a table acccessor (Table::m_cols). All
+///    non-null pointers refer to existing column accessors.
+///
+///  - The 'root_array' property of a column accessor (ColumnBase::m_array). It
+///    always refers to an existing array accessor. The exact type of that array
+///    accessor must be determinable from the following properties of itself:
+///    `is_inner_bptree_node` (Array::m_is_inner_bptree_node), `has_refs`
+///    (Array::m_has_refs), and `context_flag` (Array::m_context_flag). This
+///    allows for a column accessor to be properly destroyed.
+///
+///  - The map of subtable accessors in a column acccessor
+///    (ColumnSubtableParent::m_subtable_map). All pointers refer to existing
+///    subtable accessors, but it is not required that the set of subtable
+///    accessors referenced from a particular parent P conincide with the set
+///    of subtables accessors specifying P as parent.
+///
+///  - The `descriptor` property of a table accesor (Table::m_descriptor). If it
+///    is not null, then it refers to an existing descriptor accessor.
+///
+///  - The map of subdescriptor accessors in a descriptor accessor
+///    (Descriptor::m_subdesc_map). All non-null pointers refer to existing
+///    subdescriptor accessors.
+///
+///  - The `search_index` property of a column accesor
+///    (AdaptiveStringColumn::m_index, ColumnStringEnum::m_index). When it is
+///    non-null, it refers to an existing search index accessor.
+///
+///
+/// Structurally Correspondent Accessor Hierarchy (accessor reattachment)
+/// ---------------------------------------------------------------------
+///
+/// This section defines what it means for an accessor hierarchy to be
+/// "Structurally Correspondent". It applies to a set of accessors rooted in a
+/// common group. The general idea is that the structure of the accessors must
+/// match the underlying structure to such an extent that there is never any
+/// doubt about which underlying node that corresponds with a particular
+/// accessor. It is assumed that the accessor tree, and the underlying node
+/// structure are structurally sound individually.
+///
+/// With this level of correspondence, it is possible to reattach the accessor
+/// tree to the underlying node structure (Table::refresh_accessor_tree()).
+///
+/// While all the accessors in the tree must be in the attached state (before
+/// reattachement), they are not required to refer to existing underlying nodes;
+/// that is, their references **are** allowed to be dangling. Roughly speaking,
+/// this means that the accessor tree must have been attached to a node
+/// structure at some earlier point in time.
+///
 //
-// The "Minimal Accessor Hierarchy Consistency Guarantee" is an invariant. It
-// means that the following items are guaranteed to be valid (the list may not
-// yet be complete):
-//
-//  - The 'is_attached' property of array accessors (Array::m_data == 0).
-//
-//  - The 'parent' property of array accessors (Array::m_parent), but crucially,
-//    **not** the `index_in_parent` property.
-//
-//  - The list of table accessors in a group accessor
-//    (Group::m_table_accessors). All non-null pointers refer to existing table
-//    accessors.
-//
-//  - The list of column accessors in a table acccessor (Table::m_cols). All
-//    non-null pointers refer to existing column accessors.
-//
-//  - The 'root_array' property of a column accessor (ColumnBase::m_array). It
-//    always refers to an existing array accessor. The exact type of that array
-//    accessor must be determinable from the following properties of itself:
-//    `is_inner_bptree_node` (Array::m_is_inner_bptree_node), `has_refs`
-//    (Array::m_has_refs), and `context_flag` (Array::m_context_flag). This
-//    allows for a column accessor to be properly destroyed.
-//
-//  - The map of subtable accessors in a column acccessor
-//    (ColumnSubtableParent::m_subtable_map). All pointers refer to existing
-//    subtable accessors.
-//
-//  - The `descriptor` property of a table accesor (Table::m_descriptor). If it
-//    is not null, then it refers to an existing descriptor accessor.
-//
-//  - The map of subdescriptor accessors in a descriptor accessor
-//    (Descriptor::m_subdesc_map). All non-null pointers refer to existing
-//    dubdescriptor accessors.
-//
-//  - The `search_index` property of a column accesor
-//    (AdaptiveStringColumn::m_index, ColumnStringEnum::m_index). When it is
-//    non-null, it refers to an existing search index accessor.
-//
-// Note especially that this does **not** guarantee any correspondance between
-// the accessor hierarchy and any underlying structure of array nodes.
-//
-// The main purpose of the Minimal Accessor Hierarchy Consistency Guarantee is
-// to ensures that a group can be destroyed at any time without corruption or
-// memory leaks, even after a failure to allocate memory, regardless of where
-// that happens.
-
-
-// Accessor Hierarchy Correspondence Requirement (accessor reattachment)
-//
-// The "Accessor Hierarchy Correspondence Requirement" defines a minimum level
-// of structural correspondance between a particular accessor tree (or subtree)
-// and a particular underlying structure of array nodes. It is assumed that the
-// accessor tree and the underlying node structure are structurally sound
-// individually.
-//
-// With this level of correspondence, it is possible to reattach the accessor
-// tree to the underlying node structure (Table::refresh_accessor_tree()).
-//
-// While all the accessors in the tree must be in the attached state (before
-// reattachement), they are not required to refer to existing underlying nodes;
-// that is, their references **are** allowed to be dangling. Roughly speaking,
-// this means that the accessor tree must have been attached to a node structure
-// at some earlier point in time.
-//
-// Requirements at group level:
-//
-//  - The number of tables in the underlying group must be equal to the number
-//    of entries in `Group::m_table_accessors` in the group accessor.
-//
-//  - For each table in the underlying group, the corresponding entry in
-//    `Table::m_table_accessors` (at same index) is either null, or points to a
-//    table accessor that satisfies all the "requirements for a table".
-//
-// Requirements for a table:
-//
-//  - The corresponding underlying table has independent descriptor if, and only
-//    if `Table::m_top` is attached.
-//
-//  - The row index of every row accessor is strictly less than the number of
-//    rows in the underlying table.
-//
-//  - If `Table::m_columns` is unattached (degenerate table), then
-//    `Table::m_cols` is empty, otherwise the number of columns in the
-//    underlying table is equal to the number of entries in `Table::m_cols`.
-//
-//  - Each entry in `Table::m_cols` is either null, or points to a column
-//    accessor whose type agrees with the data type (tightdb::DataType) of the
-//    corresponding underlying column (at same index).
-//
-//  - If a column accessor is of type `ColumnStringEnum`, then the corresponding
-//    underlying column must be an enumerated strings column (the reverse is not
-//    required).
-//
-//  - If a column accessor is equipped with a search index accessor, then the
-//    corresponding underlying column must be equipped with a search index (the
-//    reverse is not required).
-//
-//  - For each entry in the subtable map of a column accessor there must be an
-//    underlying subtable at column `i` and row `j`, where `i` is the index of
-//    the column accessor in `Table::m_cols`, and `j` is the value of
-//    `ColumnSubtableParent::SubtableMap::entry::m_subtable_ndx`. The
-//    corresponding subtable accessor must satisfy all the "requirements for a
-//    table" with respect to that underlying subtable.
-//
-//  - It the table refers to a descriptor accessor (only possible for tables
-//    with independent descriptor), then that descriptor accessor must satisfy
-//    all the "requirements for a descriptor" with respect to the underlying
-//    spec structure (of this table).
-//
-// Requirements for a descriptor:
-//
-//  - For each entry in the subdescriptor map there must be an underlying
-//    subspec at column `i`, where `i` is the value of
-//    `Descriptor::subdesc_entry::m_column_ndx`. The corresponding subdescriptor
-//    accessor must satisfy all the "requirements for a descriptor" with respect
-//    to that underlying subspec.
-//
-// The 'ndx_in_parent' property of most array accessors is required to be
-// valid. There exceptions are:
-//
-//  - The top array accessor of root tables (Table::m_top). Root tables are
-//    tables with independent descriptor.
-//
-//  - The columns array accessor of subtables with shared descriptor
-//    (Table::m_columns).
-//
-//  - The top array accessor of spec objects of subtables with shared descriptor
-//    (Table::m_spec.m_top).
-//
-//  - The root array accessor of table level columns
-//    (*Table::m_cols[]->m_array).
-//
-//  - The root array accessor of the subcolumn of unique strings in an
-//    enumerated string column (*ColumnStringEnum::m_keys.m_array).
-//
-//  - The root array accessor of search indexes
-//    (*Table::m_cols[]->m_index->m_array).
-//
-// Note that the Accessor Hierarchy Correspondence Requirement trivially
-// includes the Minimal Accessor Hierarchy Consistency Guarantee, since the
-// latter it an invariant.
+/// Requirements at group level:
+///
+///  - The number of tables in the underlying group must be equal to the number
+///    of entries in `Group::m_table_accessors` in the group accessor.
+///
+///  - For each table in the underlying group, the corresponding entry in
+///    `Table::m_table_accessors` (at same index) is either null, or points to a
+///    table accessor that satisfies all the "requirements for a table".
+///
+/// Requirements for a table:
+///
+///  - The corresponding underlying table has independent descriptor if, and
+///    only if `Table::m_top` is attached.
+///
+///  - The row index of every row accessor is strictly less than the number of
+///    rows in the underlying table.
+///
+///  - If `Table::m_columns` is unattached (degenerate table), then
+///    `Table::m_cols` is empty, otherwise the number of columns in the
+///    underlying table is equal to the number of entries in `Table::m_cols`.
+///
+///  - Each entry in `Table::m_cols` is either null, or points to a column
+///    accessor whose type agrees with the data type (tightdb::DataType) of the
+///    corresponding underlying column (at same index).
+///
+///  - If a column accessor is of type `ColumnStringEnum`, then the
+///    corresponding underlying column must be an enumerated strings column (the
+///    reverse is not required).
+///
+///  - If a column accessor is equipped with a search index accessor, then the
+///    corresponding underlying column must be equipped with a search index (the
+///    reverse is not required).
+///
+///  - For each entry in the subtable map of a column accessor there must be an
+///    underlying subtable at column `i` and row `j`, where `i` is the index of
+///    the column accessor in `Table::m_cols`, and `j` is the value of
+///    `ColumnSubtableParent::SubtableMap::entry::m_subtable_ndx`. The
+///    corresponding subtable accessor must satisfy all the "requirements for a
+///    table" with respect to that underlying subtable.
+///
+///  - It the table refers to a descriptor accessor (only possible for tables
+///    with independent descriptor), then that descriptor accessor must satisfy
+///    all the "requirements for a descriptor" with respect to the underlying
+///    spec structure (of this table).
+///
+/// Requirements for a descriptor:
+///
+///  - For each entry in the subdescriptor map there must be an underlying
+///    subspec at column `i`, where `i` is the value of
+///    `Descriptor::subdesc_entry::m_column_ndx`. The corresponding
+///    subdescriptor accessor must satisfy all the "requirements for a
+///    descriptor" with respect to that underlying subspec.
+///
+/// The 'ndx_in_parent' property of most array accessors is required to be
+/// valid. The exceptions are:
+///
+///  - The top array accessor of root tables (Table::m_top). Root tables are
+///    tables with independent descriptor.
+///
+///  - The columns array accessor of subtables with shared descriptor
+///    (Table::m_columns).
+///
+///  - The top array accessor of spec objects of subtables with shared
+///    descriptor (Table::m_spec.m_top).
+///
+///  - The root array accessor of table level columns
+///    (*Table::m_cols[]->m_array).
+///
+///  - The root array accessor of the subcolumn of unique strings in an
+///    enumerated string column (*ColumnStringEnum::m_keys.m_array).
+///
+///  - The root array accessor of search indexes
+///    (*Table::m_cols[]->m_index->m_array).
+///
+/// Note that Structural Correspondence trivially includes Minimal Consistency,
+/// since the latter it an invariant.
 
 
 using namespace std;
@@ -223,18 +285,17 @@ size_t Table::add_column_link(DataType type, StringData name, Table& target)
 }
 
 
-void Table::insert_column_link(size_t column_ndx, DataType type, StringData name, Table& target)
+void Table::insert_column_link(size_t col_ndx, DataType type, StringData name, Table& target)
 {
-    get_descriptor()->insert_column_link(column_ndx, type, name, target); // Throws
+    get_descriptor()->insert_column_link(col_ndx, type, name, target); // Throws
 }
 
 
-void Table::create_backlinks_column(Table& origin, size_t origin_col_ndx,
-                                    ColumnType origin_col_type)
+void Table::create_backlinks_column(Table& origin, size_t origin_col_ndx)
 {
-    // links only work for top-level tables from groups
+    // Links only work for group-level tables
     TIGHTDB_ASSERT(!has_shared_type());
-    TIGHTDB_ASSERT(get_parent_group());
+    TIGHTDB_ASSERT(is_group_level());
 
     size_t backlink_col_ndx = m_spec.get_column_count();
     Table* link_target_table = 0;
@@ -243,19 +304,11 @@ void Table::create_backlinks_column(Table& origin, size_t origin_col_ndx,
     m_spec.set_link_target_table(backlink_col_ndx, origin_table_ndx); // Throws
     m_spec.set_backlink_origin_column(backlink_col_ndx, origin_col_ndx); // Throws
 
-    ColumnBackLink& backlink_col = get_column<ColumnBackLink, col_type_BackLink>(backlink_col_ndx);
+    ColumnBackLink& backlink_col = get_column_backlink(backlink_col_ndx);
     backlink_col.set_origin_table(origin);
 
-    TIGHTDB_ASSERT(origin_col_type == col_type_Link || origin_col_type == col_type_LinkList);
-    if (origin_col_type == col_type_Link) {
-        ColumnLink& origin_col = origin.get_column<ColumnLink, col_type_Link>(origin_col_ndx);
-        backlink_col.set_origin_column(origin_col);
-    }
-    else  {
-        ColumnLinkList& origin_col =
-            origin.get_column<ColumnLinkList, col_type_LinkList>(origin_col_ndx);
-        backlink_col.set_origin_column(origin_col);
-    }
+    ColumnLinkBase& origin_col = origin.get_column_link_base(origin_col_ndx);
+    backlink_col.set_origin_column(origin_col);
 }
 
 
@@ -263,7 +316,7 @@ ColumnBackLink& Table::get_backlink_column(size_t origin_table_ndx,
                                            size_t origin_col_ndx) TIGHTDB_NOEXCEPT
 {
     size_t backlink_col_ndx = m_spec.find_backlink_column(origin_table_ndx, origin_col_ndx);
-    return get_column<ColumnBackLink, col_type_BackLink>(backlink_col_ndx);
+    return get_column_backlink(backlink_col_ndx);
 }
 
 
@@ -272,8 +325,7 @@ size_t Table::get_backlink_count(size_t row_ndx, const Table& origin,
 {
     size_t origin_table_ndx = origin.get_index_in_parent();
     size_t backlink_col_ndx = m_spec.find_backlink_column(origin_table_ndx, origin_col_ndx);
-    const ColumnBackLink& backlink_col =
-        get_column<ColumnBackLink, col_type_BackLink>(backlink_col_ndx);
+    const ColumnBackLink& backlink_col = get_column_backlink(backlink_col_ndx);
     return backlink_col.get_backlink_count(row_ndx);
 }
 
@@ -283,8 +335,7 @@ size_t Table::get_backlink(size_t row_ndx, const Table& origin, size_t origin_co
 {
     size_t origin_table_ndx = origin.get_index_in_parent();
     size_t backlink_col_ndx = m_spec.find_backlink_column(origin_table_ndx, origin_col_ndx);
-    const ColumnBackLink& backlink_col =
-        get_column<ColumnBackLink, col_type_BackLink>(backlink_col_ndx);
+    const ColumnBackLink& backlink_col = get_column_backlink(backlink_col_ndx);
     return backlink_col.get_backlink(row_ndx, backlink_ndx);
 }
 
@@ -293,32 +344,32 @@ void Table::initialize_link_targets(Group& group, size_t table_ndx)
 {
     // Links only work for group-level tables
     TIGHTDB_ASSERT(!has_shared_type());
-    TIGHTDB_ASSERT(get_parent_group());
+    TIGHTDB_ASSERT(is_group_level());
 
     size_t n = m_spec.get_column_count();
     for (size_t i = 0; i < n; ++i) {
         ColumnType column_type = m_spec.get_column_type(i);
         if (column_type == col_type_Link || column_type == col_type_LinkList) {
             // Get the target table from group
-            size_t target_table_ndx = m_spec.get_link_target_table(i);
+            size_t target_table_ndx = m_spec.get_opposite_link_table_ndx(i);
             Table* target_table = group.get_table_by_ndx(target_table_ndx); // Throws
 
             // Set target table in column
-            ColumnLinkBase& column = get_column_linkbase(i);
-            column.set_target_table(*target_table);
-            column.set_backlink_column(target_table->get_backlink_column(table_ndx, i));
+            ColumnLinkBase& link_col = get_column_link_base(i);
+            link_col.set_target_table(*target_table);
+            link_col.set_backlink_column(target_table->get_backlink_column(table_ndx, i));
         }
         else if (column_type == col_type_BackLink) {
             // Get the origin table from group
-            size_t origin_table_ndx = m_spec.get_link_target_table(i);
+            size_t origin_table_ndx = m_spec.get_opposite_link_table_ndx(i);
             Table* origin_table = group.get_table_by_ndx(origin_table_ndx); // Throws
 
             // Get the columns the links originate from
-            size_t origin_col_ndx = m_spec.get_backlink_origin_column(i);
-            ColumnLinkBase& origin_col = origin_table->get_column_linkbase(origin_col_ndx);
+            size_t origin_col_ndx = m_spec.get_origin_column_ndx(i);
+            ColumnLinkBase& origin_col = origin_table->get_column_link_base(origin_col_ndx);
 
             // Set origination info in backlink column
-            ColumnBackLink& backlink_col = get_column<ColumnBackLink, col_type_BackLink>(i);
+            ColumnBackLink& backlink_col = get_column_backlink(i);
             backlink_col.set_origin_table(*origin_table);
             backlink_col.set_origin_column(origin_col);
         }
@@ -326,25 +377,37 @@ void Table::initialize_link_targets(Group& group, size_t table_ndx)
 }
 
 
-void Table::insert_column(size_t column_ndx, DataType type, StringData name,
+void Table::connect_opposite_link_columns(size_t link_col_ndx, Table& target_table,
+                                          size_t backlink_col_ndx) TIGHTDB_NOEXCEPT
+{
+    ColumnLinkBase& link_col = get_column_link_base(link_col_ndx);
+    ColumnBackLink& backlink_col = target_table.get_column_backlink(backlink_col_ndx);
+    link_col.set_target_table(target_table);
+    link_col.set_backlink_column(backlink_col);
+    backlink_col.set_origin_table(*this);
+    backlink_col.set_origin_column(link_col);
+}
+
+
+void Table::insert_column(size_t col_ndx, DataType type, StringData name,
                           DescriptorRef* subdesc)
 {
     TIGHTDB_ASSERT(!has_shared_type());
-    get_descriptor()->insert_column(column_ndx, type, name, subdesc); // Throws
+    get_descriptor()->insert_column(col_ndx, type, name, subdesc); // Throws
 }
 
 
-void Table::remove_column(size_t column_ndx)
+void Table::remove_column(size_t col_ndx)
 {
     TIGHTDB_ASSERT(!has_shared_type());
-    get_descriptor()->remove_column(column_ndx); // Throws
+    get_descriptor()->remove_column(col_ndx); // Throws
 }
 
 
-void Table::rename_column(size_t column_ndx, StringData name)
+void Table::rename_column(size_t col_ndx, StringData name)
 {
     TIGHTDB_ASSERT(!has_shared_type());
-    get_descriptor()->rename_column(column_ndx, name); // Throws
+    get_descriptor()->rename_column(col_ndx, name); // Throws
 }
 
 
@@ -356,10 +419,10 @@ DescriptorRef Table::get_descriptor()
         ArrayParent* array_parent = m_columns.get_parent();
         TIGHTDB_ASSERT(dynamic_cast<Parent*>(array_parent));
         Parent* table_parent = static_cast<Parent*>(array_parent);
-        size_t column_ndx = 0;
-        Table* parent = table_parent->get_parent_table(&column_ndx);
+        size_t col_ndx = 0;
+        Table* parent = table_parent->get_parent_table(&col_ndx);
         TIGHTDB_ASSERT(parent);
-        return parent->get_descriptor()->get_subdescriptor(column_ndx); // Throws
+        return parent->get_descriptor()->get_subdescriptor(col_ndx); // Throws
     }
 
     DescriptorRef desc;
@@ -383,15 +446,15 @@ ConstDescriptorRef Table::get_descriptor() const
 }
 
 
-DescriptorRef Table::get_subdescriptor(size_t column_ndx)
+DescriptorRef Table::get_subdescriptor(size_t col_ndx)
 {
-    return get_descriptor()->get_subdescriptor(column_ndx); // Throws
+    return get_descriptor()->get_subdescriptor(col_ndx); // Throws
 }
 
 
-ConstDescriptorRef Table::get_subdescriptor(size_t column_ndx) const
+ConstDescriptorRef Table::get_subdescriptor(size_t col_ndx) const
 {
-    return get_descriptor()->get_subdescriptor(column_ndx); // Throws
+    return get_descriptor()->get_subdescriptor(col_ndx); // Throws
 }
 
 
@@ -415,28 +478,28 @@ ConstDescriptorRef Table::get_subdescriptor(const path_vec& path) const
 size_t Table::add_subcolumn(const path_vec& path, DataType type, StringData name)
 {
     DescriptorRef desc = get_subdescriptor(path); // Throws
-    size_t column_ndx = desc->get_column_count();
-    desc->insert_column(column_ndx, type, name); // Throws
-    return column_ndx;
+    size_t col_ndx = desc->get_column_count();
+    desc->insert_column(col_ndx, type, name); // Throws
+    return col_ndx;
 }
 
 
-void Table::insert_subcolumn(const path_vec& path, size_t column_ndx,
+void Table::insert_subcolumn(const path_vec& path, size_t col_ndx,
                              DataType type, StringData name)
 {
-    get_subdescriptor(path)->insert_column(column_ndx, type, name); // Throws
+    get_subdescriptor(path)->insert_column(col_ndx, type, name); // Throws
 }
 
 
-void Table::remove_subcolumn(const path_vec& path, size_t column_ndx)
+void Table::remove_subcolumn(const path_vec& path, size_t col_ndx)
 {
-    get_subdescriptor(path)->remove_column(column_ndx); // Throws
+    get_subdescriptor(path)->remove_column(col_ndx); // Throws
 }
 
 
-void Table::rename_subcolumn(const path_vec& path, size_t column_ndx, StringData name)
+void Table::rename_subcolumn(const path_vec& path, size_t col_ndx, StringData name)
 {
-    get_subdescriptor(path)->rename_column(column_ndx, name); // Throws
+    get_subdescriptor(path)->rename_column(col_ndx, name); // Throws
 }
 
 
@@ -496,7 +559,7 @@ struct Table::InsertSubtableColumns: SubtableUpdater {
     void update_accessor(Table& table, size_t row_ndx) TIGHTDB_OVERRIDE
     {
         table.adj_insert_column(m_column_ndx); // Throws
-        table.mark_dirty();
+        table.mark();
         table.refresh_accessor_tree(row_ndx);
     }
 private:
@@ -519,7 +582,7 @@ struct Table::RemoveSubtableColumns: SubtableUpdater {
     void update_accessor(Table& table, size_t row_ndx) TIGHTDB_OVERRIDE
     {
         table.adj_erase_column(m_column_ndx);
-        table.mark_dirty();
+        table.mark();
         table.refresh_accessor_tree(row_ndx);
     }
 private:
@@ -533,13 +596,13 @@ struct Table::RenameSubtableColumns: SubtableUpdater {
     }
     void update_accessor(Table& table, size_t row_ndx) TIGHTDB_OVERRIDE
     {
-        table.mark_dirty();
+        table.mark();
         table.refresh_accessor_tree(row_ndx);
     }
 };
 
 
-void Table::do_insert_column(Descriptor& desc, size_t column_ndx, DataType type,
+void Table::do_insert_column(Descriptor& desc, size_t col_ndx, DataType type,
                              StringData name, Table* link_target_table)
 {
     TIGHTDB_ASSERT(desc.is_attached());
@@ -549,64 +612,67 @@ void Table::do_insert_column(Descriptor& desc, size_t column_ndx, DataType type,
     TIGHTDB_ASSERT(!root_table.has_shared_type());
 
     if (desc.is_root()) {
-        root_table.insert_root_column(column_ndx, ColumnType(type), name,
+        root_table.insert_root_column(col_ndx, ColumnType(type), name,
                                       link_target_table); // Throws
     }
     else {
         Spec* spec = df::get_spec(desc);
-        spec->insert_column(column_ndx, ColumnType(type), name); // Throws
+        spec->insert_column(col_ndx, ColumnType(type), name); // Throws
         if (!root_table.is_empty()) {
-            InsertSubtableColumns updater(column_ndx, type);
+            InsertSubtableColumns updater(col_ndx, type);
             update_subtables(desc, &updater); // Throws
         }
     }
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     if (Replication* repl = root_table.get_repl())
-        repl->insert_column(desc, column_ndx, type, name, link_target_table); // Throws
+        repl->insert_column(desc, col_ndx, type, name, link_target_table); // Throws
 #endif
 }
 
 
-void Table::do_remove_column(Descriptor& desc, size_t column_ndx)
+void Table::do_remove_column(Descriptor& desc, size_t col_ndx)
 {
     TIGHTDB_ASSERT(desc.is_attached());
 
     typedef _impl::DescriptorFriend df;
     Table& root_table = df::root_table(desc);
     TIGHTDB_ASSERT(!root_table.has_shared_type());
-    TIGHTDB_ASSERT(column_ndx < desc.get_column_count());
+    TIGHTDB_ASSERT(col_ndx < desc.get_column_count());
+
+    // No support for removal of link-type columns yet
+    TIGHTDB_ASSERT(!is_link_type(ColumnType(desc.get_column_type(col_ndx))));
 
     if (desc.is_root()) {
-        root_table.remove_root_column(column_ndx); // Throws
+        root_table.remove_root_column(col_ndx); // Throws
     }
     else {
         Spec* spec = df::get_spec(desc);
-        spec->remove_column(column_ndx); // Throws
+        spec->remove_column(col_ndx); // Throws
         if (!root_table.is_empty()) {
-            RemoveSubtableColumns updater(column_ndx);
+            RemoveSubtableColumns updater(col_ndx);
             update_subtables(desc, &updater); // Throws
         }
     }
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     if (Replication* repl = root_table.get_repl())
-        repl->erase_column(desc, column_ndx); // Throws
+        repl->erase_column(desc, col_ndx); // Throws
 #endif
 }
 
 
-void Table::do_rename_column(Descriptor& desc, size_t column_ndx, StringData name)
+void Table::do_rename_column(Descriptor& desc, size_t col_ndx, StringData name)
 {
     TIGHTDB_ASSERT(desc.is_attached());
 
     typedef _impl::DescriptorFriend df;
     Table& root_table = df::root_table(desc);
     TIGHTDB_ASSERT(!root_table.has_shared_type());
-    TIGHTDB_ASSERT(column_ndx < desc.get_column_count());
+    TIGHTDB_ASSERT(col_ndx < desc.get_column_count());
 
     Spec* spec = df::get_spec(desc);
-    spec->rename_column(column_ndx, name); // Throws
+    spec->rename_column(col_ndx, name); // Throws
 
     if (desc.is_root()) {
         root_table.bump_version();
@@ -620,7 +686,7 @@ void Table::do_rename_column(Descriptor& desc, size_t column_ndx, StringData nam
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     if (Replication* repl = root_table.get_repl())
-        repl->rename_column(desc, column_ndx, name); // Throws
+        repl->rename_column(desc, col_ndx, name); // Throws
 #endif
 }
 
@@ -645,7 +711,8 @@ void Table::insert_root_column(size_t col_ndx, ColumnType col_type, StringData n
     ColumnBase* col = create_column_accessor(col_type, col_ndx, ndx_in_parent); // Throws
     {
         UniquePtr<ColumnBase> guard(col);
-        m_cols.insert(col_ndx, intptr_t(col)); // Throws
+        m_cols.insert(m_cols.begin() + col_ndx, col);
+        // FSA: m_cols.insert(col_ndx, intptr_t(col)); // Throws
         guard.release();
     }
 
@@ -657,7 +724,7 @@ void Table::insert_root_column(size_t col_ndx, ColumnType col_type, StringData n
         size_t target_table_ndx = link_target_table->get_index_in_parent();
         m_spec.set_link_target_table(col_ndx, target_table_ndx); // Throws
 
-        link_target_table->create_backlinks_column(*this, col_ndx, col_type); // Throws
+        link_target_table->create_backlinks_column(*this, col_ndx); // Throws
 
         size_t origin_table_ndx = get_index_in_parent();
         ColumnBackLink& backlink_col =
@@ -671,16 +738,16 @@ void Table::insert_root_column(size_t col_ndx, ColumnType col_type, StringData n
 }
 
 
-void Table::remove_root_column(size_t column_ndx)
+void Table::remove_root_column(size_t col_ndx)
 {
     m_search_index = 0;
     bump_version();
 
     Spec::ColumnInfo info;
-    m_spec.get_column_info(column_ndx, info);
+    m_spec.get_column_info(col_ndx, info);
 
     // Remove the column from the spec
-    m_spec.remove_column(column_ndx); // Throws
+    m_spec.remove_column(col_ndx); // Throws
 
     // Remove and destroy the ref from m_columns
     ref_type column_ref = m_columns.get_as_ref(info.m_column_ref_ndx);
@@ -695,15 +762,13 @@ void Table::remove_root_column(size_t column_ndx)
     }
 
     // Delete the column accessor
-    ColumnBase* col = reinterpret_cast<ColumnBase*>(m_cols.get(column_ndx));
-    col->detach_subtable_accessors();
-    delete col;
+    delete m_cols[col_ndx];
 
-    m_cols.erase(column_ndx);
+    m_cols.erase(m_cols.begin() + col_ndx);
 
     // Update cached column indexes for subsequent column accessors
     int ndx_in_parent_diff = info.m_has_index ? -2 : -1;
-    adjust_column_index(column_ndx, ndx_in_parent_diff);
+    adjust_column_index(col_ndx, ndx_in_parent_diff);
 
     // If there are no columns left, mark the table as empty
     if (get_column_count() == 0) {
@@ -796,10 +861,10 @@ void Table::update_subtables(const size_t* col_path_begin, const size_t* col_pat
     size_t col_path_size = col_path_end - col_path_begin;
     TIGHTDB_ASSERT(col_path_size >= 1);
 
-    size_t column_ndx = *col_path_begin;
-    TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_Table);
+    size_t col_ndx = *col_path_begin;
+    TIGHTDB_ASSERT(get_real_column_type(col_ndx) == col_type_Table);
 
-    ColumnTable& subtables = get_column_table(column_ndx); // Throws
+    ColumnTable& subtables = get_column_table(col_ndx); // Throws
     size_t num_rows = size();
     bool is_parent_of_modify_level = col_path_size == 1;
     for (size_t row_ndx = 0; row_ndx < num_rows; ++row_ndx) {
@@ -853,9 +918,9 @@ void Table::update_subtables(const size_t* col_path_begin, const size_t* col_pat
 void Table::update_accessors(const size_t* col_path_begin, const size_t* col_path_end,
                              AccessorUpdater& updater)
 {
-    // This function must be able to operate with only the Minimal Accessor
-    // Hierarchy Consistency Guarantee. This means, in particular, that it
-    // cannot access the underlying array structure.
+    // This function must assume no more than minimal consistency of the
+    // accessor hierarchy. This means in particular that it cannot access the
+    // underlying node structure. See AccessorConcistncyLevels.
 
     TIGHTDB_ASSERT(is_attached());
 
@@ -871,10 +936,10 @@ void Table::update_accessors(const size_t* col_path_begin, const size_t* col_pat
     TIGHTDB_ASSERT(!m_columns.is_attached() || col_ndx < m_cols.size());
 
     // Early-out if this accessor refers to a degenerate subtable
-    if (m_cols.is_empty())
+    if (m_cols.empty())
         return;
 
-    if (ColumnBase* col = reinterpret_cast<ColumnBase*>(m_cols.get(col_ndx))) {
+    if (ColumnBase* col = m_cols[col_ndx]) {
         TIGHTDB_ASSERT(dynamic_cast<ColumnTable*>(col));
         ColumnTable* col_2 = static_cast<ColumnTable*>(col);
         col_2->update_table_accessors(col_path_begin+1, col_path_end, updater); // Throws
@@ -956,16 +1021,16 @@ void Table::create_columns()
                 break;
             }
             case type_Table: {
-                size_t column_ndx = m_cols.size();
-                ColumnTable* c = new ColumnTable(alloc, this, column_ndx);
+                size_t col_ndx = m_cols.size();
+                ColumnTable* c = new ColumnTable(alloc, this, col_ndx);
                 m_columns.add(c->get_ref());
                 c->set_parent(&m_columns, ref_pos);
                 new_col = c;
                 break;
             }
             case type_Mixed: {
-                size_t column_ndx = m_cols.size();
-                ColumnMixed* c = new ColumnMixed(alloc, this, column_ndx);
+                size_t col_ndx = m_cols.size();
+                ColumnMixed* c = new ColumnMixed(alloc, this, col_ndx);
                 m_columns.add(c->get_ref());
                 c->set_parent(&m_columns, ref_pos);
                 new_col = c;
@@ -980,13 +1045,14 @@ void Table::create_columns()
         }
 
         // Cache Columns
-        m_cols.add(reinterpret_cast<intptr_t>(new_col)); // FIXME: intptr_t is not guaranteed to exists, not even in C++11
+        m_cols.push_back(new_col);
+        // FSA: m_cols.add(reinterpret_cast<intptr_t>(new_col)); // FIXME: intptr_t is not guaranteed to exists, not even in C++11
 
         // Atributes on columns may define that they come with an index
         if (attr != col_attr_None) {
             TIGHTDB_ASSERT(attr == col_attr_Indexed); // only supported attr so far
-            size_t column_ndx = m_cols.size()-1;
-            set_index(column_ndx, false);
+            size_t col_ndx = m_cols.size()-1;
+            set_index(col_ndx, false);
         }
     }
 }
@@ -994,9 +1060,9 @@ void Table::create_columns()
 
 void Table::detach() TIGHTDB_NOEXCEPT
 {
-    // This function must be able to operate with only the Minimal Accessor
-    // Hierarchy Consistency Guarantee. This means, in particular, that it
-    // cannot access the underlying array structure.
+    // This function must assume no more than minimal consistency of the
+    // accessor hierarchy. This means in particular that it cannot access the
+    // underlying node structure. See AccessorConcistncyLevels.
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
@@ -1011,11 +1077,10 @@ void Table::detach() TIGHTDB_NOEXCEPT
     // also causes is_attached() to return false.
     m_columns.set_parent(0,0);
 
-    discard_row_accessors();
-    discard_subtable_accessors();
-
+    discard_child_accessors();
     destroy_column_accessors();
-    m_cols.destroy();
+    m_cols.clear();
+    // FSA: m_cols.destroy();
     detach_views_except(0);
 }
 
@@ -1043,16 +1108,18 @@ void Table::detach_views_except(const TableViewBase* view) TIGHTDB_NOEXCEPT
 }
 
 
-void Table::discard_subtable_accessors() TIGHTDB_NOEXCEPT
+void Table::discard_child_accessors() TIGHTDB_NOEXCEPT
 {
-    // This function must be able to operate with only the Minimal Accessor
-    // Hierarchy Consistency Guarantee. This means, in particular, that it
-    // cannot access the underlying array structure.
+    // This function must assume no more than minimal consistency of the
+    // accessor hierarchy. This means in particular that it cannot access the
+    // underlying node structure. See AccessorConcistncyLevels.
+
+    discard_row_accessors();
 
     size_t n = m_cols.size();
     for (size_t i = 0; i < n; ++i) {
-        if (ColumnBase* col = reinterpret_cast<ColumnBase*>(uintptr_t(m_cols.get(i))))
-            col->detach_subtable_accessors();
+        if (ColumnBase* col = m_cols[i])
+            col->discard_child_accessors();
     }
 }
 
@@ -1127,19 +1194,15 @@ ColumnBase* Table::create_column_accessor(ColumnType col_type, size_t col_ndx, s
 
 void Table::create_column_accessors()
 {
-    TIGHTDB_ASSERT(m_cols.is_empty()); // only done on creation
+    TIGHTDB_ASSERT(m_cols.empty()); // only done on creation
 
     size_t ndx_in_parent = 0;
     size_t num_cols = m_spec.get_column_count();
+    m_cols.resize(num_cols);
     for (size_t col_ndx = 0; col_ndx < num_cols; ++col_ndx) {
         ColumnType col_type = m_spec.get_column_type(col_ndx);
         ColumnBase* col = create_column_accessor(col_type, col_ndx, ndx_in_parent); // Throws
-        // FIXME: Memory leak if the following addition statement fails. This
-        // problem disappears as soon as m_cols is changed to be of std::vector
-        // type. When that happens `m_cols` must be resized to num_cols
-        // initially. This also means the column accessors can be null in m_cols
-        // in other cases than during Group::advance_transact().
-        m_cols.add(intptr_t(col));
+        m_cols[col_ndx] = col;
 
         // Attributes on columns may define that they come with a search index
         ColumnAttr attr = m_spec.get_column_attr(col_ndx);
@@ -1163,7 +1226,7 @@ void Table::create_column_accessors()
         m_size = 0;
     }
     else {
-        ColumnBase* first_col = reinterpret_cast<ColumnBase*>(m_cols.get(0));
+        ColumnBase* first_col = m_cols[0];
         m_size = first_col->size();
     }
 }
@@ -1171,15 +1234,13 @@ void Table::create_column_accessors()
 
 void Table::destroy_column_accessors() TIGHTDB_NOEXCEPT
 {
-    // This function must be able to operate with only the Minimal Accessor
-    // Hierarchy Consistency Guarantee. This means, in particular, that it
-    // cannot access the underlying array structure.
-
-    TIGHTDB_ASSERT(m_cols.is_attached());
+    // This function must assume no more than minimal consistency of the
+    // accessor hierarchy. This means in particular that it cannot access the
+    // underlying node structure. See AccessorConcistncyLevels.
 
     size_t n = m_cols.size();
     for (size_t i = 0; i != n; ++i) {
-        ColumnBase* column = reinterpret_cast<ColumnBase*>(m_cols.get(i));
+        ColumnBase* column = m_cols[i];
         delete column;
     }
     m_cols.clear();
@@ -1189,9 +1250,9 @@ void Table::destroy_column_accessors() TIGHTDB_NOEXCEPT
 Table::~Table() TIGHTDB_NOEXCEPT
 {
     // Whenever this is not a free-standing table, the destructor must be able
-    // to operate with only the Minimal Accessor Hierarchy Consistency
-    // Guarantee. This means, in particular, that it cannot access the
-    // underlying structure of array nodes.
+    // to operate without assuming more than minimal accessor consistency This
+    // means in particular that it cannot access the underlying structure of
+    // array nodes. See AccessorConcistncyLevels.
 
     if (!is_attached()) {
         // This table has been detached.
@@ -1215,7 +1276,7 @@ Table::~Table() TIGHTDB_NOEXCEPT
         TIGHTDB_ASSERT(dynamic_cast<Parent*>(parent));
         static_cast<Parent*>(parent)->child_accessor_destroyed(this);
         destroy_column_accessors();
-        m_cols.destroy();
+        m_cols.clear();
         return;
     }
 
@@ -1227,7 +1288,7 @@ Table::~Table() TIGHTDB_NOEXCEPT
         TIGHTDB_ASSERT(dynamic_cast<Parent*>(parent));
         static_cast<Parent*>(parent)->child_accessor_destroyed(this);
         destroy_column_accessors();
-        m_cols.destroy();
+        m_cols.clear();
         return;
     }
 
@@ -1246,39 +1307,40 @@ Table::~Table() TIGHTDB_NOEXCEPT
     }
     else {
         destroy_column_accessors();
-        m_cols.destroy();
+        m_cols.clear();
     }
     m_top.destroy_deep();
 }
 
 
-bool Table::has_index(size_t column_ndx) const TIGHTDB_NOEXCEPT
+bool Table::has_index(size_t col_ndx) const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(column_ndx < get_column_count());
-    const ColumnBase& col = get_column_base(column_ndx);
+    TIGHTDB_ASSERT(col_ndx < get_column_count());
+    const ColumnBase& col = get_column_base(col_ndx);
     return col.has_index();
 }
 
 
-void Table::set_index(size_t column_ndx, bool update_spec)
+void Table::set_index(size_t col_ndx, bool update_spec)
 {
     TIGHTDB_ASSERT(!has_shared_type());
-    TIGHTDB_ASSERT(column_ndx < get_column_count());
+    TIGHTDB_ASSERT(col_ndx < get_column_count());
 
-    if (has_index(column_ndx))
+    if (has_index(col_ndx))
         return;
 
     m_search_index = 0;
+    // FIXME: can this ever change the outcome of a query?
     bump_version();
 
-    ColumnType ct = get_real_column_type(column_ndx);
+    ColumnType ct = get_real_column_type(col_ndx);
     Spec::ColumnInfo info;
-    m_spec.get_column_info(column_ndx, info);
+    m_spec.get_column_info(col_ndx, info);
     size_t column_pos = info.m_column_ref_ndx;
     ref_type index_ref = 0;
 
     if (ct == col_type_String) {
-        AdaptiveStringColumn& col = get_column_string(column_ndx);
+        AdaptiveStringColumn& col = get_column_string(col_ndx);
 
         // Create the index
         StringIndex& index = col.create_index();
@@ -1286,7 +1348,7 @@ void Table::set_index(size_t column_ndx, bool update_spec)
         index_ref = index.get_ref();
     }
     else if (ct == col_type_StringEnum) {
-        ColumnStringEnum& col = get_column_string_enum(column_ndx);
+        ColumnStringEnum& col = get_column_string_enum(col_ndx);
 
         // Create the index
         StringIndex& index = col.create_index();
@@ -1301,15 +1363,15 @@ void Table::set_index(size_t column_ndx, bool update_spec)
     // Insert ref into columns list after the owning column
     m_columns.insert(column_pos+1, index_ref);
     int ndx_in_parent_diff = 1;
-    adjust_column_index(column_ndx+1, ndx_in_parent_diff);
+    adjust_column_index(col_ndx+1, ndx_in_parent_diff);
 
     // Update spec
     if (update_spec)
-        m_spec.set_column_attr(column_ndx, col_attr_Indexed);
+        m_spec.set_column_attr(col_ndx, col_attr_Indexed);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
-        repl->add_index_to_column(this, column_ndx); // Throws
+        repl->add_index_to_column(this, col_ndx); // Throws
 #endif
 }
 
@@ -1356,46 +1418,165 @@ void Table::set_index(size_t column_ndx, bool update_spec)
 // Note: get_subtable_ptr() has now been collapsed to one version, but
 // the suggested change will still be a significant improvement.
 
+const ColumnBase& Table::get_column_base(size_t ndx) const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(ndx < m_spec.get_column_count());
+    TIGHTDB_ASSERT(m_cols.size() == m_spec.get_column_count());
+    return *m_cols[ndx];
+}
+
+
 ColumnBase& Table::get_column_base(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx < m_spec.get_column_count());
     instantiate_before_change();
     TIGHTDB_ASSERT(m_cols.size() == m_spec.get_column_count());
-    return *reinterpret_cast<ColumnBase*>(m_cols.get(ndx));
+    return *m_cols[ndx];
 }
 
 
-const ColumnBase& Table::get_column_base(size_t ndx) const TIGHTDB_NOEXCEPT
+const Column& Table::get_column(size_t ndx) const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(ndx < m_spec.get_column_count());
-    TIGHTDB_ASSERT(m_cols.size() == m_spec.get_column_count());
-    return *reinterpret_cast<ColumnBase*>(m_cols.get(ndx));
+    return get_column<Column, col_type_Int>(ndx);
 }
 
-ColumnLinkBase& Table::get_column_linkbase(size_t ndx)
+Column& Table::get_column(size_t ndx)
 {
-    TIGHTDB_ASSERT(ndx < m_spec.get_column_count());
+    return get_column<Column, col_type_Int>(ndx);
+}
+
+const AdaptiveStringColumn& Table::get_column_string(size_t ndx) const TIGHTDB_NOEXCEPT
+{
+    return get_column<AdaptiveStringColumn, col_type_String>(ndx);
+}
+
+AdaptiveStringColumn& Table::get_column_string(size_t ndx)
+{
+    return get_column<AdaptiveStringColumn, col_type_String>(ndx);
+}
+
+const ColumnStringEnum& Table::get_column_string_enum(size_t ndx) const TIGHTDB_NOEXCEPT
+{
+    return get_column<ColumnStringEnum, col_type_StringEnum>(ndx);
+}
+
+ColumnStringEnum& Table::get_column_string_enum(size_t ndx)
+{
+    return get_column<ColumnStringEnum, col_type_StringEnum>(ndx);
+}
+
+const ColumnFloat& Table::get_column_float(size_t ndx) const TIGHTDB_NOEXCEPT
+{
+    return get_column<ColumnFloat, col_type_Float>(ndx);
+}
+
+ColumnFloat& Table::get_column_float(size_t ndx)
+{
+    return get_column<ColumnFloat, col_type_Float>(ndx);
+}
+
+const ColumnDouble& Table::get_column_double(size_t ndx) const TIGHTDB_NOEXCEPT
+{
+    return get_column<ColumnDouble, col_type_Double>(ndx);
+}
+
+ColumnDouble& Table::get_column_double(size_t ndx)
+{
+    return get_column<ColumnDouble, col_type_Double>(ndx);
+}
+
+const ColumnBinary& Table::get_column_binary(size_t ndx) const TIGHTDB_NOEXCEPT
+{
+    return get_column<ColumnBinary, col_type_Binary>(ndx);
+}
+
+ColumnBinary& Table::get_column_binary(size_t ndx)
+{
+    return get_column<ColumnBinary, col_type_Binary>(ndx);
+}
+
+const ColumnTable &Table::get_column_table(size_t ndx) const TIGHTDB_NOEXCEPT
+{
+    return get_column<ColumnTable, col_type_Table>(ndx);
+}
+
+ColumnTable &Table::get_column_table(size_t ndx)
+{
+    return get_column<ColumnTable, col_type_Table>(ndx);
+}
+
+const ColumnMixed& Table::get_column_mixed(size_t ndx) const TIGHTDB_NOEXCEPT
+{
+    return get_column<ColumnMixed, col_type_Mixed>(ndx);
+}
+
+ColumnMixed& Table::get_column_mixed(size_t ndx)
+{
+    return get_column<ColumnMixed, col_type_Mixed>(ndx);
+}
+
+const ColumnLinkBase& Table::get_column_link_base(size_t ndx) const TIGHTDB_NOEXCEPT
+{
+    const ColumnBase& col_base = get_column_base(ndx);
     TIGHTDB_ASSERT(m_spec.get_column_type(ndx) == col_type_Link ||
                    m_spec.get_column_type(ndx) == col_type_LinkList);
-    instantiate_before_change();
-    TIGHTDB_ASSERT(m_cols.size() == m_spec.get_column_count());
+    const ColumnLinkBase& col_link_base = static_cast<const ColumnLinkBase&>(col_base);
+    return col_link_base;
+}
 
-    ColumnBase* colbase = reinterpret_cast<ColumnBase*>(m_cols.get(ndx));
-    ColumnLinkBase* column = static_cast<ColumnLinkBase*>(colbase);
-    return *column;
+ColumnLinkBase& Table::get_column_link_base(size_t ndx)
+{
+    ColumnBase& col_base = get_column_base(ndx);
+    TIGHTDB_ASSERT(m_spec.get_column_type(ndx) == col_type_Link ||
+                   m_spec.get_column_type(ndx) == col_type_LinkList);
+    ColumnLinkBase& col_link_base = static_cast<ColumnLinkBase&>(col_base);
+    return col_link_base;
+}
+
+const ColumnLink& Table::get_column_link(size_t ndx) const TIGHTDB_NOEXCEPT
+{
+    return get_column<ColumnLink, col_type_Link>(ndx);
+}
+
+ColumnLink& Table::get_column_link(size_t ndx)
+{
+    return get_column<ColumnLink, col_type_Link>(ndx);
+}
+
+const ColumnLinkList& Table::get_column_link_list(size_t ndx) const TIGHTDB_NOEXCEPT
+{
+    return get_column<ColumnLinkList, col_type_LinkList>(ndx);
+}
+
+ColumnLinkList& Table::get_column_link_list(size_t ndx)
+{
+    return get_column<ColumnLinkList, col_type_LinkList>(ndx);
+}
+
+const ColumnBackLink& Table::get_column_backlink(size_t ndx) const TIGHTDB_NOEXCEPT
+{
+    return get_column<ColumnBackLink, col_type_BackLink>(ndx);
+}
+
+ColumnBackLink& Table::get_column_backlink(size_t ndx)
+{
+    return get_column<ColumnBackLink, col_type_BackLink>(ndx);
 }
 
 
 void Table::validate_column_type(const ColumnBase& column, ColumnType col_type, size_t ndx) const
 {
-    if (col_type == col_type_Int || col_type == col_type_DateTime || col_type == col_type_Bool) {
-        TIGHTDB_ASSERT(column.IsIntColumn());
+    ColumnType real_col_type = get_real_column_type(ndx);
+    if (col_type == col_type_Int) {
+        TIGHTDB_ASSERT(real_col_type == col_type_Int || real_col_type == col_type_Bool ||
+                       real_col_type == col_type_DateTime);
     }
     else {
-        TIGHTDB_ASSERT(col_type == get_real_column_type(ndx));
+        TIGHTDB_ASSERT(col_type == real_col_type);
     }
     static_cast<void>(column);
     static_cast<void>(ndx);
+    static_cast<void>(real_col_type);
 }
 
 
@@ -1536,90 +1717,6 @@ ref_type Table::clone(Allocator& alloc) const
 }
 
 
-
-// TODO: get rid of the Column* template parameter
-
-Column& Table::get_column(size_t ndx)
-{
-    return get_column<Column, col_type_Int>(ndx);
-}
-
-const Column& Table::get_column(size_t ndx) const TIGHTDB_NOEXCEPT
-{
-    return get_column<Column, col_type_Int>(ndx);
-}
-
-AdaptiveStringColumn& Table::get_column_string(size_t ndx)
-{
-    return get_column<AdaptiveStringColumn, col_type_String>(ndx);
-}
-
-const AdaptiveStringColumn& Table::get_column_string(size_t ndx) const TIGHTDB_NOEXCEPT
-{
-    return get_column<AdaptiveStringColumn, col_type_String>(ndx);
-}
-
-ColumnStringEnum& Table::get_column_string_enum(size_t ndx)
-{
-    return get_column<ColumnStringEnum, col_type_StringEnum>(ndx);
-}
-
-const ColumnStringEnum& Table::get_column_string_enum(size_t ndx) const TIGHTDB_NOEXCEPT
-{
-    return get_column<ColumnStringEnum, col_type_StringEnum>(ndx);
-}
-
-ColumnFloat& Table::get_column_float(size_t ndx)
-{
-    return get_column<ColumnFloat, col_type_Float>(ndx);
-}
-
-const ColumnFloat& Table::get_column_float(size_t ndx) const TIGHTDB_NOEXCEPT
-{
-    return get_column<ColumnFloat, col_type_Float>(ndx);
-}
-
-ColumnDouble& Table::get_column_double(size_t ndx)
-{
-    return get_column<ColumnDouble, col_type_Double>(ndx);
-}
-
-const ColumnDouble& Table::get_column_double(size_t ndx) const TIGHTDB_NOEXCEPT
-{
-    return get_column<ColumnDouble, col_type_Double>(ndx);
-}
-
-ColumnBinary& Table::get_column_binary(size_t ndx)
-{
-    return get_column<ColumnBinary, col_type_Binary>(ndx);
-}
-
-const ColumnBinary& Table::get_column_binary(size_t ndx) const TIGHTDB_NOEXCEPT
-{
-    return get_column<ColumnBinary, col_type_Binary>(ndx);
-}
-
-ColumnTable &Table::get_column_table(size_t ndx)
-{
-    return get_column<ColumnTable, col_type_Table>(ndx);
-}
-
-const ColumnTable &Table::get_column_table(size_t ndx) const TIGHTDB_NOEXCEPT
-{
-    return get_column<ColumnTable, col_type_Table>(ndx);
-}
-
-ColumnMixed& Table::get_column_mixed(size_t ndx)
-{
-    return get_column<ColumnMixed, col_type_Mixed>(ndx);
-}
-
-const ColumnMixed& Table::get_column_mixed(size_t ndx) const TIGHTDB_NOEXCEPT
-{
-    return get_column<ColumnMixed, col_type_Mixed>(ndx);
-}
-
-
 void Table::insert_empty_row(size_t row_ndx, size_t num_rows)
 {
     TIGHTDB_ASSERT(is_attached());
@@ -1690,8 +1787,6 @@ void Table::move_last_over(size_t target_row_ndx)
 {
     TIGHTDB_ASSERT(target_row_ndx < m_size);
     bump_version();
-
-    // FIXME: PossibleLinkMergeConflict: `target_row_ndx` is now allowed to be equal to m_size-1. How does Group::TransactAdvancer deal with that?
 
     size_t last_row_ndx = m_size - 1;
     size_t num_cols = m_spec.get_column_count();
@@ -1790,31 +1885,48 @@ void Table::set_mixed_subtable(size_t col_ndx, size_t row_ndx, const Table* t)
 
 Table* Table::get_subtable_accessor(size_t col_ndx, size_t row_ndx) TIGHTDB_NOEXCEPT
 {
-    // This function must be able to operate with only the Minimal Accessor
-    // Hierarchy Consistency Guarantee. This means, in particular, that it
-    // cannot access the underlying array structure.
-
     TIGHTDB_ASSERT(is_attached());
     // If this table is not a degenerate subtable, then `col_ndx` must be a
     // valid index into `m_cols`.
     TIGHTDB_ASSERT(!m_columns.is_attached() || col_ndx < m_cols.size());
-    if (ColumnBase* col = reinterpret_cast<ColumnBase*>(m_cols.get(col_ndx)))
-        return col->get_subtable_accessor(row_ndx);
+    // The column accessor may not exist yet, but in that case the subtable
+    // accessor cannot exist either. Column accessors are missing only during
+    // certian operations such as the the updating of the accessor tree when a
+    // read transactions is advanced.
+    if (m_columns.is_attached()) {
+        if (ColumnBase* col = m_cols[col_ndx])
+            return col->get_subtable_accessor(row_ndx);
+    }
+    return 0;
+}
+
+
+Table* Table::get_link_target_table_accessor(size_t col_ndx) TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(is_attached());
+    // So far, link columns can only exist in group-level tables, so this table
+    // cannot be degenerate.
+    TIGHTDB_ASSERT(m_columns.is_attached());
+    TIGHTDB_ASSERT(col_ndx < m_cols.size());
+    if (ColumnBase* col = m_cols[col_ndx]) {
+        TIGHTDB_ASSERT(dynamic_cast<ColumnLinkBase*>(col));
+        return static_cast<ColumnLinkBase*>(col)->get_target_table();
+    }
     return 0;
 }
 
 
 void Table::discard_subtable_accessor(size_t col_ndx, size_t row_ndx) TIGHTDB_NOEXCEPT
 {
-    // This function must be able to operate with only the Minimal Accessor
-    // Hierarchy Consistency Guarantee. This means, in particular, that it
-    // cannot access the underlying array structure.
+    // This function must assume no more than minimal consistency of the
+    // accessor hierarchy. This means in particular that it cannot access the
+    // underlying node structure. See AccessorConcistncyLevels.
 
     TIGHTDB_ASSERT(is_attached());
     // If this table is not a degenerate subtable, then `col_ndx` must be a
     // valid index into `m_cols`.
     TIGHTDB_ASSERT(!m_columns.is_attached() || col_ndx < m_cols.size());
-    if (ColumnBase* col = reinterpret_cast<ColumnBase*>(m_cols.get(col_ndx)))
+    if (ColumnBase* col = m_cols[col_ndx])
         col->discard_subtable_accessor(row_ndx);
 }
 
@@ -1890,29 +2002,27 @@ void Table::clear_subtable(size_t col_ndx, size_t row_ndx)
 
 Group* Table::get_parent_group() const TIGHTDB_NOEXCEPT
 {
+    TIGHTDB_ASSERT(is_attached());
     if (!m_top.is_attached())
-        return null_ptr;
-
+        return 0; // Subtable with shared descriptor
     Parent* parent = static_cast<Parent*>(m_top.get_parent()); // ArrayParent guaranteed to be Table::Parent
-    if (!parent || !parent->is_parent_group())
-        return null_ptr;
-
-    Group* group = static_cast<Group*>(parent);
-    return group;
+    if (!parent)
+        return 0; // Free-standing table
+    // Null if subtable with independent descriptor (in mixed column)
+    return parent->get_parent_group();
 }
 
 
-TableRef Table::get_parent_table(size_t* column_ndx_out) TIGHTDB_NOEXCEPT
+const Table* Table::get_parent_table_ptr(size_t* column_ndx_out) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(is_attached());
     const Array& real_top = m_top.is_attached() ? m_top : m_columns;
     if (ArrayParent* array_parent = real_top.get_parent()) {
         TIGHTDB_ASSERT(dynamic_cast<Parent*>(array_parent));
         Parent* table_parent = static_cast<Parent*>(array_parent);
-        if (Table* parent = table_parent->get_parent_table(column_ndx_out))
-            return TableRef(parent);
+        return table_parent->get_parent_table(column_ndx_out);
     }
-    return TableRef();
+    return 0;
 }
 
 
@@ -2346,132 +2456,114 @@ void Table::insert_mixed(size_t column_ndx, size_t ndx, Mixed value)
 #endif
 }
 
-size_t Table::get_link(size_t column_ndx, size_t ndx) const TIGHTDB_NOEXCEPT
-{
-    TIGHTDB_ASSERT(column_ndx < get_column_count());
-    TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_Link);
-    TIGHTDB_ASSERT(ndx < m_size);
 
-    const ColumnLink& column = get_column<ColumnLink, col_type_Link>(column_ndx);
-    return column.get_link(ndx);
+size_t Table::get_link(size_t col_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(row_ndx < m_size);
+    const ColumnLink& column = get_column_link(col_ndx);
+    return column.get_link(row_ndx);
 }
 
-TableRef Table::get_link_target(size_t column_ndx) TIGHTDB_NOEXCEPT
+TableRef Table::get_link_target(size_t col_ndx) TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(column_ndx < get_column_count());
-    TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_Link ||
-                   get_real_column_type(column_ndx) == col_type_LinkList);
-
-    if (get_real_column_type(column_ndx) == col_type_Link) {
-        ColumnLink& column = get_column<ColumnLink, col_type_Link>(column_ndx);
-        return column.get_target_table();
-    }
-    else {
-        ColumnLinkList& column = get_column<ColumnLinkList, col_type_LinkList>(column_ndx);
-        return column.get_target_table();
-    }
+    ColumnLinkBase& column = get_column_link_base(col_ndx);
+    return column.get_target_table()->get_table_ref();
 }
 
-void Table::set_link(size_t column_ndx, size_t ndx, size_t target_row_ndx)
+void Table::set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx)
 {
-    TIGHTDB_ASSERT(column_ndx < get_column_count());
-    TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_Link);
-    TIGHTDB_ASSERT(ndx < m_size);
+    TIGHTDB_ASSERT(row_ndx < m_size);
     bump_version();
-
-    ColumnLink& column = get_column<ColumnLink, col_type_Link>(column_ndx);
-    column.set_link(ndx, target_row_ndx);
+    ColumnLink& column = get_column_link(col_ndx);
+    column.set_link(row_ndx, target_row_ndx);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    if (Replication* repl = get_repl())
-        repl->set_int(this, column_ndx, ndx, target_row_ndx); // Throws
+    if (Replication* repl = get_repl()) {
+        size_t link = 1 + target_row_ndx;
+        repl->set_link(this, col_ndx, row_ndx, link); // Throws
+    }
 #endif
 }
 
-void Table::insert_link(size_t column_ndx, size_t ndx, size_t target_row_ndx)
+void Table::insert_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx)
 {
-    TIGHTDB_ASSERT(column_ndx < get_column_count());
-    TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_Link);
-    TIGHTDB_ASSERT(ndx == m_size); // can only append to unorded tables
-
-    ColumnLink& column = get_column<ColumnLink, col_type_Link>(column_ndx);
-    column.insert_link(ndx, target_row_ndx);
+    TIGHTDB_ASSERT(row_ndx == m_size); // can only append to unorded tables
+    ColumnLink& column = get_column_link(col_ndx);
+    column.insert_link(row_ndx, target_row_ndx);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    if (Replication* repl = get_repl())
-        repl->insert_int(this, column_ndx, ndx, target_row_ndx); // Throws
+    if (Replication* repl = get_repl()) {
+        size_t link = 1 + target_row_ndx;
+        repl->insert_link(this, col_ndx, row_ndx, link); // Throws
+    }
 #endif
 }
 
-bool Table::is_null_link(size_t column_ndx, size_t ndx) const TIGHTDB_NOEXCEPT
+bool Table::is_null_link(size_t col_ndx, size_t ndx) const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(column_ndx < get_column_count());
-    TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_Link);
-    TIGHTDB_ASSERT(ndx <= m_size);
-
-    const ColumnLink& column = get_column<ColumnLink, col_type_Link>(column_ndx);
+    TIGHTDB_ASSERT(ndx < m_size);
+    const ColumnLink& column = get_column_link(col_ndx);
     return column.is_null_link(ndx);
 }
 
-void Table::nullify_link(size_t column_ndx, size_t ndx)
+void Table::nullify_link(size_t col_ndx, size_t row_ndx)
 {
-    TIGHTDB_ASSERT(column_ndx < get_column_count());
-    TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_Link);
-    TIGHTDB_ASSERT(ndx <= m_size);
+    TIGHTDB_ASSERT(row_ndx < m_size);
     bump_version();
-
-    ColumnLink& column = get_column<ColumnLink, col_type_Link>(column_ndx);
-    column.nullify_link(ndx);
-}
-
-void Table::insert_linklist(size_t column_ndx, size_t ndx)
-{
-    TIGHTDB_ASSERT(column_ndx < get_column_count());
-    TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_LinkList);
-    TIGHTDB_ASSERT(ndx == m_size); // can only append to unorded tables
-    (void)ndx;
-
-    ColumnLinkList& column = get_column<ColumnLinkList, col_type_LinkList>(column_ndx);
-    column.add();
+    ColumnLink& column = get_column_link(col_ndx);
+    column.nullify_link(row_ndx);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    // FIXME: PossibleLinkMergeConflict: Cannot use Replication::insert_int() here
-//    if (Replication* repl = get_repl())
-//        repl->insert_int(this, column_ndx, ndx, target_row_ndx); // Throws
+    if (Replication* repl = get_repl()) {
+        size_t link = 0; // Null-link
+        repl->set_link(this, col_ndx, row_ndx, link); // Throws
+    }
 #endif
 }
 
-LinkViewRef Table::get_linklist(size_t column_ndx, size_t row_ndx)
-{
-    TIGHTDB_ASSERT(column_ndx < get_column_count());
-    TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_LinkList);
-    TIGHTDB_ASSERT(row_ndx <= m_size);
-    bump_version();
 
-    ColumnLinkList& column = get_column<ColumnLinkList, col_type_LinkList>(column_ndx);
-    return column.get_link_view(row_ndx);
+void Table::insert_linklist(size_t col_ndx, size_t row_ndx)
+{
+    TIGHTDB_ASSERT(row_ndx == m_size); // can only append to unorded tables
+    ColumnLinkList& column = get_column_link_list(col_ndx);
+    column.insert(row_ndx);
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    if (Replication* repl = get_repl())
+        repl->insert_link_list(this, col_ndx, row_ndx); // Throws
+#endif
 }
 
-bool Table::linklist_is_empty(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT
+ConstLinkViewRef Table::get_linklist(size_t col_ndx, size_t row_ndx) const
 {
-    TIGHTDB_ASSERT(column_ndx < get_column_count());
-    TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_LinkList);
-    TIGHTDB_ASSERT(row_ndx <= m_size);
-    bump_version();
+    TIGHTDB_ASSERT(row_ndx < m_size);
+    const ColumnLinkList& column = get_column_link_list(col_ndx);
+    return column.get(row_ndx);
+}
 
-    const ColumnLinkList& column = get_column<ColumnLinkList, col_type_LinkList>(column_ndx);
+LinkViewRef Table::get_linklist(size_t col_ndx, size_t row_ndx)
+{
+    TIGHTDB_ASSERT(row_ndx < m_size);
+    // FIXME: this looks wrong! It should instead be the modifying operations of
+    // LinkView that bump the change count of the containing table.
+    ColumnLinkList& column = get_column_link_list(col_ndx);
+    return column.get(row_ndx);
+}
+
+bool Table::linklist_is_empty(size_t col_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(row_ndx < m_size);
+    const ColumnLinkList& column = get_column_link_list(col_ndx);
     return !column.has_links(row_ndx);
 }
 
-size_t Table::get_link_count(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT
+size_t Table::get_link_count(size_t col_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(column_ndx < get_column_count());
-    TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_LinkList);
-    TIGHTDB_ASSERT(row_ndx <= m_size);
-
-    const ColumnLinkList& column = get_column<ColumnLinkList, col_type_LinkList>(column_ndx);
+    TIGHTDB_ASSERT(row_ndx < m_size);
+    const ColumnLinkList& column = get_column_link_list(col_ndx);
     return column.get_link_count(row_ndx);
 }
+
 
 void Table::insert_done()
 {
@@ -2492,7 +2584,7 @@ void Table::insert_done()
         size_t column_count = m_spec.get_column_count();
 
         for (size_t i = backlinks_start; i < column_count; ++i) {
-            ColumnBackLink& column = get_column<ColumnBackLink, col_type_BackLink>(i);
+            ColumnBackLink& column = get_column_backlink(i);
             column.add_row();
         }
     }
@@ -3369,7 +3461,7 @@ void Table::optimize()
                 new ColumnStringEnum(keys_ref, values_ref, &m_columns,
                                      pos_in_mcolumns, keys_parent, keys_ndx, alloc);
             m_columns.set(pos_in_mcolumns, values_ref);
-            m_cols.set(i, intptr_t(e));
+            m_cols[i] = e;
 
             // Inherit any existing index
             if (info.m_has_index) {
@@ -3444,7 +3536,7 @@ public:
             size_t table_size = m_table.size();
             size_t n = m_table.m_cols.size();
             for (size_t i = 0; i != n; ++i) {
-                ColumnBase* column = reinterpret_cast<ColumnBase*>(m_table.m_cols.get(i));
+                ColumnBase* column = m_table.m_cols[i];
                 ref_type ref = column->write(m_offset, m_size, table_size, out); // Throws
                 int_fast64_t ref_2(ref); // FIXME: Dangerous cast (unsigned -> signed)
                 column_refs.add(ref_2); // Throws
@@ -3508,7 +3600,7 @@ void Table::adjust_column_index(size_t column_ndx_begin, int ndx_in_parent_diff)
 {
     size_t num_cols = m_cols.size();
     for (size_t col_ndx = column_ndx_begin; col_ndx != num_cols; ++col_ndx) {
-        ColumnBase* column = reinterpret_cast<ColumnBase*>(m_cols.get(col_ndx));
+        ColumnBase* column = m_cols[col_ndx];
         column->get_root_array()->adjust_ndx_in_parent(ndx_in_parent_diff);
         column->update_column_index(col_ndx, m_spec);
 
@@ -3518,7 +3610,7 @@ void Table::adjust_column_index(size_t column_ndx_begin, int ndx_in_parent_diff)
         if (type == col_type_Link || type == col_type_LinkList) {
             size_t table_ndx = get_index_in_parent();
             ColumnLinkBase* col = static_cast<ColumnLinkBase*>(column);
-            TableRef target_table = col->get_target_table();
+            TableRef target_table(col->get_target_table());
             target_table->update_backlink_column_ref(table_ndx, col_ndx-ndx_in_parent_diff,
                                                      col_ndx);
         }
@@ -3546,7 +3638,7 @@ void Table::update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT
     // Update column accessors
     size_t n = m_cols.size();
     for (size_t i = 0; i != n; ++i) {
-        ColumnBase* column = reinterpret_cast<ColumnBase*>(uintptr_t(m_cols.get(i)));
+        ColumnBase* column = m_cols[i];
         column->update_from_parent(old_baseline);
     }
 }
@@ -4072,9 +4164,8 @@ void Table::to_string_row(size_t row_ndx, ostream& out, const vector<size_t>& wi
 
 bool Table::compare_rows(const Table& t) const
 {
-    // A wrapper for an empty subtable with shared spec may be created
-    // with m_data == 0. In this case there are no Column wrappers, so
-    // the standard comparison scheme becomes impossible.
+    // Table accessors attached to degenerate subtables have no column
+    // accesssors, so the general comparison scheme is impossible in that case.
     if (m_size == 0)
         return t.m_size == 0;
 
@@ -4098,21 +4189,21 @@ bool Table::compare_rows(const Table& t) const
                 const Column& c2 = t.get_column(i);
                 if (!c1.compare_int(c2))
                     return false;
-                break;
+                continue;
             }
             case col_type_Float: {
                 const ColumnFloat& c1 = get_column_float(i);
                 const ColumnFloat& c2 = t.get_column_float(i);
                 if (!c1.compare(c2))
                     return false;
-                break;
+                continue;
             }
             case col_type_Double: {
                 const ColumnDouble& c1 = get_column_double(i);
                 const ColumnDouble& c2 = t.get_column_double(i);
                 if (!c1.compare(c2))
                     return false;
-                break;
+                continue;
             }
             case col_type_String: {
                 const AdaptiveStringColumn& c1 = get_column_string(i);
@@ -4128,7 +4219,7 @@ bool Table::compare_rows(const Table& t) const
                     if (!c2.compare_string(c1))
                         return false;
                 }
-                break;
+                continue;
             }
             case col_type_StringEnum: {
                 const ColumnStringEnum& c1 = get_column_string_enum(i);
@@ -4144,32 +4235,49 @@ bool Table::compare_rows(const Table& t) const
                     if (!c1.compare_string(c2))
                         return false;
                 }
-                break;
+                continue;
             }
             case col_type_Binary: {
                 const ColumnBinary& c1 = get_column_binary(i);
                 const ColumnBinary& c2 = t.get_column_binary(i);
                 if (!c1.compare_binary(c2))
                     return false;
-                break;
+                continue;
             }
             case col_type_Table: {
                 const ColumnTable& c1 = get_column_table(i);
                 const ColumnTable& c2 = t.get_column_table(i);
                 if (!c1.compare_table(c2)) // Throws
                     return false;
-                break;
+                continue;
             }
             case col_type_Mixed: {
                 const ColumnMixed& c1 = get_column_mixed(i);
                 const ColumnMixed& c2 = t.get_column_mixed(i);
                 if (!c1.compare_mixed(c2))
                     return false;
-                break;
+                continue;
             }
-            default:
-                TIGHTDB_ASSERT(false);
+            case col_type_Link: {
+                const ColumnLink& c1 = get_column_link(i);
+                const ColumnLink& c2 = t.get_column_link(i);
+                if (!c1.compare_int(c2))
+                    return false;
+                continue;
+            }
+            case col_type_LinkList: {
+                const ColumnLinkList& c1 = get_column_link_list(i);
+                const ColumnLinkList& c2 = t.get_column_link_list(i);
+                if (!c1.compare_link_list(c2))
+                    return false;
+                continue;
+            }
+            case col_type_BackLink:
+            case col_type_Reserved1:
+            case col_type_Reserved4:
+                break;
         }
+        TIGHTDB_ASSERT(false);
     }
     return true;
 }
@@ -4178,7 +4286,7 @@ bool Table::compare_rows(const Table& t) const
 const Array* Table::get_column_root(size_t col_ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(col_ndx < get_column_count());
-    return reinterpret_cast<ColumnBase*>(m_cols.get(col_ndx))->get_root_array();
+    return m_cols[col_ndx]->get_root_array();
 }
 
 
@@ -4187,7 +4295,7 @@ pair<const Array*, const Array*> Table::get_string_column_roots(size_t col_ndx) 
 {
     TIGHTDB_ASSERT(col_ndx < get_column_count());
 
-    const ColumnBase* col = reinterpret_cast<ColumnBase*>(m_cols.get(col_ndx));
+    const ColumnBase* col = m_cols[col_ndx];
 
     const Array* root = col->get_root_array();
     const Array* enum_root = 0;
@@ -4209,17 +4317,75 @@ StringData Table::Parent::get_child_name(size_t) const TIGHTDB_NOEXCEPT
 }
 
 
-Table* Table::Parent::get_parent_table(size_t*) const TIGHTDB_NOEXCEPT
+Group* Table::Parent::get_parent_group() TIGHTDB_NOEXCEPT
 {
     return 0;
 }
 
 
+Table* Table::Parent::get_parent_table(size_t*) TIGHTDB_NOEXCEPT
+{
+    return 0;
+}
+
+
+void Table::adj_accessors_insert_rows(size_t row_ndx, size_t num_rows) TIGHTDB_NOEXCEPT
+{
+    // This function must assume no more than minimal consistency of the
+    // accessor hierarchy. This means in particular that it cannot access the
+    // underlying node structure. See AccessorConcistncyLevels.
+
+    adj_row_acc_insert_rows(row_ndx, num_rows);
+
+    // Adjust subtable accessors after insertion of new rows
+    size_t n = m_cols.size();
+    for (size_t i = 0; i != n; ++i) {
+        if (ColumnBase* col = m_cols[i])
+            col->adj_accessors_insert_rows(row_ndx, num_rows);
+    }
+}
+
+
+void Table::adj_accessors_erase_row(size_t row_ndx) TIGHTDB_NOEXCEPT
+{
+    // This function must assume no more than minimal consistency of the
+    // accessor hierarchy. This means in particular that it cannot access the
+    // underlying node structure. See AccessorConcistncyLevels.
+
+    adj_row_acc_erase_row(row_ndx);
+
+    // Adjust subtable accessors after removal of a row
+    size_t n = m_cols.size();
+    for (size_t i = 0; i != n; ++i) {
+        if (ColumnBase* col = m_cols[i])
+            col->adj_accessors_erase_row(row_ndx);
+    }
+}
+
+
+void Table::adj_accessors_move_last_over(size_t target_row_ndx, size_t last_row_ndx)
+    TIGHTDB_NOEXCEPT
+{
+    // This function must assume no more than minimal consistency of the
+    // accessor hierarchy. This means in particular that it cannot access the
+    // underlying node structure. See AccessorConcistncyLevels.
+
+    adj_row_acc_move_last_over(target_row_ndx, last_row_ndx);
+
+    // Adjust subtable accessors after 'move last over' removal of a row
+    size_t n = m_cols.size();
+    for (size_t i = 0; i != n; ++i) {
+        if (ColumnBase* col = m_cols[i])
+            col->adj_accessors_move_last_over(target_row_ndx, last_row_ndx);
+    }
+}
+
+
 void Table::adj_row_acc_insert_rows(size_t row_ndx, size_t num_rows) TIGHTDB_NOEXCEPT
 {
-    // This function must be able to operate with only the Minimal Accessor
-    // Hierarchy Consistency Guarantee. This means, in particular, that it
-    // cannot access the underlying array structure.
+    // This function must assume no more than minimal consistency of the
+    // accessor hierarchy. This means in particular that it cannot access the
+    // underlying node structure. See AccessorConcistncyLevels.
 
     // Adjust row accessors after insertion of new rows
     typedef row_accessors::const_iterator iter;
@@ -4232,26 +4398,11 @@ void Table::adj_row_acc_insert_rows(size_t row_ndx, size_t num_rows) TIGHTDB_NOE
 }
 
 
-void Table::adj_subtab_acc_insert_rows(size_t row_ndx, size_t num_rows) TIGHTDB_NOEXCEPT
-{
-    // This function must be able to operate with only the Minimal Accessor
-    // Hierarchy Consistency Guarantee. This means, in particular, that it
-    // cannot access the underlying array structure.
-
-    // Adjust subtable accessors after insertion of new rows
-    size_t n = m_cols.size();
-    for (size_t i = 0; i != n; ++i) {
-        if (ColumnBase* col = reinterpret_cast<ColumnBase*>(m_cols.get(i)))
-            col->adj_subtab_acc_insert_rows(row_ndx, num_rows);
-    }
-}
-
-
 void Table::adj_row_acc_erase_row(size_t row_ndx) TIGHTDB_NOEXCEPT
 {
-    // This function must be able to operate with only the Minimal Accessor
-    // Hierarchy Consistency Guarantee. This means, in particular, that it
-    // cannot access the underlying array structure.
+    // This function must assume no more than minimal consistency of the
+    // accessor hierarchy. This means in particular that it cannot access the
+    // underlying node structure. See AccessorConcistncyLevels.
 
     // Adjust row accessors after removal of a row
     size_t i = 0, n = m_row_accessors.size();
@@ -4271,27 +4422,12 @@ void Table::adj_row_acc_erase_row(size_t row_ndx) TIGHTDB_NOEXCEPT
 }
 
 
-void Table::adj_subtab_acc_erase_row(size_t row_ndx) TIGHTDB_NOEXCEPT
-{
-    // This function must be able to operate with only the Minimal Accessor
-    // Hierarchy Consistency Guarantee. This means, in particular, that it
-    // cannot access the underlying array structure.
-
-    // Adjust subtable accessors after removal of a row
-    size_t n = m_cols.size();
-    for (size_t i = 0; i != n; ++i) {
-        if (ColumnBase* col = reinterpret_cast<ColumnBase*>(m_cols.get(i)))
-            col->adj_subtab_acc_erase_row(row_ndx);
-    }
-}
-
-
 void Table::adj_row_acc_move_last_over(size_t target_row_ndx, size_t last_row_ndx)
     TIGHTDB_NOEXCEPT
 {
-    // This function must be able to operate with only the Minimal Accessor
-    // Hierarchy Consistency Guarantee. This means, in particular, that it
-    // cannot access the underlying array structure.
+    // This function must assume no more than minimal consistency of the
+    // accessor hierarchy. This means in particular that it cannot access the
+    // underlying node structure. See AccessorConcistncyLevels.
 
     // Adjust row accessors after 'move last over' removal of a row
     size_t i = 0, n = m_row_accessors.size();
@@ -4311,30 +4447,13 @@ void Table::adj_row_acc_move_last_over(size_t target_row_ndx, size_t last_row_nd
 }
 
 
-void Table::adj_subtab_acc_move_last_over(size_t target_row_ndx, size_t last_row_ndx)
-    TIGHTDB_NOEXCEPT
-{
-    // This function must be able to operate with only the Minimal Accessor
-    // Hierarchy Consistency Guarantee. This means, in particular, that it
-    // cannot access the underlying array structure.
-
-    // Adjust subtable accessors after 'move last over' removal of a row
-    size_t n = m_cols.size();
-    for (size_t i = 0; i != n; ++i) {
-        if (ColumnBase* col = reinterpret_cast<ColumnBase*>(m_cols.get(i)))
-            col->adj_subtab_acc_move_last_over(target_row_ndx, last_row_ndx);
-    }
-}
-
-
 void Table::adj_clear_nonroot() TIGHTDB_NOEXCEPT
 {
-    // This function must be able to operate with only the Minimal Accessor
-    // Hierarchy Consistency Guarantee. This means, in particular, that it
-    // cannot access the underlying array structure.
+    // This function must assume no more than minimal consistency of the
+    // accessor hierarchy. This means in particular that it cannot access the
+    // underlying node structure. See AccessorConcistncyLevels.
 
-    discard_row_accessors();
-    discard_subtable_accessors();
+    discard_child_accessors();
     destroy_column_accessors();
     m_columns.detach();
 }
@@ -4342,54 +4461,52 @@ void Table::adj_clear_nonroot() TIGHTDB_NOEXCEPT
 
 void Table::adj_insert_column(size_t col_ndx)
 {
-    // This function must be able to operate with only the Minimal Accessor
-    // Hierarchy Consistency Guarantee. This means, in particular, that it
-    // cannot access the underlying array structure.
+    // This function must assume no more than minimal consistency of the
+    // accessor hierarchy. This means in particular that it cannot access the
+    // underlying node structure. See AccessorConcistncyLevels.
 
     TIGHTDB_ASSERT(is_attached());
     bool not_degenerate = m_columns.is_attached();
     if (not_degenerate) {
         TIGHTDB_ASSERT(col_ndx <= m_cols.size());
-        m_cols.insert(col_ndx, 0); // Throws
+        m_cols.insert(m_cols.begin() + col_ndx, 0); // Throws
     }
 }
 
 
 void Table::adj_erase_column(size_t col_ndx) TIGHTDB_NOEXCEPT
 {
-    // This function must be able to operate with only the Minimal Accessor
-    // Hierarchy Consistency Guarantee. This means, in particular, that it
-    // cannot access the underlying array structure.
+    // This function must assume no more than minimal consistency of the
+    // accessor hierarchy. This means in particular that it cannot access the
+    // underlying node structure. See AccessorConcistncyLevels.
 
     TIGHTDB_ASSERT(is_attached());
     bool not_degenerate = m_columns.is_attached();
     if (not_degenerate) {
         TIGHTDB_ASSERT(col_ndx < m_cols.size());
-        if (ColumnBase* col = reinterpret_cast<ColumnBase*>(m_cols.get(col_ndx))) {
-            col->detach_subtable_accessors();
+        if (ColumnBase* col = m_cols[col_ndx])
             delete col;
-        }
-        m_cols.erase(col_ndx);
+        m_cols.erase(m_cols.begin() + col_ndx);
 
         // If we removed the last column, we need to discard all row accessors
-        if (m_cols.is_empty())
+        if (m_cols.empty())
             discard_row_accessors();
     }
 }
 
 
-void Table::recursive_mark_dirty() TIGHTDB_NOEXCEPT
+void Table::recursive_mark() TIGHTDB_NOEXCEPT
 {
-    // This function must be able to operate with only the Minimal Accessor
-    // Hierarchy Consistency Guarantee. This means, in particular, that it
-    // cannot access the underlying array structure.
+    // This function must assume no more than minimal consistency of the
+    // accessor hierarchy. This means in particular that it cannot access the
+    // underlying node structure. See AccessorConcistncyLevels.
 
-    mark_dirty();
+    mark();
 
     size_t n = m_cols.size();
     for (size_t i = 0; i != n; ++i) {
-        if (ColumnBase* col = reinterpret_cast<ColumnBase*>(m_cols.get(i)))
-            col->recursive_mark_dirty();
+        if (ColumnBase* col = m_cols[i])
+            col->recursive_mark();
     }
 }
 
@@ -4401,7 +4518,7 @@ void Table::refresh_accessor_tree(size_t ndx_in_parent)
         // Root table (independent descriptor)
         m_top.set_ndx_in_parent(ndx_in_parent);
 #ifdef TIGHTDB_ENABLE_REPLICATION
-        if (!m_dirty)
+        if (!m_mark)
             return;
 #endif
         m_top.init_from_parent();
@@ -4412,23 +4529,21 @@ void Table::refresh_accessor_tree(size_t ndx_in_parent)
         // Subtable with shared descriptor
         m_columns.set_ndx_in_parent(ndx_in_parent);
 #ifdef TIGHTDB_ENABLE_REPLICATION
-        if (!m_dirty)
+        if (!m_mark)
             return;
 #endif
         m_spec.init_from_parent();
 
         // If the underlying table was degenerate, then `m_cols` must still be
         // empty.
-        TIGHTDB_ASSERT(m_columns.is_attached() || m_cols.is_empty());
+        TIGHTDB_ASSERT(m_columns.is_attached() || m_cols.empty());
 
         ref_type columns_ref = m_columns.get_ref_from_parent();
         if (columns_ref != 0) {
             if (!m_columns.is_attached()) {
                 // The underlying table is no longer degenerate
                 size_t num_cols = m_spec.get_column_count();
-                // FIXME: Should be m_col_accessors.resize(num_cols);
-                for (size_t i = 0; i < num_cols; ++i)
-                    m_cols.add(0); // Throws
+                m_cols.resize(num_cols); // throws
             }
             m_columns.init_from_ref(columns_ref);
         }
@@ -4439,12 +4554,11 @@ void Table::refresh_accessor_tree(size_t ndx_in_parent)
         }
     }
     m_search_index = 0;
-    bump_version();
 
     size_t col_ndx_in_parent = 0; // Index in Table::m_columns
     size_t num_cols = m_cols.size();
     for (size_t col_ndx = 0; col_ndx != num_cols; ++col_ndx) {
-        ColumnBase* col = reinterpret_cast<ColumnBase*>(m_cols.get(col_ndx));
+        ColumnBase* col = m_cols[col_ndx];
 
         // If the current column accessor is AdaptiveStringColumn, but the
         // underlying column has been upgraded to an enumerated strings column,
@@ -4458,7 +4572,7 @@ void Table::refresh_accessor_tree(size_t ndx_in_parent)
                 // We need to store null in `m_cols` to avoid a crash during
                 // destruction of the table accessor in case an error occurs
                 // before the refresh operation is complete.
-                m_cols.set(col_ndx, 0);
+                m_cols[col_ndx] = 0;
             }
         }
 
@@ -4470,14 +4584,38 @@ void Table::refresh_accessor_tree(size_t ndx_in_parent)
         else {
             ColumnType col_type = m_spec.get_column_type(col_ndx);
             col = create_column_accessor(col_type, col_ndx, col_ndx_in_parent); // Throws
-            // FIXME: Memory leak if the following assignment statement
-            // fails. This problem disappears as soon as m_cols is changed to be
-            // of std::vector type.
-            m_cols.set(col_ndx, intptr_t(col));
+            m_cols[col_ndx] = col;
+            // In the case of a link-type column, we must establish a connection
+            // between it and the corresponding backlink column. This, however,
+            // cannot be done until both the origin and the target table
+            // accessor have been sufficiently refreshed. The solution is to
+            // attempt the connection establishment when the link coumn is
+            // created, and when the backlink column is created. In both cases,
+            // if the opposite table accessor is still dirty, the connection
+            // stablishent is postponed.
+            if (is_link_type(col_type)) {
+                Group* group = get_parent_group();
+                size_t target_table_ndx = m_spec.get_opposite_link_table_ndx(col_ndx);
+                Table* target_table = group->get_table_by_ndx(target_table_ndx); // Throws
+                if (!target_table->is_marked()) {
+                    size_t backlink_col_ndx =
+                        target_table->m_spec.find_backlink_column(ndx_in_parent, col_ndx);
+                    connect_opposite_link_columns(col_ndx, *target_table, backlink_col_ndx);
+                }
+            }
+            else if (col_type == col_type_BackLink) {
+                Group* group = get_parent_group();
+                size_t origin_table_ndx = m_spec.get_opposite_link_table_ndx(col_ndx);
+                Table* origin_table = group->get_table_by_ndx(origin_table_ndx); // Throws
+                if (!origin_table->is_marked()) {
+                    size_t link_col_ndx = m_spec.get_origin_column_ndx(col_ndx);
+                    origin_table->connect_opposite_link_columns(link_col_ndx, *this, col_ndx);
+                }
+            }
         }
 
-        // If the column was equipped column with search index, create the
-        // search index accessor.
+        // If there is no search index accesor, but the column has been equipped
+        // with a search index, create the accessor now.
         ColumnAttr attr = m_spec.get_column_attr(col_ndx);
         bool has_search_index = attr & col_attr_Indexed;
         if (has_search_index && !col->has_index()) {
@@ -4493,14 +4631,16 @@ void Table::refresh_accessor_tree(size_t ndx_in_parent)
         m_size = 0;
     }
     else {
-        ColumnBase* first_col = reinterpret_cast<ColumnBase*>(m_cols.get(0));
+        ColumnBase* first_col = m_cols[0];
         m_size = first_col->size();
     }
 
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    m_dirty = false;
+    m_mark = false;
 #endif
+
+    bump_version(/* bump_global: */ false);
 }
 
 

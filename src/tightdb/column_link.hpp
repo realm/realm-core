@@ -22,17 +22,16 @@
 
 #include <tightdb/column.hpp>
 #include <tightdb/column_linkbase.hpp>
-//#include <tightdb/table.hpp>
 #include <tightdb/column_backlink.hpp>
 
 namespace tightdb {
 
-/// An link column (ColumnLink) is a single B+-tree, and the root of
-/// the column is the root of the B+-tree. All leaf nodes are single
-/// arrays of type Array.
+/// A link column is an extension of an integer column (Column) and maintains
+/// its node structure.
 ///
-/// The individual values in the column are row positions in the target
-/// table (offset with one to allow zero to indicate null links)
+/// The individual values in a link column are indexes of rows in the target
+/// table (offset with one to allow zero to indicate null links.) The target
+/// table is specified by the table descriptor.
 class ColumnLink: public ColumnLinkBase {
 public:
     ColumnLink(ref_type ref, ArrayParent* parent = 0, std::size_t ndx_in_parent = 0,
@@ -53,33 +52,27 @@ public:
     void erase(std::size_t, bool) TIGHTDB_OVERRIDE;
     void move_last_over(std::size_t, std::size_t) TIGHTDB_OVERRIDE;
 
-    // ColumnLinkBase overrides
-    void set_target_table(Table&) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-    TableRef get_target_table() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-    void set_backlink_column(ColumnBackLink&) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-
 protected:
     friend class ColumnBackLink;
-    void do_nullify_link(std::size_t row_ndx, std::size_t old_target_row_ndx);
-    void do_update_link(std::size_t row_ndx, std::size_t old_target_row_ndx, std::size_t new_target_row_ndx);
+    void do_nullify_link(std::size_t row_ndx, std::size_t old_target_row_ndx) TIGHTDB_OVERRIDE;
+    void do_update_link(std::size_t row_ndx, std::size_t old_target_row_ndx,
+                        std::size_t new_target_row_ndx) TIGHTDB_OVERRIDE;
 
 private:
     void remove_backlinks(size_t row_ndx);
-
-    TableRef m_target_table;
-    ColumnBackLink* m_backlinks;
 };
 
 
 // Implementation
 
-inline ColumnLink::ColumnLink(ref_type ref, ArrayParent* parent, std::size_t ndx_in_parent, Allocator& alloc):
-    ColumnLinkBase(ref, parent, ndx_in_parent, alloc), m_backlinks(null_ptr)
+inline ColumnLink::ColumnLink(ref_type ref, ArrayParent* parent, std::size_t ndx_in_parent,
+                              Allocator& alloc):
+    ColumnLinkBase(ref, parent, ndx_in_parent, alloc)
 {
 }
 
 inline ColumnLink::ColumnLink(Allocator& alloc):
-    ColumnLinkBase(alloc), m_backlinks(null_ptr)
+    ColumnLinkBase(alloc)
 {
 }
 
@@ -87,22 +80,6 @@ inline ref_type ColumnLink::create(std::size_t size, Allocator& alloc)
 {
     int_fast64_t value = 0;
     return Column::create(Array::type_Normal, size, value, alloc); // Throws
-}
-
-inline void ColumnLink::set_target_table(Table& table) TIGHTDB_NOEXCEPT
-{
-    TIGHTDB_ASSERT(!m_target_table);
-    m_target_table = table.get_table_ref();
-}
-
-inline TableRef ColumnLink::get_target_table() TIGHTDB_NOEXCEPT
-{
-    return m_target_table;
-}
-
-inline void ColumnLink::set_backlink_column(ColumnBackLink& backlinks) TIGHTDB_NOEXCEPT
-{
-    m_backlinks = &backlinks;
 }
 
 inline bool ColumnLink::is_null_link(std::size_t row_ndx) const TIGHTDB_NOEXCEPT

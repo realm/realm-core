@@ -142,7 +142,7 @@ public:
     /// when the transaction ends.
     virtual void update_from_parent(std::size_t old_baseline) TIGHTDB_NOEXCEPT;
 
-    void detach_subtable_accessors() TIGHTDB_NOEXCEPT;
+    void discard_child_accessors() TIGHTDB_NOEXCEPT;
 
     /// For columns that are able to contain subtables, this function returns
     /// the pointer to the subtable accessor at the specified row index if it
@@ -155,13 +155,14 @@ public:
     /// function does nothing.
     virtual void discard_subtable_accessor(std::size_t row_ndx) TIGHTDB_NOEXCEPT;
 
-    virtual void adj_subtab_acc_insert_rows(std::size_t row_ndx,
-                                            std::size_t num_rows) TIGHTDB_NOEXCEPT;
-    virtual void adj_subtab_acc_erase_row(std::size_t row_ndx) TIGHTDB_NOEXCEPT;
-    virtual void adj_subtab_acc_move_last_over(std::size_t target_row_ndx,
-                                               std::size_t last_row_ndx) TIGHTDB_NOEXCEPT;
+    virtual void adj_accessors_insert_rows(std::size_t row_ndx,
+                                           std::size_t num_rows) TIGHTDB_NOEXCEPT;
+    virtual void adj_accessors_erase_row(std::size_t row_ndx) TIGHTDB_NOEXCEPT;
+    virtual void adj_accessors_move_last_over(std::size_t target_row_ndx,
+                                              std::size_t last_row_ndx) TIGHTDB_NOEXCEPT;
 
-    virtual void recursive_mark_dirty() TIGHTDB_NOEXCEPT;
+    virtual void recursive_mark() TIGHTDB_NOEXCEPT;
+    virtual void bump_version_on_linked_table() TIGHTDB_NOEXCEPT { }
 
     /// Refresh the dirty part of the accessor subtree rooted at this column
     /// accessor.
@@ -177,9 +178,9 @@ public:
     ///    refreshed.
     ///
     ///  - This column accessor, as well as all its descendant accessors, are in
-    ///    a collective state that satisfies the Accessor Hierarchy
-    ///    Correspondence Guarantee with respect to the root ref stored in the
-    ///    parent (`Table::m_columns`).
+    ///    structural correspondence with the underlying node hierarchy whose
+    ///    root ref is stored in the parent (`Table::m_columns`) (see
+    ///    AccessorConsistencyLevels).
     ///
     ///  - The 'index in parent' property of the cached root array
     ///    (`m_array->m_ndx_in_parent`) is valid.
@@ -203,9 +204,9 @@ protected:
 
     virtual std::size_t do_get_size() const TIGHTDB_NOEXCEPT = 0;
 
-    // Must be able to operate with only the Minimal Accessor Hierarchy
-    // Consistency Guarantee.
-    virtual void do_detach_subtable_accessors() TIGHTDB_NOEXCEPT {}
+    // Must not assume more than minimal consistency (see
+    // AccessorConsistencyLevels).
+    virtual void do_discard_child_accessors() TIGHTDB_NOEXCEPT {}
 
     //@{
     /// \tparam L Any type with an appropriate `value_type`, %size(),
@@ -345,7 +346,7 @@ public:
     size_t find_gte(int64_t target, size_t start) const;
 
     /// Compare two columns for equality.
-    bool compare_int(const Column&) const;
+    bool compare_int(const Column&) const TIGHTDB_NOEXCEPT;
 
     static ref_type create(Array::Type leaf_type, std::size_t size, int_fast64_t value,
                            Allocator&);
@@ -423,9 +424,9 @@ inline void ColumnBase::update_column_index(std::size_t, const Spec&) TIGHTDB_NO
     // Noop
 }
 
-inline void ColumnBase::detach_subtable_accessors() TIGHTDB_NOEXCEPT
+inline void ColumnBase::discard_child_accessors() TIGHTDB_NOEXCEPT
 {
-    do_detach_subtable_accessors();
+    do_discard_child_accessors();
 }
 
 inline Table* ColumnBase::get_subtable_accessor(std::size_t) const TIGHTDB_NOEXCEPT
@@ -438,22 +439,22 @@ inline void ColumnBase::discard_subtable_accessor(std::size_t) TIGHTDB_NOEXCEPT
     // Noop
 }
 
-inline void ColumnBase::adj_subtab_acc_insert_rows(std::size_t, std::size_t) TIGHTDB_NOEXCEPT
+inline void ColumnBase::adj_accessors_insert_rows(std::size_t, std::size_t) TIGHTDB_NOEXCEPT
 {
     // Noop
 }
 
-inline void ColumnBase::adj_subtab_acc_erase_row(std::size_t) TIGHTDB_NOEXCEPT
+inline void ColumnBase::adj_accessors_erase_row(std::size_t) TIGHTDB_NOEXCEPT
 {
     // Noop
 }
 
-inline void ColumnBase::adj_subtab_acc_move_last_over(std::size_t, std::size_t) TIGHTDB_NOEXCEPT
+inline void ColumnBase::adj_accessors_move_last_over(std::size_t, std::size_t) TIGHTDB_NOEXCEPT
 {
     // Noop
 }
 
-inline void ColumnBase::recursive_mark_dirty() TIGHTDB_NOEXCEPT
+inline void ColumnBase::recursive_mark() TIGHTDB_NOEXCEPT
 {
     // Noop
 }

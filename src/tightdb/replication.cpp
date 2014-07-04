@@ -77,8 +77,9 @@ void Replication::select_table(const Table* table)
 
 good:
     transact_log_advance(buf);
-    m_selected_spec  = 0;
-    m_selected_table = table;
+    m_selected_spec      = 0;
+    m_selected_link_list = 0;
+    m_selected_table     = table;
 }
 
 
@@ -120,6 +121,16 @@ void Replication::select_desc(const Descriptor& desc)
 good:
     transact_log_advance(buf);
     m_selected_spec = df::get_spec(desc);
+}
+
+
+void Replication::select_link_list(const LinkView& list)
+{
+    typedef _impl::LinkListFriend llf;
+    check_table(&llf::get_table(list));
+    size_t col_ndx = llf::get_col_ndx(list);
+    size_t row_ndx = list.get_origin_row_index();
+    simple_cmd(instr_SelectLinkList, util::tuple(col_ndx, row_ndx)); // Throws
 }
 
 
@@ -254,6 +265,30 @@ public:
         return false;
     }
 
+    bool set_link(size_t col_ndx, size_t row_ndx, std::size_t value)
+    {
+        if (TIGHTDB_LIKELY(check_set_cell(col_ndx, row_ndx))) {
+#ifdef TIGHTDB_DEBUG
+            if (m_log) {
+                if (value == 0) {
+                    *m_log << "table->nullify_link("<<col_ndx<<", "<<row_ndx<<")\n";
+                }
+                else {
+                    *m_log << "table->set_link("<<col_ndx<<", "<<row_ndx<<", "<<(value-1)<<")\n";
+                }
+            }
+#endif
+            if (value == 0) {
+                m_table->nullify_link(col_ndx, row_ndx); // Throws
+            }
+            else {
+                m_table->set_link(col_ndx, row_ndx, value-1); // Throws
+            }
+            return true;
+        }
+        return false;
+    }
+
     bool insert_int(size_t col_ndx, size_t row_ndx, int_fast64_t value)
     {
         if (TIGHTDB_LIKELY(check_insert_cell(col_ndx, row_ndx))) {
@@ -366,6 +401,33 @@ public:
                 *m_log << "table->insert_mixed("<<col_ndx<<", "<<row_ndx<<", "<<value<<")\n";
 #endif
             m_table->insert_mixed(col_ndx, row_ndx, value); // Throws
+            return true;
+        }
+        return false;
+    }
+
+    bool insert_link(size_t col_ndx, size_t row_ndx, std::size_t value)
+    {
+        TIGHTDB_ASSERT(value > 0); // Not yet any support for inserting null links
+        if (TIGHTDB_LIKELY(check_insert_cell(col_ndx, row_ndx))) {
+#ifdef TIGHTDB_DEBUG
+            if (m_log)
+                *m_log << "table->insert_link("<<col_ndx<<", "<<row_ndx<<", "<<(value-1)<<")\n";
+#endif
+            m_table->insert_link(col_ndx, row_ndx, value-1); // Throws
+            return true;
+        }
+        return false;
+    }
+
+    bool insert_link_list(size_t col_ndx, size_t row_ndx)
+    {
+        if (TIGHTDB_LIKELY(check_insert_cell(col_ndx, row_ndx))) {
+#ifdef TIGHTDB_DEBUG
+            if (m_log)
+                *m_log << "table->insert_link_list("<<col_ndx<<", "<<row_ndx<<")\n";
+#endif
+            m_table->insert_linklist(col_ndx, row_ndx); // Throws
             return true;
         }
         return false;
@@ -524,7 +586,7 @@ public:
                 typedef _impl::TableFriend tf;
 #ifdef TIGHTDB_DEBUG
                 if (m_log) {
-                    if (tf::is_link_type(type)) {
+                    if (tf::is_link_type(ColumnType(type))) {
                         *m_log << "desc->insert_column_link("<<col_ndx<<", "
                             ""<<type_to_str(type)<<", \""<<name<<"\", "
                             "group->get_table("<<link_target_table_ndx<<"))\n";
@@ -536,7 +598,7 @@ public:
                 }
 #endif
                 Table* link_target_table = 0;
-                if (tf::is_link_type(type))
+                if (tf::is_link_type(ColumnType(type)))
                     link_target_table = m_group.get_table_by_ndx(link_target_table_ndx); // Throws
                 tf::insert_column(*m_desc, col_ndx, type, name, link_target_table); // Throws
                 return true;
@@ -627,10 +689,99 @@ public:
         return true;
     }
 
+    bool select_link_list(size_t col_ndx, size_t row_ndx)
+    {
+        if (TIGHTDB_UNLIKELY(!m_table))
+            return false;
+        if (TIGHTDB_UNLIKELY(col_ndx >= m_table->get_column_count()))
+            return false;
+        DataType type = m_table->get_column_type(col_ndx);
+        if (TIGHTDB_UNLIKELY(type != type_LinkList))
+            return false;
+#ifdef TIGHTDB_DEBUG
+        if (m_log)
+            *m_log << "link_list = table->get_link_list("<<col_ndx<<", "<<row_ndx<<")\n";
+#endif
+        m_link_list = m_table->get_linklist(col_ndx, row_ndx); // Throws
+        return true;
+    }
+
+    bool link_list_set(size_t link_ndx, size_t value)
+    {
+        if (TIGHTDB_UNLIKELY(!m_link_list))
+            return false;
+        if (TIGHTDB_UNLIKELY(link_ndx >= m_link_list->size()))
+            return false;
+#ifdef TIGHTDB_DEBUG
+        if (m_log)
+            *m_log << "link_list->set("<<link_ndx<<", "<<value<<")\n";
+#endif
+        m_link_list->set(link_ndx, value); // Throws
+        return true;
+    }
+
+    bool link_list_insert(size_t link_ndx, size_t value)
+    {
+        if (TIGHTDB_UNLIKELY(!m_link_list))
+            return false;
+        if (TIGHTDB_UNLIKELY(link_ndx > m_link_list->size()))
+            return false;
+#ifdef TIGHTDB_DEBUG
+        if (m_log)
+            *m_log << "link_list->insert("<<link_ndx<<", "<<value<<")\n";
+#endif
+        m_link_list->insert(link_ndx, value); // Throws
+        return true;
+    }
+
+    bool link_list_move(size_t old_link_ndx, size_t new_link_ndx)
+    {
+        if (TIGHTDB_UNLIKELY(!m_link_list))
+            return false;
+        size_t num_links = m_link_list->size();
+        if (TIGHTDB_UNLIKELY(old_link_ndx >= num_links))
+            return false;
+        if (TIGHTDB_UNLIKELY(new_link_ndx > num_links))
+            return false;
+#ifdef TIGHTDB_DEBUG
+        if (m_log)
+            *m_log << "link_list->move("<<old_link_ndx<<", "<<new_link_ndx<<")\n";
+#endif
+        m_link_list->move(old_link_ndx, new_link_ndx); // Throws
+        return true;
+    }
+
+    bool link_list_erase(size_t link_ndx)
+    {
+        if (TIGHTDB_UNLIKELY(!m_link_list))
+            return false;
+        if (TIGHTDB_UNLIKELY(link_ndx >= m_link_list->size()))
+            return false;
+#ifdef TIGHTDB_DEBUG
+        if (m_log)
+            *m_log << "link_list->remove("<<link_ndx<<")\n";
+#endif
+        m_link_list->remove(link_ndx); // Throws
+        return true;
+    }
+
+    bool link_list_clear()
+    {
+        if (TIGHTDB_UNLIKELY(!m_link_list))
+            return false;
+#ifdef TIGHTDB_DEBUG
+        if (m_log)
+            *m_log << "link_list->clear()\n";
+#endif
+        m_link_list->clear(); // Throws
+        return true;
+    }
+
 private:
     Group& m_group;
     TableRef m_table;
     DescriptorRef m_desc;
+    LinkViewRef m_link_list;
     ostream* m_log;
 
     bool check_set_cell(size_t col_ndx, size_t row_ndx) TIGHTDB_NOEXCEPT
@@ -659,27 +810,27 @@ private:
     {
         switch (type) {
             case type_Int:
-                return "Tnt";
+                return "type_Int";
             case type_Bool:
-                return "Bool";
+                return "type_Bool";
             case type_Float:
-                return "Float";
+                return "type_Float";
             case type_Double:
-                return "Double";
+                return "type_Double";
             case type_String:
-                return "String";
+                return "type_String";
             case type_Binary:
-                return "Binary";
+                return "type_Binary";
             case type_DateTime:
-                return "DataTime";
+                return "type_DataTime";
             case type_Table:
-                return "Table";
+                return "type_Table";
             case type_Mixed:
-                return "Mixed";
+                return "type_Mixed";
             case type_Link:
-                return "Link";
+                return "type_Link";
             case type_LinkList:
-                return "LinkList";
+                return "type_LinkList";
         }
         TIGHTDB_ASSERT(false);
         return 0;

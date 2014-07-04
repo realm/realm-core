@@ -23,6 +23,8 @@
 #include <exception>
 
 #include <pthread.h>
+#include <../test/pthread_test.hpp>
+
 #include <errno.h>
 #include <cstddef>
 

@@ -420,7 +420,8 @@ TEST(Query_NextGenSyntax)
     match = (u0 + u1 > 40).find();
     CHECK(match == 1);
 
-
+    // No longer supported
+    /*
     // Flexible language binding style
     Subexpr* first = new Columns<int64_t>(0);
     Subexpr* second = new Columns<float>(1);
@@ -472,6 +473,8 @@ TEST(Query_NextGenSyntax)
     delete third2;
     delete second2;
     delete first2;
+    */
+
 }
 
 TEST(Query_NextGenSyntaxMonkey0)
@@ -787,7 +790,7 @@ TEST(Query_MergeQueries)
     CHECK_EQUAL(1, c);
 }
 
-TEST(NotQueries)
+TEST(Query_Not)
 {
     // test Not vs And, Or, Groups.
     Table table;
@@ -1758,6 +1761,44 @@ TEST(Query_TwoCols0)
     CHECK_EQUAL(0, t2.size());
 }
 
+TEST(Query_TwoSameCols)
+{
+    Table table;
+    table.add_column(type_Bool, "first1");
+    table.add_column(type_Bool, "first2");
+    table.add_column(type_DateTime, "second1");
+    table.add_column(type_DateTime, "second2");
+
+    table.add_empty_row();
+    table.set_bool(0, 0, false);
+    table.set_bool(1, 0, true);
+    table.set_datetime(2, 0, DateTime(0));
+    table.set_datetime(3, 0, DateTime(1));
+
+    table.add_empty_row();
+    table.set_bool(0, 1, true);
+    table.set_bool(1, 1, true);
+    table.set_datetime(2, 1, DateTime(1));
+    table.set_datetime(3, 1, DateTime(1));
+
+    table.add_empty_row();
+    table.set_bool(0, 2, false);
+    table.set_bool(1, 2, true);
+    table.set_datetime(2, 2, DateTime(0));
+    table.set_datetime(3, 2, DateTime(1));
+
+    Query q1 = table.column<Bool>(0) == table.column<Bool>(1);
+    Query q2 = table.column<DateTime>(0) == table.column<DateTime>(1);
+
+    CHECK_EQUAL(1, q1.find());
+    CHECK_EQUAL(1, q2.find());
+
+    Query q3 = table.column<Bool>(0) != table.column<Bool>(1);
+    Query q4 = table.column<DateTime>(0) != table.column<DateTime>(1);
+
+    CHECK_EQUAL(0, q3.find());
+    CHECK_EQUAL(0, q4.find());
+}
 
 TEST(Query_TwoColsNoRows)
 {
@@ -2910,7 +2951,7 @@ TEST(Query_Simple)
     CHECK_EQUAL(1, tv1.get_source_ndx(0));
 }
 
-TEST(TestQueryNot)
+TEST(Query_Not2)
 {
     TupleTableType ttt;
 
@@ -3220,9 +3261,9 @@ TEST(Query_SortDates)
     tv.sort(0);
 
     CHECK(tv.size() == 3);
-    CHECK(tv.get_datetime(0, 0) == 1000);
-    CHECK(tv.get_datetime(0, 1) == 2000);
-    CHECK(tv.get_datetime(0, 2) == 3000);
+    CHECK(tv.get_datetime(0, 0) == DateTime(1000));
+    CHECK(tv.get_datetime(0, 1) == DateTime(2000));
+    CHECK(tv.get_datetime(0, 2) == DateTime(3000));
 }
 
 

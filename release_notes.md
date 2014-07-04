@@ -35,24 +35,25 @@ C++ (core)
 
 ### Bugfixes:
 
-* Fixed bug in TableView::remove() causing crash or undefined behaviour.
-* Fixed bugs in Table::insert_column() and Table::remove_column() causing crash or undefined behaviour.
+* Fixed bug in `TableView::remove()` causing crash or undefined behaviour.
+* Fixed bugs in `Table::insert_column()` and `Table::remove_column()` causing crash or undefined behaviour.
 * Fixed corruption bug when a string enumeration column follows a column with attached search index (index flavor mixup).
-* Fixed in Array::erase() causing crash in certain row insertion scenarios.
+* Fixed in `Array::erase()` causing crash in certain row insertion scenarios.
 * Fixed bug in enumerated strings column (corruption was possible when inserting default values).
-* Fixed bug in Table::update_from_parent() causing a crash if Group::commit() in presence of generated subtable accessor.
+* Fixed bug in `Table::update_from_parent()` causing a crash if `Group::commit()` in presence of generated subtable accessor.
 
 ### API breaking changes:
 
-* `???`
+* Views can now be be kept synchronized with changes to the tables used to generate the view, use `TableView::sync_if_needed()` to do so. Views are no longer detached when the table they have been generated from are changed. Instead they just go out of sync. See further description in `src/tightdb/table_view.hpp`.
 
 ### Enhancements:
-* Supports links in queries, like (table1->link(3).column<Int>(0) > 550).find();
+* Supports links in queries, like `(table1->link(3).column<Int>(0) > 550).find()`.
 * Added support for links and lists of links as column types, to enable relationships between tables.
-* Adding Table::get_index_in_parent() and Group::get_table(std::size_t table_ndx). They were needed for implicit transactions.
-* Table::get_parent_table() can now also return the index of the column in the parent.
+* Adding `Table::get_index_in_parent()` and `Group::get_table(std::size_t table_ndx)`. They were needed for implicit transactions.
+* `Table::get_parent_table()` can now also return the index of the column in the parent.
 * Support for row accessors.
 * Table, row, and descriptor accessors are now generally retained and properly adjusted when the parent table is modified.
+* Added methods to find rows by target in TableView and LinkView.
 
 -----------
 

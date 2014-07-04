@@ -43,7 +43,7 @@ Grammar:
 
     T:                  bool, int, int64_t, float, double, StringData
 
-    
+
 Class diagram
 -----------------------------------------------------------------------------------------------------------------------
 Subexpr2
@@ -155,7 +155,7 @@ template<class T> struct EitherIsString<T, StringData>
     typedef StringData type;
 };
 
-// Hack to avoid template instantiation errors. See create(). Todo, see if we can simplify OnlyNumberic and 
+// Hack to avoid template instantiation errors. See create(). Todo, see if we can simplify OnlyNumberic and
 // EitherIsString somehow
 template<class T> struct OnlyNumeric
 {
@@ -218,6 +218,7 @@ template<class T1, class T2, bool b> struct Common<T1, T2, true , false, b> {
 struct ValueBase
 {
     static const size_t default_size = 8;
+    virtual void export_bool(ValueBase& destination) const = 0;
     virtual void export_int(ValueBase& destination) const = 0;
     virtual void export_float(ValueBase& destination) const = 0;
     virtual void export_int64_t(ValueBase& destination) const = 0;
@@ -225,11 +226,11 @@ struct ValueBase
     virtual void export_StringData(ValueBase& destination) const = 0;
     virtual void import(const ValueBase& destination) = 0;
 
-    // If true, all values in the class come from a link of a single field in the parent table (m_table). If 
+    // If true, all values in the class come from a link of a single field in the parent table (m_table). If
     // false, then values come from successive rows of m_table (query operations are operated on in bulks for speed)
     bool from_link;
 
-    // Number of values stored in the class. 
+    // Number of values stored in the class.
     size_t m_values;
 };
 
@@ -239,7 +240,7 @@ public:
     Expression() {}
 
     virtual size_t find_first(size_t start, size_t end) const = 0;
-    virtual void set_table(const Table* table) = 0;
+    virtual void set_table() = 0;
     virtual const Table* get_table() = 0;
     virtual ~Expression() {}
 };
@@ -256,7 +257,7 @@ public:
     }
 
     // Recursively set table pointers for all Columns object in the expression tree. Used for late binding of table
-    virtual void set_table(const Table*) {}
+    virtual void set_table() {}
 
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression and
     // binds it to a Query at a later time
@@ -295,7 +296,7 @@ template <class L, class Cond, class R> Query create (L left, const Subexpr2<R>&
     static_cast<void>(num);
 
     const Columns<R>* column = dynamic_cast<const Columns<R>*>(&right);
-    if (column && (std::numeric_limits<L>::is_integer) && (std::numeric_limits<R>::is_integer) && 
+    if (column && (std::numeric_limits<L>::is_integer) && (std::numeric_limits<R>::is_integer) &&
         !column->m_column_linklist && !column->m_column_single_link) {
         const Table* t = (const_cast<Columns<R>*>(column))->get_table();
         Query q = Query(*t);
@@ -341,50 +342,64 @@ template <class L, class R> class Overloads
 public:
 
     // Arithmetic, right side constant
-    Operator<Plus<CommonType> >& operator + (R right) {
+    Operator<Plus<CommonType> >& operator + (R right)
+    {
        return *new Operator<Plus<CommonType> >(static_cast<Subexpr2<L>&>(*this).clone(), *new Value<R>(right), true);
     }
-    Operator<Minus<CommonType> >& operator - (R right) {
+    Operator<Minus<CommonType> >& operator - (R right)
+    {
        return *new Operator<Minus<CommonType> > (static_cast<Subexpr2<L>&>(*this).clone(), *new Value<R>(right), true);
     }
-    Operator<Mul<CommonType> >& operator * (R right) {
+    Operator<Mul<CommonType> >& operator * (R right)
+    {
        return *new Operator<Mul<CommonType> > (static_cast<Subexpr2<L>&>(*this).clone(), *new Value<R>(right), true);
     }
-    Operator<Div<CommonType> >& operator / (R right) {
+    Operator<Div<CommonType> >& operator / (R right)
+    {
         return *new Operator<Div<CommonType> > (static_cast<Subexpr2<L>&>(*this).clone(), *new Value<R>(right), true);
     }
 
     // Arithmetic, right side subexpression
-    Operator<Plus<CommonType> >& operator + (const Subexpr2<R>& right) {
+    Operator<Plus<CommonType> >& operator + (const Subexpr2<R>& right)
+    {
         return *new Operator<Plus<CommonType> > (static_cast<Subexpr2<L>&>(*this).clone(), const_cast<Subexpr2<R>&>(right).clone(), true);
     }
-    Operator<Minus<CommonType> >& operator - (const Subexpr2<R>& right) {
+    Operator<Minus<CommonType> >& operator - (const Subexpr2<R>& right)
+    {
         return *new Operator<Minus<CommonType> > (static_cast<Subexpr2<L>&>(*this).clone(), const_cast<Subexpr2<R>&>(right).clone(), true);
     }
-    Operator<Mul<CommonType> >& operator * (const Subexpr2<R>& right) {
+    Operator<Mul<CommonType> >& operator * (const Subexpr2<R>& right)
+    {
         return *new Operator<Mul<CommonType> > (static_cast<Subexpr2<L>&>(*this).clone(), const_cast<Subexpr2<R>&>(right).clone(), true);
     }
-    Operator<Div<CommonType> >& operator / (const Subexpr2<R>& right) {
+    Operator<Div<CommonType> >& operator / (const Subexpr2<R>& right)
+    {
         return *new Operator<Div<CommonType> > (static_cast<Subexpr2<L>&>(*this).clone(), const_cast<Subexpr2<R>&>(right).clone(), true);
     }
 
     // Compare, right side constant
-    Query operator > (R right) {
+    Query operator > (R right)
+    {
         return create<R, Less, L>(right, static_cast<Subexpr2<L>&>(*this));
     }
-    Query operator < (R right) {
+    Query operator < (R right)
+    {
         return create<R, Greater, L>(right, static_cast<Subexpr2<L>&>(*this));
     }
-    Query operator >= (R right) {
+    Query operator >= (R right)
+    {
         return create<R, LessEqual, L>(right, static_cast<Subexpr2<L>&>(*this));
     }
-    Query operator <= (R right) {
+    Query operator <= (R right)
+    {
         return create<R, GreaterEqual, L>(right, static_cast<Subexpr2<L>&>(*this));
     }
-    Query operator == (R right) {
+    Query operator == (R right)
+    {
         return create<R, Equal, L>(right, static_cast<Subexpr2<L>&>(*this));
     }
-    Query operator != (R right) {
+    Query operator != (R right)
+    {
         return create<R, NotEqual, L>(right, static_cast<Subexpr2<L>&>(*this));
     }
 
@@ -405,7 +420,7 @@ public:
             const Table* t = (const_cast<Columns<R>*>(left_col))->get_table();
             Query q = Query(*t);
 
-            if (std::numeric_limits<L>::is_integer) {
+            if (std::numeric_limits<L>::is_integer || util::SameType<L, DateTime>::value) {
                 if (util::SameType<Cond, Less>::value)
                     q.less_int(left_col->m_column, right_col->m_column);
                 else if (util::SameType<Cond, Greater>::value)
@@ -472,22 +487,28 @@ public:
     }
 
     // Compare, right side subexpression
-    Query operator == (const Subexpr2<R>& right) {
+    Query operator == (const Subexpr2<R>& right)
+    {
         return create2<Equal>(right);
     }
-    Query operator != (const Subexpr2<R>& right) {
+    Query operator != (const Subexpr2<R>& right)
+    {
         return create2<NotEqual>(right);
     }
-    Query operator > (const Subexpr2<R>& right) {
+    Query operator > (const Subexpr2<R>& right)
+    {
         return create2<Greater>(right);
     }
-    Query operator < (const Subexpr2<R>& right) {
+    Query operator < (const Subexpr2<R>& right)
+    {
         return create2<Less>(right);
     }
-    Query operator >= (const Subexpr2<R>& right) {
+    Query operator >= (const Subexpr2<R>& right)
+    {
         return create2<GreaterEqual>(right);
     }
-    Query operator <= (const Subexpr2<R>& right) {
+    Query operator <= (const Subexpr2<R>& right)
+    {
         return create2<LessEqual>(right);
     }
 };
@@ -495,13 +516,14 @@ public:
 // With this wrapper class we can define just 20 overloads inside Overloads<L, R> instead of 5 * 20 = 100. Todo: We can
 // consider if it's simpler/better to remove this class completely and just list all 100 overloads manually anyway.
 template <class T> class Subexpr2 : public Subexpr, public Overloads<T, const char*>, public Overloads<T, int>, public
-    Overloads<T, float>, public Overloads<T, double>, public Overloads<T, int64_t>, public Overloads<T, StringData>
+    Overloads<T, float>, public Overloads<T, double>, public Overloads<T, int64_t>, public Overloads<T, StringData>,
+    public Overloads<T, bool>, public Overloads<T, DateTime>
 {
 public:
     virtual ~Subexpr2() {};
 
     #define TDB_U2(t, o) using Overloads<T, t>::operator o;
-    #define TDB_U(o) TDB_U2(int, o) TDB_U2(float, o) TDB_U2(double, o) TDB_U2(int64_t, o) TDB_U2(StringData, o)
+    #define TDB_U(o) TDB_U2(int, o) TDB_U2(float, o) TDB_U2(double, o) TDB_U2(int64_t, o) TDB_U2(StringData, o) TDB_U2(bool, o) TDB_U2(DateTime, o)
     TDB_U(+) TDB_U(-) TDB_U(*) TDB_U(/) TDB_U(>) TDB_U(<) TDB_U(==) TDB_U(!=) TDB_U(>=) TDB_U(<=)
 };
 
@@ -519,7 +541,8 @@ public:
         m_v = null_ptr;
         init(false, ValueBase::default_size, v);
     }
-    Value(bool link, size_t values) {
+    Value(bool link, size_t values)
+    {
         m_v = null_ptr;
         init(link, values, 0);
     }
@@ -530,7 +553,8 @@ public:
         init(link, values, v);
     }
 
-    ~Value() {
+    ~Value()
+    {
         delete[] m_v;
         m_v = null_ptr;
     }
@@ -585,6 +609,11 @@ public:
         }
     }
 
+    TIGHTDB_FORCEINLINE void export_bool(ValueBase& destination) const
+    {
+        export2<bool>(destination);
+    }
+
     TIGHTDB_FORCEINLINE void export_int64_t(ValueBase& destination) const
     {
         export2<int64_t>(destination);
@@ -613,6 +642,8 @@ public:
     {
         if (util::SameType<T, int>::value)
             source.export_int(*this);
+        else if (util::SameType<T, bool>::value)
+            source.export_bool(*this);
         else if (util::SameType<T, float>::value)
             source.export_float(*this);
         else if (util::SameType<T, double>::value)
@@ -822,13 +853,13 @@ template <class T> UnaryOperator<Pow<T> >& power (Subexpr2<T>& left) {
 template <> class Columns<StringData> : public Subexpr2<StringData>
 {
 public:
-    explicit Columns(size_t column, const Table* table) : m_table(null_ptr), m_column_linklist(null_ptr),
+    explicit Columns(size_t column, const Table* table) : m_table_linked_from(null_ptr), m_table(null_ptr), m_column_linklist(null_ptr),
         m_column_single_link(null_ptr), m_column(column)
     {
-        set_table(table);
+        m_table = table;
     }
 
-    explicit Columns(size_t column, Table* table, size_t link_column) : m_table(null_ptr), 
+    explicit Columns(size_t column, Table* table, size_t link_column) : m_table_linked_from(null_ptr), m_table(null_ptr),
         m_column_linklist(null_ptr), m_column_single_link(null_ptr), m_column(column)
     {
         TableRef linked_table;
@@ -837,20 +868,21 @@ public:
         ColumnType type = table->get_real_column_type(link_column);
         if (type == col_type_LinkList) {
             m_column_linklist = &table->get_column<ColumnLinkList, col_type_LinkList>(link_column);
-            linked_table = m_column_linklist->get_target_table();
+            linked_table.reset(m_column_linklist->get_target_table());
         }
         else {
             m_column_single_link = &table->get_column<ColumnLink, col_type_Link>(link_column);
-            linked_table = m_column_single_link->get_target_table();
+            linked_table.reset(m_column_single_link->get_target_table());
         }
 
-        set_table(linked_table.get());
+        m_table = linked_table.get();
+        m_table_linked_from = table;
     }
 
-    explicit Columns() : m_table(null_ptr), m_column_linklist(null_ptr), m_column_single_link(null_ptr) { }
+    explicit Columns() : m_table_linked_from(null_ptr), m_table(null_ptr), m_column_linklist(null_ptr), m_column_single_link(null_ptr) { }
 
 
-    explicit Columns(size_t column) : m_table(null_ptr), m_column_linklist(null_ptr), m_column_single_link(null_ptr),
+    explicit Columns(size_t column) : m_table_linked_from(null_ptr), m_table(null_ptr), m_column_linklist(null_ptr), m_column_single_link(null_ptr),
         m_column(column)
     {
     }
@@ -862,25 +894,20 @@ public:
         return n;
     }
 
-    virtual void set_table(const Table* table)
-    {
-        m_table = table;
-    }
-
     virtual const Table* get_table()
     {
-        return m_table;
+        return m_table_linked_from ? m_table_linked_from : m_table;
     }
-    
+
     virtual void evaluate(size_t index, ValueBase& destination)
     {
         Value<StringData>& d = static_cast<Value<StringData>&>(destination);
-        
+
         if (m_column_linklist) {
             if (m_column_linklist->has_links(index))
             {
                 // LinkList with more than 0 values. Create Value with payload for all fields
-                LinkViewRef links = m_column_linklist->get_link_view(index);
+                LinkViewRef links = m_column_linklist->get(index);
                 Value<StringData> v(true, links->size());
 
                 for (size_t t = 0; t < links->size(); t++) {
@@ -916,6 +943,8 @@ public:
             }
         }
     }
+
+    const Table* m_table_linked_from;
 
     // Pointer to payload table (which is the linked-to table if this is a link column) used for condition operator
     const Table* m_table;
@@ -955,15 +984,15 @@ template <class T> Query operator != (const Columns<StringData>& left, T right) 
 template <class T> class Columns : public Subexpr2<T>, public ColumnsBase
 {
 public:
-    explicit Columns(size_t column, const Table* table) : m_table(null_ptr), sg(null_ptr),
+    explicit Columns(size_t column, const Table* table) : m_table_linked_from(null_ptr), m_table(null_ptr), sg(null_ptr),
         m_column_linklist(null_ptr), m_column_single_link(null_ptr), m_column(column)
     {
-        set_table(table);
+        m_table = table;
     }
 
     // Todo: Constructor almost identical with that of Columns<StringData>; simplify
-    explicit Columns(size_t column, Table* table, size_t link_column) : m_table(null_ptr), sg(null_ptr), 
-        m_column_linklist(null_ptr), m_column_single_link(null_ptr), m_column(column)
+    explicit Columns(size_t column, Table* table, size_t link_column) : m_table_linked_from(null_ptr), 
+        m_table(null_ptr), sg(null_ptr), m_column_linklist(null_ptr), m_column_single_link(null_ptr), m_column(column)
     {
         TableRef linked_table;
 
@@ -971,21 +1000,22 @@ public:
         ColumnType type = table->get_real_column_type(link_column);
         if (type == col_type_LinkList) {
             m_column_linklist = &table->get_column<ColumnLinkList, col_type_LinkList>(link_column);
-            linked_table = m_column_linklist->get_target_table();
+            linked_table.reset(m_column_linklist->get_target_table());
         }
         else {
             m_column_single_link = &table->get_column<ColumnLink, col_type_Link>(link_column);
-            linked_table = m_column_single_link->get_target_table();
+            linked_table.reset(m_column_single_link->get_target_table());
         }
 
-        set_table(linked_table.get());
+        m_table = linked_table.get();
+        m_table_linked_from = table;
     }
 
-    explicit Columns() : m_table(null_ptr), sg(null_ptr), m_column_linklist(null_ptr), 
+    explicit Columns() : m_table_linked_from(null_ptr), m_table(null_ptr), sg(null_ptr), m_column_linklist(null_ptr),
                          m_column_single_link(null_ptr) { }
 
-    explicit Columns(size_t column) : m_table(null_ptr), sg(null_ptr), m_column_linklist(null_ptr), 
-        m_column_single_link(null_ptr), m_column(column) {}
+    explicit Columns(size_t column) : m_table_linked_from(null_ptr), m_table(null_ptr), sg(null_ptr), 
+        m_column_linklist(null_ptr), m_column_single_link(null_ptr), m_column(column) {}
 
     ~Columns()
     {
@@ -1002,11 +1032,10 @@ public:
     }
 
     // Recursively set table pointers for all Columns object in the expression tree. Used for late binding of table
-    virtual void set_table(const Table* table)
+    virtual void set_table()
     {
-        m_table = table;
         typedef typename ColumnTypeTraits<T>::column_type ColType;
-        const ColType* c = static_cast<const ColType*>(&table->get_column_base(m_column));
+        const ColType* c = static_cast<const ColType*>(&m_table->get_column_base(m_column));
         if (sg == null_ptr)
             sg = new SequentialGetter<T>();
         sg->init(c);
@@ -1016,7 +1045,7 @@ public:
     // binds it to a Query at a later time
     virtual const Table* get_table()
     {
-        return m_table;
+        return m_table_linked_from ? m_table_linked_from : m_table;
     }
 
     // Load values from Column into destination
@@ -1029,7 +1058,7 @@ public:
             }
             else {
                 // LinkList with more than 0 values. Create Value with payload for all fields
-                LinkViewRef links = m_column_linklist->get_link_view(index);
+                LinkViewRef links = m_column_linklist->get(index);
                 Value<T> v(true, links->size());
 
                 for (size_t t = 0; t < links->size(); t++) {
@@ -1083,6 +1112,8 @@ public:
         }
     }
 
+    const Table* m_table_linked_from;
+
     // m_table is redundant with ColumnAccessorBase<>::m_table, but is in order to decrease class dependency/entanglement
     const Table* m_table;
 
@@ -1112,9 +1143,9 @@ public:
     }
 
     // Recursively set table pointers for all Columns object in the expression tree. Used for late binding of table
-    void set_table(const Table* table)
+    void set_table()
     {
-        m_left.set_table(table);
+        m_left.set_table();
     }
 
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression and
@@ -1126,7 +1157,8 @@ public:
     }
 
     // destination = operator(left)
-    void evaluate(size_t index, ValueBase& destination) {
+    void evaluate(size_t index, ValueBase& destination)
+    {
         Value<T> result;
         Value<T> left;
         m_left.evaluate(index, left);
@@ -1159,10 +1191,10 @@ public:
     }
 
     // Recursively set table pointers for all Columns object in the expression tree. Used for late binding of table
-    void set_table(const Table* table)
+    void set_table()
     {
-        m_left.set_table(table);
-        m_right.set_table(table);
+        m_left.set_table();
+        m_right.set_table();
     }
 
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression and
@@ -1180,7 +1212,8 @@ public:
     }
 
     // destination = operator(left, right)
-    void evaluate(size_t index, ValueBase& destination) {
+    void evaluate(size_t index, ValueBase& destination)
+    {
         Value<T> result;
         Value<T> left;
         Value<T> right;
@@ -1224,10 +1257,10 @@ public:
     }
 
     // Recursively set table pointers for all Columns object in the expression tree. Used for late binding of table
-    void set_table(const Table* table)
+    void set_table()
     {
-        m_left.set_table(table);
-        m_right.set_table(table);
+        m_left.set_table();
+        m_right.set_table();
     }
 
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression and
@@ -1244,7 +1277,8 @@ public:
         return l ? l : r;
     }
 
-    size_t find_first(size_t start, size_t end) const {
+    size_t find_first(size_t start, size_t end) const
+    {
         size_t match;
         Value<T> right;
         Value<T> left;
@@ -1256,7 +1290,7 @@ public:
 
             if (match != not_found && match + start < end)
                 return start + match;
-            
+
             size_t rows = (left.from_link || right.from_link) ? 1 : minimum(right.m_values, left.m_values);
             start += rows;
         }

@@ -1001,7 +1001,7 @@ void Column::find_all(Column& result, int64_t value, size_t begin, size_t end) c
 }
 
 
-bool Column::compare_int(const Column& c) const
+bool Column::compare_int(const Column& c) const TIGHTDB_NOEXCEPT
 {
     size_t n = size();
     if (c.size() != n)

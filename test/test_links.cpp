@@ -578,25 +578,76 @@ TEST(Links_LinkList_AccessorUpdates)
     links2->add(1);
     links2->add(0);
 
-    CHECK_EQUAL(0, links0->get_parent_row());
-    CHECK_EQUAL(1, links1->get_parent_row());
-    CHECK_EQUAL(2, links2->get_parent_row());
+    CHECK_EQUAL(0, links0->get_origin_row_index());
+    CHECK_EQUAL(1, links1->get_origin_row_index());
+    CHECK_EQUAL(2, links2->get_origin_row_index());
 
     // get the same linkview twice
     LinkViewRef links2again = source->get_linklist(col_link, 2);
-    CHECK_EQUAL(links2->get_parent_row(), links2again->get_parent_row());
+    CHECK_EQUAL(links2->get_origin_row_index(), links2again->get_origin_row_index());
 
     // delete a row and make sure involved accessors are updated
     source->move_last_over(0);
     CHECK_EQUAL(false, links0->is_attached());
-    CHECK_EQUAL(0, links2->get_parent_row());
-    CHECK_EQUAL(0, links2again->get_parent_row());
+    CHECK_EQUAL(0, links2->get_origin_row_index());
+    CHECK_EQUAL(0, links2again->get_origin_row_index());
 
     // clear and make sure all accessors get detached
     source->clear();
     CHECK_EQUAL(false, links1->is_attached());
     CHECK_EQUAL(false, links2->is_attached());
     CHECK_EQUAL(false, links2again->is_attached());
+}
+
+TEST(Links_LinkList_FindBySource)
+{
+    Group group;
+
+    TestTableLinks::Ref target = group.get_table<TestTableLinks>("target");
+    target->add("test1", 1, true,  Mon);
+    target->add("test2", 2, false, Tue);
+    target->add("test3", 3, true,  Wed);
+
+    // create table with links to target table
+    TableRef source = group.get_table("source");
+    size_t col_link = source->add_column_link(type_LinkList, "links", *TableRef(target));
+
+    source->add_empty_row();
+    LinkViewRef links = source->get_linklist(col_link, 0);
+    links->add(2);
+    links->add(1);
+    links->add(0);
+
+    CHECK_EQUAL(0, links->find(2));
+    CHECK_EQUAL(1, links->find(1));
+    CHECK_EQUAL(2, links->find(0));
+
+    links->remove(0);
+    CHECK_EQUAL(not_found, links->find(2));
+}
+
+
+TEST(Links_CircularAccessors)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg(path);
+    {
+        WriteTransaction wt(sg);
+        TableRef table1 = wt.get_table("table1");
+        TableRef table2 = wt.get_table("table2");
+        table1->add_column_link(type_Link, "link", *table2);
+        table2->add_column_link(type_Link, "link", *table1);
+        CHECK_EQUAL(table1, table2->get_link_target(0));
+        CHECK_EQUAL(table2, table1->get_link_target(0));
+        wt.commit();
+    }
+    {
+        WriteTransaction wt(sg);
+        TableRef table1 = wt.get_table("table1");
+        TableRef table2 = wt.get_table("table2");
+        CHECK_EQUAL(table1, table2->get_link_target(0));
+        CHECK_EQUAL(table2, table1->get_link_target(0));
+    }
 }
 
 TEST(Links_Transactions)
@@ -660,6 +711,5 @@ TEST(Links_Transactions)
         CHECK(owners->is_null_link(dog_col, tim_row));
     }
 }
-
 
 #endif // TEST_GROUP

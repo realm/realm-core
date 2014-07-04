@@ -3,6 +3,8 @@ PASSIVE_SUBDIRS = test-tightdb test-sqlite3 test-stl performance \
 benchmark-insert-add benchmark-insert-get-set benchmark-prealloc \
 benchmark-index benchmark-transaction experiments
 
+RESOURCES=expect_json.json expect_string.txt
+
 DIR_DEPS          = util
 test_tightdb_DEPS = util
 test_sqlite3_DEPS = util
@@ -80,5 +82,10 @@ gdb-testcase: check-norun/subdir/util
 gdb-testcase-debug: check-debug-norun/subdir/util
 	@$(MAKE) -C experiments gdb-testcase-debug
 
+.PHONY: get-test-resources get-passive-subdirs
+get-test-resources:
+	@echo $(RESOURCES)
+get-passive-subdirs:
+	@echo $(PASSIVE_SUBDIRS)
 
 include ../src/generic.mk

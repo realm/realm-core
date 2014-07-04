@@ -2460,8 +2460,111 @@ TEST(LangBindHelper_AdvanceReadTransact_MoveLastOver)
 }
 
 
+TEST(LangBindHelper_AdvanceReadTransact_Links)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg(path);
+    ShortCircuitTransactLogManager tlm(path);
+    SharedGroup sg_w(tlm);
 
-TEST(LangBindHelper_Implicit_Transactions)
+    // Start a read transaction (to be repeatedly advanced)
+    ReadTransaction rt(sg);
+    const Group& group = rt.get_group();
+    CHECK_EQUAL(0, group.size());
+
+    // Create one table to act as origin for the links, and two to act as
+    // targets
+    {
+        WriteTransaction wt(sg_w);
+        TableRef origin_w = wt.get_table("origin");
+        origin_w->add_column(type_Int, "filler_o_1");
+        origin_w->add_column(type_Int, "filler_o_2");
+        TableRef target_1_w = wt.get_table("target_1");
+        target_1_w->add_column(type_Int, "filler_t1_1");
+        TableRef target_2_w = wt.get_table("target_2");
+        target_2_w->add_column(type_Int, "filler_t2_1");
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, tlm);
+    group.Verify();
+    ConstTableRef origin = rt.get_table("origin");
+    ConstTableRef target_1 = rt.get_table("target_1");
+    ConstTableRef target_2 = rt.get_table("target_2");
+    {
+        WriteTransaction wt(sg_w);
+        TableRef origin_w = wt.get_table("origin");
+        TableRef target_1_w = wt.get_table("target_1");
+        TableRef target_2_w = wt.get_table("target_2");
+        origin_w->insert_column_link(0, type_Link, "link_1", *target_1_w);
+        origin_w->insert_column_link(3, type_Link, "link_2", *target_2_w);
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, tlm);
+    group.Verify();
+    {
+        WriteTransaction wt(sg_w);
+        TableRef origin_w = wt.get_table("origin");
+        TableRef target_1_w = wt.get_table("target_1");
+        TableRef target_2_w = wt.get_table("target_2");
+        origin_w->insert_column_link(2, type_LinkList, "link_list_1", *target_1_w);
+        origin_w->insert_column_link(3, type_LinkList, "link_list_2", *target_2_w);
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, tlm);
+    group.Verify();
+
+    // Create two origins and two targets
+    //   O_1: LL_1; F_1 LL_1; L_2 F_1 LL_1; L_2 F_1 L_3 LL_1; L_2 F_1 L_3 F_2 LL_1
+    //   O_2: F_1; L_1 F_1; L_1 F_1 LL_2; L_1 F_1 LL_2 L_3; L_1 F_1 LL_2 F_2 L_3
+
+    //   O_1: T_1 F T_2 F T_1
+    //   O_2: T_1 F T_2 F T_2
+
+    //   O_1: Insert link columns into empty table
+    //   O_2: Insert link columns into non-empty table
+
+    // Advance and check at each semicolon above (concurrently for the two origins)
+
+    // Pull out the link list accessors
+
+    // set some links
+
+    // Check that they are correct after advance
+
+    // O_1: MOVE OVER ROW NDX 4 2 0
+    // O_2: MOVE OVER ROW NDX 2 0 2
+    // T_1: MOVE OVER ROW NDX 4 0 2
+    // T_2: MOVE OVER ROW NDX 0 0 2
+
+
+    // Clear O_2 and T_2, then check result
+
+
+    // CHECK: That list accessors are properly detached on row removal, and finally after table clear
+
+    // Insert extra column in all three tables
+
+    // Check
+
+    // Change the links
+
+    // Check
+
+    // Remove the extra columns
+
+    // Check
+
+    // Use move last over on origin (first, middle, last)
+
+    // Check
+
+    // Use move last over on both targets (first, middle, last)
+
+    // Check
+}
+
+
+TEST(LangBindHelper_ImplicitTransactions)
 {
     SHARED_GROUP_TEST_PATH(path);
     {
@@ -2512,7 +2615,9 @@ TEST(LangBindHelper_Implicit_Transactions)
     }
 }
 
+
 namespace {
+
 void writer_thread(string path)
 {
     Random random(random_int<unsigned long>());
@@ -2540,7 +2645,7 @@ void reader_thread(TestResults* test_results_ptr, string path)
 {
     TestResults& test_results = *test_results_ptr;
     Random random(random_int<unsigned long>());
-    
+
     UniquePtr<Replication> repl(makeWriteLogCollector(path));
     UniquePtr<LangBindHelper::TransactLogRegistry> wlr(getWriteLogs(path));
     SharedGroup sg(*repl);
@@ -2566,9 +2671,46 @@ void reader_thread(TestResults* test_results_ptr, string path)
     sg.end_read();
 }
 
+} // anonymous namespace
+
+
+TEST(LangBindHelper_ImplicitTransactions_OverSharedGroupDestruction)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    {
+        // we hold on to write log collector and registry across a complete
+        // shutdown/initialization of shared group.
+        UniquePtr<Replication> repl(makeWriteLogCollector(path));
+        UniquePtr<LangBindHelper::TransactLogRegistry> wlr(getWriteLogs(path));
+        {
+            SharedGroup sg(*repl);
+            {
+                WriteTransaction wt(sg);
+                TableRef tr = wt.get_table("table");
+                tr->add_column(type_Int, "first");
+                for (int i=0; i<20; i++)
+                    tr->add_empty_row();
+                wt.commit();
+            }
+            // no valid shared group anymore
+        }
+        {
+            UniquePtr<Replication> repl(makeWriteLogCollector(path));
+            UniquePtr<LangBindHelper::TransactLogRegistry> wlr(getWriteLogs(path));
+            SharedGroup sg(*repl);
+            {
+                WriteTransaction wt(sg);
+                TableRef tr = wt.get_table("table");
+                for (int i=0; i<20; i++)
+                    tr->add_empty_row();
+                wt.commit();
+            }
+        }
+    }
 }
 
-TEST(LangBindHelper_Implicit_Transactions_Multiple_Trackers)
+
+TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
 {
     const int write_thread_count = 3;
     const int read_thread_count = 3;
@@ -2594,7 +2736,7 @@ TEST(LangBindHelper_Implicit_Transactions_Multiple_Trackers)
         sched_yield();
         for (i = 0; i < read_thread_count; ++i)
             threads[write_thread_count + i].start(bind(reader_thread, &test_results, string(path)));
- 
+
         // Wait for all writer threads to complete
         for (int i = 0; i < write_thread_count; ++i)
             threads[i].join();

@@ -15,6 +15,8 @@ Use by #including this file in the file(s) that call pthreads functions. If you 
 #ifdef _WIN32
 #define NOMINMAX
 #include <Windows.h>
+#else
+#include <unistd.h>
 #endif
 
 inline unsigned int ptf_fastrand()

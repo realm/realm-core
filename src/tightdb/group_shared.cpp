@@ -1143,13 +1143,13 @@ void SharedGroup::advance_read(TransactLogRegistry& log_registry)
     // because in order for us to get the new version when we grab the
     // readlock, the new version must have been entered into the ringbuffer.
     // commit always updates the replication log BEFORE updating the ringbuffer.
-    UniquePtr<BinaryData[]> 
+    UniquePtr<BinaryData[]>
         logs(new BinaryData[m_readlock.m_version-old_readlock.m_version]); // Throws
 
-    log_registry.get_commit_entries(old_readlock.m_version, 
+    log_registry.get_commit_entries(old_readlock.m_version,
                                     m_readlock.m_version, logs.get());
-    
-    m_group.advance_transact(m_readlock.m_top_ref, m_readlock.m_file_size, 
+
+    m_group.advance_transact(m_readlock.m_top_ref, m_readlock.m_file_size,
                              logs.get(),
                              logs.get() + (m_readlock.m_version-old_readlock.m_version)); // Throws
 
@@ -1232,7 +1232,7 @@ void SharedGroup::commit()
     do_commit();
 
     end_read();
-    // complete detach 
+    // complete detach
     // (end_read allows group to retain data, but accessors become invalid after commit):
     m_group.complete_detach();
 }

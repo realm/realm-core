@@ -39,19 +39,19 @@ public:
 
     void update_column_index(std::size_t, const Spec&) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
-    void recursive_mark_dirty() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void recursive_mark() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
-    void adj_subtab_acc_insert_rows(std::size_t, std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-    void adj_subtab_acc_erase_row(std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-    void adj_subtab_acc_move_last_over(std::size_t, std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void adj_accessors_insert_rows(std::size_t, std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void adj_accessors_erase_row(std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void adj_accessors_move_last_over(std::size_t, std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
     void refresh_accessor_tree(std::size_t, const Spec&) TIGHTDB_OVERRIDE;
 
     void update_from_parent(std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
-    void detach_subtable_accessors() TIGHTDB_NOEXCEPT;
+    void discard_child_accessors() TIGHTDB_NOEXCEPT;
 
-    ~ColumnSubtableParent() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
+    ~ColumnSubtableParent() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
     static ref_type create(std::size_t size, Allocator&);
 
@@ -102,7 +102,7 @@ protected:
             TIGHTDB_NOEXCEPT;
         void update_accessors(const std::size_t* col_path_begin, const std::size_t* col_path_end,
                               _impl::TableFriend::AccessorUpdater&);
-        void recursive_mark_dirty() TIGHTDB_NOEXCEPT;
+        void recursive_mark() TIGHTDB_NOEXCEPT;
         void refresh_accessor_tree(std::size_t spec_ndx_in_parent);
     private:
         struct entry {
@@ -144,7 +144,7 @@ protected:
     ref_type get_child_ref(std::size_t) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
     // Overriding method in Table::Parent
-    Table* get_parent_table(std::size_t*) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    Table* get_parent_table(std::size_t*) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
     // Overriding method in Table::Parent
     void child_accessor_destroyed(Table*) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
@@ -254,7 +254,7 @@ private:
 
     void destroy_subtable(std::size_t ndx) TIGHTDB_NOEXCEPT;
 
-    void do_detach_subtable_accessors() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void do_discard_child_accessors() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 };
 
 
@@ -302,9 +302,9 @@ inline void ColumnSubtableParent::update_column_index(std::size_t new_col_ndx, c
     m_column_ndx = new_col_ndx;
 }
 
-inline void ColumnSubtableParent::recursive_mark_dirty() TIGHTDB_NOEXCEPT
+inline void ColumnSubtableParent::recursive_mark() TIGHTDB_NOEXCEPT
 {
-    m_subtable_map.recursive_mark_dirty();
+    m_subtable_map.recursive_mark();
 }
 
 inline void ColumnSubtableParent::refresh_accessor_tree(std::size_t col_ndx, const Spec& spec)
@@ -313,22 +313,22 @@ inline void ColumnSubtableParent::refresh_accessor_tree(std::size_t col_ndx, con
     m_column_ndx = col_ndx;
 }
 
-inline void ColumnSubtableParent::adj_subtab_acc_insert_rows(std::size_t row_ndx,
-                                                             std::size_t num_rows) TIGHTDB_NOEXCEPT
+inline void ColumnSubtableParent::adj_accessors_insert_rows(std::size_t row_ndx,
+                                                            std::size_t num_rows) TIGHTDB_NOEXCEPT
 {
-    // This function must be able to operate with only the Minimal Accessor
-    // Hierarchy Consistency Guarantee. This means, in particular, that it
-    // cannot access the underlying array structure.
+    // This function must assume no more than minimal consistency of the
+    // accessor hierarchy. This means in particular that it cannot access the
+    // underlying node structure. See AccessorConcistncyLevels.
 
     const bool fix_ndx_in_parent = false;
     m_subtable_map.adj_insert_rows<fix_ndx_in_parent>(row_ndx, num_rows);
 }
 
-inline void ColumnSubtableParent::adj_subtab_acc_erase_row(std::size_t row_ndx) TIGHTDB_NOEXCEPT
+inline void ColumnSubtableParent::adj_accessors_erase_row(std::size_t row_ndx) TIGHTDB_NOEXCEPT
 {
-    // This function must be able to operate with only the Minimal Accessor
-    // Hierarchy Consistency Guarantee. This means, in particular, that it
-    // cannot access the underlying array structure.
+    // This function must assume no more than minimal consistency of the
+    // accessor hierarchy. This means in particular that it cannot access the
+    // underlying node structure. See AccessorConcistncyLevels.
 
     const bool fix_ndx_in_parent = false;
     bool last_entry_removed = m_subtable_map.adj_erase_row<fix_ndx_in_parent>(row_ndx);
@@ -337,13 +337,13 @@ inline void ColumnSubtableParent::adj_subtab_acc_erase_row(std::size_t row_ndx) 
         tf::unbind_ref(*m_table);
 }
 
-inline void ColumnSubtableParent::adj_subtab_acc_move_last_over(std::size_t target_row_ndx,
-                                                                std::size_t last_row_ndx)
+inline void ColumnSubtableParent::adj_accessors_move_last_over(std::size_t target_row_ndx,
+                                                               std::size_t last_row_ndx)
     TIGHTDB_NOEXCEPT
 {
-    // This function must be able to operate with only the Minimal Accessor
-    // Hierarchy Consistency Guarantee. This means, in particular, that it
-    // cannot access the underlying array structure.
+    // This function must assume no more than minimal consistency of the
+    // accessor hierarchy. This means in particular that it cannot access the
+    // underlying node structure. See AccessorConcistncyLevels.
 
     const bool fix_ndx_in_parent = false;
     bool last_entry_removed =
@@ -356,9 +356,9 @@ inline void ColumnSubtableParent::adj_subtab_acc_move_last_over(std::size_t targ
 inline Table* ColumnSubtableParent::get_subtable_accessor(std::size_t row_ndx) const
     TIGHTDB_NOEXCEPT
 {
-    // This function must be able to operate with only the Minimal Accessor
-    // Hierarchy Consistency Guarantee. This means, in particular, that it
-    // cannot access the underlying array structure.
+    // This function must assume no more than minimal consistency of the
+    // accessor hierarchy. This means in particular that it cannot access the
+    // underlying node structure. See AccessorConcistncyLevels.
 
     Table* subtable = m_subtable_map.find(row_ndx);
     return subtable;
@@ -366,9 +366,9 @@ inline Table* ColumnSubtableParent::get_subtable_accessor(std::size_t row_ndx) c
 
 inline void ColumnSubtableParent::discard_subtable_accessor(std::size_t row_ndx) TIGHTDB_NOEXCEPT
 {
-    // This function must be able to operate with only the Minimal Accessor
-    // Hierarchy Consistency Guarantee. This means, in particular, that it
-    // cannot access the underlying array structure.
+    // This function must assume no more than minimal consistency of the
+    // accessor hierarchy. This means in particular that it cannot access the
+    // underlying node structure. See AccessorConcistncyLevels.
 
     bool last_entry_removed = m_subtable_map.detach_and_remove(row_ndx);
     typedef _impl::TableFriend tf;
@@ -527,11 +527,16 @@ inline ref_type ColumnSubtableParent::get_child_ref(std::size_t child_ndx) const
     return get_as_ref(child_ndx);
 }
 
-inline void ColumnSubtableParent::detach_subtable_accessors() TIGHTDB_NOEXCEPT
+inline void ColumnSubtableParent::discard_child_accessors() TIGHTDB_NOEXCEPT
 {
     bool last_entry_removed = m_subtable_map.detach_and_remove_all();
     if (last_entry_removed && m_table)
         _impl::TableFriend::unbind_ref(*m_table);
+}
+
+inline ColumnSubtableParent::~ColumnSubtableParent() TIGHTDB_NOEXCEPT
+{
+    discard_child_accessors();
 }
 
 inline bool ColumnSubtableParent::compare_subtable_rows(const Table& a, const Table& b)
@@ -565,9 +570,9 @@ inline void ColumnSubtableParent::
 update_table_accessors(const std::size_t* col_path_begin, const std::size_t* col_path_end,
                        _impl::TableFriend::AccessorUpdater& updater)
 {
-    // This function must be able to operate with only the Minimal Accessor
-    // Hierarchy Consistency Guarantee. This means, in particular, that it
-    // cannot access the underlying array structure.
+    // This function must assume no more than minimal consistency of the
+    // accessor hierarchy. This means in particular that it cannot access the
+    // underlying node structure. See AccessorConcistncyLevels.
 
     m_subtable_map.update_accessors(col_path_begin, col_path_end, updater); // Throws
 }

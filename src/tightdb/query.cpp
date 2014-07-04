@@ -891,8 +891,17 @@ void Query::find_all(TableViewBase& ret, size_t start, size_t end, size_t limit)
 
     // User created query with no criteria; return everything
     if (first.size() == 0 || first[0] == 0) {
-        for (size_t i = start; i < end && i - start < limit; i++)
-            ret.get_ref_column().add(m_tableview ? m_tableview->get_source_ndx(i) : i);
+        Column& refs = ret.get_ref_column();
+        size_t end_pos = (limit != size_t(-1)) ? min(end, start + limit) : end;
+
+        if (m_tableview) {
+            for (size_t i = start; i < end_pos; ++i)
+                refs.add(m_tableview->get_source_ndx(i));
+        }
+        else {
+            for (size_t i = start; i < end_pos; ++i)
+                refs.add(i);
+        }
         return;
     }
 

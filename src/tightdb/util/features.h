@@ -42,7 +42,7 @@
 #ifdef TIGHTDB_DEBUG
 #  define TIGHTDB_DEFAULT_MAX_LIST_SIZE 4
 #else
-#  define TIGHTDB_DEFAULT_MAX_LIST_SIZE 1000
+#  define TIGHTDB_DEFAULT_MAX_LIST_SIZE 4
 #endif
 
 /* The maximum number of elements in a B+-tree node. You may override

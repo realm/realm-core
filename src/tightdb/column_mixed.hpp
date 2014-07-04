@@ -80,9 +80,9 @@ public:
 
     void update_column_index(std::size_t, const Spec&) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
-    void adj_subtab_acc_insert_rows(std::size_t, std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-    void adj_subtab_acc_erase_row(std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-    void adj_subtab_acc_move_last_over(std::size_t, std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void adj_accessors_insert_rows(std::size_t, std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void adj_accessors_erase_row(std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void adj_accessors_move_last_over(std::size_t, std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
     void update_from_parent(std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
@@ -147,7 +147,7 @@ public:
     /// Compare two mixed columns for equality.
     bool compare_mixed(const ColumnMixed&) const;
 
-    void detach_subtable_accessors() TIGHTDB_NOEXCEPT;
+    void discard_child_accessors() TIGHTDB_NOEXCEPT;
 
     static ref_type create(std::size_t num_default_values, Allocator&);
 
@@ -157,7 +157,7 @@ public:
     ref_type write(std::size_t, std::size_t, std::size_t,
                    _impl::OutputStream&) const TIGHTDB_OVERRIDE;
 
-    void recursive_mark_dirty() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void recursive_mark() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
     void refresh_accessor_tree(std::size_t, const Spec&) TIGHTDB_OVERRIDE;
 
@@ -225,7 +225,7 @@ private:
     void insert_pos_neg(std::size_t ndx, int_fast64_t value, MixedColType pos_type,
                         MixedColType neg_type);
 
-    void do_detach_subtable_accessors() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void do_discard_child_accessors() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
 #ifdef TIGHTDB_DEBUG
     void leaf_to_dot(MemRef, ArrayParent*, std::size_t,

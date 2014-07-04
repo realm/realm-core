@@ -300,7 +300,8 @@ ref_type Group::create_new_table(StringData name)
     // matters.
 
     using namespace _impl;
-    DeepArrayRefDestroyGuard ref_dg(TableFriend::create_empty_table(m_alloc), m_alloc); // Throws
+    typedef TableFriend tf;
+    DeepArrayRefDestroyGuard ref_dg(tf::create_empty_table(m_alloc), m_alloc); // Throws
     size_t ndx = m_tables.size();
     TIGHTDB_ASSERT(ndx == m_table_names.size());
     m_tables.insert(ndx, ref_dg.get()); // Throws
@@ -347,19 +348,19 @@ Table* Group::create_new_table_and_accessor(StringData name, SpecSetter spec_set
 #endif
 
     using namespace _impl;
-    DeepArrayRefDestroyGuard ref_dg(TableFriend::create_empty_table(m_alloc), m_alloc); // Throws
-    typedef TableFriend::UnbindGuard TableUnbindGuard;
-    TableUnbindGuard table_ug(TableFriend::create_ref_counted(m_alloc, ref_dg.get(),
-                                                              null_ptr, 0)); // Throws
+    typedef TableFriend tf;
+    DeepArrayRefDestroyGuard ref_dg(tf::create_empty_table(m_alloc), m_alloc); // Throws
+    typedef tf::UnbindGuard TableUnbindGuard;
+    TableUnbindGuard table_ug(tf::create_ref_counted(m_alloc, ref_dg.get(), null_ptr, 0)); // Throws
 
     // The table accessor owns the ref until the point below where a
     // parent is set in Table::m_top.
     ref_type ref = ref_dg.release();
-    TableFriend::bind_ref(*table_ug); // Increase reference count from 0 to 1
+    tf::bind_ref(*table_ug); // Increase reference count from 0 to 1
 
     size_t ndx = m_tables.size();
     m_table_accessors.resize(ndx+1); // Throws
-    TableFriend::set_top_parent(*table_ug, this, ndx);
+    tf::set_top_parent(*table_ug, this, ndx);
     try {
         if (spec_setter)
             (*spec_setter)(*table_ug); // Throws
@@ -379,7 +380,7 @@ Table* Group::create_new_table_and_accessor(StringData name, SpecSetter spec_set
         }
     }
     catch (...) {
-        TableFriend::set_top_parent(*table_ug, 0, 0);
+        tf::set_top_parent(*table_ug, 0, 0);
         throw;
     }
 }
@@ -600,8 +601,9 @@ void Group::update_refs(ref_type top_ref, size_t old_baseline) TIGHTDB_NOEXCEPT
     typedef table_accessors::const_iterator iter;
     iter end = m_table_accessors.end();
     for (iter i = m_table_accessors.begin(); i != end; ++i) {
+        typedef _impl::TableFriend tf;
         if (Table* table = *i)
-            _impl::TableFriend::update_from_parent(*table, old_baseline);
+            tf::update_from_parent(*table, old_baseline);
     }
 }
 
@@ -756,13 +758,13 @@ public:
     void update(Table& table) TIGHTDB_OVERRIDE
     {
         typedef _impl::TableFriend tf;
-        tf::mark_dirty(table);
+        tf::mark(table);
     }
 
     void update_parent(Table& table) TIGHTDB_OVERRIDE
     {
         typedef _impl::TableFriend tf;
-        tf::mark_dirty(table);
+        tf::mark(table);
     }
 
     size_t m_col_ndx;
@@ -816,13 +818,15 @@ private:
 } // anonymous namespace
 
 
-// This class must be able to operate with only the Minimal Accessor Hierarchy
-// Consistency Guarantee. This means, in particular, that it cannot access the
-// underlying array structure.
+// In general, this class cannot assume more than minimal accessor consistency
+// (See AccessorConcistncyLevels), it can however assume that replication
+// instruction arguments are meaningfull with respect to the current state of
+// the accessor hierarchy. For example, a column index argument of `i` is known
+// to refer to the `i`'th entry of Table::m_cols.
 //
 // FIXME: There is currently no checking on valid instruction arguments such as
 // column index within bounds. Consider whether we can trust the contents of the
-// transaction log enough to skip chese checks.
+// transaction log enough to skip these checks.
 class Group::TransactAdvancer {
 public:
     TransactAdvancer(Group& group):
@@ -845,7 +849,7 @@ public:
                 const size_t* path_end = path_begin + 2*levels;
                 for (;;) {
                     typedef _impl::TableFriend tf;
-                    tf::mark_dirty(*table);
+                    tf::mark(*table);
                     if (path_begin == path_end) {
                         m_table.reset(table);
                         break;
@@ -864,6 +868,9 @@ public:
 
     bool insert_empty_rows(size_t row_ndx, size_t num_rows) TIGHTDB_NOEXCEPT
     {
+        // In tables with link-type columns, all row insertion happens after the
+        // last row. Because of that, and because the inserted links will be
+        // null-links, there is no need to mark link-target tables as dirty.
         typedef _impl::TableFriend tf;
         if (m_table)
             tf::adj_accessors_insert_rows(*m_table, row_ndx, num_rows);
@@ -872,6 +879,10 @@ public:
 
     bool erase_row(size_t row_ndx) TIGHTDB_NOEXCEPT
     {
+        // This operation can not occur for tables with link-type columns.For
+        // such tables, rows can only be removed by means of the "move last
+        // over" operation. Because of that, there are no link-target tables to
+        // be marked dirty here.
         typedef _impl::TableFriend tf;
         if (m_table)
             tf::adj_accessors_erase_row(*m_table, row_ndx);
@@ -889,10 +900,8 @@ public:
     bool clear_table() TIGHTDB_NOEXCEPT
     {
         typedef _impl::TableFriend tf;
-        if (m_table) {
-            tf::discard_row_accessors(*m_table);
-            tf::discard_subtable_accessors(*m_table);
-        }
+        if (m_table)
+            tf::discard_child_accessors(*m_table);
         return true;
     }
 
@@ -959,6 +968,20 @@ public:
         return true;
     }
 
+    bool insert_link(size_t col_ndx, size_t row_ndx, size_t) TIGHTDB_NOEXCEPT
+    {
+        if (col_ndx == 0)
+            insert_empty_rows(row_ndx, 1);
+       return true;
+    }
+
+    bool insert_link_list(size_t col_ndx, size_t row_ndx) TIGHTDB_NOEXCEPT
+    {
+        if (col_ndx == 0)
+            insert_empty_rows(row_ndx, 1);
+        return true;
+    }
+
     bool row_insert_complete() TIGHTDB_NOEXCEPT
     {
         return true; // Noop
@@ -999,23 +1022,49 @@ public:
         return true; // Noop
     }
 
-    bool set_table(size_t col_ndx, size_t row_ndx)
+    bool set_table(size_t col_ndx, size_t row_ndx) TIGHTDB_NOEXCEPT
     {
         if (m_table) {
             typedef _impl::TableFriend tf;
             if (Table* subtab = tf::get_subtable_accessor(*m_table, col_ndx, row_ndx)) {
-                tf::mark_dirty(*subtab);
+                tf::mark(*subtab);
                 tf::adj_clear_nonroot(*subtab);
             }
         }
         return true;
     }
 
-    bool set_mixed(size_t col_ndx, size_t row_ndx, const Mixed&)
+    bool set_mixed(size_t col_ndx, size_t row_ndx, const Mixed&) TIGHTDB_NOEXCEPT
     {
         typedef _impl::TableFriend tf;
         if (m_table)
             tf::discard_subtable_accessor(*m_table, col_ndx, row_ndx);
+        return true;
+    }
+
+    bool set_link(size_t col_ndx, size_t, size_t) TIGHTDB_NOEXCEPT
+    {
+        // When links are changed, the link-target table is also affected and
+        // its accessor must therefore be marked dirty too. Indeed, when it
+        // exists, the link-target table accessor must be marked dirty
+        // regardless of whether an accessor exists for the origin table (i.e.,
+        // regardless of whether `m_table` is null or not.) This would seem to
+        // pose a problem, because there is no easy way to identify the
+        // link-target table when there is no accessor for the origin
+        // table. Fortunately, due to the fact that back-link column accessors
+        // refer to the origin table accessor (and vice versa), it follows that
+        // the link-target table accessor exists if, and only if then origin
+        // table accessor exists.
+        //
+        // get_link_target_table_accessor() will return null if the
+        // m_table->m_cols[col_ndx] is null, but this can happen only when the
+        // column was inserted earlier during this transaction advance, and in
+        // that case, we have already marked the target table accesor dirty.
+        typedef _impl::TableFriend tf;
+        if (m_table) {
+            if (Table* target = tf::get_link_target_table_accessor(*m_table, col_ndx))
+                tf::mark(*target);
+        }
         return true;
     }
 
@@ -1055,12 +1104,23 @@ public:
         return true;
     }
 
-    bool insert_column(size_t col_ndx, DataType, StringData, size_t)
+    bool insert_column(size_t col_ndx, DataType type, StringData, size_t link_target_table_ndx)
     {
         if (m_table) {
             typedef _impl::TableFriend tf;
             InsertColumnUpdater updater(col_ndx);
             tf::update_accessors(*m_table, m_desc_path_begin, m_desc_path_end, updater);
+
+            // See comments on link handling in TransactAdvancer::set_link().
+            //
+            // FIXME: when the table refreshing process creates missing
+            // link-type column accessors, it must also create back-link column
+            // accessors and insert them into the link-target table accessor.
+            if (tf::is_link_type(ColumnType(type))) {
+                Table* target = m_group.get_table_by_ndx(link_target_table_ndx); // Throws
+                tf::adj_add_column(*target); // Throws
+                tf::mark(*target);
+            }
         }
         typedef _impl::DescriptorFriend df;
         if (m_desc)
@@ -1071,6 +1131,10 @@ public:
     bool erase_column(size_t col_ndx)
     {
         if (m_table) {
+            // FIXME: If column is link-type, then back-link column accessor in
+            // target table must be removed too, and the target table accessor
+            // must be marked dirty. This probably requires that column type and
+            // link-target table index are added to the EraseColumn instruction.
             typedef _impl::TableFriend tf;
             EraseColumnUpdater updater(col_ndx);
             tf::update_accessors(*m_table, m_desc_path_begin, m_desc_path_end, updater);
@@ -1087,6 +1151,42 @@ public:
     }
 
     bool add_index_to_column(size_t) TIGHTDB_NOEXCEPT
+    {
+        return true; // Noop
+    }
+
+    bool select_link_list(size_t col_ndx, size_t) TIGHTDB_NOEXCEPT
+    {
+        // See comments on link handling in TransactAdvancer::set_link().
+        typedef _impl::TableFriend tf;
+        if (m_table) {
+            if (Table* target = tf::get_link_target_table_accessor(*m_table, col_ndx))
+                tf::mark(*target);
+        }
+        return true; // Noop
+    }
+
+    bool link_list_set(size_t, size_t) TIGHTDB_NOEXCEPT
+    {
+        return true; // Noop
+    }
+
+    bool link_list_insert(size_t, size_t) TIGHTDB_NOEXCEPT
+    {
+        return true; // Noop
+    }
+
+    bool link_list_move(size_t, size_t) TIGHTDB_NOEXCEPT
+    {
+        return true; // Noop
+    }
+
+    bool link_list_erase(size_t) TIGHTDB_NOEXCEPT
+    {
+        return true; // Noop
+    }
+
+    bool link_list_clear() TIGHTDB_NOEXCEPT
     {
         return true; // Noop
     }
@@ -1110,17 +1210,38 @@ void Group::advance_transact(ref_type new_top_ref, size_t new_file_size,
     //
     // Initially, when this function is invoked, we cannot assume any
     // correspondance between the accessor state and the underlying node
-    // structure. All we can assume is the Minimal Accessor Hierarchy
-    // Consistency Guarantee, which ensures that the group can be destroyed
-    // without corruption or memory leaks.
+    // structure. We can assume that the hierarchy is in a state of minimal
+    // consistency, and that it can be brought to a state of structural
+    // correspondace using information in the transaction logs. When structural
+    // correspondace is achieved, we can reliably refresh the accessor hierarchy
+    // (Table::refresh_accessor_tree()) to bring it back to a fully concsistent
+    // state. See AccessorConsistencyLevels.
     //
-    // For each transaction log instruction, the accessor state is modified in a
-    // way that maintains the Minimal Accessor Hierarchy Consistency Guarantee
-    // (Group::TransactAdvancer). When all instructions are accounted for, the
-    // accessor state has the additional property of being in structual
-    // correspondance to the underlying node structure (the Accessor Hierarchy
-    // Correspondence Requirement). At that point, we can reliably refresh each
-    // accessor recursively, starting from the root (the group).
+    // Much of the information in the transaction logs is not used in this
+    // process, because the changes have already been applied to the underlying
+    // node structure. All we need to do here is to bring the accessors back
+    // into a state where they correctly reflect the underlying structure (or
+    // detach them if the underlying entity has been removed.)
+    //
+    // The consequences of the changes in the transaction logs can be divided
+    // into two types; those that need to be applied to the accessors
+    // immediately (Table::adj_insert_column()), and those that can be "lumped
+    // together" and deduced automatically during a final accessor refresh
+    // operation (Table::refresh_accessor_tree()).
+    //
+    // Most transaction log instructions have consequences of both types. For
+    // example, when an "insert column" instruction is seen, we must immediately
+    // shift the positions of all existing columns accessors after the point of
+    // insertion. For practical reasons, and for efficiency, we will just insert
+    // a null pointer into `Table::m_cols` at this time, and then postpone the
+    // creation of the column accessor to the final per-table accessor refresh
+    // operation.
+    //
+    // The final per-table refresh operation visits each table accessor
+    // recursively starting from the roots (group-level tables). It relies the
+    // the per-table accessor dirty flags (Table::m_dirty) to prune the
+    // traversal to the set of accessors that were touched by the changes in the
+    // transaction logs.
 
     MultiLogInputStream in(logs_begin, logs_end);
     Replication::TransactLogParser parser(in);
@@ -1133,11 +1254,11 @@ void Group::advance_transact(ref_type new_top_ref, size_t new_file_size,
         m_alloc.remap(new_file_size); // Throws
         // The file was mapped to a new address, so all array accessors must be
         // updated.
-        mark_all_table_accessors_dirty();
+        mark_all_table_accessors();
     }
 
     init_from_ref(new_top_ref);
-
+    m_top.get_alloc().bump_global_version();
     // Refresh all remaining dirty table accessors
     size_t num_tables = m_table_accessors.size();
     for (size_t table_ndx = 0; table_ndx != num_tables; ++table_ndx) {
@@ -1148,13 +1269,13 @@ void Group::advance_transact(ref_type new_top_ref, size_t new_file_size,
     }
 }
 
-void Group::mark_all_table_accessors_dirty()
+void Group::mark_all_table_accessors()
 {
     size_t num_tables = m_table_accessors.size();
     for (size_t table_ndx = 0; table_ndx != num_tables; ++table_ndx) {
         if (Table* table = m_table_accessors[table_ndx]) {
             typedef _impl::TableFriend tf;
-            tf::recursive_mark_dirty(*table); // Also all subtable accessors
+            tf::recursive_mark(*table); // Also all subtable accessors
         }
     }
 }
