@@ -23,6 +23,7 @@
 
 #include <string>
 #include <vector>
+#include <map>
 
 #include <tightdb/util/features.h>
 #include <tightdb/exceptions.hpp>
@@ -289,7 +290,8 @@ public:
     void commit();
 
     // Conversion
-    template<class S> void to_json(S& out) const;
+    template<class S> void to_json(S& out, size_t link_depth = 0, 
+        std::map<std::string, std::string>* renames = null_ptr) const;
     void to_string(std::ostream& out) const;
 
     /// Compare two groups for equality. Two groups are equal if, and
@@ -664,23 +666,30 @@ public:
     virtual ~TableWriter() TIGHTDB_NOEXCEPT {}
 };
 
-template<class S> void Group::to_json(S& out) const
+template<class S> void Group::to_json(S& out, size_t link_depth, std::map<std::string, std::string>* renames) const
 {
     if (!is_attached()) {
         out << "{}";
         return;
     }
 
+    std::map<std::string, std::string> renames2;
+    renames = renames ? renames : &renames2;
+
     out << "{";
 
     for (std::size_t i = 0; i < m_tables.size(); ++i) {
         StringData name = m_table_names.get(i);
+        std::map<std::string, std::string>& m = *renames;
+        if (m[name] != "")
+            name = m[name];
+
         ConstTableRef table = get_table(i);
 
         if (i) out << ",";
         out << "\"" << name << "\"";
         out << ":";
-        table->to_json(out);
+        table->to_json(out, link_depth, renames);
     }
 
     out << "}";

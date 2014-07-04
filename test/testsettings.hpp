@@ -49,6 +49,7 @@
 #define TEST_REPLICATION
 #define TEST_UTF8
 #define TEST_COLUMN_LARGE
+#define TEST_JSON
 
 
 // Takes a long time. Also currently fails to reproduce the Java bug, but once it has been identified, this

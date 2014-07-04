@@ -179,6 +179,19 @@ ref_type ColumnLinkList::get_child_ref(size_t child_ndx) const TIGHTDB_NOEXCEPT
     return Column::get(child_ndx);
 }
 
+void ColumnLinkList::to_json_row(size_t row_ndx, std::ostream& out) const
+{
+    LinkViewRef links1 = const_cast<ColumnLinkList*>(this)->get(row_ndx);
+    for (size_t t = 0; t < links1->size(); t++) {
+        if (t > 0)
+            out << ", ";
+        size_t target = links1->get_target_row(t);
+        out << target;
+    }
+    
+}
+
+
 
 void ColumnLinkList::discard_child_accessors() TIGHTDB_NOEXCEPT
 {

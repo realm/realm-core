@@ -176,6 +176,13 @@
 		4142C9861623478700B3B902 /* tightdb.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 365CCE77157CC3A100172BF8 /* tightdb.hpp */; };
 		4142C9871623478700B3B902 /* group_shared.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 365CCE7F157CCB4100172BF8 /* group_shared.hpp */; };
 		4142C9881623478700B3B902 /* index_string.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 36E67FC915A2EDDB00D131FB /* index_string.hpp */; };
+		4222F2F719640A4100EC86A5 /* test_json.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4222F2F619640A4100EC86A5 /* test_json.cpp */; };
+		4222F2FA19640A7A00EC86A5 /* jsmn.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4222F2F819640A7A00EC86A5 /* jsmn.cpp */; };
+		4222F2FB19640A7A00EC86A5 /* jsmn.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 4222F2F919640A7A00EC86A5 /* jsmn.hpp */; };
+		4222F2FE19640B8400EC86A5 /* replication.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4222F2FC19640B8400EC86A5 /* replication.cpp */; };
+		4222F2FF19640B8400EC86A5 /* replication.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 4222F2FD19640B8400EC86A5 /* replication.hpp */; };
+		4222F30219640C6700EC86A5 /* commit_log.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4222F30019640C6700EC86A5 /* commit_log.cpp */; };
+		4222F30319640C6700EC86A5 /* commit_log.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 4222F30119640C6700EC86A5 /* commit_log.hpp */; };
 		520588CA16C1DA9D009DA6D8 /* data_type.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 520588C916C1DA9D009DA6D8 /* data_type.hpp */; };
 		52113CDE16C27EF800C301FB /* lang_bind_helper.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 52113CDD16C27EF800C301FB /* lang_bind_helper.cpp */; };
 		5219EB6918FB026100FF9232 /* verified_integer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 5219EB6718FB026100FF9232 /* verified_integer.cpp */; };
@@ -463,6 +470,13 @@
 		36FDACDD17D67DDB0084E8BB /* array_blobs_big.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = array_blobs_big.cpp; path = tightdb/array_blobs_big.cpp; sourceTree = "<group>"; };
 		36FDACDE17D67DDC0084E8BB /* array_blobs_big.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = array_blobs_big.hpp; path = tightdb/array_blobs_big.hpp; sourceTree = "<group>"; };
 		4142C9951623478700B3B902 /* liblibtightdb ios.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "liblibtightdb ios.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		4222F2F619640A4100EC86A5 /* test_json.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = test_json.cpp; sourceTree = "<group>"; };
+		4222F2F819640A7A00EC86A5 /* jsmn.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = jsmn.cpp; sourceTree = "<group>"; };
+		4222F2F919640A7A00EC86A5 /* jsmn.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = jsmn.hpp; sourceTree = "<group>"; };
+		4222F2FC19640B8400EC86A5 /* replication.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = replication.cpp; path = tightdb/replication.cpp; sourceTree = "<group>"; };
+		4222F2FD19640B8400EC86A5 /* replication.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = replication.hpp; path = tightdb/replication.hpp; sourceTree = "<group>"; };
+		4222F30019640C6700EC86A5 /* commit_log.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = commit_log.cpp; path = tightdb/commit_log.cpp; sourceTree = "<group>"; };
+		4222F30119640C6700EC86A5 /* commit_log.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = commit_log.hpp; path = tightdb/commit_log.hpp; sourceTree = "<group>"; };
 		520588C916C1DA9D009DA6D8 /* data_type.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; name = data_type.hpp; path = tightdb/data_type.hpp; sourceTree = "<group>"; };
 		52113CDD16C27EF800C301FB /* lang_bind_helper.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = lang_bind_helper.cpp; path = tightdb/lang_bind_helper.cpp; sourceTree = "<group>"; };
 		5219EB6718FB026100FF9232 /* verified_integer.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = verified_integer.cpp; sourceTree = "<group>"; };
@@ -626,6 +640,10 @@
 		3647DEEA14209C1200D56FD7 /* src */ = {
 			isa = PBXGroup;
 			children = (
+				4222F30019640C6700EC86A5 /* commit_log.cpp */,
+				4222F30119640C6700EC86A5 /* commit_log.hpp */,
+				4222F2FC19640B8400EC86A5 /* replication.cpp */,
+				4222F2FD19640B8400EC86A5 /* replication.hpp */,
 				3620DF0318B6CA7B003AD498 /* impl */,
 				52D7C4661852A01700633748 /* util */,
 				52F6359316B43C79006117C4 /* alloc.cpp */,
@@ -725,6 +743,7 @@
 		3647DFF214209CE600D56FD7 /* test */ = {
 			isa = PBXGroup;
 			children = (
+				4222F2F619640A4100EC86A5 /* test_json.cpp */,
 				52D6E056175BDBDD00B423E5 /* util */,
 				52807FB118E737E300A22716 /* test_self.cpp */,
 				B159814D18CF562600E3C5DF /* test_safe_int_ops.cpp */,
@@ -824,6 +843,8 @@
 		52D6E056175BDBDD00B423E5 /* util */ = {
 			isa = PBXGroup;
 			children = (
+				4222F2F819640A7A00EC86A5 /* jsmn.cpp */,
+				4222F2F919640A7A00EC86A5 /* jsmn.hpp */,
 				B159814918CF560000E3C5DF /* super_int.hpp */,
 				52D6E05D175BDBDD00B423E5 /* number_names.hpp */,
 				526F3F071824652B005217F1 /* thread_wrapper.hpp */,
@@ -932,6 +953,7 @@
 				365CCE60157CC37D00172BF8 /* query_conditions.hpp in Headers */,
 				365CCE61157CC37D00172BF8 /* query_engine.hpp in Headers */,
 				365CCE63157CC37D00172BF8 /* query.hpp in Headers */,
+				4222F2FF19640B8400EC86A5 /* replication.hpp in Headers */,
 				B159814518CF55D400E3C5DF /* type_traits.hpp in Headers */,
 				365CCE65157CC37D00172BF8 /* spec.hpp in Headers */,
 				365CCE67157CC37D00172BF8 /* table_accessors.hpp in Headers */,
@@ -983,6 +1005,7 @@
 				52D7C4911852A01700633748 /* utf8.hpp in Headers */,
 				5267884E189AB4D7009CDE7D /* descriptor.hpp in Headers */,
 				52678850189AB4EA009CDE7D /* descriptor_fwd.hpp in Headers */,
+				4222F30319640C6700EC86A5 /* commit_log.hpp in Headers */,
 				3620DF0218B6C93C003AD498 /* memory_stream.hpp in Headers */,
 				3620DF0D18B6CA7B003AD498 /* destroy_guard.hpp in Headers */,
 				3620DF1218B6CA7B003AD498 /* output_stream.hpp in Headers */,
@@ -1048,6 +1071,7 @@
 				B159814C18CF560000E3C5DF /* super_int.hpp in Headers */,
 				B159627918DB14C4008B9421 /* wildcard.hpp in Headers */,
 				B159627518DB14C4008B9421 /* test_only.hpp in Headers */,
+				4222F2FB19640A7A00EC86A5 /* jsmn.hpp in Headers */,
 				B159627718DB14C4008B9421 /* unit_test.hpp in Headers */,
 				5219EB6A18FB026100FF9232 /* verified_integer.hpp in Headers */,
 				B159814B18CF560000E3C5DF /* demangle.hpp in Headers */,
@@ -1082,6 +1106,7 @@
 			buildPhases = (
 				3647E0FF1420E4D800D56FD7 /* Sources */,
 				3647E1011420E4D800D56FD7 /* CopyFiles */,
+				4222F3041964103400EC86A5 /* Copy JSON files */,
 				3647E1001420E4D800D56FD7 /* Frameworks */,
 			);
 			buildRules = (
@@ -1198,6 +1223,23 @@
 		};
 /* End PBXProject section */
 
+/* Begin PBXShellScriptBuildPhase section */
+		4222F3041964103400EC86A5 /* Copy JSON files */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Copy JSON files";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "cp -a ${PROJECT_DIR}/test/*.json ${BUILD_DIR}/${CONFIGURATION}\ncp -a ${PROJECT_DIR}/test/expect_string.txt ${BUILD_DIR}/${CONFIGURATION}";
+		};
+/* End PBXShellScriptBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		3647E0E314209E6B00D56FD7 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
@@ -1220,6 +1262,7 @@
 				365CCE4F157CC37D00172BF8 /* column_table.cpp in Sources */,
 				365CCE53157CC37D00172BF8 /* column.cpp in Sources */,
 				365CCE57157CC37D00172BF8 /* group_writer.cpp in Sources */,
+				4222F30219640C6700EC86A5 /* commit_log.cpp in Sources */,
 				365CCE59157CC37D00172BF8 /* group.cpp in Sources */,
 				365CCE62157CC37D00172BF8 /* query.cpp in Sources */,
 				365CCE64157CC37D00172BF8 /* spec.cpp in Sources */,
@@ -1238,6 +1281,7 @@
 				52D7C4891852A01700633748 /* terminate.cpp in Sources */,
 				522EA519192C4D3C002AD3B6 /* unicode.cpp in Sources */,
 				52D7C48B1852A01700633748 /* thread.cpp in Sources */,
+				4222F2FE19640B8400EC86A5 /* replication.cpp in Sources */,
 				5267884B189AB4B8009CDE7D /* descriptor.cpp in Sources */,
 				3620DF0118B6C93C003AD498 /* memory_stream.cpp in Sources */,
 				3620DF0E18B6CA7B003AD498 /* output_stream.cpp in Sources */,
@@ -1255,6 +1299,7 @@
 				3647E1121420E69400D56FD7 /* test_table.cpp in Sources */,
 				3647E10D1420E66B00D56FD7 /* main.cpp in Sources */,
 				368063381445AF9B00283774 /* test_group.cpp in Sources */,
+				4222F2F719640A4100EC86A5 /* test_json.cpp in Sources */,
 				3680633A1446D12B00283774 /* test_alloc.cpp in Sources */,
 				36E608911459F11200CCC3E8 /* test_array_blob.cpp in Sources */,
 				36E60897145A99D800CCC3E8 /* test_array_string_long.cpp in Sources */,
@@ -1357,6 +1402,7 @@
 				B159627818DB14C4008B9421 /* wildcard.cpp in Sources */,
 				524F3C9A18EA346A00DEE22A /* test_path.cpp in Sources */,
 				523AC1AA18EABFE900049AEA /* random.cpp in Sources */,
+				4222F2FA19640A7A00EC86A5 /* jsmn.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1484,6 +1530,10 @@
 					"$(inherited)",
 					"$(PROJECT_DIR)/src/tightdb",
 				);
+				OTHER_CPLUSPLUSFLAGS = (
+					"$(OTHER_CFLAGS)",
+					"-DTIGHTDB_HAVE_CONFIG",
+				);
 				PRODUCT_NAME = tightdb;
 			};
 			name = Debug;
@@ -1502,6 +1552,10 @@
 					"$(inherited)",
 					"$(PROJECT_DIR)/src/tightdb",
 				);
+				OTHER_CPLUSPLUSFLAGS = (
+					"$(OTHER_CFLAGS)",
+					"-DTIGHTDB_HAVE_CONFIG",
+				);
 				PRODUCT_NAME = tightdb;
 			};
 			name = Release;
@@ -1518,6 +1572,10 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				HEADER_SEARCH_PATHS = "$(inherited)";
 				LIBRARY_SEARCH_PATHS = "$(inherited)";
+				OTHER_CPLUSPLUSFLAGS = (
+					"$(OTHER_CFLAGS)",
+					"-DTIGHTDB_HAVE_CONFIG",
+				);
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				VERSION_INFO_FILE = "$(TARGET_NAME)";
 			};
@@ -1535,6 +1593,10 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				HEADER_SEARCH_PATHS = "$(inherited)";
 				LIBRARY_SEARCH_PATHS = "$(inherited)";
+				OTHER_CPLUSPLUSFLAGS = (
+					"$(OTHER_CFLAGS)",
+					"-DTIGHTDB_HAVE_CONFIG",
+				);
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				VERSION_INFO_FILE = "$(TARGET_NAME)";
 			};

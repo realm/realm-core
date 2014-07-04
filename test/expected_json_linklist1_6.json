@@ -1,0 +1,1 @@
+[{"col1":100,"STR1":"foo","LINKA":[{"col1":500,"str2":"world"}],"linkB":[{"col1":700,"str2":"baz"}, {"col1":900,"str2":"hi"}]},{"col1":200,"STR1":"!","LINKA":[{"col1":500,"str2":"world"}, {"col1":600,"str2":"!"}],"linkB":[]},{"col1":300,"STR1":"bar","LINKA":[],"linkB":[]}]
