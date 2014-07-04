@@ -69,6 +69,11 @@ namespace {
         first, Int,
         second, String)
 
+        TIGHTDB_TABLE_3(DateIntString,
+        first, Int,
+        second, String,
+        third, DateTime)
+
         TIGHTDB_TABLE_2(TupleTableTypeBin,
         first, Int,
         second, Binary)
@@ -1203,6 +1208,8 @@ TEST(Query_Expressions0)
     table.add_column(type_Float, "second1");
     table.add_column(type_Double, "third");
 
+
+
     size_t match;
 
     Columns<int64_t> first = table.column<int64_t>(0);
@@ -1393,6 +1400,8 @@ TEST(Query_Expressions0)
 
     match = (power(first) == 401).find();
     CHECK_EQUAL(not_found, match);
+
+    Query qq = (power(first) == 401);
 
     // power of floats. Using a range check because of float arithmetic imprecisions
     match = (power(second) < 9.001 && power(second) > 8.999).find();
@@ -4709,15 +4718,18 @@ TEST(Query_TestTV_where)
 
 TEST(Query_SumMinMaxAvg)
 {
-    TupleTableType t;
-    t.add(1, "a");
-    t.add(2, "b");
-    t.add(3, "c");
+    DateIntString t;
+    t.add(1, "a", DateTime(100));
+    t.add(2, "b", DateTime(300));
+    t.add(3, "c", DateTime(50));
 
     CHECK_EQUAL(6, t.where().first.sum());
     CHECK_EQUAL(1, t.where().first.minimum());
     CHECK_EQUAL(3, t.where().first.maximum());
     CHECK_EQUAL(2, t.where().first.average());
+
+    CHECK_EQUAL(DateTime(300), t.where().third.maximum());
+    CHECK_EQUAL(DateTime(50), t.where().third.minimum());
 
     size_t cnt;
     CHECK_EQUAL(0, t.where().first.sum(&cnt, 0, 0));
