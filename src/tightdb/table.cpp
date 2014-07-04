@@ -3645,7 +3645,8 @@ void Table::update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT
 
 
 // to JSON: ------------------------------------------
-void Table::to_json_row(std::size_t row_ndx, std::ostream& out, size_t link_depth, std::map<std::string, std::string>* renames) const
+void Table::to_json_row(std::size_t row_ndx, std::ostream& out, size_t link_depth, std::map<std::string, 
+    std::string>* renames) const
 {
     std::map<std::string, std::string> renames2;
     renames = renames ? renames : &renames2;
@@ -3716,7 +3717,8 @@ void Table::to_json(std::ostream& out, size_t link_depth, std::map<std::string, 
     out << "]";
 }
 
-void Table::to_json_row(std::size_t row_ndx, std::ostream& out, size_t link_depth, std::map<std::string, std::string>& renames, std::vector<ref_type>& followed) const
+void Table::to_json_row(std::size_t row_ndx, std::ostream& out, size_t link_depth, 
+    std::map<std::string, std::string>& renames, std::vector<ref_type>& followed) const
 {
     out << "{";
     size_t column_count = get_column_count();

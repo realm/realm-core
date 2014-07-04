@@ -290,7 +290,8 @@ public:
     void commit();
 
     // Conversion
-    template<class S> void to_json(S& out, size_t link_depth = 0, std::map<std::string, std::string>* renames = null_ptr) const;
+    template<class S> void to_json(S& out, size_t link_depth = 0, 
+        std::map<std::string, std::string>* renames = null_ptr) const;
     void to_string(std::ostream& out) const;
 
     /// Compare two groups for equality. Two groups are equal if, and
