@@ -53,6 +53,7 @@ C++ (core)
 * `Table::get_parent_table()` can now also return the index of the column in the parent.
 * Support for row accessors.
 * Table, row, and descriptor accessors are now generally retained and properly adjusted when the parent table is modified.
+* Added methods to find rows by target in TableView and LinkView.
 
 -----------
 

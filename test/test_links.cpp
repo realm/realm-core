@@ -599,6 +599,34 @@ TEST(Links_LinkList_AccessorUpdates)
     CHECK_EQUAL(false, links2again->is_attached());
 }
 
+TEST(Links_LinkList_FindBySource)
+{
+    Group group;
+
+    TestTableLinks::Ref target = group.get_table<TestTableLinks>("target");
+    target->add("test1", 1, true,  Mon);
+    target->add("test2", 2, false, Tue);
+    target->add("test3", 3, true,  Wed);
+
+    // create table with links to target table
+    TableRef source = group.get_table("source");
+    size_t col_link = source->add_column_link(type_LinkList, "links", *TableRef(target));
+
+    source->add_empty_row();
+    LinkViewRef links = source->get_linklist(col_link, 0);
+    links->add(2);
+    links->add(1);
+    links->add(0);
+
+    CHECK_EQUAL(0, links->find(2));
+    CHECK_EQUAL(1, links->find(1));
+    CHECK_EQUAL(2, links->find(0));
+
+    links->remove(0);
+    CHECK_EQUAL(not_found, links->find(2));
+}
+
+
 TEST(Links_CircularAccessors)
 {
     SHARED_GROUP_TEST_PATH(path);
