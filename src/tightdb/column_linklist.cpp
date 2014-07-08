@@ -162,7 +162,7 @@ LinkView* ColumnLinkList::get_ptr(size_t row_ndx) const
     m_list_accessors.reserve(m_list_accessors.size() + 1); // Throws
     list_entry entry;
     entry.m_row_ndx = row_ndx;
-    entry.m_list = new LinkView(const_cast<ColumnLinkList&>(*this), row_ndx); // Throws
+    entry.m_list = new LinkView(m_table, const_cast<ColumnLinkList&>(*this), row_ndx); // Throws
     m_list_accessors.push_back(entry); // Not throwing due to space reservation
     return entry.m_list;
 }
@@ -185,10 +185,9 @@ void ColumnLinkList::to_json_row(size_t row_ndx, std::ostream& out) const
     for (size_t t = 0; t < links1->size(); t++) {
         if (t > 0)
             out << ", ";
-        size_t target = links1->get_target_row(t);
+        size_t target = links1->get(t).get_index();
         out << target;
     }
-    
 }
 
 
@@ -202,8 +201,9 @@ void ColumnLinkList::discard_child_accessors() TIGHTDB_NOEXCEPT
     m_list_accessors.clear();
 }
 
-void ColumnLinkList::refresh_accessor_tree(size_t, const Spec&)
+void ColumnLinkList::refresh_accessor_tree(size_t col_ndx, const Spec& spec)
 {
+    ColumnLinkBase::refresh_accessor_tree(col_ndx, spec); // Throws
     typedef list_accessors::const_iterator iter;
     iter end = m_list_accessors.end();
     for (iter i = m_list_accessors.begin(); i != end; ++i)

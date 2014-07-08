@@ -911,7 +911,7 @@ public:
                 Value<StringData> v(true, links->size());
 
                 for (size_t t = 0; t < links->size(); t++) {
-                    size_t link_to = links->get_target_row(t);
+                    size_t link_to = links->get(t).get_index();
                     v.m_v[t] = m_table->get_string(m_column, link_to);
                 }
                 destination.import(v);
@@ -922,7 +922,7 @@ public:
                 destination.import(v);
             }
         }
-        else if (m_column_single_link) {  
+        else if (m_column_single_link) {
             if (m_column_single_link->is_null_link(index)) {
                 // Null link; create empty Value (Value with m_values == 0)
                 Value<StringData> v(true, 0);
@@ -1062,7 +1062,7 @@ public:
                 Value<T> v(true, links->size());
 
                 for (size_t t = 0; t < links->size(); t++) {
-                    size_t link_to = links->get_target_row(t);
+                    size_t link_to = links->get(t).get_index();
                     sg->cache_next(link_to); // todo, needed?
                     v.m_v[t] = sg->get_next(link_to);
                 }

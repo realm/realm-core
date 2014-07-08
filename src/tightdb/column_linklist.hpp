@@ -44,9 +44,10 @@ typedef util::bind_ptr<LinkView> LinkViewRef;
 /// ref.
 class ColumnLinkList: public ColumnLinkBase, public ArrayParent {
 public:
-    ColumnLinkList(ref_type ref, ArrayParent* parent = 0, std::size_t ndx_in_parent = 0,
-        Allocator& alloc = Allocator::get_default()); // Throws
-    ColumnLinkList(Allocator& alloc);  // Throws
+    ColumnLinkList(Table*, std::size_t column_ndx, ref_type ref,
+                   ArrayParent* = 0, std::size_t ndx_in_parent = 0,
+                   Allocator& = Allocator::get_default()); // Throws
+    ColumnLinkList(Table*, std::size_t column_ndx, Allocator&);  // Throws
     ~ColumnLinkList() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
     static ref_type create(std::size_t size, Allocator&);
@@ -66,6 +67,8 @@ public:
 
     void to_json_row(size_t row_ndx, std::ostream& out) const;
 
+    void update_column_index(std::size_t, const Spec&) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+
     void refresh_accessor_tree(std::size_t, const Spec&) TIGHTDB_OVERRIDE;
 
     void adj_accessors_move_last_over(std::size_t, std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
@@ -74,6 +77,12 @@ protected:
     void do_discard_child_accessors() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
 private:
+    // A pointer to the table that this column is part of.
+    Table* const m_table;
+
+    // The index of this column within m_table.m_cols.
+    std::size_t m_column_ndx;
+
     struct list_entry {
         std::size_t m_row_ndx;
         LinkView* m_list;
@@ -110,19 +119,28 @@ private:
 
     friend class ColumnBackLink;
     friend class LinkView;
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    friend class Replication;
+#endif
 };
 
 
 // Implementation
 
-inline ColumnLinkList::ColumnLinkList(ref_type ref, ArrayParent* parent, std::size_t ndx_in_parent,
+inline ColumnLinkList::ColumnLinkList(Table* table, std::size_t column_ndx, ref_type ref,
+                                      ArrayParent* parent, std::size_t ndx_in_parent,
                                       Allocator& alloc):
-    ColumnLinkBase(ref, parent, ndx_in_parent, alloc)
+    ColumnLinkBase(ref, parent, ndx_in_parent, alloc),
+    m_table(table),
+    m_column_ndx(column_ndx)
 {
 }
 
-inline ColumnLinkList::ColumnLinkList(Allocator& alloc):
-    ColumnLinkBase(Array::type_HasRefs, alloc)
+inline ColumnLinkList::ColumnLinkList(Table* table, std::size_t column_ndx, Allocator& alloc):
+    ColumnLinkBase(Array::type_HasRefs, alloc),
+    m_table(table),
+    m_column_ndx(column_ndx)
 {
 }
 
@@ -161,6 +179,13 @@ inline LinkViewRef ColumnLinkList::get(std::size_t row_ndx)
 {
     LinkView* link_list = get_ptr(row_ndx); // Throws
     return LinkViewRef(link_list);
+}
+
+inline void ColumnLinkList::update_column_index(std::size_t new_col_ndx, const Spec& spec)
+    TIGHTDB_NOEXCEPT
+{
+    Column::update_column_index(new_col_ndx, spec);
+    m_column_ndx = new_col_ndx;
 }
 
 inline void ColumnLinkList::do_discard_child_accessors() TIGHTDB_NOEXCEPT

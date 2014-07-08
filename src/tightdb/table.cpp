@@ -986,7 +986,8 @@ void Table::create_columns()
                 break;
             }
             case type_LinkList: {
-                ColumnLinkList* c = new ColumnLinkList(alloc);
+                size_t col_ndx = m_cols.size();
+                ColumnLinkList* c = new ColumnLinkList(this, col_ndx, alloc);
                 m_columns.add(c->get_ref());
                 c->set_parent(&m_columns, ref_pos);
                 new_col = c;
@@ -1178,7 +1179,8 @@ ColumnBase* Table::create_column_accessor(ColumnType col_type, size_t col_ndx, s
             return new ColumnLink(ref, &m_columns, ndx_in_parent, alloc); // Throws
         case col_type_LinkList:
             // Target table will be set by group after entire table has been created
-            return new ColumnLinkList(ref, &m_columns, ndx_in_parent, alloc); // Throws
+            return new ColumnLinkList(this, col_ndx, ref, &m_columns, ndx_in_parent,
+                                      alloc); // Throws
         case col_type_BackLink:
             // Origin table will be set by group after entire table has been created
             return new ColumnBackLink(ref, &m_columns, ndx_in_parent, alloc); // Throws
@@ -3717,7 +3719,7 @@ void Table::to_json(std::ostream& out, size_t link_depth, std::map<std::string, 
     out << "]";
 }
 
-void Table::to_json_row(std::size_t row_ndx, std::ostream& out, size_t link_depth, 
+void Table::to_json_row(std::size_t row_ndx, std::ostream& out, size_t link_depth,
     std::map<std::string, std::string>& renames, std::vector<ref_type>& followed) const
 {
     out << "{";
@@ -3806,7 +3808,7 @@ void Table::to_json_row(std::size_t row_ndx, std::ostream& out, size_t link_dept
 
             if (!cl.is_null_link(row_ndx)) {
                 ref_type lnk = clb.get_ref();
-                if ((link_depth == 0) || 
+                if ((link_depth == 0) ||
                     (link_depth == not_found && std::find(followed.begin(), followed.end(), lnk) != followed.end())) {
                     out << "\"" << cl.get_link(row_ndx) << "\"";
                     break;
@@ -3833,7 +3835,7 @@ void Table::to_json_row(std::size_t row_ndx, std::ostream& out, size_t link_dept
             LinkViewRef lv = cll.get(row_ndx);
 
             ref_type lnk = clb.get_ref();
-            if ((link_depth == 0) || 
+            if ((link_depth == 0) ||
                 (link_depth == not_found && std::find(followed.begin(), followed.end(), lnk) != followed.end())) {
                 out << "{\"table\": \"" << cll.get_target_table()->get_name() << "\", \"rows\": [";
                 cll.to_json_row(row_ndx, out);
@@ -3847,7 +3849,7 @@ void Table::to_json_row(std::size_t row_ndx, std::ostream& out, size_t link_dept
                         out << ", ";
                     followed.push_back(lnk);
                     size_t new_depth = link_depth == not_found ? not_found : link_depth - 1;
-                    table->to_json_row(lv->get_target_row(link), out, new_depth, renames, followed);
+                    table->to_json_row(lv->get(link).get_index(), out, new_depth, renames, followed);
                 }
                 out << "]";
             }

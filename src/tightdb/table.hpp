@@ -1878,6 +1878,7 @@ public:
         table.bump_version( /* bump_global: */ false);
     }
 
+/*
     static std::size_t find_column(const Table& table, const ColumnBase* col)
     {
         const Table::column_accessors& cols = table.m_cols;
@@ -1887,6 +1888,7 @@ public:
             return tightdb::npos;
         return i - cols.begin();
     }
+*/
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     static Replication* get_repl(Table& table) TIGHTDB_NOEXCEPT
