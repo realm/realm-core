@@ -190,8 +190,8 @@ inline bool LinkView::operator==(const LinkView& link_list) const TIGHTDB_NOEXCE
     if (!m_target_row_indexes.is_attached() || m_target_row_indexes.is_empty())
         return !link_list.m_target_row_indexes.is_attached() ||
             link_list.m_target_row_indexes.is_empty();
-    return link_list.m_target_row_idnexes.is_attached() &&
-        m_target_row_indexes.compare_int(link_list.m_target_row_idnexes);
+    return link_list.m_target_row_indexes.is_attached() &&
+        m_target_row_indexes.compare_int(link_list.m_target_row_indexes);
 }
 
 inline bool LinkView::operator!=(const LinkView& link_list) const TIGHTDB_NOEXCEPT
@@ -228,7 +228,7 @@ inline Table::RowExpr LinkView::operator[](std::size_t link_ndx) TIGHTDB_NOEXCEP
 inline void LinkView::add(std::size_t target_row_ndx)
 {
     TIGHTDB_ASSERT(is_attached());
-    size_t ins_pos = (m_target_row_indexes.is_attached()) ? m_target_row_idnexes.size() : 0;
+    size_t ins_pos = (m_target_row_indexes.is_attached()) ? m_target_row_indexes.size() : 0;
     insert(ins_pos, target_row_ndx);
 }
 
@@ -237,7 +237,7 @@ inline std::size_t LinkView::find(std::size_t target_row_ndx) const TIGHTDB_NOEX
     TIGHTDB_ASSERT(is_attached());
     TIGHTDB_ASSERT(target_row_ndx < m_origin_column.get_target_table()->size());
 
-    if (!m_target_row_idnexes.is_attached())
+    if (!m_target_row_indexes.is_attached())
         return not_found;
 
     return m_target_row_indexes.find_first(target_row_ndx);
