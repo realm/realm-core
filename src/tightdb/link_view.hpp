@@ -187,9 +187,10 @@ inline bool LinkView::operator==(const LinkView& link_list) const TIGHTDB_NOEXCE
     Table* target_table_2 = link_list.m_origin_column.get_target_table();
     if (target_table_1->get_index_in_parent() != target_table_2->get_index_in_parent())
         return false;
-    if (!m_target_row_indexes.is_attached() || m_target_row_indexes.is_empty())
+    if (!m_target_row_indexes.is_attached() || m_target_row_indexes.is_empty()) {
         return !link_list.m_target_row_indexes.is_attached() ||
-            link_list.m_target_row_indexes.is_empty();
+                link_list.m_target_row_indexes.is_empty();
+    }
     return link_list.m_target_row_indexes.is_attached() &&
         m_target_row_indexes.compare_int(link_list.m_target_row_indexes);
 }
