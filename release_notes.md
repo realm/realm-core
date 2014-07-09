@@ -53,6 +53,7 @@ C++ (core)
 * Added `LinkView::get_origin_table()` and `LinkView::get_target_table()`.
 
 ### Enhancements:
+* Now maximum() and minimum() can return the index of the match and not only the value. Implemented for Query, Table and TableView.
 * Now supports links in Table::to_json. Please see unit tests in the new test_json.cpp file
 * Now supports DateTime Query::maximum_datetime() and DateTime Query::minimum_datetime()
 * Supports links in queries, like `(table1->link(3).column<Int>(0) > 550).find()`.
