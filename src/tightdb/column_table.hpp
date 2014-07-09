@@ -60,19 +60,12 @@ public:
     void discard_subtable_accessor(std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
 protected:
-    /// A pointer to the table that this column is part of. For a
-    /// free-standing column, this pointer is null.
+    /// A pointer to the table that this column is part of. For a free-standing
+    /// column, this pointer is null.
     Table* const m_table;
 
-    /// The index of this column within the table that this column is
-    /// part of. For a free-standing column, this index is zero.
-    ///
-    /// This index specifies the position of the column within the
-    /// Table::m_cols array. Note that this corresponds to the logical
-    /// index of the column, which is not always the same as the index
-    /// of this column within Table::m_columns. This is because
-    /// Table::m_columns contains columns as well as indexes for those
-    /// columns.
+    /// The index of this column within m_table.m_cols. For a free-standing
+    /// column, this index is zero.
     std::size_t m_column_ndx;
 
     struct SubtableMap {

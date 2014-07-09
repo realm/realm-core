@@ -401,9 +401,9 @@ TEST(Links_LinkList_Basics)
     links->add(0);
     CHECK(!source->linklist_is_empty(col_link, 0));
     CHECK_EQUAL(3, links->size());
-    CHECK_EQUAL(2, links->get_target_row(0));
-    CHECK_EQUAL(1, links->get_target_row(1));
-    CHECK_EQUAL(0, links->get_target_row(2));
+    CHECK_EQUAL(2, links->get(0).get_index());
+    CHECK_EQUAL(1, links->get(1).get_index());
+    CHECK_EQUAL(0, links->get(2).get_index());
     CHECK_EQUAL(Wed, (Days)(*links)[0].get_int(3));
 
     // verify that backlinks was set correctly
@@ -417,10 +417,10 @@ TEST(Links_LinkList_Basics)
     // insert a link at a specific position in the linklist
     links->insert(1, 2);
     CHECK_EQUAL(4, source->get_link_count(col_link, 0));
-    CHECK_EQUAL(2, links->get_target_row(0));
-    CHECK_EQUAL(2, links->get_target_row(1));
-    CHECK_EQUAL(1, links->get_target_row(2));
-    CHECK_EQUAL(0, links->get_target_row(3));
+    CHECK_EQUAL(2, links->get(0).get_index());
+    CHECK_EQUAL(2, links->get(1).get_index());
+    CHECK_EQUAL(1, links->get(2).get_index());
+    CHECK_EQUAL(0, links->get(3).get_index());
 
     CHECK_EQUAL(2, target->get_backlink_count(2, *source, col_link));
     CHECK_EQUAL(0, target->get_backlink(2, *source, col_link, 0));
@@ -429,10 +429,10 @@ TEST(Links_LinkList_Basics)
     // change one link to another
     links->set(0, 1);
     CHECK_EQUAL(4, source->get_link_count(col_link, 0));
-    CHECK_EQUAL(1, links->get_target_row(0));
-    CHECK_EQUAL(2, links->get_target_row(1));
-    CHECK_EQUAL(1, links->get_target_row(2));
-    CHECK_EQUAL(0, links->get_target_row(3));
+    CHECK_EQUAL(1, links->get(0).get_index());
+    CHECK_EQUAL(2, links->get(1).get_index());
+    CHECK_EQUAL(1, links->get(2).get_index());
+    CHECK_EQUAL(0, links->get(3).get_index());
 
     CHECK_EQUAL(1, target->get_backlink_count(0, *source, col_link));
     CHECK_EQUAL(0, target->get_backlink(0, *source, col_link, 0));
@@ -445,10 +445,10 @@ TEST(Links_LinkList_Basics)
     // move a link
     links->move(3, 0);
     CHECK_EQUAL(4, source->get_link_count(col_link, 0));
-    CHECK_EQUAL(0, links->get_target_row(0));
-    CHECK_EQUAL(1, links->get_target_row(1));
-    CHECK_EQUAL(2, links->get_target_row(2));
-    CHECK_EQUAL(1, links->get_target_row(3));
+    CHECK_EQUAL(0, links->get(0).get_index());
+    CHECK_EQUAL(1, links->get(1).get_index());
+    CHECK_EQUAL(2, links->get(2).get_index());
+    CHECK_EQUAL(1, links->get(3).get_index());
 
     // remove a link
     links->remove(0);
@@ -488,8 +488,8 @@ TEST(Links_LinkList_Backlinks)
     // remove a target row and check that source links are removed as well
     target->move_last_over(1);
     CHECK_EQUAL(2, source->get_link_count(col_link, 0));
-    CHECK_EQUAL(1, links->get_target_row(0));
-    CHECK_EQUAL(0, links->get_target_row(1));
+    CHECK_EQUAL(1, links->get(0).get_index());
+    CHECK_EQUAL(0, links->get(1).get_index());
 
     // remove all
     target->clear();

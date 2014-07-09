@@ -35,16 +35,22 @@ C++ (core)
 
 ### Bugfixes:
 
-* Fixed bug in `TableView::remove()` causing crash or undefined behaviour.
+* Fixed bug in `TableView::remove()` causing crash or undefined behavior.
 * Fixed bugs in `Table::insert_column()` and `Table::remove_column()` causing crash or undefined behaviour.
 * Fixed corruption bug when a string enumeration column follows a column with attached search index (index flavor mixup).
 * Fixed in `Array::erase()` causing crash in certain row insertion scenarios.
 * Fixed bug in enumerated strings column (corruption was possible when inserting default values).
 * Fixed bug in `Table::update_from_parent()` causing a crash if `Group::commit()` in presence of generated subtable accessor.
+* Fixed several link-related bugs due to confusion about the meaning of `LinkView::m_table`.
 
 ### API breaking changes:
 
 * Views can now be be kept synchronized with changes to the tables used to generate the view, use `TableView::sync_if_needed()` to do so. Views are no longer detached when the table they have been generated from are changed. Instead they just go out of sync. See further description in `src/tightdb/table_view.hpp`.
+* is_attached(), detach(), get_table(), and get_index() moved from BasicRow to RowFuncs. This makes it possible to write `link_list[7].get_index()`, for instance.
+* `LinkView::get_target_row(link_ndx)` was removed as it is now just a shorthand for the equally efficient `LinkView::get(link_ndx).get_index()`.
+* Added missing const versions of `LinkView::get()` and `LinkView::operator[]()`.
+* Confusing `LinkView::get_parent()` removed.
+* Added `LinkView::get_origin_table()` and `LinkView::get_target_table()`.
 
 ### Enhancements:
 * Now supports links in Table::to_json. Please see unit tests in the new test_json.cpp file
@@ -56,6 +62,7 @@ C++ (core)
 * Support for row accessors.
 * Table, row, and descriptor accessors are now generally retained and properly adjusted when the parent table is modified.
 * Added methods to find rows by target in TableView and LinkView.
+
 
 -----------
 
