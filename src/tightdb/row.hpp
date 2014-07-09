@@ -487,7 +487,7 @@ inline std::size_t RowFuncs<T,R>::get_column_index(StringData name) const TIGHTD
 
 template<class T, class R> inline bool RowFuncs<T,R>::is_attached() const TIGHTDB_NOEXCEPT
 {
-    return bool(static_cast<const R*>(this)->impl_get_table());
+    return static_cast<const R*>(this)->impl_get_table();
 }
 
 template<class T, class R> inline void RowFuncs<T,R>::detach() TIGHTDB_NOEXCEPT
