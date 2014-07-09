@@ -733,31 +733,31 @@ size_t Column::count(int64_t target) const
     return size_t(aggregate<int64_t, int64_t, act_Count, Equal>(target, 0, size()));
 }
 
-int64_t Column::sum(size_t start, size_t end, size_t limit) const
+int64_t Column::sum(size_t start, size_t end, size_t limit, size_t* return_ndx) const
 {
-    return aggregate<int64_t, int64_t, act_Sum, None>(0, start, end, limit);
+    return aggregate<int64_t, int64_t, act_Sum, None>(0, start, end, limit, return_ndx);
 }
 
-double Column::average(size_t start, size_t end, size_t limit) const
+double Column::average(size_t start, size_t end, size_t limit, size_t* return_ndx) const
 {
     if (end == size_t(-1))
         end = size();
     size_t size = end - start;
     if(limit < size)
         size = limit;
-    int64_t sum = aggregate<int64_t, int64_t, act_Sum, None>(0, start, end, limit);
+    int64_t sum = aggregate<int64_t, int64_t, act_Sum, None>(0, start, end, limit, return_ndx);
     double avg = double(sum) / double(size == 0 ? 1 : size);
     return avg;
 }
 
-int64_t Column::minimum(size_t start, size_t end, size_t limit) const
+int64_t Column::minimum(size_t start, size_t end, size_t limit, size_t* return_ndx) const
 {
-    return aggregate<int64_t, int64_t, act_Min, None>(0, start, end, limit);
+    return aggregate<int64_t, int64_t, act_Min, None>(0, start, end, limit, return_ndx);
 }
 
-int64_t Column::maximum(size_t start, size_t end, size_t limit) const
+int64_t Column::maximum(size_t start, size_t end, size_t limit, size_t* return_ndx) const
 {
-    return aggregate<int64_t, int64_t, act_Max, None>(0, start, end, limit);
+    return aggregate<int64_t, int64_t, act_Max, None>(0, start, end, limit, return_ndx);
 }
 
 

@@ -462,12 +462,12 @@ public:
     int64_t sum_int(std::size_t column_ndx) const;
     double  sum_float(std::size_t column_ndx) const;
     double  sum_double(std::size_t column_ndx) const;
-    int64_t maximum_int(std::size_t column_ndx) const;
-    float   maximum_float(std::size_t column_ndx) const;
-    double  maximum_double(std::size_t column_ndx) const;
-    int64_t minimum_int(std::size_t column_ndx) const;
-    float   minimum_float(std::size_t column_ndx) const;
-    double  minimum_double(std::size_t column_ndx) const;
+    int64_t maximum_int(std::size_t column_ndx, std::size_t* return_ndx = null_ptr) const;
+    float   maximum_float(std::size_t column_ndx, std::size_t* return_ndx = null_ptr) const;
+    double  maximum_double(std::size_t column_ndx, std::size_t* return_ndx = null_ptr) const;
+    int64_t minimum_int(std::size_t column_ndx, std::size_t* return_ndx = null_ptr) const;
+    float   minimum_float(std::size_t column_ndx, std::size_t* return_ndx = null_ptr) const;
+    double  minimum_double(std::size_t column_ndx, std::size_t* return_ndx = null_ptr) const;
     double  average_int(std::size_t column_ndx) const;
     double  average_float(std::size_t column_ndx) const;
     double  average_double(std::size_t column_ndx) const;

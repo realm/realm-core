@@ -66,13 +66,13 @@ public:
 
     typedef typename AggReturnType<T>::sum_type SumType;
     SumType sum(std::size_t begin = 0, std::size_t end = npos,
-                std::size_t limit = std::size_t(-1)) const;
+        std::size_t limit = std::size_t(-1), size_t* return_ndx = null_ptr) const;
     double average(std::size_t begin = 0, std::size_t end = npos,
-                   std::size_t limit = std::size_t(-1)) const;
+        std::size_t limit = std::size_t(-1), size_t* return_ndx = null_ptr) const;
     T maximum(std::size_t begin = 0, std::size_t end = npos,
-              std::size_t limit = std::size_t(-1)) const;
+        std::size_t limit = std::size_t(-1), size_t* return_ndx = null_ptr) const;
     T minimum(std::size_t begin = 0, std::size_t end = npos,
-              std::size_t limit = std::size_t(-1)) const;
+        std::size_t limit = std::size_t(-1), size_t* return_ndx = null_ptr) const;
     std::size_t find_first(T value, std::size_t begin = 0 , std::size_t end = npos) const;
     void find_all(Column& result, T value, std::size_t begin = 0, std::size_t end = npos) const;
 
@@ -113,7 +113,7 @@ private:
                                 Array::TreeInsert<BasicColumn<T> >&);
 
     template <typename R, Action action, class cond>
-    R aggregate(T target, std::size_t start, std::size_t end) const;
+    R aggregate(T target, std::size_t start, std::size_t end, std::size_t* return_ndx) const;
 
     class SetLeafElem;
     class EraseLeafElem;

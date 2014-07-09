@@ -496,24 +496,24 @@ template<class T> std::size_t BasicColumn<T>::count(T target) const
 
 template<class T>
 typename BasicColumn<T>::SumType BasicColumn<T>::sum(std::size_t begin, std::size_t end,
-                                                     std::size_t limit) const
+    std::size_t limit, std::size_t* return_ndx) const
 {
-    return ColumnBase::aggregate<T, SumType, act_Sum, None>(0, begin, end, limit);
+    return ColumnBase::aggregate<T, SumType, act_Sum, None>(0, begin, end, limit, return_ndx);
 }
 template<class T>
-T BasicColumn<T>::minimum(std::size_t begin, std::size_t end, std::size_t limit) const
+T BasicColumn<T>::minimum(std::size_t begin, std::size_t end, std::size_t limit, size_t* return_ndx) const
 {
-    return ColumnBase::aggregate<T, T, act_Min, None>(0, begin, end, limit);
-}
-
-template<class T>
-T BasicColumn<T>::maximum(std::size_t begin, std::size_t end, std::size_t limit) const
-{
-    return ColumnBase::aggregate<T, T, act_Max, None>(0, begin, end, limit);
+    return ColumnBase::aggregate<T, T, act_Min, None>(0, begin, end, limit, return_ndx);
 }
 
 template<class T>
-double BasicColumn<T>::average(std::size_t begin, std::size_t end, std::size_t limit) const
+T BasicColumn<T>::maximum(std::size_t begin, std::size_t end, std::size_t limit, size_t* return_ndx) const
+{
+    return ColumnBase::aggregate<T, T, act_Max, None>(0, begin, end, limit, return_ndx);
+}
+
+template<class T>
+double BasicColumn<T>::average(std::size_t begin, std::size_t end, std::size_t limit, size_t* /*return_ndx*/) const
 {
     if (end == npos)
         end = size();

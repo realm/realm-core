@@ -143,29 +143,29 @@ public:
     // function> except Count. Hack because of bug in optional
     // arguments in clang and vs2010 (fixed in 2012)
     template <int function, typename T, typename R, class ColType>
-    R aggregate(R (ColType::*aggregateMethod)(size_t, size_t, size_t) const,
-                size_t column_ndx, T count_target) const;
+    R aggregate(R (ColType::*aggregateMethod)(size_t, size_t, size_t, size_t*) const,
+        size_t column_ndx, T count_target, size_t* return_ndx = null_ptr) const;
 
     int64_t sum_int(size_t column_ndx) const;
-    int64_t maximum_int(size_t column_ndx) const;
-    int64_t minimum_int(size_t column_ndx) const;
+    int64_t maximum_int(size_t column_ndx, size_t* return_ndx = null_ptr) const;
+    int64_t minimum_int(size_t column_ndx, size_t* return_ndx = null_ptr) const;
     double average_int(size_t column_ndx) const;
     size_t count_int(size_t column_ndx, int64_t target) const;
 
     double sum_float(size_t column_ndx) const;
-    float maximum_float(size_t column_ndx) const;
-    float minimum_float(size_t column_ndx) const;
+    float maximum_float(size_t column_ndx, size_t* return_ndx = null_ptr) const;
+    float minimum_float(size_t column_ndx, size_t* return_ndx = null_ptr) const;
     double average_float(size_t column_ndx) const;
     size_t count_float(size_t column_ndx, float target) const;
 
     double sum_double(size_t column_ndx) const;
-    double maximum_double(size_t column_ndx) const;
-    double minimum_double(size_t column_ndx) const;
+    double maximum_double(size_t column_ndx, size_t* return_ndx = null_ptr) const;
+    double minimum_double(size_t column_ndx, size_t* return_ndx = null_ptr) const;
     double average_double(size_t column_ndx) const;
     size_t count_double(size_t column_ndx, double target) const;
 
-    DateTime maximum_datetime(size_t column_ndx) const;
-    DateTime minimum_datetime(size_t column_ndx) const;
+    DateTime maximum_datetime(size_t column_ndx, size_t* return_ndx = null_ptr) const;
+    DateTime minimum_datetime(size_t column_ndx, size_t* return_ndx = null_ptr) const;
 
     void sort(size_t column_ndx, bool ascending = true);
 

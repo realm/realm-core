@@ -221,7 +221,7 @@ protected:
     bool root_is_leaf() const TIGHTDB_NOEXCEPT { return !m_array->is_inner_bptree_node(); }
 
     template <class T, class R, Action action, class condition>
-    R aggregate(T target, std::size_t start, std::size_t end, size_t limit = size_t(-1)) const;
+    R aggregate(T target, std::size_t start, std::size_t end, size_t limit = size_t(-1), size_t* return_ndx = null_ptr) const;
 
     /// Introduce a new root node which increments the height of the
     /// tree by one.
@@ -313,10 +313,10 @@ public:
     void insert(std::size_t ndx, int_fast64_t value = 0);
 
     std::size_t count(int64_t target) const;
-    int64_t sum(std::size_t start = 0, std::size_t end = -1, size_t limit = size_t(-1)) const;
-    int64_t maximum(std::size_t start = 0, std::size_t end = -1, size_t limit = size_t(-1)) const;
-    int64_t minimum(std::size_t start = 0, std::size_t end = -1, size_t limit = size_t(-1)) const;
-    double  average(std::size_t start = 0, std::size_t end = -1, size_t limit = size_t(-1)) const;
+    int64_t sum(std::size_t start = 0, std::size_t end = -1, size_t limit = size_t(-1), size_t* return_ndx = null_ptr) const;
+    int64_t maximum(std::size_t start = 0, std::size_t end = -1, size_t limit = size_t(-1), size_t* return_ndx = null_ptr) const;
+    int64_t minimum(std::size_t start = 0, std::size_t end = -1, size_t limit = size_t(-1), size_t* return_ndx = null_ptr) const;
+    double  average(std::size_t start = 0, std::size_t end = -1, size_t limit = size_t(-1), size_t* return_ndx = null_ptr) const;
 
     // FIXME: Be careful, clear() currently forgets if the leaf type
     // is Array::type_HasRefs.
