@@ -670,6 +670,8 @@ EOF
         done
         cp src/tightdb/libtightdb.a "$tmpdir/$BASENAME" || exit 1
         cp src/tightdb/libtightdb-dbg.a "$tmpdir/$BASENAME" || exit 1
+        command -v pandoc >/dev/null 2>&1 || { echo >&2 "Pandoc is required but it's not installed.  Aborting."; exit 1; }
+        pandoc -f markdown -t plain -o "$tmpdir/$BASENAME/release_notes.txt" release_notes.md || exit 1
 
         echo "Create zip file: '$BASENAME-$realm_version.zip'"
         (cd $tmpdir && zip -r -q "$BASENAME-$realm_version.zip" "$BASENAME") || exit 1
