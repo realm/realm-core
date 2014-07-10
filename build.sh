@@ -890,6 +890,19 @@ EOF
         exit 0
         ;;
 
+    "release-notes-prerelease")
+        RELEASE_HEADER="# $(sh build.sh get-version) Release notes ($(date +%F))" || exit 1
+        sed -i.bak "1s/.*/$RELEASE_HEADER/" release_notes.md || exit 1
+        rm release_notes.md.bak
+        exit 0
+        ;;
+
+    "release-notes-postrelease")
+        cat doc/release_notes_template.md release_notes.md > release_notes.md.new || exit 1
+        mv release_notes.md.new release_notes.md || exit 1
+        exit 0
+        ;;
+
     "get-version")
         version_file="src/tightdb/version.hpp"
         tightdb_ver_major="$(grep ^"#define TIGHTDB_VER_MAJOR" $version_file | awk '{print $3}')" || exit 1
