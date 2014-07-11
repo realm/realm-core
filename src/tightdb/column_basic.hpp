@@ -66,14 +66,19 @@ public:
 
     typedef typename AggReturnType<T>::sum_type SumType;
     SumType sum(std::size_t begin = 0, std::size_t end = npos,
-        std::size_t limit = std::size_t(-1), size_t* return_ndx = null_ptr) const;
+                std::size_t limit = std::size_t(-1), size_t* return_ndx = null_ptr) const;
+
     double average(std::size_t begin = 0, std::size_t end = npos,
-        std::size_t limit = std::size_t(-1), size_t* return_ndx = null_ptr) const;
+                   std::size_t limit = std::size_t(-1), size_t* return_ndx = null_ptr) const;
+
     T maximum(std::size_t begin = 0, std::size_t end = npos,
-        std::size_t limit = std::size_t(-1), size_t* return_ndx = null_ptr) const;
+              std::size_t limit = std::size_t(-1), size_t* return_ndx = null_ptr) const;
+
     T minimum(std::size_t begin = 0, std::size_t end = npos,
-        std::size_t limit = std::size_t(-1), size_t* return_ndx = null_ptr) const;
+              std::size_t limit = std::size_t(-1), size_t* return_ndx = null_ptr) const;
+
     std::size_t find_first(T value, std::size_t begin = 0 , std::size_t end = npos) const;
+
     void find_all(Column& result, T value, std::size_t begin = 0, std::size_t end = npos) const;
 
     //@{

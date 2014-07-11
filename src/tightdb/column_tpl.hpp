@@ -55,8 +55,8 @@ template<class cond> struct ColumnTypeTraits2<cond, double> {
 
 
 template <class T, class R, Action action, class condition>
-R ColumnBase::aggregate(T target, std::size_t start, std::size_t end,
-    std::size_t limit, std::size_t* return_ndx) const
+    R ColumnBase::aggregate(T target, std::size_t start, std::size_t end,
+                            std::size_t limit, std::size_t* return_ndx) const
 {
 
     condition cond;

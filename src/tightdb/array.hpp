@@ -585,8 +585,13 @@ public:
 
     int64_t sum(std::size_t start = 0, std::size_t end = std::size_t(-1)) const;
     std::size_t count(int64_t value) const;
-    bool maximum(int64_t& result, std::size_t start = 0, std::size_t end = std::size_t(-1), std::size_t* return_ndx = null_ptr) const;
-    bool minimum(int64_t& result, std::size_t start = 0, std::size_t end = std::size_t(-1), std::size_t* return_ndx = null_ptr) const;
+
+    bool maximum(int64_t& result, std::size_t start = 0, std::size_t end = std::size_t(-1), 
+                 std::size_t* return_ndx = null_ptr) const;
+
+    bool minimum(int64_t& result, std::size_t start = 0, std::size_t end = std::size_t(-1), 
+                 std::size_t* return_ndx = null_ptr) const;
+
     void sort();
     void ReferenceSort(Array& ref) const;
 

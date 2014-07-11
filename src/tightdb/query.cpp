@@ -535,8 +535,10 @@ size_t Query::peek_tableview(size_t tv_index) const
 }
 
 template <Action action, typename T, typename R, class ColType>
-R Query::aggregate(R(ColType::*aggregateMethod)(size_t start, size_t end, size_t limit, size_t* return_ndx) const,
-    size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit, size_t* return_ndx) const
+    R Query::aggregate(R(ColType::*aggregateMethod)(size_t start, size_t end, size_t limit,
+                                                    size_t* return_ndx) const,
+                       size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit, 
+                       size_t* return_ndx) const
 {
     if(limit == 0 || m_table->is_degenerate()) {
         if (resultcount)
@@ -663,49 +665,51 @@ double Query::sum_double(size_t column_ndx, size_t* resultcount, size_t start, s
 // Maximum
 
 int64_t Query::maximum_int(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit, 
-    size_t* return_ndx) const
+                           size_t* return_ndx) const
 {
     return aggregate<act_Max, int64_t>(&Column::maximum, column_ndx, resultcount, start, end, limit, return_ndx);
 }
 
 DateTime Query::maximum_datetime(size_t column_ndx, size_t* resultcount, size_t start, size_t end, 
-    size_t limit, size_t* return_ndx) const
+                                 size_t limit, size_t* return_ndx) const
 {
     return aggregate<act_Max, int64_t>(&Column::maximum, column_ndx, resultcount, start, end, limit, return_ndx);
 }
 
 float Query::maximum_float(size_t column_ndx, size_t* resultcount, size_t start, size_t end, 
-    size_t limit, size_t* return_ndx) const
+                           size_t limit, size_t* return_ndx) const
 {
     return aggregate<act_Max, float>(&ColumnFloat::maximum, column_ndx, resultcount, start, end, limit, return_ndx);
 }
 double Query::maximum_double(size_t column_ndx, size_t* resultcount, size_t start, size_t end,
-    size_t limit, size_t* return_ndx) const
+                             size_t limit, size_t* return_ndx) const
 {
-    return aggregate<act_Max, double>(&ColumnDouble::maximum, column_ndx, resultcount, start, end, limit, return_ndx);
+    return aggregate<act_Max, double>(&ColumnDouble::maximum, column_ndx, resultcount, start, end, limit,
+                                      return_ndx);
 }
 
 
 // Minimum
 
 int64_t Query::minimum_int(size_t column_ndx, size_t* resultcount, size_t start, size_t end, 
-    size_t limit, size_t* return_ndx) const
+                           size_t limit, size_t* return_ndx) const
 {
     return aggregate<act_Min, int64_t>(&Column::minimum, column_ndx, resultcount, start, end, limit, return_ndx);
 }
 float Query::minimum_float(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit,
-    size_t* return_ndx) const
+                           size_t* return_ndx) const
 {
     return aggregate<act_Min, float>(&ColumnFloat::minimum, column_ndx, resultcount, start, end, limit, return_ndx);
 }
 double Query::minimum_double(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit, 
-    size_t* return_ndx) const
+                             size_t* return_ndx) const
 {
-    return aggregate<act_Min, double>(&ColumnDouble::minimum, column_ndx, resultcount, start, end, limit, return_ndx);
+    return aggregate<act_Min, double>(&ColumnDouble::minimum, column_ndx, resultcount, start, end, limit, 
+                                      return_ndx);
 }
 
 DateTime Query::minimum_datetime(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit,
-    size_t* return_ndx) const
+                                 size_t* return_ndx) const
 {
     return aggregate<act_Min, int64_t>(&Column::minimum, column_ndx, resultcount, start, end, limit, return_ndx);
 }
