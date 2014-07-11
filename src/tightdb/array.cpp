@@ -878,8 +878,10 @@ template<bool eq, size_t width> size_t FindZero(uint64_t v)
 } // anonymous namesapce
 
 
-template<bool find_max, size_t w> bool Array::minmax(int64_t& result, size_t start, size_t end) const
+template<bool find_max, size_t w> bool Array::minmax(int64_t& result, size_t start, size_t end, size_t* return_ndx) const
 {
+    size_t best_index = 0;
+
     if (end == size_t(-1))
         end = m_size;
     TIGHTDB_ASSERT(start < m_size && end <= m_size && start < end);
@@ -888,6 +890,8 @@ template<bool find_max, size_t w> bool Array::minmax(int64_t& result, size_t sta
         return false;
 
     if (w == 0) {
+        if (return_ndx)
+            *return_ndx = best_index;
         result = 0;
         return true;
     }
@@ -895,12 +899,15 @@ template<bool find_max, size_t w> bool Array::minmax(int64_t& result, size_t sta
     int64_t m = Get<w>(start);
     ++start;
 
+#if 0 // We must now return both value AND index of result. SSE does not support finding index, so we've disabled it
 #ifdef TIGHTDB_COMPILER_SSE
     if (sseavx<42>()) {
         // Test manually until 128 bit aligned
         for (; (start < end) && (((size_t(m_data) & 0xf) * 8 + start * w) % (128) != 0); start++) {
-            if (find_max ? Get<w>(start) > m : Get<w>(start) < m)
+            if (find_max ? Get<w>(start) > m : Get<w>(start) < m) {
                 m = Get<w>(start);
+                best_index = start;
+            }
         }
 
         if ((w == 8 || w == 16 || w == 32) && end - start > 2 * sizeof (__m128i) * 8 / no0(w)) {
@@ -937,26 +944,30 @@ template<bool find_max, size_t w> bool Array::minmax(int64_t& result, size_t sta
         }
     }
 #endif
+#endif
 
     for (; start < end; ++start) {
         const int64_t v = Get<w>(start);
         if (find_max ? v > m : v < m) {
             m = v;
+            best_index = start;
         }
     }
 
     result = m;
+    if (return_ndx)
+        *return_ndx = best_index;
     return true;
 }
 
-bool Array::maximum(int64_t& result, size_t start, size_t end) const
+bool Array::maximum(int64_t& result, size_t start, size_t end, size_t* return_ndx) const
 {
-    TIGHTDB_TEMPEX2(return minmax, true, m_width, (result, start, end));
+    TIGHTDB_TEMPEX2(return minmax, true, m_width, (result, start, end, return_ndx));
 }
 
-bool Array::minimum(int64_t& result, size_t start, size_t end) const
+bool Array::minimum(int64_t& result, size_t start, size_t end, size_t* return_ndx) const
 {
-    TIGHTDB_TEMPEX2(return minmax, false, m_width, (result, start, end));
+    TIGHTDB_TEMPEX2(return minmax, false, m_width, (result, start, end, return_ndx));
 }
 
 int64_t Array::sum(size_t start, size_t end) const

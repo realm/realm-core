@@ -2701,14 +2701,14 @@ double Table::average_double(size_t column_ndx) const
 
 #define USE_COLUMN_AGGREGATE 1
 
-int64_t Table::minimum_int(size_t column_ndx) const
+int64_t Table::minimum_int(size_t column_ndx, size_t* return_ndx) const
 {
     if(!m_columns.is_attached())
         return 0;
 
 #if USE_COLUMN_AGGREGATE
     const Column& column = get_column<Column, col_type_Int>(column_ndx);
-    return column.minimum();
+    return column.minimum(0, npos, npos, return_ndx);
 #else
     if (is_empty())
         return 0;
@@ -2724,33 +2724,33 @@ int64_t Table::minimum_int(size_t column_ndx) const
 #endif
 }
 
-float Table::minimum_float(size_t column_ndx) const
+float Table::minimum_float(size_t column_ndx, size_t* return_ndx) const
 {
     if(!m_columns.is_attached())
         return 0.f;
 
     const ColumnFloat& column = get_column<ColumnFloat, col_type_Float>(column_ndx);
-    return column.minimum();
+    return column.minimum(0, npos, npos, return_ndx);
 }
-double Table::minimum_double(size_t column_ndx) const
+double Table::minimum_double(size_t column_ndx, size_t* return_ndx) const
 {
     if(!m_columns.is_attached())
         return 0.;
 
     const ColumnDouble& column = get_column<ColumnDouble, col_type_Double>(column_ndx);
-    return column.minimum();
+    return column.minimum(0, npos, npos, return_ndx);
 }
 
 // maximum ----------------------------------------------
 
-int64_t Table::maximum_int(size_t column_ndx) const
+int64_t Table::maximum_int(size_t column_ndx, size_t* return_ndx) const
 {
     if(!m_columns.is_attached())
         return 0;
 
 #if USE_COLUMN_AGGREGATE
     const Column& column = get_column<Column, col_type_Int>(column_ndx);
-    return column.maximum();
+    return column.maximum(0, npos, npos, return_ndx);
 #else
     if (is_empty())
         return 0;
@@ -2765,21 +2765,21 @@ int64_t Table::maximum_int(size_t column_ndx) const
     return mv;
 #endif
 }
-float Table::maximum_float(size_t column_ndx) const
+float Table::maximum_float(size_t column_ndx, size_t* return_ndx) const
 {
     if(!m_columns.is_attached())
         return 0.f;
 
     const ColumnFloat& column = get_column<ColumnFloat, col_type_Float>(column_ndx);
-    return column.maximum();
+    return column.maximum(0, npos, npos, return_ndx);
 }
-double Table::maximum_double(size_t column_ndx) const
+double Table::maximum_double(size_t column_ndx, size_t* return_ndx) const
 {
     if(!m_columns.is_attached())
         return 0.;
 
     const ColumnDouble& column = get_column<ColumnDouble, col_type_Double>(column_ndx);
-    return column.maximum();
+    return column.maximum(0, npos, npos, return_ndx);
 }
 
 

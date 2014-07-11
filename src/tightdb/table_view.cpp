@@ -58,7 +58,7 @@ size_t TableViewBase::find_first_binary(size_t column_ndx, BinaryData value) con
 // count_target is ignored by all <int function> except Count. Hack because of bug in optional
 // arguments in clang and vs2010 (fixed in 2012)
 template <int function, typename T, typename R, class ColType>
-R TableViewBase::aggregate(R (ColType::*aggregateMethod)(size_t, size_t, size_t) const, size_t column_ndx, T count_target) const
+R TableViewBase::aggregate(R(ColType::*aggregateMethod)(size_t, size_t, size_t, size_t*) const, size_t column_ndx, T count_target, size_t* return_ndx) const
 {
     TIGHTDB_ASSERT_COLUMN_AND_TYPE(column_ndx, ColumnTypeTraits<T>::id);
     TIGHTDB_ASSERT(function == act_Sum || function == act_Max || function == act_Min || function == act_Count);
@@ -75,7 +75,7 @@ R TableViewBase::aggregate(R (ColType::*aggregateMethod)(size_t, size_t, size_t)
         if(function == act_Count)
             return static_cast<R>(column->count(count_target));
         else
-            return (column->*aggregateMethod)(0, size_t(-1), size_t(-1)); // end == limit == -1
+            return (column->*aggregateMethod)(0, size_t(-1), size_t(-1), return_ndx); // end == limit == -1
     }
 
     // Array object instantiation must NOT allocate initial memory (capacity)
@@ -87,9 +87,11 @@ R TableViewBase::aggregate(R (ColType::*aggregateMethod)(size_t, size_t, size_t)
     size_t row_ndx;
 
     R res = static_cast<R>(0);
-
     T first = column->get(to_size_t(m_refs.get(0)));
 
+    if (return_ndx)
+        *return_ndx = 0;
+    
     if(function == act_Count)
         res = static_cast<R>((first == count_target ? 1 : 0));
     else
@@ -107,10 +109,16 @@ R TableViewBase::aggregate(R (ColType::*aggregateMethod)(size_t, size_t, size_t)
 
         if (function == act_Sum)
             res += static_cast<R>(v);
-        else if (function == act_Max && v > static_cast<T>(res))
+        else if (function == act_Max && v > static_cast<T>(res)) {
             res = static_cast<R>(v);
-        else if (function == act_Min && v < static_cast<T>(res))
+            if (return_ndx)
+                *return_ndx = ss;
+        }
+        else if (function == act_Min && v < static_cast<T>(res)) {
             res = static_cast<R>(v);
+            if (return_ndx)
+                *return_ndx = ss;
+        }
         else if (function == act_Count && v == count_target)
             res++;
 
@@ -119,7 +127,7 @@ R TableViewBase::aggregate(R (ColType::*aggregateMethod)(size_t, size_t, size_t)
     return res;
 }
 
-// sum
+// sum 
 
 int64_t TableViewBase::sum_int(size_t column_ndx) const
 {
@@ -136,40 +144,40 @@ double TableViewBase::sum_double(size_t column_ndx) const
 
 // Maximum
 
-int64_t TableViewBase::maximum_int(size_t column_ndx) const
+int64_t TableViewBase::maximum_int(size_t column_ndx, size_t* return_ndx) const
 {
-    return aggregate<act_Max, int64_t>(&Column::maximum, column_ndx, 0);
+    return aggregate<act_Max, int64_t>(&Column::maximum, column_ndx, 0, return_ndx);
 }
-float TableViewBase::maximum_float(size_t column_ndx) const
+float TableViewBase::maximum_float(size_t column_ndx, size_t* return_ndx) const
 {
-    return aggregate<act_Max, float>(&ColumnFloat::maximum, column_ndx, 0.0);
+    return aggregate<act_Max, float>(&ColumnFloat::maximum, column_ndx, 0.0, return_ndx);
 }
-double TableViewBase::maximum_double(size_t column_ndx) const
+double TableViewBase::maximum_double(size_t column_ndx, size_t* return_ndx) const
 {
-    return aggregate<act_Max, double>(&ColumnDouble::maximum, column_ndx, 0.0);
+    return aggregate<act_Max, double>(&ColumnDouble::maximum, column_ndx, 0.0, return_ndx);
 }
-DateTime TableViewBase::maximum_datetime(size_t column_ndx) const
+DateTime TableViewBase::maximum_datetime(size_t column_ndx, size_t* return_ndx) const
 {
-    return aggregate<act_Max, int64_t>(&Column::maximum, column_ndx, 0);
+    return aggregate<act_Max, int64_t>(&Column::maximum, column_ndx, 0, return_ndx);
 }
 
 // Minimum
 
-int64_t TableViewBase::minimum_int(size_t column_ndx) const
+int64_t TableViewBase::minimum_int(size_t column_ndx, size_t* return_ndx) const
 {
-    return aggregate<act_Min, int64_t>(&Column::minimum, column_ndx, 0);
+    return aggregate<act_Min, int64_t>(&Column::minimum, column_ndx, 0, return_ndx);
 }
-float TableViewBase::minimum_float(size_t column_ndx) const
+float TableViewBase::minimum_float(size_t column_ndx, size_t* return_ndx) const
 {
-    return aggregate<act_Min, float>(&ColumnFloat::minimum, column_ndx, 0.0);
+    return aggregate<act_Min, float>(&ColumnFloat::minimum, column_ndx, 0.0, return_ndx);
 }
-double TableViewBase::minimum_double(size_t column_ndx) const
+double TableViewBase::minimum_double(size_t column_ndx, size_t* return_ndx) const
 {
-    return aggregate<act_Min, double>(&ColumnDouble::minimum, column_ndx, 0.0);
+    return aggregate<act_Min, double>(&ColumnDouble::minimum, column_ndx, 0.0, return_ndx);
 }
-DateTime TableViewBase::minimum_datetime(size_t column_ndx) const
+DateTime TableViewBase::minimum_datetime(size_t column_ndx, size_t* return_ndx) const
 {
-    return aggregate<act_Min, int64_t>(&Column::minimum, column_ndx, 0);
+    return aggregate<act_Min, int64_t>(&Column::minimum, column_ndx, 0, return_ndx);
 }
 
 // Average

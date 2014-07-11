@@ -585,8 +585,13 @@ public:
 
     int64_t sum(std::size_t start = 0, std::size_t end = std::size_t(-1)) const;
     std::size_t count(int64_t value) const;
-    bool maximum(int64_t& result, std::size_t start = 0, std::size_t end = std::size_t(-1)) const;
-    bool minimum(int64_t& result, std::size_t start = 0, std::size_t end = std::size_t(-1)) const;
+
+    bool maximum(int64_t& result, std::size_t start = 0, std::size_t end = std::size_t(-1), 
+                 std::size_t* return_ndx = null_ptr) const;
+
+    bool minimum(int64_t& result, std::size_t start = 0, std::size_t end = std::size_t(-1), 
+                 std::size_t* return_ndx = null_ptr) const;
+
     void sort();
     void ReferenceSort(Array& ref) const;
 
@@ -1036,7 +1041,7 @@ protected:
 private:
     std::size_t m_ref;
     template<bool max, std::size_t w> bool minmax(int64_t& result, std::size_t start,
-                                                  std::size_t end) const;
+                                                  std::size_t end, std::size_t* return_ndx) const;
 
 protected:
     std::size_t m_size;     // Number of elements currently stored.
@@ -1181,6 +1186,7 @@ public:
     int64_t m_state;
     size_t m_match_count;
     size_t m_limit;
+    size_t m_minmax_index; // used only for min/max, to save index of current min/max value
 
     template<Action action> bool uses_val()
     {
@@ -1194,6 +1200,7 @@ public:
     {
         m_match_count = 0;
         m_limit = limit;
+        m_minmax_index = not_found;
 
         if (action == act_Max)
             m_state = -0x7fffffffffffffffLL - 1LL;
@@ -1234,12 +1241,16 @@ public:
         ++m_match_count;
 
         if (action == act_Max) {
-            if (value > m_state)
+            if (value > m_state) {
                 m_state = value;
+                m_minmax_index = index;
+            }
         }
         else if (action == act_Min) {
-            if (value < m_state)
+            if (value < m_state) {
                 m_state = value;
+                m_minmax_index = index;
+            }
         }
         else if (action == act_Sum)
             m_state += value;
@@ -1267,6 +1278,7 @@ public:
     R m_state;
     size_t m_match_count;
     size_t m_limit;
+    size_t m_minmax_index; // used only for min/max, to save index of current min/max value
 
     template<Action action> bool uses_val()
     {
@@ -1279,6 +1291,7 @@ public:
                                util::SameType<R, double>::value), "");
         m_match_count = 0;
         m_limit = limit;
+        m_minmax_index = not_found;
 
         if (action == act_Max)
             m_state = -std::numeric_limits<R>::infinity();
@@ -1291,7 +1304,7 @@ public:
     }
 
     template<Action action, bool pattern, typename resulttype>
-    inline bool match(size_t /*index*/, uint64_t /*indexpattern*/, resulttype value)
+    inline bool match(size_t index, uint64_t /*indexpattern*/, resulttype value)
     {
         if (pattern)
             return false;
@@ -1300,12 +1313,16 @@ public:
         ++m_match_count;
 
         if (action == act_Max) {
-            if (value > m_state)
+            if (value > m_state) {
                 m_state = value;
+                m_minmax_index = index;
+            }
         }
         else if (action == act_Min) {
-            if (value < m_state)
+            if (value < m_state) {
                 m_state = value;
+                m_minmax_index = index;
+            }
         }
         else if (action == act_Sum)
             m_state += value;
@@ -2485,14 +2502,15 @@ template<class cond2, Action action, size_t bitwidth, class Callback> bool Array
         }
         if (action == act_Sum || action == act_Max || action == act_Min) {
             int64_t res;
+            size_t res_ndx = 0;
             if (action == act_Sum)
                 res = Array::sum(start, end2);
             if (action == act_Max)
-                Array::maximum(res, start, end2);
+                Array::maximum(res, start, end2, &res_ndx);
             if (action == act_Min)
-                Array::minimum(res, start, end2);
+                Array::minimum(res, start, end2, &res_ndx);
 
-            find_action<action, Callback>(start + baseindex, res, state, callback);
+            find_action<action, Callback>(res_ndx + baseindex, res, state, callback);
             state->m_match_count += end2 - start;
 
         }

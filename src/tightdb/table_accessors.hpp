@@ -851,14 +851,14 @@ public:
         return Base::m_table->get_impl()->sum_int(col_idx);
     }
 
-    int64_t maximum() const
+    int64_t maximum(std::size_t* return_ndx = 0) const
     {
-        return Base::m_table->get_impl()->maximum_int(col_idx);
+        return Base::m_table->get_impl()->maximum_int(col_idx, return_ndx);
     }
 
-    int64_t minimum() const
+    int64_t minimum(std::size_t* return_ndx = 0) const
     {
-        return Base::m_table->get_impl()->minimum_int(col_idx);
+        return Base::m_table->get_impl()->minimum_int(col_idx, return_ndx);
     }
 
     double average() const
@@ -923,14 +923,14 @@ public:
         return Base::m_table->get_impl()->sum_float(col_idx);
     }
 
-    float maximum() const
+    float maximum(std::size_t* return_ndx = 0) const
     {
-        return Base::m_table->get_impl()->maximum_float(col_idx);
+        return Base::m_table->get_impl()->maximum_float(col_idx, return_ndx);
     }
 
-    float minimum() const
+    float minimum(std::size_t* return_ndx = 0) const
     {
-        return Base::m_table->get_impl()->minimum_float(col_idx);
+        return Base::m_table->get_impl()->minimum_float(col_idx, return_ndx);
     }
 
     double average() const
@@ -995,14 +995,14 @@ public:
         return Base::m_table->get_impl()->sum_double(col_idx);
     }
 
-    double maximum() const
+    double maximum(std::size_t* return_ndx = 0) const
     {
-        return Base::m_table->get_impl()->maximum_double(col_idx);
+        return Base::m_table->get_impl()->maximum_double(col_idx, return_ndx);
     }
 
-    double minimum() const
+    double minimum(std::size_t* return_ndx = 0) const
     {
-        return Base::m_table->get_impl()->minimum_double(col_idx);
+        return Base::m_table->get_impl()->minimum_double(col_idx, return_ndx);
     }
 
     double average() const
@@ -1090,14 +1090,14 @@ private:
 public:
     explicit ColumnAccessor(Taboid* t) TIGHTDB_NOEXCEPT: Base(t) {}
 
-    DateTime maximum() const
+    DateTime maximum(std::size_t* return_ndx = 0) const
     {
-        return Base::m_table->get_impl()->maximum_datetime(col_idx);
+        return Base::m_table->get_impl()->maximum_datetime(col_idx, return_ndx);
     }
 
-    DateTime minimum() const
+    DateTime minimum(std::size_t* return_ndx = 0) const
     {
-        return Base::m_table->get_impl()->minimum_datetime(col_idx);
+        return Base::m_table->get_impl()->minimum_datetime(col_idx, return_ndx);
     }
 
     std::size_t find_first(DateTime value) const
@@ -1278,25 +1278,27 @@ public:
         return *Base::m_query;
     };
 
-    int64_t sum(std::size_t* resultcount=null_ptr, std::size_t start=0,
+    int64_t sum(std::size_t* resultcount = 0, std::size_t start = 0,
                 std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1)) const
     {
         return Base::m_query->m_impl.sum_int(col_idx, resultcount, start, end, limit);
     }
 
-    int64_t maximum(std::size_t* resultcount=null_ptr, std::size_t start=0,
-                    std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1)) const
+    int64_t maximum(std::size_t* resultcount = 0, std::size_t start = 0,
+                    std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1), 
+                    std::size_t* return_ndx = 0) const
     {
-        return Base::m_query->m_impl.maximum_int(col_idx, resultcount, start, end, limit);
+        return Base::m_query->m_impl.maximum_int(col_idx, resultcount, start, end, limit, return_ndx);
     }
 
-    int64_t minimum(std::size_t* resultcount=null_ptr, std::size_t start=0,
-                    std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1)) const
+    int64_t minimum(std::size_t* resultcount = 0, std::size_t start = 0,
+                    std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1),
+                    std::size_t* return_ndx = 0) const
     {
-        return Base::m_query->m_impl.minimum_int(col_idx, resultcount, start, end, limit);
+        return Base::m_query->m_impl.minimum_int(col_idx, resultcount, start, end, limit, return_ndx);
     }
 
-    double average(std::size_t* resultcount=null_ptr, std::size_t start=0,
+    double average(std::size_t* resultcount = 0, std::size_t start = 0,
                    std::size_t end=std::size_t(-1), std::size_t limit=std::size_t(-1)) const
     {
         return Base::m_query->m_impl.average_int(col_idx, resultcount, start, end, limit);
@@ -1347,25 +1349,27 @@ public:
         return *Base::m_query;
     };
 
-    double sum(std::size_t* resultcount=null_ptr, std::size_t start=0,
+    double sum(std::size_t* resultcount = 0, std::size_t start = 0,
                std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1)) const
     {
         return Base::m_query->m_impl.sum_float(col_idx, resultcount, start, end, limit);
     }
 
-    float maximum(std::size_t* resultcount=null_ptr, std::size_t start=0,
-                    std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1)) const
+    float maximum(std::size_t* resultcount = 0, std::size_t start = 0,
+                    std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1),
+                    std::size_t* return_ndx = 0) const
     {
-        return Base::m_query->m_impl.maximum_float(col_idx, resultcount, start, end, limit);
+        return Base::m_query->m_impl.maximum_float(col_idx, resultcount, start, end, limit, return_ndx);
     }
 
-    float minimum(std::size_t* resultcount=null_ptr, std::size_t start=0,
-                    std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1)) const
+    float minimum(std::size_t* resultcount = 0, std::size_t start = 0,
+                    std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1),
+                    std::size_t* return_ndx = 0) const
     {
-        return Base::m_query->m_impl.minimum_float(col_idx, resultcount, start, end, limit);
+        return Base::m_query->m_impl.minimum_float(col_idx, resultcount, start, end, limit, return_ndx);
     }
 
-    double average(std::size_t* resultcount=null_ptr, std::size_t start=0,
+    double average(std::size_t* resultcount = 0, std::size_t start = 0,
                    std::size_t end=std::size_t(-1), std::size_t limit=std::size_t(-1)) const
     {
         return Base::m_query->m_impl.average_float(col_idx, resultcount, start, end, limit);
@@ -1416,25 +1420,27 @@ public:
         return *Base::m_query;
     };
 
-    double sum(std::size_t* resultcount=null_ptr, std::size_t start=0,
+    double sum(std::size_t* resultcount = 0, std::size_t start = 0,
                std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1)) const
     {
         return Base::m_query->m_impl.sum_double(col_idx, resultcount, start, end, limit);
     }
 
-    double maximum(std::size_t* resultcount=null_ptr, std::size_t start=0,
-                    std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1)) const
+    double maximum(std::size_t* resultcount = 0, std::size_t start = 0,
+                    std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1),
+                    std::size_t* return_ndx = 0) const
     {
-        return Base::m_query->m_impl.maximum_double(col_idx, resultcount, start, end, limit);
+        return Base::m_query->m_impl.maximum_double(col_idx, resultcount, start, end, limit, return_ndx);
     }
 
-    double minimum(std::size_t* resultcount=null_ptr, std::size_t start=0,
-                    std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1)) const
+    double minimum(std::size_t* resultcount = 0, std::size_t start = 0,
+                    std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1),
+                    std::size_t* return_ndx = 0) const
     {
-        return Base::m_query->m_impl.minimum_double(col_idx, resultcount, start, end, limit);
+        return Base::m_query->m_impl.minimum_double(col_idx, resultcount, start, end, limit, return_ndx);
     }
 
-    double average(std::size_t* resultcount=null_ptr, std::size_t start=0,
+    double average(std::size_t* resultcount = 0, std::size_t start = 0,
                    std::size_t end=std::size_t(-1), std::size_t limit=std::size_t(-1)) const
     {
         return Base::m_query->m_impl.average_double(col_idx, resultcount, start, end, limit);
@@ -1524,16 +1530,18 @@ public:
         return *Base::m_query;
     };
 
-    DateTime maximum(std::size_t* resultcount=null_ptr, std::size_t start=0,
-                 std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1)) const
+    DateTime maximum(std::size_t* resultcount = 0, std::size_t start = 0,
+                 std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1),
+                 std::size_t* return_ndx = 0) const
     {
-        return Base::m_query->m_impl.maximum_datetime(col_idx, resultcount, start, end, limit);
+        return Base::m_query->m_impl.maximum_datetime(col_idx, resultcount, start, end, limit, return_ndx);
     }
 
-    DateTime minimum(std::size_t* resultcount=null_ptr, std::size_t start=0,
-                 std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1)) const
+    DateTime minimum(std::size_t* resultcount = 0, std::size_t start = 0,
+                 std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1),
+                 std::size_t* return_ndx = 0) const
     {
-        return Base::m_query->m_impl.minimum_datetime(col_idx, resultcount, start, end, limit);
+        return Base::m_query->m_impl.minimum_datetime(col_idx, resultcount, start, end, limit, return_ndx);
     }
 };
 
