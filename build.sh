@@ -893,7 +893,7 @@ EOF
         ;;
 
     "release-notes-prerelease")
-        RELEASE_HEADER="# $(sh build.sh get-version) Release notes ($(date +%F))" || exit 1
+        RELEASE_HEADER="# $(sh build.sh get-version) Release notes" || exit 1
         sed -i.bak "1s/.*/$RELEASE_HEADER/" release_notes.md || exit 1
         rm release_notes.md.bak
         exit 0
@@ -927,6 +927,7 @@ EOF
         sed -i -e "s/\#define TIGHTDB_VER_PATCH .*/\#define TIGHTDB_VER_PATCH $tightdb_ver_patch/" $version_file || exit 1
 
         sh tools/add-deb-changelog.sh "$tightdb_version" "$(pwd)/debian/changelog.in" libtightdb || exit 1
+        sh build.sh release-notes-prerelease || exit 1
         exit 0
         ;;
 
