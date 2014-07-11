@@ -571,7 +571,7 @@ public:
         ValueBase::from_link = link;
         ValueBase::m_values = values;
         if (m_values > 0) {
-            // If we store more than default_size elements then we used 'new', else we used m_cache
+            // If we store more than default_size elements then use 'new', else use m_cache
             if (m_values > ValueBase::default_size)
                 m_v = new T[m_values];
             else
