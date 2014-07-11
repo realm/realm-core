@@ -555,19 +555,27 @@ public:
 
     ~Value()
     {
-        delete[] m_v;
+        // If we store more than default_size elements then we used 'new', else we used m_cache
+        if (m_values > ValueBase::default_size)
+            delete[] m_v;
         m_v = null_ptr;
     }
 
     void init(bool link, size_t values, T v) {
         if (m_v) {
-            delete[] m_v;
+            // If we store more than default_size elements then we used 'new', else we used m_cache
+            if (m_values > ValueBase::default_size)
+                delete[] m_v;
             m_v = null_ptr;
         }
         ValueBase::from_link = link;
         ValueBase::m_values = values;
         if (m_values > 0) {
-            m_v = new T[m_values];
+            // If we store more than default_size elements then use 'new', else use m_cache
+            if (m_values > ValueBase::default_size)
+                m_v = new T[m_values];
+            else
+                m_v = m_cache;
             std::fill(m_v, m_v + ValueBase::m_values, v);
         }
     }
@@ -709,7 +717,11 @@ public:
         return n;
     }
 
+    // Pointer to value payload
     T *m_v;
+
+    // If there is less than default_size elements in payload, then use this cache, else use 'new'
+    T m_cache[ValueBase::default_size];
 };
 
 
