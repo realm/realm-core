@@ -473,6 +473,31 @@ TEST(TableView_Follows_Changes)
     CHECK_EQUAL(1, v.get_int(0,0));
 }
 
+TEST(TableView_SyncAfterCopy) {
+    Table table;
+    table.add_column(type_Int, "first");
+    table.add_empty_row();
+    table.set_int(0,0,1);
+
+    // do initial query
+    Query q = table.where().equal(0,1);
+    TableView v = q.find_all();
+    CHECK_EQUAL(1, v.size());
+    CHECK_EQUAL(1, v.get_int(0,0));
+
+    // move the tableview
+    TableView v2 = v;
+    CHECK_EQUAL(1, v2.size());
+
+    // make a change
+    size_t ndx2 = table.add_empty_row();
+    table.set_int(0, ndx2, 1);
+
+    // verify that the copied view sees the change
+    v2.sync_if_needed();
+    CHECK_EQUAL(2, v2.size());
+}
+
 TEST(TableView_FindAll)
 {
     TestTableInt table;
