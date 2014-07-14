@@ -31,7 +31,7 @@ C++ (core)
 -----------
 
 ### Bugfixes:
-
+* Fixed bug in `TableView::clear()` causing crash if its table contained link columns.
 * Fixed bug in `TableView::remove()` causing crash or undefined behavior.
 * Fixed bugs in `Table::insert_column()` and `Table::remove_column()` causing crash or undefined behaviour.
 * Fixed corruption bug when a string enumeration column follows a column with attached search index (index flavor mixup).
@@ -60,6 +60,7 @@ C++ (core)
 * Support for row accessors.
 * Table, row, and descriptor accessors are now generally retained and properly adjusted when the parent table is modified.
 * Added methods to find rows by target in TableView and LinkView.
+* Added methods `LinkView::remove_target_row()` and `LinkView::remove_all_target_rows()`.
 
 
 -----------

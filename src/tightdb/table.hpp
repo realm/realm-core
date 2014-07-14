@@ -802,8 +802,6 @@ private:
               std::size_t parent_row_ndx);
 
     // view management support:
-    void from_view_remove(std::size_t row_ndx, TableViewBase* view); // FIXME: Please rename to remove_by_view()
-
     void do_erase_row(std::size_t row_ndx);
 
     static void do_insert_column(Descriptor&, std::size_t col_ndx, DataType type,
@@ -1161,11 +1159,6 @@ inline void Table::bump_version(bool bump_global) const
 #endif
 
 inline void Table::remove(std::size_t row_ndx)
-{
-    do_erase_row(row_ndx);
-}
-
-inline void Table::from_view_remove(std::size_t row_ndx, TableViewBase*)
 {
     do_erase_row(row_ndx);
 }

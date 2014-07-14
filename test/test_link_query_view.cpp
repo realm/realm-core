@@ -141,7 +141,6 @@ TEST(LinkList_Basic2)
 }
 
 
-
 TEST(LinkList_QuerySingle)
 {
     Group group;
@@ -244,4 +243,143 @@ TEST(LinkList_TableViewTracking)
     tv.sync_if_needed();
     CHECK_EQUAL(1, tv.size());
 }
+
+
+// Attempts to expose a bug (it would assert) where TableView::clear() was called with an unordered m_table. 
+// Internally, clear() tests if TableView::m_table is unordered by testing if it has any link or backlink columns
+// (asana task made with 'fixme' because it's unreliable - in the future you could have unordered tables with no 
+// links).
+TEST(LinkList_ClearView1)
+{
+    // m_table has:
+    //      type_Link 
+    //      type_BackLink 
+    // tv: increasing target row indexes 
+    {
+        Group group;
+
+        TableRef table1 = group.get_table("table1");
+        TableRef table2 = group.get_table("table2");
+
+        // add some more columns to table1 and table2
+        table1->add_column(type_Int, "col1");
+        table1->add_column(type_String, "str1");
+
+        // add some rows
+        table1->add_empty_row();
+        table1->set_int(0, 0, 300);
+        table1->set_string(1, 0, "foo");
+        table1->add_empty_row();
+        table1->set_int(0, 1, 200);
+        table1->set_string(1, 1, "!");
+        table1->add_empty_row();
+        table1->set_int(0, 2, 100);
+        table1->set_string(1, 2, "bar");
+
+        size_t col_link2 = table2->add_column_link(type_Link, "link", *table1);
+        table2->add_empty_row();
+        table2->add_empty_row();
+
+        table2->set_link(col_link2, 0, 1);
+        table2->set_link(col_link2, 1, 2);
+
+        TableView tv = (table2->link(col_link2).column<String>(1) != "!").find_all();
+
+        tv.clear();
+        CHECK_EQUAL(1, table2->size());
+    }
+
+    // m_table has:
+    //      type_LinkList
+    //      type_BackLink 
+    // tv: increasing target row indexes 
+    {
+        Group group;
+
+        TableRef table1 = group.get_table("table1");
+        TableRef table2 = group.get_table("table2");
+
+        // add some more columns to table1 and table2
+        table1->add_column(type_Int, "col1");
+        table1->add_column(type_String, "str1");
+
+        // add some rows
+        table1->add_empty_row();
+        table1->set_int(0, 0, 300);
+        table1->set_string(1, 0, "foo");
+        table1->add_empty_row();
+        table1->set_int(0, 1, 200);
+        table1->set_string(1, 1, "!");
+        table1->add_empty_row();
+        table1->set_int(0, 2, 100);
+        table1->set_string(1, 2, "bar");
+
+        size_t col_link2 = table2->add_column_link(type_LinkList, "link", *table1);
+        table2->add_empty_row();
+        table2->add_empty_row();
+        table2->add_empty_row();
+
+        LinkViewRef links1;
+
+        links1 = table2->get_linklist(col_link2, 0);
+        links1->add(0);
+        links1->add(1);
+
+        links1 = table2->get_linklist(col_link2, 2);
+        links1->add(1);
+        links1->add(2);
+
+        TableView tv = (table2->link(col_link2).column<String>(1) == "!").find_all();
+
+        tv.clear();
+        CHECK_EQUAL(1, table2->size());
+    }
+
+
+    // m_table has:
+    //      type_BackLink 
+    // tv: random target row index order (due to sort() - this can be interesting to test because clear() performs a 
+    // sort internally.
+    {
+        Group group;
+
+        TableRef table1 = group.get_table("table1");
+        TableRef table2 = group.get_table("table2");
+
+        // add some more columns to table1 and table2
+        table1->add_column(type_Int, "col1");
+        table1->add_column(type_String, "str1");
+
+        // add some rows
+        table1->add_empty_row();
+        table1->set_int(0, 0, 300);
+        table1->set_string(1, 0, "foo");
+        table1->add_empty_row();
+        table1->set_int(0, 1, 200);
+        table1->set_string(1, 1, "!");
+        table1->add_empty_row();
+        table1->set_int(0, 2, 100);
+        table1->set_string(1, 2, "bar");
+
+        size_t col_link2 = table2->add_column_link(type_LinkList, "link", *table1);
+        table2->add_empty_row();
+        table2->add_empty_row();
+
+        LinkViewRef links1;
+
+        links1 = table2->get_linklist(col_link2, 0);
+        links1->add(0);
+        links1->add(1);
+
+        links1 = table2->get_linklist(col_link2, 1);
+        links1->add(1);
+        links1->add(2);
+
+        TableView tv = (table1->column<String>(1) != "!").find_all();
+        tv.sort(1);
+        tv.clear();
+        CHECK_EQUAL(1, table1->size());
+    }
+}
+
 #endif

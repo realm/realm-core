@@ -722,4 +722,50 @@ TEST(Links_Transactions)
     }
 }
 
+TEST(Links_RemoveTargetRows)
+{
+    Group group;
+
+    TestTableLinks::Ref target = group.get_table<TestTableLinks>("target");
+    target->add("test1", 1, true,  Mon);
+    target->add("test2", 2, false, Tue);
+    target->add("test3", 3, true,  Wed);
+
+    // create table with links to target table
+    TableRef source = group.get_table("source");
+    size_t col_link = source->add_column_link(type_LinkList, "links", *TableRef(target));
+
+    source->add_empty_row();
+    LinkViewRef links = source->get_linklist(col_link, 0);
+    links->add(2);
+    links->add(1);
+    links->add(0);
+
+    // delete target rows through the links one at a time
+    links->remove_target_row(0);
+    CHECK_EQUAL(2, target->size());
+    CHECK_EQUAL(2, links->size());
+
+    links->remove_target_row(1);
+    CHECK_EQUAL(1, target->size());
+    CHECK_EQUAL(1, links->size());
+
+    links->remove_target_row(0);
+    CHECK_EQUAL(0, target->size());
+    CHECK_EQUAL(0, links->size());
+
+    // re-add targets and links
+    target->add("test1", 1, true,  Mon);
+    target->add("test2", 2, false, Tue);
+    target->add("test3", 3, true,  Wed);
+    links->add(2);
+    links->add(1);
+    links->add(0);
+
+    // Remove all targets through the links
+    links->remove_all_target_rows();
+    CHECK(target->is_empty());
+    CHECK(links->is_empty());
+}
+
 #endif // TEST_GROUP

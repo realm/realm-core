@@ -413,8 +413,12 @@ inline bool Spec::get_first_column_type_from_ref(ref_type top_ref, Allocator& al
 
 inline bool Spec::has_backlinks() const TIGHTDB_NOEXCEPT
 {
-    // backlinks are always last and do not have names
+    // backlinks are always last and do not have names. 
     return m_names.size() < m_spec.size();
+
+    // Fixme: It's bad design that backlinks are stored and recognized like this. Backlink columns
+    // should be a column type like any other, and we should find another way to hide them away from
+    // the user.
 }
 
 
