@@ -30,7 +30,7 @@ C++ (core)
 -----------
 
 ### Bugfixes:
-
+* Fixed bug in `TableView::clear()` causing crash if its table contained link columns.
 * Fixed bug in `TableView::remove()` causing crash or undefined behavior.
 * Fixed bugs in `Table::insert_column()` and `Table::remove_column()` causing crash or undefined behaviour.
 * Fixed corruption bug when a string enumeration column follows a column with attached search index (index flavor mixup).
