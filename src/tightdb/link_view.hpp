@@ -60,6 +60,10 @@ public:
     void remove(std::size_t link_ndx);
     void clear();
 
+    /// Remove from linkview and delete in target table
+    void delete_target_row(std::size_t link_ndx);
+    void delete_all();
+
     /// Search this list for a link to the specified target table row (specified
     /// by its index in the target table). If found, the index of the link to
     /// that row within this list is returned, otherwise `tightdb::not_found` is
