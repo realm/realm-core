@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 0.23.0 Release notes
 
 C++ (core)
 -----------

@@ -1,3 +1,10 @@
+libtightdb (0.23.0~@CODENAME@-1) UNRELEASED; urgency=low
+
+  * Tracking upstream release.
+
+ -- Emanuele Zattin <ez@realm.io>  Mon, 14 Jul 2014 09:42:29 +0200
+
+
 libtightdb (0.22.0~@CODENAME@-1) UNRELEASED; urgency=low
 
   * Tracking upstream release.
