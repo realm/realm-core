@@ -188,14 +188,14 @@ void Spec::remove_column(size_t column_ndx)
         subspec_top.destroy_deep(); // recursively delete entire subspec
         m_subspecs.erase(subspec_ndx); // Throws
     }
-    else if (type == col_type_Link) {
+    else if (type == col_type_Link || type == col_type_LinkList) {
         size_t subspec_ndx = get_subspec_ndx(column_ndx);
-        m_subspecs.erase(subspec_ndx); // origin table ref  : Throws
+        m_subspecs.erase(subspec_ndx); // origin table index  : Throws
     }
     else if (type == col_type_BackLink) {
         size_t subspec_ndx = get_subspec_ndx(column_ndx);
-        m_subspecs.erase(subspec_ndx); // origin table ref  : Throws
-        m_subspecs.erase(subspec_ndx); // origin column ref : Throws
+        m_subspecs.erase(subspec_ndx); // origin table index  : Throws
+        m_subspecs.erase(subspec_ndx); // origin column index : Throws
     }
     else if (type == col_type_StringEnum) {
         // Enum columns do also have a separate key list
@@ -297,19 +297,6 @@ ref_type Spec::get_enumkeys_ref(size_t column_ndx, ArrayParent** keys_parent,
     return m_enumkeys.get_as_ref(enumkeys_ndx);
 }
 
-void Spec::set_link_target_table(size_t column_ndx, size_t table_ndx)
-{
-    TIGHTDB_ASSERT(column_ndx < get_column_count());
-    TIGHTDB_ASSERT(get_column_type(column_ndx) == col_type_Link ||
-                   get_column_type(column_ndx) == col_type_LinkList ||
-                   get_column_type(column_ndx) == col_type_BackLink);
-
-    // position of target table is stored as tagged int
-    size_t tagged_ndx = (table_ndx << 1) + 1;
-
-    size_t subspec_ndx = get_subspec_ndx(column_ndx);
-    m_subspecs.set(subspec_ndx, tagged_ndx); // Throws
-}
 
 size_t Spec::get_opposite_link_table_ndx(size_t column_ndx) const TIGHTDB_NOEXCEPT
 {
@@ -328,6 +315,22 @@ size_t Spec::get_opposite_link_table_ndx(size_t column_ndx) const TIGHTDB_NOEXCE
     return table_ref;
 }
 
+
+void Spec::set_opposite_link_table_ndx(size_t column_ndx, size_t table_ndx)
+{
+    TIGHTDB_ASSERT(column_ndx < get_column_count());
+    TIGHTDB_ASSERT(get_column_type(column_ndx) == col_type_Link ||
+                   get_column_type(column_ndx) == col_type_LinkList ||
+                   get_column_type(column_ndx) == col_type_BackLink);
+
+    // position of target table is stored as tagged int
+    size_t tagged_ndx = (table_ndx << 1) + 1;
+
+    size_t subspec_ndx = get_subspec_ndx(column_ndx);
+    m_subspecs.set(subspec_ndx, tagged_ndx); // Throws
+}
+
+
 void Spec::set_backlink_origin_column(size_t backlink_col_ndx, size_t origin_col_ndx)
 {
     TIGHTDB_ASSERT(backlink_col_ndx < get_column_count());
@@ -339,6 +342,7 @@ void Spec::set_backlink_origin_column(size_t backlink_col_ndx, size_t origin_col
     size_t subspec_ndx = get_subspec_ndx(backlink_col_ndx);
     m_subspecs.set(subspec_ndx+1, tagged_ndx); // Throws
 }
+
 
 size_t Spec::get_origin_column_ndx(size_t backlink_col_ndx) const TIGHTDB_NOEXCEPT
 {
@@ -353,6 +357,7 @@ size_t Spec::get_origin_column_ndx(size_t backlink_col_ndx) const TIGHTDB_NOEXCE
     size_t origin_col_ndx = size_t(uint64_t(tagged_value) >> 1);
     return origin_col_ndx;
 }
+
 
 size_t Spec::find_backlink_column(size_t origin_table_ndx, size_t origin_col_ndx) const
     TIGHTDB_NOEXCEPT
@@ -377,16 +382,6 @@ size_t Spec::find_backlink_column(size_t origin_table_ndx, size_t origin_col_ndx
     return not_found;
 }
 
-void Spec::update_backlink_column_ref(size_t origin_table_ndx, size_t old_column_ndx,
-                                      size_t new_column_ndx)
-{
-    size_t column_ndx = find_backlink_column(origin_table_ndx, old_column_ndx);
-    TIGHTDB_ASSERT(column_ndx != not_found);
-
-    size_t backlink_info_ndx = get_subspec_ndx(column_ndx);
-    int64_t tagged_column_ndx = (new_column_ndx << 1) + 1;
-    m_subspecs.set(backlink_info_ndx+1, tagged_column_ndx);
-}
 
 DataType Spec::get_public_column_type(size_t ndx) const TIGHTDB_NOEXCEPT
 {
@@ -420,7 +415,7 @@ size_t Spec::get_column_pos(size_t column_ndx) const
 void Spec::get_column_info(size_t column_ndx, ColumnInfo& info) const TIGHTDB_NOEXCEPT
 {
     info.m_column_ref_ndx = get_column_pos(column_ndx);
-    info.m_has_index = (get_column_attr(column_ndx) & col_attr_Indexed) != 0;
+    info.m_has_search_index = (get_column_attr(column_ndx) & col_attr_Indexed) != 0;
 }
 
 

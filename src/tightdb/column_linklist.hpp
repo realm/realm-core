@@ -27,12 +27,10 @@
 #include <tightdb/column_linkbase.hpp>
 #include <tightdb/table.hpp>
 #include <tightdb/column_backlink.hpp>
+#include <tightdb/link_view_fwd.hpp>
 #include <iostream>
 
 namespace tightdb {
-
-class LinkView;
-typedef util::bind_ptr<LinkView> LinkViewRef;
 
 
 /// A column of link lists (ColumnLinkList) is a single B+-tree, and the root of
@@ -47,7 +45,6 @@ public:
     ColumnLinkList(Table*, std::size_t column_ndx, ref_type ref,
                    ArrayParent* = 0, std::size_t ndx_in_parent = 0,
                    Allocator& = Allocator::get_default()); // Throws
-    ColumnLinkList(Table*, std::size_t column_ndx, Allocator&);  // Throws
     ~ColumnLinkList() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
     static ref_type create(std::size_t size, Allocator&);
@@ -67,11 +64,10 @@ public:
 
     void to_json_row(size_t row_ndx, std::ostream& out) const;
 
-    void update_column_index(std::size_t, const Spec&) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-
     void refresh_accessor_tree(std::size_t, const Spec&) TIGHTDB_OVERRIDE;
 
     void adj_accessors_move_last_over(std::size_t, std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void adj_acc_clear_root_table() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
 protected:
     void do_discard_child_accessors() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
@@ -126,19 +122,15 @@ private:
 };
 
 
+
+
+
 // Implementation
 
 inline ColumnLinkList::ColumnLinkList(Table* table, std::size_t column_ndx, ref_type ref,
                                       ArrayParent* parent, std::size_t ndx_in_parent,
                                       Allocator& alloc):
     ColumnLinkBase(ref, parent, ndx_in_parent, alloc),
-    m_table(table),
-    m_column_ndx(column_ndx)
-{
-}
-
-inline ColumnLinkList::ColumnLinkList(Table* table, std::size_t column_ndx, Allocator& alloc):
-    ColumnLinkBase(Array::type_HasRefs, alloc),
     m_table(table),
     m_column_ndx(column_ndx)
 {
@@ -179,13 +171,6 @@ inline LinkViewRef ColumnLinkList::get(std::size_t row_ndx)
 {
     LinkView* link_list = get_ptr(row_ndx); // Throws
     return LinkViewRef(link_list);
-}
-
-inline void ColumnLinkList::update_column_index(std::size_t new_col_ndx, const Spec& spec)
-    TIGHTDB_NOEXCEPT
-{
-    Column::update_column_index(new_col_ndx, spec);
-    m_column_ndx = new_col_ndx;
 }
 
 inline void ColumnLinkList::do_discard_child_accessors() TIGHTDB_NOEXCEPT

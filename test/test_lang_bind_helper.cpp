@@ -2472,95 +2472,2070 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
     const Group& group = rt.get_group();
     CHECK_EQUAL(0, group.size());
 
-    // Create one table to act as origin for the links, and two to act as
-    // targets
+    // Create two origin tables and two target tables, and add some links
     {
         WriteTransaction wt(sg_w);
-        TableRef origin_w = wt.get_table("origin");
-        origin_w->add_column(type_Int, "filler_o_1");
-        origin_w->add_column(type_Int, "filler_o_2");
+        TableRef origin_1_w = wt.get_table("origin_1");
+        TableRef origin_2_w = wt.get_table("origin_2");
         TableRef target_1_w = wt.get_table("target_1");
-        target_1_w->add_column(type_Int, "filler_t1_1");
         TableRef target_2_w = wt.get_table("target_2");
-        target_2_w->add_column(type_Int, "filler_t2_1");
+        target_1_w->add_column(type_Int, "t_1");
+        target_2_w->add_column(type_Int, "t_2");
+        target_1_w->add_empty_row(2);
+        target_2_w->add_empty_row(2);
         wt.commit();
     }
     LangBindHelper::advance_read(sg, tlm);
     group.Verify();
-    ConstTableRef origin = rt.get_table("origin");
+    ConstTableRef origin_1 = rt.get_table("origin_1");
+    ConstTableRef origin_2 = rt.get_table("origin_2");
     ConstTableRef target_1 = rt.get_table("target_1");
     ConstTableRef target_2 = rt.get_table("target_2");
     {
         WriteTransaction wt(sg_w);
-        TableRef origin_w = wt.get_table("origin");
+        TableRef origin_1_w = wt.get_table("origin_1");
+        TableRef origin_2_w = wt.get_table("origin_2");
         TableRef target_1_w = wt.get_table("target_1");
-        TableRef target_2_w = wt.get_table("target_2");
-        origin_w->insert_column_link(0, type_Link, "link_1", *target_1_w);
-        origin_w->insert_column_link(3, type_Link, "link_2", *target_2_w);
+        origin_1_w->add_column_link(type_LinkList, "o_1_ll_1", *target_1_w);
+        origin_2_w->add_column(type_Int, "o_2_f_1");
+        origin_2_w->add_empty_row(2);
         wt.commit();
     }
     LangBindHelper::advance_read(sg, tlm);
     group.Verify();
+    // O_1: LL_1->T_1
+    // O_2: F_1
     {
         WriteTransaction wt(sg_w);
-        TableRef origin_w = wt.get_table("origin");
+        TableRef origin_1_w = wt.get_table("origin_1");
+        TableRef origin_2_w = wt.get_table("origin_2");
         TableRef target_1_w = wt.get_table("target_1");
-        TableRef target_2_w = wt.get_table("target_2");
-        origin_w->insert_column_link(2, type_LinkList, "link_list_1", *target_1_w);
-        origin_w->insert_column_link(3, type_LinkList, "link_list_2", *target_2_w);
+        origin_1_w->insert_column(0, type_Int, "o_1_f_2");
+        origin_2_w->insert_column_link(0, type_Link, "o_2_l_2", *target_1_w);
+        origin_2_w->set_link(0, 0, 1); // O_2_L_2[0] -> T_1[1]
         wt.commit();
     }
     LangBindHelper::advance_read(sg, tlm);
     group.Verify();
+    // O_1: F_2   LL_1->T_1
+    // O_2: L_2->T_1   F_1
+    {
+        WriteTransaction wt(sg_w);
+        TableRef origin_1_w = wt.get_table("origin_1");
+        TableRef origin_2_w = wt.get_table("origin_2");
+        TableRef target_1_w = wt.get_table("target_1");
+        TableRef target_2_w = wt.get_table("target_2");
+        origin_1_w->insert_column_link(0, type_Link, "o_1_l_3", *target_1_w);
+        origin_2_w->add_column_link(type_LinkList, "o_2_ll_3", *target_2_w);
+        origin_2_w->get_linklist(2, 0)->add(1); // O_2_LL_3[0] -> T_2[1]
+        origin_2_w->get_linklist(2, 1)->add(0); // O_2_LL_3[1] -> T_2[0]
+        origin_2_w->get_linklist(2, 1)->add(1); // O_2_LL_3[1] -> T_2[1]
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, tlm);
+    group.Verify();
+    // O_1: L_3->T_1   F_2   LL_1->T_1
+    // O_2: L_2->T_1   F_1   LL_3->T_2
+    {
+        WriteTransaction wt(sg_w);
+        TableRef origin_1_w = wt.get_table("origin_1");
+        TableRef origin_2_w = wt.get_table("origin_2");
+        TableRef target_2_w = wt.get_table("target_2");
+        origin_1_w->insert_column_link(2, type_Link, "o_1_l_4", *target_2_w);
+        origin_2_w->add_column_link(type_Link, "o_2_l_4", *target_2_w);
+        origin_2_w->set_link(3, 0, 1); // O_2_L_4[0] -> T_2[1]
+        origin_2_w->set_link(3, 1, 0); // O_2_L_4[1] -> T_2[0]
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, tlm);
+    group.Verify();
+    // O_1: L_3->T_1   F_2   L_4->T_2   LL_1->T_1
+    // O_2: L_2->T_1   F_1   LL_3->T_2   L_4->T_2
+    {
+        WriteTransaction wt(sg_w);
+        TableRef origin_1_w = wt.get_table("origin_1");
+        TableRef origin_2_w = wt.get_table("origin_2");
+        TableRef target_1_w = wt.get_table("target_1");
+        TableRef target_2_w = wt.get_table("target_2");
+        origin_1_w->insert_column(3, type_Int, "o_1_f_5");
+        origin_2_w->insert_column(3, type_Int, "o_2_f_5");
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, tlm);
+    group.Verify();
+    // O_1: L_3->T_1   F_2   L_4->T_2   F_5   LL_1->T_1
+    // O_2: L_2->T_1   F_1   LL_3->T_2   F_5   L_4->T_2
+    {
+        WriteTransaction wt(sg_w);
+        TableRef origin_1_w = wt.get_table("origin_1");
+        origin_1_w->add_empty_row(2);
+        origin_1_w->set_link(0, 1, 0); // O_1_L_3[1] -> T_1[0]
+        origin_1_w->set_link(2, 0, 0); // O_1_L_4[0] -> T_2[0]
+        origin_1_w->set_link(2, 1, 1); // O_1_L_4[1] -> T_2[1]
+        origin_1_w->get_linklist(4, 1)->add(0); // O_1_LL_1[1] -> T_1[0]
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, tlm);
+    group.Verify();
+    // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
+    // ----------------------------------------------------------------------------------------
+    // null       T_2[0]     []                     T_1[1]     [ T_2[1] ]             T_2[1]
+    // T_1[0]     T_2[1]     [ T_1[0] ]             null       [ T_2[0], T_2[1] ]     T_2[0]
+    CHECK_EQUAL(4, group.size());
+    CHECK(origin_1->is_attached());
+    CHECK(origin_2->is_attached());
+    CHECK(target_1->is_attached());
+    CHECK(target_2->is_attached());
+    CHECK_EQUAL(2, origin_1->size());
+    CHECK_EQUAL(2, origin_2->size());
+    CHECK_EQUAL(2, target_1->size());
+    CHECK_EQUAL(2, target_2->size());
+    CHECK_EQUAL(5, origin_1->get_column_count());
+    CHECK_EQUAL(5, origin_2->get_column_count());
+    CHECK_EQUAL(1, target_1->get_column_count());
+    CHECK_EQUAL(1, target_2->get_column_count());
+    CHECK_EQUAL(type_Link,     origin_1->get_column_type(0));
+    CHECK_EQUAL(type_Int,      origin_1->get_column_type(1));
+    CHECK_EQUAL(type_Link,     origin_1->get_column_type(2));
+    CHECK_EQUAL(type_Int,      origin_1->get_column_type(3));
+    CHECK_EQUAL(type_LinkList, origin_1->get_column_type(4));
+    CHECK_EQUAL(type_Link,     origin_2->get_column_type(0));
+    CHECK_EQUAL(type_Int,      origin_2->get_column_type(1));
+    CHECK_EQUAL(type_LinkList, origin_2->get_column_type(2));
+    CHECK_EQUAL(type_Int,      origin_2->get_column_type(3));
+    CHECK_EQUAL(type_Link,     origin_2->get_column_type(4));
+    CHECK_EQUAL(target_1, origin_1->get_link_target(0));
+    CHECK_EQUAL(target_2, origin_1->get_link_target(2));
+    CHECK_EQUAL(target_1, origin_1->get_link_target(4));
+    CHECK_EQUAL(target_1, origin_2->get_link_target(0));
+    CHECK_EQUAL(target_2, origin_2->get_link_target(2));
+    CHECK_EQUAL(target_2, origin_2->get_link_target(4));
+    CHECK(origin_1->is_null_link(0,0));
+    CHECK_EQUAL(0, origin_1->get_link(0,1));
+    CHECK_EQUAL(0, origin_1->get_link(2,0));
+    CHECK_EQUAL(1, origin_1->get_link(2,1));
+    CHECK_EQUAL(0, origin_1->get_linklist(4,0)->size());
+    CHECK_EQUAL(1, origin_1->get_linklist(4,1)->size());
+    CHECK_EQUAL(0, origin_1->get_linklist(4,1)->get(0).get_index());
+    CHECK_EQUAL(1, origin_2->get_link(0,0));
+    CHECK(origin_2->is_null_link(0,1));
+    CHECK_EQUAL(1, origin_2->get_linklist(2,0)->size());
+    CHECK_EQUAL(1, origin_2->get_linklist(2,0)->get(0).get_index());
+    CHECK_EQUAL(2, origin_2->get_linklist(2,1)->size());
+    CHECK_EQUAL(0, origin_2->get_linklist(2,1)->get(0).get_index());
+    CHECK_EQUAL(1, origin_2->get_linklist(2,1)->get(1).get_index());
+    CHECK_EQUAL(1, origin_2->get_link(4,0));
+    CHECK_EQUAL(0, origin_2->get_link(4,1));
+    CHECK_EQUAL(1, target_1->get_backlink_count(0, *origin_1, 0));
+    CHECK_EQUAL(1, target_1->get_backlink_count(0, *origin_1, 4));
+    CHECK_EQUAL(0, target_1->get_backlink_count(0, *origin_2, 0));
+    CHECK_EQUAL(0, target_1->get_backlink_count(1, *origin_1, 0));
+    CHECK_EQUAL(0, target_1->get_backlink_count(1, *origin_1, 4));
+    CHECK_EQUAL(1, target_1->get_backlink_count(1, *origin_2, 0));
+    CHECK_EQUAL(1, target_2->get_backlink_count(0, *origin_1, 2));
+    CHECK_EQUAL(1, target_2->get_backlink_count(0, *origin_2, 2));
+    CHECK_EQUAL(1, target_2->get_backlink_count(0, *origin_2, 4));
+    CHECK_EQUAL(1, target_2->get_backlink_count(1, *origin_1, 2));
+    CHECK_EQUAL(2, target_2->get_backlink_count(1, *origin_2, 2));
+    CHECK_EQUAL(1, target_2->get_backlink_count(1, *origin_2, 4));
 
-    // Create two origins and two targets
-    //   O_1: LL_1; F_1 LL_1; L_2 F_1 LL_1; L_2 F_1 L_3 LL_1; L_2 F_1 L_3 F_2 LL_1
-    //   O_2: F_1; L_1 F_1; L_1 F_1 LL_2; L_1 F_1 LL_2 L_3; L_1 F_1 LL_2 F_2 L_3
+    // Check that an empty row can be added to an origin table
+    {
+        WriteTransaction wt(sg_w);
+        TableRef origin_1_w = wt.get_table("origin_1");
+        origin_1_w->add_empty_row();
+        origin_1_w->set_int(1, 2, 13);
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, tlm);
+    group.Verify();
+    // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
+    // ----------------------------------------------------------------------------------------
+    // null       T_2[0]     []                     T_1[1]     [ T_2[1] ]             T_2[1]
+    // T_1[0]     T_2[1]     [ T_1[0] ]             null       [ T_2[0], T_2[1] ]     T_2[0]
+    // null       null       []
+    CHECK_EQUAL(3, origin_1->size());
+    CHECK_EQUAL(13, origin_1->get_int(1,2));
+    CHECK(origin_1->is_null_link(0,0));
+    CHECK_EQUAL(0, origin_1->get_link(0,1));
+    CHECK(origin_1->is_null_link(0,2));
+    CHECK_EQUAL(0, origin_1->get_link(2,0));
+    CHECK_EQUAL(1, origin_1->get_link(2,1));
+    CHECK(origin_1->is_null_link(2,2));
+    CHECK_EQUAL(0, origin_1->get_linklist(4,0)->size());
+    CHECK_EQUAL(1, origin_1->get_linklist(4,1)->size());
+    CHECK_EQUAL(0, origin_1->get_linklist(4,1)->get(0).get_index());
+    CHECK_EQUAL(0, origin_1->get_linklist(4,2)->size());
+    CHECK_EQUAL(1, origin_2->get_link(0,0));
+    CHECK(origin_2->is_null_link(0,1));
+    CHECK_EQUAL(1, origin_2->get_linklist(2,0)->size());
+    CHECK_EQUAL(1, origin_2->get_linklist(2,0)->get(0).get_index());
+    CHECK_EQUAL(2, origin_2->get_linklist(2,1)->size());
+    CHECK_EQUAL(0, origin_2->get_linklist(2,1)->get(0).get_index());
+    CHECK_EQUAL(1, origin_2->get_linklist(2,1)->get(1).get_index());
+    CHECK_EQUAL(1, origin_2->get_link(4,0));
+    CHECK_EQUAL(0, origin_2->get_link(4,1));
+    CHECK_EQUAL(1, target_1->get_backlink_count(0, *origin_1, 0));
+    CHECK_EQUAL(1, target_1->get_backlink_count(0, *origin_1, 4));
+    CHECK_EQUAL(0, target_1->get_backlink_count(0, *origin_2, 0));
+    CHECK_EQUAL(0, target_1->get_backlink_count(1, *origin_1, 0));
+    CHECK_EQUAL(0, target_1->get_backlink_count(1, *origin_1, 4));
+    CHECK_EQUAL(1, target_1->get_backlink_count(1, *origin_2, 0));
+    CHECK_EQUAL(1, target_2->get_backlink_count(0, *origin_1, 2));
+    CHECK_EQUAL(1, target_2->get_backlink_count(0, *origin_2, 2));
+    CHECK_EQUAL(1, target_2->get_backlink_count(0, *origin_2, 4));
+    CHECK_EQUAL(1, target_2->get_backlink_count(1, *origin_1, 2));
+    CHECK_EQUAL(2, target_2->get_backlink_count(1, *origin_2, 2));
+    CHECK_EQUAL(1, target_2->get_backlink_count(1, *origin_2, 4));
 
-    //   O_1: T_1 F T_2 F T_1
-    //   O_2: T_1 F T_2 F T_2
+    // Check that an empty row can be added to a target table
+    {
+        WriteTransaction wt(sg_w);
+        TableRef target_1_w = wt.get_table("target_1");
+        target_1_w->add_empty_row();
+        target_1_w->set_int(0, 2, 17);
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, tlm);
+    group.Verify();
+    // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
+    // ----------------------------------------------------------------------------------------
+    // null       T_2[0]     []                     T_1[1]     [ T_2[1] ]             T_2[1]
+    // T_1[0]     T_2[1]     [ T_1[0] ]             null       [ T_2[0], T_2[1] ]     T_2[0]
+    // null       null       []
+    CHECK_EQUAL(3, target_1->size());
+    CHECK_EQUAL(17, target_1->get_int(0,2));
+    CHECK(origin_1->is_null_link(0,0));
+    CHECK_EQUAL(0, origin_1->get_link(0,1));
+    CHECK(origin_1->is_null_link(0,2));
+    CHECK_EQUAL(0, origin_1->get_link(2,0));
+    CHECK_EQUAL(1, origin_1->get_link(2,1));
+    CHECK(origin_1->is_null_link(2,2));
+    CHECK_EQUAL(0, origin_1->get_linklist(4,0)->size());
+    CHECK_EQUAL(1, origin_1->get_linklist(4,1)->size());
+    CHECK_EQUAL(0, origin_1->get_linklist(4,1)->get(0).get_index());
+    CHECK_EQUAL(0, origin_1->get_linklist(4,2)->size());
+    CHECK_EQUAL(1, origin_2->get_link(0,0));
+    CHECK(origin_2->is_null_link(0,1));
+    CHECK_EQUAL(1, origin_2->get_linklist(2,0)->size());
+    CHECK_EQUAL(1, origin_2->get_linklist(2,0)->get(0).get_index());
+    CHECK_EQUAL(2, origin_2->get_linklist(2,1)->size());
+    CHECK_EQUAL(0, origin_2->get_linklist(2,1)->get(0).get_index());
+    CHECK_EQUAL(1, origin_2->get_linklist(2,1)->get(1).get_index());
+    CHECK_EQUAL(1, origin_2->get_link(4,0));
+    CHECK_EQUAL(0, origin_2->get_link(4,1));
+    CHECK_EQUAL(1, target_1->get_backlink_count(0, *origin_1, 0));
+    CHECK_EQUAL(1, target_1->get_backlink_count(0, *origin_1, 4));
+    CHECK_EQUAL(0, target_1->get_backlink_count(0, *origin_2, 0));
+    CHECK_EQUAL(0, target_1->get_backlink_count(1, *origin_1, 0));
+    CHECK_EQUAL(0, target_1->get_backlink_count(1, *origin_1, 4));
+    CHECK_EQUAL(1, target_1->get_backlink_count(1, *origin_2, 0));
+    CHECK_EQUAL(0, target_1->get_backlink_count(2, *origin_1, 0));
+    CHECK_EQUAL(0, target_1->get_backlink_count(2, *origin_1, 4));
+    CHECK_EQUAL(0, target_1->get_backlink_count(2, *origin_2, 0));
+    CHECK_EQUAL(1, target_2->get_backlink_count(0, *origin_1, 2));
+    CHECK_EQUAL(1, target_2->get_backlink_count(0, *origin_2, 2));
+    CHECK_EQUAL(1, target_2->get_backlink_count(0, *origin_2, 4));
+    CHECK_EQUAL(1, target_2->get_backlink_count(1, *origin_1, 2));
+    CHECK_EQUAL(2, target_2->get_backlink_count(1, *origin_2, 2));
+    CHECK_EQUAL(1, target_2->get_backlink_count(1, *origin_2, 4));
 
-    //   O_1: Insert link columns into empty table
-    //   O_2: Insert link columns into non-empty table
+    // Check that a non-empty row can be added to an origin table
+    {
+        WriteTransaction wt(sg_w);
+        TableRef origin_2_w = wt.get_table("origin_2");
+        origin_2_w->insert_link(0, 2, 1);  // O_2_L_2[2] -> T_1[1]
+        origin_2_w->insert_int(1, 2, 19);
+        origin_2_w->insert_linklist(2, 2);
+        origin_2_w->insert_int(3, 2, 0);
+        origin_2_w->insert_link(4, 2, 0);  // O_2_L_4[2] -> T_2[0]
+        origin_2_w->insert_done();
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, tlm);
+    group.Verify();
+    // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
+    // ----------------------------------------------------------------------------------------
+    // null       T_2[0]     []                     T_1[1]     [ T_2[1] ]             T_2[1]
+    // T_1[0]     T_2[1]     [ T_1[0] ]             null       [ T_2[0], T_2[1] ]     T_2[0]
+    // null       null       []                     T_1[1]     []                     T_2[0]
+    CHECK_EQUAL(3, origin_2->size());
+    CHECK_EQUAL(19, origin_2->get_int(1,2));
+    CHECK(origin_1->is_null_link(0,0));
+    CHECK_EQUAL(0, origin_1->get_link(0,1));
+    CHECK(origin_1->is_null_link(0,2));
+    CHECK_EQUAL(0, origin_1->get_link(2,0));
+    CHECK_EQUAL(1, origin_1->get_link(2,1));
+    CHECK(origin_1->is_null_link(2,2));
+    CHECK_EQUAL(0, origin_1->get_linklist(4,0)->size());
+    CHECK_EQUAL(1, origin_1->get_linklist(4,1)->size());
+    CHECK_EQUAL(0, origin_1->get_linklist(4,1)->get(0).get_index());
+    CHECK_EQUAL(0, origin_1->get_linklist(4,2)->size());
+    CHECK_EQUAL(1, origin_2->get_link(0,0));
+    CHECK(origin_2->is_null_link(0,1));
+    CHECK_EQUAL(1, origin_2->get_link(0,2));
+    CHECK_EQUAL(1, origin_2->get_linklist(2,0)->size());
+    CHECK_EQUAL(1, origin_2->get_linklist(2,0)->get(0).get_index());
+    CHECK_EQUAL(2, origin_2->get_linklist(2,1)->size());
+    CHECK_EQUAL(0, origin_2->get_linklist(2,1)->get(0).get_index());
+    CHECK_EQUAL(1, origin_2->get_linklist(2,1)->get(1).get_index());
+    CHECK_EQUAL(0, origin_2->get_linklist(2,2)->size());
+    CHECK_EQUAL(1, origin_2->get_link(4,0));
+    CHECK_EQUAL(0, origin_2->get_link(4,1));
+    CHECK_EQUAL(0, origin_2->get_link(4,2));
+    CHECK_EQUAL(1, target_1->get_backlink_count(0, *origin_1, 0));
+    CHECK_EQUAL(1, target_1->get_backlink_count(0, *origin_1, 4));
+    CHECK_EQUAL(0, target_1->get_backlink_count(0, *origin_2, 0));
+    CHECK_EQUAL(0, target_1->get_backlink_count(1, *origin_1, 0));
+    CHECK_EQUAL(0, target_1->get_backlink_count(1, *origin_1, 4));
+    CHECK_EQUAL(2, target_1->get_backlink_count(1, *origin_2, 0));
+    CHECK_EQUAL(0, target_1->get_backlink_count(2, *origin_1, 0));
+    CHECK_EQUAL(0, target_1->get_backlink_count(2, *origin_1, 4));
+    CHECK_EQUAL(0, target_1->get_backlink_count(2, *origin_2, 0));
+    CHECK_EQUAL(1, target_2->get_backlink_count(0, *origin_1, 2));
+    CHECK_EQUAL(1, target_2->get_backlink_count(0, *origin_2, 2));
+    CHECK_EQUAL(2, target_2->get_backlink_count(0, *origin_2, 4));
+    CHECK_EQUAL(1, target_2->get_backlink_count(1, *origin_1, 2));
+    CHECK_EQUAL(2, target_2->get_backlink_count(1, *origin_2, 2));
+    CHECK_EQUAL(1, target_2->get_backlink_count(1, *origin_2, 4));
 
-    // Advance and check at each semicolon above (concurrently for the two origins)
+    // Check that a link can be changed
+    {
+        WriteTransaction wt(sg_w);
+        TableRef origin_1_w = wt.get_table("origin_1");
+        TableRef origin_2_w = wt.get_table("origin_2");
+        origin_1_w->set_link(0, 2, 1);  // null -> non-null
+        origin_2_w->nullify_link(0, 2); // non-null -> null
+        origin_2_w->set_link(4, 2, 1);  // non-null -> non-null
+        // Removes O_2_L_2[2] -> T_1[1]  and  O_2_L_4[2] -> T_2[0]
+        // Adds    O_1_L_3[2] -> T_1[1]  and  O_2_L_4[2] -> T_2[1]
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, tlm);
+    group.Verify();
+    // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
+    // ----------------------------------------------------------------------------------------
+    // null       T_2[0]     []                     T_1[1]     [ T_2[1] ]             T_2[1]
+    // T_1[0]     T_2[1]     [ T_1[0] ]             null       [ T_2[0], T_2[1] ]     T_2[0]
+    // T_1[1]     null       []                     null       []                     T_2[1]
+    CHECK(origin_1->is_null_link(0,0));
+    CHECK_EQUAL(0, origin_1->get_link(0,1));
+    CHECK_EQUAL(1, origin_1->get_link(0,2));
+    CHECK_EQUAL(0, origin_1->get_link(2,0));
+    CHECK_EQUAL(1, origin_1->get_link(2,1));
+    CHECK(origin_1->is_null_link(2,2));
+    CHECK_EQUAL(0, origin_1->get_linklist(4,0)->size());
+    CHECK_EQUAL(1, origin_1->get_linklist(4,1)->size());
+    CHECK_EQUAL(0, origin_1->get_linklist(4,1)->get(0).get_index());
+    CHECK_EQUAL(0, origin_1->get_linklist(4,2)->size());
+    CHECK_EQUAL(1, origin_2->get_link(0,0));
+    CHECK(origin_2->is_null_link(0,1));
+    CHECK(origin_2->is_null_link(0,2));
+    CHECK_EQUAL(1, origin_2->get_linklist(2,0)->size());
+    CHECK_EQUAL(1, origin_2->get_linklist(2,0)->get(0).get_index());
+    CHECK_EQUAL(2, origin_2->get_linklist(2,1)->size());
+    CHECK_EQUAL(0, origin_2->get_linklist(2,1)->get(0).get_index());
+    CHECK_EQUAL(1, origin_2->get_linklist(2,1)->get(1).get_index());
+    CHECK_EQUAL(0, origin_2->get_linklist(2,2)->size());
+    CHECK_EQUAL(1, origin_2->get_link(4,0));
+    CHECK_EQUAL(0, origin_2->get_link(4,1));
+    CHECK_EQUAL(1, origin_2->get_link(4,2));
+    CHECK_EQUAL(1, target_1->get_backlink_count(0, *origin_1, 0));
+    CHECK_EQUAL(1, target_1->get_backlink_count(0, *origin_1, 4));
+    CHECK_EQUAL(0, target_1->get_backlink_count(0, *origin_2, 0));
+    CHECK_EQUAL(1, target_1->get_backlink_count(1, *origin_1, 0));
+    CHECK_EQUAL(0, target_1->get_backlink_count(1, *origin_1, 4));
+    CHECK_EQUAL(1, target_1->get_backlink_count(1, *origin_2, 0));
+    CHECK_EQUAL(0, target_1->get_backlink_count(2, *origin_1, 0));
+    CHECK_EQUAL(0, target_1->get_backlink_count(2, *origin_1, 4));
+    CHECK_EQUAL(0, target_1->get_backlink_count(2, *origin_2, 0));
+    CHECK_EQUAL(1, target_2->get_backlink_count(0, *origin_1, 2));
+    CHECK_EQUAL(1, target_2->get_backlink_count(0, *origin_2, 2));
+    CHECK_EQUAL(1, target_2->get_backlink_count(0, *origin_2, 4));
+    CHECK_EQUAL(1, target_2->get_backlink_count(1, *origin_1, 2));
+    CHECK_EQUAL(2, target_2->get_backlink_count(1, *origin_2, 2));
+    CHECK_EQUAL(2, target_2->get_backlink_count(1, *origin_2, 4));
 
-    // Pull out the link list accessors
+    // Check that a link can be added to an empty link list
+    ConstLinkViewRef link_list_1_2 = origin_1->get_linklist(4,2);
+    {
+        WriteTransaction wt(sg_w);
+        TableRef origin_1_w = wt.get_table("origin_1");
+        TableRef origin_2_w = wt.get_table("origin_2");
+        LinkViewRef link_list_1_2_w = origin_1_w->get_linklist(4,2);
+        LinkViewRef link_list_2_2_w = origin_2_w->get_linklist(2,2);
+        link_list_1_2_w->add(0); // O_1_LL_1[2] -> T_1[0]
+        link_list_1_2_w->add(1); // O_1_LL_1[2] -> T_1[1]
+        link_list_2_2_w->add(0); // O_2_LL_3[2] -> T_2[0]
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, tlm);
+    group.Verify();
+    // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
+    // ----------------------------------------------------------------------------------------
+    // null       T_2[0]     []                     T_1[1]     [ T_2[1] ]             T_2[1]
+    // T_1[0]     T_2[1]     [ T_1[0] ]             null       [ T_2[0], T_2[1] ]     T_2[0]
+    // T_1[1]     null       [ T_1[0], T_1[1] ]     null       [ T_2[0] ]             T_2[1]
+    ConstLinkViewRef link_list_2_2 = origin_2->get_linklist(2,2);
+    CHECK(origin_1->is_null_link(0,0));
+    CHECK_EQUAL(0, origin_1->get_link(0,1));
+    CHECK_EQUAL(1, origin_1->get_link(0,2));
+    CHECK_EQUAL(0, origin_1->get_link(2,0));
+    CHECK_EQUAL(1, origin_1->get_link(2,1));
+    CHECK(origin_1->is_null_link(2,2));
+    CHECK_EQUAL(0, origin_1->get_linklist(4,0)->size());
+    CHECK_EQUAL(1, origin_1->get_linklist(4,1)->size());
+    CHECK_EQUAL(0, origin_1->get_linklist(4,1)->get(0).get_index());
+    CHECK(link_list_1_2->is_attached());
+    CHECK_EQUAL(link_list_1_2, origin_1->get_linklist(4,2));
+    CHECK_EQUAL(2, link_list_1_2->size());
+    CHECK_EQUAL(0, link_list_1_2->get(0).get_index());
+    CHECK_EQUAL(1, link_list_1_2->get(1).get_index());
+    CHECK_EQUAL(1, origin_2->get_link(0,0));
+    CHECK(origin_2->is_null_link(0,1));
+    CHECK(origin_2->is_null_link(0,2));
+    CHECK_EQUAL(1, origin_2->get_linklist(2,0)->size());
+    CHECK_EQUAL(1, origin_2->get_linklist(2,0)->get(0).get_index());
+    CHECK_EQUAL(2, origin_2->get_linklist(2,1)->size());
+    CHECK_EQUAL(0, origin_2->get_linklist(2,1)->get(0).get_index());
+    CHECK_EQUAL(1, origin_2->get_linklist(2,1)->get(1).get_index());
+    CHECK(link_list_2_2->is_attached());
+    CHECK_EQUAL(link_list_2_2, origin_2->get_linklist(2,2));
+    CHECK_EQUAL(1, link_list_2_2->size());
+    CHECK_EQUAL(0, link_list_2_2->get(0).get_index());
+    CHECK_EQUAL(1, origin_2->get_link(4,0));
+    CHECK_EQUAL(0, origin_2->get_link(4,1));
+    CHECK_EQUAL(1, origin_2->get_link(4,2));
+    CHECK_EQUAL(1, target_1->get_backlink_count(0, *origin_1, 0));
+    CHECK_EQUAL(2, target_1->get_backlink_count(0, *origin_1, 4));
+    CHECK_EQUAL(0, target_1->get_backlink_count(0, *origin_2, 0));
+    CHECK_EQUAL(1, target_1->get_backlink_count(1, *origin_1, 0));
+    CHECK_EQUAL(1, target_1->get_backlink_count(1, *origin_1, 4));
+    CHECK_EQUAL(1, target_1->get_backlink_count(1, *origin_2, 0));
+    CHECK_EQUAL(0, target_1->get_backlink_count(2, *origin_1, 0));
+    CHECK_EQUAL(0, target_1->get_backlink_count(2, *origin_1, 4));
+    CHECK_EQUAL(0, target_1->get_backlink_count(2, *origin_2, 0));
+    CHECK_EQUAL(1, target_2->get_backlink_count(0, *origin_1, 2));
+    CHECK_EQUAL(2, target_2->get_backlink_count(0, *origin_2, 2));
+    CHECK_EQUAL(1, target_2->get_backlink_count(0, *origin_2, 4));
+    CHECK_EQUAL(1, target_2->get_backlink_count(1, *origin_1, 2));
+    CHECK_EQUAL(2, target_2->get_backlink_count(1, *origin_2, 2));
+    CHECK_EQUAL(2, target_2->get_backlink_count(1, *origin_2, 4));
 
-    // set some links
+    // Check that a link can be removed from a link list, and that a link can be
+    // added to a non-empty link list
+    {
+        WriteTransaction wt(sg_w);
+        TableRef origin_1_w = wt.get_table("origin_1");
+        TableRef origin_2_w = wt.get_table("origin_2");
+        LinkViewRef link_list_1_2_w = origin_1_w->get_linklist(4,2);
+        LinkViewRef link_list_2_2_w = origin_2_w->get_linklist(2,2);
+        link_list_1_2_w->remove(0); // Remove  O_1_LL_1[2] -> T_1[0]
+        link_list_2_2_w->add(1);    // Add     O_2_LL_3[2] -> T_2[1]
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, tlm);
+    group.Verify();
+    // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
+    // ----------------------------------------------------------------------------------------
+    // null       T_2[0]     []                     T_1[1]     [ T_2[1] ]             T_2[1]
+    // T_1[0]     T_2[1]     [ T_1[0] ]             null       [ T_2[0], T_2[1] ]     T_2[0]
+    // T_1[1]     null       [ T_1[1] ]             null       [ T_2[0], T_2[1] ]     T_2[1]
+    CHECK(origin_1->is_null_link(0,0));
+    CHECK_EQUAL(0, origin_1->get_link(0,1));
+    CHECK_EQUAL(1, origin_1->get_link(0,2));
+    CHECK_EQUAL(0, origin_1->get_link(2,0));
+    CHECK_EQUAL(1, origin_1->get_link(2,1));
+    CHECK(origin_1->is_null_link(2,2));
+    CHECK_EQUAL(0, origin_1->get_linklist(4,0)->size());
+    CHECK_EQUAL(1, origin_1->get_linklist(4,1)->size());
+    CHECK_EQUAL(0, origin_1->get_linklist(4,1)->get(0).get_index());
+    CHECK(link_list_1_2->is_attached());
+    CHECK_EQUAL(link_list_1_2, origin_1->get_linklist(4,2));
+    CHECK_EQUAL(1, link_list_1_2->size());
+    CHECK_EQUAL(1, link_list_1_2->get(0).get_index());
+    CHECK_EQUAL(1, origin_2->get_link(0,0));
+    CHECK(origin_2->is_null_link(0,1));
+    CHECK(origin_2->is_null_link(0,2));
+    CHECK_EQUAL(1, origin_2->get_linklist(2,0)->size());
+    CHECK_EQUAL(1, origin_2->get_linklist(2,0)->get(0).get_index());
+    CHECK_EQUAL(2, origin_2->get_linklist(2,1)->size());
+    CHECK_EQUAL(0, origin_2->get_linklist(2,1)->get(0).get_index());
+    CHECK_EQUAL(1, origin_2->get_linklist(2,1)->get(1).get_index());
+    CHECK(link_list_2_2->is_attached());
+    CHECK_EQUAL(link_list_2_2, origin_2->get_linklist(2,2));
+    CHECK_EQUAL(2, link_list_2_2->size());
+    CHECK_EQUAL(0, link_list_2_2->get(0).get_index());
+    CHECK_EQUAL(1, link_list_2_2->get(1).get_index());
+    CHECK_EQUAL(1, origin_2->get_link(4,0));
+    CHECK_EQUAL(0, origin_2->get_link(4,1));
+    CHECK_EQUAL(1, origin_2->get_link(4,2));
+    CHECK_EQUAL(1, target_1->get_backlink_count(0, *origin_1, 0));
+    CHECK_EQUAL(1, target_1->get_backlink_count(0, *origin_1, 4));
+    CHECK_EQUAL(0, target_1->get_backlink_count(0, *origin_2, 0));
+    CHECK_EQUAL(1, target_1->get_backlink_count(1, *origin_1, 0));
+    CHECK_EQUAL(1, target_1->get_backlink_count(1, *origin_1, 4));
+    CHECK_EQUAL(1, target_1->get_backlink_count(1, *origin_2, 0));
+    CHECK_EQUAL(0, target_1->get_backlink_count(2, *origin_1, 0));
+    CHECK_EQUAL(0, target_1->get_backlink_count(2, *origin_1, 4));
+    CHECK_EQUAL(0, target_1->get_backlink_count(2, *origin_2, 0));
+    CHECK_EQUAL(1, target_2->get_backlink_count(0, *origin_1, 2));
+    CHECK_EQUAL(2, target_2->get_backlink_count(0, *origin_2, 2));
+    CHECK_EQUAL(1, target_2->get_backlink_count(0, *origin_2, 4));
+    CHECK_EQUAL(1, target_2->get_backlink_count(1, *origin_1, 2));
+    CHECK_EQUAL(3, target_2->get_backlink_count(1, *origin_2, 2));
+    CHECK_EQUAL(2, target_2->get_backlink_count(1, *origin_2, 4));
 
-    // Check that they are correct after advance
+    ConstLinkViewRef link_list_1_0 = origin_1->get_linklist(4,0);
+    ConstLinkViewRef link_list_1_1 = origin_1->get_linklist(4,1);
+    ConstLinkViewRef link_list_2_0 = origin_2->get_linklist(2,0);
+    ConstLinkViewRef link_list_2_1 = origin_2->get_linklist(2,1);
 
-    // O_1: MOVE OVER ROW NDX 4 2 0
-    // O_2: MOVE OVER ROW NDX 2 0 2
-    // T_1: MOVE OVER ROW NDX 4 0 2
-    // T_2: MOVE OVER ROW NDX 0 0 2
+    // Check that a link list can be cleared, and that a link can be moved
+    // inside a link list
+    {
+        WriteTransaction wt(sg_w);
+        TableRef origin_1_w = wt.get_table("origin_1");
+        TableRef origin_2_w = wt.get_table("origin_2");
+        LinkViewRef link_list_1_2_w = origin_1_w->get_linklist(4,2);
+        LinkViewRef link_list_2_2_w = origin_2_w->get_linklist(2,2);
+        link_list_1_2_w->clear(); // Remove  O_1_LL_1[2] -> T_1[1]
+        link_list_2_2_w->move(0,2); // [ 0, 1 ] -> [ 1, 0 ]
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, tlm);
+    group.Verify();
+    // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
+    // ----------------------------------------------------------------------------------------
+    // null       T_2[0]     []                     T_1[1]     [ T_2[1] ]             T_2[1]
+    // T_1[0]     T_2[1]     [ T_1[0] ]             null       [ T_2[0], T_2[1] ]     T_2[0]
+    // T_1[1]     null       []                     null       [ T_2[1], T_2[0] ]     T_2[1]
+    CHECK(origin_1->is_null_link(0,0));
+    CHECK_EQUAL(0, origin_1->get_link(0,1));
+    CHECK_EQUAL(1, origin_1->get_link(0,2));
+    CHECK_EQUAL(0, origin_1->get_link(2,0));
+    CHECK_EQUAL(1, origin_1->get_link(2,1));
+    CHECK(origin_1->is_null_link(2,2));
+    CHECK_EQUAL(0, origin_1->get_linklist(4,0)->size());
+    CHECK_EQUAL(1, origin_1->get_linklist(4,1)->size());
+    CHECK_EQUAL(0, origin_1->get_linklist(4,1)->get(0).get_index());
+    CHECK(link_list_1_2->is_attached());
+    CHECK_EQUAL(link_list_1_2, origin_1->get_linklist(4,2));
+    CHECK_EQUAL(0, link_list_1_2->size());
+    CHECK_EQUAL(1, origin_2->get_link(0,0));
+    CHECK(origin_2->is_null_link(0,1));
+    CHECK(origin_2->is_null_link(0,2));
+    CHECK_EQUAL(1, origin_2->get_linklist(2,0)->size());
+    CHECK_EQUAL(1, origin_2->get_linklist(2,0)->get(0).get_index());
+    CHECK_EQUAL(2, origin_2->get_linklist(2,1)->size());
+    CHECK_EQUAL(0, origin_2->get_linklist(2,1)->get(0).get_index());
+    CHECK_EQUAL(1, origin_2->get_linklist(2,1)->get(1).get_index());
+    CHECK(link_list_2_2->is_attached());
+    CHECK_EQUAL(link_list_2_2, origin_2->get_linklist(2,2));
+    CHECK_EQUAL(2, link_list_2_2->size());
+    CHECK_EQUAL(1, link_list_2_2->get(0).get_index());
+    CHECK_EQUAL(0, link_list_2_2->get(1).get_index());
+    CHECK_EQUAL(1, origin_2->get_link(4,0));
+    CHECK_EQUAL(0, origin_2->get_link(4,1));
+    CHECK_EQUAL(1, origin_2->get_link(4,2));
+    CHECK_EQUAL(1, target_1->get_backlink_count(0, *origin_1, 0));
+    CHECK_EQUAL(1, target_1->get_backlink_count(0, *origin_1, 4));
+    CHECK_EQUAL(0, target_1->get_backlink_count(0, *origin_2, 0));
+    CHECK_EQUAL(1, target_1->get_backlink_count(1, *origin_1, 0));
+    CHECK_EQUAL(0, target_1->get_backlink_count(1, *origin_1, 4));
+    CHECK_EQUAL(1, target_1->get_backlink_count(1, *origin_2, 0));
+    CHECK_EQUAL(0, target_1->get_backlink_count(2, *origin_1, 0));
+    CHECK_EQUAL(0, target_1->get_backlink_count(2, *origin_1, 4));
+    CHECK_EQUAL(0, target_1->get_backlink_count(2, *origin_2, 0));
+    CHECK_EQUAL(1, target_2->get_backlink_count(0, *origin_1, 2));
+    CHECK_EQUAL(2, target_2->get_backlink_count(0, *origin_2, 2));
+    CHECK_EQUAL(1, target_2->get_backlink_count(0, *origin_2, 4));
+    CHECK_EQUAL(1, target_2->get_backlink_count(1, *origin_1, 2));
+    CHECK_EQUAL(3, target_2->get_backlink_count(1, *origin_2, 2));
+    CHECK_EQUAL(2, target_2->get_backlink_count(1, *origin_2, 4));
 
+    // Check that an origin-side row can be deleted by a "move last over"
+    // operation
+    {
+        WriteTransaction wt(sg_w);
+        TableRef origin_1_w = wt.get_table("origin_1");
+        TableRef origin_2_w = wt.get_table("origin_2");
+        origin_1_w->move_last_over(0); // [ 0, 1, 2 ] -> [ 2, 1 ]
+        origin_2_w->move_last_over(2); // [ 0, 1, 2 ] -> [ 0, 1 ]
+        // Removes  O_1_L_4[0]  -> T_2[0]  and  O_1_L_3[2]  -> T_1[1]  and
+        //          O_2_LL_3[2] -> T_2[0]  and  O_2_LL_3[2] -> T_2[1]  and  O_2_L_4[2] -> T_2[1]
+        // Adds     O_1_L_3[0]  -> T_1[1]
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, tlm);
+    group.Verify();
+    // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
+    // ----------------------------------------------------------------------------------------
+    // T_1[1]     null       []                     T_1[1]     [ T_2[1] ]             T_2[1]
+    // T_1[0]     T_2[1]     [ T_1[0] ]             null       [ T_2[0], T_2[1] ]     T_2[0]
+    CHECK_EQUAL(2, origin_1->size());
+    CHECK_EQUAL(2, origin_2->size());
+    CHECK(!link_list_1_0->is_attached());
+    CHECK(link_list_1_1->is_attached());
+    CHECK(link_list_1_2->is_attached());
+    CHECK(link_list_2_0->is_attached());
+    CHECK(link_list_2_1->is_attached());
+    CHECK(!link_list_2_2->is_attached());
+    CHECK_EQUAL(link_list_1_2, origin_1->get_linklist(4,0));
+    CHECK_EQUAL(link_list_1_1, origin_1->get_linklist(4,1));
+    CHECK_EQUAL(link_list_2_0, origin_2->get_linklist(2,0));
+    CHECK_EQUAL(link_list_2_1, origin_2->get_linklist(2,1));
+    link_list_1_0 = link_list_1_2;
+    link_list_1_2.reset();
+    link_list_2_2.reset();
+    CHECK_EQUAL(0, link_list_1_0->get_origin_row_index());
+    CHECK_EQUAL(1, link_list_1_1->get_origin_row_index());
+    CHECK_EQUAL(0, link_list_2_0->get_origin_row_index());
+    CHECK_EQUAL(1, link_list_2_1->get_origin_row_index());
+    CHECK_EQUAL(1, origin_1->get_link(0,0));
+    CHECK_EQUAL(0, origin_1->get_link(0,1));
+    CHECK(origin_1->is_null_link(2,0));
+    CHECK_EQUAL(1, origin_1->get_link(2,1));
+    CHECK_EQUAL(0, link_list_1_0->size());
+    CHECK_EQUAL(1, link_list_1_1->size());
+    CHECK_EQUAL(0, link_list_1_1->get(0).get_index());
+    CHECK_EQUAL(1, origin_2->get_link(0,0));
+    CHECK(origin_2->is_null_link(0,1));
+    CHECK_EQUAL(1, link_list_2_0->size());
+    CHECK_EQUAL(1, link_list_2_0->get(0).get_index());
+    CHECK_EQUAL(2, link_list_2_1->size());
+    CHECK_EQUAL(0, link_list_2_1->get(0).get_index());
+    CHECK_EQUAL(1, link_list_2_1->get(1).get_index());
+    CHECK_EQUAL(1, origin_2->get_link(4,0));
+    CHECK_EQUAL(0, origin_2->get_link(4,1));
+    CHECK_EQUAL(1, target_1->get_backlink_count(0, *origin_1, 0));
+    CHECK_EQUAL(1, target_1->get_backlink_count(0, *origin_1, 4));
+    CHECK_EQUAL(0, target_1->get_backlink_count(0, *origin_2, 0));
+    CHECK_EQUAL(1, target_1->get_backlink_count(1, *origin_1, 0));
+    CHECK_EQUAL(0, target_1->get_backlink_count(1, *origin_1, 4));
+    CHECK_EQUAL(1, target_1->get_backlink_count(1, *origin_2, 0));
+    CHECK_EQUAL(0, target_1->get_backlink_count(2, *origin_1, 0));
+    CHECK_EQUAL(0, target_1->get_backlink_count(2, *origin_1, 4));
+    CHECK_EQUAL(0, target_1->get_backlink_count(2, *origin_2, 0));
+    CHECK_EQUAL(0, target_2->get_backlink_count(0, *origin_1, 2));
+    CHECK_EQUAL(1, target_2->get_backlink_count(0, *origin_2, 2));
+    CHECK_EQUAL(1, target_2->get_backlink_count(0, *origin_2, 4));
+    CHECK_EQUAL(1, target_2->get_backlink_count(1, *origin_1, 2));
+    CHECK_EQUAL(2, target_2->get_backlink_count(1, *origin_2, 2));
+    CHECK_EQUAL(1, target_2->get_backlink_count(1, *origin_2, 4));
+    {
+        WriteTransaction wt(sg_w);
+        TableRef origin_1_w = wt.get_table("origin_1");
+        TableRef origin_2_w = wt.get_table("origin_2");
+        origin_1_w->add_empty_row();   // [ 2, 1 ] -> [ 2, 1, 3 ]
+        origin_1_w->set_link(2, 2, 0);
+        origin_2_w->move_last_over(0); // [ 0, 1 ] -> [ 1 ]
+        // Removes  O_2_L_2[0]  -> T_1[1]  and  O_2_LL_3[1] -> T_2[0]  and
+        //          O_2_LL_3[1] -> T_2[1]  and  O_2_L_4[0]  -> T_2[1]  and  O_2_L_4[1] -> T_2[0]
+        // Adds     O_1_L_4[2]  -> T_2[0]  and  O_2_LL_3[0] -> T_2[0]  and  O_2_L_4[0] -> T_2[0]
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, tlm);
+    group.Verify();
+    // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
+    // ----------------------------------------------------------------------------------------
+    // T_1[1]     null       []                     null       [ T_2[0], T_2[1] ]     T_2[0]
+    // T_1[0]     T_2[1]     [ T_1[0] ]
+    // null       T_2[0]     []
+    CHECK_EQUAL(3, origin_1->size());
+    CHECK_EQUAL(1, origin_2->size());
+    CHECK(link_list_1_0->is_attached());
+    CHECK(link_list_1_1->is_attached());
+    CHECK(!link_list_2_0->is_attached());
+    CHECK(link_list_2_1->is_attached());
+    CHECK_EQUAL(link_list_1_0, origin_1->get_linklist(4,0));
+    CHECK_EQUAL(link_list_1_1, origin_1->get_linklist(4,1));
+    CHECK_EQUAL(link_list_2_1, origin_2->get_linklist(2,0));
+    link_list_1_2 = origin_1->get_linklist(4,2);
+    link_list_2_0 = link_list_2_1;
+    link_list_2_1.reset();
+    CHECK_EQUAL(0, link_list_1_0->get_origin_row_index());
+    CHECK_EQUAL(1, link_list_1_1->get_origin_row_index());
+    CHECK_EQUAL(2, link_list_1_2->get_origin_row_index());
+    CHECK_EQUAL(0, link_list_2_0->get_origin_row_index());
+    CHECK_EQUAL(1, origin_1->get_link(0,0));
+    CHECK_EQUAL(0, origin_1->get_link(0,1));
+    CHECK(origin_1->is_null_link(0,2));
+    CHECK(origin_1->is_null_link(2,0));
+    CHECK_EQUAL(1, origin_1->get_link(2,1));
+    CHECK_EQUAL(0, origin_1->get_link(2,2));
+    CHECK_EQUAL(0, link_list_1_0->size());
+    CHECK_EQUAL(1, link_list_1_1->size());
+    CHECK_EQUAL(0, link_list_1_1->get(0).get_index());
+    CHECK_EQUAL(0, link_list_1_2->size());
+    CHECK(origin_2->is_null_link(0,0));
+    CHECK_EQUAL(2, link_list_2_0->size());
+    CHECK_EQUAL(0, link_list_2_0->get(0).get_index());
+    CHECK_EQUAL(1, link_list_2_0->get(1).get_index());
+    CHECK_EQUAL(0, origin_2->get_link(4,0));
+    CHECK_EQUAL(1, target_1->get_backlink_count(0, *origin_1, 0));
+    CHECK_EQUAL(1, target_1->get_backlink_count(0, *origin_1, 4));
+    CHECK_EQUAL(0, target_1->get_backlink_count(0, *origin_2, 0));
+    CHECK_EQUAL(1, target_1->get_backlink_count(1, *origin_1, 0));
+    CHECK_EQUAL(0, target_1->get_backlink_count(1, *origin_1, 4));
+    CHECK_EQUAL(0, target_1->get_backlink_count(1, *origin_2, 0));
+    CHECK_EQUAL(0, target_1->get_backlink_count(2, *origin_1, 0));
+    CHECK_EQUAL(0, target_1->get_backlink_count(2, *origin_1, 4));
+    CHECK_EQUAL(0, target_1->get_backlink_count(2, *origin_2, 0));
+    CHECK_EQUAL(1, target_2->get_backlink_count(0, *origin_1, 2));
+    CHECK_EQUAL(1, target_2->get_backlink_count(0, *origin_2, 2));
+    CHECK_EQUAL(1, target_2->get_backlink_count(0, *origin_2, 4));
+    CHECK_EQUAL(1, target_2->get_backlink_count(1, *origin_1, 2));
+    CHECK_EQUAL(1, target_2->get_backlink_count(1, *origin_2, 2));
+    CHECK_EQUAL(0, target_2->get_backlink_count(1, *origin_2, 4));
+    {
+        WriteTransaction wt(sg_w);
+        TableRef origin_1_w = wt.get_table("origin_1");
+        TableRef origin_2_w = wt.get_table("origin_2");
+        origin_1_w->move_last_over(1); // [ 2, 1, 3 ] -> [ 2, 3 ]
+        origin_2_w->move_last_over(0); // [ 1 ] -> []
+        // Removes  O_1_L_3[1]  -> T_1[0]  and  O_1_L_4[1]  -> T_2[1]  and
+        //          O_1_LL_1[1] -> T_1[0]  and  O_1_L_4[2]  -> T_2[0]  and
+        //          O_2_LL_3[0] -> T_2[0]  and  O_2_LL_3[0] -> T_2[1]  and  O_2_L_4[0]  -> T_2[0]
+        // Adds     O_1_L_4[1]  -> T_2[0]
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, tlm);
+    group.Verify();
+    // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
+    // ----------------------------------------------------------------------------------------
+    // T_1[1]     null       []
+    // null       T_2[0]     []
+    CHECK_EQUAL(2, origin_1->size());
+    CHECK_EQUAL(0, origin_2->size());
+    CHECK(link_list_1_0->is_attached());
+    CHECK(!link_list_1_1->is_attached());
+    CHECK(link_list_1_2->is_attached());
+    CHECK(!link_list_2_0->is_attached());
+    CHECK_EQUAL(link_list_1_0, origin_1->get_linklist(4,0));
+    CHECK_EQUAL(link_list_1_2, origin_1->get_linklist(4,1));
+    link_list_1_1 = link_list_1_2;
+    link_list_1_2.reset();
+    CHECK_EQUAL(0, link_list_1_0->get_origin_row_index());
+    CHECK_EQUAL(1, link_list_1_1->get_origin_row_index());
+    CHECK_EQUAL(1, origin_1->get_link(0,0));
+    CHECK(origin_1->is_null_link(0,1));
+    CHECK(origin_1->is_null_link(2,0));
+    CHECK_EQUAL(0, origin_1->get_link(2,1));
+    CHECK_EQUAL(0, link_list_1_0->size());
+    CHECK_EQUAL(0, link_list_1_1->size());
+    CHECK_EQUAL(0, target_1->get_backlink_count(0, *origin_1, 0));
+    CHECK_EQUAL(0, target_1->get_backlink_count(0, *origin_1, 4));
+    CHECK_EQUAL(0, target_1->get_backlink_count(0, *origin_2, 0));
+    CHECK_EQUAL(1, target_1->get_backlink_count(1, *origin_1, 0));
+    CHECK_EQUAL(0, target_1->get_backlink_count(1, *origin_1, 4));
+    CHECK_EQUAL(0, target_1->get_backlink_count(1, *origin_2, 0));
+    CHECK_EQUAL(0, target_1->get_backlink_count(2, *origin_1, 0));
+    CHECK_EQUAL(0, target_1->get_backlink_count(2, *origin_1, 4));
+    CHECK_EQUAL(0, target_1->get_backlink_count(2, *origin_2, 0));
+    CHECK_EQUAL(1, target_2->get_backlink_count(0, *origin_1, 2));
+    CHECK_EQUAL(0, target_2->get_backlink_count(0, *origin_2, 2));
+    CHECK_EQUAL(0, target_2->get_backlink_count(0, *origin_2, 4));
+    CHECK_EQUAL(0, target_2->get_backlink_count(1, *origin_1, 2));
+    CHECK_EQUAL(0, target_2->get_backlink_count(1, *origin_2, 2));
+    CHECK_EQUAL(0, target_2->get_backlink_count(1, *origin_2, 4));
+    {
+        WriteTransaction wt(sg_w);
+        TableRef origin_1_w = wt.get_table("origin_1");
+        TableRef origin_2_w = wt.get_table("origin_2");
+        origin_1_w->move_last_over(1); // [ 2, 3 ] -> [ 2 ]
+        // Removes  O_1_L_4[1] -> T_2[0]
+        origin_2_w->add_empty_row(3); // [] -> [ 3, 4, 5 ]
+        origin_2_w->set_link(0,0,0);           // O_2_L_2[0]  -> T_1[0]
+        origin_2_w->set_link(0,2,1);           // O_2_L_2[2]  -> T_1[1]
+        origin_2_w->get_linklist(2,0)->add(1); // O_2_LL_3[0] -> T_2[1]
+        origin_2_w->get_linklist(2,1)->add(0); // O_2_LL_3[1] -> T_2[0]
+        origin_2_w->get_linklist(2,1)->add(1); // O_2_LL_3[1] -> T_2[1]
+        origin_2_w->get_linklist(2,2)->add(1); // O_2_LL_3[2] -> T_2[1]
+        origin_2_w->get_linklist(2,2)->add(0); // O_2_LL_3[2] -> T_2[0]
+        origin_2_w->set_link(4,0,1);           // O_2_L_4[0]  -> T_2[1]
+        origin_2_w->set_link(4,2,0);           // O_2_L_4[2]  -> T_2[0]
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, tlm);
+    group.Verify();
+    // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
+    // ----------------------------------------------------------------------------------------
+    // T_1[1]     null       []                     T_1[0]     [ T_2[1] ]             T_2[1]
+    //                                              null       [ T_2[0], T_2[1] ]     null
+    //                                              T_1[1]     [ T_2[1], T_2[0] ]     T_2[0]
+    CHECK_EQUAL(1, origin_1->size());
+    CHECK_EQUAL(3, origin_2->size());
+    CHECK(link_list_1_0->is_attached());
+    CHECK(!link_list_1_1->is_attached());
+    CHECK_EQUAL(link_list_1_0, origin_1->get_linklist(4,0));
+    link_list_1_1.reset();
+    link_list_2_0 = origin_2->get_linklist(2,0);
+    link_list_2_1 = origin_2->get_linklist(2,1);
+    link_list_2_2 = origin_2->get_linklist(2,2);
+    CHECK_EQUAL(0, link_list_1_0->get_origin_row_index());
+    CHECK_EQUAL(0, link_list_2_0->get_origin_row_index());
+    CHECK_EQUAL(1, link_list_2_1->get_origin_row_index());
+    CHECK_EQUAL(2, link_list_2_2->get_origin_row_index());
+    CHECK_EQUAL(1, origin_1->get_link(0,0));
+    CHECK(origin_1->is_null_link(2,0));
+    CHECK_EQUAL(0, link_list_1_0->size());
+    CHECK_EQUAL(0, origin_2->get_link(0,0));
+    CHECK(origin_2->is_null_link(0,1));
+    CHECK_EQUAL(1, origin_2->get_link(0,2));
+    CHECK_EQUAL(1, link_list_2_0->size());
+    CHECK_EQUAL(1, link_list_2_0->get(0).get_index());
+    CHECK_EQUAL(2, link_list_2_1->size());
+    CHECK_EQUAL(0, link_list_2_1->get(0).get_index());
+    CHECK_EQUAL(1, link_list_2_1->get(1).get_index());
+    CHECK_EQUAL(2, link_list_2_2->size());
+    CHECK_EQUAL(1, link_list_2_2->get(0).get_index());
+    CHECK_EQUAL(0, link_list_2_2->get(1).get_index());
+    CHECK_EQUAL(1, origin_2->get_link(4,0));
+    CHECK(origin_2->is_null_link(4,1));
+    CHECK_EQUAL(0, origin_2->get_link(4,2));
+    CHECK_EQUAL(0, target_1->get_backlink_count(0, *origin_1, 0));
+    CHECK_EQUAL(0, target_1->get_backlink_count(0, *origin_1, 4));
+    CHECK_EQUAL(1, target_1->get_backlink_count(0, *origin_2, 0));
+    CHECK_EQUAL(1, target_1->get_backlink_count(1, *origin_1, 0));
+    CHECK_EQUAL(0, target_1->get_backlink_count(1, *origin_1, 4));
+    CHECK_EQUAL(1, target_1->get_backlink_count(1, *origin_2, 0));
+    CHECK_EQUAL(0, target_1->get_backlink_count(2, *origin_1, 0));
+    CHECK_EQUAL(0, target_1->get_backlink_count(2, *origin_1, 4));
+    CHECK_EQUAL(0, target_1->get_backlink_count(2, *origin_2, 0));
+    CHECK_EQUAL(0, target_2->get_backlink_count(0, *origin_1, 2));
+    CHECK_EQUAL(2, target_2->get_backlink_count(0, *origin_2, 2));
+    CHECK_EQUAL(1, target_2->get_backlink_count(0, *origin_2, 4));
+    CHECK_EQUAL(0, target_2->get_backlink_count(1, *origin_1, 2));
+    CHECK_EQUAL(3, target_2->get_backlink_count(1, *origin_2, 2));
+    CHECK_EQUAL(1, target_2->get_backlink_count(1, *origin_2, 4));
+    {
+        WriteTransaction wt(sg_w);
+        TableRef origin_1_w = wt.get_table("origin_1");
+        origin_1_w->add_empty_row(2); // [ 2 ] -> [ 2, 4, 5 ]
+        origin_1_w->set_link(0,2,0); // O_1_L_3[2] -> T_1[0]
+        origin_1_w->set_link(2,0,1); // O_1_L_4[0] -> T_2[1]
+        origin_1_w->set_link(2,2,0); // O_1_L_4[2] -> T_2[0]
+        origin_1_w->get_linklist(4,1)->add(0); // O_1_LL_1[1] -> T_1[0]
+        origin_1_w->get_linklist(4,1)->add(0); // O_1_LL_1[1] -> T_1[0] (double)
+        origin_1_w->get_linklist(4,2)->add(1); // O_1_LL_1[2] -> T_1[1]
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, tlm);
+    group.Verify();
+    // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
+    // ----------------------------------------------------------------------------------------
+    // T_1[1]     T_2[1]     []                     T_1[0]     [ T_2[1] ]             T_2[1]
+    // null       null       [ T_1[0], T_1[0] ]     null       [ T_2[0], T_2[1] ]     null
+    // T_1[0]     T_2[0]     [ T_1[1] ]             T_1[1]     [ T_2[1], T_2[0] ]     T_2[0]
+    CHECK_EQUAL(3, origin_1->size());
+    CHECK_EQUAL(3, origin_2->size());
+    CHECK(link_list_1_0->is_attached());
+    CHECK(link_list_2_0->is_attached());
+    CHECK(link_list_2_1->is_attached());
+    CHECK(link_list_2_2->is_attached());
+    CHECK_EQUAL(link_list_1_0, origin_1->get_linklist(4,0));
+    CHECK_EQUAL(link_list_2_0, origin_2->get_linklist(2,0));
+    CHECK_EQUAL(link_list_2_1, origin_2->get_linklist(2,1));
+    CHECK_EQUAL(link_list_2_2, origin_2->get_linklist(2,2));
+    link_list_1_1 = origin_1->get_linklist(4,1);
+    link_list_1_2 = origin_1->get_linklist(4,2);
+    CHECK_EQUAL(0, link_list_1_0->get_origin_row_index());
+    CHECK_EQUAL(1, link_list_1_1->get_origin_row_index());
+    CHECK_EQUAL(2, link_list_1_2->get_origin_row_index());
+    CHECK_EQUAL(0, link_list_2_0->get_origin_row_index());
+    CHECK_EQUAL(1, link_list_2_1->get_origin_row_index());
+    CHECK_EQUAL(2, link_list_2_2->get_origin_row_index());
+    CHECK_EQUAL(1, origin_1->get_link(0,0));
+    CHECK(origin_1->is_null_link(0,1));
+    CHECK_EQUAL(0, origin_1->get_link(0,2));
+    CHECK_EQUAL(1, origin_1->get_link(2,0));
+    CHECK(origin_1->is_null_link(2,1));
+    CHECK_EQUAL(0, origin_1->get_link(2,2));
+    CHECK_EQUAL(0, link_list_1_0->size());
+    CHECK_EQUAL(2, link_list_1_1->size());
+    CHECK_EQUAL(0, link_list_1_1->get(0).get_index());
+    CHECK_EQUAL(0, link_list_1_1->get(1).get_index());
+    CHECK_EQUAL(1, link_list_1_2->size());
+    CHECK_EQUAL(1, link_list_1_2->get(0).get_index());
+    CHECK_EQUAL(0, origin_2->get_link(0,0));
+    CHECK(origin_2->is_null_link(0,1));
+    CHECK_EQUAL(1, origin_2->get_link(0,2));
+    CHECK_EQUAL(1, link_list_2_0->size());
+    CHECK_EQUAL(1, link_list_2_0->get(0).get_index());
+    CHECK_EQUAL(2, link_list_2_1->size());
+    CHECK_EQUAL(0, link_list_2_1->get(0).get_index());
+    CHECK_EQUAL(1, link_list_2_1->get(1).get_index());
+    CHECK_EQUAL(2, link_list_2_2->size());
+    CHECK_EQUAL(1, link_list_2_2->get(0).get_index());
+    CHECK_EQUAL(0, link_list_2_2->get(1).get_index());
+    CHECK_EQUAL(1, origin_2->get_link(4,0));
+    CHECK(origin_2->is_null_link(4,1));
+    CHECK_EQUAL(0, origin_2->get_link(4,2));
+    CHECK_EQUAL(1, target_1->get_backlink_count(0, *origin_1, 0));
+    CHECK_EQUAL(2, target_1->get_backlink_count(0, *origin_1, 4));
+    CHECK_EQUAL(1, target_1->get_backlink_count(0, *origin_2, 0));
+    CHECK_EQUAL(1, target_1->get_backlink_count(1, *origin_1, 0));
+    CHECK_EQUAL(1, target_1->get_backlink_count(1, *origin_1, 4));
+    CHECK_EQUAL(1, target_1->get_backlink_count(1, *origin_2, 0));
+    CHECK_EQUAL(0, target_1->get_backlink_count(2, *origin_1, 0));
+    CHECK_EQUAL(0, target_1->get_backlink_count(2, *origin_1, 4));
+    CHECK_EQUAL(0, target_1->get_backlink_count(2, *origin_2, 0));
+    CHECK_EQUAL(1, target_2->get_backlink_count(0, *origin_1, 2));
+    CHECK_EQUAL(2, target_2->get_backlink_count(0, *origin_2, 2));
+    CHECK_EQUAL(1, target_2->get_backlink_count(0, *origin_2, 4));
+    CHECK_EQUAL(1, target_2->get_backlink_count(1, *origin_1, 2));
+    CHECK_EQUAL(3, target_2->get_backlink_count(1, *origin_2, 2));
+    CHECK_EQUAL(1, target_2->get_backlink_count(1, *origin_2, 4));
 
-    // Clear O_2 and T_2, then check result
+    // Check that an target-side row can be deleted by a "move last over"
+    // operation
+    {
+        WriteTransaction wt(sg_w);
+        TableRef origin_1_w = wt.get_table("origin_1");
+        TableRef origin_2_w = wt.get_table("origin_2");
+        TableRef target_2_w = wt.get_table("target_2");
+        target_2_w->add_empty_row();
+        origin_1_w->get_linklist(4,1)->set(0,2);
+        origin_2_w->get_linklist(2,2)->set(1,2);
+        origin_2_w->set_link(4,0,2);
+        // Removes  O_1_LL_1[1] -> T_1[0]  and  O_2_LL_3[2] -> T_2[0]  and  O_2_L_4[0] -> T_2[1]
+        // Adds     O_1_LL_1[1] -> T_1[2]  and  O_2_LL_3[2] -> T_2[2]  and  O_2_L_4[0] -> T_2[2]
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, tlm);
+    group.Verify();
+    // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
+    // ----------------------------------------------------------------------------------------
+    // T_1[1]     T_2[1]     []                     T_1[0]     [ T_2[1] ]             T_2[2]
+    // null       null       [ T_1[2], T_1[0] ]     null       [ T_2[0], T_2[1] ]     null
+    // T_1[0]     T_2[0]     [ T_1[1] ]             T_1[1]     [ T_2[1], T_2[2] ]     T_2[0]
+    CHECK_EQUAL(3, target_1->size());
+    CHECK_EQUAL(3, target_2->size());
+    CHECK(link_list_1_0->is_attached());
+    CHECK(link_list_1_1->is_attached());
+    CHECK(link_list_1_2->is_attached());
+    CHECK(link_list_2_0->is_attached());
+    CHECK(link_list_2_1->is_attached());
+    CHECK(link_list_2_2->is_attached());
+    CHECK_EQUAL(link_list_1_0, origin_1->get_linklist(4,0));
+    CHECK_EQUAL(link_list_1_1, origin_1->get_linklist(4,1));
+    CHECK_EQUAL(link_list_1_2, origin_1->get_linklist(4,2));
+    CHECK_EQUAL(link_list_2_0, origin_2->get_linklist(2,0));
+    CHECK_EQUAL(link_list_2_1, origin_2->get_linklist(2,1));
+    CHECK_EQUAL(link_list_2_2, origin_2->get_linklist(2,2));
+    CHECK_EQUAL(0, link_list_1_0->get_origin_row_index());
+    CHECK_EQUAL(1, link_list_1_1->get_origin_row_index());
+    CHECK_EQUAL(2, link_list_1_2->get_origin_row_index());
+    CHECK_EQUAL(0, link_list_2_0->get_origin_row_index());
+    CHECK_EQUAL(1, link_list_2_1->get_origin_row_index());
+    CHECK_EQUAL(2, link_list_2_2->get_origin_row_index());
+    CHECK_EQUAL(1, origin_1->get_link(0,0));
+    CHECK(origin_1->is_null_link(0,1));
+    CHECK_EQUAL(0, origin_1->get_link(0,2));
+    CHECK_EQUAL(1, origin_1->get_link(2,0));
+    CHECK(origin_1->is_null_link(2,1));
+    CHECK_EQUAL(0, origin_1->get_link(2,2));
+    CHECK_EQUAL(0, link_list_1_0->size());
+    CHECK_EQUAL(2, link_list_1_1->size());
+    CHECK_EQUAL(2, link_list_1_1->get(0).get_index());
+    CHECK_EQUAL(0, link_list_1_1->get(1).get_index());
+    CHECK_EQUAL(1, link_list_1_2->size());
+    CHECK_EQUAL(1, link_list_1_2->get(0).get_index());
+    CHECK_EQUAL(0, origin_2->get_link(0,0));
+    CHECK(origin_2->is_null_link(0,1));
+    CHECK_EQUAL(1, origin_2->get_link(0,2));
+    CHECK_EQUAL(1, link_list_2_0->size());
+    CHECK_EQUAL(1, link_list_2_0->get(0).get_index());
+    CHECK_EQUAL(2, link_list_2_1->size());
+    CHECK_EQUAL(0, link_list_2_1->get(0).get_index());
+    CHECK_EQUAL(1, link_list_2_1->get(1).get_index());
+    CHECK_EQUAL(2, link_list_2_2->size());
+    CHECK_EQUAL(1, link_list_2_2->get(0).get_index());
+    CHECK_EQUAL(2, link_list_2_2->get(1).get_index());
+    CHECK_EQUAL(2, origin_2->get_link(4,0));
+    CHECK(origin_2->is_null_link(4,1));
+    CHECK_EQUAL(0, origin_2->get_link(4,2));
+    CHECK_EQUAL(1, target_1->get_backlink_count(0, *origin_1, 0));
+    CHECK_EQUAL(1, target_1->get_backlink_count(0, *origin_1, 4));
+    CHECK_EQUAL(1, target_1->get_backlink_count(0, *origin_2, 0));
+    CHECK_EQUAL(1, target_1->get_backlink_count(1, *origin_1, 0));
+    CHECK_EQUAL(1, target_1->get_backlink_count(1, *origin_1, 4));
+    CHECK_EQUAL(1, target_1->get_backlink_count(1, *origin_2, 0));
+    CHECK_EQUAL(0, target_1->get_backlink_count(2, *origin_1, 0));
+    CHECK_EQUAL(1, target_1->get_backlink_count(2, *origin_1, 4));
+    CHECK_EQUAL(0, target_1->get_backlink_count(2, *origin_2, 0));
+    CHECK_EQUAL(1, target_2->get_backlink_count(0, *origin_1, 2));
+    CHECK_EQUAL(1, target_2->get_backlink_count(0, *origin_2, 2));
+    CHECK_EQUAL(1, target_2->get_backlink_count(0, *origin_2, 4));
+    CHECK_EQUAL(1, target_2->get_backlink_count(1, *origin_1, 2));
+    CHECK_EQUAL(3, target_2->get_backlink_count(1, *origin_2, 2));
+    CHECK_EQUAL(0, target_2->get_backlink_count(1, *origin_2, 4));
+    CHECK_EQUAL(0, target_2->get_backlink_count(2, *origin_1, 2));
+    CHECK_EQUAL(1, target_2->get_backlink_count(2, *origin_2, 2));
+    CHECK_EQUAL(1, target_2->get_backlink_count(2, *origin_2, 4));
+    {
+        WriteTransaction wt(sg_w);
+        TableRef target_1_w = wt.get_table("target_1");
+        TableRef target_2_w = wt.get_table("target_2");
+        target_1_w->move_last_over(0); // [ 0, 1, 2 ] -> [ 2, 1 ]
+        target_2_w->move_last_over(2); // [ 0, 1, 2 ] -> [ 0, 1 ]
+        // Removes  O_1_L_3[2] -> T_1[0]  and  O_1_LL_1[1] -> T_1[2]  and
+        //          O_2_L_2[0] -> T_1[0]  and  O_2_LL_3[2] -> T_2[2]  and  O_2_L_4[0] -> T_2[2]
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, tlm);
+    group.Verify();
+    // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
+    // ----------------------------------------------------------------------------------------
+    // T_1[1]     T_2[1]     []                     null       [ T_2[1] ]             null
+    // null       null       [ T_1[0] ]             null       [ T_2[0], T_2[1] ]     null
+    // null       T_2[0]     [ T_1[1] ]             T_1[1]     [ T_2[1] ]             T_2[0]
+    CHECK_EQUAL(2, target_1->size());
+    CHECK_EQUAL(2, target_2->size());
+    CHECK(link_list_1_0->is_attached());
+    CHECK(link_list_1_1->is_attached());
+    CHECK(link_list_1_2->is_attached());
+    CHECK(link_list_2_0->is_attached());
+    CHECK(link_list_2_1->is_attached());
+    CHECK(link_list_2_2->is_attached());
+    CHECK_EQUAL(link_list_1_0, origin_1->get_linklist(4,0));
+    CHECK_EQUAL(link_list_1_1, origin_1->get_linklist(4,1));
+    CHECK_EQUAL(link_list_1_2, origin_1->get_linklist(4,2));
+    CHECK_EQUAL(link_list_2_0, origin_2->get_linklist(2,0));
+    CHECK_EQUAL(link_list_2_1, origin_2->get_linklist(2,1));
+    CHECK_EQUAL(link_list_2_2, origin_2->get_linklist(2,2));
+    CHECK_EQUAL(0, link_list_1_0->get_origin_row_index());
+    CHECK_EQUAL(1, link_list_1_1->get_origin_row_index());
+    CHECK_EQUAL(2, link_list_1_2->get_origin_row_index());
+    CHECK_EQUAL(0, link_list_2_0->get_origin_row_index());
+    CHECK_EQUAL(1, link_list_2_1->get_origin_row_index());
+    CHECK_EQUAL(2, link_list_2_2->get_origin_row_index());
+    CHECK_EQUAL(1, origin_1->get_link(0,0));
+    CHECK(origin_1->is_null_link(0,1));
+    CHECK(origin_1->is_null_link(0,2));
+    CHECK_EQUAL(1, origin_1->get_link(2,0));
+    CHECK(origin_1->is_null_link(2,1));
+    CHECK_EQUAL(0, origin_1->get_link(2,2));
+    CHECK_EQUAL(0, link_list_1_0->size());
+    CHECK_EQUAL(1, link_list_1_1->size());
+    CHECK_EQUAL(0, link_list_1_1->get(0).get_index());
+    CHECK_EQUAL(1, link_list_1_2->size());
+    CHECK_EQUAL(1, link_list_1_2->get(0).get_index());
+    CHECK(origin_2->is_null_link(0,0));
+    CHECK(origin_2->is_null_link(0,1));
+    CHECK_EQUAL(1, origin_2->get_link(0,2));
+    CHECK_EQUAL(1, link_list_2_0->size());
+    CHECK_EQUAL(1, link_list_2_0->get(0).get_index());
+    CHECK_EQUAL(2, link_list_2_1->size());
+    CHECK_EQUAL(0, link_list_2_1->get(0).get_index());
+    CHECK_EQUAL(1, link_list_2_1->get(1).get_index());
+    CHECK_EQUAL(1, link_list_2_2->size());
+    CHECK_EQUAL(1, link_list_2_2->get(0).get_index());
+    CHECK(origin_2->is_null_link(4,0));
+    CHECK(origin_2->is_null_link(4,1));
+    CHECK_EQUAL(0, origin_2->get_link(4,2));
+    CHECK_EQUAL(0, target_1->get_backlink_count(0, *origin_1, 0));
+    CHECK_EQUAL(1, target_1->get_backlink_count(0, *origin_1, 4));
+    CHECK_EQUAL(0, target_1->get_backlink_count(0, *origin_2, 0));
+    CHECK_EQUAL(1, target_1->get_backlink_count(1, *origin_1, 0));
+    CHECK_EQUAL(1, target_1->get_backlink_count(1, *origin_1, 4));
+    CHECK_EQUAL(1, target_1->get_backlink_count(1, *origin_2, 0));
+    CHECK_EQUAL(1, target_2->get_backlink_count(0, *origin_1, 2));
+    CHECK_EQUAL(1, target_2->get_backlink_count(0, *origin_2, 2));
+    CHECK_EQUAL(1, target_2->get_backlink_count(0, *origin_2, 4));
+    CHECK_EQUAL(1, target_2->get_backlink_count(1, *origin_1, 2));
+    CHECK_EQUAL(3, target_2->get_backlink_count(1, *origin_2, 2));
+    CHECK_EQUAL(0, target_2->get_backlink_count(1, *origin_2, 4));
+    {
+        WriteTransaction wt(sg_w);
+        TableRef origin_1_w = wt.get_table("origin_1");
+        TableRef origin_2_w = wt.get_table("origin_2");
+        TableRef target_1_w = wt.get_table("target_1");
+        TableRef target_2_w = wt.get_table("target_2");
+        target_1_w->add_empty_row();   // [ 2, 1 ] -> [ 2, 1, 3 ]
+        origin_1_w->set_link(0,2,2);           // O_1_L_3[2]  -> T_1[2]
+        origin_1_w->get_linklist(4,1)->add(2); // O_1_LL_1[1] -> T_1[2]
+        origin_2_w->set_link(0,0,2);           // O_2_L_2[0]  -> T_1[2]
+        target_2_w->move_last_over(0); // [ 0, 1 ] -> [ 1 ]
+        // Removes  O_1_L_4[0]  -> T_2[1]  and  O_1_L_4[2]  -> T_2[0]  and
+        //          O_2_LL_3[0] -> T_2[1]  and  O_2_LL_3[1] -> T_2[1]  and
+        //          O_2_LL_3[2] -> T_2[1]  and  O_2_L_4[2]  -> T_2[0]
+        // Adds     O_1_L_4[0]  -> T_2[0]  and  O_2_LL_3[0] -> T_2[0]  and
+        //          O_2_LL_3[2] -> T_2[0]
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, tlm);
+    group.Verify();
+    // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
+    // ----------------------------------------------------------------------------------------
+    // T_1[1]     T_2[0]     []                     T_1[2]     [ T_2[0] ]             null
+    // null       null       [ T_1[0], T_1[2] ]     null       [ T_2[0] ]             null
+    // T_1[2]     null       [ T_1[1] ]             T_1[1]     [ T_2[0] ]             null
+    CHECK_EQUAL(3, target_1->size());
+    CHECK_EQUAL(1, target_2->size());
+    CHECK(link_list_1_0->is_attached());
+    CHECK(link_list_1_1->is_attached());
+    CHECK(link_list_1_2->is_attached());
+    CHECK(link_list_2_0->is_attached());
+    CHECK(link_list_2_1->is_attached());
+    CHECK(link_list_2_2->is_attached());
+    CHECK_EQUAL(link_list_1_0, origin_1->get_linklist(4,0));
+    CHECK_EQUAL(link_list_1_1, origin_1->get_linklist(4,1));
+    CHECK_EQUAL(link_list_1_2, origin_1->get_linklist(4,2));
+    CHECK_EQUAL(link_list_2_0, origin_2->get_linklist(2,0));
+    CHECK_EQUAL(link_list_2_1, origin_2->get_linklist(2,1));
+    CHECK_EQUAL(link_list_2_2, origin_2->get_linklist(2,2));
+    CHECK_EQUAL(0, link_list_1_0->get_origin_row_index());
+    CHECK_EQUAL(1, link_list_1_1->get_origin_row_index());
+    CHECK_EQUAL(2, link_list_1_2->get_origin_row_index());
+    CHECK_EQUAL(0, link_list_2_0->get_origin_row_index());
+    CHECK_EQUAL(1, link_list_2_1->get_origin_row_index());
+    CHECK_EQUAL(2, link_list_2_2->get_origin_row_index());
+    CHECK_EQUAL(1, origin_1->get_link(0,0));
+    CHECK(origin_1->is_null_link(0,1));
+    CHECK_EQUAL(2, origin_1->get_link(0,2));
+    CHECK_EQUAL(0, origin_1->get_link(2,0));
+    CHECK(origin_1->is_null_link(2,1));
+    CHECK(origin_1->is_null_link(2,2));
+    CHECK_EQUAL(0, link_list_1_0->size());
+    CHECK_EQUAL(2, link_list_1_1->size());
+    CHECK_EQUAL(0, link_list_1_1->get(0).get_index());
+    CHECK_EQUAL(2, link_list_1_1->get(1).get_index());
+    CHECK_EQUAL(1, link_list_1_2->size());
+    CHECK_EQUAL(1, link_list_1_2->get(0).get_index());
+    CHECK_EQUAL(2, origin_2->get_link(0,0));
+    CHECK(origin_2->is_null_link(0,1));
+    CHECK_EQUAL(1, origin_2->get_link(0,2));
+    CHECK_EQUAL(1, link_list_2_0->size());
+    CHECK_EQUAL(0, link_list_2_0->get(0).get_index());
+    CHECK_EQUAL(1, link_list_2_1->size());
+    CHECK_EQUAL(0, link_list_2_1->get(0).get_index());
+    CHECK_EQUAL(1, link_list_2_2->size());
+    CHECK_EQUAL(0, link_list_2_2->get(0).get_index());
+    CHECK(origin_2->is_null_link(4,0));
+    CHECK(origin_2->is_null_link(4,1));
+    CHECK(origin_2->is_null_link(4,2));
+    CHECK_EQUAL(0, target_1->get_backlink_count(0, *origin_1, 0));
+    CHECK_EQUAL(1, target_1->get_backlink_count(0, *origin_1, 4));
+    CHECK_EQUAL(0, target_1->get_backlink_count(0, *origin_2, 0));
+    CHECK_EQUAL(1, target_1->get_backlink_count(1, *origin_1, 0));
+    CHECK_EQUAL(1, target_1->get_backlink_count(1, *origin_1, 4));
+    CHECK_EQUAL(1, target_1->get_backlink_count(1, *origin_2, 0));
+    CHECK_EQUAL(1, target_1->get_backlink_count(2, *origin_1, 0));
+    CHECK_EQUAL(1, target_1->get_backlink_count(2, *origin_1, 4));
+    CHECK_EQUAL(1, target_1->get_backlink_count(2, *origin_2, 0));
+    CHECK_EQUAL(1, target_2->get_backlink_count(0, *origin_1, 2));
+    CHECK_EQUAL(3, target_2->get_backlink_count(0, *origin_2, 2));
+    CHECK_EQUAL(0, target_2->get_backlink_count(0, *origin_2, 4));
+    {
+        WriteTransaction wt(sg_w);
+        TableRef target_1_w = wt.get_table("target_1");
+        TableRef target_2_w = wt.get_table("target_2");
+        target_1_w->move_last_over(1); // [ 2, 1, 3 ] -> [ 2, 3 ]
+        target_2_w->move_last_over(0); // [ 1 ] -> []
+        // Removes  O_1_L_3[0]  -> T_1[1]  and  O_1_L_3[2]  -> T_1[2]  and
+        //          O_1_L_4[0]  -> T_2[0]  and  O_1_LL_1[1] -> T_1[2]  and
+        //          O_1_LL_1[2] -> T_1[1]  and  O_2_L_2[0]  -> T_1[2]  and
+        //          O_2_L_2[2]  -> T_1[1]  and  O_2_LL_3[0] -> T_2[0]  and
+        //          O_2_LL_3[1] -> T_2[0]  and  O_2_LL_3[2] -> T_2[0]
+        // Adds     O_1_L_3[2]  -> T_1[1]  and  O_1_LL_1[1] -> T_1[1]  and
+        //          O_2_L_2[0]  -> T_1[1]
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, tlm);
+    group.Verify();
+    // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
+    // ----------------------------------------------------------------------------------------
+    // null       null       []                     T_1[1]     []                     null
+    // null       null       [ T_1[0], T_1[1] ]     null       []                     null
+    // T_1[1]     null       []                     null       []                     null
+    CHECK_EQUAL(2, target_1->size());
+    CHECK_EQUAL(0, target_2->size());
+    CHECK(link_list_1_0->is_attached());
+    CHECK(link_list_1_1->is_attached());
+    CHECK(link_list_1_2->is_attached());
+    CHECK(link_list_2_0->is_attached());
+    CHECK(link_list_2_1->is_attached());
+    CHECK(link_list_2_2->is_attached());
+    CHECK_EQUAL(link_list_1_0, origin_1->get_linklist(4,0));
+    CHECK_EQUAL(link_list_1_1, origin_1->get_linklist(4,1));
+    CHECK_EQUAL(link_list_1_2, origin_1->get_linklist(4,2));
+    CHECK_EQUAL(link_list_2_0, origin_2->get_linklist(2,0));
+    CHECK_EQUAL(link_list_2_1, origin_2->get_linklist(2,1));
+    CHECK_EQUAL(link_list_2_2, origin_2->get_linklist(2,2));
+    CHECK_EQUAL(0, link_list_1_0->get_origin_row_index());
+    CHECK_EQUAL(1, link_list_1_1->get_origin_row_index());
+    CHECK_EQUAL(2, link_list_1_2->get_origin_row_index());
+    CHECK_EQUAL(0, link_list_2_0->get_origin_row_index());
+    CHECK_EQUAL(1, link_list_2_1->get_origin_row_index());
+    CHECK_EQUAL(2, link_list_2_2->get_origin_row_index());
+    CHECK(origin_1->is_null_link(0,0));
+    CHECK(origin_1->is_null_link(0,1));
+    CHECK_EQUAL(1, origin_1->get_link(0,2));
+    CHECK(origin_1->is_null_link(2,0));
+    CHECK(origin_1->is_null_link(2,1));
+    CHECK(origin_1->is_null_link(2,2));
+    CHECK_EQUAL(0, link_list_1_0->size());
+    CHECK_EQUAL(2, link_list_1_1->size());
+    CHECK_EQUAL(0, link_list_1_1->get(0).get_index());
+    CHECK_EQUAL(1, link_list_1_1->get(1).get_index());
+    CHECK_EQUAL(0, link_list_1_2->size());
+    CHECK_EQUAL(1, origin_2->get_link(0,0));
+    CHECK(origin_2->is_null_link(0,1));
+    CHECK(origin_2->is_null_link(0,2));
+    CHECK_EQUAL(0, link_list_2_0->size());
+    CHECK_EQUAL(0, link_list_2_1->size());
+    CHECK_EQUAL(0, link_list_2_2->size());
+    CHECK(origin_2->is_null_link(4,0));
+    CHECK(origin_2->is_null_link(4,1));
+    CHECK(origin_2->is_null_link(4,2));
+    CHECK_EQUAL(0, target_1->get_backlink_count(0, *origin_1, 0));
+    CHECK_EQUAL(1, target_1->get_backlink_count(0, *origin_1, 4));
+    CHECK_EQUAL(0, target_1->get_backlink_count(0, *origin_2, 0));
+    CHECK_EQUAL(1, target_1->get_backlink_count(1, *origin_1, 0));
+    CHECK_EQUAL(1, target_1->get_backlink_count(1, *origin_1, 4));
+    CHECK_EQUAL(1, target_1->get_backlink_count(1, *origin_2, 0));
+    {
+        WriteTransaction wt(sg_w);
+        TableRef origin_1_w = wt.get_table("origin_1");
+        TableRef origin_2_w = wt.get_table("origin_2");
+        TableRef target_1_w = wt.get_table("target_1");
+        TableRef target_2_w = wt.get_table("target_2");
+        target_1_w->move_last_over(1); // [ 2, 3 ] -> [ 2 ]
+        // Removes  O_1_L_3[2] -> T_1[1]  and  O_1_LL_1[1] -> T_1[1]  and  O_2_L_2[0] -> T_1[1]
+        target_2_w->add_empty_row(3); // [] -> [ 3, 4, 5 ]
+        origin_1_w->set_link(2,0,1);           // O_1_L_4[0]  -> T_2[1]
+        origin_1_w->set_link(2,2,0);           // O_1_L_4[2]  -> T_2[0]
+        origin_2_w->get_linklist(2,0)->add(1); // O_2_LL_3[0] -> T_2[1]
+        origin_2_w->get_linklist(2,0)->add(1); // O_2_LL_3[0] -> T_2[1]
+        origin_2_w->get_linklist(2,2)->add(0); // O_2_LL_3[2] -> T_2[0]
+        origin_2_w->set_link(4,0,0);           // O_2_L_4[0]  -> T_2[0]
+        origin_2_w->set_link(4,1,1);           // O_2_L_4[1]  -> T_2[1]
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, tlm);
+    group.Verify();
+    // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
+    // ----------------------------------------------------------------------------------------
+    // null       T_2[1]     []                     null       [ T_2[1], T_2[1] ]     T_2[0]
+    // null       null       [ T_1[0] ]             null       []                     T_2[1]
+    // null       T_2[0]     []                     null       [ T_2[0] ]             null
+    CHECK_EQUAL(1, target_1->size());
+    CHECK_EQUAL(3, target_2->size());
+    CHECK(link_list_1_0->is_attached());
+    CHECK(link_list_1_1->is_attached());
+    CHECK(link_list_1_2->is_attached());
+    CHECK(link_list_2_0->is_attached());
+    CHECK(link_list_2_1->is_attached());
+    CHECK(link_list_2_2->is_attached());
+    CHECK_EQUAL(link_list_1_0, origin_1->get_linklist(4,0));
+    CHECK_EQUAL(link_list_1_1, origin_1->get_linklist(4,1));
+    CHECK_EQUAL(link_list_1_2, origin_1->get_linklist(4,2));
+    CHECK_EQUAL(link_list_2_0, origin_2->get_linklist(2,0));
+    CHECK_EQUAL(link_list_2_1, origin_2->get_linklist(2,1));
+    CHECK_EQUAL(link_list_2_2, origin_2->get_linklist(2,2));
+    CHECK_EQUAL(0, link_list_1_0->get_origin_row_index());
+    CHECK_EQUAL(1, link_list_1_1->get_origin_row_index());
+    CHECK_EQUAL(2, link_list_1_2->get_origin_row_index());
+    CHECK_EQUAL(0, link_list_2_0->get_origin_row_index());
+    CHECK_EQUAL(1, link_list_2_1->get_origin_row_index());
+    CHECK_EQUAL(2, link_list_2_2->get_origin_row_index());
+    CHECK(origin_1->is_null_link(0,0));
+    CHECK(origin_1->is_null_link(0,1));
+    CHECK(origin_1->is_null_link(0,2));
+    CHECK_EQUAL(1, origin_1->get_link(2,0));
+    CHECK(origin_1->is_null_link(2,1));
+    CHECK_EQUAL(0, origin_1->get_link(2,2));
+    CHECK_EQUAL(0, link_list_1_0->size());
+    CHECK_EQUAL(1, link_list_1_1->size());
+    CHECK_EQUAL(0, link_list_1_1->get(0).get_index());
+    CHECK_EQUAL(0, link_list_1_2->size());
+    CHECK(origin_2->is_null_link(0,0));
+    CHECK(origin_2->is_null_link(0,1));
+    CHECK(origin_2->is_null_link(0,2));
+    CHECK_EQUAL(2, link_list_2_0->size());
+    CHECK_EQUAL(1, link_list_2_0->get(0).get_index());
+    CHECK_EQUAL(1, link_list_2_0->get(1).get_index());
+    CHECK_EQUAL(0, link_list_2_1->size());
+    CHECK_EQUAL(1, link_list_2_2->size());
+    CHECK_EQUAL(0, link_list_2_2->get(0).get_index());
+    CHECK_EQUAL(0, origin_2->get_link(4,0));
+    CHECK_EQUAL(1, origin_2->get_link(4,1));
+    CHECK(origin_2->is_null_link(4,2));
+    CHECK_EQUAL(0, target_1->get_backlink_count(0, *origin_1, 0));
+    CHECK_EQUAL(1, target_1->get_backlink_count(0, *origin_1, 4));
+    CHECK_EQUAL(0, target_1->get_backlink_count(0, *origin_2, 0));
+    CHECK_EQUAL(1, target_2->get_backlink_count(0, *origin_1, 2));
+    CHECK_EQUAL(1, target_2->get_backlink_count(0, *origin_2, 2));
+    CHECK_EQUAL(1, target_2->get_backlink_count(0, *origin_2, 4));
+    CHECK_EQUAL(1, target_2->get_backlink_count(1, *origin_1, 2));
+    CHECK_EQUAL(2, target_2->get_backlink_count(1, *origin_2, 2));
+    CHECK_EQUAL(1, target_2->get_backlink_count(1, *origin_2, 4));
+    CHECK_EQUAL(0, target_2->get_backlink_count(2, *origin_1, 2));
+    CHECK_EQUAL(0, target_2->get_backlink_count(2, *origin_2, 2));
+    CHECK_EQUAL(0, target_2->get_backlink_count(2, *origin_2, 4));
+    {
+        WriteTransaction wt(sg_w);
+        TableRef target_1_w = wt.get_table("target_1");
+        TableRef origin_1_w = wt.get_table("origin_1");
+        TableRef origin_2_w = wt.get_table("origin_2");
+        target_1_w->add_empty_row(2); // [ 2 ] -> [ 2, 4, 5 ]
+        origin_1_w->set_link(0,0,1); // O_1_L_3[0] -> T_1[1]
+        origin_1_w->set_link(0,2,0); // O_1_L_3[2] -> T_1[0]
+        origin_1_w->get_linklist(4,0)->add(1); // O_1_LL_1[0] -> T_1[1]
+        origin_1_w->get_linklist(4,0)->add(0); // O_1_LL_1[0] -> T_1[0]
+        origin_2_w->set_link(0,0,0); // O_2_L_2[0] -> T_1[0]
+        origin_2_w->set_link(0,2,1); // O_2_L_2[2] -> T_1[1]
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, tlm);
+    group.Verify();
+    // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
+    // ----------------------------------------------------------------------------------------
+    // T_1[1]     T_2[1]     [ T_1[1], T_1[0] ]     T_1[0]     [ T_2[1], T_2[1] ]     T_2[0]
+    // null       null       [ T_1[0] ]             null       []                     T_2[1]
+    // T_1[0]     T_2[0]     []                     T_1[1]     [ T_2[0] ]             null
+    CHECK_EQUAL(3, target_1->size());
+    CHECK_EQUAL(3, target_2->size());
+    CHECK(link_list_1_0->is_attached());
+    CHECK(link_list_1_1->is_attached());
+    CHECK(link_list_1_2->is_attached());
+    CHECK(link_list_2_0->is_attached());
+    CHECK(link_list_2_1->is_attached());
+    CHECK(link_list_2_2->is_attached());
+    CHECK_EQUAL(link_list_1_0, origin_1->get_linklist(4,0));
+    CHECK_EQUAL(link_list_1_1, origin_1->get_linklist(4,1));
+    CHECK_EQUAL(link_list_1_2, origin_1->get_linklist(4,2));
+    CHECK_EQUAL(link_list_2_0, origin_2->get_linklist(2,0));
+    CHECK_EQUAL(link_list_2_1, origin_2->get_linklist(2,1));
+    CHECK_EQUAL(link_list_2_2, origin_2->get_linklist(2,2));
+    CHECK_EQUAL(0, link_list_1_0->get_origin_row_index());
+    CHECK_EQUAL(1, link_list_1_1->get_origin_row_index());
+    CHECK_EQUAL(2, link_list_1_2->get_origin_row_index());
+    CHECK_EQUAL(0, link_list_2_0->get_origin_row_index());
+    CHECK_EQUAL(1, link_list_2_1->get_origin_row_index());
+    CHECK_EQUAL(2, link_list_2_2->get_origin_row_index());
+    CHECK_EQUAL(1, origin_1->get_link(0,0));
+    CHECK(origin_1->is_null_link(0,1));
+    CHECK_EQUAL(0, origin_1->get_link(0,2));
+    CHECK_EQUAL(1, origin_1->get_link(2,0));
+    CHECK(origin_1->is_null_link(2,1));
+    CHECK_EQUAL(0, origin_1->get_link(2,2));
+    CHECK_EQUAL(2, link_list_1_0->size());
+    CHECK_EQUAL(1, link_list_1_0->get(0).get_index());
+    CHECK_EQUAL(0, link_list_1_0->get(1).get_index());
+    CHECK_EQUAL(1, link_list_1_1->size());
+    CHECK_EQUAL(0, link_list_1_1->get(0).get_index());
+    CHECK_EQUAL(0, link_list_1_2->size());
+    CHECK_EQUAL(0, origin_2->get_link(0,0));
+    CHECK(origin_2->is_null_link(0,1));
+    CHECK_EQUAL(1, origin_2->get_link(0,2));
+    CHECK_EQUAL(2, link_list_2_0->size());
+    CHECK_EQUAL(1, link_list_2_0->get(0).get_index());
+    CHECK_EQUAL(1, link_list_2_0->get(1).get_index());
+    CHECK_EQUAL(0, link_list_2_1->size());
+    CHECK_EQUAL(1, link_list_2_2->size());
+    CHECK_EQUAL(0, link_list_2_2->get(0).get_index());
+    CHECK_EQUAL(0, origin_2->get_link(4,0));
+    CHECK_EQUAL(1, origin_2->get_link(4,1));
+    CHECK(origin_2->is_null_link(4,2));
+    CHECK_EQUAL(1, target_1->get_backlink_count(0, *origin_1, 0));
+    CHECK_EQUAL(2, target_1->get_backlink_count(0, *origin_1, 4));
+    CHECK_EQUAL(1, target_1->get_backlink_count(0, *origin_2, 0));
+    CHECK_EQUAL(1, target_1->get_backlink_count(1, *origin_1, 0));
+    CHECK_EQUAL(1, target_1->get_backlink_count(1, *origin_1, 4));
+    CHECK_EQUAL(1, target_1->get_backlink_count(1, *origin_2, 0));
+    CHECK_EQUAL(0, target_1->get_backlink_count(2, *origin_1, 0));
+    CHECK_EQUAL(0, target_1->get_backlink_count(2, *origin_1, 4));
+    CHECK_EQUAL(0, target_1->get_backlink_count(2, *origin_2, 0));
+    CHECK_EQUAL(1, target_2->get_backlink_count(0, *origin_1, 2));
+    CHECK_EQUAL(1, target_2->get_backlink_count(0, *origin_2, 2));
+    CHECK_EQUAL(1, target_2->get_backlink_count(0, *origin_2, 4));
+    CHECK_EQUAL(1, target_2->get_backlink_count(1, *origin_1, 2));
+    CHECK_EQUAL(2, target_2->get_backlink_count(1, *origin_2, 2));
+    CHECK_EQUAL(1, target_2->get_backlink_count(1, *origin_2, 4));
+    CHECK_EQUAL(0, target_2->get_backlink_count(2, *origin_1, 2));
+    CHECK_EQUAL(0, target_2->get_backlink_count(2, *origin_2, 2));
+    CHECK_EQUAL(0, target_2->get_backlink_count(2, *origin_2, 4));
 
+    // Check that an origin-side table can be cleared
+    {
+        WriteTransaction wt(sg_w);
+        TableRef origin_2_w = wt.get_table("origin_2");
+        origin_2_w->clear();
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, tlm);
+    group.Verify();
+    // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
+    // ----------------------------------------------------------------------------------------
+    // T_1[1]     T_2[1]     [ T_1[1], T_1[0] ]
+    // null       null       [ T_1[0] ]
+    // T_1[0]     T_2[0]     []
+    CHECK_EQUAL(3, origin_1->size());
+    CHECK_EQUAL(0, origin_2->size());
+    CHECK(link_list_1_0->is_attached());
+    CHECK(link_list_1_1->is_attached());
+    CHECK(link_list_1_2->is_attached());
+    CHECK(!link_list_2_0->is_attached());
+    CHECK(!link_list_2_1->is_attached());
+    CHECK(!link_list_2_2->is_attached());
+    CHECK_EQUAL(link_list_1_0, origin_1->get_linklist(4,0));
+    CHECK_EQUAL(link_list_1_1, origin_1->get_linklist(4,1));
+    CHECK_EQUAL(link_list_1_2, origin_1->get_linklist(4,2));
+    link_list_2_0.reset();
+    link_list_2_1.reset();
+    link_list_2_2.reset();
+    CHECK_EQUAL(0, link_list_1_0->get_origin_row_index());
+    CHECK_EQUAL(1, link_list_1_1->get_origin_row_index());
+    CHECK_EQUAL(2, link_list_1_2->get_origin_row_index());
+    CHECK_EQUAL(1, origin_1->get_link(0,0));
+    CHECK(origin_1->is_null_link(0,1));
+    CHECK_EQUAL(0, origin_1->get_link(0,2));
+    CHECK_EQUAL(1, origin_1->get_link(2,0));
+    CHECK(origin_1->is_null_link(2,1));
+    CHECK_EQUAL(0, origin_1->get_link(2,2));
+    CHECK_EQUAL(2, link_list_1_0->size());
+    CHECK_EQUAL(1, link_list_1_0->get(0).get_index());
+    CHECK_EQUAL(0, link_list_1_0->get(1).get_index());
+    CHECK_EQUAL(1, link_list_1_1->size());
+    CHECK_EQUAL(0, link_list_1_1->get(0).get_index());
+    CHECK_EQUAL(0, link_list_1_2->size());
+    CHECK_EQUAL(1, target_1->get_backlink_count(0, *origin_1, 0));
+    CHECK_EQUAL(2, target_1->get_backlink_count(0, *origin_1, 4));
+    CHECK_EQUAL(0, target_1->get_backlink_count(0, *origin_2, 0));
+    CHECK_EQUAL(1, target_1->get_backlink_count(1, *origin_1, 0));
+    CHECK_EQUAL(1, target_1->get_backlink_count(1, *origin_1, 4));
+    CHECK_EQUAL(0, target_1->get_backlink_count(1, *origin_2, 0));
+    CHECK_EQUAL(0, target_1->get_backlink_count(2, *origin_1, 0));
+    CHECK_EQUAL(0, target_1->get_backlink_count(2, *origin_1, 4));
+    CHECK_EQUAL(0, target_1->get_backlink_count(2, *origin_2, 0));
+    CHECK_EQUAL(1, target_2->get_backlink_count(0, *origin_1, 2));
+    CHECK_EQUAL(0, target_2->get_backlink_count(0, *origin_2, 2));
+    CHECK_EQUAL(0, target_2->get_backlink_count(0, *origin_2, 4));
+    CHECK_EQUAL(1, target_2->get_backlink_count(1, *origin_1, 2));
+    CHECK_EQUAL(0, target_2->get_backlink_count(1, *origin_2, 2));
+    CHECK_EQUAL(0, target_2->get_backlink_count(1, *origin_2, 4));
+    CHECK_EQUAL(0, target_2->get_backlink_count(2, *origin_1, 2));
+    CHECK_EQUAL(0, target_2->get_backlink_count(2, *origin_2, 2));
+    CHECK_EQUAL(0, target_2->get_backlink_count(2, *origin_2, 4));
+    {
+        WriteTransaction wt(sg_w);
+        TableRef origin_2_w = wt.get_table("origin_2");
+        origin_2_w->add_empty_row(3);
+        origin_2_w->set_link(0,0,0);
+        origin_2_w->set_link(0,2,1);
+        origin_2_w->get_linklist(2,0)->add(1);
+        origin_2_w->get_linklist(2,0)->add(1);
+        origin_2_w->get_linklist(2,2)->add(0);
+        origin_2_w->set_link(4,0,0);
+        origin_2_w->set_link(4,1,1);
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, tlm);
+    group.Verify();
+    // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
+    // ----------------------------------------------------------------------------------------
+    // T_1[1]     T_2[1]     [ T_1[1], T_1[0] ]     T_1[0]     [ T_2[1], T_2[1] ]     T_2[0]
+    // null       null       [ T_1[0] ]             null       []                     T_2[1]
+    // T_1[0]     T_2[0]     []                     T_1[1]     [ T_2[0] ]             null
+    CHECK_EQUAL(3, origin_1->size());
+    CHECK_EQUAL(3, origin_2->size());
+    CHECK(link_list_1_0->is_attached());
+    CHECK(link_list_1_1->is_attached());
+    CHECK(link_list_1_2->is_attached());
+    CHECK_EQUAL(link_list_1_0, origin_1->get_linklist(4,0));
+    CHECK_EQUAL(link_list_1_1, origin_1->get_linklist(4,1));
+    CHECK_EQUAL(link_list_1_2, origin_1->get_linklist(4,2));
+    link_list_2_0 = origin_2->get_linklist(2,0);
+    link_list_2_1 = origin_2->get_linklist(2,1);
+    link_list_2_2 = origin_2->get_linklist(2,2);
+    CHECK_EQUAL(0, link_list_1_0->get_origin_row_index());
+    CHECK_EQUAL(1, link_list_1_1->get_origin_row_index());
+    CHECK_EQUAL(2, link_list_1_2->get_origin_row_index());
+    CHECK_EQUAL(0, link_list_2_0->get_origin_row_index());
+    CHECK_EQUAL(1, link_list_2_1->get_origin_row_index());
+    CHECK_EQUAL(2, link_list_2_2->get_origin_row_index());
+    CHECK_EQUAL(1, origin_1->get_link(0,0));
+    CHECK(origin_1->is_null_link(0,1));
+    CHECK_EQUAL(0, origin_1->get_link(0,2));
+    CHECK_EQUAL(1, origin_1->get_link(2,0));
+    CHECK(origin_1->is_null_link(2,1));
+    CHECK_EQUAL(0, origin_1->get_link(2,2));
+    CHECK_EQUAL(2, link_list_1_0->size());
+    CHECK_EQUAL(1, link_list_1_0->get(0).get_index());
+    CHECK_EQUAL(0, link_list_1_0->get(1).get_index());
+    CHECK_EQUAL(1, link_list_1_1->size());
+    CHECK_EQUAL(0, link_list_1_1->get(0).get_index());
+    CHECK_EQUAL(0, link_list_1_2->size());
+    CHECK_EQUAL(0, origin_2->get_link(0,0));
+    CHECK(origin_2->is_null_link(0,1));
+    CHECK_EQUAL(1, origin_2->get_link(0,2));
+    CHECK_EQUAL(2, link_list_2_0->size());
+    CHECK_EQUAL(1, link_list_2_0->get(0).get_index());
+    CHECK_EQUAL(1, link_list_2_0->get(1).get_index());
+    CHECK_EQUAL(0, link_list_2_1->size());
+    CHECK_EQUAL(1, link_list_2_2->size());
+    CHECK_EQUAL(0, link_list_2_2->get(0).get_index());
+    CHECK_EQUAL(0, origin_2->get_link(4,0));
+    CHECK_EQUAL(1, origin_2->get_link(4,1));
+    CHECK(origin_2->is_null_link(4,2));
+    CHECK_EQUAL(1, target_1->get_backlink_count(0, *origin_1, 0));
+    CHECK_EQUAL(2, target_1->get_backlink_count(0, *origin_1, 4));
+    CHECK_EQUAL(1, target_1->get_backlink_count(0, *origin_2, 0));
+    CHECK_EQUAL(1, target_1->get_backlink_count(1, *origin_1, 0));
+    CHECK_EQUAL(1, target_1->get_backlink_count(1, *origin_1, 4));
+    CHECK_EQUAL(1, target_1->get_backlink_count(1, *origin_2, 0));
+    CHECK_EQUAL(0, target_1->get_backlink_count(2, *origin_1, 0));
+    CHECK_EQUAL(0, target_1->get_backlink_count(2, *origin_1, 4));
+    CHECK_EQUAL(0, target_1->get_backlink_count(2, *origin_2, 0));
+    CHECK_EQUAL(1, target_2->get_backlink_count(0, *origin_1, 2));
+    CHECK_EQUAL(1, target_2->get_backlink_count(0, *origin_2, 2));
+    CHECK_EQUAL(1, target_2->get_backlink_count(0, *origin_2, 4));
+    CHECK_EQUAL(1, target_2->get_backlink_count(1, *origin_1, 2));
+    CHECK_EQUAL(2, target_2->get_backlink_count(1, *origin_2, 2));
+    CHECK_EQUAL(1, target_2->get_backlink_count(1, *origin_2, 4));
+    CHECK_EQUAL(0, target_2->get_backlink_count(2, *origin_1, 2));
+    CHECK_EQUAL(0, target_2->get_backlink_count(2, *origin_2, 2));
+    CHECK_EQUAL(0, target_2->get_backlink_count(2, *origin_2, 4));
 
-    // CHECK: That list accessors are properly detached on row removal, and finally after table clear
+    // Check that a target-side table can be cleared
+    {
+        WriteTransaction wt(sg_w);
+        TableRef target_2_w = wt.get_table("target_2");
+        target_2_w->clear();
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, tlm);
+    group.Verify();
+    // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
+    // ----------------------------------------------------------------------------------------
+    // T_1[1]     null       [ T_1[1], T_1[0] ]     T_1[0]     []                     null
+    // null       null       [ T_1[0] ]             null       []                     null
+    // T_1[0]     null       []                     T_1[1]     []                     null
+    CHECK_EQUAL(3, origin_1->size());
+    CHECK_EQUAL(3, origin_2->size());
+    CHECK_EQUAL(3, target_1->size());
+    CHECK_EQUAL(0, target_2->size());
+    CHECK(link_list_1_0->is_attached());
+    CHECK(link_list_1_1->is_attached());
+    CHECK(link_list_1_2->is_attached());
+    CHECK(link_list_2_0->is_attached());
+    CHECK(link_list_2_1->is_attached());
+    CHECK(link_list_2_2->is_attached());
+    CHECK_EQUAL(link_list_1_0, origin_1->get_linklist(4,0));
+    CHECK_EQUAL(link_list_1_1, origin_1->get_linklist(4,1));
+    CHECK_EQUAL(link_list_1_2, origin_1->get_linklist(4,2));
+    CHECK_EQUAL(link_list_2_0, origin_2->get_linklist(2,0));
+    CHECK_EQUAL(link_list_2_1, origin_2->get_linklist(2,1));
+    CHECK_EQUAL(link_list_2_2, origin_2->get_linklist(2,2));
+    CHECK_EQUAL(0, link_list_1_0->get_origin_row_index());
+    CHECK_EQUAL(1, link_list_1_1->get_origin_row_index());
+    CHECK_EQUAL(2, link_list_1_2->get_origin_row_index());
+    CHECK_EQUAL(0, link_list_2_0->get_origin_row_index());
+    CHECK_EQUAL(1, link_list_2_1->get_origin_row_index());
+    CHECK_EQUAL(2, link_list_2_2->get_origin_row_index());
+    CHECK_EQUAL(1, origin_1->get_link(0,0));
+    CHECK(origin_1->is_null_link(0,1));
+    CHECK_EQUAL(0, origin_1->get_link(0,2));
+    CHECK(origin_1->is_null_link(2,0));
+    CHECK(origin_1->is_null_link(2,1));
+    CHECK(origin_1->is_null_link(2,2));
+    CHECK_EQUAL(2, link_list_1_0->size());
+    CHECK_EQUAL(1, link_list_1_0->get(0).get_index());
+    CHECK_EQUAL(0, link_list_1_0->get(1).get_index());
+    CHECK_EQUAL(1, link_list_1_1->size());
+    CHECK_EQUAL(0, link_list_1_1->get(0).get_index());
+    CHECK_EQUAL(0, link_list_1_2->size());
+    CHECK_EQUAL(0, origin_2->get_link(0,0));
+    CHECK(origin_2->is_null_link(0,1));
+    CHECK_EQUAL(1, origin_2->get_link(0,2));
+    CHECK_EQUAL(0, link_list_2_0->size());
+    CHECK_EQUAL(0, link_list_2_1->size());
+    CHECK_EQUAL(0, link_list_2_2->size());
+    CHECK(origin_2->is_null_link(4,0));
+    CHECK(origin_2->is_null_link(4,1));
+    CHECK(origin_2->is_null_link(4,2));
+    CHECK_EQUAL(1, target_1->get_backlink_count(0, *origin_1, 0));
+    CHECK_EQUAL(2, target_1->get_backlink_count(0, *origin_1, 4));
+    CHECK_EQUAL(1, target_1->get_backlink_count(0, *origin_2, 0));
+    CHECK_EQUAL(1, target_1->get_backlink_count(1, *origin_1, 0));
+    CHECK_EQUAL(1, target_1->get_backlink_count(1, *origin_1, 4));
+    CHECK_EQUAL(1, target_1->get_backlink_count(1, *origin_2, 0));
+    CHECK_EQUAL(0, target_1->get_backlink_count(2, *origin_1, 0));
+    CHECK_EQUAL(0, target_1->get_backlink_count(2, *origin_1, 4));
+    CHECK_EQUAL(0, target_1->get_backlink_count(2, *origin_2, 0));
+    {
+        WriteTransaction wt(sg_w);
+        TableRef origin_1_w = wt.get_table("origin_1");
+        TableRef origin_2_w = wt.get_table("origin_2");
+        TableRef target_2_w = wt.get_table("target_2");
+        target_2_w->add_empty_row(3);
+        origin_1_w->set_link(2,0,1);
+        origin_1_w->set_link(2,2,0);
+        origin_2_w->get_linklist(2,0)->add(1);
+        origin_2_w->get_linklist(2,0)->add(1);
+        origin_2_w->get_linklist(2,2)->add(0);
+        origin_2_w->set_link(4,0,0);
+        origin_2_w->set_link(4,1,1);
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, tlm);
+    group.Verify();
+    // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
+    // ----------------------------------------------------------------------------------------
+    // T_1[1]     T_2[1]     [ T_1[1], T_1[0] ]     T_1[0]     [ T_2[1], T_2[1] ]     T_2[0]
+    // null       null       [ T_1[0] ]             null       []                     T_2[1]
+    // T_1[0]     T_2[0]     []                     T_1[1]     [ T_2[0] ]             null
+    CHECK_EQUAL(3, target_1->size());
+    CHECK_EQUAL(3, target_2->size());
+    CHECK(link_list_1_0->is_attached());
+    CHECK(link_list_1_1->is_attached());
+    CHECK(link_list_1_2->is_attached());
+    CHECK(link_list_2_0->is_attached());
+    CHECK(link_list_2_1->is_attached());
+    CHECK(link_list_2_2->is_attached());
+    CHECK_EQUAL(link_list_1_0, origin_1->get_linklist(4,0));
+    CHECK_EQUAL(link_list_1_1, origin_1->get_linklist(4,1));
+    CHECK_EQUAL(link_list_1_2, origin_1->get_linklist(4,2));
+    CHECK_EQUAL(link_list_2_0, origin_2->get_linklist(2,0));
+    CHECK_EQUAL(link_list_2_1, origin_2->get_linklist(2,1));
+    CHECK_EQUAL(link_list_2_2, origin_2->get_linklist(2,2));
+    CHECK_EQUAL(0, link_list_1_0->get_origin_row_index());
+    CHECK_EQUAL(1, link_list_1_1->get_origin_row_index());
+    CHECK_EQUAL(2, link_list_1_2->get_origin_row_index());
+    CHECK_EQUAL(0, link_list_2_0->get_origin_row_index());
+    CHECK_EQUAL(1, link_list_2_1->get_origin_row_index());
+    CHECK_EQUAL(2, link_list_2_2->get_origin_row_index());
+    CHECK_EQUAL(1, origin_1->get_link(0,0));
+    CHECK(origin_1->is_null_link(0,1));
+    CHECK_EQUAL(0, origin_1->get_link(0,2));
+    CHECK_EQUAL(1, origin_1->get_link(2,0));
+    CHECK(origin_1->is_null_link(2,1));
+    CHECK_EQUAL(0, origin_1->get_link(2,2));
+    CHECK_EQUAL(2, link_list_1_0->size());
+    CHECK_EQUAL(1, link_list_1_0->get(0).get_index());
+    CHECK_EQUAL(0, link_list_1_0->get(1).get_index());
+    CHECK_EQUAL(1, link_list_1_1->size());
+    CHECK_EQUAL(0, link_list_1_1->get(0).get_index());
+    CHECK_EQUAL(0, link_list_1_2->size());
+    CHECK_EQUAL(0, origin_2->get_link(0,0));
+    CHECK(origin_2->is_null_link(0,1));
+    CHECK_EQUAL(1, origin_2->get_link(0,2));
+    CHECK_EQUAL(2, link_list_2_0->size());
+    CHECK_EQUAL(1, link_list_2_0->get(0).get_index());
+    CHECK_EQUAL(1, link_list_2_0->get(1).get_index());
+    CHECK_EQUAL(0, link_list_2_1->size());
+    CHECK_EQUAL(1, link_list_2_2->size());
+    CHECK_EQUAL(0, link_list_2_2->get(0).get_index());
+    CHECK_EQUAL(0, origin_2->get_link(4,0));
+    CHECK_EQUAL(1, origin_2->get_link(4,1));
+    CHECK(origin_2->is_null_link(4,2));
+    CHECK_EQUAL(1, target_1->get_backlink_count(0, *origin_1, 0));
+    CHECK_EQUAL(2, target_1->get_backlink_count(0, *origin_1, 4));
+    CHECK_EQUAL(1, target_1->get_backlink_count(0, *origin_2, 0));
+    CHECK_EQUAL(1, target_1->get_backlink_count(1, *origin_1, 0));
+    CHECK_EQUAL(1, target_1->get_backlink_count(1, *origin_1, 4));
+    CHECK_EQUAL(1, target_1->get_backlink_count(1, *origin_2, 0));
+    CHECK_EQUAL(0, target_1->get_backlink_count(2, *origin_1, 0));
+    CHECK_EQUAL(0, target_1->get_backlink_count(2, *origin_1, 4));
+    CHECK_EQUAL(0, target_1->get_backlink_count(2, *origin_2, 0));
+    CHECK_EQUAL(1, target_2->get_backlink_count(0, *origin_1, 2));
+    CHECK_EQUAL(1, target_2->get_backlink_count(0, *origin_2, 2));
+    CHECK_EQUAL(1, target_2->get_backlink_count(0, *origin_2, 4));
+    CHECK_EQUAL(1, target_2->get_backlink_count(1, *origin_1, 2));
+    CHECK_EQUAL(2, target_2->get_backlink_count(1, *origin_2, 2));
+    CHECK_EQUAL(1, target_2->get_backlink_count(1, *origin_2, 4));
+    CHECK_EQUAL(0, target_2->get_backlink_count(2, *origin_1, 2));
+    CHECK_EQUAL(0, target_2->get_backlink_count(2, *origin_2, 2));
+    CHECK_EQUAL(0, target_2->get_backlink_count(2, *origin_2, 4));
 
-    // Insert extra column in all three tables
+    // Check that non-link columns can be inserted into origin table and removed
+    // from it
+    CHECK_EQUAL(5, origin_1->get_column_count());
+    CHECK_EQUAL(5, origin_2->get_column_count());
+    CHECK_EQUAL(type_Link,     origin_1->get_column_type(0));
+    CHECK_EQUAL(type_Int,      origin_1->get_column_type(1));
+    CHECK_EQUAL(type_Link,     origin_1->get_column_type(2));
+    CHECK_EQUAL(type_Int,      origin_1->get_column_type(3));
+    CHECK_EQUAL(type_LinkList, origin_1->get_column_type(4));
+    CHECK_EQUAL(type_Link,     origin_2->get_column_type(0));
+    CHECK_EQUAL(type_Int,      origin_2->get_column_type(1));
+    CHECK_EQUAL(type_LinkList, origin_2->get_column_type(2));
+    CHECK_EQUAL(type_Int,      origin_2->get_column_type(3));
+    CHECK_EQUAL(type_Link,     origin_2->get_column_type(4));
+    {
+        WriteTransaction wt(sg_w);
+        TableRef origin_1_w = wt.get_table("origin_1");
+        TableRef origin_2_w = wt.get_table("origin_2");
+        origin_1_w->insert_column(2, type_Table,  "foo_1");
+        origin_2_w->insert_column(0, type_Table,  "foo_2");
+        origin_2_w->insert_column(6, type_String, "foo_3");
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, tlm);
+    group.Verify();
+    CHECK_EQUAL(6, origin_1->get_column_count());
+    CHECK_EQUAL(7, origin_2->get_column_count());
+    CHECK_EQUAL(type_Link,     origin_1->get_column_type(0));
+    CHECK_EQUAL(type_Int,      origin_1->get_column_type(1));
+    CHECK_EQUAL(type_Table,    origin_1->get_column_type(2));
+    CHECK_EQUAL(type_Link,     origin_1->get_column_type(3));
+    CHECK_EQUAL(type_Int,      origin_1->get_column_type(4));
+    CHECK_EQUAL(type_LinkList, origin_1->get_column_type(5));
+    CHECK_EQUAL(type_Table,    origin_2->get_column_type(0));
+    CHECK_EQUAL(type_Link,     origin_2->get_column_type(1));
+    CHECK_EQUAL(type_Int,      origin_2->get_column_type(2));
+    CHECK_EQUAL(type_LinkList, origin_2->get_column_type(3));
+    CHECK_EQUAL(type_Int,      origin_2->get_column_type(4));
+    CHECK_EQUAL(type_Link,     origin_2->get_column_type(5));
+    CHECK_EQUAL(type_String,   origin_2->get_column_type(6));
+    CHECK_EQUAL(3, origin_1->size());
+    CHECK_EQUAL(3, origin_2->size());
+    CHECK(link_list_1_0->is_attached());
+    CHECK(link_list_1_1->is_attached());
+    CHECK(link_list_1_2->is_attached());
+    CHECK(link_list_2_0->is_attached());
+    CHECK(link_list_2_1->is_attached());
+    CHECK(link_list_2_2->is_attached());
+    CHECK_EQUAL(link_list_1_0, origin_1->get_linklist(5,0));
+    CHECK_EQUAL(link_list_1_1, origin_1->get_linklist(5,1));
+    CHECK_EQUAL(link_list_1_2, origin_1->get_linklist(5,2));
+    CHECK_EQUAL(link_list_2_0, origin_2->get_linklist(3,0));
+    CHECK_EQUAL(link_list_2_1, origin_2->get_linklist(3,1));
+    CHECK_EQUAL(link_list_2_2, origin_2->get_linklist(3,2));
+    CHECK_EQUAL(0, link_list_1_0->get_origin_row_index());
+    CHECK_EQUAL(1, link_list_1_1->get_origin_row_index());
+    CHECK_EQUAL(2, link_list_1_2->get_origin_row_index());
+    CHECK_EQUAL(0, link_list_2_0->get_origin_row_index());
+    CHECK_EQUAL(1, link_list_2_1->get_origin_row_index());
+    CHECK_EQUAL(2, link_list_2_2->get_origin_row_index());
+    CHECK_EQUAL(1, origin_1->get_link(0,0));
+    CHECK(origin_1->is_null_link(0,1));
+    CHECK_EQUAL(0, origin_1->get_link(0,2));
+    CHECK_EQUAL(1, origin_1->get_link(3,0));
+    CHECK(origin_1->is_null_link(3,1));
+    CHECK_EQUAL(0, origin_1->get_link(3,2));
+    CHECK_EQUAL(2, link_list_1_0->size());
+    CHECK_EQUAL(1, link_list_1_0->get(0).get_index());
+    CHECK_EQUAL(0, link_list_1_0->get(1).get_index());
+    CHECK_EQUAL(1, link_list_1_1->size());
+    CHECK_EQUAL(0, link_list_1_1->get(0).get_index());
+    CHECK_EQUAL(0, link_list_1_2->size());
+    CHECK_EQUAL(0, origin_2->get_link(1,0));
+    CHECK(origin_2->is_null_link(1,1));
+    CHECK_EQUAL(1, origin_2->get_link(1,2));
+    CHECK_EQUAL(2, link_list_2_0->size());
+    CHECK_EQUAL(1, link_list_2_0->get(0).get_index());
+    CHECK_EQUAL(1, link_list_2_0->get(1).get_index());
+    CHECK_EQUAL(0, link_list_2_1->size());
+    CHECK_EQUAL(1, link_list_2_2->size());
+    CHECK_EQUAL(0, link_list_2_2->get(0).get_index());
+    CHECK_EQUAL(0, origin_2->get_link(5,0));
+    CHECK_EQUAL(1, origin_2->get_link(5,1));
+    CHECK(origin_2->is_null_link(5,2));
+    CHECK_EQUAL(1, target_1->get_backlink_count(0, *origin_1, 0));
+    CHECK_EQUAL(2, target_1->get_backlink_count(0, *origin_1, 5));
+    CHECK_EQUAL(1, target_1->get_backlink_count(0, *origin_2, 1));
+    CHECK_EQUAL(1, target_1->get_backlink_count(1, *origin_1, 0));
+    CHECK_EQUAL(1, target_1->get_backlink_count(1, *origin_1, 5));
+    CHECK_EQUAL(1, target_1->get_backlink_count(1, *origin_2, 1));
+    CHECK_EQUAL(0, target_1->get_backlink_count(2, *origin_1, 0));
+    CHECK_EQUAL(0, target_1->get_backlink_count(2, *origin_1, 5));
+    CHECK_EQUAL(0, target_1->get_backlink_count(2, *origin_2, 1));
+    CHECK_EQUAL(1, target_2->get_backlink_count(0, *origin_1, 3));
+    CHECK_EQUAL(1, target_2->get_backlink_count(0, *origin_2, 3));
+    CHECK_EQUAL(1, target_2->get_backlink_count(0, *origin_2, 5));
+    CHECK_EQUAL(1, target_2->get_backlink_count(1, *origin_1, 3));
+    CHECK_EQUAL(2, target_2->get_backlink_count(1, *origin_2, 3));
+    CHECK_EQUAL(1, target_2->get_backlink_count(1, *origin_2, 5));
+    CHECK_EQUAL(0, target_2->get_backlink_count(2, *origin_1, 3));
+    CHECK_EQUAL(0, target_2->get_backlink_count(2, *origin_2, 3));
+    CHECK_EQUAL(0, target_2->get_backlink_count(2, *origin_2, 5));
+    {
+        WriteTransaction wt(sg_w);
+        TableRef origin_1_w = wt.get_table("origin_1");
+        TableRef origin_2_w = wt.get_table("origin_2");
+        origin_1_w->insert_column(4, type_Mixed, "foo_4");
+        origin_2_w->remove_column(0);
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, tlm);
+    group.Verify();
+    CHECK_EQUAL(7, origin_1->get_column_count());
+    CHECK_EQUAL(6, origin_2->get_column_count());
+    CHECK_EQUAL(type_Link,     origin_1->get_column_type(0));
+    CHECK_EQUAL(type_Int,      origin_1->get_column_type(1));
+    CHECK_EQUAL(type_Table,    origin_1->get_column_type(2));
+    CHECK_EQUAL(type_Link,     origin_1->get_column_type(3));
+    CHECK_EQUAL(type_Mixed,    origin_1->get_column_type(4));
+    CHECK_EQUAL(type_Int,      origin_1->get_column_type(5));
+    CHECK_EQUAL(type_LinkList, origin_1->get_column_type(6));
+    CHECK_EQUAL(type_Link,     origin_2->get_column_type(0));
+    CHECK_EQUAL(type_Int,      origin_2->get_column_type(1));
+    CHECK_EQUAL(type_LinkList, origin_2->get_column_type(2));
+    CHECK_EQUAL(type_Int,      origin_2->get_column_type(3));
+    CHECK_EQUAL(type_Link,     origin_2->get_column_type(4));
+    CHECK_EQUAL(type_String,   origin_2->get_column_type(5));
+    CHECK(link_list_1_0->is_attached());
+    CHECK(link_list_1_1->is_attached());
+    CHECK(link_list_1_2->is_attached());
+    CHECK(link_list_2_0->is_attached());
+    CHECK(link_list_2_1->is_attached());
+    CHECK(link_list_2_2->is_attached());
+    CHECK_EQUAL(link_list_1_0, origin_1->get_linklist(6,0));
+    CHECK_EQUAL(link_list_1_1, origin_1->get_linklist(6,1));
+    CHECK_EQUAL(link_list_1_2, origin_1->get_linklist(6,2));
+    CHECK_EQUAL(link_list_2_0, origin_2->get_linklist(2,0));
+    CHECK_EQUAL(link_list_2_1, origin_2->get_linklist(2,1));
+    CHECK_EQUAL(link_list_2_2, origin_2->get_linklist(2,2));
+    CHECK_EQUAL(0, link_list_1_0->get_origin_row_index());
+    CHECK_EQUAL(1, link_list_1_1->get_origin_row_index());
+    CHECK_EQUAL(2, link_list_1_2->get_origin_row_index());
+    CHECK_EQUAL(0, link_list_2_0->get_origin_row_index());
+    CHECK_EQUAL(1, link_list_2_1->get_origin_row_index());
+    CHECK_EQUAL(2, link_list_2_2->get_origin_row_index());
+    CHECK_EQUAL(1, origin_1->get_link(0,0));
+    CHECK(origin_1->is_null_link(0,1));
+    CHECK_EQUAL(0, origin_1->get_link(0,2));
+    CHECK_EQUAL(1, origin_1->get_link(3,0));
+    CHECK(origin_1->is_null_link(3,1));
+    CHECK_EQUAL(0, origin_1->get_link(3,2));
+    CHECK_EQUAL(2, link_list_1_0->size());
+    CHECK_EQUAL(1, link_list_1_0->get(0).get_index());
+    CHECK_EQUAL(0, link_list_1_0->get(1).get_index());
+    CHECK_EQUAL(1, link_list_1_1->size());
+    CHECK_EQUAL(0, link_list_1_1->get(0).get_index());
+    CHECK_EQUAL(0, link_list_1_2->size());
+    CHECK_EQUAL(0, origin_2->get_link(0,0));
+    CHECK(origin_2->is_null_link(0,1));
+    CHECK_EQUAL(1, origin_2->get_link(0,2));
+    CHECK_EQUAL(2, link_list_2_0->size());
+    CHECK_EQUAL(1, link_list_2_0->get(0).get_index());
+    CHECK_EQUAL(1, link_list_2_0->get(1).get_index());
+    CHECK_EQUAL(0, link_list_2_1->size());
+    CHECK_EQUAL(1, link_list_2_2->size());
+    CHECK_EQUAL(0, link_list_2_2->get(0).get_index());
+    CHECK_EQUAL(0, origin_2->get_link(4,0));
+    CHECK_EQUAL(1, origin_2->get_link(4,1));
+    CHECK(origin_2->is_null_link(4,2));
+    CHECK_EQUAL(1, target_1->get_backlink_count(0, *origin_1, 0));
+    CHECK_EQUAL(2, target_1->get_backlink_count(0, *origin_1, 6));
+    CHECK_EQUAL(1, target_1->get_backlink_count(0, *origin_2, 0));
+    CHECK_EQUAL(1, target_1->get_backlink_count(1, *origin_1, 0));
+    CHECK_EQUAL(1, target_1->get_backlink_count(1, *origin_1, 6));
+    CHECK_EQUAL(1, target_1->get_backlink_count(1, *origin_2, 0));
+    CHECK_EQUAL(0, target_1->get_backlink_count(2, *origin_1, 0));
+    CHECK_EQUAL(0, target_1->get_backlink_count(2, *origin_1, 6));
+    CHECK_EQUAL(0, target_1->get_backlink_count(2, *origin_2, 0));
+    CHECK_EQUAL(1, target_2->get_backlink_count(0, *origin_1, 3));
+    CHECK_EQUAL(1, target_2->get_backlink_count(0, *origin_2, 2));
+    CHECK_EQUAL(1, target_2->get_backlink_count(0, *origin_2, 4));
+    CHECK_EQUAL(1, target_2->get_backlink_count(1, *origin_1, 3));
+    CHECK_EQUAL(2, target_2->get_backlink_count(1, *origin_2, 2));
+    CHECK_EQUAL(1, target_2->get_backlink_count(1, *origin_2, 4));
+    CHECK_EQUAL(0, target_2->get_backlink_count(2, *origin_1, 3));
+    CHECK_EQUAL(0, target_2->get_backlink_count(2, *origin_2, 2));
+    CHECK_EQUAL(0, target_2->get_backlink_count(2, *origin_2, 4));
+    {
+        WriteTransaction wt(sg_w);
+        TableRef origin_1_w = wt.get_table("origin_1");
+        TableRef origin_2_w = wt.get_table("origin_2");
+        origin_1_w->remove_column(2);
+        origin_1_w->remove_column(3);
+        origin_2_w->remove_column(5);
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, tlm);
+    group.Verify();
+    CHECK_EQUAL(5, origin_1->get_column_count());
+    CHECK_EQUAL(5, origin_2->get_column_count());
+    CHECK_EQUAL(type_Link,     origin_1->get_column_type(0));
+    CHECK_EQUAL(type_Int,      origin_1->get_column_type(1));
+    CHECK_EQUAL(type_Link,     origin_1->get_column_type(2));
+    CHECK_EQUAL(type_Int,      origin_1->get_column_type(3));
+    CHECK_EQUAL(type_LinkList, origin_1->get_column_type(4));
+    CHECK_EQUAL(type_Link,     origin_2->get_column_type(0));
+    CHECK_EQUAL(type_Int,      origin_2->get_column_type(1));
+    CHECK_EQUAL(type_LinkList, origin_2->get_column_type(2));
+    CHECK_EQUAL(type_Int,      origin_2->get_column_type(3));
+    CHECK_EQUAL(type_Link,     origin_2->get_column_type(4));
+    CHECK(link_list_1_0->is_attached());
+    CHECK(link_list_1_1->is_attached());
+    CHECK(link_list_1_2->is_attached());
+    CHECK(link_list_2_0->is_attached());
+    CHECK(link_list_2_1->is_attached());
+    CHECK(link_list_2_2->is_attached());
+    CHECK_EQUAL(link_list_1_0, origin_1->get_linklist(4,0));
+    CHECK_EQUAL(link_list_1_1, origin_1->get_linklist(4,1));
+    CHECK_EQUAL(link_list_1_2, origin_1->get_linklist(4,2));
+    CHECK_EQUAL(link_list_2_0, origin_2->get_linklist(2,0));
+    CHECK_EQUAL(link_list_2_1, origin_2->get_linklist(2,1));
+    CHECK_EQUAL(link_list_2_2, origin_2->get_linklist(2,2));
+    CHECK_EQUAL(0, link_list_1_0->get_origin_row_index());
+    CHECK_EQUAL(1, link_list_1_1->get_origin_row_index());
+    CHECK_EQUAL(2, link_list_1_2->get_origin_row_index());
+    CHECK_EQUAL(0, link_list_2_0->get_origin_row_index());
+    CHECK_EQUAL(1, link_list_2_1->get_origin_row_index());
+    CHECK_EQUAL(2, link_list_2_2->get_origin_row_index());
+    CHECK_EQUAL(1, origin_1->get_link(0,0));
+    CHECK(origin_1->is_null_link(0,1));
+    CHECK_EQUAL(0, origin_1->get_link(0,2));
+    CHECK_EQUAL(1, origin_1->get_link(2,0));
+    CHECK(origin_1->is_null_link(2,1));
+    CHECK_EQUAL(0, origin_1->get_link(2,2));
+    CHECK_EQUAL(2, link_list_1_0->size());
+    CHECK_EQUAL(1, link_list_1_0->get(0).get_index());
+    CHECK_EQUAL(0, link_list_1_0->get(1).get_index());
+    CHECK_EQUAL(1, link_list_1_1->size());
+    CHECK_EQUAL(0, link_list_1_1->get(0).get_index());
+    CHECK_EQUAL(0, link_list_1_2->size());
+    CHECK_EQUAL(0, origin_2->get_link(0,0));
+    CHECK(origin_2->is_null_link(0,1));
+    CHECK_EQUAL(1, origin_2->get_link(0,2));
+    CHECK_EQUAL(2, link_list_2_0->size());
+    CHECK_EQUAL(1, link_list_2_0->get(0).get_index());
+    CHECK_EQUAL(1, link_list_2_0->get(1).get_index());
+    CHECK_EQUAL(0, link_list_2_1->size());
+    CHECK_EQUAL(1, link_list_2_2->size());
+    CHECK_EQUAL(0, link_list_2_2->get(0).get_index());
+    CHECK_EQUAL(0, origin_2->get_link(4,0));
+    CHECK_EQUAL(1, origin_2->get_link(4,1));
+    CHECK(origin_2->is_null_link(4,2));
+    CHECK_EQUAL(1, target_1->get_backlink_count(0, *origin_1, 0));
+    CHECK_EQUAL(2, target_1->get_backlink_count(0, *origin_1, 4));
+    CHECK_EQUAL(1, target_1->get_backlink_count(0, *origin_2, 0));
+    CHECK_EQUAL(1, target_1->get_backlink_count(1, *origin_1, 0));
+    CHECK_EQUAL(1, target_1->get_backlink_count(1, *origin_1, 4));
+    CHECK_EQUAL(1, target_1->get_backlink_count(1, *origin_2, 0));
+    CHECK_EQUAL(0, target_1->get_backlink_count(2, *origin_1, 0));
+    CHECK_EQUAL(0, target_1->get_backlink_count(2, *origin_1, 4));
+    CHECK_EQUAL(0, target_1->get_backlink_count(2, *origin_2, 0));
+    CHECK_EQUAL(1, target_2->get_backlink_count(0, *origin_1, 2));
+    CHECK_EQUAL(1, target_2->get_backlink_count(0, *origin_2, 2));
+    CHECK_EQUAL(1, target_2->get_backlink_count(0, *origin_2, 4));
+    CHECK_EQUAL(1, target_2->get_backlink_count(1, *origin_1, 2));
+    CHECK_EQUAL(2, target_2->get_backlink_count(1, *origin_2, 2));
+    CHECK_EQUAL(1, target_2->get_backlink_count(1, *origin_2, 4));
+    CHECK_EQUAL(0, target_2->get_backlink_count(2, *origin_1, 2));
+    CHECK_EQUAL(0, target_2->get_backlink_count(2, *origin_2, 2));
+    CHECK_EQUAL(0, target_2->get_backlink_count(2, *origin_2, 4));
 
-    // Check
+    // Check that link columns can be inserted into origin table and removed
+    // from it
+    {
+        WriteTransaction wt(sg_w);
+        TableRef origin_1_w = wt.get_table("origin_1");
+        TableRef origin_2_w = wt.get_table("origin_2");
+        TableRef target_1_w = wt.get_table("target_1");
+        TableRef target_2_w = wt.get_table("target_2");
+        origin_1_w->insert_column_link(2, type_LinkList,  "bar_1", *target_2_w);
+        origin_2_w->insert_column_link(0, type_Link,      "bar_2", *target_1_w);
+        origin_2_w->insert_column_link(6, type_LinkList,  "bar_3", *target_2_w);
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, tlm);
+    group.Verify();
+    ConstLinkViewRef link_list_x_1 = origin_1->get_linklist(2,0);
+    CHECK_EQUAL(6, origin_1->get_column_count());
+    CHECK_EQUAL(7, origin_2->get_column_count());
+    CHECK_EQUAL(type_Link,     origin_1->get_column_type(0));
+    CHECK_EQUAL(type_Int,      origin_1->get_column_type(1));
+    CHECK_EQUAL(type_LinkList, origin_1->get_column_type(2));
+    CHECK_EQUAL(type_Link,     origin_1->get_column_type(3));
+    CHECK_EQUAL(type_Int,      origin_1->get_column_type(4));
+    CHECK_EQUAL(type_LinkList, origin_1->get_column_type(5));
+    CHECK_EQUAL(type_Link,     origin_2->get_column_type(0));
+    CHECK_EQUAL(type_Link,     origin_2->get_column_type(1));
+    CHECK_EQUAL(type_Int,      origin_2->get_column_type(2));
+    CHECK_EQUAL(type_LinkList, origin_2->get_column_type(3));
+    CHECK_EQUAL(type_Int,      origin_2->get_column_type(4));
+    CHECK_EQUAL(type_Link,     origin_2->get_column_type(5));
+    CHECK_EQUAL(type_LinkList, origin_2->get_column_type(6));
+    CHECK(link_list_1_0->is_attached());
+    CHECK(link_list_1_1->is_attached());
+    CHECK(link_list_1_2->is_attached());
+    CHECK(link_list_2_0->is_attached());
+    CHECK(link_list_2_1->is_attached());
+    CHECK(link_list_2_2->is_attached());
+    CHECK_EQUAL(link_list_1_0, origin_1->get_linklist(5,0));
+    CHECK_EQUAL(link_list_1_1, origin_1->get_linklist(5,1));
+    CHECK_EQUAL(link_list_1_2, origin_1->get_linklist(5,2));
+    CHECK_EQUAL(link_list_2_0, origin_2->get_linklist(3,0));
+    CHECK_EQUAL(link_list_2_1, origin_2->get_linklist(3,1));
+    CHECK_EQUAL(link_list_2_2, origin_2->get_linklist(3,2));
+    CHECK_EQUAL(0, link_list_1_0->get_origin_row_index());
+    CHECK_EQUAL(1, link_list_1_1->get_origin_row_index());
+    CHECK_EQUAL(2, link_list_1_2->get_origin_row_index());
+    CHECK_EQUAL(0, link_list_2_0->get_origin_row_index());
+    CHECK_EQUAL(1, link_list_2_1->get_origin_row_index());
+    CHECK_EQUAL(2, link_list_2_2->get_origin_row_index());
 
-    // Change the links
+    CHECK_EQUAL(1, origin_1->get_link(0,0));
+    CHECK(origin_1->is_null_link(0,1));
+    CHECK_EQUAL(0, origin_1->get_link(0,2));
+    CHECK_EQUAL(1, origin_1->get_link(3,0));
+    CHECK(origin_1->is_null_link(3,1));
+    CHECK_EQUAL(0, origin_1->get_link(3,2));
+    CHECK_EQUAL(2, link_list_1_0->size());
+    CHECK_EQUAL(1, link_list_1_0->get(0).get_index());
+    CHECK_EQUAL(0, link_list_1_0->get(1).get_index());
+    CHECK_EQUAL(1, link_list_1_1->size());
+    CHECK_EQUAL(0, link_list_1_1->get(0).get_index());
+    CHECK_EQUAL(0, link_list_1_2->size());
 
-    // Check
+    CHECK_EQUAL(0, origin_2->get_link(1,0));
+    CHECK(origin_2->is_null_link(1,1));
+    CHECK_EQUAL(1, origin_2->get_link(1,2));
+    CHECK_EQUAL(2, link_list_2_0->size());
+    CHECK_EQUAL(1, link_list_2_0->get(0).get_index());
+    CHECK_EQUAL(1, link_list_2_0->get(1).get_index());
+    CHECK_EQUAL(0, link_list_2_1->size());
+    CHECK_EQUAL(1, link_list_2_2->size());
+    CHECK_EQUAL(0, link_list_2_2->get(0).get_index());
+    CHECK_EQUAL(0, origin_2->get_link(5,0));
+    CHECK_EQUAL(1, origin_2->get_link(5,1));
+    CHECK(origin_2->is_null_link(5,2));
 
-    // Remove the extra columns
+    CHECK_EQUAL(1, target_1->get_backlink_count(0, *origin_1, 0));
+    CHECK_EQUAL(2, target_1->get_backlink_count(0, *origin_1, 5));
+    CHECK_EQUAL(1, target_1->get_backlink_count(0, *origin_2, 1));
+    CHECK_EQUAL(1, target_1->get_backlink_count(1, *origin_1, 0));
+    CHECK_EQUAL(1, target_1->get_backlink_count(1, *origin_1, 5));
+    CHECK_EQUAL(1, target_1->get_backlink_count(1, *origin_2, 1));
+    CHECK_EQUAL(0, target_1->get_backlink_count(2, *origin_1, 0));
+    CHECK_EQUAL(0, target_1->get_backlink_count(2, *origin_1, 5));
+    CHECK_EQUAL(0, target_1->get_backlink_count(2, *origin_2, 1));
+    CHECK_EQUAL(1, target_2->get_backlink_count(0, *origin_1, 3));
+    CHECK_EQUAL(1, target_2->get_backlink_count(0, *origin_2, 3));
+    CHECK_EQUAL(1, target_2->get_backlink_count(0, *origin_2, 5));
+    CHECK_EQUAL(1, target_2->get_backlink_count(1, *origin_1, 3));
+    CHECK_EQUAL(2, target_2->get_backlink_count(1, *origin_2, 3));
+    CHECK_EQUAL(1, target_2->get_backlink_count(1, *origin_2, 5));
+    CHECK_EQUAL(0, target_2->get_backlink_count(2, *origin_1, 3));
+    CHECK_EQUAL(0, target_2->get_backlink_count(2, *origin_2, 3));
+    CHECK_EQUAL(0, target_2->get_backlink_count(2, *origin_2, 5));
 
-    // Check
+    ConstLinkViewRef link_list_x_2 = origin_1->get_linklist(2,2);
+    ConstLinkViewRef link_list_x_3 = origin_2->get_linklist(6,1);
 
-    // Use move last over on origin (first, middle, last)
+    // 1: insert link list column into origin 1 before middle link column
+    // 1: insert link column into origin 2 before first link column
+    // 1: insert link list column into origin 2 after last link column
 
-    // Check
+    // Retreive link list accessors
 
-    // Use move last over on both targets (first, middle, last)
+    // 2: Add a link to a link list
+    // 2: insert link column into origin 1 after middle link column
+    // 2: remove the second inserted column from origin 2
 
-    // Check
+    // Check that link list accessors are detached
+
+    // 3: romve the two inserted columns from origin 1
+    // 3: remove the first inserted column from origin 2
+
+    // Check that link list accessors are detached
 }
 
 

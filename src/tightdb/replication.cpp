@@ -86,7 +86,7 @@ good:
 void Replication::select_desc(const Descriptor& desc)
 {
     typedef _impl::DescriptorFriend df;
-    check_table(&df::root_table(desc));
+    check_table(&df::get_root_table(desc));
     size_t* begin;
     size_t* end;
     for (;;) {
@@ -120,7 +120,7 @@ void Replication::select_desc(const Descriptor& desc)
 
 good:
     transact_log_advance(buf);
-    m_selected_spec = df::get_spec(desc);
+    m_selected_spec = &df::get_spec(desc);
 }
 
 
@@ -560,7 +560,7 @@ public:
         return false;
     }
 
-    bool add_index_to_column(size_t col_ndx)
+    bool add_search_index(size_t col_ndx)
     {
         if (TIGHTDB_LIKELY(m_table)) {
             if (TIGHTDB_LIKELY(!m_table->has_shared_type())) {
@@ -585,7 +585,7 @@ public:
                 typedef _impl::TableFriend tf;
 #ifdef TIGHTDB_DEBUG
                 if (m_log) {
-                    if (tf::is_link_type(ColumnType(type))) {
+                    if (link_target_table_ndx != tightdb::npos) {
                         *m_log << "desc->insert_column_link("<<col_ndx<<", "
                             ""<<type_to_str(type)<<", \""<<name<<"\", "
                             "group->get_table("<<link_target_table_ndx<<"))\n";
@@ -597,7 +597,7 @@ public:
                 }
 #endif
                 Table* link_target_table = 0;
-                if (tf::is_link_type(ColumnType(type)))
+                if (link_target_table_ndx != tightdb::npos)
                     link_target_table = m_group.get_table_by_ndx(link_target_table_ndx); // Throws
                 tf::insert_column(*m_desc, col_ndx, type, name, link_target_table); // Throws
                 return true;
@@ -606,7 +606,7 @@ public:
         return false;
     }
 
-    bool erase_column(size_t col_ndx)
+    bool erase_column(size_t col_ndx, size_t, size_t)
     {
         if (TIGHTDB_LIKELY(m_desc)) {
             if (TIGHTDB_LIKELY(col_ndx < m_desc->get_column_count())) {
@@ -614,7 +614,7 @@ public:
                 if (m_log)
                     *m_log << "desc->remove_column("<<col_ndx<<")\n";
 #endif
-                _impl::TableFriend::remove_column(*m_desc, col_ndx); // Throws
+                _impl::TableFriend::erase_column(*m_desc, col_ndx); // Throws
                 return true;
             }
         }
@@ -665,9 +665,9 @@ public:
         if (TIGHTDB_LIKELY(!m_group.has_table(name))) {
 #ifdef TIGHTDB_DEBUG
             if (m_log)
-                *m_log << "group->create_new_table(\""<<name<<"\")\n";
+                *m_log << "group->create_table(\""<<name<<"\")\n";
 #endif
-            m_group.create_new_table(name); // Throws
+            m_group.create_table(name); // Throws
             return true;
         }
         return false;

@@ -34,10 +34,8 @@ namespace tightdb {
 /// table is specified by the table descriptor.
 class ColumnLink: public ColumnLinkBase {
 public:
-    ColumnLink(ref_type ref, ArrayParent* parent = 0, std::size_t ndx_in_parent = 0,
-                    Allocator& alloc = Allocator::get_default()); // Throws
-    ColumnLink(Allocator& alloc);
-    ~ColumnLink() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
+    ColumnLink(ref_type ref, ArrayParent*, std::size_t ndx_in_parent, Allocator&); // Throws
+    ~ColumnLink() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
     static ref_type create(std::size_t size, Allocator&);
 
@@ -71,8 +69,7 @@ inline ColumnLink::ColumnLink(ref_type ref, ArrayParent* parent, std::size_t ndx
 {
 }
 
-inline ColumnLink::ColumnLink(Allocator& alloc):
-    ColumnLinkBase(alloc)
+inline ColumnLink::~ColumnLink() TIGHTDB_NOEXCEPT
 {
 }
 

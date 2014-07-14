@@ -118,8 +118,6 @@ public:
 
     bool is_string_col() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
-    void update_column_index(std::size_t, const Spec&) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-
     void refresh_accessor_tree(std::size_t, const Spec&) TIGHTDB_OVERRIDE;
 
 #ifdef TIGHTDB_DEBUG

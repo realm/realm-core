@@ -127,26 +127,32 @@ public:
 
 inline Table* LangBindHelper::new_table()
 {
+    typedef _impl::TableFriend tf;
     Allocator& alloc = Allocator::get_default();
-    std::size_t ref = Table::create_empty_table(alloc); // Throws
-    Table* const table = new Table(Table::ref_count_tag(), alloc, ref, 0, 0); // Throws
-    table->bind_ref();
+    std::size_t ref = tf::create_empty_table(alloc); // Throws
+    Table::Parent* parent = 0;
+    std::size_t ndx_in_parent = 0;
+    Table* table = tf::create_accessor(alloc, ref, parent, ndx_in_parent); // Throws
+    tf::bind_ref(*table);
     return table;
 }
 
-inline Table* LangBindHelper::copy_table(const Table& t)
+inline Table* LangBindHelper::copy_table(const Table& table)
 {
+    typedef _impl::TableFriend tf;
     Allocator& alloc = Allocator::get_default();
-    std::size_t ref = t.clone(alloc); // Throws
-    Table* const table = new Table(Table::ref_count_tag(), alloc, ref, 0, 0); // Throws
-    table->bind_ref();
-    return table;
+    std::size_t ref = tf::clone(table, alloc); // Throws
+    Table::Parent* parent = 0;
+    std::size_t ndx_in_parent = 0;
+    Table* copy_of_table = tf::create_accessor(alloc, ref, parent, ndx_in_parent); // Throws
+    tf::bind_ref(*copy_of_table);
+    return copy_of_table;
 }
 
 inline Table* LangBindHelper::get_subtable_ptr(Table* t, std::size_t column_ndx,
                                                std::size_t row_ndx)
 {
-    Table* subtab = t->get_subtable_ptr(column_ndx, row_ndx);
+    Table* subtab = t->get_subtable_ptr(column_ndx, row_ndx); // Throws
     subtab->bind_ref();
     return subtab;
 }
@@ -154,7 +160,7 @@ inline Table* LangBindHelper::get_subtable_ptr(Table* t, std::size_t column_ndx,
 inline const Table* LangBindHelper::get_subtable_ptr(const Table* t, std::size_t column_ndx,
                                                      std::size_t row_ndx)
 {
-    const Table* subtab = t->get_subtable_ptr(column_ndx, row_ndx);
+    const Table* subtab = t->get_subtable_ptr(column_ndx, row_ndx); // Throws
     subtab->bind_ref();
     return subtab;
 }

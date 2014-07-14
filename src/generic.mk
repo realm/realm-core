@@ -632,7 +632,7 @@ INSTALL_LIBRARY = $(INSTALL) -m 644
 INSTALL_PROGRAM = $(INSTALL)
 
 VALGRIND       ?= valgrind
-VALGRIND_FLAGS ?= --quiet --track-origins=yes --leak-check=yes --leak-resolution=low
+VALGRIND_FLAGS ?= --quiet --track-origins=yes --leak-check=yes --leak-resolution=low --num-callers=24
 
 # Alternative filesystem root for installation
 DESTDIR =

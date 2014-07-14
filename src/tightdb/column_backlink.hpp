@@ -63,32 +63,32 @@ public:
     void adj_accessors_insert_rows(std::size_t, std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     void adj_accessors_erase_row(std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     void adj_accessors_move_last_over(std::size_t, std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void adj_acc_clear_root_table() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+
+    void bump_link_origin_table_version() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
 protected:
     // ArrayParent overrides
     void update_child_ref(std::size_t child_ndx, ref_type new_ref) TIGHTDB_OVERRIDE;
     ref_type get_child_ref(std::size_t child_ndx) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+
 #ifdef TIGHTDB_DEBUG
     // Used only by Array::to_dot().
     std::pair<ref_type, std::size_t>
     get_to_dot_parent(std::size_t ndx_in_parent) const TIGHTDB_OVERRIDE;
 #endif
-    void bump_version_on_linked_table() TIGHTDB_NOEXCEPT;
 
 private:
-    void nullify_links(std::size_t row_ndx, bool do_destroy);
-
     TableRef        m_origin_table;
     ColumnLinkBase* m_origin_column;
+
+    void nullify_links(std::size_t row_ndx, bool do_destroy);
 };
 
 
-// Implementation
 
-inline void ColumnBackLink::bump_version_on_linked_table() TIGHTDB_NOEXCEPT
-{
-    _impl::TableFriend::bump_version(*m_origin_table);
-}
+
+// Implementation
 
 inline ColumnBackLink::ColumnBackLink(ref_type ref, ArrayParent* parent, std::size_t ndx_in_parent,
                                       Allocator& alloc):
@@ -151,6 +151,20 @@ inline void ColumnBackLink::adj_accessors_move_last_over(std::size_t target_row_
 
     typedef _impl::TableFriend tf;
     tf::mark(*m_origin_table);
+}
+
+inline void ColumnBackLink::adj_acc_clear_root_table() TIGHTDB_NOEXCEPT
+{
+    Column::adj_acc_clear_root_table();
+
+    typedef _impl::TableFriend tf;
+    tf::mark(*m_origin_table);
+}
+
+inline void ColumnBackLink::bump_link_origin_table_version() TIGHTDB_NOEXCEPT
+{
+    typedef _impl::TableFriend tf;
+    tf::bump_version(*m_origin_table);
 }
 
 

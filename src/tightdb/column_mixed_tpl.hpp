@@ -38,15 +38,6 @@ inline ColumnMixed::ColumnMixed(Allocator& alloc, Table* table, std::size_t colu
     create(alloc, table, column_ndx, parent, ndx_in_parent, ref);
 }
 
-inline void ColumnMixed::update_column_index(std::size_t new_col_ndx, const Spec& spec)
-    TIGHTDB_NOEXCEPT
-{
-    m_types->update_column_index(new_col_ndx, spec);
-    m_data->update_column_index(new_col_ndx, spec);
-    if (m_binary_data)
-        m_binary_data->update_column_index(new_col_ndx, spec);
-}
-
 inline void ColumnMixed::adj_accessors_insert_rows(std::size_t row_ndx,
                                                    std::size_t num_rows) TIGHTDB_NOEXCEPT
 {
@@ -62,6 +53,11 @@ inline void ColumnMixed::adj_accessors_move_last_over(std::size_t target_row_ndx
                                                       std::size_t last_row_ndx) TIGHTDB_NOEXCEPT
 {
     m_data->adj_accessors_move_last_over(target_row_ndx, last_row_ndx);
+}
+
+inline void ColumnMixed::adj_acc_clear_root_table() TIGHTDB_NOEXCEPT
+{
+    m_data->adj_acc_clear_root_table();
 }
 
 inline ref_type ColumnMixed::get_subtable_ref(std::size_t row_ndx) const TIGHTDB_NOEXCEPT

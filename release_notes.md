@@ -6,21 +6,22 @@ The C++ API has been updated and your code will break!
 
 ### Bugfixes:
 
-* None.
+* Fixed bug which would corrupt subtable accessors when inserting or removing parent table columns.
+* Fixed bug in LinkView::refresh_accessor_tree() causing problems when transaction is advanced after a link list is cleared.
+* Fixed bug causing problems when transaction is advanced after a table with link-like columns is cleared.
 
 ### API breaking changes:
 
-* `???`
+* None
 
 ### Enhancements:
 
-* `???`
+* Support for removing link columns
 
 -----------
 
 ### Internals:
 
-* `???`
 
 ----------------------------------------------
 

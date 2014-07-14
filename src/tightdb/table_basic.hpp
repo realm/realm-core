@@ -295,14 +295,14 @@ private:
         ForEachType<typename Spec::Columns, _impl::AddCol>::exec(&*desc, dyn_col_names); // Throws
     }
 
-    static bool matches_dynamic_spec(const tightdb::Spec* spec) TIGHTDB_NOEXCEPT
+    static bool matches_dynamic_spec(const tightdb::Spec& spec) TIGHTDB_NOEXCEPT
     {
         using namespace tightdb::util;
         const int num_cols = util::TypeCount<typename Spec::Columns>::value;
         StringData dyn_col_names[num_cols];
         Spec::dyn_col_names(dyn_col_names);
         return !HasType<typename Spec::Columns,
-                        _impl::CmpColType>::exec(spec, dyn_col_names);
+                        _impl::CmpColType>::exec(&spec, dyn_col_names);
     }
 
     // This one allows a BasicTable to know that BasicTables with
@@ -492,7 +492,7 @@ template<class Subtab, int col_idx> struct CmpColType<SpecBase::Subtable<Subtab>
         if (spec->get_column_type(col_idx) != col_type_Table ||
             col_names[col_idx] != spec->get_column_name(col_idx)) return true;
         const Spec subspec = const_cast<Spec*>(spec)->get_subtable_spec(col_idx);
-        return !Subtab::matches_dynamic_spec(&subspec);
+        return !Subtab::matches_dynamic_spec(subspec);
     }
 };
 
@@ -684,7 +684,8 @@ inline typename BasicTable<Spec>::Ref BasicTable<Spec>::copy(Allocator& alloc) c
 
 template<class T> inline bool is_a(const Table& t) TIGHTDB_NOEXCEPT
 {
-    return T::matches_dynamic_spec(_impl::TableFriend::get_spec(t));
+    typedef _impl::TableFriend tf;
+    return T::matches_dynamic_spec(tf::get_spec(t));
 }
 
 

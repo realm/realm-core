@@ -71,6 +71,7 @@ TEST(Links_Columns)
     CHECK_EQUAL(0, table2->get_backlink(1, *table1, new_link_col_ndx, 0));
 }
 
+
 TEST(Links_Basic)
 {
     GROUP_TEST_PATH(path);
@@ -171,6 +172,7 @@ TEST(Links_Basic)
     }
 }
 
+
 TEST(Links_Deletes)
 {
     Group group;
@@ -237,6 +239,7 @@ TEST(Links_Deletes)
     CHECK(table2->is_null_link(col_link, 0));
     CHECK(table2->is_null_link(col_link, 1));
 }
+
 
 TEST(Links_Multi)
 {
@@ -307,6 +310,7 @@ TEST(Links_Multi)
     CHECK(table2->is_null_link(col_link, 3));
 }
 
+
 TEST(Links_MultiToSame)
 {
     Group group;
@@ -333,6 +337,7 @@ TEST(Links_MultiToSame)
     CHECK_EQUAL(0, table1->get_backlink_count(0, *table2, col_link1));
     CHECK_EQUAL(0, table1->get_backlink_count(0, *table2, col_link2));
 }
+
 
 TEST(Links_LinkList_TableOps)
 {
@@ -375,6 +380,7 @@ TEST(Links_LinkList_TableOps)
     source->clear();
 
 }
+
 
 TEST(Links_LinkList_Basics)
 {
@@ -463,6 +469,7 @@ TEST(Links_LinkList_Basics)
     CHECK_EQUAL(0, target->get_backlink_count(2, *source, col_link));
 }
 
+
 TEST(Links_LinkList_Backlinks)
 {
     Group group;
@@ -542,6 +549,7 @@ TEST(Links_LinkList_Backlinks)
     CHECK_EQUAL(0, target->get_backlink_count(2, *source, col_link));
 }
 
+
 TEST(Links_LinkList_AccessorUpdates)
 {
     Group group;
@@ -599,6 +607,7 @@ TEST(Links_LinkList_AccessorUpdates)
     CHECK_EQUAL(false, links2again->is_attached());
 }
 
+
 TEST(Links_LinkList_FindBySource)
 {
     Group group;
@@ -649,6 +658,7 @@ TEST(Links_CircularAccessors)
         CHECK_EQUAL(table2, table1->get_link_target(0));
     }
 }
+
 
 TEST(Links_Transactions)
 {
