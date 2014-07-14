@@ -59,6 +59,7 @@ C++ (core)
 * Support for row accessors.
 * Table, row, and descriptor accessors are now generally retained and properly adjusted when the parent table is modified.
 * Added methods to find rows by target in TableView and LinkView.
+* Added methods `LinkView::remove_target_row()` and `LinkView::remove_all_target_rows()`.
 
 
 -----------

@@ -153,6 +153,40 @@ void LinkView::clear()
 }
 
 
+void LinkView::remove_target_row(std::size_t link_ndx)
+{
+    TIGHTDB_ASSERT(is_attached());
+    TIGHTDB_ASSERT(m_target_row_indexes.is_attached() && link_ndx < m_target_row_indexes.size());
+
+    size_t target_row_ndx = m_target_row_indexes.get(link_ndx);
+    Table& target_table = get_target_table();
+
+    // Deleting the target row will automatically remove all links
+    // to it. So we do not have to manually remove the deleted link
+    target_table.move_last_over(target_row_ndx);
+}
+
+
+void LinkView::remove_all_target_rows()
+{
+    TIGHTDB_ASSERT(is_attached());
+
+    Table& target_table = get_target_table();
+
+    // Delete all rows targeted by links. We have to keep checking the
+    // size as the list may contain multiple links to the same row, so
+    // one delete could remove multiple entries.
+    while (size_t count = size()) {
+        size_t last_link_ndx = count-1;
+        size_t target_row_ndx = m_target_row_indexes.get(last_link_ndx);
+
+        // Deleting the target row will automatically remove all links
+        // to it. So we do not have to manually remove the deleted link
+        target_table.move_last_over(target_row_ndx);
+    }
+}
+
+
 void LinkView::do_nullify_link(std::size_t old_target_row_ndx)
 {
     TIGHTDB_ASSERT(m_target_row_indexes.is_attached());
