@@ -449,7 +449,7 @@ inline void Descriptor::remove_column(std::size_t column_ndx)
 {
     typedef _impl::TableFriend tf;
     TIGHTDB_ASSERT(is_attached());
-    tf::remove_column(*this, column_ndx); // Throws
+    tf::erase_column(*this, column_ndx); // Throws
     adj_erase_column(column_ndx);
 }
 
@@ -557,24 +557,24 @@ public:
         desc.detach();
     }
 
-    static Table& root_table(Descriptor& desc) TIGHTDB_NOEXCEPT
+    static Table& get_root_table(Descriptor& desc) TIGHTDB_NOEXCEPT
     {
         return *desc.m_root_table;
     }
 
-    static const Table& root_table(const Descriptor& desc) TIGHTDB_NOEXCEPT
+    static const Table& get_root_table(const Descriptor& desc) TIGHTDB_NOEXCEPT
     {
         return *desc.m_root_table;
     }
 
-    static Spec* get_spec(Descriptor& desc) TIGHTDB_NOEXCEPT
+    static Spec& get_spec(Descriptor& desc) TIGHTDB_NOEXCEPT
     {
-        return desc.m_spec;
+        return *desc.m_spec;
     }
 
-    static const Spec* get_spec(const Descriptor& desc) TIGHTDB_NOEXCEPT
+    static const Spec& get_spec(const Descriptor& desc) TIGHTDB_NOEXCEPT
     {
-        return desc.m_spec;
+        return *desc.m_spec;
     }
 
     static std::size_t* record_subdesc_path(const Descriptor& desc, std::size_t* begin,

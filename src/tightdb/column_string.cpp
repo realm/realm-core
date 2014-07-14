@@ -1179,17 +1179,6 @@ ref_type AdaptiveStringColumn::write(size_t slice_offset, size_t slice_size,
 }
 
 
-void AdaptiveStringColumn::update_column_index(size_t new_col_ndx, const Spec& spec)
-    TIGHTDB_NOEXCEPT
-{
-    ColumnBase::update_column_index(new_col_ndx, spec);
-    if (m_index) {
-        size_t ndx_in_parent = m_array->get_ndx_in_parent();
-        m_index->get_root_array()->set_ndx_in_parent(ndx_in_parent + 1);
-    }
-}
-
-
 void AdaptiveStringColumn::refresh_accessor_tree(size_t col_ndx, const Spec& spec)
 {
     refresh_root_accessor(); // Throws

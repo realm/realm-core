@@ -87,19 +87,18 @@ public:
                               std::size_t* keys_ndx = 0) TIGHTDB_NOEXCEPT;
 
     // Links
-    void set_link_target_table(std::size_t column_ndx, std::size_t table_ndx);
     std::size_t get_opposite_link_table_ndx(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
+    void set_opposite_link_table_ndx(std::size_t column_ndx, std::size_t table_ndx);
     bool has_backlinks() const TIGHTDB_NOEXCEPT;
     void set_backlink_origin_column(std::size_t backlink_col_ndx, std::size_t origin_col_ndx);
     std::size_t get_origin_column_ndx(std::size_t backlink_col_ndx) const  TIGHTDB_NOEXCEPT;
     std::size_t find_backlink_column(std::size_t origin_table_ndx,
                                      std::size_t origin_col_ndx) const TIGHTDB_NOEXCEPT;
-    void update_backlink_column_ref(std::size_t origin_table_ndx, std::size_t old_column_ndx,
-                                    std::size_t new_column_ndx);
 
-    // Get position in column list adjusted for indexes
-    // (since index refs are stored alongside column refs in
-    //  m_columns, this may differ from the logical position)
+    /// Get position in `Table::m_columns` of the specified column. It may be
+    /// different from the specified logical column index due to the presence of
+    /// search indexes, since their top refs are stored in Table::m_columns as
+    /// well.
     std::size_t get_column_pos(std::size_t column_ndx) const;
 
     /// Compare two table specs for equality.
@@ -159,8 +158,8 @@ private:
 
     struct ColumnInfo {
         std::size_t m_column_ref_ndx; ///< Index within Table::m_columns
-        bool m_has_index;
-        ColumnInfo(): m_column_ref_ndx(0), m_has_index(false) {}
+        bool m_has_search_index;
+        ColumnInfo(): m_column_ref_ndx(0), m_has_search_index(false) {}
     };
 
     void get_column_info(std::size_t column_ndx, ColumnInfo&) const TIGHTDB_NOEXCEPT;

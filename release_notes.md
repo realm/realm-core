@@ -38,6 +38,9 @@ C++ (core)
 * Fixed bug in enumerated strings column (corruption was possible when inserting default values).
 * Fixed bug in `Table::update_from_parent()` causing a crash if `Group::commit()` in presence of generated subtable accessor.
 * Fixed several link-related bugs due to confusion about the meaning of `LinkView::m_table`.
+* Fixed bug which would corrupt subtable accessors when inserting or removing parent table columns.
+* Fixed bug in LinkView::refresh_accessor_tree() causing problems when transaction is advanced after a link list is cleared.
+* Fixed bug causing problems when transaction is advanced after a table with link-like columns is cleared.
 
 ### API breaking changes:
 

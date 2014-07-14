@@ -278,9 +278,14 @@ inline Table& LinkView::get_target_table() TIGHTDB_NOEXCEPT
 
 inline void LinkView::refresh_accessor_tree(size_t new_row_ndx)
 {
-    Array* row_indexes_root = m_target_row_indexes.get_root_array();
-    row_indexes_root->set_ndx_in_parent(new_row_ndx);
-    row_indexes_root->init_from_parent();
+    Array& root = *m_target_row_indexes.get_root_array();
+    root.set_ndx_in_parent(new_row_ndx);
+    if (ref_type ref = root.get_ref_from_parent()) {
+        root.init_from_ref(ref);
+    }
+    else {
+        root.detach();
+    }
 }
 
 #ifdef TIGHTDB_ENABLE_REPLICATION

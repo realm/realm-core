@@ -87,8 +87,10 @@ void fix_max_open_files()
             long new_soft_limit = hard_limit < 0 ? 4096 : hard_limit;
             if (new_soft_limit > soft_limit) {
                 set_soft_rlimit(resource_NumOpenFiles, new_soft_limit);
+/*
                 cout << "\n"
                     "MaxOpenFiles: "<<soft_limit<<" --> "<<new_soft_limit<<"\n";
+*/
             }
         }
     }

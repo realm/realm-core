@@ -190,8 +190,6 @@ void ColumnLinkList::to_json_row(size_t row_ndx, std::ostream& out) const
     }
 }
 
-
-
 void ColumnLinkList::discard_child_accessors() TIGHTDB_NOEXCEPT
 {
     typedef list_accessors::const_iterator iter;
@@ -217,6 +215,12 @@ void ColumnLinkList::adj_accessors_move_last_over(size_t target_row_ndx,
 
     const bool fix_ndx_in_parent = false;
     adj_move_last_over<fix_ndx_in_parent>(target_row_ndx, last_row_ndx);
+}
+
+void ColumnLinkList::adj_acc_clear_root_table() TIGHTDB_NOEXCEPT
+{
+    ColumnLinkBase::adj_acc_clear_root_table();
+    discard_child_accessors();
 }
 
 template<bool fix_ndx_in_parent>
