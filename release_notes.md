@@ -16,10 +16,6 @@
 * Added methods `LinkView::remove_target_row()` and `LinkView::remove_all_target_rows()`.
 * Support for removing link columns
 
------------
-
-### Internals:
-
 
 ----------------------------------------------
 
