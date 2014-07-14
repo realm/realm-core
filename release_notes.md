@@ -1,4 +1,4 @@
-# 0.24.0 Release notes
+# 0.80.0 Release notes
 
 ### Bugfixes:
 
