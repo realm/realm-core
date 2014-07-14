@@ -4551,7 +4551,7 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkCycles)
 {
     // This test checks that cyclic link relationships work across transaction
     // boundaries (advance transaction). The simplest cyclic link relationship
-    // (shortest cycle) is when a table has a link column whose liks point to
+    // (shortest cycle) is when a table has a link column whose links point to
     // rows in the same table, but longer cycles are also checked.
 
     SHARED_GROUP_TEST_PATH(path);
