@@ -245,7 +245,7 @@ TEST(LinkList_TableViewTracking)
 }
 
 
-// Attempts to expose a bug (it would assert) where TableView::Clear() was called with an unordered m_table. 
+// Attempts to expose a bug (it would assert) where TableView::clear() was called with an unordered m_table. 
 // Internally, clear() tests if TableView::m_table is unordered by testing if it has any link or backlink columns
 // (asana task made with 'fixme' because it's unreliable - in the future you could have unordered tables with no 
 // links).
