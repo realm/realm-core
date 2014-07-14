@@ -164,7 +164,8 @@ inline void ColumnBackLink::adj_acc_clear_root_table() TIGHTDB_NOEXCEPT
 inline void ColumnBackLink::bump_link_origin_table_version() TIGHTDB_NOEXCEPT
 {
     typedef _impl::TableFriend tf;
-    tf::bump_version(*m_origin_table);
+    if (m_origin_table)
+        tf::bump_version(*m_origin_table);
 }
 
 

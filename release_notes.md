@@ -6,6 +6,7 @@
 * Fixed bug which would corrupt subtable accessors when inserting or removing parent table columns.
 * Fixed bug in LinkView::refresh_accessor_tree() causing problems when transaction is advanced after a link list is cleared.
 * Fixed bug causing problems when transaction is advanced after a table with link-like columns is cleared.
+* Fixed bug in connection with cyclic link relationships.
 
 ### API breaking changes:
 
