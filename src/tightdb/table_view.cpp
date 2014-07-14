@@ -428,7 +428,7 @@ void TableView::remove(size_t ndx)
 
     // Delete row in source table
     const size_t real_ndx = size_t(m_refs.get(ndx));
-    m_table->from_view_remove(real_ndx, this);
+    m_table->remove(real_ndx);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     // It is important to not accidentally bring us in sync, if we were
@@ -480,7 +480,7 @@ void TableView::clear()
 
         // If table is unordered, we must use move_last_over()
         if (is_ordered)
-            m_table->from_view_remove(ndx, this);
+            m_table->remove(ndx);
         else
             m_table->move_last_over(ndx);
     }
