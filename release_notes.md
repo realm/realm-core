@@ -1,11 +1,8 @@
-# NEXT RELEASE
-
-## C++ (core)
-
-The C++ API has been updated and your code will break!
+# 0.24.0 Release notes
 
 ### Bugfixes:
 
+* Fixed bug in `TableView::clear()` causing crash if its table contained link columns.
 * Fixed bug which would corrupt subtable accessors when inserting or removing parent table columns.
 * Fixed bug in LinkView::refresh_accessor_tree() causing problems when transaction is advanced after a link list is cleared.
 * Fixed bug causing problems when transaction is advanced after a table with link-like columns is cleared.
@@ -16,6 +13,7 @@ The C++ API has been updated and your code will break!
 
 ### Enhancements:
 
+* Added methods `LinkView::remove_target_row()` and `LinkView::remove_all_target_rows()`.
 * Support for removing link columns
 
 -----------
@@ -27,11 +25,7 @@ The C++ API has been updated and your code will break!
 
 # 0.23.0 Release notes
 
-C++ (core)
------------
-
 ### Bugfixes:
-* Fixed bug in `TableView::clear()` causing crash if its table contained link columns.
 * Fixed bug in `TableView::remove()` causing crash or undefined behavior.
 * Fixed bugs in `Table::insert_column()` and `Table::remove_column()` causing crash or undefined behaviour.
 * Fixed corruption bug when a string enumeration column follows a column with attached search index (index flavor mixup).
@@ -60,7 +54,6 @@ C++ (core)
 * Support for row accessors.
 * Table, row, and descriptor accessors are now generally retained and properly adjusted when the parent table is modified.
 * Added methods to find rows by target in TableView and LinkView.
-* Added methods `LinkView::remove_target_row()` and `LinkView::remove_all_target_rows()`.
 
 
 -----------
