@@ -654,28 +654,29 @@ void Table::insert_root_column(size_t col_ndx, DataType type, StringData name,
 
     do_insert_root_column(col_ndx, ColumnType(type), name); // Throws
     adj_insert_column(col_ndx); // Throws
+    update_link_target_tables(col_ndx, col_ndx + 1); // Throws
 
+    // When the inserted column is a link-type column, we must also add a
+    // backlink column to the target table, however, since the origin column
+    // accessor does not yet exist, the connection between the column accessors
+    // (Table::connect_opposite_link_columns()) cannot be established yet. The
+    // marking of the target table tells Table::refresh_column_accessors() that
+    // it should not try to establish the connection yet. The connection will be
+    // established by Table::refresh_column_accessors() when it is invoked for
+    // the target table below.
     if (link_target_table) {
         size_t target_table_ndx = link_target_table->get_index_in_parent();
         m_spec.set_opposite_link_table_ndx(col_ndx, target_table_ndx); // Throws
-        size_t origin_table_ndx = get_index_in_parent();
-
-        // When the inserted column is a link-type column, we must also add a
-        // backlink column to the target table, however, since the origin column
-        // accessor does not yet exist, the connection between the column
-        // accessors (Table::connect_opposite_link_columns()) cannot be
-        // established yet. The marking of the origin table tells
-        // Table::refresh_column_accessors() that it should not try to establish
-        // the connection yet. The connection will be established by
-        // Table::refresh_column_accessors() when it is invoked for the origin
-        // table below.
-        mark();
-        link_target_table->insert_backlink_column(origin_table_ndx, col_ndx); // Throws
-        unmark();
+        link_target_table->mark();
     }
 
-    update_link_target_tables(col_ndx, col_ndx + 1); // Throws
     refresh_column_accessors(col_ndx); // Throws
+
+    if (link_target_table) {
+        link_target_table->unmark();
+        size_t origin_table_ndx = get_index_in_parent();
+        link_target_table->insert_backlink_column(origin_table_ndx, col_ndx); // Throws
+    }
 }
 
 
@@ -4486,7 +4487,7 @@ void Table::refresh_column_accessors(size_t col_ndx_begin)
                 Group* group = get_parent_group();
                 size_t target_table_ndx = m_spec.get_opposite_link_table_ndx(col_ndx);
                 Table* target_table = group->get_table_by_ndx(target_table_ndx); // Throws
-                if (!target_table->is_marked()) {
+                if (!target_table->is_marked() && target_table != this) {
                     size_t origin_ndx_in_group = m_top.get_ndx_in_parent();
                     size_t backlink_col_ndx =
                         target_table->m_spec.find_backlink_column(origin_ndx_in_group, col_ndx);
@@ -4497,7 +4498,7 @@ void Table::refresh_column_accessors(size_t col_ndx_begin)
                 Group* group = get_parent_group();
                 size_t origin_table_ndx = m_spec.get_opposite_link_table_ndx(col_ndx);
                 Table* origin_table = group->get_table_by_ndx(origin_table_ndx); // Throws
-                if (!origin_table->is_marked()) {
+                if (!origin_table->is_marked() || origin_table == this) {
                     size_t link_col_ndx = m_spec.get_origin_column_ndx(col_ndx);
                     origin_table->connect_opposite_link_columns(link_col_ndx, *this, col_ndx);
                 }

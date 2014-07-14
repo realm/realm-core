@@ -175,10 +175,21 @@ public:
         return BasicTableRef(&r, move_tag());
     }
 
-    // Comparison
+    //@{
+    /// Comparison
     template<class U> bool operator==(const BasicTableRef<U>&) const TIGHTDB_NOEXCEPT;
+    template<class U> bool operator==(U*) const TIGHTDB_NOEXCEPT;
     template<class U> bool operator!=(const BasicTableRef<U>&) const TIGHTDB_NOEXCEPT;
+    template<class U> bool operator!=(U*) const TIGHTDB_NOEXCEPT;
     template<class U> bool operator<(const BasicTableRef<U>&) const TIGHTDB_NOEXCEPT;
+    template<class U> bool operator<(U*) const TIGHTDB_NOEXCEPT;
+    template<class U> bool operator>(const BasicTableRef<U>&) const TIGHTDB_NOEXCEPT;
+    template<class U> bool operator>(U*) const TIGHTDB_NOEXCEPT;
+    template<class U> bool operator<=(const BasicTableRef<U>&) const TIGHTDB_NOEXCEPT;
+    template<class U> bool operator<=(U*) const TIGHTDB_NOEXCEPT;
+    template<class U> bool operator>=(const BasicTableRef<U>&) const TIGHTDB_NOEXCEPT;
+    template<class U> bool operator>=(U*) const TIGHTDB_NOEXCEPT;
+    //@}
 
     // Dereference
 #ifdef __clang__
@@ -271,6 +282,17 @@ template<class T> inline BasicTableRef<const T> unchecked_cast(ConstTableRef t) 
 }
 
 
+//@{
+/// Comparison
+template<class T, class U> bool operator==(T*, const BasicTableRef<U>&) TIGHTDB_NOEXCEPT;
+template<class T, class U> bool operator!=(T*, const BasicTableRef<U>&) TIGHTDB_NOEXCEPT;
+template<class T, class U> bool operator<(T*, const BasicTableRef<U>&) TIGHTDB_NOEXCEPT;
+template<class T, class U> bool operator>(T*, const BasicTableRef<U>&) TIGHTDB_NOEXCEPT;
+template<class T, class U> bool operator<=(T*, const BasicTableRef<U>&) TIGHTDB_NOEXCEPT;
+template<class T, class U> bool operator>=(T*, const BasicTableRef<U>&) TIGHTDB_NOEXCEPT;
+//@}
+
+
 
 
 
@@ -325,21 +347,99 @@ inline BasicTableRef<T>& BasicTableRef<T>::operator=(BasicTableRef<U> r) TIGHTDB
 #endif // !TIGHTDB_HAVE_CXX11_RVALUE_REFERENCE
 
 template<class T> template<class U>
-inline bool BasicTableRef<T>::operator==(const BasicTableRef<U>& r) const TIGHTDB_NOEXCEPT
+bool BasicTableRef<T>::operator==(const BasicTableRef<U>& p) const TIGHTDB_NOEXCEPT
 {
-    return this->util::bind_ptr<T>::operator==(r);
+    return get() == p.get();
+}
+
+template<class T> template<class U> bool BasicTableRef<T>::operator==(U* p) const TIGHTDB_NOEXCEPT
+{
+    return get() == p;
 }
 
 template<class T> template<class U>
-inline bool BasicTableRef<T>::operator!=(const BasicTableRef<U>& r) const TIGHTDB_NOEXCEPT
+bool BasicTableRef<T>::operator!=(const BasicTableRef<U>& p) const TIGHTDB_NOEXCEPT
 {
-    return this->util::bind_ptr<T>::operator!=(r);
+    return get() != p.get();
+}
+
+template<class T> template<class U> bool BasicTableRef<T>::operator!=(U* p) const TIGHTDB_NOEXCEPT
+{
+    return get() != p;
 }
 
 template<class T> template<class U>
-inline bool BasicTableRef<T>::operator<(const BasicTableRef<U>& r) const TIGHTDB_NOEXCEPT
+bool BasicTableRef<T>::operator<(const BasicTableRef<U>& p) const TIGHTDB_NOEXCEPT
 {
-    return this->util::bind_ptr<T>::operator<(r);
+    return get() < p.get();
+}
+
+template<class T> template<class U> bool BasicTableRef<T>::operator<(U* p) const TIGHTDB_NOEXCEPT
+{
+    return get() < p;
+}
+
+template<class T> template<class U>
+bool BasicTableRef<T>::operator>(const BasicTableRef<U>& p) const TIGHTDB_NOEXCEPT
+{
+    return get() > p.get();
+}
+
+template<class T> template<class U> bool BasicTableRef<T>::operator>(U* p) const TIGHTDB_NOEXCEPT
+{
+    return get() > p;
+}
+
+template<class T> template<class U>
+bool BasicTableRef<T>::operator<=(const BasicTableRef<U>& p) const TIGHTDB_NOEXCEPT
+{
+    return get() <= p.get();
+}
+
+template<class T> template<class U> bool BasicTableRef<T>::operator<=(U* p) const TIGHTDB_NOEXCEPT
+{
+    return get() <= p;
+}
+
+template<class T> template<class U>
+bool BasicTableRef<T>::operator>=(const BasicTableRef<U>& p) const TIGHTDB_NOEXCEPT
+{
+    return get() >= p.get();
+}
+
+template<class T> template<class U> bool BasicTableRef<T>::operator>=(U* p) const TIGHTDB_NOEXCEPT
+{
+    return get() >= p;
+}
+
+template<class T, class U> bool operator==(T* a, const BasicTableRef<U>& b) TIGHTDB_NOEXCEPT
+{
+    return b == a;
+}
+
+template<class T, class U> bool operator!=(T* a, const BasicTableRef<U>& b) TIGHTDB_NOEXCEPT
+{
+    return b != a;
+}
+
+template<class T, class U> bool operator<(T* a, const BasicTableRef<U>& b) TIGHTDB_NOEXCEPT
+{
+    return b > a;
+}
+
+template<class T, class U> bool operator>(T* a, const BasicTableRef<U>& b) TIGHTDB_NOEXCEPT
+{
+    return b < a;
+}
+
+template<class T, class U> bool operator<=(T* a, const BasicTableRef<U>& b) TIGHTDB_NOEXCEPT
+{
+    return b >= a;
+}
+
+template<class T, class U> bool operator>=(T* a, const BasicTableRef<U>& b) TIGHTDB_NOEXCEPT
+{
+    return b <= a;
 }
 
 

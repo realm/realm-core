@@ -2462,6 +2462,12 @@ TEST(LangBindHelper_AdvanceReadTransact_MoveLastOver)
 
 TEST(LangBindHelper_AdvanceReadTransact_Links)
 {
+    // This test checks that all the links-related stuff works across
+    // transaction boundaries (advance transaction). It does that in a chained
+    // fashion where the output of one test acts as the input of the next
+    // one. This is to save boilerplate code, and to make the test scenarios
+    // slightly more varied and realistic.
+
     SHARED_GROUP_TEST_PATH(path);
     SharedGroup sg(path);
     ShortCircuitTransactLogManager tlm(path);
@@ -4536,6 +4542,266 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
     // 3: remove the first inserted column from origin 2
 
     // Check that link list accessors are detached
+
+    // FIXME: Check column removal in LangBindHelper_AdvanceReadTransact_LinkCycles
+}
+
+
+TEST(LangBindHelper_AdvanceReadTransact_LinkCycles)
+{
+    // This test checks that cyclic link relationships work across transaction
+    // boundaries (advance transaction). The simplest cyclic link relationship
+    // (shortest cycle) is when a table has a link column whose liks point to
+    // rows in the same table, but longer cycles are also checked.
+
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg(path);
+    ShortCircuitTransactLogManager tlm(path);
+    SharedGroup sg_w(tlm);
+
+    // Start a read transaction (to be repeatedly advanced)
+    ReadTransaction rt(sg);
+    const Group& group = rt.get_group();
+    CHECK_EQUAL(0, group.size());
+
+    // Test that a table can refer to itself. First check that it works when the
+    // link column is added to a pre-existing table, then check that it works
+    // when the table and the link column is created in the same transaction.
+    {
+        WriteTransaction wt(sg_w);
+        TableRef table_w = wt.get_table("table");
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, tlm);
+    group.Verify();
+    ConstTableRef table = group.get_table("table");
+    {
+        WriteTransaction wt(sg_w);
+        TableRef table_w = wt.get_table("table");
+        table_w->add_column_link(type_Link,     "foo", *table_w);
+        table_w->add_column_link(type_LinkList, "bar", *table_w);
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, tlm);
+    group.Verify();
+    CHECK(table->is_attached());
+    CHECK_EQUAL(2, table->get_column_count());
+    CHECK_EQUAL(type_Link,     table->get_column_type(0));
+    CHECK_EQUAL(type_LinkList, table->get_column_type(1));
+    CHECK_EQUAL(table, table->get_link_target(0));
+    CHECK_EQUAL(table, table->get_link_target(1));
+    CHECK(table->is_empty());
+    {
+        WriteTransaction wt(sg_w);
+        TableRef table_w = wt.get_table("table");
+        table_w->add_empty_row();
+        table_w->set_link(0,0,0);
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, tlm);
+    group.Verify();
+    CHECK(table->is_attached());
+    CHECK_EQUAL(table, table->get_link_target(0));
+    CHECK_EQUAL(table, table->get_link_target(1));
+    CHECK_EQUAL(1, table->size());
+    CHECK_EQUAL(0, table->get_link(0,0));
+    ConstLinkViewRef link_list = table->get_linklist(1,0);
+    CHECK_EQUAL(table, &link_list->get_origin_table());
+    CHECK_EQUAL(table, &link_list->get_target_table());
+    CHECK(link_list->is_empty());
+    CHECK_EQUAL(1, table->get_backlink_count(0, *table, 0));
+    CHECK_EQUAL(0, table->get_backlink_count(0, *table, 1));
+    {
+        WriteTransaction wt(sg_w);
+        TableRef table_w = wt.get_table("table");
+        table_w->get_linklist(1,0)->add(0);
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, tlm);
+    group.Verify();
+    CHECK(table->is_attached());
+    CHECK_EQUAL(table, table->get_link_target(0));
+    CHECK_EQUAL(table, table->get_link_target(1));
+    CHECK_EQUAL(1, table->size());
+    CHECK_EQUAL(0, table->get_link(0,0));
+    CHECK(link_list->is_attached());
+    CHECK_EQUAL(table, &link_list->get_origin_table());
+    CHECK_EQUAL(table, &link_list->get_target_table());
+    CHECK_EQUAL(1, link_list->size());
+    ConstRow row = link_list->get(0);
+    CHECK_EQUAL(table, row.get_table());
+    CHECK_EQUAL(0, row.get_index());
+    CHECK_EQUAL(1, table->get_backlink_count(0, *table, 0));
+    CHECK_EQUAL(1, table->get_backlink_count(0, *table, 1));
+    {
+        WriteTransaction wt(sg_w);
+        TableRef table_2_w = wt.get_table("table_2");
+        table_2_w->add_column_link(type_Link,     "foo", *table_2_w);
+        table_2_w->add_column_link(type_LinkList, "bar", *table_2_w);
+        table_2_w->add_empty_row();
+        table_2_w->set_link(0,0,0);
+        table_2_w->get_linklist(1,0)->add(0);
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, tlm);
+    group.Verify();
+    ConstTableRef table_2 = group.get_table("table_2");
+    CHECK_EQUAL(2, table_2->get_column_count());
+    CHECK_EQUAL(type_Link,     table_2->get_column_type(0));
+    CHECK_EQUAL(type_LinkList, table_2->get_column_type(1));
+    CHECK_EQUAL(table_2, table_2->get_link_target(0));
+    CHECK_EQUAL(table_2, table_2->get_link_target(1));
+    CHECK_EQUAL(1, table_2->size());
+    CHECK_EQUAL(0, table_2->get_link(0,0));
+    ConstLinkViewRef link_list_2 = table_2->get_linklist(1,0);
+    CHECK_EQUAL(table_2, &link_list_2->get_origin_table());
+    CHECK_EQUAL(table_2, &link_list_2->get_target_table());
+    CHECK_EQUAL(1, link_list_2->size());
+    ConstRow row_2 = link_list_2->get(0);
+    CHECK_EQUAL(table_2, row_2.get_table());
+    CHECK_EQUAL(0, row_2.get_index());
+    CHECK_EQUAL(1, table_2->get_backlink_count(0, *table_2, 0));
+    CHECK_EQUAL(1, table_2->get_backlink_count(0, *table_2, 1));
+
+    // Test that a table A can refer to table B, and B to A. First check that it
+    // works when the link columns are added to pre-existing tables, then check
+    // that it works when the tables and the link columns are created in the
+    // same transaction.
+    {
+        WriteTransaction wt(sg_w);
+        TableRef table_w   = wt.get_table("table");
+        TableRef table_2_w = wt.get_table("table_2");
+        table_w->add_column_link(type_Link,       "foobar", *table_2_w);
+        table_2_w->add_column_link(type_LinkList, "barfoo", *table_w);
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, tlm);
+    group.Verify();
+    CHECK(table->is_attached());
+    CHECK(table_2->is_attached());
+    CHECK_EQUAL(3, table->get_column_count());
+    CHECK_EQUAL(3, table_2->get_column_count());
+    CHECK_EQUAL(type_Link,     table->get_column_type(0));
+    CHECK_EQUAL(type_LinkList, table->get_column_type(1));
+    CHECK_EQUAL(type_Link,     table->get_column_type(2));
+    CHECK_EQUAL(type_Link,     table_2->get_column_type(0));
+    CHECK_EQUAL(type_LinkList, table_2->get_column_type(1));
+    CHECK_EQUAL(type_LinkList, table_2->get_column_type(2));
+    CHECK_EQUAL(table,   table->get_link_target(0));
+    CHECK_EQUAL(table,   table->get_link_target(1));
+    CHECK_EQUAL(table_2, table->get_link_target(2));
+    CHECK_EQUAL(table_2, table_2->get_link_target(0));
+    CHECK_EQUAL(table_2, table_2->get_link_target(1));
+    CHECK_EQUAL(table,   table_2->get_link_target(2));
+    CHECK_EQUAL(1, table->size());
+    CHECK_EQUAL(1, table_2->size());
+    CHECK_EQUAL(0, table->get_link(0,0));
+    CHECK(table->is_null_link(2,0));
+    CHECK(link_list->is_attached());
+    CHECK_EQUAL(table, &link_list->get_origin_table());
+    CHECK_EQUAL(table, &link_list->get_target_table());
+    CHECK_EQUAL(1, link_list->size());
+    row = link_list->get(0);
+    CHECK_EQUAL(table, row.get_table());
+    CHECK_EQUAL(0, row.get_index());
+    CHECK_EQUAL(0, table_2->get_link(0,0));
+    CHECK(link_list_2->is_attached());
+    CHECK_EQUAL(table_2, &link_list_2->get_origin_table());
+    CHECK_EQUAL(table_2, &link_list_2->get_target_table());
+    CHECK_EQUAL(1, link_list_2->size());
+    row_2 = link_list_2->get(0);
+    CHECK_EQUAL(table_2, row_2.get_table());
+    CHECK_EQUAL(0, row_2.get_index());
+    ConstLinkViewRef link_list_3 = table_2->get_linklist(2,0);
+    CHECK_EQUAL(table_2, &link_list_3->get_origin_table());
+    CHECK_EQUAL(table,   &link_list_3->get_target_table());
+    CHECK(link_list_3->is_empty());
+    CHECK_EQUAL(1, table->get_backlink_count(0, *table, 0));
+    CHECK_EQUAL(1, table->get_backlink_count(0, *table, 1));
+    CHECK_EQUAL(0, table->get_backlink_count(0, *table_2, 2));
+    CHECK_EQUAL(1, table_2->get_backlink_count(0, *table_2, 0));
+    CHECK_EQUAL(1, table_2->get_backlink_count(0, *table_2, 1));
+    CHECK_EQUAL(0, table_2->get_backlink_count(0, *table, 2));
+    {
+        WriteTransaction wt(sg_w);
+        TableRef table_w   = wt.get_table("table");
+        TableRef table_2_w = wt.get_table("table_2");
+        table_w->set_link(2,0,0);
+        table_2_w->get_linklist(2,0)->add(0);
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, tlm);
+    group.Verify();
+    CHECK(table->is_attached());
+    CHECK(table_2->is_attached());
+    CHECK_EQUAL(1, table->size());
+    CHECK_EQUAL(1, table_2->size());
+    CHECK_EQUAL(0, table->get_link(0,0));
+    CHECK_EQUAL(0, table->get_link(2,0));
+    CHECK(link_list->is_attached());
+    CHECK_EQUAL(table, &link_list->get_origin_table());
+    CHECK_EQUAL(table, &link_list->get_target_table());
+    CHECK_EQUAL(1, link_list->size());
+    row = link_list->get(0);
+    CHECK_EQUAL(table, row.get_table());
+    CHECK_EQUAL(0, row.get_index());
+    CHECK_EQUAL(0, table_2->get_link(0,0));
+    CHECK(link_list_2->is_attached());
+    CHECK_EQUAL(table_2, &link_list_2->get_origin_table());
+    CHECK_EQUAL(table_2, &link_list_2->get_target_table());
+    CHECK_EQUAL(1, link_list_2->size());
+    row_2 = link_list_2->get(0);
+    CHECK_EQUAL(table_2, row_2.get_table());
+    CHECK_EQUAL(0, row_2.get_index());
+    CHECK(link_list_3->is_attached());
+    CHECK_EQUAL(table_2, &link_list_3->get_origin_table());
+    CHECK_EQUAL(table,   &link_list_3->get_target_table());
+    CHECK_EQUAL(1, link_list_3->size());
+    ConstRow row_3 = link_list_3->get(0);
+    CHECK_EQUAL(table, row_3.get_table());
+    CHECK_EQUAL(0, row_3.get_index());
+    CHECK_EQUAL(1, table->get_backlink_count(0, *table, 0));
+    CHECK_EQUAL(1, table->get_backlink_count(0, *table, 1));
+    CHECK_EQUAL(1, table->get_backlink_count(0, *table_2, 2));
+    CHECK_EQUAL(1, table_2->get_backlink_count(0, *table_2, 0));
+    CHECK_EQUAL(1, table_2->get_backlink_count(0, *table_2, 1));
+    CHECK_EQUAL(1, table_2->get_backlink_count(0, *table, 2));
+    {
+        WriteTransaction wt(sg_w);
+        TableRef table_3_w = wt.get_table("table_3");
+        TableRef table_4_w = wt.get_table("table_4");
+        table_3_w->add_column_link(type_LinkList, "foobar_2", *table_4_w);
+        table_4_w->add_column_link(type_Link,     "barfoo_2", *table_3_w);
+        table_3_w->add_empty_row();
+        table_4_w->add_empty_row();
+        table_3_w->get_linklist(0,0)->add(0);
+        table_4_w->set_link(0,0,0);
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, tlm);
+    group.Verify();
+    ConstTableRef table_3 = group.get_table("table_3");
+    ConstTableRef table_4 = group.get_table("table_4");
+    CHECK_EQUAL(1, table_3->get_column_count());
+    CHECK_EQUAL(1, table_4->get_column_count());
+    CHECK_EQUAL(type_LinkList, table_3->get_column_type(0));
+    CHECK_EQUAL(type_Link,     table_4->get_column_type(0));
+    CHECK_EQUAL(table_4, table_3->get_link_target(0));
+    CHECK_EQUAL(table_3, table_4->get_link_target(0));
+    CHECK_EQUAL(1, table_3->size());
+    CHECK_EQUAL(1, table_4->size());
+    ConstLinkViewRef link_list_4 = table_3->get_linklist(0,0);
+    CHECK_EQUAL(table_3, &link_list_4->get_origin_table());
+    CHECK_EQUAL(table_4, &link_list_4->get_target_table());
+    CHECK_EQUAL(1, link_list_4->size());
+    ConstRow row_4 = link_list_4->get(0);
+    CHECK_EQUAL(table_4, row_4.get_table());
+    CHECK_EQUAL(0, row_4.get_index());
+    CHECK_EQUAL(0, table_4->get_link(0,0));
+    CHECK_EQUAL(1, table_3->get_backlink_count(0, *table_4, 0));
+    CHECK_EQUAL(1, table_4->get_backlink_count(0, *table_3, 0));
+
+    // FIXME: Check column removal
 }
 
 
@@ -4591,64 +4857,6 @@ TEST(LangBindHelper_ImplicitTransactions)
 }
 
 
-namespace {
-
-void writer_thread(string path)
-{
-    Random random(random_int<unsigned long>());
-    UniquePtr<Replication> repl(makeWriteLogCollector(path));
-    SharedGroup sg(*repl);
-    for (int i=0; i<10; i++)
-    {
-        WriteTransaction wt(sg);
-        TestTableInts::Ref tr = wt.get_table<TestTableInts>("table");
-
-        int idx = (tr->size()==0) ? 0 : (random.draw_int_mod(tr->size()));
-
-        if (tr[idx].first == 42) {
-            // do nothing
-        }
-        else {
-            tr->insert(idx, 0);
-        }
-        wt.commit();
-        sched_yield();
-    }
-}
-
-void reader_thread(TestResults* test_results_ptr, string path)
-{
-    TestResults& test_results = *test_results_ptr;
-    Random random(random_int<unsigned long>());
-
-    UniquePtr<Replication> repl(makeWriteLogCollector(path));
-    UniquePtr<LangBindHelper::TransactLogRegistry> wlr(getWriteLogs(path));
-    SharedGroup sg(*repl);
-    Group& g = const_cast<Group&>(sg.begin_read());
-    TableRef tr = g.get_table("table");
-    Query q = tr->where().equal(0, 42);
-    int idx = q.find();
-    Row r = (*tr)[idx];
-    TableView tv = q.find_all();
-    while (1)
-    {
-        int val = r.get_int(0);
-        tv.sync_if_needed();
-        if (val == 43) break;
-        CHECK_EQUAL(42, val);
-        CHECK_EQUAL(1,tv.size());
-        CHECK_EQUAL(42, tv.get_int(0,0));
-        while (!sg.has_changed())
-            sched_yield();
-        LangBindHelper::advance_read(sg, *wlr);
-    }
-    CHECK_EQUAL(0,tv.size());
-    sg.end_read();
-}
-
-} // anonymous namespace
-
-
 TEST(LangBindHelper_ImplicitTransactions_OverSharedGroupDestruction)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -4685,53 +4893,109 @@ TEST(LangBindHelper_ImplicitTransactions_OverSharedGroupDestruction)
 }
 
 
+namespace {
+
+void multiple_trackers_writer_thread(string path)
+{
+    Random random(random_int<unsigned long>());
+    UniquePtr<Replication> repl(makeWriteLogCollector(path));
+    SharedGroup sg(*repl);
+    for (int i = 0; i < 10; ++i) {
+        WriteTransaction wt(sg);
+        TestTableInts::Ref tr = wt.get_table<TestTableInts>("table");
+
+        int idx = tr->is_empty() ? 0 : (random.draw_int_mod(tr->size()));
+
+        if (tr[idx].first == 42) {
+            // do nothing
+        }
+        else {
+            tr->insert(idx, 0);
+        }
+        wt.commit();
+        sched_yield();
+    }
+}
+
+void multiple_trackers_reader_thread(TestResults* test_results_ptr, string path)
+{
+    TestResults& test_results = *test_results_ptr;
+    Random random(random_int<unsigned long>());
+
+    UniquePtr<Replication> repl(makeWriteLogCollector(path));
+    UniquePtr<LangBindHelper::TransactLogRegistry> wlr(getWriteLogs(path));
+    SharedGroup sg(*repl);
+    Group& g = const_cast<Group&>(sg.begin_read());
+    TableRef tr = g.get_table("table");
+    Query q = tr->where().equal(0, 42);
+    int row_ndx = q.find();
+    Row row = tr->get(row_ndx);
+    TableView tv = q.find_all();
+    for (;;) {
+        int val = row.get_int(0);
+        tv.sync_if_needed();
+        if (val == 43)
+            break;
+        CHECK_EQUAL(42, val);
+        CHECK_EQUAL(1,tv.size());
+        CHECK_EQUAL(42, tv.get_int(0,0));
+        while (!sg.has_changed())
+            sched_yield();
+        LangBindHelper::advance_read(sg, *wlr);
+    }
+    CHECK_EQUAL(0, tv.size());
+    sg.end_read();
+}
+
+} // anonymous namespace
+
+
 TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
 {
     const int write_thread_count = 3;
     const int read_thread_count = 3;
 
     SHARED_GROUP_TEST_PATH(path);
+
+    UniquePtr<Replication> repl(makeWriteLogCollector(path));
+    SharedGroup sg(*repl);
     {
-        UniquePtr<Replication> repl(makeWriteLogCollector(path));
-        SharedGroup sg(*repl);
-        {
-            WriteTransaction wt(sg);
-            TableRef tr = wt.get_table("table");
-            tr->add_column(type_Int, "first");
-            for (int i=0; i<200; i++)
-                tr->add_empty_row();
-            tr->set_int(0, 100, 42);
-            wt.commit();
-
-        }
-        Thread threads[write_thread_count + read_thread_count];
-        int i;
-        for (i = 0; i < write_thread_count; ++i)
-            threads[i].start(bind(writer_thread, string(path)));
-        sched_yield();
-        for (i = 0; i < read_thread_count; ++i)
-            threads[write_thread_count + i].start(bind(reader_thread, &test_results, string(path)));
-
-        // Wait for all writer threads to complete
-        for (int i = 0; i < write_thread_count; ++i)
-            threads[i].join();
-
-        // signal to all readers to complete
-        {
-            WriteTransaction wt(sg);
-            TableRef tr = wt.get_table("table");
-            Query q = tr->where().equal(0, 42);
-            int idx = q.find();
-            tr->set_int(0, idx, 43);
-            wt.commit();
-        }
-        // Wait for all reader threads to complete
-        for (int i = 0; i < read_thread_count; ++i)
-            threads[write_thread_count + i].join();
-
-        // cleanup
-        sg.end_read();
+        WriteTransaction wt(sg);
+        TableRef tr = wt.get_table("table");
+        tr->add_column(type_Int, "first");
+        for (int i = 0; i < 200; ++i)
+            tr->add_empty_row();
+        tr->set_int(0, 100, 42);
+        wt.commit();
     }
+    Thread threads[write_thread_count + read_thread_count];
+    for (int i = 0; i < write_thread_count; ++i)
+        threads[i].start(bind(multiple_trackers_writer_thread, string(path)));
+    sched_yield();
+    for (int i = 0; i < read_thread_count; ++i) {
+        threads[write_thread_count + i].start(bind(multiple_trackers_reader_thread,
+                                                   &test_results, string(path)));
+    }
+
+    // Wait for all writer threads to complete
+    for (int i = 0; i < write_thread_count; ++i)
+        threads[i].join();
+
+    // signal to all readers to complete
+    {
+        WriteTransaction wt(sg);
+        TableRef tr = wt.get_table("table");
+        Query q = tr->where().equal(0, 42);
+        int idx = q.find();
+        tr->set_int(0, idx, 43);
+        wt.commit();
+    }
+    // Wait for all reader threads to complete
+    for (int i = 0; i < read_thread_count; ++i)
+        threads[write_thread_count + i].join();
+
+    // cleanup
+    sg.end_read();
 }
 
 

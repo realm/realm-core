@@ -94,10 +94,21 @@ public:
     // Replacement for std::move() in C++11
     friend bind_ptr move(bind_ptr& p) TIGHTDB_NOEXCEPT { return bind_ptr(&p, move_tag()); }
 
+    //@{
     // Comparison
-    template<class U> bool operator==(const bind_ptr<U>& p) const TIGHTDB_NOEXCEPT { return m_ptr == p.m_ptr; }
-    template<class U> bool operator!=(const bind_ptr<U>& p) const TIGHTDB_NOEXCEPT { return m_ptr != p.m_ptr; }
-    template<class U> bool operator<(const bind_ptr<U>& p) const TIGHTDB_NOEXCEPT { return m_ptr < p.m_ptr; }
+    template<class U> bool operator==(const bind_ptr<U>&) const TIGHTDB_NOEXCEPT;
+    template<class U> bool operator==(U*) const TIGHTDB_NOEXCEPT;
+    template<class U> bool operator!=(const bind_ptr<U>&) const TIGHTDB_NOEXCEPT;
+    template<class U> bool operator!=(U*) const TIGHTDB_NOEXCEPT;
+    template<class U> bool operator<(const bind_ptr<U>&) const TIGHTDB_NOEXCEPT;
+    template<class U> bool operator<(U*) const TIGHTDB_NOEXCEPT;
+    template<class U> bool operator>(const bind_ptr<U>&) const TIGHTDB_NOEXCEPT;
+    template<class U> bool operator>(U*) const TIGHTDB_NOEXCEPT;
+    template<class U> bool operator<=(const bind_ptr<U>&) const TIGHTDB_NOEXCEPT;
+    template<class U> bool operator<=(U*) const TIGHTDB_NOEXCEPT;
+    template<class U> bool operator>=(const bind_ptr<U>&) const TIGHTDB_NOEXCEPT;
+    template<class U> bool operator>=(U*) const TIGHTDB_NOEXCEPT;
+    //@}
 
     // Dereference
     T& operator*() const TIGHTDB_NOEXCEPT { return *m_ptr; }
@@ -145,6 +156,16 @@ inline std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>& out, const b
     return out;
 }
 
+
+//@{
+// Comparison
+template<class T, class U> bool operator==(T*, const bind_ptr<U>&) TIGHTDB_NOEXCEPT;
+template<class T, class U> bool operator!=(T*, const bind_ptr<U>&) TIGHTDB_NOEXCEPT;
+template<class T, class U> bool operator<(T*, const bind_ptr<U>&) TIGHTDB_NOEXCEPT;
+template<class T, class U> bool operator>(T*, const bind_ptr<U>&) TIGHTDB_NOEXCEPT;
+template<class T, class U> bool operator<=(T*, const bind_ptr<U>&) TIGHTDB_NOEXCEPT;
+template<class T, class U> bool operator>=(T*, const bind_ptr<U>&) TIGHTDB_NOEXCEPT;
+//@}
 
 
 
@@ -195,6 +216,102 @@ private:
     template<class> friend class bind_ptr;
 };
 #endif // TIGHTDB_HAVE_CXX11_ATOMIC
+
+
+
+
+
+// Implementation:
+
+template<class T> template<class U> bool bind_ptr<T>::operator==(const bind_ptr<U>& p) const TIGHTDB_NOEXCEPT
+{
+    return m_ptr == p.m_ptr;
+}
+
+template<class T> template<class U> bool bind_ptr<T>::operator==(U* p) const TIGHTDB_NOEXCEPT
+{
+    return m_ptr == p;
+}
+
+template<class T> template<class U> bool bind_ptr<T>::operator!=(const bind_ptr<U>& p) const TIGHTDB_NOEXCEPT
+{
+    return m_ptr != p.m_ptr;
+}
+
+template<class T> template<class U> bool bind_ptr<T>::operator!=(U* p) const TIGHTDB_NOEXCEPT
+{
+    return m_ptr != p;
+}
+
+template<class T> template<class U> bool bind_ptr<T>::operator<(const bind_ptr<U>& p) const TIGHTDB_NOEXCEPT
+{
+    return m_ptr < p.m_ptr;
+}
+
+template<class T> template<class U> bool bind_ptr<T>::operator<(U* p) const TIGHTDB_NOEXCEPT
+{
+    return m_ptr < p;
+}
+
+template<class T> template<class U> bool bind_ptr<T>::operator>(const bind_ptr<U>& p) const TIGHTDB_NOEXCEPT
+{
+    return m_ptr > p.m_ptr;
+}
+
+template<class T> template<class U> bool bind_ptr<T>::operator>(U* p) const TIGHTDB_NOEXCEPT
+{
+    return m_ptr > p;
+}
+
+template<class T> template<class U> bool bind_ptr<T>::operator<=(const bind_ptr<U>& p) const TIGHTDB_NOEXCEPT
+{
+    return m_ptr <= p.m_ptr;
+}
+
+template<class T> template<class U> bool bind_ptr<T>::operator<=(U* p) const TIGHTDB_NOEXCEPT
+{
+    return m_ptr <= p;
+}
+
+template<class T> template<class U> bool bind_ptr<T>::operator>=(const bind_ptr<U>& p) const TIGHTDB_NOEXCEPT
+{
+    return m_ptr >= p.m_ptr;
+}
+
+template<class T> template<class U> bool bind_ptr<T>::operator>=(U* p) const TIGHTDB_NOEXCEPT
+{
+    return m_ptr >= p;
+}
+
+template<class T, class U> bool operator==(T* a, const bind_ptr<U>& b) TIGHTDB_NOEXCEPT
+{
+    return b == a;
+}
+
+template<class T, class U> bool operator!=(T* a, const bind_ptr<U>& b) TIGHTDB_NOEXCEPT
+{
+    return b != a;
+}
+
+template<class T, class U> bool operator<(T* a, const bind_ptr<U>& b) TIGHTDB_NOEXCEPT
+{
+    return b > a;
+}
+
+template<class T, class U> bool operator>(T* a, const bind_ptr<U>& b) TIGHTDB_NOEXCEPT
+{
+    return b < a;
+}
+
+template<class T, class U> bool operator<=(T* a, const bind_ptr<U>& b) TIGHTDB_NOEXCEPT
+{
+    return b >= a;
+}
+
+template<class T, class U> bool operator>=(T* a, const bind_ptr<U>& b) TIGHTDB_NOEXCEPT
+{
+    return b <= a;
+}
 
 
 } // namespace util
