@@ -4241,7 +4241,7 @@ void Table::adj_acc_clear_root_table() TIGHTDB_NOEXCEPT
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
-    // underlying node structure. See AccessorConcistncyLevels.
+    // underlying node structure. See AccessorConcistencyLevels.
 
     discard_row_accessors();
 
@@ -4257,7 +4257,7 @@ void Table::adj_acc_clear_nonroot_table() TIGHTDB_NOEXCEPT
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
-    // underlying node structure. See AccessorConcistncyLevels.
+    // underlying node structure. See AccessorConcistencyLevels.
 
     discard_child_accessors();
     destroy_column_accessors();
