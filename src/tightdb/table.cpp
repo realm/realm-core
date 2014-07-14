@@ -4441,7 +4441,10 @@ void Table::refresh_column_accessors(size_t col_ndx_begin)
 {
     m_search_index = 0;
 
-    size_t ndx_in_parent = m_spec.get_column_pos(col_ndx_begin); // Index in Table::m_columns
+    // Index of column in Table::m_columns, which is not always equal to the
+    // 'logical' column index.
+    size_t ndx_in_parent = m_spec.get_column_pos(col_ndx_begin);
+
     size_t col_ndx_end = m_cols.size();
     for (size_t col_ndx = col_ndx_begin; col_ndx != col_ndx_end; ++col_ndx) {
         ColumnBase* col = m_cols[col_ndx];
