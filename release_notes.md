@@ -1,4 +1,4 @@
-# 0.24.0 Release notes
+# 0.80.0 Release notes
 
 ### Bugfixes:
 
@@ -15,10 +15,6 @@
 
 * Added methods `LinkView::remove_target_row()` and `LinkView::remove_all_target_rows()`.
 * Support for removing link columns
-
------------
-
-### Internals:
 
 
 ----------------------------------------------
