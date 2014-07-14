@@ -450,6 +450,18 @@ void TableView::remove(size_t ndx)
 
 void TableView::clear()
 {
+    // If m_table is unordered we must use move_last_over(). Fixme/todo: To test if it's unordered we currently
+    // see if we have any link or backlink columns. This is bad becuase in the future we could have unordered tables
+    // with no links
+    bool is_ordered = true;
+    for (size_t c = 0; c < m_table->m_spec.get_column_count(); c++) {
+        ColumnType t = m_table->m_spec.get_column_type(c);
+        if (t == col_type_Link || t == col_type_LinkList || t == col_type_BackLink) {
+            is_ordered = false;
+            break;
+        }
+    }
+
     TIGHTDB_ASSERT(m_table);
     // sort m_refs
     vector<size_t> v;
@@ -465,7 +477,12 @@ void TableView::clear()
     // (in reverse order to avoid index drift)
     for (size_t i = m_refs.size(); i != 0; --i) {
         size_t ndx = size_t(v[i-1]);
-        m_table->from_view_remove(ndx, this);
+
+        // If table is unordered, we must use move_last_over()
+        if (is_ordered)
+            m_table->from_view_remove(ndx, this);
+        else
+            m_table->move_last_over(ndx);
     }
 
     m_refs.clear();

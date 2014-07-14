@@ -414,7 +414,7 @@ inline bool Spec::get_first_column_type_from_ref(ref_type top_ref, Allocator& al
 
 inline bool Spec::has_backlinks() const TIGHTDB_NOEXCEPT
 {
-    // backlinks are always last and do not have names
+    // backlinks are always last and do not have names. Fixme: unreliable/error-prone method to detect backlinks
     return m_names.size() < m_spec.size();
 }
 
