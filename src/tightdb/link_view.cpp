@@ -152,7 +152,9 @@ void LinkView::clear()
 #endif
 }
 
-void LinkView::delete_target_row(std::size_t link_ndx) {
+
+void LinkView::remove_target_row(std::size_t link_ndx)
+{
     TIGHTDB_ASSERT(is_attached());
     TIGHTDB_ASSERT(m_target_row_indexes.is_attached() && link_ndx < m_target_row_indexes.size());
 
@@ -164,7 +166,9 @@ void LinkView::delete_target_row(std::size_t link_ndx) {
     target_table.move_last_over(target_row_ndx);
 }
 
-void LinkView::delete_all() {
+
+void LinkView::remove_all_target_rows()
+{
     TIGHTDB_ASSERT(is_attached());
 
     Table& target_table = get_target_table();
@@ -181,6 +185,7 @@ void LinkView::delete_all() {
         target_table.move_last_over(target_row_ndx);
     }
 }
+
 
 void LinkView::do_nullify_link(std::size_t old_target_row_ndx)
 {

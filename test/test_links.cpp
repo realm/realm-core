@@ -712,7 +712,7 @@ TEST(Links_Transactions)
     }
 }
 
-TEST(Links_DeleteTargetRows)
+TEST(Links_RemoveTargetRows)
 {
     Group group;
 
@@ -732,15 +732,15 @@ TEST(Links_DeleteTargetRows)
     links->add(0);
 
     // delete target rows through the links one at a time
-    links->delete_target_row(0);
+    links->remove_target_row(0);
     CHECK_EQUAL(2, target->size());
     CHECK_EQUAL(2, links->size());
 
-    links->delete_target_row(1);
+    links->remove_target_row(1);
     CHECK_EQUAL(1, target->size());
     CHECK_EQUAL(1, links->size());
 
-    links->delete_target_row(0);
+    links->remove_target_row(0);
     CHECK_EQUAL(0, target->size());
     CHECK_EQUAL(0, links->size());
 
@@ -752,8 +752,8 @@ TEST(Links_DeleteTargetRows)
     links->add(1);
     links->add(0);
 
-    // delete all targets through the links
-    links->delete_all();
+    // Remove all targets through the links
+    links->remove_all_target_rows();
     CHECK(target->is_empty());
     CHECK(links->is_empty());
 }
