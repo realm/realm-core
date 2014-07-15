@@ -1096,19 +1096,23 @@ public:
         return true;
     }
 
-    bool erase_column(size_t col_ndx, size_t link_target_table_ndx, size_t link_target_col_ndx)
+    bool erase_column(size_t col_ndx, size_t link_target_table_ndx, size_t backlink_col_ndx)
     {
         if (m_table) {
             typedef _impl::TableFriend tf;
-            EraseColumnUpdater updater(col_ndx);
-            tf::update_accessors(*m_table, m_desc_path_begin, m_desc_path_end, updater);
 
-            // See comments on link handling in TransactAdvancer::set_link().
+            // For link columns we need to handle the backlink column first in
+            // case the target table is the same as the origin table (because
+            // the backlink column occurs after regular columns.) Also see
+            // comments on link handling in TransactAdvancer::set_link().
             if (link_target_table_ndx != tightdb::npos) {
                 Table* target = m_group.get_table_by_ndx(link_target_table_ndx); // Throws
-                tf::adj_erase_column(*target, link_target_col_ndx); // Throws
+                tf::adj_erase_column(*target, backlink_col_ndx); // Throws
                 tf::mark(*target);
             }
+
+            EraseColumnUpdater updater(col_ndx);
+            tf::update_accessors(*m_table, m_desc_path_begin, m_desc_path_end, updater);
         }
         typedef _impl::DescriptorFriend df;
         if (m_desc)

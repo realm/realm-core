@@ -419,7 +419,7 @@ public:
     ///     bool insert_column(std::size_t col_ndx, DataType, StringData name,
     ///                        std::size_t link_target_table_ndx)
     ///     bool erase_column(std::size_t col_ndx, std::size_t link_target_table_ndx,
-    ///                       std::size_t link_target_col_ndx)
+    ///                       std::size_t backlink_col_ndx)
     ///     bool rename_column(std::size_t col_ndx, StringData new_name)
     ///     bool add_search_index(std::size_t col_ndx)
     ///     bool select_link_list(std::size_t col_ndx, std::size_t row_ndx)
@@ -1441,13 +1441,13 @@ bool Replication::TransactLogParser::do_parse(InstructionHandler& handler)
             case instr_EraseLinkColumn: {
                 std::size_t col_ndx = read_int<std::size_t>(); // Throws
                 std::size_t link_target_table_ndx = tightdb::npos;
-                std::size_t link_target_col_ndx   = 0;
+                std::size_t backlink_col_ndx   = 0;
                 if (Instruction(instr) == instr_EraseLinkColumn) {
                     link_target_table_ndx = read_int<std::size_t>(); // Throws
-                    link_target_col_ndx   = read_int<std::size_t>(); // Throws
+                    backlink_col_ndx      = read_int<std::size_t>(); // Throws
                 }
                 if (!handler.erase_column(col_ndx, link_target_table_ndx,
-                                          link_target_col_ndx)) // Throws
+                                          backlink_col_ndx)) // Throws
                     return false;
                 continue;
             }

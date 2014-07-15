@@ -607,7 +607,7 @@ void Table::do_erase_column(Descriptor& desc, size_t col_ndx)
     }
     else {
         Spec& spec = df::get_spec(desc);
-        spec.remove_column(col_ndx); // Throws
+        spec.erase_column(col_ndx); // Throws
         if (!root_table.is_empty()) {
             root_table.m_top.get_alloc().bump_global_version();
             EraseSubtableColumns updater(col_ndx);
@@ -683,21 +683,36 @@ void Table::insert_root_column(size_t col_ndx, DataType type, StringData name,
 void Table::erase_root_column(size_t col_ndx)
 {
     TIGHTDB_ASSERT(col_ndx < m_spec.get_public_column_count());
-    Table* link_target_table = 0;
+
+    // It is possible that the column to be removed is the last column that is
+    // not a backlink column. If there are no backlink columns, then the removal
+    // of the last column is enough to effectively truncate the size (number of
+    // rows) to zero, since the number of rows is simply the number of entries
+    // en each column. If, on the other hand, there are additional backlink
+    // columns, we need to manually clear out the contents of the remaining
+    // backlink columns to correctly reproduce the desired effect, namely that
+    // the table appears truncated after the removal of the last non-hidden
+    // column.
+    if (m_spec.get_public_column_count() == 1 && m_cols.size() > 1)
+        do_clear();
+
+    // For link columns we need to erase the backlink column first in case the
+    // target table is the same as the origin table (because the backlink column
+    // occurs after regular columns.)
     ColumnType col_type = m_spec.get_column_type(col_ndx);
-    if (is_link_type(col_type))
-        link_target_table = get_link_target_table_accessor(col_ndx);
-
-    do_erase_root_column(col_ndx); // Throws
-    adj_erase_column(col_ndx);
-
-    if (link_target_table) {
+    if (is_link_type(col_type)) {
+        Table* link_target_table = get_link_target_table_accessor(col_ndx);
         size_t origin_table_ndx = get_index_in_parent();
         link_target_table->erase_backlink_column(origin_table_ndx, col_ndx); // Throws
     }
 
-    refresh_column_accessors(col_ndx);
+    do_erase_root_column(col_ndx); // Throws
+    adj_erase_column(col_ndx);
     update_link_target_tables(col_ndx + 1, col_ndx); // Throws
+    refresh_column_accessors(col_ndx);
+
+    if (m_spec.get_public_column_count() == 0 && !m_cols.empty())
+        clear();
 }
 
 
@@ -717,7 +732,7 @@ void Table::do_erase_root_column(size_t ndx)
 {
     Spec::ColumnInfo info;
     m_spec.get_column_info(ndx, info);
-    m_spec.remove_column(ndx); // Throws
+    m_spec.erase_column(ndx); // Throws
 
     // Remove ref from m_columns, and destroy node structure
     size_t ndx_in_parent = info.m_column_ref_ndx;
@@ -751,6 +766,7 @@ void Table::erase_backlink_column(size_t origin_table_ndx, size_t origin_col_ndx
     size_t backlink_col_ndx = m_spec.find_backlink_column(origin_table_ndx, origin_col_ndx);
     TIGHTDB_ASSERT(backlink_col_ndx != tightdb::not_found);
     do_erase_root_column(backlink_col_ndx); // Throws
+    adj_erase_column(backlink_col_ndx);
     refresh_column_accessors(backlink_col_ndx); // Throws
 }
 
@@ -1620,13 +1636,7 @@ void Table::clear()
     TIGHTDB_ASSERT(is_attached());
     bump_version();
 
-    size_t num_cols = m_spec.get_column_count();
-    for (size_t col_ndx = 0; col_ndx != num_cols; ++col_ndx) {
-        ColumnBase& column = get_column_base(col_ndx);
-        column.clear(); // Throws
-    }
-    discard_row_accessors();
-    m_size = 0;
+    do_clear(); // Throws
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
@@ -1635,7 +1645,19 @@ void Table::clear()
 }
 
 
-void Table::do_erase_row(size_t row_ndx)
+void Table::do_clear()
+{
+    size_t num_cols = m_spec.get_column_count();
+    for (size_t col_ndx = 0; col_ndx != num_cols; ++col_ndx) {
+        ColumnBase& column = get_column_base(col_ndx);
+        column.clear(); // Throws
+    }
+    discard_row_accessors();
+    m_size = 0;
+}
+
+
+void Table::remove(size_t row_ndx)
 {
     TIGHTDB_ASSERT(is_attached());
     TIGHTDB_ASSERT(row_ndx < m_size);

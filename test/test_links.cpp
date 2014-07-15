@@ -722,6 +722,7 @@ TEST(Links_Transactions)
     }
 }
 
+
 TEST(Links_RemoveTargetRows)
 {
     Group group;
@@ -766,6 +767,41 @@ TEST(Links_RemoveTargetRows)
     links->remove_all_target_rows();
     CHECK(target->is_empty());
     CHECK(links->is_empty());
+}
+
+
+TEST(Links_RemoveLastTargetColumn)
+{
+    // When the last ordinary column is removed from a table, its size (number
+    // of rows) must "jump" to zero, even when the table continues to have
+    // "hidden" backlick columns.
+
+    Group group;
+    TableRef origin = group.get_table("origin");
+    TableRef target = group.get_table("target");
+    target->add_column(type_Int, "t");
+    target->add_empty_row();
+    origin->add_column_link(type_Link,     "o_1", *target);
+    origin->add_column_link(type_LinkList, "o_2", *target);
+    origin->add_empty_row();
+    origin->set_link(0,0,0);
+    LinkViewRef link_list = origin->get_linklist(1,0);
+    link_list->add(0);
+    Row target_row_1 = target->get(0);
+    Row target_row_2 = link_list->get(0);
+
+    CHECK_EQUAL(1, target->size());
+    target->remove_column(0);
+    CHECK_EQUAL(0, target->get_column_count());
+    CHECK(target->is_empty());
+    CHECK(origin->is_null_link(0,0));
+    CHECK(link_list->is_attached());
+    CHECK_EQUAL(link_list, origin->get_linklist(1,0));
+    CHECK_EQUAL(origin, &link_list->get_origin_table());
+    CHECK_EQUAL(target, &link_list->get_target_table());
+    CHECK_EQUAL(0, link_list->size());
+    CHECK(!target_row_1.is_attached());
+    CHECK(!target_row_2.is_attached());
 }
 
 #endif // TEST_GROUP
