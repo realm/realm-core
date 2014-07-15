@@ -450,6 +450,12 @@ void TableView::remove(size_t ndx)
 
 void TableView::clear()
 {
+    TIGHTDB_ASSERT(m_table);
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    bool sync_to_keep = m_last_seen_version == m_table->m_version;
+#endif
+
     // If m_table is unordered we must use move_last_over(). Fixme/todo: To test if it's unordered we currently
     // see if we have any link or backlink columns. This is bad becuase in the future we could have unordered tables
     // with no links
@@ -462,27 +468,44 @@ void TableView::clear()
         }
     }
 
-    TIGHTDB_ASSERT(m_table);
-    // sort m_refs
-    vector<size_t> v;
-    for (size_t t = 0; t < size(); t++)
-        v.push_back(to_size_t(m_refs.get(t)));
-    std::sort(v.begin(), v.end());
+    // Test if tableview is sorted ascendingly
+    bool is_sorted = true;
+    for (size_t t = 1; t < size(); t++) {
+        if (m_refs.get(t) < m_refs.get(t - 1)) {
+            is_sorted = false;
+            break;
+        }
+    }
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
-    bool sync_to_keep = m_last_seen_version == m_table->m_version;
-#endif
+    if (is_sorted) {
+        // Delete all referenced rows in source table
+        // (in reverse order to avoid index drift)
+        for (size_t i = m_refs.size(); i != 0; --i) {
+            size_t ndx = size_t(m_refs.get(i - 1));
 
-    // Delete all referenced rows in source table
-    // (in reverse order to avoid index drift)
-    for (size_t i = m_refs.size(); i != 0; --i) {
-        size_t ndx = size_t(v[i-1]);
+            // If table is unordered, we must use move_last_over()
+            if (is_ordered)
+                m_table->remove(ndx);
+            else
+                m_table->move_last_over(ndx);
+        }
+    }
+    else {
+        // sort tableview
+        vector<size_t> v;
+        for (size_t t = 0; t < size(); t++)
+            v.push_back(to_size_t(m_refs.get(t)));
+        std::sort(v.begin(), v.end());
 
-        // If table is unordered, we must use move_last_over()
-        if (is_ordered)
-            m_table->remove(ndx);
-        else
-            m_table->move_last_over(ndx);
+        for (size_t i = m_refs.size(); i != 0; --i) {
+            size_t ndx = size_t(v[i - 1]);
+
+            // If table is unordered, we must use move_last_over()
+            if (is_ordered)
+                m_table->remove(ndx);
+            else
+                m_table->move_last_over(ndx);
+        }
     }
 
     m_refs.clear();
