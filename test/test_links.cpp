@@ -1,5 +1,5 @@
 #include "testsettings.hpp"
-#ifdef TEST_LINK
+#ifdef TEST_LINKS
 
 
 #include <tightdb.hpp>
