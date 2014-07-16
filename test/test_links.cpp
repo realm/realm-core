@@ -770,15 +770,16 @@ TEST(Links_RemoveTargetRows)
 }
 
 
-ONLY(Links_FuzzyTest)
+ONLY(Links_RandomizedOperations)
 {
     Random rnd;
+    rnd.seed(random_int<unsigned long>()); // Seed from slow global generator
 
     for (size_t outer_iter = 0; outer_iter < 1000; outer_iter++) {
         Group group;
         TableRef refs[100];
         size_t tablecount = 0;
-        vector<vector<size_t>> tables;
+        vector<vector<size_t> > tables;
 
         for (size_t inner_iter = 0; inner_iter < 20; inner_iter++) {
             int action = rnd.draw_int_mod(100);
