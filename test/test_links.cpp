@@ -1,5 +1,5 @@
 #include "testsettings.hpp"
-#ifdef TEST_GROUP
+#ifdef TEST_LINK
 
 
 #include <tightdb.hpp>
@@ -10,6 +10,7 @@
 using namespace std;
 using namespace tightdb;
 using namespace tightdb::util;
+using namespace tightdb::test_util;
 
 namespace {
 
@@ -768,4 +769,50 @@ TEST(Links_RemoveTargetRows)
     CHECK(links->is_empty());
 }
 
-#endif // TEST_GROUP
+
+ONLY(Links_FuzzyTest)
+{
+    Random rnd;
+
+    for (size_t outer_iter = 0; outer_iter < 1000; outer_iter++) {
+        Group group;
+        TableRef refs[100];
+        size_t tablecount = 0;
+        vector<vector<size_t>> tables;
+
+        for (size_t inner_iter = 0; inner_iter < 20; inner_iter++) {
+            int action = rnd.draw_int_mod(100);
+
+            if (action < 40 && tables.size() > 0) {
+                // create link
+                size_t from = rand() % tables.size();
+                size_t to = rand() % tables.size();
+                tables[from].push_back(to);
+
+                int type = rnd.draw_int_mod(2);
+                if (type == 0)
+                    refs[from]->add_column_link(type_Link, "link", *refs[to]);
+                else
+                    refs[from]->add_column_link(type_LinkList, "link", *refs[to]);
+            }
+            else if (action < 80 && tables.size() > 0) {
+                // delete link
+                size_t from = rnd.draw_int_mod(tables.size());
+
+                if (tables[from].size() > 0) {
+                    size_t to = rnd.draw_int_mod(tables[from].size());
+                    tables[from].erase(tables[from].begin() + to);
+                    refs[from]->remove_column(to);
+                }
+            }
+            else if (tables.size() < 10) {
+                // create table
+                refs[tables.size()] = group.get_table("table");
+                tables.push_back(vector<size_t>());
+            }
+        }
+    }
+}
+
+
+#endif // TEST_LINKS

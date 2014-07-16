@@ -50,7 +50,7 @@
 #define TEST_UTF8
 #define TEST_COLUMN_LARGE
 #define TEST_JSON
-
+#define TEST_LINK
 
 // Takes a long time. Also currently fails to reproduce the Java bug, but once it has been identified, this
 // test could perhaps be modified to trigger it (unless it's a language binding problem).
