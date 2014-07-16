@@ -220,7 +220,7 @@ template<class T_1, int> struct test_two_args_1 {
 
 TEST(SafeIntOps_General)
 {
-    // Generate a set of interesting values in these steps
+    // Generate a set of interesting values in three steps
     set<super_int> values;
 
     // Add 0 to the set (worst case 1)
