@@ -710,9 +710,6 @@ void Table::erase_root_column(size_t col_ndx)
     adj_erase_column(col_ndx);
     update_link_target_tables(col_ndx + 1, col_ndx); // Throws
     refresh_column_accessors(col_ndx);
-
-    if (m_spec.get_public_column_count() == 0 && !m_cols.empty())
-        clear();
 }
 
 

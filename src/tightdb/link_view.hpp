@@ -102,7 +102,7 @@ private:
     void bind_ref() const TIGHTDB_NOEXCEPT;
     void unbind_ref() const TIGHTDB_NOEXCEPT;
 
-    void refresh_accessor_tree(size_t new_row_ndx);
+    void refresh_accessor_tree(size_t new_row_ndx) TIGHTDB_NOEXCEPT;
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     Replication* get_repl() TIGHTDB_NOEXCEPT;
@@ -286,7 +286,7 @@ inline Table& LinkView::get_target_table() TIGHTDB_NOEXCEPT
     return *m_origin_column.get_target_table();
 }
 
-inline void LinkView::refresh_accessor_tree(size_t new_row_ndx)
+inline void LinkView::refresh_accessor_tree(size_t new_row_ndx) TIGHTDB_NOEXCEPT
 {
     Array& root = *m_target_row_indexes.get_root_array();
     root.set_ndx_in_parent(new_row_ndx);

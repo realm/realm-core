@@ -8,6 +8,7 @@ The C++ API has been updated and your code will break!
 
 * Fixed several bugs in connection to removal of like-type columns.
 * Fixed bug when last regular column is removed from table with remaining hidden backlink columns.
+* Fixed bug causing corrupted table accessor when column are added or removed before alink column.
 
 ### API breaking changes:
 

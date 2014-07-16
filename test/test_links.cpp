@@ -776,9 +776,14 @@ TEST(Links_RemoveLastTargetColumn)
     // of rows) must "jump" to zero, even when the table continues to have
     // "hidden" backlick columns.
 
-    Group group;
-    TableRef origin = group.get_table("origin");
-    TableRef target = group.get_table("target");
+    Group group_1;
+    TableRef table = group_1.get_table("table");
+    table->add_column_link(type_Link, "t", *table);
+    table->remove_column(0);
+
+    Group group_2;
+    TableRef origin = group_2.get_table("origin");
+    TableRef target = group_2.get_table("target");
     target->add_column(type_Int, "t");
     target->add_empty_row();
     origin->add_column_link(type_Link,     "o_1", *target);

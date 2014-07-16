@@ -179,6 +179,7 @@ ref_type ColumnLinkList::get_child_ref(size_t child_ndx) const TIGHTDB_NOEXCEPT
     return Column::get(child_ndx);
 }
 
+
 void ColumnLinkList::to_json_row(size_t row_ndx, std::ostream& out) const
 {
     LinkViewRef links1 = const_cast<ColumnLinkList*>(this)->get(row_ndx);
@@ -190,6 +191,7 @@ void ColumnLinkList::to_json_row(size_t row_ndx, std::ostream& out) const
     }
 }
 
+
 void ColumnLinkList::discard_child_accessors() TIGHTDB_NOEXCEPT
 {
     typedef list_accessors::const_iterator iter;
@@ -199,14 +201,17 @@ void ColumnLinkList::discard_child_accessors() TIGHTDB_NOEXCEPT
     m_list_accessors.clear();
 }
 
+
 void ColumnLinkList::refresh_accessor_tree(size_t col_ndx, const Spec& spec)
 {
     ColumnLinkBase::refresh_accessor_tree(col_ndx, spec); // Throws
+    m_column_ndx = col_ndx;
     typedef list_accessors::const_iterator iter;
     iter end = m_list_accessors.end();
     for (iter i = m_list_accessors.begin(); i != end; ++i)
         i->m_list->refresh_accessor_tree(i->m_row_ndx);
 }
+
 
 void ColumnLinkList::adj_accessors_move_last_over(size_t target_row_ndx,
                                                   size_t last_row_ndx) TIGHTDB_NOEXCEPT
@@ -217,11 +222,13 @@ void ColumnLinkList::adj_accessors_move_last_over(size_t target_row_ndx,
     adj_move_last_over<fix_ndx_in_parent>(target_row_ndx, last_row_ndx);
 }
 
+
 void ColumnLinkList::adj_acc_clear_root_table() TIGHTDB_NOEXCEPT
 {
     ColumnLinkBase::adj_acc_clear_root_table();
     discard_child_accessors();
 }
+
 
 template<bool fix_ndx_in_parent>
 void ColumnLinkList::adj_move_last_over(size_t target_row_ndx,
@@ -298,4 +305,4 @@ pair<ref_type, size_t> ColumnLinkList::get_to_dot_parent(size_t ndx_in_parent) c
     return make_pair(p.first.m_ref, p.second);
 }
 
-#endif //TIGHTDB_DEBUG
+#endif // TIGHTDB_DEBUG
