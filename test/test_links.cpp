@@ -785,8 +785,8 @@ ONLY(Links_FuzzyTest)
 
             if (action < 40 && tables.size() > 0) {
                 // create link
-                size_t from = rand() % tables.size();
-                size_t to = rand() % tables.size();
+                size_t from = rnd.draw_int_mod(tables.size());
+                size_t to = rnd.draw_int_mod(tables.size());
                 tables[from].push_back(to);
 
                 int type = rnd.draw_int_mod(2);
