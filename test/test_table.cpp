@@ -648,6 +648,27 @@ TEST(Table_DeleteAllTypes)
 #endif
 }
 
+// Triggers a bug that would make Realm crash if you run optimize() followed by set_index()
+ONLY(Table_Optimize_SetIndex_Crash)
+{
+    Random random(random_int<unsigned long>()); // Seed from slow global generator
+
+    Table table;
+    table.add_column(type_String, "first");
+    table.add_empty_row(3);
+    table.set_string(0, 0, "string0");
+    table.set_string(0, 1, "string1");
+    table.set_string(0, 2, "string1");
+
+    table.optimize();
+
+    table.set_string(0, 2, "string2");
+
+    table.set_index(0);
+
+    table.move_last_over(1);
+    table.move_last_over(1);
+}
 
 TEST(Table_MoveAllTypes)
 {
