@@ -822,10 +822,10 @@ TEST(Links_RandomizedOperations)
         size_t tablecount = 0;
         vector<vector<size_t> > tables;
 
-        for (size_t inner_iter = 0; inner_iter < 20; inner_iter++) {
+        for (size_t inner_iter = 0; inner_iter < 30; inner_iter++) {
             int action = rnd.draw_int_mod(100);
 
-            if (action < 40 && tables.size() > 0) {
+            if (action < 33 && tables.size() > 0) {
                 // create link
                 size_t from = rnd.draw_int_mod(tables.size());
                 size_t to = rnd.draw_int_mod(tables.size());
@@ -837,7 +837,7 @@ TEST(Links_RandomizedOperations)
                 else
                     refs[from]->add_column_link(type_LinkList, "link", *refs[to]);
             }
-            else if (action < 80 && tables.size() > 0) {
+            else if (action < 66 && tables.size() > 0) {
                 // delete link
                 size_t from = rnd.draw_int_mod(tables.size());
 
