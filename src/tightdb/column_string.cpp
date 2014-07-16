@@ -493,8 +493,9 @@ void AdaptiveStringColumn::move_last_over(size_t target_row_ndx, size_t last_row
 
     if (m_index) {
         // remove the value to be overwritten from index
-        StringData old_target_val = get(target_row_ndx);
-        m_index->erase(target_row_ndx, old_target_val, true); // Throws
+        StringData old_target_value = get(target_row_ndx);
+        bool is_last = true; // This tells StringIndex::erase() to not adjust subsequent indexes
+        m_index->erase(target_row_ndx, old_target_value, is_last); // Throws
 
         // update index to point to new location
         m_index->update_ref(copy_of_value, last_row_ndx, target_row_ndx); // Throws
