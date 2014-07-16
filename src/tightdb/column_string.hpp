@@ -65,8 +65,8 @@ public:
 
     void insert(std::size_t, std::size_t, bool) TIGHTDB_OVERRIDE;
     void erase(std::size_t ndx, bool is_last) TIGHTDB_OVERRIDE;
-    void clear() TIGHTDB_OVERRIDE;
     void move_last_over(std::size_t, std::size_t) TIGHTDB_OVERRIDE;
+    void clear() TIGHTDB_OVERRIDE;
 
     std::size_t count(StringData value) const;
     std::size_t find_first(StringData value, std::size_t begin = 0,
