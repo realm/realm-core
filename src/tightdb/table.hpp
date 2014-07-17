@@ -1224,26 +1224,25 @@ inline DataType Table::get_column_type(std::size_t ndx) const TIGHTDB_NOEXCEPT
     return m_spec.get_public_column_type(ndx);
 }
 
-template <class C, ColumnType col_type>
-C& Table::get_column(std::size_t ndx)
+template<class Col, ColumnType col_type> inline Col& Table::get_column(std::size_t ndx)
 {
     ColumnBase& col = get_column_base(ndx);
 #ifdef TIGHTDB_DEBUG
     validate_column_type(col, col_type, ndx);
 #endif
-    TIGHTDB_ASSERT(dynamic_cast<C*>(&col));
-    return static_cast<C&>(col);
+    TIGHTDB_ASSERT(dynamic_cast<Col*>(&col));
+    return static_cast<Col&>(col);
 }
 
-template <class C, ColumnType col_type>
-const C& Table::get_column(std::size_t ndx) const TIGHTDB_NOEXCEPT
+template<class Col, ColumnType col_type>
+inline const Col& Table::get_column(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
     const ColumnBase& col = get_column_base(ndx);
 #ifdef TIGHTDB_DEBUG
     validate_column_type(col, col_type, ndx);
 #endif
-    TIGHTDB_ASSERT(dynamic_cast<const C*>(&col));
-    return static_cast<const C&>(col);
+    TIGHTDB_ASSERT(dynamic_cast<const Col*>(&col));
+    return static_cast<const Col&>(col);
 }
 
 inline bool Table::has_shared_type() const TIGHTDB_NOEXCEPT
