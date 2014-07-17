@@ -51,10 +51,12 @@ using unit_test::TestResults;
 // `experiments/testcase.cpp` and then run `sh build.sh
 // check-testcase` (or one of its friends) from the command line.
 
+namespace {
+
 static bool generate_all = false;
 
-// After modifying json methods in core, set above generate_all = true to 
-// make the unit tests output their results to files. Then inspect the 
+// After modifying json methods in core, set above generate_all = true to
+// make the unit tests output their results to files. Then inspect the
 // files manually to see if the json is correct.
 //
 // Finally set generate_all = false and commit them to github which will
@@ -63,7 +65,6 @@ static bool generate_all = false;
 // All produced json is automatically checked for syntax regardless of
 // the setting of generate_all. This is done using the 'jsmn' parser.
 
-namespace {
 void setup_multi_table(Table& table, size_t rows, size_t sub_rows, bool fixed_subtab_sizes = false)
 {
     // Create table with all column types
@@ -201,7 +202,6 @@ void setup_multi_table(Table& table, size_t rows, size_t sub_rows, bool fixed_su
     // We also want a ColumnStringEnum
     table.optimize();
 }
-}
 
 bool json_test(string json, string expected_file, bool generate)
 {
@@ -249,7 +249,7 @@ bool json_test(string json, string expected_file, bool generate)
 }
 
 
-TEST(Test_Json_nolinks)
+TEST(Json_NoLinks)
 {
     Table table;
     setup_multi_table(table, 15, 2);
@@ -269,14 +269,14 @@ link_depth = -1:
     make it complex to find out what link is being followed for a table that has multiple outgoing links
 
 link_depth >= 0:
-    Follow all possible permitations of link paths that are at most link_depth links deep. A link can be taken any 
+    Follow all possible permitations of link paths that are at most link_depth links deep. A link can be taken any
     number if times.
 
-A link which isn't followed (bottom of link_depth has been met, or link has already been followed with 
+A link which isn't followed (bottom of link_depth has been met, or link has already been followed with
     link_depth = -1) is printed as a simple sequence of integers of row indexes in the link column.
 */
 
-TEST(Test_json_linklist1)
+TEST(Json_LinkList1)
 {
     // Basic non-cyclic LinkList test that also tests column and table renaming
     Group group;
@@ -339,7 +339,7 @@ TEST(Test_json_linklist1)
 
     stringstream ss;
 
-    // Now try different link_depth arguments 
+    // Now try different link_depth arguments
     table1->to_json(ss);
     CHECK(json_test(ss.str(), "expected_json_linklist1_1", generate_all));
 
@@ -369,7 +369,7 @@ TEST(Test_json_linklist1)
     CHECK(json_test(ss.str(), "expected_json_linklist1_6", generate_all));
 }
 
-TEST(Test_json_linklist_cycle)
+TEST(Json_LinkListCycle)
 {
     // Cycle in LinkList
     Group group;
@@ -405,7 +405,7 @@ TEST(Test_json_linklist_cycle)
 
     stringstream ss;
 
-    // Now try different link_depth arguments 
+    // Now try different link_depth arguments
     table1->to_json(ss);
     CHECK(json_test(ss.str(), "expected_json_linklist_cycle1", generate_all));
 
@@ -431,7 +431,7 @@ TEST(Test_json_linklist_cycle)
 
 }
 
-TEST(Test_json_link_cycles)
+TEST(Json_LinkCycles)
 {
     // Cycle in Link
     Group group;
@@ -459,7 +459,7 @@ TEST(Test_json_link_cycles)
 
     stringstream ss;
 
-    // Now try different link_depth arguments 
+    // Now try different link_depth arguments
     table1->to_json(ss);
     CHECK(json_test(ss.str(), "expected_json_link_cycles1", generate_all));
 
@@ -479,5 +479,7 @@ TEST(Test_json_link_cycles)
     table1->to_json(ss, 2);
     CHECK(json_test(ss.str(), "expected_json_link_cycles5", generate_all));
 }
+
+} // anonymous namespace
 
 #endif // TEST_TABLE
