@@ -130,6 +130,7 @@ void Replication::select_link_list(const LinkView& list)
     size_t col_ndx = list.m_origin_column.m_column_ndx;
     size_t row_ndx = list.get_origin_row_index();
     simple_cmd(instr_SelectLinkList, util::tuple(col_ndx, row_ndx)); // Throws
+    m_selected_link_list = &list;
 }
 
 

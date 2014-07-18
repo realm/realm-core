@@ -596,6 +596,21 @@ void Table::do_erase_column(Descriptor& desc, size_t col_ndx)
     TIGHTDB_ASSERT(!root_table.has_shared_type());
     TIGHTDB_ASSERT(col_ndx < desc.get_column_count());
 
+    // For root tables, it is possible that the column to be removed is the last
+    // column that is not a backlink column. If there are no backlink columns,
+    // then the removal of the last column is enough to effectively truncate the
+    // size (number of rows) to zero, since the number of rows is simply the
+    // number of entries en each column. If, on the other hand, there are
+    // additional backlink columns, we need to inject a clear operation before
+    // the column removal to correctly reproduce the desired effect, namely that
+    // the table appears truncated after the removal of the last non-hidden
+    // column. This has the a regular replicated clear operation in order to get
+    // the right behaviour in Group::advance_transact().
+    if (desc.is_root()) {
+        if (root_table.m_spec.get_public_column_count() == 1 && root_table.m_cols.size() > 1)
+            root_table.clear(); // Throws
+    }
+
 #ifdef TIGHTDB_ENABLE_REPLICATION
     if (Replication* repl = root_table.get_repl())
         repl->erase_column(desc, col_ndx); // Throws
@@ -683,18 +698,6 @@ void Table::insert_root_column(size_t col_ndx, DataType type, StringData name,
 void Table::erase_root_column(size_t col_ndx)
 {
     TIGHTDB_ASSERT(col_ndx < m_spec.get_public_column_count());
-
-    // It is possible that the column to be removed is the last column that is
-    // not a backlink column. If there are no backlink columns, then the removal
-    // of the last column is enough to effectively truncate the size (number of
-    // rows) to zero, since the number of rows is simply the number of entries
-    // en each column. If, on the other hand, there are additional backlink
-    // columns, we need to manually clear out the contents of the remaining
-    // backlink columns to correctly reproduce the desired effect, namely that
-    // the table appears truncated after the removal of the last non-hidden
-    // column.
-    if (m_spec.get_public_column_count() == 1 && m_cols.size() > 1)
-        do_clear();
 
     // For link columns we need to erase the backlink column first in case the
     // target table is the same as the origin table (because the backlink column
@@ -1633,17 +1636,6 @@ void Table::clear()
     TIGHTDB_ASSERT(is_attached());
     bump_version();
 
-    do_clear(); // Throws
-
-#ifdef TIGHTDB_ENABLE_REPLICATION
-    if (Replication* repl = get_repl())
-        repl->clear_table(this); // Throws
-#endif
-}
-
-
-void Table::do_clear()
-{
     size_t num_cols = m_spec.get_column_count();
     for (size_t col_ndx = 0; col_ndx != num_cols; ++col_ndx) {
         ColumnBase& column = get_column_base(col_ndx);
@@ -1651,6 +1643,11 @@ void Table::do_clear()
     }
     discard_row_accessors();
     m_size = 0;
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    if (Replication* repl = get_repl())
+        repl->clear_table(this); // Throws
+#endif
 }
 
 

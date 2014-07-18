@@ -801,8 +801,6 @@ private:
     void init(ConstSubspecRef shared_spec, ArrayParent* parent_column,
               std::size_t parent_row_ndx);
 
-    void do_clear();
-
     static void do_insert_column(Descriptor&, std::size_t col_ndx, DataType type,
                                  StringData name, Table* link_target_table);
     static void do_erase_column(Descriptor&, std::size_t col_ndx);
