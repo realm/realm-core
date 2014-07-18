@@ -1,5 +1,5 @@
 #include "testsettings.hpp"
-#ifdef TEST_GROUP
+#ifdef TEST_LINKS
 
 
 #include <tightdb.hpp>
@@ -10,6 +10,7 @@
 using namespace std;
 using namespace tightdb;
 using namespace tightdb::util;
+using namespace tightdb::test_util;
 
 namespace {
 
@@ -809,4 +810,51 @@ TEST(Links_RemoveLastTargetColumn)
     CHECK(!target_row_2.is_attached());
 }
 
-#endif // TEST_GROUP
+
+ONLY(Links_RandomizedOperations)
+{
+    const size_t tests = 30;
+    Random rnd;
+    rnd.seed(random_int<unsigned long>()); // Seed from slow global generator
+
+    for (size_t outer_iter = 0; outer_iter < 1000; outer_iter++) {
+        Group group;
+        TableRef refs[tests]; // 'tests' is max number of tables that can be produced
+
+        vector<vector<size_t> > tables;
+
+        for (size_t inner_iter = 0; inner_iter < tests; inner_iter++) {
+            int action = rnd.draw_int_mod(100);
+
+            if (action < 33 && tables.size() > 0) {
+                // create link
+                size_t from = rnd.draw_int_mod(tables.size());
+                size_t to = rnd.draw_int_mod(tables.size());
+                tables[from].push_back(to);
+
+                int type = rnd.draw_int_mod(2);
+                if (type == 0)
+                    refs[from]->add_column_link(type_Link, "link", *refs[to]);
+                else
+                    refs[from]->add_column_link(type_LinkList, "link", *refs[to]);
+            }
+            else if (action < 66 && tables.size() > 0) {
+                // delete link
+                size_t from = rnd.draw_int_mod(tables.size());
+
+                if (tables[from].size() > 0) {
+                    size_t to = rnd.draw_int_mod(tables[from].size());
+                    tables[from].erase(tables[from].begin() + to);
+                    refs[from]->remove_column(to);
+                }
+            }
+            else if (tables.size() < 10) {
+                // create table
+                refs[tables.size()] = group.get_table("table");
+                tables.push_back(vector<size_t>());
+            }
+        }
+    }
+}
+
+#endif // TEST_LINKS
