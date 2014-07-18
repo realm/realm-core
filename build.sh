@@ -922,9 +922,9 @@ EOF
         tightdb_ver_patch="$(echo "$tightdb_version" | cut -f3 -d.)" || exit 1
 
         # update version.hpp
-        sed -i -e "s/\#define TIGHTDB_VER_MAJOR .*/\#define TIGHTDB_VER_MAJOR $tightdb_ver_major/" $version_file || exit 1
-        sed -i -e "s/\#define TIGHTDB_VER_MINOR .*/\#define TIGHTDB_VER_MINOR $tightdb_ver_minor/" $version_file || exit 1
-        sed -i -e "s/\#define TIGHTDB_VER_PATCH .*/\#define TIGHTDB_VER_PATCH $tightdb_ver_patch/" $version_file || exit 1
+        sed -i '' -e "s/\#define TIGHTDB_VER_MAJOR .*/\#define TIGHTDB_VER_MAJOR $tightdb_ver_major/" $version_file || exit 1
+        sed -i '' -e "s/\#define TIGHTDB_VER_MINOR .*/\#define TIGHTDB_VER_MINOR $tightdb_ver_minor/" $version_file || exit 1
+        sed -i '' -e "s/\#define TIGHTDB_VER_PATCH .*/\#define TIGHTDB_VER_PATCH $tightdb_ver_patch/" $version_file || exit 1
 
         sh tools/add-deb-changelog.sh "$tightdb_version" "$(pwd)/debian/changelog.in" libtightdb || exit 1
         sh build.sh release-notes-prerelease || exit 1
