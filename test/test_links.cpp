@@ -811,7 +811,7 @@ TEST(Links_RemoveLastTargetColumn)
 }
 
 
-TEST(Links_RandomizedOperations)
+ONLY(Links_RandomizedOperations)
 {
     const size_t tests = 30;
     Random rnd;
@@ -820,7 +820,7 @@ TEST(Links_RandomizedOperations)
     for (size_t outer_iter = 0; outer_iter < 1000; outer_iter++) {
         Group group;
         TableRef refs[tests]; // 'tests' is max number of tables that can be produced
-        size_t tablecount = 0;
+
         vector<vector<size_t> > tables;
 
         for (size_t inner_iter = 0; inner_iter < tests; inner_iter++) {
