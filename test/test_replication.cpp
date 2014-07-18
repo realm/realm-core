@@ -291,7 +291,7 @@ TEST(Replication_Links)
     SHARED_GROUP_TEST_PATH(path_2);
 
     ostream* replay_log = 0;
-    replay_log = &cout;
+//    replay_log = &cout;
 
     MyTrivialReplication repl(path_1);
     SharedGroup sg_1(repl);

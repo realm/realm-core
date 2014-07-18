@@ -811,7 +811,7 @@ TEST(Links_RemoveLastTargetColumn)
 }
 
 
-ONLY(Links_RandomizedOperations)
+TEST(Links_RandomizedOperations)
 {
     const size_t tests = 30;
     Random rnd;
