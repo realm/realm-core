@@ -3,7 +3,8 @@
 
 ### Bugfixes:
 
-* `???`
+* Fixed bug causing corrupted table accessor when advancing transaction after last regular column is removed from table with remaining hidden backlink columns.
+* Fixed replication issue causing too many link list selection instructions to be generated.
 
 ### API breaking changes:
 
