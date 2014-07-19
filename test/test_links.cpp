@@ -883,7 +883,7 @@ ONLY(Links_foobar)
         int operations = 0;
         Random rnd(outer_iter);
         stream << "Random rnd(" << outer_iter << ");\n";
-
+        cerr << "*** new seed ***";
         try {
 
 /**********************************************************************************/
@@ -894,6 +894,7 @@ ONLY(Links_foobar)
                 if (b) {
                     operations++;
                     stream << "a.add(" << 0 << ");\n";
+                    cerr << "true ";
                     a.add(0);
                 }
                 else if (a.size() > 0) {
@@ -901,6 +902,7 @@ ONLY(Links_foobar)
                     size_t idx = rnd.draw_int_mod(a.size());
                     stream << "a.set(" << idx << ", 5);\n";
                     a.set(idx, 5);
+                    cerr << "false ";
                 }
             }
 
