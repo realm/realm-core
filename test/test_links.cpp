@@ -877,12 +877,12 @@ TEST(foobar)
 ONLY(Links_foobar)
 {
     int fewest_operations = -1;
-    ostringstream stream;
+  //  ostringstream stream;
 
     for (int outer_iter = 0; outer_iter < 10000; outer_iter++) {
         int operations = 0;
         Random rnd(outer_iter);
-        stream << "Random rnd(" << outer_iter << ");\n";
+      //  stream << "Random rnd(" << outer_iter << ");\n";
         cerr << "*** new seed ***";
         try {
 
@@ -893,14 +893,14 @@ ONLY(Links_foobar)
                 bool b = rnd.draw_bool();
                 if (b) {
                     operations++;
-                    stream << "a.add(" << 0 << ");\n";
+            //        stream << "a.add(" << 0 << ");\n";
                     cerr << "true ";
                     a.add(0);
                 }
                 else if (a.size() > 0) {
                     operations++;
                     size_t idx = rnd.draw_int_mod(a.size());
-                    stream << "a.set(" << idx << ", 5);\n";
+             //       stream << "a.set(" << idx << ", 5);\n";
                     a.set(idx, 5);
                     cerr << "false ";
                 }
@@ -912,8 +912,8 @@ ONLY(Links_foobar)
         catch (int x) {
             if (operations < fewest_operations || fewest_operations == -1) {
                 fewest_operations = operations;            
-                cerr << "------------------\n" << stream.str() << "\n\n";
-                stream = ostringstream("");
+          //      cerr << "------------------\n" << stream.str() << "\n\n";
+          //      stream = ostringstream("");
             }
         }
 
