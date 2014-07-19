@@ -14,13 +14,13 @@ using namespace tightdb::test_util;
 
 namespace {
 
-enum Days { Mon, Tue, Wed, Thu, Fri, Sat, Sun };
+    enum Days { Mon, Tue, Wed, Thu, Fri, Sat, Sun };
 
-TIGHTDB_TABLE_4(TestTableLinks,
-                first,  String,
-                second, Int,
-                third,  Bool,
-                fourth, Enum<Days>)
+    TIGHTDB_TABLE_4(TestTableLinks,
+        first, String,
+        second, Int,
+        third, Bool,
+        fourth, Enum<Days>)
 
 } // Anonymous namespace
 
@@ -179,9 +179,9 @@ TEST(Links_Deletes)
     Group group;
 
     TestTableLinks::Ref table1 = group.get_table<TestTableLinks>("table1");
-    table1->add("test1", 1, true,  Mon);
+    table1->add("test1", 1, true, Mon);
     table1->add("test2", 2, false, Tue);
-    table1->add("test3", 3, true,  Wed);
+    table1->add("test3", 3, true, Wed);
 
     // create table with links to table1
     TableRef table2 = group.get_table("table2");
@@ -218,9 +218,9 @@ TEST(Links_Deletes)
     CHECK(table2->is_null_link(col_link, 1));
 
     // add target rows again with links
-    table1->add("test1", 1, true,  Mon);
+    table1->add("test1", 1, true, Mon);
     table1->add("test2", 2, false, Tue);
-    table1->add("test3", 3, true,  Wed);
+    table1->add("test3", 3, true, Wed);
     table2->set_link(col_link, 0, 1);
     table2->set_link(col_link, 1, 0);
 
@@ -248,9 +248,9 @@ TEST(Links_Multi)
     Group group;
 
     TestTableLinks::Ref table1 = group.get_table<TestTableLinks>("table1");
-    table1->add("test1", 1, true,  Mon);
+    table1->add("test1", 1, true, Mon);
     table1->add("test2", 2, false, Tue);
-    table1->add("test3", 3, true,  Wed);
+    table1->add("test3", 3, true, Wed);
 
     // create table with links to table1
     TableRef table2 = group.get_table("table2");
@@ -317,9 +317,9 @@ TEST(Links_MultiToSame)
     Group group;
 
     TestTableLinks::Ref table1 = group.get_table<TestTableLinks>("table1");
-    table1->add("test1", 1, true,  Mon);
+    table1->add("test1", 1, true, Mon);
     table1->add("test2", 2, false, Tue);
-    table1->add("test3", 3, true,  Wed);
+    table1->add("test3", 3, true, Wed);
 
     // create table with multiple links to table1
     TableRef table2 = group.get_table("table2");
@@ -345,9 +345,9 @@ TEST(Links_LinkList_TableOps)
     Group group;
 
     TestTableLinks::Ref target = group.get_table<TestTableLinks>("target");
-    target->add("test1", 1, true,  Mon);
+    target->add("test1", 1, true, Mon);
     target->add("test2", 2, false, Tue);
-    target->add("test3", 3, true,  Wed);
+    target->add("test3", 3, true, Wed);
 
     // create table with links to target table
     TableRef source = group.get_table("source");
@@ -388,9 +388,9 @@ TEST(Links_LinkList_Basics)
     Group group;
 
     TestTableLinks::Ref target = group.get_table<TestTableLinks>("target");
-    target->add("test1", 1, true,  Mon);
+    target->add("test1", 1, true, Mon);
     target->add("test2", 2, false, Tue);
-    target->add("test3", 3, true,  Wed);
+    target->add("test3", 3, true, Wed);
 
     // create table with links to target table
     TableRef source = group.get_table("source");
@@ -476,9 +476,9 @@ TEST(Links_LinkList_Backlinks)
     Group group;
 
     TestTableLinks::Ref target = group.get_table<TestTableLinks>("target");
-    target->add("test1", 1, true,  Mon);
+    target->add("test1", 1, true, Mon);
     target->add("test2", 2, false, Tue);
-    target->add("test3", 3, true,  Wed);
+    target->add("test3", 3, true, Wed);
 
     // create table with links to target table
     TableRef source = group.get_table("source");
@@ -505,9 +505,9 @@ TEST(Links_LinkList_Backlinks)
     CHECK(links->is_empty());
 
     // re-add rows to target
-    target->add("test1", 1, true,  Mon);
+    target->add("test1", 1, true, Mon);
     target->add("test2", 2, false, Tue);
-    target->add("test3", 3, true,  Wed);
+    target->add("test3", 3, true, Wed);
 
     // add more rows with links
     source->add_empty_row();
@@ -556,9 +556,9 @@ TEST(Links_LinkList_AccessorUpdates)
     Group group;
 
     TestTableLinks::Ref target = group.get_table<TestTableLinks>("target");
-    target->add("test1", 1, true,  Mon);
+    target->add("test1", 1, true, Mon);
     target->add("test2", 2, false, Tue);
-    target->add("test3", 3, true,  Wed);
+    target->add("test3", 3, true, Wed);
 
     // create table with links to target table
     TableRef source = group.get_table("source");
@@ -614,9 +614,9 @@ TEST(Links_LinkList_FindBySource)
     Group group;
 
     TestTableLinks::Ref target = group.get_table<TestTableLinks>("target");
-    target->add("test1", 1, true,  Mon);
+    target->add("test1", 1, true, Mon);
     target->add("test2", 2, false, Tue);
-    target->add("test3", 3, true,  Wed);
+    target->add("test3", 3, true, Wed);
 
     // create table with links to target table
     TableRef source = group.get_table("source");
@@ -666,9 +666,9 @@ TEST(Links_Transactions)
     SHARED_GROUP_TEST_PATH(path);
     SharedGroup sg(path);
 
-    size_t name_col   = 0;
-    size_t dog_col    = 1;
-    size_t tim_row    = 0;
+    size_t name_col = 0;
+    size_t dog_col = 1;
+    size_t tim_row = 0;
     size_t harvey_row = 0;
 
     {
@@ -729,9 +729,9 @@ TEST(Links_RemoveTargetRows)
     Group group;
 
     TestTableLinks::Ref target = group.get_table<TestTableLinks>("target");
-    target->add("test1", 1, true,  Mon);
+    target->add("test1", 1, true, Mon);
     target->add("test2", 2, false, Tue);
-    target->add("test3", 3, true,  Wed);
+    target->add("test3", 3, true, Wed);
 
     // create table with links to target table
     TableRef source = group.get_table("source");
@@ -757,9 +757,9 @@ TEST(Links_RemoveTargetRows)
     CHECK_EQUAL(0, links->size());
 
     // re-add targets and links
-    target->add("test1", 1, true,  Mon);
+    target->add("test1", 1, true, Mon);
     target->add("test2", 2, false, Tue);
-    target->add("test3", 3, true,  Wed);
+    target->add("test3", 3, true, Wed);
     links->add(2);
     links->add(1);
     links->add(0);
@@ -787,11 +787,11 @@ TEST(Links_RemoveLastTargetColumn)
     TableRef target = group_2.get_table("target");
     target->add_column(type_Int, "t");
     target->add_empty_row();
-    origin->add_column_link(type_Link,     "o_1", *target);
+    origin->add_column_link(type_Link, "o_1", *target);
     origin->add_column_link(type_LinkList, "o_2", *target);
     origin->add_empty_row();
-    origin->set_link(0,0,0);
-    LinkViewRef link_list = origin->get_linklist(1,0);
+    origin->set_link(0, 0, 0);
+    LinkViewRef link_list = origin->get_linklist(1, 0);
     link_list->add(0);
     Row target_row_1 = target->get(0);
     Row target_row_2 = link_list->get(0);
@@ -800,9 +800,9 @@ TEST(Links_RemoveLastTargetColumn)
     target->remove_column(0);
     CHECK_EQUAL(0, target->get_column_count());
     CHECK(target->is_empty());
-    CHECK(origin->is_null_link(0,0));
+    CHECK(origin->is_null_link(0, 0));
     CHECK(link_list->is_attached());
-    CHECK_EQUAL(link_list, origin->get_linklist(1,0));
+    CHECK_EQUAL(link_list, origin->get_linklist(1, 0));
     CHECK_EQUAL(origin, &link_list->get_origin_table());
     CHECK_EQUAL(target, &link_list->get_target_table());
     CHECK_EQUAL(0, link_list->size());
@@ -855,6 +855,33 @@ TEST(Links_RandomizedOperations)
             }
         }
     }
+}
+
+ONLY(Links_SetLinkCrash)
+{
+
+    Group group_1;
+    TableRef table = group_1.get_table("table");
+
+
+    /*
+    table->add_column_link(type_Link, "link", *table);
+    table->add_column_link(type_Link, "link", *table);
+    table->add_column_link(type_Link, "link", *table);
+    table->add_empty_row(17);
+    table->add_column_link(type_Link, "link", *table);
+    table->add_empty_row(2);
+
+    // crash in get_bptree_leaf() in VS and gcc, but only if TIGHTDB_DEFAULT_MAX_LIST_SIZE == 4
+    table->set_link(3, 18, 16);
+    */
+
+    // should crash too, else try above instead
+    table->add_column_link(type_Link, "link", *table);
+    table->add_empty_row(17);
+    table->add_column_link(type_Link, "link", *table);
+    table->add_empty_row(2);
+    table->set_link(1, 18, 16);
 }
 
 #endif // TEST_LINKS
