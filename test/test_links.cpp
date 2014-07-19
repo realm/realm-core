@@ -857,4 +857,67 @@ TEST(Links_RandomizedOperations)
     }
 }
 
+
+
+TEST(foobar)
+{
+    Random rnd(0);
+
+    for (;;) {
+        bool b = rnd.draw_bool();
+        if (b)
+            cerr << "T";
+        else
+            cerr << "F";
+    }
+
+}
+
+
+ONLY(Links_foobar)
+{
+    int fewest_operations = -1;
+    ostringstream stream;
+
+    for (int outer_iter = 0; outer_iter < 10000; outer_iter++) {
+        int operations = 0;
+        Random rnd(outer_iter);
+        stream << "Random rnd(" << outer_iter << ");\n";
+
+        try {
+
+/**********************************************************************************/
+
+            for (int i = 0; i < 100; i++) {
+                Array a;
+                bool b = rnd.draw_bool();
+                if (b) {
+                    operations++;
+                    stream << "a.add(" << 0 << ");\n";
+                    a.add(0);
+                }
+                else if (a.size() > 0) {
+                    operations++;
+                    size_t idx = rnd.draw_int_mod(a.size());
+                    stream << "a.set(" << idx << ", 5);\n";
+                    a.set(idx, 5);
+                }
+            }
+
+/**********************************************************************************/
+
+        }
+        catch (int x) {
+            if (operations < fewest_operations || fewest_operations == -1) {
+                fewest_operations = operations;            
+                cerr << "------------------\n" << stream.str() << "\n\n";
+                stream = ostringstream("");
+            }
+        }
+
+    }
+
+}
+
+
 #endif // TEST_LINKS
