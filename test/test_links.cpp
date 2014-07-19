@@ -859,9 +859,12 @@ TEST(Links_RandomizedOperations)
 
 ONLY(Links_SetLinkCrash)
 {
+                
     Group group_1;
     TableRef table = group_1.get_table("table");
 
+    
+/*
     table->add_column_link(type_Link, "link", *table);
     table->add_column_link(type_Link, "link", *table);
     table->add_column_link(type_Link, "link", *table);
@@ -871,6 +874,14 @@ ONLY(Links_SetLinkCrash)
 
     // crash in get_bptree_leaf() in VS and gcc, but only if TIGHTDB_DEFAULT_MAX_LIST_SIZE == 4 
     table->set_link(3, 18, 16);
+*/    
+    
+    // should crash too, else try above instead
+    table->add_column_link(type_Link, "link", *table);
+    table->add_empty_row(17);
+    table->add_column_link(type_Link, "link", *table);
+    table->add_empty_row(2);
+    table->set_link(1, 18, 16);
 }
 
 #endif // TEST_LINKS
