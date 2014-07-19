@@ -22,8 +22,9 @@
 
 #include <tightdb/util/features.h>
 
-
-#ifdef TIGHTDB_DEBUG
+#ifdef TIGHTDB_ANALYZE
+#  define TIGHTDB_ASSERT(condition) if(!(condition)) throw(0);
+#elif defined(TIGHTDB_DEBUG)
 #  include <tightdb/util/terminate.hpp>
 #  define TIGHTDB_ASSERT(condition) \
     ((condition) ? static_cast<void>(0) :                               \
