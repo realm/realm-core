@@ -2,7 +2,9 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
+* Fix bug in Table::add_column() which would produce a corrupt underlying node
+  structure if the table already contains more than N**2+1 row, where N is
+  TIGHTDB_MAX_LIST_SIZE (currently set to 1000).
 
 ### API breaking changes:
 
@@ -22,25 +24,10 @@
 
 # 0.80.2 Release notes
 
-
 ### Bugfixes:
 
 * Fixed bug causing corrupted table accessor when advancing transaction after last regular column is removed from table with remaining hidden backlink columns.
 * Fixed replication issue causing too many link list selection instructions to be generated.
-
-### API breaking changes:
-
-* `???`
-
-### Enhancements:
-
-* `???`
-
------------
-
-### Internals:
-
-* `???`
 
 ----------------------------------------------
 

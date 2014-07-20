@@ -617,7 +617,7 @@ ref_type ColumnBase::build(size_t* rest_size_ptr, size_t fixed_height,
                 new_inner_node.add(v); // Throws
                 node = 0;
                 size_t num_children = 1;
-                for (;;) {
+                while (rest_size > 0 && num_children != TIGHTDB_MAX_LIST_SIZE) {
                     ref_type child = build(&rest_size, height, alloc, handler); // Throws
                     try {
                         int_fast64_t v = child; // FIXME: Dangerous cast here (unsigned -> signed)
@@ -627,8 +627,6 @@ ref_type ColumnBase::build(size_t* rest_size_ptr, size_t fixed_height,
                         Array::destroy_deep(child, alloc);
                         throw;
                     }
-                    if (rest_size == 0 || ++num_children == TIGHTDB_MAX_LIST_SIZE)
-                        break;
                 }
                 v = orig_rest_size - rest_size; // total_elems_in_tree
                 new_inner_node.add(1 + 2*v); // Throws
