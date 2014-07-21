@@ -184,11 +184,15 @@ inline void ColumnBackLink::bump_link_origin_table_version() TIGHTDB_NOEXCEPT
         tf::bump_version(*m_origin_table);
 }
 
+#ifdef TIGHTDB_DEBUG
+
 inline bool ColumnBackLink::VerifyPair::operator<(const VerifyPair& p) const TIGHTDB_NOEXCEPT
 {
     return origin_row_ndx < p.origin_row_ndx;
 }
 
-} //namespace tightdb
+#endif // TIGHTDB_DEBUG
 
-#endif //TIGHTDB_COLUMN_BACKLINK_HPP
+} // namespace tightdb
+
+#endif // TIGHTDB_COLUMN_BACKLINK_HPP
