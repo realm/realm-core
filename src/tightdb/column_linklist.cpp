@@ -18,6 +18,9 @@
  *
  **************************************************************************/
 
+#include <algorithm>
+#include <set>
+
 #include <tightdb/column_linklist.hpp>
 #include <tightdb/link_view.hpp>
 
@@ -27,10 +30,12 @@ using namespace tightdb;
 
 void ColumnLinkList::clear()
 {
+    discard_child_accessors();
+
     // Remove all backlinks to the delete rows
     size_t row_count = size();
     for (size_t r = 0; r < row_count; ++r) {
-        ref_type ref = Column::get_as_ref(r);
+        ref_type ref = ColumnLinkBase::get_as_ref(r);
         if (ref == 0)
             continue;
 
@@ -38,49 +43,45 @@ void ColumnLinkList::clear()
         size_t n = link_col.size();
         for (size_t i = 0; i < n; ++i) {
             size_t old_target_row_ndx = link_col.get(i);
-            m_backlinks->remove_backlink(old_target_row_ndx, r);
+            m_backlink_column->remove_backlink(old_target_row_ndx, r);
         }
     }
 
     // Do the actual deletion
-    Column::clear();
-
-    // Detach all accessors
-    typedef list_accessors::const_iterator iter;
-    iter end = m_list_accessors.end();
-    for (iter i = m_list_accessors.begin(); i != end; ++i)
-        i->m_list->detach();
-    m_list_accessors.clear();
+    ColumnLinkBase::clear(); // Throws
+    // FIXME: This one is needed because Column::clear() forgets about the leaf
+    // type. A better solution should probably be sought after.
+    m_array->set_type(Array::type_HasRefs);
 }
 
 
 void ColumnLinkList::move_last_over(size_t target_row_ndx, size_t last_row_ndx)
 {
     // Remove backlinks to the delete row
-    ref_type ref = Column::get_as_ref(target_row_ndx);
+    ref_type ref = ColumnLinkBase::get_as_ref(target_row_ndx);
     if (ref) {
         const Column linkcol(ref, null_ptr, 0, get_alloc());
         size_t count = linkcol.size();
         for (size_t i = 0; i < count; ++i) {
             size_t old_target_row_ndx = linkcol.get(i);
-            m_backlinks->remove_backlink(old_target_row_ndx, target_row_ndx);
+            m_backlink_column->remove_backlink(old_target_row_ndx, target_row_ndx);
         }
     }
 
     // Update backlinks to last row to point to its new position
-    ref_type ref2 = Column::get_as_ref(last_row_ndx);
+    ref_type ref2 = ColumnLinkBase::get_as_ref(last_row_ndx);
     if (ref2) {
         const Column linkcol(ref2, null_ptr, 0, get_alloc());
         size_t count = linkcol.size();
         for (size_t i = 0; i < count; ++i) {
             size_t old_target_row_ndx = linkcol.get(i);
-            m_backlinks->update_backlink(old_target_row_ndx, last_row_ndx, target_row_ndx);
+            m_backlink_column->update_backlink(old_target_row_ndx, last_row_ndx, target_row_ndx);
         }
     }
 
     // Do the actual delete and move
-    Column::destroy_subtree(target_row_ndx, false);
-    Column::move_last_over(target_row_ndx, last_row_ndx);
+    ColumnLinkBase::destroy_subtree(target_row_ndx, false);
+    ColumnLinkBase::move_last_over(target_row_ndx, last_row_ndx);
 
     const bool fix_ndx_in_parent = true;
     adj_move_last_over<fix_ndx_in_parent>(target_row_ndx, last_row_ndx);
@@ -93,19 +94,19 @@ void ColumnLinkList::erase(size_t row_ndx, bool is_last)
     TIGHTDB_ASSERT(is_last);
 
     // Remove backlinks to the delete row
-    ref_type ref = Column::get_as_ref(row_ndx);
+    ref_type ref = ColumnLinkBase::get_as_ref(row_ndx);
     if (ref) {
         const Column linkcol(ref, null_ptr, 0, get_alloc());
         size_t count = linkcol.size();
         for (size_t i = 0; i < count; ++i) {
             size_t old_target_row_ndx = linkcol.get(i);
-            m_backlinks->remove_backlink(old_target_row_ndx, row_ndx);
+            m_backlink_column->remove_backlink(old_target_row_ndx, row_ndx);
         }
     }
 
     // Do the actual delete
-    Column::destroy_subtree(row_ndx, false);
-    Column::erase(row_ndx, is_last);
+    ColumnLinkBase::destroy_subtree(row_ndx, false);
+    ColumnLinkBase::erase(row_ndx, is_last);
 
     // Detach accessor, if any
     typedef list_accessors::iterator iter;
@@ -170,13 +171,13 @@ LinkView* ColumnLinkList::get_ptr(size_t row_ndx) const
 
 void ColumnLinkList::update_child_ref(size_t child_ndx, ref_type new_ref)
 {
-    Column::set(child_ndx, new_ref);
+    ColumnLinkBase::set(child_ndx, new_ref);
 }
 
 
 ref_type ColumnLinkList::get_child_ref(size_t child_ndx) const TIGHTDB_NOEXCEPT
 {
-    return Column::get(child_ndx);
+    return ColumnLinkBase::get(child_ndx);
 }
 
 
@@ -298,6 +299,67 @@ void ColumnLinkList::adj_move_last_over(size_t target_row_ndx,
 
 
 #ifdef TIGHTDB_DEBUG
+
+namespace {
+
+size_t verify_leaf(MemRef mem, Allocator& alloc)
+{
+    Array leaf(alloc);
+    leaf.init_from_mem(mem);
+    leaf.Verify();
+    TIGHTDB_ASSERT(leaf.has_refs());
+    return leaf.size();
+}
+
+} // anonymous namespace
+
+void ColumnLinkList::Verify() const
+{
+    if (root_is_leaf()) {
+        m_array->Verify();
+        TIGHTDB_ASSERT(m_array->has_refs());
+        return;
+    }
+
+    m_array->verify_bptree(&verify_leaf);
+}
+
+
+void ColumnLinkList::Verify(const Table& table, size_t col_ndx) const
+{
+    ColumnLinkBase::Verify(table, col_ndx);
+
+    vector<ColumnBackLink::VerifyPair> pairs;
+    m_backlink_column->get_backlinks(pairs);
+
+    // For each link list, verify the accessor, then check that the contents of
+    // the list is in agreement with the corresponding backlinks. A forward link
+    // (origin_row_ndx -> target_row_ndx) with multiplicity N must exists if,
+    // and only if there exists a backward link (target_row_ndx ->
+    // origin_row_ndx) with multiplicity N.
+    size_t backlinks_seen = 0;
+    size_t n = size();
+    for (size_t i = 0; i != n; ++i) {
+        ConstLinkViewRef link_list = get(i);
+        link_list->Verify(i);
+        multiset<size_t> links_1, links_2;
+        size_t m = link_list->size();
+        for (size_t j = 0; j < m; ++j)
+            links_1.insert(link_list->get(j).get_index());
+        typedef vector<ColumnBackLink::VerifyPair>::const_iterator iter;
+        ColumnBackLink::VerifyPair search_value;
+        search_value.origin_row_ndx = i;
+        pair<iter,iter> range = equal_range(pairs.begin(), pairs.end(), search_value);
+        for (iter j = range.first; j != range.second; ++j)
+            links_2.insert(j->target_row_ndx);
+        TIGHTDB_ASSERT(links_1 == links_2);
+        backlinks_seen += links_2.size();
+    }
+
+    // All backlinks must have been matched by a forward link
+    TIGHTDB_ASSERT(backlinks_seen == pairs.size());
+}
+
 
 pair<ref_type, size_t> ColumnLinkList::get_to_dot_parent(size_t ndx_in_parent) const
 {

@@ -99,6 +99,8 @@ public:
     /// different from the specified logical column index due to the presence of
     /// search indexes, since their top refs are stored in Table::m_columns as
     /// well.
+    ///
+    /// FIXME: Rename to get_column_ndx_in_parent()
     std::size_t get_column_pos(std::size_t column_ndx) const;
 
     /// Compare two table specs for equality.
@@ -106,6 +108,7 @@ public:
 
     void destroy() TIGHTDB_NOEXCEPT;
 
+    std::size_t get_ndx_in_parent() const TIGHTDB_NOEXCEPT;
     void set_ndx_in_parent(std::size_t) TIGHTDB_NOEXCEPT;
 
 #ifdef TIGHTDB_DEBUG
@@ -328,6 +331,11 @@ inline void Spec::init_from_parent() TIGHTDB_NOEXCEPT
 inline void Spec::destroy() TIGHTDB_NOEXCEPT
 {
     m_top.destroy_deep();
+}
+
+inline std::size_t Spec::get_ndx_in_parent() const TIGHTDB_NOEXCEPT
+{
+    return m_top.get_ndx_in_parent();
 }
 
 inline void Spec::set_ndx_in_parent(std::size_t ndx) TIGHTDB_NOEXCEPT

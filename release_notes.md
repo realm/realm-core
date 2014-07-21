@@ -2,9 +2,12 @@
 
 ### Bugfixes:
 
-* Fix bug in Table::add_column() which would produce a corrupt underlying node
-  structure if the table already contains more than N**2+1 row, where N is
-  TIGHTDB_MAX_LIST_SIZE (currently set to 1000).
+* Fixed bug in `Table::add_column()` which would produce a corrupt underlying
+  node structure if the table already contains more than N**2 rows, where N is
+  `TIGHTDB_MAX_LIST_SIZE` (currently set to 1000).
+* Fixed bugs in `Table::clear()` which would produce a corrupt underlying node
+  structure if the table already contains more than N rows, where N is
+  `TIGHTDB_MAX_LIST_SIZE` (currently set to 1000).
 
 ### API breaking changes:
 
@@ -18,7 +21,8 @@
 
 ### Internals:
 
-* Lorem ipsum.
+* Table::Verify() has been heavily extended and now also checks link columns and
+  link lists (debug mode only).
 
 ----------------------------------------------
 

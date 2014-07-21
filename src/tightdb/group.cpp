@@ -1298,6 +1298,7 @@ void Group::Verify() const
         size_t n = m_tables.size();
         for (size_t i = 0; i != n; ++i) {
             const Table* table = get_table_by_ndx(i);
+            TIGHTDB_ASSERT(table->get_index_in_parent() == i);
             table->Verify();
         }
     }

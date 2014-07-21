@@ -11,6 +11,7 @@
 #include <tightdb/column_table.hpp>
 #include <tightdb/column_mixed.hpp>
 #include <tightdb/query_engine.hpp>
+#include <tightdb/table.hpp>
 
 using namespace std;
 using namespace tightdb;
@@ -222,6 +223,16 @@ void ColumnBase::update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT
 {
     m_array->update_from_parent(old_baseline);
 }
+
+
+#ifdef TIGHTDB_DEBUG
+
+void ColumnBase::Verify(const Table&, size_t) const
+{
+    Verify();
+}
+
+#endif // TIGHTDB_DEBUG
 
 
 namespace {
@@ -1134,6 +1145,7 @@ void Column::Verify() const
 
     m_array->verify_bptree(&verify_leaf);
 }
+
 
 class ColumnBase::LeafToDot: public Array::ToDotHandler {
 public:

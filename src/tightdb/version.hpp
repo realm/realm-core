@@ -45,6 +45,6 @@ public:
 };
 
 
-} // namespace tigthdb
+} // namespace tightdb
 
 #endif // TIGHTDB_VERSION_HPP
