@@ -2714,6 +2714,7 @@ size_t Table::lookup(StringData value) const
     return m_search_index->find_first(value);
 }
 
+
 template <class T> size_t Table::find_first(size_t col_ndx, T value) const
 {
     TIGHTDB_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
@@ -2725,6 +2726,13 @@ template <class T> size_t Table::find_first(size_t col_ndx, T value) const
     typedef typename ColumnTypeTraits3<T>::column_type ColType;
     const ColType& column = get_column<ColType, ColumnTypeTraits3<T>::ct_id>(col_ndx);
     return column.find_first(value);
+}
+
+size_t Table::find_first_link(size_t target_row_index) const
+{
+    size_t ret = where().links_to(m_link_chain[0], target_row_index).find();
+    m_link_chain.clear();
+    return ret;
 }
 
 size_t Table::find_first_int(size_t col_ndx, int64_t value) const
@@ -2788,6 +2796,17 @@ template <class T> TableView Table::find_all(size_t col_ndx, T value)
     return where().equal(col_ndx, value).find_all();
 }
 
+TableView Table::find_all_link(size_t target_row_index)
+{
+    TableView tv = where().links_to(m_link_chain[0], target_row_index).find_all();
+    m_link_chain.clear();
+    return tv;
+}
+
+ConstTableView Table::find_all_link(size_t target_row_index) const
+{
+    return const_cast<Table*>(this)->find_all_link(target_row_index);
+}
 
 TableView Table::find_all_int(size_t col_ndx, int64_t value)
 {

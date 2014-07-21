@@ -382,4 +382,166 @@ TEST(LinkList_ClearView1)
     }
 }
 
+
+TEST(LinkList_QueryFindLinkTarget)
+{
+    Group group;
+
+    TableRef table1 = group.get_table("table1");
+    TableRef table2 = group.get_table("table2");
+
+    // add some more columns to table1 and table2
+    table1->add_column(type_Int, "col1");
+    table1->add_column(type_String, "str1");
+
+    table2->add_column(type_Int, "col1");
+    table2->add_column(type_String, "str2");
+
+    // add some rows
+    table1->add_empty_row();
+    table1->set_int(0, 0, 100);
+    table1->set_string(1, 0, "foo");
+    table1->add_empty_row();
+    table1->set_int(0, 1, 200);
+    table1->set_string(1, 1, "!");
+    table1->add_empty_row();
+    table1->set_int(0, 2, 300);
+    table1->set_string(1, 2, "bar");
+
+    table2->add_empty_row();
+
+    table2->set_int(0, 0, 400);
+    table2->set_string(1, 0, "hello");
+    table2->add_empty_row();
+    table2->set_int(0, 1, 500);
+    table2->set_string(1, 1, "world");
+    table2->add_empty_row();
+    table2->set_int(0, 2, 600);
+    table2->set_string(1, 2, "!");
+    table2->add_empty_row();
+    table2->set_int(0, 3, 700);
+    table2->set_string(1, 3, "!!");
+
+    size_t col_link2 = table1->add_column_link(type_Link, "link", *table2);
+    size_t col_link3 = table1->add_column_link(type_LinkList, "link", *table2);
+
+    // set some links
+
+    table1->set_link(col_link2, 0, 1);
+    table1->set_link(col_link2, 1, 2);
+
+    LinkViewRef lvr;
+
+    lvr = table1->get_linklist(col_link3, 0);
+    lvr->add(0);
+    lvr->add(1);
+
+    lvr = table1->get_linklist(col_link3, 1);
+    lvr->add(1);
+    lvr->add(2);
+
+    size_t match;
+    
+    // First we test find_*_link on Table
+
+    // find on Link
+    match = table1->link(col_link2).find_first_link(1);
+    CHECK_EQUAL(0, match);
+
+    match = table1->link(col_link2).find_first_link(2);
+    CHECK_EQUAL(1, match);
+
+    match = table1->link(col_link2).find_first_link(3);
+    CHECK_EQUAL(not_found, match);
+
+    // find on LinkList
+    match = table1->link(col_link3).find_first_link(1);
+    CHECK_EQUAL(0, match);
+
+    match = table1->link(col_link3).find_first_link(2);
+    CHECK_EQUAL(1, match);
+
+    match = table1->link(col_link3).find_first_link(3);
+    CHECK_EQUAL(not_found, match);
+
+
+    // find_all on Link
+
+    TableView tv;
+
+    tv = table1->link(col_link2).find_all_link(2);
+    CHECK_EQUAL(1, tv.size());
+    CHECK_EQUAL(1, tv.get_source_ndx(0));
+
+    tv = table1->link(col_link2).find_all_link(1);
+    CHECK_EQUAL(1, tv.size());
+    CHECK_EQUAL(0, tv.get_source_ndx(0));
+
+    tv = table1->link(col_link2).find_all_link(3);
+    CHECK_EQUAL(0, tv.size());
+
+    // find_all on LinkList
+    tv = table1->link(col_link3).find_all_link(2);
+    CHECK_EQUAL(1, tv.size());
+    CHECK_EQUAL(1, tv.get_source_ndx(0));
+
+    tv = table1->link(col_link3).find_all_link(1);
+    CHECK_EQUAL(2, tv.size());
+    CHECK_EQUAL(0, tv.get_source_ndx(0));
+    CHECK_EQUAL(1, tv.get_source_ndx(1));
+
+    tv = table1->link(col_link3).find_all_link(3);
+    CHECK_EQUAL(0, tv.size());
+
+
+    // find on query with Link
+    match = table1->where().links_to(col_link2, 1).find();
+    CHECK_EQUAL(0, match);
+
+    match = table1->where().links_to(col_link2, 2).find();
+    CHECK_EQUAL(1, match);
+
+    match = table1->where().links_to(col_link2, 3).find();
+    CHECK_EQUAL(not_found, match);
+
+
+    // find_all on query with Link
+    tv = table1->where().links_to(col_link2, 2).find_all();
+    CHECK_EQUAL(1, tv.size());
+    CHECK_EQUAL(1, tv.get_source_ndx(0));
+
+    tv = table1->where().links_to(col_link2, 1).find_all();
+    CHECK_EQUAL(1, tv.size());
+    CHECK_EQUAL(0, tv.get_source_ndx(0));
+
+    tv = table1->where().links_to(col_link2, 3).find_all();
+    CHECK_EQUAL(0, tv.size());
+
+
+    // find on query with LinkList
+    match = table1->where().links_to(col_link3, 1).find();
+    CHECK_EQUAL(0, match);
+
+    match = table1->where().links_to(col_link3, 2).find();
+    CHECK_EQUAL(1, match);
+
+    match = table1->where().links_to(col_link3, 3).find();
+    CHECK_EQUAL(not_found, match);
+
+    // find_all on query with LinkList
+    tv = table1->where().links_to(col_link3, 2).find_all();
+    CHECK_EQUAL(1, tv.size());
+    CHECK_EQUAL(1, tv.get_source_ndx(0));
+
+    tv = table1->where().links_to(col_link3, 1).find_all();
+    CHECK_EQUAL(2, tv.size());
+    CHECK_EQUAL(0, tv.get_source_ndx(0));
+    CHECK_EQUAL(1, tv.get_source_ndx(1));
+
+    tv = table1->where().links_to(col_link3, 3).find_all();
+    CHECK_EQUAL(0, tv.size());
+}
+
+
+
 #endif

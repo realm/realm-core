@@ -9,13 +9,11 @@
   structure if the table already contains more than N rows, where N is
   `TIGHTDB_MAX_LIST_SIZE` (currently set to 1000).
 
-### API breaking changes:
-
-* Lorem ipsum.
-
 ### Enhancements:
 
-* Lorem ipsum.
+* Lets you find links that point at a specific row index. Works on Query and
+  Table. Please see `LinkList_QueryFindLinkTarget` in `test_link_query_view.cpp`
+  for usage.
 
 -----------
 
