@@ -68,6 +68,9 @@ public:
     // Conditions: Query only rows contained in tv
     Query& tableview(const TableView& tv); // throws
 
+    // Find links that point to a specific target row 
+    Query& links_to(size_t column_ndx, size_t target_row);
+
     // Conditions: int64_t
     Query& equal(size_t column_ndx, int64_t value);
     Query& not_equal(size_t column_ndx, int64_t value);

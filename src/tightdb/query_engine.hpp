@@ -1924,6 +1924,61 @@ public:
     Expression* m_compare;
 };
 
+
+class LinksToNode : public ParentNode {
+public:
+    LinksToNode(size_t origin_column_index, size_t target_row) : m_origin_column(origin_column_index),
+                                                                 m_target_row(target_row)
+    {
+        m_child = 0;
+        m_dD = 10.0;
+        m_dT = 50.0;
+    }
+
+    void init(const Table& table)  TIGHTDB_OVERRIDE
+    {
+        m_table = &table;
+        if (m_child)
+            m_child->init(table);
+    }
+
+    size_t find_first_local(size_t start, size_t end) TIGHTDB_OVERRIDE
+    {
+        size_t ret;
+        DataType type = m_table->get_column_type(m_origin_column);
+
+        if (type == type_Link) {
+            ColumnLinkBase& clb = const_cast<Table*>(m_table)->get_column_link_base(m_origin_column);
+            ColumnLink& cl = static_cast<ColumnLink&>(clb);
+            ret = cl.find_first(m_target_row + 1, start); // ColumnLink stores link to row N as the integer N + 1
+        }
+        else if (type == type_LinkList) {
+            ColumnLinkBase& clb = const_cast<Table*>(m_table)->get_column_link_base(m_origin_column);
+            ColumnLinkList& cll = static_cast<ColumnLinkList&>(clb);
+            for (size_t i = start; i < end; i++) {
+                LinkViewRef lv = cll.get(i);
+                ret = lv->find(m_target_row);
+                if (ret != not_found)
+                    return i;
+            }
+        }
+        else {
+            TIGHTDB_ASSERT(false);
+        }
+
+        return ret;
+    }
+
+    virtual ParentNode* clone()
+    {
+        return new LinksToNode(*this);
+    }
+
+    size_t m_origin_column;
+    size_t m_target_row;
+};
+
+
 } // namespace tightdb
 
 #endif // TIGHTDB_QUERY_ENGINE_HPP

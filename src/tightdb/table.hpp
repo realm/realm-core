@@ -475,6 +475,7 @@ public:
 
     // Searching
     std::size_t    lookup(StringData value) const;
+    std::size_t    find_first_link(std::size_t target_row_index) const;
     std::size_t    find_first_int(std::size_t column_ndx, int64_t value) const;
     std::size_t    find_first_bool(std::size_t column_ndx, bool value) const;
     std::size_t    find_first_datetime(std::size_t column_ndx, DateTime value) const;
@@ -483,6 +484,8 @@ public:
     std::size_t    find_first_string(std::size_t column_ndx, StringData value) const;
     std::size_t    find_first_binary(std::size_t column_ndx, BinaryData value) const;
 
+    TableView      find_all_link(size_t target_row_index);
+    ConstTableView find_all_link(size_t target_row_index) const;
     TableView      find_all_int(std::size_t column_ndx, int64_t value);
     ConstTableView find_all_int(std::size_t column_ndx, int64_t value) const;
     TableView      find_all_bool(std::size_t column_ndx, bool value);
@@ -744,7 +747,7 @@ private:
     mutable row_accessors m_row_accessors;
 
     // Used for queries: Items are added with link() method during buildup of query
-    std::vector<size_t> m_link_chain;
+    mutable std::vector<size_t> m_link_chain;
 
     /// Used only in connection with Group::advance_transact() and
     /// Table::refresh_accessor_tree().
@@ -1084,6 +1087,7 @@ private:
     friend class ParentNode;
     template<class> friend class SequentialGetter;
     friend class RowBase;
+    friend class LinksToNode;
 };
 
 
