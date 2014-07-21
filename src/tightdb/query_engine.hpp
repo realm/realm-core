@@ -1944,7 +1944,7 @@ public:
 
     size_t find_first_local(size_t start, size_t end) TIGHTDB_OVERRIDE
     {
-        size_t ret;
+        size_t ret = tightdb::npos; // superfluous init, but gives warnings otherwise
         DataType type = m_table->get_column_type(m_origin_column);
 
         if (type == type_Link) {
