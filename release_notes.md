@@ -21,7 +21,8 @@
 
 ### Internals:
 
-* Table::Verify() has been heavily extended and now also checks link columns and link lists (debug mode only).
+* Table::Verify() has been heavily extended and now also checks link columns and
+  link lists (debug mode only).
 
 ----------------------------------------------
 
