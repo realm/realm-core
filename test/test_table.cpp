@@ -5290,17 +5290,4 @@ TEST(Table_AddColumnWithThreeLevelBptree)
     table->Verify();
 }
 
-
-ONLY(Table_newbug)
-{
-    Group group;
-
-    TableRef table1 = group.get_table("table1");
-    table1->add_column(type_Int, "col1");
-
-    Random rnd(31);
-    table1->add_empty_row(2);
-    table1->insert_int(0, 0, 7);
-    table1->remove(1);
-}
 #endif // TEST_TABLE
