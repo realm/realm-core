@@ -50,6 +50,7 @@ public:
 
 #ifdef TIGHTDB_DEBUG
     void Verify(const Table&, std::size_t) const TIGHTDB_OVERRIDE;
+    using Column::Verify;
 #endif
 
 protected:

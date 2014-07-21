@@ -228,7 +228,7 @@ private:
     void do_discard_child_accessors() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
 #ifdef TIGHTDB_DEBUG
-    void do_verify(const Table*, std::size_t col_ndx) const TIGHTDB_OVERRIDE;
+    void do_verify(const Table*, std::size_t col_ndx) const;
     void leaf_to_dot(MemRef, ArrayParent*, std::size_t,
                      std::ostream&) const TIGHTDB_OVERRIDE {} // Not used
 #endif
