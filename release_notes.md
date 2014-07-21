@@ -10,7 +10,7 @@
 
 ### Enhancements:
 
-* Lorem ipsum.
+* Lets you find links that point at a specific row index. Works on Query and Table. . Please see LinkList_QueryFindLinkTarget in test_link_query_view.cpp for usage
 
 -----------
 
@@ -30,17 +30,12 @@
 
 ### API breaking changes:
 
-* `???`
+* None
 
 ### Enhancements:
 
-* `???`
+* None
 
------------
-
-### Internals:
-
-* `???`
 
 ----------------------------------------------
 
