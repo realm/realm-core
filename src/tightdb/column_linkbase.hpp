@@ -32,8 +32,9 @@ public:
     ColumnLinkBase(ref_type, ArrayParent*, std::size_t ndx_in_parent, Allocator&);
     ~ColumnLinkBase() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
+    Table& get_target_table() const TIGHTDB_NOEXCEPT;
     void set_target_table(Table&) TIGHTDB_NOEXCEPT;
-    Table* get_target_table() TIGHTDB_NOEXCEPT;
+    ColumnBackLink& get_backlink_column() const TIGHTDB_NOEXCEPT;
     void set_backlink_column(ColumnBackLink&) TIGHTDB_NOEXCEPT;
 
     virtual void do_nullify_link(std::size_t row_ndx, std::size_t old_target_row_ndx) = 0;
@@ -47,9 +48,14 @@ public:
 
     void mark_link_target_table() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
+#ifdef TIGHTDB_DEBUG
+    void Verify(const Table&, std::size_t) const TIGHTDB_OVERRIDE;
+    using Column::Verify;
+#endif
+
 protected:
     TableRef m_target_table;
-    ColumnBackLink* m_backlinks;
+    ColumnBackLink* m_backlink_column;
 };
 
 
@@ -60,12 +66,17 @@ protected:
 inline ColumnLinkBase::ColumnLinkBase(ref_type ref, ArrayParent* parent, std::size_t ndx_in_parent,
                                       Allocator& alloc):
     Column(ref, parent, ndx_in_parent, alloc),
-    m_backlinks(0)
+    m_backlink_column(0)
 {
 }
 
 inline ColumnLinkBase::~ColumnLinkBase() TIGHTDB_NOEXCEPT
 {
+}
+
+inline Table& ColumnLinkBase::get_target_table() const TIGHTDB_NOEXCEPT
+{
+    return *m_target_table;
 }
 
 inline void ColumnLinkBase::set_target_table(Table& table) TIGHTDB_NOEXCEPT
@@ -74,14 +85,14 @@ inline void ColumnLinkBase::set_target_table(Table& table) TIGHTDB_NOEXCEPT
     m_target_table = table.get_table_ref();
 }
 
-inline Table* ColumnLinkBase::get_target_table() TIGHTDB_NOEXCEPT
+inline ColumnBackLink& ColumnLinkBase::get_backlink_column() const TIGHTDB_NOEXCEPT
 {
-    return m_target_table.get();
+    return *m_backlink_column;
 }
 
-inline void ColumnLinkBase::set_backlink_column(ColumnBackLink& backlinks) TIGHTDB_NOEXCEPT
+inline void ColumnLinkBase::set_backlink_column(ColumnBackLink& column) TIGHTDB_NOEXCEPT
 {
-    m_backlinks = &backlinks;
+    m_backlink_column = &column;
 }
 
 inline void ColumnLinkBase::adj_accessors_insert_rows(std::size_t row_ndx,
@@ -126,6 +137,6 @@ inline void ColumnLinkBase::mark_link_target_table() TIGHTDB_NOEXCEPT
 }
 
 
-} //namespace tightdb
+} // namespace tightdb
 
-#endif //TIGHTDB_COLUMN_LINKBASE_HPP
+#endif // TIGHTDB_COLUMN_LINKBASE_HPP

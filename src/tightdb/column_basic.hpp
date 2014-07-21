@@ -100,7 +100,7 @@ public:
     void refresh_accessor_tree(std::size_t, const Spec&) TIGHTDB_OVERRIDE;
 
 #ifdef TIGHTDB_DEBUG
-    void Verify() const TIGHTDB_OVERRIDE;
+    void Verify() const;
     void to_dot(std::ostream&, StringData title) const TIGHTDB_OVERRIDE;
     void dump_node_structure(std::ostream&, int level) const TIGHTDB_OVERRIDE;
     using ColumnBase::dump_node_structure;

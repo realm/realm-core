@@ -110,6 +110,10 @@ private:
     friend class Replication;
 #endif
 
+#ifdef TIGHTDB_DEBUG
+    void Verify(std::size_t row_ndx) const;
+#endif
+
     friend class ColumnLinkList;
     friend class util::bind_ptr<LinkView>;
     friend class util::bind_ptr<const LinkView>;
@@ -193,9 +197,9 @@ inline std::size_t LinkView::size() const TIGHTDB_NOEXCEPT
 
 inline bool LinkView::operator==(const LinkView& link_list) const TIGHTDB_NOEXCEPT
 {
-    Table* target_table_1 = m_origin_column.get_target_table();
-    Table* target_table_2 = link_list.m_origin_column.get_target_table();
-    if (target_table_1->get_index_in_parent() != target_table_2->get_index_in_parent())
+    Table& target_table_1 = m_origin_column.get_target_table();
+    Table& target_table_2 = link_list.m_origin_column.get_target_table();
+    if (target_table_1.get_index_in_parent() != target_table_2.get_index_in_parent())
         return false;
     if (!m_target_row_indexes.is_attached() || m_target_row_indexes.is_empty()) {
         return !link_list.m_target_row_indexes.is_attached() ||
@@ -221,7 +225,7 @@ inline Table::RowExpr LinkView::get(std::size_t link_ndx) TIGHTDB_NOEXCEPT
     TIGHTDB_ASSERT(m_target_row_indexes.is_attached());
     TIGHTDB_ASSERT(link_ndx < m_target_row_indexes.size());
 
-    Table& target_table = *m_origin_column.get_target_table();
+    Table& target_table = m_origin_column.get_target_table();
     std::size_t target_row_ndx = to_size_t(m_target_row_indexes.get(link_ndx));
     return target_table[target_row_ndx];
 }
@@ -246,7 +250,7 @@ inline void LinkView::add(std::size_t target_row_ndx)
 inline std::size_t LinkView::find(std::size_t target_row_ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(is_attached());
-    TIGHTDB_ASSERT(target_row_ndx < m_origin_column.get_target_table()->size());
+    TIGHTDB_ASSERT(target_row_ndx < m_origin_column.get_target_table().size());
 
     if (!m_target_row_indexes.is_attached())
         return not_found;
@@ -278,12 +282,12 @@ inline void LinkView::set_origin_row_index(std::size_t row_ndx)
 
 inline const Table& LinkView::get_target_table() const TIGHTDB_NOEXCEPT
 {
-    return *m_origin_column.get_target_table();
+    return m_origin_column.get_target_table();
 }
 
 inline Table& LinkView::get_target_table() TIGHTDB_NOEXCEPT
 {
-    return *m_origin_column.get_target_table();
+    return m_origin_column.get_target_table();
 }
 
 inline void LinkView::refresh_accessor_tree(size_t new_row_ndx) TIGHTDB_NOEXCEPT

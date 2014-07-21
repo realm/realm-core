@@ -785,7 +785,7 @@ void Table::update_link_target_tables(size_t old_col_ndx_begin, size_t new_col_n
         if (!is_link_type(type))
             continue;
         ColumnLinkBase* link_col = static_cast<ColumnLinkBase*>(m_cols[new_col_ndx]);
-        Spec& target_spec = link_col->get_target_table()->m_spec;
+        Spec& target_spec = link_col->get_target_table().m_spec;
         size_t origin_table_ndx = get_index_in_parent();
         size_t old_col_ndx = old_col_ndx_begin + (new_col_ndx - new_col_ndx_begin);
         size_t backlink_col_ndx = target_spec.find_backlink_column(origin_table_ndx, old_col_ndx);
@@ -1801,7 +1801,7 @@ Table* Table::get_link_target_table_accessor(size_t col_ndx) TIGHTDB_NOEXCEPT
     TIGHTDB_ASSERT(col_ndx < m_cols.size());
     if (ColumnBase* col = m_cols[col_ndx]) {
         TIGHTDB_ASSERT(dynamic_cast<ColumnLinkBase*>(col));
-        return static_cast<ColumnLinkBase*>(col)->get_target_table();
+        return &static_cast<ColumnLinkBase*>(col)->get_target_table();
     }
     return 0;
 }
@@ -2358,7 +2358,7 @@ size_t Table::get_link(size_t col_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT
 TableRef Table::get_link_target(size_t col_ndx) TIGHTDB_NOEXCEPT
 {
     ColumnLinkBase& column = get_column_link_base(col_ndx);
-    return column.get_target_table()->get_table_ref();
+    return column.get_target_table().get_table_ref();
 }
 
 void Table::set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx)
@@ -3694,7 +3694,7 @@ void Table::to_json_row(std::size_t row_ndx, std::ostream& out, size_t link_dept
         {
             ColumnLinkBase& clb = const_cast<Table*>(this)->get_column_link_base(i);
             ColumnLink& cl = static_cast<ColumnLink&>(clb);
-            Table* table = cl.get_target_table();
+            Table& table = cl.get_target_table();
 
             if (!cl.is_null_link(row_ndx)) {
                 ref_type lnk = clb.get_ref();
@@ -3707,7 +3707,7 @@ void Table::to_json_row(std::size_t row_ndx, std::ostream& out, size_t link_dept
                     out << "[";
                     followed.push_back(clb.get_ref());
                     size_t new_depth = link_depth == not_found ? not_found : link_depth - 1;
-                    table->to_json_row(cl.get_link(row_ndx), out, new_depth, renames, followed);
+                    table.to_json_row(cl.get_link(row_ndx), out, new_depth, renames, followed);
                     out << "]";
                 }
             }
@@ -3721,13 +3721,13 @@ void Table::to_json_row(std::size_t row_ndx, std::ostream& out, size_t link_dept
         {
             ColumnLinkBase& clb = const_cast<Table*>(this)->get_column_link_base(i);
             ColumnLinkList& cll = static_cast<ColumnLinkList&>(clb);
-            Table* table = cll.get_target_table();
+            Table& table = cll.get_target_table();
             LinkViewRef lv = cll.get(row_ndx);
 
             ref_type lnk = clb.get_ref();
             if ((link_depth == 0) ||
                 (link_depth == not_found && std::find(followed.begin(), followed.end(), lnk) != followed.end())) {
-                out << "{\"table\": \"" << cll.get_target_table()->get_name() << "\", \"rows\": [";
+                out << "{\"table\": \"" << cll.get_target_table().get_name() << "\", \"rows\": [";
                 cll.to_json_row(row_ndx, out);
                 out << "]}";
                 break;
@@ -3739,7 +3739,7 @@ void Table::to_json_row(std::size_t row_ndx, std::ostream& out, size_t link_dept
                         out << ", ";
                     followed.push_back(lnk);
                     size_t new_depth = link_depth == not_found ? not_found : link_depth - 1;
-                    table->to_json_row(lv->get(link).get_index(), out, new_depth, renames, followed);
+                    table.to_json_row(lv->get(link).get_index(), out, new_depth, renames, followed);
                 }
                 out << "]";
             }
@@ -4601,7 +4601,9 @@ void Table::Verify() const
         TIGHTDB_ASSERT(n == m_cols.size());
         for (size_t i = 0; i != n; ++i) {
             const ColumnBase& column = get_column_base(i);
-            column.Verify();
+            std::size_t ndx_in_parent = m_spec.get_column_pos(i);
+            TIGHTDB_ASSERT(ndx_in_parent == column.get_root_array()->get_ndx_in_parent());
+            column.Verify(*this, i);
             TIGHTDB_ASSERT(column.size() == m_size);
         }
     }

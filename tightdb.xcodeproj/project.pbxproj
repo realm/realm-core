@@ -216,6 +216,7 @@
 		52807FB218E737E300A22716 /* test_self.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 52807FB118E737E300A22716 /* test_self.cpp */; };
 		52807FB518E73A1900A22716 /* test_destroy_guard.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 52807FB418E73A1900A22716 /* test_destroy_guard.cpp */; };
 		52807FB718E73A4800A22716 /* test_file_locks.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 52807FB618E73A4700A22716 /* test_file_locks.cpp */; };
+		5285BD0A197D5A830031FD44 /* column_link_base.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 5285BD09197D5A830031FD44 /* column_link_base.cpp */; };
 		52A32B3717D4E7FE00DD22CC /* test_array_float.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 52A32B3617D4E7FE00DD22CC /* test_array_float.cpp */; };
 		52A32B3A17D4E82000DD22CC /* test_column_basic.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 52A32B3917D4E82000DD22CC /* test_column_basic.cpp */; };
 		52A32B3C17D4E83500DD22CC /* test_column_float.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 52A32B3B17D4E83500DD22CC /* test_column_float.cpp */; };
@@ -510,6 +511,7 @@
 		52807FB118E737E300A22716 /* test_self.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = test_self.cpp; sourceTree = "<group>"; };
 		52807FB418E73A1900A22716 /* test_destroy_guard.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = test_destroy_guard.cpp; sourceTree = "<group>"; };
 		52807FB618E73A4700A22716 /* test_file_locks.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = test_file_locks.cpp; sourceTree = "<group>"; };
+		5285BD09197D5A830031FD44 /* column_link_base.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = column_link_base.cpp; path = tightdb/column_link_base.cpp; sourceTree = "<group>"; };
 		52A32B3617D4E7FE00DD22CC /* test_array_float.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = test_array_float.cpp; sourceTree = "<group>"; };
 		52A32B3917D4E82000DD22CC /* test_column_basic.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = test_column_basic.cpp; sourceTree = "<group>"; };
 		52A32B3B17D4E83500DD22CC /* test_column_float.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = test_column_float.cpp; sourceTree = "<group>"; };
@@ -673,6 +675,7 @@
 				365CCE04157CC37D00172BF8 /* column_binary.hpp */,
 				365CCE05157CC37D00172BF8 /* column_fwd.hpp */,
 				3658CE7C19256CA1009A7085 /* column_linkbase.hpp */,
+				5285BD09197D5A830031FD44 /* column_link_base.cpp */,
 				3658CE6B19209EDD009A7085 /* column_link.cpp */,
 				3658CE6C19209EDD009A7085 /* column_link.hpp */,
 				3658CE7819245BE5009A7085 /* column_linklist.cpp */,
@@ -1246,6 +1249,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				365CCE34157CC37D00172BF8 /* alloc_slab.cpp in Sources */,
+				5285BD0A197D5A830031FD44 /* column_link_base.cpp in Sources */,
 				365CCE37157CC37D00172BF8 /* array_binary.cpp in Sources */,
 				80ADCCE918A23DD00049D472 /* version.cpp in Sources */,
 				365CCE39157CC37D00172BF8 /* array_blob.cpp in Sources */,
@@ -1453,7 +1457,10 @@
 				CLANG_X86_VECTOR_INSTRUCTIONS = sse4.2;
 				COPY_PHASE_STRIP = NO;
 				GCC_OPTIMIZATION_LEVEL = 0;
-				GCC_PREPROCESSOR_DEFINITIONS = "TIGHTDB_DEBUG=1";
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"TIGHTDB_DEBUG=1",
+					"TIGHTDB_ENABLE_REPLICATION=1",
+				);
 				GCC_PREPROCESSOR_DEFINITIONS_NOT_USED_IN_PRECOMPS = USE_SSE42;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
 				GCC_WARN_ABOUT_MISSING_FIELD_INITIALIZERS = YES;
@@ -1488,7 +1495,10 @@
 				CLANG_WARN_SUSPICIOUS_IMPLICIT_CONVERSION = YES;
 				CLANG_WARN__EXIT_TIME_DESTRUCTORS = NO;
 				CLANG_X86_VECTOR_INSTRUCTIONS = sse4.2;
-				GCC_PREPROCESSOR_DEFINITIONS = NDEBUG;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					NDEBUG,
+					"TIGHTDB_ENABLE_REPLICATION=1",
+				);
 				GCC_PREPROCESSOR_DEFINITIONS_NOT_USED_IN_PRECOMPS = USE_SSE42;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
 				GCC_WARN_ABOUT_MISSING_FIELD_INITIALIZERS = YES;
@@ -1530,10 +1540,6 @@
 					"$(inherited)",
 					"$(PROJECT_DIR)/src/tightdb",
 				);
-				OTHER_CPLUSPLUSFLAGS = (
-					"$(OTHER_CFLAGS)",
-					"-DTIGHTDB_HAVE_CONFIG",
-				);
 				PRODUCT_NAME = tightdb;
 			};
 			name = Debug;
@@ -1552,10 +1558,6 @@
 					"$(inherited)",
 					"$(PROJECT_DIR)/src/tightdb",
 				);
-				OTHER_CPLUSPLUSFLAGS = (
-					"$(OTHER_CFLAGS)",
-					"-DTIGHTDB_HAVE_CONFIG",
-				);
 				PRODUCT_NAME = tightdb;
 			};
 			name = Release;
@@ -1572,10 +1574,6 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				HEADER_SEARCH_PATHS = "$(inherited)";
 				LIBRARY_SEARCH_PATHS = "$(inherited)";
-				OTHER_CPLUSPLUSFLAGS = (
-					"$(OTHER_CFLAGS)",
-					"-DTIGHTDB_HAVE_CONFIG",
-				);
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				VERSION_INFO_FILE = "$(TARGET_NAME)";
 			};
@@ -1593,10 +1591,6 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				HEADER_SEARCH_PATHS = "$(inherited)";
 				LIBRARY_SEARCH_PATHS = "$(inherited)";
-				OTHER_CPLUSPLUSFLAGS = (
-					"$(OTHER_CFLAGS)",
-					"-DTIGHTDB_HAVE_CONFIG",
-				);
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				VERSION_INFO_FILE = "$(TARGET_NAME)";
 			};

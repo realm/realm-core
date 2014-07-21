@@ -2,40 +2,34 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
-
-### API breaking changes:
-
-* Lorem ipsum.
+* Fixed bug in `Table::add_column()` which would produce a corrupt underlying
+  node structure if the table already contains more than N**2 rows, where N is
+  `TIGHTDB_MAX_LIST_SIZE` (currently set to 1000).
+* Fixed bugs in `Table::clear()` which would produce a corrupt underlying node
+  structure if the table already contains more than N rows, where N is
+  `TIGHTDB_MAX_LIST_SIZE` (currently set to 1000).
 
 ### Enhancements:
 
-* Lets you find links that point at a specific row index. Works on Query and Table. . Please see LinkList_QueryFindLinkTarget in test_link_query_view.cpp for usage
+* Lets you find links that point at a specific row index. Works on Query and
+  Table. Please see `LinkList_QueryFindLinkTarget` in `test_link_query_view.cpp`
+  for usage.
 
 -----------
 
 ### Internals:
 
-* Lorem ipsum.
+* Table::Verify() has been heavily extended and now also checks link columns and
+  link lists (debug mode only).
 
 ----------------------------------------------
 
 # 0.80.2 Release notes
 
-
 ### Bugfixes:
 
 * Fixed bug causing corrupted table accessor when advancing transaction after last regular column is removed from table with remaining hidden backlink columns.
 * Fixed replication issue causing too many link list selection instructions to be generated.
-
-### API breaking changes:
-
-* None
-
-### Enhancements:
-
-* None
-
 
 ----------------------------------------------
 

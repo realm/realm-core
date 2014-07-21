@@ -35,15 +35,14 @@ namespace tightdb {
 namespace test_util {
 
 
-/// Draw a uniformly distributed integer from the specified range
-/// using the global pseudorandom number generator. This global
-/// generator is an instance of `Random` and is therefore independent
-/// of other generators such as the one availble via std::rand(). This
-/// function is thread safe.
+/// Draw a uniformly distributed integer from the specified range using the
+/// global pseudorandom number generator. This global generator is based on an
+/// instance of `Random` and is therefore independent of other generators such
+/// as the one availble via std::rand(). This function is thread safe.
 ///
-/// The thread-safety of this function means that it is relatively
-/// slow, so if you need to draw many random numbers efficiently,
-/// consider creating your own instance of `Random`.
+/// The thread-safety of this function means that it is relatively slow, so if
+/// you need to draw many random numbers efficiently, consider creating your own
+/// instance of `Random`.
 template<class T> T random_int(T min, T max) TIGHTDB_NOEXCEPT;
 
 /// Same as `random_int(lim::min(), lim::max())` where `lim` is
@@ -56,21 +55,19 @@ template<class T> T random_int() TIGHTDB_NOEXCEPT;
 /// This function is thread safe.
 void random_seed(unsigned long) TIGHTDB_NOEXCEPT;
 
-/// To the extent possible, produce a nondeterministic value for
-/// seeding a pseudorandom number genrator.
+/// To the extent possible, produce a nondeterministic value for seeding a
+/// pseudorandom number genrator.
 ///
 /// This function is thread safe.
 unsigned long produce_nondeterministic_random_seed();
 
 
 
-/// Mersenne Twister by Matsumoto and Nishimura, 1998
-/// (MT19937).
+/// Mersenne Twister by Matsumoto and Nishimura, 1998 (MT19937).
 ///
 /// http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/MT2002/emt19937ar.html
 ///
-/// \tparam w Word size, the number of bits in each element of the
-/// state vector.
+/// \tparam w Word size, the number of bits in each element of the state vector.
 ///
 /// \tparam n, m Shift values.
 ///
@@ -152,37 +149,36 @@ public:
     /// Reseed this pseudorandom number generator.
     void seed(unsigned long) TIGHTDB_NOEXCEPT;
 
-    /// Draw a uniformly distributed integer from the specified
-    /// range. It is an error if `min` is greater than `max`.
+    /// Draw a uniformly distributed integer from the specified range. It is an
+    /// error if `min` is greater than `max`.
     template<class T> T draw_int(T min, T max) TIGHTDB_NOEXCEPT;
 
     /// Same as `draw_int(lim::min(), lim::max())` where `lim` is
     /// `std::numeric_limits<T>`.
     template<class T> T draw_int() TIGHTDB_NOEXCEPT;
 
-    /// Same as `draw_int<T>(0, max)`. It is an error to specify a
-    /// `max` less than 0.
+    /// Same as `draw_int<T>(0, max)`. It is an error to specify a `max` less
+    /// than 0.
     template<class T> T draw_int_max(T max) TIGHTDB_NOEXCEPT;
 
-    /// Same as `draw_int_max(module_size-1)`. It is an error to
-    /// specify a module size less than 1.
+    /// Same as `draw_int_max(module_size-1)`. It is an error to specify a
+    /// module size less than 1.
     template<class T> T draw_int_mod(T module_size) TIGHTDB_NOEXCEPT;
 
-    /// Same as `draw_int<T>(max)` where `max` is one less than 2 to
-    /// the power of `bits`. It is an error to specify a number of
-    /// bits less than zero, or greater than `lim::digits` where `lim`
-    /// is `std::numeric_limits<T>`.
+    /// Same as `draw_int<T>(max)` where `max` is one less than 2 to the power
+    /// of `bits`. It is an error to specify a number of bits less than zero, or
+    /// greater than `lim::digits` where `lim` is `std::numeric_limits<T>`.
     template<class T> T draw_int_bits(int bits) TIGHTDB_NOEXCEPT;
 
-    /// Draw true `n` out of `m` times. It is an error if `n` is less
-    /// than 1, or if `m` is less than `n`.
+    /// Draw true `n` out of `m` times. It is an error if `n` is less than 1, or
+    /// if `m` is less than `n`.
     bool chance(int n, int m) TIGHTDB_NOEXCEPT;
 
     /// Same as `chance(1,2)`.
     bool draw_bool() TIGHTDB_NOEXCEPT;
 
-    /// Reorder the specified elements such that each possible
-    /// permutation has an equal probability of appearing.
+    /// Reorder the specified elements such that each possible permutation has
+    /// an equal probability of appearing.
     template<class RandomIt> void shuffle(RandomIt begin, RandomIt end);
 
 private:
@@ -305,10 +301,10 @@ inline T UniformIntDistribution<T>::operator()(G& generator) const TIGHTDB_NOEXC
 template<class T> template<class G>
 inline T UniformIntDistribution<T>::draw(G& generator, T min, T max) TIGHTDB_NOEXCEPT
 {
-    // FIXME: This implementation assumes that if `T` is signed then
-    // there exists an unsigned type with at least one more value bit
-    // than `T` has. This is not guaranteed by the standard, not even
-    // when `T` is a standard integer type.
+    // FIXME: This implementation assumes that if `T` is signed then there
+    // exists an unsigned type with at least one more value bit than `T`
+    // has. While this is typically the case, it is not guaranteed by the
+    // standard, not even when `T` is a standard integer type.
     typedef std::numeric_limits<typename G::result_type> lim_g;
     typedef std::numeric_limits<T> lim_t;
     const int uint_bits_g = lim_g::is_signed ? lim_g::digits + 1 : lim_g::digits;
@@ -339,8 +335,8 @@ inline T UniformIntDistribution<T>::draw(G& generator, T min, T max) TIGHTDB_NOE
         for (;;) {
             uint_type v = num_gen_values * draw(generator, 0, T(val_max_2));
             value += v;
-            // Previous addition may have overflowed, so we have
-            // to test for that too
+            // Previous addition may have overflowed, so we have to test for
+            // that too
             if (value <= val_max && value >= v)
                 break;
             value = uint_type(generator()) - uint_type(G::min());

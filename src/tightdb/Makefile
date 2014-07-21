@@ -33,10 +33,10 @@ libtightdb_a_SOURCES = util/terminate.cpp util/string_buffer.cpp util/memory_str
 util/thread.cpp util/file.cpp utilities.cpp alloc.cpp alloc_slab.cpp array.cpp \
 array_string.cpp array_string_long.cpp array_binary.cpp array_blob.cpp array_blobs_big.cpp \
 column.cpp column_string.cpp column_string_enum.cpp column_binary.cpp column_table.cpp \
-column_mixed.cpp column_link.cpp column_linklist.cpp column_backlink.cpp link_view.cpp spec.cpp \
-impl/output_stream.cpp table.cpp table_view.cpp row.cpp descriptor.cpp group.cpp group_writer.cpp \
-group_shared.cpp $(REPLICATION_CPP) index_string.cpp query.cpp lang_bind_helper.cpp importer.cpp \
-commit_log.cpp version.cpp unicode.cpp
+column_mixed.cpp column_link_base.cpp column_link.cpp column_linklist.cpp column_backlink.cpp \
+link_view.cpp spec.cpp impl/output_stream.cpp table.cpp table_view.cpp row.cpp descriptor.cpp \
+group.cpp group_writer.cpp group_shared.cpp $(REPLICATION_CPP) index_string.cpp query.cpp \
+lang_bind_helper.cpp importer.cpp commit_log.cpp version.cpp unicode.cpp
 
 # Format: CURRENT[:REVISION[:AGE]]
 #

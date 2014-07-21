@@ -405,7 +405,7 @@ public:
     /// Get the ref of this array as known to the parent. The caller must ensure
     /// that the parent information ('pointer to parent' and 'index in parent')
     /// is correct before calling this function.
-    ref_type get_ref_from_parent() TIGHTDB_NOEXCEPT;
+    ref_type get_ref_from_parent() const TIGHTDB_NOEXCEPT;
 
     bool is_attached() const TIGHTDB_NOEXCEPT;
 
@@ -2051,7 +2051,7 @@ inline void Array::adjust_ndx_in_parent(int diff) TIGHTDB_NOEXCEPT
     m_ndx_in_parent += diff;
 }
 
-inline ref_type Array::get_ref_from_parent() TIGHTDB_NOEXCEPT
+inline ref_type Array::get_ref_from_parent() const TIGHTDB_NOEXCEPT
 {
     ref_type ref = m_parent->get_child_ref(m_ndx_in_parent);
     return ref;

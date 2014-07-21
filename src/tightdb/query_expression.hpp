@@ -880,11 +880,11 @@ public:
         ColumnType type = table->get_real_column_type(link_column);
         if (type == col_type_LinkList) {
             m_column_linklist = &table->get_column<ColumnLinkList, col_type_LinkList>(link_column);
-            linked_table.reset(m_column_linklist->get_target_table());
+            linked_table.reset(&m_column_linklist->get_target_table());
         }
         else {
             m_column_single_link = &table->get_column<ColumnLink, col_type_Link>(link_column);
-            linked_table.reset(m_column_single_link->get_target_table());
+            linked_table.reset(&m_column_single_link->get_target_table());
         }
 
         m_table = linked_table.get();
@@ -1012,11 +1012,11 @@ public:
         ColumnType type = table->get_real_column_type(link_column);
         if (type == col_type_LinkList) {
             m_column_linklist = &table->get_column<ColumnLinkList, col_type_LinkList>(link_column);
-            linked_table.reset(m_column_linklist->get_target_table());
+            linked_table.reset(&m_column_linklist->get_target_table());
         }
         else {
             m_column_single_link = &table->get_column<ColumnLink, col_type_Link>(link_column);
-            linked_table.reset(m_column_single_link->get_target_table());
+            linked_table.reset(&m_column_single_link->get_target_table());
         }
 
         m_table = linked_table.get();

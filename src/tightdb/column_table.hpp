@@ -36,6 +36,7 @@ public:
     void insert(std::size_t, std::size_t, bool) TIGHTDB_OVERRIDE;
     void erase(std::size_t, bool) TIGHTDB_OVERRIDE;
     void move_last_over(std::size_t, std::size_t) TIGHTDB_OVERRIDE;
+    void clear() TIGHTDB_OVERRIDE;
 
     void recursive_mark() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
@@ -57,6 +58,11 @@ public:
     Table* get_subtable_accessor(std::size_t) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
     void discard_subtable_accessor(std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+
+#ifdef TIGHTDB_DEBUG
+    void Verify() const TIGHTDB_OVERRIDE;
+    void Verify(const Table&, std::size_t) const TIGHTDB_OVERRIDE;
+#endif
 
 protected:
     /// A pointer to the table that this column is part of. For a free-standing
@@ -221,7 +227,6 @@ public:
 
     using ColumnSubtableParent::insert;
 
-    void clear() TIGHTDB_OVERRIDE;
     void erase(std::size_t, bool) TIGHTDB_OVERRIDE;
     void move_last_over(std::size_t, std::size_t) TIGHTDB_OVERRIDE;
 
@@ -231,7 +236,7 @@ public:
     void refresh_accessor_tree(std::size_t, const Spec&) TIGHTDB_OVERRIDE;
 
 #ifdef TIGHTDB_DEBUG
-    void Verify() const TIGHTDB_OVERRIDE; // Must be upper case to avoid conflict with macro in ObjC
+    void Verify(const Table&, std::size_t) const TIGHTDB_OVERRIDE;
     void dump_node_structure(std::ostream&, int level) const TIGHTDB_OVERRIDE;
     using ColumnSubtableParent::dump_node_structure;
     void to_dot(std::ostream&, StringData title) const TIGHTDB_OVERRIDE;

@@ -161,7 +161,8 @@ public:
     void refresh_accessor_tree(std::size_t, const Spec&) TIGHTDB_OVERRIDE;
 
 #ifdef TIGHTDB_DEBUG
-    void Verify() const TIGHTDB_OVERRIDE; // Must be upper case to avoid conflict with macro in ObjC
+    void Verify() const TIGHTDB_OVERRIDE;
+    void Verify(const Table&, std::size_t) const TIGHTDB_OVERRIDE;
     void to_dot(std::ostream&, StringData title) const TIGHTDB_OVERRIDE;
     void dump_node_structure(std::ostream&, int level) const TIGHTDB_OVERRIDE;
     using ColumnBase::dump_node_structure;
@@ -227,6 +228,7 @@ private:
     void do_discard_child_accessors() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
 #ifdef TIGHTDB_DEBUG
+    void do_verify(const Table*, std::size_t col_ndx) const;
     void leaf_to_dot(MemRef, ArrayParent*, std::size_t,
                      std::ostream&) const TIGHTDB_OVERRIDE {} // Not used
 #endif

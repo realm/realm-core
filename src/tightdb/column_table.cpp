@@ -8,12 +8,58 @@ using namespace tightdb;
 using namespace tightdb::util;
 
 
+void ColumnSubtableParent::clear()
+{
+    discard_child_accessors();
+    Column::clear(); // Throws
+    // FIXME: This one is needed because Column::clear() forgets about the leaf
+    // type. A better solution should probably be sought after.
+    m_array->set_type(Array::type_HasRefs);
+}
+
 void ColumnSubtableParent::update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT
 {
     if (!m_array->update_from_parent(old_baseline))
         return;
     m_subtable_map.update_from_parent(old_baseline);
 }
+
+
+#ifdef TIGHTDB_DEBUG
+
+namespace {
+
+size_t verify_leaf(MemRef mem, Allocator& alloc)
+{
+    Array leaf(alloc);
+    leaf.init_from_mem(mem);
+    leaf.Verify();
+    TIGHTDB_ASSERT(leaf.has_refs());
+    return leaf.size();
+}
+
+} // anonymous namespace
+
+void ColumnSubtableParent::Verify() const
+{
+    if (root_is_leaf()) {
+        m_array->Verify();
+        TIGHTDB_ASSERT(m_array->has_refs());
+        return;
+    }
+
+    m_array->verify_bptree(&verify_leaf);
+}
+
+void ColumnSubtableParent::Verify(const Table& table, size_t col_ndx) const
+{
+    Column::Verify(table, col_ndx);
+
+    TIGHTDB_ASSERT(m_table == &table);
+    TIGHTDB_ASSERT(m_column_ndx == col_ndx);
+}
+
+#endif
 
 
 Table* ColumnSubtableParent::get_subtable_ptr(size_t subtable_ndx)
@@ -294,16 +340,6 @@ void ColumnTable::set(size_t row_ndx, const Table* subtable)
 }
 
 
-void ColumnTable::clear()
-{
-    discard_child_accessors();
-    Column::clear(); // Throws
-    // FIXME: This one is needed because Column::clear() forgets about the leaf
-    // type. A better solution should probably be sought after.
-    m_array->set_type(Array::type_HasRefs);
-}
-
-
 void ColumnTable::erase(size_t row_ndx, bool is_last)
 {
     TIGHTDB_ASSERT(row_ndx < size());
@@ -356,16 +392,24 @@ void ColumnTable::do_discard_child_accessors() TIGHTDB_NOEXCEPT
 
 #ifdef TIGHTDB_DEBUG
 
-void ColumnTable::Verify() const
+void ColumnTable::Verify(const Table& table, size_t col_ndx) const
 {
-    Column::Verify();
+    ColumnSubtableParent::Verify(table, col_ndx);
 
-    // Verify each sub-table
+    typedef _impl::TableFriend tf;
+    const Spec& spec = tf::get_spec(table);
+    size_t subspec_ndx = spec.get_subspec_ndx(col_ndx);
+    if (m_subspec_ndx != tightdb::npos)
+        TIGHTDB_ASSERT(m_subspec_ndx == tightdb::npos || m_subspec_ndx == subspec_ndx);
+
+    // Verify each subtable
     size_t n = size();
     for (size_t i = 0; i != n; ++i) {
         // We want to verify any cached table accessors so we do not
         // want to skip null refs here.
         ConstTableRef subtable = get_subtable_ptr(i)->get_table_ref();
+        TIGHTDB_ASSERT(tf::get_spec(*subtable).get_ndx_in_parent() == subspec_ndx);
+        TIGHTDB_ASSERT(subtable->get_index_in_parent() == i);
         subtable->Verify();
     }
 }
