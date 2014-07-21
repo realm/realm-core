@@ -811,6 +811,46 @@ TEST(Links_RemoveLastTargetColumn)
 }
 
 
+TEST(Links_ClearColumnWithTwoLevelBptree)
+{
+    Group group;
+    TableRef origin = group.get_table("origin");
+    TableRef target = group.get_table("target");
+
+    // The extra columns beyond the first one increase the likelihood of
+    // getting unambiguously bad ref
+    target->add_column(type_Int, "");
+    target->add_column(type_Int, "");
+    target->add_column(type_Int, "");
+    target->add_column(type_Int, "");
+    target->add_column(type_Int, "");
+    target->add_empty_row();
+
+    origin->add_column_link(type_LinkList, "", *target);
+    origin->add_empty_row(TIGHTDB_MAX_LIST_SIZE+1);
+    origin->clear();
+    origin->add_empty_row();
+    origin->get_linklist(0,0)->add(0);
+    group.Verify();
+}
+
+
+TEST(Links_ClearLinkListWithTwoLevelBptree)
+{
+    Group group;
+    TableRef origin = group.get_table("origin");
+    TableRef target = group.get_table("target");
+    target->add_empty_row();
+    origin->add_column_link(type_LinkList, "", *target);
+    origin->add_empty_row();
+    LinkViewRef link_list = origin->get_linklist(0,0);
+    for (size_t i = 0; i < TIGHTDB_MAX_LIST_SIZE+1; ++i)
+        link_list->add(0);
+    link_list->clear();
+    group.Verify();
+}
+
+
 TEST(Links_RandomizedOperations)
 {
     const size_t tests = 30;

@@ -5278,4 +5278,24 @@ TEST(Table_EnumStringInsertEmptyRow)
     CHECK_EQUAL("", table.get_string(0, 128));
 }
 
+
+TEST(Table_AddColumnWithThreeLevelBptree)
+{
+    Table table;
+    table.add_column(type_Int, "");
+    table.add_empty_row(TIGHTDB_MAX_LIST_SIZE*TIGHTDB_MAX_LIST_SIZE+1);
+    table.add_column(type_Int, "");
+    table.Verify();
+}
+
+
+TEST(Table_ClearWithTwoLevelBptree)
+{
+    Table table;
+    table.add_column(type_Mixed, "");
+    table.add_empty_row(TIGHTDB_MAX_LIST_SIZE+1);
+    table.clear();
+    table.Verify();
+}
+
 #endif // TEST_TABLE

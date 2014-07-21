@@ -20,6 +20,8 @@
 #ifndef TIGHTDB_COLUMN_BACKLINK_HPP
 #define TIGHTDB_COLUMN_BACKLINK_HPP
 
+#include <vector>
+
 #include <tightdb/column.hpp>
 #include <tightdb/column_linkbase.hpp>
 #include <tightdb/table.hpp>
@@ -56,8 +58,9 @@ public:
     void move_last_over(std::size_t, std::size_t) TIGHTDB_OVERRIDE;
 
     // Link origination info
+    Table& get_origin_table() const TIGHTDB_NOEXCEPT;
     void set_origin_table(Table&) TIGHTDB_NOEXCEPT;
-    TableRef get_origin_table() const TIGHTDB_NOEXCEPT;
+    ColumnLinkBase& get_origin_column() const TIGHTDB_NOEXCEPT;
     void set_origin_column(ColumnLinkBase&) TIGHTDB_NOEXCEPT;
 
     void adj_accessors_insert_rows(std::size_t, std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
@@ -67,15 +70,23 @@ public:
 
     void bump_link_origin_table_version() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
+#ifdef TIGHTDB_DEBUG
+    void Verify() const TIGHTDB_OVERRIDE;
+    void Verify(const Table&, std::size_t) const TIGHTDB_OVERRIDE;
+    struct VerifyPair {
+        std::size_t origin_row_ndx, target_row_ndx;
+        bool operator<(const VerifyPair&) const TIGHTDB_NOEXCEPT;
+    };
+    void get_backlinks(std::vector<VerifyPair>&); // Sorts
+#endif
+
 protected:
     // ArrayParent overrides
     void update_child_ref(std::size_t child_ndx, ref_type new_ref) TIGHTDB_OVERRIDE;
     ref_type get_child_ref(std::size_t child_ndx) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
 #ifdef TIGHTDB_DEBUG
-    // Used only by Array::to_dot().
-    std::pair<ref_type, std::size_t>
-    get_to_dot_parent(std::size_t ndx_in_parent) const TIGHTDB_OVERRIDE;
+    std::pair<ref_type, std::size_t> get_to_dot_parent(std::size_t) const TIGHTDB_OVERRIDE;
 #endif
 
 private:
@@ -108,15 +119,20 @@ inline bool ColumnBackLink::has_backlinks(std::size_t ndx) const TIGHTDB_NOEXCEP
     return Column::get(ndx) != 0;
 }
 
+inline Table& ColumnBackLink::get_origin_table() const TIGHTDB_NOEXCEPT
+{
+    return *m_origin_table;
+}
+
 inline void ColumnBackLink::set_origin_table(Table& table) TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(!m_origin_table);
     m_origin_table = table.get_table_ref();
 }
 
-inline TableRef ColumnBackLink::get_origin_table() const TIGHTDB_NOEXCEPT
+inline ColumnLinkBase& ColumnBackLink::get_origin_column() const TIGHTDB_NOEXCEPT
 {
-    return m_origin_table;
+    return *m_origin_column;
 }
 
 inline void ColumnBackLink::set_origin_column(ColumnLinkBase& column) TIGHTDB_NOEXCEPT
@@ -168,6 +184,10 @@ inline void ColumnBackLink::bump_link_origin_table_version() TIGHTDB_NOEXCEPT
         tf::bump_version(*m_origin_table);
 }
 
+inline bool ColumnBackLink::VerifyPair::operator<(const VerifyPair& p) const TIGHTDB_NOEXCEPT
+{
+    return origin_row_ndx < p.origin_row_ndx;
+}
 
 } //namespace tightdb
 

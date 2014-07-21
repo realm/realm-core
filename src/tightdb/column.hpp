@@ -186,6 +186,7 @@ public:
 #ifdef TIGHTDB_DEBUG
     // Must be upper case to avoid conflict with macro in Objective-C
     virtual void Verify() const = 0;
+    virtual void Verify(const Table&, std::size_t col_ndx) const;
     virtual void to_dot(std::ostream&, StringData title = StringData()) const = 0;
     void dump_node_structure() const; // To std::cerr (for GDB)
     virtual void dump_node_structure(std::ostream&, int level) const = 0;
@@ -365,7 +366,8 @@ public:
     void refresh_accessor_tree(std::size_t, const Spec&) TIGHTDB_OVERRIDE;
 
 #ifdef TIGHTDB_DEBUG
-    virtual void Verify() const TIGHTDB_OVERRIDE;
+    void Verify() const TIGHTDB_OVERRIDE;
+    using ColumnBase::Verify;
     void to_dot(std::ostream&, StringData title) const TIGHTDB_OVERRIDE;
     MemStats stats() const;
     void dump_node_structure(std::ostream&, int level) const TIGHTDB_OVERRIDE;

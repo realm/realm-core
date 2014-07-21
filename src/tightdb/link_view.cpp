@@ -32,7 +32,7 @@ void LinkView::insert(std::size_t link_ndx, std::size_t target_row_ndx)
     TIGHTDB_ASSERT(is_attached());
     TIGHTDB_ASSERT(m_target_row_indexes.is_attached() || link_ndx == 0);
     TIGHTDB_ASSERT(!m_target_row_indexes.is_attached() || link_ndx <= m_target_row_indexes.size());
-    TIGHTDB_ASSERT(target_row_ndx < m_origin_column.get_target_table()->size());
+    TIGHTDB_ASSERT(target_row_ndx < m_origin_column.get_target_table().size());
     m_origin_table->bump_version();
 
     size_t row_ndx = get_origin_row_index();
@@ -59,7 +59,7 @@ void LinkView::set(std::size_t link_ndx, std::size_t target_row_ndx)
 {
     TIGHTDB_ASSERT(is_attached());
     TIGHTDB_ASSERT(m_target_row_indexes.is_attached() && link_ndx < m_target_row_indexes.size());
-    TIGHTDB_ASSERT(target_row_ndx < m_origin_column.get_target_table()->size());
+    TIGHTDB_ASSERT(target_row_ndx < m_origin_column.get_target_table().size());
     m_origin_table->bump_version();
 
     // update backlinks
@@ -225,3 +225,20 @@ void LinkView::repl_unselect() TIGHTDB_NOEXCEPT
 }
 
 #endif // TIGHTDB_ENABLE_REPLICATION
+
+
+#ifdef TIGHTDB_DEBUG
+
+void LinkView::Verify(size_t row_ndx) const
+{
+    // Only called for attached lists
+    TIGHTDB_ASSERT(is_attached());
+
+    TIGHTDB_ASSERT(m_target_row_indexes.get_root_array()->get_ndx_in_parent() == row_ndx);
+    bool not_degenerate = m_target_row_indexes.get_root_array()->get_ref_from_parent() != 0;
+    TIGHTDB_ASSERT(not_degenerate == m_target_row_indexes.is_attached());
+    if (m_target_row_indexes.is_attached())
+        m_target_row_indexes.Verify();
+}
+
+#endif // TIGHTDB_DEBUG

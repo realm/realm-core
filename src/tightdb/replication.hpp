@@ -244,7 +244,7 @@ protected:
     // transaction logs during application of ones that have olready
     // been created elsewhere. See
     // ReplicationImpl::do_begin_write_transact() in
-    // tigthdb/replication/simplified/provider.cpp for more on this.
+    // tightdb/replication/simplified/provider.cpp for more on this.
     static void set_replication(Group&, Replication*) TIGHTDB_NOEXCEPT;
 
     /// Must be called only from do_begin_write_transact(),

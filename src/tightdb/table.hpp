@@ -1720,6 +1720,11 @@ public:
         return table.m_spec;
     }
 
+    static ColumnBase& get_column(const Table& table, std::size_t col_ndx)
+    {
+        return *table.m_cols[col_ndx];
+    }
+
     static std::size_t* record_subtable_path(const Table& table, std::size_t* begin,
                                              std::size_t* end) TIGHTDB_NOEXCEPT
     {

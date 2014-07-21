@@ -11,6 +11,7 @@
 #include <tightdb/column_table.hpp>
 #include <tightdb/column_mixed.hpp>
 #include <tightdb/query_engine.hpp>
+#include <tightdb/table.hpp>
 
 using namespace std;
 using namespace tightdb;
@@ -222,6 +223,16 @@ void ColumnBase::update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT
 {
     m_array->update_from_parent(old_baseline);
 }
+
+
+#ifdef TIGHTDB_DEBUG
+
+void ColumnBase::Verify(const Table&, size_t) const
+{
+    Verify();
+}
+
+#endif // TIGHTDB_DEBUG
 
 
 namespace {
@@ -617,7 +628,7 @@ ref_type ColumnBase::build(size_t* rest_size_ptr, size_t fixed_height,
                 new_inner_node.add(v); // Throws
                 node = 0;
                 size_t num_children = 1;
-                for (;;) {
+                while (rest_size > 0 && num_children != TIGHTDB_MAX_LIST_SIZE) {
                     ref_type child = build(&rest_size, height, alloc, handler); // Throws
                     try {
                         int_fast64_t v = child; // FIXME: Dangerous cast here (unsigned -> signed)
@@ -627,8 +638,6 @@ ref_type ColumnBase::build(size_t* rest_size_ptr, size_t fixed_height,
                         Array::destroy_deep(child, alloc);
                         throw;
                     }
-                    if (rest_size == 0 || ++num_children == TIGHTDB_MAX_LIST_SIZE)
-                        break;
                 }
                 v = orig_rest_size - rest_size; // total_elems_in_tree
                 new_inner_node.add(1 + 2*v); // Throws
@@ -1136,6 +1145,7 @@ void Column::Verify() const
 
     m_array->verify_bptree(&verify_leaf);
 }
+
 
 class ColumnBase::LeafToDot: public Array::ToDotHandler {
 public:
