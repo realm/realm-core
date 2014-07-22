@@ -18,7 +18,7 @@ using namespace std;
 using namespace tightdb;
 using namespace test_util;
 
-TEST(LinkList_Basic1)
+ONLY(LinkList_Basic1)
 {
     Group group;
 

@@ -1088,6 +1088,7 @@ private:
     template<class> friend class SequentialGetter;
     friend class RowBase;
     friend class LinksToNode;
+    friend class LinkFollower;
 };
 
 
@@ -1358,10 +1359,7 @@ template<class T> inline Columns<T> Table::column(std::size_t column)
 
     std::vector<size_t> tmp = m_link_chain;
     m_link_chain.clear();
-    if (tmp.size() == 0)
-        return Columns<T>(column, this);
-    else
-        return Columns<T>(column, this, tmp[0]);
+    return Columns<T>(column, this, tmp);
 }
 
 // For use by queries
