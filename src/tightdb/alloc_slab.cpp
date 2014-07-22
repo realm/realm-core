@@ -268,12 +268,11 @@ void SlabAlloc::do_free(ref_type ref, const char* addr) TIGHTDB_NOEXCEPT
 
         // Check if we can merge with end of free block
         if (m_slabs.column().ref_end.find_first(ref) == not_found) { // avoid slab borders
-            // FIXME: Thie following search loop appears to have
-            // quadratic complexity in terms of the numner of
-            // previosuly freed chunks. This can easily become
-            // intolerable. I (Kristian) have seen half an hour spent
-            // just to destroy a group containing a single table with
-            // 10 columns and less than 10K rows.
+            // FIXME: The following search loop appears to have quadratic
+            // complexity in terms of the numner of previosuly freed
+            // chunks. This can easily become intolerable. I (Kristian) have
+            // seen half an hour spent just to destroy a group containing a
+            // single table with 10 columns and less than 10K rows.
             size_t n = free_space.size();
             for (size_t i = 0; i < n; ++i) {
                 FreeSpace::Cursor c = free_space[i];

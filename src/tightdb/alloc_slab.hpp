@@ -239,10 +239,15 @@ private:
         attach_UnsharedFile // Not on behalf of SharedGroup
     };
 
-    // Define internal tables
+    // A slab is a dynamically allocated contiguous chunk of memory used to
+    // extend the amount of space available for database node
+    // storage. Inter-node references are represented as file offsets
+    // (a.k.a. "refs"), and each slab creates an apparently seamless extension
+    // of this file offset addressable space. Slabes are stored as rows in the
+    // Slabs table in order of ascending file offsets.
     TIGHTDB_TABLE_2(Slabs,
-                    ref_end, Int, // One plus last ref targeting this slab
-                    addr,    Int) // Memory pointer to this slab
+                    ref_end, Int, // One plus ref of last byte of this slab
+                    addr,    Int) // Memory address of first byte of this slab
     TIGHTDB_TABLE_2(FreeSpace,
                     ref,    Int,
                     size,   Int)
