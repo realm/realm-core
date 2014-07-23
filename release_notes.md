@@ -16,7 +16,9 @@
 
 ### Internals:
 
-* Lorem ipsum.
+* Efficiency of CRUD operations has been greatly improved due to an improvement
+  of SlabAlloc). The cost of end-insertion (MyTable::add()), for example, has
+  been reduced to less than a 10th of its previous cost.
 
 ----------------------------------------------
 
@@ -74,10 +76,6 @@
 * Fixed bug in LinkView::refresh_accessor_tree() causing problems when transaction is advanced after a link list is cleared.
 * Fixed bug causing problems when transaction is advanced after a table with link-like columns is cleared.
 * Fixed bug in connection with cyclic link relationships.
-
-### API breaking changes:
-
-* None
 
 ### Enhancements:
 
