@@ -349,7 +349,9 @@ private:
 
 // Implementation:
 
-inline SlabAlloc::SlabAlloc(): m_attach_mode(attach_None), m_free_space_invalid(false)
+inline SlabAlloc::SlabAlloc():
+    m_attach_mode(attach_None),
+    m_free_space_invalid(false)
 {
     m_baseline = 0; // Unattached
 #ifdef TIGHTDB_DEBUG
