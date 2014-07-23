@@ -166,9 +166,9 @@ MemRef SlabAlloc::do_alloc(size_t size)
 
     // Do we have a free space we can reuse?
     {
-        typedef chunks::iterator iter;
-        iter end = m_free_space.end();
-        for (iter i = m_free_space.begin(); i != end; ++i) {
+        typedef chunks::reverse_iterator iter;
+        iter rend = m_free_space.rend();
+        for (iter i = m_free_space.rbegin(); i != rend; ++i) {
             if (size <= i->size) {
                 ref_type ref = i->ref;
                 size_t rest = i->size - size;
@@ -176,7 +176,7 @@ MemRef SlabAlloc::do_alloc(size_t size)
                 // Update free list
                 if (rest == 0) {
                     // Erase by "move last over"
-                    *i = *(end-1);
+                    *i = m_free_space.back();
                     m_free_space.pop_back();
                 }
                 else {
