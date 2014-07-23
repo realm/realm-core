@@ -248,7 +248,7 @@ TEST(Alloc_BadBuffer)
 }
 
 
-TEST(Alloc_Fuzzy)
+ONLY(Alloc_Fuzzy)
 {
     SlabAlloc alloc;
     vector<MemRef> refs;
@@ -267,7 +267,7 @@ TEST(Alloc_Fuzzy)
             set_capacity(r.m_addr, siz);
 
             // write some data to the allcoated area so that we can verify it later
-            memset(r.m_addr + 3, (char)r.m_addr, siz - 3);
+            memset(r.m_addr + 3, static_cast<char>(reinterpret_cast<intptr_t>(r.m_addr)), siz - 3);
         }
         else if(refs.size() > 0) {
             // free random entry
@@ -284,7 +284,7 @@ TEST(Alloc_Fuzzy)
 
                 // verify that all the data we wrote during allocation is intact
                 for (size_t c = 3; c < siz; c++) {
-                    if (r.m_addr[c] != (char)r.m_addr) {
+                    if (r.m_addr[c] != static_cast<char>(reinterpret_cast<intptr_t>(r.m_addr))) {
                         // faster than using 'CHECK' for each character, which is slow
                         CHECK(false);
                     }
