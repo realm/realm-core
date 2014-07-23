@@ -3,6 +3,7 @@
 #include <iostream>
 
 #include <tightdb.hpp>
+#include <tightdb/util/unique_ptr.hpp>
 
 #include "../util/timer.hpp"
 #include "../util/random.hpp"
@@ -10,6 +11,7 @@
 
 using namespace std;
 using namespace tightdb;
+using namespace tightdb::util;
 using namespace tightdb::test_util;
 
 
@@ -74,7 +76,30 @@ int main()
     Random random;
     random.shuffle(random_order.begin(), random_order.end());
 
-    IntTable tables_1[num_tables], tables_2[num_tables];
+    UniquePtr<Group> group;
+    IntTable::Ref tables_1[num_tables], tables_2[num_tables];
+
+    bool from_group = true;
+    if (from_group) {
+        group.reset(new Group);
+        ostringstream out;
+        for (int i = 0; i < num_tables; ++i) {
+            out.str(string());
+            out << "table_1_" << i;
+            tables_1[i] = group->get_table<IntTable>(out.str());
+        }
+        for (int i = 0; i < num_tables; ++i) {
+            out.str(string());
+            out << "table_2_" << i;
+            tables_2[i] = group->get_table<IntTable>(out.str());
+        }
+    }
+    else {
+        for (int i = 0; i < num_tables; ++i)
+            tables_1[i] = IntTable::create();
+        for (int i = 0; i < num_tables; ++i)
+            tables_2[i] = IntTable::create();
+    }
 
     int_fast64_t dummy = 0;
 
@@ -86,53 +111,53 @@ int main()
     {
         timer.reset();
         for (int i = 0; i != num_tables; ++i)
-            insert(tables_1[i], rising_order);
+            insert(*tables_1[i], rising_order);
         results.submit(timer, "insert_end_compact", "Insert at end (compact)");
         timer.reset();
         for (int i = 0; i != num_tables; ++i)
-            dummy += read(tables_1[i], rising_order);
+            dummy += read(*tables_1[i], rising_order);
         results.submit(timer, "read_seq_compact", "Sequential read (compact)");
         timer.reset();
         for (int i = 0; i != num_tables; ++i)
-            dummy += read(tables_1[i], random_order);
+            dummy += read(*tables_1[i], random_order);
         results.submit(timer, "read_ran_compact", "Random read (compact)");
         timer.reset();
         for (int i = 0; i != num_tables; ++i)
-            write(tables_1[i], rising_order);
+            write(*tables_1[i], rising_order);
         results.submit(timer, "write_seq_compact", "Sequential write (compact)");
         timer.reset();
         for (int i = 0; i != num_tables; ++i)
-            write(tables_1[i], random_order);
+            write(*tables_1[i], random_order);
         results.submit(timer, "write_ran_compact", "Random write (compact)");
         timer.reset();
         for (int i = 0; i != num_tables; ++i)
-            erase(tables_1[i], falling_order);
+            erase(*tables_1[i], falling_order);
         results.submit(timer, "erase_end_compact", "Erase from end (compact)");
     }
     {
         timer.reset();
         for (int i = 0; i != num_tables; ++i)
-            insert(tables_2[i], random_insert_order);
+            insert(*tables_2[i], random_insert_order);
         results.submit(timer, "insert_ran_general", "Random insert (general)");
         timer.reset();
         for (int i = 0; i != num_tables; ++i)
-            dummy += read(tables_2[0], rising_order);
+            dummy += read(*tables_2[0], rising_order);
         results.submit(timer, "read_seq_general", "Sequential read (general)");
         timer.reset();
         for (int i = 0; i != num_tables; ++i)
-            dummy += read(tables_2[0], random_order);
+            dummy += read(*tables_2[0], random_order);
         results.submit(timer, "read_ran_general", "Random read (general)");
         timer.reset();
         for (int i = 0; i != num_tables; ++i)
-            write(tables_2[i], rising_order);
+            write(*tables_2[i], rising_order);
         results.submit(timer, "write_seq_general", "Sequential write (general)");
         timer.reset();
         for (int i = 0; i != num_tables; ++i)
-            write(tables_2[i], random_order);
+            write(*tables_2[i], random_order);
         results.submit(timer, "write_ran_general", "Random write (general)");
         timer.reset();
         for (int i = 0; i != num_tables; ++i)
-            erase(tables_2[i], random_erase_order);
+            erase(*tables_2[i], random_erase_order);
         results.submit(timer, "erase_ran_general", "Random erase (general)");
     }
 
