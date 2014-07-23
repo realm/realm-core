@@ -1354,9 +1354,6 @@ inline TableRef Table::copy(Allocator& alloc) const
 // For use by queries
 template<class T> inline Columns<T> Table::column(std::size_t column)
 {
-    // links to links not yet supported
-    TIGHTDB_ASSERT(m_link_chain.size() < 2);
-
     std::vector<size_t> tmp = m_link_chain;
     m_link_chain.clear();
     return Columns<T>(column, this, tmp);

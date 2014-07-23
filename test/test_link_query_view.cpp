@@ -18,7 +18,7 @@ using namespace std;
 using namespace tightdb;
 using namespace test_util;
 
-ONLY(LinkList_Basic1)
+TEST(LinkList_Basic1)
 {
     Group group;
 
@@ -541,6 +541,208 @@ TEST(LinkList_QueryFindLinkTarget)
     tv = table1->where().links_to(col_link3, 3).find_all();
     CHECK_EQUAL(0, tv.size());
 }
+
+
+
+ONLY(LinkList_MultiLinkQuery)
+{
+    Group group;
+
+    TableRef table1 = group.get_table("table1");
+    TableRef table2 = group.get_table("table2");
+    TableRef table3 = group.get_table("table3");
+
+    size_t col_linklist2 = table1->add_column_link(type_LinkList, "link", *table2);
+    size_t col_link2 = table1->add_column_link(type_Link, "link", *table2);
+
+    size_t col_link3 = table2->add_column_link(type_Link, "link", *table3);
+    size_t col_linklist3 = table2->add_column_link(type_LinkList, "link", *table3);
+
+    table3->add_column(type_Int, "int");
+    table3->add_column(type_String, "string");
+    table3->add_column(type_Float, "string");
+
+    // add some rows
+    table3->add_empty_row();
+    table3->set_int(0, 0, 100);
+    table3->set_string(1, 0, "foo");
+    table3->set_float(2, 0, 100.0);
+
+    table3->add_empty_row();
+    table3->set_int(0, 1, 200);
+    table3->set_string(1, 1, "bar");
+    table3->set_float(2, 1, 200.0);
+
+    table3->add_empty_row();
+    table3->set_int(0, 2, 300);
+    table3->set_string(1, 2, "baz");
+    table3->set_float(2, 2, 300.0);
+
+    LinkViewRef lvr;
+
+    table2->add_empty_row();
+    table2->set_link(col_link3, 0, 0);
+    lvr = table2->get_linklist(col_linklist3, 0);
+    lvr->add(0);
+    lvr->add(1);
+
+    table2->add_empty_row();
+    table2->set_link(col_link3, 1, 2);
+    lvr = table2->get_linklist(col_linklist3, 1);
+    lvr->add(2);
+
+    table2->add_empty_row();
+
+    table1->add_empty_row();
+    table1->set_link(col_link2, 0, 1);
+    lvr = table1->get_linklist(col_linklist2, 0);
+    lvr->add(0);
+    lvr->add(1);
+
+    table1->add_empty_row();
+    table1->set_link(col_link2, 1, 0);
+    lvr = table1->get_linklist(col_linklist2, 1);
+    lvr->add(2);
+
+    table1->add_empty_row();
+
+    size_t match;
+    TableView tv;
+    
+    // Link -> Link
+    tv = (table1->link(col_link2).link(col_link3).column<Int>(0) == 300).find_all();
+    CHECK_EQUAL(1, tv.size());
+    CHECK_EQUAL(0, tv.get_source_ndx(0));
+
+    tv = (table1->link(col_link2).link(col_link3).column<Int>(0) == 100).find_all();
+    CHECK_EQUAL(1, tv.size());
+    CHECK_EQUAL(1, tv.get_source_ndx(0));
+
+    tv = (table1->link(col_link2).link(col_link3).column<Int>(0) == 200).find_all();
+    CHECK_EQUAL(0, tv.size());
+
+
+    tv = (table1->link(col_link2).link(col_link3).column<String>(1) == "baz").find_all();
+    CHECK_EQUAL(1, tv.size());
+    CHECK_EQUAL(0, tv.get_source_ndx(0));
+
+    tv = (table1->link(col_link2).link(col_link3).column<String>(1) == "foo").find_all();
+    CHECK_EQUAL(1, tv.size());
+    CHECK_EQUAL(1, tv.get_source_ndx(0));
+
+    tv = (table1->link(col_link2).link(col_link3).column<String>(1) == "bar").find_all();
+    CHECK_EQUAL(0, tv.size());
+
+
+    tv = (table1->link(col_link2).link(col_link3).column<Float>(2) == 300.).find_all();
+    CHECK_EQUAL(1, tv.size());
+    CHECK_EQUAL(0, tv.get_source_ndx(0));
+
+    tv = (table1->link(col_link2).link(col_link3).column<Float>(2) == 100.).find_all();
+    CHECK_EQUAL(1, tv.size());
+    CHECK_EQUAL(1, tv.get_source_ndx(0));
+
+    tv = (table1->link(col_link2).link(col_link3).column<Float>(2) == 200.).find_all();
+    CHECK_EQUAL(0, tv.size());
+
+
+    // Link -> LinkList
+    tv = (table1->link(col_link2).link(col_linklist3).column<Int>(0) == 300).find_all();
+    CHECK_EQUAL(1, tv.size());
+    CHECK_EQUAL(0, tv.get_source_ndx(0));
+
+    tv = (table1->link(col_link2).link(col_linklist3).column<Int>(0) < 300).find_all();
+    CHECK_EQUAL(1, tv.size());
+    CHECK_EQUAL(1, tv.get_source_ndx(0));
+
+    tv = (table1->link(col_link2).link(col_linklist3).column<Int>(0) == 400).find_all();
+    CHECK_EQUAL(0, tv.size());
+
+
+    tv = (table1->link(col_link2).link(col_linklist3).column<String>(1) == "baz").find_all();
+    CHECK_EQUAL(1, tv.size());
+    CHECK_EQUAL(0, tv.get_source_ndx(0));
+
+    tv = (table1->link(col_link2).link(col_linklist3).column<Int>(0) == "none").find_all();
+    CHECK_EQUAL(0, tv.size());
+
+
+    // LinkList -> Link
+    tv = (table1->link(col_linklist2).link(col_link3).column<Int>(0) == 300).find_all();
+    CHECK_EQUAL(1, tv.size());
+    CHECK_EQUAL(0, tv.get_source_ndx(0));
+
+    tv = (table1->link(col_linklist2).link(col_link3).column<Int>(0) == 100).find_all();
+    CHECK_EQUAL(1, tv.size());
+    CHECK_EQUAL(0, tv.get_source_ndx(0));
+
+    tv = (table1->link(col_linklist2).link(col_link3).column<Int>(0) == 200).find_all();
+    CHECK_EQUAL(0, tv.size());
+
+
+    tv = (table1->link(col_linklist2).link(col_link3).column<String>(1) == "baz").find_all();
+    CHECK_EQUAL(1, tv.size());
+    CHECK_EQUAL(0, tv.get_source_ndx(0));
+
+
+    tv = (table1->link(col_linklist2).link(col_link3).column<String>(1) == "foo").find_all();
+    CHECK_EQUAL(1, tv.size());
+    CHECK_EQUAL(0, tv.get_source_ndx(0));
+
+    tv = (table1->link(col_linklist2).link(col_link3).column<String>(1) == "bar").find_all();
+    CHECK_EQUAL(0, tv.size());
+
+
+    // LinkList -> LinkList
+    tv = (table1->link(col_linklist2).link(col_linklist3).column<Int>(0) == 100).find_all();
+    CHECK_EQUAL(1, tv.size());
+    CHECK_EQUAL(0, tv.get_source_ndx(0));
+
+    tv = (table1->link(col_linklist2).link(col_linklist3).column<Int>(0) == 200).find_all();
+    CHECK_EQUAL(1, tv.size());
+    CHECK_EQUAL(0, tv.get_source_ndx(0));
+
+    tv = (table1->link(col_linklist2).link(col_linklist3).column<Int>(0) == 300).find_all();
+    CHECK_EQUAL(1, tv.size());
+    CHECK_EQUAL(0, tv.get_source_ndx(0));
+
+    tv = (table1->link(col_linklist2).link(col_linklist3).column<Int>(0) == 400).find_all();
+    CHECK_EQUAL(0, tv.size());
+
+
+    tv = (table1->link(col_linklist2).link(col_linklist3).column<String>(1) == "foo").find_all();
+    CHECK_EQUAL(1, tv.size());
+    CHECK_EQUAL(0, tv.get_source_ndx(0));
+
+    tv = (table1->link(col_linklist2).link(col_linklist3).column<String>(1) == "bar").find_all();
+    CHECK_EQUAL(1, tv.size());
+    CHECK_EQUAL(0, tv.get_source_ndx(0));
+
+    tv = (table1->link(col_linklist2).link(col_linklist3).column<String>(1) == "baz").find_all();
+    CHECK_EQUAL(1, tv.size());
+    CHECK_EQUAL(0, tv.get_source_ndx(0));
+
+    tv = (table1->link(col_linklist2).link(col_linklist3).column<String>(1) == "none").find_all();
+    CHECK_EQUAL(0, tv.size());
+
+
+    tv = (table1->link(col_linklist2).link(col_linklist3).column<Float>(2) == 100.).find_all();
+    CHECK_EQUAL(1, tv.size());
+    CHECK_EQUAL(0, tv.get_source_ndx(0));
+
+    tv = (table1->link(col_linklist2).link(col_linklist3).column<Float>(2) == 200.).find_all();
+    CHECK_EQUAL(1, tv.size());
+    CHECK_EQUAL(0, tv.get_source_ndx(0));
+
+    tv = (table1->link(col_linklist2).link(col_linklist3).column<Float>(2) == 300.).find_all();
+    CHECK_EQUAL(1, tv.size());
+    CHECK_EQUAL(0, tv.get_source_ndx(0));
+
+    tv = (table1->link(col_linklist2).link(col_linklist3).column<Float>(2) == 400.).find_all();
+    CHECK_EQUAL(0, tv.size());
+
+}
+
 
 
 

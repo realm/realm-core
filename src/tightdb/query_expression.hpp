@@ -906,7 +906,10 @@ public:
 
         if (m_link_types[column] == type_Link) {
             ColumnLink& cl = *static_cast<ColumnLink*>(m_link_columns[column]);
-            size_t r = cl.get(row) - 1;
+            size_t r = cl.get(row);
+            if (r == 0)
+                return;
+            r--; // ColumnLink stores link to row N as N + 1
             if (last)
                 result.push_back(r);
             else
@@ -984,8 +987,8 @@ public:
         }
         else {
             // Not a link column
-            for (size_t t = 0; t < destination.m_values && index + t < m_link_follower.m_table->size(); t++) {
-                d.m_v[t] = m_link_follower.m_table->get_string(m_column, index + t);
+            for (size_t t = 0; t < destination.m_values && index + t < m_table->size(); t++) {
+                d.m_v[t] = m_table->get_string(m_column, index + t);
             }
         }
     }
@@ -1066,7 +1069,12 @@ public:
     virtual void set_table()
     {
         typedef typename ColumnTypeTraits<T>::column_type ColType;
-        const ColType* c = static_cast<const ColType*>(&m_link_follower.m_table->get_column_base(m_column));
+        const ColType* c;
+        if (m_link_follower.m_link_columns.size() == 0)
+            c = static_cast<const ColType*>(&m_table->get_column_base(m_column));
+        else
+            c = static_cast<const ColType*>(&m_link_follower.m_table->get_column_base(m_column));
+
         if (sg == null_ptr)
             sg = new SequentialGetter<T>();
         sg->init(c);
