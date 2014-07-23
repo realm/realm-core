@@ -7,7 +7,6 @@
 #  include <map>
 #endif
 
-//#include <tightdb/util/safe_int_ops.hpp>
 #include <tightdb/util/terminate.hpp>
 #include <tightdb/util/unique_ptr.hpp>
 #include <tightdb/array.hpp>
@@ -158,19 +157,10 @@ MemRef SlabAlloc::do_alloc(size_t size)
     TIGHTDB_ASSERT((size & 0x7) == 0); // only allow sizes that are multiples of 8
     TIGHTDB_ASSERT(is_attached());
 
-    // FIXME: The table operations that modify the free lists below
-    // are not yet exception safe, that is, if one of them fails
-    // (presumably due to std::bad_alloc being thrown) they may leave
-    // the underlying node structure of the tables in a state that is
-    // so corrupt that it can lead to memory leaks and even general
-    // memory corruption. This must be fixed. Note that corruption may
-    // be accetable, but we must be able to guarantee that corruption
-    // never gets so bad that destruction of the tables fail.
-
-    // FIXME: Ideally, instead of just marking the free space as
-    // invalid in free_(), we shuld at least make a best effort to
-    // keep a record of what was freed and then attempt to rebuild the
-    // free lists here when they have become invalid.
+    // FIXME: Ideally, instead of just marking the free space as invalid in
+    // do_free(), we shuld at least make a best effort to keep a record of what
+    // was freed and then attempt to rebuild the free lists here when they have
+    // become invalid.
     if (m_free_space_invalid)
         throw InvalidFreeSpace();
 
@@ -287,14 +277,6 @@ void SlabAlloc::do_free(ref_type ref, const char* addr) TIGHTDB_NOEXCEPT
 
     if (m_free_space_invalid)
         return;
-
-    // FIXME: The table operations that modify the free lists below are not yet
-    // exception safe, that is, if one of them fails (presumably due to
-    // std::bad_alloc being thrown) they may leave the underlying node structure
-    // of the tables in a state that is so corrupt that it can lead to memory
-    // leaks and even general memory corruption. This must be fixed. Note that
-    // corruption may be accetable, but we must be able to guarantee that
-    // corruption never gets so bad that destruction of the tables fail.
 
     // Check if we can merge with adjacent succeeding free block
     typedef chunks::iterator iter;

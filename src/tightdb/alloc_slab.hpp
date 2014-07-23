@@ -255,15 +255,6 @@ private:
         size_t size;
     };
 
-/*
-    TIGHTDB_TABLE_2(Slabs,
-                    ref_end, Int, // One plus ref of last byte of this slab
-                    addr,    Int) // Memory address of first byte of this slab
-    TIGHTDB_TABLE_2(FreeSpace,
-                    ref,    Int,
-                    size,   Int)
-*/
-
     // 24 bytes
     struct Header {
         uint64_t m_top_ref[2]; // 2 * 8 bytes
