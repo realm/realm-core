@@ -65,8 +65,8 @@ public:
 
     void insert(std::size_t, std::size_t, bool) TIGHTDB_OVERRIDE;
     void erase(std::size_t ndx, bool is_last) TIGHTDB_OVERRIDE;
-    void clear() TIGHTDB_OVERRIDE;
     void move_last_over(std::size_t, std::size_t) TIGHTDB_OVERRIDE;
+    void clear() TIGHTDB_OVERRIDE;
 
     std::size_t count(StringData value) const;
     std::size_t find_first(StringData value, std::size_t begin = 0,
@@ -85,9 +85,9 @@ public:
     FindRes find_all_indexref(StringData value, std::size_t& dst) const;
 
     // Index
-    bool has_index() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return m_index != 0; }
+    bool has_index() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return m_search_index != 0; }
     void set_index_ref(ref_type, ArrayParent*, std::size_t ndx_in_parent) TIGHTDB_OVERRIDE;
-    const StringIndex& get_index() const TIGHTDB_NOEXCEPT { return *m_index; }
+    const StringIndex& get_index() const TIGHTDB_NOEXCEPT { return *m_search_index; }
     StringIndex* release_index() TIGHTDB_NOEXCEPT;
     StringIndex& create_index();
 
@@ -118,19 +118,18 @@ public:
 
     bool is_string_col() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
-    void update_column_index(std::size_t, const Spec&) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-
     void refresh_accessor_tree(std::size_t, const Spec&) TIGHTDB_OVERRIDE;
 
 #ifdef TIGHTDB_DEBUG
     void Verify() const TIGHTDB_OVERRIDE;
+    void Verify(const Table&, std::size_t) const TIGHTDB_OVERRIDE;
     void to_dot(std::ostream&, StringData title) const TIGHTDB_OVERRIDE;
     void dump_node_structure(std::ostream&, int level) const TIGHTDB_OVERRIDE;
     using ColumnBase::dump_node_structure;
 #endif
 
 private:
-    StringIndex* m_index;
+    StringIndex* m_search_index;
 
     std::size_t do_get_size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return size(); }
 
@@ -231,8 +230,8 @@ inline void AdaptiveStringColumn::insert(std::size_t row_ndx, std::size_t num_ro
 
 inline StringIndex* AdaptiveStringColumn::release_index() TIGHTDB_NOEXCEPT
 {
-    StringIndex* i = m_index;
-    m_index = 0;
+    StringIndex* i = m_search_index;
+    m_search_index = 0;
     return i;
 }
 

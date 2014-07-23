@@ -26,36 +26,36 @@ using namespace tightdb;
 
 void ColumnLink::set_link(size_t row_ndx, size_t target_row_ndx)
 {
-    size_t ref = Column::get(row_ndx);
+    size_t ref = ColumnLinkBase::get(row_ndx);
     if (ref != 0) {
         size_t old_target_row_ndx = ref - 1;
-        m_backlinks->remove_backlink(old_target_row_ndx, row_ndx);
+        m_backlink_column->remove_backlink(old_target_row_ndx, row_ndx);
     }
 
     // Row pos is offset by one, to allow null refs
-    Column::set(row_ndx, target_row_ndx + 1);
+    ColumnLinkBase::set(row_ndx, target_row_ndx + 1);
 
-    m_backlinks->add_backlink(target_row_ndx, row_ndx);
+    m_backlink_column->add_backlink(target_row_ndx, row_ndx);
 }
 
 void ColumnLink::nullify_link(size_t row_ndx)
 {
-    size_t ref = Column::get(row_ndx);
+    size_t ref = ColumnLinkBase::get(row_ndx);
     if (ref == 0)
         return;
 
     size_t old_target_row_ndx = ref - 1;
-    m_backlinks->remove_backlink(old_target_row_ndx, row_ndx);
+    m_backlink_column->remove_backlink(old_target_row_ndx, row_ndx);
 
-    Column::set(row_ndx, 0);
+    ColumnLinkBase::set(row_ndx, 0);
 }
 
 void ColumnLink::remove_backlinks(size_t row_ndx)
 {
-    size_t ref = Column::get(row_ndx);
+    size_t ref = ColumnLinkBase::get(row_ndx);
     if (ref != 0) {
         size_t old_target_row_ndx = ref - 1;
-        m_backlinks->remove_backlink(old_target_row_ndx, row_ndx);
+        m_backlink_column->remove_backlink(old_target_row_ndx, row_ndx);
     }
 }
 
@@ -68,14 +68,14 @@ void ColumnLink::move_last_over(size_t target_row_ndx, size_t last_row_ndx)
     remove_backlinks(target_row_ndx);
 
     // Update backlinks to last row to point to its new position
-    size_t ref2 = Column::get(last_row_ndx);
+    size_t ref2 = ColumnLinkBase::get(last_row_ndx);
     if (ref2 != 0) {
         size_t last_target_row_ndx = ref2 - 1;
-        m_backlinks->update_backlink(last_target_row_ndx, last_row_ndx, target_row_ndx);
+        m_backlink_column->update_backlink(last_target_row_ndx, last_row_ndx, target_row_ndx);
     }
 
     // Do the actual move
-    Column::move_last_over(target_row_ndx, last_row_ndx);
+    ColumnLinkBase::move_last_over(target_row_ndx, last_row_ndx);
 }
 
 void ColumnLink::erase(size_t row_ndx, bool is_last)
@@ -85,16 +85,46 @@ void ColumnLink::erase(size_t row_ndx, bool is_last)
     // Remove backlinks to deleted row
     remove_backlinks(row_ndx);
 
-    Column::erase(row_ndx, is_last);
+    ColumnLinkBase::erase(row_ndx, is_last);
 }
 
 void ColumnLink::clear()
 {
     size_t count = size();
-    for (size_t i = 0; i < count; ++i) {
+    for (size_t i = 0; i < count; ++i)
         remove_backlinks(i);
-    }
-    Column::clear();
+    ColumnLinkBase::clear();
 }
 
 
+#ifdef TIGHTDB_DEBUG
+
+void ColumnLink::Verify(const Table& table, size_t col_ndx) const
+{
+    ColumnLinkBase::Verify(table, col_ndx);
+
+    vector<ColumnBackLink::VerifyPair> pairs;
+    m_backlink_column->get_backlinks(pairs);
+
+    // Check correspondence between forward nad backward links.
+    size_t backlinks_seen = 0;
+    size_t n = size();
+    for (size_t i = 0; i != n; ++i) {
+        if (is_null_link(i))
+            continue;
+        size_t target_row_ndx = get_link(i);
+        typedef vector<ColumnBackLink::VerifyPair>::const_iterator iter;
+        ColumnBackLink::VerifyPair search_value;
+        search_value.origin_row_ndx = i;
+        pair<iter,iter> range = equal_range(pairs.begin(), pairs.end(), search_value);
+        // Exactly one corresponding backlink must exist
+        TIGHTDB_ASSERT(range.second - range.first == 1);
+        TIGHTDB_ASSERT(range.first->target_row_ndx == target_row_ndx);
+        ++backlinks_seen;
+    }
+
+    // All backlinks must have been matched by a forward link
+    TIGHTDB_ASSERT(backlinks_seen == pairs.size());
+}
+
+#endif // TIGHTDB_DEBUG

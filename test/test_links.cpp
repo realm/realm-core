@@ -1,5 +1,5 @@
 #include "testsettings.hpp"
-#ifdef TEST_GROUP
+#ifdef TEST_LINKS
 
 
 #include <tightdb.hpp>
@@ -10,6 +10,7 @@
 using namespace std;
 using namespace tightdb;
 using namespace tightdb::util;
+using namespace tightdb::test_util;
 
 namespace {
 
@@ -70,6 +71,7 @@ TEST(Links_Columns)
     CHECK_EQUAL(1, table2->get_backlink_count(1, *table1, new_link_col_ndx));
     CHECK_EQUAL(0, table2->get_backlink(1, *table1, new_link_col_ndx, 0));
 }
+
 
 TEST(Links_Basic)
 {
@@ -171,6 +173,7 @@ TEST(Links_Basic)
     }
 }
 
+
 TEST(Links_Deletes)
 {
     Group group;
@@ -237,6 +240,7 @@ TEST(Links_Deletes)
     CHECK(table2->is_null_link(col_link, 0));
     CHECK(table2->is_null_link(col_link, 1));
 }
+
 
 TEST(Links_Multi)
 {
@@ -307,6 +311,7 @@ TEST(Links_Multi)
     CHECK(table2->is_null_link(col_link, 3));
 }
 
+
 TEST(Links_MultiToSame)
 {
     Group group;
@@ -333,6 +338,7 @@ TEST(Links_MultiToSame)
     CHECK_EQUAL(0, table1->get_backlink_count(0, *table2, col_link1));
     CHECK_EQUAL(0, table1->get_backlink_count(0, *table2, col_link2));
 }
+
 
 TEST(Links_LinkList_TableOps)
 {
@@ -376,6 +382,7 @@ TEST(Links_LinkList_TableOps)
 
 }
 
+
 TEST(Links_LinkList_Basics)
 {
     Group group;
@@ -401,9 +408,9 @@ TEST(Links_LinkList_Basics)
     links->add(0);
     CHECK(!source->linklist_is_empty(col_link, 0));
     CHECK_EQUAL(3, links->size());
-    CHECK_EQUAL(2, links->get_target_row(0));
-    CHECK_EQUAL(1, links->get_target_row(1));
-    CHECK_EQUAL(0, links->get_target_row(2));
+    CHECK_EQUAL(2, links->get(0).get_index());
+    CHECK_EQUAL(1, links->get(1).get_index());
+    CHECK_EQUAL(0, links->get(2).get_index());
     CHECK_EQUAL(Wed, (Days)(*links)[0].get_int(3));
 
     // verify that backlinks was set correctly
@@ -417,10 +424,10 @@ TEST(Links_LinkList_Basics)
     // insert a link at a specific position in the linklist
     links->insert(1, 2);
     CHECK_EQUAL(4, source->get_link_count(col_link, 0));
-    CHECK_EQUAL(2, links->get_target_row(0));
-    CHECK_EQUAL(2, links->get_target_row(1));
-    CHECK_EQUAL(1, links->get_target_row(2));
-    CHECK_EQUAL(0, links->get_target_row(3));
+    CHECK_EQUAL(2, links->get(0).get_index());
+    CHECK_EQUAL(2, links->get(1).get_index());
+    CHECK_EQUAL(1, links->get(2).get_index());
+    CHECK_EQUAL(0, links->get(3).get_index());
 
     CHECK_EQUAL(2, target->get_backlink_count(2, *source, col_link));
     CHECK_EQUAL(0, target->get_backlink(2, *source, col_link, 0));
@@ -429,10 +436,10 @@ TEST(Links_LinkList_Basics)
     // change one link to another
     links->set(0, 1);
     CHECK_EQUAL(4, source->get_link_count(col_link, 0));
-    CHECK_EQUAL(1, links->get_target_row(0));
-    CHECK_EQUAL(2, links->get_target_row(1));
-    CHECK_EQUAL(1, links->get_target_row(2));
-    CHECK_EQUAL(0, links->get_target_row(3));
+    CHECK_EQUAL(1, links->get(0).get_index());
+    CHECK_EQUAL(2, links->get(1).get_index());
+    CHECK_EQUAL(1, links->get(2).get_index());
+    CHECK_EQUAL(0, links->get(3).get_index());
 
     CHECK_EQUAL(1, target->get_backlink_count(0, *source, col_link));
     CHECK_EQUAL(0, target->get_backlink(0, *source, col_link, 0));
@@ -445,10 +452,10 @@ TEST(Links_LinkList_Basics)
     // move a link
     links->move(3, 0);
     CHECK_EQUAL(4, source->get_link_count(col_link, 0));
-    CHECK_EQUAL(0, links->get_target_row(0));
-    CHECK_EQUAL(1, links->get_target_row(1));
-    CHECK_EQUAL(2, links->get_target_row(2));
-    CHECK_EQUAL(1, links->get_target_row(3));
+    CHECK_EQUAL(0, links->get(0).get_index());
+    CHECK_EQUAL(1, links->get(1).get_index());
+    CHECK_EQUAL(2, links->get(2).get_index());
+    CHECK_EQUAL(1, links->get(3).get_index());
 
     // remove a link
     links->remove(0);
@@ -462,6 +469,7 @@ TEST(Links_LinkList_Basics)
     CHECK_EQUAL(0, target->get_backlink_count(1, *source, col_link));
     CHECK_EQUAL(0, target->get_backlink_count(2, *source, col_link));
 }
+
 
 TEST(Links_LinkList_Backlinks)
 {
@@ -488,8 +496,8 @@ TEST(Links_LinkList_Backlinks)
     // remove a target row and check that source links are removed as well
     target->move_last_over(1);
     CHECK_EQUAL(2, source->get_link_count(col_link, 0));
-    CHECK_EQUAL(1, links->get_target_row(0));
-    CHECK_EQUAL(0, links->get_target_row(1));
+    CHECK_EQUAL(1, links->get(0).get_index());
+    CHECK_EQUAL(0, links->get(1).get_index());
 
     // remove all
     target->clear();
@@ -541,6 +549,7 @@ TEST(Links_LinkList_Backlinks)
     CHECK_EQUAL(0, target->get_backlink_count(1, *source, col_link));
     CHECK_EQUAL(0, target->get_backlink_count(2, *source, col_link));
 }
+
 
 TEST(Links_LinkList_AccessorUpdates)
 {
@@ -599,6 +608,7 @@ TEST(Links_LinkList_AccessorUpdates)
     CHECK_EQUAL(false, links2again->is_attached());
 }
 
+
 TEST(Links_LinkList_FindBySource)
 {
     Group group;
@@ -649,6 +659,7 @@ TEST(Links_CircularAccessors)
         CHECK_EQUAL(table2, table1->get_link_target(0));
     }
 }
+
 
 TEST(Links_Transactions)
 {
@@ -712,4 +723,178 @@ TEST(Links_Transactions)
     }
 }
 
-#endif // TEST_GROUP
+
+TEST(Links_RemoveTargetRows)
+{
+    Group group;
+
+    TestTableLinks::Ref target = group.get_table<TestTableLinks>("target");
+    target->add("test1", 1, true,  Mon);
+    target->add("test2", 2, false, Tue);
+    target->add("test3", 3, true,  Wed);
+
+    // create table with links to target table
+    TableRef source = group.get_table("source");
+    size_t col_link = source->add_column_link(type_LinkList, "links", *TableRef(target));
+
+    source->add_empty_row();
+    LinkViewRef links = source->get_linklist(col_link, 0);
+    links->add(2);
+    links->add(1);
+    links->add(0);
+
+    // delete target rows through the links one at a time
+    links->remove_target_row(0);
+    CHECK_EQUAL(2, target->size());
+    CHECK_EQUAL(2, links->size());
+
+    links->remove_target_row(1);
+    CHECK_EQUAL(1, target->size());
+    CHECK_EQUAL(1, links->size());
+
+    links->remove_target_row(0);
+    CHECK_EQUAL(0, target->size());
+    CHECK_EQUAL(0, links->size());
+
+    // re-add targets and links
+    target->add("test1", 1, true,  Mon);
+    target->add("test2", 2, false, Tue);
+    target->add("test3", 3, true,  Wed);
+    links->add(2);
+    links->add(1);
+    links->add(0);
+
+    // Remove all targets through the links
+    links->remove_all_target_rows();
+    CHECK(target->is_empty());
+    CHECK(links->is_empty());
+}
+
+
+TEST(Links_RemoveLastTargetColumn)
+{
+    // When the last ordinary column is removed from a table, its size (number
+    // of rows) must "jump" to zero, even when the table continues to have
+    // "hidden" backlick columns.
+
+    Group group_1;
+    TableRef table = group_1.get_table("table");
+    table->add_column_link(type_Link, "t", *table);
+    table->remove_column(0);
+
+    Group group_2;
+    TableRef origin = group_2.get_table("origin");
+    TableRef target = group_2.get_table("target");
+    target->add_column(type_Int, "t");
+    target->add_empty_row();
+    origin->add_column_link(type_Link,     "o_1", *target);
+    origin->add_column_link(type_LinkList, "o_2", *target);
+    origin->add_empty_row();
+    origin->set_link(0,0,0);
+    LinkViewRef link_list = origin->get_linklist(1,0);
+    link_list->add(0);
+    Row target_row_1 = target->get(0);
+    Row target_row_2 = link_list->get(0);
+
+    CHECK_EQUAL(1, target->size());
+    target->remove_column(0);
+    CHECK_EQUAL(0, target->get_column_count());
+    CHECK(target->is_empty());
+    CHECK(origin->is_null_link(0,0));
+    CHECK(link_list->is_attached());
+    CHECK_EQUAL(link_list, origin->get_linklist(1,0));
+    CHECK_EQUAL(origin, &link_list->get_origin_table());
+    CHECK_EQUAL(target, &link_list->get_target_table());
+    CHECK_EQUAL(0, link_list->size());
+    CHECK(!target_row_1.is_attached());
+    CHECK(!target_row_2.is_attached());
+}
+
+
+TEST(Links_ClearColumnWithTwoLevelBptree)
+{
+    Group group;
+    TableRef origin = group.get_table("origin");
+    TableRef target = group.get_table("target");
+
+    // The extra columns beyond the first one increase the likelihood of
+    // getting unambiguously bad ref
+    target->add_column(type_Int, "");
+    target->add_column(type_Int, "");
+    target->add_column(type_Int, "");
+    target->add_column(type_Int, "");
+    target->add_column(type_Int, "");
+    target->add_empty_row();
+
+    origin->add_column_link(type_LinkList, "", *target);
+    origin->add_empty_row(TIGHTDB_MAX_LIST_SIZE+1);
+    origin->clear();
+    origin->add_empty_row();
+    origin->get_linklist(0,0)->add(0);
+    group.Verify();
+}
+
+
+TEST(Links_ClearLinkListWithTwoLevelBptree)
+{
+    Group group;
+    TableRef origin = group.get_table("origin");
+    TableRef target = group.get_table("target");
+    target->add_empty_row();
+    origin->add_column_link(type_LinkList, "", *target);
+    origin->add_empty_row();
+    LinkViewRef link_list = origin->get_linklist(0,0);
+    for (size_t i = 0; i < TIGHTDB_MAX_LIST_SIZE+1; ++i)
+        link_list->add(0);
+    link_list->clear();
+    group.Verify();
+}
+
+
+TEST(Links_RandomizedOperations)
+{
+    const size_t tests = 30;
+    Random rnd;
+    rnd.seed(random_int<unsigned long>()); // Seed from slow global generator
+
+    for (size_t outer_iter = 0; outer_iter < 1000; outer_iter++) {
+        Group group;
+        TableRef refs[tests]; // 'tests' is max number of tables that can be produced
+
+        vector<vector<size_t> > tables;
+
+        for (size_t inner_iter = 0; inner_iter < tests; inner_iter++) {
+            int action = rnd.draw_int_mod(100);
+
+            if (action < 33 && tables.size() > 0) {
+                // create link
+                size_t from = rnd.draw_int_mod(tables.size());
+                size_t to = rnd.draw_int_mod(tables.size());
+                tables[from].push_back(to);
+
+                int type = rnd.draw_int_mod(2);
+                if (type == 0)
+                    refs[from]->add_column_link(type_Link, "link", *refs[to]);
+                else
+                    refs[from]->add_column_link(type_LinkList, "link", *refs[to]);
+            }
+            else if (action < 66 && tables.size() > 0) {
+                // delete link
+                size_t from = rnd.draw_int_mod(tables.size());
+
+                if (tables[from].size() > 0) {
+                    size_t to = rnd.draw_int_mod(tables[from].size());
+                    tables[from].erase(tables[from].begin() + to);
+                    refs[from]->remove_column(to);
+                }
+            }
+            else if (tables.size() < 10) {
+                // create table
+                refs[tables.size()] = group.get_table("table");
+                tables.push_back(vector<size_t>());
+            }
+        }
+    }
+}
+
+#endif // TEST_LINKS

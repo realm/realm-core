@@ -670,6 +670,8 @@ EOF
         done
         cp src/tightdb/libtightdb.a "$tmpdir/$BASENAME" || exit 1
         cp src/tightdb/libtightdb-dbg.a "$tmpdir/$BASENAME" || exit 1
+        command -v pandoc >/dev/null 2>&1 || { echo "Pandoc is required but it's not installed.  Aborting." >&2; exit 1; }
+        pandoc -f markdown -t plain -o "$tmpdir/$BASENAME/release_notes.txt" release_notes.md || exit 1
 
         echo "Create zip file: '$BASENAME-$realm_version.zip'"
         (cd $tmpdir && zip -r -q "$BASENAME-$realm_version.zip" "$BASENAME") || exit 1
@@ -890,6 +892,19 @@ EOF
         exit 0
         ;;
 
+    "release-notes-prerelease")
+        RELEASE_HEADER="# $(sh build.sh get-version) Release notes" || exit 1
+        sed -i.bak "1s/.*/$RELEASE_HEADER/" release_notes.md || exit 1
+        rm release_notes.md.bak
+        exit 0
+        ;;
+
+    "release-notes-postrelease")
+        cat doc/release_notes_template.md release_notes.md > release_notes.md.new || exit 1
+        mv release_notes.md.new release_notes.md || exit 1
+        exit 0
+        ;;
+
     "get-version")
         version_file="src/tightdb/version.hpp"
         tightdb_ver_major="$(grep ^"#define TIGHTDB_VER_MAJOR" $version_file | awk '{print $3}')" || exit 1
@@ -907,11 +922,12 @@ EOF
         tightdb_ver_patch="$(echo "$tightdb_version" | cut -f3 -d.)" || exit 1
 
         # update version.hpp
-        sed -i -e "s/\#define TIGHTDB_VER_MAJOR .*/\#define TIGHTDB_VER_MAJOR $tightdb_ver_major/" $version_file || exit 1
-        sed -i -e "s/\#define TIGHTDB_VER_MINOR .*/\#define TIGHTDB_VER_MINOR $tightdb_ver_minor/" $version_file || exit 1
-        sed -i -e "s/\#define TIGHTDB_VER_PATCH .*/\#define TIGHTDB_VER_PATCH $tightdb_ver_patch/" $version_file || exit 1
+        printf ",s/#define TIGHTDB_VER_MAJOR .*/#define TIGHTDB_VER_MAJOR $tightdb_ver_major/\nw\nq" | ed -s "$version_file" || exit 1
+        printf ",s/#define TIGHTDB_VER_MINOR .*/#define TIGHTDB_VER_MINOR $tightdb_ver_minor/\nw\nq" | ed -s "$version_file" || exit 1
+        printf ",s/#define TIGHTDB_VER_PATCH .*/#define TIGHTDB_VER_PATCH $tightdb_ver_patch/\nw\nq" | ed -s "$version_file" || exit 1
 
         sh tools/add-deb-changelog.sh "$tightdb_version" "$(pwd)/debian/changelog.in" libtightdb || exit 1
+        sh build.sh release-notes-prerelease || exit 1
         exit 0
         ;;
 

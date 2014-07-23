@@ -11,6 +11,7 @@
 #include <tightdb/column_table.hpp>
 #include <tightdb/column_mixed.hpp>
 #include <tightdb/query_engine.hpp>
+#include <tightdb/table.hpp>
 
 using namespace std;
 using namespace tightdb;
@@ -222,6 +223,16 @@ void ColumnBase::update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT
 {
     m_array->update_from_parent(old_baseline);
 }
+
+
+#ifdef TIGHTDB_DEBUG
+
+void ColumnBase::Verify(const Table&, size_t) const
+{
+    Verify();
+}
+
+#endif // TIGHTDB_DEBUG
 
 
 namespace {
@@ -617,7 +628,7 @@ ref_type ColumnBase::build(size_t* rest_size_ptr, size_t fixed_height,
                 new_inner_node.add(v); // Throws
                 node = 0;
                 size_t num_children = 1;
-                for (;;) {
+                while (rest_size > 0 && num_children != TIGHTDB_MAX_LIST_SIZE) {
                     ref_type child = build(&rest_size, height, alloc, handler); // Throws
                     try {
                         int_fast64_t v = child; // FIXME: Dangerous cast here (unsigned -> signed)
@@ -627,8 +638,6 @@ ref_type ColumnBase::build(size_t* rest_size_ptr, size_t fixed_height,
                         Array::destroy_deep(child, alloc);
                         throw;
                     }
-                    if (rest_size == 0 || ++num_children == TIGHTDB_MAX_LIST_SIZE)
-                        break;
                 }
                 v = orig_rest_size - rest_size; // total_elems_in_tree
                 new_inner_node.add(1 + 2*v); // Throws
@@ -733,31 +742,31 @@ size_t Column::count(int64_t target) const
     return size_t(aggregate<int64_t, int64_t, act_Count, Equal>(target, 0, size()));
 }
 
-int64_t Column::sum(size_t start, size_t end, size_t limit) const
+int64_t Column::sum(size_t start, size_t end, size_t limit, size_t* return_ndx) const
 {
-    return aggregate<int64_t, int64_t, act_Sum, None>(0, start, end, limit);
+    return aggregate<int64_t, int64_t, act_Sum, None>(0, start, end, limit, return_ndx);
 }
 
-double Column::average(size_t start, size_t end, size_t limit) const
+double Column::average(size_t start, size_t end, size_t limit, size_t* return_ndx) const
 {
     if (end == size_t(-1))
         end = size();
     size_t size = end - start;
     if(limit < size)
         size = limit;
-    int64_t sum = aggregate<int64_t, int64_t, act_Sum, None>(0, start, end, limit);
+    int64_t sum = aggregate<int64_t, int64_t, act_Sum, None>(0, start, end, limit, return_ndx);
     double avg = double(sum) / double(size == 0 ? 1 : size);
     return avg;
 }
 
-int64_t Column::minimum(size_t start, size_t end, size_t limit) const
+int64_t Column::minimum(size_t start, size_t end, size_t limit, size_t* return_ndx) const
 {
-    return aggregate<int64_t, int64_t, act_Min, None>(0, start, end, limit);
+    return aggregate<int64_t, int64_t, act_Min, None>(0, start, end, limit, return_ndx);
 }
 
-int64_t Column::maximum(size_t start, size_t end, size_t limit) const
+int64_t Column::maximum(size_t start, size_t end, size_t limit, size_t* return_ndx) const
 {
-    return aggregate<int64_t, int64_t, act_Max, None>(0, start, end, limit);
+    return aggregate<int64_t, int64_t, act_Max, None>(0, start, end, limit, return_ndx);
 }
 
 
@@ -1136,6 +1145,7 @@ void Column::Verify() const
 
     m_array->verify_bptree(&verify_leaf);
 }
+
 
 class ColumnBase::LeafToDot: public Array::ToDotHandler {
 public:

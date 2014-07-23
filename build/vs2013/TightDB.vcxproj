@@ -594,6 +594,7 @@
     <ClCompile Include="..\..\src\tightdb\array_string.cpp" />
     <ClCompile Include="..\..\src\tightdb\array_string_long.cpp" />
     <ClCompile Include="..\..\src\tightdb\column.cpp" />
+    <ClCompile Include="..\..\src\tightdb\column_link_base.cpp" />
     <ClCompile Include="..\..\src\tightdb\column_backlink.cpp" />
     <ClCompile Include="..\..\src\tightdb\column_binary.cpp" />
     <ClCompile Include="..\..\src\tightdb\column_link.cpp" />

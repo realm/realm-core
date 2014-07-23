@@ -1,52 +1,114 @@
-Template
-=============================================================
-x.x.x Release notes (yyyy—MM-dd)
-================================
-
-C++ (core)
------------
-The C++ API has been updated and your code will break!
+# NEXT RELEASE
 
 ### Bugfixes:
 
-* None.
+* Lorem ipsum.
 
 ### API breaking changes:
 
-* `???`
+* Lorem ipsum.
 
 ### Enhancements:
 
-* `???`
+* Lorem ipsum.
 
 -----------
 
 ### Internals:
 
-* `???`
+* Lorem ipsum.
 
 ----------------------------------------------
 
-x.x.x Release notes (yyyy—MM-dd)    <<<------------ PLEASE NOTE, THIS IS THE NEXT RELEASE!!!!!!
-================================
-
-C++ (core)
------------
+# 0.80.3 Release notes
 
 ### Bugfixes:
 
-* Fixed bug in `TableView::remove()` causing crash or undefined behaviour.
+* Fixed bug in `Table::add_column()` which would produce a corrupt underlying
+  node structure if the table already contains more than N**2 rows, where N is
+  `TIGHTDB_MAX_LIST_SIZE` (currently set to 1000).
+* Fixed bugs in `Table::clear()` which would produce a corrupt underlying node
+  structure if the table already contains more than N rows, where N is
+  `TIGHTDB_MAX_LIST_SIZE` (currently set to 1000).
+
+### Enhancements:
+
+* Lets you find links that point at a specific row index. Works on Query and
+  Table. Please see `LinkList_QueryFindLinkTarget` in `test_link_query_view.cpp`
+  for usage.
+
+-----------
+
+### Internals:
+
+* Table::Verify() has been heavily extended and now also checks link columns and
+  link lists (debug mode only).
+
+----------------------------------------------
+
+# 0.80.2 Release notes
+
+### Bugfixes:
+
+* Fixed bug causing corrupted table accessor when advancing transaction after last regular column is removed from table with remaining hidden backlink columns.
+* Fixed replication issue causing too many link list selection instructions to be generated.
+
+----------------------------------------------
+
+# 0.80.1 Release notes
+
+### Bugfixes:
+
+* Fixed several bugs in connection to removal of like-type columns.
+* Fixed bug when last regular column is removed from table with remaining hidden backlink columns.
+* Fixed bug causing corrupted table accessor when column are added or removed before alink column.
+
+----------------------------------------------
+
+# 0.80.0 Release notes
+
+### Bugfixes:
+
+* Fixed bug in `TableView::clear()` causing crash if its table contained link columns.
+* Fixed bug which would corrupt subtable accessors when inserting or removing parent table columns.
+* Fixed bug in LinkView::refresh_accessor_tree() causing problems when transaction is advanced after a link list is cleared.
+* Fixed bug causing problems when transaction is advanced after a table with link-like columns is cleared.
+* Fixed bug in connection with cyclic link relationships.
+
+### API breaking changes:
+
+* None
+
+### Enhancements:
+
+* Added methods `LinkView::remove_target_row()` and `LinkView::remove_all_target_rows()`.
+* Support for removing link columns
+
+
+----------------------------------------------
+
+# 0.23.0 Release notes
+
+### Bugfixes:
+* Fixed bug in `TableView::remove()` causing crash or undefined behavior.
 * Fixed bugs in `Table::insert_column()` and `Table::remove_column()` causing crash or undefined behaviour.
 * Fixed corruption bug when a string enumeration column follows a column with attached search index (index flavor mixup).
 * Fixed in `Array::erase()` causing crash in certain row insertion scenarios.
 * Fixed bug in enumerated strings column (corruption was possible when inserting default values).
 * Fixed bug in `Table::update_from_parent()` causing a crash if `Group::commit()` in presence of generated subtable accessor.
+* Fixed several link-related bugs due to confusion about the meaning of `LinkView::m_table`.
 
 ### API breaking changes:
 
 * Views can now be be kept synchronized with changes to the tables used to generate the view, use `TableView::sync_if_needed()` to do so. Views are no longer detached when the table they have been generated from are changed. Instead they just go out of sync. See further description in `src/tightdb/table_view.hpp`.
+* is_attached(), detach(), get_table(), and get_index() moved from BasicRow to RowFuncs. This makes it possible to write `link_list[7].get_index()`, for instance.
+* `LinkView::get_target_row(link_ndx)` was removed as it is now just a shorthand for the equally efficient `LinkView::get(link_ndx).get_index()`.
+* Added missing const versions of `LinkView::get()` and `LinkView::operator[]()`.
+* Confusing `LinkView::get_parent()` removed.
+* Added `LinkView::get_origin_table()` and `LinkView::get_target_table()`.
 
 ### Enhancements:
+* Now maximum() and minimum() can return the index of the match and not only the value. Implemented for Query, Table and TableView.
 * Now supports links in Table::to_json. Please see unit tests in the new test_json.cpp file
 * Now supports DateTime Query::maximum_datetime() and DateTime Query::minimum_datetime()
 * Supports links in queries, like `(table1->link(3).column<Int>(0) > 550).find()`.
@@ -56,6 +118,7 @@ C++ (core)
 * Support for row accessors.
 * Table, row, and descriptor accessors are now generally retained and properly adjusted when the parent table is modified.
 * Added methods to find rows by target in TableView and LinkView.
+
 
 -----------
 

@@ -69,10 +69,12 @@ namespace {
         first, Int,
         second, String)
 
-        TIGHTDB_TABLE_3(DateIntString,
+        TIGHTDB_TABLE_5(DateIntStringFloatDouble,
         first, Int,
         second, String,
-        third, DateTime)
+        third, DateTime,
+        fourth, Float,
+        fifth, Double)
 
         TIGHTDB_TABLE_2(TupleTableTypeBin,
         first, Int,
@@ -1473,44 +1475,84 @@ TEST(Query_LimitUntyped2)
     sumd = q.sum_double(2, NULL, 0, 2, 3);
     CHECK_EQUAL(40000., sumd);
 
+    size_t ndx = not_found;
+
     // max, limited by 'limit'
     sum = q.maximum_int(0, NULL, 0, -1, 1);
     CHECK_EQUAL(10000, sum);
+    q.maximum_int(0, NULL, 0, -1, 1, &ndx);
+    CHECK_EQUAL(0, ndx);
+
     sum = q.maximum_int(0, NULL, 0, -1, 2);
     CHECK_EQUAL(30000, sum);
+    q.maximum_int(0, NULL, 0, -1, 2, &ndx);
+    CHECK_EQUAL(1, ndx);
+
     sum = q.maximum_int(0, NULL, 0, -1);
     CHECK_EQUAL(40000, sum);
+    q.maximum_int(0, NULL, 0, -1, -1, &ndx);
+    CHECK_EQUAL(2, ndx);
 
     sumf = q.maximum_float(1, NULL, 0, -1, 1);
     CHECK_EQUAL(10000., sumf);
+    q.maximum_float(1, NULL, 0, -1, 1, &ndx);
+    CHECK_EQUAL(0, ndx);
+
     sumf = q.maximum_float(1, NULL, 0, -1, 2);
     CHECK_EQUAL(30000., sumf);
+    q.maximum_float(1, NULL, 0, -1, 2, &ndx);
+    CHECK_EQUAL(1, ndx);
+
     sumf = q.maximum_float(1, NULL, 0, -1);
     CHECK_EQUAL(40000., sumf);
+    q.maximum_float(1, NULL, 0, -1, -1, &ndx);
+    CHECK_EQUAL(2, ndx);
 
     sumd = q.maximum_double(2, NULL, 0, -1, 1);
     CHECK_EQUAL(10000., sumd);
+    q.maximum_double(2, NULL, 0, -1, 1, &ndx);
+    CHECK_EQUAL(0, ndx);
+
     sumd = q.maximum_double(2, NULL, 0, -1, 2);
     CHECK_EQUAL(30000., sumd);
+    q.maximum_double(2, NULL, 0, -1, 2, &ndx);
+    CHECK_EQUAL(1, ndx);
+
     sumd = q.maximum_double(2, NULL, 0, -1);
     CHECK_EQUAL(40000., sumd);
-
+    q.maximum_double(2, NULL, 0, -1, -1, &ndx);
+    CHECK_EQUAL(2, ndx);
 
     // max, limited by 'end', but still having 'limit' specified
     sum = q.maximum_int(0, NULL, 0, 1, 3);
     CHECK_EQUAL(10000, sum);
+    q.maximum_int(0, NULL, 0, 1, 3, &ndx);
+    CHECK_EQUAL(0, ndx);
+
     sum = q.maximum_int(0, NULL, 0, 2, 3);
     CHECK_EQUAL(30000, sum);
+    q.maximum_int(0, NULL, 0, 2, 3, &ndx);
+    CHECK_EQUAL(1, ndx);
 
     sumf = q.maximum_float(1, NULL, 0, 1, 3);
     CHECK_EQUAL(10000., sumf);
+    q.maximum_float(1, NULL, 0, 1, 3, &ndx);
+    CHECK_EQUAL(0, ndx);
+
     sumf = q.maximum_float(1, NULL, 0, 2, 3);
     CHECK_EQUAL(30000., sumf);
+    q.maximum_float(1, NULL, 0, 2, 3, &ndx);
+    CHECK_EQUAL(1, ndx);
 
     sumd = q.maximum_double(2, NULL, 0, 1, 3);
     CHECK_EQUAL(10000., sumd);
+    q.maximum_double(2, NULL, 0, 1, 3, &ndx);
+    CHECK_EQUAL(0, ndx);
+
     sumd = q.maximum_double(2, NULL, 0, 2, 3);
     CHECK_EQUAL(30000., sumd);
+    q.maximum_double(2, NULL, 0, 2, 3, &ndx);
+    CHECK_EQUAL(1, ndx);
 
 
     // avg
@@ -2540,39 +2582,82 @@ TEST(Query_Float)
 
     // -------- Test minimum(), maximum()
 
+    size_t ndx = not_found;
+
     // ... NO conditions
     CHECK_EQUAL(1.20f, t.where().col_float.maximum());
+    t.where().col_float.maximum(null_ptr, 0, not_found, not_found, &ndx);
+    CHECK_EQUAL(4, ndx);
+    
     CHECK_EQUAL(1.10f, t.where().col_float.minimum());
+    t.where().col_float.minimum(null_ptr, 0, not_found, not_found, &ndx);
+    CHECK_EQUAL(0, ndx);
+
     CHECK_EQUAL(3.20, t.where().col_double.maximum());
+    CHECK_EQUAL(3.20, t.where().col_double.maximum(null_ptr, 0, not_found, not_found, &ndx));
+
     CHECK_EQUAL(2.20, t.where().col_double.minimum());
+    t.where().col_double.minimum(null_ptr, 0, not_found, not_found, &ndx);
 
     // ... with conditions
     CHECK_EQUAL(1.20f, q2.col_float.maximum());
+    q2.col_float.maximum(null_ptr, 0, not_found, not_found, &ndx);
+    CHECK_EQUAL(4, ndx);
+
     CHECK_EQUAL(1.13f, q2.col_float.minimum());
+    q2.col_float.minimum(null_ptr, 0, not_found, not_found, &ndx);
+    CHECK_EQUAL(1, ndx);
+
     CHECK_EQUAL(3.20, q2.col_double.maximum());
+    q2.col_double.maximum(null_ptr, 0, not_found, not_found, &ndx);
+    CHECK_EQUAL(4, ndx);
+
     CHECK_EQUAL(2.21, q2.col_double.minimum());
+    q2.col_double.minimum(null_ptr, 0, not_found, not_found, &ndx);
+    CHECK_EQUAL(1, ndx);
 
     size_t count = 0;
     // ... NO conditions
     CHECK_EQUAL(1.20f, t.where().col_float.maximum(&count));
     CHECK_EQUAL(5, count);
+    t.where().col_float.maximum(&count, 0, not_found, not_found, &ndx);
+    CHECK_EQUAL(4, ndx);
+
     CHECK_EQUAL(1.10f, t.where().col_float.minimum(&count));
     CHECK_EQUAL(5, count);
+    t.where().col_float.minimum(&count, 0, not_found, not_found, &ndx);
+    CHECK_EQUAL(0, ndx);
+
     CHECK_EQUAL(3.20, t.where().col_double.maximum(&count));
     CHECK_EQUAL(5, count);
+    t.where().col_double.maximum(&count, 0, not_found, not_found, &ndx);
+    CHECK_EQUAL(4, ndx);
+
     CHECK_EQUAL(2.20, t.where().col_double.minimum(&count));
     CHECK_EQUAL(5, count);
+    t.where().col_double.minimum(&count, 0, not_found, not_found, &ndx);
+    CHECK_EQUAL(0, ndx);
 
     // ... with conditions
     CHECK_EQUAL(1.20f, q2.col_float.maximum(&count));
     CHECK_EQUAL(2, count);
+    q2.col_float.maximum(&count, 0, not_found, not_found, &ndx);
+    CHECK_EQUAL(4, ndx);
+
     CHECK_EQUAL(1.13f, q2.col_float.minimum(&count));
     CHECK_EQUAL(2, count);
+    q2.col_float.minimum(&count, 0, not_found, not_found, &ndx);
+    CHECK_EQUAL(1, ndx);
+
     CHECK_EQUAL(3.20, q2.col_double.maximum(&count));
     CHECK_EQUAL(2, count);
+    q2.col_double.maximum(&count, 0, not_found, not_found, &ndx);
+    CHECK_EQUAL(4, ndx);
+
     CHECK_EQUAL(2.21, q2.col_double.minimum(&count));
     CHECK_EQUAL(2, count);
-
+    q2.col_double.minimum(&count, 0, not_found, not_found, &ndx);
+    CHECK_EQUAL(1, ndx);
 }
 
 
@@ -4718,18 +4803,66 @@ TEST(Query_TestTV_where)
 
 TEST(Query_SumMinMaxAvg)
 {
-    DateIntString t;
-    t.add(1, "a", DateTime(100));
-    t.add(2, "b", DateTime(300));
-    t.add(3, "c", DateTime(50));
+    DateIntStringFloatDouble t;
 
-    CHECK_EQUAL(6, t.where().first.sum());
-    CHECK_EQUAL(1, t.where().first.minimum());
+    t.add(1, "a", DateTime(100), 1.0f, 1.0);
+    t.add(1, "a", DateTime(100), 1.0f, 1.0);
+    t.add(1, "a", DateTime(100), 1.0f, 1.0);
+    t.add(1, "a", DateTime(100), 1.0f, 1.0);
+    t.add(2, "b", DateTime(300), 3.0f, 3.0);
+    t.add(3, "c", DateTime(50), 5.0f, 5.0);
+    t.add(0, "a", DateTime(100), 1.0f, 1.0);
+    t.add(0, "b", DateTime(3000), 30.0f, 30.0);
+    t.add(0, "c", DateTime(5), 0.5f, 0.5);
+
+    CHECK_EQUAL(9, t.where().first.sum());
+
+    CHECK_EQUAL(0, t.where().first.minimum());
     CHECK_EQUAL(3, t.where().first.maximum());
-    CHECK_EQUAL(2, t.where().first.average());
 
-    CHECK_EQUAL(DateTime(300), t.where().third.maximum());
-    CHECK_EQUAL(DateTime(50), t.where().third.minimum());
+    size_t resindex = not_found;
+
+    t.where().first.maximum(null_ptr, 0, -1, -1, &resindex);
+    CHECK_EQUAL(5, resindex);
+
+    t.where().first.minimum(null_ptr, 0, -1, -1, &resindex);
+    CHECK_EQUAL(6, resindex);
+
+    t.where().third.maximum(null_ptr, 0, -1, -1, &resindex);
+    CHECK_EQUAL(7, resindex);
+
+    t.where().third.minimum(null_ptr, 0, -1, -1, &resindex);
+    CHECK_EQUAL(8, resindex);
+
+    t.where().fourth.maximum(null_ptr, 0, -1, -1, &resindex);
+    CHECK_EQUAL(7, resindex);
+
+    t.where().fourth.minimum(null_ptr, 0, -1, -1, &resindex);
+    CHECK_EQUAL(8, resindex);
+
+    t.where().fifth.maximum(null_ptr, 0, -1, -1, &resindex);
+    CHECK_EQUAL(7, resindex);
+
+    t.where().fifth.minimum(null_ptr, 0, -1, -1, &resindex);
+    CHECK_EQUAL(8, resindex);
+
+    // Now with condition (tests another code path in Array::minmax())
+    t.where().first.not_equal(0).fifth.minimum(null_ptr, 0, -1, -1, &resindex);
+    CHECK_EQUAL(0, resindex);
+
+    t.where().first.not_equal(0).fourth.minimum(null_ptr, 0, -1, -1, &resindex);
+    CHECK_EQUAL(0, resindex);
+
+    t.where().first.not_equal(0).third.minimum(null_ptr, 0, -1, -1, &resindex);
+    CHECK_EQUAL(5, resindex);
+
+    t.where().first.not_equal(0).third.maximum(null_ptr, 0, -1, -1, &resindex);
+    CHECK_EQUAL(4, resindex);
+
+    CHECK_APPROXIMATELY_EQUAL(1, t.where().first.average(), 0.001);
+
+    CHECK_EQUAL(DateTime(3000), t.where().third.maximum());
+    CHECK_EQUAL(DateTime(5), t.where().third.minimum());
 
     size_t cnt;
     CHECK_EQUAL(0, t.where().first.sum(&cnt, 0, 0));
@@ -4741,35 +4874,73 @@ TEST(Query_SumMinMaxAvg)
 
     CHECK_EQUAL(1, t.where().first.sum(&cnt, 0, 1));
     CHECK_EQUAL(1, cnt);
-    CHECK_EQUAL(2, t.where().first.sum(&cnt, 1, 2));
+    CHECK_EQUAL(2, t.where().first.sum(&cnt, 4, 5));
     CHECK_EQUAL(1, cnt);
-    CHECK_EQUAL(3, t.where().first.sum(&cnt, 2, 3));
+    CHECK_EQUAL(3, t.where().first.sum(&cnt, 5, 6));
     CHECK_EQUAL(1, cnt);
 
-    CHECK_EQUAL(3, t.where().first.sum(&cnt, 0, 2));
+    CHECK_EQUAL(2, t.where().first.sum(&cnt, 0, 2));
     CHECK_EQUAL(2, cnt);
-    CHECK_EQUAL(5, t.where().first.sum(&cnt, 1, 3));
-    CHECK_EQUAL(2, cnt);
+    CHECK_EQUAL(5, t.where().first.sum(&cnt, 1, 5));
+    CHECK_EQUAL(4, cnt);
 
-    CHECK_EQUAL(6, t.where().first.sum(&cnt, 0, 3));
+    CHECK_EQUAL(3, t.where().first.sum(&cnt, 0, 3));
     CHECK_EQUAL(3, cnt);
-    CHECK_EQUAL(6, t.where().first.sum(&cnt, 0, size_t(-1)));
-    CHECK_EQUAL(3, cnt);
+    CHECK_EQUAL(9, t.where().first.sum(&cnt, 0, size_t(-1)));
+    CHECK_EQUAL(9, cnt);
 }
 
 TEST(Query_SumMinMaxAvg_where)
 {
-    TupleTableType t;
-    t.add(1, "a");
-    t.add(2, "b");
-    t.add(3, "c");
+    DateIntStringFloatDouble t;
 
-    TupleTableType::View v = t.where().find_all();
+    t.add(1, "a", DateTime(100), 1.0f, 1.0);
+    t.add(1, "a", DateTime(100), 1.0f, 1.0);
+    t.add(1, "a", DateTime(100), 1.0f, 1.0);
+    t.add(1, "a", DateTime(100), 1.0f, 1.0);
+    t.add(2, "b", DateTime(300), 3.0f, 3.0);
+    t.add(3, "c", DateTime(50), 5.0f, 5.0);
+    t.add(0, "a", DateTime(100), 1.0f, 1.0);
+    t.add(0, "b", DateTime(3000), 30.0f, 30.0);
+    t.add(0, "c", DateTime(5), 0.5f, 0.5);
 
-    CHECK_EQUAL(6, t.where(&v).first.sum());
-    CHECK_EQUAL(1, t.where(&v).first.minimum());
+    DateIntStringFloatDouble::View v = t.where().find_all();
+
+    CHECK_EQUAL(9, t.where(&v).first.sum());
+
+    CHECK_EQUAL(0, t.where(&v).first.minimum());
     CHECK_EQUAL(3, t.where(&v).first.maximum());
-    CHECK_EQUAL(2, t.where(&v).first.average());
+
+    size_t resindex = not_found;
+
+    t.where(&v).first.maximum(null_ptr, 0, -1, -1, &resindex);
+    CHECK_EQUAL(5, resindex);
+
+    t.where(&v).first.minimum(null_ptr, 0, -1, -1, &resindex);
+    CHECK_EQUAL(6, resindex);
+
+    t.where(&v).third.maximum(null_ptr, 0, -1, -1, &resindex);
+    CHECK_EQUAL(7, resindex);
+
+    t.where(&v).third.minimum(null_ptr, 0, -1, -1, &resindex);
+    CHECK_EQUAL(8, resindex);
+
+    t.where(&v).fourth.maximum(null_ptr, 0, -1, -1, &resindex);
+    CHECK_EQUAL(7, resindex);
+
+    t.where(&v).fourth.minimum(null_ptr, 0, -1, -1, &resindex);
+    CHECK_EQUAL(8, resindex);
+
+    t.where(&v).fifth.maximum(null_ptr, 0, -1, -1, &resindex);
+    CHECK_EQUAL(7, resindex);
+
+    t.where(&v).fifth.minimum(null_ptr, 0, -1, -1, &resindex);
+    CHECK_EQUAL(8, resindex);
+
+    CHECK_APPROXIMATELY_EQUAL(1, t.where(&v).first.average(), 0.001);
+
+    CHECK_EQUAL(DateTime(3000), t.where(&v).third.maximum());
+    CHECK_EQUAL(DateTime(5), t.where(&v).third.minimum());
 
     size_t cnt;
     CHECK_EQUAL(0, t.where(&v).first.sum(&cnt, 0, 0));
@@ -4781,20 +4952,23 @@ TEST(Query_SumMinMaxAvg_where)
 
     CHECK_EQUAL(1, t.where(&v).first.sum(&cnt, 0, 1));
     CHECK_EQUAL(1, cnt);
-    CHECK_EQUAL(2, t.where(&v).first.sum(&cnt, 1, 2));
+    CHECK_EQUAL(2, t.where(&v).first.sum(&cnt, 4, 5));
     CHECK_EQUAL(1, cnt);
-    CHECK_EQUAL(3, t.where(&v).first.sum(&cnt, 2, 3));
+    CHECK_EQUAL(3, t.where(&v).first.sum(&cnt, 5, 6));
     CHECK_EQUAL(1, cnt);
 
-    CHECK_EQUAL(3, t.where(&v).first.sum(&cnt, 0, 2));
+    CHECK_EQUAL(2, t.where(&v).first.sum(&cnt, 0, 2));
     CHECK_EQUAL(2, cnt);
-    CHECK_EQUAL(5, t.where(&v).first.sum(&cnt, 1, 3));
-    CHECK_EQUAL(2, cnt);
+    CHECK_EQUAL(5, t.where(&v).first.sum(&cnt, 1, 5));
+    CHECK_EQUAL(4, cnt);
 
-    CHECK_EQUAL(6, t.where(&v).first.sum(&cnt, 0, 3));
+    CHECK_EQUAL(3, t.where(&v).first.sum(&cnt, 0, 3));
     CHECK_EQUAL(3, cnt);
-    CHECK_EQUAL(6, t.where(&v).first.sum(&cnt, 0, size_t(-1)));
-    CHECK_EQUAL(3, cnt);
+    CHECK_EQUAL(9, t.where(&v).first.sum(&cnt, 0, size_t(-1)));
+    CHECK_EQUAL(9, cnt);
+
+
+
 }
 
 TEST(Query_Avg)
@@ -5000,18 +5174,38 @@ TEST(Query_AllTypesDynamicallyTyped)
 
     Query query = table.where().equal(0, false);
 
+    size_t ndx = not_found;
+
     CHECK_EQUAL(54, query.minimum_int(1));
+    query.minimum_int(1, null_ptr, 0, not_found, not_found, &ndx);
+    CHECK_EQUAL(0, ndx);
+
     CHECK_EQUAL(54, query.maximum_int(1));
+    query.maximum_int(1, null_ptr, 0, not_found, not_found, &ndx);
+    CHECK_EQUAL(0, ndx);
+
     CHECK_EQUAL(54, query.sum_int(1));
     CHECK_EQUAL(54, query.average_int(1));
 
     CHECK_EQUAL(0.7f, query.minimum_float(2));
+    query.minimum_float(2, null_ptr, 0, not_found, not_found, &ndx);
+    CHECK_EQUAL(0, ndx);
+
     CHECK_EQUAL(0.7f, query.maximum_float(2));
+    query.maximum_float(2, null_ptr, 0, not_found, not_found, &ndx);
+    CHECK_EQUAL(0, ndx);
+
     CHECK_EQUAL(0.7f, query.sum_float(2));
     CHECK_EQUAL(0.7f, query.average_float(2));
 
     CHECK_EQUAL(0.8, query.minimum_double(3));
+    query.minimum_double(3, null_ptr, 0, not_found, not_found, &ndx);
+    CHECK_EQUAL(0, ndx);
+
     CHECK_EQUAL(0.8, query.maximum_double(3));
+    query.maximum_double(3, null_ptr, 0, not_found, not_found, &ndx);
+    CHECK_EQUAL(0, ndx);
+
     CHECK_EQUAL(0.8, query.sum_double(3));
     CHECK_EQUAL(0.8, query.average_double(3));
 }
@@ -5063,18 +5257,38 @@ TEST(Query_AllTypesStaticallyTyped)
 
     TestQueryAllTypes::Query query = table.where().bool_col.equal(false);
 
+    size_t ndx = not_found;
+
     CHECK_EQUAL(54, query.int_col.minimum());
+    query.int_col.minimum(null_ptr, 0, not_found, not_found, &ndx);
+    CHECK_EQUAL(0, ndx);
+
     CHECK_EQUAL(54, query.int_col.maximum());
+    query.int_col.maximum(null_ptr, 0, not_found, not_found, &ndx);
+    CHECK_EQUAL(0, ndx);
+
     CHECK_EQUAL(54, query.int_col.sum());
     CHECK_EQUAL(54, query.int_col.average());
 
     CHECK_EQUAL(0.7f, query.float_col.minimum());
+    query.float_col.minimum(null_ptr, 0, not_found, not_found, &ndx);
+    CHECK_EQUAL(0, ndx);
+
     CHECK_EQUAL(0.7f, query.float_col.maximum());
+    query.float_col.maximum(null_ptr, 0, not_found, not_found, &ndx);
+    CHECK_EQUAL(0, ndx);
+
     CHECK_EQUAL(0.7f, query.float_col.sum());
     CHECK_EQUAL(0.7f, query.float_col.average());
 
     CHECK_EQUAL(0.8, query.double_col.minimum());
+    query.double_col.minimum(null_ptr, 0, not_found, not_found, &ndx);
+    CHECK_EQUAL(0, ndx);
+
     CHECK_EQUAL(0.8, query.double_col.maximum());
+    query.double_col.maximum(null_ptr, 0, not_found, not_found, &ndx);
+    CHECK_EQUAL(0, ndx);
+
     CHECK_EQUAL(0.8, query.double_col.sum());
     CHECK_EQUAL(0.8, query.double_col.average());
 }

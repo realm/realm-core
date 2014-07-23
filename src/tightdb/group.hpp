@@ -335,7 +335,6 @@ public:
     class TransactAdvancer;
     void advance_transact(ref_type new_top_ref, std::size_t new_file_size,
                           const BinaryData* logs_begin, const BinaryData* logs_end);
-    void mark_all_table_accessors();
 #endif
 
 #ifdef TIGHTDB_DEBUG
@@ -436,10 +435,12 @@ private:
 
     Table* get_table_by_ndx(std::size_t ndx);
     const Table* get_table_by_ndx(std::size_t ndx) const;
-    ref_type create_new_table(StringData name);
-    Table* create_new_table_and_accessor(StringData name, SpecSetter);
+    std::size_t create_table(StringData name); // Returns index of new table
+    Table* create_table_accessor(std::size_t table_ndx);
 
     void detach_table_accessors() TIGHTDB_NOEXCEPT;
+
+    void mark_all_table_accessors() TIGHTDB_NOEXCEPT;
 
 #ifdef TIGHTDB_DEBUG
     std::pair<ref_type, std::size_t>
@@ -573,23 +574,28 @@ template<class T> inline bool Group::has_table(StringData name) const
     if (ndx == not_found)
         return false;
     const Table* table = get_table_by_ndx(ndx); // Throws
-    return T::matches_dynamic_spec(_impl::TableFriend::get_spec(*table));
+    typedef _impl::TableFriend tf;
+    return T::matches_dynamic_spec(tf::get_spec(*table));
 }
 
 
 inline Table* Group::get_table_ptr(StringData name, SpecSetter spec_setter, bool& was_created)
 {
     TIGHTDB_ASSERT(is_attached());
+
+    Table* table;
     std::size_t ndx = m_table_names.find_first(name);
-
     if (ndx != not_found) {
-        Table* table = get_table_by_ndx(ndx); // Throws
+        table = get_table_by_ndx(ndx); // Throws
         was_created = false;
-        return table;
     }
-
-    Table* table = create_new_table_and_accessor(name, spec_setter); // Throws
-    was_created = true;
+    else {
+        ndx = create_table(name); // Throws
+        table = create_table_accessor(ndx); // Throws
+        if (spec_setter)
+            (*spec_setter)(*table); // Throws
+        was_created = true;
+    }
     return table;
 }
 

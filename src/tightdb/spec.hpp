@@ -50,7 +50,7 @@ public:
     /// used in a non-transactional context, or if the spec has
     /// already been successfully modified within the current write
     /// transaction.
-    void remove_column(std::size_t column_ndx);
+    void erase_column(std::size_t column_ndx);
 
     //@{
     // If a new Spec is constructed from the returned subspec
@@ -87,19 +87,20 @@ public:
                               std::size_t* keys_ndx = 0) TIGHTDB_NOEXCEPT;
 
     // Links
-    void set_link_target_table(std::size_t column_ndx, std::size_t table_ndx);
     std::size_t get_opposite_link_table_ndx(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
+    void set_opposite_link_table_ndx(std::size_t column_ndx, std::size_t table_ndx);
     bool has_backlinks() const TIGHTDB_NOEXCEPT;
     void set_backlink_origin_column(std::size_t backlink_col_ndx, std::size_t origin_col_ndx);
     std::size_t get_origin_column_ndx(std::size_t backlink_col_ndx) const  TIGHTDB_NOEXCEPT;
     std::size_t find_backlink_column(std::size_t origin_table_ndx,
                                      std::size_t origin_col_ndx) const TIGHTDB_NOEXCEPT;
-    void update_backlink_column_ref(std::size_t origin_table_ndx, std::size_t old_column_ndx,
-                                    std::size_t new_column_ndx);
 
-    // Get position in column list adjusted for indexes
-    // (since index refs are stored alongside column refs in
-    //  m_columns, this may differ from the logical position)
+    /// Get position in `Table::m_columns` of the specified column. It may be
+    /// different from the specified logical column index due to the presence of
+    /// search indexes, since their top refs are stored in Table::m_columns as
+    /// well.
+    ///
+    /// FIXME: Rename to get_column_ndx_in_parent()
     std::size_t get_column_pos(std::size_t column_ndx) const;
 
     /// Compare two table specs for equality.
@@ -107,6 +108,7 @@ public:
 
     void destroy() TIGHTDB_NOEXCEPT;
 
+    std::size_t get_ndx_in_parent() const TIGHTDB_NOEXCEPT;
     void set_ndx_in_parent(std::size_t) TIGHTDB_NOEXCEPT;
 
 #ifdef TIGHTDB_DEBUG
@@ -116,10 +118,8 @@ public:
 
 private:
     // Underlying array structure.
-    //
-    // FIXME: Rename `m_spec` to `m_types`.
     Array m_top;
-    Array m_spec;        // 1st slot in m_top
+    Array m_types;       // 1st slot in m_top
     ArrayString m_names; // 2nd slot in m_top
     Array m_attr;        // 3rd slot in m_top
     Array m_subspecs;    // 4th slot in m_top (optional)
@@ -159,8 +159,8 @@ private:
 
     struct ColumnInfo {
         std::size_t m_column_ref_ndx; ///< Index within Table::m_columns
-        bool m_has_index;
-        ColumnInfo(): m_column_ref_ndx(0), m_has_index(false) {}
+        bool m_has_search_index;
+        ColumnInfo(): m_column_ref_ndx(0), m_has_search_index(false) {}
     };
 
     void get_column_info(std::size_t column_ndx, ColumnInfo&) const TIGHTDB_NOEXCEPT;
@@ -233,23 +233,34 @@ inline ref_type Spec::get_subspec_ref(std::size_t subspec_ndx) const TIGHTDB_NOE
 }
 
 inline Spec::Spec(SubspecRef r) TIGHTDB_NOEXCEPT:
-    m_top(r.m_parent->get_alloc()), m_spec(r.m_parent->get_alloc()),
-    m_names(r.m_parent->get_alloc()), m_attr(r.m_parent->get_alloc()),
-    m_subspecs(r.m_parent->get_alloc()), m_enumkeys(r.m_parent->get_alloc())
+    m_top(r.m_parent->get_alloc()),
+    m_types(r.m_parent->get_alloc()),
+    m_names(r.m_parent->get_alloc()),
+    m_attr(r.m_parent->get_alloc()),
+    m_subspecs(r.m_parent->get_alloc()),
+    m_enumkeys(r.m_parent->get_alloc())
 {
     init(r);
 }
 
 // Uninitialized Spec (call init() to init)
 inline Spec::Spec(Allocator& alloc) TIGHTDB_NOEXCEPT:
-    m_top(alloc), m_spec(alloc), m_names(alloc), m_attr(alloc), m_subspecs(alloc),
+    m_top(alloc),
+    m_types(alloc),
+    m_names(alloc),
+    m_attr(alloc),
+    m_subspecs(alloc),
     m_enumkeys(alloc)
 {
 }
 
 // Create a new Spec
 inline Spec::Spec(Allocator& alloc, ArrayParent* parent, std::size_t ndx_in_parent):
-    m_top(alloc), m_spec(alloc), m_names(alloc), m_attr(alloc), m_subspecs(alloc),
+    m_top(alloc),
+    m_types(alloc),
+    m_names(alloc),
+    m_attr(alloc),
+    m_subspecs(alloc),
     m_enumkeys(alloc)
 {
     MemRef mem = create_empty_spec(alloc); // Throws
@@ -261,7 +272,7 @@ inline Spec::Spec(Allocator& alloc, ArrayParent* parent, std::size_t ndx_in_pare
 inline Spec::Spec(Allocator& alloc, MemRef mem, ArrayParent* parent,
                   std::size_t ndx_in_parent) TIGHTDB_NOEXCEPT:
     m_top(alloc),
-    m_spec(alloc),
+    m_types(alloc),
     m_names(alloc),
     m_attr(alloc),
     m_subspecs(alloc),
@@ -322,6 +333,11 @@ inline void Spec::destroy() TIGHTDB_NOEXCEPT
     m_top.destroy_deep();
 }
 
+inline std::size_t Spec::get_ndx_in_parent() const TIGHTDB_NOEXCEPT
+{
+    return m_top.get_ndx_in_parent();
+}
+
 inline void Spec::set_ndx_in_parent(std::size_t ndx) TIGHTDB_NOEXCEPT
 {
     m_top.set_ndx_in_parent(ndx);
@@ -339,14 +355,14 @@ inline void Spec::set_parent(ArrayParent* parent, std::size_t ndx_in_parent) TIG
 
 inline void Spec::rename_column(std::size_t column_ndx, StringData new_name)
 {
-    TIGHTDB_ASSERT(column_ndx < m_spec.size());
+    TIGHTDB_ASSERT(column_ndx < m_types.size());
     m_names.set(column_ndx, new_name);
 }
 
 inline std::size_t Spec::get_column_count() const TIGHTDB_NOEXCEPT
 {
     // This is the total count of columns, including backlinks (not public)
-    return m_spec.size();
+    return m_types.size();
 }
 
 inline std::size_t Spec::get_public_column_count() const TIGHTDB_NOEXCEPT
@@ -359,7 +375,7 @@ inline std::size_t Spec::get_public_column_count() const TIGHTDB_NOEXCEPT
 inline ColumnType Spec::get_column_type(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < get_column_count());
-    return ColumnType(m_spec.get(ndx));
+    return ColumnType(m_types.get(ndx));
 }
 
 inline void Spec::set_column_type(std::size_t column_ndx, ColumnType type)
@@ -367,10 +383,10 @@ inline void Spec::set_column_type(std::size_t column_ndx, ColumnType type)
     TIGHTDB_ASSERT(column_ndx < get_column_count());
 
     // At this point we only support upgrading to string enum
-    TIGHTDB_ASSERT(ColumnType(m_spec.get(column_ndx)) == col_type_String);
+    TIGHTDB_ASSERT(ColumnType(m_types.get(column_ndx)) == col_type_String);
     TIGHTDB_ASSERT(type == col_type_StringEnum);
 
-    m_spec.set(column_ndx, type); // Throws
+    m_types.set(column_ndx, type); // Throws
 }
 
 inline ColumnAttr Spec::get_column_attr(std::size_t ndx) const TIGHTDB_NOEXCEPT
@@ -401,7 +417,7 @@ inline std::size_t Spec::get_column_index(StringData name) const TIGHTDB_NOEXCEP
 }
 
 inline bool Spec::get_first_column_type_from_ref(ref_type top_ref, Allocator& alloc,
-                                                     ColumnType& type) TIGHTDB_NOEXCEPT
+                                                 ColumnType& type) TIGHTDB_NOEXCEPT
 {
     const char* top_header = alloc.translate(top_ref);
     ref_type types_ref = to_ref(Array::get(top_header, 0));
@@ -414,28 +430,37 @@ inline bool Spec::get_first_column_type_from_ref(ref_type top_ref, Allocator& al
 
 inline bool Spec::has_backlinks() const TIGHTDB_NOEXCEPT
 {
-    // backlinks are always last and do not have names
-    return m_names.size() < m_spec.size();
+    // backlinks are always last and do not have names.
+    return m_names.size() < m_types.size();
+
+    // Fixme: It's bad design that backlinks are stored and recognized like this. Backlink columns
+    // should be a column type like any other, and we should find another way to hide them away from
+    // the user.
 }
 
 
 inline SubspecRef::SubspecRef(Array* parent, std::size_t ndx_in_parent) TIGHTDB_NOEXCEPT:
-    m_parent(parent), m_ndx_in_parent(ndx_in_parent)
+    m_parent(parent),
+    m_ndx_in_parent(ndx_in_parent)
 {
 }
 
 inline SubspecRef::SubspecRef(const_cast_tag, ConstSubspecRef r) TIGHTDB_NOEXCEPT:
-    m_parent(const_cast<Array*>(r.m_parent)), m_ndx_in_parent(r.m_ndx_in_parent)
+    m_parent(const_cast<Array*>(r.m_parent)),
+    m_ndx_in_parent(r.m_ndx_in_parent)
 {
 }
 
-inline ConstSubspecRef::ConstSubspecRef(const Array* parent, std::size_t ndx_in_parent) TIGHTDB_NOEXCEPT:
-        m_parent(parent), m_ndx_in_parent(ndx_in_parent)
+inline ConstSubspecRef::ConstSubspecRef(const Array* parent,
+                                        std::size_t ndx_in_parent) TIGHTDB_NOEXCEPT:
+    m_parent(parent),
+    m_ndx_in_parent(ndx_in_parent)
 {
 }
 
 inline ConstSubspecRef::ConstSubspecRef(SubspecRef r) TIGHTDB_NOEXCEPT:
-        m_parent(r.m_parent), m_ndx_in_parent(r.m_ndx_in_parent)
+        m_parent(r.m_parent),
+    m_ndx_in_parent(r.m_ndx_in_parent)
 {
 }
 

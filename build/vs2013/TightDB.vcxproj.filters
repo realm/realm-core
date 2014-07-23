@@ -255,6 +255,9 @@
     <ClCompile Include="..\..\src\tightdb\unicode.cpp">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\tightdb\column_link_base.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\src\tightdb\column_backlink.cpp">
       <Filter>src</Filter>
     </ClCompile>

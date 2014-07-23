@@ -8,12 +8,58 @@ using namespace tightdb;
 using namespace tightdb::util;
 
 
+void ColumnSubtableParent::clear()
+{
+    discard_child_accessors();
+    Column::clear(); // Throws
+    // FIXME: This one is needed because Column::clear() forgets about the leaf
+    // type. A better solution should probably be sought after.
+    m_array->set_type(Array::type_HasRefs);
+}
+
 void ColumnSubtableParent::update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT
 {
     if (!m_array->update_from_parent(old_baseline))
         return;
     m_subtable_map.update_from_parent(old_baseline);
 }
+
+
+#ifdef TIGHTDB_DEBUG
+
+namespace {
+
+size_t verify_leaf(MemRef mem, Allocator& alloc)
+{
+    Array leaf(alloc);
+    leaf.init_from_mem(mem);
+    leaf.Verify();
+    TIGHTDB_ASSERT(leaf.has_refs());
+    return leaf.size();
+}
+
+} // anonymous namespace
+
+void ColumnSubtableParent::Verify() const
+{
+    if (root_is_leaf()) {
+        m_array->Verify();
+        TIGHTDB_ASSERT(m_array->has_refs());
+        return;
+    }
+
+    m_array->verify_bptree(&verify_leaf);
+}
+
+void ColumnSubtableParent::Verify(const Table& table, size_t col_ndx) const
+{
+    Column::Verify(table, col_ndx);
+
+    TIGHTDB_ASSERT(m_table == &table);
+    TIGHTDB_ASSERT(m_column_ndx == col_ndx);
+}
+
+#endif
 
 
 Table* ColumnSubtableParent::get_subtable_ptr(size_t subtable_ndx)
@@ -26,8 +72,7 @@ Table* ColumnSubtableParent::get_subtable_ptr(size_t subtable_ndx)
     ref_type top_ref = get_as_ref(subtable_ndx);
     Allocator& alloc = get_alloc();
     ColumnSubtableParent* parent = this;
-    UniquePtr<Table> subtable(tf::create_ref_counted(alloc, top_ref, parent,
-                                                     subtable_ndx)); // Throws
+    UniquePtr<Table> subtable(tf::create_accessor(alloc, top_ref, parent, subtable_ndx)); // Throws
     // FIXME: Note that if the following map insertion fails, then the
     // destructor of the newly created child will call
     // ColumnSubtableParent::child_accessor_destroyed() with a pointer that is
@@ -47,17 +92,15 @@ Table* ColumnTable::get_subtable_ptr(size_t subtable_ndx)
         return subtable;
 
     typedef _impl::TableFriend tf;
-    const Spec* spec = tf::get_spec(*m_table);
+    const Spec& spec = tf::get_spec(*m_table);
     size_t subspec_ndx = get_subspec_ndx();
-    ConstSubspecRef shared_subspec = spec->get_subspec_by_ndx(subspec_ndx);
-    ref_type columns_ref = get_as_ref(subtable_ndx);
+    ConstSubspecRef shared_subspec = spec.get_subspec_by_ndx(subspec_ndx);
     ColumnTable* parent = this;
-    UniquePtr<Table> subtable(tf::create_ref_counted(shared_subspec, columns_ref,
-                                                     parent, subtable_ndx)); // Throws
+    UniquePtr<Table> subtable(tf::create_accessor(shared_subspec, parent, subtable_ndx)); // Throws
     // FIXME: Note that if the following map insertion fails, then the
     // destructor of the newly created child will call
     // ColumnSubtableParent::child_accessor_destroyed() with a pointer that is
-    // not in the map. Fortunatly, that situation is properly handled.
+    // not in the map. Fortunately, that situation is properly handled.
     bool was_empty = m_subtable_map.empty();
     m_subtable_map.add(subtable_ndx, subtable.get()); // Throws
     if (was_empty && m_table)
@@ -208,7 +251,11 @@ void ColumnSubtableParent::SubtableMap::refresh_accessor_tree(size_t spec_ndx_in
         TableRef table(i->m_table);
         typedef _impl::TableFriend tf;
         tf::set_shared_subspec_ndx_in_parent(*table, spec_ndx_in_parent);
-        tf::refresh_accessor_tree(*table, i->m_subtable_ndx);
+        tf::set_ndx_in_parent(*table, i->m_subtable_ndx);
+        if (tf::is_marked(*table)) {
+            tf::refresh_accessor_tree(*table);
+            tf::bump_version(*table);
+        }
     }
 }
 
@@ -234,9 +281,9 @@ size_t ColumnTable::get_subtable_size(size_t ndx) const TIGHTDB_NOEXCEPT
 
     typedef _impl::TableFriend tf;
     size_t subspec_ndx = get_subspec_ndx();
-    Spec* spec = tf::get_spec(*m_table);
-    ref_type subspec_ref = spec->get_subspec_ref(subspec_ndx);
-    Allocator& alloc = spec->get_alloc();
+    Spec& spec = tf::get_spec(*m_table);
+    ref_type subspec_ref = spec.get_subspec_ref(subspec_ndx);
+    Allocator& alloc = spec.get_alloc();
     return tf::get_size_from_ref(subspec_ref, columns_ref, alloc);
 }
 
@@ -287,19 +334,9 @@ void ColumnTable::set(size_t row_ndx, const Table* subtable)
         table_2.reset(table); // Must hold counted reference
         typedef _impl::TableFriend tf;
         tf::discard_child_accessors(*table_2);
-        tf::mark(*table_2);
-        tf::refresh_accessor_tree(*table_2, row_ndx);
+        tf::refresh_accessor_tree(*table_2);
+        tf::bump_version(*table_2);
     }
-}
-
-
-void ColumnTable::clear()
-{
-    discard_child_accessors();
-    Column::clear(); // Throws
-    // FIXME: This one is needed because Column::clear() forgets about the leaf
-    // type. A better solution should probably be sought after.
-    m_array->set_type(Array::type_HasRefs);
 }
 
 
@@ -355,16 +392,24 @@ void ColumnTable::do_discard_child_accessors() TIGHTDB_NOEXCEPT
 
 #ifdef TIGHTDB_DEBUG
 
-void ColumnTable::Verify() const
+void ColumnTable::Verify(const Table& table, size_t col_ndx) const
 {
-    Column::Verify();
+    ColumnSubtableParent::Verify(table, col_ndx);
 
-    // Verify each sub-table
+    typedef _impl::TableFriend tf;
+    const Spec& spec = tf::get_spec(table);
+    size_t subspec_ndx = spec.get_subspec_ndx(col_ndx);
+    if (m_subspec_ndx != tightdb::npos)
+        TIGHTDB_ASSERT(m_subspec_ndx == tightdb::npos || m_subspec_ndx == subspec_ndx);
+
+    // Verify each subtable
     size_t n = size();
     for (size_t i = 0; i != n; ++i) {
         // We want to verify any cached table accessors so we do not
         // want to skip null refs here.
         ConstTableRef subtable = get_subtable_ptr(i)->get_table_ref();
+        TIGHTDB_ASSERT(tf::get_spec(*subtable).get_ndx_in_parent() == subspec_ndx);
+        TIGHTDB_ASSERT(subtable->get_index_in_parent() == i);
         subtable->Verify();
     }
 }

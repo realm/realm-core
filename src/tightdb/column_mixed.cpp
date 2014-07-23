@@ -399,9 +399,35 @@ ref_type ColumnMixed::write(size_t slice_offset, size_t slice_size,
 
 void ColumnMixed::Verify() const
 {
+    do_verify(0,0);
+}
+
+void ColumnMixed::Verify(const Table& table, size_t col_ndx) const
+{
+    do_verify(&table, col_ndx);
+
+    // Verify each sub-table
+    size_t n = size();
+    for (size_t i = 0; i < n; ++i) {
+        int64_t v = m_data->get(i);
+        if (v == 0 || v & 0x1)
+            continue;
+        ConstTableRef subtable = m_data->get_subtable_ptr(i)->get_table_ref();
+        TIGHTDB_ASSERT(subtable->get_index_in_parent() == i);
+        subtable->Verify();
+    }
+}
+
+void ColumnMixed::do_verify(const Table* table, size_t col_ndx) const
+{
     m_array->Verify();
     m_types->Verify();
-    m_data->Verify();
+    if (table) {
+        m_data->Verify(*table, col_ndx);
+    }
+    else {
+        m_data->Verify();
+    }
     if (m_binary_data)
         m_binary_data->Verify();
 
@@ -409,16 +435,6 @@ void ColumnMixed::Verify() const
     size_t types_len = m_types->size();
     size_t refs_len  = m_data->size();
     TIGHTDB_ASSERT(types_len == refs_len);
-
-    // Verify each sub-table
-    size_t count = size();
-    for (size_t i = 0; i < count; ++i) {
-        int64_t v = m_data->get(i);
-        if (v == 0 || v & 0x1)
-            continue;
-        ConstTableRef subtable = m_data->get_subtable_ptr(i)->get_table_ref();
-        subtable->Verify();
-    }
 }
 
 void ColumnMixed::to_dot(ostream& out, StringData title) const

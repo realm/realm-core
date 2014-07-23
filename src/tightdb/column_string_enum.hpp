@@ -66,9 +66,8 @@ public:
 
     void insert(std::size_t, std::size_t, bool) TIGHTDB_OVERRIDE;
     void erase(std::size_t ndx, bool is_last) TIGHTDB_OVERRIDE;
+    void move_last_over(std::size_t, std::size_t) TIGHTDB_OVERRIDE;
     void clear() TIGHTDB_OVERRIDE;
-
-    using Column::move_last_over;
 
     std::size_t count(StringData value) const;
     size_t find_first(StringData value, std::size_t begin = 0, std::size_t end = npos) const;
@@ -104,12 +103,11 @@ public:
 
     const Array* get_enum_root_array() const TIGHTDB_NOEXCEPT;
 
-    void update_column_index(std::size_t, const Spec&) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-
     void refresh_accessor_tree(std::size_t, const Spec&) TIGHTDB_OVERRIDE;
 
 #ifdef TIGHTDB_DEBUG
-    void Verify() const TIGHTDB_OVERRIDE; // Must be upper case to avoid conflict with macro in ObjC
+    void Verify() const TIGHTDB_OVERRIDE;
+    void Verify(const Table&, std::size_t) const TIGHTDB_OVERRIDE;
     void to_dot(std::ostream&, StringData title) const TIGHTDB_OVERRIDE;
     void dump_node_structure(std::ostream&, int level) const TIGHTDB_OVERRIDE;
     using Column::dump_node_structure;
@@ -123,7 +121,7 @@ public:
 private:
     // Member variables
     AdaptiveStringColumn m_keys;
-    StringIndex* m_index;
+    StringIndex* m_search_index;
 
     /// If you are appending and have the size of the column readily available,
     /// call the 4 argument version instead. If you are not appending, either
@@ -189,12 +187,12 @@ inline std::size_t ColumnStringEnum::upper_bound_string(StringData value) const 
 
 inline bool ColumnStringEnum::has_index() const TIGHTDB_NOEXCEPT
 {
-    return m_index != 0;
+    return m_search_index != 0;
 }
 
 inline const StringIndex& ColumnStringEnum::get_index() const TIGHTDB_NOEXCEPT
 {
-    return *m_index;
+    return *m_search_index;
 }
 
 inline const Array* ColumnStringEnum::get_enum_root_array() const TIGHTDB_NOEXCEPT

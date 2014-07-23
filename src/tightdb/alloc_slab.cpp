@@ -7,13 +7,14 @@
 #  include <map>
 #endif
 
-#include <tightdb/util/safe_int_ops.hpp>
 #include <tightdb/util/terminate.hpp>
+#include <tightdb/util/unique_ptr.hpp>
 #include <tightdb/array.hpp>
 #include <tightdb/alloc_slab.hpp>
 
 using namespace std;
 using namespace tightdb;
+using namespace tightdb::util;
 
 
 namespace {
@@ -35,6 +36,7 @@ public:
 
 } // anonymous namespace
 
+
 const SlabAlloc::Header SlabAlloc::empty_file_header = {
     { 0, 0 }, // top-refs
     { 'T', '-', 'D', 'B' },
@@ -51,6 +53,52 @@ const SlabAlloc::Header SlabAlloc::streaming_header = {
     0  // select bit
 };
 
+
+class SlabAlloc::ChunkRefEq {
+public:
+    ChunkRefEq(ref_type ref) TIGHTDB_NOEXCEPT:
+        m_ref(ref)
+    {
+    }
+    bool operator()(const Chunk& chunk) const TIGHTDB_NOEXCEPT
+    {
+        return chunk.ref == m_ref;
+    }
+private:
+    ref_type m_ref;
+};
+
+
+class SlabAlloc::ChunkRefEndEq {
+public:
+    ChunkRefEndEq(ref_type ref) TIGHTDB_NOEXCEPT:
+        m_ref(ref)
+    {
+    }
+    bool operator()(const Chunk& chunk) const TIGHTDB_NOEXCEPT
+    {
+        return chunk.ref + chunk.size == m_ref;
+    }
+private:
+    ref_type m_ref;
+};
+
+
+class SlabAlloc::SlabRefEndEq {
+public:
+    SlabRefEndEq(ref_type ref) TIGHTDB_NOEXCEPT:
+        m_ref(ref)
+    {
+    }
+    bool operator()(const Slab& slab) const TIGHTDB_NOEXCEPT
+    {
+        return slab.ref_end == m_ref;
+    }
+private:
+    ref_type m_ref;
+};
+
+
 void SlabAlloc::detach() TIGHTDB_NOEXCEPT
 {
     switch (m_attach_mode) {
@@ -62,7 +110,7 @@ void SlabAlloc::detach() TIGHTDB_NOEXCEPT
             goto found;
         case attach_SharedFile:
         case attach_UnsharedFile:
-            util::File::unmap(m_data, m_baseline);
+            File::unmap(m_data, m_baseline);
             m_file.close();
             goto found;
     }
@@ -81,8 +129,7 @@ SlabAlloc::~SlabAlloc() TIGHTDB_NOEXCEPT
             // No point inchecking if free space info is invalid
             if (!m_free_space_invalid) {
                 if (!is_all_free()) {
-                    m_slabs.print();
-                    m_free_space.print();
+                    print();
 #  ifndef TIGHTDB_SLAB_ALLOC_DEBUG
                     cerr << "To get the stack-traces of the corresponding allocations,"
                         "first compile with TIGHTDB_SLAB_ALLOC_DEBUG defined,"
@@ -97,7 +144,7 @@ SlabAlloc::~SlabAlloc() TIGHTDB_NOEXCEPT
 
     // Release all allocated memory
     for (size_t i = 0; i < m_slabs.size(); ++i)
-        delete[] reinterpret_cast<char*>(m_slabs[i].addr.get());
+        delete[] m_slabs[i].addr;
 
     if (is_attached())
         detach();
@@ -110,38 +157,31 @@ MemRef SlabAlloc::do_alloc(size_t size)
     TIGHTDB_ASSERT((size & 0x7) == 0); // only allow sizes that are multiples of 8
     TIGHTDB_ASSERT(is_attached());
 
-    // FIXME: The table operations that modify the free lists below
-    // are not yet exception safe, that is, if one of them fails
-    // (presumably due to std::bad_alloc being thrown) they may leave
-    // the underlying node structure of the tables in a state that is
-    // so corrupt that it can lead to memory leaks and even general
-    // memory corruption. This must be fixed. Note that corruption may
-    // be accetable, but we must be able to guarantee that corruption
-    // never gets so bad that destruction of the tables fail.
-
-    // FIXME: Ideally, instead of just marking the free space as
-    // invalid in free_(), we shuld at least make a best effort to
-    // keep a record of what was freed and then attempt to rebuild the
-    // free lists here when they have become invalid.
+    // FIXME: Ideally, instead of just marking the free space as invalid in
+    // do_free(), we shuld at least make a best effort to keep a record of what
+    // was freed and then attempt to rebuild the free lists here when they have
+    // become invalid.
     if (m_free_space_invalid)
         throw InvalidFreeSpace();
 
     // Do we have a free space we can reuse?
     {
-        size_t n = m_free_space.size();
-        for (size_t i = 0; i < n; ++i) {
-            FreeSpace::Cursor r = m_free_space[i];
-            if (int(size) <= r.size) {
-                ref_type ref = to_ref(r.ref);
-                size_t rest = size_t(r.size - size);
+        typedef chunks::reverse_iterator iter;
+        iter rend = m_free_space.rend();
+        for (iter i = m_free_space.rbegin(); i != rend; ++i) {
+            if (size <= i->size) {
+                ref_type ref = i->ref;
+                size_t rest = i->size - size;
 
                 // Update free list
                 if (rest == 0) {
-                    m_free_space.remove(i);
+                    // Erase by "move last over"
+                    *i = m_free_space.back();
+                    m_free_space.pop_back();
                 }
                 else {
-                    r.size = rest;
-                    r.ref += unsigned(size); // FIXME: Bad cast ('unsigned' may be smaller than 'size_t')
+                    i->size = rest;
+                    i->ref += size;
                 }
 
 #ifdef TIGHTDB_DEBUG
@@ -163,42 +203,39 @@ MemRef SlabAlloc::do_alloc(size_t size)
 
     // Else, allocate new slab
     size_t new_size = ((size-1) | 255) + 1; // Round up to nearest multiple of 256
-    size_t curr_ref_end;
-    if (m_slabs.is_empty()) {
-        curr_ref_end = m_baseline;
+    ref_type ref;
+    if (m_slabs.empty()) {
+        ref = m_baseline;
     }
     else {
-        curr_ref_end = to_size_t(m_slabs.back().ref_end);
+        ref_type curr_ref_end = to_size_t(m_slabs.back().ref_end);
         // Make it at least as big as twice the previous slab
-        size_t prev_ref_end = m_slabs.size() == 1 ? m_baseline :
-            to_size_t(m_slabs.back(-2).ref_end);
+        ref_type prev_ref_end = m_slabs.size() == 1 ? m_baseline :
+            to_size_t(m_slabs[m_slabs.size()-2].ref_end);
         size_t min_size = 2 * (curr_ref_end - prev_ref_end);
         if (new_size < min_size)
             new_size = min_size;
+        ref = curr_ref_end;
     }
-
-    // Allocate memory
     TIGHTDB_ASSERT(0 < new_size);
-    char* slab = new char[new_size]; // Throws
-    fill(slab, slab+new_size, 0);
+    UniquePtr<char[]> mem(new char[new_size]); // Throws
+    fill(mem.get(), mem.get()+new_size, 0);
 
-    // Add to slab table
-    size_t new_ref_end = curr_ref_end + new_size;
-    // FIXME: intptr_t is not guaranteed to exists, not even in C++11
-    uintptr_t slab_2 = reinterpret_cast<uintptr_t>(slab);
-    // FIXME: Dangerous conversions to int64_t here (undefined behavior according to C++11)
-    m_slabs.add(int64_t(new_ref_end), int64_t(slab_2));
+    // Add to list of slabs
+    Slab slab;
+    slab.addr = mem.get();
+    slab.ref_end = ref + new_size;
+    m_slabs.push_back(slab); // Throws
+    mem.release();
 
     // Update free list
     size_t unused = new_size - size;
     if (0 < unused) {
-        size_t ref = curr_ref_end + size;
-        // FIXME: Dangerous conversions to int64_t here (undefined behavior according to C++11)
-        m_free_space.add(int64_t(ref), int64_t(unused));
+        Chunk chunk;
+        chunk.ref = ref + size;
+        chunk.size = unused;
+        m_free_space.push_back(chunk); // Throws
     }
-
-    char* addr = slab;
-    size_t ref = curr_ref_end;
 
 #ifdef TIGHTDB_DEBUG
     if (m_debug_out)
@@ -206,13 +243,13 @@ MemRef SlabAlloc::do_alloc(size_t size)
 #endif
 
 #ifdef TIGHTDB_ENABLE_ALLOC_SET_ZERO
-    fill(addr, addr+size, 0);
+    fill(slab.addr, slab.addr+size, 0);
 #endif
 #ifdef TIGHTDB_SLAB_ALLOC_DEBUG
     malloc_debug_map[ref] = malloc(1);
 #endif
 
-    return MemRef(addr, ref);
+    return MemRef(slab.addr, ref);
 }
 
 
@@ -222,7 +259,7 @@ void SlabAlloc::do_free(ref_type ref, const char* addr) TIGHTDB_NOEXCEPT
 
     // Free space in read only segment is tracked separately
     bool read_only = is_read_only(ref);
-    FreeSpace& free_space = read_only ? m_free_read_only : m_free_space;
+    chunks& free_space = read_only ? m_free_read_only : m_free_space;
 
 #ifdef TIGHTDB_SLAB_ALLOC_DEBUG
     free(malloc_debug_map[ref]);
@@ -231,7 +268,7 @@ void SlabAlloc::do_free(ref_type ref, const char* addr) TIGHTDB_NOEXCEPT
     // Get size from segment
     size_t size = read_only ? Array::get_byte_size_from_header(addr) :
         Array::get_capacity_from_header(addr);
-    size_t ref_end = ref + size;
+    ref_type ref_end = ref + size;
 
 #ifdef TIGHTDB_DEBUG
     if (m_debug_out)
@@ -241,64 +278,51 @@ void SlabAlloc::do_free(ref_type ref, const char* addr) TIGHTDB_NOEXCEPT
     if (m_free_space_invalid)
         return;
 
-    try {
-        // FIXME: The table operations that modify the free lists
-        // below are not yet exception safe, that is, if one of them
-        // fails (presumably due to std::bad_alloc being thrown) they
-        // may leave the underlying node structure of the tables in a
-        // state that is so corrupt that it can lead to memory leaks
-        // and even general memory corruption. This must be
-        // fixed. Note that corruption may be accetable, but we must
-        // be able to guarantee that corruption never gets so bad that
-        // destruction of the tables fail.
-
-        // Check if we can merge with start of free block
-        size_t merged_with = npos;
-        {
-            size_t n = free_space.column().ref.find_first(ref_end);
-            if (n != not_found) {
-                // No consolidation over slab borders
-                if (m_slabs.column().ref_end.find_first(ref_end) == not_found) {
-                    free_space[n].ref = ref; // Throws
-                    free_space[n].size += size; // Throws
-                    merged_with = n;
-                }
+    // Check if we can merge with adjacent succeeding free block
+    typedef chunks::iterator iter;
+    iter merged_with = free_space.end();
+    {
+        iter i = find_if(free_space.begin(), free_space.end(), ChunkRefEq(ref_end));
+        if (i != free_space.end()) {
+            // No consolidation over slab borders
+            if (find_if(m_slabs.begin(), m_slabs.end(), SlabRefEndEq(ref_end)) == m_slabs.end()) {
+                i->ref = ref;
+                i->size += size;
+                merged_with = i;
             }
-        }
-
-        // Check if we can merge with end of free block
-        if (m_slabs.column().ref_end.find_first(ref) == not_found) { // avoid slab borders
-            // FIXME: Thie following search loop appears to have
-            // quadratic complexity in terms of the numner of
-            // previosuly freed chunks. This can easily become
-            // intolerable. I (Kristian) have seen half an hour spent
-            // just to destroy a group containing a single table with
-            // 10 columns and less than 10K rows.
-            size_t n = free_space.size();
-            for (size_t i = 0; i < n; ++i) {
-                FreeSpace::Cursor c = free_space[i];
-                ref_type end = to_ref(c.ref + c.size);
-                if (ref == end) {
-                    if (merged_with != npos) {
-                        size_t s = to_size_t(free_space[merged_with].size);
-                        c.size += s; // Throws
-                        free_space.remove(merged_with); // Throws
-                    }
-                    else {
-                        c.size += size; // Throws
-                    }
-                    return;
-                }
-            }
-        }
-
-        // Else just add to freelist
-        if (merged_with == npos) {
-            free_space.add(ref, size); // Throws
         }
     }
-    catch (...) {
-        m_free_space_invalid = true;
+
+    // Check if we can merge with adjacent preceeding free block (not if that
+    // would cross slab boundary)
+    if (find_if(m_slabs.begin(), m_slabs.end(), SlabRefEndEq(ref)) == m_slabs.end()) {
+        typedef chunks::iterator iter;
+        iter i = find_if(free_space.begin(), free_space.end(), ChunkRefEndEq(ref));
+        if (i != free_space.end()) {
+            if (merged_with != free_space.end()) {
+                i->size += merged_with->size;
+                // Erase by "move last over"
+                *merged_with = free_space.back();
+                free_space.pop_back();
+            }
+            else {
+                i->size += size;
+            }
+            return;
+        }
+    }
+
+    // Else just add to freelist
+    if (merged_with == free_space.end()) {
+        try {
+            Chunk chunk;
+            chunk.ref  = ref;
+            chunk.size = size;
+            free_space.push_back(chunk); // Throws
+        }
+        catch (...) {
+            m_free_space_invalid = true;
+        }
     }
 }
 
@@ -341,12 +365,12 @@ char* SlabAlloc::do_translate(ref_type ref) const TIGHTDB_NOEXCEPT
     if (ref < m_baseline)
         return m_data + ref;
 
-    size_t ndx = m_slabs.column().ref_end.upper_bound(ref);
-    TIGHTDB_ASSERT(ndx != m_slabs.size());
+    typedef slabs::const_iterator iter;
+    iter i = upper_bound(m_slabs.begin(), m_slabs.end(), ref, &ref_less_than_slab_ref_end);
+    TIGHTDB_ASSERT(i != m_slabs.end());
 
-    size_t offset = ndx == 0 ? m_baseline : to_size_t(m_slabs[ndx-1].ref_end);
-    intptr_t addr = intptr_t(m_slabs[ndx].addr.get());
-    return reinterpret_cast<char*>(addr) + (ref - offset);
+    ref_type slab_ref = i == m_slabs.begin() ? m_baseline : (i-1)->ref_end;
+    return i->addr + (ref - slab_ref);
 }
 
 
@@ -526,35 +550,27 @@ void SlabAlloc::do_prepare_for_update(char* mutable_data)
 
 size_t SlabAlloc::get_total_size() const TIGHTDB_NOEXCEPT
 {
-    return m_slabs.is_empty() ? m_baseline : to_size_t(m_slabs.back().ref_end);
+    return m_slabs.empty() ? m_baseline : m_slabs.back().ref_end;
 }
 
 
 void SlabAlloc::reset_free_space_tracking()
 {
-    // FIXME: Currently, it is not safe to call
-    // m_free_read_only.clear() and m_free_space.clear() after a
-    // failure to update them in free() (m_free_space_valid =
-    // true). It is expected that this problem will be fixed by
-    // changes that will make the public API completely exception
-    // safe.
-
     // Free all scratch space (done after all data has
     // been commited to persistent space)
+    m_free_read_only.clear();
+    m_free_space.clear();
+
+    // Rebuild free list to include all slabs
     try {
-        m_free_read_only.clear(); // Throws
-        m_free_space.clear(); // Throws
-
-        // Rebuild free list to include all slabs
-        size_t ref = m_baseline;
-        size_t n = m_slabs.size();
-        for (size_t i = 0; i < n; ++i) {
-            Slabs::Cursor c = m_slabs[i];
-            size_t size = to_size_t(c.ref_end - ref);
-
-            m_free_space.add(ref, size); // Throws
-
-            ref = to_size_t(c.ref_end);
+        Chunk chunk;
+        chunk.ref = m_baseline;
+        typedef slabs::const_iterator iter;
+        iter end = m_slabs.end();
+        for (iter i = m_slabs.begin(); i != end; ++i) {
+            chunk.size = i->ref_end - chunk.ref;
+            m_free_space.push_back(chunk); // Throws
+            chunk.ref = i->ref_end;
         }
     }
     catch (...) {
@@ -572,8 +588,7 @@ bool SlabAlloc::remap(size_t file_size)
 {
     TIGHTDB_ASSERT(file_size % 8 == 0); // 8-byte alignment required
     TIGHTDB_ASSERT(m_attach_mode == attach_SharedFile || m_attach_mode == attach_UnsharedFile);
-    TIGHTDB_ASSERT(m_free_read_only.is_empty());
-    TIGHTDB_ASSERT(m_slabs.size() == m_free_space.size());
+    TIGHTDB_ASSERT(m_free_read_only.empty());
     TIGHTDB_ASSERT(m_baseline <= file_size);
 
     // FIXME: We only need to call remap() in cases where free space
@@ -584,29 +599,29 @@ bool SlabAlloc::remap(size_t file_size)
     // and Group::init_for_transact() no longer have to call
     // SlabAlloc::reset_free_space_tracking().
 
-    void* addr =
-        m_file.remap(m_data, m_baseline, util::File::access_ReadOnly, file_size);
-
+    void* addr = m_file.remap(m_data, m_baseline, File::access_ReadOnly, file_size);
     bool addr_changed = addr != m_data;
 
     m_data = static_cast<char*>(addr);
     m_baseline = file_size;
 
-    // Rebase slabs and free list
-    size_t new_offset = file_size;
-    size_t n = m_slabs.size();
+    // Rebase slabs and free list (assumes exactly one entry in m_free_space for
+    // each entire slab in m_slabs)
+    size_t slab_ref = file_size;
+    size_t n = m_free_space.size();
+    TIGHTDB_ASSERT(m_slabs.size() == n);
     for (size_t i = 0; i < n; ++i) {
-        FreeSpace::Cursor c = m_free_space[i];
-        c.ref = new_offset;
-        new_offset = to_size_t(new_offset + c.size);
-
-        m_slabs[i].ref_end = new_offset;
+        Chunk& free_chunk = m_free_space[i];
+        free_chunk.ref = slab_ref;
+        ref_type slab_ref_end = slab_ref + free_chunk.size;
+        m_slabs[i].ref_end = slab_ref_end;
+        slab_ref = slab_ref_end;
     }
 
     return addr_changed;
 }
 
-const SlabAlloc::FreeSpace& SlabAlloc::get_free_read_only() const
+const SlabAlloc::chunks& SlabAlloc::get_free_read_only() const
 {
     if (m_free_space_invalid)
         throw InvalidFreeSpace();
@@ -622,18 +637,18 @@ bool SlabAlloc::is_all_free() const
         return false;
 
     // Verify that free space matches slabs
-    size_t ref = m_baseline;
-    for (size_t i = 0; i < m_slabs.size(); ++i) {
-        Slabs::ConstCursor c = m_slabs[i];
-        size_t size = to_ref(c.ref_end) - ref;
-
-        size_t r = m_free_space.column().ref.find_first(ref);
-        if (r == not_found)
+    ref_type slab_ref = m_baseline;
+    typedef slabs::const_iterator iter;
+    iter end = m_slabs.end();
+    for (iter slab = m_slabs.begin(); slab != end; ++slab) {
+        size_t slab_size = slab->ref_end - slab_ref;
+        chunks::const_iterator chunk =
+            find_if(m_free_space.begin(), m_free_space.end(), ChunkRefEq(slab_ref));
+        if (chunk == m_free_space.end())
             return false;
-        if (size != size_t(m_free_space[r].size))
+        if (slab_size != chunk->size)
             return false;
-
-        ref = to_ref(c.ref_end);
+        slab_ref = slab->ref_end;
     }
     return true;
 }
@@ -642,82 +657,69 @@ bool SlabAlloc::is_all_free() const
 void SlabAlloc::Verify() const
 {
     // Make sure that all free blocks fit within a slab
-    size_t n = m_free_space.size();
-    for (size_t i = 0; i < n; ++i) {
-        FreeSpace::ConstCursor c = m_free_space[i];
-        ref_type ref = to_ref(c.ref);
+    typedef chunks::const_iterator iter;
+    iter end = m_free_space.end();
+    for (iter chunk = m_free_space.begin(); chunk != end; ++chunk) {
+        slabs::const_iterator slab =
+            upper_bound(m_slabs.begin(), m_slabs.end(), chunk->ref, &ref_less_than_slab_ref_end);
+        TIGHTDB_ASSERT(slab != m_slabs.end());
 
-        size_t ndx = m_slabs.column().ref_end.upper_bound(ref);
-        TIGHTDB_ASSERT(ndx != m_slabs.size());
-
-        size_t slab_end = to_ref(m_slabs[ndx].ref_end);
-        size_t free_end = ref + to_ref(c.size);
-
-        TIGHTDB_ASSERT(free_end <= slab_end);
+        ref_type slab_ref_end = slab->ref_end;
+        ref_type chunk_ref_end = chunk->ref + chunk->size;
+        TIGHTDB_ASSERT(chunk_ref_end <= slab_ref_end);
     }
 }
 
 
 void SlabAlloc::print() const
 {
-    size_t allocated_for_slabs = m_slabs.is_empty() ? 0 :
-        size_t(m_slabs[m_slabs.size()-1].ref_end - m_baseline);
+    size_t allocated_for_slabs = m_slabs.empty() ? 0 : m_slabs.back().ref_end - m_baseline;
 
     size_t free = 0;
     for (size_t i = 0; i < m_free_space.size(); ++i)
-        free += to_ref(m_free_space[i].size);
+        free += m_free_space[i].size;
 
     size_t allocated = allocated_for_slabs - free;
     cout << "Attached: " << (m_data ? m_baseline : 0) << " Allocated: " << allocated << "\n";
 
-    {
-        size_t n = m_slabs.size();
-        if (n > 0) {
-            ref_type ref_end = ref_type(m_slabs[0].ref_end);
-            void* addr = reinterpret_cast<void*>(uintptr_t(m_slabs[0].addr));
-            cout << "Slabs: (" << m_baseline<<"->"<<(ref_end-1) << ", "
-                "size="<<(ref_end-m_baseline)<<", addr=" << addr << ")";
-            ref_type prev = ref_end;
-            for (size_t i = 1; i < n; ++i) {
-                ref_end = ref_type(m_slabs[i].ref_end);
-                addr = reinterpret_cast<void*>(uintptr_t(m_slabs[i].addr));
-                cout << ", (" << prev<<"->"<<(ref_end-1) << ", "
-                    "size="<<(ref_end-prev)<<", addr=" << addr << ")";
-                prev = ref_end;
-            }
-            cout << endl;
+    if (!m_slabs.empty()) {
+        cout << "Slabs: ";
+        ref_type first_ref = m_baseline;
+        typedef slabs::const_iterator iter;
+        for (iter i = m_slabs.begin(); i != m_slabs.end(); ++i) {
+            if (i != m_slabs.begin())
+                cout << ", ";
+            ref_type last_ref = i->ref_end - 1;
+            size_t size = i->ref_end - first_ref;
+            void* addr = i->addr;
+            cout << "("<<first_ref<<"->"<<last_ref<<", size="<<size<<", addr="<<addr<<")";
+            first_ref = i->ref_end;
         }
+        cout << "\n";
     }
-
-    {
-        size_t n = m_free_space.size();
-        if (n > 0) {
-            ref_type ref = ref_type(m_free_space[0].ref);
-            size_t size = size_t(m_free_space[0].size);
-            cout << "FreeSpace: ("<<ref<<"->"<<(ref+size-1)<<", size="<<size<<")";
-            for (size_t i = 1; i < n; ++i) {
-                ref = ref_type(m_free_space[i].ref);
-                size = size_t(m_free_space[i].size);
-                cout << ", ("<<ref<<"->"<<(ref+size-1)<<", size="<<size<<")";
-            }
-            cout << endl;
+    if (!m_free_space.empty()) {
+        cout << "FreeSpace: ";
+        typedef chunks::const_iterator iter;
+        for (iter i = m_free_space.begin(); i != m_free_space.end(); ++i) {
+            if (i != m_free_space.begin())
+                cout << ", ";
+            ref_type last_ref = i->ref + i->size - 1;
+            cout << "("<<i->ref<<"->"<<last_ref<<", size="<<i->size<<")";
         }
+        cout << "\n";
     }
-
-    {
-        size_t n = m_free_read_only.size();
-        if (n > 0) {
-            ref_type ref = ref_type(m_free_read_only[0].ref);
-            size_t size = size_t(m_free_read_only[0].size);
-            cout << "FreeSpace (ro): ("<<ref<<"->"<<(ref+size-1)<<", size="<<size<<")";
-            for (size_t i = 1; i < n; ++i) {
-                ref = ref_type(m_free_read_only[i].ref);
-                size = size_t(m_free_read_only[i].size);
-                cout << ", ("<<ref<<"->"<<(ref+size-1)<<", size="<<size<<")";
-            }
-            cout << endl;
+    if (!m_free_read_only.empty()) {
+        cout << "FreeSpace (ro): ";
+        typedef chunks::const_iterator iter;
+        for (iter i = m_free_read_only.begin(); i != m_free_read_only.end(); ++i) {
+            if (i != m_free_read_only.begin())
+                cout << ", ";
+            ref_type last_ref = i->ref + i->size - 1;
+            cout << "("<<i->ref<<"->"<<last_ref<<", size="<<i->size<<")";
         }
+        cout << "\n";
     }
+    cout << flush;
 }
 
 #endif // TIGHTDB_DEBUG

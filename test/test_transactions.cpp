@@ -8,9 +8,10 @@
 #include <iostream>
 #include <iomanip>
 
-#include <tightdb/group_shared.hpp>
 #include <tightdb/util/bind.hpp>
 #include <tightdb/util/file.hpp>
+#include <tightdb/group_shared.hpp>
+#include <tightdb/table_macros.hpp>
 
 #include "util/thread_wrapper.hpp"
 

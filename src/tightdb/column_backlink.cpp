@@ -18,8 +18,11 @@
  *
  **************************************************************************/
 
+#include <algorithm>
+
 #include <tightdb/column_backlink.hpp>
 #include <tightdb/column_link.hpp>
+#include <tightdb/table.hpp>
 
 using namespace std;
 using namespace tightdb;
@@ -58,6 +61,7 @@ void ColumnBackLink::add_backlink(size_t row_ndx, size_t origin_row_ndx)
     col.add(origin_row_ndx);
 }
 
+
 size_t ColumnBackLink::get_backlink_count(size_t row_ndx) const TIGHTDB_NOEXCEPT
 {
     size_t ref = Column::get(row_ndx);
@@ -71,6 +75,7 @@ size_t ColumnBackLink::get_backlink_count(size_t row_ndx) const TIGHTDB_NOEXCEPT
     // get list size
     return ColumnBase::get_size_from_ref(ref, get_alloc());
 }
+
 
 size_t ColumnBackLink::get_backlink(size_t row_ndx, size_t backlink_ndx) const TIGHTDB_NOEXCEPT
 {
@@ -90,6 +95,7 @@ size_t ColumnBackLink::get_backlink(size_t row_ndx, size_t backlink_ndx) const T
     Column col(ref, null_ptr, 0, get_alloc());
     return col.get(backlink_ndx);
 }
+
 
 void ColumnBackLink::remove_backlink(size_t row_ndx, size_t origin_row_ndx)
 {
@@ -122,6 +128,7 @@ void ColumnBackLink::remove_backlink(size_t row_ndx, size_t origin_row_ndx)
     }
 }
 
+
 void ColumnBackLink::update_backlink(size_t row_ndx, size_t old_row_ndx, size_t new_row_ndx) {
     size_t ref = Column::get(row_ndx);
     TIGHTDB_ASSERT(ref != 0);
@@ -139,6 +146,7 @@ void ColumnBackLink::update_backlink(size_t row_ndx, size_t old_row_ndx, size_t 
     TIGHTDB_ASSERT(ref_pos != not_found);
     col.set(ref_pos, new_row_ndx);
 }
+
 
 void ColumnBackLink::nullify_links(size_t row_ndx, bool do_destroy)
 {
@@ -165,6 +173,7 @@ void ColumnBackLink::nullify_links(size_t row_ndx, bool do_destroy)
         }
     }
 }
+
 
 void ColumnBackLink::move_last_over(size_t target_row_ndx, size_t last_row_ndx)
 {
@@ -198,6 +207,7 @@ void ColumnBackLink::move_last_over(size_t target_row_ndx, size_t last_row_ndx)
     Column::erase(last_row_ndx, true);
 }
 
+
 void ColumnBackLink::erase(size_t row_ndx, bool is_last)
 {
     TIGHTDB_ASSERT(is_last);
@@ -205,6 +215,7 @@ void ColumnBackLink::erase(size_t row_ndx, bool is_last)
     nullify_links(row_ndx, false);
     Column::erase(row_ndx, is_last);
 }
+
 
 void ColumnBackLink::clear()
 {
@@ -218,17 +229,76 @@ void ColumnBackLink::clear()
     m_array->set_type(Array::type_HasRefs);
 }
 
+
 void ColumnBackLink::update_child_ref(size_t child_ndx, ref_type new_ref)
 {
     Column::set(child_ndx, new_ref);
 }
+
 
 ref_type ColumnBackLink::get_child_ref(size_t child_ndx) const TIGHTDB_NOEXCEPT
 {
     return Column::get(child_ndx);
 }
 
+
 #ifdef TIGHTDB_DEBUG
+
+namespace {
+
+size_t verify_leaf(MemRef mem, Allocator& alloc)
+{
+    Array leaf(alloc);
+    leaf.init_from_mem(mem);
+    leaf.Verify();
+    TIGHTDB_ASSERT(leaf.has_refs());
+    return leaf.size();
+}
+
+} // anonymous namespace
+
+void ColumnBackLink::Verify() const
+{
+    if (root_is_leaf()) {
+        m_array->Verify();
+        TIGHTDB_ASSERT(m_array->has_refs());
+        return;
+    }
+
+    m_array->verify_bptree(&verify_leaf);
+}
+
+void ColumnBackLink::Verify(const Table& table, size_t col_ndx) const
+{
+    Column::Verify(table, col_ndx);
+
+    // Check that the origin column specifies the right target
+    TIGHTDB_ASSERT(&m_origin_column->get_target_table() == &table);
+    TIGHTDB_ASSERT(&m_origin_column->get_backlink_column() == this);
+
+    // Check that m_origin_table is the table specified by the spec
+    size_t origin_table_ndx = m_origin_table->get_index_in_parent();
+    typedef _impl::TableFriend tf;
+    const Spec& spec = tf::get_spec(table);
+    TIGHTDB_ASSERT(origin_table_ndx == spec.get_opposite_link_table_ndx(col_ndx));
+}
+
+
+void ColumnBackLink::get_backlinks(vector<VerifyPair>& pairs)
+{
+    VerifyPair pair;
+    size_t n = size();
+    for (size_t i = 0; i < n ; ++i) {
+        pair.target_row_ndx = i;
+        size_t m = get_backlink_count(i);
+        for (size_t j = 0; j < m; ++j) {
+            pair.origin_row_ndx = get_backlink(i,j);
+            pairs.push_back(pair);
+        }
+    }
+    sort(pairs.begin(), pairs.end());
+}
+
 
 pair<ref_type, size_t> ColumnBackLink::get_to_dot_parent(size_t ndx_in_parent) const
 {
@@ -236,5 +306,4 @@ pair<ref_type, size_t> ColumnBackLink::get_to_dot_parent(size_t ndx_in_parent) c
     return make_pair(p.first.m_ref, p.second);
 }
 
-#endif //TIGHTDB_DEBUG
-
+#endif // TIGHTDB_DEBUG

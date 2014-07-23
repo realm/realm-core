@@ -649,6 +649,28 @@ TEST(Table_DeleteAllTypes)
 }
 
 
+// Triggers a bug that would make Realm crash if you run optimize() followed by set_index()
+TEST(Table_Optimize_SetIndex_Crash)
+{
+    Table table;
+    table.add_column(type_String, "first");
+    table.add_empty_row(3);
+    table.set_string(0, 0, "string0");
+    table.set_string(0, 1, "string1");
+    table.set_string(0, 2, "string1");
+
+    table.optimize();
+    CHECK_NOT_EQUAL(0, table.get_descriptor()->get_num_unique_values(0));
+
+    table.set_string(0, 2, "string2");
+
+    table.set_index(0);
+
+    table.move_last_over(1);
+    table.move_last_over(1);
+}
+
+
 TEST(Table_MoveAllTypes)
 {
     Random random(random_int<unsigned long>()); // Seed from slow global generator
@@ -5254,6 +5276,26 @@ TEST(Table_EnumStringInsertEmptyRow)
     CHECK_EQUAL(1, desc->get_num_unique_values(0));
     table.add_empty_row();
     CHECK_EQUAL("", table.get_string(0, 128));
+}
+
+
+TEST(Table_AddColumnWithThreeLevelBptree)
+{
+    Table table;
+    table.add_column(type_Int, "");
+    table.add_empty_row(TIGHTDB_MAX_LIST_SIZE*TIGHTDB_MAX_LIST_SIZE+1);
+    table.add_column(type_Int, "");
+    table.Verify();
+}
+
+
+TEST(Table_ClearWithTwoLevelBptree)
+{
+    Table table;
+    table.add_column(type_Mixed, "");
+    table.add_empty_row(TIGHTDB_MAX_LIST_SIZE+1);
+    table.clear();
+    table.Verify();
 }
 
 #endif // TEST_TABLE

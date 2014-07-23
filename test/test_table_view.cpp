@@ -99,9 +99,13 @@ TEST(TableView_DateMaxMin)
     ttd.add(DateTime(2015, 7, 10), 1);
 
     TestTableDate::View v = ttd.column().second.find_all(1);
+    size_t ndx = not_found;
 
-    CHECK_EQUAL(DateTime(2015, 8, 10), v.column().first.maximum());
-    CHECK_EQUAL(DateTime(2013, 7, 10), v.column().first.minimum());
+    CHECK_EQUAL(DateTime(2015, 8, 10), v.column().first.maximum(&ndx));
+    CHECK_EQUAL(2, ndx);
+
+    CHECK_EQUAL(DateTime(2013, 7, 10), v.column().first.minimum(&ndx));
+    CHECK_EQUAL(1, ndx);
 }
 
 TEST(TableView_GetSetInteger)
@@ -177,7 +181,8 @@ TEST(TableView_FloatsFindAndAggregations)
 {
     TableFloats table;
     float  f_val[] = { 1.2f, 2.1f, 3.1f, -1.1f, 2.1f, 0.0f };
-    double d_val[] = { -1.2, 2.2 , 3.2 ,-1.2 , 2.3 , 0.0  };
+    double d_val[] = { -1.2, 2.2 , 3.2 , -1.2 , 2.3 , 0.0  };
+    // v_some =        ^^^^              ^^^^
     double sum_f = 0.0;
     double sum_d = 0.0;
     for (size_t i=0; i<6; ++i) {
@@ -218,7 +223,22 @@ TEST(TableView_FloatsFindAndAggregations)
     CHECK_APPROXIMATELY_EQUAL(double(1.2f) + double(-1.1f),
                               v_some.column().col_float.sum(),  10*epsilon);
 
+    size_t ndx = not_found;
+
     // Test max
+    CHECK_EQUAL(3.2, v_all.column().col_double.maximum(&ndx));
+    CHECK_EQUAL(2, ndx);
+
+    CHECK_EQUAL(-1.2, v_some.column().col_double.maximum(&ndx));
+    CHECK_EQUAL(0, ndx);
+
+    CHECK_EQUAL(3.1f, v_all.column().col_float.maximum(&ndx));
+    CHECK_EQUAL(2, ndx);
+
+    CHECK_EQUAL(1.2f, v_some.column().col_float.maximum(&ndx));
+    CHECK_EQUAL(0, ndx);
+
+    // Max without ret_index
     CHECK_EQUAL(3.2, v_all.column().col_double.maximum());
     CHECK_EQUAL(-1.2, v_some.column().col_double.maximum());
     CHECK_EQUAL(3.1f, v_all.column().col_float.maximum());
@@ -229,6 +249,19 @@ TEST(TableView_FloatsFindAndAggregations)
     CHECK_EQUAL(-1.2, v_some.column().col_double.minimum());
     CHECK_EQUAL(-1.1f, v_all.column().col_float.minimum());
     CHECK_EQUAL(-1.1f, v_some.column().col_float.minimum());
+
+    // min with ret_ndx
+    CHECK_EQUAL(-1.2, v_all.column().col_double.minimum(&ndx));
+    CHECK_EQUAL(0, ndx);
+
+    CHECK_EQUAL(-1.2, v_some.column().col_double.minimum(&ndx));
+    CHECK_EQUAL(0, ndx);
+
+    CHECK_EQUAL(-1.1f, v_all.column().col_float.minimum(&ndx));
+    CHECK_EQUAL(3, ndx);
+
+    CHECK_EQUAL(-1.1f, v_some.column().col_float.minimum(&ndx));
+    CHECK_EQUAL(1, ndx);
 
     // Test avg
     CHECK_APPROXIMATELY_EQUAL(sum_d / 6.0,
@@ -354,6 +387,11 @@ TEST(TableView_Min)
 
     int64_t min = v.column().first.minimum();
     CHECK_EQUAL(-1, min);
+
+    size_t ndx = not_found;
+    min = v.column().first.minimum(&ndx);
+    CHECK_EQUAL(-1, min);
+    CHECK_EQUAL(0, ndx);
 }
 
 TEST(TableView_Min2)
@@ -371,6 +409,12 @@ TEST(TableView_Min2)
 
     int64_t min = v.column().first.minimum();
     CHECK_EQUAL(-3, min);
+
+    size_t ndx = not_found;
+    min = v.column().first.minimum(&ndx);
+    CHECK_EQUAL(-3, min);
+    CHECK_EQUAL(2, ndx);
+
 }
 
 
@@ -427,6 +471,31 @@ TEST(TableView_Follows_Changes)
     v.sync_if_needed();
     CHECK_EQUAL(1, v.size());
     CHECK_EQUAL(1, v.get_int(0,0));
+}
+
+TEST(TableView_SyncAfterCopy) {
+    Table table;
+    table.add_column(type_Int, "first");
+    table.add_empty_row();
+    table.set_int(0,0,1);
+
+    // do initial query
+    Query q = table.where().equal(0,1);
+    TableView v = q.find_all();
+    CHECK_EQUAL(1, v.size());
+    CHECK_EQUAL(1, v.get_int(0,0));
+
+    // move the tableview
+    TableView v2 = v;
+    CHECK_EQUAL(1, v2.size());
+
+    // make a change
+    size_t ndx2 = table.add_empty_row();
+    table.set_int(0, ndx2, 1);
+
+    // verify that the copied view sees the change
+    v2.sync_if_needed();
+    CHECK_EQUAL(2, v2.size());
 }
 
 TEST(TableView_FindAll)

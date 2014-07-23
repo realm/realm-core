@@ -11,6 +11,7 @@
 #include <tightdb/query_conditions.hpp>
 #include <tightdb/column_string.hpp>
 #include <tightdb/index_string.hpp>
+#include <tightdb/table.hpp>
 
 using namespace std;
 using namespace tightdb;
@@ -59,14 +60,16 @@ void copy_leaf(const ArrayStringLong& from, ArrayBigBlobs& to)
 
 
 
-AdaptiveStringColumn::AdaptiveStringColumn(Allocator& alloc): m_index(0)
+AdaptiveStringColumn::AdaptiveStringColumn(Allocator& alloc):
+    m_search_index(0)
 {
     m_array = new ArrayString(0, 0, alloc);
 }
 
 
 AdaptiveStringColumn::AdaptiveStringColumn(ref_type ref, ArrayParent* parent, size_t ndx_in_parent,
-                                           Allocator& alloc): m_index(0)
+                                           Allocator& alloc):
+    m_search_index(0)
 {
     char* header = alloc.translate(ref);
     MemRef mem(header, ref);
@@ -112,15 +115,15 @@ AdaptiveStringColumn::AdaptiveStringColumn(ref_type ref, ArrayParent* parent, si
 AdaptiveStringColumn::~AdaptiveStringColumn() TIGHTDB_NOEXCEPT
 {
     delete m_array;
-    delete m_index;
+    delete m_search_index;
 }
 
 
 void AdaptiveStringColumn::destroy() TIGHTDB_NOEXCEPT
 {
     ColumnBase::destroy();
-    if (m_index)
-        m_index->destroy();
+    if (m_search_index)
+        m_search_index->destroy();
 }
 
 
@@ -168,10 +171,10 @@ StringData AdaptiveStringColumn::get(size_t ndx) const TIGHTDB_NOEXCEPT
 
 StringIndex& AdaptiveStringColumn::create_index()
 {
-    TIGHTDB_ASSERT(!m_index);
+    TIGHTDB_ASSERT(!m_search_index);
 
     // Create new index
-    m_index = new StringIndex(this, &get_string, m_array->get_alloc()); // Throws
+    m_search_index = new StringIndex(this, &get_string, m_array->get_alloc()); // Throws
 
     // Populate the index
     size_t num_rows = size();
@@ -179,18 +182,18 @@ StringIndex& AdaptiveStringColumn::create_index()
         StringData value = get(row_ndx);
         size_t num_rows = 1;
         bool is_append = true;
-        m_index->insert(row_ndx, value, num_rows, is_append); // Throws
+        m_search_index->insert(row_ndx, value, num_rows, is_append); // Throws
     }
 
-    return *m_index;
+    return *m_search_index;
 }
 
 
 void AdaptiveStringColumn::set_index_ref(ref_type ref, ArrayParent* parent, size_t ndx_in_parent)
 {
-    TIGHTDB_ASSERT(!m_index);
-    m_index = new StringIndex(ref, parent, ndx_in_parent, this, &get_string,
-                              m_array->get_alloc()); // Throws
+    TIGHTDB_ASSERT(!m_search_index);
+    m_search_index = new StringIndex(ref, parent, ndx_in_parent, this, &get_string,
+                                     m_array->get_alloc()); // Throws
 }
 
 
@@ -231,8 +234,8 @@ void AdaptiveStringColumn::clear()
         m_array = array;
     }
 
-    if (m_index)
-        m_index->clear(); // Throws
+    if (m_search_index)
+        m_search_index->clear(); // Throws
 }
 
 
@@ -300,9 +303,9 @@ void AdaptiveStringColumn::set(size_t ndx, StringData value)
     // (it is important here that we do it before actually setting
     //  the value, or the index would not be able to find the correct
     //  position to update (as it looks for the old value))
-    if (m_index) {
+    if (m_search_index) {
         StringData old_val = get(ndx);
-        m_index->set(ndx, old_val, value); // Throws
+        m_search_index->set(ndx, old_val, value); // Throws
     }
 
     bool root_is_leaf = !m_array->is_inner_bptree_node();
@@ -432,9 +435,9 @@ void AdaptiveStringColumn::erase(size_t ndx, bool is_last)
     // (it is important here that we do it before actually setting
     //  the value, or the index would not be able to find the correct
     //  position to update (as it looks for the old value))
-    if (m_index) {
+    if (m_search_index) {
         StringData old_val = get(ndx);
-        m_index->erase(ndx, old_val, is_last);
+        m_search_index->erase(ndx, old_val, is_last);
     }
 
     bool root_is_leaf = !m_array->is_inner_bptree_node();
@@ -491,13 +494,14 @@ void AdaptiveStringColumn::move_last_over(size_t target_row_ndx, size_t last_row
     copy(value.data(), value.data()+value.size(), buffer.get());
     StringData copy_of_value(buffer.get(), value.size());
 
-    if (m_index) {
+    if (m_search_index) {
         // remove the value to be overwritten from index
-        StringData old_target_val = get(target_row_ndx);
-        m_index->erase(target_row_ndx, old_target_val, true); // Throws
+        StringData old_target_value = get(target_row_ndx);
+        bool is_last = true; // This tells StringIndex::erase() to not adjust subsequent indexes
+        m_search_index->erase(target_row_ndx, old_target_value, is_last); // Throws
 
         // update index to point to new location
-        m_index->update_ref(copy_of_value, last_row_ndx, target_row_ndx); // Throws
+        m_search_index->update_ref(copy_of_value, last_row_ndx, target_row_ndx); // Throws
     }
 
     bool root_is_leaf = !m_array->is_inner_bptree_node();
@@ -535,8 +539,8 @@ void AdaptiveStringColumn::move_last_over(size_t target_row_ndx, size_t last_row
 
 size_t AdaptiveStringColumn::count(StringData value) const
 {
-    if (m_index)
-        return m_index->count(value); // Throws
+    if (m_search_index)
+        return m_search_index->count(value); // Throws
 
     if (root_is_leaf()) {
         bool long_strings = m_array->has_refs();
@@ -602,8 +606,8 @@ size_t AdaptiveStringColumn::find_first(StringData value, size_t begin, size_t e
     TIGHTDB_ASSERT(begin <= size());
     TIGHTDB_ASSERT(end == npos || (begin <= end && end <= size()));
 
-    if (m_index && begin == 0 && end == npos)
-        return m_index->find_first(value); // Throws
+    if (m_search_index && begin == 0 && end == npos)
+        return m_search_index->find_first(value); // Throws
 
     if (root_is_leaf()) {
         bool long_strings = m_array->has_refs();
@@ -681,8 +685,8 @@ void AdaptiveStringColumn::find_all(Column& result, StringData value, size_t beg
     TIGHTDB_ASSERT(begin <= size());
     TIGHTDB_ASSERT(end == npos || (begin <= end && end <= size()));
 
-    if (m_index && begin == 0 && end == npos)
-        m_index->find_all(result, value); // Throws
+    if (m_search_index && begin == 0 && end == npos)
+        m_search_index->find_all(result, value); // Throws
 
     if (root_is_leaf()) {
         size_t leaf_offset = 0;
@@ -823,9 +827,9 @@ size_t AdaptiveStringColumn::upper_bound_string(StringData value) const TIGHTDB_
 FindRes AdaptiveStringColumn::find_all_indexref(StringData value, size_t& dst) const
 {
     TIGHTDB_ASSERT(value.data());
-    TIGHTDB_ASSERT(m_index);
+    TIGHTDB_ASSERT(m_search_index);
 
-    return m_index->find_all(value, dst);
+    return m_search_index->find_all(value, dst);
 }
 
 
@@ -886,10 +890,10 @@ void AdaptiveStringColumn::do_insert(size_t row_ndx, StringData value, size_t nu
 {
     bptree_insert(row_ndx, value, num_rows); // Throws
 
-    if (m_index) {
+    if (m_search_index) {
         bool is_append = row_ndx == tightdb::npos;
         size_t row_ndx_2 = is_append ? size() - num_rows : row_ndx;
-        m_index->insert(row_ndx_2, value, num_rows, is_append); // Throws
+        m_search_index->insert(row_ndx_2, value, num_rows, is_append); // Throws
     }
 }
 
@@ -899,8 +903,8 @@ void AdaptiveStringColumn::do_insert(size_t row_ndx, StringData value, size_t nu
     size_t row_ndx_2 = is_append ? tightdb::npos : row_ndx;
     bptree_insert(row_ndx_2, value, num_rows); // Throws
 
-    if (m_index)
-        m_index->insert(row_ndx, value, num_rows, is_append); // Throws
+    if (m_search_index)
+        m_search_index->insert(row_ndx, value, num_rows, is_append); // Throws
 }
 
 
@@ -1179,26 +1183,15 @@ ref_type AdaptiveStringColumn::write(size_t slice_offset, size_t slice_size,
 }
 
 
-void AdaptiveStringColumn::update_column_index(size_t new_col_ndx, const Spec& spec)
-    TIGHTDB_NOEXCEPT
-{
-    ColumnBase::update_column_index(new_col_ndx, spec);
-    if (m_index) {
-        size_t ndx_in_parent = m_array->get_ndx_in_parent();
-        m_index->get_root_array()->set_ndx_in_parent(ndx_in_parent + 1);
-    }
-}
-
-
 void AdaptiveStringColumn::refresh_accessor_tree(size_t col_ndx, const Spec& spec)
 {
     refresh_root_accessor(); // Throws
 
     // Refresh search index
-    if (m_index) {
+    if (m_search_index) {
         size_t ndx_in_parent = m_array->get_ndx_in_parent();
-        m_index->get_root_array()->set_ndx_in_parent(ndx_in_parent + 1);
-        m_index->refresh_accessor_tree(col_ndx, spec); // Throws
+        m_search_index->get_root_array()->set_ndx_in_parent(ndx_in_parent + 1);
+        m_search_index->refresh_accessor_tree(col_ndx, spec); // Throws
     }
 }
 
@@ -1358,9 +1351,25 @@ void AdaptiveStringColumn::Verify() const
         m_array->verify_bptree(&verify_leaf);
     }
 
-    if (m_index) {
-        m_index->Verify();
-        m_index->verify_entries(*this);
+    if (m_search_index) {
+        m_search_index->Verify();
+        m_search_index->verify_entries(*this);
+    }
+}
+
+
+void AdaptiveStringColumn::Verify(const Table& table, size_t col_ndx) const
+{
+    ColumnBase::Verify(table, col_ndx);
+
+    typedef _impl::TableFriend tf;
+    const Spec& spec = tf::get_spec(table);
+    ColumnAttr attr = spec.get_column_attr(col_ndx);
+    bool has_search_index = (attr & col_attr_Indexed) != 0;
+    TIGHTDB_ASSERT(has_search_index == bool(m_search_index));
+    if (has_search_index) {
+        TIGHTDB_ASSERT(m_search_index->get_root_array()->get_ndx_in_parent() ==
+                       m_array->get_ndx_in_parent() + 1);
     }
 }
 

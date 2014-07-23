@@ -130,11 +130,6 @@ public:
 
     void set_parent(ArrayParent*, std::size_t ndx_in_parent) TIGHTDB_NOEXCEPT;
 
-    /// Called when the table-level index of this column has changed. Column
-    /// classes that cache information pertaning to their position must override
-    /// this function.
-    virtual void update_column_index(std::size_t new_col_ndx, const Spec&) TIGHTDB_NOEXCEPT;
-
     /// Called in the context of Group::commit() to ensure that
     /// attached table accessors stay valid across a commit. Please
     /// note that this works only for non-transactional commits. Table
@@ -160,9 +155,11 @@ public:
     virtual void adj_accessors_erase_row(std::size_t row_ndx) TIGHTDB_NOEXCEPT;
     virtual void adj_accessors_move_last_over(std::size_t target_row_ndx,
                                               std::size_t last_row_ndx) TIGHTDB_NOEXCEPT;
+    virtual void adj_acc_clear_root_table() TIGHTDB_NOEXCEPT;
 
     virtual void recursive_mark() TIGHTDB_NOEXCEPT;
-    virtual void bump_version_on_linked_table() TIGHTDB_NOEXCEPT { }
+    virtual void mark_link_target_table() TIGHTDB_NOEXCEPT;
+    virtual void bump_link_origin_table_version() TIGHTDB_NOEXCEPT;
 
     /// Refresh the dirty part of the accessor subtree rooted at this column
     /// accessor.
@@ -189,6 +186,7 @@ public:
 #ifdef TIGHTDB_DEBUG
     // Must be upper case to avoid conflict with macro in Objective-C
     virtual void Verify() const = 0;
+    virtual void Verify(const Table&, std::size_t col_ndx) const;
     virtual void to_dot(std::ostream&, StringData title = StringData()) const = 0;
     void dump_node_structure() const; // To std::cerr (for GDB)
     virtual void dump_node_structure(std::ostream&, int level) const = 0;
@@ -221,7 +219,7 @@ protected:
     bool root_is_leaf() const TIGHTDB_NOEXCEPT { return !m_array->is_inner_bptree_node(); }
 
     template <class T, class R, Action action, class condition>
-    R aggregate(T target, std::size_t start, std::size_t end, size_t limit = size_t(-1)) const;
+    R aggregate(T target, std::size_t start, std::size_t end, size_t limit = size_t(-1), size_t* return_ndx = null_ptr) const;
 
     /// Introduce a new root node which increments the height of the
     /// tree by one.
@@ -313,10 +311,17 @@ public:
     void insert(std::size_t ndx, int_fast64_t value = 0);
 
     std::size_t count(int64_t target) const;
-    int64_t sum(std::size_t start = 0, std::size_t end = -1, size_t limit = size_t(-1)) const;
-    int64_t maximum(std::size_t start = 0, std::size_t end = -1, size_t limit = size_t(-1)) const;
-    int64_t minimum(std::size_t start = 0, std::size_t end = -1, size_t limit = size_t(-1)) const;
-    double  average(std::size_t start = 0, std::size_t end = -1, size_t limit = size_t(-1)) const;
+    int64_t sum(std::size_t start = 0, std::size_t end = -1, size_t limit = size_t(-1), 
+                size_t* return_ndx = null_ptr) const;
+
+    int64_t maximum(std::size_t start = 0, std::size_t end = -1, size_t limit = size_t(-1), 
+                    size_t* return_ndx = null_ptr) const;
+
+    int64_t minimum(std::size_t start = 0, std::size_t end = -1, size_t limit = size_t(-1), 
+                    size_t* return_ndx = null_ptr) const;
+
+    double  average(std::size_t start = 0, std::size_t end = -1, size_t limit = size_t(-1), 
+                    size_t* return_ndx = null_ptr) const;
 
     // FIXME: Be careful, clear() currently forgets if the leaf type
     // is Array::type_HasRefs.
@@ -361,7 +366,8 @@ public:
     void refresh_accessor_tree(std::size_t, const Spec&) TIGHTDB_OVERRIDE;
 
 #ifdef TIGHTDB_DEBUG
-    virtual void Verify() const TIGHTDB_OVERRIDE;
+    void Verify() const TIGHTDB_OVERRIDE;
+    using ColumnBase::Verify;
     void to_dot(std::ostream&, StringData title) const TIGHTDB_OVERRIDE;
     MemStats stats() const;
     void dump_node_structure(std::ostream&, int level) const TIGHTDB_OVERRIDE;
@@ -419,11 +425,6 @@ inline void ColumnBase::destroy() TIGHTDB_NOEXCEPT
         m_array->destroy_deep();
 }
 
-inline void ColumnBase::update_column_index(std::size_t, const Spec&) TIGHTDB_NOEXCEPT
-{
-    // Noop
-}
-
 inline void ColumnBase::discard_child_accessors() TIGHTDB_NOEXCEPT
 {
     do_discard_child_accessors();
@@ -454,7 +455,22 @@ inline void ColumnBase::adj_accessors_move_last_over(std::size_t, std::size_t) T
     // Noop
 }
 
+inline void ColumnBase::adj_acc_clear_root_table() TIGHTDB_NOEXCEPT
+{
+    // Noop
+}
+
 inline void ColumnBase::recursive_mark() TIGHTDB_NOEXCEPT
+{
+    // Noop
+}
+
+inline void ColumnBase::mark_link_target_table() TIGHTDB_NOEXCEPT
+{
+    // Noop
+}
+
+inline void ColumnBase::bump_link_origin_table_version() TIGHTDB_NOEXCEPT
 {
     // Noop
 }

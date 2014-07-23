@@ -34,10 +34,8 @@ namespace tightdb {
 /// table is specified by the table descriptor.
 class ColumnLink: public ColumnLinkBase {
 public:
-    ColumnLink(ref_type ref, ArrayParent* parent = 0, std::size_t ndx_in_parent = 0,
-                    Allocator& alloc = Allocator::get_default()); // Throws
-    ColumnLink(Allocator& alloc);
-    ~ColumnLink() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
+    ColumnLink(ref_type ref, ArrayParent*, std::size_t ndx_in_parent, Allocator&); // Throws
+    ~ColumnLink() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
     static ref_type create(std::size_t size, Allocator&);
 
@@ -51,6 +49,10 @@ public:
     void clear() TIGHTDB_OVERRIDE;
     void erase(std::size_t, bool) TIGHTDB_OVERRIDE;
     void move_last_over(std::size_t, std::size_t) TIGHTDB_OVERRIDE;
+
+#ifdef TIGHTDB_DEBUG
+    void Verify(const Table&, std::size_t) const TIGHTDB_OVERRIDE;
+#endif
 
 protected:
     friend class ColumnBackLink;
@@ -71,8 +73,7 @@ inline ColumnLink::ColumnLink(ref_type ref, ArrayParent* parent, std::size_t ndx
 {
 }
 
-inline ColumnLink::ColumnLink(Allocator& alloc):
-    ColumnLinkBase(alloc)
+inline ColumnLink::~ColumnLink() TIGHTDB_NOEXCEPT
 {
 }
 
@@ -85,32 +86,32 @@ inline ref_type ColumnLink::create(std::size_t size, Allocator& alloc)
 inline bool ColumnLink::is_null_link(std::size_t row_ndx) const TIGHTDB_NOEXCEPT
 {
     // Zero indicates a missing (null) link
-    return (Column::get(row_ndx) == 0);
+    return (ColumnLinkBase::get(row_ndx) == 0);
 }
 
 inline size_t ColumnLink::get_link(std::size_t row_ndx) const TIGHTDB_NOEXCEPT
 {
     // Row pos is offset by one, to allow null refs
-    return to_size_t(Column::get(row_ndx) - 1);
+    return to_size_t(ColumnLinkBase::get(row_ndx) - 1);
 }
 
 inline void ColumnLink::insert_link(std::size_t row_ndx, std::size_t target_row_ndx)
 {
     // Row pos is offsest by one, to allow null refs
-    Column::insert(row_ndx, target_row_ndx + 1);
+    ColumnLinkBase::insert(row_ndx, target_row_ndx + 1);
 
-    m_backlinks->add_backlink(target_row_ndx, row_ndx);
+    m_backlink_column->add_backlink(target_row_ndx, row_ndx);
 }
 
 inline void ColumnLink::do_nullify_link(std::size_t row_ndx, std::size_t)
 {
-    Column::set(row_ndx, 0);
+    ColumnLinkBase::set(row_ndx, 0);
 }
 
 inline void ColumnLink::do_update_link(std::size_t row_ndx, std::size_t, std::size_t new_target_row_ndx)
 {
     // Row pos is offset by one, to allow null refs
-    Column::set(row_ndx, new_target_row_ndx + 1);
+    ColumnLinkBase::set(row_ndx, new_target_row_ndx + 1);
 }
 
 } //namespace tightdb

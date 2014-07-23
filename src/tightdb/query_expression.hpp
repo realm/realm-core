@@ -555,19 +555,27 @@ public:
 
     ~Value()
     {
-        delete[] m_v;
+        // If we store more than default_size elements then we used 'new', else we used m_cache
+        if (m_values > ValueBase::default_size)
+            delete[] m_v;
         m_v = null_ptr;
     }
 
     void init(bool link, size_t values, T v) {
         if (m_v) {
-            delete[] m_v;
+            // If we store more than default_size elements then we used 'new', else we used m_cache
+            if (m_values > ValueBase::default_size)
+                delete[] m_v;
             m_v = null_ptr;
         }
         ValueBase::from_link = link;
         ValueBase::m_values = values;
         if (m_values > 0) {
-            m_v = new T[m_values];
+            // If we store more than default_size elements then use 'new', else use m_cache
+            if (m_values > ValueBase::default_size)
+                m_v = new T[m_values];
+            else
+                m_v = m_cache;
             std::fill(m_v, m_v + ValueBase::m_values, v);
         }
     }
@@ -709,7 +717,11 @@ public:
         return n;
     }
 
+    // Pointer to value payload
     T *m_v;
+
+    // If there is less than default_size elements in payload, then use this cache, else use 'new'
+    T m_cache[ValueBase::default_size];
 };
 
 
@@ -868,11 +880,11 @@ public:
         ColumnType type = table->get_real_column_type(link_column);
         if (type == col_type_LinkList) {
             m_column_linklist = &table->get_column<ColumnLinkList, col_type_LinkList>(link_column);
-            linked_table.reset(m_column_linklist->get_target_table());
+            linked_table.reset(&m_column_linklist->get_target_table());
         }
         else {
             m_column_single_link = &table->get_column<ColumnLink, col_type_Link>(link_column);
-            linked_table.reset(m_column_single_link->get_target_table());
+            linked_table.reset(&m_column_single_link->get_target_table());
         }
 
         m_table = linked_table.get();
@@ -911,7 +923,7 @@ public:
                 Value<StringData> v(true, links->size());
 
                 for (size_t t = 0; t < links->size(); t++) {
-                    size_t link_to = links->get_target_row(t);
+                    size_t link_to = links->get(t).get_index();
                     v.m_v[t] = m_table->get_string(m_column, link_to);
                 }
                 destination.import(v);
@@ -922,7 +934,7 @@ public:
                 destination.import(v);
             }
         }
-        else if (m_column_single_link) {  
+        else if (m_column_single_link) {
             if (m_column_single_link->is_null_link(index)) {
                 // Null link; create empty Value (Value with m_values == 0)
                 Value<StringData> v(true, 0);
@@ -1000,11 +1012,11 @@ public:
         ColumnType type = table->get_real_column_type(link_column);
         if (type == col_type_LinkList) {
             m_column_linklist = &table->get_column<ColumnLinkList, col_type_LinkList>(link_column);
-            linked_table.reset(m_column_linklist->get_target_table());
+            linked_table.reset(&m_column_linklist->get_target_table());
         }
         else {
             m_column_single_link = &table->get_column<ColumnLink, col_type_Link>(link_column);
-            linked_table.reset(m_column_single_link->get_target_table());
+            linked_table.reset(&m_column_single_link->get_target_table());
         }
 
         m_table = linked_table.get();
@@ -1062,7 +1074,7 @@ public:
                 Value<T> v(true, links->size());
 
                 for (size_t t = 0; t < links->size(); t++) {
-                    size_t link_to = links->get_target_row(t);
+                    size_t link_to = links->get(t).get_index();
                     sg->cache_next(link_to); // todo, needed?
                     v.m_v[t] = sg->get_next(link_to);
                 }

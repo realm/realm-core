@@ -37,8 +37,13 @@ using namespace tightdb::test_util::unit_test;
 namespace {
 
 const char* file_order[] = {
-    // The order of tests should be from "simple" to "complex" with repsect to Realm code coverage and 
-    // test complexity (i.e. allocator first, then array, then column, etc).
+    // When choosing order, please try to use these guidelines:
+    //
+    //  - If feature A depends on feature B, test feature B first.
+    //
+    //  - If feature A has a more central role in the API than feature B, test
+    //    feature A first.
+    //
     "test_self.cpp",
 
     // tightdb/util/
@@ -59,7 +64,6 @@ const char* file_order[] = {
     "test_destroy_guard.cpp",
 
     // /tightdb/ (main API)
-    "test_json.cpp",
     "test_version.cpp",
     "test_table*.cpp",
     "test_descriptor*.cpp",
@@ -87,8 +91,10 @@ void fix_max_open_files()
             long new_soft_limit = hard_limit < 0 ? 4096 : hard_limit;
             if (new_soft_limit > soft_limit) {
                 set_soft_rlimit(resource_NumOpenFiles, new_soft_limit);
+/*
                 cout << "\n"
                     "MaxOpenFiles: "<<soft_limit<<" --> "<<new_soft_limit<<"\n";
+*/
             }
         }
     }

@@ -58,7 +58,7 @@ size_t TableViewBase::find_first_binary(size_t column_ndx, BinaryData value) con
 // count_target is ignored by all <int function> except Count. Hack because of bug in optional
 // arguments in clang and vs2010 (fixed in 2012)
 template <int function, typename T, typename R, class ColType>
-R TableViewBase::aggregate(R (ColType::*aggregateMethod)(size_t, size_t, size_t) const, size_t column_ndx, T count_target) const
+R TableViewBase::aggregate(R(ColType::*aggregateMethod)(size_t, size_t, size_t, size_t*) const, size_t column_ndx, T count_target, size_t* return_ndx) const
 {
     TIGHTDB_ASSERT_COLUMN_AND_TYPE(column_ndx, ColumnTypeTraits<T>::id);
     TIGHTDB_ASSERT(function == act_Sum || function == act_Max || function == act_Min || function == act_Count);
@@ -75,7 +75,7 @@ R TableViewBase::aggregate(R (ColType::*aggregateMethod)(size_t, size_t, size_t)
         if(function == act_Count)
             return static_cast<R>(column->count(count_target));
         else
-            return (column->*aggregateMethod)(0, size_t(-1), size_t(-1)); // end == limit == -1
+            return (column->*aggregateMethod)(0, size_t(-1), size_t(-1), return_ndx); // end == limit == -1
     }
 
     // Array object instantiation must NOT allocate initial memory (capacity)
@@ -87,9 +87,11 @@ R TableViewBase::aggregate(R (ColType::*aggregateMethod)(size_t, size_t, size_t)
     size_t row_ndx;
 
     R res = static_cast<R>(0);
-
     T first = column->get(to_size_t(m_refs.get(0)));
 
+    if (return_ndx)
+        *return_ndx = 0;
+    
     if(function == act_Count)
         res = static_cast<R>((first == count_target ? 1 : 0));
     else
@@ -107,10 +109,16 @@ R TableViewBase::aggregate(R (ColType::*aggregateMethod)(size_t, size_t, size_t)
 
         if (function == act_Sum)
             res += static_cast<R>(v);
-        else if (function == act_Max && v > static_cast<T>(res))
+        else if (function == act_Max && v > static_cast<T>(res)) {
             res = static_cast<R>(v);
-        else if (function == act_Min && v < static_cast<T>(res))
+            if (return_ndx)
+                *return_ndx = ss;
+        }
+        else if (function == act_Min && v < static_cast<T>(res)) {
             res = static_cast<R>(v);
+            if (return_ndx)
+                *return_ndx = ss;
+        }
         else if (function == act_Count && v == count_target)
             res++;
 
@@ -119,7 +127,7 @@ R TableViewBase::aggregate(R (ColType::*aggregateMethod)(size_t, size_t, size_t)
     return res;
 }
 
-// sum
+// sum 
 
 int64_t TableViewBase::sum_int(size_t column_ndx) const
 {
@@ -136,40 +144,40 @@ double TableViewBase::sum_double(size_t column_ndx) const
 
 // Maximum
 
-int64_t TableViewBase::maximum_int(size_t column_ndx) const
+int64_t TableViewBase::maximum_int(size_t column_ndx, size_t* return_ndx) const
 {
-    return aggregate<act_Max, int64_t>(&Column::maximum, column_ndx, 0);
+    return aggregate<act_Max, int64_t>(&Column::maximum, column_ndx, 0, return_ndx);
 }
-float TableViewBase::maximum_float(size_t column_ndx) const
+float TableViewBase::maximum_float(size_t column_ndx, size_t* return_ndx) const
 {
-    return aggregate<act_Max, float>(&ColumnFloat::maximum, column_ndx, 0.0);
+    return aggregate<act_Max, float>(&ColumnFloat::maximum, column_ndx, 0.0, return_ndx);
 }
-double TableViewBase::maximum_double(size_t column_ndx) const
+double TableViewBase::maximum_double(size_t column_ndx, size_t* return_ndx) const
 {
-    return aggregate<act_Max, double>(&ColumnDouble::maximum, column_ndx, 0.0);
+    return aggregate<act_Max, double>(&ColumnDouble::maximum, column_ndx, 0.0, return_ndx);
 }
-DateTime TableViewBase::maximum_datetime(size_t column_ndx) const
+DateTime TableViewBase::maximum_datetime(size_t column_ndx, size_t* return_ndx) const
 {
-    return aggregate<act_Max, int64_t>(&Column::maximum, column_ndx, 0);
+    return aggregate<act_Max, int64_t>(&Column::maximum, column_ndx, 0, return_ndx);
 }
 
 // Minimum
 
-int64_t TableViewBase::minimum_int(size_t column_ndx) const
+int64_t TableViewBase::minimum_int(size_t column_ndx, size_t* return_ndx) const
 {
-    return aggregate<act_Min, int64_t>(&Column::minimum, column_ndx, 0);
+    return aggregate<act_Min, int64_t>(&Column::minimum, column_ndx, 0, return_ndx);
 }
-float TableViewBase::minimum_float(size_t column_ndx) const
+float TableViewBase::minimum_float(size_t column_ndx, size_t* return_ndx) const
 {
-    return aggregate<act_Min, float>(&ColumnFloat::minimum, column_ndx, 0.0);
+    return aggregate<act_Min, float>(&ColumnFloat::minimum, column_ndx, 0.0, return_ndx);
 }
-double TableViewBase::minimum_double(size_t column_ndx) const
+double TableViewBase::minimum_double(size_t column_ndx, size_t* return_ndx) const
 {
-    return aggregate<act_Min, double>(&ColumnDouble::minimum, column_ndx, 0.0);
+    return aggregate<act_Min, double>(&ColumnDouble::minimum, column_ndx, 0.0, return_ndx);
 }
-DateTime TableViewBase::minimum_datetime(size_t column_ndx) const
+DateTime TableViewBase::minimum_datetime(size_t column_ndx, size_t* return_ndx) const
 {
-    return aggregate<act_Min, int64_t>(&Column::minimum, column_ndx, 0);
+    return aggregate<act_Min, int64_t>(&Column::minimum, column_ndx, 0, return_ndx);
 }
 
 // Average
@@ -420,7 +428,7 @@ void TableView::remove(size_t ndx)
 
     // Delete row in source table
     const size_t real_ndx = size_t(m_refs.get(ndx));
-    m_table->from_view_remove(real_ndx, this);
+    m_table->remove(real_ndx);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     // It is important to not accidentally bring us in sync, if we were
@@ -443,21 +451,61 @@ void TableView::remove(size_t ndx)
 void TableView::clear()
 {
     TIGHTDB_ASSERT(m_table);
-    // sort m_refs
-    vector<size_t> v;
-    for (size_t t = 0; t < size(); t++)
-        v.push_back(to_size_t(m_refs.get(t)));
-    std::sort(v.begin(), v.end());
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     bool sync_to_keep = m_last_seen_version == m_table->m_version;
 #endif
 
-    // Delete all referenced rows in source table
-    // (in reverse order to avoid index drift)
-    for (size_t i = m_refs.size(); i != 0; --i) {
-        size_t ndx = size_t(v[i-1]);
-        m_table->from_view_remove(ndx, this);
+    // If m_table is unordered we must use move_last_over(). Fixme/todo: To test if it's unordered we currently
+    // see if we have any link or backlink columns. This is bad becuase in the future we could have unordered tables
+    // with no links
+    bool is_ordered = true;
+    for (size_t c = 0; c < m_table->m_spec.get_column_count(); c++) {
+        ColumnType t = m_table->m_spec.get_column_type(c);
+        if (t == col_type_Link || t == col_type_LinkList || t == col_type_BackLink) {
+            is_ordered = false;
+            break;
+        }
+    }
+
+    // Test if tableview is sorted ascendingly
+    bool is_sorted = true;
+    for (size_t t = 1; t < size(); t++) {
+        if (m_refs.get(t) < m_refs.get(t - 1)) {
+            is_sorted = false;
+            break;
+        }
+    }
+
+    if (is_sorted) {
+        // Delete all referenced rows in source table
+        // (in reverse order to avoid index drift)
+        for (size_t i = m_refs.size(); i != 0; --i) {
+            size_t ndx = size_t(m_refs.get(i - 1));
+
+            // If table is unordered, we must use move_last_over()
+            if (is_ordered)
+                m_table->remove(ndx);
+            else
+                m_table->move_last_over(ndx);
+        }
+    }
+    else {
+        // sort tableview
+        vector<size_t> v;
+        for (size_t t = 0; t < size(); t++)
+            v.push_back(to_size_t(m_refs.get(t)));
+        std::sort(v.begin(), v.end());
+
+        for (size_t i = m_refs.size(); i != 0; --i) {
+            size_t ndx = size_t(v[i - 1]);
+
+            // If table is unordered, we must use move_last_over()
+            if (is_ordered)
+                m_table->remove(ndx);
+            else
+                m_table->move_last_over(ndx);
+        }
     }
 
     m_refs.clear();

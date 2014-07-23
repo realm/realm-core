@@ -36,14 +36,14 @@ public:
     void insert(std::size_t, std::size_t, bool) TIGHTDB_OVERRIDE;
     void erase(std::size_t, bool) TIGHTDB_OVERRIDE;
     void move_last_over(std::size_t, std::size_t) TIGHTDB_OVERRIDE;
-
-    void update_column_index(std::size_t, const Spec&) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void clear() TIGHTDB_OVERRIDE;
 
     void recursive_mark() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
     void adj_accessors_insert_rows(std::size_t, std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     void adj_accessors_erase_row(std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     void adj_accessors_move_last_over(std::size_t, std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void adj_acc_clear_root_table() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
     void refresh_accessor_tree(std::size_t, const Spec&) TIGHTDB_OVERRIDE;
 
@@ -59,20 +59,18 @@ public:
 
     void discard_subtable_accessor(std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
+#ifdef TIGHTDB_DEBUG
+    void Verify() const TIGHTDB_OVERRIDE;
+    void Verify(const Table&, std::size_t) const TIGHTDB_OVERRIDE;
+#endif
+
 protected:
-    /// A pointer to the table that this column is part of. For a
-    /// free-standing column, this pointer is null.
+    /// A pointer to the table that this column is part of. For a free-standing
+    /// column, this pointer is null.
     Table* const m_table;
 
-    /// The index of this column within the table that this column is
-    /// part of. For a free-standing column, this index is zero.
-    ///
-    /// This index specifies the position of the column within the
-    /// Table::m_cols array. Note that this corresponds to the logical
-    /// index of the column, which is not always the same as the index
-    /// of this column within Table::m_columns. This is because
-    /// Table::m_columns contains columns as well as indexes for those
-    /// columns.
+    /// The index of this column within m_table.m_cols. For a free-standing
+    /// column, this index is zero.
     std::size_t m_column_ndx;
 
     struct SubtableMap {
@@ -229,19 +227,16 @@ public:
 
     using ColumnSubtableParent::insert;
 
-    void clear() TIGHTDB_OVERRIDE;
     void erase(std::size_t, bool) TIGHTDB_OVERRIDE;
     void move_last_over(std::size_t, std::size_t) TIGHTDB_OVERRIDE;
 
     /// Compare two subtable columns for equality.
     bool compare_table(const ColumnTable&) const;
 
-    void update_column_index(std::size_t, const Spec&) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-
     void refresh_accessor_tree(std::size_t, const Spec&) TIGHTDB_OVERRIDE;
 
 #ifdef TIGHTDB_DEBUG
-    void Verify() const TIGHTDB_OVERRIDE; // Must be upper case to avoid conflict with macro in ObjC
+    void Verify(const Table&, std::size_t) const TIGHTDB_OVERRIDE;
     void dump_node_structure(std::ostream&, int level) const TIGHTDB_OVERRIDE;
     using ColumnSubtableParent::dump_node_structure;
     void to_dot(std::ostream&, StringData title) const TIGHTDB_OVERRIDE;
@@ -295,13 +290,6 @@ inline void ColumnSubtableParent::move_last_over(std::size_t target_row_ndx,
         tf::unbind_ref(*m_table);
 }
 
-inline void ColumnSubtableParent::update_column_index(std::size_t new_col_ndx, const Spec& spec)
-    TIGHTDB_NOEXCEPT
-{
-    Column::update_column_index(new_col_ndx, spec);
-    m_column_ndx = new_col_ndx;
-}
-
 inline void ColumnSubtableParent::recursive_mark() TIGHTDB_NOEXCEPT
 {
     m_subtable_map.recursive_mark();
@@ -351,6 +339,16 @@ inline void ColumnSubtableParent::adj_accessors_move_last_over(std::size_t targe
     typedef _impl::TableFriend tf;
     if (last_entry_removed)
         tf::unbind_ref(*m_table);
+}
+
+inline void ColumnSubtableParent::adj_acc_clear_root_table() TIGHTDB_NOEXCEPT
+{
+    // This function must assume no more than minimal consistency of the
+    // accessor hierarchy. This means in particular that it cannot access the
+    // underlying node structure. See AccessorConcistncyLevels.
+
+    Column::adj_acc_clear_root_table();
+    discard_child_accessors();
 }
 
 inline Table* ColumnSubtableParent::get_subtable_accessor(std::size_t row_ndx) const
@@ -589,13 +587,6 @@ inline void ColumnSubtableParent::do_insert(std::size_t row_ndx, int_fast64_t va
 }
 
 
-inline void ColumnTable::update_column_index(std::size_t new_col_ndx, const Spec& spec)
-    TIGHTDB_NOEXCEPT
-{
-    ColumnSubtableParent::update_column_index(new_col_ndx, spec);
-    m_subspec_ndx = tightdb::npos;
-}
-
 inline ColumnTable::ColumnTable(Allocator& alloc, Table* table, std::size_t column_ndx):
     ColumnSubtableParent(alloc, table, column_ndx), m_subspec_ndx(tightdb::npos)
 {
@@ -624,8 +615,9 @@ inline void ColumnTable::refresh_accessor_tree(std::size_t col_ndx, const Spec& 
 inline std::size_t ColumnTable::get_subspec_ndx() const TIGHTDB_NOEXCEPT
 {
     if (TIGHTDB_UNLIKELY(m_subspec_ndx == tightdb::npos)) {
-        const Spec* spec = _impl::TableFriend::get_spec(*m_table);
-        m_subspec_ndx = spec->get_subspec_ndx(m_column_ndx);
+        typedef _impl::TableFriend tf;
+        const Spec& spec = tf::get_spec(*m_table);
+        m_subspec_ndx = spec.get_subspec_ndx(m_column_ndx);
     }
     return m_subspec_ndx;
 }

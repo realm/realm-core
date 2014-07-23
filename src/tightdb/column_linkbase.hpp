@@ -29,13 +29,12 @@ class ColumnBackLink;
 // Abstract base class for columns containing links
 class ColumnLinkBase: public Column {
 public:
-    explicit ColumnLinkBase(Allocator&);
-    ColumnLinkBase(Array::Type, Allocator&);
-    explicit ColumnLinkBase(ref_type, ArrayParent* = 0, std::size_t ndx_in_parent = 0,
-                            Allocator& = Allocator::get_default());
+    ColumnLinkBase(ref_type, ArrayParent*, std::size_t ndx_in_parent, Allocator&);
+    ~ColumnLinkBase() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
+    Table& get_target_table() const TIGHTDB_NOEXCEPT;
     void set_target_table(Table&) TIGHTDB_NOEXCEPT;
-    Table* get_target_table() TIGHTDB_NOEXCEPT;
+    ColumnBackLink& get_backlink_column() const TIGHTDB_NOEXCEPT;
     void set_backlink_column(ColumnBackLink&) TIGHTDB_NOEXCEPT;
 
     virtual void do_nullify_link(std::size_t row_ndx, std::size_t old_target_row_ndx) = 0;
@@ -45,9 +44,18 @@ public:
     void adj_accessors_insert_rows(std::size_t, std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     void adj_accessors_erase_row(std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     void adj_accessors_move_last_over(std::size_t, std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void adj_acc_clear_root_table() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+
+    void mark_link_target_table() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+
+#ifdef TIGHTDB_DEBUG
+    void Verify(const Table&, std::size_t) const TIGHTDB_OVERRIDE;
+    using Column::Verify;
+#endif
+
 protected:
     TableRef m_target_table;
-    ColumnBackLink* m_backlinks;
+    ColumnBackLink* m_backlink_column;
 };
 
 
@@ -55,23 +63,20 @@ protected:
 
 // Implementation
 
-inline ColumnLinkBase::ColumnLinkBase(Allocator& alloc):
-    Column(alloc),
-    m_backlinks(0)
-{
-}
-
-inline ColumnLinkBase::ColumnLinkBase(Array::Type type, Allocator& alloc):
-    Column(type, alloc),
-    m_backlinks(0)
-{
-}
-
 inline ColumnLinkBase::ColumnLinkBase(ref_type ref, ArrayParent* parent, std::size_t ndx_in_parent,
                                       Allocator& alloc):
     Column(ref, parent, ndx_in_parent, alloc),
-    m_backlinks(0)
+    m_backlink_column(0)
 {
+}
+
+inline ColumnLinkBase::~ColumnLinkBase() TIGHTDB_NOEXCEPT
+{
+}
+
+inline Table& ColumnLinkBase::get_target_table() const TIGHTDB_NOEXCEPT
+{
+    return *m_target_table;
 }
 
 inline void ColumnLinkBase::set_target_table(Table& table) TIGHTDB_NOEXCEPT
@@ -80,14 +85,14 @@ inline void ColumnLinkBase::set_target_table(Table& table) TIGHTDB_NOEXCEPT
     m_target_table = table.get_table_ref();
 }
 
-inline Table* ColumnLinkBase::get_target_table() TIGHTDB_NOEXCEPT
+inline ColumnBackLink& ColumnLinkBase::get_backlink_column() const TIGHTDB_NOEXCEPT
 {
-    return m_target_table.get();
+    return *m_backlink_column;
 }
 
-inline void ColumnLinkBase::set_backlink_column(ColumnBackLink& backlinks) TIGHTDB_NOEXCEPT
+inline void ColumnLinkBase::set_backlink_column(ColumnBackLink& column) TIGHTDB_NOEXCEPT
 {
-    m_backlinks = &backlinks;
+    m_backlink_column = &column;
 }
 
 inline void ColumnLinkBase::adj_accessors_insert_rows(std::size_t row_ndx,
@@ -117,7 +122,21 @@ inline void ColumnLinkBase::adj_accessors_move_last_over(std::size_t target_row_
     tf::mark(*m_target_table);
 }
 
+inline void ColumnLinkBase::adj_acc_clear_root_table() TIGHTDB_NOEXCEPT
+{
+    Column::adj_acc_clear_root_table();
 
-} //namespace tightdb
+    typedef _impl::TableFriend tf;
+    tf::mark(*m_target_table);
+}
 
-#endif //TIGHTDB_COLUMN_LINKBASE_HPP
+inline void ColumnLinkBase::mark_link_target_table() TIGHTDB_NOEXCEPT
+{
+    typedef _impl::TableFriend tf;
+    tf::mark(*m_target_table);
+}
+
+
+} // namespace tightdb
+
+#endif // TIGHTDB_COLUMN_LINKBASE_HPP

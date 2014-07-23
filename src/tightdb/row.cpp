@@ -26,7 +26,7 @@ void RowBase::reattach(Table* table, size_t row_ndx)
     m_row_ndx = row_ndx;
 }
 
-void RowBase::detach() TIGHTDB_NOEXCEPT
+void RowBase::impl_detach() TIGHTDB_NOEXCEPT
 {
     if (m_table) {
         m_table->unregister_row_accessor(this);
