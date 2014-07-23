@@ -1070,6 +1070,8 @@ private:
 
     void refresh_column_accessors(std::size_t col_ndx_begin = 0);
 
+    bool is_cross_table_link_target() const TIGHTDB_NOEXCEPT;
+
 #ifdef TIGHTDB_DEBUG
     void to_dot_internal(std::ostream&) const;
 #endif
@@ -1881,6 +1883,11 @@ public:
         // bump the global counter
         bool global_bump = false;
         table.bump_version(global_bump);
+    }
+
+    static bool is_cross_table_link_target(const Table& table)
+    {
+        return table.is_cross_table_link_target();
     }
 
 #ifdef TIGHTDB_ENABLE_REPLICATION

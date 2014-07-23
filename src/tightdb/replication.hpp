@@ -123,7 +123,7 @@ public:
 
     void new_group_level_table(StringData name);
     void rename_group_level_table(std::size_t table_ndx, StringData new_name);
-    void remove_group_level_table(std::size_t table_ndx);
+    void erase_group_level_table(std::size_t table_ndx);
     void insert_column(const Descriptor&, std::size_t col_ndx, DataType type, StringData name,
                        const Table* link_target_table);
     void erase_column(const Descriptor&, std::size_t col_ndx);
@@ -259,7 +259,7 @@ private:
     /// Transaction log instruction encoding
     enum Instruction {
         instr_NewGroupLevelTable    =  1,
-        instr_RemoveGroupLevelTable =  2,
+        instr_EraseGroupLevelTable  =  2, // Remove columnless table from group
         instr_RenameGroupLevelTable =  3,
         instr_SelectTable           =  4,
         instr_SetInt                =  5,
@@ -390,6 +390,8 @@ public:
     /// functions:
     ///
     ///     bool new_group_level_table(StringData name)
+    ///     bool erase_group_level_table(std::size_t table_ndx)
+    ///     bool rename_group_level_table(std::size_t table_ndx, StringData new_name)
     ///     bool select_table(std::size_t group_level_ndx, int levels, const std::size_t* path)
     ///     bool insert_empty_rows(std::size_t row_ndx, std::size_t num_rows)
     ///     bool erase_row(std::size_t row_ndx)
@@ -803,14 +805,14 @@ inline void Replication::new_group_level_table(StringData name)
     transact_log_append(name.data(), name.size()); // Throws
 }
 
-inline void Replication::remove_group_level_table(std::size_t table_ndx)
+inline void Replication::erase_group_level_table(std::size_t table_ndx)
 {
-    simple_cmd(instr_RemoveGroupLevelTable, util::tuple(table_ndx)); // Throws
+    simple_cmd(instr_EraseGroupLevelTable, util::tuple(table_ndx)); // Throws
 }
 
 inline void Replication::rename_group_level_table(std::size_t table_ndx, StringData new_name)
 {
-    simple_cmd(instr_RemoveGroupLevelTable, util::tuple(table_ndx, new_name.size())); // Throws
+    simple_cmd(instr_RenameGroupLevelTable, util::tuple(table_ndx, new_name.size())); // Throws
     transact_log_append(new_name.data(), new_name.size()); // Throws
 }
 
@@ -1495,9 +1497,9 @@ bool Replication::TransactLogParser::do_parse(InstructionHandler& handler)
                     return false;
                 continue;
             }
-            case instr_RemoveGroupLevelTable: {
+            case instr_EraseGroupLevelTable: {
                 std::size_t table_ndx = read_int<std::size_t>();
-                if (!handler.remove_group_level_table(table_ndx)) // Throws
+                if (!handler.erase_group_level_table(table_ndx)) // Throws
                     return false;
                 continue;
             }

@@ -270,12 +270,13 @@ public:
     template<class T> typename T::ConstRef get_table(StringData name) const;
     //@}
 
-    /// Remove the table at specified index. This operation fails and throws
-    /// if the table is a link target of another table, OR if the index is invalid.
+    /// Remove the table at the specified index.
+    ///
+    /// \throw CrossTableLinkTarget If the specified table is a target of
+    /// cross-table link columns.
     void remove_table(std::size_t table_ndx);
 
-    /// Rename the table at specified index. This operation fails and throws
-    /// if the index is invalid.
+    /// Rename the table at the specified index.
     void rename_table(std::size_t table_ndx, StringData new_name);
 
     // Serialization
@@ -541,7 +542,7 @@ inline bool Group::is_empty() const TIGHTDB_NOEXCEPT
 {
     if (!is_attached())
         return true;
-    return m_table_names.is_empty();
+    return m_size == 0;
 }
 
 inline std::size_t Group::size() const

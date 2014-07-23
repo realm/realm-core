@@ -273,6 +273,26 @@ TEST(Group_RemoveTable)
 }
 
 
+TEST(Group_RemoveLinkTable)
+{
+    Group group;
+    TableRef table = group.get_table("table");
+    table->add_column_link(type_Link, "", *table);
+    group.remove_table(table->get_index_in_parent());
+    CHECK(group.is_empty());
+    CHECK(!table->is_attached());
+    TableRef origin = group.get_table("origin");
+    TableRef target = group.get_table("target");
+    target->add_column(type_Int, "");
+    origin->add_column_link(type_Link, "", *target);
+    CHECK_THROW(group.remove_table(target->get_index_in_parent()), CrossTableLinkTarget);
+    group.remove_table(origin->get_index_in_parent());
+    CHECK_EQUAL(1, group.size());
+    CHECK(!origin->is_attached());
+    CHECK(target->is_attached());
+}
+
+
 TEST(Group_GetTable)
 {
     Group g;

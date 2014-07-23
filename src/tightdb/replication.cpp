@@ -685,7 +685,7 @@ public:
         return true;
     }
 
-    bool remove_group_level_table(std::size_t table_ndx) TIGHTDB_NOEXCEPT
+    bool erase_group_level_table(std::size_t table_ndx) TIGHTDB_NOEXCEPT
     {
 #ifdef TIGHTDB_DEBUG
         if (m_log)
