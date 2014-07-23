@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <iostream>
 
 #include <tightdb/util/safe_int_ops.hpp>
 #include <tightdb/group_writer.hpp>
@@ -65,7 +66,7 @@ size_t GroupWriter::write_group()
     flengths.copy_on_write(); // Throws
     if (is_shared)
         fversions.copy_on_write(); // Throws
-    const SlabAlloc::FreeSpace& new_free_space = m_group.m_alloc.get_free_read_only(); // Throws
+    const SlabAlloc::chunks& new_free_space = m_group.m_alloc.get_free_read_only(); // Throws
     max_free_list_size += new_free_space.size();
 
     // The final allocation of free space (i.e., the call to
@@ -97,17 +98,17 @@ size_t GroupWriter::write_group()
     // present in the non-transactionl case where there is no version
     // tracking on the free-space chunks.
     {
-        size_t n = new_free_space.size();
-        for (size_t i = 0; i < n; ++i) {
-            SlabAlloc::FreeSpace::ConstCursor r = new_free_space[i];
-            size_t pos  = to_size_t(r.ref);
-            size_t size = to_size_t(r.size);
+        typedef SlabAlloc::chunks::const_iterator iter;
+        iter end = new_free_space.end();
+        for (iter i = new_free_space.begin(); i != end; ++i) {
+            ref_type ref = i->ref;
+            size_t size  = i->size;
             // We always want to keep the list of free space in sorted
             // order (by ascending position) to facilitate merge of
             // adjacent segments. We can find the correct insert
             // postion by binary search
-            size_t ndx = fpositions.lower_bound_int(pos);
-            fpositions.insert(ndx, pos); // Throws
+            size_t ndx = fpositions.lower_bound_int(ref);
+            fpositions.insert(ndx, ref); // Throws
             flengths.insert(ndx, size); // Throws
             if (is_shared)
                 fversions.insert(ndx, m_current_version); // Throws
