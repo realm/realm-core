@@ -248,7 +248,7 @@ TEST(Alloc_BadBuffer)
 }
 
 
-ONLY(Alloc_Fuzzy)
+TEST(Alloc_Fuzzy)
 {
     SlabAlloc alloc;
     vector<MemRef> refs;
