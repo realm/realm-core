@@ -301,7 +301,9 @@ void SlabAlloc::do_free(ref_type ref, const char* addr) TIGHTDB_NOEXCEPT
         if (i != free_space.end()) {
             if (merged_with != free_space.end()) {
                 i->size += merged_with->size;
-                free_space.erase(merged_with);
+                // Erase by "move last over"
+                *merged_with = free_space.back();
+                free_space.pop_back();
             }
             else {
                 i->size += size;
