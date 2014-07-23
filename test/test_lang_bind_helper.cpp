@@ -4,8 +4,9 @@
 #include "testsettings.hpp"
 #ifdef TEST_LANG_BIND_HELPER
 
-#include <tightdb/lang_bind_helper.hpp>
 #include <tightdb/descriptor.hpp>
+#include <tightdb/table_macros.hpp>
+#include <tightdb/lang_bind_helper.hpp>
 #ifdef TIGHTDB_ENABLE_REPLICATION
 #  include <tightdb/replication.hpp>
 #  include <tightdb/commit_log.hpp>
