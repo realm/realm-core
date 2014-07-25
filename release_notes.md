@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 0.80.4 Release notes
 
 ### Bugfixes:
 
@@ -7,15 +7,6 @@
   `LangBindHelper::commit_and_continue_as_read()`, if the link list was modified
   during the ended "transaction", and was non-empty either before, after, or
   both before and after that "transaction".
-
-
-### API breaking changes:
-
-* Lorem ipsum.
-
-### Enhancements:
-
-* Lorem ipsum.
 
 -----------
 
