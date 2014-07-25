@@ -2,7 +2,12 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
+* Bug fixed that would always leave a link list accessor (`LinkView`) in a
+  corrupt state after a call to `Group::commit()` or
+  `LangBindHelper::commit_and_continue_as_read()`, if the link list was modified
+  during the ended "transaction", and was non-empty either before, after, or
+  both before and after that "transaction".
+
 
 ### API breaking changes:
 

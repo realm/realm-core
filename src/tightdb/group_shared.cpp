@@ -1244,13 +1244,13 @@ void SharedGroup::commit_and_continue_as_read()
 {
     do_commit();
 
-    // TODO: update all pending accessors to new refs
-    // consult group::commit for inspiration
-
     // Mark all managed space (beyond the attached file) as free.
     //
     // FIXME: Perform this as part of m_alloc.remap(), but that
     // requires that we always call remap().
+    //
+    // FIXME: This presence of this call seems to be the untended consequence of
+    // a merge (an undetected conflict). Please investigate.
     m_group.m_alloc.reset_free_space_tracking(); // Throws
 
     size_t old_baseline = m_group.m_alloc.get_baseline();

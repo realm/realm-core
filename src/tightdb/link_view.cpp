@@ -24,10 +24,11 @@
 #  include <tightdb/replication.hpp>
 #endif
 
+using namespace std;
 using namespace tightdb;
 
 
-void LinkView::insert(std::size_t link_ndx, std::size_t target_row_ndx)
+void LinkView::insert(size_t link_ndx, size_t target_row_ndx)
 {
     TIGHTDB_ASSERT(is_attached());
     TIGHTDB_ASSERT(m_target_row_indexes.is_attached() || link_ndx == 0);
@@ -55,7 +56,7 @@ void LinkView::insert(std::size_t link_ndx, std::size_t target_row_ndx)
 }
 
 
-void LinkView::set(std::size_t link_ndx, std::size_t target_row_ndx)
+void LinkView::set(size_t link_ndx, size_t target_row_ndx)
 {
     TIGHTDB_ASSERT(is_attached());
     TIGHTDB_ASSERT(m_target_row_indexes.is_attached() && link_ndx < m_target_row_indexes.size());
@@ -100,7 +101,7 @@ void LinkView::move(size_t old_link_ndx, size_t new_link_ndx)
 }
 
 
-void LinkView::remove(std::size_t link_ndx)
+void LinkView::remove(size_t link_ndx)
 {
     TIGHTDB_ASSERT(is_attached());
     TIGHTDB_ASSERT(m_target_row_indexes.is_attached() && link_ndx < m_target_row_indexes.size());
@@ -153,7 +154,7 @@ void LinkView::clear()
 }
 
 
-void LinkView::remove_target_row(std::size_t link_ndx)
+void LinkView::remove_target_row(size_t link_ndx)
 {
     TIGHTDB_ASSERT(is_attached());
     TIGHTDB_ASSERT(m_target_row_indexes.is_attached() && link_ndx < m_target_row_indexes.size());
@@ -187,12 +188,12 @@ void LinkView::remove_all_target_rows()
 }
 
 
-void LinkView::do_nullify_link(std::size_t old_target_row_ndx)
+void LinkView::do_nullify_link(size_t old_target_row_ndx)
 {
     TIGHTDB_ASSERT(m_target_row_indexes.is_attached());
 
     size_t pos = m_target_row_indexes.find_first(old_target_row_ndx);
-    TIGHTDB_ASSERT(pos != not_found);
+    TIGHTDB_ASSERT(pos != tightdb::not_found);
 
     bool is_last = (pos+1 == m_target_row_indexes.size());
     m_target_row_indexes.erase(pos, is_last);
@@ -205,12 +206,12 @@ void LinkView::do_nullify_link(std::size_t old_target_row_ndx)
 }
 
 
-void LinkView::do_update_link(size_t old_target_row_ndx, std::size_t new_target_row_ndx)
+void LinkView::do_update_link(size_t old_target_row_ndx, size_t new_target_row_ndx)
 {
     TIGHTDB_ASSERT(m_target_row_indexes.is_attached());
 
     size_t pos = m_target_row_indexes.find_first(old_target_row_ndx);
-    TIGHTDB_ASSERT(pos != not_found);
+    TIGHTDB_ASSERT(pos != tightdb::not_found);
 
     m_target_row_indexes.set(pos, new_target_row_ndx);
 }
