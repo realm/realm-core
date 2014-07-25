@@ -181,7 +181,7 @@ ref_type ColumnLinkList::get_child_ref(size_t child_ndx) const TIGHTDB_NOEXCEPT
 }
 
 
-void ColumnLinkList::to_json_row(size_t row_ndx, std::ostream& out) const
+void ColumnLinkList::to_json_row(size_t row_ndx, ostream& out) const
 {
     LinkViewRef links1 = const_cast<ColumnLinkList*>(this)->get(row_ndx);
     for (size_t t = 0; t < links1->size(); t++) {
@@ -295,6 +295,18 @@ void ColumnLinkList::adj_move_last_over(size_t target_row_ndx,
                 e.m_list->set_origin_row_index(target_row_ndx);
         }
     }
+}
+
+
+void ColumnLinkList::update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT
+{
+    if (!m_array->update_from_parent(old_baseline))
+        return;
+
+    typedef list_accessors::const_iterator iter;
+    iter end = m_list_accessors.end();
+    for (iter i = m_list_accessors.begin(); i != end; ++i)
+        i->m_list->update_from_parent(old_baseline);
 }
 
 

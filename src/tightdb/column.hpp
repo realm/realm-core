@@ -130,11 +130,9 @@ public:
 
     void set_parent(ArrayParent*, std::size_t ndx_in_parent) TIGHTDB_NOEXCEPT;
 
-    /// Called in the context of Group::commit() to ensure that
-    /// attached table accessors stay valid across a commit. Please
-    /// note that this works only for non-transactional commits. Table
-    /// accessors obtained during a transaction are always detached
-    /// when the transaction ends.
+    /// Called in the context of Group::commit() and
+    /// SharedGroup::commit_and_continue_as_read()() to ensure that attached
+    /// table and link list accessors stay valid across a commit.
     virtual void update_from_parent(std::size_t old_baseline) TIGHTDB_NOEXCEPT;
 
     void discard_child_accessors() TIGHTDB_NOEXCEPT;

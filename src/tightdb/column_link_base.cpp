@@ -2,6 +2,7 @@
 #include <tightdb/column_backlink.hpp>
 #include <tightdb/table.hpp>
 
+using namespace std;
 using namespace tightdb;
 
 

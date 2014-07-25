@@ -1357,6 +1357,23 @@ TEST(Group_StockBug)
 }
 
 
+TEST(Group_CommitLinkListChange)
+{
+    GROUP_TEST_PATH(path);
+    Group group(path, Group::mode_ReadWrite);
+    TableRef origin = group.get_table("origin");
+    TableRef target = group.get_table("target");
+    origin->add_column_link(type_LinkList, "", *target);
+    target->add_column(type_Int, "");
+    origin->add_empty_row();
+    target->add_empty_row();
+    LinkViewRef link_list = origin->get_linklist(0,0);
+    link_list->add(0);
+    group.commit();
+    group.Verify();
+}
+
+
 #ifdef TIGHTDB_DEBUG
 #ifdef TIGHTDB_TO_DOT
 
