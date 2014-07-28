@@ -543,8 +543,8 @@ TEST(LinkList_QueryFindLinkTarget)
 }
 
 
-
-ONLY(LinkList_MultiLinkQuery)
+// Tests chains of links, such as table->link(2).link(0)...
+TEST(LinkList_MultiLinkQuery)
 {
     Group group;
 

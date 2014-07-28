@@ -860,7 +860,10 @@ template <class T> UnaryOperator<Pow<T> >& power (Subexpr2<T>& left) {
     return *new UnaryOperator<Pow<T> >(left.clone(), true);
 }
 
-
+// Used for harvesting all links from a chain of links like table->link(5).link(3).link(9)
+// Given a start table, a list of link columns and a row index in the start table, it will "harvest" the link tree
+// (in case one or more link columns are of type LinkList, so that there is a fanout) and also tell what table
+// is the final target table.
 class LinkFollower
 {
 public:
