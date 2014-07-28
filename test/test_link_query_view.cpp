@@ -606,7 +606,6 @@ ONLY(LinkList_MultiLinkQuery)
 
     table1->add_empty_row();
 
-    size_t match;
     TableView tv;
     
     // Link -> Link
