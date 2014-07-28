@@ -20,6 +20,26 @@
 
 ----------------------------------------------
 
+# 0.80.4 Release notes
+
+### Bugfixes:
+
+* Bug fixed that would always leave a link list accessor (`LinkView`) in a
+  corrupt state after a call to `Group::commit()` or
+  `LangBindHelper::commit_and_continue_as_read()`, if the link list was modified
+  during the ended "transaction", and was non-empty either before, after, or
+  both before and after that "transaction".
+
+-----------
+
+### Internals:
+
+* Efficiency of CRUD operations has been greatly improved due to an improvement
+  of SlabAlloc). The cost of end-insertion (MyTable::add()), for example, has
+  been reduced to less than a 10th of its previous cost.
+
+----------------------------------------------
+
 # 0.80.3 Release notes
 
 ### Bugfixes:
@@ -74,10 +94,6 @@
 * Fixed bug in LinkView::refresh_accessor_tree() causing problems when transaction is advanced after a link list is cleared.
 * Fixed bug causing problems when transaction is advanced after a table with link-like columns is cleared.
 * Fixed bug in connection with cyclic link relationships.
-
-### API breaking changes:
-
-* None
 
 ### Enhancements:
 

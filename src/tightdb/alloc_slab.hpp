@@ -21,11 +21,12 @@
 #define TIGHTDB_ALLOC_SLAB_HPP
 
 #include <stdint.h> // unint8_t etc
+#include <vector>
 #include <string>
 
 #include <tightdb/util/features.h>
 #include <tightdb/util/file.hpp>
-#include <tightdb/table_macros.hpp>
+#include <tightdb/alloc.hpp>
 
 namespace tightdb {
 
@@ -239,13 +240,20 @@ private:
         attach_UnsharedFile // Not on behalf of SharedGroup
     };
 
-    // Define internal tables
-    TIGHTDB_TABLE_2(Slabs,
-                    ref_end, Int, // One plus last ref targeting this slab
-                    addr,    Int) // Memory pointer to this slab
-    TIGHTDB_TABLE_2(FreeSpace,
-                    ref,    Int,
-                    size,   Int)
+    // A slab is a dynamically allocated contiguous chunk of memory used to
+    // extend the amount of space available for database node
+    // storage. Inter-node references are represented as file offsets
+    // (a.k.a. "refs"), and each slab creates an apparently seamless extension
+    // of this file offset addressable space. Slabes are stored as rows in the
+    // Slabs table in order of ascending file offsets.
+    struct Slab {
+        ref_type ref_end;
+        char* addr;
+    };
+    struct Chunk {
+        ref_type ref;
+        size_t size;
+    };
 
     // 24 bytes
     struct Header {
@@ -294,20 +302,27 @@ private:
     /// less padding between members due to alignment requirements.
     bool m_free_space_invalid;
 
-    Slabs m_slabs;
-    FreeSpace m_free_space;
-    FreeSpace m_free_read_only;
+    typedef std::vector<Slab> slabs;
+    typedef std::vector<Chunk> chunks;
+    slabs m_slabs;
+    chunks m_free_space;
+    chunks m_free_read_only;
 
 #ifdef TIGHTDB_DEBUG
     bool m_debug_out;
 #endif
 
     /// Throws if free-lists are no longer valid.
-    const FreeSpace& get_free_read_only() const;
+    const chunks& get_free_read_only() const;
 
     bool validate_buffer(const char* data, std::size_t len, ref_type& top_ref);
 
     void do_prepare_for_update(char* mutable_data);
+
+    class ChunkRefEq;
+    class ChunkRefEndEq;
+    class SlabRefEndEq;
+    static bool ref_less_than_slab_ref_end(ref_type, const Slab&) TIGHTDB_NOEXCEPT;
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     Replication* get_replication() const TIGHTDB_NOEXCEPT { return m_replication; }
@@ -334,7 +349,9 @@ private:
 
 // Implementation:
 
-inline SlabAlloc::SlabAlloc(): m_attach_mode(attach_None), m_free_space_invalid(false)
+inline SlabAlloc::SlabAlloc():
+    m_attach_mode(attach_None),
+    m_free_space_invalid(false)
 {
     m_baseline = 0; // Unattached
 #ifdef TIGHTDB_DEBUG
@@ -391,6 +408,11 @@ inline SlabAlloc* SlabAlloc::DetachGuard::release() TIGHTDB_NOEXCEPT
     SlabAlloc* alloc = m_alloc;
     m_alloc = 0;
     return alloc;
+}
+
+inline bool SlabAlloc::ref_less_than_slab_ref_end(ref_type ref, const Slab& slab) TIGHTDB_NOEXCEPT
+{
+    return ref < slab.ref_end;
 }
 
 } // namespace tightdb

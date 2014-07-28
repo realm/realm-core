@@ -55,6 +55,13 @@ void set_capacity(char* header, size_t value)
     h[2] = uchar( value        & 0x000000FF);
 }
 
+size_t get_capacity(const char* header)
+{
+    typedef unsigned char uchar;
+    const uchar* h = reinterpret_cast<const uchar*>(header);
+    return (std::size_t(h[0]) << 16) + (std::size_t(h[1]) << 8) + h[2];
+}
+
 } // anonymous namespace
 
 
@@ -237,6 +244,57 @@ TEST(Alloc_BadBuffer)
         CHECK(!alloc.is_attached());
         CHECK_THROW(alloc.attach_buffer(buffer, sizeof buffer), InvalidDatabase);
         CHECK(!alloc.is_attached());
+    }
+}
+
+
+TEST(Alloc_Fuzzy)
+{
+    SlabAlloc alloc;
+    vector<MemRef> refs;
+    alloc.attach_empty();
+    const size_t iterations = 10000;
+
+    for (size_t iter = 0; iter < iterations; iter++) {
+        int action = rand() % 100;
+
+        if (action > 45) {
+            // allocate slightly more often than free so that we get a growing mem pool
+            size_t siz = rand() % 10 + 1;
+            siz *= 8;
+            MemRef r = alloc.alloc(siz);
+            refs.push_back(r);
+            set_capacity(r.m_addr, siz);
+
+            // write some data to the allcoated area so that we can verify it later
+            memset(r.m_addr + 3, static_cast<char>(reinterpret_cast<intptr_t>(r.m_addr)), siz - 3);
+        }
+        else if(refs.size() > 0) {
+            // free random entry
+            size_t entry = rand() % refs.size();
+            alloc.free_(refs[entry].m_ref, refs[entry].m_addr);
+            refs.erase(refs.begin() + entry);
+        }
+
+        if (iter + 1 == iterations || refs.size() > 10) {
+            // free everything when we have 10 allocations, or when we exit, to not leak
+            while(refs.size() > 0) {
+                MemRef r = refs[0];
+                size_t siz = get_capacity(r.m_addr);
+
+                // verify that all the data we wrote during allocation is intact
+                for (size_t c = 3; c < siz; c++) {
+                    if (r.m_addr[c] != static_cast<char>(reinterpret_cast<intptr_t>(r.m_addr))) {
+                        // faster than using 'CHECK' for each character, which is slow
+                        CHECK(false);
+                    }
+                }
+
+                alloc.free_(r.m_ref, r.m_addr);
+                refs.erase(refs.begin());
+            }
+
+        }
     }
 }
 

@@ -85,10 +85,10 @@ public:
     Table& get_target_table() TIGHTDB_NOEXCEPT;
 
 private:
-    TableRef        m_origin_table;
+    TableRef m_origin_table;
     ColumnLinkList& m_origin_column;
-    Column          m_target_row_indexes;
-    mutable size_t  m_ref_count;
+    Column m_target_row_indexes;
+    mutable std::size_t m_ref_count;
 
     // constructor (protected since it can only be used by friends)
     LinkView(Table* origin_table, ColumnLinkList&, std::size_t row_ndx);
@@ -97,12 +97,14 @@ private:
     void set_origin_row_index(std::size_t row_ndx);
 
     void do_nullify_link(std::size_t old_target_row_ndx);
-    void do_update_link(size_t old_target_row_ndx, std::size_t new_target_row_ndx);
+    void do_update_link(std::size_t old_target_row_ndx, std::size_t new_target_row_ndx);
 
     void bind_ref() const TIGHTDB_NOEXCEPT;
     void unbind_ref() const TIGHTDB_NOEXCEPT;
 
-    void refresh_accessor_tree(size_t new_row_ndx) TIGHTDB_NOEXCEPT;
+    void refresh_accessor_tree(std::size_t new_row_ndx) TIGHTDB_NOEXCEPT;
+
+    void update_from_parent(std::size_t old_baseline) TIGHTDB_NOEXCEPT;
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     Replication* get_repl() TIGHTDB_NOEXCEPT;
@@ -243,7 +245,7 @@ inline Table::RowExpr LinkView::operator[](std::size_t link_ndx) TIGHTDB_NOEXCEP
 inline void LinkView::add(std::size_t target_row_ndx)
 {
     TIGHTDB_ASSERT(is_attached());
-    size_t ins_pos = (m_target_row_indexes.is_attached()) ? m_target_row_indexes.size() : 0;
+    std::size_t ins_pos = (m_target_row_indexes.is_attached()) ? m_target_row_indexes.size() : 0;
     insert(ins_pos, target_row_ndx);
 }
 
@@ -290,7 +292,7 @@ inline Table& LinkView::get_target_table() TIGHTDB_NOEXCEPT
     return m_origin_column.get_target_table();
 }
 
-inline void LinkView::refresh_accessor_tree(size_t new_row_ndx) TIGHTDB_NOEXCEPT
+inline void LinkView::refresh_accessor_tree(std::size_t new_row_ndx) TIGHTDB_NOEXCEPT
 {
     Array& root = *m_target_row_indexes.get_root_array();
     root.set_ndx_in_parent(new_row_ndx);
@@ -300,6 +302,12 @@ inline void LinkView::refresh_accessor_tree(size_t new_row_ndx) TIGHTDB_NOEXCEPT
     else {
         root.detach();
     }
+}
+
+inline void LinkView::update_from_parent(std::size_t old_baseline) TIGHTDB_NOEXCEPT
+{
+    if (m_target_row_indexes.is_attached())
+        m_target_row_indexes.update_from_parent(old_baseline);
 }
 
 #ifdef TIGHTDB_ENABLE_REPLICATION

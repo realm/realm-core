@@ -49,8 +49,8 @@ public:
 
     static ref_type create(std::size_t size, Allocator&);
 
-    bool   has_links(std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
-    size_t get_link_count(std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
+    bool has_links(std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
+    std::size_t get_link_count(std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
 
     ConstLinkViewRef get(std::size_t row_ndx) const;
     LinkViewRef get(std::size_t row_ndx);
@@ -62,12 +62,14 @@ public:
     /// Compare two columns for equality.
     bool compare_link_list(const ColumnLinkList&) const;
 
-    void to_json_row(size_t row_ndx, std::ostream& out) const;
+    void to_json_row(std::size_t row_ndx, std::ostream& out) const;
 
     void refresh_accessor_tree(std::size_t, const Spec&) TIGHTDB_OVERRIDE;
 
     void adj_accessors_move_last_over(std::size_t, std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     void adj_acc_clear_root_table() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+
+    void update_from_parent(std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
 #ifdef TIGHTDB_DEBUG
     void Verify() const TIGHTDB_OVERRIDE;
@@ -156,7 +158,7 @@ inline bool ColumnLinkList::has_links(std::size_t row_ndx) const TIGHTDB_NOEXCEP
     return (ref != 0);
 }
 
-inline size_t ColumnLinkList::get_link_count(std::size_t row_ndx) const TIGHTDB_NOEXCEPT
+inline std::size_t ColumnLinkList::get_link_count(std::size_t row_ndx) const TIGHTDB_NOEXCEPT
 {
     ref_type ref = ColumnLinkBase::get_as_ref(row_ndx);
     if (ref == 0)

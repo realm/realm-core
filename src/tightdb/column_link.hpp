@@ -41,7 +41,7 @@ public:
 
     // Getting and modifying links
     bool is_null_link(std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
-    size_t get_link(std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
+    std::size_t get_link(std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
     void set_link(std::size_t row_ndx, std::size_t target_row_ndx);
     void insert_link(std::size_t row_ndx, std::size_t target_row_ndx);
     void nullify_link(std::size_t row_ndx);
@@ -61,7 +61,7 @@ protected:
                         std::size_t new_target_row_ndx) TIGHTDB_OVERRIDE;
 
 private:
-    void remove_backlinks(size_t row_ndx);
+    void remove_backlinks(std::size_t row_ndx);
 };
 
 
@@ -89,7 +89,7 @@ inline bool ColumnLink::is_null_link(std::size_t row_ndx) const TIGHTDB_NOEXCEPT
     return (ColumnLinkBase::get(row_ndx) == 0);
 }
 
-inline size_t ColumnLink::get_link(std::size_t row_ndx) const TIGHTDB_NOEXCEPT
+inline std::size_t ColumnLink::get_link(std::size_t row_ndx) const TIGHTDB_NOEXCEPT
 {
     // Row pos is offset by one, to allow null refs
     return to_size_t(ColumnLinkBase::get(row_ndx) - 1);
@@ -108,7 +108,8 @@ inline void ColumnLink::do_nullify_link(std::size_t row_ndx, std::size_t)
     ColumnLinkBase::set(row_ndx, 0);
 }
 
-inline void ColumnLink::do_update_link(std::size_t row_ndx, std::size_t, std::size_t new_target_row_ndx)
+inline void ColumnLink::do_update_link(std::size_t row_ndx, std::size_t,
+                                       std::size_t new_target_row_ndx)
 {
     // Row pos is offset by one, to allow null refs
     ColumnLinkBase::set(row_ndx, new_target_row_ndx + 1);

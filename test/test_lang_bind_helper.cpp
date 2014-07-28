@@ -4,8 +4,9 @@
 #include "testsettings.hpp"
 #ifdef TEST_LANG_BIND_HELPER
 
-#include <tightdb/lang_bind_helper.hpp>
 #include <tightdb/descriptor.hpp>
+#include <tightdb/table_macros.hpp>
+#include <tightdb/lang_bind_helper.hpp>
 #ifdef TIGHTDB_ENABLE_REPLICATION
 #  include <tightdb/replication.hpp>
 #  include <tightdb/commit_log.hpp>
@@ -5460,88 +5461,105 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkCycles)
 TEST(LangBindHelper_ImplicitTransactions)
 {
     SHARED_GROUP_TEST_PATH(path);
+    UniquePtr<LangBindHelper::TransactLogRegistry> wlr(getWriteLogs(path));
+    UniquePtr<Replication> repl(makeWriteLogCollector(path));
+    SharedGroup sg(*repl);
     {
-        UniquePtr<LangBindHelper::TransactLogRegistry> wlr(getWriteLogs(path));
-        UniquePtr<Replication> repl(makeWriteLogCollector(path));
-        SharedGroup sg(*repl);
+        WriteTransaction wt(sg);
+        wt.get_table<TestTableShared>("table")->add_empty_row();
+        wt.commit();
+    }
+    UniquePtr<Replication> repl2(makeWriteLogCollector(path));
+    SharedGroup sg2(*repl2);
+    Group& g = const_cast<Group&>(sg.begin_read());
+    TestTableShared::Ref table = g.get_table<TestTableShared>("table");
+    for (int i = 0; i<100; i++) {
         {
-            WriteTransaction wt(sg);
-            wt.get_table<TestTableShared>("table")->add_empty_row();
+            // change table in other context
+            WriteTransaction wt(sg2);
+            wt.get_table<TestTableShared>("table")[0].first += 100;
             wt.commit();
         }
-        UniquePtr<Replication> repl2(makeWriteLogCollector(path));
-        SharedGroup sg2(*repl2);
-        Group& g = const_cast<Group&>(sg.begin_read());
-        TestTableShared::Ref table = g.get_table<TestTableShared>("table");
-        for (int i = 0; i<100; i++) {
-            {
-                // change table in other context
-                WriteTransaction wt(sg2);
-                wt.get_table<TestTableShared>("table")[0].first += 100;
-                wt.commit();
-            }
-            // verify we can't see the update
-            CHECK_EQUAL(i, table[0].first);
-            LangBindHelper::advance_read(sg, *wlr);
-            // now we CAN see it, and through the same accessor
-            CHECK(table->is_attached());
-            CHECK_EQUAL(i + 100, table[0].first);
-            {
-                // change table in other context
-                WriteTransaction wt(sg2);
-                wt.get_table<TestTableShared>("table")[0].first += 10000;
-                wt.commit();
-            }
-            // can't see it:
-            CHECK_EQUAL(i + 100, table[0].first);
-            LangBindHelper::promote_to_write(sg, *wlr);
-            // CAN see it:
-            CHECK(table->is_attached());
-            CHECK_EQUAL(i + 10100, table[0].first);
-            table[0].first -= 10100;
-            table[0].first += 1;
-            LangBindHelper::commit_and_continue_as_read(sg);
-            CHECK(table->is_attached());
-            CHECK_EQUAL(i+1, table[0].first);
+        // verify we can't see the update
+        CHECK_EQUAL(i, table[0].first);
+        LangBindHelper::advance_read(sg, *wlr);
+        // now we CAN see it, and through the same accessor
+        CHECK(table->is_attached());
+        CHECK_EQUAL(i + 100, table[0].first);
+        {
+            // change table in other context
+            WriteTransaction wt(sg2);
+            wt.get_table<TestTableShared>("table")[0].first += 10000;
+            wt.commit();
         }
-        sg.end_read();
+        // can't see it:
+        CHECK_EQUAL(i + 100, table[0].first);
+        LangBindHelper::promote_to_write(sg, *wlr);
+        // CAN see it:
+        CHECK(table->is_attached());
+        CHECK_EQUAL(i + 10100, table[0].first);
+        table[0].first -= 10100;
+        table[0].first += 1;
+        LangBindHelper::commit_and_continue_as_read(sg);
+        CHECK(table->is_attached());
+        CHECK_EQUAL(i+1, table[0].first);
     }
+    sg.end_read();
 }
 
 
 TEST(LangBindHelper_ImplicitTransactions_OverSharedGroupDestruction)
 {
     SHARED_GROUP_TEST_PATH(path);
+    // we hold on to write log collector and registry across a complete
+    // shutdown/initialization of shared group.
+    UniquePtr<Replication> repl(makeWriteLogCollector(path));
+    UniquePtr<LangBindHelper::TransactLogRegistry> wlr(getWriteLogs(path));
     {
-        // we hold on to write log collector and registry across a complete
-        // shutdown/initialization of shared group.
+        SharedGroup sg(*repl);
+        {
+            WriteTransaction wt(sg);
+            TableRef tr = wt.get_table("table");
+            tr->add_column(type_Int, "first");
+            for (int i=0; i<20; i++)
+                tr->add_empty_row();
+            wt.commit();
+        }
+        // no valid shared group anymore
+    }
+    {
         UniquePtr<Replication> repl(makeWriteLogCollector(path));
         UniquePtr<LangBindHelper::TransactLogRegistry> wlr(getWriteLogs(path));
+        SharedGroup sg(*repl);
         {
-            SharedGroup sg(*repl);
-            {
-                WriteTransaction wt(sg);
-                TableRef tr = wt.get_table("table");
-                tr->add_column(type_Int, "first");
-                for (int i=0; i<20; i++)
-                    tr->add_empty_row();
-                wt.commit();
-            }
-            // no valid shared group anymore
-        }
-        {
-            UniquePtr<Replication> repl(makeWriteLogCollector(path));
-            UniquePtr<LangBindHelper::TransactLogRegistry> wlr(getWriteLogs(path));
-            SharedGroup sg(*repl);
-            {
-                WriteTransaction wt(sg);
-                TableRef tr = wt.get_table("table");
-                for (int i=0; i<20; i++)
-                    tr->add_empty_row();
-                wt.commit();
-            }
+            WriteTransaction wt(sg);
+            TableRef tr = wt.get_table("table");
+            for (int i=0; i<20; i++)
+                tr->add_empty_row();
+            wt.commit();
         }
     }
+}
+
+
+TEST(LangBindHelper_ImplicitTransactions_LinkList)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    UniquePtr<LangBindHelper::TransactLogRegistry> tlr(getWriteLogs(path));
+    UniquePtr<Replication> repl(makeWriteLogCollector(path));
+    SharedGroup sg(*repl);
+    Group* group = const_cast<Group*>(&sg.begin_read());
+    LangBindHelper::promote_to_write(sg, *tlr);
+    TableRef origin = group->get_table("origin");
+    TableRef target = group->get_table("target");
+    origin->add_column_link(type_LinkList, "", *target);
+    target->add_column(type_Int, "");
+    origin->add_empty_row();
+    target->add_empty_row();
+    LinkViewRef link_list = origin->get_linklist(0,0);
+    link_list->add(0);
+    LangBindHelper::commit_and_continue_as_read(sg);
+    group->Verify();
 }
 
 

@@ -5,6 +5,7 @@
 
 #include <tightdb/table.hpp>
 #include <tightdb/descriptor.hpp>
+#include <tightdb/link_view.hpp>
 #include <tightdb/group_shared.hpp>
 #include <tightdb/replication.hpp>
 

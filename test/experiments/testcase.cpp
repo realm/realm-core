@@ -21,6 +21,7 @@
 #include <tightdb/lang_bind_helper.hpp>
 #ifdef TIGHTDB_ENABLE_REPLICATION
 #  include <tightdb/replication.hpp>
+#  include <tightdb/commit_log.hpp>
 #endif
 
 #include "../test.hpp"
