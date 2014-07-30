@@ -2,7 +2,7 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
+* Fixed bug in `where(&tv)...find()` where it would fail to find a match, if usig with a TableView, tv.
 
 ### API breaking changes:
 
