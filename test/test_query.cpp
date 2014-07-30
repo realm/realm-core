@@ -3383,7 +3383,7 @@ TEST(Query_SortBools)
 }
 
 
-CHECK(Query_Sort_And_Requery_Typed1)
+TEST(Query_Sort_And_Requery_Typed1)
 {
     TupleTableType ttt;
 
