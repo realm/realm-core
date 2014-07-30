@@ -900,10 +900,10 @@ size_t Query::find(size_t begin)
 
     if (m_tableview) {
         size_t end = m_tableview->size();
-        for (size_t begin2 = begin; begin < end; begin++) {
-            size_t res = peek_tableview(begin2);
+        for (; begin < end; begin++) {
+            size_t res = peek_tableview(begin);
             if (res != not_found)
-                return begin2;
+                return begin;
         }
         return not_found;
     }
