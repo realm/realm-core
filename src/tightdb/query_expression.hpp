@@ -1039,14 +1039,6 @@ public:
         Query::m_table = t->get_table_ref();
     }
 
-/*    ~UnaryLinkCompare()
-    {
-        if (m_auto_delete) {
-
-        }
-    }
-*/
-
     void set_table()
     {
     }
@@ -1070,7 +1062,6 @@ public:
     }
 
 private:
-    bool m_auto_delete;
     mutable LinkFollower m_link_follower;
     Table* t;
 };
@@ -1099,7 +1090,7 @@ public:
     }
 
     Query is_null() {
-        return *new UnaryLinkCompare(m_link_follower); // = new UnaryLinkCompare();
+        return *new UnaryLinkCompare(m_link_follower);
     }
 
     virtual Subexpr& clone()
