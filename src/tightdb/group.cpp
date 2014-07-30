@@ -9,6 +9,7 @@
 #include <tightdb/util/thread.hpp>
 #include <tightdb/impl/destroy_guard.hpp>
 #include <tightdb/utilities.hpp>
+#include <tightdb/exceptions.hpp>
 #include <tightdb/group_writer.hpp>
 #include <tightdb/group.hpp>
 #ifdef TIGHTDB_ENABLE_REPLICATION
@@ -133,6 +134,11 @@ void Group::init_from_ref(ref_type top_ref) TIGHTDB_NOEXCEPT
     m_table_names.init_from_parent();
     m_tables.init_from_parent();
     m_is_attached = true;
+    m_size = 0;
+    size_t limit = ending_index();
+    for (size_t ndx = first_valid_index(); ndx < limit; ++ndx)
+        if (m_tables.get(ndx) != 0)
+            ++m_size;
 
     // Note that the third slot is the logical file size.
 
@@ -242,12 +248,14 @@ void Group::detach() TIGHTDB_NOEXCEPT
     complete_detach();
 }
 
+
 void Group::detach_but_retain_data() TIGHTDB_NOEXCEPT
 {
     m_is_attached = false;
     detach_table_accessors();
     m_table_accessors.clear();
 }
+
 
 void Group::complete_detach() TIGHTDB_NOEXCEPT
 {
@@ -258,6 +266,7 @@ void Group::complete_detach() TIGHTDB_NOEXCEPT
     m_free_lengths.detach();
     m_free_versions.detach();
 }
+
 
 Table* Group::get_table_by_ndx(size_t ndx)
 {
@@ -276,19 +285,84 @@ Table* Group::get_table_by_ndx(size_t ndx)
     return table;
 }
 
+
+void Group::remove_table(size_t table_ndx)
+{
+    TIGHTDB_ASSERT(is_attached());
+    TIGHTDB_ASSERT(table_ndx < m_tables.size());
+    TIGHTDB_ASSERT(m_tables.get(table_ndx) != 0);
+    Table* table = get_table_by_ndx(table_ndx);
+
+    // In principle we could remove a table even if it is the target of link
+    // columns of other tables, however, to do that, we would have to
+    // automatically remove the "offending" link columns from those other
+    // tables. Such a behaviour is deemed too obscure, and we shall therefore
+    // require that a removed table does not contain foreigh origin backlink
+    // columns.
+    typedef _impl::TableFriend tf;
+    if (tf::is_cross_table_link_target(*table))
+        throw CrossTableLinkTarget();
+
+    // There is no easy way for Group::TransactAdvancer to handle removal of
+    // tables that contain foreign target table link columns, because that
+    // involves removal of the corresponding backlink columns. For that reason,
+    // we start be removing all columns, and that will generate individual
+    // replication instructions for each column with sufficient information for
+    // Group::TransactAdvancer to handle them.
+    size_t n = table->get_column_count();
+    for (size_t i = n; i > 0; --i)
+        table->remove_column(i-1);
+
+    m_table_accessors[table_ndx] = 0;
+    tf::detach(*table);
+    tf::unbind_ref(*table);
+
+    // Destroy underlying node structure
+    ref_type ref = m_tables.get(table_ndx);
+    Array::destroy_deep(ref, m_alloc);
+
+    m_tables.set(table_ndx, 0); // Throws
+    m_table_names.set(table_ndx, StringData()); // Throws
+    --m_size;
+
+    if (Replication* repl = m_alloc.get_replication())
+        repl->erase_group_level_table(table_ndx); // Throws
+}
+
+
+void Group::rename_table(size_t table_ndx, StringData new_name)
+{
+    TIGHTDB_ASSERT(is_attached());
+    TIGHTDB_ASSERT(table_ndx < m_table_names.size());
+    TIGHTDB_ASSERT(m_tables.get(table_ndx) != 0);
+    m_table_names.set(table_ndx, new_name);
+    if (Replication* repl = m_alloc.get_replication())
+        repl->rename_group_level_table(table_ndx, new_name); // Throws
+}
+
+
 size_t Group::create_table(StringData name)
 {
     using namespace _impl;
     typedef TableFriend tf;
     ref_type ref = tf::create_empty_table(m_alloc); // Throws
-    size_t ndx = m_tables.size();
-    TIGHTDB_ASSERT(ndx == m_table_names.size());
-    m_tables.add(ref); // Throws
-    m_table_names.add(name); // Throws
-
-    // Need slot for table accessor
-    if (!m_table_accessors.empty())
-        m_table_accessors.push_back(0); // Throws
+    size_t ndx;
+    if (m_size < m_tables.size()) {
+        ndx = m_tables.find_first(0);
+        TIGHTDB_ASSERT(ndx != tightdb::not_found);
+        TIGHTDB_ASSERT(m_table_names.get(ndx) == "");
+    }
+    else {
+        ndx = m_tables.size();
+        m_tables.add(0); // Throws
+        m_table_names.add(StringData()); // Throws
+        // Need slot for table accessor
+        if (!m_table_accessors.empty())
+            m_table_accessors.push_back(0); // Throws
+    }
+    m_tables.set(ndx, ref); // Throws
+    m_table_names.set(ndx, name); // Throws
+    ++m_size;
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     if (Replication* repl = m_alloc.get_replication())
@@ -818,6 +892,25 @@ public:
         return true;
     }
 
+    bool erase_group_level_table(size_t table_ndx) TIGHTDB_NOEXCEPT
+    {
+        // Link target tables do not need to be considered here, since all
+        // columns will already have been removed at this point.
+        if (Table* table = m_group.m_table_accessors[table_ndx]) {
+            typedef _impl::TableFriend tf;
+            tf::detach(*table);
+            tf::unbind_ref(*table);
+        }
+        return true;
+    }
+
+    bool rename_group_level_table(size_t, StringData) TIGHTDB_NOEXCEPT
+    {
+        // No-op since table names are properties of the group, and the group
+        // accessor is always refreshed
+        return true;
+    }
+
     bool select_table(size_t group_level_ndx, int levels, const size_t* path) TIGHTDB_NOEXCEPT
     {
         m_table.reset();
@@ -873,7 +966,6 @@ public:
         typedef _impl::TableFriend tf;
         if (m_table)
             tf::adj_acc_clear_root_table(*m_table);
-        // tf::discard_child_accessors(*m_table);
         return true;
     }
 
@@ -956,42 +1048,42 @@ public:
 
     bool row_insert_complete() TIGHTDB_NOEXCEPT
     {
-        return true; // Noop
+        return true; // No-op
     }
 
     bool set_int(size_t, size_t, int_fast64_t) TIGHTDB_NOEXCEPT
     {
-        return true; // Noop
+        return true; // No-op
     }
 
     bool set_bool(size_t, size_t, bool) TIGHTDB_NOEXCEPT
     {
-        return true; // Noop
+        return true; // No-op
     }
 
     bool set_float(size_t, size_t, float) TIGHTDB_NOEXCEPT
     {
-        return true; // Noop
+        return true; // No-op
     }
 
     bool set_double(size_t, size_t, double) TIGHTDB_NOEXCEPT
     {
-        return true; // Noop
+        return true; // No-op
     }
 
     bool set_string(size_t, size_t, StringData) TIGHTDB_NOEXCEPT
     {
-        return true; // Noop
+        return true; // No-op
     }
 
     bool set_binary(size_t, size_t, BinaryData) TIGHTDB_NOEXCEPT
     {
-        return true; // Noop
+        return true; // No-op
     }
 
     bool set_date_time(size_t, size_t, DateTime) TIGHTDB_NOEXCEPT
     {
-        return true; // Noop
+        return true; // No-op
     }
 
     bool set_table(size_t col_ndx, size_t row_ndx) TIGHTDB_NOEXCEPT
@@ -1042,12 +1134,12 @@ public:
 
     bool add_int_to_column(size_t, int_fast64_t) TIGHTDB_NOEXCEPT
     {
-        return true; // Noop
+        return true; // No-op
     }
 
     bool optimize_table() TIGHTDB_NOEXCEPT
     {
-        return true; // Noop
+        return true; // No-op
     }
 
     bool select_descriptor(int levels, const size_t* path)
@@ -1122,12 +1214,12 @@ public:
 
     bool rename_column(size_t, StringData) TIGHTDB_NOEXCEPT
     {
-        return true; // Noop
+        return true; // No-op
     }
 
     bool add_search_index(size_t) TIGHTDB_NOEXCEPT
     {
-        return true; // Noop
+        return true; // No-op
     }
 
     bool select_link_list(size_t col_ndx, size_t) TIGHTDB_NOEXCEPT
@@ -1138,32 +1230,32 @@ public:
             if (Table* target = tf::get_link_target_table_accessor(*m_table, col_ndx))
                 tf::mark(*target);
         }
-        return true; // Noop
+        return true; // No-op
     }
 
     bool link_list_set(size_t, size_t) TIGHTDB_NOEXCEPT
     {
-        return true; // Noop
+        return true; // No-op
     }
 
     bool link_list_insert(size_t, size_t) TIGHTDB_NOEXCEPT
     {
-        return true; // Noop
+        return true; // No-op
     }
 
     bool link_list_move(size_t, size_t) TIGHTDB_NOEXCEPT
     {
-        return true; // Noop
+        return true; // No-op
     }
 
     bool link_list_erase(size_t) TIGHTDB_NOEXCEPT
     {
-        return true; // Noop
+        return true; // No-op
     }
 
     bool link_list_clear() TIGHTDB_NOEXCEPT
     {
-        return true; // Noop
+        return true; // No-op
     }
 
 private:

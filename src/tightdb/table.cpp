@@ -4566,6 +4566,20 @@ void Table::refresh_column_accessors(size_t col_ndx_begin)
 }
 
 
+bool Table::is_cross_table_link_target() const TIGHTDB_NOEXCEPT
+{
+    size_t n = m_cols.size();
+    for (size_t i = m_spec.get_public_column_count(); i < n; ++i) {
+        TIGHTDB_ASSERT(dynamic_cast<ColumnBackLink*>(m_cols[i]));
+        ColumnBackLink& backlink_col = static_cast<ColumnBackLink&>(*m_cols[i]);
+        Table& origin = backlink_col.get_origin_table();
+        if (&origin != this)
+            return true;
+    }
+    return false;
+}
+
+
 #ifdef TIGHTDB_DEBUG
 
 void Table::Verify() const

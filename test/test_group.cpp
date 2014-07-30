@@ -249,6 +249,50 @@ TEST(Group_Size)
     CHECK_EQUAL(2, g.size());
 }
 
+TEST(Group_RemoveTable)
+{
+    Group g;
+    TableRef t1 = g.get_table("alpha");
+    TableRef t2 = g.get_table("beta");
+    TableRef t3 = g.get_table("tau");
+    TableRef t4 = g.get_table("sigma");
+    CHECK_EQUAL(4, g.size());
+    g.rename_table(1, "grappa");
+    CHECK_EQUAL(4, g.size());
+    g.remove_table(1);
+    CHECK_EQUAL(3, g.size());
+    CHECK_EQUAL(StringData("alpha"), g.get_table_name(0));
+    CHECK_EQUAL(StringData("tau"), g.get_table_name(2));
+    CHECK_EQUAL(StringData("sigma"), g.get_table_name(3));
+    TableRef t5 = g.get_table("beta");
+    CHECK_EQUAL(4, g.size());
+    CHECK_EQUAL(StringData("alpha"), g.get_table_name(0));
+    CHECK_EQUAL(StringData("beta"), g.get_table_name(1));
+    CHECK_EQUAL(StringData("tau"), g.get_table_name(2));
+    CHECK_EQUAL(StringData("sigma"), g.get_table_name(3));
+}
+
+
+TEST(Group_RemoveLinkTable)
+{
+    Group group;
+    TableRef table = group.get_table("table");
+    table->add_column_link(type_Link, "", *table);
+    group.remove_table(table->get_index_in_parent());
+    CHECK(group.is_empty());
+    CHECK(!table->is_attached());
+    TableRef origin = group.get_table("origin");
+    TableRef target = group.get_table("target");
+    target->add_column(type_Int, "");
+    origin->add_column_link(type_Link, "", *target);
+    CHECK_THROW(group.remove_table(target->get_index_in_parent()), CrossTableLinkTarget);
+    group.remove_table(origin->get_index_in_parent());
+    CHECK_EQUAL(1, group.size());
+    CHECK(!origin->is_attached());
+    CHECK(target->is_attached());
+}
+
+
 TEST(Group_GetTable)
 {
     Group g;
