@@ -971,7 +971,7 @@ private:
 
     template<size_t w> bool MinMax(size_t from, size_t to, uint64_t maxdiff,
                                    int64_t* min, int64_t* max) const;
-    Array& operator=(const Array&) {return *this;} // not allowed
+    Array& operator=(const Array&); // not allowed
     template<size_t w> void QuickSort(size_t lo, size_t hi);
     void QuickSort(size_t lo, size_t hi);
     void ReferenceQuickSort(Array& ref) const;

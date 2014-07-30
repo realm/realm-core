@@ -3403,6 +3403,10 @@ TEST(Query_Sort_And_Requery_Typed1)
 
     TupleTableType::Query q = ttt.where().first.not_equal(2);
     TupleTableType::View tv = q.find_all();
+
+    size_t match = ttt.where(&tv).first.equal(7).find();
+    CHECK(match == 6);
+
     tv.column().first.sort();
 
     CHECK(tv.size() == 7);
@@ -3422,6 +3426,18 @@ TEST(Query_Sort_And_Requery_Typed1)
     CHECK_EQUAL(1, tv2[1].first);
     CHECK_EQUAL(8, tv2[2].first); // 8, 9 (sort order) instead of 9, 8 (table order)
     CHECK_EQUAL(9, tv2[3].first);
+
+    match = ttt.where(&tv).second.not_equal("X").find();
+    CHECK(match == 0);
+
+    match = ttt.where(&tv).second.not_equal("X").find(1);
+    CHECK(match == 1);
+
+    match = ttt.where(&tv).second.not_equal("X").find(2);
+    CHECK(match == 5);
+
+    match = ttt.where(&tv).second.not_equal("X").find(6);
+    CHECK(match == 6);
 }
 
 
