@@ -551,6 +551,7 @@ TEST(LinkList_MultiLinkQuery)
     TableRef table1 = group.get_table("table1");
     TableRef table2 = group.get_table("table2");
     TableRef table3 = group.get_table("table3");
+    TableRef table4 = group.get_table("table4");
 
     size_t col_linklist2 = table1->add_column_link(type_LinkList, "link", *table2);
     size_t col_link2 = table1->add_column_link(type_Link, "link", *table2);
@@ -558,9 +559,18 @@ TEST(LinkList_MultiLinkQuery)
     size_t col_link3 = table2->add_column_link(type_Link, "link", *table3);
     size_t col_linklist3 = table2->add_column_link(type_LinkList, "link", *table3);
 
+    table4->add_column(type_Int, "int");
+    table4->add_empty_row();
+    table4->set_int(0, 0, 1000);
+    table4->add_empty_row();
+    table4->set_int(0, 1, 2000);
+
     table3->add_column(type_Int, "int");
     table3->add_column(type_String, "string");
     table3->add_column(type_Float, "string");
+
+    size_t col_link4 = table3->add_column_link(type_Link, "link", *table4);
+    size_t col_linklist4 = table3->add_column_link(type_LinkList, "link", *table4);
 
     // add some rows
     table3->add_empty_row();
@@ -579,6 +589,12 @@ TEST(LinkList_MultiLinkQuery)
     table3->set_float(2, 2, 300.0);
 
     LinkViewRef lvr;
+
+    table3->add_empty_row();
+    table3->set_link(col_link4, 0, 0);
+    lvr = table3->get_linklist(col_linklist4, 0);
+    lvr->add(0);
+    lvr->add(1);
 
     table2->add_empty_row();
     table2->set_link(col_link3, 0, 0);
@@ -739,6 +755,18 @@ TEST(LinkList_MultiLinkQuery)
 
     tv = (table1->link(col_linklist2).link(col_linklist3).column<Float>(2) == 400.).find_all();
     CHECK_EQUAL(0, tv.size());
+
+    // 3 levels of links
+    tv = (table1->link(col_linklist2).link(col_linklist3).link(col_linklist4).column<Int>(0) > 0).find_all();
+    CHECK_EQUAL(1, tv.size());
+    CHECK_EQUAL(0, tv.get_source_ndx(0));
+
+    tv = (table1->link(col_link2).link(col_link3).link(col_link4).column<Int>(0) == 1000).find_all();
+    CHECK_EQUAL(1, tv.size());
+    CHECK_EQUAL(1, tv.get_source_ndx(0));
+
+    tv = (table1->link(col_link2).link(col_link3).link(col_link4).column<Int>(0) == 2000).find_all();
+    CHECK_EQUAL(0, tv.size());
 }
 
 
@@ -804,7 +832,6 @@ TEST(Link_FindNullLink)
     match = table2->column<LinkList>(col_linklist2).is_null().find(2);
     CHECK_EQUAL(3, match);
 }
-
 
 
 #endif
