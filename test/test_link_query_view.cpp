@@ -739,9 +739,71 @@ TEST(LinkList_MultiLinkQuery)
 
     tv = (table1->link(col_linklist2).link(col_linklist3).column<Float>(2) == 400.).find_all();
     CHECK_EQUAL(0, tv.size());
-
 }
 
+
+TEST(Link_FindNullLink)
+{
+    size_t match;
+
+    Group group;
+
+    TableRef table1 = group.get_table("table1");
+    TableRef table2 = group.get_table("table2");
+
+    // add some more columns to table1 and table2
+    table1->add_column(type_Int, "col1");
+    table1->add_column(type_String, "str1");
+
+    // add some rows
+    table1->add_empty_row();
+    table1->set_int(0, 0, 100);
+    table1->set_string(1, 0, "foo");
+    table1->add_empty_row();
+    table1->set_int(0, 1, 200);
+    table1->set_string(1, 1, "!");
+    table1->add_empty_row();
+    table1->set_int(0, 2, 300);
+    table1->set_string(1, 2, "bar");
+
+    size_t col_link2 = table2->add_column_link(type_Link, "link", *table1);
+    size_t col_linklist2 = table2->add_column_link(type_LinkList, "link", *table1);
+    table2->add_empty_row();
+    table2->add_empty_row();
+    table2->add_empty_row();
+    table2->add_empty_row();
+
+    table2->set_link(col_link2, 0, 1);
+    table2->set_link(col_link2, 2, 2);
+
+    LinkViewRef lvr;
+
+    lvr = table2->get_linklist(col_linklist2, 0);
+    lvr->add(0);
+    lvr->add(1);
+    lvr = table2->get_linklist(col_linklist2, 2);
+    lvr->add(0);
+
+    Query q3 = table2->column<Link>(col_link2).is_null();
+    TableView tv = q3.find_all();
+    CHECK_EQUAL(2, tv.size());
+    CHECK_EQUAL(1, tv.get_source_ndx(0));
+    CHECK_EQUAL(3, tv.get_source_ndx(1));
+    match = table2->column<Link>(col_link2).is_null().find();
+    CHECK_EQUAL(1, match);
+    match = table2->column<Link>(col_link2).is_null().find(2);
+    CHECK_EQUAL(3, match);
+
+    Query q4 = table2->column<LinkList>(col_linklist2).is_null();
+    TableView tv2 = q4.find_all();
+    CHECK_EQUAL(2, tv2.size());
+    CHECK_EQUAL(1, tv2.get_source_ndx(0));
+    CHECK_EQUAL(3, tv2.get_source_ndx(1));
+    match = table2->column<LinkList>(col_linklist2).is_null().find();
+    CHECK_EQUAL(1, match);
+    match = table2->column<LinkList>(col_linklist2).is_null().find(2);
+    CHECK_EQUAL(3, match);
+}
 
 
 

@@ -144,6 +144,7 @@ typedef float               Float;
 typedef double              Double;
 typedef tightdb::StringData String;
 
+
 // Return StringData if either T or U is StringData, else return T. See description of usage in export2().
 template<class T, class U> struct EitherIsString
 {
@@ -277,8 +278,7 @@ template <class T> class Subexpr2;
 template <class oper, class TLeft = Subexpr, class TRight = Subexpr> class Operator;
 template <class oper, class TLeft = Subexpr> class UnaryOperator;
 template <class TCond, class T, class TLeft = Subexpr, class TRight = Subexpr> class Compare;
-
-
+class UnaryLinkCompare;
 class ColumnAccessorBase;
 
 
@@ -931,7 +931,6 @@ public:
         }
     }
 
-    // Pointer to payload table (which is the linked-to table if this is a link column) used for condition operator
     const Table* m_table;
     std::vector<ColumnLinkBase*> m_link_columns;
     std::vector<tightdb::DataType> m_link_types;
@@ -1028,6 +1027,108 @@ template <class T> Query operator == (const Columns<StringData>& left, T right) 
 template <class T> Query operator != (const Columns<StringData>& left, T right) {
     return create<StringData, NotEqual, StringData>(right, left);
 }
+
+
+class UnaryLinkCompare : public Expression
+{
+public:
+    UnaryLinkCompare(LinkFollower lf) : m_link_follower(lf)
+    {
+        Query::expression(this, true);
+        t = const_cast<Table*>(get_table()); // todo, const
+        Query::m_table = t->get_table_ref();
+    }
+
+/*    ~UnaryLinkCompare()
+    {
+        if (m_auto_delete) {
+
+        }
+    }
+*/
+
+    void set_table()
+    {
+    }
+
+    virtual const Table* get_table()
+    {
+        return m_link_follower.m_tables[0];
+    }
+
+    size_t find_first(size_t start, size_t end) const
+    {
+        for (; start < end;) {
+            std::vector<size_t> l = m_link_follower.get_links(start);
+            if (l.size() == 0)
+                return start;
+            
+            start++;
+        }
+
+        return not_found; // no match
+    }
+
+private:
+    bool m_auto_delete;
+    mutable LinkFollower m_link_follower;
+    Table* t;
+};
+
+// This is for LinkList too becauswe we have 'typedef List LinkList'
+template <> class Columns<Link> : public Subexpr2<Link>
+{
+public:
+    Columns(size_t column, const Table* table, std::vector<size_t> links) :
+        m_table(null_ptr)
+    {
+        static_cast<void>(column);
+        m_link_follower.init(const_cast<Table*>(table), links);
+        m_table = table;
+
+    }
+
+    Columns() : m_table(null_ptr) { }
+
+    explicit Columns(size_t column) : m_table(null_ptr) { static_cast<void>(column); }
+
+    Columns(size_t column, const Table* table) : m_table(null_ptr)
+    {
+        static_cast<void>(column);
+        m_table = table;
+    }
+
+    Query is_null() {
+        return *new UnaryLinkCompare(m_link_follower); // = new UnaryLinkCompare();
+    }
+
+    virtual Subexpr& clone()
+    {
+        return *this;
+    }
+
+    virtual const Table* get_table()
+    {
+        return m_table;
+    }
+
+    virtual void evaluate(size_t index, ValueBase& destination)
+    {
+        static_cast<void>(index);
+        static_cast<void>(destination);
+        TIGHTDB_ASSERT(false);
+    }
+
+    // m_table is redundant with ColumnAccessorBase<>::m_table, but is in order to decrease class dependency/entanglement
+    const Table* m_table;
+
+    // Column index of payload column of m_table
+    size_t m_column;
+
+    LinkFollower m_link_follower;
+    bool auto_delete;
+};
+
 
 template <class T> class Columns : public Subexpr2<T>, public ColumnsBase
 {
@@ -1320,6 +1421,8 @@ private:
     TLeft& m_left;
     TRight& m_right;
 };
+
+
 
 //}
 #endif // TIGHTDB_QUERY_EXPRESSION_HPP

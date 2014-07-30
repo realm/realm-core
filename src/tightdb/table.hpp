@@ -49,8 +49,10 @@ class ColumnLinkBase;
 class ColumnLink;
 class ColumnLinkList;
 class ColumnBackLink;
-
 template<class> class Columns;
+
+struct Link {};
+typedef Link LinkList;
 
 namespace _impl { class TableFriend; }
 
@@ -1355,6 +1357,9 @@ inline TableRef Table::copy(Allocator& alloc) const
 template<class T> inline Columns<T> Table::column(std::size_t column)
 {
     std::vector<size_t> tmp = m_link_chain;
+    if (util::SameType<T, Link>::value || util::SameType<T, LinkList>::value) {
+        tmp.push_back(column);
+    }
     m_link_chain.clear();
     return Columns<T>(column, this, tmp);
 }
