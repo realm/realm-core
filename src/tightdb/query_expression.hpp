@@ -1028,14 +1028,16 @@ template <class T> Query operator != (const Columns<StringData>& left, T right) 
     return create<StringData, NotEqual, StringData>(right, left);
 }
 
-
+// This class is intended to perform queries on the *pointers* of links, contrary to performing queries on *payload* 
+// in linked-to tables. Queries can be "find first link that points at row X" or "find first null-link". Currently
+// only "find first null-link" is supported. More will be added later.
 class UnaryLinkCompare : public Expression
 {
 public:
     UnaryLinkCompare(LinkFollower lf) : m_link_follower(lf)
     {
         Query::expression(this, true);
-        t = const_cast<Table*>(get_table()); // todo, const
+        Table* t = const_cast<Table*>(get_table());
         Query::m_table = t->get_table_ref();
     }
 
@@ -1043,6 +1045,8 @@ public:
     {
     }
 
+    // Return main table of query (table on which table->where()... is invoked). Note that this is not the same as 
+    // any linked-to payload tables
     virtual const Table* get_table()
     {
         return m_link_follower.m_tables[0];
@@ -1052,31 +1056,38 @@ public:
     {
         for (; start < end;) {
             std::vector<size_t> l = m_link_follower.get_links(start);
+            // We have found a Link which is NULL, or LinkList with 0 entries. Return it as match.
             if (l.size() == 0)
                 return start;
             
             start++;
         }
 
-        return not_found; // no match
+        return not_found;
     }
 
 private:
     mutable LinkFollower m_link_follower;
-    Table* t;
 };
 
-// This is for LinkList too becauswe we have 'typedef List LinkList'
+// This is for LinkList too because we have 'typedef List LinkList'
 template <> class Columns<Link> : public Subexpr2<Link>
 {
 public:
+    Query is_null() {
+        if (m_link_follower.m_link_columns.size() > 1)
+            throw std::runtime_error("Cannot find null-links in a linked-to table (link()...is_null() not supported).");
+        // Todo, it may be useful to support the above, but we would need to figure out an intuitive behaviour
+        return *new UnaryLinkCompare(m_link_follower);
+    }
+
+private:
     Columns(size_t column, const Table* table, std::vector<size_t> links) :
         m_table(null_ptr)
     {
         static_cast<void>(column);
         m_link_follower.init(const_cast<Table*>(table), links);
         m_table = table;
-
     }
 
     Columns() : m_table(null_ptr) { }
@@ -1087,10 +1098,6 @@ public:
     {
         static_cast<void>(column);
         m_table = table;
-    }
-
-    Query is_null() {
-        return *new UnaryLinkCompare(m_link_follower);
     }
 
     virtual Subexpr& clone()
@@ -1118,6 +1125,8 @@ public:
 
     LinkFollower m_link_follower;
     bool auto_delete;
+
+   friend class Table;
 };
 
 
@@ -1131,7 +1140,6 @@ public:
     {
         m_link_follower.init(const_cast<Table*>(table), links);
         m_table = table; // m_link_follower.m_table;
-
     }
 
     Columns(size_t column, const Table* table) : m_table_linked_from(null_ptr), m_table(null_ptr), sg(null_ptr),
