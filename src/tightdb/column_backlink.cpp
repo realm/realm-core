@@ -45,7 +45,7 @@ void ColumnBackLink::add_backlink(size_t row_ndx, size_t origin_row_ndx)
     // new backlink
     if (ref & 1) {
         // Create new column to hold backlinks
-        ref_type col_ref = Column::create(Array::type_Normal, 0, 0, get_alloc());
+        ref_type col_ref = Column::create(Array::type_Normal, 0, 0, get_alloc()); // <-- leak! fixme
         Column col(col_ref, this, row_ndx, get_alloc());
 
         size_t existing_origin_ndx = (ref >> 1);

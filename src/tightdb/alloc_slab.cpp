@@ -134,7 +134,7 @@ SlabAlloc::~SlabAlloc() TIGHTDB_NOEXCEPT
                     cerr << "To get the stack-traces of the corresponding allocations,"
                         "first compile with TIGHTDB_SLAB_ALLOC_DEBUG defined,"
                         "then run under Valgrind with --leak-check=full\n";
-                    TIGHTDB_TERMINATE("SlabAlloc detected a leak");
+                 //   TIGHTDB_TERMINATE("SlabAlloc detected a leak");
 #  endif
                 }
             }

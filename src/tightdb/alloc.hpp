@@ -22,6 +22,7 @@
 
 #include <stdint.h>
 #include <cstddef>
+#include <iostream>
 
 #include <tightdb/util/features.h>
 #include <tightdb/util/terminate.hpp>
@@ -237,7 +238,15 @@ inline MemRef::MemRef(ref_type ref, Allocator& alloc) TIGHTDB_NOEXCEPT:
 
 inline MemRef Allocator::alloc(std::size_t size)
 {
-    return do_alloc(size);
+    static int tt = 0;
+    tt++;
+
+    if (tt == 23)
+        tt = tt;
+    MemRef m;
+    m = do_alloc(size);
+    std::cerr << size << " " << size_t(m.m_addr) << " " << size_t(m.m_ref) << "\n";
+    return m;
 }
 
 inline MemRef Allocator::realloc_(ref_type ref, const char* addr, std::size_t old_size,
@@ -256,6 +265,9 @@ inline void Allocator::free_(ref_type ref, const char* addr) TIGHTDB_NOEXCEPT
     if (ref == m_watch)
         TIGHTDB_TERMINATE("Allocator watch: Ref was freed");
 #endif
+
+    std::cerr << "  " << size_t(addr) << " " << size_t(ref) << "\n";
+
     return do_free(ref, addr);
 }
 

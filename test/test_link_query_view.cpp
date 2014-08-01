@@ -18,6 +18,23 @@ using namespace std;
 using namespace tightdb;
 using namespace test_util;
 
+ONLY(Foo) {
+    Group wt;
+
+    TableRef origin_2_w = wt.get_table("origin_2");
+    TableRef target_2_w = wt.get_table("target_2");
+
+    target_2_w->add_column(type_Int, "");
+    target_2_w->add_empty_row();
+    origin_2_w->add_column_link(type_Link, "", *target_2_w);
+
+    origin_2_w->add_empty_row(2);
+    origin_2_w->set_link(0, 0, 0);
+    origin_2_w->set_link(0, 1, 0);
+
+    target_2_w->remove(0);
+}
+
 TEST(LinkList_Basic1)
 {
     Group group;
