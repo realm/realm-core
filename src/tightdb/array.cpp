@@ -2481,31 +2481,85 @@ pair<ref_type, size_t> Array::get_to_dot_parent(size_t ndx_in_parent) const
     return make_pair(get_ref(), ndx_in_parent);
 }
 
+
+namespace {
+
+class MemStatsHandler: public Array::MemUsageHandler {
+public:
+    MemStatsHandler(MemStats& stats):
+        m_stats(stats)
+    {
+    }
+    void handle(ref_type, size_t allocated, size_t used) TIGHTDB_OVERRIDE
+    {
+        m_stats.allocated += allocated;
+        m_stats.used += used;
+        m_stats.array_count += 1;
+    }
+private:
+    MemStats& m_stats;
+};
+
+} // anonymous namespace
+
+
 void Array::stats(MemStats& stats) const
 {
-    size_t capacity_bytes;
-    size_t bytes_used = CalcByteLen(m_size, m_width);
+    MemStatsHandler handler(stats);
+    report_memory_usage(handler);
+}
 
+
+void Array::report_memory_usage(MemUsageHandler& handler) const
+{
+    if (m_has_refs)
+        report_memory_usage_2(handler);
+
+    size_t used = get_byte_size();
+    size_t allocated;
     if (m_alloc.is_read_only(m_ref)) {
-        capacity_bytes = bytes_used;
+        allocated = used;
     }
     else {
-        capacity_bytes = get_capacity_from_header();
+        char* header = get_header_from_data(m_data);
+        allocated = get_capacity_from_header(header);
     }
+    handler.handle(m_ref, allocated, used);
+}
 
-    MemStats m(capacity_bytes, bytes_used, 1);
-    stats.add(m);
 
-    // Add stats for all sub-arrays
-    if (m_has_refs) {
-        for (size_t i = 0; i < m_size; ++i) {
-            int64_t v = get(i);
-            if (v == 0 || v & 0x1)
-                continue; // zero-refs and refs that are not 64-aligned do not point to sub-trees
+void Array::report_memory_usage_2(MemUsageHandler& handler) const
+{
+    Array subarray(m_alloc);
+    for (size_t i = 0; i < m_size; ++i) {
+        int_fast64_t value = get(i);
+        // Skip null refs and values that are not refs. Values are not refs when
+        // the least significant bit is set.
+        if (value == 0 || value % 2 == 1)
+            continue;
 
-            Array sub(to_ref(v), 0, 0, get_alloc());
-            sub.stats(stats);
+        size_t used;
+        ref_type ref = to_ref(value);
+        char* header = m_alloc.translate(ref);
+        bool has_refs = get_hasrefs_from_header(header);
+        if (has_refs) {
+            MemRef mem(header, ref);
+            subarray.init_from_mem(mem);
+            subarray.report_memory_usage_2(handler);
+            used = subarray.get_byte_size();
         }
+        else {
+            used = get_byte_size_from_header(header);
+        }
+
+        size_t allocated;
+        if (m_alloc.is_read_only(ref)) {
+            allocated = used;
+        }
+        else {
+            allocated = get_capacity_from_header(header);
+        }
+        handler.handle(ref, allocated, used);
     }
 }
 
