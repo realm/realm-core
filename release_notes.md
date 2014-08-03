@@ -3,6 +3,7 @@
 ### Bugfixes:
 
 * Fixed bug in `where(&tv)...find()` where it would fail to find a match, if usig with a TableView, tv.
+* Fixed bug in `Table::remove()` which would leak memory when rows were removed and the table was a link target.
 
 ### API breaking changes:
 
