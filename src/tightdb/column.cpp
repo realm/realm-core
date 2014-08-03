@@ -847,6 +847,7 @@ public:
     }
 };
 
+
 void Column::erase(size_t ndx, bool is_last)
 {
     TIGHTDB_ASSERT(ndx < size());
@@ -862,27 +863,30 @@ void Column::erase(size_t ndx, bool is_last)
     Array::erase_bptree_elem(m_array, ndx_2, handler); // Throws
 }
 
+
 void Column::destroy_subtree(size_t ndx, bool clear_value)
 {
-    ref_type ref = get_as_ref(ndx);
+    int_fast64_t value = get(ndx);
 
-    // Null-refs indicate empty sub-trees
-    if (ref == 0)
+    // Null-refs indicate empty subtrees
+    if (value == 0)
         return;
 
     // A ref is always 8-byte aligned, so the lowest bit
     // cannot be set. If it is, it means that it should not be
     // interpreted as a ref.
-    if (ref % 2 != 0)
+    if (value % 2 != 0)
         return;
 
-    // Delete sub-tree
+    // Delete subtree
+    ref_type ref = to_ref(value);
     Allocator& alloc = get_alloc();
     Array::destroy_deep(ref, alloc);
 
     if (clear_value)
-        set(ndx, 0);
+        set(ndx, 0); // Throws
 }
+
 
 void Column::move_last_over(size_t target_row_ndx, size_t last_row_ndx)
 {
@@ -918,6 +922,7 @@ template<bool with_limit> struct AdjustHandler: Array::UpdateHandler {
 };
 
 } // anonymous namespace
+
 
 void Column::adjust(int_fast64_t diff)
 {
@@ -978,6 +983,7 @@ size_t Column::find_first(int64_t value, size_t begin, size_t end) const
 
     return not_found;
 }
+
 
 void Column::find_all(Column& result, int64_t value, size_t begin, size_t end) const
 {
