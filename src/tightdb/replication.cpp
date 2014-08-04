@@ -865,6 +865,13 @@ public:
         m_begin = end;
         return n;
     }
+
+    size_t next_block(const char*& begin, const char*& end)
+    {
+        begin = m_begin;
+        end = m_end;
+        return end - begin;
+    }
     const char* m_begin;
     const char* const m_end;
 };
