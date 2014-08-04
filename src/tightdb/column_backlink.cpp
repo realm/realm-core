@@ -222,7 +222,7 @@ void ColumnBackLink::move_last_over(size_t target_row_ndx, size_t last_row_ndx)
 }
 
 
-void ColumnBackLink::erase(std::size_t row_ndx, bool is_last)
+void ColumnBackLink::erase(size_t row_ndx, bool is_last)
 {
     TIGHTDB_ASSERT(is_last);
     bool do_destroy = true;
