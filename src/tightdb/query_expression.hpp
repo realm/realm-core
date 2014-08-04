@@ -282,34 +282,6 @@ class UnaryLinkCompare;
 class ColumnAccessorBase;
 
 
-class AnyLinks 
-{
-    AnyLinks(Table* table, size_t column_index)
-    {
-
-    }
-
-    size_t size()
-    {
-        return 0;
-    }
-
-    size_t get_link(size_t index)
-    {
-        return 0;
-    }
-
-    bool is_single()
-    {
-        return false;
-    }
-
-
-
-};
-
-
-
 // Handle cases where left side is a constant (int, float, int64_t, double, StringData)
 template <class L, class Cond, class R> Query create (L left, const Subexpr2<R>& right)
 {
@@ -955,7 +927,6 @@ public:
                 m_tables.push_back(table);
                 m_link_columns.push_back(&(table->get_column_link_list(columns[t])));
                 m_link_types.push_back(tightdb::type_LinkList);
-                // linked_table.reset(m_column_linklist->get_target_table());
                 table = &cll.get_target_table();
             }
             else {
@@ -964,7 +935,6 @@ public:
                 m_link_columns.push_back(&(table->get_column_link(columns[t])));
                 m_link_types.push_back(tightdb::type_Link);
                 table = &cl.get_target_table();
-                // linked_table.reset(m_column_single_link->get_target_table());
             }
         }
         m_table = table;
@@ -973,7 +943,7 @@ public:
     std::vector<size_t> get_links(size_t index)
     {
         std::vector<size_t> res;
-        get_links(0, index, res);
+        get_links(index, res);
         return res;
     }
 
@@ -1021,9 +991,10 @@ private:
     }
 
 
-    void get_links(size_t column, size_t row, std::vector<size_t>& result)
+    void get_links(size_t row, std::vector<size_t>& result)
     {
-        map_links(row, MakeLinkVector(result));
+        MakeLinkVector mlv = MakeLinkVector(result);
+        map_links(row, mlv);
     }
 
     std::vector<tightdb::DataType> m_link_types;
