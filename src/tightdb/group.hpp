@@ -290,7 +290,7 @@ public:
     void commit();
 
     // Conversion
-    template<class S> void to_json(S& out, size_t link_depth = 0, 
+    template<class S> void to_json(S& out, size_t link_depth = 0,
         std::map<std::string, std::string>* renames = null_ptr) const;
     void to_string(std::ostream& out) const;
 
@@ -328,8 +328,10 @@ protected:
 private:
     SlabAlloc m_alloc;
 
-    // Underlying array structure. Third slot in m_top is the "logical file
-    // size".
+    // Underlying node structure. The third slot in m_top is the "logical file
+    // size" and it is always present. The 7th slot is the "database version"
+    // (a.k.a. the "transaction number") and is present only when
+    // m_free_versions is present.
     Array m_top;
     Array m_tables;            // 2nd slot in m_top
     ArrayString m_table_names; // 1st slot in m_top

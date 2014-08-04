@@ -192,9 +192,8 @@ public:
     /// result in undefined behavior.
     std::size_t get_baseline() const TIGHTDB_NOEXCEPT;
 
-    /// Get the total amount of managed memory. This is the sum of the
-    /// size of the attached file and the sizes of each allocated
-    /// slab. It includes any free space.
+    /// Get the total amount of managed memory. This is the baseline plus the
+    /// sum of the sizes of the allocated slabs. It includes any free space.
     ///
     /// It is an error to call this function on a detached
     /// allocator. Doing so will result in undefined behavior.
@@ -292,15 +291,21 @@ private:
     /// requirements.
     bool m_file_on_streaming_form;
 
-    /// When set to true, the free lists are no longer
-    /// up-to-date. This happens if free_() or
+    enum FeeeSpaceState {
+        free_space_Clean,
+        free_space_Dirty,
+        free_space_Invalid
+    };
+
+    /// When set to free_space_Invalid, the free lists are no longer
+    /// up-to-date. This happens if do_free() or
     /// reset_free_space_tracking() fails, presumably due to
     /// std::bad_alloc being thrown during updating of the free space
     /// list. In this this case, alloc(), realloc_(), and
     /// get_free_read_only() must throw. This member is deliberately
     /// placed here (after m_attach_mode) in the hope that it leads to
     /// less padding between members due to alignment requirements.
-    bool m_free_space_invalid;
+    FeeeSpaceState m_free_space_state;
 
     typedef std::vector<Slab> slabs;
     typedef std::vector<Chunk> chunks;
@@ -351,7 +356,7 @@ private:
 
 inline SlabAlloc::SlabAlloc():
     m_attach_mode(attach_None),
-    m_free_space_invalid(false)
+    m_free_space_state(free_space_Clean)
 {
     m_baseline = 0; // Unattached
 #ifdef TIGHTDB_DEBUG
@@ -380,7 +385,6 @@ inline bool SlabAlloc::nonempty_attachment() const TIGHTDB_NOEXCEPT
 inline std::size_t SlabAlloc::get_baseline() const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(is_attached());
-    TIGHTDB_ASSERT(m_data);
     return m_baseline;
 }
 

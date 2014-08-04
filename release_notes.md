@@ -2,8 +2,10 @@
 
 ### Bugfixes:
 
-* Fixed bug in `where(&tv)...find()` where it would fail to find a match, if usig with a TableView, tv.
-* Fixed bug in `Table::remove()` which would leak memory when rows were removed and the table was a link target.
+* Fixed bug in `where(&tv)...find()` where it would fail to find a match, if
+  usig with a TableView, tv.
+* Fixed bug in `Table::remove()` which would leak memory when rows were removed
+  and the table was a link target.
 
 ### API breaking changes:
 
@@ -17,7 +19,9 @@
 
 ### Internals:
 
-* Lorem ipsum.
+* `Group::Verify()` now checks that the managed memory is precisely the
+  combination of the recorded free space and the used space reachable from the
+  root node.
 
 ----------------------------------------------
 
