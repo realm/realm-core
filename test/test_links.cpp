@@ -851,6 +851,32 @@ TEST(Links_ClearLinkListWithTwoLevelBptree)
 }
 
 
+TEST(Links_FormerMemLeakCase)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg_w(path);
+    {
+        WriteTransaction wt(sg_w);
+        TableRef origin = wt.get_table("origin");
+        TableRef target = wt.get_table("target");
+        target->add_column(type_Int, "");
+        target->add_empty_row();
+        origin->add_column_link(type_Link, "", *target);
+        origin->add_empty_row(2);
+        origin->set_link(0,0,0);
+        origin->set_link(0,1,0);
+        wt.commit();
+    }
+    {
+        WriteTransaction wt(sg_w);
+        TableRef target = wt.get_table("target");
+        target->move_last_over(0);
+        wt.get_group().Verify();
+        wt.commit();
+    }
+}
+
+
 TEST(Links_RandomizedOperations)
 {
     const size_t tests = 30;
