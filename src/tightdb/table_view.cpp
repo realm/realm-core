@@ -209,22 +209,19 @@ size_t TableViewBase::count_double(size_t column_ndx, double target) const
     return aggregate<act_Count, double, size_t, ColumnDouble>(NULL, column_ndx, target);
 }
 
-namespace tightdb {
+template <> StringData TableViewBase::GetValue<StringData>(size_t row, size_t column) const
+{
+    return get_string(column, row);
+}
 
-    template <> StringData TableViewBase::GetValue<StringData>(size_t row, size_t column) const
-    {
-        return get_string(column, row);
-    }
+template <> float TableViewBase::GetValue<float>(size_t row, size_t column) const
+{
+    return get_float(column, row);
+}
 
-    template <> float TableViewBase::GetValue<float>(size_t row, size_t column) const
-    {
-        return get_float(column, row);
-    }
-
-    template <> double TableViewBase::GetValue<double>(size_t row, size_t column) const
-    {
-        return get_double(column, row);
-    }
+template <> double TableViewBase::GetValue<double>(size_t row, size_t column) const
+{
+    return get_double(column, row);
 }
 
 // Fixme, 'compare' is workaround because using utf8.hpp inside '<' operator of StringData gives circular reference

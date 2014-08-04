@@ -59,6 +59,7 @@ public:
     void move(std::size_t old_link_ndx, std::size_t new_link_ndx);
     void remove(std::size_t link_ndx);
     void clear();
+    void sort(std::size_t column_ndx, bool ascending = true);
 
     /// Remove the target row of the specified link from the target table. This
     /// also removes the specified link from this link list, and any other link
@@ -83,6 +84,7 @@ public:
 
     const Table& get_target_table() const TIGHTDB_NOEXCEPT;
     Table& get_target_table() TIGHTDB_NOEXCEPT;
+    template <class T> T GetValue(size_t row, size_t column);
 
 private:
     TableRef m_origin_table;
@@ -105,6 +107,8 @@ private:
     void refresh_accessor_tree(std::size_t new_row_ndx) TIGHTDB_NOEXCEPT;
 
     void update_from_parent(std::size_t old_baseline) TIGHTDB_NOEXCEPT;
+    
+    template <class T> void sort(size_t column, bool ascending);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     Replication* get_repl() TIGHTDB_NOEXCEPT;
@@ -120,10 +124,8 @@ private:
     friend class util::bind_ptr<LinkView>;
     friend class util::bind_ptr<const LinkView>;
     friend class LangBindHelper;
+
 };
-
-
-
 
 
 // Implementation

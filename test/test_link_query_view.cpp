@@ -771,6 +771,69 @@ TEST(LinkList_MultiLinkQuery)
 }
 
 
+TEST(LinkList_SortLinkView)
+{
+    Group group;
+
+    TableRef table1 = group.get_table("table1");
+    TableRef table2 = group.get_table("table2");
+
+    // add some more columns to table1 and table2
+    table1->add_column(type_Int, "col1");
+    table1->add_column(type_String, "str1");
+
+    // add some rows
+    table1->add_empty_row();
+    table1->set_int(0, 0, 300);
+    table1->set_string(1, 0, "foo");
+    table1->add_empty_row();
+    table1->set_int(0, 1, 100);
+    table1->set_string(1, 1, "!");
+    table1->add_empty_row();
+    table1->set_int(0, 2, 200);
+    table1->set_string(1, 2, "bar");
+
+    size_t col_link2 = table2->add_column_link(type_LinkList, "linklist", *table1);
+    table2->add_empty_row();
+    table2->add_empty_row();
+
+    LinkViewRef lvr;
+
+    lvr = table2->get_linklist(col_link2, 0);
+    lvr->clear();
+    lvr->add(0);
+    lvr->add(1);
+    lvr->add(2);
+
+    lvr->sort(0);
+    CHECK_EQUAL(lvr->get(0).get_index(), 1);
+    CHECK_EQUAL(lvr->get(1).get_index(), 2);
+    CHECK_EQUAL(lvr->get(2).get_index(), 0);
+
+    lvr = table2->get_linklist(col_link2, 1);
+    lvr->clear();
+    lvr->add(2);
+    lvr->add(1);
+    lvr->add(0);
+
+    lvr->sort(0);
+
+    CHECK_EQUAL(lvr->get(0).get_index(), 1);
+    CHECK_EQUAL(lvr->get(1).get_index(), 2);
+    CHECK_EQUAL(lvr->get(2).get_index(), 0);
+
+    lvr = table2->get_linklist(col_link2, 1);
+    lvr->clear();
+    lvr->add(2);
+    lvr->add(1);
+    lvr->add(0);
+
+    lvr->sort(0, false);
+
+    CHECK_EQUAL(lvr->get(0).get_index(), 0);
+    CHECK_EQUAL(lvr->get(1).get_index(), 2);
+    CHECK_EQUAL(lvr->get(2).get_index(), 1);
+}
 
 
 #endif
