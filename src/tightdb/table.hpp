@@ -1090,7 +1090,7 @@ private:
     template<class> friend class SequentialGetter;
     friend class RowBase;
     friend class LinksToNode;
-    friend class LinkFollower;
+    friend class LinkMap;
 };
 
 

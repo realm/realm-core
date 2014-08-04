@@ -1918,8 +1918,6 @@ public:
         m_compare = from.m_compare;
     }
 
-
-
     bool m_auto_delete;
     Expression* m_compare;
 };
