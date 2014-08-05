@@ -155,7 +155,7 @@ void Group::init_from_ref(ref_type top_ref) TIGHTDB_NOEXCEPT
 }
 
 
-void Group::reset_freespace_tracking()
+void Group::reset_free_space_versions()
 {
     TIGHTDB_ASSERT(m_top.is_attached());
     TIGHTDB_ASSERT(m_is_attached);

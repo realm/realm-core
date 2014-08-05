@@ -355,8 +355,10 @@ private:
     void detach_but_retain_data() TIGHTDB_NOEXCEPT;
     void complete_detach() TIGHTDB_NOEXCEPT;
 
-    /// Add or clear array nodes for free-space tracking.
-    void reset_freespace_tracking();
+    /// Add free-space versioning nodes, if they do not already exist. Othewise,
+    /// set the version to zero on all free space chunks. This must be done
+    /// whenever the lock file is created or reinitialized.
+    void reset_free_space_versions();
 
     void reattach_from_retained_data();
     bool may_reattach_if_same_version() const TIGHTDB_NOEXCEPT;
