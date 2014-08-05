@@ -724,11 +724,13 @@ public:
 
     virtual size_t next_block(const char*& begin, const char*& end) TIGHTDB_OVERRIDE
     {
-        if (m_logs_begin == m_logs_end)
+        if (m_logs_begin == m_logs_end) {
             return 0;
+        }
         begin = m_logs_begin->data();
         size_t result = m_logs_begin->size();
-        end   = m_logs_begin->data() + result;
+        end   = begin + result;
+        ++m_logs_begin;
         return result;
     }
 

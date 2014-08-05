@@ -848,6 +848,75 @@ void Replication::apply_transact_log(InputStream& transact_log, Group& group, os
 }
 
 
+class NullHandler {
+public:
+    bool new_group_level_table(StringData) { return true; }
+    bool select_table(std::size_t, int, const std::size_t* ) { return true; }
+    bool insert_empty_rows(std::size_t, std::size_t ) { return true; }
+    bool erase_row(std::size_t) { return true; }
+    bool move_last_over(std::size_t, std::size_t) { return true; }
+    bool clear_table() { return true; }
+    bool insert_int(std::size_t, std::size_t, int_fast64_t) { return true; }
+    bool insert_bool(std::size_t, std::size_t, bool) { return true; }
+    bool insert_float(std::size_t, std::size_t, float) { return true; }
+    bool insert_double(std::size_t, std::size_t, double) { return true; }
+    bool insert_string(std::size_t, std::size_t, StringData) { return true; }
+    bool insert_binary(std::size_t, std::size_t, BinaryData) { return true; }
+    bool insert_date_time(std::size_t, std::size_t, DateTime) { return true; }
+    bool insert_table(std::size_t, std::size_t) { return true; }
+    bool insert_mixed(std::size_t, std::size_t, const Mixed&) { return true; }
+    bool insert_link(std::size_t, std::size_t, std::size_t) { return true; }
+    bool insert_link_list(std::size_t, std::size_t) { return true; }
+    bool row_insert_complete() { return true; }
+    bool set_int(std::size_t, std::size_t, int_fast64_t) { return true; }
+    bool set_bool(std::size_t, std::size_t, bool) { return true; }
+    bool set_float(std::size_t, std::size_t, float) { return true; }
+    bool set_double(std::size_t, std::size_t, double) { return true; }
+    bool set_string(std::size_t, std::size_t, StringData) { return true; }
+    bool set_binary(std::size_t, std::size_t, BinaryData) { return true; }
+    bool set_date_time(std::size_t, std::size_t, DateTime) { return true; }
+    bool set_table(std::size_t, std::size_t) { return true; }
+    bool set_mixed(std::size_t, std::size_t, const Mixed&) { return true; }
+    bool set_link(std::size_t, std::size_t, std::size_t) { return true; }
+    bool add_int_to_column(std::size_t, int_fast64_t) { return true; }
+    bool optimize_table() { return true; }
+    bool select_descriptor(int, const std::size_t*) { return true; }
+    bool insert_column(std::size_t, DataType, StringData,
+                       std::size_t) { return true; }
+    bool erase_column(std::size_t, std::size_t,
+                      std::size_t) { return true; }
+    bool rename_column(std::size_t, StringData) { return true; }
+    bool add_search_index(std::size_t) { return true; }
+    bool select_link_list(std::size_t, std::size_t) { return true; }
+    bool link_list_set(std::size_t, std::size_t) { return true; }
+    bool link_list_insert(std::size_t, std::size_t) { return true; }
+    bool link_list_move(std::size_t, std::size_t) { return true; }
+    bool link_list_erase(std::size_t) { return true; }
+    bool link_list_clear() { return true; }
+};
+
+class InstructionClassifierForRollback : public NullHandler {
+public:
+
+};
+
+bool Replication::TransactLogParser::determine_instruction_starts(std::vector<const char*>& instruction_starts)
+{
+    NullHandler handler;
+    m_input_begin = m_input_end = 0;
+    fill_input_buffer();
+    for (;;) {
+        char instr;
+        if (!read_char(instr))
+            break;
+        instruction_starts.push_back(m_input_begin-1);
+        if (!parse_one_inst(handler, instr))
+            return false;
+    }
+
+    return true;
+}
+
 namespace {
 
 class InputStreamImpl: public Replication::InputStream {
@@ -868,9 +937,13 @@ public:
 
     size_t next_block(const char*& begin, const char*& end)
     {
-        begin = m_begin;
-        end = m_end;
-        return end - begin;
+        if (m_begin != 0) {
+            begin = m_begin;
+            end = m_end;
+            m_begin = 0;
+            return end - begin;
+        }
+        return 0;
     }
     const char* m_begin;
     const char* const m_end;

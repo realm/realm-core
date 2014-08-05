@@ -353,7 +353,7 @@ public:
     /// \return The number of extracted bytes. This will always be
     /// less than or equal to \a size. A value of zero indicates
     /// end-of-input unless \a size was zero.
-    virtual std::size_t read(char* buffer, std::size_t size) = 0;
+    //virtual std::size_t read(char* buffer, std::size_t size) = 0;
 
     /// \return the number of accessible bytes.
     /// A value of zero indicates end-of-input.
@@ -443,8 +443,6 @@ public:
 
 private:
     InputStream& m_input;
-    static const std::size_t m_input_buffer_size = 4096; // FIXME: Use smaller number when compiling in debug mode
-    util::UniquePtr<char[]> m_input_buffer;
     const char* m_input_begin;
     const char* m_input_end;
     util::StringBuffer m_string_buffer;
@@ -453,6 +451,7 @@ private:
 
     template<class InstructionHandler> bool do_parse(InstructionHandler&);
     template<class InstructionHandler> bool parse_one_inst(InstructionHandler& handler, char instr);
+    bool determine_instruction_starts();
 
     template<class T> T read_int();
 
@@ -1492,42 +1491,18 @@ bool Replication::TransactLogParser::parse_one_inst(InstructionHandler& handler,
 template<class InstructionHandler>
 bool Replication::TransactLogParser::do_parse(InstructionHandler& handler)
 {
-    if (!m_input_buffer)
-        m_input_buffer.reset(new char[m_input_buffer_size]); // Throws
-    m_input_begin = m_input_end = m_input_buffer.get();
-
-    DescriptorRef desc;
-    for (;;) {
-        char instr;
-        if (!read_char(instr))
-            break;
-// std::cerr << "["<<util::promote(instr)<<"]";
+    std::vector<const char*> instruction_starts;
+    if (!determine_instruction_starts(instruction_starts))
+        return false;
+    m_input_end = 0; // make sure we never reach input-end during re-parse
+    for (size_t i = 0; i < instruction_starts.size(); ++i) {
+        m_input_begin = instruction_starts[i];
         if (!parse_one_inst(handler, instr))
             return false;
     }
-
     return true;
 }
-/*
-bool Replication::TransactLogParser::determine_instruction_starts(InstructionHandler& handler)
-{
-    if (!m_input_buffer)
-        m_input_buffer.reset(new char[m_input_buffer_size]); // Throws
-    m_input_begin = m_input_end = m_input_buffer.get();
 
-    DescriptorRef desc;
-    for (;;) {
-        char instr;
-        if (!read_char(instr))
-            break;
-// std::cerr << "["<<util::promote(instr)<<"]";
-        if (!parse_one_inst(handler, instr))
-            return false;
-    }
-
-    return true;
-}
-*/
 
 template<class T> T Replication::TransactLogParser::read_int()
 {
@@ -1679,14 +1654,6 @@ inline void Replication::TransactLogParser::read_mixed(Mixed* mixed)
 
 inline bool Replication::TransactLogParser::fill_input_buffer()
 {
-/*
-    const std::size_t n = m_input.read(m_input_buffer.get(), m_input_buffer_size);
-    if (n == 0)
-        return false;
-    m_input_begin = m_input_buffer.get();
-    m_input_end   = m_input_begin + n;
-    return true;
-*/
     std::size_t sz = m_input.next_block(m_input_begin, m_input_end);
     if (sz == 0)
         return false;
@@ -1697,7 +1664,11 @@ inline bool Replication::TransactLogParser::fill_input_buffer()
 
 inline bool Replication::TransactLogParser::read_char(char& c)
 {
-    if (m_input_begin == m_input_end && !fill_input_buffer())
+    // if m_input_begin has reached m_input_end we need to refresh the buffer.
+    // however m_input_begin == 0 is a special case where we should always refresh the buffer.
+    // m_input_end == 0 means that there is no end-check. This is the case, if we are
+    // re-parsing instructions which are known to be available in memory already.
+    if ((m_input_begin == 0 || m_input_begin == m_input_end) && !fill_input_buffer())
         return false;
     c = *m_input_begin++;
     return true;
