@@ -16,7 +16,7 @@
 
 ### Enhancements:
 
-* Lets you search for null-links, such as table2->column<Link>(col_link2).is_null().find(). Works for Link and LinkedList.
+* Lets you search for null-links, such as `table2->column<Link>(col_link2).is_null().find()`. Works for `Link` and `LinkedList`.
 
 -----------
 
