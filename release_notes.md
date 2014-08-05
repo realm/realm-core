@@ -6,6 +6,9 @@
   usig with a TableView, tv.
 * Fixed bug in `Table::remove()` which would leak memory when rows were removed
   and the table was a link target.
+* Fixed bug that prevented reuse of free-space when using
+  `LangBindHelper::promote_to_write()` and
+  `LangBindHelper::commit_and_continue_as_read()`.
 
 ### API breaking changes:
 

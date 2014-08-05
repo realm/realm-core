@@ -1167,33 +1167,23 @@ Group& SharedGroup::begin_write()
         throw runtime_error("Write transactions are not allowed while transactions are pinned");
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    if (Replication* repl = m_group.get_replication()) {
+    if (Replication* repl = m_group.get_replication())
         repl->begin_write_transact(*this); // Throws
-        try {
-            do_begin_write();
-            begin_read();
-        }
-        catch (...) {
-            repl->rollback_write_transact(*this);
-            throw;
-        }
-        m_transact_stage = transact_Writing;
-        if (m_readlock.m_version == 1) {
-            m_group.reset_freespace_tracking();
-        }
-        return m_group;
-    }
 #endif
 
-    do_begin_write();
-
-    // A write transaction implies a read transaction...
-    begin_read();
-    m_transact_stage = transact_Writing;
-    if (m_readlock.m_version == 1) {
-        m_group.reset_freespace_tracking();
+    try {
+        do_begin_write();
+        begin_read();
+    }
+    catch (...) {
+#ifdef TIGHTDB_ENABLE_REPLICATION
+        if (Replication* repl = m_group.get_replication())
+            repl->rollback_write_transact(*this);
+#endif
+        throw;
     }
 
+    m_transact_stage = transact_Writing;
     return m_group;
 }
 
@@ -1268,6 +1258,12 @@ void SharedGroup::commit_and_continue_as_read()
 void SharedGroup::do_commit()
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Writing);
+
+    // FIXME: This fails then replication is enabled and the first transaction
+    // in a lock-file session is rolled back, because then the first committed
+    // transaction will have m_readlock.m_version > 1.
+    if (m_readlock.m_version == 1)
+        m_group.reset_free_space_versions();
 
     SharedInfo* info = m_file_map.get_addr();
     SharedInfo* r_info = m_reader_map.get_addr();
