@@ -771,7 +771,7 @@ TEST(LinkList_MultiLinkQuery)
 }
 
 
-ONLY(LinkList_SortLinkView)
+TEST(LinkList_SortLinkView)
 {
     Group group;
 
