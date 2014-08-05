@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 0.80.5 Release notes
 
 ### Bugfixes:
 
@@ -9,10 +9,6 @@
 * Fixed bug that prevented reuse of free-space when using
   `LangBindHelper::promote_to_write()` and
   `LangBindHelper::commit_and_continue_as_read()`.
-
-### API breaking changes:
-
-* Lorem ipsum.
 
 ### Enhancements:
 
