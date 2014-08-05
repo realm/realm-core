@@ -1259,9 +1259,9 @@ void SharedGroup::do_commit()
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Writing);
 
-    // FIXME: This fails then replication is enabled and the first transaction
-    // in a lock-file session is rolled back, because then the first committed
-    // transaction will have m_readlock.m_version > 1.
+    // FIXME: This fails when replication is enabled and the first transaction
+    // in a lock-file session is rolled back (aborted), because then the first
+    // committed transaction will have m_readlock.m_version > 1.
     if (m_readlock.m_version == 1)
         m_group.reset_free_space_versions();
 
