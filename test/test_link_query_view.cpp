@@ -798,6 +798,7 @@ TEST(LinkList_SortLinkView)
     table2->add_empty_row();
 
     LinkViewRef lvr;
+    TableView tv;
 
     lvr = table2->get_linklist(col_link2, 0);
     lvr->clear();
@@ -806,9 +807,14 @@ TEST(LinkList_SortLinkView)
     lvr->add(2);
 
     lvr->sort(0);
+    tv = lvr->get_sorted_view(0);
     CHECK_EQUAL(lvr->get(0).get_index(), 1);
     CHECK_EQUAL(lvr->get(1).get_index(), 2);
     CHECK_EQUAL(lvr->get(2).get_index(), 0);
+    CHECK_EQUAL(tv.get(0).get_index(), 1); // 2 1
+    CHECK_EQUAL(tv.get(1).get_index(), 2);
+    CHECK_EQUAL(tv.get(2).get_index(), 0);
+ 
 
     lvr = table2->get_linklist(col_link2, 1);
     lvr->clear();
@@ -817,22 +823,29 @@ TEST(LinkList_SortLinkView)
     lvr->add(0);
 
     lvr->sort(0);
-
+    tv = lvr->get_sorted_view(0);
     CHECK_EQUAL(lvr->get(0).get_index(), 1);
     CHECK_EQUAL(lvr->get(1).get_index(), 2);
     CHECK_EQUAL(lvr->get(2).get_index(), 0);
+    CHECK_EQUAL(tv.get(0).get_index(), 1);
+    CHECK_EQUAL(tv.get(1).get_index(), 2);
+    CHECK_EQUAL(tv.get(2).get_index(), 0);
 
     lvr = table2->get_linklist(col_link2, 1);
     lvr->clear();
     lvr->add(2);
-    lvr->add(1);
     lvr->add(0);
+    lvr->add(1);
 
     lvr->sort(0, false);
+    tv = lvr->get_sorted_view(0, false);
 
     CHECK_EQUAL(lvr->get(0).get_index(), 0);
     CHECK_EQUAL(lvr->get(1).get_index(), 2);
     CHECK_EQUAL(lvr->get(2).get_index(), 1);
+    CHECK_EQUAL(tv.get(0).get_index(), 0);
+    CHECK_EQUAL(tv.get(1).get_index(), 2);
+    CHECK_EQUAL(tv.get(2).get_index(), 1);
 }
 
 

@@ -1,5 +1,6 @@
 #include <tightdb/table_view.hpp>
 #include <tightdb/column.hpp>
+#include <tightdb/query_conditions.hpp>
 #include <tightdb/column_basic.hpp>
 #include <tightdb/util/utf8.hpp>
 
@@ -209,40 +210,30 @@ size_t TableViewBase::count_double(size_t column_ndx, double target) const
     return aggregate<act_Count, double, size_t, ColumnDouble>(NULL, column_ndx, target);
 }
 
-template <> StringData TableViewBase::GetValue<StringData>(size_t row, size_t column) const
-{
-    return get_string(column, row);
-}
+namespace tightdb {
+    template <> StringData TableViewBase::get_value<StringData>(size_t row, size_t column) const
+    {
+        return get_string(column, row);
+    }
 
-template <> float TableViewBase::GetValue<float>(size_t row, size_t column) const
-{
-    return get_float(column, row);
-}
+    template <> float TableViewBase::get_value<float>(size_t row, size_t column) const
+    {
+        return get_float(column, row);
+    }
 
-template <> double TableViewBase::GetValue<double>(size_t row, size_t column) const
-{
-    return get_double(column, row);
-}
-
-// Fixme, 'compare' is workaround because using utf8.hpp inside '<' operator of StringData gives circular reference
-template <class T> bool compare(T v1, T v2)
-{
-    return v1 < v2;
-}
-
-template <> bool compare<StringData>(StringData v1, StringData v2)
-{
-    bool ret = utf8_compare(v1.data(), v2.data());
-    return ret;
+    template <> double TableViewBase::get_value<double>(size_t row, size_t column) const
+    {
+        return get_double(column, row);
+    }
 }
 
 template <class T> struct Comparer
 {
     Comparer(size_t column, bool ascend, TableViewBase& tv) : m_column(column), m_ascending(ascend), m_tv(tv) {}
     bool operator() (size_t i, size_t j) const {
-        T v1 = m_tv.GetValue<T>(i, m_column);
-        T v2 = m_tv.GetValue<T>(j, m_column);
-        bool b = compare(v1, v2);
+        T v1 = m_tv.get_value<T>(i, m_column);
+        T v2 = m_tv.get_value<T>(j, m_column);
+        bool b = CompareLess<T>::compare(v1, v2);
         return m_ascending ? b : !b;
     }
 
