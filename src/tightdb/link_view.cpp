@@ -227,8 +227,6 @@ template <class T> void LinkView::sort(size_t column_ndx, Column& dest, bool asc
 
 void LinkView::sort(size_t column_ndx, Column& dest, bool ascending)
 {
-    //m_auto_sort = true;
-
     Table& target_table = m_origin_column.get_target_table();
     DataType type = target_table.get_column_type(column_ndx);
 
