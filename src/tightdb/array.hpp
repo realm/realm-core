@@ -69,10 +69,6 @@ Searching: The main finding function is:
 #  include <tightdb/tightdb_nmmintrin.h> // SSE42
 #endif
 
-#ifdef TIGHTDB_DEBUG
-#  include <stdio.h>
-#endif
-
 namespace tightdb {
 
 enum Action {act_ReturnFirst, act_Sum, act_Max, act_Min, act_Count, act_FindAll, act_CallIdx, act_CallbackIdx,
@@ -156,20 +152,11 @@ template<class T> class QueryState;
 #ifdef TIGHTDB_DEBUG
 class MemStats {
 public:
-    MemStats() : allocated(0), used(0), array_count(0) {}
-    MemStats(std::size_t allocated, std::size_t used, std::size_t array_count):
-        allocated(allocated), used(used), array_count(array_count) {}
-    MemStats(const MemStats& m)
+    MemStats():
+        allocated(0),
+        used(0),
+        array_count(0)
     {
-        allocated = m.allocated;
-        used = m.used;
-        array_count = m.array_count;
-    }
-    void add(const MemStats& m)
-    {
-        allocated += m.allocated;
-        used += m.used;
-        array_count += m.array_count;
     }
     std::size_t allocated;
     std::size_t used;
@@ -949,10 +936,15 @@ public:
     void Verify() const;
     typedef std::size_t (*LeafVerifier)(MemRef, Allocator&);
     void verify_bptree(LeafVerifier) const;
-    void to_dot(std::ostream&, StringData title = StringData()) const;
+    class MemUsageHandler {
+    public:
+        virtual void handle(ref_type ref, std::size_t allocated, std::size_t used) = 0;
+    };
+    void report_memory_usage(MemUsageHandler&) const;
     void stats(MemStats& stats) const;
     typedef void (*LeafDumper)(MemRef, Allocator&, std::ostream&, int level);
     void dump_bptree_structure(std::ostream&, int level, LeafDumper) const;
+    void to_dot(std::ostream&, StringData title = StringData()) const;
     class ToDotHandler {
     public:
         virtual void to_dot(MemRef leaf_mem, ArrayParent*, std::size_t ndx_in_parent,
@@ -1057,6 +1049,10 @@ private:
     std::size_t m_ndx_in_parent; // Ignored if m_parent is null.
 
     Allocator& m_alloc;
+
+#ifdef TIGHTDB_DEBUG
+    void report_memory_usage_2(MemUsageHandler&) const;
+#endif
 
 protected:
     /// The total size in bytes (including the header) of a new empty

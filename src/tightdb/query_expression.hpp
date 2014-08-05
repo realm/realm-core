@@ -144,6 +144,7 @@ typedef float               Float;
 typedef double              Double;
 typedef tightdb::StringData String;
 
+
 // Return StringData if either T or U is StringData, else return T. See description of usage in export2().
 template<class T, class U> struct EitherIsString
 {
@@ -277,8 +278,7 @@ template <class T> class Subexpr2;
 template <class oper, class TLeft = Subexpr, class TRight = Subexpr> class Operator;
 template <class oper, class TLeft = Subexpr> class UnaryOperator;
 template <class TCond, class T, class TLeft = Subexpr, class TRight = Subexpr> class Compare;
-
-
+class UnaryLinkCompare;
 class ColumnAccessorBase;
 
 
@@ -297,7 +297,7 @@ template <class L, class Cond, class R> Query create (L left, const Subexpr2<R>&
 
     const Columns<R>* column = dynamic_cast<const Columns<R>*>(&right);
     if (column && (std::numeric_limits<L>::is_integer) && (std::numeric_limits<R>::is_integer) &&
-        !column->m_column_linklist && !column->m_column_single_link) {
+        !column->m_link_map.m_table) {
         const Table* t = (const_cast<Columns<R>*>(column))->get_table();
         Query q = Query(*t);
 
@@ -861,41 +861,167 @@ template <class T> UnaryOperator<Pow<T> >& power (Subexpr2<T>& left) {
 }
 
 
+
+// Classes used for LinkMap (see below).
+struct LinkMapFunction
+{
+    // Your consume() method is given row index of the linked-to table as argument, and you must return wether or 
+    // not you want the LinkMapFunction to exit (return false) or continue (return true) harvesting the link tree
+    // for the current main table row index (it will be a link tree if you have multiple type_LinkList columns
+    // in a link()->link() query.
+    virtual bool consume(size_t row_index) = 0;
+};
+
+struct FindNullLinks : public LinkMapFunction
+{
+    FindNullLinks() : m_has_link(false) {};
+
+    virtual bool consume(size_t row_index) {
+        static_cast<void>(row_index);
+        m_has_link = true;
+        return false; // we've found a row index, so this can't be a null-link, so exit link harvesting
+    }
+
+    bool m_has_link;
+};
+
+struct MakeLinkVector : public LinkMapFunction
+{
+    MakeLinkVector(std::vector<size_t>& result) : m_links(result) {}
+
+    virtual bool consume(size_t row_index) {
+        m_links.push_back(row_index);
+        return true; // continue evaluation
+    }
+    std::vector<size_t> &m_links;
+};
+
+
+/*
+The LinkMap and LinkMapFunction classes are used for query conditions on links themselves (contrary to conditions on
+the value payload they point at).
+
+MapLink::map_links() takes a row index of the link column as argument and follows any link chain stated in the query
+(through the link()->link() methods) until the final payload table is reached, and then applies LinkMapFunction on 
+the linked-to row index(es). 
+
+If all link columns are type_Link, then LinkMapFunction is only invoked for a single row index. If one or more 
+columns are type_LinkList, then it may result in multiple row indexes.
+
+The reason we use this map pattern is that we can exit the link-tree-traversal as early as possible, e.g. when we've
+found the first link that points to row '5'. Other solutions could be a vector<size_t> harvest_all_links(), or an
+iterator pattern. First solution can't exit, second solution requires internal state.
+*/
+class LinkMap
+{
+public:
+    LinkMap() : m_table(null_ptr) {};
+
+    void init(Table* table, std::vector<size_t> columns)
+    {
+        for (size_t t = 0; t < columns.size(); t++) {
+            // Link column can be either LinkList or single Link
+            ColumnType type = table->get_real_column_type(columns[t]);
+            if (type == col_type_LinkList) {
+                ColumnLinkList& cll = table->get_column_link_list(columns[t]);
+                m_tables.push_back(table);
+                m_link_columns.push_back(&(table->get_column_link_list(columns[t])));
+                m_link_types.push_back(tightdb::type_LinkList);
+                table = &cll.get_target_table();
+            }
+            else {
+                ColumnLink& cl = table->get_column_link(columns[t]);
+                m_tables.push_back(table);
+                m_link_columns.push_back(&(table->get_column_link(columns[t])));
+                m_link_types.push_back(tightdb::type_Link);
+                table = &cl.get_target_table();
+            }
+        }
+        m_table = table;
+    }
+
+    std::vector<size_t> get_links(size_t index)
+    {
+        std::vector<size_t> res;
+        get_links(index, res);
+        return res;
+    }
+
+    void map_links(size_t row, LinkMapFunction& lm)
+    {
+        map_links(0, row, lm);
+    }
+
+    const Table* m_table;
+    std::vector<ColumnLinkBase*> m_link_columns;
+    std::vector<Table*> m_tables;
+
+private:
+    void map_links(size_t column, size_t row, LinkMapFunction& lm)
+    {
+        bool last = (column + 1 == m_link_columns.size());
+        if (m_link_types[column] == type_Link) {
+            ColumnLink& cl = *static_cast<ColumnLink*>(m_link_columns[column]);
+            size_t r = cl.get(row);
+            if (r == 0)
+                return;
+            r--; // ColumnLink stores link to row N as N + 1
+            if (last) {
+                bool continue2 = lm.consume(r);
+                if (!continue2)
+                    return;
+            }
+            else
+                map_links(column + 1, r, lm);
+        }
+        else {
+            ColumnLinkList& cll = *static_cast<ColumnLinkList*>(m_link_columns[column]);
+            LinkViewRef lvr = cll.get(row);
+            for (size_t t = 0; t < lvr->size(); t++) {
+                size_t r = lvr->get(t).get_index();
+                if (last) {
+                    bool continue2 = lm.consume(r);
+                    if (!continue2)
+                        return;
+                }
+                else
+                    map_links(column + 1, r, lm);
+            }
+        }
+    }
+
+
+    void get_links(size_t row, std::vector<size_t>& result)
+    {
+        MakeLinkVector mlv = MakeLinkVector(result);
+        map_links(row, mlv);
+    }
+
+    std::vector<tightdb::DataType> m_link_types;
+};
+
+
 // Handling of String columns. These support only == and != compare operators. No 'arithmetic' operators (+, etc).
 template <> class Columns<StringData> : public Subexpr2<StringData>
 {
 public:
-    explicit Columns(size_t column, const Table* table) : m_table_linked_from(null_ptr), m_table(null_ptr), m_column_linklist(null_ptr),
-        m_column_single_link(null_ptr), m_column(column)
+    Columns(size_t column, const Table* table, std::vector<size_t> links) : m_table_linked_from(null_ptr),
+                                                                            m_table(null_ptr), 
+                                                                            m_column(column)
+    {
+        m_link_map.init(const_cast<Table*>(table), links);
+        m_table = table;
+    }
+
+    Columns(size_t column, const Table* table) : m_table_linked_from(null_ptr), m_table(null_ptr), m_column(column)
     {
         m_table = table;
     }
 
-    explicit Columns(size_t column, Table* table, size_t link_column) : m_table_linked_from(null_ptr), m_table(null_ptr),
-        m_column_linklist(null_ptr), m_column_single_link(null_ptr), m_column(column)
-    {
-        TableRef linked_table;
-
-        // Link column can be either LinkList or single Link
-        ColumnType type = table->get_real_column_type(link_column);
-        if (type == col_type_LinkList) {
-            m_column_linklist = &table->get_column<ColumnLinkList, col_type_LinkList>(link_column);
-            linked_table.reset(&m_column_linklist->get_target_table());
-        }
-        else {
-            m_column_single_link = &table->get_column<ColumnLink, col_type_Link>(link_column);
-            linked_table.reset(&m_column_single_link->get_target_table());
-        }
-
-        m_table = linked_table.get();
-        m_table_linked_from = table;
-    }
-
-    explicit Columns() : m_table_linked_from(null_ptr), m_table(null_ptr), m_column_linklist(null_ptr), m_column_single_link(null_ptr) { }
+    explicit Columns() : m_table_linked_from(null_ptr), m_table(null_ptr) { }
 
 
-    explicit Columns(size_t column) : m_table_linked_from(null_ptr), m_table(null_ptr), m_column_linklist(null_ptr), m_column_single_link(null_ptr),
-        m_column(column)
+    explicit Columns(size_t column) : m_table_linked_from(null_ptr), m_table(null_ptr), m_column(column)
     {
     }
 
@@ -908,45 +1034,21 @@ public:
 
     virtual const Table* get_table()
     {
-        return m_table_linked_from ? m_table_linked_from : m_table;
+        return m_table;
     }
 
     virtual void evaluate(size_t index, ValueBase& destination)
     {
         Value<StringData>& d = static_cast<Value<StringData>&>(destination);
 
-        if (m_column_linklist) {
-            if (m_column_linklist->has_links(index))
-            {
-                // LinkList with more than 0 values. Create Value with payload for all fields
-                LinkViewRef links = m_column_linklist->get(index);
-                Value<StringData> v(true, links->size());
-
-                for (size_t t = 0; t < links->size(); t++) {
-                    size_t link_to = links->get(t).get_index();
-                    v.m_v[t] = m_table->get_string(m_column, link_to);
-                }
-                destination.import(v);
+        if (m_link_map.m_link_columns.size() > 0) {
+            std::vector<size_t> links = m_link_map.get_links(index);
+            Value<StringData> v(true, links.size());
+            for (size_t t = 0; t < links.size(); t++) {
+                size_t link_to = links[t];
+                v.m_v[t] = m_link_map.m_table->get_string(m_column, link_to);
             }
-            else {
-                // No links in list; create empty Value (Value with m_values == 0)
-                Value<StringData> v(true, 0);
-                destination.import(v);
-            }
-        }
-        else if (m_column_single_link) {
-            if (m_column_single_link->is_null_link(index)) {
-                // Null link; create empty Value (Value with m_values == 0)
-                Value<StringData> v(true, 0);
-                destination.import(v);
-            }
-            else {
-                // Pick out the 1 value that the link is pointing at
-                size_t lnk = m_column_single_link->get_link(index);
-                StringData val = m_table->get_string(m_column, lnk);
-                Value<StringData> v(false, 1, val);
-                destination.import(v);
-            }
+            destination.import(v);
         }
         else {
             // Not a link column
@@ -961,16 +1063,11 @@ public:
     // Pointer to payload table (which is the linked-to table if this is a link column) used for condition operator
     const Table* m_table;
 
-    // Pointer to LinkList column object if it's a LinkList column; otherwise null_ptr
-    ColumnLinkList* m_column_linklist;
-
-    // Pointer to Link column object if it's a Link column; otherwise null_ptr
-    ColumnLink* m_column_single_link;
-
     // Column index of payload column of m_table
     size_t m_column;
-};
 
+    LinkMap m_link_map;
+};
 
 
 // String == Columns<String>
@@ -993,41 +1090,134 @@ template <class T> Query operator != (const Columns<StringData>& left, T right) 
     return create<StringData, NotEqual, StringData>(right, left);
 }
 
+// This class is intended to perform queries on the *pointers* of links, contrary to performing queries on *payload* 
+// in linked-to tables. Queries can be "find first link that points at row X" or "find first null-link". Currently
+// only "find first null-link" is supported. More will be added later.
+class UnaryLinkCompare : public Expression
+{
+public:
+    UnaryLinkCompare(LinkMap lm) : m_link_map(lm)
+    {
+        Query::expression(this, true);
+        Table* t = const_cast<Table*>(get_table());
+        Query::m_table = t->get_table_ref();
+    }
+
+    void set_table()
+    {
+    }
+
+    // Return main table of query (table on which table->where()... is invoked). Note that this is not the same as 
+    // any linked-to payload tables
+    virtual const Table* get_table()
+    {
+        return m_link_map.m_tables[0];
+    }
+
+    size_t find_first(size_t start, size_t end) const
+    {
+        for (; start < end;) {
+            std::vector<size_t> l = m_link_map.get_links(start);
+            // We have found a Link which is NULL, or LinkList with 0 entries. Return it as match.
+
+            FindNullLinks fnl;
+            m_link_map.map_links(start, fnl);
+            if (!fnl.m_has_link)
+                return start;
+            
+            start++;
+        }
+
+        return not_found;
+    }
+
+private:
+    mutable LinkMap m_link_map;
+};
+
+// This is for LinkList too because we have 'typedef List LinkList'
+template <> class Columns<Link> : public Subexpr2<Link>
+{
+public:
+    Query is_null() {
+        if (m_link_map.m_link_columns.size() > 1)
+            throw std::runtime_error("Cannot find null-links in a linked-to table (link()...is_null() not supported).");
+        // Todo, it may be useful to support the above, but we would need to figure out an intuitive behaviour
+        return *new UnaryLinkCompare(m_link_map);
+    }
+
+private:
+    Columns(size_t column, const Table* table, std::vector<size_t> links) :
+        m_table(null_ptr)
+    {
+        static_cast<void>(column);
+        m_link_map.init(const_cast<Table*>(table), links);
+        m_table = table;
+    }
+
+    Columns() : m_table(null_ptr) { }
+
+    explicit Columns(size_t column) : m_table(null_ptr) { static_cast<void>(column); }
+
+    Columns(size_t column, const Table* table) : m_table(null_ptr)
+    {
+        static_cast<void>(column);
+        m_table = table;
+    }
+
+    virtual Subexpr& clone()
+    {
+        return *this;
+    }
+
+    virtual const Table* get_table()
+    {
+        return m_table;
+    }
+
+    virtual void evaluate(size_t index, ValueBase& destination)
+    {
+        static_cast<void>(index);
+        static_cast<void>(destination);
+        TIGHTDB_ASSERT(false);
+    }
+
+    // m_table is redundant with ColumnAccessorBase<>::m_table, but is in order to decrease class dependency/entanglement
+    const Table* m_table;
+
+    // Column index of payload column of m_table
+    size_t m_column;
+
+    LinkMap m_link_map;
+    bool auto_delete;
+
+   friend class Table;
+};
+
+
 template <class T> class Columns : public Subexpr2<T>, public ColumnsBase
 {
 public:
-    explicit Columns(size_t column, const Table* table) : m_table_linked_from(null_ptr), m_table(null_ptr), sg(null_ptr),
-        m_column_linklist(null_ptr), m_column_single_link(null_ptr), m_column(column)
+
+    Columns(size_t column, const Table* table, std::vector<size_t> links) : m_table_linked_from(null_ptr), 
+                                                                            m_table(null_ptr), sg(null_ptr),
+                                                                            m_column(column)
+    {
+        m_link_map.init(const_cast<Table*>(table), links);
+        m_table = table; 
+    }
+
+    Columns(size_t column, const Table* table) : m_table_linked_from(null_ptr), m_table(null_ptr), sg(null_ptr),
+                                                 m_column(column)
     {
         m_table = table;
     }
 
-    // Todo: Constructor almost identical with that of Columns<StringData>; simplify
-    explicit Columns(size_t column, Table* table, size_t link_column) : m_table_linked_from(null_ptr), 
-        m_table(null_ptr), sg(null_ptr), m_column_linklist(null_ptr), m_column_single_link(null_ptr), m_column(column)
-    {
-        TableRef linked_table;
 
-        // Link column can be either LinkList or single Link
-        ColumnType type = table->get_real_column_type(link_column);
-        if (type == col_type_LinkList) {
-            m_column_linklist = &table->get_column<ColumnLinkList, col_type_LinkList>(link_column);
-            linked_table.reset(&m_column_linklist->get_target_table());
-        }
-        else {
-            m_column_single_link = &table->get_column<ColumnLink, col_type_Link>(link_column);
-            linked_table.reset(&m_column_single_link->get_target_table());
-        }
+    Columns() : m_table_linked_from(null_ptr), m_table(null_ptr), sg(null_ptr) { }
 
-        m_table = linked_table.get();
-        m_table_linked_from = table;
-    }
-
-    explicit Columns() : m_table_linked_from(null_ptr), m_table(null_ptr), sg(null_ptr), m_column_linklist(null_ptr),
-                         m_column_single_link(null_ptr) { }
-
-    explicit Columns(size_t column) : m_table_linked_from(null_ptr), m_table(null_ptr), sg(null_ptr), 
-        m_column_linklist(null_ptr), m_column_single_link(null_ptr), m_column(column) {}
+    explicit Columns(size_t column) : m_table_linked_from(null_ptr), m_table(null_ptr), sg(null_ptr),
+                                      m_column(column) {}
 
     ~Columns()
     {
@@ -1047,7 +1237,12 @@ public:
     virtual void set_table()
     {
         typedef typename ColumnTypeTraits<T>::column_type ColType;
-        const ColType* c = static_cast<const ColType*>(&m_table->get_column_base(m_column));
+        const ColType* c;
+        if (m_link_map.m_link_columns.size() == 0)
+            c = static_cast<const ColType*>(&m_table->get_column_base(m_column));
+        else
+            c = static_cast<const ColType*>(&m_link_map.m_table->get_column_base(m_column));
+
         if (sg == null_ptr)
             sg = new SequentialGetter<T>();
         sg->init(c);
@@ -1057,44 +1252,23 @@ public:
     // binds it to a Query at a later time
     virtual const Table* get_table()
     {
-        return m_table_linked_from ? m_table_linked_from : m_table;
+        return m_table;
     }
 
     // Load values from Column into destination
     void evaluate(size_t index, ValueBase& destination) {
-        if (m_column_linklist) {
-            if (m_column_linklist->get_link_count(index) == 0) {
-                // No links in list; create empty Value (Value with m_values == 0)
-                Value<T> v(true, 0);
-                destination.import(v);
-            }
-            else {
-                // LinkList with more than 0 values. Create Value with payload for all fields
-                LinkViewRef links = m_column_linklist->get(index);
-                Value<T> v(true, links->size());
+        if (m_link_map.m_link_columns.size() > 0) {
+            // LinkList with more than 0 values. Create Value with payload for all fields
 
-                for (size_t t = 0; t < links->size(); t++) {
-                    size_t link_to = links->get(t).get_index();
-                    sg->cache_next(link_to); // todo, needed?
-                    v.m_v[t] = sg->get_next(link_to);
-                }
-                destination.import(v);
+            std::vector<size_t> links = m_link_map.get_links(index);
+            Value<T> v(true, links.size());
+
+            for (size_t t = 0; t < links.size(); t++) {
+                size_t link_to = links[t];
+                sg->cache_next(link_to); // todo, needed?
+                v.m_v[t] = sg->get_next(link_to);
             }
-        }
-        else if (m_column_single_link) {
-            if (m_column_single_link->is_null_link(index)) {
-                // Null link; create empty Value (Value with m_values == 0)
-                Value<T> v(true, 0);
-                destination.import(v);
-            }
-            else {
-                // Pick out the 1 value that the link is pointing at
-                size_t lnk = m_column_single_link->get_link(index);
-                sg->cache_next(lnk);
-                T val = sg->get_next(lnk);
-                Value<T> v(false, 1, val);
-                destination.import(v);
-            }
+            destination.import(v);
         }
         else {
             // Not a Link column
@@ -1132,14 +1306,10 @@ public:
     // Fast (leaf caching) value getter for payload column (column in table on which query condition is executed)
     SequentialGetter<T>* sg;
 
-    // Pointer to LinkList column object if it's a LinkList column; otherwise null_ptr
-    ColumnLinkList* m_column_linklist;
-
-    // Pointer to Link column object if it's a Link column; otherwise null_ptr
-    ColumnLink* m_column_single_link;
-
     // Column index of payload column of m_table
     size_t m_column;
+
+    LinkMap m_link_map;
 };
 
 
@@ -1315,6 +1485,8 @@ private:
     TLeft& m_left;
     TRight& m_right;
 };
+
+
 
 //}
 #endif // TIGHTDB_QUERY_EXPRESSION_HPP

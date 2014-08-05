@@ -5669,6 +5669,24 @@ TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
 }
 
 
+TEST(LangBindHelper_ImplicitTransactions_NoExtremeFileSpaceLeaks)
+{
+    SHARED_GROUP_TEST_PATH(path);
+
+    for (int i = 0; i < 100; ++i) {
+        UniquePtr<Replication> repl(makeWriteLogCollector(path));
+        UniquePtr<LangBindHelper::TransactLogRegistry> tlr(getWriteLogs(path));
+        SharedGroup sg(*repl);
+        sg.begin_read();
+        LangBindHelper::promote_to_write(sg, *tlr);
+        LangBindHelper::commit_and_continue_as_read(sg);
+        sg.end_read();
+    }
+
+    CHECK_LESS_EQUAL(File(path).get_size(), 8*1024);
+}
+
+
 #endif // TIGHTDB_ENABLE_REPLICATION
 
 #endif

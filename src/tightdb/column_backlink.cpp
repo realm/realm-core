@@ -30,146 +30,156 @@ using namespace tightdb;
 
 void ColumnBackLink::add_backlink(size_t row_ndx, size_t origin_row_ndx)
 {
-    size_t ref = Column::get(row_ndx);
+    int_fast64_t value = Column::get(row_ndx);
 
-    // If there is only a single backlink, it can be stored as
-    // a tagged value
-    if (ref == 0) {
-        size_t tagged_ndx = (origin_row_ndx << 1) + 1;
-        Column::set(row_ndx, tagged_ndx);
+    // A backlink list of size 1 is stored as a single non-ref column value.
+    if (value == 0) {
+        int_fast64_t value_2 = 1 + 2 * int_fast64_t(origin_row_ndx);
+        Column::set(row_ndx, value_2); // Throws
         return;
     }
 
-    // if there already is a tagged value stored
-    // we have to convert it to a list with room for
-    // new backlink
-    if (ref & 1) {
+    ref_type ref;
+    // When increasing the size of the backlink list from 1 to 2, we need to
+    // convert from the single non-ref column value representation, to a B+-tree
+    // representation.
+    if (value % 2 != 0) {
         // Create new column to hold backlinks
-        ref_type col_ref = Column::create(Array::type_Normal, 0, 0, get_alloc());
-        Column col(col_ref, this, row_ndx, get_alloc());
-
-        size_t existing_origin_ndx = (ref >> 1);
-        col.add(existing_origin_ndx);
-        col.add(origin_row_ndx);
-
-        Column::set(row_ndx, col_ref);
-        return;
+        size_t size = 1;
+        int_fast64_t value_2 = value / 2;
+        ref = Column::create(Array::type_Normal, size, value_2, get_alloc()); // Throws
+        Column::set(row_ndx, int_fast64_t(ref)); // Throws
     }
-
-    // Otherwise just add to existing list
-    Column col(ref, this, row_ndx, get_alloc());
-    col.add(origin_row_ndx);
+    else {
+        ref = to_ref(value);
+    }
+    Column col(ref, this, row_ndx, get_alloc()); // Throws
+    col.add(int_fast64_t(origin_row_ndx)); // Throws
 }
 
 
 size_t ColumnBackLink::get_backlink_count(size_t row_ndx) const TIGHTDB_NOEXCEPT
 {
-    size_t ref = Column::get(row_ndx);
+    int_fast64_t value = Column::get(row_ndx);
 
-    if (ref == 0)
+    if (value == 0)
         return 0;
 
-    if (ref & 1)
+    if (value % 2 != 0)
         return 1;
 
     // get list size
+    ref_type ref = to_ref(value);
     return ColumnBase::get_size_from_ref(ref, get_alloc());
 }
 
 
 size_t ColumnBackLink::get_backlink(size_t row_ndx, size_t backlink_ndx) const TIGHTDB_NOEXCEPT
 {
-    size_t ref = Column::get(row_ndx);
-    TIGHTDB_ASSERT(ref != 0);
+    int_fast64_t value = Column::get(row_ndx);
+    TIGHTDB_ASSERT(value != 0);
 
-    if (ref & 1) {
+    size_t origin_row_ndx;
+    if (value % 2 != 0) {
         TIGHTDB_ASSERT(backlink_ndx == 0);
-
-        size_t row_ref = (ref >> 1);
-        return row_ref;
+        origin_row_ndx = to_size_t(value / 2);
     }
-
-    // return ref from list
-    //TODO: optimize with direct access
-    TIGHTDB_ASSERT(backlink_ndx < ColumnBase::get_size_from_ref(ref, get_alloc()));
-    Column col(ref, null_ptr, 0, get_alloc());
-    return col.get(backlink_ndx);
+    else {
+        ref_type ref = to_ref(value);
+        TIGHTDB_ASSERT(backlink_ndx < ColumnBase::get_size_from_ref(ref, get_alloc()));
+        // FIXME: Optimize with direct access (that is, avoid creation of a
+        // Column instance, since that implies dynamic allocation).
+        Column col(ref, 0, 0, get_alloc());
+        int_fast64_t value_2 = col.get(backlink_ndx);
+        origin_row_ndx = to_size_t(value_2);
+    }
+    return origin_row_ndx;
 }
 
 
 void ColumnBackLink::remove_backlink(size_t row_ndx, size_t origin_row_ndx)
 {
-    size_t ref = Column::get(row_ndx);
-    TIGHTDB_ASSERT(ref != 0);
+    int_fast64_t value = Column::get(row_ndx);
+    TIGHTDB_ASSERT(value != 0);
 
     // If there is only a single backlink, it can be stored as
     // a tagged value
-    if (ref & 1) {
-        TIGHTDB_ASSERT(get_backlink(row_ndx, 0) == origin_row_ndx);
+    if (value % 2 != 0) {
+        TIGHTDB_ASSERT(to_size_t(value/2) == origin_row_ndx);
         Column::set(row_ndx, 0);
         return;
     }
 
     // if there is a list of backlinks we have to find
     // the right one and remove it.
+    ref_type ref = to_ref(value);
     Column col(ref, this, row_ndx, get_alloc());
-    size_t ref_pos = col.find_first(origin_row_ndx);
-    TIGHTDB_ASSERT(ref_pos != not_found);
-    bool is_last = (ref_pos+1 == col.size());
-    col.erase(ref_pos, is_last);
+    int_fast64_t value_2 = int_fast64_t(origin_row_ndx);
+    size_t backlink_ndx = col.find_first(value_2);
+    TIGHTDB_ASSERT(backlink_ndx != not_found);
+    size_t num_links = col.size();
+    bool is_last = backlink_ndx+1 == num_links;
+    col.erase(backlink_ndx, is_last);
+    --num_links;
 
-    // if there is only one ref left we can inline it as tagged value
-    if (col.size() == 1) {
-        size_t last_value = col.get(0);
+    // If there is only one backlink left we can inline it as tagged value
+    if (num_links == 1) {
+        int_fast64_t value_3 = col.get(0);
         col.destroy();
 
-        size_t tagged_ndx = (last_value << 1) + 1;
-        Column::set(row_ndx, tagged_ndx);
+        int_fast64_t value_4 = 1 + 2 * value_3;
+        Column::set(row_ndx, value_4);
     }
 }
 
 
-void ColumnBackLink::update_backlink(size_t row_ndx, size_t old_row_ndx, size_t new_row_ndx) {
-    size_t ref = Column::get(row_ndx);
-    TIGHTDB_ASSERT(ref != 0);
+void ColumnBackLink::update_backlink(size_t row_ndx, size_t old_origin_row_ndx,
+                                     size_t new_origin_row_ndx)
+{
+    int_fast64_t value = Column::get(row_ndx);
+    TIGHTDB_ASSERT(value != 0);
 
-    if (ref & 1) {
-        TIGHTDB_ASSERT((ref >> 1) == old_row_ndx);
-        size_t tagged_ndx = (new_row_ndx << 1) + 1;
-        Column::set(row_ndx, tagged_ndx);
+    if (value % 2 != 0) {
+        TIGHTDB_ASSERT(to_size_t(value/2) == old_origin_row_ndx);
+        int_fast64_t value_2 = 1 + 2 * int_fast64_t(new_origin_row_ndx);
+        Column::set(row_ndx, value_2);
         return;
     }
 
-    // find match in list and replace
+    // Find match in backlink list and replace
+    ref_type ref = to_ref(value);
     Column col(ref, this, row_ndx, get_alloc());
-    size_t ref_pos = col.find_first(old_row_ndx);
-    TIGHTDB_ASSERT(ref_pos != not_found);
-    col.set(ref_pos, new_row_ndx);
+    int_fast64_t value_2 = int_fast64_t(old_origin_row_ndx);
+    size_t backlink_ndx = col.find_first(value_2);
+    TIGHTDB_ASSERT(backlink_ndx != not_found);
+    int_fast64_t value_3 = int_fast64_t(new_origin_row_ndx);
+    col.set(backlink_ndx, value_3);
 }
 
 
 void ColumnBackLink::nullify_links(size_t row_ndx, bool do_destroy)
 {
     // Nullify all links pointing to the row being deleted
-    size_t ref = Column::get(row_ndx);
-    if (ref != 0) {
-        if (ref & 1) {
-            size_t row_ref = (ref >> 1);
-            m_origin_column->do_nullify_link(row_ref, row_ndx);
+    int_fast64_t value = Column::get(row_ndx);
+    if (value != 0) {
+        if (value % 2 != 0) {
+            size_t origin_row_ndx = to_size_t(value / 2);
+            m_origin_column->do_nullify_link(origin_row_ndx, row_ndx); // Throws
         }
         else {
             // nullify entire list of links
-            Column col(ref, null_ptr, 0, get_alloc());
-            size_t count = col.size();
+            ref_type ref = to_ref(value);
+            Column col(ref, 0, 0, get_alloc()); // Throws
 
-            for (size_t i = 0; i < count; ++i) {
-                size_t origin_row_ref = col.get(i);
-                m_origin_column->do_nullify_link(origin_row_ref, row_ndx);
+            size_t n = col.size();
+            for (size_t i = 0; i < n; ++i) {
+                int_fast64_t value_2 = col.get(i);
+                size_t origin_row_ndx = to_size_t(value_2);
+                m_origin_column->do_nullify_link(origin_row_ndx, row_ndx); // Throws
             }
 
-            if (do_destroy) {
+            if (do_destroy)
                 col.destroy();
-            }
         }
     }
 }
@@ -181,49 +191,55 @@ void ColumnBackLink::move_last_over(size_t target_row_ndx, size_t last_row_ndx)
     TIGHTDB_ASSERT(last_row_ndx + 1 == size());
 
     // Nullify all links pointing to the row being deleted
-    nullify_links(target_row_ndx, true);
+    bool do_destroy = true;
+    nullify_links(target_row_ndx, do_destroy); // Throws
 
     // Update all links to the last row to point to the new row instead
-    size_t ref = Column::get(last_row_ndx);
-    if (ref != 0) {
-        if (ref & 1) {
-            size_t row_ref = (ref >> 1);
-            m_origin_column->do_update_link(row_ref, last_row_ndx, target_row_ndx);
+    int_fast64_t value = Column::get(last_row_ndx);
+    if (value != 0) {
+        if (value % 2 != 0) {
+            size_t origin_row_ndx = to_size_t(value / 2);
+            m_origin_column->do_update_link(origin_row_ndx, last_row_ndx, target_row_ndx); // Throws
         }
         else {
             // update entire list of links
-            Column col(ref, null_ptr, 0, get_alloc());
-            size_t count = col.size();
+            ref_type ref = to_ref(value);
+            Column col(ref, 0, 0, get_alloc()); // Throws
 
-            for (size_t i = 0; i < count; ++i) {
-                size_t origin_row_ref = col.get(i);
-                m_origin_column->do_update_link(origin_row_ref, last_row_ndx, target_row_ndx);
+            size_t n = col.size();
+            for (size_t i = 0; i < n; ++i) {
+                int_fast64_t value_2 = col.get(i);
+                size_t origin_row_ndx = to_size_t(value_2);
+                m_origin_column->do_update_link(origin_row_ndx, last_row_ndx, target_row_ndx); // Throws
             }
         }
     }
 
     // Do the actual move
-    Column::set(target_row_ndx, ref);
-    Column::erase(last_row_ndx, true);
+    Column::set(target_row_ndx, value); // Throws
+    bool is_last = true;
+    Column::erase(last_row_ndx, is_last); // Throws
 }
 
 
 void ColumnBackLink::erase(size_t row_ndx, bool is_last)
 {
     TIGHTDB_ASSERT(is_last);
-
-    nullify_links(row_ndx, false);
-    Column::erase(row_ndx, is_last);
+    bool do_destroy = true;
+    nullify_links(row_ndx, do_destroy); // Throws
+    Column::erase(row_ndx, is_last); // Throws
 }
 
 
 void ColumnBackLink::clear()
 {
-    size_t count = size();
-    for (size_t i = 0; i < count; ++i) {
-        nullify_links(i, false);
+    size_t n = size();
+    for (size_t i = 0; i < n; ++i) {
+        // Column::clear() handles the destruction of subtrees
+        bool do_destroy = false;
+        nullify_links(i, do_destroy); // Throws
     }
-    Column::clear();
+    Column::clear(); // Throws
     // FIXME: This one is needed because Column::clear() forgets about
     // the leaf type. A better solution should probably be found.
     m_array->set_type(Array::type_HasRefs);
@@ -232,13 +248,13 @@ void ColumnBackLink::clear()
 
 void ColumnBackLink::update_child_ref(size_t child_ndx, ref_type new_ref)
 {
-    Column::set(child_ndx, new_ref);
+    Column::set(child_ndx, new_ref); // Throws
 }
 
 
 ref_type ColumnBackLink::get_child_ref(size_t child_ndx) const TIGHTDB_NOEXCEPT
 {
-    return Column::get(child_ndx);
+    return Column::get_as_ref(child_ndx);
 }
 
 

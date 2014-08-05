@@ -127,7 +127,7 @@ SlabAlloc::~SlabAlloc() TIGHTDB_NOEXCEPT
         // A shared group does not guarantee that all space is free
         if (m_attach_mode != attach_SharedFile) {
             // No point inchecking if free space info is invalid
-            if (!m_free_space_invalid) {
+            if (m_free_space_state != free_space_Invalid) {
                 if (!is_all_free()) {
                     print();
 #  ifndef TIGHTDB_SLAB_ALLOC_DEBUG
@@ -157,12 +157,11 @@ MemRef SlabAlloc::do_alloc(size_t size)
     TIGHTDB_ASSERT((size & 0x7) == 0); // only allow sizes that are multiples of 8
     TIGHTDB_ASSERT(is_attached());
 
-    // FIXME: Ideally, instead of just marking the free space as invalid in
-    // do_free(), we shuld at least make a best effort to keep a record of what
-    // was freed and then attempt to rebuild the free lists here when they have
-    // become invalid.
-    if (m_free_space_invalid)
+    // If we failed to correctly record free space, new allocations cannot be
+    // carried out until the free space record is reset.
+    if (m_free_space_state == free_space_Invalid)
         throw InvalidFreeSpace();
+    m_free_space_state = free_space_Dirty;
 
     // Do we have a free space we can reuse?
     {
@@ -275,8 +274,14 @@ void SlabAlloc::do_free(ref_type ref, const char* addr) TIGHTDB_NOEXCEPT
         cerr << "Free ref: " << ref << " size: " << size << "\n";
 #endif
 
-    if (m_free_space_invalid)
+    if (m_free_space_state == free_space_Invalid)
         return;
+
+    // Mutable memory cannot be freed unless it has first been allocated, and
+    // any allocation puts free space tracking into the "dirty" state.
+    TIGHTDB_ASSERT(read_only || m_free_space_state == free_space_Dirty);
+
+    m_free_space_state = free_space_Dirty;
 
     // Check if we can merge with adjacent succeeding free block
     typedef chunks::iterator iter;
@@ -321,7 +326,7 @@ void SlabAlloc::do_free(ref_type ref, const char* addr) TIGHTDB_NOEXCEPT
             free_space.push_back(chunk); // Throws
         }
         catch (...) {
-            m_free_space_invalid = true;
+            m_free_space_state = free_space_Invalid;
         }
     }
 }
@@ -333,9 +338,9 @@ MemRef SlabAlloc::do_realloc(size_t ref, const char* addr, size_t old_size, size
     TIGHTDB_ASSERT(0 < new_size);
     TIGHTDB_ASSERT((new_size & 0x7) == 0); // only allow sizes that are multiples of 8
 
-    // FIXME: Check if we can extend current space. In that case,
-    // remember to check m_free_space_invalid. Also remember to fill
-    // with zero if TIGHTDB_ENABLE_ALLOC_SET_ZERO is defined.
+    // FIXME: Check if we can extend current space. In that case, remember to
+    // check whether m_free_space_state == free_state_Invalid. Also remember to
+    // fill with zero if TIGHTDB_ENABLE_ALLOC_SET_ZERO is defined.
 
     // Allocate new space
     MemRef new_mem = do_alloc(new_size); // Throws
@@ -479,12 +484,9 @@ void SlabAlloc::attach_empty()
     m_attach_mode = attach_OwnedBuffer;
     m_data = 0; // Empty buffer
 
-    // We cannot initialize m_baseline to zero, because that would
-    // cause the first invocation of alloc() to return a 'ref' equal
-    // to zero, and zero is by definition not a valid ref. Since all
-    // 'refs' must be a multiple of 8, it is appropriate to use a
-    // value of 8.
-    m_baseline = 8;
+    // No ref must ever be less that the header size, so we will use that as the
+    // baseline here.
+    m_baseline = sizeof (Header);
 }
 
 
@@ -556,31 +558,28 @@ size_t SlabAlloc::get_total_size() const TIGHTDB_NOEXCEPT
 
 void SlabAlloc::reset_free_space_tracking()
 {
+    if (m_free_space_state == free_space_Clean)
+        return;
+
     // Free all scratch space (done after all data has
     // been commited to persistent space)
     m_free_read_only.clear();
     m_free_space.clear();
 
     // Rebuild free list to include all slabs
-    try {
-        Chunk chunk;
-        chunk.ref = m_baseline;
-        typedef slabs::const_iterator iter;
-        iter end = m_slabs.end();
-        for (iter i = m_slabs.begin(); i != end; ++i) {
-            chunk.size = i->ref_end - chunk.ref;
-            m_free_space.push_back(chunk); // Throws
-            chunk.ref = i->ref_end;
-        }
-    }
-    catch (...) {
-        m_free_space_invalid = true;
-        throw;
+    Chunk chunk;
+    chunk.ref = m_baseline;
+    typedef slabs::const_iterator iter;
+    iter end = m_slabs.end();
+    for (iter i = m_slabs.begin(); i != end; ++i) {
+        chunk.size = i->ref_end - chunk.ref;
+        m_free_space.push_back(chunk); // Throws
+        chunk.ref = i->ref_end;
     }
 
     TIGHTDB_ASSERT(is_all_free());
 
-    m_free_space_invalid = false;
+    m_free_space_state = free_space_Clean;
 }
 
 
@@ -588,16 +587,8 @@ bool SlabAlloc::remap(size_t file_size)
 {
     TIGHTDB_ASSERT(file_size % 8 == 0); // 8-byte alignment required
     TIGHTDB_ASSERT(m_attach_mode == attach_SharedFile || m_attach_mode == attach_UnsharedFile);
-    TIGHTDB_ASSERT(m_free_read_only.empty());
+    TIGHTDB_ASSERT(m_free_space_state == free_space_Clean);
     TIGHTDB_ASSERT(m_baseline <= file_size);
-
-    // FIXME: We only need to call remap() in cases where free space
-    // tracking needs to be reset anyway, so instead of adjusting the
-    // free space information below, it would be more efficient to
-    // start by erasing the free space information, then remap, then
-    // rebuild the free space information. This way, Group::commit()
-    // and Group::init_for_transact() no longer have to call
-    // SlabAlloc::reset_free_space_tracking().
 
     void* addr = m_file.remap(m_data, m_baseline, File::access_ReadOnly, file_size);
     bool addr_changed = addr != m_data;
@@ -623,7 +614,7 @@ bool SlabAlloc::remap(size_t file_size)
 
 const SlabAlloc::chunks& SlabAlloc::get_free_read_only() const
 {
-    if (m_free_space_invalid)
+    if (m_free_space_state == free_space_Invalid)
         throw InvalidFreeSpace();
     return m_free_read_only;
 }
