@@ -442,16 +442,24 @@ public:
     template<class InstructionHandler> void parse(InstructionHandler&);
 
 private:
+    // The input stream is assumed to consist of chunks of memory organised such that
+    // every instruction resides in a single chunk only.
     InputStream& m_input;
+    // pointer into transaction log, each instruction is parsed from m_input_begin and onwards.
+    // Each instruction are assumed to be contiguous in memory.
     const char* m_input_begin;
+    // pointer to one past current instruction log chunk. If m_input_begin reaches m_input_end,
+    // a call to next_input_buffer will move m_input_begin and m_input_end to a new chunk of
+    // memory. Setting m_input_end to 0 disables this check, and is used if it is already known
+    // that all of the instructions are in memory.
     const char* m_input_end;
     util::StringBuffer m_string_buffer;
     static const int m_max_levels = 1024;
     util::Buffer<std::size_t> m_path;
 
     template<class InstructionHandler> bool do_parse(InstructionHandler&);
-    template<class InstructionHandler> bool parse_one_inst(InstructionHandler& handler, char instr);
-    bool determine_instruction_starts();
+    template<class InstructionHandler> bool parse_one_inst(InstructionHandler& handler);
+    bool determine_instruction_starts(std::vector<const char*>& instruction_starts);
 
     template<class T> T read_int();
 
@@ -463,11 +471,12 @@ private:
     void read_string(util::StringBuffer&);
     void read_mixed(Mixed*);
 
+    // Advance m_input_begin and m_input_end to reflect the next block of instructions
     // Returns false if no more input was available
-    bool fill_input_buffer();
+    bool next_input_buffer();
 
-    // Returns false if no input was available
-    bool read_char(char&);
+    // Throws if no input was available
+    void read_char(char&); // throws
 
     bool is_valid_data_type(int type);
 };
@@ -1136,8 +1145,10 @@ void Replication::TransactLogParser::parse(InstructionHandler& handler)
 }
 
 template<class InstructionHandler>
-bool Replication::TransactLogParser::parse_one_inst(InstructionHandler& handler, char instr)
+bool Replication::TransactLogParser::parse_one_inst(InstructionHandler& handler)
 {
+    char instr;
+    read_char(instr);
     switch (Instruction(instr)) {
         case instr_SetInt: {
             std::size_t col_ndx = read_int<std::size_t>(); // Throws
@@ -1494,10 +1505,12 @@ bool Replication::TransactLogParser::do_parse(InstructionHandler& handler)
     std::vector<const char*> instruction_starts;
     if (!determine_instruction_starts(instruction_starts))
         return false;
-    m_input_end = 0; // make sure we never reach input-end during re-parse
+    // as the first parse has made sure that all instructions are in memory,
+    // disable checksfor the rest of the parsing
+    m_input_end = 0;
     for (size_t i = 0; i < instruction_starts.size(); ++i) {
         m_input_begin = instruction_starts[i];
-        if (!parse_one_inst(handler, instr))
+        if (!parse_one_inst(handler))
             return false;
     }
     return true;
@@ -1511,8 +1524,7 @@ template<class T> T Replication::TransactLogParser::read_int()
     const int max_bytes = (std::numeric_limits<T>::digits+1+6)/7;
     for (int i = 0; i != max_bytes; ++i) {
         char c;
-        if (!read_char(c))
-            goto bad_transact_log;
+        read_char(c);
         part = static_cast<unsigned char>(c);
         if (0xFF < part)
             goto bad_transact_log; // Only the first 8 bits may be used in each byte
@@ -1544,17 +1556,8 @@ template<class T> T Replication::TransactLogParser::read_int()
 
 inline void Replication::TransactLogParser::read_bytes(char* data, std::size_t size)
 {
-    for (;;) {
-        const std::size_t avail = m_input_end - m_input_begin;
-        if (size <= avail)
-            break;
-        const char* to = m_input_begin + avail;
-        std::copy(m_input_begin, to, data);
-        if (!fill_input_buffer())
-            throw BadTransactLog();
-        data += avail;
-        size -= avail;
-    }
+    if (m_input_end && m_input_begin + size > m_input_end) 
+        throw BadTransactLog();
     const char* to = m_input_begin + size;
     std::copy(m_input_begin, to, data);
     m_input_begin = to;
@@ -1652,7 +1655,7 @@ inline void Replication::TransactLogParser::read_mixed(Mixed* mixed)
 }
 
 
-inline bool Replication::TransactLogParser::fill_input_buffer()
+inline bool Replication::TransactLogParser::next_input_buffer()
 {
     std::size_t sz = m_input.next_block(m_input_begin, m_input_end);
     if (sz == 0)
@@ -1662,16 +1665,11 @@ inline bool Replication::TransactLogParser::fill_input_buffer()
 }
 
 
-inline bool Replication::TransactLogParser::read_char(char& c)
+inline void Replication::TransactLogParser::read_char(char& c)
 {
-    // if m_input_begin has reached m_input_end we need to refresh the buffer.
-    // however m_input_begin == 0 is a special case where we should always refresh the buffer.
-    // m_input_end == 0 means that there is no end-check. This is the case, if we are
-    // re-parsing instructions which are known to be available in memory already.
-    if ((m_input_begin == 0 || m_input_begin == m_input_end) && !fill_input_buffer())
-        return false;
+    if (m_input_end && m_input_begin == m_input_end)
+        throw BadTransactLog();
     c = *m_input_begin++;
-    return true;
 }
 
 

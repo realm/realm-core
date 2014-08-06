@@ -820,12 +820,14 @@ public:
 
     bool new_group_level_table(StringData) TIGHTDB_NOEXCEPT
     {
+        // inverse: remove named table
         m_group.m_table_accessors.push_back(0); // Throws
         return true;
     }
 
     bool select_table(size_t group_level_ndx, int levels, const size_t* path) TIGHTDB_NOEXCEPT
     {
+        // inverse: transform to postfix
         m_table.reset();
         if (group_level_ndx < m_group.m_table_accessors.size()) {
             if (Table* table = m_group.m_table_accessors[group_level_ndx]) {
@@ -852,6 +854,7 @@ public:
 
     bool insert_empty_rows(size_t row_ndx, size_t num_rows) TIGHTDB_NOEXCEPT
     {
+        // inverse: *multiple* erase_row
         typedef _impl::TableFriend tf;
         if (m_table)
             tf::adj_accessors_insert_rows(*m_table, row_ndx, num_rows);
@@ -860,6 +863,7 @@ public:
 
     bool erase_row(size_t row_ndx) TIGHTDB_NOEXCEPT
     {
+        // inverse: insert empty row
         typedef _impl::TableFriend tf;
         if (m_table)
             tf::adj_accessors_erase_row(*m_table, row_ndx);
@@ -868,6 +872,7 @@ public:
 
     bool move_last_over(size_t target_row_ndx, size_t last_row_ndx) TIGHTDB_NOEXCEPT
     {
+        // inverse: append, then move -- neither exist
         typedef _impl::TableFriend tf;
         if (m_table)
             tf::adj_accessors_move_last_over(*m_table, target_row_ndx, last_row_ndx);
@@ -876,13 +881,14 @@ public:
 
     bool clear_table() TIGHTDB_NOEXCEPT
     {
+        // inverse: no-op
         typedef _impl::TableFriend tf;
         if (m_table)
             tf::adj_acc_clear_root_table(*m_table);
         // tf::discard_child_accessors(*m_table);
         return true;
     }
-
+    // inverse for insert_xxx is erase_row
     bool insert_int(size_t col_ndx, size_t row_ndx, int_fast64_t) TIGHTDB_NOEXCEPT
     {
         if (col_ndx == 0)
@@ -964,7 +970,7 @@ public:
     {
         return true; // Noop
     }
-
+    // inverse of set_xxx: no-op
     bool set_int(size_t, size_t, int_fast64_t) TIGHTDB_NOEXCEPT
     {
         return true; // Noop
@@ -1002,6 +1008,7 @@ public:
 
     bool set_table(size_t col_ndx, size_t row_ndx) TIGHTDB_NOEXCEPT
     {
+        // inverse: identical
         if (m_table) {
             typedef _impl::TableFriend tf;
             if (Table* subtab = tf::get_subtable_accessor(*m_table, col_ndx, row_ndx)) {
@@ -1014,6 +1021,7 @@ public:
 
     bool set_mixed(size_t col_ndx, size_t row_ndx, const Mixed&) TIGHTDB_NOEXCEPT
     {
+        // inverse: identical
         typedef _impl::TableFriend tf;
         if (m_table)
             tf::discard_subtable_accessor(*m_table, col_ndx, row_ndx);
@@ -1038,6 +1046,8 @@ public:
         // m_table->m_cols[col_ndx] is null, but this can happen only when the
         // column was inserted earlier during this transaction advance, and in
         // that case, we have already marked the target table accesor dirty.
+
+        // inverse: identical
         typedef _impl::TableFriend tf;
         if (m_table) {
             if (Table* target = tf::get_link_target_table_accessor(*m_table, col_ndx))
@@ -1058,6 +1068,7 @@ public:
 
     bool select_descriptor(int levels, const size_t* path)
     {
+        // inversion: identical, transform to postfix
         m_desc.reset();
         if (m_table) {
             TIGHTDB_ASSERT(!m_table->has_shared_type());
@@ -1084,6 +1095,7 @@ public:
 
     bool insert_column(size_t col_ndx, DataType, StringData, size_t link_target_table_ndx)
     {
+        // inversion: erase_column - note this means that we need to add backlink_col_ndx
         if (m_table) {
             typedef _impl::TableFriend tf;
             InsertColumnUpdater updater(col_ndx);
@@ -1104,6 +1116,7 @@ public:
 
     bool erase_column(size_t col_ndx, size_t link_target_table_ndx, size_t backlink_col_ndx)
     {
+        // inversion: insert_column
         if (m_table) {
             typedef _impl::TableFriend tf;
 
@@ -1139,6 +1152,7 @@ public:
     bool select_link_list(size_t col_ndx, size_t) TIGHTDB_NOEXCEPT
     {
         // See comments on link handling in TransactAdvancer::set_link().
+        // inversion: identical, transform to postfix
         typedef _impl::TableFriend tf;
         if (m_table) {
             if (Table* target = tf::get_link_target_table_accessor(*m_table, col_ndx))

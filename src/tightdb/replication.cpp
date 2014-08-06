@@ -904,16 +904,12 @@ bool Replication::TransactLogParser::determine_instruction_starts(std::vector<co
 {
     NullHandler handler;
     m_input_begin = m_input_end = 0;
-    fill_input_buffer();
-    for (;;) {
-        char instr;
-        if (!read_char(instr))
-            break;
-        instruction_starts.push_back(m_input_begin-1);
-        if (!parse_one_inst(handler, instr))
+    next_input_buffer();
+    while (m_input_begin != m_input_end || next_input_buffer()) {
+        instruction_starts.push_back(m_input_begin);
+        if (!parse_one_inst(handler))
             return false;
     }
-
     return true;
 }
 
