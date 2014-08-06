@@ -3036,7 +3036,8 @@ top:
             if (sub_isleaf)
                 row_ref = to_size_t(get_direct(sub_data, sub_width, 0));
             else {
-                Array sub(to_ref(ref), 0, 0, m_alloc);
+                Array sub(m_alloc);
+                sub.init_from_ref(to_ref(ref));
                 pair<MemRef, size_t> p = sub.get_bptree_leaf(0);
                 const char* leaf_header = p.first.m_addr;
                 row_ref = to_size_t(get(leaf_header, 0));
@@ -3164,7 +3165,7 @@ top:
                 }
             }
             else {
-                const Column sub(to_ref(ref), 0, 0, m_alloc);
+                const Column sub(m_alloc, to_ref(ref));
                 const size_t first_row_ref = to_size_t(sub.get(0));
 
                 // If the last byte in the stored key is not zero, we have
@@ -3290,7 +3291,7 @@ top:
                 }
             }
             else {
-                const Column sub(to_ref(ref), 0, 0, m_alloc);
+                const Column sub(m_alloc, to_ref(ref));
                 const size_t first_row_ref = to_size_t(sub.get(0));
 
                 // If the last byte in the stored key is not zero, we have
@@ -3411,7 +3412,7 @@ top:
                 row_ref = to_size_t(get_direct(sub_data, sub_width, 0));
             }
             else {
-                const Column sub(to_ref(ref), 0, 0, m_alloc);
+                const Column sub(m_alloc, to_ref(ref));
                 sub_count = sub.size();
 
                 // If the last byte in the stored key is zero, we know

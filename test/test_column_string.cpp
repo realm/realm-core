@@ -42,7 +42,8 @@ using namespace tightdb;
 
 TEST(ColumnString_Basic)
 {
-    AdaptiveStringColumn c;
+    ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
+    AdaptiveStringColumn c(Allocator::get_default(), ref);
 
     // TEST(ColumnString_MultiEmpty)
 
@@ -343,7 +344,8 @@ TEST(ColumnString_Basic)
     c.clear();
 
     {
-        Column col;
+        ref_type col_ref = Column::create(Allocator::get_default());
+        Column col(Allocator::get_default(), col_ref);
 
         c.add("foobar");
         c.add("bar abc");
@@ -367,7 +369,8 @@ TEST(ColumnString_Basic)
     c.clear();
 
     {
-        Column col;
+        ref_type col_ref = Column::create(Allocator::get_default());
+        Column col(Allocator::get_default(), col_ref);
 
         c.add("foobar");
         c.add("bar abc");
@@ -392,7 +395,8 @@ TEST(ColumnString_Basic)
     c.clear();
 
     {
-        Column col;
+        ref_type col_ref = Column::create(Allocator::get_default());
+        Column col(Allocator::get_default(), col_ref);
 
         c.add("40 chars  40 chars  40 chars  40 chars  ");
         c.add("baz");
@@ -412,7 +416,8 @@ TEST(ColumnString_Basic)
     c.clear();
 
     {
-        Column col;
+        ref_type col_ref = Column::create(Allocator::get_default());
+        Column col(Allocator::get_default(), col_ref);
 
         c.add("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ");
         c.add("baz");
@@ -435,7 +440,8 @@ TEST(ColumnString_Basic)
 
 TEST(ColumnString_Find1)
 {
-    AdaptiveStringColumn c;
+    ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
+    AdaptiveStringColumn c(Allocator::get_default(), ref);
 
     c.add("a");
     c.add("bc");
@@ -458,7 +464,8 @@ TEST(ColumnString_Find1)
 
 TEST(ColumnString_Find2)
 {
-    AdaptiveStringColumn c;
+    ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
+    AdaptiveStringColumn c(Allocator::get_default(), ref);
 
     c.add("a");
     c.add("bc");
@@ -487,7 +494,8 @@ TEST(ColumnString_Find2)
 
 TEST(ColumnString_AutoEnumerate)
 {
-    AdaptiveStringColumn c;
+    ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
+    AdaptiveStringColumn c(Allocator::get_default(), ref);
 
     // Add duplicate values
     for (size_t i = 0; i < 5; ++i) {
@@ -503,7 +511,7 @@ TEST(ColumnString_AutoEnumerate)
     ref_type values;
     bool res = c.auto_enumerate(keys, values);
     CHECK(res);
-    ColumnStringEnum e(keys, values);
+    ColumnStringEnum e(Allocator::get_default(), values, keys);
 
     // Verify that all entries match source
     CHECK_EQUAL(c.size(), e.size());
@@ -531,7 +539,8 @@ TEST(ColumnString_AutoEnumerate)
 
 TEST(ColumnString_AutoEnumerateIndex)
 {
-    AdaptiveStringColumn c;
+    ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
+    AdaptiveStringColumn c(Allocator::get_default(), ref);
 
     // Add duplicate values
     for (size_t i = 0; i < 5; ++i) {
@@ -547,7 +556,7 @@ TEST(ColumnString_AutoEnumerateIndex)
     ref_type values;
     bool res = c.auto_enumerate(keys, values);
     CHECK(res);
-    ColumnStringEnum e(keys, values);
+    ColumnStringEnum e(Allocator::get_default(), values, keys);
 
     // Set index
     e.create_index();
@@ -557,7 +566,8 @@ TEST(ColumnString_AutoEnumerateIndex)
     size_t res1 = e.find_first("nonexist");
     CHECK_EQUAL(not_found, res1);
 
-    Column results;
+    ref_type results_ref = Column::create(Allocator::get_default());
+    Column results(Allocator::get_default(), results_ref);
     e.find_all(results, "nonexist");
     CHECK(results.is_empty());
 
@@ -613,7 +623,8 @@ TEST(ColumnString_AutoEnumerateIndex)
 
 TEST(ColumnString_AutoEnumerateIndexReuse)
 {
-    AdaptiveStringColumn c;
+    ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
+    AdaptiveStringColumn c(Allocator::get_default(), ref);
 
     // Add duplicate values
     for (size_t i = 0; i < 5; ++i) {
@@ -633,7 +644,7 @@ TEST(ColumnString_AutoEnumerateIndexReuse)
     ref_type values;
     bool res = c.auto_enumerate(keys, values);
     CHECK(res);
-    ColumnStringEnum e(keys, values);
+    ColumnStringEnum e(Allocator::get_default(), values, keys);
 
     // Reuse the index from original column
     StringIndex* index = c.release_index();
@@ -658,8 +669,11 @@ TEST(ColumnString_AutoEnumerateIndexReuse)
 
 TEST(ColumnString_FindAllExpand)
 {
-    AdaptiveStringColumn asc;
-    Column c;
+    ref_type asc_ref = AdaptiveStringColumn::create(Allocator::get_default());
+    AdaptiveStringColumn asc(Allocator::get_default(), asc_ref);
+
+    ref_type col_ref = Column::create(Allocator::get_default());
+    Column c(Allocator::get_default(), col_ref);
 
     asc.add("HEJ");
     asc.add("sdfsd");
@@ -702,8 +716,11 @@ TEST(ColumnString_FindAllExpand)
 // FindAll using ranges, when expanded ArrayStringLong
 TEST(ColumnString_FindAllRangesLong)
 {
-    AdaptiveStringColumn asc;
-    Column c;
+    ref_type asc_ref = AdaptiveStringColumn::create(Allocator::get_default());
+    AdaptiveStringColumn asc(Allocator::get_default(), asc_ref);
+
+    ref_type col_ref = Column::create(Allocator::get_default());
+    Column c(Allocator::get_default(), col_ref);
 
     // 17 elements, to test node splits with TIGHTDB_MAX_LIST_SIZE = 3 or other small number
     asc.add("HEJSA"); // 0
@@ -756,8 +773,11 @@ TEST(ColumnString_FindAllRangesLong)
 // FindAll using ranges, when not expanded (using ArrayString)
 TEST(ColumnString_FindAllRanges)
 {
-    AdaptiveStringColumn asc;
-    Column c;
+    ref_type asc_ref = AdaptiveStringColumn::create(Allocator::get_default());
+    AdaptiveStringColumn asc(Allocator::get_default(), asc_ref);
+
+    ref_type col_ref = Column::create(Allocator::get_default());
+    Column c(Allocator::get_default(), col_ref);
 
     // 17 elements, to test node splits with TIGHTDB_MAX_LIST_SIZE = 3 or other small number
     asc.add("HEJSA"); // 0
@@ -809,7 +829,8 @@ TEST(ColumnString_FindAllRanges)
 
 TEST(ColumnString_Count)
 {
-    AdaptiveStringColumn asc;
+    ref_type asc_ref = AdaptiveStringColumn::create(Allocator::get_default());
+    AdaptiveStringColumn asc(Allocator::get_default(), asc_ref);
 
     // 17 elements, to test node splits with TIGHTDB_MAX_LIST_SIZE = 3 or other small number
     asc.add("HEJSA"); // 0
@@ -836,7 +857,7 @@ TEST(ColumnString_Count)
     size_t keys;
     size_t values;
     CHECK(asc.auto_enumerate(keys, values));
-    ColumnStringEnum e(keys, values);
+    ColumnStringEnum e(Allocator::get_default(), values, keys);
 
     // Check that enumerated column return same result
     CHECK_EQUAL(9, e.count("HEJSA"));
@@ -851,7 +872,8 @@ TEST(ColumnString_Count)
 
 TEST(ColumnString_Index)
 {
-    AdaptiveStringColumn asc;
+    ref_type asc_ref = AdaptiveStringColumn::create(Allocator::get_default());
+    AdaptiveStringColumn asc(Allocator::get_default(), asc_ref);
 
     // 17 elements, to test node splits with TIGHTDB_MAX_LIST_SIZE = 3 or other small number
     asc.add("HEJSA"); // 0

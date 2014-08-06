@@ -67,7 +67,8 @@ TEST_IF(Strings_Monkey2, TEST_DURATION >= 1)
     int seed = 123;
 
     VerifiedString a;
-    Column res;
+    ref_type res_ref = Column::create(Allocator::get_default());
+    Column res(Allocator::get_default(), res_ref);
 
     Random random(seed);
     int trend = 5;
@@ -103,6 +104,5 @@ TEST_IF(Strings_Monkey2, TEST_DURATION >= 1)
     }
 
     // Cleanup
-    a.destroy();
     res.destroy();
 }

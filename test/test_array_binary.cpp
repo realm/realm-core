@@ -40,7 +40,8 @@ using namespace tightdb;
 
 TEST(ArrayBinary_Basic)
 {
-    ArrayBinary c;
+    ArrayBinary c(Allocator::get_default());
+    c.create();
 
     // TEST(ArrayBinary_MultiEmpty)
 

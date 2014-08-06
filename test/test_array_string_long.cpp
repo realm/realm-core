@@ -40,7 +40,8 @@ using namespace tightdb;
 
 TEST(ArrayStringLong_Basic)
 {
-    ArrayStringLong c;
+    ArrayStringLong c(Allocator::get_default());
+    c.create();
 
     // TEST(ArrayStringLong_MultiEmpty)
 

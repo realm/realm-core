@@ -53,8 +53,10 @@ namespace {
 
 void has_zero_byte(TestResults& test_results, int64_t value, size_t reps)
 {
-    Array a;
-    Column r;
+    Array a(Allocator::get_default());
+    a.create(Array::type_Normal);
+    ref_type column_ref = Column::create(Allocator::get_default());
+    Column r(Allocator::get_default(), column_ref);
 
     for (size_t i = 0; i < reps - 1; ++i)
         a.add(value);
@@ -78,7 +80,8 @@ void has_zero_byte(TestResults& test_results, int64_t value, size_t reps)
 
 TEST(Array_General)
 {
-    Array c;
+    Array c(Allocator::get_default());
+    c.create(Array::type_Normal);
 
     // TEST(Array_Add0)
 
@@ -464,7 +467,8 @@ TEST(Array_General)
 
 TEST(Array_AddNeg1_1)
 {
-    Array c;
+    Array c(Allocator::get_default());
+    c.create(Array::type_Normal);
 
     c.add(1);
     c.add(2);
@@ -489,7 +493,8 @@ TEST(Array_UpperLowerBound)
 {
     // Tests Array::upper_bound() and Array::lower_bound()
     // This test is independent of TIGHTDB_MAX_LIST_SIZE
-    Array a;
+    Array a(Allocator::get_default());
+    a.create(Array::type_Normal);
     vector<int> v;
     Random random(random_int<unsigned long>()); // Seed from slow global generator
 
@@ -526,7 +531,9 @@ TEST(Array_UpperLowerBound)
 
 TEST(Array_LowerUpperBound)
 {
-    Array a;
+    Array a(Allocator::get_default());
+    a.create(Array::type_Normal);
+
     a.add(10);
     a.add(20);
     a.add(30);
@@ -577,7 +584,9 @@ TEST(Array_LowerUpperBound)
 TEST(Array_Sort)
 {
     // Create Array with random values
-    Array a;
+    Array a(Allocator::get_default());
+    a.create(Array::type_Normal);
+
     a.add(25);
     a.add(12);
     a.add(50);
@@ -613,8 +622,11 @@ TEST(Array_Sort)
 
 TEST(Array_FindAllInt0)
 {
-    Array a;
-    Column r;
+    Array a(Allocator::get_default());
+    a.create(Array::type_Normal);
+
+    ref_type column_ref = Column::create(Allocator::get_default());
+    Column r(Allocator::get_default(), column_ref);
 
     const int value = 0;
     const int vReps = 5;
@@ -641,8 +653,11 @@ TEST(Array_FindAllInt0)
 
 TEST(Array_FindAllInt1)
 {
-    Array a;
-    Column r;
+    Array a(Allocator::get_default());
+    a.create(Array::type_Normal);
+
+    ref_type column_ref = Column::create(Allocator::get_default());
+    Column r(Allocator::get_default(), column_ref);
 
     const int value = 1;
     const int vReps = 5;
@@ -672,8 +687,11 @@ TEST(Array_FindAllInt1)
 
 TEST(Array_FindAllInt2)
 {
-    Array a;
-    Column r;
+    Array a(Allocator::get_default());
+    a.create(Array::type_Normal);
+
+    ref_type column_ref = Column::create(Allocator::get_default());
+    Column r(Allocator::get_default(), column_ref);
 
     const int value = 3;
     const int vReps = 5;
@@ -703,8 +721,11 @@ TEST(Array_FindAllInt2)
 
 TEST(Array_FindAllInt3)
 {
-    Array a;
-    Column r;
+    Array a(Allocator::get_default());
+    a.create(Array::type_Normal);
+
+    ref_type column_ref = Column::create(Allocator::get_default());
+    Column r(Allocator::get_default(), column_ref);
 
     const int value = 10;
     const int vReps = 5;
@@ -734,8 +755,11 @@ TEST(Array_FindAllInt3)
 
 TEST(Array_FindAllInt4)
 {
-    Array a;
-    Column r;
+    Array a(Allocator::get_default());
+    a.create(Array::type_Normal);
+
+    ref_type column_ref = Column::create(Allocator::get_default());
+    Column r(Allocator::get_default(), column_ref);
 
     const int value = 20;
     const int vReps = 5;
@@ -766,8 +790,11 @@ TEST(Array_FindAllInt4)
 
 TEST(Array_FindAllInt5)
 {
-    Array a;
-    Column r;
+    Array a(Allocator::get_default());
+    a.create(Array::type_Normal);
+
+    ref_type column_ref = Column::create(Allocator::get_default());
+    Column r(Allocator::get_default(), column_ref);
 
     const int value = 303;
     const int vReps = 5;
@@ -798,8 +825,11 @@ TEST(Array_FindAllInt5)
 
 TEST(Array_FindAllInt6)
 {
-    Array a;
-    Column r;
+    Array a(Allocator::get_default());
+    a.create(Array::type_Normal);
+
+    ref_type column_ref = Column::create(Allocator::get_default());
+    Column r(Allocator::get_default(), column_ref);
 
     const int value = 70000;
     const int vReps = 5;
@@ -830,8 +860,11 @@ TEST(Array_FindAllInt6)
 
 TEST(Array_FindAllInt7)
 {
-    Array a;
-    Column r;
+    Array a(Allocator::get_default());
+    a.create(Array::type_Normal);
+
+    ref_type column_ref = Column::create(Allocator::get_default());
+    Column r(Allocator::get_default(), column_ref);
 
     const int64_t value = 4300000003ULL;
     const int vReps = 5;
@@ -877,7 +910,9 @@ TEST(Array_FindHasZeroByte)
 // New find test for SSE search, to trigger partial finds (see FindSSE()) before and after the aligned data area
 TEST(Array_FindSSE)
 {
-    Array a;
+    Array a(Allocator::get_default());
+    a.create(Array::type_Normal);
+
     for (uint64_t i = 0; i < 100; ++i) {
         a.add(10000);
     }
@@ -895,7 +930,9 @@ TEST(Array_FindSSE)
 
 TEST(Array_Sum0)
 {
-    Array a;
+    Array a(Allocator::get_default());
+    a.create(Array::type_Normal);
+
     for (int i = 0; i < 64 + 7; ++i) {
         a.add(0);
     }
@@ -905,8 +942,10 @@ TEST(Array_Sum0)
 
 TEST(Array_Sum1)
 {
+    Array a(Allocator::get_default());
+    a.create(Array::type_Normal);
+
     int64_t s1 = 0;
-    Array a;
     for (int i = 0; i < 256 + 7; ++i)
         a.add(i % 2);
 
@@ -925,8 +964,10 @@ TEST(Array_Sum1)
 
 TEST(Array_Sum2)
 {
+    Array a(Allocator::get_default());
+    a.create(Array::type_Normal);
+
     int64_t s1 = 0;
-    Array a;
     for (int i = 0; i < 256 + 7; ++i)
         a.add(i % 4);
 
@@ -946,8 +987,10 @@ TEST(Array_Sum2)
 
 TEST(Array_Sum4)
 {
+    Array a(Allocator::get_default());
+    a.create(Array::type_Normal);
+
     int64_t s1 = 0;
-    Array a;
     for (int i = 0; i < 256 + 7; ++i)
         a.add(i % 16);
 
@@ -966,8 +1009,10 @@ TEST(Array_Sum4)
 
 TEST(Array_Sum16)
 {
+    Array a(Allocator::get_default());
+    a.create(Array::type_Normal);
+
     int64_t s1 = 0;
-    Array a;
     for (int i = 0; i < 256 + 7; ++i)
         a.add(i % 30000);
 
@@ -986,7 +1031,8 @@ TEST(Array_Sum16)
 
 TEST(Array_Greater)
 {
-    Array a;
+    Array a(Allocator::get_default());
+    a.create(Array::type_Normal);
 
     size_t items = 400;
 
@@ -1111,7 +1157,8 @@ TEST(Array_Greater)
 
 TEST(Array_Less)
 {
-    Array a;
+    Array a(Allocator::get_default());
+    a.create(Array::type_Normal);
 
     size_t items = 400;
 
@@ -1231,7 +1278,8 @@ TEST(Array_Less)
 
 TEST(Array_NotEqual1)
 {
-    Array a;
+    Array a(Allocator::get_default());
+    a.create(Array::type_Normal);
 
     a.clear();
     for (size_t i = 0; i < 100; ++i) {
@@ -1245,7 +1293,8 @@ TEST(Array_NotEqual1)
 
 TEST(Array_NotEqual)
 {
-    Array a;
+    Array a(Allocator::get_default());
+    a.create(Array::type_Normal);
 
     size_t items = 400;
 
@@ -1367,7 +1416,8 @@ TEST(Array_NotEqual)
 TEST(Array_Sort1)
 {
     // negative values
-    Array a;
+    Array a(Allocator::get_default());
+    a.create(Array::type_Normal);
 
     Random random(random_int<unsigned long>()); // Seed from slow global generator
     for (size_t t = 0; t < 400; ++t)
@@ -1387,7 +1437,8 @@ TEST(Array_Sort1)
 TEST(Array_Sort2)
 {
     // 64 bit values
-    Array a;
+    Array a(Allocator::get_default());
+    a.create(Array::type_Normal);
 
     Random random(random_int<unsigned long>()); // Seed from slow global generator
     for (size_t t = 0; t < 400; ++t) {
@@ -1410,7 +1461,8 @@ TEST(Array_Sort2)
 TEST(Array_Sort3)
 {
     // many values
-    Array a;
+    Array a(Allocator::get_default());
+    a.create(Array::type_Normal);
 
     Random random(random_int<unsigned long>()); // Seed from slow global generator
     for (size_t t = 0; t < 1000000ULL; ++t)
@@ -1430,7 +1482,8 @@ TEST(Array_Sort3)
 TEST(Array_Sort4)
 {
     // same values
-    Array a;
+    Array a(Allocator::get_default());
+    a.create(Array::type_Normal);
 
     for (size_t t = 0; t < 1000; ++t)
         a.add(0);
@@ -1447,14 +1500,17 @@ TEST(Array_Sort4)
 
 TEST(Array_Copy)
 {
-    Array a;
+    Array a(Allocator::get_default());
+    a.create(Array::type_Normal);
+
     a.add(0);
     a.add(1);
     a.add(2);
     a.add(3);
     a.add(4);
 
-    Array b(a, Allocator::get_default());
+    Array b(Allocator::get_default());
+    b.init_from_mem(a.clone_deep(Allocator::get_default()));
 
 #ifdef TIGHTDB_DEBUG
     b.Verify();
@@ -1468,13 +1524,15 @@ TEST(Array_Copy)
     CHECK_EQUAL(4, b.get(4));
 
     // With sub-arrays
-    Array c(Array::type_HasRefs);
+    Array c(Allocator::get_default());
+    c.create(Array::type_HasRefs);
     c.add(a.get_ref());
 
-    Array d(c, Allocator::get_default());
+    Array d(Allocator::get_default());
+    d.init_from_mem(c.clone_deep(Allocator::get_default()));
 
 #ifdef TIGHTDB_DEBUG
-    b.Verify(); // FIXME: Should this not have been d.Verify()?
+    d.Verify();
 #endif
 
     CHECK(d.has_refs());
@@ -1496,7 +1554,8 @@ TEST(Array_Copy)
 
 TEST(Array_Count)
 {
-    Array a;
+    Array a(Allocator::get_default());
+    a.create(Array::type_Normal);
 
     // 0 bit width
     for (size_t i = 0; i < 150; ++i)

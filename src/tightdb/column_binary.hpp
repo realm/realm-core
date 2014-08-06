@@ -35,9 +35,7 @@ class ColumnBinary: public ColumnBase {
 public:
     typedef BinaryData value_type;
 
-    explicit ColumnBinary(Allocator& = Allocator::get_default());
-    explicit ColumnBinary(ref_type, ArrayParent* = 0, std::size_t ndx_in_parent = 0,
-                          Allocator& = Allocator::get_default());
+    ColumnBinary(Allocator&, ref_type);
     ~ColumnBinary() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
     std::size_t size() const TIGHTDB_NOEXCEPT;
@@ -64,7 +62,7 @@ public:
     /// Compare two binary columns for equality.
     bool compare_binary(const ColumnBinary&) const;
 
-    static ref_type create(std::size_t size, Allocator&);
+    static ref_type create(Allocator&, std::size_t size = 0);
 
     static std::size_t get_size_from_ref(ref_type root_ref, Allocator&) TIGHTDB_NOEXCEPT;
 

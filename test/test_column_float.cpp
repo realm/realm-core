@@ -75,7 +75,9 @@ const size_t num_double_values = size_of_array(double_values);
 template <class C>
 void BasicColumn_IsEmpty(TestResults& test_results)
 {
-    C c;
+    ref_type ref = C::create(Allocator::get_default());
+    C c(Allocator::get_default(), ref);
+
     CHECK(c.is_empty());
     CHECK_EQUAL(0U, c.size());
     c.destroy();
@@ -93,7 +95,9 @@ TEST(ColumnDouble_IsEmpty)
 template <class C, typename T>
 void BasicColumn_AddGet(TestResults& test_results, T values[], size_t num_values)
 {
-    C c;
+    ref_type ref = C::create(Allocator::get_default());
+    C c(Allocator::get_default(), ref);
+
     for (size_t i = 0; i < num_values; ++i) {
         c.add(values[i]);
 
@@ -118,7 +122,9 @@ TEST(ColumnDouble_AddGet)
 template <class C, typename T>
 void BasicColumn_Clear(TestResults& test_results)
 {
-    C c;
+    ref_type ref = C::create(Allocator::get_default());
+    C c(Allocator::get_default(), ref);
+
     CHECK(c.is_empty());
 
     for (size_t i = 0; i < 100; ++i)
@@ -143,7 +149,9 @@ TEST(ColumnDouble_Clear)
 template <class C, typename T>
 void BasicColumn_Set(TestResults& test_results, T values[], size_t num_values)
 {
-    C c;
+    ref_type ref = C::create(Allocator::get_default());
+    C c(Allocator::get_default(), ref);
+
     for (size_t i = 0; i < num_values; ++i)
         c.add(values[i]);
     CHECK_EQUAL(num_values, c.size());
@@ -176,7 +184,8 @@ void BasicColumn_Insert(TestResults& test_results, T values[], size_t num_values
 {
     static_cast<void>(num_values);
 
-    C c;
+    ref_type ref = C::create(Allocator::get_default());
+    C c(Allocator::get_default(), ref);
 
     // Insert in empty column
     c.insert(0, values[0]);
@@ -232,7 +241,8 @@ void BasicColumn_Aggregates(TestResults& test_results, T values[], size_t num_va
     static_cast<void>(num_values);
     static_cast<void>(values);
 
-    C c;
+    ref_type ref = C::create(Allocator::get_default());
+    C c(Allocator::get_default(), ref);
 
 //    double sum = c.sum();
 //    CHECK_EQUAL(0, sum);
@@ -255,7 +265,9 @@ TEST(ColumnDouble_Aggregates)
 template <class C, typename T>
 void BasicColumn_Delete(TestResults& test_results, T values[], size_t num_values)
 {
-    C c;
+    ref_type ref = C::create(Allocator::get_default());
+    C c(Allocator::get_default(), ref);
+
     for (size_t i = 0; i < num_values; ++i)
         c.add(values[i]);
     CHECK_EQUAL(5, c.size());

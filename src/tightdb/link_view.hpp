@@ -34,6 +34,8 @@ class ColumnLinkList;
 /// The effect of calling most of the link list functions on a detached accessor
 /// is unspecified and may lead to general corruption, or even a crash. The
 /// exceptions are is_attached() and the destructor.
+///
+/// FIXME: Rename this class to `LinkList`.
 class LinkView {
 public:
     ~LinkView() TIGHTDB_NOEXCEPT;
@@ -131,10 +133,11 @@ private:
 inline LinkView::LinkView(Table* origin_table, ColumnLinkList& column, std::size_t row_ndx):
     m_origin_table(origin_table->get_table_ref()),
     m_origin_column(column),
-    m_target_row_indexes(&column, row_ndx, column.get_alloc()),
+    m_target_row_indexes(Column::unattached_root_tag(), column.get_alloc()), // Throws
     m_ref_count(0)
 {
     Array& root = *m_target_row_indexes.get_root_array();
+    root.set_parent(&column, row_ndx);
     if (ref_type ref = root.get_ref_from_parent())
         root.init_from_ref(ref);
 }

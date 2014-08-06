@@ -73,18 +73,18 @@ const size_t num_double_values = size_of_array(double_values);
 
 // TODO: Add test of full range of floats.
 
-template <class C, typename T>
+template <class A, typename T>
 void BasicArray_AddGet(TestResults& test_results, T values[], size_t num_values)
 {
-    C f;
-    for (size_t i=0; i<num_values; ++i) {
+    A f(Allocator::get_default());
+    f.create();
+    for (size_t i = 0; i < num_values; ++i) {
         f.add(values[i]);
 
         CHECK_EQUAL(i+1, f.size());
 
-        for (size_t j=0; j<i; ++j) {
+        for (size_t j=0; j<i; ++j)
             CHECK_EQUAL(values[j], f.get(j));
-        }
     }
 
     f.clear();
@@ -102,10 +102,11 @@ TEST(ArrayDouble_AddGet)
 }
 
 
-template <class C, typename T>
+template <class A, typename T>
 void BasicArray_AddManyValues(TestResults& test_results)
 {
-    C f;
+    A f(Allocator::get_default());
+    f.create();
     size_t repeats = 1100;
     for (size_t i = 0; i < repeats; ++i) {
         f.add(T(i));
@@ -132,10 +133,11 @@ TEST(ArrayDouble_AddManyValues)
     BasicArray_AddManyValues<ArrayDouble, double>(test_results);
 }
 
-template <class C, typename T>
+template <class A, typename T>
 void BasicArray_Delete(TestResults& test_results)
 {
-    C f;
+    A f(Allocator::get_default());
+    f.create();
     for (size_t i = 0; i < 5; ++i)
         f.add( T(i) );
 
@@ -180,10 +182,12 @@ TEST(ArrayDouble_Delete)
 }
 
 
-template <class C, typename T>
+template <class A, typename T>
 void BasicArray_Set(TestResults& test_results, T values[], size_t num_values)
 {
-    C f;
+    A f(Allocator::get_default());
+    f.create();
+
     CHECK_EQUAL(0, f.size());
     for (size_t i = 0; i < num_values; ++i)
         f.add(values[i]);
@@ -211,10 +215,12 @@ TEST(ArrayDouble_Set)
 }
 
 
-template <class C, typename T>
+template <class A, typename T>
 void BasicArray_Insert(TestResults& test_results)
 {
-    C f;
+    A f(Allocator::get_default());
+    f.create();
+
     T v0 = T(123.970);
     T v1 = T(-321.971);
     T v2 = T(555.972);
@@ -259,10 +265,11 @@ TEST(ArrayDouble_Insert)
 
 #if 0
 // sum() is unused by other classes
-template <class C, typename T>
+template <class A, typename T>
 void BasicArray_Sum(TestResults& test_results)
 {
-    C f;
+    A f(Allocator::get_default());
+    f.create();
 
     T values[] = { T(1.1), T(2.2), T(3.3), T(4.4), T(5.5)};
     double sum = 0.0;
@@ -294,10 +301,12 @@ TEST(ArrayDouble_Sum)
 }
 #endif
 
-template <class C, typename T>
+template <class A, typename T>
 void BasicArray_Minimum(TestResults& test_results)
 {
-    C f;
+    A f(Allocator::get_default());
+    f.create();
+
     T res = T();
 
     CHECK_EQUAL(false, f.minimum(res));
@@ -335,10 +344,12 @@ TEST(ArrayDouble_Minimum)
 }
 
 
-template <class C, typename T>
+template <class A, typename T>
 void BasicArray_Maximum(TestResults& test_results)
 {
-    C f;
+    A f(Allocator::get_default());
+    f.create();
+
     T res = T();
 
     CHECK_EQUAL(false, f.maximum(res));
@@ -376,10 +387,11 @@ TEST(ArrayDouble_Maximum)
 }
 
 
-template <class C, typename T>
+template <class A, typename T>
 void BasicArray_Find(TestResults& test_results)
 {
-    C f;
+    A f(Allocator::get_default());
+    f.create();
 
     // Empty list
     CHECK_EQUAL(size_t(-1), f.find_first(0));
@@ -406,16 +418,17 @@ void BasicArray_Find(TestResults& test_results)
     CHECK_EQUAL(4,          f.find_first(T(1.1), 1, 5));    // skip first match, end at last match
 
     // Find all
-    Column res_arr;
-    f.find_all(&res_arr, T(1.1), 0);
-    CHECK_EQUAL(2, res_arr.size());
-    CHECK_EQUAL(0, res_arr.get(0));
-    CHECK_EQUAL(4, res_arr.get(1));
+    ref_type results_ref = Column::create(Allocator::get_default());
+    Column results(Allocator::get_default(), results_ref);
+    f.find_all(&results, T(1.1), 0);
+    CHECK_EQUAL(2, results.size());
+    CHECK_EQUAL(0, results.get(0));
+    CHECK_EQUAL(4, results.get(1));
     // Find all, range limited -> no match
-    res_arr.clear();
-    f.find_all(&res_arr, T(1.1), 0, 1, 4);
-    CHECK_EQUAL(0, res_arr.size());
-    res_arr.destroy();
+    results.clear();
+    f.find_all(&results, T(1.1), 0, 1, 4);
+    CHECK_EQUAL(0, results.size());
+    results.destroy();
 
     f.destroy();    // cleanup
 }
@@ -429,10 +442,11 @@ TEST(ArrayDouble_Find)
 }
 
 
-template <class C, typename T>
+template <class A, typename T>
 void BasicArray_Count(TestResults& test_results)
 {
-    C f;
+    A f(Allocator::get_default());
+    f.create();
 
     // Empty list
     CHECK_EQUAL(0, f.count(0));
@@ -471,10 +485,12 @@ TEST(ArrayDouble_Count)
 }
 
 
-template <class C, typename T>
+template <class A, typename T>
 void BasicArray_Compare(TestResults& test_results)
 {
-    C f1, f2;
+    A f1(Allocator::get_default()), f2(Allocator::get_default());
+    f1.create();
+    f2.create();
 
     // Empty list
     CHECK_EQUAL(true, f1.compare(f2));

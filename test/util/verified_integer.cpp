@@ -187,7 +187,7 @@ bool VerifiedInteger::occasional_verify()
     return true;
 }
 
-void VerifiedInteger::destroy()
+VerifiedInteger::~VerifiedInteger()
 {
     u.destroy();
 }
