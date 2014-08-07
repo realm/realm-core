@@ -48,9 +48,7 @@ class AdaptiveStringColumn: public ColumnBase {
 public:
     typedef StringData value_type;
 
-    explicit AdaptiveStringColumn(Allocator& = Allocator::get_default());
-    explicit AdaptiveStringColumn(ref_type, ArrayParent* = 0, std::size_t ndx_in_parent = 0,
-                                  Allocator& = Allocator::get_default());
+    AdaptiveStringColumn(Allocator&, ref_type);
     ~AdaptiveStringColumn() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
     void destroy() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
@@ -106,7 +104,7 @@ public:
     LeafType GetBlock(std::size_t ndx, ArrayParent**, std::size_t& off,
                       bool use_retval = false) const;
 
-    static ref_type create(std::size_t size, Allocator&);
+    static ref_type create(Allocator&, std::size_t size = 0);
 
     static std::size_t get_size_from_ref(ref_type root_ref, Allocator&) TIGHTDB_NOEXCEPT;
 

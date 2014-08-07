@@ -436,7 +436,8 @@ void Group::write(ostream& out, TableWriter& table_writer)
     int top_size = 3;
     size_t max_top_byte_size = Array::get_max_byte_size(top_size);
     uint64_t max_final_file_size = top_pos + max_top_byte_size;
-    Array top(Array::type_HasRefs); // Throws
+    Array top(Allocator::get_default());
+    top.create(Array::type_HasRefs); // Throws
     // FIXME: Dangerous cast: unsigned -> signed
     top.ensure_minimum_width(1 + 2*max_final_file_size); // Throws
     // FIXME: We really need an alternative to Array::truncate() that is able to expand.

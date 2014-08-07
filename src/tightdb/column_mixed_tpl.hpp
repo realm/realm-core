@@ -20,22 +20,10 @@
 
 namespace tightdb {
 
-inline ColumnMixed::ColumnMixed(): m_binary_data(0)
+inline ColumnMixed::ColumnMixed(Allocator& alloc, ref_type ref,
+                                Table* table, std::size_t column_ndx)
 {
-    create(Allocator::get_default(), 0, 0);
-}
-
-inline ColumnMixed::ColumnMixed(Allocator& alloc, Table* table, std::size_t column_ndx):
-    m_binary_data(0)
-{
-    create(alloc, table, column_ndx);
-}
-
-inline ColumnMixed::ColumnMixed(Allocator& alloc, Table* table, std::size_t column_ndx,
-                                ArrayParent* parent, std::size_t ndx_in_parent, ref_type ref):
-    m_binary_data(0)
-{
-    create(alloc, table, column_ndx, parent, ndx_in_parent, ref);
+    create(alloc, ref, table, column_ndx);
 }
 
 inline void ColumnMixed::adj_accessors_insert_rows(std::size_t row_ndx,
@@ -343,7 +331,7 @@ inline void ColumnMixed::insert_datetime(std::size_t ndx, DateTime value)
 
 inline void ColumnMixed::insert_string(std::size_t ndx, StringData value)
 {
-    init_binary_data_column();
+    ensure_binary_data_column();
     std::size_t blob_ndx = m_binary_data->size();
     m_binary_data->add_string(value); // Throws
 
@@ -353,7 +341,7 @@ inline void ColumnMixed::insert_string(std::size_t ndx, StringData value)
 
 inline void ColumnMixed::insert_binary(std::size_t ndx, BinaryData value)
 {
-    init_binary_data_column();
+    ensure_binary_data_column();
     std::size_t blob_ndx = m_binary_data->size();
     m_binary_data->add(value); // Throws
 
@@ -423,7 +411,8 @@ inline void ColumnMixed::refresh_accessor_tree(std::size_t col_ndx, const Spec& 
     // See if m_binary_data needs to be created.
     if (m_array->size() == 3) {
         ref_type ref = m_array->get_as_ref(2);
-        m_binary_data = new ColumnBinary(ref, m_array, 2, m_array->get_alloc()); // Throws
+        m_binary_data = new ColumnBinary(m_array->get_alloc(), ref); // Throws
+        m_binary_data->set_parent(m_array, 2);
     }
 }
 

@@ -185,7 +185,8 @@ void Spec::erase_column(size_t column_ndx)
         size_t subspec_ndx = get_subspec_ndx(column_ndx);
         ref_type subspec_ref = m_subspecs.get_as_ref(subspec_ndx);
 
-        Array subspec_top(subspec_ref, 0, 0, m_top.get_alloc());
+        Array subspec_top(m_top.get_alloc());
+        subspec_top.init_from_ref(subspec_ref);
         subspec_top.destroy_deep(); // recursively delete entire subspec
         m_subspecs.erase(subspec_ndx); // Throws
     }
@@ -203,7 +204,8 @@ void Spec::erase_column(size_t column_ndx)
         size_t keys_ndx = get_enumkeys_ndx(column_ndx);
         ref_type keys_ref = m_enumkeys.get_as_ref(keys_ndx);
 
-        Array keys_top(keys_ref, 0, 0, m_top.get_alloc());
+        Array keys_top(m_top.get_alloc());
+        keys_top.init_from_ref(keys_ref);
         keys_top.destroy_deep();
         m_enumkeys.erase(keys_ndx); // Throws
     }
@@ -462,12 +464,14 @@ void Spec::to_dot(ostream& out, StringData) const
         Allocator& alloc = m_top.get_alloc();
 
         // Write out subspecs
-        size_t count = m_subspecs.size();
-        for (size_t i = 0; i < count; ++i) {
+        size_t n = m_subspecs.size();
+        for (size_t i = 0; i < n; ++i) {
             ref_type ref = m_subspecs.get_as_ref(i);
             MemRef mem(ref, alloc);
-            Spec s(alloc, mem, const_cast<Array*>(&m_subspecs), i);
-            s.to_dot(out);
+            Spec subspec(alloc);
+            subspec.init(mem);
+            subspec.set_parent(const_cast<Array*>(&m_subspecs), i);
+            subspec.to_dot(out);
         }
     }
 

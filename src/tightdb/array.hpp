@@ -238,20 +238,8 @@ public:
 //    void state_init(int action, QueryState *state);
 //    bool match(int action, std::size_t index, int64_t value, QueryState *state);
 
-    /// Create an array in the unattached state.
+    /// Create an array accessor in the unattached state.
     explicit Array(Allocator&) TIGHTDB_NOEXCEPT;
-
-    /// Initialize an array wrapper from the specified memory reference.
-    Array(MemRef, ArrayParent*, std::size_t ndx_in_parent, Allocator&) TIGHTDB_NOEXCEPT;
-
-    /// Initialize an array wrapper from the specified memory reference. Note
-    /// that the version taking a MemRef argument is slightly faster, because it
-    /// does not need to map the 'ref' to a memory pointer.
-    Array(ref_type, ArrayParent*, std::size_t ndx_in_parent, Allocator&) TIGHTDB_NOEXCEPT;
-
-    /// Create a new array as a copy of the specified array using the specified
-    /// allocator.
-    Array(const Array&, Allocator&);
 
     // Fastest way to instantiate an array, if you just want to utilize its
     // methods
@@ -276,26 +264,6 @@ public:
         /// setting the vacated bit to one.
         type_HasRefs
     };
-
-    /// FIXME: Deprecated. The constructor must not allocate anything that the
-    /// destructor does not deallocate.
-    ///
-    /// Create a new array, and if \a parent and \a ndx_in_parent are specified,
-    /// update the parent to point to this new array.
-    ///
-    /// Note that if no parent is specified, the caller assumes ownership of the
-    /// allocated underlying node. It is not owned by the accessor.
-    ///
-    /// FIXME: If the Array class is to continue to function as an accessor
-    /// class and have no ownership of the underlying memory, then this
-    /// constructor must be removed. The problem is that memory will be leaked
-    /// when it is used to construct members of a bigger class (such as Group)
-    /// and something fails before the constructor of the bigger class
-    /// completes. Roughly speaking, a resource must be allocated in the
-    /// constructor when, and only when it is released in the destructor
-    /// (RAII). Anything else constitutes a "disaster waiting to happen".
-    explicit Array(Type type = type_Normal, ArrayParent* = 0, std::size_t ndx_in_parent = 0,
-                   Allocator& = Allocator::get_default());
 
     /// Create a new empty array of the specified type and attach this accessor
     /// to it. This does not modify the parent reference information of this
@@ -468,7 +436,7 @@ public:
     /// Reduce the size of this array to the specified number of elements. It is
     /// an error to specify a size that is greater than the current size of this
     /// array. The effect of doing so is undefined. Subarrays will be destroyed
-    /// recursively, as if by a call to `destroy_deep(ubarray_ref, alloc)`.
+    /// recursively, as if by a call to `destroy_deep(subarray_ref, alloc)`.
     ///
     /// This function is guaranteed not to throw if
     /// get_alloc().is_read_only(get_ref()) returns false.
@@ -485,8 +453,9 @@ public:
     void clear();
 
     /// Remove every element in this array. Subarrays will be destroyed
-    /// recursively, as if by a call to `destroy_deep(ubarray_ref, alloc)`. This
-    /// is just a shorthand for calling truncate_and_destroy_children(0).
+    /// recursively, as if by a call to `destroy_deep(subarray_ref,
+    /// alloc)`. This is just a shorthand for calling
+    /// truncate_and_destroy_children(0).
     ///
     /// This function guarantees that no exceptions will be thrown if
     /// get_alloc().is_read_only(get_ref()) would return false before the call.
@@ -573,10 +542,10 @@ public:
     int64_t sum(std::size_t start = 0, std::size_t end = std::size_t(-1)) const;
     std::size_t count(int64_t value) const;
 
-    bool maximum(int64_t& result, std::size_t start = 0, std::size_t end = std::size_t(-1), 
+    bool maximum(int64_t& result, std::size_t start = 0, std::size_t end = std::size_t(-1),
                  std::size_t* return_ndx = null_ptr) const;
 
-    bool minimum(int64_t& result, std::size_t start = 0, std::size_t end = std::size_t(-1), 
+    bool minimum(int64_t& result, std::size_t start = 0, std::size_t end = std::size_t(-1),
                  std::size_t* return_ndx = null_ptr) const;
 
     void sort();
@@ -606,22 +575,27 @@ public:
     void destroy() TIGHTDB_NOEXCEPT;
 
     /// Recursively destroy children (as if calling
-    /// clear_and_destroy_children()), then put this accessor into the
-    /// detached state (as if calling detach()), then free the
-    /// allocated memory. If this accessor is already in the detached
-    /// state, this function has no effect (idempotency).
+    /// clear_and_destroy_children()), then put this accessor into the detached
+    /// state (as if calling detach()), then free the allocated memory. If this
+    /// accessor is already in the detached state, this function has no effect
+    /// (idempotency).
     void destroy_deep() TIGHTDB_NOEXCEPT;
 
-    /// Destroy only the array pointed to be the specified 'ref', not its
-    /// children. See static destroy_deep() for an alternative.
-    static void destroy(ref_type, Allocator&) TIGHTDB_NOEXCEPT;
+    /// Shorthand for `destroy(MemRef(ref, alloc), alloc)`.
+    static void destroy(ref_type ref, Allocator& alloc) TIGHTDB_NOEXCEPT;
 
-    /// Destroy the array pointed to be the specified 'ref' and all of its
-    /// children recursively.
+    /// Destroy only the specified array node, not its children. See also
+    /// destroy_deep(MemRef, Allocator&).
+    static void destroy(MemRef, Allocator&) TIGHTDB_NOEXCEPT;
+
+    /// Shorthand for `destroy_deep(MemRef(ref, alloc), alloc)`.
+    static void destroy_deep(ref_type ref, Allocator& alloc) TIGHTDB_NOEXCEPT;
+
+    /// Destroy the specified array node and all of its children, recursively.
     ///
-    /// This is done by freeing the array node pointed to by the specified 'ref'
-    /// after calling destroy_deep() on every contained 'ref' element.
-    static void destroy_deep(ref_type, Allocator&) TIGHTDB_NOEXCEPT;
+    /// This is done by freeing the specified array node after calling
+    /// destroy_deep() for every contained 'ref' element.
+    static void destroy_deep(MemRef, Allocator&) TIGHTDB_NOEXCEPT;
 
     Allocator& get_alloc() const TIGHTDB_NOEXCEPT { return m_alloc; }
 
@@ -1048,13 +1022,9 @@ private:
     ArrayParent* m_parent;
     std::size_t m_ndx_in_parent; // Ignored if m_parent is null.
 
+protected:
     Allocator& m_alloc;
 
-#ifdef TIGHTDB_DEBUG
-    void report_memory_usage_2(MemUsageHandler&) const;
-#endif
-
-protected:
     /// The total size in bytes (including the header) of a new empty
     /// array. Must be a multiple of 8 (i.e., 64-bit aligned).
     static const std::size_t initial_capacity = 128;
@@ -1097,6 +1067,7 @@ protected:
     typedef bool (Array::*Finder)(int64_t, std::size_t, std::size_t, std::size_t, QueryState<int64_t>*) const;
     typedef void (Array::*ChunkGetter)(size_t, int64_t res[8]) const; // Note: getters must not throw
 
+private:
     Getter m_getter;
     ChunkGetter m_chunk_getter;
     Setter m_setter;
@@ -1104,6 +1075,10 @@ protected:
 
     int64_t m_lbound;       // min number that can be stored with current m_width
     int64_t m_ubound;       // max number that can be stored with current m_width
+
+#ifdef TIGHTDB_DEBUG
+    void report_memory_usage_2(MemUsageHandler&) const;
+#endif
 
     friend class SlabAlloc;
     friend class GroupWriter;
@@ -1339,42 +1314,6 @@ inline Array::Array(Allocator& alloc) TIGHTDB_NOEXCEPT:
 {
 }
 
-inline Array::Array(Type type, ArrayParent* parent, std::size_t pndx, Allocator& alloc):
-    m_parent(parent),
-    m_ndx_in_parent(pndx),
-    m_alloc(alloc)
-{
-    create(type); // Throws
-    update_parent(); // Throws
-}
-
-inline Array::Array(MemRef mem, ArrayParent* parent, std::size_t ndx_in_parent,
-                    Allocator& alloc) TIGHTDB_NOEXCEPT:
-    m_parent(parent),
-    m_ndx_in_parent(ndx_in_parent),
-    m_alloc(alloc)
-{
-    init_from_mem(mem);
-}
-
-inline Array::Array(ref_type ref, ArrayParent* parent, std::size_t pndx,
-                    Allocator& alloc) TIGHTDB_NOEXCEPT:
-    m_parent(parent),
-    m_ndx_in_parent(pndx),
-    m_alloc(alloc)
-{
-    init_from_ref(ref);
-}
-
-inline Array::Array(const Array& array, Allocator& alloc):
-    m_parent(0),
-    m_ndx_in_parent(0),
-    m_alloc(alloc)
-{
-    MemRef mem = array.clone_deep(alloc); // Throws
-    init_from_mem(mem);
-}
-
 // Fastest way to instantiate an Array. For use with GetDirect() that only fills out m_width, m_data
 // and a few other basic things needed for read-only access. Or for use if you just want a way to call
 // some methods written in Array.*
@@ -1562,13 +1501,21 @@ inline void Array::clear_and_destroy_children()
 
 inline void Array::destroy(ref_type ref, Allocator& alloc) TIGHTDB_NOEXCEPT
 {
-    MemRef mem(ref, alloc);
+    destroy(MemRef(ref, alloc), alloc);
+}
+
+inline void Array::destroy(MemRef mem, Allocator& alloc) TIGHTDB_NOEXCEPT
+{
     alloc.free_(mem);
 }
 
 inline void Array::destroy_deep(ref_type ref, Allocator& alloc) TIGHTDB_NOEXCEPT
 {
-    MemRef mem(ref, alloc);
+    destroy_deep(MemRef(ref, alloc), alloc);
+}
+
+inline void Array::destroy_deep(MemRef mem, Allocator& alloc) TIGHTDB_NOEXCEPT
+{
     if (!get_hasrefs_from_header(mem.m_addr)) {
         alloc.free_(mem);
         return;
@@ -2170,7 +2117,9 @@ ref_type Array::bptree_append(TreeInsert<TreeTraits>& state)
                                     child_ref_ndx, m_alloc, elem_ndx_in_child, state); // Throws
     }
     else {
-        Array child(MemRef(child_header, child_ref), &childs_parent, child_ref_ndx, m_alloc);
+        Array child(m_alloc);
+        child.init_from_mem(MemRef(child_header, child_ref));
+        child.set_parent(&childs_parent, child_ref_ndx);
         new_sibling_ref = child.bptree_append(state); // Throws
     }
 
@@ -2234,7 +2183,9 @@ ref_type Array::bptree_insert(std::size_t elem_ndx, TreeInsert<TreeTraits>& stat
                                     child_ref_ndx, m_alloc, elem_ndx_in_child, state); // Throws
     }
     else {
-        Array child(MemRef(child_header, child_ref), &childs_parent, child_ref_ndx, m_alloc);
+        Array child(m_alloc);
+        child.init_from_mem(MemRef(child_header, child_ref));
+        child.set_parent(&childs_parent, child_ref_ndx);
         new_sibling_ref = child.bptree_insert(elem_ndx_in_child, state); // Throws
     }
 

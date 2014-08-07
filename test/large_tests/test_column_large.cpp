@@ -75,18 +75,20 @@ TEST_IF(ColumnLarge_Less, TEST_DURATION >= 2)
 
     for (size_t w = 0; w < sizeof(v) / sizeof(*v); w++) {
         const size_t LEN = 64 * 20 + 1000;
-        Array a;
+        Array a(Allocator::get_default());
+        a.create(Array::type_Normal);
         for (size_t t = 0; t < LEN; t++)
             a.add(v[w]);
-        
+
         // to create at least 64 bytes of data (2 * 128-bit SSE chunks
         // + 64 bit chunk before and after + some unaligned data
         // before and after)
         size_t LEN2 = 64 * 8 / (a.get_width() == 0 ? 1 : a.get_width());
 
-        Column akku;
+        ref_type accu_ref = Column::create(Allocator::get_default());
+        Column accu(Allocator::get_default(), accu_ref);
         QueryState<int64_t> state;
-        state.m_state = int64_t(&akku);
+        state.m_state = int64_t(&accu);
 
         for (size_t from = 0; from < LEN2; from++) {
             for (size_t to = from + 1; to <= LEN2; to++) {
@@ -95,7 +97,7 @@ TEST_IF(ColumnLarge_Less, TEST_DURATION >= 2)
                     if (v[w] != LL_MIN) {
                         // LESS
                         a.set(match, v[w] - 1);
-                        state.init(act_ReturnFirst, &akku, size_t(-1));
+                        state.init(act_ReturnFirst, &accu, size_t(-1));
                         a.find(cond_Less, act_ReturnFirst, v[w], from, to, 0, &state);
                         size_t f = state.m_state;
                         a.set(match, v[w]);
@@ -110,7 +112,7 @@ TEST_IF(ColumnLarge_Less, TEST_DURATION >= 2)
                     if (v[w] != LL_MAX) {
                         // GREATER
                         a.set(match, v[w] + 1);
-                        state.init(act_ReturnFirst, &akku, size_t(-1));
+                        state.init(act_ReturnFirst, &accu, size_t(-1));
                         a.find(cond_Greater, act_ReturnFirst, v[w], from, to, 0, &state);
                         size_t f = state.m_state;
                         a.set(match, v[w]);
@@ -180,18 +182,18 @@ TEST_IF(ColumnLarge_Less, TEST_DURATION >= 2)
                             a.set(match, v[w] - 1);
                             a.set(match + off, v[w] - 1);
 
-                            akku.clear();
-                            state.init(act_FindAll, &akku, size_t(-1));
+                            accu.clear();
+                            state.init(act_FindAll, &accu, size_t(-1));
                             a.find(cond_Less, act_FindAll, v[w], from, to, 0, &state);
 
                             a.set(match, v[w]);
                             a.set(match + off, v[w]);
 
                             if (match >= from && match < to) {
-                                CHECK(size_t(akku.get(0)) == match);
+                                CHECK(size_t(accu.get(0)) == match);
                             }
                             if (match + off >= from && match + off < to) {
-                                CHECK(size_t(akku.get(0)) == match + off || size_t(akku.get(1)) == match + off);
+                                CHECK(size_t(accu.get(0)) == match + off || size_t(accu.get(1)) == match + off);
                             }
 
                             a.set(match, v[w]);
@@ -208,18 +210,18 @@ TEST_IF(ColumnLarge_Less, TEST_DURATION >= 2)
                             a.set(match, v[w] + 1);
                             a.set(match + off, v[w] + 1);
 
-                            akku.clear();
-                            state.init(act_FindAll, &akku, size_t(-1));
+                            accu.clear();
+                            state.init(act_FindAll, &accu, size_t(-1));
                             a.find(cond_Greater, act_FindAll, v[w], from, to, 0, &state);
 
                             a.set(match, v[w]);
                             a.set(match + off, v[w]);
 
                             if (match >= from && match < to) {
-                                CHECK(size_t(akku.get(0)) == match);
+                                CHECK(size_t(accu.get(0)) == match);
                             }
                             if (match + off >= from && match + off < to) {
-                                CHECK(size_t(akku.get(0)) == match + off || size_t(akku.get(1)) == match + off);
+                                CHECK(size_t(accu.get(0)) == match + off || size_t(accu.get(1)) == match + off);
                             }
 
                             a.set(match, v[w]);
@@ -234,18 +236,18 @@ TEST_IF(ColumnLarge_Less, TEST_DURATION >= 2)
                             a.set(match, v[w] + 1);
                             a.set(match + off, v[w] + 1);
 
-                            akku.clear();
-                            state.init(act_FindAll, &akku, size_t(-1));
+                            accu.clear();
+                            state.init(act_FindAll, &accu, size_t(-1));
                             a.find(cond_Equal, act_FindAll, v[w] + 1, from, to, 0, &state);
 
                             a.set(match, v[w]);
                             a.set(match + off, v[w]);
 
                             if (match >= from && match < to) {
-                                CHECK(size_t(akku.get(0)) == match);
+                                CHECK(size_t(accu.get(0)) == match);
                             }
                             if (match + off >= from && match + off < to) {
-                                CHECK(size_t(akku.get(0)) == match + off || size_t(akku.get(1)) == match + off);
+                                CHECK(size_t(accu.get(0)) == match + off || size_t(accu.get(1)) == match + off);
                             }
 
                             a.set(match, v[w]);
@@ -268,7 +270,8 @@ TEST_IF(ColumnLarge_Monkey2, TEST_DURATION >= 2)
 
     Random random(seed);
     VerifiedInteger a(random);
-    Column res;
+    ref_type res_ref = Column::create(Allocator::get_default());
+    Column res(Allocator::get_default(), res_ref);
 
     int trend = 5;
 
@@ -309,7 +312,6 @@ TEST_IF(ColumnLarge_Monkey2, TEST_DURATION >= 2)
     }
 
     // Cleanup
-    a.destroy();
     res.destroy();
 }
 

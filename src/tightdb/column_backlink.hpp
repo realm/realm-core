@@ -37,11 +37,10 @@ namespace tightdb {
 /// there is a single link, a tagged ref encoding the origin row position.
 class ColumnBackLink: public Column, public ArrayParent {
 public:
-    ColumnBackLink(ref_type, ArrayParent* = 0, std::size_t ndx_in_parent = 0,
-                             Allocator& = Allocator::get_default()); // Throws
+    ColumnBackLink(Allocator&, ref_type);
     ~ColumnBackLink() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
 
-    static ref_type create(std::size_t size, Allocator&);
+    static ref_type create(Allocator&, std::size_t size = 0);
 
     bool has_backlinks(std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
     std::size_t get_backlink_count(std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
@@ -101,17 +100,15 @@ private:
 
 // Implementation
 
-inline ColumnBackLink::ColumnBackLink(ref_type ref, ArrayParent* parent, std::size_t ndx_in_parent,
-                                      Allocator& alloc):
-    Column(ref, parent, ndx_in_parent, alloc),
-    m_origin_column(null_ptr)
+inline ColumnBackLink::ColumnBackLink(Allocator& alloc, ref_type ref):
+    Column(alloc, ref), // Throws
+    m_origin_column(0)
 {
 }
 
-inline ref_type ColumnBackLink::create(std::size_t size, Allocator& alloc)
+inline ref_type ColumnBackLink::create(Allocator& alloc, std::size_t size)
 {
-    int_fast64_t value = 0;
-    return Column::create(Array::type_HasRefs, size, value, alloc); // Throws
+    return Column::create(alloc, Array::type_HasRefs, size); // Throws
 }
 
 inline bool ColumnBackLink::has_backlinks(std::size_t ndx) const TIGHTDB_NOEXCEPT

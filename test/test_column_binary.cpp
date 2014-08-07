@@ -43,7 +43,8 @@ using namespace tightdb;
 
 TEST(ColumnBinary_Basic)
 {
-    ColumnBinary c;
+    ref_type ref = ColumnBinary::create(Allocator::get_default());
+    ColumnBinary c(Allocator::get_default(), ref);
 
     // TEST(ColumnBinary_MultiEmpty)
 

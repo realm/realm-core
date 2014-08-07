@@ -41,7 +41,8 @@ using namespace tightdb;
 
 TEST(ArrayString_Basic)
 {
-    ArrayString c;
+    ArrayString c(Allocator::get_default());
+    c.create();
 
     // TEST(ArrayString_MultiEmpty)
 
@@ -436,7 +437,8 @@ TEST(ArrayString_Basic)
 
     c.clear();
 
-    Column col;
+    ref_type results_ref = Column::create(Allocator::get_default());
+    Column results(Allocator::get_default(), results_ref);
 
     // first, middle and end
     c.add("foobar");
@@ -445,14 +447,14 @@ TEST(ArrayString_Basic)
     c.add("baz");
     c.add("foobar");
 
-    c.find_all(col, "foobar");
-    CHECK_EQUAL(3, col.size());
-    CHECK_EQUAL(0, col.get(0));
-    CHECK_EQUAL(2, col.get(1));
-    CHECK_EQUAL(4, col.get(2));
+    c.find_all(results, "foobar");
+    CHECK_EQUAL(3, results.size());
+    CHECK_EQUAL(0, results.get(0));
+    CHECK_EQUAL(2, results.get(1));
+    CHECK_EQUAL(4, results.get(2));
 
     // Cleanup
-    col.destroy();
+    results.destroy();
 
 
     // TEST(ArrayString_Count)
@@ -498,7 +500,9 @@ TEST(ArrayString_Basic)
 
 TEST(ArrayString_Compare)
 {
-    ArrayString a, b;
+    ArrayString a(Allocator::get_default()), b(Allocator::get_default());
+    a.create();
+    b.create();
 
     CHECK(a.compare_string(b));
     a.add("");

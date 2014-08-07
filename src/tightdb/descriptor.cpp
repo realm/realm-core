@@ -38,7 +38,7 @@ size_t Descriptor::get_num_unique_values(size_t column_ndx) const
     if (col_type != col_type_StringEnum)
         return 0;
     ref_type ref = m_spec->get_enumkeys_ref(column_ndx);
-    AdaptiveStringColumn col(ref, 0, 0, m_spec->get_alloc()); // Throws
+    AdaptiveStringColumn col(m_spec->get_alloc(), ref); // Throws
     return col.size();
 }
 

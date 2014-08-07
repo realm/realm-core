@@ -743,7 +743,8 @@ private:
     mutable Descriptor* m_descriptor;
 
     // Table view instances
-    mutable std::vector<const TableViewBase*> m_views;
+    typedef std::vector<const TableViewBase*> views;
+    mutable views m_views;
 
     typedef std::vector<RowBase*> row_accessors;
     mutable row_accessors m_row_accessors;
@@ -901,7 +902,9 @@ private:
 
     void register_view(const TableViewBase* view);
     void unregister_view(const TableViewBase* view) TIGHTDB_NOEXCEPT;
-    void detach_views_except(const TableViewBase* view) TIGHTDB_NOEXCEPT;
+    void move_registered_view(const TableViewBase* old_addr,
+                              const TableViewBase* new_addr) TIGHTDB_NOEXCEPT;
+    void discard_views() TIGHTDB_NOEXCEPT;
 
     void register_row_accessor(RowBase*) const;
     void unregister_row_accessor(RowBase*) const TIGHTDB_NOEXCEPT;

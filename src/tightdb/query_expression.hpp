@@ -962,7 +962,7 @@ private:
         bool last = (column + 1 == m_link_columns.size());
         if (m_link_types[column] == type_Link) {
             ColumnLink& cl = *static_cast<ColumnLink*>(m_link_columns[column]);
-            size_t r = cl.get(row);
+            size_t r = to_size_t(cl.get(row));
             if (r == 0)
                 return;
             r--; // ColumnLink stores link to row N as N + 1

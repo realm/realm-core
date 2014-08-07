@@ -29,14 +29,7 @@ namespace tightdb {
 class ArrayBinary: public Array {
 public:
     explicit ArrayBinary(Allocator&) TIGHTDB_NOEXCEPT;
-    ArrayBinary(MemRef,   ArrayParent*, std::size_t ndx_in_parent, Allocator&) TIGHTDB_NOEXCEPT;
-    ArrayBinary(ref_type, ArrayParent*, std::size_t ndx_in_parent, Allocator&) TIGHTDB_NOEXCEPT;
     ~ArrayBinary() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
-
-    /// FIXME: Deprecated. The constructor must not allocate anything
-    /// that the destructor does not deallocate.
-    explicit ArrayBinary(ArrayParent* = 0, std::size_t ndx_in_parent = 0,
-                         Allocator& = Allocator::get_default());
 
     /// Create a new empty binary array and attach this accessor to
     /// it. This does not modify the parent reference information of
@@ -104,16 +97,6 @@ private:
 inline ArrayBinary::ArrayBinary(Allocator& alloc) TIGHTDB_NOEXCEPT:
     Array(alloc), m_offsets(alloc), m_blob(alloc)
 {
-    m_offsets.set_parent(this, 0);
-    m_blob.set_parent(this, 1);
-}
-
-inline ArrayBinary::ArrayBinary(ArrayParent* parent, std::size_t ndx_in_parent, Allocator& alloc):
-    Array(alloc), m_offsets(alloc), m_blob(alloc)
-{
-    create(); // Throws
-    set_parent(parent, ndx_in_parent);
-    update_parent(); // Throws
     m_offsets.set_parent(this, 0);
     m_blob.set_parent(this, 1);
 }

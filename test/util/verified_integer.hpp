@@ -39,6 +39,7 @@ namespace test_util {
 class VerifiedInteger {
 public:
     VerifiedInteger(Random&);
+    ~VerifiedInteger();
     void add(int64_t value);
     void insert(std::size_t ndx, int64_t value);
     void insert(std::size_t ndx, const char *value);
@@ -55,7 +56,6 @@ public:
     bool Verify();
     bool occasional_verify();
     void verify_neighbours(std::size_t ndx);
-    void destroy();
 
 private:
     std::vector<int64_t> v;
@@ -68,8 +68,10 @@ private:
 // Implementation
 
 inline VerifiedInteger::VerifiedInteger(Random& random):
+    u(Column::unattached_root_tag(), Allocator::get_default()),
     m_random(random)
 {
+    u.get_root_array()->create(Array::type_Normal); // Throws
 }
 
 

@@ -28,13 +28,7 @@ namespace tightdb {
 class ArrayBlob: public Array {
 public:
     explicit ArrayBlob(Allocator&) TIGHTDB_NOEXCEPT;
-    ArrayBlob(ref_type, ArrayParent*, std::size_t ndx_in_parent, Allocator&) TIGHTDB_NOEXCEPT;
     ~ArrayBlob() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
-
-    /// FIXME: Deprecated. The constructor must not allocate anything
-    /// that the destructor does not deallocate.
-    explicit ArrayBlob(ArrayParent* = 0, std::size_t ndx_in_parent = 0,
-                       Allocator& = Allocator::get_default());
 
     const char* get(std::size_t pos) const TIGHTDB_NOEXCEPT;
 
@@ -84,24 +78,6 @@ private:
 inline ArrayBlob::ArrayBlob(Allocator& alloc) TIGHTDB_NOEXCEPT:
     Array(alloc)
 {
-}
-
-inline ArrayBlob::ArrayBlob(ArrayParent* parent, std::size_t ndx_in_parent, Allocator& alloc):
-    Array(type_Normal, parent, ndx_in_parent, alloc)
-{
-    // Manually set wtype as array constructor in initiatializer list
-    // will not be able to call correct virtual function
-    set_header_wtype(wtype_Ignore);
-}
-
-inline ArrayBlob::ArrayBlob(ref_type ref, ArrayParent* parent, std::size_t ndx_in_parent,
-                            Allocator& alloc) TIGHTDB_NOEXCEPT:
-    Array(alloc)
-{
-    // Manually create array as doing it in initializer list
-    // will not be able to call correct virtual functions
-    init_from_ref(ref);
-    set_parent(parent, ndx_in_parent);
 }
 
 inline const char* ArrayBlob::get(std::size_t pos) const TIGHTDB_NOEXCEPT
