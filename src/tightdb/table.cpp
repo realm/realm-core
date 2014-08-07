@@ -293,7 +293,7 @@ void Table::insert_column_link(size_t col_ndx, DataType type, StringData name, T
 size_t Table::get_backlink_count(size_t row_ndx, const Table& origin,
                                  size_t origin_col_ndx) const TIGHTDB_NOEXCEPT
 {
-    size_t origin_table_ndx = origin.get_index_in_parent();
+    size_t origin_table_ndx = origin.get_index_in_group();
     size_t backlink_col_ndx = m_spec.find_backlink_column(origin_table_ndx, origin_col_ndx);
     const ColumnBackLink& backlink_col = get_column_backlink(backlink_col_ndx);
     return backlink_col.get_backlink_count(row_ndx);
@@ -303,7 +303,7 @@ size_t Table::get_backlink_count(size_t row_ndx, const Table& origin,
 size_t Table::get_backlink(size_t row_ndx, const Table& origin, size_t origin_col_ndx,
                            size_t backlink_ndx) const TIGHTDB_NOEXCEPT
 {
-    size_t origin_table_ndx = origin.get_index_in_parent();
+    size_t origin_table_ndx = origin.get_index_in_group();
     size_t backlink_col_ndx = m_spec.find_backlink_column(origin_table_ndx, origin_col_ndx);
     const ColumnBackLink& backlink_col = get_column_backlink(backlink_col_ndx);
     return backlink_col.get_backlink(row_ndx, backlink_ndx);
@@ -680,7 +680,7 @@ void Table::insert_root_column(size_t col_ndx, DataType type, StringData name,
     // established by Table::refresh_column_accessors() when it is invoked for
     // the target table below.
     if (link_target_table) {
-        size_t target_table_ndx = link_target_table->get_index_in_parent();
+        size_t target_table_ndx = link_target_table->get_index_in_group();
         m_spec.set_opposite_link_table_ndx(col_ndx, target_table_ndx); // Throws
         link_target_table->mark();
     }
@@ -689,7 +689,7 @@ void Table::insert_root_column(size_t col_ndx, DataType type, StringData name,
 
     if (link_target_table) {
         link_target_table->unmark();
-        size_t origin_table_ndx = get_index_in_parent();
+        size_t origin_table_ndx = get_index_in_group();
         link_target_table->insert_backlink_column(origin_table_ndx, col_ndx); // Throws
     }
 }
@@ -705,7 +705,7 @@ void Table::erase_root_column(size_t col_ndx)
     ColumnType col_type = m_spec.get_column_type(col_ndx);
     if (is_link_type(col_type)) {
         Table* link_target_table = get_link_target_table_accessor(col_ndx);
-        size_t origin_table_ndx = get_index_in_parent();
+        size_t origin_table_ndx = get_index_in_group();
         link_target_table->erase_backlink_column(origin_table_ndx, col_ndx); // Throws
     }
 
@@ -786,7 +786,7 @@ void Table::update_link_target_tables(size_t old_col_ndx_begin, size_t new_col_n
             continue;
         ColumnLinkBase* link_col = static_cast<ColumnLinkBase*>(m_cols[new_col_ndx]);
         Spec& target_spec = link_col->get_target_table().m_spec;
-        size_t origin_table_ndx = get_index_in_parent();
+        size_t origin_table_ndx = get_index_in_group();
         size_t old_col_ndx = old_col_ndx_begin + (new_col_ndx - new_col_ndx_begin);
         size_t backlink_col_ndx = target_spec.find_backlink_column(origin_table_ndx, old_col_ndx);
         target_spec.set_backlink_origin_column(backlink_col_ndx, new_col_ndx); // Throws
@@ -1908,19 +1908,6 @@ void Table::clear_subtable(size_t col_ndx, size_t row_ndx)
 }
 
 
-Group* Table::get_parent_group() const TIGHTDB_NOEXCEPT
-{
-    TIGHTDB_ASSERT(is_attached());
-    if (!m_top.is_attached())
-        return 0; // Subtable with shared descriptor
-    Parent* parent = static_cast<Parent*>(m_top.get_parent()); // ArrayParent guaranteed to be Table::Parent
-    if (!parent)
-        return 0; // Free-standing table
-    // Null if subtable with independent descriptor (in mixed column)
-    return parent->get_parent_group();
-}
-
-
 const Table* Table::get_parent_table_ptr(size_t* column_ndx_out) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(is_attached());
@@ -1934,13 +1921,46 @@ const Table* Table::get_parent_table_ptr(size_t* column_ndx_out) const TIGHTDB_N
 }
 
 
-size_t Table::get_index_in_parent() const TIGHTDB_NOEXCEPT
+size_t Table::get_parent_row_index() const TIGHTDB_NOEXCEPT
 {
+    TIGHTDB_ASSERT(is_attached());
     const Array& real_top = m_top.is_attached() ? m_top : m_columns;
-    ArrayParent* parent = real_top.get_parent();
+    Parent* parent = static_cast<Parent*>(real_top.get_parent()); // ArrayParent guaranteed to be Table::Parent
     if (!parent)
-        return npos;
+        return npos; // Free-standing table
+    if (parent->get_parent_group())
+        return tightdb::npos; // Group-level table
     size_t index_in_parent = real_top.get_ndx_in_parent();
+    return index_in_parent;
+}
+
+
+Group* Table::get_parent_group() const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(is_attached());
+    if (!m_top.is_attached())
+        return 0; // Subtable with shared descriptor
+    Parent* parent = static_cast<Parent*>(m_top.get_parent()); // ArrayParent guaranteed to be Table::Parent
+    if (!parent)
+        return 0; // Free-standing table
+    Group* group = parent->get_parent_group();
+    if (!group)
+        return 0; // Subtable with independent descriptor
+    return group;
+}
+
+
+size_t Table::get_index_in_group() const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(is_attached());
+    if (!m_top.is_attached())
+        return tightdb::npos; // Subtable with shared descriptor
+    Parent* parent = static_cast<Parent*>(m_top.get_parent()); // ArrayParent guaranteed to be Table::Parent
+    if (!parent)
+        return tightdb::npos; // Free-standing table
+    if (!parent->get_parent_group())
+        return tightdb::npos; // Subtable with independent descriptor
+    size_t index_in_parent = m_top.get_ndx_in_parent();
     return index_in_parent;
 }
 
