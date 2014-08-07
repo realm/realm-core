@@ -28,6 +28,9 @@
 
 namespace tightdb {
 
+namespace _impl {
+class WriteLogCollector;
+}
 
 /// A SharedGroup facilitates transactions.
 ///
@@ -347,10 +350,22 @@ private:
     // to data. All accessors are retained and continue to reflect the
     // state at commit. 
     void commit_and_continue_as_read();
+
+    // Abort the current write transaction, discarding all changes within it,
+    // and thus restoring state to when promote_to_write() was last called.
+    // Any accessors referring to the aborted state will be detached. Accessors
+    // which was detached during the write transaction (for whatever reason)
+    // are not restored but will remain detached.
+    void rollback_and_continue_as_read();
+
+    // called by WriteLogCollector to transfer the actual commit log for
+    // accessor retention/update as part of rollback.
+    void do_rollback_and_continue_as_read(const char* start, const char* limit);
 #endif
     friend class ReadTransaction;
     friend class WriteTransaction;
     friend class LangBindHelper;
+    friend class _impl::WriteLogCollector;
 };
 
 

@@ -459,7 +459,11 @@ private:
 
     template<class InstructionHandler> bool do_parse(InstructionHandler&);
     template<class InstructionHandler> bool parse_one_inst(InstructionHandler& handler);
-    bool determine_instruction_starts(std::vector<const char*>& instruction_starts);
+    template<class InstructionHandler> 
+    bool prepare_log_reversal(std::vector<const char*>& instruction_starts, InstructionHandler& handler);
+
+    template<class InstructionHandler>
+    bool execute_in_reverse_order(std::vector<const char*>& instruction_starts, InstructionHandler& handler);
 
     template<class T> T read_int();
 
@@ -1502,20 +1506,142 @@ bool Replication::TransactLogParser::parse_one_inst(InstructionHandler& handler)
 template<class InstructionHandler>
 bool Replication::TransactLogParser::do_parse(InstructionHandler& handler)
 {
-    std::vector<const char*> instruction_starts;
-    if (!determine_instruction_starts(instruction_starts))
-        return false;
-    // as the first parse has made sure that all instructions are in memory,
-    // disable checksfor the rest of the parsing
-    m_input_end = 0;
-    for (size_t i = 0; i < instruction_starts.size(); ++i) {
-        m_input_begin = instruction_starts[i];
+    next_input_buffer();
+    while (m_input_begin != m_input_end || next_input_buffer()) {
         if (!parse_one_inst(handler))
             return false;
     }
     return true;
 }
 
+
+class NullHandler {
+public:
+    bool new_group_level_table(StringData) { return true; }
+    bool select_table(std::size_t, int, const std::size_t* ) { return true; }
+    bool insert_empty_rows(std::size_t, std::size_t ) { return true; }
+    bool erase_row(std::size_t) { return true; }
+    bool move_last_over(std::size_t, std::size_t) { return true; }
+    bool clear_table() { return true; }
+    bool insert_int(std::size_t, std::size_t, int_fast64_t) { return true; }
+    bool insert_bool(std::size_t, std::size_t, bool) { return true; }
+    bool insert_float(std::size_t, std::size_t, float) { return true; }
+    bool insert_double(std::size_t, std::size_t, double) { return true; }
+    bool insert_string(std::size_t, std::size_t, StringData) { return true; }
+    bool insert_binary(std::size_t, std::size_t, BinaryData) { return true; }
+    bool insert_date_time(std::size_t, std::size_t, DateTime) { return true; }
+    bool insert_table(std::size_t, std::size_t) { return true; }
+    bool insert_mixed(std::size_t, std::size_t, const Mixed&) { return true; }
+    bool insert_link(std::size_t, std::size_t, std::size_t) { return true; }
+    bool insert_link_list(std::size_t, std::size_t) { return true; }
+    bool row_insert_complete() { return true; }
+    bool set_int(std::size_t, std::size_t, int_fast64_t) { return true; }
+    bool set_bool(std::size_t, std::size_t, bool) { return true; }
+    bool set_float(std::size_t, std::size_t, float) { return true; }
+    bool set_double(std::size_t, std::size_t, double) { return true; }
+    bool set_string(std::size_t, std::size_t, StringData) { return true; }
+    bool set_binary(std::size_t, std::size_t, BinaryData) { return true; }
+    bool set_date_time(std::size_t, std::size_t, DateTime) { return true; }
+    bool set_table(std::size_t, std::size_t) { return true; }
+    bool set_mixed(std::size_t, std::size_t, const Mixed&) { return true; }
+    bool set_link(std::size_t, std::size_t, std::size_t) { return true; }
+    bool add_int_to_column(std::size_t, int_fast64_t) { return true; }
+    bool optimize_table() { return true; }
+    bool select_descriptor(int, const std::size_t*) { return true; }
+    bool insert_column(std::size_t, DataType, StringData,
+                       std::size_t) { return true; }
+    bool erase_column(std::size_t, std::size_t,
+                      std::size_t) { return true; }
+    bool rename_column(std::size_t, StringData) { return true; }
+    bool add_search_index(std::size_t) { return true; }
+    bool select_link_list(std::size_t, std::size_t) { return true; }
+    bool link_list_set(std::size_t, std::size_t) { return true; }
+    bool link_list_insert(std::size_t, std::size_t) { return true; }
+    bool link_list_move(std::size_t, std::size_t) { return true; }
+    bool link_list_erase(std::size_t) { return true; }
+    bool link_list_clear() { return true; }
+};
+
+class InstructionClassifierForRollback : public NullHandler {
+public:
+    // classification - initialized by caller, set by each instruction, 
+    // then read by whoever calls us to do the classification
+    enum Class { 
+        instr_class_noop, 
+        instr_class_execute, 
+        instr_class_postfix_table,
+        instr_class_postfix_descriptor };
+    Class classification;
+    // override only the instructions which are not to be treated as no-ops during rollback
+    bool new_group_level_table(StringData) { classification = instr_class_execute; return true; }
+    bool select_table(std::size_t, int, const std::size_t* ) { classification = instr_class_postfix_table; return true; }
+    bool insert_empty_rows(std::size_t, std::size_t ) { classification = instr_class_execute; return true; }
+    bool erase_row(std::size_t) { classification = instr_class_execute; return true; }
+    bool move_last_over(std::size_t, std::size_t) { classification = instr_class_execute; return true; }
+    bool clear_table() { classification = instr_class_execute; return true; }
+    bool insert_int(std::size_t, std::size_t, int_fast64_t) { classification = instr_class_execute; return true; }
+    bool insert_bool(std::size_t, std::size_t, bool) { classification = instr_class_execute; return true; }
+    bool insert_float(std::size_t, std::size_t, float) { classification = instr_class_execute; return true; }
+    bool insert_double(std::size_t, std::size_t, double) { classification = instr_class_execute; return true; }
+    bool insert_string(std::size_t, std::size_t, StringData) { classification = instr_class_execute; return true; }
+    bool insert_binary(std::size_t, std::size_t, BinaryData) { classification = instr_class_execute; return true; }
+    bool insert_date_time(std::size_t, std::size_t, DateTime) { classification = instr_class_execute; return true; }
+    bool insert_table(std::size_t, std::size_t) { classification = instr_class_execute; return true; }
+    bool insert_mixed(std::size_t, std::size_t, const Mixed&) { classification = instr_class_execute; return true; }
+    bool insert_link(std::size_t, std::size_t, std::size_t) { classification = instr_class_execute; return true; }
+    bool insert_link_list(std::size_t, std::size_t) { classification = instr_class_execute; return true; }
+    bool set_table(std::size_t, std::size_t) { classification = instr_class_execute; return true; }
+    bool set_mixed(std::size_t, std::size_t, const Mixed&) { classification = instr_class_execute; return true; }
+    bool set_link(std::size_t, std::size_t, std::size_t) { classification = instr_class_execute; return true; }
+    bool select_descriptor(int, const std::size_t*) { classification = instr_class_postfix_descriptor; return true; }
+    bool insert_column(std::size_t, DataType, StringData,
+                       std::size_t) { classification = instr_class_execute; return true; }
+    bool erase_column(std::size_t, std::size_t,
+                      std::size_t) { classification = instr_class_execute; return true; }
+    bool select_link_list(std::size_t, std::size_t) { classification = instr_class_execute; return true; }
+};
+
+template<typename InstructionClassifierForRollback>
+bool Replication::TransactLogParser::prepare_log_reversal(std::vector<const char*>& instruction_starts,
+    InstructionClassifierForRollback& handler)
+{
+    m_input_begin = m_input_end = 0;
+    const char* pending_table_select = 0;
+    const char* pending_descriptor_select = 0;
+    next_input_buffer();
+    while (m_input_begin != m_input_end || next_input_buffer()) {
+
+        // parse and classify an instruction
+        const char* instr_start = m_input_begin;
+        handler.classification = InstructionClassifierForRollback::instr_class_noop;
+        if (!parse_one_inst(handler))
+            return false;
+
+        // add relevant instructions to the list of instruction starts. First ordinary instructions
+        if (handler.classification == InstructionClassifierForRollback::instr_class_execute)
+            instruction_starts.push_back(instr_start);
+
+        // move table selection till after any relevant instructions. Achieved by moving it till
+        // we see next table selection.
+        if (handler.classification == InstructionClassifierForRollback::instr_class_postfix_table) {
+            if (pending_table_select)
+                instruction_starts.push_back(pending_table_select);
+            pending_table_select = instr_start;
+        }
+        // similarly for descriptor selection.
+        if (handler.classification == InstructionClassifierForRollback::instr_class_postfix_table) {
+            if (pending_descriptor_select)
+                instruction_starts.push_back(pending_descriptor_select);
+            pending_descriptor_select = instr_start;
+        }
+    }
+    // flush any pending table or descriptor selections
+    if (pending_table_select)
+        instruction_starts.push_back(pending_table_select);
+    if (pending_descriptor_select)
+        instruction_starts.push_back(pending_descriptor_select);
+    return true;
+}
 
 template<class T> T Replication::TransactLogParser::read_int()
 {

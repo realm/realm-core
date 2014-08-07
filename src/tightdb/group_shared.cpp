@@ -1252,6 +1252,35 @@ void SharedGroup::commit_and_continue_as_read()
     m_group.update_refs(m_readlock.m_top_ref, old_baseline);
 }
 
+void SharedGroup::rollback_and_continue_as_read()
+{
+    // Mark all managed space (beyond the attached file) as free.
+    m_group.m_alloc.reset_free_space_tracking(); // Throws
+
+    m_transact_stage = transact_Reading;
+
+    // FIXME: is this correct?
+    // m_readlock should still hold the top ref from when it was set
+    // during promote_to_write.
+    m_group.update_refs(m_readlock.m_top_ref, m_group.m_alloc.get_baseline());
+
+    // get the commit log and use it to rollback all accessors:
+    if (Replication* repl = m_group.get_replication()) {
+
+        // this call is vectored through to do_rollback_and....
+        repl->rollback_write_transact(*this);
+    }
+    // release exclusive write access: (FIXME: do this earlier?)
+    SharedInfo* info = m_file_map.get_addr();
+    info->writemutex.unlock();
+}
+
+void SharedGroup::do_rollback_and_continue_as_read(const char* start, const char* limit)
+{
+}
+
+
+
 #endif // TIGHTDB_ENABLE_REPLICATION
 
 

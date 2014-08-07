@@ -5507,6 +5507,36 @@ TEST(LangBindHelper_ImplicitTransactions)
     sg.end_read();
 }
 
+TEST(LangBindHelper_RollbackAndContinueAsRead)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    UniquePtr<Replication> repl(makeWriteLogCollector(path));
+    UniquePtr<LangBindHelper::TransactLogRegistry> wlr(getWriteLogs(path));
+    SharedGroup sg(*repl);
+    {
+        Group* group = const_cast<Group*>(&sg.begin_read());
+        LangBindHelper::promote_to_write(sg, *wlr);
+        TableRef origin = group->get_table("origin");
+        origin->add_column(type_Int, "");
+        origin->add_empty_row();
+        origin->set_int(0,0,42);
+        Row row = origin->get(0);
+        LangBindHelper::commit_and_continue_as_read(sg);
+        group->Verify();
+        CHECK_EQUAL(42, origin->get_int(0,0));
+        LangBindHelper::promote_to_write(sg, *wlr);
+        origin->insert_empty_row(0);
+        origin->set_int(0,0,5746);
+        CHECK_EQUAL(42,   origin->get_int(0,1));
+        CHECK_EQUAL(5746, origin->get_int(0,0));
+        CHECK_EQUAL(42,   row.get_int(0));
+        LangBindHelper::rollback_and_continue_as_read(sg);
+        group->Verify();
+        CHECK_EQUAL(42, origin->get_int(0,0));
+        CHECK_EQUAL(42,   row.get_int(0));
+        sg.end_read();
+    }
+}
 
 TEST(LangBindHelper_ImplicitTransactions_OverSharedGroupDestruction)
 {
