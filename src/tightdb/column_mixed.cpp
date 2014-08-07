@@ -402,7 +402,7 @@ void ColumnMixed::Verify(const Table& table, size_t col_ndx) const
         if (v == 0 || v & 0x1)
             continue;
         ConstTableRef subtable = m_data->get_subtable_ptr(i)->get_table_ref();
-        TIGHTDB_ASSERT(subtable->get_index_in_parent() == i);
+        TIGHTDB_ASSERT(subtable->get_parent_row_index() == i);
         subtable->Verify();
     }
 }

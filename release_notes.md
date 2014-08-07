@@ -6,7 +6,9 @@
 
 ### API breaking changes:
 
-* Lorem ipsum.
+* `Table::get_parent_row_index()` and `Table::get_index_in_group()` together
+  replace `Table::get_index_in_parent()`. This was done to avoid a confusing mix
+  of distinct concepts.
 
 ### Enhancements:
 
@@ -34,7 +36,9 @@
 
 ### Enhancements:
 
-* Lets you search for null-links, such as `table2->column<Link>(col_link2).is_null().find()`. Works for `Link` and `LinkedList`.
+* Lets you search for null-links, such as
+  `table2->column<Link>(col_link2).is_null().find()`. Works for `Link` and
+  `LinkedList`.
 
 -----------
 

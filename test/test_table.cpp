@@ -3240,7 +3240,8 @@ TEST(Table_Parent)
 {
     TableRef table = Table::create();
     CHECK_EQUAL(TableRef(), table->get_parent_table());
-    CHECK_EQUAL(tightdb::npos, table->get_index_in_parent());
+    CHECK_EQUAL(tightdb::npos, table->get_parent_row_index()); // Not a subtable
+    CHECK_EQUAL(tightdb::npos, table->get_index_in_group()); // Not a group-level table
 
     DescriptorRef subdesc;
     table->add_column(type_Table, "", &subdesc);
@@ -3256,22 +3257,22 @@ TEST(Table_Parent)
     subtab = table->get_subtable(0,0);
     CHECK_EQUAL(table, subtab->get_parent_table(&column_ndx));
     CHECK_EQUAL(0, column_ndx);
-    CHECK_EQUAL(0, subtab->get_index_in_parent());
+    CHECK_EQUAL(0, subtab->get_parent_row_index());
 
     subtab = table->get_subtable(0,1);
     CHECK_EQUAL(table, subtab->get_parent_table(&column_ndx));
     CHECK_EQUAL(0, column_ndx);
-    CHECK_EQUAL(1, subtab->get_index_in_parent());
+    CHECK_EQUAL(1, subtab->get_parent_row_index());
 
     subtab = table->get_subtable(1,0);
     CHECK_EQUAL(table, subtab->get_parent_table(&column_ndx));
     CHECK_EQUAL(1, column_ndx);
-    CHECK_EQUAL(0, subtab->get_index_in_parent());
+    CHECK_EQUAL(0, subtab->get_parent_row_index());
 
     subtab = table->get_subtable(1,1);
     CHECK_EQUAL(table, subtab->get_parent_table(&column_ndx));
     CHECK_EQUAL(1, column_ndx);
-    CHECK_EQUAL(1, subtab->get_index_in_parent());
+    CHECK_EQUAL(1, subtab->get_parent_row_index());
 
     // Check that column indexes are properly adjusted after new
     // column is insert.
@@ -3280,22 +3281,22 @@ TEST(Table_Parent)
     subtab = table->get_subtable(1,0);
     CHECK_EQUAL(table, subtab->get_parent_table(&column_ndx));
     CHECK_EQUAL(1, column_ndx);
-    CHECK_EQUAL(0, subtab->get_index_in_parent());
+    CHECK_EQUAL(0, subtab->get_parent_row_index());
 
     subtab = table->get_subtable(1,1);
     CHECK_EQUAL(table, subtab->get_parent_table(&column_ndx));
     CHECK_EQUAL(1, column_ndx);
-    CHECK_EQUAL(1, subtab->get_index_in_parent());
+    CHECK_EQUAL(1, subtab->get_parent_row_index());
 
     subtab = table->get_subtable(2,0);
     CHECK_EQUAL(table, subtab->get_parent_table(&column_ndx));
     CHECK_EQUAL(2, column_ndx);
-    CHECK_EQUAL(0, subtab->get_index_in_parent());
+    CHECK_EQUAL(0, subtab->get_parent_row_index());
 
     subtab = table->get_subtable(2,1);
     CHECK_EQUAL(table, subtab->get_parent_table(&column_ndx));
     CHECK_EQUAL(2, column_ndx);
-    CHECK_EQUAL(1, subtab->get_index_in_parent());
+    CHECK_EQUAL(1, subtab->get_parent_row_index());
 
     // Check that column indexes are properly adjusted after inserted
     // column is removed.
@@ -3304,22 +3305,22 @@ TEST(Table_Parent)
     subtab = table->get_subtable(0,0);
     CHECK_EQUAL(table, subtab->get_parent_table(&column_ndx));
     CHECK_EQUAL(0, column_ndx);
-    CHECK_EQUAL(0, subtab->get_index_in_parent());
+    CHECK_EQUAL(0, subtab->get_parent_row_index());
 
     subtab = table->get_subtable(0,1);
     CHECK_EQUAL(table, subtab->get_parent_table(&column_ndx));
     CHECK_EQUAL(0, column_ndx);
-    CHECK_EQUAL(1, subtab->get_index_in_parent());
+    CHECK_EQUAL(1, subtab->get_parent_row_index());
 
     subtab = table->get_subtable(1,0);
     CHECK_EQUAL(table, subtab->get_parent_table(&column_ndx));
     CHECK_EQUAL(1, column_ndx);
-    CHECK_EQUAL(0, subtab->get_index_in_parent());
+    CHECK_EQUAL(0, subtab->get_parent_row_index());
 
     subtab = table->get_subtable(1,1);
     CHECK_EQUAL(table, subtab->get_parent_table(&column_ndx));
     CHECK_EQUAL(1, column_ndx);
-    CHECK_EQUAL(1, subtab->get_index_in_parent());
+    CHECK_EQUAL(1, subtab->get_parent_row_index());
 }
 
 
