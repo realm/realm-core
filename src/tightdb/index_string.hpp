@@ -117,17 +117,26 @@ private:
 
 inline StringIndex::StringIndex(void* target_column, StringGetter get_func, Allocator& alloc):
     Column(create_node(alloc, true)), // Throws
-    m_target_column(target_column), m_get_func(get_func) {}
+    m_target_column(target_column),
+    m_get_func(get_func)
+{
+}
 
 inline StringIndex::StringIndex(inner_node_tag, Allocator& alloc):
     Column(create_node(alloc, false)), // Throws
-    m_target_column(0), m_get_func(0) {}
+    m_target_column(0),
+    m_get_func(0)
+{
+}
 
 inline StringIndex::StringIndex(ref_type ref, ArrayParent* parent, std::size_t ndx_in_parent,
                                 void* target_column, StringGetter get_func, Allocator& alloc):
-    Column(ref, parent, ndx_in_parent, alloc), m_target_column(target_column), m_get_func(get_func)
+    Column(alloc, ref),
+    m_target_column(target_column),
+    m_get_func(get_func)
 {
     TIGHTDB_ASSERT(Array::get_context_flag_from_header(alloc.translate(ref)));
+    set_parent(parent, ndx_in_parent);
 }
 
 

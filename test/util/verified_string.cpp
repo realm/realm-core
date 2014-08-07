@@ -7,6 +7,17 @@ using namespace tightdb;
 using namespace tightdb::test_util;
 
 
+VerifiedString::VerifiedString():
+    u(Allocator::get_default(), AdaptiveStringColumn::create(Allocator::get_default()))
+{
+}
+
+
+VerifiedString::~VerifiedString()
+{
+    u.destroy();
+}
+
 void VerifiedString::verify_neighbours(size_t ndx)
 {
     if (v.size() > ndx)
@@ -138,9 +149,4 @@ bool VerifiedString::conditional_verify()
     else {
         return true;
     }
-}
-
-void VerifiedString::destroy()
-{
-    u.destroy();
 }

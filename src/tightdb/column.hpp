@@ -195,8 +195,7 @@ protected:
     // const-violating moving copy constructor.
     mutable Array* m_array;
 
-    ColumnBase() TIGHTDB_NOEXCEPT {}
-    ColumnBase(Array* root) TIGHTDB_NOEXCEPT: m_array(root) {}
+    ColumnBase(Array* root = 0) TIGHTDB_NOEXCEPT;
 
     virtual std::size_t do_get_size() const TIGHTDB_NOEXCEPT = 0;
 
@@ -232,7 +231,7 @@ protected:
         ~CreateHandler() TIGHTDB_NOEXCEPT {}
     };
 
-    static ref_type create(std::size_t size, Allocator&, CreateHandler&);
+    static ref_type create(Allocator&, std::size_t size, CreateHandler&);
 
     class SliceHandler {
     public:
@@ -266,7 +265,7 @@ protected:
     EraseHandlerBase(ColumnBase& column) TIGHTDB_NOEXCEPT: m_column(column) {}
     ~EraseHandlerBase() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
     Allocator& get_alloc() TIGHTDB_NOEXCEPT;
-    void replace_root(util::UniquePtr<Array>& leaf);
+    void replace_root(Array* leaf); // Ownership passed
 private:
     ColumnBase& m_column;
 };
@@ -282,19 +281,18 @@ class Column: public ColumnBase {
 public:
     typedef int64_t value_type;
 
-    explicit Column(Allocator&);
-    Column(Array::Type, Allocator&);
-    explicit Column(Array::Type = Array::type_Normal, ArrayParent* = 0,
-                    std::size_t ndx_in_parent = 0, Allocator& = Allocator::get_default());
-    explicit Column(ref_type, ArrayParent* = 0, std::size_t ndx_in_parent = 0,
-                    Allocator& = Allocator::get_default());
-    Column(ArrayParent*, std::size_t ndx_in_parent, Allocator&); // Unattached
-    Column(const Column&); // FIXME: Constness violation
+    Column(Allocator&, ref_type);
+
+    struct unattached_root_tag {};
+    Column(unattached_root_tag, Allocator&);
+
+    struct move_tag {};
+    Column(move_tag, Column&) TIGHTDB_NOEXCEPT;
+
     ~Column() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
-    // 'this' and 'column' must use same allocator
-    void move_assign(Column& column);
-    bool IsIntColumn() const TIGHTDB_NOEXCEPT{ return true; }
+    void move_assign(Column&);
+    bool IsIntColumn() const TIGHTDB_NOEXCEPT { return true; }
 
     std::size_t size() const TIGHTDB_NOEXCEPT;
     bool is_empty() const TIGHTDB_NOEXCEPT { return size() == 0; }
@@ -332,7 +330,7 @@ public:
     void insert(std::size_t, std::size_t, bool) TIGHTDB_OVERRIDE;
     void erase(std::size_t ndx, bool is_last) TIGHTDB_OVERRIDE;
     void move_last_over(std::size_t, std::size_t) TIGHTDB_OVERRIDE;
-    void destroy_subtree(size_t ndx, bool clear_value=true);
+    void destroy_subtree(size_t ndx, bool clear_value);
 
     void adjust(int_fast64_t diff);
     void adjust_ge(int_fast64_t limit, int_fast64_t diff);
@@ -355,8 +353,8 @@ public:
     /// Compare two columns for equality.
     bool compare_int(const Column&) const TIGHTDB_NOEXCEPT;
 
-    static ref_type create(Array::Type leaf_type, std::size_t size, int_fast64_t value,
-                           Allocator&);
+    static ref_type create(Allocator&, Array::Type leaf_type = Array::type_Normal,
+                           std::size_t size = 0, int_fast64_t value = 0);
 
     // Overrriding method in ColumnBase
     ref_type write(std::size_t, std::size_t, std::size_t,
@@ -377,7 +375,7 @@ public:
 #endif
 
 protected:
-    Column(Array* root);
+    Column(Array* root = 0) TIGHTDB_NOEXCEPT;
 
     std::size_t do_get_size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return size(); }
 
@@ -387,6 +385,7 @@ protected:
 #endif
 
 private:
+    Column(const Column&); // not allowed
     Column &operator=(const Column&); // not allowed
 
     // Called by Array::bptree_insert().
@@ -405,6 +404,11 @@ private:
 
 
 // Implementation:
+
+inline ColumnBase::ColumnBase(Array* root) TIGHTDB_NOEXCEPT:
+    m_array(root)
+{
+}
 
 inline void ColumnBase::detach()
 {
@@ -556,59 +560,45 @@ inline Allocator& ColumnBase::EraseHandlerBase::get_alloc() TIGHTDB_NOEXCEPT
     return m_column.m_array->get_alloc();
 }
 
-inline void ColumnBase::EraseHandlerBase::replace_root(util::UniquePtr<Array>& leaf)
+inline void ColumnBase::EraseHandlerBase::replace_root(Array* leaf)
 {
+    util::UniquePtr<Array> leaf_2(leaf);
     ArrayParent* parent = m_column.m_array->get_parent();
     std::size_t ndx_in_parent = m_column.m_array->get_ndx_in_parent();
-    leaf->set_parent(parent, ndx_in_parent);
-    leaf->update_parent(); // Throws
+    leaf_2->set_parent(parent, ndx_in_parent);
+    leaf_2->update_parent(); // Throws
     delete m_column.m_array;
-    m_column.m_array = leaf.release();
+    m_column.m_array = leaf_2.release();
 }
 
-inline ref_type ColumnBase::create(std::size_t size, Allocator& alloc, CreateHandler& handler)
+inline ref_type ColumnBase::create(Allocator& alloc, std::size_t size, CreateHandler& handler)
 {
     std::size_t rest_size = size;
     std::size_t fixed_height = 0; // Not fixed
     return build(&rest_size, fixed_height, alloc, handler);
 }
 
-inline Column::Column(Allocator& alloc):
-    ColumnBase(new Array(Array::type_Normal, null_ptr, 0, alloc))
+inline Column::Column(Allocator& alloc, ref_type ref)
 {
+    m_array = new Array(alloc); // Throws
+    m_array->init_from_ref(ref);
 }
 
-inline Column::Column(Array::Type type, Allocator& alloc):
-    ColumnBase(new Array(type, null_ptr, 0, alloc))
+inline Column::Column(unattached_root_tag, Allocator& alloc)
 {
-    TIGHTDB_ASSERT(root_is_leaf());
+    m_array = new Array(alloc); // Throws
 }
 
-inline Column::Column(Array::Type type, ArrayParent* parent, std::size_t ndx_in_parent,
-                      Allocator& alloc):
-    ColumnBase(new Array(type, parent, ndx_in_parent, alloc))
+inline Column::Column(move_tag, Column& col) TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(root_is_leaf());
+    m_array = col.m_array;
+    col.m_array = 0;
 }
 
-inline Column::Column(ref_type ref, ArrayParent* parent, std::size_t ndx_in_parent,
-                      Allocator& alloc):
-    ColumnBase(new Array(ref, parent, ndx_in_parent, alloc)) {}
-
-inline Column::Column(ArrayParent* parent, std::size_t ndx_in_parent, Allocator& alloc) :
-    ColumnBase(new Array(alloc))
+inline Column::Column(Array* root) TIGHTDB_NOEXCEPT:
+    ColumnBase(root)
 {
-    set_parent(parent, ndx_in_parent);
 }
-
-inline Column::Column(const Column& column): ColumnBase(column.m_array)
-{
-    // FIXME: Unfortunate hidden constness violation here
-    // we now own array
-    column.m_array = 0;       // so detach source
-}
-
-inline Column::Column(Array* root): ColumnBase(root) {}
 
 inline Column::~Column() TIGHTDB_NOEXCEPT
 {
@@ -668,8 +658,10 @@ ref_type Column::leaf_insert(MemRef leaf_mem, ArrayParent& parent, std::size_t n
                              Allocator& alloc, std::size_t insert_ndx,
                              Array::TreeInsert<Column>& state)
 {
-    Array leaf(leaf_mem, &parent, ndx_in_parent, alloc);
-    return leaf.bptree_leaf_insert(insert_ndx, state.m_value, state);
+    Array leaf(alloc);
+    leaf.init_from_mem(leaf_mem);
+    leaf.set_parent(&parent, ndx_in_parent);
+    return leaf.bptree_leaf_insert(insert_ndx, state.m_value, state); // Throws
 }
 
 

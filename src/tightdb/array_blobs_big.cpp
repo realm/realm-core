@@ -16,9 +16,10 @@ void ArrayBigBlobs::add(BinaryData value, bool add_zero_term)
 {
     TIGHTDB_ASSERT(value.size() == 0 || value.data());
 
-    ArrayBlob new_blob(0, 0, get_alloc());
-    new_blob.add(value.data(), value.size(), add_zero_term);
-    Array::add(new_blob.get_ref());
+    ArrayBlob new_blob(m_alloc);
+    new_blob.create(); // Throws
+    new_blob.add(value.data(), value.size(), add_zero_term); // Throws
+    Array::add(int_fast64_t(new_blob.get_ref())); // Throws
 }
 
 
@@ -27,9 +28,12 @@ void ArrayBigBlobs::set(std::size_t ndx, BinaryData value, bool add_zero_term)
     TIGHTDB_ASSERT(ndx < size());
     TIGHTDB_ASSERT(value.size() == 0 || value.data());
 
-    ArrayBlob blob(get_as_ref(ndx), this, ndx, get_alloc());
-    blob.clear();
-    blob.add(value.data(), value.size(), add_zero_term);
+    ArrayBlob blob(m_alloc);
+    ref_type ref = get_as_ref(ndx);
+    blob.init_from_ref(ref);
+    blob.set_parent(this, ndx);
+    blob.clear(); // Throws
+    blob.add(value.data(), value.size(), add_zero_term); // Throws
 }
 
 
@@ -38,10 +42,10 @@ void ArrayBigBlobs::insert(size_t ndx, BinaryData value, bool add_zero_term)
     TIGHTDB_ASSERT(ndx <= size());
     TIGHTDB_ASSERT(value.size() == 0 || value.data());
 
-    ArrayBlob new_blob(0, 0, get_alloc());
-    new_blob.add(value.data(), value.size(), add_zero_term);
-
-    Array::insert(ndx, new_blob.get_ref());
+    ArrayBlob new_blob(m_alloc);
+    new_blob.create(); // Throws
+    new_blob.add(value.data(), value.size(), add_zero_term); // Throws
+    Array::insert(ndx, int_fast64_t(new_blob.get_ref())); // Throws
 }
 
 
@@ -117,9 +121,8 @@ ref_type ArrayBigBlobs::bptree_leaf_insert(size_t ndx, BinaryData value, bool ad
     }
 
     // Split leaf node
-    ArrayParent* parent = 0;
-    size_t ndx_in_parent = 0;
-    ArrayBigBlobs new_leaf(parent, ndx_in_parent, get_alloc());
+    ArrayBigBlobs new_leaf(m_alloc);
+    new_leaf.create(); // Throws
     if (ndx == leaf_size) {
         new_leaf.add(value, add_zero_term);
         state.m_split_offset = ndx;
@@ -145,9 +148,8 @@ void ArrayBigBlobs::Verify() const
     TIGHTDB_ASSERT(has_refs());
     for (size_t i = 0; i < size(); ++i) {
         ref_type blob_ref = Array::get_as_ref(i);
-        ArrayParent* parent = 0;
-        size_t ndx_in_parent = 0;
-        ArrayBlob blob(blob_ref, parent, ndx_in_parent, get_alloc());
+        ArrayBlob blob(m_alloc);
+        blob.init_from_ref(blob_ref);
         blob.Verify();
     }
 }
@@ -166,7 +168,9 @@ void ArrayBigBlobs::to_dot(std::ostream& out, bool, StringData title) const
 
     for (size_t i = 0; i < size(); ++i) {
         ref_type blob_ref = Array::get_as_ref(i);
-        ArrayBlob blob(blob_ref, const_cast<ArrayBigBlobs*>(this), i, get_alloc());
+        ArrayBlob blob(m_alloc);
+        blob.init_from_ref(blob_ref);
+        blob.set_parent(const_cast<ArrayBigBlobs*>(this), i);
         blob.to_dot(out);
     }
 

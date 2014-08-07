@@ -34,21 +34,19 @@ template<class T> class SequentialGetter;
 
 
 template<class T>
-BasicColumn<T>::BasicColumn(Allocator& alloc)
-{
-    m_array = new BasicArray<T>(0, 0, alloc);
-}
-
-template<class T>
-BasicColumn<T>::BasicColumn(ref_type ref, ArrayParent* parent, std::size_t pndx, Allocator& alloc)
+BasicColumn<T>::BasicColumn(Allocator& alloc, ref_type ref)
 {
     char* header = alloc.translate(ref);
     bool root_is_leaf = !Array::get_is_inner_bptree_node_from_header(header);
     if (root_is_leaf) {
-        m_array = new BasicArray<T>(MemRef(header, ref), parent, pndx, alloc);
+        BasicArray<T>* root = new BasicArray<T>(alloc); // Throws
+        root->init_from_mem(MemRef(header, ref));
+        m_array = root;
     }
     else {
-        m_array = new Array(MemRef(header, ref), parent, pndx, alloc);
+        Array* root = new Array(alloc); // Throws
+        root->init_from_mem(MemRef(header, ref));
+        m_array = root;
     }
 }
 
@@ -79,22 +77,18 @@ void BasicColumn<T>::clear()
         return;
     }
 
-    ArrayParent* parent = m_array->get_parent();
-    std::size_t ndx_in_parent = m_array->get_ndx_in_parent();
-
-    // FIXME: ExceptionSafety: Array accessor as well as underlying
-    // array node is leaked if array->update_parent() throws.
-
     // Revert to generic array
-    BasicArray<T>* array =
-        new BasicArray<T>(parent, ndx_in_parent, m_array->get_alloc()); // Throws
+    util::UniquePtr<BasicArray<T> > array;
+    array.reset(new BasicArray<T>(m_array->get_alloc())); // Throws
+    array->create(); // Throws
+    array->set_parent(m_array->get_parent(), m_array->get_ndx_in_parent());
     array->update_parent(); // Throws
 
     // Remove original node
     m_array->destroy_deep();
     delete m_array;
 
-    m_array = array;
+    m_array = array.release();
 }
 
 template<class T>
@@ -134,7 +128,9 @@ public:
     void update(MemRef mem, ArrayParent* parent, std::size_t ndx_in_parent,
                 std::size_t elem_ndx_in_leaf) TIGHTDB_OVERRIDE
     {
-        BasicArray<T> leaf(mem, parent, ndx_in_parent, m_alloc);
+        BasicArray<T> leaf(m_alloc);
+        leaf.init_from_mem(mem);
+        leaf.set_parent(parent, ndx_in_parent);
         leaf.set(elem_ndx_in_leaf, m_value); // Throws
     }
 };
@@ -201,7 +197,9 @@ public:
                          std::size_t leaf_ndx_in_parent,
                          std::size_t elem_ndx_in_leaf) TIGHTDB_OVERRIDE
     {
-        BasicArray<T> leaf(leaf_mem, parent, leaf_ndx_in_parent, get_alloc());
+        BasicArray<T> leaf(get_alloc());
+        leaf.init_from_mem(leaf_mem);
+        leaf.set_parent(parent, leaf_ndx_in_parent);
         TIGHTDB_ASSERT(leaf.size() >= 1);
         std::size_t last_ndx = leaf.size() - 1;
         if (last_ndx == 0)
@@ -214,23 +212,20 @@ public:
     }
     void destroy_leaf(MemRef leaf_mem) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
     {
-        get_alloc().free_(leaf_mem);
+        Array::destroy(leaf_mem, get_alloc()); // Shallow
     }
     void replace_root_by_leaf(MemRef leaf_mem) TIGHTDB_OVERRIDE
     {
-        ArrayParent* parent = 0;
-        std::size_t ndx_in_parent = 0;
-        util::UniquePtr<Array> leaf(new BasicArray<T>(leaf_mem, parent, ndx_in_parent,
-                                                      get_alloc())); // Throws
-        replace_root(leaf); // Throws
+        BasicArray<T>* leaf = new BasicArray<T>(get_alloc()); // Throws
+        leaf->init_from_mem(leaf_mem);
+        replace_root(leaf); // Throws, but accessor ownership is passed to callee
     }
     void replace_root_by_empty_leaf() TIGHTDB_OVERRIDE
     {
-        ArrayParent* parent = 0;
-        std::size_t ndx_in_parent = 0;
-        util::UniquePtr<Array> leaf(new BasicArray<T>(parent, ndx_in_parent,
-                                                      get_alloc())); // Throws
-        replace_root(leaf); // Throws
+        util::UniquePtr<BasicArray<T> > leaf;
+        leaf.reset(new BasicArray<T>(get_alloc())); // Throws
+        leaf->create(); // Throws
+        replace_root(leaf.release()); // Throws, but accessor ownership is passed to callee
     }
 };
 
@@ -265,10 +260,10 @@ private:
     Allocator& m_alloc;
 };
 
-template<class T> ref_type BasicColumn<T>::create(std::size_t size, Allocator& alloc)
+template<class T> ref_type BasicColumn<T>::create(Allocator& alloc, std::size_t size)
 {
     CreateHandler handler(alloc);
-    return ColumnBase::create(size, alloc, handler);
+    return ColumnBase::create(alloc, size, handler);
 }
 
 
@@ -338,17 +333,20 @@ template<class T> void BasicColumn<T>::refresh_accessor_tree(std::size_t, const 
 
     // Create new root accessor
     Array* new_root;
-    ArrayParent* parent = m_array->get_parent();
-    std::size_t ndx_in_parent = m_array->get_ndx_in_parent();
     Allocator& alloc = m_array->get_alloc();
     if (new_root_is_leaf) {
         // New root is leaf
-        new_root = new BasicArray<T>(root_mem, parent, ndx_in_parent, alloc); // Throws
+        BasicArray<T>* root = new BasicArray<T>(alloc); // Throws
+        root->init_from_mem(root_mem);
+        new_root = root;
     }
     else {
         // New root is inner node
-        new_root = new Array(root_mem, parent, ndx_in_parent, alloc); // Throws
+        Array* root = new Array(alloc); // Throws
+        root->init_from_mem(root_mem);
+        new_root = root;
     }
+    new_root->set_parent(m_array->get_parent(), m_array->get_ndx_in_parent());
 
     // Destroy old root accessor
     if (old_root_is_leaf) {
@@ -372,7 +370,8 @@ template<class T> void BasicColumn<T>::refresh_accessor_tree(std::size_t, const 
 template<class T>
 std::size_t BasicColumn<T>::verify_leaf(MemRef mem, Allocator& alloc)
 {
-    BasicArray<T> leaf(mem, 0, 0, alloc);
+    BasicArray<T> leaf(alloc);
+    leaf.init_from_mem(mem);
     leaf.Verify();
     return leaf.size();
 }
@@ -406,14 +405,17 @@ template<class T>
 void BasicColumn<T>::leaf_to_dot(MemRef leaf_mem, ArrayParent* parent, std::size_t ndx_in_parent,
                                  std::ostream& out) const
 {
-    BasicArray<T> leaf(leaf_mem.m_ref, parent, ndx_in_parent, m_array->get_alloc());
+    BasicArray<T> leaf(m_array->get_alloc());
+    leaf.init_from_mem(leaf_mem);
+    leaf.set_parent(parent, ndx_in_parent);
     leaf.to_dot(out);
 }
 
 template<class T>
 inline void BasicColumn<T>::leaf_dumper(MemRef mem, Allocator& alloc, std::ostream& out, int level)
 {
-    BasicArray<T> leaf(mem, 0, 0, alloc);
+    BasicArray<T> leaf(alloc);
+    leaf.init_from_mem(mem);
     int indent = level * 2;
     out << std::setw(indent) << "" << "Basic leaf (size: "<<leaf.size()<<")\n";
 }
@@ -446,7 +448,8 @@ std::size_t BasicColumn<T>::find_first(T value, std::size_t begin, std::size_t e
     std::size_t ndx_in_tree = begin;
     while (ndx_in_tree < end) {
         std::pair<MemRef, std::size_t> p = m_array->get_bptree_leaf(ndx_in_tree);
-        BasicArray<T> leaf(p.first, 0, 0, m_array->get_alloc());
+        BasicArray<T> leaf(m_array->get_alloc());
+        leaf.init_from_mem(p.first);
         std::size_t ndx_in_leaf = p.second;
         std::size_t leaf_offset = ndx_in_tree - ndx_in_leaf;
         std::size_t end_in_leaf = std::min(leaf.size(), end - leaf_offset);
@@ -480,7 +483,8 @@ void BasicColumn<T>::find_all(Column &result, T value, std::size_t begin, std::s
     std::size_t ndx_in_tree = begin;
     while (ndx_in_tree < end) {
         std::pair<MemRef, std::size_t> p = m_array->get_bptree_leaf(ndx_in_tree);
-        BasicArray<T> leaf(p.first, 0, 0, m_array->get_alloc());
+        BasicArray<T> leaf(m_array->get_alloc());
+        leaf.init_from_mem(p.first);
         std::size_t ndx_in_leaf = p.second;
         std::size_t leaf_offset = ndx_in_tree - ndx_in_leaf;
         std::size_t end_in_leaf = std::min(leaf.size(), end - leaf_offset);
@@ -561,7 +565,9 @@ ref_type BasicColumn<T>::leaf_insert(MemRef leaf_mem, ArrayParent& parent,
                                      Allocator& alloc, std::size_t insert_ndx,
                                      Array::TreeInsert<BasicColumn<T> >& state)
 {
-    BasicArray<T> leaf(leaf_mem, &parent, ndx_in_parent, alloc);
+    BasicArray<T> leaf(alloc);
+    leaf.init_from_mem(leaf_mem);
+    leaf.set_parent(&parent, ndx_in_parent);
     return leaf.bptree_leaf_insert(insert_ndx, state.m_value, state);
 }
 

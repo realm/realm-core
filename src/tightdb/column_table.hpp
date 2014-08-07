@@ -53,7 +53,7 @@ public:
 
     ~ColumnSubtableParent() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
-    static ref_type create(std::size_t size, Allocator&);
+    static ref_type create(Allocator&, std::size_t size = 0);
 
     Table* get_subtable_accessor(std::size_t) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
@@ -120,10 +120,9 @@ protected:
     /// non-empty.
     mutable SubtableMap m_subtable_map;
 
-    ColumnSubtableParent(Allocator&, Table*, std::size_t column_ndx);
+//    ColumnSubtableParent(Allocator&, Table*, std::size_t column_ndx);
 
-    ColumnSubtableParent(Allocator&, Table*, std::size_t column_ndx,
-                         ArrayParent*, std::size_t ndx_in_parent, ref_type);
+    ColumnSubtableParent(Allocator&, ref_type, Table*, std::size_t column_ndx);
 
     /// Get a pointer to the accessor of the specified subtable. The
     /// accessor will be created if it does not already exist.
@@ -178,17 +177,6 @@ protected:
 
 class ColumnTable: public ColumnSubtableParent {
 public:
-    /// Create a subtable column accessor and have it instantiate a
-    /// new underlying structure of arrays.
-    ///
-    /// \param table If this column is used as part of a table you must
-    /// pass a pointer to that table. Otherwise you must pass null.
-    ///
-    /// \param column_ndx If this column is used as part of a table
-    /// you must pass the logical index of the column within that
-    /// table. Otherwise you should pass zero.
-    ColumnTable(Allocator&, Table* table, std::size_t column_ndx);
-
     /// Create a subtable column accessor and attach it to a
     /// preexisting underlying structure of arrays.
     ///
@@ -198,8 +186,7 @@ public:
     /// \param column_ndx If this column is used as part of a table
     /// you must pass the logical index of the column within that
     /// table. Otherwise you should pass zero.
-    ColumnTable(Allocator&, Table* table, std::size_t column_ndx,
-                ArrayParent*, std::size_t ndx_in_parent, ref_type column_ref);
+    ColumnTable(Allocator&, ref_type, Table* table, std::size_t column_ndx);
 
     ~ColumnTable() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
 
@@ -499,19 +486,11 @@ bool ColumnSubtableParent::SubtableMap::adj_move_last_over(std::size_t target_ro
     return m_entries.empty();
 }
 
-inline ColumnSubtableParent::ColumnSubtableParent(Allocator& alloc,
+inline ColumnSubtableParent::ColumnSubtableParent(Allocator& alloc, ref_type ref,
                                                   Table* table, std::size_t column_ndx):
-    Column(Array::type_HasRefs, alloc),
-    m_table(table), m_column_ndx(column_ndx)
-{
-}
-
-inline ColumnSubtableParent::ColumnSubtableParent(Allocator& alloc,
-                                                  Table* table, std::size_t column_ndx,
-                                                  ArrayParent* parent, std::size_t ndx_in_parent,
-                                                  ref_type ref):
-    Column(ref, parent, ndx_in_parent, alloc),
-    m_table(table), m_column_ndx(column_ndx)
+    Column(alloc, ref), // Throws
+    m_table(table),
+    m_column_ndx(column_ndx)
 {
 }
 
@@ -547,10 +526,9 @@ inline ref_type ColumnSubtableParent::clone_table_columns(const Table* t)
     return _impl::TableFriend::clone_columns(*t, m_array->get_alloc());
 }
 
-inline ref_type ColumnSubtableParent::create(std::size_t size, Allocator& alloc)
+inline ref_type ColumnSubtableParent::create(Allocator& alloc, std::size_t size)
 {
-    int_fast64_t value = 0;
-    return Column::create(Array::type_HasRefs, size, value, alloc); // Throws
+    return Column::create(alloc, Array::type_HasRefs, size); // Throws
 }
 
 inline std::size_t* ColumnSubtableParent::record_subtable_path(std::size_t* begin,
@@ -587,15 +565,9 @@ inline void ColumnSubtableParent::do_insert(std::size_t row_ndx, int_fast64_t va
 }
 
 
-inline ColumnTable::ColumnTable(Allocator& alloc, Table* table, std::size_t column_ndx):
-    ColumnSubtableParent(alloc, table, column_ndx), m_subspec_ndx(tightdb::npos)
-{
-}
-
-inline ColumnTable::ColumnTable(Allocator& alloc, Table* table, std::size_t column_ndx,
-                                ArrayParent* parent, std::size_t ndx_in_parent,
-                                ref_type column_ref):
-    ColumnSubtableParent(alloc, table, column_ndx, parent, ndx_in_parent, column_ref),
+inline ColumnTable::ColumnTable(Allocator& alloc, ref_type ref,
+                                Table* table, std::size_t column_ndx):
+    ColumnSubtableParent(alloc, ref, table, column_ndx),
     m_subspec_ndx(tightdb::npos)
 {
 }

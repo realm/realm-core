@@ -55,7 +55,8 @@ const char s7[] = "Sam";
 TEST(StringIndex_IsEmpty)
 {
     // Create a column with string values
-    AdaptiveStringColumn col;
+    ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
+    AdaptiveStringColumn col(Allocator::get_default(), ref);
 
     // Create a new index on column
     const StringIndex& ndx = col.create_index();
@@ -69,7 +70,9 @@ TEST(StringIndex_IsEmpty)
 TEST(StringIndex_BuildIndex)
 {
     // Create a column with string values
-    AdaptiveStringColumn col;
+    ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
+    AdaptiveStringColumn col(Allocator::get_default(), ref);
+
     col.add(s1);
     col.add(s2);
     col.add(s3);
@@ -102,7 +105,9 @@ TEST(StringIndex_BuildIndex)
 TEST(StringIndex_DeleteAll)
 {
     // Create a column with string values
-    AdaptiveStringColumn col;
+    ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
+    AdaptiveStringColumn col(Allocator::get_default(), ref);
+
     col.add(s1);
     col.add(s2);
     col.add(s3);
@@ -160,7 +165,9 @@ TEST(StringIndex_DeleteAll)
 TEST(StringIndex_Delete)
 {
     // Create a column with random values
-    AdaptiveStringColumn col;
+    ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
+    AdaptiveStringColumn col(Allocator::get_default(), ref);
+
     col.add(s1);
     col.add(s2);
     col.add(s3);
@@ -208,7 +215,8 @@ TEST(StringIndex_Delete)
 TEST(StringIndex_ClearEmpty)
 {
     // Create a column with string values
-    AdaptiveStringColumn col;
+    ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
+    AdaptiveStringColumn col(Allocator::get_default(), ref);
 
     // Create a new index on column
     const StringIndex& ndx = col.create_index();
@@ -228,7 +236,9 @@ TEST(StringIndex_ClearEmpty)
 TEST(StringIndex_Clear)
 {
     // Create a column with string values
-    AdaptiveStringColumn col;
+    ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
+    AdaptiveStringColumn col(Allocator::get_default(), ref);
+
     col.add(s1);
     col.add(s2);
     col.add(s3);
@@ -278,7 +288,9 @@ TEST(StringIndex_Clear)
 TEST(StringIndex_Insert)
 {
     // Create a column with random values
-    AdaptiveStringColumn col;
+    ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
+    AdaptiveStringColumn col(Allocator::get_default(), ref);
+
     col.add(s1);
     col.add(s2);
     col.add(s3);
@@ -326,7 +338,9 @@ TEST(StringIndex_Insert)
 TEST(StringIndex_Set)
 {
     // Create a column with random values
-    AdaptiveStringColumn col;
+    ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
+    AdaptiveStringColumn col(Allocator::get_default(), ref);
+
     col.add(s1);
     col.add(s2);
     col.add(s3);
@@ -373,7 +387,9 @@ TEST(StringIndex_Set)
 TEST(StringIndex_Count)
 {
     // Create a column with duplcate values
-    AdaptiveStringColumn col;
+    ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
+    AdaptiveStringColumn col(Allocator::get_default(), ref);
+
     col.add(s1);
     col.add(s2);
     col.add(s2);
@@ -407,7 +423,9 @@ TEST(StringIndex_Count)
 TEST(StringIndex_Distinct)
 {
     // Create a column with duplcate values
-    AdaptiveStringColumn col;
+    ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
+    AdaptiveStringColumn col(Allocator::get_default(), ref);
+
     col.add(s1);
     col.add(s2);
     col.add(s2);
@@ -424,24 +442,27 @@ TEST(StringIndex_Distinct)
 
     // Get view of unique values
     // (sorted in alphabetical order, each ref to first match)
-    Column result;
-    ndx.distinct(result);
+    ref_type results_ref = Column::create(Allocator::get_default());
+    Column results(Allocator::get_default(), results_ref);
+    ndx.distinct(results);
 
-    CHECK_EQUAL(4, result.size());
-    CHECK_EQUAL(1, result.get(0)); // s2 = Brian
-    CHECK_EQUAL(0, result.get(1)); // s1 = John
-    CHECK_EQUAL(3, result.get(2)); // s3 = Samantha
-    CHECK_EQUAL(6, result.get(3)); // s4 = Tom
+    CHECK_EQUAL(4, results.size());
+    CHECK_EQUAL(1, results.get(0)); // s2 = Brian
+    CHECK_EQUAL(0, results.get(1)); // s1 = John
+    CHECK_EQUAL(3, results.get(2)); // s3 = Samantha
+    CHECK_EQUAL(6, results.get(3)); // s4 = Tom
 
     // Clean up
-    result.destroy();
+    results.destroy();
     col.destroy();
 }
 
 TEST(StringIndex_FindAllNoCopy)
 {
     // Create a column with duplcate values
-    AdaptiveStringColumn col;
+    ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
+    AdaptiveStringColumn col(Allocator::get_default(), ref);
+
     col.add(s1);
     col.add(s2);
     col.add(s2);
@@ -456,17 +477,17 @@ TEST(StringIndex_FindAllNoCopy)
     // Create a new index on column
     StringIndex& ndx = col.create_index();
 
-    size_t ref = not_found;
-    FindRes res1 = ndx.find_all("not there", ref);
+    size_t ref_2 = not_found;
+    FindRes res1 = ndx.find_all("not there", ref_2);
     CHECK_EQUAL(FindRes_not_found, res1);
 
-    FindRes res2 = ndx.find_all(s1, ref);
+    FindRes res2 = ndx.find_all(s1, ref_2);
     CHECK_EQUAL(FindRes_single, res2);
-    CHECK_EQUAL(0, ref);
+    CHECK_EQUAL(0, ref_2);
 
-    FindRes res3 = ndx.find_all(s4, ref);
+    FindRes res3 = ndx.find_all(s4, ref_2);
     CHECK_EQUAL(FindRes_column, res3);
-    const Column results(ref);
+    const Column results(Allocator::get_default(), ref_type(ref_2));
     CHECK_EQUAL(4, results.size());
     CHECK_EQUAL(6, results.get(0));
     CHECK_EQUAL(7, results.get(1));

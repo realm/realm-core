@@ -20,11 +20,9 @@ StringData get_string(void* column, size_t ndx)
 } // anonymous namespace
 
 
-ColumnStringEnum::ColumnStringEnum(ref_type keys, ref_type values, ArrayParent* column_parent,
-                                   size_t column_ndx_in_parent, ArrayParent* keys_parent,
-                                   size_t keys_ndx_in_parent, Allocator& alloc):
-    Column(values, column_parent, column_ndx_in_parent, alloc), // Throws
-    m_keys(keys,   keys_parent,   keys_ndx_in_parent,   alloc), // Throws
+ColumnStringEnum::ColumnStringEnum(Allocator& alloc, ref_type ref, ref_type keys_ref):
+    Column(alloc, ref), // Throws
+    m_keys(alloc, keys_ref), // Throws
     m_search_index(0)
 {
 }
@@ -357,7 +355,8 @@ namespace {
 
 void leaf_dumper(MemRef mem, Allocator& alloc, ostream& out, int level)
 {
-    Array leaf(mem, 0, 0, alloc);
+    Array leaf(alloc);
+    leaf.init_from_mem(mem);
     int indent = level * 2;
     out << setw(indent) << "" << "String enumeration leaf (size: "<<leaf.size()<<")\n";
 }

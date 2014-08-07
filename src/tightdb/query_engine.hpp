@@ -1369,22 +1369,20 @@ public:
 
             m_index_matches_destroy = false;
             if (fr == FindRes_single) {
-                m_index_matches = new Column();
+                m_index_matches = new Column(Column::unattached_root_tag(), Allocator::get_default()); // Throws
+                m_index_matches->get_root_array()->create(Array::type_Normal); // Throws
                 m_index_matches->add(index_ref);
                 m_index_matches_destroy = true;        // we own m_index_matches, so we must destroy it
             }
             else if (fr == FindRes_column) {
                 // todo: Apparently we can't use m_index.get_alloc() because it uses default allocator which simply makes
                 // translate(x) = x. Shouldn't it inherit owner column's allocator?!
-                if (m_column_type == col_type_StringEnum) {
-                    m_index_matches = new Column(index_ref, 0, 0, static_cast<const ColumnStringEnum*>(m_condition_column)->get_alloc());
-                }
-                else {
-                    m_index_matches = new Column(index_ref, 0, 0, static_cast<const AdaptiveStringColumn*>(m_condition_column)->get_alloc());
-                }
+                m_index_matches = new Column(Column::unattached_root_tag(), m_condition_column->get_alloc()); // Throws
+                m_index_matches->get_root_array()->init_from_ref(index_ref);
             }
             else if (fr == FindRes_not_found) {
-                m_index_matches = new Column;
+                m_index_matches = new Column(Column::unattached_root_tag(), Allocator::get_default()); // Throws
+                m_index_matches->get_root_array()->create(Array::type_Normal); // Throws
                 m_index_matches_destroy = true;        // we own m_index_matches, so we must destroy it
             }
 

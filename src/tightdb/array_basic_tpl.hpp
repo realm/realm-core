@@ -36,37 +36,6 @@ inline BasicArray<T>::BasicArray(Allocator& alloc) TIGHTDB_NOEXCEPT:
 }
 
 template<class T>
-inline BasicArray<T>::BasicArray(ArrayParent* parent, std::size_t ndx_in_parent, Allocator& alloc):
-    Array(alloc)
-{
-    create(); // Throws
-    set_parent(parent, ndx_in_parent);
-    update_parent(); // Throws
-}
-
-template<class T>
-inline BasicArray<T>::BasicArray(MemRef mem, ArrayParent* parent, std::size_t ndx_in_parent,
-                                 Allocator& alloc) TIGHTDB_NOEXCEPT:
-    Array(alloc)
-{
-    // Manually create array as doing it in initializer list
-    // will not be able to call correct virtual functions
-    init_from_mem(mem);
-    set_parent(parent, ndx_in_parent);
-}
-
-template<class T>
-inline BasicArray<T>::BasicArray(ref_type ref, ArrayParent* parent, std::size_t ndx_in_parent,
-                                 Allocator& alloc) TIGHTDB_NOEXCEPT:
-    Array(alloc)
-{
-    // Manually create array as doing it in initializer list
-    // will not be able to call correct virtual functions
-    init_from_ref(ref);
-    set_parent(parent, ndx_in_parent);
-}
-
-template<class T>
 inline BasicArray<T>::BasicArray(no_prealloc_tag) TIGHTDB_NOEXCEPT:
     Array(no_prealloc_tag())
 {
@@ -362,7 +331,8 @@ ref_type BasicArray<T>::bptree_leaf_insert(size_t ndx, T value, TreeInsertBase& 
     }
 
     // Split leaf node
-    BasicArray<T> new_leaf(0, 0, get_alloc());
+    BasicArray<T> new_leaf(get_alloc());
+    new_leaf.create(); // Throws
     if (ndx == leaf_size) {
         new_leaf.add(value);
         state.m_split_offset = ndx;

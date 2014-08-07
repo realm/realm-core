@@ -47,14 +47,15 @@ void ColumnBackLink::add_backlink(size_t row_ndx, size_t origin_row_ndx)
         // Create new column to hold backlinks
         size_t size = 1;
         int_fast64_t value_2 = value / 2;
-        ref = Column::create(Array::type_Normal, size, value_2, get_alloc()); // Throws
+        ref = Column::create(get_alloc(), Array::type_Normal, size, value_2); // Throws
         Column::set(row_ndx, int_fast64_t(ref)); // Throws
     }
     else {
         ref = to_ref(value);
     }
-    Column col(ref, this, row_ndx, get_alloc()); // Throws
-    col.add(int_fast64_t(origin_row_ndx)); // Throws
+    Column backlink_list(get_alloc(), ref); // Throws
+    backlink_list.set_parent(this, row_ndx);
+    backlink_list.add(int_fast64_t(origin_row_ndx)); // Throws
 }
 
 
@@ -89,8 +90,8 @@ size_t ColumnBackLink::get_backlink(size_t row_ndx, size_t backlink_ndx) const T
         TIGHTDB_ASSERT(backlink_ndx < ColumnBase::get_size_from_ref(ref, get_alloc()));
         // FIXME: Optimize with direct access (that is, avoid creation of a
         // Column instance, since that implies dynamic allocation).
-        Column col(ref, 0, 0, get_alloc());
-        int_fast64_t value_2 = col.get(backlink_ndx);
+        Column backlink_list(get_alloc(), ref); // Throws
+        int_fast64_t value_2 = backlink_list.get(backlink_ndx);
         origin_row_ndx = to_size_t(value_2);
     }
     return origin_row_ndx;
@@ -113,19 +114,20 @@ void ColumnBackLink::remove_backlink(size_t row_ndx, size_t origin_row_ndx)
     // if there is a list of backlinks we have to find
     // the right one and remove it.
     ref_type ref = to_ref(value);
-    Column col(ref, this, row_ndx, get_alloc());
+    Column backlink_list(get_alloc(), ref); // Throws
+    backlink_list.set_parent(this, row_ndx);
     int_fast64_t value_2 = int_fast64_t(origin_row_ndx);
-    size_t backlink_ndx = col.find_first(value_2);
+    size_t backlink_ndx = backlink_list.find_first(value_2);
     TIGHTDB_ASSERT(backlink_ndx != not_found);
-    size_t num_links = col.size();
+    size_t num_links = backlink_list.size();
     bool is_last = backlink_ndx+1 == num_links;
-    col.erase(backlink_ndx, is_last);
+    backlink_list.erase(backlink_ndx, is_last);
     --num_links;
 
     // If there is only one backlink left we can inline it as tagged value
     if (num_links == 1) {
-        int_fast64_t value_3 = col.get(0);
-        col.destroy();
+        int_fast64_t value_3 = backlink_list.get(0);
+        backlink_list.destroy();
 
         int_fast64_t value_4 = 1 + 2 * value_3;
         Column::set(row_ndx, value_4);
@@ -148,12 +150,13 @@ void ColumnBackLink::update_backlink(size_t row_ndx, size_t old_origin_row_ndx,
 
     // Find match in backlink list and replace
     ref_type ref = to_ref(value);
-    Column col(ref, this, row_ndx, get_alloc());
+    Column backlink_list(get_alloc(), ref); // Throws
+    backlink_list.set_parent(this, row_ndx);
     int_fast64_t value_2 = int_fast64_t(old_origin_row_ndx);
-    size_t backlink_ndx = col.find_first(value_2);
+    size_t backlink_ndx = backlink_list.find_first(value_2);
     TIGHTDB_ASSERT(backlink_ndx != not_found);
     int_fast64_t value_3 = int_fast64_t(new_origin_row_ndx);
-    col.set(backlink_ndx, value_3);
+    backlink_list.set(backlink_ndx, value_3);
 }
 
 
@@ -169,17 +172,17 @@ void ColumnBackLink::nullify_links(size_t row_ndx, bool do_destroy)
         else {
             // nullify entire list of links
             ref_type ref = to_ref(value);
-            Column col(ref, 0, 0, get_alloc()); // Throws
+            Column backlink_list(get_alloc(), ref); // Throws
 
-            size_t n = col.size();
+            size_t n = backlink_list.size();
             for (size_t i = 0; i < n; ++i) {
-                int_fast64_t value_2 = col.get(i);
+                int_fast64_t value_2 = backlink_list.get(i);
                 size_t origin_row_ndx = to_size_t(value_2);
                 m_origin_column->do_nullify_link(origin_row_ndx, row_ndx); // Throws
             }
 
             if (do_destroy)
-                col.destroy();
+                backlink_list.destroy();
         }
     }
 }
@@ -204,11 +207,11 @@ void ColumnBackLink::move_last_over(size_t target_row_ndx, size_t last_row_ndx)
         else {
             // update entire list of links
             ref_type ref = to_ref(value);
-            Column col(ref, 0, 0, get_alloc()); // Throws
+            Column backlink_list(get_alloc(), ref); // Throws
 
-            size_t n = col.size();
+            size_t n = backlink_list.size();
             for (size_t i = 0; i < n; ++i) {
-                int_fast64_t value_2 = col.get(i);
+                int_fast64_t value_2 = backlink_list.get(i);
                 size_t origin_row_ndx = to_size_t(value_2);
                 m_origin_column->do_update_link(origin_row_ndx, last_row_ndx, target_row_ndx); // Throws
             }

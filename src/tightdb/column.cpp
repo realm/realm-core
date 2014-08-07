@@ -570,10 +570,10 @@ void ColumnBase::introduce_new_root(ref_type new_sibling_ref, Array::TreeInsertB
 
     Array* orig_root = m_array;
     Allocator& alloc = orig_root->get_alloc();
-    ArrayParent* parent = orig_root->get_parent();
-    size_t ndx_in_parent = orig_root->get_ndx_in_parent();
-    UniquePtr<Array> new_root(new Array(Array::type_InnerBptreeNode,
-                                        parent, ndx_in_parent, alloc)); // Throws
+    UniquePtr<Array> new_root(new Array(alloc)); // Throws
+    new_root->create(Array::type_InnerBptreeNode); // Throws
+    new_root->set_parent(orig_root->get_parent(), orig_root->get_ndx_in_parent());
+    new_root->update_parent(); // Throws
     bool compact_form =
         is_append && (!orig_root->is_inner_bptree_node() || orig_root->get(0) % 2 != 0);
     // Something is wrong if we were not appending and the original
@@ -666,6 +666,15 @@ void Column::clear()
 }
 
 
+void Column::move_assign(Column& col)
+{
+    destroy();
+    delete m_array;
+    m_array = col.m_array;
+    col.m_array = 0;
+}
+
+
 namespace {
 
 struct SetLeafElem: Array::UpdateHandler {
@@ -697,16 +706,6 @@ struct AdjustLeafElem: Array::UpdateHandler {
 };
 
 } // anonymous namespace
-
-void Column::move_assign(Column& column)
-{
-    TIGHTDB_ASSERT(&column.get_alloc() == &get_alloc());
-    // destroy() and detach() are redundant with the Array::move_assign(), but they exist for completeness to avoid
-    // bugs if Array::move_assign() should change behaviour (e.g. no longer call destroy_deep(), etc.).
-    destroy();
-    get_root_array()->move_assign(*column.get_root_array());
-    column.detach();
-}
 
 void Column::set(size_t ndx, int64_t value)
 {
@@ -830,20 +829,23 @@ public:
     }
     void destroy_leaf(MemRef leaf_mem) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
     {
+        // FIXME: Seems like this would cause file space leaks if
+        // m_leaves_have_refs is true, but consider carefully how
+        // m_leaves_have_refs get its value.
         get_alloc().free_(leaf_mem);
     }
     void replace_root_by_leaf(MemRef leaf_mem) TIGHTDB_OVERRIDE
     {
-        UniquePtr<Array> leaf(new Array(get_alloc())); // Throws
+        Array* leaf = new Array(get_alloc()); // Throws
         leaf->init_from_mem(leaf_mem);
-        replace_root(leaf); // Throws
+        replace_root(leaf); // Throws, but callee takes ownership of accessor
     }
     void replace_root_by_empty_leaf() TIGHTDB_OVERRIDE
     {
         UniquePtr<Array> leaf(new Array(get_alloc())); // Throws
         leaf->create(m_leaves_have_refs ? Array::type_HasRefs :
                      Array::type_Normal); // Throws
-        replace_root(leaf); // Throws
+        replace_root(leaf.release()); // Throws, but callee takes ownership of accessor
     }
 };
 
@@ -1074,10 +1076,10 @@ private:
     Allocator& m_alloc;
 };
 
-ref_type Column::create(Array::Type leaf_type, size_t size, int_fast64_t value, Allocator& alloc)
+ref_type Column::create(Allocator& alloc, Array::Type leaf_type, size_t size, int_fast64_t value)
 {
     CreateHandler handler(leaf_type, value, alloc);
-    return ColumnBase::create(size, alloc, handler);
+    return ColumnBase::create(alloc, size, handler);
 }
 
 

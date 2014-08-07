@@ -44,7 +44,8 @@ using namespace tightdb;
 
 TEST(ArrayBlob_AddEmpty)
 {
-    ArrayBlob blob;
+    ArrayBlob blob(Allocator::get_default());
+    blob.create();
 
     blob.add("", 0);
 
@@ -55,7 +56,8 @@ TEST(ArrayBlob_AddEmpty)
 
 TEST(ArrayBlob_General)
 {
-    ArrayBlob blob;
+    ArrayBlob blob(Allocator::get_default());
+    blob.create();
 
     const char* t1 = "aaa";
     const char* t2 = "bbbbbb";
@@ -115,7 +117,8 @@ TEST(ArrayBlob_General)
 
 TEST(ArrayBlob_AdaptiveStringLeak)
 {
-    AdaptiveStringColumn col;
+    ref_type col_ref = AdaptiveStringColumn::create(Allocator::get_default());
+    AdaptiveStringColumn col(Allocator::get_default(), col_ref);
     for (size_t i = 0; i != 2 * TIGHTDB_MAX_LIST_SIZE; ++i)
         col.insert(0, string(100, 'a'));  // use constant larger than 'medium_string_max_size'
 

@@ -339,22 +339,22 @@ ref_type ArrayString::bptree_leaf_insert(size_t ndx, StringData value, TreeInser
     TIGHTDB_ASSERT(leaf_size <= TIGHTDB_MAX_LIST_SIZE);
     if (leaf_size < ndx) ndx = leaf_size;
     if (TIGHTDB_LIKELY(leaf_size < TIGHTDB_MAX_LIST_SIZE)) {
-        insert(ndx, value);
+        insert(ndx, value); // Throws
         return 0; // Leaf was not split
     }
 
     // Split leaf node
-    ArrayString new_leaf(0, 0, get_alloc());
+    ArrayString new_leaf(m_alloc);
+    new_leaf.create(); // Throws
     if (ndx == leaf_size) {
-        new_leaf.add(value);
+        new_leaf.add(value); // Throws
         state.m_split_offset = ndx;
     }
     else {
-        for (size_t i = ndx; i != leaf_size; ++i) {
-            new_leaf.add(get(i));
-        }
-        truncate(ndx);
-        add(value);
+        for (size_t i = ndx; i != leaf_size; ++i)
+            new_leaf.add(get(i)); // Throws
+        truncate(ndx); // Throws
+        add(value); // Throws
         state.m_split_offset = ndx + 1;
     }
     state.m_split_size = leaf_size + 1;

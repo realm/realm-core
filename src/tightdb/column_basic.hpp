@@ -44,9 +44,7 @@ class BasicColumn: public ColumnBase {
 public:
     typedef T value_type;
 
-    explicit BasicColumn(Allocator& = Allocator::get_default());
-    explicit BasicColumn(ref_type, ArrayParent* = 0, std::size_t ndx_in_parent = 0,
-                         Allocator& = Allocator::get_default());
+    BasicColumn(Allocator&, ref_type);
     ~BasicColumn() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
     std::size_t size() const TIGHTDB_NOEXCEPT;
@@ -91,7 +89,7 @@ public:
     /// Compare two columns for equality.
     bool compare(const BasicColumn&) const;
 
-    static ref_type create(std::size_t size, Allocator&);
+    static ref_type create(Allocator&, std::size_t size = 0);
 
     // Overrriding method in ColumnBase
     ref_type write(std::size_t, std::size_t, std::size_t,

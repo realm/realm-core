@@ -53,9 +53,7 @@ class ColumnStringEnum: public Column {
 public:
     typedef StringData value_type;
 
-    ColumnStringEnum(ref_type keys, ref_type values, ArrayParent* values_parent = 0,
-                     std::size_t values_ndx_in_parent = 0, ArrayParent* keys_parent = 0,
-                     std::size_t keys_ndx_in_parent = 0, Allocator& = Allocator::get_default());
+    ColumnStringEnum(Allocator&, ref_type ref, ref_type keys_ref);
     ~ColumnStringEnum() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     void destroy() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
@@ -101,8 +99,6 @@ public:
     bool compare_string(const AdaptiveStringColumn&) const;
     bool compare_string(const ColumnStringEnum&) const;
 
-    const Array* get_enum_root_array() const TIGHTDB_NOEXCEPT;
-
     void refresh_accessor_tree(std::size_t, const Spec&) TIGHTDB_OVERRIDE;
 
 #ifdef TIGHTDB_DEBUG
@@ -116,6 +112,7 @@ public:
     std::size_t GetKeyNdx(StringData value) const;
     std::size_t GetKeyNdxOrAdd(StringData value);
 
+    AdaptiveStringColumn& get_keys();
     const AdaptiveStringColumn& get_keys() const;
 
 private:
@@ -195,9 +192,9 @@ inline const StringIndex& ColumnStringEnum::get_index() const TIGHTDB_NOEXCEPT
     return *m_search_index;
 }
 
-inline const Array* ColumnStringEnum::get_enum_root_array() const TIGHTDB_NOEXCEPT
+inline AdaptiveStringColumn& ColumnStringEnum::get_keys()
 {
-    return m_keys.get_root_array();
+    return m_keys;
 }
 
 inline const AdaptiveStringColumn& ColumnStringEnum::get_keys() const

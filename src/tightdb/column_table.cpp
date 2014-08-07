@@ -358,14 +358,8 @@ void ColumnTable::move_last_over(size_t target_row_ndx, size_t last_row_ndx)
 
 void ColumnTable::destroy_subtable(size_t ndx) TIGHTDB_NOEXCEPT
 {
-    ref_type columns_ref = get_as_ref(ndx);
-    if (columns_ref == 0)
-        return; // It was never created
-
-    // Delete sub-tree
-    Allocator& alloc = get_alloc();
-    Array columns(columns_ref, 0, 0, alloc);
-    columns.destroy_deep();
+    if (ref_type ref = get_as_ref(ndx))
+        Array::destroy_deep(ref, get_alloc());
 }
 
 
@@ -438,7 +432,8 @@ namespace {
 
 void leaf_dumper(MemRef mem, Allocator& alloc, ostream& out, int level)
 {
-    Array leaf(mem, 0, 0, alloc);
+    Array leaf(alloc);
+    leaf.init_from_mem(mem);
     int indent = level * 2;
     out << setw(indent) << "" << "Subtable leaf (size: "<<leaf.size()<<")\n";
 }
