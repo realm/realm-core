@@ -122,7 +122,7 @@ TEST(Replication_General)
     SharedGroup sg_1(repl);
     {
         WriteTransaction wt(sg_1);
-        MyTable::Ref table = wt.get_table<MyTable>("my_table");
+        MyTable::Ref table = wt.add_table<MyTable>("my_table");
         table->add();
         wt.commit();
     }
@@ -199,8 +199,8 @@ TEST(Replication_Links)
     SharedGroup sg_1(repl);
     {
         WriteTransaction wt(sg_1);
-        TableRef origin = wt.get_table("origin");
-        TableRef target = wt.get_table("target");
+        TableRef origin = wt.add_table("origin");
+        TableRef target = wt.add_table("target");
         origin->add_column_link(type_Link,     "a", *target);
         origin->add_column_link(type_LinkList, "b", *target);
         wt.commit();
@@ -300,10 +300,10 @@ TEST(Replication_Links)
     // First create two origin tables and two target tables, and add some links
     {
         WriteTransaction wt(sg_1);
-        TableRef origin_1 = wt.get_table("origin_1");
-        TableRef origin_2 = wt.get_table("origin_2");
-        TableRef target_1 = wt.get_table("target_1");
-        TableRef target_2 = wt.get_table("target_2");
+        TableRef origin_1 = wt.add_table("origin_1");
+        TableRef origin_2 = wt.add_table("origin_2");
+        TableRef target_1 = wt.add_table("target_1");
+        TableRef target_2 = wt.add_table("target_2");
         target_1->add_column(type_Int, "t_1");
         target_2->add_column(type_Int, "t_2");
         target_1->add_empty_row(2);

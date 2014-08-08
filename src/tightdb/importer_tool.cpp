@@ -174,7 +174,7 @@ int main(int argc, char* argv[])
     in_file = open_files(argv[argc - 2]);
     string path = argv[argc - 1];
     Group group;
-    TableRef table2 = group.get_table(tablename);
+    TableRef table2 = group.add_table(tablename);
     Table &table = *table2;
 
     size_t imported_rows;

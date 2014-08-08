@@ -540,7 +540,7 @@ public:
     void Preset(std::size_t bitwidth, std::size_t count);
 
     int64_t sum(std::size_t start = 0, std::size_t end = std::size_t(-1)) const;
-    std::size_t count(int64_t value) const;
+    std::size_t count(int64_t value) const TIGHTDB_NOEXCEPT;
 
     bool maximum(int64_t& result, std::size_t start = 0, std::size_t end = std::size_t(-1),
                  std::size_t* return_ndx = null_ptr) const;

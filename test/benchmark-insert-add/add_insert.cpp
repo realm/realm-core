@@ -157,12 +157,12 @@ int main(int argc, char *argv[])
     switch(m) {
         case mode_UseShared: {
             WriteTransaction wt(sg);
-            BasicTableRef<TestTable> t = wt.get_table<TestTable>("test");
+            BasicTableRef<TestTable> t = wt.add_table<TestTable>("test");
             wt.commit();
             break;
         }
         case mode_UseGroup: {
-            BasicTableRef<TestTable> t = g.get_table<TestTable>("test");
+            BasicTableRef<TestTable> t = g.add_table<TestTable>("test");
             try {
                 g.commit();
             }

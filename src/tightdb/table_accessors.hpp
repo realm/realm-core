@@ -621,7 +621,7 @@ public:
     {
         // FIXME: Conversion from TableRef to ConstTableRef is relatively expensive, or is it? Check whether it involves access to the reference count!
         ConstTableRef t = static_cast<const FieldAccessor*>(this)->get_subtable();
-        return t && T::matches_dynamic_spec(TableFriend::get_spec(*t));
+        return t && T::matches_dynamic_type(TableFriend::get_spec(*t));
     }
 
     /// Generally more efficient that get_subtable()->size().
@@ -730,7 +730,7 @@ public:
     template<class T> BasicTableRef<T> set_subtable() const
     {
         BasicTableRef<T> t = unchecked_cast<T>(set_subtable());
-        T::set_dynamic_spec(*t);
+        T::set_dynamic_type(*t);
         return t;
     }
 

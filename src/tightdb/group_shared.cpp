@@ -760,7 +760,8 @@ void SharedGroup::open(Replication& repl)
     bool no_create   = false;
     DurabilityLevel dlevel = durability_Full;
     open(file, no_create, dlevel); // Throws
-    m_group.set_replication(&repl);
+    typedef _impl::GroupFriend gf;
+    gf::set_replication(m_group, &repl);
 }
 
 #endif

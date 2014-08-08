@@ -116,17 +116,17 @@ TEST(LangBindHelper_SetSubtable)
 TEST(LangBindHelper_LinkView)
 {
     Group group;
-    TableRef source = group.get_table("source");
-    TableRef target = group.get_table("target");
-    source->add_column_link(type_LinkList, "", *target);
+    TableRef origin = group.add_table("origin");
+    TableRef target = group.add_table("target");
+    origin->add_column_link(type_LinkList, "", *target);
     target->add_column(type_Int, "");
-    source->add_empty_row();
+    origin->add_empty_row();
     target->add_empty_row();
-    Row row = source->get(0);
+    Row row = origin->get(0);
     LinkView* link_view = LangBindHelper::get_linklist_ptr(row, 0);
     link_view->add(0);
     LangBindHelper::unbind_linklist_ptr(link_view);
-    CHECK_EQUAL(1, source->get_link_count(0,0));
+    CHECK_EQUAL(1, origin->get_link_count(0,0));
 }
 
 
@@ -231,7 +231,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
     // Try to advance after a propper rollback
     {
         WriteTransaction wt(sg_w);
-        TableRef foo_w = wt.get_table("bad");
+        TableRef foo_w = wt.add_table("bad");
         // Implicit rollback
     }
     LangBindHelper::advance_read(sg, tlm);
@@ -241,7 +241,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
     // Create a table via the other SharedGroup
     {
         WriteTransaction wt(sg_w);
-        TableRef foo_w = wt.get_table("foo");
+        TableRef foo_w = wt.add_table("foo");
         foo_w->add_column(type_Int, "i");
         foo_w->add_empty_row();
         wt.commit();
@@ -295,7 +295,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
     // Perform several write transactions before advancing the read transaction
     {
         WriteTransaction wt(sg_w);
-        TableRef bar_w = wt.get_table("bar");
+        TableRef bar_w = wt.add_table("bar");
         bar_w->add_column(type_Int, "a");
         wt.commit();
     }
@@ -381,13 +381,13 @@ TEST(LangBindHelper_AdvanceReadTransact_ColumnRootTypeChange)
     // Create a table for strings and one for other types
     {
         WriteTransaction wt(sg_w);
-        TableRef strings_w = wt.get_table("strings");
+        TableRef strings_w = wt.add_table("strings");
         strings_w->add_column(type_String, "a");
         strings_w->add_column(type_Binary, "b");
         strings_w->add_column(type_Mixed,  "c"); // Strings
         strings_w->add_column(type_Mixed,  "d"); // Binary data
         strings_w->add_empty_row();
-        TableRef other_w = wt.get_table("other");
+        TableRef other_w = wt.add_table("other");
         other_w->add_column(type_Int,   "A");
         other_w->add_column(type_Float, "B");
         other_w->add_column(type_Table, "C");
@@ -594,7 +594,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
     // Create one degenerate subtable
     {
         WriteTransaction wt(sg_w);
-        TableRef parent_w = wt.get_table("parent");
+        TableRef parent_w = wt.add_table("parent");
         DescriptorRef subdesc;
         parent_w->add_column(type_Table, "a", &subdesc);
         subdesc->add_column(type_Int, "x");
@@ -1168,7 +1168,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedSubtables)
     // Create one degenerate subtable
     {
         WriteTransaction wt(sg_w);
-        TableRef parent_w = wt.get_table("parent");
+        TableRef parent_w = wt.add_table("parent");
         parent_w->add_column(type_Mixed, "a");
         parent_w->add_empty_row();
         parent_w->set_mixed(0, 0, Mixed::subtable_tag());
@@ -1772,7 +1772,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
     // Create a table with two rows
     {
         WriteTransaction wt(sg_w);
-        TableRef parent_w = wt.get_table("parent");
+        TableRef parent_w = wt.add_table("parent");
         parent_w->add_column(type_Int, "a");
         parent_w->add_empty_row(2);
         parent_w->set_int(0, 0, 27);
@@ -2052,7 +2052,7 @@ TEST(LangBindHelper_AdvanceReadTransact_SubtableRowAccessors)
     // Create a mixed and a regular subtable each with one row
     {
         WriteTransaction wt(sg_w);
-        TableRef parent_w = wt.get_table("parent");
+        TableRef parent_w = wt.add_table("parent");
         parent_w->add_column(type_Mixed, "a");
         parent_w->add_column(type_Table, "b");
         DescriptorRef subdesc = parent_w->get_subdescriptor(1);
@@ -2152,7 +2152,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MoveLastOver)
         WriteTransaction wt(sg_w);
         for (int i = 0; i < 3; ++i) {
             const char* table_name = i == 0 ? "parent_1" : i == 1 ? "parent_2" : "parent_3";
-            TableRef parent_w = wt.get_table(table_name);
+            TableRef parent_w = wt.add_table(table_name);
             parent_w->add_column(type_Table, "a");
             parent_w->add_column(type_Mixed, "b");
             DescriptorRef subdesc = parent_w->get_subdescriptor(0);
@@ -2502,10 +2502,10 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
     // Create two origin tables and two target tables, and add some links
     {
         WriteTransaction wt(sg_w);
-        TableRef origin_1_w = wt.get_table("origin_1");
-        TableRef origin_2_w = wt.get_table("origin_2");
-        TableRef target_1_w = wt.get_table("target_1");
-        TableRef target_2_w = wt.get_table("target_2");
+        TableRef origin_1_w = wt.add_table("origin_1");
+        TableRef origin_2_w = wt.add_table("origin_2");
+        TableRef target_1_w = wt.add_table("target_1");
+        TableRef target_2_w = wt.add_table("target_2");
         target_1_w->add_column(type_Int, "t_1");
         target_2_w->add_column(type_Int, "t_2");
         target_1_w->add_empty_row(2);
@@ -4956,7 +4956,7 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkCycles)
     // when the table and the link column is created in the same transaction.
     {
         WriteTransaction wt(sg_w);
-        TableRef table_w = wt.get_table("table");
+        TableRef table_w = wt.add_table("table");
         wt.commit();
     }
     LangBindHelper::advance_read(sg, tlm);
@@ -5023,7 +5023,7 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkCycles)
     CHECK_EQUAL(1, table->get_backlink_count(0, *table, 1));
     {
         WriteTransaction wt(sg_w);
-        TableRef table_2_w = wt.get_table("table_2");
+        TableRef table_2_w = wt.add_table("table_2");
         table_2_w->add_column_link(type_Link,     "foo", *table_2_w);
         table_2_w->add_column_link(type_LinkList, "bar", *table_2_w);
         table_2_w->add_empty_row();
@@ -5161,8 +5161,8 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkCycles)
     CHECK_EQUAL(1, table_2->get_backlink_count(0, *table, 2));
     {
         WriteTransaction wt(sg_w);
-        TableRef table_3_w = wt.get_table("table_3");
-        TableRef table_4_w = wt.get_table("table_4");
+        TableRef table_3_w = wt.add_table("table_3");
+        TableRef table_4_w = wt.add_table("table_4");
         table_3_w->add_column_link(type_LinkList, "foobar_2", *table_4_w);
         table_4_w->add_column_link(type_Link,     "barfoo_2", *table_3_w);
         table_3_w->add_empty_row();
@@ -5466,7 +5466,7 @@ TEST(LangBindHelper_ImplicitTransactions)
     SharedGroup sg(*repl);
     {
         WriteTransaction wt(sg);
-        wt.get_table<TestTableShared>("table")->add_empty_row();
+        wt.add_table<TestTableShared>("table")->add_empty_row();
         wt.commit();
     }
     UniquePtr<Replication> repl2(makeWriteLogCollector(path));
@@ -5519,7 +5519,7 @@ TEST(LangBindHelper_ImplicitTransactions_OverSharedGroupDestruction)
         SharedGroup sg(*repl);
         {
             WriteTransaction wt(sg);
-            TableRef tr = wt.get_table("table");
+            TableRef tr = wt.add_table("table");
             tr->add_column(type_Int, "first");
             for (int i=0; i<20; i++)
                 tr->add_empty_row();
@@ -5550,8 +5550,8 @@ TEST(LangBindHelper_ImplicitTransactions_LinkList)
     SharedGroup sg(*repl);
     Group* group = const_cast<Group*>(&sg.begin_read());
     LangBindHelper::promote_to_write(sg, *tlr);
-    TableRef origin = group->get_table("origin");
-    TableRef target = group->get_table("target");
+    TableRef origin = group->add_table("origin");
+    TableRef target = group->add_table("target");
     origin->add_column_link(type_LinkList, "", *target);
     target->add_column(type_Int, "");
     origin->add_empty_row();
@@ -5631,7 +5631,7 @@ TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
     SharedGroup sg(*repl);
     {
         WriteTransaction wt(sg);
-        TableRef tr = wt.get_table("table");
+        TableRef tr = wt.add_table("table");
         tr->add_column(type_Int, "first");
         for (int i = 0; i < 200; ++i)
             tr->add_empty_row();

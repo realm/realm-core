@@ -242,12 +242,14 @@ void Group::detach() TIGHTDB_NOEXCEPT
     complete_detach();
 }
 
+
 void Group::detach_but_retain_data() TIGHTDB_NOEXCEPT
 {
     m_is_attached = false;
     detach_table_accessors();
     m_table_accessors.clear();
 }
+
 
 void Group::complete_detach() TIGHTDB_NOEXCEPT
 {
@@ -259,22 +261,77 @@ void Group::complete_detach() TIGHTDB_NOEXCEPT
     m_free_versions.detach();
 }
 
-Table* Group::get_table_by_ndx(size_t ndx)
+
+Table* Group::do_get_table(size_t table_ndx, DescMatcher desc_matcher)
 {
-    TIGHTDB_ASSERT(is_attached());
-    TIGHTDB_ASSERT(ndx < m_tables.size());
     TIGHTDB_ASSERT(m_table_accessors.empty() || m_table_accessors.size() == m_tables.size());
+
+    if (table_ndx >= m_tables.size())
+        throw InvalidArgument();
 
     if (m_table_accessors.empty())
         m_table_accessors.resize(m_tables.size()); // Throws
 
     // Get table accessor from cache if it exists, else create
-    Table* table = m_table_accessors[ndx];
+    Table* table = m_table_accessors[table_ndx];
     if (!table)
-        table = create_table_accessor(ndx); // Throws
+        table = create_table_accessor(table_ndx); // Throws
+
+    if (desc_matcher) {
+        typedef _impl::TableFriend tf;
+        if (desc_matcher && !(*desc_matcher)(tf::get_spec(*table)))
+            throw DescriptorMismatch();
+    }
 
     return table;
 }
+
+
+Table* Group::do_get_table(StringData name, DescMatcher desc_matcher)
+{
+    size_t table_ndx = m_table_names.find_first(name);
+    if (table_ndx == not_found)
+        return 0;
+
+    Table* table = do_get_table(table_ndx, desc_matcher); // Throws
+    return table;
+}
+
+
+Table* Group::do_add_table(StringData name, DescSetter desc_setter, bool require_unique_name)
+{
+    if (require_unique_name && has_table(name))
+        throw TableNameInUse();
+    return do_add_table(name, desc_setter); // Throws
+}
+
+
+Table* Group::do_add_table(StringData name, DescSetter desc_setter)
+{
+    size_t table_ndx = create_table(name); // Throws
+    Table* table = create_table_accessor(table_ndx); // Throws
+    if (desc_setter)
+        (*desc_setter)(*table); // Throws
+    return table;
+}
+
+
+Table* Group::do_get_or_add_table(StringData name, DescMatcher desc_matcher,
+                                  DescSetter desc_setter, bool* was_added)
+{
+    Table* table;
+    size_t table_ndx = m_table_names.find_first(name);
+    if (table_ndx == not_found) {
+        table = do_add_table(name, desc_setter); // Throws
+    }
+    else {
+        table = do_get_table(table_ndx, desc_matcher); // Throws
+    }
+    if (was_added)
+        *was_added = (table_ndx == not_found);
+    return table;
+}
+
 
 size_t Group::create_table(StringData name)
 {
@@ -616,9 +673,9 @@ bool Group::operator==(const Group& g) const
     if (n != g.size())
         return false;
     for (size_t i = 0; i < n; ++i) {
-        const Table* t1 = get_table_by_ndx(i); // Throws
-        const Table* t2 = g.get_table_by_ndx(i); // Throws
-        if (*t1 != *t2)
+        ConstTableRef table_1 = get_table(i); // Throws
+        ConstTableRef table_2 = g.get_table(i); // Throws
+        if (*table_1 != *table_2)
             return false;
     }
     return true;
@@ -1080,7 +1137,7 @@ public:
 
             // See comments on link handling in TransactAdvancer::set_link().
             if (link_target_table_ndx != tightdb::npos) {
-                Table* target = m_group.get_table_by_ndx(link_target_table_ndx); // Throws
+                TableRef target = m_group.get_table(link_target_table_ndx); // Throws
                 tf::adj_add_column(*target); // Throws
                 tf::mark(*target);
             }
@@ -1101,7 +1158,7 @@ public:
             // the backlink column occurs after regular columns.) Also see
             // comments on link handling in TransactAdvancer::set_link().
             if (link_target_table_ndx != tightdb::npos) {
-                Table* target = m_group.get_table_by_ndx(link_target_table_ndx); // Throws
+                TableRef target = m_group.get_table(link_target_table_ndx); // Throws
                 tf::adj_erase_column(*target, backlink_col_ndx); // Throws
                 tf::mark(*target);
             }
@@ -1361,7 +1418,7 @@ void Group::Verify() const
     {
         size_t n = m_tables.size();
         for (size_t i = 0; i != n; ++i) {
-            const Table* table = get_table_by_ndx(i);
+            ConstTableRef table = get_table(i);
             TIGHTDB_ASSERT(table->get_index_in_group() == i);
             table->Verify();
         }
@@ -1493,7 +1550,7 @@ void Group::to_dot(ostream& out) const
 
     // Tables
     for (size_t i = 0; i < m_tables.size(); ++i) {
-        const Table* table = get_table_by_ndx(i);
+        ConstTableRef table = get_table(i);
         StringData name = get_table_name(i);
         table->to_dot(out, name);
     }

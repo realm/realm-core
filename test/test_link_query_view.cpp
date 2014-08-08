@@ -23,8 +23,8 @@ TEST(LinkList_Basic1)
 {
     Group group;
 
-    TableRef table1 = group.get_table("table1");
-    TableRef table2 = group.get_table("table2");
+    TableRef table1 = group.add_table("table1");
+    TableRef table2 = group.add_table("table2");
 
     // add some more columns to table1 and table2
     table1->add_column(type_Int, "col1");
@@ -59,8 +59,8 @@ TEST(LinkList_Basic2)
 {
     Group group;
 
-    TableRef table1 = group.get_table("table1");
-    TableRef table2 = group.get_table("table2");
+    TableRef table1 = group.add_table("table1");
+    TableRef table2 = group.add_table("table2");
 
     // add some more columns to table1 and table2
     table1->add_column(type_Int, "col1");
@@ -146,8 +146,8 @@ TEST(LinkList_QuerySingle)
 {
     Group group;
 
-    TableRef table1 = group.get_table("table1");
-    TableRef table2 = group.get_table("table2");
+    TableRef table1 = group.add_table("table1");
+    TableRef table2 = group.add_table("table2");
 
     // add some more columns to table1 and table2
     table1->add_column(type_Int, "col1");
@@ -203,8 +203,8 @@ TEST(LinkList_TableViewTracking)
 {
     Group group;
 
-    TableRef table1 = group.get_table("table1");
-    TableRef table2 = group.get_table("table2");
+    TableRef table1 = group.add_table("table1");
+    TableRef table2 = group.add_table("table2");
 
     // add some more columns to table1 and table2
     table1->add_column(type_Int, "col1");
@@ -246,21 +246,21 @@ TEST(LinkList_TableViewTracking)
 }
 
 
-// Attempts to expose a bug (it would assert) where TableView::clear() was called with an unordered m_table. 
+// Attempts to expose a bug (it would assert) where TableView::clear() was called with an unordered m_table.
 // Internally, clear() tests if TableView::m_table is unordered by testing if it has any link or backlink columns
-// (asana task made with 'fixme' because it's unreliable - in the future you could have unordered tables with no 
+// (asana task made with 'fixme' because it's unreliable - in the future you could have unordered tables with no
 // links).
 TEST(LinkList_ClearView1)
 {
     // m_table has:
-    //      type_Link 
-    //      type_BackLink 
-    // tv: increasing target row indexes 
+    //      type_Link
+    //      type_BackLink
+    // tv: increasing target row indexes
     {
         Group group;
 
-        TableRef table1 = group.get_table("table1");
-        TableRef table2 = group.get_table("table2");
+        TableRef table1 = group.add_table("table1");
+        TableRef table2 = group.add_table("table2");
 
         // add some more columns to table1 and table2
         table1->add_column(type_Int, "col1");
@@ -292,13 +292,13 @@ TEST(LinkList_ClearView1)
 
     // m_table has:
     //      type_LinkList
-    //      type_BackLink 
-    // tv: increasing target row indexes 
+    //      type_BackLink
+    // tv: increasing target row indexes
     {
         Group group;
 
-        TableRef table1 = group.get_table("table1");
-        TableRef table2 = group.get_table("table2");
+        TableRef table1 = group.add_table("table1");
+        TableRef table2 = group.add_table("table2");
 
         // add some more columns to table1 and table2
         table1->add_column(type_Int, "col1");
@@ -338,14 +338,14 @@ TEST(LinkList_ClearView1)
 
 
     // m_table has:
-    //      type_BackLink 
-    // tv: random target row index order (due to sort() - this can be interesting to test because clear() performs a 
+    //      type_BackLink
+    // tv: random target row index order (due to sort() - this can be interesting to test because clear() performs a
     // sort internally.
     {
         Group group;
 
-        TableRef table1 = group.get_table("table1");
-        TableRef table2 = group.get_table("table2");
+        TableRef table1 = group.add_table("table1");
+        TableRef table2 = group.add_table("table2");
 
         // add some more columns to table1 and table2
         table1->add_column(type_Int, "col1");
@@ -388,8 +388,8 @@ TEST(LinkList_QueryFindLinkTarget)
 {
     Group group;
 
-    TableRef table1 = group.get_table("table1");
-    TableRef table2 = group.get_table("table2");
+    TableRef table1 = group.add_table("table1");
+    TableRef table2 = group.add_table("table2");
 
     // add some more columns to table1 and table2
     table1->add_column(type_Int, "col1");
@@ -442,7 +442,7 @@ TEST(LinkList_QueryFindLinkTarget)
     lvr->add(2);
 
     size_t match;
-    
+
     // First we test find_*_link on Table
 
     // find on Link
@@ -549,10 +549,10 @@ TEST(LinkList_MultiLinkQuery)
 {
     Group group;
 
-    TableRef table1 = group.get_table("table1");
-    TableRef table2 = group.get_table("table2");
-    TableRef table3 = group.get_table("table3");
-    TableRef table4 = group.get_table("table4");
+    TableRef table1 = group.add_table("table1");
+    TableRef table2 = group.add_table("table2");
+    TableRef table3 = group.add_table("table3");
+    TableRef table4 = group.add_table("table4");
 
     size_t col_linklist2 = table1->add_column_link(type_LinkList, "link", *table2);
     size_t col_link2 = table1->add_column_link(type_Link, "link", *table2);
@@ -624,7 +624,7 @@ TEST(LinkList_MultiLinkQuery)
     table1->add_empty_row();
 
     TableView tv;
-    
+
     // Link -> Link
     tv = (table1->link(col_link2).link(col_link3).column<Int>(0) == 300).find_all();
     CHECK_EQUAL(1, tv.size());
@@ -777,9 +777,9 @@ TEST(Link_FindNullLink)
 
     Group group;
 
-    TableRef table0 = group.get_table("table0");
-    TableRef table1 = group.get_table("table1");
-    TableRef table2 = group.get_table("table2");
+    TableRef table0 = group.add_table("table0");
+    TableRef table1 = group.add_table("table1");
+    TableRef table2 = group.add_table("table2");
 
     table0->add_column(type_String, "str1");
     table0->add_empty_row();
@@ -827,9 +827,9 @@ TEST(Link_FindNullLink)
 
         table2 -> table1:                table1 -> table0:
         Row   LinkCol  LinkListCol       Row   Link
-        0     1        {0, 1}            0     0       
+        0     1        {0, 1}            0     0
         1     null     {}                1     null
-        2     2        {0}               2     0   
+        2     2        {0}               2     0
         3     null     {}
     */
 
@@ -839,7 +839,7 @@ TEST(Link_FindNullLink)
     CHECK_EQUAL(2, tv.size());
     CHECK_EQUAL(1, tv.get_source_ndx(0));
     CHECK_EQUAL(3, tv.get_source_ndx(1));
-    
+
     // Test find() on Link
     match = table2->column<Link>(col_link2).is_null().find();
     CHECK_EQUAL(1, match);
