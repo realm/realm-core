@@ -23,7 +23,7 @@ void func()
         WriteTransaction trx(db);
 
         // Get table (creating it if it does not exist)
-        PeopleTable::Ref employees = trx.get_table<PeopleTable>("employees");
+        PeopleTable::Ref employees = trx.add_table<PeopleTable>("employees");
 
         // Add initial rows (with sub-tables)
         if (employees->is_empty()) {

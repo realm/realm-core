@@ -16,7 +16,7 @@ int main()
 {
     Group group;
 
-    PeopleTable::Ref table = group.get_table<PeopleTable>("people");
+    PeopleTable::Ref table = group.add_table<PeopleTable>("people");
     table->add("Mary", 14);
     table->add("Joe", 17);
     table->add("Jack", 22);

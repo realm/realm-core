@@ -19,7 +19,7 @@ void func(BinaryData buffer)
     Group g(buffer, /* take_ownership: */ false);
 
     // Get a table, or create it if it doesn't exist
-    PeopleTable::Ref table = g.get_table<PeopleTable>("people");
+    PeopleTable::Ref table = g.add_table<PeopleTable>("people");
 // @@Fold@@
 
     table->add("Mary", 14);

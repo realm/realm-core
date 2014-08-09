@@ -16,7 +16,7 @@ void func()
     Group g;
 
     // Create a table in the group
-    PeopleTable::Ref table = g.get_table<PeopleTable>("people");
+    PeopleTable::Ref table = g.add_table<PeopleTable>("people");
 // @@Fold@@
 
     table->add("Mary", 14);
