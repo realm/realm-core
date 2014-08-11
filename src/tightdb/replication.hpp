@@ -441,6 +441,12 @@ public:
     /// during subsequent calls to all descriptor modifying functions.
     template<class InstructionHandler> void parse(InstructionHandler&);
 
+    template<class InstructionHandler> 
+    bool prepare_log_reversal(std::vector<const char*>& instruction_starts, InstructionHandler& handler);
+
+    template<class InstructionHandler>
+    bool execute_in_reverse_order(std::vector<const char*>& instruction_starts, InstructionHandler& handler);
+
 private:
     // The input stream is assumed to consist of chunks of memory organised such that
     // every instruction resides in a single chunk only.
@@ -459,11 +465,6 @@ private:
 
     template<class InstructionHandler> bool do_parse(InstructionHandler&);
     template<class InstructionHandler> bool parse_one_inst(InstructionHandler& handler);
-    template<class InstructionHandler> 
-    bool prepare_log_reversal(std::vector<const char*>& instruction_starts, InstructionHandler& handler);
-
-    template<class InstructionHandler>
-    bool execute_in_reverse_order(std::vector<const char*>& instruction_starts, InstructionHandler& handler);
 
     template<class T> T read_int();
 
@@ -1562,45 +1563,6 @@ public:
     bool link_list_clear() { return true; }
 };
 
-class InstructionClassifierForRollback : public NullHandler {
-public:
-    // classification - initialized by caller, set by each instruction, 
-    // then read by whoever calls us to do the classification
-    enum Class { 
-        instr_class_noop, 
-        instr_class_execute, 
-        instr_class_postfix_table,
-        instr_class_postfix_descriptor };
-    Class classification;
-    // override only the instructions which are not to be treated as no-ops during rollback
-    bool new_group_level_table(StringData) { classification = instr_class_execute; return true; }
-    bool select_table(std::size_t, int, const std::size_t* ) { classification = instr_class_postfix_table; return true; }
-    bool insert_empty_rows(std::size_t, std::size_t ) { classification = instr_class_execute; return true; }
-    bool erase_row(std::size_t) { classification = instr_class_execute; return true; }
-    bool move_last_over(std::size_t, std::size_t) { classification = instr_class_execute; return true; }
-    bool clear_table() { classification = instr_class_execute; return true; }
-    bool insert_int(std::size_t, std::size_t, int_fast64_t) { classification = instr_class_execute; return true; }
-    bool insert_bool(std::size_t, std::size_t, bool) { classification = instr_class_execute; return true; }
-    bool insert_float(std::size_t, std::size_t, float) { classification = instr_class_execute; return true; }
-    bool insert_double(std::size_t, std::size_t, double) { classification = instr_class_execute; return true; }
-    bool insert_string(std::size_t, std::size_t, StringData) { classification = instr_class_execute; return true; }
-    bool insert_binary(std::size_t, std::size_t, BinaryData) { classification = instr_class_execute; return true; }
-    bool insert_date_time(std::size_t, std::size_t, DateTime) { classification = instr_class_execute; return true; }
-    bool insert_table(std::size_t, std::size_t) { classification = instr_class_execute; return true; }
-    bool insert_mixed(std::size_t, std::size_t, const Mixed&) { classification = instr_class_execute; return true; }
-    bool insert_link(std::size_t, std::size_t, std::size_t) { classification = instr_class_execute; return true; }
-    bool insert_link_list(std::size_t, std::size_t) { classification = instr_class_execute; return true; }
-    bool set_table(std::size_t, std::size_t) { classification = instr_class_execute; return true; }
-    bool set_mixed(std::size_t, std::size_t, const Mixed&) { classification = instr_class_execute; return true; }
-    bool set_link(std::size_t, std::size_t, std::size_t) { classification = instr_class_execute; return true; }
-    bool select_descriptor(int, const std::size_t*) { classification = instr_class_postfix_descriptor; return true; }
-    bool insert_column(std::size_t, DataType, StringData,
-                       std::size_t) { classification = instr_class_execute; return true; }
-    bool erase_column(std::size_t, std::size_t,
-                      std::size_t) { classification = instr_class_execute; return true; }
-    bool select_link_list(std::size_t, std::size_t) { classification = instr_class_execute; return true; }
-};
-
 template<typename InstructionClassifierForRollback>
 bool Replication::TransactLogParser::prepare_log_reversal(std::vector<const char*>& instruction_starts,
     InstructionClassifierForRollback& handler)
@@ -1642,6 +1604,21 @@ bool Replication::TransactLogParser::prepare_log_reversal(std::vector<const char
         instruction_starts.push_back(pending_descriptor_select);
     return true;
 }
+
+template<class InstructionHandler>
+bool Replication::TransactLogParser::execute_in_reverse_order(std::vector<const char*>& instruction_starts, 
+                                                              InstructionHandler& handler)
+{
+    size_t i = instruction_starts.size() - 1;
+    while (i > 0) {
+        m_input_begin = instruction_starts[i];
+        if (!parse_one_inst(handler))
+            return false;
+        --i;
+    }
+    return true;
+}
+
 
 template<class T> T Replication::TransactLogParser::read_int()
 {

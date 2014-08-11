@@ -1270,6 +1270,164 @@ void Group::advance_transact(ref_type new_top_ref, size_t new_file_size,
     }
 }
 
+
+class InstructionClassifierForRollback : public NullHandler {
+public:
+    // classification - initialized by caller, set by each instruction, 
+    // then read by whoever calls us to do the classification
+    enum Class { 
+        instr_class_noop, 
+        instr_class_execute, 
+        instr_class_postfix_table,
+        instr_class_postfix_descriptor };
+    Class classification;
+    // override only the instructions which are not to be treated as no-ops during rollback
+    bool new_group_level_table(StringData) { classification = instr_class_execute; return true; }
+    bool select_table(std::size_t, int, const std::size_t* ) { classification = instr_class_postfix_table; return true; }
+    bool insert_empty_rows(std::size_t, std::size_t ) { classification = instr_class_execute; return true; }
+    bool erase_row(std::size_t) { classification = instr_class_execute; return true; }
+    bool move_last_over(std::size_t, std::size_t) { classification = instr_class_execute; return true; }
+    bool insert_int(std::size_t, std::size_t, int_fast64_t) { classification = instr_class_execute; return true; }
+    bool insert_bool(std::size_t, std::size_t, bool) { classification = instr_class_execute; return true; }
+    bool insert_float(std::size_t, std::size_t, float) { classification = instr_class_execute; return true; }
+    bool insert_double(std::size_t, std::size_t, double) { classification = instr_class_execute; return true; }
+    bool insert_string(std::size_t, std::size_t, StringData) { classification = instr_class_execute; return true; }
+    bool insert_binary(std::size_t, std::size_t, BinaryData) { classification = instr_class_execute; return true; }
+    bool insert_date_time(std::size_t, std::size_t, DateTime) { classification = instr_class_execute; return true; }
+    bool insert_table(std::size_t, std::size_t) { classification = instr_class_execute; return true; }
+    bool insert_mixed(std::size_t, std::size_t, const Mixed&) { classification = instr_class_execute; return true; }
+    bool insert_link(std::size_t, std::size_t, std::size_t) { classification = instr_class_execute; return true; }
+    bool insert_link_list(std::size_t, std::size_t) { classification = instr_class_execute; return true; }
+    bool set_table(std::size_t, std::size_t) { classification = instr_class_execute; return true; }
+    bool set_mixed(std::size_t, std::size_t, const Mixed&) { classification = instr_class_execute; return true; }
+    bool set_link(std::size_t, std::size_t, std::size_t) { classification = instr_class_execute; return true; }
+    bool select_descriptor(int, const std::size_t*) { classification = instr_class_postfix_descriptor; return true; }
+    bool insert_column(std::size_t, DataType, StringData,
+                       std::size_t) { classification = instr_class_execute; return true; }
+    bool erase_column(std::size_t, std::size_t,
+                      std::size_t) { classification = instr_class_execute; return true; }
+    bool select_link_list(std::size_t, std::size_t) { classification = instr_class_execute; return true; }
+};
+
+class Group::TransactReverser : public Group::TransactAdvancer  {
+public:
+    TransactReverser(Group& group) : TransactAdvancer(group) {};
+    // override only the instructions which need to be reversed.
+    bool new_group_level_table(StringData) 
+    { 
+        // FIXME: need table removal to reverse this one correctly
+        return true;
+    }
+
+    bool insert_empty_rows(std::size_t idx, std::size_t num_rows) 
+    { 
+        while (num_rows > 0) {
+            Group::TransactAdvancer::erase_row(idx);
+            --num_rows;
+            ++idx;
+        }
+        return true; 
+    }
+
+    bool erase_row(std::size_t idx) 
+    { 
+        Group::TransactAdvancer::insert_empty_rows(idx,1);
+        return true; 
+    }
+
+    bool move_last_over(std::size_t target_row_idx, std::size_t last_row_idx) 
+    { 
+        // FIXME: the inverse is to append, then move and neither exist as instructions
+        return true; 
+    }
+    // helper function, shared by insert_xxx
+    bool insert(std::size_t col_idx, std::size_t row_idx) 
+    { 
+        if (col_idx == 0)
+            Group::TransactAdvancer::erase_row(row_idx);
+        return true; 
+    }
+    bool insert_int(std::size_t col_idx, std::size_t row_idx, int_fast64_t) 
+    { 
+        return insert(col_idx, row_idx);
+    }
+
+    bool insert_bool(std::size_t col_idx, std::size_t row_idx, bool) 
+    { 
+        return insert(col_idx, row_idx);
+    }
+
+    bool insert_float(std::size_t col_idx, std::size_t row_idx, float) 
+    { 
+        return insert(col_idx, row_idx);
+    }
+
+    bool insert_double(std::size_t col_idx, std::size_t row_idx, double) 
+    { 
+        return insert(col_idx, row_idx);
+    }
+
+    bool insert_string(std::size_t col_idx, std::size_t row_idx, StringData) 
+    { 
+        return insert(col_idx, row_idx);
+    }
+
+    bool insert_binary(std::size_t col_idx, std::size_t row_idx, BinaryData) 
+    { 
+        return insert(col_idx, row_idx);
+    }
+
+    bool insert_date_time(std::size_t col_idx, std::size_t row_idx, DateTime) 
+    { 
+        return insert(col_idx, row_idx);
+    }
+
+    bool insert_table(std::size_t col_idx, std::size_t row_idx) 
+    { 
+        return insert(col_idx, row_idx); 
+    }
+
+    bool insert_mixed(std::size_t col_idx, std::size_t row_idx, const Mixed&) 
+    { 
+        return insert(col_idx, row_idx);
+    }
+
+    bool insert_link(std::size_t col_idx, std::size_t row_idx, std::size_t) 
+    { 
+        return insert(col_idx, row_idx);
+    }
+
+    bool insert_link_list(std::size_t col_idx, std::size_t row_idx) 
+    { 
+        return insert(col_idx, row_idx);
+    }
+
+    bool insert_column(std::size_t, DataType, StringData,
+                       std::size_t) 
+    { 
+        // FIXME: needs to have backlink col added to utilize erase_column
+        return true; 
+    }
+
+    bool erase_column(std::size_t col_idx, std::size_t target_table_idx,
+                      std::size_t backlink_col_idx) 
+    { 
+        Group::TransactAdvancer::insert_column(col_idx, DataType(), StringData(), target_table_idx);
+        return true; 
+    }
+};
+
+void Group::reverse_transact(const BinaryData& log)
+{
+    InstructionClassifierForRollback icfb;
+    std::vector<const char*> instructions;
+    MultiLogInputStream in(&log, (&log)+1);
+    Replication::TransactLogParser parser(in);
+    parser.prepare_log_reversal(instructions, icfb);
+    TransactReverser reverser(*this);
+    parser.execute_in_reverse_order(instructions, reverser);
+}
+
 #endif // TIGHTDB_ENABLE_REPLICATION
 
 
