@@ -2,11 +2,13 @@
 
 ### Bugfixes:
 
-* Fixed bug in `where(&tv)...find()` where it would fail to find a match, if usig with a TableView, tv.
+* Lorem ipsum.
 
 ### API breaking changes:
 
-* Lorem ipsum.
+* `Table::get_parent_row_index()` and `Table::get_index_in_group()` together
+  replace `Table::get_index_in_parent()`. This was done to avoid a confusing mix
+  of distinct concepts.
 
 ### Enhancements:
 
@@ -17,6 +19,34 @@
 ### Internals:
 
 * Lorem ipsum.
+
+----------------------------------------------
+
+# 0.80.5 Release notes
+
+### Bugfixes:
+
+* Fixed bug in `where(&tv)...find()` where it would fail to find a match, if
+  usig with a TableView, tv.
+* Fixed bug in `Table::remove()` which would leak memory when rows were removed
+  and the table was a link target.
+* Fixed bug that prevented reuse of free-space when using
+  `LangBindHelper::promote_to_write()` and
+  `LangBindHelper::commit_and_continue_as_read()`.
+
+### Enhancements:
+
+* Lets you search for null-links, such as
+  `table2->column<Link>(col_link2).is_null().find()`. Works for `Link` and
+  `LinkedList`.
+
+-----------
+
+### Internals:
+
+* `Group::Verify()` now checks that the managed memory is precisely the
+  combination of the recorded free space and the used space reachable from the
+  root node.
 
 ----------------------------------------------
 

@@ -1,10 +1,12 @@
 #include <iostream>
 #include <iomanip>
 
+#include <tightdb/util/unique_ptr.hpp>
 #include <tightdb/column_mixed.hpp>
 
 using namespace std;
 using namespace tightdb;
+using namespace tightdb::util;
 
 
 ColumnMixed::~ColumnMixed() TIGHTDB_NOEXCEPT
@@ -27,55 +29,47 @@ void ColumnMixed::update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT
         m_binary_data->update_from_parent(old_baseline);
 }
 
-
-void ColumnMixed::create(Allocator& alloc, Table* table, size_t column_ndx)
+void ColumnMixed::create(Allocator& alloc, ref_type ref, Table* table, size_t column_ndx)
 {
-    m_array = new Array(Array::type_HasRefs, 0, 0, alloc);
+    UniquePtr<Array> top;
+    UniquePtr<Column> types;
+    UniquePtr<RefsColumn> data;
+    UniquePtr<ColumnBinary> binary_data;
+    top.reset(new Array(alloc)); // Throws
+    top->init_from_ref(ref);
+    TIGHTDB_ASSERT(top->size() == 2 || top->size() == 3);
+    ref_type types_ref = top->get_as_ref(0);
+    ref_type data_ref  = top->get_as_ref(1);
+    types.reset(new Column(alloc, types_ref)); // Throws
+    types->set_parent(&*top, 0);
+    data.reset(new RefsColumn(alloc, data_ref, table, column_ndx)); // Throws
+    data->set_parent(&*top, 1);
+    TIGHTDB_ASSERT(types->size() == data->size());
 
-    m_types = new Column(Array::type_Normal, alloc);
-    m_data  = new RefsColumn(alloc, table, column_ndx);
-
-    m_array->add(m_types->get_ref());
-    m_array->add(m_data->get_ref());
-
-    m_types->set_parent(m_array, 0);
-    m_data->set_parent(m_array, 1);
-}
-
-void ColumnMixed::create(Allocator& alloc, Table* table, size_t column_ndx,
-                         ArrayParent* parent, size_t ndx_in_parent, ref_type ref)
-{
-    m_array = new Array(ref, parent, ndx_in_parent, alloc);
-    TIGHTDB_ASSERT(m_array->size() == 2 || m_array->size() == 3);
-
-    ref_type types_ref = m_array->get_as_ref(0);
-    ref_type refs_ref  = m_array->get_as_ref(1);
-
-    m_types = new Column(types_ref, m_array, 0, alloc);
-    m_data  = new RefsColumn(alloc, table, column_ndx, m_array, 1, refs_ref);
-    TIGHTDB_ASSERT(m_types->size() == m_data->size());
-
-    // Binary column with values that does not fit in refs
-    // is only there if needed
-    if (m_array->size() == 3) {
-        ref_type data_ref = m_array->get_as_ref(2);
-        m_binary_data = new ColumnBinary(data_ref, m_array, 2, alloc);
+    // Binary data column with values that does not fit in data column is only
+    // there if needed
+    if (top->size() == 3) {
+        ref_type binary_data_ref = top->get_as_ref(2);
+        binary_data.reset(new ColumnBinary(alloc, binary_data_ref)); // Throws
+        binary_data->set_parent(&*top, 2);
     }
+
+    m_array = top.release();
+    m_types = types.release();
+    m_data  = data.release();
+    m_binary_data = binary_data.release();
 }
 
 
-void ColumnMixed::init_binary_data_column()
+void ColumnMixed::ensure_binary_data_column()
 {
     if (m_binary_data)
         return;
 
+    ref_type ref = ColumnBinary::create(m_array->get_alloc()); // Throws
+    m_binary_data = new ColumnBinary(m_array->get_alloc(), ref); // Throws
     TIGHTDB_ASSERT(m_array->size() == 2);
-
-    // Create new data column for items that do not fit in refs
-    m_binary_data = new ColumnBinary(m_array->get_alloc());
-    ref_type ref = m_binary_data->get_ref();
-
-    m_array->add(ref);
+    m_array->add(ref); // Throws
     m_binary_data->set_parent(m_array, 2);
 }
 
@@ -181,7 +175,7 @@ DataType ColumnMixed::get_type(size_t ndx) const TIGHTDB_NOEXCEPT
 void ColumnMixed::set_string(size_t ndx, StringData value)
 {
     TIGHTDB_ASSERT(ndx < m_types->size());
-    init_binary_data_column();
+    ensure_binary_data_column();
 
     MixedColType type = MixedColType(m_types->get(ndx));
 
@@ -214,7 +208,7 @@ void ColumnMixed::set_string(size_t ndx, StringData value)
 void ColumnMixed::set_binary(size_t ndx, BinaryData value)
 {
     TIGHTDB_ASSERT(ndx < m_types->size());
-    init_binary_data_column();
+    ensure_binary_data_column();
 
     MixedColType type = MixedColType(m_types->get(ndx));
 
@@ -293,36 +287,31 @@ bool ColumnMixed::compare_mixed(const ColumnMixed& c) const
     return true;
 }
 
+
 void ColumnMixed::do_discard_child_accessors() TIGHTDB_NOEXCEPT
 {
     discard_child_accessors();
 }
 
-ref_type ColumnMixed::create(size_t size, Allocator& alloc)
+
+ref_type ColumnMixed::create(Allocator& alloc, size_t size)
 {
     Array top(alloc);
-    _impl::DeepArrayDestroyGuard dg(&top);
     top.create(Array::type_HasRefs); // Throws
 
-    _impl::DeepArrayRefDestroyGuard dg_2(alloc);
     {
         int_fast64_t v = mixcol_Int;
-        ref_type ref = Column::create(Array::type_Normal, size, v, alloc); // Throws
-        dg_2.reset(ref);
+        ref_type ref = Column::create(alloc, Array::type_Normal, size, v); // Throws
         v = int_fast64_t(ref); // FIXME: Dangerous cast (unsigned -> signed)
         top.add(v); // Throws
-        dg_2.release();
     }
     {
         int_fast64_t v = 1; // 1 + 2*value where value is 0
-        ref_type ref = Column::create(Array::type_HasRefs, size, v, alloc); // Throws
-        dg_2.reset(ref);
+        ref_type ref = Column::create(alloc, Array::type_HasRefs, size, v); // Throws
         v = int_fast64_t(ref); // FIXME: Dangerous cast (unsigned -> signed)
         top.add(v); // Throws
-        dg_2.release();
     }
 
-    dg.release();
     return top.get_ref();
 }
 
@@ -413,7 +402,7 @@ void ColumnMixed::Verify(const Table& table, size_t col_ndx) const
         if (v == 0 || v & 0x1)
             continue;
         ConstTableRef subtable = m_data->get_subtable_ptr(i)->get_table_ref();
-        TIGHTDB_ASSERT(subtable->get_index_in_parent() == i);
+        TIGHTDB_ASSERT(subtable->get_parent_row_index() == i);
         subtable->Verify();
     }
 }

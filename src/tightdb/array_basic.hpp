@@ -29,15 +29,8 @@ namespace tightdb {
 template<class T> class BasicArray: public Array {
 public:
     explicit BasicArray(Allocator&) TIGHTDB_NOEXCEPT;
-    BasicArray(MemRef,   ArrayParent*, std::size_t ndx_in_parent, Allocator&) TIGHTDB_NOEXCEPT;
-    BasicArray(ref_type, ArrayParent*, std::size_t ndx_in_parent, Allocator&) TIGHTDB_NOEXCEPT;
     explicit BasicArray(no_prealloc_tag) TIGHTDB_NOEXCEPT;
     ~BasicArray() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
-
-    /// FIXME: Deprecated. The constructor must not allocate anything
-    /// that the destructor does not deallocate.
-    explicit BasicArray(ArrayParent* = 0, std::size_t ndx_in_parent = 0,
-                        Allocator& = Allocator::get_default());
 
     T get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
     void add(T value);

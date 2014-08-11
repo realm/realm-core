@@ -48,21 +48,6 @@ class ColumnBinary;
 /// subcolumns.
 class ColumnMixed: public ColumnBase {
 public:
-    /// Create a free-standing mixed column.
-    ColumnMixed();
-
-    /// Create a mixed column wrapper and have it instantiate a new
-    /// underlying structure of arrays.
-    ///
-    /// \param table If this column is used as part of a table you
-    /// must pass a pointer to that table. Otherwise you must pass
-    /// null.
-    ///
-    /// \param column_ndx If this column is used as part of a table
-    /// you must pass the logical index of the column within that
-    /// table. Otherwise you should pass zero.
-    ColumnMixed(Allocator&, Table* table, std::size_t column_ndx);
-
     /// Create a mixed column wrapper and attach it to a preexisting
     /// underlying structure of arrays.
     ///
@@ -73,8 +58,7 @@ public:
     /// \param column_ndx If this column is used as part of a table
     /// you must pass the logical index of the column within that
     /// table. Otherwise you should pass zero.
-    ColumnMixed(Allocator&, Table* table, std::size_t column_ndx,
-                ArrayParent*, std::size_t ndx_in_parent, ref_type);
+    ColumnMixed(Allocator&, ref_type, Table* table, std::size_t column_ndx);
 
     ~ColumnMixed() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
@@ -148,7 +132,7 @@ public:
 
     void discard_child_accessors() TIGHTDB_NOEXCEPT;
 
-    static ref_type create(std::size_t num_default_values, Allocator&);
+    static ref_type create(Allocator&, std::size_t size = 0);
 
     static std::size_t get_size_from_ref(ref_type root_ref, Allocator&) TIGHTDB_NOEXCEPT;
 
@@ -207,10 +191,8 @@ private:
 
     std::size_t do_get_size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return size(); }
 
-    void create(Allocator&, Table*, std::size_t column_ndx);
-    void create(Allocator&, Table*, std::size_t column_ndx,
-                ArrayParent*, std::size_t ndx_in_parent, ref_type);
-    void init_binary_data_column();
+    void create(Allocator&, ref_type, Table*, std::size_t column_ndx);
+    void ensure_binary_data_column();
 
     MixedColType clear_value(std::size_t ndx, MixedColType new_type); // Returns old type
     void clear_value_and_discard_subtab_acc(std::size_t ndx, MixedColType new_type);
@@ -237,14 +219,8 @@ private:
 
 class ColumnMixed::RefsColumn: public ColumnSubtableParent {
 public:
-    RefsColumn(Allocator& alloc, Table* table, std::size_t column_ndx):
-        ColumnSubtableParent(alloc, table, column_ndx)
-    {
-    }
-
-    RefsColumn(Allocator& alloc, Table* table, std::size_t column_ndx,
-               ArrayParent* parent, std::size_t ndx_in_parent, ref_type ref):
-        ColumnSubtableParent(alloc, table, column_ndx, parent, ndx_in_parent, ref)
+    RefsColumn(Allocator& alloc, ref_type ref, Table* table, std::size_t column_ndx):
+        ColumnSubtableParent(alloc, ref, table, column_ndx)
     {
     }
 

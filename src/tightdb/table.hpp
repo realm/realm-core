@@ -49,8 +49,10 @@ class ColumnLinkBase;
 class ColumnLink;
 class ColumnLinkList;
 class ColumnBackLink;
-
 template<class> class Columns;
+
+struct Link {};
+typedef Link LinkList;
 
 namespace _impl { class TableFriend; }
 
@@ -60,25 +62,22 @@ class Replication;
 
 
 /// The Table class is non-polymorphic, that is, it has no virtual
-/// functions. This is important because it ensures that there is no
-/// run-time distinction between a Table instance and an instance of
-/// any variation of BasicTable<T>, and this, in turn, makes it valid
-/// to cast a pointer from Table to BasicTable<T> even when the
-/// instance is constructed as a Table. Of course, this also assumes
-/// that BasicTable<> is non-polymorphic, has no destructor, and adds
-/// no extra data members.
+/// functions. This is important because it ensures that there is no run-time
+/// distinction between a Table instance and an instance of any variation of
+/// BasicTable<T>, and this, in turn, makes it valid to cast a pointer from
+/// Table to BasicTable<T> even when the instance is constructed as a Table. Of
+/// course, this also assumes that BasicTable<> is non-polymorphic, has no
+/// destructor, and adds no extra data members.
 ///
-/// FIXME: Table assignment (from any group to any group) could be made
-/// aliasing safe as follows: Start by cloning source table into
-/// target allocator. On success, assign, and then deallocate any
-/// previous structure at the target.
+/// FIXME: Table assignment (from any group to any group) could be made aliasing
+/// safe as follows: Start by cloning source table into target allocator. On
+/// success, assign, and then deallocate any previous structure at the target.
 ///
-/// FIXME: It might be desirable to have a 'table move' feature
-/// between two places inside the same group (say from a subtable or a
-/// mixed column to group level). This could be done in a very
-/// efficient manner.
+/// FIXME: It might be desirable to have a 'table move' feature between two
+/// places inside the same group (say from a subtable or a mixed column to group
+/// level). This could be done in a very efficient manner.
 ///
-/// FIXME: When compiling in debug mode, all public table methods
+/// FIXME: When compiling in debug mode, all public non-static table functions
 /// should TIGHTDB_ASSERT(is_attached()).
 class Table {
 public:
@@ -119,10 +118,10 @@ public:
     /// A table accessor may get detached from the underlying row for various
     /// reasons (see below). When it does, it no longer refers to anything, and
     /// can no longer be used, except for calling is_attached(). The
-    /// consequences of calling other methods on a detached table accessor are
-    /// undefined. Table accessors obtained by calling functions in the TightDB
-    /// API are always in the 'attached' state immediately upon return from
-    /// those functions.
+    /// consequences of calling other non-static functions on a detached table
+    /// accessor are unspecified. Table accessors obtained by calling functions in
+    /// the TightDB API are always in the 'attached' state immediately upon
+    /// return from those functions.
     ///
     /// A table accessor of a free-standing table never becomes detached (except
     /// during its eventual destruction). A group-level table accessor becomes
@@ -154,10 +153,10 @@ public:
     StringData get_name() const TIGHTDB_NOEXCEPT;
 
     //@{
-    /// Conventience methods for inspecting the dynamic table type.
+    /// Conventience functions for inspecting the dynamic table type.
     ///
-    /// These methods behave as if they were called on the descriptor
-    /// returned by get_descriptor().
+    /// These functions behave as if they were called on the descriptor returned
+    /// by get_descriptor().
     std::size_t get_column_count() const TIGHTDB_NOEXCEPT;
     DataType    get_column_type(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
     StringData  get_column_name(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
@@ -165,31 +164,28 @@ public:
     //@}
 
     //@{
-    /// Convenience methods for manipulating the dynamic table type.
+    /// Convenience functions for manipulating the dynamic table type.
     ///
-    /// These function must be called only for tables with independent
-    /// dynamic type. A table has independent dynamic type if the
-    /// function has_shared_type() returns false. A table that is a
-    /// direct member of a group has independent dynamic type. So does
-    /// a free-standing table, and a subtable in a column of type
-    /// 'mixed'. All other tables have shared dynamic type. The
-    /// consequences of calling any of these functions for a table
-    /// with shared dynamic type are undefined.
+    /// These function must be called only for tables with independent dynamic
+    /// type. A table has independent dynamic type if the function
+    /// has_shared_type() returns false. A table that is a direct member of a
+    /// group has independent dynamic type. So does a free-standing table, and a
+    /// subtable in a column of type 'mixed'. All other tables have shared
+    /// dynamic type. The consequences of calling any of these functions for a
+    /// table with shared dynamic type are undefined.
     ///
-    /// Apart from that, these methods behave as if they were called on the
+    /// Apart from that, these functions behave as if they were called on the
     /// descriptor returned by get_descriptor(). Note especially that the
     /// `_link` suffixed functions must be used when inserting link-type
     /// columns.
     ///
-    /// If you need to change the shared dynamic type of the subtables
-    /// in a subtable column, consider using the API offered by the
-    /// Descriptor class.
+    /// If you need to change the shared dynamic type of the subtables in a
+    /// subtable column, consider using the API offered by the Descriptor class.
     ///
-    /// \param subdesc If a non-null pointer is passed, and the
-    /// specified type is `type_Table`, then this function
-    /// automatically reteives the descriptor associated with the new
-    /// subtable column, and stores a reference to its accessor in
-    /// `*subdesc`.
+    /// \param subdesc If a non-null pointer is passed, and the specified type
+    /// is `type_Table`, then this function automatically reteives the
+    /// descriptor associated with the new subtable column, and stores a
+    /// reference to its accessor in `*subdesc`.
     ///
     /// \return The value returned by add_column() and add_column_link(), is the
     /// index of the added column.
@@ -222,13 +218,12 @@ public:
     //@{
     /// Get the dynamic type descriptor for this table.
     ///
-    /// Every table has an associated descriptor that specifies its
-    /// dynamic type. For simple tables, that is, tables without
-    /// subtable columns, the dynamic type can be inspected and
-    /// modified directly using methods such as get_column_count() and
-    /// add_column(). For more complex tables, the type is best
-    /// managed through the associated descriptor object which is
-    /// returned by this method.
+    /// Every table has an associated descriptor that specifies its dynamic
+    /// type. For simple tables, that is, tables without subtable columns, the
+    /// dynamic type can be inspected and modified directly using member
+    /// functions such as get_column_count() and add_column(). For more complex
+    /// tables, the type is best managed through the associated descriptor
+    /// object which is returned by this function.
     ///
     /// \sa has_shared_type()
     DescriptorRef get_descriptor();
@@ -239,9 +234,8 @@ public:
     /// Get the dynamic type descriptor for the column with the
     /// specified index. That column must have type 'table'.
     ///
-    /// This is merely a shorthand for calling
-    /// `get_subdescriptor(column_ndx)` on the descriptor
-    /// returned by `get_descriptor()`.
+    /// This is merely a shorthand for calling `get_subdescriptor(column_ndx)`
+    /// on the descriptor returned by `get_descriptor()`.
     DescriptorRef get_subdescriptor(std::size_t column_ndx);
     ConstDescriptorRef get_subdescriptor(std::size_t column_ndx) const;
     //@}
@@ -250,21 +244,20 @@ public:
     /// Get access to an arbitrarily nested dynamic type descriptor.
     ///
     /// The returned descriptor is the one you would get by calling
-    /// Descriptor::get_subdescriptor() once for each entry in the
-    /// specified path, starting with the descriptor returned by
-    /// get_descriptor(). The path is allowed to be empty.
+    /// Descriptor::get_subdescriptor() once for each entry in the specified
+    /// path, starting with the descriptor returned by get_descriptor(). The
+    /// path is allowed to be empty.
     typedef std::vector<std::size_t> path_vec;
     DescriptorRef get_subdescriptor(const path_vec& path);
     ConstDescriptorRef get_subdescriptor(const path_vec& path) const;
     //@}
 
     //@{
-    /// Convenience methods for manipulating nested table types.
+    /// Convenience functions for manipulating nested table types.
     ///
-    /// These functions behave as if they were called on the
-    /// descriptor returned by `get_subdescriptor(path)`. These
-    /// function must be called only on tables with independent
-    /// dynamic type.
+    /// These functions behave as if they were called on the descriptor returned
+    /// by `get_subdescriptor(path)`. These function must be called only on
+    /// tables with independent dynamic type.
     ///
     /// \return The value returned by add_subcolumn(), is the index of
     /// the added column within the descriptor referenced by the
@@ -292,7 +285,7 @@ public:
     /// such subtables, this function returns true. See
     /// Descriptor::is_root() for more on this.
     ///
-    /// Please note that Table methods that modify the dynamic type
+    /// Please note that Table functions that modify the dynamic type
     /// directly, such as add_column(), are only allowed to be used on
     /// tables with non-shared type. If you need to modify a shared
     /// type, you will have to do that through the descriptor returned
@@ -433,12 +426,10 @@ public:
     /// parent table, and the subtable either resides in a column of type
     /// `table` or of type `mixed` in that parent. In that case
     /// get_parent_table() returns a reference to the accessor associated with
-    /// the parent, and get_index_in_parent() returns the index of the row in
-    /// which the subtable resides. Otherwise, if this table is a group-level
-    /// table, get_parent_table() returns null and get_index_in_parent() returns
-    /// the index of this table within the group. Otherwise this table is a
-    /// free-standing table, get_parent_table() returns null, and
-    /// get_index_in_parent() returns tightdb::npos.
+    /// the parent, and get_parent_row_index() returns the index of the row in
+    /// which the subtable resides. In all other cases (free-standing and
+    /// group-level tables), get_parent_table() returns null and
+    /// get_parent_row_index() returns tightdb::npos.
     ///
     /// If this accessor is attached to a subtable, and \a column_ndx_out is
     /// specified, then `*column_ndx_out` is set to the index of the column of
@@ -447,12 +438,16 @@ public:
     /// value upon return.
     TableRef get_parent_table(std::size_t* column_ndx_out = 0) TIGHTDB_NOEXCEPT;
     ConstTableRef get_parent_table(std::size_t* column_ndx_out = 0) const TIGHTDB_NOEXCEPT;
-    std::size_t get_index_in_parent() const TIGHTDB_NOEXCEPT;
+    std::size_t get_parent_row_index() const TIGHTDB_NOEXCEPT;
     //@}
 
     /// Only group-level unordered tables can be used as origins or targets for
     /// links.
     bool is_group_level() const TIGHTDB_NOEXCEPT;
+
+    /// If this table is a group-level table, then this function returns the
+    /// index of this table within the group. Otherwise it returns tightdb::npos.
+    std::size_t get_index_in_group() const TIGHTDB_NOEXCEPT;
 
     // Aggregate functions
     std::size_t count_int(std::size_t column_ndx, int64_t value) const;
@@ -741,7 +736,8 @@ private:
     mutable Descriptor* m_descriptor;
 
     // Table view instances
-    mutable std::vector<const TableViewBase*> m_views;
+    typedef std::vector<const TableViewBase*> views;
+    mutable views m_views;
 
     typedef std::vector<RowBase*> row_accessors;
     mutable row_accessors m_row_accessors;
@@ -899,7 +895,9 @@ private:
 
     void register_view(const TableViewBase* view);
     void unregister_view(const TableViewBase* view) TIGHTDB_NOEXCEPT;
-    void detach_views_except(const TableViewBase* view) TIGHTDB_NOEXCEPT;
+    void move_registered_view(const TableViewBase* old_addr,
+                              const TableViewBase* new_addr) TIGHTDB_NOEXCEPT;
+    void discard_views() TIGHTDB_NOEXCEPT;
 
     void register_row_accessor(RowBase*) const;
     void unregister_row_accessor(RowBase*) const TIGHTDB_NOEXCEPT;
@@ -1088,7 +1086,7 @@ private:
     template<class> friend class SequentialGetter;
     friend class RowBase;
     friend class LinksToNode;
-    friend class LinkFollower;
+    friend class LinkMap;
 };
 
 
@@ -1355,6 +1353,9 @@ inline TableRef Table::copy(Allocator& alloc) const
 template<class T> inline Columns<T> Table::column(std::size_t column)
 {
     std::vector<size_t> tmp = m_link_chain;
+    if (util::SameType<T, Link>::value || util::SameType<T, LinkList>::value) {
+        tmp.push_back(column);
+    }
     m_link_chain.clear();
     return Columns<T>(column, this, tmp);
 }

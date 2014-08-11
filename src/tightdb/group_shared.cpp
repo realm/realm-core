@@ -1167,33 +1167,23 @@ Group& SharedGroup::begin_write()
         throw runtime_error("Write transactions are not allowed while transactions are pinned");
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    if (Replication* repl = m_group.get_replication()) {
+    if (Replication* repl = m_group.get_replication())
         repl->begin_write_transact(*this); // Throws
-        try {
-            do_begin_write();
-            begin_read();
-        }
-        catch (...) {
-            repl->rollback_write_transact(*this);
-            throw;
-        }
-        m_transact_stage = transact_Writing;
-        if (m_readlock.m_version == 1) {
-            m_group.reset_freespace_tracking();
-        }
-        return m_group;
-    }
 #endif
 
-    do_begin_write();
-
-    // A write transaction implies a read transaction...
-    begin_read();
-    m_transact_stage = transact_Writing;
-    if (m_readlock.m_version == 1) {
-        m_group.reset_freespace_tracking();
+    try {
+        do_begin_write();
+        begin_read();
+    }
+    catch (...) {
+#ifdef TIGHTDB_ENABLE_REPLICATION
+        if (Replication* repl = m_group.get_replication())
+            repl->rollback_write_transact(*this);
+#endif
+        throw;
     }
 
+    m_transact_stage = transact_Writing;
     return m_group;
 }
 
@@ -1225,8 +1215,9 @@ void SharedGroup::do_begin_write()
         info->free_write_slots--;
         info->balancemutex.unlock();
     }
-#endif
+#endif // _WIN32
 }
+
 
 void SharedGroup::commit()
 {
@@ -1238,6 +1229,7 @@ void SharedGroup::commit()
     m_group.complete_detach();
 }
 
+
 #ifdef TIGHTDB_ENABLE_REPLICATION
 
 void SharedGroup::commit_and_continue_as_read()
@@ -1245,33 +1237,33 @@ void SharedGroup::commit_and_continue_as_read()
     do_commit();
 
     // Mark all managed space (beyond the attached file) as free.
-    //
-    // FIXME: Perform this as part of m_alloc.remap(), but that
-    // requires that we always call remap().
-    //
-    // FIXME: This presence of this call seems to be the untended consequence of
-    // a merge (an undetected conflict). Please investigate.
     m_group.m_alloc.reset_free_space_tracking(); // Throws
 
     size_t old_baseline = m_group.m_alloc.get_baseline();
 
     // Remap file if it has grown
     if (m_readlock.m_file_size > old_baseline) {
-
-        // FIXME: Not sure if this test is correct in this context
-        if (m_group.m_alloc.remap(m_readlock.m_file_size)) { // Throws
-            // The file was mapped to a new address, so all array
-            // accessors must be updated.
+        bool addr_changed = m_group.m_alloc.remap(m_readlock.m_file_size); // Throws
+        // If the file was mapped to a new address, all array accessors must be
+        // updated.
+        if (addr_changed)
             old_baseline = 0;
-        }
     }
     m_group.update_refs(m_readlock.m_top_ref, old_baseline);
 }
-#endif
+
+#endif // TIGHTDB_ENABLE_REPLICATION
+
 
 void SharedGroup::do_commit()
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Writing);
+
+    // FIXME: This fails when replication is enabled and the first transaction
+    // in a lock-file session is rolled back (aborted), because then the first
+    // committed transaction will have m_readlock.m_version > 1.
+    if (m_readlock.m_version == 1)
+        m_group.reset_free_space_versions();
 
     SharedInfo* info = m_file_map.get_addr();
     SharedInfo* r_info = m_reader_map.get_addr();

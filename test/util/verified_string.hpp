@@ -37,6 +37,8 @@ namespace test_util {
 
 class VerifiedString {
 public:
+    VerifiedString();
+    ~VerifiedString();
     void add(StringData value);
     void insert(std::size_t ndx, StringData value);
     StringData get(std::size_t ndx);
@@ -49,7 +51,6 @@ public:
     bool Verify();
     bool conditional_verify();
     void verify_neighbours(std::size_t ndx);
-    void destroy();
 
 private:
     std::vector<std::string> v;

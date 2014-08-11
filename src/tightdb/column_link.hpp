@@ -34,10 +34,10 @@ namespace tightdb {
 /// table is specified by the table descriptor.
 class ColumnLink: public ColumnLinkBase {
 public:
-    ColumnLink(ref_type ref, ArrayParent*, std::size_t ndx_in_parent, Allocator&); // Throws
+    ColumnLink(Allocator&, ref_type ref); // Throws
     ~ColumnLink() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
-    static ref_type create(std::size_t size, Allocator&);
+    static ref_type create(Allocator&, std::size_t size = 0);
 
     // Getting and modifying links
     bool is_null_link(std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
@@ -67,9 +67,8 @@ private:
 
 // Implementation
 
-inline ColumnLink::ColumnLink(ref_type ref, ArrayParent* parent, std::size_t ndx_in_parent,
-                              Allocator& alloc):
-    ColumnLinkBase(ref, parent, ndx_in_parent, alloc)
+inline ColumnLink::ColumnLink(Allocator& alloc, ref_type ref):
+    ColumnLinkBase(alloc, ref) // Throws
 {
 }
 
@@ -77,10 +76,9 @@ inline ColumnLink::~ColumnLink() TIGHTDB_NOEXCEPT
 {
 }
 
-inline ref_type ColumnLink::create(std::size_t size, Allocator& alloc)
+inline ref_type ColumnLink::create(Allocator& alloc, std::size_t size)
 {
-    int_fast64_t value = 0;
-    return Column::create(Array::type_Normal, size, value, alloc); // Throws
+    return Column::create(alloc, Array::type_Normal, size); // Throws
 }
 
 inline bool ColumnLink::is_null_link(std::size_t row_ndx) const TIGHTDB_NOEXCEPT

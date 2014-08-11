@@ -10,35 +10,6 @@ using namespace std;
 using namespace tightdb;
 
 
-ArrayBinary::ArrayBinary(MemRef mem, ArrayParent* parent, size_t ndx_in_parent,
-                         Allocator& alloc) TIGHTDB_NOEXCEPT:
-    Array(mem, parent, ndx_in_parent, alloc), m_offsets(Array::get_as_ref(0), 0, 0, alloc),
-    m_blob(Array::get_as_ref(1), 0, 0, alloc)
-{
-    // has_refs() indicates that this is a long string
-    TIGHTDB_ASSERT(has_refs() && !is_inner_bptree_node());
-    TIGHTDB_ASSERT(Array::size() == 2);
-    TIGHTDB_ASSERT(m_blob.size() == (m_offsets.is_empty() ? 0 : to_size_t(m_offsets.back())));
-
-    m_offsets.set_parent(this, 0);
-    m_blob.set_parent(this, 1);
-}
-
-ArrayBinary::ArrayBinary(ref_type ref, ArrayParent* parent, size_t ndx_in_parent,
-                         Allocator& alloc) TIGHTDB_NOEXCEPT:
-    Array(ref, parent, ndx_in_parent, alloc), m_offsets(Array::get_as_ref(0), 0, 0, alloc),
-    m_blob(Array::get_as_ref(1), 0, 0, alloc)
-{
-    // has_refs() indicates that this is a long string
-    TIGHTDB_ASSERT(has_refs() && !is_inner_bptree_node());
-    TIGHTDB_ASSERT(Array::size() == 2);
-    TIGHTDB_ASSERT(m_blob.size() == (m_offsets.is_empty() ? 0 : to_size_t(m_offsets.back())));
-
-    m_offsets.set_parent(this, 0);
-    m_blob.set_parent(this, 1);
-}
-
-
 void ArrayBinary::init_from_mem(MemRef mem) TIGHTDB_NOEXCEPT
 {
     Array::init_from_mem(mem);

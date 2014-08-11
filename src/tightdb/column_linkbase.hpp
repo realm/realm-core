@@ -29,7 +29,6 @@ class ColumnBackLink;
 // Abstract base class for columns containing links
 class ColumnLinkBase: public Column {
 public:
-    ColumnLinkBase(ref_type, ArrayParent*, std::size_t ndx_in_parent, Allocator&);
     ~ColumnLinkBase() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
     Table& get_target_table() const TIGHTDB_NOEXCEPT;
@@ -56,6 +55,9 @@ public:
 protected:
     TableRef m_target_table;
     ColumnBackLink* m_backlink_column;
+
+    // Create unattached root array aaccessor.
+    ColumnLinkBase(Allocator&, ref_type);
 };
 
 
@@ -63,9 +65,8 @@ protected:
 
 // Implementation
 
-inline ColumnLinkBase::ColumnLinkBase(ref_type ref, ArrayParent* parent, std::size_t ndx_in_parent,
-                                      Allocator& alloc):
-    Column(ref, parent, ndx_in_parent, alloc),
+inline ColumnLinkBase::ColumnLinkBase(Allocator& alloc, ref_type ref):
+    Column(alloc, ref),
     m_backlink_column(0)
 {
 }

@@ -91,6 +91,19 @@
     } \
     while(false)
 
+#define CHECK_THROW_ANY(expr) \
+    do { \
+        try { \
+            (expr); \
+            test_results.throw_failed(__FILE__, __LINE__, #expr); \
+        } \
+        catch (...) { \
+            test_results.check_succeeded(); \
+        } \
+    } \
+    while (false)
+
+
 
 //@{
 
@@ -342,7 +355,7 @@ public:
 
     void check_succeeded();
 
-    void throw_failed(const char* file, long line, const char* expr_text, const char* exception);
+    void throw_failed(const char* file, long line, const char* expr_text, const char* exception = 0);
 
 private:
     Test* m_test;

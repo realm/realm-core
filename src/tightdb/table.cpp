@@ -293,7 +293,7 @@ void Table::insert_column_link(size_t col_ndx, DataType type, StringData name, T
 size_t Table::get_backlink_count(size_t row_ndx, const Table& origin,
                                  size_t origin_col_ndx) const TIGHTDB_NOEXCEPT
 {
-    size_t origin_table_ndx = origin.get_index_in_parent();
+    size_t origin_table_ndx = origin.get_index_in_group();
     size_t backlink_col_ndx = m_spec.find_backlink_column(origin_table_ndx, origin_col_ndx);
     const ColumnBackLink& backlink_col = get_column_backlink(backlink_col_ndx);
     return backlink_col.get_backlink_count(row_ndx);
@@ -303,7 +303,7 @@ size_t Table::get_backlink_count(size_t row_ndx, const Table& origin,
 size_t Table::get_backlink(size_t row_ndx, const Table& origin, size_t origin_col_ndx,
                            size_t backlink_ndx) const TIGHTDB_NOEXCEPT
 {
-    size_t origin_table_ndx = origin.get_index_in_parent();
+    size_t origin_table_ndx = origin.get_index_in_group();
     size_t backlink_col_ndx = m_spec.find_backlink_column(origin_table_ndx, origin_col_ndx);
     const ColumnBackLink& backlink_col = get_column_backlink(backlink_col_ndx);
     return backlink_col.get_backlink(row_ndx, backlink_ndx);
@@ -680,7 +680,7 @@ void Table::insert_root_column(size_t col_ndx, DataType type, StringData name,
     // established by Table::refresh_column_accessors() when it is invoked for
     // the target table below.
     if (link_target_table) {
-        size_t target_table_ndx = link_target_table->get_index_in_parent();
+        size_t target_table_ndx = link_target_table->get_index_in_group();
         m_spec.set_opposite_link_table_ndx(col_ndx, target_table_ndx); // Throws
         link_target_table->mark();
     }
@@ -689,7 +689,7 @@ void Table::insert_root_column(size_t col_ndx, DataType type, StringData name,
 
     if (link_target_table) {
         link_target_table->unmark();
-        size_t origin_table_ndx = get_index_in_parent();
+        size_t origin_table_ndx = get_index_in_group();
         link_target_table->insert_backlink_column(origin_table_ndx, col_ndx); // Throws
     }
 }
@@ -705,7 +705,7 @@ void Table::erase_root_column(size_t col_ndx)
     ColumnType col_type = m_spec.get_column_type(col_ndx);
     if (is_link_type(col_type)) {
         Table* link_target_table = get_link_target_table_accessor(col_ndx);
-        size_t origin_table_ndx = get_index_in_parent();
+        size_t origin_table_ndx = get_index_in_group();
         link_target_table->erase_backlink_column(origin_table_ndx, col_ndx); // Throws
     }
 
@@ -786,26 +786,10 @@ void Table::update_link_target_tables(size_t old_col_ndx_begin, size_t new_col_n
             continue;
         ColumnLinkBase* link_col = static_cast<ColumnLinkBase*>(m_cols[new_col_ndx]);
         Spec& target_spec = link_col->get_target_table().m_spec;
-        size_t origin_table_ndx = get_index_in_parent();
+        size_t origin_table_ndx = get_index_in_group();
         size_t old_col_ndx = old_col_ndx_begin + (new_col_ndx - new_col_ndx_begin);
         size_t backlink_col_ndx = target_spec.find_backlink_column(origin_table_ndx, old_col_ndx);
         target_spec.set_backlink_origin_column(backlink_col_ndx, new_col_ndx); // Throws
-    }
-}
-
-
-void Table::unregister_view(const TableViewBase* view) TIGHTDB_NOEXCEPT
-{
-    // Fixme: O(n) may be unacceptable - if so, put and maintain
-    // iterator or index in TableViewBase.
-    vector<const TableViewBase*>::iterator it;
-    vector<const TableViewBase*>::iterator end = m_views.end();
-    for (it = m_views.begin(); it != end; ++it) {
-        if (*it == view) {
-            *it = m_views.back();
-            m_views.pop_back();
-            break;
-        }
     }
 }
 
@@ -911,7 +895,9 @@ void Table::update_subtables(const size_t* col_path_begin, const size_t* col_pat
             }
             else {
                 Allocator& alloc = m_columns.get_alloc();
-                Array subcolumns(subtable_ref, &subtables, row_ndx, alloc);
+                Array subcolumns(alloc);
+                subcolumns.init_from_ref(subtable_ref);
+                subcolumns.set_parent(&subtables, row_ndx);
                 updater->update(subtables, subcolumns); // Throws
             }
         }
@@ -1017,30 +1003,48 @@ void Table::detach() TIGHTDB_NOEXCEPT
     destroy_column_accessors();
     m_cols.clear();
     // FSA: m_cols.destroy();
-    detach_views_except(0);
+    discard_views();
 }
 
 
-// Note about exception safety:
-// This function must be called with a view that is either 0, OR
-// already present in the view registry, Otherwise it may throw.
-void Table::detach_views_except(const TableViewBase* view) TIGHTDB_NOEXCEPT
+void Table::unregister_view(const TableViewBase* view) TIGHTDB_NOEXCEPT
 {
-    vector<const TableViewBase*>::iterator end = m_views.end();
-    vector<const TableViewBase*>::iterator it = m_views.begin();
-    while (it != end) {
-        const TableViewBase* v = *it;
-        if (v != view)
-            v->detach();
-        ++it;
+    // Fixme: O(n) may be unacceptable - if so, put and maintain
+    // iterator or index in TableViewBase.
+    typedef views::iterator iter;
+    iter end = m_views.end();
+    for (iter i = m_views.begin(); i != end; ++i) {
+        if (*i == view) {
+            *i = m_views.back();
+            m_views.pop_back();
+            break;
+        }
     }
+}
+
+
+void Table::move_registered_view(const TableViewBase* old_addr,
+                                 const TableViewBase* new_addr) TIGHTDB_NOEXCEPT
+{
+    typedef views::iterator iter;
+    iter end = m_views.end();
+    for (iter i = m_views.begin(); i != end; ++i) {
+        if (*i == old_addr) {
+            *i = new_addr;
+            return;
+        }
+    }
+    TIGHTDB_ASSERT(false);
+}
+
+
+void Table::discard_views() TIGHTDB_NOEXCEPT
+{
+    typedef views::const_iterator iter;
+    iter end = m_views.end();
+    for (iter i = m_views.begin(); i != end; ++i)
+        (*i)->detach();
     m_views.clear();
-    if (view) {
-        // Can **not** throw, because if the view is not 0, it must
-        // have been in the registry before AND since clear does not
-        // release memory, no new memory is needed for push_back:
-        m_views.push_back(view);
-    }
 }
 
 
@@ -1082,50 +1086,63 @@ void Table::instantiate_before_change()
 
 ColumnBase* Table::create_column_accessor(ColumnType col_type, size_t col_ndx, size_t ndx_in_parent)
 {
+    ColumnBase* col = 0;
     ref_type ref = m_columns.get_as_ref(ndx_in_parent);
     Allocator& alloc = m_columns.get_alloc();
     switch (col_type) {
         case col_type_Int:
         case col_type_Bool:
         case col_type_DateTime:
-            return new Column(ref, &m_columns, ndx_in_parent, alloc); // Throws
+            col = new Column(alloc, ref); // Throws
+            break;
         case col_type_Float:
-            return new ColumnFloat(ref, &m_columns, ndx_in_parent, alloc); // Throws
+            col = new ColumnFloat(alloc, ref); // Throws
+            break;
         case col_type_Double:
-            return new ColumnDouble(ref, &m_columns, ndx_in_parent, alloc); // Throws
+            col = new ColumnDouble(alloc, ref); // Throws
+            break;
         case col_type_String:
-            return new AdaptiveStringColumn(ref, &m_columns, ndx_in_parent, alloc); // Throws
+            col = new AdaptiveStringColumn(alloc, ref); // Throws
+            break;
         case col_type_Binary:
-            return new ColumnBinary(ref, &m_columns, ndx_in_parent, alloc); // Throws
+            col = new ColumnBinary(alloc, ref); // Throws
+            break;
         case col_type_StringEnum: {
             ArrayParent* keys_parent;
             size_t keys_ndx_in_parent;
             ref_type keys_ref =
                 m_spec.get_enumkeys_ref(col_ndx, &keys_parent, &keys_ndx_in_parent);
-            return new ColumnStringEnum(keys_ref, ref, &m_columns, ndx_in_parent,
-                                        keys_parent, keys_ndx_in_parent, alloc); // Throws
+            ColumnStringEnum* col_2 = new ColumnStringEnum(alloc, ref, keys_ref); // Throws
+            col_2->get_keys().set_parent(keys_parent, keys_ndx_in_parent);
+            col = col_2;
+            break;
         }
         case col_type_Table:
-            return new ColumnTable(alloc, this, col_ndx, &m_columns, ndx_in_parent, ref); // Throws
+            col = new ColumnTable(alloc, ref, this, col_ndx); // Throws
+            break;
         case col_type_Mixed:
-            return new ColumnMixed(alloc, this, col_ndx, &m_columns, ndx_in_parent, ref); // Throws
+            col = new ColumnMixed(alloc, ref, this, col_ndx); // Throws
+            break;
         case col_type_Link:
             // Target table will be set by group after entire table has been created
-            return new ColumnLink(ref, &m_columns, ndx_in_parent, alloc); // Throws
+            col = new ColumnLink(alloc, ref); // Throws
+            break;
         case col_type_LinkList:
             // Target table will be set by group after entire table has been created
-            return new ColumnLinkList(this, col_ndx, ref, &m_columns, ndx_in_parent,
-                                      alloc); // Throws
+            col = new ColumnLinkList(alloc, ref, this, col_ndx); // Throws
+            break;
         case col_type_BackLink:
             // Origin table will be set by group after entire table has been created
-            return new ColumnBackLink(ref, &m_columns, ndx_in_parent, alloc); // Throws
+            col = new ColumnBackLink(alloc, ref); // Throws
+            break;
         case col_type_Reserved1:
         case col_type_Reserved4:
             // These have no function yet and are therefore unexpected.
             break;
     }
-    TIGHTDB_ASSERT(false);
-    return 0;
+    TIGHTDB_ASSERT(col);
+    col->set_parent(&m_columns, ndx_in_parent);
+    return col;
 }
 
 
@@ -1518,28 +1535,26 @@ ref_type Table::create_column(ColumnType col_type, size_t size, Allocator& alloc
     switch (col_type) {
         case col_type_Int:
         case col_type_Bool:
-        case col_type_DateTime: {
-            int_fast64_t value = 0;
-            return Column::create(Array::type_Normal, size, value, alloc); // Throws
-        }
+        case col_type_DateTime:
+            return Column::create(alloc, Array::type_Normal, size); // Throws
         case col_type_Float:
-            return ColumnFloat::create(size, alloc); // Throws
+            return ColumnFloat::create(alloc, size); // Throws
         case col_type_Double:
-            return ColumnDouble::create(size, alloc); // Throws
+            return ColumnDouble::create(alloc, size); // Throws
         case col_type_String:
-            return AdaptiveStringColumn::create(size, alloc); // Throws
+            return AdaptiveStringColumn::create(alloc, size); // Throws
         case col_type_Binary:
-            return ColumnBinary::create(size, alloc); // Throws
+            return ColumnBinary::create(alloc, size); // Throws
         case col_type_Table:
-            return ColumnTable::create(size, alloc); // Throws
+            return ColumnTable::create(alloc, size); // Throws
         case col_type_Mixed:
-            return ColumnMixed::create(size, alloc); // Throws
+            return ColumnMixed::create(alloc, size); // Throws
         case col_type_Link:
-            return ColumnLink::create(size, alloc); // Throws
+            return ColumnLink::create(alloc, size); // Throws
         case col_type_LinkList:
-            return ColumnLinkList::create(size, alloc); // Throws
+            return ColumnLinkList::create(alloc, size); // Throws
         case col_type_BackLink:
-            return ColumnBackLink::create(size, alloc); // Throws
+            return ColumnBackLink::create(alloc, size); // Throws
         case col_type_StringEnum:
         case col_type_Reserved1:
         case col_type_Reserved4:
@@ -1552,19 +1567,21 @@ ref_type Table::create_column(ColumnType col_type, size_t size, Allocator& alloc
 
 ref_type Table::clone_columns(Allocator& alloc) const
 {
-    Array new_columns(Array::type_HasRefs, null_ptr, 0, alloc);
-    size_t n = get_column_count();
-    for (size_t i=0; i<n; ++i) {
+    Array new_columns(alloc);
+    new_columns.create(Array::type_HasRefs); // Throws
+    size_t num_cols = get_column_count();
+    for (size_t col_ndx = 0; col_ndx < num_cols; ++col_ndx) {
         ref_type new_col_ref;
-        const ColumnBase* col = &get_column_base(i);
+        const ColumnBase* col = &get_column_base(col_ndx);
         if (const ColumnStringEnum* enum_col = dynamic_cast<const ColumnStringEnum*>(col)) {
-            AdaptiveStringColumn new_col(alloc);
+            ref_type ref = AdaptiveStringColumn::create(alloc); // Throws
+            AdaptiveStringColumn new_col(alloc, ref); // Throws
             // FIXME: Should be optimized with something like
             // new_col.add(seq_tree_accessor.begin(),
             // seq_tree_accessor.end())
-            size_t n2 = enum_col->size();
-            for (size_t i2=0; i2<n2; ++i2)
-                new_col.add(enum_col->get(i));
+            size_t n = enum_col->size();
+            for (size_t i = 0; i < n; ++i)
+                new_col.add(enum_col->get(i)); // Throws
             new_col_ref = new_col.get_ref();
         }
         else {
@@ -1572,7 +1589,7 @@ ref_type Table::clone_columns(Allocator& alloc) const
             MemRef mem = root.clone_deep(alloc); // Throws
             new_col_ref = mem.m_ref;
         }
-        new_columns.add(new_col_ref);
+        new_columns.add(int_fast64_t(new_col_ref)); // Throws
     }
     return new_columns.get_ref();
 }
@@ -1891,19 +1908,6 @@ void Table::clear_subtable(size_t col_ndx, size_t row_ndx)
 }
 
 
-Group* Table::get_parent_group() const TIGHTDB_NOEXCEPT
-{
-    TIGHTDB_ASSERT(is_attached());
-    if (!m_top.is_attached())
-        return 0; // Subtable with shared descriptor
-    Parent* parent = static_cast<Parent*>(m_top.get_parent()); // ArrayParent guaranteed to be Table::Parent
-    if (!parent)
-        return 0; // Free-standing table
-    // Null if subtable with independent descriptor (in mixed column)
-    return parent->get_parent_group();
-}
-
-
 const Table* Table::get_parent_table_ptr(size_t* column_ndx_out) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(is_attached());
@@ -1917,13 +1921,46 @@ const Table* Table::get_parent_table_ptr(size_t* column_ndx_out) const TIGHTDB_N
 }
 
 
-size_t Table::get_index_in_parent() const TIGHTDB_NOEXCEPT
+size_t Table::get_parent_row_index() const TIGHTDB_NOEXCEPT
 {
+    TIGHTDB_ASSERT(is_attached());
     const Array& real_top = m_top.is_attached() ? m_top : m_columns;
-    ArrayParent* parent = real_top.get_parent();
+    Parent* parent = static_cast<Parent*>(real_top.get_parent()); // ArrayParent guaranteed to be Table::Parent
     if (!parent)
-        return npos;
+        return npos; // Free-standing table
+    if (parent->get_parent_group())
+        return tightdb::npos; // Group-level table
     size_t index_in_parent = real_top.get_ndx_in_parent();
+    return index_in_parent;
+}
+
+
+Group* Table::get_parent_group() const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(is_attached());
+    if (!m_top.is_attached())
+        return 0; // Subtable with shared descriptor
+    Parent* parent = static_cast<Parent*>(m_top.get_parent()); // ArrayParent guaranteed to be Table::Parent
+    if (!parent)
+        return 0; // Free-standing table
+    Group* group = parent->get_parent_group();
+    if (!group)
+        return 0; // Subtable with independent descriptor
+    return group;
+}
+
+
+size_t Table::get_index_in_group() const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(is_attached());
+    if (!m_top.is_attached())
+        return tightdb::npos; // Subtable with shared descriptor
+    Parent* parent = static_cast<Parent*>(m_top.get_parent()); // ArrayParent guaranteed to be Table::Parent
+    if (!parent)
+        return tightdb::npos; // Free-standing table
+    if (!parent->get_parent_group())
+        return tightdb::npos; // Subtable with independent descriptor
+    size_t index_in_parent = m_top.get_ndx_in_parent();
     return index_in_parent;
 }
 
@@ -3344,16 +3381,16 @@ void Table::optimize()
         if (type == col_type_String) {
             AdaptiveStringColumn* column = &get_column_string(i);
 
-            ref_type keys_ref, values_ref;
-            bool res = column->auto_enumerate(keys_ref, values_ref);
+            ref_type ref, keys_ref;
+            bool res = column->auto_enumerate(keys_ref, ref);
             if (!res)
                 continue;
 
             Spec::ColumnInfo info;
             m_spec.get_column_info(i, info);
             ArrayParent* keys_parent;
-            size_t keys_ndx;
-            m_spec.upgrade_string_to_enum(i, keys_ref, keys_parent, keys_ndx);
+            size_t keys_ndx_in_parent;
+            m_spec.upgrade_string_to_enum(i, keys_ref, keys_parent, keys_ndx_in_parent);
 
             // Upgrading the column may have moved the
             // refs to keylists in other columns so we
@@ -3367,14 +3404,14 @@ void Table::optimize()
             }
 
             // Indexes are also in m_columns, so we need adjusted pos
-            size_t pos_in_mcolumns = m_spec.get_column_pos(i);
+            size_t ndx_in_parent = m_spec.get_column_pos(i);
 
             // Replace column
-            ColumnStringEnum* e =
-                new ColumnStringEnum(keys_ref, values_ref, &m_columns,
-                                     pos_in_mcolumns, keys_parent, keys_ndx, alloc);
-            m_columns.set(pos_in_mcolumns, values_ref);
+            ColumnStringEnum* e = new ColumnStringEnum(alloc, ref, keys_ref); // Throws
+            e->set_parent(&m_columns, ndx_in_parent);
+            e->get_keys().set_parent(keys_parent, keys_ndx_in_parent);
             m_cols[i] = e;
+            m_columns.set(ndx_in_parent, ref); // Throws
 
             // Inherit any existing index
             if (info.m_has_search_index) {
@@ -4195,7 +4232,7 @@ pair<const Array*, const Array*> Table::get_string_column_roots(size_t col_ndx) 
     const Array* enum_root = 0;
 
     if (const ColumnStringEnum* c = dynamic_cast<const ColumnStringEnum*>(col)) {
-        enum_root = c->get_enum_root_array();
+        enum_root = c->get_keys().get_root_array();
     }
     else {
         TIGHTDB_ASSERT(dynamic_cast<const AdaptiveStringColumn*>(col));

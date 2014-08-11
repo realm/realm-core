@@ -44,7 +44,8 @@ using namespace tightdb::test_util;
 
 TEST(Column_Basic)
 {
-    Column c;
+    ref_type ref = Column::create(Allocator::get_default());
+    Column c(Allocator::get_default(), ref);
 
     // TEST(Column_IsEmpty)
 
@@ -420,7 +421,7 @@ TEST(Column_Basic)
 
     // TEST(Column_HeaderParse)
 
-    Column column(c.get_ref(), 0, 0);
+    Column column(Allocator::get_default(), c.get_ref());
     bool is_equal = c.compare_int(column);
     CHECK(is_equal);
 
@@ -433,7 +434,8 @@ TEST(Column_Basic)
 
 TEST(Column_FindLeafs)
 {
-    Column a;
+    ref_type ref = Column::create(Allocator::get_default());
+    Column a(Allocator::get_default(), ref);
 
     // Create values that span multible leaves
     // we use 5 to ensure that we get two levels
@@ -519,8 +521,10 @@ TEST(Column_Sort)
 
 TEST(Column_FindAllIntMin)
 {
-    Column c;
-    Column r;
+    ref_type ref_c = Column::create(Allocator::get_default());
+    ref_type ref_r = Column::create(Allocator::get_default());
+    Column c(Allocator::get_default(), ref_c);
+    Column r(Allocator::get_default(), ref_r);
 
     const int value = 0;
     const int reps = 5;
@@ -546,8 +550,10 @@ TEST(Column_FindAllIntMin)
 
 TEST(Column_FindAllIntMax)
 {
-    Column c;
-    Column r;
+    ref_type ref_c = Column::create(Allocator::get_default());
+    ref_type ref_r = Column::create(Allocator::get_default());
+    Column c(Allocator::get_default(), ref_c);
+    Column r(Allocator::get_default(), ref_r);
 
     const int64_t value = 4300000003ULL;
     const int reps = 5;
@@ -580,7 +586,8 @@ TEST(Column_FindAllIntMax)
 TEST(Column_LowerUpperBound)
 {
     // Create column with sorted members
-    Column col;
+    ref_type ref = Column::create(Allocator::get_default());
+    Column col(Allocator::get_default(), ref);
     col.add(5);
     for (size_t i = 5; i < 100; i += 5)
         col.add(i);
@@ -616,7 +623,8 @@ TEST(Column_LowerUpperBound)
 
 TEST(Column_Average)
 {
-    Column c;
+    ref_type ref = Column::create(Allocator::get_default());
+    Column c(Allocator::get_default(), ref);
     c.add(10);
     CHECK_EQUAL(10, c.average());
 
@@ -632,7 +640,8 @@ TEST(Column_Average)
 
 TEST(Column_SumAverage)
 {
-    Column c;
+    ref_type ref = Column::create(Allocator::get_default());
+    Column c(Allocator::get_default(), ref);
     int64_t sum = 0;
 
     // Sum of 0 elements
@@ -690,7 +699,8 @@ TEST(Column_SumAverage)
 
 TEST(Column_Max)
 {
-    Column c;
+    ref_type ref = Column::create(Allocator::get_default());
+    Column c(Allocator::get_default(), ref);
     int64_t t = c.maximum();
 //    CHECK_EQUAL(0, t); // max on empty range returns zero // edit: is undefined!
 
@@ -704,7 +714,8 @@ TEST(Column_Max)
 
 TEST(Column_Max2)
 {
-    Column c;
+    ref_type ref = Column::create(Allocator::get_default());
+    Column c(Allocator::get_default(), ref);
 
     for (int i = 0; i < 100; i++)
         c.add(10);
@@ -721,7 +732,8 @@ TEST(Column_Max2)
 
 TEST(Column_Min)
 {
-    Column c;
+    ref_type ref = Column::create(Allocator::get_default());
+    Column c(Allocator::get_default(), ref);
     int64_t t = c.minimum();
 //    CHECK_EQUAL(0, t); // min on empty range returns zero // update: is undefined
 
@@ -735,7 +747,8 @@ TEST(Column_Min)
 
 TEST(Column_Min2)
 {
-    Column c;
+    ref_type ref = Column::create(Allocator::get_default());
+    Column c(Allocator::get_default(), ref);
 
     for (int i = 0; i < 100; i++)
         c.add(10);
@@ -773,7 +786,8 @@ TEST(Column_Sort2)
 TEST_IF(Column_PrependMany, TEST_DURATION >= 1)
 {
     // Test against a "Assertion failed: start < m_len, file src\Array.cpp, line 276" bug
-    Column a;
+    ref_type ref = Column::create(Allocator::get_default());
+    Column a(Allocator::get_default(), ref);
 
     for (size_t items = 0; items < 3000; ++items) {
         a.clear();

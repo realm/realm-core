@@ -38,7 +38,8 @@ using namespace tightdb;
 
 TEST(ArrayBigBlobs_Basic)
 {
-    ArrayBigBlobs c;
+    ArrayBigBlobs c(Allocator::get_default());
+    c.create();
 
     // TEST(ArrayBigBlobs_IsEmpty)
 
@@ -245,7 +246,8 @@ TEST(ArrayBigBlobs_Basic)
 
     CHECK_EQUAL(3, c.find_first(BinaryData("baz")));
 
-    Column results;
+    ref_type results_ref = Column::create(Allocator::get_default());
+    Column results(Allocator::get_default(), results_ref);
     c.find_all(results, BinaryData("foobar"));
     CHECK_EQUAL(3, results.size());
 

@@ -29,15 +29,8 @@ public:
     typedef StringData value_type;
 
     explicit ArrayString(Allocator&) TIGHTDB_NOEXCEPT;
-    ArrayString(MemRef,   ArrayParent*, std::size_t ndx_in_parent, Allocator&) TIGHTDB_NOEXCEPT;
-    ArrayString(ref_type, ArrayParent*, std::size_t ndx_in_parent, Allocator&) TIGHTDB_NOEXCEPT;
     explicit ArrayString(no_prealloc_tag) TIGHTDB_NOEXCEPT;
     ~ArrayString() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
-
-    /// FIXME: Deprecated. The constructor must not allocate anything
-    /// that the destructor does not deallocate.
-    explicit ArrayString(ArrayParent* = 0, std::size_t ndx_in_parent = 0,
-                         Allocator& = Allocator::get_default());
 
     StringData get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
     void add();
@@ -109,32 +102,6 @@ inline ArrayString::ArrayString(Allocator& alloc) TIGHTDB_NOEXCEPT:
 inline ArrayString::ArrayString(no_prealloc_tag) TIGHTDB_NOEXCEPT:
     Array(*static_cast<Allocator*>(0))
 {
-}
-
-inline ArrayString::ArrayString(ArrayParent* parent, std::size_t ndx_in_parent,
-                                Allocator& alloc): Array(alloc)
-{
-    create(); // Throws
-    set_parent(parent, ndx_in_parent);
-    update_parent(); // Throws
-}
-
-inline ArrayString::ArrayString(MemRef mem, ArrayParent* parent, std::size_t ndx_in_parent,
-                                Allocator& alloc) TIGHTDB_NOEXCEPT: Array(alloc)
-{
-    // Manually create array as doing it in initializer list
-    // will not be able to call correct virtual functions
-    init_from_mem(mem);
-    set_parent(parent, ndx_in_parent);
-}
-
-inline ArrayString::ArrayString(ref_type ref, ArrayParent* parent, std::size_t ndx_in_parent,
-                                Allocator& alloc) TIGHTDB_NOEXCEPT: Array(alloc)
-{
-    // Manually create array as doing it in initializer list
-    // will not be able to call correct virtual functions
-    init_from_ref(ref);
-    set_parent(parent, ndx_in_parent);
 }
 
 inline void ArrayString::create()

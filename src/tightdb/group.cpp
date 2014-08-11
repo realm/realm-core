@@ -155,7 +155,7 @@ void Group::init_from_ref(ref_type top_ref) TIGHTDB_NOEXCEPT
 }
 
 
-void Group::reset_freespace_tracking()
+void Group::reset_free_space_versions()
 {
     TIGHTDB_ASSERT(m_top.is_attached());
     TIGHTDB_ASSERT(m_is_attached);
@@ -436,7 +436,8 @@ void Group::write(ostream& out, TableWriter& table_writer)
     int top_size = 3;
     size_t max_top_byte_size = Array::get_max_byte_size(top_size);
     uint64_t max_final_file_size = top_pos + max_top_byte_size;
-    Array top(Array::type_HasRefs); // Throws
+    Array top(Allocator::get_default());
+    top.create(Array::type_HasRefs); // Throws
     // FIXME: Dangerous cast: unsigned -> signed
     top.ensure_minimum_width(1 + 2*max_final_file_size); // Throws
     // FIXME: We really need an alternative to Array::truncate() that is able to expand.
@@ -506,9 +507,6 @@ void Group::commit()
     // commit
 
     // Mark all managed space (beyond the attached file) as free.
-    //
-    // FIXME: Perform this as part of m_alloc.remap(), but that
-    // requires that we always call remap().
     m_alloc.reset_free_space_tracking(); // Throws
 
     size_t old_baseline = m_alloc.get_baseline();
@@ -516,11 +514,11 @@ void Group::commit()
     // Remap file if it has grown
     size_t new_file_size = out.get_file_size();
     if (new_file_size > old_baseline) {
-        if (m_alloc.remap(new_file_size)) { // Throws
-            // The file was mapped to a new address, so all array
-            // accessors must be updated.
+        bool addr_changed = m_alloc.remap(new_file_size); // Throws
+        // If the file was mapped to a new address, all array accessors must be
+        // updated.
+        if (addr_changed)
             old_baseline = 0;
-        }
     }
 
     out.commit(top_ref); // Throws
@@ -588,9 +586,6 @@ void Group::init_for_transact(ref_type new_top_ref, size_t new_file_size)
 
     // Make all managed memory beyond the attached file available
     // again.
-    //
-    // FIXME: Perform this as part of m_alloc.remap(), but that
-    // requires that we always call remap().
     m_alloc.reset_free_space_tracking(); // Throws
 
     // Update memory mapping if database file has grown
@@ -1223,13 +1218,15 @@ void Group::advance_transact(ref_type new_top_ref, size_t new_file_size,
     TransactAdvancer advancer(*this);
     parser.parse(advancer); // Throws
 
+    m_alloc.reset_free_space_tracking(); // Throws
+
     // Update memory mapping if database file has grown
     if (new_file_size > m_alloc.get_baseline()) {
-        m_alloc.reset_free_space_tracking(); // Throws
-        m_alloc.remap(new_file_size); // Throws
-        // The file was mapped to a new address, so all array accessors must be
+        bool addr_changed = m_alloc.remap(new_file_size); // Throws
+        // If the file was mapped to a new address, all array accessors must be
         // updated.
-        mark_all_table_accessors();
+        if (addr_changed)
+            mark_all_table_accessors();
     }
 
     init_from_ref(new_top_ref);
@@ -1252,56 +1249,195 @@ void Group::advance_transact(ref_type new_top_ref, size_t new_file_size,
 
 #ifdef TIGHTDB_DEBUG
 
+namespace {
+
+class MemUsageVerifier: public Array::MemUsageHandler {
+public:
+    MemUsageVerifier(ref_type ref_begin, ref_type immutable_ref_end, ref_type mutable_ref_end, ref_type baseline):
+        m_ref_begin(ref_begin),
+        m_immutable_ref_end(immutable_ref_end),
+        m_mutable_ref_end(mutable_ref_end),
+        m_baseline(baseline)
+    {
+    }
+    void add_immutable(ref_type ref, size_t size)
+    {
+        TIGHTDB_ASSERT(ref  % 8 == 0); // 8-byte alignment
+        TIGHTDB_ASSERT(size % 8 == 0); // 8-byte alignment
+        TIGHTDB_ASSERT(size > 0);
+        TIGHTDB_ASSERT(ref >= m_ref_begin);
+        TIGHTDB_ASSERT(size <= m_immutable_ref_end - ref);
+        Chunk chunk;
+        chunk.ref  = ref;
+        chunk.size = size;
+        m_chunks.push_back(chunk);
+    }
+    void add_mutable(ref_type ref, size_t size)
+    {
+        TIGHTDB_ASSERT(ref  % 8 == 0); // 8-byte alignment
+        TIGHTDB_ASSERT(size % 8 == 0); // 8-byte alignment
+        TIGHTDB_ASSERT(size > 0);
+        TIGHTDB_ASSERT(ref >= m_immutable_ref_end);
+        TIGHTDB_ASSERT(size <= m_mutable_ref_end - ref);
+        Chunk chunk;
+        chunk.ref  = ref;
+        chunk.size = size;
+        m_chunks.push_back(chunk);
+    }
+    void add(ref_type ref, size_t size)
+    {
+        TIGHTDB_ASSERT(ref  % 8 == 0); // 8-byte alignment
+        TIGHTDB_ASSERT(size % 8 == 0); // 8-byte alignment
+        TIGHTDB_ASSERT(size > 0);
+        TIGHTDB_ASSERT(ref >= m_ref_begin);
+        TIGHTDB_ASSERT(size <= (ref < m_baseline ? m_immutable_ref_end : m_mutable_ref_end) - ref);
+        Chunk chunk;
+        chunk.ref  = ref;
+        chunk.size = size;
+        m_chunks.push_back(chunk);
+    }
+    void add(const MemUsageVerifier& verifier)
+    {
+        m_chunks.insert(m_chunks.end(), verifier.m_chunks.begin(), verifier.m_chunks.end());
+    }
+    void handle(ref_type ref, size_t allocated, size_t) TIGHTDB_OVERRIDE
+    {
+        add(ref, allocated);
+    }
+    void canonicalize()
+    {
+        // Sort the chunks in order of increasing ref, then merge adjacent
+        // chunks while checking that there is no overlap
+        typedef vector<Chunk>::iterator iter;
+        iter i_1 = m_chunks.begin(), end = m_chunks.end();
+        iter i_2 = i_1;
+        sort(i_1, end);
+        if (i_1 != end) {
+            while (++i_2 != end) {
+                ref_type prev_ref_end = i_1->ref + i_1->size;
+                TIGHTDB_ASSERT(prev_ref_end <= i_2->ref);
+                if (i_2->ref == prev_ref_end) {
+                    i_1->size += i_2->size; // Merge
+                }
+                else {
+                    *++i_1 = *i_2;
+                }
+            }
+            m_chunks.erase(i_1 + 1, end);
+        }
+    }
+    void clear()
+    {
+        m_chunks.clear();
+    }
+    void check_total_coverage()
+    {
+        TIGHTDB_ASSERT(m_chunks.size() == 1);
+        TIGHTDB_ASSERT(m_chunks.front().ref == m_ref_begin);
+        TIGHTDB_ASSERT(m_chunks.front().size == m_mutable_ref_end - m_ref_begin);
+    }
+private:
+    struct Chunk {
+        ref_type ref;
+        size_t size;
+        bool operator<(const Chunk& c) const
+        {
+            return ref < c.ref;
+        }
+    };
+    vector<Chunk> m_chunks;
+    ref_type m_ref_begin, m_immutable_ref_end, m_mutable_ref_end, m_baseline;
+};
+
+} // anonymous namespace
+
 void Group::Verify() const
 {
     TIGHTDB_ASSERT(is_attached());
 
     m_alloc.Verify();
 
-    // Verify free lists
-    if (m_free_positions.is_attached()) {
-        TIGHTDB_ASSERT(m_free_lengths.is_attached());
-
-        size_t n = m_free_positions.size();
-        TIGHTDB_ASSERT(n == m_free_lengths.size());
-
-        if (m_free_versions.is_attached())
-            TIGHTDB_ASSERT(n == m_free_versions.size());
-
-        // We need to consider the "logical" size of the file here,
-        // and not the real size. The real size may have changed
-        // without the free space information having been adjusted
-        // accordingly. This can happen, for example, if commit()
-        // fails before writing the new top-ref, but after having
-        // extended the file size.
-        size_t logical_file_size = to_size_t(m_top.get(2) / 2);
-
-        size_t prev_end = 0;
-        for (size_t i = 0; i != n; ++i) {
-            size_t pos  = to_size_t(m_free_positions.get(i));
-            size_t size = to_size_t(m_free_lengths.get(i));
-
-            TIGHTDB_ASSERT(pos < logical_file_size);
-            TIGHTDB_ASSERT(size > 0);
-            TIGHTDB_ASSERT(pos + size <= logical_file_size);
-            TIGHTDB_ASSERT(prev_end <= pos);
-
-            TIGHTDB_ASSERT(pos  % 8 == 0); // 8-byte alignment
-            TIGHTDB_ASSERT(size % 8 == 0); // 8-byte alignment
-
-            prev_end = pos + size;
-        }
-    }
-
     // Verify tables
     {
         size_t n = m_tables.size();
         for (size_t i = 0; i != n; ++i) {
             const Table* table = get_table_by_ndx(i);
-            TIGHTDB_ASSERT(table->get_index_in_parent() == i);
+            TIGHTDB_ASSERT(table->get_index_in_group() == i);
             table->Verify();
         }
     }
+
+    size_t logical_file_size = to_size_t(m_top.get(2) / 2);
+    size_t ref_begin = sizeof (SlabAlloc::Header);
+    ref_type immutable_ref_end = logical_file_size;
+    ref_type mutable_ref_end = m_alloc.get_total_size();
+    ref_type baseline = m_alloc.get_baseline();
+
+    // Check the concistency of the allocation of used memory
+    MemUsageVerifier mem_usage_1(ref_begin, immutable_ref_end, mutable_ref_end, baseline);
+    m_top.report_memory_usage(mem_usage_1);
+    mem_usage_1.canonicalize();
+
+    // Check concistency of the allocation of the immutable memory that was
+    // marked as free before the file was opened.
+    MemUsageVerifier mem_usage_2(ref_begin, immutable_ref_end, mutable_ref_end, baseline);
+    if (m_free_positions.is_attached()) {
+        size_t n = m_free_positions.size();
+        TIGHTDB_ASSERT(n == m_free_lengths.size());
+        if (m_free_versions.is_attached())
+            TIGHTDB_ASSERT(n == m_free_versions.size());
+        for (size_t i = 0; i != n; ++i) {
+            ref_type ref  = to_ref(m_free_positions.get(i));
+            size_t size = to_size_t(m_free_lengths.get(i));
+            mem_usage_2.add_immutable(ref, size);
+        }
+        mem_usage_2.canonicalize();
+        mem_usage_1.add(mem_usage_2);
+        mem_usage_1.canonicalize();
+        mem_usage_2.clear();
+    }
+
+    // Check the concistency of the allocation of the immutable memory that has
+    // been marked as free after the file was opened
+    {
+        typedef SlabAlloc::chunks::const_iterator iter;
+        iter end = m_alloc.m_free_read_only.end();
+        for (iter i = m_alloc.m_free_read_only.begin(); i != end; ++i)
+            mem_usage_2.add_immutable(i->ref, i->size);
+    }
+    mem_usage_2.canonicalize();
+    mem_usage_1.add(mem_usage_2);
+    mem_usage_1.canonicalize();
+    mem_usage_2.clear();
+
+    // Check the concistency of the allocation of the mutable memory that has
+    // been marked as free
+    {
+        typedef SlabAlloc::chunks::const_iterator iter;
+        iter end = m_alloc.m_free_space.end();
+        for (iter i = m_alloc.m_free_space.begin(); i != end; ++i)
+            mem_usage_2.add_mutable(i->ref, i->size);
+    }
+    mem_usage_2.canonicalize();
+    mem_usage_1.add(mem_usage_2);
+    mem_usage_1.canonicalize();
+    mem_usage_2.clear();
+
+    // Due to a current problem with the baseline not reflecting the logical
+    // file size, but the physical file size, there is a potential gap of
+    // unusable ref-space between the logical file size and the baseline. We
+    // need to take that into account here.
+    TIGHTDB_ASSERT(immutable_ref_end <= baseline);
+    if (immutable_ref_end < baseline) {
+        ref_type ref = immutable_ref_end;
+        size_t size = baseline - immutable_ref_end;
+        mem_usage_1.add_mutable(ref, size);
+        mem_usage_1.canonicalize();
+    }
+
+    // At this point we have account for all memory managed by the slab
+    // allocator
+    mem_usage_1.check_total_coverage();
 }
 
 

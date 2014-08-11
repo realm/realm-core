@@ -807,7 +807,7 @@ inline void Replication::insert_column(const Descriptor& desc, std::size_t col_n
     simple_cmd(instr_InsertColumn, util::tuple(col_ndx, int(type), name.size())); // Throws
     transact_log_append(name.data(), name.size()); // Throws
     if (link_target_table) {
-        std::size_t target_table_ndx = link_target_table->get_index_in_parent();
+        std::size_t target_table_ndx = link_target_table->get_index_in_group();
         append_num(target_table_ndx); // Throws
     }
 }
@@ -828,9 +828,9 @@ inline void Replication::erase_column(const Descriptor& desc, std::size_t col_nd
     const Table& origin_table = df::get_root_table(desc);
     TIGHTDB_ASSERT(origin_table.is_group_level());
     const Table& target_table = *tf::get_link_target_table_accessor(origin_table, col_ndx);
-    std::size_t target_table_ndx = target_table.get_index_in_parent();
+    std::size_t target_table_ndx = target_table.get_index_in_group();
     const Spec& target_spec = tf::get_spec(target_table);
-    std::size_t origin_table_ndx = origin_table.get_index_in_parent();
+    std::size_t origin_table_ndx = origin_table.get_index_in_group();
     std::size_t backlink_col_ndx = target_spec.find_backlink_column(origin_table_ndx, col_ndx);
     simple_cmd(instr_EraseLinkColumn, util::tuple(col_ndx, target_table_ndx,
                                                   backlink_col_ndx)); // Throws

@@ -482,7 +482,7 @@ void TestResults::throw_failed(const char* file, long line,
                                const char* expr_text, const char* exception)
 {
     ostringstream out;
-    out << "CHECK_THROW("<<expr_text<<", "<<exception<<") failed: Did not throw";
+    out << "CHECK_THROW(" << expr_text << ", " << (exception ? exception : "''") << ") failed: Did not throw";
     check_failed(file, line, out.str());
 }
 

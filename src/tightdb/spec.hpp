@@ -125,12 +125,7 @@ private:
     Array m_subspecs;    // 4th slot in m_top (optional)
     Array m_enumkeys;    // 5th slot in m_top (optional)
 
-    Spec(Allocator&) TIGHTDB_NOEXCEPT; // Uninitialized
-    Spec(Allocator&, MemRef, ArrayParent*, std::size_t ndx_in_parent) TIGHTDB_NOEXCEPT;
-
-    // FIXME: Deprecated. The constructor must not allocate anything
-    // that the destructor does not deallocate.
-    Spec(Allocator&, ArrayParent*, std::size_t ndx_in_parent);
+    Spec(Allocator&) TIGHTDB_NOEXCEPT; // Unattached
 
     void init(ref_type) TIGHTDB_NOEXCEPT;
     void init(MemRef) TIGHTDB_NOEXCEPT;
@@ -253,35 +248,6 @@ inline Spec::Spec(Allocator& alloc) TIGHTDB_NOEXCEPT:
     m_enumkeys(alloc)
 {
 }
-
-// Create a new Spec
-inline Spec::Spec(Allocator& alloc, ArrayParent* parent, std::size_t ndx_in_parent):
-    m_top(alloc),
-    m_types(alloc),
-    m_names(alloc),
-    m_attr(alloc),
-    m_subspecs(alloc),
-    m_enumkeys(alloc)
-{
-    MemRef mem = create_empty_spec(alloc); // Throws
-    m_top.set_parent(parent, ndx_in_parent);
-    init(mem);
-}
-
-// Attach to preexisting Spec
-inline Spec::Spec(Allocator& alloc, MemRef mem, ArrayParent* parent,
-                  std::size_t ndx_in_parent) TIGHTDB_NOEXCEPT:
-    m_top(alloc),
-    m_types(alloc),
-    m_names(alloc),
-    m_attr(alloc),
-    m_subspecs(alloc),
-    m_enumkeys(alloc)
-{
-    m_top.set_parent(parent, ndx_in_parent);
-    init(mem);
-}
-
 
 inline SubspecRef Spec::get_subtable_spec(std::size_t column_ndx) TIGHTDB_NOEXCEPT
 {

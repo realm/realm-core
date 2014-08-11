@@ -17,6 +17,7 @@
 using namespace std;
 using namespace tightdb;
 using namespace test_util;
+using namespace tightdb::util;
 
 TEST(LinkList_Basic1)
 {
@@ -756,7 +757,6 @@ TEST(LinkList_MultiLinkQuery)
     tv = (table1->link(col_linklist2).link(col_linklist3).column<Float>(2) == 400.).find_all();
     CHECK_EQUAL(0, tv.size());
 
-
     // 3 levels of links
     tv = (table1->link(col_linklist2).link(col_linklist3).link(col_linklist4).column<Int>(0) > 0).find_all();
     CHECK_EQUAL(1, tv.size());
@@ -907,6 +907,99 @@ TEST(LinkList_SortLinkView)
     CHECK_EQUAL(tv.get(0).get_index(), 0);
     CHECK_EQUAL(tv.get(1).get_index(), 2);
     CHECK_EQUAL(tv.get(2).get_index(), 1);
+}
+
+
+TEST(Link_FindNullLink)
+{
+    size_t match;
+
+    Group group;
+
+    TableRef table0 = group.get_table("table0");
+    TableRef table1 = group.get_table("table1");
+    TableRef table2 = group.get_table("table2");
+
+    table0->add_column(type_String, "str1");
+    table0->add_empty_row();
+    table0->set_string(0, 0, "hello");
+
+    // add some more columns to table1 and table2
+    table1->add_column(type_Int, "col1");
+    table1->add_column(type_String, "str1");
+
+    // add some rows
+    table1->add_empty_row();
+    table1->set_int(0, 0, 100);
+    table1->set_string(1, 0, "foo");
+    table1->add_empty_row();
+    table1->set_int(0, 1, 200);
+    table1->set_string(1, 1, "!");
+    table1->add_empty_row();
+    table1->set_int(0, 2, 300);
+    table1->set_string(1, 2, "bar");
+
+    size_t col_link1 = table1->add_column_link(type_Link, "link", *table1);
+    table1->set_link(col_link1, 0, 0);
+    table1->set_link(col_link1, 2, 0);
+
+    size_t col_link2 = table2->add_column_link(type_Link, "link", *table1);
+    size_t col_linklist2 = table2->add_column_link(type_LinkList, "link", *table1);
+    table2->add_empty_row();
+    table2->add_empty_row();
+    table2->add_empty_row();
+    table2->add_empty_row();
+
+    table2->set_link(col_link2, 0, 1);
+    table2->set_link(col_link2, 2, 2);
+
+    LinkViewRef lvr;
+
+    lvr = table2->get_linklist(col_linklist2, 0);
+    lvr->add(0);
+    lvr->add(1);
+    lvr = table2->get_linklist(col_linklist2, 2);
+    lvr->add(0);
+
+    /*
+        Table setup. table2 has links to table1 and table1 to table0:
+
+        table2 -> table1:                table1 -> table0:
+        Row   LinkCol  LinkListCol       Row   Link
+        0     1        {0, 1}            0     0       
+        1     null     {}                1     null
+        2     2        {0}               2     0   
+        3     null     {}
+    */
+
+    // Test find_all on Link
+    Query q3 = table2->column<Link>(col_link2).is_null();
+    TableView tv = q3.find_all();
+    CHECK_EQUAL(2, tv.size());
+    CHECK_EQUAL(1, tv.get_source_ndx(0));
+    CHECK_EQUAL(3, tv.get_source_ndx(1));
+    
+    // Test find() on Link
+    match = table2->column<Link>(col_link2).is_null().find();
+    CHECK_EQUAL(1, match);
+    match = table2->column<Link>(col_link2).is_null().find(2);
+    CHECK_EQUAL(3, match);
+
+    // Test find_all() on LinkList
+    Query q4 = table2->column<LinkList>(col_linklist2).is_null();
+    TableView tv2 = q4.find_all();
+    CHECK_EQUAL(2, tv2.size());
+    CHECK_EQUAL(1, tv2.get_source_ndx(0));
+    CHECK_EQUAL(3, tv2.get_source_ndx(1));
+
+    // Test find() on LinkList
+    match = table2->column<LinkList>(col_linklist2).is_null().find();
+    CHECK_EQUAL(1, match);
+    match = table2->column<LinkList>(col_linklist2).is_null().find(2);
+    CHECK_EQUAL(3, match);
+
+    // We have not yet defined behaviour of finding null-links in a linked-to table, so we just throw. Todo.
+    CHECK_THROW_ANY(table2->link(col_linklist2).column<Link>(col_link1).is_null());
 }
 
 

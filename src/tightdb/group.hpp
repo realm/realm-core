@@ -290,7 +290,7 @@ public:
     void commit();
 
     // Conversion
-    template<class S> void to_json(S& out, size_t link_depth = 0, 
+    template<class S> void to_json(S& out, size_t link_depth = 0,
         std::map<std::string, std::string>* renames = null_ptr) const;
     void to_string(std::ostream& out) const;
 
@@ -328,8 +328,10 @@ protected:
 private:
     SlabAlloc m_alloc;
 
-    // Underlying array structure. Third slot in m_top is the "logical file
-    // size".
+    // Underlying node structure. The third slot in m_top is the "logical file
+    // size" and it is always present. The 7th slot is the "database version"
+    // (a.k.a. the "transaction number") and is present only when
+    // m_free_versions is present.
     Array m_top;
     Array m_tables;            // 2nd slot in m_top
     ArrayString m_table_names; // 1st slot in m_top
@@ -353,8 +355,10 @@ private:
     void detach_but_retain_data() TIGHTDB_NOEXCEPT;
     void complete_detach() TIGHTDB_NOEXCEPT;
 
-    /// Add or clear array nodes for free-space tracking.
-    void reset_freespace_tracking();
+    /// Add free-space versioning nodes, if they do not already exist. Othewise,
+    /// set the version to zero on all free space chunks. This must be done
+    /// whenever the lock file is created or reinitialized.
+    void reset_free_space_versions();
 
     void reattach_from_retained_data();
     bool may_reattach_if_same_version() const TIGHTDB_NOEXCEPT;

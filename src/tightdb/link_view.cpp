@@ -41,8 +41,8 @@ void LinkView::insert(size_t link_ndx, size_t target_row_ndx)
     // if there are no links yet, we have to create list
     if (!m_target_row_indexes.is_attached()) {
         TIGHTDB_ASSERT(link_ndx == 0);
-        ref_type col_ref = Column::create(Array::type_Normal, 0, 0, m_origin_column.get_alloc());
-        m_origin_column.set_row_ref(row_ndx, col_ref);
+        ref_type ref = Column::create(m_origin_column.get_alloc());
+        m_origin_column.set_row_ref(row_ndx, ref);
         m_target_row_indexes.get_root_array()->init_from_parent(); // re-attach
     }
 

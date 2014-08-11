@@ -33,17 +33,20 @@ void ColumnLinkList::clear()
     discard_child_accessors();
 
     // Remove all backlinks to the delete rows
-    size_t row_count = size();
-    for (size_t r = 0; r < row_count; ++r) {
-        ref_type ref = ColumnLinkBase::get_as_ref(r);
+    //
+    // FIXME: size() is a relatively slow function. Consider passing the size
+    // from Table::m_size.
+    size_t num_rows = size();
+    for (size_t row_ndx = 0; row_ndx < num_rows; ++row_ndx) {
+        ref_type ref = get_as_ref(row_ndx);
         if (ref == 0)
             continue;
 
-        Column link_col(ref, null_ptr, 0, get_alloc());
-        size_t n = link_col.size();
+        Column link_list(get_alloc(), ref);
+        size_t n = link_list.size();
         for (size_t i = 0; i < n; ++i) {
-            size_t old_target_row_ndx = link_col.get(i);
-            m_backlink_column->remove_backlink(old_target_row_ndx, r);
+            size_t old_target_row_ndx = to_size_t(link_list.get(i));
+            m_backlink_column->remove_backlink(old_target_row_ndx, row_ndx);
         }
     }
 
@@ -51,36 +54,35 @@ void ColumnLinkList::clear()
     ColumnLinkBase::clear(); // Throws
     // FIXME: This one is needed because Column::clear() forgets about the leaf
     // type. A better solution should probably be sought after.
-    m_array->set_type(Array::type_HasRefs);
+    m_array->set_type(Array::type_HasRefs); // Throws
 }
 
 
 void ColumnLinkList::move_last_over(size_t target_row_ndx, size_t last_row_ndx)
 {
     // Remove backlinks to the delete row
-    ref_type ref = ColumnLinkBase::get_as_ref(target_row_ndx);
-    if (ref) {
-        const Column linkcol(ref, null_ptr, 0, get_alloc());
-        size_t count = linkcol.size();
-        for (size_t i = 0; i < count; ++i) {
-            size_t old_target_row_ndx = linkcol.get(i);
+    if (ref_type ref = get_as_ref(target_row_ndx)) {
+        Column link_list(get_alloc(), ref);
+        size_t n = link_list.size();
+        for (size_t i = 0; i < n; ++i) {
+            size_t old_target_row_ndx = to_size_t(link_list.get(i));
             m_backlink_column->remove_backlink(old_target_row_ndx, target_row_ndx);
         }
     }
 
     // Update backlinks to last row to point to its new position
-    ref_type ref2 = ColumnLinkBase::get_as_ref(last_row_ndx);
-    if (ref2) {
-        const Column linkcol(ref2, null_ptr, 0, get_alloc());
-        size_t count = linkcol.size();
-        for (size_t i = 0; i < count; ++i) {
-            size_t old_target_row_ndx = linkcol.get(i);
+    if (ref_type ref = get_as_ref(last_row_ndx)) {
+        Column link_list(get_alloc(), ref);
+        size_t n = link_list.size();
+        for (size_t i = 0; i < n; ++i) {
+            size_t old_target_row_ndx = to_size_t(link_list.get(i));
             m_backlink_column->update_backlink(old_target_row_ndx, last_row_ndx, target_row_ndx);
         }
     }
 
     // Do the actual delete and move
-    ColumnLinkBase::destroy_subtree(target_row_ndx, false);
+    bool clear_value = false;
+    destroy_subtree(target_row_ndx, clear_value);
     ColumnLinkBase::move_last_over(target_row_ndx, last_row_ndx);
 
     const bool fix_ndx_in_parent = true;
@@ -94,18 +96,18 @@ void ColumnLinkList::erase(size_t row_ndx, bool is_last)
     TIGHTDB_ASSERT(is_last);
 
     // Remove backlinks to the delete row
-    ref_type ref = ColumnLinkBase::get_as_ref(row_ndx);
-    if (ref) {
-        const Column linkcol(ref, null_ptr, 0, get_alloc());
-        size_t count = linkcol.size();
-        for (size_t i = 0; i < count; ++i) {
-            size_t old_target_row_ndx = linkcol.get(i);
+    if (ref_type ref = get_as_ref(row_ndx)) {
+        Column link_list(get_alloc(), ref);
+        size_t n = link_list.size();
+        for (size_t i = 0; i < n; ++i) {
+            size_t old_target_row_ndx = to_size_t(link_list.get(i));
             m_backlink_column->remove_backlink(old_target_row_ndx, row_ndx);
         }
     }
 
     // Do the actual delete
-    ColumnLinkBase::destroy_subtree(row_ndx, false);
+    bool clear_value = false;
+    destroy_subtree(row_ndx, clear_value);
     ColumnLinkBase::erase(row_ndx, is_last);
 
     // Detach accessor, if any

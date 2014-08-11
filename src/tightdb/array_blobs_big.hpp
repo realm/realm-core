@@ -30,13 +30,6 @@ public:
     typedef BinaryData value_type;
 
     explicit ArrayBigBlobs(Allocator&) TIGHTDB_NOEXCEPT;
-    ArrayBigBlobs(MemRef,   ArrayParent*, std::size_t ndx_in_parent, Allocator&) TIGHTDB_NOEXCEPT;
-    ArrayBigBlobs(ref_type, ArrayParent*, std::size_t ndx_in_parent, Allocator&) TIGHTDB_NOEXCEPT;
-
-    /// FIXME: Deprecated. The constructor must not allocate anything
-    /// that the destructor does not deallocate.
-    explicit ArrayBigBlobs(ArrayParent* = 0, std::size_t ndx_in_parent = 0,
-                           Allocator& = Allocator::get_default());
 
     BinaryData get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
     void set(std::size_t ndx, BinaryData value, bool add_zero_term = false);
@@ -101,29 +94,6 @@ public:
 inline ArrayBigBlobs::ArrayBigBlobs(Allocator& alloc) TIGHTDB_NOEXCEPT:
     Array(alloc)
 {
-}
-
-inline ArrayBigBlobs::ArrayBigBlobs(ArrayParent* parent, std::size_t ndx_in_parent,
-                                    Allocator& alloc):
-    Array(alloc)
-{
-    create(); // Throws
-    set_parent(parent, ndx_in_parent);
-    update_parent(); // Throws
-}
-
-inline ArrayBigBlobs::ArrayBigBlobs(MemRef mem, ArrayParent* parent, std::size_t ndx_in_parent,
-                                    Allocator& alloc) TIGHTDB_NOEXCEPT:
-    Array(mem, parent, ndx_in_parent, alloc)
-{
-    TIGHTDB_ASSERT(!is_inner_bptree_node() && has_refs() && get_context_flag());
-}
-
-inline ArrayBigBlobs::ArrayBigBlobs(ref_type ref, ArrayParent* parent, std::size_t ndx_in_parent,
-                                    Allocator& alloc) TIGHTDB_NOEXCEPT:
-    Array(ref, parent, ndx_in_parent, alloc)
-{
-    TIGHTDB_ASSERT(!is_inner_bptree_node() && has_refs() && get_context_flag());
 }
 
 inline BinaryData ArrayBigBlobs::get(std::size_t ndx) const TIGHTDB_NOEXCEPT

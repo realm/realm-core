@@ -275,8 +275,9 @@ void TableViewBase::sort(size_t column, bool Ascending)
 
     if (m_refs.size() == 0)
         return;
-    
-    Array result;
+
+    Array result(Allocator::get_default());
+    result.create(Array::type_Normal);
 
     if (type == type_Float) {
         sort<float>(column, Ascending);
@@ -289,8 +290,10 @@ void TableViewBase::sort(size_t column, bool Ascending)
     }
     else {
 
-        Array vals;
-        Array ref;
+        Array vals(Allocator::get_default());
+        vals.create(Array::type_Normal);
+        Array ref(Allocator::get_default());
+        ref.create(Array::type_Normal);
 
         //ref.Preset(0, m_refs.size() - 1, m_refs.size());
         for (size_t t = 0; t < m_refs.size(); t++)
@@ -320,7 +323,7 @@ void TableViewBase::sort(size_t column, bool Ascending)
         }
 
         vals.ReferenceSort(ref);
-        vals.destroy();
+        vals.destroy(); // FIXME: Leak if we don't get this far
 
         for (size_t t = 0; t < m_refs.size(); t++) {
             size_t r = to_size_t(ref.get(t));
@@ -342,9 +345,9 @@ void TableViewBase::sort(size_t column, bool Ascending)
                 m_refs.add(v);
             }
         }
-        ref.destroy();
+        ref.destroy(); // FIXME: Leak if we don't get this far
     }
-    result.destroy();
+    result.destroy(); // FIXME: Leak if we don't get this far
 }
 
 // Simple pivot aggregate method. Experimental! Please do not document method publicly.
