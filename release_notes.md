@@ -12,7 +12,7 @@
 
 ### Enhancements:
 
-* Lorem ipsum.
+* Lets you sort a LinkRef according to a column in the target table. Also lets you build a TableView with the sorted result instead.
 
 -----------
 
