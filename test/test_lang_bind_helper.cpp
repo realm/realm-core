@@ -5530,9 +5530,10 @@ TEST(LangBindHelper_RollbackAndContinueAsRead)
         CHECK_EQUAL(42,   origin->get_int(0,1));
         CHECK_EQUAL(5746, origin->get_int(0,0));
         CHECK_EQUAL(42,   row.get_int(0));
+        group->Verify();
         LangBindHelper::rollback_and_continue_as_read(sg);
         group->Verify();
-        CHECK_EQUAL(42, origin->get_int(0,0));
+        CHECK_EQUAL(42,   origin->get_int(0,0));
         CHECK_EQUAL(42,   row.get_int(0));
         sg.end_read();
     }

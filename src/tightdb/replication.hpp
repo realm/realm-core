@@ -1591,7 +1591,7 @@ bool Replication::TransactLogParser::prepare_log_reversal(std::vector<const char
             pending_table_select = instr_start;
         }
         // similarly for descriptor selection.
-        if (handler.classification == InstructionClassifierForRollback::instr_class_postfix_table) {
+        if (handler.classification == InstructionClassifierForRollback::instr_class_postfix_descriptor) {
             if (pending_descriptor_select)
                 instruction_starts.push_back(pending_descriptor_select);
             pending_descriptor_select = instr_start;
@@ -1609,12 +1609,12 @@ template<class InstructionHandler>
 bool Replication::TransactLogParser::execute_in_reverse_order(std::vector<const char*>& instruction_starts, 
                                                               InstructionHandler& handler)
 {
-    size_t i = instruction_starts.size() - 1;
+    size_t i = instruction_starts.size();
     while (i > 0) {
+        --i;
         m_input_begin = instruction_starts[i];
         if (!parse_one_inst(handler))
             return false;
-        --i;
     }
     return true;
 }

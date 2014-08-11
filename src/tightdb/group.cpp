@@ -1410,8 +1410,8 @@ public:
     }
 
     bool erase_column(std::size_t col_idx, std::size_t target_table_idx,
-                      std::size_t backlink_col_idx) 
-    { 
+                      std::size_t) 
+    {
         Group::TransactAdvancer::insert_column(col_idx, DataType(), StringData(), target_table_idx);
         return true; 
     }
