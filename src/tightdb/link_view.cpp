@@ -177,7 +177,9 @@ namespace tightdb {
         int64_t i = m_origin_column.get_target_table().get_int(column, row);
         return i;
     }
+}
 
+namespace {
     template <class T> struct LinkComparer
     {
         LinkComparer(size_t column, bool ascend, LinkView& lv) : m_column(column), m_ascending(ascend), m_lv(lv) {}
@@ -193,7 +195,6 @@ namespace tightdb {
         bool m_ascending;
         LinkView& m_lv;
     };
-
 }
 
 void LinkView::sort(size_t column_ndx, bool ascending)
