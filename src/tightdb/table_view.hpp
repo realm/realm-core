@@ -189,8 +189,8 @@ public:
     void to_string(std::ostream&, std::size_t limit = 500) const;
     void row_to_string(std::size_t row_ndx, std::ostream&) const;
 
-    // todo, uninvestigated compiler error message if we make GetValue protected and declare Comparer friend
-    template <class T> T GetValue(size_t row, size_t column) const;
+    template <class T> T get_value(size_t row, size_t column) const;
+
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     // Determine if the view is 'in sync' with the underlying table
@@ -402,6 +402,7 @@ private:
     friend class Query;
     friend class TableViewBase;
     friend class ListviewNode;
+    friend class LinkView;
 };
 
 
