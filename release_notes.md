@@ -1,24 +1,13 @@
-# NEXT RELEASE
-
-### Bugfixes:
-
-* Lorem ipsum.
+# 0.81.0 Release notes
 
 ### API breaking changes:
 
 * `Table::get_parent_row_index()` and `Table::get_index_in_group()` together
-  replace `Table::get_index_in_parent()`. This was done to avoid a confusing mix
-  of distinct concepts.
+  replace `Table::get_index_in_parent()`. This was done to avoid a confusing mix of distinct concepts.
 
 ### Enhancements:
 
-* Lets you sort a LinkRef according to a column in the target table. Also lets you build a TableView with the sorted result instead.
-
------------
-
-### Internals:
-
-* Lorem ipsum.
+* It's now possible to sort a LinkRef according to a column in the target table. Also lets you build a TableView with the sorted result instead. The new methods on LinkViewRef are `sort()` and `get_sorted_view()`
 
 ----------------------------------------------
 
