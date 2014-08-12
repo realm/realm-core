@@ -771,6 +771,145 @@ TEST(LinkList_MultiLinkQuery)
 }
 
 
+TEST(LinkList_SortLinkView)
+{
+    Group group;
+
+    TableRef table1 = group.get_table("table1");
+    TableRef table2 = group.get_table("table2");
+
+    // add some more columns to table1 and table2
+    table1->add_column(type_Int, "col1");
+    table1->add_column(type_String, "str1");
+    table1->add_column(type_Float, "str1");
+    table1->add_column(type_Double, "str1");
+
+    // add some rows
+    table1->add_empty_row();
+    table1->set_int(0, 0, 300);
+    table1->set_string(1, 0, "delta");
+    table1->set_float(2, 0, 300.f);
+    table1->set_double(3, 0, 300.);
+
+    table1->add_empty_row();
+    table1->set_int(0, 1, 100);
+    table1->set_string(1, 1, "alfa");
+    table1->set_float(2, 1, 100.f);
+    table1->set_double(3, 1, 100.);
+
+    table1->add_empty_row();
+    table1->set_int(0, 2, 200);
+    table1->set_string(1, 2, "beta");
+    table1->set_float(2, 2, 200.f);
+    table1->set_double(3, 2, 200.);
+
+    size_t col_link2 = table2->add_column_link(type_LinkList, "linklist", *table1);
+    table2->add_empty_row();
+    table2->add_empty_row();
+
+    LinkViewRef lvr;
+    TableView tv;
+
+    lvr = table2->get_linklist(col_link2, 0);
+    lvr->clear();
+    lvr->add(0);
+    lvr->add(1);
+    lvr->add(2);
+
+    lvr->sort(0);
+    tv = lvr->get_sorted_view(0);
+    CHECK_EQUAL(lvr->get(0).get_index(), 1);
+    CHECK_EQUAL(lvr->get(1).get_index(), 2);
+    CHECK_EQUAL(lvr->get(2).get_index(), 0);
+    CHECK_EQUAL(tv.get(0).get_index(), 1); // 2 1
+    CHECK_EQUAL(tv.get(1).get_index(), 2);
+    CHECK_EQUAL(tv.get(2).get_index(), 0);
+ 
+
+    lvr = table2->get_linklist(col_link2, 1);
+    lvr->clear();
+    lvr->add(2);
+    lvr->add(1);
+    lvr->add(0);
+
+    lvr->sort(0);
+    tv = lvr->get_sorted_view(0);
+    CHECK_EQUAL(lvr->get(0).get_index(), 1);
+    CHECK_EQUAL(lvr->get(1).get_index(), 2);
+    CHECK_EQUAL(lvr->get(2).get_index(), 0);
+    CHECK_EQUAL(tv.get(0).get_index(), 1);
+    CHECK_EQUAL(tv.get(1).get_index(), 2);
+    CHECK_EQUAL(tv.get(2).get_index(), 0);
+
+    lvr = table2->get_linklist(col_link2, 1);
+    lvr->clear();
+    lvr->add(2);
+    lvr->add(0);
+    lvr->add(1);
+
+    lvr->sort(0, false);
+    tv = lvr->get_sorted_view(0, false);
+
+    CHECK_EQUAL(lvr->get(0).get_index(), 0);
+    CHECK_EQUAL(lvr->get(1).get_index(), 2);
+    CHECK_EQUAL(lvr->get(2).get_index(), 1);
+    CHECK_EQUAL(tv.get(0).get_index(), 0);
+    CHECK_EQUAL(tv.get(1).get_index(), 2);
+    CHECK_EQUAL(tv.get(2).get_index(), 1);
+
+    // Floats
+    lvr = table2->get_linklist(col_link2, 1);
+    lvr->clear();
+    lvr->add(2);
+    lvr->add(0);
+    lvr->add(1);
+
+    lvr->sort(2, false);
+    tv = lvr->get_sorted_view(2, false);
+
+    CHECK_EQUAL(lvr->get(0).get_index(), 0);
+    CHECK_EQUAL(lvr->get(1).get_index(), 2);
+    CHECK_EQUAL(lvr->get(2).get_index(), 1);
+    CHECK_EQUAL(tv.get(0).get_index(), 0);
+    CHECK_EQUAL(tv.get(1).get_index(), 2);
+    CHECK_EQUAL(tv.get(2).get_index(), 1);
+
+    // Doubles
+    lvr = table2->get_linklist(col_link2, 1);
+    lvr->clear();
+    lvr->add(2);
+    lvr->add(0);
+    lvr->add(1);
+
+    lvr->sort(3, false);
+    tv = lvr->get_sorted_view(3, false);
+
+    CHECK_EQUAL(lvr->get(0).get_index(), 0);
+    CHECK_EQUAL(lvr->get(1).get_index(), 2);
+    CHECK_EQUAL(lvr->get(2).get_index(), 1);
+    CHECK_EQUAL(tv.get(0).get_index(), 0);
+    CHECK_EQUAL(tv.get(1).get_index(), 2);
+    CHECK_EQUAL(tv.get(2).get_index(), 1);
+
+    // String
+    lvr = table2->get_linklist(col_link2, 1);
+    lvr->clear();
+    lvr->add(2);
+    lvr->add(0);
+    lvr->add(1);
+
+    lvr->sort(1, false);
+    tv = lvr->get_sorted_view(1, false);
+
+    CHECK_EQUAL(lvr->get(0).get_index(), 0);
+    CHECK_EQUAL(lvr->get(1).get_index(), 2);
+    CHECK_EQUAL(lvr->get(2).get_index(), 1);
+    CHECK_EQUAL(tv.get(0).get_index(), 0);
+    CHECK_EQUAL(tv.get(1).get_index(), 2);
+    CHECK_EQUAL(tv.get(2).get_index(), 1);
+}
+
+
 TEST(Link_FindNullLink)
 {
     size_t match;

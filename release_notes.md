@@ -8,9 +8,6 @@
 
 * `Group::has_table<T>()` removed, because it had awkward and incongruous
   semantics, and could not be efficiently implemented.
-* `Table::get_parent_row_index()` and `Table::get_index_in_group()` together
-  replace `Table::get_index_in_parent()`. This was done to avoid a confusing mix
-  of distinct concepts.
 * The version of `Group::get_table()`, that takes a name argument, can no longer
   add a table to the group, instead it returns null if there is no table with
   the spaecified name. Addition is now handled by either `Group::add_table()` or
@@ -40,6 +37,19 @@
 ### Internals:
 
 * Lorem ipsum.
+
+----------------------------------------------
+
+# 0.81.0 Release notes
+
+### API breaking changes:
+
+* `Table::get_parent_row_index()` and `Table::get_index_in_group()` together
+  replace `Table::get_index_in_parent()`. This was done to avoid a confusing mix of distinct concepts.
+
+### Enhancements:
+
+* It's now possible to sort a LinkRef according to a column in the target table. Also lets you build a TableView with the sorted result instead. The new methods on LinkViewRef are `sort()` and `get_sorted_view()`
 
 ----------------------------------------------
 
