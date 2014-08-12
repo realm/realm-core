@@ -201,6 +201,9 @@ protected:
 
     // Table needs to be able to modify m_table and m_row_ndx.
     friend class Table;
+private:
+    RowBase* m_prev; // Undefined if detached.
+    RowBase* m_next; // Undefined if detached.
 };
 
 
