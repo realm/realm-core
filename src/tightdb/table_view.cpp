@@ -323,7 +323,7 @@ void TableViewBase::sort(size_t column, bool Ascending)
         }
 
         vals.ReferenceSort(ref);
-        vals.destroy();
+        vals.destroy(); // FIXME: Leak if we don't get this far
 
         for (size_t t = 0; t < m_refs.size(); t++) {
             size_t r = to_size_t(ref.get(t));
@@ -345,9 +345,9 @@ void TableViewBase::sort(size_t column, bool Ascending)
                 m_refs.add(v);
             }
         }
-        ref.destroy();
+        ref.destroy(); // FIXME: Leak if we don't get this far
     }
-    result.destroy();
+    result.destroy(); // FIXME: Leak if we don't get this far
 }
 
 // Simple pivot aggregate method. Experimental! Please do not document method publicly.
