@@ -775,8 +775,8 @@ TEST(LinkList_SortLinkView)
 {
     Group group;
 
-    TableRef table1 = group.get_table("table1");
-    TableRef table2 = group.get_table("table2");
+    TableRef table1 = group.add_table("table1");
+    TableRef table2 = group.add_table("table2");
 
     // add some more columns to table1 and table2
     table1->add_column(type_Int, "col1");
@@ -824,7 +824,6 @@ TEST(LinkList_SortLinkView)
     CHECK_EQUAL(tv.get(0).get_index(), 1); // 2 1
     CHECK_EQUAL(tv.get(1).get_index(), 2);
     CHECK_EQUAL(tv.get(2).get_index(), 0);
- 
 
     lvr = table2->get_linklist(col_link2, 1);
     lvr->clear();
