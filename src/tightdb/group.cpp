@@ -1417,15 +1417,39 @@ public:
     }
 };
 
-void Group::reverse_transact(const BinaryData& log)
+void Group::reverse_transact(ref_type new_top_ref, size_t new_file_size, const BinaryData& log)
 {
+    // classify the instructions, building a vector of relevant instructions.
+    // The order is changed so that prefix instructions are moved to a postfix
+    // position. This allows them to still work as prefixes when the instructions
+    // are traversed in reverse order. Instructions which are not relevant for reversal
+    // eliminated in the process.
     InstructionClassifierForRollback icfb;
     std::vector<const char*> instructions;
     MultiLogInputStream in(&log, (&log)+1);
     Replication::TransactLogParser parser(in);
     parser.prepare_log_reversal(instructions, icfb);
+
+    // execute the selected instructions in reverse order.
     TransactReverser reverser(*this);
     parser.execute_in_reverse_order(instructions, reverser);
+
+    // restore group internal arrays to state before transaction (rollback state)
+    init_from_ref(new_top_ref);
+
+    // propagate restoration to all relevant accessors:
+    m_top.get_alloc().bump_global_version();
+    // Refresh all remaining dirty table accessors
+    size_t num_tables = m_table_accessors.size();
+    for (size_t table_ndx = 0; table_ndx != num_tables; ++table_ndx) {
+        if (Table* table = m_table_accessors[table_ndx]) {
+            typedef _impl::TableFriend tf;
+            if (tf::is_marked(*table)) {
+                tf::refresh_accessor_tree(*table); // Throws
+                tf::bump_version(*table);
+            }
+        }
+    }
 }
 
 #endif // TIGHTDB_ENABLE_REPLICATION

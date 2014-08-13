@@ -1255,11 +1255,6 @@ void SharedGroup::commit_and_continue_as_read()
 void SharedGroup::rollback_and_continue_as_read()
 {
     m_group.Verify();
-    // FIXME: is this correct?
-    // m_readlock should still hold the top ref from when it was set
-    // during promote_to_write.
-    m_group.update_refs(m_readlock.m_top_ref, m_group.m_alloc.get_baseline());
-    m_group.Verify();
     // Mark all managed space (beyond the attached file) as free.
     m_group.m_alloc.reset_free_space_tracking(); // Throws
 
@@ -1280,7 +1275,7 @@ void SharedGroup::rollback_and_continue_as_read()
 void SharedGroup::do_rollback_and_continue_as_read(const char* start, const char* limit)
 {
     BinaryData buffer(start, limit-start);
-    m_group.reverse_transact(buffer);
+    m_group.reverse_transact(m_readlock.m_top_ref, m_readlock.m_file_size, buffer);
 }
 
 
