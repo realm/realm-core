@@ -580,7 +580,7 @@ public:
     }
 
     bool insert_column(size_t col_ndx, DataType type, StringData name,
-                       size_t link_target_table_ndx)
+                       size_t link_target_table_ndx, size_t)
     {
         if (TIGHTDB_LIKELY(m_desc)) {
             if (TIGHTDB_LIKELY(col_ndx <= m_desc->get_column_count())) {

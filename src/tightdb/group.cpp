@@ -1094,7 +1094,8 @@ public:
         return true;
     }
 
-    bool insert_column(size_t col_ndx, DataType, StringData, size_t link_target_table_ndx)
+    bool insert_column(size_t col_ndx, DataType, StringData, 
+                       size_t link_target_table_ndx, size_t)
     {
         // inversion: erase_column - note this means that we need to add backlink_col_ndx
         if (m_table) {
@@ -1303,7 +1304,7 @@ public:
     bool set_link(std::size_t, std::size_t, std::size_t) { classification = instr_class_execute; return true; }
     bool select_descriptor(int, const std::size_t*) { classification = instr_class_postfix_descriptor; return true; }
     bool insert_column(std::size_t, DataType, StringData,
-                       std::size_t) { classification = instr_class_execute; return true; }
+                       std::size_t, std::size_t) { classification = instr_class_execute; return true; }
     bool erase_column(std::size_t, std::size_t,
                       std::size_t) { classification = instr_class_execute; return true; }
     bool select_link_list(std::size_t, std::size_t) { classification = instr_class_execute; return true; }
@@ -1403,17 +1404,17 @@ public:
     }
 
     bool insert_column(std::size_t col_idx, DataType, StringData,
-                       std::size_t) 
+                       std::size_t target_table_idx, std::size_t backlink_col_ndx) 
     { 
         // FIXME: needs to have backlink col added to utilize erase_column
-        return true; 
+        return Group::TransactAdvancer::erase_column(col_idx, target_table_idx, backlink_col_ndx);
     }
 
     bool erase_column(std::size_t col_idx, std::size_t target_table_idx,
-                      std::size_t /* backlink_col_idx */) 
+                      std::size_t backlink_col_idx) 
     {
-        Group::TransactAdvancer::insert_column(col_idx, DataType(), StringData(), target_table_idx);
-        return true; 
+        return Group::TransactAdvancer::insert_column(col_idx, DataType(), StringData(), 
+                                                      target_table_idx, backlink_col_idx);
     }
 };
 

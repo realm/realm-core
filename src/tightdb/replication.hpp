@@ -424,7 +424,7 @@ public:
     ///     bool optimize_table()
     ///     bool select_descriptor(int levels, const std::size_t* path)
     ///     bool insert_column(std::size_t col_ndx, DataType, StringData name,
-    ///                        std::size_t link_target_table_ndx)
+    ///                        std::size_t link_target_table_ndx, std::size_t backlink_col_ndx)
     ///     bool erase_column(std::size_t col_ndx, std::size_t link_target_table_ndx,
     ///                       std::size_t backlink_col_ndx)
     ///     bool rename_column(std::size_t col_ndx, StringData new_name)
@@ -828,8 +828,16 @@ inline void Replication::insert_column(const Descriptor& desc, std::size_t col_n
     simple_cmd(instr_InsertColumn, util::tuple(col_ndx, int(type), name.size())); // Throws
     transact_log_append(name.data(), name.size()); // Throws
     if (link_target_table) {
+        typedef _impl::TableFriend tf;
+        typedef _impl::DescriptorFriend df;
         std::size_t target_table_ndx = link_target_table->get_index_in_group();
         append_num(target_table_ndx); // Throws
+        const Table& origin_table = df::get_root_table(desc);
+        TIGHTDB_ASSERT(origin_table.is_group_level());
+        const Spec& target_spec = tf::get_spec(*link_target_table);
+        std::size_t origin_table_ndx = origin_table.get_index_in_group();
+        std::size_t backlink_col_ndx = target_spec.find_backlink_column(origin_table_ndx, col_ndx);
+        append_num(backlink_col_ndx);
     }
 }
 
@@ -841,20 +849,22 @@ inline void Replication::erase_column(const Descriptor& desc, std::size_t col_nd
     typedef _impl::TableFriend tf;
     if (!tf::is_link_type(ColumnType(type))) {
         simple_cmd(instr_EraseColumn, util::tuple(col_ndx)); // Throws
-        return;
     }
+    else { // it's a link column:
 
-    TIGHTDB_ASSERT(desc.is_root());
-    typedef _impl::DescriptorFriend df;
-    const Table& origin_table = df::get_root_table(desc);
-    TIGHTDB_ASSERT(origin_table.is_group_level());
-    const Table& target_table = *tf::get_link_target_table_accessor(origin_table, col_ndx);
-    std::size_t target_table_ndx = target_table.get_index_in_group();
-    const Spec& target_spec = tf::get_spec(target_table);
-    std::size_t origin_table_ndx = origin_table.get_index_in_group();
-    std::size_t backlink_col_ndx = target_spec.find_backlink_column(origin_table_ndx, col_ndx);
-    simple_cmd(instr_EraseLinkColumn, util::tuple(col_ndx, target_table_ndx,
-                                                  backlink_col_ndx)); // Throws
+        TIGHTDB_ASSERT(desc.is_root());
+        typedef _impl::DescriptorFriend df;
+        const Table& origin_table = df::get_root_table(desc);
+        TIGHTDB_ASSERT(origin_table.is_group_level());
+        const Table& target_table = *tf::get_link_target_table_accessor(origin_table, col_ndx);
+        std::size_t target_table_ndx = target_table.get_index_in_group();
+        const Spec& target_spec = tf::get_spec(target_table);
+        std::size_t origin_table_ndx = origin_table.get_index_in_group();
+        std::size_t backlink_col_ndx = target_spec.find_backlink_column(origin_table_ndx, col_ndx);
+        simple_cmd(instr_EraseLinkColumn, util::tuple(col_ndx, target_table_ndx,
+                                                      backlink_col_ndx)); // Throws
+    }
+    return;
 }
 
 inline void Replication::rename_column(const Descriptor& desc, std::size_t col_ndx,
@@ -1442,11 +1452,14 @@ bool Replication::TransactLogParser::parse_one_inst(InstructionHandler& handler)
             read_string(m_string_buffer); // Throws
             StringData name(m_string_buffer.data(), m_string_buffer.size());
             std::size_t link_target_table_ndx = tightdb::npos;
+            std::size_t backlink_col_ndx = tightdb::npos;
             typedef _impl::TableFriend tf;
-            if (tf::is_link_type(ColumnType(type)))
+            if (tf::is_link_type(ColumnType(type))) {
                 link_target_table_ndx = read_int<std::size_t>(); // Throws
+                backlink_col_ndx = read_int<std::size_t>(); // Throws
+            }
             if (!handler.insert_column(col_ndx, DataType(type), name,
-                                       link_target_table_ndx)) // Throws
+                                       link_target_table_ndx, backlink_col_ndx)) // Throws
                 return false;
             return true;
         }
@@ -1550,7 +1563,7 @@ public:
     bool optimize_table() { return true; }
     bool select_descriptor(int, const std::size_t*) { return true; }
     bool insert_column(std::size_t, DataType, StringData,
-                       std::size_t) { return true; }
+                       std::size_t, std::size_t) { return true; }
     bool erase_column(std::size_t, std::size_t,
                       std::size_t) { return true; }
     bool rename_column(std::size_t, StringData) { return true; }
