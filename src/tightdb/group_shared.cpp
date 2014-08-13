@@ -1254,19 +1254,18 @@ void SharedGroup::commit_and_continue_as_read()
 
 void SharedGroup::rollback_and_continue_as_read()
 {
-    m_group.Verify();
     // Mark all managed space (beyond the attached file) as free.
     m_group.m_alloc.reset_free_space_tracking(); // Throws
 
     m_transact_stage = transact_Reading;
 
-    m_group.Verify();
     // get the commit log and use it to rollback all accessors:
     if (Replication* repl = m_group.get_replication()) {
 
         // this call is vectored through to do_rollback_and....
         repl->rollback_write_transact(*this);
     }
+
     // release exclusive write access: (FIXME: do this earlier?)
     SharedInfo* info = m_file_map.get_addr();
     info->writemutex.unlock();
