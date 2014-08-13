@@ -136,7 +136,7 @@ struct None {
 
 struct Less {
     static const int avx = 0x11; // _CMP_LT_OQ
-    template<class T> bool operator()(const T& v1, const T& v2) const {return v1 < v2;}
+    template<class T> bool operator()(const T& v1, const T& v2) const { return v1 < v2; }
     static const int condition = cond_Less;
     bool can_match(int64_t v, int64_t lbound, int64_t ubound) { static_cast<void>(ubound); return lbound < v; }
     bool will_match(int64_t v, int64_t lbound, int64_t ubound) { static_cast<void>(lbound); return ubound < v; }
@@ -153,6 +153,26 @@ struct GreaterEqual {
     template<class T> bool operator()(const T& v1, const T& v2) const {return v1 >= v2;}
     static const int condition = cond_GreaterEqual;
 };
+
+
+// CompareLess is a temporary hack to have a generalized way to compare any tightdb types. Todo, enable correct < 
+// operator of StringData (currently gives circular header dependency with utf8.hpp)
+template <class T> struct CompareLess
+{
+    static bool compare(T v1, T v2)
+    {
+        return v1 < v2;
+    }
+};
+template <> struct CompareLess<StringData>
+{
+    static bool compare(StringData v1, StringData v2)
+    {
+        bool ret = utf8_compare(v1.data(), v2.data());
+        return ret;
+    }
+};
+
 } // namespace tightdb
 
 #endif // TIGHTDB_QUERY_CONDITIONS_HPP

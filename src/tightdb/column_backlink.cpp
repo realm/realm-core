@@ -296,7 +296,7 @@ void ColumnBackLink::Verify(const Table& table, size_t col_ndx) const
     TIGHTDB_ASSERT(&m_origin_column->get_backlink_column() == this);
 
     // Check that m_origin_table is the table specified by the spec
-    size_t origin_table_ndx = m_origin_table->get_index_in_parent();
+    size_t origin_table_ndx = m_origin_table->get_index_in_group();
     typedef _impl::TableFriend tf;
     const Spec& spec = tf::get_spec(table);
     TIGHTDB_ASSERT(origin_table_ndx == spec.get_opposite_link_table_ndx(col_ndx));

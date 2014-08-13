@@ -153,6 +153,108 @@ void LinkView::clear()
 #endif
 }
 
+namespace tightdb {
+    template <> StringData LinkView::get_value<StringData>(size_t row, size_t column)
+    {
+        StringData s = m_origin_column.get_target_table().get_string(column, row);
+        return s;
+    }
+
+    template <> float LinkView::get_value<float>(size_t row, size_t column)
+    {
+        float f = m_origin_column.get_target_table().get_float(column, row);
+        return f;
+    }
+
+    template <> double LinkView::get_value<double>(size_t row, size_t column)
+    {
+        float d = m_origin_column.get_target_table().get_double(column, row);
+        return d;
+    }
+
+    template <> int64_t LinkView::get_value<int64_t>(size_t row, size_t column)
+    {
+        int64_t i = m_origin_column.get_target_table().get_int(column, row);
+        return i;
+    }
+}
+
+namespace {
+    template <class T> struct LinkComparer
+    {
+        LinkComparer(size_t column, bool ascend, LinkView& lv) : m_column(column), m_ascending(ascend), m_lv(lv) {}
+
+        bool operator() (size_t i, size_t j) const {
+            T v1 = m_lv.get_value<T>(i, m_column);
+            T v2 = m_lv.get_value<T>(j, m_column);
+            bool b = CompareLess<T>::compare(v1, v2);
+            return m_ascending ? b : !b;
+        }
+
+        size_t m_column;
+        bool m_ascending;
+        LinkView& m_lv;
+    };
+}
+
+void LinkView::sort(size_t column_ndx, bool ascending)
+{
+    sort(column_ndx, m_target_row_indexes, ascending);
+}
+
+
+TableView LinkView::get_sorted_view(std::size_t column_ndx, bool ascending)
+{
+    TableView res(m_origin_column.get_target_table());
+    sort(column_ndx, res.get_ref_column(), ascending);
+    return res;
+}
+
+
+template <class T> void LinkView::sort(size_t column_ndx, Column& dest, bool ascending)
+{
+    vector<size_t> v, v2;
+    for (size_t t = 0; t < size(); t++) {
+        v.push_back(t);
+        v2.push_back(m_target_row_indexes.get(t));
+    }
+    LinkComparer<T> c = LinkComparer<T>(column_ndx, ascending, *this);
+    std::stable_sort(v2.begin(), v2.end(), c);
+    dest.clear();
+    for (size_t t = 0; t < v.size(); t++)
+        dest.add(v2[t]);
+}
+
+
+void LinkView::sort(size_t column_ndx, Column& dest, bool ascending)
+{
+    Table& target_table = m_origin_column.get_target_table();
+    DataType type = target_table.get_column_type(column_ndx);
+
+    TIGHTDB_ASSERT(type == type_Int ||
+        type == type_DateTime ||
+        type == type_Bool ||
+        type == type_Float ||
+        type == type_Double ||
+        type == type_String);
+
+    if (m_target_row_indexes.size() == 0)
+        return;
+
+    if (type == type_Float) {
+        sort<float>(column_ndx, dest, ascending);
+    }
+    else if (type == type_Double) {
+        sort<double>(column_ndx, dest, ascending);
+    }
+    else if (type == type_String) {
+        sort<StringData>(column_ndx, dest, ascending);
+    }
+    else {
+        sort<int64_t>(column_ndx, dest, ascending);
+    }
+}
+
 
 void LinkView::remove_target_row(size_t link_ndx)
 {

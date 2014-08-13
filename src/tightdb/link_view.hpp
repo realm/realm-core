@@ -25,6 +25,7 @@
 #include <tightdb/column_linklist.hpp>
 #include <tightdb/link_view_fwd.hpp>
 #include <tightdb/table.hpp>
+#include <tightdb/table_view.hpp>
 
 namespace tightdb {
 
@@ -61,6 +62,8 @@ public:
     void move(std::size_t old_link_ndx, std::size_t new_link_ndx);
     void remove(std::size_t link_ndx);
     void clear();
+    void sort(std::size_t column_ndx, bool ascending = true);
+    TableView get_sorted_view(std::size_t column_ndx, bool ascending = true);
 
     /// Remove the target row of the specified link from the target table. This
     /// also removes the specified link from this link list, and any other link
@@ -85,6 +88,7 @@ public:
 
     const Table& get_target_table() const TIGHTDB_NOEXCEPT;
     Table& get_target_table() TIGHTDB_NOEXCEPT;
+    template <class T> T get_value(size_t row, size_t column);
 
 private:
     TableRef m_origin_table;
@@ -107,6 +111,10 @@ private:
     void refresh_accessor_tree(std::size_t new_row_ndx) TIGHTDB_NOEXCEPT;
 
     void update_from_parent(std::size_t old_baseline) TIGHTDB_NOEXCEPT;
+    
+    void sort(size_t column_ndx, Column& dest, bool ascending);
+    template <class T> void sort(size_t column_ndx, Column& dest, bool ascending);
+
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     Replication* get_repl() TIGHTDB_NOEXCEPT;
@@ -123,9 +131,6 @@ private:
     friend class util::bind_ptr<const LinkView>;
     friend class LangBindHelper;
 };
-
-
-
 
 
 // Implementation
@@ -204,7 +209,7 @@ inline bool LinkView::operator==(const LinkView& link_list) const TIGHTDB_NOEXCE
 {
     Table& target_table_1 = m_origin_column.get_target_table();
     Table& target_table_2 = link_list.m_origin_column.get_target_table();
-    if (target_table_1.get_index_in_parent() != target_table_2.get_index_in_parent())
+    if (target_table_1.get_index_in_group() != target_table_2.get_index_in_group())
         return false;
     if (!m_target_row_indexes.is_attached() || m_target_row_indexes.is_empty()) {
         return !link_list.m_target_row_indexes.is_attached() ||
