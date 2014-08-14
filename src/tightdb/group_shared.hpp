@@ -345,7 +345,7 @@ private:
     // End the current write transaction and transition atomically into
     // a read transaction, WITHOUT synchronizing to external changes
     // to data. All accessors are retained and continue to reflect the
-    // state at commit. 
+    // state at commit.
     void commit_and_continue_as_read();
 #endif
     friend class ReadTransaction;
