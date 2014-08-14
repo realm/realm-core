@@ -1,7 +1,7 @@
 #include <iostream>
-using namespace std;
-
 #include <tightdb.hpp>
+
+using namespace std;
 using namespace tightdb;
 
 // defining a table
@@ -10,7 +10,8 @@ TIGHTDB_TABLE_2(MyTable,
                 name,    String,
                 age,     Int)
 
-int main() {
+int main()
+{
     // create an in-memory shared data structure
     SharedGroup sg("persons.tightdb", false, SharedGroup::durability_MemOnly);
 
@@ -19,7 +20,7 @@ int main() {
         WriteTransaction tr(sg);
 
         // create a table
-        MyTable::Ref table = tr.get_table<MyTable>("persons");
+        MyTable::Ref table = tr.add_table<MyTable>("persons");
 
         // add three rows
         table->add("Mary", 40);

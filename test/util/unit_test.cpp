@@ -449,9 +449,10 @@ void TestResults::test_failed(const string& message)
 }
 
 
-void TestResults::cond_failed(const char* file, long line, const char* cond_text)
+void TestResults::cond_failed(const char* file, long line, const char* macro_name,
+                              const char* cond_text)
 {
-    string msg = "CHECK("+string(cond_text)+") failed";
+    string msg = string(macro_name)+"("+cond_text+") failed";
     check_failed(file, line, msg);
 }
 

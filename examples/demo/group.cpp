@@ -7,16 +7,18 @@ TIGHTDB_TABLE_3(People,
                 name, String,
                 age,  Int,
                 hired, Bool)
+
 TIGHTDB_TABLE_2(Books,
                 title, String,
                 author, String)
 
-int main(int, char*[]) {
+int main()
+{
     // Create group
     Group g1;
 
     // Create table (as reference)
-    People::Ref t1 = g1.get_table<People>("people");
+    People::Ref t1 = g1.add_table<People>("people");
 
     // Add rows
     t1->add("John", 13, true);

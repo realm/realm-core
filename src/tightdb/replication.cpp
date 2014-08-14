@@ -34,7 +34,8 @@ Group& Replication::get_group(SharedGroup& sg) TIGHTDB_NOEXCEPT
 
 void Replication::set_replication(Group& group, Replication* repl) TIGHTDB_NOEXCEPT
 {
-    group.set_replication(repl);
+    typedef _impl::GroupFriend gf;
+    gf::set_replication(group, repl);
 }
 
 
@@ -599,8 +600,10 @@ public:
                 }
 #endif
                 Table* link_target_table = 0;
-                if (link_target_table_ndx != tightdb::npos)
-                    link_target_table = m_group.get_table_by_ndx(link_target_table_ndx); // Throws
+                if (link_target_table_ndx != tightdb::npos) {
+                    typedef _impl::GroupFriend gf;
+                    link_target_table = &gf::get_table(m_group, link_target_table_ndx); // Throws
+                }
                 tf::insert_column(*m_desc, col_ndx, type, name, link_target_table); // Throws
                 return true;
             }
@@ -669,7 +672,9 @@ public:
             if (m_log)
                 *m_log << "group->create_table(\""<<name<<"\")\n";
 #endif
-            m_group.create_table(name); // Throws
+            typedef _impl::GroupFriend gf;
+            bool require_unique_name = false;
+            gf::add_table(m_group, name, require_unique_name); // Throws
             return true;
         }
         return false;

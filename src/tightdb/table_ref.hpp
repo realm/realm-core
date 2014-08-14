@@ -245,6 +245,7 @@ public:
 private:
     friend class ColumnSubtableParent;
     friend class Table;
+    friend class Group;
     template<class> friend class BasicTable;
     template<class> friend class BasicTableRef;
 

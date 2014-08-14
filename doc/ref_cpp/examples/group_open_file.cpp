@@ -18,7 +18,7 @@ void func()
     g.open("people.tightdb", Group::mode_ReadWrite);
 
 // @@Fold@@
-    PeopleTable::Ref table = g.get_table<PeopleTable>("people");
+    PeopleTable::Ref table = g.add_table<PeopleTable>("people");
 
     table->add("Mary", 14);
     table->add("Joe", 17);

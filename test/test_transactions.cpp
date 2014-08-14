@@ -87,7 +87,7 @@ void round(TestResults& test_results, SharedGroup& db, int index)
     // Testing all value types
     {
         WriteTransaction wt(db); // Write transaction #1
-        MyTable::Ref table = wt.get_table<MyTable>("my_table");
+        MyTable::Ref table = wt.get_or_add_table<MyTable>("my_table");
         if (table->is_empty()) {
             table->add();
             table->add(0, false, moja, time_t(), "", BinaryData(0,0), 0, Mixed(int64_t()));

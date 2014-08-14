@@ -9,7 +9,7 @@ using namespace std;
 int main()
 {
     Group group;
-    TableRef table = group.get_table("test");
+    TableRef table = group.add_table("test");
     table->add_column(type_String,   "name");
     table->add_column(type_Int,      "age");
     table->add_column(type_Bool,     "male");

@@ -2,7 +2,6 @@
 #include <stdexcept>
 
 #include <tightdb/util/thread.hpp>
-#include <tightdb/exceptions.hpp>
 
 #if !defined _WIN32
 #  include <unistd.h>
@@ -82,14 +81,9 @@ void Thread::join()
     m_joinable = false;
 }
 
-TIGHTDB_NORETURN void Thread::create_failed(int err)
+TIGHTDB_NORETURN void Thread::create_failed(int)
 {
-    switch (err) {
-        case EAGAIN:
-            throw ResourceAllocError("pthread_create() failed");
-        default:
-            throw runtime_error("pthread_create() failed");
-    }
+    throw runtime_error("pthread_create() failed");
 }
 
 TIGHTDB_NORETURN void Thread::join_failed(int)
@@ -132,8 +126,6 @@ TIGHTDB_NORETURN void Mutex::init_failed(int err)
     switch (err) {
         case ENOMEM:
             throw bad_alloc();
-        case EAGAIN:
-            throw ResourceAllocError("pthread_mutex_init() failed");
         default:
             throw runtime_error("pthread_mutex_init() failed");
     }
@@ -223,8 +215,6 @@ TIGHTDB_NORETURN void CondVar::init_failed(int err)
     switch (err) {
         case ENOMEM:
             throw bad_alloc();
-        case EAGAIN:
-            throw ResourceAllocError("pthread_cond_init() failed");
         default:
             throw runtime_error("pthread_cond_init() failed");
     }

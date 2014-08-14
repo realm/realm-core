@@ -1,6 +1,7 @@
 #include "testsettings.hpp"
 #ifdef TEST_SHARED
 
+#include <streambuf>
 #include <fstream>
 
 // Need fork() and waitpid() for Shared_RobustAgainstDeathDuringWrite
@@ -100,6 +101,7 @@ TEST(Shared_NoCreateCleanupLockFileAfterFailure)
     // Verify that the `lock` file is not left behind
     CHECK(!File::exists(path.get_lock_path()));
 }
+
 
 // FIXME: The following test seems really weird. The previous test
 // checks that no `lock` file is left behind, yet this test seems to
@@ -248,7 +250,7 @@ TEST(Shared_Initial2)
             {
                 WriteTransaction wt(sg2);
                 wt.get_group().Verify();
-                TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
+                TestTableShared::Ref t1 = wt.add_table<TestTableShared>("test");
                 t1->add(1, 2, false, "test");
                 wt.commit();
             }
@@ -294,7 +296,7 @@ TEST(Shared_Initial2_Mem)
             {
                 WriteTransaction wt(sg2);
                 wt.get_group().Verify();
-                TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
+                TestTableShared::Ref t1 = wt.add_table<TestTableShared>("test");
                 t1->add(1, 2, false, "test");
                 wt.commit();
             }
@@ -329,7 +331,7 @@ TEST(Shared_1)
         {
             WriteTransaction wt(sg);
             wt.get_group().Verify();
-            TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
+            TestTableShared::Ref t1 = wt.add_table<TestTableShared>("test");
             t1->add(1, 2, false, "test");
             wt.commit();
         }
@@ -410,6 +412,7 @@ TEST(Shared_1)
     CHECK(!File::exists(path.get_lock_path()));
 }
 
+
 TEST(Shared_Rollback)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -421,7 +424,7 @@ TEST(Shared_Rollback)
         {
             WriteTransaction wt(sg);
             wt.get_group().Verify();
-            TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
+            TestTableShared::Ref t1 = wt.add_table<TestTableShared>("test");
             t1->add(1, 2, false, "test");
             // Note: Implicit rollback
         }
@@ -430,14 +433,14 @@ TEST(Shared_Rollback)
         {
             ReadTransaction rt(sg);
             rt.get_group().Verify();
-            CHECK_EQUAL(false, rt.get_group().has_table("test"));
+            CHECK(!rt.get_group().has_table("test"));
         }
 
         // Really create first table in group
         {
             WriteTransaction wt(sg);
             wt.get_group().Verify();
-            TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
+            TestTableShared::Ref t1 = wt.add_table<TestTableShared>("test");
             t1->add(1, 2, false, "test");
             wt.commit();
         }
@@ -480,6 +483,7 @@ TEST(Shared_Rollback)
     CHECK(!File::exists(path.get_lock_path()));
 }
 
+
 TEST(Shared_Writes)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -491,7 +495,7 @@ TEST(Shared_Writes)
         {
             WriteTransaction wt(sg);
             wt.get_group().Verify();
-            TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
+            TestTableShared::Ref t1 = wt.add_table<TestTableShared>("test");
             t1->add(0, 2, false, "test");
             wt.commit();
         }
@@ -528,7 +532,7 @@ TEST(Shared_AddColumnToSubspec)
     // Create table with a non-empty subtable
     {
         WriteTransaction wt(sg);
-        TableRef table = wt.get_table("table");
+        TableRef table = wt.add_table("table");
         DescriptorRef sub_1;
         table->add_column(type_Table, "subtable", &sub_1);
         sub_1->add_column(type_Int,   "int");
@@ -587,7 +591,7 @@ TEST(Shared_RemoveColumnBeforeSubtableColumn)
     {
         WriteTransaction wt(sg);
         DescriptorRef sub_1;
-        TableRef table = wt.get_table("table");
+        TableRef table = wt.add_table("table");
         table->add_column(type_Int,   "int");
         table->add_column(type_Table, "subtable", &sub_1);
         sub_1->add_column(type_Int,   "int");
@@ -669,11 +673,11 @@ TEST(Shared_ManyReaders)
         {
             WriteTransaction wt(root_sg);
             wt.get_group().Verify();
-            TableRef test_1 = wt.get_table("test_1");
+            TableRef test_1 = wt.get_or_add_table("test_1");
             test_1->add_column(type_Int, "i");
             test_1->insert_int(0,0,0);
             test_1->insert_done();
-            TableRef test_2 = wt.get_table("test_2");
+            TableRef test_2 = wt.get_or_add_table("test_2");
             test_2->add_column(type_Binary, "b");
             wt.commit();
         }
@@ -887,7 +891,7 @@ TEST(Shared_WritesSpecialOrder)
     {
         WriteTransaction wt(sg);
         wt.get_group().Verify();
-        MyTable_SpecialOrder::Ref table = wt.get_table<MyTable_SpecialOrder>("test");
+        MyTable_SpecialOrder::Ref table = wt.add_table<MyTable_SpecialOrder>("test");
         for (int i=0; i<num_rows; ++i) {
             table->add(0);
         }
@@ -970,7 +974,7 @@ TEST(Shared_WriterThreads)
         {
             WriteTransaction wt(sg);
             wt.get_group().Verify();
-            TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
+            TestTableShared::Ref t1 = wt.add_table<TestTableShared>("test");
             for (size_t i = 0; i < thread_count; ++i)
                 t1->add(0, 2, false, "test");
             wt.commit();
@@ -1027,7 +1031,7 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
             SharedGroup sg(path);
             WriteTransaction wt(sg);
             wt.get_group().Verify();
-            TableRef table = wt.get_table("alpha");
+            TableRef table = wt.add_table("alpha");
             _exit(0); // Die with an active write transaction
         }
         else {
@@ -1048,7 +1052,7 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
             SharedGroup sg(path);
             WriteTransaction wt(sg);
             wt.get_group().Verify();
-            TableRef table = wt.get_table("beta");
+            TableRef table = wt.add_table("beta");
             if (table->is_empty()) {
                 table->add_column(type_Int, "i");
                 table->insert_int(0,0,0);
@@ -1081,7 +1085,7 @@ TEST(Shared_FormerErrorCase1)
         DescriptorRef sub_1, sub_2;
         WriteTransaction wt(sg);
         wt.get_group().Verify();
-        TableRef table = wt.get_table("my_table");
+        TableRef table = wt.add_table("my_table");
         table->add_column(type_Int,      "alpha");
         table->add_column(type_Bool,     "beta");
         table->add_column(type_Int,      "gamma");
@@ -1228,20 +1232,18 @@ TEST(Shared_FormerErrorCase2)
     SHARED_GROUP_TEST_PATH(path);
     for (int i=0; i<10; ++i) {
         SharedGroup sg(path);
-        {
-            WriteTransaction wt(sg);
-            wt.get_group().Verify();
-            FormerErrorCase2_Table::Ref table = wt.get_table<FormerErrorCase2_Table>("table");
-            table->add();
-            table->add();
-            table->add();
-            table->add();
-            table->add();
-            table->clear();
-            table->add();
-            table[0].bar->add();
-            wt.commit();
-        }
+        WriteTransaction wt(sg);
+        wt.get_group().Verify();
+        FormerErrorCase2_Table::Ref table = wt.get_or_add_table<FormerErrorCase2_Table>("table");
+        table->add();
+        table->add();
+        table->add();
+        table->add();
+        table->add();
+        table->clear();
+        table->add();
+        table[0].bar->add();
+        wt.commit();
     }
 }
 
@@ -1270,7 +1272,7 @@ TEST(Shared_SpaceOveruse)
     for (int i = 0; i != n_outer; ++i) {
         WriteTransaction wt(sg);
         wt.get_group().Verify();
-        OverAllocTable::Ref table = wt.get_table<OverAllocTable>("my_table");
+        OverAllocTable::Ref table = wt.get_or_add_table<OverAllocTable>("my_table");
         for (int j = 0; j != n_inner; ++j)
             table->add("x");
         wt.commit();
@@ -1319,7 +1321,7 @@ TEST(Shared_Notifications)
         {
             WriteTransaction wt(sg2);
             wt.get_group().Verify();
-            TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
+            TestTableShared::Ref t1 = wt.add_table<TestTableShared>("test");
             t1->add(1, 2, false, "test");
             wt.commit();
         }
@@ -1352,7 +1354,7 @@ TEST(Shared_FromSerialized)
     // Create new group and serialize to disk
     {
         Group g1;
-        TestTableShared::Ref t1 = g1.get_table<TestTableShared>("test");
+        TestTableShared::Ref t1 = g1.add_table<TestTableShared>("test");
         t1->add(1, 2, false, "test");
         g1.write(path);
     }
@@ -1381,7 +1383,7 @@ TEST_IF(Shared_StringIndexBug1, TEST_DURATION >= 3)
 
     {
         Group& group = db.begin_write();
-        TableRef table = group.get_table("users");
+        TableRef table = group.add_table("users");
         table->add_column(type_String, "username");
         table->set_index(0);
         for (int i = 0; i < TIGHTDB_MAX_LIST_SIZE + 1; ++i)
@@ -1408,7 +1410,7 @@ TEST(Shared_StringIndexBug2)
     {
         WriteTransaction wt(sg);
         wt.get_group().Verify();
-        TableRef table = wt.get_table("a");
+        TableRef table = wt.add_table("a");
         table->add_column(type_String, "b");
         table->set_index(0);  // Not adding index makes it work
         table->add_empty_row();
@@ -1439,7 +1441,7 @@ TEST(Shared_StringIndexBug3)
 
     {
         Group& group = db.begin_write();
-        TableRef table = group.get_table("users");
+        TableRef table = group.add_table("users");
         table->add_column(type_String, "username");
         table->set_index(0);  // Disabling index makes it work
         db.commit();
@@ -1488,7 +1490,7 @@ TEST(Shared_ClearColumnWithBasicArrayRootLeaf)
     {
         SharedGroup sg(path);
         WriteTransaction wt(sg);
-        TableRef test = wt.get_table("Test");
+        TableRef test = wt.add_table("Test");
         test->add_column(type_Double, "foo");
         test->clear();
         test->add_empty_row();
@@ -1521,7 +1523,7 @@ TEST_IF(Shared_Async, allow_async)
 //            cout << "t "<<n<<"\n";
             WriteTransaction wt(db);
             wt.get_group().Verify();
-            TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
+            TestTableShared::Ref t1 = wt.get_or_add_table<TestTableShared>("test");
             t1->add(1, i, false, "test");
             wt.commit();
         }
@@ -1634,7 +1636,7 @@ void multiprocess_make_table(string path, string lock_path, string alone_path, s
         bool no_create = false;
         SharedGroup sg(path, no_create, SharedGroup::durability_Async);
         WriteTransaction wt(sg);
-        TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
+        TestTableShared::Ref t1 = wt.get_or_add_table<TestTableShared>("test");
         for (size_t i = 0; i < rows; ++i) {
             t1->add(0, 2, false, "test");
         }
@@ -1781,7 +1783,7 @@ TEST(Shared_MixedWithNonShared)
     {
         // See if we can modify with non-shared group
         Group g(path, Group::mode_ReadWrite);
-        g.get_table("foo"); // Add table "foo"
+        g.add_table("foo"); // Add table "foo"
         g.commit();
     }
 
@@ -1789,13 +1791,13 @@ TEST(Shared_MixedWithNonShared)
     {
         // Create non-empty file without free-space tracking
         Group g;
-        g.get_table("x");
+        g.add_table("x");
         g.write(path);
     }
     {
         // See if we can modify with non-shared group
         Group g(path, Group::mode_ReadWrite);
-        g.get_table("foo"); // Add table "foo"
+        g.add_table("foo"); // Add table "foo"
         g.commit();
     }
 
@@ -1816,7 +1818,7 @@ TEST(Shared_MixedWithNonShared)
         {
             WriteTransaction wt(sg);
             wt.get_group().Verify();
-            wt.get_table("foo"); // Add table "foo"
+            wt.add_table("foo"); // Add table "foo"
             wt.commit();
         }
     }
@@ -1825,7 +1827,7 @@ TEST(Shared_MixedWithNonShared)
     {
         // Create non-empty file without free-space tracking
         Group g;
-        g.get_table("x");
+        g.add_table("x");
         g.write(path);
     }
     {
@@ -1839,7 +1841,7 @@ TEST(Shared_MixedWithNonShared)
         {
             WriteTransaction wt(sg);
             wt.get_group().Verify();
-            wt.get_table("foo"); // Add table "foo"
+            wt.add_table("foo"); // Add table "foo"
             wt.commit();
         }
     }
@@ -1859,7 +1861,7 @@ TEST(Shared_MixedWithNonShared)
     {
         // Modify using non-shared group
         Group g(path, Group::mode_ReadWrite);
-        g.get_table("bar"); // Add table "bar"
+        g.add_table("bar"); // Add table "bar"
         g.commit();
     }
     {
@@ -1875,7 +1877,7 @@ TEST(Shared_MixedWithNonShared)
         {
             WriteTransaction wt(sg);
             wt.get_group().Verify();
-            wt.get_table("baz"); // Add table "baz"
+            wt.add_table("baz"); // Add table "baz"
             wt.commit();
         }
     }
@@ -1886,6 +1888,26 @@ TEST(Shared_MixedWithNonShared)
             rt.get_group().Verify();
             CHECK(rt.has_table("baz"));
         }
+    }
+
+    // The empty group created initially by a shared group accessor is special
+    // in that it contains no nodes, and the root-ref is therefore zero. The
+    // following block checks that the contents of such a file is still
+    // perceived as valid when placed in a memory buffer, and then opened.
+    File::try_remove(path);
+    {
+        {
+            SharedGroup sg(path); // Create the very empty group
+        }
+        ifstream in(path.c_str());
+        string buffer((istreambuf_iterator<char>(in)), istreambuf_iterator<char>());
+        bool take_ownership = false;
+        Group group(BinaryData(buffer), take_ownership);
+        group.Verify();
+        CHECK(group.is_empty());
+        group.add_table("x");
+        group.Verify();
+        CHECK_EQUAL(1, group.size());
     }
 }
 
@@ -1907,7 +1929,7 @@ TEST(Shared_PinnedTransactions)
     }
     {   // add something to the db to play with
         WriteTransaction wt(sg1);
-        TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
+        TestTableShared::Ref t1 = wt.add_table<TestTableShared>("test");
         t1->add(0, 2, false, "test");
         wt.commit();
     }
@@ -2057,7 +2079,7 @@ TEST(Shared_ReserveDiskSpace)
         {
             WriteTransaction wt(sg);
             wt.get_group().Verify();
-            wt.get_table<TestTableShared>("table_1")->add_empty_row(2000);
+            wt.add_table<TestTableShared>("table_1")->add_empty_row(2000);
             wt.commit();
         }
         orig_file_size = size_t(File(path).get_size());
@@ -2067,13 +2089,13 @@ TEST(Shared_ReserveDiskSpace)
         CHECK(new_file_size_4 >= reserve_size_4);
         WriteTransaction wt(sg);
         wt.get_group().Verify();
-        wt.get_table<TestTableShared>("table_2")->add_empty_row(2000);
+        wt.add_table<TestTableShared>("table_2")->add_empty_row(2000);
         orig_file_size = size_t(File(path).get_size());
         size_t reserve_size_5 = orig_file_size + 333;
         sg.reserve(reserve_size_5);
         size_t new_file_size_5 = size_t(File(path).get_size());
         CHECK(new_file_size_5 >= reserve_size_5);
-        wt.get_table<TestTableShared>("table_3")->add_empty_row(2000);
+        wt.add_table<TestTableShared>("table_3")->add_empty_row(2000);
         wt.commit();
         orig_file_size = size_t(File(path).get_size());
         size_t reserve_size_6 = orig_file_size + 459;
@@ -2102,7 +2124,7 @@ TEST(Shared_MovingEnumStringColumn)
 
     {
         WriteTransaction wt(sg);
-        TableRef table = wt.get_table("foo");
+        TableRef table = wt.add_table("foo");
         table->add_column(type_String, "");
         table->add_empty_row(64);
         for (int i = 0; i < 64; ++i)
@@ -2207,7 +2229,7 @@ TEST(Shared_MovingSearchIndex)
     // equip both with search indexes.
     {
         WriteTransaction wt(sg);
-        TableRef table = wt.get_table("foo");
+        TableRef table = wt.add_table("foo");
         table->add_column(type_String, "regular");
         table->add_column(type_String, "enum");
         table->add_empty_row(64);
@@ -2327,7 +2349,7 @@ TEST(Shared_ArrayEraseBug)
     SharedGroup sg(path);
     {
         WriteTransaction wt(sg);
-        TableRef table = wt.get_table("table");
+        TableRef table = wt.add_table("table");
         table->add_column(type_Int, "");
         for (size_t i = 0; i < max_node_size_squared; ++i)
             table->insert_empty_row(0);

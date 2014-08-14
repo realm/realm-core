@@ -7,7 +7,7 @@ int main()
 {
 // @@Show@@
     Group group;
-    TableRef table = group.get_table("test");
+    TableRef table = group.add_table("test");
 
     // Create query with no criterias which will match all rows
     Query q = table->where();

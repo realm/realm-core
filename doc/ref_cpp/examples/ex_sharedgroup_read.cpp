@@ -28,7 +28,7 @@ void func()
 
     {
         Group& g = db.begin_write();
-        PeopleTable::Ref employees = g.get_table<PeopleTable>("employees");
+        PeopleTable::Ref employees = g.add_table<PeopleTable>("employees");
         employees->add("joe", 42, false);
         employees->add("jessica", 22, true);
         db.commit();

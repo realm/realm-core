@@ -14,7 +14,7 @@ void func(Group& g)
     if (!g.is_attached())
         g.open("people.tightdb");
 
-    PeopleTable::Ref table = g.get_table<PeopleTable>("people");
+    PeopleTable::Ref table = g.add_table<PeopleTable>("people");
 
     table->add("Mary", 14);
     table->add("Joe", 17);
@@ -32,8 +32,7 @@ int main()
 
 // @@EndFold@@
     // Create a group without attached storage
-    Group::unattached_tag tag;
-    Group g2(tag);
+    Group g2((Group::unattached_tag()));
     func(g2);
 // @@Fold@@
     util::File::remove("people.tightdb");

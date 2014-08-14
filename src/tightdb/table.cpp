@@ -4557,24 +4557,25 @@ void Table::refresh_column_accessors(size_t col_ndx_begin)
             // created, and when the backlink column is created. In both cases,
             // if the opposite table accessor is still dirty, the establishment
             // of the connection is postponed.
+            typedef _impl::GroupFriend gf;
             if (is_link_type(col_type)) {
-                Group* group = get_parent_group();
+                Group& group = *get_parent_group();
                 size_t target_table_ndx = m_spec.get_opposite_link_table_ndx(col_ndx);
-                Table* target_table = group->get_table_by_ndx(target_table_ndx); // Throws
-                if (!target_table->is_marked() && target_table != this) {
+                Table& target_table = gf::get_table(group, target_table_ndx); // Throws
+                if (!target_table.is_marked() && &target_table != this) {
                     size_t origin_ndx_in_group = m_top.get_ndx_in_parent();
                     size_t backlink_col_ndx =
-                        target_table->m_spec.find_backlink_column(origin_ndx_in_group, col_ndx);
-                    connect_opposite_link_columns(col_ndx, *target_table, backlink_col_ndx);
+                        target_table.m_spec.find_backlink_column(origin_ndx_in_group, col_ndx);
+                    connect_opposite_link_columns(col_ndx, target_table, backlink_col_ndx);
                 }
             }
             else if (col_type == col_type_BackLink) {
-                Group* group = get_parent_group();
+                Group& group = *get_parent_group();
                 size_t origin_table_ndx = m_spec.get_opposite_link_table_ndx(col_ndx);
-                Table* origin_table = group->get_table_by_ndx(origin_table_ndx); // Throws
-                if (!origin_table->is_marked() || origin_table == this) {
+                Table& origin_table = gf::get_table(group, origin_table_ndx); // Throws
+                if (!origin_table.is_marked() || &origin_table == this) {
                     size_t link_col_ndx = m_spec.get_origin_column_ndx(col_ndx);
-                    origin_table->connect_opposite_link_columns(link_col_ndx, *this, col_ndx);
+                    origin_table.connect_opposite_link_columns(link_col_ndx, *this, col_ndx);
                 }
             }
         }
