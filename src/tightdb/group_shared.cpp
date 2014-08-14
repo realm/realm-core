@@ -1224,6 +1224,11 @@ void SharedGroup::commit(bool eliminate_if_empty)
 {
     if (eliminate_if_empty && m_readlock.m_top_ref == m_group.get_top_ref()) {
 
+#ifdef TIGHTDB_ENABLE_REPLICATION
+        if (Replication* repl = m_group.get_replication()) {
+            repl->rollback_write_transact(*this);
+        }
+#endif
         // Release write lock
         SharedInfo* info = m_file_map.get_addr();
         info->writemutex.unlock();
@@ -1244,6 +1249,9 @@ void SharedGroup::commit_and_continue_as_read(bool eliminate_if_empty)
 {
     if (eliminate_if_empty && m_readlock.m_top_ref == m_group.get_top_ref()) {
 
+        if (Replication* repl = m_group.get_replication()) {
+            repl->rollback_write_transact(*this);
+        }
         // back to reading stage
         m_transact_stage = transact_Reading;
 
