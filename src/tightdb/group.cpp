@@ -994,6 +994,9 @@ public:
 
     bool insert_link(size_t col_ndx, size_t row_ndx, size_t) TIGHTDB_NOEXCEPT
     {
+        // The marking dirty of the target table is handled by
+        // insert_empty_rows() regardless of whether the link column is the
+        // first column or not.
         if (col_ndx == 0)
             insert_empty_rows(row_ndx, 1);
        return true;
@@ -1077,7 +1080,7 @@ public:
         // link-target table when there is no accessor for the origin
         // table. Fortunately, due to the fact that back-link column accessors
         // refer to the origin table accessor (and vice versa), it follows that
-        // the link-target table accessor exists if, and only if then origin
+        // the link-target table accessor exists if, and only if the origin
         // table accessor exists.
         //
         // get_link_target_table_accessor() will return null if the

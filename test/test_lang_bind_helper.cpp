@@ -5458,6 +5458,46 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkCycles)
 }
 
 
+TEST(LangBindHelper_AdvanceReadTransact_InsertLink)
+{
+    // This test checks that Table::insert_link() works across transaction
+    // boundaries (advance transaction).
+
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg(path);
+    ShortCircuitTransactLogManager tlm(path);
+    SharedGroup sg_w(tlm);
+
+    // Start a read transaction (to be repeatedly advanced)
+    ReadTransaction rt(sg);
+    const Group& group = rt.get_group();
+    CHECK_EQUAL(0, group.size());
+
+    {
+        WriteTransaction wt(sg_w);
+        TableRef origin_w = wt.get_table("origin");
+        TableRef target_w = wt.get_table("target");
+        origin_w->add_column_link(type_Link, "", *target_w);
+        target_w->add_column(type_Int, "");
+        target_w->add_empty_row();
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, tlm);
+    group.Verify();
+    ConstTableRef origin = group.get_table("origin");
+    ConstTableRef target = group.get_table("target");
+    {
+        WriteTransaction wt(sg_w);
+        TableRef origin_w = wt.get_table("origin");
+        origin_w->insert_link(0,0,0);
+        origin_w->insert_done();
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, tlm);
+    group.Verify();
+}
+
+
 TEST(LangBindHelper_ImplicitTransactions)
 {
     SHARED_GROUP_TEST_PATH(path);
