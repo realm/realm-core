@@ -670,7 +670,7 @@ public:
         if (TIGHTDB_LIKELY(!m_group.has_table(name))) {
 #ifdef TIGHTDB_DEBUG
             if (m_log)
-                *m_log << "group->create_table(\""<<name<<"\")\n";
+                *m_log << "group->add_table(\""<<name<<"\", false)\n";
 #endif
             typedef _impl::GroupFriend gf;
             bool require_unique_name = false;
