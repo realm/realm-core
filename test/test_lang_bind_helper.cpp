@@ -5547,6 +5547,29 @@ TEST(LangBindHelper_ImplicitTransactions)
     sg.end_read();
 }
 
+TEST(LangBindHelper_CommitElimination)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    UniquePtr<LangBindHelper::TransactLogRegistry> wlr(getWriteLogs(path));
+    UniquePtr<Replication> repl(makeWriteLogCollector(path));
+    SharedGroup sg(*repl);
+    {
+        WriteTransaction wt(sg);
+        wt.add_table<TestTableShared>("table")->add_empty_row();
+        wt.commit();
+    }
+    UniquePtr<Replication> repl2(makeWriteLogCollector(path));
+    SharedGroup sg2(*repl2);
+    CHECK_EQUAL(true, sg2.has_changed());
+    sg2.begin_read(); // "see" the change
+    sg2.end_read();
+    {
+        WriteTransaction wt(sg);
+        // empty transaction
+        wt.commit();
+    }
+    CHECK_EQUAL(false, sg2.has_changed());
+}
 
 TEST(LangBindHelper_ImplicitTransactions_OverSharedGroupDestruction)
 {

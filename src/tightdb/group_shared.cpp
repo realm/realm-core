@@ -1220,10 +1220,17 @@ void SharedGroup::do_begin_write()
 }
 
 
-void SharedGroup::commit()
+void SharedGroup::commit(bool eliminate_if_empty)
 {
-    do_commit();
+    if (eliminate_if_empty && m_readlock.m_top_ref == m_group.get_top_ref()) {
 
+        // Release write lock
+        SharedInfo* info = m_file_map.get_addr();
+        info->writemutex.unlock();
+    }
+    else {
+        do_commit();
+    }
     end_read();
     // complete detach
     // (end_read allows group to retain data, but accessors become invalid after commit):
@@ -1233,8 +1240,19 @@ void SharedGroup::commit()
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
 
-void SharedGroup::commit_and_continue_as_read()
+void SharedGroup::commit_and_continue_as_read(bool eliminate_if_empty)
 {
+    if (eliminate_if_empty && m_readlock.m_top_ref == m_group.get_top_ref()) {
+
+        // back to reading stage
+        m_transact_stage = transact_Reading;
+
+        // Release write lock
+        SharedInfo* info = m_file_map.get_addr();
+        info->writemutex.unlock();
+        return;
+    }
+
     do_commit();
 
     // Mark all managed space (beyond the attached file) as free.

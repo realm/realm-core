@@ -419,6 +419,9 @@ private:
     /// commits via shared group.
     void update_refs(ref_type top_ref, std::size_t old_baseline) TIGHTDB_NOEXCEPT;
 
+    // Return the top ref
+    ref_type get_top_ref();
+
     /// Reinitialize group for a new read or write transaction.
     void init_for_transact(ref_type new_top_ref, std::size_t new_file_size);
 
