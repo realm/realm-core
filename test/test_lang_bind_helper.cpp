@@ -5475,8 +5475,8 @@ TEST(LangBindHelper_AdvanceReadTransact_InsertLink)
 
     {
         WriteTransaction wt(sg_w);
-        TableRef origin_w = wt.get_table("origin");
-        TableRef target_w = wt.get_table("target");
+        TableRef origin_w = wt.add_table("origin");
+        TableRef target_w = wt.add_table("target");
         origin_w->add_column_link(type_Link, "", *target_w);
         target_w->add_column(type_Int, "");
         target_w->add_empty_row();
