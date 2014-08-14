@@ -281,9 +281,9 @@ TEST(Json_LinkList1)
     // Basic non-cyclic LinkList test that also tests column and table renaming
     Group group;
 
-    TableRef table1 = group.get_table("table1");
-    TableRef table2 = group.get_table("table2");
-    TableRef table3 = group.get_table("table3");
+    TableRef table1 = group.add_table("table1");
+    TableRef table2 = group.add_table("table2");
+    TableRef table3 = group.add_table("table3");
 
     // add some more columns to table1 and table2
     table1->add_column(type_Int, "col1");
@@ -374,8 +374,8 @@ TEST(Json_LinkListCycle)
     // Cycle in LinkList
     Group group;
 
-    TableRef table1 = group.get_table("table1");
-    TableRef table2 = group.get_table("table2");
+    TableRef table1 = group.add_table("table1");
+    TableRef table2 = group.add_table("table2");
 
     table1->add_column(type_String, "str1");
     table2->add_column(type_String, "str2");
@@ -436,8 +436,8 @@ TEST(Json_LinkCycles)
     // Cycle in Link
     Group group;
 
-    TableRef table1 = group.get_table("table1");
-    TableRef table2 = group.get_table("table2");
+    TableRef table1 = group.add_table("table1");
+    TableRef table2 = group.add_table("table2");
 
     table1->add_column(type_String, "str1");
     table2->add_column(type_String, "str2");

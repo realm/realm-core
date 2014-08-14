@@ -8,7 +8,7 @@ using namespace std;
 int main()
 {
     Group group;
-    TableRef table = group.get_table("test");
+    TableRef table = group.add_table("test");
     table->add_column(type_String, "Name");
 
     table->add_empty_row(5);

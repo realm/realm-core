@@ -21,16 +21,41 @@
 #ifndef TIGHTDB_EXCEPTIONS_HPP
 #define TIGHTDB_EXCEPTIONS_HPP
 
-#include <stdexcept>
+#include <exception>
 
 namespace tightdb {
 
 
-/// Thrown by various TightDb functions and methods if necessary
-/// system resources could not be allocated. Memory allocation errors,
-/// specifically, are generally reported by throwing std::bad_alloc.
-struct ResourceAllocError: std::runtime_error {
-    ResourceAllocError(const std::string& msg): std::runtime_error(msg) {}
+/// Thrown by various functions to indicate that a specified argument is not
+/// valid.
+class InvalidArgument: public std::exception {
+public:
+    const char* what() const TIGHTDB_NOEXCEPT_OR_NOTHROW TIGHTDB_OVERRIDE
+    {
+        return "Invalid argument";
+    }
+};
+
+
+/// Thrown by various functions to indicate that the dynamic type of a table
+/// does not match a particular other table type (dynamic or static).
+class DescriptorMismatch: public std::exception {
+public:
+    const char* what() const TIGHTDB_NOEXCEPT_OR_NOTHROW TIGHTDB_OVERRIDE
+    {
+        return "The specified table name is already in use";
+    }
+};
+
+
+/// Thrown by various functions to indicate that a specified table name is
+/// already in use.
+class TableNameInUse: public std::exception {
+public:
+    const char* what() const TIGHTDB_NOEXCEPT_OR_NOTHROW TIGHTDB_OVERRIDE
+    {
+        return "The specified table name is already in use";
+    }
 };
 
 

@@ -1140,7 +1140,7 @@ template<size_t w> int64_t Array::sum(size_t start, size_t end) const
     return s;
 }
 
-size_t Array::count(int64_t value) const
+size_t Array::count(int64_t value) const TIGHTDB_NOEXCEPT
 {
     const uint64_t* next = reinterpret_cast<uint64_t*>(m_data);
     size_t count = 0;

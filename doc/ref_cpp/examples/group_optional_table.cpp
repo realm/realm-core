@@ -14,9 +14,9 @@ TIGHTDB_TABLE_2(PeopleTable,
 void optional_table(const Group& group)
 {
 // @@EndFold@@
-    assert(group.has_table<PeopleTable>("people") || !group.has_table("people"));
     PeopleTable::ConstRef table = group.get_table<PeopleTable>("people");
-    cout << table->get_column_count() << "\n";
+    if (table)
+        cout << table->get_column_count() << "\n";
 // @@Fold@@
 }
 
@@ -24,7 +24,7 @@ int main()
 {
     Group group;
 
-    PeopleTable::Ref table = group.get_table<PeopleTable>("people");
+    PeopleTable::Ref table = group.add_table<PeopleTable>("people");
     table->add("Mary", 14);
     table->add("Joe", 17);
     table->add("Jack", 22);

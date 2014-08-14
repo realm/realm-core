@@ -348,7 +348,7 @@ private:
     // End the current write transaction and transition atomically into
     // a read transaction, WITHOUT synchronizing to external changes
     // to data. All accessors are retained and continue to reflect the
-    // state at commit. 
+    // state at commit.
     void commit_and_continue_as_read();
 
     // Abort the current write transaction, discarding all changes within it,
@@ -371,9 +371,10 @@ private:
 
 class ReadTransaction {
 public:
-    ReadTransaction(SharedGroup& sg): m_shared_group(sg)
+    ReadTransaction(SharedGroup& sg):
+        m_shared_group(sg)
     {
-        m_shared_group.begin_read();
+        m_shared_group.begin_read(); // Throws
     }
 
     ~ReadTransaction() TIGHTDB_NOEXCEPT
@@ -381,19 +382,19 @@ public:
         m_shared_group.end_read();
     }
 
-    bool has_table(StringData name) const
+    bool has_table(StringData name) const TIGHTDB_NOEXCEPT
     {
         return get_group().has_table(name);
     }
 
     ConstTableRef get_table(StringData name) const
     {
-        return get_group().get_table(name);
+        return get_group().get_table(name); // Throws
     }
 
-    template<class T> typename T::ConstRef get_table(StringData name) const
+    template<class T> BasicTableRef<const T> get_table(StringData name) const
     {
-        return get_group().get_table<T>(name);
+        return get_group().get_table<T>(name); // Throws
     }
 
     const Group& get_group() const TIGHTDB_NOEXCEPT
@@ -408,9 +409,10 @@ private:
 
 class WriteTransaction {
 public:
-    WriteTransaction(SharedGroup& sg): m_shared_group(&sg)
+    WriteTransaction(SharedGroup& sg):
+        m_shared_group(&sg)
     {
-        m_shared_group->begin_write();
+        m_shared_group->begin_write(); // Throws
     }
 
     ~WriteTransaction() TIGHTDB_NOEXCEPT
@@ -421,12 +423,33 @@ public:
 
     TableRef get_table(StringData name) const
     {
-        return get_group().get_table(name);
+        return get_group().get_table(name); // Throws
     }
 
-    template<class T> typename T::Ref get_table(StringData name) const
+    TableRef add_table(StringData name, bool require_unique_name = true) const
     {
-        return get_group().get_table<T>(name);
+        return get_group().add_table(name, require_unique_name); // Throws
+    }
+
+    TableRef get_or_add_table(StringData name, bool* was_added = 0) const
+    {
+        return get_group().get_or_add_table(name, was_added); // Throws
+    }
+
+    template<class T> BasicTableRef<T> get_table(StringData name) const
+    {
+        return get_group().get_table<T>(name); // Throws
+    }
+
+    template<class T>
+    BasicTableRef<T> add_table(StringData name, bool require_unique_name = true) const
+    {
+        return get_group().add_table<T>(name, require_unique_name); // Throws
+    }
+
+    template<class T> BasicTableRef<T> get_or_add_table(StringData name, bool* was_added = 0) const
+    {
+        return get_group().get_or_add_table<T>(name, was_added); // Throws
     }
 
     Group& get_group() const TIGHTDB_NOEXCEPT

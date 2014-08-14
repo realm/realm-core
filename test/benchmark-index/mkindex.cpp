@@ -19,7 +19,7 @@ TIGHTDB_TABLE_7(IndexTable,
 int main(int argc, char *argv[]) {
     Group *g = new Group();
 
-    BasicTableRef<IndexTable> t = g->get_table<IndexTable>("test");
+    BasicTableRef<IndexTable> t = g->add_table<IndexTable>("test");
     srandom(1);
     printf("Adding rows\n");
     for(size_t i=0; i<10000000; ++i) {

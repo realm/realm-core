@@ -31,7 +31,7 @@ int main()
     */
 // @@Fold@@
     Group group;
-    TableRef table = group.get_table("MainTable");
+    TableRef table = group.add_table("MainTable");
 
     table->add_column(type_String, "Names");
     table->add_column(type_Table, "Scores");

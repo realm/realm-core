@@ -33,7 +33,7 @@ void func()
         try {
 
             // Get table (creating it if it does not exist)
-            PeopleTable::Ref employees = g.get_table<PeopleTable>("employees");
+            PeopleTable::Ref employees = g.add_table<PeopleTable>("employees");
 
             // Add initial rows (with sub-tables)
             if (employees->is_empty()) {

@@ -406,7 +406,7 @@ static void *tdb_writer(void *arg)
         // execute transaction
         {
             WriteTransaction wt(sg);
-            BasicTableRef<TestTable> t = wt.get_table<TestTable>("test");
+            BasicTableRef<TestTable> t = wt.get_or_add_table<TestTable>("test");
             long randx = random() % 1000;
             long randy = random() % 1000;
             TestTable::View tv = t->where().y.equal(randy).find_all();
@@ -492,7 +492,7 @@ void tdb_create(const char *f, long n)
     SharedGroup sg(f);
     {
         WriteTransaction wt(sg);
-        BasicTableRef<TestTable> t = wt.get_table<TestTable>("test");
+        BasicTableRef<TestTable> t = wt.get_or_add_table<TestTable>("test");
 
         srandom(1);
         for(int i=0; i<n; ++i) {

@@ -83,8 +83,8 @@ TEST(Table_ManyColumnsCrash2)
     {
         Group group;
 
-        MainTableType::Ref mainTable = group.get_table<MainTableType>("PatientTable");
-        TableRef dynPatientTable = group.get_table("PatientTable");
+        MainTableType::Ref mainTable = group.add_table<MainTableType>("PatientTable");
+        TableRef dynPatientTable = group.add_table("PatientTable");
         dynPatientTable->add_empty_row();
 
         for (int counter = 0; counter < 20000; counter++)
@@ -116,7 +116,7 @@ TEST(Table_ManyColumnsCrash2)
 TEST(Table_DeleteCrash)
 {
     Group group;
-    TableRef table = group.get_table("test");
+    TableRef table = group.add_table("test");
 
     table->add_column(type_String, "name");
     table->add_column(type_Int,    "age");
@@ -389,13 +389,13 @@ TEST(Table_GetName)
     // Direct members of groups do have names
     {
         Group group;
-        TableRef table = group.get_table("table");
+        TableRef table = group.add_table("table");
         CHECK_EQUAL("table", table->get_name());
     }
     {
         Group group;
-        TableRef foo = group.get_table("foo");
-        TableRef bar = group.get_table("bar");
+        TableRef foo = group.add_table("foo");
+        TableRef bar = group.add_table("bar");
         CHECK_EQUAL("foo", foo->get_name());
         CHECK_EQUAL("bar", bar->get_name());
     }
@@ -413,7 +413,7 @@ TEST(Table_GetName)
     // ... not even when the parent is a member of a group
     {
         Group group;
-        TableRef table = group.get_table("table");
+        TableRef table = group.add_table("table");
         DescriptorRef subdesc;
         table->add_column(type_Table, "sub", &subdesc);
         table->add_empty_row();
@@ -847,7 +847,7 @@ TEST(Table_RangeConst)
 {
     Group group;
     {
-        TableRef table = group.get_table("test");
+        TableRef table = group.add_table("test");
         table->add_column(type_Int, "int");
         table->add_empty_row(100);
         for (int i = 0 ; i < 100; ++i)
@@ -1620,7 +1620,7 @@ TEST(Table_SlabAlloc)
 TEST(Table_Spec)
 {
     Group group;
-    TableRef table = group.get_table("test");
+    TableRef table = group.add_table("test");
 
     // Create specification with sub-table
     {
@@ -1687,7 +1687,7 @@ TEST(Table_Spec)
 TEST(Table_SpecColumnPath)
 {
     Group group;
-    TableRef table = group.get_table("test");
+    TableRef table = group.add_table("test");
 
     // Create path to sub-table column (starting with root)
     vector<size_t> column_path;
@@ -1725,7 +1725,7 @@ TEST(Table_SpecColumnPath)
 TEST(Table_SpecRenameColumns)
 {
     Group group;
-    TableRef table = group.get_table("test");
+    TableRef table = group.add_table("test");
 
     // Create specification with sub-table
     table->add_column(type_Int,    "first");
@@ -1775,7 +1775,7 @@ TEST(Table_SpecRenameColumns)
 TEST(Table_SpecDeleteColumns)
 {
     Group group;
-    TableRef table = group.get_table("test");
+    TableRef table = group.add_table("test");
 
     // Create specification with sub-table
     table->add_column(type_Int,    "first");
@@ -1893,7 +1893,7 @@ TEST(Table_SpecDeleteColumns)
 TEST(Table_SpecAddColumns)
 {
     Group group;
-    TableRef table = group.get_table("test");
+    TableRef table = group.add_table("test");
 
     // Create specification with sub-table
     table->add_column(type_Int,    "first");
@@ -2631,7 +2631,7 @@ TEST(Table_DateAndBinary)
 TEST(Table_ClearWithSubtableAndGroup)
 {
     Group group;
-    TableRef table = group.get_table("test");
+    TableRef table = group.add_table("test");
     DescriptorRef sub_1;
 
     // Create specification with sub-table
@@ -2670,7 +2670,7 @@ TEST(Table_ClearWithSubtableAndGroup)
 TEST(Table_SetSubTableByExample1)
 {
     Group group;
-    TableRef table = group.get_table("test");
+    TableRef table = group.add_table("test");
 
     // Create specification with sub-table
     table->add_column(type_Int,    "first");
@@ -2724,7 +2724,7 @@ TEST(Table_SetSubTableByExample1)
 TEST(Table_SetSubTableByExample2)
 {
     Group group;
-    TableRef table = group.get_table("test");
+    TableRef table = group.add_table("test");
 
     // Create specification with sub-table
     table->add_column(type_Int,    "first");
@@ -2794,13 +2794,13 @@ TEST(Table_HasSharedSpec)
     MyTable2 table1;
     CHECK(!table1.has_shared_type());
     Group g;
-    MyTable2::Ref table2 = g.get_table<MyTable2>("foo");
+    MyTable2::Ref table2 = g.add_table<MyTable2>("foo");
     CHECK(!table2->has_shared_type());
     table2->add();
     CHECK(table2[0].subtab->has_shared_type());
 
     // Subtable in mixed column
-    TestTableMX::Ref table3 = g.get_table<TestTableMX>("bar");
+    TestTableMX::Ref table3 = g.add_table<TestTableMX>("bar");
     CHECK(!table3->has_shared_type());
     table3->add();
     table3[0].first.set_subtable<MyTable2>();
@@ -2907,8 +2907,8 @@ TEST(Table_LanguageBindings)
 
    CHECK(*table == *table2);
 
-   LangBindHelper::unbind_table_ref(table);
-   LangBindHelper::unbind_table_ref(table2);
+   LangBindHelper::unbind_table_ptr(table);
+   LangBindHelper::unbind_table_ptr(table2);
 }
 
 TEST(Table_MultipleColumn)
@@ -3198,7 +3198,7 @@ TEST(Table_WriteSlice)
     }
     {
         Group group;
-        TableRef table = group.get_table("test");
+        TableRef table = group.add_table("test");
         test_write_slice_name(test_results, *table, "test", false);
         test_write_slice_name(test_results, *table, "foo",  true); // Override
         test_write_slice_name(test_results, *table, "",     true); // Override
@@ -3216,7 +3216,7 @@ TEST(Table_WriteSlice)
     for (int table_size_i = 0; table_size_i != num_sizes; ++table_size_i) {
         int table_size = table_sizes[table_size_i];
         Group group;
-        TableRef table = group.get_table("test");
+        TableRef table = group.add_table("test");
         bool fixed_subtab_sizes = true;
         setup_multi_table(*table, table_size, 1, fixed_subtab_sizes);
         for (int offset_i = 0; offset_i != num_sizes; ++offset_i) {
@@ -4524,10 +4524,10 @@ TEST(Table_RowAccessor)
 TEST(Table_RowAccessorLinks)
 {
     Group group;
-    TableRef target_table = group.get_table("target");
+    TableRef target_table = group.add_table("target");
     target_table->add_column(type_Int, "");
     target_table->add_empty_row(16);
-    TableRef source_table = group.get_table("source");
+    TableRef source_table = group.add_table("source");
     source_table->add_column_link(type_Link, "", *target_table);
     source_table->add_column_link(type_LinkList, "", *target_table);
     source_table->add_empty_row(2);
