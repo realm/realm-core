@@ -5556,7 +5556,7 @@ TEST(LangBindHelper_RollbackAndContinueAsRead)
     {
         Group* group = const_cast<Group*>(&sg.begin_read());
         LangBindHelper::promote_to_write(sg, *wlr);
-        TableRef origin = group->get_table("origin");
+        TableRef origin = group->get_or_add_table("origin");
         origin->add_column(type_Int, "");
         origin->add_empty_row();
         origin->set_int(0,0,42);
