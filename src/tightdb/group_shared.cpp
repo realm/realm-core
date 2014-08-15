@@ -1229,6 +1229,8 @@ void SharedGroup::commit(bool eliminate_if_empty)
             repl->rollback_write_transact(*this);
         }
 #endif
+        // back to reading stage (or end_read() will assert)
+        m_transact_stage = transact_Reading;
         // Release write lock
         SharedInfo* info = m_file_map.get_addr();
         info->writemutex.unlock();
