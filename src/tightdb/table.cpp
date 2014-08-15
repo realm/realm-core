@@ -1631,7 +1631,8 @@ void Table::insert_empty_row(size_t row_ndx, size_t num_rows)
         bool is_append = row_ndx == m_size;
         column.insert(row_ndx, num_rows, is_append); // Throws
     }
-    adj_row_acc_insert_rows(row_ndx, num_rows);
+    if (row_ndx < m_size)
+        adj_row_acc_insert_rows(row_ndx, num_rows);
     m_size += num_rows;
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
