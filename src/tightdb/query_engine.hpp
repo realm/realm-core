@@ -90,6 +90,7 @@ AggregateState      State of the aggregate - contains a state variable that stor
 #include <functional>
 #include <algorithm>
 
+#include <tightdb/util/thread.hpp>
 #include <tightdb/util/meta.hpp>
 #include <tightdb/unicode.hpp>
 #include <tightdb/utilities.hpp>
@@ -544,7 +545,7 @@ public:
         return to_size_t(m_tv.get_ref_column().get(n));
     }
 
-    void init(const Table& table) TIGHTDB_OVERRIDE
+    virtual void init(const Table& table) TIGHTDB_OVERRIDE
     {
         m_table = &table;
 
@@ -1865,14 +1866,16 @@ protected:
 #include "query_expression.hpp"
 
 
-// For Nexgt-Generation expressions like col1 / col2 + 123 > col4 * 100
+// For Next-Generation expressions like col1 / col2 + 123 > col4 * 100. m_compare is reference counted with the 
+// m_references counter. You could instead add copy/move semantics (much boilerplate and also slow) or use 
+// shared_ptr (c++11)
 class ExpressionNode: public ParentNode {
 
 public:
     ~ExpressionNode() TIGHTDB_NOEXCEPT
     {
-        if (m_auto_delete)
-            delete m_compare, m_compare = null_ptr;
+        if (m_compare->m_references.fetch_sub_acquire(1) == 1)
+            delete m_compare;
     }
 
     ExpressionNode(Expression* compare, bool auto_delete)
@@ -1910,10 +1913,8 @@ public:
     ExpressionNode(ExpressionNode& from) 
         : ParentNode(from)
     {
-        // FIXME! We take over any ownership. This is most likely not correct.
-        m_auto_delete = from.m_auto_delete; // shared ownership? deep copy?
-        from.m_auto_delete = false;
         m_compare = from.m_compare;
+        m_compare->m_references.fetch_add_release(1);
     }
 
     bool m_auto_delete;

@@ -5438,6 +5438,11 @@ TEST(Query_TableViewMoveAssignLeak2)
     Query q = t.column().ints > 2 + 0 && t.column().strings == "4";
     TableView tv = q.find_all();
 
+    // Upon each find_all() call, tv copies the query 'q' into itself. See if this copying works
+    tv = q.find_all();
+    tv = q.find_all();
+    tv = q.find_all();
+    tv = q.find_all();
     tv = q.find_all();
 }
 

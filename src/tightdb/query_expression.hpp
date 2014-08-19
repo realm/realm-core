@@ -238,12 +238,14 @@ struct ValueBase
 class Expression : public Query
 {
 public:
-    Expression() {}
+    Expression() : m_references(1) { }
 
     virtual size_t find_first(size_t start, size_t end) const = 0;
     virtual void set_table() = 0;
     virtual const Table* get_table() = 0;
     virtual ~Expression() {}
+
+    tightdb::util::Atomic<int> m_references;
 };
 
 class Subexpr
