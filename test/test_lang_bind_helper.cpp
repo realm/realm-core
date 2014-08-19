@@ -5727,6 +5727,47 @@ TEST(LangBindHelper_ImplicitTransactions_NoExtremeFileSpaceLeaks)
 }
 
 
+TEST(LangBindHelper_ImplicitTransactions_DetachRowAccessorOnMoveLastOver)
+{
+    SHARED_GROUP_TEST_PATH(path);
+
+    Row rows[10];
+
+    UniquePtr<Replication> repl(makeWriteLogCollector(path));
+    UniquePtr<LangBindHelper::TransactLogRegistry> tlr(getWriteLogs(path));
+    SharedGroup sg(*repl);
+    Group& group = const_cast<Group&>(sg.begin_read());
+
+    LangBindHelper::promote_to_write(sg, *tlr);
+    TableRef table = group.add_table("table");
+    table->add_column(type_Int, "");
+    table->add_empty_row(10);
+    for (int i = 0; i < 10; ++i)
+        table->set_int(0, i, i);
+    LangBindHelper::commit_and_continue_as_read(sg);
+
+    for (int i = 0; i < 10; ++i)
+        rows[i] = table->get(i);
+
+    Random random(random_int<unsigned long>());
+
+    LangBindHelper::promote_to_write(sg, *tlr);
+    for (int i = 0; i < 10; ++i) {
+        size_t row_ndx = random.draw_int_mod(table->size());
+        int value = table->get_int(0, row_ndx);
+        table->move_last_over(row_ndx);
+        CHECK_EQUAL(tightdb::not_found, table->find_first_int(0, value));
+        for (int j = 0; j < 10; ++j) {
+            bool should_be_attached = table->find_first_int(0, j) != tightdb::not_found;
+            CHECK_EQUAL(should_be_attached, rows[j].is_attached());
+        }
+    }
+    LangBindHelper::commit_and_continue_as_read(sg);
+
+    sg.end_read();
+}
+
+
 #endif // TIGHTDB_ENABLE_REPLICATION
 
 #endif
