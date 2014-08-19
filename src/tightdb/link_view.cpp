@@ -34,7 +34,8 @@ void LinkView::insert(size_t link_ndx, size_t target_row_ndx)
     TIGHTDB_ASSERT(m_target_row_indexes.is_attached() || link_ndx == 0);
     TIGHTDB_ASSERT(!m_target_row_indexes.is_attached() || link_ndx <= m_target_row_indexes.size());
     TIGHTDB_ASSERT(target_row_ndx < m_origin_column.get_target_table().size());
-    m_origin_table->bump_version();
+    typedef _impl::TableFriend tf;
+    tf::bump_version(*m_origin_table);
 
     size_t row_ndx = get_origin_row_index();
 
@@ -61,7 +62,8 @@ void LinkView::set(size_t link_ndx, size_t target_row_ndx)
     TIGHTDB_ASSERT(is_attached());
     TIGHTDB_ASSERT(m_target_row_indexes.is_attached() && link_ndx < m_target_row_indexes.size());
     TIGHTDB_ASSERT(target_row_ndx < m_origin_column.get_target_table().size());
-    m_origin_table->bump_version();
+    typedef _impl::TableFriend tf;
+    tf::bump_version(*m_origin_table);
 
     // update backlinks
     size_t row_ndx = get_origin_row_index();
@@ -86,7 +88,8 @@ void LinkView::move(size_t old_link_ndx, size_t new_link_ndx)
 
     if (old_link_ndx == new_link_ndx)
         return;
-    m_origin_table->bump_version();
+    typedef _impl::TableFriend tf;
+    tf::bump_version(*m_origin_table);
 
     size_t link_ndx = (new_link_ndx <= old_link_ndx) ? new_link_ndx : new_link_ndx-1;
     size_t target_row_ndx = m_target_row_indexes.get(old_link_ndx);
@@ -105,7 +108,8 @@ void LinkView::remove(size_t link_ndx)
 {
     TIGHTDB_ASSERT(is_attached());
     TIGHTDB_ASSERT(m_target_row_indexes.is_attached() && link_ndx < m_target_row_indexes.size());
-    m_origin_table->bump_version();
+    typedef _impl::TableFriend tf;
+    tf::bump_version(*m_origin_table);
 
     // update backlinks
     size_t target_row_ndx = m_target_row_indexes.get(link_ndx);
@@ -134,7 +138,8 @@ void LinkView::clear()
     if (!m_target_row_indexes.is_attached())
         return;
 
-    m_origin_table->bump_version();
+    typedef _impl::TableFriend tf;
+    tf::bump_version(*m_origin_table);
 
     // Update backlinks
     size_t row_ndx = get_origin_row_index();

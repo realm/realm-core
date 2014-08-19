@@ -67,6 +67,8 @@ public:
     void adj_accessors_move_last_over(std::size_t, std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     void adj_acc_clear_root_table() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
+    void mark(int) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+
     void bump_link_origin_table_version() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
 #ifdef TIGHTDB_DEBUG
@@ -174,11 +176,21 @@ inline void ColumnBackLink::adj_acc_clear_root_table() TIGHTDB_NOEXCEPT
     tf::mark(*m_origin_table);
 }
 
+inline void ColumnBackLink::mark(int type) TIGHTDB_NOEXCEPT
+{
+    if (type & mark_LinkOrigins) {
+        typedef _impl::TableFriend tf;
+        tf::mark(*m_origin_table);
+    }
+}
+
 inline void ColumnBackLink::bump_link_origin_table_version() TIGHTDB_NOEXCEPT
 {
     typedef _impl::TableFriend tf;
-    if (m_origin_table)
-        tf::bump_version(*m_origin_table);
+    if (m_origin_table) {
+        bool bump_global = false;
+        tf::bump_version(*m_origin_table, bump_global);
+    }
 }
 
 #ifdef TIGHTDB_DEBUG

@@ -45,7 +45,7 @@ public:
     void adj_accessors_move_last_over(std::size_t, std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     void adj_acc_clear_root_table() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
-    void mark_link_target_table() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void mark(int) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
 #ifdef TIGHTDB_DEBUG
     void Verify(const Table&, std::size_t) const TIGHTDB_OVERRIDE;
@@ -131,10 +131,12 @@ inline void ColumnLinkBase::adj_acc_clear_root_table() TIGHTDB_NOEXCEPT
     tf::mark(*m_target_table);
 }
 
-inline void ColumnLinkBase::mark_link_target_table() TIGHTDB_NOEXCEPT
+inline void ColumnLinkBase::mark(int type) TIGHTDB_NOEXCEPT
 {
-    typedef _impl::TableFriend tf;
-    tf::mark(*m_target_table);
+    if (type & mark_LinkTargets) {
+        typedef _impl::TableFriend tf;
+        tf::mark(*m_target_table);
+    }
 }
 
 

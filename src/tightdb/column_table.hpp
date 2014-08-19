@@ -38,7 +38,7 @@ public:
     void move_last_over(std::size_t, std::size_t) TIGHTDB_OVERRIDE;
     void clear() TIGHTDB_OVERRIDE;
 
-    void recursive_mark() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void mark(int) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
     void adj_accessors_insert_rows(std::size_t, std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     void adj_accessors_erase_row(std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
@@ -277,9 +277,10 @@ inline void ColumnSubtableParent::move_last_over(std::size_t target_row_ndx,
         tf::unbind_ref(*m_table);
 }
 
-inline void ColumnSubtableParent::recursive_mark() TIGHTDB_NOEXCEPT
+inline void ColumnSubtableParent::mark(int type) TIGHTDB_NOEXCEPT
 {
-    m_subtable_map.recursive_mark();
+    if (type & mark_Recursive)
+        m_subtable_map.recursive_mark();
 }
 
 inline void ColumnSubtableParent::refresh_accessor_tree(std::size_t col_ndx, const Spec& spec)
@@ -293,7 +294,7 @@ inline void ColumnSubtableParent::adj_accessors_insert_rows(std::size_t row_ndx,
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
-    // underlying node structure. See AccessorConcistncyLevels.
+    // underlying node structure. See AccessorConsistencyLevels.
 
     const bool fix_ndx_in_parent = false;
     m_subtable_map.adj_insert_rows<fix_ndx_in_parent>(row_ndx, num_rows);
@@ -303,7 +304,7 @@ inline void ColumnSubtableParent::adj_accessors_erase_row(std::size_t row_ndx) T
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
-    // underlying node structure. See AccessorConcistncyLevels.
+    // underlying node structure. See AccessorConsistencyLevels.
 
     const bool fix_ndx_in_parent = false;
     bool last_entry_removed = m_subtable_map.adj_erase_row<fix_ndx_in_parent>(row_ndx);
@@ -318,7 +319,7 @@ inline void ColumnSubtableParent::adj_accessors_move_last_over(std::size_t targe
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
-    // underlying node structure. See AccessorConcistncyLevels.
+    // underlying node structure. See AccessorConsistencyLevels.
 
     const bool fix_ndx_in_parent = false;
     bool last_entry_removed =
@@ -332,7 +333,7 @@ inline void ColumnSubtableParent::adj_acc_clear_root_table() TIGHTDB_NOEXCEPT
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
-    // underlying node structure. See AccessorConcistncyLevels.
+    // underlying node structure. See AccessorConsistencyLevels.
 
     Column::adj_acc_clear_root_table();
     discard_child_accessors();
@@ -343,7 +344,7 @@ inline Table* ColumnSubtableParent::get_subtable_accessor(std::size_t row_ndx) c
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
-    // underlying node structure. See AccessorConcistncyLevels.
+    // underlying node structure. See AccessorConsistencyLevels.
 
     Table* subtable = m_subtable_map.find(row_ndx);
     return subtable;
@@ -353,7 +354,7 @@ inline void ColumnSubtableParent::discard_subtable_accessor(std::size_t row_ndx)
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
-    // underlying node structure. See AccessorConcistncyLevels.
+    // underlying node structure. See AccessorConsistencyLevels.
 
     bool last_entry_removed = m_subtable_map.detach_and_remove(row_ndx);
     typedef _impl::TableFriend tf;
@@ -548,7 +549,7 @@ update_table_accessors(const std::size_t* col_path_begin, const std::size_t* col
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
-    // underlying node structure. See AccessorConcistncyLevels.
+    // underlying node structure. See AccessorConsistencyLevels.
 
     m_subtable_map.update_accessors(col_path_begin, col_path_end, updater); // Throws
 }
