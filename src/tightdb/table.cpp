@@ -54,11 +54,11 @@
 /// only on some parts of the internal accessors states, and only on some parts
 /// of the structural state.
 ///
-/// This is the level of consistency is the **maximum** that may be assumed
-/// after a library function fails by throwing an unexpected exception (such as
-/// std::bad_alloc), and it is the **minimum** level of consistency that is
-/// needed to be able to properly destroy the accessor objects (manually, or as
-/// a result of stack unwinding).
+/// This level of consistency is guaranteed, and it is also the **maximum** that
+/// may be assumed by the application after a library function fails by throwing
+/// an unexpected exception (such as std::bad_alloc). It is also the **minimum**
+/// level of consistency that is required to be able to properly destroy the
+/// accessor objects (manually, or as a result of stack unwinding).
 ///
 /// It is supposed to be a library-wide invariant that an accessor hierarchy is
 /// at least minimally consistent, but so far, only some parts of the library
@@ -97,6 +97,12 @@
 /// state of the accessors and the underlying node structure. It enables safe
 /// destruction of the accessor objects by requiring that the following items
 /// are valid (the list may not yet be complete):
+///
+///  - Every allocated accessor is either a group accessors, or occurs as a
+///    direct, or an indirect child of a group accessor.
+///
+///  - No allocated accessor occurs as a child more than once (for example, no
+///    doublets are allowed in Group::m_table_accessors).
 ///
 ///  - The 'is_attached' property of array accessors (Array::m_data == 0). For
 ///    example, `Table::m_top` is attached if and only if that table accessor
@@ -513,8 +519,8 @@ struct Table::InsertSubtableColumns: SubtableUpdater {
     {
         table.adj_insert_column(m_column_ndx); // Throws
         table.refresh_column_accessors(m_column_ndx); // Throws
-        bool global_bump = false;
-        table.bump_version(global_bump);
+        bool bump_global = false;
+        table.bump_version(bump_global);
     }
 private:
     const size_t m_column_ndx;
@@ -537,8 +543,8 @@ struct Table::EraseSubtableColumns: SubtableUpdater {
     {
         table.adj_erase_column(m_column_ndx);
         table.refresh_column_accessors(m_column_ndx);
-        bool global_bump = false;
-        table.bump_version(global_bump);
+        bool bump_global = false;
+        table.bump_version(bump_global);
     }
 private:
     const size_t m_column_ndx;
@@ -551,8 +557,8 @@ struct Table::RenameSubtableColumns: SubtableUpdater {
     }
     void update_accessor(Table& table) TIGHTDB_OVERRIDE
     {
-        bool global_bump = false;
-        table.bump_version(global_bump);
+        bool bump_global = false;
+        table.bump_version(bump_global);
     }
 };
 
@@ -925,7 +931,7 @@ void Table::update_accessors(const size_t* col_path_begin, const size_t* col_pat
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
-    // underlying node structure. See AccessorConcistncyLevels.
+    // underlying node structure. See AccessorConsistencyLevels.
 
     TIGHTDB_ASSERT(is_attached());
 
@@ -984,7 +990,7 @@ void Table::detach() TIGHTDB_NOEXCEPT
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
-    // underlying node structure. See AccessorConcistncyLevels.
+    // underlying node structure. See AccessorConsistencyLevels.
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
@@ -1052,7 +1058,7 @@ void Table::discard_child_accessors() TIGHTDB_NOEXCEPT
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
-    // underlying node structure. See AccessorConcistncyLevels.
+    // underlying node structure. See AccessorConsistencyLevels.
 
     discard_row_accessors();
 
@@ -1150,7 +1156,7 @@ void Table::destroy_column_accessors() TIGHTDB_NOEXCEPT
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
-    // underlying node structure. See AccessorConcistncyLevels.
+    // underlying node structure. See AccessorConsistencyLevels.
 
     size_t n = m_cols.size();
     for (size_t i = 0; i != n; ++i) {
@@ -1166,7 +1172,7 @@ Table::~Table() TIGHTDB_NOEXCEPT
     // Whenever this is not a free-standing table, the destructor must be able
     // to operate without assuming more than minimal accessor consistency This
     // means in particular that it cannot access the underlying structure of
-    // array nodes. See AccessorConcistncyLevels.
+    // array nodes. See AccessorConsistencyLevels.
 
     if (!is_attached()) {
         // This table has been detached.
@@ -1828,7 +1834,7 @@ void Table::discard_subtable_accessor(size_t col_ndx, size_t row_ndx) TIGHTDB_NO
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
-    // underlying node structure. See AccessorConcistncyLevels.
+    // underlying node structure. See AccessorConsistencyLevels.
 
     TIGHTDB_ASSERT(is_attached());
     // If this table is not a degenerate subtable, then `col_ndx` must be a
@@ -4264,7 +4270,7 @@ void Table::adj_accessors_insert_rows(size_t row_ndx, size_t num_rows) TIGHTDB_N
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
-    // underlying node structure. See AccessorConcistncyLevels.
+    // underlying node structure. See AccessorConsistencyLevels.
 
     adj_row_acc_insert_rows(row_ndx, num_rows);
 
@@ -4281,7 +4287,7 @@ void Table::adj_accessors_erase_row(size_t row_ndx) TIGHTDB_NOEXCEPT
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
-    // underlying node structure. See AccessorConcistncyLevels.
+    // underlying node structure. See AccessorConsistencyLevels.
 
     adj_row_acc_erase_row(row_ndx);
 
@@ -4299,7 +4305,7 @@ void Table::adj_accessors_move_last_over(size_t target_row_ndx, size_t last_row_
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
-    // underlying node structure. See AccessorConcistncyLevels.
+    // underlying node structure. See AccessorConsistencyLevels.
 
     adj_row_acc_move_last_over(target_row_ndx, last_row_ndx);
 
@@ -4344,7 +4350,7 @@ void Table::adj_row_acc_insert_rows(size_t row_ndx, size_t num_rows) TIGHTDB_NOE
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
-    // underlying node structure. See AccessorConcistncyLevels.
+    // underlying node structure. See AccessorConsistencyLevels.
 
     // Adjust row accessors after insertion of new rows
     typedef row_accessors::const_iterator iter;
@@ -4361,7 +4367,7 @@ void Table::adj_row_acc_erase_row(size_t row_ndx) TIGHTDB_NOEXCEPT
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
-    // underlying node structure. See AccessorConcistncyLevels.
+    // underlying node structure. See AccessorConsistencyLevels.
 
     // Adjust row accessors after removal of a row
     size_t i = 0, n = m_row_accessors.size();
@@ -4386,7 +4392,7 @@ void Table::adj_row_acc_move_last_over(size_t target_row_ndx, size_t last_row_nd
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
-    // underlying node structure. See AccessorConcistncyLevels.
+    // underlying node structure. See AccessorConsistencyLevels.
 
     // Adjust row accessors after 'move last over' removal of a row
     size_t i = 0, n = m_row_accessors.size();
@@ -4411,7 +4417,7 @@ void Table::adj_insert_column(size_t col_ndx)
     // Beyond the constraints on the specified column index, this function must
     // assume no more than minimal consistency of the accessor hierarchy. This
     // means in particular that it cannot access the underlying node
-    // structure. See AccessorConcistncyLevels.
+    // structure. See AccessorConsistencyLevels.
 
     TIGHTDB_ASSERT(is_attached());
     bool not_degenerate = m_columns.is_attached();
@@ -4426,7 +4432,7 @@ void Table::adj_erase_column(size_t col_ndx) TIGHTDB_NOEXCEPT
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
-    // underlying node structure. See AccessorConcistncyLevels.
+    // underlying node structure. See AccessorConsistencyLevels.
 
     TIGHTDB_ASSERT(is_attached());
     bool not_degenerate = m_columns.is_attached();
@@ -4443,14 +4449,14 @@ void Table::recursive_mark() TIGHTDB_NOEXCEPT
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
-    // underlying node structure. See AccessorConcistncyLevels.
+    // underlying node structure. See AccessorConsistencyLevels.
 
     mark();
 
     size_t n = m_cols.size();
     for (size_t i = 0; i != n; ++i) {
         if (ColumnBase* col = m_cols[i])
-            col->recursive_mark();
+            col->mark(ColumnBase::mark_Recursive);
     }
 }
 
@@ -4460,14 +4466,30 @@ void Table::mark_link_target_tables(size_t col_ndx_begin) TIGHTDB_NOEXCEPT
     // Beyond the constraints on the specified column index, this function must
     // assume no more than minimal consistency of the accessor hierarchy. This
     // means in particular that it cannot access the underlying node
-    // structure. See AccessorConcistncyLevels.
+    // structure. See AccessorConsistencyLevels.
 
     TIGHTDB_ASSERT(is_attached());
     TIGHTDB_ASSERT(!m_columns.is_attached() || col_ndx_begin <= m_cols.size());
     size_t n = m_cols.size();
     for (size_t i = col_ndx_begin; i < n; ++i) {
         if (ColumnBase* col = m_cols[i])
-            col->mark_link_target_table();
+            col->mark(ColumnBase::mark_LinkTargets);
+    }
+}
+
+
+void Table::mark_opposite_link_tables() TIGHTDB_NOEXCEPT
+{
+    // Beyond the constraints on the specified column index, this function must
+    // assume no more than minimal consistency of the accessor hierarchy. This
+    // means in particular that it cannot access the underlying node
+    // structure. See AccessorConsistencyLevels.
+
+    TIGHTDB_ASSERT(is_attached());
+    size_t n = m_cols.size();
+    for (size_t i = 0; i < n; ++i) {
+        if (ColumnBase* col = m_cols[i])
+            col->mark(ColumnBase::mark_LinkOrigins | ColumnBase::mark_LinkTargets);
     }
 }
 
@@ -4601,6 +4623,20 @@ void Table::refresh_column_accessors(size_t col_ndx_begin)
         ColumnBase* first_col = m_cols[0];
         m_size = first_col->size();
     }
+}
+
+
+bool Table::is_cross_table_link_target() const TIGHTDB_NOEXCEPT
+{
+    size_t n = m_cols.size();
+    for (size_t i = m_spec.get_public_column_count(); i < n; ++i) {
+        TIGHTDB_ASSERT(dynamic_cast<ColumnBackLink*>(m_cols[i]));
+        ColumnBackLink& backlink_col = static_cast<ColumnBackLink&>(*m_cols[i]);
+        Table& origin = backlink_col.get_origin_table();
+        if (&origin != this)
+            return true;
+    }
+    return false;
 }
 
 

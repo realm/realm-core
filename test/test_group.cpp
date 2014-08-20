@@ -389,6 +389,233 @@ TEST(Group_StaticallyTypedTables)
 }
 
 
+TEST(Group_BasicRemoveTable)
+{
+    Group group;
+    TableRef alpha = group.add_table("alpha");
+    TableRef beta  = group.add_table("beta");
+    TableRef gamma = group.add_table("gamma");
+    TableRef delta = group.add_table("delta");
+    CHECK_EQUAL(4, group.size());
+    group.remove_table(gamma->get_index_in_group()); // By index
+    CHECK_EQUAL(3, group.size());
+    CHECK(alpha->is_attached());
+    CHECK(beta->is_attached());
+    CHECK_NOT(gamma->is_attached());
+    CHECK(delta->is_attached());
+    CHECK_EQUAL("alpha", group.get_table_name(alpha->get_index_in_group()));
+    CHECK_EQUAL("beta",  group.get_table_name(beta->get_index_in_group()));
+    CHECK_EQUAL("delta", group.get_table_name(delta->get_index_in_group()));
+    group.remove_table(alpha->get_index_in_group()); // By index
+    CHECK_EQUAL(2, group.size());
+    CHECK_NOT(alpha->is_attached());
+    CHECK(beta->is_attached());
+    CHECK_NOT(gamma->is_attached());
+    CHECK(delta->is_attached());
+    CHECK_EQUAL("beta",  group.get_table_name(beta->get_index_in_group()));
+    CHECK_EQUAL("delta", group.get_table_name(delta->get_index_in_group()));
+    group.remove_table("delta"); // By name
+    CHECK_EQUAL(1, group.size());
+    CHECK_NOT(alpha->is_attached());
+    CHECK(beta->is_attached());
+    CHECK_NOT(gamma->is_attached());
+    CHECK_NOT(delta->is_attached());
+    CHECK_EQUAL("beta",  group.get_table_name(beta->get_index_in_group()));
+    CHECK_THROW(group.remove_table(1), tightdb::InvalidArgument);
+    CHECK_THROW(group.remove_table("epsilon"), NoSuchTable);
+    group.Verify();
+}
+
+
+TEST(Group_RemoveTableWithColumns)
+{
+    Group group;
+
+    TableRef alpha   = group.add_table("alpha");
+    TableRef beta    = group.add_table("beta");
+    TableRef gamma   = group.add_table("gamma");
+    TableRef delta   = group.add_table("delta");
+    TableRef epsilon = group.add_table("epsilon");
+    CHECK_EQUAL(5, group.size());
+
+    alpha->add_column(type_Int, "alpha-1");
+    beta->add_column_link(type_Link, "beta-1", *delta);
+    gamma->add_column_link(type_Link, "gamma-1", *gamma);
+    delta->add_column(type_Int, "delta-1");
+    epsilon->add_column_link(type_Link, "epsilon-1", *delta);
+
+    // Remove table with columns, but no link columns, and table is not a link
+    // target.
+    group.remove_table("alpha");
+    CHECK_EQUAL(4, group.size());
+    CHECK_NOT(alpha->is_attached());
+    CHECK(beta->is_attached());
+    CHECK(gamma->is_attached());
+    CHECK(delta->is_attached());
+    CHECK(epsilon->is_attached());
+
+    // Remove table with link column, and table is not a link target.
+    group.remove_table("beta");
+    CHECK_EQUAL(3, group.size());
+    CHECK_NOT(beta->is_attached());
+    CHECK(gamma->is_attached());
+    CHECK(delta->is_attached());
+    CHECK(epsilon->is_attached());
+
+    // Remove table with self-link column, and table is not a target of link
+    // columns of other tables.
+    group.remove_table("gamma");
+    CHECK_EQUAL(2, group.size());
+    CHECK_NOT(gamma->is_attached());
+    CHECK(delta->is_attached());
+    CHECK(epsilon->is_attached());
+
+    // Try, but fail to remove table which is a target of link columns of other
+    // tables.
+    CHECK_THROW(group.remove_table("delta"), CrossTableLinkTarget);
+    CHECK_EQUAL(2, group.size());
+    CHECK(delta->is_attached());
+    CHECK(epsilon->is_attached());
+}
+
+
+TEST(Group_RemoveTableMovesTableWithLinksOver)
+{
+    // Create a scenario where a table is removed from the group, and the last
+    // table in the group (which will be moved into the vacated slot) has both
+    // link and backlink columns.
+
+    Group group;
+    group.add_table("alpha");
+    group.add_table("beta");
+    group.add_table("gamma");
+    group.add_table("delta");
+    TableRef first  = group.get_table(0);
+    TableRef second = group.get_table(1);
+    TableRef third  = group.get_table(2);
+    TableRef fourth = group.get_table(3);
+
+    first->add_column_link(type_Link,  "one",   *third);
+    third->add_column_link(type_Link,  "two",   *fourth);
+    third->add_column_link(type_Link,  "three", *third);
+    fourth->add_column_link(type_Link, "four",  *first);
+    fourth->add_column_link(type_Link, "five",  *third);
+    first->add_empty_row(2);
+    third->add_empty_row(2);
+    fourth->add_empty_row(2);
+    first->set_link(0,0,0);  // first[0].one   = third[0]
+    first->set_link(0,1,1);  // first[1].one   = third[1]
+    third->set_link(0,0,1);  // third[0].two   = fourth[1]
+    third->set_link(0,1,0);  // third[1].two   = fourth[0]
+    third->set_link(1,0,1);  // third[0].three = third[1]
+    third->set_link(1,1,1);  // third[1].three = third[1]
+    fourth->set_link(0,0,0); // fourth[0].four = first[0]
+    fourth->set_link(0,1,0); // fourth[1].four = first[0]
+    fourth->set_link(1,0,0); // fourth[0].five = third[0]
+    fourth->set_link(1,1,1); // fourth[1].five = third[1]
+
+    group.Verify();
+
+    group.remove_table(1); // Second
+
+    group.Verify();
+
+    CHECK_EQUAL(3, group.size());
+    CHECK(first->is_attached());
+    CHECK_NOT(second->is_attached());
+    CHECK(third->is_attached());
+    CHECK(fourth->is_attached());
+    CHECK_EQUAL(1, first->get_column_count());
+    CHECK_EQUAL("one", first->get_column_name(0));
+    CHECK_EQUAL(third, first->get_link_target(0));
+    CHECK_EQUAL(2, third->get_column_count());
+    CHECK_EQUAL("two",   third->get_column_name(0));
+    CHECK_EQUAL("three", third->get_column_name(1));
+    CHECK_EQUAL(fourth, third->get_link_target(0));
+    CHECK_EQUAL(third,  third->get_link_target(1));
+    CHECK_EQUAL(2, fourth->get_column_count());
+    CHECK_EQUAL("four", fourth->get_column_name(0));
+    CHECK_EQUAL("five", fourth->get_column_name(1));
+    CHECK_EQUAL(first, fourth->get_link_target(0));
+    CHECK_EQUAL(third, fourth->get_link_target(1));
+
+    third->set_link(0,0,0);  // third[0].two   = fourth[0]
+    fourth->set_link(0,1,1); // fourth[1].four = first[1]
+    first->set_link(0,0,1);  // first[0].one   = third[1]
+
+    group.Verify();
+
+    CHECK_EQUAL(2, first->size());
+    CHECK_EQUAL(1, first->get_link(0,0));
+    CHECK_EQUAL(1, first->get_link(0,1));
+    CHECK_EQUAL(1, first->get_backlink_count(0, *fourth, 0));
+    CHECK_EQUAL(1, first->get_backlink_count(1, *fourth, 0));
+    CHECK_EQUAL(2, third->size());
+    CHECK_EQUAL(0, third->get_link(0,0));
+    CHECK_EQUAL(0, third->get_link(0,1));
+    CHECK_EQUAL(1, third->get_link(1,0));
+    CHECK_EQUAL(1, third->get_link(1,1));
+    CHECK_EQUAL(0, third->get_backlink_count(0, *first,  0));
+    CHECK_EQUAL(2, third->get_backlink_count(1, *first,  0));
+    CHECK_EQUAL(0, third->get_backlink_count(0, *third,  1));
+    CHECK_EQUAL(2, third->get_backlink_count(1, *third,  1));
+    CHECK_EQUAL(1, third->get_backlink_count(0, *fourth, 1));
+    CHECK_EQUAL(1, third->get_backlink_count(1, *fourth, 1));
+    CHECK_EQUAL(2, fourth->size());
+    CHECK_EQUAL(0, fourth->get_link(0,0));
+    CHECK_EQUAL(1, fourth->get_link(0,1));
+    CHECK_EQUAL(0, fourth->get_link(1,0));
+    CHECK_EQUAL(1, fourth->get_link(1,1));
+    CHECK_EQUAL(2, fourth->get_backlink_count(0, *third, 0));
+    CHECK_EQUAL(0, fourth->get_backlink_count(1, *third, 0));
+}
+
+
+TEST(Group_RemoveLinkTable)
+{
+    Group group;
+    TableRef table = group.add_table("table");
+    table->add_column_link(type_Link, "", *table);
+    group.remove_table(table->get_index_in_group());
+    CHECK(group.is_empty());
+    CHECK(!table->is_attached());
+    TableRef origin = group.add_table("origin");
+    TableRef target = group.add_table("target");
+    target->add_column(type_Int, "");
+    origin->add_column_link(type_Link, "", *target);
+    CHECK_THROW(group.remove_table(target->get_index_in_group()), CrossTableLinkTarget);
+    group.remove_table(origin->get_index_in_group());
+    CHECK_EQUAL(1, group.size());
+    CHECK(!origin->is_attached());
+    CHECK(target->is_attached());
+    group.Verify();
+}
+
+
+TEST(Group_RenameTable)
+{
+    Group group;
+    TableRef alpha = group.add_table("alpha");
+    TableRef beta  = group.add_table("beta");
+    TableRef gamma = group.add_table("gamma");
+    group.rename_table(beta->get_index_in_group(), "delta");
+    CHECK_EQUAL("delta", beta->get_name());
+    group.rename_table("delta", "epsilon");
+    CHECK_EQUAL("alpha",   alpha->get_name());
+    CHECK_EQUAL("epsilon", beta->get_name());
+    CHECK_EQUAL("gamma",   gamma->get_name());
+    CHECK_THROW(group.rename_table(3, "zeta"), tightdb::InvalidArgument);
+    CHECK_THROW(group.rename_table("eta", "theta"), NoSuchTable);
+    CHECK_THROW(group.rename_table("epsilon", "alpha"), TableNameInUse);
+    bool require_unique_name = false;
+    group.rename_table("epsilon", "alpha", require_unique_name);
+    CHECK_EQUAL("alpha", alpha->get_name());
+    CHECK_EQUAL("alpha", beta->get_name());
+    CHECK_EQUAL("gamma", gamma->get_name());
+    group.Verify();
+}
+
+
 namespace {
 
 void setup_table(TestTableGroup::Ref t)
