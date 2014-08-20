@@ -43,7 +43,18 @@ class DescriptorMismatch: public std::exception {
 public:
     const char* what() const TIGHTDB_NOEXCEPT_OR_NOTHROW TIGHTDB_OVERRIDE
     {
-        return "The specified table name is already in use";
+        return "Incompatible dynamic table type";
+    }
+};
+
+
+/// Thrown by various functions to indicate that a specified table does not
+/// exist.
+class NoSuchTable: public std::exception {
+public:
+    const char* what() const TIGHTDB_NOEXCEPT_OR_NOTHROW TIGHTDB_OVERRIDE
+    {
+        return "No such table exists";
     }
 };
 
@@ -55,6 +66,17 @@ public:
     const char* what() const TIGHTDB_NOEXCEPT_OR_NOTHROW TIGHTDB_OVERRIDE
     {
         return "The specified table name is already in use";
+    }
+};
+
+
+// Thrown by functions that require a table to **not** be the target of link
+// columns, unless those link columns are part of the table itself.
+class CrossTableLinkTarget: public std::exception {
+public:
+    const char* what() const TIGHTDB_NOEXCEPT_OR_NOTHROW TIGHTDB_OVERRIDE
+    {
+        return "Table is target of cross-table link columns";
     }
 };
 

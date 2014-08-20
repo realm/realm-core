@@ -38,9 +38,9 @@ benchmark-insert-add: check-norun/subdir/src
 	@$(MAKE) -C test benchmark-insert-add
 
 # Build and run the insert/get/set benchmarking program
-.PHONY: benchmark-insert-get-set
-benchmark-insert-get-set: check-norun/subdir/src
-	@$(MAKE) -C test benchmark-insert-get-set
+.PHONY: benchmark-crud
+benchmark-crud: check-norun/subdir/src
+	@$(MAKE) -C test benchmark-crud
 
 # Build and run the prealloc benchmarking program
 .PHONY: benchmark-prealloc

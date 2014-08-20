@@ -393,9 +393,9 @@ inline void ColumnMixed::clear_value_and_discard_subtab_acc(std::size_t row_ndx,
         m_data->discard_subtable_accessor(row_ndx);
 }
 
-inline void ColumnMixed::recursive_mark() TIGHTDB_NOEXCEPT
+inline void ColumnMixed::mark(int type) TIGHTDB_NOEXCEPT
 {
-    m_data->recursive_mark();
+    m_data->mark(type);
 }
 
 inline void ColumnMixed::refresh_accessor_tree(std::size_t col_ndx, const Spec& spec)

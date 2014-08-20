@@ -5498,6 +5498,229 @@ TEST(LangBindHelper_AdvanceReadTransact_InsertLink)
 }
 
 
+TEST(LangBindHelper_AdvanceReadTransact_RemoveTableWithColumns)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg(path);
+    ShortCircuitTransactLogManager tlm(path);
+    SharedGroup sg_w(tlm);
+
+    // Start a read transaction (to be repeatedly advanced)
+    ReadTransaction rt(sg);
+    const Group& group = rt.get_group();
+    CHECK_EQUAL(0, group.size());
+
+    {
+        WriteTransaction wt(sg_w);
+        TableRef alpha_w   = wt.add_table("alpha");
+        TableRef beta_w    = wt.add_table("beta");
+        TableRef gamma_w   = wt.add_table("gamma");
+        TableRef delta_w   = wt.add_table("delta");
+        TableRef epsilon_w = wt.add_table("epsilon");
+        alpha_w->add_column(type_Int, "alpha-1");
+        beta_w->add_column_link(type_Link, "beta-1", *delta_w);
+        gamma_w->add_column_link(type_Link, "gamma-1", *gamma_w);
+        delta_w->add_column(type_Int, "delta-1");
+        epsilon_w->add_column_link(type_Link, "epsilon-1", *delta_w);
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, tlm);
+    group.Verify();
+
+    CHECK_EQUAL(5, group.size());
+    ConstTableRef alpha   = group.get_table("alpha");
+    ConstTableRef beta    = group.get_table("beta");
+    ConstTableRef gamma   = group.get_table("gamma");
+    ConstTableRef delta   = group.get_table("delta");
+    ConstTableRef epsilon = group.get_table("epsilon");
+
+    // Remove table with columns, but no link columns, and table is not a link
+    // target.
+    {
+        WriteTransaction wt(sg_w);
+        wt.get_group().remove_table("alpha");
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, tlm);
+    group.Verify();
+
+    CHECK_EQUAL(4, group.size());
+    CHECK_NOT(alpha->is_attached());
+    CHECK(beta->is_attached());
+    CHECK(gamma->is_attached());
+    CHECK(delta->is_attached());
+    CHECK(epsilon->is_attached());
+
+    // Remove table with link column, and table is not a link target.
+    {
+        WriteTransaction wt(sg_w);
+        wt.get_group().remove_table("beta");
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, tlm);
+    group.Verify();
+
+    CHECK_EQUAL(3, group.size());
+    CHECK_NOT(beta->is_attached());
+    CHECK(gamma->is_attached());
+    CHECK(delta->is_attached());
+    CHECK(epsilon->is_attached());
+
+    // Remove table with self-link column, and table is not a target of link
+    // columns of other tables.
+    {
+        WriteTransaction wt(sg_w);
+        wt.get_group().remove_table("gamma");
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, tlm);
+    group.Verify();
+
+    CHECK_EQUAL(2, group.size());
+    CHECK_NOT(gamma->is_attached());
+    CHECK(delta->is_attached());
+    CHECK(epsilon->is_attached());
+
+    // Try, but fail to remove table which is a target of link columns of other
+    // tables.
+    {
+        WriteTransaction wt(sg_w);
+        CHECK_THROW(wt.get_group().remove_table("delta"), CrossTableLinkTarget);
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, tlm);
+    group.Verify();
+
+    CHECK_EQUAL(2, group.size());
+    CHECK(delta->is_attached());
+    CHECK(epsilon->is_attached());
+}
+
+
+TEST(LangBindHelper_AdvanceReadTransact_RemoveTableMovesTableWithLinksOver)
+{
+    // Create a scenario where a table is removed from the group, and the last
+    // table in the group (which will be moved into the vacated slot) has both
+    // link and backlink columns.
+
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg(path);
+    ShortCircuitTransactLogManager tlm(path);
+    SharedGroup sg_w(tlm);
+
+    // Start a read transaction (to be repeatedly advanced)
+    ReadTransaction rt(sg);
+    const Group& group = rt.get_group();
+    CHECK_EQUAL(0, group.size());
+
+    string names[4];
+    {
+        WriteTransaction wt(sg_w);
+        wt.add_table("alpha");
+        wt.add_table("beta");
+        wt.add_table("gamma");
+        wt.add_table("delta");
+        names[0] = wt.get_group().get_table_name(0);
+        names[1] = wt.get_group().get_table_name(1);
+        names[2] = wt.get_group().get_table_name(2);
+        names[3] = wt.get_group().get_table_name(3);
+        TableRef first_w  = wt.get_table(names[0]);
+        TableRef third_w  = wt.get_table(names[2]);
+        TableRef fourth_w = wt.get_table(names[3]);
+        first_w->add_column_link(type_Link,  "one",   *third_w);
+        third_w->add_column_link(type_Link,  "two",   *fourth_w);
+        third_w->add_column_link(type_Link,  "three", *third_w);
+        fourth_w->add_column_link(type_Link, "four",  *first_w);
+        fourth_w->add_column_link(type_Link, "five",  *third_w);
+        first_w->add_empty_row(2);
+        third_w->add_empty_row(2);
+        fourth_w->add_empty_row(2);
+        first_w->set_link(0,0,0);  // first[0].one   = third[0]
+        first_w->set_link(0,1,1);  // first[1].one   = third[1]
+        third_w->set_link(0,0,1);  // third[0].two   = fourth[1]
+        third_w->set_link(0,1,0);  // third[1].two   = fourth[0]
+        third_w->set_link(1,0,1);  // third[0].three = third[1]
+        third_w->set_link(1,1,1);  // third[1].three = third[1]
+        fourth_w->set_link(0,0,0); // fourth[0].four = first[0]
+        fourth_w->set_link(0,1,0); // fourth[1].four = first[0]
+        fourth_w->set_link(1,0,0); // fourth[0].five = third[0]
+        fourth_w->set_link(1,1,1); // fourth[1].five = third[1]
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, tlm);
+    group.Verify();
+
+    ConstTableRef first  = group.get_table(names[0]);
+    ConstTableRef second = group.get_table(names[1]);
+    ConstTableRef third  = group.get_table(names[2]);
+    ConstTableRef fourth = group.get_table(names[3]);
+
+    {
+        WriteTransaction wt(sg_w);
+        wt.get_group().remove_table(1); // Second
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, tlm);
+    group.Verify();
+
+    CHECK_EQUAL(3, group.size());
+    CHECK(first->is_attached());
+    CHECK_NOT(second->is_attached());
+    CHECK(third->is_attached());
+    CHECK(fourth->is_attached());
+    CHECK_EQUAL(1, first->get_column_count());
+    CHECK_EQUAL("one", first->get_column_name(0));
+    CHECK_EQUAL(third, first->get_link_target(0));
+    CHECK_EQUAL(2, third->get_column_count());
+    CHECK_EQUAL("two",   third->get_column_name(0));
+    CHECK_EQUAL("three", third->get_column_name(1));
+    CHECK_EQUAL(fourth, third->get_link_target(0));
+    CHECK_EQUAL(third,  third->get_link_target(1));
+    CHECK_EQUAL(2, fourth->get_column_count());
+    CHECK_EQUAL("four", fourth->get_column_name(0));
+    CHECK_EQUAL("five", fourth->get_column_name(1));
+    CHECK_EQUAL(first, fourth->get_link_target(0));
+    CHECK_EQUAL(third, fourth->get_link_target(1));
+
+    {
+        WriteTransaction wt(sg_w);
+        TableRef first_w  = wt.get_table(names[0]);
+        TableRef third_w  = wt.get_table(names[2]);
+        TableRef fourth_w = wt.get_table(names[3]);
+        third_w->set_link(0,0,0);  // third[0].two   = fourth[0]
+        fourth_w->set_link(0,1,1); // fourth[1].four = first[1]
+        first_w->set_link(0,0,1);  // first[0].one   = third[1]
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, tlm);
+    group.Verify();
+
+    CHECK_EQUAL(2, first->size());
+    CHECK_EQUAL(1, first->get_link(0,0));
+    CHECK_EQUAL(1, first->get_link(0,1));
+    CHECK_EQUAL(1, first->get_backlink_count(0, *fourth, 0));
+    CHECK_EQUAL(1, first->get_backlink_count(1, *fourth, 0));
+    CHECK_EQUAL(2, third->size());
+    CHECK_EQUAL(0, third->get_link(0,0));
+    CHECK_EQUAL(0, third->get_link(0,1));
+    CHECK_EQUAL(1, third->get_link(1,0));
+    CHECK_EQUAL(1, third->get_link(1,1));
+    CHECK_EQUAL(0, third->get_backlink_count(0, *first,  0));
+    CHECK_EQUAL(2, third->get_backlink_count(1, *first,  0));
+    CHECK_EQUAL(0, third->get_backlink_count(0, *third,  1));
+    CHECK_EQUAL(2, third->get_backlink_count(1, *third,  1));
+    CHECK_EQUAL(1, third->get_backlink_count(0, *fourth, 1));
+    CHECK_EQUAL(1, third->get_backlink_count(1, *fourth, 1));
+    CHECK_EQUAL(2, fourth->size());
+    CHECK_EQUAL(0, fourth->get_link(0,0));
+    CHECK_EQUAL(1, fourth->get_link(0,1));
+    CHECK_EQUAL(0, fourth->get_link(1,0));
+    CHECK_EQUAL(1, fourth->get_link(1,1));
+    CHECK_EQUAL(2, fourth->get_backlink_count(0, *third, 0));
+    CHECK_EQUAL(0, fourth->get_backlink_count(1, *third, 0));
+}
+
+
 TEST(LangBindHelper_ImplicitTransactions)
 {
     SHARED_GROUP_TEST_PATH(path);

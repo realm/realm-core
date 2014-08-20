@@ -140,7 +140,7 @@ public:
     ref_type write(std::size_t, std::size_t, std::size_t,
                    _impl::OutputStream&) const TIGHTDB_OVERRIDE;
 
-    void recursive_mark() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void mark(int) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
     void refresh_accessor_tree(std::size_t, const Spec&) TIGHTDB_OVERRIDE;
 

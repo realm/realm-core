@@ -665,19 +665,42 @@ public:
         return true;
     }
 
-    bool new_group_level_table(StringData name)
+    bool insert_group_level_table(size_t table_ndx, size_t num_tables, StringData name)
     {
-        if (TIGHTDB_LIKELY(!m_group.has_table(name))) {
+        if (TIGHTDB_UNLIKELY(table_ndx != num_tables))
+            return false;
+        if (TIGHTDB_UNLIKELY(num_tables != m_group.size()))
+            return false;
 #ifdef TIGHTDB_DEBUG
-            if (m_log)
-                *m_log << "group->add_table(\""<<name<<"\", false)\n";
+        if (m_log)
+            *m_log << "group->add_table(\""<<name<<"\", false)\n";
 #endif
-            typedef _impl::GroupFriend gf;
-            bool require_unique_name = false;
-            gf::add_table(m_group, name, require_unique_name); // Throws
-            return true;
-        }
-        return false;
+        typedef _impl::GroupFriend gf;
+        bool require_unique_name = false;
+        gf::add_table(m_group, name, require_unique_name); // Throws
+        return true;
+    }
+
+    bool erase_group_level_table(std::size_t table_ndx, size_t num_tables) TIGHTDB_NOEXCEPT
+    {
+        if (TIGHTDB_UNLIKELY(num_tables != m_group.size()))
+            return false;
+#ifdef TIGHTDB_DEBUG
+        if (m_log)
+            *m_log << "group->remove_table("<<table_ndx<<")\n";
+#endif
+        m_group.remove_table(table_ndx);
+        return true;
+    }
+
+    bool rename_group_level_table(std::size_t table_ndx, StringData new_name) TIGHTDB_NOEXCEPT
+    {
+#ifdef TIGHTDB_DEBUG
+        if (m_log)
+            *m_log << "group->rename_table("<<table_ndx<<", \""<<new_name<<"\")\n";
+#endif
+        m_group.rename_table(table_ndx, new_name);
+        return true;
     }
 
     bool optimize_table()

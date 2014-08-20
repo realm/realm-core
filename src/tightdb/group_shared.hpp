@@ -387,6 +387,11 @@ public:
         return get_group().has_table(name);
     }
 
+    ConstTableRef get_table(std::size_t table_ndx) const
+    {
+        return get_group().get_table(table_ndx); // Throws
+    }
+
     ConstTableRef get_table(StringData name) const
     {
         return get_group().get_table(name); // Throws
@@ -419,6 +424,11 @@ public:
     {
         if (m_shared_group)
             m_shared_group->rollback();
+    }
+
+    TableRef get_table(std::size_t table_ndx) const
+    {
+        return get_group().get_table(table_ndx); // Throws
     }
 
     TableRef get_table(StringData name) const
