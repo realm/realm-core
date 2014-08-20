@@ -35,8 +35,6 @@
 #  endif
 #endif
 
-
-
 /* This one is needed to allow tightdb-config to know whether a
  * nondefault value is in effect. */
 #ifdef TIGHTDB_DEBUG
