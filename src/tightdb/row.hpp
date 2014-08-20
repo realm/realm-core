@@ -199,11 +199,12 @@ protected:
     void reattach(Table*, std::size_t row_ndx);
     void impl_detach() TIGHTDB_NOEXCEPT;
 
+private:
+    RowBase* m_prev; // Null if first, undefined if detached.
+    RowBase* m_next; // Null if last, undefined if detached.
+
     // Table needs to be able to modify m_table and m_row_ndx.
     friend class Table;
-private:
-    RowBase* m_prev; // Undefined if detached.
-    RowBase* m_next; // Undefined if detached.
 };
 
 
