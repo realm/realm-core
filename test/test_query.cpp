@@ -5426,7 +5426,7 @@ TEST(Query_TableViewMoveAssign1)
     tv = q.find_all();
 }
 
-TEST(Query_TableViewMoveAssignLeak2)
+ONLY(Query_TableViewMoveAssignLeak2)
 {
     Types t;
 
@@ -5435,7 +5435,7 @@ TEST(Query_TableViewMoveAssignLeak2)
     t.add(3, "3", 3.3);
     t.add(4, "4", 4.4);
 
-    Query q = t.column().ints > 2 + 0 && t.column().strings == "4";
+    Query q = t.column().ints < t.column().doubles && t.column().strings == "4";
     TableView tv = q.find_all();
 
     // Upon each find_all() call, tv copies the query 'q' into itself. See if this copying works
@@ -5444,7 +5444,44 @@ TEST(Query_TableViewMoveAssignLeak2)
     tv = q.find_all();
     tv = q.find_all();
     tv = q.find_all();
+
+    tv.sort(0, true);
+
+    tv = q.find_all();
+
+    Query q2 = t.column().ints <= t.column().doubles;
+    tv = q2.find_all();
+    q.and_query(q2);
+    tv = q.find_all();
+
+    tv.sync_if_needed();
+
+    size_t t2 = q.find();
+    tv = q.find_all();
+    tv.sync_if_needed();
+    t2 = q.find();
+    tv.sync_if_needed();
+    tv = q.find_all();
+    tv.sync_if_needed();
+    t2 = q.find();
+    tv.sync_if_needed();
+    tv = q.find_all();
+    tv.sync_if_needed();
+    tv = q.find_all();
+    tv.sync_if_needed();
+
+
+    Query q3;
+
+    q3 = q2;
+
+    q3.find();
+    q2.find();
+
+
 }
+
+
 
 TEST(Query_DeepCopyLeak1)
 {

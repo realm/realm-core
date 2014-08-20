@@ -71,32 +71,39 @@ void Query::move_assign(Query& copy)
     copy.m_table = TableRef();
 }
 
+// todo, remove usage of this constructor from lang. bindings and unit tests and then remove it
 Query::Query(const Query& copy, const TCopyExpressionTag&) 
 {
-    Create();
-    std::map<ParentNode*, ParentNode*> node_mapping;
-    node_mapping[ null_ptr ] = null_ptr;
-    std::vector<ParentNode*>::const_iterator i;
-    for (i = copy.all_nodes.begin(); i != copy.all_nodes.end(); ++i) {
-        ParentNode* new_node = (*i)->clone();
-        all_nodes.push_back(new_node);
-        node_mapping[ *i ] = new_node;
-    }
-    for (i = all_nodes.begin(); i != all_nodes.end(); ++i) {
-        (*i)->translate_pointers(node_mapping);
-    }
-    if (all_nodes.size() > 0) {
-        first[0] = all_nodes[0];
-    }
-    m_table = copy.m_table;
-    m_tableview = copy.m_tableview;
-
-    for (size_t t = 0; t < update.size(); t++) {
-        update[t] = &first[0];
-    }
-
+    *this = copy;
 }
 
+Query& Query::operator = (const Query& source)
+{
+    if (this != &source) {
+        Create();
+        std::map<ParentNode*, ParentNode*> node_mapping;
+        node_mapping[null_ptr] = null_ptr;
+        std::vector<ParentNode*>::const_iterator i;
+        for (i = source.all_nodes.begin(); i != source.all_nodes.end(); ++i) {
+            ParentNode* new_node = (*i)->clone();
+            all_nodes.push_back(new_node);
+            node_mapping[*i] = new_node;
+        }
+        for (i = all_nodes.begin(); i != all_nodes.end(); ++i) {
+            (*i)->translate_pointers(node_mapping);
+        }
+        if (all_nodes.size() > 0) {
+            first[0] = all_nodes[0];
+        }
+        m_table = source.m_table;
+        m_tableview = source.m_tableview;
+
+        for (size_t t = 0; t < update.size(); t++) {
+            update[t] = &first[0];
+        }
+    }
+    return *this;
+}
 
 Query::~Query() TIGHTDB_NOEXCEPT
 {

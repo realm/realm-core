@@ -448,7 +448,7 @@ TEST(TableView_Follows_Changes)
     CHECK_EQUAL(1, v.get_int(0,0));
 
     // low level sanity check that we can copy a query and run the copy:
-    Query q2(q,Query::TCopyExpressionTag());
+    Query q2 = q;
     TableView v2 = q2.find_all();
 
     // now the fun begins
@@ -1269,6 +1269,7 @@ TEST(TableView_RowAccessor)
     CHECK_EQUAL(703, crow_2.get_int(0));
 }
 
+
 TEST(TableView_FindBySourceNdx)
 {
     Table table;
@@ -1286,6 +1287,24 @@ TEST(TableView_FindBySourceNdx)
     CHECK_EQUAL(0, tv.find_by_source_ndx(2));
     CHECK_EQUAL(1, tv.find_by_source_ndx(1));
     CHECK_EQUAL(2, tv.find_by_source_ndx(0));
+
+
+    Query q = table.where();
+    Query q2 = table.where().equal(0, 123);
+
+    Query q3 = Query(q2, Query::TCopyExpressionTag());
+
+    q2 = q;
+
+    q2.find();
+
+
+
+
+
+
+
+
 }
 
 
