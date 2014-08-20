@@ -18,6 +18,8 @@
  *
  **************************************************************************/
 
+#include <algorithm>
+
 #include <tightdb/link_view.hpp>
 #include <tightdb/column_linklist.hpp>
 #ifdef TIGHTDB_ENABLE_REPLICATION
@@ -34,7 +36,8 @@ void LinkView::insert(size_t link_ndx, size_t target_row_ndx)
     TIGHTDB_ASSERT(m_target_row_indexes.is_attached() || link_ndx == 0);
     TIGHTDB_ASSERT(!m_target_row_indexes.is_attached() || link_ndx <= m_target_row_indexes.size());
     TIGHTDB_ASSERT(target_row_ndx < m_origin_column.get_target_table().size());
-    m_origin_table->bump_version();
+    typedef _impl::TableFriend tf;
+    tf::bump_version(*m_origin_table);
 
     size_t row_ndx = get_origin_row_index();
 
@@ -61,7 +64,8 @@ void LinkView::set(size_t link_ndx, size_t target_row_ndx)
     TIGHTDB_ASSERT(is_attached());
     TIGHTDB_ASSERT(m_target_row_indexes.is_attached() && link_ndx < m_target_row_indexes.size());
     TIGHTDB_ASSERT(target_row_ndx < m_origin_column.get_target_table().size());
-    m_origin_table->bump_version();
+    typedef _impl::TableFriend tf;
+    tf::bump_version(*m_origin_table);
 
     // update backlinks
     size_t row_ndx = get_origin_row_index();
@@ -86,7 +90,8 @@ void LinkView::move(size_t old_link_ndx, size_t new_link_ndx)
 
     if (old_link_ndx == new_link_ndx)
         return;
-    m_origin_table->bump_version();
+    typedef _impl::TableFriend tf;
+    tf::bump_version(*m_origin_table);
 
     size_t link_ndx = (new_link_ndx <= old_link_ndx) ? new_link_ndx : new_link_ndx-1;
     size_t target_row_ndx = m_target_row_indexes.get(old_link_ndx);
@@ -105,7 +110,8 @@ void LinkView::remove(size_t link_ndx)
 {
     TIGHTDB_ASSERT(is_attached());
     TIGHTDB_ASSERT(m_target_row_indexes.is_attached() && link_ndx < m_target_row_indexes.size());
-    m_origin_table->bump_version();
+    typedef _impl::TableFriend tf;
+    tf::bump_version(*m_origin_table);
 
     // update backlinks
     size_t target_row_ndx = m_target_row_indexes.get(link_ndx);
@@ -134,7 +140,8 @@ void LinkView::clear()
     if (!m_target_row_indexes.is_attached())
         return;
 
-    m_origin_table->bump_version();
+    typedef _impl::TableFriend tf;
+    tf::bump_version(*m_origin_table);
 
     // Update backlinks
     size_t row_ndx = get_origin_row_index();
@@ -153,49 +160,32 @@ void LinkView::clear()
 #endif
 }
 
-namespace tightdb {
-    template <> StringData LinkView::get_value<StringData>(size_t row, size_t column)
-    {
-        StringData s = m_origin_column.get_target_table().get_string(column, row);
-        return s;
-    }
-
-    template <> float LinkView::get_value<float>(size_t row, size_t column)
-    {
-        float f = m_origin_column.get_target_table().get_float(column, row);
-        return f;
-    }
-
-    template <> double LinkView::get_value<double>(size_t row, size_t column)
-    {
-        float d = m_origin_column.get_target_table().get_double(column, row);
-        return d;
-    }
-
-    template <> int64_t LinkView::get_value<int64_t>(size_t row, size_t column)
-    {
-        int64_t i = m_origin_column.get_target_table().get_int(column, row);
-        return i;
-    }
-}
 
 namespace {
-    template <class T> struct LinkComparer
+
+template<class T> struct LinkComparer {
+    LinkComparer(size_t column, bool ascend, LinkView& lv):
+        m_column(column),
+        m_ascending(ascend),
+        m_lv(lv)
     {
-        LinkComparer(size_t column, bool ascend, LinkView& lv) : m_column(column), m_ascending(ascend), m_lv(lv) {}
+    }
 
-        bool operator() (size_t i, size_t j) const {
-            T v1 = m_lv.get_value<T>(i, m_column);
-            T v2 = m_lv.get_value<T>(j, m_column);
-            bool b = CompareLess<T>::compare(v1, v2);
-            return m_ascending ? b : !b;
-        }
+    bool operator()(size_t i, size_t j) const
+    {
+        T v1 = m_lv.get_value<T>(i, m_column);
+        T v2 = m_lv.get_value<T>(j, m_column);
+        bool b = CompareLess<T>::compare(v1, v2);
+        return m_ascending ? b : !b;
+    }
 
-        size_t m_column;
-        bool m_ascending;
-        LinkView& m_lv;
-    };
-}
+    size_t m_column;
+    bool m_ascending;
+    LinkView& m_lv;
+};
+
+} // anonymous namespace
+
 
 void LinkView::sort(size_t column_ndx, bool ascending)
 {
@@ -203,7 +193,7 @@ void LinkView::sort(size_t column_ndx, bool ascending)
 }
 
 
-TableView LinkView::get_sorted_view(std::size_t column_ndx, bool ascending)
+TableView LinkView::get_sorted_view(size_t column_ndx, bool ascending)
 {
     TableView res(m_origin_column.get_target_table());
     sort(column_ndx, res.get_ref_column(), ascending);
@@ -219,7 +209,7 @@ template <class T> void LinkView::sort(size_t column_ndx, Column& dest, bool asc
         v2.push_back(m_target_row_indexes.get(t));
     }
     LinkComparer<T> c = LinkComparer<T>(column_ndx, ascending, *this);
-    std::stable_sort(v2.begin(), v2.end(), c);
+    stable_sort(v2.begin(), v2.end(), c);
     dest.clear();
     for (size_t t = 0; t < v.size(); t++)
         dest.add(v2[t]);
@@ -323,8 +313,8 @@ void LinkView::do_update_link(size_t old_target_row_ndx, size_t new_target_row_n
 
 void LinkView::repl_unselect() TIGHTDB_NOEXCEPT
 {
-        if (Replication* repl = get_repl())
-            repl->on_link_list_destroyed(*this);
+    if (Replication* repl = get_repl())
+        repl->on_link_list_destroyed(*this);
 }
 
 #endif // TIGHTDB_ENABLE_REPLICATION

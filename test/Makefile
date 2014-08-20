@@ -1,6 +1,6 @@
 SUBDIRS = util
 PASSIVE_SUBDIRS = test-tightdb test-sqlite3 test-stl performance \
-benchmark-insert-add benchmark-insert-get-set benchmark-prealloc \
+benchmark-insert-add benchmark-crud benchmark-prealloc \
 benchmark-index benchmark-transaction experiments
 
 RESOURCES=expect_json.json expect_string.txt
@@ -47,9 +47,9 @@ benchmark-insert-add: check-norun/subdir/util
 	@$(MAKE) -C benchmark-insert-add check-norun
 
 # Build and run the insert/get/set benchmark
-.PHONY: benchmark-insert-get-set
-benchmark-insert-get-set: check-norun/subdir/util
-	@$(MAKE) -C benchmark-insert-get-set check
+.PHONY: benchmark-crud
+benchmark-crud: check-norun/subdir/util
+	@$(MAKE) -C benchmark-crud check
 
 # Build and run the prealloc benchmark
 .PHONY: benchmark-prealloc

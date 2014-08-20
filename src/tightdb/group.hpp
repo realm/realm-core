@@ -40,10 +40,11 @@ namespace _impl { class GroupFriend; }
 
 /// A group is a collection of named tables.
 ///
-/// Tables occur in the group in an unspecified order, but one that generally
-/// remains fixed. The order is guaranteed to remain fixed between two point in
-/// time, if no tables are added to the group during that time. When tables are
-/// added to the group, the order may change arbitrarily.
+/// Tables occur in the group in an unspecified order, but an order that
+/// generally remains fixed. The order is guaranteed to remain fixed between two
+/// points in time if no tables are added to, or removed from the group during
+/// that time. When tables are added to, or removed from the group, the order
+/// may change arbitrarily.
 ///
 /// If `table` is a table accessor attached to a group-level table, and `group`
 /// is a group accessor attached to the group, then the following is guaranteed,
@@ -233,10 +234,22 @@ public:
     /// add_table() adds a table with the specified name to this group. It
     /// throws TableNameInUse if \a require_unique_name is true and \a name
     /// clashes with the name of an existing table. If \a require_unique_name is
-    /// false, it becomes possible to have more than one table with a given name
-    /// in a single group.
+    /// false, it is possible to add more than one table with the same
+    /// name. Whenever a table is added, the order of the preexisting tables may
+    /// change arbitrarily, and the new table may not end up as the last one
+    /// either. But know that you can always call Table::get_index_in_group() on
+    /// the returned table accessor to find out at which index it ends up.
     ///
-    /// The template functions work exactly like their non-template counterparts
+    /// remove_table() removes the specified table from this group. A table can
+    /// be removed only when it is not the target of a link column of a
+    /// different table. Whenever a table is removed, the order of the remaining
+    /// tables may change arbitrarily.
+    ///
+    /// rename_table() changes the name of a preexisting table. If \a
+    /// require_unique_name is false, it becomes possible to have more than one
+    /// table with a given name in a single group.
+    ///
+    /// The template functions work exactly like their non-template namesakes
     /// except as follows: The template versions of get_table() and
     /// get_or_add_table() throw DescriptorMismatch if the dynamic type of the
     /// specified table does not match the statically specified custom table
@@ -248,10 +261,14 @@ public:
     ///
     /// \param index Index of table in this group.
     ///
-    /// \param name Name of table.
+    /// \param name Name of table. All strings are valid table names as long as
+    /// they are valid UTF-8 encodings.
     ///
-    /// \param require_unique_name When set to true, it becomes impossible to
-    /// add a table with a name that is already in use.
+    /// \param new_name New name for preexisting table.
+    ///
+    /// \param require_unique_name When set to true (the default), it becomes
+    /// impossible to add a table with a name that is already in use, or to
+    /// rename a table to a name that is already in use.
     ///
     /// \param was_added When specified, the boolean variable is set to true if
     /// the table was added, and to false otherwise. If the function throws, the
@@ -265,12 +282,21 @@ public:
     /// tf the dynamic table type does not match the statically specified custom
     /// table type (\a T).
     ///
-    /// \throw TableNameInUse Thrown by add_table() if \a require_unique_name is
-    /// true and \a name clashes with the name of a preexisting table.
+    /// \throw NoSuchTable Thrown by remove_table() and rename_table() if there
+    /// is no table with the specified \a name.
     ///
-    /// \throw InvalidArgument Thrown by get_table() and get_table_name() if \a
-    /// index is not a valid table index, i.e., if it is greater than, or equal
-    /// to the number of tables in the group.
+    /// \throw TableNameInUse Thrown by add_table() if \a require_unique_name is
+    /// true and \a name clashes with the name of a preexisting table. Thrown by
+    /// rename_table() if \a require_unique_name is true and \a new_name clashes
+    /// with the name of a preexisting table.
+    ///
+    /// \throw CrossTableLinkTarget Thrown by remove_table() if the specified
+    /// table is the target of a link column of a different table.
+    ///
+    /// \throw InvalidArgument Thrown by get_table(), get_table_name(),
+    /// remove_table(), and rename_table() if \a index is not a valid table
+    /// index, i.e., if it is greater than, or equal to the number of tables in
+    /// the group.
 
     bool has_table(StringData name) const TIGHTDB_NOEXCEPT;
     std::size_t find_table(StringData name) const TIGHTDB_NOEXCEPT;
@@ -294,8 +320,13 @@ public:
     template<class T> BasicTableRef<T> add_table(StringData name, bool require_unique_name = true);
     template<class T> BasicTableRef<T> get_or_add_table(StringData name, bool* was_added = 0);
 
-    //@}
+    void remove_table(std::size_t index);
+    void remove_table(StringData name);
 
+    void rename_table(std::size_t index, StringData new_name, bool require_unique_name = true);
+    void rename_table(StringData name, StringData new_name, bool require_unique_name = true);
+
+    //@}
 
     // Serialization
 
@@ -350,12 +381,6 @@ public:
     /// Compare two groups for inequality. See operator==().
     bool operator!=(const Group& g) const { return !(*this == g); }
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
-    class TransactAdvancer;
-    void advance_transact(ref_type new_top_ref, std::size_t new_file_size,
-                          const BinaryData* logs_begin, const BinaryData* logs_end);
-#endif
-
 #ifdef TIGHTDB_DEBUG
     void Verify() const; // Uncapitalized 'verify' cannot be used due to conflict with macro in Obj-C
     void print() const;
@@ -368,9 +393,6 @@ public:
 #else
     void Verify() const {}
 #endif
-
-protected:
-    Group* get_parent_group() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
 private:
     SlabAlloc m_alloc;
@@ -434,6 +456,9 @@ private:
     // Overriding method in Table::Parent
     void child_accessor_destroyed(Table*) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
+    // Overriding method in Table::Parent
+    Group* get_parent_group() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+
     class TableWriter;
     class DefaultTableWriter;
 
@@ -469,6 +494,9 @@ private:
 #ifdef TIGHTDB_ENABLE_REPLICATION
     Replication* get_replication() const TIGHTDB_NOEXCEPT;
     void set_replication(Replication*) TIGHTDB_NOEXCEPT;
+    class TransactAdvancer;
+    void advance_transact(ref_type new_top_ref, std::size_t new_file_size,
+                          const BinaryData* logs_begin, const BinaryData* logs_end);
 #endif
 
 #ifdef TIGHTDB_DEBUG

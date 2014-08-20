@@ -29,6 +29,7 @@
 * `Group::find_table()` added as a way of mapping a table name to the index of
   table in the group.
 * `Group::add_table()` and `Group::get_or_add_table()` were added.
+* `Group::remove_table()` and `Group::rename_table()` were added.
 * `WriteTransaction::add_table()` and `WriteTransaction::get_or_add_table()`
   ware added.
 
@@ -45,11 +46,14 @@
 ### API breaking changes:
 
 * `Table::get_parent_row_index()` and `Table::get_index_in_group()` together
-  replace `Table::get_index_in_parent()`. This was done to avoid a confusing mix of distinct concepts.
+  replace `Table::get_index_in_parent()`. This was done to avoid a confusing mix
+  of distinct concepts.
 
 ### Enhancements:
 
-* It's now possible to sort a LinkRef according to a column in the target table. Also lets you build a TableView with the sorted result instead. The new methods on LinkViewRef are `sort()` and `get_sorted_view()`
+* It's now possible to sort a LinkRef according to a column in the target
+  table. Also lets you build a TableView with the sorted result instead. The new
+  methods on LinkViewRef are `sort()` and `get_sorted_view()`
 
 ----------------------------------------------
 

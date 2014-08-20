@@ -121,7 +121,9 @@ public:
     /// occured.
     void clear_interrupt() TIGHTDB_NOEXCEPT;
 
-    void new_group_level_table(StringData name);
+    void insert_group_level_table(std::size_t table_ndx, std::size_t num_tables, StringData name);
+    void erase_group_level_table(std::size_t table_ndx, std::size_t num_tables);
+    void rename_group_level_table(std::size_t table_ndx, StringData new_name);
     void insert_column(const Descriptor&, std::size_t col_ndx, DataType type, StringData name,
                        const Table* link_target_table);
     void erase_column(const Descriptor&, std::size_t col_ndx);
@@ -256,48 +258,50 @@ private:
 
     /// Transaction log instruction encoding
     enum Instruction {
-        instr_NewGroupLevelTable =  1,
-        instr_SelectTable        =  2,
-        instr_SetInt             =  3,
-        instr_SetBool            =  4,
-        instr_SetFloat           =  5,
-        instr_SetDouble          =  6,
-        instr_SetString          =  7,
-        instr_SetBinary          =  8,
-        instr_SetDateTime        =  9,
-        instr_SetTable           = 10,
-        instr_SetMixed           = 11,
-        instr_SetLink            = 12,
-        instr_InsertInt          = 13,
-        instr_InsertBool         = 14,
-        instr_InsertFloat        = 15,
-        instr_InsertDouble       = 16,
-        instr_InsertString       = 17,
-        instr_InsertBinary       = 18,
-        instr_InsertDateTime     = 19,
-        instr_InsertTable        = 20,
-        instr_InsertMixed        = 21,
-        instr_InsertLink         = 22,
-        instr_InsertLinkList     = 23,
-        instr_RowInsertComplete  = 24,
-        instr_InsertEmptyRows    = 25,
-        instr_EraseRow           = 26, // Remove a row
-        instr_MoveLastOver       = 27, // Remove a row by replacing it with the last row
-        instr_AddIntToColumn     = 28, // Add an integer value to all cells in a column
-        instr_ClearTable         = 29, // Remove all rows in selected table
-        instr_OptimizeTable      = 30,
-        instr_SelectDescriptor   = 31, // Select descriptor from currently selected root table
-        instr_InsertColumn       = 32, // Insert new column into to selected descriptor
-        instr_EraseColumn        = 33, // Remove column from selected descriptor
-        instr_EraseLinkColumn    = 34, // Remove link-type column from selected descriptor
-        instr_RenameColumn       = 35, // Rename column in selected descriptor
-        instr_AddSearchIndex     = 36, // Add a search index to a column
-        instr_SelectLinkList     = 37,
-        instr_LinkListSet        = 38, // Assign to link list entry
-        instr_LinkListInsert     = 39, // Insert entry into link list
-        instr_LinkListMove       = 40, // Move an entry within a link list
-        instr_LinkListErase      = 41, // Remove an entry from a link list
-        instr_LinkListClear      = 42  // Ramove all entries from a link list
+        instr_InsertGroupLevelTable =  1,
+        instr_EraseGroupLevelTable  =  2, // Remove columnless table from group
+        instr_RenameGroupLevelTable =  3,
+        instr_SelectTable           =  4,
+        instr_SetInt                =  5,
+        instr_SetBool               =  6,
+        instr_SetFloat              =  7,
+        instr_SetDouble             =  8,
+        instr_SetString             =  9,
+        instr_SetBinary             = 10,
+        instr_SetDateTime           = 11,
+        instr_SetTable              = 12,
+        instr_SetMixed              = 13,
+        instr_SetLink               = 14,
+        instr_InsertInt             = 15,
+        instr_InsertBool            = 16,
+        instr_InsertFloat           = 17,
+        instr_InsertDouble          = 18,
+        instr_InsertString          = 19,
+        instr_InsertBinary          = 20,
+        instr_InsertDateTime        = 21,
+        instr_InsertTable           = 22,
+        instr_InsertMixed           = 23,
+        instr_InsertLink            = 24,
+        instr_InsertLinkList        = 25,
+        instr_RowInsertComplete     = 26,
+        instr_InsertEmptyRows       = 27,
+        instr_EraseRow              = 28, // Remove a row
+        instr_MoveLastOver          = 29, // Remove a row by replacing it with the last row
+        instr_AddIntToColumn        = 30, // Add an integer value to all cells in a column
+        instr_ClearTable            = 31, // Remove all rows in selected table
+        instr_OptimizeTable         = 32,
+        instr_SelectDescriptor      = 33, // Select descriptor from currently selected root table
+        instr_InsertColumn          = 34, // Insert new column into to selected descriptor
+        instr_EraseColumn           = 35, // Remove column from selected descriptor
+        instr_EraseLinkColumn       = 36, // Remove link-type column from selected descriptor
+        instr_RenameColumn          = 37, // Rename column in selected descriptor
+        instr_AddSearchIndex        = 38, // Add a search index to a column
+        instr_SelectLinkList        = 39,
+        instr_LinkListSet           = 40, // Assign to link list entry
+        instr_LinkListInsert        = 41, // Insert entry into link list
+        instr_LinkListMove          = 42, // Move an entry within a link list
+        instr_LinkListErase         = 43, // Remove an entry from a link list
+        instr_LinkListClear         = 44  // Ramove all entries from a link list
     };
 
     util::Buffer<std::size_t> m_subtab_path_buf;
@@ -385,7 +389,10 @@ public:
     /// `InstructionHandler` must define the following member
     /// functions:
     ///
-    ///     bool new_group_level_table(StringData name)
+    ///     bool insert_group_level_table(std::size_t table_ndx, std::size_t num_tables,
+    ///                                   StringData name)
+    ///     bool erase_group_level_table(std::size_t table_ndx, std::size_t num_tables)
+    ///     bool rename_group_level_table(std::size_t table_ndx, StringData new_name)
     ///     bool select_table(std::size_t group_level_ndx, int levels, const std::size_t* path)
     ///     bool insert_empty_rows(std::size_t row_ndx, std::size_t num_rows)
     ///     bool erase_row(std::size_t row_ndx)
@@ -793,10 +800,23 @@ inline void Replication::mixed_cmd(Instruction instr, std::size_t col_ndx,
 }
 
 
-inline void Replication::new_group_level_table(StringData name)
+inline void Replication::insert_group_level_table(std::size_t table_ndx, std::size_t num_tables,
+                                                  StringData name)
 {
-    simple_cmd(instr_NewGroupLevelTable, util::tuple(name.size())); // Throws
+    simple_cmd(instr_InsertGroupLevelTable, util::tuple(table_ndx, num_tables,
+                                                        name.size())); // Throws
     transact_log_append(name.data(), name.size()); // Throws
+}
+
+inline void Replication::erase_group_level_table(std::size_t table_ndx, std::size_t num_tables)
+{
+    simple_cmd(instr_EraseGroupLevelTable, util::tuple(table_ndx, num_tables)); // Throws
+}
+
+inline void Replication::rename_group_level_table(std::size_t table_ndx, StringData new_name)
+{
+    simple_cmd(instr_RenameGroupLevelTable, util::tuple(table_ndx, new_name.size())); // Throws
+    transact_log_append(new_name.data(), new_name.size()); // Throws
 }
 
 
@@ -1473,10 +1493,27 @@ bool Replication::TransactLogParser::do_parse(InstructionHandler& handler)
                     return false;
                 continue;
             }
-            case instr_NewGroupLevelTable: {
+            case instr_InsertGroupLevelTable: {
+                std::size_t table_ndx  = read_int<std::size_t>(); // Throws
+                std::size_t num_tables = read_int<std::size_t>(); // Throws
                 read_string(m_string_buffer); // Throws
                 StringData name(m_string_buffer.data(), m_string_buffer.size());
-                if (!handler.new_group_level_table(name)) // Throws
+                if (!handler.insert_group_level_table(table_ndx, num_tables, name)) // Throws
+                    return false;
+                continue;
+            }
+            case instr_EraseGroupLevelTable: {
+                std::size_t table_ndx  = read_int<std::size_t>(); // Throws
+                std::size_t num_tables = read_int<std::size_t>(); // Throws
+                if (!handler.erase_group_level_table(table_ndx, num_tables)) // Throws
+                    return false;
+                continue;
+            }
+            case instr_RenameGroupLevelTable: {
+                std::size_t table_ndx = read_int<std::size_t>(); // Throws
+                read_string(m_string_buffer); // Throws
+                StringData new_name(m_string_buffer.data(), m_string_buffer.size());
+                if (!handler.rename_group_level_table(table_ndx, new_name)) // Throws
                     return false;
                 continue;
             }

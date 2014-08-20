@@ -113,7 +113,7 @@ void ColumnSubtableParent::child_accessor_destroyed(Table* child) TIGHTDB_NOEXCE
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
-    // underlying node structure. See AccessorConcistncyLevels.
+    // underlying node structure. See AccessorConsistencyLevels.
 
     // Note that due to the possibility of a failure during child creation, it
     // is possible that the calling child is not in the map.
@@ -254,7 +254,8 @@ void ColumnSubtableParent::SubtableMap::refresh_accessor_tree(size_t spec_ndx_in
         tf::set_ndx_in_parent(*table, i->m_subtable_ndx);
         if (tf::is_marked(*table)) {
             tf::refresh_accessor_tree(*table);
-            tf::bump_version(*table);
+            bool bump_global = false;
+            tf::bump_version(*table, bump_global);
         }
     }
 }
@@ -335,7 +336,8 @@ void ColumnTable::set(size_t row_ndx, const Table* subtable)
         typedef _impl::TableFriend tf;
         tf::discard_child_accessors(*table_2);
         tf::refresh_accessor_tree(*table_2);
-        tf::bump_version(*table_2);
+        bool bump_global = false;
+        tf::bump_version(*table_2, bump_global);
     }
 }
 
