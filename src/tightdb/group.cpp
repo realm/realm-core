@@ -1520,7 +1520,8 @@ public:
         instr_class_postfix_descriptor };
     Class classification;
     // override only the instructions which are not to be treated as no-ops during rollback
-    bool new_group_level_table(StringData) { classification = instr_class_execute; return true; }
+    bool insert_group_level_table(std::size_t, std::size_t, StringData) { classification = instr_class_execute; return true; }
+    bool erase_group_level_table(std::size_t, std::size_t)  { classification = instr_class_execute; return true; }
     bool select_table(std::size_t, int, const std::size_t* ) { classification = instr_class_postfix_table; return true; }
     bool insert_empty_rows(std::size_t, std::size_t, std::size_t, bool ) { classification = instr_class_execute; return true; }
     bool erase_row(std::size_t, std::size_t, bool) { classification = instr_class_execute; return true; }
@@ -1562,10 +1563,14 @@ class Group::TransactReverser : public Group::TransactAdvancer  {
 public:
     TransactReverser(Group& group) : TransactAdvancer(group) {};
     // override only the instructions which need to be reversed.
-    bool new_group_level_table(StringData) 
+    bool insert_group_level_table(std::size_t table_ndx, std::size_t num_tables, StringData) 
     { 
-        // FIXME: need table removal to reverse this one correctly
-        return true;
+        return TransactAdvancer::erase_group_level_table(table_ndx, num_tables);
+    }
+
+    bool erase_group_level_table(std::size_t table_ndx, std::size_t num_tables) 
+    { 
+        return TransactAdvancer::insert_group_level_table(table_ndx, num_tables, StringData());
     }
 
     bool insert_empty_rows(std::size_t idx, std::size_t num_rows, std::size_t tbl_sz, bool unordered) 
