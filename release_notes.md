@@ -1,8 +1,4 @@
-# NEXT RELEASE
-
-### Bugfixes:
-
-* Lorem ipsum.
+# 0.82.0 Release notes
 
 ### API breaking changes:
 
@@ -32,12 +28,6 @@
 * `Group::remove_table()` and `Group::rename_table()` were added.
 * `WriteTransaction::add_table()` and `WriteTransaction::get_or_add_table()`
   ware added.
-
------------
-
-### Internals:
-
-* Lorem ipsum.
 
 ----------------------------------------------
 
