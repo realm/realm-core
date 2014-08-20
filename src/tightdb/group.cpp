@@ -910,7 +910,7 @@ public:
         return true;
     }
 
-    bool insert_empty_rows(size_t row_ndx, size_t num_rows) TIGHTDB_NOEXCEPT
+    bool insert_empty_rows(size_t row_ndx, size_t num_rows, size_t tbl_sz, bool unordered) TIGHTDB_NOEXCEPT
     {
         // inverse: *multiple* erase_row
         typedef _impl::TableFriend tf;
@@ -919,7 +919,7 @@ public:
         return true;
     }
 
-    bool erase_row(size_t row_ndx) TIGHTDB_NOEXCEPT
+    bool erase_row(size_t row_ndx, size_t tbl_sz, bool unordered) TIGHTDB_NOEXCEPT
     {
         // inverse: insert empty row
         typedef _impl::TableFriend tf;
@@ -947,83 +947,83 @@ public:
         return true;
     }
     // inverse for insert_xxx is erase_row
-    bool insert_int(size_t col_ndx, size_t row_ndx, int_fast64_t) TIGHTDB_NOEXCEPT
+    bool insert_int(size_t col_ndx, size_t row_ndx, size_t tbl_sz, bool unordered, int_fast64_t) TIGHTDB_NOEXCEPT
     {
         if (col_ndx == 0)
-            insert_empty_rows(row_ndx, 1);
+            insert_empty_rows(row_ndx, 1, tbl_sz, unordered);
         return true;
     }
 
-    bool insert_bool(size_t col_ndx, size_t row_ndx, bool) TIGHTDB_NOEXCEPT
+    bool insert_bool(size_t col_ndx, size_t row_ndx, size_t tbl_sz, bool unordered, bool) TIGHTDB_NOEXCEPT
     {
         if (col_ndx == 0)
-            insert_empty_rows(row_ndx, 1);
+            insert_empty_rows(row_ndx, 1, tbl_sz, unordered);
         return true;
     }
 
-    bool insert_float(size_t col_ndx, size_t row_ndx, float) TIGHTDB_NOEXCEPT
+    bool insert_float(size_t col_ndx, size_t row_ndx, size_t tbl_sz, bool unordered, float) TIGHTDB_NOEXCEPT
     {
         if (col_ndx == 0)
-            insert_empty_rows(row_ndx, 1);
+            insert_empty_rows(row_ndx, 1, tbl_sz, unordered);
         return true;
     }
 
-    bool insert_double(size_t col_ndx, size_t row_ndx, double) TIGHTDB_NOEXCEPT
+    bool insert_double(size_t col_ndx, size_t row_ndx, size_t tbl_sz, bool unordered, double) TIGHTDB_NOEXCEPT
     {
         if (col_ndx == 0)
-            insert_empty_rows(row_ndx, 1);
+            insert_empty_rows(row_ndx, 1, tbl_sz, unordered);
         return true;
     }
 
-    bool insert_string(size_t col_ndx, size_t row_ndx, StringData) TIGHTDB_NOEXCEPT
+    bool insert_string(size_t col_ndx, size_t row_ndx, size_t tbl_sz, bool unordered, StringData) TIGHTDB_NOEXCEPT
     {
         if (col_ndx == 0)
-            insert_empty_rows(row_ndx, 1);
+            insert_empty_rows(row_ndx, 1, tbl_sz, unordered);
         return true;
     }
 
-    bool insert_binary(size_t col_ndx, size_t row_ndx, BinaryData) TIGHTDB_NOEXCEPT
+    bool insert_binary(size_t col_ndx, size_t row_ndx, size_t tbl_sz, bool unordered, BinaryData) TIGHTDB_NOEXCEPT
     {
         if (col_ndx == 0)
-            insert_empty_rows(row_ndx, 1);
+            insert_empty_rows(row_ndx, 1, tbl_sz, unordered);
         return true;
     }
 
-    bool insert_date_time(size_t col_ndx, size_t row_ndx, DateTime) TIGHTDB_NOEXCEPT
+    bool insert_date_time(size_t col_ndx, size_t row_ndx, size_t tbl_sz, bool unordered, DateTime) TIGHTDB_NOEXCEPT
     {
         if (col_ndx == 0)
-            insert_empty_rows(row_ndx, 1);
+            insert_empty_rows(row_ndx, 1, tbl_sz, unordered);
         return true;
     }
 
-    bool insert_table(size_t col_ndx, size_t row_ndx) TIGHTDB_NOEXCEPT
+    bool insert_table(size_t col_ndx, size_t row_ndx, size_t tbl_sz, bool unordered) TIGHTDB_NOEXCEPT
     {
         if (col_ndx == 0)
-            insert_empty_rows(row_ndx, 1);
+            insert_empty_rows(row_ndx, 1, tbl_sz, unordered);
         return true;
     }
 
-    bool insert_mixed(size_t col_ndx, size_t row_ndx, const Mixed&) TIGHTDB_NOEXCEPT
+    bool insert_mixed(size_t col_ndx, size_t row_ndx, size_t tbl_sz, bool unordered, const Mixed&) TIGHTDB_NOEXCEPT
     {
         if (col_ndx == 0)
-            insert_empty_rows(row_ndx, 1);
+            insert_empty_rows(row_ndx, 1, tbl_sz, unordered);
         return true;
     }
 
-    bool insert_link(size_t col_ndx, size_t row_ndx, size_t) TIGHTDB_NOEXCEPT
+    bool insert_link(size_t col_ndx, size_t row_ndx, size_t tbl_sz, bool unordered, size_t) TIGHTDB_NOEXCEPT
     {
         // The marking dirty of the target table is handled by
         // insert_empty_rows() regardless of whether the link column is the
         // first column or not.
         if (col_ndx == 0)
-            insert_empty_rows(row_ndx, 1);
+            insert_empty_rows(row_ndx, 1, tbl_sz, unordered);
        return true;
     }
 
-    bool insert_link_list(size_t col_ndx, size_t row_ndx) TIGHTDB_NOEXCEPT
+    bool insert_link_list(size_t col_ndx, size_t row_ndx, size_t tbl_sz, bool unordered) TIGHTDB_NOEXCEPT
     {
         if (col_ndx == 0)
-            insert_empty_rows(row_ndx, 1);
+            insert_empty_rows(row_ndx, 1, tbl_sz, unordered);
         return true;
     }
 
@@ -1345,20 +1345,31 @@ public:
     // override only the instructions which are not to be treated as no-ops during rollback
     bool new_group_level_table(StringData) { classification = instr_class_execute; return true; }
     bool select_table(std::size_t, int, const std::size_t* ) { classification = instr_class_postfix_table; return true; }
-    bool insert_empty_rows(std::size_t, std::size_t ) { classification = instr_class_execute; return true; }
-    bool erase_row(std::size_t) { classification = instr_class_execute; return true; }
+    bool insert_empty_rows(std::size_t, std::size_t, std::size_t, bool ) { classification = instr_class_execute; return true; }
+    bool erase_row(std::size_t, std::size_t, bool) { classification = instr_class_execute; return true; }
     bool move_last_over(std::size_t, std::size_t) { classification = instr_class_execute; return true; }
-    bool insert_int(std::size_t, std::size_t, int_fast64_t) { classification = instr_class_execute; return true; }
-    bool insert_bool(std::size_t, std::size_t, bool) { classification = instr_class_execute; return true; }
-    bool insert_float(std::size_t, std::size_t, float) { classification = instr_class_execute; return true; }
-    bool insert_double(std::size_t, std::size_t, double) { classification = instr_class_execute; return true; }
-    bool insert_string(std::size_t, std::size_t, StringData) { classification = instr_class_execute; return true; }
-    bool insert_binary(std::size_t, std::size_t, BinaryData) { classification = instr_class_execute; return true; }
-    bool insert_date_time(std::size_t, std::size_t, DateTime) { classification = instr_class_execute; return true; }
-    bool insert_table(std::size_t, std::size_t) { classification = instr_class_execute; return true; }
-    bool insert_mixed(std::size_t, std::size_t, const Mixed&) { classification = instr_class_execute; return true; }
-    bool insert_link(std::size_t, std::size_t, std::size_t) { classification = instr_class_execute; return true; }
-    bool insert_link_list(std::size_t, std::size_t) { classification = instr_class_execute; return true; }
+    bool insert_int(std::size_t, std::size_t, std::size_t, bool, int_fast64_t)
+    { classification = instr_class_execute; return true; }
+    bool insert_bool(std::size_t, std::size_t, std::size_t, bool, bool)
+    { classification = instr_class_execute; return true; }
+    bool insert_float(std::size_t, std::size_t, std::size_t, bool, float)
+    { classification = instr_class_execute; return true; }
+    bool insert_double(std::size_t, std::size_t, std::size_t, bool, double)
+    { classification = instr_class_execute; return true; }
+    bool insert_string(std::size_t, std::size_t, std::size_t, bool, StringData)
+    { classification = instr_class_execute; return true; }
+    bool insert_binary(std::size_t, std::size_t, std::size_t, bool, BinaryData)
+    { classification = instr_class_execute; return true; }
+    bool insert_date_time(std::size_t, std::size_t, std::size_t, bool, DateTime)
+    { classification = instr_class_execute; return true; }
+    bool insert_table(std::size_t, std::size_t, std::size_t, bool)
+    { classification = instr_class_execute; return true; }
+    bool insert_mixed(std::size_t, std::size_t, std::size_t, bool, const Mixed&)
+    { classification = instr_class_execute; return true; }
+    bool insert_link(std::size_t, std::size_t, std::size_t, bool, std::size_t)
+    { classification = instr_class_execute; return true; }
+    bool insert_link_list(std::size_t, std::size_t, std::size_t, bool)
+    { classification = instr_class_execute; return true; }
     bool set_table(std::size_t, std::size_t) { classification = instr_class_execute; return true; }
     bool set_mixed(std::size_t, std::size_t, const Mixed&) { classification = instr_class_execute; return true; }
     bool set_link(std::size_t, std::size_t, std::size_t) { classification = instr_class_execute; return true; }
@@ -1380,19 +1391,19 @@ public:
         return true;
     }
 
-    bool insert_empty_rows(std::size_t idx, std::size_t num_rows) 
+    bool insert_empty_rows(std::size_t idx, std::size_t num_rows, std::size_t tbl_sz, bool unordered) 
     { 
         while (num_rows > 0) {
-            Group::TransactAdvancer::erase_row(idx);
+            Group::TransactAdvancer::erase_row(idx, tbl_sz, unordered);
             --num_rows;
             ++idx;
         }
         return true; 
     }
 
-    bool erase_row(std::size_t idx) 
+    bool erase_row(std::size_t idx, std::size_t tbl_sz, bool unordered) 
     { 
-        Group::TransactAdvancer::insert_empty_rows(idx,1);
+        Group::TransactAdvancer::insert_empty_rows(idx, 1, tbl_sz, unordered);
         return true; 
     }
 
@@ -1402,65 +1413,65 @@ public:
         return true; 
     }
     // helper function, shared by insert_xxx
-    bool insert(std::size_t col_idx, std::size_t row_idx) 
+    bool insert(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz, bool unordered) 
     { 
         if (col_idx == 0)
-            Group::TransactAdvancer::erase_row(row_idx);
+            Group::TransactAdvancer::erase_row(row_idx, tbl_sz, unordered);
         return true; 
     }
-    bool insert_int(std::size_t col_idx, std::size_t row_idx, int_fast64_t) 
+    bool insert_int(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz, bool unordered, int_fast64_t) 
     { 
-        return insert(col_idx, row_idx);
+        return insert(col_idx, row_idx, tbl_sz, unordered);
     }
 
-    bool insert_bool(std::size_t col_idx, std::size_t row_idx, bool) 
+    bool insert_bool(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz, bool unordered, bool) 
     { 
-        return insert(col_idx, row_idx);
+        return insert(col_idx, row_idx, tbl_sz, unordered);
     }
 
-    bool insert_float(std::size_t col_idx, std::size_t row_idx, float) 
+    bool insert_float(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz, bool unordered, float) 
     { 
-        return insert(col_idx, row_idx);
+        return insert(col_idx, row_idx, tbl_sz, unordered);
     }
 
-    bool insert_double(std::size_t col_idx, std::size_t row_idx, double) 
+    bool insert_double(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz, bool unordered, double) 
     { 
-        return insert(col_idx, row_idx);
+        return insert(col_idx, row_idx, tbl_sz, unordered);
     }
 
-    bool insert_string(std::size_t col_idx, std::size_t row_idx, StringData) 
+    bool insert_string(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz, bool unordered, StringData) 
     { 
-        return insert(col_idx, row_idx);
+        return insert(col_idx, row_idx, tbl_sz, unordered);
     }
 
-    bool insert_binary(std::size_t col_idx, std::size_t row_idx, BinaryData) 
+    bool insert_binary(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz, bool unordered, BinaryData) 
     { 
-        return insert(col_idx, row_idx);
+        return insert(col_idx, row_idx, tbl_sz, unordered);
     }
 
-    bool insert_date_time(std::size_t col_idx, std::size_t row_idx, DateTime) 
+    bool insert_date_time(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz, bool unordered, DateTime) 
     { 
-        return insert(col_idx, row_idx);
+        return insert(col_idx, row_idx, tbl_sz, unordered);
     }
 
-    bool insert_table(std::size_t col_idx, std::size_t row_idx) 
+    bool insert_table(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz, bool unordered) 
     { 
-        return insert(col_idx, row_idx); 
+        return insert(col_idx, row_idx, tbl_sz, unordered); 
     }
 
-    bool insert_mixed(std::size_t col_idx, std::size_t row_idx, const Mixed&) 
+    bool insert_mixed(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz, bool unordered, const Mixed&) 
     { 
-        return insert(col_idx, row_idx);
+        return insert(col_idx, row_idx, tbl_sz, unordered);
     }
 
-    bool insert_link(std::size_t col_idx, std::size_t row_idx, std::size_t) 
+    bool insert_link(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz, bool unordered, std::size_t) 
     { 
-        return insert(col_idx, row_idx);
+        return insert(col_idx, row_idx, tbl_sz, unordered);
     }
 
-    bool insert_link_list(std::size_t col_idx, std::size_t row_idx) 
+    bool insert_link_list(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz, bool unordered) 
     { 
-        return insert(col_idx, row_idx);
+        return insert(col_idx, row_idx, tbl_sz, unordered);
     }
 
     bool insert_column(std::size_t col_idx, DataType, StringData,
