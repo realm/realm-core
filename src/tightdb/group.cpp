@@ -1086,8 +1086,10 @@ public:
         return true;
     }
 
-    bool insert_empty_rows(size_t row_ndx, size_t num_rows, size_t tbl_sz, bool unordered) TIGHTDB_NOEXCEPT
+    bool insert_empty_rows(size_t row_ndx, size_t num_rows, size_t, bool unordered) TIGHTDB_NOEXCEPT
     {
+        static_cast<void>(unordered);
+        TIGHTDB_ASSERT(unordered == false);
         // inverse: *multiple* erase_row
         typedef _impl::TableFriend tf;
         if (m_table)
@@ -1097,14 +1099,18 @@ public:
 
     bool erase_row(size_t row_ndx, size_t tbl_sz, bool unordered) TIGHTDB_NOEXCEPT
     {
-        // inverse: insert empty row
-        typedef _impl::TableFriend tf;
-        if (m_table)
-            tf::adj_accessors_erase_row(*m_table, row_ndx);
+        if (unordered) {
+            _move_last_over(row_ndx, tbl_sz-1);
+        }
+        else {
+            typedef _impl::TableFriend tf;
+            if (m_table)
+                tf::adj_accessors_erase_row(*m_table, row_ndx);
+        }
         return true;
     }
 
-    bool move_last_over(size_t target_row_ndx, size_t last_row_ndx) TIGHTDB_NOEXCEPT
+    bool _move_last_over(size_t target_row_ndx, size_t last_row_ndx) TIGHTDB_NOEXCEPT
     {
         // inverse: append, then move -- neither exist
         typedef _impl::TableFriend tf;
@@ -1525,7 +1531,6 @@ public:
     bool select_table(std::size_t, int, const std::size_t* ) { classification = instr_class_postfix_table; return true; }
     bool insert_empty_rows(std::size_t, std::size_t, std::size_t, bool ) { classification = instr_class_execute; return true; }
     bool erase_row(std::size_t, std::size_t, bool) { classification = instr_class_execute; return true; }
-    bool move_last_over(std::size_t, std::size_t) { classification = instr_class_execute; return true; }
     bool insert_int(std::size_t, std::size_t, std::size_t, bool, int_fast64_t)
     { classification = instr_class_execute; return true; }
     bool insert_bool(std::size_t, std::size_t, std::size_t, bool, bool)
@@ -1589,11 +1594,6 @@ public:
         return true; 
     }
 
-    bool move_last_over(std::size_t target_row_idx, std::size_t last_row_idx) 
-    { 
-        // FIXME: the inverse is to append, then move and neither exist as instructions
-        return true; 
-    }
     // helper function, shared by insert_xxx
     bool insert(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz, bool unordered) 
     { 
@@ -1659,7 +1659,6 @@ public:
     bool insert_column(std::size_t col_idx, DataType, StringData,
                        std::size_t target_table_idx, std::size_t backlink_col_ndx) 
     { 
-        // FIXME: needs to have backlink col added to utilize erase_column
         return Group::TransactAdvancer::erase_column(col_idx, target_table_idx, backlink_col_ndx);
     }
 
@@ -1671,13 +1670,13 @@ public:
     }
 };
 
-void Group::reverse_transact(ref_type new_top_ref, size_t new_file_size, const BinaryData& log)
+void Group::reverse_transact(ref_type new_top_ref, const BinaryData& log)
 {
     // classify the instructions, building a vector of relevant instructions.
     // The order is changed so that prefix instructions are moved to a postfix
     // position. This allows them to still work as prefixes when the instructions
     // are traversed in reverse order. Instructions which are not relevant for reversal
-    // eliminated in the process.
+    // are eliminated in the process.
     InstructionClassifierForRollback icfb;
     std::vector<const char*> instructions;
     MultiLogInputStream in(&log, (&log)+1);

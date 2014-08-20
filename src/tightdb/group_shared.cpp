@@ -1275,7 +1275,7 @@ void SharedGroup::rollback_and_continue_as_read()
 void SharedGroup::do_rollback_and_continue_as_read(const char* start, const char* limit)
 {
     BinaryData buffer(start, limit-start);
-    m_group.reverse_transact(m_readlock.m_top_ref, m_readlock.m_file_size, buffer);
+    m_group.reverse_transact(m_readlock.m_top_ref, buffer);
 }
 
 

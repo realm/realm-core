@@ -286,22 +286,21 @@ private:
         instr_RowInsertComplete     = 26,
         instr_InsertEmptyRows       = 27,
         instr_EraseRow              = 28, // Remove a row
-        instr_MoveLastOver          = 29, // Remove a row by replacing it with the last row
-        instr_AddIntToColumn        = 30, // Add an integer value to all cells in a column
-        instr_ClearTable            = 31, // Remove all rows in selected table
-        instr_OptimizeTable         = 32,
-        instr_SelectDescriptor      = 33, // Select descriptor from currently selected root table
-        instr_InsertColumn          = 34, // Insert new column into to selected descriptor
-        instr_EraseColumn           = 35, // Remove column from selected descriptor
-        instr_EraseLinkColumn       = 36, // Remove link-type column from selected descriptor
-        instr_RenameColumn          = 37, // Rename column in selected descriptor
-        instr_AddSearchIndex        = 38, // Add a search index to a column
-        instr_SelectLinkList        = 39,
-        instr_LinkListSet           = 40, // Assign to link list entry
-        instr_LinkListInsert        = 41, // Insert entry into link list
-        instr_LinkListMove          = 42, // Move an entry within a link list
-        instr_LinkListErase         = 43, // Remove an entry from a link list
-        instr_LinkListClear         = 44  // Ramove all entries from a link list
+        instr_AddIntToColumn        = 29, // Add an integer value to all cells in a column
+        instr_ClearTable            = 30, // Remove all rows in selected table
+        instr_OptimizeTable         = 31,
+        instr_SelectDescriptor      = 32, // Select descriptor from currently selected root table
+        instr_InsertColumn          = 33, // Insert new column into to selected descriptor
+        instr_EraseColumn           = 34, // Remove column from selected descriptor
+        instr_EraseLinkColumn       = 35, // Remove link-type column from selected descriptor
+        instr_RenameColumn          = 36, // Rename column in selected descriptor
+        instr_AddSearchIndex        = 37, // Add a search index to a column
+        instr_SelectLinkList        = 38,
+        instr_LinkListSet           = 39, // Assign to link list entry
+        instr_LinkListInsert        = 40, // Insert entry into link list
+        instr_LinkListMove          = 41, // Move an entry within a link list
+        instr_LinkListErase         = 42, // Remove an entry from a link list
+        instr_LinkListClear         = 43  // Ramove all entries from a link list
     };
 
     util::Buffer<std::size_t> m_subtab_path_buf;
@@ -405,7 +404,6 @@ public:
     ///     bool select_table(std::size_t group_level_ndx, int levels, const std::size_t* path)
     ///     bool insert_empty_rows(std::size_t row_ndx, std::size_t num_rows, std::size_t tbl_sz, bool unordered)
     ///     bool erase_row(std::size_t row_ndx, std::size_t tbl_sz, bool unordered)
-    ///     bool move_last_over(std::size_t target_row_ndx, std::size_t last_row_ndx)
     ///     bool clear_table()
     ///     bool insert_int(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, bool unordered, int_fast64_t)
     ///     bool insert_bool(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, bool unordered, bool)
@@ -1081,14 +1079,13 @@ inline void Replication::erase_row(const Table* t, std::size_t row_ndx)
     simple_cmd(instr_EraseRow, util::tuple(row_ndx, t->size(), false)); // Throws
 }
 
-
-inline void Replication::move_last_over(const Table* t, std::size_t target_row_ndx,
-                                        std::size_t last_row_ndx)
+inline void Replication::move_last_over(const Table* t, std::size_t target_row_ndx, std::size_t last_row_ndx)
 {
     check_table(t); // Throws
-    simple_cmd(instr_MoveLastOver, util::tuple(target_row_ndx, last_row_ndx)); // Throws
+    static_cast<void>(last_row_ndx);
+    TIGHTDB_ASSERT(t->size() == last_row_ndx);
+    simple_cmd(instr_EraseRow, util::tuple(target_row_ndx, t->size(), true)); // Throws    
 }
-
 
 inline void Replication::add_int_to_column(const Table* t, std::size_t col_ndx, int_fast64_t value)
 {
@@ -1422,13 +1419,6 @@ bool Replication::TransactLogParser::parse_one_inst(InstructionHandler& handler)
                 return false;
             return true;
         }
-        case instr_MoveLastOver: {
-            std::size_t target_row_ndx = read_int<std::size_t>(); // Throws
-            std::size_t last_row_ndx = read_int<std::size_t>(); // Throws
-            if (!handler.move_last_over(target_row_ndx, last_row_ndx)) // Throws
-                return false;
-            return true;
-        }
         case instr_AddIntToColumn: {
             std::size_t col_ndx = read_int<std::size_t>(); // Throws
             // FIXME: Don't depend on the existence of int64_t,
@@ -1616,7 +1606,6 @@ public:
     bool select_table(std::size_t, int, const std::size_t* ) { return true; }
     bool insert_empty_rows(std::size_t, std::size_t, std::size_t, bool ) { return true; }
     bool erase_row(std::size_t, std::size_t, bool) { return true; }
-    bool move_last_over(std::size_t, std::size_t) { return true; }
     bool clear_table() { return true; }
     bool insert_int(std::size_t, std::size_t, std::size_t, bool, int_fast64_t) { return true; }
     bool insert_bool(std::size_t, std::size_t, std::size_t, bool, bool) { return true; }

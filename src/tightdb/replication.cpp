@@ -463,22 +463,27 @@ public:
         return false;
     }
 
-    bool erase_row(size_t row_ndx, std::size_t, bool)
+    bool erase_row(size_t row_ndx, std::size_t tbl_sz, bool unordered)
     {
         if (TIGHTDB_LIKELY(m_table)) {
-            if (TIGHTDB_LIKELY(row_ndx < m_table->size())) {
+            if (unordered) {
+                _move_last_over(row_ndx, tbl_sz-1);
+            }
+            else {
+                if (TIGHTDB_LIKELY(row_ndx < m_table->size())) {
 #ifdef TIGHTDB_DEBUG
-                if (m_log)
-                    *m_log << "table->remove("<<row_ndx<<")\n";
+                    if (m_log)
+                        *m_log << "table->remove("<<row_ndx<<")\n";
 #endif
-                m_table->remove(row_ndx); // Throws
-                return true;
+                    m_table->remove(row_ndx); // Throws
+                    return true;
+                }
             }
         }
         return false;
     }
 
-    bool move_last_over(size_t target_row_ndx, size_t last_row_ndx)
+    bool _move_last_over(size_t target_row_ndx, size_t last_row_ndx)
     {
         if (TIGHTDB_LIKELY(m_table)) {
             if (TIGHTDB_LIKELY(target_row_ndx < last_row_ndx &&
