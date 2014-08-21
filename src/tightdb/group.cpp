@@ -1100,7 +1100,7 @@ public:
     bool erase_row(size_t row_ndx, size_t tbl_sz, bool unordered) TIGHTDB_NOEXCEPT
     {
         if (unordered) {
-            _move_last_over(row_ndx, tbl_sz-1);
+            return _move_last_over(row_ndx, tbl_sz);
         }
         else {
             typedef _impl::TableFriend tf;

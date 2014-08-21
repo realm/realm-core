@@ -36,6 +36,8 @@
 #include <tightdb/group.hpp>
 #include <tightdb/group_shared.hpp>
 
+#include <iostream>
+
 namespace tightdb {
 
 
@@ -1591,8 +1593,9 @@ bool Replication::TransactLogParser::do_parse(InstructionHandler& handler)
 {
     next_input_buffer();
     while (m_input_begin != m_input_end || next_input_buffer()) {
-        if (!parse_one_inst(handler))
+        if (!parse_one_inst(handler)) {
             return false;
+        }
     }
     return true;
 }

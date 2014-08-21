@@ -467,7 +467,7 @@ public:
     {
         if (TIGHTDB_LIKELY(m_table)) {
             if (unordered) {
-                _move_last_over(row_ndx, tbl_sz-1);
+                return _move_last_over(row_ndx, tbl_sz);
             }
             else {
                 if (TIGHTDB_LIKELY(row_ndx < m_table->size())) {
