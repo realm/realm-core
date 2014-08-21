@@ -305,7 +305,7 @@ void ColumnBinary::do_insert(size_t row_ndx, BinaryData value, bool add_zero_ter
     for (size_t i = 0; i != num_rows; ++i) {
         size_t row_ndx_2 = row_ndx == tightdb::npos ? tightdb::npos : row_ndx + i;
         if (root_is_leaf()) {
-            TIGHTDB_ASSERT(row_ndx_2 == tightdb::npos || row_ndx_2 < TIGHTDB_MAX_LIST_SIZE);
+            TIGHTDB_ASSERT(row_ndx_2 == tightdb::npos || row_ndx_2 < TIGHTDB_MAX_BPNODE_SIZE);
             bool is_big = upgrade_root_leaf(value.size()); // Throws
             if (!is_big) {
                 // Small blobs root leaf

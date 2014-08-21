@@ -279,7 +279,7 @@ private:
 const int ITER3 =     20;
 const int WRITERS3 =   4;
 const int READERS3 =   4;
-const size_t ROWS3 = 1*1000*1000 + 1000; // + 1000 to add extra depth level if TIGHTDB_MAX_LIST_SIZE = 1000
+const size_t ROWS3 = 1*1000*1000 + 1000; // + 1000 to add extra depth level if TIGHTDB_MAX_BPNODE_SIZE = 1000
 volatile bool terminate3 = false;
 
 void write_thread3(string path)

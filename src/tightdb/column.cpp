@@ -311,7 +311,7 @@ public:
                        bool leaf_or_compact, ref_type* is_last);
 
 private:
-    const size_t m_max_elems_per_child; // A power of `TIGHTDB_MAX_LIST_SIZE`
+    const size_t m_max_elems_per_child; // A power of `TIGHTDB_MAX_BPNODE_SIZE`
     size_t m_elems_in_parent; // Zero if reinitialization is needed
     bool m_is_on_general_form; // Defined only when m_elems_in_parent > 0
     Array m_main, m_offsets;
@@ -338,7 +338,7 @@ void TreeWriter::add_leaf_ref(ref_type leaf_ref, size_t elems_in_leaf, ref_type*
             return;
         }
         m_last_parent_level.reset(new ParentLevel(m_alloc, m_out,
-                                                  TIGHTDB_MAX_LIST_SIZE)); // Throws
+                                                  TIGHTDB_MAX_BPNODE_SIZE)); // Throws
     }
     bool leaf_or_compact = true;
     m_last_parent_level->add_child_ref(leaf_ref, elems_in_leaf,
@@ -368,7 +368,7 @@ void TreeWriter::ParentLevel::add_child_ref(ref_type child_ref, size_t elems_in_
 {
     bool force_general_form = !leaf_or_compact ||
         (elems_in_child != m_max_elems_per_child &&
-         m_main.size() != 1 + TIGHTDB_MAX_LIST_SIZE - 1 &&
+         m_main.size() != 1 + TIGHTDB_MAX_BPNODE_SIZE - 1 &&
          !is_last);
 
     // Add the incoming child to this inner node
@@ -391,7 +391,7 @@ void TreeWriter::ParentLevel::add_child_ref(ref_type child_ref, size_t elems_in_
             m_offsets.add(v); // Throws
         }
         m_elems_in_parent += elems_in_child;
-        if (!is_last && m_main.size() < 1 + TIGHTDB_MAX_LIST_SIZE)
+        if (!is_last && m_main.size() < 1 + TIGHTDB_MAX_BPNODE_SIZE)
           return;
     }
     else { // First child in this node
@@ -436,7 +436,7 @@ void TreeWriter::ParentLevel::add_child_ref(ref_type child_ref, size_t elems_in_
             Allocator& alloc = m_main.get_alloc();
             size_t next_level_elems_per_child = m_max_elems_per_child;
             if (int_multiply_with_overflow_detect(next_level_elems_per_child,
-                                                  TIGHTDB_MAX_LIST_SIZE))
+                                                  TIGHTDB_MAX_BPNODE_SIZE))
                 throw runtime_error("Overflow in number of elements per child");
             m_prev_parent_level.reset(new ParentLevel(alloc, m_out,
                                                       next_level_elems_per_child)); // Throws
@@ -609,7 +609,7 @@ ref_type ColumnBase::build(size_t* rest_size_ptr, size_t fixed_height,
 {
     size_t rest_size = *rest_size_ptr;
     size_t orig_rest_size = rest_size;
-    size_t leaf_size = min(size_t(TIGHTDB_MAX_LIST_SIZE), rest_size);
+    size_t leaf_size = min(size_t(TIGHTDB_MAX_BPNODE_SIZE), rest_size);
     rest_size -= leaf_size;
     ref_type node = handler.create_leaf(leaf_size);
     size_t height = 1;
@@ -628,7 +628,7 @@ ref_type ColumnBase::build(size_t* rest_size_ptr, size_t fixed_height,
                 new_inner_node.add(v); // Throws
                 node = 0;
                 size_t num_children = 1;
-                while (rest_size > 0 && num_children != TIGHTDB_MAX_LIST_SIZE) {
+                while (rest_size > 0 && num_children != TIGHTDB_MAX_BPNODE_SIZE) {
                     ref_type child = build(&rest_size, height, alloc, handler); // Throws
                     try {
                         int_fast64_t v = child; // FIXME: Dangerous cast here (unsigned -> signed)
@@ -1039,7 +1039,7 @@ void Column::do_insert(size_t row_ndx, int_fast64_t value, size_t num_rows)
     for (size_t i = 0; i != num_rows; ++i) {
         size_t row_ndx_2 = row_ndx == tightdb::npos ? tightdb::npos : row_ndx + i;
         if (root_is_leaf()) {
-            TIGHTDB_ASSERT(row_ndx_2 == tightdb::npos || row_ndx_2 < TIGHTDB_MAX_LIST_SIZE);
+            TIGHTDB_ASSERT(row_ndx_2 == tightdb::npos || row_ndx_2 < TIGHTDB_MAX_BPNODE_SIZE);
             new_sibling_ref = m_array->bptree_leaf_insert(row_ndx_2, value, state); // Throws
         }
         else {

@@ -2177,7 +2177,7 @@ ref_type Array::bptree_insert(std::size_t elem_ndx, TreeInsert<TreeTraits>& stat
     char* child_header = static_cast<char*>(m_alloc.translate(child_ref));
     bool child_is_leaf = !get_is_inner_bptree_node_from_header(child_header);
     if (child_is_leaf) {
-        TIGHTDB_ASSERT(elem_ndx_in_child <= TIGHTDB_MAX_LIST_SIZE);
+        TIGHTDB_ASSERT(elem_ndx_in_child <= TIGHTDB_MAX_BPNODE_SIZE);
         new_sibling_ref =
             TreeTraits::leaf_insert(MemRef(child_header, child_ref), childs_parent,
                                     child_ref_ndx, m_alloc, elem_ndx_in_child, state); // Throws

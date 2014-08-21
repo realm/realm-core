@@ -16,7 +16,8 @@
 
 ### Internals:
 
-* Lorem ipsum.
+* `TIGHTDB_MAX_LIST_SIZE` was renamed to `TIGHTDB_MAX_BPNODE_SIZE`. `BPNODE`
+  stands for "B+-tree node".
 
 ----------------------------------------------
 

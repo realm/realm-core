@@ -413,7 +413,7 @@ TEST(LangBindHelper_AdvanceReadTransact_ColumnRootTypeChange)
     CHECK_EQUAL(type_Table, other->get_column_type(2));
     CHECK_EQUAL(1, other->size());
 
-    size_t leaf_x4    = 4 * TIGHTDB_MAX_LIST_SIZE;
+    size_t leaf_x4    = 4 * TIGHTDB_MAX_BPNODE_SIZE;
     size_t leaf_x4p16 = leaf_x4 + 16;
 
     // Change root type in various string columns (including mixed)
