@@ -1008,6 +1008,8 @@ private:
     void adj_accessors_erase_row(std::size_t row_ndx) TIGHTDB_NOEXCEPT;
     void adj_accessors_move_last_over(std::size_t target_row_ndx, std::size_t last_row_ndx)
         TIGHTDB_NOEXCEPT;
+    void adj_accessors_inverse_move_last_over(std::size_t target_row_ndx, std::size_t last_row_ndx)
+        TIGHTDB_NOEXCEPT;
     void adj_acc_clear_root_table() TIGHTDB_NOEXCEPT;
     void adj_acc_clear_nonroot_table() TIGHTDB_NOEXCEPT;
     void adj_row_acc_insert_rows(std::size_t row_ndx, std::size_t num_rows) TIGHTDB_NOEXCEPT;
@@ -1794,6 +1796,12 @@ public:
                                              std::size_t last_row_ndx) TIGHTDB_NOEXCEPT
     {
         table.adj_accessors_move_last_over(target_row_ndx, last_row_ndx);
+    }
+
+    static void adj_accessors_inverse_move_last_over(Table& table, std::size_t target_row_ndx,
+                                             std::size_t last_row_ndx) TIGHTDB_NOEXCEPT
+    {
+        table.adj_accessors_inverse_move_last_over(target_row_ndx, last_row_ndx);
     }
 
     static void adj_acc_clear_root_table(Table& table) TIGHTDB_NOEXCEPT

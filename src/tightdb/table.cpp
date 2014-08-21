@@ -4300,6 +4300,17 @@ void Table::adj_accessors_erase_row(size_t row_ndx) TIGHTDB_NOEXCEPT
 }
 
 
+void Table::adj_accessors_inverse_move_last_over(size_t target_row_ndx, size_t last_row_ndx)
+    TIGHTDB_NOEXCEPT
+{
+    // This function must assume no more than minimal consistency of the
+    // accessor hierarchy. This means in particular that it cannot access the
+    // underlying node structure. See AccessorConsistencyLevels.
+
+    adj_row_acc_move_last_over(last_row_ndx, target_row_ndx);
+}
+
+
 void Table::adj_accessors_move_last_over(size_t target_row_ndx, size_t last_row_ndx)
     TIGHTDB_NOEXCEPT
 {

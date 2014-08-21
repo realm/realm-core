@@ -1086,14 +1086,19 @@ public:
         return true;
     }
 
-    bool insert_empty_rows(size_t row_ndx, size_t num_rows, size_t, bool unordered) TIGHTDB_NOEXCEPT
+    bool insert_empty_rows(size_t row_ndx, size_t num_rows, size_t last_row_ndx, bool unordered) TIGHTDB_NOEXCEPT
     {
-        static_cast<void>(unordered);
-        TIGHTDB_ASSERT(unordered == false);
-        // inverse: *multiple* erase_row
         typedef _impl::TableFriend tf;
-        if (m_table)
-            tf::adj_accessors_insert_rows(*m_table, row_ndx, num_rows);
+        if (unordered) {
+            // unordered insertion of multiple rows is not supported (and not needed) currently.
+            TIGHTDB_ASSERT(num_rows == 1);
+            if (m_table)
+                tf::adj_accessors_inverse_move_last_over(*m_table, row_ndx, last_row_ndx);
+        }
+        else {
+            if (m_table)
+                tf::adj_accessors_insert_rows(*m_table, row_ndx, num_rows);
+        }
         return true;
     }
 
