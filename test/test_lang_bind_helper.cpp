@@ -5798,6 +5798,18 @@ TEST(LangBindHelper_RollbackAndContinueAsRead)
         group->Verify();
         CHECK_EQUAL(42, origin->get_int(0,0));
         CHECK_EQUAL(42, row.get_int(0));
+        origin->add_empty_row();
+        origin->set_int(0,1,42);
+        Row row2 = origin->get(1);
+        LangBindHelper::promote_to_write(sg, *wlr);
+        origin->move_last_over(0);
+        CHECK_EQUAL(42, row2.get_int(0));
+        CHECK_EQUAL(42, origin->get_int(0,0));
+        group->Verify();
+        LangBindHelper::rollback_and_continue_as_read(sg);
+        group->Verify();
+        CHECK_EQUAL(42, row2.get_int(0));
+        CHECK_EQUAL(42, origin->get_int(0,1));
         sg.end_read();
     }
 }
