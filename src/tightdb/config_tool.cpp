@@ -54,15 +54,7 @@ void emit_flags()
     if (emit_cflags) {
 #ifdef TIGHTDB_HAVE_CONFIG
         emit_flags("-DTIGHTDB_HAVE_CONFIG");
-#else
-#  ifdef TIGHTDB_ENABLE_REPLICATION
-        emit_flags("-DTIGHTDB_ENABLE_REPLICATION");
-#  endif
 #endif
-
-        if (TIGHTDB_MAX_LIST_SIZE != TIGHTDB_DEFAULT_MAX_LIST_SIZE)
-            emit_flags("-DTIGHTDB_MAX_LIST_SIZE=" TO_STR(TIGHTDB_MAX_LIST_SIZE));
-
 #ifdef TIGHTDB_DEBUG
         emit_flags("-DTIGHTDB_DEBUG");
 #endif

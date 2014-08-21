@@ -539,7 +539,7 @@ template<class T> void BasicColumn<T>::do_insert(std::size_t row_ndx, T value, s
     for (std::size_t i = 0; i != num_rows; ++i) {
         std::size_t row_ndx_2 = row_ndx == tightdb::npos ? tightdb::npos : row_ndx + i;
         if (root_is_leaf()) {
-            TIGHTDB_ASSERT(row_ndx_2 == tightdb::npos || row_ndx_2 < TIGHTDB_MAX_LIST_SIZE);
+            TIGHTDB_ASSERT(row_ndx_2 == tightdb::npos || row_ndx_2 < TIGHTDB_MAX_BPNODE_SIZE);
             BasicArray<T>* leaf = static_cast<BasicArray<T>*>(m_array);
             new_sibling_ref = leaf->bptree_leaf_insert(row_ndx_2, value, state);
         }

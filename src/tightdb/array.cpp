@@ -102,7 +102,7 @@
 //   `N_t` is the total number of elements in the subtree
 //         (`total_elems_in_subtree`).
 //
-// `N_c` must always be a power of `TIGHTDB_MAX_LIST_SIZE`.
+// `N_c` must always be a power of `TIGHTDB_MAX_BPNODE_SIZE`.
 //
 // It is expected that `N_t` will be removed in a future version of
 // the file format. This will make it much more efficient to append
@@ -2076,7 +2076,7 @@ ref_type Array::insert_bptree_child(Array& offsets, size_t orig_child_ndx,
     size_t insert_ndx = orig_child_ref_ndx + 1;
 
     TIGHTDB_ASSERT(insert_ndx <= size() - 1);
-    if (TIGHTDB_LIKELY(size() < 1 + TIGHTDB_MAX_LIST_SIZE + 1)) {
+    if (TIGHTDB_LIKELY(size() < 1 + TIGHTDB_MAX_BPNODE_SIZE + 1)) {
         // Case 1/2: This parent has space for the new child, so it
         // does not have to be split.
         insert(insert_ndx, new_sibling_ref); // Throws
@@ -2121,8 +2121,8 @@ ref_type Array::insert_bptree_child(Array& offsets, size_t orig_child_ndx,
         new_sibling.add(v); // Throws
     }
     size_t new_split_offset, new_split_size;
-    if (insert_ndx - 1 >= TIGHTDB_MAX_LIST_SIZE) {
-        TIGHTDB_ASSERT(insert_ndx - 1 == TIGHTDB_MAX_LIST_SIZE);
+    if (insert_ndx - 1 >= TIGHTDB_MAX_BPNODE_SIZE) {
+        TIGHTDB_ASSERT(insert_ndx - 1 == TIGHTDB_MAX_BPNODE_SIZE);
         // Case 1/2: The split child was the last child of the parent
         // to be split. In this case the parent may or may not be on
         // the compact form.
@@ -2176,10 +2176,10 @@ ref_type Array::insert_bptree_child(Array& offsets, size_t orig_child_ndx,
 ref_type Array::bptree_leaf_insert(size_t ndx, int64_t value, TreeInsertBase& state)
 {
     size_t leaf_size = size();
-    TIGHTDB_ASSERT(leaf_size <= TIGHTDB_MAX_LIST_SIZE);
+    TIGHTDB_ASSERT(leaf_size <= TIGHTDB_MAX_BPNODE_SIZE);
     if (leaf_size < ndx)
         ndx = leaf_size;
-    if (TIGHTDB_LIKELY(leaf_size < TIGHTDB_MAX_LIST_SIZE)) {
+    if (TIGHTDB_LIKELY(leaf_size < TIGHTDB_MAX_BPNODE_SIZE)) {
         insert(ndx, value); // Throws
         return 0; // Leaf was not split
     }

@@ -31,20 +31,6 @@ cstring_escape()
 tightdb_version="$(get_config_param "TIGHTDB_VERSION")" || exit 1
 tigthdb_version_escaped="$(cstring_escape "$tightdb_version")" || exit 1
 
-enable_replication="$(get_config_param "ENABLE_REPLICATION")" || exit 1
-if [ "$enable_replication" = "yes" ]; then
-    enable_replication="1"
-else
-    enable_replication="0"
-fi
-
-enable_alloc_set_zero="$(get_config_param "ENABLE_ALLOC_SET_ZERO")" || exit 1
-if [ "$enable_alloc_set_zero" = "yes" ]; then
-    enable_alloc_set_zero="1"
-else
-    enable_alloc_set_zero="0"
-fi
-
 install_prefix="$(get_config_param "INSTALL_PREFIX")" || exit 1
 install_prefix_escaped="$(cstring_escape "$install_prefix")" || exit 1
 
@@ -63,6 +49,23 @@ install_libdir_escaped="$(cstring_escape "$install_libdir")" || exit 1
 install_libexecdir="$(get_config_param "INSTALL_LIBEXECDIR")" || exit 1
 install_libexecdir_escaped="$(cstring_escape "$install_libexecdir")" || exit 1
 
+max_bpnode_size="$(get_config_param "MAX_BPNODE_SIZE")" || exit 1
+max_bpnode_size_debug="$(get_config_param "MAX_BPNODE_SIZE_DEBUG")" || exit 1
+
+enable_replication="$(get_config_param "ENABLE_REPLICATION")" || exit 1
+if [ "$enable_replication" = "yes" ]; then
+    enable_replication="1"
+else
+    enable_replication="0"
+fi
+
+enable_alloc_set_zero="$(get_config_param "ENABLE_ALLOC_SET_ZERO")" || exit 1
+if [ "$enable_alloc_set_zero" = "yes" ]; then
+    enable_alloc_set_zero="1"
+else
+    enable_alloc_set_zero="0"
+fi
+
 cat >"$target" <<EOF
 /*************************************************************************
  *
@@ -74,6 +77,19 @@ cat >"$target" <<EOF
 
 #define TIGHTDB_VERSION "$tigthdb_version_escaped"
 
+#define TIGHTDB_INSTALL_PREFIX      "$install_prefix_escaped"
+#define TIGHTDB_INSTALL_EXEC_PREFIX "$install_exec_prefix_escaped"
+#define TIGHTDB_INSTALL_INCLUDEDIR  "$install_includedir_escaped"
+#define TIGHTDB_INSTALL_BINDIR      "$install_bindir_escaped"
+#define TIGHTDB_INSTALL_LIBDIR      "$install_libdir_escaped"
+#define TIGHTDB_INSTALL_LIBEXECDIR  "$install_libexecdir_escaped"
+
+#ifdef TIGHTDB_DEBUG
+#  define TIGHTDB_MAX_BPNODE_SIZE $max_bpnode_size_debug
+#else
+#  define TIGHTDB_MAX_BPNODE_SIZE $max_bpnode_size
+#endif
+
 #if $enable_replication
 #  define TIGHTDB_ENABLE_REPLICATION 1
 #endif
@@ -81,11 +97,4 @@ cat >"$target" <<EOF
 #if $enable_alloc_set_zero
 #  define TIGHTDB_ENABLE_ALLOC_SET_ZERO 1
 #endif
-
-#define TIGHTDB_INSTALL_PREFIX      "$install_prefix_escaped"
-#define TIGHTDB_INSTALL_EXEC_PREFIX "$install_exec_prefix_escaped"
-#define TIGHTDB_INSTALL_INCLUDEDIR  "$install_includedir_escaped"
-#define TIGHTDB_INSTALL_BINDIR      "$install_bindir_escaped"
-#define TIGHTDB_INSTALL_LIBDIR      "$install_libdir_escaped"
-#define TIGHTDB_INSTALL_LIBEXECDIR  "$install_libexecdir_escaped"
 EOF

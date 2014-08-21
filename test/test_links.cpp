@@ -827,7 +827,7 @@ TEST(Links_ClearColumnWithTwoLevelBptree)
     target->add_empty_row();
 
     origin->add_column_link(type_LinkList, "", *target);
-    origin->add_empty_row(TIGHTDB_MAX_LIST_SIZE+1);
+    origin->add_empty_row(TIGHTDB_MAX_BPNODE_SIZE+1);
     origin->clear();
     origin->add_empty_row();
     origin->get_linklist(0,0)->add(0);
@@ -844,7 +844,7 @@ TEST(Links_ClearLinkListWithTwoLevelBptree)
     origin->add_column_link(type_LinkList, "", *target);
     origin->add_empty_row();
     LinkViewRef link_list = origin->get_linklist(0,0);
-    for (size_t i = 0; i < TIGHTDB_MAX_LIST_SIZE+1; ++i)
+    for (size_t i = 0; i < TIGHTDB_MAX_BPNODE_SIZE+1; ++i)
         link_list->add(0);
     link_list->clear();
     group.Verify();

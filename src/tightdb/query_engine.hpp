@@ -865,7 +865,7 @@ public:
                 m_condition_column->GetBlock(s, m_array, m_leaf_start);
                 m_leaf_end = m_leaf_start + m_array.size();
                 size_t w = m_array.get_width();
-                m_dT = (w == 0 ? 1.0 / TIGHTDB_MAX_LIST_SIZE : w / float(bitwidth_time_unit));
+                m_dT = (w == 0 ? 1.0 / TIGHTDB_MAX_BPNODE_SIZE : w / float(bitwidth_time_unit));
             }
 
             size_t end2;
