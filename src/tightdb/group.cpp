@@ -1575,7 +1575,7 @@ public:
     // override only the instructions which need to be reversed.
     bool insert_group_level_table(std::size_t table_ndx, std::size_t num_tables, StringData) 
     { 
-        return TransactAdvancer::erase_group_level_table(table_ndx, num_tables);
+        return TransactAdvancer::erase_group_level_table(table_ndx, num_tables + 1);
     }
 
     bool erase_group_level_table(std::size_t table_ndx, std::size_t num_tables) 

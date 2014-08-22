@@ -5787,6 +5787,18 @@ TEST(LangBindHelper_RollbackAndContinueAsRead)
             LangBindHelper::commit_and_continue_as_read(sg);
         }
         group->Verify();
+        {
+            // rollback of group level table insertion
+            LangBindHelper::promote_to_write(sg, *wlr);
+            TableRef o = group->get_or_add_table("nullermand");
+            TableRef o2 = group->get_table("nullermand");
+            TIGHTDB_ASSERT(o2 != 0);
+            LangBindHelper::rollback_and_continue_as_read(sg);
+            TableRef o3 = group->get_table("nullermand");
+            TIGHTDB_ASSERT(o3 == 0);
+            TIGHTDB_ASSERT(o2->is_attached() == false);
+        }
+
         TableRef origin = group->get_table("origin");
         Row row = origin->get(0);
         CHECK_EQUAL(42, origin->get_int(0,0));
