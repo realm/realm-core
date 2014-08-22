@@ -81,6 +81,7 @@ Query& Query::operator = (const Query& source)
 {
     if (this != &source) {
         Create();
+        first = source.first;
         std::map<ParentNode*, ParentNode*> node_mapping;
         node_mapping[null_ptr] = null_ptr;
         std::vector<ParentNode*>::const_iterator i;
@@ -92,8 +93,8 @@ Query& Query::operator = (const Query& source)
         for (i = all_nodes.begin(); i != all_nodes.end(); ++i) {
             (*i)->translate_pointers(node_mapping);
         }
-        if (all_nodes.size() > 0) {
-            first[0] = all_nodes[0];
+        for (size_t t = 0; t < first.size(); t++) {
+            first[t] = node_mapping[first[t]];
         }
         m_table = source.m_table;
         m_tableview = source.m_tableview;

@@ -1270,7 +1270,7 @@ TEST(TableView_RowAccessor)
 }
 
 
-TEST(TableView_FindBySourceNdx)
+ONLY(TableView_FindBySourceNdx)
 {
     Table table;
     table.add_column(type_Int, "");
@@ -1290,17 +1290,29 @@ TEST(TableView_FindBySourceNdx)
 
 
     Query q = table.where();
- //   q.group();
+
+    /*
+    //   q.group();
     q.equal(0, 1);
     q.greater(0, 123);
     q.less(0, 11);
  //   q.end_group();
     
+    */
+
+    q.group();
+    q.equal(0, 1);
+    q.Or();
+    q.equal(0, 2);
+    q.end_group();
+
+    size_t rrr = q.count();
+
     Query q2;
     
     q2 = q;
 
-    q2.find_all();
+    rrr = q2.count();
 
 
 
