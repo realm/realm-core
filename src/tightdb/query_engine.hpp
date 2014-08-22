@@ -588,6 +588,7 @@ public:
         m_max = from.m_max;
         m_next = from.m_next;
         m_size = from.m_size;
+        m_child = from.m_child;
     }
 
 protected:
@@ -679,6 +680,7 @@ public:
     {
         m_child2 = from.m_child2;
         m_column = from.m_column;
+        m_child = from.m_child;
     }
 
     ParentNode* m_child2;
@@ -961,6 +963,7 @@ public:
         m_value = from.m_value;
         m_condition_column = from.m_condition_column;
         m_find_callback_specialized = from.m_find_callback_specialized;
+        m_child = from.m_child;
     }
 
     TConditionValue m_value;
@@ -1633,6 +1636,7 @@ public:
         m_last[1] = from.m_last[1];
         m_was_match[0] = from.m_was_match[0];
         m_was_match[1] = from.m_was_match[1];
+        m_child = from.m_child;
     }
 
 
@@ -1742,6 +1746,7 @@ public:
         m_cond = from.m_cond;
         m_last = from.m_last;
         m_was_match = from.m_was_match;
+        m_child = from.m_child;
     }
 
     ParentNode* m_cond;
@@ -1849,6 +1854,7 @@ public:
         m_column_type = from.m_column_type;
         m_condition_column_idx1 = from.m_condition_column_idx1;
         m_condition_column_idx2 = from.m_condition_column_idx2;
+        m_child = from.m_child;
         // NOT copied:
         // m_getter1 = from.m_getter1;
         // m_getter2 = from.m_getter2;
