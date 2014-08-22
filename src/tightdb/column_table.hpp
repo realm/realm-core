@@ -43,6 +43,7 @@ public:
     void adj_accessors_insert_rows(std::size_t, std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     void adj_accessors_erase_row(std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     void adj_accessors_move_last_over(std::size_t, std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void adj_accessors_inverse_move_last_over(std::size_t, std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     void adj_acc_clear_root_table() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
     void refresh_accessor_tree(std::size_t, const Spec&) TIGHTDB_OVERRIDE;
@@ -97,6 +98,9 @@ protected:
         // was the last entry in the map.
         template<bool fix_ndx_in_parent>
         bool adj_move_last_over(std::size_t target_row_ndx, std::size_t last_row_ndx)
+            TIGHTDB_NOEXCEPT;
+        template<bool fix_ndx_in_parent>
+        void adj_inverse_move_last_over(std::size_t target_row_ndx, std::size_t last_row_ndx)
             TIGHTDB_NOEXCEPT;
         void update_accessors(const std::size_t* col_path_begin, const std::size_t* col_path_end,
                               _impl::TableFriend::AccessorUpdater&);
@@ -329,6 +333,18 @@ inline void ColumnSubtableParent::adj_accessors_move_last_over(std::size_t targe
         tf::unbind_ref(*m_table);
 }
 
+inline void ColumnSubtableParent::adj_accessors_inverse_move_last_over(std::size_t target_row_ndx,
+                                                                       std::size_t last_row_ndx)
+    TIGHTDB_NOEXCEPT
+{
+    // This function must assume no more than minimal consistency of the
+    // accessor hierarchy. This means in particular that it cannot access the
+    // underlying node structure. See AccessorConsistencyLevels.
+
+    const bool fix_ndx_in_parent = false;
+    m_subtable_map.adj_inverse_move_last_over<fix_ndx_in_parent>(target_row_ndx, last_row_ndx);
+}
+
 inline void ColumnSubtableParent::adj_acc_clear_root_table() TIGHTDB_NOEXCEPT
 {
     // This function must assume no more than minimal consistency of the
@@ -414,6 +430,15 @@ bool ColumnSubtableParent::SubtableMap::adj_erase_row(std::size_t row_ndx) TIGHT
     *erase = *--end; // Move last over
     m_entries.pop_back();
     return m_entries.empty();
+}
+
+
+template<bool fix_ndx_in_parent>
+void ColumnSubtableParent::SubtableMap::adj_inverse_move_last_over(std::size_t target_row_ndx,
+                                                                   std::size_t last_row_ndx) TIGHTDB_NOEXCEPT
+{
+    // Not implemented
+    TIGHTDB_ASSERT(false);
 }
 
 template<bool fix_ndx_in_parent>

@@ -4306,8 +4306,15 @@ void Table::adj_accessors_inverse_move_last_over(size_t target_row_ndx, size_t l
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
     // underlying node structure. See AccessorConsistencyLevels.
+    adj_row_acc_inverse_move_last_over(target_row_ndx, last_row_ndx);
 
-    adj_row_acc_move_last_over(last_row_ndx, target_row_ndx);
+    // Adjust subtable accessors after 'move last over' removal of a row
+    size_t n = m_cols.size();
+    for (size_t i = 0; i != n; ++i) {
+        if (ColumnBase* col = m_cols[i])
+            col->adj_accessors_inverse_move_last_over(target_row_ndx, last_row_ndx);
+    }
+
 }
 
 
@@ -4393,6 +4400,29 @@ void Table::adj_row_acc_erase_row(size_t row_ndx) TIGHTDB_NOEXCEPT
         }
         if (row->m_row_ndx > row_ndx)
             --row->m_row_ndx;
+        ++i;
+    }
+}
+
+
+void Table::adj_row_acc_inverse_move_last_over(size_t target_row_ndx, size_t last_row_ndx)
+    TIGHTDB_NOEXCEPT
+{
+    // This function must assume no more than minimal consistency of the
+    // accessor hierarchy. This means in particular that it cannot access the
+    // underlying node structure. See AccessorConsistencyLevels.
+
+    // Adjust row accessors after 'inverse move last over', i.e. the entry at target_row_ndx
+    // is moved to last_row_ndx. This is done by looking through the accessor list to find
+    // any accessor matching the 'target_row_ndx'. If found, it is changed to point to 'last_row_ndx'.
+    size_t i = 0, n = m_row_accessors.size();
+    while (i != n) {
+        RowBase*& row = m_row_accessors[i];
+        // There can be no accessor already matching last_row_ndx:
+        TIGHTDB_ASSERT(row->m_row_ndx != last_row_ndx);
+
+        if (row->m_row_ndx == target_row_ndx)
+            row->m_row_ndx = last_row_ndx;
         ++i;
     }
 }

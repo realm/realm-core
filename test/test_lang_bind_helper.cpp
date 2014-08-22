@@ -5778,35 +5778,54 @@ TEST(LangBindHelper_RollbackAndContinueAsRead)
     SharedGroup sg(*repl);
     {
         Group* group = const_cast<Group*>(&sg.begin_read());
-        LangBindHelper::promote_to_write(sg, *wlr);
-        TableRef origin = group->get_or_add_table("origin");
-        origin->add_column(type_Int, "");
-        origin->add_empty_row();
-        origin->set_int(0,0,42);
+       {
+            LangBindHelper::promote_to_write(sg, *wlr);
+            TableRef origin = group->get_or_add_table("origin");
+            origin->add_column(type_Int, "");
+            origin->add_empty_row();
+            origin->set_int(0,0,42);
+            LangBindHelper::commit_and_continue_as_read(sg);
+        }
+        group->Verify();
+        TableRef origin = group->get_table("origin");
         Row row = origin->get(0);
-        LangBindHelper::commit_and_continue_as_read(sg);
+        CHECK_EQUAL(42, origin->get_int(0,0));
+
+        {
+            LangBindHelper::promote_to_write(sg, *wlr);
+            origin->insert_empty_row(0);
+            origin->set_int(0,0,5746);
+            CHECK_EQUAL(42, origin->get_int(0,1));
+            CHECK_EQUAL(5746, origin->get_int(0,0));
+            CHECK_EQUAL(42, row.get_int(0));
+            CHECK_EQUAL(2, origin->size());
+            group->Verify();
+            LangBindHelper::rollback_and_continue_as_read(sg);
+        }
+        CHECK_EQUAL(1, origin->size());
         group->Verify();
         CHECK_EQUAL(42, origin->get_int(0,0));
-        LangBindHelper::promote_to_write(sg, *wlr);
-        origin->insert_empty_row(0);
-        origin->set_int(0,0,5746);
-        CHECK_EQUAL(42, origin->get_int(0,1));
-        CHECK_EQUAL(5746, origin->get_int(0,0));
         CHECK_EQUAL(42, row.get_int(0));
-        group->Verify();
-        LangBindHelper::rollback_and_continue_as_read(sg);
-        group->Verify();
-        CHECK_EQUAL(42, origin->get_int(0,0));
-        CHECK_EQUAL(42, row.get_int(0));
-        origin->add_empty_row();
-        origin->set_int(0,1,42);
+
+        {
+            LangBindHelper::promote_to_write(sg, *wlr);
+            origin->add_empty_row();
+            origin->set_int(0,1,42);
+            LangBindHelper::commit_and_continue_as_read(sg);
+        }
         Row row2 = origin->get(1);
-        LangBindHelper::promote_to_write(sg, *wlr);
-        origin->move_last_over(0);
-        CHECK_EQUAL(42, row2.get_int(0));
-        CHECK_EQUAL(42, origin->get_int(0,0));
-        group->Verify();
-        LangBindHelper::rollback_and_continue_as_read(sg);
+        CHECK_EQUAL(2, origin->size());
+
+        {
+            LangBindHelper::promote_to_write(sg, *wlr);
+            origin->move_last_over(0);
+            CHECK_EQUAL(1, origin->size());
+            CHECK_EQUAL(42, row2.get_int(0));
+            CHECK_EQUAL(42, origin->get_int(0,0));
+            group->Verify();
+            LangBindHelper::rollback_and_continue_as_read(sg);
+        }
+        CHECK_EQUAL(2, origin->size());
         group->Verify();
         CHECK_EQUAL(42, row2.get_int(0));
         CHECK_EQUAL(42, origin->get_int(0,1));

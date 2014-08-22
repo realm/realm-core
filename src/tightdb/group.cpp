@@ -1702,6 +1702,7 @@ void Group::reverse_transact(ref_type new_top_ref, const BinaryData& log)
     for (size_t table_ndx = 0; table_ndx != num_tables; ++table_ndx) {
         if (Table* table = m_table_accessors[table_ndx]) {
             typedef _impl::TableFriend tf;
+            tf::set_ndx_in_parent(*table, table_ndx);
             if (tf::is_marked(*table)) {
                 tf::refresh_accessor_tree(*table); // Throws
                 tf::bump_version(*table);

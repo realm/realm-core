@@ -1199,6 +1199,7 @@ bool Replication::TransactLogParser::parse_one_inst(InstructionHandler& handler)
 {
     char instr;
     read_char(instr);
+    //    std::cout << "parsing " << (int) instr << " @ " << std::hex << (long) m_input_begin << std::endl;
     switch (Instruction(instr)) {
         case instr_SetInt: {
             std::size_t col_ndx = read_int<std::size_t>(); // Throws
@@ -1653,6 +1654,7 @@ template<typename InstructionClassifierForRollback>
 bool Replication::TransactLogParser::prepare_log_reversal(std::vector<const char*>& instruction_starts,
     InstructionClassifierForRollback& handler)
 {
+    // std::cout << "PREP" << std::endl;
     m_input_begin = m_input_end = 0;
     const char* pending_table_select = 0;
     const char* pending_descriptor_select = 0;
@@ -1695,13 +1697,17 @@ template<class InstructionHandler>
 bool Replication::TransactLogParser::execute_in_reverse_order(std::vector<const char*>& instruction_starts, 
                                                               InstructionHandler& handler)
 {
+    // std::cout << "REVERSE" << std::endl;
     size_t i = instruction_starts.size();
     while (i > 0) {
         --i;
         m_input_begin = instruction_starts[i];
-        if (!parse_one_inst(handler))
+        if (!parse_one_inst(handler)) {
+            // std::cout << "DONE FAILED" << std::endl;
             return false;
+        }
     }
+    // std::cout << "DONE OK" << std::endl;
     return true;
 }
 

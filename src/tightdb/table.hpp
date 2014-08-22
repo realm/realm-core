@@ -1016,6 +1016,8 @@ private:
     void adj_row_acc_erase_row(std::size_t row_ndx) TIGHTDB_NOEXCEPT;
     void adj_row_acc_move_last_over(std::size_t target_row_ndx, std::size_t last_row_ndx)
         TIGHTDB_NOEXCEPT;
+    void adj_row_acc_inverse_move_last_over(std::size_t target_row_ndx, std::size_t last_row_ndx)
+        TIGHTDB_NOEXCEPT;
     void adj_insert_column(std::size_t col_ndx);
     void adj_erase_column(std::size_t col_ndx) TIGHTDB_NOEXCEPT;
 
