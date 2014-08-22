@@ -740,7 +740,7 @@ public:
         : ParentNode(from), m_array(Array::no_prealloc_tag())
     {
         // state is transient/only valid during search, no need to copy
-        m_child = 0;
+        m_child = from.m_child;
         m_conds = 0;
         m_dT = 1.0 / 4.0;
         m_probes = 0;
@@ -1026,6 +1026,7 @@ public:
         : ParentNode(from)
     {
         m_value = from.m_value;
+        m_child = from.m_child;
         // m_condition_column is not copied
     }
 
@@ -1097,6 +1098,7 @@ public:
         m_value = BinaryData(data, from.m_value.size());
         m_condition_column = from.m_condition_column;
         m_column_type = from.m_column_type;
+        m_child = from.m_child;
     }
 
 
@@ -1183,6 +1185,7 @@ public:
         m_leaf_type = from.m_leaf_type;
         m_end_s = 0;
         m_leaf_start = 0;
+        m_child = from.m_child;
     }
 
 protected:
@@ -1298,6 +1301,7 @@ public:
         memcpy(ucase, from.m_ucase, sz);
         m_lcase = lcase;
         m_ucase = ucase;
+        m_child = from.m_child;
     }
 protected:
     const char* m_lcase;
@@ -1914,6 +1918,7 @@ public:
         : ParentNode(from)
     {
         m_compare = from.m_compare;
+        m_child = from.m_child;
         m_compare->m_references.fetch_add_release(1);
     }
 

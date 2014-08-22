@@ -1290,17 +1290,17 @@ TEST(TableView_FindBySourceNdx)
 
 
     Query q = table.where();
-    Query q2 = table.where().equal(0, 123);
-
-    Query q3 = Query(q2, Query::TCopyExpressionTag());
-
+ //   q.group();
+    q.equal(0, 1);
+    q.greater(0, 123);
+    q.less(0, 11);
+ //   q.end_group();
+    
+    Query q2;
+    
     q2 = q;
 
-    q2.find();
-
-
-
-
+    q2.find_all();
 
 
 
