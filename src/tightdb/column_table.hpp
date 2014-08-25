@@ -422,68 +422,33 @@ bool ColumnSubtableParent::SubtableMap::adj_move(std::size_t target_row_ndx,
 {
     typedef _impl::TableFriend tf;
 
-    // Search for either index in a tight loop for speed
-    bool source_seen = false;
-    std::size_t i = 0, n = m_entries.size();
-    for (;;) {
-        if (i == n)
-            return false;
-        const entry& e = m_entries[i];
-        if (e.m_subtable_ndx == target_row_ndx)
-            goto target;
-        if (e.m_subtable_ndx == source_row_ndx)
-            break;
-        ++i;
-    }
+    std::size_t i = 0, limit = m_entries.size();
+    if (i == limit) // early out with 'false' as result.
+        return false;
+    while (i < limit) {
 
-    // Move subtable accessor at `source_row_ndx`, then look for `target_row_ndx`
-    {
         entry& e = m_entries[i];
-        e.m_subtable_ndx = target_row_ndx;
-        if (fix_ndx_in_parent)
-            tf::set_ndx_in_parent(*(e.m_table), e.m_subtable_ndx);
-    }
-    for (;;) {
-        ++i;
-        if (i == n)
-            return false;
-        const entry& e = m_entries[i];
-        if (e.m_subtable_ndx == target_row_ndx)
-            break;
-    }
-    source_seen = true;
+        if (TIGHTDB_UNLIKELY(e.m_subtable_ndx == target_row_ndx)) {
 
-    // Detach and remove original subtable accessor at `target_row_ndx`, then
-    // look for `last_row_ndx
-  target:
-    {
-        entry& e = m_entries[i];
-        // Must hold a counted reference while detaching
-        TableRef table(e.m_table);
-        tf::detach(*table);
-        // Delete entry by moving last over (faster and avoids invalidating
-        // iterators)
-        e = m_entries[--n];
-        m_entries.pop_back();
-    }
-    if (!source_seen) {
-        for (;;) {
-            if (i == n)
-                goto check_empty;
-            const entry& e = m_entries[i];
-            if (e.m_subtable_ndx == source_row_ndx)
-                break;
+            // Must hold a counted reference while detaching
+            TableRef table(e.m_table);
+            tf::detach(*table);
+            // Delete entry by moving last over (faster and avoids invalidating
+            // iterators)
+            e = m_entries[--limit];
+            m_entries.pop_back();
+            continue;
+        }
+        else {
+            if (TIGHTDB_UNLIKELY(e.m_subtable_ndx == source_row_ndx)) {
+
+                e.m_subtable_ndx = target_row_ndx;
+                if (fix_ndx_in_parent)
+                    tf::set_ndx_in_parent(*(e.m_table), e.m_subtable_ndx);
+            }
             ++i;
         }
-        {
-            entry& e = m_entries[i];
-            e.m_subtable_ndx = target_row_ndx;
-            if (fix_ndx_in_parent)
-                tf::set_ndx_in_parent(*(e.m_table), target_row_ndx);
-        }
     }
-
-  check_empty:
     return m_entries.empty();
 }
 
