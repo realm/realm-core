@@ -90,7 +90,7 @@ AggregateState      State of the aggregate - contains a state variable that stor
 #include <functional>
 #include <algorithm>
 
-#include <tightdb/util/thread.hpp>
+#include <tightdb/util/bind_ptr.hpp>
 #include <tightdb/util/meta.hpp>
 #include <tightdb/unicode.hpp>
 #include <tightdb/utilities.hpp>
@@ -1876,23 +1876,20 @@ protected:
 #include "query_expression.hpp"
 
 
-// For Next-Generation expressions like col1 / col2 + 123 > col4 * 100. m_compare is reference counted with the 
-// m_references counter. You could instead add copy/move semantics (much boilerplate and also slow) or use 
-// shared_ptr (c++11)
+// For Next-Generation expressions like col1 / col2 + 123 > col4 * 100.
 class ExpressionNode: public ParentNode {
 
 public:
     ~ExpressionNode() TIGHTDB_NOEXCEPT
     {
-        if (m_compare->m_references.fetch_sub_acquire(1) == 1)
-            delete m_compare;
+        m_compare.reset();
     }
 
     ExpressionNode(Expression* compare, bool auto_delete)
     {
         m_auto_delete = auto_delete;
         m_child = 0;
-        m_compare = compare;
+        m_compare = util::bind_ptr<Expression>(compare);
         m_dD = 10.0;
         m_dT = 50.0;
     }
@@ -1925,11 +1922,10 @@ public:
     {
         m_compare = from.m_compare;
         m_child = from.m_child;
-        m_compare->m_references.fetch_add_release(1);
     }
 
     bool m_auto_delete;
-    Expression* m_compare;
+    util::bind_ptr<Expression> m_compare;
 };
 
 

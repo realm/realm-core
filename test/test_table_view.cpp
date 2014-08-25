@@ -1312,7 +1312,7 @@ TEST(TableView_QueryCopy)
     q.equal(0, 2);
     q.end_group();
 
-    size_t rrr = q.count();
+    q.count();
     Query q2;
     q2 = q;
     size_t t = q2.count();

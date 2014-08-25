@@ -235,17 +235,15 @@ struct ValueBase
     size_t m_values;
 };
 
-class Expression : public Query
+class Expression : public Query, public util::RefCountBase
 {
 public:
-    Expression() : m_references(1) { }
+    Expression() { }
 
     virtual size_t find_first(size_t start, size_t end) const = 0;
     virtual void set_table() = 0;
     virtual const Table* get_table() = 0;
     virtual ~Expression() {}
-
-    tightdb::util::Atomic<int> m_references;
 };
 
 class Subexpr
