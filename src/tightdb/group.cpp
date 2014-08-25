@@ -1105,22 +1105,15 @@ public:
     bool erase_row(size_t row_ndx, size_t tbl_sz, bool unordered) TIGHTDB_NOEXCEPT
     {
         if (unordered) {
-            return _move_last_over(row_ndx, tbl_sz);
+            typedef _impl::TableFriend tf;
+            if (m_table)
+                tf::adj_accessors_move(*m_table, row_ndx, tbl_sz);
         }
         else {
             typedef _impl::TableFriend tf;
             if (m_table)
                 tf::adj_accessors_erase_row(*m_table, row_ndx);
         }
-        return true;
-    }
-
-    bool _move_last_over(size_t target_row_ndx, size_t last_row_ndx) TIGHTDB_NOEXCEPT
-    {
-        // inverse: append, then move -- neither exist
-        typedef _impl::TableFriend tf;
-        if (m_table)
-            tf::adj_accessors_move(*m_table, target_row_ndx, last_row_ndx);
         return true;
     }
 
