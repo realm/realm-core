@@ -71,8 +71,8 @@ void Query::move_assign(Query& copy)
     copy.m_table = TableRef();
 }
 
-// todo, try and remove this constructor. It's currently required for copy-initialization only, and not copy-assignment
-// anylonger (which is now just "=").
+// todo, try and remove this constructor. It's currently required for copy-initialization only, and not
+// copy-assignment anylonger (which is now just "=").
 Query::Query(const Query& copy, const TCopyExpressionTag&) 
 {
     *this = copy;
