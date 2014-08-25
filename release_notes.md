@@ -6,6 +6,35 @@
 
 ### API breaking changes:
 
+* Lorem ipsum.
+
+### Enhancements:
+
+* Lorem ipsum.
+
+-----------
+
+### Internals:
+
+* Lorem ipsum.
+
+----------------------------------------------
+
+# 0.82.1 Release notes
+
+### Internals:
+
+* `TIGHTDB_MAX_LIST_SIZE` was renamed to `TIGHTDB_MAX_BPNODE_SIZE`. `BPNODE`
+  stands for "B+-tree node".
+* `TIGHTDB_MAX_BPNODE_SIZE` now defaults to 1000 in both *release* and *debug*
+  mode.
+
+----------------------------------------------
+
+# 0.82.0 Release notes
+
+### API breaking changes:
+
 * `Group::has_table<T>()` removed, because it had awkward and incongruous
   semantics, and could not be efficiently implemented.
 * The version of `Group::get_table()`, that takes a name argument, can no longer
@@ -32,12 +61,6 @@
 * `Group::remove_table()` and `Group::rename_table()` were added.
 * `WriteTransaction::add_table()` and `WriteTransaction::get_or_add_table()`
   ware added.
-
------------
-
-### Internals:
-
-* Lorem ipsum.
 
 ----------------------------------------------
 

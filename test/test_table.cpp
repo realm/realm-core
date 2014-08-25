@@ -2823,7 +2823,7 @@ TIGHTDB_TABLE_3(TableAgg,
 } // anonymous namespace
 
 #if TEST_DURATION > 0
-#define TBL_SIZE TIGHTDB_MAX_LIST_SIZE*10
+#define TBL_SIZE TIGHTDB_MAX_BPNODE_SIZE*10
 #else
 #define TBL_SIZE 10
 #endif
@@ -5284,7 +5284,7 @@ TEST(Table_AddColumnWithThreeLevelBptree)
 {
     Table table;
     table.add_column(type_Int, "");
-    table.add_empty_row(TIGHTDB_MAX_LIST_SIZE*TIGHTDB_MAX_LIST_SIZE+1);
+    table.add_empty_row(TIGHTDB_MAX_BPNODE_SIZE*TIGHTDB_MAX_BPNODE_SIZE+1);
     table.add_column(type_Int, "");
     table.Verify();
 }
@@ -5294,7 +5294,7 @@ TEST(Table_ClearWithTwoLevelBptree)
 {
     Table table;
     table.add_column(type_Mixed, "");
-    table.add_empty_row(TIGHTDB_MAX_LIST_SIZE+1);
+    table.add_empty_row(TIGHTDB_MAX_BPNODE_SIZE+1);
     table.clear();
     table.Verify();
 }

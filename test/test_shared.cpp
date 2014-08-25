@@ -885,7 +885,7 @@ TEST(Shared_WritesSpecialOrder)
     SHARED_GROUP_TEST_PATH(path);
     SharedGroup sg(path);
 
-    const int num_rows = 5; // FIXME: Should be strictly greater than TIGHTDB_MAX_LIST_SIZE, but that takes a loooooong time!
+    const int num_rows = 5; // FIXME: Should be strictly greater than TIGHTDB_MAX_BPNODE_SIZE, but that takes a loooooong time!
     const int num_reps = 25;
 
     {
@@ -1386,9 +1386,9 @@ TEST_IF(Shared_StringIndexBug1, TEST_DURATION >= 3)
         TableRef table = group.add_table("users");
         table->add_column(type_String, "username");
         table->set_index(0);
-        for (int i = 0; i < TIGHTDB_MAX_LIST_SIZE + 1; ++i)
+        for (int i = 0; i < TIGHTDB_MAX_BPNODE_SIZE + 1; ++i)
             table->add_empty_row();
-        for (int i = 0; i < TIGHTDB_MAX_LIST_SIZE + 1; ++i)
+        for (int i = 0; i < TIGHTDB_MAX_BPNODE_SIZE + 1; ++i)
             table->remove(0);
         db.commit();
     }
@@ -2340,7 +2340,7 @@ TEST(Shared_ArrayEraseBug)
 {
     // This test only makes sense when we can insert a number of rows
     // equal to the square of the maximum B+-tree node size.
-    size_t max_node_size = TIGHTDB_MAX_LIST_SIZE;
+    size_t max_node_size = TIGHTDB_MAX_BPNODE_SIZE;
     size_t max_node_size_squared = max_node_size;
     if (int_multiply_with_overflow_detect(max_node_size_squared, max_node_size))
         return;

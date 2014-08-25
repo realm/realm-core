@@ -492,7 +492,7 @@ TEST(Array_AddNeg1_1)
 TEST(Array_UpperLowerBound)
 {
     // Tests Array::upper_bound() and Array::lower_bound()
-    // This test is independent of TIGHTDB_MAX_LIST_SIZE
+    // This test is independent of TIGHTDB_MAX_BPNODE_SIZE
     Array a(Allocator::get_default());
     a.create(Array::type_Normal);
     vector<int> v;

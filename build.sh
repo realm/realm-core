@@ -378,6 +378,15 @@ case "$MODE" in
             tightdb_version="$(printf "%s\n" "$value" | sed 's/^v//')" || exit 1
         fi
 
+        max_bpnode_size=1000
+        max_bpnode_size_debug=1000
+        if [ "$TIGHTDB_MAX_BPNODE_SIZE" ]; then
+            max_bpnode_size="$TIGHTDB_MAX_BPNODE_SIZE"
+        fi
+        if [ "$TIGHTDB_MAX_BPNODE_SIZE_DEBUG" ]; then
+            max_bpnode_size_debug="$TIGHTDB_MAX_BPNODE_SIZE_DEBUG"
+        fi
+
         enable_replication="no"
         if [ "$TIGHTDB_ENABLE_REPLICATION" ]; then
             enable_replication="yes"
@@ -457,6 +466,8 @@ INSTALL_INCLUDEDIR    = $install_includedir
 INSTALL_BINDIR        = $install_bindir
 INSTALL_LIBDIR        = $install_libdir
 INSTALL_LIBEXECDIR    = $install_libexecdir
+MAX_BPNODE_SIZE       = $max_bpnode_size
+MAX_BPNODE_SIZE_DEBUG = $max_bpnode_size_debug
 ENABLE_REPLICATION    = $enable_replication
 ENABLE_ALLOC_SET_ZERO = $enable_alloc_set_zero
 XCODE_HOME            = $xcode_home

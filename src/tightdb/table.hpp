@@ -739,8 +739,8 @@ private:
     typedef std::vector<const TableViewBase*> views;
     mutable views m_views;
 
-    typedef std::vector<RowBase*> row_accessors;
-    mutable row_accessors m_row_accessors;
+    // Points to first bound row accessor, or is null if there are none.
+    mutable RowBase* m_row_accessors;
 
     // Used for queries: Items are added with link() method during buildup of query
     mutable std::vector<size_t> m_link_chain;
@@ -1308,6 +1308,7 @@ inline Table::Table(Allocator& alloc):
 {
     m_ref_count = 1; // Explicitely managed lifetime
     m_descriptor = 0;
+    m_row_accessors = 0;
 
     ref_type ref = create_empty_table(alloc); // Throws
     Parent* parent = 0;
@@ -1322,6 +1323,7 @@ inline Table::Table(const Table& t, Allocator& alloc):
 {
     m_ref_count = 1; // Explicitely managed lifetime
     m_descriptor = 0;
+    m_row_accessors = 0;
 
     ref_type ref = t.clone(alloc); // Throws
     Parent* parent = 0;
@@ -1336,6 +1338,7 @@ inline Table::Table(ref_count_tag, Allocator& alloc):
 {
     m_ref_count = 0; // Lifetime managed by reference counting
     m_descriptor = 0;
+    m_row_accessors = 0;
 }
 
 inline TableRef Table::create(Allocator& alloc)

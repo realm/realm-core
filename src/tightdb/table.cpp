@@ -802,37 +802,32 @@ void Table::update_link_target_tables(size_t old_col_ndx_begin, size_t new_col_n
 
 void Table::register_row_accessor(RowBase* row) const
 {
-    m_row_accessors.push_back(row); // Throws
+    row->m_prev = 0;
+    row->m_next = m_row_accessors;
+    if (m_row_accessors)
+        m_row_accessors->m_prev = row;
+    m_row_accessors = row;
 }
 
 
 void Table::unregister_row_accessor(RowBase* row) const TIGHTDB_NOEXCEPT
 {
-    typedef row_accessors::iterator iter;
-    iter i = m_row_accessors.begin(), end = m_row_accessors.end();
-    for (;;) {
-        if (i == end)
-            return;
-        if (*i == row)
-            break;
-        ++i;
+    if (row->m_prev) {
+        row->m_prev->m_next = row->m_next;
     }
-    --end;
-    // If the discarded accessor is not the last entry, we
-    // need to move the last entry over
-    if (i != end)
-        *i = *end;
-    m_row_accessors.pop_back();
+    else { // is head of list
+        m_row_accessors = row->m_next;
+    }
+    if (row->m_next)
+        row->m_next->m_prev = row->m_prev;
 }
 
 
 void Table::discard_row_accessors() TIGHTDB_NOEXCEPT
 {
-    typedef row_accessors::const_iterator iter;
-    iter end = m_row_accessors.end();
-    for (iter i = m_row_accessors.begin(); i != end; ++i)
-        (*i)->m_table.reset(); // Detach
-    m_row_accessors.clear();
+    for (RowBase* row = m_row_accessors; row; row = row->m_next)
+        row->m_table.reset(); // Detach
+    m_row_accessors = 0;
 }
 
 
@@ -1644,7 +1639,8 @@ void Table::insert_empty_row(size_t row_ndx, size_t num_rows)
         bool is_append = row_ndx == m_size;
         column.insert(row_ndx, num_rows, is_append); // Throws
     }
-    adj_row_acc_insert_rows(row_ndx, num_rows);
+    if (row_ndx < m_size)
+        adj_row_acc_insert_rows(row_ndx, num_rows);
     m_size += num_rows;
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
@@ -4353,10 +4349,7 @@ void Table::adj_row_acc_insert_rows(size_t row_ndx, size_t num_rows) TIGHTDB_NOE
     // underlying node structure. See AccessorConsistencyLevels.
 
     // Adjust row accessors after insertion of new rows
-    typedef row_accessors::const_iterator iter;
-    iter end = m_row_accessors.end();
-    for (iter i = m_row_accessors.begin(); i != end; ++i) {
-        RowBase* row = *i;
+    for (RowBase* row = m_row_accessors; row; row = row->m_next) {
         if (row->m_row_ndx >= row_ndx)
             row->m_row_ndx += num_rows;
     }
@@ -4370,19 +4363,17 @@ void Table::adj_row_acc_erase_row(size_t row_ndx) TIGHTDB_NOEXCEPT
     // underlying node structure. See AccessorConsistencyLevels.
 
     // Adjust row accessors after removal of a row
-    size_t i = 0, n = m_row_accessors.size();
-    while (i != n) {
-        RowBase*& row = m_row_accessors[i];
+    RowBase* row = m_row_accessors;
+    while (row) {
+        RowBase* next = row->m_next;
         if (row->m_row_ndx == row_ndx) {
-            row->m_table.reset(); // Detach
-            // Move last over
-            row = m_row_accessors[--n];
-            m_row_accessors.pop_back();
-            continue;
+            row->m_table.reset();
+            unregister_row_accessor(row);
         }
-        if (row->m_row_ndx > row_ndx)
+        else if (row->m_row_ndx > row_ndx) {
             --row->m_row_ndx;
-        ++i;
+        }
+        row = next;
     }
 }
 
@@ -4395,19 +4386,17 @@ void Table::adj_row_acc_move(size_t target_row_ndx, size_t source_row_ndx)
     // underlying node structure. See AccessorConsistencyLevels.
 
     // Adjust row accessors after 'move last over' removal of a row
-    size_t i = 0, n = m_row_accessors.size();
-    while (i != n) {
-        RowBase*& row = m_row_accessors[i];
+    RowBase* row = m_row_accessors;
+    while (row) {
+        RowBase* next = row->m_next;
         if (row->m_row_ndx == target_row_ndx) {
-            row->m_table.reset(); // Detach
-            // Move last over in list of accessors
-            row = m_row_accessors[--n];
-            m_row_accessors.pop_back();
-            continue;
+            row->m_table.reset();
+            unregister_row_accessor(row);
         }
-        if (row->m_row_ndx == source_row_ndx)
+        else if (row->m_row_ndx == source_row_ndx) {
             row->m_row_ndx = target_row_ndx;
-        ++i;
+        }
+        row = next;
     }
 }
 
@@ -4656,12 +4645,7 @@ void Table::Verify() const
 
     // Verify row accessors
     {
-        typedef row_accessors::const_iterator iter;
-        iter end = m_row_accessors.end();
-        for (iter i = m_row_accessors.begin(); i != end; ++i) {
-            RowBase* row = *i;
-            // Check that each row accessor occurs only once
-            TIGHTDB_ASSERT(find(i+1, end, row) == end);
+        for (RowBase* row = m_row_accessors; row; row = row->m_next) {
             // Check that it is attached to this table
             TIGHTDB_ASSERT(row->m_table.get() == this);
             // Check that its row index is not out of bounds

@@ -119,7 +119,7 @@ TEST(ArrayBlob_AdaptiveStringLeak)
 {
     ref_type col_ref = AdaptiveStringColumn::create(Allocator::get_default());
     AdaptiveStringColumn col(Allocator::get_default(), col_ref);
-    for (size_t i = 0; i != 2 * TIGHTDB_MAX_LIST_SIZE; ++i)
+    for (size_t i = 0; i != 2 * TIGHTDB_MAX_BPNODE_SIZE; ++i)
         col.insert(0, string(100, 'a'));  // use constant larger than 'medium_string_max_size'
 
     col.destroy();
