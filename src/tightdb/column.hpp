@@ -155,8 +155,14 @@ public:
                                               std::size_t last_row_ndx) TIGHTDB_NOEXCEPT;
     virtual void adj_acc_clear_root_table() TIGHTDB_NOEXCEPT;
 
-    virtual void recursive_mark() TIGHTDB_NOEXCEPT;
-    virtual void mark_link_target_table() TIGHTDB_NOEXCEPT;
+    enum {
+        mark_Recursive   = 0x01,
+        mark_LinkTargets = 0x02,
+        mark_LinkOrigins = 0x04
+    };
+
+    virtual void mark(int type) TIGHTDB_NOEXCEPT;
+
     virtual void bump_link_origin_table_version() TIGHTDB_NOEXCEPT;
 
     /// Refresh the dirty part of the accessor subtree rooted at this column
@@ -466,12 +472,7 @@ inline void ColumnBase::adj_acc_clear_root_table() TIGHTDB_NOEXCEPT
     // Noop
 }
 
-inline void ColumnBase::recursive_mark() TIGHTDB_NOEXCEPT
-{
-    // Noop
-}
-
-inline void ColumnBase::mark_link_target_table() TIGHTDB_NOEXCEPT
+inline void ColumnBase::mark(int) TIGHTDB_NOEXCEPT
 {
     // Noop
 }

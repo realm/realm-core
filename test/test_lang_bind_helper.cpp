@@ -116,17 +116,17 @@ TEST(LangBindHelper_SetSubtable)
 TEST(LangBindHelper_LinkView)
 {
     Group group;
-    TableRef source = group.get_table("source");
-    TableRef target = group.get_table("target");
-    source->add_column_link(type_LinkList, "", *target);
+    TableRef origin = group.add_table("origin");
+    TableRef target = group.add_table("target");
+    origin->add_column_link(type_LinkList, "", *target);
     target->add_column(type_Int, "");
-    source->add_empty_row();
+    origin->add_empty_row();
     target->add_empty_row();
-    Row row = source->get(0);
+    Row row = origin->get(0);
     LinkView* link_view = LangBindHelper::get_linklist_ptr(row, 0);
     link_view->add(0);
     LangBindHelper::unbind_linklist_ptr(link_view);
-    CHECK_EQUAL(1, source->get_link_count(0,0));
+    CHECK_EQUAL(1, origin->get_link_count(0,0));
 }
 
 
@@ -231,7 +231,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
     // Try to advance after a propper rollback
     {
         WriteTransaction wt(sg_w);
-        TableRef foo_w = wt.get_table("bad");
+        TableRef foo_w = wt.add_table("bad");
         // Implicit rollback
     }
     LangBindHelper::advance_read(sg, tlm);
@@ -241,7 +241,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
     // Create a table via the other SharedGroup
     {
         WriteTransaction wt(sg_w);
-        TableRef foo_w = wt.get_table("foo");
+        TableRef foo_w = wt.add_table("foo");
         foo_w->add_column(type_Int, "i");
         foo_w->add_empty_row();
         wt.commit();
@@ -295,7 +295,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
     // Perform several write transactions before advancing the read transaction
     {
         WriteTransaction wt(sg_w);
-        TableRef bar_w = wt.get_table("bar");
+        TableRef bar_w = wt.add_table("bar");
         bar_w->add_column(type_Int, "a");
         wt.commit();
     }
@@ -381,13 +381,13 @@ TEST(LangBindHelper_AdvanceReadTransact_ColumnRootTypeChange)
     // Create a table for strings and one for other types
     {
         WriteTransaction wt(sg_w);
-        TableRef strings_w = wt.get_table("strings");
+        TableRef strings_w = wt.add_table("strings");
         strings_w->add_column(type_String, "a");
         strings_w->add_column(type_Binary, "b");
         strings_w->add_column(type_Mixed,  "c"); // Strings
         strings_w->add_column(type_Mixed,  "d"); // Binary data
         strings_w->add_empty_row();
-        TableRef other_w = wt.get_table("other");
+        TableRef other_w = wt.add_table("other");
         other_w->add_column(type_Int,   "A");
         other_w->add_column(type_Float, "B");
         other_w->add_column(type_Table, "C");
@@ -413,7 +413,7 @@ TEST(LangBindHelper_AdvanceReadTransact_ColumnRootTypeChange)
     CHECK_EQUAL(type_Table, other->get_column_type(2));
     CHECK_EQUAL(1, other->size());
 
-    size_t leaf_x4    = 4 * TIGHTDB_MAX_LIST_SIZE;
+    size_t leaf_x4    = 4 * TIGHTDB_MAX_BPNODE_SIZE;
     size_t leaf_x4p16 = leaf_x4 + 16;
 
     // Change root type in various string columns (including mixed)
@@ -594,7 +594,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
     // Create one degenerate subtable
     {
         WriteTransaction wt(sg_w);
-        TableRef parent_w = wt.get_table("parent");
+        TableRef parent_w = wt.add_table("parent");
         DescriptorRef subdesc;
         parent_w->add_column(type_Table, "a", &subdesc);
         subdesc->add_column(type_Int, "x");
@@ -1168,7 +1168,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedSubtables)
     // Create one degenerate subtable
     {
         WriteTransaction wt(sg_w);
-        TableRef parent_w = wt.get_table("parent");
+        TableRef parent_w = wt.add_table("parent");
         parent_w->add_column(type_Mixed, "a");
         parent_w->add_empty_row();
         parent_w->set_mixed(0, 0, Mixed::subtable_tag());
@@ -1772,7 +1772,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
     // Create a table with two rows
     {
         WriteTransaction wt(sg_w);
-        TableRef parent_w = wt.get_table("parent");
+        TableRef parent_w = wt.add_table("parent");
         parent_w->add_column(type_Int, "a");
         parent_w->add_empty_row(2);
         parent_w->set_int(0, 0, 27);
@@ -2052,7 +2052,7 @@ TEST(LangBindHelper_AdvanceReadTransact_SubtableRowAccessors)
     // Create a mixed and a regular subtable each with one row
     {
         WriteTransaction wt(sg_w);
-        TableRef parent_w = wt.get_table("parent");
+        TableRef parent_w = wt.add_table("parent");
         parent_w->add_column(type_Mixed, "a");
         parent_w->add_column(type_Table, "b");
         DescriptorRef subdesc = parent_w->get_subdescriptor(1);
@@ -2152,7 +2152,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MoveLastOver)
         WriteTransaction wt(sg_w);
         for (int i = 0; i < 3; ++i) {
             const char* table_name = i == 0 ? "parent_1" : i == 1 ? "parent_2" : "parent_3";
-            TableRef parent_w = wt.get_table(table_name);
+            TableRef parent_w = wt.add_table(table_name);
             parent_w->add_column(type_Table, "a");
             parent_w->add_column(type_Mixed, "b");
             DescriptorRef subdesc = parent_w->get_subdescriptor(0);
@@ -2502,10 +2502,10 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
     // Create two origin tables and two target tables, and add some links
     {
         WriteTransaction wt(sg_w);
-        TableRef origin_1_w = wt.get_table("origin_1");
-        TableRef origin_2_w = wt.get_table("origin_2");
-        TableRef target_1_w = wt.get_table("target_1");
-        TableRef target_2_w = wt.get_table("target_2");
+        TableRef origin_1_w = wt.add_table("origin_1");
+        TableRef origin_2_w = wt.add_table("origin_2");
+        TableRef target_1_w = wt.add_table("target_1");
+        TableRef target_2_w = wt.add_table("target_2");
         target_1_w->add_column(type_Int, "t_1");
         target_2_w->add_column(type_Int, "t_2");
         target_1_w->add_empty_row(2);
@@ -4956,7 +4956,7 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkCycles)
     // when the table and the link column is created in the same transaction.
     {
         WriteTransaction wt(sg_w);
-        TableRef table_w = wt.get_table("table");
+        TableRef table_w = wt.add_table("table");
         wt.commit();
     }
     LangBindHelper::advance_read(sg, tlm);
@@ -5023,7 +5023,7 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkCycles)
     CHECK_EQUAL(1, table->get_backlink_count(0, *table, 1));
     {
         WriteTransaction wt(sg_w);
-        TableRef table_2_w = wt.get_table("table_2");
+        TableRef table_2_w = wt.add_table("table_2");
         table_2_w->add_column_link(type_Link,     "foo", *table_2_w);
         table_2_w->add_column_link(type_LinkList, "bar", *table_2_w);
         table_2_w->add_empty_row();
@@ -5161,8 +5161,8 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkCycles)
     CHECK_EQUAL(1, table_2->get_backlink_count(0, *table, 2));
     {
         WriteTransaction wt(sg_w);
-        TableRef table_3_w = wt.get_table("table_3");
-        TableRef table_4_w = wt.get_table("table_4");
+        TableRef table_3_w = wt.add_table("table_3");
+        TableRef table_4_w = wt.add_table("table_4");
         table_3_w->add_column_link(type_LinkList, "foobar_2", *table_4_w);
         table_4_w->add_column_link(type_Link,     "barfoo_2", *table_3_w);
         table_3_w->add_empty_row();
@@ -5458,6 +5458,269 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkCycles)
 }
 
 
+TEST(LangBindHelper_AdvanceReadTransact_InsertLink)
+{
+    // This test checks that Table::insert_link() works across transaction
+    // boundaries (advance transaction).
+
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg(path);
+    ShortCircuitTransactLogManager tlm(path);
+    SharedGroup sg_w(tlm);
+
+    // Start a read transaction (to be repeatedly advanced)
+    ReadTransaction rt(sg);
+    const Group& group = rt.get_group();
+    CHECK_EQUAL(0, group.size());
+
+    {
+        WriteTransaction wt(sg_w);
+        TableRef origin_w = wt.add_table("origin");
+        TableRef target_w = wt.add_table("target");
+        origin_w->add_column_link(type_Link, "", *target_w);
+        target_w->add_column(type_Int, "");
+        target_w->add_empty_row();
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, tlm);
+    group.Verify();
+    ConstTableRef origin = group.get_table("origin");
+    ConstTableRef target = group.get_table("target");
+    {
+        WriteTransaction wt(sg_w);
+        TableRef origin_w = wt.get_table("origin");
+        origin_w->insert_link(0,0,0);
+        origin_w->insert_done();
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, tlm);
+    group.Verify();
+}
+
+
+TEST(LangBindHelper_AdvanceReadTransact_RemoveTableWithColumns)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg(path);
+    ShortCircuitTransactLogManager tlm(path);
+    SharedGroup sg_w(tlm);
+
+    // Start a read transaction (to be repeatedly advanced)
+    ReadTransaction rt(sg);
+    const Group& group = rt.get_group();
+    CHECK_EQUAL(0, group.size());
+
+    {
+        WriteTransaction wt(sg_w);
+        TableRef alpha_w   = wt.add_table("alpha");
+        TableRef beta_w    = wt.add_table("beta");
+        TableRef gamma_w   = wt.add_table("gamma");
+        TableRef delta_w   = wt.add_table("delta");
+        TableRef epsilon_w = wt.add_table("epsilon");
+        alpha_w->add_column(type_Int, "alpha-1");
+        beta_w->add_column_link(type_Link, "beta-1", *delta_w);
+        gamma_w->add_column_link(type_Link, "gamma-1", *gamma_w);
+        delta_w->add_column(type_Int, "delta-1");
+        epsilon_w->add_column_link(type_Link, "epsilon-1", *delta_w);
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, tlm);
+    group.Verify();
+
+    CHECK_EQUAL(5, group.size());
+    ConstTableRef alpha   = group.get_table("alpha");
+    ConstTableRef beta    = group.get_table("beta");
+    ConstTableRef gamma   = group.get_table("gamma");
+    ConstTableRef delta   = group.get_table("delta");
+    ConstTableRef epsilon = group.get_table("epsilon");
+
+    // Remove table with columns, but no link columns, and table is not a link
+    // target.
+    {
+        WriteTransaction wt(sg_w);
+        wt.get_group().remove_table("alpha");
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, tlm);
+    group.Verify();
+
+    CHECK_EQUAL(4, group.size());
+    CHECK_NOT(alpha->is_attached());
+    CHECK(beta->is_attached());
+    CHECK(gamma->is_attached());
+    CHECK(delta->is_attached());
+    CHECK(epsilon->is_attached());
+
+    // Remove table with link column, and table is not a link target.
+    {
+        WriteTransaction wt(sg_w);
+        wt.get_group().remove_table("beta");
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, tlm);
+    group.Verify();
+
+    CHECK_EQUAL(3, group.size());
+    CHECK_NOT(beta->is_attached());
+    CHECK(gamma->is_attached());
+    CHECK(delta->is_attached());
+    CHECK(epsilon->is_attached());
+
+    // Remove table with self-link column, and table is not a target of link
+    // columns of other tables.
+    {
+        WriteTransaction wt(sg_w);
+        wt.get_group().remove_table("gamma");
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, tlm);
+    group.Verify();
+
+    CHECK_EQUAL(2, group.size());
+    CHECK_NOT(gamma->is_attached());
+    CHECK(delta->is_attached());
+    CHECK(epsilon->is_attached());
+
+    // Try, but fail to remove table which is a target of link columns of other
+    // tables.
+    {
+        WriteTransaction wt(sg_w);
+        CHECK_THROW(wt.get_group().remove_table("delta"), CrossTableLinkTarget);
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, tlm);
+    group.Verify();
+
+    CHECK_EQUAL(2, group.size());
+    CHECK(delta->is_attached());
+    CHECK(epsilon->is_attached());
+}
+
+
+TEST(LangBindHelper_AdvanceReadTransact_RemoveTableMovesTableWithLinksOver)
+{
+    // Create a scenario where a table is removed from the group, and the last
+    // table in the group (which will be moved into the vacated slot) has both
+    // link and backlink columns.
+
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg(path);
+    ShortCircuitTransactLogManager tlm(path);
+    SharedGroup sg_w(tlm);
+
+    // Start a read transaction (to be repeatedly advanced)
+    ReadTransaction rt(sg);
+    const Group& group = rt.get_group();
+    CHECK_EQUAL(0, group.size());
+
+    string names[4];
+    {
+        WriteTransaction wt(sg_w);
+        wt.add_table("alpha");
+        wt.add_table("beta");
+        wt.add_table("gamma");
+        wt.add_table("delta");
+        names[0] = wt.get_group().get_table_name(0);
+        names[1] = wt.get_group().get_table_name(1);
+        names[2] = wt.get_group().get_table_name(2);
+        names[3] = wt.get_group().get_table_name(3);
+        TableRef first_w  = wt.get_table(names[0]);
+        TableRef third_w  = wt.get_table(names[2]);
+        TableRef fourth_w = wt.get_table(names[3]);
+        first_w->add_column_link(type_Link,  "one",   *third_w);
+        third_w->add_column_link(type_Link,  "two",   *fourth_w);
+        third_w->add_column_link(type_Link,  "three", *third_w);
+        fourth_w->add_column_link(type_Link, "four",  *first_w);
+        fourth_w->add_column_link(type_Link, "five",  *third_w);
+        first_w->add_empty_row(2);
+        third_w->add_empty_row(2);
+        fourth_w->add_empty_row(2);
+        first_w->set_link(0,0,0);  // first[0].one   = third[0]
+        first_w->set_link(0,1,1);  // first[1].one   = third[1]
+        third_w->set_link(0,0,1);  // third[0].two   = fourth[1]
+        third_w->set_link(0,1,0);  // third[1].two   = fourth[0]
+        third_w->set_link(1,0,1);  // third[0].three = third[1]
+        third_w->set_link(1,1,1);  // third[1].three = third[1]
+        fourth_w->set_link(0,0,0); // fourth[0].four = first[0]
+        fourth_w->set_link(0,1,0); // fourth[1].four = first[0]
+        fourth_w->set_link(1,0,0); // fourth[0].five = third[0]
+        fourth_w->set_link(1,1,1); // fourth[1].five = third[1]
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, tlm);
+    group.Verify();
+
+    ConstTableRef first  = group.get_table(names[0]);
+    ConstTableRef second = group.get_table(names[1]);
+    ConstTableRef third  = group.get_table(names[2]);
+    ConstTableRef fourth = group.get_table(names[3]);
+
+    {
+        WriteTransaction wt(sg_w);
+        wt.get_group().remove_table(1); // Second
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, tlm);
+    group.Verify();
+
+    CHECK_EQUAL(3, group.size());
+    CHECK(first->is_attached());
+    CHECK_NOT(second->is_attached());
+    CHECK(third->is_attached());
+    CHECK(fourth->is_attached());
+    CHECK_EQUAL(1, first->get_column_count());
+    CHECK_EQUAL("one", first->get_column_name(0));
+    CHECK_EQUAL(third, first->get_link_target(0));
+    CHECK_EQUAL(2, third->get_column_count());
+    CHECK_EQUAL("two",   third->get_column_name(0));
+    CHECK_EQUAL("three", third->get_column_name(1));
+    CHECK_EQUAL(fourth, third->get_link_target(0));
+    CHECK_EQUAL(third,  third->get_link_target(1));
+    CHECK_EQUAL(2, fourth->get_column_count());
+    CHECK_EQUAL("four", fourth->get_column_name(0));
+    CHECK_EQUAL("five", fourth->get_column_name(1));
+    CHECK_EQUAL(first, fourth->get_link_target(0));
+    CHECK_EQUAL(third, fourth->get_link_target(1));
+
+    {
+        WriteTransaction wt(sg_w);
+        TableRef first_w  = wt.get_table(names[0]);
+        TableRef third_w  = wt.get_table(names[2]);
+        TableRef fourth_w = wt.get_table(names[3]);
+        third_w->set_link(0,0,0);  // third[0].two   = fourth[0]
+        fourth_w->set_link(0,1,1); // fourth[1].four = first[1]
+        first_w->set_link(0,0,1);  // first[0].one   = third[1]
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, tlm);
+    group.Verify();
+
+    CHECK_EQUAL(2, first->size());
+    CHECK_EQUAL(1, first->get_link(0,0));
+    CHECK_EQUAL(1, first->get_link(0,1));
+    CHECK_EQUAL(1, first->get_backlink_count(0, *fourth, 0));
+    CHECK_EQUAL(1, first->get_backlink_count(1, *fourth, 0));
+    CHECK_EQUAL(2, third->size());
+    CHECK_EQUAL(0, third->get_link(0,0));
+    CHECK_EQUAL(0, third->get_link(0,1));
+    CHECK_EQUAL(1, third->get_link(1,0));
+    CHECK_EQUAL(1, third->get_link(1,1));
+    CHECK_EQUAL(0, third->get_backlink_count(0, *first,  0));
+    CHECK_EQUAL(2, third->get_backlink_count(1, *first,  0));
+    CHECK_EQUAL(0, third->get_backlink_count(0, *third,  1));
+    CHECK_EQUAL(2, third->get_backlink_count(1, *third,  1));
+    CHECK_EQUAL(1, third->get_backlink_count(0, *fourth, 1));
+    CHECK_EQUAL(1, third->get_backlink_count(1, *fourth, 1));
+    CHECK_EQUAL(2, fourth->size());
+    CHECK_EQUAL(0, fourth->get_link(0,0));
+    CHECK_EQUAL(1, fourth->get_link(0,1));
+    CHECK_EQUAL(0, fourth->get_link(1,0));
+    CHECK_EQUAL(1, fourth->get_link(1,1));
+    CHECK_EQUAL(2, fourth->get_backlink_count(0, *third, 0));
+    CHECK_EQUAL(0, fourth->get_backlink_count(1, *third, 0));
+}
+
+
 TEST(LangBindHelper_ImplicitTransactions)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -5466,7 +5729,7 @@ TEST(LangBindHelper_ImplicitTransactions)
     SharedGroup sg(*repl);
     {
         WriteTransaction wt(sg);
-        wt.get_table<TestTableShared>("table")->add_empty_row();
+        wt.add_table<TestTableShared>("table")->add_empty_row();
         wt.commit();
     }
     UniquePtr<Replication> repl2(makeWriteLogCollector(path));
@@ -5519,7 +5782,7 @@ TEST(LangBindHelper_ImplicitTransactions_OverSharedGroupDestruction)
         SharedGroup sg(*repl);
         {
             WriteTransaction wt(sg);
-            TableRef tr = wt.get_table("table");
+            TableRef tr = wt.add_table("table");
             tr->add_column(type_Int, "first");
             for (int i=0; i<20; i++)
                 tr->add_empty_row();
@@ -5550,8 +5813,8 @@ TEST(LangBindHelper_ImplicitTransactions_LinkList)
     SharedGroup sg(*repl);
     Group* group = const_cast<Group*>(&sg.begin_read());
     LangBindHelper::promote_to_write(sg, *tlr);
-    TableRef origin = group->get_table("origin");
-    TableRef target = group->get_table("target");
+    TableRef origin = group->add_table("origin");
+    TableRef target = group->add_table("target");
     origin->add_column_link(type_LinkList, "", *target);
     target->add_column(type_Int, "");
     origin->add_empty_row();
@@ -5631,7 +5894,7 @@ TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
     SharedGroup sg(*repl);
     {
         WriteTransaction wt(sg);
-        TableRef tr = wt.get_table("table");
+        TableRef tr = wt.add_table("table");
         tr->add_column(type_Int, "first");
         for (int i = 0; i < 200; ++i)
             tr->add_empty_row();
@@ -5684,6 +5947,47 @@ TEST(LangBindHelper_ImplicitTransactions_NoExtremeFileSpaceLeaks)
     }
 
     CHECK_LESS_EQUAL(File(path).get_size(), 8*1024);
+}
+
+
+TEST(LangBindHelper_ImplicitTransactions_DetachRowAccessorOnMoveLastOver)
+{
+    SHARED_GROUP_TEST_PATH(path);
+
+    Row rows[10];
+
+    UniquePtr<Replication> repl(makeWriteLogCollector(path));
+    UniquePtr<LangBindHelper::TransactLogRegistry> tlr(getWriteLogs(path));
+    SharedGroup sg(*repl);
+    Group& group = const_cast<Group&>(sg.begin_read());
+
+    LangBindHelper::promote_to_write(sg, *tlr);
+    TableRef table = group.add_table("table");
+    table->add_column(type_Int, "");
+    table->add_empty_row(10);
+    for (int i = 0; i < 10; ++i)
+        table->set_int(0, i, i);
+    LangBindHelper::commit_and_continue_as_read(sg);
+
+    for (int i = 0; i < 10; ++i)
+        rows[i] = table->get(i);
+
+    Random random(random_int<unsigned long>());
+
+    LangBindHelper::promote_to_write(sg, *tlr);
+    for (int i = 0; i < 10; ++i) {
+        size_t row_ndx = random.draw_int_mod(table->size());
+        int value = table->get_int(0, row_ndx);
+        table->move_last_over(row_ndx);
+        CHECK_EQUAL(tightdb::not_found, table->find_first_int(0, value));
+        for (int j = 0; j < 10; ++j) {
+            bool should_be_attached = table->find_first_int(0, j) != tightdb::not_found;
+            CHECK_EQUAL(should_be_attached, rows[j].is_attached());
+        }
+    }
+    LangBindHelper::commit_and_continue_as_read(sg);
+
+    sg.end_read();
 }
 
 

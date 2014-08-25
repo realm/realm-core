@@ -37,21 +37,48 @@ namespace tightdb {
 /// \note Applications are not supposed to call any of these functions
 /// directly.
 ///
-/// All the get_*_ptr() functions as well as new_table() and
-/// copy_table() will return a pointer to a Table whose reference
-/// count has already been incremented.
-///
-/// The application must make sure that the unbind_table_ref() function is
-/// called to decrement the reference count when it no longer needs
-/// access to that table.
+/// All of the get_subtable_ptr() functions bind the table accessor pointer
+/// before it is returned (bind_table_ptr()). The caller is then responsible for
+/// making the corresponding call to unbind_table_ptr().
 class LangBindHelper {
 public:
-    /// Construct a new freestanding table.
+    /// Increment the reference counter of the specified table accessor. This is
+    /// done automatically by all of the functions in this class that return
+    /// table accessor pointers, but if the binding/application makes a copy of
+    /// such a pointer, and the copy needs to have an "independent life", then
+    /// the binding/application must bind that copy using this function.
+    static void bind_table_ptr(const Table*) TIGHTDB_NOEXCEPT;
+
+    /// Decrement the reference counter of the specified table accessor. The
+    /// binding/application must call this function for every bound table
+    /// accessor pointer object, when that pointer object ends its life.
+    static void unbind_table_ptr(const Table*) TIGHTDB_NOEXCEPT;
+
+    /// Construct a new freestanding table. The table accessor pointer is bound
+    /// by the callee before it is returned (bind_table_ptr()).
     static Table* new_table();
 
-    /// Construct a new freestanding table as a copy of the specified
-    /// one.
+    /// Construct a new freestanding table as a copy of the specified one. The
+    /// table accessor pointer is bound by the callee before it is returned
+    /// (bind_table_ptr()).
     static Table* copy_table(const Table&);
+
+    //@{
+
+    /// These functions are like their namesakes in Group, but these bypass the
+    /// construction of a smart-pointer object (TableRef). The table accessor
+    /// pointer is bound by the callee before it is returned (bind_table_ptr()).
+
+    static Table* get_table(Group&, std::size_t index_in_group);
+    static const Table* get_table(const Group&, std::size_t index_in_group);
+
+    static Table* get_table(Group&, StringData name);
+    static const Table* get_table(const Group&, StringData name);
+
+    static Table* add_table(Group&, StringData name, bool require_unique_name = true);
+    static Table* get_or_add_table(Group&, StringData name, bool* was_added = 0);
+
+    //@}
 
     static Table* get_subtable_ptr(Table*, std::size_t column_ndx, std::size_t row_ndx);
     static const Table* get_subtable_ptr(const Table*, std::size_t column_ndx,
@@ -67,13 +94,6 @@ public:
                                          std::size_t row_ndx);
     static const Table* get_subtable_ptr(const ConstTableView*, std::size_t column_ndx,
                                          std::size_t row_ndx);
-
-    static Table* get_table_ptr(Group* grp, StringData name);
-    static Table* get_table_ptr(Group* grp, StringData name, bool& was_created);
-    static const Table* get_table_ptr(const Group* grp, StringData name);
-
-    static void unbind_table_ref(const Table*);
-    static void bind_table_ref(const Table*) TIGHTDB_NOEXCEPT;
 
     /// Calls parent.insert_subtable(col_ndx, row_ndx, &source). Note
     /// that the source table must have a descriptor that is
@@ -183,34 +203,62 @@ inline const Table* LangBindHelper::get_subtable_ptr(const ConstTableView* tv,
     return get_subtable_ptr(&tv->get_parent(), column_ndx, tv->get_source_ndx(row_ndx));
 }
 
-inline Table* LangBindHelper::get_table_ptr(Group* grp, StringData name)
+inline Table* LangBindHelper::get_table(Group& group, std::size_t index_in_group)
 {
-    Table* subtab = grp->get_table_ptr(name);
-    subtab->bind_ref();
-    return subtab;
+    typedef _impl::GroupFriend gf;
+    Table* table = &gf::get_table(group, index_in_group); // Throws
+    table->bind_ref();
+    return table;
 }
 
-inline Table* LangBindHelper::get_table_ptr(Group* grp, StringData name, bool& was_created)
+inline const Table* LangBindHelper::get_table(const Group& group, std::size_t index_in_group)
 {
-    Group::SpecSetter spec_setter = 0; // Do not add any columns
-    Table* subtab = grp->get_table_ptr(name, spec_setter, was_created);
-    subtab->bind_ref();
-    return subtab;
+    typedef _impl::GroupFriend gf;
+    const Table* table = &gf::get_table(group, index_in_group); // Throws
+    table->bind_ref();
+    return table;
 }
 
-inline const Table* LangBindHelper::get_table_ptr(const Group* grp, StringData name)
+inline Table* LangBindHelper::get_table(Group& group, StringData name)
 {
-    const Table* subtab = grp->get_table_ptr(name);
-    subtab->bind_ref();
-    return subtab;
+    typedef _impl::GroupFriend gf;
+    Table* table = gf::get_table(group, name); // Throws
+    if (table)
+        table->bind_ref();
+    return table;
 }
 
-inline void LangBindHelper::unbind_table_ref(const Table* t)
+inline const Table* LangBindHelper::get_table(const Group& group, StringData name)
+{
+    typedef _impl::GroupFriend gf;
+    const Table* table = gf::get_table(group, name); // Throws
+    if (table)
+        table->bind_ref();
+    return table;
+}
+
+inline Table* LangBindHelper::add_table(Group& group, StringData name, bool require_unique_name)
+{
+    typedef _impl::GroupFriend gf;
+    Table* table = &gf::add_table(group, name, require_unique_name); // Throws
+    table->bind_ref();
+    return table;
+}
+
+inline Table* LangBindHelper::get_or_add_table(Group& group, StringData name, bool* was_added)
+{
+    typedef _impl::GroupFriend gf;
+    Table* table = &gf::get_or_add_table(group, name, was_added); // Throws
+    table->bind_ref();
+    return table;
+}
+
+inline void LangBindHelper::unbind_table_ptr(const Table* t) TIGHTDB_NOEXCEPT
 {
    t->unbind_ref();
 }
 
-inline void LangBindHelper::bind_table_ref(const Table* t) TIGHTDB_NOEXCEPT
+inline void LangBindHelper::bind_table_ptr(const Table* t) TIGHTDB_NOEXCEPT
 {
    t->bind_ref();
 }

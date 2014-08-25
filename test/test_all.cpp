@@ -163,7 +163,7 @@ void display_build_config()
         "  with Debug "<<with_debug<<"\n"
         "  with Replication "<<with_replication<<"\n"
         "\n"
-        "TIGHTDB_MAX_LIST_SIZE = "<<TIGHTDB_MAX_LIST_SIZE<<"\n"
+        "TIGHTDB_MAX_BPNODE_SIZE = "<<TIGHTDB_MAX_BPNODE_SIZE<<"\n"
         "\n"
         // Be aware that ps3/xbox have sizeof (void*) = 4 && sizeof (size_t) == 8
         // We decide to print size_t here

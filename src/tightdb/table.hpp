@@ -441,7 +441,7 @@ public:
     std::size_t get_parent_row_index() const TIGHTDB_NOEXCEPT;
     //@}
 
-    /// Only group-level unordered tables can be used as origins or targets for
+    /// Only group-level unordered tables can be used as origins or targets of
     /// links.
     bool is_group_level() const TIGHTDB_NOEXCEPT;
 
@@ -739,8 +739,8 @@ private:
     typedef std::vector<const TableViewBase*> views;
     mutable views m_views;
 
-    typedef std::vector<RowBase*> row_accessors;
-    mutable row_accessors m_row_accessors;
+    // Points to first bound row accessor, or is null if there are none.
+    mutable RowBase* m_row_accessors;
 
     // Used for queries: Items are added with link() method during buildup of query
     mutable std::vector<size_t> m_link_chain;
@@ -751,6 +751,7 @@ private:
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     mutable uint_fast64_t m_version;
+#endif
 
     /// Update the version of this table and all tables which have links to it.
     /// This causes all views referring to those tables to go out of sync, so that
@@ -762,10 +763,7 @@ private:
     /// when a change is made to the table. When calling recursively (following links
     /// or going to the parent table), the parameter should be set to false to correctly
     /// prune traversal.
-    void bump_version(bool bump_global = true) const;
-#else
-    inline void bump_version(bool bump_global = true) const { static_cast<void>(bump_global); }
-#endif
+    void bump_version(bool bump_global = true) const TIGHTDB_NOEXCEPT;
 
     /// Disable copying assignment.
     ///
@@ -1024,6 +1022,7 @@ private:
     void unmark() TIGHTDB_NOEXCEPT;
     void recursive_mark() TIGHTDB_NOEXCEPT;
     void mark_link_target_tables(std::size_t col_ndx_begin) TIGHTDB_NOEXCEPT;
+    void mark_opposite_link_tables() TIGHTDB_NOEXCEPT;
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     Replication* get_repl() TIGHTDB_NOEXCEPT;
@@ -1068,6 +1067,8 @@ private:
 
     void refresh_column_accessors(std::size_t col_ndx_begin = 0);
 
+    bool is_cross_table_link_target() const TIGHTDB_NOEXCEPT;
+
 #ifdef TIGHTDB_DEBUG
     void to_dot_internal(std::ostream&) const;
 #endif
@@ -1079,7 +1080,6 @@ private:
     friend class LangBindHelper;
     friend class TableViewBase;
     friend class TableView;
-    friend class LinkView;
     template<class T> friend class Columns;
     friend class Columns<StringData>;
     friend class ParentNode;
@@ -1131,7 +1131,8 @@ protected:
 
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-inline void Table::bump_version(bool bump_global) const
+
+inline void Table::bump_version(bool bump_global) const TIGHTDB_NOEXCEPT
 {
     if (bump_global) {
         // This is only set on initial entry through an operation on the same
@@ -1156,7 +1157,15 @@ inline void Table::bump_version(bool bump_global) const
         }
     }
 }
-#endif
+
+#else // TIGHTDB_ENABLE_REPLICATION
+
+inline void Table::bump_version(bool) const TIGHTDB_NOEXCEPT
+{
+    // No-op when replication is disabled at compile time
+}
+
+#endif // TIGHTDB_ENABLE_REPLICATION
 
 inline void Table::remove_last()
 {
@@ -1299,6 +1308,7 @@ inline Table::Table(Allocator& alloc):
 {
     m_ref_count = 1; // Explicitely managed lifetime
     m_descriptor = 0;
+    m_row_accessors = 0;
 
     ref_type ref = create_empty_table(alloc); // Throws
     Parent* parent = 0;
@@ -1313,6 +1323,7 @@ inline Table::Table(const Table& t, Allocator& alloc):
 {
     m_ref_count = 1; // Explicitely managed lifetime
     m_descriptor = 0;
+    m_row_accessors = 0;
 
     ref_type ref = t.clone(alloc); // Throws
     Parent* parent = 0;
@@ -1327,6 +1338,7 @@ inline Table::Table(ref_count_tag, Allocator& alloc):
 {
     m_ref_count = 0; // Lifetime managed by reference counting
     m_descriptor = 0;
+    m_row_accessors = 0;
 }
 
 inline TableRef Table::create(Allocator& alloc)
@@ -1838,6 +1850,11 @@ public:
         table.mark_link_target_tables(col_ndx_begin);
     }
 
+    static void mark_opposite_link_tables(Table& table) TIGHTDB_NOEXCEPT
+    {
+        table.mark_opposite_link_tables();
+    }
+
     static Descriptor* get_root_table_desc_accessor(Table& root_table) TIGHTDB_NOEXCEPT
     {
         return root_table.m_descriptor;
@@ -1871,12 +1888,14 @@ public:
         return Table::is_link_type(type);
     }
 
-    static inline void bump_version(Table& table)
+    static void bump_version(Table& table, bool bump_global = true) TIGHTDB_NOEXCEPT
     {
-        // calls going through tablefriend are always part of a recursion, so shouldn't
-        // bump the global counter
-        bool global_bump = false;
-        table.bump_version(global_bump);
+        table.bump_version(bump_global);
+    }
+
+    static bool is_cross_table_link_target(const Table& table)
+    {
+        return table.is_cross_table_link_target();
     }
 
 #ifdef TIGHTDB_ENABLE_REPLICATION

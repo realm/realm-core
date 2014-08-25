@@ -169,7 +169,7 @@ TEST(Query_Count)
 {
     // Intended to test QueryState::match<pattern = true>(); which is only triggered if:
     // * Table size is large enough to have SSE-aligned or bithack-aligned rows (this requires
-    //   TIGHTDB_MAX_LIST_SIZE > [some large number]!)
+    //   TIGHTDB_MAX_BPNODE_SIZE > [some large number]!)
     // * You're doing a 'count' which is currently the only operation that uses 'pattern', and
     // * There exists exactly 1 condition (if there is 0 conditions, it will fallback to column::count
     //   and if there exists > 1 conditions, 'pattern' is currently not supported - but could easily be
@@ -181,7 +181,7 @@ TEST(Query_Count)
         table.add_column(type_Int, "i");
 
         size_t count = 0;
-        size_t rows = random.draw_int_mod(5 * TIGHTDB_MAX_LIST_SIZE); // to cross some leaf boundaries
+        size_t rows = random.draw_int_mod(5 * TIGHTDB_MAX_BPNODE_SIZE); // to cross some leaf boundaries
 
         for (size_t i = 0; i < rows; ++i) {
             table.add_empty_row();
@@ -492,7 +492,7 @@ TEST(Query_NextGenSyntaxMonkey0)
     Random random(random_int<unsigned long>()); // Seed from slow global generator
     for (int iter = 1; iter < 100 + TEST_DURATION * 10000; iter++)
     {
-        const size_t rows = 1 + random.draw_int_mod(2 * TIGHTDB_MAX_LIST_SIZE);
+        const size_t rows = 1 + random.draw_int_mod(2 * TIGHTDB_MAX_BPNODE_SIZE);
         Table table;
 
         // Two different row types prevents fallback to query_engine (good because we want to test query_expression)
@@ -549,7 +549,7 @@ TEST(Query_NextGenSyntaxMonkey)
     for (int iter = 1; iter < 20 * (TEST_DURATION * TEST_DURATION * TEST_DURATION + 1); iter++) {
         // Keep at least '* 20' else some tests will give 0 matches and bad coverage
         const size_t rows =
-            1 + random.draw_int_mod<size_t>(TIGHTDB_MAX_LIST_SIZE * 20 *
+            1 + random.draw_int_mod<size_t>(TIGHTDB_MAX_BPNODE_SIZE * 20 *
             (TEST_DURATION * TEST_DURATION * TEST_DURATION + 1));
         Table table;
         table.add_column(type_Int, "first");
@@ -884,7 +884,7 @@ TEST(Query_MergeQueriesMonkey)
 {
     Random random(random_int<unsigned long>()); // Seed from slow global generator
     for (int iter = 0; iter < 5; iter++) {
-        const size_t rows = TIGHTDB_MAX_LIST_SIZE * 4;
+        const size_t rows = TIGHTDB_MAX_BPNODE_SIZE * 4;
         Table table;
         table.add_column(type_Int, "first");
         table.add_column(type_Int, "second");
@@ -1062,7 +1062,7 @@ TEST(Query_MergeQueriesMonkeyOverloads)
 {
     Random random(random_int<unsigned long>()); // Seed from slow global generator
     for (int iter = 0; iter < 5; iter++) {
-        const size_t rows = TIGHTDB_MAX_LIST_SIZE * 4;
+        const size_t rows = TIGHTDB_MAX_BPNODE_SIZE * 4;
         Table table;
         table.add_column(type_Int, "first");
         table.add_column(type_Int, "second");
@@ -1597,12 +1597,12 @@ TEST(Query_StrIndexCrash)
 
     for (int iter = 0; iter < 5; ++iter) {
         Group group;
-        TableRef table = group.get_table("test");
+        TableRef table = group.add_table("test");
         table->add_column(type_String, "first");
 
         size_t eights = 0;
 
-        for (int i = 0; i < TIGHTDB_MAX_LIST_SIZE * 2; ++i) {
+        for (int i = 0; i < TIGHTDB_MAX_BPNODE_SIZE * 2; ++i) {
             int v = random.draw_int_mod(10);
             if (v == 8) {
                 eights++;
@@ -1653,7 +1653,7 @@ TEST(Query_TwoColsEqualVaryWidthAndValues)
     table.add_column(type_Double, "sixth");
 
 #ifdef TIGHTDB_DEBUG
-    for (int i = 0; i < TIGHTDB_MAX_LIST_SIZE * 5; i++) {
+    for (int i = 0; i < TIGHTDB_MAX_BPNODE_SIZE * 5; i++) {
 #else
     for (int i = 0; i < 50000; i++) {
 #endif
@@ -2051,12 +2051,12 @@ TEST(Query_OnTableView)
         OneIntTable oti;
         size_t cnt1 = 0;
         size_t cnt0 = 0;
-        size_t limit = random.draw_int_max(TIGHTDB_MAX_LIST_SIZE * 10);
+        size_t limit = random.draw_int_max(TIGHTDB_MAX_BPNODE_SIZE * 10);
 
-        size_t lbound = random.draw_int_mod(TIGHTDB_MAX_LIST_SIZE * 10);
-        size_t ubound = lbound + random.draw_int_mod(TIGHTDB_MAX_LIST_SIZE * 10 - lbound);
+        size_t lbound = random.draw_int_mod(TIGHTDB_MAX_BPNODE_SIZE * 10);
+        size_t ubound = lbound + random.draw_int_mod(TIGHTDB_MAX_BPNODE_SIZE * 10 - lbound);
 
-        for (size_t i = 0; i < TIGHTDB_MAX_LIST_SIZE * 10; i++) {
+        for (size_t i = 0; i < TIGHTDB_MAX_BPNODE_SIZE * 10; i++) {
             int v = random.draw_int_mod(3);
 
             if (v == 1 && i >= lbound && i < ubound && cnt0 < limit)
@@ -2090,12 +2090,12 @@ TEST(Query_OnTableView_where)
         OneIntTable oti;
         size_t cnt1 = 0;
         size_t cnt0 = 0;
-        size_t limit = random.draw_int_max(TIGHTDB_MAX_LIST_SIZE * 10);
+        size_t limit = random.draw_int_max(TIGHTDB_MAX_BPNODE_SIZE * 10);
 
-        size_t lbound = random.draw_int_mod(TIGHTDB_MAX_LIST_SIZE * 10);
-        size_t ubound = lbound + random.draw_int_mod(TIGHTDB_MAX_LIST_SIZE * 10 - lbound);
+        size_t lbound = random.draw_int_mod(TIGHTDB_MAX_BPNODE_SIZE * 10);
+        size_t ubound = lbound + random.draw_int_mod(TIGHTDB_MAX_BPNODE_SIZE * 10 - lbound);
 
-        for (size_t i = 0; i < TIGHTDB_MAX_LIST_SIZE * 10; i++) {
+        for (size_t i = 0; i < TIGHTDB_MAX_BPNODE_SIZE * 10; i++) {
             int v = random.draw_int_mod(3);
 
             if (v == 1 && i >= lbound && i < ubound && cnt0 < limit)
@@ -2142,13 +2142,13 @@ TEST(Query_StrIndex3)
 #endif
             // 1/500 match probability because we want possibility for a 1000 sized leaf to contain 0 matches (important
             // edge case)
-            int f1 = random.draw_int_mod(TIGHTDB_MAX_LIST_SIZE) / 2 + 1;
-            int f2 = random.draw_int_mod(TIGHTDB_MAX_LIST_SIZE) / 2 + 1;
+            int f1 = random.draw_int_mod(TIGHTDB_MAX_BPNODE_SIZE) / 2 + 1;
+            int f2 = random.draw_int_mod(TIGHTDB_MAX_BPNODE_SIZE) / 2 + 1;
             bool longstrings = random.chance(1, 5);
 
             // 2200 entries with that probability to fill out two concecutive 1000 sized leaves with above probability,
             // plus a remainder (edge case)
-            for (int j = 0; j < TIGHTDB_MAX_LIST_SIZE * 2 + TIGHTDB_MAX_LIST_SIZE / 5; j++) {
+            for (int j = 0; j < TIGHTDB_MAX_BPNODE_SIZE * 2 + TIGHTDB_MAX_BPNODE_SIZE / 5; j++) {
                 if (random.chance(1, f1)) {
                     if (random.chance(1, f2)) {
                         ttt.add(0, longstrings ? "AAAAAAAAAAAAAAAAAAAAAAAA" : "AA");
@@ -2261,7 +2261,7 @@ TEST(Query_StrEnum)
     for (int i = 0; i < 100; ++i) {
         ttt.clear();
         aa = 0;
-        for (size_t t = 0; t < TIGHTDB_MAX_LIST_SIZE * 2; ++t) {
+        for (size_t t = 0; t < TIGHTDB_MAX_BPNODE_SIZE * 2; ++t) {
             if (random.chance(1, 3)) {
                 ttt.add(1, "AA");
                 ++aa;
@@ -2326,7 +2326,7 @@ TEST(Query_GameAnalytics)
     Random random(random_int<unsigned long>()); // Seed from slow global generator
     {
         Group g;
-        GATable::Ref t = g.get_table<GATable>("firstevents");
+        GATable::Ref t = g.add_table<GATable>("firstevents");
 
         for (size_t i = 0; i < 100; ++i) {
             int64_t r1 = random.draw_int_mod(100);
@@ -2588,7 +2588,7 @@ TEST(Query_Float)
     CHECK_EQUAL(1.20f, t.where().col_float.maximum());
     t.where().col_float.maximum(null_ptr, 0, not_found, not_found, &ndx);
     CHECK_EQUAL(4, ndx);
-    
+
     CHECK_EQUAL(1.10f, t.where().col_float.minimum());
     t.where().col_float.minimum(null_ptr, 0, not_found, not_found, &ndx);
     CHECK_EQUAL(0, ndx);
@@ -3084,7 +3084,7 @@ TEST(Query_SimpleBugDetect)
 TEST(Query_Subtable)
 {
     Group group;
-    TableRef table = group.get_table("test");
+    TableRef table = group.add_table("test");
 
     // Create specification with sub-table
     DescriptorRef sub_1;
@@ -3194,7 +3194,7 @@ TEST(Query_Subtable)
 TEST(Query_SubtableBug)
 {
     Group group;
-    TableRef table = group.get_table("test");
+    TableRef table = group.add_table("test");
 
     // Create specification with sub-table
     table->add_column(type_Int, "col 0");
@@ -3447,10 +3447,10 @@ TEST(Query_Sort_And_Requery_FindFirst)
 {
     TwoIntTable ttt;
 
-    ttt.add(1, 60); 
+    ttt.add(1, 60);
     ttt.add(2, 50); // **
     ttt.add(3, 40); // *
-    ttt.add(1, 30); 
+    ttt.add(1, 30);
     ttt.add(2, 20); // **
     ttt.add(3, 10); // **
 
@@ -3657,7 +3657,7 @@ TEST(Query_Sort_And_Requery_Untyped1)
     CHECK_EQUAL(8, tv3.get_int(0, 2)); // 8, 9 (sort order) instead of 9, 8 (table order)
     CHECK_EQUAL(9, tv3.get_int(0, 3));
 
-    // Test remove() 
+    // Test remove()
     tv3.remove(0);
     Query q4 = table.where(&tv3).not_equal(1, "X");
     TableView tv4 = q4.find_all();
@@ -3679,7 +3679,7 @@ TEST(Query_Sort_And_Requery_Untyped_Monkey2)
         table.add_column(type_Int, "second1");
 
         // Add random data to table
-        for (size_t t = 0; t < 3 * TIGHTDB_MAX_LIST_SIZE; t++) {
+        for (size_t t = 0; t < 3 * TIGHTDB_MAX_BPNODE_SIZE; t++) {
             table.add_empty_row();
             int64_t val1 = rand() % 5;
             table.set_int(0, t, val1);
@@ -4002,7 +4002,7 @@ TEST(Query_FindNextBackwards)
     TupleTableType ttt;
 
     // Create multiple leaves
-    for (size_t i = 0; i < TIGHTDB_MAX_LIST_SIZE * 4; i++) {
+    for (size_t i = 0; i < TIGHTDB_MAX_BPNODE_SIZE * 4; i++) {
         ttt.add(6, "X");
         ttt.add(7, "X");
     }
@@ -4011,8 +4011,8 @@ TEST(Query_FindNextBackwards)
 
     // Check if leaf caching works correctly in the case you go backwards. 'res' result is not so important
     // in this test; this test tests if we assert errorneously. Next test (TestQueryFindRandom) is more exhaustive
-    size_t res = q.find(TIGHTDB_MAX_LIST_SIZE * 2);
-    CHECK_EQUAL(TIGHTDB_MAX_LIST_SIZE * 2, res);
+    size_t res = q.find(TIGHTDB_MAX_BPNODE_SIZE * 2);
+    CHECK_EQUAL(TIGHTDB_MAX_BPNODE_SIZE * 2, res);
     res = q.find(0);
     CHECK_EQUAL(0, res);
 }
@@ -4025,14 +4025,14 @@ TEST(Query_FindRandom)
     Random random(random_int<unsigned long>()); // Seed from slow global generator
 
     TupleTableType ttt;
-    int64_t search = TIGHTDB_MAX_LIST_SIZE / 2;
-    size_t rows = TIGHTDB_MAX_LIST_SIZE * 20;
+    int64_t search = TIGHTDB_MAX_BPNODE_SIZE / 2;
+    size_t rows = TIGHTDB_MAX_BPNODE_SIZE * 20;
 
     // Create multiple leaves
     for (size_t i = 0; i < rows; i++) {
         // This value distribution makes us sometimes cross a leaf boundary, and sometimes not, with both having
         // a fair probability of happening
-        ttt.add(random.draw_int_mod(TIGHTDB_MAX_LIST_SIZE), "X");
+        ttt.add(random.draw_int_mod(TIGHTDB_MAX_BPNODE_SIZE), "X");
     }
 
     TupleTableType::Query q = ttt.where().first.equal(search);
@@ -4702,7 +4702,7 @@ TEST(Query_SyntaxCheck)
 TEST(Query_SubtableSyntaxCheck)
 {
     Group group;
-    TableRef table = group.get_table("test");
+    TableRef table = group.add_table("test");
     string s;
 
     // Create specification with sub-table
@@ -5051,7 +5051,7 @@ TEST(Query_Avg2)
 TEST(Query_OfByOne)
 {
     TupleTableType t;
-    for (size_t i = 0; i < TIGHTDB_MAX_LIST_SIZE * 2; ++i) {
+    for (size_t i = 0; i < TIGHTDB_MAX_BPNODE_SIZE * 2; ++i) {
         t.add(1, "a");
     }
 
@@ -5062,19 +5062,19 @@ TEST(Query_OfByOne)
     t[0].first = 1; // reset
 
     // Before split
-    t[TIGHTDB_MAX_LIST_SIZE - 1].first = 0;
+    t[TIGHTDB_MAX_BPNODE_SIZE - 1].first = 0;
     res = t.where().first.equal(0).find();
-    CHECK_EQUAL(TIGHTDB_MAX_LIST_SIZE - 1, res);
-    t[TIGHTDB_MAX_LIST_SIZE - 1].first = 1; // reset
+    CHECK_EQUAL(TIGHTDB_MAX_BPNODE_SIZE - 1, res);
+    t[TIGHTDB_MAX_BPNODE_SIZE - 1].first = 1; // reset
 
     // After split
-    t[TIGHTDB_MAX_LIST_SIZE].first = 0;
+    t[TIGHTDB_MAX_BPNODE_SIZE].first = 0;
     res = t.where().first.equal(0).find();
-    CHECK_EQUAL(TIGHTDB_MAX_LIST_SIZE, res);
-    t[TIGHTDB_MAX_LIST_SIZE].first = 1; // reset
+    CHECK_EQUAL(TIGHTDB_MAX_BPNODE_SIZE, res);
+    t[TIGHTDB_MAX_BPNODE_SIZE].first = 1; // reset
 
     // Before end
-    const size_t last_pos = (TIGHTDB_MAX_LIST_SIZE * 2) - 1;
+    const size_t last_pos = (TIGHTDB_MAX_BPNODE_SIZE * 2) - 1;
     t[last_pos].first = 0;
     res = t.where().first.equal(0).find();
     CHECK_EQUAL(last_pos, res);
@@ -5320,7 +5320,7 @@ TEST(Query_RefCounting)
 
     Query q = t->where();
 
-    LangBindHelper::unbind_table_ref(t);
+    LangBindHelper::unbind_table_ptr(t);
 
     // Now try to access Query and see that the Table is still alive
     TableView tv = q.find_all();
@@ -5330,9 +5330,9 @@ TEST(Query_RefCounting)
 
 TEST(Query_DeepCopy)
 {
-    // NOTE: You can only create a copy of a fully constructed; i.e. you cannot copy a query which is missing an 
+    // NOTE: You can only create a copy of a fully constructed; i.e. you cannot copy a query which is missing an
     // end_group(). Run Query::validate() to see if it's fully constructed.
-    
+
     Types t;
 
     t.add(1, "1", 1.1);
@@ -5353,7 +5353,7 @@ TEST(Query_DeepCopy)
     Query* q3 = new Query(q, Query::TCopyExpressionTag());
     Query* q4 = new Query(*q3, Query::TCopyExpressionTag());
     delete q3;
-    
+
 
     // Attempt to overwrite memory of the deleted q3 by allocating various sized objects so that a spurious execution
     // of methods on q3 can be detected (by making unit test crash).
@@ -5418,12 +5418,12 @@ TEST(Query_TableViewMoveAssign1)
     // temporary query is created, then q makes and stores a deep copy and then temporary is destructed
     Query q = t.column().ints > 2 + 0; // + 0 makes query_expression node instead of query_engine
 
-    // now deep copy should be destructed and replaced by new temporary      
+    // now deep copy should be destructed and replaced by new temporary
     TableView tv = q.find_all();
 
     // the original should still work; destruction of temporaries and deep copies should have no references
     // to original
-    tv = q.find_all();    
+    tv = q.find_all();
 }
 
 TEST(Query_TableViewMoveAssignLeak2)
@@ -5443,7 +5443,7 @@ TEST(Query_TableViewMoveAssignLeak2)
 
 TEST(Query_DeepCopyLeak1)
 {
-    // NOTE: You can only create a copy of a fully constructed; i.e. you cannot copy a query which is missing an 
+    // NOTE: You can only create a copy of a fully constructed; i.e. you cannot copy a query which is missing an
     // end_group(). Run Query::validate() to see if it's fully constructed.
 
     Types t;

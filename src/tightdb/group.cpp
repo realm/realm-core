@@ -1,6 +1,7 @@
 #include <cerrno>
 #include <new>
 #include <algorithm>
+#include <set>
 #include <iostream>
 #include <iomanip>
 #include <fstream>
@@ -9,6 +10,9 @@
 #include <tightdb/util/thread.hpp>
 #include <tightdb/impl/destroy_guard.hpp>
 #include <tightdb/utilities.hpp>
+#include <tightdb/exceptions.hpp>
+#include <tightdb/column_linkbase.hpp>
+#include <tightdb/column_backlink.hpp>
 #include <tightdb/group_writer.hpp>
 #include <tightdb/group.hpp>
 #ifdef TIGHTDB_ENABLE_REPLICATION
@@ -242,12 +246,14 @@ void Group::detach() TIGHTDB_NOEXCEPT
     complete_detach();
 }
 
+
 void Group::detach_but_retain_data() TIGHTDB_NOEXCEPT
 {
     m_is_attached = false;
     detach_table_accessors();
     m_table_accessors.clear();
 }
+
 
 void Group::complete_detach() TIGHTDB_NOEXCEPT
 {
@@ -259,22 +265,77 @@ void Group::complete_detach() TIGHTDB_NOEXCEPT
     m_free_versions.detach();
 }
 
-Table* Group::get_table_by_ndx(size_t ndx)
+
+Table* Group::do_get_table(size_t table_ndx, DescMatcher desc_matcher)
 {
-    TIGHTDB_ASSERT(is_attached());
-    TIGHTDB_ASSERT(ndx < m_tables.size());
     TIGHTDB_ASSERT(m_table_accessors.empty() || m_table_accessors.size() == m_tables.size());
+
+    if (table_ndx >= m_tables.size())
+        throw InvalidArgument();
 
     if (m_table_accessors.empty())
         m_table_accessors.resize(m_tables.size()); // Throws
 
     // Get table accessor from cache if it exists, else create
-    Table* table = m_table_accessors[ndx];
+    Table* table = m_table_accessors[table_ndx];
     if (!table)
-        table = create_table_accessor(ndx); // Throws
+        table = create_table_accessor(table_ndx); // Throws
+
+    if (desc_matcher) {
+        typedef _impl::TableFriend tf;
+        if (desc_matcher && !(*desc_matcher)(tf::get_spec(*table)))
+            throw DescriptorMismatch();
+    }
 
     return table;
 }
+
+
+Table* Group::do_get_table(StringData name, DescMatcher desc_matcher)
+{
+    size_t table_ndx = m_table_names.find_first(name);
+    if (table_ndx == not_found)
+        return 0;
+
+    Table* table = do_get_table(table_ndx, desc_matcher); // Throws
+    return table;
+}
+
+
+Table* Group::do_add_table(StringData name, DescSetter desc_setter, bool require_unique_name)
+{
+    if (require_unique_name && has_table(name))
+        throw TableNameInUse();
+    return do_add_table(name, desc_setter); // Throws
+}
+
+
+Table* Group::do_add_table(StringData name, DescSetter desc_setter)
+{
+    size_t table_ndx = create_table(name); // Throws
+    Table* table = create_table_accessor(table_ndx); // Throws
+    if (desc_setter)
+        (*desc_setter)(*table); // Throws
+    return table;
+}
+
+
+Table* Group::do_get_or_add_table(StringData name, DescMatcher desc_matcher,
+                                  DescSetter desc_setter, bool* was_added)
+{
+    Table* table;
+    size_t table_ndx = m_table_names.find_first(name);
+    if (table_ndx == not_found) {
+        table = do_add_table(name, desc_setter); // Throws
+    }
+    else {
+        table = do_get_table(table_ndx, desc_matcher); // Throws
+    }
+    if (was_added)
+        *was_added = (table_ndx == not_found);
+    return table;
+}
+
 
 size_t Group::create_table(StringData name)
 {
@@ -292,7 +353,7 @@ size_t Group::create_table(StringData name)
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     if (Replication* repl = m_alloc.get_replication())
-        repl->new_group_level_table(name); // Throws
+        repl->insert_group_level_table(ndx, ndx, name); // Throws
 #endif
 
     return ndx;
@@ -347,6 +408,135 @@ Table* Group::create_table_accessor(size_t table_ndx)
     tf::complete_accessor(*table); // Throws
     tf::unmark(*table);
     return table;
+}
+
+
+void Group::remove_table(StringData name)
+{
+    TIGHTDB_ASSERT(is_attached());
+    size_t table_ndx = m_table_names.find_first(name);
+    if (table_ndx == not_found)
+        throw NoSuchTable();
+    remove_table(table_ndx); // Throws
+}
+
+
+void Group::remove_table(size_t table_ndx)
+{
+    TIGHTDB_ASSERT(is_attached());
+    TableRef table = get_table(table_ndx);
+
+    // In principle we could remove a table even if it is the target of link
+    // columns of other tables, however, to do that, we would have to
+    // automatically remove the "offending" link columns from those other
+    // tables. Such a behaviour is deemed too obscure, and we shall therefore
+    // require that a removed table does not contain foreigh origin backlink
+    // columns.
+    typedef _impl::TableFriend tf;
+    if (tf::is_cross_table_link_target(*table))
+        throw CrossTableLinkTarget();
+
+    // There is no easy way for Group::TransactAdvancer to handle removal of
+    // tables that contain foreign target table link columns, because that
+    // involves removal of the corresponding backlink columns. For that reason,
+    // we start by removing all columns, and that will generate individual
+    // replication instructions for each column, with sufficient information for
+    // Group::TransactAdvancer to handle them.
+    size_t n = table->get_column_count();
+    for (size_t i = n; i > 0; --i)
+        table->remove_column(i-1);
+
+    ref_type ref = m_tables.get(table_ndx);
+
+    // If the specified table is not the last one, it will be removed by moving
+    // that last table to the index of the removed one. The movement of the last
+    // table requires link column adjustments.
+    size_t last_ndx = m_tables.size() - 1;
+    if (last_ndx != table_ndx) {
+        TableRef last_table = get_table(last_ndx);
+        const Spec& last_spec = tf::get_spec(*last_table);
+        size_t last_num_cols = last_spec.get_column_count();
+        set<Table*> opposite_tables;
+        for (size_t i = 0; i < last_num_cols; ++i) {
+            Table* opposite_table;
+            ColumnType type = last_spec.get_column_type(i);
+            if (tf::is_link_type(type)) {
+                ColumnBase& col = tf::get_column(*last_table, i);
+                TIGHTDB_ASSERT(dynamic_cast<ColumnLinkBase*>(&col));
+                ColumnLinkBase& link_col = static_cast<ColumnLinkBase&>(col);
+                opposite_table = &link_col.get_target_table();
+            }
+            else if (type == col_type_BackLink) {
+                ColumnBase& col = tf::get_column(*last_table, i);
+                TIGHTDB_ASSERT(dynamic_cast<ColumnBackLink*>(&col));
+                ColumnBackLink& backlink_col = static_cast<ColumnBackLink&>(col);
+                opposite_table = &backlink_col.get_origin_table();
+            }
+            else {
+                continue;
+            }
+            opposite_tables.insert(opposite_table); // Throws
+        }
+        typedef set<Table*>::const_iterator iter;
+        iter end = opposite_tables.end();
+        for (iter i = opposite_tables.begin(); i != end; ++i) {
+            Table* table_2 = *i;
+            Spec& spec_2 = tf::get_spec(*table_2);
+            size_t num_cols_2 = spec_2.get_column_count();
+            for (size_t col_ndx_2 = 0; col_ndx_2 < num_cols_2; ++col_ndx_2) {
+                ColumnType type_2 = spec_2.get_column_type(col_ndx_2);
+                if (type_2 == col_type_Link || type_2 == col_type_LinkList ||
+                    type_2 == col_type_BackLink) {
+                    size_t table_ndx_2 = spec_2.get_opposite_link_table_ndx(col_ndx_2);
+                    if (table_ndx_2 == last_ndx)
+                        spec_2.set_opposite_link_table_ndx(col_ndx_2, table_ndx); // Throws
+                }
+            }
+        }
+        m_tables.set(table_ndx, m_tables.get(last_ndx)); // Throws
+        m_table_names.set(table_ndx, m_table_names.get(last_ndx)); // Throws
+        tf::set_ndx_in_parent(*last_table, table_ndx);
+    }
+
+    m_tables.erase(last_ndx); // Throws
+    m_table_names.erase(last_ndx); // Throws
+
+    m_table_accessors[table_ndx] = m_table_accessors[last_ndx];
+    m_table_accessors.pop_back();
+    tf::detach(*table);
+    tf::unbind_ref(*table);
+
+    // Destroy underlying node structure
+    Array::destroy_deep(ref, m_alloc);
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    if (Replication* repl = m_alloc.get_replication())
+        repl->erase_group_level_table(table_ndx, last_ndx+1); // Throws
+#endif
+}
+
+
+void Group::rename_table(StringData name, StringData new_name, bool require_unique_name)
+{
+    TIGHTDB_ASSERT(is_attached());
+    size_t table_ndx = m_table_names.find_first(name);
+    if (table_ndx == not_found)
+        throw NoSuchTable();
+    rename_table(table_ndx, new_name, require_unique_name); // Throws
+}
+
+
+void Group::rename_table(size_t table_ndx, StringData new_name, bool require_unique_name)
+{
+    TIGHTDB_ASSERT(is_attached());
+    TIGHTDB_ASSERT(m_tables.size() == m_table_names.size());
+    if (table_ndx >= m_tables.size())
+        throw InvalidArgument();
+    if (require_unique_name && has_table(new_name))
+        throw TableNameInUse();
+    m_table_names.set(table_ndx, new_name);
+    if (Replication* repl = m_alloc.get_replication())
+        repl->rename_group_level_table(table_ndx, new_name); // Throws
 }
 
 
@@ -616,9 +806,9 @@ bool Group::operator==(const Group& g) const
     if (n != g.size())
         return false;
     for (size_t i = 0; i < n; ++i) {
-        const Table* t1 = get_table_by_ndx(i); // Throws
-        const Table* t2 = g.get_table_by_ndx(i); // Throws
-        if (*t1 != *t2)
+        ConstTableRef table_1 = get_table(i); // Throws
+        ConstTableRef table_2 = g.get_table(i); // Throws
+        if (*table_1 != *table_2)
             return false;
     }
     return true;
@@ -792,7 +982,7 @@ private:
 
 
 // In general, this class cannot assume more than minimal accessor consistency
-// (See AccessorConcistncyLevels), it can however assume that replication
+// (See AccessorConsistencyLevels., it can however assume that replication
 // instruction arguments are meaningfull with respect to the current state of
 // the accessor hierarchy. For example, a column index argument of `i` is known
 // to refer to the `i`'th entry of Table::m_cols.
@@ -807,9 +997,52 @@ public:
     {
     }
 
-    bool new_group_level_table(StringData) TIGHTDB_NOEXCEPT
+    bool insert_group_level_table(size_t table_ndx, size_t num_tables, StringData) TIGHTDB_NOEXCEPT
     {
+        // For end-insertions, table_ndx will be equal to num_tables
+        TIGHTDB_ASSERT(table_ndx <= num_tables);
         m_group.m_table_accessors.push_back(0); // Throws
+        size_t last_ndx = num_tables;
+        m_group.m_table_accessors[last_ndx] = m_group.m_table_accessors[table_ndx];
+        m_group.m_table_accessors[table_ndx] = 0;
+        if (Table* moved_table = m_group.m_table_accessors[last_ndx]) {
+            typedef _impl::TableFriend tf;
+            tf::mark(*moved_table);
+            tf::mark_opposite_link_tables(*moved_table);
+        }
+        return true;
+    }
+
+    bool erase_group_level_table(size_t table_ndx, size_t num_tables) TIGHTDB_NOEXCEPT
+    {
+        TIGHTDB_ASSERT(table_ndx < num_tables);
+
+        // Link target tables do not need to be considered here, since all
+        // columns will already have been removed at this point.
+        if (Table* table = m_group.m_table_accessors[table_ndx]) {
+            typedef _impl::TableFriend tf;
+            tf::detach(*table);
+            tf::unbind_ref(*table);
+        }
+
+        size_t last_ndx = num_tables - 1;
+        if (table_ndx < last_ndx) {
+            if (Table* moved_table = m_group.m_table_accessors[last_ndx]) {
+                typedef _impl::TableFriend tf;
+                tf::mark(*moved_table);
+                tf::mark_opposite_link_tables(*moved_table);
+            }
+            m_group.m_table_accessors[table_ndx] = m_group.m_table_accessors[last_ndx];
+        }
+        m_group.m_table_accessors.pop_back();
+
+        return true;
+    }
+
+    bool rename_group_level_table(size_t, StringData) TIGHTDB_NOEXCEPT
+    {
+        // No-op since table names are properties of the group, and the group
+        // accessor is always refreshed
         return true;
     }
 
@@ -868,7 +1101,6 @@ public:
         typedef _impl::TableFriend tf;
         if (m_table)
             tf::adj_acc_clear_root_table(*m_table);
-        // tf::discard_child_accessors(*m_table);
         return true;
     }
 
@@ -937,6 +1169,9 @@ public:
 
     bool insert_link(size_t col_ndx, size_t row_ndx, size_t) TIGHTDB_NOEXCEPT
     {
+        // The marking dirty of the target table is handled by
+        // insert_empty_rows() regardless of whether the link column is the
+        // first column or not.
         if (col_ndx == 0)
             insert_empty_rows(row_ndx, 1);
        return true;
@@ -951,42 +1186,42 @@ public:
 
     bool row_insert_complete() TIGHTDB_NOEXCEPT
     {
-        return true; // Noop
+        return true; // No-op
     }
 
     bool set_int(size_t, size_t, int_fast64_t) TIGHTDB_NOEXCEPT
     {
-        return true; // Noop
+        return true; // No-op
     }
 
     bool set_bool(size_t, size_t, bool) TIGHTDB_NOEXCEPT
     {
-        return true; // Noop
+        return true; // No-op
     }
 
     bool set_float(size_t, size_t, float) TIGHTDB_NOEXCEPT
     {
-        return true; // Noop
+        return true; // No-op
     }
 
     bool set_double(size_t, size_t, double) TIGHTDB_NOEXCEPT
     {
-        return true; // Noop
+        return true; // No-op
     }
 
     bool set_string(size_t, size_t, StringData) TIGHTDB_NOEXCEPT
     {
-        return true; // Noop
+        return true; // No-op
     }
 
     bool set_binary(size_t, size_t, BinaryData) TIGHTDB_NOEXCEPT
     {
-        return true; // Noop
+        return true; // No-op
     }
 
     bool set_date_time(size_t, size_t, DateTime) TIGHTDB_NOEXCEPT
     {
-        return true; // Noop
+        return true; // No-op
     }
 
     bool set_table(size_t col_ndx, size_t row_ndx) TIGHTDB_NOEXCEPT
@@ -1020,7 +1255,7 @@ public:
         // link-target table when there is no accessor for the origin
         // table. Fortunately, due to the fact that back-link column accessors
         // refer to the origin table accessor (and vice versa), it follows that
-        // the link-target table accessor exists if, and only if then origin
+        // the link-target table accessor exists if, and only if the origin
         // table accessor exists.
         //
         // get_link_target_table_accessor() will return null if the
@@ -1037,12 +1272,12 @@ public:
 
     bool add_int_to_column(size_t, int_fast64_t) TIGHTDB_NOEXCEPT
     {
-        return true; // Noop
+        return true; // No-op
     }
 
     bool optimize_table() TIGHTDB_NOEXCEPT
     {
-        return true; // Noop
+        return true; // No-op
     }
 
     bool select_descriptor(int levels, const size_t* path)
@@ -1080,7 +1315,7 @@ public:
 
             // See comments on link handling in TransactAdvancer::set_link().
             if (link_target_table_ndx != tightdb::npos) {
-                Table* target = m_group.get_table_by_ndx(link_target_table_ndx); // Throws
+                TableRef target = m_group.get_table(link_target_table_ndx); // Throws
                 tf::adj_add_column(*target); // Throws
                 tf::mark(*target);
             }
@@ -1101,7 +1336,7 @@ public:
             // the backlink column occurs after regular columns.) Also see
             // comments on link handling in TransactAdvancer::set_link().
             if (link_target_table_ndx != tightdb::npos) {
-                Table* target = m_group.get_table_by_ndx(link_target_table_ndx); // Throws
+                TableRef target = m_group.get_table(link_target_table_ndx); // Throws
                 tf::adj_erase_column(*target, backlink_col_ndx); // Throws
                 tf::mark(*target);
             }
@@ -1117,12 +1352,12 @@ public:
 
     bool rename_column(size_t, StringData) TIGHTDB_NOEXCEPT
     {
-        return true; // Noop
+        return true; // No-op
     }
 
     bool add_search_index(size_t) TIGHTDB_NOEXCEPT
     {
-        return true; // Noop
+        return true; // No-op
     }
 
     bool select_link_list(size_t col_ndx, size_t) TIGHTDB_NOEXCEPT
@@ -1133,32 +1368,32 @@ public:
             if (Table* target = tf::get_link_target_table_accessor(*m_table, col_ndx))
                 tf::mark(*target);
         }
-        return true; // Noop
+        return true; // No-op
     }
 
     bool link_list_set(size_t, size_t) TIGHTDB_NOEXCEPT
     {
-        return true; // Noop
+        return true; // No-op
     }
 
     bool link_list_insert(size_t, size_t) TIGHTDB_NOEXCEPT
     {
-        return true; // Noop
+        return true; // No-op
     }
 
     bool link_list_move(size_t, size_t) TIGHTDB_NOEXCEPT
     {
-        return true; // Noop
+        return true; // No-op
     }
 
     bool link_list_erase(size_t) TIGHTDB_NOEXCEPT
     {
-        return true; // Noop
+        return true; // No-op
     }
 
     bool link_list_clear() TIGHTDB_NOEXCEPT
     {
-        return true; // Noop
+        return true; // No-op
     }
 
 private:
@@ -1236,9 +1471,11 @@ void Group::advance_transact(ref_type new_top_ref, size_t new_file_size,
     for (size_t table_ndx = 0; table_ndx != num_tables; ++table_ndx) {
         if (Table* table = m_table_accessors[table_ndx]) {
             typedef _impl::TableFriend tf;
+            tf::set_ndx_in_parent(*table, table_ndx);
             if (tf::is_marked(*table)) {
                 tf::refresh_accessor_tree(*table); // Throws
-                tf::bump_version(*table);
+                bool bump_global = false;
+                tf::bump_version(*table, bump_global);
             }
         }
     }
@@ -1361,7 +1598,7 @@ void Group::Verify() const
     {
         size_t n = m_tables.size();
         for (size_t i = 0; i != n; ++i) {
-            const Table* table = get_table_by_ndx(i);
+            ConstTableRef table = get_table(i);
             TIGHTDB_ASSERT(table->get_index_in_group() == i);
             table->Verify();
         }
@@ -1493,7 +1730,7 @@ void Group::to_dot(ostream& out) const
 
     // Tables
     for (size_t i = 0; i < m_tables.size(); ++i) {
-        const Table* table = get_table_by_ndx(i);
+        ConstTableRef table = get_table(i);
         StringData name = get_table_name(i);
         table->to_dot(out, name);
     }

@@ -61,6 +61,9 @@
 #define CHECK(cond) \
     test_results.check(bool(cond), __FILE__, __LINE__, #cond)
 
+#define CHECK_NOT(cond) \
+    test_results.check_not(bool(cond), __FILE__, __LINE__, #cond)
+
 #define CHECK_EQUAL(a,b) \
     test_results.check_equal((a), (b), __FILE__, __LINE__, #a, #b)
 
@@ -301,7 +304,12 @@ Filter* create_wildcard_filter(const std::string&);
 
 class TestResults {
 public:
+    bool check_cond(bool cond, const char* file, long line, const char* macro_name,
+                    const char* cond_text);
+
     bool check(bool cond, const char* file, long line, const char* cond_text);
+
+    bool check_not(bool cond, const char* file, long line, const char* cond_text);
 
     template<class A, class B>
     bool check_compare(bool cond, const A& a, const B& b,
@@ -366,7 +374,7 @@ private:
 
     void test_failed(const std::string& message);
     void check_failed(const char* file, long line, const std::string& message);
-    void cond_failed(const char* file, long line, const char* cond_text);
+    void cond_failed(const char* file, long line, const char* macro_name, const char* cond_text);
     void compare_failed(const char* file, long line, const char* macro_name,
                         const char* a_text, const char* b_text,
                         const std::string& a_val, const std::string& b_val);
@@ -537,15 +545,26 @@ template<class T> void to_string(const T& value, std::string& str)
 }
 
 
-inline bool TestResults::check(bool cond, const char* file, long line, const char* cond_text)
+inline bool TestResults::check_cond(bool cond, const char* file, long line, const char* macro_name,
+                                    const char* cond_text)
 {
     if (TIGHTDB_LIKELY(cond)) {
         check_succeeded();
     }
     else {
-        cond_failed(file, line, cond_text);
+        cond_failed(file, line, macro_name, cond_text);
     }
     return cond;
+}
+
+inline bool TestResults::check(bool cond, const char* file, long line, const char* cond_text)
+{
+    return check_cond(cond, file, line, "CHECK", cond_text);
+}
+
+inline bool TestResults::check_not(bool cond, const char* file, long line, const char* cond_text)
+{
+    return check_cond(!cond, file, line, "CHECK_NOT", cond_text);
 }
 
 template<class A, class B>

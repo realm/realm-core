@@ -1,7 +1,8 @@
 SUBDIRS = util
 PASSIVE_SUBDIRS = test-tightdb test-sqlite3 test-stl performance \
-benchmark-insert-add benchmark-insert-get-set benchmark-prealloc \
-benchmark-index benchmark-transaction experiments
+benchmark-insert-add benchmark-crud benchmark-prealloc \
+benchmark-index benchmark-transaction benchmark-row-accessor \
+experiments
 
 RESOURCES=expect_json.json expect_string.txt
 
@@ -46,10 +47,10 @@ performance: check-norun/subdir/util
 benchmark-insert-add: check-norun/subdir/util
 	@$(MAKE) -C benchmark-insert-add check-norun
 
-# Build and run the insert/get/set benchmark
-.PHONY: benchmark-insert-get-set
-benchmark-insert-get-set: check-norun/subdir/util
-	@$(MAKE) -C benchmark-insert-get-set check
+# Build and run the CRUD benchmarking program
+.PHONY: benchmark-crud
+benchmark-crud: check-norun/subdir/util
+	@$(MAKE) -C benchmark-crud check
 
 # Build and run the prealloc benchmark
 .PHONY: benchmark-prealloc
@@ -65,6 +66,11 @@ benchmark-index: check-norun/subdir/util
 .PHONY: benchmark-transaction
 benchmark-transaction: check-norun/subdir/util
 	@$(MAKE) -C benchmark-transaction check-norun
+
+# Build and run the "row accessor" benchmarking program
+.PHONY: benchmark-row-accessor
+benchmark-row-accessor: check-norun/subdir/util
+	@$(MAKE) -C benchmark-row-accessor check
 
 # Build and run whatever is in experiements/testcase.cpp
 .PHONY: check-testcase check-testcase-debug memcheck-testcase memcheck-testcase-debug

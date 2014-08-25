@@ -82,17 +82,11 @@ int main()
     bool from_group = true;
     if (from_group) {
         group.reset(new Group);
-        ostringstream out;
-        for (int i = 0; i < num_tables; ++i) {
-            out.str(string());
-            out << "table_1_" << i;
-            tables_1[i] = group->get_table<IntTable>(out.str());
-        }
-        for (int i = 0; i < num_tables; ++i) {
-            out.str(string());
-            out << "table_2_" << i;
-            tables_2[i] = group->get_table<IntTable>(out.str());
-        }
+        bool require_unique_name = false;
+        for (int i = 0; i < num_tables; ++i)
+            tables_1[i] = group->add_table<IntTable>("", require_unique_name);
+        for (int i = 0; i < num_tables; ++i)
+            tables_2[i] = group->add_table<IntTable>("", require_unique_name);
     }
     else {
         for (int i = 0; i < num_tables; ++i)

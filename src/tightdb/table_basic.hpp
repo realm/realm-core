@@ -84,9 +84,12 @@ public:
     using Table::get_backlink_count;
     using Table::get_backlink;
 
+    using Table::is_group_level;
+    using Table::get_index_in_group;
+
     BasicTable(Allocator& alloc = Allocator::get_default()): Table(alloc)
     {
-        set_dynamic_spec(*this);
+        set_dynamic_type(*this);
     }
 
     BasicTable(const BasicTable& t, Allocator& alloc = Allocator::get_default()): Table(t, alloc) {}
@@ -285,7 +288,7 @@ private:
         return static_cast<const Subtab*>(Table::get_subtable_ptr(col_idx, row_idx));
     }
 
-    static void set_dynamic_spec(Table& table)
+    static void set_dynamic_type(Table& table)
     {
         using namespace tightdb::util;
         DescriptorRef desc = table.get_descriptor(); // Throws
@@ -295,7 +298,7 @@ private:
         ForEachType<typename Spec::Columns, _impl::AddCol>::exec(&*desc, dyn_col_names); // Throws
     }
 
-    static bool matches_dynamic_spec(const tightdb::Spec& spec) TIGHTDB_NOEXCEPT
+    static bool matches_dynamic_type(const tightdb::Spec& spec) TIGHTDB_NOEXCEPT
     {
         using namespace tightdb::util;
         const int num_cols = util::TypeCount<typename Spec::Columns>::value;
@@ -492,7 +495,7 @@ template<class Subtab, int col_idx> struct CmpColType<SpecBase::Subtable<Subtab>
         if (spec->get_column_type(col_idx) != col_type_Table ||
             col_names[col_idx] != spec->get_column_name(col_idx)) return true;
         const Spec subspec = const_cast<Spec*>(spec)->get_subtable_spec(col_idx);
-        return !Subtab::matches_dynamic_spec(subspec);
+        return !Subtab::matches_dynamic_type(subspec);
     }
 };
 
@@ -670,7 +673,7 @@ template<class Spec>
 inline typename BasicTable<Spec>::Ref BasicTable<Spec>::create(Allocator& alloc)
 {
     TableRef table = Table::create(alloc);
-    set_dynamic_spec(*table);
+    set_dynamic_type(*table);
     return unchecked_cast<BasicTable<Spec> >(move(table));
 }
 
@@ -685,7 +688,7 @@ inline typename BasicTable<Spec>::Ref BasicTable<Spec>::copy(Allocator& alloc) c
 template<class T> inline bool is_a(const Table& t) TIGHTDB_NOEXCEPT
 {
     typedef _impl::TableFriend tf;
-    return T::matches_dynamic_spec(tf::get_spec(t));
+    return T::matches_dynamic_type(tf::get_spec(t));
 }
 
 

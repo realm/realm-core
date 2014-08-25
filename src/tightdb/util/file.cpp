@@ -26,7 +26,6 @@
 #include <tightdb/util/safe_int_ops.hpp>
 #include <tightdb/util/string_buffer.hpp>
 #include <tightdb/util/file.hpp>
-#include <tightdb/exceptions.hpp>
 
 using namespace std;
 using namespace tightdb;
@@ -130,8 +129,6 @@ void make_dir(const string& path)
         case ENOENT:
         case ENOTDIR:
             throw File::AccessError(msg);
-        case ENOSPC:
-            throw ResourceAllocError(msg);
         default:
             throw runtime_error(msg);
     }
@@ -272,8 +269,6 @@ void File::open_internal(const string& path, AccessMode a, CreateMode c, int fla
             throw NotFound(msg);
         case ERROR_FILE_EXISTS:
             throw Exists(msg);
-        case ERROR_TOO_MANY_OPEN_FILES:
-            throw ResourceAllocError(msg);
         default:
             throw runtime_error(msg);
     }
@@ -336,12 +331,6 @@ void File::open_internal(const string& path, AccessMode a, CreateMode c, int fla
         case ENOTDIR:
         case ENXIO:
             throw AccessError(msg);
-        case EMFILE:
-        case ENFILE:
-        case ENOSR:
-        case ENOSPC:
-        case ENOMEM:
-            throw ResourceAllocError(msg);
         default:
             throw runtime_error(msg);
     }
@@ -424,13 +413,7 @@ size_t File::read(char* data, size_t size)
   error:
     int err = errno; // Eliminate any risk of clobbering
     string msg = get_errno_msg("read(): failed: ", err);
-    switch (err) {
-        case ENOBUFS:
-        case ENOMEM:
-            throw ResourceAllocError(msg);
-        default:
-            throw runtime_error(msg);
-    }
+    throw runtime_error(msg);
 
 #endif
 }
@@ -478,13 +461,7 @@ void File::write(const char* data, size_t size)
   error:
     int err = errno; // Eliminate any risk of clobbering
     string msg = get_errno_msg("write(): failed: ", err);
-    switch (err) {
-        case ENOSPC:
-        case ENOBUFS:
-            throw ResourceAllocError(msg);
-        default:
-            throw runtime_error(msg);
-    }
+    throw runtime_error(msg);
 
 #endif
 }
@@ -582,12 +559,7 @@ void File::prealloc_if_supported(SizeType offset, size_t size)
         return;
     int err = errno; // Eliminate any risk of clobbering
     string msg = get_errno_msg("posix_fallocate() failed: ", err);
-    switch (err) {
-        case ENOSPC:
-            throw ResourceAllocError(msg);
-        default:
-            throw runtime_error(msg);
-    }
+    throw runtime_error(msg);
 
     // FIXME: OS X does not have any version of fallocate, but see
     // http://stackoverflow.com/questions/11497567/fallocate-command-equivalent-in-os-x
@@ -729,8 +701,6 @@ bool File::lock(bool exclusive, bool non_blocking)
     if (err == EWOULDBLOCK)
         return false;
     string msg = get_errno_msg("flock() failed: ", err);
-    if (err == ENOLCK)
-        throw ResourceAllocError(msg);
     throw runtime_error(msg);
 
 #endif
@@ -819,14 +789,7 @@ void* File::map(AccessMode a, size_t size, int map_flags) const
 
     int err = errno; // Eliminate any risk of clobbering
     string msg = get_errno_msg("mmap() failed: ", err);
-    switch (err) {
-        case EAGAIN:
-        case EMFILE:
-        case ENOMEM:
-            throw ResourceAllocError(msg);
-        default:
-            throw runtime_error(msg);
-    }
+    throw runtime_error(msg);
 
 #endif
 }
@@ -862,13 +825,7 @@ void* File::remap(void* old_addr, size_t old_size, AccessMode a, size_t new_size
         return new_addr;
     int err = errno; // Eliminate any risk of clobbering
     string msg = get_errno_msg("mremap(): failed: ", err);
-    switch (err) {
-        case EAGAIN:
-        case ENOMEM:
-            throw ResourceAllocError(msg);
-        default:
-            throw runtime_error(msg);
-    }
+    throw runtime_error(msg);
 #else
     void* new_addr = map(a, new_size, map_flags);
     unmap(old_addr, old_size);
@@ -913,12 +870,7 @@ bool File::exists(const string& path)
             return false;
     }
     string msg = get_errno_msg("access() failed: ", err);
-    switch (err) {
-        case ENOMEM:
-            throw ResourceAllocError(msg);
-        default:
-            throw runtime_error(msg);
-    }
+    throw runtime_error(msg);
 }
 
 
@@ -988,8 +940,6 @@ void File::move(const string& old_path, const string& new_path)
         case EISDIR:
         case ENOTDIR:
             throw AccessError(msg);
-        case ENOSPC:
-            throw ResourceAllocError(msg);
         default:
             throw runtime_error(msg);
     }

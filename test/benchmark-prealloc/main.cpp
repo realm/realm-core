@@ -47,7 +47,7 @@ int main()
             for (int j=0; j<n_inner; ++j) {
                 {
                     WriteTransaction wt(sg);
-                    Alpha::Ref t = wt.get_table<Alpha>("alpha");
+                    Alpha::Ref t = wt.get_or_add_table<Alpha>("alpha");
                     for (int j=0; j<1000; ++j) t->add(65536,65536);
                     wt.commit();
                 }
@@ -55,19 +55,19 @@ int main()
                 for (int k=0; k<2; ++k) {
                     {
                         WriteTransaction wt(sg_interfere1);
-                        Alpha::Ref t = wt.get_table<Alpha>("alpha");
+                        Alpha::Ref t = wt.get_or_add_table<Alpha>("alpha");
                         for (int j=0; j<100; ++j) t->add(65536,65536);
                         wt.commit();
                     }
                     {
                         WriteTransaction wt(sg_interfere2);
-                        Alpha::Ref t = wt.get_table<Alpha>("alpha");
+                        Alpha::Ref t = wt.get_or_add_table<Alpha>("alpha");
                         for (int j=0; j<400; ++j) t->add(65536,65536);
                         wt.commit();
                     }
                     {
                         WriteTransaction wt(sg_interfere3);
-                        Alpha::Ref t = wt.get_table<Alpha>("alpha");
+                        Alpha::Ref t = wt.get_or_add_table<Alpha>("alpha");
                         for (int j=0; j<1600; ++j) t->add(65536,65536);
                         wt.commit();
                     }

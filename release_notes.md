@@ -6,9 +6,7 @@
 
 ### API breaking changes:
 
-* `Table::get_parent_row_index()` and `Table::get_index_in_group()` together
-  replace `Table::get_index_in_parent()`. This was done to avoid a confusing mix
-  of distinct concepts.
+* Lorem ipsum.
 
 ### Enhancements:
 
@@ -19,6 +17,66 @@
 ### Internals:
 
 * Lorem ipsum.
+
+----------------------------------------------
+
+# 0.82.1 Release notes
+
+### Internals:
+
+* `TIGHTDB_MAX_LIST_SIZE` was renamed to `TIGHTDB_MAX_BPNODE_SIZE`. `BPNODE`
+  stands for "B+-tree node".
+* `TIGHTDB_MAX_BPNODE_SIZE` now defaults to 1000 in both *release* and *debug*
+  mode.
+
+----------------------------------------------
+
+# 0.82.0 Release notes
+
+### API breaking changes:
+
+* `Group::has_table<T>()` removed, because it had awkward and incongruous
+  semantics, and could not be efficiently implemented.
+* The version of `Group::get_table()`, that takes a name argument, can no longer
+  add a table to the group, instead it returns null if there is no table with
+  the spaecified name. Addition is now handled by either `Group::add_table()` or
+  `Group::get_or_add_table()`.
+* `Group::get_table()` and Group::get_table_name() now throw
+  `tightdb::InvalidArgument` if the specified table index is out of range.
+* Template version of `Group::get_table()` now throws `DescriptorMismatch` if
+  the dynamic type disagrees with the statically specified custom table type.
+* `LangBindHelper::bind_table_ref()` was renamed to
+  `LangBindHelper::bind_table_ptr()`, and `LangBindHelper::unbind_table_ref()`
+  to `LangBindHelper::unbind_table_ptr()`.
+* LangBindHelper functions such as get_table() have been updated to reflect the
+  changed Group API.
+* Exception type `ResourceAllocError` eliminated, as there was no good reason
+  for keeping it (it had no clear role).
+
+### Enhancements:
+
+* `Group::find_table()` added as a way of mapping a table name to the index of
+  table in the group.
+* `Group::add_table()` and `Group::get_or_add_table()` were added.
+* `Group::remove_table()` and `Group::rename_table()` were added.
+* `WriteTransaction::add_table()` and `WriteTransaction::get_or_add_table()`
+  ware added.
+
+----------------------------------------------
+
+# 0.81.0 Release notes
+
+### API breaking changes:
+
+* `Table::get_parent_row_index()` and `Table::get_index_in_group()` together
+  replace `Table::get_index_in_parent()`. This was done to avoid a confusing mix
+  of distinct concepts.
+
+### Enhancements:
+
+* It's now possible to sort a LinkRef according to a column in the target
+  table. Also lets you build a TableView with the sorted result instead. The new
+  methods on LinkViewRef are `sort()` and `get_sorted_view()`
 
 ----------------------------------------------
 

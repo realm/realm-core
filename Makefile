@@ -37,10 +37,10 @@ performance: check-norun/subdir/src
 benchmark-insert-add: check-norun/subdir/src
 	@$(MAKE) -C test benchmark-insert-add
 
-# Build and run the insert/get/set benchmarking program
-.PHONY: benchmark-insert-get-set
-benchmark-insert-get-set: check-norun/subdir/src
-	@$(MAKE) -C test benchmark-insert-get-set
+# Build and run the CRUD benchmarking program
+.PHONY: benchmark-crud
+benchmark-crud: check-norun/subdir/src
+	@$(MAKE) -C test benchmark-crud
 
 # Build and run the prealloc benchmarking program
 .PHONY: benchmark-prealloc
@@ -56,6 +56,11 @@ benchmark-index: check-norun/subdir/src
 .PHONY: benchmark-transaction
 benchmark-transaction: check-norun/subdir/src
 	@$(MAKE) -C test benchmark-transaction
+
+# Build and run the "row accessor" benchmarking program
+.PHONY: benchmark-row-accessor
+benchmark-row-accessor: check-norun/subdir/src
+	@$(MAKE) -C test benchmark-row-accessor
 
 # Run coverage analysis after building everything, this time using LCOV
 .PHONY: lcov

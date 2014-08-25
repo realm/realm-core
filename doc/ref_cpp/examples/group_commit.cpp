@@ -12,7 +12,7 @@ TIGHTDB_TABLE_2(PeopleTable,
 
 void func(Group& g)
 {
-    PeopleTable::Ref table = g.get_table<PeopleTable>("people");
+    PeopleTable::Ref table = g.add_table<PeopleTable>("people");
 
     table->add("Mary", 14);
     table->add("Joe", 17);

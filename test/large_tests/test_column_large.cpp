@@ -50,7 +50,7 @@ using namespace tightdb::test_util;
 
 
 // These tests take ~5 min in release mode with
-// TIGHTDB_MAX_LIST_SIZE=1000
+// TIGHTDB_MAX_BPNODE_SIZE=1000
 
 
 TEST_IF(ColumnLarge_Less, TEST_DURATION >= 2)

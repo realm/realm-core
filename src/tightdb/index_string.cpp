@@ -182,7 +182,7 @@ StringIndex::NodeChange StringIndex::DoInsert(size_t row_ndx, key_type key, size
         }
 
         // If there is room, just update node directly
-        if (offsets.size() < TIGHTDB_MAX_LIST_SIZE) {
+        if (offsets.size() < TIGHTDB_MAX_BPNODE_SIZE) {
             if (nc.type == NodeChange::split) {
                 NodeInsertSplit(node_ndx, nc.ref2);
             }
@@ -210,7 +210,7 @@ StringIndex::NodeChange StringIndex::DoInsert(size_t row_ndx, key_type key, size
         switch (node_ndx) {
             case 0:             // insert before
                 return NodeChange(NodeChange::insert_before, new_node.get_ref());
-            case TIGHTDB_MAX_LIST_SIZE: // insert after
+            case TIGHTDB_MAX_BPNODE_SIZE: // insert after
                 if (nc.type == NodeChange::split)
                     return NodeChange(NodeChange::split, get_ref(), new_node.get_ref());
                 return NodeChange(NodeChange::insert_after, new_node.get_ref());
@@ -233,7 +233,7 @@ StringIndex::NodeChange StringIndex::DoInsert(size_t row_ndx, key_type key, size
         TIGHTDB_ASSERT(m_array->size() == old_offsets.size()+1);
 
         size_t count = old_offsets.size();
-        bool noextend = count >= TIGHTDB_MAX_LIST_SIZE;
+        bool noextend = count >= TIGHTDB_MAX_BPNODE_SIZE;
 
         // See if we can fit entry into current leaf
         // Works if there is room or it can join existing entries
@@ -287,7 +287,7 @@ void StringIndex::NodeInsertSplit(size_t ndx, size_t new_ref)
 
     TIGHTDB_ASSERT(m_array->size() == offsets.size()+1);
     TIGHTDB_ASSERT(ndx < offsets.size());
-    TIGHTDB_ASSERT(offsets.size() < TIGHTDB_MAX_LIST_SIZE);
+    TIGHTDB_ASSERT(offsets.size() < TIGHTDB_MAX_BPNODE_SIZE);
 
     // Get sublists
     size_t refs_ndx = ndx+1; // first entry in refs points to offsets
@@ -316,7 +316,7 @@ void StringIndex::NodeInsert(size_t ndx, size_t ref)
     TIGHTDB_ASSERT(m_array->size() == offsets.size()+1);
 
     TIGHTDB_ASSERT(ndx <= offsets.size());
-    TIGHTDB_ASSERT(offsets.size() < TIGHTDB_MAX_LIST_SIZE);
+    TIGHTDB_ASSERT(offsets.size() < TIGHTDB_MAX_BPNODE_SIZE);
 
     StringIndex col(ref, 0, 0, m_target_column, m_get_func, alloc);
     key_type last_key = col.GetLastKey();
@@ -700,7 +700,7 @@ void StringIndex::NodeAddKey(ref_type ref)
     Array offsets(alloc);
     get_child(*m_array, 0, offsets);
     TIGHTDB_ASSERT(m_array->size() == offsets.size()+1);
-    TIGHTDB_ASSERT(offsets.size() < TIGHTDB_MAX_LIST_SIZE+1);
+    TIGHTDB_ASSERT(offsets.size() < TIGHTDB_MAX_BPNODE_SIZE+1);
 
     Array new_top(alloc), new_offsets(alloc);
     new_top.init_from_ref(ref);

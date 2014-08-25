@@ -949,7 +949,7 @@ void AdaptiveStringColumn::bptree_insert(size_t row_ndx, StringData value, size_
     for (size_t i = 0; i != num_rows; ++i) {
         size_t row_ndx_2 = row_ndx == tightdb::npos ? tightdb::npos : row_ndx + i;
         if (root_is_leaf()) {
-            TIGHTDB_ASSERT(row_ndx_2 == tightdb::npos || row_ndx_2 < TIGHTDB_MAX_LIST_SIZE);
+            TIGHTDB_ASSERT(row_ndx_2 == tightdb::npos || row_ndx_2 < TIGHTDB_MAX_BPNODE_SIZE);
             LeafType leaf_type = upgrade_root_leaf(value.size()); // Throws
             switch (leaf_type) {
                 case leaf_type_Small: {

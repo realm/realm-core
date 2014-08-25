@@ -1,9 +1,10 @@
 #include <iostream>
+#include <tightdb.hpp>
+
 using namespace std;
+using namespace tightdb;
 
 // @@Example: create_table @@
-#include <tightdb.hpp>
-using namespace tightdb;
 
 // defining a table
 TIGHTDB_TABLE_3(MyTable,
@@ -12,7 +13,8 @@ TIGHTDB_TABLE_3(MyTable,
                 age,     Int,
                 hired,   Bool)
 
-int main() {
+int main()
+{
     // creating an instance of the table
     MyTable table;
     // @@EndExample@@
@@ -76,6 +78,7 @@ int main() {
     size_t row_ndx;
     row_ndx = table.column().name.find_first("Philip");  // => not_found (-1)
     row_ndx = table.column().name.find_first("Mary");    // => 1
+    static_cast<void>(row_ndx);
 
     MyTable::View view = table.column().age.find_all(21);
     size_t cnt = view.size();         // cnt => 2
@@ -111,7 +114,7 @@ int main() {
     // @@Example: serialisation @@
     // Create Table in Group
     Group group;
-    MyTable::Ref t = group.get_table<MyTable>("employees");
+    MyTable::Ref t = group.add_table<MyTable>("employees");
 
     // Add some rows
     t->add("John", 20, true);

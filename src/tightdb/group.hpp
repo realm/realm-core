@@ -34,11 +34,28 @@
 
 namespace tightdb {
 
-
-// Pre-declarations
 class SharedGroup;
+namespace _impl { class GroupFriend; }
 
 
+/// A group is a collection of named tables.
+///
+/// Tables occur in the group in an unspecified order, but an order that
+/// generally remains fixed. The order is guaranteed to remain fixed between two
+/// points in time if no tables are added to, or removed from the group during
+/// that time. When tables are added to, or removed from the group, the order
+/// may change arbitrarily.
+///
+/// If `table` is a table accessor attached to a group-level table, and `group`
+/// is a group accessor attached to the group, then the following is guaranteed,
+/// even after a change in the table order:
+///
+/// \code{.cpp}
+///
+///     table == group.get_table(table.get_index_in_group())
+///
+/// \endcode
+///
 class Group: private Table::Parent {
 public:
     /// Construct a free-standing group. This group instance will be
@@ -200,55 +217,116 @@ public:
     /// Returns the number of tables in this group.
     std::size_t size() const;
 
-    /// Get the name of the table at the specified index within this
-    /// group.
+    //@{
+
+    /// has_table() returns true if, and only if this group contains a table
+    /// with the specified name.
+    ///
+    /// find_table() returns the index of the first table in this group with the
+    /// specified name, or `tightdb::not_found` if this group does not contain a
+    /// table with the specified name.
+    ///
+    /// get_table_name() returns the name of table at the specified index.
+    ///
+    /// The versions of get_table(), that accepts a \a name argument, return the
+    /// first table with the specified name, or null if no such table exists.
+    ///
+    /// add_table() adds a table with the specified name to this group. It
+    /// throws TableNameInUse if \a require_unique_name is true and \a name
+    /// clashes with the name of an existing table. If \a require_unique_name is
+    /// false, it is possible to add more than one table with the same
+    /// name. Whenever a table is added, the order of the preexisting tables may
+    /// change arbitrarily, and the new table may not end up as the last one
+    /// either. But know that you can always call Table::get_index_in_group() on
+    /// the returned table accessor to find out at which index it ends up.
+    ///
+    /// remove_table() removes the specified table from this group. A table can
+    /// be removed only when it is not the target of a link column of a
+    /// different table. Whenever a table is removed, the order of the remaining
+    /// tables may change arbitrarily.
+    ///
+    /// rename_table() changes the name of a preexisting table. If \a
+    /// require_unique_name is false, it becomes possible to have more than one
+    /// table with a given name in a single group.
+    ///
+    /// The template functions work exactly like their non-template namesakes
+    /// except as follows: The template versions of get_table() and
+    /// get_or_add_table() throw DescriptorMismatch if the dynamic type of the
+    /// specified table does not match the statically specified custom table
+    /// type. The template versions of add_table() and get_or_add_table() set
+    /// the dynamic type (descriptor) to match the statically specified custom
+    /// table type.
+    ///
+    /// \tparam T An instance of the BasicTable class template.
+    ///
+    /// \param index Index of table in this group.
+    ///
+    /// \param name Name of table. All strings are valid table names as long as
+    /// they are valid UTF-8 encodings.
+    ///
+    /// \param new_name New name for preexisting table.
+    ///
+    /// \param require_unique_name When set to true (the default), it becomes
+    /// impossible to add a table with a name that is already in use, or to
+    /// rename a table to a name that is already in use.
+    ///
+    /// \param was_added When specified, the boolean variable is set to true if
+    /// the table was added, and to false otherwise. If the function throws, the
+    /// boolean variable retains its original value.
+    ///
+    /// \return get_table(), add_table(), and get_or_add_table() return a table
+    /// accessor attached to the requested (or added) table. get_table() may
+    /// return null.
+    ///
+    /// \throw DescriptorMismatch Thrown by get_table() and get_or_add_table()
+    /// tf the dynamic table type does not match the statically specified custom
+    /// table type (\a T).
+    ///
+    /// \throw NoSuchTable Thrown by remove_table() and rename_table() if there
+    /// is no table with the specified \a name.
+    ///
+    /// \throw TableNameInUse Thrown by add_table() if \a require_unique_name is
+    /// true and \a name clashes with the name of a preexisting table. Thrown by
+    /// rename_table() if \a require_unique_name is true and \a new_name clashes
+    /// with the name of a preexisting table.
+    ///
+    /// \throw CrossTableLinkTarget Thrown by remove_table() if the specified
+    /// table is the target of a link column of a different table.
+    ///
+    /// \throw InvalidArgument Thrown by get_table(), get_table_name(),
+    /// remove_table(), and rename_table() if \a index is not a valid table
+    /// index, i.e., if it is greater than, or equal to the number of tables in
+    /// the group.
+
+    bool has_table(StringData name) const TIGHTDB_NOEXCEPT;
+    std::size_t find_table(StringData name) const TIGHTDB_NOEXCEPT;
     StringData get_table_name(std::size_t table_ndx) const;
 
-    /// Check whether this group has a table with the specified name.
-    bool has_table(StringData name) const;
+    TableRef get_table(std::size_t index);
+    ConstTableRef get_table(std::size_t index) const;
 
-    /// Check whether this group has a table with the specified name
-    /// and a dynamic type that matches the specified static type.
-    ///
-    /// \tparam T An instance of the BasicTable<> class template.
-    template<class T> bool has_table(StringData name) const;
-
-    //@{
-    /// Get the table with the specified name (or at the specified
-    /// idnex) from this group.
-    ///
-    /// The non-const versions of this function, that take a name as
-    /// argument, will create a table with the specified name if one
-    /// does not already exist. The other versions will not.
-    ///
-    /// It is an error to call one of the const-qualified versions for
-    /// a table that does not already exist. The same is true for the
-    /// versions taking and index as argument. Doing so will result in
-    /// undefined behavior.
-    ///
-    /// The non-template versions will return dynamically typed table
-    /// accessors, while the template versions will return statically
-    /// typed accessors.
-    ///
-    /// It is an error to call one of the templated versions for a
-    /// table whose dynamic type does not match the specified static
-    /// type. Doing so will result in undefined behavior.
-    ///
-    /// New tables created by non-template versions will have no
-    /// columns initially. New tables created by template versions
-    /// will have a dynamic type (set of columns) that matches the
-    /// specifed static type.
-    ///
-    /// \tparam T An instance of the BasicTable<> class template.
-    TableRef      get_table(std::size_t table_ndx);
-    ConstTableRef get_table(std::size_t table_ndx) const;
-    TableRef      get_table(StringData name);
-    TableRef      get_table(StringData name, bool& was_created);
+    TableRef get_table(StringData name);
     ConstTableRef get_table(StringData name) const;
-    template<class T> typename T::Ref      get_table(StringData name);
-    template<class T> typename T::ConstRef get_table(StringData name) const;
-    //@}
 
+    TableRef add_table(StringData name, bool require_unique_name = true);
+    TableRef get_or_add_table(StringData name, bool* was_added = 0);
+
+    template<class T> BasicTableRef<T> get_table(std::size_t index);
+    template<class T> BasicTableRef<const T> get_table(std::size_t index) const;
+
+    template<class T> BasicTableRef<T> get_table(StringData name);
+    template<class T> BasicTableRef<const T> get_table(StringData name) const;
+
+    template<class T> BasicTableRef<T> add_table(StringData name, bool require_unique_name = true);
+    template<class T> BasicTableRef<T> get_or_add_table(StringData name, bool* was_added = 0);
+
+    void remove_table(std::size_t index);
+    void remove_table(StringData name);
+
+    void rename_table(std::size_t index, StringData new_name, bool require_unique_name = true);
+    void rename_table(StringData name, StringData new_name, bool require_unique_name = true);
+
+    //@}
 
     // Serialization
 
@@ -303,12 +381,6 @@ public:
     /// Compare two groups for inequality. See operator==().
     bool operator!=(const Group& g) const { return !(*this == g); }
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
-    class TransactAdvancer;
-    void advance_transact(ref_type new_top_ref, std::size_t new_file_size,
-                          const BinaryData* logs_begin, const BinaryData* logs_end);
-#endif
-
 #ifdef TIGHTDB_DEBUG
     void Verify() const; // Uncapitalized 'verify' cannot be used due to conflict with macro in Obj-C
     void print() const;
@@ -321,9 +393,6 @@ public:
 #else
     void Verify() const {}
 #endif
-
-protected:
-    Group* get_parent_group() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
 private:
     SlabAlloc m_alloc;
@@ -387,6 +456,9 @@ private:
     // Overriding method in Table::Parent
     void child_accessor_destroyed(Table*) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
+    // Overriding method in Table::Parent
+    Group* get_parent_group() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+
     class TableWriter;
     class DefaultTableWriter;
 
@@ -400,16 +472,18 @@ private:
     /// structure.
     void init_from_ref(ref_type top_ref) TIGHTDB_NOEXCEPT;
 
-    typedef void (*SpecSetter)(Table&);
-    Table* get_table_ptr(StringData name, SpecSetter, bool& was_created);
+    typedef void (*DescSetter)(Table&);
+    typedef bool (*DescMatcher)(const Spec&);
 
-    Table* get_table_ptr(StringData name);
-    const Table* get_table_ptr(StringData name) const;
-    template<class T> T* get_table_ptr(StringData name);
-    template<class T> const T* get_table_ptr(StringData name) const;
+    Table* do_get_table(size_t table_ndx, DescMatcher desc_matcher);
+    const Table* do_get_table(size_t table_ndx, DescMatcher desc_matcher) const;
+    Table* do_get_table(StringData name, DescMatcher desc_matcher);
+    const Table* do_get_table(StringData name, DescMatcher desc_matcher) const;
+    Table* do_add_table(StringData name, DescSetter desc_setter, bool require_unique_name);
+    Table* do_add_table(StringData name, DescSetter desc_setter);
+    Table* do_get_or_add_table(StringData name, DescMatcher desc_matcher,
+                               DescSetter desc_setter, bool* was_added);
 
-    Table* get_table_by_ndx(std::size_t ndx);
-    const Table* get_table_by_ndx(std::size_t ndx) const;
     std::size_t create_table(StringData name); // Returns index of new table
     Table* create_table_accessor(std::size_t table_ndx);
 
@@ -417,21 +491,23 @@ private:
 
     void mark_all_table_accessors() TIGHTDB_NOEXCEPT;
 
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    Replication* get_replication() const TIGHTDB_NOEXCEPT;
+    void set_replication(Replication*) TIGHTDB_NOEXCEPT;
+    class TransactAdvancer;
+    void advance_transact(ref_type new_top_ref, std::size_t new_file_size,
+                          const BinaryData* logs_begin, const BinaryData* logs_end);
+#endif
+
 #ifdef TIGHTDB_DEBUG
     std::pair<ref_type, std::size_t>
     get_to_dot_parent(std::size_t ndx_in_parent) const TIGHTDB_OVERRIDE;
 #endif
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
-    friend class Replication;
-    Replication* get_replication() const TIGHTDB_NOEXCEPT { return m_alloc.get_replication(); }
-    void set_replication(Replication* r) TIGHTDB_NOEXCEPT { m_alloc.set_replication(r); }
-#endif
-
     friend class Table;
     friend class GroupWriter;
     friend class SharedGroup;
-    friend class LangBindHelper;
+    friend class _impl::GroupFriend;
 };
 
 
@@ -490,6 +566,182 @@ inline Group::Group(shared_tag) TIGHTDB_NOEXCEPT:
     init_array_parents();
 }
 
+inline bool Group::is_attached() const TIGHTDB_NOEXCEPT
+{
+    return m_is_attached;
+}
+
+inline bool Group::is_empty() const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(is_attached());
+    return m_table_names.is_empty();
+}
+
+inline std::size_t Group::size() const
+{
+    TIGHTDB_ASSERT(is_attached());
+    return m_table_names.size();
+}
+
+inline StringData Group::get_table_name(std::size_t table_ndx) const
+{
+    TIGHTDB_ASSERT(is_attached());
+    if (table_ndx >= m_table_names.size())
+        throw InvalidArgument();
+    return m_table_names.get(table_ndx);
+}
+
+inline bool Group::has_table(StringData name) const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(is_attached());
+    std::size_t ndx = m_table_names.find_first(name);
+    return ndx != not_found;
+}
+
+inline std::size_t Group::find_table(StringData name) const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(is_attached());
+    std::size_t ndx = m_table_names.find_first(name);
+    return ndx;
+}
+
+inline TableRef Group::get_table(std::size_t table_ndx)
+{
+    TIGHTDB_ASSERT(is_attached());
+    DescMatcher desc_matcher = 0; // Do not check descriptor
+    Table* table = do_get_table(table_ndx, desc_matcher); // Throws
+    return TableRef(table);
+}
+
+inline ConstTableRef Group::get_table(std::size_t table_ndx) const
+{
+    TIGHTDB_ASSERT(is_attached());
+    DescMatcher desc_matcher = 0; // Do not check descriptor
+    const Table* table = do_get_table(table_ndx, desc_matcher); // Throws
+    return ConstTableRef(table);
+}
+
+inline TableRef Group::get_table(StringData name)
+{
+    TIGHTDB_ASSERT(is_attached());
+    DescMatcher desc_matcher = 0; // Do not check descriptor
+    Table* table = do_get_table(name, desc_matcher); // Throws
+    return TableRef(table);
+}
+
+inline ConstTableRef Group::get_table(StringData name) const
+{
+    TIGHTDB_ASSERT(is_attached());
+    DescMatcher desc_matcher = 0; // Do not check descriptor
+    const Table* table = do_get_table(name, desc_matcher); // Throws
+    return ConstTableRef(table);
+}
+
+inline TableRef Group::add_table(StringData name, bool require_unique_name)
+{
+    TIGHTDB_ASSERT(is_attached());
+    DescSetter desc_setter = 0; // Do not add any columns
+    Table* table = do_add_table(name, desc_setter, require_unique_name); // Throws
+    return TableRef(table);
+}
+
+inline TableRef Group::get_or_add_table(StringData name, bool* was_added)
+{
+    TIGHTDB_ASSERT(is_attached());
+    DescMatcher desc_matcher = 0; // Do not check descriptor
+    DescSetter desc_setter = 0; // Do not add any columns
+    Table* table = do_get_or_add_table(name, desc_matcher, desc_setter, was_added); // Throws
+    return TableRef(table);
+}
+
+template<class T> inline BasicTableRef<T> Group::get_table(std::size_t table_ndx)
+{
+    TIGHTDB_STATIC_ASSERT(IsBasicTable<T>::value, "Invalid table type");
+    TIGHTDB_ASSERT(is_attached());
+    DescMatcher desc_matcher = &T::matches_dynamic_type;
+    Table* table = do_get_table(table_ndx, desc_matcher); // Throws
+    return BasicTableRef<T>(static_cast<T*>(table));
+}
+
+template<class T> inline BasicTableRef<const T> Group::get_table(std::size_t table_ndx) const
+{
+    TIGHTDB_STATIC_ASSERT(IsBasicTable<T>::value, "Invalid table type");
+    TIGHTDB_ASSERT(is_attached());
+    DescMatcher desc_matcher = &T::matches_dynamic_type;
+    const Table* table = do_get_table(table_ndx, desc_matcher); // Throws
+    return BasicTableRef<const T>(static_cast<const T*>(table));
+}
+
+template<class T> inline BasicTableRef<T> Group::get_table(StringData name)
+{
+    TIGHTDB_STATIC_ASSERT(IsBasicTable<T>::value, "Invalid table type");
+    TIGHTDB_ASSERT(is_attached());
+    DescMatcher desc_matcher = &T::matches_dynamic_type;
+    Table* table = do_get_table(name, desc_matcher); // Throws
+    return BasicTableRef<T>(static_cast<T*>(table));
+}
+
+template<class T> inline BasicTableRef<const T> Group::get_table(StringData name) const
+{
+    TIGHTDB_STATIC_ASSERT(IsBasicTable<T>::value, "Invalid table type");
+    TIGHTDB_ASSERT(is_attached());
+    DescMatcher desc_matcher = &T::matches_dynamic_type;
+    const Table* table = do_get_table(name, desc_matcher); // Throws
+    return BasicTableRef<const T>(static_cast<const T*>(table));
+}
+
+template<class T>
+inline BasicTableRef<T> Group::add_table(StringData name, bool require_unique_name)
+{
+    TIGHTDB_STATIC_ASSERT(IsBasicTable<T>::value, "Invalid table type");
+    TIGHTDB_ASSERT(is_attached());
+    DescSetter desc_setter = &T::set_dynamic_type;
+    Table* table = do_add_table(name, desc_setter, require_unique_name); // Throws
+    return BasicTableRef<T>(static_cast<T*>(table));
+}
+
+template<class T> inline BasicTableRef<T> Group::get_or_add_table(StringData name, bool* was_added)
+{
+    TIGHTDB_STATIC_ASSERT(IsBasicTable<T>::value, "Invalid table type");
+    TIGHTDB_ASSERT(is_attached());
+    DescMatcher desc_matcher = &T::matches_dynamic_type;
+    DescSetter desc_setter = &T::set_dynamic_type;
+    Table* table = do_get_or_add_table(name, desc_matcher, desc_setter, was_added); // Throws
+    return BasicTableRef<T>(static_cast<T*>(table));
+}
+
+template<class S>
+void Group::to_json(S& out, std::size_t link_depth,
+                    std::map<std::string, std::string>* renames) const
+{
+    if (!is_attached()) {
+        out << "{}";
+        return;
+    }
+
+    std::map<std::string, std::string> renames2;
+    renames = renames ? renames : &renames2;
+
+    out << "{";
+
+    for (std::size_t i = 0; i < m_tables.size(); ++i) {
+        StringData name = m_table_names.get(i);
+        std::map<std::string, std::string>& m = *renames;
+        if (m[name] != "")
+            name = m[name];
+
+        ConstTableRef table = get_table(i);
+
+        if (i)
+            out << ",";
+        out << "\"" << name << "\"";
+        out << ":";
+        table->to_json(out, link_depth, renames);
+    }
+
+    out << "}";
+}
+
 inline void Group::init_array_parents() TIGHTDB_NOEXCEPT
 {
     m_table_names.set_parent(&m_top, 0);
@@ -504,149 +756,6 @@ inline void Group::init_array_parents() TIGHTDB_NOEXCEPT
 inline bool Group::may_reattach_if_same_version() const TIGHTDB_NOEXCEPT
 {
     return m_top.is_attached();
-}
-
-inline bool Group::is_attached() const TIGHTDB_NOEXCEPT
-{
-    return m_is_attached;
-}
-
-inline bool Group::is_empty() const TIGHTDB_NOEXCEPT
-{
-    if (!is_attached())
-        return true;
-    return m_table_names.is_empty();
-}
-
-inline std::size_t Group::size() const
-{
-    if (!is_attached())
-        return 0;
-    return m_table_names.size();
-}
-
-inline StringData Group::get_table_name(std::size_t table_ndx) const
-{
-    TIGHTDB_ASSERT(is_attached());
-    TIGHTDB_ASSERT(table_ndx < m_table_names.size());
-    return m_table_names.get(table_ndx);
-}
-
-inline bool Group::has_table(StringData name) const
-{
-    if (!is_attached())
-        return false;
-    std::size_t i = m_table_names.find_first(name);
-    return i != not_found;
-}
-
-template<class T> inline bool Group::has_table(StringData name) const
-{
-    if (!is_attached())
-        return false;
-    std::size_t ndx = m_table_names.find_first(name);
-    if (ndx == not_found)
-        return false;
-    const Table* table = get_table_by_ndx(ndx); // Throws
-    typedef _impl::TableFriend tf;
-    return T::matches_dynamic_spec(tf::get_spec(*table));
-}
-
-inline Table* Group::get_table_ptr(StringData name, SpecSetter spec_setter, bool& was_created)
-{
-    TIGHTDB_ASSERT(is_attached());
-
-    Table* table;
-    std::size_t ndx = m_table_names.find_first(name);
-    if (ndx != not_found) {
-        table = get_table_by_ndx(ndx); // Throws
-        was_created = false;
-    }
-    else {
-        ndx = create_table(name); // Throws
-        table = create_table_accessor(ndx); // Throws
-        if (spec_setter)
-            (*spec_setter)(*table); // Throws
-        was_created = true;
-    }
-    return table;
-}
-
-inline Table* Group::get_table_ptr(StringData name)
-{
-    SpecSetter spec_setter = 0; // Do not add any columns
-    bool was_created; // Dummy
-    return get_table_ptr(name, spec_setter, was_created);
-}
-
-inline const Table* Group::get_table_ptr(StringData name) const
-{
-    TIGHTDB_ASSERT(is_attached());
-    std::size_t ndx = m_table_names.find_first(name);
-    if (ndx == not_found)
-        return 0;
-    return get_table_by_ndx(ndx); // Throws
-}
-
-template<class T> inline T* Group::get_table_ptr(StringData name)
-{
-    TIGHTDB_STATIC_ASSERT(IsBasicTable<T>::value, "Invalid table type");
-    SpecSetter spec_setter = &T::set_dynamic_spec;
-    bool was_created; // Dummy
-    Table* table = get_table_ptr(name, spec_setter, was_created);
-    TIGHTDB_ASSERT(T::matches_dynamic_spec(_impl::TableFriend::get_spec(*table)));
-    return static_cast<T*>(table);
-}
-
-template<class T> inline const T* Group::get_table_ptr(StringData name) const
-{
-    TIGHTDB_STATIC_ASSERT(IsBasicTable<T>::value, "Invalid table type");
-    const Table* table = get_table_ptr(name); // Throws
-    TIGHTDB_ASSERT(!table || T::matches_dynamic_spec(_impl::TableFriend::get_spec(*table)));
-    return static_cast<const T*>(table);
-}
-
-inline TableRef Group::get_table(std::size_t table_ndx)
-{
-    return get_table_by_ndx(table_ndx)->get_table_ref(); // Throws
-}
-
-inline ConstTableRef Group::get_table(std::size_t table_ndx) const
-{
-    return get_table_by_ndx(table_ndx)->get_table_ref(); // Throws
-}
-
-inline TableRef Group::get_table(StringData name)
-{
-    return get_table_ptr(name)->get_table_ref();
-}
-
-inline TableRef Group::get_table(StringData name, bool& was_created)
-{
-    SpecSetter spec_setter = 0;
-    return get_table_ptr(name, spec_setter, was_created)->get_table_ref();
-}
-
-inline ConstTableRef Group::get_table(StringData name) const
-{
-    TIGHTDB_ASSERT(has_table(name));
-    return get_table_ptr(name)->get_table_ref();
-}
-
-template<class T> inline typename T::Ref Group::get_table(StringData name)
-{
-    return get_table_ptr<T>(name)->get_table_ref();
-}
-
-template<class T> inline typename T::ConstRef Group::get_table(StringData name) const
-{
-    TIGHTDB_ASSERT(has_table<T>(name));
-    return get_table_ptr<T>(name)->get_table_ref();
-}
-
-inline const Table* Group::get_table_by_ndx(std::size_t ndx) const
-{
-    return const_cast<Group*>(this)->get_table_by_ndx(ndx); // Throws
 }
 
 inline void Group::update_child_ref(std::size_t child_ndx, ref_type new_ref)
@@ -676,34 +785,90 @@ public:
     virtual ~TableWriter() TIGHTDB_NOEXCEPT {}
 };
 
-template<class S> void Group::to_json(S& out, size_t link_depth, std::map<std::string, std::string>* renames) const
+inline const Table* Group::do_get_table(size_t table_ndx, DescMatcher desc_matcher) const
 {
-    if (!is_attached()) {
-        out << "{}";
-        return;
-    }
-
-    std::map<std::string, std::string> renames2;
-    renames = renames ? renames : &renames2;
-
-    out << "{";
-
-    for (std::size_t i = 0; i < m_tables.size(); ++i) {
-        StringData name = m_table_names.get(i);
-        std::map<std::string, std::string>& m = *renames;
-        if (m[name] != "")
-            name = m[name];
-
-        ConstTableRef table = get_table(i);
-
-        if (i) out << ",";
-        out << "\"" << name << "\"";
-        out << ":";
-        table->to_json(out, link_depth, renames);
-    }
-
-    out << "}";
+    return const_cast<Group*>(this)->do_get_table(table_ndx, desc_matcher); // Throws
 }
+
+inline const Table* Group::do_get_table(StringData name, DescMatcher desc_matcher) const
+{
+    return const_cast<Group*>(this)->do_get_table(name, desc_matcher); // Throws
+}
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+
+inline Replication* Group::get_replication() const TIGHTDB_NOEXCEPT
+{
+    return m_alloc.get_replication();
+}
+
+inline void Group::set_replication(Replication* repl) TIGHTDB_NOEXCEPT
+{
+    m_alloc.set_replication(repl);
+}
+
+#endif // TIGHTDB_ENABLE_REPLICATION
+
+// The purpose of this class is to give internal access to some, but
+// not all of the non-public parts of the Group class.
+class _impl::GroupFriend {
+public:
+    static Table& get_table(Group& group, std::size_t ndx_in_group)
+    {
+        Group::DescMatcher desc_matcher = 0; // Do not check descriptor
+        Table* table = group.do_get_table(ndx_in_group, desc_matcher); // Throws
+        return *table;
+    }
+
+    static const Table& get_table(const Group& group, std::size_t ndx_in_group)
+    {
+        Group::DescMatcher desc_matcher = 0; // Do not check descriptor
+        const Table* table = group.do_get_table(ndx_in_group, desc_matcher); // Throws
+        return *table;
+    }
+
+    static Table* get_table(Group& group, StringData name)
+    {
+        Group::DescMatcher desc_matcher = 0; // Do not check descriptor
+        Table* table = group.do_get_table(name, desc_matcher); // Throws
+        return table;
+    }
+
+    static const Table* get_table(const Group& group, StringData name)
+    {
+        Group::DescMatcher desc_matcher = 0; // Do not check descriptor
+        const Table* table = group.do_get_table(name, desc_matcher); // Throws
+        return table;
+    }
+
+    static Table& add_table(Group& group, StringData name, bool require_unique_name)
+    {
+        Group::DescSetter desc_setter = 0; // Do not add any columns
+        Table* table = group.do_add_table(name, desc_setter, require_unique_name); // Throws
+        return *table;
+    }
+
+    static Table& get_or_add_table(Group& group, StringData name, bool* was_added)
+    {
+        Group::DescMatcher desc_matcher = 0; // Do not check descriptor
+        Group::DescSetter desc_setter = 0; // Do not add any columns
+        Table* table = group.do_get_or_add_table(name, desc_matcher, desc_setter,
+                                                 was_added); // Throws
+        return *table;
+    }
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    static Replication* get_replication(const Group& group) TIGHTDB_NOEXCEPT
+    {
+        return group.get_replication();
+    }
+
+    static void set_replication(Group& group, Replication* repl) TIGHTDB_NOEXCEPT
+    {
+        group.set_replication(repl);
+    }
+#endif // TIGHTDB_ENABLE_REPLICATION
+};
 
 
 } // namespace tightdb
