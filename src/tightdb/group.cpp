@@ -1093,7 +1093,8 @@ public:
             // unordered insertion of multiple rows is not supported (and not needed) currently.
             TIGHTDB_ASSERT(num_rows == 1);
             if (m_table)
-                tf::adj_accessors_inverse_move_last_over(*m_table, row_ndx, last_row_ndx);
+                tf::adj_accessors_move_last_over(*m_table, last_row_ndx, row_ndx);
+            //tf::adj_accessors_inverse_move_last_over(*m_table, row_ndx, last_row_ndx);
         }
         else {
             if (m_table)
