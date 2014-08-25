@@ -50,31 +50,12 @@ Query::Query(const Query& copy)
     do_delete = true;
 }
 
-void Query::move_assign(Query& copy)
-{
-    if (do_delete) {
-        for (size_t t = 0; t < all_nodes.size(); t++) {
-            delete all_nodes[t];
-        }
-    }
-
-    m_table = copy.m_table;
-    all_nodes = copy.all_nodes;
-    update = copy.update;
-    update_override = copy.update_override;
-    first = copy.first;
-    pending_not = copy.pending_not;
-    error_code = copy.error_code;
-    m_tableview = copy.m_tableview;
-    copy.do_delete = false;
-    do_delete = true;
-    copy.m_table = TableRef();
-}
 
 // todo, try and remove this constructor. It's currently required for copy-initialization only, and not
 // copy-assignment anylonger (which is now just "=").
 Query::Query(const Query& copy, const TCopyExpressionTag&) 
 {
+    do_delete = false;
     *this = copy;
 }
 
