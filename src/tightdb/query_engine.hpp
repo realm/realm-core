@@ -541,7 +541,7 @@ public:
     // Return the n'th table row index contained in the TableView.
     size_t tableindex(size_t n)
     {
-        return to_size_t(m_tv.m_refs.get(n));
+        return to_size_t(m_tv.m_row_indexes.get(n));
     }
 
     void init(const Table& table) TIGHTDB_OVERRIDE
@@ -562,7 +562,7 @@ public:
     {
         // Simply return index of first table row which is >= start
         size_t r;
-        r = m_tv.m_refs.find_gte(start, m_next);
+        r = m_tv.m_row_indexes.find_gte(start, m_next);
 
         if (r >= end)
             return not_found;
