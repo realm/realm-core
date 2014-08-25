@@ -55,6 +55,8 @@ Query::Query(const Query& copy)
 // copy-assignment anylonger (which is now just "=").
 Query::Query(const Query& copy, const TCopyExpressionTag&) 
 {
+    // We can call the copyassignment operator even if this destination is uninitialized - the do_delete flag 
+    // just needs to be false.
     do_delete = false;
     *this = copy;
 }

@@ -244,7 +244,7 @@ public:
 
     std::string validate();
 
-    mutable int do_delete;
+    mutable bool do_delete;
 
 protected:
     Query(Table& table, TableViewBase* tv = null_ptr);
