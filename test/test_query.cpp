@@ -5426,7 +5426,7 @@ TEST(Query_TableViewMoveAssign1)
     tv = q.find_all();
 }
 
-ONLY(Query_TableViewMoveAssignLeak2)
+TEST(Query_TableViewMoveAssignLeak2)
 {
     Types t;
 
