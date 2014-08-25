@@ -64,8 +64,7 @@ public:
 
     void refresh_accessor_tree(std::size_t, const Spec&) TIGHTDB_OVERRIDE;
 
-    void adj_accessors_move_last_over(std::size_t, std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-    void adj_accessors_inverse_move_last_over(std::size_t, std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void adj_accessors_move(std::size_t, std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     void adj_acc_clear_root_table() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
     void update_from_parent(std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
@@ -111,10 +110,7 @@ private:
     void discard_child_accessors() TIGHTDB_NOEXCEPT;
 
     template<bool fix_ndx_in_parent>
-    void adj_move_last_over(std::size_t target_row_ndx, std::size_t last_row_ndx) TIGHTDB_NOEXCEPT;
-
-    template<bool fix_ndx_in_parent>
-    void adj_inverse_move_last_over(std::size_t target_row_ndx, std::size_t last_row_ndx) TIGHTDB_NOEXCEPT;
+    void adj_move(std::size_t target_row_ndx, std::size_t source_row_ndx) TIGHTDB_NOEXCEPT;
 
 #ifdef TIGHTDB_DEBUG
     std::pair<ref_type, std::size_t> get_to_dot_parent(std::size_t) const TIGHTDB_OVERRIDE;

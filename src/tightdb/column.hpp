@@ -151,10 +151,11 @@ public:
     virtual void adj_accessors_insert_rows(std::size_t row_ndx,
                                            std::size_t num_rows) TIGHTDB_NOEXCEPT;
     virtual void adj_accessors_erase_row(std::size_t row_ndx) TIGHTDB_NOEXCEPT;
-    virtual void adj_accessors_move_last_over(std::size_t target_row_ndx,
-                                              std::size_t last_row_ndx) TIGHTDB_NOEXCEPT;
-    virtual void adj_accessors_inverse_move_last_over(std::size_t target_row_ndx,
-                                              std::size_t last_row_ndx) TIGHTDB_NOEXCEPT;
+
+    // Discard any accessor pointing to target_row_ndx. Update any accessor
+    // pointing to source_row_ndx such that it instead points to target_row_ndx.
+    virtual void adj_accessors_move(std::size_t target_row_ndx,
+                                    std::size_t source_row_ndx) TIGHTDB_NOEXCEPT;
     virtual void adj_acc_clear_root_table() TIGHTDB_NOEXCEPT;
 
     enum {
@@ -464,12 +465,7 @@ inline void ColumnBase::adj_accessors_erase_row(std::size_t) TIGHTDB_NOEXCEPT
     // Noop
 }
 
-inline void ColumnBase::adj_accessors_move_last_over(std::size_t, std::size_t) TIGHTDB_NOEXCEPT
-{
-    // Noop
-}
-
-inline void ColumnBase::adj_accessors_inverse_move_last_over(std::size_t, std::size_t) TIGHTDB_NOEXCEPT
+inline void ColumnBase::adj_accessors_move(std::size_t, std::size_t) TIGHTDB_NOEXCEPT
 {
     // Noop
 }

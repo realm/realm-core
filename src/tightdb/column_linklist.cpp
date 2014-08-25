@@ -86,7 +86,7 @@ void ColumnLinkList::move_last_over(size_t target_row_ndx, size_t last_row_ndx)
     ColumnLinkBase::move_last_over(target_row_ndx, last_row_ndx);
 
     const bool fix_ndx_in_parent = true;
-    adj_move_last_over<fix_ndx_in_parent>(target_row_ndx, last_row_ndx);
+    adj_move<fix_ndx_in_parent>(target_row_ndx, last_row_ndx);
 }
 
 
@@ -216,23 +216,13 @@ void ColumnLinkList::refresh_accessor_tree(size_t col_ndx, const Spec& spec)
 }
 
 
-void ColumnLinkList::adj_accessors_move_last_over(size_t target_row_ndx,
-                                                  size_t last_row_ndx) TIGHTDB_NOEXCEPT
+void ColumnLinkList::adj_accessors_move(size_t target_row_ndx,
+                                        size_t source_row_ndx) TIGHTDB_NOEXCEPT
 {
-    ColumnLinkBase::adj_accessors_move_last_over(target_row_ndx, last_row_ndx);
+    ColumnLinkBase::adj_accessors_move(target_row_ndx, source_row_ndx);
 
     const bool fix_ndx_in_parent = false;
-    adj_move_last_over<fix_ndx_in_parent>(target_row_ndx, last_row_ndx);
-}
-
-
-void ColumnLinkList::adj_accessors_inverse_move_last_over(size_t target_row_ndx,
-                                                  size_t last_row_ndx) TIGHTDB_NOEXCEPT
-{
-    ColumnLinkBase::adj_accessors_inverse_move_last_over(target_row_ndx, last_row_ndx);
-
-    const bool fix_ndx_in_parent = false;
-    adj_inverse_move_last_over<fix_ndx_in_parent>(target_row_ndx, last_row_ndx);
+    adj_move<fix_ndx_in_parent>(target_row_ndx, source_row_ndx);
 }
 
 
@@ -243,16 +233,7 @@ void ColumnLinkList::adj_acc_clear_root_table() TIGHTDB_NOEXCEPT
 }
 
 template<bool fix_ndx_in_parent>
-void ColumnLinkList::adj_inverse_move_last_over(size_t target_row_ndx,
-                                                size_t last_row_ndx) TIGHTDB_NOEXCEPT
-{
-    // not implemented
-    TIGHTDB_ASSERT(false);
-}
-
-template<bool fix_ndx_in_parent>
-void ColumnLinkList::adj_move_last_over(size_t target_row_ndx,
-                                        size_t last_row_ndx) TIGHTDB_NOEXCEPT
+void ColumnLinkList::adj_move(size_t target_row_ndx, size_t source_row_ndx) TIGHTDB_NOEXCEPT
 {
     // Search for either index in a tight loop for speed
     bool last_seen = false;
@@ -263,7 +244,7 @@ void ColumnLinkList::adj_move_last_over(size_t target_row_ndx,
         const list_entry& e = m_list_accessors[i];
         if (e.m_row_ndx == target_row_ndx)
             goto target;
-        if (e.m_row_ndx == last_row_ndx)
+        if (e.m_row_ndx == source_row_ndx)
             break;
         ++i;
     }
@@ -286,7 +267,7 @@ void ColumnLinkList::adj_move_last_over(size_t target_row_ndx,
     last_seen = true;
 
     // Detach and remove original list accessor at `target_row_ndx`, then
-    // look for `last_row_ndx
+    // look for `source_row_ndx
   target:
     {
         list_entry& e = m_list_accessors[i];
@@ -303,7 +284,7 @@ void ColumnLinkList::adj_move_last_over(size_t target_row_ndx,
             if (i == n)
                 return;
             const list_entry& e = m_list_accessors[i];
-            if (e.m_row_ndx == last_row_ndx)
+            if (e.m_row_ndx == source_row_ndx)
                 break;
             ++i;
         }
