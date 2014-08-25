@@ -654,6 +654,7 @@ EOF
         rm -f "$TIGHTDB_HOME/core-android-$tightdb_version.zip" || exit 1
         (cd "$TIGHTDB_HOME/$ANDROID_DIR" && zip -r -q "$TIGHTDB_HOME/core-android-$tightdb_version.zip" .) || exit 1
         echo "Unzipping in ../tightdb_java/core"
+        mkdir -p ../tightdb_java || exit 1 # to help Mr. Jenkins
         (cd ../tightdb_java && rm -rf core && mkdir core) || exit 1
         (cd ../tightdb_java/core && unzip -qq "$TIGHTDB_HOME/core-android-$tightdb_version.zip") || exit 1
         ;;
