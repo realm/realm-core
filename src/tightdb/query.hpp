@@ -35,6 +35,7 @@
 #include <pthread.h>
 #endif
 
+#include <tightdb/views.hpp>
 #include <tightdb/table_ref.hpp>
 #include <tightdb/binary_data.hpp>
 #include <tightdb/datetime.hpp>
@@ -54,7 +55,7 @@ class SequentialGetterBase;
 
 class Query {
 public:
-    Query(const Table& table, TableViewBase* tv = null_ptr);
+    Query(const Table& table, RowIndexes* tv = null_ptr);
     Query();
     Query(const Query& copy); // FIXME: Try to remove this
     struct TCopyExpressionTag {};
@@ -66,7 +67,7 @@ public:
     Expression* get_expression();
 
     // Conditions: Query only rows contained in tv
-    Query& tableview(const TableView& tv); // throws
+    Query& tableview(TableView& tv); // throws
 
     // Find links that point to a specific target row 
     Query& links_to(size_t column_ndx, size_t target_row);
@@ -247,7 +248,7 @@ public:
     mutable bool do_delete;
 
 protected:
-    Query(Table& table, TableViewBase* tv = null_ptr);
+    Query(Table& table, RowIndexes* tv = null_ptr);
 //    Query(const Table& table); // FIXME: This constructor should not exist. We need a ConstQuery class.
     void Create();
 
@@ -268,7 +269,7 @@ public:
     std::vector<ParentNode**> subtables;
     std::vector<ParentNode*> all_nodes;
     
-    TableViewBase* m_tableview;
+    RowIndexes* m_tableview;
     std::vector<bool> pending_not;
 
 private:

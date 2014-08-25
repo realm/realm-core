@@ -2925,7 +2925,7 @@ TableView Table::get_distinct_view(size_t col_ndx)
     TIGHTDB_ASSERT(has_index(col_ndx));
 
     TableView tv(*this);
-    Column& refs = tv.get_ref_column();
+    Column& refs = tv.m_refs;
 
     if(m_columns.is_attached()) {
         ColumnType type = get_real_column_type(col_ndx);
@@ -3268,7 +3268,7 @@ TableView Table::get_range_view(size_t begin, size_t end)
 
     TableView ctv(*this);
     if (m_columns.is_attached()) {
-        Column& refs = ctv.get_ref_column();
+        Column& refs = ctv.m_refs;
         for (size_t i = begin; i < end; ++i)
             refs.add(i);
     }

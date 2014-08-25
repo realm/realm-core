@@ -533,6 +533,9 @@
     <ClInclude Include="..\..\test\util\jsmn.hpp">
       <Filter>test\util</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\tightdb\views.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="pthreads">

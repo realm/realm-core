@@ -1139,6 +1139,7 @@
     <ClInclude Include="..\..\src\tightdb\util\utf8.hpp" />
     <ClInclude Include="..\..\src\tightdb\utilities.hpp" />
     <ClInclude Include="..\..\src\tightdb\version.hpp" />
+    <ClInclude Include="..\..\src\tightdb\views.hpp" />
     <ClInclude Include="..\..\src\win32\pthread\pthread.h" />
     <ClInclude Include="..\..\test\util\jsmn.hpp" />
     <ClInclude Include="..\..\test\util\verified_integer.hpp">
