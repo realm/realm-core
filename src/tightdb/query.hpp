@@ -62,7 +62,7 @@ public:
     ~Query() TIGHTDB_NOEXCEPT;
     void move_assign(Query& query);
     Query& operator = (const Query& source);
-
+    void delete_nodes();
     Query& expression(Expression* compare, bool auto_delete = false);
     Expression* get_expression();
 

@@ -81,6 +81,15 @@ Query::Query(const Query& copy, const TCopyExpressionTag&)
 Query& Query::operator = (const Query& source)
 {
     if (this != &source) {
+        // free destination object
+        delete_nodes();
+        all_nodes.clear();
+        first.clear();
+        update.clear();
+        pending_not.clear();
+        update_override.clear();
+        subtables.clear();
+
         Create();
         first = source.first;
         std::map<ParentNode*, ParentNode*> node_mapping;
@@ -109,15 +118,21 @@ Query& Query::operator = (const Query& source)
 
 Query::~Query() TIGHTDB_NOEXCEPT
 {
+    delete_nodes();
+}
+
+void Query::delete_nodes() TIGHTDB_NOEXCEPT
+{
     if (do_delete) {
         for (size_t t = 0; t < all_nodes.size(); t++) {
             ParentNode *p = all_nodes[t];
             std::vector<ParentNode *>::iterator it = std::find(all_nodes.begin(), all_nodes.begin() + t, p);
-            if(it == all_nodes.begin() + t)
+            if (it == all_nodes.begin() + t)
                 delete p;
         }
     }
 }
+
 /*
 // use and_query() instead!
 Expression* Query::get_expression() {

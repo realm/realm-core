@@ -1313,7 +1313,10 @@ TEST(TableView_QueryCopy)
     q.end_group();
 
     q.count();
+    
     Query q2;
+    q2 = table.where().equal(0, 1234);
+    
     q2 = q;
     size_t t = q2.count();
 

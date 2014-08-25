@@ -5457,6 +5457,7 @@ TEST(Query_TableViewMoveAssignLeak2)
     tv.sync_if_needed();
 
     size_t t2 = q.find();
+    static_cast<void>(t2);
     tv = q.find_all();
     tv.sync_if_needed();
     t2 = q.find();
@@ -5469,7 +5470,6 @@ TEST(Query_TableViewMoveAssignLeak2)
     tv.sync_if_needed();
     tv = q.find_all();
     tv.sync_if_needed();
-
 
     Query q3;
 
@@ -5477,8 +5477,6 @@ TEST(Query_TableViewMoveAssignLeak2)
 
     q3.find();
     q2.find();
-
-
 }
 
 
