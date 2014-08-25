@@ -1270,7 +1270,7 @@ TEST(TableView_RowAccessor)
 }
 
 
-ONLY(TableView_FindBySourceNdx)
+TEST(TableView_FindBySourceNdx)
 {
     Table table;
     table.add_column(type_Int, "");
@@ -1287,18 +1287,24 @@ ONLY(TableView_FindBySourceNdx)
     CHECK_EQUAL(0, tv.find_by_source_ndx(2));
     CHECK_EQUAL(1, tv.find_by_source_ndx(1));
     CHECK_EQUAL(2, tv.find_by_source_ndx(0));
+}
 
+
+TEST(TableView_QueryCopy)
+{
+    Table table;
+    table.add_column(type_Int, "");
+    table.add_empty_row();
+    table.add_empty_row();
+    table.add_empty_row();
+    table[0].set_int(0, 0);
+    table[1].set_int(0, 1);
+    table[2].set_int(0, 2);
+
+    // Test if copy-assign of Query in TableView works
+    TableView tv = table.where().find_all();
 
     Query q = table.where();
-
-    /*
-    //   q.group();
-    q.equal(0, 1);
-    q.greater(0, 123);
-    q.less(0, 11);
- //   q.end_group();
-    
-    */
 
     q.group();
     q.equal(0, 1);
@@ -1307,17 +1313,11 @@ ONLY(TableView_FindBySourceNdx)
     q.end_group();
 
     size_t rrr = q.count();
-
     Query q2;
-    
     q2 = q;
+    size_t t = q2.count();
 
-    rrr = q2.count();
-
-
-
-
+    CHECK_EQUAL(t, 2);
 }
-
 
 #endif // TEST_TABLE_VIEW
