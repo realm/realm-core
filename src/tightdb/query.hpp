@@ -65,9 +65,6 @@ public:
     Query& expression(Expression* compare, bool auto_delete = false);
     Expression* get_expression();
 
-    // Conditions: Query only rows contained in tv
-    Query& tableview(const TableView& tv); // throws
-
     // Find links that point to a specific target row 
     Query& links_to(size_t column_ndx, size_t target_row);
 

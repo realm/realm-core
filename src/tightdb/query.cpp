@@ -122,14 +122,6 @@ Query& Query::expression(Expression* compare, bool auto_delete)
     return *this;
 }
 
-// Makes query search only in rows contained in tv
-Query& Query::tableview(const TableView& tv)
-{
-    ParentNode* const p = new ListviewNode(tv);
-    UpdatePointers(p, &p->m_child);
-    return *this;
-}
-
 // Binary
 Query& Query::equal(size_t column_ndx, BinaryData b)
 {
