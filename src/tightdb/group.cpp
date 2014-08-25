@@ -1513,12 +1513,33 @@ void Group::advance_transact(ref_type new_top_ref, size_t new_file_size,
 }
 
 
+// Instruction Rollback support:
+//
+// Instruction rollback is implemented in two stages. First the transaction log is preprocessed,
+// classifying each instruction according to how it should take part in the rollback.
+// - nop: nop-operation
+// - execute: should be (inverse) executed during rollback
+// - postfix_table: table select. Should be executed, but also moved in the instruction stream
+//   to maintain prefix ordering. It's called 'postfix' because to be handled as a prefix in the
+//   reversed instruction stream, it must be placed as a postfix in the non-reversed stream.
+// - postfix_descriptor: descriptor_select. Same comments as above.
+//
+// As part of classification, a vector of instruction start pointers is built up in the proper
+// order for reverse execution. Also, no-operation's are eliminated in the process.
+//
+// Following classification the actual rollback is done by executing the instructions in the
+// order produced during classification. The instructions are not executed in the same way
+// as for forward execution. An alternate instruction handler class is used, which specifies
+// how each instruction is reversed. By deriving the normal handler for forward execution, we
+// can reuse those instructions which are identical regardless of the instruction execution
+// direction, for example the select operations.
+
 class InstructionClassifierForRollback : public NullHandler {
 public:
     // classification - initialized by caller, set by each instruction, 
     // then read by whoever calls us to do the classification
     enum Class { 
-        instr_class_noop, 
+        instr_class_nop, 
         instr_class_execute, 
         instr_class_postfix_table,
         instr_class_postfix_descriptor };
@@ -1562,6 +1583,8 @@ public:
     bool select_link_list(std::size_t, std::size_t) { classification = instr_class_execute; return true; }
 };
 
+
+// Here goes the class which specifies how instructions are to be executed in reverse:
 class Group::TransactReverser : public Group::TransactAdvancer  {
 public:
     TransactReverser(Group& group) : TransactAdvancer(group) {};
@@ -1667,6 +1690,8 @@ public:
                                                       target_table_idx, backlink_col_idx);
     }
 };
+
+
 
 void Group::reverse_transact(ref_type new_top_ref, const BinaryData& log)
 {

@@ -1601,7 +1601,9 @@ bool Replication::TransactLogParser::do_parse(InstructionHandler& handler)
     return true;
 }
 
-
+// The NullHandler class is trivial, just returning true for all methods. It is intended
+// as a base for classes doing more sophisticated processing for just a few of the methods.
+// See group.cpp for example of use.
 class NullHandler {
 public:
     bool insert_group_level_table(std::size_t, std::size_t, StringData) { return true; }
@@ -1663,7 +1665,7 @@ bool Replication::TransactLogParser::prepare_log_reversal(std::vector<const char
 
         // parse and classify an instruction
         const char* instr_start = m_input_begin;
-        handler.classification = InstructionClassifierForRollback::instr_class_noop;
+        handler.classification = InstructionClassifierForRollback::instr_class_nop;
         if (!parse_one_inst(handler))
             return false;
 
