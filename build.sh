@@ -648,6 +648,14 @@ EOF
         temp_dir="$(mktemp -d /tmp/tightdb.build-android.XXXX)" || exit 1
         (cd "src/tightdb" && tar czf "$temp_dir/headers.tar.gz" $inst_headers) || exit 1
         (cd "$TIGHTDB_HOME/$ANDROID_DIR/include/tightdb" && tar xzmf "$temp_dir/headers.tar.gz") || exit 1
+
+        tightdb_version="$(sh build.sh get-version)" || exit
+        echo "Create zip file core-android-$tightdb_version.zip"
+        rm -f "$TIGHTDB_HOME/core-android-$tightdb_version.zip" || exit 1
+        (cd "$TIGHTDB_HOME/$ANDROID_DIR" && zip -r -q "$TIGHTDB_HOME/core-android-$tightdb_version.zip" .) || exit 1
+        echo "Unzipping in ../tightdb_java/core"
+        (cd ../tightdb_java && rm -rf core && mkdir core) || exit 1
+        (cd ../tightdb_java/core && unzip -qq "$TIGHTDB_HOME/core-android-$tightdb_version.zip") || exit 1
         ;;
 
    "build-cocoa")
