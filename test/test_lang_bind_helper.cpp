@@ -5928,14 +5928,14 @@ TEST(LangBindHelper_RollbackAndContinueAsReadColumnRemove)
     }
     group->Verify();
     {
-        // add a column and regret it again
+        // remove a column but regret it
         LangBindHelper::promote_to_write(sg, *wlr);
         CHECK_EQUAL(2, t->get_descriptor()->get_column_count());
         t->remove_column(0);
         group->Verify();
         LangBindHelper::rollback_and_continue_as_read(sg);
         group->Verify();
-        CHECK_EQUAL(1, t->get_descriptor()->get_column_count());
+        CHECK_EQUAL(2, t->get_descriptor()->get_column_count());
     }
     group->Verify();
 }

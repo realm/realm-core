@@ -1201,7 +1201,7 @@ bool Replication::TransactLogParser::parse_one_inst(InstructionHandler& handler)
 {
     char instr;
     read_char(instr);
-    //    std::cout << "parsing " << (int) instr << " @ " << std::hex << (long) m_input_begin << std::endl;
+    // std::cout << "parsing " << (int) instr << " @ " << std::hex << (long) m_input_begin << std::endl;
     switch (Instruction(instr)) {
         case instr_SetInt: {
             std::size_t col_ndx = read_int<std::size_t>(); // Throws
@@ -1678,6 +1678,10 @@ bool Replication::TransactLogParser::prepare_log_reversal(std::vector<const char
         // move table selection till after any relevant instructions. Achieved by moving it till
         // we see next table selection.
         if (handler.classification == InstructionClassifierForRollback::instr_class_postfix_table) {
+            if (pending_descriptor_select) {
+                instruction_starts.push_back(pending_descriptor_select);
+                pending_descriptor_select = 0;
+            }
             if (pending_table_select)
                 instruction_starts.push_back(pending_table_select);
             pending_table_select = instr_start;
@@ -1689,11 +1693,11 @@ bool Replication::TransactLogParser::prepare_log_reversal(std::vector<const char
             pending_descriptor_select = instr_start;
         }
     }
-    // flush any pending table or descriptor selections
-    if (pending_table_select)
-        instruction_starts.push_back(pending_table_select);
+    // flush any pending table or descriptor selections (order matters here!)
     if (pending_descriptor_select)
         instruction_starts.push_back(pending_descriptor_select);
+    if (pending_table_select)
+        instruction_starts.push_back(pending_table_select);
     return true;
 }
 
