@@ -61,7 +61,7 @@ Static library*/
 
 # sh build.sh build-android
 /android-lib/
-core-android-*.zip
+core-android-*.tar.gz
 
 # debian/ubuntu builds
 /debian/tightdb/*
