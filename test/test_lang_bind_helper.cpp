@@ -5845,6 +5845,101 @@ TEST(LangBindHelper_RollbackAndContinueAsRead)
     }
 }
 
+TEST(LangBindHelper_RollbackAndContinueAsReadGroupLevelTableRemoval)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    UniquePtr<Replication> repl(makeWriteLogCollector(path));
+    UniquePtr<LangBindHelper::TransactLogRegistry> wlr(getWriteLogs(path));
+    SharedGroup sg(*repl);
+    Group* group = const_cast<Group*>(&sg.begin_read());
+    {
+        LangBindHelper::promote_to_write(sg, *wlr);
+        TableRef origin = group->get_or_add_table("a_table");
+        LangBindHelper::commit_and_continue_as_read(sg);
+    }
+    group->Verify();
+    {
+        // rollback of group level table delete
+        LangBindHelper::promote_to_write(sg, *wlr);
+        TableRef o2 = group->get_table("a_table");
+        TIGHTDB_ASSERT(o2 != 0);
+        group->remove_table("a_table");
+        TableRef o3 = group->get_table("a_table");
+        TIGHTDB_ASSERT(o3 == 0);
+        LangBindHelper::rollback_and_continue_as_read(sg);
+        TableRef o4 = group->get_table("a_table");
+        TIGHTDB_ASSERT(o4 != 0);
+    }
+    group->Verify();
+}
+
+
+TEST(LangBindHelper_RollbackAndContinueAsReadColumnAdd)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    UniquePtr<Replication> repl(makeWriteLogCollector(path));
+    UniquePtr<LangBindHelper::TransactLogRegistry> wlr(getWriteLogs(path));
+    SharedGroup sg(*repl);
+    Group* group = const_cast<Group*>(&sg.begin_read());
+    TableRef t;
+    {
+        LangBindHelper::promote_to_write(sg, *wlr);
+        t = group->get_or_add_table("a_table");
+        t->add_column(type_Int, "lorelei");
+        t->insert_empty_row(0);
+        t->set_int(0,0,43);
+        CHECK_EQUAL(1, t->get_descriptor()->get_column_count());
+        LangBindHelper::commit_and_continue_as_read(sg);
+    }
+    group->Verify();
+    {
+        // add a column and regret it again
+        LangBindHelper::promote_to_write(sg, *wlr);
+        t->add_column(type_Int, "riget");
+        t->set_int(1,0,44);
+        CHECK_EQUAL(2, t->get_descriptor()->get_column_count());
+        group->Verify();
+        LangBindHelper::rollback_and_continue_as_read(sg);
+        group->Verify();
+        CHECK_EQUAL(1, t->get_descriptor()->get_column_count());
+    }
+    group->Verify();
+}
+
+
+TEST(LangBindHelper_RollbackAndContinueAsReadColumnRemove)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    UniquePtr<Replication> repl(makeWriteLogCollector(path));
+    UniquePtr<LangBindHelper::TransactLogRegistry> wlr(getWriteLogs(path));
+    SharedGroup sg(*repl);
+    Group* group = const_cast<Group*>(&sg.begin_read());
+    TableRef t;
+    {
+        LangBindHelper::promote_to_write(sg, *wlr);
+        t = group->get_or_add_table("a_table");
+        t->add_column(type_Int, "lorelei");
+        t->add_column(type_Int, "riget");
+        t->insert_empty_row(0);
+        t->set_int(0,0,43);
+        t->set_int(1,0,44);
+        CHECK_EQUAL(2, t->get_descriptor()->get_column_count());
+        LangBindHelper::commit_and_continue_as_read(sg);
+    }
+    group->Verify();
+    {
+        // add a column and regret it again
+        LangBindHelper::promote_to_write(sg, *wlr);
+        CHECK_EQUAL(2, t->get_descriptor()->get_column_count());
+        t->remove_column(0);
+        group->Verify();
+        LangBindHelper::rollback_and_continue_as_read(sg);
+        group->Verify();
+        CHECK_EQUAL(1, t->get_descriptor()->get_column_count());
+    }
+    group->Verify();
+}
+
 TEST(LangBindHelper_ImplicitTransactions_OverSharedGroupDestruction)
 {
     SHARED_GROUP_TEST_PATH(path);

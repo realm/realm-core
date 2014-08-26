@@ -860,6 +860,8 @@ inline void Replication::insert_column(const Descriptor& desc, std::size_t col_n
     check_desc(desc); // Throws
     simple_cmd(instr_InsertColumn, util::tuple(col_ndx, int(type), name.size())); // Throws
     transact_log_append(name.data(), name.size()); // Throws
+    typedef _impl::TableFriend tf;
+    TIGHTDB_ASSERT(tf::is_link_type(ColumnType(type)) == (link_target_table != 0));
     if (link_target_table) {
         typedef _impl::TableFriend tf;
         typedef _impl::DescriptorFriend df;
