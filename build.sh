@@ -656,7 +656,7 @@ EOF
         echo "Unpacking in ../tightdb_java/core"
         mkdir -p ../tightdb_java || exit 1 # to help Mr. Jenkins
         (cd ../tightdb_java && rm -rf core && mkdir core) || exit 1
-        (cd ../tightdb_java/core && tar xzf "$TIGHTDB_HOME/core-android-$tightdb_version.zip") || exit 1
+        (cd ../tightdb_java/core && tar xzf "$TIGHTDB_HOME/core-android-$tightdb_version.tar.gz") || exit 1
         ;;
 
    "build-cocoa")
