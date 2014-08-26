@@ -612,7 +612,7 @@ inline void TableViewBase::move_assign(TableViewBase* tv) TIGHTDB_NOEXCEPT
         m_table->move_registered_view(tv, this);
 
     m_refs.move_assign(tv->m_refs);
-    m_query.move_assign(tv->m_query);
+    m_query = tv->m_query;
 #ifdef TIGHTDB_ENABLE_REPLICATION
     m_last_seen_version = tv->m_last_seen_version;
     m_auto_sort = tv->m_auto_sort;
