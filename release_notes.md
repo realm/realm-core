@@ -16,8 +16,7 @@
 
 ### Internals:
 
-* Lorem ipsum.
-
+* Query must now be deep-copied using the '=' operator instead of using TCopyExpressionTag. Also fixed a bug in this deep-copying.
 ----------------------------------------------
 
 # 0.82.1 Release notes
