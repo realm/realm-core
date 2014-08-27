@@ -1,22 +1,9 @@
-# NEXT RELEASE
-
-### Bugfixes:
-
-* Lorem ipsum.
-
-### API breaking changes:
-
-* Lorem ipsum.
-
-### Enhancements:
-
-* Lorem ipsum.
-
------------
+# 0.82.2 Release notes
 
 ### Internals:
 
-* Query must now be deep-copied using the '=' operator instead of using TCopyExpressionTag. Also fixed a bug in this deep-copying.
+* Query must now be deep-copied using the '=' operator instead of using
+  TCopyExpressionTag. Also fixed a bug in this deep-copying.
 
 ----------------------------------------------
 
