@@ -5940,6 +5940,44 @@ TEST(LangBindHelper_RollbackAndContinueAsReadColumnRemove)
     group->Verify();
 }
 
+
+TEST(LangBindHelper_RollbackAndContinueAsReadLinkList)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    UniquePtr<LangBindHelper::TransactLogRegistry> tlr(getWriteLogs(path));
+    UniquePtr<Replication> repl(makeWriteLogCollector(path));
+    SharedGroup sg(*repl);
+    Group* group = const_cast<Group*>(&sg.begin_read());
+    LangBindHelper::promote_to_write(sg, *tlr);
+    TableRef origin = group->add_table("origin");
+    TableRef target = group->add_table("target");
+    origin->add_column_link(type_LinkList, "", *target);
+    target->add_column(type_Int, "");
+    origin->add_empty_row();
+    target->add_empty_row();
+    target->add_empty_row();
+    target->add_empty_row();
+    LinkViewRef link_list = origin->get_linklist(0,0);
+    link_list->add(0);
+    LangBindHelper::commit_and_continue_as_read(sg);
+    CHECK_EQUAL(1, link_list->size());
+    group->Verify();
+    // now change a link in link list and roll back the change
+    LangBindHelper::promote_to_write(sg, *tlr);
+    link_list->add(1);
+    link_list->add(2);
+    CHECK_EQUAL(3, link_list->size());
+    LangBindHelper::rollback_and_continue_as_read(sg);
+    CHECK_EQUAL(1, link_list->size());
+    LangBindHelper::promote_to_write(sg, *tlr);
+    link_list->remove(0);
+    CHECK_EQUAL(0, link_list->size());
+    LangBindHelper::rollback_and_continue_as_read(sg);
+    CHECK_EQUAL(1, link_list->size());
+}
+
+
+
 TEST(LangBindHelper_ImplicitTransactions_OverSharedGroupDestruction)
 {
     SHARED_GROUP_TEST_PATH(path);
