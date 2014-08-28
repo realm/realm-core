@@ -4762,6 +4762,27 @@ TEST(Table_RowAccessorCopyAndAssign)
     }
 }
 
+TEST(Table_RowAccessorAssignMultipleTables)
+{
+    Table tables[2];
+    for (int i = 0; i < 2; ++i) {
+        tables[i].add_column(type_Int, "");
+        tables[i].add_empty_row(2);
+        tables[i].set_int(0, 0, 750);
+        tables[i].set_int(0, 1, 751);
+    }
+
+    Row row_1 = tables[0][1];
+    Row row_2 = tables[1][1];
+    Row row_3 = tables[0][1];
+    row_1 = tables[1][1]; // Assign attached `Row` to a different table
+
+    // Veriy that the correct accessors are updated when removing from a table
+    tables[0].remove(0);
+    CHECK_EQUAL(row_1.get_index(), 1);
+    CHECK_EQUAL(row_2.get_index(), 1);
+    CHECK_EQUAL(row_3.get_index(), 0);
+}
 
 TEST(Table_RowAccessorRetain)
 {

@@ -800,7 +800,7 @@ void Table::update_link_target_tables(size_t old_col_ndx_begin, size_t new_col_n
 }
 
 
-void Table::register_row_accessor(RowBase* row) const
+void Table::register_row_accessor(RowBase* row) const TIGHTDB_NOEXCEPT
 {
     row->m_prev = 0;
     row->m_next = m_row_accessors;
