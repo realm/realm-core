@@ -195,8 +195,8 @@ protected:
     TableRef m_table; // Null if detached.
     std::size_t m_row_ndx; // Undefined if detached.
 
-    void attach(Table*, std::size_t row_ndx);
-    void reattach(Table*, std::size_t row_ndx);
+    void attach(Table*, std::size_t row_ndx) TIGHTDB_NOEXCEPT;
+    void reattach(Table*, std::size_t row_ndx) TIGHTDB_NOEXCEPT;
     void impl_detach() TIGHTDB_NOEXCEPT;
 
 private:
@@ -243,10 +243,10 @@ template<class T> class BasicRow:
 public:
     BasicRow() TIGHTDB_NOEXCEPT;
 
-    template<class U> BasicRow(BasicRowExpr<U>);
-    template<class U> BasicRow(const BasicRow<U>&);
-    template<class U> BasicRow& operator=(BasicRowExpr<U>);
-    template<class U> BasicRow& operator=(BasicRow<U>);
+    template<class U> BasicRow(BasicRowExpr<U>) TIGHTDB_NOEXCEPT;
+    template<class U> BasicRow(const BasicRow<U>&) TIGHTDB_NOEXCEPT;
+    template<class U> BasicRow& operator=(BasicRowExpr<U>) TIGHTDB_NOEXCEPT;
+    template<class U> BasicRow& operator=(BasicRow<U>) TIGHTDB_NOEXCEPT;
 
     ~BasicRow() TIGHTDB_NOEXCEPT;
 
@@ -564,31 +564,31 @@ template<class T> inline BasicRow<T>::BasicRow() TIGHTDB_NOEXCEPT
 {
 }
 
-template<class T> template<class U> inline BasicRow<T>::BasicRow(BasicRowExpr<U> expr)
+template<class T> template<class U> inline BasicRow<T>::BasicRow(BasicRowExpr<U> expr) TIGHTDB_NOEXCEPT
 {
     T* table = expr.m_table; // Check that pointer types are compatible
-    attach(const_cast<Table*>(table), expr.m_row_ndx); // Throws
+    attach(const_cast<Table*>(table), expr.m_row_ndx);
 }
 
-template<class T> template<class U> inline BasicRow<T>::BasicRow(const BasicRow<U>& row)
+template<class T> template<class U> inline BasicRow<T>::BasicRow(const BasicRow<U>& row) TIGHTDB_NOEXCEPT
 {
     T* table = row.m_table.get(); // Check that pointer types are compatible
-    attach(const_cast<Table*>(table), row.m_row_ndx); // Throws
+    attach(const_cast<Table*>(table), row.m_row_ndx);
 }
 
 template<class T> template<class U>
-inline BasicRow<T>& BasicRow<T>::operator=(BasicRowExpr<U> expr)
+inline BasicRow<T>& BasicRow<T>::operator=(BasicRowExpr<U> expr) TIGHTDB_NOEXCEPT
 {
     T* table = expr.m_table; // Check that pointer types are compatible
-    reattach(const_cast<Table*>(table), expr.m_row_ndx); // Throws
+    reattach(const_cast<Table*>(table), expr.m_row_ndx);
     return *this;
 }
 
 template<class T> template<class U>
-inline BasicRow<T>& BasicRow<T>::operator=(BasicRow<U> row)
+inline BasicRow<T>& BasicRow<T>::operator=(BasicRow<U> row) TIGHTDB_NOEXCEPT
 {
     T* table = row.m_table.get(); // Check that pointer types are compatible
-    reattach(const_cast<Table*>(table), row.m_row_ndx); // Throws
+    reattach(const_cast<Table*>(table), row.m_row_ndx);
     return *this;
 }
 
