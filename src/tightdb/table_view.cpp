@@ -209,7 +209,7 @@ size_t TableViewBase::count_double(size_t column_ndx, double target) const
 {
     return aggregate<act_Count, double, size_t, ColumnDouble>(NULL, column_ndx, target);
 }
-
+/*
 namespace tightdb {
     template <> StringData TableViewBase::get_value<StringData>(size_t row, size_t column) const
     {
@@ -349,6 +349,8 @@ void TableViewBase::sort(size_t column, bool Ascending)
     }
     result.destroy(); // FIXME: Leak if we don't get this far
 }
+*/
+
 
 // Simple pivot aggregate method. Experimental! Please do not document method publicly.
 void TableViewBase::aggregate(size_t group_by_column, size_t aggr_column, Table::AggrType op, Table& result) const

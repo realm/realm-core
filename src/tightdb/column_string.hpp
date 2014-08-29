@@ -72,6 +72,15 @@ public:
     void find_all(Column& result, StringData value, std::size_t begin = 0,
                   std::size_t end = npos) const;
 
+    int compare_values(size_t row1, size_t row2) const
+    {        
+        if (get(row1).data() == get(row2).data())
+            return 0;
+
+        bool ret = utf8_compare(get(row1).data(), get(row2).data());        
+        return ret ? 1 : -1;
+    }
+
     //@{
     /// Find the lower/upper bound for the specified value assuming
     /// that the elements are already sorted in ascending order

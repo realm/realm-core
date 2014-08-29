@@ -186,21 +186,23 @@ template<class T> struct LinkComparer {
 
 } // anonymous namespace
 
-
+/*
 void LinkView::sort(size_t column_ndx, bool ascending)
 {
-    sort(column_ndx, m_row_indexes, ascending);
+    sort(column_ndx, ascending);
 }
-
+*/
 
 TableView LinkView::get_sorted_view(size_t column_ndx, bool ascending)
 {
-    TableView res(m_origin_column.get_target_table());
-    sort(column_ndx, res.m_row_indexes, ascending);
-    return res;
+    TableView v(m_origin_column.get_target_table());
+    for (size_t t = 0; t < m_row_indexes.size(); t++) // todo, simpler way?
+        v.m_row_indexes.add(get(t).get_index());
+    v.sort(column_ndx, ascending);
+    return v;
 }
 
-
+/*
 template <class T> void LinkView::sort(size_t column_ndx, Column& dest, bool ascending)
 {
     vector<size_t> v, v2;
@@ -244,7 +246,7 @@ void LinkView::sort(size_t column_ndx, Column& dest, bool ascending)
         sort<int64_t>(column_ndx, dest, ascending);
     }
 }
-
+*/
 
 void LinkView::remove_target_row(size_t link_ndx)
 {

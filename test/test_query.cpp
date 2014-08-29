@@ -3467,7 +3467,7 @@ TEST(Query_Sort_And_Requery_FindFirst)
 }
 
 
-TEST(Query_Sort_And_Requery_Untyped2)
+ONLY(Query_Sort_And_Requery_Untyped2)
 {
     // New where(tableview) method
     Table table;

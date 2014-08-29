@@ -288,6 +288,9 @@
     <ClCompile Include="..\..\test\util\jsmn.cpp">
       <Filter>test\util</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\tightdb\views.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\win32\pthread\pthread.h">

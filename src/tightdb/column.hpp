@@ -64,6 +64,9 @@ public:
     /// always be strictly less that the last index.
     virtual void move_last_over(std::size_t target_row_ndx, std::size_t last_row_ndx) = 0;
 
+    /// return if row1 > row2
+    virtual int compare_values(size_t row1, size_t row2) const { TIGHTDB_ASSERT(false); return 0; }
+
     virtual bool IsIntColumn() const TIGHTDB_NOEXCEPT { return false; }
 
     // Returns true if, and only if this column is an AdaptiveStringColumn.
@@ -345,6 +348,14 @@ public:
     void find_all(Column& result, int64_t value,
                   std::size_t begin = 0, std::size_t end = npos) const;
 
+    int compare_values(size_t row1, size_t row2) const 
+    { 
+        if (get(row1) == get(row2))
+            return 0;
+        if (get(row1) < get(row2))
+            return 1;
+        return -1;
+    }
     //@{
     /// Find the lower/upper bound for the specified value assuming
     /// that the elements are already sorted in ascending order

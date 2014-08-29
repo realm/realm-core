@@ -60,6 +60,15 @@ public:
     void clear() TIGHTDB_OVERRIDE;
     void move_last_over(std::size_t, std::size_t) TIGHTDB_OVERRIDE;
 
+    int compare_values(size_t row1, size_t row2) const
+    {
+        if (get(row1) == get(row2))
+            return 0;
+        if (get(row1) < get(row2))
+            return 1;
+        return -1;
+    }
+
     std::size_t count(T value) const;
 
     typedef typename AggReturnType<T>::sum_type SumType;

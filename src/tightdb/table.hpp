@@ -1087,6 +1087,7 @@ private:
     friend class RowBase;
     friend class LinksToNode;
     friend class LinkMap;
+    friend class LinkView;
 };
 
 

@@ -164,6 +164,9 @@ TEST(TableView_FloatsGetSet)
     v = table.column().col_float.find_all(2.1f); // Test assignment
     CHECK_EQUAL(2, v.size());
 
+    TableFloats::View v2(v);
+
+
     // Test of Get
     CHECK_EQUAL(2.1f, v[0].col_float);
     CHECK_EQUAL(2.1f, v[1].col_float);
@@ -1273,15 +1276,27 @@ TEST(TableView_FindBySourceNdx)
 {
     Table table;
     table.add_column(type_Int, "");
+    table.add_column(type_Float, "");
     table.add_empty_row();
     table.add_empty_row();
     table.add_empty_row();
     table[0].set_int(0, 0);
     table[1].set_int(0, 1);
-    table[2].set_int(0, 2);
+    table[2].set_int(0, 1);
+
+    table[0].set_float(1, 0);
+    table[1].set_float(1, 2);
+    table[2].set_float(1, 1);
 
     TableView tv = table.where().find_all();
     tv.sort(0, false);
+
+    std::vector<size_t> v;
+    v.push_back(0);
+    v.push_back(1);
+    tv.sort(v, true);
+
+//    tv.get_value<StringData>(1, 2);
 
     CHECK_EQUAL(0, tv.find_by_source_ndx(2));
     CHECK_EQUAL(1, tv.find_by_source_ndx(1));

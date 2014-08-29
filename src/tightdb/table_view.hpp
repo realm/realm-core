@@ -107,6 +107,11 @@ public:
     bool is_attached() const TIGHTDB_NOEXCEPT;
     std::size_t size() const TIGHTDB_NOEXCEPT;
 
+    ColumnBase& get_column_base(size_t index)
+    {
+        return m_table->get_column_base(index);
+    }
+
     // Column information
     size_t      get_column_count() const TIGHTDB_NOEXCEPT;
     StringData  get_column_name(size_t column_ndx) const TIGHTDB_NOEXCEPT;
@@ -167,8 +172,6 @@ public:
 
     DateTime maximum_datetime(size_t column_ndx, size_t* return_ndx = 0) const;
     DateTime minimum_datetime(size_t column_ndx, size_t* return_ndx = 0) const;
-
-    void sort(size_t column_ndx, bool ascending = true);
 
     void apply_same_order(TableViewBase& order);
 
@@ -274,7 +277,6 @@ protected:
 private:
     void detach() const TIGHTDB_NOEXCEPT;
     std::size_t find_first_integer(std::size_t column_ndx, int64_t value) const;
-    template <class T> void sort(size_t column, bool ascending);
     friend class Table;
     friend class Query;
 };
