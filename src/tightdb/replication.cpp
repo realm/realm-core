@@ -882,7 +882,7 @@ public:
 
     ~InputStreamImpl() TIGHTDB_NOEXCEPT {}
 
-    size_t read(char* buffer, size_t size)
+    size_t read(char* buffer, size_t size) TIGHTDB_OVERRIDE
     {
         size_t n = min<size_t>(size, m_end-m_begin);
         const char* end = m_begin + n;
@@ -891,7 +891,7 @@ public:
         return n;
     }
 
-    size_t next_block(const char*& begin, const char*& end)
+    size_t next_block(const char*& begin, const char*& end) TIGHTDB_OVERRIDE
     {
         if (m_begin != 0) {
             begin = m_begin;

@@ -501,7 +501,6 @@ private:
     void reverse_transact(ref_type new_top_ref, const BinaryData& log);
 #endif
 
-
 #ifdef TIGHTDB_DEBUG
     std::pair<ref_type, std::size_t>
     get_to_dot_parent(std::size_t ndx_in_parent) const TIGHTDB_OVERRIDE;
