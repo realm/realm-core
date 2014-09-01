@@ -1291,7 +1291,7 @@ void SharedGroup::do_commit()
     // in a lock-file session is rolled back (aborted), because then the first
     // committed transaction will have m_readlock.m_version > 1.
     if (m_readlock.m_version == 1)
-        m_group.reset_free_space_versions();
+        m_group.reset_free_space_versions(); // Throws
 
     SharedInfo* info = m_file_map.get_addr();
     SharedInfo* r_info = m_reader_map.get_addr();
@@ -1307,9 +1307,9 @@ void SharedGroup::do_commit()
     {
         uint_fast64_t new_version;
 #ifdef TIGHTDB_ENABLE_REPLICATION
-        // It is essential that if Replication::commit_write_transact()
-        // fails, then the transaction is not completed. A subsequent call
-        // to rollback() must roll it back.
+        // It is essential that if Replication::commit_write_transact() fails,
+        // then the transaction is not completed. In that case, a subsequent
+        // call to rollback() must still roll the transaction back.
         if (Replication* repl = m_group.get_replication()) {
             uint_fast64_t current_version = r_info->get_current_version_unchecked();
             new_version = repl->commit_write_transact(*this, current_version); // Throws
@@ -1328,8 +1328,16 @@ void SharedGroup::do_commit()
     // we know for certain that the readlock we will grab WILL refer to our own newly
     // completed commit.
     release_readlock(m_readlock);
+    // FIXME: Why grab a new read-lock as part of a regular commit? It seems
+    // wrong.
+    //
+    // FIXME: We need to find a way to give SharedGroup::commit() a sound and
+    // intelligable exception behavior. The desirable exception behavior is
+    // probably that the commit has occured if, and only if it does not
+    // throw. The possible exception from grab_latest_readlock() makes this
+    // harder than it would otherwise have been.
     bool ignored;
-    grab_latest_readlock(m_readlock, ignored);
+    grab_latest_readlock(m_readlock, ignored); // Throws
 
     // downgrade to a read transaction (if not, assert in end_read)
     m_transact_stage = transact_Reading;

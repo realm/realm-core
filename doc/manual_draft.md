@@ -1,5 +1,5 @@
-String and binary data sizes:
------------------------------
+String and binary data sizes
+----------------------------
 
 TightDB currently has the following limitations:
 
@@ -16,8 +16,8 @@ TightDB currently has the following limitations:
 
 
 
-Strings and Unicode:
---------------------
+Strings and Unicode
+-------------------
 
 TightDB has full support for Unicode. Internally it stores all strings
 using the UTF-8 character encoding.
@@ -29,8 +29,8 @@ Matching,” in Section 5.18, Case Mappings of the the Unicode Standard.
 
 
 
-Date/time:
-----------
+Date/time
+---------
 
 TightDB supports only one date/time data type called 'DateTime'. A DateTime
 value represents an absolute point it time, and is represented as an
@@ -43,8 +43,8 @@ representation that does not have this limitation.
 
 
 
-Misc.:
-------
+Misc.
+-----
 
 Due to memory mapping, read/write errors are not reported by the
 library in the usual way. On Linux an application will have to install
