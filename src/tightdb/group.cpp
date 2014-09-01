@@ -127,6 +127,10 @@ void Group::create(bool add_free_versions)
     }
 }
 
+ref_type Group::get_top_ref()
+{
+    return m_top.get_ref();
+}
 
 void Group::init_from_ref(ref_type top_ref) TIGHTDB_NOEXCEPT
 {

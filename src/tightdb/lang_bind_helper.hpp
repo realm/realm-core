@@ -119,7 +119,7 @@ public:
     /// Wrappers - forward calls to shared group. A bit like NSA. Circumventing privacy :-)
     static void advance_read(SharedGroup&, TransactLogRegistry& write_logs);
     static void promote_to_write(SharedGroup&, TransactLogRegistry& write_logs);
-    static void commit_and_continue_as_read(SharedGroup&);
+    static void commit_and_continue_as_read(SharedGroup&, bool eliminate_if_empty = true);
 #endif
 
     /// Returns the name of the specified data type as follows:
@@ -308,9 +308,9 @@ inline void LangBindHelper::promote_to_write(SharedGroup& sg,
     sg.promote_to_write(log_registry);
 }
 
-inline void LangBindHelper::commit_and_continue_as_read(SharedGroup& sg)
+inline void LangBindHelper::commit_and_continue_as_read(SharedGroup& sg, bool eliminate_if_empty)
 {
-    sg.commit_and_continue_as_read();
+    sg.commit_and_continue_as_read(eliminate_if_empty);
 }
 
 

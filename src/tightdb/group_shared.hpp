@@ -176,7 +176,7 @@ public:
     Group& begin_write();
 
     // End the current write transaction. All accessors are detached.
-    void commit();
+    void commit(bool eliminate_if_empty = true);
 
     // End the current write transaction. All accessors are detached.
     void rollback() TIGHTDB_NOEXCEPT;
@@ -345,8 +345,9 @@ private:
     // End the current write transaction and transition atomically into
     // a read transaction, WITHOUT synchronizing to external changes
     // to data. All accessors are retained and continue to reflect the
-    // state at commit.
-    void commit_and_continue_as_read();
+    // state at commit. If eliminate_if_empty is set, and the write
+    // transaction holds no changes, the commit is eliminated.
+    void commit_and_continue_as_read(bool eliminate_if_empty);
 #endif
     friend class ReadTransaction;
     friend class WriteTransaction;
@@ -453,10 +454,10 @@ public:
         return m_shared_group->m_group;
     }
 
-    void commit()
+    void commit(bool eliminate_if_empty = true)
     {
         TIGHTDB_ASSERT(m_shared_group);
-        m_shared_group->commit();
+        m_shared_group->commit(eliminate_if_empty);
         m_shared_group = 0;
     }
 
