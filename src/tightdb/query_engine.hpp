@@ -90,6 +90,7 @@ AggregateState      State of the aggregate - contains a state variable that stor
 #include <functional>
 #include <algorithm>
 
+#include <tightdb/util/bind_ptr.hpp>
 #include <tightdb/util/meta.hpp>
 #include <tightdb/unicode.hpp>
 #include <tightdb/utilities.hpp>
@@ -544,7 +545,7 @@ public:
         return to_size_t(m_tv.m_row_indexes.get(n));
     }
 
-    void init(const Table& table) TIGHTDB_OVERRIDE
+    virtual void init(const Table& table) TIGHTDB_OVERRIDE
     {
         m_table = &table;
 
@@ -587,6 +588,7 @@ public:
         m_max = from.m_max;
         m_next = from.m_next;
         m_size = from.m_size;
+        m_child = from.m_child;
     }
 
 protected:
@@ -678,6 +680,7 @@ public:
     {
         m_child2 = from.m_child2;
         m_column = from.m_column;
+        m_child = from.m_child;
     }
 
     ParentNode* m_child2;
@@ -739,7 +742,7 @@ public:
         : ParentNode(from), m_array(Array::no_prealloc_tag())
     {
         // state is transient/only valid during search, no need to copy
-        m_child = 0;
+        m_child = from.m_child;
         m_conds = 0;
         m_dT = 1.0 / 4.0;
         m_probes = 0;
@@ -960,6 +963,7 @@ public:
         m_value = from.m_value;
         m_condition_column = from.m_condition_column;
         m_find_callback_specialized = from.m_find_callback_specialized;
+        m_child = from.m_child;
     }
 
     TConditionValue m_value;
@@ -1025,6 +1029,7 @@ public:
         : ParentNode(from)
     {
         m_value = from.m_value;
+        m_child = from.m_child;
         // m_condition_column is not copied
     }
 
@@ -1096,6 +1101,7 @@ public:
         m_value = BinaryData(data, from.m_value.size());
         m_condition_column = from.m_condition_column;
         m_column_type = from.m_column_type;
+        m_child = from.m_child;
     }
 
 
@@ -1182,6 +1188,7 @@ public:
         m_leaf_type = from.m_leaf_type;
         m_end_s = 0;
         m_leaf_start = 0;
+        m_child = from.m_child;
     }
 
 protected:
@@ -1297,6 +1304,7 @@ public:
         memcpy(ucase, from.m_ucase, sz);
         m_lcase = lcase;
         m_ucase = ucase;
+        m_child = from.m_child;
     }
 protected:
     const char* m_lcase;
@@ -1628,6 +1636,7 @@ public:
         m_last[1] = from.m_last[1];
         m_was_match[0] = from.m_was_match[0];
         m_was_match[1] = from.m_was_match[1];
+        m_child = from.m_child;
     }
 
 
@@ -1737,6 +1746,7 @@ public:
         m_cond = from.m_cond;
         m_last = from.m_last;
         m_was_match = from.m_was_match;
+        m_child = from.m_child;
     }
 
     ParentNode* m_cond;
@@ -1844,6 +1854,7 @@ public:
         m_column_type = from.m_column_type;
         m_condition_column_idx1 = from.m_condition_column_idx1;
         m_condition_column_idx2 = from.m_condition_column_idx2;
+        m_child = from.m_child;
         // NOT copied:
         // m_getter1 = from.m_getter1;
         // m_getter2 = from.m_getter2;
@@ -1865,21 +1876,20 @@ protected:
 #include "query_expression.hpp"
 
 
-// For Nexgt-Generation expressions like col1 / col2 + 123 > col4 * 100
+// For Next-Generation expressions like col1 / col2 + 123 > col4 * 100.
 class ExpressionNode: public ParentNode {
 
 public:
     ~ExpressionNode() TIGHTDB_NOEXCEPT
     {
-        if (m_auto_delete)
-            delete m_compare, m_compare = null_ptr;
+        m_compare.reset();
     }
 
     ExpressionNode(Expression* compare, bool auto_delete)
     {
         m_auto_delete = auto_delete;
         m_child = 0;
-        m_compare = compare;
+        m_compare = util::bind_ptr<Expression>(compare);
         m_dD = 10.0;
         m_dT = 50.0;
     }
@@ -1910,14 +1920,12 @@ public:
     ExpressionNode(ExpressionNode& from) 
         : ParentNode(from)
     {
-        // FIXME! We take over any ownership. This is most likely not correct.
-        m_auto_delete = from.m_auto_delete; // shared ownership? deep copy?
-        from.m_auto_delete = false;
         m_compare = from.m_compare;
+        m_child = from.m_child;
     }
 
     bool m_auto_delete;
-    Expression* m_compare;
+    util::bind_ptr<Expression> m_compare;
 };
 
 

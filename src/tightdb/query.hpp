@@ -63,6 +63,8 @@ public:
     ~Query() TIGHTDB_NOEXCEPT;
     void move_assign(Query& query);
 
+    Query& operator = (const Query& source);
+
     Query& expression(Expression* compare, bool auto_delete = false);
     Expression* get_expression();
 
@@ -295,6 +297,7 @@ private:
                             size_t start, size_t end, SequentialGetterBase* source_column) const;
 
     void find_all(TableViewBase& tv, size_t start = 0, size_t end=size_t(-1), size_t limit = size_t(-1)) const;
+    void delete_nodes() TIGHTDB_NOEXCEPT;
 
     std::string error_code;
 

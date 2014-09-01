@@ -64,9 +64,7 @@ public:
     {
         if (get(row1) == get(row2))
             return 0;
-        if (get(row1) < get(row2))
-            return 1;
-        return -1;
+        return get(row1) < get(row2) ? 1 : -1;
     }
 
     std::size_t count(T value) const;

@@ -50,65 +50,72 @@ Query::Query(const Query& copy)
     do_delete = true;
 }
 
-void Query::move_assign(Query& copy)
-{
-    if (do_delete) {
-        for (size_t t = 0; t < all_nodes.size(); t++) {
-            delete all_nodes[t];
-        }
-    }
 
-    m_table = copy.m_table;
-    all_nodes = copy.all_nodes;
-    update = copy.update;
-    update_override = copy.update_override;
-    first = copy.first;
-    pending_not = copy.pending_not;
-    error_code = copy.error_code;
-    m_tableview = copy.m_tableview;
-    copy.do_delete = false;
-    do_delete = true;
-    copy.m_table = TableRef();
-}
-
+// todo, try and remove this constructor. It's currently required for copy-initialization only, and not
+// copy-assignment anylonger (which is now just "=").
 Query::Query(const Query& copy, const TCopyExpressionTag&) 
 {
-    Create();
-    std::map<ParentNode*, ParentNode*> node_mapping;
-    node_mapping[ null_ptr ] = null_ptr;
-    std::vector<ParentNode*>::const_iterator i;
-    for (i = copy.all_nodes.begin(); i != copy.all_nodes.end(); ++i) {
-        ParentNode* new_node = (*i)->clone();
-        all_nodes.push_back(new_node);
-        node_mapping[ *i ] = new_node;
-    }
-    for (i = all_nodes.begin(); i != all_nodes.end(); ++i) {
-        (*i)->translate_pointers(node_mapping);
-    }
-    if (all_nodes.size() > 0) {
-        first[0] = all_nodes[0];
-    }
-    m_table = copy.m_table;
-    m_tableview = copy.m_tableview;
-
-    for (size_t t = 0; t < update.size(); t++) {
-        update[t] = &first[0];
-    }
-
+    // We can call the copyassignment operator even if this destination is uninitialized - the do_delete flag 
+    // just needs to be false.
+    do_delete = false;
+    *this = copy;
 }
 
+Query& Query::operator = (const Query& source)
+{
+    if (this != &source) {
+        // free destination object
+        delete_nodes();
+        all_nodes.clear();
+        first.clear();
+        update.clear();
+        pending_not.clear();
+        update_override.clear();
+        subtables.clear();
+
+        Create();
+        first = source.first;
+        std::map<ParentNode*, ParentNode*> node_mapping;
+        node_mapping[null_ptr] = null_ptr;
+        std::vector<ParentNode*>::const_iterator i;
+        for (i = source.all_nodes.begin(); i != source.all_nodes.end(); ++i) {
+            ParentNode* new_node = (*i)->clone();
+            all_nodes.push_back(new_node);
+            node_mapping[*i] = new_node;
+        }
+        for (i = all_nodes.begin(); i != all_nodes.end(); ++i) {
+            (*i)->translate_pointers(node_mapping);
+        }
+        for (size_t t = 0; t < first.size(); t++) {
+            first[t] = node_mapping[first[t]];
+        }
+        m_table = source.m_table;
+        m_tableview = source.m_tableview;
+
+        for (size_t t = 0; t < update.size(); t++) {
+            update[t] = &first[0];
+        }
+    }
+    return *this;
+}
 
 Query::~Query() TIGHTDB_NOEXCEPT
+{
+    delete_nodes();
+}
+
+void Query::delete_nodes() TIGHTDB_NOEXCEPT
 {
     if (do_delete) {
         for (size_t t = 0; t < all_nodes.size(); t++) {
             ParentNode *p = all_nodes[t];
             std::vector<ParentNode *>::iterator it = std::find(all_nodes.begin(), all_nodes.begin() + t, p);
-            if(it == all_nodes.begin() + t)
+            if (it == all_nodes.begin() + t)
                 delete p;
         }
     }
 }
+
 /*
 // use and_query() instead!
 Expression* Query::get_expression() {

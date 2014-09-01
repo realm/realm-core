@@ -76,9 +76,7 @@ public:
     {        
         if (get(row1).data() == get(row2).data())
             return 0;
-
-        bool ret = utf8_compare(get(row1).data(), get(row2).data());        
-        return ret ? 1 : -1;
+        return utf8_compare(get(row1).data(), get(row2).data()) ? 1 : -1;        
     }
 
     //@{

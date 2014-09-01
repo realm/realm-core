@@ -352,9 +352,7 @@ public:
     { 
         if (get(row1) == get(row2))
             return 0;
-        if (get(row1) < get(row2))
-            return 1;
-        return -1;
+        return get(row1) < get(row2) ? 1 : -1;
     }
     //@{
     /// Find the lower/upper bound for the specified value assuming

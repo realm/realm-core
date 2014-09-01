@@ -589,7 +589,9 @@ public:
     T load_relaxed() const;
     T fetch_sub_relaxed(T v);
     T fetch_sub_release(T v);
+    T fetch_add_release(T v);
     T fetch_add_acquire(T v);
+    T fetch_sub_acquire(T v);
     void store(T value);
     void store_release(T value);
     void store_relaxed(T value);
@@ -648,9 +650,21 @@ inline T Atomic<T>::fetch_sub_release(T v)
 }
 
 template<typename T>
+inline T Atomic<T>::fetch_add_release(T v)
+{
+    return state.fetch_add(v, std::memory_order_release);
+}
+
+template<typename T>
 inline T Atomic<T>::fetch_add_acquire(T v)
 {
     return state.fetch_add(v, std::memory_order_acquire);
+}
+
+template<typename T>
+inline T Atomic<T>::fetch_sub_acquire(T v)
+{
+    return state.fetch_sub(v, std::memory_order_acquire);
 }
 
 template<typename T>
@@ -791,6 +805,15 @@ inline T Atomic<T>::fetch_sub_release(T v)
 #endif
 }
 
+template<typename T>
+inline T Atomic<T>::fetch_add_release(T v)
+{
+#if TIGHTDB_HAVE_AT_LEAST_GCC(4, 7)
+    return __atomic_fetch_add(&state, v, __ATOMIC_RELEASE);
+#else
+    return __sync_fetch_and_add(&state, v);
+#endif
+}
 
 template<typename T>
 inline T Atomic<T>::fetch_add_acquire(T v)
@@ -802,6 +825,15 @@ inline T Atomic<T>::fetch_add_acquire(T v)
 #endif
 }
 
+template<typename T>
+inline T Atomic<T>::fetch_sub_acquire(T v)
+{
+#if TIGHTDB_HAVE_AT_LEAST_GCC(4, 7)
+    return __atomic_fetch_sub(&state, v, __ATOMIC_ACQUIRE);
+#else
+    return __sync_fetch_and_sub(&state, v);
+#endif
+}
 
 
 template<typename T>

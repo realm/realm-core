@@ -897,7 +897,7 @@ private:
                               const TableViewBase* new_addr) TIGHTDB_NOEXCEPT;
     void discard_views() TIGHTDB_NOEXCEPT;
 
-    void register_row_accessor(RowBase*) const;
+    void register_row_accessor(RowBase*) const TIGHTDB_NOEXCEPT;
     void unregister_row_accessor(RowBase*) const TIGHTDB_NOEXCEPT;
 
     class UnbindGuard;

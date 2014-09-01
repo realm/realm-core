@@ -451,7 +451,7 @@ TEST(TableView_Follows_Changes)
     CHECK_EQUAL(1, v.get_int(0,0));
 
     // low level sanity check that we can copy a query and run the copy:
-    Query q2(q,Query::TCopyExpressionTag());
+    Query q2 = q;
     TableView v2 = q2.find_all();
 
     // now the fun begins
@@ -1272,6 +1272,7 @@ TEST(TableView_RowAccessor)
     CHECK_EQUAL(703, crow_2.get_int(0));
 }
 
+
 TEST(TableView_FindBySourceNdx)
 {
     Table table;
@@ -1296,12 +1297,43 @@ TEST(TableView_FindBySourceNdx)
     v.push_back(1);
     tv.sort(v, true);
 
-//    tv.get_value<StringData>(1, 2);
-
     CHECK_EQUAL(0, tv.find_by_source_ndx(2));
     CHECK_EQUAL(1, tv.find_by_source_ndx(1));
     CHECK_EQUAL(2, tv.find_by_source_ndx(0));
 }
 
+
+TEST(TableView_QueryCopy)
+{
+    Table table;
+    table.add_column(type_Int, "");
+    table.add_empty_row();
+    table.add_empty_row();
+    table.add_empty_row();
+    table[0].set_int(0, 0);
+    table[1].set_int(0, 1);
+    table[2].set_int(0, 2);
+
+    // Test if copy-assign of Query in TableView works
+    TableView tv = table.where().find_all();
+
+    Query q = table.where();
+
+    q.group();
+    q.equal(0, 1);
+    q.Or();
+    q.equal(0, 2);
+    q.end_group();
+
+    q.count();
+    
+    Query q2;
+    q2 = table.where().equal(0, 1234);
+    
+    q2 = q;
+    size_t t = q2.count();
+
+    CHECK_EQUAL(t, 2);
+}
 
 #endif // TEST_TABLE_VIEW

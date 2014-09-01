@@ -110,7 +110,6 @@ public:
 
     const Table& get_target_table() const TIGHTDB_NOEXCEPT;
     Table& get_target_table() TIGHTDB_NOEXCEPT;
-    template<class T> T get_value(std::size_t row, std::size_t column);
 
 private:
     TableRef m_origin_table;
@@ -319,30 +318,6 @@ inline const Table& LinkView::get_target_table() const TIGHTDB_NOEXCEPT
 inline Table& LinkView::get_target_table() TIGHTDB_NOEXCEPT
 {
     return m_origin_column.get_target_table();
-}
-
-template<> inline StringData LinkView::get_value<StringData>(std::size_t row, std::size_t column)
-{
-    StringData s = m_origin_column.get_target_table().get_string(column, row);
-    return s;
-}
-
-template<> inline float LinkView::get_value<float>(std::size_t row, std::size_t column)
-{
-    float f = m_origin_column.get_target_table().get_float(column, row);
-    return f;
-}
-
-template<> inline double LinkView::get_value<double>(std::size_t row, std::size_t column)
-{
-    float d = m_origin_column.get_target_table().get_double(column, row);
-    return d;
-}
-
-template<> inline int64_t LinkView::get_value<int64_t>(std::size_t row, std::size_t column)
-{
-    int64_t i = m_origin_column.get_target_table().get_int(column, row);
-    return i;
 }
 
 inline void LinkView::refresh_accessor_tree(std::size_t new_row_ndx) TIGHTDB_NOEXCEPT
