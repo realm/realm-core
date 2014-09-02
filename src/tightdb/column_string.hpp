@@ -74,9 +74,11 @@ public:
 
     int compare_values(size_t row1, size_t row2) const TIGHTDB_OVERRIDE
     {        
-        if (get(row1).data() == get(row2).data())
+        StringData a = get(row1);
+        StringData b = get(row2);
+        if (a == b)
             return 0;
-        return utf8_compare(get(row1).data(), get(row2).data()) ? 1 : -1;        
+        return utf8_compare(a, b) ? 1 : -1;        
     }
 
     //@{

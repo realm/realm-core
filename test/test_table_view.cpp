@@ -1272,8 +1272,24 @@ TEST(TableView_RowAccessor)
     CHECK_EQUAL(703, crow_2.get_int(0));
 }
 
-
 TEST(TableView_FindBySourceNdx)
+{
+    Table table;
+    table.add_column(type_Int, "");
+    table.add_empty_row();
+    table.add_empty_row();
+    table.add_empty_row();
+    table[0].set_int(0, 0);
+    table[1].set_int(0, 1);
+    table[2].set_int(0, 2);
+    TableView tv = table.where().find_all();
+    tv.sort(0, false);
+    CHECK_EQUAL(0, tv.find_by_source_ndx(2));
+    CHECK_EQUAL(1, tv.find_by_source_ndx(1));
+    CHECK_EQUAL(2, tv.find_by_source_ndx(0));
+}
+
+TEST(TableView_MultiColSort)
 {
     Table table;
     table.add_column(type_Int, "");
@@ -1285,21 +1301,26 @@ TEST(TableView_FindBySourceNdx)
     table[1].set_int(0, 1);
     table[2].set_int(0, 1);
 
-    table[0].set_float(1, 0);
-    table[1].set_float(1, 2);
-    table[2].set_float(1, 1);
+    table[0].set_float(1, 0.f);
+    table[1].set_float(1, 2.f);
+    table[2].set_float(1, 1.f);
 
     TableView tv = table.where().find_all();
-    tv.sort(0, false);
 
     std::vector<size_t> v;
     v.push_back(0);
     v.push_back(1);
     tv.sort(v, true);
 
-    CHECK_EQUAL(0, tv.find_by_source_ndx(2));
-    CHECK_EQUAL(1, tv.find_by_source_ndx(1));
-    CHECK_EQUAL(2, tv.find_by_source_ndx(0));
+    CHECK_EQUAL(tv.get_float(1, 0), 0.f);
+    CHECK_EQUAL(tv.get_float(1, 1), 1.f);
+    CHECK_EQUAL(tv.get_float(1, 2), 2.f);
+
+    tv.sort(v, false);
+
+    CHECK_EQUAL(tv.get_float(1, 0), 2.f);
+    CHECK_EQUAL(tv.get_float(1, 1), 1.f);
+    CHECK_EQUAL(tv.get_float(1, 2), 0.f);
 }
 
 

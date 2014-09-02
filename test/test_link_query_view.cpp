@@ -783,6 +783,7 @@ TEST(LinkList_SortLinkView)
     table1->add_column(type_String, "str1");
     table1->add_column(type_Float, "str1");
     table1->add_column(type_Double, "str1");
+    table1->add_column(type_String, "str2");
 
     // add some rows
     table1->add_empty_row();
@@ -790,18 +791,21 @@ TEST(LinkList_SortLinkView)
     table1->set_string(1, 0, "delta");
     table1->set_float(2, 0, 300.f);
     table1->set_double(3, 0, 300.);
+    table1->set_string(4, 0, "alfa");
 
     table1->add_empty_row();
     table1->set_int(0, 1, 100);
     table1->set_string(1, 1, "alfa");
     table1->set_float(2, 1, 100.f);
     table1->set_double(3, 1, 100.);
+    table1->set_string(4, 0, "alfa");
 
     table1->add_empty_row();
     table1->set_int(0, 2, 200);
     table1->set_string(1, 2, "beta");
     table1->set_float(2, 2, 200.f);
     table1->set_double(3, 2, 200.);
+    table1->set_string(4, 0, "alfa");
 
     size_t col_link2 = table2->add_column_link(type_LinkList, "linklist", *table1);
     table2->add_empty_row();
@@ -906,6 +910,26 @@ TEST(LinkList_SortLinkView)
     CHECK_EQUAL(tv.get(0).get_index(), 0);
     CHECK_EQUAL(tv.get(1).get_index(), 2);
     CHECK_EQUAL(tv.get(2).get_index(), 1);
+
+    vector<size_t> v;
+    v.push_back(4);
+    v.push_back(1);
+    lvr->sort(v, false);
+    CHECK_EQUAL(lvr->get(0).get_index(), 0);
+    CHECK_EQUAL(lvr->get(1).get_index(), 2);
+    CHECK_EQUAL(lvr->get(2).get_index(), 1);
+
+    lvr->sort(v, true);
+    CHECK_EQUAL(lvr->get(0).get_index(), 1);
+    CHECK_EQUAL(lvr->get(1).get_index(), 2);
+    CHECK_EQUAL(lvr->get(2).get_index(), 0);
+
+    v.push_back(2);
+
+    lvr->sort(v, true);
+    CHECK_EQUAL(lvr->get(0).get_index(), 1);
+    CHECK_EQUAL(lvr->get(1).get_index(), 2);
+    CHECK_EQUAL(lvr->get(2).get_index(), 0);
 }
 
 
