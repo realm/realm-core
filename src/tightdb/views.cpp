@@ -30,5 +30,4 @@ void RowIndexes::re_sort()
     m_row_indexes.clear();
     for (size_t t = 0; t < v.size(); t++)
         m_row_indexes.add(v[t]);
-
 }

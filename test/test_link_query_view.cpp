@@ -911,25 +911,38 @@ TEST(LinkList_SortLinkView)
     CHECK_EQUAL(tv.get(1).get_index(), 2);
     CHECK_EQUAL(tv.get(2).get_index(), 1);
 
+    // Test multi-column sorting
     vector<size_t> v;
     v.push_back(4);
     v.push_back(1);
     lvr->sort(v, false);
+    tv = lvr->get_sorted_view(v, false);
     CHECK_EQUAL(lvr->get(0).get_index(), 0);
     CHECK_EQUAL(lvr->get(1).get_index(), 2);
     CHECK_EQUAL(lvr->get(2).get_index(), 1);
+    CHECK_EQUAL(tv.get(0).get_index(), 0);
+    CHECK_EQUAL(tv.get(1).get_index(), 2);
+    CHECK_EQUAL(tv.get(2).get_index(), 1);
 
     lvr->sort(v, true);
+    tv = lvr->get_sorted_view(v, true);
     CHECK_EQUAL(lvr->get(0).get_index(), 1);
     CHECK_EQUAL(lvr->get(1).get_index(), 2);
     CHECK_EQUAL(lvr->get(2).get_index(), 0);
+    CHECK_EQUAL(tv.get(0).get_index(), 1);
+    CHECK_EQUAL(tv.get(1).get_index(), 2);
+    CHECK_EQUAL(tv.get(2).get_index(), 0);
 
     v.push_back(2);
 
     lvr->sort(v, true);
+    tv = lvr->get_sorted_view(v, true);
     CHECK_EQUAL(lvr->get(0).get_index(), 1);
     CHECK_EQUAL(lvr->get(1).get_index(), 2);
     CHECK_EQUAL(lvr->get(2).get_index(), 0);
+    CHECK_EQUAL(tv.get(0).get_index(), 1);
+    CHECK_EQUAL(tv.get(1).get_index(), 2);
+    CHECK_EQUAL(tv.get(2).get_index(), 0);
 }
 
 
