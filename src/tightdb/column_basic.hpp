@@ -43,9 +43,6 @@ template<class T>
 class BasicColumn : public ColumnBase, public ColumnTemplate<T> {
 public:
     typedef T value_type;
-
-    T get_val(size_t row) const { return get(row); }
-
     BasicColumn(Allocator&, ref_type);
     ~BasicColumn() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
@@ -105,6 +102,9 @@ public:
     void dump_node_structure(std::ostream&, int level) const TIGHTDB_OVERRIDE;
     using ColumnBase::dump_node_structure;
 #endif
+
+protected:
+    T get_val(size_t row) const { return get(row); }
 
 private:
     std::size_t do_get_size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return size(); }

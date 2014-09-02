@@ -51,8 +51,8 @@ template <class T> struct ColumnTemplate : public ColumnTemplateBase
         return a == b ? 0 : a < b ? 1 : -1;
     }
 
-    // todo, we cannot use already-existing get() methods because their return type differs from T for 
-    // the ColumnStringEnum and LinkList classes. Find a way to fix/simplify this, if possible
+    // We cannot use already-existing get() methods because ColumnStringEnum and LinkList inherit from
+    // Column and overload get() with different return type than int64_t. Todo, find a way to simplify 
     virtual T get_val(size_t row) const = 0;
 };
 

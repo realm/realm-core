@@ -48,8 +48,6 @@ class AdaptiveStringColumn : public ColumnBase, public ColumnTemplate<StringData
 public:
     typedef StringData value_type;
 
-    StringData get_val(size_t row) const { return get(row); }
-
     AdaptiveStringColumn(Allocator&, ref_type);
     ~AdaptiveStringColumn() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
@@ -134,6 +132,9 @@ public:
     void dump_node_structure(std::ostream&, int level) const TIGHTDB_OVERRIDE;
     using ColumnBase::dump_node_structure;
 #endif
+
+protected:
+    StringData get_val(size_t row) const { return get(row); }
 
 private:
     StringIndex* m_search_index;
