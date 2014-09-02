@@ -28,16 +28,18 @@ public:
         Sorter(std::vector<size_t> columns, bool ascending) : m_columns(columns), m_ascending(ascending) {};
         bool operator()(size_t i, size_t j) const
         {
-            TIGHTDB_ASSERT(m_columns.size() == m_column_pointers.size());
-            for (size_t t = 0; t < m_column_pointers.size(); t++) {
-                int c = m_column_pointers[t]->compare_values(i, j);
+            for (size_t t = 0; t < m_columns.size(); t++) {
+                ColumnBase& cb = m_row_indexes_class->get_column_base(m_columns[t]);
+                // todo/fixme, cache casted pointers for speed
+                ColumnTemplateBase* ctb = dynamic_cast<ColumnTemplateBase*>(&cb);
+                TIGHTDB_ASSERT(ctb);
+                int c = ctb->compare_values(i, j);
                 if (c != 0)
                     return m_ascending ? c > 0 : c < 0;
             }
             return false; // row i == row j
         }
         std::vector<size_t> m_columns;
-        std::vector<ColumnTemplateBase*> m_column_pointers;
         RowIndexes* m_row_indexes_class;
         bool m_ascending;
     };

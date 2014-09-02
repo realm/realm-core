@@ -22,14 +22,6 @@ void RowIndexes::sort(std::vector<size_t> columns, bool ascending)
 // Re-sort view according to last used criterias
 void RowIndexes::re_sort()
 {
-    // Build vector of pointers to the user given column indexes
-    for (size_t t = 0; t < m_columns.size(); t++) {
-        ColumnBase& cb = m_row_indexes_class->get_column_base(m_columns[t]);
-        ColumnTemplateBase* ctb = dynamic_cast<ColumnTemplateBase*>(&cb);
-        TIGHTDB_ASSERT(ctb);
-        m_column_pointers.push_back(ctb);
-    }
-
     std::vector<size_t> v;
     for (size_t t = 0; t < size(); t++)
         v.push_back(m_row_indexes.get(t));
