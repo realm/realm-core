@@ -291,7 +291,7 @@ public:
         return false;
     }
 
-    bool insert_int(size_t col_ndx, size_t row_ndx, std::size_t, bool, int_fast64_t value)
+    bool insert_int(size_t col_ndx, size_t row_ndx, std::size_t, int_fast64_t value)
     {
         if (TIGHTDB_LIKELY(check_insert_cell(col_ndx, row_ndx))) {
 #ifdef TIGHTDB_DEBUG
@@ -304,7 +304,7 @@ public:
         return false;
     }
 
-    bool insert_bool(size_t col_ndx, size_t row_ndx, std::size_t, bool, bool value)
+    bool insert_bool(size_t col_ndx, size_t row_ndx, std::size_t, bool value)
     {
         if (TIGHTDB_LIKELY(check_insert_cell(col_ndx, row_ndx))) {
 #ifdef TIGHTDB_DEBUG
@@ -317,7 +317,7 @@ public:
         return false;
     }
 
-    bool insert_float(size_t col_ndx, size_t row_ndx, std::size_t, bool, float value)
+    bool insert_float(size_t col_ndx, size_t row_ndx, std::size_t, float value)
     {
         if (TIGHTDB_LIKELY(check_insert_cell(col_ndx, row_ndx))) {
 #ifdef TIGHTDB_DEBUG
@@ -330,7 +330,7 @@ public:
         return false;
     }
 
-    bool insert_double(size_t col_ndx, size_t row_ndx, std::size_t, bool, double value)
+    bool insert_double(size_t col_ndx, size_t row_ndx, std::size_t, double value)
     {
         if (TIGHTDB_LIKELY(check_insert_cell(col_ndx, row_ndx))) {
 #ifdef TIGHTDB_DEBUG
@@ -343,7 +343,7 @@ public:
         return false;
     }
 
-    bool insert_string(size_t col_ndx, size_t row_ndx, std::size_t, bool, StringData value)
+    bool insert_string(size_t col_ndx, size_t row_ndx, std::size_t, StringData value)
     {
         if (TIGHTDB_LIKELY(check_insert_cell(col_ndx, row_ndx))) {
 #ifdef TIGHTDB_DEBUG
@@ -356,7 +356,7 @@ public:
         return false;
     }
 
-    bool insert_binary(size_t col_ndx, size_t row_ndx, std::size_t, bool, BinaryData value)
+    bool insert_binary(size_t col_ndx, size_t row_ndx, std::size_t, BinaryData value)
     {
         if (TIGHTDB_LIKELY(check_insert_cell(col_ndx, row_ndx))) {
 #ifdef TIGHTDB_DEBUG
@@ -369,7 +369,7 @@ public:
         return false;
     }
 
-    bool insert_date_time(size_t col_ndx, size_t row_ndx, std::size_t, bool, DateTime value)
+    bool insert_date_time(size_t col_ndx, size_t row_ndx, std::size_t, DateTime value)
     {
         if (TIGHTDB_LIKELY(check_insert_cell(col_ndx, row_ndx))) {
 #ifdef TIGHTDB_DEBUG
@@ -382,7 +382,7 @@ public:
         return false;
     }
 
-    bool insert_table(size_t col_ndx, size_t row_ndx, std::size_t, bool)
+    bool insert_table(size_t col_ndx, size_t row_ndx, std::size_t)
     {
         if (TIGHTDB_LIKELY(check_insert_cell(col_ndx, row_ndx))) {
 #ifdef TIGHTDB_DEBUG
@@ -395,7 +395,7 @@ public:
         return false;
     }
 
-    bool insert_mixed(size_t col_ndx, size_t row_ndx, std::size_t, bool, const Mixed& value)
+    bool insert_mixed(size_t col_ndx, size_t row_ndx, std::size_t, const Mixed& value)
     {
         if (TIGHTDB_LIKELY(check_insert_cell(col_ndx, row_ndx))) {
 #ifdef TIGHTDB_DEBUG
@@ -408,7 +408,7 @@ public:
         return false;
     }
 
-    bool insert_link(size_t col_ndx, size_t row_ndx, std::size_t, bool, std::size_t value)
+    bool insert_link(size_t col_ndx, size_t row_ndx, std::size_t, std::size_t value)
     {
         TIGHTDB_ASSERT(value > 0); // Not yet any support for inserting null links
         if (TIGHTDB_LIKELY(check_insert_cell(col_ndx, row_ndx))) {
@@ -422,7 +422,7 @@ public:
         return false;
     }
 
-    bool insert_link_list(size_t col_ndx, size_t row_ndx, std::size_t, bool)
+    bool insert_link_list(size_t col_ndx, size_t row_ndx, std::size_t)
     {
         if (TIGHTDB_LIKELY(check_insert_cell(col_ndx, row_ndx))) {
 #ifdef TIGHTDB_DEBUG

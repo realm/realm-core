@@ -407,17 +407,17 @@ public:
     ///     bool insert_empty_rows(std::size_t row_ndx, std::size_t num_rows, std::size_t tbl_sz, bool unordered)
     ///     bool erase_row(std::size_t row_ndx, std::size_t tbl_sz, bool unordered)
     ///     bool clear_table()
-    ///     bool insert_int(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, bool unordered, int_fast64_t)
-    ///     bool insert_bool(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, bool unordered, bool)
-    ///     bool insert_float(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, bool unordered, float)
-    ///     bool insert_double(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, bool unordered, double)
-    ///     bool insert_string(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, bool unordered, StringData)
-    ///     bool insert_binary(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, bool unordered, BinaryData)
-    ///     bool insert_date_time(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, bool unordered, DateTime)
-    ///     bool insert_table(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, bool unordered)
-    ///     bool insert_mixed(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, bool unordered, const Mixed&)
-    ///     bool insert_link(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, bool unordered, std::size_t)
-    ///     bool insert_link_list(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, bool unordered)
+    ///     bool insert_int(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, int_fast64_t)
+    ///     bool insert_bool(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, bool)
+    ///     bool insert_float(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, float)
+    ///     bool insert_double(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, double)
+    ///     bool insert_string(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, StringData)
+    ///     bool insert_binary(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, BinaryData)
+    ///     bool insert_date_time(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, DateTime)
+    ///     bool insert_table(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz)
+    ///     bool insert_mixed(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, const Mixed&)
+    ///     bool insert_link(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, std::size_t)
+    ///     bool insert_link_list(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz)
     ///     bool row_insert_complete()
     ///     bool set_int(std::size_t col_ndx, std::std::size_t row_ndx, int_fast64_t)
     ///     bool set_bool(std::size_t col_ndx, std::size_t row_ndx, bool)
@@ -863,7 +863,6 @@ inline void Replication::insert_column(const Descriptor& desc, std::size_t col_n
     typedef _impl::TableFriend tf;
     TIGHTDB_ASSERT(tf::is_link_type(ColumnType(type)) == (link_target_table != 0));
     if (link_target_table) {
-        typedef _impl::TableFriend tf;
         typedef _impl::DescriptorFriend df;
         std::size_t target_table_ndx = link_target_table->get_index_in_group();
         append_num(target_table_ndx); // Throws
@@ -986,35 +985,35 @@ inline void Replication::insert_int(const Table* t, std::size_t col_ndx,
                                     std::size_t ndx, int_fast64_t value)
 {
     check_table(t); // Throws
-    simple_cmd(instr_InsertInt, util::tuple(col_ndx, ndx, t->size(), false, value)); // Throws
+    simple_cmd(instr_InsertInt, util::tuple(col_ndx, ndx, t->size(), value)); // Throws
 }
 
 inline void Replication::insert_bool(const Table* t, std::size_t col_ndx,
                                      std::size_t ndx, bool value)
 {
     check_table(t); // Throws
-    simple_cmd(instr_InsertBool, util::tuple(col_ndx, ndx, t->size(), false, value)); // Throws
+    simple_cmd(instr_InsertBool, util::tuple(col_ndx, ndx, t->size(), value)); // Throws
 }
 
 inline void Replication::insert_float(const Table* t, std::size_t col_ndx,
                                       std::size_t ndx, float value)
 {
     check_table(t); // Throws
-    simple_cmd(instr_InsertFloat, util::tuple(col_ndx, ndx, t->size(), false, value)); // Throws
+    simple_cmd(instr_InsertFloat, util::tuple(col_ndx, ndx, t->size(), value)); // Throws
 }
 
 inline void Replication::insert_double(const Table* t, std::size_t col_ndx,
                                        std::size_t ndx, double value)
 {
     check_table(t); // Throws
-    simple_cmd(instr_InsertDouble, util::tuple(col_ndx, ndx, t->size(), false, value)); // Throws
+    simple_cmd(instr_InsertDouble, util::tuple(col_ndx, ndx, t->size(), value)); // Throws
 }
 
 inline void Replication::insert_string(const Table* t, std::size_t col_ndx,
                                        std::size_t ndx, StringData value)
 {
     check_table(t); // Throws
-    simple_cmd(instr_InsertString, util::tuple(col_ndx, ndx, t->size(), false));
+    simple_cmd(instr_InsertString, util::tuple(col_ndx, ndx, t->size()));
     string_value(value.data(), value.size());
 }
 
@@ -1022,7 +1021,7 @@ inline void Replication::insert_binary(const Table* t, std::size_t col_ndx,
                                        std::size_t ndx, BinaryData value)
 {
     check_table(t); // Throws
-    simple_cmd(instr_InsertBinary, util::tuple(col_ndx, ndx, t->size(), false));
+    simple_cmd(instr_InsertBinary, util::tuple(col_ndx, ndx, t->size()));
     string_value(value.data(), value.size());
 }
 
@@ -1030,21 +1029,21 @@ inline void Replication::insert_date_time(const Table* t, std::size_t col_ndx,
                                           std::size_t ndx, DateTime value)
 {
     check_table(t); // Throws
-    simple_cmd(instr_InsertDateTime, util::tuple(col_ndx, ndx, t->size(), false, value.get_datetime())); // Throws
+    simple_cmd(instr_InsertDateTime, util::tuple(col_ndx, ndx, t->size(), value.get_datetime())); // Throws
 }
 
 inline void Replication::insert_table(const Table* t, std::size_t col_ndx,
                                       std::size_t ndx)
 {
     check_table(t); // Throws
-    simple_cmd(instr_InsertTable, util::tuple(col_ndx, ndx, t->size(), false)); // Throws
+    simple_cmd(instr_InsertTable, util::tuple(col_ndx, ndx, t->size())); // Throws
 }
 
 inline void Replication::insert_mixed(const Table* t, std::size_t col_ndx,
                                       std::size_t ndx, const Mixed& value)
 {
     check_table(t); // Throws
-    simple_cmd(instr_InsertMixed, util::tuple(col_ndx, ndx, t->size(), false));
+    simple_cmd(instr_InsertMixed, util::tuple(col_ndx, ndx, t->size()));
     mixed_value(value); // Throws
 }
 
@@ -1052,13 +1051,13 @@ inline void Replication::insert_link(const Table* t, std::size_t col_ndx,
                                      std::size_t ndx, std::size_t value)
 {
     check_table(t); // Throws
-    simple_cmd(instr_InsertLink, util::tuple(col_ndx, ndx, t->size(), false, value)); // Throws
+    simple_cmd(instr_InsertLink, util::tuple(col_ndx, ndx, t->size(), value)); // Throws
 }
 
 inline void Replication::insert_link_list(const Table* t, std::size_t col_ndx, std::size_t ndx)
 {
     check_table(t); // Throws
-    simple_cmd(instr_InsertLinkList, util::tuple(col_ndx, ndx, t->size(), false)); // Throws
+    simple_cmd(instr_InsertLinkList, util::tuple(col_ndx, ndx, t->size())); // Throws
 }
 
 
@@ -1292,12 +1291,11 @@ bool Replication::TransactLogParser::parse_one_inst(InstructionHandler& handler)
             std::size_t col_ndx = read_int<std::size_t>(); // Throws
             std::size_t row_ndx = read_int<std::size_t>(); // Throws
             std::size_t tbl_sz = read_int<std::size_t>(); // Throws
-            bool unordered = read_int<bool>(); // Throws
             // FIXME: Don't depend on the existence of int64_t,
             // but don't allow values to use more than 64 bits
             // either.
             int_fast64_t value = read_int<int64_t>(); // Throws
-            if (!handler.insert_int(col_ndx, row_ndx, tbl_sz, unordered, value)) // Throws
+            if (!handler.insert_int(col_ndx, row_ndx, tbl_sz, value)) // Throws
                 return false;
             return true;
         }
@@ -1305,9 +1303,8 @@ bool Replication::TransactLogParser::parse_one_inst(InstructionHandler& handler)
             std::size_t col_ndx = read_int<std::size_t>(); // Throws
             std::size_t row_ndx = read_int<std::size_t>(); // Throws
             std::size_t tbl_sz = read_int<std::size_t>(); // Throws
-            bool unordered = read_int<bool>(); // Throws
             bool value = read_int<bool>(); // Throws
-            if (!handler.insert_bool(col_ndx, row_ndx, tbl_sz, unordered, value)) // Throws
+            if (!handler.insert_bool(col_ndx, row_ndx, tbl_sz, value)) // Throws
                 return false;
             return true;
         }
@@ -1315,9 +1312,8 @@ bool Replication::TransactLogParser::parse_one_inst(InstructionHandler& handler)
             std::size_t col_ndx = read_int<std::size_t>(); // Throws
             std::size_t row_ndx = read_int<std::size_t>(); // Throws
             std::size_t tbl_sz = read_int<std::size_t>(); // Throws
-            bool unordered = read_int<bool>(); // Throws
             float value = read_float(); // Throws
-            if (!handler.insert_float(col_ndx, row_ndx, tbl_sz, unordered, value)) // Throws
+            if (!handler.insert_float(col_ndx, row_ndx, tbl_sz, value)) // Throws
                 return false;
             return true;
         }
@@ -1325,9 +1321,8 @@ bool Replication::TransactLogParser::parse_one_inst(InstructionHandler& handler)
             std::size_t col_ndx = read_int<std::size_t>(); // Throws
             std::size_t row_ndx = read_int<std::size_t>(); // Throws
             std::size_t tbl_sz = read_int<std::size_t>(); // Throws
-            bool unordered = read_int<bool>(); // Throws
             double value = read_double(); // Throws
-            if (!handler.insert_double(col_ndx, row_ndx, tbl_sz, unordered, value)) // Throws
+            if (!handler.insert_double(col_ndx, row_ndx, tbl_sz, value)) // Throws
                 return false;
             return true;
         }
@@ -1335,10 +1330,9 @@ bool Replication::TransactLogParser::parse_one_inst(InstructionHandler& handler)
             std::size_t col_ndx = read_int<std::size_t>(); // Throws
             std::size_t row_ndx = read_int<std::size_t>(); // Throws
             std::size_t tbl_sz = read_int<std::size_t>(); // Throws
-            bool unordered = read_int<bool>(); // Throws
             read_string(m_string_buffer); // Throws
             StringData value(m_string_buffer.data(), m_string_buffer.size());
-            if (!handler.insert_string(col_ndx, row_ndx, tbl_sz, unordered, value)) // Throws
+            if (!handler.insert_string(col_ndx, row_ndx, tbl_sz, value)) // Throws
                 return false;
             return true;
         }
@@ -1346,10 +1340,9 @@ bool Replication::TransactLogParser::parse_one_inst(InstructionHandler& handler)
             std::size_t col_ndx = read_int<std::size_t>(); // Throws
             std::size_t row_ndx = read_int<std::size_t>(); // Throws
             std::size_t tbl_sz = read_int<std::size_t>(); // Throws
-            bool unordered = read_int<bool>(); // Throws
             read_string(m_string_buffer); // Throws
             BinaryData value(m_string_buffer.data(), m_string_buffer.size());
-            if (!handler.insert_binary(col_ndx, row_ndx, tbl_sz, unordered, value)) // Throws
+            if (!handler.insert_binary(col_ndx, row_ndx, tbl_sz, value)) // Throws
                 return false;
             return true;
         }
@@ -1357,9 +1350,8 @@ bool Replication::TransactLogParser::parse_one_inst(InstructionHandler& handler)
             std::size_t col_ndx = read_int<std::size_t>(); // Throws
             std::size_t row_ndx = read_int<std::size_t>(); // Throws
             std::size_t tbl_sz = read_int<std::size_t>(); // Throws
-            bool unordered = read_int<bool>(); // Throws
             std::time_t value = read_int<std::time_t>(); // Throws
-            if (!handler.insert_date_time(col_ndx, row_ndx, tbl_sz, unordered, value)) // Throws
+            if (!handler.insert_date_time(col_ndx, row_ndx, tbl_sz, value)) // Throws
                 return false;
             return true;
         }
@@ -1367,8 +1359,7 @@ bool Replication::TransactLogParser::parse_one_inst(InstructionHandler& handler)
             std::size_t col_ndx = read_int<std::size_t>(); // Throws
             std::size_t row_ndx = read_int<std::size_t>(); // Throws
             std::size_t tbl_sz = read_int<std::size_t>(); // Throws
-            bool unordered = read_int<bool>(); // Throws
-            if (!handler.insert_table(col_ndx, row_ndx, tbl_sz, unordered)) // Throws
+            if (!handler.insert_table(col_ndx, row_ndx, tbl_sz)) // Throws
                 return false;
             return true;
         }
@@ -1376,10 +1367,9 @@ bool Replication::TransactLogParser::parse_one_inst(InstructionHandler& handler)
             std::size_t col_ndx = read_int<std::size_t>(); // Throws
             std::size_t row_ndx = read_int<std::size_t>(); // Throws
             std::size_t tbl_sz = read_int<std::size_t>(); // Throws
-            bool unordered = read_int<bool>(); // Throws
             Mixed value;
             read_mixed(&value); // Throws
-            if (!handler.insert_mixed(col_ndx, row_ndx, tbl_sz, unordered, value)) // Throws
+            if (!handler.insert_mixed(col_ndx, row_ndx, tbl_sz, value)) // Throws
                 return false;
             return true;
         }
@@ -1387,9 +1377,8 @@ bool Replication::TransactLogParser::parse_one_inst(InstructionHandler& handler)
             std::size_t col_ndx = read_int<std::size_t>(); // Throws
             std::size_t row_ndx = read_int<std::size_t>(); // Throws
             std::size_t tbl_sz = read_int<std::size_t>(); // Throws
-            bool unordered = read_int<bool>(); // Throws
             std::size_t value = read_int<std::size_t>(); // Throws
-            if (!handler.insert_link(col_ndx, row_ndx, tbl_sz, unordered, value)) // Throws
+            if (!handler.insert_link(col_ndx, row_ndx, tbl_sz, value)) // Throws
                 return false;
             return true;
         }
@@ -1397,8 +1386,7 @@ bool Replication::TransactLogParser::parse_one_inst(InstructionHandler& handler)
             std::size_t col_ndx = read_int<std::size_t>(); // Throws
             std::size_t row_ndx = read_int<std::size_t>(); // Throws
             std::size_t tbl_sz = read_int<std::size_t>(); // Throws
-            bool unordered = read_int<bool>(); // Throws
-            if (!handler.insert_link_list(col_ndx, row_ndx, tbl_sz, unordered)) // Throws
+            if (!handler.insert_link_list(col_ndx, row_ndx, tbl_sz)) // Throws
                 return false;
             return true;
         }
