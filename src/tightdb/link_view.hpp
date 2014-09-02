@@ -86,23 +86,6 @@ public:
         return get_target_table().get_column_base(index);
     }
 
-    StringData get_string(size_t column_ndx, size_t row_ndx) const
-    {
-        return "hej";
-    }
-    float get_float(size_t column_ndx, size_t row_ndx) const
-    {
-        return 123;
-    }
-    double get_double(size_t column_ndx, size_t row_ndx) const
-    {
-        return 132;
-    }
-    int64_t get_int(size_t column_ndx, size_t row_ndx) const
-    {
-        return 123;
-    }
-
     const Table& get_origin_table() const TIGHTDB_NOEXCEPT;
     Table& get_origin_table() TIGHTDB_NOEXCEPT;
 
@@ -132,10 +115,6 @@ private:
 
     void update_from_parent(std::size_t old_baseline) TIGHTDB_NOEXCEPT;
 
-//    void sort(std::size_t column_ndx, Column& dest, bool ascending);
- //   template<class> void sort(std::size_t column_ndx, Column& dest, bool ascending);
-
-
 #ifdef TIGHTDB_ENABLE_REPLICATION
     Replication* get_repl() TIGHTDB_NOEXCEPT;
     void repl_unselect() TIGHTDB_NOEXCEPT;
@@ -156,9 +135,9 @@ private:
 // Implementation
 
 inline LinkView::LinkView(Table* origin_table, ColumnLinkList& column, std::size_t row_ndx):
+    RowIndexes(Column::unattached_root_tag(), column.get_alloc()), // Throws
     m_origin_table(origin_table->get_table_ref()),
     m_origin_column(column),
-    RowIndexes(Column::unattached_root_tag(), column.get_alloc()), // Throws
     m_ref_count(0)
 {
     Array& root = *m_row_indexes.get_root_array();

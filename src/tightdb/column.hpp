@@ -36,6 +36,25 @@ namespace tightdb {
 // Pre-definitions
 class Column;
 
+struct ColumnTemplateBase
+{
+    virtual int compare_values(size_t row1, size_t row2) const = 0;
+};
+
+template <class T> struct ColumnTemplate : public ColumnTemplateBase
+{
+    // Overridden in column_string.* because == operator of StringData isn't yet locale aware; todo
+    virtual int compare_values(size_t row1, size_t row2) const
+    {
+        T a = get_val(row1);
+        T b = get_val(row2);
+        return a == b ? 0 : a < b ? 1 : -1;
+    }
+
+    // todo, we cannot use already-existing get() methods because their return type differs from T for 
+    // the ColumnStringEnum and LinkList classes. Find a way to fix/simplify this, if possible
+    virtual T get_val(size_t row) const = 0;
+};
 
 /// Base class for all column types.
 class ColumnBase {
@@ -63,9 +82,6 @@ public:
     /// one less than the number of rows in the column. The target index must
     /// always be strictly less that the last index.
     virtual void move_last_over(std::size_t target_row_ndx, std::size_t last_row_ndx) = 0;
-
-    /// return if row1 > row2
-    virtual int compare_values(size_t row1, size_t row2) const { TIGHTDB_ASSERT(false); return 0; }
 
     virtual bool IsIntColumn() const TIGHTDB_NOEXCEPT { return false; }
 
@@ -286,9 +302,11 @@ private:
 /// arrays of type Array.
 ///
 /// FIXME: Rename Column to IntegerColumn.
-class Column: public ColumnBase {
+class Column: public ColumnBase, public ColumnTemplate<int64_t> {
 public:
     typedef int64_t value_type;
+
+    int64_t get_val(size_t row) const { return get(row); }
 
     Column(Allocator&, ref_type);
 
@@ -348,12 +366,6 @@ public:
     void find_all(Column& result, int64_t value,
                   std::size_t begin = 0, std::size_t end = npos) const;
 
-    int compare_values(size_t row1, size_t row2) const 
-    { 
-        if (get(row1) == get(row2))
-            return 0;
-        return get(row1) < get(row2) ? 1 : -1;
-    }
     //@{
     /// Find the lower/upper bound for the specified value assuming
     /// that the elements are already sorted in ascending order

@@ -1939,7 +1939,7 @@ public:
         m_dT = 50.0;
     }
 
-    void init(const Table& table)  TIGHTDB_OVERRIDE
+    void init(const Table& table) TIGHTDB_OVERRIDE
     {
         m_table = &table;
         if (m_child)

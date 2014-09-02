@@ -223,7 +223,6 @@ protected:
 
     // Null if, and only if, the view is detached
     mutable TableRef m_table;
-//    mutable Column m_refs;
     mutable uint_fast64_t m_last_seen_version;
     // A valid query holds a reference to it's table which must match our m_table.
     // hence we can use A query with a null table reference to indicate that the view
@@ -490,9 +489,9 @@ inline TableViewBase::TableViewBase():
 }
 
 inline TableViewBase::TableViewBase(Table* parent):
-    m_table(parent->get_table_ref()),
-    RowIndexes(Column::unattached_root_tag(), Allocator::get_default()) // Throws
-{
+    RowIndexes(Column::unattached_root_tag(), Allocator::get_default()), 
+    m_table(parent->get_table_ref()) // Throws
+    {
 #ifdef TIGHTDB_ENABLE_REPLICATION
     m_last_seen_version = m_table ? m_table->m_version : 0;
     m_auto_sort = false;
@@ -508,8 +507,8 @@ inline TableViewBase::TableViewBase(Table* parent):
 }
 
 inline TableViewBase::TableViewBase(Table* parent, Query& query, size_t start, size_t end, size_t limit):
-    m_table(parent->get_table_ref()),
     RowIndexes(Column::unattached_root_tag(), Allocator::get_default()), // Throws
+    m_table(parent->get_table_ref()),
     m_query(query, Query::TCopyExpressionTag())
 {
 #ifdef TIGHTDB_ENABLE_REPLICATION
@@ -532,10 +531,10 @@ inline TableViewBase::TableViewBase(Table* parent, Query& query, size_t start, s
 }
 
 inline TableViewBase::TableViewBase(const TableViewBase& tv):
-    m_table(tv.m_table),
     RowIndexes(Column::unattached_root_tag(), Allocator::get_default()),
+    m_table(tv.m_table),
     m_query(tv.m_query, Query::TCopyExpressionTag())
-{
+    {
 #ifdef TIGHTDB_ENABLE_REPLICATION
     m_last_seen_version = tv.m_last_seen_version;
     m_auto_sort = tv.m_auto_sort;
@@ -556,8 +555,8 @@ inline TableViewBase::TableViewBase(const TableViewBase& tv):
 }
 
 inline TableViewBase::TableViewBase(TableViewBase* tv) TIGHTDB_NOEXCEPT:
-    m_table(move(tv->m_table)),
-        RowIndexes(Column::move_tag(), tv->m_row_indexes)
+    RowIndexes(Column::move_tag(), tv->m_row_indexes),
+    m_table(move(tv->m_table))
 {
 #ifdef TIGHTDB_ENABLE_REPLICATION
     // if we are created from a table view which is outdated, take care to use the outdated

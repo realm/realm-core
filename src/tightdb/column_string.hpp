@@ -44,9 +44,11 @@ class StringIndex;
 /// column.
 ///
 /// FIXME: Rename AdaptiveStringColumn to StringColumn
-class AdaptiveStringColumn: public ColumnBase {
+class AdaptiveStringColumn : public ColumnBase, public ColumnTemplate<StringData> {
 public:
     typedef StringData value_type;
+
+    StringData get_val(size_t row) const { return get(row); }
 
     AdaptiveStringColumn(Allocator&, ref_type);
     ~AdaptiveStringColumn() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
@@ -72,7 +74,7 @@ public:
     void find_all(Column& result, StringData value, std::size_t begin = 0,
                   std::size_t end = npos) const;
 
-    int compare_values(size_t row1, size_t row2) const
+    int compare_values(size_t row1, size_t row2) const TIGHTDB_OVERRIDE
     {        
         if (get(row1).data() == get(row2).data())
             return 0;

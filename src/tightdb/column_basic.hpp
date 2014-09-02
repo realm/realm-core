@@ -40,9 +40,11 @@ template<> struct AggReturnType<float> {
 /// A basic column can currently only be used for simple unstructured
 /// types like float, double.
 template<class T>
-class BasicColumn: public ColumnBase {
+class BasicColumn : public ColumnBase, public ColumnTemplate<T> {
 public:
     typedef T value_type;
+
+    T get_val(size_t row) const { return get(row); }
 
     BasicColumn(Allocator&, ref_type);
     ~BasicColumn() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
@@ -59,13 +61,6 @@ public:
     void erase(std::size_t ndx, bool is_last) TIGHTDB_OVERRIDE;
     void clear() TIGHTDB_OVERRIDE;
     void move_last_over(std::size_t, std::size_t) TIGHTDB_OVERRIDE;
-
-    int compare_values(size_t row1, size_t row2) const
-    {
-        if (get(row1) == get(row2))
-            return 0;
-        return get(row1) < get(row2) ? 1 : -1;
-    }
 
     std::size_t count(T value) const;
 
