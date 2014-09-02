@@ -401,7 +401,7 @@ public:
     using ColumnBase::dump_node_structure;
 #endif
 
-//protected:
+protected:
     Column(Array* root = 0) TIGHTDB_NOEXCEPT;
 
     std::size_t do_get_size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return size(); }

@@ -288,7 +288,7 @@ void TableViewBase::sync_if_needed() const
     }
 }
 #else
-inline void sync_if_needed() const {};
+void sync_if_needed() const {};
 #endif
 
 // O(n) for n = this->size()

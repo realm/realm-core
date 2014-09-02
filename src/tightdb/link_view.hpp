@@ -62,7 +62,7 @@ public:
     void move(std::size_t old_link_ndx, std::size_t new_link_ndx);
     void remove(std::size_t link_ndx);
     void clear();
- //   void sort(std::size_t column_ndx, bool ascending = true);
+
     TableView get_sorted_view(std::size_t column_ndx, bool ascending = true);
 
     /// Remove the target row of the specified link from the target table. This
