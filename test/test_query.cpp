@@ -5499,5 +5499,19 @@ TEST(Query_DeepCopyLeak1)
     Query q3 = Query(q2, Query::TCopyExpressionTag());
 }
 
+TEST(Query_DeepCopyTest)
+{
+    // If Query::first vector was relocated because of push_back, then Query would crash, because referenced 
+    // pointers were pointing into it.
+    Table table;
+    table.add_column(type_Int, "first");
+
+    Query q1 = table.where();
+
+    Query q2(q1, Query::TCopyExpressionTag());
+
+    q2.group();
+    q2.end_group();
+}
 
 #endif // TEST_QUERY
