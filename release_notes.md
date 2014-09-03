@@ -2,7 +2,7 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
+* Fixed bug in deep copy of Query, causing the experienced crash at end of scope of a Query after add_constraint_to_query() had been executed. The fix may not be optimal as it limits nesting of group/end_group to 16 levels, and also makes Query take 128 extra bytes of space. Asana task has been made.
 
 ### API breaking changes:
 
