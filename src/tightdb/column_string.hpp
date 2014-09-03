@@ -44,7 +44,7 @@ class StringIndex;
 /// column.
 ///
 /// FIXME: Rename AdaptiveStringColumn to StringColumn
-class AdaptiveStringColumn: public ColumnBase {
+class AdaptiveStringColumn : public ColumnBase, public ColumnTemplate<StringData> {
 public:
     typedef StringData value_type;
 
@@ -71,6 +71,15 @@ public:
                            std::size_t end = npos) const;
     void find_all(Column& result, StringData value, std::size_t begin = 0,
                   std::size_t end = npos) const;
+
+    int compare_values(size_t row1, size_t row2) const TIGHTDB_OVERRIDE
+    {        
+        StringData a = get(row1);
+        StringData b = get(row2);
+        if (a == b)
+            return 0;
+        return utf8_compare(a, b) ? 1 : -1;        
+    }
 
     //@{
     /// Find the lower/upper bound for the specified value assuming
@@ -125,6 +134,9 @@ public:
     void dump_node_structure(std::ostream&, int level) const TIGHTDB_OVERRIDE;
     using ColumnBase::dump_node_structure;
 #endif
+
+protected:
+    StringData get_val(size_t row) const { return get(row); }
 
 private:
     StringIndex* m_search_index;

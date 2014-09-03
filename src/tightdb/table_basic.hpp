@@ -349,7 +349,7 @@ public:
 
     Query& tableview(const typename BasicTable<Spec>::View& v)
     {
-        m_impl.tableview(*v.get_impl());
+        m_impl.tableview(const_cast<TableView&>(*v.get_impl()));
         return *this;
     }
 

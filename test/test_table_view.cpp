@@ -67,6 +67,28 @@ TIGHTDB_TABLE_2(TestTableFloatDouble,
 
 } // anonymous namespace
 
+ONLY(TableView_Json222)
+{
+    Table table;
+    table.add_column(type_Int, "first");
+
+    size_t ndx = table.add_empty_row();
+    table.set_int(0, ndx, 1);
+    ndx = table.add_empty_row();
+    table.set_int(0, ndx, 2);
+    ndx = table.add_empty_row();
+    table.set_int(0, ndx, 3);
+
+    Query q1 = table.where();
+
+    Query q2(q1, Query::TCopyExpressionTag());
+
+    q2.group();
+    q2.and_query(q2.get_table()->column<int64_t>(0) < 23);
+    q2.end_group();
+
+
+}
 
 TEST(TableView_Json)
 {
@@ -163,6 +185,9 @@ TEST(TableView_FloatsGetSet)
     TableFloats::View v; // Test empty construction
     v = table.column().col_float.find_all(2.1f); // Test assignment
     CHECK_EQUAL(2, v.size());
+
+    TableFloats::View v2(v);
+
 
     // Test of Get
     CHECK_EQUAL(2.1f, v[0].col_float);
@@ -1269,7 +1294,6 @@ TEST(TableView_RowAccessor)
     CHECK_EQUAL(703, crow_2.get_int(0));
 }
 
-
 TEST(TableView_FindBySourceNdx)
 {
     Table table;
@@ -1280,13 +1304,45 @@ TEST(TableView_FindBySourceNdx)
     table[0].set_int(0, 0);
     table[1].set_int(0, 1);
     table[2].set_int(0, 2);
-
     TableView tv = table.where().find_all();
     tv.sort(0, false);
-
     CHECK_EQUAL(0, tv.find_by_source_ndx(2));
     CHECK_EQUAL(1, tv.find_by_source_ndx(1));
     CHECK_EQUAL(2, tv.find_by_source_ndx(0));
+}
+
+TEST(TableView_MultiColSort)
+{
+    Table table;
+    table.add_column(type_Int, "");
+    table.add_column(type_Float, "");
+    table.add_empty_row();
+    table.add_empty_row();
+    table.add_empty_row();
+    table[0].set_int(0, 0);
+    table[1].set_int(0, 1);
+    table[2].set_int(0, 1);
+
+    table[0].set_float(1, 0.f);
+    table[1].set_float(1, 2.f);
+    table[2].set_float(1, 1.f);
+
+    TableView tv = table.where().find_all();
+
+    std::vector<size_t> v;
+    v.push_back(0);
+    v.push_back(1);
+    tv.sort(v, true);
+
+    CHECK_EQUAL(tv.get_float(1, 0), 0.f);
+    CHECK_EQUAL(tv.get_float(1, 1), 1.f);
+    CHECK_EQUAL(tv.get_float(1, 2), 2.f);
+
+    tv.sort(v, false);
+
+    CHECK_EQUAL(tv.get_float(1, 0), 2.f);
+    CHECK_EQUAL(tv.get_float(1, 1), 1.f);
+    CHECK_EQUAL(tv.get_float(1, 2), 0.f);
 }
 
 

@@ -288,6 +288,9 @@
     <ClCompile Include="..\..\test\util\jsmn.cpp">
       <Filter>test\util</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\tightdb\views.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\win32\pthread\pthread.h">
@@ -532,6 +535,9 @@
     </ClInclude>
     <ClInclude Include="..\..\test\util\jsmn.hpp">
       <Filter>test\util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\tightdb\views.hpp">
+      <Filter>src\include</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -638,6 +638,7 @@
     <ClCompile Include="..\..\src\tightdb\lang_bind_helper.cpp" />
     <ClCompile Include="..\..\src\tightdb\version.cpp" />
     <ClCompile Include="..\..\src\tightdb\impl\output_stream.cpp" />
+    <ClCompile Include="..\..\src\tightdb\views.cpp" />
     <ClCompile Include="..\..\src\win32\pthread\pthread.c">
       <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">CompileAsC</CompileAs>
       <CompileAs Condition="'$(Configuration)|$(Platform)'=='csv debug|x64'">CompileAsC</CompileAs>
@@ -1139,6 +1140,7 @@
     <ClInclude Include="..\..\src\tightdb\util\utf8.hpp" />
     <ClInclude Include="..\..\src\tightdb\utilities.hpp" />
     <ClInclude Include="..\..\src\tightdb\version.hpp" />
+    <ClInclude Include="..\..\src\tightdb\views.hpp" />
     <ClInclude Include="..\..\src\win32\pthread\pthread.h" />
     <ClInclude Include="..\..\test\util\jsmn.hpp" />
     <ClInclude Include="..\..\test\util\verified_integer.hpp">
