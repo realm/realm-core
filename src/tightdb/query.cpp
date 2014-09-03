@@ -16,12 +16,12 @@ Query::Query() : m_tableview(null_ptr)
 //    expression(static_cast<Expression*>(this));
 }
 
-Query::Query(Table& table, TableViewBase* tv) : m_table(table.get_table_ref()), m_tableview(tv)
+Query::Query(Table& table, RowIndexes* tv) : m_table(table.get_table_ref()), m_tableview(tv)
 {
     Create();
 }
 
-Query::Query(const Table& table, TableViewBase* tv) : m_table((const_cast<Table&>(table)).get_table_ref()), m_tableview(tv)
+Query::Query(const Table& table, RowIndexes* tv) : m_table((const_cast<Table&>(table)).get_table_ref()), m_tableview(tv)
 {
     Create();
 }
@@ -133,7 +133,7 @@ Query& Query::expression(Expression* compare, bool auto_delete)
 }
 
 // Makes query search only in rows contained in tv
-Query& Query::tableview(const TableView& tv)
+Query& Query::tableview(TableView& tv)
 {
     ParentNode* const p = new ListviewNode(tv);
     UpdatePointers(p, &p->m_child);
@@ -540,7 +540,7 @@ size_t Query::peek_tableview(size_t tv_index) const
     TIGHTDB_ASSERT(m_tableview);
     TIGHTDB_ASSERT(tv_index < m_tableview->size());
 
-    size_t tablerow = m_tableview->get_source_ndx(tv_index);
+    size_t tablerow = m_tableview->m_row_indexes.get(tv_index);
 
     size_t r;
     if (first.size() > 0 && first[0])
@@ -596,7 +596,7 @@ template <Action action, typename T, typename R, class ColType>
             for (size_t t = start; t < end && st.m_match_count < limit; t++) {
                 size_t r = peek_tableview(t);
                 if (r != not_found)
-                    st.template match<action, false>(r, 0, source_column.get_next(m_tableview->get_source_ndx(t)));
+                    st.template match<action, false>(r, 0, source_column.get_next(m_tableview->m_row_indexes.get(t)));
             }
         }
 
@@ -939,12 +939,12 @@ void Query::find_all(TableViewBase& ret, size_t start, size_t end, size_t limit)
 
     // User created query with no criteria; return everything
     if (first.size() == 0 || first[0] == 0) {
-        Column& refs = ret.get_ref_column();
+        Column& refs = ret.m_row_indexes;
         size_t end_pos = (limit != size_t(-1)) ? min(end, start + limit) : end;
 
         if (m_tableview) {
             for (size_t i = start; i < end_pos; ++i)
-                refs.add(m_tableview->get_source_ndx(i));
+                refs.add(m_tableview->m_row_indexes.get(i));
         }
         else {
             for (size_t i = start; i < end_pos; ++i)
@@ -957,12 +957,12 @@ void Query::find_all(TableViewBase& ret, size_t start, size_t end, size_t limit)
         for (size_t begin = start; begin < end && ret.size() < limit; begin++) {
             size_t res = peek_tableview(begin);
             if (res != not_found)
-                ret.get_ref_column().add(res);
+                ret.m_row_indexes.add(res);
         }
     }
     else {
         QueryState<int64_t> st;
-        st.init(act_FindAll, &ret.get_ref_column(), limit);
+        st.init(act_FindAll, &ret.m_row_indexes, limit);
         aggregate_internal(act_FindAll, ColumnTypeTraits<int64_t>::id, first[0], &st, start, end, NULL);
     }
 }
@@ -1029,7 +1029,7 @@ size_t Query::remove(size_t start, size_t end, size_t limit)
             size_t r = peek_tableview(start + results);
             if (r != not_found) {
                 m_table->remove(r);
-                m_tableview->get_ref_column().adjust_ge(m_tableview->get_source_ndx(start + results), -1);
+                m_tableview->m_row_indexes.adjust_ge(m_tableview->m_row_indexes.get(start + results), -1);
                 results++;
             }
             else {
