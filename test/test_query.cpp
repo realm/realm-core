@@ -5502,7 +5502,7 @@ TEST(Query_DeepCopyLeak1)
 TEST(Query_DeepCopyTest)
 {
     // If Query::first vector was relocated because of push_back, then Query would crash, because referenced 
-    / /pointers were pointing into it.
+    // pointers were pointing into it.
     Table table;
     table.add_column(type_Int, "first");
 

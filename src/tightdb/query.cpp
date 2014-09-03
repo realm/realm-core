@@ -30,9 +30,9 @@ void Query::Create()
 {
     // fixme, hack that prevents 'first' from relocating; this limits queries to 16 nested levels of group/end_group
     first.reserve(16);
-
     update.push_back(0);
     update_override.push_back(0);
+    TIGHTDB_ASSERT(first.capacity() > first.size()); // see above fixme
     first.push_back(0);
     pending_not.push_back(false);
     do_delete = true;
@@ -774,6 +774,7 @@ Query& Query::group()
 {
     update.push_back(0);
     update_override.push_back(0);
+    TIGHTDB_ASSERT(first.capacity() > first.size()); // see fixme in ::Create()
     first.push_back(0);
     pending_not.push_back(false);
     return *this;
