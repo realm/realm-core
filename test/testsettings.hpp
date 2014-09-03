@@ -16,6 +16,7 @@
 // #including pthread_test.h. Works both in debug and release mode.
 //#define TIGHTDB_PTHREADS_TEST
 
+#define TEST_BASIC_UTILS
 #define TEST_COLUMN_MIXED
 #define TEST_ALLOC
 #define TEST_ARRAY

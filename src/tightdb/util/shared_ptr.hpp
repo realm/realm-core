@@ -1,6 +1,8 @@
 #ifndef TIGHTDB_SHARED_PTR_HPP
 #define TIGHTDB_SHARED_PTR_HPP
 
+#include <cstdlib> // std::size_t
+
 namespace tightdb {
 namespace util {
 
@@ -33,35 +35,20 @@ public:
         incref();
         return *this;                          
     }
-                        
-    T* get() 
-    {
-        return m_ptr;
-    }
-
-    T* operator->() 
+     
+    T* operator->() const 
     { 
         return m_ptr;
     }
 
-    T& operator*() 
+    T& operator*() const
     {
         return *m_ptr;
     }
                         
-    const T* get() const 
+    T* get() const 
     {
         return m_ptr;
-    }
-
-    const T* operator->() const 
-    {
-        return m_ptr;
-    }
-
-    const T& operator*() const
-    { 
-        return *m_ptr;
     }
                         
     bool operator==(const SharedPtr<T>& o) const
