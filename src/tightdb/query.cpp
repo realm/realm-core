@@ -28,6 +28,9 @@ Query::Query(const Table& table, TableViewBase* tv) : m_table((const_cast<Table&
 
 void Query::Create()
 {
+    // fixme, hack that prevents 'first' from relocating; this limits queries to 16 nested levels of group/end_group
+    first.reserve(16);
+
     update.push_back(0);
     update_override.push_back(0);
     first.push_back(0);
