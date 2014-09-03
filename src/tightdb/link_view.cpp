@@ -160,7 +160,7 @@ void LinkView::clear()
 #endif
 }
 
-TableView LinkView::get_sorted_view(vector<size_t> column_indexes, bool ascending)
+TableView LinkView::get_sorted_view(vector<size_t> column_indexes, bool ascending) const
 {
     TableView v(m_origin_column.get_target_table());
     for (size_t t = 0; t < m_row_indexes.size(); t++) // todo, simpler way?
@@ -169,7 +169,7 @@ TableView LinkView::get_sorted_view(vector<size_t> column_indexes, bool ascendin
     return v;
 }
 
-TableView LinkView::get_sorted_view(size_t column_index, bool ascending)
+TableView LinkView::get_sorted_view(size_t column_index, bool ascending) const
 {
     vector<size_t> vec;
     vec.push_back(column_index);

@@ -107,12 +107,9 @@ public:
     bool is_attached() const TIGHTDB_NOEXCEPT;
     std::size_t size() const TIGHTDB_NOEXCEPT;
 
-    ColumnBase& get_column_base(size_t index)
-    {
-        return m_table->get_column_base(index);
-    }
-
     // Column information
+    const ColumnBase& get_column_base(size_t index) const;
+
     size_t      get_column_count() const TIGHTDB_NOEXCEPT;
     StringData  get_column_name(size_t column_ndx) const TIGHTDB_NOEXCEPT;
     size_t      get_column_index(StringData name) const;
@@ -628,6 +625,10 @@ inline void TableViewBase::move_assign(TableViewBase* tv) TIGHTDB_NOEXCEPT
 
 // Column information
 
+inline const ColumnBase& TableViewBase::get_column_base(size_t index) const
+{
+    return m_table->get_column_base(index);
+}
 
 inline size_t TableViewBase::get_column_count() const TIGHTDB_NOEXCEPT
 {

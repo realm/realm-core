@@ -67,28 +67,6 @@ TIGHTDB_TABLE_2(TestTableFloatDouble,
 
 } // anonymous namespace
 
-ONLY(TableView_Json222)
-{
-    Table table;
-    table.add_column(type_Int, "first");
-
-    size_t ndx = table.add_empty_row();
-    table.set_int(0, ndx, 1);
-    ndx = table.add_empty_row();
-    table.set_int(0, ndx, 2);
-    ndx = table.add_empty_row();
-    table.set_int(0, ndx, 3);
-
-    Query q1 = table.where();
-
-    Query q2(q1, Query::TCopyExpressionTag());
-
-    q2.group();
-    q2.and_query(q2.get_table()->column<int64_t>(0) < 23);
-    q2.end_group();
-
-
-}
 
 TEST(TableView_Json)
 {

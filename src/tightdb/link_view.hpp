@@ -63,8 +63,8 @@ public:
     void remove(std::size_t link_ndx);
     void clear();
 
-    TableView get_sorted_view(std::vector<std::size_t> column_indexes, bool ascending = true);
-    TableView get_sorted_view(std::size_t column_index, bool ascending = true);
+    TableView get_sorted_view(std::vector<std::size_t> column_indexes, bool ascending = true) const;
+    TableView get_sorted_view(std::size_t column_index, bool ascending = true) const;
 
     /// Remove the target row of the specified link from the target table. This
     /// also removes the specified link from this link list, and any other link
@@ -82,11 +82,7 @@ public:
     /// returned.
     std::size_t find(std::size_t target_row_ndx) const TIGHTDB_NOEXCEPT;
 
-    ColumnBase& get_column_base(size_t index)
-    {
-        return get_target_table().get_column_base(index);
-    }
-
+    const ColumnBase& get_column_base(size_t index) const;
     const Table& get_origin_table() const TIGHTDB_NOEXCEPT;
     Table& get_origin_table() TIGHTDB_NOEXCEPT;
 
@@ -266,6 +262,11 @@ inline std::size_t LinkView::find(std::size_t target_row_ndx) const TIGHTDB_NOEX
         return not_found;
 
     return m_row_indexes.find_first(target_row_ndx);
+}
+
+inline const ColumnBase& LinkView::get_column_base(size_t index) const
+{
+    return get_target_table().get_column_base(index);
 }
 
 inline const Table& LinkView::get_origin_table() const TIGHTDB_NOEXCEPT
