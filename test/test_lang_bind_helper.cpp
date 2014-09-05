@@ -5977,7 +5977,6 @@ TEST(LangBindHelper_RollbackAndContinueAsReadLinkList)
 }
 
 
-
 TEST(LangBindHelper_ImplicitTransactions_OverSharedGroupDestruction)
 {
     SHARED_GROUP_TEST_PATH(path);
