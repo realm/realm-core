@@ -1038,41 +1038,6 @@ TEST(Table_SortedInt)
 #endif
 }
 
-TEST(Table_SortedQuery)
-{
-    TestTable table;
-
-    table.add(0, 10, true, Wed); // 0: 4
-    table.add(0, 20, false, Wed); // 1: 7
-    table.add(0,  0, false, Wed); // 2: 0
-    table.add(0, 40, false, Wed); // 3: 8
-    table.add(0, 15, false, Wed); // 4: 6
-    table.add(0, 11, true, Wed); // 5: 5
-    table.add(0,  6, true, Wed); // 6: 3
-    table.add(0,  4, true, Wed); // 7: 2
-    table.add(0, 99, true, Wed); // 8: 9
-    table.add(0,  2, true, Wed); // 9: 1
-
-    // Count booleans
-    size_t count_original = table.where().third.equal(false).count();
-    CHECK_EQUAL(4, count_original);
-
-    // Get a view containing the complete table
-    TestTable::View v = table.column().first.find_all(0);
-    CHECK_EQUAL(table.size(), v.size());
-
-    // Count booleans
-    size_t count_view = table.where().tableview(v).third.equal(false).count();
-    CHECK_EQUAL(4, count_view);
-
-    TestTable::View v_sorted = table.column().second.get_sorted_view();
-    CHECK_EQUAL(table.size(), v_sorted.size());
-
-#ifdef TIGHTDB_DEBUG
-    table.Verify();
-#endif
-}
-
 
 TEST(Table_Sorted_Query_where)
 {
@@ -4762,6 +4727,27 @@ TEST(Table_RowAccessorCopyAndAssign)
     }
 }
 
+TEST(Table_RowAccessorAssignMultipleTables)
+{
+    Table tables[2];
+    for (int i = 0; i < 2; ++i) {
+        tables[i].add_column(type_Int, "");
+        tables[i].add_empty_row(2);
+        tables[i].set_int(0, 0, 750);
+        tables[i].set_int(0, 1, 751);
+    }
+
+    Row row_1 = tables[0][1];
+    Row row_2 = tables[1][1];
+    Row row_3 = tables[0][1];
+    row_1 = tables[1][1]; // Assign attached `Row` to a different table
+
+    // Veriy that the correct accessors are updated when removing from a table
+    tables[0].remove(0);
+    CHECK_EQUAL(row_1.get_index(), 1);
+    CHECK_EQUAL(row_2.get_index(), 1);
+    CHECK_EQUAL(row_3.get_index(), 0);
+}
 
 TEST(Table_RowAccessorRetain)
 {
