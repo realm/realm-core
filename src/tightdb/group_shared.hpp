@@ -57,6 +57,60 @@ class WriteLogCollector;
 ///
 /// Two processes that want to share a database file must reside on
 /// the same host.
+///
+///
+/// Desired exception behavior (not yet fully implemented)
+/// ------------------------------------------------------
+///
+///  - If any data access API function throws an unexpcted exception during a
+///    read transaction, the shared group accessor is left in state "error
+///    during read".
+///
+///  - If any data access API function throws an unexpcted exception during a
+///    write transaction, the shared group accessor is left in state "error
+///    during write".
+///
+///  - If GroupShared::begin_write() or GroupShared::begin_read() throws an
+///    unexpcted exception, the shared group accessor is left in state "no
+///    transaction in progress".
+///
+///  - GroupShared::end_read() and GroupShared::rollback() do not throw.
+///
+///  - If GroupShared::commit() throws an unexpcted exception, the shared group
+///    accessor is left in state "error during write" and the transaction was
+///    not comitted.
+///
+///  - If GroupShared::advance_read() or GroupShared::promote_to_write() throws
+///    an unexpcted exception, the shared group accessor is left in state "error
+///    during read".
+///
+///  - If GroupShared::commit_and_continue_as_read() or
+///    GroupShared::rollback_and_continue_as_read() throws an unexpcted
+///    exception, the shared group accessor is left in state "error during
+///    write".
+///
+/// It has not yet been decided exactly what an "unexpected exception" is, but
+/// `std::bad_alloc` is surely one example. On the other hand, an expected
+/// exception is one that is mentioned in the function specific documentation,
+/// and is used to abort an operation due to a special, but expected condition.
+///
+/// States
+/// ------
+///
+///  - A newly created shared group accessor is in state "no transaction in
+///    progress".
+///
+///  - In state "error during read", almost all TightDB API functions are
+///    illegal on the connected group of accessors. The only valid operations
+///    are destruction of the shared group, and GroupShared::end_read(). If
+///    GroupShared::end_read() is called, the new state becomes "no transaction
+///    in progress".
+///
+///  - In state "error during write", almost all TightDB API functions are
+///    illegal on the connected group of accessors. The only valid operations
+///    are destruction of the shared group, and GroupShared::rollback(). If
+///    GroupShared::end_write() is called, the new state becomes "no transaction
+///    in progress"
 class SharedGroup {
 public:
     enum DurabilityLevel {
