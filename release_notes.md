@@ -6,7 +6,7 @@
 
 ### API breaking changes:
 
-* Lorem ipsum.
+* Sorting on LinkView and TableView by multiple columns: Both classes now have get_sorted_view() (returns sorted view) and sort() (in-place sort). Both methods can take either a single column index as argument (as size_t) or a std::vector of columns to sort by multiple columns.
 
 ### Enhancements:
 
