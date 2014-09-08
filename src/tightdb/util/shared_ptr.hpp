@@ -9,11 +9,14 @@ namespace util {
 template <class T> class SharedPtr 
 {
 public:
-    SharedPtr(T* p) : m_ptr(p), m_count(new std::size_t(1)) {}
+    SharedPtr(T* p) 
+    { 
+        init(p); 
+    }
 
-    SharedPtr() : m_ptr(0), m_count(nil()) 
+    SharedPtr() 
     {
-        incref(); 
+        init(0);
     }
 
     ~SharedPtr() 
@@ -66,17 +69,21 @@ public:
         return m_ptr < o.m_ptr;
     }
                         
-    std::size_t refm_count() const
+    std::size_t ref_count() const
     {
         return *m_count;
     }
-                        
+
 private:
-    // special case, null pointer (nil-code)
-    static std::size_t* nil()
-    { 
-        static std::size_t nil_m_counter(1);
-        return &nil_m_counter; 
+    void init(T* p)
+    {
+        m_ptr = p;
+        try {
+            m_count = new std::size_t(1);
+        }
+        catch (...) {
+            delete p;
+        }
     }
 
     void decref() 
