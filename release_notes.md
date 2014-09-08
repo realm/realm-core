@@ -16,7 +16,7 @@
 
 ### Internals:
 
-* Lorem ipsum.
+* Made common base class for TableView and LinkView with common shared functionality (so far just sort).
 
 ----------------------------------------------
 
