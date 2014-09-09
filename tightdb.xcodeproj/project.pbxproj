@@ -183,6 +183,8 @@
 		4222F2FF19640B8400EC86A5 /* replication.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 4222F2FD19640B8400EC86A5 /* replication.hpp */; };
 		4222F30219640C6700EC86A5 /* commit_log.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4222F30019640C6700EC86A5 /* commit_log.cpp */; };
 		4222F30319640C6700EC86A5 /* commit_log.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 4222F30119640C6700EC86A5 /* commit_log.hpp */; };
+		42F862D319BDE3460053C134 /* views.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 42F862D119BDE3460053C134 /* views.cpp */; };
+		42F862D419BDE3460053C134 /* views.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 42F862D219BDE3460053C134 /* views.hpp */; };
 		520588CA16C1DA9D009DA6D8 /* data_type.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 520588C916C1DA9D009DA6D8 /* data_type.hpp */; };
 		52113CDE16C27EF800C301FB /* lang_bind_helper.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 52113CDD16C27EF800C301FB /* lang_bind_helper.cpp */; };
 		5219EB6918FB026100FF9232 /* verified_integer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 5219EB6718FB026100FF9232 /* verified_integer.cpp */; };
@@ -478,6 +480,8 @@
 		4222F2FD19640B8400EC86A5 /* replication.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = replication.hpp; path = tightdb/replication.hpp; sourceTree = "<group>"; };
 		4222F30019640C6700EC86A5 /* commit_log.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = commit_log.cpp; path = tightdb/commit_log.cpp; sourceTree = "<group>"; };
 		4222F30119640C6700EC86A5 /* commit_log.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = commit_log.hpp; path = tightdb/commit_log.hpp; sourceTree = "<group>"; };
+		42F862D119BDE3460053C134 /* views.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = views.cpp; path = tightdb/views.cpp; sourceTree = "<group>"; };
+		42F862D219BDE3460053C134 /* views.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = views.hpp; path = tightdb/views.hpp; sourceTree = "<group>"; };
 		520588C916C1DA9D009DA6D8 /* data_type.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; name = data_type.hpp; path = tightdb/data_type.hpp; sourceTree = "<group>"; };
 		52113CDD16C27EF800C301FB /* lang_bind_helper.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = lang_bind_helper.cpp; path = tightdb/lang_bind_helper.cpp; sourceTree = "<group>"; };
 		5219EB6718FB026100FF9232 /* verified_integer.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = verified_integer.cpp; sourceTree = "<group>"; };
@@ -642,6 +646,8 @@
 		3647DEEA14209C1200D56FD7 /* src */ = {
 			isa = PBXGroup;
 			children = (
+				42F862D119BDE3460053C134 /* views.cpp */,
+				42F862D219BDE3460053C134 /* views.hpp */,
 				4222F30019640C6700EC86A5 /* commit_log.cpp */,
 				4222F30119640C6700EC86A5 /* commit_log.hpp */,
 				4222F2FC19640B8400EC86A5 /* replication.cpp */,
@@ -959,6 +965,7 @@
 				4222F2FF19640B8400EC86A5 /* replication.hpp in Headers */,
 				B159814518CF55D400E3C5DF /* type_traits.hpp in Headers */,
 				365CCE65157CC37D00172BF8 /* spec.hpp in Headers */,
+				42F862D419BDE3460053C134 /* views.hpp in Headers */,
 				365CCE67157CC37D00172BF8 /* table_accessors.hpp in Headers */,
 				365CCE68157CC37D00172BF8 /* table_basic.hpp in Headers */,
 				365CCE69157CC37D00172BF8 /* table_macros.hpp in Headers */,
@@ -1282,6 +1289,7 @@
 				3658CE711921AC6F009A7085 /* column_backlink.cpp in Sources */,
 				52D7C4821852A01700633748 /* file.cpp in Sources */,
 				52D7C4871852A01700633748 /* string_buffer.cpp in Sources */,
+				42F862D319BDE3460053C134 /* views.cpp in Sources */,
 				52D7C4891852A01700633748 /* terminate.cpp in Sources */,
 				522EA519192C4D3C002AD3B6 /* unicode.cpp in Sources */,
 				52D7C48B1852A01700633748 /* thread.cpp in Sources */,
