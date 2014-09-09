@@ -1038,5 +1038,50 @@ TEST(Link_FindNullLink)
     CHECK_THROW_ANY(table2->link(col_linklist2).column<Link>(col_link1).is_null());
 }
 
+// Tests queries on a LinkList
+TEST(LinkList_QueryOnLinkList)
+{
+    Group group;
+
+    TableRef table1 = group.add_table("table1");
+    TableRef table2 = group.add_table("table2");
+
+    // add some more columns to table1 and table2
+    table1->add_column(type_Int, "col1");
+    table1->add_column(type_String, "str1");
+
+    // add some rows
+    table1->add_empty_row();
+    table1->set_int(0, 0, 300);
+    table1->set_string(1, 0, "delta");
+
+    table1->add_empty_row();
+    table1->set_int(0, 1, 100);
+    table1->set_string(1, 1, "alfa");
+
+    table1->add_empty_row();
+    table1->set_int(0, 2, 200);
+    table1->set_string(1, 2, "beta");
+
+    size_t col_link2 = table2->add_column_link(type_LinkList, "linklist", *table1);
+    table2->add_empty_row();
+    table2->add_empty_row();
+
+    LinkViewRef lvr;
+    TableView tv;
+
+    lvr = table2->get_linklist(col_link2, 0);
+    lvr->clear();
+    lvr->add(0);
+    lvr->add(1);
+    lvr->add(2);
+
+    // Return all rows of table1 (the linked-to-table) that match the criteria and is in the LinkList
+    Query q = table2->where(lvr.get()).and_query(table1->column<Int>(0) > 100);
+    tv = q.find_all();
+    CHECK_EQUAL(2, tv.size());
+    CHECK_EQUAL(0, tv.get_source_ndx(0));
+    CHECK_EQUAL(2, tv.get_source_ndx(1));
+}
 
 #endif
