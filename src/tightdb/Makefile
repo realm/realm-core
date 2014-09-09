@@ -3,7 +3,7 @@ REPLICATION_CPP = $(if $(TIGHTDB_ENABLE_REPLICATION),replication.cpp)
 
 nobase_subinclude_HEADERS = util/features.h util/meta.hpp util/assert.hpp util/terminate.hpp \
 util/type_list.hpp util/tuple.hpp util/type_traits.hpp util/bind.hpp util/safe_int_ops.hpp \
-util/unique_ptr.hpp util/bind_ptr.hpp util/buffer.hpp util/string_buffer.hpp \
+util/unique_ptr.hpp util/bind_ptr.hpp util/buffer.hpp util/string_buffer.hpp util/shared_ptr.hpp \
 util/memory_stream.hpp util/logger.hpp util/thread.hpp util/file.hpp util/utf8.hpp exceptions.hpp \
 utilities.hpp alloc.hpp alloc_slab.hpp array.hpp array_string.hpp data_type.hpp column_type.hpp \
 column_fwd.hpp spec.hpp impl/destroy_guard.hpp impl/output_stream.hpp datetime.hpp \

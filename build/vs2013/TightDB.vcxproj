@@ -666,6 +666,7 @@
     <ClCompile Include="..\..\test\test_json.cpp" />
     <ClCompile Include="..\..\test\test_links.cpp" />
     <ClCompile Include="..\..\test\test_link_query_view.cpp" />
+    <ClCompile Include="..\..\test\test_basic_utils.cpp" />
     <ClCompile Include="..\..\test\util\jsmn.cpp" />
     <ClCompile Include="..\..\test\util\verified_integer.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
@@ -1089,6 +1090,7 @@
     <ClInclude Include="..\..\src\tightdb\query_expression.hpp" />
     <ClInclude Include="..\..\src\tightdb\string_data.hpp" />
     <ClInclude Include="..\..\src\tightdb\unicode.hpp" />
+    <ClInclude Include="..\..\src\tightdb\util\shared_ptr.hpp" />
     <ClInclude Include="..\..\src\tightdb\util\terminate.hpp" />
     <ClInclude Include="..\..\src\tightdb\util\unique_ptr.hpp" />
     <ClInclude Include="..\..\src\tightdb\util\bind_ptr.hpp" />
