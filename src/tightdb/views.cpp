@@ -6,14 +6,17 @@ using namespace tightdb;
 // Sort according to one column
 void RowIndexes::sort(size_t column, bool ascending)
 {
-    std::vector<size_t> v;
-    v.push_back(column);
-    sort(v, ascending);
+    std::vector<size_t> c;
+    std::vector<bool> a;
+    c.push_back(column);
+    a.push_back(ascending);
+    sort(c, a);
 }
 
-// Sort according to multiple columns
-void RowIndexes::sort(std::vector<size_t> columns, bool ascending)
+// Sort according to multiple columns, user specified order on each column
+void RowIndexes::sort(std::vector<size_t> columns, std::vector<bool> ascending)
 {
+    TIGHTDB_ASSERT(columns.size() == ascending.size());
     m_auto_sort = true;
     m_sorting_predicate = Sorter(columns, ascending);
     re_sort();

@@ -63,7 +63,7 @@ public:
     void remove(std::size_t link_ndx);
     void clear();
 
-    TableView get_sorted_view(std::vector<std::size_t> column_indexes, bool ascending = true) const;
+    TableView get_sorted_view(std::vector<std::size_t> column_indexes, std::vector<bool> ascending) const;
     TableView get_sorted_view(std::size_t column_index, bool ascending = true) const;
 
     /// Remove the target row of the specified link from the target table. This

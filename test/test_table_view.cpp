@@ -1310,17 +1310,36 @@ TEST(TableView_MultiColSort)
     std::vector<size_t> v;
     v.push_back(0);
     v.push_back(1);
-    tv.sort(v, true);
+
+    std::vector<bool> a;
+    a.push_back(true);
+    a.push_back(true);
+
+    tv.sort(v, a);
 
     CHECK_EQUAL(tv.get_float(1, 0), 0.f);
     CHECK_EQUAL(tv.get_float(1, 1), 1.f);
     CHECK_EQUAL(tv.get_float(1, 2), 2.f);
 
-    tv.sort(v, false);
+    std::vector<bool> a_descending;
+    a_descending.push_back(false);
+    a_descending.push_back(false);
+
+    tv.sort(v, a_descending);
 
     CHECK_EQUAL(tv.get_float(1, 0), 2.f);
     CHECK_EQUAL(tv.get_float(1, 1), 1.f);
     CHECK_EQUAL(tv.get_float(1, 2), 0.f);
+
+    std::vector<bool> a_ascdesc;
+    a_ascdesc.push_back(true);
+    a_ascdesc.push_back(false);
+
+    tv.sort(v, a_ascdesc);
+
+    CHECK_EQUAL(tv.get_float(1, 0), 0.f);
+    CHECK_EQUAL(tv.get_float(1, 1), 2.f);
+    CHECK_EQUAL(tv.get_float(1, 2), 1.f);
 }
 
 

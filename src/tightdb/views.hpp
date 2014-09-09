@@ -25,7 +25,7 @@ public:
     struct Sorter
     {
         Sorter(){}
-        Sorter(std::vector<size_t> columns, bool ascending) : m_columns(columns), m_ascending(ascending) {};
+        Sorter(std::vector<size_t> columns, std::vector<bool> ascending) : m_columns(columns), m_ascending(ascending) {};
         bool operator()(size_t i, size_t j) const
         {
             for (size_t t = 0; t < m_columns.size(); t++) {
@@ -35,20 +35,20 @@ public:
                 TIGHTDB_ASSERT(ctb);
                 int c = ctb->compare_values(i, j);
                 if (c != 0)
-                    return m_ascending ? c > 0 : c < 0;
+                    return m_ascending[t] ? c > 0 : c < 0;
             }
             return false; // row i == row j
         }
         std::vector<size_t> m_columns;
         RowIndexes* m_row_indexes_class;
-        bool m_ascending;
+        std::vector<bool> m_ascending;
     };
 
     // Sort m_row_indexes according to one column
     void sort(size_t column, bool ascending = true);
 
     // Sort m_row_indexes according to multiple columns
-    void sort(std::vector<size_t> columns, bool ascending = true);
+    void sort(std::vector<size_t> columns, std::vector<bool> ascending);
 
     // Re-sort view according to last used criterias
     void re_sort();
