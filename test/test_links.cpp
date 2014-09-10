@@ -850,6 +850,23 @@ TEST(Links_ClearLinkListWithTwoLevelBptree)
     group.Verify();
 }
 
+// Exposes new crash bug at remove, which seems analog to the two tests above
+ONLY(LinkList_RemoveCrash)
+{
+    Group group;
+
+    TableRef table1 = group.add_table("table1");
+    TableRef table2 = group.add_table("table2");
+
+    table1->add_column(type_Int, "col1");
+
+    table1->add_empty_row();
+    table1->add_empty_row();
+
+    size_t col_link2 = table2->add_column_link(type_LinkList, "linklist", *table1);
+
+    table1->remove(0);
+}
 
 TEST(Links_FormerMemLeakCase)
 {
@@ -922,5 +939,6 @@ TEST(Links_RandomizedOperations)
         }
     }
 }
+
 
 #endif // TEST_LINKS
