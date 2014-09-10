@@ -4732,20 +4732,29 @@ TEST(Table_RowAccessorAssignMultipleTables)
     Table tables[2];
     for (int i = 0; i < 2; ++i) {
         tables[i].add_column(type_Int, "");
-        tables[i].add_empty_row(2);
+        tables[i].add_empty_row(3);
         tables[i].set_int(0, 0, 750);
         tables[i].set_int(0, 1, 751);
+        tables[i].set_int(0, 2, 752);
     }
 
-    Row row_1 = tables[0][1];
-    Row row_2 = tables[1][1];
-    Row row_3 = tables[0][1];
-    row_1 = tables[1][1]; // Assign attached `Row` to a different table
+    Row row_1 = tables[0][2];
+    Row row_2 = tables[1][2];
+    Row row_3 = tables[0][2];
+    row_1 = tables[1][2]; // Assign attached `Row` to a different table via RowExpr
 
     // Veriy that the correct accessors are updated when removing from a table
     tables[0].remove(0);
-    CHECK_EQUAL(row_1.get_index(), 1);
-    CHECK_EQUAL(row_2.get_index(), 1);
+    CHECK_EQUAL(row_1.get_index(), 2);
+    CHECK_EQUAL(row_2.get_index(), 2);
+    CHECK_EQUAL(row_3.get_index(), 1);
+
+    row_1 = row_3; // Assign attached `Row` to a different table via Row
+
+    // Veriy that the correct accessors are updated when removing from a table
+    tables[0].remove(0);
+    CHECK_EQUAL(row_1.get_index(), 0);
+    CHECK_EQUAL(row_2.get_index(), 2);
     CHECK_EQUAL(row_3.get_index(), 0);
 }
 
