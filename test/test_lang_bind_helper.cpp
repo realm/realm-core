@@ -5825,21 +5825,6 @@ TEST(LangBindHelper_ImplicitTransactions_LinkList)
     group->Verify();
 }
 
-TEST(LangBindHelper_ExplicitTransactions_StringIndex)
-{
-    SHARED_GROUP_TEST_PATH(path);
-    UniquePtr<LangBindHelper::TransactLogRegistry> tlr(getWriteLogs(path));
-    UniquePtr<Replication> repl(makeWriteLogCollector(path));
-    SharedGroup sg(*repl);
-    Group& group = sg.begin_write();
-    TableRef table = group.add_table("a");
-    table->add_column(type_String, "b");
-    table->set_index(0);
-    group.Verify();
-    sg.commit();
-    sg.begin_read();
-    group.Verify();
-}
 
 TEST(LangBindHelper_ImplicitTransactions_StringIndex)
 {
