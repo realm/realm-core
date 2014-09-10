@@ -11,6 +11,9 @@
   `LangBindHelper::commit_and_continue_as_read()` to fail in the presence of
   search indexes.
 
+* Bugfix: Replication::m_selected_link_list was not cleared. This bug could lead
+  to general corruption in cases involving link lists.
+
 ----------------------------------------------
 
 # 0.82.2 Release notes
