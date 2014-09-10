@@ -509,8 +509,7 @@ inline TableViewBase::TableViewBase(Table* parent, Query& query, size_t start, s
     m_query(query, Query::TCopyExpressionTag())
 {
 #ifdef TIGHTDB_ENABLE_REPLICATION    
-    // Changes in *any* table can affect the search result because the query could follow links
-    m_last_seen_version = m_table->get_global_version();
+    m_last_seen_version = m_table ? m_table->m_version : 0;
     m_auto_sort = false;
 #endif
     m_start = start;

@@ -122,7 +122,6 @@ public:
 #ifdef TIGHTDB_ENABLE_REPLICATION
     Replication* get_replication() TIGHTDB_NOEXCEPT;
 #endif
-    inline uint_fast64_t get_global_version() TIGHTDB_NOEXCEPT;
 
 protected:
     std::size_t m_baseline; // Separation line between immutable and mutable refs.
@@ -190,10 +189,6 @@ inline uint_fast64_t Allocator::bump_global_version() TIGHTDB_NOEXCEPT
     return m_table_versioning_counter;
 }
 
-inline uint_fast64_t Allocator::get_global_version() TIGHTDB_NOEXCEPT
-{
-    return m_table_versioning_counter;
-}
 
 inline bool Allocator::should_propagate_version(uint_fast64_t& local_version) TIGHTDB_NOEXCEPT
 {

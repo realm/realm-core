@@ -21,6 +21,8 @@ public:
 
     virtual size_t size() const = 0;
 
+    virtual void sync_if_needed() const {}
+
     // Predicate for std::sort
     struct Sorter
     {

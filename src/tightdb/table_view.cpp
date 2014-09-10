@@ -410,8 +410,8 @@ void TableViewBase::do_sync()
         // valid query, so clear earlier results and reexecute it.
         m_row_indexes.clear();
         // if m_query had a TableView filter, then sync it. If it had a LinkView filter, no sync is needed
-        if (m_query.m_view && dynamic_cast<TableView*>(m_query.m_view))
-            static_cast<TableView*>(m_query.m_view)->sync_if_needed();
+        if (m_query.m_view)
+            m_query.m_view->sync_if_needed();
 
         // find_all needs to call size() on the tableview. But if we're
         // out of sync, size() will then call do_sync and we'll have an infinite regress

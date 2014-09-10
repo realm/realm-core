@@ -569,8 +569,6 @@ public:
     // Using where(tv) is the new method to perform queries on TableView. The 'tv' can have any order; it does not
     // need to be sorted, and, resulting view retains its order.
     Query where(RowIndexes* tv = null_ptr) { return Query(*this, tv); }
-    // need to be sorted, and, resulting view retains its order.
-    Query where(TableViewBase* tv = null_ptr) { return Query(*this, tv); }
 
     // FIXME: We need a ConstQuery class or runtime check against modifications in read transaction.
     Query where(RowIndexes* tv = null_ptr) const { return Query(*this, tv); }
@@ -765,7 +763,7 @@ private:
     /// or going to the parent table), the parameter should be set to false to correctly
     /// prune traversal.
     void bump_version(bool bump_global = true) const TIGHTDB_NOEXCEPT;
-    uint_fast64_t get_global_version() const TIGHTDB_NOEXCEPT;
+
     /// Disable copying assignment.
     ///
     /// It could easily be implemented by calling assign(), but the
@@ -1133,11 +1131,6 @@ protected:
 
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-
-inline uint_fast64_t Table::get_global_version() const TIGHTDB_NOEXCEPT
-{
-    return m_top.get_alloc().get_global_version();
-}
 
 inline void Table::bump_version(bool bump_global) const TIGHTDB_NOEXCEPT
 {
