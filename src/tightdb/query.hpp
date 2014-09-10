@@ -271,7 +271,7 @@ public:
     std::vector<ParentNode**> subtables;
     std::vector<ParentNode*> all_nodes;
     
-    RowIndexes* m_tableview;
+    RowIndexes* m_view;
     std::vector<bool> pending_not;
 
 private:

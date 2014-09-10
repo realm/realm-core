@@ -275,8 +275,8 @@ bool TableViewBase::is_in_sync() const TIGHTDB_NOEXCEPT
 {
     return bool(m_table)
     && (m_last_seen_version == m_table->m_version)
-    && ((m_query.m_tableview)
-    ? static_cast<TableViewBase*>(m_query.m_tableview)->is_in_sync()
+    && ((m_query.m_view)
+    ? static_cast<TableViewBase*>(m_query.m_view)->is_in_sync()
     : true);
 }
 
@@ -409,10 +409,10 @@ void TableViewBase::do_sync()
     else  {
         // valid query, so clear earlier results and reexecute it.
         m_row_indexes.clear();
-        // now we are going to do something naughty!
-        if (m_query.m_tableview)
-            static_cast<TableView*>(m_query.m_tableview)->sync_if_needed();
-        // and more:
+        // if m_query had a TableView filter, then sync it. If it had a LinkView filter, no sync is needed
+        if (m_query.m_view && dynamic_cast<TableView*>(m_query.m_view))
+            static_cast<TableView*>(m_query.m_view)->sync_if_needed();
+
         // find_all needs to call size() on the tableview. But if we're
         // out of sync, size() will then call do_sync and we'll have an infinite regress
         // SO: fake that we're up to date BEFORE calling find_all.

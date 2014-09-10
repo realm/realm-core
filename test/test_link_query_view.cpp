@@ -1048,7 +1048,7 @@ TEST(Link_FindNullLink)
 }
 
 // Tests queries on a LinkList
-TEST(LinkList_QueryOnLinkList)
+ONLY(LinkList_QueryOnLinkList)
 {
     Group group;
 
@@ -1073,6 +1073,7 @@ TEST(LinkList_QueryOnLinkList)
     table1->set_string(1, 2, "beta");
 
     size_t col_link2 = table2->add_column_link(type_LinkList, "linklist", *table1);
+
     table2->add_empty_row();
     table2->add_empty_row();
 
@@ -1091,6 +1092,12 @@ TEST(LinkList_QueryOnLinkList)
     CHECK_EQUAL(2, tv.size());
     CHECK_EQUAL(0, tv.get_source_ndx(0));
     CHECK_EQUAL(2, tv.get_source_ndx(1));
+
+    // Modify the LinkList and see if sync_if_needed takes it in count
+    lvr->remove(0);
+    tv.sync_if_needed();
+    CHECK_EQUAL(1, tv.size());
+    CHECK_EQUAL(2, tv.get_source_ndx(0));
 }
 
 #endif

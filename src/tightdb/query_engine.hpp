@@ -90,7 +90,7 @@ AggregateState      State of the aggregate - contains a state variable that stor
 #include <functional>
 #include <algorithm>
 
-#include <tightdb/util/bind_ptr.hpp>
+#include <tightdb/util/shared_ptr.hpp>
 #include <tightdb/util/meta.hpp>
 #include <tightdb/unicode.hpp>
 #include <tightdb/utilities.hpp>
@@ -1880,16 +1880,13 @@ protected:
 class ExpressionNode: public ParentNode {
 
 public:
-    ~ExpressionNode() TIGHTDB_NOEXCEPT
-    {
-        m_compare.reset();
-    }
+    ~ExpressionNode() TIGHTDB_NOEXCEPT { }
 
     ExpressionNode(Expression* compare, bool auto_delete)
     {
         m_auto_delete = auto_delete;
         m_child = 0;
-        m_compare = util::bind_ptr<Expression>(compare);
+        m_compare = util::SharedPtr<Expression>(compare);
         m_dD = 10.0;
         m_dT = 50.0;
     }
@@ -1925,7 +1922,7 @@ public:
     }
 
     bool m_auto_delete;
-    util::bind_ptr<Expression> m_compare;
+    util::SharedPtr<Expression> m_compare;
 };
 
 

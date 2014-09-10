@@ -2041,45 +2041,6 @@ TEST(Query_Huge)
     }
 }
 
-TEST(Query_OnTableView)
-{
-    Random random;
-
-    // Mostly intended to test the Array::FindGTE method
-    for (int iter = 0; iter < 100 * (1 + TEST_DURATION * TEST_DURATION * TEST_DURATION * TEST_DURATION * TEST_DURATION); iter++) {
-        random.seed(164);
-        OneIntTable oti;
-        size_t cnt1 = 0;
-        size_t cnt0 = 0;
-        size_t limit = random.draw_int_max(TIGHTDB_MAX_BPNODE_SIZE * 10);
-
-        size_t lbound = random.draw_int_mod(TIGHTDB_MAX_BPNODE_SIZE * 10);
-        size_t ubound = lbound + random.draw_int_mod(TIGHTDB_MAX_BPNODE_SIZE * 10 - lbound);
-
-        for (size_t i = 0; i < TIGHTDB_MAX_BPNODE_SIZE * 10; i++) {
-            int v = random.draw_int_mod(3);
-
-            if (v == 1 && i >= lbound && i < ubound && cnt0 < limit)
-                cnt1++;
-
-            if (v != 0 && i >= lbound && i < ubound)
-                cnt0++;
-
-            oti.add(v);
-        }
-
-        OneIntTable::View v = oti.where().first.not_equal(0).find_all(lbound, ubound, limit);
-        size_t cnt2 = oti.where().tableview(v).first.equal(1).count();
-
-        if (cnt1 != cnt2)
-            cerr << iter << " ";
-
-        CHECK_EQUAL(cnt1, cnt2);
-
-
-    }
-
-}
 
 TEST(Query_OnTableView_where)
 {
@@ -4779,24 +4740,6 @@ TEST(Query_SubtableSyntaxCheck)
     CHECK(s != "");
 }
 
-TEST(Query_TestTV)
-{
-    TupleTableType t;
-    t.add(1, "a");
-    t.add(2, "a");
-    t.add(3, "c");
-
-    TupleTableType::View v = t.where().first.greater(1).find_all();
-
-    TupleTableType::Query q1 = t.where().tableview(v);
-    CHECK_EQUAL(2, q1.count());
-
-    TupleTableType::Query q3 = t.where().tableview(v).second.equal("a");
-    CHECK_EQUAL(1, q3.count());
-
-    TupleTableType::Query q4 = t.where().tableview(v).first.between(3, 6);
-    CHECK_EQUAL(1, q4.count());
-}
 
 TEST(Query_TestTV_where)
 {
