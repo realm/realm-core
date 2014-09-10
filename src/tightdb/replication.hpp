@@ -521,6 +521,7 @@ inline void Replication::begin_write_transact(SharedGroup& sg)
     do_begin_write_transact(sg);
     m_selected_table = 0;
     m_selected_spec  = 0;
+    m_selected_link_list  = 0;
 }
 
 inline Replication::version_type

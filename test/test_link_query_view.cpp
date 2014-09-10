@@ -1048,7 +1048,7 @@ TEST(Link_FindNullLink)
 }
 
 // Tests queries on a LinkList
-ONLY(LinkList_QueryOnLinkList)
+TEST(LinkList_QueryOnLinkList)
 {
     Group group;
 

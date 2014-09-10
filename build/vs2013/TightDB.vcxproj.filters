@@ -295,6 +295,10 @@
       <Filter>test</Filter>
     </ClCompile>
   </ItemGroup>
+    <ClCompile Include="..\..\test\test_basic_utils.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+  </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\win32\pthread\pthread.h">
       <Filter>pthreads</Filter>
@@ -541,6 +545,13 @@
     </ClInclude>
     <ClInclude Include="..\..\src\tightdb\views.hpp">
       <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\tightdb\util\shared_ptr.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+      <Filter>test\util</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\tightdb\util\shared_ptr.hpp">
       <Filter>src\include</Filter>

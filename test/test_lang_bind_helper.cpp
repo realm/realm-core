@@ -5991,6 +5991,129 @@ TEST(LangBindHelper_ImplicitTransactions_DetachRowAccessorOnMoveLastOver)
 }
 
 
+TEST(LangBindHelper_ImplicitTransactions_ContinuedUseOfTable)
+{
+    SHARED_GROUP_TEST_PATH(path);
+
+    UniquePtr<Replication> repl(makeWriteLogCollector(path));
+    UniquePtr<LangBindHelper::TransactLogRegistry> tlr(getWriteLogs(path));
+    SharedGroup sg(*repl);
+    const Group& group = sg.begin_read();
+
+    UniquePtr<Replication> repl_w(makeWriteLogCollector(path));
+    UniquePtr<LangBindHelper::TransactLogRegistry> tlr_w(getWriteLogs(path));
+    SharedGroup sg_w(*repl_w);
+    Group& group_w = const_cast<Group&>(sg_w.begin_read());
+
+    LangBindHelper::promote_to_write(sg_w, *tlr_w);
+    TableRef table_w = group_w.add_table("table");
+    table_w->add_column(type_Int, "");
+    table_w->add_empty_row();
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+    group_w.Verify();
+
+    LangBindHelper::advance_read(sg, *tlr);
+    ConstTableRef table = group.get_table("table");
+    CHECK_EQUAL(0, table->get_int(0,0));
+    group.Verify();
+
+    LangBindHelper::promote_to_write(sg_w, *tlr_w);
+    table_w->set_int(0,0,1);
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+    group_w.Verify();
+
+    LangBindHelper::advance_read(sg, *tlr);
+    CHECK_EQUAL(1, table->get_int(0,0));
+    group.Verify();
+
+    sg.end_read();
+    sg_w.end_read();
+}
+
+
+TEST(LangBindHelper_ImplicitTransactions_ContinuedUseOfDescriptor)
+{
+    SHARED_GROUP_TEST_PATH(path);
+
+    UniquePtr<Replication> repl(makeWriteLogCollector(path));
+    UniquePtr<LangBindHelper::TransactLogRegistry> tlr(getWriteLogs(path));
+    SharedGroup sg(*repl);
+    const Group& group = sg.begin_read();
+
+    UniquePtr<Replication> repl_w(makeWriteLogCollector(path));
+    UniquePtr<LangBindHelper::TransactLogRegistry> tlr_w(getWriteLogs(path));
+    SharedGroup sg_w(*repl_w);
+    Group& group_w = const_cast<Group&>(sg_w.begin_read());
+
+    LangBindHelper::promote_to_write(sg_w, *tlr_w);
+    TableRef table_w = group_w.add_table("table");
+    DescriptorRef desc_w = table_w->get_descriptor();
+    desc_w->add_column(type_Int, "1");
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+    group_w.Verify();
+
+    LangBindHelper::advance_read(sg, *tlr);
+    ConstTableRef table = group.get_table("table");
+    CHECK_EQUAL(1, table->get_column_count());
+    group.Verify();
+
+    LangBindHelper::promote_to_write(sg_w, *tlr_w);
+    desc_w->add_column(type_Int, "2");
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+    group_w.Verify();
+
+    LangBindHelper::advance_read(sg, *tlr);
+    CHECK_EQUAL(2, table->get_column_count());
+    group.Verify();
+
+    sg.end_read();
+    sg_w.end_read();
+}
+
+
+TEST(LangBindHelper_ImplicitTransactions_ContinuedUseOfLinkList)
+{
+    SHARED_GROUP_TEST_PATH(path);
+
+    UniquePtr<Replication> repl(makeWriteLogCollector(path));
+    UniquePtr<LangBindHelper::TransactLogRegistry> tlr(getWriteLogs(path));
+    SharedGroup sg(*repl);
+    const Group& group = sg.begin_read();
+
+    UniquePtr<Replication> repl_w(makeWriteLogCollector(path));
+    UniquePtr<LangBindHelper::TransactLogRegistry> tlr_w(getWriteLogs(path));
+    SharedGroup sg_w(*repl_w);
+    Group& group_w = const_cast<Group&>(sg_w.begin_read());
+
+    LangBindHelper::promote_to_write(sg_w, *tlr_w);
+    TableRef table_w = group_w.add_table("table");
+    table_w->add_column_link(type_LinkList, "", *table_w);
+    table_w->add_empty_row();
+    LinkViewRef link_list_w = table_w->get_linklist(0,0);
+    link_list_w->add(0);
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+    group_w.Verify();
+
+    LangBindHelper::advance_read(sg, *tlr);
+    ConstTableRef table = group.get_table("table");
+    ConstLinkViewRef link_list = table->get_linklist(0,0);
+    CHECK_EQUAL(1, link_list->size());
+    group.Verify();
+
+    LangBindHelper::promote_to_write(sg_w, *tlr_w);
+    link_list_w->add(0);
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+    group_w.Verify();
+
+    LangBindHelper::advance_read(sg, *tlr);
+    CHECK_EQUAL(2, link_list->size());
+    group.Verify();
+
+    sg.end_read();
+    sg_w.end_read();
+}
+
+
 #endif // TIGHTDB_ENABLE_REPLICATION
 
 #endif
