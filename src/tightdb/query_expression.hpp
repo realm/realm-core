@@ -238,17 +238,12 @@ struct ValueBase
 class Expression : public Query
 {
 public:
-    Expression() : m_ref_count(0) { }
+    Expression() { }
 
     virtual size_t find_first(size_t start, size_t end) const = 0;
     virtual void set_table() = 0;
     virtual const Table* get_table() = 0;
     virtual ~Expression() {}
-
-    void bind_ref() const TIGHTDB_NOEXCEPT{ ++m_ref_count; }
-    void unbind_ref() const TIGHTDB_NOEXCEPT{ if (--m_ref_count == 0) delete this; }
-
-    mutable unsigned long m_ref_count;
 };
 
 class Subexpr

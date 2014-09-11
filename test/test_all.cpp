@@ -48,6 +48,7 @@ const char* file_order[] = {
 
     // tightdb/util/
     "test_safe_int_ops.cpp",
+    "test_basic_utils.cpp",
     "test_file*.cpp",
     "test_thread.cpp",
     "test_utf8.cpp",

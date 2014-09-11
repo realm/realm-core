@@ -197,6 +197,38 @@ void AdaptiveStringColumn::set_index_ref(ref_type ref, ArrayParent* parent, size
 }
 
 
+void AdaptiveStringColumn::update_from_parent(std::size_t old_baseline) TIGHTDB_NOEXCEPT
+{
+    if (root_is_leaf()) {
+        bool long_strings = m_array->has_refs();
+        if (!long_strings) {
+            // Small strings root leaf
+            ArrayString* leaf = static_cast<ArrayString*>(m_array);
+            leaf->update_from_parent(old_baseline);
+        }
+        else {
+            bool is_big = m_array->get_context_flag();
+            if (!is_big) {
+                // Medium strings root leaf
+                ArrayStringLong* leaf = static_cast<ArrayStringLong*>(m_array);
+                leaf->update_from_parent(old_baseline);
+            }
+            else {
+                // Big strings root leaf
+                ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array);
+                leaf->update_from_parent(old_baseline);
+            }
+        }
+    }
+    else {
+        // Non-leaf root
+        m_array->update_from_parent(old_baseline);
+    }
+    if (m_search_index)
+        m_search_index->update_from_parent(old_baseline);
+}
+
+
 void AdaptiveStringColumn::clear()
 {
     if (root_is_leaf()) {

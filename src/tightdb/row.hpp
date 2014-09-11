@@ -247,6 +247,7 @@ public:
     template<class U> BasicRow(const BasicRow<U>&) TIGHTDB_NOEXCEPT;
     template<class U> BasicRow& operator=(BasicRowExpr<U>) TIGHTDB_NOEXCEPT;
     template<class U> BasicRow& operator=(BasicRow<U>) TIGHTDB_NOEXCEPT;
+    BasicRow& operator=(const BasicRow<T>&) TIGHTDB_NOEXCEPT;
 
     ~BasicRow() TIGHTDB_NOEXCEPT;
 
@@ -589,6 +590,13 @@ inline BasicRow<T>& BasicRow<T>::operator=(BasicRow<U> row) TIGHTDB_NOEXCEPT
 {
     T* table = row.m_table.get(); // Check that pointer types are compatible
     reattach(const_cast<Table*>(table), row.m_row_ndx);
+    return *this;
+}
+
+template<class T>
+inline BasicRow<T>& BasicRow<T>::operator=(const BasicRow<T>& row) TIGHTDB_NOEXCEPT
+{
+    reattach(const_cast<Table*>(row.m_table.get()), row.m_row_ndx);
     return *this;
 }
 
