@@ -783,6 +783,7 @@ TEST(LinkList_SortLinkView)
     table1->add_column(type_String, "str1");
     table1->add_column(type_Float, "str1");
     table1->add_column(type_Double, "str1");
+    table1->add_column(type_String, "str2");
 
     // add some rows
     table1->add_empty_row();
@@ -790,18 +791,21 @@ TEST(LinkList_SortLinkView)
     table1->set_string(1, 0, "delta");
     table1->set_float(2, 0, 300.f);
     table1->set_double(3, 0, 300.);
+    table1->set_string(4, 0, "alfa");
 
     table1->add_empty_row();
     table1->set_int(0, 1, 100);
     table1->set_string(1, 1, "alfa");
     table1->set_float(2, 1, 100.f);
     table1->set_double(3, 1, 100.);
+    table1->set_string(4, 0, "alfa");
 
     table1->add_empty_row();
     table1->set_int(0, 2, 200);
     table1->set_string(1, 2, "beta");
     table1->set_float(2, 2, 200.f);
     table1->set_double(3, 2, 200.);
+    table1->set_string(4, 0, "alfa");
 
     size_t col_link2 = table2->add_column_link(type_LinkList, "linklist", *table1);
     table2->add_empty_row();
@@ -906,6 +910,48 @@ TEST(LinkList_SortLinkView)
     CHECK_EQUAL(tv.get(0).get_index(), 0);
     CHECK_EQUAL(tv.get(1).get_index(), 2);
     CHECK_EQUAL(tv.get(2).get_index(), 1);
+
+    // Test multi-column sorting
+    vector<size_t> v;
+    vector<bool> a;
+    a.push_back(true);
+    a.push_back(true);
+
+    vector<bool> a_false;
+    a_false.push_back(false);
+    a_false.push_back(false);
+
+    v.push_back(4);
+    v.push_back(1);
+    lvr->sort(v, a_false);
+    tv = lvr->get_sorted_view(v, a_false);
+    CHECK_EQUAL(lvr->get(0).get_index(), 0);
+    CHECK_EQUAL(lvr->get(1).get_index(), 2);
+    CHECK_EQUAL(lvr->get(2).get_index(), 1);
+    CHECK_EQUAL(tv.get(0).get_index(), 0);
+    CHECK_EQUAL(tv.get(1).get_index(), 2);
+    CHECK_EQUAL(tv.get(2).get_index(), 1);
+
+    lvr->sort(v, a);
+    tv = lvr->get_sorted_view(v, a);
+    CHECK_EQUAL(lvr->get(0).get_index(), 1);
+    CHECK_EQUAL(lvr->get(1).get_index(), 2);
+    CHECK_EQUAL(lvr->get(2).get_index(), 0);
+    CHECK_EQUAL(tv.get(0).get_index(), 1);
+    CHECK_EQUAL(tv.get(1).get_index(), 2);
+    CHECK_EQUAL(tv.get(2).get_index(), 0);
+
+    v.push_back(2);
+    a.push_back(true);
+
+    lvr->sort(v, a);
+    tv = lvr->get_sorted_view(v, a);
+    CHECK_EQUAL(lvr->get(0).get_index(), 1);
+    CHECK_EQUAL(lvr->get(1).get_index(), 2);
+    CHECK_EQUAL(lvr->get(2).get_index(), 0);
+    CHECK_EQUAL(tv.get(0).get_index(), 1);
+    CHECK_EQUAL(tv.get(1).get_index(), 2);
+    CHECK_EQUAL(tv.get(2).get_index(), 0);
 }
 
 
@@ -1001,5 +1047,57 @@ TEST(Link_FindNullLink)
     CHECK_THROW_ANY(table2->link(col_linklist2).column<Link>(col_link1).is_null());
 }
 
+// Tests queries on a LinkList
+TEST(LinkList_QueryOnLinkList)
+{
+    Group group;
+
+    TableRef table1 = group.add_table("table1");
+    TableRef table2 = group.add_table("table2");
+
+    // add some more columns to table1 and table2
+    table1->add_column(type_Int, "col1");
+    table1->add_column(type_String, "str1");
+
+    // add some rows
+    table1->add_empty_row();
+    table1->set_int(0, 0, 300);
+    table1->set_string(1, 0, "delta");
+
+    table1->add_empty_row();
+    table1->set_int(0, 1, 100);
+    table1->set_string(1, 1, "alfa");
+
+    table1->add_empty_row();
+    table1->set_int(0, 2, 200);
+    table1->set_string(1, 2, "beta");
+
+    size_t col_link2 = table2->add_column_link(type_LinkList, "linklist", *table1);
+
+    table2->add_empty_row();
+    table2->add_empty_row();
+
+    LinkViewRef lvr;
+    TableView tv;
+
+    lvr = table2->get_linklist(col_link2, 0);
+    lvr->clear();
+    lvr->add(0);
+    lvr->add(1);
+    lvr->add(2);
+
+    // Return all rows of table1 (the linked-to-table) that match the criteria and is in the LinkList
+    Query q = table2->where(lvr.get()).and_query(table1->column<Int>(0) > 100);
+    tv = q.find_all();
+    CHECK_EQUAL(2, tv.size());
+    CHECK_EQUAL(0, tv.get_source_ndx(0));
+    CHECK_EQUAL(2, tv.get_source_ndx(1));
+
+    // Modify the LinkList and see if sync_if_needed takes it in count
+    lvr->remove(0);
+    tv.sync_if_needed();
+    CHECK_EQUAL(1, tv.size());
+    CHECK_EQUAL(2, tv.get_source_ndx(0));
+}
 
 #endif

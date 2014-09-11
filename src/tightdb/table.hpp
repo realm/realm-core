@@ -568,10 +568,10 @@ public:
     // Queries
     // Using where(tv) is the new method to perform queries on TableView. The 'tv' can have any order; it does not
     // need to be sorted, and, resulting view retains its order.
-    Query where(TableViewBase* tv = null_ptr) { return Query(*this, tv); }
+    Query where(RowIndexes* tv = null_ptr) { return Query(*this, tv); }
 
     // FIXME: We need a ConstQuery class or runtime check against modifications in read transaction.
-    Query where(TableViewBase* tv = null_ptr) const { return Query(*this, tv); }
+    Query where(RowIndexes* tv = null_ptr) const { return Query(*this, tv); }
 
     Table& link(size_t link_column);
 
@@ -1086,6 +1086,7 @@ private:
     friend class RowBase;
     friend class LinksToNode;
     friend class LinkMap;
+    friend class LinkView;
 };
 
 
