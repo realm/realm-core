@@ -30,6 +30,8 @@
   std::vector of columns to sort by multiple columns.
 * You can now query a LinkView by calling Query::where(link_view.get()).... See
   TEST(LinkList_QueryOnLinkList) in test_link_query_view.cpp for an example.
+  *** IMPORTANT NOTE: Do not call sort() on a LinkView because it does not
+  yet support replication ***
 
 -----------
 
