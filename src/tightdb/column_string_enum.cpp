@@ -49,6 +49,8 @@ void ColumnStringEnum::update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT
 {
     m_array->update_from_parent(old_baseline);
     m_keys.update_from_parent(old_baseline);
+    if (m_search_index)
+        m_search_index->update_from_parent(old_baseline);
 }
 
 void ColumnStringEnum::set(size_t ndx, StringData value)
