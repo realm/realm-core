@@ -1376,4 +1376,33 @@ TEST(TableView_QueryCopy)
     CHECK_EQUAL(t, 2);
 }
 
+
+TEST(TableView_SortEnum)
+{
+    Table table;
+    table.add_column(type_String, "str");
+    table.add_empty_row(3);
+    table[0].set_string(0, "foo");
+    table[1].set_string(0, "foo");
+    table[2].set_string(0, "foo");
+
+    table.optimize();
+
+    table.add_empty_row(3);
+    table[3].set_string(0, "bbb");
+    table[4].set_string(0, "aaa");
+    table[5].set_string(0, "baz");
+
+    TableView tv = table.where().find_all();
+    tv.sort(0);
+
+    CHECK_EQUAL(tv[0].get_string(0), "aaa");
+    CHECK_EQUAL(tv[1].get_string(0), "baz");
+    CHECK_EQUAL(tv[2].get_string(0), "bbb");
+    CHECK_EQUAL(tv[3].get_string(0), "foo");
+    CHECK_EQUAL(tv[4].get_string(0), "foo");
+    CHECK_EQUAL(tv[5].get_string(0), "foo");
+
+}
+
 #endif // TEST_TABLE_VIEW

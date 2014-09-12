@@ -1,4 +1,3 @@
-
 #include <tightdb/views.hpp>
 
 using namespace tightdb;
