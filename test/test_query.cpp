@@ -1614,7 +1614,7 @@ TEST(Query_StrIndexCrash)
             table->insert_done();
         }
 
-        table->set_index(0);
+        table->add_search_index(0);
         TableView v = table->where().equal(0, StringData("8")).find_all();
         CHECK_EQUAL(eights, v.size());
 
@@ -1998,9 +1998,9 @@ TEST(Query_Huge)
             if (t == 1)
                 tt.optimize();
             else if (t == 2)
-                tt.column().first.set_index();
+                tt.column().first.add_search_index();
             else if (t == 3)
-                tt.column().second.set_index();
+                tt.column().second.add_search_index();
 
 
 
@@ -2168,7 +2168,7 @@ TEST(Query_StrIndex3)
         v.clear();
         vec.clear();
 
-        ttt.column().second.set_index();
+        ttt.column().second.add_search_index();
 
         // Index lookup, plus linear integer column scan
         v = ttt.where().second.equal("AA").first.equal(0).find_all();
@@ -2198,7 +2198,7 @@ TEST(Query_StrIndex2)
         ttt.add(1, "AA");
     }
     ttt.add(1, "BB");
-    ttt.column().second.set_index();
+    ttt.column().second.add_search_index();
 
     s = ttt.where().second.equal("AA").count();
     CHECK_EQUAL(100, s);
@@ -2273,7 +2273,7 @@ TEST(Query_StrIndex)
         s = ttt.where().second.equal("AA").count();
         CHECK_EQUAL(aa, s);
 
-        ttt.column().second.set_index();
+        ttt.column().second.add_search_index();
         s = ttt.where().second.equal("AA").count();
         CHECK_EQUAL(aa, s);
     }
@@ -2653,7 +2653,7 @@ TEST(Query_StrIndexedEnum)
 
     ttt.optimize();
 
-    ttt.column().second.set_index();
+    ttt.column().second.add_search_index();
 
     int64_t s = ttt.where().second.equal("a").first.sum();
     CHECK_EQUAL(10 * 11, s);
@@ -2682,7 +2682,7 @@ TEST(Query_StrIndexedNonEnum)
         ttt.add(4, "c");
     }
 
-    ttt.column().second.set_index();
+    ttt.column().second.add_search_index();
 
     int64_t s = ttt.where().second.equal("a").first.sum();
     CHECK_EQUAL(10 * 11, s);

@@ -44,9 +44,6 @@ public:
     void erase(size_t row_ndx, StringData value, bool is_last = false);
     void clear() TIGHTDB_OVERRIDE;
 
-    using Column::insert;
-    using Column::erase;
-
     size_t count(StringData value) const;
     size_t find_first(StringData value) const;
     void   find_all(Column& result, StringData value) const;
@@ -55,9 +52,12 @@ public:
 
     void update_ref(StringData value, size_t old_row_ndx, size_t new_row_ndx);
 
+    bool has_duplicate_values() const TIGHTDB_NOEXCEPT;
+
 #ifdef TIGHTDB_DEBUG
     void Verify() const TIGHTDB_OVERRIDE;
     void verify_entries(const AdaptiveStringColumn& column) const;
+    void do_dump_node_structure(std::ostream&, int) const TIGHTDB_OVERRIDE;
     void to_dot() const { to_dot(std::cerr); }
     void to_dot(std::ostream&, StringData title = StringData()) const;
 #endif
@@ -67,6 +67,12 @@ public:
     static key_type create_key(StringData) TIGHTDB_NOEXCEPT;
 
 private:
+    void* m_target_column;
+    StringGetter m_get_func;
+
+    using Column::insert;
+    using Column::erase;
+
     struct inner_node_tag {};
     StringIndex(inner_node_tag, Allocator&);
 
@@ -75,7 +81,10 @@ private:
     void InsertWithOffset(size_t row_ndx, size_t offset, StringData value);
     void InsertRowList(size_t ref, size_t offset, StringData value);
     key_type GetLastKey() const;
-    void UpdateRefs(size_t pos, int diff);
+
+    /// Add small signed \a diff to all elements that are greater than, or equal
+    /// to \a min_row_ndx.
+    void adjust_row_indexes(size_t min_row_ndx, int diff);
 
     struct NodeChange {
         size_t ref1;
@@ -97,13 +106,10 @@ private:
 
     StringData get(size_t ndx) {return (*m_get_func)(m_target_column, ndx);}
 
-    // Member variables
-    void* m_target_column;
-    StringGetter m_get_func;
-
     void NodeAddKey(ref_type ref);
 
 #ifdef TIGHTDB_DEBUG
+    static void dump_node_structure(const Array& node, std::ostream&, int level);
     void to_dot_2(std::ostream&, StringData title = StringData()) const;
     static void array_to_dot(std::ostream&, const Array&);
     static void keys_to_dot(std::ostream&, const Array&, StringData title = StringData());

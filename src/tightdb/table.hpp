@@ -202,18 +202,54 @@ public:
     void rename_column(std::size_t column_ndx, StringData new_name);
     //@}
 
-    bool has_index(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
+    //@{
 
-    /// Add a search index to the specified column of this table. This table
-    /// must be a root table; that is, it must have an independent
+    /// has_search_index() returns true if, and only if a search index has been
+    /// added to the specified column. Rather than throwing, it returns false if
+    /// the table accessor is detached or the specified index is out of range.
+    ///
+    /// add_search_index() adds a search index to the specified column of this
+    /// table. It has no effect if a search index has already been added to the
+    /// specified column (idempotency).
+    ///
+    /// has_primary_key() returns true if, and only if a primary key has been
+    /// added to this table. Rather than throwing, it returns false if the table
+    /// accessor is detached.
+    ///
+    /// add_primary_key() adds a primary key to this table, and forms the key
+    /// from the specified column. The specified column must already have a
+    /// search index. remove_primary_key() removes a previously added primary
+    /// key.
+    ///
+    /// This table must be a root table; that is, it must have an independent
     /// descriptor. Freestanding tables, group-level tables, and subtables in a
     /// column of type 'mixed' are all examples of root tables. See add_column()
     /// for more on this.
     ///
-    /// \sa add_column()
+    /// \param column_ndx The index of a column of this table.
     ///
-    /// FIXME: Rename to add_search_index().
-    void set_index(std::size_t column_ndx);
+    /// \throw ConstraintViolation Thrown by add_primary_key() if the specified
+    /// column contains null values, or if it contains duplicate values.
+    ///
+    /// \throw PrimaryKeyExists Thrown by add_primary_key() if this table
+    /// already has a primary key.
+    ///
+    /// \throw WrongKindOfTable Thrown by add_primary_key() if this table is not
+    /// a root table.
+    ///
+    /// \throw DetachedAccessor Thrown by add_search_index() and
+    /// add_primary_key().
+    ///
+    /// \throw InvalidArgument Thrown by add_search_index() and
+    /// add_primary_key() if \a column_ndx is not a valid column index.
+
+    bool has_search_index(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
+    void add_search_index(std::size_t column_ndx);
+    bool has_primary_key() const TIGHTDB_NOEXCEPT;
+    void add_primary_key(std::size_t column_ndx);
+    void remove_primary_key();
+
+    //@}
 
     //@{
     /// Get the dynamic type descriptor for this table.
@@ -421,7 +457,9 @@ public:
                              std::size_t origin_col_ndx, std::size_t backlink_ndx) const
         TIGHTDB_NOEXCEPT;
 
+
     //@{
+
     /// If this accessor is attached to a subtable, then that subtable has a
     /// parent table, and the subtable either resides in a column of type
     /// `table` or of type `mixed` in that parent. In that case
@@ -436,10 +474,13 @@ public:
     /// the parent table in which the subtable resides. If this accessor is not
     /// attached to a subtable, then `*column_ndx_out` will retain its original
     /// value upon return.
+
     TableRef get_parent_table(std::size_t* column_ndx_out = 0) TIGHTDB_NOEXCEPT;
     ConstTableRef get_parent_table(std::size_t* column_ndx_out = 0) const TIGHTDB_NOEXCEPT;
     std::size_t get_parent_row_index() const TIGHTDB_NOEXCEPT;
+
     //@}
+
 
     /// Only group-level unordered tables can be used as origins or targets of
     /// links.
@@ -469,7 +510,6 @@ public:
     double  average_double(std::size_t column_ndx) const;
 
     // Searching
-    std::size_t    lookup(StringData value) const;
     std::size_t    find_first_link(std::size_t target_row_index) const;
     std::size_t    find_first_int(std::size_t column_ndx, int64_t value) const;
     std::size_t    find_first_bool(std::size_t column_ndx, bool value) const;
@@ -504,6 +544,27 @@ public:
 
     TableView      get_range_view(std::size_t begin, std::size_t end);
     ConstTableView get_range_view(std::size_t begin, std::size_t end) const;
+
+
+    //@{
+
+    /// Find the row with the specified primary key.
+    ///
+    /// \throw NoPrimaryKey Thrown if the table has no columns.
+    ///
+    /// \throw TypeMismatch Thrown if the first column is not a string column.
+    ///
+    /// \throw DetachedAccessor Thrown if this table accessor is not attached to
+    /// an underlying table.
+
+    RowExpr find_pkey_int(int_fast64_t pkey_value);
+    ConstRowExpr find_pkey_int(int_fast64_t pkey_value) const;
+
+    RowExpr find_pkey_string(StringData pkey_value);
+    ConstRowExpr find_pkey_string(StringData pkey_value) const;
+
+    //@}
+
 
     // Pivot / aggregate operation types. Experimental! Please do not document method publicly.
     enum AggrType {
@@ -591,7 +652,8 @@ public:
     /// Descriptor) as the source table (this table), and unless it is
     /// overridden (\a override_table_name), the new table will have
     /// the same name as the source table (see get_name()). Indexes
-    /// (see set_index()) will not be carried over to the new table.
+    /// (see add_search_index()) will not be carried over to the new
+    /// table.
     ///
     /// \param offset Index of first row to include (if `size >
     /// 0`). Must be less than, or equal to size().
@@ -611,8 +673,8 @@ public:
                StringData override_table_name = StringData()) const;
 
     // Conversion
-    void to_json(std::ostream& out, size_t link_depth = 0, std::map<std::string, std::string>* renames = null_ptr)
-        const;
+    void to_json(std::ostream& out, size_t link_depth = 0, std::map<std::string,
+                 std::string>* renames = 0) const;
     void to_string(std::ostream& out, std::size_t limit = 500) const;
     void row_to_string(std::size_t row_ndx, std::ostream& out) const;
 
@@ -708,12 +770,13 @@ private:
     Array m_columns; // 2nd slot in m_top (for root tables)
     Spec m_spec;     // 1st slot in m_top (for root tables)
 
-    // Is empty when the table accessor is attached to a degenerate subtable
-    // (unattached `m_columns`), otherwise it contains precisely one column
-    // accessor for each column in the table, in order.
+    // Is guaranteed to be empty for a detached accessor. Otherwise it is empty
+    // when the table accessor is attached to a degenerate subtable (unattached
+    // `m_columns`), otherwise it contains precisely one column accessor for
+    // each column in the table, in order.
     //
-    // In some cases an entry may contain null. This is currently possible only
-    // in connection with Group::advance_transact(), but it means that several
+    // In some cases an entry may be null. This is currently possible only in
+    // connection with Group::advance_transact(), but it means that several
     // member functions must be prepared to handle these null entries; in
     // particular, detach(), ~Table(), functions called on behalf of detach()
     // and ~Table(), and functiones called on behalf of
@@ -722,7 +785,7 @@ private:
     column_accessors m_cols;
 
     mutable std::size_t m_ref_count;
-    mutable const StringIndex* m_search_index;
+    mutable const StringIndex* m_primary_key;
 
     // If this table is a root table (has independent descriptor),
     // then Table::m_descriptor refers to the accessor of its
@@ -796,6 +859,10 @@ private:
               bool skip_create_column_accessors = false);
     void init(ConstSubspecRef shared_spec, ArrayParent* parent_column,
               std::size_t parent_row_ndx);
+
+    void reveal_primary_key() const;
+    std::size_t do_find_pkey_int(int_fast64_t) const;
+    std::size_t do_find_pkey_string(StringData) const;
 
     static void do_insert_column(Descriptor&, std::size_t col_ndx, DataType type,
                                  StringData name, Table* link_target_table);
@@ -1499,6 +1566,42 @@ inline TableRef Table::get_parent_table(std::size_t* column_ndx_out) TIGHTDB_NOE
 inline bool Table::is_group_level() const TIGHTDB_NOEXCEPT
 {
     return bool(get_parent_group());
+}
+
+inline Table::RowExpr Table::find_pkey_int(int_fast64_t value)
+{
+    Table* table = 0;
+    std::size_t row_ndx = do_find_pkey_int(value); // Throws
+    if (row_ndx != tightdb::not_found)
+        table = this;
+    return RowExpr(table, row_ndx);
+}
+
+inline Table::ConstRowExpr Table::find_pkey_int(int_fast64_t value) const
+{
+    const Table* table = 0;
+    std::size_t row_ndx = do_find_pkey_int(value); // Throws
+    if (row_ndx != tightdb::not_found)
+        table = this;
+    return ConstRowExpr(table, row_ndx);
+}
+
+inline Table::RowExpr Table::find_pkey_string(StringData value)
+{
+    Table* table = 0;
+    std::size_t row_ndx = do_find_pkey_string(value); // Throws
+    if (row_ndx != tightdb::not_found)
+        table = this;
+    return RowExpr(table, row_ndx);
+}
+
+inline Table::ConstRowExpr Table::find_pkey_string(StringData value) const
+{
+    const Table* table = 0;
+    std::size_t row_ndx = do_find_pkey_string(value); // Throws
+    if (row_ndx != tightdb::not_found)
+        table = this;
+    return ConstRowExpr(table, row_ndx);
 }
 
 inline bool Table::operator==(const Table& t) const

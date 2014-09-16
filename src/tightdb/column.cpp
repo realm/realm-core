@@ -707,7 +707,7 @@ struct AdjustLeafElem: Array::UpdateHandler {
 
 } // anonymous namespace
 
-void Column::set(size_t ndx, int64_t value)
+void Column::set(size_t ndx, int_fast64_t value)
 {
     TIGHTDB_ASSERT(ndx < size());
 
@@ -720,7 +720,7 @@ void Column::set(size_t ndx, int64_t value)
     m_array->update_bptree_elem(ndx, set_leaf_elem); // Throws
 }
 
-void Column::adjust(size_t ndx, int64_t diff)
+void Column::adjust(size_t ndx, int_fast64_t diff)
 {
     TIGHTDB_ASSERT(ndx < size());
 
@@ -1174,7 +1174,7 @@ void ColumnBase::tree_to_dot(ostream& out) const
 
 void ColumnBase::dump_node_structure() const
 {
-    dump_node_structure(cerr, 0);
+    do_dump_node_structure(cerr, 0);
 }
 
 
@@ -1232,9 +1232,14 @@ void leaf_dumper(MemRef mem, Allocator& alloc, ostream& out, int level)
 
 } // anonymous namespace
 
-void Column::dump_node_structure(ostream& out, int level) const
+void Column::do_dump_node_structure(ostream& out, int level) const
 {
-    m_array->dump_bptree_structure(out, level, &leaf_dumper);
+    dump_node_structure(*m_array, out, level);
+}
+
+void Column::dump_node_structure(const Array& root,  ostream& out, int level)
+{
+    root.dump_bptree_structure(out, level, &leaf_dumper);
 }
 
 #endif // TIGHTDB_DEBUG

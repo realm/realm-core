@@ -88,12 +88,12 @@ public:
     void adjust_keys_ndx_in_parent(int diff) TIGHTDB_NOEXCEPT;
     void update_from_parent(std::size_t old_baseline) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
-    // Index
-    bool has_index() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-    void set_index_ref(ref_type, ArrayParent*, std::size_t ndx_in_parent) TIGHTDB_OVERRIDE;
-    const StringIndex& get_index() const TIGHTDB_NOEXCEPT;
-    StringIndex& create_index();
-    void install_index(StringIndex*) TIGHTDB_NOEXCEPT;
+    // Search index
+    bool has_search_index() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void set_search_index_ref(ref_type, ArrayParent*, std::size_t ndx_in_parent) TIGHTDB_OVERRIDE;
+    const StringIndex& get_search_index() const TIGHTDB_NOEXCEPT;
+    StringIndex& create_search_index();
+    void install_search_index(StringIndex*) TIGHTDB_NOEXCEPT;
 
     // Compare two string columns for equality
     bool compare_string(const AdaptiveStringColumn&) const;
@@ -104,9 +104,8 @@ public:
 #ifdef TIGHTDB_DEBUG
     void Verify() const TIGHTDB_OVERRIDE;
     void Verify(const Table&, std::size_t) const TIGHTDB_OVERRIDE;
+    void do_dump_node_structure(std::ostream&, int) const TIGHTDB_OVERRIDE;
     void to_dot(std::ostream&, StringData title) const TIGHTDB_OVERRIDE;
-    void dump_node_structure(std::ostream&, int level) const TIGHTDB_OVERRIDE;
-    using Column::dump_node_structure;
 #endif
 
     std::size_t GetKeyNdx(StringData value) const;
@@ -182,12 +181,12 @@ inline std::size_t ColumnStringEnum::upper_bound_string(StringData value) const 
     return ColumnBase::upper_bound(*this, value);
 }
 
-inline bool ColumnStringEnum::has_index() const TIGHTDB_NOEXCEPT
+inline bool ColumnStringEnum::has_search_index() const TIGHTDB_NOEXCEPT
 {
     return m_search_index != 0;
 }
 
-inline const StringIndex& ColumnStringEnum::get_index() const TIGHTDB_NOEXCEPT
+inline const StringIndex& ColumnStringEnum::get_search_index() const TIGHTDB_NOEXCEPT
 {
     return *m_search_index;
 }

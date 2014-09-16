@@ -8,6 +8,8 @@
 #  include <win32\types.h>
 #endif
 
+#include <tightdb/util/unique_ptr.hpp>
+
 #include <tightdb/query_conditions.hpp>
 #include <tightdb/column_string.hpp>
 #include <tightdb/index_string.hpp>
@@ -169,12 +171,12 @@ StringData AdaptiveStringColumn::get(size_t ndx) const TIGHTDB_NOEXCEPT
 }
 
 
-StringIndex& AdaptiveStringColumn::create_index()
+StringIndex& AdaptiveStringColumn::create_search_index()
 {
     TIGHTDB_ASSERT(!m_search_index);
 
-    // Create new index
-    m_search_index = new StringIndex(this, &get_string, m_array->get_alloc()); // Throws
+    UniquePtr<StringIndex> index;
+    index.reset(new StringIndex(this, &get_string, m_array->get_alloc())); // Throws
 
     // Populate the index
     size_t num_rows = size();
@@ -182,14 +184,16 @@ StringIndex& AdaptiveStringColumn::create_index()
         StringData value = get(row_ndx);
         size_t num_rows = 1;
         bool is_append = true;
-        m_search_index->insert(row_ndx, value, num_rows, is_append); // Throws
+        index->insert(row_ndx, value, num_rows, is_append); // Throws
     }
 
+    m_search_index = index.release();
     return *m_search_index;
 }
 
 
-void AdaptiveStringColumn::set_index_ref(ref_type ref, ArrayParent* parent, size_t ndx_in_parent)
+void AdaptiveStringColumn::set_search_index_ref(ref_type ref, ArrayParent* parent,
+                                                size_t ndx_in_parent)
 {
     TIGHTDB_ASSERT(!m_search_index);
     m_search_index = new StringIndex(ref, parent, ndx_in_parent, this, &get_string,
@@ -348,7 +352,7 @@ void AdaptiveStringColumn::set(size_t ndx, StringData value)
 {
     TIGHTDB_ASSERT(ndx < size());
 
-    // Update index
+    // Update search index
     // (it is important here that we do it before actually setting
     //  the value, or the index would not be able to find the correct
     //  position to update (as it looks for the old value))
@@ -484,7 +488,7 @@ void AdaptiveStringColumn::erase(size_t ndx, bool is_last)
     TIGHTDB_ASSERT(ndx < size());
     TIGHTDB_ASSERT(is_last == (ndx == size()-1));
 
-    // Update index
+    // Update search index
     // (it is important here that we do it before actually setting
     //  the value, or the index would not be able to find the correct
     //  position to update (as it looks for the old value))
@@ -1558,9 +1562,12 @@ void leaf_dumper(MemRef mem, Allocator& alloc, ostream& out, int level)
 
 } // anonymous namespace
 
-void AdaptiveStringColumn::dump_node_structure(ostream& out, int level) const
+void AdaptiveStringColumn::do_dump_node_structure(ostream& out, int level) const
 {
     m_array->dump_bptree_structure(out, level, &leaf_dumper);
+    int indent = level * 2;
+    out << setw(indent) << "" << "Search index\n";
+    m_search_index->do_dump_node_structure(out, level+1);
 }
 
 #endif // TIGHTDB_DEBUG

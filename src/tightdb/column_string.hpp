@@ -91,12 +91,12 @@ public:
 
     FindRes find_all_indexref(StringData value, std::size_t& dst) const;
 
-    // Index
-    bool has_index() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return m_search_index != 0; }
-    void set_index_ref(ref_type, ArrayParent*, std::size_t ndx_in_parent) TIGHTDB_OVERRIDE;
-    const StringIndex& get_index() const TIGHTDB_NOEXCEPT { return *m_search_index; }
-    StringIndex* release_index() TIGHTDB_NOEXCEPT;
-    StringIndex& create_index();
+    // Search index
+    bool has_search_index() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return m_search_index != 0; }
+    void set_search_index_ref(ref_type, ArrayParent*, std::size_t ndx_in_parent) TIGHTDB_OVERRIDE;
+    const StringIndex& get_search_index() const TIGHTDB_NOEXCEPT { return *m_search_index; }
+    StringIndex* release_search_index() TIGHTDB_NOEXCEPT;
+    StringIndex& create_search_index();
 
     // Optimizing data layout
     bool auto_enumerate(ref_type& keys, ref_type& values) const;
@@ -131,8 +131,7 @@ public:
     void Verify() const TIGHTDB_OVERRIDE;
     void Verify(const Table&, std::size_t) const TIGHTDB_OVERRIDE;
     void to_dot(std::ostream&, StringData title) const TIGHTDB_OVERRIDE;
-    void dump_node_structure(std::ostream&, int level) const TIGHTDB_OVERRIDE;
-    using ColumnBase::dump_node_structure;
+    void do_dump_node_structure(std::ostream&, int) const TIGHTDB_OVERRIDE;
 #endif
 
 protected:
@@ -238,7 +237,7 @@ inline void AdaptiveStringColumn::insert(std::size_t row_ndx, std::size_t num_ro
     do_insert(row_ndx, value, num_rows, is_append); // Throws
 }
 
-inline StringIndex* AdaptiveStringColumn::release_index() TIGHTDB_NOEXCEPT
+inline StringIndex* AdaptiveStringColumn::release_search_index() TIGHTDB_NOEXCEPT
 {
     StringIndex* i = m_search_index;
     m_search_index = 0;
