@@ -41,7 +41,7 @@
  * to leaves. The minimum allowable value is 2.
  */
 #ifndef TIGHTDB_MAX_BPNODE_SIZE
-#  define TIGHTDB_MAX_BPNODE_SIZE 1000
+#  define TIGHTDB_MAX_BPNODE_SIZE 5
 #endif
 
 

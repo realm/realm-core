@@ -588,7 +588,7 @@ TEST(ColumnString_AutoEnumerateIndex)
     size_t res3 = e.count("a");
     size_t res4 = e.count("bc");
     size_t res5 = e.count("newval");
-    CHECK_EQUAL(5, res3);
+    CHECK_EQUAL(5, res3); // 4
     CHECK_EQUAL(4, res4);
     CHECK_EQUAL(1, res5);
 

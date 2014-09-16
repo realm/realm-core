@@ -958,6 +958,8 @@ private:
 
     bool do_erase_bptree_elem(std::size_t elem_ndx, EraseHandler&);
 
+
+    template <int method> size_t index_string(StringData value, Column& result, size_t &result_ref, void* column, StringGetter get_func) const;
 protected:
 //    void AddPositiveLocal(int64_t value);
 
