@@ -51,6 +51,7 @@ Query::Query(const Query& copy)
     m_view = copy.m_view;
     copy.do_delete = false;
     do_delete = true;
+    m_keep_alive = copy.m_keep_alive;
 }
 
 

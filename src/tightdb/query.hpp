@@ -276,6 +276,10 @@ public:
     RowIndexes* m_view;
     std::vector<bool> pending_not;
 
+    // Used for the binding to keep a LinkView alive for the lifetime of the Query. Todo, kind of a hack, should
+    // be solved properly later.
+    LinkViewRef m_keep_alive;
+
 private:
     template <class TColumnType> Query& equal(size_t column_ndx1, size_t column_ndx2);
     template <class TColumnType> Query& less(size_t column_ndx1, size_t column_ndx2);
