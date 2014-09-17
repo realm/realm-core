@@ -398,6 +398,59 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
 }
 
 
+TEST(LangBindHelper_AdvanceReadTransact_LinkListSort)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg(path);
+    ShortCircuitTransactLogManager tlm(path);
+    SharedGroup sg_w(tlm);
+
+    // Start a read transaction (to be repeatedly advanced)
+    ReadTransaction rt(sg);
+    const Group& group = rt.get_group();
+    CHECK_EQUAL(0, group.size());
+
+    // Create a table via the other SharedGroup
+    {
+        WriteTransaction wt(sg_w);
+        TableRef foo_w = wt.add_table("foo");
+        foo_w->add_column(type_Int, "i");
+        foo_w->add_empty_row();
+        wt.commit();
+    }
+
+    // Verify that sorting a LinkList works
+    size_t link_col;
+    {
+        WriteTransaction wt(sg_w);
+        TableRef foo_w = wt.add_table("links");
+        link_col = foo_w->add_column_link(type_LinkList, "links", *foo_w); // just link to self
+        size_t val_col = foo_w->add_column(type_Int, "vals"); // just link to self
+        foo_w->add_empty_row(4);
+        foo_w->set_int(val_col, 0, 40);
+        foo_w->set_int(val_col, 1, 20);
+        foo_w->set_int(val_col, 2, 10);
+        foo_w->set_int(val_col, 3, 30);
+        LinkViewRef lvr = foo_w->get_linklist(link_col, 0);
+        lvr->add(0);
+        lvr->add(1);
+        lvr->add(2);
+        lvr->add(3);
+        lvr->sort(val_col); // sort such that they links become 2, 1, 3, 0
+        wt.commit();
+    }
+
+    LangBindHelper::advance_read(sg, tlm);
+
+    // Verify sorted LinkList (see above)
+    ConstTableRef linktable = group.get_table("links");
+    ConstLinkViewRef lvr = linktable->get_linklist(link_col, 0);
+    CHECK_EQUAL(2, lvr->get(0).get_index());
+    CHECK_EQUAL(1, lvr->get(1).get_index());
+    CHECK_EQUAL(3, lvr->get(2).get_index());
+    CHECK_EQUAL(0, lvr->get(3).get_index());
+}
+
 TEST(LangBindHelper_AdvanceReadTransact_ColumnRootTypeChange)
 {
     SHARED_GROUP_TEST_PATH(path);

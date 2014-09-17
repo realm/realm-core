@@ -302,8 +302,8 @@ private:
         instr_LinkListInsert        = 41, // Insert entry into link list
         instr_LinkListMove          = 42, // Move an entry within a link list
         instr_LinkListErase         = 43, // Remove an entry from a link list
-        instr_LinkListClear         = 44,  // Ramove all entries from a link list
-        instr_LinkListSetAll        = 45 // Assign to link list entry
+        instr_LinkListClear         = 44, // Remove all entries from a link list
+        instr_LinkListSetAll        = 45  // Assign to link list entry
     };
 
     util::Buffer<std::size_t> m_subtab_path_buf;
@@ -1074,8 +1074,7 @@ inline void Replication::optimize_table(const Table* t)
 }
 
 
-inline void Replication::link_list_set(const LinkView& list, std::size_t link_ndx,
-    std::size_t value)
+inline void Replication::link_list_set(const LinkView& list, std::size_t link_ndx, std::size_t value)
 {
     check_link_list(list); // Throws
     simple_cmd(instr_LinkListSet, util::tuple(link_ndx, value)); // Throws
@@ -1115,7 +1114,6 @@ inline void Replication::link_list_erase(const LinkView& list, std::size_t link_
 inline void Replication::link_list_clear(const LinkView& list)
 {
     check_link_list(list); // Throws
-    
     simple_cmd(instr_LinkListClear, util::tuple()); // Throws
 }
 
