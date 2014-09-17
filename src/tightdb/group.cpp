@@ -271,7 +271,7 @@ Table* Group::do_get_table(size_t table_ndx, DescMatcher desc_matcher)
     TIGHTDB_ASSERT(m_table_accessors.empty() || m_table_accessors.size() == m_tables.size());
 
     if (table_ndx >= m_tables.size())
-        throw LogicError(LogicError::index_out_of_range);
+        throw LogicError(LogicError::table_index_out_of_range);
 
     if (m_table_accessors.empty())
         m_table_accessors.resize(m_tables.size()); // Throws
@@ -531,7 +531,7 @@ void Group::rename_table(size_t table_ndx, StringData new_name, bool require_uni
     TIGHTDB_ASSERT(is_attached());
     TIGHTDB_ASSERT(m_tables.size() == m_table_names.size());
     if (table_ndx >= m_tables.size())
-        throw LogicError(LogicError::index_out_of_range);
+        throw LogicError(LogicError::table_index_out_of_range);
     if (require_unique_name && has_table(new_name))
         throw TableNameInUse();
     m_table_names.set(table_ndx, new_name);

@@ -11,6 +11,7 @@
 #include <tightdb/column_table.hpp>
 #include <tightdb/column_mixed.hpp>
 #include <tightdb/query_engine.hpp>
+#include <tightdb/exceptions.hpp>
 #include <tightdb/table.hpp>
 
 using namespace std;
@@ -217,6 +218,12 @@ void merge_references(Array* valuelist, Array* indexlists, Array** indexresult)
 */
 
 } // anonymous namespace
+
+
+void ColumnBase::set_string(size_t, StringData)
+{
+    throw LogicError(LogicError::type_mismatch);
+}
 
 
 void ColumnBase::update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT

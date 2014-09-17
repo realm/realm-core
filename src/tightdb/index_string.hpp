@@ -33,7 +33,7 @@ class StringIndex: public Column {
 public:
     StringIndex(void* target_column, StringGetter get_func, Allocator&);
     StringIndex(ref_type, ArrayParent*, std::size_t ndx_in_parent, void* target_column,
-                StringGetter get_func, Allocator&);
+                StringGetter get_func, bool allow_duplicate_values, Allocator&);
     ~StringIndex() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
     void set_target(void* target_column, StringGetter get_func) TIGHTDB_NOEXCEPT;
 
@@ -54,6 +54,9 @@ public:
 
     bool has_duplicate_values() const TIGHTDB_NOEXCEPT;
 
+    /// By default, duplicate values are allowed.
+    void set_allow_duplicate_values(bool) TIGHTDB_NOEXCEPT;
+
 #ifdef TIGHTDB_DEBUG
     void Verify() const TIGHTDB_OVERRIDE;
     void verify_entries(const AdaptiveStringColumn& column) const;
@@ -69,6 +72,7 @@ public:
 private:
     void* m_target_column;
     StringGetter m_get_func;
+    bool m_deny_duplicate_values;
 
     using Column::insert;
     using Column::erase;
@@ -78,7 +82,7 @@ private:
 
     static Array* create_node(Allocator&, bool is_leaf);
 
-    void InsertWithOffset(size_t row_ndx, size_t offset, StringData value);
+    void insert_with_offset(size_t row_ndx, StringData value, size_t offset);
     void InsertRowList(size_t ref, size_t offset, StringData value);
     key_type GetLastKey() const;
 
@@ -124,27 +128,35 @@ private:
 inline StringIndex::StringIndex(void* target_column, StringGetter get_func, Allocator& alloc):
     Column(create_node(alloc, true)), // Throws
     m_target_column(target_column),
-    m_get_func(get_func)
-{
-}
-
-inline StringIndex::StringIndex(inner_node_tag, Allocator& alloc):
-    Column(create_node(alloc, false)), // Throws
-    m_target_column(0),
-    m_get_func(0)
+    m_get_func(get_func),
+    m_deny_duplicate_values(false)
 {
 }
 
 inline StringIndex::StringIndex(ref_type ref, ArrayParent* parent, std::size_t ndx_in_parent,
-                                void* target_column, StringGetter get_func, Allocator& alloc):
+                                void* target_column, StringGetter get_func,
+                                bool deny_duplicate_values, Allocator& alloc):
     Column(alloc, ref),
     m_target_column(target_column),
-    m_get_func(get_func)
+    m_get_func(get_func),
+    m_deny_duplicate_values(deny_duplicate_values)
 {
     TIGHTDB_ASSERT(Array::get_context_flag_from_header(alloc.translate(ref)));
     set_parent(parent, ndx_in_parent);
 }
 
+inline StringIndex::StringIndex(inner_node_tag, Allocator& alloc):
+    Column(create_node(alloc, false)), // Throws
+    m_target_column(0),
+    m_get_func(0),
+    m_deny_duplicate_values(false)
+{
+}
+
+inline void StringIndex::set_allow_duplicate_values(bool allow) TIGHTDB_NOEXCEPT
+{
+    m_deny_duplicate_values = !allow;
+}
 
 inline StringIndex::key_type StringIndex::create_key(StringData str) TIGHTDB_NOEXCEPT
 {

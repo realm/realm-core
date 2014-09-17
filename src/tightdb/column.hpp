@@ -52,7 +52,7 @@ template <class T> struct ColumnTemplate : public ColumnTemplateBase
     }
 
     // We cannot use already-existing get() methods because ColumnStringEnum and LinkList inherit from
-    // Column and overload get() with different return type than int64_t. Todo, find a way to simplify 
+    // Column and overload get() with different return type than int64_t. Todo, find a way to simplify
     virtual T get_val(size_t row) const = 0;
 };
 
@@ -62,6 +62,9 @@ public:
     /// Get the number of entries in this column. This operation is relatively
     /// slow.
     std::size_t size() const TIGHTDB_NOEXCEPT;
+
+    /// \throw LogicError Thrown if this column is not string valued.
+    virtual void set_string(std::size_t row_ndx, StringData value);
 
     /// Insert the specified number of default values into this column starting
     /// at the specified row index. Set `is_append` to true if, and only if
@@ -92,9 +95,11 @@ public:
 
     virtual ~ColumnBase() TIGHTDB_NOEXCEPT {};
 
-    // Indexing
-    virtual bool has_search_index() const TIGHTDB_NOEXCEPT { return false; }
-    virtual void set_search_index_ref(ref_type, ArrayParent*, std::size_t) {}
+    // Search index
+    virtual bool has_search_index() const TIGHTDB_NOEXCEPT;
+    virtual void set_search_index_ref(ref_type, ArrayParent*, std::size_t ndx_in_parent,
+                                      bool allow_duplicate_values);
+    virtual void set_search_index_allow_duplicate_values(bool) TIGHTDB_NOEXCEPT;
 
     Allocator& get_alloc() const TIGHTDB_NOEXCEPT { return m_array->get_alloc(); }
 
@@ -462,6 +467,19 @@ inline void ColumnBase::destroy() TIGHTDB_NOEXCEPT
 {
     if (m_array)
         m_array->destroy_deep();
+}
+
+inline bool ColumnBase::has_search_index() const TIGHTDB_NOEXCEPT
+{
+    return false;
+}
+
+inline void ColumnBase::set_search_index_ref(ref_type, ArrayParent*, std::size_t, bool)
+{
+}
+
+inline void ColumnBase::set_search_index_allow_duplicate_values(bool) TIGHTDB_NOEXCEPT
+{
 }
 
 inline void ColumnBase::discard_child_accessors() TIGHTDB_NOEXCEPT

@@ -290,8 +290,8 @@ TEST(Group_TableIndex)
     CHECK_EQUAL("moja",  group.get_table_name(moja->get_index_in_group()));
     CHECK_EQUAL("mbili", group.get_table_name(mbili->get_index_in_group()));
     CHECK_EQUAL("tatu",  group.get_table_name(tatu->get_index_in_group()));
-    CHECK_LOGIC_ERROR(group.get_table(4), LogicError::index_out_of_range);
-    CHECK_LOGIC_ERROR(group.get_table_name(4), LogicError::index_out_of_range);
+    CHECK_LOGIC_ERROR(group.get_table(4), LogicError::table_index_out_of_range);
+    CHECK_LOGIC_ERROR(group.get_table_name(4), LogicError::table_index_out_of_range);
 }
 
 
@@ -385,7 +385,7 @@ TEST(Group_StaticallyTypedTables)
     CHECK_THROW(group.get_or_add_table<TestTableGroup2>("table_1"), DescriptorMismatch);
     CHECK_THROW(group.get_or_add_table<TestTableGroup>("table_2"),  DescriptorMismatch);
 
-    CHECK_LOGIC_ERROR(group.get_table<TestTableGroup>(3), LogicError::index_out_of_range);
+    CHECK_LOGIC_ERROR(group.get_table<TestTableGroup>(3), LogicError::table_index_out_of_range);
 }
 
 
@@ -421,7 +421,7 @@ TEST(Group_BasicRemoveTable)
     CHECK_NOT(gamma->is_attached());
     CHECK_NOT(delta->is_attached());
     CHECK_EQUAL("beta",  group.get_table_name(beta->get_index_in_group()));
-    CHECK_LOGIC_ERROR(group.remove_table(1), LogicError::index_out_of_range);
+    CHECK_LOGIC_ERROR(group.remove_table(1), LogicError::table_index_out_of_range);
     CHECK_THROW(group.remove_table("epsilon"), NoSuchTable);
     group.Verify();
 }
@@ -604,7 +604,7 @@ TEST(Group_RenameTable)
     CHECK_EQUAL("alpha",   alpha->get_name());
     CHECK_EQUAL("epsilon", beta->get_name());
     CHECK_EQUAL("gamma",   gamma->get_name());
-    CHECK_LOGIC_ERROR(group.rename_table(3, "zeta"), LogicError::index_out_of_range);
+    CHECK_LOGIC_ERROR(group.rename_table(3, "zeta"), LogicError::table_index_out_of_range);
     CHECK_THROW(group.rename_table("eta", "theta"), NoSuchTable);
     CHECK_THROW(group.rename_table("epsilon", "alpha"), TableNameInUse);
     bool require_unique_name = false;

@@ -193,11 +193,17 @@ StringIndex& AdaptiveStringColumn::create_search_index()
 
 
 void AdaptiveStringColumn::set_search_index_ref(ref_type ref, ArrayParent* parent,
-                                                size_t ndx_in_parent)
+                                                size_t ndx_in_parent, bool allow_duplicate_valaues)
 {
     TIGHTDB_ASSERT(!m_search_index);
     m_search_index = new StringIndex(ref, parent, ndx_in_parent, this, &get_string,
-                                     m_array->get_alloc()); // Throws
+                                     !allow_duplicate_valaues, m_array->get_alloc()); // Throws
+}
+
+
+void AdaptiveStringColumn::set_search_index_allow_duplicate_values(bool allow) TIGHTDB_NOEXCEPT
+{
+    m_search_index->set_allow_duplicate_values(allow);
 }
 
 
@@ -351,6 +357,10 @@ public:
 void AdaptiveStringColumn::set(size_t ndx, StringData value)
 {
     TIGHTDB_ASSERT(ndx < size());
+
+    // We must modify the search index before modifying the column, because we
+    // need to be able to abort the operation if the modification of the search
+    // index fails due to a unique constraint violation.
 
     // Update search index
     // (it is important here that we do it before actually setting
