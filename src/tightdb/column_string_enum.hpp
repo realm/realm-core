@@ -68,7 +68,7 @@ public:
     void clear() TIGHTDB_OVERRIDE;
 
     std::size_t count(StringData value) const;
-    size_t find_first(StringData value, std::size_t begin = 0, std::size_t end = npos) const;
+    std::size_t find_first(StringData value, std::size_t begin = 0, std::size_t end = npos) const;
     void find_all(Column& res, StringData value,
                   std::size_t begin = 0, std::size_t end = npos) const;
     FindRes find_all_indexref(StringData value, std::size_t& dst) const;
@@ -85,12 +85,16 @@ public:
     std::size_t upper_bound_string(StringData value) const TIGHTDB_NOEXCEPT;
     //@}
 
+    void set_string(std::size_t, StringData) TIGHTDB_OVERRIDE;
+
     void adjust_keys_ndx_in_parent(int diff) TIGHTDB_NOEXCEPT;
     void update_from_parent(std::size_t old_baseline) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
     // Search index
     bool has_search_index() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-    void set_search_index_ref(ref_type, ArrayParent*, std::size_t ndx_in_parent) TIGHTDB_OVERRIDE;
+    void set_search_index_ref(ref_type, ArrayParent*, std::size_t, bool) TIGHTDB_OVERRIDE;
+    void set_search_index_allow_duplicate_values(bool) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    StringIndex& get_search_index() TIGHTDB_NOEXCEPT;
     const StringIndex& get_search_index() const TIGHTDB_NOEXCEPT;
     StringIndex& create_search_index();
     void install_search_index(StringIndex*) TIGHTDB_NOEXCEPT;
@@ -181,9 +185,19 @@ inline std::size_t ColumnStringEnum::upper_bound_string(StringData value) const 
     return ColumnBase::upper_bound(*this, value);
 }
 
+inline void ColumnStringEnum::set_string(std::size_t row_ndx, StringData value)
+{
+    set(row_ndx, value); // Throws
+}
+
 inline bool ColumnStringEnum::has_search_index() const TIGHTDB_NOEXCEPT
 {
     return m_search_index != 0;
+}
+
+inline StringIndex& ColumnStringEnum::get_search_index() TIGHTDB_NOEXCEPT
+{
+    return *m_search_index;
 }
 
 inline const StringIndex& ColumnStringEnum::get_search_index() const TIGHTDB_NOEXCEPT

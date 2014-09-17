@@ -275,11 +275,18 @@ StringIndex& ColumnStringEnum::create_search_index()
 }
 
 
-void ColumnStringEnum::set_search_index_ref(ref_type ref, ArrayParent* parent, size_t ndx_in_parent)
+void ColumnStringEnum::set_search_index_ref(ref_type ref, ArrayParent* parent,
+                                            size_t ndx_in_parent, bool allow_duplicate_valaues)
 {
     TIGHTDB_ASSERT(!m_search_index);
     m_search_index = new StringIndex(ref, parent, ndx_in_parent, this, &get_string,
-                                     m_array->get_alloc()); // Throws
+                                     !allow_duplicate_valaues, m_array->get_alloc()); // Throws
+}
+
+
+void ColumnStringEnum::set_search_index_allow_duplicate_values(bool allow) TIGHTDB_NOEXCEPT
+{
+    m_search_index->set_allow_duplicate_values(allow);
 }
 
 

@@ -73,7 +73,9 @@ public:
 /// easily predicted.
 class LogicError: public std::exception {
 public:
-    static const char* const index_out_of_range;
+    static const char* const table_index_out_of_range;
+    static const char* const row_index_out_of_range;
+    static const char* const column_index_out_of_range;
 
     /// Indicates that an argument has a value that is illegal in combination
     /// with another argument, or with the state of an involved object.
@@ -90,8 +92,6 @@ public:
     /// Indicates that an involved accessor is was detached, i.e., was not
     /// attached to an underlying object.
     static const char* const detached_accessor;
-
-    static const char* const immutable_data;
 
     // Indicates that an involved column lacks a search index.
     static const char* const no_search_index;

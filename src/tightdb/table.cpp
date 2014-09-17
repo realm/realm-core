@@ -1248,7 +1248,7 @@ void Table::add_search_index(size_t col_ndx)
         throw LogicError(LogicError::wrong_kind_of_table);
 
     if (TIGHTDB_UNLIKELY(col_ndx >= m_cols.size()))
-        throw LogicError(LogicError::index_out_of_range);
+        throw LogicError(LogicError::column_index_out_of_range);
 
     if (has_search_index(col_ndx))
         return;
@@ -1319,31 +1319,34 @@ void Table::add_primary_key(size_t col_ndx)
         throw LogicError(LogicError::has_primary_key);
 
     if (TIGHTDB_UNLIKELY(col_ndx >= m_cols.size()))
-        throw LogicError(LogicError::index_out_of_range);
+        throw LogicError(LogicError::column_index_out_of_range);
 
     if (TIGHTDB_UNLIKELY(!has_search_index(col_ndx)))
         throw LogicError(LogicError::no_search_index);
 
     // FIXME: Also check that there are no null values
     // (NoNullConstraintViolation).
-    bool has_duplicate_values = false;
     ColumnType type = get_real_column_type(col_ndx);
     ColumnBase& col = get_column_base(col_ndx);
     if (type == col_type_String) {
         AdaptiveStringColumn& col_2 = static_cast<AdaptiveStringColumn&>(col);
-        const StringIndex& index = col_2.get_search_index();
-        has_duplicate_values = index.has_duplicate_values();
+        StringIndex& index = col_2.get_search_index();
+        if (index.has_duplicate_values())
+            throw UniqueConstraintViolation();
+        index.set_allow_duplicate_values(false);
     }
     else if (type == col_type_StringEnum) {
         ColumnStringEnum& col_2 = static_cast<ColumnStringEnum&>(col);
-        const StringIndex& index = col_2.get_search_index();
-        has_duplicate_values = index.has_duplicate_values();
+        StringIndex& index = col_2.get_search_index();
+        if (index.has_duplicate_values())
+            throw UniqueConstraintViolation();
+        index.set_allow_duplicate_values(false);
     }
     else {
+        // Impossible case, because we know that a search index was already
+        // added.
         TIGHTDB_ASSERT(false);
     }
-    if (has_duplicate_values)
-        throw UniqueConstraintViolation();
 
     int attr = m_spec.get_column_attr(col_ndx);
     attr |= col_attr_PrimaryKey;
@@ -1364,13 +1367,29 @@ void Table::remove_primary_key()
     if (TIGHTDB_UNLIKELY(has_shared_type()))
         throw LogicError(LogicError::wrong_kind_of_table);
 
-    size_t n = m_cols.size();
-    for (size_t i = 0; i < n; ++i) {
-        int attr = m_spec.get_column_attr(i);
+    size_t num_cols = m_cols.size();
+    for (size_t col_ndx = 0; col_ndx < num_cols; ++col_ndx) {
+        int attr = m_spec.get_column_attr(col_ndx);
         if (attr & col_attr_PrimaryKey) {
             attr &= ~col_attr_PrimaryKey;
-            m_spec.set_column_attr(i, ColumnAttr(attr)); // Throws
+            m_spec.set_column_attr(col_ndx, ColumnAttr(attr)); // Throws
             m_primary_key = 0;
+
+            ColumnType type = get_real_column_type(col_ndx);
+            ColumnBase& col = get_column_base(col_ndx);
+            if (type == col_type_String) {
+                AdaptiveStringColumn& col_2 = static_cast<AdaptiveStringColumn&>(col);
+                StringIndex& index = col_2.get_search_index();
+                index.set_allow_duplicate_values(true);
+            }
+            else if (type == col_type_StringEnum) {
+                ColumnStringEnum& col_2 = static_cast<ColumnStringEnum&>(col);
+                StringIndex& index = col_2.get_search_index();
+                index.set_allow_duplicate_values(true);
+            }
+            else {
+                TIGHTDB_ASSERT(false);
+            }
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
             if (Replication* repl = get_repl())
@@ -2265,24 +2284,21 @@ StringData Table::get_string(size_t col_ndx, size_t ndx) const TIGHTDB_NOEXCEPT
 
 void Table::set_string(size_t col_ndx, size_t ndx, StringData value)
 {
-    TIGHTDB_ASSERT(col_ndx < get_column_count());
-    TIGHTDB_ASSERT(ndx < m_size);
+    if (TIGHTDB_UNLIKELY(!is_attached()))
+        throw LogicError(LogicError::detached_accessor);
+    if (TIGHTDB_UNLIKELY(ndx >= m_size))
+        throw LogicError(LogicError::row_index_out_of_range);
+    // For a degenerate subtable, `m_cols.size()` is zero, even when it has a
+    // column, however, the previous row index check guarantees that `m_size >
+    // 0`, and since `m_size` is also zero for a degenerate subtable, the table
+    // cannot be degenerate if we got this far.
+    if (TIGHTDB_UNLIKELY(col_ndx >= m_cols.size()))
+        throw LogicError(LogicError::column_index_out_of_range);
+
     bump_version();
 
     ColumnBase& col = get_column_base(col_ndx);
-    if (TIGHTDB_UNLIKELY(&col == m_primary_key))
-        throw LogicError(LogicError::immutable_data);
-
-    ColumnType type = get_real_column_type(col_ndx);
-    if (type == col_type_String) {
-        AdaptiveStringColumn& col_2 = static_cast<AdaptiveStringColumn&>(col);
-        col_2.set(ndx, value);
-    }
-    else {
-        TIGHTDB_ASSERT(type == col_type_StringEnum);
-        ColumnStringEnum& col_2 = static_cast<ColumnStringEnum&>(col);
-        col_2.set(ndx, value);
-    }
+    col.set_string(ndx, value); // Throws
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
@@ -4714,12 +4730,20 @@ void Table::refresh_column_accessors(size_t col_ndx_begin)
         // If there is no search index accessor, but the column has been
         // equipped with a search index, create the accessor now.
         ColumnAttr attr = m_spec.get_column_attr(col_ndx);
-        bool has_search_index = (attr & col_attr_Indexed) != 0;
-        if (has_search_index && !col->has_search_index()) {
-            ref_type ref = m_columns.get_as_ref(ndx_in_parent+1);
-            col->set_search_index_ref(ref, &m_columns, ndx_in_parent+1); // Throws
+        bool has_search_index = (attr & col_attr_Indexed)    != 0;
+        bool is_primary_key   = (attr & col_attr_PrimaryKey) != 0;
+        TIGHTDB_ASSERT(has_search_index || !is_primary_key);
+        if (has_search_index) {
+            bool allow_duplicate_values = !is_primary_key;
+            if (col->has_search_index()) {
+                col->set_search_index_allow_duplicate_values(allow_duplicate_values);
+            }
+            else {
+                ref_type ref = m_columns.get_as_ref(ndx_in_parent+1);
+                col->set_search_index_ref(ref, &m_columns, ndx_in_parent+1,
+                                          allow_duplicate_values); // Throws
+            }
         }
-
         ndx_in_parent += (has_search_index ? 2 : 1);
     }
 
