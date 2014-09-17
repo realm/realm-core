@@ -68,6 +68,7 @@ TEST(File_IsSame)
     }
 }
 
+#if 0 // FIXME: needs optional encryption
 TEST(File_Streambuf)
 {
     TEST_PATH(path);
@@ -88,6 +89,28 @@ TEST(File_Streambuf)
         out << "Line " << 2 << endl;
         string s_2 = out.str();
         CHECK(s_1 == s_2);
+    }
+}
+#endif
+
+TEST(File_Map)
+{
+    TEST_PATH(path);
+    const char data[] = "hello";
+    {
+        File f(path, File::mode_Write);
+        f.resize(sizeof(data));
+
+        File::Map<char> map(f, File::access_ReadWrite, 1);
+        *map.get_addr() = data[0];
+
+        map.remap(f, File::access_ReadWrite, sizeof(data));
+        memcpy(map.get_addr() + 1, data + 1, map.get_size() - 1);
+    }
+    {
+        File f(path, File::mode_Read);
+        File::Map<void> map(f, File::access_ReadOnly, sizeof(data));
+        CHECK(memcmp(map.get_addr(), data, map.get_size()) == 0);
     }
 }
 

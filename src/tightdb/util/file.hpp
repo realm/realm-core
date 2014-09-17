@@ -21,6 +21,7 @@
 #define TIGHTDB_UTIL_FILE_HPP
 
 #include <cstddef>
+#include <memory>
 #include <stdint.h>
 #include <stdexcept>
 #include <string>
@@ -277,6 +278,8 @@ public:
     /// is idempotent.
     void unlock() TIGHTDB_NOEXCEPT;
 
+    void set_encryption_key(const uint8_t *key);
+
     enum {
         /// If possible, disable opportunistic flushing of dirted
         /// pages of a memory mapped file to physical medium. On some
@@ -428,8 +431,11 @@ private:
     void* m_handle;
     bool m_have_lock; // Only valid when m_handle is not null
 #else
-    int m_fd;
+    std::shared_ptr<int> m_fd;
 #endif
+
+    bool m_encrypt = false;
+    uint8_t m_encryption_key[32];
 
     bool lock(bool exclusive, bool non_blocking);
     void open_internal(const std::string& path, AccessMode, CreateMode, int flags, bool* success);
@@ -612,8 +618,6 @@ inline File::File(const std::string& path, Mode m)
 {
 #ifdef _WIN32
     m_handle = 0;
-#else
-    m_fd = -1;
 #endif
 
     open(path, m);
@@ -623,8 +627,6 @@ inline File::File() TIGHTDB_NOEXCEPT
 {
 #ifdef _WIN32
     m_handle = 0;
-#else
-    m_fd = -1;
 #endif
 }
 
@@ -675,7 +677,7 @@ inline bool File::is_attached() const TIGHTDB_NOEXCEPT
 #ifdef _WIN32
     return (m_handle != NULL);
 #else
-    return 0 <= m_fd;
+    return (bool)m_fd;
 #endif
 }
 

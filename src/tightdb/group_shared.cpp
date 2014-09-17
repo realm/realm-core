@@ -534,7 +534,7 @@ void spawn_daemon(const string& file) {}
 // undefined state.
 
 void SharedGroup::open(const string& path, bool no_create_file,
-                       DurabilityLevel dlevel, bool is_backend)
+                       DurabilityLevel dlevel, bool is_backend, const uint8_t *key)
 {
     TIGHTDB_ASSERT(!is_attached());
 
@@ -607,7 +607,8 @@ void SharedGroup::open(const string& path, bool no_create_file,
             if (info->versioning_ready == false) {
                 no_create = no_create_file;
             }
-            ref_type top_ref = alloc.attach_file(path, is_shared, read_only, no_create, skip_validate); // Throws
+            ref_type top_ref = alloc.attach_file(path, is_shared, read_only,
+                                                 no_create, skip_validate, key); // Throws
             size_t file_size = alloc.get_baseline();
             if (info->versioning_ready == false) {
                 info->init_versioning(top_ref, file_size);
@@ -680,12 +681,13 @@ void SharedGroup::open(const string& path, bool no_create_file,
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
 
-void SharedGroup::open(Replication& repl, DurabilityLevel dlevel)
+void SharedGroup::open(Replication& repl, DurabilityLevel dlevel, const uint8_t *key)
 {
     TIGHTDB_ASSERT(!is_attached());
     string file = repl.get_database_path();
     bool no_create   = false;
-    open(file, no_create, dlevel); // Throws
+    bool is_backend  = false;
+    open(file, no_create, dlevel, is_backend, key); // Throws
     typedef _impl::GroupFriend gf;
     gf::set_replication(m_group, &repl);
 }

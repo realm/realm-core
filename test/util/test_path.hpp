@@ -41,6 +41,12 @@
 namespace tightdb {
 namespace test_util {
 
+#if 1 // TIGHTDB_ENABLE_ENCRYPTION
+static const uint8_t key[] = "1234567890123456789012345678901";
+#else
+static const uint8_t *key = nullptr;
+#endif
+
 /// Disable removal of test files. If called, the call must complete
 /// before any TestPathGuard object is created.
 void keep_test_files();

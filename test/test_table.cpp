@@ -1771,11 +1771,11 @@ TEST(Table_Spec)
 
     // Write the group to disk
     GROUP_TEST_PATH(path);
-    group.write(path);
+    group.write(path, test_util::key);
 
     // Read back tables
     {
-        Group from_disk(path, Group::mode_ReadOnly);
+        Group from_disk(path, test_util::key, Group::mode_ReadOnly);
         TableRef from_disk_table = from_disk.get_table("test");
 
         TableRef subtable2 = from_disk_table->get_subtable(2, 0);

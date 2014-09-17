@@ -380,7 +380,7 @@ char* SlabAlloc::do_translate(ref_type ref) const TIGHTDB_NOEXCEPT
 
 
 ref_type SlabAlloc::attach_file(const string& path, bool is_shared, bool read_only, bool no_create,
-                                bool skip_validate)
+                                bool skip_validate, const uint8_t *encryption_key)
 {
     TIGHTDB_ASSERT(!is_attached());
 
@@ -397,6 +397,8 @@ ref_type SlabAlloc::attach_file(const string& path, bool is_shared, bool read_on
     File::AccessMode access = read_only ? File::access_ReadOnly : File::access_ReadWrite;
     File::CreateMode create = read_only || no_create ? File::create_Never : File::create_Auto;
     m_file.open(path.c_str(), access, create, 0); // Throws
+    if (encryption_key)
+        m_file.set_encryption_key(encryption_key);
     File::CloseGuard fcg(m_file);
 
     size_t initial_size = 4 * 1024; // a single page sure feels tight

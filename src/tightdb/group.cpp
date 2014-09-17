@@ -35,12 +35,9 @@ public:
 };
 
 Initialization initialization;
-
 } // anonymous namespace
 
-
-
-void Group::open(const string& file_path, OpenMode mode)
+void Group::open(const string& file_path, const uint8_t *encrption_key, OpenMode mode)
 {
     TIGHTDB_ASSERT(!is_attached());
     bool is_shared = false;
@@ -48,7 +45,7 @@ void Group::open(const string& file_path, OpenMode mode)
     bool no_create = mode == mode_ReadWriteNoCreate;
     bool skip_validate = false;
     ref_type top_ref = m_alloc.attach_file(file_path, is_shared, read_only, no_create,
-                                           skip_validate); // Throws
+                                           skip_validate, encrption_key); // Throws
     SlabAlloc::DetachGuard dg(m_alloc);
     m_alloc.reset_free_space_tracking(); // Throws
     if (top_ref == 0) {
@@ -565,11 +562,12 @@ void Group::write(ostream& out) const
     write(out, table_writer); // Throws
 }
 
-void Group::write(const string& path) const
+void Group::write(const string& path, const uint8_t *encrption_key) const
 {
     File file;
     int flags = 0;
     file.open(path, File::access_ReadWrite, File::create_Must, flags);
+    file.set_encryption_key(encrption_key);
     File::Streambuf streambuf(&file);
     ostream out(&streambuf);
     write(out);
@@ -649,6 +647,12 @@ void Group::write(ostream& out, TableWriter& table_writer)
     TIGHTDB_ASSERT(out_2.get_pos() == final_file_size);
 
     top.destroy(); // Shallow
+
+    // ensure the footer is 16-byte aligned for AES
+    if (final_file_size & 15) {
+        char buffer[16] = {0};
+        out_2.write(buffer, 16 - (final_file_size & 15));
+    }
 
     // Write streaming footer
     SlabAlloc::StreamingFooter footer;

@@ -1,0 +1,378 @@
+//
+//  file_mapper.cpp
+//  tightdb
+//
+//  Created by Thomas Goyne on 9/22/14.
+//  Copyright (c) 2014 TightDB. All rights reserved.
+//
+
+#include "file_mapper.hpp"
+
+#include <algorithm>
+#include <cerrno>
+#include <climits>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <vector>
+
+#include <unistd.h>
+#include <fcntl.h>
+#include <signal.h>
+#include <sys/stat.h>
+#include <sys/mman.h>
+#include <sys/file.h>
+
+#include <CommonCrypto/CommonCryptor.h>
+
+using namespace std;
+using namespace tightdb;
+using namespace tightdb::util;
+
+namespace {
+#include <execinfo.h>
+void print_backtrace() {
+    void* callstack[128];
+    int i, frames = backtrace(callstack, 128);
+    char** strs = backtrace_symbols(callstack, frames);
+    for (i = 0; i < frames; ++i) {
+        printf("%s\n", strs[i]);
+    }
+    free(strs);
+}
+
+void die(const char *msg) {
+    puts(msg);
+    print_backtrace();
+    abort();
+}
+
+struct spin_lock_guard {
+    std::atomic_flag &lock;
+
+    spin_lock_guard(std::atomic_flag &lock) : lock(lock) {
+        while (lock.test_and_set(std::memory_order_acquire)) ;
+//            die("multiple threads or re-entrant signal");
+    }
+
+    ~spin_lock_guard() {
+        lock.clear(std::memory_order_release);
+    }
+};
+
+#pragma mark - crypto
+size_t aes_block_size(size_t len) {
+    return (len + kCCBlockSizeAES128 - 1) & ~(kCCBlockSizeAES128 - 1);
+}
+
+size_t crypt(CCOperation op, const void *src, void *dst, size_t len, const uint8_t *key) {
+    uint8_t buffer[4096];
+    // if source len isn't a multiple of the block size, pad it with zeroes
+    if (len & (kCCBlockSizeAES128 - 1)) {
+        auto padded_len = aes_block_size(len);
+        memcpy(buffer, src, len);
+        memset(buffer + len, 0, padded_len - len);
+        src = buffer;
+        len = padded_len;
+    }
+
+    size_t bytesEncrypted = 0;
+    auto err = CCCrypt(op, kCCAlgorithmAES, 0 /* option */,
+                       key, kCCKeySizeAES256,
+                       nullptr /* iv */,
+                       src, len,
+                       dst, 4096,
+                       &bytesEncrypted);
+    if (err != kCCSuccess) die("CCCrypt failed");
+    return bytesEncrypted;
+}
+
+void read_decrypt(int fd, off_t pos, void *dst, size_t size, const uint8_t *key) {
+    uint8_t buffer[4096];
+    lseek(fd, pos, SEEK_SET);
+    auto count = read(fd, buffer, aes_block_size(size));
+    crypt(kCCDecrypt, buffer, dst, count, key);
+}
+
+void write_encrypt(int fd, off_t pos, void *src, size_t size, const uint8_t *key) {
+    uint8_t buffer[4096];
+    auto bytes = crypt(kCCEncrypt, src, buffer, size, key);
+    lseek(fd, pos, SEEK_SET);
+    write(fd, buffer, bytes);
+}
+
+#pragma mark - mmap
+class EncryptedFileMapping;
+
+std::atomic_flag mapping_lock = ATOMIC_FLAG_INIT;
+EncryptedFileMapping *mappings = nullptr;
+
+class EncryptedFileMapping {
+public:
+    std::shared_ptr<int> fd;
+
+    void *addr;
+    size_t size;
+
+    uintptr_t page;
+    size_t count;
+
+    std::vector<bool> read_pages;
+    std::vector<bool> dirty_pages;
+
+    dev_t device;
+    ino_t inode;
+
+    EncryptedFileMapping *next;
+
+    File::AccessMode access;
+    const uint8_t *key;
+
+    EncryptedFileMapping(std::shared_ptr<int> fd, void *addr, size_t size, EncryptedFileMapping *next, File::AccessMode access, const uint8_t *key)
+    : fd(fd)
+    , addr(addr)
+    , size(size)
+    , page((uintptr_t)addr >> 12)
+    , count((size + 4095) >> 12)
+    , read_pages(count, false)
+    , dirty_pages(count, false)
+    , next(next)
+    , access(access)
+    , key(key)
+    {
+        struct stat st;
+        if (fstat(*fd, &st)) die("fstat failed");
+        inode = st.st_ino;
+        device = st.st_dev;
+    }
+
+    bool same_file(const EncryptedFileMapping *m) const {
+        return m != this && m->inode == inode && m->device == device;
+    }
+
+    char *page_addr(size_t i) const {
+        return (char *)((page + i) << 12);
+    }
+
+    size_t page_size(size_t i) const {
+        if (i < count - 1)
+            return 4096;
+        return min<size_t>(4096, size - (page_addr(i) - (char *)addr));
+    }
+
+    void mark_unreadable(size_t i) {
+        mprotect(page_addr(i), 4096, PROT_NONE);
+        read_pages[i] = false;
+        dirty_pages[i] = false;
+    }
+
+    void mark_readable(size_t i) {
+        mprotect(page_addr(i), 4096, PROT_READ);
+        read_pages[i] = true;
+        dirty_pages[i] = false;
+    }
+
+    void mark_writeable(size_t i) {
+        mprotect(page_addr(i), 4096, PROT_READ | PROT_WRITE);
+        dirty_pages[i] = true;
+    }
+
+    void write_page(size_t i) {
+        if (!dirty_pages[i]) return;
+
+        auto addr = page_addr(i);
+        auto count = page_size(i);
+        lseek(*fd, i << 12, SEEK_SET);
+        write(*fd, addr, count);
+
+        mark_readable(i);
+    }
+
+    void flush_others(size_t i) {
+        for (auto m = mappings; m; m = m->next) {
+            if (same_file(m) && i < m->count && m->dirty_pages[i]) {
+                m->flush();
+                return; // can't have mappings with same page dirty
+            }
+        }
+    }
+
+    void read_page(size_t i) {
+        flush_others(i);
+
+        auto addr = page_addr(i);
+        mprotect(addr, 4096, PROT_READ | PROT_WRITE);
+        read_decrypt(*fd, i << 12, addr, page_size(i), key);
+
+        mark_readable(i);
+    }
+
+    void validate_page(size_t i) {
+        if (!read_pages[i]) return;
+
+        char buffer[4096];
+        read_decrypt(*fd, i << 12, buffer, sizeof(buffer), key);
+        if (memcmp(buffer, page_addr(i), page_size(i))) {
+            printf("mismatch %p: fd(%d) page(%zu/%zu) page_size(%zu) %s %s\n",
+                   this, *fd, i, count, page_size(i), buffer, page_addr(i));
+            die("");
+        }
+    }
+
+    void validate() {
+        for (size_t i = 0; i < count; ++i)
+            validate_page(i);
+    }
+
+    void flush() {
+        // invalidate all read mappings for pages we're about to write to
+        for (auto m = mappings; m; m = m->next) {
+            if (same_file(m))
+                m->invalidate(dirty_pages);
+        }
+
+        for (size_t i = 0; i < count; ++i) {
+            if (!dirty_pages[i]) {
+                validate_page(i);
+                continue;
+            }
+
+            mark_readable(i);
+            write_encrypt(*fd, i << 12, page_addr(i), page_size(i), key);
+        }
+
+        validate();
+    }
+
+    void invalidate(std::vector<bool> const& pages) {
+        for (size_t i = 0; i < count && i < pages.size(); ++i) {
+            if (pages[i] && read_pages[i])
+                mark_unreadable(i);
+        }
+    }
+};
+
+void handler(int, siginfo_t *info, void *) {
+    auto page = (uintptr_t)info->si_addr >> 12;
+
+    spin_lock_guard lock{mapping_lock};
+    for (auto m = mappings; m; m = m->next) {
+        if (m->page > page || m->page + m->count <= page) continue;
+
+        size_t idx = page - m->page;
+        if (!m->read_pages[idx]) {
+            m->read_page(idx);
+        }
+        else if (m->access == File::access_ReadWrite) {
+            m->flush_others(idx);
+            m->mark_writeable(idx);
+        }
+
+        return;
+    }
+
+    die("segv");
+}
+
+void add_mapping(void *addr, size_t size, std::shared_ptr<int> fd, File::AccessMode access, const uint8_t *encryption_key) {
+    spin_lock_guard lock{mapping_lock};
+    mappings = new EncryptedFileMapping{std::move(fd), addr, size, mappings, access, encryption_key};
+
+    if (!mappings->next) {
+        struct sigaction action;
+        action.sa_sigaction = handler;
+        action.sa_flags = SA_SIGINFO;
+
+        if (sigaction(SIGSEGV, &action, NULL) != 0) die("sigaction");
+        if (sigaction(SIGBUS, &action, NULL) != 0) die("sigaction");
+    }
+}
+
+void remove_mapping(void *addr, size_t size) {
+    spin_lock_guard lock{mapping_lock};
+    auto prev = &mappings;
+    for (auto m = mappings; m; m = m->next) {
+        if (m->addr == addr && m->size == size) {
+            m->flush();
+            *prev = m->next;
+            delete m;
+            return;
+        }
+        prev = &m->next;
+    }
+}
+
+string get_errno_msg(const char* prefix, int err)
+{
+    char buffer[256];
+    std::string str;
+    str.reserve(strlen(prefix) + sizeof(buffer));
+    str += prefix;
+
+    if (TIGHTDB_LIKELY(strerror_r(err, buffer, sizeof(buffer)) == 0))
+        str += buffer;
+    else
+        str += "Unknown error";
+
+    return str;
+}
+
+} // anonymous namespace
+
+namespace tightdb {
+namespace util {
+
+void *mmap(std::shared_ptr<int> fd, size_t size, File::AccessMode access, const uint8_t *encryption_key) {
+    if (encryption_key) {
+        void* addr = ::mmap(0, size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
+        if (addr != MAP_FAILED) {
+            mprotect(addr, size, PROT_NONE);
+            add_mapping(addr, size, fd, access, encryption_key);
+            return addr;
+        }
+    }
+    else {
+        int prot = PROT_READ;
+        switch (access) {
+            case File::access_ReadWrite:
+                prot |= PROT_WRITE;
+                break;
+            case File::access_ReadOnly:
+                break;
+        }
+
+        void* addr = ::mmap(0, size, prot, MAP_SHARED, *fd, 0);
+        if (addr != MAP_FAILED)
+            return addr;
+    }
+
+    int err = errno; // Eliminate any risk of clobbering
+    string msg = get_errno_msg("mmap() failed: ", err);
+    throw runtime_error(msg);
+}
+
+void munmap(void* addr, size_t size) {
+    remove_mapping(addr, size);
+    ::munmap(addr, size);
+}
+
+void msync(void* addr, size_t size) {
+    { // first check the encrypted mappings
+        spin_lock_guard lock{mapping_lock};
+        for (auto m = mappings; m; m = m->next) {
+            if (m->addr != addr || m->size != size) continue;
+
+            m->flush();
+            return;
+        }
+    }
+
+    // not an encrypted mapping
+    if (::msync(addr, size, MS_SYNC) != 0) {
+        int err = errno; // Eliminate any risk of clobbering
+        throw runtime_error(get_errno_msg("msync() failed: ", err));
+    }
+}
+
+}
+}
