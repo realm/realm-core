@@ -2960,7 +2960,7 @@ const Array* Array::GetBlock(size_t ndx, Array& arr, size_t& off,
 
 
 
-template <int method> size_t Array::index_string(StringData value, Column& result, size_t &result_ref, void* column, StringGetter get_func) const
+template <int method, class T> size_t Array::index_string(StringData value, Column& result, size_t &result_ref, void* column, StringGetter get_func) const
 {
     StringData value_2 = value;
     const char* data = m_data;
@@ -3013,26 +3013,20 @@ top:
             // If the last byte in the stored key is zero, we know that we have
             // compared against the entire (target) string
             if (!(stored_key << 24)) {
+                result_ref = row_ref;
                 if (method == 0)
                     result.add(row_ref);
-                else if (method == 2)
-                    return row_ref;
-                else if (method == 3)
-                    return 1;
-                result_ref = row_ref;
-                return FindRes_single;
+
+                return method == 2 ? row_ref : method == 3 ? 1 : FindRes_single;
             }
 
             StringData str = (*get_func)(column, row_ref);
             if (str == value) {
+                result_ref = row_ref;
                 if (method == 0)
                     result.add(row_ref);
-                else if (method == 2)
-                    return row_ref;
-                else if (method == 3)
-                    return 1;
-                result_ref = row_ref;
-                return FindRes_single;
+
+                return method == 2 ? row_ref : method == 3 ? 1 : FindRes_single;
             }
             return method == 1 ? FindRes_not_found : method == 2 ? not_found : 0;
         }
@@ -3065,25 +3059,22 @@ top:
                     }
                 }
 
-                if (method == 1) {
-                    result_ref = to_ref(ref);
-                    return (size_t)FindRes_column;
+                result_ref = to_ref(ref);
+
+                if (method == 0) {
+                    // Copy all matches into result column
+                    const size_t sub_size = get_size_from_header(sub_header);
+
+                    for (size_t i = 0; i < sub_size; ++i) {
+                        size_t row_ref = to_size_t(get_direct(sub_data, sub_width, i));
+                        result.add(row_ref);
+                    }
                 }
-                // todo, can a column have 0 or 1 entries, or is it guaranteed
-                // to become rearranged into a simpler btree form?
-                else if (method == 2)
-                    return to_size_t(get_direct(sub_data, sub_width, 0));
-                else if (method == 3)
-                    return sub_count;
-
-                // Copy all matches into result array
-                const size_t sub_size = get_size_from_header(sub_header);
-
-                for (size_t i = 0; i < sub_size; ++i) {
-                    size_t row_ref = to_size_t(get_direct(sub_data, sub_width, i));
-                    result.add(row_ref);
+                else {
+                    return method == 1 ? FindRes_column : 
+                           method == 2 ? to_size_t(get_direct(sub_data, sub_width, 0)) :
+                           sub_count;
                 }
-
             }
             else {
                 const Column sub(m_alloc, to_ref(ref));
@@ -3100,21 +3091,16 @@ top:
                         return method == 1 ? FindRes_not_found : method == 2 ? not_found : 0;
                 }
 
-                if (method == 1) {
-                    result_ref = to_ref(ref);
-                    return (size_t)FindRes_column;
+                result_ref = to_ref(ref);
+                if (method == 0) {
+                    // Copy all matches into result column
+                    for (size_t i = 0; i < sub.size(); ++i)
+                        result.add(to_size_t(sub.get(i)));
                 }
-                else if (method == 2)
-                    return to_size_t(sub.get(0)); // todo, why not get_direct?
-                else if (method == 3)
-                    return sub_count;
-
-                // Copy all matches into result array
-                const size_t sub_size = sub.size();
-
-                for (size_t i = 0; i < sub_size; ++i) {
-                    size_t row_ref = to_size_t(sub.get(i));
-                    result.add(row_ref);
+                else {
+                    return method == 1 ? FindRes_column :
+                           method == 2 ? to_size_t(sub.get(0)) :
+                           sub_count;
                 }
             }
 
@@ -3135,8 +3121,6 @@ top:
 
         goto top;
     }
-
-
 }
 
 size_t Array::IndexStringFindFirst(StringData value, void* column, StringGetter get_func) const
@@ -3144,7 +3128,7 @@ size_t Array::IndexStringFindFirst(StringData value, void* column, StringGetter 
     size_t dummy;
     Column dummycol;
 
-    return index_string<2>(value, dummycol, dummy, column, get_func);
+    return index_string<2, StringData>(value, dummycol, dummy, column, get_func);
 
 
     StringData value_2 = value;
@@ -3261,7 +3245,7 @@ void Array::IndexStringFindAll(Column& result, StringData value, void* column, S
 {
     size_t dummy;
 
-    index_string<0>(value, result, dummy, column, get_func);
+    index_string<0, StringData>(value, result, dummy, column, get_func);
     return;
 
 
@@ -3399,7 +3383,7 @@ top:
 FindRes Array::IndexStringFindAllNoCopy(StringData value, size_t& res_ref, void* column, StringGetter get_func) const
 {
     Column dummy;
-    return (FindRes)index_string<1>(value, dummy, res_ref, column, get_func);
+    return (FindRes)index_string<1, StringData>(value, dummy, res_ref, column, get_func);
     
 
 
@@ -3526,7 +3510,7 @@ size_t Array::IndexStringCount(StringData value, void* column, StringGetter get_
 {
     Column dummy;
     size_t dummysizet;
-    return index_string<3>(value, dummy, dummysizet, column, get_func);
+    return index_string<3, StringData>(value, dummy, dummysizet, column, get_func);
 
     StringData value_2 = value;
     const char* data   = m_data;
