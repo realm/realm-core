@@ -27,6 +27,22 @@
 
 namespace tightdb {
 
+    // todo, add some type safety for these
+template <class T> inline StringData to_string(T value)
+{   
+    return StringData(reinterpret_cast<const char*>(&value), sizeof(T));
+}
+
+template <> inline StringData to_string(const char* value)
+{
+    return StringData(value);
+}
+
+template <> inline StringData to_string<StringData>(StringData input)
+{
+    return input;
+}
+
 typedef StringData (*StringGetter)(void*, std::size_t);
 
 class StringIndex: public Column {
@@ -39,19 +55,92 @@ public:
 
     bool is_empty() const;
 
-    void insert(size_t row_ndx, StringData value, size_t num_rows, bool is_append);
-    void set(size_t row_ndx, StringData oldValue, StringData new_value);
-    void erase(size_t row_ndx, StringData value, bool is_last = false);
+    template <class T> void insert(size_t row_ndx, T value, size_t num_rows, bool is_append)
+    {
+        // If the new row is inserted after the last row in the table, we don't need
+        // to adjust any row indexes.
+        if (!is_append) {
+            for (size_t i = 0; i < num_rows; ++i) {
+                size_t row_ndx_2 = row_ndx + i;
+                adjust_row_indexes(row_ndx_2, 1); // Throws
+            }
+        }
+
+        for (size_t i = 0; i < num_rows; ++i) {
+            size_t row_ndx_2 = row_ndx + i;
+            size_t offset = 0; // First key from beginning of string
+            insert_with_offset(row_ndx_2, to_string(value), offset); // Throws
+        }
+    }
+
+    template <class T> void set(size_t row_ndx, T old_value, T new_value)
+    {
+        StringData old_value2 = to_string(old_value);
+        StringData new_value2 = to_string(new_value);
+        // Note that insert_with_offset() throws UniqueConstraintViolation.
+
+        if (TIGHTDB_LIKELY(new_value2 != old_value2)) {
+            size_t offset = 0; // First key from beginning of string
+            insert_with_offset(row_ndx, new_value2, offset); // Throws
+
+            bool is_last = true; // To avoid updating refs
+            erase(row_ndx, old_value2, is_last); // Throws
+        }
+    }
+
+    template <class T> size_t find_first(T value) const
+    {
+        // Use direct access method
+        return m_array->IndexStringFindFirst(to_string(value), m_target_column, m_get_func);
+    }
+
+    template <class T> void find_all(Column& result, T value) const
+    {
+        // Use direct access method
+        return m_array->IndexStringFindAll(result, value, m_target_column, m_get_func);
+    }
+
+    template <class T> FindRes find_all(T value, size_t& ref) const
+    {
+        // Use direct access method
+        return m_array->IndexStringFindAllNoCopy(to_string(value), ref, m_target_column, m_get_func);
+    }
+
+    template <class T> size_t count(T value) const
+    {
+        // Use direct access method
+        return m_array->IndexStringCount(to_string(value), m_target_column, m_get_func);
+    }
+
+    template <class T> void erase(size_t row_ndx, T value, bool is_last)
+    {
+        DoDelete(row_ndx, to_string(value), 0);
+
+        // Collapse top nodes with single item
+        while (!root_is_leaf()) {
+            TIGHTDB_ASSERT(m_array->size() > 1); // node cannot be empty
+            if (m_array->size() > 2)
+                break;
+
+            ref_type ref = m_array->get_as_ref(1);
+            m_array->set(1, 1); // avoid destruction of the extracted ref
+            m_array->destroy_deep();
+            m_array->init_from_ref(ref);
+            m_array->update_parent();
+        }
+
+        // If it is last item in column, we don't have to update refs
+        if (!is_last)
+            adjust_row_indexes(row_ndx, -1);
+    }
+
+    template <class T> void update_ref(T value, size_t old_row_ndx, size_t new_row_ndx)
+    {
+        do_update_ref(to_string(value), old_row_ndx, new_row_ndx, 0);
+    }
+
     void clear() TIGHTDB_OVERRIDE;
-
-    size_t count(StringData value) const;
-    size_t find_first(StringData value) const;
-    void   find_all(Column& result, StringData value) const;
-    void   distinct(Column& result) const;
-    FindRes find_all(StringData value, size_t& ref) const;
-
-    void update_ref(StringData value, size_t old_row_ndx, size_t new_row_ndx);
-
+    void distinct(Column& result) const;
     bool has_duplicate_values() const TIGHTDB_NOEXCEPT;
 
     /// By default, duplicate values are allowed.

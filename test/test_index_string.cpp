@@ -478,7 +478,7 @@ TEST(StringIndex_FindAllNoCopy)
     StringIndex& ndx = col.create_search_index();
 
     size_t ref_2 = not_found;
-    FindRes res1 = ndx.find_all("not there", ref_2);
+    FindRes res1 = ndx.find_all(StringData("not there"), ref_2);
     CHECK_EQUAL(FindRes_not_found, res1);
 
     FindRes res2 = ndx.find_all(s1, ref_2);

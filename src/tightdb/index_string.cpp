@@ -56,38 +56,6 @@ StringIndex::key_type StringIndex::GetLastKey() const
 }
 
 
-void StringIndex::set(size_t row_ndx, StringData old_value, StringData new_value)
-{
-    // Note that insert_with_offset() throws UniqueConstraintViolation.
-
-    if (TIGHTDB_LIKELY(new_value != old_value)) {
-        size_t offset = 0; // First key from beginning of string
-        insert_with_offset(row_ndx, new_value, offset); // Throws
-
-        bool is_last = true; // To avoid updating refs
-        erase(row_ndx, old_value, is_last); // Throws
-    }
-}
-
-
-void StringIndex::insert(size_t row_ndx, StringData value, size_t num_rows, bool is_append)
-{
-    // If the new row is inserted after the last row in the table, we don't need
-    // to adjust any row indexes.
-    if (!is_append) {
-        for (size_t i = 0; i < num_rows; ++i) {
-            size_t row_ndx_2 = row_ndx + i;
-            adjust_row_indexes(row_ndx_2, 1); // Throws
-        }
-    }
-
-    for (size_t i = 0; i < num_rows; ++i) {
-        size_t row_ndx_2 = row_ndx + i;
-        size_t offset = 0; // First key from beginning of string
-        insert_with_offset(row_ndx_2, value, offset); // Throws
-    }
-}
-
 
 void StringIndex::insert_with_offset(size_t row_ndx, StringData value, size_t offset)
 {
@@ -464,36 +432,6 @@ bool StringIndex::LeafInsert(size_t row_ndx, key_type key, size_t offset, String
     return true;
 }
 
-
-size_t StringIndex::find_first(StringData value) const
-{
-    // Use direct access method
-    return m_array->IndexStringFindFirst(value, m_target_column, m_get_func);
-}
-
-
-void StringIndex::find_all(Column& result, StringData value) const
-{
-    // Use direct access method
-    return m_array->IndexStringFindAll(result, value, m_target_column, m_get_func);
-}
-
-
-FindRes StringIndex::find_all(StringData value, size_t& ref) const
-{
-    // Use direct access method
-    return m_array->IndexStringFindAllNoCopy(value, ref, m_target_column, m_get_func);
-}
-
-
-size_t StringIndex::count(StringData value) const
-
-{
-    // Use direct access method
-    return m_array->IndexStringCount(value, m_target_column, m_get_func);
-}
-
-
 void StringIndex::distinct(Column& result) const
 {
     Allocator& alloc = m_array->get_alloc();
@@ -504,7 +442,7 @@ void StringIndex::distinct(Column& result) const
         for (size_t i = 1; i < count; ++i) {
             size_t ref = m_array->get_as_ref(i);
             StringIndex ndx(ref, 0, 0, m_target_column, m_get_func,
-                            m_deny_duplicate_values, alloc);
+                m_deny_duplicate_values, alloc);
             ndx.distinct(result);
         }
     }
@@ -514,14 +452,14 @@ void StringIndex::distinct(Column& result) const
 
             // low bit set indicate literal ref (shifted)
             if (ref & 1) {
-               size_t r = to_size_t((uint64_t(ref) >> 1));
-               result.add(r);
+                size_t r = to_size_t((uint64_t(ref) >> 1));
+                result.add(r);
             }
             else {
                 // A real ref either points to a list or a subindex
                 if (Array::get_context_flag_from_header(alloc.translate(to_ref(ref)))) {
                     StringIndex ndx(to_ref(ref), m_array, i, m_target_column, m_get_func,
-                                    m_deny_duplicate_values, alloc);
+                        m_deny_duplicate_values, alloc);
                     ndx.distinct(result);
                 }
                 else {
@@ -533,7 +471,6 @@ void StringIndex::distinct(Column& result) const
         }
     }
 }
-
 
 void StringIndex::adjust_row_indexes(size_t min_row_ndx, int diff)
 {
@@ -591,29 +528,6 @@ void StringIndex::clear()
 
     size_t size = 1;
     m_array->truncate_and_destroy_children(size); // Don't touch `values` array
-}
-
-
-void StringIndex::erase(size_t row_ndx, StringData value, bool is_last)
-{
-    DoDelete(row_ndx, value, 0);
-
-    // Collapse top nodes with single item
-    while (!root_is_leaf()) {
-        TIGHTDB_ASSERT(m_array->size() > 1); // node cannot be empty
-        if (m_array->size() > 2)
-            break;
-
-        ref_type ref = m_array->get_as_ref(1);
-        m_array->set(1,1); // avoid destruction of the extracted ref
-        m_array->destroy_deep();
-        m_array->init_from_ref(ref);
-        m_array->update_parent();
-    }
-
-    // If it is last item in column, we don't have to update refs
-    if (!is_last)
-        adjust_row_indexes(row_ndx, -1);
 }
 
 
@@ -685,12 +599,6 @@ void StringIndex::DoDelete(size_t row_ndx, StringData value, size_t offset)
             }
         }
     }
-}
-
-
-void StringIndex::update_ref(StringData value, size_t old_row_ndx, size_t new_row_ndx)
-{
-    do_update_ref(value, old_row_ndx, new_row_ndx, 0);
 }
 
 

@@ -2958,10 +2958,13 @@ const Array* Array::GetBlock(size_t ndx, Array& arr, size_t& off,
     return &arr;
 }
 
-
-
-template <int method, class T> size_t Array::index_string(StringData value, Column& result, size_t &result_ref, void* column, StringGetter get_func) const
+template <IndexMethod method, class T> size_t Array::index_string(StringData value, Column& result, size_t &result_ref, void* column, StringGetter get_func) const
 {
+    bool first(method == index_find_first);
+    bool count(method == index_count);
+    bool all(method == index_find_all);
+    bool allnocopy(method == index_find_all_nocopy);
+
     StringData value_2 = value;
     const char* data = m_data;
     const char* header;
@@ -2986,7 +2989,7 @@ top:
 
         // If key is outside range, we know there can be no match
         if (pos == offsets_size)
-            return method == 1 ? FindRes_not_found : method == 2 ? not_found : 0;
+            return allnocopy ? FindRes_not_found : first ? not_found : 0;
 
         // Get entry under key
         size_t pos_refs = pos + 1; // first entry in refs points to offsets
@@ -3004,7 +3007,7 @@ top:
         key_type stored_key = key_type(get_direct<32>(offsets_data, pos));
 
         if (stored_key != key)
-            return method == 1 ? FindRes_not_found : method == 2 ? not_found : 0;
+            return allnocopy ? FindRes_not_found : first ? not_found : 0;
 
         // Literal row index
         if (ref & 1) {
@@ -3014,21 +3017,21 @@ top:
             // compared against the entire (target) string
             if (!(stored_key << 24)) {
                 result_ref = row_ref;
-                if (method == 0)
+                if (all)
                     result.add(row_ref);
 
-                return method == 2 ? row_ref : method == 3 ? 1 : FindRes_single;
+                return first ? row_ref : count ? 1 : FindRes_single;
             }
 
             StringData str = (*get_func)(column, row_ref);
             if (str == value) {
                 result_ref = row_ref;
-                if (method == 0)
+                if (all)
                     result.add(row_ref);
 
-                return method == 2 ? row_ref : method == 3 ? 1 : FindRes_single;
+                return first ? row_ref : count ? 1 : FindRes_single;
             }
-            return method == 1 ? FindRes_not_found : method == 2 ? not_found : 0;
+            return allnocopy ? FindRes_not_found : first ? not_found : 0;
         }
 
         const char* sub_header = m_alloc.translate(to_ref(ref));
@@ -3042,7 +3045,7 @@ top:
             // In most cases the row list will just be an array but there
             // might be so many matches that it has branched into a column
             if (sub_isleaf) {
-                if (method == 3)
+                if (count)
                     sub_count = get_size_from_header(sub_header);
                 const size_t sub_width = get_width_from_header(sub_header);
                 const char* sub_data = get_data_from_header(sub_header);
@@ -3053,15 +3056,15 @@ top:
                 if ((stored_key << 24)) {
                     StringData str = (*get_func)(column, first_row_ref);
                     if (str != value) {
-                        if (method == 3)
+                        if (count)
                             return 0;
-                        return method == 1 ? FindRes_not_found : method == 2 ? not_found : 0;                       
+                        return allnocopy ? FindRes_not_found : first ? not_found : 0;
                     }
                 }
 
                 result_ref = to_ref(ref);
 
-                if (method == 0) {
+                if (all) {
                     // Copy all matches into result column
                     const size_t sub_size = get_size_from_header(sub_header);
 
@@ -3071,16 +3074,15 @@ top:
                     }
                 }
                 else {
-                    return method == 1 ? FindRes_column : 
-                           method == 2 ? to_size_t(get_direct(sub_data, sub_width, 0)) :
-                           sub_count;
+                    return allnocopy ? FindRes_column : 
+                           first ? to_size_t(get_direct(sub_data, sub_width, 0)) : sub_count;
                 }
             }
             else {
                 const Column sub(m_alloc, to_ref(ref));
                 const size_t first_row_ref = to_size_t(sub.get(0));
 
-                if (method == 3)
+                if (count)
                     sub_count = sub.size();
 
                 // If the last byte in the stored key is not zero, we have
@@ -3088,23 +3090,21 @@ top:
                 if ((stored_key << 24)) {
                     StringData str = (*get_func)(column, first_row_ref);
                     if (str != value)
-                        return method == 1 ? FindRes_not_found : method == 2 ? not_found : 0;
+                        return allnocopy ? FindRes_not_found : first ? not_found : 0;
                 }
 
                 result_ref = to_ref(ref);
-                if (method == 0) {
+                if (all) {
                     // Copy all matches into result column
                     for (size_t i = 0; i < sub.size(); ++i)
                         result.add(to_size_t(sub.get(i)));
                 }
                 else {
-                    return method == 1 ? FindRes_column :
-                           method == 2 ? to_size_t(sub.get(0)) :
-                           sub_count;
+                    return allnocopy ? FindRes_column : first ? to_size_t(sub.get(0)) : sub_count;
                 }
             }
 
-            TIGHTDB_ASSERT(method != 1);
+            TIGHTDB_ASSERT(method != index_find_all_nocopy);
             return FindRes_column;
         }
 
@@ -3128,7 +3128,7 @@ size_t Array::IndexStringFindFirst(StringData value, void* column, StringGetter 
     size_t dummy;
     Column dummycol;
 
-    return index_string<2, StringData>(value, dummycol, dummy, column, get_func);
+    return index_string<index_find_first, StringData>(value, dummycol, dummy, column, get_func);
 
 
     StringData value_2 = value;
@@ -3245,7 +3245,7 @@ void Array::IndexStringFindAll(Column& result, StringData value, void* column, S
 {
     size_t dummy;
 
-    index_string<0, StringData>(value, result, dummy, column, get_func);
+    index_string<index_find_all, StringData>(value, result, dummy, column, get_func);
     return;
 
 
@@ -3383,7 +3383,7 @@ top:
 FindRes Array::IndexStringFindAllNoCopy(StringData value, size_t& res_ref, void* column, StringGetter get_func) const
 {
     Column dummy;
-    return (FindRes)index_string<1, StringData>(value, dummy, res_ref, column, get_func);
+    return (FindRes)index_string<index_find_all_nocopy, StringData>(value, dummy, res_ref, column, get_func);
     
 
 
@@ -3510,7 +3510,7 @@ size_t Array::IndexStringCount(StringData value, void* column, StringGetter get_
 {
     Column dummy;
     size_t dummysizet;
-    return index_string<3, StringData>(value, dummy, dummysizet, column, get_func);
+    return index_string<index_count, StringData>(value, dummy, dummysizet, column, get_func);
 
     StringData value_2 = value;
     const char* data   = m_data;

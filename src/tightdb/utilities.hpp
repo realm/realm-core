@@ -153,6 +153,13 @@ enum FindRes {
     FindRes_column
 };
 
+enum IndexMethod {
+    index_find_first,
+    index_find_all,
+    index_find_all_nocopy,
+    index_count
+};
+
 
 // Use safe_equal() instead of std::equal() when comparing sequences which can have a 0 elements.
 template <class InputIterator1, class InputIterator2>
