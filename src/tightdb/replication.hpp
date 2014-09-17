@@ -158,6 +158,8 @@ public:
     void move_last_over(const Table*, std::size_t target_row_ndx, std::size_t last_row_ndx);
     void add_int_to_column(const Table*, std::size_t col_ndx, int_fast64_t value);
     void add_search_index(const Table*, std::size_t col_ndx);
+    void add_primary_key(const Table*, std::size_t col_ndx);
+    void remove_primary_key(const Table*);
     void clear_table(const Table*);
     void optimize_table(const Table*);
 
@@ -296,12 +298,14 @@ private:
         instr_EraseLinkColumn       = 36, // Remove link-type column from selected descriptor
         instr_RenameColumn          = 37, // Rename column in selected descriptor
         instr_AddSearchIndex        = 38, // Add a search index to a column
-        instr_SelectLinkList        = 39,
-        instr_LinkListSet           = 40, // Assign to link list entry
-        instr_LinkListInsert        = 41, // Insert entry into link list
-        instr_LinkListMove          = 42, // Move an entry within a link list
-        instr_LinkListErase         = 43, // Remove an entry from a link list
-        instr_LinkListClear         = 44  // Ramove all entries from a link list
+        instr_AddPrimaryKey         = 39, // Add a primary key to a table
+        instr_RemovePrimaryKey      = 40, // Remove primary key from a table
+        instr_SelectLinkList        = 41,
+        instr_LinkListSet           = 42, // Assign to link list entry
+        instr_LinkListInsert        = 43, // Insert entry into link list
+        instr_LinkListMove          = 44, // Move an entry within a link list
+        instr_LinkListErase         = 45, // Remove an entry from a link list
+        instr_LinkListClear         = 46  // Ramove all entries from a link list
     };
 
     util::Buffer<std::size_t> m_subtab_path_buf;
@@ -429,6 +433,8 @@ public:
     ///                       std::size_t backlink_col_ndx)
     ///     bool rename_column(std::size_t col_ndx, StringData new_name)
     ///     bool add_search_index(std::size_t col_ndx)
+    ///     bool add_primary_key(std::size_t col_ndx)
+    ///     bool remove_primary_key()
     ///     bool select_link_list(std::size_t col_ndx, std::size_t row_ndx)
     ///     bool link_list_set(std::size_t link_ndx, std::size_t value)
     ///     bool link_list_insert(std::size_t link_ndx, std::size_t value)
@@ -637,16 +643,17 @@ template<class T> inline char* Replication::encode_int(char* ptr, T value)
     // An explicit constant maximum number of iterations is specified
     // in the hope that it will help the optimizer (to do loop
     // unrolling, for example).
+    typedef unsigned char uchar;
     for (int i=0; i<max_bytes; ++i) {
         if (value >> (bits_per_byte-1) == 0)
             break;
-        *reinterpret_cast<unsigned char*>(ptr) =
-            (1U<<bits_per_byte) | unsigned(value & ((1U<<bits_per_byte)-1));
+        *reinterpret_cast<uchar*>(ptr) =
+            uchar((1U<<bits_per_byte) | unsigned(value & ((1U<<bits_per_byte)-1)));
         ++ptr;
         value >>= bits_per_byte;
     }
-    *reinterpret_cast<unsigned char*>(ptr) =
-        negative ? (1U<<(bits_per_byte-1)) | unsigned(value) : value;
+    *reinterpret_cast<uchar*>(ptr) =
+        uchar(negative ? (1U<<(bits_per_byte-1)) | unsigned(value) : value);
     return ++ptr;
 }
 
@@ -1058,6 +1065,20 @@ inline void Replication::add_search_index(const Table* t, std::size_t col_ndx)
 }
 
 
+inline void Replication::add_primary_key(const Table* t, std::size_t col_ndx)
+{
+    check_table(t); // Throws
+    simple_cmd(instr_AddPrimaryKey, util::tuple(col_ndx)); // Throws
+}
+
+
+inline void Replication::remove_primary_key(const Table* t)
+{
+    check_table(t); // Throws
+    simple_cmd(instr_RemovePrimaryKey, util::tuple()); // Throws
+}
+
+
 inline void Replication::clear_table(const Table* t)
 {
     check_table(t); // Throws
@@ -1439,6 +1460,17 @@ bool Replication::TransactLogParser::do_parse(InstructionHandler& handler)
             case instr_AddSearchIndex: {
                 std::size_t col_ndx = read_int<std::size_t>(); // Throws
                 if (!handler.add_search_index(col_ndx)) // Throws
+                    return false;
+                continue;
+            }
+            case instr_AddPrimaryKey: {
+                std::size_t col_ndx = read_int<std::size_t>(); // Throws
+                if (!handler.add_primary_key(col_ndx)) // Throws
+                    return false;
+                continue;
+            }
+            case instr_RemovePrimaryKey: {
+                if (!handler.remove_primary_key()) // Throws
                     return false;
                 continue;
             }

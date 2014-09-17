@@ -75,8 +75,7 @@ public:
 #ifdef TIGHTDB_DEBUG
     void Verify() const TIGHTDB_OVERRIDE;
     void to_dot(std::ostream&, StringData title) const TIGHTDB_OVERRIDE;
-    void dump_node_structure(std::ostream&, int level) const TIGHTDB_OVERRIDE;
-    using ColumnBase::dump_node_structure;
+    void do_dump_node_structure(std::ostream&, int) const TIGHTDB_OVERRIDE;
 #endif
     void update_from_parent(std::size_t old_baseline) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 

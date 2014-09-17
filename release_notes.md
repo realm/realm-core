@@ -6,11 +6,16 @@
 
 ### API breaking changes:
 
-* Lorem ipsum.
+* `Table::set_index()` and `Table::has_index()` renamed to
+  `Table::add_search_index()` and `Table::has_search_index()` respectively, and
+  `Table::add_search_index()` now throws `InvalidArgument`.
+* `Table::find_pkey_string()` replaces `Table::lookup()` and has slightly
+  different semantics. In particular, it throws various exceptions.
 
 ### Enhancements:
 
-* Lorem ipsum.
+* `Table::add_primary_key()` and `Table::remove_primary_key()` added.
+* `Table::find_pkey_int()` added, but not yet backed by an integer search index.
 
 -----------
 

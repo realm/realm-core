@@ -587,7 +587,7 @@ inline StringData Group::get_table_name(std::size_t table_ndx) const
 {
     TIGHTDB_ASSERT(is_attached());
     if (table_ndx >= m_table_names.size())
-        throw InvalidArgument();
+        throw LogicError(LogicError::table_index_out_of_range);
     return m_table_names.get(table_ndx);
 }
 

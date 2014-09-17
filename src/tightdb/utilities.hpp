@@ -109,7 +109,6 @@ typedef struct {
     unsigned long long result;
 } checksum_t;
 
-std::size_t to_size_t(int64_t) TIGHTDB_NOEXCEPT;
 void cpuid_init();
 unsigned long long checksum(unsigned char* data, size_t len);
 void checksum_rolling(unsigned char* data, size_t len, checksum_t* t);
@@ -128,7 +127,7 @@ int fast_popcount64(int64_t x);
 // Implementation:
 
 // Safe cast from 64 to 32 bits on 32 bit architecture. Differs from to_ref() by not testing alignment and REF-bitflag.
-inline std::size_t to_size_t(int64_t v) TIGHTDB_NOEXCEPT
+inline std::size_t to_size_t(int_fast64_t v) TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(!util::int_cast_has_overflow<std::size_t>(v));
     return std::size_t(v);
@@ -152,6 +151,13 @@ enum FindRes {
     FindRes_not_found,
     FindRes_single,
     FindRes_column
+};
+
+enum IndexMethod {
+    index_find_first,
+    index_find_all,
+    index_find_all_nocopy,
+    index_count
 };
 
 

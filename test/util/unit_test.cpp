@@ -479,11 +479,39 @@ void TestResults::inexact_compare_failed(const char* file, long line, const char
 }
 
 
-void TestResults::throw_failed(const char* file, long line,
-                               const char* expr_text, const char* exception)
+void TestResults::throw_failed(const char* file, long line, const char* expr_text,
+                               const char* exception_name)
 {
     ostringstream out;
-    out << "CHECK_THROW(" << expr_text << ", " << (exception ? exception : "''") << ") failed: Did not throw";
+    out << "CHECK_THROW("<<expr_text<<", "<<exception_name<<") failed: Did not throw";
+    check_failed(file, line, out.str());
+}
+
+
+void TestResults::throw_ex_failed(const char* file, long line, const char* expr_text,
+                                  const char* exception_name, const char* exception_cond_text)
+{
+    ostringstream out;
+    out << "CHECK_THROW_EX("<<expr_text<<", "<<exception_name<<", "<<
+        exception_cond_text<<") failed: Did not throw";
+    check_failed(file, line, out.str());
+}
+
+
+void TestResults::throw_ex_cond_failed(const char* file, long line, const char* expr_text,
+                                       const char* exception_name, const char* exception_cond_text)
+{
+    ostringstream out;
+    out << "CHECK_THROW_EX("<<expr_text<<", "<<exception_name<<", "<<
+        exception_cond_text<<") failed: Did throw, but condition failed";
+    check_failed(file, line, out.str());
+}
+
+
+void TestResults::throw_any_failed(const char* file, long line, const char* expr_text)
+{
+    ostringstream out;
+    out << "CHECK_THROW_ANY("<<expr_text<<") failed: Did not throw";
     check_failed(file, line, out.str());
 }
 
@@ -594,7 +622,7 @@ void SimpleReporter::summary(const Summary& summary)
 {
     cout << "\n";
     if (summary.num_failed_tests == 0) {
-        cout << "Success: "<<summary.num_included_tests<<" tests passed "
+        cout << "Success: All "<<summary.num_included_tests<<" tests passed "
             "("<<summary.num_checks<<" checks).\n";
     }
     else {

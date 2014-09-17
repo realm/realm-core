@@ -559,8 +559,8 @@ TEST(ColumnString_AutoEnumerateIndex)
     ColumnStringEnum e(Allocator::get_default(), values, keys);
 
     // Set index
-    e.create_index();
-    CHECK(e.has_index());
+    e.create_search_index();
+    CHECK(e.has_search_index());
 
     // Search for a value that does not exist
     size_t res1 = e.find_first("nonexist");
@@ -588,7 +588,7 @@ TEST(ColumnString_AutoEnumerateIndex)
     size_t res3 = e.count("a");
     size_t res4 = e.count("bc");
     size_t res5 = e.count("newval");
-    CHECK_EQUAL(5, res3);
+    CHECK_EQUAL(5, res3); // 4
     CHECK_EQUAL(4, res4);
     CHECK_EQUAL(1, res5);
 
@@ -636,8 +636,8 @@ TEST(ColumnString_AutoEnumerateIndexReuse)
     }
 
     // Set index
-    c.create_index();
-    CHECK(c.has_index());
+    c.create_search_index();
+    CHECK(c.has_search_index());
 
     // Create StringEnum
     ref_type keys;
@@ -647,9 +647,9 @@ TEST(ColumnString_AutoEnumerateIndexReuse)
     ColumnStringEnum e(Allocator::get_default(), values, keys);
 
     // Reuse the index from original column
-    StringIndex* index = c.release_index();
-    e.install_index(index);
-    CHECK(e.has_index());
+    StringIndex* index = c.release_search_index();
+    e.install_search_index(index);
+    CHECK(e.has_search_index());
 
     // Search for a value that does not exist
     size_t res1 = e.find_first("nonexist");
@@ -894,8 +894,8 @@ TEST(ColumnString_Index)
     asc.add("15");
     asc.add("HEJSA"); // 16
 
-    const StringIndex& ndx = asc.create_index();
-    CHECK(asc.has_index());
+    const StringIndex& ndx = asc.create_search_index();
+    CHECK(asc.has_search_index());
 #ifdef TIGHTDB_DEBUG
     ndx.verify_entries(asc);
 #else
