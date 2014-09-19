@@ -139,6 +139,7 @@ public:
     void set_table(const Table*, std::size_t col_ndx, std::size_t ndx);
     void set_mixed(const Table*, std::size_t col_ndx, std::size_t ndx, const Mixed& value);
     void set_link(const Table*, std::size_t col_ndx, std::size_t ndx, std::size_t value);
+    void set_link_list(const LinkView&, const Column& values);
 
     void insert_int(const Table*, std::size_t col_ndx, std::size_t ndx, int_fast64_t value);
     void insert_bool(const Table*, std::size_t col_ndx, std::size_t ndx, bool value);
@@ -301,7 +302,8 @@ private:
         instr_LinkListInsert        = 41, // Insert entry into link list
         instr_LinkListMove          = 42, // Move an entry within a link list
         instr_LinkListErase         = 43, // Remove an entry from a link list
-        instr_LinkListClear         = 44  // Ramove all entries from a link list
+        instr_LinkListClear         = 44, // Remove all entries from a link list
+        instr_LinkListSetAll        = 45  // Assign to link list entry
     };
 
     util::Buffer<std::size_t> m_subtab_path_buf;
@@ -1072,13 +1074,19 @@ inline void Replication::optimize_table(const Table* t)
 }
 
 
-inline void Replication::link_list_set(const LinkView& list, std::size_t link_ndx,
-                                       std::size_t value)
+inline void Replication::link_list_set(const LinkView& list, std::size_t link_ndx, std::size_t value)
 {
     check_link_list(list); // Throws
     simple_cmd(instr_LinkListSet, util::tuple(link_ndx, value)); // Throws
 }
 
+inline void Replication::set_link_list(const LinkView& list, const Column& values)
+{
+    check_link_list(list); // Throws
+    simple_cmd(instr_LinkListSetAll, util::tuple(values.size())); // Throws
+    for (size_t i = 0; i < values.size(); i++)
+        append_num(values.get(i));
+}
 
 inline void Replication::link_list_insert(const LinkView& list, std::size_t link_ndx,
                                           std::size_t value)
@@ -1402,6 +1410,16 @@ bool Replication::TransactLogParser::do_parse(InstructionHandler& handler)
                 std::size_t value = read_int<std::size_t>(); // Throws
                 if (!handler.link_list_set(link_ndx, value)) // Throws
                     return false;
+                continue;
+            }
+            case instr_LinkListSetAll: {     
+                // todo, log that it's a SetAll we're doing 
+                std::size_t size = read_int<std::size_t>(); // Throws
+                for (std::size_t i = 0; i < size; i++) {
+                    std::size_t link = read_int<std::size_t>(); // Throws
+                    if (!handler.link_list_set(i, link)) // Throws
+                        return false;
+                }
                 continue;
             }
             case instr_LinkListInsert: {
