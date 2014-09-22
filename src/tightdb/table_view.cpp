@@ -279,10 +279,7 @@ uint64_t TableViewBase::outside_version() const
 bool TableViewBase::is_in_sync() const TIGHTDB_NOEXCEPT
 {
     bool table = bool(m_table);
-
-    // Todo, Could we relax the contraint to '>'?
     bool version = bool(m_last_seen_version == outside_version());
-    
     bool view = bool(m_query.m_view);
 
     return table && version
