@@ -57,6 +57,15 @@ public:
     ~ColumnStringEnum() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     void destroy() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
+    int compare_values(size_t row1, size_t row2) const TIGHTDB_OVERRIDE
+    {
+        StringData a = get(row1);
+        StringData b = get(row2);
+        if (a == b)
+            return 0;
+        return utf8_compare(a, b) ? 1 : -1;
+    }
+
     StringData get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
     void set(std::size_t ndx, StringData value);
     void add(StringData value = StringData());

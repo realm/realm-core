@@ -22,6 +22,7 @@
 
 #include <iostream>
 
+#include <tightdb/views.hpp>
 #include <tightdb/table.hpp>
 #include <tightdb/column.hpp>
 #include <tightdb/util/features.h>
@@ -100,13 +101,15 @@ using std::size_t;
 
 
 /// Common base class for TableView and ConstTableView.
-class TableViewBase {
+class TableViewBase : public RowIndexes {
 public:
     bool is_empty() const TIGHTDB_NOEXCEPT;
     bool is_attached() const TIGHTDB_NOEXCEPT;
     std::size_t size() const TIGHTDB_NOEXCEPT;
 
     // Column information
+    const ColumnBase& get_column_base(size_t index) const;
+
     size_t      get_column_count() const TIGHTDB_NOEXCEPT;
     StringData  get_column_name(size_t column_ndx) const TIGHTDB_NOEXCEPT;
     size_t      get_column_index(StringData name) const;
@@ -167,8 +170,6 @@ public:
     DateTime maximum_datetime(size_t column_ndx, size_t* return_ndx = 0) const;
     DateTime minimum_datetime(size_t column_ndx, size_t* return_ndx = 0) const;
 
-    void sort(size_t column_ndx, bool ascending = true);
-
     void apply_same_order(TableViewBase& order);
 
     // Simple pivot aggregate method. Experimental! Please do not
@@ -189,9 +190,6 @@ public:
     void to_string(std::ostream&, std::size_t limit = 500) const;
     void row_to_string(std::size_t row_ndx, std::ostream&) const;
 
-    template <class T> T get_value(size_t row, size_t column) const;
-
-
 #ifdef TIGHTDB_ENABLE_REPLICATION
     // Determine if the view is 'in sync' with the underlying table
     // as well as other views used to generate the view. Note that updates
@@ -200,14 +198,8 @@ public:
     // is generated from another view (not a table), updates may cause
     // that view to be outdated, AND as the generated view depends upon
     // it, it too will become outdated.
-    inline bool is_in_sync() const TIGHTDB_NOEXCEPT
-    {
-        return bool(m_table)
-            && (m_last_seen_version == m_table->m_version)
-            && ((m_query.m_tableview)
-                ? m_query.m_tableview->is_in_sync()
-                : true);
-    }
+    bool is_in_sync() const TIGHTDB_NOEXCEPT;
+
     // Synchronize a view to match a table or tableview from which it
     // has been derived. Synchronization is achieved by rerunning the
     // query used to generate the view. If derived from another view, that
@@ -216,24 +208,18 @@ public:
     // "live" or "reactive" views are implemented by calling sync_if_needed
     // before any of the other access-methods whenever the view may have become
     // outdated.
-    inline void sync_if_needed() const
-    {
-        if (!is_in_sync()) {
-            // FIXME: Is this a reasonable handling of constness?
-            const_cast<TableViewBase*>(this)->do_sync();
-        }
-    }
+    void sync_if_needed() const;
 #else
-    inline void sync_if_needed() const {};
+    void sync_if_needed() const;
 #endif
 
 protected:
 #ifdef TIGHTDB_ENABLE_REPLICATION
     void do_sync();
 #endif
+
     // Null if, and only if, the view is detached
     mutable TableRef m_table;
-    mutable Column m_refs;
     mutable uint_fast64_t m_last_seen_version;
     // A valid query holds a reference to it's table which must match our m_table.
     // hence we can use A query with a null table reference to indicate that the view
@@ -243,10 +229,6 @@ protected:
     size_t m_start;
     size_t m_end;
     size_t m_limit;
-    // parameters for sorting after query rerun
-    bool m_auto_sort;
-    bool m_ascending;
-    size_t m_sort_index;
 
     /// Construct null view (no memory allocated).
     TableViewBase();
@@ -265,9 +247,6 @@ protected:
 
     void move_assign(TableViewBase*) TIGHTDB_NOEXCEPT;
 
-    Column& get_ref_column() TIGHTDB_NOEXCEPT;
-    const Column& get_ref_column() const TIGHTDB_NOEXCEPT;
-
     template<class R, class V> static R find_all_integer(V*, std::size_t, int64_t);
     template<class R, class V> static R find_all_float(V*, std::size_t, float);
     template<class R, class V> static R find_all_double(V*, std::size_t, double);
@@ -276,7 +255,6 @@ protected:
 private:
     void detach() const TIGHTDB_NOEXCEPT;
     std::size_t find_first_integer(std::size_t column_ndx, int64_t value) const;
-    template <class T> void sort(size_t column, bool ascending);
     friend class Table;
     friend class Query;
 };
@@ -472,7 +450,7 @@ private:
 
 inline bool TableViewBase::is_empty() const TIGHTDB_NOEXCEPT
 {
-    return m_refs.is_empty();
+    return m_row_indexes.is_empty();
 }
 
 inline bool TableViewBase::is_attached() const TIGHTDB_NOEXCEPT
@@ -482,35 +460,35 @@ inline bool TableViewBase::is_attached() const TIGHTDB_NOEXCEPT
 
 inline std::size_t TableViewBase::size() const TIGHTDB_NOEXCEPT
 {
-    return m_refs.size();
+    return m_row_indexes.size();
 }
 
 inline std::size_t TableViewBase::get_source_ndx(std::size_t row_ndx) const TIGHTDB_NOEXCEPT
 {
-    return to_size_t(m_refs.get(row_ndx));
+    return to_size_t(m_row_indexes.get(row_ndx));
 }
 
 inline std::size_t TableViewBase::find_by_source_ndx(std::size_t source_ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(source_ndx < m_table->size());
-    return m_refs.find_first(source_ndx);
+    return m_row_indexes.find_first(source_ndx);
 }
 
 inline TableViewBase::TableViewBase():
-    m_refs(Column::unattached_root_tag(), Allocator::get_default()) // Throws
+    RowIndexes(Column::unattached_root_tag(), Allocator::get_default()) // Throws
 {
 #ifdef TIGHTDB_ENABLE_REPLICATION
     m_last_seen_version = 0;
     m_auto_sort = false;
 #endif
-    ref_type ref = Column::create(m_refs.get_alloc()); // Throws
-    m_refs.get_root_array()->init_from_ref(ref);
+    ref_type ref = Column::create(m_row_indexes.get_alloc()); // Throws
+    m_row_indexes.get_root_array()->init_from_ref(ref);
 }
 
 inline TableViewBase::TableViewBase(Table* parent):
-    m_table(parent->get_table_ref()),
-    m_refs(Column::unattached_root_tag(), Allocator::get_default()) // Throws
-{
+    RowIndexes(Column::unattached_root_tag(), Allocator::get_default()), 
+    m_table(parent->get_table_ref()) // Throws
+    {
 #ifdef TIGHTDB_ENABLE_REPLICATION
     m_last_seen_version = m_table ? m_table->m_version : 0;
     m_auto_sort = false;
@@ -518,22 +496,20 @@ inline TableViewBase::TableViewBase(Table* parent):
     // FIXME: This code is unreasonably complicated because it uses `Column` as
     // a free-standing container, and beause `Column` does not conform to the
     // RAII idiom (nor should it).
-    Allocator& alloc = m_refs.get_alloc();
+    Allocator& alloc = m_row_indexes.get_alloc();
     _impl::DeepArrayRefDestroyGuard ref_guard(alloc);
     ref_guard.reset(Column::create(alloc)); // Throws
     parent->register_view(this); // Throws
-    m_refs.get_root_array()->init_from_ref(ref_guard.release());
+    m_row_indexes.get_root_array()->init_from_ref(ref_guard.release());
 }
 
 inline TableViewBase::TableViewBase(Table* parent, Query& query, size_t start, size_t end, size_t limit):
+    RowIndexes(Column::unattached_root_tag(), Allocator::get_default()), // Throws
     m_table(parent->get_table_ref()),
-    m_refs(Column::unattached_root_tag(), Allocator::get_default()), // Throws
     m_query(query, Query::TCopyExpressionTag())
 {
-#ifdef TIGHTDB_ENABLE_REPLICATION
+#ifdef TIGHTDB_ENABLE_REPLICATION    
     m_last_seen_version = m_table ? m_table->m_version : 0;
-    if (query.m_tableview)
-        m_last_seen_version = query.m_tableview->m_last_seen_version;
     m_auto_sort = false;
 #endif
     m_start = start;
@@ -542,42 +518,40 @@ inline TableViewBase::TableViewBase(Table* parent, Query& query, size_t start, s
     // FIXME: This code is unreasonably complicated because it uses `Column` as
     // a free-standing container, and beause `Column` does not conform to the
     // RAII idiom (nor should it).
-    Allocator& alloc = m_refs.get_alloc();
+    Allocator& alloc = m_row_indexes.get_alloc();
     _impl::DeepArrayRefDestroyGuard ref_guard(alloc);
     ref_guard.reset(Column::create(alloc)); // Throws
     parent->register_view(this); // Throws
-    m_refs.get_root_array()->init_from_ref(ref_guard.release());
+    m_row_indexes.get_root_array()->init_from_ref(ref_guard.release());
 }
 
 inline TableViewBase::TableViewBase(const TableViewBase& tv):
+    RowIndexes(Column::unattached_root_tag(), Allocator::get_default()),
     m_table(tv.m_table),
-    m_refs(Column::unattached_root_tag(), Allocator::get_default()),
     m_query(tv.m_query, Query::TCopyExpressionTag())
-{
+    {
 #ifdef TIGHTDB_ENABLE_REPLICATION
     m_last_seen_version = tv.m_last_seen_version;
     m_auto_sort = tv.m_auto_sort;
     m_start = tv.m_start;
     m_end = tv.m_end;
     m_limit = tv.m_limit;
-    m_ascending = tv.m_ascending;
-    m_sort_index = tv.m_sort_index;
 #endif
     // FIXME: This code is unreasonably complicated because it uses `Column` as
     // a free-standing container, and beause `Column` does not conform to the
     // RAII idiom (nor should it).
-    Allocator& alloc = m_refs.get_alloc();
-    MemRef mem = tv.m_refs.get_root_array()->clone_deep(alloc); // Throws
+    Allocator& alloc = m_row_indexes.get_alloc();
+    MemRef mem = tv.m_row_indexes.get_root_array()->clone_deep(alloc); // Throws
     _impl::DeepArrayRefDestroyGuard ref_guard(mem.m_ref, alloc);
     if (m_table)
         m_table->register_view(this); // Throws
-    m_refs.get_root_array()->init_from_mem(mem);
+    m_row_indexes.get_root_array()->init_from_mem(mem);
     ref_guard.release();
 }
 
 inline TableViewBase::TableViewBase(TableViewBase* tv) TIGHTDB_NOEXCEPT:
-    m_table(move(tv->m_table)),
-    m_refs(Column::move_tag(), tv->m_refs)
+    RowIndexes(Column::move_tag(), tv->m_row_indexes),
+    m_table(move(tv->m_table))
 {
 #ifdef TIGHTDB_ENABLE_REPLICATION
     // if we are created from a table view which is outdated, take care to use the outdated
@@ -587,8 +561,6 @@ inline TableViewBase::TableViewBase(TableViewBase* tv) TIGHTDB_NOEXCEPT:
     m_start = tv->m_start;
     m_end = tv->m_end;
     m_limit = tv->m_limit;
-    m_ascending = tv->m_ascending;
-    m_sort_index = tv->m_sort_index;
 #endif
     if (m_table)
         m_table->move_registered_view(tv, this);
@@ -600,7 +572,7 @@ inline TableViewBase::~TableViewBase() TIGHTDB_NOEXCEPT
         m_table->unregister_view(this);
         m_table = TableRef();
     }
-    m_refs.destroy(); // Shallow
+    m_row_indexes.destroy(); // Shallow
 }
 
 inline void TableViewBase::move_assign(TableViewBase* tv) TIGHTDB_NOEXCEPT
@@ -611,7 +583,7 @@ inline void TableViewBase::move_assign(TableViewBase* tv) TIGHTDB_NOEXCEPT
     if (m_table)
         m_table->move_registered_view(tv, this);
 
-    m_refs.move_assign(tv->m_refs);
+    m_row_indexes.move_assign(tv->m_row_indexes);
     m_query = tv->m_query;
 #ifdef TIGHTDB_ENABLE_REPLICATION
     m_last_seen_version = tv->m_last_seen_version;
@@ -619,21 +591,8 @@ inline void TableViewBase::move_assign(TableViewBase* tv) TIGHTDB_NOEXCEPT
     m_start = tv->m_start;
     m_end = tv->m_end;
     m_limit = tv->m_limit;
-    m_ascending = tv->m_ascending;
-    m_sort_index = tv->m_sort_index;
 #endif
 }
-
-inline Column& TableViewBase::get_ref_column() TIGHTDB_NOEXCEPT
-{
-    return m_refs;
-}
-
-inline const Column& TableViewBase::get_ref_column() const TIGHTDB_NOEXCEPT
-{
-    return m_refs;
-}
-
 
 #define TIGHTDB_ASSERT_COLUMN(column_ndx)                                   \
     TIGHTDB_ASSERT(m_table);                                                \
@@ -641,7 +600,7 @@ inline const Column& TableViewBase::get_ref_column() const TIGHTDB_NOEXCEPT
 
 #define TIGHTDB_ASSERT_ROW(row_ndx)                                         \
     TIGHTDB_ASSERT(m_table);                                                \
-    TIGHTDB_ASSERT(row_ndx < m_refs.size());
+    TIGHTDB_ASSERT(row_ndx < m_row_indexes.size());
 
 #define TIGHTDB_ASSERT_COLUMN_AND_TYPE(column_ndx, column_type)             \
     TIGHTDB_ASSERT_COLUMN(column_ndx)                                       \
@@ -650,20 +609,24 @@ inline const Column& TableViewBase::get_ref_column() const TIGHTDB_NOEXCEPT
 
 #define TIGHTDB_ASSERT_INDEX(column_ndx, row_ndx)                           \
     TIGHTDB_ASSERT_COLUMN(column_ndx)                                       \
-    TIGHTDB_ASSERT(row_ndx < m_refs.size());
+    TIGHTDB_ASSERT(row_ndx < m_row_indexes.size());
 
 #define TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, column_type)     \
     TIGHTDB_ASSERT_COLUMN_AND_TYPE(column_ndx, column_type)                 \
-    TIGHTDB_ASSERT(row_ndx < m_refs.size());
+    TIGHTDB_ASSERT(row_ndx < m_row_indexes.size());
 
 #define TIGHTDB_ASSERT_INDEX_AND_TYPE_TABLE_OR_MIXED(column_ndx, row_ndx)   \
     TIGHTDB_ASSERT_COLUMN(column_ndx)                                       \
     TIGHTDB_ASSERT(m_table->get_column_type(column_ndx) == type_Table ||    \
                    (m_table->get_column_type(column_ndx) == type_Mixed));   \
-    TIGHTDB_ASSERT(row_ndx < m_refs.size());
+    TIGHTDB_ASSERT(row_ndx < m_row_indexes.size());
 
 // Column information
 
+inline const ColumnBase& TableViewBase::get_column_base(size_t index) const
+{
+    return m_table->get_column_base(index);
+}
 
 inline size_t TableViewBase::get_column_count() const TIGHTDB_NOEXCEPT
 {
@@ -698,7 +661,7 @@ inline int64_t TableViewBase::get_int(size_t column_ndx, size_t row_ndx) const
 {
     TIGHTDB_ASSERT_INDEX(column_ndx, row_ndx);
 
-    const size_t real_ndx = size_t(m_refs.get(row_ndx));
+    const size_t real_ndx = size_t(m_row_indexes.get(row_ndx));
     return m_table->get_int(column_ndx, real_ndx);
 }
 
@@ -707,7 +670,7 @@ inline bool TableViewBase::get_bool(size_t column_ndx, size_t row_ndx) const
 {
     TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Bool);
 
-    const size_t real_ndx = size_t(m_refs.get(row_ndx));
+    const size_t real_ndx = size_t(m_row_indexes.get(row_ndx));
     return m_table->get_bool(column_ndx, real_ndx);
 }
 
@@ -716,7 +679,7 @@ inline DateTime TableViewBase::get_datetime(size_t column_ndx, size_t row_ndx) c
 {
     TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_DateTime);
 
-    const size_t real_ndx = size_t(m_refs.get(row_ndx));
+    const size_t real_ndx = size_t(m_row_indexes.get(row_ndx));
     return m_table->get_datetime(column_ndx, real_ndx);
 }
 
@@ -725,7 +688,7 @@ inline float TableViewBase::get_float(size_t column_ndx, size_t row_ndx) const
 {
     TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Float);
 
-    const size_t real_ndx = size_t(m_refs.get(row_ndx));
+    const size_t real_ndx = size_t(m_row_indexes.get(row_ndx));
     return m_table->get_float(column_ndx, real_ndx);
 }
 
@@ -734,7 +697,7 @@ inline double TableViewBase::get_double(size_t column_ndx, size_t row_ndx) const
 {
     TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Double);
 
-    const size_t real_ndx = size_t(m_refs.get(row_ndx));
+    const size_t real_ndx = size_t(m_row_indexes.get(row_ndx));
     return m_table->get_double(column_ndx, real_ndx);
 }
 
@@ -743,7 +706,7 @@ inline StringData TableViewBase::get_string(size_t column_ndx, size_t row_ndx) c
 {
     TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_String);
 
-    const size_t real_ndx = size_t(m_refs.get(row_ndx));
+    const size_t real_ndx = size_t(m_row_indexes.get(row_ndx));
     return m_table->get_string(column_ndx, real_ndx);
 }
 
@@ -752,7 +715,7 @@ inline BinaryData TableViewBase::get_binary(size_t column_ndx, size_t row_ndx) c
 {
     TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Binary);
 
-    const size_t real_ndx = size_t(m_refs.get(row_ndx));
+    const size_t real_ndx = size_t(m_row_indexes.get(row_ndx));
     return m_table->get_binary(column_ndx, real_ndx); // Throws
 }
 
@@ -761,7 +724,7 @@ inline Mixed TableViewBase::get_mixed(size_t column_ndx, size_t row_ndx) const
 {
     TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Mixed);
 
-    const size_t real_ndx = size_t(m_refs.get(row_ndx));
+    const size_t real_ndx = size_t(m_row_indexes.get(row_ndx));
     return m_table->get_mixed(column_ndx, real_ndx); // Throws
 }
 
@@ -770,7 +733,7 @@ inline DataType TableViewBase::get_mixed_type(size_t column_ndx, size_t row_ndx)
 {
     TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Mixed);
 
-    const size_t real_ndx = size_t(m_refs.get(row_ndx));
+    const size_t real_ndx = size_t(m_row_indexes.get(row_ndx));
     return m_table->get_mixed_type(column_ndx, real_ndx);
 }
 
@@ -779,7 +742,7 @@ inline size_t TableViewBase::get_subtable_size(size_t column_ndx, size_t row_ndx
 {
     TIGHTDB_ASSERT_INDEX_AND_TYPE_TABLE_OR_MIXED(column_ndx, row_ndx);
 
-    const size_t real_ndx = size_t(m_refs.get(row_ndx));
+    const size_t real_ndx = size_t(m_row_indexes.get(row_ndx));
     return m_table->get_subtable_size(column_ndx, real_ndx);
 }
 
@@ -788,7 +751,7 @@ inline std::size_t TableViewBase::get_link(std::size_t column_ndx, std::size_t r
 {
     TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Link);
 
-    const size_t real_ndx = size_t(m_refs.get(row_ndx));
+    const size_t real_ndx = size_t(m_row_indexes.get(row_ndx));
     return m_table->get_link(column_ndx, real_ndx);
 }
 
@@ -812,7 +775,7 @@ inline bool TableViewBase::is_null_link(std::size_t column_ndx, std::size_t row_
 {
     TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Link);
 
-    const size_t real_ndx = size_t(m_refs.get(row_ndx));
+    const size_t real_ndx = size_t(m_row_indexes.get(row_ndx));
     return m_table->is_null_link(column_ndx, real_ndx);
 }
 
@@ -1089,21 +1052,21 @@ inline ConstTableView ConstTableView::find_all_datetime(size_t column_ndx, DateT
 inline TableView::RowExpr TableView::get(std::size_t row_ndx) TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT_ROW(row_ndx);
-    std::size_t real_ndx = std::size_t(m_refs.get(row_ndx));
+    std::size_t real_ndx = std::size_t(m_row_indexes.get(row_ndx));
     return m_table->get(real_ndx);
 }
 
 inline TableView::ConstRowExpr TableView::get(std::size_t row_ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT_ROW(row_ndx);
-    std::size_t real_ndx = std::size_t(m_refs.get(row_ndx));
+    std::size_t real_ndx = std::size_t(m_row_indexes.get(row_ndx));
     return m_table->get(real_ndx);
 }
 
 inline ConstTableView::ConstRowExpr ConstTableView::get(std::size_t row_ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT_ROW(row_ndx);
-    std::size_t real_ndx = std::size_t(m_refs.get(row_ndx));
+    std::size_t real_ndx = std::size_t(m_row_indexes.get(row_ndx));
     return m_table->get(real_ndx);
 }
 
@@ -1164,7 +1127,7 @@ inline TableRef TableView::get_subtable(size_t column_ndx, size_t row_ndx)
 {
     TIGHTDB_ASSERT_INDEX_AND_TYPE_TABLE_OR_MIXED(column_ndx, row_ndx);
 
-    const size_t real_ndx = size_t(m_refs.get(row_ndx));
+    const size_t real_ndx = size_t(m_row_indexes.get(row_ndx));
     return m_table->get_subtable(column_ndx, real_ndx);
 }
 
@@ -1172,7 +1135,7 @@ inline ConstTableRef TableView::get_subtable(size_t column_ndx, size_t row_ndx) 
 {
     TIGHTDB_ASSERT_INDEX_AND_TYPE_TABLE_OR_MIXED(column_ndx, row_ndx);
 
-    const size_t real_ndx = size_t(m_refs.get(row_ndx));
+    const size_t real_ndx = size_t(m_row_indexes.get(row_ndx));
     return m_table->get_subtable(column_ndx, real_ndx);
 }
 
@@ -1180,7 +1143,7 @@ inline ConstTableRef ConstTableView::get_subtable(size_t column_ndx, size_t row_
 {
     TIGHTDB_ASSERT_INDEX_AND_TYPE_TABLE_OR_MIXED(column_ndx, row_ndx);
 
-    const size_t real_ndx = size_t(m_refs.get(row_ndx));
+    const size_t real_ndx = size_t(m_row_indexes.get(row_ndx));
     return m_table->get_subtable(column_ndx, real_ndx);
 }
 
@@ -1188,7 +1151,7 @@ inline void TableView::clear_subtable(size_t column_ndx, size_t row_ndx)
 {
     TIGHTDB_ASSERT_INDEX_AND_TYPE_TABLE_OR_MIXED(column_ndx, row_ndx);
 
-    const size_t real_ndx = size_t(m_refs.get(row_ndx));
+    const size_t real_ndx = size_t(m_row_indexes.get(row_ndx));
     return m_table->clear_subtable(column_ndx, real_ndx);
 }
 
@@ -1200,7 +1163,7 @@ inline void TableView::set_int(size_t column_ndx, size_t row_ndx, int64_t value)
 {
     TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Int);
 
-    const size_t real_ndx = size_t(m_refs.get(row_ndx));
+    const size_t real_ndx = size_t(m_row_indexes.get(row_ndx));
     m_table->set_int(column_ndx, real_ndx, value);
 }
 
@@ -1208,7 +1171,7 @@ inline void TableView::set_bool(size_t column_ndx, size_t row_ndx, bool value)
 {
     TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Bool);
 
-    const size_t real_ndx = size_t(m_refs.get(row_ndx));
+    const size_t real_ndx = size_t(m_row_indexes.get(row_ndx));
     m_table->set_bool(column_ndx, real_ndx, value);
 }
 
@@ -1216,7 +1179,7 @@ inline void TableView::set_datetime(size_t column_ndx, size_t row_ndx, DateTime 
 {
     TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_DateTime);
 
-    const size_t real_ndx = size_t(m_refs.get(row_ndx));
+    const size_t real_ndx = size_t(m_row_indexes.get(row_ndx));
     m_table->set_datetime(column_ndx, real_ndx, value);
 }
 
@@ -1224,7 +1187,7 @@ inline void TableView::set_float(size_t column_ndx, size_t row_ndx, float value)
 {
     TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Float);
 
-    const size_t real_ndx = size_t(m_refs.get(row_ndx));
+    const size_t real_ndx = size_t(m_row_indexes.get(row_ndx));
     m_table->set_float(column_ndx, real_ndx, value);
 }
 
@@ -1232,13 +1195,13 @@ inline void TableView::set_double(size_t column_ndx, size_t row_ndx, double valu
 {
     TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Double);
 
-    const size_t real_ndx = size_t(m_refs.get(row_ndx));
+    const size_t real_ndx = size_t(m_row_indexes.get(row_ndx));
     m_table->set_double(column_ndx, real_ndx, value);
 }
 
 template<class E> inline void TableView::set_enum(size_t column_ndx, size_t row_ndx, E value)
 {
-    const size_t real_ndx = size_t(m_refs.get(row_ndx));
+    const size_t real_ndx = size_t(m_row_indexes.get(row_ndx));
     m_table->set_int(column_ndx, real_ndx, value);
 }
 
@@ -1246,7 +1209,7 @@ inline void TableView::set_string(size_t column_ndx, size_t row_ndx, StringData 
 {
     TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_String);
 
-    const size_t real_ndx = size_t(m_refs.get(row_ndx));
+    const size_t real_ndx = size_t(m_row_indexes.get(row_ndx));
     m_table->set_string(column_ndx, real_ndx, value);
 }
 
@@ -1254,7 +1217,7 @@ inline void TableView::set_binary(size_t column_ndx, size_t row_ndx, BinaryData 
 {
     TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Binary);
 
-    const size_t real_ndx = size_t(m_refs.get(row_ndx));
+    const size_t real_ndx = size_t(m_row_indexes.get(row_ndx));
     m_table->set_binary(column_ndx, real_ndx, value);
 }
 
@@ -1262,28 +1225,28 @@ inline void TableView::set_mixed(size_t column_ndx, size_t row_ndx, Mixed value)
 {
     TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Mixed);
 
-    const size_t real_ndx = size_t(m_refs.get(row_ndx));
+    const size_t real_ndx = size_t(m_row_indexes.get(row_ndx));
     m_table->set_mixed(column_ndx, real_ndx, value);
 }
 
 inline void TableView::set_subtable(size_t column_ndx, size_t row_ndx, const Table* value)
 {
     TIGHTDB_ASSERT_INDEX_AND_TYPE_TABLE_OR_MIXED(column_ndx, row_ndx);
-    const size_t real_ndx = size_t(m_refs.get(row_ndx));
+    const size_t real_ndx = size_t(m_row_indexes.get(row_ndx));
     m_table->set_subtable(column_ndx, real_ndx, value);
 }
 
 inline void TableView::set_link(std::size_t column_ndx, std::size_t row_ndx, std::size_t target_row_ndx)
 {
     TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Link);
-    const size_t real_ndx = size_t(m_refs.get(row_ndx));
+    const size_t real_ndx = size_t(m_row_indexes.get(row_ndx));
     m_table->set_link(column_ndx, real_ndx, target_row_ndx);
 }
 
 inline void TableView::nullify_link(std::size_t column_ndx, std::size_t row_ndx)
 {
     TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Link);
-    const size_t real_ndx = size_t(m_refs.get(row_ndx));
+    const size_t real_ndx = size_t(m_row_indexes.get(row_ndx));
     m_table->nullify_link(column_ndx, real_ndx);
 }
 

@@ -189,6 +189,7 @@ inline uint_fast64_t Allocator::bump_global_version() TIGHTDB_NOEXCEPT
     return m_table_versioning_counter;
 }
 
+
 inline bool Allocator::should_propagate_version(uint_fast64_t& local_version) TIGHTDB_NOEXCEPT
 {
     if (local_version != m_table_versioning_counter) {

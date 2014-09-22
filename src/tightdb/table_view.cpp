@@ -1,4 +1,6 @@
 #include <tightdb/table_view.hpp>
+
+
 #include <tightdb/column.hpp>
 #include <tightdb/query_conditions.hpp>
 #include <tightdb/column_basic.hpp>
@@ -13,7 +15,7 @@ using namespace tightdb;
 
 size_t TableViewBase::find_first_integer(size_t column_ndx, int64_t value) const
 {
-    for (size_t i = 0; i < m_refs.size(); i++)
+    for (size_t i = 0; i < m_row_indexes.size(); i++)
         if (get_int(column_ndx, i) == value)
             return i;
     return size_t(-1);
@@ -21,7 +23,7 @@ size_t TableViewBase::find_first_integer(size_t column_ndx, int64_t value) const
 
 size_t TableViewBase::find_first_float(size_t column_ndx, float value) const
 {
-    for (size_t i = 0; i < m_refs.size(); i++)
+    for (size_t i = 0; i < m_row_indexes.size(); i++)
         if (get_float(column_ndx, i) == value)
             return i;
     return size_t(-1);
@@ -29,7 +31,7 @@ size_t TableViewBase::find_first_float(size_t column_ndx, float value) const
 
 size_t TableViewBase::find_first_double(size_t column_ndx, double value) const
 {
-    for (size_t i = 0; i < m_refs.size(); i++)
+    for (size_t i = 0; i < m_row_indexes.size(); i++)
         if (get_double(column_ndx, i) == value)
             return i;
     return size_t(-1);
@@ -39,7 +41,7 @@ size_t TableViewBase::find_first_string(size_t column_ndx, StringData value) con
 {
     TIGHTDB_ASSERT_COLUMN_AND_TYPE(column_ndx, type_String);
 
-    for (size_t i = 0; i < m_refs.size(); i++)
+    for (size_t i = 0; i < m_row_indexes.size(); i++)
         if (get_string(column_ndx, i) == value) return i;
     return size_t(-1);
 }
@@ -48,7 +50,7 @@ size_t TableViewBase::find_first_binary(size_t column_ndx, BinaryData value) con
 {
     TIGHTDB_ASSERT_COLUMN_AND_TYPE(column_ndx, type_Binary);
 
-    for (size_t i = 0; i < m_refs.size(); i++)
+    for (size_t i = 0; i < m_row_indexes.size(); i++)
         if (get_binary(column_ndx, i) == value) return i;
     return size_t(-1);
 }
@@ -65,13 +67,13 @@ R TableViewBase::aggregate(R(ColType::*aggregateMethod)(size_t, size_t, size_t, 
     TIGHTDB_ASSERT(function == act_Sum || function == act_Max || function == act_Min || function == act_Count);
     TIGHTDB_ASSERT(m_table);
     TIGHTDB_ASSERT(column_ndx < m_table->get_column_count());
-    if (m_refs.size() == 0)
+    if (m_row_indexes.size() == 0)
         return 0;
 
     typedef typename ColumnTypeTraits<T>::array_type ArrType;
     const ColType* column = static_cast<ColType*>(&m_table->get_column_base(column_ndx));
 
-    if (m_refs.size() == column->size()) {
+    if (m_row_indexes.size() == column->size()) {
         // direct aggregate on the column
         if(function == act_Count)
             return static_cast<R>(column->count(count_target));
@@ -88,7 +90,7 @@ R TableViewBase::aggregate(R(ColType::*aggregateMethod)(size_t, size_t, size_t, 
     size_t row_ndx;
 
     R res = static_cast<R>(0);
-    T first = column->get(to_size_t(m_refs.get(0)));
+    T first = column->get(to_size_t(m_row_indexes.get(0)));
 
     if (return_ndx)
         *return_ndx = 0;
@@ -98,8 +100,8 @@ R TableViewBase::aggregate(R(ColType::*aggregateMethod)(size_t, size_t, size_t, 
     else
         res = static_cast<R>(first);
 
-    for (size_t ss = 1; ss < m_refs.size(); ++ss) {
-        row_ndx = to_size_t(m_refs.get(ss));
+    for (size_t ss = 1; ss < m_row_indexes.size(); ++ss) {
+        row_ndx = to_size_t(m_row_indexes.get(ss));
         if (row_ndx >= leaf_end) {
             column->GetBlock(row_ndx, arr, leaf_start);
             const size_t leaf_size = arr.size();
@@ -210,150 +212,10 @@ size_t TableViewBase::count_double(size_t column_ndx, double target) const
     return aggregate<act_Count, double, size_t, ColumnDouble>(NULL, column_ndx, target);
 }
 
-namespace tightdb {
-    template <> StringData TableViewBase::get_value<StringData>(size_t row, size_t column) const
-    {
-        return get_string(column, row);
-    }
-
-    template <> float TableViewBase::get_value<float>(size_t row, size_t column) const
-    {
-        return get_float(column, row);
-    }
-
-    template <> double TableViewBase::get_value<double>(size_t row, size_t column) const
-    {
-        return get_double(column, row);
-    }
-}
-
-template <class T> struct Comparer
-{
-    Comparer(size_t column, bool ascend, TableViewBase& tv) : m_column(column), m_ascending(ascend), m_tv(tv) {}
-    bool operator() (size_t i, size_t j) const {
-        T v1 = m_tv.get_value<T>(i, m_column);
-        T v2 = m_tv.get_value<T>(j, m_column);
-        bool b = CompareLess<T>::compare(v1, v2);
-        return m_ascending ? b : !b;
-    }
-
-    size_t m_column;
-    bool m_ascending;
-    TableViewBase& m_tv;
-};
-
-// Sort m_refs with std::sort using Comparer as predicate
-template <class T> void TableViewBase::sort(size_t column, bool ascending)
-{
-    vector<size_t> v, v2;
-    for (size_t t = 0; t < size(); t++) {
-        v.push_back(t);
-        v2.push_back(get_source_ndx(t));
-    }
-    std::stable_sort(v.begin(), v.end(), Comparer<T>(column, ascending, *this));
-    m_refs.clear();
-    for (size_t t = 0; t < v.size(); t++)
-        m_refs.add(v2[v[t]]);
-}
-
-void TableViewBase::sort(size_t column, bool Ascending)
-{
-    TIGHTDB_ASSERT(m_table);
-
-    m_auto_sort = true;
-    m_ascending = Ascending;
-    m_sort_index = column;
-
-    DataType type = m_table->get_column_type(column);
-
-    TIGHTDB_ASSERT(type == type_Int  ||
-                   type == type_DateTime ||
-                   type == type_Bool ||
-                   type == type_Float ||
-                   type == type_Double ||
-                   type == type_String);
-
-    if (m_refs.size() == 0)
-        return;
-
-    Array result(Allocator::get_default());
-    result.create(Array::type_Normal);
-
-    if (type == type_Float) {
-        sort<float>(column, Ascending);
-    }
-    else if (type == type_Double) {
-        sort<double>(column, Ascending);
-    }
-    else if (type == type_String) {
-        sort<tightdb::StringData>(column, Ascending);
-    }
-    else {
-
-        Array vals(Allocator::get_default());
-        vals.create(Array::type_Normal);
-        Array ref(Allocator::get_default());
-        ref.create(Array::type_Normal);
-
-        //ref.Preset(0, m_refs.size() - 1, m_refs.size());
-        for (size_t t = 0; t < m_refs.size(); t++)
-            ref.add(t);
-
-        // Extract all values from the Column and put them in an Array because Array is much faster to operate on
-        // with rand access (we have ~log(n) accesses to each element, so using 1 additional read to speed up the rest is faster)
-        if (type == type_Int) {
-            for (size_t t = 0; t < m_refs.size(); t++) {
-                int64_t v = m_table->get_int(column, size_t(m_refs.get(t)));
-                vals.add(v);
-            }
-        }
-        else if (type == type_DateTime) {
-            for (size_t t = 0; t < m_refs.size(); t++) {
-                size_t idx = size_t(m_refs.get(t));
-                int64_t v = int64_t(m_table->get_datetime(column, idx).get_datetime());
-                vals.add(v);
-            }
-        }
-        else if (type == type_Bool) {
-            for (size_t t = 0; t < m_refs.size(); t++) {
-                size_t idx = size_t(m_refs.get(t));
-                int64_t v = int64_t(m_table->get_bool(column, idx));
-                vals.add(v);
-            }
-        }
-
-        vals.ReferenceSort(ref);
-        vals.destroy(); // FIXME: Leak if we don't get this far
-
-        for (size_t t = 0; t < m_refs.size(); t++) {
-            size_t r = to_size_t(ref.get(t));
-            size_t rr = to_size_t(m_refs.get(r));
-            result.add(rr);
-        }
-
-        // Copy result to m_refs (todo, there might be a shortcut)
-        m_refs.clear();
-        if (Ascending) {
-            for (size_t t = 0; t < ref.size(); t++) {
-                size_t v = to_size_t(result.get(t));
-                m_refs.add(v);
-            }
-        }
-        else {
-            for (size_t t = 0; t < ref.size(); t++) {
-                size_t v = to_size_t(result.get(ref.size() - t - 1));
-                m_refs.add(v);
-            }
-        }
-        ref.destroy(); // FIXME: Leak if we don't get this far
-    }
-    result.destroy(); // FIXME: Leak if we don't get this far
-}
-
 // Simple pivot aggregate method. Experimental! Please do not document method publicly.
 void TableViewBase::aggregate(size_t group_by_column, size_t aggr_column, Table::AggrType op, Table& result) const
 {
-    m_table->aggregate(group_by_column, aggr_column, op, result, &m_refs);
+    m_table->aggregate(group_by_column, aggr_column, op, result, &m_row_indexes);
 }
 
 void TableViewBase::to_json(ostream& out) const
@@ -397,7 +259,7 @@ void TableViewBase::to_string(ostream& out, size_t limit) const
 
 void TableViewBase::row_to_string(size_t row_ndx, ostream& out) const
 {
-    TIGHTDB_ASSERT(row_ndx < m_refs.size());
+    TIGHTDB_ASSERT(row_ndx < m_row_indexes.size());
 
     // Print header (will also calculate widths)
     vector<size_t> widths;
@@ -407,18 +269,40 @@ void TableViewBase::row_to_string(size_t row_ndx, ostream& out) const
     m_table->to_string_row(get_source_ndx(row_ndx), out, widths);
 }
 
+#ifdef TIGHTDB_ENABLE_REPLICATION
+
+bool TableViewBase::is_in_sync() const TIGHTDB_NOEXCEPT
+{
+    return bool(m_table)
+    && (m_last_seen_version == m_table->m_version)
+    && ((m_query.m_view)
+    ? static_cast<TableViewBase*>(m_query.m_view)->is_in_sync()
+    : true);
+}
+
+void TableViewBase::sync_if_needed() const
+{
+    if (!is_in_sync()) {
+        // FIXME: Is this a reasonable handling of constness?
+        const_cast<TableViewBase*>(this)->do_sync();
+    }
+}
+#else
+void sync_if_needed() const {};
+#endif
+
 // O(n) for n = this->size()
 void TableView::remove(size_t ndx)
 {
     TIGHTDB_ASSERT(m_table);
-    TIGHTDB_ASSERT(ndx < m_refs.size());
+    TIGHTDB_ASSERT(ndx < m_row_indexes.size());
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     bool sync_to_keep = m_last_seen_version == m_table->m_version;
 #endif
 
     // Delete row in source table
-    const size_t real_ndx = size_t(m_refs.get(ndx));
+    const size_t real_ndx = size_t(m_row_indexes.get(ndx));
     m_table->remove(real_ndx);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
@@ -429,12 +313,12 @@ void TableView::remove(size_t ndx)
 #endif
 
     // Update refs
-    m_refs.erase(ndx, ndx == size() - 1);
+    m_row_indexes.erase(ndx, ndx == size() - 1);
 
     // Decrement row indexes greater than or equal to ndx
     //
     // O(n) for n = this->size(). FIXME: Dangerous cast below: unsigned -> signed
-    m_refs.adjust_ge(int_fast64_t(real_ndx), -1);
+    m_row_indexes.adjust_ge(int_fast64_t(real_ndx), -1);
 
 }
 
@@ -462,7 +346,7 @@ void TableView::clear()
     // Test if tableview is sorted ascendingly
     bool is_sorted = true;
     for (size_t t = 1; t < size(); t++) {
-        if (m_refs.get(t) < m_refs.get(t - 1)) {
+        if (m_row_indexes.get(t) < m_row_indexes.get(t - 1)) {
             is_sorted = false;
             break;
         }
@@ -471,8 +355,8 @@ void TableView::clear()
     if (is_sorted) {
         // Delete all referenced rows in source table
         // (in reverse order to avoid index drift)
-        for (size_t i = m_refs.size(); i != 0; --i) {
-            size_t ndx = size_t(m_refs.get(i - 1));
+        for (size_t i = m_row_indexes.size(); i != 0; --i) {
+            size_t ndx = size_t(m_row_indexes.get(i - 1));
 
             // If table is unordered, we must use move_last_over()
             if (is_ordered)
@@ -485,10 +369,10 @@ void TableView::clear()
         // sort tableview
         vector<size_t> v;
         for (size_t t = 0; t < size(); t++)
-            v.push_back(to_size_t(m_refs.get(t)));
+            v.push_back(to_size_t(m_row_indexes.get(t)));
         std::sort(v.begin(), v.end());
 
-        for (size_t i = m_refs.size(); i != 0; --i) {
+        for (size_t i = m_row_indexes.size(); i != 0; --i) {
             size_t ndx = size_t(v[i - 1]);
 
             // If table is unordered, we must use move_last_over()
@@ -499,7 +383,7 @@ void TableView::clear()
         }
     }
 
-    m_refs.clear();
+    m_row_indexes.clear();
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     // It is important to not accidentally bring us in sync, if we were
@@ -517,18 +401,18 @@ void TableViewBase::do_sync()
     if (!m_query.m_table) {
         // no valid query
         m_last_seen_version = m_table->m_version;
-        m_refs.clear();
+        m_row_indexes.clear();
         for (size_t i=0; i<m_table->size(); i++)
-            m_refs.add(i);
+            m_row_indexes.add(i);
         cerr << "ref to entire table" << endl;
     }
     else  {
         // valid query, so clear earlier results and reexecute it.
-        m_refs.clear();
-        // now we are going to do something naughty!
-        if (m_query.m_tableview)
-            m_query.m_tableview->sync_if_needed();
-        // and more:
+        m_row_indexes.clear();
+        // if m_query had a TableView filter, then sync it. If it had a LinkView filter, no sync is needed
+        if (m_query.m_view)
+            m_query.m_view->sync_if_needed();
+
         // find_all needs to call size() on the tableview. But if we're
         // out of sync, size() will then call do_sync and we'll have an infinite regress
         // SO: fake that we're up to date BEFORE calling find_all.
@@ -536,6 +420,6 @@ void TableViewBase::do_sync()
         m_query.find_all(*(const_cast<TableViewBase*>(this)), m_start, m_end, m_limit);
     }
     if (m_auto_sort)
-        sort(m_sort_index, m_ascending);
+        re_sort();
 }
 #endif // TIGHTDB_ENABLE_REPLICATION

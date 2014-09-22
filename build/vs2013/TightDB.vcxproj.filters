@@ -288,6 +288,13 @@
     <ClCompile Include="..\..\test\util\jsmn.cpp">
       <Filter>test\util</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\tightdb\views.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\test\test_basic_utils.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+  </ItemGroup>
     <ClCompile Include="..\..\test\test_basic_utils.cpp">
       <Filter>test</Filter>
     </ClCompile>
@@ -534,6 +541,16 @@
       <Filter>src\include</Filter>
     </ClInclude>
     <ClInclude Include="..\..\test\util\jsmn.hpp">
+      <Filter>test\util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\tightdb\views.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\tightdb\util\shared_ptr.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
       <Filter>test\util</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\tightdb\util\shared_ptr.hpp">

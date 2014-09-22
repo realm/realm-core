@@ -20,6 +20,28 @@
 
 ----------------------------------------------
 
+# 0.83.0 Release notes
+
+### API breaking changes:
+
+* Sorting on LinkView and TableView by multiple columns: Both classes now have
+  get_sorted_view() (returns sorted view) and sort() (in-place sort). Both
+  methods can take either a single column index as argument (as size_t) or a
+  std::vector of columns to sort by multiple columns.
+* You can now query a LinkView by calling Query::where(link_view.get()).... See
+  TEST(LinkList_QueryOnLinkList) in test_link_query_view.cpp for an example.
+  *** IMPORTANT NOTE: Do not call sort() on a LinkView because it does not
+  yet support replication ***. get_sorted_view() works fine though.
+
+-----------
+
+### Internals:
+
+* Made common base class for TableView and LinkView with common shared
+  functionality (so far just sort).
+
+----------------------------------------------
+
 # 0.82.3 Release notes
 
 ### Bugfixes:

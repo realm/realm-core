@@ -36,6 +36,25 @@ namespace tightdb {
 // Pre-definitions
 class Column;
 
+struct ColumnTemplateBase
+{
+    virtual int compare_values(size_t row1, size_t row2) const = 0;
+};
+
+template <class T> struct ColumnTemplate : public ColumnTemplateBase
+{
+    // Overridden in column_string.* because == operator of StringData isn't yet locale aware; todo
+    virtual int compare_values(size_t row1, size_t row2) const
+    {
+        T a = get_val(row1);
+        T b = get_val(row2);
+        return a == b ? 0 : a < b ? 1 : -1;
+    }
+
+    // We cannot use already-existing get() methods because ColumnStringEnum and LinkList inherit from
+    // Column and overload get() with different return type than int64_t. Todo, find a way to simplify 
+    virtual T get_val(size_t row) const = 0;
+};
 
 /// Base class for all column types.
 class ColumnBase {
@@ -286,9 +305,11 @@ private:
 /// arrays of type Array.
 ///
 /// FIXME: Rename Column to IntegerColumn.
-class Column: public ColumnBase {
+class Column: public ColumnBase, public ColumnTemplate<int64_t> {
 public:
     typedef int64_t value_type;
+
+    int64_t get_val(size_t row) const { return get(row); }
 
     Column(Allocator&, ref_type);
 
