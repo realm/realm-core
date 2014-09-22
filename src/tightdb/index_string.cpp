@@ -58,10 +58,8 @@ StringIndex::key_type StringIndex::GetLastKey() const
 
 void StringIndex::set(size_t row_ndx, StringData old_value, StringData new_value)
 {
-    // Note that insert_with_offset() throws UniqueConstraintViolation.
-
     if (TIGHTDB_LIKELY(new_value != old_value)) {
-        size_t offset = 0; // First key from beginning of string
+        size_t offset = 0; // First key is at beginning of string
         insert_with_offset(row_ndx, new_value, offset); // Throws
 
         bool is_last = true; // To avoid updating refs
@@ -83,7 +81,7 @@ void StringIndex::insert(size_t row_ndx, StringData value, size_t num_rows, bool
 
     for (size_t i = 0; i < num_rows; ++i) {
         size_t row_ndx_2 = row_ndx + i;
-        size_t offset = 0; // First key from beginning of string
+        size_t offset = 0; // First key is at beginning of string
         insert_with_offset(row_ndx_2, value, offset); // Throws
     }
 }
@@ -400,7 +398,7 @@ bool StringIndex::LeafInsert(size_t row_ndx, key_type key, size_t offset, String
         StringData v2 = get(row_ndx2);
         if (v2 == value) {
             if (m_deny_duplicate_values)
-                throw UniqueConstraintViolation();
+                throw LogicError(LogicError::unique_constraint_violation);
             // convert to list (in sorted order)
             Array row_list(alloc);
             row_list.create(Array::type_Normal); // Throws
@@ -429,7 +427,7 @@ bool StringIndex::LeafInsert(size_t row_ndx, key_type key, size_t offset, String
         StringData v2 = get(r1);
         if (v2 ==  value) {
             if (m_deny_duplicate_values)
-                throw UniqueConstraintViolation();
+                throw LogicError(LogicError::unique_constraint_violation);
             // find insert position (the list has to be kept in sorted order)
             // In most cases we refs will be added to the end. So we test for that
             // first to see if we can avoid the binary search for insert position

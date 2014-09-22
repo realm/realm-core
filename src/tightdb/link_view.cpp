@@ -160,6 +160,26 @@ void LinkView::clear()
 #endif
 }
 
+void LinkView::sort(size_t column, bool ascending)
+{
+    std::vector<size_t> c;
+    std::vector<bool> a;
+    c.push_back(column);
+    a.push_back(ascending);
+    sort(c, a);
+}
+
+void LinkView::sort(std::vector<size_t> columns, std::vector<bool> ascending)
+{
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    if (Replication* repl = get_repl()) {
+        // todo, write to the replication log that we're doing a sort
+        repl->set_link_list(*this, m_row_indexes); // Throws
+    }
+#endif
+    RowIndexes::sort(columns, ascending);
+}
+
 TableView LinkView::get_sorted_view(vector<size_t> column_indexes, vector<bool> ascending) const
 {
     TableView v(m_origin_column.get_target_table());
