@@ -371,9 +371,9 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
 TEST(LangBindHelper_AdvanceReadTransact_LinkListSort)
 {
     SHARED_GROUP_TEST_PATH(path);
-    SharedGroup sg(path);
+    SharedGroup sg(path, false, SharedGroup::durability_Full, test_util::key);
     ShortCircuitTransactLogManager tlm(path);
-    SharedGroup sg_w(tlm);
+    SharedGroup sg_w(tlm, SharedGroup::durability_Full, test_util::key);
 
     // Start a read transaction (to be repeatedly advanced)
     ReadTransaction rt(sg);

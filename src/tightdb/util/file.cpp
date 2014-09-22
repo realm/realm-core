@@ -26,8 +26,6 @@
 #include <tightdb/util/file.hpp>
 #include <tightdb/util/file_mapper.hpp>
 
-#include <CommonCrypto/CommonCrypto.h>
-
 using namespace std;
 using namespace tightdb;
 using namespace tightdb::util;
@@ -1008,8 +1006,6 @@ bool File::is_removed() const
 
 void File::set_encryption_key(const uint8_t *key)
 {
-    static_assert(sizeof(m_encryption_key) == kCCKeySizeAES256,
-                  "m_encryption_key is wrong size");
     if (key) {
         memcpy(m_encryption_key, key, sizeof(m_encryption_key));
         m_encrypt = true;

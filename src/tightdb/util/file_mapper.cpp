@@ -23,13 +23,14 @@
 #include <sys/mman.h>
 #include <sys/file.h>
 
-#include <CommonCrypto/CommonCryptor.h>
+#include <openssl/evp.h>
 
 using namespace std;
 using namespace tightdb;
 using namespace tightdb::util;
 
 namespace {
+#ifdef __APPLE__
 #include <execinfo.h>
 void print_backtrace() {
     void* callstack[128];
@@ -40,6 +41,9 @@ void print_backtrace() {
     }
     free(strs);
 }
+#else
+void print_backtrace() { }
+#endif
 
 void die(const char *msg) {
     puts(msg);
@@ -61,45 +65,73 @@ struct spin_lock_guard {
 };
 
 #pragma mark - crypto
+const int block_size = 16;
+
 size_t aes_block_size(size_t len) {
-    return (len + kCCBlockSizeAES128 - 1) & ~(kCCBlockSizeAES128 - 1);
+    return (len + block_size - 1) & ~(block_size - 1);
 }
 
-size_t crypt(CCOperation op, const void *src, void *dst, size_t len, const uint8_t *key) {
-    uint8_t buffer[4096];
-    // if source len isn't a multiple of the block size, pad it with zeroes
-    if (len & (kCCBlockSizeAES128 - 1)) {
-        auto padded_len = aes_block_size(len);
-        memcpy(buffer, src, len);
-        memset(buffer + len, 0, padded_len - len);
-        src = buffer;
-        len = padded_len;
+// The system copy of OpenSSL is deprecated on OS X
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated"
+class AESCryptor {
+public:
+    AESCryptor(const uint8_t *key) : key(key) {
+        EVP_CIPHER_CTX_init(&ctx);
     }
 
-    size_t bytesEncrypted = 0;
-    auto err = CCCrypt(op, kCCAlgorithmAES, 0 /* option */,
-                       key, kCCKeySizeAES256,
-                       nullptr /* iv */,
-                       src, len,
-                       dst, 4096,
-                       &bytesEncrypted);
-    if (err != kCCSuccess) die("CCCrypt failed");
-    return bytesEncrypted;
-}
+    ~AESCryptor() {
+        EVP_CIPHER_CTX_cleanup(&ctx);
+    }
 
-void read_decrypt(int fd, off_t pos, void *dst, size_t size, const uint8_t *key) {
-    uint8_t buffer[4096];
-    lseek(fd, pos, SEEK_SET);
-    auto count = read(fd, buffer, aes_block_size(size));
-    crypt(kCCDecrypt, buffer, dst, count, key);
-}
+    void read(int fd, off_t pos, uint8_t *dst, size_t size) {
+        uint8_t buffer[4096];
+        lseek(fd, pos, SEEK_SET);
+        auto count = ::read(fd, buffer, aes_block_size(size));
+        crypt(0 /* decrypt */, pos, dst, buffer, count);
+    }
 
-void write_encrypt(int fd, off_t pos, void *src, size_t size, const uint8_t *key) {
-    uint8_t buffer[4096];
-    auto bytes = crypt(kCCEncrypt, src, buffer, size, key);
-    lseek(fd, pos, SEEK_SET);
-    write(fd, buffer, bytes);
-}
+    void write(int fd, off_t pos, const uint8_t *src, size_t size) {
+        uint8_t buffer[4096];
+        auto bytes = crypt(1 /* encrypt */, pos, buffer, src, size);
+        lseek(fd, pos, SEEK_SET);
+        ::write(fd, buffer, bytes);
+    }
+
+private:
+    int crypt(int mode, off_t pos, uint8_t *dst, const uint8_t *src, size_t len) {
+        TIGHTDB_ASSERT(len <= 4096);
+
+        uint8_t buffer[4096];
+        // if source len isn't a multiple of the block size, pad it with zeroes
+        if (len & (block_size - 1)) {
+            auto padded_len = aes_block_size(len);
+            memcpy(buffer, src, len);
+            memset(buffer + len, 0, padded_len - len);
+            src = buffer;
+            len = padded_len;
+        }
+
+        uint8_t iv[block_size] = {0};
+        memcpy(iv, &pos, sizeof(pos));
+
+        int written = 0, flush_len = 0;
+        int ret = EVP_CipherInit_ex(&ctx, EVP_aes_256_cfb(), nullptr, key, iv, mode);
+        TIGHTDB_ASSERT(ret);
+        ret = EVP_CipherUpdate(&ctx, dst, &written, src, (int)len);
+        TIGHTDB_ASSERT(ret);
+        TIGHTDB_ASSERT(written == (int)len);
+        ret = EVP_CipherFinal_ex(&ctx, dst + written, &flush_len);
+        TIGHTDB_ASSERT(flush_len == 0);
+        TIGHTDB_ASSERT(ret);
+        (void)ret;
+        return written + flush_len;
+    }
+
+    const uint8_t *key;
+    EVP_CIPHER_CTX ctx;
+};
+#pragma GCC diagnostic pop
 
 #pragma mark - mmap
 class EncryptedFileMapping;
@@ -126,7 +158,9 @@ public:
     EncryptedFileMapping *next;
 
     File::AccessMode access;
+
     const uint8_t *key;
+    AESCryptor cryptor;
 
     EncryptedFileMapping(std::shared_ptr<int> fd, void *addr, size_t size, EncryptedFileMapping *next, File::AccessMode access, const uint8_t *key)
     : fd(fd)
@@ -138,7 +172,7 @@ public:
     , dirty_pages(count, false)
     , next(next)
     , access(access)
-    , key(key)
+    , cryptor(key)
     {
         struct stat st;
         if (fstat(*fd, &st)) die("fstat failed");
@@ -202,7 +236,7 @@ public:
 
         auto addr = page_addr(i);
         mprotect(addr, 4096, PROT_READ | PROT_WRITE);
-        read_decrypt(*fd, i << 12, addr, page_size(i), key);
+        cryptor.read(*fd, i << 12, (uint8_t *)addr, page_size(i));
 
         mark_readable(i);
     }
@@ -210,8 +244,8 @@ public:
     void validate_page(size_t i) {
         if (!read_pages[i]) return;
 
-        char buffer[4096];
-        read_decrypt(*fd, i << 12, buffer, sizeof(buffer), key);
+        uint8_t buffer[4096];
+        cryptor.read(*fd, i << 12, buffer, sizeof(buffer));
         if (memcmp(buffer, page_addr(i), page_size(i))) {
             printf("mismatch %p: fd(%d) page(%zu/%zu) page_size(%zu) %s %s\n",
                    this, *fd, i, count, page_size(i), buffer, page_addr(i));
@@ -238,7 +272,7 @@ public:
             }
 
             mark_readable(i);
-            write_encrypt(*fd, i << 12, page_addr(i), page_size(i), key);
+            cryptor.write(*fd, i << 12, (uint8_t *)page_addr(i), page_size(i));
         }
 
         validate();
