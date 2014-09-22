@@ -1048,7 +1048,7 @@ TEST(Link_FindNullLink)
 }
 
 // Tests queries on a LinkList
-TEST(LinkList_QueryOnLinkList)
+ONLY(LinkList_QueryOnLinkList)
 {
     Group group;
 
@@ -1088,16 +1088,31 @@ TEST(LinkList_QueryOnLinkList)
 
     // Return all rows of table1 (the linked-to-table) that match the criteria and is in the LinkList
     Query q = table2->where(lvr.get()).and_query(table1->column<Int>(0) > 100);
+
     tv = q.find_all();
+    TableView tv2 = lvr->get_sorted_view(0);
+
+    CHECK_EQUAL(3, tv2.size());
+    CHECK_EQUAL(1, tv2.get_source_ndx(0));
+    CHECK_EQUAL(2, tv2.get_source_ndx(1));
+    CHECK_EQUAL(0, tv2.get_source_ndx(2));
+
     CHECK_EQUAL(2, tv.size());
     CHECK_EQUAL(0, tv.get_source_ndx(0));
     CHECK_EQUAL(2, tv.get_source_ndx(1));
 
     // Modify the LinkList and see if sync_if_needed takes it in count
-    lvr->remove(0);
+    lvr->remove(2);
     tv.sync_if_needed();
     CHECK_EQUAL(1, tv.size());
-    CHECK_EQUAL(2, tv.get_source_ndx(0));
+    CHECK_EQUAL(0, tv.get_source_ndx(0));
+    
+    // Now test if changes in linked-to table bumps the version of the linked-from table and that 
+    // the query of 'tv' is re-run
+    table1->set_int(0, 2, 50); // exclude row 2 from tv because of the '> 100' condition in Query
+    tv.sync_if_needed();
+    CHECK_EQUAL(1, tv.size());
+    CHECK_EQUAL(0, tv.get_source_ndx(0));
 }
 
 #endif
