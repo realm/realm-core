@@ -13,212 +13,11 @@
 #include <tightdb/query_engine.hpp>
 #include <tightdb/exceptions.hpp>
 #include <tightdb/table.hpp>
+#include <tightdb/index_string.hpp>
 
 using namespace std;
 using namespace tightdb;
 using namespace tightdb::util;
-
-
-namespace {
-
-/*
-// Input:
-//     vals:   An array of values
-//     idx0:   Array of indexes pointing into vals, sorted with respect to vals
-//     idx1:   Array of indexes pointing into vals, sorted with respect to vals
-//     idx0 and idx1 are allowed not to contain index pointers to *all* elements in vals
-//     (idx0->size() + idx1->size() < vals.size() is OK).
-// Output:
-//     idxres: Merged array of indexes sorted with respect to vals
-void merge_core_references(Array* vals, Array* idx0, Array* idx1, Array* idxres)
-{
-    int64_t v0, v1;
-    size_t i0, i1;
-    size_t p0 = 0, p1 = 0;
-    size_t s0 = idx0->size();
-    size_t s1 = idx1->size();
-
-    i0 = idx0->get_as_ref(p0++);
-    i1 = idx1->get_as_ref(p1++);
-    v0 = vals->get(i0);
-    v1 = vals->get(i1);
-
-    for (;;) {
-        if (v0 < v1) {
-            idxres->add(i0);
-            // Only check p0 if it has been modified :)
-            if (p0 == s0)
-                break;
-            i0 = idx0->get_as_ref(p0++);
-            v0 = vals->get(i0);
-        }
-        else {
-            idxres->add(i1);
-            if (p1 == s1)
-                break;
-            i1 = idx1->get_as_ref(p1++);
-            v1 = vals->get(i1);
-        }
-    }
-
-    if (p0 == s0)
-        p0--;
-    else
-        p1--;
-
-    while (p0 < s0) {
-        i0 = idx0->get_as_ref(p0++);
-        idxres->add(i0);
-    }
-    while (p1 < s1) {
-        i1 = idx1->get_as_ref(p1++);
-        idxres->add(i1);
-    }
-
-    TIGHTDB_ASSERT(idxres->size() == idx0->size() + idx1->size());
-}
-
-
-// Merge two sorted arrays into a single sorted array
-void merge_core(const Array& a0, const Array& a1, Array& res)
-{
-    TIGHTDB_ASSERT(res.is_empty());
-
-    size_t p0 = 0;
-    size_t p1 = 0;
-    const size_t s0 = a0.size();
-    const size_t s1 = a1.size();
-
-    int64_t v0 = a0.get(p0++);
-    int64_t v1 = a1.get(p1++);
-
-    for (;;) {
-        if (v0 < v1) {
-            res.add(v0);
-            if (p0 == s0)
-                break;
-            v0 = a0.get(p0++);
-        }
-        else {
-            res.add(v1);
-            if (p1 == s1)
-                break;
-            v1 = a1.get(p1++);
-        }
-    }
-
-    if (p0 == s0)
-        --p0;
-    else
-        --p1;
-
-    while (p0 < s0) {
-        v0 = a0.get(p0++);
-        res.add(v0);
-    }
-    while (p1 < s1) {
-        v1 = a1.get(p1++);
-        res.add(v1);
-    }
-
-    TIGHTDB_ASSERT(res.size() == a0.size() + a1.size());
-}
-
-
-// Input:
-//     ArrayList: An array of references to non-instantiated Arrays of values. The values in each array must be in sorted order
-// Return value:
-//     Merge-sorted array of all values
-Array* merge(const Array& array_list)
-{
-    size_t size = array_list.size();
-
-    if (size == 1)
-        return null_ptr; // already sorted
-
-    Array left_half, right_half;
-    const size_t leftSize = size / 2;
-    for (size_t t = 0; t < leftSize; ++t)
-        left_half.add(array_list.get(t));
-    for (size_t t = leftSize; t < size; ++t)
-        right_half.add(array_list.get(t));
-
-    // We merge left-half-first instead of bottom-up so that we access the same data in each call
-    // so that it's in cache, at least for the first few iterations until lists get too long
-    Array* left = merge(left_half);
-    Array* right = merge(right_half);
-    Array* res = new Array();
-
-    if (left && right)
-        merge_core(*left, *right, *res);
-    else if (left) {
-        ref_type ref = right_half.get_as_ref(0);
-        Array right0(ref, 0);
-        merge_core(*left, right0, *res);
-    }
-    else if (right) {
-        ref_type ref = left_half.get_as_ref(0);
-        Array left0(ref, 0);
-        merge_core(left0, *right, *res);
-    }
-
-    // Clean-up
-    left_half.destroy();
-    right_half.destroy();
-    if (left)
-        left->destroy();
-    if (right)
-        right->destroy();
-    delete left;
-    delete right;
-
-    return res; // receiver now own the array, and has to delete it when done
-}
-
-
-// Input:
-//     valuelist:   One array of values
-//     indexlists:  Array of pointers to non-instantiated Arrays of index numbers into valuelist
-// Output:
-//     indexresult: Array of indexes into valuelist, sorted with respect to values in valuelist
-// TODO: Set owner of created arrays and destroy/delete them if created by merge_references()
-void merge_references(Array* valuelist, Array* indexlists, Array** indexresult)
-{
-    if (indexlists->size() == 1) {
-//      size_t ref = valuelist->get(0);
-        *indexresult = reinterpret_cast<Array*>(indexlists->get(0));
-        return;
-    }
-
-    Array leftV, rightV;
-    Array leftI, rightI;
-    size_t leftSize = indexlists->size() / 2;
-    for (size_t t = 0; t < leftSize; t++) {
-        leftV.add(indexlists->get(t));
-        leftI.add(indexlists->get(t));
-    }
-    for (size_t t = leftSize; t < indexlists->size(); t++) {
-        rightV.add(indexlists->get(t));
-        rightI.add(indexlists->get(t));
-    }
-
-    Array* li;
-    Array* ri;
-
-    Array* resI = new Array;
-
-    // We merge left-half-first instead of bottom-up so that we access the same data in each call
-    // so that it's in cache, at least for the first few iterations until lists get too long
-    merge_references(valuelist, &leftI, &ri);
-    merge_references(valuelist, &rightI, &li);
-    merge_core_references(valuelist, li, ri, resI);
-
-    *indexresult = resI;
-}
-*/
-
-} // anonymous namespace
-
 
 void ColumnBase::set_string(size_t, StringData)
 {
@@ -966,6 +765,10 @@ size_t Column::find_first(int64_t value, size_t begin, size_t end) const
 {
     TIGHTDB_ASSERT(begin <= size());
     TIGHTDB_ASSERT(end == npos || (begin <= end && end <= size()));
+
+    if (m_index_column)
+        static_cast<StringIndex*>(m_index_column)->find_first(value);
+
 
     if (root_is_leaf())
         return m_array->find_first(value, begin, end); // Throws (maybe)

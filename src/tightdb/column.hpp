@@ -425,6 +425,8 @@ private:
     static ref_type leaf_insert(MemRef leaf_mem, ArrayParent&, std::size_t ndx_in_parent,
                                 Allocator&, std::size_t insert_ndx, Array::TreeInsert<Column>&);
 
+    void* m_index_column;
+
     class EraseLeafElem;
     class CreateHandler;
     class SliceHandler;
