@@ -466,7 +466,7 @@ public:
         return false;
     }
 
-    bool erase_row(size_t row_ndx, std::size_t last_row_ndx, bool unordered)
+    bool erase_rows(size_t row_ndx, size_t num_rows, std::size_t last_row_ndx, bool unordered)
     {
         if (TIGHTDB_LIKELY(m_table)) {
             if (unordered) {
@@ -476,7 +476,10 @@ public:
                     if (m_log)
                         *m_log << "table->move_last_over("<<row_ndx<<")\n";
 #endif
-                    m_table->move_last_over(row_ndx); // Throws
+                    while (num_rows--) {
+                        m_table->move_last_over(row_ndx); // Throws
+                        row_ndx++;
+                    }
                     return true;
                 }
             }
@@ -486,7 +489,10 @@ public:
                     if (m_log)
                         *m_log << "table->remove("<<row_ndx<<")\n";
 #endif
-                    m_table->remove(row_ndx); // Throws
+                    while (num_rows--) {
+                        m_table->remove(row_ndx); // Throws
+                        row_ndx++;
+                    }
                     return true;
                 }
             }
@@ -580,30 +586,18 @@ public:
         return false;
     }
 
-    bool insert_column(size_t col_ndx, DataType type, StringData name,
-                       size_t link_target_table_ndx, size_t)
+    bool insert_column(size_t col_ndx, DataType type, StringData name)
     {
         if (TIGHTDB_LIKELY(m_desc)) {
             if (TIGHTDB_LIKELY(col_ndx <= m_desc->get_column_count())) {
                 typedef _impl::TableFriend tf;
 #ifdef TIGHTDB_DEBUG
                 if (m_log) {
-                    if (link_target_table_ndx != tightdb::npos) {
-                        *m_log << "desc->insert_column_link("<<col_ndx<<", "
-                            ""<<type_to_str(type)<<", \""<<name<<"\", "
-                            "group->get_table("<<link_target_table_ndx<<"))\n";
-                    }
-                    else {
-                        *m_log << "desc->insert_column("<<col_ndx<<", "<<type_to_str(type)<<", "
-                            "\""<<name<<"\")\n";
-                    }
+                    *m_log << "desc->insert_column("<<col_ndx<<", "<<type_to_str(type)<<", "
+                        "\""<<name<<"\")\n";
                 }
 #endif
                 Table* link_target_table = 0;
-                if (link_target_table_ndx != tightdb::npos) {
-                    typedef _impl::GroupFriend gf;
-                    link_target_table = &gf::get_table(m_group, link_target_table_ndx); // Throws
-                }
                 tf::insert_column(*m_desc, col_ndx, type, name, link_target_table); // Throws
                 return true;
             }
@@ -611,7 +605,44 @@ public:
         return false;
     }
 
-    bool erase_column(size_t col_ndx, size_t, size_t)
+    bool insert_link_column(size_t col_ndx, DataType type, StringData name,
+                       size_t link_target_table_ndx, size_t)
+    {
+        if (TIGHTDB_LIKELY(m_desc)) {
+            if (TIGHTDB_LIKELY(col_ndx <= m_desc->get_column_count())) {
+                typedef _impl::TableFriend tf;
+#ifdef TIGHTDB_DEBUG
+                if (m_log) {
+                    *m_log << "desc->insert_column_link("<<col_ndx<<", "
+                        ""<<type_to_str(type)<<", \""<<name<<"\", "
+                        "group->get_table("<<link_target_table_ndx<<"))\n";
+                }
+#endif
+                typedef _impl::GroupFriend gf;
+                Table* link_target_table = &gf::get_table(m_group, link_target_table_ndx); // Throws
+                tf::insert_column(*m_desc, col_ndx, type, name, link_target_table); // Throws
+                return true;
+            }
+        }
+        return false;
+    }
+
+    bool erase_column(size_t col_ndx)
+    {
+        if (TIGHTDB_LIKELY(m_desc)) {
+            if (TIGHTDB_LIKELY(col_ndx < m_desc->get_column_count())) {
+#ifdef TIGHTDB_DEBUG
+                if (m_log)
+                    *m_log << "desc->remove_column("<<col_ndx<<")\n";
+#endif
+                _impl::TableFriend::erase_column(*m_desc, col_ndx); // Throws
+                return true;
+            }
+        }
+        return false;
+    }
+
+    bool erase_link_column(size_t col_ndx, size_t, size_t)
     {
         if (TIGHTDB_LIKELY(m_desc)) {
             if (TIGHTDB_LIKELY(col_ndx < m_desc->get_column_count())) {

@@ -1099,17 +1099,23 @@ public:
         return true;
     }
 
-    bool erase_row(size_t row_ndx, size_t tbl_sz, bool unordered) TIGHTDB_NOEXCEPT
+    bool erase_rows(size_t row_ndx, size_t num_rows, size_t tbl_sz, bool unordered) TIGHTDB_NOEXCEPT
     {
         if (unordered) {
             typedef _impl::TableFriend tf;
             if (m_table)
-                tf::adj_accessors_move(*m_table, row_ndx, tbl_sz);
+                while (num_rows--) {
+                    tf::adj_accessors_move(*m_table, row_ndx, tbl_sz);
+                    row_ndx++;
+                }
         }
         else {
             typedef _impl::TableFriend tf;
             if (m_table)
-                tf::adj_accessors_erase_row(*m_table, row_ndx);
+                while (num_rows--) {
+                    tf::adj_accessors_erase_row(*m_table, row_ndx);
+                    row_ndx++;
+                }
         }
         return true;
     }
@@ -1325,19 +1331,12 @@ public:
         return true;
     }
 
-    bool insert_column(size_t col_ndx, DataType, StringData, size_t link_target_table_ndx, size_t)
+    bool insert_column(size_t col_ndx, DataType, StringData)
     {
         if (m_table) {
             typedef _impl::TableFriend tf;
             InsertColumnUpdater updater(col_ndx);
             tf::update_accessors(*m_table, m_desc_path_begin, m_desc_path_end, updater);
-
-            // See comments on link handling in TransactAdvancer::set_link().
-            if (link_target_table_ndx != tightdb::npos) {
-                TableRef target = m_group.get_table(link_target_table_ndx); // Throws
-                tf::adj_add_column(*target); // Throws
-                tf::mark(*target);
-            }
         }
         typedef _impl::DescriptorFriend df;
         if (m_desc)
@@ -1345,7 +1344,38 @@ public:
         return true;
     }
 
-    bool erase_column(size_t col_ndx, size_t link_target_table_ndx, size_t backlink_col_ndx)
+    bool insert_link_column(size_t col_ndx, DataType, StringData, size_t link_target_table_ndx, size_t)
+    {
+        if (m_table) {
+            typedef _impl::TableFriend tf;
+            InsertColumnUpdater updater(col_ndx);
+            tf::update_accessors(*m_table, m_desc_path_begin, m_desc_path_end, updater);
+
+            // See comments on link handling in TransactAdvancer::set_link().
+            TableRef target = m_group.get_table(link_target_table_ndx); // Throws
+            tf::adj_add_column(*target); // Throws
+            tf::mark(*target);
+        }
+        typedef _impl::DescriptorFriend df;
+        if (m_desc)
+            df::adj_insert_column(*m_desc, col_ndx);
+        return true;
+    }
+
+    bool erase_column(size_t col_ndx)
+    {
+        if (m_table) {
+            typedef _impl::TableFriend tf;
+            EraseColumnUpdater updater(col_ndx);
+            tf::update_accessors(*m_table, m_desc_path_begin, m_desc_path_end, updater);
+        }
+        typedef _impl::DescriptorFriend df;
+        if (m_desc)
+            df::adj_erase_column(*m_desc, col_ndx);
+        return true;
+    }
+
+    bool erase_link_column(size_t col_ndx, size_t link_target_table_ndx, size_t backlink_col_ndx)
     {
         if (m_table) {
             typedef _impl::TableFriend tf;
@@ -1354,11 +1384,9 @@ public:
             // case the target table is the same as the origin table (because
             // the backlink column occurs after regular columns.) Also see
             // comments on link handling in TransactAdvancer::set_link().
-            if (link_target_table_ndx != tightdb::npos) {
-                TableRef target = m_group.get_table(link_target_table_ndx); // Throws
-                tf::adj_erase_column(*target, backlink_col_ndx); // Throws
-                tf::mark(*target);
-            }
+            TableRef target = m_group.get_table(link_target_table_ndx); // Throws
+            tf::adj_erase_column(*target, backlink_col_ndx); // Throws
+            tf::mark(*target);
 
             EraseColumnUpdater updater(col_ndx);
             tf::update_accessors(*m_table, m_desc_path_begin, m_desc_path_end, updater);
@@ -1423,6 +1451,24 @@ private:
     const size_t* m_desc_path_end;
 };
 
+void Group::refresh_dirty_accessors()
+{
+    m_top.get_alloc().bump_global_version();
+
+    // Refresh all remaining dirty table accessors
+    size_t num_tables = m_table_accessors.size();
+    for (size_t table_ndx = 0; table_ndx != num_tables; ++table_ndx) {
+        if (Table* table = m_table_accessors[table_ndx]) {
+            typedef _impl::TableFriend tf;
+            tf::set_ndx_in_parent(*table, table_ndx);
+            if (tf::is_marked(*table)) {
+                tf::refresh_accessor_tree(*table); // Throws
+                tf::bump_version(*table);
+            }
+        }
+    }
+}
+
 
 void Group::advance_transact(ref_type new_top_ref, size_t new_file_size,
                              const BinaryData* logs_begin, const BinaryData* logs_end)
@@ -1484,132 +1530,100 @@ void Group::advance_transact(ref_type new_top_ref, size_t new_file_size,
     }
 
     init_from_ref(new_top_ref);
-    m_top.get_alloc().bump_global_version();
-    // Refresh all remaining dirty table accessors
-    size_t num_tables = m_table_accessors.size();
-    for (size_t table_ndx = 0; table_ndx != num_tables; ++table_ndx) {
-        if (Table* table = m_table_accessors[table_ndx]) {
-            typedef _impl::TableFriend tf;
-            tf::set_ndx_in_parent(*table, table_ndx);
-            if (tf::is_marked(*table)) {
-                tf::refresh_accessor_tree(*table); // Throws
-                bool bump_global = false;
-                tf::bump_version(*table, bump_global);
-            }
-        }
-    }
+    refresh_dirty_accessors();
 }
 
-namespace {
 
-// Instruction Rollback support:
-//
-// Instruction rollback is implemented in two stages. First the transaction log is preprocessed,
-// classifying each instruction according to how it should take part in the rollback.
-// - nop: nop-operation
-// - execute: should be (inverse) executed during rollback
-// - postfix_table: table select. Should be executed, but also moved in the instruction stream
-//   to maintain prefix ordering. It's called 'postfix' because to be handled as a prefix in the
-//   reversed instruction stream, it must be placed as a postfix in the non-reversed stream.
-// - postfix_descriptor: descriptor_select. Same comments as above.
-//
-// As part of classification, a vector of instruction start pointers is built up in the proper
-// order for reverse execution. Also, no-operation's are eliminated in the process.
-//
-// Following classification the actual rollback is done by executing the instructions in the
-// order produced during classification. The instructions are not executed in the same way
-// as for forward execution. An alternate instruction handler class is used, which specifies
-// how each instruction is reversed. By deriving the normal handler for forward execution, we
-// can reuse those instructions which are identical regardless of the instruction execution
-// direction, for example the select operations.
 
-class InstructionClassifierForRollback : public NullHandler {
+
+
+
+// Here goes the class which specifies how instructions are to be reversed.
+// It uses facilities inside a TrivialReplication class to encode the reversed instructions.
+
+class Group::TransactReverser : public NullHandler  {
 public:
-    // classification - initialized by caller, set by each instruction, 
-    // then read by whoever calls us to do the classification
-    enum Class { 
-        instr_class_nop, 
-        instr_class_execute, 
-        instr_class_postfix_table,
-        instr_class_postfix_descriptor };
-    Class classification;
-    // override only the instructions which are not to be treated as no-ops during rollback
-    bool insert_group_level_table(std::size_t, std::size_t, StringData) { classification = instr_class_execute; return true; }
-    bool erase_group_level_table(std::size_t, std::size_t)  { classification = instr_class_execute; return true; }
-    bool select_table(std::size_t, int, const std::size_t* ) { classification = instr_class_postfix_table; return true; }
-    bool insert_empty_rows(std::size_t, std::size_t, std::size_t, bool ) { classification = instr_class_execute; return true; }
-    bool erase_row(std::size_t, std::size_t, bool) { classification = instr_class_execute; return true; }
-    bool insert_int(std::size_t, std::size_t, std::size_t, int_fast64_t)
-    { classification = instr_class_execute; return true; }
-    bool insert_bool(std::size_t, std::size_t, std::size_t, bool)
-    { classification = instr_class_execute; return true; }
-    bool insert_float(std::size_t, std::size_t, std::size_t, float)
-    { classification = instr_class_execute; return true; }
-    bool insert_double(std::size_t, std::size_t, std::size_t, double)
-    { classification = instr_class_execute; return true; }
-    bool insert_string(std::size_t, std::size_t, std::size_t, StringData)
-    { classification = instr_class_execute; return true; }
-    bool insert_binary(std::size_t, std::size_t, std::size_t, BinaryData)
-    { classification = instr_class_execute; return true; }
-    bool insert_date_time(std::size_t, std::size_t, std::size_t, DateTime)
-    { classification = instr_class_execute; return true; }
-    bool insert_table(std::size_t, std::size_t, std::size_t)
-    { classification = instr_class_execute; return true; }
-    bool insert_mixed(std::size_t, std::size_t, std::size_t, const Mixed&)
-    { classification = instr_class_execute; return true; }
-    bool insert_link(std::size_t, std::size_t, std::size_t, std::size_t)
-    { classification = instr_class_execute; return true; }
-    bool insert_link_list(std::size_t, std::size_t, std::size_t)
-    { classification = instr_class_execute; return true; }
-    bool set_table(std::size_t, std::size_t) { classification = instr_class_execute; return true; }
-    bool set_mixed(std::size_t, std::size_t, const Mixed&) { classification = instr_class_execute; return true; }
-    bool set_link(std::size_t, std::size_t, std::size_t) { classification = instr_class_execute; return true; }
-    bool select_descriptor(int, const std::size_t*) { classification = instr_class_postfix_descriptor; return true; }
-    bool insert_column(std::size_t, DataType, StringData,
-                       std::size_t, std::size_t) { classification = instr_class_execute; return true; }
-    bool erase_column(std::size_t, std::size_t,
-                      std::size_t) { classification = instr_class_execute; return true; }
-    bool select_link_list(std::size_t, std::size_t) { classification = instr_class_execute; return true; }
-};
 
-} // ananymous namespace
+    // FIXME: I think we need to know, that it's a TrivialReplication instead:
+    TransactReverser(Replication& encoder) : 
+        m_encoder(encoder), current_insn_start(0),
+        m_pending_table_select(false), m_pending_descriptor_select(false) 
+    {
+    }
 
-// Here goes the class which specifies how instructions are to be executed in reverse:
-class Group::TransactReverser : public Group::TransactAdvancer  {
-public:
-    TransactReverser(Group& group) : TransactAdvancer(group) {}
     // override only the instructions which need to be reversed.
+    bool select_table(std::size_t group_level_ndx, size_t levels, const size_t* path)
+    {
+        sync_table();
+        // m_encoder.select_table(group_level_ndx, path);
+        // note that for select table, 'levels' is encoded before 'group_level_ndx'
+        // despite the order of arguments
+        m_encoder.simple_cmd(Replication::instr_SelectTable, util::tuple(levels, group_level_ndx));
+        char* buf;
+        m_encoder.transact_log_reserve(&buf, 2*levels*Replication::max_enc_bytes_per_int);
+        for (size_t i = 0; i != levels; ++i) {
+            buf = m_encoder.encode_int(buf, path[i*2+0]);
+            buf = m_encoder.encode_int(buf, path[i*2+1]);
+        }
+        m_encoder.transact_log_advance(buf);
+
+        m_pending_table_select = true;
+        m_pending_ts_insn = get_inst();
+        return true;
+    }
+
+    bool select_descriptor(size_t levels, const size_t* path)
+    {
+        sync_descriptor();
+        // m_encoder.select_descriptor(path);
+        m_encoder.simple_cmd(Replication::instr_SelectDescriptor, util::tuple(levels));
+        char* buf;
+        m_encoder.transact_log_reserve(&buf, levels*Replication::max_enc_bytes_per_int);
+        for (size_t i = 0; i != levels; ++i) {
+            buf = m_encoder.encode_int(buf, path[i]);
+        }
+        m_encoder.transact_log_advance(buf);
+
+        m_pending_descriptor_select = true;
+        m_pending_ds_insn = get_inst();
+        return true;
+    }
+
     bool insert_group_level_table(std::size_t table_ndx, std::size_t num_tables, StringData) 
     { 
-        return TransactAdvancer::erase_group_level_table(table_ndx, num_tables + 1);
+        m_encoder.simple_cmd(Replication::instr_EraseGroupLevelTable, util::tuple(table_ndx, num_tables + 1));
+        append_instruction();
+        return true;
     }
 
     bool erase_group_level_table(std::size_t table_ndx, std::size_t num_tables) 
     { 
-        return TransactAdvancer::insert_group_level_table(table_ndx, num_tables, StringData());
+        m_encoder.simple_cmd(Replication::instr_InsertGroupLevelTable, util::tuple(table_ndx, num_tables));
+        append_instruction();
+        return true;
     }
 
     bool insert_empty_rows(std::size_t idx, std::size_t num_rows, std::size_t tbl_sz, bool unordered) 
     { 
-        while (num_rows > 0) {
-            Group::TransactAdvancer::erase_row(idx, tbl_sz, unordered);
-            --num_rows;
-            ++idx;
-        }
+        m_encoder.simple_cmd(Replication::instr_EraseRows, util::tuple(idx, num_rows, tbl_sz, unordered));
+        append_instruction();
         return true; 
     }
 
-    bool erase_row(std::size_t idx, std::size_t tbl_sz, bool unordered) 
+    bool erase_rows(std::size_t idx, std::size_t num_rows, std::size_t tbl_sz, bool unordered) 
     { 
-        Group::TransactAdvancer::insert_empty_rows(idx, 1, tbl_sz, unordered);
+        m_encoder.simple_cmd(Replication::instr_InsertEmptyRows, util::tuple(idx, num_rows, tbl_sz, unordered));
+        append_instruction();
         return true; 
     }
 
     // helper function, shared by insert_xxx
     bool insert(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz) 
     { 
-        if (col_idx == 0)
-            Group::TransactAdvancer::erase_row(row_idx, tbl_sz, false);
+        if (col_idx == 0) {
+            m_encoder.simple_cmd(Replication::instr_EraseRows, util::tuple(row_idx, 1, tbl_sz, false));
+            append_instruction();
+        }
         return true; 
     }
     bool insert_int(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz, int_fast64_t) 
@@ -1667,55 +1681,184 @@ public:
         return insert(col_idx, row_idx, tbl_sz);
     }
 
-    bool insert_column(std::size_t col_idx, DataType, StringData,
-                       std::size_t target_table_idx, std::size_t backlink_col_ndx) 
-    { 
-        return Group::TransactAdvancer::erase_column(col_idx, target_table_idx, backlink_col_ndx);
+    bool set_table(size_t col_ndx, size_t row_ndx)
+    {
+        m_encoder.simple_cmd(Replication::instr_SetTable, util::tuple(col_ndx, row_ndx));
+        append_instruction();
+        return true;
     }
 
-    bool erase_column(std::size_t col_idx, std::size_t target_table_idx,
-                      std::size_t backlink_col_idx) 
+    bool set_mixed(size_t col_ndx, size_t row_ndx, const Mixed& value)
     {
-        return Group::TransactAdvancer::insert_column(col_idx, DataType(), StringData(), 
-                                                      target_table_idx, backlink_col_idx);
+        m_encoder.mixed_cmd(Replication::instr_SetMixed, col_ndx, row_ndx, value);
+        append_instruction();
+        return true;
     }
+
+    bool set_link(size_t col_ndx, size_t row_ndx, size_t value)
+    {
+        m_encoder.simple_cmd(Replication::instr_SetLink, util::tuple(col_ndx, row_ndx, value));
+        append_instruction();
+        return true;
+    }
+
+    bool insert_link_column(std::size_t col_idx, DataType, StringData,
+                            std::size_t target_table_idx, std::size_t backlink_col_ndx) 
+    { 
+        m_encoder.simple_cmd(Replication::instr_EraseLinkColumn, util::tuple(col_idx, target_table_idx, backlink_col_ndx));
+        append_instruction();
+        return true;
+    }
+
+    bool erase_link_column(std::size_t col_idx, std::size_t target_table_idx, 
+                           std::size_t backlink_col_idx) 
+    {
+        m_encoder.simple_cmd(Replication::instr_InsertLinkColumn, util::tuple(col_idx, int(DataType())));
+        m_encoder.string_value(0, 0);
+        m_encoder.append_num(target_table_idx);
+        m_encoder.append_num(backlink_col_idx);
+//        m_encoder.insert_link_column(col_idx, DataType(), StringData(), 
+//                                     target_table_idx, backlink_col_idx);
+        append_instruction();
+        return true;
+    }
+
+    bool insert_column(std::size_t col_idx, DataType, StringData) 
+    { 
+        m_encoder.simple_cmd(Replication::instr_EraseColumn, util::tuple(col_idx));
+        // m_encoder.erase_column(col_idx);
+        append_instruction();
+        return true;
+    }
+
+    bool erase_column(std::size_t col_idx)
+    {
+        //m_encoder.insert_column(col_idx, DataType(), StringData());
+        m_encoder.simple_cmd(Replication::instr_InsertColumn, util::tuple(col_idx, int(DataType())));
+        m_encoder.string_value(0, 0);
+        append_instruction();
+        return true;
+    }
+
+    bool select_link_list(size_t col_ndx, size_t row_ndx) 
+    {
+        //m_encoder.select_link_list(col_ndx, row_ndx);
+        m_encoder.simple_cmd(Replication::instr_SelectLinkList, util::tuple(col_ndx, row_ndx));
+        append_instruction();
+        return true;
+    }
+
+private:
+    struct Insn { size_t start; size_t end; };
+    Replication& m_encoder;
+    std::vector<Insn> m_instructions;
+    size_t current_insn_start;
+    bool m_pending_table_select;
+    bool m_pending_descriptor_select;
+    Insn m_pending_ts_insn;
+    Insn m_pending_ds_insn;
+
+    Insn get_inst() {
+        Insn inst;
+        // FIXME: Get buffer starting offset from encoder and add it in
+        inst.start = current_insn_start;
+        TIGHTDB_ASSERT(false);
+        current_insn_start = 0;// m_denc.current_offset()+ m_instruction_buffers.size();
+        inst.end = current_insn_start;
+        return inst;
+    }
+
+    void append_instruction() {
+        m_instructions.push_back(get_inst());
+    }
+
+    void append_instruction(Insn inst) {
+        m_instructions.push_back(inst);
+    }
+
+    void sync_descriptor() {
+        if (m_pending_descriptor_select) {
+            m_pending_descriptor_select = false;
+            append_instruction(m_pending_ds_insn);
+        }
+    }
+
+    void sync_table() {
+        sync_descriptor();
+        if (m_pending_table_select) {
+            m_pending_table_select = false;
+            append_instruction(m_pending_ts_insn);
+        }
+    }
+
+    class ReversedInputStream : public Replication::InputStream {
+    public:
+        ReversedInputStream(const char* buffer, std::vector<Insn>& instruction_order)
+            : m_buffer(buffer), m_instruction_order(instruction_order)
+        {
+            m_current = m_instruction_order.size();
+        }
+        virtual void get_buffer(const char*& begin, const char*& end) 
+        {
+            if (m_current != 0) {
+                m_current--;
+                begin = m_buffer + m_instruction_order[m_current].start;
+                end   = m_buffer + m_instruction_order[m_current].end;
+            }
+        }
+
+        virtual bool more_work()
+        {
+            if (m_current == 0)
+                return false;
+            else
+                return m_instruction_order[m_current].start != m_instruction_order[m_current].end;
+        }
+    private:
+        const char* m_buffer;
+        std::vector<Insn>& m_instruction_order;
+        size_t m_current;
+    };
 };
+
+#if 0
+// FIXME:
+Replication::InputStream* Group::TransactReverser::get_reversed_log() 
+{
+    sync_table();
+    return new ReversedInputStream(m_denc.data(), m_instructions);
+}
+#endif
+
+
+
+
 
 
 void Group::reverse_transact(ref_type new_top_ref, const BinaryData& log)
 {
-    // classify the instructions, building a vector of relevant instructions.
-    // The order is changed so that prefix instructions are moved to a postfix
-    // position. This allows them to still work as prefixes when the instructions
-    // are traversed in reverse order. Instructions which are not relevant for reversal
-    // are eliminated in the process.
-    InstructionClassifierForRollback icfb;
-    std::vector<const char*> instructions;
     MultiLogInputStream in(&log, (&log)+1);
     Replication::TransactLogParser parser(in);
-    parser.prepare_log_reversal(instructions, icfb);
-
-    // execute the selected instructions in reverse order.
-    TransactReverser reverser(*this);
-    parser.execute_in_reverse_order(instructions, reverser);
-
+    TIGHTDB_ASSERT(false);
+#if 0
+    TransactReverser reverser;
+    parser.parse(reverser);
+    // FIXME: find a better way to do this - possibly by moving the reverse parsing into
+    // a method on the reverser:
+    // It is important that the reverser is kept alive until after completion of
+    // the reverse parse, because it holds the memory referenced during the parse.
+    Replication::InputStream* reversed_log = reverser.get_reversed_log();
+    Replication::TransactLogParser reverse_parser(*reversed_log);
+    // then execute the selected instructions in reverse order.
+    TransactAdvancer advancer(*this);
+    reverse_parser.parse(advancer);
+    delete reversed_log;
+#endif
     // restore group internal arrays to state before transaction (rollback state)
     init_from_ref(new_top_ref);
 
     // propagate restoration to all relevant accessors:
-    m_top.get_alloc().bump_global_version();
-    // Refresh all remaining dirty table accessors
-    size_t num_tables = m_table_accessors.size();
-    for (size_t table_ndx = 0; table_ndx != num_tables; ++table_ndx) {
-        if (Table* table = m_table_accessors[table_ndx]) {
-            typedef _impl::TableFriend tf;
-            tf::set_ndx_in_parent(*table, table_ndx);
-            if (tf::is_marked(*table)) {
-                tf::refresh_accessor_tree(*table); // Throws
-                tf::bump_version(*table);
-            }
-        }
-    }
+    refresh_dirty_accessors();
 }
 
 #endif // TIGHTDB_ENABLE_REPLICATION
