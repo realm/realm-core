@@ -2,7 +2,7 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
+* Fixed bug where a TableView generated from a LinkViewRef did not update when the origin or target table changed.
 
 ### API breaking changes:
 
