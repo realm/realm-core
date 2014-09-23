@@ -25,7 +25,7 @@
 namespace tightdb {
 namespace util {
 
-void *mmap(std::shared_ptr<int> fd, size_t size, File::AccessMode access, const uint8_t *encryption_key);
+void *mmap(int fd, size_t size, File::AccessMode access, const uint8_t *encryption_key);
 void munmap(void *addr, size_t size);
 void mremap();
 void msync(void *addr, size_t size);

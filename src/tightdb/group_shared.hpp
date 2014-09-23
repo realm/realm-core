@@ -126,7 +126,7 @@ public:
     /// DurabilityLevel) on a default constructed instance.
     explicit SharedGroup(const std::string& file, bool no_create = false,
                          DurabilityLevel dlevel = durability_Full,
-                         const uint8_t *encryption_key = nullptr);
+                         const uint8_t *encryption_key = 0);
 
     struct unattached_tag {};
 
@@ -170,7 +170,7 @@ public:
     /// among these derived exception types.
     void open(const std::string& file, bool no_create = false,
               DurabilityLevel dlevel = durability_Full,
-              bool is_backend = false, const uint8_t *encryption_key = nullptr);
+              bool is_backend = false, const uint8_t *encryption_key = 0);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
 

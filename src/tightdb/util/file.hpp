@@ -21,7 +21,6 @@
 #define TIGHTDB_UTIL_FILE_HPP
 
 #include <cstddef>
-#include <memory>
 #include <stdint.h>
 #include <stdexcept>
 #include <string>
@@ -431,10 +430,10 @@ private:
     void* m_handle;
     bool m_have_lock; // Only valid when m_handle is not null
 #else
-    std::shared_ptr<int> m_fd;
+    int m_fd;
 #endif
 
-    bool m_encrypt = false;
+    bool m_encrypt;
     uint8_t m_encryption_key[32];
 
     bool lock(bool exclusive, bool non_blocking);
@@ -618,7 +617,10 @@ inline File::File(const std::string& path, Mode m)
 {
 #ifdef _WIN32
     m_handle = 0;
+#else
+    m_fd = -1;
 #endif
+    m_encrypt = false;
 
     open(path, m);
 }
@@ -627,7 +629,11 @@ inline File::File() TIGHTDB_NOEXCEPT
 {
 #ifdef _WIN32
     m_handle = 0;
+#else
+    m_fd = -1;
 #endif
+
+    m_encrypt = false;
 }
 
 inline File::~File() TIGHTDB_NOEXCEPT
@@ -677,7 +683,7 @@ inline bool File::is_attached() const TIGHTDB_NOEXCEPT
 #ifdef _WIN32
     return (m_handle != NULL);
 #else
-    return (bool)m_fd;
+    return 0 <= m_fd;
 #endif
 }
 

@@ -1,30 +1,16 @@
-//
-//  file_mapper.cpp
-//  tightdb
-//
-//  Created by Thomas Goyne on 9/22/14.
-//  Copyright (c) 2014 TightDB. All rights reserved.
-//
-
 #include "file_mapper.hpp"
 
 #include <sys/mman.h>
 
 #ifdef TIGHTDB_ENABLE_ENCRYPTION
 
-#include <algorithm>
+#include <atomic>
 #include <cerrno>
-#include <climits>
-#include <cstdio>
-#include <cstdlib>
-#include <cstring>
 #include <vector>
 
 #include <unistd.h>
-#include <fcntl.h>
 #include <signal.h>
 #include <sys/stat.h>
-#include <sys/file.h>
 
 #include <openssl/evp.h>
 
@@ -144,7 +130,7 @@ EncryptedFileMapping *mappings = nullptr;
 
 class EncryptedFileMapping {
 public:
-    std::shared_ptr<int> fd;
+    int fd;
 
     void *addr;
     size_t size;
@@ -165,8 +151,8 @@ public:
     const uint8_t *key;
     AESCryptor cryptor;
 
-    EncryptedFileMapping(std::shared_ptr<int> fd, void *addr, size_t size, EncryptedFileMapping *next, File::AccessMode access, const uint8_t *key)
-    : fd(fd)
+    EncryptedFileMapping(int fd, void *addr, size_t size, EncryptedFileMapping *next, File::AccessMode access, const uint8_t *key)
+    : fd(dup(fd))
     , addr(addr)
     , size(size)
     , page((uintptr_t)addr >> 12)
@@ -178,9 +164,13 @@ public:
     , cryptor(key)
     {
         struct stat st;
-        if (fstat(*fd, &st)) die("fstat failed");
+        if (fstat(fd, &st)) die("fstat failed");
         inode = st.st_ino;
         device = st.st_dev;
+    }
+
+    ~EncryptedFileMapping() {
+        ::close(fd);
     }
 
     bool same_file(const EncryptedFileMapping *m) const {
@@ -219,8 +209,8 @@ public:
 
         auto addr = page_addr(i);
         auto count = page_size(i);
-        lseek(*fd, i << 12, SEEK_SET);
-        write(*fd, addr, count);
+        lseek(fd, i << 12, SEEK_SET);
+        write(fd, addr, count);
 
         mark_readable(i);
     }
@@ -239,7 +229,7 @@ public:
 
         auto addr = page_addr(i);
         mprotect(addr, 4096, PROT_READ | PROT_WRITE);
-        cryptor.read(*fd, i << 12, (uint8_t *)addr, page_size(i));
+        cryptor.read(fd, i << 12, (uint8_t *)addr, page_size(i));
 
         mark_readable(i);
     }
@@ -248,10 +238,10 @@ public:
         if (!read_pages[i]) return;
 
         uint8_t buffer[4096];
-        cryptor.read(*fd, i << 12, buffer, sizeof(buffer));
+        cryptor.read(fd, i << 12, buffer, sizeof(buffer));
         if (memcmp(buffer, page_addr(i), page_size(i))) {
             printf("mismatch %p: fd(%d) page(%zu/%zu) page_size(%zu) %s %s\n",
-                   this, *fd, i, count, page_size(i), buffer, page_addr(i));
+                   this, fd, i, count, page_size(i), buffer, page_addr(i));
             die("");
         }
     }
@@ -275,7 +265,7 @@ public:
             }
 
             mark_readable(i);
-            cryptor.write(*fd, i << 12, (uint8_t *)page_addr(i), page_size(i));
+            cryptor.write(fd, i << 12, (uint8_t *)page_addr(i), page_size(i));
         }
 
         validate();
@@ -311,9 +301,9 @@ void handler(int, siginfo_t *info, void *) {
     die("segv");
 }
 
-void add_mapping(void *addr, size_t size, std::shared_ptr<int> fd, File::AccessMode access, const uint8_t *encryption_key) {
+void add_mapping(void *addr, size_t size, int fd, File::AccessMode access, const uint8_t *encryption_key) {
     spin_lock_guard lock{mapping_lock};
-    mappings = new EncryptedFileMapping{std::move(fd), addr, size, mappings, access, encryption_key};
+    mappings = new EncryptedFileMapping{fd, addr, size, mappings, access, encryption_key};
 
     if (!mappings->next) {
         struct sigaction action;
@@ -364,7 +354,7 @@ std::string get_errno_msg(const char* prefix, int err)
 namespace tightdb {
 namespace util {
 
-void *mmap(std::shared_ptr<int> fd, size_t size, File::AccessMode access, const uint8_t *encryption_key) {
+void *mmap(int fd, size_t size, File::AccessMode access, const uint8_t *encryption_key) {
 #ifdef TIGHTDB_ENABLE_ENCRYPTION
     if (encryption_key) {
         void* addr = ::mmap(0, size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
@@ -389,7 +379,7 @@ void *mmap(std::shared_ptr<int> fd, size_t size, File::AccessMode access, const 
                 break;
         }
 
-        void* addr = ::mmap(0, size, prot, MAP_SHARED, *fd, 0);
+        void* addr = ::mmap(0, size, prot, MAP_SHARED, fd, 0);
         if (addr != MAP_FAILED)
             return addr;
     }
