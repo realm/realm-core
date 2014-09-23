@@ -764,8 +764,8 @@ namespace {
     StringData get_string(void* column, size_t ndx, char* buffer)
     {
         int64_t i = static_cast<Column*>(column)->get(ndx);
-        memcpy(buffer, &i, sizeof(i));
-        StringData s = StringData(buffer, sizeof(i));
+        *reinterpret_cast<int64_t*>(buffer) = i;
+        StringData s = to_str(*reinterpret_cast<int64_t*>(buffer));
         return s;
     }
 

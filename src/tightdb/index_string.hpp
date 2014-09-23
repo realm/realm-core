@@ -30,7 +30,15 @@ namespace tightdb {
 template <class T> inline StringData to_str(T& value)
 {
     TIGHTDB_STATIC_ASSERT((util::SameType<T, int64_t>::value), "");
-    return StringData(reinterpret_cast<const char*>(&value), sizeof(T));
+    const char* c = reinterpret_cast<const char*>(&value);
+    return StringData(c, sizeof(T));
+    
+    /*
+    if (value < (1ull << 32))
+        return StringData(c, 4);
+    else 
+        return StringData(c, 8);
+    */
 }
 
 template <> inline StringData to_str<StringData>(StringData& input)
