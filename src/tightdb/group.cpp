@@ -1540,38 +1540,40 @@ void Group::advance_transact(ref_type new_top_ref, size_t new_file_size,
 
 // Here goes the class which specifies how instructions are to be reversed.
 
+namespace {
 // First, to help, we use a special variant of TrivialReplication to gather the
 // reversed log:
 
 class ReverseReplication : public TrivialReplication {
 public:
-    ReverseReplication(const std::string& database_file) : TrivialReplication(database_file) 
+    ReverseReplication(const std::string& database_file) : TrivialReplication(database_file)
     {
         prepare_to_write();
     }
 
-    void handle_transact_log(const char*, std::size_t, version_type) 
+    void handle_transact_log(const char*, std::size_t, version_type)
     {
         // we should never get here...
         TIGHTDB_ASSERT(false);
     }
 };
 
+} // anonymous namespace
 
 class Group::TransactReverser : public NullHandler  {
 public:
 
-    TransactReverser(ReverseReplication& encoder) : 
+    TransactReverser(ReverseReplication& encoder) :
         m_encoder(encoder), current_insn_start(0),
-        m_pending_table_select(false), m_pending_descriptor_select(false) 
+        m_pending_table_select(false), m_pending_descriptor_select(false)
     {
     }
 
-    // override only the instructions which need to be reversed.
+    // override only the instructions which need to be reversed. (NullHandler class provides
+    // default implementatins for the rest)
     bool select_table(std::size_t group_level_ndx, size_t levels, const size_t* path)
     {
         sync_table();
-        // m_encoder.select_table(group_level_ndx, path);
         // note that for select table, 'levels' is encoded before 'group_level_ndx'
         // despite the order of arguments
         m_encoder.simple_cmd(Replication::instr_SelectTable, util::tuple(levels, group_level_ndx));
@@ -1591,7 +1593,6 @@ public:
     bool select_descriptor(size_t levels, const size_t* path)
     {
         sync_descriptor();
-        // m_encoder.select_descriptor(path);
         m_encoder.simple_cmd(Replication::instr_SelectDescriptor, util::tuple(levels));
         char* buf;
         m_encoder.transact_log_reserve(&buf, levels*Replication::max_enc_bytes_per_int);
@@ -1605,96 +1606,96 @@ public:
         return true;
     }
 
-    bool insert_group_level_table(std::size_t table_ndx, std::size_t num_tables, StringData) 
-    { 
+    bool insert_group_level_table(std::size_t table_ndx, std::size_t num_tables, StringData)
+    {
         m_encoder.simple_cmd(Replication::instr_EraseGroupLevelTable, util::tuple(table_ndx, num_tables + 1));
         append_instruction();
         return true;
     }
 
-    bool erase_group_level_table(std::size_t table_ndx, std::size_t num_tables) 
-    { 
+    bool erase_group_level_table(std::size_t table_ndx, std::size_t num_tables)
+    {
         m_encoder.simple_cmd(Replication::instr_InsertGroupLevelTable, util::tuple(table_ndx, num_tables));
-        m_encoder.string_value(0, 0);        
+        m_encoder.string_value(0, 0);
         append_instruction();
         return true;
     }
 
-    bool insert_empty_rows(std::size_t idx, std::size_t num_rows, std::size_t tbl_sz, bool unordered) 
-    { 
+    bool insert_empty_rows(std::size_t idx, std::size_t num_rows, std::size_t tbl_sz, bool unordered)
+    {
         m_encoder.simple_cmd(Replication::instr_EraseRows, util::tuple(idx, num_rows, tbl_sz, unordered));
         append_instruction();
-        return true; 
+        return true;
     }
 
-    bool erase_rows(std::size_t idx, std::size_t num_rows, std::size_t tbl_sz, bool unordered) 
-    { 
+    bool erase_rows(std::size_t idx, std::size_t num_rows, std::size_t tbl_sz, bool unordered)
+    {
         m_encoder.simple_cmd(Replication::instr_InsertEmptyRows, util::tuple(idx, num_rows, tbl_sz, unordered));
         append_instruction();
-        return true; 
+        return true;
     }
 
     // helper function, shared by insert_xxx
-    bool insert(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz) 
-    { 
+    bool insert(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz)
+    {
         if (col_idx == 0) {
             m_encoder.simple_cmd(Replication::instr_EraseRows, util::tuple(row_idx, 1, tbl_sz, false));
             append_instruction();
         }
-        return true; 
+        return true;
     }
-    bool insert_int(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz, int_fast64_t) 
-    { 
+    bool insert_int(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz, int_fast64_t)
+    {
         return insert(col_idx, row_idx, tbl_sz);
     }
 
-    bool insert_bool(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz, bool) 
-    { 
+    bool insert_bool(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz, bool)
+    {
         return insert(col_idx, row_idx, tbl_sz);
     }
 
-    bool insert_float(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz, float) 
-    { 
+    bool insert_float(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz, float)
+    {
         return insert(col_idx, row_idx, tbl_sz);
     }
 
-    bool insert_double(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz, double) 
-    { 
+    bool insert_double(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz, double)
+    {
         return insert(col_idx, row_idx, tbl_sz);
     }
 
-    bool insert_string(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz, StringData) 
-    { 
+    bool insert_string(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz, StringData)
+    {
         return insert(col_idx, row_idx, tbl_sz);
     }
 
-    bool insert_binary(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz, BinaryData) 
-    { 
+    bool insert_binary(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz, BinaryData)
+    {
         return insert(col_idx, row_idx, tbl_sz);
     }
 
-    bool insert_date_time(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz, DateTime) 
-    { 
+    bool insert_date_time(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz, DateTime)
+    {
         return insert(col_idx, row_idx, tbl_sz);
     }
 
-    bool insert_table(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz) 
-    { 
-        return insert(col_idx, row_idx, tbl_sz); 
-    }
-
-    bool insert_mixed(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz, const Mixed&) 
-    { 
+    bool insert_table(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz)
+    {
         return insert(col_idx, row_idx, tbl_sz);
     }
 
-    bool insert_link(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz, std::size_t) 
-    { 
+    bool insert_mixed(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz, const Mixed&)
+    {
         return insert(col_idx, row_idx, tbl_sz);
     }
 
-    bool insert_link_list(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz) 
-    { 
+    bool insert_link(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz, std::size_t)
+    {
+        return insert(col_idx, row_idx, tbl_sz);
+    }
+
+    bool insert_link_list(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz)
+    {
         return insert(col_idx, row_idx, tbl_sz);
     }
 
@@ -1720,28 +1721,26 @@ public:
     }
 
     bool insert_link_column(std::size_t col_idx, DataType, StringData,
-                            std::size_t target_table_idx, std::size_t backlink_col_ndx) 
-    { 
+                            std::size_t target_table_idx, std::size_t backlink_col_ndx)
+    {
         m_encoder.simple_cmd(Replication::instr_EraseLinkColumn, util::tuple(col_idx, target_table_idx, backlink_col_ndx));
         append_instruction();
         return true;
     }
 
-    bool erase_link_column(std::size_t col_idx, std::size_t target_table_idx, 
-                           std::size_t backlink_col_idx) 
+    bool erase_link_column(std::size_t col_idx, std::size_t target_table_idx,
+                           std::size_t backlink_col_idx)
     {
         m_encoder.simple_cmd(Replication::instr_InsertLinkColumn, util::tuple(col_idx, int(DataType())));
         m_encoder.string_value(0, 0);
         m_encoder.append_num(target_table_idx);
         m_encoder.append_num(backlink_col_idx);
-//        m_encoder.insert_link_column(col_idx, DataType(), StringData(), 
-//                                     target_table_idx, backlink_col_idx);
         append_instruction();
         return true;
     }
 
-    bool insert_column(std::size_t col_idx, DataType, StringData) 
-    { 
+    bool insert_column(std::size_t col_idx, DataType, StringData)
+    {
         m_encoder.simple_cmd(Replication::instr_EraseColumn, util::tuple(col_idx));
         // m_encoder.erase_column(col_idx);
         append_instruction();
@@ -1757,7 +1756,7 @@ public:
         return true;
     }
 
-    bool select_link_list(size_t col_ndx, size_t row_ndx) 
+    bool select_link_list(size_t col_ndx, size_t row_ndx)
     {
         //m_encoder.select_link_list(col_ndx, row_ndx);
         m_encoder.simple_cmd(Replication::instr_SelectLinkList, util::tuple(col_ndx, row_ndx));
@@ -1768,8 +1767,8 @@ public:
     void execute(Group& group);
 
 private:
-    struct Insn { size_t start; size_t end; };
     ReverseReplication& m_encoder;
+    struct Insn { size_t start; size_t end; };
     std::vector<Insn> m_instructions;
     size_t current_insn_start;
     bool m_pending_table_select;
@@ -1779,7 +1778,6 @@ private:
 
     Insn get_inst() {
         Insn inst;
-        // FIXME: Get buffer starting offset from encoder and add it in
         inst.start = current_insn_start;
         current_insn_start = m_encoder.transact_log_size();
         inst.end = current_insn_start;
@@ -1816,7 +1814,7 @@ private:
         {
             m_current = m_instruction_order.size();
         }
-        virtual size_t next_block(const char*& begin, const char*& end) 
+        virtual size_t next_block(const char*& begin, const char*& end)
         {
             if (m_current != 0) {
                 m_current--;
@@ -1836,7 +1834,10 @@ private:
 
 void Group::TransactReverser::execute(Group& group)
 {
+    // push any pending select_table or select_descriptor into the buffer:
     sync_table();
+
+    // then execute the instructions in the transformed order
     ReversedInputStream reversed_log(m_encoder.m_transact_log_buffer.data(), m_instructions);
     Replication::TransactLogParser parser(reversed_log);
     TransactAdvancer advancer(group);
