@@ -25,7 +25,9 @@
 
 ### Internals:
 
-* Lorem ipsum.
+* Introducing `LogicError` as an alternative to expected exceptions. See
+  https://github.com/Tightdb/tightdb/wiki/Exception-safety-guarantees for more
+  on this.
 
 ----------------------------------------------
 
