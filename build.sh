@@ -170,7 +170,7 @@ find_iphone_sdk()
     dir=""
     ambiguous=""
     cd "$sdks" || return 1
-    for x in *; do
+    for x in $(find * -type d -a -depth 0); do
         settings="$sdks/$x/SDKSettings"
         version2="$(defaults read "$sdks/$x/SDKSettings" Version)" || return 1
         if ! printf "%s\n" "$version2" | grep -q '^[0-9][0-9]*\(\.[0-9][0-9]*\)\{0,3\}$'; then
