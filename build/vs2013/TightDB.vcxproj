@@ -637,7 +637,6 @@
     <ClCompile Include="..\..\src\tightdb\utilities.cpp" />
     <ClCompile Include="..\..\src\tightdb\lang_bind_helper.cpp" />
     <ClCompile Include="..\..\src\tightdb\version.cpp" />
-    <ClCompile Include="..\..\src\tightdb\exceptions.cpp" />
     <ClCompile Include="..\..\src\tightdb\impl\output_stream.cpp" />
     <ClCompile Include="..\..\src\tightdb\views.cpp" />
     <ClCompile Include="..\..\src\win32\pthread\pthread.c">

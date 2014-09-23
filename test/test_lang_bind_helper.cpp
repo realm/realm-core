@@ -500,19 +500,19 @@ TEST(LangBindHelper_AdvanceReadTransact_ColumnRootTypeChange)
     for (size_t i = 0; i < sizeof steps / sizeof *steps; ++i) {
         Step step = steps[i];
         out.str("");
-        out << setfill('x') << setw(int(step.m_str_size)) << "A";
+        out << setfill('x') << setw(step.m_str_size) << "A";
         string str_1 = out.str();
         StringData str(str_1);
         out.str("");
-        out << setfill('x') << setw(int(step.m_str_size)) << "B";
+        out << setfill('x') << setw(step.m_str_size) << "B";
         string str_2 = out.str();
         BinaryData bin(str_2);
         out.str("");
-        out << setfill('x') << setw(int(step.m_str_size)) << "C";
+        out << setfill('x') << setw(step.m_str_size) << "C";
         string str_3 = out.str();
         StringData str_mix(str_3);
         out.str("");
-        out << setfill('x') << setw(int(step.m_str_size)) << "D";
+        out << setfill('x') << setw(step.m_str_size) << "D";
         string str_4 = out.str();
         BinaryData bin_mix(str_4);
         {
@@ -5891,7 +5891,7 @@ TEST(LangBindHelper_ImplicitTransactions_StringIndex)
     LangBindHelper::promote_to_write(sg, *tlr);
     TableRef table = group->add_table("a");
     table->add_column(type_String, "b");
-    table->add_search_index(0);
+    table->set_index(0);
     group->Verify();
     LangBindHelper::commit_and_continue_as_read(sg);
     group->Verify();
@@ -5909,7 +5909,7 @@ void multiple_trackers_writer_thread(string path)
         WriteTransaction wt(sg);
         TestTableInts::Ref tr = wt.get_table<TestTableInts>("table");
 
-        size_t idx = tr->is_empty() ? 0 : random.draw_int_mod(tr->size());
+        int idx = tr->is_empty() ? 0 : (random.draw_int_mod(tr->size()));
 
         if (tr[idx].first == 42) {
             // do nothing
@@ -5933,11 +5933,11 @@ void multiple_trackers_reader_thread(TestResults* test_results_ptr, string path)
     Group& g = const_cast<Group&>(sg.begin_read());
     TableRef tr = g.get_table("table");
     Query q = tr->where().equal(0, 42);
-    size_t row_ndx = q.find();
+    int row_ndx = q.find();
     Row row = tr->get(row_ndx);
     TableView tv = q.find_all();
     for (;;) {
-        int_fast64_t val = row.get_int(0);
+        int val = row.get_int(0);
         tv.sync_if_needed();
         if (val == 43)
             break;
@@ -5991,7 +5991,7 @@ TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
         WriteTransaction wt(sg);
         TableRef tr = wt.get_table("table");
         Query q = tr->where().equal(0, 42);
-        size_t idx = q.find();
+        int idx = q.find();
         tr->set_int(0, idx, 43);
         wt.commit();
     }
@@ -6049,7 +6049,7 @@ TEST(LangBindHelper_ImplicitTransactions_DetachRowAccessorOnMoveLastOver)
     LangBindHelper::promote_to_write(sg, *tlr);
     for (int i = 0; i < 10; ++i) {
         size_t row_ndx = random.draw_int_mod(table->size());
-        int_fast64_t value = table->get_int(0, row_ndx);
+        int value = table->get_int(0, row_ndx);
         table->move_last_over(row_ndx);
         CHECK_EQUAL(tightdb::not_found, table->find_first_int(0, value));
         for (int j = 0; j < 10; ++j) {

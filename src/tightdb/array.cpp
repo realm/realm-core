@@ -2338,7 +2338,7 @@ void Array::dump_bptree_structure(ostream& out, int level, LeafDumper leaf_dumpe
     }
 
     int indent = level * 2;
-    out << setw(indent) << "" << "Inner node (B+ tree) (ref: "<<get_ref()<<")\n";
+    out << setw(indent) << "" << "Inner node (B+-tree) (ref: "<<get_ref()<<")\n";
 
     size_t num_elems_in_subtree = size_t(back() / 2);
     out << setw(indent) << "" << "  Number of elements in subtree: "
@@ -2939,7 +2939,7 @@ size_t Array::find_first(int64_t value, size_t start, size_t end) const
 }
 
 
-// Get containing array block direct through column b+-tree without instatiating any Arrays. Calling with
+// Get containing array block direct through column b-tree without instatiating any Arrays. Calling with
 // use_retval = true will return itself if leaf and avoid unneccesary header initialization.
 const Array* Array::GetBlock(size_t ndx, Array& arr, size_t& off,
                              bool use_retval) const TIGHTDB_NOEXCEPT

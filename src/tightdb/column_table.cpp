@@ -442,7 +442,7 @@ void leaf_dumper(MemRef mem, Allocator& alloc, ostream& out, int level)
 
 } // anonymous namespace
 
-void ColumnTable::do_dump_node_structure(ostream& out, int level) const
+void ColumnTable::dump_node_structure(ostream& out, int level) const
 {
     m_array->dump_bptree_structure(out, level, &leaf_dumper);
 }

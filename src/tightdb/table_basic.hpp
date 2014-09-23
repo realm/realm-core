@@ -76,6 +76,7 @@ public:
     using Table::remove_last;
     using Table::move_last_over;
     using Table::optimize;
+    using Table::lookup;
     using Table::add_empty_row;
     using Table::insert_empty_row;
     using Table::aggregate;

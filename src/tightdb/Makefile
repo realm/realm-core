@@ -30,7 +30,7 @@ bin_PROGRAMS     = tightdb-import
 DEV_PROGRAMS     = tightdb-config
 
 libtightdb_a_SOURCES = util/terminate.cpp util/string_buffer.cpp util/memory_stream.cpp \
-util/thread.cpp util/file.cpp exceptions.cpp utilities.cpp alloc.cpp alloc_slab.cpp array.cpp \
+util/thread.cpp util/file.cpp utilities.cpp alloc.cpp alloc_slab.cpp array.cpp \
 array_string.cpp array_string_long.cpp array_binary.cpp array_blob.cpp array_blobs_big.cpp \
 column.cpp column_string.cpp column_string_enum.cpp column_binary.cpp column_table.cpp \
 column_mixed.cpp column_link_base.cpp column_link.cpp column_linklist.cpp column_backlink.cpp \

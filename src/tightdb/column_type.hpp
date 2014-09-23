@@ -22,9 +22,7 @@
 
 namespace tightdb {
 
-
-// Note: Enumeration value assignments must be kept in sync with
-// <tightdb/data_type.hpp>.
+// Note: Value assignments must be kept in sync with <tightdb/data_type.hpp>
 enum ColumnType {
     // Column types
     col_type_Int         =  0,
@@ -38,22 +36,18 @@ enum ColumnType {
     col_type_Reserved1   =  8, // new date
     col_type_Float       =  9,
     col_type_Double      = 10,
-    col_type_Reserved4   = 11, // Decimal
+    col_type_Reserved4   = 11,  // Decimal
     col_type_Link        = 12,
     col_type_LinkList    = 13,
     col_type_BackLink    = 14
 };
 
-
-// Column attributes can be combined using bitwise or.
+// Attributes are bitmasks
 enum ColumnAttr {
-    col_attr_None = 0,
-    col_attr_Indexed = 1,
-
-    // Specifies that this column forms the primary key. It implies that the
-    // column is bound by a no-null, and a unique constraint. It requires
-    // `col_attr_Indexed`.
-    col_attr_PrimaryKey = 2
+    col_attr_None        = 0,
+    col_attr_Indexed     = 1,
+    col_attr_Unique      = 2,
+    col_attr_Sorted      = 4
 };
 
 

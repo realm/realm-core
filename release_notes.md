@@ -6,28 +6,17 @@
 
 ### API breaking changes:
 
-* `Table::set_index()` and `Table::has_index()` renamed to
-  `Table::add_search_index()` and `Table::has_search_index()` respectively, and
-  `Table::add_search_index()` now throws instead of failing in an unspecified
-  way.
-* `Table::find_pkey_string()` replaces `Table::lookup()` and has slightly
-  different semantics. In particular, it now throws instead of failing in an
-  unspecified way.
+* Lorem ipsum.
 
 ### Enhancements:
 
-* A row accessor (`Row`) can now be evaluated in boolean context to see whether
-  it is still attached.
-* `Table::try_add_primary_key()` and `Table::remove_primary_key()` added.
-* `Table::find_pkey_int()` added, but not yet backed by an integer search index.
+* Lorem ipsum.
 
 -----------
 
 ### Internals:
 
-* Introducing `LogicError` as an alternative to expected exceptions. See
-  https://github.com/Tightdb/tightdb/wiki/Exception-safety-guarantees for more
-  on this.
+* Lorem ipsum.
 
 ----------------------------------------------
 
