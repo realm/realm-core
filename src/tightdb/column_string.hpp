@@ -44,7 +44,7 @@ class StringIndex;
 /// column.
 ///
 /// FIXME: Rename AdaptiveStringColumn to StringColumn
-class AdaptiveStringColumn : public ColumnBase, public ColumnTemplate<StringData> {
+class AdaptiveStringColumn: public ColumnBase, public ColumnTemplate<StringData> {
 public:
     typedef StringData value_type;
 
@@ -72,14 +72,7 @@ public:
     void find_all(Column& result, StringData value, std::size_t begin = 0,
                   std::size_t end = npos) const;
 
-    int compare_values(size_t row1, size_t row2) const TIGHTDB_OVERRIDE
-    {        
-        StringData a = get(row1);
-        StringData b = get(row2);
-        if (a == b)
-            return 0;
-        return utf8_compare(a, b) ? 1 : -1;        
-    }
+    int compare_values(std::size_t, std::size_t) const TIGHTDB_OVERRIDE;
 
     //@{
     /// Find the lower/upper bound for the specified value assuming
@@ -89,14 +82,18 @@ public:
     std::size_t upper_bound_string(StringData value) const TIGHTDB_NOEXCEPT;
     //@}
 
+    void set_string(std::size_t, StringData) TIGHTDB_OVERRIDE;
+
     FindRes find_all_indexref(StringData value, std::size_t& dst) const;
 
-    // Index
-    bool has_index() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return m_search_index != 0; }
-    void set_index_ref(ref_type, ArrayParent*, std::size_t ndx_in_parent) TIGHTDB_OVERRIDE;
-    const StringIndex& get_index() const TIGHTDB_NOEXCEPT { return *m_search_index; }
-    StringIndex* release_index() TIGHTDB_NOEXCEPT;
-    StringIndex& create_index();
+    // Search index
+    bool has_search_index() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void set_search_index_ref(ref_type, ArrayParent*, std::size_t, bool) TIGHTDB_OVERRIDE;
+    void set_search_index_allow_duplicate_values(bool) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    StringIndex& get_search_index() TIGHTDB_NOEXCEPT;
+    const StringIndex& get_search_index() const TIGHTDB_NOEXCEPT;
+    StringIndex* release_search_index() TIGHTDB_NOEXCEPT;
+    StringIndex& create_search_index();
 
     // Optimizing data layout
     bool auto_enumerate(ref_type& keys, ref_type& values) const;
@@ -131,12 +128,11 @@ public:
     void Verify() const TIGHTDB_OVERRIDE;
     void Verify(const Table&, std::size_t) const TIGHTDB_OVERRIDE;
     void to_dot(std::ostream&, StringData title) const TIGHTDB_OVERRIDE;
-    void dump_node_structure(std::ostream&, int level) const TIGHTDB_OVERRIDE;
-    using ColumnBase::dump_node_structure;
+    void do_dump_node_structure(std::ostream&, int) const TIGHTDB_OVERRIDE;
 #endif
 
 protected:
-    StringData get_val(size_t row) const { return get(row); }
+    StringData get_val(std::size_t row) const { return get(row); }
 
 private:
     StringIndex* m_search_index;
@@ -222,7 +218,7 @@ inline void AdaptiveStringColumn::add(StringData value)
     do_insert(row_ndx, value, num_rows); // Throws
 }
 
-inline void AdaptiveStringColumn::insert(size_t row_ndx, StringData value)
+inline void AdaptiveStringColumn::insert(std::size_t row_ndx, StringData value)
 {
     std::size_t size = this->size();
     TIGHTDB_ASSERT(row_ndx <= size);
@@ -238,7 +234,36 @@ inline void AdaptiveStringColumn::insert(std::size_t row_ndx, std::size_t num_ro
     do_insert(row_ndx, value, num_rows, is_append); // Throws
 }
 
-inline StringIndex* AdaptiveStringColumn::release_index() TIGHTDB_NOEXCEPT
+inline int AdaptiveStringColumn::compare_values(std::size_t row1, std::size_t row2) const
+{
+    StringData a = get(row1);
+    StringData b = get(row2);
+    if (a == b)
+        return 0;
+    return utf8_compare(a, b) ? 1 : -1;
+}
+
+inline void AdaptiveStringColumn::set_string(std::size_t row_ndx, StringData value)
+{
+    set(row_ndx, value); // Throws
+}
+
+inline bool AdaptiveStringColumn::has_search_index() const TIGHTDB_NOEXCEPT
+{
+    return m_search_index != 0;
+}
+
+inline StringIndex& AdaptiveStringColumn::get_search_index() TIGHTDB_NOEXCEPT
+{
+    return *m_search_index;
+}
+
+inline const StringIndex& AdaptiveStringColumn::get_search_index() const TIGHTDB_NOEXCEPT
+{
+    return *m_search_index;
+}
+
+inline StringIndex* AdaptiveStringColumn::release_search_index() TIGHTDB_NOEXCEPT
 {
     StringIndex* i = m_search_index;
     m_search_index = 0;

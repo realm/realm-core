@@ -46,6 +46,9 @@ template<class> class BasicRow;
 /// destructor. Note however, that get_index() will still return an unspecified
 /// value for a deatched accessor.
 ///
+/// When a row accessor is evaluated in a boolean context, it evaluates to true
+/// if, and only if it is attached.
+///
 /// \tparam T A const or non-const table type (currently either `Table` or
 /// `const Table`).
 ///
@@ -115,11 +118,12 @@ public:
     /// reasons (see below). When it does, it no longer refers to anything, and
     /// can no longer be used, except for calling is_attached(), detach(),
     /// get_table(), get_index(), and the destructor. The consequences of
-    /// calling other methods on a detached row accessor are unspecified. Row
-    /// accessors obtained by calling functions in the TightDB API are always in
-    /// the 'attached' state immediately upon return from those functions
-    /// (except when a detached row accessor is returned in place of a
-    /// null-link).
+    /// calling other methods on a detached row accessor are unspecified. There
+    /// are a few TightDB functions (Table::find_pkey_int()) that return a
+    /// detached row accessor to indicate a 'null' result. In all other cases,
+    /// however, row accessors obtained by calling functions in the TightDB API
+    /// are always in the 'attached' state immediately upon return from those
+    /// functions.
     ///
     /// A row accessor becomes detached if the underlying row is removed, if the
     /// associated table accessor becomes detached, or if the detach() method is
@@ -138,6 +142,13 @@ public:
     /// The index of the row to which this accessor is currently bound. For a
     /// detached accessor, the returned value is unspecified.
     std::size_t get_index() const TIGHTDB_NOEXCEPT;
+
+#ifdef TIGHTDB_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
+    explicit operator bool() const TIGHTDB_NOEXCEPT;
+#else
+    typedef bool (RowFuncs::*unspecified_bool_type)() const;
+    operator unspecified_bool_type() const TIGHTDB_NOEXCEPT;
+#endif
 
 private:
     const T* table() const TIGHTDB_NOEXCEPT;
@@ -164,8 +175,8 @@ public:
     template<class U> BasicRowExpr(const BasicRowExpr<U>&) TIGHTDB_NOEXCEPT;
 
 private:
-    T* m_table;
-    std::size_t m_row_ndx;
+    T* m_table; // Null if detached.
+    std::size_t m_row_ndx; // Undefined if detached.
 
     BasicRowExpr(T*, std::size_t row_ndx) TIGHTDB_NOEXCEPT;
 
@@ -514,6 +525,23 @@ template<class T, class R> inline std::size_t RowFuncs<T,R>::get_index() const T
 {
     return row_ndx();
 }
+
+#ifdef TIGHTDB_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
+
+template<class T, class R> inline RowFuncs<T,R>::operator bool() const TIGHTDB_NOEXCEPT
+{
+    return is_attached();
+}
+
+#else // TIGHTDB_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
+
+template<class T, class R>
+inline RowFuncs<T,R>::operator unspecified_bool_type() const TIGHTDB_NOEXCEPT
+{
+    return is_attached() ? &RowFuncs::is_attached : 0;
+}
+
+#endif // TIGHTDB_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
 
 template<class T, class R> inline const T* RowFuncs<T,R>::table() const TIGHTDB_NOEXCEPT
 {

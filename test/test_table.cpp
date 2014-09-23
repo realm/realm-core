@@ -142,7 +142,7 @@ TEST(Table_OptimizeCrash)
     // This will crash at the .add() method
     TupleTableType ttt;
     ttt.optimize();
-    ttt.column().second.set_index();
+    ttt.column().second.add_search_index();
     ttt.clear();
     ttt.add(1, "AA");
 }
@@ -649,7 +649,7 @@ TEST(Table_DeleteAllTypes)
 }
 
 
-// Triggers a bug that would make Realm crash if you run optimize() followed by set_index()
+// Triggers a bug that would make Realm crash if you run optimize() followed by add_search_index()
 TEST(Table_Optimize_SetIndex_Crash)
 {
     Table table;
@@ -664,7 +664,7 @@ TEST(Table_Optimize_SetIndex_Crash)
 
     table.set_string(0, 2, "string2");
 
-    table.set_index(0);
+    table.add_search_index(0);
 
     table.move_last_over(1);
     table.move_last_over(1);
@@ -677,7 +677,7 @@ TEST(Table_MoveAllTypes)
 
     Table table;
     setup_multi_table(table, 15, 2);
-    table.set_index(6);
+    table.add_search_index(6);
 
     while (!table.is_empty()) {
         size_t size = table.size();
@@ -717,7 +717,7 @@ TEST(Table_DegenerateSubtableSearchAndAggregate)
 
     // Searching:
 
-    CHECK_EQUAL(not_found, degen_child->lookup(StringData()));
+    CHECK_LOGIC_ERROR(degen_child->find_pkey_string(""), LogicError::no_primary_key);
 //    CHECK_EQUAL(0, degen_child->distinct(0).size()); // needs index but you cannot set index on ConstTableRef
     CHECK_EQUAL(0, degen_child->get_sorted_view(0).size());
 
@@ -1090,8 +1090,8 @@ TEST(Table_IndexString)
     table.add(Sun, "johnny");
     table.add(Mon, "jennifer"); //duplicate
 
-    table.column().second.set_index();
-    CHECK(table.column().second.has_index());
+    table.column().second.add_search_index();
+    CHECK(table.column().second.has_search_index());
 
     const size_t r1 = table.column().second.find_first("jimmi");
     CHECK_EQUAL(not_found, r1);
@@ -1122,103 +1122,174 @@ TEST(Table_IndexStringTwice)
     table.add(Sun, "johnny");
     table.add(Mon, "jennifer"); // duplicate
 
-    table.column().second.set_index();
-    CHECK_EQUAL(true, table.column().second.has_index());
-    table.column().second.set_index();
-    CHECK_EQUAL(true, table.column().second.has_index());
+    table.column().second.add_search_index();
+    CHECK_EQUAL(true, table.column().second.has_search_index());
+    table.column().second.add_search_index();
+    CHECK_EQUAL(true, table.column().second.has_search_index());
 }
 
-namespace {
 
-TIGHTDB_TABLE_2(LookupTable,
-                first,  String,
-                second, Int)
-
-} // anonymous namespace
-
-TEST(Table_Lookup)
+TEST(Table_PrimaryKeyBasics)
 {
-    LookupTable table;
+    // Note: Formally, member functions of Table are not required to leave the
+    // table in a valid state when they throw LogicError. In the cases below,
+    // however, informed by the actual implementation of these functions, we
+    // assume that they do allow us to continue, but please remember that this
+    // is not generally the case.
 
-    table.add("jeff",     0);
-    table.add("jim",      1);
-    table.add("jennifer", 2);
-    table.add("john",     3);
-    table.add("jimmy",    4);
-    table.add("jimbo",    5);
-    table.add("johnny",   6);
-    table.add("jennifer", 7); //duplicate
+    Table table;
+    table.add_column(type_String, "");
 
-    // Do lookups with manual search
-    const size_t a0 = table.lookup("jeff");
-    const size_t a1 = table.lookup("jim");
-    const size_t a2 = table.lookup("jennifer");
-    const size_t a3 = table.lookup("john");
-    const size_t a4 = table.lookup("jimmy");
-    const size_t a5 = table.lookup("jimbo");
-    const size_t a6 = table.lookup("johnny");
-    const size_t a7 = table.lookup("jerry");
-    CHECK_EQUAL(0, a0);
-    CHECK_EQUAL(1, a1);
-    CHECK_EQUAL(2, a2);
-    CHECK_EQUAL(3, a3);
-    CHECK_EQUAL(4, a4);
-    CHECK_EQUAL(5, a5);
-    CHECK_EQUAL(6, a6);
-    CHECK_EQUAL(not_found, a7);
+    // Empty table
+    CHECK_NOT(table.has_primary_key());
+    CHECK_LOGIC_ERROR(table.find_pkey_string("foo"), LogicError::no_primary_key);
+    CHECK_LOGIC_ERROR(table.try_add_primary_key(0), LogicError::no_search_index);
+    table.add_search_index(0);
+    CHECK_NOT(table.has_primary_key());
+    CHECK_LOGIC_ERROR(table.find_pkey_string("foo"), LogicError::no_primary_key);
+    CHECK(table.try_add_primary_key(0));
+    CHECK(table.has_primary_key());
+    CHECK_NOT(table.find_pkey_string("foo"));
 
-    table.column().first.set_index();
-    CHECK(table.column().first.has_index());
+    // One row
+    table.remove_primary_key();
+    table.add_empty_row();
+    table.set_string(0, 0, "foo");
+    CHECK_LOGIC_ERROR(table.find_pkey_string("foo"), LogicError::no_primary_key);
+    CHECK(table.try_add_primary_key(0));
+    CHECK_EQUAL(0, table.find_pkey_string("foo").get_index());
+    CHECK_NOT(table.find_pkey_string("bar"));
 
-    // Do lookups using (cached) index
-    const size_t b0 = table.lookup("jeff");
-    const size_t b1 = table.lookup("jim");
-    const size_t b2 = table.lookup("jennifer");
-    const size_t b3 = table.lookup("john");
-    const size_t b4 = table.lookup("jimmy");
-    const size_t b5 = table.lookup("jimbo");
-    const size_t b6 = table.lookup("johnny");
-    const size_t b7 = table.lookup("jerry");
-    CHECK_EQUAL(0, b0);
-    CHECK_EQUAL(1, b1);
-    CHECK_EQUAL(2, b2);
-    CHECK_EQUAL(3, b3);
-    CHECK_EQUAL(4, b4);
-    CHECK_EQUAL(5, b5);
-    CHECK_EQUAL(6, b6);
-    CHECK_EQUAL(not_found, b7);
+    // Two rows
+    table.remove_primary_key();
+    table.add_empty_row();
+    table.set_string(0, 1, "bar");
+    CHECK(table.try_add_primary_key(0));
+    CHECK_EQUAL(0, table.find_pkey_string("foo").get_index());
+    CHECK_EQUAL(1, table.find_pkey_string("bar").get_index());
+
+    // Modify primary key
+    CHECK_LOGIC_ERROR(table.set_string(0, 1, "foo"), LogicError::unique_constraint_violation);
+    table.set_string(0, 1, "bar");
+    table.set_string(0, 1, "baz");
+    CHECK_EQUAL(0, table.find_pkey_string("foo").get_index());
+    CHECK_NOT(table.find_pkey_string("bar"));
+    CHECK_EQUAL(1, table.find_pkey_string("baz").get_index());
+
+    // Insert row
+    // Unfortunately, we could not have recovered and continued if we had let
+    // Table::insert_string() throw.
+//    CHECK_LOGIC_ERROR(table.insert_string(0, 2, "foo"), LogicError::unique_constraint_violation);
+    table.Verify();
+    table.insert_string(0, 2, "bar");
+    table.insert_done();
+    table.Verify();
+    table.add_empty_row();
+    table.Verify();
+    // Unfortunately, we could not have recovered and continued if we had let
+    // Table::add_empty_row() throw.
+//    CHECK_LOGIC_ERROR(table.add_empty_row(), LogicError::unique_constraint_violation);
+
+    // Duplicate key value
+    table.remove_primary_key();
+    table.set_string(0, 1, "foo");
+    CHECK_NOT(table.try_add_primary_key(0));
 }
 
-namespace {
 
-TIGHTDB_TABLE_1(TestSubtableLookup2,
-                str, String)
-TIGHTDB_TABLE_1(TestSubtableLookup1,
-                subtab, Subtable<TestSubtableLookup2>)
-
-} // anonymous namespace
-
-
-TEST(Table_SubtableLookup)
+TEST(Table_PrimaryKeyLargeCommonPrefix)
 {
-    TestSubtableLookup1 t;
-    t.add();
-    t.add();
-    {
-        TestSubtableLookup2::Ref r0 = t[0].subtab;
-        r0->add("foo");
-        r0->add("bar");
-        size_t i1 = r0->lookup("bar");
-        CHECK_EQUAL(1, i1);
-        size_t i2 = r0->lookup("foobar");
-        CHECK_EQUAL(not_found, i2);
-    }
+    Table table;
+    table.add_column(type_String, "");
+    table.add_empty_row(2);
+    table.set_string(0, 0, "metasyntactic variable 1");
+    table.set_string(0, 1, "metasyntactic variable 2");
+    table.add_search_index(0);
+    CHECK(table.try_add_primary_key(0));
+    CHECK_LOGIC_ERROR(table.set_string(0, 1, "metasyntactic variable 1"),
+                      LogicError::unique_constraint_violation);
+    table.set_string(0, 1, "metasyntactic variable 2");
+    table.set_string(0, 1, "metasyntactic variable 3");
+}
 
-    {
-        TestSubtableLookup2::Ref r1 = t[1].subtab;
-        size_t i3 = r1->lookup("bar");
-        CHECK_EQUAL(not_found, i3);
-    }
+
+TEST(Table_PrimaryKeyExtra)
+{
+    Table table;
+    table.add_column(type_String, "");
+    table.add_column(type_Int, "");
+    table.add_empty_row(8);
+
+    table.set_string(0, 0, "jeff");
+    table.set_string(0, 1, "jim");
+    table.set_string(0, 2, "jennifer");
+    table.set_string(0, 3, "john");
+    table.set_string(0, 4, "jimmy");
+    table.set_string(0, 5, "jimbo");
+    table.set_string(0, 6, "johnny");
+    table.set_string(0, 7, "jennifer"); // Duplicate primary key
+
+    table.set_int(1, 0, 0);
+    table.set_int(1, 1, 1);
+    table.set_int(1, 2, 2);
+    table.set_int(1, 3, 3);
+    table.set_int(1, 4, 4);
+    table.set_int(1, 5, 5);
+    table.set_int(1, 6, 6);
+    table.set_int(1, 7, 7);
+
+    CHECK_LOGIC_ERROR(table.find_pkey_string("jeff"), LogicError::no_primary_key);
+
+    CHECK_LOGIC_ERROR(table.try_add_primary_key(0), LogicError::no_search_index);
+    CHECK_NOT(table.has_primary_key());
+
+    table.add_search_index(0);
+    CHECK(table.has_search_index(0));
+
+    CHECK_NOT(table.try_add_primary_key(0));
+    CHECK_NOT(table.has_primary_key());
+
+    table.set_string(0, 7, "jennifer 8");
+    CHECK(table.try_add_primary_key(0));
+    CHECK(table.has_primary_key());
+
+    table.Verify();
+
+    Row a0 = table.find_pkey_string("jeff");
+    Row a1 = table.find_pkey_string("jim");
+    Row a2 = table.find_pkey_string("jennifer");
+    Row a3 = table.find_pkey_string("john");
+    Row a4 = table.find_pkey_string("jimmy");
+    Row a5 = table.find_pkey_string("jimbo");
+    Row a6 = table.find_pkey_string("johnny");
+    Row a7 = table.find_pkey_string("jerry");
+    CHECK(a0);
+    CHECK(a1);
+    CHECK(a2);
+    CHECK(a3);
+    CHECK(a4);
+    CHECK(a5);
+    CHECK(a6);
+    CHECK_NOT(a7);
+    CHECK_EQUAL(0, a0.get_index());
+    CHECK_EQUAL(1, a1.get_index());
+    CHECK_EQUAL(2, a2.get_index());
+    CHECK_EQUAL(3, a3.get_index());
+    CHECK_EQUAL(4, a4.get_index());
+    CHECK_EQUAL(5, a5.get_index());
+    CHECK_EQUAL(6, a6.get_index());
+}
+
+
+TEST(Table_SubtablePrimaryKey)
+{
+    Table parent;
+    parent.add_column(type_Table, "");
+    parent.get_subdescriptor(0)->add_column(type_String, "");
+    parent.add_empty_row();
+    TableRef child = parent[0].get_subtable(0);
+    CHECK_LOGIC_ERROR(child->find_pkey_string("foo"), LogicError::no_primary_key);
+    CHECK_LOGIC_ERROR(child->add_search_index(0), LogicError::wrong_kind_of_table);
 }
 
 
@@ -1235,8 +1306,8 @@ TEST(Table_Distinct)
     table.add(Sun, "D");
     table.add(Mon, "D");
 
-    table.column().second.set_index();
-    CHECK(table.column().second.has_index());
+    table.column().second.add_search_index();
+    CHECK(table.column().second.has_search_index());
 
     TestTableEnum::View view = table.column().second.get_distinct_view();
 
@@ -1246,6 +1317,7 @@ TEST(Table_Distinct)
     CHECK_EQUAL(2, view.get_source_ndx(2));
     CHECK_EQUAL(5, view.get_source_ndx(3));
 }
+
 
 /*
 TEST(Table_IndexInt)
@@ -1264,7 +1336,7 @@ TEST(Table_IndexInt)
     table.add(0,  9, true, Wed);
 
     // Create index for column two
-//    table.cols().second.set_index();
+//    table.cols().second.add_search_index();
 
     // Search for a value that does not exits
     const size_t r1 = table.column().second.find_first(2);
@@ -1332,6 +1404,7 @@ TEST(Table_IndexInt)
 #endif
 }
 */
+
 
 namespace {
 
@@ -1756,7 +1829,7 @@ TEST(Table_SpecDeleteColumns)
     table->add_subcolumn(column_path, type_String, "sub_second");
 
     // Put in an index as well
-    table->set_index(1);
+    table->add_search_index(1);
 
     CHECK_EQUAL(4, table->get_column_count());
 
@@ -1873,7 +1946,7 @@ TEST(Table_SpecAddColumns)
     table->add_subcolumn(column_path, type_String, "sub_second");
 
     // Put in an index as well
-    table->set_index(1);
+    table->add_search_index(1);
 
     CHECK_EQUAL(3, table->get_column_count());
 
@@ -1994,7 +2067,7 @@ TEST(Table_SpecDeleteColumnsBug)
 
     // Create specification with sub-table
     table->add_column(type_String, "name");
-    table->set_index(0);
+    table->add_search_index(0);
     table->add_column(type_Int,    "age");
     table->add_column(type_Bool,   "hired");
     table->add_column(type_Table,  "phones");
