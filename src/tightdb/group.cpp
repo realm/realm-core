@@ -1011,6 +1011,7 @@ public:
 
     bool insert_group_level_table(size_t table_ndx, size_t num_tables, StringData) TIGHTDB_NOEXCEPT
     {
+        // for end-insertions, table_ndx will be equal to num_tables
         TIGHTDB_ASSERT(table_ndx <= num_tables);
         m_group.m_table_accessors.push_back(0); // Throws
         size_t last_ndx = num_tables;

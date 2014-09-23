@@ -1272,9 +1272,9 @@ void SharedGroup::rollback_and_continue_as_read()
     info->writemutex.unlock();
 }
 
-void SharedGroup::do_rollback_and_continue_as_read(const char* start, const char* limit)
+void SharedGroup::do_rollback_and_continue_as_read(const char* begin, const char* end)
 {
-    BinaryData buffer(start, limit-start);
+    BinaryData buffer(begin, end-begin);
     m_group.reverse_transact(m_readlock.m_top_ref, buffer);
 }
 
