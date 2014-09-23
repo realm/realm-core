@@ -1912,11 +1912,11 @@ TEST(Shared_MixedWithNonShared)
         }
     }
 
+#ifndef TIGHTDB_ENABLE_ENCRYPTION // encrpted buffers aren't supported
     // The empty group created initially by a shared group accessor is special
     // in that it contains no nodes, and the root-ref is therefore zero. The
     // following block checks that the contents of such a file is still
     // perceived as valid when placed in a memory buffer, and then opened.
-#if 0 // !TIGHTDB_ENABLE_ENCRYPTION
     File::try_remove(path);
     {
         {

@@ -8,6 +8,10 @@
 
 #include "file_mapper.hpp"
 
+#include <sys/mman.h>
+
+#ifdef TIGHTDB_ENABLE_ENCRYPTION
+
 #include <algorithm>
 #include <cerrno>
 #include <climits>
@@ -20,7 +24,6 @@
 #include <fcntl.h>
 #include <signal.h>
 #include <sys/stat.h>
-#include <sys/mman.h>
 #include <sys/file.h>
 
 #include <openssl/evp.h>
@@ -336,7 +339,11 @@ void remove_mapping(void *addr, size_t size) {
     }
 }
 
-string get_errno_msg(const char* prefix, int err)
+#else
+namespace {
+#endif
+
+std::string get_errno_msg(const char* prefix, int err)
 {
     char buffer[256];
     std::string str;
@@ -353,10 +360,12 @@ string get_errno_msg(const char* prefix, int err)
 
 } // anonymous namespace
 
+
 namespace tightdb {
 namespace util {
 
 void *mmap(std::shared_ptr<int> fd, size_t size, File::AccessMode access, const uint8_t *encryption_key) {
+#ifdef TIGHTDB_ENABLE_ENCRYPTION
     if (encryption_key) {
         void* addr = ::mmap(0, size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
         if (addr != MAP_FAILED) {
@@ -365,7 +374,12 @@ void *mmap(std::shared_ptr<int> fd, size_t size, File::AccessMode access, const 
             return addr;
         }
     }
-    else {
+    else
+#else
+    TIGHTDB_ASSERT(!encryption_key);
+    (void)encryption_key;
+#endif
+    {
         int prot = PROT_READ;
         switch (access) {
             case File::access_ReadWrite:
@@ -381,16 +395,19 @@ void *mmap(std::shared_ptr<int> fd, size_t size, File::AccessMode access, const 
     }
 
     int err = errno; // Eliminate any risk of clobbering
-    string msg = get_errno_msg("mmap() failed: ", err);
-    throw runtime_error(msg);
+    std::string msg = get_errno_msg("mmap() failed: ", err);
+    throw std::runtime_error(msg);
 }
 
 void munmap(void* addr, size_t size) {
+#ifdef TIGHTDB_ENABLE_ENCRYPTION
     remove_mapping(addr, size);
+#endif
     ::munmap(addr, size);
 }
 
 void msync(void* addr, size_t size) {
+#ifdef TIGHTDB_ENABLE_ENCRYPTION
     { // first check the encrypted mappings
         spin_lock_guard lock{mapping_lock};
         for (auto m = mappings; m; m = m->next) {
@@ -400,11 +417,12 @@ void msync(void* addr, size_t size) {
             return;
         }
     }
+#endif
 
     // not an encrypted mapping
     if (::msync(addr, size, MS_SYNC) != 0) {
         int err = errno; // Eliminate any risk of clobbering
-        throw runtime_error(get_errno_msg("msync() failed: ", err));
+        throw std::runtime_error(get_errno_msg("msync() failed: ", err));
     }
 }
 

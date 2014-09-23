@@ -417,6 +417,11 @@ case "$MODE" in
             enable_alloc_set_zero="yes"
         fi
 
+        enable_encryption="no"
+        if [ "$TIGHTDB_ENABLE_ENCRYPTION" ]; then
+            enable_encryption="yes"
+        fi
+
         # Find Xcode
         xcode_home="none"
         arm64_supported=""
@@ -490,6 +495,7 @@ MAX_BPNODE_SIZE       = $max_bpnode_size
 MAX_BPNODE_SIZE_DEBUG = $max_bpnode_size_debug
 ENABLE_REPLICATION    = $enable_replication
 ENABLE_ALLOC_SET_ZERO = $enable_alloc_set_zero
+ENABLE_ENCRYPTION     = $enable_encryption
 XCODE_HOME            = $xcode_home
 IPHONE_SDKS           = ${iphone_sdks:-none}
 IPHONE_SDKS_AVAIL     = $iphone_sdks_avail
@@ -635,18 +641,21 @@ EOF
             else
                 platform="9"
             fi
-            # Note that `make-standalone-toolchain.sh` is written for
-            # `bash` and must therefore be executed by `bash`.
-            make_toolchain="$android_ndk_home/build/tools/make-standalone-toolchain.sh"
-            bash "$make_toolchain" --platform="android-$platform" --install-dir="$temp_dir" --arch="$target" || exit 1
             android_prefix="$target"
+            android_toolchain="arm-linux-androideabi-4.8"
             if [ "$target" = "arm-v7a" ]; then
                 android_prefix="arm"
             elif [ "$target" = "mips" ]; then
                 android_prefix="mipsel"
+                android_toolchain="mipsel-linux-android-4.8"
             elif [ "$target" = "x86" ]; then
                 android_prefix="i686"
+                android_toolchain="x86-4.8"
             fi
+            # Note that `make-standalone-toolchain.sh` is written for
+            # `bash` and must therefore be executed by `bash`.
+            make_toolchain="$android_ndk_home/build/tools/make-standalone-toolchain.sh"
+            bash "$make_toolchain" --platform="android-$platform" --toolchain="$android_toolchain" --install-dir="$temp_dir" --arch="$target" || exit 1
             path="$temp_dir/bin:$PATH"
             cc="$(cd "$temp_dir/bin" && echo $android_prefix-linux-*-gcc)" || exit 1
             cflags_arch=""
