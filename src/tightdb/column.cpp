@@ -746,7 +746,6 @@ void Column::adjust(int_fast64_t diff)
 }
 
 
-
 void Column::adjust_ge(int_fast64_t limit, int_fast64_t diff)
 {
     if (!m_array->is_inner_bptree_node()) {
@@ -759,16 +758,50 @@ void Column::adjust_ge(int_fast64_t limit, int_fast64_t diff)
     m_array->update_bptree_leaves(leaf_handler); // Throws
 }
 
+namespace {
 
+    // Getter function for string index
+    StringData get_string(void* column, size_t ndx, char* buffer)
+    {
+        int64_t i = static_cast<Column*>(column)->get(ndx);
+        memcpy(buffer, &i, sizeof(i));
+        StringData s = StringData(buffer, sizeof(i));
+        return s;
+    }
+
+} // anonymous namespace
+
+void Column::create_search_index()
+{
+   TIGHTDB_ASSERT(!m_index_column);
+    m_index_column = new StringIndex(this, &get_string, m_array->get_alloc()); // Throws
+
+    // Populate the index
+    size_t num_rows = size();
+    for (size_t row_ndx = 0; row_ndx != num_rows; ++row_ndx) {
+        int64_t value = get(row_ndx);
+        size_t num_rows = 1;
+        bool is_append = true;
+        static_cast<StringIndex*>(m_index_column)->insert(row_ndx, value, num_rows, is_append); // Throws
+    }
+}
+
+
+void Column::set_search_index_ref(ref_type ref, ArrayParent* parent,
+    size_t ndx_in_parent, bool allow_duplicate_valaues)
+{
+    TIGHTDB_ASSERT(!m_index_column);
+//    m_index_column = new StringIndex(ref, parent, ndx_in_parent, this, &get,
+//        !allow_duplicate_valaues, m_array->get_alloc()); // Throws
+}
 
 size_t Column::find_first(int64_t value, size_t begin, size_t end) const
 {
     TIGHTDB_ASSERT(begin <= size());
     TIGHTDB_ASSERT(end == npos || (begin <= end && end <= size()));
 
-    if (m_index_column)
+    if (m_index_column && begin == 0 && end == npos)
         static_cast<StringIndex*>(m_index_column)->find_first(value);
-
 
     if (root_is_leaf())
         return m_array->find_first(value, begin, end); // Throws (maybe)

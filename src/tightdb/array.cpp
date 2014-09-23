@@ -3023,7 +3023,8 @@ top:
                 return first ? row_ref : count ? 1 : FindRes_single;
             }
 
-            StringData str = (*get_func)(column, row_ref);
+            char buffer[8];
+            StringData str = (*get_func)(column, row_ref, buffer);
             if (str == value) {
                 result_ref = row_ref;
                 if (all)
@@ -3054,7 +3055,8 @@ top:
                 // If the last byte in the stored key is not zero, we have
                 // not yet compared against the entire (target) string
                 if ((stored_key << 24)) {
-                    StringData str = (*get_func)(column, first_row_ref);
+                    char buffer[8];
+                    StringData str = (*get_func)(column, first_row_ref, buffer);
                     if (str != value) {
                         if (count)
                             return 0;
@@ -3088,7 +3090,8 @@ top:
                 // If the last byte in the stored key is not zero, we have
                 // not yet compared against the entire (target) string
                 if ((stored_key << 24)) {
-                    StringData str = (*get_func)(column, first_row_ref);
+                    char buffer[8];
+                    StringData str = (*get_func)(column, first_row_ref, buffer);
                     if (str != value)
                         return allnocopy ? FindRes_not_found : first ? not_found : 0;
                 }
@@ -3183,8 +3186,8 @@ top:
             // compared against the entire (target) string
             if (!(stored_key << 24))
                 return row_ref;
-
-            StringData str = (*get_func)(column, row_ref);
+            char buffer[8];
+            StringData str = (*get_func)(column, row_ref, buffer);
             if (str == value)
                 return row_ref;
             return not_found;
@@ -3219,7 +3222,8 @@ top:
             if (!(stored_key << 24))
                 return row_ref;
 
-            StringData str = (*get_func)(column, row_ref);
+            char buffer[8];
+            StringData str = (*get_func)(column, row_ref, buffer);
             if (str == value)
                 return row_ref;
             return not_found;
@@ -3305,7 +3309,8 @@ top:
                 return;
             }
 
-            StringData str = (*get_func)(column, row_ref);
+            char buffer[8];
+            StringData str = (*get_func)(column, row_ref, buffer);
             if (str == value)
                 result.add(row_ref);
             return; // not_found
@@ -3328,7 +3333,8 @@ top:
                 // If the last byte in the stored key is not zero, we have
                 // not yet compared against the entire (target) string
                 if ((stored_key << 24)) {
-                    StringData str = (*get_func)(column, first_row_ref);
+                    char buffer[8];
+                    StringData str = (*get_func)(column, first_row_ref, buffer);
                     if (str != value)
                         return; // not_found
                 }
@@ -3348,7 +3354,8 @@ top:
                 // If the last byte in the stored key is not zero, we have
                 // not yet compared against the entire (target) string
                 if ((stored_key << 24)) {
-                    StringData str = (*get_func)(column, first_row_ref);
+                    char buffer[8];
+                    StringData str = (*get_func)(column, first_row_ref, buffer);
                     if (str != value)
                         return; // not_found
                 }
@@ -3383,7 +3390,7 @@ top:
 FindRes Array::IndexStringFindAllNoCopy(StringData value, size_t& res_ref, void* column, StringGetter get_func) const
 {
     Column dummy;
-    return (FindRes)index_string<index_find_all_nocopy, StringData>(value, dummy, res_ref, column, get_func);
+  //  return (FindRes)index_string<index_find_all_nocopy, StringData>(value, dummy, res_ref, column, get_func);
     
 
 
@@ -3442,7 +3449,8 @@ top:
                 return FindRes_single; // found single
             }
 
-            StringData str = (*get_func)(column, row_ref);
+            char buffer[8];
+            StringData str = (*get_func)(column, row_ref, buffer);
             if (str == value) {
                 res_ref = row_ref;
                 return FindRes_single; // found single
@@ -3467,7 +3475,8 @@ top:
                 // If the last byte in the stored key is not zero, we have
                 // not yet compared against the entire (target) string
                 if ((stored_key << 24)) {
-                    StringData str = (*get_func)(column, first_row_ref);
+                    char buffer[8];
+                    StringData str = (*get_func)(column, first_row_ref, buffer);
                     if (str != value)
                         return FindRes_not_found; // not_found
                 }
@@ -3479,7 +3488,8 @@ top:
                 // If the last byte in the stored key is not zero, we have
                 // not yet compared against the entire (target) string
                 if ((stored_key << 24)) {
-                    StringData str = (*get_func)(column, first_row_ref);
+                    char buffer[8];
+                    StringData str = (*get_func)(column, first_row_ref, buffer);
                     if (str != value)
                         return FindRes_not_found; // not_found
                 }
@@ -3565,7 +3575,8 @@ top:
             if (!(stored_key << 24))
                 return 1;
 
-            StringData str = (*get_func)(column, row_ref);
+            char buffer[8];
+            StringData str = (*get_func)(column, row_ref, buffer);
             if (str == value)
                 return 1;
             return 0;
@@ -3609,7 +3620,8 @@ top:
                 row_ref = to_size_t(sub.get(0));
             }
 
-            StringData str = (*get_func)(column, row_ref);
+            char buffer[8];
+            StringData str = (*get_func)(column, row_ref, buffer);
             if (str == value)
                 return sub_count;
             return 0;

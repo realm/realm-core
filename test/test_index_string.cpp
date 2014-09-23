@@ -498,4 +498,60 @@ TEST(StringIndex_FindAllNoCopy)
     col.destroy();
 }
 
+TEST(StringIndex_FindAllNoCopy_Int)
+{
+    // Create a column with duplcate values
+    ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
+    AdaptiveStringColumn col(Allocator::get_default(), ref);
+
+    const char* v1 = (char*)new int64_t(1);
+    const char* v2 = (char*)new int64_t(2);
+    const char* v3 = (char*)new int64_t(3);
+    const char* v4 = (char*)new int64_t(4);
+    const char* v10 = (char*)new int64_t(10);
+
+    col.add(v2);
+    col.add(v2);
+
+    // Create a new index on column
+    StringIndex& ndx = col.create_search_index();
+
+    size_t ref_2 = not_found;
+    FindRes res3 = ndx.find_all(v2, ref_2);
+    CHECK_EQUAL(FindRes_column, res3);
+    const Column results(Allocator::get_default(), ref_type(ref_2));
+    CHECK_EQUAL(2, results.size());
+    CHECK_EQUAL(0, results.get(0));
+    CHECK_EQUAL(1, results.get(1));
+
+    // Clean up
+    col.destroy();
+}
+
+TEST(StringIndex_FindAllNoCopy_Int2)
+{
+    // Create a column with duplcate values
+    ref_type ref = Column::create(Allocator::get_default());
+    Column col(Allocator::get_default(), ref);
+
+    col.add(2);
+    col.add(2);
+
+    // Create a new index on column
+    col.create_search_index();
+    StringIndex& ndx = *static_cast<StringIndex*>(col.m_index_column);
+
+    size_t ref_2 = not_found;
+    FindRes res3 = ndx.find_all(int64_t(2), ref_2);
+    CHECK_EQUAL(FindRes_column, res3);
+    const Column results(Allocator::get_default(), ref_type(ref_2));
+    CHECK_EQUAL(2, results.size());
+    CHECK_EQUAL(0, results.get(0));
+    CHECK_EQUAL(1, results.get(1));
+
+    // Clean up
+    col.destroy();
+}
+
+
 #endif // TEST_INDEX_STRING

@@ -62,7 +62,7 @@ void StringIndex::insert_with_offset(size_t row_ndx, StringData value, size_t of
     // Create 4 byte index key
     key_type key = create_key(value.substr(offset));
 
-    TreeInsert(row_ndx, key, offset, value); // Throws
+     TreeInsert(row_ndx, key, offset, value); // Throws
 }
 
 
@@ -365,7 +365,8 @@ bool StringIndex::LeafInsert(size_t row_ndx, key_type key, size_t offset, String
     // Single match (lowest bit set indicates literal row_ndx)
     if (slot_value % 2 != 0) {
         size_t row_ndx2 = to_size_t(slot_value / 2);
-        StringData v2 = get(row_ndx2);
+        char buffer[8];
+        StringData v2 = get(row_ndx2, buffer);
         if (v2 == value) {
             if (m_deny_duplicate_values)
                 throw UniqueConstraintViolation();
@@ -394,8 +395,9 @@ bool StringIndex::LeafInsert(size_t row_ndx, key_type key, size_t offset, String
         sub.set_parent(m_array, ins_pos_refs);
 
         size_t r1 = to_size_t(sub.get(0));
-        StringData v2 = get(r1);
-        if (v2 ==  value) {
+        char buffer[8];
+        StringData v2 = get(r1, buffer);
+        if (v2 == value) {
             if (m_deny_duplicate_values)
                 throw UniqueConstraintViolation();
             // find insert position (the list has to be kept in sorted order)

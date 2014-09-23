@@ -372,6 +372,9 @@ public:
     void find_all(Column& result, int64_t value,
                   std::size_t begin = 0, std::size_t end = npos) const;
 
+    void set_search_index_ref(ref_type ref, ArrayParent* parent, size_t ndx_in_parent, bool allow_duplicate_valaues);
+    void create_search_index();
+
     //@{
     /// Find the lower/upper bound for the specified value assuming
     /// that the elements are already sorted in ascending order
@@ -406,6 +409,9 @@ public:
     void do_dump_node_structure(std::ostream&, int) const TIGHTDB_OVERRIDE;
 #endif
 
+    // todo, make private, and correct type
+    void* m_index_column;
+
 protected:
     Column(Array* root = 0) TIGHTDB_NOEXCEPT;
 
@@ -424,8 +430,6 @@ private:
     // Called by Array::bptree_insert().
     static ref_type leaf_insert(MemRef leaf_mem, ArrayParent&, std::size_t ndx_in_parent,
                                 Allocator&, std::size_t insert_ndx, Array::TreeInsert<Column>&);
-
-    void* m_index_column;
 
     class EraseLeafElem;
     class CreateHandler;
@@ -626,13 +630,13 @@ inline ref_type ColumnBase::create(Allocator& alloc, std::size_t size, CreateHan
     return build(&rest_size, fixed_height, alloc, handler);
 }
 
-inline Column::Column(Allocator& alloc, ref_type ref)
+inline Column::Column(Allocator& alloc, ref_type ref) : m_index_column(null_ptr)
 {
     m_array = new Array(alloc); // Throws
     m_array->init_from_ref(ref);
 }
 
-inline Column::Column(unattached_root_tag, Allocator& alloc)
+inline Column::Column(unattached_root_tag, Allocator& alloc) : m_index_column(null_ptr)
 {
     m_array = new Array(alloc); // Throws
 }
@@ -644,7 +648,7 @@ inline Column::Column(move_tag, Column& col) TIGHTDB_NOEXCEPT
 }
 
 inline Column::Column(Array* root) TIGHTDB_NOEXCEPT:
-    ColumnBase(root)
+    ColumnBase(root), m_index_column(null_ptr)
 {
 }
 

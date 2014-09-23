@@ -27,23 +27,24 @@
 
 namespace tightdb {
 
-    // todo, add some type safety for these
-template <class T> inline StringData to_string(T value)
-{   
+template <class T> inline StringData to_str(T& value)
+{
+    TIGHTDB_STATIC_ASSERT((util::SameType<T, int64_t>::value), "");
     return StringData(reinterpret_cast<const char*>(&value), sizeof(T));
 }
 
-template <> inline StringData to_string(const char* value)
-{
-    return StringData(value);
-}
-
-template <> inline StringData to_string<StringData>(StringData input)
+template <> inline StringData to_str<StringData>(StringData& input)
 {
     return input;
 }
 
-typedef StringData (*StringGetter)(void*, std::size_t);
+// todo, remove
+inline StringData to_str(const char* value)
+{
+    return StringData(value);
+}
+
+typedef StringData (*StringGetter)(void*, std::size_t, char*);
 
 class StringIndex: public Column {
 public:
@@ -69,14 +70,14 @@ public:
         for (size_t i = 0; i < num_rows; ++i) {
             size_t row_ndx_2 = row_ndx + i;
             size_t offset = 0; // First key from beginning of string
-            insert_with_offset(row_ndx_2, to_string(value), offset); // Throws
+            insert_with_offset(row_ndx_2, to_str(value), offset); // Throws
         }
     }
 
     template <class T> void set(size_t row_ndx, T old_value, T new_value)
     {
-        StringData old_value2 = to_string(old_value);
-        StringData new_value2 = to_string(new_value);
+        StringData old_value2 = to_str(old_value);
+        StringData new_value2 = to_str(new_value);
         // Note that insert_with_offset() throws UniqueConstraintViolation.
 
         if (TIGHTDB_LIKELY(new_value2 != old_value2)) {
@@ -91,7 +92,7 @@ public:
     template <class T> size_t find_first(T value) const
     {
         // Use direct access method
-        return m_array->IndexStringFindFirst(to_string(value), m_target_column, m_get_func);
+        return m_array->IndexStringFindFirst(to_str(value), m_target_column, m_get_func);
     }
 
     template <class T> void find_all(Column& result, T value) const
@@ -103,18 +104,18 @@ public:
     template <class T> FindRes find_all(T value, size_t& ref) const
     {
         // Use direct access method
-        return m_array->IndexStringFindAllNoCopy(to_string(value), ref, m_target_column, m_get_func);
+        return m_array->IndexStringFindAllNoCopy(to_str(value), ref, m_target_column, m_get_func);
     }
 
     template <class T> size_t count(T value) const
     {
         // Use direct access method
-        return m_array->IndexStringCount(to_string(value), m_target_column, m_get_func);
+        return m_array->IndexStringCount(to_str(value), m_target_column, m_get_func);
     }
 
     template <class T> void erase(size_t row_ndx, T value, bool is_last)
     {
-        DoDelete(row_ndx, to_string(value), 0);
+        DoDelete(row_ndx, to_str(value), 0);
 
         // Collapse top nodes with single item
         while (!root_is_leaf()) {
@@ -136,7 +137,7 @@ public:
 
     template <class T> void update_ref(T value, size_t old_row_ndx, size_t new_row_ndx)
     {
-        do_update_ref(to_string(value), old_row_ndx, new_row_ndx, 0);
+        do_update_ref(to_str(value), old_row_ndx, new_row_ndx, 0);
     }
 
     void clear() TIGHTDB_OVERRIDE;
@@ -197,7 +198,7 @@ private:
     void DoDelete(size_t ndx, StringData, size_t offset);
     void do_update_ref(StringData value, size_t row_ndx, size_t new_row_ndx, size_t offset);
 
-    StringData get(size_t ndx) {return (*m_get_func)(m_target_column, ndx);}
+    StringData get(size_t ndx, char* buffer) {return (*m_get_func)(m_target_column, ndx, buffer);}
 
     void NodeAddKey(ref_type ref);
 

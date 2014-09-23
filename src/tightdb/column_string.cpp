@@ -26,7 +26,7 @@ const size_t small_string_max_size  = 15; // ArrayString
 const size_t medium_string_max_size = 63; // ArrayStringLong
 
 // Getter function for string index
-StringData get_string(void* column, size_t ndx)
+StringData get_string(void* column, size_t ndx, char* buffer)
 {
     return static_cast<AdaptiveStringColumn*>(column)->get(ndx);
 }

@@ -15,7 +15,7 @@ using namespace tightdb::util;
 namespace {
 
 // Getter function for string index
-StringData get_string(void* column, size_t ndx)
+StringData get_string(void* column, size_t ndx, char*)
 {
     return static_cast<ColumnStringEnum*>(column)->get(ndx);
 }
@@ -201,7 +201,7 @@ size_t ColumnStringEnum::find_first(size_t key_ndx, size_t begin, size_t end) co
 
 size_t ColumnStringEnum::find_first(StringData value, size_t begin, size_t end) const
 {
-    if (m_search_index && begin == 0 && end == size_t(-1))
+    if (m_search_index && begin == 0 && end == npos)
         return m_search_index->find_first(value);
 
     // Find key
