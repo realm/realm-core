@@ -957,6 +957,11 @@ string TrivialReplication::do_get_database_path()
 
 void TrivialReplication::do_begin_write_transact(SharedGroup&)
 {
+    prepare_to_write();
+}
+
+void TrivialReplication::prepare_to_write()
+{
     char* data = m_transact_log_buffer.data();
     size_t size = m_transact_log_buffer.size();
     m_transact_log_free_begin = data;
@@ -987,11 +992,11 @@ void TrivialReplication::do_clear_interrupt() TIGHTDB_NOEXCEPT
 
 void TrivialReplication::do_transact_log_reserve(size_t n)
 {
-    transact_log_reserve(n);
+    internal_transact_log_reserve(n);
 }
 
 void TrivialReplication::do_transact_log_append(const char* data, size_t size)
 {
-    transact_log_reserve(size);
+    internal_transact_log_reserve(size);
     m_transact_log_free_begin = copy(data, data+size, m_transact_log_free_begin);
 }

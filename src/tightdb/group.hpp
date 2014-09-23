@@ -512,6 +512,7 @@ private:
     friend class SharedGroup;
     friend class _impl::GroupFriend;
     friend class Replication;
+    friend class TrivialReplication;
 };
 
 

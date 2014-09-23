@@ -1539,13 +1539,29 @@ void Group::advance_transact(ref_type new_top_ref, size_t new_file_size,
 
 
 // Here goes the class which specifies how instructions are to be reversed.
-// It uses facilities inside a TrivialReplication class to encode the reversed instructions.
+
+// First, to help, we use a special variant of TrivialReplication to gather the
+// reversed log:
+
+class ReverseReplication : public TrivialReplication {
+public:
+    ReverseReplication(const std::string& database_file) : TrivialReplication(database_file) 
+    {
+        prepare_to_write();
+    }
+
+    void handle_transact_log(const char*, std::size_t, version_type) 
+    {
+        // we should never get here...
+        TIGHTDB_ASSERT(false);
+    }
+};
+
 
 class Group::TransactReverser : public NullHandler  {
 public:
 
-    // FIXME: I think we need to know, that it's a TrivialReplication instead:
-    TransactReverser(Replication& encoder) : 
+    TransactReverser(ReverseReplication& encoder) : 
         m_encoder(encoder), current_insn_start(0),
         m_pending_table_select(false), m_pending_descriptor_select(false) 
     {
@@ -1599,6 +1615,7 @@ public:
     bool erase_group_level_table(std::size_t table_ndx, std::size_t num_tables) 
     { 
         m_encoder.simple_cmd(Replication::instr_InsertGroupLevelTable, util::tuple(table_ndx, num_tables));
+        m_encoder.string_value(0, 0);        
         append_instruction();
         return true;
     }
@@ -1748,9 +1765,11 @@ public:
         return true;
     }
 
+    void execute(Group& group);
+
 private:
     struct Insn { size_t start; size_t end; };
-    Replication& m_encoder;
+    ReverseReplication& m_encoder;
     std::vector<Insn> m_instructions;
     size_t current_insn_start;
     bool m_pending_table_select;
@@ -1762,8 +1781,7 @@ private:
         Insn inst;
         // FIXME: Get buffer starting offset from encoder and add it in
         inst.start = current_insn_start;
-        TIGHTDB_ASSERT(false);
-        current_insn_start = 0;// m_denc.current_offset()+ m_instruction_buffers.size();
+        current_insn_start = m_encoder.transact_log_size();
         inst.end = current_insn_start;
         return inst;
     }
@@ -1798,21 +1816,16 @@ private:
         {
             m_current = m_instruction_order.size();
         }
-        virtual void get_buffer(const char*& begin, const char*& end) 
+        virtual size_t next_block(const char*& begin, const char*& end) 
         {
             if (m_current != 0) {
                 m_current--;
                 begin = m_buffer + m_instruction_order[m_current].start;
                 end   = m_buffer + m_instruction_order[m_current].end;
+                return end-begin;
             }
-        }
-
-        virtual bool more_work()
-        {
-            if (m_current == 0)
-                return false;
             else
-                return m_instruction_order[m_current].start != m_instruction_order[m_current].end;
+                return 0;
         }
     private:
         const char* m_buffer;
@@ -1821,39 +1834,25 @@ private:
     };
 };
 
-#if 0
-// FIXME:
-Replication::InputStream* Group::TransactReverser::get_reversed_log() 
+void Group::TransactReverser::execute(Group& group)
 {
     sync_table();
-    return new ReversedInputStream(m_denc.data(), m_instructions);
+    ReversedInputStream reversed_log(m_encoder.m_transact_log_buffer.data(), m_instructions);
+    Replication::TransactLogParser parser(reversed_log);
+    TransactAdvancer advancer(group);
+    parser.parse(advancer);
 }
-#endif
-
-
-
-
 
 
 void Group::reverse_transact(ref_type new_top_ref, const BinaryData& log)
 {
     MultiLogInputStream in(&log, (&log)+1);
     Replication::TransactLogParser parser(in);
-    TIGHTDB_ASSERT(false);
-#if 0
-    TransactReverser reverser;
+    ReverseReplication encoder("reversal");
+    TransactReverser reverser(encoder);
     parser.parse(reverser);
-    // FIXME: find a better way to do this - possibly by moving the reverse parsing into
-    // a method on the reverser:
-    // It is important that the reverser is kept alive until after completion of
-    // the reverse parse, because it holds the memory referenced during the parse.
-    Replication::InputStream* reversed_log = reverser.get_reversed_log();
-    Replication::TransactLogParser reverse_parser(*reversed_log);
-    // then execute the selected instructions in reverse order.
-    TransactAdvancer advancer(*this);
-    reverse_parser.parse(advancer);
-    delete reversed_log;
-#endif
+    reverser.execute(*this);
+
     // restore group internal arrays to state before transaction (rollback state)
     init_from_ref(new_top_ref);
 

@@ -515,6 +515,7 @@ protected:
 
     static void apply_transact_log(const char* data, std::size_t size, SharedGroup& target,
                                    std::ostream* apply_log = 0);
+    void prepare_to_write();
 
 private:
     const std::string m_database_file;
@@ -528,8 +529,11 @@ private:
     void do_clear_interrupt() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     void do_transact_log_reserve(std::size_t n) TIGHTDB_OVERRIDE;
     void do_transact_log_append(const char* data, std::size_t size) TIGHTDB_OVERRIDE;
+    void internal_transact_log_reserve(std::size_t);
 
-    void transact_log_reserve(std::size_t);
+    std::size_t transact_log_size();
+
+    friend class Group::TransactReverser;
 };
 
 
@@ -1861,7 +1865,12 @@ inline TrivialReplication::TrivialReplication(const std::string& database_file):
 {
 }
 
-inline void TrivialReplication::transact_log_reserve(std::size_t n)
+inline std::size_t TrivialReplication::transact_log_size()
+{
+    return m_transact_log_free_begin - m_transact_log_buffer.data();
+}
+
+inline void TrivialReplication::internal_transact_log_reserve(std::size_t n)
 {
     char* data = m_transact_log_buffer.data();
     std::size_t size = m_transact_log_free_begin - data;
