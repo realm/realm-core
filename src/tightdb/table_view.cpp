@@ -411,6 +411,9 @@ void TableViewBase::do_sync()
     }
     // precondition: m_table is attached
     else if (!m_query.m_table) {
+        // This case gets invoked if the TableView origined from Table::find_all(T value). It is temporarely disabled 
+        // because it doesn't take the search parameter in count. FIXME/Todo
+        TIGHTDB_ASSERT(false);
         // no valid query
         m_row_indexes.clear();
         for (size_t i = 0; i < m_table->size(); i++)
