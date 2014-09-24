@@ -377,6 +377,25 @@ get_dist_log_path()
     printf "%s\n" "$path"
 }
 
+download_openssl()
+{
+    if [ -d openssl ]; then
+        return 0
+    fi
+
+    local enabled
+    enabled="$(get_config_param "ENABLE_ENCRYPTION")" || return 1
+    if [ "$enabled" != "yes" ]; then
+        return 0
+    fi
+
+    echo 'Downloading OpenSSL...'
+    curl -L -s "http://www.openssl.org/source/openssl-1.0.1i.tar.gz" -o openssl.tar.gz || return 1
+    tar -xzf openssl.tar.gz || return 1
+    mv openssl-1.0.1i openssl || return 1
+    rm openssl.tar.gz || return 1
+}
+
 
 case "$MODE" in
 
@@ -620,6 +639,8 @@ EOF
 
     "build-android")
         auto_configure || exit 1
+        download_openssl || exit 1
+
         export TIGHTDB_HAVE_CONFIG="1"
         android_ndk_home="$(get_config_param "ANDROID_NDK_HOME")" || exit 1
         if [ "$android_ndk_home" = "none" ]; then
@@ -656,6 +677,7 @@ EOF
             # `bash` and must therefore be executed by `bash`.
             make_toolchain="$android_ndk_home/build/tools/make-standalone-toolchain.sh"
             bash "$make_toolchain" --platform="android-$platform" --toolchain="$android_toolchain" --install-dir="$temp_dir" --arch="$target" || exit 1
+
             path="$temp_dir/bin:$PATH"
             cc="$(cd "$temp_dir/bin" && echo $android_prefix-linux-*-gcc)" || exit 1
             cflags_arch=""
@@ -665,7 +687,26 @@ EOF
                 word_list_append "cflags_arch" "-mthumb -march=armv7-a -mfloat-abi=softfp -mfpu=vfpv3-d16" || exit 1
             fi
             denom="android-$target"
+
+            libcrypto_name="libcrypto-$denom.a"
+            if ! [ -f "ANDROID_DIR/$libcrypto_name" ]; then
+                (
+                    cd openssl
+                    export MACHINE=$target
+                    export RELEASE=2.6.37
+                    export SYSTEM=android
+                    export ARCH=arm
+                    export HOSTCC=gcc
+                    PATH="$path" CC="$cc" ./config no-idea no-camellia no-seed no-bf no-cast no-des no-rc2 no-rc4 no-rc5 no-md2 no-md4 no-ripemd no-mdc2 no-rsa no-dsa no-dh no-ec no-ecdsa no-ecdh no-sock no-ssl2 no-ssl3 no-err no-krb5 no-engine no-srtp no-speed || exit 1
+                    $MAKE clean
+                )
+
+                PATH="$path" CC="$cc" CFLAGS="$cflags_arch" $MAKE -C "openssl" build_libs || exit 1
+                cp "openssl/libcrypto.a" "$ANDROID_DIR/$libcrypto_name" || exit 1
+            fi
+
             PATH="$path" CC="$cc" $MAKE -C "src/tightdb" CC_IS="gcc" BASE_DENOM="$denom" CFLAGS_ARCH="$cflags_arch" "libtightdb-$denom.a" || exit 1
+
             cp "src/tightdb/libtightdb-$denom.a" "$ANDROID_DIR" || exit 1
             rm -rf "$temp_dir" || exit 1
         done
