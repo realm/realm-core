@@ -20,6 +20,15 @@
 
 ----------------------------------------------
 
+# 0.83.1 Release notes
+
+### Bugfixes:
+
+* Fixed bug where a TableView generated from a LinkViewRef did not update when
+  the origin or target table changed.
+
+----------------------------------------------
+
 # 0.83.0 Release notes
 
 ### API breaking changes:
