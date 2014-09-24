@@ -688,6 +688,7 @@ EOF
             fi
             denom="android-$target"
 
+            # Build OpenSSL if needed
             libcrypto_name="libcrypto-$denom.a"
             if ! [ -f "ANDROID_DIR/$libcrypto_name" ]; then
                 (
@@ -697,19 +698,39 @@ EOF
                     export SYSTEM=android
                     export ARCH=arm
                     export HOSTCC=gcc
-                    PATH="$path" CC="$cc" ./config no-idea no-camellia no-seed no-bf no-cast no-des no-rc2 no-rc4 no-rc5 no-md2 no-md4 no-ripemd no-mdc2 no-rsa no-dsa no-dh no-ec no-ecdsa no-ecdh no-sock no-ssl2 no-ssl3 no-err no-krb5 no-engine no-srtp no-speed || exit 1
+                    export PATH="$path"
+                    export CC="$cc"
+                    ./config no-idea no-camellia no-seed no-bf no-cast no-des no-rc2 no-rc4 no-rc5 no-md2 no-md4 no-ripemd no-mdc2 no-rsa no-dsa no-dh no-ec no-ecdsa no-ecdh no-sock no-ssl2 no-ssl3 no-err no-krb5 no-engine no-srtp no-speed || exit 1
                     $MAKE clean
-                )
+                ) || exit 1
 
                 PATH="$path" CC="$cc" CFLAGS="$cflags_arch" $MAKE -C "openssl" build_libs || exit 1
                 cp "openssl/libcrypto.a" "$ANDROID_DIR/$libcrypto_name" || exit 1
             fi
 
+            # Build tightdb
             PATH="$path" CC="$cc" $MAKE -C "src/tightdb" CC_IS="gcc" BASE_DENOM="$denom" CFLAGS_ARCH="$cflags_arch" "libtightdb-$denom.a" || exit 1
 
-            cp "src/tightdb/libtightdb-$denom.a" "$ANDROID_DIR" || exit 1
+            # Merge OpenSSL and tightdb into one static library
+            mkdir ar-temp
+            (
+                AR="$(echo "$temp_dir/bin/$android_prefix-linux-*-gcc-ar")" || exit 1
+                RANLIB="$(echo "$temp_dir/bin/$android_prefix-linux-*-gcc-ranlib")" || exit 1
+                cd ar-temp
+                echo $AR x "../$ANDROID_DIR/$libcrypto_name" || exit 1
+                $AR x "../$ANDROID_DIR/$libcrypto_name" || exit 1
+                find . ! -name '*aes*' -a ! -name '*cbc128*' -delete || exit 1
+                $AR x "../src/tightdb/libtightdb-$denom.a" || exit 1
+                $AR r "../$ANDROID_DIR/libtightdb-$denom.a" *.o || exit 1
+                $RANLIB "../$ANDROID_DIR/libtightdb-$denom.a"
+            ) || exit 1
+            rm -r ar-temp
+
+            # libtool -static -o "$ANDROID_DIR/libtightdb-$denom.a" "$ANDROID_DIR/$libcrypto_name" "src/tightdb/libtightdb-$denom.a" || exit 1
+            # cp "src/tightdb/libtightdb-$denom.a" "$ANDROID_DIR" || exit 1
             rm -rf "$temp_dir" || exit 1
         done
+
         echo "Copying headers to '$ANDROID_DIR/include'"
         mkdir -p "$ANDROID_DIR/include" || exit 1
         cp "src/tightdb.hpp" "$ANDROID_DIR/include/" || exit 1
