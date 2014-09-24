@@ -94,30 +94,11 @@
     } \
     while(false)
 
-#define CHECK_THROW_EX(expr, exception_class, exception_cond) \
-    do { \
-        try { \
-            (expr); \
-            test_results.throw_ex_failed(__FILE__, __LINE__, #expr, #exception_class, \
-                                         #exception_cond); \
-        } \
-        catch (exception_class& e) { \
-            if (exception_cond) { \
-                test_results.check_succeeded(); \
-            } \
-            else { \
-                test_results.throw_ex_cond_failed(__FILE__, __LINE__, #expr, #exception_class, \
-                                                  #exception_cond); \
-            } \
-        } \
-    } \
-    while(false)
-
 #define CHECK_THROW_ANY(expr) \
     do { \
         try { \
             (expr); \
-            test_results.throw_any_failed(__FILE__, __LINE__, #expr); \
+            test_results.throw_failed(__FILE__, __LINE__, #expr); \
         } \
         catch (...) { \
             test_results.check_succeeded(); \
@@ -382,13 +363,7 @@ public:
 
     void check_succeeded();
 
-    void throw_failed(const char* file, long line, const char* expr_text,
-                      const char* exception_name);
-    void throw_ex_failed(const char* file, long line, const char* expr_text,
-                         const char* exception_name, const char* exception_cond_text);
-    void throw_ex_cond_failed(const char* file, long line, const char* expr_text,
-                              const char* exception_name, const char* exception_cond_text);
-    void throw_any_failed(const char* file, long line, const char* expr_text);
+    void throw_failed(const char* file, long line, const char* expr_text, const char* exception = 0);
 
 private:
     Test* m_test;

@@ -573,45 +573,11 @@ public:
                 if (TIGHTDB_LIKELY(col_ndx < m_table->get_column_count())) {
 #ifdef TIGHTDB_DEBUG
                     if (m_log)
-                        *m_log << "table->add_search_index("<<col_ndx<<")\n";
+                        *m_log << "table->set_index("<<col_ndx<<")\n";
 #endif
-                    m_table->add_search_index(col_ndx); // Throws
+                    m_table->set_index(col_ndx); // Throws
                     return true;
                 }
-            }
-        }
-        return false;
-    }
-
-    bool add_primary_key(size_t col_ndx)
-    {
-        if (TIGHTDB_LIKELY(m_table)) {
-            if (TIGHTDB_LIKELY(!m_table->has_shared_type())) {
-                if (TIGHTDB_LIKELY(col_ndx < m_table->get_column_count())) {
-#ifdef TIGHTDB_DEBUG
-                    if (m_log)
-                        *m_log << "table->add_primary_key("<<col_ndx<<")\n";
-#endif
-                    // Fails if there are duplicate values, but given valid
-                    // transaction logs, there never will be.
-                    bool success = m_table->try_add_primary_key(col_ndx); // Throws
-                    return success;
-                }
-            }
-        }
-        return false;
-    }
-
-    bool remove_primary_key()
-    {
-        if (TIGHTDB_LIKELY(m_table)) {
-            if (TIGHTDB_LIKELY(!m_table->has_shared_type())) {
-#ifdef TIGHTDB_DEBUG
-                if (m_log)
-                    *m_log << "table->remove_primary_key()\n";
-#endif
-                m_table->remove_primary_key(); // Throws
-                return true;
             }
         }
         return false;

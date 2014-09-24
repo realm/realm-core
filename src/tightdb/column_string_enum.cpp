@@ -1,15 +1,12 @@
 #include <iostream>
 #include <iomanip>
 
-#include <tightdb/util/unique_ptr.hpp>
-
 #include <tightdb/column_string_enum.hpp>
 #include <tightdb/index_string.hpp>
 #include <tightdb/table.hpp>
 
 using namespace std;
 using namespace tightdb;
-using namespace tightdb::util;
 
 
 namespace {
@@ -60,7 +57,7 @@ void ColumnStringEnum::set(size_t ndx, StringData value)
 {
     TIGHTDB_ASSERT(ndx < Column::size());
 
-    // Update search index
+    // Update index
     // (it is important here that we do it before actually setting
     //  the value, or the index would not be able to find the correct
     //  position to update (as it looks for the old value))
@@ -104,7 +101,7 @@ void ColumnStringEnum::erase(size_t ndx, bool is_last)
 {
     TIGHTDB_ASSERT(ndx < Column::size());
 
-    // Update search index
+    // Update index
     // (it is important here that we do it before actually setting
     //  the value, or the index would not be able to find the correct
     //  position to update (as it looks for the old value))
@@ -254,12 +251,12 @@ bool ColumnStringEnum::compare_string(const ColumnStringEnum& c) const
 }
 
 
-StringIndex& ColumnStringEnum::create_search_index()
+StringIndex& ColumnStringEnum::create_index()
 {
     TIGHTDB_ASSERT(!m_search_index);
 
-    UniquePtr<StringIndex> index;
-    index.reset(new StringIndex(this, &get_string, m_array->get_alloc())); // Throws
+    // Create new index
+    m_search_index = new StringIndex(this, &get_string, m_array->get_alloc()); // Throws
 
     // Populate the index
     size_t num_rows = size();
@@ -267,32 +264,24 @@ StringIndex& ColumnStringEnum::create_search_index()
         StringData value = get(row_ndx);
         size_t num_rows = 1;
         bool is_append = true;
-        index->insert(row_ndx, value, num_rows, is_append); // Throws
+        m_search_index->insert(row_ndx, value, num_rows, is_append); // Throws
     }
 
-    m_search_index = index.release();
     return *m_search_index;
 }
 
 
-void ColumnStringEnum::set_search_index_ref(ref_type ref, ArrayParent* parent,
-                                            size_t ndx_in_parent, bool allow_duplicate_valaues)
+void ColumnStringEnum::set_index_ref(ref_type ref, ArrayParent* parent, size_t ndx_in_parent)
 {
     TIGHTDB_ASSERT(!m_search_index);
     m_search_index = new StringIndex(ref, parent, ndx_in_parent, this, &get_string,
-                                     !allow_duplicate_valaues, m_array->get_alloc()); // Throws
+                                     m_array->get_alloc()); // Throws
 }
 
 
-void ColumnStringEnum::set_search_index_allow_duplicate_values(bool allow) TIGHTDB_NOEXCEPT
+void ColumnStringEnum::install_index(StringIndex* index) TIGHTDB_NOEXCEPT
 {
-    m_search_index->set_allow_duplicate_values(allow);
-}
-
-
-void ColumnStringEnum::install_search_index(StringIndex* index) TIGHTDB_NOEXCEPT
-{
-    TIGHTDB_ASSERT(!m_search_index);
+    TIGHTDB_ASSERT(m_search_index == null_ptr);
 
     index->set_target(this, &get_string);
     m_search_index = index; // we now own this index
@@ -376,12 +365,9 @@ void leaf_dumper(MemRef mem, Allocator& alloc, ostream& out, int level)
 
 } // anonymous namespace
 
-void ColumnStringEnum::do_dump_node_structure(ostream& out, int level) const
+void ColumnStringEnum::dump_node_structure(ostream& out, int level) const
 {
     m_array->dump_bptree_structure(out, level, &leaf_dumper);
-    int indent = level * 2;
-    out << setw(indent) << "" << "Search index\n";
-    m_search_index->do_dump_node_structure(out, level+1);
 }
 
 #endif // TIGHTDB_DEBUG

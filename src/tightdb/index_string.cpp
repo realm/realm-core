@@ -1,6 +1,5 @@
 #include <cstdio>
 
-#include <tightdb/exceptions.hpp>
 #include <tightdb/index_string.hpp>
 
 using namespace std;
@@ -39,14 +38,12 @@ Array* StringIndex::create_node(Allocator& alloc, bool is_leaf)
     return top.release();
 }
 
-
 void StringIndex::set_target(void* target_column, StringGetter get_func) TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(target_column);
     m_target_column = target_column;
     m_get_func      = get_func;
 }
-
 
 StringIndex::key_type StringIndex::GetLastKey() const
 {
@@ -55,46 +52,32 @@ StringIndex::key_type StringIndex::GetLastKey() const
     return key_type(offsets.back());
 }
 
-
-void StringIndex::set(size_t row_ndx, StringData old_value, StringData new_value)
+void StringIndex::set(size_t ndx, StringData old_value, StringData new_value)
 {
-    if (TIGHTDB_LIKELY(new_value != old_value)) {
-        size_t offset = 0; // First key is at beginning of string
-        insert_with_offset(row_ndx, new_value, offset); // Throws
-
-        bool is_last = true; // To avoid updating refs
-        erase(row_ndx, old_value, is_last); // Throws
-    }
+    bool is_last = true; // To avoid updating refs
+    erase(ndx, old_value, is_last);
+    insert(ndx, new_value, 1, is_last);
 }
-
 
 void StringIndex::insert(size_t row_ndx, StringData value, size_t num_rows, bool is_append)
 {
-    // If the new row is inserted after the last row in the table, we don't need
-    // to adjust any row indexes.
-    if (!is_append) {
-        for (size_t i = 0; i < num_rows; ++i) {
-            size_t row_ndx_2 = row_ndx + i;
-            adjust_row_indexes(row_ndx_2, 1); // Throws
-        }
-    }
-
     for (size_t i = 0; i < num_rows; ++i) {
         size_t row_ndx_2 = row_ndx + i;
-        size_t offset = 0; // First key is at beginning of string
-        insert_with_offset(row_ndx_2, value, offset); // Throws
+        // If it is last item in column, we don't have to update refs
+        if (!is_append)
+            UpdateRefs(row_ndx_2, 1);
+
+        InsertWithOffset(row_ndx_2, 0, value);
     }
 }
 
-
-void StringIndex::insert_with_offset(size_t row_ndx, StringData value, size_t offset)
+void StringIndex::InsertWithOffset(size_t row_ndx, size_t offset, StringData value)
 {
     // Create 4 byte index key
     key_type key = create_key(value.substr(offset));
 
-    TreeInsert(row_ndx, key, offset, value); // Throws
+    TreeInsert(row_ndx, key, offset, value);
 }
-
 
 void StringIndex::InsertRowList(size_t ref, size_t offset, StringData value)
 {
@@ -119,7 +102,7 @@ void StringIndex::InsertRowList(size_t ref, size_t offset, StringData value)
 
 #ifdef TIGHTDB_DEBUG
     // Since we only use this for moving existing values to new
-    // subindexes, there should never be an existing match.
+    // sub-indexes, there should never be an existing match.
     key_type k = key_type(values.get(ins_pos));
     TIGHTDB_ASSERT(k != key);
 #endif
@@ -128,7 +111,6 @@ void StringIndex::InsertRowList(size_t ref, size_t offset, StringData value)
     values.insert(ins_pos, key);
     m_array->insert(ins_pos+1, ref);
 }
-
 
 void StringIndex::TreeInsert(size_t row_ndx, key_type key, size_t offset, StringData value)
 {
@@ -164,7 +146,6 @@ void StringIndex::TreeInsert(size_t row_ndx, key_type key, size_t offset, String
     TIGHTDB_ASSERT(false);
 }
 
-
 StringIndex::NodeChange StringIndex::DoInsert(size_t row_ndx, key_type key, size_t offset, StringData value)
 {
     Allocator& alloc = m_array->get_alloc();
@@ -184,11 +165,10 @@ StringIndex::NodeChange StringIndex::DoInsert(size_t row_ndx, key_type key, size
         // Get sublist
         size_t refs_ndx = node_ndx+1; // first entry in refs points to offsets
         ref_type ref = m_array->get_as_ref(refs_ndx);
-        StringIndex target(ref, m_array, refs_ndx, m_target_column, m_get_func,
-                           m_deny_duplicate_values, alloc);
+        StringIndex target(ref, m_array, refs_ndx, m_target_column, m_get_func, alloc);
 
         // Insert item
-        NodeChange nc = target.DoInsert(row_ndx, key, offset, value);
+        const NodeChange nc = target.DoInsert(row_ndx, key, offset, value);
         if (nc.type ==  NodeChange::none) {
             // update keys
             key_type last_key = target.GetLastKey();
@@ -296,7 +276,6 @@ StringIndex::NodeChange StringIndex::DoInsert(size_t row_ndx, key_type key, size
     return NodeChange::none;
 }
 
-
 void StringIndex::NodeInsertSplit(size_t ndx, size_t new_ref)
 {
     TIGHTDB_ASSERT(!root_is_leaf());
@@ -313,10 +292,8 @@ void StringIndex::NodeInsertSplit(size_t ndx, size_t new_ref)
     // Get sublists
     size_t refs_ndx = ndx+1; // first entry in refs points to offsets
     ref_type orig_ref = m_array->get_as_ref(refs_ndx);
-    StringIndex orig_col(orig_ref, m_array, refs_ndx, m_target_column, m_get_func,
-                         m_deny_duplicate_values, alloc);
-    StringIndex new_col(new_ref, 0, 0, m_target_column, m_get_func,
-                        m_deny_duplicate_values, alloc);
+    StringIndex orig_col(orig_ref, m_array, refs_ndx, m_target_column, m_get_func, alloc);
+    StringIndex new_col(new_ref, 0, 0, m_target_column, m_get_func, alloc);
 
     // Update original key
     key_type last_key = orig_col.GetLastKey();
@@ -327,7 +304,6 @@ void StringIndex::NodeInsertSplit(size_t ndx, size_t new_ref)
     offsets.insert(ndx+1, new_key);
     m_array->insert(ndx+2, new_ref);
 }
-
 
 void StringIndex::NodeInsert(size_t ndx, size_t ref)
 {
@@ -342,14 +318,12 @@ void StringIndex::NodeInsert(size_t ndx, size_t ref)
     TIGHTDB_ASSERT(ndx <= offsets.size());
     TIGHTDB_ASSERT(offsets.size() < TIGHTDB_MAX_BPNODE_SIZE);
 
-    StringIndex col(ref, 0, 0, m_target_column, m_get_func,
-                    m_deny_duplicate_values, alloc);
+    StringIndex col(ref, 0, 0, m_target_column, m_get_func, alloc);
     key_type last_key = col.GetLastKey();
 
     offsets.insert(ndx, last_key);
     m_array->insert(ndx+1, ref);
 }
-
 
 bool StringIndex::LeafInsert(size_t row_ndx, key_type key, size_t offset, StringData value, bool noextend)
 {
@@ -362,6 +336,7 @@ bool StringIndex::LeafInsert(size_t row_ndx, key_type key, size_t offset, String
     TIGHTDB_ASSERT(m_array->size() == values.size()+1);
 
     size_t ins_pos = values.lower_bound_int(key);
+    size_t ins_pos_refs = ins_pos + 1; // first entry in refs points to offsets
     if (ins_pos == values.size()) {
         if (noextend)
             return false;
@@ -373,7 +348,6 @@ bool StringIndex::LeafInsert(size_t row_ndx, key_type key, size_t offset, String
         return true;
     }
 
-    size_t ins_pos_refs = ins_pos + 1; // first entry in refs points to offsets
     key_type k = key_type(values.get(ins_pos));
 
     // If key is not present we add it at the correct location
@@ -387,18 +361,14 @@ bool StringIndex::LeafInsert(size_t row_ndx, key_type key, size_t offset, String
         return true;
     }
 
-    // This leaf already has a slot for for the key
-
-    int_fast64_t slot_value = m_array->get(ins_pos+1);
-    size_t suboffset = offset + 4;
+    int64_t ref = m_array->get(ins_pos+1);
+    size_t sub_offset = offset + 4;
 
     // Single match (lowest bit set indicates literal row_ndx)
-    if (slot_value % 2 != 0) {
-        size_t row_ndx2 = to_size_t(slot_value / 2);
+    if (ref & 1) {
+        size_t row_ndx2 = size_t(uint64_t(ref) >> 1);
         StringData v2 = get(row_ndx2);
         if (v2 == value) {
-            if (m_deny_duplicate_values)
-                throw LogicError(LogicError::unique_constraint_violation);
             // convert to list (in sorted order)
             Array row_list(alloc);
             row_list.create(Array::type_Normal); // Throws
@@ -407,27 +377,24 @@ bool StringIndex::LeafInsert(size_t row_ndx, key_type key, size_t offset, String
             m_array->set(ins_pos_refs, row_list.get_ref());
         }
         else {
-            // convert to subindex
-            StringIndex subindex(m_target_column, m_get_func, m_array->get_alloc());
-            subindex.insert_with_offset(row_ndx2, v2, suboffset);
-            subindex.insert_with_offset(row_ndx, value, suboffset);
-            m_array->set(ins_pos_refs, subindex.get_ref());
+            // convert to sub-index
+            StringIndex sub_index(m_target_column, m_get_func, m_array->get_alloc());
+            sub_index.InsertWithOffset(row_ndx2, sub_offset, v2);
+            sub_index.InsertWithOffset(row_ndx, sub_offset, value);
+            m_array->set(ins_pos_refs, sub_index.get_ref());
         }
         return true;
     }
 
-    // If there already is a list of matches, we see if we fit there
-    // or it has to be split into a subindex
-    ref_type ref = to_ref(slot_value);
-    if (!Array::get_context_flag_from_header(alloc.translate(ref))) {
-        Column sub(alloc, ref); // Throws
+    // If there alrady is a list of matches, we see if we fit there
+    // or it has to be split into a sub-index
+    if (!Array::get_context_flag_from_header(alloc.translate(to_ref(ref)))) {
+        Column sub(alloc, to_ref(ref)); // Throws
         sub.set_parent(m_array, ins_pos_refs);
 
-        size_t r1 = to_size_t(sub.get(0));
+        size_t r1 = size_t(sub.get(0));
         StringData v2 = get(r1);
         if (v2 ==  value) {
-            if (m_deny_duplicate_values)
-                throw LogicError(LogicError::unique_constraint_violation);
             // find insert position (the list has to be kept in sorted order)
             // In most cases we refs will be added to the end. So we test for that
             // first to see if we can avoid the binary search for insert position
@@ -446,29 +413,26 @@ bool StringIndex::LeafInsert(size_t row_ndx, key_type key, size_t offset, String
             }
         }
         else {
-            StringIndex subindex(m_target_column, m_get_func, m_array->get_alloc());
-            subindex.InsertRowList(sub.get_ref(), suboffset, v2);
-            subindex.insert_with_offset(row_ndx, value, suboffset);
-            m_array->set(ins_pos_refs, subindex.get_ref());
+            StringIndex sub_index(m_target_column, m_get_func, m_array->get_alloc());
+            sub_index.InsertRowList(sub.get_ref(), sub_offset, v2);
+            sub_index.InsertWithOffset(row_ndx, sub_offset, value);
+            m_array->set(ins_pos_refs, sub_index.get_ref());
         }
         return true;
     }
 
-    // subindex
-    StringIndex subindex(ref, m_array, ins_pos_refs, m_target_column, m_get_func,
-                         m_deny_duplicate_values, alloc);
-    subindex.insert_with_offset(row_ndx, value, suboffset);
+    // sub-index
+    StringIndex sub_index(to_ref(ref), m_array, ins_pos_refs, m_target_column, m_get_func, alloc);
+    sub_index.InsertWithOffset(row_ndx, sub_offset, value);
 
     return true;
 }
-
 
 size_t StringIndex::find_first(StringData value) const
 {
     // Use direct access method
     return m_array->IndexStringFindFirst(value, m_target_column, m_get_func);
 }
-
 
 void StringIndex::find_all(Column& result, StringData value) const
 {
@@ -483,14 +447,12 @@ FindRes StringIndex::find_all(StringData value, size_t& ref) const
     return m_array->IndexStringFindAllNoCopy(value, ref, m_target_column, m_get_func);
 }
 
-
 size_t StringIndex::count(StringData value) const
 
 {
     // Use direct access method
     return m_array->IndexStringCount(value, m_target_column, m_get_func);
 }
-
 
 void StringIndex::distinct(Column& result) const
 {
@@ -501,8 +463,7 @@ void StringIndex::distinct(Column& result) const
     if (m_array->is_inner_bptree_node()) {
         for (size_t i = 1; i < count; ++i) {
             size_t ref = m_array->get_as_ref(i);
-            StringIndex ndx(ref, 0, 0, m_target_column, m_get_func,
-                            m_deny_duplicate_values, alloc);
+            const StringIndex ndx(ref, 0, 0, m_target_column, m_get_func, alloc);
             ndx.distinct(result);
         }
     }
@@ -516,10 +477,9 @@ void StringIndex::distinct(Column& result) const
                result.add(r);
             }
             else {
-                // A real ref either points to a list or a subindex
+                // A real ref either points to a list or a sub-index
                 if (Array::get_context_flag_from_header(alloc.translate(to_ref(ref)))) {
-                    StringIndex ndx(to_ref(ref), m_array, i, m_target_column, m_get_func,
-                                    m_deny_duplicate_values, alloc);
+                    const StringIndex ndx(to_ref(ref), m_array, i, m_target_column, m_get_func, alloc);
                     ndx.distinct(result);
                 }
                 else {
@@ -532,8 +492,7 @@ void StringIndex::distinct(Column& result) const
     }
 }
 
-
-void StringIndex::adjust_row_indexes(size_t min_row_ndx, int diff)
+void StringIndex::UpdateRefs(size_t pos, int diff)
 {
     TIGHTDB_ASSERT(diff == 1 || diff == -1); // only used by insert and delete
 
@@ -543,9 +502,8 @@ void StringIndex::adjust_row_indexes(size_t min_row_ndx, int diff)
     if (m_array->is_inner_bptree_node()) {
         for (size_t i = 1; i < count; ++i) {
             size_t ref = m_array->get_as_ref(i);
-            StringIndex ndx(ref, m_array, i, m_target_column, m_get_func,
-                            m_deny_duplicate_values, alloc);
-            ndx.adjust_row_indexes(min_row_ndx, diff);
+            StringIndex ndx(ref, m_array, i, m_target_column, m_get_func, alloc);
+            ndx.UpdateRefs(pos, diff);
         }
     }
     else {
@@ -555,28 +513,26 @@ void StringIndex::adjust_row_indexes(size_t min_row_ndx, int diff)
             // low bit set indicate literal ref (shifted)
             if (ref & 1) {
                 size_t r = size_t(uint64_t(ref) >> 1);
-                if (r >= min_row_ndx) {
+                if (r >= pos) {
                     size_t adjusted_ref = ((r + diff) << 1)+1;
                     m_array->set(i, adjusted_ref);
                 }
             }
             else {
-                // A real ref either points to a list or a subindex
+                // A real ref either points to a list or a sub-index
                 if (Array::get_context_flag_from_header(alloc.translate(to_ref(ref)))) {
-                    StringIndex ndx(to_ref(ref), m_array, i, m_target_column, m_get_func,
-                                    m_deny_duplicate_values, alloc);
-                    ndx.adjust_row_indexes(min_row_ndx, diff);
+                    StringIndex ndx(to_ref(ref), m_array, i, m_target_column, m_get_func, alloc);
+                    ndx.UpdateRefs(pos, diff);
                 }
                 else {
                     Column sub(alloc, to_ref(ref)); // Throws
                     sub.set_parent(m_array, i);
-                    sub.adjust_ge(min_row_ndx, diff);
+                    sub.adjust_ge(pos, diff);
                 }
             }
         }
     }
 }
-
 
 void StringIndex::clear()
 {
@@ -590,7 +546,6 @@ void StringIndex::clear()
     size_t size = 1;
     m_array->truncate_and_destroy_children(size); // Don't touch `values` array
 }
-
 
 void StringIndex::erase(size_t row_ndx, StringData value, bool is_last)
 {
@@ -611,9 +566,8 @@ void StringIndex::erase(size_t row_ndx, StringData value, bool is_last)
 
     // If it is last item in column, we don't have to update refs
     if (!is_last)
-        adjust_row_indexes(row_ndx, -1);
+        UpdateRefs(row_ndx, -1);
 }
-
 
 void StringIndex::DoDelete(size_t row_ndx, StringData value, size_t offset)
 {
@@ -631,8 +585,7 @@ void StringIndex::DoDelete(size_t row_ndx, StringData value, size_t offset)
 
     if (m_array->is_inner_bptree_node()) {
         ref_type ref = m_array->get_as_ref(pos_refs);
-        StringIndex node(ref, m_array, pos_refs, m_target_column, m_get_func,
-                         m_deny_duplicate_values, alloc);
+        StringIndex node(ref, m_array, pos_refs, m_target_column, m_get_func, alloc);
         node.DoDelete(row_ndx, value, offset);
 
         // Update the ref
@@ -655,16 +608,15 @@ void StringIndex::DoDelete(size_t row_ndx, StringData value, size_t offset)
             m_array->erase(pos_refs);
         }
         else {
-            // A real ref either points to a list or a subindex
+            // A real ref either points to a list or a sub-index
             if (Array::get_context_flag_from_header(alloc.translate(to_ref(ref)))) {
-                StringIndex subindex(to_ref(ref), m_array, pos_refs, m_target_column, m_get_func,
-                                     m_deny_duplicate_values, alloc);
-                subindex.DoDelete(row_ndx, value, offset+4);
+                StringIndex subNdx(to_ref(ref), m_array, pos_refs, m_target_column, m_get_func, alloc);
+                subNdx.DoDelete(row_ndx, value, offset+4);
 
-                if (subindex.is_empty()) {
+                if (subNdx.is_empty()) {
                     values.erase(pos);
                     m_array->erase(pos_refs);
-                    subindex.destroy();
+                    subNdx.destroy();
                 }
             }
             else {
@@ -685,12 +637,10 @@ void StringIndex::DoDelete(size_t row_ndx, StringData value, size_t offset)
     }
 }
 
-
 void StringIndex::update_ref(StringData value, size_t old_row_ndx, size_t new_row_ndx)
 {
     do_update_ref(value, old_row_ndx, new_row_ndx, 0);
 }
-
 
 void StringIndex::do_update_ref(StringData value, size_t row_ndx, size_t new_row_ndx, size_t offset)
 {
@@ -708,8 +658,7 @@ void StringIndex::do_update_ref(StringData value, size_t row_ndx, size_t new_row
 
     if (m_array->is_inner_bptree_node()) {
         ref_type ref = m_array->get_as_ref(pos_refs);
-        StringIndex node(ref, m_array, pos_refs, m_target_column, m_get_func,
-                         m_deny_duplicate_values, alloc);
+        StringIndex node(ref, m_array, pos_refs, m_target_column, m_get_func, alloc);
         node.do_update_ref(value, row_ndx, new_row_ndx, offset);
     }
     else {
@@ -720,11 +669,10 @@ void StringIndex::do_update_ref(StringData value, size_t row_ndx, size_t new_row
             m_array->set(pos_refs, shifted);
         }
         else {
-            // A real ref either points to a list or a subindex
+            // A real ref either points to a list or a sub-index
             if (Array::get_context_flag_from_header(alloc.translate(to_ref(ref)))) {
-                StringIndex subindex(to_ref(ref), m_array, pos_refs, m_target_column, m_get_func,
-                                     m_deny_duplicate_values, alloc);
-                subindex.do_update_ref(value, row_ndx, new_row_ndx, offset+4);
+                StringIndex subNdx(to_ref(ref), m_array, pos_refs, m_target_column, m_get_func, alloc);
+                subNdx.do_update_ref(value, row_ndx, new_row_ndx, offset+4);
             }
             else {
                 Column sub(alloc, to_ref(ref)); // Throws
@@ -736,61 +684,6 @@ void StringIndex::do_update_ref(StringData value, size_t row_ndx, size_t new_row
         }
     }
 }
-
-
-namespace {
-
-bool has_duplicate_values(const Array& node) TIGHTDB_NOEXCEPT
-{
-    Allocator& alloc = node.get_alloc();
-    Array child(alloc);
-    size_t n = node.size();
-    TIGHTDB_ASSERT(n >= 1);
-    if (node.is_inner_bptree_node()) {
-        // Inner node
-        for (size_t i = 1; i < n; ++i) {
-            ref_type ref = node.get_as_ref(i);
-            child.init_from_ref(ref);
-            if (has_duplicate_values(child))
-                return true;
-        }
-        return false;
-    }
-
-    // Leaf node
-    for (size_t i = 1; i < n; ++i) {
-        int_fast64_t value = node.get(i);
-        bool is_single_row_index = value % 2 != 0;
-        if (is_single_row_index)
-            continue;
-
-        ref_type ref = to_ref(value);
-        child.init_from_ref(ref);
-
-        bool is_subindex = child.get_context_flag();
-        if (is_subindex) {
-            if (has_duplicate_values(child))
-                return true;
-            continue;
-        }
-
-        // Child is root of B+-tree of row indexes
-        size_t num_rows = child.is_inner_bptree_node() ? child.get_bptree_size() : child.size();
-        if (num_rows > 1)
-            return true;
-    }
-
-    return false;
-}
-
-} // anonymous namespace
-
-
-bool StringIndex::has_duplicate_values() const TIGHTDB_NOEXCEPT
-{
-    return ::has_duplicate_values(*m_array);
-}
-
 
 bool StringIndex::is_empty() const
 {
@@ -829,7 +722,6 @@ void StringIndex::Verify() const
     // FIXME: Extend verification along the lines of Column::Verify().
 }
 
-
 void StringIndex::verify_entries(const AdaptiveStringColumn& column) const
 {
     Allocator& alloc = Allocator::get_default();
@@ -848,78 +740,6 @@ void StringIndex::verify_entries(const AdaptiveStringColumn& column) const
     }
     results.destroy(); // clean-up
 }
-
-
-void StringIndex::dump_node_structure(const Array& node, ostream& out, int level)
-{
-    int indent = level * 2;
-    Allocator& alloc = node.get_alloc();
-    Array subnode(alloc);
-
-    size_t node_size = node.size();
-    TIGHTDB_ASSERT(node_size >= 1);
-
-    bool node_is_leaf = !node.is_inner_bptree_node();
-    if (node_is_leaf) {
-        out << setw(indent) << "" << "Leaf (B+ tree) (ref: "<<node.get_ref()<<")\n";
-    }
-    else {
-        out << setw(indent) << "" << "Inner node (B+ tree) (ref: "<<node.get_ref()<<")\n";
-    }
-
-    subnode.init_from_ref(to_ref(node.front()));
-    out << setw(indent) << "" << "  Keys (keys_ref: "
-        ""<<subnode.get_ref()<<", ";
-    if (subnode.is_empty()) {
-        out << "no keys";
-    }
-    else {
-        out << "keys: ";
-        for (size_t i = 0; i != subnode.size(); ++i) {
-            if (i != 0)
-                out << ", ";
-            out << subnode[i];
-        }
-    }
-    out << ")\n";
-
-    if (node_is_leaf) {
-        for (size_t i = 1; i != node_size; ++i) {
-            int_fast64_t value = node[i];
-            bool is_single_row_index = value % 2 != 0;
-            if (is_single_row_index) {
-                out << setw(indent) << "" << "  Single row index (value: "<<(value/2)<<")\n";
-                continue;
-            }
-            subnode.init_from_ref(to_ref(value));
-            bool is_subindex = subnode.get_context_flag();
-            if (is_subindex) {
-                out << setw(indent) << "" << "  Subindex\n";
-                dump_node_structure(subnode, out, level+2);
-                continue;
-            }
-            out << setw(indent) << "" << "  List of row indexes\n";
-            Column::dump_node_structure(subnode, out, level+2);
-        }
-        return;
-    }
-
-
-    size_t num_children = node_size - 1;
-    size_t child_ref_begin = 1;
-    size_t child_ref_end = 1 + num_children;
-    for (size_t i = child_ref_begin; i != child_ref_end; ++i) {
-        subnode.init_from_ref(node.get_as_ref(i));
-        dump_node_structure(subnode, out, level+1);
-    }
-}
-
-
-void StringIndex::do_dump_node_structure(std::ostream& out, int level) const
-{
-    dump_node_structure(*m_array, out, level);
-}
-
 
 void StringIndex::to_dot(ostream& out, StringData title) const
 {
@@ -945,7 +765,6 @@ void StringIndex::to_dot_2(ostream& out, StringData title) const
 
     out << "}" << endl;
 }
-
 
 void StringIndex::array_to_dot(ostream& out, const Array& array)
 {
@@ -987,7 +806,6 @@ void StringIndex::array_to_dot(ostream& out, const Array& array)
         array_to_dot(out, r);
     }
 }
-
 
 void StringIndex::keys_to_dot(ostream& out, const Array& array, StringData title)
 {

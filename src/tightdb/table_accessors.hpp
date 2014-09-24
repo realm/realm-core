@@ -795,8 +795,8 @@ public:
         return Field(std::make_pair(m_table, row_idx));
     }
 
-    bool has_search_index() const { return m_table->get_impl()->has_search_index(col_idx); }
-    void add_search_index() const { m_table->get_impl()->add_search_index(col_idx); }
+    bool has_index() const { return m_table->get_impl()->has_index(col_idx); }
+    void set_index() const { m_table->get_impl()->set_index(col_idx); }
 
     BasicTableView<RealTable> get_sorted_view(bool ascending=true) const
     {

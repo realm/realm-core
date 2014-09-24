@@ -99,7 +99,8 @@ public:
 #ifdef TIGHTDB_DEBUG
     void Verify() const;
     void to_dot(std::ostream&, StringData title) const TIGHTDB_OVERRIDE;
-    void do_dump_node_structure(std::ostream&, int) const TIGHTDB_OVERRIDE;
+    void dump_node_structure(std::ostream&, int level) const TIGHTDB_OVERRIDE;
+    using ColumnBase::dump_node_structure;
 #endif
 
 protected:

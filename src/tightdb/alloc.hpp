@@ -38,7 +38,7 @@ class Replication;
 
 typedef std::size_t ref_type;
 
-ref_type to_ref(int64_t) TIGHTDB_NOEXCEPT;
+inline ref_type to_ref(int64_t) TIGHTDB_NOEXCEPT;
 
 class MemRef {
 public:
@@ -205,7 +205,7 @@ inline bool Allocator::should_propagate_version(uint_fast64_t& local_version) TI
 
 // Implementation:
 
-inline ref_type to_ref(int_fast64_t v) TIGHTDB_NOEXCEPT
+inline ref_type to_ref(int64_t v) TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(!util::int_cast_has_overflow<ref_type>(v));
     // Check that v is divisible by 8 (64-bit aligned).

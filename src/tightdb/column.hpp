@@ -52,7 +52,7 @@ template <class T> struct ColumnTemplate : public ColumnTemplateBase
     }
 
     // We cannot use already-existing get() methods because ColumnStringEnum and LinkList inherit from
-    // Column and overload get() with different return type than int64_t. Todo, find a way to simplify
+    // Column and overload get() with different return type than int64_t. Todo, find a way to simplify 
     virtual T get_val(size_t row) const = 0;
 };
 
@@ -61,10 +61,7 @@ class ColumnBase {
 public:
     /// Get the number of entries in this column. This operation is relatively
     /// slow.
-    std::size_t size() const TIGHTDB_NOEXCEPT;
-
-    /// \throw LogicError Thrown if this column is not string valued.
-    virtual void set_string(std::size_t row_ndx, StringData value);
+    std::size_t size() const TIGHTDB_NOEXCEPT { return do_get_size(); }
 
     /// Insert the specified number of default values into this column starting
     /// at the specified row index. Set `is_append` to true if, and only if
@@ -95,11 +92,9 @@ public:
 
     virtual ~ColumnBase() TIGHTDB_NOEXCEPT {};
 
-    // Search index
-    virtual bool has_search_index() const TIGHTDB_NOEXCEPT;
-    virtual void set_search_index_ref(ref_type, ArrayParent*, std::size_t ndx_in_parent,
-                                      bool allow_duplicate_values);
-    virtual void set_search_index_allow_duplicate_values(bool) TIGHTDB_NOEXCEPT;
+    // Indexing
+    virtual bool has_index() const TIGHTDB_NOEXCEPT { return false; }
+    virtual void set_index_ref(ref_type, ArrayParent*, std::size_t) {}
 
     Allocator& get_alloc() const TIGHTDB_NOEXCEPT { return m_array->get_alloc(); }
 
@@ -217,7 +212,7 @@ public:
     virtual void Verify(const Table&, std::size_t col_ndx) const;
     virtual void to_dot(std::ostream&, StringData title = StringData()) const = 0;
     void dump_node_structure() const; // To std::cerr (for GDB)
-    virtual void do_dump_node_structure(std::ostream&, int level) const = 0;
+    virtual void dump_node_structure(std::ostream&, int level) const = 0;
 #endif
 
 protected:
@@ -246,8 +241,7 @@ protected:
     bool root_is_leaf() const TIGHTDB_NOEXCEPT { return !m_array->is_inner_bptree_node(); }
 
     template <class T, class R, Action action, class condition>
-    R aggregate(T target, std::size_t start, std::size_t end, size_t limit = size_t(-1),
-                size_t* return_ndx = null_ptr) const;
+    R aggregate(T target, std::size_t start, std::size_t end, size_t limit = size_t(-1), size_t* return_ndx = null_ptr) const;
 
     /// Introduce a new root node which increments the height of the
     /// tree by one.
@@ -331,11 +325,11 @@ public:
     bool is_empty() const TIGHTDB_NOEXCEPT { return size() == 0; }
 
     // Getting and setting values
-    int_fast64_t get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
+    int64_t get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
     ref_type get_as_ref(std::size_t ndx) const TIGHTDB_NOEXCEPT;
-    int_fast64_t back() const TIGHTDB_NOEXCEPT { return get(size()-1); }
-    void set(std::size_t ndx, int_fast64_t value);
-    void adjust(std::size_t ndx, int_fast64_t diff);
+    int64_t back() const TIGHTDB_NOEXCEPT { return get(size()-1); }
+    void set(std::size_t ndx, int64_t value);
+    void adjust(std::size_t ndx, int64_t diff);
     void add(int_fast64_t value = 0);
     void insert(std::size_t ndx, int_fast64_t value = 0);
 
@@ -403,7 +397,8 @@ public:
     using ColumnBase::Verify;
     void to_dot(std::ostream&, StringData title) const TIGHTDB_OVERRIDE;
     MemStats stats() const;
-    void do_dump_node_structure(std::ostream&, int) const TIGHTDB_OVERRIDE;
+    void dump_node_structure(std::ostream&, int level) const TIGHTDB_OVERRIDE;
+    using ColumnBase::dump_node_structure;
 #endif
 
 protected:
@@ -414,7 +409,6 @@ protected:
 #ifdef TIGHTDB_DEBUG
     void leaf_to_dot(MemRef, ArrayParent*, std::size_t ndx_in_parent,
                      std::ostream&) const TIGHTDB_OVERRIDE;
-    static void dump_node_structure(const Array& root, std::ostream&, int level);
 #endif
 
 private:
@@ -437,11 +431,6 @@ private:
 
 
 // Implementation:
-
-inline std::size_t ColumnBase::size() const TIGHTDB_NOEXCEPT
-{
-    return do_get_size();
-}
 
 inline ColumnBase::ColumnBase(Array* root) TIGHTDB_NOEXCEPT:
     m_array(root)
@@ -467,19 +456,6 @@ inline void ColumnBase::destroy() TIGHTDB_NOEXCEPT
 {
     if (m_array)
         m_array->destroy_deep();
-}
-
-inline bool ColumnBase::has_search_index() const TIGHTDB_NOEXCEPT
-{
-    return false;
-}
-
-inline void ColumnBase::set_search_index_ref(ref_type, ArrayParent*, std::size_t, bool)
-{
-}
-
-inline void ColumnBase::set_search_index_allow_duplicate_values(bool) TIGHTDB_NOEXCEPT
-{
 }
 
 inline void ColumnBase::discard_child_accessors() TIGHTDB_NOEXCEPT
@@ -658,10 +634,10 @@ inline std::size_t Column::size() const TIGHTDB_NOEXCEPT
     return m_array->get_bptree_size();
 }
 
-inline int_fast64_t Column::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
+inline int64_t Column::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < size());
-    if (!m_array->is_inner_bptree_node())
+    if (root_is_leaf())
         return m_array->get(ndx);
 
     std::pair<MemRef, std::size_t> p = m_array->get_bptree_leaf(ndx);

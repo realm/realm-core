@@ -454,9 +454,9 @@ void ColumnMixed::to_dot(ostream& out, StringData title) const
     out << "}" << endl;
 }
 
-void ColumnMixed::do_dump_node_structure(ostream& out, int level) const
+void ColumnMixed::dump_node_structure(ostream& out, int level) const
 {
-    m_types->do_dump_node_structure(out, level); // FIXME: How to do this?
+    m_types->dump_node_structure(out, level); // FIXME: How to do this?
 }
 
 #endif // TIGHTDB_DEBUG
