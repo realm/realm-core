@@ -323,7 +323,7 @@ public:
     Column(move_tag, Column&) TIGHTDB_NOEXCEPT;
 
     ~Column() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-
+    void destroy() TIGHTDB_NOEXCEPT;
     void move_assign(Column&);
     bool IsIntColumn() const TIGHTDB_NOEXCEPT { return true; }
 
@@ -334,7 +334,7 @@ public:
     int_fast64_t get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
     ref_type get_as_ref(std::size_t ndx) const TIGHTDB_NOEXCEPT;
     int_fast64_t back() const TIGHTDB_NOEXCEPT { return get(size()-1); }
-    void set(std::size_t ndx, int_fast64_t value);
+    void set(std::size_t ndx, int64_t value);
     void adjust(std::size_t ndx, int_fast64_t diff);
     void add(int_fast64_t value = 0);
     void insert(std::size_t ndx, int_fast64_t value = 0);
@@ -389,10 +389,12 @@ public:
     /// Compare two columns for equality.
     bool compare_int(const Column&) const TIGHTDB_NOEXCEPT;
 
+    bool has_search_index() const TIGHTDB_NOEXCEPT;
+
     static ref_type create(Allocator&, Array::Type leaf_type = Array::type_Normal,
                            std::size_t size = 0, int_fast64_t value = 0);
 
-    // Overrriding method in ColumnBase
+    // Overriding method in ColumnBase
     ref_type write(std::size_t, std::size_t, std::size_t,
                    _impl::OutputStream&) const TIGHTDB_OVERRIDE;
 
@@ -645,16 +647,13 @@ inline Column::Column(move_tag, Column& col) TIGHTDB_NOEXCEPT
 {
     m_array = col.m_array;
     col.m_array = 0;
+    m_index_column = col.m_index_column;
+    col.m_index_column = null_ptr;
 }
 
 inline Column::Column(Array* root) TIGHTDB_NOEXCEPT:
     ColumnBase(root), m_index_column(null_ptr)
 {
-}
-
-inline Column::~Column() TIGHTDB_NOEXCEPT
-{
-    delete m_array;
 }
 
 inline std::size_t Column::size() const TIGHTDB_NOEXCEPT
@@ -664,7 +663,7 @@ inline std::size_t Column::size() const TIGHTDB_NOEXCEPT
     return m_array->get_bptree_size();
 }
 
-inline int_fast64_t Column::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
+inline int64_t Column::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < size());
     if (!m_array->is_inner_bptree_node())
@@ -749,6 +748,11 @@ inline size_t Column::find_gte(int64_t target, size_t start) const
         ref = not_found;
 
     return ref;
+}
+
+inline bool Column::has_search_index() const TIGHTDB_NOEXCEPT
+{
+    return m_index_column;
 }
 
 } // namespace tightdb

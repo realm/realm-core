@@ -44,7 +44,7 @@ class StringIndex;
 /// column.
 ///
 /// FIXME: Rename AdaptiveStringColumn to StringColumn
-class AdaptiveStringColumn : public ColumnBase, public ColumnTemplate<StringData> {
+class AdaptiveStringColumn: public ColumnBase, public ColumnTemplate<StringData> {
 public:
     typedef StringData value_type;
 

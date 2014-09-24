@@ -56,7 +56,6 @@ StringIndex::key_type StringIndex::GetLastKey() const
 }
 
 
-
 void StringIndex::insert_with_offset(size_t row_ndx, StringData value, size_t offset)
 {
     // Create 4 byte index key
@@ -369,7 +368,7 @@ bool StringIndex::LeafInsert(size_t row_ndx, key_type key, size_t offset, String
         StringData v2 = get(row_ndx2, buffer);
         if (v2 == value) {
             if (m_deny_duplicate_values)
-                throw UniqueConstraintViolation();
+                throw LogicError(LogicError::unique_constraint_violation);
             // convert to list (in sorted order)
             Array row_list(alloc);
             row_list.create(Array::type_Normal); // Throws
@@ -399,7 +398,7 @@ bool StringIndex::LeafInsert(size_t row_ndx, key_type key, size_t offset, String
         StringData v2 = get(r1, buffer);
         if (v2 == value) {
             if (m_deny_duplicate_values)
-                throw UniqueConstraintViolation();
+                throw LogicError(LogicError::unique_constraint_violation);
             // find insert position (the list has to be kept in sorted order)
             // In most cases we refs will be added to the end. So we test for that
             // first to see if we can avoid the binary search for insert position

@@ -466,6 +466,10 @@ ref_type ColumnBase::build(size_t* rest_size_ptr, size_t fixed_height,
 
 void Column::clear()
 {
+    if (m_index_column) {
+        static_cast<StringIndex*>(m_index_column)->clear();
+    }
+
     m_array->clear_and_destroy_children();
     if (m_array->is_inner_bptree_node())
         m_array->set_type(Array::type_Normal);
@@ -478,8 +482,17 @@ void Column::move_assign(Column& col)
     delete m_array;
     m_array = col.m_array;
     col.m_array = 0;
+    m_index_column = col.m_index_column;
+    col.m_index_column = null_ptr;
 }
 
+void Column::destroy() TIGHTDB_NOEXCEPT
+{
+    if (m_array)
+        m_array->destroy_deep();
+    if (m_index_column)
+        static_cast<StringIndex*>(m_index_column)->destroy();
+}
 
 namespace {
 
@@ -511,11 +524,31 @@ struct AdjustLeafElem: Array::UpdateHandler {
     }
 };
 
+// Getter function for string index
+StringData get_string(void* column, size_t ndx, char* buffer)
+{
+    int64_t i = static_cast<Column*>(column)->get(ndx);
+    *reinterpret_cast<int64_t*>(buffer) = i;
+    StringData s = to_str(*reinterpret_cast<int64_t*>(buffer));
+    return s;
+}
+
 } // anonymous namespace
 
-void Column::set(size_t ndx, int_fast64_t value)
+Column::~Column() TIGHTDB_NOEXCEPT
+{
+    delete static_cast<StringIndex*>(m_index_column);
+    delete m_array;
+}
+
+void Column::set(size_t ndx, int64_t value)
 {
     TIGHTDB_ASSERT(ndx < size());
+
+    if (m_index_column) {
+        int64_t oldVal = get(ndx);
+        static_cast<StringIndex*>(m_index_column)->set(ndx, oldVal, value);
+    }
 
     if (!m_array->is_inner_bptree_node()) {
         m_array->set(ndx, value); // Throws
@@ -661,6 +694,11 @@ void Column::erase(size_t ndx, bool is_last)
     TIGHTDB_ASSERT(ndx < size());
     TIGHTDB_ASSERT(is_last == (ndx == size()-1));
 
+    if (m_index_column) {
+        int64_t old_val = get(ndx);
+        static_cast<StringIndex*>(m_index_column)->erase(ndx, old_val, is_last);
+    }
+
     if (!m_array->is_inner_bptree_node()) {
         m_array->erase(ndx); // Throws
         return;
@@ -701,7 +739,18 @@ void Column::move_last_over(size_t target_row_ndx, size_t last_row_ndx)
     TIGHTDB_ASSERT(target_row_ndx < last_row_ndx);
     TIGHTDB_ASSERT(last_row_ndx + 1 == size());
 
-    int_fast64_t value = get(last_row_ndx);
+    if (m_index_column) {
+        // remove the value to be overwritten from index
+        int64_t old_target_value = get(target_row_ndx);
+        bool is_last = true; // This tells StringIndex::erase() to not adjust subsequent indexes
+        static_cast<StringIndex*>(m_index_column)->erase(target_row_ndx, old_target_value, is_last); // Throws
+
+        // update index to point to new location
+        int64_t moved_value = get(last_row_ndx);
+        static_cast<StringIndex*>(m_index_column)->update_ref(moved_value, last_row_ndx, target_row_ndx); // Throws
+    }
+
+    int64_t value = get(last_row_ndx);
     Column::set(target_row_ndx, value); // Throws
 
     bool is_last = true;
@@ -758,22 +807,9 @@ void Column::adjust_ge(int_fast64_t limit, int_fast64_t diff)
     m_array->update_bptree_leaves(leaf_handler); // Throws
 }
 
-namespace {
-
-    // Getter function for string index
-    StringData get_string(void* column, size_t ndx, char* buffer)
-    {
-        int64_t i = static_cast<Column*>(column)->get(ndx);
-        *reinterpret_cast<int64_t*>(buffer) = i;
-        StringData s = to_str(*reinterpret_cast<int64_t*>(buffer));
-        return s;
-    }
-
-} // anonymous namespace
-
 void Column::create_search_index()
 {
-   TIGHTDB_ASSERT(!m_index_column);
+    TIGHTDB_ASSERT(!m_index_column);
     m_index_column = new StringIndex(this, &get_string, m_array->get_alloc()); // Throws
 
     // Populate the index
@@ -835,6 +871,9 @@ void Column::find_all(Column& result, int64_t value, size_t begin, size_t end) c
     TIGHTDB_ASSERT(begin <= size());
     TIGHTDB_ASSERT(end == npos || (begin <= end && end <= size()));
 
+    if (m_index_column && begin == 0 && end == npos)
+        return static_cast<StringIndex*>(m_index_column)->find_all(result, value);
+
     if (root_is_leaf()) {
         size_t leaf_offset = 0;
         m_array->find_all(&result, value, leaf_offset, begin, end); // Throws
@@ -874,9 +913,16 @@ bool Column::compare_int(const Column& c) const TIGHTDB_NOEXCEPT
 }
 
 
-void Column::do_insert(size_t row_ndx, int_fast64_t value, size_t num_rows)
+void Column::do_insert(size_t row_ndx, int64_t value, size_t num_rows)
 {
     TIGHTDB_ASSERT(row_ndx == tightdb::npos || row_ndx < size());
+
+    if (m_index_column) {
+        bool is_append = row_ndx == tightdb::npos;
+        size_t row_ndx_2 = is_append ? size() - num_rows : row_ndx;
+        static_cast<StringIndex*>(m_index_column)->insert(row_ndx_2, value, num_rows, is_append); // Throws
+    }
+
     ref_type new_sibling_ref;
     Array::TreeInsert<Column> state;
     for (size_t i = 0; i != num_rows; ++i) {

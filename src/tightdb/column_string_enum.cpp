@@ -109,8 +109,8 @@ void ColumnStringEnum::erase(size_t ndx, bool is_last)
     //  the value, or the index would not be able to find the correct
     //  position to update (as it looks for the old value))
     if (m_search_index) {
-        StringData old_val = get(ndx);
-        m_search_index->erase(ndx, old_val, is_last);
+      //  StringData old_val = get(ndx);
+        m_search_index->erase2<StringData>(ndx, is_last);
     }
 
     Column::erase(ndx, is_last);

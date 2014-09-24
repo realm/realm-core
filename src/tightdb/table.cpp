@@ -1265,13 +1265,20 @@ void Table::add_search_index(size_t col_ndx)
     if (type == col_type_String) {
         AdaptiveStringColumn& col = get_column_string(col_ndx);
         StringIndex& index = col.create_search_index(); // Throws
-        index.set_parent(&m_columns, column_pos+1);
+        index.set_parent(&m_columns, column_pos + 1);
         index_ref = index.get_ref();
     }
     else if (type == col_type_StringEnum) {
         ColumnStringEnum& col = get_column_string_enum(col_ndx);
         StringIndex& index = col.create_search_index(); // Throws
-        index.set_parent(&m_columns, column_pos+1);
+        index.set_parent(&m_columns, column_pos + 1);
+        index_ref = index.get_ref();
+    }
+    else if (type == col_type_Int) {
+        Column& col = get_column(col_ndx);
+        col.create_search_index(); // Throws
+        StringIndex& index = *static_cast<StringIndex*>(col.m_index_column);
+        index.set_parent(&m_columns, column_pos + 1);
         index_ref = index.get_ref();
     }
     else {
@@ -1307,7 +1314,7 @@ bool Table::has_primary_key() const TIGHTDB_NOEXCEPT
 }
 
 
-void Table::add_primary_key(size_t col_ndx)
+bool Table::try_add_primary_key(size_t col_ndx)
 {
     if (TIGHTDB_UNLIKELY(!is_attached()))
         throw LogicError(LogicError::detached_accessor);
@@ -1332,14 +1339,14 @@ void Table::add_primary_key(size_t col_ndx)
         AdaptiveStringColumn& col_2 = static_cast<AdaptiveStringColumn&>(col);
         StringIndex& index = col_2.get_search_index();
         if (index.has_duplicate_values())
-            throw UniqueConstraintViolation();
+            return false;
         index.set_allow_duplicate_values(false);
     }
     else if (type == col_type_StringEnum) {
         ColumnStringEnum& col_2 = static_cast<ColumnStringEnum&>(col);
         StringIndex& index = col_2.get_search_index();
         if (index.has_duplicate_values())
-            throw UniqueConstraintViolation();
+            return false;
         index.set_allow_duplicate_values(false);
     }
     else {
@@ -1356,6 +1363,8 @@ void Table::add_primary_key(size_t col_ndx)
     if (Replication* repl = get_repl())
         repl->add_primary_key(this, col_ndx); // Throws
 #endif
+
+    return true;
 }
 
 
@@ -2890,7 +2899,7 @@ size_t Table::do_find_pkey_string(StringData value) const
 }
 
 
-template <class T> size_t Table::find_first(size_t col_ndx, T value) const
+template<class T> size_t Table::find_first(size_t col_ndx, T value) const
 {
     TIGHTDB_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
     TIGHTDB_ASSERT(get_real_column_type(col_ndx) == ColumnTypeTraits3<T>::ct_id_real);
@@ -3712,8 +3721,8 @@ void Table::update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT
 
 
 // to JSON: ------------------------------------------
-void Table::to_json_row(std::size_t row_ndx, std::ostream& out, size_t link_depth, std::map<std::string, 
-    std::string>* renames) const
+void Table::to_json_row(std::size_t row_ndx, std::ostream& out, size_t link_depth, std::map<std::string,
+                        std::string>* renames) const
 {
     std::map<std::string, std::string> renames2;
     renames = renames ? renames : &renames2;

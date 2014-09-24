@@ -528,7 +528,7 @@ TEST(StringIndex_FindAllNoCopy_Int)
     col.destroy();
 }
 
-ONLY(StringIndex_FindAllNoCopy_Int2)
+TEST(StringIndex_FindAllNoCopy_Int2)
 {
     // Create a column with duplcate values
     ref_type ref = Column::create(Allocator::get_default());

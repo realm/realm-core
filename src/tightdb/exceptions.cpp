@@ -22,3 +22,5 @@ const char* const LogicError::no_search_index = "Column has no search index";
 const char* const LogicError::no_primary_key = "Table has no primary key";
 
 const char* const LogicError::has_primary_key = "Primary key already added";
+
+const char* const LogicError::unique_constraint_violation = "Unique constraint violation";

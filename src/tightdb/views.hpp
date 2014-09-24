@@ -2,6 +2,7 @@
 #define TIGHTDB_VIEWS_HPP
 
 #include <tightdb/column.hpp>
+#include <tightdb/column_string_enum.hpp>
 
 using namespace tightdb;
 
@@ -32,10 +33,20 @@ public:
         {
             for (size_t t = 0; t < m_columns.size(); t++) {
                 const ColumnBase& cb = m_row_indexes_class->get_column_base(m_columns[t]);
+
                 // todo/fixme, cache casted pointers for speed
                 const ColumnTemplateBase* ctb = dynamic_cast<const ColumnTemplateBase*>(&cb);
                 TIGHTDB_ASSERT(ctb);
-                int c = ctb->compare_values(i, j);
+
+                // todo/fixme, special treatment of ColumnStringEnum by calling ColumnStringEnum::compare_values()
+                // instead of the general ColumnTemplate::compare_values() becuse it cannot overload inherited 
+                // `int64_t get_val()` of Column. Such column inheritance needs to be cleaned up 
+                int c;             
+                if (dynamic_cast<const ColumnStringEnum*>(&cb))
+                    c = static_cast<const ColumnStringEnum*>(&cb)->compare_values(i, j);
+                else
+                    c = ctb->compare_values(i, j);
+
                 if (c != 0)
                     return m_ascending[t] ? c > 0 : c < 0;
             }

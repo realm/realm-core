@@ -163,42 +163,62 @@ fi
 
 find_iphone_sdk()
 {
-    local platform_home sdks version path x version2 sorted highest ambiguous
+    local platform_home sdks highest_version highest_version_dir ambiguous dir settings version higher version_in_dir_1 version_in_dir_2 sorted new_highest_version
     platform_home="$1"
     sdks="$platform_home/Developer/SDKs"
-    version=""
-    dir=""
+    highest_version=""
+    highest_version_dir=""
     ambiguous=""
     cd "$sdks" || return 1
-    for x in *; do
-        settings="$sdks/$x/SDKSettings"
-        version2="$(defaults read "$sdks/$x/SDKSettings" Version)" || return 1
-        if ! printf "%s\n" "$version2" | grep -q '^[0-9][0-9]*\(\.[0-9][0-9]*\)\{0,3\}$'; then
-            echo "Uninterpretable 'Version' '$version2' in '$settings'" 1>&2
+    for dir in *; do
+        settings="$sdks/$dir/SDKSettings"
+        version="$(defaults read "$sdks/$dir/SDKSettings" Version)" || return 1
+        if ! printf "%s\n" "$version" | grep -q '^[0-9][0-9]*\(\.[0-9][0-9]*\)\{0,3\}$'; then
+            echo "Uninterpretable 'Version' '$version' in '$settings'" 1>&2
             return 1
         fi
-        if [ "$version" ]; then
-            sorted="$(printf "%s\n%s\n" "$version" "$version2" | sort -t . -k 1,1nr -k 2,2nr -k 3,3nr -k 4,4nr)" || return 1
-            highest="$(printf "%s\n" "$sorted" | head -n 1)" || return 1
-            if [ "$highest" = "$version2" ]; then
-                if [ "$highest" = "$version" ]; then
-                    ambiguous="1"
-                else
-                    version="$version2"
-                    dir="$x"
-                    ambiguous=""
-                fi
+        higher=""
+        if ! [ "$highest_version" ]; then
+            highest_version="$version"
+            highest_version_dir="$dir"
+        elif [ "$version" = "$highest_version" ]; then
+            # In Xcode 6.0.1 it seems that it is important that the iPhone SDK
+            # version is present in the SDK directory name. In some cases,
+            # however, the SDK dirctory does not contain that version. Instead
+            # there is a symbolic link whose name does contain it. The following
+            # logic tries to lure out the right name variant without making too
+            # many assumtions.
+            version_in_dir_1="0"
+            version_in_dir_2="0"
+            if printf "%s\n" "$dir" | grep -q -F "$version"; then
+                version_in_dir_1="1"
+            fi
+            if printf "%s\n" "$highest_version_dir" | grep -q -F "$version"; then
+                version_in_dir_2="1"
+            fi
+            if [ "$version_in_dir_1" -eq "$version_in_dir_2" ]; then
+                ambiguous="1"
+            elif [ "$version_in_dir_1" -gt "$version_in_dir_2" ]; then
+                higher="1"
             fi
         else
-            version="$version2"
-            dir="$x"
+            sorted="$(printf "%s\n%s\n" "$version" "$highest_version" | sort -t . -k 1,1nr -k 2,2nr -k 3,3nr -k 4,4nr)" || return 1
+            new_highest_version="$(printf "%s\n" "$sorted" | head -n 1)" || return 1
+            if [ "$new_highest_version" = "$version" ]; then
+                higher="1"
+            fi
+        fi
+        if [ "$higher" ]; then
+            highest_version="$version"
+            highest_version_dir="$dir"
+            ambiguous=""
         fi
     done
     if [ "$ambiguous" ]; then
-        echo "Ambiguous highest SDK version '$version' in '$sdks'" 1>&2
+        echo "Ambiguous highest SDK version '$highest_version' in '$sdks'" 1>&2
         return 1
     fi
-    printf "%s\n" "$dir"
+    printf "%s\n" "$highest_version_dir"
 }
 
 # Find the path of most recent version of the installed Android NDKs

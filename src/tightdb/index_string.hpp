@@ -106,7 +106,7 @@ public:
     template <class T> void find_all(Column& result, T value) const
     {
         // Use direct access method
-        return m_array->IndexStringFindAll(result, value, m_target_column, m_get_func);
+        return m_array->IndexStringFindAll(result, to_str(value), m_target_column, m_get_func);
     }
 
     template <class T> FindRes find_all(T value, size_t& ref) const
@@ -119,6 +119,13 @@ public:
     {
         // Use direct access method
         return m_array->IndexStringCount(to_str(value), m_target_column, m_get_func);
+    }
+
+    template <class T> void erase2(size_t row_ndx, bool is_last)
+    {
+        char buffer[8];
+        T old_val = get(row_ndx, buffer);
+        erase(row_ndx, old_val, is_last);
     }
 
     template <class T> void erase(size_t row_ndx, T value, bool is_last)
