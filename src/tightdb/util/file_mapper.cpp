@@ -6,13 +6,14 @@
 
 #include <atomic>
 #include <cerrno>
+#include <cstdlib>
 #include <vector>
 
 #include <unistd.h>
 #include <signal.h>
 #include <sys/stat.h>
 
-#include <openssl/evp.h>
+#include <openssl/aes.h>
 
 using namespace std;
 using namespace tightdb;
@@ -65,30 +66,27 @@ size_t aes_block_size(size_t len) {
 #pragma GCC diagnostic ignored "-Wdeprecated"
 class AESCryptor {
 public:
-    AESCryptor(const uint8_t *key) : key(key) {
-        EVP_CIPHER_CTX_init(&ctx);
-    }
-
-    ~AESCryptor() {
-        EVP_CIPHER_CTX_cleanup(&ctx);
+    AESCryptor(const uint8_t *key) {
+        AES_set_encrypt_key(key, 256, &ectx);
+        AES_set_decrypt_key(key, 256, &dctx);
     }
 
     void read(int fd, off_t pos, uint8_t *dst, size_t size) {
         uint8_t buffer[4096];
         lseek(fd, pos, SEEK_SET);
         auto count = ::read(fd, buffer, aes_block_size(size));
-        crypt(0 /* decrypt */, pos, dst, buffer, count);
+        crypt(AES_DECRYPT, pos, dst, buffer, count);
     }
 
     void write(int fd, off_t pos, const uint8_t *src, size_t size) {
         uint8_t buffer[4096];
-        auto bytes = crypt(1 /* encrypt */, pos, buffer, src, size);
+        auto bytes = crypt(AES_ENCRYPT, pos, buffer, src, size);
         lseek(fd, pos, SEEK_SET);
         ::write(fd, buffer, bytes);
     }
 
 private:
-    int crypt(int mode, off_t pos, uint8_t *dst, const uint8_t *src, size_t len) {
+    size_t crypt(int mode, off_t pos, uint8_t *dst, const uint8_t *src, size_t len) {
         TIGHTDB_ASSERT(len <= 4096);
 
         uint8_t buffer[4096];
@@ -100,25 +98,17 @@ private:
             src = buffer;
             len = padded_len;
         }
+        AES_KEY& key = mode == AES_ENCRYPT ? ectx : dctx;
 
         uint8_t iv[block_size] = {0};
         memcpy(iv, &pos, sizeof(pos));
 
-        int written = 0, flush_len = 0;
-        int ret = EVP_CipherInit_ex(&ctx, EVP_aes_256_cfb(), nullptr, key, iv, mode);
-        TIGHTDB_ASSERT(ret);
-        ret = EVP_CipherUpdate(&ctx, dst, &written, src, (int)len);
-        TIGHTDB_ASSERT(ret);
-        TIGHTDB_ASSERT(written == (int)len);
-        ret = EVP_CipherFinal_ex(&ctx, dst + written, &flush_len);
-        TIGHTDB_ASSERT(flush_len == 0);
-        TIGHTDB_ASSERT(ret);
-        (void)ret;
-        return written + flush_len;
+        AES_cbc_encrypt(src, dst, len, &key, iv, mode);
+        return len;
     }
 
-    const uint8_t *key;
-    EVP_CIPHER_CTX ctx;
+    AES_KEY ectx;
+    AES_KEY dctx;
 };
 #pragma GCC diagnostic pop
 
