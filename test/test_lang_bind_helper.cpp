@@ -6029,6 +6029,51 @@ TEST(LangBindHelper_RollbackAndContinueAsReadLinkList)
     CHECK_EQUAL(0, link_list->size());
     LangBindHelper::rollback_and_continue_as_read(sg);
     CHECK_EQUAL(1, link_list->size());
+    // verify that we can do move last over - first set link to last entry in target:
+    LangBindHelper::promote_to_write(sg, *tlr);
+    link_list->set(0,2); // link list holds single link to end of target
+    LangBindHelper::commit_and_continue_as_read(sg);
+    // then we test move last over:
+    LangBindHelper::promote_to_write(sg, *tlr);
+    CHECK_EQUAL(2, link_list->get(0).get_index()); // link restored
+    target->move_last_over(0);
+    CHECK_EQUAL(0, link_list->get(0).get_index()); // link was changed to 0 due to move last over
+    LangBindHelper::rollback_and_continue_as_read(sg);
+    CHECK_EQUAL(2, link_list->get(0).get_index()); // link restored
+}
+
+
+TEST(LangBindHelper_RollbackAndContinueAsReadLink)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    UniquePtr<LangBindHelper::TransactLogRegistry> tlr(getWriteLogs(path));
+    UniquePtr<Replication> repl(makeWriteLogCollector(path));
+    SharedGroup sg(*repl);
+    Group* group = const_cast<Group*>(&sg.begin_read());
+    LangBindHelper::promote_to_write(sg, *tlr);
+    TableRef origin = group->add_table("origin");
+    TableRef target = group->add_table("target");
+    origin->add_column_link(type_Link, "", *target);
+    target->add_column(type_Int, "");
+    origin->add_empty_row();
+    target->add_empty_row();
+    target->add_empty_row();
+    target->add_empty_row();
+    origin->set_link(0, 0, 2); // points to last row in target
+    CHECK_EQUAL(2, origin->get_link(0,0));
+    LangBindHelper::commit_and_continue_as_read(sg);
+    // verify that we can reverse a move last over:
+    CHECK_EQUAL(2, origin->get_link(0,0));
+    LangBindHelper::promote_to_write(sg, *tlr);
+    target->move_last_over(1);
+    CHECK_EQUAL(1, origin->get_link(0,0));
+    LangBindHelper::rollback_and_continue_as_read(sg);
+    CHECK_EQUAL(2, origin->get_link(0,0));
+    // verify that we can revert a link change:
+    LangBindHelper::promote_to_write(sg, *tlr);
+    origin->set_link(0, 0, 1);
+    LangBindHelper::rollback_and_continue_as_read(sg);
+    CHECK_EQUAL(2, origin->get_link(0,0));
 }
 
 

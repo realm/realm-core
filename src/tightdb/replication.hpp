@@ -304,7 +304,7 @@ private:
         instr_LinkListInsert        = 41, // Insert entry into link list
         instr_LinkListMove          = 42, // Move an entry within a link list
         instr_LinkListErase         = 43, // Remove an entry from a link list
-        instr_LinkListClear         = 44, // Ramove all entries from a link list
+        instr_LinkListClear         = 44, // Remove all entries from a link list
         instr_LinkListSetAll        = 45  // Assign to link list entry
     };
 

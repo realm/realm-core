@@ -1090,8 +1090,9 @@ public:
         if (unordered) {
             // unordered insertion of multiple rows is not supported (and not needed) currently.
             TIGHTDB_ASSERT(num_rows == 1);
-            if (m_table)
+            if (m_table) {
                 tf::adj_accessors_move(*m_table, last_row_ndx, row_ndx);
+            }
         }
         else {
             if (m_table)
@@ -1103,19 +1104,17 @@ public:
     bool erase_rows(size_t row_ndx, size_t num_rows, size_t tbl_sz, bool unordered) TIGHTDB_NOEXCEPT
     {
         if (unordered) {
+            // unordered removal of multiple rows is not supported (and not needed) currently.
+            TIGHTDB_ASSERT(num_rows == 1);
             typedef _impl::TableFriend tf;
             if (m_table)
-                while (num_rows--) {
-                    tf::adj_accessors_move(*m_table, row_ndx, tbl_sz);
-                    row_ndx++;
-                }
+                tf::adj_accessors_move(*m_table, row_ndx, tbl_sz);
         }
         else {
             typedef _impl::TableFriend tf;
             if (m_table)
                 while (num_rows--) {
-                    tf::adj_accessors_erase_row(*m_table, row_ndx);
-                    row_ndx++;
+                    tf::adj_accessors_erase_row(*m_table, row_ndx + num_rows);
                 }
         }
         return true;

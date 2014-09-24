@@ -423,8 +423,13 @@ bool ColumnSubtableParent::SubtableMap::adj_move(std::size_t target_row_ndx,
     typedef _impl::TableFriend tf;
 
     std::size_t i = 0, limit = m_entries.size();
-    if (i == limit) // early out with 'false' as result.
+    // We return true if and only if we remove the last entry in the map.
+    // We need a special handling for the case, where the set of entries are already empty,
+    // otherwise the final return statement would also return true in this case, even
+    // though we didn't actually remove an entry.
+    if (i == limit) 
         return false;
+
     while (i < limit) {
 
         entry& e = m_entries[i];
@@ -437,7 +442,6 @@ bool ColumnSubtableParent::SubtableMap::adj_move(std::size_t target_row_ndx,
             // iterators)
             e = m_entries[--limit];
             m_entries.pop_back();
-            continue;
         }
         else {
             if (TIGHTDB_UNLIKELY(e.m_subtable_ndx == source_row_ndx)) {
