@@ -1385,7 +1385,7 @@ TEST_IF(Shared_StringIndexBug1, TEST_DURATION >= 3)
         Group& group = db.begin_write();
         TableRef table = group.add_table("users");
         table->add_column(type_String, "username");
-        table->set_index(0);
+        table->add_search_index(0);
         for (int i = 0; i < TIGHTDB_MAX_BPNODE_SIZE + 1; ++i)
             table->add_empty_row();
         for (int i = 0; i < TIGHTDB_MAX_BPNODE_SIZE + 1; ++i)
@@ -1412,7 +1412,7 @@ TEST(Shared_StringIndexBug2)
         wt.get_group().Verify();
         TableRef table = wt.add_table("a");
         table->add_column(type_String, "b");
-        table->set_index(0);  // Not adding index makes it work
+        table->add_search_index(0);  // Not adding index makes it work
         table->add_empty_row();
         wt.commit();
     }
@@ -1443,7 +1443,7 @@ TEST(Shared_StringIndexBug3)
         Group& group = db.begin_write();
         TableRef table = group.add_table("users");
         table->add_column(type_String, "username");
-        table->set_index(0);  // Disabling index makes it work
+        table->add_search_index(0);  // Disabling index makes it work
         db.commit();
     }
 
@@ -2243,8 +2243,8 @@ TEST(Shared_MovingSearchIndex)
         table->optimize();
         CHECK_EQUAL(0, table->get_descriptor()->get_num_unique_values(0));
         CHECK_EQUAL(2, table->get_descriptor()->get_num_unique_values(1));
-        table->set_index(0);
-        table->set_index(1);
+        table->add_search_index(0);
+        table->add_search_index(1);
         wt.get_group().Verify();
         CHECK_EQUAL(62, table->find_first_string(0, "foo62"));
         CHECK_EQUAL(63, table->find_first_string(1, "bar63"));
@@ -2285,7 +2285,7 @@ TEST(Shared_MovingSearchIndex)
     {
         WriteTransaction wt(sg);
         TableRef table = wt.get_table("foo");
-        CHECK(table->has_index(1) && table->has_index(2));
+        CHECK(table->has_search_index(1) && table->has_search_index(2));
         CHECK_EQUAL(0, table->get_descriptor()->get_num_unique_values(1));
         CHECK_EQUAL(3, table->get_descriptor()->get_num_unique_values(2));
         CHECK_EQUAL(tightdb::not_found, table->find_first_string(1, "bad"));
@@ -2300,7 +2300,7 @@ TEST(Shared_MovingSearchIndex)
         CHECK_EQUAL(63, table->find_first_string(2, "bar63"));
         table->remove_column(0);
         wt.get_group().Verify();
-        CHECK(table->has_index(0) && table->has_index(1));
+        CHECK(table->has_search_index(0) && table->has_search_index(1));
         CHECK_EQUAL(0, table->get_descriptor()->get_num_unique_values(0));
         CHECK_EQUAL(3, table->get_descriptor()->get_num_unique_values(1));
         CHECK_EQUAL(tightdb::not_found, table->find_first_string(0, "bad"));
@@ -2316,7 +2316,7 @@ TEST(Shared_MovingSearchIndex)
         table->set_string(0, 1, "foo_Y");
         table->set_string(1, 1, "bar_Y");
         wt.get_group().Verify();
-        CHECK(table->has_index(0) && table->has_index(1));
+        CHECK(table->has_search_index(0) && table->has_search_index(1));
         CHECK_EQUAL(0, table->get_descriptor()->get_num_unique_values(0));
         CHECK_EQUAL(4, table->get_descriptor()->get_num_unique_values(1));
         CHECK_EQUAL(tightdb::not_found, table->find_first_string(0, "bad"));
