@@ -19,7 +19,26 @@ using namespace std;
 using namespace tightdb;
 using namespace tightdb::util;
 
+#endif
+
 namespace {
+
+std::string get_errno_msg(const char* prefix, int err) {
+    char buffer[256];
+    std::string str;
+    str.reserve(strlen(prefix) + sizeof(buffer));
+    str += prefix;
+
+    if (TIGHTDB_LIKELY(strerror_r(err, buffer, sizeof(buffer)) == 0))
+        str += buffer;
+    else
+        str += "Unknown error";
+
+    return str;
+}
+
+#ifdef TIGHTDB_ENABLE_ENCRYPTION
+
 #ifdef __APPLE__
 #include <execinfo.h>
 void print_backtrace() {
@@ -54,7 +73,6 @@ struct spin_lock_guard {
     }
 };
 
-#pragma mark - crypto
 const int block_size = 16;
 
 size_t aes_block_size(size_t len) {
@@ -112,7 +130,6 @@ private:
 };
 #pragma GCC diagnostic pop
 
-#pragma mark - mmap
 class EncryptedFileMapping;
 
 std::atomic_flag mapping_lock = ATOMIC_FLAG_INIT;
@@ -267,6 +284,17 @@ public:
                 mark_unreadable(i);
         }
     }
+
+    void set(void *new_addr, size_t new_size) {
+        flush();
+        addr = new_addr;
+        size = new_size;
+        page = (uintptr_t)addr >> 12;
+        count = (size + 4095) >> 12;
+        read_pages.clear();
+        read_pages.resize(count, false);
+        dirty_pages.resize(count, false);
+    }
 };
 
 struct sigaction old_segv;
@@ -335,25 +363,17 @@ void remove_mapping(void *addr, size_t size) {
     }
 }
 
-#else
-namespace {
-#endif
-
-std::string get_errno_msg(const char* prefix, int err)
-{
-    char buffer[256];
-    std::string str;
-    str.reserve(strlen(prefix) + sizeof(buffer));
-    str += prefix;
-
-    if (TIGHTDB_LIKELY(strerror_r(err, buffer, sizeof(buffer)) == 0))
-        str += buffer;
-    else
-        str += "Unknown error";
-
-    return str;
+void *mmap_anon(size_t size) {
+    void* addr = ::mmap(0, size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
+    if (addr == MAP_FAILED) {
+        int err = errno; // Eliminate any risk of clobbering
+        throw std::runtime_error(get_errno_msg("mmap() failed: ", err));
+    }
+    mprotect(addr, size, PROT_NONE);
+    return addr;
 }
 
+#endif
 } // anonymous namespace
 
 
@@ -363,12 +383,9 @@ namespace util {
 void *mmap(int fd, size_t size, File::AccessMode access, const uint8_t *encryption_key) {
 #ifdef TIGHTDB_ENABLE_ENCRYPTION
     if (encryption_key) {
-        void* addr = ::mmap(0, size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
-        if (addr != MAP_FAILED) {
-            mprotect(addr, size, PROT_NONE);
-            add_mapping(addr, size, fd, access, encryption_key);
-            return addr;
-        }
+        void* addr = mmap_anon(size);
+        add_mapping(addr, size, fd, access, encryption_key);
+        return addr;
     }
     else
 #else
@@ -391,8 +408,7 @@ void *mmap(int fd, size_t size, File::AccessMode access, const uint8_t *encrypti
     }
 
     int err = errno; // Eliminate any risk of clobbering
-    std::string msg = get_errno_msg("mmap() failed: ", err);
-    throw std::runtime_error(msg);
+    throw std::runtime_error(get_errno_msg("mmap() failed: ", err));
 }
 
 void munmap(void* addr, size_t size) {
@@ -400,6 +416,35 @@ void munmap(void* addr, size_t size) {
     remove_mapping(addr, size);
 #endif
     ::munmap(addr, size);
+}
+
+void* mremap(int fd, void* old_addr, size_t old_size, File::AccessMode a, size_t new_size) {
+#ifdef TIGHTDB_ENABLE_ENCRYPTION
+    {
+        spin_lock_guard lock{mapping_lock};
+        for (auto m = mappings; m; m = m->next) {
+            if (m->addr == old_addr && m->size == old_size) {
+                m->set(mmap_anon(new_size), new_size);
+                ::munmap(old_addr, old_size);
+                return m->addr;
+            }
+        }
+    }
+#endif
+
+#ifdef _GNU_SOURCE
+    static_cast<void>(fd);
+    static_cast<void>(a);
+    void* new_addr = ::mremap(old_addr, old_size, new_size, MREMAP_MAYMOVE);
+    if (new_addr != MAP_FAILED)
+        return new_addr;
+    int err = errno; // Eliminate any risk of clobbering
+    throw runtime_error(get_errno_msg("mremap(): failed: ", err));
+#else
+    void* new_addr = mmap(fd, new_size, a, nullptr);
+    ::munmap(old_addr, old_size);
+    return new_addr;
+#endif
 }
 
 void msync(void* addr, size_t size) {

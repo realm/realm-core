@@ -27,7 +27,7 @@ namespace util {
 
 void *mmap(int fd, size_t size, File::AccessMode access, const uint8_t *encryption_key);
 void munmap(void *addr, size_t size);
-void mremap();
+void* mremap(int fd, void* old_addr, size_t old_size, File::AccessMode a, size_t new_size);
 void msync(void *addr, size_t size);
 
 }

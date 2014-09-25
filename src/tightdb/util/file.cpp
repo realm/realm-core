@@ -808,23 +808,9 @@ void File::unmap(void* addr, size_t size) TIGHTDB_NOEXCEPT
 }
 
 
-void* File::remap(void* old_addr, size_t old_size, AccessMode a, size_t new_size,
-                  int map_flags) const
+void* File::remap(void* old_addr, size_t old_size, AccessMode a, size_t new_size, int) const
 {
-#ifdef _GNU_SOURCE
-    static_cast<void>(a);
-    static_cast<void>(map_flags);
-    void* new_addr = ::mremap(old_addr, old_size, new_size, MREMAP_MAYMOVE);
-    if (new_addr != MAP_FAILED)
-        return new_addr;
-    int err = errno; // Eliminate any risk of clobbering
-    string msg = get_errno_msg("mremap(): failed: ", err);
-    throw runtime_error(msg);
-#else
-    void* new_addr = map(a, new_size, map_flags);
-    unmap(old_addr, old_size);
-    return new_addr;
-#endif
+    return tightdb::util::mremap(m_fd, old_addr, old_size, a, new_size);
 }
 
 
