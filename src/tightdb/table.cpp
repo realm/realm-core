@@ -1349,7 +1349,7 @@ bool Table::try_add_primary_key(size_t col_ndx)
     }
 
     int attr = m_spec.get_column_attr(col_ndx);
-    attr |= col_attr_PrimaryKey;
+    attr |= col_attr_Unique | col_attr_PrimaryKey;
     m_spec.set_column_attr(col_ndx, ColumnAttr(attr)); // Throws
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
@@ -1373,7 +1373,7 @@ void Table::remove_primary_key()
     for (size_t col_ndx = 0; col_ndx < num_cols; ++col_ndx) {
         int attr = m_spec.get_column_attr(col_ndx);
         if (attr & col_attr_PrimaryKey) {
-            attr &= ~col_attr_PrimaryKey;
+            attr &= ~(col_attr_Unique | col_attr_PrimaryKey);
             m_spec.set_column_attr(col_ndx, ColumnAttr(attr)); // Throws
             m_primary_key = 0;
 
@@ -3610,7 +3610,7 @@ public:
             for (size_t i = 0; i != n; ++i) {
                 int attr = spec.get_column_attr(i);
                 // Remove any index specifying attributes
-                attr &= ~(col_attr_Indexed | col_attr_PrimaryKey);
+                attr &= ~(col_attr_Indexed | col_attr_Unique | col_attr_PrimaryKey);
                 spec.set_column_attr(i, ColumnAttr(attr)); // Throws
             }
             size_t pos = spec.m_top.write(out); // Throws
