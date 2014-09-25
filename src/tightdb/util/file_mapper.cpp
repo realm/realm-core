@@ -269,7 +269,10 @@ public:
     }
 };
 
-void handler(int, siginfo_t *info, void *) {
+struct sigaction old_segv;
+struct sigaction old_bus;
+
+void handler(int code, siginfo_t *info, void *ctx) {
     auto page = (uintptr_t)info->si_addr >> 12;
 
     spin_lock_guard lock{mapping_lock};
@@ -288,7 +291,20 @@ void handler(int, siginfo_t *info, void *) {
         return;
     }
 
-    die("segv");
+    if (code == SIGSEGV) {
+        if (old_segv.sa_sigaction)
+            old_segv.sa_sigaction(code, info, ctx);
+        else if (old_segv.sa_handler)
+            old_segv.sa_handler(code);
+    }
+    else if (code == SIGBUS) {
+        if (old_bus.sa_sigaction)
+            old_bus.sa_sigaction(code, info, ctx);
+        else if (old_bus.sa_handler)
+            old_bus.sa_handler(code);
+    }
+    else
+        die("segv");
 }
 
 void add_mapping(void *addr, size_t size, int fd, File::AccessMode access, const uint8_t *encryption_key) {
@@ -300,8 +316,8 @@ void add_mapping(void *addr, size_t size, int fd, File::AccessMode access, const
         action.sa_sigaction = handler;
         action.sa_flags = SA_SIGINFO;
 
-        if (sigaction(SIGSEGV, &action, NULL) != 0) die("sigaction");
-        if (sigaction(SIGBUS, &action, NULL) != 0) die("sigaction");
+        if (sigaction(SIGSEGV, &action, &old_segv) != 0) die("sigaction");
+        if (sigaction(SIGBUS, &action, &old_bus) != 0) die("sigaction");
     }
 }
 
