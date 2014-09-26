@@ -380,12 +380,12 @@ TEST(ColumnBinary_InitOfEmptyColumn)
     t.add_column(type_Binary, "works");
     t.add_column(type_Binary, "works also");
     t.add_empty_row();
-    t.set_binary(0,0, BinaryData("yellow",10));
-    t.set_binary(1,0, BinaryData("very bright", 15));
+    t.set_binary(0,0, BinaryData("yellow"));
+    t.set_binary(1,0, BinaryData("very bright"));
     t.remove_column(1);
     t.add_empty_row();
     t.add_column(type_Binary, "doesn't work");
-    CHECK_EQUAL(BinaryData("",0), t.get_binary(1,0));
+    CHECK_EQUAL(BinaryData(), t.get_binary(1,0));
 }
 
 TEST(ColumnBool_InitOfEmptyColumn)
