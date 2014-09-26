@@ -362,11 +362,6 @@ private:
 
 class Replication::InputStream {
 public:
-    /// \return The number of extracted bytes. This will always be
-    /// less than or equal to \a size. A value of zero indicates
-    /// end-of-input unless \a size was zero.
-    //virtual std::size_t read(char* buffer, std::size_t size) = 0;
-
     /// \return the number of accessible bytes.
     /// A value of zero indicates end-of-input.
     /// For non-zero return value, \a begin and \a end are
@@ -1718,8 +1713,17 @@ template<class T> T Replication::TransactLogParser::read_int()
 
 inline void Replication::TransactLogParser::read_bytes(char* data, std::size_t size)
 {
-    if (m_input_end && m_input_begin + size > m_input_end) 
-        throw BadTransactLog();
+    for (;;) {
+        const std::size_t avail = m_input_end - m_input_begin;
+        if (size <= avail)
+            break;
+        const char* to = m_input_begin + avail;
+        std::copy(m_input_begin, to, data);
+        if (!next_input_buffer())
+            throw BadTransactLog();
+        data += avail;
+        size -= avail;
+    }
     const char* to = m_input_begin + size;
     std::copy(m_input_begin, to, data);
     m_input_begin = to;
