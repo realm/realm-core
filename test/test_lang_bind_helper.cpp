@@ -5788,7 +5788,7 @@ TEST(LangBindHelper_ImplicitTransactions)
         wt.commit();
     }
     UniquePtr<Replication> repl2(makeWriteLogCollector(path));
-    SharedGroup sg2(*repl, SharedGroup::durability_Full, test_util::key);
+    SharedGroup sg2(*repl2, SharedGroup::durability_Full, test_util::key);
     Group& g = const_cast<Group&>(sg.begin_read());
     TestTableShared::Ref table = g.get_table<TestTableShared>("table");
     for (int i = 0; i<100; i++) {
