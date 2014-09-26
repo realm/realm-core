@@ -470,7 +470,6 @@ public:
     {
         if (TIGHTDB_LIKELY(m_table)) {
             if (unordered) {
-                // It might make sense to change this into an assert, as it should always hold
                 if (TIGHTDB_LIKELY(row_ndx < last_row_ndx && last_row_ndx+1 == m_table->size())) {
 #ifdef TIGHTDB_DEBUG
                     if (m_log)

@@ -1112,10 +1112,10 @@ public:
         }
         else {
             typedef _impl::TableFriend tf;
-            if (m_table)
-                while (num_rows--) {
+            if (m_table) {
+                while (num_rows--)
                     tf::adj_accessors_erase_row(*m_table, row_ndx + num_rows);
-                }
+            }
         }
         return true;
     }
@@ -1564,7 +1564,7 @@ class Group::TransactReverser : public NullHandler  {
 public:
 
     TransactReverser(ReverseReplication& encoder) :
-        m_encoder(encoder), current_insn_start(0),
+        m_encoder(encoder), current_instr_start(0),
         m_pending_table_select(false), m_pending_descriptor_select(false)
     {
     }
@@ -1586,7 +1586,7 @@ public:
         m_encoder.transact_log_advance(buf);
 
         m_pending_table_select = true;
-        m_pending_ts_insn = get_inst();
+        m_pending_ts_instr = get_inst();
         return true;
     }
 
@@ -1602,7 +1602,7 @@ public:
         m_encoder.transact_log_advance(buf);
 
         m_pending_descriptor_select = true;
-        m_pending_ds_insn = get_inst();
+        m_pending_ds_instr = get_inst();
         return true;
     }
 
@@ -1742,14 +1742,12 @@ public:
     bool insert_column(std::size_t col_idx, DataType, StringData)
     {
         m_encoder.simple_cmd(Replication::instr_EraseColumn, util::tuple(col_idx));
-        // m_encoder.erase_column(col_idx);
         append_instruction();
         return true;
     }
 
     bool erase_column(std::size_t col_idx)
     {
-        //m_encoder.insert_column(col_idx, DataType(), StringData());
         m_encoder.simple_cmd(Replication::instr_InsertColumn, util::tuple(col_idx, int(DataType())));
         m_encoder.string_value(0, 0);
         append_instruction();
@@ -1758,7 +1756,6 @@ public:
 
     bool select_link_list(size_t col_ndx, size_t row_ndx)
     {
-        //m_encoder.select_link_list(col_ndx, row_ndx);
         m_encoder.simple_cmd(Replication::instr_SelectLinkList, util::tuple(col_ndx, row_ndx));
         append_instruction();
         return true;
@@ -1768,34 +1765,34 @@ public:
 
 private:
     ReverseReplication& m_encoder;
-    struct Insn { size_t start; size_t end; };
-    std::vector<Insn> m_instructions;
-    size_t current_insn_start;
+    struct Instr { size_t begin; size_t end; };
+    std::vector<Instr> m_instructions;
+    size_t current_instr_start;
     bool m_pending_table_select;
     bool m_pending_descriptor_select;
-    Insn m_pending_ts_insn;
-    Insn m_pending_ds_insn;
+    Instr m_pending_ts_instr;
+    Instr m_pending_ds_instr;
 
-    Insn get_inst() {
-        Insn inst;
-        inst.start = current_insn_start;
-        current_insn_start = m_encoder.transact_log_size();
-        inst.end = current_insn_start;
-        return inst;
+    Instr get_inst() {
+        Instr instr;
+        instr.begin = current_instr_start;
+        current_instr_start = m_encoder.transact_log_size();
+        instr.end = current_instr_start;
+        return instr;
     }
 
     void append_instruction() {
         m_instructions.push_back(get_inst());
     }
 
-    void append_instruction(Insn inst) {
-        m_instructions.push_back(inst);
+    void append_instruction(Instr instr) {
+        m_instructions.push_back(instr);
     }
 
     void sync_descriptor() {
         if (m_pending_descriptor_select) {
             m_pending_descriptor_select = false;
-            append_instruction(m_pending_ds_insn);
+            append_instruction(m_pending_ds_instr);
         }
     }
 
@@ -1803,23 +1800,23 @@ private:
         sync_descriptor();
         if (m_pending_table_select) {
             m_pending_table_select = false;
-            append_instruction(m_pending_ts_insn);
+            append_instruction(m_pending_ts_instr);
         }
     }
 
     class ReversedInputStream : public Replication::InputStream {
     public:
-        ReversedInputStream(const char* buffer, std::vector<Insn>& instruction_order)
-            : m_buffer(buffer), m_instruction_order(instruction_order)
+        ReversedInputStream(const char* buffer, std::vector<Instr>& instr_order)
+            : m_buffer(buffer), m_instr_order(instr_order)
         {
-            m_current = m_instruction_order.size();
+            m_current = m_instr_order.size();
         }
         virtual size_t next_block(const char*& begin, const char*& end)
         {
             if (m_current != 0) {
                 m_current--;
-                begin = m_buffer + m_instruction_order[m_current].start;
-                end   = m_buffer + m_instruction_order[m_current].end;
+                begin = m_buffer + m_instr_order[m_current].begin;
+                end   = m_buffer + m_instr_order[m_current].end;
                 return end-begin;
             }
             else
@@ -1827,7 +1824,7 @@ private:
         }
     private:
         const char* m_buffer;
-        std::vector<Insn>& m_instruction_order;
+        std::vector<Instr>& m_instr_order;
         size_t m_current;
     };
 };
