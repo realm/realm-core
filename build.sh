@@ -729,6 +729,13 @@ EOF
                     $RANLIB "../$ANDROID_DIR/libtightdb-$denom.a"
                 ) || exit 1
                 rm -r ar-temp
+
+                echo 'This product includes software developed by the OpenSSL Project for use in the OpenSSL toolkit. (http://www.openssl.org/).' > $ANDROID_DIR/OpenSSL.txt
+                echo '' >> $ANDROID_DIR/OpenSSL.txt
+                echo 'The following license applies only to the portions of this product developed by the OpenSSL Project.' >> $ANDROID_DIR/OpenSSL.txt
+                echo '' >> $ANDROID_DIR/OpenSSL.txt
+
+                cat openssl/LICENSE >> $ANDROID_DIR/OpenSSL.txt
             else
                 cp "libtightdb-$denom.a" "$ANDROID_DIR"
             fi
