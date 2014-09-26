@@ -94,7 +94,7 @@ public:
     ///
     /// \throw util::File::AccessError
     ref_type attach_file(const std::string& path, bool is_shared, bool read_only, bool no_create,
-                         bool skip_validate, const uint8_t *encryption_key);
+                         bool skip_validate, const uint8_t* encryption_key);
 
     /// Attach this allocator to the specified memory buffer.
     ///

@@ -37,7 +37,7 @@ public:
 Initialization initialization;
 } // anonymous namespace
 
-void Group::open(const string& file_path, const uint8_t *encrption_key, OpenMode mode)
+void Group::open(const string& file_path, const uint8_t* encrption_key, OpenMode mode)
 {
     TIGHTDB_ASSERT(!is_attached());
     bool is_shared = false;
@@ -562,7 +562,7 @@ void Group::write(ostream& out) const
     write(out, table_writer); // Throws
 }
 
-void Group::write(const string& path, const uint8_t *encrption_key) const
+void Group::write(const string& path, const uint8_t* encrption_key) const
 {
     File file;
     int flags = 0;

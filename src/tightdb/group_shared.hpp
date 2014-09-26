@@ -178,13 +178,13 @@ public:
     /// default constructed instance.
     explicit SharedGroup(Replication& repl,
                          DurabilityLevel dlevel = durability_Full,
-                         const uint8_t *encryption_key = nullptr);
+                         const uint8_t* encryption_key = 0);
 
     /// Open this group in replication mode. The specified Replication
     /// instance must remain in exixtence for as long as the
     /// SharedGroup.
     void open(Replication&, DurabilityLevel dlevel = durability_Full,
-              const uint8_t *encryption_key = nullptr);
+              const uint8_t* encryption_key = 0);
 
     friend class Replication;
 

@@ -997,7 +997,7 @@ bool File::is_removed() const
 #endif
 }
 
-void File::set_encryption_key(const uint8_t *key)
+void File::set_encryption_key(const uint8_t* key)
 {
     if (key) {
         memcpy(m_encryption_key, key, sizeof(m_encryption_key));

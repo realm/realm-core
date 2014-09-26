@@ -277,7 +277,7 @@ public:
     /// is idempotent.
     void unlock() TIGHTDB_NOEXCEPT;
 
-    void set_encryption_key(const uint8_t *key);
+    void set_encryption_key(const uint8_t* key);
 
     enum {
         /// If possible, disable opportunistic flushing of dirted

@@ -380,7 +380,7 @@ char* SlabAlloc::do_translate(ref_type ref) const TIGHTDB_NOEXCEPT
 
 
 ref_type SlabAlloc::attach_file(const string& path, bool is_shared, bool read_only, bool no_create,
-                                bool skip_validate, const uint8_t *encryption_key)
+                                bool skip_validate, const uint8_t* encryption_key)
 {
     TIGHTDB_ASSERT(!is_attached());
 
