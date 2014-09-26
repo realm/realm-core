@@ -653,6 +653,9 @@ Please do one of the following:
 EOF
             exit 1
         fi
+
+        enable_encryption="$(get_config_param "ENABLE_ENCRYPTION")" || return 1
+
         export TIGHTDB_ANDROID="1"
         mkdir -p "$ANDROID_DIR" || exit 1
         for target in $ANDROID_PLATFORMS; do
@@ -690,7 +693,7 @@ EOF
 
             # Build OpenSSL if needed
             libcrypto_name="libcrypto-$denom.a"
-            if ! [ -f "ANDROID_DIR/$libcrypto_name" ]; then
+            if ! [ -f "ANDROID_DIR/$libcrypto_name" ] && [ $enable_encryption = yes ]; then
                 (
                     cd openssl
                     export MACHINE=$target
@@ -711,23 +714,25 @@ EOF
             # Build tightdb
             PATH="$path" CC="$cc" $MAKE -C "src/tightdb" CC_IS="gcc" BASE_DENOM="$denom" CFLAGS_ARCH="$cflags_arch" "libtightdb-$denom.a" || exit 1
 
-            # Merge OpenSSL and tightdb into one static library
-            mkdir ar-temp
-            (
-                AR="$(echo "$temp_dir/bin/$android_prefix-linux-*-gcc-ar")" || exit 1
-                RANLIB="$(echo "$temp_dir/bin/$android_prefix-linux-*-gcc-ranlib")" || exit 1
-                cd ar-temp
-                echo $AR x "../$ANDROID_DIR/$libcrypto_name" || exit 1
-                $AR x "../$ANDROID_DIR/$libcrypto_name" || exit 1
-                find . ! -name '*aes*' -a ! -name '*cbc128*' -delete || exit 1
-                $AR x "../src/tightdb/libtightdb-$denom.a" || exit 1
-                $AR r "../$ANDROID_DIR/libtightdb-$denom.a" *.o || exit 1
-                $RANLIB "../$ANDROID_DIR/libtightdb-$denom.a"
-            ) || exit 1
-            rm -r ar-temp
+            if [ $enable_encryption = yes ]; then
+                # Merge OpenSSL and tightdb into one static library
+                mkdir ar-temp
+                (
+                    AR="$(echo "$temp_dir/bin/$android_prefix-linux-*-gcc-ar")" || exit 1
+                    RANLIB="$(echo "$temp_dir/bin/$android_prefix-linux-*-gcc-ranlib")" || exit 1
+                    cd ar-temp
+                    echo $AR x "../$ANDROID_DIR/$libcrypto_name" || exit 1
+                    $AR x "../$ANDROID_DIR/$libcrypto_name" || exit 1
+                    find . ! -name '*aes*' -a ! -name '*cbc128*' -delete || exit 1
+                    $AR x "../src/tightdb/libtightdb-$denom.a" || exit 1
+                    $AR r "../$ANDROID_DIR/libtightdb-$denom.a" *.o || exit 1
+                    $RANLIB "../$ANDROID_DIR/libtightdb-$denom.a"
+                ) || exit 1
+                rm -r ar-temp
+            else
+                cp "libtightdb-$denom.a" "$ANDROID_DIR"
+            fi
 
-            # libtool -static -o "$ANDROID_DIR/libtightdb-$denom.a" "$ANDROID_DIR/$libcrypto_name" "src/tightdb/libtightdb-$denom.a" || exit 1
-            # cp "src/tightdb/libtightdb-$denom.a" "$ANDROID_DIR" || exit 1
             rm -rf "$temp_dir" || exit 1
         done
 
@@ -741,13 +746,22 @@ EOF
         (cd "$TIGHTDB_HOME/$ANDROID_DIR/include/tightdb" && tar xzmf "$temp_dir/headers.tar.gz") || exit 1
 
         tightdb_version="$(sh build.sh get-version)" || exit
-        echo "Create tar.gz file core-android-$tightdb_version.tar.gz"
-        rm -f "$TIGHTDB_HOME/core-android-$tightdb_version.tar.gz" || exit 1
-        (cd "$TIGHTDB_HOME/$ANDROID_DIR" && tar czf "$TIGHTDB_HOME/core-android-$tightdb_version.tar.gz" .) || exit 1
-        echo "Unpacking in ../tightdb_java/core"
-        mkdir -p ../tightdb_java || exit 1 # to help Mr. Jenkins
-        (cd ../tightdb_java && rm -rf core && mkdir core) || exit 1
-        (cd ../tightdb_java/core && tar xzf "$TIGHTDB_HOME/core-android-$tightdb_version.tar.gz") || exit 1
+        dir_name="core-$tightdb_version"
+        file_name="realm-core-android-$tightdb_version.tar.gz"
+        if [ $enable_encryption = yes ]; then
+            dir_name="$dir_name-encryption"
+            file_name="realm-core-android-$tightdb_version-encryption.tar.gz"
+        fi
+
+        echo "Create tar.gz file $file_name"
+        rm -f "$TIGHTDB_HOME/$file_name" || exit 1
+        (cd "$TIGHTDB_HOME/$ANDROID_DIR" && tar czf "$TIGHTDB_HOME/$file_name" .) || exit 1
+
+        echo "Unpacking in ../tightdb_java/$dir_name"
+        mkdir -p ../tightdb_java/realm-jni/build || exit 1 # to help Mr. Jenkins
+        cp "$TIGHTDB_HOME/$file_name" ../tightdb_java/realm-jni/build
+        (cd ../tightdb_java && rm -rf $dir_name && mkdir $dir_name) || exit 1
+        (cd ../tightdb_java/$dir_name && tar xzf "$TIGHTDB_HOME/$file_name") || exit 1
         ;;
 
    "build-cocoa")
