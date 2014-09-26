@@ -121,8 +121,6 @@
 		36FDACE217D67DF10084E8BB /* array_blobs_big.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 36FDACDE17D67DDC0084E8BB /* array_blobs_big.hpp */; };
 		3F5ED51419D9D4D1001FCFF4 /* test_basic_utils.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3F5ED51219D9D4D1001FCFF4 /* test_basic_utils.cpp */; };
 		3F5ED51519D9D4D1001FCFF4 /* test_link_query_view.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3F5ED51319D9D4D1001FCFF4 /* test_link_query_view.cpp */; };
-		3F18532019DF12A200843ECD /* column_link.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3F18531F19DF12A200843ECD /* column_link.cpp */; };
-		3F18532119DF12A200843ECD /* column_link.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3F18531F19DF12A200843ECD /* column_link.cpp */; };
 		3F5ED51019D08A11001FCFF4 /* file_mapper.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3F5ED50E19D08A11001FCFF4 /* file_mapper.cpp */; settings = {COMPILER_FLAGS = "-std=c++11"; }; };
 		3F5ED51119D08A11001FCFF4 /* file_mapper.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 3F5ED50F19D08A11001FCFF4 /* file_mapper.hpp */; };
 		3F5ED51419D9D4D1001FCFF4 /* test_basic_utils.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3F5ED51219D9D4D1001FCFF4 /* test_basic_utils.cpp */; };
@@ -1491,7 +1489,6 @@
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ARCHS = "$(ARCHS_STANDARD_64_BIT)";
-				CLANG_CXX_LANGUAGE_STANDARD = "c++14";
 				CLANG_CXX_LIBRARY = "libc++";
 				CLANG_WARN_IMPLICIT_SIGN_CONVERSION = NO;
 				CLANG_WARN_SUSPICIOUS_IMPLICIT_CONVERSION = YES;
@@ -1533,7 +1530,6 @@
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ARCHS = "$(ARCHS_STANDARD_64_BIT)";
-				CLANG_CXX_LANGUAGE_STANDARD = "c++14";
 				CLANG_CXX_LIBRARY = "libc++";
 				CLANG_WARN_IMPLICIT_SIGN_CONVERSION = NO;
 				CLANG_WARN_SUSPICIOUS_IMPLICIT_CONVERSION = YES;

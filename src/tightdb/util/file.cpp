@@ -392,8 +392,8 @@ error:
 #else // POSIX version
 
     if (m_encrypt) {
-        auto pos = lseek(m_fd, 0, SEEK_CUR);
-        Map<char> map{*this, access_ReadOnly, static_cast<size_t>(pos + size)};
+        off_t pos = lseek(m_fd, 0, SEEK_CUR);
+        Map<char> map(*this, access_ReadOnly, static_cast<size_t>(pos + size));
         memcpy(data, map.get_addr() + pos, size);
         return map.get_size() - pos;
     }
@@ -449,8 +449,8 @@ void File::write(const char* data, size_t size)
 #else // POSIX version
 
     if (m_encrypt) {
-        auto pos = lseek(m_fd, 0, SEEK_CUR);
-        Map<char> map{*this, access_ReadWrite, static_cast<size_t>(pos + size)};
+        off_t pos = lseek(m_fd, 0, SEEK_CUR);
+        Map<char> map(*this, access_ReadWrite, static_cast<size_t>(pos + size));
         memcpy(map.get_addr() + pos, data, size);
         return;
     }
