@@ -1833,7 +1833,6 @@ inline bool Replication::TransactLogParser::next_input_buffer()
 
 inline bool Replication::TransactLogParser::read_char(char& c)
 {
-    //   if (m_input_end && m_input_begin == m_input_end)
     if (m_input_begin == m_input_end && !next_input_buffer())
         return false;
     c = *m_input_begin++;

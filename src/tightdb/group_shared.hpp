@@ -414,7 +414,7 @@ private:
 
     // called by WriteLogCollector to transfer the actual commit log for
     // accessor retention/update as part of rollback.
-    void do_rollback_and_continue_as_read(const char* start, const char* limit);
+    void do_rollback_and_continue_as_read(const char* begin, const char* end);
 #endif
     friend class ReadTransaction;
     friend class WriteTransaction;
