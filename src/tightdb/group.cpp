@@ -907,6 +907,18 @@ public:
         }
     }
 
+    virtual size_t next_block(const char*& begin, const char*& end) TIGHTDB_OVERRIDE
+    {
+        if (m_logs_begin == m_logs_end) {
+            return 0;
+        }
+        begin = m_logs_begin->data();
+        size_t result = m_logs_begin->size();
+        end   = begin + result;
+        ++m_logs_begin;
+        return result;
+    }
+
 private:
     const BinaryData* m_logs_begin;
     const BinaryData* m_logs_end;
@@ -999,7 +1011,7 @@ public:
 
     bool insert_group_level_table(size_t table_ndx, size_t num_tables, StringData) TIGHTDB_NOEXCEPT
     {
-        // For end-insertions, table_ndx will be equal to num_tables
+        // for end-insertions, table_ndx will be equal to num_tables
         TIGHTDB_ASSERT(table_ndx <= num_tables);
         m_group.m_table_accessors.push_back(0); // Throws
         size_t last_ndx = num_tables;
@@ -1072,27 +1084,39 @@ public:
         return true;
     }
 
-    bool insert_empty_rows(size_t row_ndx, size_t num_rows) TIGHTDB_NOEXCEPT
+    bool insert_empty_rows(size_t row_ndx, size_t num_rows, size_t last_row_ndx, bool unordered) TIGHTDB_NOEXCEPT
     {
         typedef _impl::TableFriend tf;
-        if (m_table)
-            tf::adj_accessors_insert_rows(*m_table, row_ndx, num_rows);
+        if (unordered) {
+            // unordered insertion of multiple rows is not supported (and not needed) currently.
+            TIGHTDB_ASSERT(num_rows == 1);
+            if (m_table) {
+                tf::adj_accessors_move(*m_table, last_row_ndx, row_ndx);
+            }
+        }
+        else {
+            if (m_table)
+                tf::adj_accessors_insert_rows(*m_table, row_ndx, num_rows);
+        }
         return true;
     }
 
-    bool erase_row(size_t row_ndx) TIGHTDB_NOEXCEPT
+    bool erase_rows(size_t row_ndx, size_t num_rows, size_t tbl_sz, bool unordered) TIGHTDB_NOEXCEPT
     {
-        typedef _impl::TableFriend tf;
-        if (m_table)
-            tf::adj_accessors_erase_row(*m_table, row_ndx);
-        return true;
-    }
-
-    bool move_last_over(size_t target_row_ndx, size_t last_row_ndx) TIGHTDB_NOEXCEPT
-    {
-        typedef _impl::TableFriend tf;
-        if (m_table)
-            tf::adj_accessors_move_last_over(*m_table, target_row_ndx, last_row_ndx);
+        if (unordered) {
+            // unordered removal of multiple rows is not supported (and not needed) currently.
+            TIGHTDB_ASSERT(num_rows == 1);
+            typedef _impl::TableFriend tf;
+            if (m_table)
+                tf::adj_accessors_move(*m_table, row_ndx, tbl_sz);
+        }
+        else {
+            typedef _impl::TableFriend tf;
+            if (m_table) {
+                while (num_rows--)
+                    tf::adj_accessors_erase_row(*m_table, row_ndx + num_rows);
+            }
+        }
         return true;
     }
 
@@ -1104,83 +1128,83 @@ public:
         return true;
     }
 
-    bool insert_int(size_t col_ndx, size_t row_ndx, int_fast64_t) TIGHTDB_NOEXCEPT
+    bool insert_int(size_t col_ndx, size_t row_ndx, size_t tbl_sz, int_fast64_t) TIGHTDB_NOEXCEPT
     {
         if (col_ndx == 0)
-            insert_empty_rows(row_ndx, 1);
+            insert_empty_rows(row_ndx, 1, tbl_sz, false);
         return true;
     }
 
-    bool insert_bool(size_t col_ndx, size_t row_ndx, bool) TIGHTDB_NOEXCEPT
+    bool insert_bool(size_t col_ndx, size_t row_ndx, size_t tbl_sz, bool) TIGHTDB_NOEXCEPT
     {
         if (col_ndx == 0)
-            insert_empty_rows(row_ndx, 1);
+            insert_empty_rows(row_ndx, 1, tbl_sz, false);
         return true;
     }
 
-    bool insert_float(size_t col_ndx, size_t row_ndx, float) TIGHTDB_NOEXCEPT
+    bool insert_float(size_t col_ndx, size_t row_ndx, size_t tbl_sz, float) TIGHTDB_NOEXCEPT
     {
         if (col_ndx == 0)
-            insert_empty_rows(row_ndx, 1);
+            insert_empty_rows(row_ndx, 1, tbl_sz, false);
         return true;
     }
 
-    bool insert_double(size_t col_ndx, size_t row_ndx, double) TIGHTDB_NOEXCEPT
+    bool insert_double(size_t col_ndx, size_t row_ndx, size_t tbl_sz, double) TIGHTDB_NOEXCEPT
     {
         if (col_ndx == 0)
-            insert_empty_rows(row_ndx, 1);
+            insert_empty_rows(row_ndx, 1, tbl_sz, false);
         return true;
     }
 
-    bool insert_string(size_t col_ndx, size_t row_ndx, StringData) TIGHTDB_NOEXCEPT
+    bool insert_string(size_t col_ndx, size_t row_ndx, size_t tbl_sz, StringData) TIGHTDB_NOEXCEPT
     {
         if (col_ndx == 0)
-            insert_empty_rows(row_ndx, 1);
+            insert_empty_rows(row_ndx, 1, tbl_sz, false);
         return true;
     }
 
-    bool insert_binary(size_t col_ndx, size_t row_ndx, BinaryData) TIGHTDB_NOEXCEPT
+    bool insert_binary(size_t col_ndx, size_t row_ndx, size_t tbl_sz, BinaryData) TIGHTDB_NOEXCEPT
     {
         if (col_ndx == 0)
-            insert_empty_rows(row_ndx, 1);
+            insert_empty_rows(row_ndx, 1, tbl_sz, false);
         return true;
     }
 
-    bool insert_date_time(size_t col_ndx, size_t row_ndx, DateTime) TIGHTDB_NOEXCEPT
+    bool insert_date_time(size_t col_ndx, size_t row_ndx, size_t tbl_sz, DateTime) TIGHTDB_NOEXCEPT
     {
         if (col_ndx == 0)
-            insert_empty_rows(row_ndx, 1);
+            insert_empty_rows(row_ndx, 1, tbl_sz, false);
         return true;
     }
 
-    bool insert_table(size_t col_ndx, size_t row_ndx) TIGHTDB_NOEXCEPT
+    bool insert_table(size_t col_ndx, size_t row_ndx, size_t tbl_sz) TIGHTDB_NOEXCEPT
     {
         if (col_ndx == 0)
-            insert_empty_rows(row_ndx, 1);
+            insert_empty_rows(row_ndx, 1, tbl_sz, false);
         return true;
     }
 
-    bool insert_mixed(size_t col_ndx, size_t row_ndx, const Mixed&) TIGHTDB_NOEXCEPT
+    bool insert_mixed(size_t col_ndx, size_t row_ndx, size_t tbl_sz, const Mixed&) TIGHTDB_NOEXCEPT
     {
         if (col_ndx == 0)
-            insert_empty_rows(row_ndx, 1);
+            insert_empty_rows(row_ndx, 1, tbl_sz, false);
         return true;
     }
 
-    bool insert_link(size_t col_ndx, size_t row_ndx, size_t) TIGHTDB_NOEXCEPT
+    bool insert_link(size_t col_ndx, size_t row_ndx, size_t tbl_sz, size_t) TIGHTDB_NOEXCEPT
     {
         // The marking dirty of the target table is handled by
         // insert_empty_rows() regardless of whether the link column is the
         // first column or not.
         if (col_ndx == 0)
-            insert_empty_rows(row_ndx, 1);
+            insert_empty_rows(row_ndx, 1, tbl_sz, false);
        return true;
     }
 
-    bool insert_link_list(size_t col_ndx, size_t row_ndx) TIGHTDB_NOEXCEPT
+    bool insert_link_list(size_t col_ndx, size_t row_ndx, size_t tbl_sz) TIGHTDB_NOEXCEPT
     {
         if (col_ndx == 0)
-            insert_empty_rows(row_ndx, 1);
+            insert_empty_rows(row_ndx, 1, tbl_sz, false);
         return true;
     }
 
@@ -1262,6 +1286,7 @@ public:
         // m_table->m_cols[col_ndx] is null, but this can happen only when the
         // column was inserted earlier during this transaction advance, and in
         // that case, we have already marked the target table accesor dirty.
+
         typedef _impl::TableFriend tf;
         if (m_table) {
             if (Table* target = tf::get_link_target_table_accessor(*m_table, col_ndx))
@@ -1306,19 +1331,12 @@ public:
         return true;
     }
 
-    bool insert_column(size_t col_ndx, DataType, StringData, size_t link_target_table_ndx)
+    bool insert_column(size_t col_ndx, DataType, StringData)
     {
         if (m_table) {
             typedef _impl::TableFriend tf;
             InsertColumnUpdater updater(col_ndx);
             tf::update_accessors(*m_table, m_desc_path_begin, m_desc_path_end, updater);
-
-            // See comments on link handling in TransactAdvancer::set_link().
-            if (link_target_table_ndx != tightdb::npos) {
-                TableRef target = m_group.get_table(link_target_table_ndx); // Throws
-                tf::adj_add_column(*target); // Throws
-                tf::mark(*target);
-            }
         }
         typedef _impl::DescriptorFriend df;
         if (m_desc)
@@ -1326,7 +1344,38 @@ public:
         return true;
     }
 
-    bool erase_column(size_t col_ndx, size_t link_target_table_ndx, size_t backlink_col_ndx)
+    bool insert_link_column(size_t col_ndx, DataType, StringData, size_t link_target_table_ndx, size_t)
+    {
+        if (m_table) {
+            typedef _impl::TableFriend tf;
+            InsertColumnUpdater updater(col_ndx);
+            tf::update_accessors(*m_table, m_desc_path_begin, m_desc_path_end, updater);
+
+            // See comments on link handling in TransactAdvancer::set_link().
+            TableRef target = m_group.get_table(link_target_table_ndx); // Throws
+            tf::adj_add_column(*target); // Throws
+            tf::mark(*target);
+        }
+        typedef _impl::DescriptorFriend df;
+        if (m_desc)
+            df::adj_insert_column(*m_desc, col_ndx);
+        return true;
+    }
+
+    bool erase_column(size_t col_ndx)
+    {
+        if (m_table) {
+            typedef _impl::TableFriend tf;
+            EraseColumnUpdater updater(col_ndx);
+            tf::update_accessors(*m_table, m_desc_path_begin, m_desc_path_end, updater);
+        }
+        typedef _impl::DescriptorFriend df;
+        if (m_desc)
+            df::adj_erase_column(*m_desc, col_ndx);
+        return true;
+    }
+
+    bool erase_link_column(size_t col_ndx, size_t link_target_table_ndx, size_t backlink_col_ndx)
     {
         if (m_table) {
             typedef _impl::TableFriend tf;
@@ -1335,11 +1384,9 @@ public:
             // case the target table is the same as the origin table (because
             // the backlink column occurs after regular columns.) Also see
             // comments on link handling in TransactAdvancer::set_link().
-            if (link_target_table_ndx != tightdb::npos) {
-                TableRef target = m_group.get_table(link_target_table_ndx); // Throws
-                tf::adj_erase_column(*target, backlink_col_ndx); // Throws
-                tf::mark(*target);
-            }
+            TableRef target = m_group.get_table(link_target_table_ndx); // Throws
+            tf::adj_erase_column(*target, backlink_col_ndx); // Throws
+            tf::mark(*target);
 
             EraseColumnUpdater updater(col_ndx);
             tf::update_accessors(*m_table, m_desc_path_begin, m_desc_path_end, updater);
@@ -1404,6 +1451,24 @@ private:
     const size_t* m_desc_path_end;
 };
 
+void Group::refresh_dirty_accessors()
+{
+    m_top.get_alloc().bump_global_version();
+
+    // Refresh all remaining dirty table accessors
+    size_t num_tables = m_table_accessors.size();
+    for (size_t table_ndx = 0; table_ndx != num_tables; ++table_ndx) {
+        if (Table* table = m_table_accessors[table_ndx]) {
+            typedef _impl::TableFriend tf;
+            tf::set_ndx_in_parent(*table, table_ndx);
+            if (tf::is_marked(*table)) {
+                tf::refresh_accessor_tree(*table); // Throws
+                tf::bump_version(*table);
+            }
+        }
+    }
+}
+
 
 void Group::advance_transact(ref_type new_top_ref, size_t new_file_size,
                              const BinaryData* logs_begin, const BinaryData* logs_end)
@@ -1465,20 +1530,332 @@ void Group::advance_transact(ref_type new_top_ref, size_t new_file_size,
     }
 
     init_from_ref(new_top_ref);
-    m_top.get_alloc().bump_global_version();
-    // Refresh all remaining dirty table accessors
-    size_t num_tables = m_table_accessors.size();
-    for (size_t table_ndx = 0; table_ndx != num_tables; ++table_ndx) {
-        if (Table* table = m_table_accessors[table_ndx]) {
-            typedef _impl::TableFriend tf;
-            tf::set_ndx_in_parent(*table, table_ndx);
-            if (tf::is_marked(*table)) {
-                tf::refresh_accessor_tree(*table); // Throws
-                bool bump_global = false;
-                tf::bump_version(*table, bump_global);
-            }
+    refresh_dirty_accessors();
+}
+
+
+
+
+
+
+// Here goes the class which specifies how instructions are to be reversed.
+
+namespace {
+// First, to help, we use a special variant of TrivialReplication to gather the
+// reversed log:
+
+class ReverseReplication : public TrivialReplication {
+public:
+    ReverseReplication(const std::string& database_file) : TrivialReplication(database_file)
+    {
+        prepare_to_write();
+    }
+
+    void handle_transact_log(const char*, std::size_t, version_type)
+    {
+        // we should never get here...
+        TIGHTDB_ASSERT(false);
+    }
+};
+
+} // anonymous namespace
+
+class Group::TransactReverser : public NullHandler  {
+public:
+
+    TransactReverser(ReverseReplication& encoder) :
+        m_encoder(encoder), current_instr_start(0),
+        m_pending_table_select(false), m_pending_descriptor_select(false)
+    {
+    }
+
+    // override only the instructions which need to be reversed. (NullHandler class provides
+    // default implementatins for the rest)
+    bool select_table(std::size_t group_level_ndx, size_t levels, const size_t* path)
+    {
+        sync_table();
+        // note that for select table, 'levels' is encoded before 'group_level_ndx'
+        // despite the order of arguments
+        m_encoder.simple_cmd(Replication::instr_SelectTable, util::tuple(levels, group_level_ndx));
+        char* buf;
+        m_encoder.transact_log_reserve(&buf, 2*levels*Replication::max_enc_bytes_per_int);
+        for (size_t i = 0; i != levels; ++i) {
+            buf = m_encoder.encode_int(buf, path[i*2+0]);
+            buf = m_encoder.encode_int(buf, path[i*2+1]);
+        }
+        m_encoder.transact_log_advance(buf);
+
+        m_pending_table_select = true;
+        m_pending_ts_instr = get_inst();
+        return true;
+    }
+
+    bool select_descriptor(size_t levels, const size_t* path)
+    {
+        sync_descriptor();
+        m_encoder.simple_cmd(Replication::instr_SelectDescriptor, util::tuple(levels));
+        char* buf;
+        m_encoder.transact_log_reserve(&buf, levels*Replication::max_enc_bytes_per_int);
+        for (size_t i = 0; i != levels; ++i) {
+            buf = m_encoder.encode_int(buf, path[i]);
+        }
+        m_encoder.transact_log_advance(buf);
+
+        m_pending_descriptor_select = true;
+        m_pending_ds_instr = get_inst();
+        return true;
+    }
+
+    bool insert_group_level_table(std::size_t table_ndx, std::size_t num_tables, StringData)
+    {
+        m_encoder.simple_cmd(Replication::instr_EraseGroupLevelTable, util::tuple(table_ndx, num_tables + 1));
+        append_instruction();
+        return true;
+    }
+
+    bool erase_group_level_table(std::size_t table_ndx, std::size_t num_tables)
+    {
+        m_encoder.simple_cmd(Replication::instr_InsertGroupLevelTable, util::tuple(table_ndx, num_tables));
+        m_encoder.string_value(0, 0);
+        append_instruction();
+        return true;
+    }
+
+    bool insert_empty_rows(std::size_t idx, std::size_t num_rows, std::size_t tbl_sz, bool unordered)
+    {
+        m_encoder.simple_cmd(Replication::instr_EraseRows, util::tuple(idx, num_rows, tbl_sz, unordered));
+        append_instruction();
+        return true;
+    }
+
+    bool erase_rows(std::size_t idx, std::size_t num_rows, std::size_t tbl_sz, bool unordered)
+    {
+        m_encoder.simple_cmd(Replication::instr_InsertEmptyRows, util::tuple(idx, num_rows, tbl_sz, unordered));
+        append_instruction();
+        return true;
+    }
+
+    // helper function, shared by insert_xxx
+    bool insert(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz)
+    {
+        if (col_idx == 0) {
+            m_encoder.simple_cmd(Replication::instr_EraseRows, util::tuple(row_idx, 1, tbl_sz, false));
+            append_instruction();
+        }
+        return true;
+    }
+    bool insert_int(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz, int_fast64_t)
+    {
+        return insert(col_idx, row_idx, tbl_sz);
+    }
+
+    bool insert_bool(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz, bool)
+    {
+        return insert(col_idx, row_idx, tbl_sz);
+    }
+
+    bool insert_float(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz, float)
+    {
+        return insert(col_idx, row_idx, tbl_sz);
+    }
+
+    bool insert_double(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz, double)
+    {
+        return insert(col_idx, row_idx, tbl_sz);
+    }
+
+    bool insert_string(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz, StringData)
+    {
+        return insert(col_idx, row_idx, tbl_sz);
+    }
+
+    bool insert_binary(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz, BinaryData)
+    {
+        return insert(col_idx, row_idx, tbl_sz);
+    }
+
+    bool insert_date_time(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz, DateTime)
+    {
+        return insert(col_idx, row_idx, tbl_sz);
+    }
+
+    bool insert_table(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz)
+    {
+        return insert(col_idx, row_idx, tbl_sz);
+    }
+
+    bool insert_mixed(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz, const Mixed&)
+    {
+        return insert(col_idx, row_idx, tbl_sz);
+    }
+
+    bool insert_link(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz, std::size_t)
+    {
+        return insert(col_idx, row_idx, tbl_sz);
+    }
+
+    bool insert_link_list(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz)
+    {
+        return insert(col_idx, row_idx, tbl_sz);
+    }
+
+    bool set_table(size_t col_ndx, size_t row_ndx)
+    {
+        m_encoder.simple_cmd(Replication::instr_SetTable, util::tuple(col_ndx, row_ndx));
+        append_instruction();
+        return true;
+    }
+
+    bool set_mixed(size_t col_ndx, size_t row_ndx, const Mixed& value)
+    {
+        m_encoder.mixed_cmd(Replication::instr_SetMixed, col_ndx, row_ndx, value);
+        append_instruction();
+        return true;
+    }
+
+    bool set_link(size_t col_ndx, size_t row_ndx, size_t value)
+    {
+        m_encoder.simple_cmd(Replication::instr_SetLink, util::tuple(col_ndx, row_ndx, value));
+        append_instruction();
+        return true;
+    }
+
+    bool insert_link_column(std::size_t col_idx, DataType, StringData,
+                            std::size_t target_table_idx, std::size_t backlink_col_ndx)
+    {
+        m_encoder.simple_cmd(Replication::instr_EraseLinkColumn, util::tuple(col_idx, target_table_idx, backlink_col_ndx));
+        append_instruction();
+        return true;
+    }
+
+    bool erase_link_column(std::size_t col_idx, std::size_t target_table_idx,
+                           std::size_t backlink_col_idx)
+    {
+        m_encoder.simple_cmd(Replication::instr_InsertLinkColumn, util::tuple(col_idx, int(DataType())));
+        m_encoder.string_value(0, 0);
+        m_encoder.append_num(target_table_idx);
+        m_encoder.append_num(backlink_col_idx);
+        append_instruction();
+        return true;
+    }
+
+    bool insert_column(std::size_t col_idx, DataType, StringData)
+    {
+        m_encoder.simple_cmd(Replication::instr_EraseColumn, util::tuple(col_idx));
+        append_instruction();
+        return true;
+    }
+
+    bool erase_column(std::size_t col_idx)
+    {
+        m_encoder.simple_cmd(Replication::instr_InsertColumn, util::tuple(col_idx, int(DataType())));
+        m_encoder.string_value(0, 0);
+        append_instruction();
+        return true;
+    }
+
+    bool select_link_list(size_t col_ndx, size_t row_ndx)
+    {
+        m_encoder.simple_cmd(Replication::instr_SelectLinkList, util::tuple(col_ndx, row_ndx));
+        append_instruction();
+        return true;
+    }
+
+    void execute(Group& group);
+
+private:
+    ReverseReplication& m_encoder;
+    struct Instr { size_t begin; size_t end; };
+    std::vector<Instr> m_instructions;
+    size_t current_instr_start;
+    bool m_pending_table_select;
+    bool m_pending_descriptor_select;
+    Instr m_pending_ts_instr;
+    Instr m_pending_ds_instr;
+
+    Instr get_inst() {
+        Instr instr;
+        instr.begin = current_instr_start;
+        current_instr_start = m_encoder.transact_log_size();
+        instr.end = current_instr_start;
+        return instr;
+    }
+
+    void append_instruction() {
+        m_instructions.push_back(get_inst());
+    }
+
+    void append_instruction(Instr instr) {
+        m_instructions.push_back(instr);
+    }
+
+    void sync_descriptor() {
+        if (m_pending_descriptor_select) {
+            m_pending_descriptor_select = false;
+            append_instruction(m_pending_ds_instr);
         }
     }
+
+    void sync_table() {
+        sync_descriptor();
+        if (m_pending_table_select) {
+            m_pending_table_select = false;
+            append_instruction(m_pending_ts_instr);
+        }
+    }
+
+    class ReversedInputStream : public Replication::InputStream {
+    public:
+        ReversedInputStream(const char* buffer, std::vector<Instr>& instr_order)
+            : m_buffer(buffer), m_instr_order(instr_order)
+        {
+            m_current = m_instr_order.size();
+        }
+        virtual size_t next_block(const char*& begin, const char*& end)
+        {
+            if (m_current != 0) {
+                m_current--;
+                begin = m_buffer + m_instr_order[m_current].begin;
+                end   = m_buffer + m_instr_order[m_current].end;
+                return end-begin;
+            }
+            else
+                return 0;
+        }
+    private:
+        const char* m_buffer;
+        std::vector<Instr>& m_instr_order;
+        size_t m_current;
+    };
+};
+
+void Group::TransactReverser::execute(Group& group)
+{
+    // push any pending select_table or select_descriptor into the buffer:
+    sync_table();
+
+    // then execute the instructions in the transformed order
+    ReversedInputStream reversed_log(m_encoder.m_transact_log_buffer.data(), m_instructions);
+    Replication::TransactLogParser parser(reversed_log);
+    TransactAdvancer advancer(group);
+    parser.parse(advancer);
+}
+
+
+void Group::reverse_transact(ref_type new_top_ref, const BinaryData& log)
+{
+    MultiLogInputStream in(&log, (&log)+1);
+    Replication::TransactLogParser parser(in);
+    ReverseReplication encoder("reversal");
+    TransactReverser reverser(encoder);
+    parser.parse(reverser);
+    reverser.execute(*this);
+
+    // restore group internal arrays to state before transaction (rollback state)
+    init_from_ref(new_top_ref);
+
+    // propagate restoration to all relevant accessors:
+    refresh_dirty_accessors();
 }
 
 #endif // TIGHTDB_ENABLE_REPLICATION

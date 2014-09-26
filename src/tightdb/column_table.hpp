@@ -42,7 +42,7 @@ public:
 
     void adj_accessors_insert_rows(std::size_t, std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     void adj_accessors_erase_row(std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-    void adj_accessors_move_last_over(std::size_t, std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void adj_accessors_move(std::size_t, std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     void adj_acc_clear_root_table() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
     void refresh_accessor_tree(std::size_t, const Spec&) TIGHTDB_OVERRIDE;
@@ -96,7 +96,7 @@ protected:
         // Returns true if, and only if an entry was found and removed, and it
         // was the last entry in the map.
         template<bool fix_ndx_in_parent>
-        bool adj_move_last_over(std::size_t target_row_ndx, std::size_t last_row_ndx)
+        bool adj_move(std::size_t target_row_ndx, std::size_t source_row_ndx)
             TIGHTDB_NOEXCEPT;
         void update_accessors(const std::size_t* col_path_begin, const std::size_t* col_path_end,
                               _impl::TableFriend::AccessorUpdater&);
@@ -271,7 +271,7 @@ inline void ColumnSubtableParent::move_last_over(std::size_t target_row_ndx,
 
     const bool fix_ndx_in_parent = true;
     bool last_entry_removed =
-        m_subtable_map.adj_move_last_over<fix_ndx_in_parent>(target_row_ndx, last_row_ndx);
+        m_subtable_map.adj_move<fix_ndx_in_parent>(target_row_ndx, last_row_ndx);
     typedef _impl::TableFriend tf;
     if (last_entry_removed)
         tf::unbind_ref(*m_table);
@@ -313,8 +313,7 @@ inline void ColumnSubtableParent::adj_accessors_erase_row(std::size_t row_ndx) T
         tf::unbind_ref(*m_table);
 }
 
-inline void ColumnSubtableParent::adj_accessors_move_last_over(std::size_t target_row_ndx,
-                                                               std::size_t last_row_ndx)
+inline void ColumnSubtableParent::adj_accessors_move(std::size_t target_row_ndx, std::size_t source_row_ndx)
     TIGHTDB_NOEXCEPT
 {
     // This function must assume no more than minimal consistency of the
@@ -323,7 +322,7 @@ inline void ColumnSubtableParent::adj_accessors_move_last_over(std::size_t targe
 
     const bool fix_ndx_in_parent = false;
     bool last_entry_removed =
-        m_subtable_map.adj_move_last_over<fix_ndx_in_parent>(target_row_ndx, last_row_ndx);
+        m_subtable_map.adj_move<fix_ndx_in_parent>(target_row_ndx, source_row_ndx);
     typedef _impl::TableFriend tf;
     if (last_entry_removed)
         tf::unbind_ref(*m_table);
@@ -416,74 +415,44 @@ bool ColumnSubtableParent::SubtableMap::adj_erase_row(std::size_t row_ndx) TIGHT
     return m_entries.empty();
 }
 
+
 template<bool fix_ndx_in_parent>
-bool ColumnSubtableParent::SubtableMap::adj_move_last_over(std::size_t target_row_ndx,
-                                                           std::size_t last_row_ndx) TIGHTDB_NOEXCEPT
+bool ColumnSubtableParent::SubtableMap::adj_move(std::size_t target_row_ndx,
+                                                 std::size_t source_row_ndx) TIGHTDB_NOEXCEPT
 {
     typedef _impl::TableFriend tf;
 
-    // Search for either index in a tight loop for speed
-    bool last_seen = false;
-    std::size_t i = 0, n = m_entries.size();
-    for (;;) {
-        if (i == n)
-            return false;
-        const entry& e = m_entries[i];
-        if (e.m_subtable_ndx == target_row_ndx)
-            goto target;
-        if (e.m_subtable_ndx == last_row_ndx)
-            break;
-        ++i;
-    }
+    std::size_t i = 0, limit = m_entries.size();
+    // We return true if and only if we remove the last entry in the map.
+    // We need a special handling for the case, where the set of entries are already empty,
+    // otherwise the final return statement would also return true in this case, even
+    // though we didn't actually remove an entry.
+    if (i == limit) 
+        return false;
 
-    // Move subtable accessor at `last_row_ndx`, then look for `target_row_ndx`
-    {
-        entry& e = m_entries[i];
-        e.m_subtable_ndx = target_row_ndx;
-        if (fix_ndx_in_parent)
-            tf::set_ndx_in_parent(*(e.m_table), e.m_subtable_ndx);
-    }
-    for (;;) {
-        ++i;
-        if (i == n)
-            return false;
-        const entry& e = m_entries[i];
-        if (e.m_subtable_ndx == target_row_ndx)
-            break;
-    }
-    last_seen = true;
+    while (i < limit) {
 
-    // Detach and remove original subtable accessor at `target_row_ndx`, then
-    // look for `last_row_ndx
-  target:
-    {
         entry& e = m_entries[i];
-        // Must hold a counted reference while detaching
-        TableRef table(e.m_table);
-        tf::detach(*table);
-        // Delete entry by moving last over (faster and avoids invalidating
-        // iterators)
-        e = m_entries[--n];
-        m_entries.pop_back();
-    }
-    if (!last_seen) {
-        for (;;) {
-            if (i == n)
-                goto check_empty;
-            const entry& e = m_entries[i];
-            if (e.m_subtable_ndx == last_row_ndx)
-                break;
+        if (TIGHTDB_UNLIKELY(e.m_subtable_ndx == target_row_ndx)) {
+
+            // Must hold a counted reference while detaching
+            TableRef table(e.m_table);
+            tf::detach(*table);
+            // Delete entry by moving last over (faster and avoids invalidating
+            // iterators)
+            e = m_entries[--limit];
+            m_entries.pop_back();
+        }
+        else {
+            if (TIGHTDB_UNLIKELY(e.m_subtable_ndx == source_row_ndx)) {
+
+                e.m_subtable_ndx = target_row_ndx;
+                if (fix_ndx_in_parent)
+                    tf::set_ndx_in_parent(*(e.m_table), e.m_subtable_ndx);
+            }
             ++i;
         }
-        {
-            entry& e = m_entries[i];
-            e.m_subtable_ndx = target_row_ndx;
-            if (fix_ndx_in_parent)
-                tf::set_ndx_in_parent(*(e.m_table), target_row_ndx);
-        }
     }
-
-  check_empty:
     return m_entries.empty();
 }
 

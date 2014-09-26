@@ -404,8 +404,13 @@ public:
 
 
 
+} // anonymous namespace
 
 
+namespace tightdb {
+
+
+namespace _impl {
 
 class WriteLogCollector : public Replication
 {
@@ -458,8 +463,8 @@ WriteLogCollector::do_commit_write_transact(SharedGroup& sg,
 
 void WriteLogCollector::do_rollback_write_transact(SharedGroup& sg) TIGHTDB_NOEXCEPT
 {
-    // not used in this setting
-    static_cast<void>(sg);
+    // forward transaction log buffer
+    sg.do_rollback_and_continue_as_read(m_transact_log_buffer.data(), m_transact_log_free_begin);
 }
 
 
@@ -493,11 +498,7 @@ WriteLogCollector::WriteLogCollector(std::string database_name, WriteLogRegistry
     m_registry = registry;
 }
 
-
-}  // end anonymous namespace
-
-namespace tightdb {
-
+} // namespace _impl
 
 
 
@@ -510,7 +511,7 @@ LangBindHelper::TransactLogRegistry* getWriteLogs(std::string filepath)
 Replication* makeWriteLogCollector(std::string database_name)
 {
     WriteLogRegistry* registry = globalRegistry.get(database_name);
-    return  new WriteLogCollector(database_name, registry);
+    return  new _impl::WriteLogCollector(database_name, registry);
 }
 
 
