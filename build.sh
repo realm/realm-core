@@ -762,7 +762,7 @@ EOF
 
         echo "Create tar.gz file $file_name"
         rm -f "$TIGHTDB_HOME/$file_name" || exit 1
-        (cd "$TIGHTDB_HOME/$ANDROID_DIR" && tar czf "$TIGHTDB_HOME/$file_name" .) || exit 1
+        (cd "$TIGHTDB_HOME/$ANDROID_DIR" && tar czf "$TIGHTDB_HOME/$file_name" include libtightdb* *.txt) || exit 1
 
         echo "Unpacking in ../tightdb_java/$dir_name"
         mkdir -p ../tightdb_java/realm-jni/build || exit 1 # to help Mr. Jenkins
