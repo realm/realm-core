@@ -95,8 +95,12 @@ Query& Query::operator = (const Query& source)
         m_table = source.m_table;
         m_view = source.m_view;
 
-        for (size_t t = 0; t < update.size(); t++) {
-            update[t] = &first[0];
+        if (first[0]) {
+            ParentNode* node_to_update = first[0];
+            while (node_to_update->m_child) {
+                node_to_update = node_to_update->m_child;
+            }
+            update[0] = &node_to_update->m_child;
         }
     }
     return *this;
