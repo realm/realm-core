@@ -496,11 +496,11 @@ public:
 
     virtual ParentNode* clone() = 0;
 
-    virtual void translate_pointers(std::map<ParentNode*, ParentNode*> mapping)
+    virtual void translate_pointers(const std::map<ParentNode*, ParentNode*>& mapping)
     {
-        m_child = mapping[m_child];
+        m_child = mapping.find(m_child)->second;
         for (size_t i = 0; i < m_children.size(); ++i)
-            m_children[i] = mapping[m_children[i]];
+            m_children[i] = mapping.find(m_children[i])->second;
     }
 
 
@@ -577,12 +577,7 @@ public:
         return new ListviewNode(*this);
     }
 
-    virtual void translate_pointers(std::map<ParentNode*, ParentNode*> mapping)
-    {
-        ParentNode::translate_pointers(mapping);
-    }
-
-    ListviewNode(const ListviewNode& from) 
+    ListviewNode(const ListviewNode& from)
         : ParentNode(from), m_tv(from.m_tv)
     {
         m_max = from.m_max;
@@ -669,10 +664,10 @@ public:
         return new SubtableNode(*this);
     }
 
-    virtual void translate_pointers(std::map<ParentNode*, ParentNode*> mapping)
+    virtual void translate_pointers(const std::map<ParentNode*, ParentNode*>& mapping) TIGHTDB_OVERRIDE
     {
         ParentNode::translate_pointers(mapping);
-        m_child2 = mapping[m_child2];
+        m_child2 = mapping.find(m_child2)->second;
     }
 
     SubtableNode(const SubtableNode& from) 
@@ -733,12 +728,7 @@ public:
         m_matches = 0;
     }
 
-    virtual void translate_pointers(std::map<ParentNode*, ParentNode*> mapping)
-    {
-        ParentNode::translate_pointers(mapping);
-    }
-
-    IntegerNodeBase(const IntegerNodeBase& from) 
+    IntegerNodeBase(const IntegerNodeBase& from)
         : ParentNode(from), m_array(Array::no_prealloc_tag())
     {
         // state is transient/only valid during search, no need to copy
@@ -952,12 +942,7 @@ public:
         return new IntegerNode<TConditionValue, TConditionFunction>(*this);
     }
 
-    virtual void translate_pointers(std::map<ParentNode*, ParentNode*> mapping)
-    {
-        IntegerNodeBase::translate_pointers(mapping);
-    }
-
-    IntegerNode(const IntegerNode& from) 
+    IntegerNode(const IntegerNode& from)
         : IntegerNodeBase(from)
     {
         m_value = from.m_value;
@@ -1020,12 +1005,7 @@ public:
         return new FloatDoubleNode(*this);
     }
 
-    virtual void translate_pointers(std::map<ParentNode*, ParentNode*> mapping)
-    {
-        ParentNode::translate_pointers(mapping);
-    }
-
-    FloatDoubleNode(const FloatDoubleNode& from) 
+    FloatDoubleNode(const FloatDoubleNode& from)
         : ParentNode(from)
     {
         m_value = from.m_value;
@@ -1087,12 +1067,7 @@ public:
         return new BinaryNode(*this);
     }
 
-    virtual void translate_pointers(std::map<ParentNode*, ParentNode*> mapping)
-    {
-        ParentNode::translate_pointers(mapping);
-    }
-
-    BinaryNode(const BinaryNode& from) 
+    BinaryNode(const BinaryNode& from)
         : ParentNode(from)
     {
         // FIXME: Store this in std::string instead.
@@ -1288,11 +1263,6 @@ public:
     virtual ParentNode* clone()
     {
         return new StringNode<TConditionFunction>(*this);
-    }
-
-    virtual void translate_pointers(std::map<ParentNode*, ParentNode*> mapping)
-    {
-        StringNodeBase::translate_pointers(mapping);
     }
 
     StringNode(const StringNode& from) : StringNodeBase(from)
@@ -1494,12 +1464,6 @@ public:
         return new StringNode<Equal>(*this);
     }
 
-    virtual void translate_pointers(std::map<ParentNode*, ParentNode*> mapping)
-    {
-        StringNodeBase::translate_pointers(mapping);
-    }
-
-
 private:
     inline BinaryData str_to_bin(const StringData& s) TIGHTDB_NOEXCEPT
     {
@@ -1619,11 +1583,11 @@ public:
         return new OrNode(*this);
     }
 
-    virtual void translate_pointers(std::map<ParentNode*, ParentNode*> mapping)
+    virtual void translate_pointers(const std::map<ParentNode*, ParentNode*>& mapping) TIGHTDB_OVERRIDE
     {
         ParentNode::translate_pointers(mapping);
-        m_cond[0] = mapping[m_cond[0]];
-        m_cond[1] = mapping[m_cond[1]];
+        m_cond[0] = mapping.find(m_cond[0])->second;
+        m_cond[1] = mapping.find(m_cond[1])->second;
     }
 
     OrNode(const OrNode& from) 
@@ -1733,10 +1697,10 @@ public:
         return new NotNode(*this);
     }
 
-    virtual void translate_pointers(std::map<ParentNode*, ParentNode*> mapping)
+    virtual void translate_pointers(const std::map<ParentNode*, ParentNode*>& mapping) TIGHTDB_OVERRIDE
     {
         ParentNode::translate_pointers(mapping);
-        m_cond = mapping[m_cond];
+        m_cond = mapping.find(m_cond)->second;
     }
 
     NotNode(const NotNode& from) 
@@ -1841,12 +1805,7 @@ public:
         return new TwoColumnsNode<TConditionValue, TConditionFunction>(*this);
     }
 
-    virtual void translate_pointers(std::map<ParentNode*, ParentNode*> mapping)
-    {
-        ParentNode::translate_pointers(mapping);
-    }
-
-    TwoColumnsNode(const TwoColumnsNode& from) 
+    TwoColumnsNode(const TwoColumnsNode& from)
         : ParentNode(from)
     {
         m_value = from.m_value;
@@ -1907,11 +1866,6 @@ public:
     virtual ParentNode* clone()
     {
         return new ExpressionNode(*this);
-    }
-
-    virtual void translate_pointers(std::map<ParentNode*, ParentNode*> mapping)
-    {
-        ParentNode::translate_pointers(mapping);
     }
 
     ExpressionNode(ExpressionNode& from) 
