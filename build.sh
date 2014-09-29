@@ -2584,6 +2584,11 @@ EOF
 
     "jenkins-pull-request")
         # Run by Jenkins for each pull request whenever it changes
+        if ! [ -d "$WORKSPACE" ]; then
+            echo "Bad or unspecified Jenkins workspace '$WORKSPACE'" 1>&2
+            exit 1
+        fi
+
         git reset --hard || exit 1
         git clean -xfd || exit 1
 
