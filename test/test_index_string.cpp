@@ -498,4 +498,76 @@ TEST(StringIndex_FindAllNoCopy)
     col.destroy();
 }
 
+
+TEST(StringIndex_FindAllNoCopyBinary)
+{
+    // Create a column with duplcate values
+    ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
+    AdaptiveStringColumn col(Allocator::get_default(), ref);
+
+    StringData bin0 = StringData("hello\0th", 8);
+    StringData bin1 = StringData("hel\0loth", 8);
+    StringData bin2 = StringData("h\0elloth", 8);
+    StringData bin3 = bin0;
+
+    col.add(bin0);
+    col.add(bin1);
+    col.add(bin2);
+    col.add(bin3);
+
+    // Create a new index on column
+    StringIndex& ndx = col.create_index();
+    size_t ref_2;
+    FindRes res3 = ndx.find_all(bin0, ref_2);
+    CHECK_EQUAL(FindRes_column, res3);
+    const Column results(Allocator::get_default(), ref_type(ref_2));
+    CHECK_EQUAL(2, results.size());
+    CHECK_EQUAL(0, results.get(0));
+    CHECK_EQUAL(7, results.get(1));
+    CHECK_EQUAL(8, results.get(2));
+    CHECK_EQUAL(9, results.get(3));
+
+    // Clean up
+    col.destroy();
+}
+
+
+ONLY(StringIndex_FindAllNoCopy2)
+{
+    // Create a column with duplcate values
+    ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
+    AdaptiveStringColumn col(Allocator::get_default(), ref);
+
+    StringData bin0 = StringData("\x27\x22\x11\x11\0\0\0\0", 8);
+    StringData bin1 = StringData("\x92\x78\0\0\0\0\0\0", 8);
+
+    col.add(bin0);
+    col.add(bin0);
+    col.add(bin1);
+    
+    // Create a new index on column
+    StringIndex& ndx = col.create_index();
+    size_t results = not_found;
+    FindRes res = ndx.find_all(bin1, results);
+    CHECK_EQUAL(FindRes_column, res);
+
+    // Clean up
+    col.destroy();
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 #endif // TEST_INDEX_STRING
