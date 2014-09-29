@@ -775,6 +775,19 @@ EOF
         exit 0
         ;;
 
+    "asan"|"asan-debug")
+        # Run test suite with GCC's address sanitizer enabled.
+        # To get symbolized stack traces (file names and line numbers) with GCC, you at least version 4.9.
+        check_mode="$(printf "%s\n" "$MODE" | sed 's/asan/check/')" || exit 1
+        auto_configure || exit 1
+        touch "$CONFIG_MK" || exit 1 # Force complete rebuild
+        export TIGHTDB_HAVE_CONFIG="1"
+        UNITTEST_THREADS="1" UNITTEST_PROGRESS="1" $MAKE EXTRA_CFLAGS="-fsanitize=address" EXTRA_LDFLAGS="-fsanitize=address" "$check_mode" || exit 1
+        touch "$CONFIG_MK" || exit 1 # Force complete rebuild
+        echo "Test passed"
+        exit 0
+        ;;
+
     "build-test-ios-app")
         # For more documentation, see test/ios/README.md.
 
@@ -2596,7 +2609,7 @@ EOF
         sh build.sh build-iphone || exit 1
         sh build.sh build-android || exit 1
         sh build.sh build || exit 1
-        UNITTEST_SHUFFLE="1" UNITTEST_REANDOM_SEED="random" UNITTEST_THREADS="1" UNITTEST_XML="1" sh build.sh test-debug || exit 1
+        UNITTEST_SHUFFLE="1" UNITTEST_REANDOM_SEED="random" UNITTEST_THREADS="1" UNITTEST_XML="1" sh build.sh check-debug || exit 1
         sh build.sh install || exit 1
         sh build.sh check-doc-examples || exit 1
         (
@@ -2614,13 +2627,13 @@ EOF
 
     "jenkins-pipeline-unit-tests")
         # Run by Jenkins as part of the core pipeline whenever master changes.
-        MODE="$1"
-        if [ "$MODE" != "check" -a "$MODE" != "check-debug" ]; then
-            echo "Bad check mode '$MODE'" 1>&2
+        check_mode="$1"
+        if [ "$check_mode" != "check" -a "$check_mode" != "check-debug" ]; then
+            echo "Bad check mode '$check_mode'" 1>&2
             exit 1
         fi
         TIGHTDB_MAX_BPNODE_SIZE_DEBUG="4" sh build.sh config || exit 1
-        UNITTEST_SHUFFLE="1" UNITTEST_REANDOM_SEED="random" UNITTEST_XML="1" sh build.sh "$MODE" || exit 1
+        UNITTEST_SHUFFLE="1" UNITTEST_REANDOM_SEED="random" UNITTEST_XML="1" sh build.sh "$check_mode" || exit 1
         exit 0
         ;;
 
@@ -2628,6 +2641,13 @@ EOF
         # Run by Jenkins as part of the core pipeline whenever master changes
         TIGHTDB_MAX_BPNODE_SIZE_DEBUG="4" sh build.sh config || exit 1
         sh build.sh gcovr || exit 1
+        exit 0
+        ;;
+
+    "jenkins-pipeline-address-sanitizer")
+        # Run by Jenkins as part of the core pipeline whenever master changes.
+        TIGHTDB_MAX_BPNODE_SIZE_DEBUG="4" sh build.sh config || exit 1
+        sh build.sh asan-debug || exit 1
         exit 0
         ;;
 
