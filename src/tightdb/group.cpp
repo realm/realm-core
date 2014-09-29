@@ -882,7 +882,7 @@ public:
     {
     }
 
-    size_t read(char* buffer, size_t size) TIGHTDB_OVERRIDE
+    size_t read(char* buffer, size_t size)
     {
         if (m_logs_begin == m_logs_end)
             return 0;
