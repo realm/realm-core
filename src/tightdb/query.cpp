@@ -111,10 +111,7 @@ void Query::delete_nodes() TIGHTDB_NOEXCEPT
 {
     if (do_delete) {
         for (size_t t = 0; t < all_nodes.size(); t++) {
-            ParentNode *p = all_nodes[t];
-            std::vector<ParentNode *>::iterator it = std::find(all_nodes.begin(), all_nodes.begin() + t, p);
-            if (it == all_nodes.begin() + t)
-                delete p;
+            delete all_nodes[t];
         }
     }
 }
@@ -1264,8 +1261,16 @@ void Query::UpdatePointers(ParentNode* p, ParentNode** newnode)
 
 Query& Query::and_query(Query q)
 {
+    // This transfers ownership of the nodes from q to this, so both q and this
+    // must currently own their nodes
+    TIGHTDB_ASSERT(do_delete && q.do_delete);
+
     ParentNode* const p = q.first[0];
     UpdatePointers(p, &p->m_child);
+
+    // q.first[0] was added by UpdatePointers, but it'll be added again below
+    // so remove it
+    all_nodes.pop_back();
 
     // The query on which AddQuery() was called is now responsible for destruction of query given as argument. do_delete
     // indicates not to do cleanup in deconstructor, and all_nodes contains a list of all objects to be deleted. So
