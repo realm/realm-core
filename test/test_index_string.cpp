@@ -504,8 +504,11 @@ ONLY(StringIndex_FindAllNoCopy2)
     ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
     AdaptiveStringColumn col(Allocator::get_default(), ref);
 
-    StringData bin0 = StringData("\x27\x22\x11\x11\0\0\0\0", 8);
-    StringData bin1 = StringData("\x92\x78\0\0\0\0\0\0", 8);
+//    StringData bin0 = StringData("\x27\x22\x11\x11\0\0\0\0", 8);
+//    StringData bin1 = StringData("\x92\x78\0\0\0\0\0\0", 8);
+
+    StringData bin0 = StringData("xxxxxxxx", 8);
+    StringData bin1 = StringData("zxxxxxxx", 8);
 
     col.add(bin0);
     col.add(bin1);
