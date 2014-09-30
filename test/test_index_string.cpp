@@ -508,14 +508,13 @@ ONLY(StringIndex_FindAllNoCopy2)
     StringData bin1 = StringData("\x92\x78\0\0\0\0\0\0", 8);
 
     col.add(bin0);
-    col.add(bin0);
     col.add(bin1);
     
     // Create a new index on column
     StringIndex& ndx = col.create_index();
     size_t results = not_found;
-    FindRes res = ndx.find_all(bin1, results);
-    CHECK_EQUAL(FindRes_column, res);
+    FindRes res = ndx.find_all(bin0, results);
+    CHECK_EQUAL(FindRes_single, res);
 
     // Clean up
     col.destroy();
