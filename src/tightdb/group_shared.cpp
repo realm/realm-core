@@ -461,8 +461,11 @@ void spawn_daemon(const string& file)
             pid_changed = waitpid(pid, &status, 0);
         }
         while (pid_changed == -1 && errno == EINTR);
-        if (pid_changed != pid)
-            throw runtime_error("failed to wait for daemon start");
+        if (pid_changed != pid) {
+            std::cerr << "Waitpid returned pid = " << pid_changed 
+                      << " and status = " << std::hex << status << std::endl;
+            throw runtime_error("call to waitpid failed");
+        }
         if (!WIFEXITED(status))
             throw runtime_error("failed starting async commit (exit)");
         if (WEXITSTATUS(status) == 1) {
