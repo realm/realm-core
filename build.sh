@@ -782,8 +782,14 @@ EOF
         auto_configure || exit 1
         touch "$CONFIG_MK" || exit 1 # Force complete rebuild
         export TIGHTDB_HAVE_CONFIG="1"
-        UNITTEST_THREADS="1" UNITTEST_PROGRESS="1" $MAKE EXTRA_CFLAGS="-fsanitize=address" EXTRA_LDFLAGS="-fsanitize=address" "$check_mode" || exit 1
+        error=""
+        if ! UNITTEST_THREADS="1" UNITTEST_PROGRESS="1" $MAKE EXTRA_CFLAGS="-fsanitize=address" EXTRA_LDFLAGS="-fsanitize=address" "$check_mode"; then
+            error="1"
+        fi
         touch "$CONFIG_MK" || exit 1 # Force complete rebuild
+        if [ "$error" ]; then
+            exit 1
+        fi
         echo "Test passed"
         exit 0
         ;;
