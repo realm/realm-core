@@ -1615,7 +1615,7 @@ public:
 
     bool erase_group_level_table(std::size_t table_ndx, std::size_t num_tables)
     {
-        m_encoder.simple_cmd(Replication::instr_InsertGroupLevelTable, util::tuple(table_ndx, num_tables));
+        m_encoder.simple_cmd(Replication::instr_InsertGroupLevelTable, util::tuple(table_ndx, num_tables - 1));
         m_encoder.string_value(0, 0);
         append_instruction();
         return true;
