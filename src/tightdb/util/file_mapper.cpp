@@ -15,6 +15,8 @@
 
 #include <openssl/aes.h>
 
+#include <tightdb/util/terminate.hpp>
+
 using namespace std;
 using namespace tightdb;
 using namespace tightdb::util;
@@ -39,33 +41,11 @@ std::string get_errno_msg(const char* prefix, int err) {
 
 #ifdef TIGHTDB_ENABLE_ENCRYPTION
 
-#ifdef __APPLE__
-#include <execinfo.h>
-void print_backtrace() {
-    void* callstack[128];
-    int i, frames = backtrace(callstack, 128);
-    char** strs = backtrace_symbols(callstack, frames);
-    for (i = 0; i < frames; ++i) {
-        printf("%s\n", strs[i]);
-    }
-    free(strs);
-}
-#else
-void print_backtrace() { }
-#endif
-
-void die(const char *msg) {
-    puts(msg);
-    print_backtrace();
-    abort();
-}
-
 struct spin_lock_guard {
     std::atomic_flag &lock;
 
     spin_lock_guard(std::atomic_flag &lock) : lock(lock) {
         while (lock.test_and_set(std::memory_order_acquire)) ;
-//            die("multiple threads or re-entrant signal");
     }
 
     ~spin_lock_guard() {
@@ -171,7 +151,7 @@ public:
     , cryptor(key)
     {
         struct stat st;
-        if (fstat(fd, &st)) die("fstat failed");
+        if (fstat(fd, &st)) TIGHTDB_TERMINATE("fstat failed");
         inode = st.st_ino;
         device = st.st_dev;
     }
@@ -249,7 +229,7 @@ public:
         if (memcmp(buffer, page_addr(i), page_size(i))) {
             printf("mismatch %p: fd(%d) page(%zu/%zu) page_size(%zu) %s %s\n",
                    this, fd, i, count, page_size(i), buffer, page_addr(i));
-            die("");
+            TIGHTDB_TERMINATE("");
         }
     }
 
@@ -332,7 +312,7 @@ void handler(int code, siginfo_t *info, void *ctx) {
             old_bus.sa_handler(code);
     }
     else
-        die("segv");
+        TIGHTDB_TERMINATE("Segmentation fault");
 }
 
 void add_mapping(void *addr, size_t size, int fd, File::AccessMode access, const uint8_t *encryption_key) {
@@ -344,8 +324,10 @@ void add_mapping(void *addr, size_t size, int fd, File::AccessMode access, const
         action.sa_sigaction = handler;
         action.sa_flags = SA_SIGINFO;
 
-        if (sigaction(SIGSEGV, &action, &old_segv) != 0) die("sigaction");
-        if (sigaction(SIGBUS, &action, &old_bus) != 0) die("sigaction");
+        if (sigaction(SIGSEGV, &action, &old_segv) != 0)
+            TIGHTDB_TERMINATE("sigaction SEGV failed");
+        if (sigaction(SIGBUS, &action, &old_bus) != 0)
+            TIGHTDB_TERMINATE("sigaction SIGBUS");
     }
 }
 
