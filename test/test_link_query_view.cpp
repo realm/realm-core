@@ -1113,6 +1113,16 @@ TEST(LinkList_QueryOnLinkList)
     tv.sync_if_needed();
     CHECK_EQUAL(1, tv.size());
     CHECK_EQUAL(0, tv.get_source_ndx(0));
+
+    // See if we can keep a LinkView alive for the lifetime of a Query (used by objc lang. binding)
+    Query query2;
+    {
+        LinkViewRef lvr2 = table2->get_linklist(col_link2, 1);
+        query2 = table1->where(lvr2);
+        // lvr2 goes out of scope now but should be kept alive
+    }
+    query2.find_all();
+    query2.find();
 }
 
 #endif

@@ -573,6 +573,9 @@ public:
     // FIXME: We need a ConstQuery class or runtime check against modifications in read transaction.
     Query where(RowIndexes* tv = null_ptr) const { return Query(*this, tv); }
 
+    // Perform queries on a LinkView. The returned Query holds a reference to lv.
+    Query where(const LinkViewRef& lv) { return Query(*this, lv); }
+
     Table& link(size_t link_column);
 
     // Optimizing
