@@ -350,6 +350,10 @@ bool run_tests()
 
 int test_all(int argc, char* argv[])
 {
+    // Disable buffering on cout so that progress messages can be related to
+    // error messages.
+    cout.setf(ios::unitbuf);
+
     bool no_error_exit_staus = 2 <= argc && strcmp(argv[1], "--no-error-exitcode") == 0;
 
 #ifdef _MSC_VER

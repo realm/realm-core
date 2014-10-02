@@ -175,8 +175,18 @@ public:
     virtual void adj_accessors_insert_rows(std::size_t row_ndx,
                                            std::size_t num_rows) TIGHTDB_NOEXCEPT;
     virtual void adj_accessors_erase_row(std::size_t row_ndx) TIGHTDB_NOEXCEPT;
-    virtual void adj_accessors_move_last_over(std::size_t target_row_ndx,
-                                              std::size_t last_row_ndx) TIGHTDB_NOEXCEPT;
+
+    // This function assumes that a row has moved from \a origin_ndx to \a target_ndx,
+    // and it updates the column accessor, and all its subordinate accessors (subtables, rows)
+    // accordingly.
+    // Subordinate accessors that are already associated with \a target_ndx will be detached.
+    // Link-adjacent table accessors will be marked (dirty).
+    //
+    // It is used as part of Table::refresh_accessor_tree() to bring the state of the accessors
+    // from Minimal Consistency into Structural Correspondence, so it must be able to execute
+    // without accessing the underlying array nodes.
+    virtual void adj_accessors_move(std::size_t target_row_ndx,
+                                    std::size_t source_row_ndx) TIGHTDB_NOEXCEPT;
     virtual void adj_acc_clear_root_table() TIGHTDB_NOEXCEPT;
 
     enum {
@@ -507,7 +517,7 @@ inline void ColumnBase::adj_accessors_erase_row(std::size_t) TIGHTDB_NOEXCEPT
     // Noop
 }
 
-inline void ColumnBase::adj_accessors_move_last_over(std::size_t, std::size_t) TIGHTDB_NOEXCEPT
+inline void ColumnBase::adj_accessors_move(std::size_t, std::size_t) TIGHTDB_NOEXCEPT
 {
     // Noop
 }

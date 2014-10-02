@@ -651,6 +651,9 @@ public:
     // FIXME: We need a ConstQuery class or runtime check against modifications in read transaction.
     Query where(RowIndexes* tv = null_ptr) const { return Query(*this, tv); }
 
+    // Perform queries on a LinkView. The returned Query holds a reference to lv.
+    Query where(const LinkViewRef& lv) { return Query(*this, lv); }
+
     Table& link(size_t link_column);
 
     // Optimizing
@@ -1089,13 +1092,13 @@ private:
 
     void adj_accessors_insert_rows(std::size_t row_ndx, std::size_t num_rows) TIGHTDB_NOEXCEPT;
     void adj_accessors_erase_row(std::size_t row_ndx) TIGHTDB_NOEXCEPT;
-    void adj_accessors_move_last_over(std::size_t target_row_ndx, std::size_t last_row_ndx)
+    void adj_accessors_move(std::size_t target_row_ndx, std::size_t source_row_ndx)
         TIGHTDB_NOEXCEPT;
     void adj_acc_clear_root_table() TIGHTDB_NOEXCEPT;
     void adj_acc_clear_nonroot_table() TIGHTDB_NOEXCEPT;
     void adj_row_acc_insert_rows(std::size_t row_ndx, std::size_t num_rows) TIGHTDB_NOEXCEPT;
     void adj_row_acc_erase_row(std::size_t row_ndx) TIGHTDB_NOEXCEPT;
-    void adj_row_acc_move_last_over(std::size_t target_row_ndx, std::size_t last_row_ndx)
+    void adj_row_acc_move(std::size_t target_row_ndx, std::size_t source_row_ndx)
         TIGHTDB_NOEXCEPT;
     void adj_insert_column(std::size_t col_ndx);
     void adj_erase_column(std::size_t col_ndx) TIGHTDB_NOEXCEPT;
@@ -1913,10 +1916,10 @@ public:
         table.adj_accessors_erase_row(row_ndx);
     }
 
-    static void adj_accessors_move_last_over(Table& table, std::size_t target_row_ndx,
-                                             std::size_t last_row_ndx) TIGHTDB_NOEXCEPT
+    static void adj_accessors_move(Table& table, std::size_t target_row_ndx,
+                                   std::size_t source_row_ndx) TIGHTDB_NOEXCEPT
     {
-        table.adj_accessors_move_last_over(target_row_ndx, last_row_ndx);
+        table.adj_accessors_move(target_row_ndx, source_row_ndx);
     }
 
     static void adj_acc_clear_root_table(Table& table) TIGHTDB_NOEXCEPT

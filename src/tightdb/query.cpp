@@ -21,6 +21,14 @@ Query::Query(Table& table, RowIndexes* tv) : m_table(table.get_table_ref()), m_v
     Create();
 }
 
+Query::Query(const Table& table, const LinkViewRef& lv):
+    m_table((const_cast<Table&>(table)).get_table_ref()),
+    m_view(lv.get()),
+    m_source_link_view(lv)
+{
+    Create();
+}
+
 Query::Query(const Table& table, RowIndexes* tv) : m_table((const_cast<Table&>(table)).get_table_ref()), m_view(tv)
 {
     Create();
@@ -49,6 +57,7 @@ Query::Query(const Query& copy)
     pending_not = copy.pending_not;
     error_code = copy.error_code;
     m_view = copy.m_view;
+    m_source_link_view = copy.m_source_link_view;
     copy.do_delete = false;
     do_delete = true;
 }
@@ -94,9 +103,14 @@ Query& Query::operator = (const Query& source)
         }
         m_table = source.m_table;
         m_view = source.m_view;
+        m_source_link_view = source.m_source_link_view;
 
-        for (size_t t = 0; t < update.size(); t++) {
-            update[t] = &first[0];
+        if (first[0]) {
+            ParentNode* node_to_update = first[0];
+            while (node_to_update->m_child) {
+                node_to_update = node_to_update->m_child;
+            }
+            update[0] = &node_to_update->m_child;
         }
     }
     return *this;
@@ -111,10 +125,7 @@ void Query::delete_nodes() TIGHTDB_NOEXCEPT
 {
     if (do_delete) {
         for (size_t t = 0; t < all_nodes.size(); t++) {
-            ParentNode *p = all_nodes[t];
-            std::vector<ParentNode *>::iterator it = std::find(all_nodes.begin(), all_nodes.begin() + t, p);
-            if (it == all_nodes.begin() + t)
-                delete p;
+            delete all_nodes[t];
         }
     }
 }
@@ -1264,14 +1275,27 @@ void Query::UpdatePointers(ParentNode* p, ParentNode** newnode)
 
 Query& Query::and_query(Query q)
 {
+    // This transfers ownership of the nodes from q to this, so both q and this
+    // must currently own their nodes
+    TIGHTDB_ASSERT(do_delete && q.do_delete);
+
     ParentNode* const p = q.first[0];
     UpdatePointers(p, &p->m_child);
+
+    // q.first[0] was added by UpdatePointers, but it'll be added again below
+    // so remove it
+    all_nodes.pop_back();
 
     // The query on which AddQuery() was called is now responsible for destruction of query given as argument. do_delete
     // indicates not to do cleanup in deconstructor, and all_nodes contains a list of all objects to be deleted. So
     // take all objects of argument and copy to this node's all_nodes list.
     q.do_delete = false;
     all_nodes.insert( all_nodes.end(), q.all_nodes.begin(), q.all_nodes.end() );
+
+    if (q.m_source_link_view) {
+        TIGHTDB_ASSERT(!m_source_link_view || m_source_link_view == q.m_source_link_view);
+        m_source_link_view = q.m_source_link_view;
+    }
 
     return *this;
 }

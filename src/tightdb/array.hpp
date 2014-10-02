@@ -2966,7 +2966,7 @@ TIGHTDB_FORCEINLINE bool Array::FindSSE_intern(__m128i* action_data, __m128i* da
 
             size_t idx = FirstSetBit(resmask) * 8 / no0(width);
             s += idx;
-            if (!find_action<action, Callback>( s + baseindex, GetUniversal<width>(reinterpret_cast<char*>(data), s), state, callback))
+            if (!find_action<action, Callback>( s + baseindex, GetUniversal<width>(reinterpret_cast<char*>(action_data), s), state, callback))
                 return false;
             resmask >>= (idx + 1) * no0(width) / 8;
             ++s;

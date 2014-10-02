@@ -56,6 +56,7 @@ class SequentialGetterBase;
 class Query {
 public:
     Query(const Table& table, RowIndexes* tv = null_ptr);
+    Query(const Table& table, const LinkViewRef& lv);
     Query();
     Query(const Query& copy); // FIXME: Try to remove this
     struct TCopyExpressionTag {};
@@ -308,6 +309,8 @@ private:
     friend class XQueryAccessorInt;
     friend class XQueryAccessorString;
     friend class TableViewBase;
+
+    LinkViewRef m_source_link_view;
 };
 
 // Implementation:
