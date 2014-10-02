@@ -498,4 +498,29 @@ TEST(StringIndex_FindAllNoCopy)
     col.destroy();
 }
 
+ONLY(StringIndex_FindAllNoCopy2)
+{
+    // Create a column with duplcate values
+    ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
+    AdaptiveStringColumn col(Allocator::get_default(), ref);
+
+//    StringData bin0 = StringData("\x27\x22\x11\x11\0\0\0\0", 8);
+//    StringData bin1 = StringData("\x92\x78\0\0\0\0\0\0", 8);
+
+    StringData bin0 = StringData("xxxxxxxx", 8);
+    StringData bin1 = StringData("åxxxxxxx", 8);
+
+    col.add(bin0);
+    col.add(bin1);
+    
+    // Create a new index on column
+    StringIndex& ndx = col.create_index();
+    size_t results = not_found;
+    FindRes res = ndx.find_all(bin0, results);
+    CHECK_EQUAL(FindRes_single, res);
+
+    // Clean up
+    col.destroy();
+}
+
 #endif // TEST_INDEX_STRING
