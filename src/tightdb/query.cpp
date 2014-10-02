@@ -75,6 +75,8 @@ Query::Query(const Query& copy, const TCopyExpressionTag&)
 
 Query& Query::operator = (const Query& source)
 {
+    TIGHTDB_ASSERT(source.do_delete);
+
     if (this != &source) {
         // free destination object
         delete_nodes();
