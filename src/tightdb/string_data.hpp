@@ -58,11 +58,11 @@ namespace tightdb {
 ///
 /// \endcode
 ///
-/// Note that in general, no assumptions can be made about what
-/// follows a StringData object, or whether anything follows it at
-/// all. In particular, the receiver of a StringData object cannot
-/// assume that the referenced string is followed by a null character
-/// unless there is an externally provided guarantee.
+/// Note that in general, no assumptions can be made about what follows a string
+/// that is referenced by a StringData object, or whether anything follows it at
+/// all. In particular, the receiver of a StringData object cannot assume that
+/// the referenced string is followed by a null character unless there is an
+/// externally provided guarantee.
 ///
 /// This class makes it possible to distinguish between a 'null'
 /// reference and a reference to the empty string (see

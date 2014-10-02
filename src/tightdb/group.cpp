@@ -271,7 +271,7 @@ Table* Group::do_get_table(size_t table_ndx, DescMatcher desc_matcher)
     TIGHTDB_ASSERT(m_table_accessors.empty() || m_table_accessors.size() == m_tables.size());
 
     if (table_ndx >= m_tables.size())
-        throw InvalidArgument();
+        throw LogicError(LogicError::table_index_out_of_range);
 
     if (m_table_accessors.empty())
         m_table_accessors.resize(m_tables.size()); // Throws
@@ -531,7 +531,7 @@ void Group::rename_table(size_t table_ndx, StringData new_name, bool require_uni
     TIGHTDB_ASSERT(is_attached());
     TIGHTDB_ASSERT(m_tables.size() == m_table_names.size());
     if (table_ndx >= m_tables.size())
-        throw InvalidArgument();
+        throw LogicError(LogicError::table_index_out_of_range);
     if (require_unique_name && has_table(new_name))
         throw TableNameInUse();
     m_table_names.set(table_ndx, new_name);
@@ -1407,6 +1407,16 @@ public:
         return true; // No-op
     }
 
+    bool add_primary_key(size_t) TIGHTDB_NOEXCEPT
+    {
+        return true; // No-op
+    }
+
+    bool remove_primary_key() TIGHTDB_NOEXCEPT
+    {
+        return true; // No-op
+    }
+
     bool select_link_list(size_t col_ndx, size_t) TIGHTDB_NOEXCEPT
     {
         // See comments on link handling in TransactAdvancer::set_link().
@@ -1560,7 +1570,7 @@ public:
 
 } // anonymous namespace
 
-class Group::TransactReverser : public NullHandler  {
+class Group::TransactReverser  {
 public:
 
     TransactReverser(ReverseReplication& encoder) :
@@ -1621,6 +1631,16 @@ public:
         return true;
     }
 
+    bool rename_group_level_table(std::size_t, StringData)
+    {
+        return true; // No-op
+    }
+
+    bool optimize_table()
+    {
+        return true; // No-op
+    }
+
     bool insert_empty_rows(std::size_t idx, std::size_t num_rows, std::size_t tbl_sz, bool unordered)
     {
         m_encoder.simple_cmd(Replication::instr_EraseRows, util::tuple(idx, num_rows, tbl_sz, unordered));
@@ -1633,6 +1653,11 @@ public:
         m_encoder.simple_cmd(Replication::instr_InsertEmptyRows, util::tuple(idx, num_rows, tbl_sz, unordered));
         append_instruction();
         return true;
+    }
+
+    bool add_int_to_column(size_t, int_fast64_t)
+    {
+        return true; // No-op
     }
 
     // helper function, shared by insert_xxx
@@ -1699,6 +1724,46 @@ public:
         return insert(col_idx, row_idx, tbl_sz);
     }
 
+    bool row_insert_complete()
+    {
+        return true; // No-op
+    }
+
+    bool set_int(std::size_t, std::size_t, int_fast64_t)
+    {
+        return true; // No-op
+    }
+
+    bool set_bool(std::size_t, std::size_t, bool)
+    {
+        return true; // No-op
+    }
+
+    bool set_float(std::size_t, std::size_t, float)
+    {
+        return true; // No-op
+    }
+
+    bool set_double(std::size_t, std::size_t, double)
+    {
+        return true; // No-op
+    }
+
+    bool set_string(std::size_t, std::size_t, StringData)
+    {
+        return true; // No-op
+    }
+
+    bool set_binary(std::size_t, std::size_t, BinaryData)
+    {
+        return true; // No-op
+    }
+
+    bool set_date_time(std::size_t, std::size_t, DateTime)
+    {
+        return true; // No-op
+    }
+
     bool set_table(size_t col_ndx, size_t row_ndx)
     {
         m_encoder.simple_cmd(Replication::instr_SetTable, util::tuple(col_ndx, row_ndx));
@@ -1718,6 +1783,26 @@ public:
         m_encoder.simple_cmd(Replication::instr_SetLink, util::tuple(col_ndx, row_ndx, value));
         append_instruction();
         return true;
+    }
+
+    bool clear_table()
+    {
+        return true; // No-op
+    }
+
+    bool add_search_index(size_t)
+    {
+        return true; // No-op
+    }
+
+    bool add_primary_key(size_t)
+    {
+        return true; // No-op
+    }
+
+    bool remove_primary_key()
+    {
+        return true; // No-op
     }
 
     bool insert_link_column(std::size_t col_idx, DataType, StringData,
@@ -1754,6 +1839,11 @@ public:
         return true;
     }
 
+    bool rename_column(size_t, StringData)
+    {
+        return true; // No-op
+    }
+
     bool select_link_list(size_t col_ndx, size_t row_ndx)
     {
         m_encoder.simple_cmd(Replication::instr_SelectLinkList, util::tuple(col_ndx, row_ndx));
@@ -1761,7 +1851,32 @@ public:
         return true;
     }
 
-    void execute(Group& group);
+    bool link_list_set(size_t, size_t)
+    {
+        return true; // No-op
+    }
+
+    bool link_list_insert(size_t, size_t)
+    {
+        return true; // No-op
+    }
+
+    bool link_list_move(size_t, size_t)
+    {
+        return true; // No-op
+    }
+
+    bool link_list_erase(size_t)
+    {
+        return true; // No-op
+    }
+
+    bool link_list_clear()
+    {
+        return true; // No-op
+    }
+
+    void execute(Group&);
 
 private:
     ReverseReplication& m_encoder;

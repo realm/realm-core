@@ -99,9 +99,7 @@ public:
     /// different from the specified logical column index due to the presence of
     /// search indexes, since their top refs are stored in Table::m_columns as
     /// well.
-    ///
-    /// FIXME: Rename to get_column_ndx_in_parent()
-    std::size_t get_column_pos(std::size_t column_ndx) const;
+    std::size_t get_column_ndx_in_parent(std::size_t column_ndx) const;
 
     /// Compare two table specs for equality.
     bool operator==(const Spec&) const TIGHTDB_NOEXCEPT;

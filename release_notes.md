@@ -1,7 +1,21 @@
 # 0.83.2 Release notes
 
+### API breaking changes:
+
+* `Table::set_index()` and `Table::has_index()` renamed to
+  `Table::add_search_index()` and `Table::has_search_index()` respectively, and
+  `Table::add_search_index()` now throws instead of failing in an unspecified
+  way.
+* `Table::find_pkey_string()` replaces `Table::lookup()` and has slightly
+  different semantics. In particular, it now throws instead of failing in an
+  unspecified way.
+
 ### Enhancements:
 
+* A row accessor (`Row`) can now be evaluated in boolean context to see whether
+  it is still attached.
+* `Table::try_add_primary_key()` and `Table::remove_primary_key()` added.
+* `Table::find_pkey_int()` added, but not yet backed by an integer search index.
 * Added method `LangBindHelper::rollback_and_continue_as_read()`. This method
   provides the ability to rollback a write transaction while retaining
   accessors: Accessors which are detached as part of the rolled back write
@@ -13,6 +27,9 @@
 
 ### Internals:
 
+* Introducing `LogicError` as an alternative to expected exceptions. See
+  https://github.com/Tightdb/tightdb/wiki/Exception-safety-guarantees for more
+  on this.
 * Various query related speed improvements.
 * Test suite now passes ASAN (address sanitizer).
 

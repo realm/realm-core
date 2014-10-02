@@ -196,6 +196,9 @@
     <ClCompile Include="..\..\test\test_descriptor.cpp">
       <Filter>test</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\tightdb\exceptions.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\src\tightdb\version.cpp">
       <Filter>src</Filter>
     </ClCompile>
