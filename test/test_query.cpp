@@ -5424,6 +5424,7 @@ TEST(Query_TableViewMoveAssignLeak2)
 
     Query q3;
 
+    q2 = t.column().ints <= t.column().doubles;
     q3 = q2;
 
     q3.find();
