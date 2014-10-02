@@ -10,7 +10,10 @@
 
 ### Enhancements:
 
-* Lorem ipsum.
+* Added method `LangBindHelper::rollback_and_continue_as_read()`. This method provides the ability to rollback a 
+  write transaction while retaining accessors: Accessors which are detached as part of the rolled back write
+  transaction are *not* automatically re-attached. Accessors that were attached before the write transaction
+  and which are not detached during the write transaction will remain attached after the rollback.
 
 -----------
 
