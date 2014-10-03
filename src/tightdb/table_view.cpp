@@ -271,13 +271,19 @@ void TableViewBase::row_to_string(size_t row_ndx, ostream& out) const
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
 
+uint64_t TableViewBase::outside_version() const
+{
+    return m_linkview_source ? m_linkview_source->get_origin_table().m_version : m_table->m_version;
+}
+
 bool TableViewBase::is_in_sync() const TIGHTDB_NOEXCEPT
 {
-    return bool(m_table)
-    && (m_last_seen_version == m_table->m_version)
-    && ((m_query.m_view)
-    ? static_cast<TableViewBase*>(m_query.m_view)->is_in_sync()
-    : true);
+    bool table = bool(m_table);
+    bool version = bool(m_last_seen_version == outside_version());
+    bool view = bool(m_query.m_view);
+
+    return table && version
+        && (view ? static_cast<TableViewBase*>(m_query.m_view)->is_in_sync() : true);
 }
 
 void TableViewBase::sync_if_needed() const
@@ -298,7 +304,7 @@ void TableView::remove(size_t ndx)
     TIGHTDB_ASSERT(ndx < m_row_indexes.size());
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    bool sync_to_keep = m_last_seen_version == m_table->m_version;
+    bool sync_to_keep = m_last_seen_version == outside_version();
 #endif
 
     // Delete row in source table
@@ -309,7 +315,7 @@ void TableView::remove(size_t ndx)
     // It is important to not accidentally bring us in sync, if we were
     // not in sync to start with:
     if (sync_to_keep)
-        m_last_seen_version = m_table->m_version;
+        m_last_seen_version = outside_version();
 #endif
 
     // Update refs
@@ -319,7 +325,6 @@ void TableView::remove(size_t ndx)
     //
     // O(n) for n = this->size(). FIXME: Dangerous cast below: unsigned -> signed
     m_row_indexes.adjust_ge(int_fast64_t(real_ndx), -1);
-
 }
 
 
@@ -328,7 +333,7 @@ void TableView::clear()
     TIGHTDB_ASSERT(m_table);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    bool sync_to_keep = m_last_seen_version == m_table->m_version;
+    bool sync_to_keep = m_last_seen_version == outside_version();
 #endif
 
     // If m_table is unordered we must use move_last_over(). Fixme/todo: To test if it's unordered we currently
@@ -389,7 +394,7 @@ void TableView::clear()
     // It is important to not accidentally bring us in sync, if we were
     // not in sync to start with:
     if (sync_to_keep)
-        m_last_seen_version = m_table->m_version;
+        m_last_seen_version = outside_version();
 #endif
 }
 
@@ -397,14 +402,22 @@ void TableView::clear()
 
 void TableViewBase::do_sync() 
 {
-    // precondition: m_table is attached
-    if (!m_query.m_table) {
-        // no valid query
-        m_last_seen_version = m_table->m_version;
+    // A TableView can be "born" from 3 different sources: LinkView, Table::find_all() or Query. Here
+    // we sync with the respective source
+    if (m_linkview_source) {
         m_row_indexes.clear();
-        for (size_t i=0; i<m_table->size(); i++)
+        for (size_t t = 0; t < m_linkview_source->size(); t++)
+            m_row_indexes.add(m_linkview_source->get(t).get_index());
+    }
+    // precondition: m_table is attached
+    else if (!m_query.m_table) {
+        // This case gets invoked if the TableView origined from Table::find_all(T value). It is temporarely disabled 
+        // because it doesn't take the search parameter in count. FIXME/Todo
+        TIGHTDB_ASSERT(false);
+        // no valid query
+        m_row_indexes.clear();
+        for (size_t i = 0; i < m_table->size(); i++)
             m_row_indexes.add(i);
-        cerr << "ref to entire table" << endl;
     }
     else  {
         // valid query, so clear earlier results and reexecute it.
@@ -416,10 +429,11 @@ void TableViewBase::do_sync()
         // find_all needs to call size() on the tableview. But if we're
         // out of sync, size() will then call do_sync and we'll have an infinite regress
         // SO: fake that we're up to date BEFORE calling find_all.
-        m_last_seen_version = m_table->m_version;
         m_query.find_all(*(const_cast<TableViewBase*>(this)), m_start, m_end, m_limit);
     }
     if (m_auto_sort)
         re_sort();
+
+    m_last_seen_version = outside_version();
 }
 #endif // TIGHTDB_ENABLE_REPLICATION

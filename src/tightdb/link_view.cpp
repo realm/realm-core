@@ -160,9 +160,32 @@ void LinkView::clear()
 #endif
 }
 
+void LinkView::sort(size_t column, bool ascending)
+{
+    std::vector<size_t> c;
+    std::vector<bool> a;
+    c.push_back(column);
+    a.push_back(ascending);
+    sort(c, a);
+}
+
+void LinkView::sort(std::vector<size_t> columns, std::vector<bool> ascending)
+{
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    if (Replication* repl = get_repl()) {
+        // todo, write to the replication log that we're doing a sort
+        repl->set_link_list(*this, m_row_indexes); // Throws
+    }
+#endif
+    RowIndexes::sort(columns, ascending);
+}
+
 TableView LinkView::get_sorted_view(vector<size_t> column_indexes, vector<bool> ascending) const
 {
-    TableView v(m_origin_column.get_target_table());
+    TableView v(m_origin_column.get_target_table()); // sets m_table
+    v.m_last_seen_version = m_origin_table->m_version;
+    // sets m_linkview_source to indicate that this TableView was generated from a LinkView
+    v.m_linkview_source = ConstLinkViewRef(this);
     for (size_t t = 0; t < m_row_indexes.size(); t++) // todo, simpler way?
         v.m_row_indexes.add(get(t).get_index());
     v.sort(column_indexes, ascending);
@@ -175,7 +198,8 @@ TableView LinkView::get_sorted_view(size_t column_index, bool ascending) const
     vector<bool> a;
     vec.push_back(column_index);
     a.push_back(ascending);
-    return get_sorted_view(vec, a);
+    TableView v = get_sorted_view(vec, a);
+    return v;
 }
 
 

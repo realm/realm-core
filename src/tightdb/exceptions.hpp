@@ -60,14 +60,6 @@ public:
 };
 
 
-/// Thrown by various modifying functions to indicate that a 'unique constraint'
-/// would have been be violated if the operation had been performed.
-class UniqueConstraintViolation: public std::exception {
-public:
-    const char* what() const TIGHTDB_NOEXCEPT_OR_NOTHROW TIGHTDB_OVERRIDE;
-};
-
-
 /// Reports errors that are a consequence of faulty logic within the program,
 /// such as violating logical preconditions or class invariants, and can be
 /// easily predicted.
@@ -103,6 +95,10 @@ public:
     // already had a primary key.
     static const char* const has_primary_key;
 
+    /// Indicates that a modification was attempted that would have produced a
+    /// duplicate primary value.
+    static const char* const unique_constraint_violation;
+
     LogicError(const char* message);
 
     const char* what() const TIGHTDB_NOEXCEPT_OR_NOTHROW TIGHTDB_OVERRIDE;
@@ -134,12 +130,7 @@ inline const char* CrossTableLinkTarget::what() const TIGHTDB_NOEXCEPT_OR_NOTHRO
 
 inline const char* DescriptorMismatch::what() const TIGHTDB_NOEXCEPT_OR_NOTHROW
 {
-    return "Type mismatch";
-}
-
-inline const char* UniqueConstraintViolation::what() const TIGHTDB_NOEXCEPT_OR_NOTHROW
-{
-    return "Unique constraint violation";
+    return "Table descriptor mismatch";
 }
 
 inline LogicError::LogicError(const char* message):

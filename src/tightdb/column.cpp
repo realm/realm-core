@@ -463,9 +463,32 @@ ref_type ColumnBase::build(size_t* rest_size_ptr, size_t fixed_height,
     }
 }
 
+void Column::destroy() TIGHTDB_NOEXCEPT
+{
+    if (m_search_index) {
+        static_cast<StringIndex*>(m_search_index)->destroy();
+    }
+
+    if (m_array)
+        m_array->destroy_deep();
+}
+
+Column::~Column() TIGHTDB_NOEXCEPT
+{
+    if (m_search_index) {
+        //static_cast<StringIndex*>(m_search_index)->destroy();
+        delete static_cast<StringIndex*>(m_search_index);
+        m_search_index = null_ptr;
+    }
+    delete m_array;
+}
 
 void Column::clear()
 {
+    if (m_search_index) {
+        static_cast<StringIndex*>(m_search_index)->clear();
+    }
+
     m_array->clear_and_destroy_children();
     if (m_array->is_inner_bptree_node())
         m_array->set_type(Array::type_Normal);
@@ -478,6 +501,8 @@ void Column::move_assign(Column& col)
     delete m_array;
     m_array = col.m_array;
     col.m_array = 0;
+    m_search_index = col.m_search_index;
+    col.m_search_index = null_ptr;
 }
 
 
@@ -513,9 +538,13 @@ struct AdjustLeafElem: Array::UpdateHandler {
 
 } // anonymous namespace
 
-void Column::set(size_t ndx, int_fast64_t value)
+void Column::set(size_t ndx, int64_t value)
 {
     TIGHTDB_ASSERT(ndx < size());
+
+    if (m_search_index) {
+        static_cast<StringIndex*>(m_search_index)->set(ndx, to_str(value));
+    }
 
     if (!m_array->is_inner_bptree_node()) {
         m_array->set(ndx, value); // Throws
@@ -544,6 +573,9 @@ void Column::adjust(size_t ndx, int_fast64_t diff)
 
 size_t Column::count(int64_t target) const
 {
+    if (m_search_index)
+        return static_cast<StringIndex*>(m_search_index)->count(target);
+
     return size_t(aggregate<int64_t, int64_t, act_Count, Equal>(target, 0, size()));
 }
 
@@ -661,6 +693,10 @@ void Column::erase(size_t ndx, bool is_last)
     TIGHTDB_ASSERT(ndx < size());
     TIGHTDB_ASSERT(is_last == (ndx == size()-1));
 
+    if (m_search_index) {
+        static_cast<StringIndex*>(m_search_index)->erase<StringData>(ndx, is_last);
+    }
+
     if (!m_array->is_inner_bptree_node()) {
         m_array->erase(ndx); // Throws
         return;
@@ -700,6 +736,16 @@ void Column::move_last_over(size_t target_row_ndx, size_t last_row_ndx)
 {
     TIGHTDB_ASSERT(target_row_ndx < last_row_ndx);
     TIGHTDB_ASSERT(last_row_ndx + 1 == size());
+
+    if (m_search_index) {
+        // remove the value to be overwritten from index
+        bool is_last = true; // This tells StringIndex::erase() to not adjust subsequent indexes
+        static_cast<StringIndex*>(m_search_index)->erase<StringData>(target_row_ndx, is_last); // Throws
+
+        // update index to point to new location
+        int64_t moved_value = get(last_row_ndx);
+        static_cast<StringIndex*>(m_search_index)->update_ref(moved_value, last_row_ndx, target_row_ndx); // Throws
+    }
 
     int_fast64_t value = get(last_row_ndx);
     Column::set(target_row_ndx, value); // Throws
@@ -773,26 +819,34 @@ namespace {
 
 void Column::create_search_index()
 {
-   TIGHTDB_ASSERT(!m_index_column);
-    m_index_column = new StringIndex(this, &get_string, m_array->get_alloc()); // Throws
+   TIGHTDB_ASSERT(!m_search_index);
+   UniquePtr<StringIndex> index;
+   StringIndex* si = new StringIndex(this, &get_string, m_array->get_alloc());
+   index.reset(si); // Throws
 
-    // Populate the index
+   // Populate the index
     size_t num_rows = size();
     for (size_t row_ndx = 0; row_ndx != num_rows; ++row_ndx) {
         int64_t value = get(row_ndx);
         size_t num_rows = 1;
         bool is_append = true;
-        static_cast<StringIndex*>(m_index_column)->insert(row_ndx, value, num_rows, is_append); // Throws
+        static_cast<StringIndex*>(index.get())->insert(row_ndx, value, num_rows, is_append); // Throws
     }
+
+    m_search_index = index.release();
 }
 
+void* Column::get_search_index() TIGHTDB_NOEXCEPT
+{
+    return m_search_index;
+}
 
 void Column::set_search_index_ref(ref_type ref, ArrayParent* parent,
     size_t ndx_in_parent, bool allow_duplicate_valaues)
 {
-    TIGHTDB_ASSERT(!m_index_column);
-//    m_index_column = new StringIndex(ref, parent, ndx_in_parent, this, &get,
-//        !allow_duplicate_valaues, m_array->get_alloc()); // Throws
+    TIGHTDB_ASSERT(!m_search_index);
+    m_search_index = new StringIndex(ref, parent, ndx_in_parent, this, &get_string,
+        !allow_duplicate_valaues, m_array->get_alloc()); // Throws
 }
 
 size_t Column::find_first(int64_t value, size_t begin, size_t end) const
@@ -800,8 +854,8 @@ size_t Column::find_first(int64_t value, size_t begin, size_t end) const
     TIGHTDB_ASSERT(begin <= size());
     TIGHTDB_ASSERT(end == npos || (begin <= end && end <= size()));
 
-    if (m_index_column && begin == 0 && end == npos)
-        static_cast<StringIndex*>(m_index_column)->find_first(value);
+    if (m_search_index && begin == 0 && end == npos)
+        static_cast<StringIndex*>(m_search_index)->find_first(value);
 
     if (root_is_leaf())
         return m_array->find_first(value, begin, end); // Throws (maybe)
@@ -834,6 +888,9 @@ void Column::find_all(Column& result, int64_t value, size_t begin, size_t end) c
 {
     TIGHTDB_ASSERT(begin <= size());
     TIGHTDB_ASSERT(end == npos || (begin <= end && end <= size()));
+
+    if (m_search_index && begin == 0 && end == size_t(-1))
+        return static_cast<StringIndex*>(m_search_index)->find_all(result, value);
 
     if (root_is_leaf()) {
         size_t leaf_offset = 0;
@@ -877,6 +934,7 @@ bool Column::compare_int(const Column& c) const TIGHTDB_NOEXCEPT
 void Column::do_insert(size_t row_ndx, int_fast64_t value, size_t num_rows)
 {
     TIGHTDB_ASSERT(row_ndx == tightdb::npos || row_ndx < size());
+         
     ref_type new_sibling_ref;
     Array::TreeInsert<Column> state;
     for (size_t i = 0; i != num_rows; ++i) {
@@ -899,6 +957,14 @@ void Column::do_insert(size_t row_ndx, int_fast64_t value, size_t num_rows)
             introduce_new_root(new_sibling_ref, state, is_append); // Throws
         }
     }
+
+
+    if (m_search_index) {
+        bool is_append = row_ndx == tightdb::npos;
+        size_t row_ndx_2 = is_append ? size() - num_rows : row_ndx;
+        static_cast<StringIndex*>(m_search_index)->insert(row_ndx_2, value, num_rows, is_append); // Throws
+    }
+
 }
 
 

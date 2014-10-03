@@ -26,7 +26,7 @@ const size_t small_string_max_size  = 15; // ArrayString
 const size_t medium_string_max_size = 63; // ArrayStringLong
 
 // Getter function for string index
-StringData get_string(void* column, size_t ndx, char* buffer)
+StringData get_string(void* column, size_t ndx, char*)
 {
     return static_cast<AdaptiveStringColumn*>(column)->get(ndx);
 }
@@ -367,8 +367,7 @@ void AdaptiveStringColumn::set(size_t ndx, StringData value)
     //  the value, or the index would not be able to find the correct
     //  position to update (as it looks for the old value))
     if (m_search_index) {
-        StringData old_val = get(ndx);
-        m_search_index->set(ndx, old_val, value); // Throws
+        m_search_index->set(ndx, value); // Throws
     }
 
     bool root_is_leaf = !m_array->is_inner_bptree_node();
@@ -503,8 +502,7 @@ void AdaptiveStringColumn::erase(size_t ndx, bool is_last)
     //  the value, or the index would not be able to find the correct
     //  position to update (as it looks for the old value))
     if (m_search_index) {
-        StringData old_val = get(ndx);
-        m_search_index->erase(ndx, old_val, is_last);
+        m_search_index->erase<StringData>(ndx, is_last);
     }
 
     bool root_is_leaf = !m_array->is_inner_bptree_node();
@@ -563,9 +561,8 @@ void AdaptiveStringColumn::move_last_over(size_t target_row_ndx, size_t last_row
 
     if (m_search_index) {
         // remove the value to be overwritten from index
-        StringData old_target_value = get(target_row_ndx);
         bool is_last = true; // This tells StringIndex::erase() to not adjust subsequent indexes
-        m_search_index->erase(target_row_ndx, old_target_value, is_last); // Throws
+        m_search_index->erase<StringData>(target_row_ndx, is_last); // Throws
 
         // update index to point to new location
         m_search_index->update_ref(copy_of_value, last_row_ndx, target_row_ndx); // Throws

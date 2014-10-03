@@ -216,10 +216,14 @@ public:
     /// added to this table. Rather than throwing, it returns false if the table
     /// accessor is detached.
     ///
-    /// add_primary_key() adds a primary key to this table, and forms the key
-    /// from the specified column. The specified column must already have a
-    /// search index. remove_primary_key() removes a previously added primary
-    /// key.
+    /// try_add_primary_key() tries to add a primary key to this table, by
+    /// forming it from the specified column. It fails and returns false if the
+    /// specified column has duplicate values, otherwise it returns true. The
+    /// specified column must already have a search index. This table must have
+    /// no preexisting primary key.
+    ///
+    /// remove_primary_key() removes a previously added primary key. It is an
+    /// error if this table has no primary key.
     ///
     /// This table must be a root table; that is, it must have an independent
     /// descriptor. Freestanding tables, group-level tables, and subtables in a
@@ -227,26 +231,11 @@ public:
     /// for more on this.
     ///
     /// \param column_ndx The index of a column of this table.
-    ///
-    /// \throw ConstraintViolation Thrown by add_primary_key() if the specified
-    /// column contains null values, or if it contains duplicate values.
-    ///
-    /// \throw PrimaryKeyExists Thrown by add_primary_key() if this table
-    /// already has a primary key.
-    ///
-    /// \throw WrongKindOfTable Thrown by add_primary_key() if this table is not
-    /// a root table.
-    ///
-    /// \throw DetachedAccessor Thrown by add_search_index() and
-    /// add_primary_key().
-    ///
-    /// \throw InvalidArgument Thrown by add_search_index() and
-    /// add_primary_key() if \a column_ndx is not a valid column index.
 
     bool has_search_index(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
     void add_search_index(std::size_t column_ndx);
     bool has_primary_key() const TIGHTDB_NOEXCEPT;
-    void add_primary_key(std::size_t column_ndx);
+    bool try_add_primary_key(std::size_t column_ndx);
     void remove_primary_key();
 
     //@}
@@ -355,19 +344,39 @@ public:
     RowExpr operator[](std::size_t row_ndx) TIGHTDB_NOEXCEPT;
     ConstRowExpr operator[](std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
 
-    // Row handling
+
+    //@{
+
+    /// Row handling
+    ///
+    /// It is an error to call add_empty_row() or insert_empty_row() on a table
+    /// with a primary key, if that would result in a violation the implied
+    /// *unique constraint* of the primary key. The consequenses of doing so are
+    /// unspecified.
+
     std::size_t add_empty_row(std::size_t num_rows = 1);
-    void        insert_empty_row(std::size_t row_ndx, std::size_t num_rows = 1);
-    void        remove(std::size_t row_ndx);
-    void        remove_last();
+    void insert_empty_row(std::size_t row_ndx, std::size_t num_rows = 1);
+    void remove(std::size_t row_ndx);
+    void remove_last();
+
+    //@}
 
     /// Move the last row to the specified index. This overwrites the target row
     /// and reduces the number of rows by one. If the target row is the last one
     /// it will just be deleted.
     void move_last_over(std::size_t target_row_ndx);
 
-    // Insert row
-    // NOTE: You have to insert values in ALL columns followed by insert_done().
+    //@{
+
+    /// Insert row
+    ///
+    /// NOTE: You have to insert values in ALL columns followed by
+    /// insert_done(). The values must be inserted in column index order.
+    ///
+    /// It is an error to insert a value into a column that is part of a primary
+    /// key, if that would result in a violation the implied *unique constraint*
+    /// of the primary key. The consequenses of doing so are unspecified.
+
     void insert_int(std::size_t column_ndx, std::size_t row_ndx, int64_t value);
     void insert_bool(std::size_t column_ndx, std::size_t row_ndx, bool value);
     void insert_datetime(std::size_t column_ndx, std::size_t row_ndx, DateTime value);
@@ -381,6 +390,8 @@ public:
     void insert_link(std::size_t column_ndx, std::size_t row_ndx, std::size_t target_row_ndx);
     void insert_linklist(std::size_t column_ndx, std::size_t row_ndx); // Insert empty link list
     void insert_done();
+
+    //@}
 
     // Get cell values
     int64_t     get_int(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
@@ -400,7 +411,14 @@ public:
     template<class T>
     typename T::RowAccessor get_link_accessor(std::size_t column_ndx, std::size_t row_ndx);
 
-    // Set cell values
+    //@{
+
+    /// Set cell values.
+    ///
+    /// It is an error to assign a value to a column that is part of a primary
+    /// key, if that would result in a violation the implied *unique constraint*
+    /// of the primary key. The consequenses of doing so are unspecified.
+
     void set_int(std::size_t column_ndx, std::size_t row_ndx, int_fast64_t value);
     void set_bool(std::size_t column_ndx, std::size_t row_ndx, bool value);
     void set_datetime(std::size_t column_ndx, std::size_t row_ndx, DateTime value);
@@ -411,6 +429,8 @@ public:
     void set_binary(std::size_t column_ndx, std::size_t row_ndx, BinaryData value);
     void set_mixed(std::size_t column_ndx, std::size_t row_ndx, Mixed value);
     void set_link(std::size_t column_ndx, std::size_t row_ndx, std::size_t target_row_ndx);
+
+    //@}
 
     // Links
     bool is_null_link(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
@@ -550,12 +570,9 @@ public:
 
     /// Find the row with the specified primary key.
     ///
-    /// \throw NoPrimaryKey Thrown if the table has no columns.
-    ///
-    /// \throw TypeMismatch Thrown if the first column is not a string column.
-    ///
-    /// \throw DetachedAccessor Thrown if this table accessor is not attached to
-    /// an underlying table.
+    /// It is an error to call any of these function on a table that has no
+    /// primary key, or to call one of them for a column with a mismatching
+    /// type.
 
     RowExpr find_pkey_int(int_fast64_t pkey_value);
     ConstRowExpr find_pkey_int(int_fast64_t pkey_value) const;

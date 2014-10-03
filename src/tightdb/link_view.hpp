@@ -63,6 +63,9 @@ public:
     void remove(std::size_t link_ndx);
     void clear();
 
+    void sort(size_t column, bool ascending = true);
+    void sort(std::vector<size_t> columns, std::vector<bool> ascending);
+
     TableView get_sorted_view(std::vector<std::size_t> column_indexes, std::vector<bool> ascending) const;
     TableView get_sorted_view(std::size_t column_index, bool ascending = true) const;
 

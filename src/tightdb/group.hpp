@@ -292,11 +292,6 @@ public:
     ///
     /// \throw CrossTableLinkTarget Thrown by remove_table() if the specified
     /// table is the target of a link column of a different table.
-    ///
-    /// \throw InvalidArgument Thrown by get_table(), get_table_name(),
-    /// remove_table(), and rename_table() if \a index is not a valid table
-    /// index, i.e., if it is greater than, or equal to the number of tables in
-    /// the group.
 
     bool has_table(StringData name) const TIGHTDB_NOEXCEPT;
     std::size_t find_table(StringData name) const TIGHTDB_NOEXCEPT;

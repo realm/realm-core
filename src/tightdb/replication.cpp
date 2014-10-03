@@ -592,8 +592,10 @@ public:
                     if (m_log)
                         *m_log << "table->add_primary_key("<<col_ndx<<")\n";
 #endif
-                    m_table->add_primary_key(col_ndx); // Throws
-                    return true;
+                    // Fails if there are duplicate values, but given valid
+                    // transaction logs, there never will be.
+                    bool success = m_table->try_add_primary_key(col_ndx); // Throws
+                    return success;
                 }
             }
         }

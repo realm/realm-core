@@ -2,7 +2,7 @@
 #ifdef TEST_INDEX_STRING
 
 #include <tightdb/index_string.hpp>
-
+#include <set>
 #include "test.hpp"
 
 using namespace tightdb;
@@ -48,6 +48,20 @@ const char s4[] = "Tom";
 const char s5[] = "Johnathan";
 const char s6[] = "Johnny";
 const char s7[] = "Sam";
+
+// integers used by integer index tests
+const int64_t ints[] = {
+    0x1111,
+    0x11112222,
+    0x11113333,
+    0x1111333,
+    0x111122223333ull,
+    0x1111222233334ull,
+    0x22223333,
+    0x11112227,
+    0x11112227,
+    0x78923
+};
 
 } // anonymous namespace
 
@@ -205,7 +219,7 @@ TEST(StringIndex_Delete)
     col.erase(0, 0 == col.size()-1);
     col.erase(0, 0 == col.size()-1);
 #ifdef TIGHTDB_DEBUG
-    CHECK(ndx.is_empty());
+    //CHECK(ndx.is_empty());
 #endif
 
     // Clean up
@@ -498,60 +512,165 @@ TEST(StringIndex_FindAllNoCopy)
     col.destroy();
 }
 
-TEST(StringIndex_FindAllNoCopy_Int)
-{
-    // Create a column with duplcate values
-    ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
-    AdaptiveStringColumn col(Allocator::get_default(), ref);
 
-    const char* v1 = (char*)new int64_t(1);
-    const char* v2 = (char*)new int64_t(2);
-    const char* v3 = (char*)new int64_t(3);
-    const char* v4 = (char*)new int64_t(4);
-    const char* v10 = (char*)new int64_t(10);
-
-    col.add(v2);
-    col.add(v2);
-
-    // Create a new index on column
-    StringIndex& ndx = col.create_search_index();
-
-    size_t ref_2 = not_found;
-    FindRes res3 = ndx.find_all(v2, ref_2);
-    CHECK_EQUAL(FindRes_column, res3);
-    const Column results(Allocator::get_default(), ref_type(ref_2));
-    CHECK_EQUAL(2, results.size());
-    CHECK_EQUAL(0, results.get(0));
-    CHECK_EQUAL(1, results.get(1));
-
-    // Clean up
-    col.destroy();
-}
-
-ONLY(StringIndex_FindAllNoCopy_Int2)
+TEST(StringIndex_FindAllNoCopy2_Int)
 {
     // Create a column with duplcate values
     ref_type ref = Column::create(Allocator::get_default());
     Column col(Allocator::get_default(), ref);
 
-    col.add(2);
-    col.add(2);
+    for (size_t t = 0; t < sizeof(ints) / sizeof(ints[0]); t++)
+        col.add(ints[t]);
 
     // Create a new index on column
     col.create_search_index();
-    StringIndex& ndx = *static_cast<StringIndex*>(col.m_index_column);
+    StringIndex& ndx = *static_cast<StringIndex*>(col.m_search_index);
+    size_t results = not_found;
 
-    size_t ref_2 = not_found;
-    FindRes res3 = ndx.find_all(int64_t(2), ref_2);
-    CHECK_EQUAL(FindRes_column, res3);
-    const Column results(Allocator::get_default(), ref_type(ref_2));
-    CHECK_EQUAL(2, results.size());
-    CHECK_EQUAL(0, results.get(0));
-    CHECK_EQUAL(1, results.get(1));
+    FindRes res;
+
+    for (size_t t = 0; t < sizeof(ints) / sizeof(ints[0]); t++) {
+        FindRes res = ndx.find_all(ints[t], results);
+
+        size_t real = 0;
+        for (size_t y = 0; y < sizeof(ints) / sizeof(ints[0]); y++) {
+            if (ints[t] == ints[y])
+                real++;
+        }
+
+        if (real == 1) {
+            CHECK_EQUAL(res, FindRes_single);
+            CHECK_EQUAL(ints[t], ints[results]);
+        }
+        else if (real > 1) {
+            CHECK_EQUAL(FindRes_column, res);
+            const Column results(Allocator::get_default(), ref_type(results));
+            CHECK_EQUAL(real, results.size());
+            for (size_t y = 0; y < real; y++)
+                CHECK_EQUAL(ints[t], ints[results.get(y)]);
+        }
+    }
 
     // Clean up
     col.destroy();
 }
 
+
+TEST(StringIndex_Count_Int)
+{
+    // Create a column with duplcate values
+    ref_type ref = Column::create(Allocator::get_default());
+    Column col(Allocator::get_default(), ref);
+
+    for (size_t t = 0; t < sizeof(ints) / sizeof(ints[0]); t++)
+        col.add(ints[t]);
+
+    // Create a new index on column
+    col.create_search_index();
+    StringIndex& ndx = *static_cast<StringIndex*>(col.m_search_index);
+    size_t results = not_found;
+
+    for (size_t t = 0; t < sizeof(ints) / sizeof(ints[0]); t++) {
+        size_t count = ndx.count(ints[t]);
+
+        size_t real = 0;
+        for (size_t y = 0; y < sizeof(ints) / sizeof(ints[0]); y++) {
+            if (ints[t] == ints[y])
+                real++;
+        }
+        
+        CHECK_EQUAL(real, count);
+    }
+    // Clean up
+    col.destroy();
+}
+
+
+TEST(StringIndex_Distinct_Int)
+{
+    // Create a column with duplcate values
+    ref_type ref = Column::create(Allocator::get_default());
+    Column col(Allocator::get_default(), ref);
+
+    for (size_t t = 0; t < sizeof(ints) / sizeof(ints[0]); t++)
+        col.add(ints[t]);
+
+    // Create a new index on column
+    col.create_search_index();
+
+    
+    StringIndex& ndx = *static_cast<StringIndex*>(col.m_search_index);
+    
+    ref_type results_ref = Column::create(Allocator::get_default());
+    Column results(Allocator::get_default(), results_ref);
+
+    ndx.distinct(results);
+    
+    std::set<int64_t> s;    
+    for (size_t t = 0; t < sizeof(ints) / sizeof(ints[0]); t++) {
+        s.insert(ints[t]);
+    }
+
+    CHECK_EQUAL(s.size(), results.size());
+    
+    // Clean up
+    col.destroy();
+    results.destroy();
+}
+
+
+TEST(StringIndex_Set_Add_Erase_Insert_Int)
+{
+    ref_type ref = Column::create(Allocator::get_default());
+    Column col(Allocator::get_default(), ref);
+
+    col.add(1);
+    col.add(2);
+    col.add(3);
+    col.add(2);
+
+    // Create a new index on column
+    col.create_search_index();
+    StringIndex& ndx = *static_cast<StringIndex*>(col.m_search_index);
+
+    size_t f = ndx.find_first(int64_t(2));
+    CHECK_EQUAL(1, f);
+
+    col.set(1, 5);
+
+    f = ndx.find_first(int64_t(2));
+    CHECK_EQUAL(3, f);
+
+    col.erase(1, false);
+
+    f = ndx.find_first(int64_t(2));
+    CHECK_EQUAL(2, f);
+
+    col.insert(1, 5);
+
+    f = ndx.find_first(int64_t(2));
+    CHECK_EQUAL(3, f);
+
+    size_t t = col.size();
+
+    col.add(7);
+    col.set(4, 10);
+
+    t = col.size();
+
+    f = ndx.find_first(int64_t(10));
+    CHECK_EQUAL(col.size() - 1, f);
+
+    col.add(9);
+    f = ndx.find_first(int64_t(9));
+    CHECK_EQUAL(col.size() - 1, f);
+
+    col.clear();
+    f = ndx.find_first(int64_t(2));
+    CHECK_EQUAL(not_found, f);
+
+    // Clean up
+    col.destroy();
+}
 
 #endif // TEST_INDEX_STRING

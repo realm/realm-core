@@ -65,8 +65,7 @@ void ColumnStringEnum::set(size_t ndx, StringData value)
     //  the value, or the index would not be able to find the correct
     //  position to update (as it looks for the old value))
     if (m_search_index) {
-        StringData oldVal = get(ndx);
-        m_search_index->set(ndx, oldVal, value);
+        m_search_index->set(ndx, value);
     }
 
     size_t key_ndx = GetKeyNdxOrAdd(value);
@@ -77,7 +76,7 @@ void ColumnStringEnum::set(size_t ndx, StringData value)
 void ColumnStringEnum::do_insert(size_t row_ndx, StringData value, size_t num_rows)
 {
     size_t key_ndx = GetKeyNdxOrAdd(value);
-    int_fast64_t value_2 = int_fast64_t(key_ndx);
+    int64_t value_2 = int64_t(key_ndx);
     Column::do_insert(row_ndx, value_2, num_rows); // Throws
 
     if (m_search_index) {
@@ -92,7 +91,7 @@ void ColumnStringEnum::do_insert(size_t row_ndx, StringData value, size_t num_ro
 {
     size_t key_ndx = GetKeyNdxOrAdd(value);
     size_t row_ndx_2 = is_append ? tightdb::npos : row_ndx;
-    int_fast64_t value_2 = int_fast64_t(key_ndx);
+    int64_t value_2 = int64_t(key_ndx);
     Column::do_insert(row_ndx_2, value_2, num_rows); // Throws
 
     if (m_search_index)
@@ -109,8 +108,7 @@ void ColumnStringEnum::erase(size_t ndx, bool is_last)
     //  the value, or the index would not be able to find the correct
     //  position to update (as it looks for the old value))
     if (m_search_index) {
-        StringData old_val = get(ndx);
-        m_search_index->erase(ndx, old_val, is_last);
+        m_search_index->erase<StringData>(ndx, is_last);
     }
 
     Column::erase(ndx, is_last);
@@ -124,9 +122,8 @@ void ColumnStringEnum::move_last_over(size_t target_row_ndx, size_t last_row_ndx
 
     if (m_search_index) {
         // remove the value to be overwritten from index
-        StringData old_target_value = get(target_row_ndx);
         bool is_last = true; // This tells StringIndex::erase() to not adjust subsequent indexes
-        m_search_index->erase(target_row_ndx, old_target_value, is_last); // Throws
+        m_search_index->erase<StringData>(target_row_ndx, is_last); // Throws
 
         // update index to point to new location
         StringData moved_value = get(last_row_ndx);

@@ -82,18 +82,20 @@ public:
         }
     }
 
-    template <class T> void set(size_t row_ndx, T old_value, T new_value)
+    template <class T> void set(size_t row_ndx, T new_value)
     {
-        StringData old_value2 = to_str(old_value);
+        char buffer[8];
+        T old_value = get(row_ndx, buffer);
         StringData new_value2 = to_str(new_value);
+
         // Note that insert_with_offset() throws UniqueConstraintViolation.
 
-        if (TIGHTDB_LIKELY(new_value2 != old_value2)) {
+        if (TIGHTDB_LIKELY(new_value2 != old_value)) {
             size_t offset = 0; // First key from beginning of string
             insert_with_offset(row_ndx, new_value2, offset); // Throws
 
             bool is_last = true; // To avoid updating refs
-            erase(row_ndx, old_value2, is_last); // Throws
+            erase<T>(row_ndx, is_last); // Throws
         }
     }
 
@@ -106,7 +108,7 @@ public:
     template <class T> void find_all(Column& result, T value) const
     {
         // Use direct access method
-        return m_array->IndexStringFindAll(result, value, m_target_column, m_get_func);
+        return m_array->IndexStringFindAll(result, to_str(value), m_target_column, m_get_func);
     }
 
     template <class T> FindRes find_all(T value, size_t& ref) const
@@ -121,8 +123,11 @@ public:
         return m_array->IndexStringCount(to_str(value), m_target_column, m_get_func);
     }
 
-    template <class T> void erase(size_t row_ndx, T value, bool is_last)
+    template <class T> void erase(size_t row_ndx, bool is_last)
     {
+        char buffer[8];
+        T value = get(row_ndx, buffer);
+
         DoDelete(row_ndx, to_str(value), 0);
 
         // Collapse top nodes with single item
@@ -163,7 +168,7 @@ public:
     void to_dot(std::ostream&, StringData title = StringData()) const;
 #endif
 
-    typedef uint_fast32_t key_type;
+    typedef int_fast32_t key_type;
 
     static key_type create_key(StringData) TIGHTDB_NOEXCEPT;
 

@@ -50,10 +50,13 @@ enum ColumnAttr {
     col_attr_None = 0,
     col_attr_Indexed = 1,
 
-    // Specifies that this column forms the primary key. It implies that the
-    // column is bound by a no-null, and a unique constraint. It requires
+    // Specifies that this column forms a unique constraint. It requires
     // `col_attr_Indexed`.
-    col_attr_PrimaryKey = 2
+    col_attr_Unique = 2,
+
+    // Specifies that this column forms the primary key. It implies a non-null
+    // constraint on the column, and it requires `col_attr_Unique`.
+    col_attr_PrimaryKey = 4
 };
 
 

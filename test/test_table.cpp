@@ -1109,6 +1109,7 @@ TEST(Table_IndexString)
     CHECK_EQUAL(2, c1);
 }
 
+
 TEST(Table_IndexStringTwice)
 {
     TestTableEnum table;
@@ -1128,20 +1129,70 @@ TEST(Table_IndexStringTwice)
     CHECK_EQUAL(true, table.column().second.has_search_index());
 }
 
+TEST(Table_IndexInteger)
+{
+    Table table;
+    table.add_column(type_Int, "ints");
+
+    table.add_empty_row(13);
+
+    table.set_int(0, 0, 3); // 0
+    table.set_int(0, 1, 1); // 1
+    table.set_int(0, 2, 2); // 2
+    table.set_int(0, 3, 2); // 3
+    table.set_int(0, 4, 2); // 4
+    table.set_int(0, 5, 3); // 5
+    table.set_int(0, 6, 3); // 6
+    table.set_int(0, 7, 2); // 7
+    table.set_int(0, 8, 4); // 8
+    table.set_int(0, 9, 2); // 9
+    table.set_int(0, 10, 6); // 10
+    table.set_int(0, 11, 2); // 11
+    table.set_int(0, 12, 3); // 12
+
+    table.add_search_index(0);
+    CHECK(table.has_search_index(0));
+
+    size_t r = table.find_first_int(0, 11);
+    CHECK_EQUAL(not_found, r);
+
+    r = table.find_first_int(0, 3);
+    CHECK_EQUAL(0, r);
+
+    r = table.find_first_int(0, 4);
+    CHECK_EQUAL(8, r);
+
+    TableView tv = table.find_all_int(0, 2);
+    CHECK_EQUAL(6, tv.size());
+
+    CHECK_EQUAL(2, tv[0].get_index());
+    CHECK_EQUAL(3, tv[1].get_index());
+    CHECK_EQUAL(4, tv[2].get_index());
+    CHECK_EQUAL(7, tv[3].get_index());
+    CHECK_EQUAL(9, tv[4].get_index());
+    CHECK_EQUAL(11, tv[5].get_index());
+}
+
 
 TEST(Table_PrimaryKeyBasics)
 {
+    // Note: Formally, member functions of Table are not required to leave the
+    // table in a valid state when they throw LogicError. In the cases below,
+    // however, informed by the actual implementation of these functions, we
+    // assume that they do allow us to continue, but please remember that this
+    // is not generally the case.
+
     Table table;
     table.add_column(type_String, "");
 
     // Empty table
     CHECK_NOT(table.has_primary_key());
     CHECK_LOGIC_ERROR(table.find_pkey_string("foo"), LogicError::no_primary_key);
-    CHECK_LOGIC_ERROR(table.add_primary_key(0), LogicError::no_search_index);
+    CHECK_LOGIC_ERROR(table.try_add_primary_key(0), LogicError::no_search_index);
     table.add_search_index(0);
     CHECK_NOT(table.has_primary_key());
     CHECK_LOGIC_ERROR(table.find_pkey_string("foo"), LogicError::no_primary_key);
-    table.add_primary_key(0);
+    CHECK(table.try_add_primary_key(0));
     CHECK(table.has_primary_key());
     CHECK_NOT(table.find_pkey_string("foo"));
 
@@ -1150,7 +1201,7 @@ TEST(Table_PrimaryKeyBasics)
     table.add_empty_row();
     table.set_string(0, 0, "foo");
     CHECK_LOGIC_ERROR(table.find_pkey_string("foo"), LogicError::no_primary_key);
-    table.add_primary_key(0);
+    CHECK(table.try_add_primary_key(0));
     CHECK_EQUAL(0, table.find_pkey_string("foo").get_index());
     CHECK_NOT(table.find_pkey_string("bar"));
 
@@ -1158,22 +1209,36 @@ TEST(Table_PrimaryKeyBasics)
     table.remove_primary_key();
     table.add_empty_row();
     table.set_string(0, 1, "bar");
-    table.add_primary_key(0);
+    CHECK(table.try_add_primary_key(0));
     CHECK_EQUAL(0, table.find_pkey_string("foo").get_index());
     CHECK_EQUAL(1, table.find_pkey_string("bar").get_index());
 
     // Modify primary key
-    CHECK_THROW(table.set_string(0, 1, "foo"), UniqueConstraintViolation);
+    CHECK_LOGIC_ERROR(table.set_string(0, 1, "foo"), LogicError::unique_constraint_violation);
     table.set_string(0, 1, "bar");
     table.set_string(0, 1, "baz");
     CHECK_EQUAL(0, table.find_pkey_string("foo").get_index());
     CHECK_NOT(table.find_pkey_string("bar"));
     CHECK_EQUAL(1, table.find_pkey_string("baz").get_index());
 
+    // Insert row
+    // Unfortunately, we could not have recovered and continued if we had let
+    // Table::insert_string() throw.
+//    CHECK_LOGIC_ERROR(table.insert_string(0, 2, "foo"), LogicError::unique_constraint_violation);
+    table.Verify();
+    table.insert_string(0, 2, "bar");
+    table.insert_done();
+    table.Verify();
+    table.add_empty_row();
+    table.Verify();
+    // Unfortunately, we could not have recovered and continued if we had let
+    // Table::add_empty_row() throw.
+//    CHECK_LOGIC_ERROR(table.add_empty_row(), LogicError::unique_constraint_violation);
+
     // Duplicate key value
     table.remove_primary_key();
     table.set_string(0, 1, "foo");
-    CHECK_THROW(table.add_primary_key(0), UniqueConstraintViolation);
+    CHECK_NOT(table.try_add_primary_key(0));
 }
 
 
@@ -1185,8 +1250,9 @@ TEST(Table_PrimaryKeyLargeCommonPrefix)
     table.set_string(0, 0, "metasyntactic variable 1");
     table.set_string(0, 1, "metasyntactic variable 2");
     table.add_search_index(0);
-    table.add_primary_key(0);
-    CHECK_THROW(table.set_string(0, 1, "metasyntactic variable 1"), UniqueConstraintViolation);
+    CHECK(table.try_add_primary_key(0));
+    CHECK_LOGIC_ERROR(table.set_string(0, 1, "metasyntactic variable 1"),
+                      LogicError::unique_constraint_violation);
     table.set_string(0, 1, "metasyntactic variable 2");
     table.set_string(0, 1, "metasyntactic variable 3");
 }
@@ -1219,17 +1285,17 @@ TEST(Table_PrimaryKeyExtra)
 
     CHECK_LOGIC_ERROR(table.find_pkey_string("jeff"), LogicError::no_primary_key);
 
-    CHECK_LOGIC_ERROR(table.add_primary_key(0), LogicError::no_search_index);
+    CHECK_LOGIC_ERROR(table.try_add_primary_key(0), LogicError::no_search_index);
     CHECK_NOT(table.has_primary_key());
 
     table.add_search_index(0);
     CHECK(table.has_search_index(0));
 
-    CHECK_THROW(table.add_primary_key(0), UniqueConstraintViolation);
+    CHECK_NOT(table.try_add_primary_key(0));
     CHECK_NOT(table.has_primary_key());
 
     table.set_string(0, 7, "jennifer 8");
-    table.add_primary_key(0);
+    CHECK(table.try_add_primary_key(0));
     CHECK(table.has_primary_key());
 
     table.Verify();
