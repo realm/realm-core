@@ -2989,7 +2989,7 @@ top:
 
         // If key is outside range, we know there can be no match
         if (pos == offsets_size)
-            return allnocopy ? FindRes_not_found : first ? not_found : 0;
+            return allnocopy ? size_t(FindRes_not_found) : first ? not_found : 0;
 
         // Get entry under key
         size_t pos_refs = pos + 1; // first entry in refs points to offsets
@@ -3007,7 +3007,7 @@ top:
         key_type stored_key = key_type(get_direct<32>(offsets_data, pos));
 
         if (stored_key != key)
-            return allnocopy ? FindRes_not_found : first ? not_found : 0;
+            return allnocopy ? size_t(FindRes_not_found) : first ? not_found : 0;
 
         // Literal row index
         if (ref & 1) {
@@ -3032,7 +3032,7 @@ top:
 
                 return first ? row_ref : count ? 1 : FindRes_single;
             }
-            return allnocopy ? FindRes_not_found : first ? not_found : 0;
+            return allnocopy ? size_t(FindRes_not_found) : first ? not_found : 0;
         }
 
         const char* sub_header = m_alloc.translate(to_ref(ref));
@@ -3060,7 +3060,7 @@ top:
                     if (str != value) {
                         if (count)
                             return 0;
-                        return allnocopy ? FindRes_not_found : first ? not_found : 0;
+                        return allnocopy ? size_t(FindRes_not_found) : first ? not_found : 0;
                     }
                 }
 
@@ -3076,7 +3076,7 @@ top:
                     }
                 }
                 else {
-                    return allnocopy ? FindRes_column : 
+                    return allnocopy ? size_t(FindRes_column) : 
                            first ? to_size_t(get_direct(sub_data, sub_width, 0)) : sub_count;
                 }
             }
@@ -3093,7 +3093,7 @@ top:
                     char buffer[8];
                     StringData str = (*get_func)(column, first_row_ref, buffer);
                     if (str != value)
-                        return allnocopy ? FindRes_not_found : first ? not_found : 0;
+                        return allnocopy ? size_t(FindRes_not_found) : first ? not_found : 0;
                 }
 
                 result_ref = to_ref(ref);
@@ -3103,12 +3103,12 @@ top:
                         result.add(to_size_t(sub.get(i)));
                 }
                 else {
-                    return allnocopy ? FindRes_column : first ? to_size_t(sub.get(0)) : sub_count;
+                    return allnocopy ? size_t(FindRes_column) : first ? to_size_t(sub.get(0)) : sub_count;
                 }
             }
 
             TIGHTDB_ASSERT(method != index_find_all_nocopy);
-            return FindRes_column;
+            return size_t(FindRes_column);
         }
 
         // Recurse into sub-index;

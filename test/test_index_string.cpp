@@ -527,8 +527,6 @@ TEST(StringIndex_FindAllNoCopy2_Int)
     StringIndex& ndx = *static_cast<StringIndex*>(col.m_search_index);
     size_t results = not_found;
 
-    FindRes res;
-
     for (size_t t = 0; t < sizeof(ints) / sizeof(ints[0]); t++) {
         FindRes res = ndx.find_all(ints[t], results);
 
@@ -544,10 +542,10 @@ TEST(StringIndex_FindAllNoCopy2_Int)
         }
         else if (real > 1) {
             CHECK_EQUAL(FindRes_column, res);
-            const Column results(Allocator::get_default(), ref_type(results));
-            CHECK_EQUAL(real, results.size());
+            const Column results2(Allocator::get_default(), ref_type(results));
+            CHECK_EQUAL(real, results2.size());
             for (size_t y = 0; y < real; y++)
-                CHECK_EQUAL(ints[t], ints[results.get(y)]);
+                CHECK_EQUAL(ints[t], ints[results2.get(y)]);
         }
     }
 
@@ -568,7 +566,6 @@ TEST(StringIndex_Count_Int)
     // Create a new index on column
     col.create_search_index();
     StringIndex& ndx = *static_cast<StringIndex*>(col.m_search_index);
-    size_t results = not_found;
 
     for (size_t t = 0; t < sizeof(ints) / sizeof(ints[0]); t++) {
         size_t count = ndx.count(ints[t]);
@@ -655,8 +652,6 @@ TEST(StringIndex_Set_Add_Erase_Insert_Int)
 
     col.add(7);
     col.set(4, 10);
-
-    t = col.size();
 
     f = ndx.find_first(int64_t(10));
     CHECK_EQUAL(col.size() - 1, f);
