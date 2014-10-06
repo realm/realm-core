@@ -6,7 +6,8 @@
 
 ### API breaking changes:
 
-* Lorem ipsum.
+* `Query::tableview()` removed as it might lead to wrong results
+  e.g., when sorting a sorted tableview.
 
 ### Enhancements:
 
