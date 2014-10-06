@@ -775,6 +775,25 @@ EOF
         exit 0
         ;;
 
+    "asan"|"asan-debug")
+        # Run test suite with GCC's address sanitizer enabled.
+        # To get symbolized stack traces (file names and line numbers) with GCC, you at least version 4.9.
+        check_mode="$(printf "%s\n" "$MODE" | sed 's/asan/check/')" || exit 1
+        auto_configure || exit 1
+        touch "$CONFIG_MK" || exit 1 # Force complete rebuild
+        export TIGHTDB_HAVE_CONFIG="1"
+        error=""
+        if ! UNITTEST_THREADS="1" UNITTEST_PROGRESS="1" $MAKE EXTRA_CFLAGS="-fsanitize=address" EXTRA_LDFLAGS="-fsanitize=address" "$check_mode"; then
+            error="1"
+        fi
+        touch "$CONFIG_MK" || exit 1 # Force complete rebuild
+        if [ "$error" ]; then
+            exit 1
+        fi
+        echo "Test passed"
+        exit 0
+        ;;
+
     "build-test-ios-app")
         # For more documentation, see test/ios/README.md.
 
@@ -838,7 +857,7 @@ EOF
         if [ -n "$DEBUG" ]; then
             OTHER_CPLUSPLUSFLAGS="'-DTIGHTDB_DEBUG'"
         fi
-        
+
         # Initialize app directory
         cp -r "test/ios/template/App/"* "$APP_DIR" || exit 1
         mv "$APP_DIR/App-Info.plist" "$APP_DIR/$APP-Info.plist" || exit 1
@@ -853,7 +872,7 @@ EOF
         # Prepare for GYP
         ARCHS="$(echo "'$ARCHS'," | sed -E "s/ /', '/g")" || exit 1
         RESOURCES="$(echo "'$RESOURCES'," | sed -E "s/ /', '/g")" || exit 1
-        
+
         # Generate a Gyp file.
         . "$TMPL_DIR/App.gyp.sh"
 
@@ -2579,6 +2598,69 @@ EOF
         codename=$(lsb_release -s -c)
         (cd debian && sed -e "s/@CODENAME@/$codename/g" changelog.in > changelog) || exit 1
         dpkg-buildpackage -rfakeroot -us -uc || exit 1
+        exit 0
+        ;;
+
+    "jenkins-pull-request")
+        # Run by Jenkins for each pull request whenever it changes
+        if ! [ -d "$WORKSPACE" ]; then
+            echo "Bad or unspecified Jenkins workspace '$WORKSPACE'" 1>&2
+            exit 1
+        fi
+
+        git reset --hard || exit 1
+        git clean -xfd || exit 1
+
+        TIGHTDB_MAX_BPNODE_SIZE_DEBUG="4" sh build.sh config "$WORKSPACE/install" || exit 1
+        sh build.sh build-iphone || exit 1
+        sh build.sh build-android || exit 1
+        sh build.sh build || exit 1
+        UNITTEST_SHUFFLE="1" UNITTEST_REANDOM_SEED="random" UNITTEST_THREADS="1" UNITTEST_XML="1" sh build.sh check-debug || exit 1
+        sh build.sh install || exit 1
+        sh build.sh check-doc-examples || exit 1
+        (
+            cd "examples" || exit 1
+            make || exit 1
+            ./tutorial || exit 1
+            ./mini_tutorial || exit 1
+            (
+                cd "demo" || exit 1
+                make || exit 1
+            ) || exit 1
+        ) || exit 1
+        exit 0
+        ;;
+
+    "jenkins-pipeline-unit-tests")
+        # Run by Jenkins as part of the core pipeline whenever master changes.
+        check_mode="$1"
+        if [ "$check_mode" != "check" -a "$check_mode" != "check-debug" ]; then
+            echo "Bad check mode '$check_mode'" 1>&2
+            exit 1
+        fi
+        TIGHTDB_MAX_BPNODE_SIZE_DEBUG="4" sh build.sh config || exit 1
+        UNITTEST_SHUFFLE="1" UNITTEST_REANDOM_SEED="random" UNITTEST_XML="1" sh build.sh "$check_mode" || exit 1
+        exit 0
+        ;;
+
+    "jenkins-pipeline-coverage")
+        # Run by Jenkins as part of the core pipeline whenever master changes
+        TIGHTDB_MAX_BPNODE_SIZE_DEBUG="4" sh build.sh config || exit 1
+        sh build.sh gcovr || exit 1
+        exit 0
+        ;;
+
+    "jenkins-pipeline-address-sanitizer")
+        # Run by Jenkins as part of the core pipeline whenever master changes.
+        TIGHTDB_MAX_BPNODE_SIZE_DEBUG="4" sh build.sh config || exit 1
+        sh build.sh asan-debug || exit 1
+        exit 0
+        ;;
+
+    "jenkins-valgrind")
+        TIGHTDB_ENABLE_REPLICATION=1 TIGHTDB_ENABLE_ALLOC_SET_ZERO=1 sh build.sh config || exit 1
+        sh build.sh clean || exit 1
+        VALGRIND_FLAGS="--tool=memcheck --leak-check=full --undef-value-errors=yes --track-origins=yes --child-silent-after-fork=no --trace-children=yes --xml=yes --xml-file=/var/jenkins/workspace/core_valgrind/tightdb-tests-dbg.%p.memreport" sh build.sh memcheck || exit 1
         exit 0
         ;;
 

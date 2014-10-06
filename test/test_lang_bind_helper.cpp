@@ -5826,6 +5826,362 @@ TEST(LangBindHelper_ImplicitTransactions)
 }
 
 
+TEST(LangBindHelper_RollbackAndContinueAsRead)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    UniquePtr<Replication> repl(makeWriteLogCollector(path));
+    UniquePtr<LangBindHelper::TransactLogRegistry> wlr(getWriteLogs(path));
+    SharedGroup sg(*repl);
+    {
+        Group* group = const_cast<Group*>(&sg.begin_read());
+       {
+            LangBindHelper::promote_to_write(sg, *wlr);
+            TableRef origin = group->get_or_add_table("origin");
+            origin->add_column(type_Int, "");
+            origin->add_empty_row();
+            origin->set_int(0,0,42);
+            LangBindHelper::commit_and_continue_as_read(sg);
+        }
+        group->Verify();
+        {
+            // rollback of group level table insertion
+            LangBindHelper::promote_to_write(sg, *wlr);
+            TableRef o = group->get_or_add_table("nullermand");
+            TableRef o2 = group->get_table("nullermand");
+            TIGHTDB_ASSERT(o2);
+            LangBindHelper::rollback_and_continue_as_read(sg);
+            TableRef o3 = group->get_table("nullermand");
+            TIGHTDB_ASSERT(!o3);
+            TIGHTDB_ASSERT(o2->is_attached() == false);
+        }
+
+        TableRef origin = group->get_table("origin");
+        Row row = origin->get(0);
+        CHECK_EQUAL(42, origin->get_int(0,0));
+
+        {
+            LangBindHelper::promote_to_write(sg, *wlr);
+            origin->insert_empty_row(0);
+            origin->set_int(0,0,5746);
+            CHECK_EQUAL(42, origin->get_int(0,1));
+            CHECK_EQUAL(5746, origin->get_int(0,0));
+            CHECK_EQUAL(42, row.get_int(0));
+            CHECK_EQUAL(2, origin->size());
+            group->Verify();
+            LangBindHelper::rollback_and_continue_as_read(sg);
+        }
+        CHECK_EQUAL(1, origin->size());
+        group->Verify();
+        CHECK_EQUAL(42, origin->get_int(0,0));
+        CHECK_EQUAL(42, row.get_int(0));
+
+        {
+            LangBindHelper::promote_to_write(sg, *wlr);
+            origin->add_empty_row();
+            origin->set_int(0,1,42);
+            LangBindHelper::commit_and_continue_as_read(sg);
+        }
+        Row row2 = origin->get(1);
+        CHECK_EQUAL(2, origin->size());
+
+        {
+            LangBindHelper::promote_to_write(sg, *wlr);
+            origin->move_last_over(0);
+            CHECK_EQUAL(1, origin->size());
+            CHECK_EQUAL(42, row2.get_int(0));
+            CHECK_EQUAL(42, origin->get_int(0,0));
+            group->Verify();
+            LangBindHelper::rollback_and_continue_as_read(sg);
+        }
+        CHECK_EQUAL(2, origin->size());
+        group->Verify();
+        CHECK_EQUAL(42, row2.get_int(0));
+        CHECK_EQUAL(42, origin->get_int(0,1));
+        sg.end_read();
+    }
+}
+
+
+TEST(LangBindHelper_RollbackAndContinueAsReadGroupLevelTableRemoval)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    UniquePtr<Replication> repl(makeWriteLogCollector(path));
+    UniquePtr<LangBindHelper::TransactLogRegistry> wlr(getWriteLogs(path));
+    SharedGroup sg(*repl);
+    Group* group = const_cast<Group*>(&sg.begin_read());
+    {
+        LangBindHelper::promote_to_write(sg, *wlr);
+        TableRef origin = group->get_or_add_table("a_table");
+        LangBindHelper::commit_and_continue_as_read(sg);
+    }
+    group->Verify();
+    {
+        // rollback of group level table delete
+        LangBindHelper::promote_to_write(sg, *wlr);
+        TableRef o2 = group->get_table("a_table");
+        TIGHTDB_ASSERT(o2);
+        group->remove_table("a_table");
+        TableRef o3 = group->get_table("a_table");
+        TIGHTDB_ASSERT(!o3);
+        LangBindHelper::rollback_and_continue_as_read(sg);
+        TableRef o4 = group->get_table("a_table");
+        TIGHTDB_ASSERT(o4);
+    }
+    group->Verify();
+}
+
+
+TEST(LangBindHelper_RollbackAndContinueAsReadColumnAdd)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    UniquePtr<Replication> repl(makeWriteLogCollector(path));
+    UniquePtr<LangBindHelper::TransactLogRegistry> wlr(getWriteLogs(path));
+    SharedGroup sg(*repl);
+    Group* group = const_cast<Group*>(&sg.begin_read());
+    TableRef t;
+    {
+        LangBindHelper::promote_to_write(sg, *wlr);
+        t = group->get_or_add_table("a_table");
+        t->add_column(type_Int, "lorelei");
+        t->insert_empty_row(0);
+        t->set_int(0,0,43);
+        CHECK_EQUAL(1, t->get_descriptor()->get_column_count());
+        LangBindHelper::commit_and_continue_as_read(sg);
+    }
+    group->Verify();
+    {
+        // add a column and regret it again
+        LangBindHelper::promote_to_write(sg, *wlr);
+        t->add_column(type_Int, "riget");
+        t->set_int(1,0,44);
+        CHECK_EQUAL(2, t->get_descriptor()->get_column_count());
+        group->Verify();
+        LangBindHelper::rollback_and_continue_as_read(sg);
+        group->Verify();
+        CHECK_EQUAL(1, t->get_descriptor()->get_column_count());
+    }
+    group->Verify();
+}
+
+
+TEST(LangBindHelper_RollbackAndContinueAsReadColumnRemove)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    UniquePtr<Replication> repl(makeWriteLogCollector(path));
+    UniquePtr<LangBindHelper::TransactLogRegistry> wlr(getWriteLogs(path));
+    SharedGroup sg(*repl);
+    Group* group = const_cast<Group*>(&sg.begin_read());
+    TableRef t;
+    {
+        LangBindHelper::promote_to_write(sg, *wlr);
+        t = group->get_or_add_table("a_table");
+        t->add_column(type_Int, "lorelei");
+        t->add_column(type_Int, "riget");
+        t->insert_empty_row(0);
+        t->set_int(0,0,43);
+        t->set_int(1,0,44);
+        CHECK_EQUAL(2, t->get_descriptor()->get_column_count());
+        LangBindHelper::commit_and_continue_as_read(sg);
+    }
+    group->Verify();
+    {
+        // remove a column but regret it
+        LangBindHelper::promote_to_write(sg, *wlr);
+        CHECK_EQUAL(2, t->get_descriptor()->get_column_count());
+        t->remove_column(0);
+        group->Verify();
+        LangBindHelper::rollback_and_continue_as_read(sg);
+        group->Verify();
+        CHECK_EQUAL(2, t->get_descriptor()->get_column_count());
+    }
+    group->Verify();
+}
+
+
+TEST(LangBindHelper_RollbackAndContinueAsReadLinkList)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    UniquePtr<LangBindHelper::TransactLogRegistry> tlr(getWriteLogs(path));
+    UniquePtr<Replication> repl(makeWriteLogCollector(path));
+    SharedGroup sg(*repl);
+    Group* group = const_cast<Group*>(&sg.begin_read());
+    LangBindHelper::promote_to_write(sg, *tlr);
+    TableRef origin = group->add_table("origin");
+    TableRef target = group->add_table("target");
+    origin->add_column_link(type_LinkList, "", *target);
+    target->add_column(type_Int, "");
+    origin->add_empty_row();
+    target->add_empty_row();
+    target->add_empty_row();
+    target->add_empty_row();
+    LinkViewRef link_list = origin->get_linklist(0,0);
+    link_list->add(0);
+    LangBindHelper::commit_and_continue_as_read(sg);
+    CHECK_EQUAL(1, link_list->size());
+    group->Verify();
+    // now change a link in link list and roll back the change
+    LangBindHelper::promote_to_write(sg, *tlr);
+    link_list->add(1);
+    link_list->add(2);
+    CHECK_EQUAL(3, link_list->size());
+    LangBindHelper::rollback_and_continue_as_read(sg);
+    CHECK_EQUAL(1, link_list->size());
+    LangBindHelper::promote_to_write(sg, *tlr);
+    link_list->remove(0);
+    CHECK_EQUAL(0, link_list->size());
+    LangBindHelper::rollback_and_continue_as_read(sg);
+    CHECK_EQUAL(1, link_list->size());
+    // verify that we can do move last over - first set link to last entry in target:
+    LangBindHelper::promote_to_write(sg, *tlr);
+    link_list->set(0,2); // link list holds single link to end of target
+    LangBindHelper::commit_and_continue_as_read(sg);
+    // then we test move last over:
+    LangBindHelper::promote_to_write(sg, *tlr);
+    CHECK_EQUAL(2, link_list->get(0).get_index()); // link restored
+    target->move_last_over(0);
+    CHECK_EQUAL(0, link_list->get(0).get_index()); // link was changed to 0 due to move last over
+    LangBindHelper::rollback_and_continue_as_read(sg);
+    CHECK_EQUAL(2, link_list->get(0).get_index()); // link restored
+}
+
+
+TEST(LangBindHelper_RollbackAndContinueAsReadLink)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    UniquePtr<LangBindHelper::TransactLogRegistry> tlr(getWriteLogs(path));
+    UniquePtr<Replication> repl(makeWriteLogCollector(path));
+    SharedGroup sg(*repl);
+    Group* group = const_cast<Group*>(&sg.begin_read());
+    LangBindHelper::promote_to_write(sg, *tlr);
+    TableRef origin = group->add_table("origin");
+    TableRef target = group->add_table("target");
+    origin->add_column_link(type_Link, "", *target);
+    target->add_column(type_Int, "");
+    origin->add_empty_row();
+    target->add_empty_row();
+    target->add_empty_row();
+    target->add_empty_row();
+    origin->set_link(0, 0, 2); // points to last row in target
+    CHECK_EQUAL(2, origin->get_link(0,0));
+    LangBindHelper::commit_and_continue_as_read(sg);
+    // verify that we can reverse a move last over:
+    CHECK_EQUAL(2, origin->get_link(0,0));
+    LangBindHelper::promote_to_write(sg, *tlr);
+    target->move_last_over(1);
+    CHECK_EQUAL(1, origin->get_link(0,0));
+    LangBindHelper::rollback_and_continue_as_read(sg);
+    CHECK_EQUAL(2, origin->get_link(0,0));
+    // verify that we can revert a link change:
+    LangBindHelper::promote_to_write(sg, *tlr);
+    origin->set_link(0, 0, 1);
+    LangBindHelper::rollback_and_continue_as_read(sg);
+    CHECK_EQUAL(2, origin->get_link(0,0));
+}
+
+TEST(LangBindHelper_RollbackAndContinueAsRead_MoveLastOverSubtables)
+{
+    // adapted from earlier move last over test
+    SHARED_GROUP_TEST_PATH(path);
+    UniquePtr<LangBindHelper::TransactLogRegistry> tlr(getWriteLogs(path));
+    UniquePtr<Replication> repl(makeWriteLogCollector(path));
+    SharedGroup sg(*repl);
+    Group* group = const_cast<Group*>(&sg.begin_read());
+
+    CHECK_EQUAL(0, group->size());
+
+    // Create three parent tables, each with with 5 rows, and each row
+    // containing one regular and one mixed subtable
+    {
+        LangBindHelper::promote_to_write(sg, *tlr);
+        for (int i = 0; i < 3; ++i) {
+            const char* table_name = i == 0 ? "parent_1" : i == 1 ? "parent_2" : "parent_3";
+            TableRef parent_w = group->add_table(table_name);
+            parent_w->add_column(type_Table, "a");
+            parent_w->add_column(type_Mixed, "b");
+            DescriptorRef subdesc = parent_w->get_subdescriptor(0);
+            subdesc->add_column(type_Int, "regular");
+            parent_w->add_empty_row(5);
+            for (int row_ndx = 0; row_ndx < 5; ++row_ndx) {
+                TableRef regular_w = parent_w->get_subtable(0, row_ndx);
+                regular_w->add_empty_row();
+                regular_w->set_int(0, 0, 10 + row_ndx);
+                parent_w->set_mixed(1, row_ndx, Mixed::subtable_tag());
+                TableRef mixed_w = parent_w->get_subtable(1, row_ndx);
+                mixed_w->add_column(type_Int, "mixed");
+                mixed_w->add_empty_row();
+                mixed_w->set_int(0, 0, 20 + row_ndx);
+            }
+        }
+        LangBindHelper::commit_and_continue_as_read(sg);
+    }
+    group->Verify();
+
+    // Use first table to check with accessors on row indexes 0, 1, and 4, but
+    // none at index 2 and 3.
+    {
+        ConstTableRef parent = group->get_table("parent_1");
+        ConstRow row_0 = (*parent)[0];
+        ConstRow row_1 = (*parent)[1];
+        ConstRow row_4 = (*parent)[4];
+        ConstTableRef regular_0 = parent->get_subtable(0,0);
+        ConstTableRef regular_1 = parent->get_subtable(0,1);
+        ConstTableRef regular_4 = parent->get_subtable(0,4);
+        ConstTableRef   mixed_0 = parent->get_subtable(1,0);
+        ConstTableRef   mixed_1 = parent->get_subtable(1,1);
+        ConstTableRef   mixed_4 = parent->get_subtable(1,4);
+        CHECK(row_0.is_attached());
+        CHECK(row_1.is_attached());
+        CHECK(row_4.is_attached());
+        CHECK_EQUAL(0, row_0.get_index());
+        CHECK_EQUAL(1, row_1.get_index());
+        CHECK_EQUAL(4, row_4.get_index());
+        CHECK(regular_0->is_attached());
+        CHECK(regular_1->is_attached());
+        CHECK(regular_4->is_attached());
+        CHECK_EQUAL(10, regular_0->get_int(0,0));
+        CHECK_EQUAL(11, regular_1->get_int(0,0));
+        CHECK_EQUAL(14, regular_4->get_int(0,0));
+        CHECK(mixed_0 && mixed_0->is_attached());
+        CHECK(mixed_1 && mixed_1->is_attached());
+        CHECK(mixed_4 && mixed_4->is_attached());
+        CHECK_EQUAL(20, mixed_0->get_int(0,0));
+        CHECK_EQUAL(21, mixed_1->get_int(0,0));
+        CHECK_EQUAL(24, mixed_4->get_int(0,0));
+
+        // Perform two 'move last over' operations which brings the number of
+        // rows down from 5 to 3 ... then rollback to earlier state and verify
+        {
+            LangBindHelper::promote_to_write(sg, *tlr);
+            TableRef parent_w = group->get_table("parent_1");
+            parent_w->move_last_over(2); // Move row at index 4 to index 2
+            parent_w->move_last_over(0); // Move row at index 3 to index 0
+            LangBindHelper::rollback_and_continue_as_read(sg);
+        }
+        // even though we rollback, accessors to row_0 should have become
+        // detached as part of the changes done before reverting, and once
+        // detached, they are not magically attached again.
+        CHECK(!row_0.is_attached());
+        CHECK(row_1.is_attached());
+        CHECK(row_4.is_attached());
+        //CHECK_EQUAL(0, row_0.get_index());
+        CHECK_EQUAL(1, row_1.get_index());
+        CHECK_EQUAL(4, row_4.get_index());
+        //CHECK(regular_0->is_attached());
+        CHECK(regular_1->is_attached());
+        CHECK(regular_4->is_attached());
+        //CHECK_EQUAL(10, regular_0->get_int(0,0));
+        CHECK_EQUAL(11, regular_1->get_int(0,0));
+        CHECK_EQUAL(14, regular_4->get_int(0,0));
+        //CHECK(mixed_0 && mixed_0->is_attached());
+        CHECK(mixed_1 && mixed_1->is_attached());
+        CHECK(mixed_4 && mixed_4->is_attached());
+        //CHECK_EQUAL(20, mixed_0->get_int(0,0));
+        CHECK_EQUAL(21, mixed_1->get_int(0,0));
+        CHECK_EQUAL(24, mixed_4->get_int(0,0));
+    }
+}
+
+
 TEST(LangBindHelper_ImplicitTransactions_OverSharedGroupDestruction)
 {
     SHARED_GROUP_TEST_PATH(path);

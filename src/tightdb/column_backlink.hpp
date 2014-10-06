@@ -64,7 +64,7 @@ public:
 
     void adj_accessors_insert_rows(std::size_t, std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     void adj_accessors_erase_row(std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-    void adj_accessors_move_last_over(std::size_t, std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void adj_accessors_move(std::size_t, std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     void adj_acc_clear_root_table() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
     void mark(int) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
@@ -159,10 +159,10 @@ inline void ColumnBackLink::adj_accessors_erase_row(std::size_t) TIGHTDB_NOEXCEP
     TIGHTDB_ASSERT(false);
 }
 
-inline void ColumnBackLink::adj_accessors_move_last_over(std::size_t target_row_ndx,
-                                                         std::size_t last_row_ndx) TIGHTDB_NOEXCEPT
+inline void ColumnBackLink::adj_accessors_move(std::size_t target_row_ndx,
+                                               std::size_t source_row_ndx) TIGHTDB_NOEXCEPT
 {
-    Column::adj_accessors_move_last_over(target_row_ndx, last_row_ndx);
+    Column::adj_accessors_move(target_row_ndx, source_row_ndx);
 
     typedef _impl::TableFriend tf;
     tf::mark(*m_origin_table);

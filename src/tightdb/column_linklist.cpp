@@ -86,7 +86,7 @@ void ColumnLinkList::move_last_over(size_t target_row_ndx, size_t last_row_ndx)
     ColumnLinkBase::move_last_over(target_row_ndx, last_row_ndx);
 
     const bool fix_ndx_in_parent = true;
-    adj_move_last_over<fix_ndx_in_parent>(target_row_ndx, last_row_ndx);
+    adj_move<fix_ndx_in_parent>(target_row_ndx, last_row_ndx);
 }
 
 
@@ -216,13 +216,13 @@ void ColumnLinkList::refresh_accessor_tree(size_t col_ndx, const Spec& spec)
 }
 
 
-void ColumnLinkList::adj_accessors_move_last_over(size_t target_row_ndx,
-                                                  size_t last_row_ndx) TIGHTDB_NOEXCEPT
+void ColumnLinkList::adj_accessors_move(size_t target_row_ndx,
+                                        size_t source_row_ndx) TIGHTDB_NOEXCEPT
 {
-    ColumnLinkBase::adj_accessors_move_last_over(target_row_ndx, last_row_ndx);
+    ColumnLinkBase::adj_accessors_move(target_row_ndx, source_row_ndx);
 
     const bool fix_ndx_in_parent = false;
-    adj_move_last_over<fix_ndx_in_parent>(target_row_ndx, last_row_ndx);
+    adj_move<fix_ndx_in_parent>(target_row_ndx, source_row_ndx);
 }
 
 
@@ -232,69 +232,28 @@ void ColumnLinkList::adj_acc_clear_root_table() TIGHTDB_NOEXCEPT
     discard_child_accessors();
 }
 
-
 template<bool fix_ndx_in_parent>
-void ColumnLinkList::adj_move_last_over(size_t target_row_ndx,
-                                        size_t last_row_ndx) TIGHTDB_NOEXCEPT
+void ColumnLinkList::adj_move(size_t target_row_ndx, size_t source_row_ndx) TIGHTDB_NOEXCEPT
 {
-    // Search for either index in a tight loop for speed
-    bool last_seen = false;
-    size_t i = 0, n = m_list_accessors.size();
-    for (;;) {
-        if (i == n)
-            return;
-        const list_entry& e = m_list_accessors[i];
-        if (e.m_row_ndx == target_row_ndx)
-            goto target;
-        if (e.m_row_ndx == last_row_ndx)
-            break;
-        ++i;
-    }
-
-    // Move list accessor at `last_row_ndx`, then look for `target_row_ndx`
-    {
+    size_t i = 0, limit = m_list_accessors.size();
+    while (i < limit) {
         list_entry& e = m_list_accessors[i];
-        e.m_row_ndx = target_row_ndx;
-        if (fix_ndx_in_parent)
-            e.m_list->set_origin_row_index(target_row_ndx);
-    }
-    for (;;) {
-        ++i;
-        if (i == n)
-            return;
-        const list_entry& e = m_list_accessors[i];
-        if (e.m_row_ndx == target_row_ndx)
-            break;
-    }
-    last_seen = true;
-
-    // Detach and remove original list accessor at `target_row_ndx`, then
-    // look for `last_row_ndx
-  target:
-    {
-        list_entry& e = m_list_accessors[i];
-        // Must hold a counted reference while detaching
-        LinkViewRef list(e.m_list);
-        list->detach();
-        // Delete entry by moving last over (faster and avoids invalidating
-        // iterators)
-        e = m_list_accessors[--n];
-        m_list_accessors.pop_back();
-    }
-    if (!last_seen) {
-        for (;;) {
-            if (i == n)
-                return;
-            const list_entry& e = m_list_accessors[i];
-            if (e.m_row_ndx == last_row_ndx)
-                break;
-            ++i;
+        if (TIGHTDB_UNLIKELY(e.m_row_ndx == target_row_ndx)) {
+            // Must hold a counted reference while detaching
+            LinkViewRef list(e.m_list);
+            list->detach();
+            // Delete entry by moving last over (faster and avoids invalidating
+            // iterators)
+            e = m_list_accessors[--limit];
+            m_list_accessors.pop_back();
         }
-        {
-            list_entry& e = m_list_accessors[i];
-            e.m_row_ndx = target_row_ndx;
-            if (fix_ndx_in_parent)
-                e.m_list->set_origin_row_index(target_row_ndx);
+        else {
+            if (TIGHTDB_UNLIKELY(e.m_row_ndx == source_row_ndx)) {
+                e.m_row_ndx = target_row_ndx;
+                if (fix_ndx_in_parent)
+                    e.m_list->set_origin_row_index(target_row_ndx);
+            }
+            ++i;
         }
     }
 }

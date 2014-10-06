@@ -490,8 +490,11 @@ private:
     Replication* get_replication() const TIGHTDB_NOEXCEPT;
     void set_replication(Replication*) TIGHTDB_NOEXCEPT;
     class TransactAdvancer;
+    class TransactReverser;
     void advance_transact(ref_type new_top_ref, std::size_t new_file_size,
                           const BinaryData* logs_begin, const BinaryData* logs_end);
+    void reverse_transact(ref_type new_top_ref, const BinaryData& log);
+    void refresh_dirty_accessors();
 #endif
 
 #ifdef TIGHTDB_DEBUG
@@ -503,6 +506,8 @@ private:
     friend class GroupWriter;
     friend class SharedGroup;
     friend class _impl::GroupFriend;
+    friend class Replication;
+    friend class TrivialReplication;
 };
 
 

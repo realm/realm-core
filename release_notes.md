@@ -6,6 +6,24 @@
 
 ### API breaking changes:
 
+* Lorem ipsum.
+
+### Enhancements:
+
+* Lorem ipsum.
+
+-----------
+
+### Internals:
+
+* Lorem ipsum.
+
+----------------------------------------------
+
+# 0.84.0 Release notes
+
+### API breaking changes:
+
 * `Table::set_index()` and `Table::has_index()` renamed to
   `Table::add_search_index()` and `Table::has_search_index()` respectively, and
   `Table::add_search_index()` now throws instead of failing in an unspecified
@@ -20,6 +38,12 @@
   it is still attached.
 * `Table::try_add_primary_key()` and `Table::remove_primary_key()` added.
 * `Table::find_pkey_int()` added, but not yet backed by an integer search index.
+* Added method `LangBindHelper::rollback_and_continue_as_read()`. This method
+  provides the ability to rollback a write transaction while retaining
+  accessors: Accessors which are detached as part of the rolled back write
+  transaction are *not* automatically re-attached. Accessors that were attached
+  before the write transaction and which are not detached during the write
+  transaction will remain attached after the rollback.
 
 -----------
 
@@ -28,6 +52,8 @@
 * Introducing `LogicError` as an alternative to expected exceptions. See
   https://github.com/Tightdb/tightdb/wiki/Exception-safety-guarantees for more
   on this.
+* Various query related speed improvements.
+* Test suite now passes ASAN (address sanitizer).
 
 ----------------------------------------------
 

@@ -5347,6 +5347,14 @@ TEST(Query_DeepCopy)
     q11.greater(2, 4.0);
     CHECK_EQUAL(3, q11.find());
     CHECK_EQUAL(0, q10.find());
+
+    // Test and_query() on a copy
+    Query q12 = t.column().ints > 2;
+    Query q13 = Query(q12, Query::TCopyExpressionTag());
+
+    q13.and_query(t.column().strings != "3");
+    CHECK_EQUAL(3, q13.find());
+    CHECK_EQUAL(2, q12.find());
 }
 
 TEST(Query_TableViewMoveAssign1)
@@ -5416,6 +5424,7 @@ TEST(Query_TableViewMoveAssignLeak2)
 
     Query q3;
 
+    q2 = t.column().ints <= t.column().doubles;
     q3 = q2;
 
     q3.find();

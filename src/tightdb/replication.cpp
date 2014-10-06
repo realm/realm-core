@@ -294,7 +294,7 @@ public:
         return false;
     }
 
-    bool insert_int(size_t col_ndx, size_t row_ndx, int_fast64_t value)
+    bool insert_int(size_t col_ndx, size_t row_ndx, std::size_t, int_fast64_t value)
     {
         if (TIGHTDB_LIKELY(check_insert_cell(col_ndx, row_ndx))) {
 #ifdef TIGHTDB_DEBUG
@@ -307,7 +307,7 @@ public:
         return false;
     }
 
-    bool insert_bool(size_t col_ndx, size_t row_ndx, bool value)
+    bool insert_bool(size_t col_ndx, size_t row_ndx, std::size_t, bool value)
     {
         if (TIGHTDB_LIKELY(check_insert_cell(col_ndx, row_ndx))) {
 #ifdef TIGHTDB_DEBUG
@@ -320,7 +320,7 @@ public:
         return false;
     }
 
-    bool insert_float(size_t col_ndx, size_t row_ndx, float value)
+    bool insert_float(size_t col_ndx, size_t row_ndx, std::size_t, float value)
     {
         if (TIGHTDB_LIKELY(check_insert_cell(col_ndx, row_ndx))) {
 #ifdef TIGHTDB_DEBUG
@@ -333,7 +333,7 @@ public:
         return false;
     }
 
-    bool insert_double(size_t col_ndx, size_t row_ndx, double value)
+    bool insert_double(size_t col_ndx, size_t row_ndx, std::size_t, double value)
     {
         if (TIGHTDB_LIKELY(check_insert_cell(col_ndx, row_ndx))) {
 #ifdef TIGHTDB_DEBUG
@@ -346,7 +346,7 @@ public:
         return false;
     }
 
-    bool insert_string(size_t col_ndx, size_t row_ndx, StringData value)
+    bool insert_string(size_t col_ndx, size_t row_ndx, std::size_t, StringData value)
     {
         if (TIGHTDB_LIKELY(check_insert_cell(col_ndx, row_ndx))) {
 #ifdef TIGHTDB_DEBUG
@@ -359,7 +359,7 @@ public:
         return false;
     }
 
-    bool insert_binary(size_t col_ndx, size_t row_ndx, BinaryData value)
+    bool insert_binary(size_t col_ndx, size_t row_ndx, std::size_t, BinaryData value)
     {
         if (TIGHTDB_LIKELY(check_insert_cell(col_ndx, row_ndx))) {
 #ifdef TIGHTDB_DEBUG
@@ -372,7 +372,7 @@ public:
         return false;
     }
 
-    bool insert_date_time(size_t col_ndx, size_t row_ndx, DateTime value)
+    bool insert_date_time(size_t col_ndx, size_t row_ndx, std::size_t, DateTime value)
     {
         if (TIGHTDB_LIKELY(check_insert_cell(col_ndx, row_ndx))) {
 #ifdef TIGHTDB_DEBUG
@@ -385,7 +385,7 @@ public:
         return false;
     }
 
-    bool insert_table(size_t col_ndx, size_t row_ndx)
+    bool insert_table(size_t col_ndx, size_t row_ndx, std::size_t)
     {
         if (TIGHTDB_LIKELY(check_insert_cell(col_ndx, row_ndx))) {
 #ifdef TIGHTDB_DEBUG
@@ -398,7 +398,7 @@ public:
         return false;
     }
 
-    bool insert_mixed(size_t col_ndx, size_t row_ndx, const Mixed& value)
+    bool insert_mixed(size_t col_ndx, size_t row_ndx, std::size_t, const Mixed& value)
     {
         if (TIGHTDB_LIKELY(check_insert_cell(col_ndx, row_ndx))) {
 #ifdef TIGHTDB_DEBUG
@@ -411,7 +411,7 @@ public:
         return false;
     }
 
-    bool insert_link(size_t col_ndx, size_t row_ndx, std::size_t value)
+    bool insert_link(size_t col_ndx, size_t row_ndx, std::size_t, std::size_t value)
     {
         TIGHTDB_ASSERT(value > 0); // Not yet any support for inserting null links
         if (TIGHTDB_LIKELY(check_insert_cell(col_ndx, row_ndx))) {
@@ -425,7 +425,7 @@ public:
         return false;
     }
 
-    bool insert_link_list(size_t col_ndx, size_t row_ndx)
+    bool insert_link_list(size_t col_ndx, size_t row_ndx, std::size_t)
     {
         if (TIGHTDB_LIKELY(check_insert_cell(col_ndx, row_ndx))) {
 #ifdef TIGHTDB_DEBUG
@@ -451,7 +451,7 @@ public:
         return false;
     }
 
-    bool insert_empty_rows(size_t row_ndx, size_t num_rows)
+    bool insert_empty_rows(size_t row_ndx, size_t num_rows, std::size_t, bool)
     {
         if (TIGHTDB_LIKELY(m_table)) {
             if (TIGHTDB_LIKELY(row_ndx <= m_table->size())) {
@@ -466,32 +466,34 @@ public:
         return false;
     }
 
-    bool erase_row(size_t row_ndx)
+    bool erase_rows(size_t row_ndx, size_t num_rows, std::size_t last_row_ndx, bool unordered)
     {
         if (TIGHTDB_LIKELY(m_table)) {
-            if (TIGHTDB_LIKELY(row_ndx < m_table->size())) {
+            if (unordered) {
+                if (TIGHTDB_LIKELY(row_ndx < last_row_ndx && last_row_ndx+1 == m_table->size())) {
 #ifdef TIGHTDB_DEBUG
-                if (m_log)
-                    *m_log << "table->remove("<<row_ndx<<")\n";
+                    if (m_log)
+                        *m_log << "table->move_last_over("<<row_ndx<<")\n";
 #endif
-                m_table->remove(row_ndx); // Throws
-                return true;
+                    while (num_rows--) {
+                        m_table->move_last_over(row_ndx); // Throws
+                        row_ndx++;
+                    }
+                    return true;
+                }
             }
-        }
-        return false;
-    }
-
-    bool move_last_over(size_t target_row_ndx, size_t last_row_ndx)
-    {
-        if (TIGHTDB_LIKELY(m_table)) {
-            if (TIGHTDB_LIKELY(target_row_ndx < last_row_ndx &&
-                               last_row_ndx+1 == m_table->size())) {
+            else {
+                if (TIGHTDB_LIKELY(row_ndx < m_table->size())) {
 #ifdef TIGHTDB_DEBUG
-                if (m_log)
-                    *m_log << "table->move_last_over("<<target_row_ndx<<")\n";
+                    if (m_log)
+                        *m_log << "table->remove("<<row_ndx<<")\n";
 #endif
-                m_table->move_last_over(target_row_ndx); // Throws
-                return true;
+                    while (num_rows--) {
+                        m_table->remove(row_ndx); // Throws
+                        row_ndx++;
+                    }
+                    return true;
+                }
             }
         }
         return false;
@@ -617,30 +619,18 @@ public:
         return false;
     }
 
-    bool insert_column(size_t col_ndx, DataType type, StringData name,
-                       size_t link_target_table_ndx)
+    bool insert_column(size_t col_ndx, DataType type, StringData name)
     {
         if (TIGHTDB_LIKELY(m_desc)) {
             if (TIGHTDB_LIKELY(col_ndx <= m_desc->get_column_count())) {
                 typedef _impl::TableFriend tf;
 #ifdef TIGHTDB_DEBUG
                 if (m_log) {
-                    if (link_target_table_ndx != tightdb::npos) {
-                        *m_log << "desc->insert_column_link("<<col_ndx<<", "
-                            ""<<type_to_str(type)<<", \""<<name<<"\", "
-                            "group->get_table("<<link_target_table_ndx<<"))\n";
-                    }
-                    else {
-                        *m_log << "desc->insert_column("<<col_ndx<<", "<<type_to_str(type)<<", "
-                            "\""<<name<<"\")\n";
-                    }
+                    *m_log << "desc->insert_column("<<col_ndx<<", "<<type_to_str(type)<<", "
+                        "\""<<name<<"\")\n";
                 }
 #endif
                 Table* link_target_table = 0;
-                if (link_target_table_ndx != tightdb::npos) {
-                    typedef _impl::GroupFriend gf;
-                    link_target_table = &gf::get_table(m_group, link_target_table_ndx); // Throws
-                }
                 tf::insert_column(*m_desc, col_ndx, type, name, link_target_table); // Throws
                 return true;
             }
@@ -648,7 +638,44 @@ public:
         return false;
     }
 
-    bool erase_column(size_t col_ndx, size_t, size_t)
+    bool insert_link_column(size_t col_ndx, DataType type, StringData name,
+                       size_t link_target_table_ndx, size_t)
+    {
+        if (TIGHTDB_LIKELY(m_desc)) {
+            if (TIGHTDB_LIKELY(col_ndx <= m_desc->get_column_count())) {
+                typedef _impl::TableFriend tf;
+#ifdef TIGHTDB_DEBUG
+                if (m_log) {
+                    *m_log << "desc->insert_column_link("<<col_ndx<<", "
+                        ""<<type_to_str(type)<<", \""<<name<<"\", "
+                        "group->get_table("<<link_target_table_ndx<<"))\n";
+                }
+#endif
+                typedef _impl::GroupFriend gf;
+                Table* link_target_table = &gf::get_table(m_group, link_target_table_ndx); // Throws
+                tf::insert_column(*m_desc, col_ndx, type, name, link_target_table); // Throws
+                return true;
+            }
+        }
+        return false;
+    }
+
+    bool erase_column(size_t col_ndx)
+    {
+        if (TIGHTDB_LIKELY(m_desc)) {
+            if (TIGHTDB_LIKELY(col_ndx < m_desc->get_column_count())) {
+#ifdef TIGHTDB_DEBUG
+                if (m_log)
+                    *m_log << "desc->remove_column("<<col_ndx<<")\n";
+#endif
+                _impl::TableFriend::erase_column(*m_desc, col_ndx); // Throws
+                return true;
+            }
+        }
+        return false;
+    }
+
+    bool erase_link_column(size_t col_ndx, size_t, size_t)
     {
         if (TIGHTDB_LIKELY(m_desc)) {
             if (TIGHTDB_LIKELY(col_ndx < m_desc->get_column_count())) {
@@ -922,13 +949,15 @@ public:
 
     ~InputStreamImpl() TIGHTDB_NOEXCEPT {}
 
-    size_t read(char* buffer, size_t size)
+    size_t next_block(const char*& begin, const char*& end) TIGHTDB_OVERRIDE
     {
-        size_t n = min<size_t>(size, m_end-m_begin);
-        const char* end = m_begin + n;
-        copy(m_begin, end, buffer);
-        m_begin = end;
-        return n;
+        if (m_begin != 0) {
+            begin = m_begin;
+            end = m_end;
+            m_begin = 0;
+            return end - begin;
+        }
+        return 0;
     }
     const char* m_begin;
     const char* const m_end;
@@ -951,6 +980,11 @@ string TrivialReplication::do_get_database_path()
 }
 
 void TrivialReplication::do_begin_write_transact(SharedGroup&)
+{
+    prepare_to_write();
+}
+
+void TrivialReplication::prepare_to_write()
 {
     char* data = m_transact_log_buffer.data();
     size_t size = m_transact_log_buffer.size();
@@ -982,11 +1016,11 @@ void TrivialReplication::do_clear_interrupt() TIGHTDB_NOEXCEPT
 
 void TrivialReplication::do_transact_log_reserve(size_t n)
 {
-    transact_log_reserve(n);
+    internal_transact_log_reserve(n);
 }
 
 void TrivialReplication::do_transact_log_append(const char* data, size_t size)
 {
-    transact_log_reserve(size);
+    internal_transact_log_reserve(size);
     m_transact_log_free_begin = copy(data, data+size, m_transact_log_free_begin);
 }

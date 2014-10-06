@@ -32,13 +32,6 @@ template <class T> inline StringData to_str(T& value)
     TIGHTDB_STATIC_ASSERT((util::SameType<T, int64_t>::value), "");
     const char* c = reinterpret_cast<const char*>(&value);
     return StringData(c, sizeof(T));
-    
-    /*
-    if (value < (1ull << 32))
-        return StringData(c, 4);
-    else 
-        return StringData(c, 8);
-    */
 }
 
 template <> inline StringData to_str<StringData>(StringData& input)
@@ -46,7 +39,6 @@ template <> inline StringData to_str<StringData>(StringData& input)
     return input;
 }
 
-// todo, remove
 inline StringData to_str(const char* value)
 {
     return StringData(value);
@@ -84,7 +76,7 @@ public:
 
     template <class T> void set(size_t row_ndx, T new_value)
     {
-        char buffer[8];
+        char buffer[sizeof(T)];
         T old_value = get(row_ndx, buffer);
         StringData new_value2 = to_str(new_value);
 
@@ -125,7 +117,7 @@ public:
 
     template <class T> void erase(size_t row_ndx, bool is_last)
     {
-        char buffer[8];
+        char buffer[sizeof(T)];
         T value = get(row_ndx, buffer);
 
         DoDelete(row_ndx, to_str(value), 0);

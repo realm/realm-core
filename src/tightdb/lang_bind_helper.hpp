@@ -120,6 +120,7 @@ public:
     static void advance_read(SharedGroup&, TransactLogRegistry& write_logs);
     static void promote_to_write(SharedGroup&, TransactLogRegistry& write_logs);
     static void commit_and_continue_as_read(SharedGroup&);
+    static void rollback_and_continue_as_read(SharedGroup&);
 #endif
 
     /// Returns the name of the specified data type as follows:
@@ -311,6 +312,11 @@ inline void LangBindHelper::promote_to_write(SharedGroup& sg,
 inline void LangBindHelper::commit_and_continue_as_read(SharedGroup& sg)
 {
     sg.commit_and_continue_as_read();
+}
+
+inline void LangBindHelper::rollback_and_continue_as_read(SharedGroup& sg)
+{
+    sg.rollback_and_continue_as_read();
 }
 
 
