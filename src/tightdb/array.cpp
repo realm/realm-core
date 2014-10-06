@@ -3022,7 +3022,7 @@ top:
 
                 return first ? row_ref : count ? 1 : FindRes_single;
             }
-
+            // for integer index, get_func fills out 'buffer' and makes str point at it
             char buffer[8];
             StringData str = (*get_func)(column, row_ref, buffer);
             if (str == value) {
@@ -3055,6 +3055,7 @@ top:
                 // If the last byte in the stored key is not zero, we have
                 // not yet compared against the entire (target) string
                 if ((stored_key << 24)) {
+                    // for integer index, get_func fills out 'buffer' and makes str point at it
                     char buffer[8];
                     StringData str = (*get_func)(column, first_row_ref, buffer);
                     if (str != value) {
@@ -3090,6 +3091,7 @@ top:
                 // If the last byte in the stored key is not zero, we have
                 // not yet compared against the entire (target) string
                 if ((stored_key << 24)) {
+                    // for integer index, get_func fills out 'buffer' and makes str point at it
                     char buffer[8];
                     StringData str = (*get_func)(column, first_row_ref, buffer);
                     if (str != value)

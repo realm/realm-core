@@ -364,6 +364,7 @@ bool StringIndex::LeafInsert(size_t row_ndx, key_type key, size_t offset, String
     // Single match (lowest bit set indicates literal row_ndx)
     if (slot_value % 2 != 0) {
         size_t row_ndx2 = to_size_t(slot_value / 2);
+        // for integer index, get_func fills out 'buffer' and makes str point at it
         char buffer[8];
         StringData v2 = get(row_ndx2, buffer);
         if (v2 == value) {
@@ -394,6 +395,7 @@ bool StringIndex::LeafInsert(size_t row_ndx, key_type key, size_t offset, String
         sub.set_parent(m_array, ins_pos_refs);
 
         size_t r1 = to_size_t(sub.get(0));
+        // for integer index, get_func fills out 'buffer' and makes str point at it
         char buffer[8];
         StringData v2 = get(r1, buffer);
         if (v2 == value) {

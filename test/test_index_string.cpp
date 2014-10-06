@@ -648,8 +648,6 @@ TEST(StringIndex_Set_Add_Erase_Insert_Int)
     f = ndx.find_first(int64_t(2));
     CHECK_EQUAL(3, f);
 
-    size_t t = col.size();
-
     col.add(7);
     col.set(4, 10);
 

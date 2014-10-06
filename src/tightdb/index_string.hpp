@@ -27,6 +27,8 @@
 
 namespace tightdb {
 
+// to_str() is used by the integer index. The existing StringIndex is re-used for this
+// by making Column convert its integers to strings by calling to_str().
 template <class T> inline StringData to_str(T& value)
 {
     TIGHTDB_STATIC_ASSERT((util::SameType<T, int64_t>::value), "");
@@ -253,6 +255,11 @@ inline void StringIndex::set_allow_duplicate_values(bool allow) TIGHTDB_NOEXCEPT
     m_deny_duplicate_values = !allow;
 }
 
+// Byte order of the key is *reversed*, so that for the integer index, the least significant
+// byte comes first, so that it fits little-endian machines. That way we can perform fast 
+// range-lookups and iterate in order, etc, as future features. This, however, makes the same
+// features slower for string indexes. Todo, we should reverse the order conditionally, depending
+// on the column type.
 inline StringIndex::key_type StringIndex::create_key(StringData str) TIGHTDB_NOEXCEPT
 {
     key_type key = 0;
