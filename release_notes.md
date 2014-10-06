@@ -7,6 +7,7 @@
 ### API breaking changes:
 
 * Now supports index on integer columns; API is the same as for String index
+* `Query::tableview()` removed as it might lead to wrong results - e.g., when sorting a sorted tableview.
 
 ### Enhancements:
 
