@@ -369,35 +369,17 @@ private:
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
 
-    class TransactLogRegistry {
-    public:
-        /// Get all transaction logs between the specified versions. The number
-        /// of requested logs is exactly `to_version - from_version`. If this
-        /// number is greater than zero, the first requested log is the one that
-        /// brings the database from `from_version` to `from_version +
-        /// 1`. References to the requested logs are store in successive entries
-        /// of `logs_buffer`. The calee retains ownership of the memory
-        /// referenced by those entries.
-        virtual void get_commit_entries(uint_fast64_t from_version, uint_fast64_t to_version,
-                         BinaryData* logs_buffer) TIGHTDB_NOEXCEPT = 0;
-
-        /// Declare no further interest in the transaction logs between the
-        /// specified versions.
-        virtual void release_commit_entries(uint_fast64_t to_version) TIGHTDB_NOEXCEPT = 0;
-        virtual ~TransactLogRegistry() {}
-    };
-
     // Advance the current read transaction to include latest state.
     // All accessors are retained and synchronized to the new state
     // according to the (to be) defined operational transform.
-    void advance_read(TransactLogRegistry& write_logs);
+    void advance_read();
 
     // Promote the current read transaction to a write transaction.
     // CAUTION: This also synchronizes with latest state of the database,
     // including synchronization of all accessors.
     // FIXME: A version of this which does NOT synchronize with latest
     // state will be made available later, once we are able to merge commits.
-    void promote_to_write(TransactLogRegistry& write_logs);
+    void promote_to_write();
 
     // End the current write transaction and transition atomically into
     // a read transaction, WITHOUT synchronizing to external changes
