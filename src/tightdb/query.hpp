@@ -69,9 +69,6 @@ public:
     Query& expression(Expression* compare, bool auto_delete = false);
     Expression* get_expression();
 
-    // Conditions: Query only rows contained in tv
-    Query& tableview(TableView& tv); // throws
-
     // Find links that point to a specific target row 
 
     // Find links that point to a specific target row 
