@@ -38,7 +38,7 @@ typedef uint_fast64_t version_type;
 class WriteLogRegistry
 {
     struct CommitEntry { std::size_t sz; char* data; };
-    enum InterestKind { InterestTerminator = -1, InterestInUse = -2, InterestBad = -3 };
+    enum InterestKind { InterestTerminator = -1, InterestInUse = -2 };
     struct Interest {
         version_type last_seen_version; 
         int next_free_entry; // InterestKind or number of next entry on free list
@@ -46,11 +46,12 @@ class WriteLogRegistry
 public:
     WriteLogRegistry();
     ~WriteLogRegistry();
-  
+
+    void reset_log_management();
     void add_commit(version_type version, char* data, std::size_t sz);
     void get_commit_entries(int interest_registration_id, version_type from, 
                             version_type to, BinaryData* commits) TIGHTDB_NOEXCEPT;
-    int register_interest(); 
+    int register_interest(version_type last_seen_version_number); 
     void unregister_interest(int interest_registration_id);
     void release_commit_entries(int interest_registration_id, 
                                 version_type to) TIGHTDB_NOEXCEPT;
@@ -124,6 +125,31 @@ WriteLogRegistry::~WriteLogRegistry()
     }
 }
 
+
+void WriteLogRegistry::reset_log_management()
+{
+    // Clear out all interests:
+    for (size_t interest_id = 0; interest_id < m_interests.size(); ++interest_id) {
+        m_interests[interest_id].next_free_entry = interest_id - 1; // use that -1 is terminator
+    }
+    m_interest_free_list = m_interests.size()-1;
+    m_laziest_reader = -1;
+
+    if (m_oldest_version) {
+        // clear all old commits:
+        for (version_type version = m_oldest_version; version <= m_newest_version; ++version) {
+            size_t idx = to_index(version);
+            if (m_commits[idx].data)
+                delete[] m_commits[idx].data;
+            m_commits[idx].data = 0;
+            m_commits[idx].sz = 0;
+        }
+        m_newest_version = 0;
+        m_oldest_version = 0;
+    } 
+}
+
+
 void WriteLogRegistry::add_commit(version_type version, char* data, std::size_t sz)
 {
     util::LockGuard lock(m_mutex);
@@ -136,46 +162,6 @@ void WriteLogRegistry::add_commit(version_type version, char* data, std::size_t 
         cleanup();
     }
 
-    if (version != 1 + m_newest_version && version == 2) {
-
-        // special case: we are seing a commit "going back in time" to the very
-        // first version number (2). This is possible due to lack of full synchronization
-        // between shared groups and the write log registry. We accept the validity
-        // of the new version, clean out old commits and reinitializes [1]. Unfortunately,
-        // this situation may arise in a context where both stale interests and new valid 
-        // interests are registered. We run through the registered interests and invalidate
-        // all that claims to have seen a version which is now lying in the future.
-        // This (in turn) allows us to signal an error later if one of these commits are
-        // requested. This is not a perfect strategy: Stale interests which have never
-        // advanced their version number cannot be distinguished from valid newly arrived
-        // interests, so some possible errors will not be reported.
-        //
-        // [1] This is valid because a reset of the versioning numbers can occur ONLY
-        // when the *first* instance of shared group is created, so by definition all
-        // earlier instances referring to the same database must have been deleted.
-        for (size_t interest_id = 0; interest_id < m_interests.size(); ++interest_id) {
-            if (m_interests[interest_id].next_free_entry == InterestInUse
-                && m_interests[interest_id].last_seen_version >= 2)
-            {
-                m_interests[interest_id].next_free_entry = InterestBad;
-            }
-        }
-
-        if (m_oldest_version) {
-            // clear all old commits:
-            for (version_type version = m_oldest_version; version <= m_newest_version; ++version) {
-                size_t idx = to_index(version);
-                if (m_commits[idx].data)
-                    delete[] m_commits[idx].data;
-                m_commits[idx].data = 0;
-                m_commits[idx].sz = 0;
-            }
-
-            // use cleanup to do the rest:
-            m_oldest_version = m_newest_version + 1;
-        } 
-        cleanup();
-    }
     if (!holds_some_commits()) {
         m_array_start = version;
         m_oldest_version = version;
@@ -188,15 +174,16 @@ void WriteLogRegistry::add_commit(version_type version, char* data, std::size_t 
     m_newest_version = version;
 }
     
-
-int WriteLogRegistry::register_interest()
+// FIXME: Reconsider if it should be possible or even required to indicate version number 
+// from which interest starts
+int WriteLogRegistry::register_interest(version_type last_seen_version_number)
 {
     util::LockGuard lock(m_mutex);
     unsigned int retval;
     if (m_interest_free_list != InterestTerminator) {
         retval = m_interest_free_list;
         m_interest_free_list = m_interests[m_interest_free_list].next_free_entry;
-        m_interests[retval].last_seen_version = 0;
+        m_interests[retval].last_seen_version = last_seen_version_number;
     } 
     else {
         Interest i;
@@ -205,8 +192,8 @@ int WriteLogRegistry::register_interest()
         retval = m_interests.size() -1;
     }
     m_interests[retval].next_free_entry = InterestInUse; // mark as in-use
-    // As we have seen NO versions yet, we must be definition be the laziest reader
-    m_laziest_reader = retval;
+    if (m_laziest_reader == -1 || m_interests[m_laziest_reader].last_seen_version > last_seen_version_number)
+        m_laziest_reader = retval;
     return retval;
 }
     
@@ -227,6 +214,7 @@ void WriteLogRegistry::get_commit_entries(int interest_registration_id, version_
     util::LockGuard lock(m_mutex);
     size_t dest_idx = 0;
     static_cast<void>(interest_registration_id);
+    TIGHTDB_ASSERT(interest_registration_id != -1);
     TIGHTDB_ASSERT(m_interests[interest_registration_id].next_free_entry == InterestInUse);
     TIGHTDB_ASSERT(from >= m_interests[interest_registration_id].last_seen_version);
     for (version_type version = from+1; version <= to; version++) {
@@ -374,34 +362,6 @@ void RegistryRegistry::remove(std::string filepath)
 
 RegistryRegistry globalRegistry;
 
-class TransactLogRegistryImpl : public LangBindHelper::TransactLogRegistry {
-private:
-    WriteLogRegistry* m_registry;
-    int m_interest_key;
-public:
-    TransactLogRegistryImpl(WriteLogRegistry* registry) : m_registry(registry)
-    {
-        m_interest_key = registry->register_interest();
-    }
-
-    ~TransactLogRegistryImpl()
-    {
-        m_registry->unregister_interest(m_interest_key);
-        m_registry = 0;
-    }
-
-    virtual void get_commit_entries(uint_fast64_t from_version, uint_fast64_t to_version,
-                                    BinaryData* logs_buffer) TIGHTDB_NOEXCEPT
-    {
-        m_registry->get_commit_entries(m_interest_key, from_version, to_version, logs_buffer);
-    }
-
-    virtual void release_commit_entries(uint_fast64_t to_version) TIGHTDB_NOEXCEPT
-    {
-        m_registry->release_commit_entries(m_interest_key, to_version);
-    }
-};
-
 
 
 } // anonymous namespace
@@ -415,9 +375,12 @@ namespace _impl {
 class WriteLogCollector : public Replication
 {
 public:
-    WriteLogCollector(std::string database_name, 
-		      WriteLogRegistry* registry);
-    ~WriteLogCollector() TIGHTDB_NOEXCEPT {};
+    WriteLogCollector(std::string database_name, WriteLogRegistry* registry);
+    ~WriteLogCollector() TIGHTDB_NOEXCEPT 
+    {
+        if (m_interest_key != -1)
+            m_registry->unregister_interest(m_interest_key);
+    };
     std::string do_get_database_path() TIGHTDB_OVERRIDE { return m_database_name; }
     void do_begin_write_transact(SharedGroup& sg) TIGHTDB_OVERRIDE;
     version_type do_commit_write_transact(SharedGroup& sg, version_type orig_version) TIGHTDB_OVERRIDE;
@@ -427,8 +390,26 @@ public:
     void do_transact_log_reserve(std::size_t sz) TIGHTDB_OVERRIDE;
     void do_transact_log_append(const char* data, std::size_t size) TIGHTDB_OVERRIDE;
     void transact_log_reserve(std::size_t n);
+    virtual void reset_log_management() TIGHTDB_OVERRIDE;
+    virtual void register_interest(uint_fast64_t last_seen_version_number) TIGHTDB_NOEXCEPT
+    {
+        TIGHTDB_ASSERT(m_interest_key == -1);
+        m_interest_key = m_registry->register_interest(last_seen_version_number);
+    }
+
+    virtual void get_commit_entries(uint_fast64_t from_version, uint_fast64_t to_version,
+                                    BinaryData* logs_buffer) TIGHTDB_NOEXCEPT
+    {
+        m_registry->get_commit_entries(m_interest_key, from_version, to_version, logs_buffer);
+    }
+
+    virtual void release_commit_entries(uint_fast64_t to_version) TIGHTDB_NOEXCEPT
+    {
+        m_registry->release_commit_entries(m_interest_key, to_version);
+    }
 protected:
     std::string m_database_name;
+    int m_interest_key;
     util::Buffer<char> m_transact_log_buffer;
     WriteLogRegistry* m_registry;
 };
@@ -438,7 +419,10 @@ protected:
 
 
 
-
+void WriteLogCollector::reset_log_management()
+{
+    m_registry->reset_log_management();
+}
 
 void WriteLogCollector::do_begin_write_transact(SharedGroup& sg)
 {
@@ -496,16 +480,12 @@ WriteLogCollector::WriteLogCollector(std::string database_name, WriteLogRegistry
 {
     m_database_name = database_name;
     m_registry = registry;
+    m_interest_key = -1;
 }
 
 } // namespace _impl
 
 
-
-LangBindHelper::TransactLogRegistry* getWriteLogs(std::string filepath)
-{
-    return new TransactLogRegistryImpl(globalRegistry.get(filepath));
-}
 
 
 Replication* makeWriteLogCollector(std::string database_name)

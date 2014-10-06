@@ -62,6 +62,33 @@ public:
 
     class Interrupted; // Exception
 
+    /// Reset transaction logs. To be called from SharedGroup iff it initializes the .lock file.
+    /// The caller guarantees that NO SharedGroup involved in access to the same database
+    /// will ask for logs through get_commit_entries *before* calling register_interest to
+    /// indicate which versions they will possibly ask for. Also it indicates that any pending
+    /// logs pertaining to the same database are stale and can be discarded.
+    /// The caller must have exclusive access to the database when this call is made.
+    virtual void reset_log_management() TIGHTDB_OVERRIDE;
+
+    /// Called by SharedGroup once a database file has been opened and the versioning information
+    /// obtained. Guarantees that any later call to get_commit_entries will ask for later versions only.
+    virtual void register_interest(uint_fast64_t last_seen_version_number) TIGHTDB_NOEXCEPT;
+
+    /// Get all transaction logs between the specified versions. The number
+    /// of requested logs is exactly `to_version - from_version`. If this
+    /// number is greater than zero, the first requested log is the one that
+    /// brings the database from `from_version` to `from_version +
+    /// 1`. References to the requested logs are store in successive entries
+    /// of `logs_buffer`. The calee retains ownership of the memory
+    /// referenced by those entries.
+    virtual void get_commit_entries(uint_fast64_t from_version, uint_fast64_t to_version,
+                                    BinaryData* logs_buffer) TIGHTDB_NOEXCEPT;
+
+    /// The caller indicates that she's finished reading from the commit logs handed
+    /// out by the last call to get_commit_entries, AND that further calls to get_commit_entries
+    /// will ask for later versions only.
+    virtual void release_commit_entries(uint_fast64_t to_version) TIGHTDB_NOEXCEPT;
+
     /// Acquire permision to start a new 'write' transaction. This
     /// function must be called by a client before it requests a
     /// 'write' transaction. This ensures that the local shared
@@ -537,6 +564,27 @@ inline std::string Replication::get_database_path()
 {
     return do_get_database_path();
 }
+
+inline void Replication::reset_log_management() TIGHTDB_OVERRIDE
+{
+}
+
+inline void Replication::register_interest(uint_fast64_t) TIGHTDB_NOEXCEPT
+{
+}
+
+inline void Replication::get_commit_entries(uint_fast64_t, uint_fast64_t, BinaryData*) TIGHTDB_NOEXCEPT
+{
+    // Unimplemented!
+    TIGHTDB_ASSERT(false);
+}
+
+inline void Replication::release_commit_entries(uint_fast64_t) TIGHTDB_NOEXCEPT
+{
+    // Unimplemented!
+    TIGHTDB_ASSERT(false);
+}
+
 
 
 inline void Replication::begin_write_transact(SharedGroup& sg)

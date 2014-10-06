@@ -637,7 +637,12 @@ void SharedGroup::open(const string& path, bool no_create_file,
             // Set initial version so we can track if other instances
             // change the db
             m_readlock.m_version = info->get_current_version_unchecked();
-
+#ifdef TIGHTDB_ENABLE_REPLICATION
+            // If replication is enabled, we need to reset log management:
+            Replication* repl = _impl::GroupFriend::get_replication(m_group);
+            if (repl)
+                repl->reset_log_management();
+#endif
 #ifndef _WIN32
             // In async mode we need a separate process to do the async commits
             // We start it up here during init so that it only get started once
@@ -751,6 +756,13 @@ void SharedGroup::open(const string& path, bool no_create_file,
         }
     }
 #endif
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    // If replication is enabled, we need to register our interest in future commits:
+    Replication* repl = _impl::GroupFriend::get_replication(m_group);
+    if (repl)
+        repl->register_interest(1);
+#endif
+
 }
 
 
@@ -762,9 +774,11 @@ void SharedGroup::open(Replication& repl)
     string file = repl.get_database_path();
     bool no_create   = false;
     DurabilityLevel dlevel = durability_Full;
-    open(file, no_create, dlevel); // Throws
+    // we must install replication in group before calling open,
+    // because open depends on it. FIXME.
     typedef _impl::GroupFriend gf;
     gf::set_replication(m_group, &repl);
+    open(file, no_create, dlevel); // Throws
 }
 
 #endif
@@ -1088,7 +1102,7 @@ void SharedGroup::end_read() TIGHTDB_NOEXCEPT
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
 
-void SharedGroup::promote_to_write(TransactLogRegistry& write_logs)
+void SharedGroup::promote_to_write()
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Reading);
 
@@ -1100,7 +1114,7 @@ void SharedGroup::promote_to_write(TransactLogRegistry& write_logs)
         repl->begin_write_transact(*this); // Throws
         try {
             do_begin_write();
-            advance_read(write_logs);
+            advance_read();
         }
         catch (...) {
             repl->rollback_write_transact(*this);
@@ -1114,18 +1128,19 @@ void SharedGroup::promote_to_write(TransactLogRegistry& write_logs)
     do_begin_write();
 
     // Advance to latest state (accessor update)
-    advance_read(write_logs);
+    advance_read();
     m_transact_stage = transact_Writing;
 }
 
 
-void SharedGroup::advance_read(TransactLogRegistry& log_registry)
+void SharedGroup::advance_read()
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Reading);
     TIGHTDB_ASSERT(!m_transactions_are_pinned);
 
     ReadLockInfo old_readlock = m_readlock;
     bool same_as_before;
+    Replication* repl = _impl::GroupFriend::get_replication(m_group);
 
     // advance current readlock while holding onto old one.
     grab_latest_readlock(m_readlock, same_as_before); // Throws
@@ -1151,14 +1166,13 @@ void SharedGroup::advance_read(TransactLogRegistry& log_registry)
     UniquePtr<BinaryData[]>
         logs(new BinaryData[m_readlock.m_version-old_readlock.m_version]); // Throws
 
-    log_registry.get_commit_entries(old_readlock.m_version,
-                                    m_readlock.m_version, logs.get());
+    repl->get_commit_entries(old_readlock.m_version, m_readlock.m_version, logs.get());
 
     m_group.advance_transact(m_readlock.m_top_ref, m_readlock.m_file_size,
                              logs.get(),
                              logs.get() + (m_readlock.m_version-old_readlock.m_version)); // Throws
 
-    log_registry.release_commit_entries(m_readlock.m_version);
+    repl->release_commit_entries(m_readlock.m_version);
 }
 
 #endif // TIGHTDB_ENABLE_REPLICATION
