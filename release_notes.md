@@ -6,7 +6,10 @@
 
 ### API breaking changes:
 
-* Lorem ipsum.
+* The replication class must now provide methods for accessing and
+  managing the replication logs. The TransactLogRegistry is no longer
+  available and need not be supplied to calls of advance_read or
+  promote_to_write.
 
 ### Enhancements:
 
