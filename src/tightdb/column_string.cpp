@@ -25,7 +25,9 @@ namespace {
 const size_t small_string_max_size  = 15; // ArrayString
 const size_t medium_string_max_size = 63; // ArrayStringLong
 
-// Getter function for string index
+// Getter function for index. For integer index, the caller must supply a buffer that we can store the 
+// extracted value in (it may be bitpacked, so we cannot return a pointer in to the Array as we do with 
+// String index).
 StringData get_string(void* column, size_t ndx, char*)
 {
     return static_cast<AdaptiveStringColumn*>(column)->get(ndx);

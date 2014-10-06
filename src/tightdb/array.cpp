@@ -2960,10 +2960,10 @@ const Array* Array::GetBlock(size_t ndx, Array& arr, size_t& off,
 
 template <IndexMethod method, class T> size_t Array::index_string(StringData value, Column& result, size_t &result_ref, void* column, StringGetter get_func) const
 {
-    bool first(method == index_find_first);
-    bool count(method == index_count);
-    bool all(method == index_find_all);
-    bool allnocopy(method == index_find_all_nocopy);
+    bool first(method == index_FindFirst);
+    bool count(method == index_Count);
+    bool all(method == index_FindAll);
+    bool allnocopy(method == index_FindAll_nocopy);
 
     StringData value_2 = value;
     const char* data = m_data;
@@ -3109,7 +3109,7 @@ top:
                 }
             }
 
-            TIGHTDB_ASSERT(method != index_find_all_nocopy);
+            TIGHTDB_ASSERT(method != index_FindAll_nocopy);
             return size_t(FindRes_column);
         }
 
@@ -3132,7 +3132,7 @@ size_t Array::IndexStringFindFirst(StringData value, void* column, StringGetter 
 {
     size_t dummy;
     Column dummycol;
-    return index_string<index_find_first, StringData>(value, dummycol, dummy, column, get_func);
+    return index_string<index_FindFirst, StringData>(value, dummycol, dummy, column, get_func);
 }
 
 
@@ -3140,14 +3140,14 @@ void Array::IndexStringFindAll(Column& result, StringData value, void* column, S
 {
     size_t dummy;
 
-    index_string<index_find_all, StringData>(value, result, dummy, column, get_func);
+    index_string<index_FindAll, StringData>(value, result, dummy, column, get_func);
 }
 
 
 FindRes Array::IndexStringFindAllNoCopy(StringData value, size_t& res_ref, void* column, StringGetter get_func) const
 {
     Column dummy;
-    return (FindRes)index_string<index_find_all_nocopy, StringData>(value, dummy, res_ref, column, get_func);
+    return (FindRes)index_string<index_FindAll_nocopy, StringData>(value, dummy, res_ref, column, get_func);
 }
 
 
@@ -3155,7 +3155,7 @@ size_t Array::IndexStringCount(StringData value, void* column, StringGetter get_
 {
     Column dummy;
     size_t dummysizet;
-    return index_string<index_count, StringData>(value, dummy, dummysizet, column, get_func);
+    return index_string<index_Count, StringData>(value, dummy, dummysizet, column, get_func);
 }
 
 

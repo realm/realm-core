@@ -14,7 +14,9 @@ using namespace tightdb::util;
 
 namespace {
 
-// Getter function for string index
+// Getter function for index. For integer index, the caller must supply a buffer that we can store the 
+// extracted value in (it may be bitpacked, so we cannot return a pointer in to the Array as we do with 
+// String index).
 StringData get_string(void* column, size_t ndx, char*)
 {
     return static_cast<ColumnStringEnum*>(column)->get(ndx);

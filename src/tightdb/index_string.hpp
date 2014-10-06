@@ -36,7 +36,7 @@ template <class T> inline StringData to_str(T& value)
     return StringData(c, sizeof(T));
 }
 
-template <> inline StringData to_str<StringData>(StringData& input)
+inline StringData to_str(StringData& input)
 {
     return input;
 }
@@ -58,40 +58,9 @@ public:
 
     bool is_empty() const;
 
-    template <class T> void insert(size_t row_ndx, T value, size_t num_rows, bool is_append)
-    {
-        // If the new row is inserted after the last row in the table, we don't need
-        // to adjust any row indexes.
-        if (!is_append) {
-            for (size_t i = 0; i < num_rows; ++i) {
-                size_t row_ndx_2 = row_ndx + i;
-                adjust_row_indexes(row_ndx_2, 1); // Throws
-            }
-        }
-
-        for (size_t i = 0; i < num_rows; ++i) {
-            size_t row_ndx_2 = row_ndx + i;
-            size_t offset = 0; // First key from beginning of string
-            insert_with_offset(row_ndx_2, to_str(value), offset); // Throws
-        }
-    }
-
-    template <class T> void set(size_t row_ndx, T new_value)
-    {
-        char buffer[sizeof(T)];
-        T old_value = get(row_ndx, buffer);
-        StringData new_value2 = to_str(new_value);
-
-        // Note that insert_with_offset() throws UniqueConstraintViolation.
-
-        if (TIGHTDB_LIKELY(new_value2 != old_value)) {
-            size_t offset = 0; // First key from beginning of string
-            insert_with_offset(row_ndx, new_value2, offset); // Throws
-
-            bool is_last = true; // To avoid updating refs
-            erase<T>(row_ndx, is_last); // Throws
-        }
-    }
+    template <class T> void insert(size_t row_ndx, T value, size_t num_rows, bool is_append);
+    template <class T> void set(size_t row_ndx, T new_value);
+    template <class T> void erase(size_t row_ndx, bool is_last);
 
     template <class T> size_t find_first(T value) const
     {
@@ -115,31 +84,6 @@ public:
     {
         // Use direct access method
         return m_array->IndexStringCount(to_str(value), m_target_column, m_get_func);
-    }
-
-    template <class T> void erase(size_t row_ndx, bool is_last)
-    {
-        char buffer[sizeof(T)];
-        T value = get(row_ndx, buffer);
-
-        DoDelete(row_ndx, to_str(value), 0);
-
-        // Collapse top nodes with single item
-        while (!root_is_leaf()) {
-            TIGHTDB_ASSERT(m_array->size() > 1); // node cannot be empty
-            if (m_array->size() > 2)
-                break;
-
-            ref_type ref = m_array->get_as_ref(1);
-            m_array->set(1, 1); // avoid destruction of the extracted ref
-            m_array->destroy_deep();
-            m_array->init_from_ref(ref);
-            m_array->update_parent();
-        }
-
-        // If it is last item in column, we don't have to update refs
-        if (!is_last)
-            adjust_row_indexes(row_ndx, -1);
     }
 
     template <class T> void update_ref(T value, size_t old_row_ndx, size_t new_row_ndx)
@@ -287,6 +231,65 @@ inline StringIndex::key_type StringIndex::create_key(StringData str) TIGHTDB_NOE
     return key;
 }
 
+template <class T> void StringIndex::insert(size_t row_ndx, T value, size_t num_rows, bool is_append)
+{
+    // If the new row is inserted after the last row in the table, we don't need
+    // to adjust any row indexes.
+    if (!is_append) {
+        for (size_t i = 0; i < num_rows; ++i) {
+            size_t row_ndx_2 = row_ndx + i;
+            adjust_row_indexes(row_ndx_2, 1); // Throws
+        }
+    }
+
+    for (size_t i = 0; i < num_rows; ++i) {
+        size_t row_ndx_2 = row_ndx + i;
+        size_t offset = 0; // First key from beginning of string
+        insert_with_offset(row_ndx_2, to_str(value), offset); // Throws
+    }
+}
+
+template <class T> void StringIndex::set(size_t row_ndx, T new_value)
+{
+    char buffer[sizeof(T)];
+    T old_value = get(row_ndx, buffer);
+    StringData new_value2 = to_str(new_value);
+
+    // Note that insert_with_offset() throws UniqueConstraintViolation.
+
+    if (TIGHTDB_LIKELY(new_value2 != old_value)) {
+        size_t offset = 0; // First key from beginning of string
+        insert_with_offset(row_ndx, new_value2, offset); // Throws
+
+        bool is_last = true; // To avoid updating refs
+        erase<T>(row_ndx, is_last); // Throws
+    }
+}
+
+template <class T> void StringIndex::erase(size_t row_ndx, bool is_last)
+{
+    char buffer[sizeof(T)];
+    T value = get(row_ndx, buffer);
+
+    DoDelete(row_ndx, to_str(value), 0);
+
+    // Collapse top nodes with single item
+    while (!root_is_leaf()) {
+        TIGHTDB_ASSERT(m_array->size() > 1); // node cannot be empty
+        if (m_array->size() > 2)
+            break;
+
+        ref_type ref = m_array->get_as_ref(1);
+        m_array->set(1, 1); // avoid destruction of the extracted ref
+        m_array->destroy_deep();
+        m_array->init_from_ref(ref);
+        m_array->update_parent();
+    }
+
+    // If it is last item in column, we don't have to update refs
+    if (!is_last)
+        adjust_row_indexes(row_ndx, -1);
+}
 
 } //namespace tightdb
 
