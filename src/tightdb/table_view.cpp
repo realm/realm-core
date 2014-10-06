@@ -283,7 +283,7 @@ bool TableViewBase::is_in_sync() const TIGHTDB_NOEXCEPT
     bool view = bool(m_query.m_view);
 
     return table && version
-        && (view ? static_cast<TableViewBase*>(m_query.m_view)->is_in_sync() : true);
+        && (view ? m_query.m_view->is_in_sync() : true);
 }
 
 void TableViewBase::sync_if_needed() const
