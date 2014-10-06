@@ -24,7 +24,7 @@ Array* StringIndex::create_node(Allocator& alloc, bool is_leaf)
 {
     Array::Type type = is_leaf ? Array::type_HasRefs : Array::type_InnerBptreeNode;
     UniquePtr<Array> top(new Array(alloc)); // Throws
-    top->create(type); // Throws LEAK
+    top->create(type); // Throws
 
     // Mark that this is part of index
     // (as opposed to columns under leaves)
@@ -32,7 +32,7 @@ Array* StringIndex::create_node(Allocator& alloc, bool is_leaf)
 
     // Add subcolumns for leaves
     Array values(alloc);
-    values.create(Array::type_Normal); // Throws LEAK
+    values.create(Array::type_Normal); // Throws
     values.ensure_minimum_width(0x7FFFFFFF); // This ensures 31 bits plus a sign bit
     top->add(values.get_ref()); // first entry in refs points to offsets
 
