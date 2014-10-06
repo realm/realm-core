@@ -5847,10 +5847,10 @@ TEST(LangBindHelper_RollbackAndContinueAsRead)
             LangBindHelper::promote_to_write(sg, *wlr);
             TableRef o = group->get_or_add_table("nullermand");
             TableRef o2 = group->get_table("nullermand");
-            TIGHTDB_ASSERT(o2 != 0);
+            TIGHTDB_ASSERT(o2);
             LangBindHelper::rollback_and_continue_as_read(sg);
             TableRef o3 = group->get_table("nullermand");
-            TIGHTDB_ASSERT(o3 == 0);
+            TIGHTDB_ASSERT(!o3);
             TIGHTDB_ASSERT(o2->is_attached() == false);
         }
 
@@ -5917,13 +5917,13 @@ TEST(LangBindHelper_RollbackAndContinueAsReadGroupLevelTableRemoval)
         // rollback of group level table delete
         LangBindHelper::promote_to_write(sg, *wlr);
         TableRef o2 = group->get_table("a_table");
-        TIGHTDB_ASSERT(o2 != 0);
+        TIGHTDB_ASSERT(o2);
         group->remove_table("a_table");
         TableRef o3 = group->get_table("a_table");
-        TIGHTDB_ASSERT(o3 == 0);
+        TIGHTDB_ASSERT(!o3);
         LangBindHelper::rollback_and_continue_as_read(sg);
         TableRef o4 = group->get_table("a_table");
-        TIGHTDB_ASSERT(o4 != 0);
+        TIGHTDB_ASSERT(o4);
     }
     group->Verify();
 }
