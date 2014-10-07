@@ -70,9 +70,13 @@ public:
     /// The caller must have exclusive access to the database when this call is made.
     virtual void reset_log_management() TIGHTDB_OVERRIDE;
 
-    /// Called by SharedGroup once a database file has been opened and the versioning information
-    /// obtained. Guarantees that any later call to get_commit_entries will ask for later versions only.
+    /// Called by SharedGroup during begin_read()
+    /// Guarantees that any later call to get_commit_entries will ask for later versions only.
     virtual void register_interest(uint_fast64_t last_seen_version_number) TIGHTDB_NOEXCEPT;
+
+    /// Called by SharedGroup during end_read()
+    /// Guarantees that the calling shared group has no further interests in commit logs.
+    virtual void unregister_interest() TIGHTDB_NOEXCEPT;
 
     /// Get all transaction logs between the specified versions. The number
     /// of requested logs is exactly `to_version - from_version`. If this
@@ -570,6 +574,10 @@ inline void Replication::reset_log_management() TIGHTDB_OVERRIDE
 }
 
 inline void Replication::register_interest(uint_fast64_t) TIGHTDB_NOEXCEPT
+{
+}
+
+inline void Replication::unregister_interest() TIGHTDB_NOEXCEPT
 {
 }
 

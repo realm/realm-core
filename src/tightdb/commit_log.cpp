@@ -376,11 +376,7 @@ class WriteLogCollector : public Replication
 {
 public:
     WriteLogCollector(std::string database_name, WriteLogRegistry* registry);
-    ~WriteLogCollector() TIGHTDB_NOEXCEPT 
-    {
-        if (m_interest_key != -1)
-            m_registry->unregister_interest(m_interest_key);
-    };
+    ~WriteLogCollector() TIGHTDB_NOEXCEPT;
     std::string do_get_database_path() TIGHTDB_OVERRIDE { return m_database_name; }
     void do_begin_write_transact(SharedGroup& sg) TIGHTDB_OVERRIDE;
     version_type do_commit_write_transact(SharedGroup& sg, version_type orig_version) TIGHTDB_OVERRIDE;
@@ -391,22 +387,11 @@ public:
     void do_transact_log_append(const char* data, std::size_t size) TIGHTDB_OVERRIDE;
     void transact_log_reserve(std::size_t n);
     virtual void reset_log_management() TIGHTDB_OVERRIDE;
-    virtual void register_interest(uint_fast64_t last_seen_version_number) TIGHTDB_NOEXCEPT
-    {
-        TIGHTDB_ASSERT(m_interest_key == -1);
-        m_interest_key = m_registry->register_interest(last_seen_version_number);
-    }
-
+    virtual void register_interest(uint_fast64_t last_seen_version_number) TIGHTDB_NOEXCEPT;
+    virtual void unregister_interest() TIGHTDB_NOEXCEPT;
     virtual void get_commit_entries(uint_fast64_t from_version, uint_fast64_t to_version,
-                                    BinaryData* logs_buffer) TIGHTDB_NOEXCEPT
-    {
-        m_registry->get_commit_entries(m_interest_key, from_version, to_version, logs_buffer);
-    }
-
-    virtual void release_commit_entries(uint_fast64_t to_version) TIGHTDB_NOEXCEPT
-    {
-        m_registry->release_commit_entries(m_interest_key, to_version);
-    }
+                                    BinaryData* logs_buffer) TIGHTDB_NOEXCEPT;
+    virtual void release_commit_entries(uint_fast64_t to_version) TIGHTDB_NOEXCEPT;
 protected:
     std::string m_database_name;
     int m_interest_key;
@@ -416,7 +401,36 @@ protected:
 
 
 
+WriteLogCollector::~WriteLogCollector() TIGHTDB_NOEXCEPT 
+{
+    if (m_interest_key != -1)
+        m_registry->unregister_interest(m_interest_key);
+}
 
+
+void WriteLogCollector::register_interest(uint_fast64_t last_seen_version_number) TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(m_interest_key == -1);
+    m_interest_key = m_registry->register_interest(last_seen_version_number);
+}
+
+void WriteLogCollector::unregister_interest() TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(m_interest_key != -1);
+    m_registry->unregister_interest(m_interest_key);
+    m_interest_key = -1;
+}
+
+void WriteLogCollector::get_commit_entries(uint_fast64_t from_version, uint_fast64_t to_version,
+                                           BinaryData* logs_buffer) TIGHTDB_NOEXCEPT
+{
+    m_registry->get_commit_entries(m_interest_key, from_version, to_version, logs_buffer);
+}
+
+void WriteLogCollector::release_commit_entries(uint_fast64_t to_version) TIGHTDB_NOEXCEPT
+{
+    m_registry->release_commit_entries(m_interest_key, to_version);
+}
 
 
 void WriteLogCollector::reset_log_management()

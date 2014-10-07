@@ -756,13 +756,6 @@ void SharedGroup::open(const string& path, bool no_create_file,
         }
     }
 #endif
-#ifdef TIGHTDB_ENABLE_REPLICATION
-    // If replication is enabled, we need to register our interest in future commits:
-    Replication* repl = _impl::GroupFriend::get_replication(m_group);
-    if (repl)
-        repl->register_interest(1);
-#endif
-
 }
 
 
@@ -1071,6 +1064,14 @@ const Group& SharedGroup::begin_read()
     }
     m_transact_stage = transact_Reading;
 
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    // If replication is enabled, we need to register our interest in future commits:
+    Replication* repl = _impl::GroupFriend::get_replication(m_group);
+    if (repl)
+        repl->register_interest(m_readlock.m_version);
+#endif
+
+
     return m_group;
 }
 
@@ -1087,6 +1088,13 @@ void SharedGroup::end_read() TIGHTDB_NOEXCEPT
 {
     if (!m_group.is_attached())
         return;
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    // If replication is enabled, we need to register our interest in future commits:
+    Replication* repl = _impl::GroupFriend::get_replication(m_group);
+    if (repl)
+        repl->unregister_interest();
+#endif
 
     TIGHTDB_ASSERT(m_transact_stage == transact_Reading);
     TIGHTDB_ASSERT(m_readlock.m_version != numeric_limits<size_t>::max());
