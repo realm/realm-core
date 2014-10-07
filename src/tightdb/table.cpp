@@ -1274,7 +1274,7 @@ void Table::add_search_index(size_t col_ndx)
         index.set_parent(&m_columns, column_pos+1);
         index_ref = index.get_ref();
     }
-    else if (type == col_type_Int) {
+    else if (type == col_type_Int || type == col_type_DateTime || type == col_type_Bool) {
         Column& col = get_column(col_ndx);
         col.create_search_index(); // Throws
         StringIndex& index = *static_cast<StringIndex*>(col.m_search_index);

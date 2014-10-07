@@ -1129,10 +1129,17 @@ TEST(Table_IndexStringTwice)
     CHECK_EQUAL(true, table.column().second.has_search_index());
 }
 
+
+// Tests Table part of index on Int, DateTime and Bool columns. For a more exhaustive 
+// test of the integer index (bypassing Table), see test_index_string.cpp)
 TEST(Table_IndexInteger)
 {
     Table table;
+    size_t r;
+
     table.add_column(type_Int, "ints");
+    table.add_column(type_DateTime, "date");
+    table.add_column(type_Bool, "date");
 
     table.add_empty_row(13);
 
@@ -1152,8 +1159,20 @@ TEST(Table_IndexInteger)
 
     table.add_search_index(0);
     CHECK(table.has_search_index(0));
+    table.add_search_index(1);
+    CHECK(table.has_search_index(1));
+    table.add_search_index(2);
+    CHECK(table.has_search_index(2));
 
-    size_t r = table.find_first_int(0, 11);
+    table.set_datetime(1, 10, DateTime(43));
+    r = table.find_first_datetime(1, DateTime(43));
+    CHECK_EQUAL(10, r);
+
+    table.set_bool(2, 11, true);
+    r = table.find_first_bool(2, true);
+    CHECK_EQUAL(11, r);
+
+    r = table.find_first_int(0, 11);
     CHECK_EQUAL(not_found, r);
 
     r = table.find_first_int(0, 3);
