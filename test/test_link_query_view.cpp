@@ -1048,7 +1048,7 @@ TEST(Link_FindNullLink)
 }
 
 // Tests queries on a LinkList
-ONLY(LinkList_QueryOnLinkList)
+TEST(LinkList_QueryOnLinkList)
 {
     Group group;
 
@@ -1087,9 +1087,14 @@ ONLY(LinkList_QueryOnLinkList)
     lvr->add(2);
 
     // Return all rows of table1 (the linked-to-table) that match the criteria and is in the LinkList
-    Query q = table2->where(lvr.get()).and_query(table1->column<Int>(0) > 100);
 
-    tv = q.find_all();
+    // q.m_table = table1
+    // q.m_view = lvr
+    Query q = table1->where(lvr.get()).and_query(table1->column<Int>(0) > 100);
+
+    // tv.m_table == table1
+    tv = q.find_all(); // tv = { 0, 2 }
+
     TableView tv2 = lvr->get_sorted_view(0);
 
     CHECK_EQUAL(3, tv2.size());
@@ -1105,9 +1110,10 @@ ONLY(LinkList_QueryOnLinkList)
     tv.sync_if_needed();
   
     // Modify the LinkList and see if sync_if_needed takes it in count
-    lvr->remove(2);
+    lvr->remove(2); // bumps version of table2 and only table2
     tv.sync_if_needed();
-    CHECK_EQUAL(1, tv.size());
+    
+    CHECK_EQUAL(1, tv.size()); // fail
     CHECK_EQUAL(0, tv.get_source_ndx(0));
     
     // Now test if changes in linked-to table bumps the version of the linked-from table and that 
