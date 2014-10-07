@@ -1064,14 +1064,6 @@ const Group& SharedGroup::begin_read()
     }
     m_transact_stage = transact_Reading;
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
-    // If replication is enabled, we need to register our interest in future commits:
-    Replication* repl = _impl::GroupFriend::get_replication(m_group);
-    if (repl)
-        repl->register_interest(m_readlock.m_version);
-#endif
-
-
     return m_group;
 }
 
@@ -1088,13 +1080,6 @@ void SharedGroup::end_read() TIGHTDB_NOEXCEPT
 {
     if (!m_group.is_attached())
         return;
-
-#ifdef TIGHTDB_ENABLE_REPLICATION
-    // If replication is enabled, we need to register our interest in future commits:
-    Replication* repl = _impl::GroupFriend::get_replication(m_group);
-    if (repl)
-        repl->unregister_interest();
-#endif
 
     TIGHTDB_ASSERT(m_transact_stage == transact_Reading);
     TIGHTDB_ASSERT(m_readlock.m_version != numeric_limits<size_t>::max());
@@ -1150,12 +1135,17 @@ void SharedGroup::advance_read()
     bool same_as_before;
     Replication* repl = _impl::GroupFriend::get_replication(m_group);
 
-    // advance current readlock while holding onto old one.
+    // advance current readlock while holding onto old one - we MUST hold onto
+    // the old readlock until after the call to advance_transact. Once a readlock
+    // is released, the release may propagate to the commit log management, causing
+    // it to reclaim memory for old commit logs. We must finished use of the commit log
+    // before allowing that to happen.
     grab_latest_readlock(m_readlock, same_as_before); // Throws
-    release_readlock(old_readlock);
 
-    if (same_as_before)
+    if (same_as_before) {
+        release_readlock(old_readlock);
         return;
+    }
 
     // If the new top-ref is zero, then the previous top-ref must have
     // been zero too, and we are still seing an empty TightDB file
@@ -1164,8 +1154,10 @@ void SharedGroup::advance_read()
     // retain the temporary arrays that were created earlier by
     // Group::init_for_transact() to put the group accessor into a
     // valid state.
-    if (m_readlock.m_top_ref == 0)
+    if (m_readlock.m_top_ref == 0) {
+        release_readlock(old_readlock);
         return;
+    }
 
     // We know that the log_registry already knows about the new_version,
     // because in order for us to get the new version when we grab the
@@ -1180,7 +1172,8 @@ void SharedGroup::advance_read()
                              logs.get(),
                              logs.get() + (m_readlock.m_version-old_readlock.m_version)); // Throws
 
-    repl->release_commit_entries(m_readlock.m_version);
+    // OK to release the readlock here:
+    release_readlock(old_readlock);
 }
 
 #endif // TIGHTDB_ENABLE_REPLICATION
@@ -1464,6 +1457,14 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
         r_info->readers.cleanup();
         const Ringbuffer::ReadCount& r = r_info->readers.get_oldest();
         readlock_version = r.version;
+#ifdef TIGHTDB_ENABLE_REPLICATION
+        // If replication is enabled, we need to propagate knowledge of the earliest 
+        // available version:
+        Replication* repl = _impl::GroupFriend::get_replication(m_group);
+        if (repl)
+            repl->set_oldest_version_needed(readlock_version);
+#endif
+
     }
 
     // Do the actual commit

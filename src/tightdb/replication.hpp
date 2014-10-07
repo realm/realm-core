@@ -70,13 +70,11 @@ public:
     /// The caller must have exclusive access to the database when this call is made.
     virtual void reset_log_management() TIGHTDB_OVERRIDE;
 
-    /// Called by SharedGroup during begin_read()
+    /// Called by SharedGroup during a write transaction, when readlocks are recycled, to
+    /// keep the commit log management in sync with what versions can possibly be interesting
+    /// in the futre.
     /// Guarantees that any later call to get_commit_entries will ask for later versions only.
-    virtual void register_interest(uint_fast64_t last_seen_version_number) TIGHTDB_NOEXCEPT;
-
-    /// Called by SharedGroup during end_read()
-    /// Guarantees that the calling shared group has no further interests in commit logs.
-    virtual void unregister_interest() TIGHTDB_NOEXCEPT;
+    virtual void set_oldest_version_needed(uint_fast64_t last_seen_version_number) TIGHTDB_NOEXCEPT;
 
     /// Get all transaction logs between the specified versions. The number
     /// of requested logs is exactly `to_version - from_version`. If this
@@ -87,11 +85,6 @@ public:
     /// referenced by those entries.
     virtual void get_commit_entries(uint_fast64_t from_version, uint_fast64_t to_version,
                                     BinaryData* logs_buffer) TIGHTDB_NOEXCEPT;
-
-    /// The caller indicates that she's finished reading from the commit logs handed
-    /// out by the last call to get_commit_entries, AND that further calls to get_commit_entries
-    /// will ask for later versions only.
-    virtual void release_commit_entries(uint_fast64_t to_version) TIGHTDB_NOEXCEPT;
 
     /// Acquire permision to start a new 'write' transaction. This
     /// function must be called by a client before it requests a
@@ -573,11 +566,7 @@ inline void Replication::reset_log_management() TIGHTDB_OVERRIDE
 {
 }
 
-inline void Replication::register_interest(uint_fast64_t) TIGHTDB_NOEXCEPT
-{
-}
-
-inline void Replication::unregister_interest() TIGHTDB_NOEXCEPT
+inline void Replication::set_oldest_version_needed(uint_fast64_t) TIGHTDB_NOEXCEPT
 {
 }
 
@@ -586,13 +575,6 @@ inline void Replication::get_commit_entries(uint_fast64_t, uint_fast64_t, Binary
     // Unimplemented!
     TIGHTDB_ASSERT(false);
 }
-
-inline void Replication::release_commit_entries(uint_fast64_t) TIGHTDB_NOEXCEPT
-{
-    // Unimplemented!
-    TIGHTDB_ASSERT(false);
-}
-
 
 
 inline void Replication::begin_write_transact(SharedGroup& sg)
