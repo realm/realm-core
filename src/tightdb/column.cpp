@@ -857,7 +857,7 @@ size_t Column::find_first(int64_t value, size_t begin, size_t end) const
     TIGHTDB_ASSERT(end == npos || (begin <= end && end <= size()));
 
     if (m_search_index && begin == 0 && end == npos)
-        static_cast<StringIndex*>(m_search_index)->find_first(value);
+        return static_cast<StringIndex*>(m_search_index)->find_first(value);
 
     if (root_is_leaf())
         return m_array->find_first(value, begin, end); // Throws (maybe)
