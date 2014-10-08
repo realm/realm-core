@@ -6074,6 +6074,11 @@ TEST(LangBindHelper_RollbackAndContinueAsReadLink)
     origin->set_link(0, 0, 1);
     LangBindHelper::rollback_and_continue_as_read(sg);
     CHECK_EQUAL(2, origin->get_link(0,0));
+    // verify that we can revert addition of a row in target table
+    LangBindHelper::promote_to_write(sg, *tlr);
+    target->add_empty_row();
+    LangBindHelper::rollback_and_continue_as_read(sg);
+    CHECK_EQUAL(2, origin->get_link(0,0));
 }
 
 TEST(LangBindHelper_RollbackAndContinueAsRead_MoveLastOverSubtables)
