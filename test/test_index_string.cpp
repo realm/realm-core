@@ -671,7 +671,7 @@ TEST(StringIndex_Set_Add_Erase_Insert_Int)
     col.destroy();
 }
 
-TEST(StringIndex_Set_Add_Erase_Insert_Int2)
+TEST(StringIndex_FuzzyTest_Int)
 {
     bool benchmark = false;
 
