@@ -273,7 +273,22 @@ void TableViewBase::row_to_string(size_t row_ndx, ostream& out) const
 
 uint64_t TableViewBase::outside_version() const
 {
-    return m_linkview_source ? m_linkview_source->get_origin_table().m_version : m_table->m_version;
+    // Return version of whatever this TableView depends on
+
+    LinkView* lvp = dynamic_cast<LinkView*>(m_query.m_view);
+    if (lvp) {
+        // This TableView was created by a Query that had a LinkViewRef inside its .where() clause
+        return lvp->get_origin_table().m_version;
+    }
+
+    if (m_linkview_source) {
+        // m_linkview_source is set if-and-only-if this TableView was created by LinkView::get_as_sorted_view()
+        return m_linkview_source->get_origin_table().m_version;
+    }
+    else {
+        // This TableView was created by a method directly on Table, such as Table::find_all(int64_t)
+        return m_table->m_version;
+    }
 }
 
 bool TableViewBase::is_in_sync() const TIGHTDB_NOEXCEPT
@@ -282,8 +297,7 @@ bool TableViewBase::is_in_sync() const TIGHTDB_NOEXCEPT
     bool version = bool(m_last_seen_version == outside_version());
     bool view = bool(m_query.m_view);
 
-    return table && version
-        && (view ? static_cast<TableViewBase*>(m_query.m_view)->is_in_sync() : true);
+    return table && version && (view ? m_query.m_view->is_in_sync() : true);
 }
 
 void TableViewBase::sync_if_needed() const
