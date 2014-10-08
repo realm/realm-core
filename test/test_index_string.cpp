@@ -219,7 +219,7 @@ TEST(StringIndex_Delete)
     col.erase(0, 0 == col.size()-1);
     col.erase(0, 0 == col.size()-1);
 #ifdef TIGHTDB_DEBUG
-    //CHECK(ndx.is_empty());
+    CHECK(ndx.is_empty());
 #endif
 
     // Clean up

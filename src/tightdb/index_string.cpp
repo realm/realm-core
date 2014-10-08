@@ -445,7 +445,7 @@ void StringIndex::distinct(Column& result) const
         for (size_t i = 1; i < count; ++i) {
             size_t ref = m_array->get_as_ref(i);
             StringIndex ndx(ref, 0, 0, m_target_column, m_get_func,
-                m_deny_duplicate_values, alloc);
+                            m_deny_duplicate_values, alloc);
             ndx.distinct(result);
         }
     }
@@ -462,7 +462,7 @@ void StringIndex::distinct(Column& result) const
                 // A real ref either points to a list or a subindex
                 if (Array::get_context_flag_from_header(alloc.translate(to_ref(ref)))) {
                     StringIndex ndx(to_ref(ref), m_array, i, m_target_column, m_get_func,
-                        m_deny_duplicate_values, alloc);
+                                    m_deny_duplicate_values, alloc);
                     ndx.distinct(result);
                 }
                 else {
