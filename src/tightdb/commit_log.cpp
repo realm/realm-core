@@ -35,224 +35,6 @@ using namespace tightdb;
 
 typedef uint_fast64_t version_type;
 
-class WriteLogRegistry
-{
-    struct CommitEntry { std::size_t sz; char* data; };
-public:
-    WriteLogRegistry();
-    ~WriteLogRegistry();
-
-    void reset_log_management();
-    void add_commit(version_type version, char* data, std::size_t sz);
-    void get_commit_entries(version_type from, version_type to, BinaryData* commits) TIGHTDB_NOEXCEPT;
-    void set_oldest_version_needed(version_type last_seen_version_number) TIGHTDB_NOEXCEPT;
-
-private:
-    // Get the index into the arrays for the selected version.
-    size_t to_index(version_type version) { 
-        TIGHTDB_ASSERT(version >= m_array_start);
-        return version - m_array_start; 
-    }
-    version_type to_version(size_t idx)   { return idx + m_array_start; }
-    bool holds_some_commits()             { return m_oldest_version != 0; }
-    bool is_a_known_commit(version_type version);
-
-    util::Mutex m_mutex;
-
-    // array holding all commits. Array start with version 'm_array_start',
-    std::vector<CommitEntry> m_commits;
-    version_type m_array_start;
-
-    // oldest and newest version stored - 0 in m_oldest_version indicates no versions stored
-    version_type m_oldest_version;
-    version_type m_newest_version;
-};
-
-
-bool WriteLogRegistry::is_a_known_commit(version_type version)
-{
-    return (holds_some_commits() && version >= m_oldest_version && version <= m_newest_version);
-}
-
-
-WriteLogRegistry::WriteLogRegistry()
-{
-    m_newest_version = 0;
-    m_oldest_version = 0;
-    // a version of 0 is never added, so having m_oldest_version==0 indicates
-    // that no versions are present.
-    m_array_start = 0;
-}
-
-
-WriteLogRegistry::~WriteLogRegistry()
-{
-    for (size_t i = 0; i < m_commits.size(); i++) {
-        if (m_commits[i].data) {
-            delete[] m_commits[i].data;
-            m_commits[i].data = 0;
-        }
-    }
-}
-
-
-void WriteLogRegistry::reset_log_management()
-{
-    if (m_oldest_version) {
-        // clear all old commits:
-        for (version_type version = m_oldest_version; version <= m_newest_version; ++version) {
-            size_t idx = to_index(version);
-            if (m_commits[idx].data)
-                delete[] m_commits[idx].data;
-            m_commits[idx].data = 0;
-            m_commits[idx].sz = 0;
-        }
-        m_newest_version = 0;
-        m_oldest_version = 0;
-    }
-}
-
-
-void WriteLogRegistry::add_commit(version_type version, char* data, std::size_t sz)
-{
-    util::LockGuard lock(m_mutex);
-
-    if (!holds_some_commits()) {
-        m_array_start = version;
-        m_oldest_version = version;
-    }
-    else {
-        TIGHTDB_ASSERT(version == 1 + m_newest_version);
-    }
-    CommitEntry ce = { sz, data };
-    m_commits.push_back(ce);
-    m_newest_version = version;
-}
-
-
-
-void WriteLogRegistry::get_commit_entries(version_type from, 
-                                          version_type to, BinaryData* commits) TIGHTDB_NOEXCEPT
-{
-    util::LockGuard lock(m_mutex);
-    size_t dest_idx = 0;
-    for (version_type version = from+1; version <= to; version++) {
-        TIGHTDB_ASSERT(is_a_known_commit(version));
-        size_t idx = to_index(version);
-        TIGHTDB_ASSERT(idx < m_commits.size());
-        WriteLogRegistry::CommitEntry* entry = & m_commits[ idx ];
-        commits[dest_idx] = BinaryData(entry->data, entry->sz);
-        dest_idx++;
-    }
-}
-
-
-void WriteLogRegistry::set_oldest_version_needed(version_type last_seen_version_number) TIGHTDB_NOEXCEPT
-{
-    util::LockGuard lock(m_mutex);
-
-    // bail out early if no versions are stored
-    if (! holds_some_commits()) return;
-
-    version_type last_to_clean = last_seen_version_number;
-    // do the actual cleanup, releasing commits in range [m_oldest_version .. last_to_clean]:
-    for (version_type version = m_oldest_version; version <= last_to_clean; version++) {
-        size_t idx = to_index(version);
-        if (m_commits[idx].data)
-            delete[] m_commits[idx].data;
-        m_commits[idx].data = 0;
-        m_commits[idx].sz = 0;
-    }
-
-    // realign or clear array of commits:
-    if (last_to_clean == m_newest_version) {
-        // special case: all commits have been released
-        m_oldest_version = 0;
-        m_array_start = 0;
-        m_commits.resize(0);
-    } 
-    else {
-        // some commits must be retained.
-        m_oldest_version = last_to_clean + 1;
-
-        if (to_index(m_oldest_version) > (m_commits.size() >> 1)) {
-            // more than half of the commit array is free, so we'll
-            // shift contents down and resize the array.
-
-            size_t begin = to_index(m_oldest_version);
-            size_t end = to_index(m_newest_version) + 1;
-
-            std::copy(m_commits.begin() + begin,
-                      m_commits.begin() + end,
-                      m_commits.begin());
-            m_commits.resize(m_newest_version - m_oldest_version + 1);
-            m_array_start = m_oldest_version;
-        }
-    }
-}
-
-
-
-
-
-
-
-class RegistryRegistry {
-public:
-    WriteLogRegistry* get(std::string filepath);
-    void add(std::string filepath, WriteLogRegistry* registry);
-    void remove(std::string filepath);
-    ~RegistryRegistry();
-private:
-    util::Mutex m_mutex;
-    std::map<std::string, WriteLogRegistry*> m_registries;
-};
-
-
-WriteLogRegistry* RegistryRegistry::get(std::string filepath)
-{
-    util::LockGuard lock(m_mutex);
-    std::map<std::string, WriteLogRegistry*>::iterator iter;
-    iter = m_registries.find(filepath);
-    if (iter != m_registries.end())
-        return iter->second;
-    WriteLogRegistry* result = new WriteLogRegistry;
-    m_registries[filepath] = result;
-    return result;
-}
-
-RegistryRegistry::~RegistryRegistry()
-{
-    std::map<std::string, WriteLogRegistry*>::iterator iter;
-    iter = m_registries.begin();
-    while (iter != m_registries.end()) {
-        delete iter->second;
-        iter->second = 0;
-        ++iter;
-    }
-}
-
-void RegistryRegistry::add(std::string filepath, WriteLogRegistry* registry)
-{
-    util::LockGuard lock(m_mutex);
-    m_registries[filepath] = registry;
-}
-
-
-void RegistryRegistry::remove(std::string filepath)
-{
-    util::LockGuard lock(m_mutex);
-    m_registries.erase(filepath);
-}
-
-
-RegistryRegistry globalRegistry;
-
-
-
-} // anonymous namespace
-
-
 namespace tightdb {
 
 
@@ -278,40 +60,69 @@ public:
                                     BinaryData* logs_buffer) TIGHTDB_NOEXCEPT;
 protected:
     std::string m_database_name;
-    util::Buffer<char> m_transact_log_buffer;
-    WriteLogRegistry* m_registry;
 };
 
 
+// Design of the commit logs:
+//
+// We use two files to hold the commit logs. Using two files allows us to append data to the
+// end of one of the files, instead of doing complex memory management. Initially, both files
+// hold only a header, and one of them is designated 'active'. New commit logs are appended
+// to the active file. Each file holds a consecutive range of commits, the active file holding
+// the latest commits.
+//
+// Calls to set_oldest_version_needed checks if the non-active file holds stale commit logs only.
+// If so, the non-active file is reset and becomes active instead.
+//
+// Filesizes are determined by heuristics. When a file runs out of size, its size is doubled.
+// When changing the active file, the new file is reset to 1/4 of the current total size, thus gradually
+// decreasing file sizes (until a minimum limit is reached). A commit log entry is never split
+// between the files.
+//
+// Calls to get_commit_entries determines which file(s) needs to be accessed, maps them to
+// memory and builds a vector of BinaryData with pointers to the buffers. The pointers may
+// end up going to both mappings/files.
+//
+// Layout of the commit logs preamble:
+struct CommitLogPreample {
+    size_t write_offset; // value always kept aligned to size_t
+    size_t begin_commit;
+    size_t end_commit; // if end_commit == begin_commit, the file is (logically) empty.
+    size_t data_area_start;
+};
+// Each of the actual logs are preceded by their size (in size_t format), and each log start
+// aligned to size_t (required on some architectures). The size does not count any padding
+// needed at the end of each log.
 
 WriteLogCollector::~WriteLogCollector() TIGHTDB_NOEXCEPT 
 {
 }
 
+void WriteLogCollector::reset_log_management()
+{
+    // this call is only made on the replication object associated with the *first* SharedGroup
+    // it must (re)initialize the log files. It does not change the content of any already existing
+    // files, but instead deletes and re-creates the files.
+    // it also clears the memory mappings set for the files.
+}
+
 
 void WriteLogCollector::set_oldest_version_needed(uint_fast64_t last_seen_version_number) TIGHTDB_NOEXCEPT
 {
-    m_registry->set_oldest_version_needed(last_seen_version_number);
+    // this call should only update in-file information, possibly recycling file usage
+    // if a file holds only versions before last_seen_version_number, it can be recycled.
+    // recycling is done by writing a new preamble and choosing an initial size of 1/4 of
+    // the sum of the two file sizes.
+    // it also clears the memory mappings set for the files.
 }
 
 
 void WriteLogCollector::get_commit_entries(uint_fast64_t from_version, uint_fast64_t to_version,
                                            BinaryData* logs_buffer) TIGHTDB_NOEXCEPT
 {
-    m_registry->get_commit_entries(from_version, to_version, logs_buffer);
-}
-
-
-void WriteLogCollector::reset_log_management()
-{
-    m_registry->reset_log_management();
-}
-
-void WriteLogCollector::do_begin_write_transact(SharedGroup& sg)
-{
-    static_cast<void>(sg);
-    m_transact_log_free_begin = m_transact_log_buffer.data();
-    m_transact_log_free_end   = m_transact_log_free_begin + m_transact_log_buffer.size();
+    // - make sure the files are open and mapped, possibly update stale mappings
+    // - for each requested version
+    //   - add ref to a vector
 }
 
 
@@ -319,12 +130,25 @@ WriteLogCollector::version_type
 WriteLogCollector::do_commit_write_transact(SharedGroup& sg, 
 	WriteLogCollector::version_type orig_version)
 {
+    // determine which file is the one to append to.
+    // resize it as needed.
+    // change the mapping to match if needed.
+    // copy the log to the end of memory area
+    // update metadata making the new log entry visible to readers
     static_cast<void>(sg);
     char* data     = m_transact_log_buffer.release();
     std::size_t sz = m_transact_log_free_begin - data;
     version_type new_version = orig_version + 1;
     m_registry->add_commit(new_version, data, sz);
     return new_version;
+}
+
+
+void WriteLogCollector::do_begin_write_transact(SharedGroup& sg)
+{
+    static_cast<void>(sg);
+    m_transact_log_free_begin = m_transact_log_buffer.data();
+    m_transact_log_free_end   = m_transact_log_free_begin + m_transact_log_buffer.size();
 }
 
 
