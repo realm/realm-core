@@ -57,6 +57,13 @@ public:
     void move_last_over(std::size_t, std::size_t) TIGHTDB_OVERRIDE;
     void clear() TIGHTDB_OVERRIDE;
 
+    void erase_cascade(std::size_t, std::size_t, cascade_rows&) const TIGHTDB_OVERRIDE;
+    void clear_cascade(std::size_t, std::size_t, cascade_rows&) const TIGHTDB_OVERRIDE;
+
+    /// Like erase_cascade() but this one is called when only a single link in
+    /// the list as about to be broken.
+    void erase_cascade_single(std::size_t row_ndx, std::size_t link_ndx, cascade_rows& rows) const;
+
     /// Compare two columns for equality.
     bool compare_link_list(const ColumnLinkList&) const;
 
@@ -106,6 +113,11 @@ private:
     // ArrayParent overrides
     void update_child_ref(std::size_t child_ndx, ref_type new_ref) TIGHTDB_OVERRIDE;
     ref_type get_child_ref(std::size_t child_ndx) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+
+    void erase_cascade_2(const Array& link_list_root, std::size_t target_table_ndx,
+                         std::size_t stop_on_table_ndx, cascade_rows&) const;
+    void erase_cascade_3(const Array& link_list_leaf, std::size_t target_table_ndx,
+                         std::size_t stop_on_table_ndx, cascade_rows&) const;
 
     void discard_child_accessors() TIGHTDB_NOEXCEPT;
 

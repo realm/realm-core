@@ -40,7 +40,7 @@ namespace _impl { class DescriptorFriend; }
 /// changed. Accessors can become detached, see is_attached() for more
 /// on this. The descriptor itself is stored inside the database file,
 /// or elsewhere in case of a free-standing table or a table in a
-/// free-stading group.
+/// free-standing group.
 ///
 /// The dynamic type consists first, and foremost of an ordered list
 /// of column descriptors. Each column descriptor specifies the name
@@ -96,7 +96,7 @@ public:
     /// \sa Table::add_column()
     std::size_t add_column(DataType type, StringData name, DescriptorRef* subdesc = 0);
 
-    /// Insert a new column into all the tables associated wiuth this
+    /// Insert a new column into all the tables associated with this
     /// descriptor. If any of the tables are not empty, the new column will be
     /// filled with the default value associated with the specified type. This
     /// function cannot be used to insert link-type columns. For that, you have
@@ -110,7 +110,7 @@ public:
     ///
     /// \param subdesc If a non-null pointer is passed, and the
     /// specified type is `type_Table`, then this function
-    /// automatically reteives the descriptor associated with the new
+    /// automatically retrieves the descriptor associated with the new
     /// subtable column, and stores a reference to its accessor in
     /// `*subdesc`.
     ///
@@ -121,15 +121,22 @@ public:
                        DescriptorRef* subdesc = 0);
 
     //@{
-    /// Add link-type columns to group-level tables. It is not possible to add
+    /// Add a link-type column to a group-level table. It is not possible to add
     /// link-type columns to tables that are not group-level tables. These
     /// functions must be used in place of the ones without the `_link` suffix
     /// when the column type is `type_Link` or `type_LinkList`. A link-type
     /// column is associated with a particular target table. All links in a
     /// link-type column refer to rows in the target table of that column. The
     /// target table must also be a group-level table.
-    std::size_t add_column_link(DataType type, StringData name, Table& target);
-    void insert_column_link(std::size_t column_ndx, DataType type, StringData name, Table& target);
+    ///
+    /// \param link_type See set_link_type().
+    ///
+    /// \sa Table::add_column_link()
+    /// \sa Table::insert_column_link()
+    std::size_t add_column_link(DataType type, StringData name, Table& target,
+                                LinkType = link_Weak);
+    void insert_column_link(std::size_t column_ndx, DataType type, StringData name, Table& target,
+                            LinkType = link_Weak);
     //@}
 
     /// Remove the specified column from each of the associated
@@ -169,6 +176,69 @@ public:
     /// \sa Table::rename_column()
     void rename_column(std::size_t column_ndx, StringData new_name);
 
+    /// There are two kinds of links, 'weak' and 'strong'. A strong link is one
+    /// that implies ownership, i.e., that the origin row (parent) owns the
+    /// target row (child). Simply stated, this means that when the origin row
+    /// (parent) is removed, so is the target row (child). If there are multiple
+    /// strong links to a target row, the origin rows share ownership, and the
+    /// target row is removed when the last owner disappears. Weak links do not
+    /// imply ownership, and will be nullified or removed when the target row
+    /// disappears.
+    ///
+    /// To put this in precise terms; when a strong link is broken, and the
+    /// target row has no other strong links to it, the target row is removed. A
+    /// row that is implicitly removed in this way, is said to be
+    /// *cascade-removed*. When a weak link is broken, nothing is
+    /// cascade-removed.
+    ///
+    /// A link is considered broken if
+    ///
+    ///  - the link is nullified, removed, or replaced by a different link
+    ///    (Table::nullify_link(), Table::set_link(), LinkView::remove_link(),
+    ///    LinkView::set_link(), LinkView::clear()), or if
+    ///
+    ///  - the origin row is explicitly removed (Table::remove()), or if
+    ///
+    ///  - the origin row is cascade-removed.
+    ///
+    /// Note that if a link is replaced by itself (a link to the same target
+    /// row), then the link is *not* considered broken, and no rows will be
+    /// cascade-removed by such an operation.
+    ///
+    /// When a row is explicitly removed (such as by Table::remove()), all links
+    /// to it are automatically removed or nullified. For single link columns
+    /// (type_Link), links to the removed row are nullified. For link list
+    /// columns (type_LinkList), links to the removed row are removed from the
+    /// list.
+    ///
+    /// When a row is cascade-removed there can no longer be any strong links to it,
+    /// but if there are any weak links, they will be removed or nullified.
+    ///
+    /// It is important to understand that this cascade-removal scheme is too
+    /// simplistic to enable detection and removal of orphaned link-cycles. In
+    /// this respect, it suffers from the same limitations as a reference
+    /// counting scheme generally does.
+    ///
+    /// It is also important to understand, that the possible presence of link
+    /// cycles can cause a row to be cascade-removed as a consequence of being
+    /// modified. This happens, for example, if two rows, A and B, have strong
+    /// links to each other, and there are no other strong links to either of
+    /// them. In this case, if A->B is changed to A->C, then both A and B will
+    /// be cascade-removed. This can lead to obscure bugs in some applications,
+    /// such as in the following case:
+    ///
+    ///     table.set_link(col_ndx_1, row_ndx, ...);
+    ///     table.set_int(col_ndx_2, row_ndx, ...); // Oops, `row_ndx` may no longer refer to the same row
+    ///
+    /// To be safe, applications, that may encounter cycles, are advised to
+    /// adopt the following pattern:
+    ///
+    ///     Row row = table[row_ndx];
+    ///     row.set_link(col_ndx_1, ...);
+    ///     if (row)
+    ///         row.set_int(col_ndx_2, ...); // Ok, because we check whether the row has disappeared
+    void set_link_type(std::size_t column_ndx, LinkType);
+
     //@{
     /// Get the descriptor for the specified subtable column.
     ///
@@ -192,7 +262,7 @@ public:
     //@{
     /// Returns the parent table descriptor, if any.
     ///
-    /// If this descriptor is the *root destriptor*, then this
+    /// If this descriptor is the *root descriptor*, then this
     /// function returns null. Otherwise it returns the accessor of
     /// the parent descriptor.
     ///
@@ -213,7 +283,7 @@ public:
     /// Is this a root descriptor?
     ///
     /// Descriptors of tables with independent dynamic type are root
-    /// destriptors. Root descriptors are never shared. Tables that
+    /// descriptors. Root descriptors are never shared. Tables that
     /// are direct members of groups have independent dynamic
     /// types. The same is true for free-standing tables and subtables
     /// in columns of type 'mixed'.
@@ -226,9 +296,9 @@ public:
     ///
     /// A type descriptor can even be shared by subtables with
     /// different parent tables, but only if the parent tables
-    /// themselves have a shared type descritpor. For examaple, if a
+    /// themselves have a shared type descriptor. For example, if a
     /// table has a column `foo` of type 'table', and each of the
-    /// subtables in `foo` havs a column `bar` of type 'table', then
+    /// subtables in `foo` has a column `bar` of type 'table', then
     /// all the subtables in all the `bar` columns share the same
     /// dynamic type descriptor.
     ///
@@ -237,7 +307,7 @@ public:
 
     /// Determine whether this accessor is still attached.
     ///
-    /// A table descriptor accesor may get detached from the
+    /// A table descriptor accessor may get detached from the
     /// underlying descriptor for various reasons (see below). When it
     /// does, it no longer refers to that descriptor, and can no
     /// longer be used, except for calling is_attached(). The
@@ -260,7 +330,7 @@ public:
     /// and only if they contain the same number of columns, and each
     /// corresponding pair of columns have the same name and type.
     ///
-    /// The consequences of comparing a deatched descriptor are
+    /// The consequences of comparing a detached descriptor are
     /// undefined.
     bool operator==(const Descriptor&) const TIGHTDB_NOEXCEPT;
     bool operator!=(const Descriptor&) const TIGHTDB_NOEXCEPT;
@@ -288,7 +358,7 @@ private:
     // overlap in time, then they will all refer to the same
     // descriptor object.
     //
-    // It also enables the necessary resursive detaching of descriptor
+    // It also enables the necessary recursive detaching of descriptor
     // objects.
     struct subdesc_entry {
         std::size_t m_column_ndx;
@@ -423,19 +493,20 @@ inline void Descriptor::insert_column(std::size_t column_ndx, DataType type, Str
         *subdesc = get_subdescriptor(column_ndx);
 }
 
-inline std::size_t Descriptor::add_column_link(DataType type, StringData name, Table& target)
+inline std::size_t Descriptor::add_column_link(DataType type, StringData name, Table& target,
+                                               LinkType link_type)
 {
     std::size_t column_ndx = m_spec->get_public_column_count();
-    insert_column_link(column_ndx, type, name, target); // Throws
+    insert_column_link(column_ndx, type, name, target, link_type); // Throws
     return column_ndx;
 }
 
 inline void Descriptor::insert_column_link(std::size_t column_ndx, DataType type, StringData name,
-                                           Table& target)
+                                           Table& target, LinkType link_type)
 {
-    typedef _impl::TableFriend tf;
     TIGHTDB_ASSERT(is_attached());
     TIGHTDB_ASSERT(column_ndx <= get_column_count());
+    typedef _impl::TableFriend tf;
     TIGHTDB_ASSERT(tf::is_link_type(ColumnType(type)));
     // Both origin and target must be group-level tables
     TIGHTDB_ASSERT(is_root() && get_root_table()->is_group_level());
@@ -443,21 +514,32 @@ inline void Descriptor::insert_column_link(std::size_t column_ndx, DataType type
 
     tf::insert_column(*this, column_ndx, type, name, &target); // Throws
     adj_insert_column(column_ndx);
+
+    tf::set_link_type(*get_root_table(), column_ndx, link_type); // Throws
 }
 
 inline void Descriptor::remove_column(std::size_t column_ndx)
 {
-    typedef _impl::TableFriend tf;
     TIGHTDB_ASSERT(is_attached());
+    typedef _impl::TableFriend tf;
     tf::erase_column(*this, column_ndx); // Throws
     adj_erase_column(column_ndx);
 }
 
 inline void Descriptor::rename_column(std::size_t column_ndx, StringData name)
 {
-    typedef _impl::TableFriend tf;
     TIGHTDB_ASSERT(is_attached());
+    typedef _impl::TableFriend tf;
     tf::rename_column(*this, column_ndx, name); // Throws
+}
+
+inline void Descriptor::set_link_type(std::size_t column_ndx, LinkType link_type)
+{
+    TIGHTDB_ASSERT(is_attached());
+    TIGHTDB_ASSERT(column_ndx <= get_column_count());
+    typedef _impl::TableFriend tf;
+    TIGHTDB_ASSERT(tf::is_link_type(ColumnType(get_column_type(column_ndx))));
+    tf::set_link_type(*get_root_table(), column_ndx, link_type); // Throws
 }
 
 inline ConstDescriptorRef Descriptor::get_subdescriptor(std::size_t column_ndx) const

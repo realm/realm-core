@@ -123,6 +123,113 @@ void ColumnLinkList::erase(size_t row_ndx, bool is_last)
 }
 
 
+void ColumnLinkList::erase_cascade(size_t row_ndx, size_t stop_on_table_ndx,
+                                   cascade_rows& rows) const
+{
+    if (m_weak_links)
+        return;
+
+    size_t target_table_ndx = m_target_table->get_index_in_group();
+    if (target_table_ndx == stop_on_table_ndx)
+        return;
+
+    // Avoid the construction of both a LinkView and a Column instance, since
+    // both would involve heap allocations.
+    ref_type ref = get_as_ref(row_ndx);
+    if (ref == 0)
+        return;
+    Array root(get_alloc());
+    root.init_from_ref(ref);
+    erase_cascade_2(root, target_table_ndx, stop_on_table_ndx, rows); // Throws
+}
+
+
+void ColumnLinkList::clear_cascade(size_t table_ndx, size_t num_rows, cascade_rows& rows) const
+{
+    if (m_weak_links)
+        return;
+
+    size_t target_table_ndx = m_target_table->get_index_in_group();
+    if (target_table_ndx == table_ndx)
+        return;
+
+    // Avoid the construction of both a LinkView and a Column instance, since
+    // both would involve heap allocations.
+    Array root(get_alloc());
+    for (size_t i = 0; i < num_rows; ++i) {
+        ref_type ref = get_as_ref(i);
+        if (ref == 0)
+            continue;
+        root.init_from_ref(ref);
+        erase_cascade_2(root, target_table_ndx, table_ndx, rows); // Throws
+    }
+}
+
+
+void ColumnLinkList::erase_cascade_single(size_t row_ndx, size_t link_ndx,
+                                          cascade_rows& rows) const
+{
+    if (m_weak_links)
+        return;
+
+    // Avoid the construction of both a LinkView and a Column instance, since
+    // both would involve heap allocations.
+    ref_type ref = get_as_ref(row_ndx);
+    TIGHTDB_ASSERT(ref != 0);
+    Array root(get_alloc());
+    root.init_from_ref(ref);
+    size_t target_row_ndx;
+    if (root.is_inner_bptree_node()) {
+        pair<MemRef, size_t> p = root.get_bptree_leaf(link_ndx);
+        MemRef leaf_mem = p.first;
+        Array leaf(get_alloc());
+        leaf.init_from_mem(leaf_mem);
+        size_t ndx_in_leaf = p.second;
+        target_row_ndx = to_size_t(leaf.get(ndx_in_leaf));
+    }
+    else {
+        target_row_ndx = to_size_t(root.get(link_ndx));
+    }
+
+    size_t target_table_ndx = m_target_table->get_index_in_group();
+    size_t stop_on_table_ndx = tightdb::npos;
+    erase_cascade_target_row(target_table_ndx, target_row_ndx, stop_on_table_ndx, rows); // Throws
+}
+
+
+void ColumnLinkList::erase_cascade_2(const Array& link_list_root, size_t target_table_ndx,
+                                     size_t stop_on_table_ndx, cascade_rows& rows) const
+{
+    if (!link_list_root.is_inner_bptree_node()) {
+        erase_cascade_3(link_list_root, target_table_ndx, stop_on_table_ndx, rows); // Throws
+        return;
+    }
+
+    size_t link_ndx = 0;
+    size_t num_links = link_list_root.get_bptree_size();
+    Array leaf(get_alloc());
+    while (link_ndx < num_links) {
+        pair<MemRef, size_t> p = link_list_root.get_bptree_leaf(link_ndx);
+        MemRef leaf_mem = p.first;
+        leaf.init_from_mem(leaf_mem);
+        erase_cascade_3(leaf, target_table_ndx, stop_on_table_ndx, rows); // Throws
+        link_ndx += leaf.size();
+    }
+}
+
+
+void ColumnLinkList::erase_cascade_3(const Array& link_list_leaf, size_t target_table_ndx,
+                                     size_t stop_on_table_ndx, cascade_rows& rows) const
+{
+    size_t num_links = link_list_leaf.size();
+    for (size_t i = 0; i < num_links; ++i) {
+        size_t target_row_ndx = to_size_t(link_list_leaf.get(i));
+        erase_cascade_target_row(target_table_ndx, target_row_ndx,
+                                 stop_on_table_ndx, rows); // Throws
+    }
+}
+
+
 bool ColumnLinkList::compare_link_list(const ColumnLinkList& c) const
 {
     size_t n = size();

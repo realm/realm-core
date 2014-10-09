@@ -22,6 +22,7 @@
 
 #include <stdint.h> // unint8_t etc
 #include <cstdlib> // std::size_t
+#include <vector>
 
 #include <tightdb/util/unique_ptr.hpp>
 #include <tightdb/array.hpp>
@@ -158,6 +159,40 @@ public:
     /// SharedGroup::commit_and_continue_as_read()() to ensure that attached
     /// table and link list accessors stay valid across a commit.
     virtual void update_from_parent(std::size_t old_baseline) TIGHTDB_NOEXCEPT;
+
+    struct cascade_row {
+        size_t table_ndx, row_ndx;
+
+        /// Trivial lexicographic order
+        bool operator<(const cascade_row&r) const TIGHTDB_NOEXCEPT;
+    };
+
+    typedef std::vector<cascade_row> cascade_rows;
+
+    //@{
+
+    /// erase_cascade() is called when the row at \a row_ndx is about to be
+    /// removed, and clear_cascade() when the column is about to be cleared (all
+    /// rows removed). Link columns must override these functions and descend
+    /// into target rows. If a target row has no other strong links to it, that
+    /// target row must be added to \a rows, and the cascade must recurse from
+    /// that point. Rows that are added to \a rows will eventually be
+    /// cascade-removed.
+    ///
+    /// \param stop_on_table_ndx If not equal to tightdb::npos, then do not
+    /// recurse into rows of the group-level table with that index in the group.
+    ///
+    /// \param rows A sorted list of rows. Each entry is a pair (table_ndx,
+    /// row_ndx), where table_ndx is the index withing the group of a
+    /// group-level table. Insertions must therfore respect this order.
+
+    virtual void erase_cascade(std::size_t row_ndx, std::size_t stop_on_table_ndx,
+                               cascade_rows& rows) const;
+
+    virtual void clear_cascade(std::size_t table_ndx, std::size_t num_rows,
+                               cascade_rows& rows) const;
+
+    //@}
 
     void discard_child_accessors() TIGHTDB_NOEXCEPT;
 
@@ -490,6 +525,11 @@ inline void ColumnBase::set_search_index_ref(ref_type, ArrayParent*, std::size_t
 
 inline void ColumnBase::set_search_index_allow_duplicate_values(bool) TIGHTDB_NOEXCEPT
 {
+}
+
+inline bool ColumnBase::cascade_row::operator<(const cascade_row& r) const TIGHTDB_NOEXCEPT
+{
+    return table_ndx < r.table_ndx || (table_ndx == r.table_ndx && row_ndx < r.row_ndx);
 }
 
 inline void ColumnBase::discard_child_accessors() TIGHTDB_NOEXCEPT

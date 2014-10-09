@@ -6,11 +6,14 @@
 
 ### API breaking changes:
 
-* `Query::tableview()` removed as it might lead to wrong results
-  e.g., when sorting a sorted tableview.
+* `Query::tableview()` removed as it might lead to wrong results e.g., when
+  sorting a sorted tableview.
 
 ### Enhancements:
 
+* Support added for cascading row removal. See `Descriptor::set_link_type()` for
+  details. All previsouly created link columns will effectively have link-type
+  'weak'.
 * Make the durability level settable in the `SharedGroup` constructor and
   `open()` overloads taking a `Replication`.
 

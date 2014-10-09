@@ -619,6 +619,23 @@ public:
         return false;
     }
 
+    bool set_link_type(size_t col_ndx, LinkType link_type)
+    {
+        if (TIGHTDB_LIKELY(m_table)) {
+            if (TIGHTDB_LIKELY(col_ndx < m_desc->get_column_count())) {
+#ifdef TIGHTDB_DEBUG
+                if (m_log)
+                    *m_log << "table->set_link_type("<<col_ndx<<", "
+                        "\""<<link_type_to_str(link_type)<<"\")\n";
+#endif
+                typedef _impl::TableFriend tf;
+                tf::set_link_type(*m_table, col_ndx, link_type); // Throws
+                return true;
+            }
+        }
+        return false;
+    }
+
     bool insert_column(size_t col_ndx, DataType type, StringData name)
     {
         if (TIGHTDB_LIKELY(m_desc)) {
@@ -626,7 +643,7 @@ public:
                 typedef _impl::TableFriend tf;
 #ifdef TIGHTDB_DEBUG
                 if (m_log) {
-                    *m_log << "desc->insert_column("<<col_ndx<<", "<<type_to_str(type)<<", "
+                    *m_log << "desc->insert_column("<<col_ndx<<", "<<data_type_to_str(type)<<", "
                         "\""<<name<<"\")\n";
                 }
 #endif
@@ -647,7 +664,7 @@ public:
 #ifdef TIGHTDB_DEBUG
                 if (m_log) {
                     *m_log << "desc->insert_column_link("<<col_ndx<<", "
-                        ""<<type_to_str(type)<<", \""<<name<<"\", "
+                        ""<<data_type_to_str(type)<<", \""<<name<<"\", "
                         "group->get_table("<<link_target_table_ndx<<"))\n";
                 }
 #endif
@@ -668,7 +685,8 @@ public:
                 if (m_log)
                     *m_log << "desc->remove_column("<<col_ndx<<")\n";
 #endif
-                _impl::TableFriend::erase_column(*m_desc, col_ndx); // Throws
+                typedef _impl::TableFriend tf;
+                tf::erase_column(*m_desc, col_ndx); // Throws
                 return true;
             }
         }
@@ -683,7 +701,8 @@ public:
                 if (m_log)
                     *m_log << "desc->remove_column("<<col_ndx<<")\n";
 #endif
-                _impl::TableFriend::erase_column(*m_desc, col_ndx); // Throws
+                typedef _impl::TableFriend tf;
+                tf::erase_column(*m_desc, col_ndx); // Throws
                 return true;
             }
         }
@@ -698,11 +717,12 @@ public:
                 if (m_log)
                     *m_log << "desc->rename_column("<<col_ndx<<", \""<<name<<"\")\n";
 #endif
-                _impl::TableFriend::rename_column(*m_desc, col_ndx, name); // Throws
+                typedef _impl::TableFriend tf;
+                tf::rename_column(*m_desc, col_ndx, name); // Throws
                 return true;
             }
         }
-        return true;
+        return false;
     }
 
     bool select_descriptor(int levels, const size_t* path)
@@ -779,7 +799,7 @@ public:
                 return true;
             }
         }
-        return true;
+        return false;
     }
 
     bool select_link_list(size_t col_ndx, size_t row_ndx)
@@ -899,7 +919,7 @@ private:
         return false;
     }
 
-    const char* type_to_str(DataType type)
+    const char* data_type_to_str(DataType type)
     {
         switch (type) {
             case type_Int:
@@ -924,6 +944,18 @@ private:
                 return "type_Link";
             case type_LinkList:
                 return "type_LinkList";
+        }
+        TIGHTDB_ASSERT(false);
+        return 0;
+    }
+
+    const char* link_type_to_str(LinkType type)
+    {
+        switch (type) {
+            case link_Strong:
+                return "link_Strong";
+            case link_Weak:
+                return "link_Weak";
         }
         TIGHTDB_ASSERT(false);
         return 0;

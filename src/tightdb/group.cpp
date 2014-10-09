@@ -1417,6 +1417,11 @@ public:
         return true; // No-op
     }
 
+    bool set_link_type(size_t, LinkType) TIGHTDB_NOEXCEPT
+    {
+        return true; // No-op
+    }
+
     bool select_link_list(size_t col_ndx, size_t) TIGHTDB_NOEXCEPT
     {
         // See comments on link handling in TransactAdvancer::set_link().
@@ -1801,6 +1806,11 @@ public:
     }
 
     bool remove_primary_key()
+    {
+        return true; // No-op
+    }
+
+    bool set_link_type(size_t, LinkType)
     {
         return true; // No-op
     }

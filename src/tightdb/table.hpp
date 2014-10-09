@@ -187,6 +187,8 @@ public:
     /// descriptor associated with the new subtable column, and stores a
     /// reference to its accessor in `*subdesc`.
     ///
+    /// \param link_type See Descriptor::set_link_type().
+    ///
     /// \return The value returned by add_column() and add_column_link(), is the
     /// index of the added column.
     ///
@@ -196,8 +198,9 @@ public:
     std::size_t add_column(DataType type, StringData name, DescriptorRef* subdesc = 0);
     void insert_column(std::size_t column_ndx, DataType type, StringData name,
                        DescriptorRef* subdesc = 0);
-    std::size_t add_column_link(DataType type, StringData name, Table& target);
-    void insert_column_link(std::size_t column_ndx, DataType type, StringData name, Table& target);
+    std::size_t add_column_link(DataType type, StringData name, Table& target, LinkType link_type = link_Weak);
+    void insert_column_link(std::size_t column_ndx, DataType type, StringData name, Table& target,
+                            LinkType link_type = link_Weak);
     void remove_column(std::size_t column_ndx);
     void rename_column(std::size_t column_ndx, StringData new_name);
     //@}
@@ -325,9 +328,8 @@ public:
     template<class T> Columns<T> column(std::size_t column); // FIXME: Should this one have been declared TIGHTDB_NOEXCEPT?
 
     // Table size and deletion
-    bool        is_empty() const TIGHTDB_NOEXCEPT;
+    bool is_empty() const TIGHTDB_NOEXCEPT;
     std::size_t size() const TIGHTDB_NOEXCEPT;
-    void        clear();
 
     typedef BasicRowExpr<Table> RowExpr;
     typedef BasicRowExpr<const Table> ConstRowExpr;
@@ -347,7 +349,13 @@ public:
 
     //@{
 
-    /// Row handling
+    /// Row handling.
+    ///
+    /// The removal of a row may cause other linked rows to be
+    /// cascade-removed. The clearing of a table may also cause linked rows to
+    /// be cascade-removed, but in this respect, the effect is exactly as if
+    /// each row had been removed individually. See Descriptor::set_link_type()
+    /// for details.
     ///
     /// It is an error to call add_empty_row() or insert_empty_row() on a table
     /// with a primary key, if that would result in a violation the implied
@@ -358,6 +366,7 @@ public:
     void insert_empty_row(std::size_t row_ndx, std::size_t num_rows = 1);
     void remove(std::size_t row_ndx);
     void remove_last();
+    void clear();
 
     //@}
 
@@ -898,6 +907,7 @@ private:
     void erase_root_column(std::size_t col_ndx);
     void do_insert_root_column(std::size_t col_ndx, ColumnType, StringData name);
     void do_erase_root_column(std::size_t col_ndx);
+    void do_set_link_type(std::size_t col_ndx, LinkType);
     void insert_backlink_column(std::size_t origin_table_ndx, std::size_t origin_col_ndx);
     void erase_backlink_column(std::size_t origin_table_ndx, std::size_t origin_col_ndx);
     void update_link_target_tables(std::size_t old_col_ndx_begin, std::size_t new_col_ndx_begin);
@@ -1064,6 +1074,20 @@ private:
 
     void connect_opposite_link_columns(std::size_t link_col_ndx, Table& target_table,
                                        std::size_t backlink_col_ndx) TIGHTDB_NOEXCEPT;
+
+    std::size_t get_num_strong_backlinks(std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
+
+    typedef ColumnBase::cascade_rows cascade_rows;
+
+    /// Calls ColumnBase::erase_cascade() for each column.
+    void erase_cascade(std::size_t row_ndx, std::size_t stop_on_table_ndx, cascade_rows&) const;
+
+    /// Calls do_move_last_over() for each of the specified rows.
+    static void erase_rows__w_repl__wo_cascade(Group&, const cascade_rows&);
+
+    /// Remove the specified row by the 'move last over' method, and submit the
+    /// operation to the replication subsystem.
+    void do_move_last_over(std::size_t row_ndx);
 
     // Precondition: 1 <= end - begin
     std::size_t* record_subtable_path(std::size_t* begin,
@@ -1860,6 +1884,23 @@ public:
         return *table.m_cols[col_ndx];
     }
 
+    static std::size_t get_num_strong_backlinks(const Table& table,
+                                                std::size_t row_ndx) TIGHTDB_NOEXCEPT
+    {
+        return table.get_num_strong_backlinks(row_ndx);
+    }
+
+    static void erase_cascade(const Table& table, std::size_t row_ndx,
+                              std::size_t stop_on_table_ndx, Table::cascade_rows& rows)
+    {
+        table.erase_cascade(row_ndx, stop_on_table_ndx, rows); // Throws
+    }
+
+    static void erase_rows__w_repl__wo_cascade(Group& group, const Table::cascade_rows& rows)
+    {
+        Table::erase_rows__w_repl__wo_cascade(group, rows); // Throws
+    }
+
     static std::size_t* record_subtable_path(const Table& table, std::size_t* begin,
                                              std::size_t* end) TIGHTDB_NOEXCEPT
     {
@@ -1880,6 +1921,11 @@ public:
     static void rename_column(Descriptor& desc, std::size_t column_ndx, StringData name)
     {
         Table::do_rename_column(desc, column_ndx, name); // Throws
+    }
+
+    static void set_link_type(Table& table, std::size_t column_ndx, LinkType link_type)
+    {
+        table.do_set_link_type(column_ndx, link_type); // Throws
     }
 
     static void clear_root_table_desc(const Table& root_table) TIGHTDB_NOEXCEPT

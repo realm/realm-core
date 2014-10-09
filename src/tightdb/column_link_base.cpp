@@ -6,6 +6,39 @@ using namespace std;
 using namespace tightdb;
 
 
+void ColumnLinkBase::erase_cascade_target_row(size_t target_table_ndx, size_t target_row_ndx,
+                                              size_t stop_on_table_ndx, cascade_rows& rows) const
+{
+    // Stop if there are other strong links to this row (this scheme fails to
+    // discover orphaned cycles)
+    typedef _impl::TableFriend tf;
+    size_t num_strong_backlinks = tf::get_num_strong_backlinks(*m_target_table, target_row_ndx);
+    if (num_strong_backlinks > 1)
+        return;
+
+    // Stop if the target row was already visited
+    cascade_row target_row;
+    target_row.table_ndx = target_table_ndx;
+    target_row.row_ndx   = target_row_ndx;
+    typedef cascade_rows::iterator iter;
+    iter i = ::upper_bound(rows.begin(), rows.end(), target_row);
+    if (i != rows.end())
+        return;
+
+    // Recurse
+    rows.insert(i, target_row); // Throws
+    tf::erase_cascade(*m_target_table, target_row_ndx, stop_on_table_ndx, rows); // Throws
+}
+
+
+void ColumnLinkBase::refresh_accessor_tree(size_t col_ndx, const Spec& spec)
+{
+    Column::refresh_accessor_tree(col_ndx, spec); // Throws
+    ColumnAttr attr = spec.get_column_attr(col_ndx);
+    m_weak_links = (attr & col_attr_StrongLinks) == 0;
+}
+
+
 #ifdef TIGHTDB_DEBUG
 
 void ColumnLinkBase::Verify(const Table& table, size_t col_ndx) const

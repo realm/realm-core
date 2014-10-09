@@ -31,6 +31,9 @@ class ColumnLinkBase: public Column {
 public:
     ~ColumnLinkBase() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
+    bool get_weak_links() const TIGHTDB_NOEXCEPT;
+    void set_weak_links(bool) TIGHTDB_NOEXCEPT;
+
     Table& get_target_table() const TIGHTDB_NOEXCEPT;
     void set_target_table(Table&) TIGHTDB_NOEXCEPT;
     ColumnBackLink& get_backlink_column() const TIGHTDB_NOEXCEPT;
@@ -39,6 +42,11 @@ public:
     virtual void do_nullify_link(std::size_t row_ndx, std::size_t old_target_row_ndx) = 0;
     virtual void do_update_link(std::size_t row_ndx, std::size_t old_target_row_ndx,
                                 std::size_t new_target_row_ndx) = 0;
+
+    void erase_cascade_target_row(std::size_t target_table_ndx, std::size_t target_row_ndx,
+                                  std::size_t stop_on_table_ndx, cascade_rows&) const;
+
+    void refresh_accessor_tree(std::size_t, const Spec&) TIGHTDB_OVERRIDE;
 
     void adj_accessors_insert_rows(std::size_t, std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     void adj_accessors_erase_row(std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
@@ -55,6 +63,7 @@ public:
 protected:
     TableRef m_target_table;
     ColumnBackLink* m_backlink_column;
+    bool m_weak_links; // True if these links are weak (not strong)
 
     // Create unattached root array aaccessor.
     ColumnLinkBase(Allocator&, ref_type);
@@ -67,12 +76,23 @@ protected:
 
 inline ColumnLinkBase::ColumnLinkBase(Allocator& alloc, ref_type ref):
     Column(alloc, ref),
-    m_backlink_column(0)
+    m_backlink_column(0),
+    m_weak_links(false)
 {
 }
 
 inline ColumnLinkBase::~ColumnLinkBase() TIGHTDB_NOEXCEPT
 {
+}
+
+inline bool ColumnLinkBase::get_weak_links() const TIGHTDB_NOEXCEPT
+{
+    return m_weak_links;
+}
+
+inline void ColumnLinkBase::set_weak_links(bool value) TIGHTDB_NOEXCEPT
+{
+    m_weak_links = value;
 }
 
 inline Table& ColumnLinkBase::get_target_table() const TIGHTDB_NOEXCEPT

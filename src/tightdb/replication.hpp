@@ -163,6 +163,7 @@ public:
     void add_search_index(const Table*, std::size_t col_ndx);
     void add_primary_key(const Table*, std::size_t col_ndx);
     void remove_primary_key(const Table*);
+    void set_link_type(const Table*, std::size_t col_ndx, LinkType);
     void clear_table(const Table*);
     void optimize_table(const Table*);
 
@@ -303,13 +304,14 @@ private:
         instr_AddSearchIndex        = 38, // Add a search index to a column
         instr_AddPrimaryKey         = 39, // Add a primary key to a table
         instr_RemovePrimaryKey      = 40, // Remove primary key from a table
-        instr_SelectLinkList        = 41,
-        instr_LinkListSet           = 42, // Assign to link list entry
-        instr_LinkListInsert        = 43, // Insert entry into link list
-        instr_LinkListMove          = 44, // Move an entry within a link list
-        instr_LinkListErase         = 45, // Remove an entry from a link list
-        instr_LinkListClear         = 46, // Ramove all entries from a link list
-        instr_LinkListSetAll        = 47  // Assign to link list entry
+        instr_SetLinkType           = 41, // Strong/weak
+        instr_SelectLinkList        = 42,
+        instr_LinkListSet           = 43, // Assign to link list entry
+        instr_LinkListInsert        = 44, // Insert entry into link list
+        instr_LinkListMove          = 45, // Move an entry within a link list
+        instr_LinkListErase         = 46, // Remove an entry from a link list
+        instr_LinkListClear         = 47, // Ramove all entries from a link list
+        instr_LinkListSetAll        = 48  // Assign to link list entry
     };
 
     util::Buffer<std::size_t> m_subtab_path_buf;
@@ -446,6 +448,7 @@ public:
     ///     bool add_search_index(std::size_t col_ndx)
     ///     bool add_primary_key(std::size_t col_ndx)
     ///     bool remove_primary_key()
+    ///     bool set_link_type(std::size_t col_ndx, LinkType);
     ///     bool select_link_list(std::size_t col_ndx, std::size_t row_ndx)
     ///     bool link_list_set(std::size_t link_ndx, std::size_t value)
     ///     bool link_list_insert(std::size_t link_ndx, std::size_t value)
@@ -495,6 +498,7 @@ private:
     bool read_char(char&); // throws
 
     bool is_valid_data_type(int type);
+    bool is_valid_link_type(int type);
 };
 
 
@@ -1099,12 +1103,13 @@ inline void Replication::erase_row(const Table* t, std::size_t row_ndx)
     simple_cmd(instr_EraseRows, util::tuple(row_ndx, num_rows, t->size(), false)); // Throws
 }
 
-inline void Replication::move_last_over(const Table* t, std::size_t target_row_ndx, std::size_t last_row_ndx)
+inline void Replication::move_last_over(const Table* t, std::size_t target_row_ndx,
+                                        std::size_t last_row_ndx)
 {
     check_table(t); // Throws
     static_cast<void>(last_row_ndx);
     TIGHTDB_ASSERT(t->size() == last_row_ndx);
-    simple_cmd(instr_EraseRows, util::tuple(target_row_ndx, 1, t->size(), true)); // Throws    
+    simple_cmd(instr_EraseRows, util::tuple(target_row_ndx, 1, t->size(), true)); // Throws
 }
 
 inline void Replication::add_int_to_column(const Table* t, std::size_t col_ndx, int_fast64_t value)
@@ -1135,6 +1140,13 @@ inline void Replication::remove_primary_key(const Table* t)
 }
 
 
+inline void Replication::set_link_type(const Table* t, std::size_t col_ndx, LinkType link_type)
+{
+    check_table(t); // Throws
+    simple_cmd(instr_SetLinkType, util::tuple(col_ndx, int(link_type))); // Throws
+}
+
+
 inline void Replication::clear_table(const Table* t)
 {
     check_table(t); // Throws
@@ -1149,7 +1161,8 @@ inline void Replication::optimize_table(const Table* t)
 }
 
 
-inline void Replication::link_list_set(const LinkView& list, std::size_t link_ndx, std::size_t value)
+inline void Replication::link_list_set(const LinkView& list, std::size_t link_ndx,
+                                       std::size_t value)
 {
     check_link_list(list); // Throws
     simple_cmd(instr_LinkListSet, util::tuple(link_ndx, value)); // Throws
@@ -1553,6 +1566,15 @@ bool Replication::TransactLogParser::do_parse(InstructionHandler& handler)
                     return false;
                 continue;
             }
+            case instr_SetLinkType: {
+                std::size_t col_ndx = read_int<std::size_t>(); // Throws
+                int link_type = read_int<int>(); // Throws
+                if (!is_valid_link_type(link_type))
+                    return false;
+                if (!handler.set_link_type(col_ndx, LinkType(link_type))) // Throws
+                    return false;
+                continue;
+            }
             case instr_InsertColumn: {
                 std::size_t col_ndx = read_int<std::size_t>(); // Throws
                 int type = read_int<int>(); // Throws
@@ -1835,6 +1857,17 @@ inline bool Replication::TransactLogParser::is_valid_data_type(int type)
         case type_Mixed:
         case type_Link:
         case type_LinkList:
+            return true;
+    }
+    return false;
+}
+
+
+inline bool Replication::TransactLogParser::is_valid_link_type(int type)
+{
+    switch (LinkType(type)) {
+        case link_Strong:
+        case link_Weak:
             return true;
     }
     return false;

@@ -285,15 +285,16 @@ size_t Table::add_column(DataType type, StringData name, DescriptorRef* subdesc)
     return get_descriptor()->add_column(type, name, subdesc); // Throws
 }
 
-size_t Table::add_column_link(DataType type, StringData name, Table& target)
+size_t Table::add_column_link(DataType type, StringData name, Table& target, LinkType link_type)
 {
-    return get_descriptor()->add_column_link(type, name, target); // Throws
+    return get_descriptor()->add_column_link(type, name, target, link_type); // Throws
 }
 
 
-void Table::insert_column_link(size_t col_ndx, DataType type, StringData name, Table& target)
+void Table::insert_column_link(size_t col_ndx, DataType type, StringData name, Table& target,
+                               LinkType link_type)
 {
-    get_descriptor()->insert_column_link(col_ndx, type, name, target); // Throws
+    get_descriptor()->insert_column_link(col_ndx, type, name, target, link_type); // Throws
 }
 
 
@@ -326,6 +327,81 @@ void Table::connect_opposite_link_columns(size_t link_col_ndx, Table& target_tab
     link_col.set_backlink_column(backlink_col);
     backlink_col.set_origin_table(*this);
     backlink_col.set_origin_column(link_col);
+}
+
+
+size_t Table::get_num_strong_backlinks(std::size_t row_ndx) const TIGHTDB_NOEXCEPT
+{
+    size_t sum = 0;
+    size_t col_ndx_begin = m_spec.get_public_column_count();
+    size_t col_ndx_end   = m_cols.size();
+    for (size_t i = col_ndx_begin; i < col_ndx_end; ++i) {
+        const ColumnBackLink& backlink_col = get_column_backlink(i);
+        const ColumnLinkBase& link_col = backlink_col.get_origin_column();
+        if (link_col.get_weak_links())
+            continue;
+        sum += backlink_col.get_backlink_count(row_ndx);
+    }
+    return sum;
+}
+
+
+void Table::erase_cascade(size_t row_ndx, size_t stop_on_table_ndx, cascade_rows& rows) const
+{
+    size_t num_cols = m_spec.get_public_column_count();
+    for (size_t col_ndx = 0; col_ndx != num_cols; ++col_ndx) {
+        const ColumnBase& column = get_column_base(col_ndx);
+        column.erase_cascade(row_ndx, stop_on_table_ndx, rows); // Throws
+    }
+}
+
+
+void Table::erase_rows__w_repl__wo_cascade(Group& group, const cascade_rows& rows)
+{
+    // Rows are ordered by ascending row index, but we need to remove the rows
+    // by descending index to avoid changing the indexes of rows that are not
+    // removed yet.
+    //
+    // Note that cascade removal works under the assumption that all group-level
+    // tables are unorered, and threrefore that rows must be removed by the
+    // 'move last over' method.
+    typedef cascade_rows::const_reverse_iterator iter;
+    iter end = rows.rend();
+    for (iter i = rows.rbegin(); i != end; ++i) {
+        typedef _impl::GroupFriend gf;
+        Table& table = gf::get_table(group, i->table_ndx);
+        table.do_move_last_over(i->row_ndx);
+    }
+}
+
+
+void Table::do_move_last_over(size_t row_ndx)
+{
+    TIGHTDB_ASSERT(row_ndx < m_size);
+    bump_version();
+
+    size_t last_row_ndx = m_size - 1;
+    size_t num_cols = m_spec.get_column_count();
+    if (row_ndx != last_row_ndx) {
+        for (size_t col_ndx = 0; col_ndx != num_cols; ++col_ndx) {
+            ColumnBase& column = get_column_base(col_ndx);
+            column.move_last_over(row_ndx, last_row_ndx); // Throws
+        }
+    }
+    else {
+        for (size_t col_ndx = 0; col_ndx != num_cols; ++col_ndx) {
+            ColumnBase& column = get_column_base(col_ndx);
+            bool is_last = true;
+            column.erase(row_ndx, is_last); // Throws
+        }
+    }
+    adj_row_acc_move(row_ndx, last_row_ndx);
+    --m_size;
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    if (Replication* repl = get_repl())
+        repl->move_last_over(this, row_ndx, last_row_ndx); // Throws
+#endif
 }
 
 
@@ -754,6 +830,36 @@ void Table::do_erase_root_column(size_t ndx)
         Array::destroy_deep(index_ref, m_columns.get_alloc());
         m_columns.erase(ndx_in_parent);
     }
+}
+
+
+void Table::do_set_link_type(size_t col_ndx, LinkType link_type)
+{
+    bool weak_links = false;
+    switch (link_type) {
+        case link_Strong:
+            break;
+        case link_Weak:
+            weak_links = true;
+            break;
+    }
+
+    ColumnAttr attr = m_spec.get_column_attr(col_ndx);
+    ColumnAttr attr_2 = attr;
+    attr_2 = ColumnAttr(attr_2 & ~col_attr_StrongLinks);
+    if (!weak_links)
+        attr_2 = ColumnAttr(attr_2 | col_attr_StrongLinks);
+    if (attr_2 == attr)
+        return;
+    m_spec.set_column_attr(col_ndx, attr);
+
+    ColumnLinkBase& col = get_column_link_base(col_ndx);
+    col.set_weak_links(weak_links);
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    if (Replication* repl = get_repl())
+        repl->set_link_type(this, col_ndx, link_type); // Throws
+#endif
 }
 
 
@@ -1774,6 +1880,22 @@ void Table::clear()
     TIGHTDB_ASSERT(is_attached());
     bump_version();
 
+    size_t table_ndx = get_index_in_group();
+    if (table_ndx != tightdb::npos) {
+        // Group-level tables may have links, so in those cases we need to
+        // discover all the rows that need to be cascade-removed.
+        cascade_rows rows; // ordered
+
+        size_t num_public_cols = m_spec.get_public_column_count();
+        for (size_t i = 0; i < num_public_cols; ++i) {
+            ColumnBase& column = get_column_base(i);
+            column.clear_cascade(table_ndx, m_size, rows);
+        }
+
+        Group* group = get_parent_group();
+        erase_rows__w_repl__wo_cascade(*group, rows); // Throws
+    }
+
     size_t num_cols = m_spec.get_column_count();
     for (size_t col_ndx = 0; col_ndx != num_cols; ++col_ndx) {
         ColumnBase& column = get_column_base(col_ndx);
@@ -1812,33 +1934,29 @@ void Table::remove(size_t row_ndx)
 }
 
 
-void Table::move_last_over(size_t target_row_ndx)
+void Table::move_last_over(size_t row_ndx)
 {
-    TIGHTDB_ASSERT(target_row_ndx < m_size);
-    bump_version();
+    TIGHTDB_ASSERT(is_attached());
 
-    size_t last_row_ndx = m_size - 1;
-    size_t num_cols = m_spec.get_column_count();
-    if (target_row_ndx != last_row_ndx) {
-        for (size_t col_ndx = 0; col_ndx != num_cols; ++col_ndx) {
-            ColumnBase& column = get_column_base(col_ndx);
-            column.move_last_over(target_row_ndx, last_row_ndx); // Throws
-        }
+    size_t table_ndx = get_index_in_group();
+    if (table_ndx == tightdb::npos) {
+        do_move_last_over(row_ndx);
+        return;
     }
-    else {
-        for (size_t col_ndx = 0; col_ndx != num_cols; ++col_ndx) {
-            ColumnBase& column = get_column_base(col_ndx);
-            bool is_last = true;
-            column.erase(target_row_ndx, is_last); // Throws
-        }
-    }
-    adj_row_acc_move(target_row_ndx, last_row_ndx);
-    --m_size;
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
-    if (Replication* repl = get_repl())
-        repl->move_last_over(this, target_row_ndx, last_row_ndx); // Throws
-#endif
+    // Group-level tables may have links, so in those cases we need to discover
+    // all the rows that need to be cascade-removed.
+    ColumnBase::cascade_row row;
+    row.table_ndx = table_ndx;
+    row.row_ndx   = row_ndx;
+    cascade_rows rows; // ordered
+    rows.push_back(row);
+
+    size_t stop_on_table_ndx = tightdb::npos;
+    erase_cascade(row_ndx, stop_on_table_ndx, rows); // Throws
+
+    Group* group = get_parent_group();
+    erase_rows__w_repl__wo_cascade(*group, rows); // Throws
 }
 
 
@@ -2525,6 +2643,20 @@ void Table::set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx)
     TIGHTDB_ASSERT(row_ndx < m_size);
     bump_version();
     ColumnLink& column = get_column_link(col_ndx);
+
+    // Identify the rows that need to be cascade-removed
+    cascade_rows rows; // ordered
+    if (!column.get_weak_links() && !column.is_null_link(row_ndx)) {
+        size_t old_target_row_ndx = column.get_link(row_ndx);
+        if (target_row_ndx != old_target_row_ndx) {
+            Table& target_table = column.get_target_table();
+            size_t target_table_ndx = target_table.get_index_in_group();
+            size_t stop_on_table_ndx = tightdb::npos;
+            column.erase_cascade_target_row(target_table_ndx, old_target_row_ndx,
+                                            stop_on_table_ndx, rows); // Throws
+        }
+    }
+
     column.set_link(row_ndx, target_row_ndx);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
@@ -2533,6 +2665,9 @@ void Table::set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx)
         repl->set_link(this, col_ndx, row_ndx, link); // Throws
     }
 #endif
+
+    Group* group = get_parent_group();
+    erase_rows__w_repl__wo_cascade(*group, rows); // Throws
 }
 
 void Table::insert_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx)
@@ -2562,6 +2697,15 @@ void Table::nullify_link(size_t col_ndx, size_t row_ndx)
     TIGHTDB_ASSERT(row_ndx < m_size);
     bump_version();
     ColumnLink& column = get_column_link(col_ndx);
+
+    // Group-level tables may have links, so in those cases we need to take care
+    // of cascade-removal.
+    cascade_rows rows; // ordered
+    size_t stop_on_table_ndx = tightdb::npos;
+    column.erase_cascade(row_ndx, stop_on_table_ndx, rows); // Throws
+    Group* group = get_parent_group();
+    erase_rows__w_repl__wo_cascade(*group, rows); // Throws
+
     column.nullify_link(row_ndx);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
@@ -4708,6 +4852,10 @@ void Table::refresh_column_accessors(size_t col_ndx_begin)
             // of the connection is postponed.
             typedef _impl::GroupFriend gf;
             if (is_link_type(col_type)) {
+                ColumnAttr attr = m_spec.get_column_attr(col_ndx);
+                bool weak_links = (attr & col_attr_StrongLinks) == 0;
+                ColumnLinkBase* link_col = static_cast<ColumnLinkBase*>(col);
+                link_col->set_weak_links(weak_links);
                 Group& group = *get_parent_group();
                 size_t target_table_ndx = m_spec.get_opposite_link_table_ndx(col_ndx);
                 Table& target_table = gf::get_table(group, target_table_ndx); // Throws

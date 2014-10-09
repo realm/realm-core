@@ -67,9 +67,19 @@ void LinkView::set(size_t link_ndx, size_t target_row_ndx)
     typedef _impl::TableFriend tf;
     tf::bump_version(*m_origin_table);
 
+    // Identify the rows that need to be cascade-removed
+    size_t old_target_row_ndx = m_row_indexes.get(link_ndx);
+    ColumnLinkList::cascade_rows rows; // ordered
+    if (!m_origin_column.m_weak_links && target_row_ndx != old_target_row_ndx) {
+        Table& target_table = m_origin_column.get_target_table();
+        size_t target_table_ndx = target_table.get_index_in_group();
+        size_t stop_on_table_ndx = tightdb::npos;
+        m_origin_column.erase_cascade_target_row(target_table_ndx, old_target_row_ndx,
+                                                 stop_on_table_ndx, rows); // Throws
+    }
+
     // update backlinks
     size_t row_ndx = get_origin_row_index();
-    size_t old_target_row_ndx = m_row_indexes.get(link_ndx);
     m_origin_column.remove_backlink(old_target_row_ndx, row_ndx);
     m_origin_column.add_backlink(target_row_ndx, row_ndx);
     m_row_indexes.set(link_ndx, target_row_ndx);
@@ -78,6 +88,9 @@ void LinkView::set(size_t link_ndx, size_t target_row_ndx)
     if (Replication* repl = get_repl())
         repl->link_list_set(*this, link_ndx, target_row_ndx); // Throws
 #endif
+
+    Group* group = m_origin_table->get_parent_group();
+    tf::erase_rows__w_repl__wo_cascade(*group, rows); // Throws
 }
 
 
@@ -113,8 +126,18 @@ void LinkView::remove(size_t link_ndx)
     typedef _impl::TableFriend tf;
     tf::bump_version(*m_origin_table);
 
-    // update backlinks
+    // Identify the rows that need to be cascade-removed
     size_t target_row_ndx = m_row_indexes.get(link_ndx);
+    ColumnLinkList::cascade_rows rows; // ordered
+    if (!m_origin_column.m_weak_links) {
+        Table& target_table = m_origin_column.get_target_table();
+        size_t target_table_ndx = target_table.get_index_in_group();
+        size_t stop_on_table_ndx = tightdb::npos;
+        m_origin_column.erase_cascade_target_row(target_table_ndx, target_row_ndx,
+                                                 stop_on_table_ndx, rows); // Throws
+    }
+
+    // update backlinks
     size_t row_ndx = get_origin_row_index();
     m_origin_column.remove_backlink(target_row_ndx, row_ndx);
 
@@ -130,6 +153,9 @@ void LinkView::remove(size_t link_ndx)
     if (Replication* repl = get_repl())
         repl->link_list_erase(*this, link_ndx); // Throws
 #endif
+
+    Group* group = m_origin_table->get_parent_group();
+    tf::erase_rows__w_repl__wo_cascade(*group, rows); // Throws
 }
 
 
@@ -142,6 +168,15 @@ void LinkView::clear()
 
     typedef _impl::TableFriend tf;
     tf::bump_version(*m_origin_table);
+
+    // Identify the rows that need to be cascade-removed
+    ColumnLinkList::cascade_rows rows; // ordered
+    if (!m_origin_column.m_weak_links) {
+        Array& link_list_root = *m_row_indexes.get_root_array();
+        size_t target_table_ndx = m_origin_column.get_target_table().get_index_in_group();
+        size_t stop_on_table_ndx = tightdb::npos;
+        m_origin_column.erase_cascade_2(link_list_root, target_table_ndx, stop_on_table_ndx, rows); // Throws
+    }
 
     // Update backlinks
     size_t row_ndx = get_origin_row_index();
@@ -158,6 +193,9 @@ void LinkView::clear()
     if (Replication* repl = get_repl())
         repl->link_list_clear(*this); // Throws
 #endif
+
+    Group* group = m_origin_table->get_parent_group();
+    tf::erase_rows__w_repl__wo_cascade(*group, rows); // Throws
 }
 
 void LinkView::sort(size_t column, bool ascending)
