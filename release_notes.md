@@ -2,7 +2,8 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
+* Fixed a crash when copying a query checking for equality on an indexed string
+  column.
 
 ### API breaking changes:
 

@@ -1464,6 +1464,13 @@ public:
         return new StringNode<Equal>(*this);
     }
 
+    StringNode(const StringNode& from) : StringNodeBase(from)
+    {
+        m_index_getter = 0;
+        m_index_matches = 0;
+        m_index_matches_destroy = false;
+    }
+
 private:
     inline BinaryData str_to_bin(const StringData& s) TIGHTDB_NOEXCEPT
     {

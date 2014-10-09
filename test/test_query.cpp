@@ -5466,4 +5466,17 @@ TEST(Query_DeepCopyTest)
     q2.end_group();
 }
 
+TEST(Query_StringIndexCrash)
+{
+    // Test for a crash which occured when a query testing for equality on a
+    // string index was deep-copied after being run
+    Table table;
+    table.add_column(type_String, "s");
+    table.add_search_index(0);
+
+    Query q = table.where().equal(0, StringData(""));
+    q.count();
+    Query(q, Query::TCopyExpressionTag());
+}
+
 #endif // TEST_QUERY
