@@ -1084,7 +1084,11 @@ inline void Replication::insert_empty_rows(const Table* t, std::size_t row_ndx,
                                            std::size_t num_rows)
 {
     check_table(t); // Throws
-    simple_cmd(instr_InsertEmptyRows, util::tuple(row_ndx, num_rows, t->size(), false)); // Throws
+
+    // default to unordered, if we are inserting at the end:
+    bool unordered = row_ndx == t->size()-num_rows; 
+
+    simple_cmd(instr_InsertEmptyRows, util::tuple(row_ndx, num_rows, t->size(), unordered)); // Throws
 }
 
 
