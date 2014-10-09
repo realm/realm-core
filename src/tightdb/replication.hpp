@@ -448,7 +448,7 @@ public:
     ///     bool add_search_index(std::size_t col_ndx)
     ///     bool add_primary_key(std::size_t col_ndx)
     ///     bool remove_primary_key()
-    ///     bool set_link_type(std::size_t col_ndx, LinkType);
+    ///     bool set_link_type(std::size_t col_ndx, LinkType)
     ///     bool select_link_list(std::size_t col_ndx, std::size_t row_ndx)
     ///     bool link_list_set(std::size_t link_ndx, std::size_t value)
     ///     bool link_list_insert(std::size_t link_ndx, std::size_t value)
