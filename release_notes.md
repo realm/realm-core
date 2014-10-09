@@ -11,7 +11,8 @@
 
 ### Enhancements:
 
-* Lorem ipsum.
+* Make the durability level settable in the `SharedGroup` constructor and
+  `open()` overloads taking a `Replication`.
 
 -----------
 
