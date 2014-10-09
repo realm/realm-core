@@ -6539,6 +6539,42 @@ TEST(LangBindHelper_ImplicitTransactions_ContinuedUseOfLinkList)
     sg_w.end_read();
 }
 
+TEST(LangBindHelper_MemOnly)
+{
+    SHARED_GROUP_TEST_PATH(path);
+
+    // Verify that the db is empty after populating and then re-opening a file
+    {
+        ShortCircuitTransactLogManager tlm(path);
+        SharedGroup sg(tlm, SharedGroup::durability_MemOnly);
+        WriteTransaction wt(sg);
+        wt.add_table("table");
+        wt.commit();
+    }
+    {
+        ShortCircuitTransactLogManager tlm(path);
+        SharedGroup sg(tlm, SharedGroup::durability_MemOnly);
+        ReadTransaction rt(sg);
+        CHECK(rt.get_group().is_empty());
+    }
+
+    // Verify that basic replication functionality works
+
+    ShortCircuitTransactLogManager tlm(path);
+    SharedGroup sg_r(tlm, SharedGroup::durability_MemOnly);
+    SharedGroup sg_w(tlm, SharedGroup::durability_MemOnly);
+    ReadTransaction rt(sg_r);
+
+    {
+        WriteTransaction wt(sg_w);
+        wt.add_table("table");
+        wt.commit();
+    }
+
+    CHECK(rt.get_group().is_empty());
+    LangBindHelper::advance_read(sg_r, tlm);
+    CHECK(!rt.get_group().is_empty());
+}
 
 #endif // TIGHTDB_ENABLE_REPLICATION
 
