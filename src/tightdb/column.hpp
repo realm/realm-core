@@ -164,7 +164,7 @@ public:
         size_t table_ndx, row_ndx;
 
         /// Trivial lexicographic order
-        bool operator<(const cascade_row&r) const TIGHTDB_NOEXCEPT;
+        bool operator<(const cascade_row&) const TIGHTDB_NOEXCEPT;
     };
 
     typedef std::vector<cascade_row> cascade_rows;

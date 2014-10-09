@@ -201,9 +201,9 @@ public:
     ///
     ///  - the origin row is cascade-removed.
     ///
-    /// Note that if a link is replaced by itself (a link to the same target
-    /// row), then the link is *not* considered broken, and no rows will be
-    /// cascade-removed by such an operation.
+    /// Note that a link is *not* considered broken when it is replaced by a
+    /// link to the same target row. In such a case, no rows are
+    /// cascade-removed.
     ///
     /// When a row is explicitly removed (such as by Table::remove()), all links
     /// to it are automatically removed or nullified. For single link columns
