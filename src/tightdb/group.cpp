@@ -1088,10 +1088,10 @@ public:
     {
         typedef _impl::TableFriend tf;
         if (unordered) {
-            // unordered insertion of multiple rows is not supported (and not needed) currently.
-            TIGHTDB_ASSERT(num_rows == 1);
             if (m_table) {
-                tf::adj_accessors_move(*m_table, last_row_ndx, row_ndx);
+                while (num_rows--) {
+                    tf::adj_accessors_move(*m_table, last_row_ndx - num_rows, row_ndx + num_rows);
+                }
             }
         }
         else {
