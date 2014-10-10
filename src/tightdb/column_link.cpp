@@ -104,7 +104,8 @@ void ColumnLink::clear()
 }
 
 
-void ColumnLink::erase_cascade(size_t row_ndx, size_t stop_on_table_ndx, cascade_rows& rows) const
+void ColumnLink::find_erase_cascade(size_t row_ndx, size_t stop_on_table_ndx,
+                                    cascade_rowset& rows) const
 {
     if (m_weak_links || is_null_link(row_ndx))
         return;
@@ -114,11 +115,13 @@ void ColumnLink::erase_cascade(size_t row_ndx, size_t stop_on_table_ndx, cascade
         return;
 
     size_t target_row_ndx = get_link(row_ndx);
-    erase_cascade_target_row(target_table_ndx, target_row_ndx, stop_on_table_ndx, rows); // Throws
+    find_erase_cascade_for_target_row(target_table_ndx, target_row_ndx,
+                                      stop_on_table_ndx, rows); // Throws
 }
 
 
-void ColumnLink::clear_cascade(size_t table_ndx, size_t num_rows, cascade_rows& rows) const
+void ColumnLink::find_clear_cascade(size_t table_ndx, size_t num_rows,
+                                    cascade_rowset& rows) const
 {
     if (m_weak_links)
         return;
@@ -131,7 +134,12 @@ void ColumnLink::clear_cascade(size_t table_ndx, size_t num_rows, cascade_rows& 
         if (is_null_link(i))
             continue;
         size_t target_row_ndx = get_link(i);
-        erase_cascade_target_row(target_table_ndx, target_row_ndx, table_ndx, rows); // Throws
+        // Setting `stop_on_table_ndx` to avoid removing idividual rows from this
+        // column, since it is about to be cleared anyway. This also prevents
+        // generating superfluous replication instructions.
+        size_t stop_on_table_ndx = table_ndx;
+        find_erase_cascade_for_target_row(target_table_ndx, target_row_ndx,
+                                          stop_on_table_ndx, rows); // Throws
     }
 }
 

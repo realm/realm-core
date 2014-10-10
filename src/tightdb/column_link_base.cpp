@@ -6,8 +6,10 @@ using namespace std;
 using namespace tightdb;
 
 
-void ColumnLinkBase::erase_cascade_target_row(size_t target_table_ndx, size_t target_row_ndx,
-                                              size_t stop_on_table_ndx, cascade_rows& rows) const
+void ColumnLinkBase::find_erase_cascade_for_target_row(size_t target_table_ndx,
+                                                       size_t target_row_ndx,
+                                                       size_t stop_on_table_ndx,
+                                                       cascade_rowset& rows) const
 {
     // Stop if there are other strong links to this row (this scheme fails to
     // discover orphaned cycles)
@@ -20,14 +22,14 @@ void ColumnLinkBase::erase_cascade_target_row(size_t target_table_ndx, size_t ta
     cascade_row target_row;
     target_row.table_ndx = target_table_ndx;
     target_row.row_ndx   = target_row_ndx;
-    typedef cascade_rows::iterator iter;
+    typedef cascade_rowset::iterator iter;
     iter i = ::upper_bound(rows.begin(), rows.end(), target_row);
     if (i != rows.end())
         return;
 
     // Recurse
     rows.insert(i, target_row); // Throws
-    tf::erase_cascade(*m_target_table, target_row_ndx, stop_on_table_ndx, rows); // Throws
+    tf::find_erase_cascade(*m_target_table, target_row_ndx, stop_on_table_ndx, rows); // Throws
 }
 
 

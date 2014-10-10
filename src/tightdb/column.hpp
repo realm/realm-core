@@ -167,30 +167,30 @@ public:
         bool operator<(const cascade_row&) const TIGHTDB_NOEXCEPT;
     };
 
-    typedef std::vector<cascade_row> cascade_rows;
+    typedef std::vector<cascade_row> cascade_rowset;
 
     //@{
 
-    /// erase_cascade() is called when the row at \a row_ndx is about to be
-    /// removed, and clear_cascade() when the column is about to be cleared (all
-    /// rows removed). Link columns must override these functions and descend
-    /// into target rows. If a target row has no other strong links to it, that
-    /// target row must be added to \a rows, and the cascade must recurse from
-    /// that point. Rows that are added to \a rows will eventually be
-    /// cascade-removed.
+    /// find_erase_cascade() is called when the row at \a row_ndx is about to be
+    /// removed, and find_clear_cascade() when the column is about to be cleared
+    /// (all rows removed). Link columns must override these functions and
+    /// descend into target rows. If a target row has no other strong links to
+    /// it, that target row must be added to \a rows, and the cascade must
+    /// recurse from that point. Rows that are added to \a rows will eventually
+    /// be cascade-removed.
     ///
     /// \param stop_on_table_ndx If not equal to tightdb::npos, then do not
-    /// recurse into rows of the group-level table with that index in the group.
+    /// recurse into rows of the group-level table with that index in the group. This is used by 
     ///
     /// \param rows A sorted list of rows. Each entry is a pair (table_ndx,
     /// row_ndx), where table_ndx is the index withing the group of a
     /// group-level table. Insertions must therfore respect this order.
 
-    virtual void erase_cascade(std::size_t row_ndx, std::size_t stop_on_table_ndx,
-                               cascade_rows& rows) const;
+    virtual void find_erase_cascade(std::size_t row_ndx, std::size_t stop_on_table_ndx,
+                                    cascade_rowset& rows) const;
 
-    virtual void clear_cascade(std::size_t table_ndx, std::size_t num_rows,
-                               cascade_rows& rows) const;
+    virtual void find_clear_cascade(std::size_t table_ndx, std::size_t num_rows,
+                                    cascade_rowset& rows) const;
 
     //@}
 

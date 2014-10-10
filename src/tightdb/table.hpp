@@ -1084,13 +1084,19 @@ private:
 
     std::size_t get_num_strong_backlinks(std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
 
-    typedef ColumnBase::cascade_rows cascade_rows;
+    typedef ColumnBase::cascade_rowset cascade_rowset;
 
-    /// Calls ColumnBase::erase_cascade() for each column.
-    void erase_cascade(std::size_t row_ndx, std::size_t stop_on_table_ndx, cascade_rows&) const;
+    /// Calls ColumnBase::find_erase_cascade() for each column to find the set
+    /// of rows that need to be cascade-removed. See the documentation of it for
+    /// the meaning of the arguments.
+    void find_erase_cascade(std::size_t row_ndx, std::size_t stop_on_table_ndx,
+                            cascade_rowset&) const;
 
-    /// Calls do_move_last_over() for each of the specified rows.
-    static void erase_rows__w_repl__wo_cascade(Group&, const cascade_rows&);
+    /// Calls do_move_last_over() for each of the rows in the specified
+    /// rowset. This means that each row removal will be individually submitted
+    /// to the replication subsystem. This operation removes only the specified
+    /// rows. It does not itself trigger new cascade-removals.
+    static void erase_rowset(Group&, const cascade_rowset&);
 
     /// Remove the specified row by the 'move last over' method, and submit the
     /// operation to the replication subsystem.
@@ -1897,15 +1903,15 @@ public:
         return table.get_num_strong_backlinks(row_ndx);
     }
 
-    static void erase_cascade(const Table& table, std::size_t row_ndx,
-                              std::size_t stop_on_table_ndx, Table::cascade_rows& rows)
+    static void find_erase_cascade(const Table& table, std::size_t row_ndx,
+                                   std::size_t stop_on_table_ndx, Table::cascade_rowset& rows)
     {
-        table.erase_cascade(row_ndx, stop_on_table_ndx, rows); // Throws
+        table.find_erase_cascade(row_ndx, stop_on_table_ndx, rows); // Throws
     }
 
-    static void erase_rows__w_repl__wo_cascade(Group& group, const Table::cascade_rows& rows)
+    static void erase_rowset(Group& group, const Table::cascade_rowset& rows)
     {
-        Table::erase_rows__w_repl__wo_cascade(group, rows); // Throws
+        Table::erase_rowset(group, rows); // Throws
     }
 
     static std::size_t* record_subtable_path(const Table& table, std::size_t* begin,

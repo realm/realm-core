@@ -123,8 +123,8 @@ void ColumnLinkList::erase(size_t row_ndx, bool is_last)
 }
 
 
-void ColumnLinkList::erase_cascade(size_t row_ndx, size_t stop_on_table_ndx,
-                                   cascade_rows& rows) const
+void ColumnLinkList::find_erase_cascade(size_t row_ndx, size_t stop_on_table_ndx,
+                                        cascade_rowset& rows) const
 {
     if (m_weak_links)
         return;
@@ -140,11 +140,12 @@ void ColumnLinkList::erase_cascade(size_t row_ndx, size_t stop_on_table_ndx,
         return;
     Array root(get_alloc());
     root.init_from_ref(ref);
-    erase_cascade_2(root, target_table_ndx, stop_on_table_ndx, rows); // Throws
+    find_erase_cascade_2(root, target_table_ndx, stop_on_table_ndx, rows); // Throws
 }
 
 
-void ColumnLinkList::clear_cascade(size_t table_ndx, size_t num_rows, cascade_rows& rows) const
+void ColumnLinkList::find_clear_cascade(size_t table_ndx, size_t num_rows,
+                                        cascade_rowset& rows) const
 {
     if (m_weak_links)
         return;
@@ -161,13 +162,17 @@ void ColumnLinkList::clear_cascade(size_t table_ndx, size_t num_rows, cascade_ro
         if (ref == 0)
             continue;
         root.init_from_ref(ref);
-        erase_cascade_2(root, target_table_ndx, table_ndx, rows); // Throws
+        // Setting `stop_on_table_ndx` to avoid removing idividual rows from this
+        // column, since it is about to be cleared anyway. This also prevents
+        // generating superfluous replication instructions.
+        size_t stop_on_table_ndx = table_ndx;
+        find_erase_cascade_2(root, target_table_ndx, stop_on_table_ndx, rows); // Throws
     }
 }
 
 
-void ColumnLinkList::erase_cascade_single(size_t row_ndx, size_t link_ndx,
-                                          cascade_rows& rows) const
+void ColumnLinkList::find_erase_cascade_for_single_link(size_t row_ndx, size_t link_ndx,
+                                                        cascade_rowset& rows) const
 {
     if (m_weak_links)
         return;
@@ -193,15 +198,16 @@ void ColumnLinkList::erase_cascade_single(size_t row_ndx, size_t link_ndx,
 
     size_t target_table_ndx = m_target_table->get_index_in_group();
     size_t stop_on_table_ndx = tightdb::npos;
-    erase_cascade_target_row(target_table_ndx, target_row_ndx, stop_on_table_ndx, rows); // Throws
+    find_erase_cascade_for_target_row(target_table_ndx, target_row_ndx,
+                                      stop_on_table_ndx, rows); // Throws
 }
 
 
-void ColumnLinkList::erase_cascade_2(const Array& link_list_root, size_t target_table_ndx,
-                                     size_t stop_on_table_ndx, cascade_rows& rows) const
+void ColumnLinkList::find_erase_cascade_2(const Array& link_list_root, size_t target_table_ndx,
+                                          size_t stop_on_table_ndx, cascade_rowset& rows) const
 {
     if (!link_list_root.is_inner_bptree_node()) {
-        erase_cascade_3(link_list_root, target_table_ndx, stop_on_table_ndx, rows); // Throws
+        find_erase_cascade_3(link_list_root, target_table_ndx, stop_on_table_ndx, rows); // Throws
         return;
     }
 
@@ -212,20 +218,20 @@ void ColumnLinkList::erase_cascade_2(const Array& link_list_root, size_t target_
         pair<MemRef, size_t> p = link_list_root.get_bptree_leaf(link_ndx);
         MemRef leaf_mem = p.first;
         leaf.init_from_mem(leaf_mem);
-        erase_cascade_3(leaf, target_table_ndx, stop_on_table_ndx, rows); // Throws
+        find_erase_cascade_3(leaf, target_table_ndx, stop_on_table_ndx, rows); // Throws
         link_ndx += leaf.size();
     }
 }
 
 
-void ColumnLinkList::erase_cascade_3(const Array& link_list_leaf, size_t target_table_ndx,
-                                     size_t stop_on_table_ndx, cascade_rows& rows) const
+void ColumnLinkList::find_erase_cascade_3(const Array& link_list_leaf, size_t target_table_ndx,
+                                          size_t stop_on_table_ndx, cascade_rowset& rows) const
 {
     size_t num_links = link_list_leaf.size();
     for (size_t i = 0; i < num_links; ++i) {
         size_t target_row_ndx = to_size_t(link_list_leaf.get(i));
-        erase_cascade_target_row(target_table_ndx, target_row_ndx,
-                                 stop_on_table_ndx, rows); // Throws
+        find_erase_cascade_for_target_row(target_table_ndx, target_row_ndx,
+                                          stop_on_table_ndx, rows); // Throws
     }
 }
 

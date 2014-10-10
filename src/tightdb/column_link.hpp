@@ -50,8 +50,8 @@ public:
     void erase(std::size_t, bool) TIGHTDB_OVERRIDE;
     void move_last_over(std::size_t, std::size_t) TIGHTDB_OVERRIDE;
 
-    void erase_cascade(std::size_t, std::size_t, cascade_rows&) const TIGHTDB_OVERRIDE;
-    void clear_cascade(std::size_t, std::size_t, cascade_rows&) const TIGHTDB_OVERRIDE;
+    void find_erase_cascade(std::size_t, std::size_t, cascade_rowset&) const TIGHTDB_OVERRIDE;
+    void find_clear_cascade(std::size_t, std::size_t, cascade_rowset&) const TIGHTDB_OVERRIDE;
 
 #ifdef TIGHTDB_DEBUG
     void Verify(const Table&, std::size_t) const TIGHTDB_OVERRIDE;

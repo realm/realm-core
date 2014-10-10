@@ -232,13 +232,13 @@ void ColumnBase::update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT
 }
 
 
-void ColumnBase::erase_cascade(std::size_t, size_t, cascade_rows&) const
+void ColumnBase::find_erase_cascade(std::size_t, size_t, cascade_rowset&) const
 {
     // No-op by default
 }
 
 
-void ColumnBase::clear_cascade(std::size_t, size_t, cascade_rows&) const
+void ColumnBase::find_clear_cascade(std::size_t, size_t, cascade_rowset&) const
 {
     // No-op by default
 }

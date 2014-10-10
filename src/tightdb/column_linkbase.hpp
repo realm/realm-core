@@ -43,8 +43,8 @@ public:
     virtual void do_update_link(std::size_t row_ndx, std::size_t old_target_row_ndx,
                                 std::size_t new_target_row_ndx) = 0;
 
-    void erase_cascade_target_row(std::size_t target_table_ndx, std::size_t target_row_ndx,
-                                  std::size_t stop_on_table_ndx, cascade_rows&) const;
+    void find_erase_cascade_for_target_row(std::size_t target_table_ndx, std::size_t target_row_ndx,
+                                           std::size_t stop_on_table_ndx, cascade_rowset&) const;
 
     void refresh_accessor_tree(std::size_t, const Spec&) TIGHTDB_OVERRIDE;
 

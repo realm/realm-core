@@ -346,17 +346,18 @@ size_t Table::get_num_strong_backlinks(std::size_t row_ndx) const TIGHTDB_NOEXCE
 }
 
 
-void Table::erase_cascade(size_t row_ndx, size_t stop_on_table_ndx, cascade_rows& rows) const
+void Table::find_erase_cascade(size_t row_ndx, size_t stop_on_table_ndx,
+                               cascade_rowset& rows) const
 {
     size_t num_cols = m_spec.get_public_column_count();
     for (size_t col_ndx = 0; col_ndx != num_cols; ++col_ndx) {
         const ColumnBase& column = get_column_base(col_ndx);
-        column.erase_cascade(row_ndx, stop_on_table_ndx, rows); // Throws
+        column.find_erase_cascade(row_ndx, stop_on_table_ndx, rows); // Throws
     }
 }
 
 
-void Table::erase_rows__w_repl__wo_cascade(Group& group, const cascade_rows& rows)
+void Table::erase_rowset(Group& group, const cascade_rowset& rows)
 {
     // Rows are ordered by ascending row index, but we need to remove the rows
     // by descending index to avoid changing the indexes of rows that are not
@@ -365,7 +366,7 @@ void Table::erase_rows__w_repl__wo_cascade(Group& group, const cascade_rows& row
     // Note that cascade removal works under the assumption that all group-level
     // tables are unorered, and threrefore that rows must be removed by the
     // 'move last over' method.
-    typedef cascade_rows::const_reverse_iterator iter;
+    typedef cascade_rowset::const_reverse_iterator iter;
     iter end = rows.rend();
     for (iter i = rows.rbegin(); i != end; ++i) {
         typedef _impl::GroupFriend gf;
@@ -1884,16 +1885,16 @@ void Table::clear()
     if (table_ndx != tightdb::npos) {
         // Group-level tables may have links, so in those cases we need to
         // discover all the rows that need to be cascade-removed.
-        cascade_rows rows; // ordered
+        cascade_rowset rows; // ordered
 
         size_t num_public_cols = m_spec.get_public_column_count();
         for (size_t i = 0; i < num_public_cols; ++i) {
             ColumnBase& column = get_column_base(i);
-            column.clear_cascade(table_ndx, m_size, rows);
+            column.find_clear_cascade(table_ndx, m_size, rows);
         }
 
         Group* group = get_parent_group();
-        erase_rows__w_repl__wo_cascade(*group, rows); // Throws
+        erase_rowset(*group, rows); // Throws
     }
 
     size_t num_cols = m_spec.get_column_count();
@@ -1949,14 +1950,14 @@ void Table::move_last_over(size_t row_ndx)
     ColumnBase::cascade_row row;
     row.table_ndx = table_ndx;
     row.row_ndx   = row_ndx;
-    cascade_rows rows; // ordered
+    cascade_rowset rows; // ordered
     rows.push_back(row);
 
     size_t stop_on_table_ndx = tightdb::npos;
-    erase_cascade(row_ndx, stop_on_table_ndx, rows); // Throws
+    find_erase_cascade(row_ndx, stop_on_table_ndx, rows); // Throws
 
     Group* group = get_parent_group();
-    erase_rows__w_repl__wo_cascade(*group, rows); // Throws
+    erase_rowset(*group, rows); // Throws
 }
 
 
@@ -2645,15 +2646,15 @@ void Table::set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx)
     ColumnLink& column = get_column_link(col_ndx);
 
     // Identify the rows that need to be cascade-removed
-    cascade_rows rows; // ordered
+    cascade_rowset rows; // ordered
     if (!column.get_weak_links() && !column.is_null_link(row_ndx)) {
         size_t old_target_row_ndx = column.get_link(row_ndx);
         if (target_row_ndx != old_target_row_ndx) {
             Table& target_table = column.get_target_table();
             size_t target_table_ndx = target_table.get_index_in_group();
             size_t stop_on_table_ndx = tightdb::npos;
-            column.erase_cascade_target_row(target_table_ndx, old_target_row_ndx,
-                                            stop_on_table_ndx, rows); // Throws
+            column.find_erase_cascade_for_target_row(target_table_ndx, old_target_row_ndx,
+                                                     stop_on_table_ndx, rows); // Throws
         }
     }
 
@@ -2667,7 +2668,7 @@ void Table::set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx)
 #endif
 
     Group* group = get_parent_group();
-    erase_rows__w_repl__wo_cascade(*group, rows); // Throws
+    erase_rowset(*group, rows); // Throws
 }
 
 void Table::insert_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx)
@@ -2700,11 +2701,11 @@ void Table::nullify_link(size_t col_ndx, size_t row_ndx)
 
     // Group-level tables may have links, so in those cases we need to take care
     // of cascade-removal.
-    cascade_rows rows; // ordered
+    cascade_rowset rows; // ordered
     size_t stop_on_table_ndx = tightdb::npos;
-    column.erase_cascade(row_ndx, stop_on_table_ndx, rows); // Throws
+    column.find_erase_cascade(row_ndx, stop_on_table_ndx, rows); // Throws
     Group* group = get_parent_group();
-    erase_rows__w_repl__wo_cascade(*group, rows); // Throws
+    erase_rowset(*group, rows); // Throws
 
     column.nullify_link(row_ndx);
 
