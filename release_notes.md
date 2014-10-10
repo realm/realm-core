@@ -4,6 +4,7 @@
 
 * Fixed a crash when copying a query checking for equality on an indexed string
   column.
+* Fixed a stack overflow when too many query conditions were combined with Or().
 
 ### API breaking changes:
 
