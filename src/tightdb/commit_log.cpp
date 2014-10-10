@@ -40,6 +40,27 @@ namespace tightdb {
 
 namespace _impl {
 
+// Design of the commit logs:
+//
+// We use two files to hold the commit logs. Using two files allows us to append data to the
+// end of one of the files, instead of doing complex memory management. Initially, both files
+// hold only a header, and one of them is designated 'active'. New commit logs are appended
+// to the active file. Each file holds a consecutive range of commits, the active file holding
+// the latest commits. A commit log entry is never split between the files.
+//
+// Calls to set_oldest_version_needed checks if the non-active file holds stale commit logs only.
+// If so, the non-active file is reset and becomes active instead.
+//
+// Filesizes are determined by heuristics. When a file runs out of size, its size is doubled.
+// When changing the active file, the total amount memory that can be reached is computed,
+// and if it is below 1/8 of the current filesize, the file is truncated to half its old size.
+// the intention is to strike a balance between shrinking the files, when they are much bigger
+// than needed, while at the same time avoiding many repeated shrinks and expansions.
+//
+// Calls to get_commit_entries determines which file(s) needs to be accessed, maps them to
+// memory and builds a vector of BinaryData with pointers to the buffers. The pointers may
+// end up going to both mappings/files.
+//
 class WriteLogCollector : public Replication
 {
 public:
@@ -59,43 +80,43 @@ public:
     virtual void get_commit_entries(uint_fast64_t from_version, uint_fast64_t to_version,
                                     BinaryData* logs_buffer) TIGHTDB_NOEXCEPT;
 protected:
+    static const size_t minimal_log_size = 1024;
+    // Layout of the commit logs preamble:
+    struct CommitLogPreample {
+        size_t write_offset; // value always kept aligned to size_t
+        size_t begin_commit;
+        size_t end_commit; // if end_commit == begin_commit, the file is (logically) empty.
+        size_t data_area_start;
+    };
+    // Each of the actual logs are preceded by their size (in size_t format), and each log start
+    // aligned to size_t (required on some architectures). The size does not count any padding
+    // needed at the end of each log.
+
+    // Metadata for a file:
+    struct CommitLogMetadata {
+        util::File file;
+        util::Map<CommitLogPreample> map;
+        std::size_t last_seen_size;
+    }
+
     std::string m_database_name;
+    CommitLogMetadata m_log_a;
+    CommitLogMetadata m_log_b;
+
+    // Ensure that the log file is opened and its map up to date (the mapping needs to be changed
+    // if the file has grown beyond the limit of the previous mapping).
+    void map_if_needed(CommitLogMetadata& log);
+
+    // Reset mapping and file
+    void reset_file(CommitLogMetadata& log);
+
+    // Get the commitlogs in order of their commits.
+    void get_maps_in_order(CommitLogMetadata& first, CommitLogMetadata& second);
 };
 
-
-// Design of the commit logs:
-//
-// We use two files to hold the commit logs. Using two files allows us to append data to the
-// end of one of the files, instead of doing complex memory management. Initially, both files
-// hold only a header, and one of them is designated 'active'. New commit logs are appended
-// to the active file. Each file holds a consecutive range of commits, the active file holding
-// the latest commits.
-//
-// Calls to set_oldest_version_needed checks if the non-active file holds stale commit logs only.
-// If so, the non-active file is reset and becomes active instead.
-//
-// Filesizes are determined by heuristics. When a file runs out of size, its size is doubled.
-// When changing the active file, the new file is reset to 1/4 of the current total size, thus gradually
-// decreasing file sizes (until a minimum limit is reached). A commit log entry is never split
-// between the files.
-//
-// Calls to get_commit_entries determines which file(s) needs to be accessed, maps them to
-// memory and builds a vector of BinaryData with pointers to the buffers. The pointers may
-// end up going to both mappings/files.
-//
-// Layout of the commit logs preamble:
-struct CommitLogPreample {
-    size_t write_offset; // value always kept aligned to size_t
-    size_t begin_commit;
-    size_t end_commit; // if end_commit == begin_commit, the file is (logically) empty.
-    size_t data_area_start;
-};
-// Each of the actual logs are preceded by their size (in size_t format), and each log start
-// aligned to size_t (required on some architectures). The size does not count any padding
-// needed at the end of each log.
 
 WriteLogCollector::~WriteLogCollector() TIGHTDB_NOEXCEPT 
-{
+{    
 }
 
 void WriteLogCollector::reset_log_management()
@@ -104,6 +125,21 @@ void WriteLogCollector::reset_log_management()
     // it must (re)initialize the log files. It does not change the content of any already existing
     // files, but instead deletes and re-creates the files.
     // it also clears the memory mappings set for the files.
+    reset_file(m_log_a, m_database_name + ".log_a");
+    reset_file(m_log_b, m_database_name + ".log_b");
+/*
+    m_log_a.map.unmap();
+    m_log_a.file.close();
+    m_log_a.file.try_remove();
+    m_log_a.file.open(m_database_name + ".log_a", mode_Write);
+    m_log_a.file.resize(minimal_log_size);
+    m_log_a.map.map(m_log_a.file, access_ReadWrite, minimal_log_size);
+
+    m_log_b.map.unmap();
+    m_log_b.file.close();
+    m_log_a.file.try_remove();
+    m_log_b.file.open(m_database_name + ".log_b", mode_Write);
+*/
 }
 
 
