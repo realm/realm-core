@@ -923,4 +923,117 @@ TEST(Links_RandomizedOperations)
     }
 }
 
+
+TEST(Links_CascadeRemove_ColumnLink)
+{
+    Group group;
+    TableRef origin = group.add_table("origin");
+    TableRef target = group.add_table("target");
+    origin->add_column_link(type_Link, "o_1", *target, link_Strong);
+    target->add_column(type_Int, "t_1");
+    origin->add_empty_row(2);
+    target->add_empty_row(2);
+    Row origin_row_0 = origin->get(0);
+    Row origin_row_1 = origin->get(1);
+    Row target_row_0 = target->get(0);
+    Row target_row_1 = target->get(1);
+    origin_row_0.set_link(0,0); // origin[0].o_1 -> target[0]
+    origin_row_1.set_link(0,1); // origin[1].o_1 -> target[1]
+
+    // Break link by nullifying
+    CHECK(origin_row_0.get_link(0) == 0 && origin_row_1.get_link(0) == 1);
+    CHECK(target_row_0 && target_row_1);
+    origin_row_1.nullify_link(0); // origin[1].o_1 -> null
+    CHECK(target_row_0 && !target_row_1);
+    target->add_empty_row();
+    target_row_1 = target->get(1);
+    origin_row_1.set_link(0,1); // origin[1].o_1 -> target[1]
+
+    // Break link by reassign
+    CHECK(origin_row_0.get_link(0) == 0 && origin_row_1.get_link(0) == 1);
+    CHECK(target_row_0 && target_row_1);
+    origin_row_1.set_link(0,0); // origin[1].o_1 -> target[0]
+    CHECK(target_row_0 && !target_row_1);
+    target->add_empty_row();
+    target_row_1 = target->get(1);
+    origin_row_1.set_link(0,1); // origin[1].o_1 -> target[1]
+
+    // Avoid breaking link by reassigning self
+    CHECK(origin_row_0.get_link(0) == 0 && origin_row_1.get_link(0) == 1);
+    CHECK(target_row_0 && target_row_1);
+    origin_row_1.set_link(0,1); // origin[1].o_1 -> target[1]
+    CHECK(target_row_0 && target_row_1);
+
+    // Break link by explicit row removal
+    CHECK(origin_row_0.get_link(0) == 0 && origin_row_1.get_link(0) == 1);
+    CHECK(target_row_0 && target_row_1);
+    origin_row_1.move_last_over();
+    CHECK(target_row_0 && !target_row_1);
+    origin->add_empty_row();
+    target->add_empty_row();
+    origin_row_1 = origin->get(1);
+    target_row_1 = target->get(1);
+    origin_row_1.set_link(0,1); // origin[1].o_1 -> target[1]
+
+    // Break link by clearing of table
+    CHECK(origin_row_0.get_link(0) == 0 && origin_row_1.get_link(0) == 1);
+    CHECK(target_row_0 && target_row_1);
+    origin->clear();
+    CHECK(!target_row_0 && !target_row_1);
+}
+
+
+/*
+TEST(Links_CascadeRemove_ColumnLinkList)
+{
+    Group group;
+    TableRef origin = group.add_table("origin");
+    TableRef target = group.add_table("target");
+    origin->add_column_link(type_LinkList, "o_1", *target, link_Strong);
+    target->add_column(type_Int, "t_1");
+    origin->add_empty_row(2);
+    target->add_empty_row(2);
+    Row origin_row_0 = origin->get(0);
+    Row origin_row_1 = origin->get(1);
+    Row target_row_0 = target->get(0);
+    Row target_row_1 = target->get(1);
+    origin_row_0.set_link(0,0); // origin[0].o_1 -> target[0]
+    origin_row_1.set_link(0,1); // origin[1].o_1 -> target[1]
+
+    // Break link by nullifying
+    CHECK(origin_row_0.get_link(0) == 0 && origin_row_1.get_link(0) == 1);
+    CHECK(target_row_0 && target_row_1);
+    origin_row_1.nullify_link(0); // origin[1].o_1 -> null
+    CHECK(target_row_0 && !target_row_1);
+    target->add_empty_row();
+    target_row_1 = target->get(1);
+    origin_row_1.set_link(0,1); // origin[1].o_1 -> target[1]
+
+    // Break link by reassign
+    CHECK(origin_row_0.get_link(0) == 0 && origin_row_1.get_link(0) == 1);
+    CHECK(target_row_0 && target_row_1);
+    origin_row_1.set_link(0,0); // origin[1].o_1 -> target[0]
+    CHECK(target_row_0 && !target_row_1);
+    target->add_empty_row();
+    target_row_1 = target->get(1);
+    origin_row_1.set_link(0,1); // origin[1].o_1 -> target[1]
+
+    // Avoid breaking link by reassigning self
+    CHECK(origin_row_0.get_link(0) == 0 && origin_row_1.get_link(0) == 1);
+    CHECK(target_row_0 && target_row_1);
+    origin_row_1.set_link(0,1); // origin[1].o_1 -> target[1]
+    CHECK(target_row_0 && target_row_1);
+}
+*/
+
+
+TEST(Links_CascadeRemove_MultiLevel)
+{
+}
+
+
+TEST(Links_CascadeRemove_Cycles)
+{
+}
+
 #endif // TEST_LINKS

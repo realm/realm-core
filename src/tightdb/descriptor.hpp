@@ -194,10 +194,11 @@ public:
     /// A link is considered broken if
     ///
     ///  - the link is nullified, removed, or replaced by a different link
-    ///    (Table::nullify_link(), Table::set_link(), LinkView::remove_link(),
+    ///    (Row::nullify_link(), Row::set_link(), LinkView::remove_link(),
     ///    LinkView::set_link(), LinkView::clear()), or if
     ///
-    ///  - the origin row is explicitly removed (Table::remove()), or if
+    ///  - the origin row is explicitly removed (Row::move_last_over(),
+    ///    Table::clear()), or if
     ///
     ///  - the origin row is cascade-removed.
     ///

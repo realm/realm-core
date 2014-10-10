@@ -14,6 +14,8 @@
 * Support added for cascading row removal. See `Descriptor::set_link_type()` for
   details. All previsouly created link columns will effectively have link-type
   'weak'.
+* Rows can now be removed via a row accessors (`Row::remove()`,
+  `Row::move_last_over()`).
 * Make the durability level settable in the `SharedGroup` constructor and
   `open()` overloads taking a `Replication`.
 

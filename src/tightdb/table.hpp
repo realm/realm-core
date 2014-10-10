@@ -351,11 +351,21 @@ public:
 
     /// Row handling.
     ///
-    /// The removal of a row may cause other linked rows to be
-    /// cascade-removed. The clearing of a table may also cause linked rows to
-    /// be cascade-removed, but in this respect, the effect is exactly as if
-    /// each row had been removed individually. See Descriptor::set_link_type()
-    /// for details.
+    /// remove() removes the specified row from the table and shifts all rows at
+    /// higher index to fill the vacated slot. This operation assumes that the
+    /// table is ordered, and it is therefore allowed only on tables **without**
+    /// link columns, as link columns are only allowed in unordered tables.
+    ///
+    /// move_last_over() removes the specified row from the table, and if it is
+    /// not the last row in the table, it then moves the last row into the
+    /// vacated slot. This operation assumes that the table is unordered, and it
+    /// may therfore be used on tables with link columns.
+    ///
+    /// The removal of a row from an unordered table (move_last_over()) may
+    /// cause other linked rows to be cascade-removed. The clearing of a table
+    /// may also cause linked rows to be cascade-removed, but in this respect,
+    /// the effect is exactly as if each row had been removed individually. See
+    /// Descriptor::set_link_type() for details.
     ///
     /// It is an error to call add_empty_row() or insert_empty_row() on a table
     /// with a primary key, if that would result in a violation the implied
@@ -366,14 +376,11 @@ public:
     void insert_empty_row(std::size_t row_ndx, std::size_t num_rows = 1);
     void remove(std::size_t row_ndx);
     void remove_last();
+    void move_last_over(std::size_t row_ndx);
     void clear();
 
     //@}
 
-    /// Move the last row to the specified index. This overwrites the target row
-    /// and reduces the number of rows by one. If the target row is the last one
-    /// it will just be deleted.
-    void move_last_over(std::size_t target_row_ndx);
 
     //@{
 
