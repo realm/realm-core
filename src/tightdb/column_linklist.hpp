@@ -115,6 +115,8 @@ private:
     void update_child_ref(std::size_t child_ndx, ref_type new_ref) TIGHTDB_OVERRIDE;
     ref_type get_child_ref(std::size_t child_ndx) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
+    // These helpers are needed because of the way the B+-tree of links is
+    // traversed.
     void find_erase_cascade_2(const Array& link_list_root, std::size_t target_table_ndx,
                               std::size_t stop_on_table_ndx, cascade_rowset&) const;
     void find_erase_cascade_3(const Array& link_list_leaf, std::size_t target_table_ndx,

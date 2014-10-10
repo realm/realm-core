@@ -961,7 +961,7 @@ TEST(Links_CascadeRemove_ColumnLink)
     // Avoid breaking link by reassigning self
     CHECK(origin_row_0.get_link(0) == 0 && origin_row_1.get_link(0) == 1);
     CHECK(target_row_0 && target_row_1);
-    origin_row_1.set_link(0,1); // origin[1].o_1 -> target[1]
+    origin_row_1.set_link(0,1); // No effective change!
     CHECK(target_row_0 && target_row_1);
 
     // Break link by explicit row removal
@@ -975,7 +975,7 @@ TEST(Links_CascadeRemove_ColumnLink)
     target_row_1 = target->get(1);
     origin_row_1.set_link(0,1); // origin[1].o_1 -> target[1]
 
-    // Break link by clearing of table
+    // Break link by clearing table
     CHECK(origin_row_0.get_link(0) == 0 && origin_row_1.get_link(0) == 1);
     CHECK(target_row_0 && target_row_1);
     origin->clear();
@@ -983,7 +983,6 @@ TEST(Links_CascadeRemove_ColumnLink)
 }
 
 
-/*
 TEST(Links_CascadeRemove_ColumnLinkList)
 {
     Group group;
@@ -997,34 +996,77 @@ TEST(Links_CascadeRemove_ColumnLinkList)
     Row origin_row_1 = origin->get(1);
     Row target_row_0 = target->get(0);
     Row target_row_1 = target->get(1);
-    origin_row_0.set_link(0,0); // origin[0].o_1 -> target[0]
-    origin_row_1.set_link(0,1); // origin[1].o_1 -> target[1]
+    LinkViewRef link_list_0 = origin_row_0.get_linklist(0);
+    LinkViewRef link_list_1 = origin_row_1.get_linklist(0);
+    link_list_0->add(0); // origin[0].o_1 -> [ target[0] ]
+    link_list_1->add(0); // origin[1].o_1 -> [ target[0] ]
+    link_list_1->add(1); // origin[1].o_1 -> [ target[0], target[1] ]
 
-    // Break link by nullifying
-    CHECK(origin_row_0.get_link(0) == 0 && origin_row_1.get_link(0) == 1);
+    // Break link by clearing list
+    CHECK(link_list_0->size() == 1 && link_list_0->get(0).get_index() == 0);
+    CHECK(link_list_1->size() == 2 && link_list_1->get(0).get_index() == 0 &&
+          link_list_1->get(1).get_index() == 1);
     CHECK(target_row_0 && target_row_1);
-    origin_row_1.nullify_link(0); // origin[1].o_1 -> null
+    link_list_1->clear(); // origin[1].o_1 -> []
     CHECK(target_row_0 && !target_row_1);
     target->add_empty_row();
     target_row_1 = target->get(1);
-    origin_row_1.set_link(0,1); // origin[1].o_1 -> target[1]
+    link_list_1->add(0); // origin[1].o_1 -> [ target[0] ]
+    link_list_1->add(1); // origin[1].o_1 -> [ target[0], target[1] ]
+
+    // Break link by removal from list
+    CHECK(link_list_0->size() == 1 && link_list_0->get(0).get_index() == 0);
+    CHECK(link_list_1->size() == 2 && link_list_1->get(0).get_index() == 0 &&
+          link_list_1->get(1).get_index() == 1);
+    CHECK(target_row_0 && target_row_1);
+    link_list_1->remove(1); // origin[1].o_1 -> [ target[0] ]
+    CHECK(target_row_0 && !target_row_1);
+    target->add_empty_row();
+    target_row_1 = target->get(1);
+    link_list_1->add(1); // origin[1].o_1 -> [ target[0], target[1] ]
 
     // Break link by reassign
-    CHECK(origin_row_0.get_link(0) == 0 && origin_row_1.get_link(0) == 1);
+    CHECK(link_list_0->size() == 1 && link_list_0->get(0).get_index() == 0);
+    CHECK(link_list_1->size() == 2 && link_list_1->get(0).get_index() == 0 &&
+          link_list_1->get(1).get_index() == 1);
     CHECK(target_row_0 && target_row_1);
-    origin_row_1.set_link(0,0); // origin[1].o_1 -> target[0]
+    link_list_1->set(1,0); // origin[1].o_1 -> [ target[0], target[0] ]
     CHECK(target_row_0 && !target_row_1);
     target->add_empty_row();
     target_row_1 = target->get(1);
-    origin_row_1.set_link(0,1); // origin[1].o_1 -> target[1]
+    link_list_1->set(1,1); // origin[1].o_1 -> [ target[0], target[1] ]
 
     // Avoid breaking link by reassigning self
-    CHECK(origin_row_0.get_link(0) == 0 && origin_row_1.get_link(0) == 1);
+    CHECK(link_list_0->size() == 1 && link_list_0->get(0).get_index() == 0);
+    CHECK(link_list_1->size() == 2 && link_list_1->get(0).get_index() == 0 &&
+          link_list_1->get(1).get_index() == 1);
     CHECK(target_row_0 && target_row_1);
-    origin_row_1.set_link(0,1); // origin[1].o_1 -> target[1]
+    link_list_1->set(1,1); // No effective change!
     CHECK(target_row_0 && target_row_1);
+
+    // Break link by explicit row removal
+    CHECK(link_list_0->size() == 1 && link_list_0->get(0).get_index() == 0);
+    CHECK(link_list_1->size() == 2 && link_list_1->get(0).get_index() == 0 &&
+          link_list_1->get(1).get_index() == 1);
+    CHECK(target_row_0 && target_row_1);
+    origin_row_1.move_last_over();
+    CHECK(target_row_0 && !target_row_1);
+    origin->add_empty_row();
+    target->add_empty_row();
+    origin_row_1 = origin->get(1);
+    target_row_1 = target->get(1);
+    link_list_1 = origin_row_1.get_linklist(0);
+    link_list_1->add(0); // origin[1].o_1 -> [ target[0] ]
+    link_list_1->add(1); // origin[1].o_1 -> [ target[0], target[1] ]
+
+    // Break link by clearing table
+    CHECK(link_list_0->size() == 1 && link_list_0->get(0).get_index() == 0);
+    CHECK(link_list_1->size() == 2 && link_list_1->get(0).get_index() == 0 &&
+          link_list_1->get(1).get_index() == 1);
+    CHECK(target_row_0 && target_row_1);
+    origin->clear();
+    CHECK(!target_row_0 && !target_row_1);
 }
-*/
 
 
 TEST(Links_CascadeRemove_MultiLevel)
