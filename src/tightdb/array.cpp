@@ -2958,121 +2958,13 @@ const Array* Array::GetBlock(size_t ndx, Array& arr, size_t& off,
     return &arr;
 }
 
-
-size_t Array::IndexStringFindFirst(StringData value, void* column, StringGetter get_func) const
+template <IndexMethod method, class T> size_t Array::index_string(StringData value, Column& result, size_t &result_ref, void* column, StringGetter get_func) const
 {
-    StringData value_2 = value;
-    const char* data   = m_data;
-    const char* header;
-    size_t width = m_width;
-    bool is_inner_node = m_is_inner_bptree_node;
-    typedef StringIndex::key_type key_type;
-    key_type key;
+    bool first(method == index_FindFirst);
+    bool count(method == index_Count);
+    bool all(method == index_FindAll);
+    bool allnocopy(method == index_FindAll_nocopy);
 
-top:
-    // Create 4 byte index key
-    key = StringIndex::create_key(value_2);
-
-    for (;;) {
-        // Get subnode table
-        ref_type offsets_ref = to_ref(get_direct(data, width, 0));
-
-        // Find the position matching the key
-        const char* offsets_header = m_alloc.translate(offsets_ref);
-        const char* offsets_data = get_data_from_header(offsets_header);
-        size_t offsets_size = get_size_from_header(offsets_header);
-        size_t pos = ::lower_bound<32>(offsets_data, offsets_size, key); // keys are always 32 bits wide
-
-        // If key is outside range, we know there can be no match
-        if (pos == offsets_size)
-            return not_found;
-
-        // Get entry under key
-        size_t pos_refs = pos + 1; // first entry in refs points to offsets
-        int64_t ref = get_direct(data, width, pos_refs);
-
-        if (is_inner_node) {
-            // Set vars for next iteration
-            header        = m_alloc.translate(to_ref(ref));
-            data          = get_data_from_header(header);
-            width         = get_width_from_header(header);
-            is_inner_node = get_is_inner_bptree_node_from_header(header);
-            continue;
-        }
-
-        key_type stored_key = key_type(get_direct<32>(offsets_data, pos));
-
-        if (stored_key != key)
-            return not_found;
-
-        // Literal row index
-        if (ref & 1) {
-            size_t row_ref = size_t(uint64_t(ref) >> 1);
-
-            // If the last byte in the stored key is zero, we know that we have
-            // compared against the entire (target) string
-            if (!(stored_key << 24))
-                return row_ref;
-
-            StringData str = (*get_func)(column, row_ref);
-            if (str == value)
-                return row_ref;
-            return not_found;
-        }
-
-        const char* sub_header = m_alloc.translate(to_ref(ref));
-        const bool sub_isindex = get_context_flag_from_header(sub_header);
-
-        // List of matching row indexes
-        if (!sub_isindex) {
-            const char*  sub_data   = get_data_from_header(sub_header);
-            const size_t sub_width  = get_width_from_header(sub_header);
-            const bool   sub_isleaf = !get_is_inner_bptree_node_from_header(sub_header);
-
-            // In most cases the row list will just be an array but
-            // there might be so many matches that it has branched
-            // into a column
-            size_t row_ref;
-            if (sub_isleaf)
-                row_ref = to_size_t(get_direct(sub_data, sub_width, 0));
-            else {
-                Array sub(m_alloc);
-                sub.init_from_ref(to_ref(ref));
-                pair<MemRef, size_t> p = sub.get_bptree_leaf(0);
-                const char* leaf_header = p.first.m_addr;
-                row_ref = to_size_t(get(leaf_header, 0));
-            }
-
-            // If the last byte in the stored key is zero, we know
-            // that we have compared against the entire (target)
-            // string
-            if (!(stored_key << 24))
-                return row_ref;
-
-            StringData str = (*get_func)(column, row_ref);
-            if (str == value)
-                return row_ref;
-            return not_found;
-        }
-
-        // Recurse into sub-index;
-        header        = sub_header;
-        data          = get_data_from_header(header);
-        width         = get_width_from_header(header);
-        is_inner_node = get_is_inner_bptree_node_from_header(header);
-        if (value_2.size() <= 4) {
-            value_2 = StringData();
-        }
-        else {
-            value_2 = value_2.substr(4);
-        }
-        goto top;
-    }
-}
-
-
-void Array::IndexStringFindAll(Column& result, StringData value, void* column, StringGetter get_func) const
-{
     StringData value_2 = value;
     const char* data = m_data;
     const char* header;
@@ -3097,7 +2989,7 @@ top:
 
         // If key is outside range, we know there can be no match
         if (pos == offsets_size)
-            return; // not_found
+            return allnocopy ? size_t(FindRes_not_found) : first ? not_found : 0;
 
         // Get entry under key
         size_t pos_refs = pos + 1; // first entry in refs points to offsets
@@ -3105,9 +2997,9 @@ top:
 
         if (is_inner_node) {
             // Set vars for next iteration
-            header        = m_alloc.translate(to_ref(ref));
-            data          = get_data_from_header(header);
-            width         = get_width_from_header(header);
+            header = m_alloc.translate(to_ref(ref));
+            data = get_data_from_header(header);
+            width = get_width_from_header(header);
             is_inner_node = get_is_inner_bptree_node_from_header(header);
             continue;
         }
@@ -3115,7 +3007,7 @@ top:
         key_type stored_key = key_type(get_direct<32>(offsets_data, pos));
 
         if (stored_key != key)
-            return; // not_found
+            return allnocopy ? size_t(FindRes_not_found) : first ? not_found : 0;
 
         // Literal row index
         if (ref & 1) {
@@ -3124,266 +3016,23 @@ top:
             // If the last byte in the stored key is zero, we know that we have
             // compared against the entire (target) string
             if (!(stored_key << 24)) {
-                result.add(row_ref);
-                return;
-            }
-
-            StringData str = (*get_func)(column, row_ref);
-            if (str == value)
-                result.add(row_ref);
-            return; // not_found
-        }
-
-        const char* sub_header = m_alloc.translate(to_ref(ref));
-        const bool sub_isindex = get_context_flag_from_header(sub_header);
-
-        // List of matching row indexes
-        if (!sub_isindex) {
-            const bool sub_isleaf = !get_is_inner_bptree_node_from_header(sub_header);
-
-            // In most cases the row list will just be an array but there
-            // might be so many matches that it has branched into a column
-            if (sub_isleaf) {
-                const size_t sub_width = get_width_from_header(sub_header);
-                const char* sub_data = get_data_from_header(sub_header);
-                const size_t first_row_ref = to_size_t(get_direct(sub_data, sub_width, 0));
-
-                // If the last byte in the stored key is not zero, we have
-                // not yet compared against the entire (target) string
-                if ((stored_key << 24)) {
-                    StringData str = (*get_func)(column, first_row_ref);
-                    if (str != value)
-                        return; // not_found
-                }
-
-                // Copy all matches into result array
-                const size_t sub_size  = get_size_from_header(sub_header);
-
-                for (size_t i = 0; i < sub_size; ++i) {
-                    size_t row_ref = to_size_t(get_direct(sub_data, sub_width, i));
+                result_ref = row_ref;
+                if (all)
                     result.add(row_ref);
-                }
+
+                return first ? row_ref : count ? 1 : FindRes_single;
             }
-            else {
-                const Column sub(m_alloc, to_ref(ref));
-                const size_t first_row_ref = to_size_t(sub.get(0));
-
-                // If the last byte in the stored key is not zero, we have
-                // not yet compared against the entire (target) string
-                if ((stored_key << 24)) {
-                    StringData str = (*get_func)(column, first_row_ref);
-                    if (str != value)
-                        return; // not_found
-                }
-
-                // Copy all matches into result array
-                const size_t sub_size  = sub.size();
-
-                for (size_t i = 0; i < sub_size; ++i) {
-                    size_t row_ref = to_size_t(sub.get(i));
-                    result.add(row_ref);
-                }
-            }
-            return;
-        }
-
-        // Recurse into sub-index;
-        header        = sub_header;
-        data          = get_data_from_header(header);
-        width         = get_width_from_header(header);
-        is_inner_node = get_is_inner_bptree_node_from_header(header);
-        if (value_2.size() <= 4) {
-            value_2 = StringData();
-        }
-        else {
-            value_2 = value_2.substr(4);
-        }
-        goto top;
-    }
-}
-
-
-FindRes Array::IndexStringFindAllNoCopy(StringData value, size_t& res_ref, void* column, StringGetter get_func) const
-{
-    StringData value_2 = value;
-    const char* data = m_data;
-    const char* header;
-    size_t width = m_width;
-    bool is_inner_node = m_is_inner_bptree_node;
-    typedef StringIndex::key_type key_type;
-    key_type key;
-
-top:
-    // Create 4 byte index key
-    key = StringIndex::create_key(value_2);
-
-    for (;;) {
-        // Get subnode table
-        ref_type offsets_ref = to_ref(get_direct(data, width, 0));
-
-        // Find the position matching the key
-        const char* offsets_header = m_alloc.translate(offsets_ref);
-        const char* offsets_data   = get_data_from_header(offsets_header);
-        size_t offsets_size = get_size_from_header(offsets_header);
-        size_t pos = ::lower_bound<32>(offsets_data, offsets_size, key); // keys are always 32 bits wide
-
-        // If key is outside range, we know there can be no match
-        if (pos == offsets_size)
-            return FindRes_not_found;
-
-        // Get entry under key
-        size_t pos_refs = pos + 1; // first entry in refs points to offsets
-        int64_t ref = get_direct(data, width, pos_refs);
-
-        if (is_inner_node) {
-            // Set vars for next iteration
-            header        = m_alloc.translate(to_ref(ref));
-            data          = get_data_from_header(header);
-            width         = get_width_from_header(header);
-            is_inner_node = get_is_inner_bptree_node_from_header(header);
-            continue;
-        }
-
-        key_type stored_key = key_type(get_direct<32>(offsets_data, pos));
-
-        if (stored_key != key)
-            return FindRes_not_found; // not_found
-
-        // Literal row index
-        if (ref & 1) {
-            size_t row_ref = size_t(uint64_t(ref) >> 1);
-
-            // If the last byte in the stored key is zero, we know that we have
-            // compared against the entire (target) string
-            if (!(stored_key << 24)) {
-                res_ref = row_ref;
-                return FindRes_single; // found single
-            }
-
-            StringData str = (*get_func)(column, row_ref);
+            // for integer index, get_func fills out 'buffer' and makes str point at it
+            char buffer[8];
+            StringData str = (*get_func)(column, row_ref, buffer);
             if (str == value) {
-                res_ref = row_ref;
-                return FindRes_single; // found single
+                result_ref = row_ref;
+                if (all)
+                    result.add(row_ref);
+
+                return first ? row_ref : count ? 1 : FindRes_single;
             }
-            return FindRes_not_found; // not_found
-        }
-
-        const char* sub_header  = m_alloc.translate(to_ref(ref));
-        const bool  sub_isindex = get_context_flag_from_header(sub_header);
-
-        // List of matching row indexes
-        if (!sub_isindex) {
-            const bool sub_isleaf = !get_is_inner_bptree_node_from_header(sub_header);
-
-            // In most cases the row list will just be an array but there
-            // might be so many matches that it has branched into a column
-            if (sub_isleaf) {
-                const size_t sub_width = get_width_from_header(sub_header);
-                const char*  sub_data  = get_data_from_header(sub_header);
-                const size_t first_row_ref = to_size_t(get_direct(sub_data, sub_width, 0));
-
-                // If the last byte in the stored key is not zero, we have
-                // not yet compared against the entire (target) string
-                if ((stored_key << 24)) {
-                    StringData str = (*get_func)(column, first_row_ref);
-                    if (str != value)
-                        return FindRes_not_found; // not_found
-                }
-            }
-            else {
-                const Column sub(m_alloc, to_ref(ref));
-                const size_t first_row_ref = to_size_t(sub.get(0));
-
-                // If the last byte in the stored key is not zero, we have
-                // not yet compared against the entire (target) string
-                if ((stored_key << 24)) {
-                    StringData str = (*get_func)(column, first_row_ref);
-                    if (str != value)
-                        return FindRes_not_found; // not_found
-                }
-            }
-
-            // Return a reference to the result column
-            res_ref = to_ref(ref);
-            return FindRes_column; // column of matches
-        }
-
-        // Recurse into sub-index;
-        header        = sub_header;
-        data          = get_data_from_header(header);
-        width         = get_width_from_header(header);
-        is_inner_node = get_is_inner_bptree_node_from_header(header);
-        if (value_2.size() <= 4) {
-            value_2 = StringData();
-        }
-        else {
-            value_2 = value_2.substr(4);
-        }
-        goto top;
-    }
-}
-
-
-size_t Array::IndexStringCount(StringData value, void* column, StringGetter get_func) const
-
-{
-    StringData value_2 = value;
-    const char* data   = m_data;
-    const char* header;
-    size_t width = m_width;
-    bool is_inner_node = m_is_inner_bptree_node;
-    typedef StringIndex::key_type key_type;
-    key_type key;
-
-top:
-    // Create 4 byte index key
-    key = StringIndex::create_key(value_2);
-
-    for (;;) {
-        // Get subnode table
-        ref_type offsets_ref = to_ref(get_direct(data, width, 0));
-
-        // Find the position matching the key
-        const char* offsets_header = m_alloc.translate(offsets_ref);
-        const char* offsets_data = get_data_from_header(offsets_header);
-        size_t offsets_size = get_size_from_header(offsets_header);
-        size_t pos = ::lower_bound<32>(offsets_data, offsets_size, key); // keys are always 32 bits wide
-
-        // If key is outside range, we know there can be no match
-        if (pos == offsets_size)
-            return 0;
-
-        // Get entry under key
-        size_t pos_refs = pos + 1; // first entry in refs points to offsets
-        int64_t ref = get_direct(data, width, pos_refs);
-
-        if (is_inner_node) {
-            // Set vars for next iteration
-            header        = m_alloc.translate(to_ref(ref));
-            data          = get_data_from_header(header);
-            width         = get_width_from_header(header);
-            is_inner_node = get_is_inner_bptree_node_from_header(header);
-            continue;
-        }
-
-        key_type stored_key = key_type(get_direct<32>(offsets_data, pos));
-
-        if (stored_key != key)
-            return 0;
-
-        // Literal row index
-        if (ref & 1) {
-            const size_t row_ref = size_t((uint64_t(ref) >> 1));
-
-            // If the last byte in the stored key is zero, we know that we have
-            // compared against the entire (target) string
-            if (!(stored_key << 24))
-                return 1;
-
-            StringData str = (*get_func)(column, row_ref);
-            if (str == value)
-                return 1;
-            return 0;
+            return allnocopy ? size_t(FindRes_not_found) : first ? not_found : 0;
         }
 
         const char* sub_header = m_alloc.translate(to_ref(ref));
@@ -3393,56 +3042,120 @@ top:
         if (!sub_isindex) {
             const bool sub_isleaf = !get_is_inner_bptree_node_from_header(sub_header);
             size_t sub_count;
-            size_t row_ref;
 
-            // In most cases the row list will just be an array but
-            // there might be so many matches that it has branched
-            // into a column
+            // In most cases the row list will just be an array but there
+            // might be so many matches that it has branched into a column
             if (sub_isleaf) {
-                sub_count  = get_size_from_header(sub_header);
-
-                // If the last byte in the stored key is zero, we know
-                // that we have compared against the entire (target)
-                // string
-                if (!(stored_key << 24))
-                    return sub_count;
-
+                if (count)
+                    sub_count = get_size_from_header(sub_header);
+                const size_t sub_width = get_width_from_header(sub_header);
                 const char* sub_data = get_data_from_header(sub_header);
-                const size_t sub_width  = get_width_from_header(sub_header);
-                row_ref = to_size_t(get_direct(sub_data, sub_width, 0));
+                const size_t first_row_ref = to_size_t(get_direct(sub_data, sub_width, 0));
+
+                // If the last byte in the stored key is not zero, we have
+                // not yet compared against the entire (target) string
+                if ((stored_key << 24)) {
+                    // for integer index, get_func fills out 'buffer' and makes str point at it
+                    char buffer[8];
+                    StringData str = (*get_func)(column, first_row_ref, buffer);
+                    if (str != value) {
+                        if (count)
+                            return 0;
+                        return allnocopy ? size_t(FindRes_not_found) : first ? not_found : 0;
+                    }
+                }
+
+                result_ref = to_ref(ref);
+
+                if (all) {
+                    // Copy all matches into result column
+                    const size_t sub_size = get_size_from_header(sub_header);
+
+                    for (size_t i = 0; i < sub_size; ++i) {
+                        size_t row_ref = to_size_t(get_direct(sub_data, sub_width, i));
+                        result.add(row_ref);
+                    }
+                }
+                else {
+                    return allnocopy ? size_t(FindRes_column) : 
+                           first ? to_size_t(get_direct(sub_data, sub_width, 0)) : sub_count;
+                }
             }
             else {
                 const Column sub(m_alloc, to_ref(ref));
-                sub_count = sub.size();
+                const size_t first_row_ref = to_size_t(sub.get(0));
 
-                // If the last byte in the stored key is zero, we know
-                // that we have compared against the entire (target)
-                // string
-                if (!(stored_key << 24))
-                    return sub_count;
+                if (count)
+                    sub_count = sub.size();
 
-                row_ref = to_size_t(sub.get(0));
+                // If the last byte in the stored key is not zero, we have
+                // not yet compared against the entire (target) string
+                if ((stored_key << 24)) {
+                    // for integer index, get_func fills out 'buffer' and makes str point at it
+                    char buffer[8];
+                    StringData str = (*get_func)(column, first_row_ref, buffer);
+                    if (str != value)
+                        return allnocopy ? size_t(FindRes_not_found) : first ? not_found : 0;
+                }
+
+                result_ref = to_ref(ref);
+                if (all) {
+                    // Copy all matches into result column
+                    for (size_t i = 0; i < sub.size(); ++i)
+                        result.add(to_size_t(sub.get(i)));
+                }
+                else {
+                    return allnocopy ? size_t(FindRes_column) : first ? to_size_t(sub.get(0)) : sub_count;
+                }
             }
 
-            StringData str = (*get_func)(column, row_ref);
-            if (str == value)
-                return sub_count;
-            return 0;
+            TIGHTDB_ASSERT(method != index_FindAll_nocopy);
+            return size_t(FindRes_column);
         }
 
         // Recurse into sub-index;
-        header        = sub_header;
-        data          = get_data_from_header(header);
-        width         = get_width_from_header(header);
+        header = sub_header;
+        data = get_data_from_header(header);
+        width = get_width_from_header(header);
         is_inner_node = get_is_inner_bptree_node_from_header(header);
-        if (value_2.size() <= 4) {
+
+        if (value_2.size() <= 4)
             value_2 = StringData();
-        }
-        else {
+        else
             value_2 = value_2.substr(4);
-        }
+
         goto top;
     }
+}
+
+size_t Array::IndexStringFindFirst(StringData value, void* column, StringGetter get_func) const
+{
+    size_t dummy;
+    Column dummycol;
+    return index_string<index_FindFirst, StringData>(value, dummycol, dummy, column, get_func);
+}
+
+
+void Array::IndexStringFindAll(Column& result, StringData value, void* column, StringGetter get_func) const
+{
+    size_t dummy;
+
+    index_string<index_FindAll, StringData>(value, result, dummy, column, get_func);
+}
+
+
+FindRes Array::IndexStringFindAllNoCopy(StringData value, size_t& res_ref, void* column, StringGetter get_func) const
+{
+    Column dummy;
+    return (FindRes)index_string<index_FindAll_nocopy, StringData>(value, dummy, res_ref, column, get_func);
+}
+
+
+size_t Array::IndexStringCount(StringData value, void* column, StringGetter get_func) const
+{
+    Column dummy;
+    size_t dummysizet;
+    return index_string<index_Count, StringData>(value, dummy, dummysizet, column, get_func);
 }
 
 
