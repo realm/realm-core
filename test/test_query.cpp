@@ -4209,6 +4209,27 @@ TEST(Query_FindAllOrNested)
     ttt.add(11, "X");
     ttt.add(8, "Y");
 
+    // first > 3 && (first == 5 || second == X || second == Y)
+    TupleTableType::Query q1 = ttt.where().first.greater(3).group().first.equal(5).Or().second.equal("X").Or().second.equal("Y").end_group();
+    TupleTableType::View tv1 = q1.find_all();
+    CHECK_EQUAL(5, tv1.get_source_ndx(0));
+    CHECK_EQUAL(6, tv1.get_source_ndx(1));
+    CHECK_EQUAL(7, tv1.get_source_ndx(2));
+}
+
+TEST(Query_FindAllOrNestedInnerGroup)
+{
+    TupleTableType ttt;
+
+    ttt.add(1, "a");
+    ttt.add(2, "a");
+    ttt.add(3, "X");
+    ttt.add(3, "X");
+    ttt.add(4, "a");
+    ttt.add(5, "a");
+    ttt.add(11, "X");
+    ttt.add(8, "Y");
+
     // first > 3 && (first == 5 || (second == X || second == Y))
     TupleTableType::Query q1 = ttt.where().first.greater(3).group().first.equal(5).Or().group().second.equal("X").Or().second.equal("Y").end_group().end_group();
     TupleTableType::View tv1 = q1.find_all();
