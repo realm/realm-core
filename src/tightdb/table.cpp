@@ -1403,6 +1403,11 @@ void Table::remove_primary_key()
                 StringIndex& index = col_2.get_search_index();
                 index.set_allow_duplicate_values(true);
             }
+            else if (type == col_type_Int) {
+                Column& col_2 = static_cast<Column&>(col);
+                StringIndex& index = *static_cast<StringIndex*>(col_2.get_search_index());
+                index.set_allow_duplicate_values(true);
+            }
             else {
                 TIGHTDB_ASSERT(false);
             }
@@ -2868,6 +2873,11 @@ void Table::reveal_primary_key() const
                 m_primary_key = &col_2.get_search_index();
                 return;
             }
+            if (type == col_type_Int) {
+                const Column& col_2 = static_cast<const Column&>(col);
+                m_primary_key = static_cast<StringIndex*>(col_2.m_search_index);
+                return;
+            }
             TIGHTDB_ASSERT(false);
             return;
         }
@@ -2876,7 +2886,7 @@ void Table::reveal_primary_key() const
 }
 
 
-size_t Table::do_find_pkey_int(int_fast64_t) const
+size_t Table::do_find_pkey_int(int_fast64_t value) const
 {
     if (TIGHTDB_UNLIKELY(!is_attached()))
         throw LogicError(LogicError::detached_accessor);
@@ -2884,9 +2894,8 @@ size_t Table::do_find_pkey_int(int_fast64_t) const
     if (TIGHTDB_UNLIKELY(!m_primary_key))
         reveal_primary_key(); // Throws
 
-    // FIXME: Implement this when integer indexes become available. For now, all
-    // search indexes are of string type.
-    throw LogicError(LogicError::type_mismatch);
+    size_t row_ndx = m_primary_key->find_first(to_str(value)); // Throws
+    return row_ndx;
 }
 
 
