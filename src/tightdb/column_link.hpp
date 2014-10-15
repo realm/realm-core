@@ -98,7 +98,8 @@ inline void ColumnLink::insert_link(std::size_t row_ndx, std::size_t target_row_
     // Row pos is offsest by one, to allow null refs
     ColumnLinkBase::insert(row_ndx, target_row_ndx + 1);
 
-    m_backlink_column->add_backlink(target_row_ndx, row_ndx);
+    if (target_row_ndx != tightdb::npos)
+        m_backlink_column->add_backlink(target_row_ndx, row_ndx);
 }
 
 inline void ColumnLink::do_nullify_link(std::size_t row_ndx, std::size_t)
