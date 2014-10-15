@@ -673,38 +673,34 @@ TEST(StringIndex_Set_Add_Erase_Insert_Int)
 
 TEST(StringIndex_FuzzyTest_Int)
 {
-    bool benchmark = false;
-
-    /* Fuzzy test that can also be used as benchmark.
-    n:              1000       10000      100000
-    index       0.06 sec    0.10 sec    0.34 sec
-    no index    0.32 sec     3.3 sec      22 sec
-    */
-
     ref_type ref = Column::create(Allocator::get_default());
     Column col(Allocator::get_default(), ref);
     Random random(random_int<unsigned long>());
-    const size_t n = 1000;
+    const size_t n = 1.2 * TIGHTDB_MAX_BPNODE_SIZE;
 
     col.create_search_index();
 
     for (size_t t = 0; t < n; t++) {
-        col.add(random.draw_int_mod(100000));
+        col.add(random.draw_int_mod(0xffffffffffffffff));
     }
 
-    for (int64_t t = 0; t < (benchmark ? 1000000 : 100); t++) {
-        int64_t r = random.draw_int_mod(100000);
-        // volatile for benchmark so compiler won't optimize away the call
-        volatile size_t m = col.find_first(r);
-        if (!benchmark) {
-            for (size_t t = 0; t < n; t++) {
-                if (col.get(t) == r) {
-                    CHECK_EQUAL(t, m);
-                    break;
-                }
+    for (int64_t t = 0; t < n; t++) {
+        int64_t r;
+            
+        if (rand() % 2 == 1)
+            r = col.get(t);
+        else
+            r = random.draw_int_mod(0xffffffffffffffff);
+
+        size_t m = col.find_first(r);
+        for (size_t t = 0; t < n; t++) {
+            if (col.get(t) == r) {
+                CHECK_EQUAL(t, m); // 238, -1
+                break;
             }
         }
     }
+    col.destroy();
 }
 
 #endif // TEST_INDEX_STRING

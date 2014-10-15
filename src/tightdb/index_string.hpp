@@ -106,7 +106,7 @@ public:
     void to_dot(std::ostream&, StringData title = StringData()) const;
 #endif
 
-    typedef int_fast32_t key_type;
+    typedef int32_t key_type;
 
     static key_type create_key(StringData) TIGHTDB_NOEXCEPT;
 
