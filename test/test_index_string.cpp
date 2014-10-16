@@ -680,22 +680,21 @@ TEST(StringIndex_FuzzyTest_Int)
 
     col.create_search_index();
 
-    for (size_t t = 0; t < n; t++) {
-        col.add(random.draw_int_mod(0xffffffffffffffff));
+    for (size_t t = 0; t < n; ++t) {
+        col.add(random.draw_int_max(0xffffffffffffffff));
     }
 
-    for (int64_t t = 0; t < n; t++) {
+    for (size_t t = 0; t < n; ++t) {
         int64_t r;
-            
-        if (rand() % 2 == 1)
+        if (random.draw_bool())
             r = col.get(t);
         else
-            r = random.draw_int_mod(0xffffffffffffffff);
+            r = random.draw_int_max(0xffffffffffffffff);
 
         size_t m = col.find_first(r);
-        for (size_t t = 0; t < n; t++) {
-            if (col.get(t) == r) {
-                CHECK_EQUAL(t, m); // 238, -1
+        for (size_t t_2 = 0; t_2 < n; ++t_2) {
+            if (col.get(t_2) == r) {
+                CHECK_EQUAL(t_2, m); // 238, -1
                 break;
             }
         }
