@@ -1464,6 +1464,13 @@ public:
         return new StringNode<Equal>(*this);
     }
 
+    StringNode(const StringNode& from) : StringNodeBase(from)
+    {
+        m_index_getter = 0;
+        m_index_matches = 0;
+        m_index_matches_destroy = false;
+    }
+
 private:
     inline BinaryData str_to_bin(const StringData& s) TIGHTDB_NOEXCEPT
     {
@@ -1483,22 +1490,13 @@ private:
     size_t m_index_size;
 };
 
-// OR node contains 3 Node pointers; m_cond[0], m_cond[1] and m_child
+// OR node contains at least two node pointers: Two or more conditions to OR
+// together in m_cond, and the next AND condition (if any) in m_child.
 //
 // For 'second.equal(23).begin_group().first.equal(111).Or().first.equal(222).end_group().third().equal(555)', this
 // will first set m_cond[0] = left-hand-side through constructor, and then later, when .first.equal(222) is invoked,
 // invocation will set m_cond[1] = right-hand-side through Query& Query::Or() (see query.cpp). In there, m_child is
-// also set to next AND condition (if any exists) following the OR. So we have following pointers:
-//
-//                        Equal(23)
-//                           |
-//                           |
-// OR node: m_cond[0]     m_child     m_cond[1]
-//             |             |           |
-//      Equal(111) node      |    Equal(222) node
-//                           |
-//                       Equal(555)
-//
+// also set to next AND condition (if any exists) following the OR.
 class OrNode: public ParentNode {
 public:
     template <Action TAction> int64_t find_all(Column*, size_t, size_t, size_t, size_t)
@@ -1507,7 +1505,11 @@ public:
         return 0;
     }
 
-    OrNode(ParentNode* p1) {m_child = null_ptr; m_cond[0] = p1; m_cond[1] = null_ptr; m_dT = 50.0;}
+    OrNode(ParentNode* p1) : m_cond(1, p1) {
+        m_child = null_ptr;
+        m_dT = 50.0;
+    }
+
     ~OrNode() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
 
     void init(const Table& table) TIGHTDB_OVERRIDE
@@ -1516,12 +1518,16 @@ public:
 
         std::vector<ParentNode*> v;
 
-        for (size_t c = 0; c < 2; ++c) {
+        m_last.clear();
+        m_last.resize(m_cond.size(), 0);
+
+        m_was_match.clear();
+        m_was_match.resize(m_cond.size(), false);
+
+        for (size_t c = 0; c < m_cond.size(); ++c) {
             m_cond[c]->init(table);
             v.clear();
             m_cond[c]->gather_children(v);
-            m_last[c] = 0;
-            m_was_match[c] = false;
         }
 
         if (m_child)
@@ -1532,28 +1538,29 @@ public:
 
     size_t find_first_local(size_t start, size_t end) TIGHTDB_OVERRIDE
     {
-        for (size_t s = start; s < end; ++s) {
-            size_t f[2];
+        if (start >= end)
+            return not_found;
 
-            for (size_t c = 0; c < 2; ++c) {
-                if (m_last[c] >= end)
-                    f[c] = end;
-                else if (m_was_match[c] && m_last[c] >= s)
-                    f[c] = m_last[c];
-                else {
-                    size_t fmax = m_last[c] > s ? m_last[c] : s;
-                    f[c] = m_cond[c]->find_first(fmax, end);
-                    m_was_match[c] = (f[c] != not_found);
-                    m_last[c] = f[c] == not_found ? end : f[c];
-                }
+        size_t index = not_found;
+
+        for (size_t c = 0; c < m_cond.size(); ++c) {
+            if (m_last[c] >= end)
+                continue;
+            else if (m_was_match[c] && m_last[c] >= start) {
+                if (index > m_last[c])
+                    index = m_last[c];
             }
-
-            s = f[0] < f[1] ? f[0] : f[1];
-            s = s >= end ? not_found : s;
-
-            return s;
+            else {
+                size_t fmax = m_last[c] > start ? m_last[c] : start;
+                size_t f = m_cond[c]->find_first(fmax, end);
+                m_was_match[c] = f != not_found;
+                m_last[c] = f == not_found ? end : f;
+                if (f != not_found && index > m_last[c])
+                    index = m_last[c];
+            }
         }
-        return not_found;
+
+        return index;
     }
 
     std::string validate() TIGHTDB_OVERRIDE
@@ -1562,19 +1569,18 @@ public:
             return error_code;
         if (m_cond[0] == 0)
             return "Missing left-hand side of OR";
-        if (m_cond[1] == 0)
-            return "Missing right-hand side of OR";
+        if (m_cond.back() == 0)
+            return "Missing final right-hand side of OR";
         std::string s;
         if (m_child != 0)
             s = m_child->validate();
         if (s != "")
             return s;
-        s = m_cond[0]->validate();
-        if (s != "")
-            return s;
-        s = m_cond[1]->validate();
-        if (s != "")
-            return s;
+        for (size_t i = 0; i < m_cond.size(); ++i) {
+            s = m_cond[i]->validate();
+            if (s != "")
+                return s;
+        }
         return "";
     }
 
@@ -1586,29 +1592,14 @@ public:
     virtual void translate_pointers(const std::map<ParentNode*, ParentNode*>& mapping) TIGHTDB_OVERRIDE
     {
         ParentNode::translate_pointers(mapping);
-        m_cond[0] = mapping.find(m_cond[0])->second;
-        m_cond[1] = mapping.find(m_cond[1])->second;
+        for (size_t i = 0; i < m_cond.size(); ++i)
+            m_cond[i] = mapping.find(m_cond[i])->second;
     }
 
-    OrNode(const OrNode& from) 
-        : ParentNode(from)
-    {
-        // here we are just copying the pointers - they'll be remapped by "translate_pointers"
-        m_cond[0] = from.m_cond[0];
-        m_cond[1] = from.m_cond[1];
-        m_last[0] = from.m_last[0];
-        m_last[1] = from.m_last[1];
-        m_was_match[0] = from.m_was_match[0];
-        m_was_match[1] = from.m_was_match[1];
-        m_child = from.m_child;
-    }
-
-
-
-    ParentNode* m_cond[2];
+    std::vector<ParentNode*> m_cond;
 private:
-    size_t m_last[2];
-    bool m_was_match[2];
+    std::vector<size_t> m_last;
+    std::vector<bool> m_was_match;
 };
 
 

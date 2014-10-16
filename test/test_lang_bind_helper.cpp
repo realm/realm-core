@@ -5825,6 +5825,7 @@ TEST(LangBindHelper_ImplicitTransactions)
     sg.end_read();
 }
 
+
 TEST(LangBindHelper_RollbackAndContinueAsRead)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -5899,6 +5900,7 @@ TEST(LangBindHelper_RollbackAndContinueAsRead)
         sg.end_read();
     }
 }
+
 
 TEST(LangBindHelper_RollbackAndContinueAsReadGroupLevelTableRemoval)
 {

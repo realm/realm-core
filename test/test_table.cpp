@@ -1109,6 +1109,7 @@ TEST(Table_IndexString)
     CHECK_EQUAL(2, c1);
 }
 
+
 TEST(Table_IndexStringTwice)
 {
     TestTableEnum table;
@@ -1126,6 +1127,69 @@ TEST(Table_IndexStringTwice)
     CHECK_EQUAL(true, table.column().second.has_search_index());
     table.column().second.add_search_index();
     CHECK_EQUAL(true, table.column().second.has_search_index());
+}
+
+
+// Tests Table part of index on Int, DateTime and Bool columns. For a more exhaustive 
+// test of the integer index (bypassing Table), see test_index_string.cpp)
+TEST(Table_IndexInteger)
+{
+    Table table;
+    size_t r;
+
+    table.add_column(type_Int, "ints");
+    table.add_column(type_DateTime, "date");
+    table.add_column(type_Bool, "date");
+
+    table.add_empty_row(13);
+
+    table.set_int(0, 0, 3); // 0
+    table.set_int(0, 1, 1); // 1
+    table.set_int(0, 2, 2); // 2
+    table.set_int(0, 3, 2); // 3
+    table.set_int(0, 4, 2); // 4
+    table.set_int(0, 5, 3); // 5
+    table.set_int(0, 6, 3); // 6
+    table.set_int(0, 7, 2); // 7
+    table.set_int(0, 8, 4); // 8
+    table.set_int(0, 9, 2); // 9
+    table.set_int(0, 10, 6); // 10
+    table.set_int(0, 11, 2); // 11
+    table.set_int(0, 12, 3); // 12
+
+    table.add_search_index(0);
+    CHECK(table.has_search_index(0));
+    table.add_search_index(1);
+    CHECK(table.has_search_index(1));
+    table.add_search_index(2);
+    CHECK(table.has_search_index(2));
+
+    table.set_datetime(1, 10, DateTime(43));
+    r = table.find_first_datetime(1, DateTime(43));
+    CHECK_EQUAL(10, r);
+
+    table.set_bool(2, 11, true);
+    r = table.find_first_bool(2, true);
+    CHECK_EQUAL(11, r);
+
+    r = table.find_first_int(0, 11);
+    CHECK_EQUAL(not_found, r);
+
+    r = table.find_first_int(0, 3);
+    CHECK_EQUAL(0, r);
+
+    r = table.find_first_int(0, 4);
+    CHECK_EQUAL(8, r);
+
+    TableView tv = table.find_all_int(0, 2);
+    CHECK_EQUAL(6, tv.size());
+
+    CHECK_EQUAL(2, tv[0].get_index());
+    CHECK_EQUAL(3, tv[1].get_index());
+    CHECK_EQUAL(4, tv[2].get_index());
+    CHECK_EQUAL(7, tv[3].get_index());
+    CHECK_EQUAL(9, tv[4].get_index());
+    CHECK_EQUAL(11, tv[5].get_index());
 }
 
 

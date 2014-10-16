@@ -360,7 +360,7 @@ public:
     int64_t get_val(size_t row) const { return get(row); }
 
     Column(Allocator&, ref_type);
-
+    inline bool has_search_index() const TIGHTDB_NOEXCEPT;
     struct unattached_root_tag {};
     Column(unattached_root_tag, Allocator&);
 
@@ -368,7 +368,7 @@ public:
     Column(move_tag, Column&) TIGHTDB_NOEXCEPT;
 
     ~Column() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-
+    void destroy() TIGHTDB_NOEXCEPT;
     void move_assign(Column&);
     bool IsIntColumn() const TIGHTDB_NOEXCEPT { return true; }
 
@@ -417,6 +417,10 @@ public:
     void find_all(Column& result, int64_t value,
                   std::size_t begin = 0, std::size_t end = npos) const;
 
+    void set_search_index_ref(ref_type ref, ArrayParent* parent, size_t ndx_in_parent, bool allow_duplicate_valaues);
+    void create_search_index();
+    void* get_search_index() TIGHTDB_NOEXCEPT;
+
     //@{
     /// Find the lower/upper bound for the specified value assuming
     /// that the elements are already sorted in ascending order
@@ -450,6 +454,9 @@ public:
     MemStats stats() const;
     void do_dump_node_structure(std::ostream&, int) const TIGHTDB_OVERRIDE;
 #endif
+
+    // todo, make private, and correct type
+    void* m_search_index;
 
 protected:
     Column(Array* root = 0) TIGHTDB_NOEXCEPT;
@@ -674,31 +681,35 @@ inline ref_type ColumnBase::create(Allocator& alloc, std::size_t size, CreateHan
     return build(&rest_size, fixed_height, alloc, handler);
 }
 
-inline Column::Column(Allocator& alloc, ref_type ref)
+inline bool Column::has_search_index() const TIGHTDB_NOEXCEPT
+{
+    return m_search_index;
+}
+
+// fixme, must m_search_index be copied here?
+inline Column::Column(Allocator& alloc, ref_type ref) : m_search_index(null_ptr)
 {
     m_array = new Array(alloc); // Throws
     m_array->init_from_ref(ref);
 }
 
-inline Column::Column(unattached_root_tag, Allocator& alloc)
+inline Column::Column(unattached_root_tag, Allocator& alloc) : m_search_index(null_ptr)
 {
     m_array = new Array(alloc); // Throws
+
 }
 
 inline Column::Column(move_tag, Column& col) TIGHTDB_NOEXCEPT
 {
     m_array = col.m_array;
     col.m_array = 0;
+    m_search_index = col.m_search_index;
+    col.m_search_index = 0;
 }
 
 inline Column::Column(Array* root) TIGHTDB_NOEXCEPT:
-    ColumnBase(root)
+    ColumnBase(root), m_search_index(null_ptr)
 {
-}
-
-inline Column::~Column() TIGHTDB_NOEXCEPT
-{
-    delete m_array;
 }
 
 inline std::size_t Column::size() const TIGHTDB_NOEXCEPT

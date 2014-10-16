@@ -6,8 +6,7 @@
 
 ### API breaking changes:
 
-* `Query::tableview()` removed as it might lead to wrong results e.g., when
-  sorting a sorted tableview.
+* Lorem ipsum.
 
 ### Enhancements:
 
@@ -16,14 +15,34 @@
   'weak'.
 * Rows can now be removed via a row accessors (`Row::remove()`,
   `Row::move_last_over()`).
-* Make the durability level settable in the `SharedGroup` constructor and
-  `open()` overloads taking a `Replication`.
 
 -----------
 
 ### Internals:
 
 * Lorem ipsum.
+
+----------------------------------------------
+
+# 0.85.0 Release notes
+
+### Bugfixes:
+
+* Fixed a crash when copying a query checking for equality on an indexed string
+  column.
+* Fixed a stack overflow when too many query conditions were combined with Or().
+
+### API breaking changes:
+
+* Now supports index on Integer, Bool and Date columns; API is the same as for
+  String index
+* `Query::tableview()` removed as it might lead to wrong results - e.g., when
+  sorting a sorted tableview.
+
+### Enhancements:
+
+* Make the durability level settable in the `SharedGroup` constructor and
+  `open()` overloads taking a `Replication`.
 
 ----------------------------------------------
 
