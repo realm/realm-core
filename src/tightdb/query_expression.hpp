@@ -1432,8 +1432,9 @@ public:
     // Compare extends Expression which extends Query. This constructor for Compare initializes the Query part by
     // adding an ExpressionNode (see query_engine.hpp) and initializes Query::table so that it's ready to call
     // Query methods on, like find_first(), etc.
-    Compare(TLeft& left, const TRight& right, bool auto_delete = false, util::SharedPtr<char> compare_string = util::SharedPtr<char>(null_ptr)) :
-            m_left(left), m_right(const_cast<TRight&>(right)), m_compare_string(compare_string)
+    Compare(TLeft& left, const TRight& right, bool auto_delete = false, util::SharedPtr<char> compare_string 
+        = util::SharedPtr<char>(null_ptr)) : m_left(left), m_right(const_cast<TRight&>(right)),
+        m_compare_string(compare_string)
     {
         m_auto_delete = auto_delete;
         Query::expression(this, auto_delete);
