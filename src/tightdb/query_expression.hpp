@@ -284,7 +284,7 @@ class ColumnAccessorBase;
 
 // Handle cases where left side is a constant (int, float, int64_t, double, StringData)
 template <class L, class Cond, class R> Query create(L left, const Subexpr2<R>& right, 
-                                                     util::SharedPtr<char> compare_string = util::SharedPtr<char>(null_ptr))
+                                                     const char* compare_string = null_ptr)
 {
     // Purpose of below code is to intercept the creation of a condition and test if it's supported by the old
     // query_engine.hpp which is faster. If it's supported, create a query_engine.hpp node, otherwise create a
@@ -1086,9 +1086,9 @@ template <class T> Query operator != (T left, const Columns<StringData>& right) 
 template <class T> Query operator == (const Columns<StringData>& left, T right) {
     // Create deep copy of search string. Destructor of the Compare class will delete it.
     StringData sd(right);
-    util::SharedPtr<char> string_payload(new char[sd.size()]);
-    memcpy(string_payload.get(), sd.data(), sd.size());
-    StringData sd2(StringData(string_payload.get(), sd.size()));
+    char* string_payload(new char[sd.size()]);
+    memcpy(string_payload, sd.data(), sd.size());
+    StringData sd2(StringData(string_payload, sd.size()));
     return create<StringData, Equal, StringData>(sd2, left, string_payload);
 }
 
@@ -1096,9 +1096,9 @@ template <class T> Query operator == (const Columns<StringData>& left, T right) 
 template <class T> Query operator != (const Columns<StringData>& left, T right) {
     // Create deep copy of search string. Destructor of the Compare class will delete it.
     StringData sd(right);
-    util::SharedPtr<char> string_payload(new char[sd.size()]);
-    memcpy(string_payload.get(), sd.data(), sd.size());
-    StringData sd2(StringData(string_payload.get(), sd.size()));
+    char* string_payload(new char[sd.size()]);
+    memcpy(string_payload, sd.data(), sd.size());
+    StringData sd2(StringData(string_payload, sd.size()));
     return create<StringData, NotEqual, StringData>(sd2, left, string_payload);
 }
 
@@ -1432,7 +1432,7 @@ public:
     // Compare extends Expression which extends Query. This constructor for Compare initializes the Query part by
     // adding an ExpressionNode (see query_engine.hpp) and initializes Query::table so that it's ready to call
     // Query methods on, like find_first(), etc.
-    Compare(TLeft& left, const TRight& right, bool auto_delete = false, util::SharedPtr<char> compare_string = util::SharedPtr<char>(null_ptr)) :
+    Compare(TLeft& left, const TRight& right, bool auto_delete = false, const char* compare_string = null_ptr) :
             m_left(left), m_right(const_cast<TRight&>(right)), m_compare_string(compare_string)
     {
         m_auto_delete = auto_delete;
@@ -1446,6 +1446,7 @@ public:
     ~Compare()
     {
         if (m_auto_delete) {
+            delete[] m_compare_string;
             delete &m_left;
             delete &m_right;
         }
@@ -1501,7 +1502,7 @@ private:
     // Only used if T is StringData. It then points at the deep copied user given string (the "foo" in 
     // Query q = table2->link(col_link2).column<String>(1) == "foo") so that we can delete it when this 
     // Compare object is destructed and the copy is no longer needed. 
-    util::SharedPtr<char> m_compare_string;
+    const char* m_compare_string;
 };
 
 
