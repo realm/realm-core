@@ -223,8 +223,8 @@ void WriteLogCollector::get_commit_entries(version_type from_version, version_ty
         preamble->lock.lock(&recover_from_dead_owner);
         size_t version;
         char* log_buffer;
-        // traverse commits in first file:
-        if (preamble->active_file_is_log_a == false)
+        // traverse commits in first file (first file is the opposite of the active file):
+        if (preamble->active_file_is_log_a)
             log_buffer = reinterpret_cast<char*>(1+m_log_b.map.get_addr());
         else
             log_buffer = reinterpret_cast<char*>(1+m_log_a.map.get_addr());
@@ -244,7 +244,7 @@ void WriteLogCollector::get_commit_entries(version_type from_version, version_ty
             }
         }
         // then second file:
-        if (preamble->active_file_is_log_a == true)
+        if (preamble->active_file_is_log_a == false)
             log_buffer = reinterpret_cast<char*>(1+m_log_b.map.get_addr());
         else
             log_buffer = reinterpret_cast<char*>(1+m_log_a.map.get_addr());
