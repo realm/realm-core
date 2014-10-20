@@ -284,7 +284,7 @@ class ColumnAccessorBase;
 
 // Handle cases where left side is a constant (int, float, int64_t, double, StringData)
 template <class L, class Cond, class R> Query create(L left, const Subexpr2<R>& right, 
-                                                     util::SharedPtr<char> compare_string = util::SharedPtr<char>(null_ptr))
+    util::SharedPtr<char> compare_string = util::SharedPtr<char>(null_ptr))
 {
     // Purpose of below code is to intercept the creation of a condition and test if it's supported by the old
     // query_engine.hpp which is faster. If it's supported, create a query_engine.hpp node, otherwise create a
