@@ -2,7 +2,7 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
+* Made Query store a deep copy of user given strings when using the expression syntax
 
 ### API breaking changes:
 
