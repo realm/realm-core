@@ -172,6 +172,8 @@ public:
     // at a time tries to perform cleanup. This is ensured by doing the cleanup
     // as part of write transactions, where mutual exclusion is assured by the
     // write mutex.
+
+    // FIXME: The use of uint_fast64_t is in principle wrong
     struct ReadCount {
         uint_fast64_t version;
         uint_fast64_t filesize;
@@ -627,7 +629,15 @@ void SharedGroup::open(const string& path, bool no_create_file,
                 throw;
             }
 
+#ifdef TIGHTDB_ENABLE_REPLICATION
+            // If replication is enabled, we need to reset log management:
+            Replication* repl = _impl::GroupFriend::get_replication(m_group);
+            if (repl)
+                repl->reset_log_management();
+#endif
             // Call SharedInfo::SharedInfo() (placement new)
+            // This also sets init_complete, which allows other accessors to proceed,
+            // hence must happen after completing initialization of the log management.
             size_t file_size = alloc.get_baseline();
             new (info) SharedInfo(top_ref, file_size, dlevel); // Throws
             // we need a thread-local copy of the number of ringbuffer entries in order
@@ -637,12 +647,6 @@ void SharedGroup::open(const string& path, bool no_create_file,
             // Set initial version so we can track if other instances
             // change the db
             m_readlock.m_version = info->get_current_version_unchecked();
-#ifdef TIGHTDB_ENABLE_REPLICATION
-            // If replication is enabled, we need to reset log management:
-            Replication* repl = _impl::GroupFriend::get_replication(m_group);
-            if (repl)
-                repl->reset_log_management();
-#endif
 #ifndef _WIN32
             // In async mode we need a separate process to do the async commits
             // We start it up here during init so that it only get started once
@@ -829,6 +833,12 @@ SharedGroup::~SharedGroup() TIGHTDB_NOEXCEPT
     m_file.close();
     m_file_map.unmap();
     m_reader_map.unmap();
+#ifdef TIGHTDB_ENABLE_REPLICATION
+            // If replication is enabled, we need to stop log management:
+            Replication* repl = _impl::GroupFriend::get_replication(m_group);
+            if (repl)
+                repl->stop_logging();
+#endif
     try {
         util::File::remove(m_file_path.c_str());
     }
