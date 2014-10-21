@@ -1473,7 +1473,8 @@ void Group::refresh_dirty_accessors()
             tf::set_ndx_in_parent(*table, table_ndx);
             if (tf::is_marked(*table)) {
                 tf::refresh_accessor_tree(*table); // Throws
-                tf::bump_version(*table);
+                bool bump_global = false;
+                tf::bump_version(*table, bump_global);
             }
         }
     }

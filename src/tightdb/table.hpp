@@ -1560,7 +1560,6 @@ template<class E>
 inline void Table::set_enum(std::size_t column_ndx, std::size_t row_ndx, E value)
 {
     set_int(column_ndx, row_ndx, value);
-    bump_version();
 }
 
 inline TableRef Table::get_subtable(std::size_t column_ndx, std::size_t row_ndx)
