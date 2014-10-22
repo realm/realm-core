@@ -6080,7 +6080,7 @@ TEST(LangBindHelper_RollbackAndContinueAsReadLink)
     LangBindHelper::rollback_and_continue_as_read(sg);
     CHECK_EQUAL(2, origin->get_link(0,0));
     // verify that we can revert addition of a row in target table
-    LangBindHelper::promote_to_write(sg, *tlr);
+    LangBindHelper::promote_to_write(sg);
     target->add_empty_row();
     LangBindHelper::rollback_and_continue_as_read(sg);
     CHECK_EQUAL(2, origin->get_link(0,0));
@@ -6636,7 +6636,7 @@ TEST(LangBindHelper_MemOnly)
     }
 
     CHECK(rt.get_group().is_empty());
-    LangBindHelper::advance_read(sg_r, tlm);
+    LangBindHelper::advance_read(sg_r);
     CHECK(!rt.get_group().is_empty());
 }
 
