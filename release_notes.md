@@ -12,7 +12,7 @@
 
 ### Enhancements:
 
-* Lorem ipsum.
+* Support for implicit transactions has been extended to work between multiple processes.
 
 -----------
 
