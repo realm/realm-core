@@ -12,6 +12,16 @@
 #  include <tightdb/commit_log.hpp>
 #  include <tightdb/util/bind.hpp>
 #endif
+// Need fork() and waitpid() for Shared_RobustAgainstDeathDuringWrite
+#ifndef _WIN32
+#  include <unistd.h>
+#  include <sys/wait.h>
+#  define ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE
+#else
+#  define NOMINMAX
+#  include <windows.h>
+#endif
+
 
 #include "test.hpp"
 
@@ -6247,7 +6257,7 @@ void multiple_trackers_writer_thread(string path)
     Random random(random_int<unsigned long>());
     UniquePtr<Replication> repl(makeWriteLogCollector(path));
     SharedGroup sg(*repl);
-    for (int i = 0; i < 10; ++i) {
+    for (int i = 0; i < 30; ++i) {
         WriteTransaction wt(sg);
         TestTableInts::Ref tr = wt.get_table<TestTableInts>("table");
 
@@ -6298,7 +6308,7 @@ void multiple_trackers_reader_thread(TestResults* test_results_ptr, string path)
 
 TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
 {
-    const int write_thread_count = 3;
+    const int write_thread_count = 7;
     const int read_thread_count = 3;
 
     SHARED_GROUP_TEST_PATH(path);
@@ -6342,6 +6352,74 @@ TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
 
     // cleanup
     sg.end_read();
+}
+
+
+TEST(LangBindHelper_ImplicitTransactions_InterProcess)
+{
+    const int write_process_count = 7;
+    const int read_process_count = 3;
+
+    SHARED_GROUP_TEST_PATH(path);
+
+    if (fork() == 0) {
+        UniquePtr<Replication> repl(makeWriteLogCollector(path));
+        SharedGroup sg(*repl);
+        {
+            WriteTransaction wt(sg);
+            TableRef tr = wt.add_table("table");
+            tr->add_column(type_Int, "first");
+            for (int i = 0; i < 200; ++i)
+                tr->add_empty_row();
+            tr->set_int(0, 100, 42);
+            wt.commit();
+        }
+        exit(0);
+    } else {
+        int status;
+        wait(&status);
+    }
+
+    // intialization complete. Start writers:
+    for (int i = 0; i < write_process_count; ++i) {
+        if (fork() == 0) {
+            multiple_trackers_writer_thread(string(path));
+            exit(0);
+        }
+    }
+    sched_yield();
+    // then start readers:
+    for (int i = 0; i < read_process_count; ++i) {
+        if (fork() == 0) {
+            multiple_trackers_reader_thread(&test_results, string(path));
+            exit(0);
+        }
+    }
+
+    // Wait for all writer threads to complete
+    for (int i = 0; i < write_process_count; ++i) {
+        int status = 0;
+        wait(&status);
+    }
+
+    // signal to all readers to complete
+    {
+        UniquePtr<Replication> repl(makeWriteLogCollector(path));
+        SharedGroup sg(*repl);
+        WriteTransaction wt(sg);
+        TableRef tr = wt.get_table("table");
+        Query q = tr->where().equal(0, 42);
+        int idx = q.find();
+        tr->set_int(0, idx, 43);
+        wt.commit();
+    }
+
+    // Wait for all reader threads to complete
+    for (int i = 0; i < read_process_count; ++i) {
+        int status;
+        wait(&status);
+    }
+
 }
 
 
