@@ -6361,6 +6361,7 @@ TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
     sg.end_read();
 }
 
+#ifndef _WIN32
 
 TEST(LangBindHelper_ImplicitTransactions_InterProcess)
 {
@@ -6428,7 +6429,7 @@ TEST(LangBindHelper_ImplicitTransactions_InterProcess)
     }
 
 }
-
+#endif
 
 TEST(LangBindHelper_ImplicitTransactions_NoExtremeFileSpaceLeaks)
 {
