@@ -224,8 +224,7 @@ public:
 
 #ifdef TIGHTDB_DEBUG
     void Verify(const Table&, std::size_t) const TIGHTDB_OVERRIDE;
-    void dump_node_structure(std::ostream&, int level) const TIGHTDB_OVERRIDE;
-    using ColumnSubtableParent::dump_node_structure;
+    void do_dump_node_structure(std::ostream&, int) const TIGHTDB_OVERRIDE;
     void to_dot(std::ostream&, StringData title) const TIGHTDB_OVERRIDE;
 #endif
 

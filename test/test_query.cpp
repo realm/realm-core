@@ -1614,7 +1614,7 @@ TEST(Query_StrIndexCrash)
             table->insert_done();
         }
 
-        table->set_index(0);
+        table->add_search_index(0);
         TableView v = table->where().equal(0, StringData("8")).find_all();
         CHECK_EQUAL(eights, v.size());
 
@@ -1998,9 +1998,9 @@ TEST(Query_Huge)
             if (t == 1)
                 tt.optimize();
             else if (t == 2)
-                tt.column().first.set_index();
+                tt.column().first.add_search_index();
             else if (t == 3)
-                tt.column().second.set_index();
+                tt.column().second.add_search_index();
 
 
 
@@ -2168,7 +2168,7 @@ TEST(Query_StrIndex3)
         v.clear();
         vec.clear();
 
-        ttt.column().second.set_index();
+        ttt.column().second.add_search_index();
 
         // Index lookup, plus linear integer column scan
         v = ttt.where().second.equal("AA").first.equal(0).find_all();
@@ -2198,7 +2198,7 @@ TEST(Query_StrIndex2)
         ttt.add(1, "AA");
     }
     ttt.add(1, "BB");
-    ttt.column().second.set_index();
+    ttt.column().second.add_search_index();
 
     s = ttt.where().second.equal("AA").count();
     CHECK_EQUAL(100, s);
@@ -2273,7 +2273,7 @@ TEST(Query_StrIndex)
         s = ttt.where().second.equal("AA").count();
         CHECK_EQUAL(aa, s);
 
-        ttt.column().second.set_index();
+        ttt.column().second.add_search_index();
         s = ttt.where().second.equal("AA").count();
         CHECK_EQUAL(aa, s);
     }
@@ -2653,7 +2653,7 @@ TEST(Query_StrIndexedEnum)
 
     ttt.optimize();
 
-    ttt.column().second.set_index();
+    ttt.column().second.add_search_index();
 
     int64_t s = ttt.where().second.equal("a").first.sum();
     CHECK_EQUAL(10 * 11, s);
@@ -2682,7 +2682,7 @@ TEST(Query_StrIndexedNonEnum)
         ttt.add(4, "c");
     }
 
-    ttt.column().second.set_index();
+    ttt.column().second.add_search_index();
 
     int64_t s = ttt.where().second.equal("a").first.sum();
     CHECK_EQUAL(10 * 11, s);
@@ -4209,6 +4209,27 @@ TEST(Query_FindAllOrNested)
     ttt.add(11, "X");
     ttt.add(8, "Y");
 
+    // first > 3 && (first == 5 || second == X || second == Y)
+    TupleTableType::Query q1 = ttt.where().first.greater(3).group().first.equal(5).Or().second.equal("X").Or().second.equal("Y").end_group();
+    TupleTableType::View tv1 = q1.find_all();
+    CHECK_EQUAL(5, tv1.get_source_ndx(0));
+    CHECK_EQUAL(6, tv1.get_source_ndx(1));
+    CHECK_EQUAL(7, tv1.get_source_ndx(2));
+}
+
+TEST(Query_FindAllOrNestedInnerGroup)
+{
+    TupleTableType ttt;
+
+    ttt.add(1, "a");
+    ttt.add(2, "a");
+    ttt.add(3, "X");
+    ttt.add(3, "X");
+    ttt.add(4, "a");
+    ttt.add(5, "a");
+    ttt.add(11, "X");
+    ttt.add(8, "Y");
+
     // first > 3 && (first == 5 || (second == X || second == Y))
     TupleTableType::Query q1 = ttt.where().first.greater(3).group().first.equal(5).Or().group().second.equal("X").Or().second.equal("Y").end_group().end_group();
     TupleTableType::View tv1 = q1.find_all();
@@ -5424,6 +5445,7 @@ TEST(Query_TableViewMoveAssignLeak2)
 
     Query q3;
 
+    q2 = t.column().ints <= t.column().doubles;
     q3 = q2;
 
     q3.find();
@@ -5463,6 +5485,19 @@ TEST(Query_DeepCopyTest)
 
     q2.group();
     q2.end_group();
+}
+
+TEST(Query_StringIndexCrash)
+{
+    // Test for a crash which occured when a query testing for equality on a
+    // string index was deep-copied after being run
+    Table table;
+    table.add_column(type_String, "s");
+    table.add_search_index(0);
+
+    Query q = table.where().equal(0, StringData(""));
+    q.count();
+    Query(q, Query::TCopyExpressionTag());
 }
 
 #endif // TEST_QUERY

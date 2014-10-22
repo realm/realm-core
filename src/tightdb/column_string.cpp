@@ -8,6 +8,8 @@
 #  include <win32\types.h>
 #endif
 
+#include <tightdb/util/unique_ptr.hpp>
+
 #include <tightdb/query_conditions.hpp>
 #include <tightdb/column_string.hpp>
 #include <tightdb/index_string.hpp>
@@ -23,8 +25,10 @@ namespace {
 const size_t small_string_max_size  = 15; // ArrayString
 const size_t medium_string_max_size = 63; // ArrayStringLong
 
-// Getter function for string index
-StringData get_string(void* column, size_t ndx)
+// Getter function for index. For integer index, the caller must supply a buffer that we can store the 
+// extracted value in (it may be bitpacked, so we cannot return a pointer in to the Array as we do with 
+// String index).
+StringData get_string(void* column, size_t ndx, char*)
 {
     return static_cast<AdaptiveStringColumn*>(column)->get(ndx);
 }
@@ -169,12 +173,12 @@ StringData AdaptiveStringColumn::get(size_t ndx) const TIGHTDB_NOEXCEPT
 }
 
 
-StringIndex& AdaptiveStringColumn::create_index()
+StringIndex& AdaptiveStringColumn::create_search_index()
 {
     TIGHTDB_ASSERT(!m_search_index);
 
-    // Create new index
-    m_search_index = new StringIndex(this, &get_string, m_array->get_alloc()); // Throws
+    UniquePtr<StringIndex> index;
+    index.reset(new StringIndex(this, &get_string, m_array->get_alloc())); // Throws
 
     // Populate the index
     size_t num_rows = size();
@@ -182,18 +186,26 @@ StringIndex& AdaptiveStringColumn::create_index()
         StringData value = get(row_ndx);
         size_t num_rows = 1;
         bool is_append = true;
-        m_search_index->insert(row_ndx, value, num_rows, is_append); // Throws
+        index->insert(row_ndx, value, num_rows, is_append); // Throws
     }
 
+    m_search_index = index.release();
     return *m_search_index;
 }
 
 
-void AdaptiveStringColumn::set_index_ref(ref_type ref, ArrayParent* parent, size_t ndx_in_parent)
+void AdaptiveStringColumn::set_search_index_ref(ref_type ref, ArrayParent* parent,
+                                                size_t ndx_in_parent, bool allow_duplicate_valaues)
 {
     TIGHTDB_ASSERT(!m_search_index);
     m_search_index = new StringIndex(ref, parent, ndx_in_parent, this, &get_string,
-                                     m_array->get_alloc()); // Throws
+                                     !allow_duplicate_valaues, m_array->get_alloc()); // Throws
+}
+
+
+void AdaptiveStringColumn::set_search_index_allow_duplicate_values(bool allow) TIGHTDB_NOEXCEPT
+{
+    m_search_index->set_allow_duplicate_values(allow);
 }
 
 
@@ -348,13 +360,16 @@ void AdaptiveStringColumn::set(size_t ndx, StringData value)
 {
     TIGHTDB_ASSERT(ndx < size());
 
-    // Update index
+    // We must modify the search index before modifying the column, because we
+    // need to be able to abort the operation if the modification of the search
+    // index fails due to a unique constraint violation.
+
+    // Update search index
     // (it is important here that we do it before actually setting
     //  the value, or the index would not be able to find the correct
     //  position to update (as it looks for the old value))
     if (m_search_index) {
-        StringData old_val = get(ndx);
-        m_search_index->set(ndx, old_val, value); // Throws
+        m_search_index->set(ndx, value); // Throws
     }
 
     bool root_is_leaf = !m_array->is_inner_bptree_node();
@@ -484,13 +499,12 @@ void AdaptiveStringColumn::erase(size_t ndx, bool is_last)
     TIGHTDB_ASSERT(ndx < size());
     TIGHTDB_ASSERT(is_last == (ndx == size()-1));
 
-    // Update index
+    // Update search index
     // (it is important here that we do it before actually setting
     //  the value, or the index would not be able to find the correct
     //  position to update (as it looks for the old value))
     if (m_search_index) {
-        StringData old_val = get(ndx);
-        m_search_index->erase(ndx, old_val, is_last);
+        m_search_index->erase<StringData>(ndx, is_last);
     }
 
     bool root_is_leaf = !m_array->is_inner_bptree_node();
@@ -549,9 +563,8 @@ void AdaptiveStringColumn::move_last_over(size_t target_row_ndx, size_t last_row
 
     if (m_search_index) {
         // remove the value to be overwritten from index
-        StringData old_target_value = get(target_row_ndx);
         bool is_last = true; // This tells StringIndex::erase() to not adjust subsequent indexes
-        m_search_index->erase(target_row_ndx, old_target_value, is_last); // Throws
+        m_search_index->erase<StringData>(target_row_ndx, is_last); // Throws
 
         // update index to point to new location
         m_search_index->update_ref(copy_of_value, last_row_ndx, target_row_ndx); // Throws
@@ -1558,9 +1571,12 @@ void leaf_dumper(MemRef mem, Allocator& alloc, ostream& out, int level)
 
 } // anonymous namespace
 
-void AdaptiveStringColumn::dump_node_structure(ostream& out, int level) const
+void AdaptiveStringColumn::do_dump_node_structure(ostream& out, int level) const
 {
     m_array->dump_bptree_structure(out, level, &leaf_dumper);
+    int indent = level * 2;
+    out << setw(indent) << "" << "Search index\n";
+    m_search_index->do_dump_node_structure(out, level+1);
 }
 
 #endif // TIGHTDB_DEBUG

@@ -510,19 +510,19 @@ TEST(LangBindHelper_AdvanceReadTransact_ColumnRootTypeChange)
     for (size_t i = 0; i < sizeof steps / sizeof *steps; ++i) {
         Step step = steps[i];
         out.str("");
-        out << setfill('x') << setw(step.m_str_size) << "A";
+        out << setfill('x') << setw(int(step.m_str_size)) << "A";
         string str_1 = out.str();
         StringData str(str_1);
         out.str("");
-        out << setfill('x') << setw(step.m_str_size) << "B";
+        out << setfill('x') << setw(int(step.m_str_size)) << "B";
         string str_2 = out.str();
         BinaryData bin(str_2);
         out.str("");
-        out << setfill('x') << setw(step.m_str_size) << "C";
+        out << setfill('x') << setw(int(step.m_str_size)) << "C";
         string str_3 = out.str();
         StringData str_mix(str_3);
         out.str("");
-        out << setfill('x') << setw(step.m_str_size) << "D";
+        out << setfill('x') << setw(int(step.m_str_size)) << "D";
         string str_4 = out.str();
         BinaryData bin_mix(str_4);
         {
@@ -5834,6 +5834,7 @@ TEST(LangBindHelper_ImplicitTransactions)
     sg.end_read();
 }
 
+
 TEST(LangBindHelper_RollbackAndContinueAsRead)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -5855,10 +5856,10 @@ TEST(LangBindHelper_RollbackAndContinueAsRead)
             LangBindHelper::promote_to_write(sg);
             TableRef o = group->get_or_add_table("nullermand");
             TableRef o2 = group->get_table("nullermand");
-            TIGHTDB_ASSERT(o2 != 0);
+            TIGHTDB_ASSERT(o2);
             LangBindHelper::rollback_and_continue_as_read(sg);
             TableRef o3 = group->get_table("nullermand");
-            TIGHTDB_ASSERT(o3 == 0);
+            TIGHTDB_ASSERT(!o3);
             TIGHTDB_ASSERT(o2->is_attached() == false);
         }
 
@@ -5908,6 +5909,7 @@ TEST(LangBindHelper_RollbackAndContinueAsRead)
     }
 }
 
+
 TEST(LangBindHelper_RollbackAndContinueAsReadGroupLevelTableRemoval)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -5924,13 +5926,13 @@ TEST(LangBindHelper_RollbackAndContinueAsReadGroupLevelTableRemoval)
         // rollback of group level table delete
         LangBindHelper::promote_to_write(sg);
         TableRef o2 = group->get_table("a_table");
-        TIGHTDB_ASSERT(o2 != 0);
+        TIGHTDB_ASSERT(o2);
         group->remove_table("a_table");
         TableRef o3 = group->get_table("a_table");
-        TIGHTDB_ASSERT(o3 == 0);
+        TIGHTDB_ASSERT(!o3);
         LangBindHelper::rollback_and_continue_as_read(sg);
         TableRef o4 = group->get_table("a_table");
-        TIGHTDB_ASSERT(o4 != 0);
+        TIGHTDB_ASSERT(o4);
     }
     group->Verify();
 }
@@ -6075,6 +6077,11 @@ TEST(LangBindHelper_RollbackAndContinueAsReadLink)
     // verify that we can revert a link change:
     LangBindHelper::promote_to_write(sg);
     origin->set_link(0, 0, 1);
+    LangBindHelper::rollback_and_continue_as_read(sg);
+    CHECK_EQUAL(2, origin->get_link(0,0));
+    // verify that we can revert addition of a row in target table
+    LangBindHelper::promote_to_write(sg, *tlr);
+    target->add_empty_row();
     LangBindHelper::rollback_and_continue_as_read(sg);
     CHECK_EQUAL(2, origin->get_link(0,0));
 }
@@ -6243,7 +6250,7 @@ TEST(LangBindHelper_ImplicitTransactions_StringIndex)
     LangBindHelper::promote_to_write(sg);
     TableRef table = group->add_table("a");
     table->add_column(type_String, "b");
-    table->set_index(0);
+    table->add_search_index(0);
     group->Verify();
     LangBindHelper::commit_and_continue_as_read(sg);
     group->Verify();
@@ -6261,7 +6268,7 @@ void multiple_trackers_writer_thread(string path)
         WriteTransaction wt(sg);
         TestTableInts::Ref tr = wt.get_table<TestTableInts>("table");
 
-        int idx = tr->is_empty() ? 0 : (random.draw_int_mod(tr->size()));
+        size_t idx = tr->is_empty() ? 0 : random.draw_int_mod(tr->size());
 
         if (tr[idx].first == 42) {
             // do nothing
@@ -6284,11 +6291,11 @@ void multiple_trackers_reader_thread(TestResults* test_results_ptr, string path)
     Group& g = const_cast<Group&>(sg.begin_read());
     TableRef tr = g.get_table("table");
     Query q = tr->where().equal(0, 42);
-    int row_ndx = q.find();
+    size_t row_ndx = q.find();
     Row row = tr->get(row_ndx);
     TableView tv = q.find_all();
     for (;;) {
-        int val = row.get_int(0);
+        int_fast64_t val = row.get_int(0);
         tv.sync_if_needed();
         if (val == 43)
             break;
@@ -6342,7 +6349,7 @@ TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
         WriteTransaction wt(sg);
         TableRef tr = wt.get_table("table");
         Query q = tr->where().equal(0, 42);
-        int idx = q.find();
+        size_t idx = q.find();
         tr->set_int(0, idx, 43);
         wt.commit();
     }
@@ -6466,7 +6473,7 @@ TEST(LangBindHelper_ImplicitTransactions_DetachRowAccessorOnMoveLastOver)
     LangBindHelper::promote_to_write(sg);
     for (int i = 0; i < 10; ++i) {
         size_t row_ndx = random.draw_int_mod(table->size());
-        int value = table->get_int(0, row_ndx);
+        int_fast64_t value = table->get_int(0, row_ndx);
         table->move_last_over(row_ndx);
         CHECK_EQUAL(tightdb::not_found, table->find_first_int(0, value));
         for (int j = 0; j < 10; ++j) {
@@ -6596,6 +6603,42 @@ TEST(LangBindHelper_ImplicitTransactions_ContinuedUseOfLinkList)
     sg_w.end_read();
 }
 
+TEST(LangBindHelper_MemOnly)
+{
+    SHARED_GROUP_TEST_PATH(path);
+
+    // Verify that the db is empty after populating and then re-opening a file
+    {
+        ShortCircuitTransactLogManager tlm(path);
+        SharedGroup sg(tlm, SharedGroup::durability_MemOnly);
+        WriteTransaction wt(sg);
+        wt.add_table("table");
+        wt.commit();
+    }
+    {
+        ShortCircuitTransactLogManager tlm(path);
+        SharedGroup sg(tlm, SharedGroup::durability_MemOnly);
+        ReadTransaction rt(sg);
+        CHECK(rt.get_group().is_empty());
+    }
+
+    // Verify that basic replication functionality works
+
+    ShortCircuitTransactLogManager tlm(path);
+    SharedGroup sg_r(tlm, SharedGroup::durability_MemOnly);
+    SharedGroup sg_w(tlm, SharedGroup::durability_MemOnly);
+    ReadTransaction rt(sg_r);
+
+    {
+        WriteTransaction wt(sg_w);
+        wt.add_table("table");
+        wt.commit();
+    }
+
+    CHECK(rt.get_group().is_empty());
+    LangBindHelper::advance_read(sg_r, tlm);
+    CHECK(!rt.get_group().is_empty());
+}
 
 #endif // TIGHTDB_ENABLE_REPLICATION
 

@@ -8,6 +8,7 @@
 
 #include <tightdb/util/features.h>
 #include <tightdb/impl/destroy_guard.hpp>
+#include <tightdb/exceptions.hpp>
 #include <tightdb/table.hpp>
 #include <tightdb/descriptor.hpp>
 #include <tightdb/alloc_slab.hpp>
@@ -98,7 +99,7 @@
 /// destruction of the accessor objects by requiring that the following items
 /// are valid (the list may not yet be complete):
 ///
-///  - Every allocated accessor is either a group accessors, or occurs as a
+///  - Every allocated accessor is either a group accessor, or occurs as a
 ///    direct, or an indirect child of a group accessor.
 ///
 ///  - No allocated accessor occurs as a child more than once (for example, no
@@ -1228,53 +1229,68 @@ Table::~Table() TIGHTDB_NOEXCEPT
 }
 
 
-bool Table::has_index(size_t col_ndx) const TIGHTDB_NOEXCEPT
+bool Table::has_search_index(size_t col_ndx) const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(col_ndx < get_column_count());
+    // Utilize the guarantee that m_cols.size() == 0 for a detached table accessor.
+    if (TIGHTDB_UNLIKELY(col_ndx >= m_cols.size()))
+        return false;
     const ColumnBase& col = get_column_base(col_ndx);
-    return col.has_index();
+    return col.has_search_index();
 }
 
 
-void Table::set_index(size_t col_ndx)
+void Table::add_search_index(size_t col_ndx)
 {
-    TIGHTDB_ASSERT(!has_shared_type());
-    TIGHTDB_ASSERT(col_ndx < get_column_count());
+    if (TIGHTDB_UNLIKELY(!is_attached()))
+        throw LogicError(LogicError::detached_accessor);
 
-    if (has_index(col_ndx))
+    if (TIGHTDB_UNLIKELY(has_shared_type()))
+        throw LogicError(LogicError::wrong_kind_of_table);
+
+    if (TIGHTDB_UNLIKELY(col_ndx >= m_cols.size()))
+        throw LogicError(LogicError::column_index_out_of_range);
+
+    if (has_search_index(col_ndx))
         return;
 
-    ColumnType ct = get_real_column_type(col_ndx);
+    TIGHTDB_ASSERT(!m_primary_key);
+
+    ColumnType type = get_real_column_type(col_ndx);
     Spec::ColumnInfo info;
     m_spec.get_column_info(col_ndx, info);
     size_t column_pos = info.m_column_ref_ndx;
     ref_type index_ref = 0;
 
-    if (ct == col_type_String) {
+    // Create the index
+    if (type == col_type_String) {
         AdaptiveStringColumn& col = get_column_string(col_ndx);
-
-        // Create the index
-        StringIndex& index = col.create_index();
+        StringIndex& index = col.create_search_index(); // Throws
         index.set_parent(&m_columns, column_pos+1);
         index_ref = index.get_ref();
     }
-    else if (ct == col_type_StringEnum) {
+    else if (type == col_type_StringEnum) {
         ColumnStringEnum& col = get_column_string_enum(col_ndx);
-
-        // Create the index
-        StringIndex& index = col.create_index();
+        StringIndex& index = col.create_search_index(); // Throws
         index.set_parent(&m_columns, column_pos+1);
+        index_ref = index.get_ref();
+    }
+    else if (type == col_type_Int || type == col_type_DateTime || type == col_type_Bool) {
+        Column& col = get_column(col_ndx);
+        col.create_search_index(); // Throws
+        StringIndex& index = *static_cast<StringIndex*>(col.m_search_index);
+        index.set_parent(&m_columns, column_pos + 1);
         index_ref = index.get_ref();
     }
     else {
-        TIGHTDB_ASSERT(false);
-        return;
+        throw LogicError(LogicError::illegal_combination);
     }
 
     // Insert ref into list of column refs after the owning column
     m_columns.insert(column_pos+1, index_ref); // Throws
 
-    m_spec.set_column_attr(col_ndx, col_attr_Indexed); // Throws
+    int attr = m_spec.get_column_attr(col_ndx);
+    attr |= col_attr_Indexed;
+    m_spec.set_column_attr(col_ndx, ColumnAttr(attr)); // Throws
 
     refresh_column_accessors(col_ndx+1); // Throws
 
@@ -1284,6 +1300,123 @@ void Table::set_index(size_t col_ndx)
 #endif
 }
 
+
+bool Table::has_primary_key() const TIGHTDB_NOEXCEPT
+{
+    // Utilize the guarantee that m_cols.size() == 0 for a detached table accessor.
+    size_t n = m_cols.size();
+    for (size_t i = 0; i < n; ++i) {
+        ColumnAttr attr = m_spec.get_column_attr(i);
+        if (attr & col_attr_PrimaryKey)
+            return true;
+    }
+    return false;
+}
+
+
+bool Table::try_add_primary_key(size_t col_ndx)
+{
+    if (TIGHTDB_UNLIKELY(!is_attached()))
+        throw LogicError(LogicError::detached_accessor);
+
+    if (TIGHTDB_UNLIKELY(has_shared_type()))
+        throw LogicError(LogicError::wrong_kind_of_table);
+
+    if (TIGHTDB_UNLIKELY(has_primary_key()))
+        throw LogicError(LogicError::has_primary_key);
+
+    if (TIGHTDB_UNLIKELY(col_ndx >= m_cols.size()))
+        throw LogicError(LogicError::column_index_out_of_range);
+
+    if (TIGHTDB_UNLIKELY(!has_search_index(col_ndx)))
+        throw LogicError(LogicError::no_search_index);
+
+    // FIXME: Also check that there are no null values
+    // (NoNullConstraintViolation).
+    ColumnType type = get_real_column_type(col_ndx);
+    ColumnBase& col = get_column_base(col_ndx);
+    if (type == col_type_String) {
+        AdaptiveStringColumn& col_2 = static_cast<AdaptiveStringColumn&>(col);
+        StringIndex& index = col_2.get_search_index();
+        if (index.has_duplicate_values())
+            return false;
+        index.set_allow_duplicate_values(false);
+    }
+    else if (type == col_type_StringEnum) {
+        ColumnStringEnum& col_2 = static_cast<ColumnStringEnum&>(col);
+        StringIndex& index = col_2.get_search_index();
+        if (index.has_duplicate_values())
+            return false;
+        index.set_allow_duplicate_values(false);
+    }
+    else if (type == col_type_Int) {
+        Column& col_2 = static_cast<Column&>(col);
+        StringIndex& index = *static_cast<StringIndex*>(col_2.get_search_index());
+        if (index.has_duplicate_values())
+            return false;
+        index.set_allow_duplicate_values(false);
+    }
+    else {
+        // Impossible case, because we know that a search index was already
+        // added.
+        TIGHTDB_ASSERT(false);
+    }
+
+    int attr = m_spec.get_column_attr(col_ndx);
+    attr |= col_attr_Unique | col_attr_PrimaryKey;
+    m_spec.set_column_attr(col_ndx, ColumnAttr(attr)); // Throws
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    if (Replication* repl = get_repl())
+        repl->add_primary_key(this, col_ndx); // Throws
+#endif
+
+    return true;
+}
+
+
+void Table::remove_primary_key()
+{
+    if (TIGHTDB_UNLIKELY(!is_attached()))
+        throw LogicError(LogicError::detached_accessor);
+
+    if (TIGHTDB_UNLIKELY(has_shared_type()))
+        throw LogicError(LogicError::wrong_kind_of_table);
+
+    size_t num_cols = m_cols.size();
+    for (size_t col_ndx = 0; col_ndx < num_cols; ++col_ndx) {
+        int attr = m_spec.get_column_attr(col_ndx);
+        if (attr & col_attr_PrimaryKey) {
+            attr &= ~(col_attr_Unique | col_attr_PrimaryKey);
+            m_spec.set_column_attr(col_ndx, ColumnAttr(attr)); // Throws
+            m_primary_key = 0;
+
+            ColumnType type = get_real_column_type(col_ndx);
+            ColumnBase& col = get_column_base(col_ndx);
+            if (type == col_type_String) {
+                AdaptiveStringColumn& col_2 = static_cast<AdaptiveStringColumn&>(col);
+                StringIndex& index = col_2.get_search_index();
+                index.set_allow_duplicate_values(true);
+            }
+            else if (type == col_type_StringEnum) {
+                ColumnStringEnum& col_2 = static_cast<ColumnStringEnum&>(col);
+                StringIndex& index = col_2.get_search_index();
+                index.set_allow_duplicate_values(true);
+            }
+            else {
+                TIGHTDB_ASSERT(false);
+            }
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+            if (Replication* repl = get_repl())
+                repl->remove_primary_key(this); // Throws
+#endif
+            return;
+        }
+    }
+
+    throw LogicError(LogicError::no_primary_key);
+}
 
 
 // FIXME:
@@ -2167,20 +2300,21 @@ StringData Table::get_string(size_t col_ndx, size_t ndx) const TIGHTDB_NOEXCEPT
 
 void Table::set_string(size_t col_ndx, size_t ndx, StringData value)
 {
-    TIGHTDB_ASSERT(col_ndx < get_column_count());
-    TIGHTDB_ASSERT(ndx < m_size);
+    if (TIGHTDB_UNLIKELY(!is_attached()))
+        throw LogicError(LogicError::detached_accessor);
+    if (TIGHTDB_UNLIKELY(ndx >= m_size))
+        throw LogicError(LogicError::row_index_out_of_range);
+    // For a degenerate subtable, `m_cols.size()` is zero, even when it has a
+    // column, however, the previous row index check guarantees that `m_size >
+    // 0`, and since `m_size` is also zero for a degenerate subtable, the table
+    // cannot be degenerate if we got this far.
+    if (TIGHTDB_UNLIKELY(col_ndx >= m_cols.size()))
+        throw LogicError(LogicError::column_index_out_of_range);
+
     bump_version();
 
-    ColumnType type = get_real_column_type(col_ndx);
-    if (type == col_type_String) {
-        AdaptiveStringColumn& column = get_column_string(col_ndx);
-        column.set(ndx, value);
-    }
-    else {
-        TIGHTDB_ASSERT(type == col_type_StringEnum);
-        ColumnStringEnum& column = get_column_string_enum(col_ndx);
-        column.set(ndx, value);
-    }
+    ColumnBase& col = get_column_base(col_ndx);
+    col.set_string(ndx, value); // Throws
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
@@ -2662,6 +2796,7 @@ float Table::minimum_float(size_t col_ndx, size_t* return_ndx) const
     const ColumnFloat& column = get_column<ColumnFloat, col_type_Float>(col_ndx);
     return column.minimum(0, npos, npos, return_ndx);
 }
+
 double Table::minimum_double(size_t col_ndx, size_t* return_ndx) const
 {
     if(!m_columns.is_attached())
@@ -2695,6 +2830,7 @@ int64_t Table::maximum_int(size_t col_ndx, size_t* return_ndx) const
     return mv;
 #endif
 }
+
 float Table::maximum_float(size_t col_ndx, size_t* return_ndx) const
 {
     if(!m_columns.is_attached())
@@ -2703,6 +2839,7 @@ float Table::maximum_float(size_t col_ndx, size_t* return_ndx) const
     const ColumnFloat& column = get_column<ColumnFloat, col_type_Float>(col_ndx);
     return column.maximum(0, npos, npos, return_ndx);
 }
+
 double Table::maximum_double(size_t col_ndx, size_t* return_ndx) const
 {
     if(!m_columns.is_attached())
@@ -2713,48 +2850,63 @@ double Table::maximum_double(size_t col_ndx, size_t* return_ndx) const
 }
 
 
-
-size_t Table::lookup(StringData value) const
+void Table::reveal_primary_key() const
 {
-    // Early-out if this is a degenerate subtable
-    if(!m_columns.is_attached())
-        return not_found;
-
-    // First time we do a lookup we check if we can cache the index
-    if (!m_search_index) {
-        if (get_column_count() < 1)
-            return not_found; // no column to lookup in
-
-        ColumnType type = get_real_column_type(0);
-        if (type == col_type_String) {
-            const AdaptiveStringColumn& column = get_column_string(0);
-            if (!column.has_index()) {
-                return column.find_first(value);
+    size_t n = m_cols.size();
+    for (size_t i = 0; i < n; ++i) {
+        ColumnAttr attr = m_spec.get_column_attr(i);
+        if (attr & col_attr_PrimaryKey) {
+            ColumnType type = m_spec.get_column_type(i);
+            const ColumnBase& col = get_column_base(i);
+            if (type == col_type_String) {
+                const AdaptiveStringColumn& col_2 = static_cast<const AdaptiveStringColumn&>(col);
+                m_primary_key = &col_2.get_search_index();
+                return;
             }
-            else {
-                m_search_index = &column.get_index();
+            if (type == col_type_StringEnum) {
+                const ColumnStringEnum& col_2 = static_cast<const ColumnStringEnum&>(col);
+                m_primary_key = &col_2.get_search_index();
+                return;
             }
-        }
-        else if (type == col_type_StringEnum) {
-            const ColumnStringEnum& column = get_column_string_enum(0);
-            if (!column.has_index()) {
-                return column.find_first(value);
-            }
-            else {
-                m_search_index = &column.get_index();
-            }
-        }
-        else {
-            return not_found; // invalid column type
+            TIGHTDB_ASSERT(false);
+            return;
         }
     }
-
-    // Do lookup directly on cached index
-    return m_search_index->find_first(value);
+    throw LogicError(LogicError::no_primary_key);
 }
 
 
-template <class T> size_t Table::find_first(size_t col_ndx, T value) const
+size_t Table::do_find_pkey_int(int_fast64_t) const
+{
+    if (TIGHTDB_UNLIKELY(!is_attached()))
+        throw LogicError(LogicError::detached_accessor);
+
+    if (TIGHTDB_UNLIKELY(!m_primary_key))
+        reveal_primary_key(); // Throws
+
+    // FIXME: Implement this when integer indexes become available. For now, all
+    // search indexes are of string type.
+    throw LogicError(LogicError::type_mismatch);
+}
+
+
+size_t Table::do_find_pkey_string(StringData value) const
+{
+    if (TIGHTDB_UNLIKELY(!is_attached()))
+        throw LogicError(LogicError::detached_accessor);
+
+    if (TIGHTDB_UNLIKELY(!m_primary_key))
+        reveal_primary_key(); // Throws
+
+    // FIXME: In case of datatype mismatch throw LogicError::type_mismatch. For
+    // now, all search indexes are of string type.
+
+    size_t row_ndx = m_primary_key->find_first(value); // Throws
+    return row_ndx;
+}
+
+
+template<class T> size_t Table::find_first(size_t col_ndx, T value) const
 {
     TIGHTDB_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
     TIGHTDB_ASSERT(get_real_column_type(col_ndx) == ColumnTypeTraits3<T>::ct_id_real);
@@ -2924,7 +3076,7 @@ TableView Table::get_distinct_view(size_t col_ndx)
 {
     // FIXME: lacks support for reactive updates
     TIGHTDB_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
-    TIGHTDB_ASSERT(has_index(col_ndx));
+    TIGHTDB_ASSERT(has_search_index(col_ndx));
 
     TableView tv(*this);
     Column& refs = tv.m_row_indexes;
@@ -2933,13 +3085,13 @@ TableView Table::get_distinct_view(size_t col_ndx)
         ColumnType type = get_real_column_type(col_ndx);
         if (type == col_type_String) {
             const AdaptiveStringColumn& column = get_column_string(col_ndx);
-            const StringIndex& index = column.get_index();
+            const StringIndex& index = column.get_search_index();
             index.distinct(refs);
         }
         else {
             TIGHTDB_ASSERT(type == col_type_StringEnum);
             const ColumnStringEnum& column = get_column_string_enum(col_ndx);
-            const StringIndex& index = column.get_index();
+            const StringIndex& index = column.get_search_index();
             index.distinct(refs);
         }
     }
@@ -3068,8 +3220,8 @@ void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, T
     else {
         // If the group_by column is not auto-enumerated, we have to do
         // (more expensive) direct lookups.
-        result.set_index(0);
-        const StringIndex& dst_index = result.get_column_string(0).get_index();
+        result.add_search_index(0);
+        const StringIndex& dst_index = result.get_column_string(0).get_search_index();
 
         state.table = this;
         state.dst_index = &dst_index;
@@ -3406,7 +3558,7 @@ void Table::optimize()
             }
 
             // Indexes are also in m_columns, so we need adjusted pos
-            size_t ndx_in_parent = m_spec.get_column_pos(i);
+            size_t ndx_in_parent = m_spec.get_column_ndx_in_parent(i);
 
             // Replace column
             ColumnStringEnum* e = new ColumnStringEnum(alloc, ref, keys_ref); // Throws
@@ -3417,8 +3569,8 @@ void Table::optimize()
 
             // Inherit any existing index
             if (info.m_has_search_index) {
-                StringIndex* index = column->release_index();
-                e->install_index(index);
+                StringIndex* index = column->release_search_index();
+                e->install_search_index(index);
             }
 
             // Clean up the old column
@@ -3470,10 +3622,10 @@ public:
             _impl::DestroyGuard<Spec> dg(&spec);
             size_t n = spec.get_column_count();
             for (size_t i = 0; i != n; ++i) {
-                ColumnAttr attr = spec.get_column_attr(i);
+                int attr = spec.get_column_attr(i);
                 // Remove any index specifying attributes
-                attr = ColumnAttr(attr & ~col_attr_Indexed);
-                spec.set_column_attr(i, attr); // Throws
+                attr &= ~(col_attr_Indexed | col_attr_Unique | col_attr_PrimaryKey);
+                spec.set_column_attr(i, ColumnAttr(attr)); // Throws
             }
             size_t pos = spec.m_top.write(out); // Throws
             spec_ref = pos;
@@ -3576,8 +3728,8 @@ void Table::update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT
 
 
 // to JSON: ------------------------------------------
-void Table::to_json_row(std::size_t row_ndx, std::ostream& out, size_t link_depth, std::map<std::string, 
-    std::string>* renames) const
+void Table::to_json_row(std::size_t row_ndx, std::ostream& out, size_t link_depth, std::map<std::string,
+                        std::string>* renames) const
 {
     std::map<std::string, std::string> renames2;
     renames = renames ? renames : &renames2;
@@ -4525,11 +4677,11 @@ void Table::refresh_accessor_tree()
 
 void Table::refresh_column_accessors(size_t col_ndx_begin)
 {
-    m_search_index = 0;
+    m_primary_key = 0;
 
     // Index of column in Table::m_columns, which is not always equal to the
     // 'logical' column index.
-    size_t ndx_in_parent = m_spec.get_column_pos(col_ndx_begin);
+    size_t ndx_in_parent = m_spec.get_column_ndx_in_parent(col_ndx_begin);
 
     size_t col_ndx_end = m_cols.size();
     for (size_t col_ndx = col_ndx_begin; col_ndx != col_ndx_end; ++col_ndx) {
@@ -4594,12 +4746,20 @@ void Table::refresh_column_accessors(size_t col_ndx_begin)
         // If there is no search index accessor, but the column has been
         // equipped with a search index, create the accessor now.
         ColumnAttr attr = m_spec.get_column_attr(col_ndx);
-        bool has_search_index = attr & col_attr_Indexed;
-        if (has_search_index && !col->has_index()) {
-            ref_type ref = m_columns.get_as_ref(ndx_in_parent+1);
-            col->set_index_ref(ref, &m_columns, ndx_in_parent+1); // Throws
+        bool has_search_index = (attr & col_attr_Indexed)    != 0;
+        bool is_primary_key   = (attr & col_attr_PrimaryKey) != 0;
+        TIGHTDB_ASSERT(has_search_index || !is_primary_key);
+        if (has_search_index) {
+            bool allow_duplicate_values = !is_primary_key;
+            if (col->has_search_index()) {
+                col->set_search_index_allow_duplicate_values(allow_duplicate_values);
+            }
+            else {
+                ref_type ref = m_columns.get_as_ref(ndx_in_parent+1);
+                col->set_search_index_ref(ref, &m_columns, ndx_in_parent+1,
+                                          allow_duplicate_values); // Throws
+            }
         }
-
         ndx_in_parent += (has_search_index ? 2 : 1);
     }
 
@@ -4659,7 +4819,7 @@ void Table::Verify() const
         TIGHTDB_ASSERT(n == m_cols.size());
         for (size_t i = 0; i != n; ++i) {
             const ColumnBase& column = get_column_base(i);
-            std::size_t ndx_in_parent = m_spec.get_column_pos(i);
+            std::size_t ndx_in_parent = m_spec.get_column_ndx_in_parent(i);
             TIGHTDB_ASSERT(ndx_in_parent == column.get_root_array()->get_ndx_in_parent());
             column.Verify(*this, i);
             TIGHTDB_ASSERT(column.size() == m_size);
@@ -4805,8 +4965,9 @@ void Table::dump_node_structure(ostream& out, int level) const
     out << setw(indent) << "" << "Table (top_ref: "<<m_top.get_ref()<<")\n";
     size_t n = get_column_count();
     for (size_t i = 0; i != n; ++i) {
+        out << setw(indent) << "" << "  Column "<<(i+1)<<"\n";
         const ColumnBase& column = get_column_base(i);
-        column.dump_node_structure(out, level+1);
+        column.do_dump_node_structure(out, level+2);
     }
 }
 

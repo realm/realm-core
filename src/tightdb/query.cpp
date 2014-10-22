@@ -75,6 +75,8 @@ Query::Query(const Query& copy, const TCopyExpressionTag&)
 
 Query& Query::operator = (const Query& source)
 {
+    TIGHTDB_ASSERT(source.do_delete);
+
     if (this != &source) {
         // free destination object
         delete_nodes();
@@ -139,14 +141,6 @@ Expression* Query::get_expression() {
 Query& Query::expression(Expression* compare, bool auto_delete)
 {
     ParentNode* const p = new ExpressionNode(compare, auto_delete);
-    UpdatePointers(p, &p->m_child);
-    return *this;
-}
-
-// Makes query search only in rows contained in tv
-Query& Query::tableview(TableView& tv)
-{
-    ParentNode* const p = new ListviewNode(tv);
     UpdatePointers(p, &p->m_child);
     return *this;
 }
@@ -867,12 +861,20 @@ void Query::HandlePendingNot()
 
 Query& Query::Or()
 {
-    ParentNode* const o = new OrNode(first[first.size()-1]);
-    all_nodes.push_back(o);
+    OrNode* o = dynamic_cast<OrNode*>(first.back());
+    if (o) {
+        if (o->m_cond.back())
+            o->m_cond.push_back(0);
+    }
+    else {
+        o = new OrNode(first.back());
+        o->m_cond.push_back(0);
+        all_nodes.push_back(o);
+    }
 
-    first[first.size()-1] = o;
-    update[update.size()-1] = &((OrNode*)o)->m_cond[1];
-    update_override[update_override.size()-1] = &((OrNode*)o)->m_child;
+    first.back() = o;
+    update.back() = &o->m_cond.back();
+    update_override.back() = &o->m_child;
     return *this;
 }
 

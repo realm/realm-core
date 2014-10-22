@@ -76,7 +76,6 @@ public:
     using Table::remove_last;
     using Table::move_last_over;
     using Table::optimize;
-    using Table::lookup;
     using Table::add_empty_row;
     using Table::insert_empty_row;
     using Table::aggregate;
@@ -346,12 +345,6 @@ template<class Spec> class BasicTable<Spec>::Query:
 public:
     Query(const Query& q): Spec::template ColNames<QueryCol, Query*>(this), m_impl(q.m_impl) {}
     ~Query() TIGHTDB_NOEXCEPT {}
-
-    Query& tableview(const typename BasicTable<Spec>::View& v)
-    {
-        m_impl.tableview(const_cast<TableView&>(*v.get_impl()));
-        return *this;
-    }
 
     Query& group() { m_impl.group(); return *this; }
 

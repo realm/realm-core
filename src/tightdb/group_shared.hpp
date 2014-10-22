@@ -175,12 +175,13 @@ public:
 
     /// Equivalent to calling open(Replication&) on a
     /// default constructed instance.
-    explicit SharedGroup(Replication&);
+    explicit SharedGroup(Replication& repl,
+                         DurabilityLevel dlevel = durability_Full);
 
     /// Open this group in replication mode. The specified Replication
     /// instance must remain in exixtence for as long as the
     /// SharedGroup.
-    void open(Replication&);
+    void open(Replication&, DurabilityLevel dlevel = durability_Full);
 
     friend class Replication;
 
@@ -540,11 +541,11 @@ inline bool SharedGroup::is_attached() const TIGHTDB_NOEXCEPT
 }
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-inline SharedGroup::SharedGroup(Replication& repl):
+inline SharedGroup::SharedGroup(Replication& repl, DurabilityLevel dlevel):
     m_group(Group::shared_tag()),
     m_transactions_are_pinned(false)
 {
-    open(repl);
+    open(repl, dlevel);
 }
 #endif
 

@@ -188,6 +188,8 @@ public:
     void move_last_over(const Table*, std::size_t target_row_ndx, std::size_t last_row_ndx);
     void add_int_to_column(const Table*, std::size_t col_ndx, int_fast64_t value);
     void add_search_index(const Table*, std::size_t col_ndx);
+    void add_primary_key(const Table*, std::size_t col_ndx);
+    void remove_primary_key(const Table*);
     void clear_table(const Table*);
     void optimize_table(const Table*);
 
@@ -326,13 +328,15 @@ private:
         instr_EraseLinkColumn       = 36, // Remove link-type column from selected descriptor
         instr_RenameColumn          = 37, // Rename column in selected descriptor
         instr_AddSearchIndex        = 38, // Add a search index to a column
-        instr_SelectLinkList        = 39,
-        instr_LinkListSet           = 40, // Assign to link list entry
-        instr_LinkListInsert        = 41, // Insert entry into link list
-        instr_LinkListMove          = 42, // Move an entry within a link list
-        instr_LinkListErase         = 43, // Remove an entry from a link list
-        instr_LinkListClear         = 44, // Remove all entries from a link list
-        instr_LinkListSetAll        = 45  // Assign to link list entry
+        instr_AddPrimaryKey         = 39, // Add a primary key to a table
+        instr_RemovePrimaryKey      = 40, // Remove primary key from a table
+        instr_SelectLinkList        = 41,
+        instr_LinkListSet           = 42, // Assign to link list entry
+        instr_LinkListInsert        = 43, // Insert entry into link list
+        instr_LinkListMove          = 44, // Move an entry within a link list
+        instr_LinkListErase         = 45, // Remove an entry from a link list
+        instr_LinkListClear         = 46, // Ramove all entries from a link list
+        instr_LinkListSetAll        = 47  // Assign to link list entry
     };
 
     util::Buffer<std::size_t> m_subtab_path_buf;
@@ -467,6 +471,8 @@ public:
     ///     bool erase_column(std::size_t col_ndx)
     ///     bool rename_column(std::size_t col_ndx, StringData new_name)
     ///     bool add_search_index(std::size_t col_ndx)
+    ///     bool add_primary_key(std::size_t col_ndx)
+    ///     bool remove_primary_key()
     ///     bool select_link_list(std::size_t col_ndx, std::size_t row_ndx)
     ///     bool link_list_set(std::size_t link_ndx, std::size_t value)
     ///     bool link_list_insert(std::size_t link_ndx, std::size_t value)
@@ -705,16 +711,17 @@ template<class T> inline char* Replication::encode_int(char* ptr, T value)
     // An explicit constant maximum number of iterations is specified
     // in the hope that it will help the optimizer (to do loop
     // unrolling, for example).
+    typedef unsigned char uchar;
     for (int i=0; i<max_bytes; ++i) {
         if (value >> (bits_per_byte-1) == 0)
             break;
-        *reinterpret_cast<unsigned char*>(ptr) =
-            (1U<<bits_per_byte) | unsigned(value & ((1U<<bits_per_byte)-1));
+        *reinterpret_cast<uchar*>(ptr) =
+            uchar((1U<<bits_per_byte) | unsigned(value & ((1U<<bits_per_byte)-1)));
         ++ptr;
         value >>= bits_per_byte;
     }
-    *reinterpret_cast<unsigned char*>(ptr) =
-        negative ? (1U<<(bits_per_byte-1)) | unsigned(value) : value;
+    *reinterpret_cast<uchar*>(ptr) =
+        uchar(negative ? (1U<<(bits_per_byte-1)) | unsigned(value) : value);
     return ++ptr;
 }
 
@@ -1122,7 +1129,11 @@ inline void Replication::insert_empty_rows(const Table* t, std::size_t row_ndx,
                                            std::size_t num_rows)
 {
     check_table(t); // Throws
-    simple_cmd(instr_InsertEmptyRows, util::tuple(row_ndx, num_rows, t->size(), false)); // Throws
+
+    // default to unordered, if we are inserting at the end:
+    bool unordered = row_ndx == t->size()-num_rows; 
+
+    simple_cmd(instr_InsertEmptyRows, util::tuple(row_ndx, num_rows, t->size(), unordered)); // Throws
 }
 
 
@@ -1152,6 +1163,20 @@ inline void Replication::add_search_index(const Table* t, std::size_t col_ndx)
 {
     check_table(t); // Throws
     simple_cmd(instr_AddSearchIndex, util::tuple(col_ndx)); // Throws
+}
+
+
+inline void Replication::add_primary_key(const Table* t, std::size_t col_ndx)
+{
+    check_table(t); // Throws
+    simple_cmd(instr_AddPrimaryKey, util::tuple(col_ndx)); // Throws
+}
+
+
+inline void Replication::remove_primary_key(const Table* t)
+{
+    check_table(t); // Throws
+    simple_cmd(instr_RemovePrimaryKey, util::tuple()); // Throws
 }
 
 
@@ -1514,8 +1539,8 @@ bool Replication::TransactLogParser::do_parse(InstructionHandler& handler)
                     return false;
                 continue;
             }
-            case instr_LinkListSetAll: {     
-                // todo, log that it's a SetAll we're doing 
+            case instr_LinkListSetAll: {
+                // todo, log that it's a SetAll we're doing
                 std::size_t size = read_int<std::size_t>(); // Throws
                 for (std::size_t i = 0; i < size; i++) {
                     std::size_t link = read_int<std::size_t>(); // Throws
@@ -1559,6 +1584,17 @@ bool Replication::TransactLogParser::do_parse(InstructionHandler& handler)
             case instr_AddSearchIndex: {
                 std::size_t col_ndx = read_int<std::size_t>(); // Throws
                 if (!handler.add_search_index(col_ndx)) // Throws
+                    return false;
+                continue;
+            }
+            case instr_AddPrimaryKey: {
+                std::size_t col_ndx = read_int<std::size_t>(); // Throws
+                if (!handler.add_primary_key(col_ndx)) // Throws
+                    return false;
+                continue;
+            }
+            case instr_RemovePrimaryKey: {
+                if (!handler.remove_primary_key()) // Throws
                     return false;
                 continue;
             }
@@ -1661,61 +1697,6 @@ bool Replication::TransactLogParser::do_parse(InstructionHandler& handler)
     }
     return true;
 }
-
-
-
-// The NullHandler class is trivial, just returning true for all methods. It is intended
-// as a base for classes doing more sophisticated processing for just a few of the methods.
-// See group.cpp for example of use.
-class NullHandler {
-public:
-    bool insert_group_level_table(std::size_t, std::size_t, StringData) { return true; }
-    bool erase_group_level_table(std::size_t, std::size_t) { return true; }
-    bool rename_group_level_table(std::size_t, StringData) { return true; }
-    bool select_table(std::size_t, int, const std::size_t* ) { return true; }
-    bool insert_empty_rows(std::size_t, std::size_t, std::size_t, bool ) { return true; }
-    bool erase_rows(std::size_t, std::size_t, bool) { return true; }
-    bool clear_table() { return true; }
-    bool insert_int(std::size_t, std::size_t, std::size_t, bool, int_fast64_t) { return true; }
-    bool insert_bool(std::size_t, std::size_t, std::size_t, bool, bool) { return true; }
-    bool insert_float(std::size_t, std::size_t, std::size_t, bool, float) { return true; }
-    bool insert_double(std::size_t, std::size_t, std::size_t, bool, double) { return true; }
-    bool insert_string(std::size_t, std::size_t, std::size_t, bool, StringData) { return true; }
-    bool insert_binary(std::size_t, std::size_t, std::size_t, bool, BinaryData) { return true; }
-    bool insert_date_time(std::size_t, std::size_t, std::size_t, bool, DateTime) { return true; }
-    bool insert_table(std::size_t, std::size_t, std::size_t, bool) { return true; }
-    bool insert_mixed(std::size_t, std::size_t, std::size_t, bool, const Mixed&) { return true; }
-    bool insert_link(std::size_t, std::size_t, std::size_t, bool, std::size_t) { return true; }
-    bool insert_link_list(std::size_t, std::size_t, std::size_t, bool) { return true; }
-    bool row_insert_complete() { return true; }
-    bool set_int(std::size_t, std::size_t, int_fast64_t) { return true; }
-    bool set_bool(std::size_t, std::size_t, bool) { return true; }
-    bool set_float(std::size_t, std::size_t, float) { return true; }
-    bool set_double(std::size_t, std::size_t, double) { return true; }
-    bool set_string(std::size_t, std::size_t, StringData) { return true; }
-    bool set_binary(std::size_t, std::size_t, BinaryData) { return true; }
-    bool set_date_time(std::size_t, std::size_t, DateTime) { return true; }
-    bool set_table(std::size_t, std::size_t) { return true; }
-    bool set_mixed(std::size_t, std::size_t, const Mixed&) { return true; }
-    bool set_link(std::size_t, std::size_t, std::size_t) { return true; }
-    bool add_int_to_column(std::size_t, int_fast64_t) { return true; }
-    bool optimize_table() { return true; }
-    bool select_descriptor(int, const std::size_t*) { return true; }
-    bool insert_column(std::size_t, DataType, StringData) { return true; }
-    bool erase_column(std::size_t) { return true; }
-    bool insert_link_column(std::size_t, DataType, StringData,
-                       std::size_t, std::size_t) { return true; }
-    bool erase_link_column(std::size_t, std::size_t,
-                      std::size_t) { return true; }
-    bool rename_column(std::size_t, StringData) { return true; }
-    bool add_search_index(std::size_t) { return true; }
-    bool select_link_list(std::size_t, std::size_t) { return true; }
-    bool link_list_set(std::size_t, std::size_t) { return true; }
-    bool link_list_insert(std::size_t, std::size_t) { return true; }
-    bool link_list_move(std::size_t, std::size_t) { return true; }
-    bool link_list_erase(std::size_t) { return true; }
-    bool link_list_clear() { return true; }
-};
 
 
 template<class T> T Replication::TransactLogParser::read_int()

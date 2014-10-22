@@ -55,6 +55,46 @@ TEST(LinkList_Basic1)
     TableView tv2 = q2.find_all();
 }
 
+TEST(LinkList_MissingDeepCopy)
+{
+    // Attempt to test that Query makes a deep copy of user given strings.
+    Group group;
+
+    TableRef table1 = group.add_table("table1");
+    TableRef table2 = group.add_table("table2");
+
+    // add some more columns to table1 and table2
+    table1->add_column(type_Int, "col1");
+    table1->add_column(type_String, "str1");
+
+    // add some rows
+    table1->add_empty_row();
+    table1->set_int(0, 0, 100);
+    table1->set_string(1, 0, "foo");
+    table1->add_empty_row();
+    table1->set_int(0, 1, 200);
+    table1->set_string(1, 1, "!");
+    table1->add_empty_row();
+    table1->set_int(0, 2, 300);
+    table1->set_string(1, 2, "bar");
+
+    size_t col_link2 = table2->add_column_link(type_Link, "link", *table1);
+    table2->add_empty_row();
+    table2->add_empty_row();
+
+    table2->set_link(col_link2, 0, 1);
+    table2->set_link(col_link2, 1, 2);
+
+    char* c = new char[10000000]; 
+    c[10000000 - 1] = '!';
+    Query q = table2->link(col_link2).column<String>(1) == StringData(&c[10000000 - 1], 1);
+
+    delete[] c;
+    // If this segfaults, Query hasn't made its own deep copy of "!"
+    size_t m = q.find();
+    CHECK_EQUAL(0, m);
+}
+
 TEST(LinkList_Basic2)
 {
     Group group;
@@ -1087,9 +1127,14 @@ TEST(LinkList_QueryOnLinkList)
     lvr->add(2);
 
     // Return all rows of table1 (the linked-to-table) that match the criteria and is in the LinkList
-    Query q = table2->where(lvr.get()).and_query(table1->column<Int>(0) > 100);
 
-    tv = q.find_all();
+    // q.m_table = table1
+    // q.m_view = lvr
+    Query q = table1->where(lvr.get()).and_query(table1->column<Int>(0) > 100);
+
+    // tv.m_table == table1
+    tv = q.find_all(); // tv = { 0, 2 }
+
     TableView tv2 = lvr->get_sorted_view(0);
 
     CHECK_EQUAL(3, tv2.size());
@@ -1101,10 +1146,14 @@ TEST(LinkList_QueryOnLinkList)
     CHECK_EQUAL(0, tv.get_source_ndx(0));
     CHECK_EQUAL(2, tv.get_source_ndx(1));
 
-    // Modify the LinkList and see if sync_if_needed takes it in count
-    lvr->remove(2);
+    // Should of course work even if nothing has changed
     tv.sync_if_needed();
-    CHECK_EQUAL(1, tv.size());
+  
+    // Modify the LinkList and see if sync_if_needed takes it in count
+    lvr->remove(2); // bumps version of table2 and only table2
+    tv.sync_if_needed();
+    
+    CHECK_EQUAL(1, tv.size()); // fail
     CHECK_EQUAL(0, tv.get_source_ndx(0));
     
     // Now test if changes in linked-to table bumps the version of the linked-from table and that 

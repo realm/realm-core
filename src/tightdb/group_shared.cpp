@@ -765,14 +765,11 @@ void SharedGroup::open(const string& path, bool no_create_file,
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
 
-void SharedGroup::open(Replication& repl)
+void SharedGroup::open(Replication& repl, DurabilityLevel dlevel)
 {
     TIGHTDB_ASSERT(!is_attached());
     string file = repl.get_database_path();
     bool no_create   = false;
-    DurabilityLevel dlevel = durability_Full;
-    // we must install replication in group before calling open,
-    // because open depends on it. FIXME.
     typedef _impl::GroupFriend gf;
     gf::set_replication(m_group, &repl);
     open(file, no_create, dlevel); // Throws

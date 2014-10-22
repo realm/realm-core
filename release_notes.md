@@ -2,7 +2,7 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
+* Made Query store a deep copy of user given strings when using the expression syntax
 
 ### API breaking changes:
 
@@ -19,6 +19,65 @@
 ### Internals:
 
 * Lorem ipsum.
+
+----------------------------------------------
+
+# 0.85.0 Release notes
+
+### Bugfixes:
+
+* Fixed a crash when copying a query checking for equality on an indexed string
+  column.
+* Fixed a stack overflow when too many query conditions were combined with Or().
+
+### API breaking changes:
+
+* Now supports index on Integer, Bool and Date columns; API is the same as for
+  String index
+* `Query::tableview()` removed as it might lead to wrong results - e.g., when
+  sorting a sorted tableview.
+
+### Enhancements:
+
+* Make the durability level settable in the `SharedGroup` constructor and
+  `open()` overloads taking a `Replication`.
+
+----------------------------------------------
+
+# 0.84.0 Release notes
+
+### API breaking changes:
+
+* `Table::set_index()` and `Table::has_index()` renamed to
+  `Table::add_search_index()` and `Table::has_search_index()` respectively, and
+  `Table::add_search_index()` now throws instead of failing in an unspecified
+  way.
+* `Table::find_pkey_string()` replaces `Table::lookup()` and has slightly
+  different semantics. In particular, it now throws instead of failing in an
+  unspecified way.
+
+### Enhancements:
+
+* A row accessor (`Row`) can now be evaluated in boolean context to see whether
+  it is still attached.
+* `Table::try_add_primary_key()` and `Table::remove_primary_key()` added.
+* `Table::find_pkey_int()` added, but not yet backed by an integer search index.
+* Added method `LangBindHelper::rollback_and_continue_as_read()`. This method
+  provides the ability to rollback a write transaction while retaining
+  accessors: Accessors which are detached as part of the rolled back write
+  transaction are *not* automatically re-attached. Accessors that were attached
+  before the write transaction and which are not detached during the write
+  transaction will remain attached after the rollback.
+
+-----------
+
+### Internals:
+
+* Introducing `LogicError` as an alternative to expected exceptions. See
+  https://github.com/Tightdb/tightdb/wiki/Exception-safety-guarantees for more
+  on this.
+* Various query related speed improvements.
+* Test suite now passes ASAN (address sanitizer).
 
 ----------------------------------------------
 

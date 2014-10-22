@@ -469,7 +469,7 @@ public:
     const Array* GetBlock(std::size_t ndx, Array& arr, std::size_t& off,
                           bool use_retval = false) const TIGHTDB_NOEXCEPT; // FIXME: Constness is not propagated to the sub-array
 
-    typedef StringData (*StringGetter)(void*, std::size_t); // Pre-declare getter function from string index
+    typedef StringData (*StringGetter)(void*, std::size_t, char*); // Pre-declare getter function from string index
     size_t IndexStringFindFirst(StringData value, void* column, StringGetter get_func) const;
     void   IndexStringFindAll(Column& result, StringData value, void* column, StringGetter get_func) const;
     size_t IndexStringCount(StringData value, void* column, StringGetter get_func) const;
@@ -485,8 +485,8 @@ public:
     /// Add \a diff to all the elements in the specified index range.
     void adjust(std::size_t begin, std::size_t end, int_fast64_t diff);
 
-    /// Add \a diff to all elements that are greater than, or equal to the
-    /// specified limit.
+    /// Add signed \a diff to all elements that are greater than, or equal to \a
+    /// limit.
     void adjust_ge(int_fast64_t limit, int_fast64_t diff);
 
     //@{
@@ -554,14 +554,14 @@ public:
     /// This information is guaranteed to be cached in the array accessor.
     bool is_inner_bptree_node() const TIGHTDB_NOEXCEPT;
 
-    /// Returns true if type is either type_HasRefs or type_InnerColumnNode
+    /// Returns true if type is either type_HasRefs or type_InnerColumnNode.
     ///
     /// This information is guaranteed to be cached in the array accessor.
     bool has_refs() const TIGHTDB_NOEXCEPT;
 
     /// This information is guaranteed to be cached in the array accessor.
     ///
-    /// Columns and indexes can use the context bit to diffentiate leaf types
+    /// Columns and indexes can use the context bit to differentiate leaf types.
     bool get_context_flag() const TIGHTDB_NOEXCEPT;
     void set_context_flag(bool) TIGHTDB_NOEXCEPT;
 
@@ -958,6 +958,8 @@ private:
 
     bool do_erase_bptree_elem(std::size_t elem_ndx, EraseHandler&);
 
+
+    template <IndexMethod method, class T> size_t index_string(StringData value, Column& result, size_t &result_ref, void* column, StringGetter get_func) const;
 protected:
 //    void AddPositiveLocal(int64_t value);
 

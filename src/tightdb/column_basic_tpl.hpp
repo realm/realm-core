@@ -421,7 +421,7 @@ inline void BasicColumn<T>::leaf_dumper(MemRef mem, Allocator& alloc, std::ostre
 }
 
 template<class T>
-inline void BasicColumn<T>::dump_node_structure(std::ostream& out, int level) const
+inline void BasicColumn<T>::do_dump_node_structure(std::ostream& out, int level) const
 {
     m_array->dump_bptree_structure(out, level, &leaf_dumper);
 }
