@@ -6,7 +6,7 @@
 
 ### API breaking changes:
 
-* Added not_equal(), equal(), contains(), begins_with(), ends_with() for String columns in the Query expression syntax. They work both case sensitive and insensitive. So now you can write 'size_t m = table1->column<String>(0).contains("A", true).find();'
+* Added not_equal(), equal(), contains(), begins_with(), ends_with() for String columns in the Query expression syntax. They work both case sensitive and insensitive. So now you can write 'size_t m = table1->column<String>(0).contains("A", true).find();'. Works with Links too.
 
 ### Enhancements:
 
