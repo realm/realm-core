@@ -329,6 +329,15 @@ namespace tightdb {
     // If an output character differs in size, it is simply substituded by
     // the original character. This may of course give wrong search
     // results in very special cases. Todo.
+    string case_map(StringData source, bool upper)
+    {
+        char* dst = new char[source.size()];
+        case_map(source, dst, upper);
+        string str(dst, source.size());
+        delete[] dst;
+        return str;
+    }
+
     bool case_map(StringData source, char* target, bool upper)
     {
 #ifdef _WIN32

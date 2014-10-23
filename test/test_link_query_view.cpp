@@ -50,10 +50,15 @@ TEST(LinkList_Basic1)
 
     Query q = table2->link(col_link2).column<String>(1) == "!";
     TableView tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv[0].get_index(), 0);
 
     Query q2 = table2->link(col_link2).column<Int>(0) == 200;
     TableView tv2 = q2.find_all();
+    CHECK_EQUAL(tv2.size(), 1);
+    CHECK_EQUAL(tv2[0].get_index(), 0);
 }
+
 
 TEST(LinkList_MissingDeepCopy)
 {
