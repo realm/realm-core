@@ -2,7 +2,7 @@
 
 ### Bugfixes:
 
-* Made Query store a deep copy of user given strings when using the expression syntax
+* Lorem ipsum.
 
 ### API breaking changes:
 
@@ -21,6 +21,15 @@
 ### Internals:
 
 * Lorem ipsum.
+
+----------------------------------------------
+
+# 0.85.1 Release notes
+
+### Bugfixes:
+
+* Made Query store a deep copy of user given strings when using the expression
+  syntax
 
 ----------------------------------------------
 
