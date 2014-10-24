@@ -1,22 +1,9 @@
-# NEXT RELEASE
+# 0.85.1 Release notes
 
 ### Bugfixes:
 
-* Made Query store a deep copy of user given strings when using the expression syntax
-
-### API breaking changes:
-
-* Lorem ipsum.
-
-### Enhancements:
-
-* Lorem ipsum.
-
------------
-
-### Internals:
-
-* Lorem ipsum.
+* Made Query store a deep copy of user given strings when using the expression
+  syntax
 
 ----------------------------------------------
 
