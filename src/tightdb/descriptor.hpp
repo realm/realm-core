@@ -206,11 +206,11 @@ public:
     /// link to the same target row. In such a case, no rows are
     /// cascade-removed.
     ///
-    /// When a row is explicitly removed (such as by Table::remove()), all links
-    /// to it are automatically removed or nullified. For single link columns
-    /// (type_Link), links to the removed row are nullified. For link list
-    /// columns (type_LinkList), links to the removed row are removed from the
-    /// list.
+    /// When a row is explicitly removed (such as by Table::move_last_over()),
+    /// all links to it are automatically removed or nullified. For single link
+    /// columns (type_Link), links to the removed row are nullified. For link
+    /// list columns (type_LinkList), links to the removed row are removed from
+    /// the list.
     ///
     /// When a row is cascade-removed there can no longer be any strong links to it,
     /// but if there are any weak links, they will be removed or nullified.
@@ -220,8 +220,8 @@ public:
     /// this respect, it suffers from the same limitations as a reference
     /// counting scheme generally does.
     ///
-    /// It is also important to understand, that the possible presence of link
-    /// cycles can cause a row to be cascade-removed as a consequence of being
+    /// It is also important to understand, that the possible presence of a link
+    /// cycle can cause a row to be cascade-removed as a consequence of being
     /// modified. This happens, for example, if two rows, A and B, have strong
     /// links to each other, and there are no other strong links to either of
     /// them. In this case, if A->B is changed to A->C, then both A and B will
