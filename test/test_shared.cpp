@@ -88,7 +88,9 @@ TIGHTDB_TABLE_4(TestTableShared,
 
 } // anonymous namespace
 
-
+#ifdef LOCKFILE_CLEANUP
+// The following two tests are now disabled, as we have abandoned the requirement to
+// clean up the .lock file after use.
 TEST(Shared_NoCreateCleanupLockFileAfterFailure)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -129,7 +131,7 @@ TEST(Shared_NoCreateCleanupLockFileAfterFailure2)
     // Verify that the `lock` file is not left behind
     CHECK(!File::exists(path.get_lock_path()));
 }
-
+#endif
 
 TEST(Shared_Initial)
 {
@@ -146,11 +148,14 @@ TEST(Shared_Initial)
 
     }
 
+#ifdef LOCKFILE_CLEANUP
     // Verify that the `lock` file is not left behind
     CHECK(!File::exists(path.get_lock_path()));
+#endif
 }
 
 
+#ifdef LOCKFILE_CLEANUP
 TEST(Shared_StaleLockFileFaked)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -202,7 +207,7 @@ TEST(Shared_StaleLockFileRenamed)
     // Verify that the `lock` file is not left behind
     CHECK(!File::exists(lock_path));
 }
-
+#endif
 
 TEST(Shared_InitialMem)
 {
@@ -224,8 +229,10 @@ TEST(Shared_InitialMem)
     // removed.
     CHECK(!File::exists(path));
 
+#ifdef LOCKFILE_CLEANUP
     // Verify that the `lock` file is not left behind
     CHECK(!File::exists(path.get_lock_path()));
+#endif
 }
 
 
@@ -269,8 +276,10 @@ TEST(Shared_Initial2)
         }
     }
 
+#ifdef LOCKFILE_CLEANUP
     // Verify that the `lock` file is not left behind
     CHECK(!File::exists(path.get_lock_path()));
+#endif
 }
 
 
@@ -315,8 +324,10 @@ TEST(Shared_Initial2_Mem)
         }
     }
 
+#ifdef LOCKFILE_CLEANUP
     // Verify that the `lock` file is not left behind
     CHECK(!File::exists(path.get_lock_path()));
+#endif
 }
 
 
@@ -408,8 +419,10 @@ TEST(Shared_1)
         }
     }
 
+#ifdef LOCKFILE_CLEANUP
     // Verify that lock file was deleted after use
     CHECK(!File::exists(path.get_lock_path()));
+#endif
 }
 
 
@@ -479,8 +492,10 @@ TEST(Shared_Rollback)
         }
     }
 
+#ifdef LOCKFILE_CLEANUP
     // Verify that lock file was deleted after use
     CHECK(!File::exists(path.get_lock_path()));
+#endif
 }
 
 
@@ -519,8 +534,10 @@ TEST(Shared_Writes)
         }
     }
 
+#ifdef LOCKFILE_CLEANUP
     // Verify that lock file was deleted after use
     CHECK(!File::exists(path.get_lock_path()));
+#endif
 }
 
 
@@ -1003,8 +1020,10 @@ TEST(Shared_WriterThreads)
         }
     }
 
+#ifdef LOCKFILE_CLEANUP
     // Verify that lock file was deleted after use
     CHECK(!File::exists(path.get_lock_path()));
+#endif
 }
 
 
