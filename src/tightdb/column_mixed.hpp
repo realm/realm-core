@@ -62,13 +62,6 @@ public:
 
     ~ColumnMixed() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
-    void adj_accessors_insert_rows(std::size_t, std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-    void adj_accessors_erase_row(std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-    void adj_accessors_move(std::size_t, std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-    void adj_acc_clear_root_table() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-
-    void update_from_parent(std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-
     DataType get_type(std::size_t ndx) const TIGHTDB_NOEXCEPT;
     std::size_t size() const TIGHTDB_NOEXCEPT { return m_types->size(); }
     bool is_empty() const TIGHTDB_NOEXCEPT { return size() == 0; }
@@ -122,10 +115,9 @@ public:
     void insert_binary(std::size_t ndx, BinaryData value);
     void insert_subtable(std::size_t ndx, const Table* value);
 
-    void clear() TIGHTDB_OVERRIDE;
-    void insert(std::size_t, std::size_t, bool) TIGHTDB_OVERRIDE;
-    void erase(std::size_t, bool) TIGHTDB_OVERRIDE;
-    void move_last_over(std::size_t, std::size_t) TIGHTDB_OVERRIDE;
+    void erase(std::size_t row_ndx);
+    void move_last_over(std::size_t row_ndx);
+    void clear();
 
     /// Compare two mixed columns for equality.
     bool compare_mixed(const ColumnMixed&) const;
@@ -140,8 +132,16 @@ public:
     ref_type write(std::size_t, std::size_t, std::size_t,
                    _impl::OutputStream&) const TIGHTDB_OVERRIDE;
 
+    void insert(std::size_t, std::size_t, bool) TIGHTDB_OVERRIDE;
+    void erase(std::size_t, bool) TIGHTDB_OVERRIDE;
+    void move_last_over(std::size_t, std::size_t, bool) TIGHTDB_OVERRIDE;
+    void clear(std::size_t, bool) TIGHTDB_OVERRIDE;
+    void update_from_parent(std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void adj_acc_insert_rows(std::size_t, std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void adj_acc_erase_row(std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void adj_acc_move_over(std::size_t, std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void adj_acc_clear_root_table() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     void mark(int) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-
     void refresh_accessor_tree(std::size_t, const Spec&) TIGHTDB_OVERRIDE;
 
 #ifdef TIGHTDB_DEBUG
@@ -189,6 +189,10 @@ private:
     ColumnBinary* m_binary_data;
 
     std::size_t do_get_size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return size(); }
+
+    void do_erase(std::size_t row_ndx, bool is_last);
+    void do_move_last_over(std::size_t row_ndx, std::size_t last_row_ndx);
+    void do_clear(std::size_t num_rows);
 
     void create(Allocator&, ref_type, Table*, std::size_t column_ndx);
     void ensure_binary_data_column();

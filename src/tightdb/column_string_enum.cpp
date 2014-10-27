@@ -101,7 +101,7 @@ void ColumnStringEnum::do_insert(size_t row_ndx, StringData value, size_t num_ro
 }
 
 
-void ColumnStringEnum::erase(size_t ndx, bool is_last)
+void ColumnStringEnum::do_erase(size_t ndx, bool is_last)
 {
     TIGHTDB_ASSERT(ndx < Column::size());
 
@@ -109,37 +109,38 @@ void ColumnStringEnum::erase(size_t ndx, bool is_last)
     // (it is important here that we do it before actually setting
     //  the value, or the index would not be able to find the correct
     //  position to update (as it looks for the old value))
-    if (m_search_index) {
+    if (m_search_index)
         m_search_index->erase<StringData>(ndx, is_last);
-    }
 
-    Column::erase(ndx, is_last);
+    Column::do_erase(ndx, is_last);
 }
 
 
-void ColumnStringEnum::move_last_over(size_t target_row_ndx, size_t last_row_ndx)
+void ColumnStringEnum::do_move_last_over(size_t row_ndx, size_t last_row_ndx)
 {
-    TIGHTDB_ASSERT(target_row_ndx < last_row_ndx);
+    TIGHTDB_ASSERT(row_ndx <= last_row_ndx);
     TIGHTDB_ASSERT(last_row_ndx + 1 == size());
 
     if (m_search_index) {
         // remove the value to be overwritten from index
         bool is_last = true; // This tells StringIndex::erase() to not adjust subsequent indexes
-        m_search_index->erase<StringData>(target_row_ndx, is_last); // Throws
+        m_search_index->erase<StringData>(row_ndx, is_last); // Throws
 
         // update index to point to new location
-        StringData moved_value = get(last_row_ndx);
-        m_search_index->update_ref(moved_value, last_row_ndx, target_row_ndx); // Throws
+        if (row_ndx != last_row_ndx) {
+            StringData moved_value = get(last_row_ndx);
+            m_search_index->update_ref(moved_value, last_row_ndx, row_ndx); // Throws
+        }
     }
 
-    Column::move_last_over(target_row_ndx, last_row_ndx); // Throws
+    Column::do_move_last_over(row_ndx, last_row_ndx); // Throws
 }
 
 
-void ColumnStringEnum::clear()
+void ColumnStringEnum::do_clear()
 {
     // Note that clearing a StringEnum does not remove keys
-    Column::clear();
+    Column::do_clear();
 
     if (m_search_index)
         m_search_index->clear();

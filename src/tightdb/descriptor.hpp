@@ -200,11 +200,16 @@ public:
     ///  - the origin row is explicitly removed (Row::move_last_over(),
     ///    Table::clear()), or if
     ///
-    ///  - the origin row is cascade-removed.
+    ///  - the origin row is cascade-removed, or if
+    ///
+    ///  - the origin column is removed from the table (Table::remove_column()),
+    ///    or if
+    ///
+    ///  - the origin table is removed from the group.
     ///
     /// Note that a link is *not* considered broken when it is replaced by a
-    /// link to the same target row. In such a case, no rows are
-    /// cascade-removed.
+    /// link to the same target row. I.e., no no rows will be cascade-removed
+    /// due to such an operation.
     ///
     /// When a row is explicitly removed (such as by Table::move_last_over()),
     /// all links to it are automatically removed or nullified. For single link

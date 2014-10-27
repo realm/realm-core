@@ -194,9 +194,8 @@ TEST(Links_Deletes)
     table2->insert_link(col_link, 1, 0);
     table2->insert_done();
 
-    while (!table2->is_empty()) {
+    while (!table2->is_empty())
         table2->move_last_over(0);
-    }
 
     CHECK(table2->is_empty());
     CHECK_EQUAL(0, table1->get_backlink_count(0, *table2, col_link));
@@ -209,9 +208,8 @@ TEST(Links_Deletes)
     table2->insert_done();
 
     // remove all rows in target table
-    while (!table1->is_empty()) {
+    while (!table1->is_empty())
         table1->move_last_over(0);
-    }
 
     // verify that originating links was nullified
     CHECK(table2->is_null_link(col_link, 0));

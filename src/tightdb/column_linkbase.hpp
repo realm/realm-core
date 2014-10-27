@@ -43,17 +43,13 @@ public:
     virtual void do_update_link(std::size_t row_ndx, std::size_t old_target_row_ndx,
                                 std::size_t new_target_row_ndx) = 0;
 
-    void find_erase_cascade_for_target_row(std::size_t target_table_ndx, std::size_t target_row_ndx,
-                                           std::size_t stop_on_table_ndx, cascade_rowset&) const;
-
-    void refresh_accessor_tree(std::size_t, const Spec&) TIGHTDB_OVERRIDE;
-
-    void adj_accessors_insert_rows(std::size_t, std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-    void adj_accessors_erase_row(std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-    void adj_accessors_move(std::size_t, std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void erase(std::size_t, bool) TIGHTDB_OVERRIDE;
+    void adj_acc_insert_rows(std::size_t, std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void adj_acc_erase_row(std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void adj_acc_move_over(std::size_t, std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     void adj_acc_clear_root_table() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-
     void mark(int) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void refresh_accessor_tree(std::size_t, const Spec&) TIGHTDB_OVERRIDE;
 
 #ifdef TIGHTDB_DEBUG
     void Verify(const Table&, std::size_t) const TIGHTDB_OVERRIDE;
@@ -67,6 +63,12 @@ protected:
 
     // Create unattached root array aaccessor.
     ColumnLinkBase(Allocator&, ref_type);
+
+    /// Call Table::cascade_break_backlinks_to() for the specified target row if
+    /// it is not already in \a state.rows, and the number of strong links to it
+    /// has dropped to zero.
+    void check_cascade_break_backlinks_to(std::size_t target_table_ndx, std::size_t target_row_ndx,
+                                          CascadeState& state);
 };
 
 
@@ -116,10 +118,10 @@ inline void ColumnLinkBase::set_backlink_column(ColumnBackLink& column) TIGHTDB_
     m_backlink_column = &column;
 }
 
-inline void ColumnLinkBase::adj_accessors_insert_rows(std::size_t row_ndx,
-                                                      std::size_t num_rows) TIGHTDB_NOEXCEPT
+inline void ColumnLinkBase::adj_acc_insert_rows(std::size_t row_ndx,
+                                                std::size_t num_rows) TIGHTDB_NOEXCEPT
 {
-    Column::adj_accessors_insert_rows(row_ndx, num_rows);
+    Column::adj_acc_insert_rows(row_ndx, num_rows);
 
     // For tables with link-type columns, the insertion point must be after all
     // existsing rows, but since the inserted link can be non-null, the target
@@ -128,16 +130,16 @@ inline void ColumnLinkBase::adj_accessors_insert_rows(std::size_t row_ndx,
     tf::mark(*m_target_table);
 }
 
-inline void ColumnLinkBase::adj_accessors_erase_row(std::size_t) TIGHTDB_NOEXCEPT
+inline void ColumnLinkBase::adj_acc_erase_row(std::size_t) TIGHTDB_NOEXCEPT
 {
     // Rows cannot be erased this way in tables with link-type columns
     TIGHTDB_ASSERT(false);
 }
 
-inline void ColumnLinkBase::adj_accessors_move(std::size_t target_row_ndx,
-                                               std::size_t source_row_ndx) TIGHTDB_NOEXCEPT
+inline void ColumnLinkBase::adj_acc_move_over(std::size_t from_row_ndx,
+                                              std::size_t to_row_ndx) TIGHTDB_NOEXCEPT
 {
-    Column::adj_accessors_move(target_row_ndx, source_row_ndx);
+    Column::adj_acc_move_over(from_row_ndx, to_row_ndx);
 
     typedef _impl::TableFriend tf;
     tf::mark(*m_target_table);

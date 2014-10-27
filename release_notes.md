@@ -6,7 +6,12 @@
 
 ### API breaking changes:
 
-* Lorem ipsum.
+* Table::erase() can no longer be used with unordered tables. Previously it was
+  allowed if the specified index was the index of the last row in the table. One
+  must now always use Table::move_last_over() with unordered tables. Whether a
+  table is ordered or unordered is entirely decided by the way it is used by the
+  application, and note that only unordered tables are allowed to contain link
+  columns.
 
 ### Enhancements:
 

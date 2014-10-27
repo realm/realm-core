@@ -69,41 +69,6 @@ inline std::size_t BasicColumn<T>::size() const TIGHTDB_NOEXCEPT
     return m_array->get_bptree_size();
 }
 
-template<class T>
-void BasicColumn<T>::clear()
-{
-    if (!m_array->is_inner_bptree_node()) {
-        static_cast<BasicArray<T>*>(m_array)->clear(); // Throws
-        return;
-    }
-
-    // Revert to generic array
-    util::UniquePtr<BasicArray<T> > array;
-    array.reset(new BasicArray<T>(m_array->get_alloc())); // Throws
-    array->create(); // Throws
-    array->set_parent(m_array->get_parent(), m_array->get_ndx_in_parent());
-    array->update_parent(); // Throws
-
-    // Remove original node
-    m_array->destroy_deep();
-    delete m_array;
-
-    m_array = array.release();
-}
-
-template<class T>
-void BasicColumn<T>::move_last_over(std::size_t target_row_ndx, std::size_t last_row_ndx)
-{
-    TIGHTDB_ASSERT(target_row_ndx < last_row_ndx);
-    TIGHTDB_ASSERT(last_row_ndx + 1 == size());
-
-    T value = get(last_row_ndx);
-    set(target_row_ndx, value); // Throws
-
-    bool is_last = true;
-    erase(last_row_ndx, is_last); // Throws
-}
-
 
 template<class T>
 T BasicColumn<T>::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
@@ -163,13 +128,22 @@ template<class T> inline void BasicColumn<T>::insert(std::size_t row_ndx, T valu
     do_insert(row_ndx_2, value, num_rows); // Throws
 }
 
-// Implementing pure virtual method of ColumnBase.
-template<class T>
-inline void BasicColumn<T>::insert(std::size_t row_ndx, std::size_t num_rows, bool is_append)
+template<class T> inline void BasicColumn<T>::erase(std::size_t row_ndx)
 {
-    std::size_t row_ndx_2 = is_append ? tightdb::npos : row_ndx;
-    T value = T();
-    do_insert(row_ndx_2, value, num_rows); // Throws
+    std::size_t last_row_ndx = size() - 1; // Note that size() is slow
+    bool is_last = row_ndx == last_row_ndx;
+    do_erase(row_ndx, is_last); // Throws
+}
+
+template<class T> inline void BasicColumn<T>::move_last_over(std::size_t row_ndx)
+{
+    std::size_t last_row_ndx = size() - 1; // Note that size() is slow
+    do_move_last_over(row_ndx, last_row_ndx); // Throws
+}
+
+template<class T> inline void BasicColumn<T>::clear()
+{
+    do_clear(); // Throws
 }
 
 template<class T>
@@ -230,7 +204,7 @@ public:
 };
 
 template<class T>
-void BasicColumn<T>::erase(std::size_t ndx, bool is_last)
+void BasicColumn<T>::do_erase(std::size_t ndx, bool is_last)
 {
     TIGHTDB_ASSERT(ndx < size());
     TIGHTDB_ASSERT(is_last == (ndx == size()-1));
@@ -240,9 +214,44 @@ void BasicColumn<T>::erase(std::size_t ndx, bool is_last)
         return;
     }
 
-    size_t ndx_2 = is_last ? npos : ndx;
+    std::size_t ndx_2 = is_last ? npos : ndx;
     EraseLeafElem erase_leaf_elem(*this);
     Array::erase_bptree_elem(m_array, ndx_2, erase_leaf_elem); // Throws
+}
+
+
+template<class T>
+void BasicColumn<T>::do_move_last_over(std::size_t row_ndx, std::size_t last_row_ndx)
+{
+    TIGHTDB_ASSERT(row_ndx <= last_row_ndx);
+    TIGHTDB_ASSERT(last_row_ndx + 1 == size());
+
+    T value = get(last_row_ndx);
+    set(row_ndx, value); // Throws
+
+    bool is_last = true;
+    erase(last_row_ndx, is_last); // Throws
+}
+
+template<class T> void BasicColumn<T>::do_clear()
+{
+    if (!m_array->is_inner_bptree_node()) {
+        static_cast<BasicArray<T>*>(m_array)->clear(); // Throws
+        return;
+    }
+
+    // Revert to generic array
+    util::UniquePtr<BasicArray<T> > array;
+    array.reset(new BasicArray<T>(m_array->get_alloc())); // Throws
+    array->create(); // Throws
+    array->set_parent(m_array->get_parent(), m_array->get_ndx_in_parent());
+    array->update_parent(); // Throws
+
+    // Remove original node
+    m_array->destroy_deep();
+    delete m_array;
+
+    m_array = array.release();
 }
 
 
@@ -300,6 +309,35 @@ template<class T> ref_type BasicColumn<T>::write(size_t slice_offset, size_t sli
                                 table_size, handler, out); // Throws
     }
     return ref;
+}
+
+
+// Implementing pure virtual method of ColumnBase.
+template<class T>
+inline void BasicColumn<T>::insert(std::size_t row_ndx, std::size_t num_rows, bool is_append)
+{
+    std::size_t row_ndx_2 = is_append ? tightdb::npos : row_ndx;
+    T value = T();
+    do_insert(row_ndx_2, value, num_rows); // Throws
+}
+
+// Implementing pure virtual method of ColumnBase.
+template<class T> inline void BasicColumn<T>::erase(std::size_t row_ndx, bool is_last)
+{
+    do_erase(row_ndx, is_last); // Throws
+}
+
+// Implementing pure virtual method of ColumnBase.
+template<class T>
+void BasicColumn<T>::move_last_over(std::size_t row_ndx, std::size_t last_row_ndx, bool)
+{
+    do_move_last_over(row_ndx, last_row_ndx); // Throws
+}
+
+// Implementing pure virtual method of ColumnBase.
+template<class T> void BasicColumn<T>::clear(std::size_t, bool)
+{
+    do_clear(); // Throws
 }
 
 

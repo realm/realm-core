@@ -27,6 +27,7 @@
 #include <tightdb/util/unique_ptr.hpp>
 #include <tightdb/array.hpp>
 #include <tightdb/column_type.hpp>
+#include <tightdb/column_fwd.hpp>
 #include <tightdb/spec.hpp>
 #include <tightdb/impl/output_stream.hpp>
 #include <tightdb/query_conditions.hpp>
@@ -72,20 +73,30 @@ public:
     /// `row_ndx` is equal to the size of the column (before insertion).
     virtual void insert(std::size_t row_ndx, std::size_t num_rows, bool is_append) = 0;
 
-    /// Remove all entries from this column.
-    virtual void clear() = 0;
+    /// Remove all elements from this column.
+    ///
+    /// \param num_rows The total number of rows in this column.
+    ///
+    /// \param broken_reciprocal_backlinks If true, link columns must assume
+    /// that reciprocal backlinks have already been removed. Non-link columns,
+    /// and backlink columns should ignore this argument.
+    virtual void clear(std::size_t num_rows, bool broken_reciprocal_backlinks) = 0;
 
     /// Remove the specified entry from this column. Set \a is_last to
     /// true when deleting the last element. This is important to
     /// avoid conversion to to general form of inner nodes of the
     /// B+-tree.
-    virtual void erase(std::size_t ndx, bool is_last) = 0;
+    virtual void erase(std::size_t row_ndx, bool is_last) = 0;
 
-    /// Move the last element to the specified target index. This reduces the
+    /// Remove the specified row by moving the last row over it. This reduces the
     /// number of elements by one. The specified last row index must always be
-    /// one less than the number of rows in the column. The target index must
-    /// always be strictly less that the last index.
-    virtual void move_last_over(std::size_t target_row_ndx, std::size_t last_row_ndx) = 0;
+    /// one less than the number of rows in the column.
+    ///
+    /// \param broken_reciprocal_backlinks If true, link columns must assume
+    /// that reciprocal backlinks have already been removed for the specified
+    /// row. Non-link columns, and backlink columns should ignore this argument.
+    virtual void move_last_over(std::size_t row_ndx, std::size_t last_row_ndx,
+                                bool broken_reciprocal_backlinks) = 0;
 
     virtual bool IsIntColumn() const TIGHTDB_NOEXCEPT { return false; }
 
@@ -160,37 +171,20 @@ public:
     /// table and link list accessors stay valid across a commit.
     virtual void update_from_parent(std::size_t old_baseline) TIGHTDB_NOEXCEPT;
 
-    struct cascade_row {
-        size_t table_ndx, row_ndx;
-
-        /// Trivial lexicographic order
-        bool operator<(const cascade_row&) const TIGHTDB_NOEXCEPT;
-    };
-
-    typedef std::vector<cascade_row> cascade_rowset;
-
     //@{
 
-    /// find_erase_cascade() is called when the row at \a row_ndx is about to be
-    /// removed, and find_clear_cascade() when the column is about to be cleared
-    /// (all rows removed). Link columns must override these functions and
-    /// descend into target rows. If a target row has no other strong links to
-    /// it, that target row must be added to \a rows, and the cascade must
-    /// recurse from that point. Rows that are added to \a rows will eventually
-    /// be cascade-removed.
-    ///
-    /// \param stop_on_table_ndx If not equal to tightdb::npos, then do not
-    /// recurse into rows of the group-level table with that index in the group. This is used by 
-    ///
-    /// \param rows A sorted list of rows. Each entry is a pair (table_ndx,
-    /// row_ndx), where table_ndx is the index withing the group of a
-    /// group-level table. Insertions must therfore respect this order.
+    /// cascade_break_backlinks_to() is called iteratively for each column by
+    /// Table::cascade_break_backlinks_to() with the same arguments as are
+    /// passed to Table::cascade_break_backlinks_to(). Link columns must
+    /// override it. The same is true for cascade_break_backlinks_to_all_rows(),
+    /// except that it is called from
+    /// Table::cascade_break_backlinks_to_all_rows(), and that it expects
+    /// Table::cascade_break_backlinks_to_all_rows() to pass the number of rows
+    /// in the table as \a num_rows.
 
-    virtual void find_erase_cascade(std::size_t row_ndx, std::size_t stop_on_table_ndx,
-                                    cascade_rowset& rows) const;
-
-    virtual void find_clear_cascade(std::size_t table_ndx, std::size_t num_rows,
-                                    cascade_rowset& rows) const;
+    struct CascadeState;
+    virtual void cascade_break_backlinks_to(std::size_t row_ndx, CascadeState&);
+    virtual void cascade_break_backlinks_to_all_rows(std::size_t num_rows, CascadeState&);
 
     //@}
 
@@ -207,21 +201,11 @@ public:
     /// function does nothing.
     virtual void discard_subtable_accessor(std::size_t row_ndx) TIGHTDB_NOEXCEPT;
 
-    virtual void adj_accessors_insert_rows(std::size_t row_ndx,
-                                           std::size_t num_rows) TIGHTDB_NOEXCEPT;
-    virtual void adj_accessors_erase_row(std::size_t row_ndx) TIGHTDB_NOEXCEPT;
-
-    // This function assumes that a row has moved from \a origin_ndx to \a target_ndx,
-    // and it updates the column accessor, and all its subordinate accessors (subtables, rows)
-    // accordingly.
-    // Subordinate accessors that are already associated with \a target_ndx will be detached.
-    // Link-adjacent table accessors will be marked (dirty).
-    //
-    // It is used as part of Table::refresh_accessor_tree() to bring the state of the accessors
-    // from Minimal Consistency into Structural Correspondence, so it must be able to execute
-    // without accessing the underlying array nodes.
-    virtual void adj_accessors_move(std::size_t target_row_ndx,
-                                    std::size_t source_row_ndx) TIGHTDB_NOEXCEPT;
+    virtual void adj_acc_insert_rows(std::size_t row_ndx, std::size_t num_rows) TIGHTDB_NOEXCEPT;
+    virtual void adj_acc_erase_row(std::size_t row_ndx) TIGHTDB_NOEXCEPT;
+    /// See Table::adj_acc_move_over()
+    virtual void adj_acc_move_over(std::size_t from_row_ndx,
+                                   std::size_t to_row_ndx) TIGHTDB_NOEXCEPT;
     virtual void adj_acc_clear_root_table() TIGHTDB_NOEXCEPT;
 
     enum {
@@ -336,6 +320,49 @@ private:
 };
 
 
+struct ColumnBase::CascadeState {
+    struct row {
+        std::size_t table_ndx; ///< Index within group of a group-level table.
+        std::size_t row_ndx;
+
+        bool operator==(const row&) const TIGHTDB_NOEXCEPT;
+        bool operator!=(const row&) const TIGHTDB_NOEXCEPT;
+
+        /// Trivial lexicographic order
+        bool operator<(const row&) const TIGHTDB_NOEXCEPT;
+    };
+
+    typedef std::vector<row> row_set;
+
+    /// A sorted list of rows. The order is defined by row::operator<(), and
+    /// insertions must respect this order.
+    row_set rows;
+
+    /// If non-null, then no recursion will be performed for rows of that
+    /// table. The effect is then exactly as if all the rows of that table were
+    /// added to \a state.rows initially, and then removed again after the
+    /// explicit invocations of Table::cascade_break_backlinks_to() (one for
+    /// each initiating row). This is used by Table::clear() to avoid
+    /// reentrance.
+    ///
+    /// Must never be set concurrently with stop_on_link_list_column.
+    Table* stop_on_table;
+
+    /// If non-null, then Table::cascade_break_backlinks_to() will skip the
+    /// removal of reciprocal backlinks for the link list at
+    /// stop_on_link_list_row_ndx in this column, and no recursion will happen
+    /// on its behalf. This is used by LinkView::clear() to avoid reentrance.
+    ///
+    /// Must never be set concurrently with stop_on_table.
+    ColumnLinkList* stop_on_link_list_column;
+
+    /// Is ignored if stop_on_link_list_column is null.
+    std::size_t stop_on_link_list_row_ndx;
+
+    CascadeState();
+};
+
+
 class ColumnBase::EraseHandlerBase: public Array::EraseHandler {
 protected:
     EraseHandlerBase(ColumnBase& column) TIGHTDB_NOEXCEPT: m_column(column) {}
@@ -383,6 +410,9 @@ public:
     void adjust(std::size_t ndx, int_fast64_t diff);
     void add(int_fast64_t value = 0);
     void insert(std::size_t ndx, int_fast64_t value = 0);
+    void erase(std::size_t row_ndx);
+    void move_last_over(std::size_t row_ndx);
+    void clear();
 
     std::size_t count(int64_t target) const;
     int64_t sum(std::size_t start = 0, std::size_t end = -1, size_t limit = size_t(-1),
@@ -397,17 +427,6 @@ public:
     double  average(std::size_t start = 0, std::size_t end = -1, size_t limit = size_t(-1),
                     size_t* return_ndx = null_ptr) const;
 
-    /// If any element points to an array node, this function recursively
-    /// destroys that array node. Note that the same is **not** true for
-    /// Column::erase() and Column::move_last_over().
-    ///
-    /// FIXME: Be careful, clear() currently forgets if the leaf type is
-    /// Array::type_HasRefs.
-    void clear() TIGHTDB_OVERRIDE;
-
-    void insert(std::size_t, std::size_t, bool) TIGHTDB_OVERRIDE;
-    void erase(std::size_t ndx, bool is_last) TIGHTDB_OVERRIDE;
-    void move_last_over(std::size_t, std::size_t) TIGHTDB_OVERRIDE;
     void destroy_subtree(size_t ndx, bool clear_value);
 
     void adjust(int_fast64_t diff);
@@ -442,10 +461,14 @@ public:
     ref_type write(std::size_t, std::size_t, std::size_t,
                    _impl::OutputStream&) const TIGHTDB_OVERRIDE;
 
+    void insert(std::size_t, std::size_t, bool) TIGHTDB_OVERRIDE;
+    void erase(std::size_t, bool) TIGHTDB_OVERRIDE;
+    void move_last_over(std::size_t, std::size_t, bool) TIGHTDB_OVERRIDE;
+    void clear(std::size_t, bool) TIGHTDB_OVERRIDE;
+    void refresh_accessor_tree(std::size_t, const Spec&) TIGHTDB_OVERRIDE;
+
     /// \param row_ndx Must be `tightdb::npos` if appending.
     void do_insert(std::size_t row_ndx, int_fast64_t value, std::size_t num_rows);
-
-    void refresh_accessor_tree(std::size_t, const Spec&) TIGHTDB_OVERRIDE;
 
 #ifdef TIGHTDB_DEBUG
     void Verify() const TIGHTDB_OVERRIDE;
@@ -462,6 +485,18 @@ protected:
     Column(Array* root = 0) TIGHTDB_NOEXCEPT;
 
     std::size_t do_get_size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return size(); }
+
+    void do_erase(std::size_t row_ndx, bool is_last);
+
+    void do_move_last_over(std::size_t row_ndx, std::size_t last_row_ndx);
+
+    /// If any element points to an array node, this function recursively
+    /// destroys that array node. Note that the same is **not** true for
+    /// Column::do_erase() and Column::do_move_last_over().
+    ///
+    /// FIXME: Be careful, do_clear() currently forgets if the leaf type is
+    /// Array::type_HasRefs.
+    void do_clear();
 
 #ifdef TIGHTDB_DEBUG
     void leaf_to_dot(MemRef, ArrayParent*, std::size_t ndx_in_parent,
@@ -534,9 +569,26 @@ inline void ColumnBase::set_search_index_allow_duplicate_values(bool) TIGHTDB_NO
 {
 }
 
-inline bool ColumnBase::cascade_row::operator<(const cascade_row& r) const TIGHTDB_NOEXCEPT
+inline bool ColumnBase::CascadeState::row::operator==(const row& r) const TIGHTDB_NOEXCEPT
+{
+    return table_ndx == r.table_ndx && row_ndx == r.row_ndx;
+}
+
+inline bool ColumnBase::CascadeState::row::operator!=(const row& r) const TIGHTDB_NOEXCEPT
+{
+    return !(*this == r);
+}
+
+inline bool ColumnBase::CascadeState::row::operator<(const row& r) const TIGHTDB_NOEXCEPT
 {
     return table_ndx < r.table_ndx || (table_ndx == r.table_ndx && row_ndx < r.row_ndx);
+}
+
+inline ColumnBase::CascadeState::CascadeState():
+    stop_on_table(0),
+    stop_on_link_list_column(0),
+    stop_on_link_list_row_ndx(0)
+{
 }
 
 inline void ColumnBase::discard_child_accessors() TIGHTDB_NOEXCEPT
@@ -554,17 +606,17 @@ inline void ColumnBase::discard_subtable_accessor(std::size_t) TIGHTDB_NOEXCEPT
     // Noop
 }
 
-inline void ColumnBase::adj_accessors_insert_rows(std::size_t, std::size_t) TIGHTDB_NOEXCEPT
+inline void ColumnBase::adj_acc_insert_rows(std::size_t, std::size_t) TIGHTDB_NOEXCEPT
 {
     // Noop
 }
 
-inline void ColumnBase::adj_accessors_erase_row(std::size_t) TIGHTDB_NOEXCEPT
+inline void ColumnBase::adj_acc_erase_row(std::size_t) TIGHTDB_NOEXCEPT
 {
     // Noop
 }
 
-inline void ColumnBase::adj_accessors_move(std::size_t, std::size_t) TIGHTDB_NOEXCEPT
+inline void ColumnBase::adj_acc_move_over(std::size_t, std::size_t) TIGHTDB_NOEXCEPT
 {
     // Noop
 }
@@ -752,12 +804,48 @@ inline void Column::insert(std::size_t row_ndx, int_fast64_t value)
     do_insert(row_ndx_2, value, num_rows); // Throws
 }
 
+inline void Column::erase(std::size_t row_ndx)
+{
+    std::size_t last_row_ndx = size() - 1; // Note that size() is slow
+    bool is_last = row_ndx == last_row_ndx;
+    do_erase(row_ndx, is_last); // Throws
+}
+
+inline void Column::move_last_over(std::size_t row_ndx)
+{
+    std::size_t last_row_ndx = size() - 1; // Note that size() is slow
+    do_move_last_over(row_ndx, last_row_ndx); // Throws
+}
+
+inline void Column::clear()
+{
+    do_clear(); // Throws
+}
+
 // Implementing pure virtual method of ColumnBase.
 inline void Column::insert(std::size_t row_ndx, std::size_t num_rows, bool is_append)
 {
     std::size_t row_ndx_2 = is_append ? tightdb::npos : row_ndx;
     int_fast64_t value = 0;
     do_insert(row_ndx_2, value, num_rows); // Throws
+}
+
+// Implementing pure virtual method of ColumnBase.
+inline void Column::erase(std::size_t row_ndx, bool is_last)
+{
+    do_erase(row_ndx, is_last); // Throws
+}
+
+// Implementing pure virtual method of ColumnBase.
+inline void Column::move_last_over(std::size_t row_ndx, std::size_t last_row_ndx, bool)
+{
+    do_move_last_over(row_ndx, last_row_ndx); // Throws
+}
+
+// Implementing pure virtual method of ColumnBase.
+inline void Column::clear(std::size_t, bool)
+{
+    do_clear(); // Throws
 }
 
 TIGHTDB_FORCEINLINE

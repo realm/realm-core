@@ -420,6 +420,11 @@ public:
     Mixed       get_mixed(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
     DataType    get_mixed_type(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
     std::size_t get_link(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
+    bool is_null_link(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
+    LinkViewRef get_linklist(std::size_t column_ndx, std::size_t row_ndx);
+    ConstLinkViewRef get_linklist(std::size_t column_ndx, std::size_t row_ndx) const;
+    std::size_t get_link_count(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
+    bool linklist_is_empty(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
 
     TableRef get_link_target(std::size_t column_ndx) TIGHTDB_NOEXCEPT;
     ConstTableRef get_link_target(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
@@ -433,7 +438,7 @@ public:
     ///
     /// It is an error to assign a value to a column that is part of a primary
     /// key, if that would result in a violation the implied *unique constraint*
-    /// of the primary key. The consequenses of doing so are unspecified.
+    /// of that primary key. The consequenses of doing so are unspecified.
 
     void set_int(std::size_t column_ndx, std::size_t row_ndx, int_fast64_t value);
     void set_bool(std::size_t column_ndx, std::size_t row_ndx, bool value);
@@ -445,18 +450,9 @@ public:
     void set_binary(std::size_t column_ndx, std::size_t row_ndx, BinaryData value);
     void set_mixed(std::size_t column_ndx, std::size_t row_ndx, Mixed value);
     void set_link(std::size_t column_ndx, std::size_t row_ndx, std::size_t target_row_ndx);
-
-    //@}
-
-    // Links
-    bool is_null_link(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
     void nullify_link(std::size_t column_ndx, std::size_t row_ndx);
 
-    // Link lists
-    ConstLinkViewRef get_linklist(std::size_t column_ndx, std::size_t row_ndx) const;
-    LinkViewRef get_linklist(std::size_t column_ndx, std::size_t row_ndx);
-    bool linklist_is_empty(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
-    std::size_t get_link_count(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
+    //@}
 
     void add_int(std::size_t column_ndx, int64_t value);
 
@@ -851,6 +847,11 @@ private:
     mutable uint_fast64_t m_version;
 #endif
 
+    void do_remove(std::size_t row_ndx);
+    void do_move_last_over(std::size_t row_ndx, bool broken_reciprocal_backlinks);
+    void do_clear(bool broken_reciprocal_backlinks);
+    std::size_t do_set_link(std::size_t col_ndx, std::size_t row_ndx, std::size_t target_row_ndx);
+
     /// Update the version of this table and all tables which have links to it.
     /// This causes all views referring to those tables to go out of sync, so that
     /// calls to sync_if_needed() will bring the view up to date by reexecuting the
@@ -1084,19 +1085,85 @@ private:
 
     std::size_t get_num_strong_backlinks(std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
 
-    typedef ColumnBase::cascade_rowset cascade_rowset;
+    //@{
 
-    /// Calls ColumnBase::find_erase_cascade() for each column to find the set
-    /// of rows that need to be cascade-removed. See the documentation of it for
-    /// the meaning of the arguments.
-    void find_erase_cascade(std::size_t row_ndx, std::size_t stop_on_table_ndx,
-                            cascade_rowset&) const;
+    /// Cascading removal of strong links.
+    ///
+    /// cascade_break_backlinks_to() removes all backlinks pointing to the row
+    /// at \a row_ndx. Additionally, if this causes the number of **strong**
+    /// backlinks originating from a particular opposite row (target row of
+    /// corresponding forward link) to drop to zero, and that row is not already
+    /// in \a state.rows, then that row is added to \a state.rows, and
+    /// cascade_break_backlinks_to() is called recursively for it. This
+    /// operation is the first half of the cascading row removal operation. The
+    /// second half is performed by passing the resulting contents of \a
+    /// state.rows to remove_backlink_broken_rows().
+    ///
+    /// Operations that trigger cascading row removal due to explicit removal of
+    /// one or more rows (the *initiating rows*), should add those rows to \a
+    /// rows initially, and then call cascade_break_backlinks_to() once for each
+    /// of them in turn. This is opposed to carrying out the explicit row
+    /// removals independently, which is also possible, but does require that
+    /// any initiating rows, that end up in \a state.rows due to link cycles,
+    /// are removed before passing \a state.rows to
+    /// remove_backlink_broken_rows(). In the case of clear(), where all rows of
+    /// a table are explicitly removed, it is better to use
+    /// cascade_break_backlinks_to_all_rows(), and then carry out the table
+    /// clearing as an independent step. For operations that trigger cascading
+    /// row removal for other reasons than explicit row removal, \a state.rows
+    /// must be empty initially, but cascade_break_backlinks_to() must still be
+    /// called for each of the initiating rows.
+    ///
+    /// When the last non-recursive invocation of cascade_break_backlinks_to()
+    /// returns, all forward links originating from a row in \a state.rows have
+    /// had their reciprocal backlinks removed, so remove_backlink_broken_rows()
+    /// does not perform reciprocal backlink removal at all. Additionally, all
+    /// remaining backlinks originating from rows in \a state.rows are
+    /// guaranteed to point to rows that are **not** in \a state.rows. This is
+    /// true because any backlink that was pointing to a row in \a state.rows
+    /// has been removed by one of the invocations of
+    /// cascade_break_backlinks_to(). The set of forward links, that correspond
+    /// to these remaining backlinks, is precisely the set of forward links that
+    /// need to be removed/nullified by remove_backlink_broken_rows(), which it
+    /// does by way of reciprocal forward link removal. Note also, that while
+    /// all the rows in \a state.rows can have remaining **weak** backlinks
+    /// originating from them, only the initiating rows in \a state.rows can
+    /// have remaining **strong** backlinks originating from them. This is true
+    /// because a non-initiating row is added to \a state.rows only when the
+    /// last backlink originating from it is lost.
+    ///
+    /// Each row removal is replicated individually (as opposed to one
+    /// replication instruction for the entire cascading operation). This is
+    /// done because it provides an easy way for Group::advance_transact() to
+    /// know which tables are affected by the cascade. Note that this has
+    /// several important consequences: First of all, the replication log
+    /// receiver must execute the row removal instructions in a non-cascading
+    /// fashion, meaning that there will be an asymmetry between the two sides
+    /// in how the effect of the cascade is brought about. While this is fine
+    /// for simple 1-to-1 replication, it may end up interfering badly with
+    /// *transaction merging*, when that feature is introduced. Imagine for
+    /// example that the cascade initiating operation gets canceled during
+    /// conflict resolution, but some, or all of the induced row removals get to
+    /// stay. That would break causal consistency. It is important, however, for
+    /// transaction merging that the cascaded row removals are explicitly
+    /// mentioned in the replication log, such that they can be used to adjust
+    /// row indexes during the *operational transform*.
+    ///
+    /// cascade_break_backlinks_to_all_rows() has the same affect as calling
+    /// cascade_break_backlinks_to() once for each row in the table. When
+    /// calling this function, \a state.stop_on_table must be set to the origin
+    /// table (origin table of corresponding forward links), and \a
+    /// state.stop_on_link_list_column must be null.
+    ///
+    /// It is immaterial which table remove_backlink_broken_rows() is called on,
+    /// as long it that table is in the same group as the specified rows.
 
-    /// Calls do_move_last_over() for each of the rows in the specified
-    /// rowset. This means that each row removal will be individually submitted
-    /// to the replication subsystem. This operation removes only the specified
-    /// rows. It does not itself trigger new cascade-removals.
-    static void erase_rowset(Group&, const cascade_rowset&);
+    typedef ColumnBase::CascadeState CascadeState;
+    void cascade_break_backlinks_to(std::size_t row_ndx, CascadeState& state);
+    void cascade_break_backlinks_to_all_rows(CascadeState& state);
+    void remove_backlink_broken_rows(const CascadeState::row_set&);
+
+    //@}
 
     /// Remove the specified row by the 'move last over' method, and submit the
     /// operation to the replication subsystem.
@@ -1127,16 +1194,50 @@ private:
 
     void discard_subtable_accessor(std::size_t col_ndx, std::size_t row_ndx) TIGHTDB_NOEXCEPT;
 
-    void adj_accessors_insert_rows(std::size_t row_ndx, std::size_t num_rows) TIGHTDB_NOEXCEPT;
-    void adj_accessors_erase_row(std::size_t row_ndx) TIGHTDB_NOEXCEPT;
-    void adj_accessors_move(std::size_t target_row_ndx, std::size_t source_row_ndx)
-        TIGHTDB_NOEXCEPT;
+    void adj_acc_insert_rows(std::size_t row_ndx, std::size_t num_rows) TIGHTDB_NOEXCEPT;
+    void adj_acc_erase_row(std::size_t row_ndx) TIGHTDB_NOEXCEPT;
+
+    /// Adjust this table accessor and its subordinates after move_last_over()
+    /// (or its inverse).
+    ///
+    /// First, any row, subtable, or link list accessors registered as being at
+    /// \a to_row_ndx will be detached, as that row is assumed to have been
+    /// replaced. Next, any row, subtable, or link list accessors registered as
+    /// being at \a from_row_ndx, will be reregistered as being at \a
+    /// to_row_ndx, as the row at \a from_row_ndx is assumed to have been moved
+    /// to \a to_row_ndx.
+    ///
+    /// Crucially, if \a to_row_ndx is equal to \a from_row_ndx, then row,
+    /// subtable, or link list accessors at that row are **still detached**.
+    ///
+    /// Additionally, this function causes all link-adjacent tables to be marked
+    /// (dirty). Two tables are link-adjacent if one is the target table of a
+    /// link column of the other table. Note that this marking follows these
+    /// relations in both directions, but only to a depth of one.
+    ///
+    /// When this function is used in connection with move_last_over(), set \a
+    /// to_row_ndx to the index of the row to be removed, and set \a
+    /// from_row_ndx to the index of the last row in the table. As mentioned
+    /// earlier, this function can also be used in connection with the **inverse
+    /// of** move_last_over(), which is an operation that vacates a row by
+    /// moving its contents into a new last row of the table. In that case, set
+    /// \a to_row_ndx to one plus the index of the last row in the table, and
+    /// set \a from_row_ndx to the index of the row to be vacated.
+    ///
+    /// This function is used as part of Table::refresh_accessor_tree() to
+    /// promote the state of the accessors from Minimal Consistency into
+    /// Structural Correspondence, so it must be able to execute without
+    /// accessing the underlying array nodes.
+    void adj_acc_move_over(std::size_t from_row_ndx, std::size_t to_row_ndx) TIGHTDB_NOEXCEPT;
+
     void adj_acc_clear_root_table() TIGHTDB_NOEXCEPT;
     void adj_acc_clear_nonroot_table() TIGHTDB_NOEXCEPT;
     void adj_row_acc_insert_rows(std::size_t row_ndx, std::size_t num_rows) TIGHTDB_NOEXCEPT;
     void adj_row_acc_erase_row(std::size_t row_ndx) TIGHTDB_NOEXCEPT;
-    void adj_row_acc_move(std::size_t target_row_ndx, std::size_t source_row_ndx)
-        TIGHTDB_NOEXCEPT;
+
+    /// Called by adj_acc_move_over() to adjust row accessors.
+    void adj_row_acc_move_over(std::size_t from_row_ndx, std::size_t to_row_ndx) TIGHTDB_NOEXCEPT;
+
     void adj_insert_column(std::size_t col_ndx);
     void adj_erase_column(std::size_t col_ndx) TIGHTDB_NOEXCEPT;
 
@@ -1588,6 +1689,11 @@ inline void Table::insert_subtable(std::size_t col_ndx, std::size_t row_ndx)
     insert_subtable(col_ndx, row_ndx, 0); // Null stands for an empty table
 }
 
+inline bool Table::is_null_link(std::size_t col_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT
+{
+    return get_link(col_ndx, row_ndx) == tightdb::npos;
+}
+
 inline ConstTableRef Table::get_link_target(std::size_t col_ndx) const TIGHTDB_NOEXCEPT
 {
     return const_cast<Table*>(this)->get_link_target(col_ndx);
@@ -1597,6 +1703,11 @@ template<class E>
 inline void Table::set_enum(std::size_t column_ndx, std::size_t row_ndx, E value)
 {
     set_int(column_ndx, row_ndx, value);
+}
+
+inline void Table::nullify_link(std::size_t col_ndx, std::size_t row_ndx)
+{
+    set_link(col_ndx, row_ndx, tightdb::npos);
 }
 
 inline TableRef Table::get_subtable(std::size_t column_ndx, std::size_t row_ndx)
@@ -1896,21 +2007,44 @@ public:
         return *table.m_cols[col_ndx];
     }
 
+    static void do_remove(Table& table, std::size_t row_ndx)
+    {
+        table.do_remove(row_ndx); // Throws
+    }
+
+    static void do_move_last_over(Table& table, std::size_t row_ndx)
+    {
+        bool broken_reciprocal_backlinks = false;
+        table.do_move_last_over(row_ndx, broken_reciprocal_backlinks); // Throws
+    }
+
+    static void do_clear(Table& table)
+    {
+        bool broken_reciprocal_backlinks = false;
+        table.do_clear(broken_reciprocal_backlinks); // Throws
+    }
+
+    static void do_set_link(Table& table, std::size_t col_ndx, std::size_t row_ndx,
+                            std::size_t target_row_ndx)
+    {
+        table.do_set_link(col_ndx, row_ndx, target_row_ndx); // Throws
+    }
+
     static std::size_t get_num_strong_backlinks(const Table& table,
                                                 std::size_t row_ndx) TIGHTDB_NOEXCEPT
     {
         return table.get_num_strong_backlinks(row_ndx);
     }
 
-    static void find_erase_cascade(const Table& table, std::size_t row_ndx,
-                                   std::size_t stop_on_table_ndx, Table::cascade_rowset& rows)
+    static void cascade_break_backlinks_to(Table& table, std::size_t row_ndx,
+                                           Table::CascadeState& state)
     {
-        table.find_erase_cascade(row_ndx, stop_on_table_ndx, rows); // Throws
+        table.cascade_break_backlinks_to(row_ndx, state); // Throws
     }
 
-    static void erase_rowset(Group& group, const Table::cascade_rowset& rows)
+    static void remove_backlink_broken_rows(Table& table, const Table::CascadeState::row_set& rows)
     {
-        Table::erase_rowset(group, rows); // Throws
+        table.remove_backlink_broken_rows(rows); // Throws
     }
 
     static std::size_t* record_subtable_path(const Table& table, std::size_t* begin,
@@ -1963,21 +2097,21 @@ public:
         return table.get_link_target_table_accessor(col_ndx);
     }
 
-    static void adj_accessors_insert_rows(Table& table, std::size_t row_ndx,
-                                          std::size_t num_rows) TIGHTDB_NOEXCEPT
+    static void adj_acc_insert_rows(Table& table, std::size_t row_ndx,
+                                    std::size_t num_rows) TIGHTDB_NOEXCEPT
     {
-        table.adj_accessors_insert_rows(row_ndx, num_rows);
+        table.adj_acc_insert_rows(row_ndx, num_rows);
     }
 
-    static void adj_accessors_erase_row(Table& table, std::size_t row_ndx) TIGHTDB_NOEXCEPT
+    static void adj_acc_erase_row(Table& table, std::size_t row_ndx) TIGHTDB_NOEXCEPT
     {
-        table.adj_accessors_erase_row(row_ndx);
+        table.adj_acc_erase_row(row_ndx);
     }
 
-    static void adj_accessors_move(Table& table, std::size_t target_row_ndx,
-                                   std::size_t source_row_ndx) TIGHTDB_NOEXCEPT
+    static void adj_acc_move_over(Table& table, std::size_t from_row_ndx,
+                                  std::size_t to_row_ndx) TIGHTDB_NOEXCEPT
     {
-        table.adj_accessors_move(target_row_ndx, source_row_ndx);
+        table.adj_acc_move_over(from_row_ndx, to_row_ndx);
     }
 
     static void adj_acc_clear_root_table(Table& table) TIGHTDB_NOEXCEPT

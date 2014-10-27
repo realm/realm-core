@@ -26,120 +26,91 @@ using namespace std;
 using namespace tightdb;
 
 
-void ColumnLink::set_link(size_t row_ndx, size_t target_row_ndx)
-{
-    size_t ref = ColumnLinkBase::get(row_ndx);
-    if (ref != 0) {
-        size_t old_target_row_ndx = ref - 1;
-        m_backlink_column->remove_backlink(old_target_row_ndx, row_ndx);
-    }
-
-    // Row pos is offset by one, to allow null refs
-    ColumnLinkBase::set(row_ndx, target_row_ndx + 1);
-
-    m_backlink_column->add_backlink(target_row_ndx, row_ndx);
-}
-
-
-void ColumnLink::nullify_link(size_t row_ndx)
-{
-    size_t ref = ColumnLinkBase::get(row_ndx);
-    if (ref == 0)
-        return;
-
-    size_t old_target_row_ndx = ref - 1;
-    m_backlink_column->remove_backlink(old_target_row_ndx, row_ndx);
-
-    ColumnLinkBase::set(row_ndx, 0);
-}
-
-
 void ColumnLink::remove_backlinks(size_t row_ndx)
 {
-    size_t ref = ColumnLinkBase::get(row_ndx);
-    if (ref != 0) {
-        size_t old_target_row_ndx = ref - 1;
-        m_backlink_column->remove_backlink(old_target_row_ndx, row_ndx);
+    int_fast64_t value = ColumnLinkBase::get(row_ndx);
+    if (value != 0) {
+        size_t target_row_ndx = to_size_t(value - 1);
+        m_backlink_column->remove_one_backlink(target_row_ndx, row_ndx);
     }
 }
 
 
-void ColumnLink::move_last_over(size_t target_row_ndx, size_t last_row_ndx)
+void ColumnLink::move_last_over(size_t row_ndx, size_t last_row_ndx,
+                                bool broken_reciprocal_backlinks)
 {
-    TIGHTDB_ASSERT(target_row_ndx < last_row_ndx);
+    TIGHTDB_ASSERT(row_ndx <= last_row_ndx);
     TIGHTDB_ASSERT(last_row_ndx + 1 == size());
 
     // Remove backlinks to deleted row
-    remove_backlinks(target_row_ndx);
+    if (!broken_reciprocal_backlinks)
+        remove_backlinks(row_ndx);
 
     // Update backlinks to last row to point to its new position
-    size_t ref2 = ColumnLinkBase::get(last_row_ndx);
-    if (ref2 != 0) {
-        size_t last_target_row_ndx = ref2 - 1;
-        m_backlink_column->update_backlink(last_target_row_ndx, last_row_ndx, target_row_ndx);
+    if (row_ndx != last_row_ndx) {
+        int_fast64_t value = ColumnLinkBase::get(last_row_ndx);
+        if (value != 0) {
+            size_t target_row_ndx = to_size_t(value - 1);
+            m_backlink_column->update_backlink(target_row_ndx, last_row_ndx, row_ndx);
+        }
     }
 
-    // Do the actual move
-    ColumnLinkBase::move_last_over(target_row_ndx, last_row_ndx);
+    do_move_last_over(row_ndx, last_row_ndx);
 }
 
 
-void ColumnLink::erase(size_t row_ndx, bool is_last)
+void ColumnLink::clear(size_t, bool broken_reciprocal_backlinks)
 {
-    TIGHTDB_ASSERT(is_last);
+    if (!broken_reciprocal_backlinks) {
+        size_t num_target_rows = m_target_table->size();
+        m_backlink_column->remove_all_backlinks(num_target_rows); // Throws
+    }
 
-    // Remove backlinks to deleted row
-    remove_backlinks(row_ndx);
-
-    ColumnLinkBase::erase(row_ndx, is_last);
+    do_clear(); // Throws
 }
 
 
-void ColumnLink::clear()
+void ColumnLink::cascade_break_backlinks_to(size_t row_ndx, CascadeState& state)
 {
-    size_t count = size();
-    for (size_t i = 0; i < count; ++i)
-        remove_backlinks(i);
-    ColumnLinkBase::clear();
-}
-
-
-void ColumnLink::find_erase_cascade(size_t row_ndx, size_t stop_on_table_ndx,
-                                    cascade_rowset& rows) const
-{
-    if (m_weak_links || is_null_link(row_ndx))
+    int_fast64_t value = ColumnLinkBase::get(row_ndx);
+    bool is_null = value == 0;
+    if (is_null)
         return;
 
-    size_t target_table_ndx = m_target_table->get_index_in_group();
-    if (target_table_ndx == stop_on_table_ndx)
-        return;
+    // Remove the reciprocal backlink at target_row_ndx that points to row_ndx
+    size_t target_row_ndx = to_size_t(value - 1);
+    m_backlink_column->remove_one_backlink(target_row_ndx, row_ndx);
 
-    size_t target_row_ndx = get_link(row_ndx);
-    find_erase_cascade_for_target_row(target_table_ndx, target_row_ndx,
-                                      stop_on_table_ndx, rows); // Throws
-}
-
-
-void ColumnLink::find_clear_cascade(size_t table_ndx, size_t num_rows,
-                                    cascade_rowset& rows) const
-{
     if (m_weak_links)
         return;
-
-    size_t target_table_ndx = m_target_table->get_index_in_group();
-    if (target_table_ndx == table_ndx)
+    if (m_target_table == state.stop_on_table)
         return;
 
+    // Recurse on target row when appropriate
+    size_t target_table_ndx = m_target_table->get_index_in_group();
+    check_cascade_break_backlinks_to(target_table_ndx, target_row_ndx, state); // Throws
+}
+
+
+void ColumnLink::cascade_break_backlinks_to_all_rows(size_t num_rows, CascadeState& state)
+{
+    size_t num_target_rows = m_target_table->size();
+    m_backlink_column->remove_all_backlinks(num_target_rows);
+
+    if (m_weak_links)
+        return;
+    if (m_target_table == state.stop_on_table)
+        return;
+
+    size_t target_table_ndx = m_target_table->get_index_in_group();
     for (size_t i = 0; i < num_rows; ++i) {
-        if (is_null_link(i))
+        int_fast64_t value = ColumnLinkBase::get(i);
+        bool is_null = value == 0;
+        if (is_null)
             continue;
-        size_t target_row_ndx = get_link(i);
-        // Setting `stop_on_table_ndx` to avoid removing idividual rows from this
-        // column, since it is about to be cleared anyway. This also prevents
-        // generating superfluous replication instructions.
-        size_t stop_on_table_ndx = table_ndx;
-        find_erase_cascade_for_target_row(target_table_ndx, target_row_ndx,
-                                          stop_on_table_ndx, rows); // Throws
+
+        size_t target_row_ndx = to_size_t(value - 1);
+        check_cascade_break_backlinks_to(target_table_ndx, target_row_ndx, state); // Throws
     }
 }
 

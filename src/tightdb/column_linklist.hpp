@@ -53,29 +53,19 @@ public:
     ConstLinkViewRef get(std::size_t row_ndx) const;
     LinkViewRef get(std::size_t row_ndx);
 
-    void erase(std::size_t, bool) TIGHTDB_OVERRIDE;
-    void move_last_over(std::size_t, std::size_t) TIGHTDB_OVERRIDE;
-    void clear() TIGHTDB_OVERRIDE;
-
-    void find_erase_cascade(std::size_t, std::size_t, cascade_rowset&) const TIGHTDB_OVERRIDE;
-    void find_clear_cascade(std::size_t, std::size_t, cascade_rowset&) const TIGHTDB_OVERRIDE;
-
-    /// Like find_erase_cascade() but this one is called when only a single link
-    /// in the list as about to be broken.
-    void find_erase_cascade_for_single_link(std::size_t row_ndx, std::size_t link_ndx,
-                                            cascade_rowset& rows) const;
-
     /// Compare two columns for equality.
     bool compare_link_list(const ColumnLinkList&) const;
 
     void to_json_row(std::size_t row_ndx, std::ostream& out) const;
 
-    void refresh_accessor_tree(std::size_t, const Spec&) TIGHTDB_OVERRIDE;
-
-    void adj_accessors_move(std::size_t, std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-    void adj_acc_clear_root_table() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-
+    void move_last_over(std::size_t, std::size_t, bool) TIGHTDB_OVERRIDE;
+    void clear(std::size_t, bool) TIGHTDB_OVERRIDE;
+    void cascade_break_backlinks_to(std::size_t, CascadeState&) TIGHTDB_OVERRIDE;
+    void cascade_break_backlinks_to_all_rows(std::size_t, CascadeState&) TIGHTDB_OVERRIDE;
     void update_from_parent(std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void adj_acc_move_over(std::size_t, std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void adj_acc_clear_root_table() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void refresh_accessor_tree(std::size_t, const Spec&) TIGHTDB_OVERRIDE;
 
 #ifdef TIGHTDB_DEBUG
     void Verify() const TIGHTDB_OVERRIDE;
@@ -116,16 +106,16 @@ private:
     ref_type get_child_ref(std::size_t child_ndx) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
     // These helpers are needed because of the way the B+-tree of links is
-    // traversed.
-    void find_erase_cascade_2(const Array& link_list_root, std::size_t target_table_ndx,
-                              std::size_t stop_on_table_ndx, cascade_rowset&) const;
-    void find_erase_cascade_3(const Array& link_list_leaf, std::size_t target_table_ndx,
-                              std::size_t stop_on_table_ndx, cascade_rowset&) const;
+    // traversed in cascade_break_backlinks_to() and
+    // cascade_break_backlinks_to_all_rows().
+    void cascade_break_backlinks_to__leaf(std::size_t row_ndx, const Array& link_list_leaf,
+                                          CascadeState&);
+    void cascade_break_backlinks_to_all_rows__leaf(const Array& link_list_leaf, CascadeState&);
 
     void discard_child_accessors() TIGHTDB_NOEXCEPT;
 
     template<bool fix_ndx_in_parent>
-    void adj_move(std::size_t target_row_ndx, std::size_t source_row_ndx) TIGHTDB_NOEXCEPT;
+    void adj_move_over(std::size_t from_row_ndx, std::size_t to_row_ndx) TIGHTDB_NOEXCEPT;
 
 #ifdef TIGHTDB_DEBUG
     std::pair<ref_type, std::size_t> get_to_dot_parent(std::size_t) const TIGHTDB_OVERRIDE;
@@ -212,17 +202,17 @@ inline ref_type ColumnLinkList::get_row_ref(std::size_t row_ndx) const TIGHTDB_N
 
 inline void ColumnLinkList::set_row_ref(std::size_t row_ndx, ref_type new_ref)
 {
-    ColumnLinkBase::set(row_ndx, new_ref);
+    ColumnLinkBase::set(row_ndx, new_ref); // Throws
 }
 
 inline void ColumnLinkList::add_backlink(std::size_t target_row, std::size_t source_row)
 {
-    m_backlink_column->add_backlink(target_row, source_row);
+    m_backlink_column->add_backlink(target_row, source_row); // Throws
 }
 
 inline void ColumnLinkList::remove_backlink(std::size_t target_row, std::size_t source_row)
 {
-    m_backlink_column->remove_backlink(target_row, source_row);
+    m_backlink_column->remove_one_backlink(target_row, source_row); // Throws
 }
 
 

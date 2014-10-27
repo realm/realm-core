@@ -157,8 +157,7 @@ public:
 
     void row_insert_complete(const Table*);
     void insert_empty_rows(const Table*, std::size_t row_ndx, std::size_t num_rows);
-    void erase_row(const Table*, std::size_t row_ndx);
-    void move_last_over(const Table*, std::size_t target_row_ndx, std::size_t last_row_ndx);
+    void erase_row(const Table*, std::size_t row_ndx, bool move_last_over);
     void add_int_to_column(const Table*, std::size_t col_ndx, int_fast64_t value);
     void add_search_index(const Table*, std::size_t col_ndx);
     void add_primary_key(const Table*, std::size_t col_ndx);
@@ -992,8 +991,11 @@ inline void Replication::set_mixed(const Table* t, std::size_t col_ndx,
 inline void Replication::set_link(const Table* t, std::size_t col_ndx,
                                   std::size_t ndx, std::size_t value)
 {
+    // Map `tightdb::npos` to zero, and `n` to `n+1`, where `n` is a target row
+    // index.
+    size_t value_2 = size_t(1) + value;
     check_table(t); // Throws
-    simple_cmd(instr_SetLink, util::tuple(col_ndx, ndx, value)); // Throws
+    simple_cmd(instr_SetLink, util::tuple(col_ndx, ndx, value_2)); // Throws
 }
 
 
@@ -1090,26 +1092,18 @@ inline void Replication::insert_empty_rows(const Table* t, std::size_t row_ndx,
     check_table(t); // Throws
 
     // default to unordered, if we are inserting at the end:
-    bool unordered = row_ndx == t->size()-num_rows; 
+    bool unordered = row_ndx == t->size()-num_rows;
 
     simple_cmd(instr_InsertEmptyRows, util::tuple(row_ndx, num_rows, t->size(), unordered)); // Throws
 }
 
 
-inline void Replication::erase_row(const Table* t, std::size_t row_ndx)
+inline void Replication::erase_row(const Table* t, std::size_t row_ndx, bool move_last_over)
 {
     check_table(t); // Throws
     std::size_t num_rows = 1; // FIXME: might want to make this parameter externally visible?
-    simple_cmd(instr_EraseRows, util::tuple(row_ndx, num_rows, t->size(), false)); // Throws
-}
-
-inline void Replication::move_last_over(const Table* t, std::size_t target_row_ndx,
-                                        std::size_t last_row_ndx)
-{
-    check_table(t); // Throws
-    static_cast<void>(last_row_ndx);
-    TIGHTDB_ASSERT(t->size() == last_row_ndx);
-    simple_cmd(instr_EraseRows, util::tuple(target_row_ndx, 1, t->size(), true)); // Throws
+    std::size_t last_row_ndx = t->size() - 1;
+    simple_cmd(instr_EraseRows, util::tuple(row_ndx, num_rows, last_row_ndx, move_last_over)); // Throws
 }
 
 inline void Replication::add_int_to_column(const Table* t, std::size_t col_ndx, int_fast64_t value)

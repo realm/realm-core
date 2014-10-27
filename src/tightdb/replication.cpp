@@ -55,7 +55,8 @@ void Replication::select_table(const Table* table)
     for (;;) {
         begin = m_subtab_path_buf.data();
         end   = begin + m_subtab_path_buf.size();
-        end = _impl::TableFriend::record_subtable_path(*table, begin, end);
+        typedef _impl::TableFriend tf;
+        end = tf::record_subtable_path(*table, begin, end);
         if (end)
             break;
         size_t new_size = m_subtab_path_buf.size();
@@ -283,12 +284,10 @@ public:
                 }
             }
 #endif
-            if (value == 0) {
-                m_table->nullify_link(col_ndx, row_ndx); // Throws
-            }
-            else {
-                m_table->set_link(col_ndx, row_ndx, value-1); // Throws
-            }
+            typedef _impl::TableFriend tf;
+            // Map zero to tightdb::npos, and `n+1` to `n`, where `n` is a target row index.
+            size_t target_row_ndx = value - size_t(1);
+            tf::do_set_link(*m_table, col_ndx, row_ndx, target_row_ndx); // Throws
             return true;
         }
         return false;
@@ -468,35 +467,28 @@ public:
 
     bool erase_rows(size_t row_ndx, size_t num_rows, std::size_t last_row_ndx, bool unordered)
     {
-        if (TIGHTDB_LIKELY(m_table)) {
-            if (unordered) {
-                if (TIGHTDB_LIKELY(row_ndx < last_row_ndx && last_row_ndx+1 == m_table->size())) {
+        if (TIGHTDB_UNLIKELY(!m_table))
+            return false;
+        if (TIGHTDB_UNLIKELY(row_ndx > last_row_ndx || last_row_ndx+1 != m_table->size()))
+            return false;
+        if (TIGHTDB_UNLIKELY(num_rows != 1))
+            return false;
+        typedef _impl::TableFriend tf;
+        if (unordered) {
 #ifdef TIGHTDB_DEBUG
-                    if (m_log)
-                        *m_log << "table->move_last_over("<<row_ndx<<")\n";
+            if (m_log)
+                *m_log << "table->move_last_over("<<row_ndx<<")\n";
 #endif
-                    while (num_rows--) {
-                        m_table->move_last_over(row_ndx); // Throws
-                        row_ndx++;
-                    }
-                    return true;
-                }
-            }
-            else {
-                if (TIGHTDB_LIKELY(row_ndx < m_table->size())) {
-#ifdef TIGHTDB_DEBUG
-                    if (m_log)
-                        *m_log << "table->remove("<<row_ndx<<")\n";
-#endif
-                    while (num_rows--) {
-                        m_table->remove(row_ndx); // Throws
-                        row_ndx++;
-                    }
-                    return true;
-                }
-            }
+            tf::do_move_last_over(*m_table, row_ndx); // Throws
         }
-        return false;
+        else {
+#ifdef TIGHTDB_DEBUG
+            if (m_log)
+                *m_log << "table->remove("<<row_ndx<<")\n";
+#endif
+            tf::do_remove(*m_table, row_ndx); // Throws
+        }
+        return true;
     }
 
     bool add_int_to_column(size_t col_ndx, int_fast64_t value)
@@ -562,7 +554,8 @@ public:
             if (m_log)
                 *m_log << "table->clear()\n";
 #endif
-            m_table->clear(); // Throws
+            typedef _impl::TableFriend tf;
+            tf::do_clear(*m_table); // Throws
             return true;
         }
         return false;
@@ -829,7 +822,8 @@ public:
         if (m_log)
             *m_log << "link_list->set("<<link_ndx<<", "<<value<<")\n";
 #endif
-        m_link_list->set(link_ndx, value); // Throws
+        typedef _impl::LinkListFriend llf;
+        llf::do_set(*m_link_list, link_ndx, value); // Throws
         return true;
     }
 
@@ -874,7 +868,8 @@ public:
         if (m_log)
             *m_log << "link_list->remove("<<link_ndx<<")\n";
 #endif
-        m_link_list->remove(link_ndx); // Throws
+        typedef _impl::LinkListFriend llf;
+        llf::do_remove(*m_link_list, link_ndx); // Throws
         return true;
     }
 
@@ -886,7 +881,8 @@ public:
         if (m_log)
             *m_log << "link_list->clear()\n";
 #endif
-        m_link_list->clear(); // Throws
+        typedef _impl::LinkListFriend llf;
+        llf::do_clear(*m_link_list); // Throws
         return true;
     }
 
