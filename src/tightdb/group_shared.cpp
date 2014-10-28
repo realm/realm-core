@@ -336,8 +336,25 @@ private:
 
 struct SharedGroup::SharedInfo
 {
-    Atomic<uint32_t> active_read_count;
-    Atomic<uint16_t> init_complete; // indicates lock file has valid content
+    // indicates lock file has valid content, implying that all the following member
+    // variables have been initialized. All member variables, except for the Ringbuffer,
+    // are protected by the write mutex, except during initialization, where access is
+    // guarded by the exclusive file lock.
+    bool init_complete;
+
+    // number of participating shared groups:
+    uint32_t num_participants;
+
+    // set when a participant decides to start the daemon, cleared by the daemon
+    // when it decides to exit. Participants check during open() and start the
+    // daemon if running in async mode.
+    bool daemon_started;
+
+    // set by the daemon when it is ready to handle commits. Participants must
+    // wait during open() on 'daemon_becomes_ready' for this to become true.
+    // Cleared by the daemon when it decides to exit.
+    bool daemon_ready;
+
     uint16_t version;
     uint16_t flags;
     uint16_t free_write_slots;
@@ -348,6 +365,7 @@ struct SharedGroup::SharedInfo
     // FIXME: windows pthread support for condvar not ready
     CondVar room_to_write;
     CondVar work_to_do;
+    CondVar daemon_becomes_ready;
 #endif
     // IMPORTANT: The ringbuffer MUST be the last field in SharedInfo - see above.
     Ringbuffer readers;
@@ -365,14 +383,15 @@ SharedGroup::SharedInfo::SharedInfo(ref_type top_ref, size_t file_size, Durabili
     writemutex(), // Throws
     balancemutex(), // Throws
     room_to_write(CondVar::process_shared_tag()), // Throws
-    work_to_do(CondVar::process_shared_tag()) // Throws
+    work_to_do(CondVar::process_shared_tag()), // Throws
+    daemon_becomes_ready(CondVar::process_shared_tag()) // Throws
 #else
     writemutex(), // Throws
     balancemutex() // Throws
 #endif
 {
-    version  = 0;
-    flags    = dlevel; // durability level is fixed from creation
+    version = 0;
+    flags = dlevel; // durability level is fixed from creation
     // Create our first versioning entry:
     Ringbuffer::ReadCount& r = readers.get_next();
     r.filesize = file_size;
@@ -380,7 +399,10 @@ SharedGroup::SharedInfo::SharedInfo(ref_type top_ref, size_t file_size, Durabili
     r.current_top = top_ref;
     readers.use_next();
     free_write_slots = 0;
-    init_complete.store_release(1);
+    num_participants = 0;
+    daemon_started = false;
+    daemon_ready = false;
+    init_complete = 1;
 }
 
 
@@ -531,12 +553,10 @@ void SharedGroup::open(const string& path, bool no_create_file,
         File::CloseGuard fcg(m_file);
         if (m_file.try_lock_exclusive()) {
 
-            // Ok to initialize the file:
+            // We're alone in the world, and it is Ok to initialize the file:
             char empty_buf[sizeof (SharedInfo)];
             fill(empty_buf, empty_buf+sizeof(SharedInfo), 0);
             m_file.write(empty_buf, sizeof(SharedInfo));
-
-            // FIXME: Log file initialization should go here to prevent races:
 
             // If we are the first we may have to create the database file
             // but we invalidate the internals right after to avoid conflicting
@@ -556,26 +576,8 @@ void SharedGroup::open(const string& path, bool no_create_file,
             new (info) SharedInfo(top_ref, file_size, dlevel); // Throws
             alloc.detach();
 
-            // we need a thread-local copy of the number of ringbuffer entries in order
-            // to detect concurrent expansion of the ringbuffer.
-            m_local_max_entry = info->readers.get_num_entries();
-
-            // Set initial version so we can track if other instances
-            // change the db
-            m_readlock.m_version = info->get_current_version_unchecked();
-
             // unlock the file
             m_file.unlock(); // Just to make it explicit, that we are unlocking
-
-#ifndef _WIN32
-            // FIXME: Interaction with file locks (?)
-
-            // In async mode we need a separate process to do the async commits
-            // We start it up here during init so that it only get started once
-            if (dlevel == durability_Async) {
-                spawn_daemon(path);
-            }
-#endif
         }
         m_file.lock_shared(); // <-- we hold the shared lock from here until we close the file!
 
@@ -595,49 +597,75 @@ void SharedGroup::open(const string& path, bool no_create_file,
 
         // validate initialization complete:
         SharedInfo* info = m_file_map.get_addr();
-        if (info->init_complete.load_acquire() == 0) {
+        if (info->init_complete == 0) {
             m_file.unlock();
             micro_sleep(1000);
             continue;
         }
+        // lock file appears valid. We can now continue operations under the protection
+        // of the write mutex.
+        {
+            RobustLockGuard lock(info->writemutex, &recover_from_dead_write_transact); // Throws
+            // Even though we checked init_complete before grabbing the write mutex,
+            // we do not need to check it again, because it is only changed under
+            // an exclusive file lock, and we're operating under a shared file lock
 
-        // lock file appears valid.
-        m_local_max_entry = 0;
-        m_readlock.m_version = 0;
-        SlabAlloc& alloc = m_group.m_alloc;
+#ifndef _WIN32
+            // In async mode, we need to make sure the daemon is running and ready:
+            if (dlevel == durability_Async && !is_backend) {
+                while (info->daemon_ready == false) {
+                    if (info->daemon_started == false) {
+                        spawn_daemon(path);
+                        info->daemon_started = true;
+                    }
+                    // FIXME: It might be more robust to sleep a little, then restart the loop
+                    info->daemon_becomes_ready.wait(info->writemutex,
+                                                    &recover_from_dead_write_transact,
+                                                    0);
+                }
+            }
+#endif
+            // we need a thread-local copy of the number of ringbuffer entries in order
+            // to detect concurrent expansion of the ringbuffer.
+            m_local_max_entry = info->readers.get_num_entries();
 
-        // make our precense noted:
-        info->active_read_count.fetch_add_release(1);
+            // Set initial version so we can track if other instances
+            // change the db
+            m_readlock.m_version = info->get_current_version_unchecked();
 
-        // We need to map the info file once more for the readers part
-        // since that part can be resized and as such remapped which
-        // could move our mutexes (which we don't want to risk moving while
-        // they are locked)
-        m_reader_map.map(m_file, File::access_ReadWrite, sizeof (SharedInfo), File::map_NoSync);
-        File::UnmapGuard fug_2(m_reader_map);
+            // We need to map the info file once more for the readers part
+            // since that part can be resized and as such remapped which
+            // could move our mutexes (which we don't want to risk moving while
+            // they are locked)
+            m_reader_map.map(m_file, File::access_ReadWrite, sizeof (SharedInfo), File::map_NoSync);
+            File::UnmapGuard fug_2(m_reader_map);
 
-        if (info->version != 0)
-            throw runtime_error("Unsupported version");
+            if (info->version != 0)
+                throw runtime_error("Unsupported version");
 
-        // Durability level cannot be changed at runtime
-        if (info->flags != dlevel)
-            throw runtime_error("Inconsistent durability level");
+            // Durability level cannot be changed at runtime
+            if (info->flags != dlevel)
+                throw runtime_error("Inconsistent durability level");
 
-        // Setup the group, but leave it in invalid state
-        bool is_shared = true;
-        bool read_only = false;
-        bool no_create = true;
-        bool skip_validate = true; // To avoid race conditions
-        try {
-            alloc.attach_file(path, is_shared, read_only, no_create, skip_validate); // Throws
+            // Setup the group, but leave it in invalid state
+            bool is_shared = true;
+            bool read_only = false;
+            bool no_create = true;
+            bool skip_validate = true; // To avoid race conditions
+            try {
+                alloc.attach_file(path, is_shared, read_only, no_create, skip_validate); // Throws
+            }
+            catch (File::NotFound) {
+                throw LockFileButNoData(path);
+            }
+            // make our presence noted:
+            ++info->num_participants;
+
+            // Keep the mappings and file open:
+            fug_2.release(); // Do not unmap
+            fug_1.release(); // Do not unmap
+            fcg.release(); // Do not close
         }
-        catch (File::NotFound) {
-            throw LockFileButNoData(path);
-        }
-        // Keep the mappings and file open:
-        fug_2.release(); // Do not unmap
-        fug_1.release(); // Do not unmap
-        fcg.release(); // Do not close
         break;
     }
 
@@ -647,18 +675,6 @@ void SharedGroup::open(const string& path, bool no_create_file,
     if (dlevel == durability_Async) {
         if (is_backend) {
             do_async_commits();
-        }
-        else {
-            // In async mode we need to wait for the commit process to get ready
-            SharedInfo* const info = m_file_map.get_addr();
-            int maxwait = max_wait_for_daemon_start;
-            while (maxwait--) {
-                if (info->init_complete.load_acquire() == 2) {
-                    return;
-                }
-                micro_sleep(1000);
-            }
-            throw runtime_error("Failed to observe async commit starting");
         }
     }
 #endif
@@ -697,32 +713,26 @@ SharedGroup::~SharedGroup() TIGHTDB_NOEXCEPT
     }
 
     SharedInfo* info = m_file_map.get_addr();
+    {
+        RobustLockGuard lock(info->writemutex, recover_from_dead_write_transact);
+        --info->num_participants;
+        if (info->num_participants == 0) {
 
-#ifndef _WIN32
-    if (info->flags == durability_Async) {
-        m_file.unlock();
-        return;
-    }
-#endif
-
-    if (info->active_read_count.fetch_sub_release(1) <= 1) {
-
-        // If the db file is just backing for a transient data structure,
-        // we can delete it when done.
-        if (info->flags == durability_MemOnly) {
-            try {
-                size_t path_len = m_file_path.size()-5; // remove ".lock"
-                string db_path = m_file_path.substr(0, path_len); // Throws
-                m_group.m_alloc.detach();
-                util::File::remove(db_path.c_str());
+            // If the db file is just backing for a transient data structure,
+            // we can delete it when done.
+            if (info->flags == durability_MemOnly) {
+                try {
+                    size_t path_len = m_file_path.size()-5; // remove ".lock"
+                    string db_path = m_file_path.substr(0, path_len); // Throws
+                    m_group.m_alloc.detach();
+                    util::File::remove(db_path.c_str());
+                }
+                catch(...) {} // ignored on purpose.
             }
-            catch(...) {} // ignored on purpose.
         }
     }
     m_file.unlock();
-
     // info->~SharedInfo(); // DO NOT Call destructor
-
     m_file.close();
     m_file_map.unmap();
     m_reader_map.unmap();
@@ -777,9 +787,9 @@ void SharedGroup::do_async_commits()
 {
     bool shutdown = false;
     SharedInfo* info = m_file_map.get_addr();
-    // NO client are allowed to proceed and update current_version
-    // until they see the init_complete == 2.
-    // As we haven't set init_complete to 2 yet, it is safe to assert the following:
+    // NO client are allowed to proceed through open and update current_version
+    // until they see 'daemon_running == true'
+    // As we haven't set daemon_running yet, the following must hold:
     TIGHTDB_ASSERT(get_current_version() == 0 || get_current_version() == 1);
 
     // We always want to keep a read lock on the last version
@@ -790,9 +800,12 @@ void SharedGroup::do_async_commits()
     begin_read(); // Throws
     // we must treat version and version_index the same way:
     ReadLockInfo last_readlock = m_readlock;
-
-    info->free_write_slots = max_write_slots;
-    info->init_complete.store_release(2); // allow waiting clients to proceed
+    {
+        RobustLockGuard(info->writemutex, &recover_from_dead_write_transact);
+        info->free_write_slots = max_write_slots;
+        info->daemon_ready = true;
+        info->daemon_becomes_ready.notify_all();
+    }
     m_group.detach();
 
     while(true) {
@@ -806,23 +819,18 @@ void SharedGroup::do_async_commits()
         }
 
         // detect if we're the last "client", and if so, shutdown:
-/*
-        // mark the
-        // lock file invalid. Any client coming along before we
-        // finish syncing will see the lock file, but detect that
-        // the daemon has abandoned it. It can then wait for the
-        // lock file to be removed (with a timeout).
-        m_file.unlock();
-        if (m_file.try_lock_exclusive()) {
-            shutdown = true;
+        {
+            RobustLockGuard lock(info->writemutex, recover_from_dead_write_transact);
+            if (shutdown || info->num_participants == 1) {
+#ifdef TIGHTDB_ENABLE_LOGFILE
+                cerr << "Daemon exiting nicely" << endl << endl;
+#endif
+                info->daemon_started = false;
+                info->daemon_ready = false;
+                return;
+            }
         }
-        // if try_lock_exclusive fails, we loose our read lock, so
-        // reacquire it! At the moment this is not used for anything,
-        // because ONLY the daemon ever asks for an exclusive lock
-        // when async commits are used.
-        else
-            m_file.lock_shared();
-*/
+
         if (has_changed()) {
 
 #ifdef TIGHTDB_ENABLE_LOGFILE
@@ -850,17 +858,6 @@ void SharedGroup::do_async_commits()
         }
         else
             sched_yield(); // prevent spinning on has_changed!
-
-        if (shutdown) {
-            // Being the backend process, we own the lock file, so we
-            // have to clean up when we shut down.
-            // info->~SharedInfo(); // DO NOT Call destructor
-            m_file_map.unmap();
-#ifdef TIGHTDB_ENABLE_LOGFILE
-            cerr << "Daemon exiting nicely" << endl << endl;
-#endif
-            return;
-        }
 
         info->balancemutex.lock(&recover_from_dead_write_transact);
 
