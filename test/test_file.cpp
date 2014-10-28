@@ -68,7 +68,6 @@ TEST(File_IsSame)
     }
 }
 
-#if 0 // FIXME: needs optional encryption
 TEST(File_Streambuf)
 {
     TEST_PATH(path);
@@ -91,7 +90,6 @@ TEST(File_Streambuf)
         CHECK(s_1 == s_2);
     }
 }
-#endif
 
 TEST(File_Map)
 {
@@ -99,6 +97,7 @@ TEST(File_Map)
     const char data[] = "hello";
     {
         File f(path, File::mode_Write);
+        f.set_encryption_key(tightdb::test_util::key);
         f.resize(sizeof(data));
 
         File::Map<char> map(f, File::access_ReadWrite, 1);
@@ -109,7 +108,8 @@ TEST(File_Map)
     }
     {
         File f(path, File::mode_Read);
-        File::Map<void> map(f, File::access_ReadOnly, sizeof(data));
+        f.set_encryption_key(tightdb::test_util::key);
+        File::Map<char> map(f, File::access_ReadOnly, sizeof(data));
         CHECK(memcmp(map.get_addr(), data, map.get_size()) == 0);
     }
 }
