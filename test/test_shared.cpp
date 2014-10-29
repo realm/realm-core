@@ -1937,12 +1937,8 @@ TEST(Shared_PinnedTransactions)
     SharedGroup sg1(path);
     SharedGroup sg2(path);
     {
-        // initially, always say that the db has changed
+        // initially, always say that the db hasn't changed
         bool changed = sg2.pin_read_transactions();
-        CHECK(changed);
-        sg2.unpin_read_transactions();
-        // asking again - this time there is no change
-        changed = sg2.pin_read_transactions();
         CHECK(!changed);
         sg2.unpin_read_transactions();
     }
