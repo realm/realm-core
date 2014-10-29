@@ -973,11 +973,37 @@ TEST(Links_CascadeRemove_ColumnLink)
     target_row_1 = target->get(1);
     origin_row_1.set_link(0,1); // origin[1].o_1 -> target[1]
 
-    // Break link by clearing table
+    // Break links by clearing table
     CHECK(origin_row_0.get_link(0) == 0 && origin_row_1.get_link(0) == 1);
     CHECK(target_row_0 && target_row_1);
     origin->clear();
     CHECK(!target_row_0 && !target_row_1);
+    CHECK(target->is_empty());
+    origin->add_empty_row(2);
+    target->add_empty_row(2);
+    origin_row_0 = origin->get(0);
+    origin_row_1 = origin->get(1);
+    target_row_0 = target->get(0);
+    target_row_1 = target->get(1);
+    origin_row_0.set_link(0,0); // origin[0].o_1 -> target[0]
+    origin_row_1.set_link(0,1); // origin[1].o_1 -> target[1]
+
+    // Break links by link column removal
+    CHECK(origin_row_0.get_link(0) == 0 && origin_row_1.get_link(0) == 1);
+    CHECK(target_row_0 && target_row_1);
+    origin->remove_column(0);
+    CHECK(!target_row_0 && !target_row_1);
+    CHECK(target->is_empty());
+    origin->add_column_link(type_Link, "o_1", *target, link_Strong);
+    origin_row_0.set_link(0,0); // origin[0].o_1 -> target[0]
+    origin_row_1.set_link(0,1); // origin[1].o_1 -> target[1]
+
+    // Break links by removal of origin table
+    CHECK(origin_row_0.get_link(0) == 0 && origin_row_1.get_link(0) == 1);
+    CHECK(target_row_0 && target_row_1);
+    group.remove_table("origin");
+    CHECK(!target_row_0 && !target_row_1);
+    CHECK(target->is_empty());
 }
 
 
@@ -1057,7 +1083,7 @@ TEST(Links_CascadeRemove_ColumnLinkList)
     link_list_1->add(0); // origin[1].o_1 -> [ target[0] ]
     link_list_1->add(1); // origin[1].o_1 -> [ target[0], target[1] ]
 
-    // Break link by clearing table
+    // Break links by clearing table
     CHECK(link_list_0->size() == 1 && link_list_0->get(0).get_index() == 0);
     CHECK(link_list_1->size() == 2 && link_list_1->get(0).get_index() == 0 &&
           link_list_1->get(1).get_index() == 1);
@@ -1068,6 +1094,11 @@ TEST(Links_CascadeRemove_ColumnLinkList)
 
 
 TEST(Links_CascadeRemove_MultiLevel)
+{
+}
+
+
+TEST(Links_CascadeRemove_SameOriginAndTargetTable)
 {
 }
 

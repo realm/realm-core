@@ -899,8 +899,8 @@ inline void Replication::erase_column(const Descriptor& desc, std::size_t col_nd
     if (!tf::is_link_type(ColumnType(type))) {
         simple_cmd(instr_EraseColumn, util::tuple(col_ndx)); // Throws
     }
-    else { // it's a link column:
-
+    else {
+        // Link column
         TIGHTDB_ASSERT(desc.is_root());
         typedef _impl::DescriptorFriend df;
         const Table& origin_table = df::get_root_table(desc);
