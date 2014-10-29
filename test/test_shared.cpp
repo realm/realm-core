@@ -1549,19 +1549,17 @@ TEST_IF(Shared_Async, allow_async)
     }
 
     // Wait for async_commit process to shutdown
-    while (File::exists(path.get_lock_path()))
-        sleep(1);
+    // FIXME: we need a way to determine properly if the daemon has shot down instead of just sleeping
+    sleep(1);
 
     // Read the db again in normal mode to verify
     {
         SharedGroup db(path);
 
-        for (size_t i = 0; i < 100; ++i) {
-            ReadTransaction rt(db);
-            rt.get_group().Verify();
-            TestTableShared::ConstRef t1 = rt.get_table<TestTableShared>("test");
-            CHECK(t1->size() == 100);
-        }
+        ReadTransaction rt(db);
+        rt.get_group().Verify();
+        TestTableShared::ConstRef t1 = rt.get_table<TestTableShared>("test");
+        CHECK_EQUAL(100, t1->size());
     }
 }
 
@@ -1611,6 +1609,7 @@ void multiprocess_thread(TestResults* test_results_ptr, string path, size_t row_
 
 void multiprocess_make_table(string path, string lock_path, string alone_path, size_t rows)
 {
+    static_cast<void>(lock_path);
     // Create first table in group
 #if 1
     static_cast<void>(alone_path);
@@ -1664,8 +1663,8 @@ void multiprocess_make_table(string path, string lock_path, string alone_path, s
 #    endif
 #  endif
     // Wait for async_commit process to shutdown
-    while (File::exists(lock_path))
-        usleep(100);
+    // FIXME: No good way of doing this
+    sleep(1);
 #else
     {
         Group g(alone_path, Group::mode_ReadWrite);
@@ -1718,8 +1717,9 @@ void multiprocess_validate_and_clear(TestResults& test_results, string path, str
                                      size_t rows, int result)
 {
     // Wait for async_commit process to shutdown
-    while (File::exists(lock_path))
-        usleep(100);
+    // FIXME: this is not apropriate
+    static_cast<void>(lock_path);
+    sleep(1);
 
     // Verify - once more, in sync mode - that the changes were made
     {

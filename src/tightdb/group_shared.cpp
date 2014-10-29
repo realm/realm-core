@@ -619,21 +619,18 @@ void SharedGroup::open(const string& path, bool no_create_file,
                         info->daemon_started = true;
                     }
                     // FIXME: It might be more robust to sleep a little, then restart the loop
-                    cerr << "Waiting for daemon" << endl;
+                    // cerr << "Waiting for daemon" << endl;
                     info->daemon_becomes_ready.wait(info->writemutex,
                                                     &recover_from_dead_write_transact,
                                                     0);
-                    cerr << " - notified" << endl;
+                    // cerr << " - notified" << endl;
                 }
             }
+            // cerr << "daemon should be ready" << endl;
 #endif
             // we need a thread-local copy of the number of ringbuffer entries in order
             // to detect concurrent expansion of the ringbuffer.
             m_local_max_entry = info->readers.get_num_entries();
-
-            // Set initial version so we can track if other instances
-            // change the db
-            m_readlock.m_version = info->get_current_version_unchecked();
 
             // We need to map the info file once more for the readers part
             // since that part can be resized and as such remapped which
@@ -641,6 +638,10 @@ void SharedGroup::open(const string& path, bool no_create_file,
             // they are locked)
             m_reader_map.map(m_file, File::access_ReadWrite, sizeof (SharedInfo), File::map_NoSync);
             File::UnmapGuard fug_2(m_reader_map);
+
+            // Set initial version so we can track if other instances
+            // change the db
+            m_readlock.m_version = info->get_current_version_unchecked();
 
             if (info->version != 0)
                 throw runtime_error("Unsupported version");
@@ -672,6 +673,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
     }
 
     m_transact_stage = transact_Ready;
+    // cerr << "open completed" << endl;
 
 #ifndef _WIN32
     if (dlevel == durability_Async) {
@@ -718,6 +720,7 @@ SharedGroup::~SharedGroup() TIGHTDB_NOEXCEPT
     {
         RobustLockGuard lock(info->writemutex, recover_from_dead_write_transact);
         --info->num_participants;
+        // cerr << "closing" << endl;
         if (info->num_participants == 0) {
 
             // If the db file is just backing for a transient data structure,
@@ -801,7 +804,6 @@ void SharedGroup::do_async_commits()
     // processes that that they can start commiting to the db.
     begin_read(); // Throws
     // we must treat version and version_index the same way:
-    ReadLockInfo last_readlock = m_readlock;
     {
         RobustLockGuard(info->writemutex, &recover_from_dead_write_transact);
         info->free_write_slots = max_write_slots;
@@ -823,10 +825,11 @@ void SharedGroup::do_async_commits()
         // detect if we're the last "client", and if so, shutdown:
         {
             RobustLockGuard lock(info->writemutex, &recover_from_dead_write_transact);
-            if (shutdown || info->num_participants == 1) {
+            if (!has_changed() && (shutdown || info->num_participants == 1)) {
 #ifdef TIGHTDB_ENABLE_LOGFILE
                 cerr << "Daemon exiting nicely" << endl << endl;
 #endif
+                end_read();
                 info->daemon_started = false;
                 info->daemon_ready = false;
                 return;
@@ -841,11 +844,15 @@ void SharedGroup::do_async_commits()
             // Get a read lock on the (current) version that we want
             // to commit to disk.
             m_transact_stage = transact_Ready; // FAKE stage to prevent begin_read from failing
-
+#ifdef TIGHTDB_ENABLE_LOGFILE
+            cerr << "..from version " << m_readlock.m_version << endl;
+#endif
+            ReadLockInfo last_readlock = m_readlock;
             begin_read(); // Throws
-
             ReadLockInfo current_readlock = m_readlock;
-
+#ifdef TIGHTDB_ENABLE_LOGFILE
+            cerr << "..to version " << m_readlock.m_version << endl;
+#endif
             GroupWriter writer(m_group);
             writer.commit(current_readlock.m_top_ref);
 
@@ -853,7 +860,7 @@ void SharedGroup::do_async_commits()
             // to disk and just keep the lock on the latest version.
             m_readlock = last_readlock;
             end_read();
-            last_readlock = m_readlock;
+            m_readlock = current_readlock;
 #ifdef TIGHTDB_ENABLE_LOGFILE
             cerr << "..and Done" << endl;
 #endif
