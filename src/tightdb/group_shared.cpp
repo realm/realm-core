@@ -619,9 +619,11 @@ void SharedGroup::open(const string& path, bool no_create_file,
                         info->daemon_started = true;
                     }
                     // FIXME: It might be more robust to sleep a little, then restart the loop
+                    cerr << "Waiting for daemon" << endl;
                     info->daemon_becomes_ready.wait(info->writemutex,
                                                     &recover_from_dead_write_transact,
                                                     0);
+                    cerr << " - notified" << endl;
                 }
             }
 #endif
@@ -820,7 +822,7 @@ void SharedGroup::do_async_commits()
 
         // detect if we're the last "client", and if so, shutdown:
         {
-            RobustLockGuard lock(info->writemutex, recover_from_dead_write_transact);
+            RobustLockGuard lock(info->writemutex, &recover_from_dead_write_transact);
             if (shutdown || info->num_participants == 1) {
 #ifdef TIGHTDB_ENABLE_LOGFILE
                 cerr << "Daemon exiting nicely" << endl << endl;
