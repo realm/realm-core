@@ -573,7 +573,13 @@ void SharedGroup::open(const string& path, bool no_create_file,
             // unlock the file
             m_file.unlock(); // Just to make it explicit, that we are unlocking
         }
-        m_file.lock_shared(); // <-- we hold the shared lock from here until we close the file!
+
+        // we hold the shared lock from here until we close the file!
+        m_file.lock_shared(); 
+
+        // Once we get the shared lock, we'll need to verify that the initialization of the
+        // lock file has been completed succesfully. The initializing process could have crashed
+        // during initialization. If so we must detect it and start all over again.
 
         // wait for file to at least contain the basic shared info block
         // NB! it might be larger due to expansion of the ring buffer.
@@ -596,13 +602,19 @@ void SharedGroup::open(const string& path, bool no_create_file,
             micro_sleep(1000);
             continue;
         }
-        // lock file appears valid. We can now continue operations under the protection
-        // of the write mutex.
+
+        // OK! lock file appears valid. We can now continue operations under the protection
+        // of the write mutex. The write mutex protects the following activities:
+        // - attachment of the database file
+        // - start of the async daemon
+        // - stop of the async daemon
+        // - SharedGroup joining/leaving the sharing scheme
+        // - write transactions (which gave the mutex its name)
         {
             RobustLockGuard lock(info->writemutex, &recover_from_dead_write_transact); // Throws
             // Even though we checked init_complete before grabbing the write mutex,
             // we do not need to check it again, because it is only changed under
-            // an exclusive file lock, and we're operating under a shared file lock
+            // an exclusive file lock, and we checked it under a shared file lock
 
 #ifndef _WIN32
             // In async mode, we need to make sure the daemon is running and ready:
@@ -794,12 +806,11 @@ void SharedGroup::do_async_commits()
     // We always want to keep a read lock on the last version
     // that was commited to disk, to protect it against being
     // overwritten by commits being made to memory by others.
-    // Note that taking this lock also signals to the other
-    // processes that that they can start commiting to the db.
-    begin_read(); // Throws
+    bool dummy;
+    grab_latest_readlock(m_readlock, dummy);
     // we must treat version and version_index the same way:
     {
-        RobustLockGuard(info->writemutex, &recover_from_dead_write_transact);
+        RobustLockGuard lock(info->writemutex, &recover_from_dead_write_transact);
         info->free_write_slots = max_write_slots;
         info->daemon_ready = true;
         info->daemon_becomes_ready.notify_all();
@@ -816,51 +827,42 @@ void SharedGroup::do_async_commits()
 #endif
         }
 
-        // detect if we're the last "client", and if so, shutdown:
+        bool is_same;
+        ReadLockInfo next_readlock = m_readlock;
         {
+            // detect if we're the last "client", and if so, shutdown (must be under lock):
             RobustLockGuard lock(info->writemutex, &recover_from_dead_write_transact);
-            if (!has_changed() && (shutdown || info->num_participants == 1)) {
+            grab_latest_readlock(next_readlock, is_same);
+            if (is_same && (shutdown || info->num_participants == 1)) {
 #ifdef TIGHTDB_ENABLE_LOGFILE
                 cerr << "Daemon exiting nicely" << endl << endl;
 #endif
-                end_read();
+                release_readlock(next_readlock);
+                release_readlock(m_readlock);
                 info->daemon_started = false;
                 info->daemon_ready = false;
                 return;
             }
         }
 
-        if (has_changed()) {
+        if (!is_same) {
 
 #ifdef TIGHTDB_ENABLE_LOGFILE
-            cerr << "Syncing...";
-#endif
-            // Get a read lock on the (current) version that we want
-            // to commit to disk.
-            m_transact_stage = transact_Ready; // FAKE stage to prevent begin_read from failing
-#ifdef TIGHTDB_ENABLE_LOGFILE
-            cerr << "..from version " << m_readlock.m_version << endl;
-#endif
-            ReadLockInfo last_readlock = m_readlock;
-            begin_read(); // Throws
-            ReadLockInfo current_readlock = m_readlock;
-#ifdef TIGHTDB_ENABLE_LOGFILE
-            cerr << "..to version " << m_readlock.m_version << endl;
+            cerr << "Syncing from version " << m_readlock.m_version 
+                 << " to " << next_readlock.m_version << endl;
 #endif
             GroupWriter writer(m_group);
-            writer.commit(current_readlock.m_top_ref);
+            writer.commit(next_readlock.m_top_ref);
 
-            // Now we can release the version that was previously commited
-            // to disk and just keep the lock on the latest version.
-            m_readlock = last_readlock;
-            end_read();
-            m_readlock = current_readlock;
 #ifdef TIGHTDB_ENABLE_LOGFILE
             cerr << "..and Done" << endl;
 #endif
         }
-        else
-            sched_yield(); // prevent spinning on has_changed!
+
+        // Now we can release the version that was previously commited
+        // to disk and just keep the lock on the latest version.
+        release_readlock(m_readlock);
+        m_readlock = next_readlock;
 
         info->balancemutex.lock(&recover_from_dead_write_transact);
 
