@@ -26,9 +26,6 @@ using namespace tightdb::util;
 
 #endif
 
-// todo:
-// don't reuse IV
-
 namespace {
 
 std::string get_errno_msg(const char* prefix, int err) {
@@ -77,7 +74,8 @@ private:
     AES_KEY m_dctx;
 #endif
 
-    size_t crypt(EncryptionMode mode, off_t pos, uint8_t* dst, const uint8_t* src, size_t len);
+    size_t crypt(EncryptionMode mode, off_t pos, uint8_t* dst, const uint8_t* src,
+                 size_t len, const char* stored_iv);
 };
 
 class EncryptedFileMapping;
@@ -188,6 +186,8 @@ void signal_handler(int code, siginfo_t* info, void* ctx) {
         return;
     }
 
+    abort();
+
     // forward unhandled signals
     if (code == SIGSEGV) {
         if (old_segv.sa_sigaction)
@@ -257,21 +257,83 @@ AESCryptor::AESCryptor(const uint8_t* key) {
 #endif
 }
 
+// We have the following constraints here:
+//
+// 1. When writing, we only know which 4k page is dirty, and not what bytes
+//    within the page are dirty, so we always have to write in 4k blocks.
+// 2. Pages being written need to be entirely within an 8k-aligned block to
+//    ensure that they're written to the hardware in atomic blocks.
+// 3. We need to store the IV used for each 4k page somewhere, so that we can
+//    ensure that we never reuse an IV (and still be decryptable).
+//
+// Because pages need to be aligned, we can't just prepend the IV to each page,
+// or we'd have to double the size of the file (as the rest of the 4k block
+// containing the IV would not be usable). Writing the IVs to a different part
+// of the file from the data results in them not being in the same 8k block, and
+// so it is possible that only the IV or only the data actually gets updated on
+// disk. We deal with this by storing four pieces of data about each page: the
+// hash of the encrypted data, the current IV, the hash of the previous encrypted
+// data, and the previous IV. To write, we encrypt the data, hash the ciphertext,
+// then write the new IV/ciphertext hash, fsync(), and then write the new
+// ciphertext. This ensures that if an error occurs between writing the IV and
+// the ciphertext, we can still determine that we should use the old IV, since
+// the ciphertext's hash will match the old ciphertext.
+
+static const int metadata_size = 16; // two four-byte hashes and four-byte IVs
+static const int pages_per_metadata_page = page_size / metadata_size;
+
+template<typename Int>
+Int real_offset(Int pos) {
+    const auto page_index = pos / page_size;
+    const auto metadata_page_count = page_index / pages_per_metadata_page + 1;
+    return pos + metadata_page_count * page_size;
+}
+
+template<typename Int>
+Int fake_offset(Int pos) {
+    const auto page_index = pos / page_size;
+    const auto metadata_page_count = (page_index + pages_per_metadata_page) / (pages_per_metadata_page + 1);
+    return pos - metadata_page_count * page_size;
+}
+
+off_t iv_table_pos(off_t pos) {
+    const auto page_index = pos / page_size;
+    const auto metadata_block = page_index / pages_per_metadata_page;
+    const auto metadata_index = page_index & (pages_per_metadata_page - 1);
+    return metadata_block * (pages_per_metadata_page + 1) * page_size + metadata_index * metadata_size;
+}
+
 void AESCryptor::read(int fd, off_t pos, uint8_t* dst, size_t size) {
+    off_t iv_pos = iv_table_pos(pos);
+    lseek(fd, iv_pos, SEEK_SET);
+    char iv_buff[4] = {0};
+    ::read(fd, iv_buff, 4);
+
+    pos = real_offset(pos);
     uint8_t buffer[page_size];
     lseek(fd, pos, SEEK_SET);
     ssize_t bytes_read = ::read(fd, buffer, pad_to_aes_block_size(size));
-    crypt(mode_Decrypt, pos, dst, buffer, bytes_read);
+    crypt(mode_Decrypt, pos, dst, buffer, bytes_read, iv_buff);
 }
 
 void AESCryptor::write(int fd, off_t pos, const uint8_t* src, size_t size) {
+    off_t iv_pos = iv_table_pos(pos);
+    lseek(fd, iv_pos, SEEK_SET);
+    char iv_buff[4] = {0};
+    ::read(fd, iv_buff, 4);
+    ++*reinterpret_cast<uint32_t *>(iv_buff);
+    lseek(fd, iv_pos, SEEK_SET);
+    ::write(fd, iv_buff, 4);
+
+    pos = real_offset(pos);
     uint8_t buffer[page_size];
-    size_t bytes = crypt(mode_Encrypt, pos, buffer, src, size);
+    size_t bytes = crypt(mode_Encrypt, pos, buffer, src, size, iv_buff);
     lseek(fd, pos, SEEK_SET);
     ::write(fd, buffer, bytes);
+    off_t new_pos = lseek(fd, 0, SEEK_CUR);
 }
 
-size_t AESCryptor::crypt(EncryptionMode mode, off_t pos, uint8_t* dst, const uint8_t* src, size_t len) {
+size_t AESCryptor::crypt(EncryptionMode mode, off_t pos, uint8_t* dst, const uint8_t* src, size_t len, const char* stored_iv) {
     TIGHTDB_ASSERT(len <= page_size);
 
     uint8_t buffer[page_size];
@@ -287,8 +349,8 @@ size_t AESCryptor::crypt(EncryptionMode mode, off_t pos, uint8_t* dst, const uin
     }
 
     uint8_t iv[aes_block_size] = {0};
-    memcpy(iv, &pos, sizeof(pos));
-
+    memcpy(iv, stored_iv, 4);
+    memcpy(iv + 4, &pos, sizeof(pos));
 
 #ifdef __APPLE__
     size_t bytesEncrypted = 0;
@@ -575,6 +637,14 @@ void msync(void* addr, size_t size) {
         int err = errno; // Eliminate any risk of clobbering
         throw std::runtime_error(get_errno_msg("msync() failed: ", err));
     }
+}
+
+File::SizeType encrypted_size_to_data_size(File::SizeType size) {
+    return fake_offset(size);
+}
+
+File::SizeType data_size_to_encrypted_size(File::SizeType size) {
+    return real_offset(size);
 }
 
 }

@@ -499,6 +499,8 @@ File::SizeType File::get_size() const
         SizeType size;
         if (int_cast_with_overflow_detect(statbuf.st_size, size))
             throw runtime_error("File size overflow");
+        if (m_encrypt)
+            return encrypted_size_to_data_size(size);
         return size;
     }
     throw runtime_error("fstat() failed");
@@ -519,6 +521,9 @@ void File::resize(SizeType size)
         throw runtime_error("SetEndOfFile() failed");
 
 #else // POSIX version
+
+    if (m_encrypt)
+        size = data_size_to_encrypted_size(size);
 
     off_t size2;
     if (int_cast_with_overflow_detect(size, size2))
@@ -560,6 +565,9 @@ void File::prealloc_if_supported(SizeType offset, size_t size)
 #if _POSIX_C_SOURCE >= 200112L // POSIX.1-2001 version
 
     TIGHTDB_ASSERT(is_prealloc_supported());
+
+    if (m_encrypt)
+        size = data_size_to_encrypted_size(size);
 
     off_t size2;
     if (int_cast_with_overflow_detect(size, size2))
