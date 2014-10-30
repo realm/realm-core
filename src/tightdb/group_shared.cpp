@@ -37,12 +37,6 @@ namespace {
 const uint16_t max_write_slots = 100;
 const uint16_t relaxed_sync_threshold = 50;
 
-// Constants controlling timeout behaviour during opening of a shared group
-const int max_retries_awaiting_shutdown = 5;
-// rough limits, milliseconds:
-const int max_wait_for_ok_filesize = 500;
-const int max_wait_for_sharedinfo_valid = 500;
-const int max_wait_for_daemon_start = 500;
 
 // The following functions are carefully designed for minimal overhead
 // in case of contention among read transactions. In case of contention,
