@@ -49,12 +49,14 @@ const int page_size = 4096;
 
 #pragma mark Types
 
+struct iv_table;
+
 class AESCryptor {
 public:
     AESCryptor(const uint8_t* key);
 
-    void read(int fd, off_t pos, uint8_t* dst, size_t size);
-    void write(int fd, off_t pos, const uint8_t* src, size_t size);
+    void read(int fd, off_t pos, char* dst, size_t size);
+    void write(int fd, off_t pos, const char* src, size_t size);
 
 private:
     enum EncryptionMode {
@@ -74,8 +76,10 @@ private:
     AES_KEY m_dctx;
 #endif
 
-    size_t crypt(EncryptionMode mode, off_t pos, uint8_t* dst, const uint8_t* src,
+    size_t crypt(EncryptionMode mode, off_t pos, char* dst, const char* src,
                  size_t len, const char* stored_iv);
+
+    iv_table read_iv_table(int fd, off_t data_pos);
 };
 
 class EncryptedFileMapping;
@@ -284,9 +288,17 @@ AESCryptor::AESCryptor(const uint8_t* key) {
 // the ciphertext, we can still determine that we should use the old IV, since
 // the ciphertext's hash will match the old ciphertext.
 
-static const int metadata_size = 16; // two four-byte hashes and four-byte IVs
+struct iv_table {
+    char iv1[4];
+    char hash1[4];
+    char iv2[4];
+    char hash2[4];
+};
+
+static const int metadata_size = sizeof(iv_table);
 static const int pages_per_metadata_page = page_size / metadata_size;
 
+// map an offset in the data to the actual location in the file
 template<typename Int>
 Int real_offset(Int pos) {
     const auto page_index = pos / page_size;
@@ -294,6 +306,7 @@ Int real_offset(Int pos) {
     return pos + metadata_page_count * page_size;
 }
 
+// map a location in the file to the offset in the data
 template<typename Int>
 Int fake_offset(Int pos) {
     const auto page_index = pos / page_size;
@@ -301,6 +314,7 @@ Int fake_offset(Int pos) {
     return pos - metadata_page_count * page_size;
 }
 
+// get the location of the iv_table for the given data (not file) position
 off_t iv_table_pos(off_t pos) {
     const auto page_index = pos / page_size;
     const auto metadata_block = page_index / pages_per_metadata_page;
@@ -308,40 +322,55 @@ off_t iv_table_pos(off_t pos) {
     return metadata_block * (pages_per_metadata_page + 1) * page_size + metadata_index * metadata_size;
 }
 
-void AESCryptor::read(int fd, off_t pos, uint8_t* dst, size_t size) {
-    off_t iv_pos = iv_table_pos(pos);
-    lseek(fd, iv_pos, SEEK_SET);
-    char iv_buff[4] = {0};
-    ::read(fd, iv_buff, 4);
-
-    pos = real_offset(pos);
-    uint8_t buffer[page_size];
+iv_table AESCryptor::read_iv_table(int fd, off_t data_pos) {
+    off_t pos = iv_table_pos(data_pos);
     lseek(fd, pos, SEEK_SET);
+    iv_table iv;
+    memset(&iv, 0, sizeof(iv));
+    ::read(fd, &iv, sizeof(iv));
+    return iv;
+}
+
+void AESCryptor::read(int fd, off_t pos, char* dst, size_t size) {
+    iv_table iv = read_iv_table(fd, pos);
+
+    char buffer[page_size];
+    lseek(fd, real_offset(pos), SEEK_SET);
     ssize_t bytes_read = ::read(fd, buffer, pad_to_aes_block_size(size));
-    crypt(mode_Decrypt, pos, dst, buffer, bytes_read, iv_buff);
+
+    crypt(mode_Decrypt, pos, dst, buffer, bytes_read,
+          memcmp(buffer, iv.hash1, 4) == 0 ? iv.iv1 : iv.iv2);
 }
 
-void AESCryptor::write(int fd, off_t pos, const uint8_t* src, size_t size) {
-    off_t iv_pos = iv_table_pos(pos);
-    lseek(fd, iv_pos, SEEK_SET);
-    char iv_buff[4] = {0};
-    ::read(fd, iv_buff, 4);
-    ++*reinterpret_cast<uint32_t *>(iv_buff);
-    lseek(fd, iv_pos, SEEK_SET);
-    ::write(fd, iv_buff, 4);
+void AESCryptor::write(int fd, off_t pos, const char* src, size_t size) {
+    iv_table iv = read_iv_table(fd, pos);
 
-    pos = real_offset(pos);
-    uint8_t buffer[page_size];
-    size_t bytes = crypt(mode_Encrypt, pos, buffer, src, size, iv_buff);
-    lseek(fd, pos, SEEK_SET);
+    // FIXME: shouldn't bump iv1 to iv2 if iv2 is the active one (i.e. the case
+    // of two failures in a row between writing IV and writing data)
+    memcpy(iv.iv2, iv.iv1, 8);
+    size_t bytes;
+    char buffer[page_size];
+    do {
+        ++*reinterpret_cast<uint32_t*>(iv.iv1);
+
+        bytes = crypt(mode_Encrypt, pos, buffer, src, size, iv.iv1);
+        // Just using the prefix as the hash should be fine since it's ciphertext
+        memcpy(iv.hash1, buffer, 4);
+        // If both the old and new have the same prefix we won't know which IV
+        // to use, so keep bumping the new IV until they're different
+    } while (TIGHTDB_UNLIKELY(memcmp(iv.hash1, iv.hash2, 4) == 0));
+
+    lseek(fd, iv_table_pos(pos), SEEK_SET);
+    ::write(fd, &iv, sizeof(iv));
+
+    lseek(fd, real_offset(pos), SEEK_SET);
     ::write(fd, buffer, bytes);
-    lseek(fd, 0, SEEK_CUR);
 }
 
-size_t AESCryptor::crypt(EncryptionMode mode, off_t pos, uint8_t* dst, const uint8_t* src, size_t len, const char* stored_iv) {
+size_t AESCryptor::crypt(EncryptionMode mode, off_t pos, char* dst, const char* src, size_t len, const char* stored_iv) {
     TIGHTDB_ASSERT(len <= page_size);
 
-    uint8_t buffer[page_size];
+    char buffer[page_size] = {0};
     // if source len isn't a multiple of the block size, pad it with zeroes
     // we don't store the real size anywhere and rely on that the things
     // using this are okay with too-large files
@@ -435,7 +464,7 @@ void EncryptedFileMapping::read_page(size_t i) {
 
     auto addr = page_addr(i);
     mprotect(addr, ::page_size, PROT_READ | PROT_WRITE);
-    m_cryptor.read(m_fd, i * ::page_size, (uint8_t*)addr, page_size(i));
+    m_cryptor.read(m_fd, i * ::page_size, (char*)addr, page_size(i));
 
     mark_readable(i);
 }
@@ -456,7 +485,7 @@ void EncryptedFileMapping::validate_page(size_t i) {
 #ifdef TIGHTDB_DEBUG
     if (!m_read_pages[i]) return;
 
-    uint8_t buffer[::page_size];
+    char buffer[::page_size];
     m_cryptor.read(m_fd, i * ::page_size, buffer, sizeof(buffer));
     if (memcmp(buffer, page_addr(i), page_size(i))) {
         printf("mismatch %p: fd(%d) page(%zu/%zu) page_size(%zu) %s %s\n",
@@ -499,7 +528,7 @@ void EncryptedFileMapping::flush() {
         }
 
         mark_readable(i);
-        m_cryptor.write(m_fd, i * ::page_size, (uint8_t*)page_addr(i), page_size(i));
+        m_cryptor.write(m_fd, i * ::page_size, (char*)page_addr(i), page_size(i));
     }
 
     validate();
