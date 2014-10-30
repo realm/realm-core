@@ -186,20 +186,22 @@ void signal_handler(int code, siginfo_t* info, void* ctx) {
         return;
     }
 
-    abort();
-
     // forward unhandled signals
     if (code == SIGSEGV) {
         if (old_segv.sa_sigaction)
             old_segv.sa_sigaction(code, info, ctx);
         else if (old_segv.sa_handler)
             old_segv.sa_handler(code);
+        else
+            TIGHTDB_TERMINATE("Segmentation fault");
     }
     else if (code == SIGBUS) {
         if (old_bus.sa_sigaction)
             old_bus.sa_sigaction(code, info, ctx);
         else if (old_bus.sa_handler)
             old_bus.sa_handler(code);
+        else
+            TIGHTDB_TERMINATE("Segmentation fault");
     }
     else
         TIGHTDB_TERMINATE("Segmentation fault");
@@ -218,7 +220,10 @@ mapping_and_addr* find_mapping_for_addr(void* addr, size_t size) {
 void add_mapping(void* addr, size_t size, int fd, File::AccessMode access, const uint8_t* encryption_key) {
     SpinLockGuard lock{mapping_lock};
 
-    if (mappings_by_file.empty()) {
+    static bool has_installed_handler = false;
+    if (!has_installed_handler) {
+        has_installed_handler = true;
+
         struct sigaction action;
         action.sa_sigaction = signal_handler;
         action.sa_flags = SA_SIGINFO;
@@ -330,7 +335,7 @@ void AESCryptor::write(int fd, off_t pos, const uint8_t* src, size_t size) {
     size_t bytes = crypt(mode_Encrypt, pos, buffer, src, size, iv_buff);
     lseek(fd, pos, SEEK_SET);
     ::write(fd, buffer, bytes);
-    off_t new_pos = lseek(fd, 0, SEEK_CUR);
+    lseek(fd, 0, SEEK_CUR);
 }
 
 size_t AESCryptor::crypt(EncryptionMode mode, off_t pos, uint8_t* dst, const uint8_t* src, size_t len, const char* stored_iv) {
