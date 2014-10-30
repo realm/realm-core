@@ -10,7 +10,8 @@
 
 ### Enhancements:
 
-* Lorem ipsum.
+* Major simplification of ".lock" file handling.
+  We now leave the ".lock" file behind.
 
 -----------
 
