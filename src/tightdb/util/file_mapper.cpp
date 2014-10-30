@@ -429,7 +429,7 @@ void EncryptedFileMapping::flush_page(size_t i) {
 
 void EncryptedFileMapping::read_page(size_t i) {
     for (auto m : mappings_by_file) {
-        if (same_file(m))
+        if (same_file(m) && i < m.mapping->m_page_count)
             m.mapping->flush_page(i);
     }
 
@@ -442,7 +442,7 @@ void EncryptedFileMapping::read_page(size_t i) {
 
 void EncryptedFileMapping::write_page(size_t i) {
     for (auto m : mappings_by_file) {
-        if (same_file(m)) {
+        if (same_file(m) && i < m.mapping->m_page_count) {
             m.mapping->flush_page(i);
             m.mapping->mark_unreadable(i);
         }
