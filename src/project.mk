@@ -59,8 +59,12 @@ ifneq ($(TIGHTDB_HAVE_CONFIG),)
     TIGHTDB_ENABLE_REPLICATION = $(EMPTY)
   endif
   ifeq ($(ENABLE_ENCRYPTION),yes)
-    PROJECT_CFLAGS += -DTIGHTDB_ENABLE_ENCRYPTION -std=c++11 -I../../openssl/include
-    PROJECT_LDFLAGS += -lcrypto
+    ifeq ($(OS),Darwin)
+      PROJECT_CFLAGS += -DTIGHTDB_ENABLE_ENCRYPTION -std=c++11
+    else
+      PROJECT_CFLAGS += -DTIGHTDB_ENABLE_ENCRYPTION -std=c++11 -I../../openssl/include
+      PROJECT_LDFLAGS += -lcrypto
+    endif
   endif
 else
   ifneq ($(TIGHTDB_ENABLE_REPLICATION),)

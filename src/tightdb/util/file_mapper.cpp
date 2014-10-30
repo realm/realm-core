@@ -13,7 +13,11 @@
 #include <signal.h>
 #include <sys/stat.h>
 
+#ifdef __APPLE__
+#include <CommonCrypto/CommonCryptor.h>
+#else
 #include <openssl/aes.h>
+#endif
 
 #include <tightdb/util/terminate.hpp>
 
@@ -25,7 +29,6 @@ using namespace tightdb::util;
 // todo:
 // skip verify in release mode
 // don't reuse IV
-// switch back to CC on apple
 
 namespace {
 
@@ -52,32 +55,43 @@ size_t pad_to_aes_block_size(size_t len) {
     return (len + aes_block_size - 1) & ~(aes_block_size - 1);
 }
 
-// The system copy of OpenSSL is deprecated on OS X
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated"
+enum EncryptionMode {
+#ifdef __APPLE__
+    mode_Encrypt = kCCEncrypt,
+    mode_Decrypt = kCCDecrypt
+#else
+    mode_Encrypt = AES_ENCRYPT,
+    mode_Decrypt = AES_DECRYPT
+#endif
+};
+
 class AESCryptor {
 public:
     AESCryptor(const uint8_t* key) {
+#ifdef __APPLE__
+        memcpy(m_key, key, 32);
+#else
         AES_set_encrypt_key(key, 256 /* key size in bits */, &m_ectx);
         AES_set_decrypt_key(key, 256 /* key size in bits */, &m_dctx);
+#endif
     }
 
     void read(int fd, off_t pos, uint8_t* dst, size_t size) {
         uint8_t buffer[page_size];
         lseek(fd, pos, SEEK_SET);
         ssize_t bytes_read = ::read(fd, buffer, pad_to_aes_block_size(size));
-        crypt(AES_DECRYPT, pos, dst, buffer, bytes_read);
+        crypt(mode_Decrypt, pos, dst, buffer, bytes_read);
     }
 
     void write(int fd, off_t pos, const uint8_t* src, size_t size) {
         uint8_t buffer[page_size];
-        size_t bytes = crypt(AES_ENCRYPT, pos, buffer, src, size);
+        size_t bytes = crypt(mode_Encrypt, pos, buffer, src, size);
         lseek(fd, pos, SEEK_SET);
         ::write(fd, buffer, bytes);
     }
 
 private:
-    size_t crypt(int mode, off_t pos, uint8_t* dst, const uint8_t* src, size_t len) {
+    size_t crypt(EncryptionMode mode, off_t pos, uint8_t* dst, const uint8_t* src, size_t len) {
         TIGHTDB_ASSERT(len <= page_size);
 
         uint8_t buffer[page_size];
@@ -95,14 +109,31 @@ private:
         uint8_t iv[aes_block_size] = {0};
         memcpy(iv, &pos, sizeof(pos));
 
-        AES_cbc_encrypt(src, dst, len, mode == AES_ENCRYPT ? &m_ectx : &m_dctx, iv, mode);
+
+#ifdef __APPLE__
+        size_t bytesEncrypted = 0;
+        auto err = CCCrypt(mode, kCCAlgorithmAES, 0 /* options */,
+                           m_key, kCCKeySizeAES256, iv,
+                           src, len,
+                           dst, sizeof(buffer),
+                           &bytesEncrypted);
+        TIGHTDB_ASSERT(err == kCCSuccess);
+        TIGHTDB_ASSERT(bytesEncrypted == len);
+        static_cast<void>(bytesEncrypted);
+        static_cast<void>(err);
+#else
+        AES_cbc_encrypt(src, dst, len, mode == mode_Encrypt ? &m_ectx : &m_dctx, iv, mode);
+#endif
         return len;
     }
 
+#ifdef __APPLE__
+    uint8_t m_key[32];
+#else
     AES_KEY m_ectx;
     AES_KEY m_dctx;
+#endif
 };
-#pragma GCC diagnostic pop
 
 class EncryptedFileMapping;
 
@@ -250,7 +281,8 @@ public:
     }
 
     void flush() {
-        // invalidate all read mappings for pages we're about to write to
+        // invalidate all read mappings for pages we're about to write to and
+        // for them to be re-read when needed
         for (auto m : mappings_by_file) {
             if (same_file(m))
                 m.mapping->invalidate(m_dirty_pages);
