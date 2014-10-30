@@ -78,5 +78,10 @@ SharedGroupTestPathGuard::SharedGroupTestPathGuard(const string& path):
 }
 
 
+SharedGroupTestPathGuard::~SharedGroupTestPathGuard()
+{
+    File::try_remove(m_path+".lock");
+}
+
 } // namespace test_util
 } // namespace tightdb
