@@ -27,7 +27,6 @@ using namespace tightdb::util;
 #endif
 
 // todo:
-// skip verify in release mode
 // don't reuse IV
 
 namespace {
@@ -232,6 +231,7 @@ class EncryptedFileMapping {
     }
 
     void validate_page(size_t i) {
+#ifdef TIGHTDB_DEBUG
         if (!m_read_pages[i]) return;
 
         uint8_t buffer[::page_size];
@@ -241,11 +241,16 @@ class EncryptedFileMapping {
                    this, m_fd, i, m_page_count, page_size(i), buffer, page_addr(i));
             TIGHTDB_TERMINATE("");
         }
+#else
+        static_cast<void>(i);
+#endif
     }
 
     void validate() {
+#ifdef TIGHTDB_DEBUG
         for (size_t i = 0; i < m_page_count; ++i)
             validate_page(i);
+#endif
     }
 
     void invalidate(std::vector<bool> const& pages) {
