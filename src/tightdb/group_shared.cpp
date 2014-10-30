@@ -624,7 +624,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
 #endif
             // we need a thread-local copy of the number of ringbuffer entries in order
             // to detect concurrent expansion of the ringbuffer.
-            m_local_max_entry = info->readers.get_num_entries();
+            m_local_max_entry = 0;
 
             // We need to map the info file once more for the readers part
             // since that part can be resized and as such remapped which
@@ -635,7 +635,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
 
             // Set initial version so we can track if other instances
             // change the db
-            m_readlock.m_version = info->get_current_version_unchecked();
+            m_readlock.m_version = get_current_version();
 
             if (info->version != 0)
                 throw runtime_error("Unsupported version");
