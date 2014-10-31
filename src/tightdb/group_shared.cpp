@@ -349,6 +349,10 @@ struct SharedGroup::SharedInfo
     // Cleared by the daemon when it decides to exit.
     bool daemon_ready;
 
+    // Set when the database and the .lock file is in sync with respect to versioning
+    // (and a few other metadata)
+    bool versioning_ready;
+
     uint16_t version;
     uint16_t flags;
     uint16_t free_write_slots;
@@ -364,8 +368,17 @@ struct SharedGroup::SharedInfo
 #endif
     // IMPORTANT: The ringbuffer MUST be the last field in SharedInfo - see above.
     Ringbuffer readers;
-    SharedInfo(ref_type top_ref, size_t file_size, DurabilityLevel);
+    SharedInfo(DurabilityLevel);
     ~SharedInfo() TIGHTDB_NOEXCEPT {}
+    void init_versioning(ref_type top_ref, size_t file_size)
+    {
+        // Create our first versioning entry:
+        Ringbuffer::ReadCount& r = readers.get_next();
+        r.filesize = file_size;
+        r.version = 1;
+        r.current_top = top_ref;
+        readers.use_next();
+    }
     uint_fast64_t get_current_version_unchecked() const
     {
         return readers.get_last().version;
@@ -373,7 +386,7 @@ struct SharedGroup::SharedInfo
 };
 
 
-SharedGroup::SharedInfo::SharedInfo(ref_type top_ref, size_t file_size, DurabilityLevel dlevel):
+SharedGroup::SharedInfo::SharedInfo(DurabilityLevel dlevel):
 #ifndef _WIN32
     writemutex(), // Throws
     balancemutex(), // Throws
@@ -388,16 +401,11 @@ SharedGroup::SharedInfo::SharedInfo(ref_type top_ref, size_t file_size, Durabili
 {
     version = 0;
     flags = dlevel; // durability level is fixed from creation
-    // Create our first versioning entry:
-    Ringbuffer::ReadCount& r = readers.get_next();
-    r.filesize = file_size;
-    r.version = 1;
-    r.current_top = top_ref;
-    readers.use_next();
     free_write_slots = 0;
     num_participants = 0;
     daemon_started = false;
     daemon_ready = false;
+    versioning_ready = false;
     init_complete = 1;
 }
 
@@ -549,28 +557,18 @@ void SharedGroup::open(const string& path, bool no_create_file,
         File::CloseGuard fcg(m_file);
         if (m_file.try_lock_exclusive()) {
 
+            File::UnlockGuard ulg(m_file);
+
             // We're alone in the world, and it is Ok to initialize the file:
             char empty_buf[sizeof (SharedInfo)];
             fill(empty_buf, empty_buf+sizeof(SharedInfo), 0);
             m_file.write(empty_buf, sizeof(SharedInfo));
 
-            bool is_shared = true;
-            bool read_only = false;
-            bool skip_validate = false;
-            ref_type top_ref;
-            top_ref = alloc.attach_file(path, is_shared, read_only, no_create_file,
-                                        skip_validate); // Throws
-
             // Complete initialization of shared info via the memory mapping:
             m_file_map.map(m_file, File::access_ReadWrite, sizeof (SharedInfo), File::map_NoSync);
             File::UnmapGuard fug_1(m_file_map);
-            size_t file_size = alloc.get_baseline();
             SharedInfo* info = m_file_map.get_addr();
-            new (info) SharedInfo(top_ref, file_size, dlevel); // Throws
-            alloc.detach();
-
-            // unlock the file
-            m_file.unlock(); // Just to make it explicit, that we are unlocking
+            new (info) SharedInfo(dlevel); // Throws
         }
 
         // we hold the shared lock from here until we close the file!
@@ -612,6 +610,22 @@ void SharedGroup::open(const string& path, bool no_create_file,
             // we do not need to check it again, because it is only changed under
             // an exclusive file lock, and we checked it under a shared file lock
 
+            // proceed to initialize versioning and other metadata information related to
+            // the database. Also create the database if we're first to get here.
+            bool is_shared = true;
+            bool read_only = false;
+            bool no_create = true;
+            bool skip_validate = false;
+            if (info->versioning_ready == false) {
+                no_create = no_create_file;
+            }
+            ref_type top_ref = alloc.attach_file(path, is_shared, read_only, no_create, skip_validate); // Throws
+            size_t file_size = alloc.get_baseline();
+            if (info->versioning_ready == false) {
+                info->init_versioning(top_ref, file_size);
+                info->versioning_ready = true;
+            }
+
 #ifndef _WIN32
             // In async mode, we need to make sure the daemon is running and ready:
             if (dlevel == durability_Async && !is_backend) {
@@ -652,17 +666,6 @@ void SharedGroup::open(const string& path, bool no_create_file,
             if (info->flags != dlevel)
                 throw runtime_error("Inconsistent durability level");
 
-            // Setup the group, but leave it in invalid state
-            bool is_shared = true;
-            bool read_only = false;
-            bool no_create = true;
-            bool skip_validate = true; // To avoid race conditions
-            try {
-                alloc.attach_file(path, is_shared, read_only, no_create, skip_validate); // Throws
-            }
-            catch (File::NotFound) {
-                throw LockFileButNoData(path);
-            }
             // make our presence noted:
             ++info->num_participants;
 
