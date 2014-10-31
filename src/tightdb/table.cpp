@@ -674,9 +674,9 @@ void Table::do_erase_column(Descriptor& desc, size_t col_ndx)
     // the column removal to correctly reproduce the desired effect, namely that
     // the table appears truncated after the removal of the last non-hidden
     // column. The clear operation needs to be submitted to the replication
-    // handler as an individual operationin order to get the right behaviour in
-    // Group::advance_transact(). This ensures that origin tables for cleared
-    // backlink columns are marked dirty.
+    // handler as an individual operation, and precede the column removal
+    // operation in order to get the right behaviour in
+    // Group::advance_transact().
     if (desc.is_root()) {
         if (root_table.m_spec.get_public_column_count() == 1 && root_table.m_cols.size() > 1)
             root_table.clear(); // Throws

@@ -430,15 +430,15 @@ void Group::remove_table(size_t table_ndx)
     // columns of other tables, however, to do that, we would have to
     // automatically remove the "offending" link columns from those other
     // tables. Such a behaviour is deemed too obscure, and we shall therefore
-    // require that a removed table does not contain any backlinks columns whose
-    // origin table is not the removed table.
+    // require that a removed table does not contain foreigh origin backlink
+    // columns.
     typedef _impl::TableFriend tf;
     if (tf::is_cross_table_link_target(*table))
         throw CrossTableLinkTarget();
 
     // There is no easy way for Group::TransactAdvancer to handle removal of
     // tables that contain foreign target table link columns, because that
-    // involves removal of the corresponding backlink columns. For this reason,
+    // involves removal of the corresponding backlink columns. For that reason,
     // we start by removing all columns, which will generate individual
     // replication instructions for each column removal with sufficient
     // information for Group::TransactAdvancer to handle them.
