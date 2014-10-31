@@ -98,7 +98,7 @@ size_t ColumnBackLink::get_backlink(size_t row_ndx, size_t backlink_ndx) const T
 }
 
 
-void ColumnBackLink::remove_backlink(size_t row_ndx, size_t origin_row_ndx)
+void ColumnBackLink::remove_one_backlink(size_t row_ndx, size_t origin_row_ndx)
 {
     int_fast64_t value = Column::get(row_ndx);
     TIGHTDB_ASSERT(value != 0);
@@ -131,6 +131,22 @@ void ColumnBackLink::remove_backlink(size_t row_ndx, size_t origin_row_ndx)
 
         int_fast64_t value_4 = 1 + 2 * value_3;
         Column::set(row_ndx, value_4);
+    }
+}
+
+
+void ColumnBackLink::remove_all_backlinks(size_t num_rows)
+{
+    Allocator& alloc = m_array->get_alloc();
+    for (size_t row_ndx = 0; row_ndx < num_rows; ++row_ndx) {
+        // List lists with more than one element are represented by a B+ tree,
+        // whose nodes need to be freed.
+        int_fast64_t value = Column::get(row_ndx);
+        if (value && value % 2 == 0) {
+            ref_type ref = to_ref(value);
+            Array::destroy_deep(ref, alloc);
+        }
+        Column::set(row_ndx, 0);
     }
 }
 
@@ -188,62 +204,65 @@ void ColumnBackLink::nullify_links(size_t row_ndx, bool do_destroy)
 }
 
 
-void ColumnBackLink::move_last_over(size_t target_row_ndx, size_t last_row_ndx)
+void ColumnBackLink::erase(size_t, bool)
 {
-    TIGHTDB_ASSERT(target_row_ndx < last_row_ndx);
+    // This operation is not available for unordered tables, and only unordered
+    // tables may have link columns.
+    TIGHTDB_ASSERT(false);
+}
+
+
+void ColumnBackLink::move_last_over(size_t row_ndx, size_t last_row_ndx, bool)
+{
+    TIGHTDB_ASSERT(row_ndx <= last_row_ndx);
     TIGHTDB_ASSERT(last_row_ndx + 1 == size());
 
     // Nullify all links pointing to the row being deleted
     bool do_destroy = true;
-    nullify_links(target_row_ndx, do_destroy); // Throws
+    nullify_links(row_ndx, do_destroy); // Throws
 
     // Update all links to the last row to point to the new row instead
     int_fast64_t value = Column::get(last_row_ndx);
-    if (value != 0) {
-        if (value % 2 != 0) {
-            size_t origin_row_ndx = to_size_t(value / 2);
-            m_origin_column->do_update_link(origin_row_ndx, last_row_ndx, target_row_ndx); // Throws
-        }
-        else {
-            // update entire list of links
-            ref_type ref = to_ref(value);
-            Column backlink_list(get_alloc(), ref); // Throws
+    if (row_ndx != last_row_ndx) {
+        if (value != 0) {
+            if (value % 2 != 0) {
+                size_t origin_row_ndx = to_size_t(value / 2);
+                m_origin_column->do_update_link(origin_row_ndx, last_row_ndx,
+                                                row_ndx); // Throws
+            }
+            else {
+                // update entire list of links
+                ref_type ref = to_ref(value);
+                Column backlink_list(get_alloc(), ref); // Throws
 
-            size_t n = backlink_list.size();
-            for (size_t i = 0; i < n; ++i) {
-                int_fast64_t value_2 = backlink_list.get(i);
-                size_t origin_row_ndx = to_size_t(value_2);
-                m_origin_column->do_update_link(origin_row_ndx, last_row_ndx, target_row_ndx); // Throws
+                size_t n = backlink_list.size();
+                for (size_t i = 0; i < n; ++i) {
+                    int_fast64_t value_2 = backlink_list.get(i);
+                    size_t origin_row_ndx = to_size_t(value_2);
+                    m_origin_column->do_update_link(origin_row_ndx, last_row_ndx,
+                                                    row_ndx); // Throws
+                }
             }
         }
     }
 
     // Do the actual move
-    Column::set(target_row_ndx, value); // Throws
+    Column::set(row_ndx, value); // Throws
     bool is_last = true;
-    Column::erase(last_row_ndx, is_last); // Throws
+    do_erase(last_row_ndx, is_last); // Throws
 }
 
 
-void ColumnBackLink::erase(size_t row_ndx, bool is_last)
+void ColumnBackLink::clear(std::size_t num_rows, bool)
 {
-    TIGHTDB_ASSERT(is_last);
-    bool do_destroy = true;
-    nullify_links(row_ndx, do_destroy); // Throws
-    Column::erase(row_ndx, is_last); // Throws
-}
-
-
-void ColumnBackLink::clear()
-{
-    size_t n = size();
-    for (size_t i = 0; i < n; ++i) {
+    for (size_t row_ndx = 0; row_ndx < num_rows; ++row_ndx) {
         // Column::clear() handles the destruction of subtrees
         bool do_destroy = false;
-        nullify_links(i, do_destroy); // Throws
+        nullify_links(row_ndx, do_destroy); // Throws
     }
-    Column::clear(); // Throws
-    // FIXME: This one is needed because Column::clear() forgets about
+
+    do_clear(); // Throws
+    // FIXME: This one is needed because Column::do_clear() forgets about
     // the leaf type. A better solution should probably be found.
     m_array->set_type(Array::type_HasRefs);
 }

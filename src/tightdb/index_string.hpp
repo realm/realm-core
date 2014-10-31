@@ -91,7 +91,9 @@ public:
         do_update_ref(to_str(value), old_row_ndx, new_row_ndx, 0);
     }
 
-    void clear() TIGHTDB_OVERRIDE;
+    void clear();
+    using Column::clear;
+
     void distinct(Column& result) const;
     bool has_duplicate_values() const TIGHTDB_NOEXCEPT;
 

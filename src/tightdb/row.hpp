@@ -41,10 +41,10 @@ template<class> class BasicRow;
 ///     table[i].get_int(j) == table.get_int(i,j)
 ///
 /// The effect of calling most of the row accessor functions on a detached
-/// accessor is unspecified and may lead to general corruption, or a crash. The
-/// exceptions are is_attached(), detach(), get_table(), get_index(), and the
-/// destructor. Note however, that get_index() will still return an unspecified
-/// value for a deatched accessor.
+/// accessor is unspecified and may lead to general corruption, and/or a
+/// crash. The exceptions are is_attached(), detach(), get_table(), get_index(),
+/// and the destructor. Note however, that get_index() will still return an
+/// unspecified value for a deatched accessor.
 ///
 /// When a row accessor is evaluated in a boolean context, it evaluates to true
 /// if, and only if it is attached.
@@ -100,6 +100,12 @@ public:
     void nullify_link(std::size_t col_ndx);
     void set_mixed(std::size_t col_ndx, Mixed value);
     void set_mixed_subtable(std::size_t col_ndx, const Table* value);
+
+    //@{
+    /// Note that these operations will cause the row accessor to be detached.
+    void remove();
+    void move_last_over();
+    //@}
 
     std::size_t get_backlink_count(const Table& src_table,
                                    std::size_t src_col_ndx) const TIGHTDB_NOEXCEPT;
@@ -461,6 +467,16 @@ template<class T, class R>
 inline void RowFuncs<T,R>::set_mixed_subtable(std::size_t col_ndx, const Table* value)
 {
     table()->set_mixed_subtable(col_ndx, row_ndx(), value); // Throws
+}
+
+template<class T, class R> inline void RowFuncs<T,R>::remove()
+{
+    table()->remove(row_ndx()); // Throws
+}
+
+template<class T, class R> inline void RowFuncs<T,R>::move_last_over()
+{
+    table()->move_last_over(row_ndx()); // Throws
 }
 
 template<class T, class R> inline std::size_t

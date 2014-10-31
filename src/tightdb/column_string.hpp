@@ -60,11 +60,9 @@ public:
     void set(std::size_t ndx, StringData);
     void add(StringData value = StringData());
     void insert(std::size_t ndx, StringData value = StringData());
-
-    void insert(std::size_t, std::size_t, bool) TIGHTDB_OVERRIDE;
-    void erase(std::size_t ndx, bool is_last) TIGHTDB_OVERRIDE;
-    void move_last_over(std::size_t, std::size_t) TIGHTDB_OVERRIDE;
-    void clear() TIGHTDB_OVERRIDE;
+    void erase(std::size_t row_ndx);
+    void move_last_over(std::size_t row_ndx);
+    void clear();
 
     std::size_t count(StringData value) const;
     std::size_t find_first(StringData value, std::size_t begin = 0,
@@ -118,10 +116,13 @@ public:
     ref_type write(std::size_t, std::size_t, std::size_t,
                    _impl::OutputStream&) const TIGHTDB_OVERRIDE;
 
-    void update_from_parent(std::size_t old_baseline) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-
     bool is_string_col() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
+    void insert(std::size_t, std::size_t, bool) TIGHTDB_OVERRIDE;
+    void erase(std::size_t, bool) TIGHTDB_OVERRIDE;
+    void move_last_over(std::size_t, std::size_t, bool) TIGHTDB_OVERRIDE;
+    void clear(std::size_t, bool) TIGHTDB_OVERRIDE;
+    void update_from_parent(std::size_t old_baseline) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     void refresh_accessor_tree(std::size_t, const Spec&) TIGHTDB_OVERRIDE;
 
 #ifdef TIGHTDB_DEBUG
@@ -165,6 +166,10 @@ private:
     class EraseLeafElem;
     class CreateHandler;
     class SliceHandler;
+
+    void do_erase(std::size_t row_ndx, bool is_last);
+    void do_move_last_over(std::size_t row_ndx, std::size_t last_row_ndx);
+    void do_clear();
 
     /// Root must be a leaf. Upgrades the root leaf as
     /// necessary. Returns the type of the root leaf as it is upon
@@ -227,11 +232,22 @@ inline void AdaptiveStringColumn::insert(std::size_t row_ndx, StringData value)
     do_insert(row_ndx, value, num_rows, is_append); // Throws
 }
 
-// Implementing pure virtual method of ColumnBase.
-inline void AdaptiveStringColumn::insert(std::size_t row_ndx, std::size_t num_rows, bool is_append)
+inline void AdaptiveStringColumn::erase(std::size_t row_ndx)
 {
-    StringData value = StringData();
-    do_insert(row_ndx, value, num_rows, is_append); // Throws
+    std::size_t last_row_ndx = size() - 1; // Note that size() is slow
+    bool is_last = row_ndx == last_row_ndx;
+    do_erase(row_ndx, is_last); // Throws
+}
+
+inline void AdaptiveStringColumn::move_last_over(std::size_t row_ndx)
+{
+    std::size_t last_row_ndx = size() - 1; // Note that size() is slow
+    do_move_last_over(row_ndx, last_row_ndx); // Throws
+}
+
+inline void AdaptiveStringColumn::clear()
+{
+    do_clear(); // Throws
 }
 
 inline int AdaptiveStringColumn::compare_values(std::size_t row1, std::size_t row2) const
@@ -295,6 +311,32 @@ inline std::size_t AdaptiveStringColumn::get_size_from_ref(ref_type root_ref,
 inline bool AdaptiveStringColumn::is_string_col() const TIGHTDB_NOEXCEPT
 {
     return true;
+}
+
+// Implementing pure virtual method of ColumnBase.
+inline void AdaptiveStringColumn::insert(std::size_t row_ndx, std::size_t num_rows, bool is_append)
+{
+    StringData value = StringData();
+    do_insert(row_ndx, value, num_rows, is_append); // Throws
+}
+
+// Implementing pure virtual method of ColumnBase.
+inline void AdaptiveStringColumn::erase(std::size_t row_ndx, bool is_last)
+{
+    do_erase(row_ndx, is_last); // Throws
+}
+
+// Implementing pure virtual method of ColumnBase.
+inline void AdaptiveStringColumn::move_last_over(std::size_t row_ndx, std::size_t last_row_ndx,
+                                                 bool)
+{
+    do_move_last_over(row_ndx, last_row_ndx); // Throws
+}
+
+// Implementing pure virtual method of ColumnBase.
+inline void AdaptiveStringColumn::clear(std::size_t, bool)
+{
+    do_clear(); // Throws
 }
 
 } // namespace tightdb

@@ -28,97 +28,165 @@ using namespace std;
 using namespace tightdb;
 
 
-void ColumnLinkList::clear()
+void ColumnLinkList::move_last_over(size_t row_ndx, size_t last_row_ndx,
+                                    bool broken_reciprocal_backlinks)
 {
-    discard_child_accessors();
+    TIGHTDB_ASSERT(row_ndx <= last_row_ndx);
+    TIGHTDB_ASSERT(last_row_ndx + 1 == size());
 
-    // Remove all backlinks to the delete rows
-    //
-    // FIXME: size() is a relatively slow function. Consider passing the size
-    // from Table::m_size.
-    size_t num_rows = size();
-    for (size_t row_ndx = 0; row_ndx < num_rows; ++row_ndx) {
-        ref_type ref = get_as_ref(row_ndx);
-        if (ref == 0)
-            continue;
-
-        Column link_list(get_alloc(), ref);
-        size_t n = link_list.size();
-        for (size_t i = 0; i < n; ++i) {
-            size_t old_target_row_ndx = to_size_t(link_list.get(i));
-            m_backlink_column->remove_backlink(old_target_row_ndx, row_ndx);
-        }
-    }
-
-    // Do the actual deletion
-    ColumnLinkBase::clear(); // Throws
-    // FIXME: This one is needed because Column::clear() forgets about the leaf
-    // type. A better solution should probably be sought after.
-    m_array->set_type(Array::type_HasRefs); // Throws
-}
-
-
-void ColumnLinkList::move_last_over(size_t target_row_ndx, size_t last_row_ndx)
-{
     // Remove backlinks to the delete row
-    if (ref_type ref = get_as_ref(target_row_ndx)) {
-        Column link_list(get_alloc(), ref);
-        size_t n = link_list.size();
-        for (size_t i = 0; i < n; ++i) {
-            size_t old_target_row_ndx = to_size_t(link_list.get(i));
-            m_backlink_column->remove_backlink(old_target_row_ndx, target_row_ndx);
+    if (!broken_reciprocal_backlinks) {
+        if (ref_type ref = get_as_ref(row_ndx)) {
+            Column link_list(get_alloc(), ref);
+            size_t n = link_list.size();
+            for (size_t i = 0; i < n; ++i) {
+                size_t target_row_ndx = to_size_t(link_list.get(i));
+                m_backlink_column->remove_one_backlink(target_row_ndx, row_ndx);
+            }
         }
     }
 
     // Update backlinks to last row to point to its new position
-    if (ref_type ref = get_as_ref(last_row_ndx)) {
-        Column link_list(get_alloc(), ref);
-        size_t n = link_list.size();
-        for (size_t i = 0; i < n; ++i) {
-            size_t old_target_row_ndx = to_size_t(link_list.get(i));
-            m_backlink_column->update_backlink(old_target_row_ndx, last_row_ndx, target_row_ndx);
+    if (row_ndx != last_row_ndx) {
+        if (ref_type ref = get_as_ref(last_row_ndx)) {
+            Column link_list(get_alloc(), ref);
+            size_t n = link_list.size();
+            for (size_t i = 0; i < n; ++i) {
+                size_t target_row_ndx = to_size_t(link_list.get(i));
+                m_backlink_column->update_backlink(target_row_ndx, last_row_ndx, row_ndx);
+            }
         }
     }
 
     // Do the actual delete and move
     bool clear_value = false;
-    destroy_subtree(target_row_ndx, clear_value);
-    ColumnLinkBase::move_last_over(target_row_ndx, last_row_ndx);
+    destroy_subtree(row_ndx, clear_value);
+    do_move_last_over(row_ndx, last_row_ndx);
 
     const bool fix_ndx_in_parent = true;
-    adj_move<fix_ndx_in_parent>(target_row_ndx, last_row_ndx);
+    adj_move_over<fix_ndx_in_parent>(last_row_ndx, row_ndx);
 }
 
 
-void ColumnLinkList::erase(size_t row_ndx, bool is_last)
+void ColumnLinkList::clear(size_t, bool broken_reciprocal_backlinks)
 {
-    TIGHTDB_ASSERT(row_ndx+1 == size());
-    TIGHTDB_ASSERT(is_last);
-
-    // Remove backlinks to the delete row
-    if (ref_type ref = get_as_ref(row_ndx)) {
-        Column link_list(get_alloc(), ref);
-        size_t n = link_list.size();
-        for (size_t i = 0; i < n; ++i) {
-            size_t old_target_row_ndx = to_size_t(link_list.get(i));
-            m_backlink_column->remove_backlink(old_target_row_ndx, row_ndx);
-        }
+    if (!broken_reciprocal_backlinks) {
+        size_t num_target_rows = m_target_table->size();
+        m_backlink_column->remove_all_backlinks(num_target_rows); // Throws
     }
 
-    // Do the actual delete
-    bool clear_value = false;
-    destroy_subtree(row_ndx, clear_value);
-    ColumnLinkBase::erase(row_ndx, is_last);
+    // Do the actual deletion
+    do_clear(); // Throws
+    // FIXME: This one is needed because Column::do_clear() forgets about the
+    // leaf type. A better solution should probably be sought after.
+    m_array->set_type(Array::type_HasRefs); // Throws
 
-    // Detach accessor, if any
-    typedef list_accessors::iterator iter;
-    iter end = m_list_accessors.end();
-    for (iter i = m_list_accessors.begin(); i != end; ++i) {
-        if (i->m_row_ndx == row_ndx) {
-            i->m_list->detach();
-            m_list_accessors.erase(i);
-            break;
+    discard_child_accessors();
+}
+
+
+void ColumnLinkList::cascade_break_backlinks_to(size_t row_ndx, CascadeState& state)
+{
+    if (row_ndx == state.stop_on_link_list_row_ndx && this == state.stop_on_link_list_column)
+        return;
+
+    // Avoid the construction of both a LinkView and a Column instance, since
+    // both would involve heap allocations.
+    ref_type ref = get_as_ref(row_ndx);
+    if (ref == 0)
+        return;
+    Array root(get_alloc());
+    root.init_from_ref(ref);
+
+    if (!root.is_inner_bptree_node()) {
+        cascade_break_backlinks_to__leaf(row_ndx, root, state); // Throws
+        return;
+    }
+
+    Array leaf(get_alloc());
+    size_t link_ndx = 0;
+    size_t num_links = root.get_bptree_size();
+    while (link_ndx < num_links) {
+        pair<MemRef, size_t> p = root.get_bptree_leaf(link_ndx);
+        MemRef leaf_mem = p.first;
+        leaf.init_from_mem(leaf_mem);
+        cascade_break_backlinks_to__leaf(row_ndx, leaf, state); // Throws
+        link_ndx += leaf.size();
+    }
+}
+
+
+void ColumnLinkList::cascade_break_backlinks_to__leaf(size_t row_ndx, const Array& link_list_leaf,
+                                                      CascadeState& state)
+{
+    size_t target_table_ndx = m_target_table->get_index_in_group();
+
+    size_t num_links = link_list_leaf.size();
+    for (size_t i = 0; i < num_links; ++i) {
+        size_t target_row_ndx = to_size_t(link_list_leaf.get(i));
+
+        // Remove the reciprocal backlink at target_row_ndx that points to row_ndx
+        m_backlink_column->remove_one_backlink(target_row_ndx, row_ndx);
+
+        if (m_weak_links)
+            continue;
+        if (m_target_table == state.stop_on_table)
+            continue;
+
+        // Recurse on target row when appropriate
+        check_cascade_break_backlinks_to(target_table_ndx, target_row_ndx, state); // Throws
+    }
+}
+
+
+void ColumnLinkList::cascade_break_backlinks_to_all_rows(size_t num_rows, CascadeState& state)
+{
+    size_t num_target_rows = m_target_table->size();
+    m_backlink_column->remove_all_backlinks(num_target_rows);
+
+    if (m_weak_links)
+        return;
+    if (m_target_table == state.stop_on_table)
+        return;
+
+    // Avoid the construction of both a LinkView and a Column instance, since
+    // both would involve heap allocations.
+    Array root(get_alloc()), leaf(get_alloc());
+    for (size_t i = 0; i < num_rows; ++i) {
+        ref_type ref = get_as_ref(i);
+        if (ref == 0)
+            continue;
+        root.init_from_ref(ref);
+
+        if (!root.is_inner_bptree_node()) {
+            cascade_break_backlinks_to_all_rows__leaf(root, state); // Throws
+            continue;
         }
+
+        size_t link_ndx = 0;
+        size_t num_links = root.get_bptree_size();
+        while (link_ndx < num_links) {
+            pair<MemRef, size_t> p = root.get_bptree_leaf(link_ndx);
+            MemRef leaf_mem = p.first;
+            leaf.init_from_mem(leaf_mem);
+            cascade_break_backlinks_to_all_rows__leaf(leaf, state); // Throws
+            link_ndx += leaf.size();
+        }
+    }
+}
+
+
+void ColumnLinkList::cascade_break_backlinks_to_all_rows__leaf(const Array& link_list_leaf,
+                                                               CascadeState& state)
+{
+    size_t target_table_ndx = m_target_table->get_index_in_group();
+
+    size_t num_links = link_list_leaf.size();
+    for (size_t i = 0; i < num_links; ++i) {
+        size_t target_row_ndx = to_size_t(link_list_leaf.get(i));
+
+        // Recurse on target row when appropriate
+        check_cascade_break_backlinks_to(target_table_ndx, target_row_ndx, state); // Throws
     }
 }
 
@@ -216,13 +284,12 @@ void ColumnLinkList::refresh_accessor_tree(size_t col_ndx, const Spec& spec)
 }
 
 
-void ColumnLinkList::adj_accessors_move(size_t target_row_ndx,
-                                        size_t source_row_ndx) TIGHTDB_NOEXCEPT
+void ColumnLinkList::adj_acc_move_over(size_t from_row_ndx, size_t to_row_ndx) TIGHTDB_NOEXCEPT
 {
-    ColumnLinkBase::adj_accessors_move(target_row_ndx, source_row_ndx);
+    ColumnLinkBase::adj_acc_move_over(from_row_ndx, to_row_ndx);
 
     const bool fix_ndx_in_parent = false;
-    adj_move<fix_ndx_in_parent>(target_row_ndx, source_row_ndx);
+    adj_move_over<fix_ndx_in_parent>(from_row_ndx, to_row_ndx);
 }
 
 
@@ -233,25 +300,25 @@ void ColumnLinkList::adj_acc_clear_root_table() TIGHTDB_NOEXCEPT
 }
 
 template<bool fix_ndx_in_parent>
-void ColumnLinkList::adj_move(size_t target_row_ndx, size_t source_row_ndx) TIGHTDB_NOEXCEPT
+void ColumnLinkList::adj_move_over(size_t from_row_ndx, size_t to_row_ndx) TIGHTDB_NOEXCEPT
 {
-    size_t i = 0, limit = m_list_accessors.size();
-    while (i < limit) {
+    size_t i = 0, n = m_list_accessors.size();
+    while (i < n) {
         list_entry& e = m_list_accessors[i];
-        if (TIGHTDB_UNLIKELY(e.m_row_ndx == target_row_ndx)) {
+        if (TIGHTDB_UNLIKELY(e.m_row_ndx == to_row_ndx)) {
             // Must hold a counted reference while detaching
             LinkViewRef list(e.m_list);
             list->detach();
             // Delete entry by moving last over (faster and avoids invalidating
             // iterators)
-            e = m_list_accessors[--limit];
+            e = m_list_accessors[--n];
             m_list_accessors.pop_back();
         }
         else {
-            if (TIGHTDB_UNLIKELY(e.m_row_ndx == source_row_ndx)) {
-                e.m_row_ndx = target_row_ndx;
+            if (TIGHTDB_UNLIKELY(e.m_row_ndx == from_row_ndx)) {
+                e.m_row_ndx = to_row_ndx;
                 if (fix_ndx_in_parent)
-                    e.m_list->set_origin_row_index(target_row_ndx);
+                    e.m_list->set_origin_row_index(to_row_ndx);
             }
             ++i;
         }

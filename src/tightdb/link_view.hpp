@@ -31,6 +31,8 @@ namespace tightdb {
 
 class ColumnLinkList;
 
+namespace _impl { class LinkListFriend; }
+
 
 /// The effect of calling most of the link list functions on a detached accessor
 /// is unspecified and may lead to general corruption, or even a crash. The
@@ -105,6 +107,10 @@ private:
     void detach();
     void set_origin_row_index(std::size_t row_ndx);
 
+    std::size_t do_set(std::size_t link_ndx, std::size_t target_row_ndx);
+    std::size_t do_remove(std::size_t link_ndx);
+    void do_clear(bool broken_reciprocal_backlinks);
+
     void do_nullify_link(std::size_t old_target_row_ndx);
     void do_update_link(std::size_t old_target_row_ndx, std::size_t new_target_row_ndx);
 
@@ -125,6 +131,7 @@ private:
     void Verify(std::size_t row_ndx) const;
 #endif
 
+    friend class _impl::LinkListFriend;
     friend class ColumnLinkList;
     friend class util::bind_ptr<LinkView>;
     friend class util::bind_ptr<const LinkView>;
@@ -329,6 +336,28 @@ inline Replication* LinkView::get_repl() TIGHTDB_NOEXCEPT
     return tf::get_repl(*m_origin_table);
 }
 #endif
+
+
+// The purpose of this class is to give internal access to some, but not all of
+// the non-public parts of LinkView.
+class _impl::LinkListFriend {
+public:
+    static void do_set(LinkView& list, std::size_t link_ndx, std::size_t target_row_ndx)
+    {
+        list.do_set(link_ndx, target_row_ndx);
+    }
+
+    static void do_remove(LinkView& list, std::size_t link_ndx)
+    {
+        list.do_remove(link_ndx);
+    }
+
+    static void do_clear(LinkView& list)
+    {
+        bool broken_reciprocal_backlinks = false;
+        list.do_clear(broken_reciprocal_backlinks);
+    }
+};
 
 } // namespace tightdb
 

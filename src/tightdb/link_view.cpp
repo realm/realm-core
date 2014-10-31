@@ -39,18 +39,18 @@ void LinkView::insert(size_t link_ndx, size_t target_row_ndx)
     typedef _impl::TableFriend tf;
     tf::bump_version(*m_origin_table);
 
-    size_t row_ndx = get_origin_row_index();
+    size_t origin_row_ndx = get_origin_row_index();
 
     // if there are no links yet, we have to create list
     if (!m_row_indexes.is_attached()) {
         TIGHTDB_ASSERT(link_ndx == 0);
-        ref_type ref = Column::create(m_origin_column.get_alloc());
-        m_origin_column.set_row_ref(row_ndx, ref);
+        ref_type ref = Column::create(m_origin_column.get_alloc()); // Throws
+        m_origin_column.set_row_ref(origin_row_ndx, ref); // Throws
         m_row_indexes.get_root_array()->init_from_parent(); // re-attach
     }
 
-    m_row_indexes.insert(link_ndx, target_row_ndx);
-    m_origin_column.add_backlink(target_row_ndx, row_ndx);
+    m_row_indexes.insert(link_ndx, target_row_ndx); // Throws
+    m_origin_column.add_backlink(target_row_ndx, origin_row_ndx); // Throws
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
@@ -64,20 +64,44 @@ void LinkView::set(size_t link_ndx, size_t target_row_ndx)
     TIGHTDB_ASSERT(is_attached());
     TIGHTDB_ASSERT(m_row_indexes.is_attached() && link_ndx < m_row_indexes.size());
     TIGHTDB_ASSERT(target_row_ndx < m_origin_column.get_target_table().size());
-    typedef _impl::TableFriend tf;
-    tf::bump_version(*m_origin_table);
-
-    // update backlinks
-    size_t row_ndx = get_origin_row_index();
-    size_t old_target_row_ndx = m_row_indexes.get(link_ndx);
-    m_origin_column.remove_backlink(old_target_row_ndx, row_ndx);
-    m_origin_column.add_backlink(target_row_ndx, row_ndx);
-    m_row_indexes.set(link_ndx, target_row_ndx);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
         repl->link_list_set(*this, link_ndx, target_row_ndx); // Throws
 #endif
+
+    size_t old_target_row_ndx = do_set(link_ndx, target_row_ndx); // Throws
+    if (m_origin_column.m_weak_links)
+        return;
+
+    Table& target_table = m_origin_column.get_target_table();
+    size_t num_remaining = target_table.get_num_strong_backlinks(old_target_row_ndx);
+    if (num_remaining > 0)
+        return;
+
+    ColumnBase::CascadeState::row target_row;
+    target_row.table_ndx = target_table.get_index_in_group();
+    target_row.row_ndx   = old_target_row_ndx;
+    ColumnBase::CascadeState state;
+    state.rows.push_back(target_row);
+
+    typedef _impl::TableFriend tf;
+    tf::cascade_break_backlinks_to(target_table, old_target_row_ndx, state); // Throws
+    tf::remove_backlink_broken_rows(target_table, state.rows); // Throws
+}
+
+
+// Replication instruction 'link-list-set' calls this function directly.
+size_t LinkView::do_set(size_t link_ndx, size_t target_row_ndx)
+{
+    size_t old_target_row_ndx = m_row_indexes.get(link_ndx);
+    size_t origin_row_ndx = get_origin_row_index();
+    m_origin_column.remove_backlink(old_target_row_ndx, origin_row_ndx); // Throws
+    m_origin_column.add_backlink(target_row_ndx, origin_row_ndx); // Throws
+    m_row_indexes.set(link_ndx, target_row_ndx); // Throws
+    typedef _impl::TableFriend tf;
+    tf::bump_version(*m_origin_table);
+    return old_target_row_ndx;
 }
 
 
@@ -110,26 +134,44 @@ void LinkView::remove(size_t link_ndx)
 {
     TIGHTDB_ASSERT(is_attached());
     TIGHTDB_ASSERT(m_row_indexes.is_attached() && link_ndx < m_row_indexes.size());
-    typedef _impl::TableFriend tf;
-    tf::bump_version(*m_origin_table);
-
-    // update backlinks
-    size_t target_row_ndx = m_row_indexes.get(link_ndx);
-    size_t row_ndx = get_origin_row_index();
-    m_origin_column.remove_backlink(target_row_ndx, row_ndx);
-
-    bool is_last = (link_ndx + 1 == m_row_indexes.size());
-    m_row_indexes.erase(link_ndx, is_last);
-
-    if (m_row_indexes.is_empty()) {
-        m_row_indexes.detach();
-        m_origin_column.set_row_ref(row_ndx, 0);
-    }
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
         repl->link_list_erase(*this, link_ndx); // Throws
 #endif
+
+    size_t target_row_ndx = do_remove(link_ndx); // Throws
+    if (m_origin_column.m_weak_links)
+        return;
+
+    Table& target_table = m_origin_column.get_target_table();
+    size_t num_remaining = target_table.get_num_strong_backlinks(target_row_ndx);
+    if (num_remaining > 0)
+        return;
+
+    ColumnBase::CascadeState::row target_row;
+    target_row.table_ndx = target_table.get_index_in_group();
+    target_row.row_ndx   = target_row_ndx;
+    ColumnBase::CascadeState state;
+    state.rows.push_back(target_row);
+
+    typedef _impl::TableFriend tf;
+    tf::cascade_break_backlinks_to(target_table, target_row_ndx, state); // Throws
+    tf::remove_backlink_broken_rows(target_table, state.rows); // Throws
+}
+
+
+// Replication instruction 'link-list-erase' calls this function directly.
+size_t LinkView::do_remove(size_t link_ndx)
+{
+    size_t target_row_ndx = m_row_indexes.get(link_ndx);
+    size_t origin_row_ndx = get_origin_row_index();
+    m_origin_column.remove_backlink(target_row_ndx, origin_row_ndx); // Throws
+    bool is_last = (link_ndx + 1 == m_row_indexes.size());
+    m_row_indexes.erase(link_ndx, is_last); // Throws
+    typedef _impl::TableFriend tf;
+    tf::bump_version(*m_origin_table);
+    return target_row_ndx;
 }
 
 
@@ -140,25 +182,68 @@ void LinkView::clear()
     if (!m_row_indexes.is_attached())
         return;
 
-    typedef _impl::TableFriend tf;
-    tf::bump_version(*m_origin_table);
-
-    // Update backlinks
-    size_t row_ndx = get_origin_row_index();
-    size_t n = m_row_indexes.size();
-    for (size_t i = 0; i < n; ++i) {
-        size_t target_row_ndx = m_row_indexes.get(i);
-        m_origin_column.remove_backlink(target_row_ndx, row_ndx);
-    }
-
-    m_row_indexes.destroy();
-    m_origin_column.set_row_ref(row_ndx, 0);
-
 #ifdef TIGHTDB_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
         repl->link_list_clear(*this); // Throws
 #endif
+
+    if (m_origin_column.m_weak_links) {
+        bool broken_reciprocal_backlinks = false;
+        do_clear(broken_reciprocal_backlinks); // Throws
+        return;
+    }
+
+    size_t origin_row_ndx = get_origin_row_index();
+    ColumnBase::CascadeState state;
+    state.stop_on_link_list_column  = &m_origin_column;
+    state.stop_on_link_list_row_ndx = origin_row_ndx;
+
+    typedef _impl::TableFriend tf;
+    size_t num_links = m_row_indexes.size();
+    for (size_t link_ndx = 0; link_ndx < num_links; ++link_ndx) {
+        size_t target_row_ndx = m_row_indexes.get(link_ndx);
+        m_origin_column.remove_backlink(target_row_ndx, origin_row_ndx); // Throws
+        Table& target_table = m_origin_column.get_target_table();
+        size_t num_remaining = target_table.get_num_strong_backlinks(target_row_ndx);
+        if (num_remaining > 0)
+            continue;
+        ColumnBase::CascadeState::row target_row;
+        target_row.table_ndx = target_table.get_index_in_group();
+        target_row.row_ndx   = target_row_ndx;
+        typedef ColumnBase::CascadeState::row_set::iterator iter;
+        iter i = ::upper_bound(state.rows.begin(), state.rows.end(), target_row);
+        // This target row cannot already be in state.rows
+        TIGHTDB_ASSERT(i == state.rows.begin() || i[-1] != target_row);
+        state.rows.insert(i, target_row);
+        tf::cascade_break_backlinks_to(target_table, target_row_ndx, state); // Throws
+    }
+
+    bool broken_reciprocal_backlinks = true;
+    do_clear(broken_reciprocal_backlinks); // Throws
+
+    tf::remove_backlink_broken_rows(*m_origin_table, state.rows); // Throws
 }
+
+
+// Replication instruction 'link-list-clear' calls this function directly.
+void LinkView::do_clear(bool broken_reciprocal_backlinks)
+{
+    size_t origin_row_ndx = get_origin_row_index();
+    if (!broken_reciprocal_backlinks) {
+        size_t num_links = m_row_indexes.size();
+        for (size_t link_ndx = 0; link_ndx < num_links; ++link_ndx) {
+            size_t target_row_ndx = m_row_indexes.get(link_ndx);
+            m_origin_column.remove_backlink(target_row_ndx, origin_row_ndx); // Throws
+        }
+    }
+
+    m_row_indexes.destroy();
+    m_origin_column.set_row_ref(origin_row_ndx, 0); // Throws
+
+    typedef _impl::TableFriend tf;
+    tf::bump_version(*m_origin_table);
+}
+
 
 void LinkView::sort(size_t column, bool ascending)
 {
@@ -168,6 +253,7 @@ void LinkView::sort(size_t column, bool ascending)
     a.push_back(ascending);
     sort(c, a);
 }
+
 
 void LinkView::sort(std::vector<size_t> columns, std::vector<bool> ascending)
 {
@@ -249,8 +335,8 @@ void LinkView::do_nullify_link(size_t old_target_row_ndx)
 
     if (m_row_indexes.is_empty()) {
         m_row_indexes.destroy();
-        size_t row_ndx = get_origin_row_index();
-        m_origin_column.set_row_ref(row_ndx, 0);
+        size_t origin_row_ndx = get_origin_row_index();
+        m_origin_column.set_row_ref(origin_row_ndx, 0);
     }
 }
 

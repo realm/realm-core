@@ -53,11 +53,9 @@ public:
     void add(T value = T());
     void set(std::size_t ndx, T value);
     void insert(std::size_t ndx, T value = T());
-
-    void insert(std::size_t, std::size_t, bool) TIGHTDB_OVERRIDE;
-    void erase(std::size_t ndx, bool is_last) TIGHTDB_OVERRIDE;
-    void clear() TIGHTDB_OVERRIDE;
-    void move_last_over(std::size_t, std::size_t) TIGHTDB_OVERRIDE;
+    void erase(std::size_t row_ndx);
+    void move_last_over(std::size_t row_ndx);
+    void clear();
 
     std::size_t count(T value) const;
 
@@ -94,6 +92,10 @@ public:
     ref_type write(std::size_t, std::size_t, std::size_t,
                    _impl::OutputStream&) const TIGHTDB_OVERRIDE;
 
+    void insert(std::size_t, std::size_t, bool) TIGHTDB_OVERRIDE;
+    void erase(std::size_t, bool) TIGHTDB_OVERRIDE;
+    void move_last_over(std::size_t, std::size_t, bool) TIGHTDB_OVERRIDE;
+    void clear(std::size_t, bool) TIGHTDB_OVERRIDE;
     void refresh_accessor_tree(std::size_t, const Spec&) TIGHTDB_OVERRIDE;
 
 #ifdef TIGHTDB_DEBUG
@@ -123,6 +125,10 @@ private:
     class EraseLeafElem;
     class CreateHandler;
     class SliceHandler;
+
+    void do_erase(std::size_t row_ndx, bool is_last);
+    void do_move_last_over(std::size_t row_ndx, std::size_t last_row_ndx);
+    void do_clear();
 
 #ifdef TIGHTDB_DEBUG
     static std::size_t verify_leaf(MemRef, Allocator&);
