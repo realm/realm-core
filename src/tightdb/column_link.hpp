@@ -39,16 +39,27 @@ public:
 
     static ref_type create(Allocator&, std::size_t size = 0);
 
-    // Getting and modifying links
-    bool is_null_link(std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
-    std::size_t get_link(std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
-    void set_link(std::size_t row_ndx, std::size_t target_row_ndx);
-    void insert_link(std::size_t row_ndx, std::size_t target_row_ndx);
-    void nullify_link(std::size_t row_ndx);
+    //@{
 
-    void clear() TIGHTDB_OVERRIDE;
-    void erase(std::size_t, bool) TIGHTDB_OVERRIDE;
-    void move_last_over(std::size_t, std::size_t) TIGHTDB_OVERRIDE;
+    /// is_null_link() is shorthand for `get_link() == tightdb::npos`,
+    /// nullify_link() is shorthand foe `set_link(tightdb::npos)`, and
+    /// insert_null_link() is shorthand for
+    /// `insert_link(tightdb::npos)`. set_link() returns the original link, with
+    /// `tightdb::npos` indicating that it was null.
+
+    std::size_t get_link(std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
+    bool is_null_link(std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
+    std::size_t set_link(std::size_t row_ndx, std::size_t target_row_ndx);
+    void nullify_link(std::size_t row_ndx);
+    void insert_link(std::size_t row_ndx, std::size_t target_row_ndx);
+    void insert_null_link(std::size_t row_ndx);
+
+    //@}
+
+    void move_last_over(std::size_t, std::size_t, bool) TIGHTDB_OVERRIDE;
+    void clear(std::size_t, bool) TIGHTDB_OVERRIDE;
+    void cascade_break_backlinks_to(std::size_t, CascadeState&) TIGHTDB_OVERRIDE;
+    void cascade_break_backlinks_to_all_rows(std::size_t, CascadeState&) TIGHTDB_OVERRIDE;
 
 #ifdef TIGHTDB_DEBUG
     void Verify(const Table&, std::size_t) const TIGHTDB_OVERRIDE;
@@ -81,24 +92,51 @@ inline ref_type ColumnLink::create(Allocator& alloc, std::size_t size)
     return Column::create(alloc, Array::type_Normal, size); // Throws
 }
 
-inline bool ColumnLink::is_null_link(std::size_t row_ndx) const TIGHTDB_NOEXCEPT
-{
-    // Zero indicates a missing (null) link
-    return (ColumnLinkBase::get(row_ndx) == 0);
-}
-
 inline std::size_t ColumnLink::get_link(std::size_t row_ndx) const TIGHTDB_NOEXCEPT
 {
-    // Row pos is offset by one, to allow null refs
-    return to_size_t(ColumnLinkBase::get(row_ndx) - 1);
+    // Map zero to tightdb::npos, and `n+1` to `n`, where `n` is a target row index.
+    return to_size_t(ColumnLinkBase::get(row_ndx)) - size_t(1);
+}
+
+inline bool ColumnLink::is_null_link(std::size_t row_ndx) const TIGHTDB_NOEXCEPT
+{
+    // Null is represented by zero
+    return ColumnLinkBase::get(row_ndx) == 0;
+}
+
+inline std::size_t ColumnLink::set_link(std::size_t row_ndx, std::size_t target_row_ndx)
+{
+    int_fast64_t old_value = ColumnLinkBase::get(row_ndx);
+    std::size_t old_target_row_ndx = to_size_t(old_value) - size_t(1);
+    if (old_value != 0)
+        m_backlink_column->remove_one_backlink(old_target_row_ndx, row_ndx); // Throws
+
+    int_fast64_t new_value = int_fast64_t(size_t(1) + target_row_ndx);
+    ColumnLinkBase::set(row_ndx, new_value); // Throws
+
+    if (target_row_ndx != tightdb::npos)
+        m_backlink_column->add_backlink(target_row_ndx, row_ndx); // Throws
+
+    return old_target_row_ndx;
+}
+
+inline void ColumnLink::nullify_link(size_t row_ndx)
+{
+    set_link(row_ndx, tightdb::npos); // Throws
 }
 
 inline void ColumnLink::insert_link(std::size_t row_ndx, std::size_t target_row_ndx)
 {
-    // Row pos is offsest by one, to allow null refs
-    ColumnLinkBase::insert(row_ndx, target_row_ndx + 1);
+    int_fast64_t value = int_fast64_t(size_t(1) + target_row_ndx);
+    ColumnLinkBase::insert(row_ndx, value); // Throws
 
-    m_backlink_column->add_backlink(target_row_ndx, row_ndx);
+    if (target_row_ndx != tightdb::npos)
+        m_backlink_column->add_backlink(target_row_ndx, row_ndx); // Throws
+}
+
+inline void ColumnLink::insert_null_link(size_t row_ndx)
+{
+    insert_link(row_ndx, tightdb::npos); // Throws
 }
 
 inline void ColumnLink::do_nullify_link(std::size_t row_ndx, std::size_t)

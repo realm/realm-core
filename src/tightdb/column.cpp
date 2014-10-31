@@ -31,6 +31,18 @@ void ColumnBase::update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT
 }
 
 
+void ColumnBase::cascade_break_backlinks_to(size_t, CascadeState&)
+{
+    // No-op by default
+}
+
+
+void ColumnBase::cascade_break_backlinks_to_all_rows(size_t, CascadeState&)
+{
+    // No-op by default
+}
+
+
 #ifdef TIGHTDB_DEBUG
 
 void ColumnBase::Verify(const Table&, size_t) const
@@ -483,17 +495,6 @@ Column::~Column() TIGHTDB_NOEXCEPT
     delete m_array;
 }
 
-void Column::clear()
-{
-    if (m_search_index) {
-        static_cast<StringIndex*>(m_search_index)->clear();
-    }
-
-    m_array->clear_and_destroy_children();
-    if (m_array->is_inner_bptree_node())
-        m_array->set_type(Array::type_Normal);
-}
-
 
 void Column::move_assign(Column& col)
 {
@@ -640,74 +641,6 @@ void Column::ReferenceSort(size_t start, size_t end, Column& ref)
 */
 
 
-class Column::EraseLeafElem: public EraseHandlerBase {
-public:
-    Array m_leaf;
-    bool m_leaves_have_refs;
-    EraseLeafElem(Column& column) TIGHTDB_NOEXCEPT:
-        EraseHandlerBase(column), m_leaf(get_alloc()),
-        m_leaves_have_refs(false) {}
-    bool erase_leaf_elem(MemRef leaf_mem, ArrayParent* parent,
-                         size_t leaf_ndx_in_parent,
-                         size_t elem_ndx_in_leaf) TIGHTDB_OVERRIDE
-    {
-        m_leaf.init_from_mem(leaf_mem);
-        TIGHTDB_ASSERT(m_leaf.size() >= 1);
-        size_t last_ndx = m_leaf.size() - 1;
-        if (last_ndx == 0) {
-            m_leaves_have_refs = m_leaf.has_refs();
-            return true;
-        }
-        m_leaf.set_parent(parent, leaf_ndx_in_parent);
-        size_t ndx = elem_ndx_in_leaf;
-        if (ndx == npos)
-            ndx = last_ndx;
-        m_leaf.erase(ndx); // Throws
-        return false;
-    }
-    void destroy_leaf(MemRef leaf_mem) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
-    {
-        // FIXME: Seems like this would cause file space leaks if
-        // m_leaves_have_refs is true, but consider carefully how
-        // m_leaves_have_refs get its value.
-        get_alloc().free_(leaf_mem);
-    }
-    void replace_root_by_leaf(MemRef leaf_mem) TIGHTDB_OVERRIDE
-    {
-        Array* leaf = new Array(get_alloc()); // Throws
-        leaf->init_from_mem(leaf_mem);
-        replace_root(leaf); // Throws, but callee takes ownership of accessor
-    }
-    void replace_root_by_empty_leaf() TIGHTDB_OVERRIDE
-    {
-        UniquePtr<Array> leaf(new Array(get_alloc())); // Throws
-        leaf->create(m_leaves_have_refs ? Array::type_HasRefs :
-                     Array::type_Normal); // Throws
-        replace_root(leaf.release()); // Throws, but callee takes ownership of accessor
-    }
-};
-
-
-void Column::erase(size_t ndx, bool is_last)
-{
-    TIGHTDB_ASSERT(ndx < size());
-    TIGHTDB_ASSERT(is_last == (ndx == size()-1));
-
-    if (m_search_index) {
-        static_cast<StringIndex*>(m_search_index)->erase<StringData>(ndx, is_last);
-    }
-
-    if (!m_array->is_inner_bptree_node()) {
-        m_array->erase(ndx); // Throws
-        return;
-    }
-
-    size_t ndx_2 = is_last ? npos : ndx;
-    EraseLeafElem handler(*this);
-    Array::erase_bptree_elem(m_array, ndx_2, handler); // Throws
-}
-
-
 void Column::destroy_subtree(size_t ndx, bool clear_value)
 {
     int_fast64_t value = get(ndx);
@@ -729,29 +662,6 @@ void Column::destroy_subtree(size_t ndx, bool clear_value)
 
     if (clear_value)
         set(ndx, 0); // Throws
-}
-
-
-void Column::move_last_over(size_t target_row_ndx, size_t last_row_ndx)
-{
-    TIGHTDB_ASSERT(target_row_ndx < last_row_ndx);
-    TIGHTDB_ASSERT(last_row_ndx + 1 == size());
-
-    if (m_search_index) {
-        // remove the value to be overwritten from index
-        bool is_last = true; // This tells StringIndex::erase() to not adjust subsequent indexes
-        static_cast<StringIndex*>(m_search_index)->erase<StringData>(target_row_ndx, is_last); // Throws
-
-        // update index to point to new location
-        int64_t moved_value = get(last_row_ndx);
-        static_cast<StringIndex*>(m_search_index)->update_ref(moved_value, last_row_ndx, target_row_ndx); // Throws
-    }
-
-    int_fast64_t value = get(last_row_ndx);
-    Column::set(target_row_ndx, value); // Throws
-
-    bool is_last = true;
-    Column::erase(last_row_ndx, is_last); // Throws
 }
 
 
@@ -936,7 +846,7 @@ bool Column::compare_int(const Column& c) const TIGHTDB_NOEXCEPT
 void Column::do_insert(size_t row_ndx, int_fast64_t value, size_t num_rows)
 {
     TIGHTDB_ASSERT(row_ndx == tightdb::npos || row_ndx < size());
-         
+
     ref_type new_sibling_ref;
     Array::TreeInsert<Column> state;
     for (size_t i = 0; i != num_rows; ++i) {
@@ -967,6 +877,123 @@ void Column::do_insert(size_t row_ndx, int_fast64_t value, size_t num_rows)
         static_cast<StringIndex*>(m_search_index)->insert(row_ndx_2, value, num_rows, is_append); // Throws
     }
 
+}
+
+
+class Column::EraseLeafElem: public EraseHandlerBase {
+public:
+    Array m_leaf;
+    bool m_leaves_have_refs;
+    EraseLeafElem(Column& column) TIGHTDB_NOEXCEPT:
+        EraseHandlerBase(column), m_leaf(get_alloc()),
+        m_leaves_have_refs(false) {}
+    bool erase_leaf_elem(MemRef leaf_mem, ArrayParent* parent,
+                         size_t leaf_ndx_in_parent,
+                         size_t elem_ndx_in_leaf) TIGHTDB_OVERRIDE
+    {
+        m_leaf.init_from_mem(leaf_mem);
+        TIGHTDB_ASSERT(m_leaf.size() >= 1);
+        size_t last_ndx = m_leaf.size() - 1;
+        if (last_ndx == 0) {
+            m_leaves_have_refs = m_leaf.has_refs();
+            return true;
+        }
+        m_leaf.set_parent(parent, leaf_ndx_in_parent);
+        size_t ndx = elem_ndx_in_leaf;
+        if (ndx == npos)
+            ndx = last_ndx;
+        m_leaf.erase(ndx); // Throws
+        return false;
+    }
+    void destroy_leaf(MemRef leaf_mem) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
+    {
+        // FIXME: Seems like this would cause file space leaks if
+        // m_leaves_have_refs is true, but consider carefully how
+        // m_leaves_have_refs get its value.
+        get_alloc().free_(leaf_mem);
+    }
+    void replace_root_by_leaf(MemRef leaf_mem) TIGHTDB_OVERRIDE
+    {
+        Array* leaf = new Array(get_alloc()); // Throws
+        leaf->init_from_mem(leaf_mem);
+        replace_root(leaf); // Throws, but callee takes ownership of accessor
+    }
+    void replace_root_by_empty_leaf() TIGHTDB_OVERRIDE
+    {
+        UniquePtr<Array> leaf(new Array(get_alloc())); // Throws
+        leaf->create(m_leaves_have_refs ? Array::type_HasRefs :
+                     Array::type_Normal); // Throws
+        replace_root(leaf.release()); // Throws, but callee takes ownership of accessor
+    }
+};
+
+
+void Column::do_erase(size_t ndx, bool is_last)
+{
+    TIGHTDB_ASSERT(ndx < size());
+    TIGHTDB_ASSERT(is_last == (ndx == size()-1));
+
+    if (m_search_index)
+        static_cast<StringIndex*>(m_search_index)->erase<StringData>(ndx, is_last);
+
+    if (!m_array->is_inner_bptree_node()) {
+        m_array->erase(ndx); // Throws
+        return;
+    }
+
+    size_t ndx_2 = is_last ? npos : ndx;
+    EraseLeafElem handler(*this);
+    Array::erase_bptree_elem(m_array, ndx_2, handler); // Throws
+}
+
+
+void Column::do_move_last_over(size_t row_ndx, size_t last_row_ndx)
+{
+    TIGHTDB_ASSERT(row_ndx <= last_row_ndx);
+    TIGHTDB_ASSERT(last_row_ndx + 1 == size());
+
+    if (m_search_index) {
+        // remove the value to be overwritten from index
+        bool is_last = true; // This tells StringIndex::erase() to not adjust subsequent indexes
+        static_cast<StringIndex*>(m_search_index)->erase<StringData>(row_ndx, is_last); // Throws
+
+        // update index to point to new location
+        if (row_ndx != last_row_ndx) {
+            int_fast64_t moved_value = get(last_row_ndx);
+            static_cast<StringIndex*>(m_search_index)->update_ref(moved_value, last_row_ndx, row_ndx); // Throws
+        }
+    }
+
+    // Copy value from last row over
+    int_fast64_t value = get(last_row_ndx);
+    if (m_array->is_inner_bptree_node()) {
+        SetLeafElem set_leaf_elem(m_array->get_alloc(), value);
+        m_array->update_bptree_elem(row_ndx, set_leaf_elem); // Throws
+    }
+    else {
+        m_array->set(row_ndx, value); // Throws
+    }
+
+    // Discard last row
+    if (m_array->is_inner_bptree_node()) {
+        size_t row_ndx_2 = tightdb::npos;
+        EraseLeafElem handler(*this);
+        Array::erase_bptree_elem(m_array, row_ndx_2, handler); // Throws
+    }
+    else {
+        m_array->erase(last_row_ndx); // Throws
+    }
+}
+
+
+void Column::do_clear()
+{
+    if (m_search_index)
+        static_cast<StringIndex*>(m_search_index)->clear();
+
+    m_array->clear_and_destroy_children();
+    if (m_array->is_inner_bptree_node())
+        m_array->set_type(Array::type_Normal);
 }
 
 

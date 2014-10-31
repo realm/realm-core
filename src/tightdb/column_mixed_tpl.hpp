@@ -26,21 +26,21 @@ inline ColumnMixed::ColumnMixed(Allocator& alloc, ref_type ref,
     create(alloc, ref, table, column_ndx);
 }
 
-inline void ColumnMixed::adj_accessors_insert_rows(std::size_t row_ndx,
-                                                   std::size_t num_rows) TIGHTDB_NOEXCEPT
+inline void ColumnMixed::adj_acc_insert_rows(std::size_t row_ndx,
+                                             std::size_t num_rows) TIGHTDB_NOEXCEPT
 {
-    m_data->adj_accessors_insert_rows(row_ndx, num_rows);
+    m_data->adj_acc_insert_rows(row_ndx, num_rows);
 }
 
-inline void ColumnMixed::adj_accessors_erase_row(std::size_t row_ndx) TIGHTDB_NOEXCEPT
+inline void ColumnMixed::adj_acc_erase_row(std::size_t row_ndx) TIGHTDB_NOEXCEPT
 {
-    m_data->adj_accessors_erase_row(row_ndx);
+    m_data->adj_acc_erase_row(row_ndx);
 }
 
-inline void ColumnMixed::adj_accessors_move(std::size_t target_row_ndx,
-                                            std::size_t source_row_ndx) TIGHTDB_NOEXCEPT
+inline void ColumnMixed::adj_acc_move_over(std::size_t from_row_ndx,
+                                           std::size_t to_row_ndx) TIGHTDB_NOEXCEPT
 {
-    m_data->adj_accessors_move(target_row_ndx, source_row_ndx);
+    m_data->adj_acc_move_over(from_row_ndx, to_row_ndx);
 }
 
 inline void ColumnMixed::adj_acc_clear_root_table() TIGHTDB_NOEXCEPT
@@ -364,18 +364,23 @@ inline void ColumnMixed::insert_subtable(std::size_t ndx, const Table* t)
     insert_value(ndx, types_value, data_value); // Throws
 }
 
-// Implementing pure virtual method of ColumnBase.
-inline void ColumnMixed::insert(std::size_t row_ndx, std::size_t num_rows, bool is_append)
+inline void ColumnMixed::erase(std::size_t row_ndx)
 {
-    std::size_t row_ndx_2 = is_append ? tightdb::npos : row_ndx;
+    std::size_t last_row_ndx = size() - 1; // Note that size() is slow
+    bool is_last = row_ndx == last_row_ndx;
+    do_erase(row_ndx, is_last); // Throws
+}
 
-    int_fast64_t type_value = mixcol_Int;
-    m_types->do_insert(row_ndx_2, type_value, num_rows); // Throws
+inline void ColumnMixed::move_last_over(std::size_t row_ndx)
+{
+    std::size_t last_row_ndx = size() - 1; // Note that size() is slow
+    do_move_last_over(row_ndx, last_row_ndx); // Throws
+}
 
-    // The least significant bit indicates that the rest of the bits form an
-    // integer value, so 1 is actually zero.
-    int_fast64_t data_value = 1;
-    m_data->do_insert(row_ndx_2, data_value, num_rows); // Throws
+inline void ColumnMixed::clear()
+{
+    std::size_t num_rows = size(); // Note that size() is slow
+    do_clear(num_rows); // Throws
 }
 
 inline std::size_t ColumnMixed::get_size_from_ref(ref_type root_ref,
@@ -391,6 +396,38 @@ inline void ColumnMixed::clear_value_and_discard_subtab_acc(std::size_t row_ndx,
     MixedColType old_type = clear_value(row_ndx, new_type);
     if (old_type == mixcol_Table)
         m_data->discard_subtable_accessor(row_ndx);
+}
+
+// Implementing pure virtual method of ColumnBase.
+inline void ColumnMixed::insert(std::size_t row_ndx, std::size_t num_rows, bool is_append)
+{
+    std::size_t row_ndx_2 = is_append ? tightdb::npos : row_ndx;
+
+    int_fast64_t type_value = mixcol_Int;
+    m_types->do_insert(row_ndx_2, type_value, num_rows); // Throws
+
+    // The least significant bit indicates that the rest of the bits form an
+    // integer value, so 1 is actually zero.
+    int_fast64_t data_value = 1;
+    m_data->do_insert(row_ndx_2, data_value, num_rows); // Throws
+}
+
+// Implementing pure virtual method of ColumnBase.
+inline void ColumnMixed::erase(std::size_t row_ndx, bool is_last)
+{
+    do_erase(row_ndx, is_last); // Throws
+}
+
+// Implementing pure virtual method of ColumnBase.
+inline void ColumnMixed::move_last_over(std::size_t row_ndx, std::size_t last_row_ndx, bool)
+{
+    do_move_last_over(row_ndx, last_row_ndx); // Throws
+}
+
+// Implementing pure virtual method of ColumnBase.
+inline void ColumnMixed::clear(std::size_t num_rows, bool)
+{
+    do_clear(num_rows); // Throws
 }
 
 inline void ColumnMixed::mark(int type) TIGHTDB_NOEXCEPT
