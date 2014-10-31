@@ -427,7 +427,7 @@ inline void UniqueLock::unlock() TIGHTDB_NOEXCEPT
 }
 
 template<typename TFunc>
-inline RobustLockGuard::RobustLockGuard(RobustMutex& m, TFunc func);
+inline RobustLockGuard::RobustLockGuard(RobustMutex& m, TFunc func) :
     m_mutex(m)
 {
     m_mutex.lock(func);

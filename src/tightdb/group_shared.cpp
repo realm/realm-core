@@ -554,9 +554,6 @@ void SharedGroup::open(const string& path, bool no_create_file,
             fill(empty_buf, empty_buf+sizeof(SharedInfo), 0);
             m_file.write(empty_buf, sizeof(SharedInfo));
 
-            // If we are the first we may have to create the database file
-            // but we invalidate the internals right after to avoid conflicting
-            // with old state when starting transactions
             bool is_shared = true;
             bool read_only = false;
             bool skip_validate = false;
@@ -564,7 +561,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
             top_ref = alloc.attach_file(path, is_shared, read_only, no_create_file,
                                         skip_validate); // Throws
 
-            // Complete initialization of shared info in the file:
+            // Complete initialization of shared info via the memory mapping:
             m_file_map.map(m_file, File::access_ReadWrite, sizeof (SharedInfo), File::map_NoSync);
             File::UnmapGuard fug_1(m_file_map);
             size_t file_size = alloc.get_baseline();
@@ -590,7 +587,6 @@ void SharedGroup::open(const string& path, bool no_create_file,
             throw runtime_error("Lock file too large");
         if (info_size < sizeof (SharedInfo)) {
                 m_file.unlock();
-                micro_sleep(1000);
                 continue;
         }
         // Map to memory
@@ -601,7 +597,6 @@ void SharedGroup::open(const string& path, bool no_create_file,
         SharedInfo* info = m_file_map.get_addr();
         if (info->init_complete == 0) {
             m_file.unlock();
-            micro_sleep(1000);
             continue;
         }
 
