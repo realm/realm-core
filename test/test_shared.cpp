@@ -88,7 +88,9 @@ TIGHTDB_TABLE_4(TestTableShared,
 
 } // anonymous namespace
 
-
+#ifdef LOCKFILE_CLEANUP
+// The following two tests are now disabled, as we have abandoned the requirement to
+// clean up the .lock file after use.
 TEST(Shared_NoCreateCleanupLockFileAfterFailure)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -129,7 +131,7 @@ TEST(Shared_NoCreateCleanupLockFileAfterFailure2)
     // Verify that the `lock` file is not left behind
     CHECK(!File::exists(path.get_lock_path()));
 }
-
+#endif
 
 TEST(Shared_Initial)
 {
@@ -146,11 +148,14 @@ TEST(Shared_Initial)
 
     }
 
+#ifdef LOCKFILE_CLEANUP
     // Verify that the `lock` file is not left behind
     CHECK(!File::exists(path.get_lock_path()));
+#endif
 }
 
 
+#ifdef LOCKFILE_CLEANUP
 TEST(Shared_StaleLockFileFaked)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -202,7 +207,7 @@ TEST(Shared_StaleLockFileRenamed)
     // Verify that the `lock` file is not left behind
     CHECK(!File::exists(lock_path));
 }
-
+#endif
 
 TEST(Shared_InitialMem)
 {
@@ -224,8 +229,10 @@ TEST(Shared_InitialMem)
     // removed.
     CHECK(!File::exists(path));
 
+#ifdef LOCKFILE_CLEANUP
     // Verify that the `lock` file is not left behind
     CHECK(!File::exists(path.get_lock_path()));
+#endif
 }
 
 
@@ -269,8 +276,10 @@ TEST(Shared_Initial2)
         }
     }
 
+#ifdef LOCKFILE_CLEANUP
     // Verify that the `lock` file is not left behind
     CHECK(!File::exists(path.get_lock_path()));
+#endif
 }
 
 
@@ -315,8 +324,10 @@ TEST(Shared_Initial2_Mem)
         }
     }
 
+#ifdef LOCKFILE_CLEANUP
     // Verify that the `lock` file is not left behind
     CHECK(!File::exists(path.get_lock_path()));
+#endif
 }
 
 
@@ -408,8 +419,10 @@ TEST(Shared_1)
         }
     }
 
+#ifdef LOCKFILE_CLEANUP
     // Verify that lock file was deleted after use
     CHECK(!File::exists(path.get_lock_path()));
+#endif
 }
 
 
@@ -479,8 +492,10 @@ TEST(Shared_Rollback)
         }
     }
 
+#ifdef LOCKFILE_CLEANUP
     // Verify that lock file was deleted after use
     CHECK(!File::exists(path.get_lock_path()));
+#endif
 }
 
 
@@ -519,8 +534,10 @@ TEST(Shared_Writes)
         }
     }
 
+#ifdef LOCKFILE_CLEANUP
     // Verify that lock file was deleted after use
     CHECK(!File::exists(path.get_lock_path()));
+#endif
 }
 
 
@@ -1003,8 +1020,10 @@ TEST(Shared_WriterThreads)
         }
     }
 
+#ifdef LOCKFILE_CLEANUP
     // Verify that lock file was deleted after use
     CHECK(!File::exists(path.get_lock_path()));
+#endif
 }
 
 
@@ -1530,19 +1549,17 @@ TEST_IF(Shared_Async, allow_async)
     }
 
     // Wait for async_commit process to shutdown
-    while (File::exists(path.get_lock_path()))
-        sleep(1);
+    // FIXME: we need a way to determine properly if the daemon has shot down instead of just sleeping
+    sleep(1);
 
     // Read the db again in normal mode to verify
     {
         SharedGroup db(path);
 
-        for (size_t i = 0; i < 100; ++i) {
-            ReadTransaction rt(db);
-            rt.get_group().Verify();
-            TestTableShared::ConstRef t1 = rt.get_table<TestTableShared>("test");
-            CHECK(t1->size() == 100);
-        }
+        ReadTransaction rt(db);
+        rt.get_group().Verify();
+        TestTableShared::ConstRef t1 = rt.get_table<TestTableShared>("test");
+        CHECK_EQUAL(100, t1->size());
     }
 }
 
@@ -1592,6 +1609,7 @@ void multiprocess_thread(TestResults* test_results_ptr, string path, size_t row_
 
 void multiprocess_make_table(string path, string lock_path, string alone_path, size_t rows)
 {
+    static_cast<void>(lock_path);
     // Create first table in group
 #if 1
     static_cast<void>(alone_path);
@@ -1645,8 +1663,8 @@ void multiprocess_make_table(string path, string lock_path, string alone_path, s
 #    endif
 #  endif
     // Wait for async_commit process to shutdown
-    while (File::exists(lock_path))
-        usleep(100);
+    // FIXME: No good way of doing this
+    sleep(1);
 #else
     {
         Group g(alone_path, Group::mode_ReadWrite);
@@ -1699,8 +1717,9 @@ void multiprocess_validate_and_clear(TestResults& test_results, string path, str
                                      size_t rows, int result)
 {
     // Wait for async_commit process to shutdown
-    while (File::exists(lock_path))
-        usleep(100);
+    // FIXME: this is not apropriate
+    static_cast<void>(lock_path);
+    sleep(1);
 
     // Verify - once more, in sync mode - that the changes were made
     {
@@ -1918,12 +1937,8 @@ TEST(Shared_PinnedTransactions)
     SharedGroup sg1(path);
     SharedGroup sg2(path);
     {
-        // initially, always say that the db has changed
+        // initially, always say that the db hasn't changed
         bool changed = sg2.pin_read_transactions();
-        CHECK(changed);
-        sg2.unpin_read_transactions();
-        // asking again - this time there is no change
-        changed = sg2.pin_read_transactions();
         CHECK(!changed);
         sg2.unpin_read_transactions();
     }

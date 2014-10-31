@@ -15,6 +15,8 @@
 
 ### Enhancements:
 
+* Major simplification of ".lock" file handling.
+  We now leave the ".lock" file behind.
 * Support added for cascading row removal. See `Descriptor::set_link_type()` for
   details. All previsouly created link columns will effectively have link-type
   'weak'.
