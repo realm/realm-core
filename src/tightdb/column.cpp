@@ -570,23 +570,6 @@ void Column::adjust(size_t ndx, int_fast64_t diff)
 }
 
 
-
-
-
-
-
-                                      
-
-
-
-
-
-
-
-
-
-
-
 // int64_t specific:
 
 size_t Column::count(int64_t target) const
