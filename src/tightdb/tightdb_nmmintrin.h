@@ -18,6 +18,9 @@
     #include <emmintrin.h> // SSE2 (using __m128i)
 #endif
 
+namespace tightdb {
+
+#if 0
 #ifdef TIGHTDB_COMPILER_AVX
 typedef float __m256 __attribute__((__vector_size__(32), __may_alias__));
 typedef double __m256d __attribute__((__vector_size__(32), __may_alias__));
@@ -94,6 +97,7 @@ static inline int movemask_cmp_pd(__m256d* y1, __m256d* y2, int op)
 
 
 #endif
+#endif
 
 // Instructions introduced by SSE 3 and 4.2
 static inline __m128i _mm_cmpgt_epi64(__m128i xmm1, __m128i xmm2)
@@ -151,5 +155,8 @@ static inline __m128i __attribute__((always_inline)) _mm_cvtepi32_epi64(__m128i 
     __asm__("pmovsxdq %1, %0" : "=x" (xmm1) : "xm" (xmm2));
     return xmm1;
 }
+
+} // namespace tightdb
+
 #endif
 #endif

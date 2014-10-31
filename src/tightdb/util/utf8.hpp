@@ -28,15 +28,8 @@
 #include <tightdb/util/features.h>
 #include <tightdb/utilities.hpp>
 
-#if TIGHTDB_HAVE_CXX11
-    #include <locale>
-#endif
-
 namespace tightdb {
-
-
 namespace util {
-
 
 
 /// Transcode between UTF-8 and UTF-16.
@@ -88,7 +81,9 @@ template<class Char16, class Traits16 = std::char_traits<Char16> > struct Utf8x1
     static std::size_t find_utf8_buf_size(const Char16*& in_begin, const Char16* in_end);
 };
 
-// -------------------------------------------------------------------
+
+
+
 
 // Implementation:
 
