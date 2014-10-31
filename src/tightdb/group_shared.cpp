@@ -332,7 +332,7 @@ struct SharedGroup::SharedInfo
 {
     // indicates lock file has valid content, implying that all the following member
     // variables have been initialized. All member variables, except for the Ringbuffer,
-    // are protected by the write mutex, except during initialization, where access is
+    // are protected by 'controlmutex', except during initialization, where access is
     // guarded by the exclusive file lock.
     bool init_complete;
 
@@ -355,6 +355,7 @@ struct SharedGroup::SharedInfo
 
     RobustMutex writemutex;
     RobustMutex balancemutex;
+    RobustMutex controlmutex;
 #ifndef _WIN32
     // FIXME: windows pthread support for condvar not ready
     CondVar room_to_write;
@@ -376,6 +377,7 @@ SharedGroup::SharedInfo::SharedInfo(ref_type top_ref, size_t file_size, Durabili
 #ifndef _WIN32
     writemutex(), // Throws
     balancemutex(), // Throws
+    controlmutex(), // Throws
     room_to_write(CondVar::process_shared_tag()), // Throws
     work_to_do(CondVar::process_shared_tag()), // Throws
     daemon_becomes_ready(CondVar::process_shared_tag()) // Throws
@@ -604,14 +606,13 @@ void SharedGroup::open(const string& path, bool no_create_file,
         }
 
         // OK! lock file appears valid. We can now continue operations under the protection
-        // of the write mutex. The write mutex protects the following activities:
+        // of the controlmutex. The controlmutex protects the following activities:
         // - attachment of the database file
         // - start of the async daemon
         // - stop of the async daemon
         // - SharedGroup joining/leaving the sharing scheme
-        // - write transactions (which gave the mutex its name)
         {
-            RobustLockGuard lock(info->writemutex, &recover_from_dead_write_transact); // Throws
+            RobustLockGuard lock(info->controlmutex, &recover_from_dead_write_transact); // Throws
             // Even though we checked init_complete before grabbing the write mutex,
             // we do not need to check it again, because it is only changed under
             // an exclusive file lock, and we checked it under a shared file lock
@@ -626,7 +627,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
                     }
                     // FIXME: It might be more robust to sleep a little, then restart the loop
                     // cerr << "Waiting for daemon" << endl;
-                    info->daemon_becomes_ready.wait(info->writemutex,
+                    info->daemon_becomes_ready.wait(info->controlmutex,
                                                     &recover_from_dead_write_transact,
                                                     0);
                     // cerr << " - notified" << endl;
@@ -724,7 +725,7 @@ SharedGroup::~SharedGroup() TIGHTDB_NOEXCEPT
 
     SharedInfo* info = m_file_map.get_addr();
     {
-        RobustLockGuard lock(info->writemutex, recover_from_dead_write_transact);
+        RobustLockGuard lock(info->controlmutex, recover_from_dead_write_transact);
         --info->num_participants;
         // cerr << "closing" << endl;
         if (info->num_participants == 0) {
@@ -810,7 +811,7 @@ void SharedGroup::do_async_commits()
     grab_latest_readlock(m_readlock, dummy);
     // we must treat version and version_index the same way:
     {
-        RobustLockGuard lock(info->writemutex, &recover_from_dead_write_transact);
+        RobustLockGuard lock(info->controlmutex, &recover_from_dead_write_transact);
         info->free_write_slots = max_write_slots;
         info->daemon_ready = true;
         info->daemon_becomes_ready.notify_all();
@@ -831,7 +832,7 @@ void SharedGroup::do_async_commits()
         ReadLockInfo next_readlock = m_readlock;
         {
             // detect if we're the last "client", and if so, shutdown (must be under lock):
-            RobustLockGuard lock(info->writemutex, &recover_from_dead_write_transact);
+            RobustLockGuard lock(info->controlmutex, &recover_from_dead_write_transact);
             grab_latest_readlock(next_readlock, is_same);
             if (is_same && (shutdown || info->num_participants == 1)) {
 #ifdef TIGHTDB_ENABLE_LOGFILE
