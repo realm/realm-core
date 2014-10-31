@@ -74,13 +74,13 @@ TestPathGuard::~TestPathGuard() TIGHTDB_NOEXCEPT
 SharedGroupTestPathGuard::SharedGroupTestPathGuard(const string& path):
     TestPathGuard(path)
 {
-    File::try_remove(m_path+".lock");
+    File::try_remove(get_lock_path());
 }
 
 
 SharedGroupTestPathGuard::~SharedGroupTestPathGuard()
 {
-    File::try_remove(m_path+".lock");
+    File::try_remove(get_lock_path());
 }
 
 } // namespace test_util

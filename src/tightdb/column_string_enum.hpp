@@ -70,11 +70,9 @@ public:
     void set(std::size_t ndx, StringData value);
     void add(StringData value = StringData());
     void insert(std::size_t ndx, StringData value = StringData());
-
-    void insert(std::size_t, std::size_t, bool) TIGHTDB_OVERRIDE;
-    void erase(std::size_t ndx, bool is_last) TIGHTDB_OVERRIDE;
-    void move_last_over(std::size_t, std::size_t) TIGHTDB_OVERRIDE;
-    void clear() TIGHTDB_OVERRIDE;
+    void erase(std::size_t row_ndx);
+    void move_last_over(std::size_t row_ndx);
+    void clear();
 
     std::size_t count(StringData value) const;
     std::size_t find_first(StringData value, std::size_t begin = 0, std::size_t end = npos) const;
@@ -97,7 +95,6 @@ public:
     void set_string(std::size_t, StringData) TIGHTDB_OVERRIDE;
 
     void adjust_keys_ndx_in_parent(int diff) TIGHTDB_NOEXCEPT;
-    void update_from_parent(std::size_t old_baseline) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
     // Search index
     bool has_search_index() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
@@ -112,7 +109,18 @@ public:
     bool compare_string(const AdaptiveStringColumn&) const;
     bool compare_string(const ColumnStringEnum&) const;
 
+    void insert(std::size_t, std::size_t, bool) TIGHTDB_OVERRIDE;
+    void erase(std::size_t, bool) TIGHTDB_OVERRIDE;
+    void move_last_over(std::size_t, std::size_t, bool) TIGHTDB_OVERRIDE;
+    void clear(std::size_t, bool) TIGHTDB_OVERRIDE;
+    void update_from_parent(std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     void refresh_accessor_tree(std::size_t, const Spec&) TIGHTDB_OVERRIDE;
+
+    std::size_t GetKeyNdx(StringData value) const;
+    std::size_t GetKeyNdxOrAdd(StringData value);
+
+    AdaptiveStringColumn& get_keys();
+    const AdaptiveStringColumn& get_keys() const;
 
 #ifdef TIGHTDB_DEBUG
     void Verify() const TIGHTDB_OVERRIDE;
@@ -120,12 +128,6 @@ public:
     void do_dump_node_structure(std::ostream&, int) const TIGHTDB_OVERRIDE;
     void to_dot(std::ostream&, StringData title) const TIGHTDB_OVERRIDE;
 #endif
-
-    std::size_t GetKeyNdx(StringData value) const;
-    std::size_t GetKeyNdxOrAdd(StringData value);
-
-    AdaptiveStringColumn& get_keys();
-    const AdaptiveStringColumn& get_keys() const;
 
 private:
     // Member variables
@@ -146,6 +148,10 @@ private:
     /// \param is_append Must be true if, and only if `row_ndx` is equal to the
     /// size of the column (before insertion).
     void do_insert(std::size_t row_ndx, StringData value, std::size_t num_rows, bool is_append);
+
+    void do_erase(std::size_t row_ndx, bool is_last);
+    void do_move_last_over(std::size_t row_ndx, std::size_t last_row_ndx);
+    void do_clear();
 };
 
 
@@ -177,11 +183,47 @@ inline void ColumnStringEnum::insert(std::size_t row_ndx, StringData value)
     do_insert(row_ndx, value, num_rows, is_append); // Throws
 }
 
+inline void ColumnStringEnum::erase(std::size_t row_ndx)
+{
+    std::size_t last_row_ndx = size() - 1; // Note that size() is slow
+    bool is_last = row_ndx == last_row_ndx;
+    do_erase(row_ndx, is_last); // Throws
+}
+
+inline void ColumnStringEnum::move_last_over(std::size_t row_ndx)
+{
+    std::size_t last_row_ndx = size() - 1; // Note that size() is slow
+    do_move_last_over(row_ndx, last_row_ndx); // Throws
+}
+
+inline void ColumnStringEnum::clear()
+{
+    do_clear(); // Throws
+}
+
 // Overriding virtual method of Column.
 inline void ColumnStringEnum::insert(std::size_t row_ndx, std::size_t num_rows, bool is_append)
 {
     StringData value = StringData();
     do_insert(row_ndx, value, num_rows, is_append); // Throws
+}
+
+// Overriding virtual method of Column.
+inline void ColumnStringEnum::erase(std::size_t row_ndx, bool is_last)
+{
+    do_erase(row_ndx, is_last); // Throws
+}
+
+// Overriding virtual method of Column.
+inline void ColumnStringEnum::move_last_over(std::size_t row_ndx, std::size_t last_row_ndx, bool)
+{
+    do_move_last_over(row_ndx, last_row_ndx); // Throws
+}
+
+// Overriding virtual method of Column.
+inline void ColumnStringEnum::clear(std::size_t, bool)
+{
+    do_clear(); // Throws
 }
 
 inline std::size_t ColumnStringEnum::lower_bound_string(StringData value) const TIGHTDB_NOEXCEPT

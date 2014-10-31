@@ -233,8 +233,9 @@ public:
 /// A simple robust mutex ownership wrapper.
 class RobustLockGuard {
 public:
+    /// \param recover_func See RobustMutex::lock().
     template<class TFunc>
-    RobustLockGuard(RobustMutex&, TFunc func) TIGHTDB_NOEXCEPT;
+    RobustLockGuard(RobustMutex&, TFunc func);
     ~RobustLockGuard() TIGHTDB_NOEXCEPT;
 
 private:
@@ -427,7 +428,7 @@ inline void UniqueLock::unlock() TIGHTDB_NOEXCEPT
 }
 
 template<typename TFunc>
-inline RobustLockGuard::RobustLockGuard(RobustMutex& m, TFunc func) TIGHTDB_NOEXCEPT:
+inline RobustLockGuard::RobustLockGuard(RobustMutex& m, TFunc func) :
     m_mutex(m)
 {
     m_mutex.lock(func);

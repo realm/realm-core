@@ -7,16 +7,6 @@ using namespace std;
 using namespace tightdb;
 using namespace tightdb::util;
 
-
-void ColumnSubtableParent::clear()
-{
-    discard_child_accessors();
-    Column::clear(); // Throws
-    // FIXME: This one is needed because Column::clear() forgets about the leaf
-    // type. A better solution should probably be sought after.
-    m_array->set_type(Array::type_HasRefs);
-}
-
 void ColumnSubtableParent::update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT
 {
     if (!m_array->update_from_parent(old_baseline))
@@ -350,11 +340,14 @@ void ColumnTable::erase(size_t row_ndx, bool is_last)
 }
 
 
-void ColumnTable::move_last_over(size_t target_row_ndx, size_t last_row_ndx)
+void ColumnTable::move_last_over(size_t row_ndx, size_t last_row_ndx,
+                                 bool broken_reciprocal_backlinks)
 {
-    TIGHTDB_ASSERT(target_row_ndx < size());
-    destroy_subtable(target_row_ndx);
-    ColumnSubtableParent::move_last_over(target_row_ndx, last_row_ndx); // Throws
+    TIGHTDB_ASSERT(row_ndx <= last_row_ndx);
+    TIGHTDB_ASSERT(last_row_ndx + 1 == size());
+    destroy_subtable(row_ndx);
+    ColumnSubtableParent::move_last_over(row_ndx, last_row_ndx,
+                                         broken_reciprocal_backlinks); // Throws
 }
 
 
