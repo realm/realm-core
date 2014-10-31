@@ -36,7 +36,7 @@ namespace {
 // Constants controlling the amount of uncommited writes in flight:
 const uint16_t max_write_slots = 100;
 const uint16_t relaxed_sync_threshold = 50;
-
+#define SHAREDINFO_VERSION 1
 
 // The following functions are carefully designed for minimal overhead
 // in case of contention among read transactions. In case of contention,
@@ -399,7 +399,7 @@ SharedGroup::SharedInfo::SharedInfo(DurabilityLevel dlevel):
     balancemutex() // Throws
 #endif
 {
-    version = 0;
+    version = SHAREDINFO_VERSION;
     flags = dlevel; // durability level is fixed from creation
     free_write_slots = 0;
     num_participants = 0;
@@ -512,16 +512,6 @@ void spawn_daemon(const string& file) {}
 #endif
 
 
-inline void micro_sleep(uint_fast64_t microsec_delay)
-{
-#ifdef _WIN32
-    // FIXME: this is not optimal, but it should work
-    Sleep(static_cast<DWORD>(microsec_delay/1000+1));
-#else
-    usleep(useconds_t(microsec_delay));
-#endif
-}
-
 } // anonymous namespace
 
 
@@ -584,8 +574,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
         if (int_cast_with_overflow_detect(m_file.get_size(), info_size))
             throw runtime_error("Lock file too large");
         if (info_size < sizeof (SharedInfo)) {
-                m_file.unlock();
-                continue;
+            continue;
         }
         // Map to memory
         m_file_map.map(m_file, File::access_ReadWrite, sizeof (SharedInfo), File::map_NoSync);
@@ -594,7 +583,6 @@ void SharedGroup::open(const string& path, bool no_create_file,
         // validate initialization complete:
         SharedInfo* info = m_file_map.get_addr();
         if (info->init_complete == 0) {
-            m_file.unlock();
             continue;
         }
 
@@ -659,7 +647,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
             // change the db
             m_readlock.m_version = get_current_version();
 
-            if (info->version != 0)
+            if (info->version != SHAREDINFO_VERSION)
                 throw runtime_error("Unsupported version");
 
             // Durability level cannot be changed at runtime
