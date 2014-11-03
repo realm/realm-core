@@ -311,7 +311,7 @@ public:
 private:
     // number of entries. Access synchronized through put_pos.
     uint_fast32_t entries;
-    Atomic<uint_fast32_t> put_pos; // only changed under lock, but accessed outside lock
+    Atomic<uint32_t> put_pos; // only changed under lock, but accessed outside lock
     uint_fast32_t old_pos; // only accessed during write transactions and under lock
 
     const static int init_readers_size = 32;
@@ -630,15 +630,15 @@ void SharedGroup::open(const string& path, bool no_create_file,
                 else {
                     // the database was just created, no metadata has been written yet.
                     version = 1;
-                }
-                info->init_versioning(top_ref, file_size, version);
-                info->versioning_ready = true;
 #ifdef TIGHTDB_ENABLE_REPLICATION
                 // If replication is enabled, we need to reset log management:
                 Replication* repl = _impl::GroupFriend::get_replication(m_group);
                 if (repl)
                     repl->reset_log_management();
 #endif
+                }
+                info->init_versioning(top_ref, file_size, version);
+                info->versioning_ready = true;
             }
 
 #ifndef _WIN32
@@ -753,13 +753,13 @@ SharedGroup::~SharedGroup() TIGHTDB_NOEXCEPT
                     util::File::remove(db_path.c_str());
                 }
                 catch(...) {} // ignored on purpose.
-            }
 #ifdef TIGHTDB_ENABLE_REPLICATION
-            // If replication is enabled, we need to stop log management:
-            Replication* repl = _impl::GroupFriend::get_replication(m_group);
-            if (repl)
-                repl->stop_logging();
+                // If replication is enabled, we need to stop log management:
+                Replication* repl = _impl::GroupFriend::get_replication(m_group);
+                if (repl)
+                    repl->stop_logging();
 #endif
+            }
         }
     }
     m_file.unlock();
