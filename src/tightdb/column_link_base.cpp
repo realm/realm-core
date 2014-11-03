@@ -6,6 +6,49 @@ using namespace std;
 using namespace tightdb;
 
 
+
+void ColumnLinkBase::erase(size_t, bool)
+{
+    // This operation is not available for unordered tables, and only unordered
+    // tables may have link columns.
+    TIGHTDB_ASSERT(false);
+}
+
+
+void ColumnLinkBase::refresh_accessor_tree(size_t col_ndx, const Spec& spec)
+{
+    Column::refresh_accessor_tree(col_ndx, spec); // Throws
+    ColumnAttr attr = spec.get_column_attr(col_ndx);
+    m_weak_links = (attr & col_attr_StrongLinks) == 0;
+}
+
+
+void ColumnLinkBase::check_cascade_break_backlinks_to(size_t target_table_ndx, size_t target_row_ndx,
+                                                      CascadeState& state)
+{
+    // Stop if the target row was already visited
+    CascadeState::row target_row;
+    target_row.table_ndx = target_table_ndx;
+    target_row.row_ndx   = target_row_ndx;
+    typedef CascadeState::row_set::iterator iter;
+    iter i = ::upper_bound(state.rows.begin(), state.rows.end(), target_row);
+    bool already_seen = i != state.rows.begin() && i[-1] == target_row;
+    if (already_seen)
+        return;
+
+    // Stop if there are any remaining strong links to this row (this scheme
+    // fails to discover orphaned cycles)
+    typedef _impl::TableFriend tf;
+    size_t num_remaining = tf::get_num_strong_backlinks(*m_target_table, target_row_ndx);
+    if (num_remaining > 0)
+        return;
+
+    // Recurse
+    state.rows.insert(i, target_row); // Throws
+    tf::cascade_break_backlinks_to(*m_target_table, target_row_ndx, state); // Throws
+}
+
+
 #ifdef TIGHTDB_DEBUG
 
 void ColumnLinkBase::Verify(const Table& table, size_t col_ndx) const

@@ -40,6 +40,11 @@ enum DataType {
     type_LinkList   = 13
 };
 
+/// See Descriptor::set_link_type().
+enum LinkType {
+    link_Strong,
+    link_Weak
+};
 
 } // namespace tightdb
 

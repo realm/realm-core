@@ -46,11 +46,9 @@ public:
     void add(BinaryData value = BinaryData());
     void set(std::size_t ndx, BinaryData value, bool add_zero_term = false);
     void insert(std::size_t ndx, BinaryData value = BinaryData());
-
-    void insert(std::size_t, std::size_t, bool) TIGHTDB_OVERRIDE;
-    void erase(std::size_t ndx, bool is_last) TIGHTDB_OVERRIDE;
-    void clear() TIGHTDB_OVERRIDE;
-    void move_last_over(std::size_t, std::size_t) TIGHTDB_OVERRIDE;
+    void erase(std::size_t row_ndx);
+    void move_last_over(std::size_t row_ndx);
+    void clear();
 
     // Requires that the specified entry was inserted as StringData.
     StringData get_string(std::size_t ndx) const TIGHTDB_NOEXCEPT;
@@ -70,6 +68,11 @@ public:
     ref_type write(std::size_t, std::size_t, std::size_t,
                    _impl::OutputStream&) const TIGHTDB_OVERRIDE;
 
+    void insert(std::size_t, std::size_t, bool) TIGHTDB_OVERRIDE;
+    void erase(std::size_t, bool) TIGHTDB_OVERRIDE;
+    void move_last_over(std::size_t, std::size_t, bool) TIGHTDB_OVERRIDE;
+    void clear(std::size_t, bool) TIGHTDB_OVERRIDE;
+    void update_from_parent(std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     void refresh_accessor_tree(std::size_t, const Spec&) TIGHTDB_OVERRIDE;
 
 #ifdef TIGHTDB_DEBUG
@@ -77,7 +80,6 @@ public:
     void to_dot(std::ostream&, StringData title) const TIGHTDB_OVERRIDE;
     void do_dump_node_structure(std::ostream&, int) const TIGHTDB_OVERRIDE;
 #endif
-    void update_from_parent(std::size_t old_baseline) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
 private:
     std::size_t do_get_size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return size(); }
@@ -98,6 +100,10 @@ private:
     class EraseLeafElem;
     class CreateHandler;
     class SliceHandler;
+
+    void do_erase(std::size_t row_ndx, bool is_last);
+    void do_move_last_over(std::size_t row_ndx, std::size_t last_row_ndx);
+    void do_clear();
 
     /// Root must be a leaf. Upgrades the root leaf if
     /// necessary. Returns true if, and only if the root is a 'big
@@ -215,6 +221,24 @@ inline void ColumnBinary::insert(std::size_t row_ndx, BinaryData value)
     do_insert(row_ndx_2, value, add_zero_term, num_rows); // Throws
 }
 
+inline void ColumnBinary::erase(std::size_t row_ndx)
+{
+    std::size_t last_row_ndx = size() - 1; // Note that size() is slow
+    bool is_last = row_ndx == last_row_ndx;
+    do_erase(row_ndx, is_last); // Throws
+}
+
+inline void ColumnBinary::move_last_over(std::size_t row_ndx)
+{
+    std::size_t last_row_ndx = size() - 1; // Note that size() is slow
+    do_move_last_over(row_ndx, last_row_ndx); // Throws
+}
+
+inline void ColumnBinary::clear()
+{
+    do_clear(); // Throws
+}
+
 // Implementing pure virtual method of ColumnBase.
 inline void ColumnBinary::insert(std::size_t row_ndx, std::size_t num_rows, bool is_append)
 {
@@ -222,6 +246,24 @@ inline void ColumnBinary::insert(std::size_t row_ndx, std::size_t num_rows, bool
     BinaryData value = BinaryData();
     bool add_zero_term = false;
     do_insert(row_ndx_2, value, add_zero_term, num_rows); // Throws
+}
+
+// Implementing pure virtual method of ColumnBase.
+inline void ColumnBinary::erase(std::size_t row_ndx, bool is_last)
+{
+    do_erase(row_ndx, is_last); // Throws
+}
+
+// Implementing pure virtual method of ColumnBase.
+inline void ColumnBinary::move_last_over(std::size_t row_ndx, std::size_t last_row_ndx, bool)
+{
+    do_move_last_over(row_ndx, last_row_ndx); // Throws
+}
+
+// Implementing pure virtual method of ColumnBase.
+inline void ColumnBinary::clear(std::size_t, bool)
+{
+    do_clear(); // Throws
 }
 
 inline void ColumnBinary::add_string(StringData value)

@@ -81,6 +81,7 @@ public:
     {
         return m_path + ".lock";
     }
+    ~SharedGroupTestPathGuard();
 };
 
 } // namespace test_util
