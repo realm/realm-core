@@ -338,15 +338,20 @@ void AESCryptor::read(int fd, off_t pos, char* dst, size_t size) {
     lseek(fd, real_offset(pos), SEEK_SET);
     ssize_t bytes_read = ::read(fd, buffer, pad_to_aes_block_size(size));
 
-    crypt(mode_Decrypt, pos, dst, buffer, bytes_read,
-          memcmp(buffer, iv.hash1, 4) == 0 ? iv.iv1 : iv.iv2);
+    if (memcmp(buffer, iv.hash1, 4) != 0) {
+        // we had an interrupted write and the IV was bumped but the data not
+        // updated, so un-bump the IV
+        memcpy(iv.iv1, iv.iv2, 8);
+        lseek(fd, iv_table_pos(pos), SEEK_SET);
+        ::write(fd, &iv, sizeof(iv));
+    }
+
+    crypt(mode_Decrypt, pos, dst, buffer, bytes_read, iv.iv1);
 }
 
 void AESCryptor::write(int fd, off_t pos, const char* src, size_t size) {
     iv_table iv = read_iv_table(fd, pos);
 
-    // FIXME: shouldn't bump iv1 to iv2 if iv2 is the active one (i.e. the case
-    // of two failures in a row between writing IV and writing data)
     memcpy(iv.iv2, iv.iv1, 8);
     size_t bytes;
     char buffer[page_size];
