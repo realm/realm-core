@@ -167,15 +167,15 @@ public:
     // as part of write transactions, where mutual exclusion is assured by the
     // write mutex.
     struct ReadCount {
-        uint_fast64_t version;
-        uint_fast64_t filesize;
-        uint_fast64_t current_top;
+        uint64_t version;
+        uint64_t filesize;
+        uint64_t current_top;
         // The count field acts as synchronization point for accesses to the above
         // fields. A succesfull inc implies acquire wrt memory consistency.
         // Release is triggered by explicitly storing into count whenever a
         // new entry has been initialized.
-        mutable Atomic<uint_fast32_t> count;
-        uint_fast32_t next;
+        mutable Atomic<uint32_t> count;
+        uint32_t next;
     };
 
     Ringbuffer() TIGHTDB_NOEXCEPT
@@ -370,12 +370,12 @@ struct SharedGroup::SharedInfo
     Ringbuffer readers;
     SharedInfo(DurabilityLevel);
     ~SharedInfo() TIGHTDB_NOEXCEPT {}
-    void init_versioning(ref_type top_ref, size_t file_size)
+    void init_versioning(ref_type top_ref, size_t file_size, uint64_t initial_version)
     {
         // Create our first versioning entry:
         Ringbuffer::ReadCount& r = readers.get_next();
         r.filesize = file_size;
-        r.version = 1;
+        r.version = 1; // initial_version;
         r.current_top = top_ref;
         readers.use_next();
     }
@@ -610,7 +610,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
             ref_type top_ref = alloc.attach_file(path, is_shared, read_only, no_create, skip_validate); // Throws
             size_t file_size = alloc.get_baseline();
             if (info->versioning_ready == false) {
-                info->init_versioning(top_ref, file_size);
+                info->init_versioning(top_ref, file_size, 1);
                 info->versioning_ready = true;
             }
 
