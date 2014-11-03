@@ -36,7 +36,7 @@ namespace {
 // Constants controlling the amount of uncommited writes in flight:
 const uint16_t max_write_slots = 100;
 const uint16_t relaxed_sync_threshold = 50;
-
+#define SHAREDINFO_VERSION 1
 
 // The following functions are carefully designed for minimal overhead
 // in case of contention among read transactions. In case of contention,
@@ -332,7 +332,7 @@ struct SharedGroup::SharedInfo
 {
     // indicates lock file has valid content, implying that all the following member
     // variables have been initialized. All member variables, except for the Ringbuffer,
-    // are protected by the write mutex, except during initialization, where access is
+    // are protected by 'controlmutex', except during initialization, where access is
     // guarded by the exclusive file lock.
     bool init_complete;
 
@@ -349,12 +349,17 @@ struct SharedGroup::SharedInfo
     // Cleared by the daemon when it decides to exit.
     bool daemon_ready;
 
+    // Set when the database and the .lock file is in sync with respect to versioning
+    // (and a few other metadata)
+    bool versioning_ready;
+
     uint16_t version;
     uint16_t flags;
     uint16_t free_write_slots;
 
     RobustMutex writemutex;
     RobustMutex balancemutex;
+    RobustMutex controlmutex;
 #ifndef _WIN32
     // FIXME: windows pthread support for condvar not ready
     CondVar room_to_write;
@@ -363,8 +368,17 @@ struct SharedGroup::SharedInfo
 #endif
     // IMPORTANT: The ringbuffer MUST be the last field in SharedInfo - see above.
     Ringbuffer readers;
-    SharedInfo(ref_type top_ref, size_t file_size, DurabilityLevel);
+    SharedInfo(DurabilityLevel);
     ~SharedInfo() TIGHTDB_NOEXCEPT {}
+    void init_versioning(ref_type top_ref, size_t file_size)
+    {
+        // Create our first versioning entry:
+        Ringbuffer::ReadCount& r = readers.get_next();
+        r.filesize = file_size;
+        r.version = 1;
+        r.current_top = top_ref;
+        readers.use_next();
+    }
     uint_fast64_t get_current_version_unchecked() const
     {
         return readers.get_last().version;
@@ -372,10 +386,11 @@ struct SharedGroup::SharedInfo
 };
 
 
-SharedGroup::SharedInfo::SharedInfo(ref_type top_ref, size_t file_size, DurabilityLevel dlevel):
+SharedGroup::SharedInfo::SharedInfo(DurabilityLevel dlevel):
 #ifndef _WIN32
     writemutex(), // Throws
     balancemutex(), // Throws
+    controlmutex(), // Throws
     room_to_write(CondVar::process_shared_tag()), // Throws
     work_to_do(CondVar::process_shared_tag()), // Throws
     daemon_becomes_ready(CondVar::process_shared_tag()) // Throws
@@ -384,18 +399,13 @@ SharedGroup::SharedInfo::SharedInfo(ref_type top_ref, size_t file_size, Durabili
     balancemutex() // Throws
 #endif
 {
-    version = 0;
+    version = SHAREDINFO_VERSION;
     flags = dlevel; // durability level is fixed from creation
-    // Create our first versioning entry:
-    Ringbuffer::ReadCount& r = readers.get_next();
-    r.filesize = file_size;
-    r.version = 1;
-    r.current_top = top_ref;
-    readers.use_next();
     free_write_slots = 0;
     num_participants = 0;
     daemon_started = false;
     daemon_ready = false;
+    versioning_ready = false;
     init_complete = 1;
 }
 
@@ -502,16 +512,6 @@ void spawn_daemon(const string& file) {}
 #endif
 
 
-inline void micro_sleep(uint_fast64_t microsec_delay)
-{
-#ifdef _WIN32
-    // FIXME: this is not optimal, but it should work
-    Sleep(static_cast<DWORD>(microsec_delay/1000+1));
-#else
-    usleep(useconds_t(microsec_delay));
-#endif
-}
-
 } // anonymous namespace
 
 
@@ -547,31 +547,18 @@ void SharedGroup::open(const string& path, bool no_create_file,
         File::CloseGuard fcg(m_file);
         if (m_file.try_lock_exclusive()) {
 
+            File::UnlockGuard ulg(m_file);
+
             // We're alone in the world, and it is Ok to initialize the file:
             char empty_buf[sizeof (SharedInfo)];
             fill(empty_buf, empty_buf+sizeof(SharedInfo), 0);
             m_file.write(empty_buf, sizeof(SharedInfo));
 
-            // If we are the first we may have to create the database file
-            // but we invalidate the internals right after to avoid conflicting
-            // with old state when starting transactions
-            bool is_shared = true;
-            bool read_only = false;
-            bool skip_validate = false;
-            ref_type top_ref;
-            top_ref = alloc.attach_file(path, is_shared, read_only, no_create_file,
-                                        skip_validate); // Throws
-
-            // Complete initialization of shared info in the file:
+            // Complete initialization of shared info via the memory mapping:
             m_file_map.map(m_file, File::access_ReadWrite, sizeof (SharedInfo), File::map_NoSync);
             File::UnmapGuard fug_1(m_file_map);
-            size_t file_size = alloc.get_baseline();
             SharedInfo* info = m_file_map.get_addr();
-            new (info) SharedInfo(top_ref, file_size, dlevel); // Throws
-            alloc.detach();
-
-            // unlock the file
-            m_file.unlock(); // Just to make it explicit, that we are unlocking
+            new (info) SharedInfo(dlevel); // Throws
         }
 
         // we hold the shared lock from here until we close the file!
@@ -587,9 +574,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
         if (int_cast_with_overflow_detect(m_file.get_size(), info_size))
             throw runtime_error("Lock file too large");
         if (info_size < sizeof (SharedInfo)) {
-                m_file.unlock();
-                micro_sleep(1000);
-                continue;
+            continue;
         }
         // Map to memory
         m_file_map.map(m_file, File::access_ReadWrite, sizeof (SharedInfo), File::map_NoSync);
@@ -598,23 +583,36 @@ void SharedGroup::open(const string& path, bool no_create_file,
         // validate initialization complete:
         SharedInfo* info = m_file_map.get_addr();
         if (info->init_complete == 0) {
-            m_file.unlock();
-            micro_sleep(1000);
             continue;
         }
 
         // OK! lock file appears valid. We can now continue operations under the protection
-        // of the write mutex. The write mutex protects the following activities:
+        // of the controlmutex. The controlmutex protects the following activities:
         // - attachment of the database file
         // - start of the async daemon
         // - stop of the async daemon
         // - SharedGroup joining/leaving the sharing scheme
-        // - write transactions (which gave the mutex its name)
         {
-            RobustLockGuard lock(info->writemutex, &recover_from_dead_write_transact); // Throws
+            RobustLockGuard lock(info->controlmutex, &recover_from_dead_write_transact); // Throws
             // Even though we checked init_complete before grabbing the write mutex,
             // we do not need to check it again, because it is only changed under
             // an exclusive file lock, and we checked it under a shared file lock
+
+            // proceed to initialize versioning and other metadata information related to
+            // the database. Also create the database if we're first to get here.
+            bool is_shared = true;
+            bool read_only = false;
+            bool no_create = true;
+            bool skip_validate = false;
+            if (info->versioning_ready == false) {
+                no_create = no_create_file;
+            }
+            ref_type top_ref = alloc.attach_file(path, is_shared, read_only, no_create, skip_validate); // Throws
+            size_t file_size = alloc.get_baseline();
+            if (info->versioning_ready == false) {
+                info->init_versioning(top_ref, file_size);
+                info->versioning_ready = true;
+            }
 
 #ifndef _WIN32
             // In async mode, we need to make sure the daemon is running and ready:
@@ -626,7 +624,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
                     }
                     // FIXME: It might be more robust to sleep a little, then restart the loop
                     // cerr << "Waiting for daemon" << endl;
-                    info->daemon_becomes_ready.wait(info->writemutex,
+                    info->daemon_becomes_ready.wait(info->controlmutex,
                                                     &recover_from_dead_write_transact,
                                                     0);
                     // cerr << " - notified" << endl;
@@ -649,24 +647,13 @@ void SharedGroup::open(const string& path, bool no_create_file,
             // change the db
             m_readlock.m_version = get_current_version();
 
-            if (info->version != 0)
+            if (info->version != SHAREDINFO_VERSION)
                 throw runtime_error("Unsupported version");
 
             // Durability level cannot be changed at runtime
             if (info->flags != dlevel)
                 throw runtime_error("Inconsistent durability level");
 
-            // Setup the group, but leave it in invalid state
-            bool is_shared = true;
-            bool read_only = false;
-            bool no_create = true;
-            bool skip_validate = true; // To avoid race conditions
-            try {
-                alloc.attach_file(path, is_shared, read_only, no_create, skip_validate); // Throws
-            }
-            catch (File::NotFound) {
-                throw LockFileButNoData(path);
-            }
             // make our presence noted:
             ++info->num_participants;
 
@@ -724,7 +711,7 @@ SharedGroup::~SharedGroup() TIGHTDB_NOEXCEPT
 
     SharedInfo* info = m_file_map.get_addr();
     {
-        RobustLockGuard lock(info->writemutex, recover_from_dead_write_transact);
+        RobustLockGuard lock(info->controlmutex, recover_from_dead_write_transact);
         --info->num_participants;
         // cerr << "closing" << endl;
         if (info->num_participants == 0) {
@@ -747,43 +734,6 @@ SharedGroup::~SharedGroup() TIGHTDB_NOEXCEPT
     m_file.close();
     m_file_map.unmap();
     m_reader_map.unmap();
-}
-
-bool SharedGroup::pin_read_transactions()
-{
-    if (m_transactions_are_pinned) {
-        throw runtime_error("transactions are already pinned, cannot pin again");
-    }
-    if (m_transact_stage != transact_Ready) {
-        throw runtime_error("pinning transactions not allowed inside a transaction");
-    }
-    bool same_as_before;
-    grab_latest_readlock(m_readlock, same_as_before);
-
-    // Prepare the group for a new transaction. A zero top ref means
-    // that the file has just been created.
-    try {
-        m_group.init_for_transact(m_readlock.m_top_ref, m_readlock.m_file_size); // Throws
-    }
-    catch (...) {
-        end_read();
-        throw;
-    }
-    m_group.detach_but_retain_data();
-    m_transactions_are_pinned = true;
-    return !same_as_before;
-}
-
-void SharedGroup::unpin_read_transactions()
-{
-    if (! m_transactions_are_pinned) {
-        throw runtime_error("transactions are not pinned, cannot unpin");
-    }
-    if (m_transact_stage != transact_Ready) {
-        throw runtime_error("unpinning transactions not allowed inside a transaction");
-    }
-    m_transactions_are_pinned = false;
-    release_readlock(m_readlock);
 }
 
 bool SharedGroup::has_changed()
@@ -810,7 +760,7 @@ void SharedGroup::do_async_commits()
     grab_latest_readlock(m_readlock, dummy);
     // we must treat version and version_index the same way:
     {
-        RobustLockGuard lock(info->writemutex, &recover_from_dead_write_transact);
+        RobustLockGuard lock(info->controlmutex, &recover_from_dead_write_transact);
         info->free_write_slots = max_write_slots;
         info->daemon_ready = true;
         info->daemon_becomes_ready.notify_all();
@@ -831,7 +781,7 @@ void SharedGroup::do_async_commits()
         ReadLockInfo next_readlock = m_readlock;
         {
             // detect if we're the last "client", and if so, shutdown (must be under lock):
-            RobustLockGuard lock(info->writemutex, &recover_from_dead_write_transact);
+            RobustLockGuard lock(info->controlmutex, &recover_from_dead_write_transact);
             grab_latest_readlock(next_readlock, is_same);
             if (is_same && (shutdown || info->num_participants == 1)) {
 #ifdef TIGHTDB_ENABLE_LOGFILE
@@ -928,26 +878,20 @@ const Group& SharedGroup::begin_read()
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Ready);
 
-    if (m_transactions_are_pinned) {
+    bool same_version_as_before;
+    grab_latest_readlock(m_readlock, same_version_as_before);
+    if (same_version_as_before && m_group.may_reattach_if_same_version()) {
         m_group.reattach_from_retained_data();
     }
     else {
-
-        bool same_version_as_before;
-        grab_latest_readlock(m_readlock, same_version_as_before);
-        if (same_version_as_before && m_group.may_reattach_if_same_version()) {
-            m_group.reattach_from_retained_data();
+        // Prepare the group for a new transaction. A zero top ref
+        // means that the file has just been created.
+        try {
+            m_group.init_for_transact(m_readlock.m_top_ref, m_readlock.m_file_size); // Throws
         }
-        else {
-            // Prepare the group for a new transaction. A zero top ref
-            // means that the file has just been created.
-            try {
-                m_group.init_for_transact(m_readlock.m_top_ref, m_readlock.m_file_size); // Throws
-            }
-            catch (...) {
-                end_read();
-                throw;
-            }
+        catch (...) {
+            end_read();
+            throw;
         }
     }
     m_transact_stage = transact_Reading;
@@ -972,9 +916,7 @@ void SharedGroup::end_read() TIGHTDB_NOEXCEPT
     TIGHTDB_ASSERT(m_transact_stage == transact_Reading);
     TIGHTDB_ASSERT(m_readlock.m_version != numeric_limits<size_t>::max());
 
-    if (! m_transactions_are_pinned) {
-        release_readlock(m_readlock);
-    }
+    release_readlock(m_readlock);
 
     // The read may have allocated some temporary state
     m_group.detach_but_retain_data();
@@ -986,9 +928,6 @@ void SharedGroup::end_read() TIGHTDB_NOEXCEPT
 void SharedGroup::promote_to_write(TransactLogRegistry& write_logs)
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Reading);
-
-    if (m_transactions_are_pinned)
-        throw runtime_error("Write transactions are not allowed while transactions are pinned");
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     if (Replication* repl = m_group.get_replication()) {
@@ -1017,7 +956,6 @@ void SharedGroup::promote_to_write(TransactLogRegistry& write_logs)
 void SharedGroup::advance_read(TransactLogRegistry& log_registry)
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Reading);
-    TIGHTDB_ASSERT(!m_transactions_are_pinned);
 
     ReadLockInfo old_readlock = m_readlock;
     bool same_as_before;
@@ -1061,9 +999,6 @@ void SharedGroup::advance_read(TransactLogRegistry& log_registry)
 Group& SharedGroup::begin_write()
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Ready);
-
-    if (m_transactions_are_pinned)
-        throw runtime_error("Write transactions are not allowed while transactions are pinned");
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     if (Replication* repl = m_group.get_replication())
