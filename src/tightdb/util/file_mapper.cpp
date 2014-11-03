@@ -674,11 +674,19 @@ void msync(void* addr, size_t size) {
 }
 
 File::SizeType encrypted_size_to_data_size(File::SizeType size) {
+#ifdef TIGHTDB_ENABLE_ENCRYPTION
     return fake_offset(size);
+#else
+    return size;
+#endif
 }
 
 File::SizeType data_size_to_encrypted_size(File::SizeType size) {
+#ifdef TIGHTDB_ENABLE_ENCRYPTION
     return real_offset(size);
+#else
+    return size;
+#endif
 }
 
 }
