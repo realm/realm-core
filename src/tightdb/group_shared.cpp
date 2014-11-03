@@ -375,7 +375,7 @@ struct SharedGroup::SharedInfo
         // Create our first versioning entry:
         Ringbuffer::ReadCount& r = readers.get_next();
         r.filesize = file_size;
-        r.version = 1; // initial_version;
+        r.version = initial_version;
         r.current_top = top_ref;
         readers.use_next();
     }
@@ -609,8 +609,27 @@ void SharedGroup::open(const string& path, bool no_create_file,
             }
             ref_type top_ref = alloc.attach_file(path, is_shared, read_only, no_create, skip_validate); // Throws
             size_t file_size = alloc.get_baseline();
+
+            // determine initial version
+            uint_fast64_t version;
             if (info->versioning_ready == false) {
-                info->init_versioning(top_ref, file_size, 1);
+                Array top(alloc);
+                if (top_ref) {
+                    top.init_from_ref(top_ref);
+                    if (top.size() <= 5) {
+                        // the database wasn't written by shared group, so no versioning info
+                        version = 1;
+                    }
+                    else {
+                        // the database was written by shared group, so it has versioning info
+                        version = top.get(6);
+                    }
+                }
+                else {
+                    // the database was just created, no metadata has been written yet.
+                    version = 1;
+                }
+                info->init_versioning(top_ref, file_size, version);
                 info->versioning_ready = true;
             }
 

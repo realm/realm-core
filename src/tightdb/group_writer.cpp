@@ -146,7 +146,7 @@ size_t GroupWriter::write_group()
     if (is_shared) {
         top.set(5, free_versions_pos); // Throws
         // Seventh slot holds the database version (a.k.a. transaction number)
-        top.set(6, m_current_version); // Throws
+        top.set(6, m_current_version * 2 +1); // Throws
     }
 
     // Get final sizes
