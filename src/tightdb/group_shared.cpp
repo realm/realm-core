@@ -736,43 +736,6 @@ SharedGroup::~SharedGroup() TIGHTDB_NOEXCEPT
     m_reader_map.unmap();
 }
 
-bool SharedGroup::pin_read_transactions()
-{
-    if (m_transactions_are_pinned) {
-        throw runtime_error("transactions are already pinned, cannot pin again");
-    }
-    if (m_transact_stage != transact_Ready) {
-        throw runtime_error("pinning transactions not allowed inside a transaction");
-    }
-    bool same_as_before;
-    grab_latest_readlock(m_readlock, same_as_before);
-
-    // Prepare the group for a new transaction. A zero top ref means
-    // that the file has just been created.
-    try {
-        m_group.init_for_transact(m_readlock.m_top_ref, m_readlock.m_file_size); // Throws
-    }
-    catch (...) {
-        end_read();
-        throw;
-    }
-    m_group.detach_but_retain_data();
-    m_transactions_are_pinned = true;
-    return !same_as_before;
-}
-
-void SharedGroup::unpin_read_transactions()
-{
-    if (! m_transactions_are_pinned) {
-        throw runtime_error("transactions are not pinned, cannot unpin");
-    }
-    if (m_transact_stage != transact_Ready) {
-        throw runtime_error("unpinning transactions not allowed inside a transaction");
-    }
-    m_transactions_are_pinned = false;
-    release_readlock(m_readlock);
-}
-
 bool SharedGroup::has_changed()
 {
     bool changed = m_readlock.m_version != get_current_version();
@@ -915,26 +878,20 @@ const Group& SharedGroup::begin_read()
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Ready);
 
-    if (m_transactions_are_pinned) {
+    bool same_version_as_before;
+    grab_latest_readlock(m_readlock, same_version_as_before);
+    if (same_version_as_before && m_group.may_reattach_if_same_version()) {
         m_group.reattach_from_retained_data();
     }
     else {
-
-        bool same_version_as_before;
-        grab_latest_readlock(m_readlock, same_version_as_before);
-        if (same_version_as_before && m_group.may_reattach_if_same_version()) {
-            m_group.reattach_from_retained_data();
+        // Prepare the group for a new transaction. A zero top ref
+        // means that the file has just been created.
+        try {
+            m_group.init_for_transact(m_readlock.m_top_ref, m_readlock.m_file_size); // Throws
         }
-        else {
-            // Prepare the group for a new transaction. A zero top ref
-            // means that the file has just been created.
-            try {
-                m_group.init_for_transact(m_readlock.m_top_ref, m_readlock.m_file_size); // Throws
-            }
-            catch (...) {
-                end_read();
-                throw;
-            }
+        catch (...) {
+            end_read();
+            throw;
         }
     }
     m_transact_stage = transact_Reading;
@@ -959,9 +916,7 @@ void SharedGroup::end_read() TIGHTDB_NOEXCEPT
     TIGHTDB_ASSERT(m_transact_stage == transact_Reading);
     TIGHTDB_ASSERT(m_readlock.m_version != numeric_limits<size_t>::max());
 
-    if (! m_transactions_are_pinned) {
-        release_readlock(m_readlock);
-    }
+    release_readlock(m_readlock);
 
     // The read may have allocated some temporary state
     m_group.detach_but_retain_data();
@@ -973,9 +928,6 @@ void SharedGroup::end_read() TIGHTDB_NOEXCEPT
 void SharedGroup::promote_to_write(TransactLogRegistry& write_logs)
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Reading);
-
-    if (m_transactions_are_pinned)
-        throw runtime_error("Write transactions are not allowed while transactions are pinned");
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     if (Replication* repl = m_group.get_replication()) {
@@ -1004,7 +956,6 @@ void SharedGroup::promote_to_write(TransactLogRegistry& write_logs)
 void SharedGroup::advance_read(TransactLogRegistry& log_registry)
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Reading);
-    TIGHTDB_ASSERT(!m_transactions_are_pinned);
 
     ReadLockInfo old_readlock = m_readlock;
     bool same_as_before;
@@ -1048,9 +999,6 @@ void SharedGroup::advance_read(TransactLogRegistry& log_registry)
 Group& SharedGroup::begin_write()
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Ready);
-
-    if (m_transactions_are_pinned)
-        throw runtime_error("Write transactions are not allowed while transactions are pinned");
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     if (Replication* repl = m_group.get_replication())

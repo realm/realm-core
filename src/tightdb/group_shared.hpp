@@ -239,39 +239,6 @@ public:
     // End the current write transaction. All accessors are detached.
     void rollback() TIGHTDB_NOEXCEPT;
 
-    // Pinned transactions:
-
-    // Shared group can work with either pinned or unpinned read transactions.
-    // - With unpinned read transactions, each new read transaction will refer
-    //   to the latest database state.
-    // - With pinned read transactions, each new read transaction will refer
-    //   to the database state as it was, when pin_read_transactions() was called,
-    //   ignoring further changes until shared group is either unpinned or
-    //   pinned again to a new state.
-    // Default is to use unpinned read transactions.
-    //
-    // You can only pin read transactions. You must unpin before starting a
-    // write transaction.
-    //
-    // Note that a write transaction can proceed via one SharedGroup, while
-    // read transactions are pinned via another SharedGroup that is attached
-    // to the same database. It is important to understand that each such
-    // write transaction will allocate resources (memory and/or disk), which
-    // will not be freed until the pinning is ended. For this reason, one should
-    // be careful to avoid long lived pinnings on databases that also see many
-    // write transactions.
-
-    // Pin subsequent read transactions to the current state. It is illegal
-    // to use pin_read_transactions() while a transaction is in progress. Returns true,
-    // if transactions are pinned to a new version of the database, false
-    // if there are no changes.
-    bool pin_read_transactions();
-
-    // Unpin, i.e. allow subsequent read transactions to refer to whatever
-    // is the current state when they are initiated. It is illegal to use
-    // unpin_read_transactions() while a transaction is in progress.
-    void unpin_read_transactions();
-
 #ifdef TIGHTDB_DEBUG
     void test_ringbuf();
 #endif
@@ -323,7 +290,6 @@ private:
         transact_Writing
     };
     TransactStage m_transact_stage;
-    bool m_transactions_are_pinned;
     struct ReadCount;
 
     // Ring buffer managment
@@ -354,8 +320,8 @@ private:
     void do_begin_write();
     void do_commit();
 
-    // Must be called only by someone that has a lock on the write
-    // mutex.
+    // return the current version of the database - note, this is not necessarily
+    // the version seen by any currently open transactions.
     uint_fast64_t get_current_version();
 
     // make sure the given index is within the currently mapped area.
@@ -541,15 +507,13 @@ private:
 // Implementation:
 
 inline SharedGroup::SharedGroup(const std::string& file, bool no_create, DurabilityLevel dlevel):
-    m_group(Group::shared_tag()),
-    m_transactions_are_pinned(false)
+    m_group(Group::shared_tag())
 {
     open(file, no_create, dlevel);
 }
 
 inline SharedGroup::SharedGroup(unattached_tag) TIGHTDB_NOEXCEPT:
-    m_group(Group::shared_tag()),
-    m_transactions_are_pinned(false)
+    m_group(Group::shared_tag())
 {
 }
 
@@ -560,8 +524,7 @@ inline bool SharedGroup::is_attached() const TIGHTDB_NOEXCEPT
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
 inline SharedGroup::SharedGroup(Replication& repl, DurabilityLevel dlevel):
-    m_group(Group::shared_tag()),
-    m_transactions_are_pinned(false)
+    m_group(Group::shared_tag())
 {
     open(repl, dlevel);
 }
