@@ -462,14 +462,22 @@ void EncryptedFileMapping::flush_page(size_t i) {
 }
 
 void EncryptedFileMapping::read_page(size_t i) {
-    for (auto m : mappings_by_file) {
-        if (same_file(m) && i < m.mapping->m_page_count)
-            m.mapping->flush_page(i);
-    }
-
+    bool has_copied = false;
     auto addr = page_addr(i);
     mprotect(addr, page_size, PROT_READ | PROT_WRITE);
-    m_cryptor.read(m_fd, i * page_size, (char*)addr, actual_page_size(i));
+
+    for (auto m : mappings_by_file) {
+        if (same_file(m) && i < m.mapping->m_page_count) {
+            m.mapping->flush_page(i);
+            if (!has_copied && m.mapping->m_read_pages[i] && actual_page_size(i) == m.mapping->actual_page_size(i)) {
+                memcpy(addr, m.mapping->page_addr(i), page_size);
+                has_copied = true;
+            }
+        }
+    }
+
+    if (!has_copied)
+        m_cryptor.read(m_fd, i * page_size, (char*)addr, actual_page_size(i));
 
     mark_readable(i);
 }
