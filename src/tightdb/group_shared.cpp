@@ -23,7 +23,7 @@
 #  include <windows.h>
 #endif
 
-//#define TIGHTDB_ENABLE_LOGFILE
+#define TIGHTDB_ENABLE_LOGFILE
 
 
 using namespace std;
@@ -785,7 +785,7 @@ void SharedGroup::do_async_commits()
     // NO client are allowed to proceed through open and update current_version
     // until they see 'daemon_running == true'
     // As we haven't set daemon_running yet, the following must hold:
-    TIGHTDB_ASSERT(get_current_version() == 0 || get_current_version() == 1);
+    //    TIGHTDB_ASSERT(get_current_version() == 0 || get_current_version() == 1);
 
     // We always want to keep a read lock on the last version
     // that was commited to disk, to protect it against being
@@ -815,6 +815,7 @@ void SharedGroup::do_async_commits()
         ReadLockInfo next_readlock = m_readlock;
         {
             // detect if we're the last "client", and if so, shutdown (must be under lock):
+            RobustLockGuard lock2(info->writemutex, &recover_from_dead_write_transact);
             RobustLockGuard lock(info->controlmutex, &recover_from_dead_write_transact);
             grab_latest_readlock(next_readlock, is_same);
             if (is_same && (shutdown || info->num_participants == 1)) {
