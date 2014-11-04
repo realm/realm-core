@@ -101,7 +101,7 @@ TEST(LinkList_MissingDeepCopy)
     c[10000000 - 1] = '!';
     Query q = table2->link(col_link2).column<String>(1) == StringData(&c[10000000 - 1], 1);
 
-    delete c;
+    delete[] c;
     // If this segfaults, Query hasn't made its own deep copy of "!"
     size_t m = q.find();
     CHECK_EQUAL(0, m);

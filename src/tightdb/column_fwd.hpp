@@ -34,6 +34,7 @@ class ColumnBinary;
 class ColumnTable;
 class ColumnMixed;
 class ColumnLink;
+class ColumnLinkList;
 
 } // namespace tightdb
 

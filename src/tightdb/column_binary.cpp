@@ -59,39 +59,6 @@ ColumnBinary::~ColumnBinary() TIGHTDB_NOEXCEPT
 }
 
 
-void ColumnBinary::clear()
-{
-    bool root_is_leaf = !m_array->is_inner_bptree_node();
-    if (root_is_leaf) {
-        bool is_big = m_array->get_context_flag();
-        if (!is_big) {
-            // Small blobs root leaf
-            ArrayBinary* leaf = static_cast<ArrayBinary*>(m_array);
-            leaf->clear(); // Throws
-            return;
-        }
-        // Big blobs root leaf
-        ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array);
-        leaf->clear(); // Throws
-        return;
-    }
-
-    // Non-leaf root - revert to small blobs leaf
-    Allocator& alloc = m_array->get_alloc();
-    UniquePtr<ArrayBinary> array;
-    array.reset(new ArrayBinary(alloc)); // Throws
-    array->create(); // Throws
-    array->set_parent(m_array->get_parent(), m_array->get_ndx_in_parent());
-    array->update_parent(); // Throws
-
-    // Remove original node
-    m_array->destroy_deep();
-    delete m_array;
-
-    m_array = array.release();
-}
-
-
 namespace {
 
 struct SetLeafElem: Array::UpdateHandler {
@@ -153,134 +120,6 @@ void ColumnBinary::set(size_t ndx, BinaryData value, bool add_zero_term)
     // Non-leaf root
     SetLeafElem set_leaf_elem(m_array->get_alloc(), value, add_zero_term);
     m_array->update_bptree_elem(ndx, set_leaf_elem); // Throws
-}
-
-
-class ColumnBinary::EraseLeafElem: public ColumnBase::EraseHandlerBase {
-public:
-    EraseLeafElem(ColumnBinary& column) TIGHTDB_NOEXCEPT:
-        EraseHandlerBase(column) {}
-    bool erase_leaf_elem(MemRef leaf_mem, ArrayParent* parent,
-                         size_t leaf_ndx_in_parent,
-                         size_t elem_ndx_in_leaf) TIGHTDB_OVERRIDE
-    {
-        bool is_big = Array::get_context_flag_from_header(leaf_mem.m_addr);
-        if (!is_big) {
-            // Small blobs
-            ArrayBinary leaf(get_alloc());
-            leaf.init_from_mem(leaf_mem);
-            leaf.set_parent(parent, leaf_ndx_in_parent);
-            TIGHTDB_ASSERT(leaf.size() >= 1);
-            size_t last_ndx = leaf.size() - 1;
-            if (last_ndx == 0)
-                return true;
-            size_t ndx = elem_ndx_in_leaf;
-            if (ndx == npos)
-                ndx = last_ndx;
-            leaf.erase(ndx); // Throws
-            return false;
-        }
-        // Big blobs
-        ArrayBigBlobs leaf(get_alloc());
-        leaf.init_from_mem(leaf_mem);
-        leaf.set_parent(parent, leaf_ndx_in_parent);
-        TIGHTDB_ASSERT(leaf.size() >= 1);
-        size_t last_ndx = leaf.size() - 1;
-        if (last_ndx == 0)
-            return true;
-        size_t ndx = elem_ndx_in_leaf;
-        if (ndx == npos)
-            ndx = last_ndx;
-        leaf.erase(ndx); // Throws
-        return false;
-    }
-    void destroy_leaf(MemRef leaf_mem) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
-    {
-        Array::destroy_deep(leaf_mem, get_alloc());
-    }
-    void replace_root_by_leaf(MemRef leaf_mem) TIGHTDB_OVERRIDE
-    {
-        Array* leaf;
-        bool is_big = Array::get_context_flag_from_header(leaf_mem.m_addr);
-        if (!is_big) {
-            // Small blobs
-            ArrayBinary* leaf_2 = new ArrayBinary(get_alloc()); // Throws
-            leaf_2->init_from_mem(leaf_mem);
-            leaf = leaf_2;
-        }
-        else {
-            // Big blobs
-            ArrayBigBlobs* leaf_2 = new ArrayBigBlobs(get_alloc()); // Throws
-            leaf_2->init_from_mem(leaf_mem);
-            leaf = leaf_2;
-        }
-        replace_root(leaf); // Throws, but accessor ownership is passed to callee
-    }
-    void replace_root_by_empty_leaf() TIGHTDB_OVERRIDE
-    {
-        UniquePtr<ArrayBinary> leaf;
-        leaf.reset(new ArrayBinary(get_alloc())); // Throws
-        leaf->create(); // Throws
-        replace_root(leaf.release()); // Throws, but accessor ownership is passed to callee
-    }
-};
-
-void ColumnBinary::erase(size_t ndx, bool is_last)
-{
-    TIGHTDB_ASSERT(ndx < size());
-    TIGHTDB_ASSERT(is_last == (ndx == size()-1));
-
-    bool root_is_leaf = !m_array->is_inner_bptree_node();
-    if (root_is_leaf) {
-        bool is_big = m_array->get_context_flag();
-        if (!is_big) {
-            // Small blobs root leaf
-            ArrayBinary* leaf = static_cast<ArrayBinary*>(m_array);
-            leaf->erase(ndx); // Throws
-            return;
-        }
-        // Big blobs root leaf
-        ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array);
-        leaf->erase(ndx); // Throws
-        return;
-    }
-
-    // Non-leaf root
-    size_t ndx_2 = is_last ? npos : ndx;
-    EraseLeafElem erase_leaf_elem(*this);
-    Array::erase_bptree_elem(m_array, ndx_2, erase_leaf_elem); // Throws
-}
-
-
-void ColumnBinary::move_last_over(size_t target_row_ndx, size_t last_row_ndx)
-{
-    // FIXME: ExceptionSafety: The current implementation of this
-    // function is not exception-safe, and it is hard to see how to
-    // repair it.
-
-    // FIXME: Consider doing two nested calls to
-    // update_bptree_elem(). If the two leaves are not the same, no
-    // copying is needed. If they are the same, call
-    // ArrayBinary::move_last_over() (does not yet
-    // exist). ArrayBinary::move_last_over() could be implemented in a
-    // way that avoids the intermediate copy. This approach is also
-    // likely to be necesseray for exception safety.
-
-    TIGHTDB_ASSERT(target_row_ndx < last_row_ndx);
-    TIGHTDB_ASSERT(last_row_ndx + 1 == size());
-
-    BinaryData value = get(last_row_ndx);
-
-    // Copying binary data from a column to itself requires an
-    // intermediate copy of the data (constr:bptree-copy-to-self).
-    UniquePtr<char[]> buffer(new char[value.size()]); // Throws
-    copy(value.data(), value.data()+value.size(), buffer.get());
-    BinaryData copy_of_value(buffer.get(), value.size());
-
-    set(target_row_ndx, copy_of_value); // Throws
-
-    bool is_last = true;
-    erase(last_row_ndx, is_last); // Throws
 }
 
 
@@ -368,6 +207,167 @@ ref_type ColumnBinary::leaf_insert(MemRef leaf_mem, ArrayParent& parent,
     leaf.destroy();
     return new_leaf.bptree_leaf_insert(insert_ndx, state_2.m_value, state_2.m_add_zero_term,
                                        state); // Throws
+}
+
+
+class ColumnBinary::EraseLeafElem: public ColumnBase::EraseHandlerBase {
+public:
+    EraseLeafElem(ColumnBinary& column) TIGHTDB_NOEXCEPT:
+        EraseHandlerBase(column) {}
+    bool erase_leaf_elem(MemRef leaf_mem, ArrayParent* parent,
+                         size_t leaf_ndx_in_parent,
+                         size_t elem_ndx_in_leaf) TIGHTDB_OVERRIDE
+    {
+        bool is_big = Array::get_context_flag_from_header(leaf_mem.m_addr);
+        if (!is_big) {
+            // Small blobs
+            ArrayBinary leaf(get_alloc());
+            leaf.init_from_mem(leaf_mem);
+            leaf.set_parent(parent, leaf_ndx_in_parent);
+            TIGHTDB_ASSERT(leaf.size() >= 1);
+            size_t last_ndx = leaf.size() - 1;
+            if (last_ndx == 0)
+                return true;
+            size_t ndx = elem_ndx_in_leaf;
+            if (ndx == npos)
+                ndx = last_ndx;
+            leaf.erase(ndx); // Throws
+            return false;
+        }
+        // Big blobs
+        ArrayBigBlobs leaf(get_alloc());
+        leaf.init_from_mem(leaf_mem);
+        leaf.set_parent(parent, leaf_ndx_in_parent);
+        TIGHTDB_ASSERT(leaf.size() >= 1);
+        size_t last_ndx = leaf.size() - 1;
+        if (last_ndx == 0)
+            return true;
+        size_t ndx = elem_ndx_in_leaf;
+        if (ndx == npos)
+            ndx = last_ndx;
+        leaf.erase(ndx); // Throws
+        return false;
+    }
+    void destroy_leaf(MemRef leaf_mem) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
+    {
+        Array::destroy_deep(leaf_mem, get_alloc());
+    }
+    void replace_root_by_leaf(MemRef leaf_mem) TIGHTDB_OVERRIDE
+    {
+        Array* leaf;
+        bool is_big = Array::get_context_flag_from_header(leaf_mem.m_addr);
+        if (!is_big) {
+            // Small blobs
+            ArrayBinary* leaf_2 = new ArrayBinary(get_alloc()); // Throws
+            leaf_2->init_from_mem(leaf_mem);
+            leaf = leaf_2;
+        }
+        else {
+            // Big blobs
+            ArrayBigBlobs* leaf_2 = new ArrayBigBlobs(get_alloc()); // Throws
+            leaf_2->init_from_mem(leaf_mem);
+            leaf = leaf_2;
+        }
+        replace_root(leaf); // Throws, but accessor ownership is passed to callee
+    }
+    void replace_root_by_empty_leaf() TIGHTDB_OVERRIDE
+    {
+        UniquePtr<ArrayBinary> leaf;
+        leaf.reset(new ArrayBinary(get_alloc())); // Throws
+        leaf->create(); // Throws
+        replace_root(leaf.release()); // Throws, but accessor ownership is passed to callee
+    }
+};
+
+void ColumnBinary::do_erase(size_t ndx, bool is_last)
+{
+    TIGHTDB_ASSERT(ndx < size());
+    TIGHTDB_ASSERT(is_last == (ndx == size()-1));
+
+    bool root_is_leaf = !m_array->is_inner_bptree_node();
+    if (root_is_leaf) {
+        bool is_big = m_array->get_context_flag();
+        if (!is_big) {
+            // Small blobs root leaf
+            ArrayBinary* leaf = static_cast<ArrayBinary*>(m_array);
+            leaf->erase(ndx); // Throws
+            return;
+        }
+        // Big blobs root leaf
+        ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array);
+        leaf->erase(ndx); // Throws
+        return;
+    }
+
+    // Non-leaf root
+    size_t ndx_2 = is_last ? npos : ndx;
+    EraseLeafElem erase_leaf_elem(*this);
+    Array::erase_bptree_elem(m_array, ndx_2, erase_leaf_elem); // Throws
+}
+
+
+void ColumnBinary::do_move_last_over(size_t row_ndx, size_t last_row_ndx)
+{
+    TIGHTDB_ASSERT(row_ndx <= last_row_ndx);
+    TIGHTDB_ASSERT(last_row_ndx + 1 == size());
+
+    // FIXME: ExceptionSafety: The current implementation of this
+    // function is not exception-safe, and it is hard to see how to
+    // repair it.
+
+    // FIXME: Consider doing two nested calls to
+    // update_bptree_elem(). If the two leaves are not the same, no
+    // copying is needed. If they are the same, call
+    // ArrayBinary::move_last_over() (does not yet
+    // exist). ArrayBinary::move_last_over() could be implemented in a
+    // way that avoids the intermediate copy. This approach is also
+    // likely to be necesseray for exception safety.
+
+    BinaryData value = get(last_row_ndx);
+
+    // Copying binary data from a column to itself requires an
+    // intermediate copy of the data (constr:bptree-copy-to-self).
+    UniquePtr<char[]> buffer(new char[value.size()]); // Throws
+    copy(value.data(), value.data()+value.size(), buffer.get());
+    BinaryData copy_of_value(buffer.get(), value.size());
+
+    set(row_ndx, copy_of_value); // Throws
+
+    bool is_last = true;
+    erase(last_row_ndx, is_last); // Throws
+}
+
+
+void ColumnBinary::do_clear()
+{
+    bool root_is_leaf = !m_array->is_inner_bptree_node();
+    if (root_is_leaf) {
+        bool is_big = m_array->get_context_flag();
+        if (!is_big) {
+            // Small blobs root leaf
+            ArrayBinary* leaf = static_cast<ArrayBinary*>(m_array);
+            leaf->clear(); // Throws
+            return;
+        }
+        // Big blobs root leaf
+        ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array);
+        leaf->clear(); // Throws
+        return;
+    }
+
+    // Non-leaf root - revert to small blobs leaf
+    Allocator& alloc = m_array->get_alloc();
+    UniquePtr<ArrayBinary> array;
+    array.reset(new ArrayBinary(alloc)); // Throws
+    array->create(); // Throws
+    array->set_parent(m_array->get_parent(), m_array->get_ndx_in_parent());
+    array->update_parent(); // Throws
+
+    // Remove original node
+    m_array->destroy_deep();
+    delete m_array;
+
+    m_array = array.release();
 }
 
 

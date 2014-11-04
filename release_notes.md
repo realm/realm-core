@@ -2,21 +2,42 @@
 
 ### Bugfixes:
 
-* Made Query store a deep copy of user given strings when using the expression syntax
+* Lorem ipsum.
 
 ### API breaking changes:
 
 * Added not_equal(), equal(), contains(), begins_with(), ends_with() for String columns in the Query expression syntax. They work both case sensitive and insensitive. So now you can write 'size_t m = table1->column<String>(0).contains("A", true).find();'. Works with Links too.
+* Table::erase() can no longer be used with unordered tables. Previously it was
+  allowed if the specified index was the index of the last row in the table. One
+  must now always use Table::move_last_over() with unordered tables. Whether a
+  table is ordered or unordered is entirely decided by the way it is used by the
+  application, and note that only unordered tables are allowed to contain link
+  columns.
 
 ### Enhancements:
 
-* Lorem ipsum.
+* Major simplification of ".lock" file handling.
+  We now leave the ".lock" file behind.
+* Support added for cascading row removal. See `Descriptor::set_link_type()` for
+  details. All previsouly created link columns will effectively have link-type
+  'weak'.
+* Rows can now be removed via a row accessors (`Row::remove()`,
+  `Row::move_last_over()`).
 
 -----------
 
 ### Internals:
 
 * Lorem ipsum.
+
+----------------------------------------------
+
+# 0.85.1 Release notes
+
+### Bugfixes:
+
+* Made Query store a deep copy of user given strings when using the expression
+  syntax
 
 ----------------------------------------------
 

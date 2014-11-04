@@ -439,9 +439,9 @@ void Group::remove_table(size_t table_ndx)
     // There is no easy way for Group::TransactAdvancer to handle removal of
     // tables that contain foreign target table link columns, because that
     // involves removal of the corresponding backlink columns. For that reason,
-    // we start by removing all columns, and that will generate individual
-    // replication instructions for each column, with sufficient information for
-    // Group::TransactAdvancer to handle them.
+    // we start by removing all columns, which will generate individual
+    // replication instructions for each column removal with sufficient
+    // information for Group::TransactAdvancer to handle them.
     size_t n = table->get_column_count();
     for (size_t i = n; i > 0; --i)
         table->remove_column(i-1);
@@ -1084,19 +1084,20 @@ public:
         return true;
     }
 
-    bool insert_empty_rows(size_t row_ndx, size_t num_rows, size_t last_row_ndx, bool unordered) TIGHTDB_NOEXCEPT
+    bool insert_empty_rows(size_t row_ndx, size_t num_rows, size_t last_row_ndx,
+                           bool unordered) TIGHTDB_NOEXCEPT
     {
         typedef _impl::TableFriend tf;
         if (unordered) {
             if (m_table) {
                 while (num_rows--) {
-                    tf::adj_accessors_move(*m_table, last_row_ndx - num_rows, row_ndx + num_rows);
+                    tf::adj_acc_move_over(*m_table, row_ndx + num_rows, last_row_ndx - num_rows);
                 }
             }
         }
         else {
             if (m_table)
-                tf::adj_accessors_insert_rows(*m_table, row_ndx, num_rows);
+                tf::adj_acc_insert_rows(*m_table, row_ndx, num_rows);
         }
         return true;
     }
@@ -1108,13 +1109,13 @@ public:
             TIGHTDB_ASSERT(num_rows == 1);
             typedef _impl::TableFriend tf;
             if (m_table)
-                tf::adj_accessors_move(*m_table, row_ndx, tbl_sz);
+                tf::adj_acc_move_over(*m_table, tbl_sz, row_ndx);
         }
         else {
             typedef _impl::TableFriend tf;
             if (m_table) {
                 while (num_rows--)
-                    tf::adj_accessors_erase_row(*m_table, row_ndx + num_rows);
+                    tf::adj_acc_erase_row(*m_table, row_ndx + num_rows);
             }
         }
         return true;
@@ -1417,6 +1418,11 @@ public:
         return true; // No-op
     }
 
+    bool set_link_type(size_t, LinkType) TIGHTDB_NOEXCEPT
+    {
+        return true; // No-op
+    }
+
     bool select_link_list(size_t col_ndx, size_t) TIGHTDB_NOEXCEPT
     {
         // See comments on link handling in TransactAdvancer::set_link().
@@ -1473,7 +1479,8 @@ void Group::refresh_dirty_accessors()
             tf::set_ndx_in_parent(*table, table_ndx);
             if (tf::is_marked(*table)) {
                 tf::refresh_accessor_tree(*table); // Throws
-                tf::bump_version(*table);
+                bool bump_global = false;
+                tf::bump_version(*table, bump_global);
             }
         }
     }
@@ -1801,6 +1808,11 @@ public:
     }
 
     bool remove_primary_key()
+    {
+        return true; // No-op
+    }
+
+    bool set_link_type(size_t, LinkType)
     {
         return true; // No-op
     }

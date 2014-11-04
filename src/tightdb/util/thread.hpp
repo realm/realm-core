@@ -230,6 +230,21 @@ public:
 };
 
 
+/// A simple robust mutex ownership wrapper.
+class RobustLockGuard {
+public:
+    /// \param recover_func See RobustMutex::lock().
+    template<class TFunc>
+    RobustLockGuard(RobustMutex&, TFunc func);
+    ~RobustLockGuard() TIGHTDB_NOEXCEPT;
+
+private:
+    RobustMutex& m_mutex;
+    friend class CondVar;
+};
+
+
+
 /// Condition variable for use in synchronization monitors.
 class CondVar {
 public:
@@ -410,6 +425,18 @@ inline void UniqueLock::unlock() TIGHTDB_NOEXCEPT
 {
     m_mutex->unlock();
     m_is_locked = false;
+}
+
+template<typename TFunc>
+inline RobustLockGuard::RobustLockGuard(RobustMutex& m, TFunc func) :
+    m_mutex(m)
+{
+    m_mutex.lock(func);
+}
+
+inline RobustLockGuard::~RobustLockGuard() TIGHTDB_NOEXCEPT
+{
+    m_mutex.unlock();
 }
 
 

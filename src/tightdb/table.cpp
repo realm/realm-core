@@ -285,15 +285,16 @@ size_t Table::add_column(DataType type, StringData name, DescriptorRef* subdesc)
     return get_descriptor()->add_column(type, name, subdesc); // Throws
 }
 
-size_t Table::add_column_link(DataType type, StringData name, Table& target)
+size_t Table::add_column_link(DataType type, StringData name, Table& target, LinkType link_type)
 {
-    return get_descriptor()->add_column_link(type, name, target); // Throws
+    return get_descriptor()->add_column_link(type, name, target, link_type); // Throws
 }
 
 
-void Table::insert_column_link(size_t col_ndx, DataType type, StringData name, Table& target)
+void Table::insert_column_link(size_t col_ndx, DataType type, StringData name, Table& target,
+                               LinkType link_type)
 {
-    get_descriptor()->insert_column_link(col_ndx, type, name, target); // Throws
+    get_descriptor()->insert_column_link(col_ndx, type, name, target, link_type); // Throws
 }
 
 
@@ -326,6 +327,67 @@ void Table::connect_opposite_link_columns(size_t link_col_ndx, Table& target_tab
     link_col.set_backlink_column(backlink_col);
     backlink_col.set_origin_table(*this);
     backlink_col.set_origin_column(link_col);
+}
+
+
+size_t Table::get_num_strong_backlinks(std::size_t row_ndx) const TIGHTDB_NOEXCEPT
+{
+    size_t sum = 0;
+    size_t col_ndx_begin = m_spec.get_public_column_count();
+    size_t col_ndx_end   = m_cols.size();
+    for (size_t i = col_ndx_begin; i < col_ndx_end; ++i) {
+        const ColumnBackLink& backlink_col = get_column_backlink(i);
+        const ColumnLinkBase& link_col = backlink_col.get_origin_column();
+        if (link_col.get_weak_links())
+            continue;
+        sum += backlink_col.get_backlink_count(row_ndx);
+    }
+    return sum;
+}
+
+
+void Table::cascade_break_backlinks_to(size_t row_ndx, CascadeState& state)
+{
+    size_t num_cols = m_spec.get_public_column_count();
+    for (size_t col_ndx = 0; col_ndx != num_cols; ++col_ndx) {
+        ColumnBase& column = get_column_base(col_ndx);
+        column.cascade_break_backlinks_to(row_ndx, state); // Throws
+    }
+}
+
+
+void Table::cascade_break_backlinks_to_all_rows(CascadeState& state)
+{
+    size_t num_cols = m_spec.get_public_column_count();
+    for (size_t col_ndx = 0; col_ndx != num_cols; ++col_ndx) {
+        ColumnBase& column = get_column_base(col_ndx);
+        column.cascade_break_backlinks_to_all_rows(m_size, state); // Throws
+    }
+}
+
+
+void Table::remove_backlink_broken_rows(const CascadeState::row_set& rows)
+{
+    Group& group = *get_parent_group();
+
+    // Rows are ordered by ascending row index, but we need to remove the rows
+    // by descending index to avoid changing the indexes of rows that are not
+    // removed yet.
+    typedef CascadeState::row_set::const_reverse_iterator iter;
+    iter end = rows.rend();
+    for (iter i = rows.rbegin(); i != end; ++i) {
+        typedef _impl::GroupFriend gf;
+        Table& table = gf::get_table(group, i->table_ndx);
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+        if (Replication* repl = table.get_repl()) {
+            bool move_last_over = true;
+            repl->erase_row(&table, i->row_ndx, move_last_over); // Throws
+        }
+#endif
+        bool broken_reciprocal_backlinks = true;
+        table.do_move_last_over(i->row_ndx, broken_reciprocal_backlinks);
+    }
 }
 
 
@@ -611,8 +673,10 @@ void Table::do_erase_column(Descriptor& desc, size_t col_ndx)
     // additional backlink columns, we need to inject a clear operation before
     // the column removal to correctly reproduce the desired effect, namely that
     // the table appears truncated after the removal of the last non-hidden
-    // column. This has the a regular replicated clear operation in order to get
-    // the right behaviour in Group::advance_transact().
+    // column. The clear operation needs to be submitted to the replication
+    // handler as an individual operation, and precede the column removal
+    // operation in order to get the right behaviour in
+    // Group::advance_transact().
     if (desc.is_root()) {
         if (root_table.m_spec.get_public_column_count() == 1 && root_table.m_cols.size() > 1)
             root_table.clear(); // Throws
@@ -754,6 +818,36 @@ void Table::do_erase_root_column(size_t ndx)
         Array::destroy_deep(index_ref, m_columns.get_alloc());
         m_columns.erase(ndx_in_parent);
     }
+}
+
+
+void Table::do_set_link_type(size_t col_ndx, LinkType link_type)
+{
+    bool weak_links = false;
+    switch (link_type) {
+        case link_Strong:
+            break;
+        case link_Weak:
+            weak_links = true;
+            break;
+    }
+
+    ColumnAttr attr = m_spec.get_column_attr(col_ndx);
+    ColumnAttr attr_2 = attr;
+    attr_2 = ColumnAttr(attr_2 & ~col_attr_StrongLinks);
+    if (!weak_links)
+        attr_2 = ColumnAttr(attr_2 | col_attr_StrongLinks);
+    if (attr_2 == attr)
+        return;
+    m_spec.set_column_attr(col_ndx, attr);
+
+    ColumnLinkBase& col = get_column_link_base(col_ndx);
+    col.set_weak_links(weak_links);
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    if (Replication* repl = get_repl())
+        repl->set_link_type(this, col_ndx, link_type); // Throws
+#endif
 }
 
 
@@ -1783,34 +1877,27 @@ void Table::insert_empty_row(size_t row_ndx, size_t num_rows)
 }
 
 
-void Table::clear()
-{
-    TIGHTDB_ASSERT(is_attached());
-    bump_version();
-
-    size_t num_cols = m_spec.get_column_count();
-    for (size_t col_ndx = 0; col_ndx != num_cols; ++col_ndx) {
-        ColumnBase& column = get_column_base(col_ndx);
-        column.clear(); // Throws
-    }
-    discard_row_accessors();
-    m_size = 0;
-
-#ifdef TIGHTDB_ENABLE_REPLICATION
-    if (Replication* repl = get_repl())
-        repl->clear_table(this); // Throws
-#endif
-}
-
-
 void Table::remove(size_t row_ndx)
 {
     TIGHTDB_ASSERT(is_attached());
     TIGHTDB_ASSERT(row_ndx < m_size);
-    bump_version();
 
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    if (Replication* repl = get_repl()) {
+        bool move_last_over = false;
+        repl->erase_row(this, row_ndx, move_last_over); // Throws
+    }
+#endif
+
+    do_remove(row_ndx);
+}
+
+
+// Replication instruction 'erase-row(unordered=false)' calls this function
+// directly.
+void Table::do_remove(size_t row_ndx)
+{
     bool is_last = row_ndx == m_size - 1;
-
     size_t num_cols = m_spec.get_column_count();
     for (size_t col_ndx = 0; col_ndx != num_cols; ++col_ndx) {
         ColumnBase& column = get_column_base(col_ndx);
@@ -1818,41 +1905,101 @@ void Table::remove(size_t row_ndx)
     }
     adj_row_acc_erase_row(row_ndx);
     --m_size;
-
-#ifdef TIGHTDB_ENABLE_REPLICATION
-    if (Replication* repl = get_repl())
-        repl->erase_row(this, row_ndx); // Throws
-#endif
+    bump_version();
 }
 
 
-void Table::move_last_over(size_t target_row_ndx)
+void Table::move_last_over(size_t row_ndx)
 {
-    TIGHTDB_ASSERT(target_row_ndx < m_size);
-    bump_version();
+    TIGHTDB_ASSERT(is_attached());
+    TIGHTDB_ASSERT(row_ndx < m_size);
 
+    size_t table_ndx = get_index_in_group();
+    if (table_ndx == tightdb::npos) {
+#ifdef TIGHTDB_ENABLE_REPLICATION
+        if (Replication* repl = get_repl()) {
+            bool move_last_over = true;
+            repl->erase_row(this, row_ndx, move_last_over); // Throws
+        }
+#endif
+
+        bool broken_reciprocal_backlinks = false;
+        do_move_last_over(row_ndx, broken_reciprocal_backlinks);
+        return;
+    }
+
+    // Group-level tables may have links, so in those cases we need to discover
+    // all the rows that need to be cascade-removed.
+    CascadeState::row row;
+    row.table_ndx = table_ndx;
+    row.row_ndx   = row_ndx;
+    CascadeState state;
+    state.rows.push_back(row);
+
+    cascade_break_backlinks_to(row_ndx, state); // Throws
+
+    remove_backlink_broken_rows(state.rows); // Throws
+}
+
+
+// Replication instruction 'erase-row(unordered=true)' calls this function
+// directly with broken_reciprocal_backlinks=false.
+void Table::do_move_last_over(size_t row_ndx, bool broken_reciprocal_backlinks)
+{
     size_t last_row_ndx = m_size - 1;
     size_t num_cols = m_spec.get_column_count();
-    if (target_row_ndx != last_row_ndx) {
-        for (size_t col_ndx = 0; col_ndx != num_cols; ++col_ndx) {
-            ColumnBase& column = get_column_base(col_ndx);
-            column.move_last_over(target_row_ndx, last_row_ndx); // Throws
-        }
+    for (size_t col_ndx = 0; col_ndx != num_cols; ++col_ndx) {
+        ColumnBase& column = get_column_base(col_ndx);
+        column.move_last_over(row_ndx, last_row_ndx, broken_reciprocal_backlinks); // Throws
     }
-    else {
-        for (size_t col_ndx = 0; col_ndx != num_cols; ++col_ndx) {
-            ColumnBase& column = get_column_base(col_ndx);
-            bool is_last = true;
-            column.erase(target_row_ndx, is_last); // Throws
-        }
-    }
-    adj_row_acc_move(target_row_ndx, last_row_ndx);
+    adj_row_acc_move_over(last_row_ndx, row_ndx);
     --m_size;
+    bump_version();
+}
+
+
+void Table::clear()
+{
+    TIGHTDB_ASSERT(is_attached());
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
-        repl->move_last_over(this, target_row_ndx, last_row_ndx); // Throws
+        repl->clear_table(this); // Throws
 #endif
+
+    size_t table_ndx = get_index_in_group();
+    if (table_ndx == tightdb::npos) {
+        bool broken_reciprocal_backlinks = false;
+        do_clear(broken_reciprocal_backlinks);
+        return;
+    }
+
+    // Group-level tables may have links, so in those cases we need to discover
+    // all the rows that need to be cascade-removed.
+    CascadeState state;
+    state.stop_on_table = this;
+    cascade_break_backlinks_to_all_rows(state); // Throws
+
+    bool broken_reciprocal_backlinks = true;
+    do_clear(broken_reciprocal_backlinks);
+
+    remove_backlink_broken_rows(state.rows); // Throws
+}
+
+
+// Replication instruction 'clear-table' calls this function
+// directly with broken_reciprocal_backlinks=false.
+void Table::do_clear(bool broken_reciprocal_backlinks)
+{
+    size_t num_cols = m_spec.get_column_count();
+    for (size_t col_ndx = 0; col_ndx != num_cols; ++col_ndx) {
+        ColumnBase& column = get_column_base(col_ndx);
+        column.clear(m_size, broken_reciprocal_backlinks); // Throws
+    }
+    m_size = 0;
+
+    discard_row_accessors();
+    bump_version();
 }
 
 
@@ -2536,18 +2683,48 @@ TableRef Table::get_link_target(size_t col_ndx) TIGHTDB_NOEXCEPT
 
 void Table::set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx)
 {
+    TIGHTDB_ASSERT(is_attached());
     TIGHTDB_ASSERT(row_ndx < m_size);
-    bump_version();
-    ColumnLink& column = get_column_link(col_ndx);
-    column.set_link(row_ndx, target_row_ndx);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    if (Replication* repl = get_repl()) {
-        size_t link = 1 + target_row_ndx;
-        repl->set_link(this, col_ndx, row_ndx, link); // Throws
-    }
+    if (Replication* repl = get_repl())
+        repl->set_link(this, col_ndx, row_ndx, target_row_ndx); // Throws
 #endif
+
+    size_t old_target_row_ndx = do_set_link(col_ndx, row_ndx, target_row_ndx); // Throws
+    if (old_target_row_ndx == tightdb::npos)
+        return;
+
+    ColumnLink& col = get_column_link(col_ndx);
+    if (col.get_weak_links())
+        return;
+
+    Table& target_table = col.get_target_table();
+    size_t num_remaining = target_table.get_num_strong_backlinks(old_target_row_ndx);
+    if (num_remaining > 0)
+        return;
+
+    CascadeState::row target_row;
+    target_row.table_ndx = target_table.get_index_in_group();
+    target_row.row_ndx   = old_target_row_ndx;
+    CascadeState state;
+    state.rows.push_back(target_row);
+    target_table.cascade_break_backlinks_to(old_target_row_ndx, state); // Throws
+
+    remove_backlink_broken_rows(state.rows); // Throws
 }
+
+
+// Replication instruction 'set_link' calls this function directly.
+size_t Table::do_set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx)
+{
+    TIGHTDB_ASSERT(row_ndx < m_size);
+    ColumnLink& col = get_column_link(col_ndx);
+    size_t old_target_row_ndx = col.set_link(row_ndx, target_row_ndx);
+    bump_version();
+    return old_target_row_ndx;
+}
+
 
 void Table::insert_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx)
 {
@@ -2560,28 +2737,6 @@ void Table::insert_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx)
     if (Replication* repl = get_repl()) {
         size_t link = 1 + target_row_ndx;
         repl->insert_link(this, col_ndx, row_ndx, link); // Throws
-    }
-#endif
-}
-
-bool Table::is_null_link(size_t col_ndx, size_t ndx) const TIGHTDB_NOEXCEPT
-{
-    TIGHTDB_ASSERT(ndx < m_size);
-    const ColumnLink& column = get_column_link(col_ndx);
-    return column.is_null_link(ndx);
-}
-
-void Table::nullify_link(size_t col_ndx, size_t row_ndx)
-{
-    TIGHTDB_ASSERT(row_ndx < m_size);
-    bump_version();
-    ColumnLink& column = get_column_link(col_ndx);
-    column.nullify_link(row_ndx);
-
-#ifdef TIGHTDB_ENABLE_REPLICATION
-    if (Replication* repl = get_repl()) {
-        size_t link = 0; // Null-link
-        repl->set_link(this, col_ndx, row_ndx, link); // Throws
     }
 #endif
 }
@@ -4414,7 +4569,7 @@ Table* Table::Parent::get_parent_table(size_t*) TIGHTDB_NOEXCEPT
 }
 
 
-void Table::adj_accessors_insert_rows(size_t row_ndx, size_t num_rows) TIGHTDB_NOEXCEPT
+void Table::adj_acc_insert_rows(size_t row_ndx, size_t num_rows) TIGHTDB_NOEXCEPT
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
@@ -4426,12 +4581,12 @@ void Table::adj_accessors_insert_rows(size_t row_ndx, size_t num_rows) TIGHTDB_N
     size_t n = m_cols.size();
     for (size_t i = 0; i != n; ++i) {
         if (ColumnBase* col = m_cols[i])
-            col->adj_accessors_insert_rows(row_ndx, num_rows);
+            col->adj_acc_insert_rows(row_ndx, num_rows);
     }
 }
 
 
-void Table::adj_accessors_erase_row(size_t row_ndx) TIGHTDB_NOEXCEPT
+void Table::adj_acc_erase_row(size_t row_ndx) TIGHTDB_NOEXCEPT
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
@@ -4443,25 +4598,24 @@ void Table::adj_accessors_erase_row(size_t row_ndx) TIGHTDB_NOEXCEPT
     size_t n = m_cols.size();
     for (size_t i = 0; i != n; ++i) {
         if (ColumnBase* col = m_cols[i])
-            col->adj_accessors_erase_row(row_ndx);
+            col->adj_acc_erase_row(row_ndx);
     }
 }
 
 
-void Table::adj_accessors_move(size_t target_row_ndx, size_t source_row_ndx)
+void Table::adj_acc_move_over(size_t from_row_ndx, size_t to_row_ndx)
     TIGHTDB_NOEXCEPT
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
     // underlying node structure. See AccessorConsistencyLevels.
 
-    adj_row_acc_move(target_row_ndx, source_row_ndx);
+    adj_row_acc_move_over(from_row_ndx, to_row_ndx);
 
-    // Adjust subtable accessors after 'move last over' removal of a row
     size_t n = m_cols.size();
     for (size_t i = 0; i != n; ++i) {
         if (ColumnBase* col = m_cols[i])
-            col->adj_accessors_move(target_row_ndx, source_row_ndx);
+            col->adj_acc_move_over(from_row_ndx, to_row_ndx);
     }
 }
 
@@ -4530,23 +4684,21 @@ void Table::adj_row_acc_erase_row(size_t row_ndx) TIGHTDB_NOEXCEPT
 }
 
 
-void Table::adj_row_acc_move(size_t target_row_ndx, size_t source_row_ndx)
+void Table::adj_row_acc_move_over(size_t from_row_ndx, size_t to_row_ndx)
     TIGHTDB_NOEXCEPT
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
     // underlying node structure. See AccessorConsistencyLevels.
-
-    // Adjust row accessors after 'move last over' removal of a row
     RowBase* row = m_row_accessors;
     while (row) {
         RowBase* next = row->m_next;
-        if (row->m_row_ndx == target_row_ndx) {
+        if (row->m_row_ndx == to_row_ndx) {
             row->m_table.reset();
             unregister_row_accessor(row);
         }
-        else if (row->m_row_ndx == source_row_ndx) {
-            row->m_row_ndx = target_row_ndx;
+        else if (row->m_row_ndx == from_row_ndx) {
+            row->m_row_ndx = to_row_ndx;
         }
         row = next;
     }
@@ -4722,6 +4874,10 @@ void Table::refresh_column_accessors(size_t col_ndx_begin)
             // of the connection is postponed.
             typedef _impl::GroupFriend gf;
             if (is_link_type(col_type)) {
+                ColumnAttr attr = m_spec.get_column_attr(col_ndx);
+                bool weak_links = (attr & col_attr_StrongLinks) == 0;
+                ColumnLinkBase* link_col = static_cast<ColumnLinkBase*>(col);
+                link_col->set_weak_links(weak_links);
                 Group& group = *get_parent_group();
                 size_t target_table_ndx = m_spec.get_opposite_link_table_ndx(col_ndx);
                 Table& target_table = gf::get_table(group, target_table_ndx); // Throws
