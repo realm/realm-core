@@ -212,7 +212,6 @@ void WriteLogCollector::reset_log_management()
     reset_file(m_log_a);
     reset_file(m_log_b);
     new(m_log_a.map.get_addr()) CommitLogPreamble();
-    // cerr << "reset complete" << endl;
 }
 
 void recover_from_dead_owner()
