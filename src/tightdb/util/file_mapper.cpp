@@ -124,8 +124,8 @@ private:
     dev_t m_device;
     ino_t m_inode;
 
-    void* m_addr;
-    size_t m_size;
+    void* m_addr = 0;
+    size_t m_size = 0;
 
     uintptr_t m_first_page;
     size_t m_page_count = 0;
@@ -140,7 +140,7 @@ private:
     bool same_file(mapping_and_file_info m) const;
 
     char* page_addr(size_t i) const;
-    size_t page_size(size_t i) const;
+    size_t actual_page_size(size_t i) const;
 
     void mark_unreadable(size_t i);
     void mark_readable(size_t i);
@@ -435,23 +435,23 @@ bool EncryptedFileMapping::same_file(mapping_and_file_info m) const {
 }
 
 char* EncryptedFileMapping::page_addr(size_t i) const {
-    return reinterpret_cast<char*>(((m_first_page + i) * ::page_size));
+    return reinterpret_cast<char*>(((m_first_page + i) * page_size));
 }
 
-size_t EncryptedFileMapping::page_size(size_t i) const {
+size_t EncryptedFileMapping::actual_page_size(size_t i) const {
     if (i < m_page_count - 1)
-        return ::page_size;
-    return std::min<size_t>(::page_size, m_size - (page_addr(i) - (char*)m_addr));
+        return page_size;
+    return std::min<size_t>(page_size, m_size - (page_addr(i) - (char*)m_addr));
 }
 
 void EncryptedFileMapping::mark_unreadable(size_t i) {
-    mprotect(page_addr(i), ::page_size, PROT_NONE);
+    mprotect(page_addr(i), page_size, PROT_NONE);
     m_read_pages[i] = false;
     m_dirty_pages[i] = false;
 }
 
 void EncryptedFileMapping::mark_readable(size_t i) {
-    mprotect(page_addr(i), ::page_size, PROT_READ);
+    mprotect(page_addr(i), page_size, PROT_READ);
     m_read_pages[i] = true;
     m_dirty_pages[i] = false;
 }
@@ -468,8 +468,8 @@ void EncryptedFileMapping::read_page(size_t i) {
     }
 
     auto addr = page_addr(i);
-    mprotect(addr, ::page_size, PROT_READ | PROT_WRITE);
-    m_cryptor.read(m_fd, i * ::page_size, (char*)addr, page_size(i));
+    mprotect(addr, page_size, PROT_READ | PROT_WRITE);
+    m_cryptor.read(m_fd, i * page_size, (char*)addr, actual_page_size(i));
 
     mark_readable(i);
 }
@@ -482,7 +482,7 @@ void EncryptedFileMapping::write_page(size_t i) {
         }
     }
 
-    mprotect(page_addr(i), ::page_size, PROT_READ | PROT_WRITE);
+    mprotect(page_addr(i), page_size, PROT_READ | PROT_WRITE);
     m_dirty_pages[i] = true;
 }
 
@@ -490,11 +490,11 @@ void EncryptedFileMapping::validate_page(size_t i) {
 #ifdef TIGHTDB_DEBUG
     if (!m_read_pages[i]) return;
 
-    char buffer[::page_size];
-    m_cryptor.read(m_fd, i * ::page_size, buffer, sizeof(buffer));
-    if (memcmp(buffer, page_addr(i), page_size(i))) {
+    char buffer[page_size];
+    m_cryptor.read(m_fd, i * page_size, buffer, sizeof(buffer));
+    if (memcmp(buffer, page_addr(i), actual_page_size(i))) {
         printf("mismatch %p: fd(%d) page(%zu/%zu) page_size(%zu) %s %s\n",
-               this, m_fd, i, m_page_count, page_size(i), buffer, page_addr(i));
+               this, m_fd, i, m_page_count, actual_page_size(i), buffer, page_addr(i));
         TIGHTDB_TERMINATE("");
     }
 #else
@@ -533,7 +533,7 @@ void EncryptedFileMapping::flush() {
         }
 
         mark_readable(i);
-        m_cryptor.write(m_fd, i * ::page_size, (char*)page_addr(i), page_size(i));
+        m_cryptor.write(m_fd, i * page_size, (char*)page_addr(i), actual_page_size(i));
     }
 
     validate();
@@ -544,7 +544,7 @@ void EncryptedFileMapping::sync() {
 }
 
 void EncryptedFileMapping::handle_access(void* addr) {
-    auto accessed_page = (uintptr_t)addr / ::page_size;
+    auto accessed_page = (uintptr_t)addr / page_size;
 
     size_t idx = accessed_page - m_first_page;
     if (!m_read_pages[idx]) {
@@ -559,12 +559,20 @@ void EncryptedFileMapping::handle_access(void* addr) {
 }
 
 void EncryptedFileMapping::set(void* new_addr, size_t new_size) {
+    // Happens if mremap() was called where the old size and new size need the
+    // same number of pages
+    if (new_addr == m_addr) {
+        TIGHTDB_ASSERT((new_size + page_size - 1) / page_size == m_page_count);
+        m_size = new_size;
+        return;
+    }
+
     flush();
     m_addr = new_addr;
     m_size = new_size;
 
-    m_first_page = (uintptr_t)m_addr / ::page_size;
-    m_page_count = (m_size + ::page_size - 1)  / ::page_size;
+    m_first_page = (uintptr_t)m_addr / page_size;
+    m_page_count = (m_size + page_size - 1)  / page_size;
 
     m_read_pages.clear();
     m_dirty_pages.clear();
@@ -573,7 +581,12 @@ void EncryptedFileMapping::set(void* new_addr, size_t new_size) {
     m_dirty_pages.resize(m_page_count, false);
 }
 
+size_t round_up_to_page_size(size_t size) {
+    return (size + page_size - 1) & ~(page_size - 1);
+}
+
 void* mmap_anon(size_t size) {
+    size = round_up_to_page_size(size);
     void* addr = ::mmap(0, size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
     if (addr == MAP_FAILED) {
         int err = errno; // Eliminate any risk of clobbering
@@ -634,6 +647,12 @@ void* mremap(int fd, void* old_addr, size_t old_size, File::AccessMode a, size_t
     {
         SpinLockGuard lock{mapping_lock};
         if (auto m = find_mapping_for_addr(old_addr, old_size)) {
+            if (round_up_to_page_size(old_size) == round_up_to_page_size(new_size)) {
+                m->mapping->set(old_addr, new_size);
+                m->size = new_size;
+                return old_addr;
+            }
+
             auto new_addr = mmap_anon(new_size);
             m->mapping->set(new_addr, new_size);
             ::munmap(old_addr, old_size);
