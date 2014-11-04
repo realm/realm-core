@@ -23,7 +23,7 @@
 #  include <windows.h>
 #endif
 
-#define TIGHTDB_ENABLE_LOGFILE
+//#define TIGHTDB_ENABLE_LOGFILE
 
 
 using namespace std;
