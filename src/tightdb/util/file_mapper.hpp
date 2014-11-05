@@ -26,12 +26,12 @@ namespace tightdb {
 namespace util {
 
 void *mmap(int fd, size_t size, File::AccessMode access, const uint8_t *encryption_key);
-void munmap(void *addr, size_t size);
+void munmap(void *addr, size_t size) TIGHTDB_NOEXCEPT;
 void* mremap(int fd, void* old_addr, size_t old_size, File::AccessMode a, size_t new_size);
 void msync(void *addr, size_t size);
 
-File::SizeType encrypted_size_to_data_size(File::SizeType size);
-File::SizeType data_size_to_encrypted_size(File::SizeType size);
+File::SizeType encrypted_size_to_data_size(File::SizeType size) TIGHTDB_NOEXCEPT;
+File::SizeType data_size_to_encrypted_size(File::SizeType size) TIGHTDB_NOEXCEPT;
 
 }
 }

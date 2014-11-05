@@ -4,20 +4,11 @@
 
 #ifdef TIGHTDB_ENABLE_ENCRYPTION
 
-#include <atomic>
-#include <cerrno>
-#include <cstdlib>
-#include <vector>
+#include "encrypted_file_mapping.hpp"
 
-#include <unistd.h>
 #include <signal.h>
 #include <sys/stat.h>
-
-#ifdef __APPLE__
-#include <CommonCrypto/CommonCryptor.h>
-#else
-#include <openssl/aes.h>
-#endif
+#include <unistd.h>
 
 #include <tightdb/util/terminate.hpp>
 
@@ -44,123 +35,8 @@ std::string get_errno_msg(const char* prefix, int err) {
 
 #ifdef TIGHTDB_ENABLE_ENCRYPTION
 
-const int aes_block_size = 16;
 const int page_size = 4096;
 
-#pragma mark Types
-
-struct iv_table;
-
-class AESCryptor {
-public:
-    AESCryptor(const uint8_t* key);
-    ~AESCryptor();
-
-    void read(int fd, off_t pos, char* dst, size_t size);
-    void write(int fd, off_t pos, const char* src, size_t size);
-
-private:
-    enum EncryptionMode {
-#ifdef __APPLE__
-        mode_Encrypt = kCCEncrypt,
-        mode_Decrypt = kCCDecrypt
-#else
-        mode_Encrypt = AES_ENCRYPT,
-        mode_Decrypt = AES_DECRYPT
-#endif
-    };
-
-#ifdef __APPLE__
-    CCCryptorRef m_encr;
-    CCCryptorRef m_decr;
-#else
-    AES_KEY m_ectx;
-    AES_KEY m_dctx;
-#endif
-
-    size_t crypt(EncryptionMode mode, off_t pos, char* dst, const char* src,
-                 size_t len, const char* stored_iv);
-
-    iv_table read_iv_table(int fd, off_t data_pos);
-};
-
-class EncryptedFileMapping;
-
-struct shared_file_info {
-    int fd;
-    AESCryptor cryptor;
-    std::vector<EncryptedFileMapping*> mappings;
-
-    shared_file_info(const uint8_t* key, int fd);
-};
-
-shared_file_info::shared_file_info(const uint8_t* key, int fd) : cryptor(key), fd(fd) { }
-
-// A list of all of the active encrypted mappings for a single file
-struct mappings_for_file  {
-    dev_t device;
-    ino_t inode;
-    std::unique_ptr<shared_file_info> info;
-};
-
-// Group the information we need to map a SIGSEGV address to an
-// EncryptedFileMapping for the sake of cache-friendliness with 3+ active
-// mappings (and no worse with only two
-struct mapping_and_addr {
-    std::unique_ptr<EncryptedFileMapping> mapping;
-    void* addr;
-    size_t size;
-};
-
-class EncryptedFileMapping {
-public:
-    EncryptedFileMapping(shared_file_info& file, void* addr, size_t size, File::AccessMode access);
-    ~EncryptedFileMapping();
-
-    // Write all dirty pages to disk and mark them read-only
-    // Does not call fsync
-    void flush();
-
-    // Sync this file to disk
-    void sync();
-
-    // Handle a SEGV or BUS at the given address, which must be within this
-    // object's mapping
-    void handle_access(void* addr) TIGHTDB_NOEXCEPT;
-
-    // Set this mapping to a new address and size
-    // Flushes any remaining dirty pages from the old mapping
-    void set(void* new_addr, size_t new_size);
-
-private:
-    shared_file_info& m_file;
-
-    void* m_addr = 0;
-    size_t m_size = 0;
-
-    uintptr_t m_first_page;
-    size_t m_page_count = 0;
-
-    std::vector<bool> m_read_pages;
-    std::vector<bool> m_dirty_pages;
-
-    File::AccessMode m_access;
-
-    char* page_addr(size_t i) const;
-    size_t actual_page_size(size_t i) const;
-
-    void mark_unreadable(size_t i);
-    void mark_readable(size_t i);
-
-    void flush_page(size_t i);
-    void read_page(size_t i);
-    void write_page(size_t i);
-
-    void validate_page(size_t i);
-    void validate();
-};
-
-// a RAII spinlock, since pthreads aren't signal-safe
 class SpinLockGuard {
 public:
     SpinLockGuard(std::atomic_flag& lock) : m_lock(lock) {
@@ -175,7 +51,21 @@ private:
     std::atomic_flag& m_lock;
 };
 
-#pragma mark Mapping management
+// A list of all of the active encrypted mappings for a single file
+struct mappings_for_file  {
+    dev_t device;
+    ino_t inode;
+    std::unique_ptr<SharedFileInfo> info;
+};
+
+// Group the information we need to map a SIGSEGV address to an
+// EncryptedFileMapping for the sake of cache-friendliness with 3+ active
+// mappings (and no worse with only two
+struct mapping_and_addr {
+    std::unique_ptr<EncryptedFileMapping> mapping;
+    void* addr;
+    size_t size;
+};
 
 std::atomic_flag mapping_lock = ATOMIC_FLAG_INIT;
 std::vector<mapping_and_addr> mappings_by_addr;
@@ -257,7 +147,7 @@ void add_mapping(void* addr, size_t size, int fd, File::AccessMode access, const
         it = --end(mappings_by_file);
         it->device = st.st_dev;
         it->inode = st.st_ino;
-        it->info.reset(new shared_file_info{encryption_key, dup(fd)});
+        it->info.reset(new SharedFileInfo{encryption_key, dup(fd)});
     }
 
     auto mapping = new EncryptedFileMapping{*it->info, addr, size, access};
@@ -278,329 +168,6 @@ void remove_mapping(void* addr, size_t size) {
             break;
         }
     }
-}
-
-#pragma mark Encryption
-
-size_t pad_to_aes_block_size(size_t len) {
-    return (len + aes_block_size - 1) & ~(aes_block_size - 1);
-}
-
-AESCryptor::AESCryptor(const uint8_t* key) {
-#ifdef __APPLE__
-    CCCryptorCreate(kCCEncrypt, kCCAlgorithmAES, 0 /* options */, key, kCCKeySizeAES256, 0 /* IV */, &m_encr);
-    CCCryptorCreate(kCCDecrypt, kCCAlgorithmAES, 0 /* options */, key, kCCKeySizeAES256, 0 /* IV */, &m_decr);
-#else
-    AES_set_encrypt_key(key, 256 /* key size in bits */, &m_ectx);
-    AES_set_decrypt_key(key, 256 /* key size in bits */, &m_dctx);
-#endif
-}
-
-AESCryptor::~AESCryptor() {
-#ifdef __APPLE__
-    CCCryptorRelease(m_encr);
-    CCCryptorRelease(m_decr);
-#endif
-}
-
-// We have the following constraints here:
-//
-// 1. When writing, we only know which 4k page is dirty, and not what bytes
-//    within the page are dirty, so we always have to write in 4k blocks.
-// 2. Pages being written need to be entirely within an 8k-aligned block to
-//    ensure that they're written to the hardware in atomic blocks.
-// 3. We need to store the IV used for each 4k page somewhere, so that we can
-//    ensure that we never reuse an IV (and still be decryptable).
-//
-// Because pages need to be aligned, we can't just prepend the IV to each page,
-// or we'd have to double the size of the file (as the rest of the 4k block
-// containing the IV would not be usable). Writing the IVs to a different part
-// of the file from the data results in them not being in the same 8k block, and
-// so it is possible that only the IV or only the data actually gets updated on
-// disk. We deal with this by storing four pieces of data about each page: the
-// hash of the encrypted data, the current IV, the hash of the previous encrypted
-// data, and the previous IV. To write, we encrypt the data, hash the ciphertext,
-// then write the new IV/ciphertext hash, fsync(), and then write the new
-// ciphertext. This ensures that if an error occurs between writing the IV and
-// the ciphertext, we can still determine that we should use the old IV, since
-// the ciphertext's hash will match the old ciphertext.
-
-struct iv_table {
-    char iv1[4];
-    char hash1[4];
-    char iv2[4];
-    char hash2[4];
-};
-
-static const int metadata_size = sizeof(iv_table);
-static const int pages_per_metadata_page = page_size / metadata_size;
-
-// map an offset in the data to the actual location in the file
-template<typename Int>
-Int real_offset(Int pos) {
-    const auto page_index = pos / page_size;
-    const auto metadata_page_count = page_index / pages_per_metadata_page + 1;
-    return pos + metadata_page_count * page_size;
-}
-
-// map a location in the file to the offset in the data
-template<typename Int>
-Int fake_offset(Int pos) {
-    const auto page_index = pos / page_size;
-    const auto metadata_page_count = (page_index + pages_per_metadata_page) / (pages_per_metadata_page + 1);
-    return pos - metadata_page_count * page_size;
-}
-
-// get the location of the iv_table for the given data (not file) position
-off_t iv_table_pos(off_t pos) {
-    const auto page_index = pos / page_size;
-    const auto metadata_block = page_index / pages_per_metadata_page;
-    const auto metadata_index = page_index & (pages_per_metadata_page - 1);
-    return metadata_block * (pages_per_metadata_page + 1) * page_size + metadata_index * metadata_size;
-}
-
-iv_table AESCryptor::read_iv_table(int fd, off_t data_pos) {
-    off_t pos = iv_table_pos(data_pos);
-    lseek(fd, pos, SEEK_SET);
-    iv_table iv;
-    memset(&iv, 0, sizeof(iv));
-    ::read(fd, &iv, sizeof(iv));
-    return iv;
-}
-
-void AESCryptor::read(int fd, off_t pos, char* dst, size_t size) {
-    iv_table iv = read_iv_table(fd, pos);
-
-    char buffer[page_size];
-    lseek(fd, real_offset(pos), SEEK_SET);
-    ssize_t bytes_read = ::read(fd, buffer, pad_to_aes_block_size(size));
-
-    if (memcmp(buffer, iv.hash1, 4) != 0) {
-        // we had an interrupted write and the IV was bumped but the data not
-        // updated, so un-bump the IV
-        memcpy(iv.iv1, iv.iv2, 8);
-        lseek(fd, iv_table_pos(pos), SEEK_SET);
-        ::write(fd, &iv, sizeof(iv));
-    }
-
-    crypt(mode_Decrypt, pos, dst, buffer, bytes_read, iv.iv1);
-}
-
-void AESCryptor::write(int fd, off_t pos, const char* src, size_t size) {
-    iv_table iv = read_iv_table(fd, pos);
-
-    memcpy(iv.iv2, iv.iv1, 8);
-    size_t bytes;
-    char buffer[page_size];
-    do {
-        ++*reinterpret_cast<uint32_t*>(iv.iv1);
-
-        bytes = crypt(mode_Encrypt, pos, buffer, src, size, iv.iv1);
-        // Just using the prefix as the hash should be fine since it's ciphertext
-        memcpy(iv.hash1, buffer, 4);
-        // If both the old and new have the same prefix we won't know which IV
-        // to use, so keep bumping the new IV until they're different
-    } while (TIGHTDB_UNLIKELY(memcmp(iv.hash1, iv.hash2, 4) == 0));
-
-    lseek(fd, iv_table_pos(pos), SEEK_SET);
-    ::write(fd, &iv, sizeof(iv));
-
-    lseek(fd, real_offset(pos), SEEK_SET);
-    ::write(fd, buffer, bytes);
-}
-
-size_t AESCryptor::crypt(EncryptionMode mode, off_t pos, char* dst, const char* src, size_t len, const char* stored_iv) {
-    TIGHTDB_ASSERT(len <= page_size);
-
-    char buffer[page_size] = {0};
-    // if source len isn't a multiple of the block size, pad it with zeroes
-    // we don't store the real size anywhere and rely on that the things
-    // using this are okay with too-large files
-    if (len & (aes_block_size - 1)) {
-        auto padded_len = pad_to_aes_block_size(len);
-        memcpy(buffer, src, len);
-        memset(buffer + len, 0, padded_len - len);
-        src = buffer;
-        len = padded_len;
-    }
-
-    uint8_t iv[aes_block_size] = {0};
-    memcpy(iv, stored_iv, 4);
-    memcpy(iv + 4, &pos, sizeof(pos));
-
-#ifdef __APPLE__
-    auto cryptor = mode == mode_Encrypt ? m_encr : m_decr;
-    CCCryptorReset(cryptor, iv);
-
-    size_t bytesEncrypted = 0;
-    auto err = CCCryptorUpdate(cryptor, src, len, dst, sizeof(buffer), &bytesEncrypted);
-    TIGHTDB_ASSERT(err == kCCSuccess);
-    TIGHTDB_ASSERT(bytesEncrypted == len);
-    static_cast<void>(bytesEncrypted);
-    static_cast<void>(err);
-#else
-    AES_cbc_encrypt(src, dst, len, mode == mode_Encrypt ? &m_ectx : &m_dctx, iv, mode);
-#endif
-    return len;
-}
-
-EncryptedFileMapping::EncryptedFileMapping(shared_file_info& file, void* addr, size_t size, File::AccessMode access)
-: m_file(file)
-, m_access(access)
-{
-    set(addr, size);
-    file.mappings.push_back(this);
-}
-
-EncryptedFileMapping::~EncryptedFileMapping() {
-    flush();
-    sync();
-    m_file.mappings.erase(remove(m_file.mappings.begin(), m_file.mappings.end(), this));
-}
-
-char* EncryptedFileMapping::page_addr(size_t i) const {
-    return reinterpret_cast<char*>(((m_first_page + i) * page_size));
-}
-
-size_t EncryptedFileMapping::actual_page_size(size_t i) const {
-    if (i < m_page_count - 1)
-        return page_size;
-    return std::min<size_t>(page_size, m_size - (page_addr(i) - (char*)m_addr));
-}
-
-void EncryptedFileMapping::mark_unreadable(size_t i) {
-    mprotect(page_addr(i), page_size, PROT_NONE);
-    m_read_pages[i] = false;
-    m_dirty_pages[i] = false;
-}
-
-void EncryptedFileMapping::mark_readable(size_t i) {
-    mprotect(page_addr(i), page_size, PROT_READ);
-    m_read_pages[i] = true;
-    m_dirty_pages[i] = false;
-}
-
-void EncryptedFileMapping::flush_page(size_t i) {
-    if (i <= m_page_count && m_dirty_pages[i])
-        flush(); // have to flush all pages for ACID guarantess
-}
-
-void EncryptedFileMapping::read_page(size_t i) {
-    bool has_copied = false;
-    auto addr = page_addr(i);
-    mprotect(addr, page_size, PROT_READ | PROT_WRITE);
-
-    for (auto m : m_file.mappings) {
-        if (m != this && i < m->m_page_count) {
-            m->flush_page(i);
-            if (!has_copied && m->m_read_pages[i] && actual_page_size(i) == m->actual_page_size(i)) {
-                memcpy(addr, m->page_addr(i), page_size);
-                has_copied = true;
-            }
-        }
-    }
-
-    if (!has_copied)
-        m_file.cryptor.read(m_file.fd, i * page_size, (char*)addr, actual_page_size(i));
-
-    mark_readable(i);
-}
-
-void EncryptedFileMapping::write_page(size_t i) {
-    for (auto m : m_file.mappings) {
-        if (m != this && i < m->m_page_count) {
-            m->flush_page(i);
-            m->mark_unreadable(i);
-        }
-    }
-
-    mprotect(page_addr(i), page_size, PROT_READ | PROT_WRITE);
-    m_dirty_pages[i] = true;
-}
-
-void EncryptedFileMapping::validate_page(size_t i) {
-#ifdef TIGHTDB_DEBUG
-    if (!m_read_pages[i]) return;
-
-    char buffer[page_size];
-    m_file.cryptor.read(m_file.fd, i * page_size, buffer, sizeof(buffer));
-    if (memcmp(buffer, page_addr(i), actual_page_size(i))) {
-        printf("mismatch %p: fd(%d) page(%zu/%zu) page_size(%zu) %s %s\n",
-               this, m_file.fd, i, m_page_count, actual_page_size(i), buffer, page_addr(i));
-        TIGHTDB_TERMINATE("");
-    }
-#else
-    static_cast<void>(i);
-#endif
-}
-
-void EncryptedFileMapping::validate() {
-#ifdef TIGHTDB_DEBUG
-    for (size_t i = 0; i < m_page_count; ++i)
-        validate_page(i);
-#endif
-}
-
-void EncryptedFileMapping::flush() {
-    size_t start = 0;
-    for (size_t i = 0; i < m_page_count; ++i) {
-        if (!m_dirty_pages[i]) {
-            validate_page(i);
-            if (start < i)
-                mprotect(page_addr(start), (i - start) * page_size, PROT_READ);
-            start = i + 1;
-            continue;
-        }
-
-        m_file.cryptor.write(m_file.fd, i * page_size, (char*)page_addr(i), actual_page_size(i));
-        m_dirty_pages[i] = false;
-    }
-    if (start < m_page_count)
-        mprotect(page_addr(start), (m_page_count - start) * page_size, PROT_READ);
-
-    validate();
-}
-
-void EncryptedFileMapping::sync() {
-    fsync(m_file.fd);
-}
-
-void EncryptedFileMapping::handle_access(void* addr) TIGHTDB_NOEXCEPT {
-    auto accessed_page = (uintptr_t)addr / page_size;
-
-    size_t idx = accessed_page - m_first_page;
-    if (!m_read_pages[idx]) {
-        read_page(idx);
-    }
-    else if (m_access == File::access_ReadWrite) {
-        write_page(idx);
-    }
-    else {
-        TIGHTDB_TERMINATE("Attempt to write to read-only memory");
-    }
-}
-
-void EncryptedFileMapping::set(void* new_addr, size_t new_size) {
-    // Happens if mremap() was called where the old size and new size need the
-    // same number of pages
-    if (new_addr == m_addr) {
-        TIGHTDB_ASSERT((new_size + page_size - 1) / page_size == m_page_count);
-        m_size = new_size;
-        return;
-    }
-
-    flush();
-    m_addr = new_addr;
-    m_size = new_size;
-
-    m_first_page = (uintptr_t)m_addr / page_size;
-    m_page_count = (m_size + page_size - 1)  / page_size;
-
-    m_read_pages.clear();
-    m_dirty_pages.clear();
-
-    m_read_pages.resize(m_page_count, false);
-    m_dirty_pages.resize(m_page_count, false);
 }
 
 size_t round_up_to_page_size(size_t size) {
@@ -657,7 +224,7 @@ void* mmap(int fd, size_t size, File::AccessMode access, const uint8_t* encrypti
     throw std::runtime_error(get_errno_msg("mmap() failed: ", err));
 }
 
-void munmap(void* addr, size_t size) {
+void munmap(void* addr, size_t size) TIGHTDB_NOEXCEPT {
 #ifdef TIGHTDB_ENABLE_ENCRYPTION
     remove_mapping(addr, size);
 #endif
@@ -717,22 +284,6 @@ void msync(void* addr, size_t size) {
         int err = errno; // Eliminate any risk of clobbering
         throw std::runtime_error(get_errno_msg("msync() failed: ", err));
     }
-}
-
-File::SizeType encrypted_size_to_data_size(File::SizeType size) {
-#ifdef TIGHTDB_ENABLE_ENCRYPTION
-    return fake_offset(size);
-#else
-    return size;
-#endif
-}
-
-File::SizeType data_size_to_encrypted_size(File::SizeType size) {
-#ifdef TIGHTDB_ENABLE_ENCRYPTION
-    return real_offset(size);
-#else
-    return size;
-#endif
 }
 
 }
