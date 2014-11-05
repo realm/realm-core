@@ -150,7 +150,6 @@ private:
     void flush_page(size_t i);
     void read_page(size_t i);
     void write_page(size_t i);
-    void invalidate(std::vector<bool> const& pages);
 
     void validate_page(size_t i);
     void validate();
@@ -526,23 +525,7 @@ void EncryptedFileMapping::validate() {
 #endif
 }
 
-void EncryptedFileMapping::invalidate(std::vector<bool> const& pages) {
-    for (size_t i = 0; i < m_page_count && i < pages.size(); ++i) {
-        if (pages[i] && m_read_pages[i]) {
-            TIGHTDB_ASSERT(!m_dirty_pages[i]);
-            mark_unreadable(i);
-        }
-    }
-}
-
 void EncryptedFileMapping::flush() {
-    // invalidate all read mappings for pages we're about to write to and
-    // for them to be re-read when needed
-    for (auto m : mappings_by_file) {
-        if (same_file(m))
-            m.mapping->invalidate(m_dirty_pages);
-    }
-
     for (size_t i = 0; i < m_page_count; ++i) {
         if (!m_dirty_pages[i]) {
             validate_page(i);
