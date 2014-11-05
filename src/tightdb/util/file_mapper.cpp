@@ -526,15 +526,21 @@ void EncryptedFileMapping::validate() {
 }
 
 void EncryptedFileMapping::flush() {
+    size_t start = 0;
     for (size_t i = 0; i < m_page_count; ++i) {
         if (!m_dirty_pages[i]) {
             validate_page(i);
+            if (start < i)
+                mprotect(page_addr(start), (i - start) * page_size, PROT_READ);
+            start = i + 1;
             continue;
         }
 
-        mark_readable(i);
         m_cryptor.write(m_fd, i * page_size, (char*)page_addr(i), actual_page_size(i));
+        m_dirty_pages[i] = false;
     }
+    if (start < m_page_count)
+        mprotect(page_addr(start), (m_page_count - start) * page_size, PROT_READ);
 
     validate();
 }
