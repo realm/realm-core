@@ -81,9 +81,10 @@ public:
     void transact_log_reserve(std::size_t n);
     virtual void stop_logging() TIGHTDB_OVERRIDE;
     virtual void reset_log_management() TIGHTDB_OVERRIDE;
+    void cleanup_stale_versions();
     virtual void set_last_version_seen_locally(uint_fast64_t last_seen_version_number) TIGHTDB_NOEXCEPT;
     virtual void set_last_version_synced(uint_fast64_t last_seen_version_number) TIGHTDB_NOEXCEPT;
-    virtual uint_fast64_t get_last_version_synced() TIGHTDB_NOEXCEPT;
+    virtual uint_fast64_t get_last_version_synced(uint_fast64_t* newest_version_number) TIGHTDB_NOEXCEPT;
     virtual void get_commit_entries(uint_fast64_t from_version, uint_fast64_t to_version,
                                     BinaryData* logs_buffer) TIGHTDB_NOEXCEPT;
 protected:
@@ -105,12 +106,19 @@ protected:
         // The end_commit_range is a traditional C++ limit, it points one past the last number
         uint64_t write_offset; // within active file, value always kept aligned to uint64_t
 
+        // Last seen versions by Sync and local sharing, respectively
+        uint64_t last_version_seen_locally;
+        // A value of zero for last_version_synced indicates that Sync is not used, so this
+        // member can be disregarded when determining which logs are stale.
+        uint64_t last_version_synced;
+
         // proper intialization:
         CommitLogPreamble() : lock() 
         { 
             active_file_is_log_a = true;
             // The first commit will be from state 1 -> state 2, so we must set 1 initially
             begin_oldest_commit_range = begin_newest_commit_range = end_commit_range = 1;
+            last_version_seen_locally = last_version_synced = 0;
             write_offset = sizeof(*this);
         }
     };
@@ -192,7 +200,7 @@ void WriteLogCollector::reset_file(CommitLogMetadata& log)
 }
 
 WriteLogCollector::~WriteLogCollector() TIGHTDB_NOEXCEPT 
-{    
+{
     m_log_a.map.unmap();
     m_log_a.file.close();
     m_log_b.map.unmap();
@@ -207,24 +215,11 @@ void WriteLogCollector::stop_logging()
 
 void WriteLogCollector::reset_log_management()
 {
-    // this call is only made on the replication object associated with the *first* SharedGroup
-    // it must (re)initialize the log files. It does not change the content of any already existing
-    // files, but instead deletes and re-creates the files.
-    // it also sets the intial memory mappings for the files.
     reset_file(m_log_a);
     reset_file(m_log_b);
     new(m_log_a.map.get_addr()) CommitLogPreamble();
 }
 
-
-void WriteLogCollector::set_last_version_synced(uint_fast64_t last_seen_version_number) TIGHTDB_NOEXCEPT
-{
-}
-
-uint_fast64_t WriteLogCollector::get_last_version_synced() TIGHTDB_NOEXCEPT
-{
-    return 0;
-}
 
 
 void recover_from_dead_owner()
@@ -232,25 +227,58 @@ void recover_from_dead_owner()
     // nothing!
 }
 
+
+void WriteLogCollector::set_last_version_synced(uint_fast64_t last_seen_version_number) TIGHTDB_NOEXCEPT
+{
+    remap_if_needed(m_log_a);
+    CommitLogPreamble* preamble = m_log_a.map.get_addr();
+    RobustLockGuard rlg(preamble->lock, &recover_from_dead_owner);
+    preamble->last_version_synced = last_seen_version_number;
+    cleanup_stale_versions();
+}
+
+uint_fast64_t WriteLogCollector::get_last_version_synced(uint_fast64_t* end_version_number) TIGHTDB_NOEXCEPT
+{
+    remap_if_needed(m_log_a);
+    CommitLogPreamble* preamble = m_log_a.map.get_addr();
+    RobustLockGuard rlg(preamble->lock, &recover_from_dead_owner);
+    if (end_version_number) {
+        *end_version_number = preamble->end_commit_range;
+    }
+    if (preamble->last_version_synced)
+        return preamble->last_version_synced;
+    else
+        return preamble->last_version_seen_locally;
+}
+
 void WriteLogCollector::set_last_version_seen_locally(version_type last_seen_version_number) TIGHTDB_NOEXCEPT
 {
-    // this call should only update in-file information, possibly recycling file usage
-    // if a file holds only versions before last_seen_version_number, it can be recycled.
-    // recycling is done by updating the preamble
     remap_if_needed(m_log_a);
-    remap_if_needed(m_log_b);
     CommitLogPreamble* preamble = m_log_a.map.get_addr();
-    {
-        preamble->lock.lock(&recover_from_dead_owner);
-        // cerr << "oldest_version(" << last_seen_version_number << ")" << endl; 
-        if (last_seen_version_number >= preamble->begin_newest_commit_range) {
-            // oldest file holds only stale commitlogs, so let's swap files and update the range
-            preamble->active_file_is_log_a = !preamble->active_file_is_log_a;
-            preamble->begin_oldest_commit_range = preamble->begin_newest_commit_range;
-            preamble->begin_newest_commit_range = preamble->end_commit_range;
-            preamble->write_offset = sizeof(CommitLogPreamble);
-        }
-        preamble->lock.unlock();
+    RobustLockGuard rlg(preamble->lock, &recover_from_dead_owner);
+    preamble->last_version_seen_locally = last_seen_version_number;
+    cleanup_stale_versions();
+}
+
+void WriteLogCollector::cleanup_stale_versions()
+{
+    // if a file holds only versions before last_seen_version_number, it can be recycled.
+    // recycling is done by updating the preamble of log file A, which must be mapped by
+    // the caller.
+    CommitLogPreamble* preamble = m_log_a.map.get_addr();
+    version_type last_seen_version_number;
+    last_seen_version_number = preamble->last_version_seen_locally;
+    if (preamble->last_version_synced 
+        && preamble->last_version_synced < preamble->last_version_seen_locally)
+        last_seen_version_number = preamble->last_version_synced;
+
+    // cerr << "oldest_version(" << last_seen_version_number << ")" << endl; 
+    if (last_seen_version_number >= preamble->begin_newest_commit_range) {
+        // oldest file holds only stale commitlogs, so let's swap files and update the range
+        preamble->active_file_is_log_a = !preamble->active_file_is_log_a;
+        preamble->begin_oldest_commit_range = preamble->begin_newest_commit_range;
+        preamble->begin_newest_commit_range = preamble->end_commit_range;
+        preamble->write_offset = sizeof(CommitLogPreamble);
     }
 }
 

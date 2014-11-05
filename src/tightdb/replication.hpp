@@ -62,10 +62,7 @@ public:
 
     class Interrupted; // Exception
 
-    /// Reset transaction logs. To be called from SharedGroup iff it initializes the .lock file.
-    /// The caller guarantees that NO SharedGroup involved in access to the same database
-    /// will ask for logs through get_commit_entries *before* calling register_interest to
-    /// indicate which versions they will possibly ask for. Also it indicates that any pending
+    /// Reset transaction logs. This call indicates that any existing
     /// logs pertaining to the same database are stale and can be discarded.
     /// The caller must have exclusive access to the database when this call is made.
     virtual void reset_log_management() TIGHTDB_OVERRIDE;
@@ -76,26 +73,32 @@ public:
     /// Called by SharedGroup during a write transaction, when readlocks are recycled, to
     /// keep the commit log management in sync with what versions can possibly be interesting
     /// in the future.
-    /// Guarantees that any later call to get_commit_entries will ask for later versions only.
     virtual void set_last_version_seen_locally(uint_fast64_t last_seen_version_number) TIGHTDB_NOEXCEPT;
 
     /// Get all transaction logs between the specified versions. The number
     /// of requested logs is exactly `to_version - from_version`. If this
     /// number is greater than zero, the first requested log is the one that
     /// brings the database from `from_version` to `from_version +
-    /// 1`. References to the requested logs are store in successive entries
+    /// 1`. References to the requested logs are stored in successive entries
     /// of `logs_buffer`. The calee retains ownership of the memory
-    /// referenced by those entries.
+    /// referenced by those entries, and the memory will remain accessible
+    /// to the caller until they are declared stale by calls to 'set_last_version_seen_locally' 
+    /// and 'set_last_version_synced'.
     virtual void get_commit_entries(uint_fast64_t from_version, uint_fast64_t to_version,
                                     BinaryData* logs_buffer) TIGHTDB_NOEXCEPT;
 
     /// Support for global sync. The commit logs will be retained until
     /// they grow older than both of the versions indicated by 'set_last_versions_seen_locally'
-    /// and 'set_last_version_synced'
+    /// and 'set_last_version_synced'. Providing a version number of zero disables
+    /// the use of sync versioning. Providing a non-zero version number enables the
+    /// use of sync versioning.
     virtual void set_last_version_synced(uint_fast64_t last_seen_version_number) TIGHTDB_NOEXCEPT;
 
     /// Get the value set by last call to 'set_last_version_synced'
-    virtual uint_fast64_t get_last_version_synced() TIGHTDB_NOEXCEPT;
+    /// If 'end_version_number' is non null, a limit to version numbering is returned.
+    /// The limit is one past the number of the last version actually stored.
+    /// If sync versioning is disabled, the last version set locally is returned.
+    virtual uint_fast64_t get_last_version_synced(uint_fast64_t* end_version_number = 0) TIGHTDB_NOEXCEPT;
 
     /// Acquire permision to start a new 'write' transaction. This
     /// function must be called by a client before it requests a
@@ -598,7 +601,7 @@ inline void Replication::set_last_version_synced(uint_fast64_t) TIGHTDB_NOEXCEPT
 {
 }
 
-inline uint_fast64_t Replication::get_last_version_synced() TIGHTDB_NOEXCEPT
+inline uint_fast64_t Replication::get_last_version_synced(uint_fast64_t*) TIGHTDB_NOEXCEPT
 {
     return 0;
 }
