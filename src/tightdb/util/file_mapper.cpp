@@ -54,6 +54,7 @@ struct iv_table;
 class AESCryptor {
 public:
     AESCryptor(const uint8_t* key);
+    ~AESCryptor();
 
     void read(int fd, off_t pos, char* dst, size_t size);
     void write(int fd, off_t pos, const char* src, size_t size);
@@ -70,7 +71,8 @@ private:
     };
 
 #ifdef __APPLE__
-    uint8_t m_key[32];
+    CCCryptorRef m_encr;
+    CCCryptorRef m_decr;
 #else
     AES_KEY m_ectx;
     AES_KEY m_dctx;
@@ -112,7 +114,7 @@ public:
 
     // Handle a SEGV or BUS at the given address, which must be within this
     // object's mapping
-    void handle_access(void* addr);
+    void handle_access(void* addr) TIGHTDB_NOEXCEPT;
 
     // Set this mapping to a new address and size
     // Flushes any remaining dirty pages from the old mapping
@@ -259,10 +261,18 @@ size_t pad_to_aes_block_size(size_t len) {
 
 AESCryptor::AESCryptor(const uint8_t* key) {
 #ifdef __APPLE__
-    memcpy(m_key, key, 32);
+    CCCryptorCreate(kCCEncrypt, kCCAlgorithmAES, 0 /* options */, key, kCCKeySizeAES256, 0 /* IV */, &m_encr);
+    CCCryptorCreate(kCCDecrypt, kCCAlgorithmAES, 0 /* options */, key, kCCKeySizeAES256, 0 /* IV */, &m_decr);
 #else
     AES_set_encrypt_key(key, 256 /* key size in bits */, &m_ectx);
     AES_set_decrypt_key(key, 256 /* key size in bits */, &m_dctx);
+#endif
+}
+
+AESCryptor::~AESCryptor() {
+#ifdef __APPLE__
+    CCCryptorRelease(m_encr);
+    CCCryptorRelease(m_decr);
 #endif
 }
 
@@ -392,12 +402,11 @@ size_t AESCryptor::crypt(EncryptionMode mode, off_t pos, char* dst, const char* 
     memcpy(iv + 4, &pos, sizeof(pos));
 
 #ifdef __APPLE__
+    auto cryptor = mode == mode_Encrypt ? m_encr : m_decr;
+    CCCryptorReset(cryptor, iv);
+
     size_t bytesEncrypted = 0;
-    auto err = CCCrypt(mode, kCCAlgorithmAES, 0 /* options */,
-                       m_key, kCCKeySizeAES256, iv,
-                       src, len,
-                       dst, sizeof(buffer),
-                       &bytesEncrypted);
+    auto err = CCCryptorUpdate(cryptor, src, len, dst, sizeof(buffer), &bytesEncrypted);
     TIGHTDB_ASSERT(err == kCCSuccess);
     TIGHTDB_ASSERT(bytesEncrypted == len);
     static_cast<void>(bytesEncrypted);
@@ -551,7 +560,7 @@ void EncryptedFileMapping::sync() {
     fsync(m_fd);
 }
 
-void EncryptedFileMapping::handle_access(void* addr) {
+void EncryptedFileMapping::handle_access(void* addr) TIGHTDB_NOEXCEPT {
     auto accessed_page = (uintptr_t)addr / page_size;
 
     size_t idx = accessed_page - m_first_page;
