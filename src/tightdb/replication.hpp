@@ -77,7 +77,7 @@ public:
     /// keep the commit log management in sync with what versions can possibly be interesting
     /// in the future.
     /// Guarantees that any later call to get_commit_entries will ask for later versions only.
-    virtual void set_oldest_version_needed(uint_fast64_t last_seen_version_number) TIGHTDB_NOEXCEPT;
+    virtual void set_last_version_seen_locally(uint_fast64_t last_seen_version_number) TIGHTDB_NOEXCEPT;
 
     /// Get all transaction logs between the specified versions. The number
     /// of requested logs is exactly `to_version - from_version`. If this
@@ -88,6 +88,14 @@ public:
     /// referenced by those entries.
     virtual void get_commit_entries(uint_fast64_t from_version, uint_fast64_t to_version,
                                     BinaryData* logs_buffer) TIGHTDB_NOEXCEPT;
+
+    /// Support for global sync. The commit logs will be retained until
+    /// they grow older than both of the versions indicated by 'set_last_versions_seen_locally'
+    /// and 'set_last_version_synced'
+    virtual void set_last_version_synced(uint_fast64_t last_seen_version_number) TIGHTDB_NOEXCEPT;
+
+    /// Get the value set by last call to 'set_last_version_synced'
+    virtual uint_fast64_t get_last_version_synced() TIGHTDB_NOEXCEPT;
 
     /// Acquire permision to start a new 'write' transaction. This
     /// function must be called by a client before it requests a
@@ -582,8 +590,17 @@ inline void Replication::stop_logging() TIGHTDB_OVERRIDE
 {
 }
 
-inline void Replication::set_oldest_version_needed(uint_fast64_t) TIGHTDB_NOEXCEPT
+inline void Replication::set_last_version_seen_locally(uint_fast64_t) TIGHTDB_NOEXCEPT
 {
+}
+
+inline void Replication::set_last_version_synced(uint_fast64_t) TIGHTDB_NOEXCEPT
+{
+}
+
+inline uint_fast64_t Replication::get_last_version_synced() TIGHTDB_NOEXCEPT
+{
+    return 0;
 }
 
 inline void Replication::get_commit_entries(uint_fast64_t, uint_fast64_t, BinaryData*) TIGHTDB_NOEXCEPT

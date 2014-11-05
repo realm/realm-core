@@ -1320,7 +1320,7 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
         // available version:
         Replication* repl = _impl::GroupFriend::get_replication(m_group);
         if (repl)
-            repl->set_oldest_version_needed(readlock_version);
+            repl->set_last_version_seen_locally(readlock_version);
 #endif
 
     }

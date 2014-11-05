@@ -81,7 +81,9 @@ public:
     void transact_log_reserve(std::size_t n);
     virtual void stop_logging() TIGHTDB_OVERRIDE;
     virtual void reset_log_management() TIGHTDB_OVERRIDE;
-    virtual void set_oldest_version_needed(uint_fast64_t last_seen_version_number) TIGHTDB_NOEXCEPT;
+    virtual void set_last_version_seen_locally(uint_fast64_t last_seen_version_number) TIGHTDB_NOEXCEPT;
+    virtual void set_last_version_synced(uint_fast64_t last_seen_version_number) TIGHTDB_NOEXCEPT;
+    virtual uint_fast64_t get_last_version_synced() TIGHTDB_NOEXCEPT;
     virtual void get_commit_entries(uint_fast64_t from_version, uint_fast64_t to_version,
                                     BinaryData* logs_buffer) TIGHTDB_NOEXCEPT;
 protected:
@@ -214,12 +216,23 @@ void WriteLogCollector::reset_log_management()
     new(m_log_a.map.get_addr()) CommitLogPreamble();
 }
 
+
+void WriteLogCollector::set_last_version_synced(uint_fast64_t last_seen_version_number) TIGHTDB_NOEXCEPT
+{
+}
+
+uint_fast64_t WriteLogCollector::get_last_version_synced() TIGHTDB_NOEXCEPT
+{
+    return 0;
+}
+
+
 void recover_from_dead_owner()
 {
     // nothing!
 }
 
-void WriteLogCollector::set_oldest_version_needed(version_type last_seen_version_number) TIGHTDB_NOEXCEPT
+void WriteLogCollector::set_last_version_seen_locally(version_type last_seen_version_number) TIGHTDB_NOEXCEPT
 {
     // this call should only update in-file information, possibly recycling file usage
     // if a file holds only versions before last_seen_version_number, it can be recycled.
