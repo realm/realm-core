@@ -139,12 +139,20 @@ protected:
     CommitLogMetadata m_log_a;
     CommitLogMetadata m_log_b;
     util::Buffer<char> m_transact_log_buffer;
+    util::File::Map<CommitLogPreamble> m_preamble;
     // last seen version and associated offset - 0 for invalid
     uint64_t m_read_version;
     uint64_t m_read_offset;
 
-    // Ensure the log files memory mapping is up to date (for full portability, the
-    // mapping needs to be changed if the size of the file has changed since the previous mapping).
+    // make sure the preamble (in log file A) is available and mapped. This is required for
+    // mutex access.
+    void map_preamble_if_needed();
+
+    // Ensure the file is open so that it can be resized or mapped
+    void open_if_needed(CommitLogMetadata& log);
+
+    // Ensure the log files memory mapping is up to date (the mapping needs to be changed 
+    // if the size of the file has changed since the previous mapping).
     void remap_if_needed(CommitLogMetadata& log);
 
     // Reset mapping and file
@@ -174,10 +182,18 @@ void WriteLogCollector::get_buffers_in_order(char*& first, char*& second)
     }
 }
 
-void WriteLogCollector::remap_if_needed(CommitLogMetadata& log)
+
+void WriteLogCollector::open_if_needed(CommitLogMetadata& log)
 {
     if (log.file.is_attached() == false) {
         log.file.open(log.name, File::mode_Update);
+    }
+}
+
+void WriteLogCollector::remap_if_needed(CommitLogMetadata& log)
+{
+    if (log.map.is_attached() == false) {
+        open_if_needed(log);
         log.last_seen_size = log.file.get_size();
         log.map.map(log.file, File::access_ReadWrite, log.last_seen_size);
         return;
@@ -185,6 +201,14 @@ void WriteLogCollector::remap_if_needed(CommitLogMetadata& log)
     if (log.last_seen_size != log.file.get_size()) {
         log.map.remap(log.file, File::access_ReadWrite, log.file.get_size());
         log.last_seen_size = log.file.get_size();
+    }
+}
+
+void WriteLogCollector::map_preamble_if_needed()
+{
+    if (m_preamble.is_attached() == false) {
+        open_if_needed(m_log_a);
+        m_preamble.map(m_log_a.file, File::access_ReadWrite, sizeof(CommitLogPreamble));
     }
 }
 
@@ -205,6 +229,7 @@ WriteLogCollector::~WriteLogCollector() TIGHTDB_NOEXCEPT
     m_log_a.file.close();
     m_log_b.map.unmap();
     m_log_b.file.close();
+    m_preamble.unmap();
 }
 
 void WriteLogCollector::stop_logging()
@@ -215,9 +240,11 @@ void WriteLogCollector::stop_logging()
 
 void WriteLogCollector::reset_log_management()
 {
+    m_preamble.unmap();
     reset_file(m_log_a);
     reset_file(m_log_b);
-    new(m_log_a.map.get_addr()) CommitLogPreamble();
+    map_preamble_if_needed();
+    new(m_preamble.get_addr()) CommitLogPreamble();
 }
 
 
@@ -230,8 +257,8 @@ void recover_from_dead_owner()
 
 void WriteLogCollector::set_last_version_synced(uint_fast64_t last_seen_version_number) TIGHTDB_NOEXCEPT
 {
-    remap_if_needed(m_log_a);
-    CommitLogPreamble* preamble = m_log_a.map.get_addr();
+    map_preamble_if_needed();
+    CommitLogPreamble* preamble = m_preamble.get_addr();
     RobustLockGuard rlg(preamble->lock, &recover_from_dead_owner);
     preamble->last_version_synced = last_seen_version_number;
     cleanup_stale_versions();
@@ -239,8 +266,8 @@ void WriteLogCollector::set_last_version_synced(uint_fast64_t last_seen_version_
 
 uint_fast64_t WriteLogCollector::get_last_version_synced(uint_fast64_t* end_version_number) TIGHTDB_NOEXCEPT
 {
-    remap_if_needed(m_log_a);
-    CommitLogPreamble* preamble = m_log_a.map.get_addr();
+    map_preamble_if_needed();
+    CommitLogPreamble* preamble = m_preamble.get_addr();
     RobustLockGuard rlg(preamble->lock, &recover_from_dead_owner);
     if (end_version_number) {
         *end_version_number = preamble->end_commit_range;
@@ -253,8 +280,8 @@ uint_fast64_t WriteLogCollector::get_last_version_synced(uint_fast64_t* end_vers
 
 void WriteLogCollector::set_last_version_seen_locally(version_type last_seen_version_number) TIGHTDB_NOEXCEPT
 {
-    remap_if_needed(m_log_a);
-    CommitLogPreamble* preamble = m_log_a.map.get_addr();
+    map_preamble_if_needed();
+    CommitLogPreamble* preamble = m_preamble.get_addr();
     RobustLockGuard rlg(preamble->lock, &recover_from_dead_owner);
     preamble->last_version_seen_locally = last_seen_version_number;
     cleanup_stale_versions();
@@ -265,7 +292,7 @@ void WriteLogCollector::cleanup_stale_versions()
     // if a file holds only versions before last_seen_version_number, it can be recycled.
     // recycling is done by updating the preamble of log file A, which must be mapped by
     // the caller.
-    CommitLogPreamble* preamble = m_log_a.map.get_addr();
+    CommitLogPreamble* preamble = m_preamble.get_addr();
     version_type last_seen_version_number;
     last_seen_version_number = preamble->last_version_seen_locally;
     if (preamble->last_version_synced 
@@ -286,17 +313,16 @@ void WriteLogCollector::cleanup_stale_versions()
 void WriteLogCollector::get_commit_entries(version_type from_version, version_type to_version,
                                            BinaryData* logs_buffer) TIGHTDB_NOEXCEPT
 {
-    // - make sure the files are open and mapped, possibly update stale mappings
-    remap_if_needed(m_log_a);
-    remap_if_needed(m_log_b);
-    CommitLogPreamble* preamble = m_log_a.map.get_addr();
+    map_preamble_if_needed();
+    CommitLogPreamble* preamble = m_preamble.get_addr();
     {
-        // even though the file may grow and after the remapping above and before
-        // we take the lock, we are safe. The versions requested (and which we will visit
-        // in the files) will stay at the same offset of the files.
         preamble->lock.lock(&recover_from_dead_owner);
         TIGHTDB_ASSERT(from_version >= preamble->begin_oldest_commit_range);
         TIGHTDB_ASSERT(to_version <= preamble->end_commit_range);
+
+        // - make sure the files are open and mapped, possibly update stale mappings
+        remap_if_needed(m_log_a);
+        remap_if_needed(m_log_b);
         // cerr << "get_commit_entries(" << from_version << ", " << to_version <<")" << endl;
         char* buffer;
         char* second_buffer;
@@ -368,9 +394,8 @@ WriteLogCollector::do_commit_write_transact(SharedGroup& sg,
     char* data     = m_transact_log_buffer.release();
     uint64_t sz = m_transact_log_free_begin - data;
     version_type new_version = orig_version + 1;
-    remap_if_needed(m_log_a);
-    remap_if_needed(m_log_b);
-    CommitLogPreamble* preamble = m_log_a.map.get_addr();
+    map_preamble_if_needed();
+    CommitLogPreamble* preamble = m_preamble.get_addr();
     {
         preamble->lock.lock(&recover_from_dead_owner);
         // cerr << "commit_write_transaction(" << orig_version << ")" << endl;
@@ -380,6 +405,9 @@ WriteLogCollector::do_commit_write_transact(SharedGroup& sg,
         else
             active_log = &m_log_b;
 
+        // make sure the file is available for potential resizing
+        open_if_needed(*active_log);
+
         // make sure we have space (allocate if not)
         File::SizeType size_needed = aligned_to(sizeof(uint64_t), preamble->write_offset + sizeof(uint64_t) + sz);
         size_needed = aligned_to(page_size, size_needed);
@@ -387,10 +415,8 @@ WriteLogCollector::do_commit_write_transact(SharedGroup& sg,
             active_log->file.resize(size_needed);
         }
 
-        // change mapping so that we can write:
+        // create/update mapping so that we are sure it covers the file we are about write:
         remap_if_needed(*active_log);
-        // remember to refresh the preamble pointer, as it may have been remapped
-        preamble = m_log_a.map.get_addr();
 
         // append data from write pointer and onwards:
         char* write_ptr = reinterpret_cast<char*>(active_log->map.get_addr()) + preamble->write_offset;

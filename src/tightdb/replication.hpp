@@ -81,9 +81,9 @@ public:
     /// brings the database from `from_version` to `from_version +
     /// 1`. References to the requested logs are stored in successive entries
     /// of `logs_buffer`. The calee retains ownership of the memory
-    /// referenced by those entries, and the memory will remain accessible
+    /// referenced by those entries, but the memory will remain accessible
     /// to the caller until they are declared stale by calls to 'set_last_version_seen_locally' 
-    /// and 'set_last_version_synced'.
+    /// and 'set_last_version_synced', OR until a new call to get_commit_entries() is made.
     virtual void get_commit_entries(uint_fast64_t from_version, uint_fast64_t to_version,
                                     BinaryData* logs_buffer) TIGHTDB_NOEXCEPT;
 
