@@ -114,4 +114,30 @@ TEST(File_Map)
     }
 }
 
+TEST(File_MapMultiplePages)
+{
+    const size_t count = 4096 * 100;
+
+    TEST_PATH(path);
+    {
+        File f(path, File::mode_Write);
+        f.set_encryption_key(tightdb::test_util::key);
+        f.resize(count * sizeof(size_t));
+
+        File::Map<size_t> map(f, File::access_ReadWrite, count * sizeof(size_t));
+        for (size_t i = 0; i < count; ++i)
+            map.get_addr()[i] = i;
+    }
+    {
+        File f(path, File::mode_Read);
+        f.set_encryption_key(tightdb::test_util::key);
+        File::Map<size_t> map(f, File::access_ReadOnly, count * sizeof(size_t));
+        for (size_t i = 0; i < count; ++i) {
+            CHECK_EQUAL(map.get_addr()[i], i);
+            if (map.get_addr()[i] != i)
+                return;
+          }
+    }
+}
+
 #endif // TEST_FILE

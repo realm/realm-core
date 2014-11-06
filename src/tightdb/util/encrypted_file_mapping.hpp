@@ -43,6 +43,8 @@ public:
     AESCryptor(const uint8_t* key);
     ~AESCryptor() TIGHTDB_NOEXCEPT;
 
+    void set_file_size(off_t new_size);
+
     void read(int fd, off_t pos, char* dst, size_t size) TIGHTDB_NOEXCEPT;
     void write(int fd, off_t pos, const char* src, size_t size) TIGHTDB_NOEXCEPT;
 
@@ -65,10 +67,12 @@ private:
     AES_KEY m_dctx;
 #endif
 
+    std::vector<iv_table> m_iv_buffer;
+
     size_t crypt(EncryptionMode mode, off_t pos, char* dst, const char* src,
                  size_t len, const char* stored_iv) TIGHTDB_NOEXCEPT;
 
-    iv_table read_iv_table(int fd, off_t data_pos) TIGHTDB_NOEXCEPT;
+    iv_table& get_iv_table(int fd, off_t data_pos) TIGHTDB_NOEXCEPT;
 };
 
 class EncryptedFileMapping;
@@ -99,7 +103,7 @@ public:
 
     // Set this mapping to a new address and size
     // Flushes any remaining dirty pages from the old mapping
-    void set(void* new_addr, size_t new_size) TIGHTDB_NOEXCEPT;
+    void set(void* new_addr, size_t new_size);
 
 private:
     SharedFileInfo& m_file;

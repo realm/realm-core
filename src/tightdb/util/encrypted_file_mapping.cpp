@@ -113,31 +113,50 @@ ssize_t check_read(int fd, off_t pos, void *dst, size_t len) {
 
 } // namespace {
 
-iv_table AESCryptor::read_iv_table(int fd, off_t data_pos) TIGHTDB_NOEXCEPT {
-    iv_table iv;
-    memset(&iv, 0, sizeof(iv));
-    check_read(fd, iv_table_pos(data_pos), &iv, sizeof(iv));
-    return iv;
+void AESCryptor::set_file_size(off_t new_size) {
+    auto page_count = (new_size + page_size - 1) / page_size;
+    m_iv_buffer.reserve((page_count + pages_per_metadata_page - 1) & ~(pages_per_metadata_page - 1));
+}
+
+iv_table& AESCryptor::get_iv_table(int fd, off_t data_pos) TIGHTDB_NOEXCEPT {
+    size_t idx = data_pos / page_size;
+    if (idx < m_iv_buffer.size())
+        return m_iv_buffer[idx];
+    TIGHTDB_ASSERT(idx < m_iv_buffer.capacity()); // not safe to allocate here
+
+    auto old_size = m_iv_buffer.size();
+    auto new_page_count = 1 + idx / pages_per_metadata_page;
+    m_iv_buffer.resize(new_page_count * pages_per_metadata_page);
+
+    for (size_t i = old_size; i < new_page_count * pages_per_metadata_page; i += pages_per_metadata_page) {
+        auto bytes = check_read(fd, iv_table_pos(i * page_size), &m_iv_buffer[i], page_size);
+        if (bytes < page_size)
+            break; // rest is zero-filled by resize()
+    }
+
+    return m_iv_buffer[idx];
 }
 
 void AESCryptor::read(int fd, off_t pos, char* dst, size_t size) TIGHTDB_NOEXCEPT {
-    iv_table iv = read_iv_table(fd, pos);
-
     char buffer[page_size];
     ssize_t bytes_read = check_read(fd, real_offset(pos), buffer, pad_to_aes_block_size(size));
+
+    if (bytes_read == 0)
+        return;
+
+    iv_table& iv = get_iv_table(fd, pos);
 
     if (memcmp(buffer, iv.hash1, 4) != 0) {
         // we had an interrupted write and the IV was bumped but the data not
         // updated, so un-bump the IV
         memcpy(iv.iv1, iv.iv2, 8);
-        check_write(fd, iv_table_pos(pos), &iv, sizeof(iv));
     }
 
     crypt(mode_Decrypt, pos, dst, buffer, bytes_read, iv.iv1);
 }
 
 void AESCryptor::write(int fd, off_t pos, const char* src, size_t size) TIGHTDB_NOEXCEPT {
-    iv_table iv = read_iv_table(fd, pos);
+    iv_table& iv = get_iv_table(fd, pos);
 
     memcpy(iv.iv2, iv.iv1, 8);
     size_t bytes;
@@ -328,7 +347,9 @@ void EncryptedFileMapping::handle_access(void* addr) TIGHTDB_NOEXCEPT {
     }
 }
 
-void EncryptedFileMapping::set(void* new_addr, size_t new_size) TIGHTDB_NOEXCEPT {
+void EncryptedFileMapping::set(void* new_addr, size_t new_size) {
+    m_file.cryptor.set_file_size(new_size);
+
     // Happens if mremap() was called where the old size and new size need the
     // same number of pages
     if (new_addr == m_addr) {

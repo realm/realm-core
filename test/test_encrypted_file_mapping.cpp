@@ -47,6 +47,7 @@ TEST(EncryptedFile_CryptorBasic)
     TEST_PATH(path);
 
     AESCryptor cryptor((const uint8_t *)"12345678901234567890123456789012");
+    cryptor.set_file_size(16);
     const char data[] = "test data";
     char buffer[16];
 
@@ -62,6 +63,7 @@ TEST(EncryptedFile_CryptorAlignedDataSize)
     TEST_PATH(path);
 
     AESCryptor cryptor((const uint8_t *)"12345678901234567890123456789012");
+    cryptor.set_file_size(16);
     const char data[] = "16 b test data";
     char buffer[16];
 
@@ -76,6 +78,7 @@ TEST(EncryptedFile_CryptorRepeatedWrites)
 {
     TEST_PATH(path);
     AESCryptor cryptor((const uint8_t *)"12345678901234567890123456789012");
+    cryptor.set_file_size(16);
 
     const char data[] = "test data";
     char raw_buffer_1[8192] = {0}, raw_buffer_2[9192] = {0};
@@ -104,10 +107,12 @@ TEST(EncryptedFile_SeparateCryptors)
     int fd = open(path.c_str(), O_CREAT|O_RDWR);
     {
         AESCryptor cryptor((const uint8_t *)"12345678901234567890123456789012");
+        cryptor.set_file_size(16);
         cryptor.write(fd, 0, data, sizeof(data));
     }
     {
         AESCryptor cryptor((const uint8_t *)"12345678901234567890123456789012");
+        cryptor.set_file_size(16);
         cryptor.read(fd, 0, buffer, sizeof(buffer));
     }
 
@@ -124,6 +129,7 @@ TEST(EncryptedFile_InterruptedWrite)
     int fd = open(path.c_str(), O_CREAT|O_RDWR);
     {
         AESCryptor cryptor((const uint8_t *)"12345678901234567890123456789012");
+        cryptor.set_file_size(16);
         cryptor.write(fd, 0, data, sizeof(data));
     }
 
@@ -138,6 +144,7 @@ TEST(EncryptedFile_InterruptedWrite)
 
     {
         AESCryptor cryptor((const uint8_t *)"12345678901234567890123456789012");
+        cryptor.set_file_size(16);
         cryptor.read(fd, 0, buffer, sizeof(buffer));
         CHECK(memcmp(buffer, data, sizeof(data)) == 0);
     }
