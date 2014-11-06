@@ -65,10 +65,10 @@ public:
     /// Reset transaction logs. This call indicates that any existing
     /// logs pertaining to the same database are stale and can be discarded.
     /// The caller must have exclusive access to the database when this call is made.
-    virtual void reset_log_management() TIGHTDB_OVERRIDE;
+    virtual void reset_log_management();
 
     /// Cleanup, remove any log files
-    virtual void stop_logging() TIGHTDB_OVERRIDE;
+    virtual void stop_logging();
 
     /// Called by SharedGroup during a write transaction, when readlocks are recycled, to
     /// keep the commit log management in sync with what versions can possibly be interesting
