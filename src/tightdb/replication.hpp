@@ -585,11 +585,11 @@ inline std::string Replication::get_database_path()
     return do_get_database_path();
 }
 
-inline void Replication::reset_log_management() TIGHTDB_OVERRIDE
+inline void Replication::reset_log_management()
 {
 }
 
-inline void Replication::stop_logging() TIGHTDB_OVERRIDE
+inline void Replication::stop_logging()
 {
 }
 
