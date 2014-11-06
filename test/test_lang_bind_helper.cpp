@@ -191,10 +191,6 @@ public:
         }
     }
 
-    void release_commit_entries(uint_fast64_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
-    {
-    }
-
 private:
     typedef map<uint_fast64_t, BinaryData> TransactLogs;
     TransactLogs m_transact_logs;
