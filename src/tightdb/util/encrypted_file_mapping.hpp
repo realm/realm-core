@@ -115,6 +115,7 @@ private:
     size_t m_page_count = 0;
 
     std::vector<bool> m_read_pages;
+    std::vector<bool> m_write_pages;
     std::vector<bool> m_dirty_pages;
 
     File::AccessMode m_access;
@@ -124,8 +125,8 @@ private:
 
     void mark_unreadable(size_t i) TIGHTDB_NOEXCEPT;
     void mark_readable(size_t i) TIGHTDB_NOEXCEPT;
+    void mark_unwritable(size_t i) TIGHTDB_NOEXCEPT;
 
-    void flush_page(size_t i) TIGHTDB_NOEXCEPT;
     void read_page(size_t i) TIGHTDB_NOEXCEPT;
     void write_page(size_t i) TIGHTDB_NOEXCEPT;
 

@@ -236,20 +236,35 @@ size_t EncryptedFileMapping::actual_page_size(size_t i) const TIGHTDB_NOEXCEPT {
 }
 
 void EncryptedFileMapping::mark_unreadable(size_t i) TIGHTDB_NOEXCEPT {
-    mprotect(page_addr(i), page_size, PROT_NONE);
-    m_read_pages[i] = false;
-    m_dirty_pages[i] = false;
+    if (i >= m_page_count)
+        return;
+
+    if (m_dirty_pages[i])
+        flush();
+
+    if (m_read_pages[i]) {
+        mprotect(page_addr(i), page_size, PROT_NONE);
+        m_read_pages[i] = false;
+    }
 }
 
 void EncryptedFileMapping::mark_readable(size_t i) TIGHTDB_NOEXCEPT {
+    if (i >= m_read_pages.size() || (m_read_pages[i] && !m_write_pages[i]))
+        return;
+
     mprotect(page_addr(i), page_size, PROT_READ);
     m_read_pages[i] = true;
-    m_dirty_pages[i] = false;
+    m_write_pages[i] = false;
 }
 
-void EncryptedFileMapping::flush_page(size_t i) TIGHTDB_NOEXCEPT {
-    if (i <= m_page_count && m_dirty_pages[i])
-        flush(); // have to flush all pages for ACID guarantess
+void EncryptedFileMapping::mark_unwritable(size_t i) TIGHTDB_NOEXCEPT {
+    if (i >= m_write_pages.size() || !m_write_pages[i])
+        return;
+
+    TIGHTDB_ASSERT(m_read_pages[i]);
+    mprotect(page_addr(i), page_size, PROT_READ);
+    m_write_pages[i] = false;
+    // leave dirty bit set
 }
 
 void EncryptedFileMapping::read_page(size_t i) TIGHTDB_NOEXCEPT {
@@ -258,12 +273,13 @@ void EncryptedFileMapping::read_page(size_t i) TIGHTDB_NOEXCEPT {
     mprotect(addr, page_size, PROT_READ | PROT_WRITE);
 
     for (auto m : m_file.mappings) {
-        if (m != this && i < m->m_page_count) {
-            m->flush_page(i);
-            if (!has_copied && m->m_read_pages[i] && actual_page_size(i) == m->actual_page_size(i)) {
-                memcpy(addr, m->page_addr(i), page_size);
-                has_copied = true;
-            }
+        if (m == this || i >= m->m_page_count)
+            continue;
+
+        m->mark_unwritable(i);
+        if (!has_copied && m->m_read_pages[i] && (actual_page_size(i) == m->actual_page_size(i) || m->m_dirty_pages[i])) {
+            memcpy(addr, m->page_addr(i), page_size);
+            has_copied = true;
         }
     }
 
@@ -275,13 +291,12 @@ void EncryptedFileMapping::read_page(size_t i) TIGHTDB_NOEXCEPT {
 
 void EncryptedFileMapping::write_page(size_t i) TIGHTDB_NOEXCEPT {
     for (auto m : m_file.mappings) {
-        if (m != this && i < m->m_page_count) {
-            m->flush_page(i);
+        if (m != this)
             m->mark_unreadable(i);
-        }
     }
 
     mprotect(page_addr(i), page_size, PROT_READ | PROT_WRITE);
+    m_write_pages[i] = true;
     m_dirty_pages[i] = true;
 }
 
@@ -291,6 +306,14 @@ void EncryptedFileMapping::validate_page(size_t i) TIGHTDB_NOEXCEPT {
 
     char buffer[page_size];
     m_file.cryptor.read(m_file.fd, i * page_size, buffer, sizeof(buffer));
+
+    for (auto m : m_file.mappings) {
+        if (m != this && i < m->m_page_count && m->m_dirty_pages[i]) {
+            memcpy(buffer, m->page_addr(i), page_size);
+            break;
+        }
+    }
+
     if (memcmp(buffer, page_addr(i), actual_page_size(i))) {
         printf("mismatch %p: fd(%d) page(%zu/%zu) page_size(%zu) %s %s\n",
                this, m_file.fd, i, m_page_count, actual_page_size(i), buffer, page_addr(i));
@@ -311,16 +334,22 @@ void EncryptedFileMapping::validate() TIGHTDB_NOEXCEPT {
 void EncryptedFileMapping::flush() TIGHTDB_NOEXCEPT {
     size_t start = 0;
     for (size_t i = 0; i < m_page_count; ++i) {
-        if (!m_dirty_pages[i]) {
-            validate_page(i);
+        if (!m_read_pages[i]) {
             if (start < i)
                 mprotect(page_addr(start), (i - start) * page_size, PROT_READ);
             start = i + 1;
+        }
+        else if (start == i && !m_write_pages[i])
+            start = i + 1;
+
+        if (!m_dirty_pages[i]) {
+            validate_page(i);
             continue;
         }
 
         m_file.cryptor.write(m_file.fd, i * page_size, (char*)page_addr(i), actual_page_size(i));
         m_dirty_pages[i] = false;
+        m_write_pages[i] = false;
     }
     if (start < m_page_count)
         mprotect(page_addr(start), (m_page_count - start) * page_size, PROT_READ);
@@ -366,9 +395,11 @@ void EncryptedFileMapping::set(void* new_addr, size_t new_size) {
     m_page_count = (m_size + page_size - 1)  / page_size;
 
     m_read_pages.clear();
+    m_write_pages.clear();
     m_dirty_pages.clear();
 
     m_read_pages.resize(m_page_count, false);
+    m_write_pages.resize(m_page_count, false);
     m_dirty_pages.resize(m_page_count, false);
 }
 
