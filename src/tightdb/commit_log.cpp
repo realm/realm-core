@@ -79,6 +79,8 @@ public:
     void do_transact_log_reserve(std::size_t sz) TIGHTDB_OVERRIDE;
     void do_transact_log_append(const char* data, std::size_t size) TIGHTDB_OVERRIDE;
     void transact_log_reserve(std::size_t n);
+    version_type internal_submit_log(const char*, uint64_t);
+    virtual void submit_transact_log(BinaryData);
     virtual void stop_logging() TIGHTDB_OVERRIDE;
     virtual void reset_log_management() TIGHTDB_OVERRIDE;
     void cleanup_stale_versions();
@@ -385,15 +387,10 @@ void WriteLogCollector::get_commit_entries(version_type from_version, version_ty
     }
 }
 
-
-WriteLogCollector::version_type 
-WriteLogCollector::do_commit_write_transact(SharedGroup& sg, 
-	WriteLogCollector::version_type orig_version)
+// returns the current "from" version
+version_type WriteLogCollector::internal_submit_log(const char* data, uint64_t sz)
 {
-    static_cast<void>(sg);
-    char* data     = m_transact_log_buffer.release();
-    uint64_t sz = m_transact_log_free_begin - data;
-    version_type new_version = orig_version + 1;
+    version_type orig_version;
     map_preamble_if_needed();
     CommitLogPreamble* preamble = m_preamble.get_addr();
     {
@@ -427,10 +424,28 @@ WriteLogCollector::do_commit_write_transact(SharedGroup& sg,
 
         // update metadata to reflect the added commit log
         preamble->write_offset += aligned_to(sizeof(uint64_t), sz + sizeof(uint64_t));
-        TIGHTDB_ASSERT(orig_version == preamble->end_commit_range);
-        preamble->end_commit_range = new_version;
+        orig_version = preamble->end_commit_range;
+        preamble->end_commit_range = orig_version+1;
         preamble->lock.unlock();
     }
+    return orig_version;
+}
+
+void WriteLogCollector::submit_transact_log(BinaryData bd)
+{
+    internal_submit_log(bd.data(), bd.size());
+}
+
+WriteLogCollector::version_type 
+WriteLogCollector::do_commit_write_transact(SharedGroup& sg, 
+	WriteLogCollector::version_type orig_version)
+{
+    static_cast<void>(sg);
+    char* data = m_transact_log_buffer.data();
+    uint64_t sz = m_transact_log_free_begin - data;
+    version_type from_version = internal_submit_log(data,sz);
+    TIGHTDB_ASSERT(from_version == orig_version);
+    version_type new_version = orig_version + 1;
     return new_version;
 }
 

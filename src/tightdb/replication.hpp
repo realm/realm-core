@@ -96,9 +96,14 @@ public:
 
     /// Get the value set by last call to 'set_last_version_synced'
     /// If 'end_version_number' is non null, a limit to version numbering is returned.
-    /// The limit is one past the number of the last version actually stored.
+    /// The limit returned is the version number of the latest commit.
     /// If sync versioning is disabled, the last version set locally is returned.
     virtual uint_fast64_t get_last_version_synced(uint_fast64_t* end_version_number = 0) TIGHTDB_NOEXCEPT;
+
+    /// Submit a transact log directly into the system bypassing the normal
+    /// collection of replication entries. This is used to add a transactlog
+    /// just for updating accessors. The caller retains ownership of the buffer.
+    virtual void submit_transact_log(BinaryData);
 
     /// Acquire permision to start a new 'write' transaction. This
     /// function must be called by a client before it requests a
@@ -604,6 +609,12 @@ inline void Replication::set_last_version_synced(uint_fast64_t) TIGHTDB_NOEXCEPT
 inline uint_fast64_t Replication::get_last_version_synced(uint_fast64_t*) TIGHTDB_NOEXCEPT
 {
     return 0;
+}
+
+inline void Replication::submit_transact_log(BinaryData)
+{
+    // Unimplemented!
+    TIGHTDB_ASSERT(false);
 }
 
 inline void Replication::get_commit_entries(uint_fast64_t, uint_fast64_t, BinaryData*) TIGHTDB_NOEXCEPT
