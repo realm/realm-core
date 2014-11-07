@@ -116,7 +116,8 @@ TEST(File_Map)
 
 TEST(File_MapMultiplePages)
 {
-    const size_t count = 4096 * 100;
+    // two blocks of IV tables
+    const size_t count = 4096 / sizeof(size_t) * 256 * 2;
 
     TEST_PATH(path);
     {
@@ -137,6 +138,66 @@ TEST(File_MapMultiplePages)
             if (map.get_addr()[i] != i)
                 return;
           }
+    }
+}
+
+TEST(File_ReaderAndWriter)
+{
+    const size_t count = 4096 / sizeof(size_t) * 256 * 2;
+
+    TEST_PATH(path);
+
+    File writer(path, File::mode_Write);
+    writer.set_encryption_key(tightdb::test_util::key);
+    writer.resize(count * sizeof(size_t));
+
+    File reader(path, File::mode_Read);
+    reader.set_encryption_key(tightdb::test_util::key);
+    CHECK_EQUAL(writer.get_size(), reader.get_size());
+
+    File::Map<size_t> write(writer, File::access_ReadWrite, count * sizeof(size_t));
+    File::Map<size_t> read(reader, File::access_ReadOnly, count * sizeof(size_t));
+
+    for (size_t i = 0; i < count; i += 100) {
+        write.get_addr()[i] = i;
+        CHECK_EQUAL(read.get_addr()[i], i);
+        if (read.get_addr()[i] != i)
+            return;
+    }
+}
+
+TEST(File_MultipleWriters)
+{
+    const size_t count = 4096 / sizeof(size_t) * 256 * 2;
+
+    TEST_PATH(path);
+
+    {
+        File w1(path, File::mode_Write);
+        w1.set_encryption_key(tightdb::test_util::key);
+        w1.resize(count * sizeof(size_t));
+
+        File w2(path, File::mode_Write);
+        w2.set_encryption_key(tightdb::test_util::key);
+
+        File::Map<size_t> map1(w1, File::access_ReadWrite, count * sizeof(size_t));
+        File::Map<size_t> map2(w2, File::access_ReadWrite, count * sizeof(size_t));
+
+        for (size_t i = 0; i < count; i += 100) {
+            ++map1.get_addr()[i];
+            ++map2.get_addr()[i];
+        }
+    }
+
+    File reader(path, File::mode_Read);
+    reader.set_encryption_key(tightdb::test_util::key);
+
+    File::Map<size_t> read(reader, File::access_ReadOnly, count * sizeof(size_t));
+
+    for (size_t i = 0; i < count; i += 100) {
+        CHECK_EQUAL(read.get_addr()[i], 2);
+        if (read.get_addr()[i] != 2)
+            return;
     }
 }
 

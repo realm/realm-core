@@ -38,7 +38,6 @@
 // check-testcase` (or one of its friends) from the command line.
 
 #ifdef TIGHTDB_ENABLE_ENCRYPTION
-#endif
 
 using namespace tightdb::util;
 
@@ -151,4 +150,6 @@ TEST(EncryptedFile_InterruptedWrite)
 
     close(fd);
 }
+
+#endif // TIGHTDB_ENABLE_ENCRYPTION
 #endif // TEST_ENCRYPTED_FILE_MAPPING
