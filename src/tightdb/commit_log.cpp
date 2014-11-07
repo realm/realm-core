@@ -120,7 +120,7 @@ protected:
             active_file_is_log_a = true;
             // The first commit will be from state 1 -> state 2, so we must set 1 initially
             begin_oldest_commit_range = begin_newest_commit_range = end_commit_range = 1;
-            last_version_seen_locally = last_version_synced = 0;
+            last_version_seen_locally = last_version_synced = 1;
             write_offset = sizeof(*this);
         }
     };
@@ -242,6 +242,13 @@ void WriteLogCollector::stop_logging()
 
 void WriteLogCollector::reset_log_management(version_type last_version)
 {
+    // TODO:
+    // regardless of version, it should be ok to initialize the mutex. This protects
+    // us against deadlock when we restart after crash on a platform without support
+    // for robust mutexes.
+    //
+    // for version number 1 the log files will be completely (re)initialized.
+    // for all other versions, the log files must be there and pass an integrity check.
     if (last_version == 1) {
         m_preamble.unmap();
         reset_file(m_log_a);

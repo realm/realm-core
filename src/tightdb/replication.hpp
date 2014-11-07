@@ -111,7 +111,7 @@ public:
     /// Get the value set by last call to 'set_last_version_synced'
     /// If 'end_version_number' is non null, a limit to version numbering is returned.
     /// The limit returned is the version number of the latest commit.
-    /// If sync versioning is disabled, the last version set locally is returned.
+    /// If sync versioning is disabled, the last version seen locally is returned.
     virtual uint_fast64_t get_last_version_synced(uint_fast64_t* end_version_number = 0) TIGHTDB_NOEXCEPT;
 
     /// Submit a transact log directly into the system bypassing the normal
