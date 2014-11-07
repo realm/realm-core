@@ -45,6 +45,7 @@ public:
 
     void set_file_size(off_t new_size);
 
+    void try_read(int fd, off_t pos, char* dst);
     void read(int fd, off_t pos, char* dst) TIGHTDB_NOEXCEPT;
     void write(int fd, off_t pos, const char* src) TIGHTDB_NOEXCEPT;
 
@@ -90,6 +91,7 @@ struct SharedFileInfo {
 
 class EncryptedFileMapping {
 public:
+    // Adds the newly-created object to file.mappings iff it's successfully constructed
     EncryptedFileMapping(SharedFileInfo& file, void* addr, size_t size, File::AccessMode access);
     ~EncryptedFileMapping();
 
@@ -129,6 +131,7 @@ private:
     void mark_readable(size_t i) TIGHTDB_NOEXCEPT;
     void mark_unwritable(size_t i) TIGHTDB_NOEXCEPT;
 
+    bool copy_read_page(size_t i) TIGHTDB_NOEXCEPT;
     void read_page(size_t i) TIGHTDB_NOEXCEPT;
     void write_page(size_t i) TIGHTDB_NOEXCEPT;
 

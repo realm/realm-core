@@ -150,6 +150,9 @@ void add_mapping(void* addr, size_t size, int fd, File::AccessMode access, const
         return m.inode == st.st_ino && m.device == st.st_dev;
     });
 
+    // Get the potential memory allocation out of the way so that mappings_by_addr.push_back can't throw
+    mappings_by_addr.reserve(mappings_by_addr.size() + 1);
+
     if (it == end(mappings_by_file)) {
         mappings_by_file.emplace_back();
         it = --end(mappings_by_file);
@@ -158,8 +161,17 @@ void add_mapping(void* addr, size_t size, int fd, File::AccessMode access, const
         it->info.reset(new SharedFileInfo{encryption_key, dup(fd)});
     }
 
-    auto mapping = new EncryptedFileMapping{*it->info, addr, size, access};
-    mappings_by_addr.push_back(mapping_and_addr{std::unique_ptr<EncryptedFileMapping>{mapping}, addr, size});
+    try {
+        auto mapping = new EncryptedFileMapping{*it->info, addr, size, access}; // throws
+        mappings_by_addr.push_back(mapping_and_addr{std::unique_ptr<EncryptedFileMapping>{mapping}, addr, size});
+    }
+    catch (...) {
+        if (it->info->mappings.empty()) {
+            ::close(it->info->fd);
+            mappings_by_file.erase(it);
+        }
+        throw;
+    }
 }
 
 void remove_mapping(void* addr, size_t size) {
@@ -185,7 +197,6 @@ void* mmap_anon(size_t size) {
         int err = errno; // Eliminate any risk of clobbering
         throw std::runtime_error(get_errno_msg("mmap() failed: ", err));
     }
-    mprotect(addr, size, PROT_NONE);
     return addr;
 }
 

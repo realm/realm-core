@@ -8,6 +8,7 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
+#include <tightdb/alloc_slab.hpp>
 #include <tightdb/util/terminate.hpp>
 
 namespace tightdb {
@@ -146,6 +147,16 @@ bool AESCryptor::check_hmac(const void *src, size_t len, const uint8_t *hmac) co
 };
 
 void AESCryptor::read(int fd, off_t pos, char* dst) TIGHTDB_NOEXCEPT {
+    try {
+        try_read(fd, pos, dst);
+    }
+    catch (...) {
+        // Not recoverable since we're running in a signal handler
+        TIGHTDB_TERMINATE("corrupted database");
+    }
+}
+
+void AESCryptor::try_read(int fd, off_t pos, char* dst) {
     char buffer[page_size];
     ssize_t bytes_read = check_read(fd, real_offset(pos), buffer, page_size);
 
@@ -173,10 +184,8 @@ void AESCryptor::read(int fd, off_t pos, char* dst) TIGHTDB_NOEXCEPT {
             // happened
             memcpy(iv.iv1, iv.iv2, 32);
         }
-        else {
-            // Not recoverable since we're running in a signal handler
-            TIGHTDB_TERMINATE("corrupted database");
-        }
+        else
+            throw InvalidDatabase();
     }
 
     crypt(mode_Decrypt, pos, dst, buffer, iv.iv1);
@@ -230,7 +239,7 @@ EncryptedFileMapping::EncryptedFileMapping(SharedFileInfo& file, void* addr, siz
 : m_file(file)
 , m_access(access)
 {
-    set(addr, size);
+    set(addr, size); // throws
     file.mappings.push_back(this);
 }
 
@@ -276,23 +285,25 @@ void EncryptedFileMapping::mark_unwritable(size_t i) TIGHTDB_NOEXCEPT {
     // leave dirty bit set
 }
 
-void EncryptedFileMapping::read_page(size_t i) TIGHTDB_NOEXCEPT {
-    bool has_copied = false;
-    auto addr = page_addr(i);
-    mprotect(addr, page_size, PROT_READ | PROT_WRITE);
-
+bool EncryptedFileMapping::copy_read_page(size_t i) TIGHTDB_NOEXCEPT {
     for (auto m : m_file.mappings) {
         if (m == this || i >= m->m_page_count)
             continue;
 
         m->mark_unwritable(i);
-        if (!has_copied && m->m_read_pages[i]) {
-            memcpy(addr, m->page_addr(i), page_size);
-            has_copied = true;
+        if (m->m_read_pages[i]) {
+            memcpy(page_addr(i), m->page_addr(i), page_size);
+            return true;
         }
     }
+    return false;
+}
 
-    if (!has_copied)
+void EncryptedFileMapping::read_page(size_t i) TIGHTDB_NOEXCEPT {
+    auto addr = page_addr(i);
+    mprotect(addr, page_size, PROT_READ | PROT_WRITE);
+
+    if (!copy_read_page(i))
         m_file.cryptor.read(m_file.fd, i * page_size, (char*)addr);
 
     mark_readable(i);
@@ -389,6 +400,8 @@ void EncryptedFileMapping::set(void* new_addr, size_t new_size) {
     m_file.cryptor.set_file_size(new_size);
     TIGHTDB_ASSERT(new_size % page_size == 0);
 
+    bool first_init = m_addr == 0;
+
     flush();
     m_addr = new_addr;
     m_size = new_size;
@@ -403,6 +416,16 @@ void EncryptedFileMapping::set(void* new_addr, size_t new_size) {
     m_read_pages.resize(m_page_count, false);
     m_write_pages.resize(m_page_count, false);
     m_dirty_pages.resize(m_page_count, false);
+
+    if (first_init) {
+        if (!copy_read_page(0))
+            m_file.cryptor.try_read(m_file.fd, 0, page_addr(0));
+        mark_readable(0);
+        if (m_page_count > 0)
+            mprotect(page_addr(1), (m_page_count - 1) * page_size, PROT_NONE);
+    }
+    else
+        mprotect(m_addr, m_page_count * page_size, PROT_NONE);
 }
 
 File::SizeType encrypted_size_to_data_size(File::SizeType size) TIGHTDB_NOEXCEPT {
