@@ -27,6 +27,9 @@
 #include <tightdb/link_view.hpp>
 #include <tightdb/group.hpp>
 #include <tightdb/group_shared.hpp>
+#ifdef TIGHTDB_ENABLE_REPLICATION
+#  include <tightdb/replication.hpp>
+#endif
 
 namespace tightdb {
 
@@ -120,6 +123,11 @@ public:
     static void promote_to_write(SharedGroup&);
     static void commit_and_continue_as_read(SharedGroup&);
     static void rollback_and_continue_as_read(SharedGroup&);
+
+    static Replication::version_type get_current_version(SharedGroup& sg)
+    {
+        return Replication::version_type(sg.get_current_version());
+    }
 #endif
 
     /// Returns the name of the specified data type as follows:

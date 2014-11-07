@@ -237,6 +237,7 @@ public:
     class TransactLogParser;
 
     class InputStream;
+    class SimpleInputStream;
 
     class BadTransactLog; // Exception
 
@@ -429,9 +430,33 @@ public:
     /// For non-zero return value, \a begin and \a end are
     /// updated to reflect the start and limit of a
     /// contiguous memory chunk.
-    virtual size_t next_block(const char*& begin, const char*& end) = 0;
+    virtual std::size_t next_block(const char*& begin, const char*& end) = 0;
 
     virtual ~InputStream() {}
+};
+
+
+class Replication::SimpleInputStream: public InputStream {
+public:
+    SimpleInputStream(const char* data, std::size_t size) TIGHTDB_NOEXCEPT:
+        m_data(data), m_size(size)
+    {
+    }
+
+    std::size_t next_block(const char*& begin, const char*& end) TIGHTDB_OVERRIDE
+    {
+        if (m_size == 0)
+            return 0;
+        std::size_t size = m_size;
+        begin = m_data;
+        end = m_data + size;
+        m_size = 0;
+        return size;
+    }
+
+private:
+    const char* m_data;
+    std::size_t m_size;
 };
 
 
