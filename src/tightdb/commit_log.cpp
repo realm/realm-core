@@ -82,7 +82,7 @@ public:
     version_type internal_submit_log(const char*, uint64_t);
     virtual void submit_transact_log(BinaryData);
     virtual void stop_logging() TIGHTDB_OVERRIDE;
-    virtual void reset_log_management() TIGHTDB_OVERRIDE;
+    virtual void reset_log_management(version_type last_version) TIGHTDB_OVERRIDE;
     void cleanup_stale_versions();
     virtual void set_last_version_seen_locally(uint_fast64_t last_seen_version_number) TIGHTDB_NOEXCEPT;
     virtual void set_last_version_synced(uint_fast64_t last_seen_version_number) TIGHTDB_NOEXCEPT;
@@ -240,13 +240,15 @@ void WriteLogCollector::stop_logging()
     File::try_remove(m_log_b.name);
 }
 
-void WriteLogCollector::reset_log_management()
+void WriteLogCollector::reset_log_management(version_type last_version)
 {
-    m_preamble.unmap();
-    reset_file(m_log_a);
-    reset_file(m_log_b);
-    map_preamble_if_needed();
-    new(m_preamble.get_addr()) CommitLogPreamble();
+    if (last_version == 1) {
+        m_preamble.unmap();
+        reset_file(m_log_a);
+        reset_file(m_log_b);
+        map_preamble_if_needed();
+        new(m_preamble.get_addr()) CommitLogPreamble();
+    }
 }
 
 
@@ -445,6 +447,7 @@ WriteLogCollector::do_commit_write_transact(SharedGroup& sg,
     uint64_t sz = m_transact_log_free_begin - data;
     version_type from_version = internal_submit_log(data,sz);
     TIGHTDB_ASSERT(from_version == orig_version);
+    static_cast<void>(from_version);
     version_type new_version = orig_version + 1;
     return new_version;
 }

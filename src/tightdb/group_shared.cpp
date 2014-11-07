@@ -631,13 +631,14 @@ void SharedGroup::open(const string& path, bool no_create_file,
                 else {
                     // the database was just created, no metadata has been written yet.
                     version = 1;
-#ifdef TIGHTDB_ENABLE_REPLICATION
-                    // If replication is enabled, we need to reset log management:
-                    Replication* repl = _impl::GroupFriend::get_replication(m_group);
-                    if (repl)
-                        repl->reset_log_management();
-#endif
                 }
+#ifdef TIGHTDB_ENABLE_REPLICATION
+                // If replication is enabled, we need to inform it of the latest version,
+                // allowing it to discard any surplus log entries
+                Replication* repl = _impl::GroupFriend::get_replication(m_group);
+                if (repl)
+                    repl->reset_log_management(version);
+#endif
                 info->init_versioning(top_ref, file_size, version);
                 info->versioning_ready = true;
             }

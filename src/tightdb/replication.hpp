@@ -62,10 +62,24 @@ public:
 
     class Interrupted; // Exception
 
-    /// Reset transaction logs. This call indicates that any existing
-    /// logs pertaining to the same database are stale and can be discarded.
-    /// The caller must have exclusive access to the database when this call is made.
-    virtual void reset_log_management();
+    /// Reset transaction logs. This call informs the commitlog subsystem of
+    /// the initial version chosen as part of establishing a sharing scheme.
+    /// Following a crash, the commitlog subsystem may hold multiple commitlogs
+    /// for versions which are lost during the crash. When SharedGroup establishes
+    /// a sharing scheme it will continue from the last version commited to
+    /// the database. The commitlog subsystem will then discard any commitlogs
+    /// for later versions. When run with durability_Full there can be a disparity
+    /// of at most one version, but if run with durability_Async the two subsystems
+    /// can be many versions apart. Note: the commitlogs may hold entries, which
+    /// are not in the database after a crash, but the reverse is not possible.
+    /// Version number '1' is the very first version of any database and indicates
+    /// a full reset of the commitlogs.
+    ///
+    /// The call also indicates that the current thread (and current process) has
+    /// exclusive access to the commitlogs, allowing them to reset synchronization
+    /// variables. This can be beneficial on systems without proper support for robust
+    /// mutexes.
+    virtual void reset_log_management(version_type last_version);
 
     /// Cleanup, remove any log files
     virtual void stop_logging();
@@ -590,7 +604,7 @@ inline std::string Replication::get_database_path()
     return do_get_database_path();
 }
 
-inline void Replication::reset_log_management()
+inline void Replication::reset_log_management(version_type)
 {
 }
 
