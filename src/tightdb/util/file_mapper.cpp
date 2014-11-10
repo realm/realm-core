@@ -10,6 +10,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include <tightdb/alloc_slab.hpp>
 #include <tightdb/util/terminate.hpp>
 
 using namespace tightdb;
@@ -137,6 +138,9 @@ void add_mapping(void* addr, size_t size, int fd, File::AccessMode access, const
     struct stat st;
     if (fstat(fd, &st))
         TIGHTDB_TERMINATE("fstat failed"); // FIXME: throw instead
+
+    if (st.st_size > 0 && st.st_size < page_size)
+        throw InvalidDatabase();
 
     auto it = find_if(begin(mappings_by_file), end(mappings_by_file), [=](mappings_for_file& m) {
         return m.inode == st.st_ino && m.device == st.st_dev;
