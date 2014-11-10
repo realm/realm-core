@@ -4,7 +4,7 @@ from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
 
 PORT_NUMBER = 8080
 
-first_version = 0
+first_version = 1
 transact_logs = []
 
 class MyHandler(BaseHTTPRequestHandler):
@@ -15,53 +15,47 @@ class MyHandler(BaseHTTPRequestHandler):
         print "path = '%s'" % (path)
         if path.startswith('/receive/'):
             client_version = int(path.split('/')[2])
-            if transact_logs:
-                if client_version == 0:
-                    client_version = first_version - 1
-                print "client_version = '%s'" % (client_version)
-                last_version = first_version + (len(transact_logs) - 1)
-                if client_version < last_version:
-                    next_version = client_version + 1
-                    transact_log_ndx = next_version - first_version
-                    transact_log = transact_logs[transact_log_ndx]
-                    self.send_response(200)
-                    self.send_header('Content-type', 'application/octet-stream')
-                    self.end_headers()
-                    self.wfile.write(transact_log)
-                    return
+            last_version = first_version + len(transact_logs)
+            print "last_version = %s" % (last_version)
+            if client_version < 1:
+                self.send_error(400, 'Bad request: Invalid client version %s' % (client_version))
+                return
+            if client_version >= last_version:
+                print "Response: up-to-date"
+                self.send_response(200)
+                self.send_header('Content-type', 'text/plain')
+                self.end_headers()
+                self.wfile.write("up-to-date")
+                return
+            next_version = client_version + 1
+            print "Offering transaction log %s -> %s" % (next_version-1, next_version)
+            transact_log_ndx = next_version - (first_version + 1)
+            transact_log = transact_logs[transact_log_ndx]
             self.send_response(200)
-            self.send_header('Content-type', 'text/plain')
+            self.send_header('Content-type', 'application/octet-stream')
             self.end_headers()
-            self.wfile.write("up-to-date")
+            self.wfile.write(transact_log)
             return
         if path.startswith('/send/'):
             client_version = int(path.split('/')[2])
-            invalid_version = False
-            if client_version < 1:
-                invalid_version = True
-            elif transact_logs:
-                print "first_version = %s" % (first_version)
-                last_version = first_version + (len(transact_logs) - 1)
-                print "last_version = %s" % (last_version)
-                if client_version <= last_version:
-                    self.send_response(200)
-                    self.send_header('Content-type', 'text/plain')
-                    self.end_headers()
-                    self.wfile.write("conflict")
-                    return
-                if client_version > last_version + 1:
-                    invalid_version = True
-            if invalid_version:
+            last_version = first_version + len(transact_logs)
+            print "last_version = %s" % (last_version)
+            next_version = last_version + 1
+            if client_version < 2 or client_version > next_version:
                 self.send_error(400, 'Bad request: Invalid client version %s' % (client_version))
                 return
+            if client_version < next_version:
+                print "Response: conflict"
+                self.send_response(200)
+                self.send_header('Content-type', 'text/plain')
+                self.end_headers()
+                self.wfile.write("conflict")
+                return
+            print "Accepting transaction log %s -> %s" % (next_version-1, next_version)
             body_size = int(self.headers['Content-Length'])
             transact_log = self.rfile.read(body_size)
             print "transact_log: '%s'" % (transact_log)
-            first = not transact_logs
-            print "first = %s" % (first)
             transact_logs.append(transact_log)
-            if first:
-                first_version = client_version
             self.send_response(200)
             self.send_header('Content-type', 'text/plain')
             self.end_headers()
