@@ -582,7 +582,7 @@ BinaryData Group::write_to_mem() const
     //
     // FIXME: This size could potentially be vastly bigger that what
     // is actually needed.
-    size_t max_size = m_alloc.get_total_size();
+    size_t max_size = (m_alloc.get_total_size() + 4095) & ~4095;
 
     char* buffer = static_cast<char*>(malloc(max_size)); // Throws
     if (!buffer)
@@ -648,10 +648,10 @@ void Group::write(ostream& out, TableWriter& table_writer)
 
     top.destroy(); // Shallow
 
-    // ensure the footer is 16-byte aligned for AES
-    if (final_file_size & 15) {
-        char buffer[16] = {0};
-        out_2.write(buffer, 16 - (final_file_size & 15));
+    // ensure the footer is aligned to the end of a page for encryption
+    if ((final_file_size + sizeof(SlabAlloc::StreamingFooter)) & 4095) {
+        char buffer[4096] = {0};
+        out_2.write(buffer, 4096 - ((final_file_size + sizeof(SlabAlloc::StreamingFooter)) & 4095));
     }
 
     // Write streaming footer

@@ -118,6 +118,10 @@ mapping_and_addr* find_mapping_for_addr(void* addr, size_t size) {
     return 0;
 }
 
+size_t round_up_to_page_size(size_t size) {
+    return (size + page_size - 1) & ~(page_size - 1);
+}
+
 void add_mapping(void* addr, size_t size, int fd, File::AccessMode access, const uint8_t* encryption_key) {
     SpinLockGuard lock{mapping_lock};
 
@@ -159,6 +163,7 @@ void add_mapping(void* addr, size_t size, int fd, File::AccessMode access, const
 }
 
 void remove_mapping(void* addr, size_t size) {
+    size = round_up_to_page_size(size);
     SpinLockGuard lock{mapping_lock};
     auto m = find_mapping_for_addr(addr, size);
     if (!m)
@@ -174,12 +179,7 @@ void remove_mapping(void* addr, size_t size) {
     }
 }
 
-size_t round_up_to_page_size(size_t size) {
-    return (size + page_size - 1) & ~(page_size - 1);
-}
-
 void* mmap_anon(size_t size) {
-    size = round_up_to_page_size(size);
     void* addr = ::mmap(0, size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
     if (addr == MAP_FAILED) {
         int err = errno; // Eliminate any risk of clobbering
@@ -200,6 +200,7 @@ namespace util {
 void* mmap(int fd, size_t size, File::AccessMode access, const uint8_t* encryption_key) {
 #ifdef TIGHTDB_ENABLE_ENCRYPTION
     if (encryption_key) {
+        size = round_up_to_page_size(size);
         void* addr = mmap_anon(size);
         add_mapping(addr, size, fd, access, encryption_key);
         return addr;
@@ -239,18 +240,17 @@ void* mremap(int fd, void* old_addr, size_t old_size, File::AccessMode a, size_t
 #ifdef TIGHTDB_ENABLE_ENCRYPTION
     {
         SpinLockGuard lock{mapping_lock};
-        if (auto m = find_mapping_for_addr(old_addr, old_size)) {
-            if (round_up_to_page_size(old_size) == round_up_to_page_size(new_size)) {
-                m->mapping->set(old_addr, new_size);
-                m->size = new_size;
+        size_t rounded_old_size = round_up_to_page_size(old_size);
+        if (auto m = find_mapping_for_addr(old_addr, rounded_old_size)) {
+            size_t rounded_new_size = round_up_to_page_size(new_size);
+            if (rounded_old_size == rounded_new_size)
                 return old_addr;
-            }
 
-            auto new_addr = mmap_anon(new_size);
-            m->mapping->set(new_addr, new_size);
-            ::munmap(old_addr, old_size);
+            auto new_addr = mmap_anon(rounded_new_size);
+            m->mapping->set(new_addr, rounded_new_size);
+            ::munmap(old_addr, rounded_old_size);
             m->addr = new_addr;
-            m->size = new_size;
+            m->size = rounded_new_size;
             return new_addr;
         }
     }

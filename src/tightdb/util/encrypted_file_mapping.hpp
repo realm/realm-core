@@ -45,8 +45,8 @@ public:
 
     void set_file_size(off_t new_size);
 
-    void read(int fd, off_t pos, char* dst, size_t size) TIGHTDB_NOEXCEPT;
-    void write(int fd, off_t pos, const char* src, size_t size) TIGHTDB_NOEXCEPT;
+    void read(int fd, off_t pos, char* dst) TIGHTDB_NOEXCEPT;
+    void write(int fd, off_t pos, const char* src) TIGHTDB_NOEXCEPT;
 
 private:
     enum EncryptionMode {
@@ -62,15 +62,18 @@ private:
 #ifdef __APPLE__
     CCCryptorRef m_encr;
     CCCryptorRef m_decr;
+    uint8_t m_hmacKey[32];
 #else
     AES_KEY m_ectx;
     AES_KEY m_dctx;
 #endif
 
+    bool check_hmac(const void *data, size_t len, const uint8_t *hmac) const;
+
     std::vector<iv_table> m_iv_buffer;
 
-    size_t crypt(EncryptionMode mode, off_t pos, char* dst, const char* src,
-                 size_t len, const char* stored_iv) TIGHTDB_NOEXCEPT;
+    void crypt(EncryptionMode mode, off_t pos, char* dst, const char* src,
+               const char* stored_iv) TIGHTDB_NOEXCEPT;
 
     iv_table& get_iv_table(int fd, off_t data_pos) TIGHTDB_NOEXCEPT;
 };
@@ -121,7 +124,6 @@ private:
     File::AccessMode m_access;
 
     char* page_addr(size_t i) const TIGHTDB_NOEXCEPT;
-    size_t actual_page_size(size_t i) const TIGHTDB_NOEXCEPT;
 
     void mark_unreadable(size_t i) TIGHTDB_NOEXCEPT;
     void mark_readable(size_t i) TIGHTDB_NOEXCEPT;

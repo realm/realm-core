@@ -94,23 +94,21 @@ TEST(File_Streambuf)
 TEST(File_Map)
 {
     TEST_PATH(path);
-    const char data[] = "hello";
+    const char data[4096] = "12345678901234567890";
+    size_t len = strlen(data);
     {
         File f(path, File::mode_Write);
         f.set_encryption_key(tightdb::test_util::key);
-        f.resize(sizeof(data));
+        f.resize(strlen(data));
 
-        File::Map<char> map(f, File::access_ReadWrite, 1);
-        *map.get_addr() = data[0];
-
-        map.remap(f, File::access_ReadWrite, sizeof(data));
-        memcpy(map.get_addr() + 1, data + 1, map.get_size() - 1);
+        File::Map<char> map(f, File::access_ReadWrite, len);
+        memcpy(map.get_addr(), data, len);
     }
     {
         File f(path, File::mode_Read);
         f.set_encryption_key(tightdb::test_util::key);
-        File::Map<char> map(f, File::access_ReadOnly, sizeof(data));
-        CHECK(memcmp(map.get_addr(), data, map.get_size()) == 0);
+        File::Map<char> map(f, File::access_ReadOnly, len);
+        CHECK(memcmp(map.get_addr(), data, len) == 0);
     }
 }
 

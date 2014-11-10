@@ -47,29 +47,13 @@ TEST(EncryptedFile_CryptorBasic)
 
     AESCryptor cryptor((const uint8_t *)"12345678901234567890123456789012");
     cryptor.set_file_size(16);
-    const char data[] = "test data";
-    char buffer[16];
+    const char data[4096] = "test data";
+    char buffer[4096];
 
     int fd = open(path.c_str(), O_CREAT|O_RDWR);
-    cryptor.write(fd, 0, data, sizeof(data));
-    cryptor.read(fd, 0, buffer, sizeof(data));
-    CHECK(memcmp(buffer, data, sizeof(data)) == 0);
-    close(fd);
-}
-
-TEST(EncryptedFile_CryptorAlignedDataSize)
-{
-    TEST_PATH(path);
-
-    AESCryptor cryptor((const uint8_t *)"12345678901234567890123456789012");
-    cryptor.set_file_size(16);
-    const char data[] = "16 b test data";
-    char buffer[16];
-
-    int fd = open(path.c_str(), O_CREAT|O_RDWR);
-    cryptor.write(fd, 0, data, sizeof(data));
-    cryptor.read(fd, 0, buffer, sizeof(buffer));
-    CHECK(memcmp(buffer, data, sizeof(data)) == 0);
+    cryptor.write(fd, 0, data);
+    cryptor.read(fd, 0, buffer);
+    CHECK(memcmp(buffer, data, strlen(data)) == 0);
     close(fd);
 }
 
@@ -79,15 +63,15 @@ TEST(EncryptedFile_CryptorRepeatedWrites)
     AESCryptor cryptor((const uint8_t *)"12345678901234567890123456789012");
     cryptor.set_file_size(16);
 
-    const char data[] = "test data";
+    const char data[4096] = "test data";
     char raw_buffer_1[8192] = {0}, raw_buffer_2[9192] = {0};
     int fd = open(path.c_str(), O_CREAT|O_RDWR);
 
-    cryptor.write(fd, 0, data, sizeof(data));
+    cryptor.write(fd, 0, data);
     lseek(fd, 0, SEEK_SET);
     read(fd, raw_buffer_1, sizeof(raw_buffer_1));
 
-    cryptor.write(fd, 0, data, sizeof(data));
+    cryptor.write(fd, 0, data);
     lseek(fd, 0, SEEK_SET);
     read(fd, raw_buffer_2, sizeof(raw_buffer_2));
 
@@ -100,22 +84,22 @@ TEST(EncryptedFile_SeparateCryptors)
 {
     TEST_PATH(path);
 
-    const char data[] = "test data";
-    char buffer[16];
+    const char data[4096] = "test data";
+    char buffer[4096];
 
     int fd = open(path.c_str(), O_CREAT|O_RDWR);
     {
         AESCryptor cryptor((const uint8_t *)"12345678901234567890123456789012");
         cryptor.set_file_size(16);
-        cryptor.write(fd, 0, data, sizeof(data));
+        cryptor.write(fd, 0, data);
     }
     {
         AESCryptor cryptor((const uint8_t *)"12345678901234567890123456789012");
         cryptor.set_file_size(16);
-        cryptor.read(fd, 0, buffer, sizeof(buffer));
+        cryptor.read(fd, 0, buffer);
     }
 
-    CHECK(memcmp(buffer, data, sizeof(data)) == 0);
+    CHECK(memcmp(buffer, data, strlen(data)) == 0);
     close(fd);
 }
 
@@ -129,23 +113,21 @@ TEST(EncryptedFile_InterruptedWrite)
     {
         AESCryptor cryptor((const uint8_t *)"12345678901234567890123456789012");
         cryptor.set_file_size(16);
-        cryptor.write(fd, 0, data, sizeof(data));
+        cryptor.write(fd, 0, data);
     }
 
     // Fake an interrupted write which updates the IV table but not the data
-    char buffer[16];
-    lseek(fd, 0, SEEK_SET);
-    read(fd, buffer, 16);
-    memcpy(buffer + 8, buffer, 8);
-    buffer[5]++; // first byte of "hash" field in iv table
-    lseek(fd, 0, SEEK_SET);
-    write(fd, buffer, 16);
+    char buffer[4096];
+    pread(fd, buffer, 64, 0);
+    memcpy(buffer + 32, buffer, 32);
+    buffer[5]++; // first byte of "hmac1" field in iv table
+    pwrite(fd, buffer, 64, 0);
 
     {
         AESCryptor cryptor((const uint8_t *)"12345678901234567890123456789012");
         cryptor.set_file_size(16);
-        cryptor.read(fd, 0, buffer, sizeof(buffer));
-        CHECK(memcmp(buffer, data, sizeof(data)) == 0);
+        cryptor.read(fd, 0, buffer);
+        CHECK(memcmp(buffer, data, strlen(data)) == 0);
     }
 
     close(fd);

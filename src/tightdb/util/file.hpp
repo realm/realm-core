@@ -277,6 +277,10 @@ public:
     /// is idempotent.
     void unlock() TIGHTDB_NOEXCEPT;
 
+    /// Set the encryption key used for this file. Must be called before any
+    /// mappings are created.
+    ///
+    /// \param key A 64-byte encryption key, or null to disable encryption.
     void set_encryption_key(const uint8_t* key);
 
     enum {
@@ -434,7 +438,7 @@ private:
 #endif
 
     bool m_encrypt;
-    uint8_t m_encryption_key[32];
+    uint8_t m_encryption_key[64];
 
     bool lock(bool exclusive, bool non_blocking);
     void open_internal(const std::string& path, AccessMode, CreateMode, int flags, bool* success);
