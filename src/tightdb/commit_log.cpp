@@ -209,9 +209,10 @@ protected:
 
     void sync_header()
     {
-        // TODO: implement
         CommitLogHeader* header = m_header.get_addr();
+        m_header.sync();
         header->use_preamble_a = ! header->use_preamble_a;
+        m_header.sync();
     }
 
     // Ensure the file is open so that it can be resized or mapped
@@ -366,6 +367,7 @@ void WriteLogCollector::reset_log_management(version_type last_version)
     // us against deadlock when we restart after crash on a platform without support
     // for robust mutexes.
     new (& m_header.get_addr()->lock) RobustMutex;
+    m_header.sync();
 }
 
 
@@ -536,6 +538,7 @@ version_type WriteLogCollector::internal_submit_log(const char* data, uint64_t s
     *reinterpret_cast<uint64_t*>(write_ptr) = sz;
     write_ptr += sizeof(uint64_t);
     std::copy(data, data+sz, write_ptr);
+    active_log->map.sync();
     // cerr << "    -- at: " << preamble->write_offset << ", " << sz << endl;
 
     // update metadata to reflect the added commit log
