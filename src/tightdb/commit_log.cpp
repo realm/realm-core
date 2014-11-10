@@ -79,11 +79,9 @@ public:
     void do_transact_log_reserve(std::size_t sz) TIGHTDB_OVERRIDE;
     void do_transact_log_append(const char* data, std::size_t size) TIGHTDB_OVERRIDE;
     void transact_log_reserve(std::size_t n);
-    version_type internal_submit_log(const char*, uint64_t);
     virtual void submit_transact_log(BinaryData);
     virtual void stop_logging() TIGHTDB_OVERRIDE;
     virtual void reset_log_management(version_type last_version) TIGHTDB_OVERRIDE;
-    void cleanup_stale_versions();
     virtual void set_last_version_seen_locally(uint_fast64_t last_seen_version_number) TIGHTDB_NOEXCEPT;
     virtual void set_last_version_synced(uint_fast64_t last_seen_version_number) TIGHTDB_NOEXCEPT;
     virtual uint_fast64_t get_last_version_synced(uint_fast64_t* newest_version_number) TIGHTDB_NOEXCEPT;
@@ -92,11 +90,20 @@ public:
 protected:
     static const size_t page_size = 4096; // file and memory mappings are always multipla of this size
     static const size_t minimal_pages = 1; 
-    // Layout of the commit logs preamble. The preamble is placed at the start of the first commitlog file.
-    // (space is reserved at the start of both files, but only the preamble in m_log_a is used).
+
+    // Layout of the commit logs preamble and header. The header contains a mutex, two
+    // preambles and a flag indicating which preamble is in use. Changes to the commitlogs
+    // are crash safe because of the order of updates to the file. When commit logs are 
+    // added, they are appended to the active file, the preamble is copied, the copy
+    // is updated and sync'ed to disk. Then the flag selecting which preamble to use is
+    // updated and sync'ed. This way, should we crash during updates, the old preamble
+    // will be in effect once we restart, and the more-or-less written changes are just
+    // ignored.
+    // The header is placed at the start of the first commitlog file. The header is mapped
+    // separately from the rest of the file so that the mapping does not need to be resized
+    // as the data area is resized.
+    // (space is reserved at the start of both files, but only the header in m_log_a is used).
     struct CommitLogPreamble {
-        // lock:
-        RobustMutex lock;
         // indicates which file is active/being written.
         bool active_file_is_log_a;
 
@@ -115,24 +122,43 @@ protected:
         uint64_t last_version_synced;
 
         // proper intialization:
-        CommitLogPreamble() : lock() 
+        CommitLogPreamble()
         { 
             active_file_is_log_a = true;
             // The first commit will be from state 1 -> state 2, so we must set 1 initially
             begin_oldest_commit_range = begin_newest_commit_range = end_commit_range = 1;
             last_version_seen_locally = last_version_synced = 1;
-            write_offset = sizeof(*this);
         }
     };
+
+    // The header:
+    struct CommitLogHeader {
+        // lock:
+        RobustMutex lock;
+
+        // selector:
+        bool use_preamble_a;
+
+        // preambles:
+        CommitLogPreamble preamble_a;
+        CommitLogPreamble preamble_b;
+
+        CommitLogHeader() { 
+            use_preamble_a = true; 
+            preamble_a.write_offset = sizeof(*this);
+            preamble_b.write_offset = sizeof(*this);
+        }
+    };
+
     // Each of the actual logs are preceded by their size (in uint64_t format), and each log start
     // aligned to uint64_t (required on some architectures). The size does not count any padding
     // needed at the end of each log.
 
-    // Metadata for a file:
+    // Metadata for a file (in memory):
     struct CommitLogMetadata {
         util::File file;
         std::string name;
-        util::File::Map<CommitLogPreamble> map;
+        util::File::Map<CommitLogHeader> map;
         util::File::SizeType last_seen_size;
         CommitLogMetadata(std::string name) : name(name) {}
     };
@@ -141,14 +167,52 @@ protected:
     CommitLogMetadata m_log_a;
     CommitLogMetadata m_log_b;
     util::Buffer<char> m_transact_log_buffer;
-    util::File::Map<CommitLogPreamble> m_preamble;
+    util::File::Map<CommitLogHeader> m_header;
     // last seen version and associated offset - 0 for invalid
     uint64_t m_read_version;
     uint64_t m_read_offset;
 
-    // make sure the preamble (in log file A) is available and mapped. This is required for
+    // make sure the header (in log file A) is available and mapped. This is required for
     // mutex access.
-    void map_preamble_if_needed();
+    void map_header_if_needed();
+
+    // Get the current preamble for reading only - use get_preamble_for_write() if you are
+    // going to change stuff in the preamble.
+    const CommitLogPreamble* get_preamble()
+    {
+        CommitLogHeader* header = m_header.get_addr();
+        if (header->use_preamble_a)
+            return & header->preamble_a;
+        else
+            return & header->preamble_a;
+    }
+
+    // Creates in-memory copy of the active preamble and returns a pointer to it.
+    // Allows you to do in-place updates of the preamble, then commit those changes
+    // by m_sync, then negate 'use_preamble_a', then one more msync.
+    CommitLogPreamble* get_preamble_for_write()
+    {
+        CommitLogHeader* header = m_header.get_addr();
+        CommitLogPreamble* from;
+        CommitLogPreamble* to;
+        if (header->use_preamble_a) {
+            from = & header->preamble_a;
+            to = & header->preamble_b;
+        }
+        else {
+            from = & header->preamble_b;
+            to = & header->preamble_a;
+        }
+        *to = *from;
+        return to;
+    }
+
+    void sync_header()
+    {
+        // TODO: implement
+        CommitLogHeader* header = m_header.get_addr();
+        header->use_preamble_a = ! header->use_preamble_a;
+    }
 
     // Ensure the file is open so that it can be resized or mapped
     void open_if_needed(CommitLogMetadata& log);
@@ -161,7 +225,11 @@ protected:
     void reset_file(CommitLogMetadata& log);
 
     // Get the buffers pointing into the two files in order of their commits.
-    void get_buffers_in_order(char*& first, char*& second);
+    void get_buffers_in_order(const CommitLogPreamble* preamble, char*& first, char*& second);
+
+    version_type internal_submit_log(const char*, uint64_t);
+    void cleanup_stale_versions(CommitLogPreamble*);
+
 };
 
 // little helper:
@@ -171,9 +239,8 @@ uint64_t aligned_to(uint64_t alignment, uint64_t value)
 }
 
 // Files must be mapped before calling this method
-void WriteLogCollector::get_buffers_in_order(char*& first, char*& second)
+void WriteLogCollector::get_buffers_in_order(const CommitLogPreamble* preamble, char*& first, char*& second)
 {
-    CommitLogPreamble* preamble = m_preamble.get_addr();
     if (preamble->active_file_is_log_a) {
         first  = reinterpret_cast<char*>(m_log_b.map.get_addr());
         second = reinterpret_cast<char*>(m_log_a.map.get_addr());
@@ -206,11 +273,11 @@ void WriteLogCollector::remap_if_needed(CommitLogMetadata& log)
     }
 }
 
-void WriteLogCollector::map_preamble_if_needed()
+void WriteLogCollector::map_header_if_needed()
 {
-    if (m_preamble.is_attached() == false) {
+    if (m_header.is_attached() == false) {
         open_if_needed(m_log_a);
-        m_preamble.map(m_log_a.file, File::access_ReadWrite, sizeof(CommitLogPreamble));
+        m_header.map(m_log_a.file, File::access_ReadWrite, sizeof(CommitLogHeader));
     }
 }
 
@@ -231,7 +298,7 @@ WriteLogCollector::~WriteLogCollector() TIGHTDB_NOEXCEPT
     m_log_a.file.close();
     m_log_b.map.unmap();
     m_log_b.file.close();
-    m_preamble.unmap();
+    m_header.unmap();
 }
 
 void WriteLogCollector::stop_logging()
@@ -244,26 +311,24 @@ void WriteLogCollector::reset_log_management(version_type last_version)
 {
     if (last_version == 1) {
         // for version number 1 the log files will be completely (re)initialized.
-        m_preamble.unmap();
+        m_header.unmap();
         reset_file(m_log_a);
         reset_file(m_log_b);
-        map_preamble_if_needed();
-        new(m_preamble.get_addr()) CommitLogPreamble();
+        map_header_if_needed();
+        new(m_header.get_addr()) CommitLogHeader();
     }
     else {
         // for all other versions, the log files must be there:
         open_if_needed(m_log_a);
         open_if_needed(m_log_b);
-        map_preamble_if_needed();
-        CommitLogPreamble* preamble = m_preamble.get_addr();
+        map_header_if_needed();
+        CommitLogPreamble* preamble = const_cast<CommitLogPreamble*>(get_preamble());
 
         // Verify that end of the commit range is equal to or after 'last_version'
         // TODO: This most likely should throw an exception ?
         TIGHTDB_ASSERT(last_version <= preamble->end_commit_range);
 
         if (last_version <= preamble->end_commit_range) {
-            // TODO: Traverse the logs to establish the new write point
-            // TODO: Adjust metadata to reflect new write point
             if (last_version < preamble->begin_newest_commit_range) {
                 // writepoint is somewhere in the in-active (oldest) file, so
                 // discard data in the active file, and make the in-active file active
@@ -271,8 +336,8 @@ void WriteLogCollector::reset_log_management(version_type last_version)
                 preamble->begin_newest_commit_range = preamble->begin_oldest_commit_range;
                 preamble->active_file_is_log_a = ! preamble->active_file_is_log_a;
             }
-            // writepoint is somewhere in the active file. We scan from the start to
-            // find it.
+            // writepoint is somewhere in the active file. 
+            // We scan from the start to find it.
             TIGHTDB_ASSERT(last_version >= preamble->begin_newest_commit_range);
             CommitLogMetadata* active_log;
             if (preamble->active_file_is_log_a)
@@ -283,8 +348,8 @@ void WriteLogCollector::reset_log_management(version_type last_version)
             version_type current_version;
             char* old_buffer; 
             char* buffer;
-            get_buffers_in_order(old_buffer, buffer);
-            preamble->write_offset = sizeof(CommitLogPreamble);
+            get_buffers_in_order(preamble, old_buffer, buffer);
+            preamble->write_offset = sizeof(CommitLogHeader);
             for (current_version = preamble->begin_newest_commit_range; 
                  current_version < last_version;
                  current_version++) {
@@ -296,11 +361,11 @@ void WriteLogCollector::reset_log_management(version_type last_version)
             }
             preamble->end_commit_range = current_version;
         }
-        // regardless of version, it should be ok to initialize the mutex. This protects
-        // us against deadlock when we restart after crash on a platform without support
-        // for robust mutexes.
-        new (& preamble->lock) RobustMutex;
     }
+    // regardless of version, it should be ok to initialize the mutex. This protects
+    // us against deadlock when we restart after crash on a platform without support
+    // for robust mutexes.
+    new (& m_header.get_addr()->lock) RobustMutex;
 }
 
 
@@ -313,18 +378,19 @@ void recover_from_dead_owner()
 
 void WriteLogCollector::set_last_version_synced(uint_fast64_t last_seen_version_number) TIGHTDB_NOEXCEPT
 {
-    map_preamble_if_needed();
-    CommitLogPreamble* preamble = m_preamble.get_addr();
-    RobustLockGuard rlg(preamble->lock, &recover_from_dead_owner);
+    map_header_if_needed();
+    RobustLockGuard rlg(m_header.get_addr()->lock, &recover_from_dead_owner);
+    CommitLogPreamble* preamble = get_preamble_for_write();
     preamble->last_version_synced = last_seen_version_number;
-    cleanup_stale_versions();
+    cleanup_stale_versions(preamble);
+    sync_header();
 }
 
 uint_fast64_t WriteLogCollector::get_last_version_synced(uint_fast64_t* end_version_number) TIGHTDB_NOEXCEPT
 {
-    map_preamble_if_needed();
-    CommitLogPreamble* preamble = m_preamble.get_addr();
-    RobustLockGuard rlg(preamble->lock, &recover_from_dead_owner);
+    map_header_if_needed();
+    RobustLockGuard rlg(m_header.get_addr()->lock, &recover_from_dead_owner);
+    const CommitLogPreamble* preamble = get_preamble();
     if (end_version_number) {
         *end_version_number = preamble->end_commit_range;
     }
@@ -336,19 +402,19 @@ uint_fast64_t WriteLogCollector::get_last_version_synced(uint_fast64_t* end_vers
 
 void WriteLogCollector::set_last_version_seen_locally(version_type last_seen_version_number) TIGHTDB_NOEXCEPT
 {
-    map_preamble_if_needed();
-    CommitLogPreamble* preamble = m_preamble.get_addr();
-    RobustLockGuard rlg(preamble->lock, &recover_from_dead_owner);
+    map_header_if_needed();
+    RobustLockGuard rlg(m_header.get_addr()->lock, &recover_from_dead_owner);
+    CommitLogPreamble* preamble = get_preamble_for_write();
     preamble->last_version_seen_locally = last_seen_version_number;
-    cleanup_stale_versions();
+    cleanup_stale_versions(preamble);
+    sync_header();
 }
 
-void WriteLogCollector::cleanup_stale_versions()
+void WriteLogCollector::cleanup_stale_versions(CommitLogPreamble* preamble)
 {
     // if a file holds only versions before last_seen_version_number, it can be recycled.
     // recycling is done by updating the preamble of log file A, which must be mapped by
     // the caller.
-    CommitLogPreamble* preamble = m_preamble.get_addr();
     version_type last_seen_version_number;
     last_seen_version_number = preamble->last_version_seen_locally;
     if (preamble->last_version_synced 
@@ -361,7 +427,7 @@ void WriteLogCollector::cleanup_stale_versions()
         preamble->active_file_is_log_a = !preamble->active_file_is_log_a;
         preamble->begin_oldest_commit_range = preamble->begin_newest_commit_range;
         preamble->begin_newest_commit_range = preamble->end_commit_range;
-        preamble->write_offset = sizeof(CommitLogPreamble);
+        preamble->write_offset = sizeof(CommitLogHeader);
     }
 }
 
@@ -369,75 +435,72 @@ void WriteLogCollector::cleanup_stale_versions()
 void WriteLogCollector::get_commit_entries(version_type from_version, version_type to_version,
                                            BinaryData* logs_buffer) TIGHTDB_NOEXCEPT
 {
-    map_preamble_if_needed();
-    CommitLogPreamble* preamble = m_preamble.get_addr();
-    {
-        preamble->lock.lock(&recover_from_dead_owner);
-        TIGHTDB_ASSERT(from_version >= preamble->begin_oldest_commit_range);
-        TIGHTDB_ASSERT(to_version <= preamble->end_commit_range);
+    map_header_if_needed();
+    RobustLockGuard rlg(m_header.get_addr()->lock, &recover_from_dead_owner);
+    const CommitLogPreamble* preamble = get_preamble();
+    TIGHTDB_ASSERT(from_version >= preamble->begin_oldest_commit_range);
+    TIGHTDB_ASSERT(to_version <= preamble->end_commit_range);
 
-        // - make sure the files are open and mapped, possibly update stale mappings
-        remap_if_needed(m_log_a);
-        remap_if_needed(m_log_b);
-        // cerr << "get_commit_entries(" << from_version << ", " << to_version <<")" << endl;
-        char* buffer;
-        char* second_buffer;
-        get_buffers_in_order(buffer, second_buffer);
+    // - make sure the files are open and mapped, possibly update stale mappings
+    remap_if_needed(m_log_a);
+    remap_if_needed(m_log_b);
+    // cerr << "get_commit_entries(" << from_version << ", " << to_version <<")" << endl;
+    char* buffer;
+    char* second_buffer;
+    get_buffers_in_order(preamble, buffer, second_buffer);
 
-        // setup local offset and version tracking variables if needed
-        if (m_read_version < preamble->begin_oldest_commit_range) {
-            m_read_version = preamble->begin_oldest_commit_range;
-            m_read_offset = sizeof(CommitLogPreamble);
-            // cerr << "  -- reset tracking" << endl;
-        }
+    // setup local offset and version tracking variables if needed
+    if (m_read_version < preamble->begin_oldest_commit_range) {
+        m_read_version = preamble->begin_oldest_commit_range;
+        m_read_offset = sizeof(CommitLogHeader);
+        // cerr << "  -- reset tracking" << endl;
+    }
 
-        // switch buffer if we are starting scanning in the second file:
-        if (m_read_version >= preamble->begin_newest_commit_range) {
+    // switch buffer if we are starting scanning in the second file:
+    if (m_read_version >= preamble->begin_newest_commit_range) {
+        buffer = second_buffer;
+        second_buffer = 0;
+        // cerr << "  -- resuming directly in second file" << endl;
+        // The saved offset (m_read_offset) should still be valid
+    }
+
+    // traverse commits:
+    // FIXME: The layout of this loop is very carefully crafted to ensure proper
+    // updates of read tracking (m_read_version and m_read_offset), and most notably
+    // to PREVENT update of read tracking if it is unsafe, i.e. could lead to problems
+    // when reading is resumed during a later call.
+    while (1) {
+
+        // switch from first to second file if needed (at most once)
+        if (second_buffer && m_read_version >= preamble->begin_newest_commit_range) {
             buffer = second_buffer;
             second_buffer = 0;
-            // cerr << "  -- resuming directly in second file" << endl;
-            // The saved offset (m_read_offset) should still be valid
+            m_read_offset = sizeof(CommitLogHeader);
+            // cerr << "  -- switching from first to second file" << endl;
         }
 
-        // traverse commits:
-        // FIXME: The layout of this loop is very carefully crafted to ensure proper
-        // updates of read tracking (m_read_version and m_read_offset), and most notably
-        // to PREVENT update of read tracking if it is unsafe, i.e. could lead to problems
-        // when reading is resumed during a later call.
-        while (1) {
+        // this condition cannot be moved to be a condition for the entire while loop,
+        // because we need to do the above updates to read tracking
+        if (m_read_version >= to_version)
+            break;
 
-            // switch from first to second file if needed (at most once)
-            if (second_buffer && m_read_version >= preamble->begin_newest_commit_range) {
-                buffer = second_buffer;
-                second_buffer = 0;
-                m_read_offset = sizeof(CommitLogPreamble);
-                // cerr << "  -- switching from first to second file" << endl;
-            }
-
-            // this condition cannot be moved to be a condition for the entire while loop,
-            // because we need to do the above updates to read tracking
-            if (m_read_version >= to_version)
-                break;
-
-            // follow buffer layout
-            uint64_t size = *reinterpret_cast<uint64_t*>(buffer + m_read_offset);
-            uint64_t tmp_offset = m_read_offset + sizeof(uint64_t);
-            if (m_read_version >= from_version) {
-                // cerr << "  --at: " << m_read_offset << ", " << size << endl;
-                *logs_buffer = BinaryData(buffer + tmp_offset, size);
-                ++logs_buffer;
-            }
-            // break early to avoid updating tracking information, if we've reached past
-            // the final entry.. We CAN resume from the final entry, but we cannot safely
-            // resume once we've read past the final entry. The reason is that an intervening
-            // call to set_oldest_version could shift the write point to the beginning of the
-            // other file.
-            if (m_read_version+1 >= preamble->end_commit_range) break;
-            size = aligned_to(sizeof(uint64_t), size);
-            m_read_offset = tmp_offset + size;
-            m_read_version++;
+        // follow buffer layout
+        uint64_t size = *reinterpret_cast<uint64_t*>(buffer + m_read_offset);
+        uint64_t tmp_offset = m_read_offset + sizeof(uint64_t);
+        if (m_read_version >= from_version) {
+            // cerr << "  --at: " << m_read_offset << ", " << size << endl;
+            *logs_buffer = BinaryData(buffer + tmp_offset, size);
+            ++logs_buffer;
         }
-        preamble->lock.unlock();
+        // break early to avoid updating tracking information, if we've reached past
+        // the final entry.. We CAN resume from the final entry, but we cannot safely
+        // resume once we've read past the final entry. The reason is that an intervening
+        // call to set_oldest_version could shift the write point to the beginning of the
+        // other file.
+        if (m_read_version+1 >= preamble->end_commit_range) break;
+        size = aligned_to(sizeof(uint64_t), size);
+        m_read_offset = tmp_offset + size;
+        m_read_version++;
     }
 }
 
@@ -445,43 +508,41 @@ void WriteLogCollector::get_commit_entries(version_type from_version, version_ty
 version_type WriteLogCollector::internal_submit_log(const char* data, uint64_t sz)
 {
     version_type orig_version;
-    map_preamble_if_needed();
-    CommitLogPreamble* preamble = m_preamble.get_addr();
-    {
-        preamble->lock.lock(&recover_from_dead_owner);
-        // cerr << "commit_write_transaction(" << orig_version << ")" << endl;
-        CommitLogMetadata* active_log;
-        if (preamble->active_file_is_log_a)
-            active_log = &m_log_a;
-        else
-            active_log = &m_log_b;
+    map_header_if_needed();
+    RobustLockGuard rlg(m_header.get_addr()->lock, &recover_from_dead_owner);
+    CommitLogPreamble* preamble = get_preamble_for_write();
+    // cerr << "commit_write_transaction(" << orig_version << ")" << endl;
+    CommitLogMetadata* active_log;
+    if (preamble->active_file_is_log_a)
+        active_log = &m_log_a;
+    else
+        active_log = &m_log_b;
 
-        // make sure the file is available for potential resizing
-        open_if_needed(*active_log);
+    // make sure the file is available for potential resizing
+    open_if_needed(*active_log);
 
-        // make sure we have space (allocate if not)
-        File::SizeType size_needed = aligned_to(sizeof(uint64_t), preamble->write_offset + sizeof(uint64_t) + sz);
-        size_needed = aligned_to(page_size, size_needed);
-        if (size_needed > active_log->file.get_size()) {
-            active_log->file.resize(size_needed);
-        }
-
-        // create/update mapping so that we are sure it covers the file we are about write:
-        remap_if_needed(*active_log);
-
-        // append data from write pointer and onwards:
-        char* write_ptr = reinterpret_cast<char*>(active_log->map.get_addr()) + preamble->write_offset;
-        *reinterpret_cast<uint64_t*>(write_ptr) = sz;
-        write_ptr += sizeof(uint64_t);
-        std::copy(data, data+sz, write_ptr);
-        // cerr << "    -- at: " << preamble->write_offset << ", " << sz << endl;
-
-        // update metadata to reflect the added commit log
-        preamble->write_offset += aligned_to(sizeof(uint64_t), sz + sizeof(uint64_t));
-        orig_version = preamble->end_commit_range;
-        preamble->end_commit_range = orig_version+1;
-        preamble->lock.unlock();
+    // make sure we have space (allocate if not)
+    File::SizeType size_needed = aligned_to(sizeof(uint64_t), preamble->write_offset + sizeof(uint64_t) + sz);
+    size_needed = aligned_to(page_size, size_needed);
+    if (size_needed > active_log->file.get_size()) {
+        active_log->file.resize(size_needed);
     }
+
+    // create/update mapping so that we are sure it covers the file we are about write:
+    remap_if_needed(*active_log);
+
+    // append data from write pointer and onwards:
+    char* write_ptr = reinterpret_cast<char*>(active_log->map.get_addr()) + preamble->write_offset;
+    *reinterpret_cast<uint64_t*>(write_ptr) = sz;
+    write_ptr += sizeof(uint64_t);
+    std::copy(data, data+sz, write_ptr);
+    // cerr << "    -- at: " << preamble->write_offset << ", " << sz << endl;
+
+    // update metadata to reflect the added commit log
+    preamble->write_offset += aligned_to(sizeof(uint64_t), sz + sizeof(uint64_t));
+    orig_version = preamble->end_commit_range;
+    preamble->end_commit_range = orig_version+1;
+    sync_header();
     return orig_version;
 }
 
