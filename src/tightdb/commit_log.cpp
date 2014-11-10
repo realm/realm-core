@@ -173,7 +173,7 @@ uint64_t aligned_to(uint64_t alignment, uint64_t value)
 // Files must be mapped before calling this method
 void WriteLogCollector::get_buffers_in_order(char*& first, char*& second)
 {
-    CommitLogPreamble* preamble = m_log_a.map.get_addr();
+    CommitLogPreamble* preamble = m_preamble.get_addr();
     if (preamble->active_file_is_log_a) {
         first  = reinterpret_cast<char*>(m_log_b.map.get_addr());
         second = reinterpret_cast<char*>(m_log_a.map.get_addr());
@@ -242,19 +242,64 @@ void WriteLogCollector::stop_logging()
 
 void WriteLogCollector::reset_log_management(version_type last_version)
 {
-    // TODO:
-    // regardless of version, it should be ok to initialize the mutex. This protects
-    // us against deadlock when we restart after crash on a platform without support
-    // for robust mutexes.
-    //
-    // for version number 1 the log files will be completely (re)initialized.
-    // for all other versions, the log files must be there and pass an integrity check.
     if (last_version == 1) {
+        // for version number 1 the log files will be completely (re)initialized.
         m_preamble.unmap();
         reset_file(m_log_a);
         reset_file(m_log_b);
         map_preamble_if_needed();
         new(m_preamble.get_addr()) CommitLogPreamble();
+    }
+    else {
+        // for all other versions, the log files must be there:
+        open_if_needed(m_log_a);
+        open_if_needed(m_log_b);
+        map_preamble_if_needed();
+        CommitLogPreamble* preamble = m_preamble.get_addr();
+
+        // Verify that end of the commit range is equal to or after 'last_version'
+        // TODO: This most likely should throw an exception ?
+        TIGHTDB_ASSERT(last_version <= preamble->end_commit_range);
+
+        if (last_version <= preamble->end_commit_range) {
+            // TODO: Traverse the logs to establish the new write point
+            // TODO: Adjust metadata to reflect new write point
+            if (last_version < preamble->begin_newest_commit_range) {
+                // writepoint is somewhere in the in-active (oldest) file, so
+                // discard data in the active file, and make the in-active file active
+                preamble->end_commit_range = preamble->begin_newest_commit_range;
+                preamble->begin_newest_commit_range = preamble->begin_oldest_commit_range;
+                preamble->active_file_is_log_a = ! preamble->active_file_is_log_a;
+            }
+            // writepoint is somewhere in the active file. We scan from the start to
+            // find it.
+            TIGHTDB_ASSERT(last_version >= preamble->begin_newest_commit_range);
+            CommitLogMetadata* active_log;
+            if (preamble->active_file_is_log_a)
+                active_log = &m_log_a;
+            else
+                active_log = &m_log_b;
+            remap_if_needed(*active_log);
+            version_type current_version;
+            char* old_buffer; 
+            char* buffer;
+            get_buffers_in_order(old_buffer, buffer);
+            preamble->write_offset = sizeof(CommitLogPreamble);
+            for (current_version = preamble->begin_newest_commit_range; 
+                 current_version < last_version;
+                 current_version++) {
+                // advance write ptr to next buffer start:
+                uint64_t size = *reinterpret_cast<uint64_t*>(buffer + preamble->write_offset);
+                uint64_t tmp_offset = preamble->write_offset + sizeof(uint64_t);
+                size = aligned_to(sizeof(uint64_t), size);
+                preamble->write_offset = tmp_offset + size;
+            }
+            preamble->end_commit_range = current_version;
+        }
+        // regardless of version, it should be ok to initialize the mutex. This protects
+        // us against deadlock when we restart after crash on a platform without support
+        // for robust mutexes.
+        new (& preamble->lock) RobustMutex;
     }
 }
 
