@@ -87,7 +87,7 @@ public:
     /// Called by SharedGroup during a write transaction, when readlocks are recycled, to
     /// keep the commit log management in sync with what versions can possibly be interesting
     /// in the future.
-    virtual void set_last_version_seen_locally(uint_fast64_t last_seen_version_number) TIGHTDB_NOEXCEPT;
+    virtual void set_last_version_seen_locally(version_type last_seen_version_number) TIGHTDB_NOEXCEPT;
 
     /// Get all transaction logs between the specified versions. The number
     /// of requested logs is exactly `to_version - from_version`. If this
@@ -98,7 +98,7 @@ public:
     /// referenced by those entries, but the memory will remain accessible
     /// to the caller until they are declared stale by calls to 'set_last_version_seen_locally' 
     /// and 'set_last_version_synced', OR until a new call to get_commit_entries() is made.
-    virtual void get_commit_entries(uint_fast64_t from_version, uint_fast64_t to_version,
+    virtual void get_commit_entries(version_type from_version, version_type to_version,
                                     BinaryData* logs_buffer) TIGHTDB_NOEXCEPT;
 
     /// Support for global sync. The commit logs will be retained until
@@ -106,13 +106,13 @@ public:
     /// and 'set_last_version_synced'. Providing a version number of zero disables
     /// the use of sync versioning. Providing a non-zero version number enables the
     /// use of sync versioning.
-    virtual void set_last_version_synced(uint_fast64_t last_seen_version_number) TIGHTDB_NOEXCEPT;
+    virtual void set_last_version_synced(version_type last_seen_version_number) TIGHTDB_NOEXCEPT;
 
     /// Get the value set by last call to 'set_last_version_synced'
     /// If 'end_version_number' is non null, a limit to version numbering is returned.
     /// The limit returned is the version number of the latest commit.
     /// If sync versioning is disabled, the last version seen locally is returned.
-    virtual uint_fast64_t get_last_version_synced(uint_fast64_t* end_version_number = 0) TIGHTDB_NOEXCEPT;
+    virtual version_type get_last_version_synced(version_type* end_version_number = 0) TIGHTDB_NOEXCEPT;
 
     /// Submit a transact log directly into the system bypassing the normal
     /// collection of replication entries. This is used to add a transactlog
@@ -612,15 +612,15 @@ inline void Replication::stop_logging()
 {
 }
 
-inline void Replication::set_last_version_seen_locally(uint_fast64_t) TIGHTDB_NOEXCEPT
+inline void Replication::set_last_version_seen_locally(version_type) TIGHTDB_NOEXCEPT
 {
 }
 
-inline void Replication::set_last_version_synced(uint_fast64_t) TIGHTDB_NOEXCEPT
+inline void Replication::set_last_version_synced(version_type) TIGHTDB_NOEXCEPT
 {
 }
 
-inline uint_fast64_t Replication::get_last_version_synced(uint_fast64_t*) TIGHTDB_NOEXCEPT
+inline Replication::version_type Replication::get_last_version_synced(version_type*) TIGHTDB_NOEXCEPT
 {
     return 0;
 }
@@ -631,7 +631,7 @@ inline void Replication::submit_transact_log(BinaryData)
     TIGHTDB_ASSERT(false);
 }
 
-inline void Replication::get_commit_entries(uint_fast64_t, uint_fast64_t, BinaryData*) TIGHTDB_NOEXCEPT
+inline void Replication::get_commit_entries(version_type, version_type, BinaryData*) TIGHTDB_NOEXCEPT
 {
     // Unimplemented!
     TIGHTDB_ASSERT(false);

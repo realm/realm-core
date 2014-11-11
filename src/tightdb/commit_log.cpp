@@ -32,12 +32,13 @@
 
 typedef uint_fast64_t version_type;
 
-namespace tightdb {
-
-
-namespace _impl {
 using namespace util;
 using namespace std;
+
+namespace tightdb {
+
+namespace _impl {
+
 
 // Design of the commit logs:
 //
@@ -82,10 +83,10 @@ public:
     virtual void submit_transact_log(BinaryData);
     virtual void stop_logging() TIGHTDB_OVERRIDE;
     virtual void reset_log_management(version_type last_version) TIGHTDB_OVERRIDE;
-    virtual void set_last_version_seen_locally(uint_fast64_t last_seen_version_number) TIGHTDB_NOEXCEPT;
-    virtual void set_last_version_synced(uint_fast64_t last_seen_version_number) TIGHTDB_NOEXCEPT;
-    virtual uint_fast64_t get_last_version_synced(uint_fast64_t* newest_version_number) TIGHTDB_NOEXCEPT;
-    virtual void get_commit_entries(uint_fast64_t from_version, uint_fast64_t to_version,
+    virtual void set_last_version_seen_locally(version_type last_seen_version_number) TIGHTDB_NOEXCEPT;
+    virtual void set_last_version_synced(version_type last_seen_version_number) TIGHTDB_NOEXCEPT;
+    virtual version_type get_last_version_synced(version_type* newest_version_number) TIGHTDB_NOEXCEPT;
+    virtual void get_commit_entries(version_type from_version, version_type to_version,
                                     BinaryData* logs_buffer) TIGHTDB_NOEXCEPT;
 protected:
     static const size_t page_size = 4096; // file and memory mappings are always multipla of this size
@@ -104,6 +105,7 @@ protected:
     // as the data area is resized.
     // (space is reserved at the start of both files, but only the header in m_log_a is used).
     struct CommitLogPreamble {
+
         // indicates which file is active/being written.
         bool active_file_is_log_a;
 
@@ -111,12 +113,14 @@ protected:
         uint64_t begin_oldest_commit_range; // for commits residing in in-active file
         uint64_t begin_newest_commit_range; // for commits residing in the active file
         uint64_t end_commit_range;
+
         // The log bringing us from state A to state A+1 is given the number A.
         // The end_commit_range is a traditional C++ limit, it points one past the last number
         uint64_t write_offset; // within active file, value always kept aligned to uint64_t
 
         // Last seen versions by Sync and local sharing, respectively
         uint64_t last_version_seen_locally;
+
         // A value of zero for last_version_synced indicates that Sync is not used, so this
         // member can be disregarded when determining which logs are stale.
         uint64_t last_version_synced;
@@ -168,52 +172,39 @@ protected:
     CommitLogMetadata m_log_b;
     util::Buffer<char> m_transact_log_buffer;
     util::File::Map<CommitLogHeader> m_header;
+
     // last seen version and associated offset - 0 for invalid
     uint64_t m_read_version;
     uint64_t m_read_offset;
 
     // make sure the header (in log file A) is available and mapped. This is required for
-    // mutex access.
+    // any access to metadata. Calling the method while the mutex is locked will result in
+    // undefined behavior, so DON'T.
     void map_header_if_needed();
 
     // Get the current preamble for reading only - use get_preamble_for_write() if you are
-    // going to change stuff in the preamble.
-    const CommitLogPreamble* get_preamble()
-    {
-        CommitLogHeader* header = m_header.get_addr();
-        if (header->use_preamble_a)
-            return & header->preamble_a;
-        else
-            return & header->preamble_b;
-    }
+    // going to change stuff in the preamble, and remember to call sync_header() to commit those
+    // changes.
+    const CommitLogPreamble* get_preamble();
 
-    // Creates in-memory copy of the active preamble and returns a pointer to it.
+    // Creates in-mapped-memory copy of the active preamble and returns a pointer to it.
     // Allows you to do in-place updates of the preamble, then commit those changes
-    // by m_sync, then negate 'use_preamble_a', then one more msync.
-    CommitLogPreamble* get_preamble_for_write()
-    {
-        CommitLogHeader* header = m_header.get_addr();
-        CommitLogPreamble* from;
-        CommitLogPreamble* to;
-        if (header->use_preamble_a) {
-            from = & header->preamble_a;
-            to = & header->preamble_b;
-        }
-        else {
-            from = & header->preamble_b;
-            to = & header->preamble_a;
-        }
-        *to = *from;
-        return to;
-    }
+    // by calling sync_header().
+    CommitLogPreamble* get_preamble_for_write();
 
-    void sync_header()
-    {
-        CommitLogHeader* header = m_header.get_addr();
-        m_header.sync();
-        header->use_preamble_a = ! header->use_preamble_a;
-        m_header.sync();
-    }
+    // commit any changes to the preamble obtained by get_preamble_for_writing.
+    void sync_header();
+
+    // Get the active log file. The active log file is the file to which
+    // log entries are currently appended.
+    CommitLogMetadata* get_active_log(CommitLogPreamble*);
+
+    // Get the buffers pointing into the two files in order of their commits.
+    // The first buffer maps the file containing log entries:
+    //    [ preamble->begin_oldest_commit_range .. preamble->begin_newest_commit_range [
+    // The second buffer maps the file containing log entries:
+    //    [ preamble->begin_newest_commit_range .. preamble->end_commit_range [
+    void get_buffers_in_order(const CommitLogPreamble* preamble, char*& first, char*& second);
 
     // Ensure the file is open so that it can be resized or mapped
     void open_if_needed(CommitLogMetadata& log);
@@ -225,21 +216,81 @@ protected:
     // Reset mapping and file
     void reset_file(CommitLogMetadata& log);
 
-    // Get the buffers pointing into the two files in order of their commits.
-    void get_buffers_in_order(const CommitLogPreamble* preamble, char*& first, char*& second);
-
+    // Add a single log entry to the logs. The log data is copied.
     version_type internal_submit_log(const char*, uint64_t);
-    void cleanup_stale_versions(CommitLogPreamble*);
 
+    // Determine if one of the log files hold only stale log entries.
+    // If so, recycle said log file.
+    void cleanup_stale_versions(CommitLogPreamble*);
 };
 
-// little helper:
-uint64_t aligned_to(uint64_t alignment, uint64_t value)
+
+
+// little helpers:
+inline uint64_t aligned_to(uint64_t alignment, uint64_t value)
 {
     return (value + alignment - 1) & ~(alignment - 1);
 }
 
-// Files must be mapped before calling this method
+
+void recover_from_dead_owner()
+{
+    // nothing!
+}
+
+
+
+// Header access and manipulation methods:
+
+inline const WriteLogCollector::CommitLogPreamble* WriteLogCollector::get_preamble()
+{
+    CommitLogHeader* header = m_header.get_addr();
+    if (header->use_preamble_a)
+        return & header->preamble_a;
+    else
+        return & header->preamble_b;
+}
+
+
+inline WriteLogCollector::CommitLogPreamble* WriteLogCollector::get_preamble_for_write()
+{
+    CommitLogHeader* header = m_header.get_addr();
+    CommitLogPreamble* from;
+    CommitLogPreamble* to;
+    if (header->use_preamble_a) {
+        from = & header->preamble_a;
+        to = & header->preamble_b;
+    }
+    else {
+        from = & header->preamble_b;
+        to = & header->preamble_a;
+    }
+    *to = *from;
+    return to;
+}
+
+
+inline void WriteLogCollector::sync_header()
+{
+    CommitLogHeader* header = m_header.get_addr();
+    m_header.sync();
+    header->use_preamble_a = ! header->use_preamble_a;
+    m_header.sync();
+}
+
+
+inline void WriteLogCollector::map_header_if_needed()
+{
+    if (m_header.is_attached() == false) {
+        open_if_needed(m_log_a);
+        m_header.map(m_log_a.file, File::access_ReadWrite, sizeof(CommitLogHeader));
+    }
+}
+
+
+
+// convenience methods for getting to buffers and logs.
+
 void WriteLogCollector::get_buffers_in_order(const CommitLogPreamble* preamble, char*& first, char*& second)
 {
     if (preamble->active_file_is_log_a) {
@@ -252,6 +303,17 @@ void WriteLogCollector::get_buffers_in_order(const CommitLogPreamble* preamble, 
     }
 }
 
+WriteLogCollector::CommitLogMetadata* WriteLogCollector::get_active_log(CommitLogPreamble* preamble)
+{
+    if (preamble->active_file_is_log_a)
+        return &m_log_a;
+    else
+        return &m_log_b;
+}
+
+
+
+// File and memory mapping functions:
 
 void WriteLogCollector::open_if_needed(CommitLogMetadata& log)
 {
@@ -274,14 +336,6 @@ void WriteLogCollector::remap_if_needed(CommitLogMetadata& log)
     }
 }
 
-void WriteLogCollector::map_header_if_needed()
-{
-    if (m_header.is_attached() == false) {
-        open_if_needed(m_log_a);
-        m_header.map(m_log_a.file, File::access_ReadWrite, sizeof(CommitLogHeader));
-    }
-}
-
 void WriteLogCollector::reset_file(CommitLogMetadata& log)
 {
     log.map.unmap();
@@ -292,6 +346,87 @@ void WriteLogCollector::reset_file(CommitLogMetadata& log)
     log.map.map(log.file, File::access_ReadWrite, minimal_pages * page_size);
     log.last_seen_size = minimal_pages * page_size;
 }
+
+
+
+// Helper methods for adding and cleaning up commit log entries:
+
+void WriteLogCollector::cleanup_stale_versions(CommitLogPreamble* preamble)
+{
+    // if a file holds only versions before last_seen_version_number, it can be recycled.
+    // recycling is done by updating the preamble of log file A, which must be mapped by
+    // the caller.
+    version_type last_seen_version_number;
+    last_seen_version_number = preamble->last_version_seen_locally;
+    if (preamble->last_version_synced 
+        && preamble->last_version_synced < preamble->last_version_seen_locally)
+        last_seen_version_number = preamble->last_version_synced;
+
+    // cerr << "oldest_version(" << last_seen_version_number << ")" << endl; 
+    if (last_seen_version_number >= preamble->begin_newest_commit_range) {
+        // oldest file holds only stale commitlogs, so let's swap files and update the range
+        preamble->active_file_is_log_a = !preamble->active_file_is_log_a;
+        preamble->begin_oldest_commit_range = preamble->begin_newest_commit_range;
+        preamble->begin_newest_commit_range = preamble->end_commit_range;
+        preamble->write_offset = sizeof(CommitLogHeader);
+
+        // shrink the recycled file by 1/4
+        CommitLogMetadata* active_log = get_active_log(preamble);
+        open_if_needed(*active_log);
+        File::SizeType sz = active_log->file.get_size();
+        sz /= page_size * minimal_pages;
+        if (sz > 4) {
+            sz -= sz/4;
+            sz *= page_size * minimal_pages;
+            active_log->file.resize(sz);
+        }
+    }
+}
+
+
+// returns the current "from" version
+version_type WriteLogCollector::internal_submit_log(const char* data, uint64_t sz)
+{
+    version_type orig_version;
+    map_header_if_needed();
+    RobustLockGuard rlg(m_header.get_addr()->lock, &recover_from_dead_owner);
+    CommitLogPreamble* preamble = get_preamble_for_write();
+    // cerr << "commit_write_transaction(" << orig_version << ")" << endl;
+    CommitLogMetadata* active_log = get_active_log(preamble);
+
+    // make sure the file is available for potential resizing
+    open_if_needed(*active_log);
+
+    // make sure we have space (allocate if not)
+    File::SizeType size_needed = aligned_to(sizeof(uint64_t), preamble->write_offset + sizeof(uint64_t) + sz);
+    size_needed = aligned_to(page_size, size_needed);
+    if (size_needed > active_log->file.get_size()) {
+        active_log->file.resize(size_needed);
+    }
+
+    // create/update mapping so that we are sure it covers the file we are about write:
+    remap_if_needed(*active_log);
+
+    // append data from write pointer and onwards:
+    char* write_ptr = reinterpret_cast<char*>(active_log->map.get_addr()) + preamble->write_offset;
+    *reinterpret_cast<uint64_t*>(write_ptr) = sz;
+    write_ptr += sizeof(uint64_t);
+    std::copy(data, data+sz, write_ptr);
+    active_log->map.sync();
+    // cerr << "    -- at: " << preamble->write_offset << ", " << sz << endl;
+
+    // update metadata to reflect the added commit log
+    preamble->write_offset += aligned_to(sizeof(uint64_t), sz + sizeof(uint64_t));
+    orig_version = preamble->end_commit_range;
+    preamble->end_commit_range = orig_version+1;
+    sync_header();
+    return orig_version;
+}
+
+
+
+
+// Public methods:
 
 WriteLogCollector::~WriteLogCollector() TIGHTDB_NOEXCEPT 
 {
@@ -340,11 +475,7 @@ void WriteLogCollector::reset_log_management(version_type last_version)
             // writepoint is somewhere in the active file. 
             // We scan from the start to find it.
             TIGHTDB_ASSERT(last_version >= preamble->begin_newest_commit_range);
-            CommitLogMetadata* active_log;
-            if (preamble->active_file_is_log_a)
-                active_log = &m_log_a;
-            else
-                active_log = &m_log_b;
+            CommitLogMetadata* active_log = get_active_log(preamble);
             remap_if_needed(*active_log);
             version_type current_version;
             char* old_buffer; 
@@ -371,14 +502,7 @@ void WriteLogCollector::reset_log_management(version_type last_version)
 }
 
 
-
-void recover_from_dead_owner()
-{
-    // nothing!
-}
-
-
-void WriteLogCollector::set_last_version_synced(uint_fast64_t last_seen_version_number) TIGHTDB_NOEXCEPT
+void WriteLogCollector::set_last_version_synced(version_type last_seen_version_number) TIGHTDB_NOEXCEPT
 {
     map_header_if_needed();
     RobustLockGuard rlg(m_header.get_addr()->lock, &recover_from_dead_owner);
@@ -388,7 +512,8 @@ void WriteLogCollector::set_last_version_synced(uint_fast64_t last_seen_version_
     sync_header();
 }
 
-uint_fast64_t WriteLogCollector::get_last_version_synced(uint_fast64_t* end_version_number) TIGHTDB_NOEXCEPT
+
+version_type WriteLogCollector::get_last_version_synced(version_type* end_version_number) TIGHTDB_NOEXCEPT
 {
     map_header_if_needed();
     RobustLockGuard rlg(m_header.get_addr()->lock, &recover_from_dead_owner);
@@ -402,6 +527,7 @@ uint_fast64_t WriteLogCollector::get_last_version_synced(uint_fast64_t* end_vers
         return preamble->last_version_seen_locally;
 }
 
+
 void WriteLogCollector::set_last_version_seen_locally(version_type last_seen_version_number) TIGHTDB_NOEXCEPT
 {
     map_header_if_needed();
@@ -410,27 +536,6 @@ void WriteLogCollector::set_last_version_seen_locally(version_type last_seen_ver
     preamble->last_version_seen_locally = last_seen_version_number;
     cleanup_stale_versions(preamble);
     sync_header();
-}
-
-void WriteLogCollector::cleanup_stale_versions(CommitLogPreamble* preamble)
-{
-    // if a file holds only versions before last_seen_version_number, it can be recycled.
-    // recycling is done by updating the preamble of log file A, which must be mapped by
-    // the caller.
-    version_type last_seen_version_number;
-    last_seen_version_number = preamble->last_version_seen_locally;
-    if (preamble->last_version_synced 
-        && preamble->last_version_synced < preamble->last_version_seen_locally)
-        last_seen_version_number = preamble->last_version_synced;
-
-    // cerr << "oldest_version(" << last_seen_version_number << ")" << endl; 
-    if (last_seen_version_number >= preamble->begin_newest_commit_range) {
-        // oldest file holds only stale commitlogs, so let's swap files and update the range
-        preamble->active_file_is_log_a = !preamble->active_file_is_log_a;
-        preamble->begin_oldest_commit_range = preamble->begin_newest_commit_range;
-        preamble->begin_newest_commit_range = preamble->end_commit_range;
-        preamble->write_offset = sizeof(CommitLogHeader);
-    }
 }
 
 
@@ -506,53 +611,12 @@ void WriteLogCollector::get_commit_entries(version_type from_version, version_ty
     }
 }
 
-// returns the current "from" version
-version_type WriteLogCollector::internal_submit_log(const char* data, uint64_t sz)
-{
-    version_type orig_version;
-    map_header_if_needed();
-    RobustLockGuard rlg(m_header.get_addr()->lock, &recover_from_dead_owner);
-    CommitLogPreamble* preamble = get_preamble_for_write();
-    // cerr << "commit_write_transaction(" << orig_version << ")" << endl;
-    CommitLogMetadata* active_log;
-    if (preamble->active_file_is_log_a)
-        active_log = &m_log_a;
-    else
-        active_log = &m_log_b;
-
-    // make sure the file is available for potential resizing
-    open_if_needed(*active_log);
-
-    // make sure we have space (allocate if not)
-    File::SizeType size_needed = aligned_to(sizeof(uint64_t), preamble->write_offset + sizeof(uint64_t) + sz);
-    size_needed = aligned_to(page_size, size_needed);
-    if (size_needed > active_log->file.get_size()) {
-        active_log->file.resize(size_needed);
-    }
-
-    // create/update mapping so that we are sure it covers the file we are about write:
-    remap_if_needed(*active_log);
-
-    // append data from write pointer and onwards:
-    char* write_ptr = reinterpret_cast<char*>(active_log->map.get_addr()) + preamble->write_offset;
-    *reinterpret_cast<uint64_t*>(write_ptr) = sz;
-    write_ptr += sizeof(uint64_t);
-    std::copy(data, data+sz, write_ptr);
-    active_log->map.sync();
-    // cerr << "    -- at: " << preamble->write_offset << ", " << sz << endl;
-
-    // update metadata to reflect the added commit log
-    preamble->write_offset += aligned_to(sizeof(uint64_t), sz + sizeof(uint64_t));
-    orig_version = preamble->end_commit_range;
-    preamble->end_commit_range = orig_version+1;
-    sync_header();
-    return orig_version;
-}
 
 void WriteLogCollector::submit_transact_log(BinaryData bd)
 {
     internal_submit_log(bd.data(), bd.size());
 }
+
 
 WriteLogCollector::version_type 
 WriteLogCollector::do_commit_write_transact(SharedGroup& sg, 
@@ -616,14 +680,13 @@ WriteLogCollector::WriteLogCollector(std::string database_name)
     m_read_offset = 0;
 }
 
-} // namespace _impl
-
+} // end _impl
 
 
 
 Replication* makeWriteLogCollector(std::string database_name)
 {
-    return  new _impl::WriteLogCollector(database_name);
+    return new _impl::WriteLogCollector(database_name);
 }
 
 
