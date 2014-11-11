@@ -184,7 +184,7 @@ protected:
         if (header->use_preamble_a)
             return & header->preamble_a;
         else
-            return & header->preamble_a;
+            return & header->preamble_b;
     }
 
     // Creates in-memory copy of the active preamble and returns a pointer to it.
