@@ -302,14 +302,14 @@ template <class L, class Cond, class R> Query create(L left, const Subexpr2<R>& 
 
     if (column &&
         ((std::numeric_limits<L>::is_integer && std::numeric_limits<L>::is_integer) ||
-        (SameType<L, double>::value && SameType<R, double>::value) ||
-        (SameType<L, float>::value && SameType<R, float>::value))
+        (util::SameType<L, double>::value && util::SameType<R, double>::value) ||
+        (util::SameType<L, float>::value && util::SameType<R, float>::value))
         &&
         column->m_link_map.m_tables.size() == 0) {
         const Table* t = (const_cast<Columns<R>*>(column))->get_table();
         Query q = Query(*t);
 
-        typedef OnlyNumeric<R>::type2 type2;
+        typedef typename OnlyNumeric<R>::type2 type2;
 
         if (util::SameType<Cond, Less>::value)
             q.greater(column->m_column, static_cast<type2>(num.get(left)));
