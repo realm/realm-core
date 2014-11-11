@@ -23,20 +23,30 @@ class MyHandler(BaseHTTPRequestHandler):
             if client_version >= last_version:
                 print "Response: up-to-date"
                 self.send_response(200)
-                self.send_header('Content-type', 'text/plain')
+                self.send_header('Content-Type', 'text/plain')
                 self.end_headers()
                 self.wfile.write("up-to-date")
                 return
             next_version = client_version + 1
-            print "Offering transaction log %s -> %s" % (next_version-1, next_version)
             transact_log_ndx = next_version - (first_version + 1)
             transact_log = transact_logs[transact_log_ndx]
+            transact_log_size = len(transact_log)
+            print "Offering transaction log %s -> %s of size %s" % (next_version-1, next_version, transact_log_size)
+            # Unfortunately, iOS seems to try to guess the Content-Type, and
+            # ignore what is specified here. To work around this issue, we
+            # always prepend a null character to the transmitted transaction
+            # log.
             self.send_response(200)
-            self.send_header('Content-type', 'application/octet-stream')
+            self.send_header('Content-Type', 'application/octet-stream')
+            self.send_header('Content-Length', '%s' % (transact_log_size + 1))
             self.end_headers()
+            self.wfile.write("\0")
             self.wfile.write(transact_log)
             return
         if path.startswith('/send/'):
+            body_size = int(self.headers['Content-Length'])
+            transact_log = self.rfile.read(body_size)
+            print "transact_log: '%s'" % (transact_log)
             client_version = int(path.split('/')[2])
             last_version = first_version + len(transact_logs)
             print "last_version = %s" % (last_version)
@@ -47,17 +57,14 @@ class MyHandler(BaseHTTPRequestHandler):
             if client_version < next_version:
                 print "Response: conflict"
                 self.send_response(200)
-                self.send_header('Content-type', 'text/plain')
+                self.send_header('Content-Type', 'text/plain')
                 self.end_headers()
                 self.wfile.write("conflict")
                 return
             print "Accepting transaction log %s -> %s" % (next_version-1, next_version)
-            body_size = int(self.headers['Content-Length'])
-            transact_log = self.rfile.read(body_size)
-            print "transact_log: '%s'" % (transact_log)
             transact_logs.append(transact_log)
             self.send_response(200)
-            self.send_header('Content-type', 'text/plain')
+            self.send_header('Content-Type', 'text/plain')
             self.end_headers()
             self.wfile.write("ok")
             return
