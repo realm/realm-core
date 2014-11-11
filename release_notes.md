@@ -22,6 +22,8 @@
   'weak'.
 * Rows can now be removed via a row accessors (`Row::remove()`,
   `Row::move_last_over()`).
+* Speedup of double/float conditions in query expression of a factor ~5 (uses fallback
+  to old query nodes for double/float too, instead of only for integer conditions).
 
 -----------
 

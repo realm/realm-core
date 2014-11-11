@@ -2638,6 +2638,39 @@ TEST(Query_DateQuery)
 }
 
 
+TEST(Query_DoubleCoordinates)
+{
+    Group group;
+    TableRef table = group.add_table("test");
+
+    table->add_column(type_Double, "name");
+    table->add_column(type_Double, "age");
+
+    size_t expected = 0;
+
+    for (size_t t = 0; t < 100000; t++) {
+        table->add_empty_row(1);
+        table->set_double(0, t, (t * 12345) % 1000);
+        table->set_double(1, t, (t * 12345) % 1000);
+
+        if (table->get_double(0, t) >= 100. && table->get_double(0, t) <= 110. &&
+            table->get_double(1, t) >= 100. && table->get_double(1, t) <= 110.)
+        {
+            expected++;
+        }
+    }
+
+    // This unit test can be used as benchmark. Just enable this for loop
+    //    for (size_t t = 0; t < 1000; t++) {
+    Query q = table->column<double>(0) >= 100. && table->column<double>(0) <= 110. &&
+        table->column<double>(1) >= 100. && table->column<double>(1) <= 110.;
+
+    size_t c = q.count();
+    TIGHTDB_ASSERT(c == expected);
+    //    }
+}
+
+
 TEST(Query_StrIndexedEnum)
 {
     TupleTableType ttt;
