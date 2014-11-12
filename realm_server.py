@@ -70,6 +70,19 @@ class MyHandler(BaseHTTPRequestHandler):
             return
         self.send_error(404, 'File Not Found: %s' % (self.path))
 
+    def do_GET(self):
+        global first_version, transact_logs
+        url = urlparse.urlsplit(self.path)
+        path = url.path
+        if path == '/status':
+            last_version = first_version + len(transact_logs)
+            self.send_response(200)
+            self.send_header('Content-Type', 'text/plain')
+            self.end_headers()
+            self.wfile.write("Last stored version is %s\n" % (last_version))
+            return
+        self.send_error(404, 'File Not Found: %s' % (self.path))
+
     def get_session(self):
         if "Cookie" in self.headers:
             print self.headers["Cookie"]
