@@ -484,6 +484,77 @@ TEST(Query_NextGenSyntax)
 
 }
 
+
+// This tests the new string conditions now available for the expression syntax
+TEST(Query_NextGen_StringConditions)
+{
+    Group group;
+    TableRef table1 = group.add_table("table1");
+    table1->add_column(type_String, "str1");
+
+    // add some rows
+    table1->add_empty_row();
+    table1->set_string(0, 0, "foo");
+    table1->add_empty_row();
+    table1->set_string(0, 1, "!");
+    table1->add_empty_row();
+    table1->set_string(0, 2, "bar");
+
+    size_t m;
+    // Equal
+    m = table1->column<String>(0).equal("bar", false).find();
+    CHECK_EQUAL(m, 2);
+
+    m = table1->column<String>(0).equal("bar", true).find();
+    CHECK_EQUAL(m, 2);
+
+    m = table1->column<String>(0).equal("Bar", true).find();
+    CHECK_EQUAL(m, not_found);
+
+    m = table1->column<String>(0).equal("Bar", false).find();
+    CHECK_EQUAL(m, 2);
+
+    // Contains
+    m = table1->column<String>(0).contains("a", false).find();
+    CHECK_EQUAL(m, 2);
+
+    m = table1->column<String>(0).contains("a", true).find();
+    CHECK_EQUAL(m, 2);
+
+    m = table1->column<String>(0).contains("A", true).find();
+    CHECK_EQUAL(m, not_found);
+
+    m = table1->column<String>(0).contains("A", false).find();
+    CHECK_EQUAL(m, 2);
+
+    // Begins with
+    m = table1->column<String>(0).begins_with("b", false).find();
+    CHECK_EQUAL(m, 2);
+
+    m = table1->column<String>(0).begins_with("b", true).find();
+    CHECK_EQUAL(m, 2);
+
+    m = table1->column<String>(0).begins_with("B", true).find();
+    CHECK_EQUAL(m, not_found);
+
+    m = table1->column<String>(0).begins_with("B", false).find();
+    CHECK_EQUAL(m, 2);
+
+    // Ends with
+    m = table1->column<String>(0).ends_with("r", false).find();
+    CHECK_EQUAL(m, 2);
+
+    m = table1->column<String>(0).ends_with("r", true).find();
+    CHECK_EQUAL(m, 2);
+
+    m = table1->column<String>(0).ends_with("R", true).find();
+    CHECK_EQUAL(m, not_found);
+
+    m = table1->column<String>(0).ends_with("R", false).find();
+    CHECK_EQUAL(m, 2);
+}
+
+
 TEST(Query_NextGenSyntaxMonkey0)
 {
     // Intended to test eval() for columns in query_expression.hpp which fetch 8 values at a time. This test varies

@@ -1011,6 +1011,7 @@ private:
     std::vector<tightdb::DataType> m_link_types;
 };
 
+template <class T, class C> Query string_compare(const Columns<StringData>& left, T right);
 
 // Handling of String columns. These support only == and != compare operators. No 'arithmetic' operators (+, etc).
 template <> class Columns<StringData> : public Subexpr2<StringData>
@@ -1069,6 +1070,46 @@ public:
         }
     }
 
+    Query equal(StringData sd, bool case_sensitive = true)
+    {
+        if (case_sensitive)
+            return string_compare<StringData, Equal>(*this, sd);
+        else
+            return string_compare<StringData, EqualIns>(*this, sd);
+    }
+
+    Query not_equal(StringData sd, bool case_sensitive = true)
+    {
+        if (case_sensitive)
+            return string_compare<StringData, NotEqual>(*this, sd);
+        else
+            return string_compare<StringData, NotEqualIns>(*this, sd);
+    }
+    
+    Query begins_with(StringData sd, bool case_sensitive = true)
+    {
+        if (case_sensitive)
+            return string_compare<StringData, BeginsWith>(*this, sd);
+        else
+            return string_compare<StringData, BeginsWithIns>(*this, sd);
+    }
+
+    Query ends_with(StringData sd, bool case_sensitive = true)
+    {
+        if (case_sensitive)
+            return string_compare<StringData, EndsWith>(*this, sd);
+        else
+            return string_compare<StringData, EndsWithIns>(*this, sd);
+    }
+    
+    Query contains(StringData sd, bool case_sensitive = true)
+    {
+        if (case_sensitive)
+            return string_compare<StringData, Contains>(*this, sd);
+        else
+            return string_compare<StringData, ContainsIns>(*this, sd);
+    }
+    
     const Table* m_table_linked_from;
 
     // Pointer to payload table (which is the linked-to table if this is a link column) used for condition operator
@@ -1080,6 +1121,16 @@ public:
     LinkMap m_link_map;
 };
 
+
+template <class T, class C> Query string_compare(const Columns<StringData>& left, T right)
+{
+    // Create deep copy of search string. Destructor of the Compare class will delete it.
+    StringData sd(right);
+    char* string_payload(new char[sd.size()]);
+    memcpy(string_payload, sd.data(), sd.size());
+    StringData sd2(StringData(string_payload, sd.size()));
+    return create<StringData, C, StringData>(sd2, left, string_payload);
+}
 
 // String == Columns<String>
 template <class T> Query operator == (T left, const Columns<StringData>& right) {
@@ -1093,22 +1144,12 @@ template <class T> Query operator != (T left, const Columns<StringData>& right) 
 
 // Columns<String> == String
 template <class T> Query operator == (const Columns<StringData>& left, T right) {
-    // Create deep copy of search string. Destructor of the Compare class will delete it.
-    StringData sd(right);
-    char* string_payload(new char[sd.size()]);
-    memcpy(string_payload, sd.data(), sd.size());
-    StringData sd2(StringData(string_payload, sd.size()));
-    return create<StringData, Equal, StringData>(sd2, left, string_payload);
+    return string_compare<T, Equal>(left, right);
 }
 
 // Columns<String> != String
 template <class T> Query operator != (const Columns<StringData>& left, T right) {
-    // Create deep copy of search string. Destructor of the Compare class will delete it.
-    StringData sd(right);
-    char* string_payload(new char[sd.size()]);
-    memcpy(string_payload, sd.data(), sd.size());
-    StringData sd2(StringData(string_payload, sd.size()));
-    return create<StringData, NotEqual, StringData>(sd2, left, string_payload);
+    return string_compare<T, NotEqual>(left, right);
 }
 
 // This class is intended to perform queries on the *pointers* of links, contrary to performing queries on *payload* 
