@@ -300,15 +300,16 @@ bool TableViewBase::is_in_sync() const TIGHTDB_NOEXCEPT
     return table && version && (view ? m_query.m_view->is_in_sync() : true);
 }
 
-void TableViewBase::sync_if_needed() const
+uint_fast64_t TableViewBase::sync_if_needed() const
 {
     if (!is_in_sync()) {
         // FIXME: Is this a reasonable handling of constness?
         const_cast<TableViewBase*>(this)->do_sync();
     }
+    return m_last_seen_version;
 }
 #else
-void sync_if_needed() const {};
+uint_fast64_t sync_if_needed() const { return 0; };
 #endif
 
 // O(n) for n = this->size()
