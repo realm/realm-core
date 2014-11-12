@@ -83,7 +83,7 @@ struct sigaction old_bus;
 void signal_handler(int code, siginfo_t* info, void* ctx) {
     SpinLockGuard lock{mapping_lock};
     for (auto& m : mappings_by_addr) {
-        if (m.addr > info->si_addr || (char*)m.addr + m.size <= info->si_addr)
+        if (m.addr > info->si_addr || static_cast<char*>(m.addr) + m.size <= info->si_addr)
             continue;
 
         m.mapping->handle_access(info->si_addr);

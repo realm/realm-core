@@ -99,7 +99,7 @@ off_t iv_table_pos(off_t pos) {
 
 void check_write(int fd, off_t pos, const void *data, size_t len) {
     auto ret = pwrite(fd, data, len, pos);
-    TIGHTDB_ASSERT(ret >= 0 && (size_t)ret == len);
+    TIGHTDB_ASSERT(ret >= 0 && static_cast<size_t>(ret) == len);
     static_cast<void>(ret);
 }
 
@@ -312,7 +312,7 @@ void EncryptedFileMapping::read_page(size_t i) TIGHTDB_NOEXCEPT {
     mprotect(addr, page_size, PROT_READ | PROT_WRITE);
 
     if (!copy_read_page(i))
-        m_file.cryptor.read(m_file.fd, i * page_size, (char*)addr);
+        m_file.cryptor.read(m_file.fd, i * page_size, addr);
 
     mark_readable(i);
 }
@@ -375,7 +375,7 @@ void EncryptedFileMapping::flush() TIGHTDB_NOEXCEPT {
             continue;
         }
 
-        m_file.cryptor.write(m_file.fd, i * page_size, (char*)page_addr(i));
+        m_file.cryptor.write(m_file.fd, i * page_size, page_addr(i));
         m_dirty_pages[i] = false;
         m_write_pages[i] = false;
     }
@@ -390,7 +390,7 @@ void EncryptedFileMapping::sync() TIGHTDB_NOEXCEPT {
 }
 
 void EncryptedFileMapping::handle_access(void* addr) TIGHTDB_NOEXCEPT {
-    auto accessed_page = (uintptr_t)addr / page_size;
+    auto accessed_page = reinterpret_cast<uintptr_t>(addr) / page_size;
 
     size_t idx = accessed_page - m_first_page;
     if (!m_read_pages[idx]) {
@@ -414,7 +414,7 @@ void EncryptedFileMapping::set(void* new_addr, size_t new_size) {
     m_addr = new_addr;
     m_size = new_size;
 
-    m_first_page = (uintptr_t)m_addr / page_size;
+    m_first_page = reinterpret_cast<uintptr_t>(m_addr) / page_size;
     m_page_count = (m_size + page_size - 1)  / page_size;
 
     m_read_pages.clear();
