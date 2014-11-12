@@ -1593,6 +1593,7 @@
 					"$(PROJECT_DIR)/src/tightdb",
 				);
 				PRODUCT_NAME = tightdb;
+				WARNING_CFLAGS = "-Wold-style-cast";
 			};
 			name = Debug;
 		};
@@ -1611,6 +1612,7 @@
 					"$(PROJECT_DIR)/src/tightdb",
 				);
 				PRODUCT_NAME = tightdb;
+				WARNING_CFLAGS = "-Wold-style-cast";
 			};
 			name = Release;
 		};
