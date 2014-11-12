@@ -37,7 +37,7 @@ public:
 Initialization initialization;
 } // anonymous namespace
 
-void Group::open(const string& file_path, const uint8_t* encrption_key, OpenMode mode)
+void Group::open(const string& file_path, const uint8_t* encryption_key, OpenMode mode)
 {
     TIGHTDB_ASSERT(!is_attached());
     bool is_shared = false;
@@ -45,7 +45,7 @@ void Group::open(const string& file_path, const uint8_t* encrption_key, OpenMode
     bool no_create = mode == mode_ReadWriteNoCreate;
     bool skip_validate = false;
     ref_type top_ref = m_alloc.attach_file(file_path, is_shared, read_only, no_create,
-                                           skip_validate, encrption_key); // Throws
+                                           skip_validate, encryption_key); // Throws
     SlabAlloc::DetachGuard dg(m_alloc);
     m_alloc.reset_free_space_tracking(); // Throws
     if (top_ref == 0) {

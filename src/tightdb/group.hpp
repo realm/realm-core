@@ -175,7 +175,7 @@ public:
     /// types that are derived from util::File::AccessError, the
     /// derived exception type is thrown. Note that InvalidDatabase is
     /// among these derived exception types.
-    void open(const std::string& file, const uint8_t* encrption_key,
+    void open(const std::string& file, const uint8_t* encryption_key,
               OpenMode mode = mode_ReadOnly);
 
     /// Attach this Group instance to the specified memory buffer.
@@ -347,7 +347,7 @@ public:
     /// types that are derived from util::File::AccessError, the
     /// derived exception type is thrown. In particular,
     /// util::File::Exists will be thrown if the file exists already.
-    void write(const std::string& file, const uint8_t* encrption_key=0) const;
+    void write(const std::string& file, const uint8_t* encryption_key=0) const;
 
     /// Write this database to a memory buffer.
     ///
