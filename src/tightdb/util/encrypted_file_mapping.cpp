@@ -23,11 +23,11 @@ AESCryptor::AESCryptor(const uint8_t* key) {
 #ifdef __APPLE__
     CCCryptorCreate(kCCEncrypt, kCCAlgorithmAES, 0 /* options */, key, kCCKeySizeAES256, 0 /* IV */, &m_encr);
     CCCryptorCreate(kCCDecrypt, kCCAlgorithmAES, 0 /* options */, key, kCCKeySizeAES256, 0 /* IV */, &m_decr);
-    memcpy(m_hmacKey, key + kCCKeySizeAES256, kCCKeySizeAES256);
 #else
     AES_set_encrypt_key(key, 256 /* key size in bits */, &m_ectx);
     AES_set_decrypt_key(key, 256 /* key size in bits */, &m_dctx);
 #endif
+    memcpy(m_hmacKey, key + 32, 32);
 }
 
 AESCryptor::~AESCryptor() TIGHTDB_NOEXCEPT {
@@ -60,9 +60,9 @@ AESCryptor::~AESCryptor() TIGHTDB_NOEXCEPT {
 // the ciphertext's hash will match the old ciphertext.
 
 struct iv_table {
-    char iv1[4];
+    uint32_t iv1;
     uint8_t hmac1[28];
-    char iv2[4];
+    uint32_t iv2;
     uint8_t hmac2[28];
 };
 
@@ -109,6 +109,14 @@ ssize_t check_read(int fd, off_t pos, void *dst, size_t len) {
     return ret;
 }
 
+void calc_hmac(const void* src, size_t len, uint8_t* dst, const uint8_t* key) {
+#ifdef __APPLE__
+    CCHmac(kCCHmacAlgSHA224, key, kCCKeySizeAES256, src, len, dst);
+#else
+    HMAC(EVP_sha224(), key, 32, static_cast<const uint8_t*>(src), len, dst, nullptr);
+#endif
+}
+
 } // namespace {
 
 void AESCryptor::set_file_size(off_t new_size) {
@@ -137,14 +145,14 @@ iv_table& AESCryptor::get_iv_table(int fd, off_t data_pos) TIGHTDB_NOEXCEPT {
 
 bool AESCryptor::check_hmac(const void *src, size_t len, const uint8_t *hmac) const {
     uint8_t buffer[224 / 8];
-    CCHmac(kCCHmacAlgSHA224, m_hmacKey, kCCKeySizeAES256, src, len, buffer);
+    calc_hmac(src, len, buffer, m_hmacKey);
 
     // Constant-time memcmp to avoid timing attacks
     uint8_t result = 0;
     for (size_t i = 0; i < 224/8; ++i)
         result |= buffer[i] ^ hmac[i];
     return result == 0;
-};
+}
 
 void AESCryptor::read(int fd, off_t pos, char* dst) TIGHTDB_NOEXCEPT {
     try {
@@ -164,7 +172,7 @@ void AESCryptor::try_read(int fd, off_t pos, char* dst) {
         return;
 
     iv_table& iv = get_iv_table(fd, pos);
-    if (*reinterpret_cast<uint32_t*>(iv.iv1) == 0) {
+    if (iv.iv1 == 0) {
         // This page has never been written to, so we've just read pre-allocated
         // space. No memset() since the code using this doesn't rely on
         // pre-allocated space being zeroed.
@@ -182,29 +190,28 @@ void AESCryptor::try_read(int fd, off_t pos, char* dst) {
         if (check_hmac(buffer, bytes_read, iv.hmac2)) {
             // Un-bump the IV since the write with the bumped IV never actually
             // happened
-            memcpy(iv.iv1, iv.iv2, 32);
+            memcpy(&iv.iv1, &iv.iv2, 32);
         }
         else
             throw InvalidDatabase();
     }
 
-    crypt(mode_Decrypt, pos, dst, buffer, iv.iv1);
+    crypt(mode_Decrypt, pos, dst, buffer, reinterpret_cast<const char*>(&iv.iv1));
 }
 
 void AESCryptor::write(int fd, off_t pos, const char* src) TIGHTDB_NOEXCEPT {
     iv_table& iv = get_iv_table(fd, pos);
 
-    memcpy(iv.iv2, iv.iv1, 32);
+    memcpy(&iv.iv2, &iv.iv1, 32);
     char buffer[page_size];
     do {
-        uint32_t& new_iv = *reinterpret_cast<uint32_t*>(iv.iv1);
-        ++new_iv;
+        ++iv.iv1;
         // 0 is reserved for never-been-used, so bump if we just wrapped around
-        if (new_iv == 0)
-            ++new_iv;
+        if (iv.iv1 == 0)
+            ++iv.iv1;
 
-        crypt(mode_Encrypt, pos, buffer, src, iv.iv1);
-        CCHmac(kCCHmacAlgSHA224, m_hmacKey, kCCKeySizeAES256, buffer, page_size, iv.hmac1);
+        crypt(mode_Encrypt, pos, buffer, src, reinterpret_cast<const char*>(&iv.iv1));
+        calc_hmac(buffer, page_size, iv.hmac1, m_hmacKey);
         // In the extremely unlikely case that both the old and new versions have
         // the same hash we won't know which IV to use, so bump the IV until
         // they're different.
@@ -231,7 +238,8 @@ void AESCryptor::crypt(EncryptionMode mode, off_t pos, char* dst,
     static_cast<void>(bytesEncrypted);
     static_cast<void>(err);
 #else
-    AES_cbc_encrypt(src, dst, page_size, mode == mode_Encrypt ? &m_ectx : &m_dctx, iv, mode);
+    AES_cbc_encrypt(reinterpret_cast<const uint8_t*>(src), reinterpret_cast<uint8_t*>(dst),
+                    page_size, mode == mode_Encrypt ? &m_ectx : &m_dctx, iv, mode);
 #endif
 }
 

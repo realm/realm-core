@@ -1,11 +1,14 @@
 #include "file_mapper.hpp"
 
+#include <cerrno>
 #include <sys/mman.h>
 
 #ifdef TIGHTDB_ENABLE_ENCRYPTION
 
 #include "encrypted_file_mapping.hpp"
 
+#include <atomic>
+#include <memory>
 #include <signal.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -203,8 +206,6 @@ void* mmap_anon(size_t size) {
 #endif
 } // anonymous namespace
 
-#pragma mark Public API
-
 namespace tightdb {
 namespace util {
 
@@ -274,7 +275,7 @@ void* mremap(int fd, void* old_addr, size_t old_size, File::AccessMode a, size_t
     if (new_addr != MAP_FAILED)
         return new_addr;
     int err = errno; // Eliminate any risk of clobbering
-    throw runtime_error(get_errno_msg("mremap(): failed: ", err));
+    throw std::runtime_error(get_errno_msg("mremap(): failed: ", err));
 #else
     void* new_addr = mmap(fd, new_size, a, nullptr);
     ::munmap(old_addr, old_size);

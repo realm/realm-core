@@ -59,7 +59,7 @@ ifneq ($(TIGHTDB_HAVE_CONFIG),)
     TIGHTDB_ENABLE_REPLICATION = $(EMPTY)
   endif
   ifeq ($(ENABLE_ENCRYPTION),yes)
-    ifeq ($(OS),Darwin)
+    ifeq ($(TIGHTDB_ANDROID),)
       PROJECT_CFLAGS += -DTIGHTDB_ENABLE_ENCRYPTION -std=c++11
     else
       PROJECT_CFLAGS += -DTIGHTDB_ENABLE_ENCRYPTION -std=c++11 -I../../openssl/include

@@ -793,7 +793,7 @@ void* File::map(AccessMode a, size_t size, int map_flags) const
     // reliably detect these systems?
     static_cast<void>(map_flags);
 
-    return tightdb::util::mmap(m_fd, size, a, m_encrypt ? m_encryption_key : nullptr);
+    return tightdb::util::mmap(m_fd, size, a, m_encrypt ? m_encryption_key : 0);
 
 #endif
 }

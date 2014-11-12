@@ -693,7 +693,7 @@ EOF
 
             # Build OpenSSL if needed
             libcrypto_name="libcrypto-$denom.a"
-            if ! [ -f "ANDROID_DIR/$libcrypto_name" ] && [ $enable_encryption = yes ]; then
+            if ! [ -f "$ANDROID_DIR/$libcrypto_name" ] && [ $enable_encryption = yes ]; then
                 (
                     cd openssl
                     export MACHINE=$target
@@ -707,7 +707,7 @@ EOF
                     $MAKE clean
                 ) || exit 1
 
-                PATH="$path" CC="$cc" CFLAGS="$cflags_arch" $MAKE -C "openssl" build_libs || exit 1
+                PATH="$path" CC="$cc" CFLAGS="$cflags_arch -DOPENSSL_NO_SHA512" $MAKE -C "openssl" build_libs || exit 1
                 cp "openssl/libcrypto.a" "$ANDROID_DIR/$libcrypto_name" || exit 1
             fi
 
@@ -723,7 +723,15 @@ EOF
                     cd ar-temp
                     echo $AR x "../$ANDROID_DIR/$libcrypto_name" || exit 1
                     $AR x "../$ANDROID_DIR/$libcrypto_name" || exit 1
-                    find . ! -name '*aes*' -a ! -name '*cbc128*' -delete || exit 1
+                    find \
+                      . ! -name '*aes*' \
+                      -a ! -name '*cbc128*' \
+                      -a ! -name m_sha1.o \
+                      -a ! -name hmac.o \
+                      -a ! -name digest.o \
+                      -a ! -name sha256.o \
+                      -a ! -name cryptlib.o \
+                      -delete || exit 1
                     $AR x "../src/tightdb/libtightdb-$denom.a" || exit 1
                     $AR r "../$ANDROID_DIR/libtightdb-$denom.a" *.o || exit 1
                     $RANLIB "../$ANDROID_DIR/libtightdb-$denom.a"

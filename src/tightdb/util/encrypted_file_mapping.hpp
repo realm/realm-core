@@ -31,6 +31,7 @@
 #include <CommonCrypto/CommonCrypto.h>
 #else
 #include <openssl/aes.h>
+#include <openssl/hmac.h>
 #endif
 
 namespace tightdb {
@@ -63,19 +64,17 @@ private:
 #ifdef __APPLE__
     CCCryptorRef m_encr;
     CCCryptorRef m_decr;
-    uint8_t m_hmacKey[32];
 #else
     AES_KEY m_ectx;
     AES_KEY m_dctx;
 #endif
 
-    bool check_hmac(const void *data, size_t len, const uint8_t *hmac) const;
-
+    uint8_t m_hmacKey[32];
     std::vector<iv_table> m_iv_buffer;
 
+    bool check_hmac(const void *data, size_t len, const uint8_t *hmac) const;
     void crypt(EncryptionMode mode, off_t pos, char* dst, const char* src,
                const char* stored_iv) TIGHTDB_NOEXCEPT;
-
     iv_table& get_iv_table(int fd, off_t data_pos) TIGHTDB_NOEXCEPT;
 };
 
