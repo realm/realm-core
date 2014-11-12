@@ -39,7 +39,7 @@ std::string get_errno_msg(const char* prefix, int err) {
 
 #ifdef TIGHTDB_ENABLE_ENCRYPTION
 
-const int page_size = 4096;
+const size_t page_size = 4096;
 
 class SpinLockGuard {
 public:
@@ -146,7 +146,7 @@ void add_mapping(void* addr, size_t size, int fd, File::AccessMode access, const
     if (fstat(fd, &st))
         TIGHTDB_TERMINATE("fstat failed"); // FIXME: throw instead
 
-    if (st.st_size > 0 && st.st_size < page_size)
+    if (st.st_size > 0 && static_cast<size_t>(st.st_size) < page_size)
         throw InvalidDatabase();
 
     auto it = find_if(begin(mappings_by_file), end(mappings_by_file), [=](mappings_for_file& m) {

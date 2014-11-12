@@ -68,45 +68,48 @@ struct iv_table {
 
 namespace {
 const int aes_block_size = 16;
-const int page_size = 4096;
+const size_t page_size = 4096;
 
-const int metadata_size = sizeof(iv_table);
-const int pages_per_metadata_page = page_size / metadata_size;
+const size_t metadata_size = sizeof(iv_table);
+const size_t pages_per_metadata_page = page_size / metadata_size;
 
 // map an offset in the data to the actual location in the file
 template<typename Int>
 Int real_offset(Int pos) {
-    const auto page_index = pos / page_size;
-    const auto metadata_page_count = page_index / pages_per_metadata_page + 1;
+    TIGHTDB_ASSERT(pos >= 0);
+    const size_t page_index = static_cast<size_t>(pos) / page_size;
+    const size_t metadata_page_count = page_index / pages_per_metadata_page + 1;
     return pos + metadata_page_count * page_size;
 }
 
 // map a location in the file to the offset in the data
 template<typename Int>
 Int fake_offset(Int pos) {
-    const auto page_index = pos / page_size;
-    const auto metadata_page_count = (page_index + pages_per_metadata_page) / (pages_per_metadata_page + 1);
+    TIGHTDB_ASSERT(pos >= 0);
+    const size_t page_index = static_cast<size_t>(pos) / page_size;
+    const size_t metadata_page_count = (page_index + pages_per_metadata_page) / (pages_per_metadata_page + 1);
     return pos - metadata_page_count * page_size;
 }
 
 // get the location of the iv_table for the given data (not file) position
 off_t iv_table_pos(off_t pos) {
-    const auto page_index = pos / page_size;
-    const auto metadata_block = page_index / pages_per_metadata_page;
-    const auto metadata_index = page_index & (pages_per_metadata_page - 1);
+    TIGHTDB_ASSERT(pos >= 0);
+    const size_t page_index = static_cast<size_t>(pos) / page_size;
+    const size_t metadata_block = page_index / pages_per_metadata_page;
+    const size_t metadata_index = page_index & (pages_per_metadata_page - 1);
     return metadata_block * (pages_per_metadata_page + 1) * page_size + metadata_index * metadata_size;
 }
 
 void check_write(int fd, off_t pos, const void *data, size_t len) {
-    auto ret = pwrite(fd, data, len, pos);
+    ssize_t ret = pwrite(fd, data, len, pos);
     TIGHTDB_ASSERT(ret >= 0 && static_cast<size_t>(ret) == len);
     static_cast<void>(ret);
 }
 
-ssize_t check_read(int fd, off_t pos, void *dst, size_t len) {
+size_t check_read(int fd, off_t pos, void *dst, size_t len) {
     auto ret = pread(fd, dst, len, pos);
     TIGHTDB_ASSERT(ret >= 0);
-    return ret;
+    return ret < 0 ? 0 : static_cast<size_t>(ret);
 }
 
 void calc_hmac(const void* src, size_t len, uint8_t* dst, const uint8_t* key) {
@@ -120,6 +123,7 @@ void calc_hmac(const void* src, size_t len, uint8_t* dst, const uint8_t* key) {
 } // namespace {
 
 void AESCryptor::set_file_size(off_t new_size) {
+    TIGHTDB_ASSERT(new_size >= 0);
     auto page_count = (new_size + page_size - 1) / page_size;
     m_iv_buffer.reserve((page_count + pages_per_metadata_page - 1) & ~(pages_per_metadata_page - 1));
 }
@@ -182,7 +186,7 @@ void AESCryptor::try_read(int fd, off_t pos, char* dst) {
     if (!check_hmac(buffer, bytes_read, iv.hmac1)) {
         // Either the DB is corrupted or we were interrupted between writing the
         // new IV and writing the data
-        if (*reinterpret_cast<uint32_t*>(iv.iv2) == 0) {
+        if (iv.iv2 == 0) {
             // Very first write was interrupted
             return;
         }
@@ -390,7 +394,7 @@ void EncryptedFileMapping::sync() TIGHTDB_NOEXCEPT {
 }
 
 void EncryptedFileMapping::handle_access(void* addr) TIGHTDB_NOEXCEPT {
-    auto accessed_page = reinterpret_cast<uintptr_t>(addr) / page_size;
+    size_t accessed_page = reinterpret_cast<uintptr_t>(addr) / page_size;
 
     size_t idx = accessed_page - m_first_page;
     if (!m_read_pages[idx]) {
