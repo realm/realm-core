@@ -6,7 +6,6 @@
 
 ### API breaking changes:
 
-* Added not_equal(), equal(), contains(), begins_with(), ends_with() for String columns in the Query expression syntax. They work both case sensitive and insensitive. So now you can write 'size_t m = table1->column<String>(0).contains("A", true).find();'. Works with Links too.
 * Table::erase() can no longer be used with unordered tables. Previously it was
   allowed if the specified index was the index of the last row in the table. One
   must now always use Table::move_last_over() with unordered tables. Whether a
@@ -15,6 +14,11 @@
   columns.
 
 ### Enhancements:
+
+* Added not_equal(), equal(), contains(), begins_with(), ends_with() for String 
+  columns in the Query expression syntax. They work both case sensitive and 
+  insensitive. So now you can write 'size_t 
+  m = table1->column<String>(0).contains("A", true).find();'. Works with Links too.
 
 * Major simplification of ".lock" file handling.
   We now leave the ".lock" file behind.
