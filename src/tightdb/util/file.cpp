@@ -816,9 +816,17 @@ void File::unmap(void* addr, size_t size) TIGHTDB_NOEXCEPT
 }
 
 
-void* File::remap(void* old_addr, size_t old_size, AccessMode a, size_t new_size, int) const
+void* File::remap(void* old_addr, size_t old_size, AccessMode a, size_t new_size,
+                  int map_flags) const
 {
+#ifdef _WIN32
+    void* new_addr = map(a, new_size, map_flags);
+    unmap(old_addr, old_size);
+    return new_addr;
+#else
+    static_cast<void>(map_flags);
     return tightdb::util::mremap(m_fd, old_addr, old_size, a, new_size);
+#endif
 }
 
 
