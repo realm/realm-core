@@ -10,7 +10,8 @@
 
 ### Enhancements:
 
-* Lorem ipsum.
+* Added SharedGroup::get_number_of_versions() which will report the number of
+  distinct versions kept in the database.
 
 -----------
 
