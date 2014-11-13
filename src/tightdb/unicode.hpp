@@ -118,6 +118,7 @@ namespace tightdb {
     /// \a source, and returns true. Returns false if invalid UTF-8
     /// encoding was encountered.
     bool case_map(StringData source, char* target, bool upper);
+    std::string case_map(StringData source, bool upper);
 
     /// Assumes that the sizes of \a needle_upper and \a needle_lower are
     /// identical to the size of \a haystack. Returns false if the needle

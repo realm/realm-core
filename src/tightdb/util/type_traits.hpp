@@ -37,6 +37,13 @@
 namespace tightdb {
 namespace util {
 
+template<class T, class F, bool b> struct EitherType;
+template<class T, class F> struct EitherType<T, F, true> {
+    typedef T type;
+};
+template<class T, class F> struct EitherType<T, F, false> {
+    typedef F type;
+};
 
 template<class T> struct IsConst          { static const bool value = false; };
 template<class T> struct IsConst<const T> { static const bool value = true;  };

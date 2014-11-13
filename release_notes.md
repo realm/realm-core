@@ -6,6 +6,28 @@
 
 ### API breaking changes:
 
+* Lorem ipsum.
+
+### Enhancements:
+
+* Lorem ipsum.
+
+-----------
+
+### Internals:
+
+* Lorem ipsum.
+
+----------------------------------------------
+
+# 0.86.0 Release notes
+
+### Bugfixes:
+
+* Fixed a bug where rollback of an empty transaction could cause a crash.
+
+### API breaking changes:
+
 * Table::erase() can no longer be used with unordered tables. Previously it was
   allowed if the specified index was the index of the last row in the table. One
   must now always use Table::move_last_over() with unordered tables. Whether a
@@ -15,21 +37,22 @@
 
 ### Enhancements:
 
-* Major simplification of ".lock" file handling.
-  We now leave the ".lock" file behind.
+* TableView::sync_if_needed() now returns a version number. Bindings can compare
+  version numbers returned in order to determine if the TableView has changed.
+* Added not_equal(), equal(), contains(), begins_with(), ends_with() for String
+  columns in the Query expression syntax. They work both case sensitive and
+  insensitive. So now you can write 'size_t m =
+  table1->column<String>(0).contains("A", true).find();'. Works with Links too.
+* Major simplification of ".lock" file handling.  We now leave the ".lock" file
+  behind.
 * Support added for cascading row removal. See `Descriptor::set_link_type()` for
   details. All previsouly created link columns will effectively have link-type
   'weak'.
 * Rows can now be removed via a row accessors (`Row::remove()`,
   `Row::move_last_over()`).
-* Speedup of double/float conditions in query expression of a factor ~5 (uses fallback
-  to old query nodes for double/float too, instead of only for integer conditions).
-
------------
-
-### Internals:
-
-* Lorem ipsum.
+* Speedup of double/float conditions in query expression of a factor ~5 (uses
+  fallback to old query nodes for double/float too, instead of only for integer
+  conditions).
 
 ----------------------------------------------
 
