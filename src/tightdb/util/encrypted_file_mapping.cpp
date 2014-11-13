@@ -1,7 +1,6 @@
 #include "encrypted_file_mapping.hpp"
 
 #ifdef TIGHTDB_ENABLE_ENCRYPTION
-#include <cerrno>
 #include <cstdlib>
 
 #include <sys/mman.h>

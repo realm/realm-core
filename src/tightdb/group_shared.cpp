@@ -5,6 +5,7 @@
 #include <fcntl.h>
 
 #include <tightdb/util/features.h>
+#include <tightdb/util/errno.hpp>
 #include <tightdb/util/safe_int_ops.hpp>
 #include <tightdb/util/thread.hpp>
 #include <tightdb/group_writer.hpp>
@@ -426,8 +427,8 @@ void spawn_daemon(const string& file)
     int m = int(sysconf(_SC_OPEN_MAX));
     if (m < 0) {
         if (errno) {
-            // int err = errno; // TODO: include err in exception string
-            throw runtime_error("'sysconf(_SC_OPEN_MAX)' failed ");
+            int err = errno; // Eliminate any risk of clobbering
+            throw runtime_error(get_errno_msg("'sysconf(_SC_OPEN_MAX)' failed: ", err));
         }
         throw runtime_error("'sysconf(_SC_OPEN_MAX)' failed with no reason");
     }
