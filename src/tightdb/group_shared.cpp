@@ -365,6 +365,7 @@ struct SharedGroup::SharedInfo
     CondVar room_to_write;
     CondVar work_to_do;
     CondVar daemon_becomes_ready;
+    CondVar new_commit_available;
 #endif
     // IMPORTANT: The ringbuffer MUST be the last field in SharedInfo - see above.
     Ringbuffer readers;
@@ -393,7 +394,8 @@ SharedGroup::SharedInfo::SharedInfo(DurabilityLevel dlevel):
     controlmutex(), // Throws
     room_to_write(CondVar::process_shared_tag()), // Throws
     work_to_do(CondVar::process_shared_tag()), // Throws
-    daemon_becomes_ready(CondVar::process_shared_tag()) // Throws
+    daemon_becomes_ready(CondVar::process_shared_tag()), // Throws
+    new_commit_available(CondVar::process_shared_tag()) // Throws
 #else
     writemutex(), // Throws
     balancemutex() // Throws
@@ -592,6 +594,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
         // - start of the async daemon
         // - stop of the async daemon
         // - SharedGroup joining/leaving the sharing scheme
+        // - Waiting for and signalling database changes
         {
             RobustLockGuard lock(info->controlmutex, &recover_from_dead_write_transact); // Throws
             // Even though we checked init_complete before grabbing the write mutex,
@@ -743,6 +746,17 @@ bool SharedGroup::has_changed()
 }
 
 #ifndef _WIN32
+void SharedGroup::wait_for_change()
+{
+    while (!has_changed()) {
+        SharedInfo* info = m_file_map.get_addr();
+        RobustLockGuard lock(info->controlmutex, recover_from_dead_write_transact);
+        if (!has_changed())
+            info->new_commit_available.wait(info->controlmutex,
+                                            &recover_from_dead_write_transact,
+                                            0);
+    }
+}
 
 void SharedGroup::do_async_commits()
 {
@@ -1313,6 +1327,12 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
         r.version     = new_version;
         r_info->readers.use_next();
     }
+#ifndef _WIN32
+    {
+        RobustLockGuard lock(info->controlmutex, recover_from_dead_write_transact);
+        info->new_commit_available.notify_all();
+    }
+#endif
 }
 
 
