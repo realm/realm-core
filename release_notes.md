@@ -6,11 +6,14 @@
 
 ### API breaking changes:
 
-* Lorem ipsum.
+* `TransactLogRegistry` is no longer available and must therefore no longer be
+  passed to `LangBindHelper::advance_read()` and
+  `LangBindHelper::promote_to_write()`.
 
 ### Enhancements:
 
-* Lorem ipsum.
+* Support for implicit transactions has been extended to work between multiple
+  processes.
 
 -----------
 
@@ -25,16 +28,6 @@
 ### Bugfixes:
 
 * Fixed a bug where rollback of an empty transaction could cause a crash.
-
-### API breaking changes:
-
-* `TransactLogRegistry` is no longer available and must therefore no longer 
-  be passed to `LangBindHelper::advance_read()` and 
-  `LangBindHelper::promote_to_write()`.
-
-### Enhancements:
-
-* Support for implicit transactions has been extended to work between multiple processes.
 * Table::erase() can no longer be used with unordered tables. Previously it was
   allowed if the specified index was the index of the last row in the table. One
   must now always use Table::move_last_over() with unordered tables. Whether a
