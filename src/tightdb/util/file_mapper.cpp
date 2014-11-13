@@ -3,6 +3,8 @@
 #include <cerrno>
 #include <sys/mman.h>
 
+#include <tightdb/util/errno.hpp>
+
 #ifdef TIGHTDB_ENABLE_ENCRYPTION
 
 #include "encrypted_file_mapping.hpp"
@@ -13,33 +15,14 @@
 #include <unistd.h>
 
 #include <tightdb/alloc_slab.hpp>
+#include <tightdb/util/shared_ptr.hpp>
 #include <tightdb/util/terminate.hpp>
 #include <tightdb/util/thread.hpp>
-#include <tightdb/util/shared_ptr.hpp>
 
 using namespace tightdb;
 using namespace tightdb::util;
 
-#endif
-
 namespace {
-
-std::string get_errno_msg(const char* prefix, int err) {
-    char buffer[256];
-    std::string str;
-    str.reserve(strlen(prefix) + sizeof(buffer));
-    str += prefix;
-
-    if (TIGHTDB_LIKELY(strerror_r(err, buffer, sizeof(buffer)) == 0))
-        str += buffer;
-    else
-        str += "Unknown error";
-
-    return str;
-}
-
-#ifdef TIGHTDB_ENABLE_ENCRYPTION
-
 const size_t page_size = 4096;
 
 class SpinLockGuard {
@@ -211,8 +194,8 @@ void* mmap_anon(size_t size) {
     return addr;
 }
 
-#endif
 } // anonymous namespace
+#endif
 
 namespace tightdb {
 namespace util {

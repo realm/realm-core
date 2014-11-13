@@ -27,7 +27,7 @@
 // Use below line to enable a thread bug detection tool. Note: Will make program execution slower.
 // #include <../test/pthread_test.hpp>
 
-#include <errno.h>
+#include <cerrno>
 #include <cstddef>
 
 #include <tightdb/util/features.h>

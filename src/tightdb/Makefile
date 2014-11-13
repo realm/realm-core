@@ -29,15 +29,15 @@ libexec_PROGRAMS = tightdbd
 bin_PROGRAMS     = tightdb-import
 DEV_PROGRAMS     = tightdb-config
 
-libtightdb_a_SOURCES = util/terminate.cpp util/string_buffer.cpp util/memory_stream.cpp \
-util/file.cpp util/file_mapper.cpp util/encrypted_file_mapping.cpp util/thread.cpp \
-$(REPLICATION_CPP) alloc.cpp alloc_slab.cpp array.cpp array_binary.cpp array_blob.cpp \
-array_blobs_big.cpp array_string.cpp array_string_long.cpp column.cpp column_backlink.cpp \
-column_binary.cpp column_link.cpp column_link_base.cpp column_linklist.cpp column_mixed.cpp \
-column_string.cpp column_string_enum.cpp column_table.cpp commit_log.cpp descriptor.cpp \
-exceptions.cpp group.cpp group_shared.cpp group_writer.cpp impl/output_stream.cpp importer.cpp \
-index_string.cpp lang_bind_helper.cpp link_view.cpp query.cpp row.cpp spec.cpp table.cpp \
-table_view.cpp unicode.cpp utilities.cpp version.cpp views.cpp
+libtightdb_a_SOURCES = util/encrypted_file_mapping.cpp util/errno.cpp util/file.cpp \
+util/file_mapper.cpp util/memory_stream.cpp util/string_buffer.cpp util/terminate.cpp \
+util/thread.cpp $(REPLICATION_CPP) alloc.cpp alloc_slab.cpp array.cpp array_binary.cpp \
+array_blob.cpp array_blobs_big.cpp array_string.cpp array_string_long.cpp column.cpp \
+column_backlink.cpp column_binary.cpp column_link.cpp column_link_base.cpp column_linklist.cpp \
+column_mixed.cpp column_string.cpp column_string_enum.cpp column_table.cpp commit_log.cpp \
+descriptor.cpp exceptions.cpp group.cpp group_shared.cpp group_writer.cpp impl/output_stream.cpp \
+importer.cpp index_string.cpp lang_bind_helper.cpp link_view.cpp query.cpp row.cpp spec.cpp \
+table.cpp table_view.cpp unicode.cpp utilities.cpp version.cpp views.cpp
 
 # Format: CURRENT[:REVISION[:AGE]]
 #

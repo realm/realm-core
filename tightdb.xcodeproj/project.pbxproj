@@ -125,6 +125,8 @@
 		3F5ED51519D9D4D1001FCFF4 /* test_link_query_view.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3F5ED51319D9D4D1001FCFF4 /* test_link_query_view.cpp */; };
 		3FA0DBCC1A0BF29C003548DC /* test_encrypted_file_mapping.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3FA0DBCA1A0BF28C003548DC /* test_encrypted_file_mapping.cpp */; };
 		3FC68FDA1A0AD3FE005F3103 /* encrypted_file_mapping.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3FC68FD91A0AD3FE005F3103 /* encrypted_file_mapping.cpp */; };
+		3FE557F71A150F2100A18CCB /* errno.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3FE557F51A150F2100A18CCB /* errno.cpp */; };
+		3FE557F81A150F2100A18CCB /* errno.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 3FE557F61A150F2100A18CCB /* errno.hpp */; };
 		3FF6A2A11A02B1FC0074A601 /* column_link.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3F18531F19DF12A200843ECD /* column_link.cpp */; };
 		3FF6A2A21A02B1FD0074A601 /* column_link.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3F18531F19DF12A200843ECD /* column_link.cpp */; };
 		4142C93B1623478700B3B902 /* alloc_slab.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 365CCDF1157CC37D00172BF8 /* alloc_slab.cpp */; };
@@ -489,6 +491,8 @@
 		3FA0DBCA1A0BF28C003548DC /* test_encrypted_file_mapping.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = test_encrypted_file_mapping.cpp; sourceTree = "<group>"; };
 		3FC68FD81A0AD3BF005F3103 /* encrypted_file_mapping.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = encrypted_file_mapping.hpp; sourceTree = "<group>"; };
 		3FC68FD91A0AD3FE005F3103 /* encrypted_file_mapping.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = encrypted_file_mapping.cpp; sourceTree = "<group>"; };
+		3FE557F51A150F2100A18CCB /* errno.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = errno.cpp; sourceTree = "<group>"; };
+		3FE557F61A150F2100A18CCB /* errno.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = errno.hpp; sourceTree = "<group>"; };
 		4142C9951623478700B3B902 /* liblibtightdb ios.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "liblibtightdb ios.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		4222F2F619640A4100EC86A5 /* test_json.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = test_json.cpp; sourceTree = "<group>"; };
 		4222F2F819640A7A00EC86A5 /* jsmn.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = jsmn.cpp; sourceTree = "<group>"; };
@@ -923,6 +927,8 @@
 				52D7C46B1852A01700633748 /* config.sh */,
 				3FC68FD91A0AD3FE005F3103 /* encrypted_file_mapping.cpp */,
 				3FC68FD81A0AD3BF005F3103 /* encrypted_file_mapping.hpp */,
+				3FE557F51A150F2100A18CCB /* errno.cpp */,
+				3FE557F61A150F2100A18CCB /* errno.hpp */,
 				52D7C46C1852A01700633748 /* features.h */,
 				52D7C46D1852A01700633748 /* file.cpp */,
 				52D7C46E1852A01700633748 /* file.hpp */,
@@ -1003,6 +1009,7 @@
 				5267884E189AB4D7009CDE7D /* descriptor.hpp in Headers */,
 				52678850189AB4EA009CDE7D /* descriptor_fwd.hpp in Headers */,
 				3620DF0D18B6CA7B003AD498 /* destroy_guard.hpp in Headers */,
+				3FE557F81A150F2100A18CCB /* errno.hpp in Headers */,
 				36EE6CC517F0F9CB00BA9635 /* exceptions.hpp in Headers */,
 				52D7C4811852A01700633748 /* features.h in Headers */,
 				52D7C4831852A01700633748 /* file.hpp in Headers */,
@@ -1309,6 +1316,7 @@
 				4222F30219640C6700EC86A5 /* commit_log.cpp in Sources */,
 				5267884B189AB4B8009CDE7D /* descriptor.cpp in Sources */,
 				3FC68FDA1A0AD3FE005F3103 /* encrypted_file_mapping.cpp in Sources */,
+				3FE557F71A150F2100A18CCB /* errno.cpp in Sources */,
 				52C9B60E19B7406D00248011 /* exceptions.cpp in Sources */,
 				52D7C4821852A01700633748 /* file.cpp in Sources */,
 				3F5ED51019D08A11001FCFF4 /* file_mapper.cpp in Sources */,
