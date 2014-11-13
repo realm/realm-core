@@ -7,7 +7,6 @@
 
 #include "encrypted_file_mapping.hpp"
 
-#include <atomic>
 #include <memory>
 #include <signal.h>
 #include <sys/stat.h>
@@ -15,6 +14,8 @@
 
 #include <tightdb/alloc_slab.hpp>
 #include <tightdb/util/terminate.hpp>
+#include <tightdb/util/thread.hpp>
+#include <tightdb/util/shared_ptr.hpp>
 
 using namespace tightdb;
 using namespace tightdb::util;
@@ -43,35 +44,35 @@ const size_t page_size = 4096;
 
 class SpinLockGuard {
 public:
-    SpinLockGuard(std::atomic_flag& lock) : m_lock(lock) {
-        while (m_lock.test_and_set(std::memory_order_acquire)) ;
+    SpinLockGuard(Atomic<bool>& lock) : m_lock(lock) {
+        while (m_lock.exchange_acquire(true)) ;
     }
 
     ~SpinLockGuard() {
-        m_lock.clear(std::memory_order_release);
+        m_lock.store_release(false);
     }
 
 private:
-    std::atomic_flag& m_lock;
+    Atomic<bool>& m_lock;
 };
 
 // A list of all of the active encrypted mappings for a single file
 struct mappings_for_file  {
     dev_t device;
     ino_t inode;
-    std::unique_ptr<SharedFileInfo> info;
+    SharedPtr<SharedFileInfo> info;
 };
 
 // Group the information we need to map a SIGSEGV address to an
 // EncryptedFileMapping for the sake of cache-friendliness with 3+ active
 // mappings (and no worse with only two
 struct mapping_and_addr {
-    std::unique_ptr<EncryptedFileMapping> mapping;
+    SharedPtr<EncryptedFileMapping> mapping;
     void* addr;
     size_t size;
 };
 
-std::atomic_flag mapping_lock = ATOMIC_FLAG_INIT;
+Atomic<bool> mapping_lock;
 std::vector<mapping_and_addr> mappings_by_addr;
 std::vector<mappings_for_file> mappings_by_file;
 
@@ -81,8 +82,9 @@ struct sigaction old_segv;
 struct sigaction old_bus;
 
 void signal_handler(int code, siginfo_t* info, void* ctx) {
-    SpinLockGuard lock{mapping_lock};
-    for (auto& m : mappings_by_addr) {
+    SpinLockGuard lock(mapping_lock);
+    for (size_t i = 0; i < mappings_by_addr.size(); ++i) {
+        mapping_and_addr& m = mappings_by_addr[i];
         if (m.addr > info->si_addr || static_cast<char*>(m.addr) + m.size <= info->si_addr)
             continue;
 
@@ -112,10 +114,10 @@ void signal_handler(int code, siginfo_t* info, void* ctx) {
 }
 
 mapping_and_addr* find_mapping_for_addr(void* addr, size_t size) {
-    for (auto& m : mappings_by_addr) {
-        if (m.addr == addr && m.size == size) {
+    for (size_t i = 0; i < mappings_by_addr.size(); ++i) {
+        mapping_and_addr& m = mappings_by_addr[i];
+        if (m.addr == addr && m.size == size)
             return &m;
-        }
     }
 
     return 0;
@@ -126,7 +128,7 @@ size_t round_up_to_page_size(size_t size) {
 }
 
 void add_mapping(void* addr, size_t size, int fd, File::AccessMode access, const uint8_t* encryption_key) {
-    SpinLockGuard lock{mapping_lock};
+    SpinLockGuard lock(mapping_lock);
 
     static bool has_installed_handler = false;
     if (!has_installed_handler) {
@@ -149,24 +151,30 @@ void add_mapping(void* addr, size_t size, int fd, File::AccessMode access, const
     if (st.st_size > 0 && static_cast<size_t>(st.st_size) < page_size)
         throw InvalidDatabase();
 
-    auto it = find_if(begin(mappings_by_file), end(mappings_by_file), [=](mappings_for_file& m) {
-        return m.inode == st.st_ino && m.device == st.st_dev;
-    });
+    std::vector<mappings_for_file>::iterator it;
+    for (it = mappings_by_file.begin(); it != mappings_by_file.end(); ++it) {
+        if (it->inode == st.st_ino && it->device == st.st_dev)
+            break;
+    }
 
     // Get the potential memory allocation out of the way so that mappings_by_addr.push_back can't throw
     mappings_by_addr.reserve(mappings_by_addr.size() + 1);
 
-    if (it == end(mappings_by_file)) {
-        mappings_by_file.emplace_back();
-        it = --end(mappings_by_file);
-        it->device = st.st_dev;
-        it->inode = st.st_ino;
-        it->info.reset(new SharedFileInfo{encryption_key, dup(fd)});
+    if (it == mappings_by_file.end()) {
+        mappings_for_file f;
+        f.device = st.st_dev;
+        f.inode = st.st_ino;
+        f.info = new SharedFileInfo(encryption_key, dup(fd));
+        mappings_by_file.push_back(f);
+        it = --mappings_by_file.end();
     }
 
     try {
-        auto mapping = new EncryptedFileMapping{*it->info, addr, size, access}; // throws
-        mappings_by_addr.push_back(mapping_and_addr{std::unique_ptr<EncryptedFileMapping>{mapping}, addr, size});
+        mapping_and_addr m;
+        m.addr = addr;
+        m.size = size;
+        m.mapping = new EncryptedFileMapping(*it->info, addr, size, access);
+        mappings_by_addr.push_back(m);
     }
     catch (...) {
         if (it->info->mappings.empty()) {
@@ -179,13 +187,13 @@ void add_mapping(void* addr, size_t size, int fd, File::AccessMode access, const
 
 void remove_mapping(void* addr, size_t size) {
     size = round_up_to_page_size(size);
-    SpinLockGuard lock{mapping_lock};
-    auto m = find_mapping_for_addr(addr, size);
+    SpinLockGuard lock(mapping_lock);
+    mapping_and_addr* m = find_mapping_for_addr(addr, size);
     if (!m)
         return;
 
     mappings_by_addr.erase(mappings_by_addr.begin() + (m - &mappings_by_addr[0]));
-    for (auto it = begin(mappings_by_file); it != end(mappings_by_file); ++it) {
+    for (std::vector<mappings_for_file>::iterator it = mappings_by_file.begin(); it != mappings_by_file.end(); ++it) {
         if (it->info->mappings.empty()) {
             ::close(it->info->fd);
             mappings_by_file.erase(it);
@@ -251,14 +259,14 @@ void munmap(void* addr, size_t size) TIGHTDB_NOEXCEPT {
 void* mremap(int fd, void* old_addr, size_t old_size, File::AccessMode a, size_t new_size) {
 #ifdef TIGHTDB_ENABLE_ENCRYPTION
     {
-        SpinLockGuard lock{mapping_lock};
+        SpinLockGuard lock(mapping_lock);
         size_t rounded_old_size = round_up_to_page_size(old_size);
-        if (auto m = find_mapping_for_addr(old_addr, rounded_old_size)) {
+        if (mapping_and_addr* m = find_mapping_for_addr(old_addr, rounded_old_size)) {
             size_t rounded_new_size = round_up_to_page_size(new_size);
             if (rounded_old_size == rounded_new_size)
                 return old_addr;
 
-            auto new_addr = mmap_anon(rounded_new_size);
+            void* new_addr = mmap_anon(rounded_new_size);
             m->mapping->set(new_addr, rounded_new_size);
             ::munmap(old_addr, rounded_old_size);
             m->addr = new_addr;
@@ -286,8 +294,8 @@ void* mremap(int fd, void* old_addr, size_t old_size, File::AccessMode a, size_t
 void msync(void* addr, size_t size) {
 #ifdef TIGHTDB_ENABLE_ENCRYPTION
     { // first check the encrypted mappings
-        SpinLockGuard lock{mapping_lock};
-        if (auto m = find_mapping_for_addr(addr, size)) {
+        SpinLockGuard lock(mapping_lock);
+        if (mapping_and_addr* m = find_mapping_for_addr(addr, size)) {
             m->mapping->flush();
             m->mapping->sync();
             return;

@@ -60,9 +60,9 @@ ifneq ($(TIGHTDB_HAVE_CONFIG),)
   endif
   ifeq ($(ENABLE_ENCRYPTION),yes)
     ifeq ($(TIGHTDB_ANDROID),)
-      PROJECT_CFLAGS += -DTIGHTDB_ENABLE_ENCRYPTION -std=c++11
+      PROJECT_CFLAGS += -DTIGHTDB_ENABLE_ENCRYPTION
     else
-      PROJECT_CFLAGS += -DTIGHTDB_ENABLE_ENCRYPTION -std=c++11 -I../../openssl/include
+      PROJECT_CFLAGS += -DTIGHTDB_ENABLE_ENCRYPTION -I../../openssl/include
       PROJECT_LDFLAGS += -lcrypto
     endif
   endif

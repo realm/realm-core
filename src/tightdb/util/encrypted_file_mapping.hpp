@@ -112,11 +112,11 @@ public:
 private:
     SharedFileInfo& m_file;
 
-    void* m_addr = 0;
-    size_t m_size = 0;
+    void* m_addr;
+    size_t m_size;
 
     uintptr_t m_first_page;
-    size_t m_page_count = 0;
+    size_t m_page_count;
 
     std::vector<bool> m_read_pages;
     std::vector<bool> m_write_pages;
