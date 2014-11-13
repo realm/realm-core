@@ -2,7 +2,7 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
+* Fixed a bug where rollback of an empty transaction could cause a crash
 
 ### API breaking changes:
 
@@ -15,6 +15,8 @@
 
 ### Enhancements:
 
+* TableView::sync_if_needed() now returns a version number. Bindings can compare
+  version numbers returned in order to determine if the TableView has changed.
 * Added not_equal(), equal(), contains(), begins_with(), ends_with() for String 
   columns in the Query expression syntax. They work both case sensitive and 
   insensitive. So now you can write 'size_t 
