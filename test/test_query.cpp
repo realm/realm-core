@@ -484,6 +484,77 @@ TEST(Query_NextGenSyntax)
 
 }
 
+
+// This tests the new string conditions now available for the expression syntax
+TEST(Query_NextGen_StringConditions)
+{
+    Group group;
+    TableRef table1 = group.add_table("table1");
+    table1->add_column(type_String, "str1");
+
+    // add some rows
+    table1->add_empty_row();
+    table1->set_string(0, 0, "foo");
+    table1->add_empty_row();
+    table1->set_string(0, 1, "!");
+    table1->add_empty_row();
+    table1->set_string(0, 2, "bar");
+
+    size_t m;
+    // Equal
+    m = table1->column<String>(0).equal("bar", false).find();
+    CHECK_EQUAL(m, 2);
+
+    m = table1->column<String>(0).equal("bar", true).find();
+    CHECK_EQUAL(m, 2);
+
+    m = table1->column<String>(0).equal("Bar", true).find();
+    CHECK_EQUAL(m, not_found);
+
+    m = table1->column<String>(0).equal("Bar", false).find();
+    CHECK_EQUAL(m, 2);
+
+    // Contains
+    m = table1->column<String>(0).contains("a", false).find();
+    CHECK_EQUAL(m, 2);
+
+    m = table1->column<String>(0).contains("a", true).find();
+    CHECK_EQUAL(m, 2);
+
+    m = table1->column<String>(0).contains("A", true).find();
+    CHECK_EQUAL(m, not_found);
+
+    m = table1->column<String>(0).contains("A", false).find();
+    CHECK_EQUAL(m, 2);
+
+    // Begins with
+    m = table1->column<String>(0).begins_with("b", false).find();
+    CHECK_EQUAL(m, 2);
+
+    m = table1->column<String>(0).begins_with("b", true).find();
+    CHECK_EQUAL(m, 2);
+
+    m = table1->column<String>(0).begins_with("B", true).find();
+    CHECK_EQUAL(m, not_found);
+
+    m = table1->column<String>(0).begins_with("B", false).find();
+    CHECK_EQUAL(m, 2);
+
+    // Ends with
+    m = table1->column<String>(0).ends_with("r", false).find();
+    CHECK_EQUAL(m, 2);
+
+    m = table1->column<String>(0).ends_with("r", true).find();
+    CHECK_EQUAL(m, 2);
+
+    m = table1->column<String>(0).ends_with("R", true).find();
+    CHECK_EQUAL(m, not_found);
+
+    m = table1->column<String>(0).ends_with("R", false).find();
+    CHECK_EQUAL(m, 2);
+}
+
+
 TEST(Query_NextGenSyntaxMonkey0)
 {
     // Intended to test eval() for columns in query_expression.hpp which fetch 8 values at a time. This test varies
@@ -2635,6 +2706,39 @@ TEST(Query_DateQuery)
         .hired.less(tightdb::DateTime(2013, 1, 1).get_datetime()).find_all();
     CHECK_EQUAL(1, view5.size());
     CHECK_EQUAL("Mary", view5[0].name);
+}
+
+
+TEST(Query_DoubleCoordinates)
+{
+    Group group;
+    TableRef table = group.add_table("test");
+
+    table->add_column(type_Double, "name");
+    table->add_column(type_Double, "age");
+
+    size_t expected = 0;
+
+    for (size_t t = 0; t < 100000; t++) {
+        table->add_empty_row(1);
+        table->set_double(0, t, (t * 12345) % 1000);
+        table->set_double(1, t, (t * 12345) % 1000);
+
+        if (table->get_double(0, t) >= 100. && table->get_double(0, t) <= 110. &&
+            table->get_double(1, t) >= 100. && table->get_double(1, t) <= 110.)
+        {
+            expected++;
+        }
+    }
+
+    // This unit test can be used as benchmark. Just enable this for loop
+    //    for (size_t t = 0; t < 1000; t++) {
+    Query q = table->column<double>(0) >= 100. && table->column<double>(0) <= 110. &&
+        table->column<double>(1) >= 100. && table->column<double>(1) <= 110.;
+
+    size_t c = q.count();
+    TIGHTDB_ASSERT(c == expected);
+    //    }
 }
 
 

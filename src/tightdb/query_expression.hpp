@@ -162,12 +162,14 @@ template<class T> struct OnlyNumeric
 {
     static T get(T in) { return in; }
     typedef T type;
+    typedef T type2;
 };
 
 template<> struct OnlyNumeric<StringData>
 {
     static int get(StringData in) { static_cast<void>(in); return 0; }
     typedef StringData type;
+    typedef int type2;
 };
 
 
@@ -283,8 +285,8 @@ class ColumnAccessorBase;
 
 
 // Handle cases where left side is a constant (int, float, int64_t, double, StringData)
-template <class L, class Cond, class R> Query create(L left, const Subexpr2<R>& right, 
-                                                     const char* compare_string = null_ptr)
+template <class L, class Cond, class R> Query create(L left, const Subexpr2<R>& right,
+    const char* compare_string = null_ptr)
 {
     // Purpose of below code is to intercept the creation of a condition and test if it's supported by the old
     // query_engine.hpp which is faster. If it's supported, create a query_engine.hpp node, otherwise create a
@@ -297,23 +299,30 @@ template <class L, class Cond, class R> Query create(L left, const Subexpr2<R>& 
     static_cast<void>(num);
 
     const Columns<R>* column = dynamic_cast<const Columns<R>*>(&right);
-    if (column && (std::numeric_limits<L>::is_integer) && (std::numeric_limits<R>::is_integer) &&
-        !column->m_link_map.m_table) {
+
+    if (column &&
+        ((std::numeric_limits<L>::is_integer && std::numeric_limits<L>::is_integer) ||
+        (util::SameType<L, double>::value && util::SameType<R, double>::value) ||
+        (util::SameType<L, float>::value && util::SameType<R, float>::value))
+        &&
+        column->m_link_map.m_tables.size() == 0) {
         const Table* t = (const_cast<Columns<R>*>(column))->get_table();
         Query q = Query(*t);
 
+        typedef typename OnlyNumeric<R>::type2 type2;
+
         if (util::SameType<Cond, Less>::value)
-            q.greater(column->m_column, num.get(left));
+            q.greater(column->m_column, static_cast<type2>(num.get(left)));
         else if (util::SameType<Cond, Greater>::value)
-            q.less(column->m_column, num.get(left));
+            q.less(column->m_column, static_cast<type2>(num.get(left)));
         else if (util::SameType<Cond, Equal>::value)
-            q.equal(column->m_column, num.get(left));
+            q.equal(column->m_column, static_cast<type2>(num.get(left)));
         else if (util::SameType<Cond, NotEqual>::value)
-            q.not_equal(column->m_column, num.get(left));
+            q.not_equal(column->m_column, static_cast<type2>(num.get(left)));
         else if (util::SameType<Cond, LessEqual>::value)
-            q.greater_equal(column->m_column, num.get(left));
+            q.greater_equal(column->m_column, static_cast<type2>(num.get(left)));
         else if (util::SameType<Cond, GreaterEqual>::value)
-            q.less_equal(column->m_column, num.get(left));
+            q.less_equal(column->m_column, static_cast<type2>(num.get(left)));
         else {
             // query_engine.hpp does not support this Cond. Please either add support for it in query_engine.hpp or
             // fallback to using use 'return *new Compare<>' instead.
@@ -326,7 +335,7 @@ template <class L, class Cond, class R> Query create(L left, const Subexpr2<R>& 
 #endif
     {
         // Return query_expression.hpp node
-        return *new Compare<Cond, typename Common<L, R>::type>(*new Value<L>(left), 
+        return *new Compare<Cond, typename Common<L, R>::type>(*new Value<L>(left),
             const_cast<Subexpr2<R>&>(right).clone(), true, compare_string);
     }
 }
@@ -1002,6 +1011,7 @@ private:
     std::vector<tightdb::DataType> m_link_types;
 };
 
+template <class T, class C> Query string_compare(const Columns<StringData>& left, T right);
 
 // Handling of String columns. These support only == and != compare operators. No 'arithmetic' operators (+, etc).
 template <> class Columns<StringData> : public Subexpr2<StringData>
@@ -1060,6 +1070,46 @@ public:
         }
     }
 
+    Query equal(StringData sd, bool case_sensitive = true)
+    {
+        if (case_sensitive)
+            return string_compare<StringData, Equal>(*this, sd);
+        else
+            return string_compare<StringData, EqualIns>(*this, sd);
+    }
+
+    Query not_equal(StringData sd, bool case_sensitive = true)
+    {
+        if (case_sensitive)
+            return string_compare<StringData, NotEqual>(*this, sd);
+        else
+            return string_compare<StringData, NotEqualIns>(*this, sd);
+    }
+    
+    Query begins_with(StringData sd, bool case_sensitive = true)
+    {
+        if (case_sensitive)
+            return string_compare<StringData, BeginsWith>(*this, sd);
+        else
+            return string_compare<StringData, BeginsWithIns>(*this, sd);
+    }
+
+    Query ends_with(StringData sd, bool case_sensitive = true)
+    {
+        if (case_sensitive)
+            return string_compare<StringData, EndsWith>(*this, sd);
+        else
+            return string_compare<StringData, EndsWithIns>(*this, sd);
+    }
+    
+    Query contains(StringData sd, bool case_sensitive = true)
+    {
+        if (case_sensitive)
+            return string_compare<StringData, Contains>(*this, sd);
+        else
+            return string_compare<StringData, ContainsIns>(*this, sd);
+    }
+    
     const Table* m_table_linked_from;
 
     // Pointer to payload table (which is the linked-to table if this is a link column) used for condition operator
@@ -1071,6 +1121,16 @@ public:
     LinkMap m_link_map;
 };
 
+
+template <class T, class C> Query string_compare(const Columns<StringData>& left, T right)
+{
+    // Create deep copy of search string. Destructor of the Compare class will delete it.
+    StringData sd(right);
+    char* string_payload(new char[sd.size()]);
+    memcpy(string_payload, sd.data(), sd.size());
+    StringData sd2(StringData(string_payload, sd.size()));
+    return create<StringData, C, StringData>(sd2, left, string_payload);
+}
 
 // String == Columns<String>
 template <class T> Query operator == (T left, const Columns<StringData>& right) {
@@ -1084,22 +1144,12 @@ template <class T> Query operator != (T left, const Columns<StringData>& right) 
 
 // Columns<String> == String
 template <class T> Query operator == (const Columns<StringData>& left, T right) {
-    // Create deep copy of search string. Destructor of the Compare class will delete it.
-    StringData sd(right);
-    char* string_payload(new char[sd.size()]);
-    memcpy(string_payload, sd.data(), sd.size());
-    StringData sd2(StringData(string_payload, sd.size()));
-    return create<StringData, Equal, StringData>(sd2, left, string_payload);
+    return string_compare<T, Equal>(left, right);
 }
 
 // Columns<String> != String
 template <class T> Query operator != (const Columns<StringData>& left, T right) {
-    // Create deep copy of search string. Destructor of the Compare class will delete it.
-    StringData sd(right);
-    char* string_payload(new char[sd.size()]);
-    memcpy(string_payload, sd.data(), sd.size());
-    StringData sd2(StringData(string_payload, sd.size()));
-    return create<StringData, NotEqual, StringData>(sd2, left, string_payload);
+    return string_compare<T, NotEqual>(left, right);
 }
 
 // This class is intended to perform queries on the *pointers* of links, contrary to performing queries on *payload* 

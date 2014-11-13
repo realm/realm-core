@@ -34,18 +34,21 @@ enum {cond_Equal, cond_NotEqual, cond_Greater, cond_GreaterEqual, cond_Less, con
 // Does v2 contain v1?
 struct Contains {
     bool operator()(StringData v1, const char*, const char*, StringData v2) const { return v2.contains(v1); }
+    bool operator()(StringData v1, StringData v2) const { return v2.contains(v1); }
     bool operator()(BinaryData v1, BinaryData v2) const { return v2.contains(v1); }
 };
 
 // Does v2 begin with v1?
 struct BeginsWith {
     bool operator()(StringData v1, const char*, const char*, StringData v2) const { return v2.begins_with(v1); }
+    bool operator()(StringData v1, StringData v2) const { return v2.begins_with(v1); }
     bool operator()(BinaryData v1, BinaryData v2) const { return v2.begins_with(v1); }
 };
 
 // Does v2 end with v1?
 struct EndsWith {
     bool operator()(StringData v1, const char*, const char*, StringData v2) const { return v2.ends_with(v1); }
+    bool operator()(StringData v1, StringData v2) const { return v2.ends_with(v1); }
     bool operator()(BinaryData v1, BinaryData v2) const { return v2.ends_with(v1); }
 };
 
@@ -81,6 +84,15 @@ struct ContainsIns {
     {
         return search_case_fold(v2, v1_upper, v1_lower, v1.size()) != v2.size();
     }
+
+    // Slow version, used if caller hasn't stored an upper and lower case version
+    bool operator()(StringData v1, StringData v2) const
+    {
+        std::string v1_upper = case_map(v1, true);
+        std::string v1_lower = case_map(v1, false);
+        return search_case_fold(v2, v1_upper.c_str(), v1_lower.c_str(), v1.size()) != v2.size();
+    }
+
     static const int condition = -1;
 };
 
@@ -90,6 +102,17 @@ struct BeginsWithIns {
     {
         return v1.size() <= v2.size() && equal_case_fold(v2.prefix(v1.size()), v1_upper, v1_lower);
     }
+
+    // Slow version, used if caller hasn't stored an upper and lower case version
+    bool operator()(StringData v1, StringData v2) const
+    {
+        if (v1.size() > v2.size())
+            return false;
+        std::string v1_upper = case_map(v1, true);
+        std::string v1_lower = case_map(v1, false);
+        return equal_case_fold(v2.prefix(v1.size()), v1_upper.c_str(), v1_lower.c_str());
+    }
+
     static const int condition = -1;
 };
 
@@ -99,6 +122,17 @@ struct EndsWithIns {
     {
         return v1.size() <= v2.size() && equal_case_fold(v2.suffix(v1.size()), v1_upper, v1_lower);
     }
+
+    // Slow version, used if caller hasn't stored an upper and lower case version
+    bool operator()(StringData v1, StringData v2) const
+    {
+        if (v1.size() > v2.size())
+            return false;
+        std::string v1_upper = case_map(v1, true);
+        std::string v1_lower = case_map(v1, false);
+        return equal_case_fold(v2.suffix(v1.size()), v1_upper.c_str(), v1_lower.c_str());
+    }
+
     static const int condition = -1;
 };
 
@@ -107,6 +141,17 @@ struct EqualIns {
     {
         return v1.size() == v2.size() && equal_case_fold(v2, v1_upper, v1_lower);
     }
+
+    // Slow version, used if caller hasn't stored an upper and lower case version
+    bool operator()(StringData v1, StringData v2) const
+    {
+        if (v1.size() != v2.size())
+            return false;
+        std::string v1_upper = case_map(v1, true);
+        std::string v1_lower = case_map(v1, false);
+        return equal_case_fold(v2, v1_upper.c_str() , v1_lower.c_str());
+    }
+
     static const int condition = -1;
 };
 
@@ -114,6 +159,16 @@ struct NotEqualIns {
     bool operator()(StringData v1, const char* v1_upper, const char* v1_lower, StringData v2) const
     {
         return v1.size() != v2.size() || !equal_case_fold(v2, v1_upper, v1_lower);
+    }
+
+    // Slow version, used if caller hasn't stored an upper and lower case version
+    bool operator()(StringData v1, StringData v2) const
+    {
+        if (v1.size() != v2.size())
+            return true;        
+        std::string v1_upper = case_map(v1, true);
+        std::string v1_lower = case_map(v1, false);
+        return !equal_case_fold(v2, v1_upper.c_str(), v1_lower.c_str());
     }
     static const int condition = -1;
 };

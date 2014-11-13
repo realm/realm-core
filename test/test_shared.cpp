@@ -1524,6 +1524,9 @@ TEST(Shared_ClearColumnWithBasicArrayRootLeaf)
     }
 }
 
+#if 0
+// Temporarily disable async testing until use of sleep() in the async tests have
+// been replaced with a better solution.
 
 // disable shared async on windows and any Apple operating system
 // TODO: enable async daemon for OS X - think how to do it in XCode (no issue for build.sh)
@@ -1789,7 +1792,7 @@ TEST_IF(Shared_AsyncMultiprocess, allow_async)
 }
 
 #endif // endif not on windows
-
+#endif // temporary disable
 
 TEST(Shared_MixedWithNonShared)
 {
