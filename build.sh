@@ -2711,6 +2711,10 @@ EOF
         git reset --hard || exit 1
         git clean -xfd || exit 1
 
+        TIGHTDB_MAX_BPNODE_SIZE_DEBUG="4" TIGHTDB_ENABLE_ENCRYPTION="yes" sh build.sh config "$WORKSPACE/install" || exit 1
+        sh build.sh build-iphone || exit 1
+        sh build.sh build-android || exit 1
+
         TIGHTDB_MAX_BPNODE_SIZE_DEBUG="4" sh build.sh config "$WORKSPACE/install" || exit 1
         sh build.sh build-iphone || exit 1
         sh build.sh build-android || exit 1
