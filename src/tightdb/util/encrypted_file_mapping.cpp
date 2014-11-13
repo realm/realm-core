@@ -112,9 +112,30 @@ size_t check_read(int fd, off_t pos, void *dst, size_t len) {
 
 void calc_hmac(const void* src, size_t len, uint8_t* dst, const uint8_t* key) {
 #ifdef __APPLE__
-    CCHmac(kCCHmacAlgSHA224, key, kCCKeySizeAES256, src, len, dst);
+    CCHmac(kCCHmacAlgSHA224, key, 32, src, len, dst);
 #else
-    HMAC(EVP_sha224(), key, 32, static_cast<const uint8_t*>(src), len, dst, 0);
+    SHA256_CTX ctx;
+
+    uint8_t ipad[64];
+    for (size_t i = 0; i < 32; ++i)
+        ipad[i] = key[i] ^ 0x36;
+    memset(ipad + 32, 0x36, 32);
+
+    uint8_t opad[64] = {0};
+    for (size_t i = 0; i < 32; ++i)
+        opad[i] = key[i] ^ 0x5C;
+    memset(opad + 32, 0x5C, 32);
+
+    // Full hmac operation is sha224(opad + sha224(ipad + data))
+    SHA224_Init(&ctx);
+    SHA256_Update(&ctx, ipad, 64);
+    SHA256_Update(&ctx, static_cast<const uint8_t*>(src), len);
+    SHA256_Final(dst, &ctx);
+
+    SHA224_Init(&ctx);
+    SHA256_Update(&ctx, opad, 64);
+    SHA256_Update(&ctx, dst, SHA224_DIGEST_LENGTH);
+    SHA256_Final(dst, &ctx);
 #endif
 }
 

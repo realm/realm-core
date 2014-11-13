@@ -31,7 +31,7 @@
 #include <CommonCrypto/CommonCrypto.h>
 #else
 #include <openssl/aes.h>
-#include <openssl/hmac.h>
+#include <openssl/sha.h>
 #endif
 
 namespace tightdb {

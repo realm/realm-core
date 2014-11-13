@@ -394,6 +394,11 @@ download_openssl()
     tar -xzf openssl.tar.gz || return 1
     mv openssl-1.0.1i openssl || return 1
     rm openssl.tar.gz || return 1
+
+    # A function we don't use calls OPENSSL_cleanse, which has all sorts of
+    # dependencies due to being written in asm
+    sed '/OPENSSL_cleanse/d' 'openssl/crypto/sha/sha256.c' > sha_tmp
+    mv sha_tmp 'openssl/crypto/sha/sha256.c'
 }
 
 
@@ -707,7 +712,7 @@ EOF
                     $MAKE clean
                 ) || exit 1
 
-                PATH="$path" CC="$cc" CFLAGS="$cflags_arch -DOPENSSL_NO_SHA512" $MAKE -C "openssl" build_libs || exit 1
+                PATH="$path" CC="$cc" CFLAGS="$cflags_arch -DOPENSSL_NO_SHA512 -DOPENSSL_NO_SHA0" $MAKE -C "openssl" build_libs || exit 1
                 cp "openssl/libcrypto.a" "$ANDROID_DIR/$libcrypto_name" || exit 1
             fi
 
@@ -724,14 +729,12 @@ EOF
                     echo $AR x "../$ANDROID_DIR/$libcrypto_name" || exit 1
                     $AR x "../$ANDROID_DIR/$libcrypto_name" || exit 1
                     find \
-                      . ! -name '*aes*' \
-                      -a ! -name '*cbc128*' \
-                      -a ! -name m_sha1.o \
-                      -a ! -name hmac.o \
-                      -a ! -name digest.o \
+                      . ! -name 'aes*' \
+                      -a ! -name cbc128.o \
                       -a ! -name sha256.o \
-                      -a ! -name cryptlib.o \
+                      -a ! -name sha256-586.o \
                       -delete || exit 1
+                    rm -f aes_wrap.o
                     $AR x "../src/tightdb/libtightdb-$denom.a" || exit 1
                     $AR r "../$ANDROID_DIR/libtightdb-$denom.a" *.o || exit 1
                     $RANLIB "../$ANDROID_DIR/libtightdb-$denom.a"
@@ -762,10 +765,10 @@ EOF
 
         tightdb_version="$(sh build.sh get-version)" || exit
         dir_name="core-$tightdb_version"
-        file_name="realm-core-android-$tightdb_version.tar.gz"
+        file_name="core-android-$tightdb_version.tar.gz"
         if [ $enable_encryption = yes ]; then
             dir_name="$dir_name-encryption"
-            file_name="realm-core-android-$tightdb_version-encryption.tar.gz"
+            file_name="core-android-$tightdb_version-encryption.tar.gz"
         fi
 
         echo "Create tar.gz file $file_name"
