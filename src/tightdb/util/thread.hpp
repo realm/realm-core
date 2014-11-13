@@ -623,6 +623,7 @@ public:
     void store_release(T value);
     void store_relaxed(T value);
     bool compare_and_swap(T& oldvalue, T newvalue);
+    T exchange_acquire(T newvalue);
 private:
     // the following is not supported
     Atomic(Atomic<T>&);
@@ -631,16 +632,12 @@ private:
     // Assumed to be naturally aligned - if not, hardware might not guarantee atomicity
 #ifdef TIGHTDB_HAVE_CXX11_ATOMIC
     std::atomic<T> state;
-#else
-#ifdef _MSC_VER
+#elif defined(_MSC_VER)
     volatile T state;
-#else
-#ifdef __GNUC__
+#elif defined(__GNUC__)
     T state;
 #else
 #error "Atomic is not support on this compiler"
-#endif
-#endif
 #endif
 };
 
@@ -718,8 +715,14 @@ inline bool Atomic<T>::compare_and_swap(T& oldvalue, T newvalue)
     return state.compare_exchange_weak(oldvalue, newvalue);
 }
 
-#else
-#ifdef _MSC_VER
+template<typename T>
+inline T Atomic<T>::exchange_acquire(T value)
+{
+    return state.exchange(value, std::memory_order_acquire);
+}
+
+#elif defined(_MSC_VER)
+
 template<typename T>
 inline T Atomic<T>::load() const
 {
@@ -757,29 +760,102 @@ inline void Atomic<T>::store_release(T value)
     state = value;
 }
 
-#endif
-#ifdef __GNUC__
-// gcc implementation, pre c++11:
+#elif TIGHTDB_HAVE_AT_LEAST_GCC(4, 7) || TIGHTDB_HAVE_CLANG_FEATURE(c_atomic)
+// Modern non-C++11 gcc/clang implementaion
+
 template<typename T>
 inline T Atomic<T>::load_acquire() const
 {
-    T retval;
-#if TIGHTDB_HAVE_AT_LEAST_GCC(4, 7)
-    retval = __atomic_load_n(&state, __ATOMIC_ACQUIRE);
-#else
+    return __atomic_load_n(&state, __ATOMIC_ACQUIRE);
+}
+
+template<typename T>
+inline T Atomic<T>::load_relaxed() const
+{
+    return __atomic_load_n(&state, __ATOMIC_RELAXED);
+}
+
+template<typename T>
+inline T Atomic<T>::load() const
+{
+    return __atomic_load_n(&state, __ATOMIC_SEQ_CST);
+}
+
+template<typename T>
+inline T Atomic<T>::fetch_sub_relaxed(T v)
+{
+    return __atomic_fetch_sub(&state, v, __ATOMIC_RELAXED);
+}
+
+template<typename T>
+inline T Atomic<T>::fetch_sub_release(T v)
+{
+    return __atomic_fetch_sub(&state, v, __ATOMIC_RELEASE);
+}
+
+template<typename T>
+inline T Atomic<T>::fetch_add_release(T v)
+{
+    return __atomic_fetch_add(&state, v, __ATOMIC_RELEASE);
+}
+
+template<typename T>
+inline T Atomic<T>::fetch_add_acquire(T v)
+{
+    return __atomic_fetch_add(&state, v, __ATOMIC_ACQUIRE);
+}
+
+template<typename T>
+inline T Atomic<T>::fetch_sub_acquire(T v)
+{
+    return __atomic_fetch_sub(&state, v, __ATOMIC_ACQUIRE);
+}
+
+template<typename T>
+inline void Atomic<T>::store(T value)
+{
+    __atomic_store_n(&state, value, __ATOMIC_SEQ_CST);
+}
+
+template<typename T>
+inline void Atomic<T>::store_release(T value)
+{
+    __atomic_store_n(&state, value, __ATOMIC_RELEASE);
+}
+
+template<typename T>
+inline void Atomic<T>::store_relaxed(T value)
+{
+    __atomic_store_n(&state, value, __ATOMIC_RELAXED);
+}
+
+template<typename T>
+inline bool Atomic<T>::compare_and_swap(T& oldvalue, T newvalue)
+{
+    return __atomic_compare_exchange_n(&state, &oldvalue, newvalue, false, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE);
+}
+
+template<typename T>
+inline T Atomic<T>::exchange_acquire(T newvalue)
+{
+    T old;
+    __atomic_exchange(&state, &newvalue, &old, __ATOMIC_ACQUIRE);
+    return old;
+}
+
+#elif defined(__GNUC__)
+// Legacy GCC implementation
+template<typename T>
+inline T Atomic<T>::load_acquire() const
+{
     __sync_synchronize();
-    retval = load_relaxed();
-#endif
-    return retval;
+    return load_relaxed();
 }
 
 template<typename T>
 inline T Atomic<T>::load_relaxed() const
 {
     T retval;
-#if TIGHTDB_HAVE_AT_LEAST_GCC(4, 7)
-    retval = __atomic_load_n(&state, __ATOMIC_RELAXED);
-#else
     if (sizeof(T) >= sizeof(ptrdiff_t)) {
         // do repeated reads until we've seen the same value twice,
         // then we know that the reads were done without changes to the value.
@@ -796,79 +872,50 @@ inline T Atomic<T>::load_relaxed() const
         asm volatile ("" : : : "memory");
         retval = state;
     }
-#endif
     return retval;
 }
 
 template<typename T>
 inline T Atomic<T>::load() const
 {
-#if TIGHTDB_HAVE_AT_LEAST_GCC(4, 7)
-    T retval = __atomic_load_n(&state, __ATOMIC_SEQ_CST);
-#else
     __sync_synchronize();
-    T retval = load_relaxed();
-#endif
-    return retval;
+    return load_relaxed();
 }
 
 template<typename T>
 inline T Atomic<T>::fetch_sub_relaxed(T v)
 {
-#if TIGHTDB_HAVE_AT_LEAST_GCC(4, 7)
-    return __atomic_fetch_sub(&state, v, __ATOMIC_RELAXED);
-#else
     return __sync_fetch_and_sub(&state, v);
-#endif
 }
 
 template<typename T>
 inline T Atomic<T>::fetch_sub_release(T v)
 {
-#if TIGHTDB_HAVE_AT_LEAST_GCC(4, 7)
-    return __atomic_fetch_sub(&state, v, __ATOMIC_RELEASE);
-#else
     return __sync_fetch_and_sub(&state, v);
-#endif
 }
 
 template<typename T>
 inline T Atomic<T>::fetch_add_release(T v)
 {
-#if TIGHTDB_HAVE_AT_LEAST_GCC(4, 7)
-    return __atomic_fetch_add(&state, v, __ATOMIC_RELEASE);
-#else
     return __sync_fetch_and_add(&state, v);
-#endif
 }
 
 template<typename T>
 inline T Atomic<T>::fetch_add_acquire(T v)
 {
-#if TIGHTDB_HAVE_AT_LEAST_GCC(4, 7)
-    return __atomic_fetch_add(&state, v, __ATOMIC_ACQUIRE);
-#else
     return __sync_fetch_and_add(&state, v);
-#endif
 }
 
 template<typename T>
 inline T Atomic<T>::fetch_sub_acquire(T v)
 {
-#if TIGHTDB_HAVE_AT_LEAST_GCC(4, 7)
-    return __atomic_fetch_sub(&state, v, __ATOMIC_ACQUIRE);
-#else
     return __sync_fetch_and_sub(&state, v);
-#endif
 }
 
 
 template<typename T>
 inline void Atomic<T>::store(T value)
 {
-#if TIGHTDB_HAVE_AT_LEAST_GCC(4, 7)
-    __atomic_store_n(&state, value, __ATOMIC_SEQ_CST);
-#else
     if (sizeof(T) >= sizeof(ptrdiff_t)) {
         T old_value = state;
         // Ensure atomic store for type larger than largest native word.
@@ -882,52 +929,39 @@ inline void Atomic<T>::store(T value)
     }
     // prevent registerization of state (this is not really needed, I think)
     asm volatile ("" : : : "memory");
-#endif
 }
 
 template<typename T>
 inline void Atomic<T>::store_release(T value)
 {
-#if TIGHTDB_HAVE_AT_LEAST_GCC(4, 7)
-    __atomic_store_n(&state, value, __ATOMIC_RELEASE);
-#else
     // prior to gcc 4.7 we have no portable way of expressing
     // release semantics, so we do seq_consistent store instead
     store(value);
-#endif
 }
 
 template<typename T>
 inline void Atomic<T>::store_relaxed(T value)
 {
-#if TIGHTDB_HAVE_AT_LEAST_GCC(4, 7)
-    __atomic_store_n(&state, value, __ATOMIC_RELAXED);
-#else
     // prior to gcc 4.7 we have no portable way of expressing
     // relaxed semantics, so we do seq_consistent store instead
     // FIXME: we did! ordinary stores (with atomicity..)
     store(value);
-#endif
 }
 
 template<typename T>
 inline bool Atomic<T>::compare_and_swap(T& oldvalue, T newvalue)
 {
-#if TIGHTDB_HAVE_AT_LEAST_GCC(4, 7)
-    return __atomic_compare_exchange_n(&state, &oldvalue, newvalue, false, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE);
-#else
     T ov = oldvalue;
     oldvalue = __sync_val_compare_and_swap(&state, oldvalue, newvalue);
     return (ov == oldvalue);
-    
-#endif
 }
 
-
-#endif // GCC
-#endif // C++11 else
-
-
+template<typename T>
+inline T Atomic<T>::exchange_acquire(T newvalue)
+{
+    return __sync_lock_test_and_set(&state, newvalue);
+}
+#endif
 
 } // namespace util
 } // namespace tightdb
