@@ -745,7 +745,7 @@ EOF
 
                 cat openssl/LICENSE >> $ANDROID_DIR/OpenSSL.txt
             else
-                cp "libtightdb-$denom.a" "$ANDROID_DIR"
+                cp "src/tightdb/libtightdb-$denom.a" "$ANDROID_DIR" || exit 1
             fi
 
             rm -rf "$temp_dir" || exit 1
@@ -2768,7 +2768,8 @@ EOF
         exit 0
         ;;
 
-    *)  usage
+    *)
+        usage
         exit 1
         ;;
 esac
