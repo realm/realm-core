@@ -708,11 +708,16 @@ EOF
                     export HOSTCC=gcc
                     export PATH="$path"
                     export CC="$cc"
-                    ./config no-idea no-camellia no-seed no-bf no-cast no-des no-rc2 no-rc4 no-rc5 no-md2 no-md4 no-ripemd no-mdc2 no-rsa no-dsa no-dh no-ec no-ecdsa no-ecdh no-sock no-ssl2 no-ssl3 no-err no-krb5 no-engine no-srtp no-speed || exit 1
+                    ./config no-idea no-camellia no-seed no-bf no-cast no-des \
+                             no-rc2 no-rc4 no-rc5 no-md2 no-md4 no-ripemd \
+                             no-mdc2 no-rsa no-dsa no-dh no-ec no-ecdsa no-ecdh \
+                             no-sock no-ssl2 no-ssl3 no-err no-krb5 no-engine \
+                             no-srtp no-speed -DOPENSSL_NO_SHA512 \
+                             -DOPENSSL_NO_SHA0 -w -fPIC || exit 1
                     $MAKE clean
                 ) || exit 1
 
-                PATH="$path" CC="$cc" CFLAGS="$cflags_arch -DOPENSSL_NO_SHA512 -DOPENSSL_NO_SHA0" $MAKE -C "openssl" build_libs || exit 1
+                PATH="$path" CC="$cc" CFLAGS="$cflags_arch" $MAKE -C "openssl" build_libs || exit 1
                 cp "openssl/libcrypto.a" "$ANDROID_DIR/$libcrypto_name" || exit 1
             fi
 
