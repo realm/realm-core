@@ -74,7 +74,7 @@ public:
 
     /// Equivalent to calling open(const std::string&, const uint8_t*, OpenMode)
     /// on an unattached group accessor.
-    explicit Group(const std::string& file, const uint8_t* encryption_key, OpenMode = mode_ReadOnly);
+    explicit Group(const std::string& file, const uint8_t* encryption_key = 0, OpenMode = mode_ReadOnly);
 
     /// Equivalent to calling open(BinaryData, bool) on an unattached
     /// group accessor. Note that if this constructor throws, the
@@ -175,7 +175,7 @@ public:
     /// types that are derived from util::File::AccessError, the
     /// derived exception type is thrown. Note that InvalidDatabase is
     /// among these derived exception types.
-    void open(const std::string& file, const uint8_t* encryption_key,
+    void open(const std::string& file, const uint8_t* encryption_key = 0,
               OpenMode mode = mode_ReadOnly);
 
     /// Attach this Group instance to the specified memory buffer.
