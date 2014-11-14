@@ -99,7 +99,7 @@ TEST(File_Map)
     {
         File f(path, File::mode_Write);
         f.set_encryption_key(tightdb::test_util::key);
-        f.resize(strlen(data));
+        f.resize(len);
 
         File::Map<char> map(f, File::access_ReadWrite, len);
         memcpy(map.get_addr(), data, len);
@@ -177,6 +177,7 @@ TEST(File_MultipleWriters)
 
         File w2(path, File::mode_Write);
         w2.set_encryption_key(tightdb::test_util::key);
+        w2.resize(count * sizeof(size_t));
 
         File::Map<size_t> map1(w1, File::access_ReadWrite, count * sizeof(size_t));
         File::Map<size_t> map2(w2, File::access_ReadWrite, count * sizeof(size_t));
