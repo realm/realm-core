@@ -10,7 +10,8 @@
 
 ### Enhancements:
 
-* Lorem ipsum.
+* Speed up Or() groups within a Not() by about an order of magnitude, and
+  slightly speed up most other queries within a Not().
 
 -----------
 

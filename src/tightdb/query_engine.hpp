@@ -448,6 +448,7 @@ public:
                 m_dD = double(r - start) / (local_matches + 1.1);
                 return end;
             }
+            TIGHTDB_ASSERT(r < end);
 
             local_matches++;
 
@@ -1543,7 +1544,7 @@ public:
 
         size_t index = not_found;
 
-        for (size_t c = 0; c < m_cond.size(); ++c) {
+        for (size_t c = 0; c < m_cond.size() && index > start; ++c) {
             if (m_last[c] >= end)
                 continue;
             else if (m_was_match[c] && m_last[c] >= start) {
@@ -1624,8 +1625,8 @@ public:
         m_cond->init(table);
         v.clear();
         m_cond->gather_children(v);
-        m_last = 0;
-        m_was_match = false;
+        m_last_end = not_found;
+        m_next_child_match = not_found;
 
         if (m_child)
             m_child->init(table);
@@ -1635,34 +1636,27 @@ public:
 
     size_t find_first_local(size_t start, size_t end) TIGHTDB_OVERRIDE
     {
+        if (start >= end)
+            return not_found;
+        // no matches for the child query and we've looked at least to the end
+        if (m_last_end != not_found && m_last_end >= end && m_next_child_match == not_found)
+            return start;
+        // the next match for the child query is after the start
+        if (m_next_child_match != not_found && m_next_child_match > start)
+            return start;
+        TIGHTDB_ASSERT(m_next_child_match == not_found || m_next_child_match < m_last_end);
+        TIGHTDB_ASSERT(start < end);
+
+        m_last_end = end;
         for (size_t s = start; s < end; ++s) {
-
-            size_t f;
-
-            if (m_last >= end)
-                f = end;
-            else if (m_was_match && m_last >= s)
-                f = m_last;
-            else {
-                size_t fmax = m_last > s ? m_last : s;
-                for (f = fmax; f < end; f++) {
-                    if (m_cond->find_first(f,f+1)==not_found) {
-                        m_was_match = true;
-                        m_last = f;
-                        return f;
-                    }
-                }
-                // ID: f = m_cond->find_first(fmax, end);
-                m_was_match = false;
-                m_last = end;
-                f = end;
-            }
-
-            s = f;
-            s = s >= end ? not_found : s;
-
-            return s;
+            size_t e = (s + 127) & ~size_t(127);
+            if (e > end)
+                e = end;
+            m_next_child_match = m_cond->find_first(s, e);
+            if (m_next_child_match > s)
+                return s;
         }
+
         return not_found;
     }
 
@@ -1699,15 +1693,15 @@ public:
     {
         // here we are just copying the pointers - they'll be remapped by "translate_pointers"
         m_cond = from.m_cond;
-        m_last = from.m_last;
-        m_was_match = from.m_was_match;
+        m_last_end = from.m_last_end;
+        m_next_child_match = from.m_next_child_match;
         m_child = from.m_child;
     }
 
     ParentNode* m_cond;
 private:
-    size_t m_last;
-    bool m_was_match;
+    size_t m_next_child_match;
+    size_t m_last_end;
 };
 
 
