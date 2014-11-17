@@ -1,3 +1,22 @@
+/*************************************************************************
+ *
+ * TIGHTDB CONFIDENTIAL
+ * __________________
+ *
+ *  [2011] - [2012] TightDB Inc
+ *  All Rights Reserved.
+ *
+ * NOTICE:  All information contained herein is, and remains
+ * the property of TightDB Incorporated and its suppliers,
+ * if any.  The intellectual and technical concepts contained
+ * herein are proprietary to TightDB Incorporated
+ * and its suppliers and may be covered by U.S. and Foreign Patents,
+ * patents in process, and are protected by trade secret or copyright law.
+ * Dissemination of this information or reproduction of this material
+ * is strictly forbidden unless prior written permission is obtained
+ * from TightDB Incorporated.
+ *
+ **************************************************************************/
 #include "encrypted_file_mapping.hpp"
 
 #ifdef TIGHTDB_ENABLE_ENCRYPTION
@@ -358,7 +377,8 @@ void EncryptedFileMapping::write_page(size_t page) TIGHTDB_NOEXCEPT {
 
 void EncryptedFileMapping::validate_page(size_t page) TIGHTDB_NOEXCEPT {
 #ifdef TIGHTDB_DEBUG
-    if (!m_read_pages[page]) return;
+    if (!m_read_pages[page])
+        return;
 
     char buffer[page_size];
     m_file.cryptor.read(m_file.fd, page * page_size, buffer);
