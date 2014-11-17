@@ -168,7 +168,6 @@ namespace tightdb {
 namespace test_util {
 namespace unit_test {
 
-
 class Test;
 class TestResults;
 

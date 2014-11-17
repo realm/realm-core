@@ -17,37 +17,22 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#include <iostream>
+#ifndef TIGHTDB_UTIL_FILE_MAPPER_HPP
+#define TIGHTDB_UTIL_FILE_MAPPER_HPP
 
-#ifdef __APPLE__
-#include <execinfo.h>
-#endif
-
-#include <tightdb/util/terminate.hpp>
-
-using namespace std;
+#include <tightdb/util/file.hpp>
 
 namespace tightdb {
 namespace util {
 
+void *mmap(int fd, size_t size, File::AccessMode access, const uint8_t *encryption_key);
+void munmap(void *addr, size_t size) TIGHTDB_NOEXCEPT;
+void* mremap(int fd, void* old_addr, size_t old_size, File::AccessMode a, size_t new_size);
+void msync(void *addr, size_t size);
 
-TIGHTDB_NORETURN void terminate(string message, const char* file, long line) TIGHTDB_NOEXCEPT
-{
-    cerr << file << ":" << line << ": " << message << endl;
+File::SizeType encrypted_size_to_data_size(File::SizeType size) TIGHTDB_NOEXCEPT;
+File::SizeType data_size_to_encrypted_size(File::SizeType size) TIGHTDB_NOEXCEPT;
 
-#ifdef __APPLE__
-    void* callstack[128];
-    int frames = backtrace(callstack, 128);
-    char** strs = backtrace_symbols(callstack, frames);
-    for (int i = 0; i < frames; ++i) {
-        cerr << strs[i] << endl;
-    }
-    free(strs);
-#endif
-
-    abort();
 }
-
-
-} // namespace util
-} // namespace tightdb
+}
+#endif

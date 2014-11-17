@@ -90,19 +90,19 @@ TEST(Group_OpenFile)
 
     {
         Group group((Group::unattached_tag()));
-        group.open(path, Group::mode_ReadWrite);
+        group.open(path, test_util::key, Group::mode_ReadWrite);
         CHECK(group.is_attached());
     }
 
     {
         Group group((Group::unattached_tag()));
-        group.open(path, Group::mode_ReadWriteNoCreate);
+        group.open(path, test_util::key, Group::mode_ReadWriteNoCreate);
         CHECK(group.is_attached());
     }
 
     {
         Group group((Group::unattached_tag()));
-        group.open(path, Group::mode_ReadOnly);
+        group.open(path, test_util::key, Group::mode_ReadOnly);
         CHECK(group.is_attached());
     }
 }
@@ -128,7 +128,7 @@ TEST(Group_Permissions)
             t1->insert_int(1, i, 3);
             t1->insert_done();
         }
-        group1.write(path);
+        group1.write(path, test_util::key);
     }
 
 #ifdef _WIN32
@@ -139,7 +139,7 @@ TEST(Group_Permissions)
 
     {
         Group group2((Group::unattached_tag()));
-        CHECK_THROW(group2.open(path, Group::mode_ReadOnly), File::PermissionDenied);
+        CHECK_THROW(group2.open(path, test_util::key, Group::mode_ReadOnly), File::PermissionDenied);
         CHECK(!group2.is_attached());
     }
 }
@@ -157,15 +157,15 @@ TEST(Group_BadFile)
 
     {
         Group group((Group::unattached_tag()));
-        CHECK_THROW(group.open(path_1, Group::mode_ReadOnly), InvalidDatabase);
+        CHECK_THROW(group.open(path_1, test_util::key, Group::mode_ReadOnly), InvalidDatabase);
         CHECK(!group.is_attached());
-        CHECK_THROW(group.open(path_1, Group::mode_ReadOnly), InvalidDatabase); // Again
+        CHECK_THROW(group.open(path_1, test_util::key, Group::mode_ReadOnly), InvalidDatabase); // Again
         CHECK(!group.is_attached());
-        CHECK_THROW(group.open(path_1, Group::mode_ReadWrite), InvalidDatabase);
+        CHECK_THROW(group.open(path_1, test_util::key, Group::mode_ReadWrite), InvalidDatabase);
         CHECK(!group.is_attached());
-        CHECK_THROW(group.open(path_1, Group::mode_ReadWriteNoCreate), InvalidDatabase);
+        CHECK_THROW(group.open(path_1, test_util::key, Group::mode_ReadWriteNoCreate), InvalidDatabase);
         CHECK(!group.is_attached());
-        group.open(path_2, Group::mode_ReadWrite); // This one must work
+        group.open(path_2, test_util::key, Group::mode_ReadWrite); // This one must work
         CHECK(group.is_attached());
     }
 }
@@ -233,7 +233,7 @@ TEST(Group_BadBuffer)
         CHECK(!group.is_attached());
         // Check that the group is still able to attach to a file,
         // even after failures.
-        group.open(path, Group::mode_ReadWrite);
+        group.open(path, test_util::key, Group::mode_ReadWrite);
         CHECK(group.is_attached());
     }
 }
@@ -668,7 +668,7 @@ TEST(Group_Invalid1)
 
     // Try to open non-existing file
     // (read-only files have to exists to before opening)
-    CHECK_THROW(Group(path), File::NotFound);
+    CHECK_THROW(Group(path, test_util::key), File::NotFound);
 }
 
 
@@ -689,17 +689,17 @@ TEST(Group_Overwrite)
     GROUP_TEST_PATH(path);
     {
         Group g;
-        g.write(path);
-        CHECK_THROW(g.write(path), File::Exists);
+        g.write(path, test_util::key);
+        CHECK_THROW(g.write(path, test_util::key), File::Exists);
     }
     {
-        Group g(path);
-        CHECK_THROW(g.write(path), File::Exists);
+        Group g(path, test_util::key);
+        CHECK_THROW(g.write(path, test_util::key), File::Exists);
     }
     {
         Group g;
         File::try_remove(path);
-        g.write(path);
+        g.write(path, test_util::key);
     }
 }
 
@@ -710,10 +710,10 @@ TEST(Group_Serialize0)
     {
         // Create empty group and serialize to disk
         Group to_disk;
-        to_disk.write(path);
+        to_disk.write(path, test_util::key);
 
         // Load the group
-        Group from_disk(path);
+        Group from_disk(path, test_util::key);
 
         // Create new table in group
         TestTableGroup::Ref t = from_disk.add_table<TestTableGroup>("test");
@@ -732,7 +732,7 @@ TEST(Group_Serialize0)
     {
         // Load the group and let it clean up without loading
         // any tables
-        Group g(path);
+        Group g(path, test_util::key);
     }
 }
 
@@ -760,10 +760,10 @@ TEST(Group_Serialize1)
 #endif
 
         // Serialize to disk
-        to_disk.write(path);
+        to_disk.write(path, test_util::key);
 
         // Load the table
-        Group from_disk(path);
+        Group from_disk(path, test_util::key);
         TestTableGroup::Ref t = from_disk.get_table<TestTableGroup>("test");
 
         CHECK_EQUAL(4, t->get_column_count());
@@ -790,7 +790,7 @@ TEST(Group_Serialize1)
     {
         // Load the group and let it clean up without loading
         // any tables
-        Group g(path);
+        Group g(path, test_util::key);
     }
 }
 
@@ -815,10 +815,10 @@ TEST(Group_Serialize2)
 #endif
 
     // Serialize to disk
-    to_disk.write(path);
+    to_disk.write(path, test_util::key);
 
     // Load the tables
-    Group from_disk(path);
+    Group from_disk(path, test_util::key);
     TestTableGroup::Ref t1 = from_disk.get_table<TestTableGroup>("test1");
     TestTableGroup::Ref t2 = from_disk.get_table<TestTableGroup>("test2");
 
@@ -848,10 +848,10 @@ TEST(Group_Serialize3)
 #endif
 
     // Serialize to disk
-    to_disk.write(path);
+    to_disk.write(path, test_util::key);
 
     // Load the table
-    Group from_disk(path);
+    Group from_disk(path, test_util::key);
     TestTableGroup::Ref t = from_disk.get_table<TestTableGroup>("test");
 
     // Verify that original values are there
@@ -1001,13 +1001,12 @@ TEST(Group_Serialize_All)
     CHECK_EQUAL(false, t->get_mixed(5, 0).get_bool());
 }
 
-
 TEST(Group_Persist)
 {
     GROUP_TEST_PATH(path);
 
     // Create new database
-    Group db(path, Group::mode_ReadWrite);
+    Group db(path, test_util::key, Group::mode_ReadWrite);
 
     // Insert some data
     TableRef table = db.add_table("test");
@@ -1163,10 +1162,10 @@ TEST(Group_Subtable)
         }
     }
 
-    g.write(path_1);
+    g.write(path_1, test_util::key);
 
     // Read back tables
-    Group g2(path_1);
+    Group g2(path_1, test_util::key);
     TableRef table2 = g2.get_table("test");
 
     for (int i=0; i<n; ++i) {
@@ -1256,10 +1255,10 @@ TEST(Group_Subtable)
         }
     }
 
-    g2.write(path_2);
+    g2.write(path_2, test_util::key);
 
     // Read back tables
-    Group g3(path_2);
+    Group g3(path_2, test_util::key);
     TableRef table3 = g2.get_table("test");
 
     for (int i=0; i<n; ++i) {
@@ -1343,12 +1342,12 @@ TEST(Group_MultiLevelSubtables)
             b->add_column(type_Int, "int");
             b->add_empty_row();
         }
-        g.write(path_1);
+        g.write(path_1, test_util::key);
     }
 
     // Non-mixed
     {
-        Group g(path_1);
+        Group g(path_1, test_util::key);
         TableRef table = g.get_table("test");
         // Get A as subtable
         TableRef a = table->get_subtable(1, 0);
@@ -1366,10 +1365,10 @@ TEST(Group_MultiLevelSubtables)
         // get a second ref to B (compare)
         CHECK_EQUAL(a->get_subtable(1, 0), b);
         CHECK_EQUAL(a->get_subtable(1, 0)->get_int(0,0), 6661012);
-        g.write(path_2);
+        g.write(path_2, test_util::key);
     }
     {
-        Group g(path_2);
+        Group g(path_2, test_util::key);
         TableRef table = g.get_table("test");
         // Get A as subtable
         TableRef a = table->get_subtable(1, 0);
@@ -1385,12 +1384,12 @@ TEST(Group_MultiLevelSubtables)
         // Get third ref to B and verify last mod
         b = a->get_subtable(1, 0);
         CHECK_EQUAL(a->get_subtable(1, 0)->get_int(0,0), 6661013);
-        g.write(path_3);
+        g.write(path_3, test_util::key);
     }
 
     // Mixed
     {
-        Group g(path_3);
+        Group g(path_3, test_util::key);
         TableRef table = g.get_table("test");
         // Get A as subtable
         TableRef a = table->get_subtable(2, 0);
@@ -1408,10 +1407,10 @@ TEST(Group_MultiLevelSubtables)
         // get a second ref to B (compare)
         CHECK_EQUAL(a->get_subtable(1, 0), b);
         CHECK_EQUAL(a->get_subtable(1, 0)->get_int(0,0), 6661012);
-        g.write(path_4);
+        g.write(path_4, test_util::key);
     }
     {
-        Group g(path_4);
+        Group g(path_4, test_util::key);
         TableRef table = g.get_table("test");
         // Get A as subtable
         TableRef a = table->get_subtable(2, 0);
@@ -1427,7 +1426,7 @@ TEST(Group_MultiLevelSubtables)
         // Get third ref to B and verify last mod
         b = a->get_subtable(1, 0);
         CHECK_EQUAL(a->get_subtable(1, 0)->get_int(0,0), 6661013);
-        g.write(path_5);
+        g.write(path_5, test_util::key);
     }
 }
 
@@ -1435,7 +1434,7 @@ TEST(Group_MultiLevelSubtables)
 TEST(Group_CommitSubtable)
 {
     GROUP_TEST_PATH(path);
-    Group group(path, Group::mode_ReadWrite);
+    Group group(path, test_util::key, Group::mode_ReadWrite);
 
     TableRef table = group.add_table("test");
     DescriptorRef sub_1;
@@ -1466,7 +1465,7 @@ TEST(Group_CommitSubtable)
 TEST(Group_CommitSubtableMixed)
 {
     GROUP_TEST_PATH(path);
-    Group group(path, Group::mode_ReadWrite);
+    Group group(path, test_util::key, Group::mode_ReadWrite);
 
     TableRef table = group.add_table("test");
     table->add_column(type_Mixed, "mixed");
@@ -1497,7 +1496,7 @@ TEST(Group_CommitSubtableMixed)
 TEST(Group_CommitDegenerateSubtable)
 {
     GROUP_TEST_PATH(path);
-    Group group(path, Group::mode_ReadWrite);
+    Group group(path, test_util::key, Group::mode_ReadWrite);
     TableRef table = group.add_table("parent");
     table->add_column(type_Table, "");
     table->get_subdescriptor(0)->add_column(type_Int, "");
@@ -1647,7 +1646,7 @@ TEST(Group_StockBug)
     // the application. To get an assert in debug mode, the max
     // list size should be set to 1000.
     GROUP_TEST_PATH(path);
-    Group group(path, Group::mode_ReadWrite);
+    Group group(path, test_util::key, Group::mode_ReadWrite);
 
     TableRef table = group.add_table("stocks");
     table->add_column(type_String, "ticker");
@@ -1665,7 +1664,7 @@ TEST(Group_StockBug)
 TEST(Group_CommitLinkListChange)
 {
     GROUP_TEST_PATH(path);
-    Group group(path, Group::mode_ReadWrite);
+    Group group(path, test_util::key, Group::mode_ReadWrite);
     TableRef origin = group.add_table("origin");
     TableRef target = group.add_table("target");
     origin->add_column_link(type_LinkList, "", *target);

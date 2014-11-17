@@ -15,7 +15,7 @@ void func()
     // Create a group from a file:
     Group::unattached_tag tag;
     Group g(tag);
-    g.open("people.tightdb", Group::mode_ReadWrite);
+    g.open("people.tightdb", 0, Group::mode_ReadWrite);
 
 // @@Fold@@
     PeopleTable::Ref table = g.add_table<PeopleTable>("people");

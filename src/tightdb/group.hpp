@@ -72,9 +72,9 @@ public:
         mode_ReadWriteNoCreate
     };
 
-    /// Equivalent to calling open(const std::string&, OpenMode) on an
-    /// unattached group accessor.
-    explicit Group(const std::string& file, OpenMode = mode_ReadOnly);
+    /// Equivalent to calling open(const std::string&, const uint8_t*, OpenMode)
+    /// on an unattached group accessor.
+    explicit Group(const std::string& file, const uint8_t* encryption_key = 0, OpenMode = mode_ReadOnly);
 
     /// Equivalent to calling open(BinaryData, bool) on an unattached
     /// group accessor. Note that if this constructor throws, the
@@ -161,6 +161,9 @@ public:
     ///
     /// \param file File system path to a TightDB database file.
     ///
+    /// \param encryption_key 32-byte key used to encrypt and decrypt
+    /// the database file, or nullptr to disable encryption.
+    ///
     /// \param mode Specifying a mode that is not mode_ReadOnly
     /// requires that the specified file can be opened in read/write
     /// mode. In general there is no reason to open a group in
@@ -172,7 +175,8 @@ public:
     /// types that are derived from util::File::AccessError, the
     /// derived exception type is thrown. Note that InvalidDatabase is
     /// among these derived exception types.
-    void open(const std::string& file, OpenMode mode = mode_ReadOnly);
+    void open(const std::string& file, const uint8_t* encryption_key = 0,
+              OpenMode mode = mode_ReadOnly);
 
     /// Attach this Group instance to the specified memory buffer.
     ///
@@ -335,12 +339,15 @@ public:
     ///
     /// \param file A filesystem path.
     ///
+    /// \param encryption_key 32-byte key used to encrypt the database file,
+    /// or nullptr to disable encryption.
+    ///
     /// \throw util::File::AccessError If the file could not be
     /// opened. If the reason corresponds to one of the exception
     /// types that are derived from util::File::AccessError, the
     /// derived exception type is thrown. In particular,
     /// util::File::Exists will be thrown if the file exists already.
-    void write(const std::string& file) const;
+    void write(const std::string& file, const uint8_t* encryption_key=0) const;
 
     /// Write this database to a memory buffer.
     ///
@@ -527,13 +534,13 @@ inline Group::Group():
     create(add_free_versions); // Throws
 }
 
-inline Group::Group(const std::string& file, OpenMode mode):
+inline Group::Group(const std::string& file, const uint8_t* key, OpenMode mode):
     m_alloc(), // Throws
     m_top(m_alloc), m_tables(m_alloc), m_table_names(m_alloc), m_free_positions(m_alloc),
     m_free_lengths(m_alloc), m_free_versions(m_alloc), m_is_shared(false), m_is_attached(false)
 {
     init_array_parents();
-    open(file, mode); // Throws
+    open(file, key, mode); // Throws
 }
 
 inline Group::Group(BinaryData buffer, bool take_ownership):

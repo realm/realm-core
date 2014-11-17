@@ -2,7 +2,6 @@
 #ifdef TEST_FILE_LOCKS
 
 #include <cassert>
-#include <cerrno>
 #include <map>
 #include <iostream>
 

@@ -138,7 +138,7 @@ TEST(Shared_Initial)
     SHARED_GROUP_TEST_PATH(path);
     {
         // Create a new shared db
-        SharedGroup sg(path);
+        SharedGroup sg(path, false, SharedGroup::durability_Full, test_util::key);
 
         // Verify that new group is empty
         {
@@ -183,7 +183,7 @@ TEST(Shared_StaleLockFileRenamed)
     bool no_create = false;
     {
         // create lock file
-        SharedGroup sg(path, no_create, SharedGroup::durability_Full);
+        SharedGroup sg(path, no_create, SharedGroup::durability_Full, test_util::key);
 #ifdef _WIN32
         // Requires ntfs to work
         if (!CreateHardLinkA(lock_path_2.c_str(), lock_path.c_str(), 0)) {
@@ -201,7 +201,7 @@ TEST(Shared_StaleLockFileRenamed)
     // FIXME: Why is it ok to replace the lock file with a new file?
     // Why must it be ok? Explanation is needed here!
     {
-        SharedGroup sg(path, no_create, SharedGroup::durability_Full);
+        SharedGroup sg(path, no_create, SharedGroup::durability_Full, test_util::key);
     }
 
     // Verify that the `lock` file is not left behind
@@ -241,11 +241,11 @@ TEST(Shared_Initial2)
     SHARED_GROUP_TEST_PATH(path);
     {
         // Create a new shared db
-        SharedGroup sg(path);
+        SharedGroup sg(path, false, SharedGroup::durability_Full, test_util::key);
 
         {
             // Open the same db again (in empty state)
-            SharedGroup sg2(path);
+            SharedGroup sg2(path, false, SharedGroup::durability_Full, test_util::key);
 
             // Verify that new group is empty
             {
@@ -336,7 +336,7 @@ TEST(Shared_1)
     SHARED_GROUP_TEST_PATH(path);
     {
         // Create a new shared db
-        SharedGroup sg(path);
+        SharedGroup sg(path, false, SharedGroup::durability_Full, test_util::key);
 
         // Create first table in group
         {
@@ -348,7 +348,7 @@ TEST(Shared_1)
         }
 
         // Open same db again
-        SharedGroup sg2(path);
+        SharedGroup sg2(path, false, SharedGroup::durability_Full, test_util::key);
         {
             ReadTransaction rt(sg2);
             rt.get_group().Verify();
@@ -431,7 +431,7 @@ TEST(Shared_Rollback)
     SHARED_GROUP_TEST_PATH(path);
     {
         // Create a new shared db
-        SharedGroup sg(path);
+        SharedGroup sg(path, false, SharedGroup::durability_Full, test_util::key);
 
         // Create first table in group (but rollback)
         {
@@ -504,7 +504,7 @@ TEST(Shared_Writes)
     SHARED_GROUP_TEST_PATH(path);
     {
         // Create a new shared db
-        SharedGroup sg(path);
+        SharedGroup sg(path, false, SharedGroup::durability_Full, test_util::key);
 
         // Create first table in group
         {
@@ -544,7 +544,7 @@ TEST(Shared_Writes)
 TEST(Shared_AddColumnToSubspec)
 {
     SHARED_GROUP_TEST_PATH(path);
-    SharedGroup sg(path);
+    SharedGroup sg(path, false, SharedGroup::durability_Full, test_util::key);
 
     // Create table with a non-empty subtable
     {
@@ -601,7 +601,7 @@ TEST(Shared_AddColumnToSubspec)
 TEST(Shared_RemoveColumnBeforeSubtableColumn)
 {
     SHARED_GROUP_TEST_PATH(path);
-    SharedGroup sg(path);
+    SharedGroup sg(path, false, SharedGroup::durability_Full, test_util::key);
 
     // Create table with a non-empty subtable in a subtable column
     // that is preceded by another column
@@ -900,7 +900,7 @@ TIGHTDB_TABLE_1(MyTable_SpecialOrder, first,  Int)
 TEST(Shared_WritesSpecialOrder)
 {
     SHARED_GROUP_TEST_PATH(path);
-    SharedGroup sg(path);
+    SharedGroup sg(path, false, SharedGroup::durability_Full, test_util::key);
 
     const int num_rows = 5; // FIXME: Should be strictly greater than TIGHTDB_MAX_BPNODE_SIZE, but that takes a loooooong time!
     const int num_reps = 25;
@@ -945,7 +945,7 @@ void writer_threads_thread(TestResults* test_results_ptr, string path, size_t ro
     TestResults& test_results = *test_results_ptr;
 
     // Open shared db
-    SharedGroup sg(path);
+    SharedGroup sg(path, false, SharedGroup::durability_Full, test_util::key);
 
     for (size_t i = 0; i < 100; ++i) {
         // Increment cell
@@ -984,7 +984,7 @@ TEST(Shared_WriterThreads)
     SHARED_GROUP_TEST_PATH(path);
     {
         // Create a new shared db
-        SharedGroup sg(path);
+        SharedGroup sg(path, false, SharedGroup::durability_Full, test_util::key);
 
         const size_t thread_count = 10;
         // Create first table in group
@@ -1047,7 +1047,7 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
             TIGHTDB_TERMINATE("fork() failed");
         if (pid == 0) {
             // Child
-            SharedGroup sg(path);
+            SharedGroup sg(path, false, SharedGroup::durability_Full, test_util::key);
             WriteTransaction wt(sg);
             wt.get_group().Verify();
             TableRef table = wt.add_table("alpha");
@@ -1068,7 +1068,7 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
 
         // Check that we can continue without dead-locking
         {
-            SharedGroup sg(path);
+            SharedGroup sg(path, false, SharedGroup::durability_Full, test_util::key);
             WriteTransaction wt(sg);
             wt.get_group().Verify();
             TableRef table = wt.add_table("beta");
@@ -1083,7 +1083,7 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
     }
 
     {
-        SharedGroup sg(path);
+        SharedGroup sg(path, false, SharedGroup::durability_Full, test_util::key);
         ReadTransaction rt(sg);
         rt.get_group().Verify();
         CHECK(!rt.has_table("alpha"));
@@ -1099,7 +1099,7 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
 TEST(Shared_FormerErrorCase1)
 {
     SHARED_GROUP_TEST_PATH(path);
-    SharedGroup sg(path);
+    SharedGroup sg(path, false, SharedGroup::durability_Full, test_util::key);
     {
         DescriptorRef sub_1, sub_2;
         WriteTransaction wt(sg);
@@ -1250,7 +1250,7 @@ TEST(Shared_FormerErrorCase2)
 {
     SHARED_GROUP_TEST_PATH(path);
     for (int i=0; i<10; ++i) {
-        SharedGroup sg(path);
+        SharedGroup sg(path, false, SharedGroup::durability_Full, test_util::key);
         WriteTransaction wt(sg);
         wt.get_group().Verify();
         FormerErrorCase2_Table::Ref table = wt.get_or_add_table<FormerErrorCase2_Table>("table");
@@ -1285,7 +1285,7 @@ TEST(Shared_SpaceOveruse)
 
     // Many transactions
     SHARED_GROUP_TEST_PATH(path);
-    SharedGroup sg(path);
+    SharedGroup sg(path, false, SharedGroup::durability_Full, test_util::key);
 
     // Do a lot of sequential transactions
     for (int i = 0; i != n_outer; ++i) {
@@ -1318,14 +1318,14 @@ TEST(Shared_Notifications)
 {
     // Create a new shared db
     SHARED_GROUP_TEST_PATH(path);
-    SharedGroup sg(path);
+    SharedGroup sg(path, false, SharedGroup::durability_Full, test_util::key);
 
     // No other instance have changed db since last transaction
     CHECK(!sg.has_changed());
 
     {
         // Open the same db again (in empty state)
-        SharedGroup sg2(path);
+        SharedGroup sg2(path, false, SharedGroup::durability_Full, test_util::key);
 
         // Verify that new group is empty
         {
@@ -1375,11 +1375,11 @@ TEST(Shared_FromSerialized)
         Group g1;
         TestTableShared::Ref t1 = g1.add_table<TestTableShared>("test");
         t1->add(1, 2, false, "test");
-        g1.write(path);
+        g1.write(path, test_util::key);
     }
 
     // Open same file as shared group
-    SharedGroup sg(path);
+    SharedGroup sg(path, false, SharedGroup::durability_Full, test_util::key);
 
     // Verify that contents is there when shared
     {
@@ -1398,7 +1398,7 @@ TEST(Shared_FromSerialized)
 TEST_IF(Shared_StringIndexBug1, TEST_DURATION >= 3)
 {
     SHARED_GROUP_TEST_PATH(path);
-    SharedGroup db(path);
+    SharedGroup db(path, false, SharedGroup::durability_Full, test_util::key);
 
     {
         Group& group = db.begin_write();
@@ -1424,7 +1424,7 @@ TEST_IF(Shared_StringIndexBug1, TEST_DURATION >= 3)
 TEST(Shared_StringIndexBug2)
 {
     SHARED_GROUP_TEST_PATH(path);
-    SharedGroup sg(path);
+    SharedGroup sg(path, false, SharedGroup::durability_Full, test_util::key);
 
     {
         WriteTransaction wt(sg);
@@ -1456,7 +1456,7 @@ void rand_str(Random& random, char* res, size_t len)
 TEST(Shared_StringIndexBug3)
 {
     SHARED_GROUP_TEST_PATH(path);
-    SharedGroup db(path);
+    SharedGroup db(path, false, SharedGroup::durability_Full, test_util::key);
 
     {
         Group& group = db.begin_write();
@@ -1507,7 +1507,7 @@ TEST(Shared_ClearColumnWithBasicArrayRootLeaf)
 {
     SHARED_GROUP_TEST_PATH(path);
     {
-        SharedGroup sg(path);
+        SharedGroup sg(path, false, SharedGroup::durability_Full, test_util::key);
         WriteTransaction wt(sg);
         TableRef test = wt.add_table("Test");
         test->add_column(type_Double, "foo");
@@ -1517,7 +1517,7 @@ TEST(Shared_ClearColumnWithBasicArrayRootLeaf)
         wt.commit();
     }
     {
-        SharedGroup sg(path);
+        SharedGroup sg(path, false, SharedGroup::durability_Full, test_util::key);
         ReadTransaction rt(sg);
         ConstTableRef test = rt.get_table("Test");
         CHECK_EQUAL(727.2, test->get_double(0,0));
@@ -1644,7 +1644,7 @@ void multiprocess_make_table(string path, string lock_path, string alone_path, s
 #  else
 #    if 0
     {
-        SharedGroup sg(path);
+        SharedGroup sg(path, false, SharedGroup::durability_Full, test_util::key);
         WriteTransaction wt(sg);
         TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
         for (size_t i = 0; i < rows; ++i) {
@@ -1726,7 +1726,7 @@ void multiprocess_validate_and_clear(TestResults& test_results, string path, str
 
     // Verify - once more, in sync mode - that the changes were made
     {
-        SharedGroup sg(path);
+        SharedGroup sg(path, false, SharedGroup::durability_Full, test_util::key);
         WriteTransaction wt(sg);
         wt.get_group().Verify();
         TestTableShared::Ref t = wt.get_table<TestTableShared>("test");
@@ -1800,11 +1800,11 @@ TEST(Shared_MixedWithNonShared)
     {
         // Create empty file without free-space tracking
         Group g;
-        g.write(path);
+        g.write(path, test_util::key);
     }
     {
         // See if we can modify with non-shared group
-        Group g(path, Group::mode_ReadWrite);
+        Group g(path, test_util::key, Group::mode_ReadWrite);
         g.add_table("foo"); // Add table "foo"
         g.commit();
     }
@@ -1814,11 +1814,11 @@ TEST(Shared_MixedWithNonShared)
         // Create non-empty file without free-space tracking
         Group g;
         g.add_table("x");
-        g.write(path);
+        g.write(path, test_util::key);
     }
     {
         // See if we can modify with non-shared group
-        Group g(path, Group::mode_ReadWrite);
+        Group g(path, test_util::key, Group::mode_ReadWrite);
         g.add_table("foo"); // Add table "foo"
         g.commit();
     }
@@ -1827,11 +1827,11 @@ TEST(Shared_MixedWithNonShared)
     {
         // Create empty file without free-space tracking
         Group g;
-        g.write(path);
+        g.write(path, test_util::key);
     }
     {
         // See if we can read and modify with shared group
-        SharedGroup sg(path);
+        SharedGroup sg(path, false, SharedGroup::durability_Full, test_util::key);
         {
             ReadTransaction rt(sg);
             rt.get_group().Verify();
@@ -1850,11 +1850,11 @@ TEST(Shared_MixedWithNonShared)
         // Create non-empty file without free-space tracking
         Group g;
         g.add_table("x");
-        g.write(path);
+        g.write(path, test_util::key);
     }
     {
         // See if we can read and modify with shared group
-        SharedGroup sg(path);
+        SharedGroup sg(path, false, SharedGroup::durability_Full, test_util::key);
         {
             ReadTransaction rt(sg);
             rt.get_group().Verify();
@@ -1868,7 +1868,7 @@ TEST(Shared_MixedWithNonShared)
         }
     }
     {
-        SharedGroup sg(path);
+        SharedGroup sg(path, false, SharedGroup::durability_Full, test_util::key);
         {
             ReadTransaction rt(sg);
             rt.get_group().Verify();
@@ -1877,18 +1877,18 @@ TEST(Shared_MixedWithNonShared)
     }
     {
         // Access using non-shared group
-        Group g(path, Group::mode_ReadWrite);
+        Group g(path, test_util::key, Group::mode_ReadWrite);
         g.commit();
     }
     {
         // Modify using non-shared group
-        Group g(path, Group::mode_ReadWrite);
+        Group g(path, test_util::key, Group::mode_ReadWrite);
         g.add_table("bar"); // Add table "bar"
         g.commit();
     }
     {
         // See if we can still acces using shared group
-        SharedGroup sg(path);
+        SharedGroup sg(path, false, SharedGroup::durability_Full, test_util::key);
         {
             ReadTransaction rt(sg);
             rt.get_group().Verify();
@@ -1904,7 +1904,7 @@ TEST(Shared_MixedWithNonShared)
         }
     }
     {
-        SharedGroup sg(path);
+        SharedGroup sg(path, false, SharedGroup::durability_Full, test_util::key);
         {
             ReadTransaction rt(sg);
             rt.get_group().Verify();
@@ -1912,6 +1912,7 @@ TEST(Shared_MixedWithNonShared)
         }
     }
 
+#ifndef TIGHTDB_ENABLE_ENCRYPTION // encrpted buffers aren't supported
     // The empty group created initially by a shared group accessor is special
     // in that it contains no nodes, and the root-ref is therefore zero. The
     // following block checks that the contents of such a file is still
@@ -1919,7 +1920,7 @@ TEST(Shared_MixedWithNonShared)
     File::try_remove(path);
     {
         {
-            SharedGroup sg(path); // Create the very empty group
+            SharedGroup sg(path, false, SharedGroup::durability_Full, test_util::key); // Create the very empty group
         }
         ifstream in(path.c_str());
         string buffer((istreambuf_iterator<char>(in)), istreambuf_iterator<char>());
@@ -1931,13 +1932,14 @@ TEST(Shared_MixedWithNonShared)
         group.Verify();
         CHECK_EQUAL(1, group.size());
     }
+#endif
 }
 
 
 TEST(Shared_MultipleRollbacks)
 {
     SHARED_GROUP_TEST_PATH(path);
-    SharedGroup sg(path);
+    SharedGroup sg(path, false, SharedGroup::durability_Full, test_util::key);
     sg.begin_write();
     sg.rollback();
     sg.rollback();
@@ -1947,7 +1949,7 @@ TEST(Shared_MultipleRollbacks)
 TEST(Shared_MultipleEndReads)
 {
     SHARED_GROUP_TEST_PATH(path);
-    SharedGroup sg(path);
+    SharedGroup sg(path, false, SharedGroup::durability_Full, test_util::key);
     sg.begin_read();
     sg.end_read();
     sg.end_read();
@@ -1963,7 +1965,7 @@ TEST(Shared_ReserveDiskSpace)
 
     SHARED_GROUP_TEST_PATH(path);
     {
-        SharedGroup sg(path);
+        SharedGroup sg(path, false, SharedGroup::durability_Full, test_util::key);
         size_t orig_file_size = size_t(File(path).get_size());
 
         // Check that reserve() does not change the file size if the
@@ -2033,7 +2035,7 @@ TEST(Shared_MovingEnumStringColumn)
     // node in the Spec class.
 
     SHARED_GROUP_TEST_PATH(path);
-    SharedGroup sg(path);
+    SharedGroup sg(path, false, SharedGroup::durability_Full, test_util::key);
 
     {
         WriteTransaction wt(sg);
@@ -2136,7 +2138,7 @@ TEST(Shared_MovingSearchIndex)
     // adjusted when columns are inserted or removed at a lower column_index.
 
     SHARED_GROUP_TEST_PATH(path);
-    SharedGroup sg(path);
+    SharedGroup sg(path, false, SharedGroup::durability_Full, test_util::key);
 
     // Create a regular string column and an enumeration strings column, and
     // equip both with search indexes.
@@ -2259,7 +2261,7 @@ TEST(Shared_ArrayEraseBug)
         return;
 
     SHARED_GROUP_TEST_PATH(path);
-    SharedGroup sg(path);
+    SharedGroup sg(path, false, SharedGroup::durability_Full, test_util::key);
     {
         WriteTransaction wt(sg);
         TableRef table = wt.add_table("table");
