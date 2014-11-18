@@ -967,8 +967,10 @@ void SharedGroup::advance_read(TransactLogRegistry& log_registry)
     grab_latest_readlock(m_readlock, same_as_before); // Throws
     release_readlock(old_readlock);
 
-    if (same_as_before)
+    if (same_as_before) {
+        log_registry.release_commit_entries(m_readlock.m_version);
         return;
+    }
 
     // If the new top-ref is zero, then the previous top-ref must have
     // been zero too, and we are still seing an empty TightDB file

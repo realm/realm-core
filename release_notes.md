@@ -2,7 +2,8 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
+* Fixed unbounded growth of the write log when a single SharedGroup is used for
+  repeated writes.
 
 ### API breaking changes:
 
