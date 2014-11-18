@@ -260,6 +260,10 @@ private:
         // Info-block 8-bytes
         uint8_t m_mnemonic[4]; // "T-DB"
         uint8_t m_file_format_version[2];
+        // bit 0 of m_reserved is to be set for persistent commit-logs (Sync support).
+        // when clear, the commit-logs will be removed at the end of a session.
+        // when set, the commmit-logs are persisted, and IFF the database exists
+        // already at the start of a session, the commit logs too must exist.
         uint8_t m_reserved;
         uint8_t m_select_bit;
     };

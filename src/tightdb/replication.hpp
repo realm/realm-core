@@ -63,17 +63,12 @@ public:
     class Interrupted; // Exception
 
     /// Reset transaction logs. This call informs the commitlog subsystem of
-    /// the initial version chosen as part of establishing a sharing scheme.
+    /// the initial version chosen as part of establishing a sharing scheme
+    /// (also called a "session").
     /// Following a crash, the commitlog subsystem may hold multiple commitlogs
     /// for versions which are lost during the crash. When SharedGroup establishes
     /// a sharing scheme it will continue from the last version commited to
-    /// the database. The commitlog subsystem will then discard any commitlogs
-    /// for later versions. When run with durability_Full there can be a disparity
-    /// of at most one version, but if run with durability_Async the two subsystems
-    /// can be many versions apart. Note: the commitlogs may hold entries, which
-    /// are not in the database after a crash, but the reverse is not possible.
-    /// Version number '1' is the very first version of any database and indicates
-    /// a full reset of the commitlogs.
+    /// the database.
     ///
     /// The call also indicates that the current thread (and current process) has
     /// exclusive access to the commitlogs, allowing them to reset synchronization
@@ -83,6 +78,22 @@ public:
 
     /// Cleanup, remove any log files
     virtual void stop_logging();
+
+    /// The commitlog subsystem can be operated in either of two modes:
+    /// server-synchronization mode and normal mode.
+    /// When operating in server-synchronization mode.
+    /// - the log files are persisted in a crash safe fashion
+    /// - when a sharing scheme is established, the logs are assumed to exist already
+    ///   (unless we are creating a new database), and an exception is thrown if they
+    ///   are missing.
+    /// - even after a crash which leaves the log files out of sync wrt to the database,
+    ///   the log files can re-synchronized transparently
+    /// When operating in normal-mode
+    /// - the log files are not updated in a crash safe way
+    /// - the log files are removed when the session ends
+    /// - the log files are not assumed to be there when a session starts, but are 
+    ///   created on demand.
+    virtual bool is_in_server_synchronization_mode();
 
     /// Called by SharedGroup during a write transaction, when readlocks are recycled, to
     /// keep the commit log management in sync with what versions can possibly be interesting
@@ -606,6 +617,11 @@ inline std::string Replication::get_database_path()
 
 inline void Replication::reset_log_management(version_type)
 {
+}
+
+inline bool Replication::is_in_server_synchronization_mode()
+{
+    return false;
 }
 
 inline void Replication::stop_logging()

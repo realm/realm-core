@@ -69,7 +69,7 @@ namespace _impl {
 class WriteLogCollector : public Replication
 {
 public:
-    WriteLogCollector(std::string database_name);
+    WriteLogCollector(std::string database_name, bool server_synchronization_mode);
     ~WriteLogCollector() TIGHTDB_NOEXCEPT;
     std::string do_get_database_path() TIGHTDB_OVERRIDE { return m_database_name; }
     void do_begin_write_transact(SharedGroup& sg) TIGHTDB_OVERRIDE;
@@ -80,6 +80,7 @@ public:
     void do_transact_log_reserve(std::size_t sz) TIGHTDB_OVERRIDE;
     void do_transact_log_append(const char* data, std::size_t size) TIGHTDB_OVERRIDE;
     void transact_log_reserve(std::size_t n);
+    virtual bool is_in_server_synchronization_mode() { return m_is_persisting; }
     virtual void submit_transact_log(BinaryData);
     virtual void stop_logging() TIGHTDB_OVERRIDE;
     virtual void reset_log_management(version_type last_version) TIGHTDB_OVERRIDE;
@@ -126,12 +127,12 @@ protected:
         uint64_t last_version_synced;
 
         // proper intialization:
-        CommitLogPreamble()
+        CommitLogPreamble(uint64_t version)
         { 
             active_file_is_log_a = true;
             // The first commit will be from state 1 -> state 2, so we must set 1 initially
-            begin_oldest_commit_range = begin_newest_commit_range = end_commit_range = 1;
-            last_version_seen_locally = last_version_synced = 1;
+            begin_oldest_commit_range = begin_newest_commit_range = end_commit_range = version;
+            last_version_seen_locally = last_version_synced = version;
         }
     };
 
@@ -147,7 +148,7 @@ protected:
         CommitLogPreamble preamble_a;
         CommitLogPreamble preamble_b;
 
-        CommitLogHeader() { 
+        CommitLogHeader(uint64_t version) : preamble_a(version), preamble_b(version) { 
             use_preamble_a = true; 
             preamble_a.write_offset = sizeof(*this);
             preamble_b.write_offset = sizeof(*this);
@@ -172,10 +173,12 @@ protected:
     CommitLogMetadata m_log_b;
     util::Buffer<char> m_transact_log_buffer;
     util::File::Map<CommitLogHeader> m_header;
+    bool m_is_persisting;
 
     // last seen version and associated offset - 0 for invalid
     uint64_t m_read_version;
     uint64_t m_read_offset;
+
 
     // make sure the header (in log file A) is available and mapped. This is required for
     // any access to metadata. Calling the method while the mutex is locked will result in
@@ -273,9 +276,11 @@ inline WriteLogCollector::CommitLogPreamble* WriteLogCollector::get_preamble_for
 inline void WriteLogCollector::sync_header()
 {
     CommitLogHeader* header = m_header.get_addr();
-    m_header.sync();
+    if (m_is_persisting)
+        m_header.sync();
     header->use_preamble_a = ! header->use_preamble_a;
-    m_header.sync();
+    if (m_is_persisting)
+        m_header.sync();
 }
 
 
@@ -358,7 +363,7 @@ void WriteLogCollector::cleanup_stale_versions(CommitLogPreamble* preamble)
     // the caller.
     version_type last_seen_version_number;
     last_seen_version_number = preamble->last_version_seen_locally;
-    if (preamble->last_version_synced 
+    if (m_is_persisting
         && preamble->last_version_synced < preamble->last_version_seen_locally)
         last_seen_version_number = preamble->last_version_synced;
 
@@ -439,19 +444,22 @@ WriteLogCollector::~WriteLogCollector() TIGHTDB_NOEXCEPT
 
 void WriteLogCollector::stop_logging()
 {
+    if (m_is_persisting)
+        return;
+
     File::try_remove(m_log_a.name);
     File::try_remove(m_log_b.name);
 }
 
 void WriteLogCollector::reset_log_management(version_type last_version)
 {
-    if (last_version == 1) {
+    if (last_version == 1 || m_is_persisting == false) {
         // for version number 1 the log files will be completely (re)initialized.
         m_header.unmap();
         reset_file(m_log_a);
         reset_file(m_log_b);
         map_header_if_needed();
-        new(m_header.get_addr()) CommitLogHeader();
+        new(m_header.get_addr()) CommitLogHeader(last_version);
     }
     else {
         // for all other versions, the log files must be there:
@@ -672,21 +680,22 @@ void WriteLogCollector::transact_log_reserve(std::size_t n)
 }
 
 
-WriteLogCollector::WriteLogCollector(std::string database_name)
+WriteLogCollector::WriteLogCollector(std::string database_name, bool server_synchronization_mode)
     : m_log_a(database_name + ".log_a"), m_log_b(database_name + ".log_b")
 {
     m_database_name = database_name;
     m_read_version = 0;
     m_read_offset = 0;
+    m_is_persisting = server_synchronization_mode;
 }
 
 } // end _impl
 
 
 
-Replication* makeWriteLogCollector(std::string database_name)
+Replication* makeWriteLogCollector(std::string database_name, bool server_synchronization_mode)
 {
-    return new _impl::WriteLogCollector(database_name);
+    return new _impl::WriteLogCollector(database_name, server_synchronization_mode);
 }
 
 

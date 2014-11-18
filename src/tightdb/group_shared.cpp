@@ -755,13 +755,13 @@ SharedGroup::~SharedGroup() TIGHTDB_NOEXCEPT
                     util::File::remove(db_path.c_str());
                 }
                 catch(...) {} // ignored on purpose.
-#ifdef TIGHTDB_ENABLE_REPLICATION
-                // If replication is enabled, we need to stop log management:
-                Replication* repl = _impl::GroupFriend::get_replication(m_group);
-                if (repl)
-                    repl->stop_logging();
-#endif
             }
+#ifdef TIGHTDB_ENABLE_REPLICATION
+            // If replication is enabled, we need to stop log management:
+            Replication* repl = _impl::GroupFriend::get_replication(m_group);
+            if (repl)
+                repl->stop_logging();
+#endif
         }
     }
     m_file.unlock();
