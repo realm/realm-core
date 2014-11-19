@@ -1,4 +1,5 @@
 #include <stdexcept>
+#include <iostream>
 
 #include <tightdb/util/thread.hpp>
 
@@ -193,6 +194,9 @@ CondVar::CondVar(process_shared_tag)
 {
 #ifdef TIGHTDB_HAVE_PTHREAD_PROCESS_SHARED
     pthread_condattr_t attr;
+
+    std::cerr << "\n************************************ INIT in constructor " << this << "\n";
+
     int r = pthread_condattr_init(&attr);
     if (TIGHTDB_UNLIKELY(r != 0))
         attr_init_failed(r);

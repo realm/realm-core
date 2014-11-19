@@ -21,6 +21,7 @@
 #define TIGHTDB_UTIL_THREAD_HPP
 
 #include <exception>
+#include <iostream>
 
 #include <pthread.h>
 
@@ -483,6 +484,7 @@ inline void RobustMutex::unlock() TIGHTDB_NOEXCEPT
 
 inline CondVar::CondVar()
 {
+    std::cerr << "\n************************************ INIT in CondVar default constructor " << this << "\n";
     int r = pthread_cond_init(&m_impl, 0);
     if (TIGHTDB_UNLIKELY(r != 0))
         init_failed(r);

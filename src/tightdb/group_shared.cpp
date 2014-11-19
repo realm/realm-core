@@ -425,6 +425,8 @@ SharedGroup::SharedInfo::SharedInfo(DurabilityLevel dlevel):
     balancemutex() // Throws
 #endif
 {
+        std::cerr << "\n************************************ INIT from SharedInfo constructors init list " << &new_commit_available << "\n";
+
     version = SHAREDINFO_VERSION;
     flags = dlevel; // durability level is fixed from creation
     free_write_slots = 0;
@@ -781,6 +783,9 @@ void SharedGroup::wait_for_change()
         if (!has_changed()) {
             if (info->waiting_for_change == false)
                 info->waiting_for_change = true;
+
+            std::cerr << "\n************************************ WAIT ON " << &(info->new_commit_available) << "\n";
+
             info->new_commit_available.wait(info->controlmutex,
                                             &recover_from_dead_write_transact,
                                             0);
@@ -1362,6 +1367,10 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
         RobustLockGuard lock(info->controlmutex, recover_from_dead_write_transact);
         if (info->waiting_for_change) {
             info->waiting_for_change = false;
+
+            std::cerr << "\n************************************ NOTIFY " << &(info->new_commit_available) << "\n";
+
+
             info->new_commit_available.notify_all();
         }
     }

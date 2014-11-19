@@ -1813,7 +1813,30 @@ void waiter(string path, int i)
     shared_state[i] = 5;
 }
 
-TEST(Shared_WaitForChange)
+void recover_from_dead_write_transact()
+{
+    // Nothing needs to be done
+}
+
+/*
+TEST(Shared_Spurious)
+{
+    bool has_changed = false;
+    RobustMutex controlmutex;
+    CondVar new_commit_available;
+
+    //while (has_changed == false) 
+    {
+        RobustLockGuard lock(controlmutex, recover_from_dead_write_transact);
+        new_commit_available.wait(controlmutex, &recover_from_dead_write_transact, 0);
+    }
+
+    return;    
+}
+*/
+
+
+ONLY(Shared_WaitForChange)
 {
     SHARED_GROUP_TEST_PATH(path);
     for (int j=0; j < num_threads; j++)
