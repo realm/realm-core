@@ -201,4 +201,17 @@ TEST(File_MultipleWriters)
     }
 }
 
+TEST(File_SetEncryptionKey)
+{
+    TEST_PATH(path);
+    File f(path, File::mode_Write);
+
+#ifdef TIGHTDB_ENABLE_ENCRYPTION
+    f.set_encryption_key(crypt_key); // should not throw
+#else
+    uint8_t key[64] = {0};
+    CHECK_THROW(f.set_encryption_key(key), std::runtime_error);
+#endif
+}
+
 #endif // TEST_FILE
