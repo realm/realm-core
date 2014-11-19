@@ -2367,10 +2367,10 @@ TEST(Query_GameAnalytics)
             t->add("10", "US", "1.0", r1, r2);
         }
         t->optimize();
-        g.write(path);
+        g.write(path, test_util::key);
     }
 
-    Group g(path);
+    Group g(path, test_util::key);
     GATable::Ref t = g.get_table<GATable>("firstevents");
 
     GATable::Query q = t->where().country.equal("US");
@@ -2738,6 +2738,7 @@ TEST(Query_DoubleCoordinates)
 
     size_t c = q.count();
     TIGHTDB_ASSERT(c == expected);
+    static_cast<void>(c);
     //    }
 }
 

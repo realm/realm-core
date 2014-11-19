@@ -246,6 +246,8 @@
 
 #if defined ANDROID
 #  define TIGHTDB_ANDROID 1
+/* std::is_integral doesn't work on some Android platforms for whatever reason */
+#  undef TIGHTDB_HAVE_CXX11_TYPE_TRAITS
 #endif
 
 
