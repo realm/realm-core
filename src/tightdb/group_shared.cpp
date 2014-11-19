@@ -36,7 +36,7 @@ namespace {
 // Constants controlling the amount of uncommited writes in flight:
 const uint16_t max_write_slots = 100;
 const uint16_t relaxed_sync_threshold = 50;
-#define SHAREDINFO_VERSION 1
+#define SHAREDINFO_VERSION 2
 
 // The following functions are carefully designed for minimal overhead
 // in case of contention among read transactions. In case of contention,
@@ -353,6 +353,9 @@ struct SharedGroup::SharedInfo
     // (and a few other metadata)
     bool versioning_ready;
 
+    // Set when some thread wants to suspend waiting for a change. Cleared when all
+    // waiting threads are woken.
+    bool waiting_for_change;
     uint16_t version;
     uint16_t flags;
     uint16_t free_write_slots;
@@ -408,6 +411,7 @@ SharedGroup::SharedInfo::SharedInfo(DurabilityLevel dlevel):
     daemon_started = false;
     daemon_ready = false;
     versioning_ready = false;
+    waiting_for_change = false;
     init_complete = 1;
 }
 
@@ -751,10 +755,13 @@ void SharedGroup::wait_for_change()
     while (!has_changed()) {
         SharedInfo* info = m_file_map.get_addr();
         RobustLockGuard lock(info->controlmutex, recover_from_dead_write_transact);
-        if (!has_changed())
+        if (!has_changed()) {
+            if (info->waiting_for_change == false)
+                info->waiting_for_change = true;
             info->new_commit_available.wait(info->controlmutex,
                                             &recover_from_dead_write_transact,
                                             0);
+        }
     }
 }
 
@@ -1330,7 +1337,10 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
 #ifndef _WIN32
     {
         RobustLockGuard lock(info->controlmutex, recover_from_dead_write_transact);
-        info->new_commit_available.notify_all();
+        if (info->waiting_for_change) {
+            info->waiting_for_change = false;
+            info->new_commit_available.notify_all();
+        }
     }
 #endif
 }
