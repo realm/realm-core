@@ -87,11 +87,14 @@ public:
     /// that creates/initlializes the coordination file) may validate
     /// the header, otherwise it will result in a race condition.
     ///
+    /// \param encryption_key 32-byte key to use to encrypt and decrypt
+    /// the backing storage, or nullptr to disable encryption.
+    ///
     /// \return The `ref` of the root node, or zero if there is none.
     ///
     /// \throw util::File::AccessError
     ref_type attach_file(const std::string& path, bool is_shared, bool read_only, bool no_create,
-                         bool skip_validate);
+                         bool skip_validate, const uint8_t* encryption_key);
 
     /// Attach this allocator to the specified memory buffer.
     ///

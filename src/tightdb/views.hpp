@@ -23,7 +23,7 @@ public:
     virtual size_t size() const = 0;
 
     // These two methods are overridden by TableView. They are no-ops for LinkView because sync'ed automatically
-    virtual void sync_if_needed() const {}
+    virtual uint_fast64_t sync_if_needed() const { return 0; }
     virtual bool is_in_sync() const { return true; }
 
     // Predicate for std::sort

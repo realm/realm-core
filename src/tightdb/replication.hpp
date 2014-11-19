@@ -1330,6 +1330,7 @@ inline void Replication::on_link_list_destroyed(const LinkView& list) TIGHTDB_NO
 inline Replication::TransactLogParser::TransactLogParser(Replication::InputStream& transact_log):
     m_input(transact_log)
 {
+    m_input_begin = m_input_end = 0;
 }
 
 

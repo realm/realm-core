@@ -6,6 +6,7 @@
 #include <tightdb/util/file.hpp>
 
 #include "test.hpp"
+#include "crypt_key.hpp"
 
 using namespace std;
 using namespace tightdb;
@@ -154,12 +155,12 @@ TEST(Links_Basic)
         table2->set_link(col_link, 0, 4);
         CHECK_EQUAL(1, table1->get_backlink_count(4, *table2, col_link));
 
-        group.write(path);
+        group.write(path, crypt_key);
     }
 
     // Reopen same group from disk
     {
-        Group group(path);
+        Group group(path, crypt_key);
 
         TestTableLinks::Ref table1 = group.get_table<TestTableLinks>("table1");
         TableRef table2 = group.get_table("table2");

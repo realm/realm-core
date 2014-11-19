@@ -17,37 +17,19 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#include <iostream>
+#ifndef TIGHTDB_TEST_CRYPT_KEY_HPP
+#define TIGHTDB_TEST_CRYPT_KEY_HPP
 
-#ifdef __APPLE__
-#include <execinfo.h>
+#include <stdint.h>
+
+namespace {
+
+#ifdef TIGHTDB_ENABLE_ENCRYPTION
+const uint8_t crypt_key[] = "12345678901234567890123456789011234567890123456789012345678901";
+#else
+const uint8_t* crypt_key = 0;
 #endif
 
-#include <tightdb/util/terminate.hpp>
+} // anonymous namespace
 
-using namespace std;
-
-namespace tightdb {
-namespace util {
-
-
-TIGHTDB_NORETURN void terminate(string message, const char* file, long line) TIGHTDB_NOEXCEPT
-{
-    cerr << file << ":" << line << ": " << message << endl;
-
-#ifdef __APPLE__
-    void* callstack[128];
-    int frames = backtrace(callstack, 128);
-    char** strs = backtrace_symbols(callstack, frames);
-    for (int i = 0; i < frames; ++i) {
-        cerr << strs[i] << endl;
-    }
-    free(strs);
-#endif
-
-    abort();
-}
-
-
-} // namespace util
-} // namespace tightdb
+#endif // TIGHTDB_TEST_CRYPT_KEY_HPP

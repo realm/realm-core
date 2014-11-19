@@ -208,9 +208,9 @@ public:
     // "live" or "reactive" views are implemented by calling sync_if_needed
     // before any of the other access-methods whenever the view may have become
     // outdated.
-    void sync_if_needed() const;
+    uint_fast64_t sync_if_needed() const;
 #else
-    void sync_if_needed() const;
+    uint_fast64_t sync_if_needed() const;
 #endif
 
     // This TableView can be "born" from 3 different sources : LinkView, Table::find_all() or Query. Return

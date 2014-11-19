@@ -12,6 +12,7 @@
 #endif
 
 #include "test.hpp"
+#include "crypt_key.hpp"
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
 
@@ -119,7 +120,7 @@ TEST(Replication_General)
     SHARED_GROUP_TEST_PATH(path_2);
 
     MyTrivialReplication repl(path_1);
-    SharedGroup sg_1(repl);
+    SharedGroup sg_1(repl, SharedGroup::durability_Full, crypt_key);
     {
         WriteTransaction wt(sg_1);
         MyTable::Ref table = wt.add_table<MyTable>("my_table");
@@ -196,7 +197,7 @@ TEST(Replication_Links)
     SHARED_GROUP_TEST_PATH(path_2);
 
     MyTrivialReplication repl(path_1);
-    SharedGroup sg_1(repl);
+    SharedGroup sg_1(repl, false, crypt_key);
     {
         WriteTransaction wt(sg_1);
         TableRef origin = wt.add_table("origin");
@@ -294,7 +295,7 @@ TEST(Replication_Links)
 //    replay_log = &cout;
 
     MyTrivialReplication repl(path_1);
-    SharedGroup sg_1(repl);
+    SharedGroup sg_1(repl, SharedGroup::durability_Full, crypt_key);
     SharedGroup sg_2(path_2);
 
     // First create two origin tables and two target tables, and add some links
