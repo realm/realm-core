@@ -7,6 +7,7 @@
 #include <tightdb/util/file.hpp>
 
 #include "test.hpp"
+#include "crypt_key.hpp"
 
 using namespace std;
 using namespace tightdb::util;
@@ -98,7 +99,7 @@ TEST(File_Map)
     size_t len = strlen(data);
     {
         File f(path, File::mode_Write);
-        f.set_encryption_key(tightdb::test_util::key);
+        f.set_encryption_key(crypt_key);
         f.resize(len);
 
         File::Map<char> map(f, File::access_ReadWrite, len);
@@ -106,7 +107,7 @@ TEST(File_Map)
     }
     {
         File f(path, File::mode_Read);
-        f.set_encryption_key(tightdb::test_util::key);
+        f.set_encryption_key(crypt_key);
         File::Map<char> map(f, File::access_ReadOnly, len);
         CHECK(memcmp(map.get_addr(), data, len) == 0);
     }
@@ -120,7 +121,7 @@ TEST(File_MapMultiplePages)
     TEST_PATH(path);
     {
         File f(path, File::mode_Write);
-        f.set_encryption_key(tightdb::test_util::key);
+        f.set_encryption_key(crypt_key);
         f.resize(count * sizeof(size_t));
 
         File::Map<size_t> map(f, File::access_ReadWrite, count * sizeof(size_t));
@@ -129,7 +130,7 @@ TEST(File_MapMultiplePages)
     }
     {
         File f(path, File::mode_Read);
-        f.set_encryption_key(tightdb::test_util::key);
+        f.set_encryption_key(crypt_key);
         File::Map<size_t> map(f, File::access_ReadOnly, count * sizeof(size_t));
         for (size_t i = 0; i < count; ++i) {
             CHECK_EQUAL(map.get_addr()[i], i);
@@ -146,11 +147,11 @@ TEST(File_ReaderAndWriter)
     TEST_PATH(path);
 
     File writer(path, File::mode_Write);
-    writer.set_encryption_key(tightdb::test_util::key);
+    writer.set_encryption_key(crypt_key);
     writer.resize(count * sizeof(size_t));
 
     File reader(path, File::mode_Read);
-    reader.set_encryption_key(tightdb::test_util::key);
+    reader.set_encryption_key(crypt_key);
     CHECK_EQUAL(writer.get_size(), reader.get_size());
 
     File::Map<size_t> write(writer, File::access_ReadWrite, count * sizeof(size_t));
@@ -172,11 +173,11 @@ TEST(File_MultipleWriters)
 
     {
         File w1(path, File::mode_Write);
-        w1.set_encryption_key(tightdb::test_util::key);
+        w1.set_encryption_key(crypt_key);
         w1.resize(count * sizeof(size_t));
 
         File w2(path, File::mode_Write);
-        w2.set_encryption_key(tightdb::test_util::key);
+        w2.set_encryption_key(crypt_key);
         w2.resize(count * sizeof(size_t));
 
         File::Map<size_t> map1(w1, File::access_ReadWrite, count * sizeof(size_t));
@@ -189,7 +190,7 @@ TEST(File_MultipleWriters)
     }
 
     File reader(path, File::mode_Read);
-    reader.set_encryption_key(tightdb::test_util::key);
+    reader.set_encryption_key(crypt_key);
 
     File::Map<size_t> read(reader, File::access_ReadOnly, count * sizeof(size_t));
 

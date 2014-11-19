@@ -58,4 +58,8 @@
 // test could perhaps be modified to trigger it (unless it's a language binding problem).
 //#define JAVA_MANY_COLUMNS_CRASH
 
+// Temporarily disable async testing until use of sleep() in the async tests have
+// been replaced with a better solution.
+#define DISABLE_ASYNC
+
 #endif
