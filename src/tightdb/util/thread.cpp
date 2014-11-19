@@ -1,4 +1,5 @@
 #include <stdexcept>
+#include <iostream>
 
 #include <tightdb/util/thread.hpp>
 
@@ -198,6 +199,9 @@ CondVar::CondVar(process_shared_tag)
         attr_init_failed(r);
     r = pthread_condattr_setpshared(&attr, PTHREAD_PROCESS_SHARED);
     TIGHTDB_ASSERT(r == 0);
+
+    std::cerr << "\n************************************ pthread_cond_init(" << &m_impl << "), PTHREAD_PROCESS_SHARED\n";
+
     r = pthread_cond_init(&m_impl, &attr);
     int r2 = pthread_condattr_destroy(&attr);
     TIGHTDB_ASSERT(r2 == 0);

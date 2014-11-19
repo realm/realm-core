@@ -21,6 +21,7 @@
 #define TIGHTDB_UTIL_THREAD_HPP
 
 #include <exception>
+#include <iostream>
 
 #include <pthread.h>
 
@@ -483,6 +484,7 @@ inline void RobustMutex::unlock() TIGHTDB_NOEXCEPT
 
 inline CondVar::CondVar()
 {
+    std::cerr << "\n************************************ pthread_cond_init(" << &m_impl << ") NONSHARED! \n";
     int r = pthread_cond_init(&m_impl, 0);
     if (TIGHTDB_UNLIKELY(r != 0))
         init_failed(r);
@@ -497,6 +499,7 @@ inline CondVar::~CondVar() TIGHTDB_NOEXCEPT
 
 inline void CondVar::wait(LockGuard& l) TIGHTDB_NOEXCEPT
 {
+    std::cerr << "\n************************************ pthread_cond_wait(" << &m_impl << ")\n";
     int r = pthread_cond_wait(&m_impl, &l.m_mutex.m_impl);
     if (TIGHTDB_UNLIKELY(r != 0))
         TIGHTDB_TERMINATE("pthread_cond_wait() failed");
@@ -505,8 +508,10 @@ inline void CondVar::wait(LockGuard& l) TIGHTDB_NOEXCEPT
 template<class Func>
 inline void CondVar::wait(RobustMutex& m, Func recover_func, const struct timespec* tp)
 {
+
     int r;
     if (!tp) {
+        std::cerr << "\n************************************ weird pthread_cond_wait(" << &m_impl << ")\n";
         r = pthread_cond_wait(&m_impl, &m.m_impl);
     }
     else {
@@ -549,6 +554,7 @@ inline void CondVar::notify() TIGHTDB_NOEXCEPT
 
 inline void CondVar::notify_all() TIGHTDB_NOEXCEPT
 {
+    std::cerr << "\n************************************ pthread_cond_broadcast(" << &m_impl << ")\n";
     int r = pthread_cond_broadcast(&m_impl);
     TIGHTDB_ASSERT(r == 0);
     static_cast<void>(r);

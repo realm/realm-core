@@ -1790,6 +1790,87 @@ TEST_IF(Shared_AsyncMultiprocess, allow_async)
 
 #endif // endif not on windows
 
+static const int num_threads = 3;
+static int shared_state[num_threads];
+
+void waiter(string path, int i)
+{
+    SharedGroup sg(path, true, SharedGroup::durability_Full);
+    shared_state[i] = 1;
+    sg.wait_for_change();
+    shared_state[i] = 2; // this state should not be observed by the writer
+    sg.wait_for_change(); // we'll fall right through here, because we haven't advanced our readlock
+    shared_state[i] = 3;
+    sg.begin_read();
+    sg.end_read();
+    sg.wait_for_change(); // this time we'll wait because state hasn't advanced since we did.
+    shared_state[i] = 4;
+
+    // works within a read transaction as well
+    sg.begin_read();
+    sg.wait_for_change();
+    sg.end_read();
+    shared_state[i] = 5;
+}
+
+void recover_from_dead_write_transact()
+{
+    // Nothing needs to be done
+}
+
+/*
+TEST(Shared_Spurious)
+{
+    bool has_changed = false;
+    RobustMutex controlmutex;
+    CondVar new_commit_available;
+
+    //while (has_changed == false) 
+    {
+        RobustLockGuard lock(controlmutex, recover_from_dead_write_transact);
+        new_commit_available.wait(controlmutex, &recover_from_dead_write_transact, 0);
+    }
+
+    return;    
+}
+*/
+
+
+ONLY(Shared_WaitForChange)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    for (int j=0; j < num_threads; j++)
+        shared_state[j] = 0;
+    SharedGroup sg(path, false, SharedGroup::durability_Full);
+    Thread threads[num_threads];
+    for (int j=0; j < num_threads; j++)
+        threads[j].start(bind(&waiter, string(path), j));
+    sleep(1);
+    for (int j=0; j < num_threads; j++)
+        CHECK_EQUAL(1, shared_state[j]);
+
+    sg.begin_write();
+    sg.commit();
+    sleep(1);
+    for (int j=0; j < num_threads; j++)
+        CHECK_EQUAL(3, shared_state[j]);
+
+    sg.begin_write();
+    sg.commit();
+    sleep(1);
+    for (int j=0; j < num_threads; j++)
+        CHECK_EQUAL(4, shared_state[j]);
+
+    sg.begin_write();
+    sg.commit();
+    sleep(1);
+    for (int j=0; j < num_threads; j++)
+        CHECK_EQUAL(5, shared_state[j]);
+
+    for (int j=0; j < num_threads; j++)
+        threads[j].join();
+}
+
 TEST(Shared_MixedWithNonShared)
 {
     SHARED_GROUP_TEST_PATH(path);
