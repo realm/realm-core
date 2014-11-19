@@ -194,14 +194,14 @@ CondVar::CondVar(process_shared_tag)
 {
 #ifdef TIGHTDB_HAVE_PTHREAD_PROCESS_SHARED
     pthread_condattr_t attr;
-
-    std::cerr << "\n************************************ INIT in constructor " << this << "\n";
-
     int r = pthread_condattr_init(&attr);
     if (TIGHTDB_UNLIKELY(r != 0))
         attr_init_failed(r);
     r = pthread_condattr_setpshared(&attr, PTHREAD_PROCESS_SHARED);
     TIGHTDB_ASSERT(r == 0);
+
+    std::cerr << "\n************************************ pthread_cond_init(" << &m_impl << "), PTHREAD_PROCESS_SHARED\n";
+
     r = pthread_cond_init(&m_impl, &attr);
     int r2 = pthread_condattr_destroy(&attr);
     TIGHTDB_ASSERT(r2 == 0);
