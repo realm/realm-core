@@ -197,9 +197,9 @@ private:
 TEST(LangBindHelper_AdvanceReadTransact_Basics)
 {
     SHARED_GROUP_TEST_PATH(path);
-    SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key);
+    SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());
     ShortCircuitTransactLogManager tlm(path);
-    SharedGroup sg_w(tlm, SharedGroup::durability_Full, crypt_key);
+    SharedGroup sg_w(tlm, SharedGroup::durability_Full, crypt_key());
 
     // Start a read transaction (to be repeatedly advanced)
     ReadTransaction rt(sg);
@@ -372,9 +372,9 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
 TEST(LangBindHelper_AdvanceReadTransact_LinkListSort)
 {
     SHARED_GROUP_TEST_PATH(path);
-    SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key);
+    SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());
     ShortCircuitTransactLogManager tlm(path);
-    SharedGroup sg_w(tlm, SharedGroup::durability_Full, crypt_key);
+    SharedGroup sg_w(tlm, SharedGroup::durability_Full, crypt_key());
 
     // Start a read transaction (to be repeatedly advanced)
     ReadTransaction rt(sg);
@@ -425,9 +425,9 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkListSort)
 TEST(LangBindHelper_AdvanceReadTransact_ColumnRootTypeChange)
 {
     SHARED_GROUP_TEST_PATH(path);
-    SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key);
+    SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());
     ShortCircuitTransactLogManager tlm(path);
-    SharedGroup sg_w(tlm, SharedGroup::durability_Full, crypt_key);
+    SharedGroup sg_w(tlm, SharedGroup::durability_Full, crypt_key());
 
     // Start a read transaction (to be repeatedly advanced)
     ReadTransaction rt(sg);
@@ -638,9 +638,9 @@ TEST(LangBindHelper_AdvanceReadTransact_SearchIndex)
 TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
 {
     SHARED_GROUP_TEST_PATH(path);
-    SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key);
+    SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());
     ShortCircuitTransactLogManager tlm(path);
-    SharedGroup sg_w(tlm, SharedGroup::durability_Full, crypt_key);
+    SharedGroup sg_w(tlm, SharedGroup::durability_Full, crypt_key());
 
     // Start a read transaction (to be repeatedly advanced)
     ReadTransaction rt(sg);
@@ -1212,9 +1212,9 @@ TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
 TEST(LangBindHelper_AdvanceReadTransact_MixedSubtables)
 {
     SHARED_GROUP_TEST_PATH(path);
-    SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key);
+    SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());
     ShortCircuitTransactLogManager tlm(path);
-    SharedGroup sg_w(tlm, SharedGroup::durability_Full, crypt_key);
+    SharedGroup sg_w(tlm, SharedGroup::durability_Full, crypt_key());
 
     // Start a read transaction (to be repeatedly advanced)
     ReadTransaction rt(sg);
@@ -1816,9 +1816,9 @@ TEST(LangBindHelper_AdvanceReadTransact_Descriptor)
 TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
 {
     SHARED_GROUP_TEST_PATH(path);
-    SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key);
+    SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());
     ShortCircuitTransactLogManager tlm(path);
-    SharedGroup sg_w(tlm, SharedGroup::durability_Full, crypt_key);
+    SharedGroup sg_w(tlm, SharedGroup::durability_Full, crypt_key());
 
     // Start a read transaction (to be repeatedly advanced)
     ReadTransaction rt(sg);
@@ -2096,9 +2096,9 @@ TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
 TEST(LangBindHelper_AdvanceReadTransact_SubtableRowAccessors)
 {
     SHARED_GROUP_TEST_PATH(path);
-    SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key);
+    SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());
     ShortCircuitTransactLogManager tlm(path);
-    SharedGroup sg_w(tlm, SharedGroup::durability_Full, crypt_key);
+    SharedGroup sg_w(tlm, SharedGroup::durability_Full, crypt_key());
 
     // Start a read transaction (to be repeatedly advanced)
     ReadTransaction rt(sg);
@@ -2193,9 +2193,9 @@ TEST(LangBindHelper_AdvanceReadTransact_SubtableRowAccessors)
 TEST(LangBindHelper_AdvanceReadTransact_MoveLastOver)
 {
     SHARED_GROUP_TEST_PATH(path);
-    SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key);
+    SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());
     ShortCircuitTransactLogManager tlm(path);
-    SharedGroup sg_w(tlm, SharedGroup::durability_Full, crypt_key);
+    SharedGroup sg_w(tlm, SharedGroup::durability_Full, crypt_key());
 
     // Start a read transaction (to be repeatedly advanced)
     ReadTransaction rt(sg);
@@ -2546,9 +2546,9 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
     // - Insert and remove columns in target table
 
     SHARED_GROUP_TEST_PATH(path);
-    SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key);
+    SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());
     ShortCircuitTransactLogManager tlm(path);
-    SharedGroup sg_w(tlm, SharedGroup::durability_Full, crypt_key);
+    SharedGroup sg_w(tlm, SharedGroup::durability_Full, crypt_key());
 
     // Start a read transaction (to be repeatedly advanced)
     ReadTransaction rt(sg);
@@ -4998,9 +4998,9 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkCycles)
     // rows in the same table, but longer cycles are also checked.
 
     SHARED_GROUP_TEST_PATH(path);
-    SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key);
+    SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());
     ShortCircuitTransactLogManager tlm(path);
-    SharedGroup sg_w(tlm, SharedGroup::durability_Full, crypt_key);
+    SharedGroup sg_w(tlm, SharedGroup::durability_Full, crypt_key());
 
     // Start a read transaction (to be repeatedly advanced)
     ReadTransaction rt(sg);
@@ -5520,9 +5520,9 @@ TEST(LangBindHelper_AdvanceReadTransact_InsertLink)
     // boundaries (advance transaction).
 
     SHARED_GROUP_TEST_PATH(path);
-    SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key);
+    SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());
     ShortCircuitTransactLogManager tlm(path);
-    SharedGroup sg_w(tlm, SharedGroup::durability_Full, crypt_key);
+    SharedGroup sg_w(tlm, SharedGroup::durability_Full, crypt_key());
 
     // Start a read transaction (to be repeatedly advanced)
     ReadTransaction rt(sg);
@@ -5557,9 +5557,9 @@ TEST(LangBindHelper_AdvanceReadTransact_InsertLink)
 TEST(LangBindHelper_AdvanceReadTransact_RemoveTableWithColumns)
 {
     SHARED_GROUP_TEST_PATH(path);
-    SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key);
+    SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());
     ShortCircuitTransactLogManager tlm(path);
-    SharedGroup sg_w(tlm, SharedGroup::durability_Full, crypt_key);
+    SharedGroup sg_w(tlm, SharedGroup::durability_Full, crypt_key());
 
     // Start a read transaction (to be repeatedly advanced)
     ReadTransaction rt(sg);
@@ -5660,9 +5660,9 @@ TEST(LangBindHelper_AdvanceReadTransact_RemoveTableMovesTableWithLinksOver)
     // link and backlink columns.
 
     SHARED_GROUP_TEST_PATH(path);
-    SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key);
+    SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());
     ShortCircuitTransactLogManager tlm(path);
-    SharedGroup sg_w(tlm, SharedGroup::durability_Full, crypt_key);
+    SharedGroup sg_w(tlm, SharedGroup::durability_Full, crypt_key());
 
     // Start a read transaction (to be repeatedly advanced)
     ReadTransaction rt(sg);
@@ -5782,14 +5782,14 @@ TEST(LangBindHelper_ImplicitTransactions)
     SHARED_GROUP_TEST_PATH(path);
     UniquePtr<LangBindHelper::TransactLogRegistry> wlr(getWriteLogs(path));
     UniquePtr<Replication> repl(makeWriteLogCollector(path));
-    SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key);
+    SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
     {
         WriteTransaction wt(sg);
         wt.add_table<TestTableShared>("table")->add_empty_row();
         wt.commit();
     }
     UniquePtr<Replication> repl2(makeWriteLogCollector(path));
-    SharedGroup sg2(*repl2, SharedGroup::durability_Full, crypt_key);
+    SharedGroup sg2(*repl2, SharedGroup::durability_Full, crypt_key());
     Group& g = const_cast<Group&>(sg.begin_read());
     TestTableShared::Ref table = g.get_table<TestTableShared>("table");
     for (int i = 0; i<100; i++) {
@@ -5832,7 +5832,7 @@ TEST(LangBindHelper_RollbackAndContinueAsRead)
     SHARED_GROUP_TEST_PATH(path);
     UniquePtr<Replication> repl(makeWriteLogCollector(path));
     UniquePtr<LangBindHelper::TransactLogRegistry> wlr(getWriteLogs(path));
-    SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key);
+    SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
     {
         Group* group = const_cast<Group*>(&sg.begin_read());
        {
@@ -5908,7 +5908,7 @@ TEST(LangBindHelper_RollbackAndContinueAsReadGroupLevelTableRemoval)
     SHARED_GROUP_TEST_PATH(path);
     UniquePtr<Replication> repl(makeWriteLogCollector(path));
     UniquePtr<LangBindHelper::TransactLogRegistry> wlr(getWriteLogs(path));
-    SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key);
+    SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
     Group* group = const_cast<Group*>(&sg.begin_read());
     {
         LangBindHelper::promote_to_write(sg, *wlr);
@@ -5937,7 +5937,7 @@ TEST(LangBindHelper_RollbackAndContinueAsReadColumnAdd)
     SHARED_GROUP_TEST_PATH(path);
     UniquePtr<Replication> repl(makeWriteLogCollector(path));
     UniquePtr<LangBindHelper::TransactLogRegistry> wlr(getWriteLogs(path));
-    SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key);
+    SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
     Group* group = const_cast<Group*>(&sg.begin_read());
     TableRef t;
     {
@@ -5970,7 +5970,7 @@ TEST(LangBindHelper_RollbackAndContinueAsReadColumnRemove)
     SHARED_GROUP_TEST_PATH(path);
     UniquePtr<Replication> repl(makeWriteLogCollector(path));
     UniquePtr<LangBindHelper::TransactLogRegistry> wlr(getWriteLogs(path));
-    SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key);
+    SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
     Group* group = const_cast<Group*>(&sg.begin_read());
     TableRef t;
     {
@@ -6004,7 +6004,7 @@ TEST(LangBindHelper_RollbackAndContinueAsReadLinkList)
     SHARED_GROUP_TEST_PATH(path);
     UniquePtr<LangBindHelper::TransactLogRegistry> tlr(getWriteLogs(path));
     UniquePtr<Replication> repl(makeWriteLogCollector(path));
-    SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key);
+    SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
     Group* group = const_cast<Group*>(&sg.begin_read());
     LangBindHelper::promote_to_write(sg, *tlr);
     TableRef origin = group->add_table("origin");
@@ -6051,7 +6051,7 @@ TEST(LangBindHelper_RollbackAndContinueAsReadLink)
     SHARED_GROUP_TEST_PATH(path);
     UniquePtr<LangBindHelper::TransactLogRegistry> tlr(getWriteLogs(path));
     UniquePtr<Replication> repl(makeWriteLogCollector(path));
-    SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key);
+    SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
     Group* group = const_cast<Group*>(&sg.begin_read());
     LangBindHelper::promote_to_write(sg, *tlr);
     TableRef origin = group->add_table("origin");
@@ -6090,7 +6090,7 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_MoveLastOverSubtables)
     SHARED_GROUP_TEST_PATH(path);
     UniquePtr<LangBindHelper::TransactLogRegistry> tlr(getWriteLogs(path));
     UniquePtr<Replication> repl(makeWriteLogCollector(path));
-    SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key);
+    SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
     Group* group = const_cast<Group*>(&sg.begin_read());
 
     CHECK_EQUAL(0, group->size());
@@ -6196,7 +6196,7 @@ TEST(LangBindHelper_ImplicitTransactions_OverSharedGroupDestruction)
     UniquePtr<Replication> repl(makeWriteLogCollector(path));
     UniquePtr<LangBindHelper::TransactLogRegistry> wlr(getWriteLogs(path));
     {
-        SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key);
+        SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
         {
             WriteTransaction wt(sg);
             TableRef tr = wt.add_table("table");
@@ -6210,7 +6210,7 @@ TEST(LangBindHelper_ImplicitTransactions_OverSharedGroupDestruction)
     {
         UniquePtr<Replication> repl(makeWriteLogCollector(path));
         UniquePtr<LangBindHelper::TransactLogRegistry> wlr(getWriteLogs(path));
-        SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key);
+        SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
         {
             WriteTransaction wt(sg);
             TableRef tr = wt.get_table("table");
@@ -6227,7 +6227,7 @@ TEST(LangBindHelper_ImplicitTransactions_LinkList)
     SHARED_GROUP_TEST_PATH(path);
     UniquePtr<LangBindHelper::TransactLogRegistry> tlr(getWriteLogs(path));
     UniquePtr<Replication> repl(makeWriteLogCollector(path));
-    SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key);
+    SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
     Group* group = const_cast<Group*>(&sg.begin_read());
     LangBindHelper::promote_to_write(sg, *tlr);
     TableRef origin = group->add_table("origin");
@@ -6248,7 +6248,7 @@ TEST(LangBindHelper_ImplicitTransactions_StringIndex)
     SHARED_GROUP_TEST_PATH(path);
     UniquePtr<LangBindHelper::TransactLogRegistry> tlr(getWriteLogs(path));
     UniquePtr<Replication> repl(makeWriteLogCollector(path));
-    SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key);
+    SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
     Group* group = const_cast<Group*>(&sg.begin_read());
     LangBindHelper::promote_to_write(sg, *tlr);
     TableRef table = group->add_table("a");
@@ -6266,7 +6266,7 @@ void multiple_trackers_writer_thread(string path)
 {
     Random random(random_int<unsigned long>());
     UniquePtr<Replication> repl(makeWriteLogCollector(path));
-    SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key);
+    SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
     for (int i = 0; i < 10; ++i) {
         WriteTransaction wt(sg);
         TestTableInts::Ref tr = wt.get_table<TestTableInts>("table");
@@ -6291,7 +6291,7 @@ void multiple_trackers_reader_thread(TestResults* test_results_ptr, string path)
 
     UniquePtr<Replication> repl(makeWriteLogCollector(path));
     UniquePtr<LangBindHelper::TransactLogRegistry> wlr(getWriteLogs(path));
-    SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key);
+    SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
     Group& g = const_cast<Group&>(sg.begin_read());
     TableRef tr = g.get_table("table");
     Query q = tr->where().equal(0, 42);
@@ -6325,7 +6325,7 @@ TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
     SHARED_GROUP_TEST_PATH(path);
 
     UniquePtr<Replication> repl(makeWriteLogCollector(path));
-    SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key);
+    SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
     {
         WriteTransaction wt(sg);
         TableRef tr = wt.add_table("table");
@@ -6373,7 +6373,7 @@ TEST(LangBindHelper_ImplicitTransactions_NoExtremeFileSpaceLeaks)
     for (int i = 0; i < 100; ++i) {
         UniquePtr<Replication> repl(makeWriteLogCollector(path));
         UniquePtr<LangBindHelper::TransactLogRegistry> tlr(getWriteLogs(path));
-        SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key);
+        SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
         sg.begin_read();
         LangBindHelper::promote_to_write(sg, *tlr);
         LangBindHelper::commit_and_continue_as_read(sg);
@@ -6392,7 +6392,7 @@ TEST(LangBindHelper_ImplicitTransactions_DetachRowAccessorOnMoveLastOver)
 
     UniquePtr<Replication> repl(makeWriteLogCollector(path));
     UniquePtr<LangBindHelper::TransactLogRegistry> tlr(getWriteLogs(path));
-    SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key);
+    SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
     Group& group = const_cast<Group&>(sg.begin_read());
 
     LangBindHelper::promote_to_write(sg, *tlr);
@@ -6431,12 +6431,12 @@ TEST(LangBindHelper_ImplicitTransactions_ContinuedUseOfTable)
 
     UniquePtr<Replication> repl(makeWriteLogCollector(path));
     UniquePtr<LangBindHelper::TransactLogRegistry> tlr(getWriteLogs(path));
-    SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key);
+    SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
     const Group& group = sg.begin_read();
 
     UniquePtr<Replication> repl_w(makeWriteLogCollector(path));
     UniquePtr<LangBindHelper::TransactLogRegistry> tlr_w(getWriteLogs(path));
-    SharedGroup sg_w(*repl_w, SharedGroup::durability_Full, crypt_key);
+    SharedGroup sg_w(*repl_w, SharedGroup::durability_Full, crypt_key());
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
     LangBindHelper::promote_to_write(sg_w, *tlr_w);
@@ -6471,12 +6471,12 @@ TEST(LangBindHelper_ImplicitTransactions_ContinuedUseOfDescriptor)
 
     UniquePtr<Replication> repl(makeWriteLogCollector(path));
     UniquePtr<LangBindHelper::TransactLogRegistry> tlr(getWriteLogs(path));
-    SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key);
+    SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
     const Group& group = sg.begin_read();
 
     UniquePtr<Replication> repl_w(makeWriteLogCollector(path));
     UniquePtr<LangBindHelper::TransactLogRegistry> tlr_w(getWriteLogs(path));
-    SharedGroup sg_w(*repl_w, SharedGroup::durability_Full, crypt_key);
+    SharedGroup sg_w(*repl_w, SharedGroup::durability_Full, crypt_key());
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
     LangBindHelper::promote_to_write(sg_w, *tlr_w);
@@ -6511,12 +6511,12 @@ TEST(LangBindHelper_ImplicitTransactions_ContinuedUseOfLinkList)
 
     UniquePtr<Replication> repl(makeWriteLogCollector(path));
     UniquePtr<LangBindHelper::TransactLogRegistry> tlr(getWriteLogs(path));
-    SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key);
+    SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
     const Group& group = sg.begin_read();
 
     UniquePtr<Replication> repl_w(makeWriteLogCollector(path));
     UniquePtr<LangBindHelper::TransactLogRegistry> tlr_w(getWriteLogs(path));
-    SharedGroup sg_w(*repl_w, SharedGroup::durability_Full, crypt_key);
+    SharedGroup sg_w(*repl_w, SharedGroup::durability_Full, crypt_key());
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
     LangBindHelper::promote_to_write(sg_w, *tlr_w);
