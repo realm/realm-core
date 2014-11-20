@@ -92,7 +92,8 @@ const size_t pages_per_metadata_page = page_size / metadata_size;
 
 // map an offset in the data to the actual location in the file
 template<typename Int>
-Int real_offset(Int pos) {
+Int real_offset(Int pos)
+{
     TIGHTDB_ASSERT(pos >= 0);
     const size_t page_index = static_cast<size_t>(pos) / page_size;
     const size_t metadata_page_count = page_index / pages_per_metadata_page + 1;
@@ -101,7 +102,8 @@ Int real_offset(Int pos) {
 
 // map a location in the file to the offset in the data
 template<typename Int>
-Int fake_offset(Int pos) {
+Int fake_offset(Int pos)
+{
     TIGHTDB_ASSERT(pos >= 0);
     const size_t page_index = static_cast<size_t>(pos) / page_size;
     const size_t metadata_page_count = (page_index + pages_per_metadata_page) / (pages_per_metadata_page + 1);
@@ -109,7 +111,8 @@ Int fake_offset(Int pos) {
 }
 
 // get the location of the iv_table for the given data (not file) position
-off_t iv_table_pos(off_t pos) {
+off_t iv_table_pos(off_t pos)
+{
     TIGHTDB_ASSERT(pos >= 0);
     const size_t page_index = static_cast<size_t>(pos) / page_size;
     const size_t metadata_block = page_index / pages_per_metadata_page;
@@ -117,19 +120,22 @@ off_t iv_table_pos(off_t pos) {
     return metadata_block * (pages_per_metadata_page + 1) * page_size + metadata_index * metadata_size;
 }
 
-void check_write(int fd, off_t pos, const void *data, size_t len) {
+void check_write(int fd, off_t pos, const void *data, size_t len)
+{
     ssize_t ret = pwrite(fd, data, len, pos);
     TIGHTDB_ASSERT(ret >= 0 && static_cast<size_t>(ret) == len);
     static_cast<void>(ret);
 }
 
-size_t check_read(int fd, off_t pos, void *dst, size_t len) {
+size_t check_read(int fd, off_t pos, void *dst, size_t len)
+{
     ssize_t ret = pread(fd, dst, len, pos);
     TIGHTDB_ASSERT(ret >= 0);
     return ret < 0 ? 0 : static_cast<size_t>(ret);
 }
 
-void calc_hmac(const void* src, size_t len, uint8_t* dst, const uint8_t* key) {
+void calc_hmac(const void* src, size_t len, uint8_t* dst, const uint8_t* key)
+{
 #ifdef __APPLE__
     CCHmac(kCCHmacAlgSHA224, key, 32, src, len, dst);
 #else
@@ -160,13 +166,15 @@ void calc_hmac(const void* src, size_t len, uint8_t* dst, const uint8_t* key) {
 
 } // namespace {
 
-void AESCryptor::set_file_size(off_t new_size) {
+void AESCryptor::set_file_size(off_t new_size)
+{
     TIGHTDB_ASSERT(new_size >= 0);
     size_t page_count = (new_size + page_size - 1) / page_size;
     m_iv_buffer.reserve((page_count + pages_per_metadata_page - 1) & ~(pages_per_metadata_page - 1));
 }
 
-iv_table& AESCryptor::get_iv_table(int fd, off_t data_pos) TIGHTDB_NOEXCEPT {
+iv_table& AESCryptor::get_iv_table(int fd, off_t data_pos) TIGHTDB_NOEXCEPT
+{
     size_t idx = data_pos / page_size;
     if (idx < m_iv_buffer.size())
         return m_iv_buffer[idx];
@@ -185,7 +193,8 @@ iv_table& AESCryptor::get_iv_table(int fd, off_t data_pos) TIGHTDB_NOEXCEPT {
     return m_iv_buffer[idx];
 }
 
-bool AESCryptor::check_hmac(const void *src, size_t len, const uint8_t *hmac) const {
+bool AESCryptor::check_hmac(const void *src, size_t len, const uint8_t *hmac) const
+{
     uint8_t buffer[224 / 8];
     calc_hmac(src, len, buffer, m_hmacKey);
 
@@ -196,7 +205,8 @@ bool AESCryptor::check_hmac(const void *src, size_t len, const uint8_t *hmac) co
     return result == 0;
 }
 
-void AESCryptor::read(int fd, off_t pos, char* dst) TIGHTDB_NOEXCEPT {
+void AESCryptor::read(int fd, off_t pos, char* dst) TIGHTDB_NOEXCEPT
+{
     try {
         try_read(fd, pos, dst);
     }
@@ -241,7 +251,8 @@ void AESCryptor::try_read(int fd, off_t pos, char* dst) {
     crypt(mode_Decrypt, pos, dst, buffer, reinterpret_cast<const char*>(&iv.iv1));
 }
 
-void AESCryptor::write(int fd, off_t pos, const char* src) TIGHTDB_NOEXCEPT {
+void AESCryptor::write(int fd, off_t pos, const char* src) TIGHTDB_NOEXCEPT
+{
     iv_table& iv = get_iv_table(fd, pos);
 
     memcpy(&iv.iv2, &iv.iv1, 32);
@@ -264,7 +275,8 @@ void AESCryptor::write(int fd, off_t pos, const char* src) TIGHTDB_NOEXCEPT {
 }
 
 void AESCryptor::crypt(EncryptionMode mode, off_t pos, char* dst,
-                         const char* src, const char* stored_iv) TIGHTDB_NOEXCEPT {
+                         const char* src, const char* stored_iv) TIGHTDB_NOEXCEPT
+{
     uint8_t iv[aes_block_size] = {0};
     memcpy(iv, stored_iv, 4);
     memcpy(iv + 4, &pos, sizeof(pos));
@@ -296,17 +308,20 @@ EncryptedFileMapping::EncryptedFileMapping(SharedFileInfo& file, void* addr, siz
     file.mappings.push_back(this);
 }
 
-EncryptedFileMapping::~EncryptedFileMapping() {
+EncryptedFileMapping::~EncryptedFileMapping()
+{
     flush();
     sync();
     m_file.mappings.erase(remove(m_file.mappings.begin(), m_file.mappings.end(), this));
 }
 
-char* EncryptedFileMapping::page_addr(size_t i) const TIGHTDB_NOEXCEPT {
+char* EncryptedFileMapping::page_addr(size_t i) const TIGHTDB_NOEXCEPT
+{
     return reinterpret_cast<char*>(((m_first_page + i) * page_size));
 }
 
-void EncryptedFileMapping::mark_unreadable(size_t i) TIGHTDB_NOEXCEPT {
+void EncryptedFileMapping::mark_unreadable(size_t i) TIGHTDB_NOEXCEPT
+{
     if (i >= m_page_count)
         return;
 
@@ -319,7 +334,8 @@ void EncryptedFileMapping::mark_unreadable(size_t i) TIGHTDB_NOEXCEPT {
     }
 }
 
-void EncryptedFileMapping::mark_readable(size_t i) TIGHTDB_NOEXCEPT {
+void EncryptedFileMapping::mark_readable(size_t i) TIGHTDB_NOEXCEPT
+{
     if (i >= m_read_pages.size() || (m_read_pages[i] && !m_write_pages[i]))
         return;
 
@@ -328,7 +344,8 @@ void EncryptedFileMapping::mark_readable(size_t i) TIGHTDB_NOEXCEPT {
     m_write_pages[i] = false;
 }
 
-void EncryptedFileMapping::mark_unwritable(size_t i) TIGHTDB_NOEXCEPT {
+void EncryptedFileMapping::mark_unwritable(size_t i) TIGHTDB_NOEXCEPT
+{
     if (i >= m_write_pages.size() || !m_write_pages[i])
         return;
 
@@ -338,7 +355,8 @@ void EncryptedFileMapping::mark_unwritable(size_t i) TIGHTDB_NOEXCEPT {
     // leave dirty bit set
 }
 
-bool EncryptedFileMapping::copy_read_page(size_t page) TIGHTDB_NOEXCEPT {
+bool EncryptedFileMapping::copy_read_page(size_t page) TIGHTDB_NOEXCEPT
+{
     for (size_t i = 0; i < m_file.mappings.size(); ++i) {
         EncryptedFileMapping* m = m_file.mappings[i];
         if (m == this || page >= m->m_page_count)
@@ -353,7 +371,8 @@ bool EncryptedFileMapping::copy_read_page(size_t page) TIGHTDB_NOEXCEPT {
     return false;
 }
 
-void EncryptedFileMapping::read_page(size_t i) TIGHTDB_NOEXCEPT {
+void EncryptedFileMapping::read_page(size_t i) TIGHTDB_NOEXCEPT
+{
     char* addr = page_addr(i);
     mprotect(addr, page_size, PROT_READ | PROT_WRITE);
 
@@ -363,7 +382,8 @@ void EncryptedFileMapping::read_page(size_t i) TIGHTDB_NOEXCEPT {
     mark_readable(i);
 }
 
-void EncryptedFileMapping::write_page(size_t page) TIGHTDB_NOEXCEPT {
+void EncryptedFileMapping::write_page(size_t page) TIGHTDB_NOEXCEPT
+{
     for (size_t i = 0; i < m_file.mappings.size(); ++i) {
         EncryptedFileMapping* m = m_file.mappings[i];
         if (m != this)
@@ -375,7 +395,8 @@ void EncryptedFileMapping::write_page(size_t page) TIGHTDB_NOEXCEPT {
     m_dirty_pages[page] = true;
 }
 
-void EncryptedFileMapping::validate_page(size_t page) TIGHTDB_NOEXCEPT {
+void EncryptedFileMapping::validate_page(size_t page) TIGHTDB_NOEXCEPT
+{
 #ifdef TIGHTDB_DEBUG
     if (!m_read_pages[page])
         return;
@@ -401,14 +422,16 @@ void EncryptedFileMapping::validate_page(size_t page) TIGHTDB_NOEXCEPT {
 #endif
 }
 
-void EncryptedFileMapping::validate() TIGHTDB_NOEXCEPT {
+void EncryptedFileMapping::validate() TIGHTDB_NOEXCEPT
+{
 #ifdef TIGHTDB_DEBUG
     for (size_t i = 0; i < m_page_count; ++i)
         validate_page(i);
 #endif
 }
 
-void EncryptedFileMapping::flush() TIGHTDB_NOEXCEPT {
+void EncryptedFileMapping::flush() TIGHTDB_NOEXCEPT
+{
     size_t start = 0;
     for (size_t i = 0; i < m_page_count; ++i) {
         if (!m_read_pages[i]) {
@@ -434,11 +457,13 @@ void EncryptedFileMapping::flush() TIGHTDB_NOEXCEPT {
     validate();
 }
 
-void EncryptedFileMapping::sync() TIGHTDB_NOEXCEPT {
+void EncryptedFileMapping::sync() TIGHTDB_NOEXCEPT
+{
     fsync(m_file.fd);
 }
 
-void EncryptedFileMapping::handle_access(void* addr) TIGHTDB_NOEXCEPT {
+void EncryptedFileMapping::handle_access(void* addr) TIGHTDB_NOEXCEPT
+{
     size_t accessed_page = reinterpret_cast<uintptr_t>(addr) / page_size;
 
     size_t idx = accessed_page - m_first_page;
@@ -453,7 +478,8 @@ void EncryptedFileMapping::handle_access(void* addr) TIGHTDB_NOEXCEPT {
     }
 }
 
-void EncryptedFileMapping::set(void* new_addr, size_t new_size) {
+void EncryptedFileMapping::set(void* new_addr, size_t new_size)
+{
     m_file.cryptor.set_file_size(new_size);
     TIGHTDB_ASSERT(new_size % page_size == 0);
 
@@ -485,13 +511,15 @@ void EncryptedFileMapping::set(void* new_addr, size_t new_size) {
         mprotect(m_addr, m_page_count * page_size, PROT_NONE);
 }
 
-File::SizeType encrypted_size_to_data_size(File::SizeType size) TIGHTDB_NOEXCEPT {
+File::SizeType encrypted_size_to_data_size(File::SizeType size) TIGHTDB_NOEXCEPT
+{
     if (size == 0)
         return 0;
     return fake_offset(size);
 }
 
-File::SizeType data_size_to_encrypted_size(File::SizeType size) TIGHTDB_NOEXCEPT {
+File::SizeType data_size_to_encrypted_size(File::SizeType size) TIGHTDB_NOEXCEPT
+{
     return real_offset(size);
 }
 
@@ -500,11 +528,13 @@ File::SizeType data_size_to_encrypted_size(File::SizeType size) TIGHTDB_NOEXCEPT
 namespace tightdb {
 namespace util {
 
-File::SizeType encrypted_size_to_data_size(File::SizeType size) TIGHTDB_NOEXCEPT {
+File::SizeType encrypted_size_to_data_size(File::SizeType size) TIGHTDB_NOEXCEPT
+{
     return size;
 }
 
-File::SizeType data_size_to_encrypted_size(File::SizeType size) TIGHTDB_NOEXCEPT {
+File::SizeType data_size_to_encrypted_size(File::SizeType size) TIGHTDB_NOEXCEPT
+{
     return size;
 }
 
