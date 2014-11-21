@@ -609,6 +609,7 @@
     <ClCompile Include="..\..\src\tightdb\link_view.cpp" />
     <ClCompile Include="..\..\src\tightdb\replication.cpp" />
     <ClCompile Include="..\..\src\tightdb\unicode.cpp" />
+    <ClCompile Include="..\..\src\tightdb\util\errno.cpp" />
     <ClCompile Include="..\..\src\tightdb\util\file.cpp" />
     <ClCompile Include="..\..\src\tightdb\importer.cpp" />
     <ClCompile Include="..\..\src\tightdb\importer_tool.cpp">
@@ -1093,6 +1094,7 @@
     <ClInclude Include="..\..\src\tightdb\query_expression.hpp" />
     <ClInclude Include="..\..\src\tightdb\string_data.hpp" />
     <ClInclude Include="..\..\src\tightdb\unicode.hpp" />
+    <ClInclude Include="..\..\src\tightdb\util\errno.hpp" />
     <ClInclude Include="..\..\src\tightdb\util\shared_ptr.hpp" />
     <ClInclude Include="..\..\src\tightdb\util\terminate.hpp" />
     <ClInclude Include="..\..\src\tightdb\util\unique_ptr.hpp" />

@@ -17,7 +17,8 @@
 
 ### Enhancements:
 
-* Lorem ipsum.
+* Adding SharedGroup::wait_for_change() which allows a thread to sleep until
+  the database changes.
 
 -----------
 
