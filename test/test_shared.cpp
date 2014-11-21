@@ -89,6 +89,86 @@ TIGHTDB_TABLE_4(TestTableShared,
 
 } // anonymous namespace
 
+void writer(string path)
+{
+    SharedGroup sg(path, true, SharedGroup::durability_Full);
+    for (int i=0; i<1000; ++i) {
+        WriteTransaction wt(sg);
+        if (i & 1) {
+            TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
+            t1->add(i, 2, false, "test");
+        }
+        wt.commit();
+    }
+    _exit(0);
+}
+
+void killer(TestResults& test_results, int pid, string path)
+{
+    {
+        SharedGroup sg(path, true, SharedGroup::durability_Full);
+        size_t size;
+        {
+            ReadTransaction rt(sg);
+            rt.get_group().Verify();
+            TestTableShared::ConstRef t1 = rt.get_table<TestTableShared>("test");
+            size = t1->size();
+        }
+        bool done = false;
+        do {
+            sched_yield();
+            ReadTransaction rt(sg);
+            rt.get_group().Verify();
+            TestTableShared::ConstRef t1 = rt.get_table<TestTableShared>("test");
+            done = size + 10 < t1->size();
+        } while (!done);
+    }
+    kill(pid, 9);
+    int stat_loc = 0;
+    int options = 0;
+    pid = waitpid(pid, &stat_loc, options);
+    if (pid == pid_t(-1))
+        TIGHTDB_TERMINATE("waitpid() failed");
+    bool child_exited_from_signal = WIFSIGNALED(stat_loc);
+    CHECK(child_exited_from_signal);
+    int child_exit_status = WEXITSTATUS(stat_loc);
+    CHECK_EQUAL(0, child_exit_status);
+}
+
+TEST(Shared_PipelinedWritesWithKills)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    cout << string(path) << endl;
+    {
+        SharedGroup sg(path, false, SharedGroup::durability_Full);
+        // Create first table in group
+        {
+            WriteTransaction wt(sg);
+            TestTableShared::Ref t1 = wt.add_table<TestTableShared>("test");
+            t1->add(-1, 2, false, "test");
+            wt.commit();
+        }
+    }
+    int pid = fork();
+    if (pid == 0) {
+        // first writer!
+        writer(path);
+    }
+    else {
+        for (int k=0; k<100; ++k) {
+            int pid2 = pid;
+            pid = fork();
+            if (pid == 0) {
+                writer(path);
+            }
+            else {
+                killer(test_results, pid2, path);
+            }
+        }
+        killer(test_results, pid, path);
+    }
+}
+
 #ifdef LOCKFILE_CLEANUP
 // The following two tests are now disabled, as we have abandoned the requirement to
 // clean up the .lock file after use.
