@@ -1788,8 +1788,6 @@ TEST_IF(Shared_AsyncMultiprocess, allow_async)
 #endif
 }
 
-#endif // endif not on windows
-
 static const int num_threads = 3;
 static int shared_state[num_threads];
 static Mutex muu;
@@ -1866,6 +1864,8 @@ TEST(Shared_WaitForChange)
     for (int j=0; j < num_threads; j++)
         threads[j].join();
 }
+
+#endif // endif not on windows
 
 TEST(Shared_MixedWithNonShared)
 {
