@@ -1,0 +1,5 @@
+#!/bin/bash
+while :
+do
+	test/tightdb-tests-dbg
+done

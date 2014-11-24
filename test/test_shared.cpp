@@ -83,10 +83,16 @@ bool allow_async = true;
 #endif
 
 TIGHTDB_TABLE_4(TestTableShared,
-                first,  Int,
-                second, Int,
-                third,  Bool,
-                fourth, String)
+    first, Int,
+    second, Int,
+    third, Bool,
+    fourth, String)
+
+
+
+    TIGHTDB_TABLE_1(Woop,
+    first, Int)
+
 
 } // anonymous namespace
 
@@ -94,11 +100,16 @@ void writer(string path)
 {
     SharedGroup sg(path, true, SharedGroup::durability_Full);
     for (int i=0; i<1000; ++i) {
+
+	if(i >= 0)
+            cerr << i;
+
+	if(i >= 1000)
+            cerr << "\nNever killed?\n";
+
         WriteTransaction wt(sg);
-        if (i & 1) {
-            TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
-            t1->add(i, 2, false, "test");
-        }
+        Woop::Ref t1 = wt.get_table<Woop>("test");
+        t1[0].first = 1000 + i; 
         wt.commit();
     }
     _exit(0);
@@ -106,26 +117,23 @@ void writer(string path)
 
 void killer(TestResults& test_results, int pid, string path)
 {
-    size_t size;
     {
         SharedGroup sg(path, true, SharedGroup::durability_Full);
+        size_t size;
         {
             ReadTransaction rt(sg);
             rt.get_group().Verify();
-            TestTableShared::ConstRef t1 = rt.get_table<TestTableShared>("test");
+            Woop::ConstRef t1 = rt.get_table<Woop>("test");
             size = t1->size();
         }
         bool done = false;
         do {
             sched_yield();
-            // pseudo randomized wait (to prevent unwanted synchronization effects of yield):
-            int n = random() % 10000;
-            volatile int thing = 0;
-            while (n--) thing += random();
             ReadTransaction rt(sg);
             rt.get_group().Verify();
-            TestTableShared::ConstRef t1 = rt.get_table<TestTableShared>("test");
-            done = size + 10 < t1->size();
+            Woop::ConstRef t1 = rt.get_table<Woop>("test");
+            size = t1[0].first; //->get_int(0, 0);
+            done = size > 1000;
         } while (!done);
     }
     kill(pid, 9);
@@ -138,17 +146,9 @@ void killer(TestResults& test_results, int pid, string path)
     CHECK(child_exited_from_signal);
     int child_exit_status = WEXITSTATUS(stat_loc);
     CHECK_EQUAL(0, child_exit_status);
-    {
-        // Verify that we surely did kill the process before it could do all it's commits.
-        SharedGroup sg(path, true, SharedGroup::durability_Full);
-        ReadTransaction rt(sg);
-        rt.get_group().Verify();
-        TestTableShared::ConstRef t1 = rt.get_table<TestTableShared>("test");
-        CHECK(size + 500 > t1->size());
-    }
 }
 
-TEST(Shared_PipelinedWritesWithKills)
+ONLY(Shared_PipelinedWritesWithKills)
 {
     SHARED_GROUP_TEST_PATH(path);
     {
@@ -156,8 +156,8 @@ TEST(Shared_PipelinedWritesWithKills)
         // Create first table in group
         {
             WriteTransaction wt(sg);
-            TestTableShared::Ref t1 = wt.add_table<TestTableShared>("test");
-            t1->add(-1, 2, false, "test");
+            Woop::Ref t1 = wt.add_table<Woop>("test");
+            t1->add(1000); // init to 1000 so it won't use time on bitexpand 
             wt.commit();
         }
     }
@@ -167,7 +167,7 @@ TEST(Shared_PipelinedWritesWithKills)
         writer(path);
     }
     else {
-        for (int k=0; k<100; ++k) {
+        for (int k=0; k<2000; ++k) {
             int pid2 = pid;
             pid = fork();
             if (pid == 0) {
