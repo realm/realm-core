@@ -8,6 +8,7 @@
 #ifndef _WIN32
 #  include <unistd.h>
 #  include <sys/wait.h>
+#  include <signal.h>
 #  define ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE
 #else
 #  define NOMINMAX
@@ -138,7 +139,6 @@ void killer(TestResults& test_results, int pid, string path)
 TEST(Shared_PipelinedWritesWithKills)
 {
     SHARED_GROUP_TEST_PATH(path);
-    cout << string(path) << endl;
     {
         SharedGroup sg(path, false, SharedGroup::durability_Full);
         // Create first table in group
