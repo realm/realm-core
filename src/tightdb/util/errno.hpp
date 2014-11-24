@@ -17,37 +17,18 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#include <iostream>
+#ifndef TIGHTDB_UTIL_ERRNO_HPP
+#define TIGHTDB_UTIL_ERRNO_HPP
 
-#ifdef __APPLE__
-#include <execinfo.h>
-#endif
-
-#include <tightdb/util/terminate.hpp>
-
-using namespace std;
+#include <string>
 
 namespace tightdb {
 namespace util {
 
+// Get the error message for a given error code, and append it to `prefix`
+std::string get_errno_msg(const char* prefix, int err);
 
-TIGHTDB_NORETURN void terminate(string message, const char* file, long line) TIGHTDB_NOEXCEPT
-{
-    cerr << file << ":" << line << ": " << message << endl;
-
-#ifdef __APPLE__
-    void* callstack[128];
-    int frames = backtrace(callstack, 128);
-    char** strs = backtrace_symbols(callstack, frames);
-    for (int i = 0; i < frames; ++i) {
-        cerr << strs[i] << endl;
-    }
-    free(strs);
-#endif
-
-    abort();
+}
 }
 
-
-} // namespace util
-} // namespace tightdb
+#endif

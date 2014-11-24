@@ -1,4 +1,3 @@
-#include <cerrno>
 #include <stdexcept>
 
 #include <tightdb/util/thread.hpp>

@@ -377,6 +377,30 @@ get_dist_log_path()
     printf "%s\n" "$path"
 }
 
+download_openssl()
+{
+    if [ -d openssl ]; then
+        return 0
+    fi
+
+    local enabled
+    enabled="$(get_config_param "ENABLE_ENCRYPTION")" || return 1
+    if [ "$enabled" != "yes" ]; then
+        return 0
+    fi
+
+    echo 'Downloading OpenSSL...'
+    curl -L -s "http://www.openssl.org/source/openssl-1.0.1i.tar.gz" -o openssl.tar.gz || return 1
+    tar -xzf openssl.tar.gz || return 1
+    mv openssl-1.0.1i openssl || return 1
+    rm openssl.tar.gz || return 1
+
+    # A function we don't use calls OPENSSL_cleanse, which has all sorts of
+    # dependencies due to being written in asm
+    sed '/OPENSSL_cleanse/d' 'openssl/crypto/sha/sha256.c' > sha_tmp
+    mv sha_tmp 'openssl/crypto/sha/sha256.c'
+}
+
 
 case "$MODE" in
 
@@ -415,6 +439,11 @@ case "$MODE" in
         enable_alloc_set_zero="no"
         if [ "$TIGHTDB_ENABLE_ALLOC_SET_ZERO" ]; then
             enable_alloc_set_zero="yes"
+        fi
+
+        enable_encryption="no"
+        if [ "$TIGHTDB_ENABLE_ENCRYPTION" ]; then
+            enable_encryption="yes"
         fi
 
         # Find Xcode
@@ -490,6 +519,7 @@ MAX_BPNODE_SIZE       = $max_bpnode_size
 MAX_BPNODE_SIZE_DEBUG = $max_bpnode_size_debug
 ENABLE_REPLICATION    = $enable_replication
 ENABLE_ALLOC_SET_ZERO = $enable_alloc_set_zero
+ENABLE_ENCRYPTION     = $enable_encryption
 XCODE_HOME            = $xcode_home
 IPHONE_SDKS           = ${iphone_sdks:-none}
 IPHONE_SDKS_AVAIL     = $iphone_sdks_avail
@@ -614,6 +644,8 @@ EOF
 
     "build-android")
         auto_configure || exit 1
+        download_openssl || exit 1
+
         export TIGHTDB_HAVE_CONFIG="1"
         android_ndk_home="$(get_config_param "ANDROID_NDK_HOME")" || exit 1
         if [ "$android_ndk_home" = "none" ]; then
@@ -626,6 +658,9 @@ Please do one of the following:
 EOF
             exit 1
         fi
+
+        enable_encryption="$(get_config_param "ENABLE_ENCRYPTION")" || return 1
+
         export TIGHTDB_ANDROID="1"
         mkdir -p "$ANDROID_DIR" || exit 1
         for target in $ANDROID_PLATFORMS; do
@@ -635,18 +670,22 @@ EOF
             else
                 platform="9"
             fi
-            # Note that `make-standalone-toolchain.sh` is written for
-            # `bash` and must therefore be executed by `bash`.
-            make_toolchain="$android_ndk_home/build/tools/make-standalone-toolchain.sh"
-            bash "$make_toolchain" --platform="android-$platform" --install-dir="$temp_dir" --arch="$target" || exit 1
             android_prefix="$target"
+            android_toolchain="arm-linux-androideabi-4.8"
             if [ "$target" = "arm-v7a" ]; then
                 android_prefix="arm"
             elif [ "$target" = "mips" ]; then
                 android_prefix="mipsel"
+                android_toolchain="mipsel-linux-android-4.8"
             elif [ "$target" = "x86" ]; then
                 android_prefix="i686"
+                android_toolchain="x86-4.8"
             fi
+            # Note that `make-standalone-toolchain.sh` is written for
+            # `bash` and must therefore be executed by `bash`.
+            make_toolchain="$android_ndk_home/build/tools/make-standalone-toolchain.sh"
+            bash "$make_toolchain" --platform="android-$platform" --toolchain="$android_toolchain" --install-dir="$temp_dir" --arch="$target" || exit 1
+
             path="$temp_dir/bin:$PATH"
             cc="$(cd "$temp_dir/bin" && echo $android_prefix-linux-*-gcc)" || exit 1
             cflags_arch=""
@@ -656,10 +695,70 @@ EOF
                 word_list_append "cflags_arch" "-mthumb -march=armv7-a -mfloat-abi=softfp -mfpu=vfpv3-d16" || exit 1
             fi
             denom="android-$target"
+
+            # Build OpenSSL if needed
+            libcrypto_name="libcrypto-$denom.a"
+            if ! [ -f "$ANDROID_DIR/$libcrypto_name" ] && [ $enable_encryption = yes ]; then
+                (
+                    cd openssl
+                    export MACHINE=$target
+                    export RELEASE=2.6.37
+                    export SYSTEM=android
+                    export ARCH=arm
+                    export HOSTCC=gcc
+                    export PATH="$path"
+                    export CC="$cc"
+                    ./config no-idea no-camellia no-seed no-bf no-cast no-des \
+                             no-rc2 no-rc4 no-rc5 no-md2 no-md4 no-ripemd \
+                             no-mdc2 no-rsa no-dsa no-dh no-ec no-ecdsa no-ecdh \
+                             no-sock no-ssl2 no-ssl3 no-err no-krb5 no-engine \
+                             no-srtp no-speed -DOPENSSL_NO_SHA512 \
+                             -DOPENSSL_NO_SHA0 -w -fPIC || exit 1
+                    $MAKE clean
+                ) || exit 1
+
+                PATH="$path" CC="$cc" CFLAGS="$cflags_arch" $MAKE -C "openssl" build_libs || exit 1
+                cp "openssl/libcrypto.a" "$ANDROID_DIR/$libcrypto_name" || exit 1
+            fi
+
+            # Build tightdb
             PATH="$path" CC="$cc" $MAKE -C "src/tightdb" CC_IS="gcc" BASE_DENOM="$denom" CFLAGS_ARCH="$cflags_arch" "libtightdb-$denom.a" || exit 1
-            cp "src/tightdb/libtightdb-$denom.a" "$ANDROID_DIR" || exit 1
+
+            if [ $enable_encryption = yes ]; then
+                # Merge OpenSSL and tightdb into one static library
+                mkdir ar-temp
+                (
+                    AR="$(echo "$temp_dir/bin/$android_prefix-linux-*-gcc-ar")" || exit 1
+                    RANLIB="$(echo "$temp_dir/bin/$android_prefix-linux-*-gcc-ranlib")" || exit 1
+                    cd ar-temp
+                    echo $AR x "../$ANDROID_DIR/$libcrypto_name" || exit 1
+                    $AR x "../$ANDROID_DIR/$libcrypto_name" || exit 1
+                    find \
+                      . ! -name 'aes*' \
+                      -a ! -name cbc128.o \
+                      -a ! -name sha256.o \
+                      -a ! -name sha256-586.o \
+                      -delete || exit 1
+                    rm -f aes_wrap.o
+                    $AR x "../src/tightdb/libtightdb-$denom.a" || exit 1
+                    $AR r "../$ANDROID_DIR/libtightdb-$denom.a" *.o || exit 1
+                    $RANLIB "../$ANDROID_DIR/libtightdb-$denom.a"
+                ) || exit 1
+                rm -r ar-temp
+
+                echo 'This product includes software developed by the OpenSSL Project for use in the OpenSSL toolkit. (http://www.openssl.org/).' > $ANDROID_DIR/OpenSSL.txt
+                echo '' >> $ANDROID_DIR/OpenSSL.txt
+                echo 'The following license applies only to the portions of this product developed by the OpenSSL Project.' >> $ANDROID_DIR/OpenSSL.txt
+                echo '' >> $ANDROID_DIR/OpenSSL.txt
+
+                cat openssl/LICENSE >> $ANDROID_DIR/OpenSSL.txt
+            else
+                cp "src/tightdb/libtightdb-$denom.a" "$ANDROID_DIR" || exit 1
+            fi
+
             rm -rf "$temp_dir" || exit 1
         done
+
         echo "Copying headers to '$ANDROID_DIR/include'"
         mkdir -p "$ANDROID_DIR/include" || exit 1
         cp "src/tightdb.hpp" "$ANDROID_DIR/include/" || exit 1
@@ -670,13 +769,22 @@ EOF
         (cd "$TIGHTDB_HOME/$ANDROID_DIR/include/tightdb" && tar xzmf "$temp_dir/headers.tar.gz") || exit 1
 
         tightdb_version="$(sh build.sh get-version)" || exit
-        echo "Create tar.gz file core-android-$tightdb_version.tar.gz"
-        rm -f "$TIGHTDB_HOME/core-android-$tightdb_version.tar.gz" || exit 1
-        (cd "$TIGHTDB_HOME/$ANDROID_DIR" && tar czf "$TIGHTDB_HOME/core-android-$tightdb_version.tar.gz" .) || exit 1
-        echo "Unpacking in ../tightdb_java/core"
-        mkdir -p ../tightdb_java || exit 1 # to help Mr. Jenkins
-        (cd ../tightdb_java && rm -rf core && mkdir core) || exit 1
-        (cd ../tightdb_java/core && tar xzf "$TIGHTDB_HOME/core-android-$tightdb_version.tar.gz") || exit 1
+        dir_name="core-$tightdb_version"
+        file_name="core-android-$tightdb_version.tar.gz"
+        if [ $enable_encryption = yes ]; then
+            dir_name="$dir_name-encryption"
+            file_name="core-android-$tightdb_version-encryption.tar.gz"
+        fi
+
+        echo "Create tar.gz file $file_name"
+        rm -f "$TIGHTDB_HOME/$file_name" || exit 1
+        (cd "$TIGHTDB_HOME/$ANDROID_DIR" && tar czf "$TIGHTDB_HOME/$file_name" include libtightdb* *.txt) || exit 1
+
+        echo "Unpacking in ../tightdb_java/$dir_name"
+        mkdir -p ../tightdb_java/realm-jni/build || exit 1 # to help Mr. Jenkins
+        cp "$TIGHTDB_HOME/$file_name" ../tightdb_java/realm-jni/build
+        (cd ../tightdb_java && rm -rf $dir_name && mkdir $dir_name) || exit 1
+        (cd ../tightdb_java/$dir_name && tar xzf "$TIGHTDB_HOME/$file_name") || exit 1
         ;;
 
    "build-cocoa")
@@ -2611,6 +2719,11 @@ EOF
         git reset --hard || exit 1
         git clean -xfd || exit 1
 
+        TIGHTDB_MAX_BPNODE_SIZE_DEBUG="4" TIGHTDB_ENABLE_ENCRYPTION="yes" sh build.sh config "$WORKSPACE/install" || exit 1
+        sh build.sh build-iphone || exit 1
+        sh build.sh build-android || exit 1
+        sh build.sh check || exit 1
+
         TIGHTDB_MAX_BPNODE_SIZE_DEBUG="4" sh build.sh config "$WORKSPACE/install" || exit 1
         sh build.sh build-iphone || exit 1
         sh build.sh build-android || exit 1
@@ -2664,7 +2777,8 @@ EOF
         exit 0
         ;;
 
-    *)  usage
+    *)
+        usage
         exit 1
         ;;
 esac

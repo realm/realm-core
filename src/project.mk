@@ -58,6 +58,14 @@ ifneq ($(TIGHTDB_HAVE_CONFIG),)
   else
     TIGHTDB_ENABLE_REPLICATION = $(EMPTY)
   endif
+  ifeq ($(ENABLE_ENCRYPTION),yes)
+    ifeq ($(TIGHTDB_ANDROID),)
+      PROJECT_CFLAGS += -DTIGHTDB_ENABLE_ENCRYPTION
+    else
+      PROJECT_CFLAGS += -DTIGHTDB_ENABLE_ENCRYPTION -I../../openssl/include
+      PROJECT_LDFLAGS += -lcrypto
+    endif
+  endif
 else
   ifneq ($(TIGHTDB_ENABLE_REPLICATION),)
     PROJECT_CFLAGS += -DTIGHTDB_ENABLE_REPLICATION

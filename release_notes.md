@@ -12,6 +12,8 @@
 
 * Added SharedGroup::get_number_of_versions() which will report the number of
   distinct versions kept in the database.
+* Adding SharedGroup::wait_for_change() which allows a thread to sleep until
+  the database changes.
 
 -----------
 

@@ -1,3 +1,23 @@
+/*************************************************************************
+ *
+ * TIGHTDB CONFIDENTIAL
+ * __________________
+ *
+ *  [2011] - [2012] TightDB Inc
+ *  All Rights Reserved.
+ *
+ * NOTICE:  All information contained herein is, and remains
+ * the property of TightDB Incorporated and its suppliers,
+ * if any.  The intellectual and technical concepts contained
+ * herein are proprietary to TightDB Incorporated
+ * and its suppliers and may be covered by U.S. and Foreign Patents,
+ * patents in process, and are protected by trade secret or copyright law.
+ * Dissemination of this information or reproduction of this material
+ * is strictly forbidden unless prior written permission is obtained
+ * from TightDB Incorporated.
+ *
+ **************************************************************************/
+
 #include <cerrno>
 #include <algorithm>
 #include <iostream>
@@ -5,6 +25,7 @@
 #include <fcntl.h>
 
 #include <tightdb/util/features.h>
+#include <tightdb/util/errno.hpp>
 #include <tightdb/util/safe_int_ops.hpp>
 #include <tightdb/util/thread.hpp>
 #include <tightdb/group_writer.hpp>
@@ -36,7 +57,7 @@ namespace {
 // Constants controlling the amount of uncommited writes in flight:
 const uint16_t max_write_slots = 100;
 const uint16_t relaxed_sync_threshold = 50;
-#define SHAREDINFO_VERSION 1
+#define SHAREDINFO_VERSION 2
 
 // The following functions are carefully designed for minimal overhead
 // in case of contention among read transactions. In case of contention,
@@ -353,6 +374,9 @@ struct SharedGroup::SharedInfo
     // (and a few other metadata)
     bool versioning_ready;
 
+    // Set when some thread wants to suspend waiting for a change. Cleared when all
+    // waiting threads are woken.
+    bool waiting_for_change;
     uint16_t version;
     uint16_t flags;
     uint16_t free_write_slots;
@@ -366,6 +390,7 @@ struct SharedGroup::SharedInfo
     CondVar room_to_write;
     CondVar work_to_do;
     CondVar daemon_becomes_ready;
+    CondVar new_commit_available;
 #endif
     // IMPORTANT: The ringbuffer MUST be the last field in SharedInfo - see above.
     Ringbuffer readers;
@@ -394,7 +419,8 @@ SharedGroup::SharedInfo::SharedInfo(DurabilityLevel dlevel):
     controlmutex(), // Throws
     room_to_write(CondVar::process_shared_tag()), // Throws
     work_to_do(CondVar::process_shared_tag()), // Throws
-    daemon_becomes_ready(CondVar::process_shared_tag()) // Throws
+    daemon_becomes_ready(CondVar::process_shared_tag()), // Throws
+    new_commit_available(CondVar::process_shared_tag()) // Throws
 #else
     writemutex(), // Throws
     balancemutex() // Throws
@@ -407,6 +433,7 @@ SharedGroup::SharedInfo::SharedInfo(DurabilityLevel dlevel):
     daemon_started = false;
     daemon_ready = false;
     versioning_ready = false;
+    waiting_for_change = false;
     init_complete = 1;
 }
 
@@ -427,8 +454,8 @@ void spawn_daemon(const string& file)
     int m = int(sysconf(_SC_OPEN_MAX));
     if (m < 0) {
         if (errno) {
-            // int err = errno; // TODO: include err in exception string
-            throw runtime_error("'sysconf(_SC_OPEN_MAX)' failed ");
+            int err = errno; // Eliminate any risk of clobbering
+            throw runtime_error(get_errno_msg("'sysconf(_SC_OPEN_MAX)' failed: ", err));
         }
         throw runtime_error("'sysconf(_SC_OPEN_MAX)' failed with no reason");
     }
@@ -535,7 +562,7 @@ void spawn_daemon(const string& file) {}
 // undefined state.
 
 void SharedGroup::open(const string& path, bool no_create_file,
-                       DurabilityLevel dlevel, bool is_backend)
+                       DurabilityLevel dlevel, bool is_backend, const uint8_t* key)
 {
     TIGHTDB_ASSERT(!is_attached());
 
@@ -593,6 +620,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
         // - start of the async daemon
         // - stop of the async daemon
         // - SharedGroup joining/leaving the sharing scheme
+        // - Waiting for and signalling database changes
         {
             RobustLockGuard lock(info->controlmutex, &recover_from_dead_write_transact); // Throws
             // Even though we checked init_complete before grabbing the write mutex,
@@ -608,7 +636,8 @@ void SharedGroup::open(const string& path, bool no_create_file,
             if (info->versioning_ready == false) {
                 no_create = no_create_file;
             }
-            ref_type top_ref = alloc.attach_file(path, is_shared, read_only, no_create, skip_validate); // Throws
+            ref_type top_ref = alloc.attach_file(path, is_shared, read_only,
+                                                 no_create, skip_validate, key); // Throws
             size_t file_size = alloc.get_baseline();
             if (info->versioning_ready == false) {
                 info->init_versioning(top_ref, file_size);
@@ -690,12 +719,13 @@ uint_fast64_t SharedGroup::get_number_of_versions()
 }
 #ifdef TIGHTDB_ENABLE_REPLICATION
 
-void SharedGroup::open(Replication& repl, DurabilityLevel dlevel)
+void SharedGroup::open(Replication& repl, DurabilityLevel dlevel, const uint8_t* key)
 {
     TIGHTDB_ASSERT(!is_attached());
     string file = repl.get_database_path();
     bool no_create   = false;
-    open(file, no_create, dlevel); // Throws
+    bool is_backend  = false;
+    open(file, no_create, dlevel, is_backend, key); // Throws
     typedef _impl::GroupFriend gf;
     gf::set_replication(m_group, &repl);
 }
@@ -753,6 +783,20 @@ bool SharedGroup::has_changed()
 }
 
 #ifndef _WIN32
+void SharedGroup::wait_for_change()
+{
+    while (!has_changed()) {
+        SharedInfo* info = m_file_map.get_addr();
+        RobustLockGuard lock(info->controlmutex, recover_from_dead_write_transact);
+        if (!has_changed()) {
+            if (info->waiting_for_change == false)
+                info->waiting_for_change = true;
+            info->new_commit_available.wait(info->controlmutex,
+                                            &recover_from_dead_write_transact,
+                                            0);
+        }
+    }
+}
 
 void SharedGroup::do_async_commits()
 {
@@ -1323,11 +1367,16 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
         r.version     = new_version;
         r_info->readers.use_next();
     }
+#ifndef _WIN32
     {
-        SharedInfo* info = m_file_map.get_addr();
-        RobustLockGuard lock(info->controlmutex, &recover_from_dead_write_transact); // Throws
+        RobustLockGuard lock(info->controlmutex, recover_from_dead_write_transact);
         info->number_of_versions = new_version - readlock_version + 1;
+        if (info->waiting_for_change) {
+            info->waiting_for_change = false;
+            info->new_commit_available.notify_all();
+        }
     }
+#endif
 }
 
 

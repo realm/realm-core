@@ -125,7 +125,8 @@ public:
     /// Equivalent to calling open(const std::string&, bool,
     /// DurabilityLevel) on a default constructed instance.
     explicit SharedGroup(const std::string& file, bool no_create = false,
-                         DurabilityLevel dlevel = durability_Full);
+                         DurabilityLevel dlevel = durability_Full,
+                         const uint8_t *encryption_key = 0);
 
     struct unattached_tag {};
 
@@ -169,19 +170,21 @@ public:
     /// among these derived exception types.
     void open(const std::string& file, bool no_create = false,
               DurabilityLevel dlevel = durability_Full,
-              bool is_backend = false);
+              bool is_backend = false, const uint8_t *encryption_key = 0);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
 
     /// Equivalent to calling open(Replication&) on a
     /// default constructed instance.
     explicit SharedGroup(Replication& repl,
-                         DurabilityLevel dlevel = durability_Full);
+                         DurabilityLevel dlevel = durability_Full,
+                         const uint8_t* encryption_key = 0);
 
     /// Open this group in replication mode. The specified Replication
     /// instance must remain in exixtence for as long as the
     /// SharedGroup.
-    void open(Replication&, DurabilityLevel dlevel = durability_Full);
+    void open(Replication&, DurabilityLevel dlevel = durability_Full,
+              const uint8_t* encryption_key = 0);
 
     friend class Replication;
 
@@ -214,8 +217,21 @@ public:
     /// group. Doing so will result in undefined behavior.
     void reserve(std::size_t size_in_bytes);
 
-    // Has db been modified since last transaction?
+    // Querying for changes:
+    //
+    // NOTE:
+    // "changed" means that one or more commits has been made to the database
+    // since the SharedGroup (on which wait_for_change() is called) last
+    // started, committed, promoted or advanced a transaction.
+    //
+    // No distinction is made between changes done by another process
+    // and changes done by another thread in the same process as the caller.
+    //
+    // Has db been changed ?
     bool has_changed();
+
+    // The calling thread goes to sleep until the database is changed.
+    void wait_for_change();
 
     // Transactions:
 
@@ -511,10 +527,10 @@ private:
 
 // Implementation:
 
-inline SharedGroup::SharedGroup(const std::string& file, bool no_create, DurabilityLevel dlevel):
+inline SharedGroup::SharedGroup(const std::string& file, bool no_create, DurabilityLevel dlevel, const uint8_t* key):
     m_group(Group::shared_tag())
 {
-    open(file, no_create, dlevel);
+    open(file, no_create, dlevel, false, key);
 }
 
 inline SharedGroup::SharedGroup(unattached_tag) TIGHTDB_NOEXCEPT:
@@ -528,10 +544,10 @@ inline bool SharedGroup::is_attached() const TIGHTDB_NOEXCEPT
 }
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-inline SharedGroup::SharedGroup(Replication& repl, DurabilityLevel dlevel):
+inline SharedGroup::SharedGroup(Replication& repl, DurabilityLevel dlevel, const uint8_t* key):
     m_group(Group::shared_tag())
 {
-    open(repl, dlevel);
+    open(repl, dlevel, key);
 }
 #endif
 

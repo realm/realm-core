@@ -13,6 +13,7 @@
 #include "util/misc.hpp"
 
 #include "test.hpp"
+#include "crypt_key.hpp"
 
 using namespace std;
 using namespace tightdb;
@@ -1771,11 +1772,11 @@ TEST(Table_Spec)
 
     // Write the group to disk
     GROUP_TEST_PATH(path);
-    group.write(path);
+    group.write(path, crypt_key);
 
     // Read back tables
     {
-        Group from_disk(path, Group::mode_ReadOnly);
+        Group from_disk(path, crypt_key, Group::mode_ReadOnly);
         TableRef from_disk_table = from_disk.get_table("test");
 
         TableRef subtable2 = from_disk_table->get_subtable(2, 0);

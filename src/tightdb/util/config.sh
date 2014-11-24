@@ -66,6 +66,13 @@ else
     enable_alloc_set_zero="0"
 fi
 
+enable_encryption="$(get_config_param "ENABLE_ENCRYPTION")" || exit 1
+if [ "$enable_encryption" = "yes" ]; then
+    enable_encryption="1"
+else
+    enable_encryption="0"
+fi
+
 cat >"$target" <<EOF
 /*************************************************************************
  *
@@ -96,5 +103,9 @@ cat >"$target" <<EOF
 
 #if $enable_alloc_set_zero
 #  define TIGHTDB_ENABLE_ALLOC_SET_ZERO 1
+#endif
+
+#if $enable_encryption
+#  define TIGHTDB_ENABLE_ENCRYPTION 1
 #endif
 EOF

@@ -1,6 +1,7 @@
 #include <climits>
 #include <limits>
 #include <algorithm>
+#include <vector>
 
 #include <errno.h>
 #include <string.h>
@@ -18,63 +19,19 @@
 #  include <sys/stat.h>
 #  include <sys/mman.h>
 #  include <sys/file.h> // BSD / Linux flock()
-#  ifdef _GNU_SOURCE
-#    include <sys/mman.h> // mremap()
-#  endif
 #endif
 
+#include <tightdb/util/errno.hpp>
+#include <tightdb/util/file.hpp>
+#include <tightdb/util/file_mapper.hpp>
 #include <tightdb/util/safe_int_ops.hpp>
 #include <tightdb/util/string_buffer.hpp>
-#include <tightdb/util/file.hpp>
 
 using namespace std;
 using namespace tightdb;
 using namespace tightdb::util;
 
-
 namespace {
-
-
-string get_errno_msg(const char* prefix, int err)
-{
-    StringBuffer buffer;
-    buffer.append_c_str(prefix);
-
-#if defined _WIN32 // Windows version <stdlib.h>
-
-    if (TIGHTDB_LIKELY(0 <= err || err < _sys_nerr)) {
-        buffer.append_c_str(_sys_errlist[err]);
-        return buffer.str();
-    }
-
-#elif _GNU_SOURCE && !TIGHTDB_ANDROID // GNU specific version <string.h>
-
-    // Note that Linux provides the GNU specific version even though
-    // it sets _POSIX_C_SOURCE >= 200112L.
-
-    size_t offset = buffer.size();
-    size_t max_msg_size = 256;
-    buffer.resize(offset + max_msg_size);
-    if (char* msg = strerror_r(err, buffer.data()+offset, max_msg_size))
-        return msg;
-    buffer.resize(offset);
-
-#else // POSIX.1-2001 fallback version <string.h>
-
-    size_t offset = buffer.size();
-    size_t max_msg_size = 256;
-    buffer.resize(offset + max_msg_size);
-    if (TIGHTDB_LIKELY(strerror_r(err, buffer.data()+offset, max_msg_size) == 0))
-        return buffer.str();
-    buffer.resize(offset);
-
-#endif
-
-    buffer.append_c_str("Unknown error");
-    return buffer.str();
-}
-
-
 #ifdef _WIN32 // Windows - GetLastError()
 
 string get_last_error_msg(const char* prefix, DWORD err)
@@ -388,12 +345,19 @@ size_t File::read(char* data, size_t size)
     }
     return data - data_0;
 
-  error:
+error:
     DWORD err = GetLastError(); // Eliminate any risk of clobbering
     string msg = get_last_error_msg("ReadFile() failed: ", err);
     throw runtime_error(msg);
 
 #else // POSIX version
+
+    if (m_encrypt) {
+        off_t pos = lseek(m_fd, 0, SEEK_CUR);
+        Map<char> map(*this, access_ReadOnly, static_cast<size_t>(pos + size));
+        memcpy(data, map.get_addr() + pos, size);
+        return map.get_size() - pos;
+    }
 
     char* const data_0 = data;
     while (0 < size) {
@@ -410,7 +374,7 @@ size_t File::read(char* data, size_t size)
     }
     return data - data_0;
 
-  error:
+error:
     int err = errno; // Eliminate any risk of clobbering
     string msg = get_errno_msg("read(): failed: ", err);
     throw runtime_error(msg);
@@ -444,6 +408,13 @@ void File::write(const char* data, size_t size)
     throw runtime_error(msg);
 
 #else // POSIX version
+
+    if (m_encrypt) {
+        off_t pos = lseek(m_fd, 0, SEEK_CUR);
+        Map<char> map(*this, access_ReadWrite, static_cast<size_t>(pos + size));
+        memcpy(map.get_addr() + pos, data, size);
+        return;
+    }
 
     while (0 < size) {
         // POSIX requires that 'n' is less than or equal to SSIZE_MAX
@@ -489,6 +460,8 @@ File::SizeType File::get_size() const
         SizeType size;
         if (int_cast_with_overflow_detect(statbuf.st_size, size))
             throw runtime_error("File size overflow");
+        if (m_encrypt)
+            return encrypted_size_to_data_size(size);
         return size;
     }
     throw runtime_error("fstat() failed");
@@ -509,6 +482,9 @@ void File::resize(SizeType size)
         throw runtime_error("SetEndOfFile() failed");
 
 #else // POSIX version
+
+    if (m_encrypt)
+        size = data_size_to_encrypted_size(size);
 
     off_t size2;
     if (int_cast_with_overflow_detect(size, size2))
@@ -550,6 +526,9 @@ void File::prealloc_if_supported(SizeType offset, size_t size)
 #if _POSIX_C_SOURCE >= 200112L // POSIX.1-2001 version
 
     TIGHTDB_ASSERT(is_prealloc_supported());
+
+    if (m_encrypt)
+        size = data_size_to_encrypted_size(size);
 
     off_t size2;
     if (int_cast_with_overflow_detect(size, size2))
@@ -775,21 +754,7 @@ void* File::map(AccessMode a, size_t size, int map_flags) const
     // reliably detect these systems?
     static_cast<void>(map_flags);
 
-    int prot = PROT_READ;
-    switch (a) {
-        case access_ReadWrite:
-            prot |= PROT_WRITE;
-            break;
-        case access_ReadOnly:
-            break;
-    }
-    void* addr = ::mmap(0, size, prot, MAP_SHARED, m_fd, 0);
-    if (addr != MAP_FAILED)
-        return addr;
-
-    int err = errno; // Eliminate any risk of clobbering
-    string msg = get_errno_msg("mmap() failed: ", err);
-    throw runtime_error(msg);
+    return tightdb::util::mmap(m_fd, size, a, m_encrypt ? m_encryption_key : 0);
 
 #endif
 }
@@ -806,9 +771,7 @@ void File::unmap(void* addr, size_t size) TIGHTDB_NOEXCEPT
 
 #else // POSIX version
 
-    int r = ::munmap(addr, size);
-    TIGHTDB_ASSERT(r == 0);
-    static_cast<void>(r);
+    tightdb::util::munmap(addr, size);
 
 #endif
 }
@@ -817,19 +780,13 @@ void File::unmap(void* addr, size_t size) TIGHTDB_NOEXCEPT
 void* File::remap(void* old_addr, size_t old_size, AccessMode a, size_t new_size,
                   int map_flags) const
 {
-#ifdef _GNU_SOURCE
-    static_cast<void>(a);
-    static_cast<void>(map_flags);
-    void* new_addr = ::mremap(old_addr, old_size, new_size, MREMAP_MAYMOVE);
-    if (new_addr != MAP_FAILED)
-        return new_addr;
-    int err = errno; // Eliminate any risk of clobbering
-    string msg = get_errno_msg("mremap(): failed: ", err);
-    throw runtime_error(msg);
-#else
+#ifdef _WIN32
     void* new_addr = map(a, new_size, map_flags);
     unmap(old_addr, old_size);
     return new_addr;
+#else
+    static_cast<void>(map_flags);
+    return tightdb::util::mremap(m_fd, old_addr, old_size, a, new_size);
 #endif
 }
 
@@ -844,10 +801,7 @@ void File::sync_map(void* addr, size_t size)
 
 #else // POSIX version
 
-    if (::msync(addr, size, MS_SYNC) == 0)
-        return;
-    int err = errno; // Eliminate any risk of clobbering
-    throw runtime_error(get_errno_msg("msync() failed: ", err));
+    tightdb::util::msync(addr, size);
 
 #endif
 }
@@ -1018,4 +972,16 @@ bool File::is_removed() const
     throw runtime_error("fstat() failed");
 
 #endif
+}
+
+void File::set_encryption_key(const uint8_t* key)
+{
+    if (key) {
+        memcpy(m_encryption_key, key, sizeof(m_encryption_key));
+        m_encrypt = true;
+    }
+    else {
+        memset(m_encryption_key, 0, sizeof(m_encryption_key));
+        m_encrypt = false;
+    }
 }
