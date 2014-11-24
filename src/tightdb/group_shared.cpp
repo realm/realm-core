@@ -645,6 +645,14 @@ void SharedGroup::open(const string& path, bool no_create_file,
             uint_fast64_t version;
             if (info->versioning_ready == false) {
                 Array top(alloc);
+                bool sync_mode = false;
+#ifdef TIGHTDB_ENABLE_REPLICATION
+                // If replication is enabled, we need to ask it whether we're in server-sync mode
+                // and check that the database is operated in the same mode.
+                Replication* repl = _impl::GroupFriend::get_replication(m_group);
+                if (repl)
+                    sync_mode = repl->is_in_server_synchronization_mode();
+#endif
                 if (top_ref) {
                     top.init_from_ref(top_ref);
                     if (top.size() <= 5) {
@@ -656,15 +664,22 @@ void SharedGroup::open(const string& path, bool no_create_file,
                         TIGHTDB_ASSERT(top.size() == 7);
                         version = (top.get(6) - 1) / 2;
                     }
+                    // Validate server-sync mode
+                    if (sync_mode != alloc.get_server_sync_mode()) {
+                        throw SyncUsageConsistencyError(path);
+                    }
                 }
                 else {
                     // the database was just created, no metadata has been written yet.
                     version = 1;
+
+                    // Persist server-sync mode for later checking
+                    alloc.set_server_sync_mode(sync_mode);
                 }
 #ifdef TIGHTDB_ENABLE_REPLICATION
                 // If replication is enabled, we need to inform it of the latest version,
                 // allowing it to discard any surplus log entries
-                Replication* repl = _impl::GroupFriend::get_replication(m_group);
+                repl = _impl::GroupFriend::get_replication(m_group);
                 if (repl)
                     repl->reset_log_management(version);
 #endif

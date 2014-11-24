@@ -30,6 +30,11 @@
 
 namespace tightdb {
 
+class LogFileError : public std::runtime_error {
+public:
+    LogFileError(const std::string file_name) : std::runtime_error(file_name) {}
+};
+
 // Create a writelog collector and associate it with a filepath. You'll need one writelog
 // collector for each shared group. Commits from writelog collectors for a specific filepath 
 // may later be obtained through other writrlog collectors associated with said filepath.

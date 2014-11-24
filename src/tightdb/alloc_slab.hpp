@@ -218,6 +218,10 @@ public:
     /// mapped byte has changed.
     bool remap(std::size_t file_size);
 
+    /// Set/query the sync mode stored in the database (m_reserved).
+    /// This call MUST be made while having exclusive access to the database.
+    bool get_server_sync_mode();
+    void set_server_sync_mode(bool is_in_server_sync_mode);
 #ifdef TIGHTDB_DEBUG
     void enable_debug(bool enable) { m_debug_out = enable; }
     void Verify() const TIGHTDB_OVERRIDE;
@@ -343,6 +347,7 @@ private:
 
     friend class Group;
     friend class GroupWriter;
+    friend class GroupShared;
 };
 
 

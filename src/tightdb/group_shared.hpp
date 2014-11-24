@@ -281,6 +281,13 @@ public:
         LockFileButNoData(const std::string& msg) : std::runtime_error(msg) {}
     };
 
+    // If the database was created in sync mode it's an error to try to reopen it
+    // in non-sync mode:
+    class SyncUsageConsistencyError : public std::runtime_error {
+    public:
+        SyncUsageConsistencyError(const std::string& filename) : std::runtime_error(filename) {}
+    };
+
 private:
     struct SharedInfo;
     struct ReadLockInfo {

@@ -6359,6 +6359,98 @@ TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
 }
 
 #ifndef _WIN32
+TEST(LangBindHelper_Logfiles)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    {
+        // enable sync (to get persistent log files)
+        UniquePtr<Replication> repl(makeWriteLogCollector(path, true));
+        SharedGroup sg(*repl);
+        {
+            WriteTransaction wt(sg);
+            TableRef tr = wt.add_table("table");
+            wt.commit();
+        }
+    }
+    {
+        // enable sync (to get persistent log files)
+        UniquePtr<Replication> repl(makeWriteLogCollector(path, true));
+        SharedGroup sg(*repl);
+        {
+            WriteTransaction wt(sg);
+        }
+    }
+    util::File::try_remove(string(path) + ".log_b");
+    {
+        // enable sync (to get persistent log files)
+        bool did_throw = false;
+        UniquePtr<Replication> repl(makeWriteLogCollector(path, true));
+        try {
+            SharedGroup sg(*repl);
+        } catch (LogFileError& e) 
+        {
+            CHECK_EQUAL(string(path), e.what());
+            did_throw = true;
+        };
+        CHECK(did_throw);
+    }
+}
+
+TEST(LangBindHelper_SyncCannotBeChanged_1)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    {
+        // enable sync
+        UniquePtr<Replication> repl(makeWriteLogCollector(path, true));
+        SharedGroup sg(*repl);
+        {
+            WriteTransaction wt(sg);
+            TableRef tr = wt.add_table("table");
+            wt.commit();
+        }
+    }
+    {
+        // try to access the database with sync disabled
+        UniquePtr<Replication> repl(makeWriteLogCollector(path));
+        bool did_throw = false;
+        try {
+            SharedGroup sg(*repl);
+        } 
+        catch (SharedGroup::SyncUsageConsistencyError& e)
+        {
+            did_throw = true;
+        }
+        CHECK(did_throw);
+    }
+}
+
+TEST(LangBindHelper_SyncCannotBeChanged_2)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    {
+        // enable sync
+        UniquePtr<Replication> repl(makeWriteLogCollector(path));
+        SharedGroup sg(*repl);
+        {
+            WriteTransaction wt(sg);
+            TableRef tr = wt.add_table("table");
+            wt.commit();
+        }
+    }
+    {
+        // try to access the database with sync enabled
+        UniquePtr<Replication> repl(makeWriteLogCollector(path, true));
+        bool did_throw = false;
+        try {
+            SharedGroup sg(*repl);
+        } 
+        catch (SharedGroup::SyncUsageConsistencyError& e)
+        {
+            did_throw = true;
+        }
+        CHECK(did_throw);
+    }
+}
 
 TEST(LangBindHelper_ImplicitTransactions_InterProcess)
 {

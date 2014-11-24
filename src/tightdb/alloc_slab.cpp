@@ -362,6 +362,18 @@ MemRef SlabAlloc::do_realloc(size_t ref, const char* addr, size_t old_size, size
     return new_mem;
 }
 
+bool SlabAlloc::get_server_sync_mode()
+{
+    File::Map<Header> map(m_file, File::access_ReadOnly, sizeof(Header)); // Throws
+    return (map.get_addr()->m_reserved & 1) != 0;
+}
+
+void SlabAlloc::set_server_sync_mode(bool is_in_server_sync_mode)
+{
+    File::Map<Header> map(m_file, File::access_ReadWrite, sizeof(Header)); // Throws
+    map.get_addr()->m_reserved |= is_in_server_sync_mode ? 1 : 0;
+    map.sync();
+}
 
 char* SlabAlloc::do_translate(ref_type ref) const TIGHTDB_NOEXCEPT
 {

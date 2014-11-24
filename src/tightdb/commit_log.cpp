@@ -463,9 +463,13 @@ void WriteLogCollector::reset_log_management(version_type last_version)
     }
     else {
         // for all other versions, the log files must be there:
-        open_if_needed(m_log_a);
-        open_if_needed(m_log_b);
-        map_header_if_needed();
+        try {
+            open_if_needed(m_log_a);
+            open_if_needed(m_log_b);
+            map_header_if_needed();
+        } catch (util::File::AccessError& e) {
+            throw LogFileError(m_database_name);
+        }
         CommitLogPreamble* preamble = const_cast<CommitLogPreamble*>(get_preamble());
 
         // Verify that end of the commit range is equal to or after 'last_version'
