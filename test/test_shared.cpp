@@ -106,9 +106,9 @@ void writer(string path)
 
 void killer(TestResults& test_results, int pid, string path)
 {
+    size_t size;
     {
         SharedGroup sg(path, true, SharedGroup::durability_Full);
-        size_t size;
         {
             ReadTransaction rt(sg);
             rt.get_group().Verify();
@@ -118,6 +118,10 @@ void killer(TestResults& test_results, int pid, string path)
         bool done = false;
         do {
             sched_yield();
+            // pseudo randomized wait (to prevent unwanted synchronization effects of yield):
+            int n = random() % 10000;
+            volatile int thing = 0;
+            while (n--) thing += random();
             ReadTransaction rt(sg);
             rt.get_group().Verify();
             TestTableShared::ConstRef t1 = rt.get_table<TestTableShared>("test");
@@ -134,6 +138,14 @@ void killer(TestResults& test_results, int pid, string path)
     CHECK(child_exited_from_signal);
     int child_exit_status = WEXITSTATUS(stat_loc);
     CHECK_EQUAL(0, child_exit_status);
+    {
+        // Verify that we surely did kill the process before it could do all it's commits.
+        SharedGroup sg(path, true, SharedGroup::durability_Full);
+        ReadTransaction rt(sg);
+        rt.get_group().Verify();
+        TestTableShared::ConstRef t1 = rt.get_table<TestTableShared>("test");
+        CHECK(size + 500 > t1->size());
+    }
 }
 
 TEST(Shared_PipelinedWritesWithKills)
