@@ -88,6 +88,8 @@ TIGHTDB_TABLE_4(TestTableShared,
                 third,  Bool,
                 fourth, String)
 
+#if !defined(__APPLE__)
+
 void writer(string path, int id)
 {
     SharedGroup sg(path, true, SharedGroup::durability_Full);
@@ -138,6 +140,7 @@ void killer(TestResults& test_results, int pid, string path, int id)
         CHECK(500 > t1[id].first);
     }
 }
+#endif
 
 } // anonymous namespace
 
