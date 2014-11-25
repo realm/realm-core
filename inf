@@ -1,5 +1,11 @@
 #!/bin/bash
-while :
+
+
+while [ true ]
 do
-	test/tightdb-tests-dbg
+	if [ $(test/tightdb-tests-dbg 2>&1 | tee t | grep -c "Assertion failed") -gt 0 ]; then 
+           cat t
+	   exit 1
+	fi
+	cat t
 done
