@@ -138,6 +138,7 @@ void killer(TestResults& test_results, int pid, string path, int id)
         rt.get_group().Verify();
         TestTableShared::ConstRef t1 = rt.get_table<TestTableShared>("test");
         CHECK(500 > t1[id].first);
+        CHECK(10 < t1[id].first);
     }
 }
 #endif
