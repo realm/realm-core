@@ -227,7 +227,7 @@ void CondVar::handle_wait_error(int err)
     if (err == EOWNERDEAD)
         return;
 #endif
-    RobustMutex::lock_failed(err);
+    TIGHTDB_TERMINATE("pthread_mutex_lock() failed");
 }
 
 TIGHTDB_NORETURN void CondVar::attr_init_failed(int err)
