@@ -376,9 +376,11 @@ struct SharedGroup::SharedInfo
     // (and a few other metadata)
     bool versioning_ready;
 
-    // Set when some thread wants to suspend waiting for a change. Cleared when all
-    // waiting threads are woken.
-    bool waiting_for_change;
+    // Latest version number. Guarded by the controlmutex (for lock-free access, use
+    // get_current_version() instead)
+    uint64_t latest_version_number;
+
+    // Tracks the most recent version number. Should only be accessed 
     uint16_t version;
     uint16_t flags;
     uint16_t free_write_slots;
@@ -434,7 +436,6 @@ SharedGroup::SharedInfo::SharedInfo(DurabilityLevel dlevel):
     daemon_started = false;
     daemon_ready = false;
     versioning_ready = false;
-    waiting_for_change = false;
     init_complete = 1;
 }
 
@@ -683,6 +684,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
                 if (repl)
                     repl->reset_log_management(version);
 #endif
+                info->latest_version_number = version;
                 info->init_versioning(top_ref, file_size, version);
                 info->versioning_ready = true;
             }
@@ -825,16 +827,12 @@ bool SharedGroup::has_changed()
 #ifndef _WIN32
 void SharedGroup::wait_for_change()
 {
-    while (!has_changed()) {
-        SharedInfo* info = m_file_map.get_addr();
-        RobustLockGuard lock(info->controlmutex, recover_from_dead_write_transact);
-        if (!has_changed()) {
-            if (info->waiting_for_change == false)
-                info->waiting_for_change = true;
-            info->new_commit_available.wait(info->controlmutex,
-                                            &recover_from_dead_write_transact,
-                                            0);
-        }
+    SharedInfo* info = m_file_map.get_addr();
+    RobustLockGuard lock(info->controlmutex, recover_from_dead_write_transact);
+    while (m_readlock.m_version == info->latest_version_number) {
+        info->new_commit_available.wait(info->controlmutex,
+                                        &recover_from_dead_write_transact,
+                                        0);
     }
 }
 
@@ -1427,10 +1425,8 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
 #ifndef _WIN32
     {
         RobustLockGuard lock(info->controlmutex, recover_from_dead_write_transact);
-        if (info->waiting_for_change) {
-            info->waiting_for_change = false;
-            info->new_commit_available.notify_all();
-        }
+        info->latest_version_number = new_version;
+        info->new_commit_available.notify_all();
     }
 #endif
 }
