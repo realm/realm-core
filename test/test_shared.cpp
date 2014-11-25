@@ -8,6 +8,7 @@
 #ifndef _WIN32
 #  include <unistd.h>
 #  include <sys/wait.h>
+#  include <signal.h>
 #  define ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE
 #else
 #  define NOMINMAX
@@ -82,12 +83,106 @@ bool allow_async = true;
 #endif
 
 TIGHTDB_TABLE_4(TestTableShared,
-                first,  Int,
-                second, Int,
-                third,  Bool,
-                fourth, String)
+    first, Int,
+    second, Int,
+    third, Bool,
+    fourth, String)
+
+
+
+    TIGHTDB_TABLE_1(Woop,
+    first, Int)
+
 
 } // anonymous namespace
+
+void writer(string path)
+{
+    SharedGroup sg(path, true, SharedGroup::durability_Full);
+    for (int i=0; i<1000; ++i) {
+
+	if(i >= 0)
+            cerr << i;
+
+	if(i >= 1000)
+            cerr << "\nNever killed?\n";
+
+        WriteTransaction wt(sg);
+        Woop::Ref t1 = wt.get_table<Woop>("test");
+        t1[0].first = 1000 + i; 
+        wt.commit();
+    }
+    _exit(0);
+}
+
+void killer(TestResults& test_results, int pid, string path)
+{
+    {
+        SharedGroup sg(path, true, SharedGroup::durability_Full);
+        size_t size;
+        {
+            ReadTransaction rt(sg);
+            rt.get_group().Verify();
+            Woop::ConstRef t1 = rt.get_table<Woop>("test");
+            size = t1->size();
+        }
+        bool done = false;
+        do {
+            sched_yield();
+            ReadTransaction rt(sg);
+            rt.get_group().Verify();
+            Woop::ConstRef t1 = rt.get_table<Woop>("test");
+            size = t1[0].first; //->get_int(0, 0);
+            done = size > 1000;
+
+            cerr << size;
+
+        } while (!done);
+    }
+    kill(pid, 9);
+    int stat_loc = 0;
+    int options = 0;
+    pid = waitpid(pid, &stat_loc, options);
+    if (pid == pid_t(-1))
+        TIGHTDB_TERMINATE("waitpid() failed");
+    bool child_exited_from_signal = WIFSIGNALED(stat_loc);
+    CHECK(child_exited_from_signal);
+    int child_exit_status = WEXITSTATUS(stat_loc);
+    CHECK_EQUAL(0, child_exit_status);
+}
+
+ONLY(Shared_PipelinedWritesWithKills)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    {
+        SharedGroup sg(path, false, SharedGroup::durability_Full);
+        // Create first table in group
+        {
+            WriteTransaction wt(sg);
+            Woop::Ref t1 = wt.add_table<Woop>("test");
+            t1->add(1000); // init to 1000 so it won't use time on bitexpand 
+            wt.commit();
+        }
+    }
+    int pid = fork();
+    if (pid == 0) {
+        // first writer!
+        writer(path);
+    }
+    else {
+        for (int k=0; k<200; ++k) {
+            int pid2 = pid;
+            pid = fork();
+            if (pid == 0) {
+                writer(path);
+            }
+            else {
+                killer(test_results, pid2, path);
+            }
+        }
+        killer(test_results, pid, path);
+    }
+}
 
 #ifdef LOCKFILE_CLEANUP
 // The following two tests are now disabled, as we have abandoned the requirement to
