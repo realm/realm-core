@@ -226,6 +226,8 @@ void CondVar::handle_wait_error(int err)
         throw RobustMutex::NotRecoverable();
     if (err == EOWNERDEAD)
         return;
+#else
+    static_cast<void>(err);
 #endif
     TIGHTDB_TERMINATE("pthread_mutex_lock() failed");
 }
