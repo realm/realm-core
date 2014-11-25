@@ -282,6 +282,7 @@ private:
     TIGHTDB_NORETURN static void init_failed(int);
     TIGHTDB_NORETURN static void attr_init_failed(int);
     TIGHTDB_NORETURN static void destroy_failed(int) TIGHTDB_NOEXCEPT;
+    void handle_wait_error(int error);
 };
 
 
@@ -516,12 +517,7 @@ inline void CondVar::wait(RobustMutex& m, Func recover_func, const struct timesp
     }
     if (TIGHTDB_LIKELY(r == 0))
         return;
-#ifdef TIGHTDB_HAVE_ROBUST_PTHREAD_MUTEX
-    if (r == ENOTRECOVERABLE)
-        throw NotRecoverable();
-    if (r != EOWNERDEAD)
-        lock_failed(r); // does not return
-#endif
+    handle_wait_error(r);
     try {
         recover_func(); // Throws
         m.mark_as_consistent();

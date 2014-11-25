@@ -1,3 +1,23 @@
+/*************************************************************************
+ *
+ * TIGHTDB CONFIDENTIAL
+ * __________________
+ *
+ *  [2011] - [2012] TightDB Inc
+ *  All Rights Reserved.
+ *
+ * NOTICE:  All information contained herein is, and remains
+ * the property of TightDB Incorporated and its suppliers,
+ * if any.  The intellectual and technical concepts contained
+ * herein are proprietary to TightDB Incorporated
+ * and its suppliers and may be covered by U.S. and Foreign Patents,
+ * patents in process, and are protected by trade secret or copyright law.
+ * Dissemination of this information or reproduction of this material
+ * is strictly forbidden unless prior written permission is obtained
+ * from TightDB Incorporated.
+ *
+ **************************************************************************/
+
 #include <cerrno>
 #include <algorithm>
 #include <iostream>
@@ -37,7 +57,7 @@ namespace {
 // Constants controlling the amount of uncommited writes in flight:
 const uint16_t max_write_slots = 100;
 const uint16_t relaxed_sync_threshold = 50;
-#define SHAREDINFO_VERSION 1
+#define SHAREDINFO_VERSION 2
 
 // The following functions are carefully designed for minimal overhead
 // in case of contention among read transactions. In case of contention,
@@ -354,6 +374,11 @@ struct SharedGroup::SharedInfo
     // (and a few other metadata)
     bool versioning_ready;
 
+    // Latest version number. Guarded by the controlmutex (for lock-free access, use
+    // get_current_version() instead)
+    uint64_t latest_version_number;
+
+    // Tracks the most recent version number. Should only be accessed 
     uint16_t version;
     uint16_t flags;
     uint16_t free_write_slots;
@@ -366,6 +391,7 @@ struct SharedGroup::SharedInfo
     CondVar room_to_write;
     CondVar work_to_do;
     CondVar daemon_becomes_ready;
+    CondVar new_commit_available;
 #endif
     // IMPORTANT: The ringbuffer MUST be the last field in SharedInfo - see above.
     Ringbuffer readers;
@@ -394,7 +420,8 @@ SharedGroup::SharedInfo::SharedInfo(DurabilityLevel dlevel):
     controlmutex(), // Throws
     room_to_write(CondVar::process_shared_tag()), // Throws
     work_to_do(CondVar::process_shared_tag()), // Throws
-    daemon_becomes_ready(CondVar::process_shared_tag()) // Throws
+    daemon_becomes_ready(CondVar::process_shared_tag()), // Throws
+    new_commit_available(CondVar::process_shared_tag()) // Throws
 #else
     writemutex(), // Throws
     balancemutex() // Throws
@@ -593,6 +620,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
         // - start of the async daemon
         // - stop of the async daemon
         // - SharedGroup joining/leaving the sharing scheme
+        // - Waiting for and signalling database changes
         {
             RobustLockGuard lock(info->controlmutex, &recover_from_dead_write_transact); // Throws
             // Even though we checked init_complete before grabbing the write mutex,
@@ -612,6 +640,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
                                                  no_create, skip_validate, key); // Throws
             size_t file_size = alloc.get_baseline();
             if (info->versioning_ready == false) {
+                info->latest_version_number = 1;
                 info->init_versioning(top_ref, file_size);
                 info->versioning_ready = true;
             }
@@ -746,6 +775,16 @@ bool SharedGroup::has_changed()
 }
 
 #ifndef _WIN32
+void SharedGroup::wait_for_change()
+{
+    SharedInfo* info = m_file_map.get_addr();
+    RobustLockGuard lock(info->controlmutex, recover_from_dead_write_transact);
+    while (m_readlock.m_version == info->latest_version_number) {
+        info->new_commit_available.wait(info->controlmutex,
+                                        &recover_from_dead_write_transact,
+                                        0);
+    }
+}
 
 void SharedGroup::do_async_commits()
 {
@@ -1316,6 +1355,13 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
         r.version     = new_version;
         r_info->readers.use_next();
     }
+#ifndef _WIN32
+    {
+        RobustLockGuard lock(info->controlmutex, recover_from_dead_write_transact);
+        info->latest_version_number = new_version;
+        info->new_commit_available.notify_all();
+    }
+#endif
 }
 
 
