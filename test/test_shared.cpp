@@ -134,6 +134,9 @@ void killer(TestResults& test_results, int pid, string path)
             Woop::ConstRef t1 = rt.get_table<Woop>("test");
             size = t1[0].first; //->get_int(0, 0);
             done = size > 1000;
+
+            cerr << size;
+
         } while (!done);
     }
     kill(pid, 9);
@@ -167,7 +170,7 @@ ONLY(Shared_PipelinedWritesWithKills)
         writer(path);
     }
     else {
-        for (int k=0; k<2000; ++k) {
+        for (int k=0; k<200; ++k) {
             int pid2 = pid;
             pid = fork();
             if (pid == 0) {
