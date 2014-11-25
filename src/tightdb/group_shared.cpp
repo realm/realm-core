@@ -374,10 +374,6 @@ struct SharedGroup::SharedInfo
     // (and a few other metadata)
     bool versioning_ready;
 
-    // Set when some thread wants to suspend waiting for a change. Cleared when all
-    // waiting threads are woken.
-    bool waiting_for_change;
-
     // Latest version number. Guarded by the controlmutex (for lock-free access, use
     // get_current_version() instead)
     uint64_t latest_version_number;
@@ -438,7 +434,6 @@ SharedGroup::SharedInfo::SharedInfo(DurabilityLevel dlevel):
     daemon_started = false;
     daemon_ready = false;
     versioning_ready = false;
-    waiting_for_change = false;
     init_complete = 1;
 }
 
@@ -785,8 +780,6 @@ void SharedGroup::wait_for_change()
     SharedInfo* info = m_file_map.get_addr();
     RobustLockGuard lock(info->controlmutex, recover_from_dead_write_transact);
     while (m_readlock.m_version == info->latest_version_number) {
-        if (info->waiting_for_change == false)
-            info->waiting_for_change = true;
         info->new_commit_available.wait(info->controlmutex,
                                         &recover_from_dead_write_transact,
                                         0);
@@ -1366,10 +1359,7 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
     {
         RobustLockGuard lock(info->controlmutex, recover_from_dead_write_transact);
         info->latest_version_number = new_version;
-        if (info->waiting_for_change) {
-            info->waiting_for_change = false;
-            info->new_commit_available.notify_all();
-        }
+        info->new_commit_available.notify_all();
     }
 #endif
 }
