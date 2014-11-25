@@ -90,31 +90,24 @@ TIGHTDB_TABLE_4(TestTableShared,
 
 } // anonymous namespace
 
-void writer(string path)
+void writer(string path, int id)
 {
     SharedGroup sg(path, true, SharedGroup::durability_Full);
     for (int i=0; i<1000; ++i) {
         WriteTransaction wt(sg);
         if (i & 1) {
             TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
-            t1->add(i, 2, false, "test");
+            t1[id].first = 1 + t1[id].first;
         }
         wt.commit();
     }
     _exit(0);
 }
 
-void killer(TestResults& test_results, int pid, string path)
+void killer(TestResults& test_results, int pid, string path, int id)
 {
-    size_t size;
     {
         SharedGroup sg(path, true, SharedGroup::durability_Full);
-        {
-            ReadTransaction rt(sg);
-            rt.get_group().Verify();
-            TestTableShared::ConstRef t1 = rt.get_table<TestTableShared>("test");
-            size = t1->size();
-        }
         bool done = false;
         do {
             sched_yield();
@@ -125,7 +118,7 @@ void killer(TestResults& test_results, int pid, string path)
             ReadTransaction rt(sg);
             rt.get_group().Verify();
             TestTableShared::ConstRef t1 = rt.get_table<TestTableShared>("test");
-            done = size + 10 < t1->size();
+            done = 10 < t1[id].first;
         } while (!done);
     }
     kill(pid, 9);
@@ -144,40 +137,42 @@ void killer(TestResults& test_results, int pid, string path)
         ReadTransaction rt(sg);
         rt.get_group().Verify();
         TestTableShared::ConstRef t1 = rt.get_table<TestTableShared>("test");
-        CHECK(size + 500 > t1->size());
+        CHECK(500 > t1[id].first);
     }
 }
 
 TEST(Shared_PipelinedWritesWithKills)
 {
+    const int num_processes = 50;
     SHARED_GROUP_TEST_PATH(path);
     {
         SharedGroup sg(path, false, SharedGroup::durability_Full);
-        // Create first table in group
+        // Create table entries
+        WriteTransaction wt(sg);
+        TestTableShared::Ref t1 = wt.add_table<TestTableShared>("test");
+        for (int i = 0; i < num_processes; ++i)
         {
-            WriteTransaction wt(sg);
-            TestTableShared::Ref t1 = wt.add_table<TestTableShared>("test");
-            t1->add(-1, 2, false, "test");
-            wt.commit();
+            t1->add(0, i, false, "test");
         }
+        wt.commit();
     }
     int pid = fork();
     if (pid == 0) {
         // first writer!
-        writer(path);
+        writer(path, 0);
     }
     else {
-        for (int k=0; k<100; ++k) {
+        for (int k=1; k < num_processes; ++k) {
             int pid2 = pid;
             pid = fork();
             if (pid == 0) {
-                writer(path);
+                writer(path, k);
             }
             else {
-                killer(test_results, pid2, path);
+                killer(test_results, pid2, path, k-1);
             }
         }
-        killer(test_results, pid, path);
+        killer(test_results, pid, path, num_processes-1);
     }
 }
 
