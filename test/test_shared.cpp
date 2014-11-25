@@ -88,8 +88,6 @@ TIGHTDB_TABLE_4(TestTableShared,
                 third,  Bool,
                 fourth, String)
 
-} // anonymous namespace
-
 void writer(string path, int id)
 {
     SharedGroup sg(path, true, SharedGroup::durability_Full);
@@ -141,8 +139,12 @@ void killer(TestResults& test_results, int pid, string path, int id)
     }
 }
 
+} // anonymous namespace
+
+#if !defined(__APPLE__)
 TEST(Shared_PipelinedWritesWithKills)
 {
+    CHECK(RobustMutex::is_robust_on_this_platform());
     const int num_processes = 50;
     SHARED_GROUP_TEST_PATH(path);
     {
@@ -175,6 +177,7 @@ TEST(Shared_PipelinedWritesWithKills)
         killer(test_results, pid, path, num_processes-1);
     }
 }
+#endif
 
 #ifdef LOCKFILE_CLEANUP
 // The following two tests are now disabled, as we have abandoned the requirement to
