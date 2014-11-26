@@ -1,24 +1,10 @@
-# NEXT RELEASE
-
-### Bugfixes:
-
-* Lorem ipsum.
-
-### API breaking changes:
-
-* Lorem ipsum.
+# 0.86.1 Release notes
 
 ### Enhancements:
 
-* Added support for encryption
-* Adding SharedGroup::wait_for_change() which allows a thread to sleep until
-  the database changes.
-
------------
-
-### Internals:
-
-* Lorem ipsum.
+* Added support for encryption.
+* Adding SharedGroup::wait_for_change() which allows a thread to sleep until the
+  database changes.
 
 ----------------------------------------------
 
