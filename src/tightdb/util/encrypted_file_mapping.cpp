@@ -24,6 +24,8 @@
 
 #include <sys/mman.h>
 #include <unistd.h>
+#include <string.h>
+#include <stdio.h>
 
 #include <tightdb/alloc_slab.hpp>
 #include <tightdb/util/terminate.hpp>
@@ -393,7 +395,7 @@ void EncryptedFileMapping::validate_page(size_t page) TIGHTDB_NOEXCEPT {
 
     if (memcmp(buffer, page_addr(page), page_size)) {
         printf("mismatch %p: fd(%d) page(%zu/%zu) %s %s\n",
-               this, m_file.fd, page, m_page_count, buffer, page_addr(page));
+               (void*)this, m_file.fd, page, m_page_count, buffer, page_addr(page));
         TIGHTDB_TERMINATE("");
     }
 #else

@@ -6452,6 +6452,9 @@ TEST(LangBindHelper_SyncCannotBeChanged_2)
     }
 }
 
+#ifndef TIGHTDB_ENABLE_ENCRYPTION
+// Interprocess communication does not work with encryption enabled
+
 TEST(LangBindHelper_ImplicitTransactions_InterProcess)
 {
     const int write_process_count = 7;
@@ -6518,6 +6521,7 @@ TEST(LangBindHelper_ImplicitTransactions_InterProcess)
     }
 
 }
+#endif
 #endif
 
 TEST(LangBindHelper_ImplicitTransactions_NoExtremeFileSpaceLeaks)

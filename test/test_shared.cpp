@@ -73,13 +73,15 @@ TEST(Shared_Unattached)
 namespace {
 
 // async deamon does not start when launching unit tests from osx, so async is currently disabled on osx.
+// Also: async requires interprocess communication, which does not work with our current encryption support.
 #if !defined(_WIN32) && !defined(__APPLE__)
-#  if TIGHTDB_ANDROID || defined DISABLE_ASYNC
+#  if TIGHTDB_ANDROID || defined DISABLE_ASYNC || defined TIGHTDB_ENABLE_ENCRYPTION
 bool allow_async = false;
 #  else
 bool allow_async = true;
 #  endif
 #endif
+
 
 TIGHTDB_TABLE_4(TestTableShared,
                 first,  Int,
@@ -1028,7 +1030,7 @@ TEST(Shared_WriterThreads)
 }
 
 
-#if defined TEST_ROBUSTNESS && defined ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE
+#if defined TEST_ROBUSTNESS && defined ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE && !defined TIGHTDB_ENABLE_ENCRYPTION
 // Not supported on Windows in particular? Keywords: winbug
 TEST(Shared_RobustAgainstDeathDuringWrite)
 {
@@ -1094,7 +1096,7 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
     }
 }
 
-#endif // defined TEST_ROBUSTNESS && defined ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE
+#endif // defined TEST_ROBUSTNESS && defined ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE && !defined TIGHTDB_ENABLE_ENCRYPTION
 
 
 TEST(Shared_FormerErrorCase1)
