@@ -57,7 +57,7 @@ namespace {
 // Constants controlling the amount of uncommited writes in flight:
 const uint16_t max_write_slots = 100;
 const uint16_t relaxed_sync_threshold = 50;
-#define SHAREDINFO_VERSION 2
+#define SHAREDINFO_VERSION 3
 
 // The following functions are carefully designed for minimal overhead
 // in case of contention among read transactions. In case of contention,
@@ -380,6 +380,11 @@ struct SharedGroup::SharedInfo
     // get_current_version() instead)
     uint64_t latest_version_number;
 
+    // Pid of process initiating the session, but only if that process runs with encryption
+    // enabled, zero otherwise. Other processes cannot join a session wich uses encryption,
+    // because interprocess sharing is not supported by our current encryption mechanisms.
+    uint64_t session_initiator_pid;
+
     // Tracks the most recent version number. Should only be accessed 
     uint16_t version;
     uint16_t flags;
@@ -433,6 +438,7 @@ SharedGroup::SharedInfo::SharedInfo(DurabilityLevel dlevel):
     flags = dlevel; // durability level is fixed from creation
     free_write_slots = 0;
     num_participants = 0;
+    session_initiator_pid = 0;
     daemon_started = false;
     daemon_ready = false;
     versioning_ready = false;
@@ -684,11 +690,17 @@ void SharedGroup::open(const string& path, bool no_create_file,
                 if (repl)
                     repl->reset_log_management(version);
 #endif
+                if (key) {
+                    info->session_initiator_pid = static_cast<unsigned>(getpid());
+                }
                 info->latest_version_number = version;
                 info->init_versioning(top_ref, file_size, version);
                 info->versioning_ready = true;
             }
-
+            else { // not the session initiator!
+                if (key && info->session_initiator_pid != static_cast<unsigned>(getpid()))
+                    throw InterprocessWithEncryptionUnsupported(path);
+            }
 #ifndef _WIN32
             // In async mode, we need to make sure the daemon is running and ready:
             if (dlevel == durability_Async && !is_backend) {

@@ -288,6 +288,13 @@ public:
         SyncUsageConsistencyError(const std::string& filename) : std::runtime_error(filename) {}
     };
 
+    // if the database is encrypted, interprocess sharing is not supported:
+    class InterprocessWithEncryptionUnsupported : public std::runtime_error {
+    public:
+        InterprocessWithEncryptionUnsupported(const std::string& filename) : std::runtime_error(filename) {}
+    };
+
+
 private:
     struct SharedInfo;
     struct ReadLockInfo {
