@@ -2102,6 +2102,29 @@ TEST(Shared_MixedWithNonShared)
 #endif
 }
 
+TEST(Shared_VersionCount)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg_w(path);
+    SharedGroup sg_r(path);
+    CHECK_EQUAL(1, sg_r.get_number_of_versions());
+    sg_r.begin_read();
+    sg_w.begin_write();
+    CHECK_EQUAL(1, sg_r.get_number_of_versions());
+    sg_w.commit();
+    CHECK_EQUAL(2, sg_r.get_number_of_versions());
+    sg_w.begin_write();
+    sg_w.commit();
+    CHECK_EQUAL(3, sg_r.get_number_of_versions());
+    sg_r.end_read();
+    CHECK_EQUAL(3, sg_r.get_number_of_versions());
+    sg_w.begin_write();
+    sg_w.commit();
+    // both the last and the second-last commit is kept, so once
+    // you've committed anything, you will never get back to having
+    // just a single version.
+    CHECK_EQUAL(2, sg_r.get_number_of_versions());
+}
 
 TEST(Shared_MultipleRollbacks)
 {

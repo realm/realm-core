@@ -383,6 +383,7 @@ struct SharedGroup::SharedInfo
     uint16_t flags;
     uint16_t free_write_slots;
 
+    uint64_t number_of_versions;
     RobustMutex writemutex;
     RobustMutex balancemutex;
     RobustMutex controlmutex;
@@ -688,6 +689,9 @@ void SharedGroup::open(const string& path, bool no_create_file,
             // make our presence noted:
             ++info->num_participants;
 
+            // Initially there is a single version in the file
+            info->number_of_versions = 1;
+
             // Keep the mappings and file open:
             fug_2.release(); // Do not unmap
             fug_1.release(); // Do not unmap
@@ -709,6 +713,12 @@ void SharedGroup::open(const string& path, bool no_create_file,
 }
 
 
+uint_fast64_t SharedGroup::get_number_of_versions()
+{
+    SharedInfo* info = m_file_map.get_addr();
+    RobustLockGuard lock(info->controlmutex, &recover_from_dead_write_transact); // Throws
+    return info->number_of_versions;
+}
 #ifdef TIGHTDB_ENABLE_REPLICATION
 
 void SharedGroup::open(Replication& repl, DurabilityLevel dlevel, const uint8_t* key)
@@ -1358,6 +1368,7 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
 #ifndef _WIN32
     {
         RobustLockGuard lock(info->controlmutex, recover_from_dead_write_transact);
+        info->number_of_versions = new_version - readlock_version + 1;
         info->latest_version_number = new_version;
         info->new_commit_available.notify_all();
     }
