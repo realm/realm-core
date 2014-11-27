@@ -6460,9 +6460,12 @@ TEST(LangBindHelper_ImplicitTransactions_InterProcess)
     const int write_process_count = 7;
     const int read_process_count = 3;
 
+    int readpids[read_process_count];
+    int writepids[read_process_count];
     SHARED_GROUP_TEST_PATH(path);
 
-    if (fork() == 0) {
+    int pid = fork();
+    if (pid == 0) {
         UniquePtr<Replication> repl(makeWriteLogCollector(path));
         SharedGroup sg(*repl);
         {
@@ -6477,12 +6480,13 @@ TEST(LangBindHelper_ImplicitTransactions_InterProcess)
         exit(0);
     } else {
         int status;
-        wait(&status);
+        waitpid(pid, &status, 0);
     }
 
     // intialization complete. Start writers:
     for (int i = 0; i < write_process_count; ++i) {
-        if (fork() == 0) {
+        writepids[i] = fork();
+        if (writepids[i] == 0) {
             multiple_trackers_writer_thread(string(path));
             exit(0);
         }
@@ -6490,7 +6494,8 @@ TEST(LangBindHelper_ImplicitTransactions_InterProcess)
     sched_yield();
     // then start readers:
     for (int i = 0; i < read_process_count; ++i) {
-        if (fork() == 0) {
+        readpids[i] = fork();
+        if (readpids[i] == 0) {
             multiple_trackers_reader_thread(&test_results, string(path));
             exit(0);
         }
@@ -6499,7 +6504,7 @@ TEST(LangBindHelper_ImplicitTransactions_InterProcess)
     // Wait for all writer threads to complete
     for (int i = 0; i < write_process_count; ++i) {
         int status = 0;
-        wait(&status);
+        waitpid(writepids[i], &status, 0);
     }
 
     // signal to all readers to complete
@@ -6517,7 +6522,7 @@ TEST(LangBindHelper_ImplicitTransactions_InterProcess)
     // Wait for all reader threads to complete
     for (int i = 0; i < read_process_count; ++i) {
         int status;
-        wait(&status);
+        waitpid(readpids[i], &status, 0);
     }
 
 }

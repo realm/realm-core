@@ -90,18 +90,27 @@ TIGHTDB_TABLE_4(TestTableShared,
                 third,  Bool,
                 fourth, String)
 
-#if !defined(__APPLE__)
+#if !defined(__APPLE__) && !defined TIGHTDB_ENABLE_ENCRYPTION
 
 void writer(string path, int id)
 {
-    SharedGroup sg(path, true, SharedGroup::durability_Full);
-    for (int i=0; i<1000; ++i) {
-        WriteTransaction wt(sg);
-        if (i & 1) {
-            TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
-            t1[id].first = 1 + t1[id].first;
+    // cerr << "Started pid " << getpid() << endl;
+    try {
+        SharedGroup sg(path, true, SharedGroup::durability_Full);
+        // cerr << "Opened sg, pid " << getpid() << endl;
+        for (int i=0; i<1000; ++i) {
+            // cerr << "       - " << getpid() << endl;
+            WriteTransaction wt(sg);
+            if (i & 1) {
+                TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
+                t1[id].first = 1 + t1[id].first;
+            }
+            sched_yield(); // increase chance of signal arriving in the middle of a transaction
+            wt.commit();
         }
-        wt.commit();
+        // cerr << "Ended pid " << getpid() << endl;
+    } catch (...) {
+        cerr << "Exception from " << getpid() << endl;
     }
     _exit(0);
 }
@@ -126,9 +135,16 @@ void killer(TestResults& test_results, int pid, string path, int id)
     kill(pid, 9);
     int stat_loc = 0;
     int options = 0;
-    pid = waitpid(pid, &stat_loc, options);
-    if (pid == pid_t(-1))
-        TIGHTDB_TERMINATE("waitpid() failed");
+    int ret_pid = waitpid(pid, &stat_loc, options);
+    if (ret_pid == pid_t(-1)) {
+        if (errno == EINTR)
+            cerr << "waitpid was interrupted" << endl;
+        if (errno == EINVAL)
+            cerr << "waitpid got bad arguments" << endl;
+        if (errno == ECHILD)
+            cerr << "waitpid tried to wait for the wrong child: " << pid << endl;
+        TIGHTDB_TERMINATE("waitpid failed");
+    }
     bool child_exited_from_signal = WIFSIGNALED(stat_loc);
     CHECK(child_exited_from_signal);
     int child_exit_status = WEXITSTATUS(stat_loc);
@@ -147,7 +163,8 @@ void killer(TestResults& test_results, int pid, string path, int id)
 
 } // anonymous namespace
 
-#if !defined(__APPLE__)
+#if !defined(__APPLE__) && !defined TIGHTDB_ENABLE_ENCRYPTION
+
 TEST(Shared_PipelinedWritesWithKills)
 {
     CHECK(RobustMutex::is_robust_on_this_platform());
@@ -165,6 +182,8 @@ TEST(Shared_PipelinedWritesWithKills)
         wt.commit();
     }
     int pid = fork();
+    if (pid == -1)
+        TIGHTDB_TERMINATE("fork() failed");
     if (pid == 0) {
         // first writer!
         writer(path, 0);
@@ -173,13 +192,17 @@ TEST(Shared_PipelinedWritesWithKills)
         for (int k=1; k < num_processes; ++k) {
             int pid2 = pid;
             pid = fork();
+            if (pid == pid_t(-1))
+                TIGHTDB_TERMINATE("fork() failed");
             if (pid == 0) {
                 writer(path, k);
             }
             else {
+                // cerr << "New process " << pid << " killing old " << pid2 << endl;
                 killer(test_results, pid2, path, k-1);
             }
         }
+        // cerr << "Killing last one: " << pid << endl;
         killer(test_results, pid, path, num_processes-1);
     }
 }
@@ -1835,15 +1858,17 @@ void multiprocess_validate_and_clear(TestResults& test_results, string path, str
 
 void multiprocess(TestResults& test_results, string path, int num_procs, size_t num_threads)
 {
+    int* pids = new int[num_procs];
     for (int i = 0; i != num_procs; ++i) {
-        if (fork() == 0) {
+        if (0 == (pids[i] = fork())) {
             multiprocess_threaded(test_results, path, num_threads, i*num_threads);
             _exit(0);
         }
     }
     int status = 0;
     for (int i = 0; i != num_procs; ++i)
-        wait(&status);
+        waitpid(pids[i], &status, 0);
+    delete[] pids;
 }
 
 } // anonymous namespace
