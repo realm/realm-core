@@ -219,6 +219,19 @@ TIGHTDB_NORETURN void CondVar::init_failed(int err)
     }
 }
 
+void CondVar::handle_wait_error(int err)
+{
+#ifdef TIGHTDB_HAVE_ROBUST_PTHREAD_MUTEX
+    if (err == ENOTRECOVERABLE)
+        throw RobustMutex::NotRecoverable();
+    if (err == EOWNERDEAD)
+        return;
+#else
+    static_cast<void>(err);
+#endif
+    TIGHTDB_TERMINATE("pthread_mutex_lock() failed");
+}
+
 TIGHTDB_NORETURN void CondVar::attr_init_failed(int err)
 {
     switch (err) {

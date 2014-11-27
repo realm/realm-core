@@ -8,6 +8,7 @@
 #ifndef _WIN32
 #  include <unistd.h>
 #  include <sys/wait.h>
+#  include <signal.h>
 #  define ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE
 #else
 #  define NOMINMAX
@@ -89,7 +90,100 @@ TIGHTDB_TABLE_4(TestTableShared,
                 third,  Bool,
                 fourth, String)
 
+#if !defined(__APPLE__)
+
+void writer(string path, int id)
+{
+    SharedGroup sg(path, true, SharedGroup::durability_Full);
+    for (int i=0; i<1000; ++i) {
+        WriteTransaction wt(sg);
+        if (i & 1) {
+            TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
+            t1[id].first = 1 + t1[id].first;
+        }
+        wt.commit();
+    }
+    _exit(0);
+}
+
+void killer(TestResults& test_results, int pid, string path, int id)
+{
+    {
+        SharedGroup sg(path, true, SharedGroup::durability_Full);
+        bool done = false;
+        do {
+            sched_yield();
+            // pseudo randomized wait (to prevent unwanted synchronization effects of yield):
+            int n = random() % 10000;
+            volatile int thing = 0;
+            while (n--) thing += random();
+            ReadTransaction rt(sg);
+            rt.get_group().Verify();
+            TestTableShared::ConstRef t1 = rt.get_table<TestTableShared>("test");
+            done = 10 < t1[id].first;
+        } while (!done);
+    }
+    kill(pid, 9);
+    int stat_loc = 0;
+    int options = 0;
+    pid = waitpid(pid, &stat_loc, options);
+    if (pid == pid_t(-1))
+        TIGHTDB_TERMINATE("waitpid() failed");
+    bool child_exited_from_signal = WIFSIGNALED(stat_loc);
+    CHECK(child_exited_from_signal);
+    int child_exit_status = WEXITSTATUS(stat_loc);
+    CHECK_EQUAL(0, child_exit_status);
+    {
+        // Verify that we surely did kill the process before it could do all it's commits.
+        SharedGroup sg(path, true, SharedGroup::durability_Full);
+        ReadTransaction rt(sg);
+        rt.get_group().Verify();
+        TestTableShared::ConstRef t1 = rt.get_table<TestTableShared>("test");
+        CHECK(500 > t1[id].first);
+        CHECK(10 < t1[id].first);
+    }
+}
+#endif
+
 } // anonymous namespace
+
+#if !defined(__APPLE__)
+TEST(Shared_PipelinedWritesWithKills)
+{
+    CHECK(RobustMutex::is_robust_on_this_platform());
+    const int num_processes = 50;
+    SHARED_GROUP_TEST_PATH(path);
+    {
+        SharedGroup sg(path, false, SharedGroup::durability_Full);
+        // Create table entries
+        WriteTransaction wt(sg);
+        TestTableShared::Ref t1 = wt.add_table<TestTableShared>("test");
+        for (int i = 0; i < num_processes; ++i)
+        {
+            t1->add(0, i, false, "test");
+        }
+        wt.commit();
+    }
+    int pid = fork();
+    if (pid == 0) {
+        // first writer!
+        writer(path, 0);
+    }
+    else {
+        for (int k=1; k < num_processes; ++k) {
+            int pid2 = pid;
+            pid = fork();
+            if (pid == 0) {
+                writer(path, k);
+            }
+            else {
+                killer(test_results, pid2, path, k-1);
+            }
+        }
+        killer(test_results, pid, path, num_processes-1);
+    }
+}
+#endif
 
 #ifdef LOCKFILE_CLEANUP
 // The following two tests are now disabled, as we have abandoned the requirement to
