@@ -1,12 +1,4 @@
-# NEXT RELEASE
-
-### Bugfixes:
-
-* Lorem ipsum.
-
-### API breaking changes:
-
-* Lorem ipsum.
+# 0.86.1 Release notes
 
 ### Enhancements:
 
