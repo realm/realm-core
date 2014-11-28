@@ -255,6 +255,11 @@ public:
     // End the current write transaction. All accessors are detached.
     void rollback() TIGHTDB_NOEXCEPT;
 
+    // Report the number of distinct versions currently stored in the database.
+    // Note: the database only cleans up versions as part of commit, so ending
+    // a read transaction will not immediately release any versions.
+    uint_fast64_t get_number_of_versions();
+
 #ifdef TIGHTDB_DEBUG
     void test_ringbuf();
 #endif
