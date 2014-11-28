@@ -6461,7 +6461,7 @@ TEST(LangBindHelper_ImplicitTransactions_InterProcess)
     const int read_process_count = 3;
 
     int readpids[read_process_count];
-    int writepids[read_process_count];
+    int writepids[write_process_count];
     SHARED_GROUP_TEST_PATH(path);
 
     int pid = fork();
