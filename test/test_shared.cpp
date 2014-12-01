@@ -1,5 +1,3 @@
-#if 0
-
 #include "testsettings.hpp"
 #ifdef TEST_SHARED
 
@@ -2472,6 +2470,3 @@ TEST(Shared_ArrayEraseBug)
 }
 
 #endif // TEST_SHARED
-
-
-#endif
