@@ -556,6 +556,8 @@ void Column::set(size_t ndx, int64_t value)
     m_array->update_bptree_elem(ndx, set_leaf_elem); // Throws
 }
 
+// todo, add proper unsigned -> signed conversion that works even though the system is not using 
+// 2. complement representation
 void Column::set_uint(size_t ndx, uint64_t value)
 {
     set(ndx, static_cast<int64_t>(value));

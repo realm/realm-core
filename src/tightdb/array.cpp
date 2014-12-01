@@ -478,6 +478,8 @@ void Array::set(size_t ndx, int64_t value)
 
 void Array::set_uint(std::size_t ndx, uint64_t value)
 {
+    // todo, add proper unsigned -> signed conversion that works even though the system is not using 
+    // 2. complement representation
     set(ndx, value);
 }
 
