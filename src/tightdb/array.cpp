@@ -476,6 +476,16 @@ void Array::set(size_t ndx, int64_t value)
     (this->*m_setter)(ndx, value);
 }
 
+void Array::set_uint(std::size_t ndx, uint64_t value)
+{
+    set(ndx, value);
+}
+
+void Array::set_as_ref(std::size_t ndx, ref_type ref)
+{
+    set(ndx, to_ref(ref));
+}
+
 /*
 // Optimization for the common case of adding positive values to a local array
 // (happens a lot when returning results to TableViews)

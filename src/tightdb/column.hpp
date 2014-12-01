@@ -407,6 +407,9 @@ public:
     ref_type get_as_ref(std::size_t ndx) const TIGHTDB_NOEXCEPT;
     int_fast64_t back() const TIGHTDB_NOEXCEPT { return get(size()-1); }
     void set(std::size_t ndx, int_fast64_t value);
+    void set_uint(std::size_t ndx, uint64_t value);
+    void set_as_ref(std::size_t ndx, ref_type ref);
+    uint64_t get_uint(std::size_t ndx) const TIGHTDB_NOEXCEPT;
     void adjust(std::size_t ndx, int_fast64_t diff);
     void add(int_fast64_t value = 0);
     void insert(std::size_t ndx, int_fast64_t value = 0);
@@ -786,6 +789,11 @@ inline int_fast64_t Column::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 inline ref_type Column::get_as_ref(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
     return to_ref(get(ndx));
+}
+
+inline uint64_t Column::get_uint(std::size_t ndx) const TIGHTDB_NOEXCEPT
+{
+    return static_cast<uint64_t>(get(ndx));
 }
 
 inline void Column::add(int_fast64_t value)

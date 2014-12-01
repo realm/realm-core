@@ -556,6 +556,16 @@ void Column::set(size_t ndx, int64_t value)
     m_array->update_bptree_elem(ndx, set_leaf_elem); // Throws
 }
 
+void Column::set_uint(size_t ndx, uint64_t value)
+{
+    set(ndx, static_cast<int64_t>(value));
+}
+
+void Column::set_as_ref(size_t ndx, ref_type ref)
+{
+    set(ndx, to_ref(ref));
+}
+
 void Column::adjust(size_t ndx, int_fast64_t diff)
 {
     TIGHTDB_ASSERT(ndx < size());
