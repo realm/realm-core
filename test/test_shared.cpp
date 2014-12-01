@@ -88,7 +88,7 @@ TIGHTDB_TABLE_4(TestTableShared,
                 third,  Bool,
                 fourth, String)
 
-#if !defined(__APPLE__)
+#if !defined(__APPLE__) && !defined(_WIN32)
 
 void writer(string path, int id)
 {
@@ -145,7 +145,7 @@ void killer(TestResults& test_results, int pid, string path, int id)
 
 } // anonymous namespace
 
-#if !defined(__APPLE__)
+#if !defined(__APPLE__) && !defined(_WIN32)
 TEST(Shared_PipelinedWritesWithKills)
 {
     CHECK(RobustMutex::is_robust_on_this_platform());

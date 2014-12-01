@@ -12,9 +12,24 @@ class RowIndexes
 {
 public:
     RowIndexes(Column::unattached_root_tag urt, tightdb::Allocator& alloc) : m_row_indexes(urt, alloc), 
-        m_auto_sort(false)  {}
-    RowIndexes(Column::move_tag mt, Column& col) : m_row_indexes(mt, col), m_auto_sort(false) {}
-    virtual ~RowIndexes() {};
+        m_auto_sort(false) 
+#ifdef TIGHTDB_DEBUG
+        , cookie(cookie_expected)
+#endif
+    {}
+
+    RowIndexes(Column::move_tag mt, Column& col) : m_row_indexes(mt, col), m_auto_sort(false) 
+#ifdef TIGHTDB_DEBUG
+        , cookie(cookie_expected)
+#endif
+    {}
+
+    virtual ~RowIndexes() 
+    {
+#ifdef TIGHTDB_DEBUG
+        cookie = 0xdeaddeaddead1111ULL; // dead 1111 means dead linkview or tableview
+#endif
+    }
 
     // Return a column of the table that m_row_indexes are pointing at (which is the target table for LinkList and
     // parent table for TableView)
@@ -71,6 +86,12 @@ public:
     Column m_row_indexes;
     Sorter m_sorting_predicate; // Stores sorting criterias (columns + ascending)
     bool m_auto_sort;
+
+#ifdef TIGHTDB_DEBUG
+    static const uint64_t cookie_expected = 0x1111111111111111ULL;
+    uint64_t cookie;
+#endif
+
 };
 
 #endif // TIGHTDB_VIEWS_HPP
