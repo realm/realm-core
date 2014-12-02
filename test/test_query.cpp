@@ -1923,6 +1923,22 @@ TEST(Query_TwoSameCols)
     CHECK_EQUAL(0, q4.find());
 }
 
+TEST(Query_DateTest)
+{
+    Table table;
+    table.add_column(type_DateTime, "second1");
+
+    for (int i = 1; i < 10; i++) {
+        table.add_empty_row();
+        table.set_datetime(0, i - 1, DateTime(i * 1000));
+    }
+
+    Query q = table.where().equal_datetime(0, DateTime(5000));
+    CHECK_EQUAL(1, q.count());
+    TableView tv = q.find_all();
+    CHECK_EQUAL(1, tv.size());
+}
+
 TEST(Query_TwoColsNoRows)
 {
     Table table;
