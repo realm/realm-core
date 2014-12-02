@@ -33,6 +33,12 @@
 #endif
 
 
+#include <tightdb/util/terminate.hpp>
+#define TIGHTDB_ASSERT_RELEASE(condition) \
+    ((condition) ? static_cast<void>(0) : \
+    tightdb::util::terminate("Assertion failed: " #condition, __FILE__, __LINE__))
+
+
 #ifdef TIGHTDB_HAVE_CXX11_STATIC_ASSERT
 #  define TIGHTDB_STATIC_ASSERT(condition, message) static_assert(condition, message)
 #else
@@ -51,5 +57,8 @@ namespace util {
 }
 #endif
 
+#if defined(TIGHTDB_DEBUG) && !defined(TIGHTDB_COOKIE_CHECK)
+#  define TIGHTDB_COOKIE_CHECK
+#endif
 
 #endif // TIGHTDB_UTIL_ASSERT_HPP
