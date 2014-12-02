@@ -42,6 +42,13 @@ public:
     virtual uint_fast64_t sync_if_needed() const { return 0; }
     virtual bool is_in_sync() const { return true; }
 
+    void check_cookie() const
+    {
+#ifdef TIGHTDB_COOKIE_CHECK
+        TIGHTDB_ASSERT_RELEASE(cookie == cookie_expected);
+#endif
+    }
+
     // Predicate for std::sort
     struct Sorter
     {
