@@ -1345,6 +1345,8 @@ size_t Array::calc_aligned_byte_size(size_t size, int width)
 
 size_t Array::CalcByteLen(size_t count, size_t width) const
 {
+    TIGHTDB_ASSERT(get_wtype_from_header(get_header_from_data(m_data)) == wtype_Bits);
+
     // FIXME: Consider calling `calc_aligned_byte_size(size)`
     // instead. Note however, that CalcByteLen() is supposed to return
     // the unaligned byte size. It is probably the case that no harm
