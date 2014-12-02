@@ -84,7 +84,7 @@ template <int function, typename T, typename R, class ColType>
 R TableViewBase::aggregate(R(ColType::*aggregateMethod)(size_t, size_t, size_t, size_t*) const, size_t column_ndx, T count_target, size_t* return_ndx) const
 {
 #ifdef TIGHTDB_COOKIE_CHECK
-    TIGHTDB_ASSERT_RELEASE(cookie != cookie_expected);
+    TIGHTDB_ASSERT_RELEASE(cookie == cookie_expected);
 #endif
 
     TIGHTDB_ASSERT_COLUMN_AND_TYPE(column_ndx, ColumnTypeTraits<T>::id);
