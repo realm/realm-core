@@ -384,10 +384,16 @@ public:
     /// returns false (noexcept:array-set). Note that for a value of zero, the
     /// first criterion is trivially satisfied.
     void set(std::size_t ndx, int64_t value);
+    
+    void set_uint(std::size_t ndx, uint64_t value);
+
+    void set_as_ref(std::size_t ndx, ref_type ref);
 
     template<std::size_t w> void Set(std::size_t ndx, int64_t value);
 
     int64_t get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
+    inline uint64_t get_uint(std::size_t ndx) const TIGHTDB_NOEXCEPT;
+
     template<std::size_t w> int64_t Get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
     void get_chunk(size_t ndx, int64_t res[8]) const TIGHTDB_NOEXCEPT;
     template<size_t w> void get_chunk(size_t ndx, int64_t res[8]) const TIGHTDB_NOEXCEPT;
@@ -1387,6 +1393,12 @@ inline int64_t Array::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
     else
         return (this->*m_getter)(ndx);
 */
+}
+
+
+inline uint64_t Array::get_uint(std::size_t ndx) const TIGHTDB_NOEXCEPT
+{
+    return get(ndx);
 }
 
 inline int64_t Array::front() const TIGHTDB_NOEXCEPT
