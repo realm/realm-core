@@ -476,16 +476,14 @@ void Array::set(size_t ndx, int64_t value)
     (this->*m_setter)(ndx, value);
 }
 
-void Array::set_uint(std::size_t ndx, uint64_t value)
+void Array::set_uint(std::size_t ndx, uint_fast64_t value)
 {
-    // todo, add proper unsigned -> signed conversion that works even though the system is not using 
-    // 2. complement representation
-    set(ndx, value);
+    set(ndx, from_twos_compl<int_fast64_t>(value));
 }
 
 void Array::set_as_ref(std::size_t ndx, ref_type ref)
 {
-    set(ndx, to_ref(ref));
+    set(ndx, from_ref(ref));
 }
 
 /*

@@ -560,12 +560,12 @@ void Column::set(size_t ndx, int64_t value)
 // 2. complement representation
 void Column::set_uint(size_t ndx, uint64_t value)
 {
-    set(ndx, static_cast<int64_t>(value));
+    set(ndx, from_twos_compl<int_fast64_t>(value));
 }
 
 void Column::set_as_ref(size_t ndx, ref_type ref)
 {
-    set(ndx, to_ref(ref));
+    set(ndx, from_ref(ref));
 }
 
 void Column::adjust(size_t ndx, int_fast64_t diff)
