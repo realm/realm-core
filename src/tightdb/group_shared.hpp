@@ -264,42 +264,6 @@ public:
     void test_ringbuf();
 #endif
 
-    /// If a stale .lock file is present when a SharedGroup is opened,
-    /// an Exception of type PresumablyStaleLockFile will be thrown.
-    /// The name of the stale lock file will be given as argument to the
-    /// exception. Important: In a heavily loaded scenario a lock file
-    /// may be considered stale, merely because the system is unresponsive
-    /// for a long period of time. Depending on your knowledge of the
-    /// system and its load, you must choose to either retry the operation
-    /// or manually remove the stale lock file.
-    class PresumablyStaleLockFile : public std::runtime_error {
-    public:
-        PresumablyStaleLockFile(const std::string& msg): std::runtime_error(msg) {}
-    };
-
-    // If the database file is deleted while there are open shared groups,
-    // subsequent attempts to open shared groups will try to join an already
-    // active sharing scheme, but fail due to the missing database file.
-    // This causes the following exception to be thrown from Open or the constructor.
-    class LockFileButNoData : public std::runtime_error {
-    public:
-        LockFileButNoData(const std::string& msg) : std::runtime_error(msg) {}
-    };
-
-    // If the database was created in sync mode it's an error to try to reopen it
-    // in non-sync mode:
-    class SyncUsageConsistencyError : public std::runtime_error {
-    public:
-        SyncUsageConsistencyError(const std::string& filename) : std::runtime_error(filename) {}
-    };
-
-    // if the database is encrypted, interprocess sharing is not supported:
-    class InterprocessWithEncryptionUnsupported : public std::runtime_error {
-    public:
-        InterprocessWithEncryptionUnsupported(const std::string& filename) : std::runtime_error(filename) {}
-    };
-
-
 private:
     struct SharedInfo;
     struct ReadLockInfo {

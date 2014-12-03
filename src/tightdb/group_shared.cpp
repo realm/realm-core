@@ -641,22 +641,23 @@ void SharedGroup::open(const string& path, bool no_create_file,
             // only the session initiator is allowed to create the database, all other
             // must assume that it already exists.
             bool no_create = begin_new_session ? no_create_file : true;
+
+            // If replication is enabled, we need to ask it whether we're in server-sync mode
+            // and check that the database is operated in the same mode.
+            bool server_sync_mode = false;
+#ifdef TIGHTDB_ENABLE_REPLICATION
+            Replication* repl = _impl::GroupFriend::get_replication(m_group);
+            if (repl)
+                server_sync_mode = repl->is_in_server_synchronization_mode();
+#endif
             ref_type top_ref = alloc.attach_file(path, is_shared, read_only,
-                                                 no_create, skip_validate, key); // Throws
+                                                 no_create, skip_validate, key, server_sync_mode); // Throws
             size_t file_size = alloc.get_baseline();
 
             // determine version
             uint_fast64_t version;
             if (begin_new_session) {
                 Array top(alloc);
-                bool sync_mode = false;
-#ifdef TIGHTDB_ENABLE_REPLICATION
-                // If replication is enabled, we need to ask it whether we're in server-sync mode
-                // and check that the database is operated in the same mode.
-                Replication* repl = _impl::GroupFriend::get_replication(m_group);
-                if (repl)
-                    sync_mode = repl->is_in_server_synchronization_mode();
-#endif
                 if (top_ref) {
 
                     // top_ref is non-zero implying that the database has seen at least one commit,
@@ -671,17 +672,10 @@ void SharedGroup::open(const string& path, bool no_create_file,
                         TIGHTDB_ASSERT(top.size() == 7);
                         version = (top.get(6) - 1) / 2;
                     }
-                    // Validate server-sync mode
-                    if (sync_mode != alloc.get_server_sync_mode()) {
-                        throw SyncUsageConsistencyError(path);
-                    }
                 }
                 else {
                     // the database was just created, no metadata has been written yet.
                     version = 1;
-
-                    // Persist server-sync mode for later checking
-                    alloc.set_server_sync_mode(sync_mode);
                 }
 #ifdef TIGHTDB_ENABLE_REPLICATION
                 // If replication is enabled, we need to inform it of the latest version,
@@ -698,7 +692,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
             }
             else { // not the session initiator!
                 if (key && info->session_initiator_pid != static_cast<unsigned>(getpid()))
-                    throw InterprocessWithEncryptionUnsupported(path);
+                    throw runtime_error(path + ": Encrypted interprocess sharing is currently unsupported");
             }
 #ifndef _WIN32
             // In async mode, we need to make sure the daemon is running and ready:

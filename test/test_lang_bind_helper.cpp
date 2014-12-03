@@ -6416,9 +6416,11 @@ TEST(LangBindHelper_SyncCannotBeChanged_1)
         try {
             SharedGroup sg(*repl);
         } 
-        catch (SharedGroup::SyncUsageConsistencyError& e)
+        catch (std::runtime_error& e)
         {
-            did_throw = true;
+            string error_report = e.what();
+            if (error_report == string(path) + ": found db in server sync mode, expected local mode")
+                did_throw = true;
         }
         CHECK(did_throw);
     }
@@ -6444,8 +6446,10 @@ TEST(LangBindHelper_SyncCannotBeChanged_2)
         try {
             SharedGroup sg(*repl);
         } 
-        catch (SharedGroup::SyncUsageConsistencyError& e)
+        catch (std::runtime_error& e)
         {
+            string error_report = e.what();
+            if (error_report == string(path) + ": expected db in server sync mode, found local mode")
             did_throw = true;
         }
         CHECK(did_throw);

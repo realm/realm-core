@@ -362,19 +362,6 @@ MemRef SlabAlloc::do_realloc(size_t ref, const char* addr, size_t old_size, size
     return new_mem;
 }
 
-bool SlabAlloc::get_server_sync_mode()
-{
-    File::Map<Header> map(m_file, File::access_ReadOnly, sizeof(Header)); // Throws
-    return (map.get_addr()->m_reserved & 1) != 0;
-}
-
-void SlabAlloc::set_server_sync_mode(bool is_in_server_sync_mode)
-{
-    File::Map<Header> map(m_file, File::access_ReadWrite, sizeof(Header)); // Throws
-    map.get_addr()->m_reserved |= is_in_server_sync_mode ? 1 : 0;
-    map.sync();
-}
-
 char* SlabAlloc::do_translate(ref_type ref) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(is_attached());
@@ -392,7 +379,7 @@ char* SlabAlloc::do_translate(ref_type ref) const TIGHTDB_NOEXCEPT
 
 
 ref_type SlabAlloc::attach_file(const string& path, bool is_shared, bool read_only, bool no_create,
-                                bool skip_validate, const uint8_t* encryption_key)
+                                bool skip_validate, const uint8_t* encryption_key, bool server_sync_mode)
 {
     TIGHTDB_ASSERT(!is_attached());
 
@@ -420,6 +407,7 @@ ref_type SlabAlloc::attach_file(const string& path, bool is_shared, bool read_on
     // The size of a database file must not exceed what can be encoded
     // in std::size_t.
     size_t size;
+    bool did_create = false;
     if (int_cast_with_overflow_detect(m_file.get_size(), size))
         goto invalid_database;
 
@@ -439,6 +427,7 @@ ref_type SlabAlloc::attach_file(const string& path, bool is_shared, bool read_on
     // exception. C) It looks good. In this case we proceede as
     // normal.
     if (size == 0) {
+        did_create = true;
         if (read_only)
             goto invalid_database;
 
@@ -459,10 +448,26 @@ ref_type SlabAlloc::attach_file(const string& path, bool is_shared, bool read_on
             if (!validate_buffer(map.get_addr(), size, top_ref))
                 goto invalid_database;
         }
-
         m_data        = map.release();
         m_baseline    = size;
         m_attach_mode = is_shared ? attach_SharedFile : attach_UnsharedFile;
+        if (did_create) {
+            File::Map<Header> writable_map(m_file, File::access_ReadWrite, sizeof(Header)); // Throws
+            Header* header = writable_map.get_addr();
+            header->m_select_bit |= server_sync_mode ? 0x2 : 0x0;
+            header = reinterpret_cast<Header*>(m_data);
+            bool stored_server_sync_mode = (header->m_select_bit & 0x2) != 0;
+            if (server_sync_mode != stored_server_sync_mode)
+                throw runtime_error(path + ": failed to write!");
+        }
+        else {
+            Header* header = reinterpret_cast<Header*>(m_data);
+            bool stored_server_sync_mode = (header->m_select_bit & 0x2) != 0;
+            if (server_sync_mode &&  !stored_server_sync_mode)
+                throw runtime_error(path + ": expected db in server sync mode, found local mode");
+            if (!server_sync_mode &&  stored_server_sync_mode)
+                throw runtime_error(path + ": found db in server sync mode, expected local mode");
+        }
     }
 
     fcg.release(); // Do not close
@@ -559,7 +564,7 @@ void SlabAlloc::do_prepare_for_update(char* mutable_data)
     StreamingFooter* footer = reinterpret_cast<StreamingFooter*>(mutable_data+m_baseline) - 1;
     TIGHTDB_ASSERT(footer->m_magic_cookie == footer_magic_cookie);
     header->m_top_ref[1] = footer->m_top_ref;
-    header->m_select_bit = 1;
+    header->m_select_bit |= 1; // keep bit 1 used for server sync mode unchanged
     m_file_on_streaming_form = false;
 }
 
