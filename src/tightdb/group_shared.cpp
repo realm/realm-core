@@ -372,10 +372,6 @@ struct SharedGroup::SharedInfo
     // Cleared by the daemon when it decides to exit.
     bool daemon_ready;
 
-    // Set when the database and the .lock file is in sync with respect to versioning
-    // (and a few other metadata)
-    bool versioning_ready;
-
     // Latest version number. Guarded by the controlmutex (for lock-free access, use
     // get_current_version() instead)
     uint64_t latest_version_number;
@@ -442,7 +438,6 @@ SharedGroup::SharedInfo::SharedInfo(DurabilityLevel dlevel):
     session_initiator_pid = 0;
     daemon_started = false;
     daemon_ready = false;
-    versioning_ready = false;
     init_complete = 1;
 }
 
@@ -628,7 +623,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
         // - attachment of the database file
         // - start of the async daemon
         // - stop of the async daemon
-        // - SharedGroup joining/leaving the sharing scheme
+        // - SharedGroup beginning/ending a session
         // - Waiting for and signalling database changes
         {
             RobustLockGuard lock(info->controlmutex, &recover_from_dead_write_transact); // Throws
@@ -637,21 +632,22 @@ void SharedGroup::open(const string& path, bool no_create_file,
             // an exclusive file lock, and we checked it under a shared file lock
 
             // proceed to initialize versioning and other metadata information related to
-            // the database. Also create the database if we're first to get here.
+            // the database. Also create the database if we're beginning a new session
+            bool begin_new_session = info->num_participants == 0;
             bool is_shared = true;
             bool read_only = false;
-            bool no_create = true;
             bool skip_validate = false;
-            if (info->versioning_ready == false) {
-                no_create = no_create_file;
-            }
+
+            // only the session initiator is allowed to create the database, all other
+            // must assume that it already exists.
+            bool no_create = begin_new_session ? no_create_file : true;
             ref_type top_ref = alloc.attach_file(path, is_shared, read_only,
                                                  no_create, skip_validate, key); // Throws
             size_t file_size = alloc.get_baseline();
 
-            // determine initial version
+            // determine version
             uint_fast64_t version;
-            if (info->versioning_ready == false) {
+            if (begin_new_session) {
                 Array top(alloc);
                 bool sync_mode = false;
 #ifdef TIGHTDB_ENABLE_REPLICATION
@@ -662,6 +658,9 @@ void SharedGroup::open(const string& path, bool no_create_file,
                     sync_mode = repl->is_in_server_synchronization_mode();
 #endif
                 if (top_ref) {
+
+                    // top_ref is non-zero implying that the database has seen at least one commit,
+                    // so we can get the versioning info from the database
                     top.init_from_ref(top_ref);
                     if (top.size() <= 5) {
                         // the database wasn't written by shared group, so no versioning info
@@ -696,7 +695,6 @@ void SharedGroup::open(const string& path, bool no_create_file,
                 }
                 info->latest_version_number = version;
                 info->init_versioning(top_ref, file_size, version);
-                info->versioning_ready = true;
             }
             else { // not the session initiator!
                 if (key && info->session_initiator_pid != static_cast<unsigned>(getpid()))
@@ -811,8 +809,9 @@ SharedGroup::~SharedGroup() TIGHTDB_NOEXCEPT
     {
         RobustLockGuard lock(info->controlmutex, recover_from_dead_write_transact);
         --info->num_participants;
+        bool end_of_session = info->num_participants == 0;
         // cerr << "closing" << endl;
-        if (info->num_participants == 0) {
+        if (end_of_session) {
 
             // If the db file is just backing for a transient data structure,
             // we can delete it when done.
