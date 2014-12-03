@@ -383,12 +383,11 @@ ref_type SlabAlloc::attach_file(const string& path, bool is_shared, bool read_on
 {
     TIGHTDB_ASSERT(!is_attached());
 
-    // When 'read_only' is true, this function will throw
-    // InvalidDatabase if the file exists already but is empty. This
-    // can happen if another process is currently creating it. Note
-    // however, that it is only legal for multiple processes to access
-    // a database file concurrently if it is done via a SharedGroup,
-    // and in that case 'read_only' can never be true.
+    // When 'read_only' is true, this function will throw InvalidDatabase if the
+    // file exists already but is empty. This can happen if another process is
+    // currently creating it. Note however, that it is only legal for multiple
+    // processes to access a database file concurrently if it is done via a
+    // SharedGroup, and in that case 'read_only' can never be true.
     TIGHTDB_ASSERT(!(is_shared && read_only));
     static_cast<void>(is_shared);
 
@@ -400,32 +399,29 @@ ref_type SlabAlloc::attach_file(const string& path, bool is_shared, bool read_on
         m_file.set_encryption_key(encryption_key);
     File::CloseGuard fcg(m_file);
 
-    size_t initial_size = 4 * 1024; // a single page sure feels tight
+    size_t initial_size = 4 * 1024; // 4 KiB
 
     ref_type top_ref = 0;
 
-    // The size of a database file must not exceed what can be encoded
-    // in std::size_t.
+    // The size of a database file must not exceed what can be encoded in
+    // std::size_t.
     size_t size;
     bool did_create = false;
     if (int_cast_with_overflow_detect(m_file.get_size(), size))
         goto invalid_database;
 
-    // FIXME: This initialization procedure does not provide
-    // sufficient robustness given that processes may be abruptly
-    // terminated at any point in time. In unshared mode, we must be
-    // able to reliably detect any invalid file as long as its
-    // invalidity is due to a terminated serialization process
-    // (e.g. due to a power failure). In shared mode we can guarantee
-    // that if the database file was ever valid, then it will remain
-    // valid, however, there is no way we can ensure that
-    // initialization of an empty database file succeeds. Thus, in
-    // shared mode we must be able to reliably distiguish between
-    // three cases when opening a database file: A) It was never
-    // properly initialized. In this case we should simply
-    // reinitialize it. B) It looks corrupt. In this case we throw an
-    // exception. C) It looks good. In this case we proceede as
-    // normal.
+    // FIXME: This initialization procedure does not provide sufficient
+    // robustness given that processes may be abruptly terminated at any point
+    // in time. In unshared mode, we must be able to reliably detect any invalid
+    // file as long as its invalidity is due to a terminated serialization
+    // process (e.g. due to a power failure). In shared mode we can guarantee
+    // that if the database file was ever valid, then it will remain valid,
+    // however, there is no way we can ensure that initialization of an empty
+    // database file succeeds. Thus, in shared mode we must be able to reliably
+    // distiguish between three cases when opening a database file: A) It was
+    // never properly initialized. In this case we should simply reinitialize
+    // it. B) It looks corrupt. In this case we throw an exception. C) It looks
+    // good. In this case we proceede as normal.
     if (size == 0) {
         did_create = true;
         if (read_only)

@@ -79,6 +79,23 @@ namespace tightdb {
     // Return size in bytes of utf8 character. No error checking
     size_t sequence_length(char lead);
 
+    // Limitations for case insensitive string search
+    // Case insensitive search (equal, begins_with, ends_with and contains)
+    // only works for unicodes 0...0x7f which is the same as the 0...127
+    // ASCII character set (letters a-z and A-Z).
+
+    // In does *not* work for the 0...255 ANSI character set that contains
+    // characters from many European countries like Germany, France, Denmark,
+    // etc.
+
+    // It also does not work for characters from non-western countries like
+    // Japan, Russia, Arabia, etc.
+
+    // If there exists characters outside the ASCII range either in the text
+    // to be searched for, or in the Realm string column which is searched
+    // in, then the compare yields a random result such that the row may or
+    // may not be included in the result set.
+
     // Return bool(string1 < string2)
     bool utf8_compare(StringData string1, StringData string2);
 

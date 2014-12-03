@@ -247,7 +247,7 @@ void ColumnLinkList::update_child_ref(size_t child_ndx, ref_type new_ref)
 
 ref_type ColumnLinkList::get_child_ref(size_t child_ndx) const TIGHTDB_NOEXCEPT
 {
-    return ColumnLinkBase::get(child_ndx);
+    return ColumnLinkBase::get_as_ref(child_ndx);
 }
 
 

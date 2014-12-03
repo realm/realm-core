@@ -476,6 +476,16 @@ void Array::set(size_t ndx, int64_t value)
     (this->*m_setter)(ndx, value);
 }
 
+void Array::set_uint(std::size_t ndx, uint_fast64_t value)
+{
+    set(ndx, from_twos_compl<int_fast64_t>(value));
+}
+
+void Array::set_as_ref(std::size_t ndx, ref_type ref)
+{
+    set(ndx, from_ref(ref));
+}
+
 /*
 // Optimization for the common case of adding positive values to a local array
 // (happens a lot when returning results to TableViews)
@@ -1345,6 +1355,8 @@ size_t Array::calc_aligned_byte_size(size_t size, int width)
 
 size_t Array::CalcByteLen(size_t count, size_t width) const
 {
+    TIGHTDB_ASSERT(get_wtype_from_header(get_header_from_data(m_data)) == wtype_Bits);
+
     // FIXME: Consider calling `calc_aligned_byte_size(size)`
     // instead. Note however, that CalcByteLen() is supposed to return
     // the unaligned byte size. It is probably the case that no harm
