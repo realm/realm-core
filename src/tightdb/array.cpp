@@ -476,6 +476,10 @@ void Array::set(size_t ndx, int64_t value)
     (this->*m_setter)(ndx, value);
 }
 
+// When a value of a signed type is converted to an unsigned type, the C++ standard guarantees that negative values 
+// are converted from the native representation to 2's complement, but the opposite conversion is left as undefined. 
+// tightdb::util::from_twos_compl() is used here to perform the correct opposite unsigned-to-signed conversion,
+// which reduces to a no-op when 2's complement is the native representation of negative values.
 void Array::set_uint(std::size_t ndx, uint_fast64_t value)
 {
     set(ndx, from_twos_compl<int_fast64_t>(value));
