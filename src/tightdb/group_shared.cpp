@@ -666,11 +666,12 @@ void SharedGroup::open(const string& path, bool no_create_file,
                     if (top.size() <= 5) {
                         // the database wasn't written by shared group, so no versioning info
                         version = 1;
+                        TIGHTDB_ASSERT(! server_sync_mode);
                     }
                     else {
                         // the database was written by shared group, so it has versioning info
                         TIGHTDB_ASSERT(top.size() == 7);
-                        version = (top.get(6) - 1) / 2;
+                        version = top.get(6) / 2;
                     }
                 }
                 else {
@@ -685,13 +686,14 @@ void SharedGroup::open(const string& path, bool no_create_file,
                     repl->reset_log_management(version);
 #endif
                 if (key) {
-                    info->session_initiator_pid = static_cast<unsigned>(getpid());
+                    TIGHTDB_STATIC_ASSERT(sizeof(pid_t) <= sizeof(uint64_t), "process identifiers too large");
+                    info->session_initiator_pid = static_cast<uint64_t>(getpid());
                 }
                 info->latest_version_number = version;
                 info->init_versioning(top_ref, file_size, version);
             }
             else { // not the session initiator!
-                if (key && info->session_initiator_pid != static_cast<unsigned>(getpid()))
+                if (key && info->session_initiator_pid != static_cast<uint64_t>(getpid()))
                     throw runtime_error(path + ": Encrypted interprocess sharing is currently unsupported");
             }
 #ifndef _WIN32

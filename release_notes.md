@@ -9,6 +9,8 @@
 * `TransactLogRegistry` is no longer available and must therefore no longer 
   be passed to `LangBindHelper::advance_read()` and 
   `LangBindHelper::promote_to_write()`.
+* The exceptions `PresumablyStaleLockFile` and `LockFileButNoData` are no longer
+  thrown from SharedGroup and has been removed from the API.
 
 ### Enhancements:
 
