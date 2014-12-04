@@ -24,8 +24,8 @@
 #include <sstream>
 
 #define TIGHTDB_VER_MAJOR 0
-#define TIGHTDB_VER_MINOR 86
-#define TIGHTDB_VER_PATCH 1
+#define TIGHTDB_VER_MINOR 87
+#define TIGHTDB_VER_PATCH 0
 
 namespace tightdb {
 
