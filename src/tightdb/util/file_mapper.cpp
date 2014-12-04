@@ -134,7 +134,7 @@ size_t round_up_to_page_size(size_t size)
     return (size + page_size - 1) & ~(page_size - 1);
 }
 
-void add_mapping(void* addr, size_t size, int fd, File::AccessMode access, const uint8_t* encryption_key)
+void add_mapping(void* addr, size_t size, int fd, File::AccessMode access, const char* encryption_key)
 {
     SpinLockGuard lock(mapping_lock);
 
@@ -172,7 +172,7 @@ void add_mapping(void* addr, size_t size, int fd, File::AccessMode access, const
         mappings_for_file f;
         f.device = st.st_dev;
         f.inode = st.st_ino;
-        f.info = new SharedFileInfo(encryption_key, dup(fd));
+        f.info = new SharedFileInfo(reinterpret_cast<const uint8_t*>(encryption_key), dup(fd));
         mappings_by_file.push_back(f);
         it = --mappings_by_file.end();
     }
@@ -227,7 +227,7 @@ void* mmap_anon(size_t size)
 namespace tightdb {
 namespace util {
 
-void* mmap(int fd, size_t size, File::AccessMode access, const uint8_t* encryption_key)
+void* mmap(int fd, size_t size, File::AccessMode access, const char* encryption_key)
 {
 #ifdef TIGHTDB_ENABLE_ENCRYPTION
     if (encryption_key) {
