@@ -21,6 +21,7 @@
 
 #ifdef TIGHTDB_ENABLE_ENCRYPTION
 #include <cstdlib>
+#include <iostream>
 
 #include <sys/mman.h>
 #include <unistd.h>
@@ -413,8 +414,9 @@ void EncryptedFileMapping::validate_page(size_t page) TIGHTDB_NOEXCEPT
     }
 
     if (memcmp(buffer, page_addr(page), page_size)) {
-        printf("mismatch %p: fd(%d) page(%zu/%zu) %s %s\n",
-               this, m_file.fd, page, m_page_count, buffer, page_addr(page));
+        std::cerr << "mismatch " << this << ": fd(" << m_file.fd << ") page("
+                  << page << "/" << m_page_count << ") " << buffer << " "
+                  << page_addr(page) << std::endl;
         TIGHTDB_TERMINATE("");
     }
 #else
