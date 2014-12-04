@@ -687,13 +687,13 @@ void SharedGroup::open(const string& path, bool no_create_file,
 #endif
                 if (key) {
                     TIGHTDB_STATIC_ASSERT(sizeof(pid_t) <= sizeof(uint64_t), "process identifiers too large");
-                    info->session_initiator_pid = static_cast<uint64_t>(getpid());
+                    info->session_initiator_pid = uint64_t(getpid());
                 }
                 info->latest_version_number = version;
                 info->init_versioning(top_ref, file_size, version);
             }
             else { // not the session initiator!
-                if (key && info->session_initiator_pid != static_cast<uint64_t>(getpid()))
+                if (key && info->session_initiator_pid != uint64_t(getpid()))
                     throw runtime_error(path + ": Encrypted interprocess sharing is currently unsupported");
             }
 #ifndef _WIN32
