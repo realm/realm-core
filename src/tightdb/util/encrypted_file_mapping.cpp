@@ -395,7 +395,7 @@ void EncryptedFileMapping::validate_page(size_t page) TIGHTDB_NOEXCEPT {
 
     if (memcmp(buffer, page_addr(page), page_size)) {
         printf("mismatch %p: fd(%d) page(%zu/%zu) %s %s\n",
-               (void*)this, m_file.fd, page, m_page_count, buffer, page_addr(page));
+               this, m_file.fd, page, m_page_count, buffer, page_addr(page));
         TIGHTDB_TERMINATE("");
     }
 #else

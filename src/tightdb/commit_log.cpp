@@ -77,9 +77,9 @@ public:
     void do_rollback_write_transact(SharedGroup& sg) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     void do_interrupt() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {};
     void do_clear_interrupt() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {};
-    void do_transact_log_reserve(std::size_t sz) TIGHTDB_OVERRIDE;
+    void do_transact_log_reserve(std::size_t size) TIGHTDB_OVERRIDE;
     void do_transact_log_append(const char* data, std::size_t size) TIGHTDB_OVERRIDE;
-    void transact_log_reserve(std::size_t n);
+    void transact_log_reserve(std::size_t size);
     virtual bool is_in_server_synchronization_mode() { return m_is_persisting; }
     virtual void submit_transact_log(BinaryData);
     virtual void stop_logging() TIGHTDB_OVERRIDE;
@@ -207,7 +207,7 @@ protected:
     //    [ preamble->begin_oldest_commit_range .. preamble->begin_newest_commit_range [
     // The second buffer maps the file containing log entries:
     //    [ preamble->begin_newest_commit_range .. preamble->end_commit_range [
-    void get_buffers_in_order(const CommitLogPreamble* preamble, char*& first, char*& second);
+    void get_buffers_in_order(const CommitLogPreamble* preamble, const char*& first, const char*& second);
 
     // Ensure the file is open so that it can be resized or mapped
     void open_if_needed(CommitLogMetadata& log);
@@ -261,12 +261,12 @@ inline WriteLogCollector::CommitLogPreamble* WriteLogCollector::get_preamble_for
     CommitLogPreamble* from;
     CommitLogPreamble* to;
     if (header->use_preamble_a) {
-        from = & header->preamble_a;
-        to = & header->preamble_b;
+        from = &(header->preamble_a);
+        to = &(header->preamble_b);
     }
     else {
-        from = & header->preamble_b;
-        to = & header->preamble_a;
+        from = &(header->preamble_b);
+        to = &(header->preamble_a);
     }
     *to = *from;
     return to;
@@ -296,7 +296,8 @@ inline void WriteLogCollector::map_header_if_needed()
 
 // convenience methods for getting to buffers and logs.
 
-void WriteLogCollector::get_buffers_in_order(const CommitLogPreamble* preamble, char*& first, char*& second)
+void WriteLogCollector::get_buffers_in_order(const CommitLogPreamble* preamble, 
+                                             const char*& first, const char*& second)
 {
     if (preamble->active_file_is_log_a) {
         first  = reinterpret_cast<char*>(m_log_b.map.get_addr());
@@ -378,19 +379,19 @@ void WriteLogCollector::cleanup_stale_versions(CommitLogPreamble* preamble)
         // shrink the recycled file by 1/4
         CommitLogMetadata* active_log = get_active_log(preamble);
         open_if_needed(*active_log);
-        File::SizeType sz = active_log->file.get_size();
-        sz /= page_size * minimal_pages;
-        if (sz > 4) {
-            sz -= sz/4;
-            sz *= page_size * minimal_pages;
-            active_log->file.resize(sz);
+        File::SizeType size = active_log->file.get_size();
+        size /= page_size * minimal_pages;
+        if (size > 4) {
+            size -= size/4;
+            size *= page_size * minimal_pages;
+            active_log->file.resize(size);
         }
     }
 }
 
 
 // returns the current "from" version
-version_type WriteLogCollector::internal_submit_log(const char* data, uint64_t sz)
+version_type WriteLogCollector::internal_submit_log(const char* data, uint64_t size)
 {
     version_type orig_version;
     map_header_if_needed();
@@ -403,7 +404,7 @@ version_type WriteLogCollector::internal_submit_log(const char* data, uint64_t s
     open_if_needed(*active_log);
 
     // make sure we have space (allocate if not)
-    File::SizeType size_needed = aligned_to(sizeof(uint64_t), preamble->write_offset + sizeof(uint64_t) + sz);
+    File::SizeType size_needed = aligned_to(sizeof(uint64_t), preamble->write_offset + sizeof(uint64_t) + size);
     size_needed = aligned_to(page_size, size_needed);
     if (size_needed > active_log->file.get_size()) {
         active_log->file.resize(size_needed);
@@ -414,14 +415,14 @@ version_type WriteLogCollector::internal_submit_log(const char* data, uint64_t s
 
     // append data from write pointer and onwards:
     char* write_ptr = reinterpret_cast<char*>(active_log->map.get_addr()) + preamble->write_offset;
-    *reinterpret_cast<uint64_t*>(write_ptr) = sz;
+    *reinterpret_cast<uint64_t*>(write_ptr) = size;
     write_ptr += sizeof(uint64_t);
-    std::copy(data, data+sz, write_ptr);
+    std::copy(data, data+size, write_ptr);
     active_log->map.sync();
-    // cerr << "    -- at: " << preamble->write_offset << ", " << sz << endl;
+    // cerr << "    -- at: " << preamble->write_offset << ", " << size << endl;
 
     // update metadata to reflect the added commit log
-    preamble->write_offset += aligned_to(sizeof(uint64_t), sz + sizeof(uint64_t));
+    preamble->write_offset += aligned_to(sizeof(uint64_t), size + sizeof(uint64_t));
     orig_version = preamble->end_commit_range;
     preamble->end_commit_range = orig_version+1;
     sync_header();
@@ -490,15 +491,15 @@ void WriteLogCollector::reset_log_management(version_type last_version)
             CommitLogMetadata* active_log = get_active_log(preamble);
             remap_if_needed(*active_log);
             version_type current_version;
-            char* old_buffer; 
-            char* buffer;
+            const char* old_buffer; 
+            const char* buffer;
             get_buffers_in_order(preamble, old_buffer, buffer);
             preamble->write_offset = sizeof(CommitLogHeader);
             for (current_version = preamble->begin_newest_commit_range; 
                  current_version < last_version;
                  current_version++) {
                 // advance write ptr to next buffer start:
-                uint64_t size = *reinterpret_cast<uint64_t*>(buffer + preamble->write_offset);
+                uint64_t size = *reinterpret_cast<const uint64_t*>(buffer + preamble->write_offset);
                 uint64_t tmp_offset = preamble->write_offset + sizeof(uint64_t);
                 size = aligned_to(sizeof(uint64_t), size);
                 preamble->write_offset = tmp_offset + size;
@@ -564,8 +565,8 @@ void WriteLogCollector::get_commit_entries(version_type from_version, version_ty
     remap_if_needed(m_log_a);
     remap_if_needed(m_log_b);
     // cerr << "get_commit_entries(" << from_version << ", " << to_version <<")" << endl;
-    char* buffer;
-    char* second_buffer;
+    const char* buffer;
+    const char* second_buffer;
     get_buffers_in_order(preamble, buffer, second_buffer);
 
     // setup local offset and version tracking variables if needed
@@ -588,7 +589,7 @@ void WriteLogCollector::get_commit_entries(version_type from_version, version_ty
     // updates of read tracking (m_read_version and m_read_offset), and most notably
     // to PREVENT update of read tracking if it is unsafe, i.e. could lead to problems
     // when reading is resumed during a later call.
-    while (1) {
+    for (;;) {
 
         // switch from first to second file if needed (at most once)
         if (second_buffer && m_read_version >= preamble->begin_newest_commit_range) {
@@ -604,7 +605,7 @@ void WriteLogCollector::get_commit_entries(version_type from_version, version_ty
             break;
 
         // follow buffer layout
-        uint64_t size = *reinterpret_cast<uint64_t*>(buffer + m_read_offset);
+        uint64_t size = *reinterpret_cast<const uint64_t*>(buffer + m_read_offset);
         uint64_t tmp_offset = m_read_offset + sizeof(uint64_t);
         if (m_read_version >= from_version) {
             // cerr << "  --at: " << m_read_offset << ", " << size << endl;
@@ -636,8 +637,8 @@ WriteLogCollector::do_commit_write_transact(SharedGroup& sg,
 {
     static_cast<void>(sg);
     char* data = m_transact_log_buffer.data();
-    uint64_t sz = m_transact_log_free_begin - data;
-    version_type from_version = internal_submit_log(data,sz);
+    uint64_t size = m_transact_log_free_begin - data;
+    version_type from_version = internal_submit_log(data,size);
     TIGHTDB_ASSERT(from_version == orig_version);
     static_cast<void>(from_version);
     version_type new_version = orig_version + 1;
@@ -660,9 +661,9 @@ void WriteLogCollector::do_rollback_write_transact(SharedGroup& sg) TIGHTDB_NOEX
 }
 
 
-void WriteLogCollector::do_transact_log_reserve(std::size_t sz)
+void WriteLogCollector::do_transact_log_reserve(std::size_t size)
 {
-    transact_log_reserve(sz);
+    transact_log_reserve(size);
 }
 
 
@@ -673,13 +674,13 @@ void WriteLogCollector::do_transact_log_append(const char* data, std::size_t siz
 }
 
 
-void WriteLogCollector::transact_log_reserve(std::size_t n)
+void WriteLogCollector::transact_log_reserve(std::size_t size)
 {
     char* data = m_transact_log_buffer.data();
-    std::size_t size = m_transact_log_free_begin - data;
-    m_transact_log_buffer.reserve_extra(size, n);
+    std::size_t size2 = m_transact_log_free_begin - data;
+    m_transact_log_buffer.reserve_extra(size2, size);
     data = m_transact_log_buffer.data();
-    m_transact_log_free_begin = data + size;
+    m_transact_log_free_begin = data + size2;
     m_transact_log_free_end = data + m_transact_log_buffer.size();
 }
 

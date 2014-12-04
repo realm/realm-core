@@ -194,7 +194,7 @@ public:
         uint64_t filesize;
         uint64_t current_top;
         // The count field acts as synchronization point for accesses to the above
-        // fields. A succesfull inc implies acquire wrt memory consistency.
+        // fields. A succesfull inc implies acquire with regard to memory consistency.
         // Release is triggered by explicitly storing into count whenever a
         // new entry has been initialized.
         mutable Atomic<uint32_t> count;
@@ -855,10 +855,6 @@ void SharedGroup::do_async_commits()
 {
     bool shutdown = false;
     SharedInfo* info = m_file_map.get_addr();
-    // NO client are allowed to proceed through open and update current_version
-    // until they see 'daemon_running == true'
-    // As we haven't set daemon_running yet, the following must hold:
-    //    TIGHTDB_ASSERT(get_current_version() == 0 || get_current_version() == 1);
 
     // We always want to keep a read lock on the last version
     // that was commited to disk, to protect it against being
