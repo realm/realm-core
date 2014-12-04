@@ -99,7 +99,7 @@ TEST(File_Map)
     size_t len = strlen(data);
     {
         File f(path, File::mode_Write);
-        f.set_encryption_key(crypt_key);
+        f.set_encryption_key(crypt_key(true));
         f.resize(len);
 
         File::Map<char> map(f, File::access_ReadWrite, len);
@@ -107,7 +107,7 @@ TEST(File_Map)
     }
     {
         File f(path, File::mode_Read);
-        f.set_encryption_key(crypt_key);
+        f.set_encryption_key(crypt_key(true));
         File::Map<char> map(f, File::access_ReadOnly, len);
         CHECK(memcmp(map.get_addr(), data, len) == 0);
     }
@@ -121,7 +121,7 @@ TEST(File_MapMultiplePages)
     TEST_PATH(path);
     {
         File f(path, File::mode_Write);
-        f.set_encryption_key(crypt_key);
+        f.set_encryption_key(crypt_key(true));
         f.resize(count * sizeof(size_t));
 
         File::Map<size_t> map(f, File::access_ReadWrite, count * sizeof(size_t));
@@ -130,7 +130,7 @@ TEST(File_MapMultiplePages)
     }
     {
         File f(path, File::mode_Read);
-        f.set_encryption_key(crypt_key);
+        f.set_encryption_key(crypt_key(true));
         File::Map<size_t> map(f, File::access_ReadOnly, count * sizeof(size_t));
         for (size_t i = 0; i < count; ++i) {
             CHECK_EQUAL(map.get_addr()[i], i);
@@ -147,11 +147,11 @@ TEST(File_ReaderAndWriter)
     TEST_PATH(path);
 
     File writer(path, File::mode_Write);
-    writer.set_encryption_key(crypt_key);
+    writer.set_encryption_key(crypt_key(true));
     writer.resize(count * sizeof(size_t));
 
     File reader(path, File::mode_Read);
-    reader.set_encryption_key(crypt_key);
+    reader.set_encryption_key(crypt_key(true));
     CHECK_EQUAL(writer.get_size(), reader.get_size());
 
     File::Map<size_t> write(writer, File::access_ReadWrite, count * sizeof(size_t));
@@ -173,11 +173,11 @@ TEST(File_MultipleWriters)
 
     {
         File w1(path, File::mode_Write);
-        w1.set_encryption_key(crypt_key);
+        w1.set_encryption_key(crypt_key(true));
         w1.resize(count * sizeof(size_t));
 
         File w2(path, File::mode_Write);
-        w2.set_encryption_key(crypt_key);
+        w2.set_encryption_key(crypt_key(true));
         w2.resize(count * sizeof(size_t));
 
         File::Map<size_t> map1(w1, File::access_ReadWrite, count * sizeof(size_t));
@@ -190,7 +190,7 @@ TEST(File_MultipleWriters)
     }
 
     File reader(path, File::mode_Read);
-    reader.set_encryption_key(crypt_key);
+    reader.set_encryption_key(crypt_key(true));
 
     File::Map<size_t> read(reader, File::access_ReadOnly, count * sizeof(size_t));
 
@@ -199,6 +199,19 @@ TEST(File_MultipleWriters)
         if (read.get_addr()[i] != 2)
             return;
     }
+}
+
+TEST(File_SetEncryptionKey)
+{
+    TEST_PATH(path);
+    File f(path, File::mode_Write);
+    uint8_t key[64] = {0};
+
+#ifdef TIGHTDB_ENABLE_ENCRYPTION
+    f.set_encryption_key(key); // should not throw
+#else
+    CHECK_THROW(f.set_encryption_key(key), std::runtime_error);
+#endif
 }
 
 #endif // TEST_FILE

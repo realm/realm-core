@@ -278,7 +278,7 @@ public:
     void unlock() TIGHTDB_NOEXCEPT;
 
     /// Set the encryption key used for this file. Must be called before any
-    /// mappings are created.
+    /// mappings are created or any data is read from or written to the file.
     ///
     /// \param key A 64-byte encryption key, or null to disable encryption.
     void set_encryption_key(const uint8_t* key);
