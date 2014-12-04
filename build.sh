@@ -771,14 +771,16 @@ EOF
         tightdb_version="$(sh build.sh get-version)" || exit
         dir_name="core-$tightdb_version"
         file_name="core-android-$tightdb_version.tar.gz"
+        tar_files='libtightdb*'
         if [ $enable_encryption = yes ]; then
             dir_name="$dir_name-encryption"
             file_name="core-android-$tightdb_version-encryption.tar.gz"
+            tar_files='libtightdb* *.txt'
         fi
 
         echo "Create tar.gz file $file_name"
         rm -f "$TIGHTDB_HOME/$file_name" || exit 1
-        (cd "$TIGHTDB_HOME/$ANDROID_DIR" && tar czf "$TIGHTDB_HOME/$file_name" include libtightdb* *.txt) || exit 1
+        (cd "$TIGHTDB_HOME/$ANDROID_DIR" && tar czf "$TIGHTDB_HOME/$file_name" include $tar_files) || exit 1
 
         echo "Unpacking in ../tightdb_java/$dir_name"
         mkdir -p ../tightdb_java/realm-jni/build || exit 1 # to help Mr. Jenkins
@@ -2722,7 +2724,7 @@ EOF
         TIGHTDB_MAX_BPNODE_SIZE_DEBUG="4" TIGHTDB_ENABLE_ENCRYPTION="yes" sh build.sh config "$WORKSPACE/install" || exit 1
         sh build.sh build-iphone || exit 1
         sh build.sh build-android || exit 1
-        sh build.sh check || exit 1
+        UNITTEST_ENCRYPT_ALL=yes sh build.sh check || exit 1
 
         TIGHTDB_MAX_BPNODE_SIZE_DEBUG="4" sh build.sh config "$WORKSPACE/install" || exit 1
         sh build.sh build-iphone || exit 1
