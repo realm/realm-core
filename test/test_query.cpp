@@ -2754,6 +2754,8 @@ TEST(Query_DoubleCoordinates)
 
     size_t c = q.count();
     TIGHTDB_ASSERT(c == expected);
+    static_cast<void>(c);
+
     //    }
 }
 
