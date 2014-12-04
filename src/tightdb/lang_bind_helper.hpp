@@ -114,11 +114,10 @@ public:
     static void unbind_linklist_ptr(LinkView*);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    typedef SharedGroup::TransactLogRegistry TransactLogRegistry;
 
     /// Wrappers - forward calls to shared group. A bit like NSA. Circumventing privacy :-)
-    static void advance_read(SharedGroup&, TransactLogRegistry& write_logs);
-    static void promote_to_write(SharedGroup&, TransactLogRegistry& write_logs);
+    static void advance_read(SharedGroup&);
+    static void promote_to_write(SharedGroup&);
     static void commit_and_continue_as_read(SharedGroup&);
     static void rollback_and_continue_as_read(SharedGroup&);
 #endif
@@ -297,16 +296,14 @@ inline void LangBindHelper::unbind_linklist_ptr(LinkView* link_view)
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
 
-inline void LangBindHelper::advance_read(SharedGroup& sg,
-                                         TransactLogRegistry& log_registry)
+inline void LangBindHelper::advance_read(SharedGroup& sg)
 {
-    sg.advance_read(log_registry);
+    sg.advance_read();
 }
 
-inline void LangBindHelper::promote_to_write(SharedGroup& sg,
-                                             TransactLogRegistry& log_registry)
+inline void LangBindHelper::promote_to_write(SharedGroup& sg)
 {
-    sg.promote_to_write(log_registry);
+    sg.promote_to_write();
 }
 
 inline void LangBindHelper::commit_and_continue_as_read(SharedGroup& sg)

@@ -57,7 +57,7 @@ namespace {
 // Constants controlling the amount of uncommited writes in flight:
 const uint16_t max_write_slots = 100;
 const uint16_t relaxed_sync_threshold = 50;
-#define SHAREDINFO_VERSION 2
+#define SHAREDINFO_VERSION 3
 
 // The following functions are carefully designed for minimal overhead
 // in case of contention among read transactions. In case of contention,
@@ -187,16 +187,18 @@ public:
     // at a time tries to perform cleanup. This is ensured by doing the cleanup
     // as part of write transactions, where mutual exclusion is assured by the
     // write mutex.
+
+    // FIXME: The use of uint_fast64_t is in principle wrong
     struct ReadCount {
-        uint_fast64_t version;
-        uint_fast64_t filesize;
-        uint_fast64_t current_top;
+        uint64_t version;
+        uint64_t filesize;
+        uint64_t current_top;
         // The count field acts as synchronization point for accesses to the above
-        // fields. A succesfull inc implies acquire wrt memory consistency.
+        // fields. A succesfull inc implies acquire with regard to memory consistency.
         // Release is triggered by explicitly storing into count whenever a
         // new entry has been initialized.
-        mutable Atomic<uint_fast32_t> count;
-        uint_fast32_t next;
+        mutable Atomic<uint32_t> count;
+        uint32_t next;
     };
 
     Ringbuffer() TIGHTDB_NOEXCEPT
@@ -330,7 +332,7 @@ public:
 private:
     // number of entries. Access synchronized through put_pos.
     uint_fast32_t entries;
-    Atomic<uint_fast32_t> put_pos; // only changed under lock, but accessed outside lock
+    Atomic<uint32_t> put_pos; // only changed under lock, but accessed outside lock
     uint_fast32_t old_pos; // only accessed during write transactions and under lock
 
     const static int init_readers_size = 32;
@@ -370,13 +372,14 @@ struct SharedGroup::SharedInfo
     // Cleared by the daemon when it decides to exit.
     bool daemon_ready;
 
-    // Set when the database and the .lock file is in sync with respect to versioning
-    // (and a few other metadata)
-    bool versioning_ready;
-
     // Latest version number. Guarded by the controlmutex (for lock-free access, use
     // get_current_version() instead)
     uint64_t latest_version_number;
+
+    // Pid of process initiating the session, but only if that process runs with encryption
+    // enabled, zero otherwise. Other processes cannot join a session wich uses encryption,
+    // because interprocess sharing is not supported by our current encryption mechanisms.
+    uint64_t session_initiator_pid;
 
     // Tracks the most recent version number. Should only be accessed 
     uint16_t version;
@@ -398,12 +401,12 @@ struct SharedGroup::SharedInfo
     Ringbuffer readers;
     SharedInfo(DurabilityLevel);
     ~SharedInfo() TIGHTDB_NOEXCEPT {}
-    void init_versioning(ref_type top_ref, size_t file_size)
+    void init_versioning(ref_type top_ref, size_t file_size, uint64_t initial_version)
     {
         // Create our first versioning entry:
         Ringbuffer::ReadCount& r = readers.get_next();
         r.filesize = file_size;
-        r.version = 1;
+        r.version = initial_version;
         r.current_top = top_ref;
         readers.use_next();
     }
@@ -432,9 +435,9 @@ SharedGroup::SharedInfo::SharedInfo(DurabilityLevel dlevel):
     flags = dlevel; // durability level is fixed from creation
     free_write_slots = 0;
     num_participants = 0;
+    session_initiator_pid = 0;
     daemon_started = false;
     daemon_ready = false;
-    versioning_ready = false;
     init_complete = 1;
 }
 
@@ -620,7 +623,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
         // - attachment of the database file
         // - start of the async daemon
         // - stop of the async daemon
-        // - SharedGroup joining/leaving the sharing scheme
+        // - SharedGroup beginning/ending a session
         // - Waiting for and signalling database changes
         {
             RobustLockGuard lock(info->controlmutex, &recover_from_dead_write_transact); // Throws
@@ -629,23 +632,70 @@ void SharedGroup::open(const string& path, bool no_create_file,
             // an exclusive file lock, and we checked it under a shared file lock
 
             // proceed to initialize versioning and other metadata information related to
-            // the database. Also create the database if we're first to get here.
+            // the database. Also create the database if we're beginning a new session
+            bool begin_new_session = info->num_participants == 0;
             bool is_shared = true;
             bool read_only = false;
-            bool no_create = true;
             bool skip_validate = false;
-            if (info->versioning_ready == false) {
-                no_create = no_create_file;
-            }
-            ref_type top_ref = alloc.attach_file(path, is_shared, read_only,
-                                                 no_create, skip_validate, key); // Throws
-            size_t file_size = alloc.get_baseline();
-            if (info->versioning_ready == false) {
-                info->latest_version_number = 1;
-                info->init_versioning(top_ref, file_size);
-                info->versioning_ready = true;
-            }
 
+            // only the session initiator is allowed to create the database, all other
+            // must assume that it already exists.
+            bool no_create = begin_new_session ? no_create_file : true;
+
+            // If replication is enabled, we need to ask it whether we're in server-sync mode
+            // and check that the database is operated in the same mode.
+            bool server_sync_mode = false;
+#ifdef TIGHTDB_ENABLE_REPLICATION
+            Replication* repl = _impl::GroupFriend::get_replication(m_group);
+            if (repl)
+                server_sync_mode = repl->is_in_server_synchronization_mode();
+#endif
+            ref_type top_ref = alloc.attach_file(path, is_shared, read_only,
+                                                 no_create, skip_validate, key, server_sync_mode); // Throws
+            size_t file_size = alloc.get_baseline();
+
+            // determine version
+            uint_fast64_t version;
+            if (begin_new_session) {
+                Array top(alloc);
+                if (top_ref) {
+
+                    // top_ref is non-zero implying that the database has seen at least one commit,
+                    // so we can get the versioning info from the database
+                    top.init_from_ref(top_ref);
+                    if (top.size() <= 5) {
+                        // the database wasn't written by shared group, so no versioning info
+                        version = 1;
+                        TIGHTDB_ASSERT(! server_sync_mode);
+                    }
+                    else {
+                        // the database was written by shared group, so it has versioning info
+                        TIGHTDB_ASSERT(top.size() == 7);
+                        version = top.get(6) / 2;
+                    }
+                }
+                else {
+                    // the database was just created, no metadata has been written yet.
+                    version = 1;
+                }
+#ifdef TIGHTDB_ENABLE_REPLICATION
+                // If replication is enabled, we need to inform it of the latest version,
+                // allowing it to discard any surplus log entries
+                repl = _impl::GroupFriend::get_replication(m_group);
+                if (repl)
+                    repl->reset_log_management(version);
+#endif
+                if (key) {
+                    TIGHTDB_STATIC_ASSERT(sizeof(pid_t) <= sizeof(uint64_t), "process identifiers too large");
+                    info->session_initiator_pid = uint64_t(getpid());
+                }
+                info->latest_version_number = version;
+                info->init_versioning(top_ref, file_size, version);
+            }
+            else { // not the session initiator!
+                if (key && info->session_initiator_pid != uint64_t(getpid()))
+                    throw runtime_error(path + ": Encrypted interprocess sharing is currently unsupported");
+            }
 #ifndef _WIN32
             // In async mode, we need to make sure the daemon is running and ready:
             if (dlevel == durability_Async && !is_backend) {
@@ -727,9 +777,9 @@ void SharedGroup::open(Replication& repl, DurabilityLevel dlevel, const uint8_t*
     string file = repl.get_database_path();
     bool no_create   = false;
     bool is_backend  = false;
-    open(file, no_create, dlevel, is_backend, key); // Throws
     typedef _impl::GroupFriend gf;
     gf::set_replication(m_group, &repl);
+    open(file, no_create, dlevel, is_backend, key); // Throws
 }
 
 #endif
@@ -755,8 +805,9 @@ SharedGroup::~SharedGroup() TIGHTDB_NOEXCEPT
     {
         RobustLockGuard lock(info->controlmutex, recover_from_dead_write_transact);
         --info->num_participants;
+        bool end_of_session = info->num_participants == 0;
         // cerr << "closing" << endl;
-        if (info->num_participants == 0) {
+        if (end_of_session) {
 
             // If the db file is just backing for a transient data structure,
             // we can delete it when done.
@@ -769,6 +820,12 @@ SharedGroup::~SharedGroup() TIGHTDB_NOEXCEPT
                 }
                 catch(...) {} // ignored on purpose.
             }
+#ifdef TIGHTDB_ENABLE_REPLICATION
+            // If replication is enabled, we need to stop log management:
+            Replication* repl = _impl::GroupFriend::get_replication(m_group);
+            if (repl)
+                repl->stop_logging();
+#endif
         }
     }
     m_file.unlock();
@@ -800,10 +857,6 @@ void SharedGroup::do_async_commits()
 {
     bool shutdown = false;
     SharedInfo* info = m_file_map.get_addr();
-    // NO client are allowed to proceed through open and update current_version
-    // until they see 'daemon_running == true'
-    // As we haven't set daemon_running yet, the following must hold:
-    TIGHTDB_ASSERT(get_current_version() == 0 || get_current_version() == 1);
 
     // We always want to keep a read lock on the last version
     // that was commited to disk, to protect it against being
@@ -833,6 +886,7 @@ void SharedGroup::do_async_commits()
         ReadLockInfo next_readlock = m_readlock;
         {
             // detect if we're the last "client", and if so, shutdown (must be under lock):
+            RobustLockGuard lock2(info->writemutex, &recover_from_dead_write_transact);
             RobustLockGuard lock(info->controlmutex, &recover_from_dead_write_transact);
             grab_latest_readlock(next_readlock, is_same);
             if (is_same && (shutdown || info->num_participants == 1)) {
@@ -977,7 +1031,7 @@ void SharedGroup::end_read() TIGHTDB_NOEXCEPT
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
 
-void SharedGroup::promote_to_write(TransactLogRegistry& write_logs)
+void SharedGroup::promote_to_write()
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Reading);
 
@@ -986,7 +1040,7 @@ void SharedGroup::promote_to_write(TransactLogRegistry& write_logs)
         repl->begin_write_transact(*this); // Throws
         try {
             do_begin_write();
-            advance_read(write_logs);
+            advance_read();
         }
         catch (...) {
             repl->rollback_write_transact(*this);
@@ -1000,24 +1054,30 @@ void SharedGroup::promote_to_write(TransactLogRegistry& write_logs)
     do_begin_write();
 
     // Advance to latest state (accessor update)
-    advance_read(write_logs);
+    advance_read();
     m_transact_stage = transact_Writing;
 }
 
 
-void SharedGroup::advance_read(TransactLogRegistry& log_registry)
+void SharedGroup::advance_read()
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Reading);
 
     ReadLockInfo old_readlock = m_readlock;
     bool same_as_before;
+    Replication* repl = _impl::GroupFriend::get_replication(m_group);
 
-    // advance current readlock while holding onto old one.
+    // advance current readlock while holding onto old one - we MUST hold onto
+    // the old readlock until after the call to advance_transact. Once a readlock
+    // is released, the release may propagate to the commit log management, causing
+    // it to reclaim memory for old commit logs. We must finished use of the commit log
+    // before allowing that to happen.
     grab_latest_readlock(m_readlock, same_as_before); // Throws
-    release_readlock(old_readlock);
 
-    if (same_as_before)
+    if (same_as_before) {
+        release_readlock(old_readlock);
         return;
+    }
 
     // If the new top-ref is zero, then the previous top-ref must have
     // been zero too, and we are still seing an empty TightDB file
@@ -1026,8 +1086,10 @@ void SharedGroup::advance_read(TransactLogRegistry& log_registry)
     // retain the temporary arrays that were created earlier by
     // Group::init_for_transact() to put the group accessor into a
     // valid state.
-    if (m_readlock.m_top_ref == 0)
+    if (m_readlock.m_top_ref == 0) {
+        release_readlock(old_readlock);
         return;
+    }
 
     // We know that the log_registry already knows about the new_version,
     // because in order for us to get the new version when we grab the
@@ -1036,14 +1098,14 @@ void SharedGroup::advance_read(TransactLogRegistry& log_registry)
     UniquePtr<BinaryData[]>
         logs(new BinaryData[m_readlock.m_version-old_readlock.m_version]); // Throws
 
-    log_registry.get_commit_entries(old_readlock.m_version,
-                                    m_readlock.m_version, logs.get());
+    repl->get_commit_entries(old_readlock.m_version, m_readlock.m_version, logs.get());
 
     m_group.advance_transact(m_readlock.m_top_ref, m_readlock.m_file_size,
                              logs.get(),
                              logs.get() + (m_readlock.m_version-old_readlock.m_version)); // Throws
 
-    log_registry.release_commit_entries(m_readlock.m_version);
+    // OK to release the readlock here:
+    release_readlock(old_readlock);
 }
 
 #endif // TIGHTDB_ENABLE_REPLICATION
@@ -1324,6 +1386,14 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
         r_info->readers.cleanup();
         const Ringbuffer::ReadCount& r = r_info->readers.get_oldest();
         readlock_version = r.version;
+#ifdef TIGHTDB_ENABLE_REPLICATION
+        // If replication is enabled, we need to propagate knowledge of the earliest 
+        // available version:
+        Replication* repl = _impl::GroupFriend::get_replication(m_group);
+        if (repl)
+            repl->set_last_version_seen_locally(readlock_version);
+#endif
+
     }
 
     // Do the actual commit

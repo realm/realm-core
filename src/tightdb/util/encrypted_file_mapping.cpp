@@ -25,6 +25,8 @@
 
 #include <sys/mman.h>
 #include <unistd.h>
+#include <string.h>
+#include <stdio.h>
 
 #include <tightdb/alloc_slab.hpp>
 #include <tightdb/util/terminate.hpp>

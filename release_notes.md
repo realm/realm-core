@@ -1,3 +1,22 @@
+# NEXT RELEASE
+
+### Bugfixes:
+
+* Lorem ipsum.
+
+### API breaking changes:
+
+* `TransactLogRegistry` is no longer available and must therefore no longer 
+  be passed to `LangBindHelper::advance_read()` and 
+  `LangBindHelper::promote_to_write()`.
+* The exceptions `PresumablyStaleLockFile` and `LockFileButNoData` are no longer
+  thrown from SharedGroup and has been removed from the API.
+
+### Enhancements:
+
+* Support for implicit transactions has been extended to work between multiple processes.
+* Commitlogs can now be persisted and support server-synchronization
+
 # 0.86.1 Release notes
 
 ### Enhancements:
