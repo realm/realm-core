@@ -183,6 +183,36 @@ TEST(Shared_PipelinedWritesWithKills)
 }
 #endif
 
+TEST(Shared_CompactingOnTheFly)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    string old_path = path;
+    string tmp_path = string(path)+".tmp";
+    Thread writer_thread;
+    {
+        SharedGroup sg(path, false, SharedGroup::durability_Full);
+        // Create table entries
+        WriteTransaction wt(sg);
+        TestTableShared::Ref t1 = wt.add_table<TestTableShared>("test");
+        for (int i = 0; i < 100; ++i)
+        {
+            t1->add(0, i, false, "test");
+        }
+        wt.commit();
+        writer_thread.start(bind(&writer, old_path, 42));
+        sleep(1);
+        ReadTransaction rt(sg);
+        rt.get_group().write(tmp_path);
+        rename(tmp_path.c_str(), old_path.c_str());
+    }
+    writer_thread.join();
+    {
+        SharedGroup sg2(path, true, SharedGroup::durability_Full);
+        ReadTransaction rt2(sg2);
+        rt2.get_group().Verify();
+    }
+}
+
 #ifdef LOCKFILE_CLEANUP
 // The following two tests are now disabled, as we have abandoned the requirement to
 // clean up the .lock file after use.
