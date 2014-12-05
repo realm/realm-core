@@ -74,7 +74,7 @@ TEST(UTF_Fuzzy_utf8_to_utf16)
     char in[size];
     int16_t out[size];
 
-    for (size_t iter = 0; iter < 100000; iter++) {
+    for (size_t iter = 0; iter < 1000000; iter++) {
         for (size_t t = 0; t < size; t++) {
             in[t] = random.draw_int<char>();
         }
@@ -90,11 +90,12 @@ TEST(UTF_Fuzzy_utf8_to_utf16)
         CHECK(read <= size);
 
         int16_t* out2 = out;
+        in2 = in;
         Utf8x16<int16_t>::to_utf16(in2, in2 + read, out2, out2 + needed);
         size_t read2 = in2 - in;
         size_t written = out2 - out;
 
-        CHECK(read2 <= read);
+        CHECK(read2 <= size);
         CHECK(written <= needed);
     }
 }
