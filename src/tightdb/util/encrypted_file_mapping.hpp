@@ -146,4 +146,17 @@ private:
 }
 
 #endif // TIGHTDB_ENABLE_ENCRYPTION
+
+namespace tightdb {
+namespace util {
+
+/// Thrown by EncryptedFileMapping if a file opened is non-empty and does not
+/// contain valid encrypted data
+struct DecryptionFailed: util::File::AccessError {
+    DecryptionFailed(): util::File::AccessError("Decryption failed") {}
+};
+
+}
+}
+
 #endif // TIGHTDB_UTIL_ENCRYPTED_FILE_MAPPING_HPP

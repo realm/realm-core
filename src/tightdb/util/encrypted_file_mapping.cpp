@@ -28,7 +28,6 @@
 #include <string.h>
 #include <stdio.h>
 
-#include <tightdb/alloc_slab.hpp>
 #include <tightdb/util/terminate.hpp>
 
 namespace tightdb {
@@ -248,7 +247,7 @@ void AESCryptor::try_read(int fd, off_t pos, char* dst) {
             memcpy(&iv.iv1, &iv.iv2, 32);
         }
         else
-            throw InvalidDatabase();
+            throw DecryptionFailed();
     }
 
     crypt(mode_Decrypt, pos, dst, buffer, reinterpret_cast<const char*>(&iv.iv1));

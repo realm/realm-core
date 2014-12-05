@@ -33,7 +33,6 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include <tightdb/alloc_slab.hpp>
 #include <tightdb/util/shared_ptr.hpp>
 #include <tightdb/util/terminate.hpp>
 #include <tightdb/util/thread.hpp>
@@ -157,7 +156,7 @@ void add_mapping(void* addr, size_t size, int fd, File::AccessMode access, const
         TIGHTDB_TERMINATE("fstat failed"); // FIXME: throw instead
 
     if (st.st_size > 0 && static_cast<size_t>(st.st_size) < page_size)
-        throw InvalidDatabase();
+        throw DecryptionFailed();
 
     std::vector<mappings_for_file>::iterator it;
     for (it = mappings_by_file.begin(); it != mappings_by_file.end(); ++it) {
