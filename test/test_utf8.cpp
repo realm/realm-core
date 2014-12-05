@@ -67,7 +67,7 @@ const char* uae = "\xc3\xa6"; // danish lower case ae
 const char* u16sur = "\xF0\xA0\x9C\x8E"; // chineese needing utf16 surrogate pair
 const char* u16sur2 = "\xF0\xA0\x9C\xB1"; // same as above, with larger unicode
 
-ONLY(UTF_Fuzzy_utf8_to_utf16)
+TEST(UTF8_Fuzzy_utf8_to_utf16)
 {
     Random random(random_int<unsigned long>()); // Seed from slow global generator
     const size_t size = 10;
@@ -100,7 +100,7 @@ ONLY(UTF_Fuzzy_utf8_to_utf16)
 }
 
 
-TEST(Compare_Core_ASCII) {
+TEST(UTF8_Compare_Core_ASCII) {
     // Useful line for creating new unit test cases:
     // bool ret = std::locale("us_EN")(string("a"), string("b"));
 
@@ -153,7 +153,7 @@ TEST(Compare_Core_ASCII) {
 }
 
 
-TEST(Compare_Core_utf8) 
+TEST(UTF8_Compare_Core_utf8)
 {
     // Useful line for creating new unit test cases:
     // bool ret = std::locale("us_EN")(string("a"), string("b"));
@@ -185,7 +185,7 @@ TEST(Compare_Core_utf8)
     CHECK_EQUAL(false, utf8_compare(u16sur2, u16sur2));
 }
 
-TEST(Compare_Core_utf8_invalid)
+TEST(UTF8_Compare_Core_utf8_invalid)
 {
     // Test that invalid utf8 won't make decisions on data beyond Realm payload. Do that by placing an utf8 header that
     // indicate 5 octets will follow, and put spurious1 and spurious2 after them to see if Realm will access these too
@@ -229,7 +229,7 @@ TEST(Compare_Core_utf8_invalid_crash)
     }
 }
 */
-TEST(Compare_Core_utf8_zero)
+TEST(UTF8_Compare_Core_utf8_zero)
 {
     // Realm must support 0 characters in utf8 strings
     CHECK_EQUAL(false, utf8_compare(StringData("\0", 1), StringData("\0", 1)));
@@ -451,7 +451,7 @@ template<class String16> size_t find_buf_size_utf16_to_utf8(const String16& s)
 
 #ifndef _WIN32
 
-TEST(Utf8_TranscodeUtf16)
+TEST(UTF8_TranscodeUtf16)
 {
     typedef IntChar<int>                   Char16;
     typedef IntCharTraits<Char16, long>    Traits16;
