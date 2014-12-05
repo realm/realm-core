@@ -335,7 +335,10 @@ public:
     // Serialization
 
     /// Write this database to the specified output stream.
-    void write(std::ostream&) const;
+    ///
+    /// \param pad If true, the file is padded to ensure the footer is aligned
+    /// to the end of a page
+    void write(std::ostream&, bool pad=false) const;
 
     /// Write this database to a new file. It is an error to specify a
     /// file that already exists. This is to protect against
@@ -469,7 +472,7 @@ private:
     class TableWriter;
     class DefaultTableWriter;
 
-    static void write(std::ostream&, TableWriter&);
+    static void write(std::ostream&, TableWriter&, bool);
 
     /// Create a new underlying node structure and attach this
     /// accessor instance to it
