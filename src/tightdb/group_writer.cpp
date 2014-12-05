@@ -144,6 +144,7 @@ size_t GroupWriter::write_group()
     if (is_shared) {
         top.set(5, free_versions_pos); // Throws
         // Seventh slot holds the database version (a.k.a. transaction number)
+        top.set(6, m_current_version * 2 +1); // Throws
     }
 
     // Get final sizes
@@ -468,9 +469,10 @@ void GroupWriter::commit(ref_type new_top_ref)
     char* file_header = m_file_map.get_addr();
 
     // Least significant bit in last byte of info block indicates
-    // which top_ref block is valid
-    int current_valid_ref = file_header[16+7] & 0x1;
-    int new_valid_ref = current_valid_ref ^ 0x1;
+    // which top_ref block is valid - other bits remain unchanged
+    int select_field = file_header[16+7];
+    select_field ^= 0x1;
+    int new_valid_ref = select_field & 0x1;
 
     // FIXME: What rule guarantees that the new top ref is written to
     // physical medium before the swapping bit?
@@ -478,7 +480,7 @@ void GroupWriter::commit(ref_type new_top_ref)
     // Update top ref pointer
     uint64_t* top_refs = reinterpret_cast<uint64_t*>(file_header);
     top_refs[new_valid_ref] = new_top_ref;
-    file_header[16+7] = char(new_valid_ref); // swap
+    file_header[16+7] = char(select_field); // swap
 
     // Write new header to disk
     m_file_map.sync(); // Throws

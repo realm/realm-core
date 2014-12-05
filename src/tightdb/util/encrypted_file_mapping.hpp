@@ -25,6 +25,10 @@
 
 #ifdef TIGHTDB_ENABLE_ENCRYPTION
 
+#ifdef _WIN32
+#error Encryption is not yet implemented for Windows.
+#endif
+
 #include <vector>
 
 #ifdef __APPLE__

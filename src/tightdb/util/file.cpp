@@ -976,6 +976,7 @@ bool File::is_removed() const
 
 void File::set_encryption_key(const uint8_t* key)
 {
+#ifdef TIGHTDB_ENABLE_ENCRYPTION
     if (key) {
         memcpy(m_encryption_key, key, sizeof(m_encryption_key));
         m_encrypt = true;
@@ -984,4 +985,9 @@ void File::set_encryption_key(const uint8_t* key)
         memset(m_encryption_key, 0, sizeof(m_encryption_key));
         m_encrypt = false;
     }
+#else
+    if (key) {
+        throw runtime_error("Encryption not enabled");
+    }
+#endif
 }

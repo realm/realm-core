@@ -46,11 +46,13 @@ const size_t page_size = 4096;
 
 class SpinLockGuard {
 public:
-    SpinLockGuard(Atomic<bool>& lock) : m_lock(lock) {
+    SpinLockGuard(Atomic<bool>& lock) : m_lock(lock)
+    {
         while (m_lock.exchange_acquire(true)) ;
     }
 
-    ~SpinLockGuard() {
+    ~SpinLockGuard()
+    {
         m_lock.store_release(false);
     }
 
@@ -59,7 +61,7 @@ private:
 };
 
 // A list of all of the active encrypted mappings for a single file
-struct mappings_for_file  {
+struct mappings_for_file {
     dev_t device;
     ino_t inode;
     SharedPtr<SharedFileInfo> info;
@@ -83,7 +85,8 @@ std::vector<mappings_for_file> mappings_by_file;
 struct sigaction old_segv;
 struct sigaction old_bus;
 
-void signal_handler(int code, siginfo_t* info, void* ctx) {
+void signal_handler(int code, siginfo_t* info, void* ctx)
+{
     SpinLockGuard lock(mapping_lock);
     for (size_t i = 0; i < mappings_by_addr.size(); ++i) {
         mapping_and_addr& m = mappings_by_addr[i];
@@ -115,7 +118,8 @@ void signal_handler(int code, siginfo_t* info, void* ctx) {
         TIGHTDB_TERMINATE("Segmentation fault");
 }
 
-mapping_and_addr* find_mapping_for_addr(void* addr, size_t size) {
+mapping_and_addr* find_mapping_for_addr(void* addr, size_t size)
+{
     for (size_t i = 0; i < mappings_by_addr.size(); ++i) {
         mapping_and_addr& m = mappings_by_addr[i];
         if (m.addr == addr && m.size == size)
@@ -125,11 +129,13 @@ mapping_and_addr* find_mapping_for_addr(void* addr, size_t size) {
     return 0;
 }
 
-size_t round_up_to_page_size(size_t size) {
+size_t round_up_to_page_size(size_t size)
+{
     return (size + page_size - 1) & ~(page_size - 1);
 }
 
-void add_mapping(void* addr, size_t size, int fd, File::AccessMode access, const uint8_t* encryption_key) {
+void add_mapping(void* addr, size_t size, int fd, File::AccessMode access, const uint8_t* encryption_key)
+{
     SpinLockGuard lock(mapping_lock);
 
     static bool has_installed_handler = false;
@@ -187,7 +193,8 @@ void add_mapping(void* addr, size_t size, int fd, File::AccessMode access, const
     }
 }
 
-void remove_mapping(void* addr, size_t size) {
+void remove_mapping(void* addr, size_t size)
+{
     size = round_up_to_page_size(size);
     SpinLockGuard lock(mapping_lock);
     mapping_and_addr* m = find_mapping_for_addr(addr, size);
@@ -204,7 +211,8 @@ void remove_mapping(void* addr, size_t size) {
     }
 }
 
-void* mmap_anon(size_t size) {
+void* mmap_anon(size_t size)
+{
     void* addr = ::mmap(0, size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
     if (addr == MAP_FAILED) {
         int err = errno; // Eliminate any risk of clobbering
@@ -219,7 +227,8 @@ void* mmap_anon(size_t size) {
 namespace tightdb {
 namespace util {
 
-void* mmap(int fd, size_t size, File::AccessMode access, const uint8_t* encryption_key) {
+void* mmap(int fd, size_t size, File::AccessMode access, const uint8_t* encryption_key)
+{
 #ifdef TIGHTDB_ENABLE_ENCRYPTION
     if (encryption_key) {
         size = round_up_to_page_size(size);
@@ -230,7 +239,7 @@ void* mmap(int fd, size_t size, File::AccessMode access, const uint8_t* encrypti
     else
 #else
     TIGHTDB_ASSERT(!encryption_key);
-    (void)encryption_key;
+    static_cast<void>(encryption_key);
 #endif
     {
         int prot = PROT_READ;
@@ -251,14 +260,16 @@ void* mmap(int fd, size_t size, File::AccessMode access, const uint8_t* encrypti
     throw std::runtime_error(get_errno_msg("mmap() failed: ", err));
 }
 
-void munmap(void* addr, size_t size) TIGHTDB_NOEXCEPT {
+void munmap(void* addr, size_t size) TIGHTDB_NOEXCEPT
+{
 #ifdef TIGHTDB_ENABLE_ENCRYPTION
     remove_mapping(addr, size);
 #endif
     ::munmap(addr, size);
 }
 
-void* mremap(int fd, void* old_addr, size_t old_size, File::AccessMode a, size_t new_size) {
+void* mremap(int fd, void* old_addr, size_t old_size, File::AccessMode a, size_t new_size)
+{
 #ifdef TIGHTDB_ENABLE_ENCRYPTION
     {
         SpinLockGuard lock(mapping_lock);
@@ -293,7 +304,8 @@ void* mremap(int fd, void* old_addr, size_t old_size, File::AccessMode a, size_t
 #endif
 }
 
-void msync(void* addr, size_t size) {
+void msync(void* addr, size_t size)
+{
 #ifdef TIGHTDB_ENABLE_ENCRYPTION
     { // first check the encrypted mappings
         SpinLockGuard lock(mapping_lock);

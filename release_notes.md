@@ -1,18 +1,52 @@
-# 0.86.1 Release notes
+# NEXT RELEASE
+
+### Bugfixes:
+
+* Lorem ipsum.
+
+### API breaking changes:
+
+* Lorem ipsum.
 
 ### Enhancements:
 
-* Added SharedGroup::get_number_of_versions() which will report the number of
-  distinct versions kept in the database.
-* Added support for encryption
-* Adding SharedGroup::wait_for_change() which allows a thread to sleep until
-  the database changes.
+* Lorem ipsum.
 
 -----------
 
 ### Internals:
 
 * Lorem ipsum.
+
+----------------------------------------------
+
+# 0.87.0 Release notes
+
+### API breaking changes:
+
+* `TransactLogRegistry` is no longer available and must therefore no longer be
+  passed to `LangBindHelper::advance_read()` and
+  `LangBindHelper::promote_to_write()`.
+* The exceptions `PresumablyStaleLockFile` and `LockFileButNoData` are no longer
+  thrown from SharedGroup and has been removed from the API.
+
+### Enhancements:
+
+* Support for implicit transactions has been extended to work between multiple
+  processes.
+* Commitlogs can now be persisted and support server-synchronization
+
+----------------------------------------------
+
+# 0.86.1 Release notes
+
+### Enhancements:
+
+* Added `SharedGroup::get_number_of_versions()` which will report the number of
+  distinct versions kept in the database.
+* Added support for encryption
+* Adding `SharedGroup::wait_for_change()` which allows a thread to sleep until
+  the database changes.
 
 ----------------------------------------------
 

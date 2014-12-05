@@ -21,14 +21,27 @@
 #define TIGHTDB_TEST_CRYPT_KEY_HPP
 
 #include <stdint.h>
+#include <stdlib.h>
 
 namespace {
 
+const uint8_t* crypt_key(bool always=false) {
+    static const uint8_t key[] = "12345678901234567890123456789011234567890123456789012345678901";
+    if (always) {
 #ifdef TIGHTDB_ENABLE_ENCRYPTION
-const uint8_t crypt_key[] = "12345678901234567890123456789011234567890123456789012345678901";
+        return key;
 #else
-const uint8_t* crypt_key = 0;
+        return 0;
 #endif
+    }
+
+    const char* str = getenv("UNITTEST_ENCRYPT_ALL");
+    if (str && *str) {
+        return key;
+    }
+
+    return 0;
+}
 
 } // anonymous namespace
 

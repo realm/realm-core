@@ -75,12 +75,16 @@ SharedGroupTestPathGuard::SharedGroupTestPathGuard(const string& path):
     TestPathGuard(path)
 {
     File::try_remove(get_lock_path());
+    File::try_remove(m_path + ".log_a");
+    File::try_remove(m_path + ".log_b");
 }
 
 
 SharedGroupTestPathGuard::~SharedGroupTestPathGuard()
 {
     File::try_remove(get_lock_path());
+    File::try_remove(m_path + ".log_a");
+    File::try_remove(m_path + ".log_b");
 }
 
 } // namespace test_util

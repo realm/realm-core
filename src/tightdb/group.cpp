@@ -43,8 +43,9 @@ void Group::open(const string& file_path, const uint8_t* encryption_key, OpenMod
     bool read_only = mode == mode_ReadOnly;
     bool no_create = mode == mode_ReadWriteNoCreate;
     bool skip_validate = false;
+    bool server_sync_mode = false;
     ref_type top_ref = m_alloc.attach_file(file_path, is_shared, read_only, no_create,
-                                           skip_validate, encryption_key); // Throws
+                                           skip_validate, encryption_key, server_sync_mode); // Throws
     SlabAlloc::DetachGuard dg(m_alloc);
     m_alloc.reset_free_space_tracking(); // Throws
     if (top_ref == 0) {

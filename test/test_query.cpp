@@ -11,7 +11,6 @@
 #include <tightdb/query_engine.hpp>
 
 #include "test.hpp"
-#include "crypt_key.hpp"
 
 using namespace std;
 using namespace tightdb;
@@ -2384,10 +2383,10 @@ TEST(Query_GameAnalytics)
             t->add("10", "US", "1.0", r1, r2);
         }
         t->optimize();
-        g.write(path, crypt_key);
+        g.write(path);
     }
 
-    Group g(path, crypt_key);
+    Group g(path);
     GATable::Ref t = g.get_table<GATable>("firstevents");
 
     GATable::Query q = t->where().country.equal("US");
@@ -2756,6 +2755,7 @@ TEST(Query_DoubleCoordinates)
     size_t c = q.count();
     TIGHTDB_ASSERT(c == expected);
     static_cast<void>(c);
+
     //    }
 }
 

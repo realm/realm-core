@@ -62,6 +62,74 @@ public:
 
     class Interrupted; // Exception
 
+    /// Reset transaction logs. This call informs the commitlog subsystem of
+    /// the initial version chosen as part of establishing a sharing scheme
+    /// (also called a "session").
+    /// Following a crash, the commitlog subsystem may hold multiple commitlogs
+    /// for versions which are lost during the crash. When SharedGroup establishes
+    /// a sharing scheme it will continue from the last version commited to
+    /// the database.
+    ///
+    /// The call also indicates that the current thread (and current process) has
+    /// exclusive access to the commitlogs, allowing them to reset synchronization
+    /// variables. This can be beneficial on systems without proper support for robust
+    /// mutexes.
+    virtual void reset_log_management(version_type last_version);
+
+    /// Cleanup, remove any log files
+    virtual void stop_logging();
+
+    /// The commitlog subsystem can be operated in either of two modes:
+    /// server-synchronization mode and normal mode.
+    /// When operating in server-synchronization mode.
+    /// - the log files are persisted in a crash safe fashion
+    /// - when a sharing scheme is established, the logs are assumed to exist already
+    ///   (unless we are creating a new database), and an exception is thrown if they
+    ///   are missing.
+    /// - even after a crash which leaves the log files out of sync wrt to the database,
+    ///   the log files can re-synchronized transparently
+    /// When operating in normal-mode
+    /// - the log files are not updated in a crash safe way
+    /// - the log files are removed when the session ends
+    /// - the log files are not assumed to be there when a session starts, but are 
+    ///   created on demand.
+    virtual bool is_in_server_synchronization_mode();
+
+    /// Called by SharedGroup during a write transaction, when readlocks are recycled, to
+    /// keep the commit log management in sync with what versions can possibly be interesting
+    /// in the future.
+    virtual void set_last_version_seen_locally(version_type last_seen_version_number) TIGHTDB_NOEXCEPT;
+
+    /// Get all transaction logs between the specified versions. The number
+    /// of requested logs is exactly `to_version - from_version`. If this
+    /// number is greater than zero, the first requested log is the one that
+    /// brings the database from `from_version` to `from_version +
+    /// 1`. References to the requested logs are stored in successive entries
+    /// of `logs_buffer`. The calee retains ownership of the memory
+    /// referenced by those entries, but the memory will remain accessible
+    /// to the caller until they are declared stale by calls to 'set_last_version_seen_locally' 
+    /// and 'set_last_version_synced', OR until a new call to get_commit_entries() is made.
+    virtual void get_commit_entries(version_type from_version, version_type to_version,
+                                    BinaryData* logs_buffer) TIGHTDB_NOEXCEPT;
+
+    /// Support for global sync. The commit logs will be retained until
+    /// they grow older than both of the versions indicated by 'set_last_versions_seen_locally'
+    /// and 'set_last_version_synced'. Providing a version number of zero disables
+    /// the use of sync versioning. Providing a non-zero version number enables the
+    /// use of sync versioning.
+    virtual void set_last_version_synced(version_type last_seen_version_number) TIGHTDB_NOEXCEPT;
+
+    /// Get the value set by last call to 'set_last_version_synced'
+    /// If 'end_version_number' is non null, a limit to version numbering is returned.
+    /// The limit returned is the version number of the latest commit.
+    /// If sync versioning is disabled, the last version seen locally is returned.
+    virtual version_type get_last_version_synced(version_type* end_version_number = 0) TIGHTDB_NOEXCEPT;
+
+    /// Submit a transact log directly into the system bypassing the normal
+    /// collection of replication entries. This is used to add a transactlog
+    /// just for updating accessors. The caller retains ownership of the buffer.
+    virtual void submit_transact_log(BinaryData);
+
     /// Acquire permision to start a new 'write' transaction. This
     /// function must be called by a client before it requests a
     /// 'write' transaction. This ensures that the local shared
@@ -545,6 +613,44 @@ private:
 inline std::string Replication::get_database_path()
 {
     return do_get_database_path();
+}
+
+inline void Replication::reset_log_management(version_type)
+{
+}
+
+inline bool Replication::is_in_server_synchronization_mode()
+{
+    return false;
+}
+
+inline void Replication::stop_logging()
+{
+}
+
+inline void Replication::set_last_version_seen_locally(version_type) TIGHTDB_NOEXCEPT
+{
+}
+
+inline void Replication::set_last_version_synced(version_type) TIGHTDB_NOEXCEPT
+{
+}
+
+inline Replication::version_type Replication::get_last_version_synced(version_type*) TIGHTDB_NOEXCEPT
+{
+    return 0;
+}
+
+inline void Replication::submit_transact_log(BinaryData)
+{
+    // Unimplemented!
+    TIGHTDB_ASSERT(false);
+}
+
+inline void Replication::get_commit_entries(version_type, version_type, BinaryData*) TIGHTDB_NOEXCEPT
+{
+    // Unimplemented!
+    TIGHTDB_ASSERT(false);
 }
 
 
