@@ -288,6 +288,9 @@ void File::open_internal(const string& path, AccessMode a, CreateMode c, int fla
         case ENOTDIR:
         case ENXIO:
             throw AccessError(msg);
+        case EPERM:
+            msg = get_errno_msg("open() failed (insufficient permissions): ", err);
+            throw runtime_error(msg);
         default:
             throw runtime_error(msg);
     }
