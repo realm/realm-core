@@ -372,6 +372,10 @@ struct SharedGroup::SharedInfo
     // Cleared by the daemon when it decides to exit.
     bool daemon_ready;
 
+    // controls whether wait_for_change() will actually wait for a change or return
+    // immediately
+    bool wait_for_change_enabled;
+
     // Latest version number. Guarded by the controlmutex (for lock-free access, use
     // get_current_version() instead)
     uint64_t latest_version_number;
@@ -438,6 +442,7 @@ SharedGroup::SharedInfo::SharedInfo(DurabilityLevel dlevel):
     session_initiator_pid = 0;
     daemon_started = false;
     daemon_ready = false;
+    wait_for_change_enabled = true;
     init_complete = 1;
 }
 
@@ -842,15 +847,28 @@ bool SharedGroup::has_changed()
 }
 
 #ifndef _WIN32
-void SharedGroup::wait_for_change()
+bool SharedGroup::wait_for_change()
 {
     SharedInfo* info = m_file_map.get_addr();
     RobustLockGuard lock(info->controlmutex, recover_from_dead_write_transact);
-    while (m_readlock.m_version == info->latest_version_number) {
+    while (m_readlock.m_version == info->latest_version_number && info->wait_for_change_enabled) {
         info->new_commit_available.wait(info->controlmutex,
                                         &recover_from_dead_write_transact,
                                         0);
     }
+    return m_readlock.m_version != info->latest_version_number;
+}
+
+
+void SharedGroup::wait_for_change_enable(bool enabled)
+{
+    SharedInfo* info = m_file_map.get_addr();
+    RobustLockGuard lock(info->controlmutex, recover_from_dead_write_transact);
+    if (info->wait_for_change_enabled && !enabled) {
+        // someone might be waiting, so wake them up
+        info->new_commit_available.notify_all();
+    }
+    info->wait_for_change_enabled = enabled;
 }
 
 void SharedGroup::do_async_commits()

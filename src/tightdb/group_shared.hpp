@@ -230,8 +230,15 @@ public:
     // Has db been changed ?
     bool has_changed();
 
-    // The calling thread goes to sleep until the database is changed.
-    void wait_for_change();
+    // The calling thread goes to sleep until the database is changed, or
+    // until wait for change is disabled.
+    bool wait_for_change();
+
+    // If wait for change is enabled, threads calling wait_for_change() will
+    // suspend until the database is changed or wait for change is disabled.
+    // If wait_for_change is disabled, any thread calling wait_for_change()
+    // return immediately - any thread alredy waiting will wake up and return
+    void wait_for_change_enable(bool enabled);
 
     // Transactions:
 
