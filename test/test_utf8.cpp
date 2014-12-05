@@ -67,7 +67,7 @@ const char* uae = "\xc3\xa6"; // danish lower case ae
 const char* u16sur = "\xF0\xA0\x9C\x8E"; // chineese needing utf16 surrogate pair
 const char* u16sur2 = "\xF0\xA0\x9C\xB1"; // same as above, with larger unicode
 
-TEST(UTF8_Fuzzy_utf8_to_utf16)
+TEST(UTF_Fuzzy_utf8_to_utf16)
 {
     Random random(random_int<unsigned long>()); // Seed from slow global generator
     const size_t size = 10;
