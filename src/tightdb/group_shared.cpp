@@ -57,7 +57,7 @@ namespace {
 // Constants controlling the amount of uncommited writes in flight:
 const uint16_t max_write_slots = 100;
 const uint16_t relaxed_sync_threshold = 50;
-#define SHAREDINFO_VERSION 3
+#define SHAREDINFO_VERSION 4
 
 // The following functions are carefully designed for minimal overhead
 // in case of contention among read transactions. In case of contention,
@@ -764,6 +764,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
 
 bool SharedGroup::compact()
 {
+    // Verify that preconditions for compacting is met:
     if (m_transact_stage != transact_Ready) {
         throw runtime_error(m_file_path + ": compact is not supported whithin a transaction");
     }
@@ -772,14 +773,24 @@ bool SharedGroup::compact()
     RobustLockGuard lock(info->controlmutex, &recover_from_dead_write_transact); // Throws
     if (info->num_participants > 1)
         return false;
+
     // Using begin_read here ensures that we have access to the latest and greatest entry
     // in the ringbuffer. We need to have access to that later to update top_ref and file_size.
     begin_read();
+
+    // Compact by writing a new file holding only live data, then renaming the new file
+    // so it becomes the database file, replacing the old one in the process.
+    // TODO: group::write() must store the version info - this is not done at the moment.
     m_group.write(tmp_path);
     rename(tmp_path.c_str(), m_path.c_str());
     end_read();
+
+    // We must detach group complety to force it to fully refresh its accessors for use
+    // in later transactions
     m_group.complete_detach();
     SlabAlloc& alloc = m_group.m_alloc;
+
+    // close and reopen the database file.
     alloc.detach();
     bool skip_validate = false;
     bool no_create = true;
@@ -789,6 +800,8 @@ bool SharedGroup::compact()
     ref_type top_ref = alloc.attach_file(m_path, is_shared, read_only, no_create, 
                                          skip_validate, m_key, server_sync_mode); // Throws
     size_t file_size = alloc.get_baseline();
+
+    // update the versioning info to match
     Ringbuffer::ReadCount& rc = const_cast<Ringbuffer::ReadCount&>(info->readers.get_last());
     TIGHTDB_ASSERT(rc.version == info->latest_version_number);
     rc.filesize = file_size;

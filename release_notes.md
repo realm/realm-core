@@ -10,7 +10,7 @@
 
 ### Enhancements:
 
-* Lorem ipsum.
+* Added 'compact' method to SharedGroup for better control of compaction of the database file.
 
 -----------
 

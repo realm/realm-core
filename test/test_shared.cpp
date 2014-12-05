@@ -91,7 +91,6 @@ TIGHTDB_TABLE_4(TestTableShared,
                 fourth, String)
 
 
-#if !defined(__APPLE__) && !defined(_WIN32) && !defined TIGHTDB_ENABLE_ENCRYPTION
 
 void writer(string path, int id)
 {
@@ -114,6 +113,9 @@ void writer(string path, int id)
         cerr << "Exception from " << getpid() << endl;
     }
 }
+
+
+#if !defined(__APPLE__) && !defined(_WIN32) && !defined TIGHTDB_ENABLE_ENCRYPTION
 
 void killer(TestResults& test_results, int pid, string path, int id)
 {
@@ -241,7 +243,6 @@ TEST(Shared_CompactingOnTheFly)
         ReadTransaction rt2(sg2);
         rt2.get_group().Verify();
     }
-    CHECK(true);
 }
 
 #ifdef LOCKFILE_CLEANUP
