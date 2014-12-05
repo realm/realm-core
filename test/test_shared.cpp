@@ -113,7 +113,6 @@ void writer(string path, int id)
     } catch (...) {
         cerr << "Exception from " << getpid() << endl;
     }
-    _exit(0);
 }
 
 void killer(TestResults& test_results, int pid, string path, int id)
@@ -188,6 +187,7 @@ TEST(Shared_PipelinedWritesWithKills)
     if (pid == 0) {
         // first writer!
         writer(path, 0);
+        _exit(0);
     }
     else {
         for (int k=1; k < num_processes; ++k) {
@@ -197,6 +197,7 @@ TEST(Shared_PipelinedWritesWithKills)
                 TIGHTDB_TERMINATE("fork() failed");
             if (pid == 0) {
                 writer(path, k);
+                _exit(0);
             }
             else {
                 // cerr << "New process " << pid << " killing old " << pid2 << endl;
@@ -225,18 +226,22 @@ TEST(Shared_CompactingOnTheFly)
             t1->add(0, i, false, "test");
         }
         wt.commit();
-        writer_thread.start(bind(&writer, old_path, 42));
-        sleep(1);
-        ReadTransaction rt(sg);
-        rt.get_group().write(tmp_path);
-        rename(tmp_path.c_str(), old_path.c_str());
+        {
+            ReadTransaction rt(sg);
+            writer_thread.start(bind(&writer, old_path, 42));
+            sleep(1);
+        }
+        // we cannot compact while a writer is still running:
+        CHECK_EQUAL(false, sg.compact());
     }
     writer_thread.join();
     {
         SharedGroup sg2(path, true, SharedGroup::durability_Full);
+        CHECK_EQUAL(true, sg2.compact());
         ReadTransaction rt2(sg2);
         rt2.get_group().Verify();
     }
+    CHECK(true);
 }
 
 #ifdef LOCKFILE_CLEANUP

@@ -187,8 +187,6 @@ public:
     // at a time tries to perform cleanup. This is ensured by doing the cleanup
     // as part of write transactions, where mutual exclusion is assured by the
     // write mutex.
-
-    // FIXME: The use of uint_fast64_t is in principle wrong
     struct ReadCount {
         uint64_t version;
         uint64_t filesize;
@@ -381,7 +379,7 @@ struct SharedGroup::SharedInfo
     // because interprocess sharing is not supported by our current encryption mechanisms.
     uint64_t session_initiator_pid;
 
-    // Tracks the most recent version number. Should only be accessed 
+    // Tracks the most recent version number. Should only be accessed
     uint16_t version;
     uint16_t flags;
     uint16_t free_write_slots;
@@ -570,6 +568,8 @@ void SharedGroup::open(const string& path, bool no_create_file,
 {
     TIGHTDB_ASSERT(!is_attached());
 
+    m_path = path;
+    m_key = key;
     m_file_path = path + ".lock";
     SlabAlloc& alloc = m_group.m_alloc;
 
@@ -762,6 +762,40 @@ void SharedGroup::open(const string& path, bool no_create_file,
 #endif
 }
 
+bool SharedGroup::compact()
+{
+    if (m_transact_stage != transact_Ready) {
+        throw runtime_error(m_file_path + ": compact is not supported whithin a transaction");
+    }
+    string tmp_path = m_path + ".tmp";
+    SharedInfo* info = m_file_map.get_addr();
+    RobustLockGuard lock(info->controlmutex, &recover_from_dead_write_transact); // Throws
+    if (info->num_participants > 1)
+        return false;
+    // Using begin_read here ensures that we have access to the latest and greatest entry
+    // in the ringbuffer. We need to have access to that later to update top_ref and file_size.
+    begin_read();
+    m_group.write(tmp_path);
+    rename(tmp_path.c_str(), m_path.c_str());
+    end_read();
+    m_group.complete_detach();
+    SlabAlloc& alloc = m_group.m_alloc;
+    alloc.detach();
+    bool skip_validate = false;
+    bool no_create = true;
+    bool read_only = false;
+    bool is_shared = true;
+    bool server_sync_mode = false;
+    ref_type top_ref = alloc.attach_file(m_path, is_shared, read_only, no_create, 
+                                         skip_validate, m_key, server_sync_mode); // Throws
+    size_t file_size = alloc.get_baseline();
+    Ringbuffer::ReadCount& rc = const_cast<Ringbuffer::ReadCount&>(info->readers.get_last());
+    TIGHTDB_ASSERT(rc.version == info->latest_version_number);
+    cerr << "Compact: from a size of " << rc.filesize << " to " << file_size << endl;
+    rc.filesize = file_size;
+    rc.current_top = top_ref;
+    return true;
+}
 
 uint_fast64_t SharedGroup::get_number_of_versions()
 {
@@ -784,8 +818,12 @@ void SharedGroup::open(Replication& repl, DurabilityLevel dlevel, const uint8_t*
 
 #endif
 
-
 SharedGroup::~SharedGroup() TIGHTDB_NOEXCEPT
+{
+    close();
+}
+
+void SharedGroup::close() TIGHTDB_NOEXCEPT
 {
     if (!is_attached())
         return;
