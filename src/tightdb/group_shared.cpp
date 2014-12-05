@@ -685,16 +685,23 @@ void SharedGroup::open(const string& path, bool no_create_file,
                 if (repl)
                     repl->reset_log_management(version);
 #endif
+
+#ifndef _WIN32
                 if (key) {
                     TIGHTDB_STATIC_ASSERT(sizeof(pid_t) <= sizeof(uint64_t), "process identifiers too large");
                     info->session_initiator_pid = uint64_t(getpid());
                 }
+#endif
+
                 info->latest_version_number = version;
                 info->init_versioning(top_ref, file_size, version);
             }
             else { // not the session initiator!
+#ifndef _WIN32
                 if (key && info->session_initiator_pid != uint64_t(getpid()))
                     throw runtime_error(path + ": Encrypted interprocess sharing is currently unsupported");
+#endif
+
             }
 #ifndef _WIN32
             // In async mode, we need to make sure the daemon is running and ready:
