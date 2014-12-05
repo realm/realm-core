@@ -11,12 +11,13 @@
 #include <tightdb/util/unique_ptr.hpp>
 #include <tightdb/util/utf8.hpp>
 #include <tightdb/unicode.hpp>
+
 #include "test.hpp"
 
 using namespace std;
 using namespace tightdb;
 using namespace tightdb::util;
-
+using namespace tightdb::test_util;
 
 // Test independence and thread-safety
 // -----------------------------------
@@ -65,6 +66,39 @@ const char* uae = "\xc3\xa6"; // danish lower case ae
 
 const char* u16sur = "\xF0\xA0\x9C\x8E"; // chineese needing utf16 surrogate pair
 const char* u16sur2 = "\xF0\xA0\x9C\xB1"; // same as above, with larger unicode
+
+ONLY(UTF_Fuzzy_utf8_to_utf16)
+{
+    Random random(random_int<unsigned long>()); // Seed from slow global generator
+    const size_t size = 10;
+    char in[size];
+    int16_t out[size];
+
+    for (size_t iter = 0; iter < 100000; iter++) {
+        for (size_t t = 0; t < size; t++) {
+            in[t] = random.draw_int<char>();
+        }
+
+        const char* in2 = in;
+        size_t needed = Utf8x16<int16_t>::find_utf16_buf_size(in2, in + size);
+        size_t read = in2 - in;
+
+        // number of utf16 codepoints should not exceed number of utf8 codepoints
+        CHECK(needed <= size);
+        
+        // we should not read beyond input buffer
+        CHECK(read <= size);
+
+        int16_t* out2 = out;
+        Utf8x16<int16_t>::to_utf16(in2, in2 + read, out2, out2 + needed);
+        size_t read2 = in2 - in;
+        size_t written = out2 - out;
+
+        CHECK(read2 <= read);
+        CHECK(written <= needed);
+    }
+}
+
 
 TEST(Compare_Core_ASCII) {
     // Useful line for creating new unit test cases:

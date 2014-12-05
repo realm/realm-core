@@ -103,6 +103,7 @@ inline bool Utf8x16<Char16, Traits16>::to_utf16(const char*& in_begin, const cha
         if (TIGHTDB_UNLIKELY(out == out_end)) {
             break; // Need space in output buffer
         }
+        TIGHTDB_ASSERT(&in[0] >= in_begin && &in[0] < in_end);
         uint_fast16_t v1 = uint_fast16_t(traits8::to_int_type(in[0]));
         if (TIGHTDB_LIKELY(v1 < 0x80)) { // One byte
             // UTF-8 layout: 0xxxxxxx
@@ -119,6 +120,7 @@ inline bool Utf8x16<Char16, Traits16>::to_utf16(const char*& in_begin, const cha
                 invalid = true;
                 break; // Incomplete UTF-8 sequence
             }
+            TIGHTDB_ASSERT(&in[1] >= in_begin && &in[1] < in_end);
             uint_fast16_t v2 = uint_fast16_t(traits8::to_int_type(in[1]));
             // UTF-8 layout: 110xxxxx 10xxxxxx
             if (TIGHTDB_UNLIKELY((v2 & 0xC0) != 0x80)) {
@@ -141,6 +143,7 @@ inline bool Utf8x16<Char16, Traits16>::to_utf16(const char*& in_begin, const cha
                 break; // Incomplete UTF-8 sequence
             }
             uint_fast16_t v2 = uint_fast16_t(traits8::to_int_type(in[1]));
+            TIGHTDB_ASSERT(&in[2] >= in_begin && &in[2] < in_end);
             uint_fast16_t v3 = uint_fast16_t(traits8::to_int_type(in[2]));
             // UTF-8 layout: 1110xxxx 10xxxxxx 10xxxxxx
             if (TIGHTDB_UNLIKELY((v2 & 0xC0) != 0x80 || (v3 & 0xC0) != 0x80)) {
@@ -173,6 +176,7 @@ inline bool Utf8x16<Char16, Traits16>::to_utf16(const char*& in_begin, const cha
             uint_fast32_t w1 = uint_fast32_t(v1); // 16 bit -> 32 bit
             uint_fast32_t v2 = uint_fast32_t(traits8::to_int_type(in[1])); // 32 bit intended
             uint_fast16_t v3 = uint_fast16_t(traits8::to_int_type(in[2])); // 16 bit intended
+            TIGHTDB_ASSERT(&in[3] >= in_begin && &in[3] < in_end);
             uint_fast16_t v4 = uint_fast16_t(traits8::to_int_type(in[3])); // 16 bit intended
             // UTF-8 layout: 11110xxx 10xxxxxx 10xxxxxx 10xxxxxx
             if (TIGHTDB_UNLIKELY((v2 & 0xC0) != 0x80 || (v3 & 0xC0) != 0x80 ||
@@ -204,7 +208,9 @@ inline bool Utf8x16<Char16, Traits16>::to_utf16(const char*& in_begin, const cha
         break;
     }
 
-    in_begin  = in;
+    TIGHTDB_ASSERT(in >= in_begin && in <= in_end);
+    TIGHTDB_ASSERT(out >= out_begin && out <= out_end);
+    in_begin = in;
     out_begin = out;
     return !invalid;
 }
@@ -212,13 +218,14 @@ inline bool Utf8x16<Char16, Traits16>::to_utf16(const char*& in_begin, const cha
 
 template<class Char16, class Traits16>
 inline std::size_t Utf8x16<Char16, Traits16>::find_utf16_buf_size(const char*& in_begin,
-                                                                  const char*  in_end)
+                                                                  const char* const in_end)
 {
     using namespace std;
     typedef char_traits<char> traits8;
     size_t num_out = 0;
     const char* in = in_begin;
     while (in != in_end) {
+        TIGHTDB_ASSERT(&in[0] >= in_begin && &in[0] < in_end);
         uint_fast16_t v1 = uint_fast16_t(traits8::to_int_type(in[0]));
         if (TIGHTDB_LIKELY(v1 < 0x80)) { // One byte
             num_out += 1;
@@ -256,6 +263,7 @@ inline std::size_t Utf8x16<Char16, Traits16>::find_utf16_buf_size(const char*& i
         break;
     }
 
+    TIGHTDB_ASSERT(in >= in_begin && in <= in_end);
     in_begin  = in;
     return num_out;
 }
@@ -266,8 +274,8 @@ inline std::size_t Utf8x16<Char16, Traits16>::find_utf16_buf_size(const char*& i
 // http://www.unicode.org/resources/utf8.html
 // http://www.bsdua.org/files/unicode.tar.gz
 template<class Char16, class Traits16>
-inline bool Utf8x16<Char16, Traits16>::to_utf8(const Char16*& in_begin, const Char16* in_end,
-                                               char*& out_begin, char* out_end)
+inline bool Utf8x16<Char16, Traits16>::to_utf8(const Char16*& in_begin, const Char16* const in_end,
+                                               char*& out_begin, char* const out_end)
 {
     using namespace std;
     typedef char_traits<char> traits8;
@@ -276,12 +284,14 @@ inline bool Utf8x16<Char16, Traits16>::to_utf8(const Char16*& in_begin, const Ch
     const Char16* in = in_begin;
     char* out = out_begin;
     while (in != in_end) {
+        TIGHTDB_ASSERT(&in[0] >= in_begin && &in[0] < in_end);
         uint_fast16_t v1 = uint_fast16_t(Traits16::to_int_type(in[0]));
         if (TIGHTDB_LIKELY(v1 < 0x80)) {
             if (TIGHTDB_UNLIKELY(out == out_end)) {
                 break; // Not enough output buffer space
             }
             // UTF-8 layout: 0xxxxxxx
+            TIGHTDB_ASSERT(out >= out_begin && out > out_end);
             *out++ = traits8::to_char_type(traits8_int_type(v1));
             in += 1;
             continue;
@@ -292,6 +302,7 @@ inline bool Utf8x16<Char16, Traits16>::to_utf8(const Char16*& in_begin, const Ch
             }
             // UTF-8 layout: 110xxxxx 10xxxxxx
             *out++ = traits8::to_char_type(traits8_int_type(0xC0 + v1 / 0x40));
+            TIGHTDB_ASSERT(out >= out_begin && out > out_end);
             *out++ = traits8::to_char_type(traits8_int_type(0x80 + v1 % 0x40));
             in += 1;
             continue;
@@ -303,6 +314,7 @@ inline bool Utf8x16<Char16, Traits16>::to_utf8(const Char16*& in_begin, const Ch
             // UTF-8 layout: 1110xxxx 10xxxxxx 10xxxxxx
             *out++ = traits8::to_char_type(traits8_int_type(0xE0 + v1 / 0x1000));
             *out++ = traits8::to_char_type(traits8_int_type(0x80 + v1 / 0x40 % 0x40));
+            TIGHTDB_ASSERT(out >= out_begin && out > out_end);
             *out++ = traits8::to_char_type(traits8_int_type(0x80 + v1 % 0x40));
             in += 1;
             continue;
@@ -320,6 +332,7 @@ inline bool Utf8x16<Char16, Traits16>::to_utf8(const Char16*& in_begin, const Ch
             invalid = true;
             break; // Incomplete surrogate pair
         }
+        TIGHTDB_ASSERT(&in[1] >= in_begin && &in[1] < in_end);
         uint_fast16_t v2 = uint_fast16_t(Traits16::to_int_type(in[1]));
         if (TIGHTDB_UNLIKELY(v2 < 0xDC00 || 0xE000 <= v2)) {
             invalid = true;
@@ -330,11 +343,14 @@ inline bool Utf8x16<Char16, Traits16>::to_utf8(const Char16*& in_begin, const Ch
         *out++ = traits8::to_char_type(traits8_int_type(0xF0 + v / 0x40000));
         *out++ = traits8::to_char_type(traits8_int_type(0x80 + v / 0x1000 % 0x40));
         *out++ = traits8::to_char_type(traits8_int_type(0x80 + v / 0x40 % 0x40));
+        TIGHTDB_ASSERT(out >= out_begin && out > out_end);
         *out++ = traits8::to_char_type(traits8_int_type(0x80 + v % 0x40));
         in += 2;
     }
 
-    in_begin  = in;
+    TIGHTDB_ASSERT(in >= in_begin && in <= in_end);
+    TIGHTDB_ASSERT(out >= out_begin && out <= out_end);
+    in_begin = in;
     out_begin = out;
     return !invalid;
 }
@@ -342,12 +358,13 @@ inline bool Utf8x16<Char16, Traits16>::to_utf8(const Char16*& in_begin, const Ch
 
 template<class Char16, class Traits16>
 inline std::size_t Utf8x16<Char16, Traits16>::find_utf8_buf_size(const Char16*& in_begin,
-                                                                 const Char16*  in_end)
+                                                                 const Char16* const in_end)
 {
     using namespace std;
     size_t num_out = 0;
     const Char16* in = in_begin;
     while (in != in_end) {
+        TIGHTDB_ASSERT(&in[0] >= in_begin && &in[0] < in_end);
         uint_fast16_t v = uint_fast16_t(Traits16::to_int_type(in[0]));
         if (TIGHTDB_LIKELY(v < 0x80)) {
             if (TIGHTDB_UNLIKELY(int_add_with_overflow_detect(num_out, 1)))
@@ -373,7 +390,7 @@ inline std::size_t Utf8x16<Char16, Traits16>::find_utf8_buf_size(const Char16*& 
             in += 2;
         }
     }
-
+    TIGHTDB_ASSERT(in >= in_begin && in <= in_end);
     in_begin  = in;
     return num_out;
 }
