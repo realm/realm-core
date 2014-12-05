@@ -167,7 +167,7 @@ void calc_hmac(const void* src, size_t len, uint8_t* dst, const uint8_t* key)
 #endif
 }
 
-} // namespace {
+} // anonymous namespace
 
 void AESCryptor::set_file_size(off_t new_size)
 {
