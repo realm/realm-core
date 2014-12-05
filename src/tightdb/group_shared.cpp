@@ -791,7 +791,6 @@ bool SharedGroup::compact()
     size_t file_size = alloc.get_baseline();
     Ringbuffer::ReadCount& rc = const_cast<Ringbuffer::ReadCount&>(info->readers.get_last());
     TIGHTDB_ASSERT(rc.version == info->latest_version_number);
-    cerr << "Compact: from a size of " << rc.filesize << " to " << file_size << endl;
     rc.filesize = file_size;
     rc.current_top = top_ref;
     return true;
