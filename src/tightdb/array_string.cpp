@@ -34,6 +34,19 @@ size_t round_up(size_t size)
 
 } // anonymous namespace
 
+bool ArrayString::is_null(size_t ndx) const
+{
+    TIGHTDB_ASSERT(ndx < m_size);
+    StringData sd = get(ndx);
+    return sd.data() == null_ptr;
+}
+
+void ArrayString::set_null(size_t ndx)
+{
+    TIGHTDB_ASSERT(ndx < m_size);
+    StringData sd = StringData(null_ptr, 0);
+    set(ndx, sd);
+}
 
 void ArrayString::set(size_t ndx, StringData value)
 {
@@ -45,15 +58,21 @@ void ArrayString::set(size_t ndx, StringData value)
 
     // Make room for the new value plus a zero-termination
     if (m_width <= value.size()) {
-        if (value.size() == 0 && m_width == 0)
-            return;
+        // if m_width == 0 then entire array contains only null entries
+        if (value.data() == null_ptr && m_width == 0) {
+            return; // set null element to null
+        }
 
-        TIGHTDB_ASSERT(0 < value.size());
+//        TIGHTDB_ASSERT(0 < value.size());
 
         // Calc min column width
-        size_t new_width = ::round_up(value.size());
+        size_t new_width;
+        if (m_width == 0 && value.size() == 0)
+            new_width = ::round_up(1); // get(ndx) is null. Overwrite with empty string
+        else
+            new_width = ::round_up(value.size());
 
-        TIGHTDB_ASSERT(value.size() < new_width);
+        //TIGHTDB_ASSERT(value.size() < new_width);
 
         // FIXME: Should we try to avoid double copying when realloc fails to preserve the address?
         alloc(m_size, new_width); // Throws
@@ -67,20 +86,29 @@ void ArrayString::set(size_t ndx, StringData value)
             while (new_end != base) {
                 *--new_end = char(*--old_end + (new_width-m_width));
                 {
+                    // extend 0-padding
                     char* new_begin = new_end - (new_width-m_width);
-                    fill(new_begin, new_end, 0); // Extend zero padding
+                    if (new_end - new_begin == m_width)
+                        fill(new_begin, new_end - 1, 0); // null
+                    else
+                        fill(new_begin, new_end, 0);
                     new_end = new_begin;
                 }
                 {
+                    // copy string payload
                     const char* old_begin = old_end - (m_width-1);
-                    new_end = copy_backward(old_begin, old_end, new_end);
+                    if(old_end - old_begin == m_width)
+                        new_end = copy_backward(old_begin, old_end - 1, new_end); // null
+                    else
+                        new_end = copy_backward(old_begin, old_end, new_end);
                     old_end = old_begin;
                 }
             }
         }
         else {
+            // m_width == 0, so all elements are null. Expand that to new width.
             while (new_end != base) {
-                *--new_end = char(new_width-1);
+                *--new_end = new_width; //  char(new_width - 1);
                 {
                     char* new_begin = new_end - (new_width-1);
                     fill(new_begin, new_end, 0); // Fill with zero bytes
@@ -101,8 +129,13 @@ void ArrayString::set(size_t ndx, StringData value)
     fill(begin, end, 0); // Pad with zero bytes
     TIGHTDB_STATIC_ASSERT(max_width <= 128, "Padding size must fit in 7-bits");
     TIGHTDB_ASSERT(end - begin < max_width);
-    int pad_size = int(end - begin);
-    *end = char(pad_size);
+    if (value.data() == null_ptr) {
+        *end = m_width;
+    }
+    else {
+        int pad_size = int(end - begin);
+        *end = char(pad_size);
+    }
 }
 
 
@@ -114,12 +147,19 @@ void ArrayString::insert(size_t ndx, StringData value)
     // Check if we need to copy before modifying
     copy_on_write(); // Throws
 
-    // Calc min column width (incl trailing zero-byte)
-    size_t new_width = max(m_width, ::round_up(value.size()));
+    // Allocate room for the new value
+    alloc(m_size+1, m_width); // Throws
+    
+    // Make gap for new value
+    memmove(m_data + m_width * (ndx + 1), m_data + m_width * ndx, m_width * (m_size - ndx));
 
-    // Make room for the new value
-    alloc(m_size+1, new_width); // Throws
+    m_size++;
+    set(ndx, value);
 
+    return;
+
+    // Below method saves 1 memcpy, but is complex. Todo, enable method when null is finished
+#if 0
     if (0 < value.size() || 0 < m_width) {
         char* base = m_data;
         const char* old_end = base + m_size*m_width;
@@ -211,6 +251,8 @@ void ArrayString::insert(size_t ndx, StringData value)
     }
 
     ++m_size;
+#endif    
+
 }
 
 void ArrayString::erase(size_t ndx)
