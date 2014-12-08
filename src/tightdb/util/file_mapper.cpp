@@ -33,6 +33,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include <tightdb/util/errno.hpp>
 #include <tightdb/util/shared_ptr.hpp>
 #include <tightdb/util/terminate.hpp>
 #include <tightdb/util/thread.hpp>
@@ -136,8 +137,10 @@ size_t round_up_to_page_size(size_t size)
 void add_mapping(void* addr, size_t size, int fd, File::AccessMode access, const char* encryption_key)
 {
     struct stat st;
-    if (fstat(fd, &st))
-        TIGHTDB_TERMINATE("fstat failed"); // FIXME: throw instead
+    if (fstat(fd, &st)) {
+        int err = errno; // Eliminate any risk of clobbering
+        throw std::runtime_error(get_errno_msg("fstat() failed: ", err));
+    }
 
     if (st.st_size > 0 && static_cast<size_t>(st.st_size) < page_size)
         throw DecryptionFailed();
@@ -168,10 +171,16 @@ void add_mapping(void* addr, size_t size, int fd, File::AccessMode access, const
     mappings_by_addr.reserve(mappings_by_addr.size() + 1);
 
     if (it == mappings_by_file.end()) {
+        fd = dup(fd);
+        if (fd == -1) {
+            int err = errno; // Eliminate any risk of clobbering
+            throw std::runtime_error(get_errno_msg("dup() failed: ", err));
+        }
+
         mappings_for_file f;
         f.device = st.st_dev;
         f.inode = st.st_ino;
-        f.info = new SharedFileInfo(reinterpret_cast<const uint8_t*>(encryption_key), dup(fd));
+        f.info = new SharedFileInfo(reinterpret_cast<const uint8_t*>(encryption_key), fd);
         mappings_by_file.push_back(f);
         it = mappings_by_file.end() - 1;
     }
