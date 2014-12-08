@@ -50,8 +50,8 @@ public:
 
     void set_file_size(off_t new_size);
 
-    void try_read(int fd, off_t pos, char* dst);
-    void read(int fd, off_t pos, char* dst) TIGHTDB_NOEXCEPT;
+    bool try_read(int fd, off_t pos, char* dst);
+    bool read(int fd, off_t pos, char* dst) TIGHTDB_NOEXCEPT;
     void write(int fd, off_t pos, const char* src) TIGHTDB_NOEXCEPT;
 
 private:

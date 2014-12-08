@@ -207,10 +207,10 @@ bool AESCryptor::check_hmac(const void *src, size_t len, const uint8_t *hmac) co
     return result == 0;
 }
 
-void AESCryptor::read(int fd, off_t pos, char* dst) TIGHTDB_NOEXCEPT
+bool AESCryptor::read(int fd, off_t pos, char* dst) TIGHTDB_NOEXCEPT
 {
     try {
-        try_read(fd, pos, dst);
+        return try_read(fd, pos, dst);
     }
     catch (...) {
         // Not recoverable since we're running in a signal handler
@@ -218,19 +218,19 @@ void AESCryptor::read(int fd, off_t pos, char* dst) TIGHTDB_NOEXCEPT
     }
 }
 
-void AESCryptor::try_read(int fd, off_t pos, char* dst) {
+bool AESCryptor::try_read(int fd, off_t pos, char* dst) {
     char buffer[page_size];
     ssize_t bytes_read = check_read(fd, real_offset(pos), buffer, page_size);
 
     if (bytes_read == 0)
-        return;
+        return false;
 
     iv_table& iv = get_iv_table(fd, pos);
     if (iv.iv1 == 0) {
         // This page has never been written to, so we've just read pre-allocated
         // space. No memset() since the code using this doesn't rely on
         // pre-allocated space being zeroed.
-        return;
+        return false;
     }
 
     if (!check_hmac(buffer, bytes_read, iv.hmac1)) {
@@ -238,7 +238,7 @@ void AESCryptor::try_read(int fd, off_t pos, char* dst) {
         // new IV and writing the data
         if (iv.iv2 == 0) {
             // Very first write was interrupted
-            return;
+            return false;
         }
 
         if (check_hmac(buffer, bytes_read, iv.hmac2)) {
@@ -251,6 +251,7 @@ void AESCryptor::try_read(int fd, off_t pos, char* dst) {
     }
 
     crypt(mode_Decrypt, pos, dst, buffer, reinterpret_cast<const char*>(&iv.iv1));
+    return true;
 }
 
 void AESCryptor::write(int fd, off_t pos, const char* src) TIGHTDB_NOEXCEPT
@@ -404,7 +405,8 @@ void EncryptedFileMapping::validate_page(size_t page) TIGHTDB_NOEXCEPT
         return;
 
     char buffer[page_size];
-    m_file.cryptor.read(m_file.fd, page * page_size, buffer);
+    if (!m_file.cryptor.read(m_file.fd, page * page_size, buffer))
+        return;
 
     for (size_t i = 0; i < m_file.mappings.size(); ++i) {
         EncryptedFileMapping* m = m_file.mappings[i];
