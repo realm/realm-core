@@ -568,15 +568,15 @@ void Group::write(ostream& out, bool pad) const
     write(out, table_writer, pad); // Throws
 }
 
-void Group::write(const string& path, const char* encrption_key) const
+void Group::write(const string& path, const char* encryption_key) const
 {
     File file;
     int flags = 0;
     file.open(path, File::access_ReadWrite, File::create_Must, flags);
-    file.set_encryption_key(encrption_key);
+    file.set_encryption_key(encryption_key);
     File::Streambuf streambuf(&file);
     ostream out(&streambuf);
-    write(out, encrption_key != 0);
+    write(out, encryption_key != 0);
 }
 
 
