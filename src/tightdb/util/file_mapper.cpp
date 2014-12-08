@@ -135,6 +135,13 @@ size_t round_up_to_page_size(size_t size)
 
 void add_mapping(void* addr, size_t size, int fd, File::AccessMode access, const char* encryption_key)
 {
+    struct stat st;
+    if (fstat(fd, &st))
+        TIGHTDB_TERMINATE("fstat failed"); // FIXME: throw instead
+
+    if (st.st_size > 0 && static_cast<size_t>(st.st_size) < page_size)
+        throw DecryptionFailed();
+
     SpinLockGuard lock(mapping_lock);
 
     static bool has_installed_handler = false;
@@ -150,13 +157,6 @@ void add_mapping(void* addr, size_t size, int fd, File::AccessMode access, const
         if (sigaction(SIGBUS, &action, &old_bus) != 0)
             TIGHTDB_TERMINATE("sigaction SIGBUS");
     }
-
-    struct stat st;
-    if (fstat(fd, &st))
-        TIGHTDB_TERMINATE("fstat failed"); // FIXME: throw instead
-
-    if (st.st_size > 0 && static_cast<size_t>(st.st_size) < page_size)
-        throw DecryptionFailed();
 
     std::vector<mappings_for_file>::iterator it;
     for (it = mappings_by_file.begin(); it != mappings_by_file.end(); ++it) {
