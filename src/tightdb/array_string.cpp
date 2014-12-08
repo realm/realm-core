@@ -147,6 +147,10 @@ void ArrayString::insert(size_t ndx, StringData value)
     // Check if we need to copy before modifying
     copy_on_write(); // Throws
 
+    // Todo: Below code will perform up to 3 memcpy() operations in worst case. Todo, if we improve the
+    // allocator to make a gap for the new value for us, we can have just 1. We can also have 2 by merging
+    // memmove() and set(), but it's a bit complex. May be done after support of null is completed.
+
     // Allocate room for the new value
     alloc(m_size+1, m_width); // Throws
     
@@ -154,105 +158,10 @@ void ArrayString::insert(size_t ndx, StringData value)
     memmove(m_data + m_width * (ndx + 1), m_data + m_width * ndx, m_width * (m_size - ndx));
 
     m_size++;
+
+    // Set new value
     set(ndx, value);
-
     return;
-
-    // Below method saves 1 memcpy, but is complex. Todo, enable method when null is finished
-#if 0
-    if (0 < value.size() || 0 < m_width) {
-        char* base = m_data;
-        const char* old_end = base + m_size*m_width;
-        char*       new_end = base + m_size*new_width + new_width;
-
-        // Move values after insertion point (may expand)
-        if (ndx != m_size) {
-            if (TIGHTDB_UNLIKELY(m_width < new_width)) {
-                char* const new_begin = base + ndx*new_width + new_width;
-                if (0 < m_width) {
-                    // Expand the old values
-                    do {
-                        *--new_end = char(*--old_end + (new_width-m_width));
-                        {
-                            char* new_begin2 = new_end - (new_width-m_width);
-                            fill(new_begin2, new_end, 0); // Extend zero padding
-                            new_end = new_begin2;
-                        }
-                        {
-                            const char* old_begin = old_end - (m_width-1);
-                            new_end = copy_backward(old_begin, old_end, new_end);
-                            old_end = old_begin;
-                        }
-                    }
-                    while (new_end != new_begin);
-                }
-                else {
-                    do {
-                        *--new_end = char(new_width-1);
-                        {
-                            char* new_begin2 = new_end - (new_width-1);
-                            fill(new_begin2, new_end, 0); // Fill with zero bytes
-                            new_end = new_begin2;
-                        }
-                    }
-                    while (new_end != new_begin);
-                }
-            }
-            else {
-                // when no expansion just move the following entries forward
-                const char* old_begin = base + ndx*m_width;
-                new_end = copy_backward(old_begin, old_end, new_end);
-                old_end = old_begin;
-            }
-        }
-
-        // Set the value
-        {
-            char* new_begin = new_end - new_width;
-            char* pad_begin = copy(value.data(), value.data()+value.size(), new_begin);
-            --new_end;
-            fill(pad_begin, new_end, 0); // Pad with zero bytes
-            TIGHTDB_STATIC_ASSERT(max_width <= 128, "Padding size must fit in 7-bits");
-            TIGHTDB_ASSERT(new_end - pad_begin < max_width);
-            int pad_size = int(new_end - pad_begin);
-            *new_end = char(pad_size);
-            new_end = new_begin;
-        }
-
-        // Expand values before insertion point
-        if (TIGHTDB_UNLIKELY(m_width < new_width)) {
-            if (0 < m_width) {
-                while (new_end != base) {
-                    *--new_end = char(*--old_end + (new_width-m_width));
-                    {
-                        char* new_begin = new_end - (new_width-m_width);
-                        fill(new_begin, new_end, 0); // Extend zero padding
-                        new_end = new_begin;
-                    }
-                    {
-                        const char* old_begin = old_end - (m_width-1);
-                        new_end = copy_backward(old_begin, old_end, new_end);
-                        old_end = old_begin;
-                    }
-                }
-            }
-            else {
-                while (new_end != base) {
-                    *--new_end = char(new_width-1);
-                    {
-                        char* new_begin = new_end - (new_width-1);
-                        fill(new_begin, new_end, 0); // Fill with zero bytes
-                        new_end = new_begin;
-                    }
-                }
-            }
-            m_width = new_width;
-        }
-    }
-
-    ++m_size;
-#endif    
-
 }
 
 void ArrayString::erase(size_t ndx)
