@@ -69,7 +69,7 @@ namespace _impl {
 class WriteLogCollector : public Replication
 {
 public:
-    WriteLogCollector(std::string database_name, bool server_synchronization_mode);
+    WriteLogCollector(std::string database_name, bool server_synchronization_mode, const char *encryption_key);
     ~WriteLogCollector() TIGHTDB_NOEXCEPT;
     std::string do_get_database_path() TIGHTDB_OVERRIDE { return m_database_name; }
     void do_begin_write_transact(SharedGroup& sg) TIGHTDB_OVERRIDE;
@@ -685,22 +685,30 @@ void WriteLogCollector::transact_log_reserve(std::size_t size)
 }
 
 
-WriteLogCollector::WriteLogCollector(std::string database_name, bool server_synchronization_mode)
+WriteLogCollector::WriteLogCollector(std::string database_name,
+                                     bool server_synchronization_mode,
+                                     const char *encryption_key)
     : m_log_a(database_name + ".log_a"), m_log_b(database_name + ".log_b")
 {
     m_database_name = database_name;
     m_read_version = 0;
     m_read_offset = 0;
     m_is_persisting = server_synchronization_mode;
+    m_log_a.file.set_encryption_key(encryption_key);
+    m_log_b.file.set_encryption_key(encryption_key);
 }
 
 } // end _impl
 
 
 
-Replication* makeWriteLogCollector(std::string database_name, bool server_synchronization_mode)
+Replication* makeWriteLogCollector(std::string database_name,
+                                   bool server_synchronization_mode,
+                                   const char *encryption_key)
 {
-    return new _impl::WriteLogCollector(database_name, server_synchronization_mode);
+    return new _impl::WriteLogCollector(database_name,
+                                        server_synchronization_mode,
+                                        encryption_key);
 }
 
 
