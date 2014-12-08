@@ -173,7 +173,7 @@ void add_mapping(void* addr, size_t size, int fd, File::AccessMode access, const
         f.inode = st.st_ino;
         f.info = new SharedFileInfo(reinterpret_cast<const uint8_t*>(encryption_key), dup(fd));
         mappings_by_file.push_back(f);
-        it = --mappings_by_file.end();
+        it = mappings_by_file.end() - 1;
     }
 
     try {
