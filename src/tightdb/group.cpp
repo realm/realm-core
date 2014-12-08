@@ -588,7 +588,7 @@ BinaryData Group::write_to_mem() const
     //
     // FIXME: This size could potentially be vastly bigger that what
     // is actually needed.
-    size_t max_size = (m_alloc.get_total_size() + 4095) & ~4095UL;
+    size_t max_size = m_alloc.get_total_size();
 
     char* buffer = static_cast<char*>(malloc(max_size)); // Throws
     if (!buffer)
