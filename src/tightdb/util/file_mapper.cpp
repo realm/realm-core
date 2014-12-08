@@ -171,6 +171,8 @@ void add_mapping(void* addr, size_t size, int fd, File::AccessMode access, const
     mappings_by_addr.reserve(mappings_by_addr.size() + 1);
 
     if (it == mappings_by_file.end()) {
+        mappings_by_file.reserve(mappings_by_file.size() + 1);
+
         fd = dup(fd);
         if (fd == -1) {
             int err = errno; // Eliminate any risk of clobbering
@@ -180,8 +182,15 @@ void add_mapping(void* addr, size_t size, int fd, File::AccessMode access, const
         mappings_for_file f;
         f.device = st.st_dev;
         f.inode = st.st_ino;
-        f.info = new SharedFileInfo(reinterpret_cast<const uint8_t*>(encryption_key), fd);
-        mappings_by_file.push_back(f);
+        try {
+            f.info = new SharedFileInfo(reinterpret_cast<const uint8_t*>(encryption_key), fd);
+        }
+        catch (...) {
+            ::close(fd);
+            throw;
+        }
+
+        mappings_by_file.push_back(f); // can't throw due to reserve() above
         it = mappings_by_file.end() - 1;
     }
 
@@ -190,7 +199,7 @@ void add_mapping(void* addr, size_t size, int fd, File::AccessMode access, const
         m.addr = addr;
         m.size = size;
         m.mapping = new EncryptedFileMapping(*it->info, addr, size, access);
-        mappings_by_addr.push_back(m);
+        mappings_by_addr.push_back(m); // can't throw due to reserve() above
     }
     catch (...) {
         if (it->info->mappings.empty()) {
