@@ -40,14 +40,13 @@ namespace util {
 /// \a Char16.
 template<class Char16, class Traits16 = std::char_traits<Char16> > struct Utf8x16 {
     /// Transcode as much as possible of the specified UTF-8 input, to
-    /// UTF-16. Returns true if all input characters were transcoded,
-    /// or transcoding stopped because the next character did not fit
-    /// into the output buffer. Returns false if transcoding stopped
-    /// due to invalid input. It is not specified whether this
-    /// function returns true or false if invalid input occurs at the
-    /// same time that the output buffer runs full. In any case, upon
-    /// return, \a in_begin and \a out_begin are advanced to the
-    /// position where the transcoding stopped.
+    /// UTF-16. Returns true if all input characters were transcoded, or
+    /// transcoding stopped because the next character did not fit into the
+    /// output buffer. Returns false if transcoding stopped due to invalid
+    /// input. It is not specified whether this function returns true or false
+    /// if invalid input occurs at the same time as the output buffer runs
+    /// full. In any case, upon return, \a in_begin and \a out_begin are
+    /// advanced to the position where transcoding stopped.
     ///
     /// Throws only if Traits16::to_char_type() throws.
     static bool to_utf16(const char*& in_begin, const char* in_end,
@@ -59,25 +58,23 @@ template<class Char16, class Traits16 = std::char_traits<Char16> > struct Utf8x1
     static bool to_utf8(const Char16*& in_begin, const Char16* in_end,
                         char*& out_begin, char* out_end);
 
-    /// Summarize the number of UTF-16 elements needed to hold the
-    /// result of transcoding the specified UTF-8 string. Upon return,
-    /// if \a in_begin != \a in_end, then the summation stopped due to
-    /// invalid UTF-8 input. The returned size then reflects the
-    /// number of UTF-16 elements needed to hold the result of
-    /// transcoding the part of the input that was examined. This
-    /// function will only detect a few UTF-8 validity issues, and can
-    /// therefore not be used for general UTF-8 validation.
+    /// Summarize the number of UTF-16 elements needed to hold the result of
+    /// transcoding the specified UTF-8 string. Upon return, if \a in_begin !=
+    /// \a in_end, then the summation stopped due to invalid UTF-8 input. The
+    /// returned size then reflects the number of UTF-16 elements needed to hold
+    /// the result of transcoding the part of the input that was examined. This
+    /// function will only detect a few UTF-8 validity issues, and can therefore
+    /// not be used for general UTF-8 validation.
     static std::size_t find_utf16_buf_size(const char*& in_begin, const char* in_end);
 
-    /// Summarize the number of UTF-8 bytes needed to hold the result
-    /// of transcoding the specified UTF-16 string. Upon return, if \a
-    /// in_begin != \a in_end, then the summation stopped due to
-    /// invalid UTF-16 input, or to prevent the returned \c size_t
-    /// value from overflowing. The returned size then reflects the
-    /// number of UTF-8 bytes needed to hold the result of transcoding
-    /// the part of the input that was examined. This function will
-    /// only detect a few UTF-16 validity issues, and can therefore
-    /// not be used for general UTF-16 validation.
+    /// Summarize the number of UTF-8 bytes needed to hold the result of
+    /// transcoding the specified UTF-16 string. Upon return, if \a in_begin !=
+    /// \a in_end, then the summation stopped due to invalid UTF-16 input, or to
+    /// prevent the returned \c size_t value from overflowing. The returned size
+    /// then reflects the number of UTF-8 bytes needed to hold the result of
+    /// transcoding the part of the input that was examined. This function will
+    /// only detect a few UTF-16 validity issues, and can therefore not be used
+    /// for general UTF-16 validation.
     static std::size_t find_utf8_buf_size(const Char16*& in_begin, const Char16* in_end);
 };
 
