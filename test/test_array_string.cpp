@@ -42,18 +42,6 @@ using namespace tightdb::test_util;
 // `experiments/testcase.cpp` and then run `sh build.sh
 // check-testcase` (or one of its friends) from the command line.
 
-TEST(ArrayString_Basic2)
-{
-    ArrayString c(Allocator::get_default());
-    c.create();
-
-//    c.add("he");
-    c.add("hej");
-
-    c.get(0);
-//    c.add("hejs");
-}
-
 TEST(ArrayString_Basic)
 {
     ArrayString c(Allocator::get_default());
