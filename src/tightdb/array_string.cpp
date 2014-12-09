@@ -22,11 +22,10 @@ const int max_width = 64;
 // strings in as little space as possible, because 0 can only store nulls.
 size_t round_up(size_t size)
 {
-    if (size == 0)
-        return 0;
+    TIGHTDB_ASSERT(size <= 256);
 
-    if (size == 1)
-        return 1;
+    if (size <= 1)
+        return size;
 
     size--;
     size |= size >> 1;
