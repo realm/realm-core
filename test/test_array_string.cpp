@@ -509,8 +509,8 @@ TEST(ArrayString_Null)
 
         a.add("foo");
         a.add("");
-        a.add(StringData(0, 0));
-
+        a.add(StringData(0, 0)); // add null (StringData::data() == 0)
+        
         CHECK_EQUAL(a.is_null(0), false);
         CHECK_EQUAL(a.is_null(1), false);
         CHECK_EQUAL(a.is_null(2), true);
@@ -531,7 +531,7 @@ TEST(ArrayString_Null)
         ArrayString a(Allocator::get_default());
         a.create();
 
-        a.add(StringData(0, 0));
+        a.add(StringData(0, 0));  // add null (StringData::data() == 0)
         a.add("");
         a.add("foo");
 
@@ -541,9 +541,9 @@ TEST(ArrayString_Null)
         CHECK_EQUAL(memcmp(a.get(2).data(), "foo", 3), 0);
 
         // Test insert
-        a.insert(0, StringData(0, 0));
-        a.insert(2, StringData(0, 0));
-        a.insert(4, StringData(0, 0));
+        a.insert(0, StringData(0, 0)); // add null (StringData::data() == 0)
+        a.insert(2, StringData(0, 0)); // add null (StringData::data() == 0)
+        a.insert(4, StringData(0, 0)); // add null (StringData::data() == 0)
 
         CHECK_EQUAL(a.is_null(0), true);
         CHECK_EQUAL(a.is_null(1), true);
