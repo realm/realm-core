@@ -592,7 +592,7 @@ TEST(ArrayString_Null)
 
     Random random(random_int<unsigned long>());
 
-    for (size_t t = 0; t < 100; t++) {
+    for (size_t t = 0; t < 50; t++) {
         ArrayString a(Allocator::get_default());
         a.create();
 
@@ -601,7 +601,7 @@ TEST(ArrayString_Null)
 
         // ArrayString capacity starts at 128 bytes, so we need lots of elements
         // to test if relocation works
-        for (size_t i = 0; i < 300; i++) {
+        for (size_t i = 0; i < 100; i++) {
             unsigned char rnd = random.draw_int<unsigned char>();  //    = 1234 * ((i + 123) * (t + 432) + 423) + 543;
 
             // Add more often than removing, so that we grow
@@ -611,14 +611,19 @@ TEST(ArrayString_Null)
                 v.erase(v.begin() + del);
             }
             else {
-                static const char str[] = "Hello world!";
-                size_t len = (rnd % 3) * 5; // 0, 4, 8 or 16
+                // Generate string with good probability of being empty or null
+                static const char str[] = "This is a test of null strings";
+                size_t len;
                 
+                if (random.draw_int<unsigned char>() > 100)
+                    len = rnd % 15;
+                else
+                    len = 0;
+
                 StringData sd;
                 string stdstr;
 
-                // if 16, then null
-                if (len == 16) {
+                if (random.draw_int<unsigned char>() > 100) {
                     sd = StringData(0, 0);
                     stdstr = "null";
                 }
@@ -627,30 +632,28 @@ TEST(ArrayString_Null)
                     stdstr = string(str, len);
                 }
 
-                if (rnd % 2) {
+                if (random.draw_int<unsigned char>() > 100) {
                     a.add(sd);
                     v.push_back(stdstr);
                 }
                 else if (a.size() > 0) {
                     size_t pos = rnd % a.size();
-                    a.insert(pos, StringData(str, len));
+                    a.insert(pos, sd);
                     v.insert(v.begin() + pos, stdstr);
+                }
+
+                CHECK_EQUAL(a.size(), v.size());
+                for (size_t i = 0; i < a.size(); i++) {
+                    if (v[i] == "null") {
+                        CHECK(a.is_null(i));
+                        CHECK(a.get(i).data() == 0);
+                    }
+                    else {
+                        CHECK(a.get(i) == v[i]);
+                    }
                 }
             }
         }
-
-        CHECK_EQUAL(a.size(), v.size());
-        for (size_t i = 0; i < a.size(); i++) {
-            if (v[i] == "null") {
-                CHECK(a.is_null(i));
-                CHECK(a.get(i).data() == 0);
-            }
-            else {
-                CHECK(a.get(i) == v[i]);
-            }
-        }
-
-
         a.destroy();
     }
 }

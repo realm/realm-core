@@ -33,12 +33,10 @@ An example of the format for m_width = 4 is following sequence of bytes, where x
 xxx0 xx01 x002 0003 0004 (strings "xxx",. "xx", "x", "", null)
 
 So each string is 0 terminated, and the last byte in a block tells how many 0s are present, except
-for a NULL, in which case the value of the byte equals m_width (4). This number is used to compute 
-the length of a (non-null) string.
+for a null which has the byte set to m_width (4). The byte is used to compute the length of a string
+in various functions.
 
-If m_witdh = 0, then all elements are null.
-
-A StringData is null if-and-only-if StringData::data() == 0. 
+New: If m_witdh = 0, then all elements are null. So to add an empty string we must expand m_width
 */
 
 class ArrayString: public Array {
@@ -143,11 +141,11 @@ inline StringData ArrayString::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
     if (m_width == 0)
         return StringData(null_ptr, 0); // return null
     const char* data = m_data + (ndx * m_width);
+    std::size_t size = (m_width-1) - data[m_width-1];
 
-    if (data[m_width - 1] == m_width)
+    if (size == static_cast<size_t>(-1))
         return StringData(null_ptr, 0); // return null
 
-    std::size_t size = (m_width-1) - data[m_width-1];
     TIGHTDB_ASSERT(data[size] == 0); // Realm guarantees 0 terminated return strings
     return StringData(data, size);
 }
@@ -169,11 +167,11 @@ inline StringData ArrayString::get(const char* header, std::size_t ndx) TIGHTDB_
     if (width == 0)
         return StringData(null_ptr, 0); // return null
     const char* data = get_data_from_header(header) + (ndx * width);
+    std::size_t size = (width-1) - data[width-1];
 
-    if (data[width - 1] == width)
+    if (size == static_cast<size_t>(-1))
         return StringData(null_ptr, 0); // return null
 
-    std::size_t size = (width-1) - data[width-1];
     return StringData(data, size);
 }
 

@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <iostream>
 #include <iomanip>
+#include <cstring>
 
 #include <tightdb/utilities.hpp>
 #include <tightdb/array_string.hpp>
@@ -17,14 +18,15 @@ namespace {
 
 const int max_width = 64;
 
-// When size = 0 returns 0
-// When size = 1 returns 4
-// When 2 <= size < 256, returns 2**ceil(log2(size+1)).
-// Thus, 0 < size < 256 implies that size < round_up(size).
+// Round up to nearest possible block length: {0, 1, 4, 8, 16, 32, 64, 128, ...}
 size_t round_up(size_t size)
 {
-    if (size < 2)
-        return size << 2;
+    if (size == 0)
+        return 0;
+
+    if (size == 1)
+        return 1;
+
     size |= size >> 1;
     size |= size >> 2;
     size |= size >> 4;
@@ -68,9 +70,9 @@ void ArrayString::set(size_t ndx, StringData value)
         // Calc min column width
         size_t new_width;
         if (m_width == 0 && value.size() == 0)
-            new_width = ::round_up(1); // get(ndx) is null. Overwrite with empty string
+            new_width = ::round_up(1); // Entire Array is nulls; expand to m_width > 0
         else
-            new_width = ::round_up(value.size());
+            new_width = ::round_up(value.size() + 1);
 
         //TIGHTDB_ASSERT(value.size() < new_width);
 
@@ -88,18 +90,13 @@ void ArrayString::set(size_t ndx, StringData value)
                 {
                     // extend 0-padding
                     char* new_begin = new_end - (new_width-m_width);
-                    if (new_end - new_begin == m_width)
-                        fill(new_begin, new_end - 1, 0); // null
-                    else
-                        fill(new_begin, new_end, 0);
+                    fill(new_begin, new_end, 0);
                     new_end = new_begin;
                 }
                 {
                     // copy string payload
                     const char* old_begin = old_end - (m_width-1);
-                    if(old_end - old_begin == m_width)
-                        new_end = copy_backward(old_begin, old_end - 1, new_end); // null
-                    else
+                    if(static_cast<size_t>(old_end - old_begin) < m_width) // non-null string
                         new_end = copy_backward(old_begin, old_end, new_end);
                     old_end = old_begin;
                 }
@@ -128,7 +125,7 @@ void ArrayString::set(size_t ndx, StringData value)
     begin = copy(value.data(), value.data()+value.size(), begin);
     fill(begin, end, 0); // Pad with zero bytes
     TIGHTDB_STATIC_ASSERT(max_width <= 128, "Padding size must fit in 7-bits");
-    TIGHTDB_ASSERT(end - begin < max_width);
+//    TIGHTDB_ASSERT(end - begin < max_width);
     if (value.data() == null_ptr) {
         *end = m_width;
     }
