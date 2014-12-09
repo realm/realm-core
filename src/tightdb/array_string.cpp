@@ -28,6 +28,7 @@ size_t round_up(size_t size)
     if (size == 1)
         return 1;
 
+    size--;
     size |= size >> 1;
     size |= size >> 2;
     size |= size >> 4;
