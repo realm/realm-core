@@ -18,7 +18,7 @@ namespace {
 
 const int max_width = 64;
 
-// Round up to nearest possible block length: {0, 1, 4, 8, 16, 32, 64, 128, ...}. We include 1 to store empty 
+// Round up to nearest possible block length: 0, 1, 4, 8, 16, 32, 64, 128, ... We include 1 to store empty 
 // strings in as little space as possible, because 0 can only store nulls.
 size_t round_up(size_t size)
 {
