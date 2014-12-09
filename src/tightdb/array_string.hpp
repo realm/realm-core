@@ -37,7 +37,7 @@ for a null which has the byte set to m_width (4). The byte is used to compute th
 in various functions.
 
 New: If m_witdh = 0, then all elements are null. So to add an empty string we must expand m_width
-New: StringData is null if-and-only-if StringData::data() == 0. Todo, think of making StringData null-aware.
+New: StringData is null if-and-only-if StringData::data() == 0. Todo, maybe make StringData null-aware?
 */
 
 class ArrayString: public Array {
