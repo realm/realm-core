@@ -2634,7 +2634,7 @@ inline int64_t get_direct(const char* data, size_t width, size_t ndx) TIGHTDB_NO
 template<int width> inline pair<int64_t, int64_t> get_two(const char* data, size_t ndx) TIGHTDB_NOEXCEPT
 {
     return make_pair(to_size_t(get_direct<width>(data, ndx + 0)),
-    to_size_t(get_direct<width>(data, ndx + 1)));
+                     to_size_t(get_direct<width>(data, ndx + 1)));
 }
 
 inline pair<int64_t, int64_t> get_two(const char* data, size_t width, size_t ndx) TIGHTDB_NOEXCEPT
