@@ -2631,17 +2631,29 @@ inline int64_t get_direct(const char* data, size_t width, size_t ndx) TIGHTDB_NO
 }
 
 
-template<int width>
-inline pair<int_fast64_t, int_fast64_t> get_two(const char* data, size_t ndx) TIGHTDB_NOEXCEPT
+template<int width> inline pair<int64_t, int64_t> get_two(const char* data, size_t ndx) TIGHTDB_NOEXCEPT
 {
-    return make_pair(to_size_t(get_direct<width>(data, ndx+0)),
-                     to_size_t(get_direct<width>(data, ndx+1)));
+    return make_pair(to_size_t(get_direct<width>(data, ndx + 0)),
+    to_size_t(get_direct<width>(data, ndx + 1)));
 }
 
-inline pair<int_fast64_t, int_fast64_t> get_two(const char* data, size_t width,
-                                                size_t ndx) TIGHTDB_NOEXCEPT
+inline pair<int64_t, int64_t> get_two(const char* data, size_t width, size_t ndx) TIGHTDB_NOEXCEPT
 {
     TIGHTDB_TEMPEX(return get_two, width, (data, ndx));
+}
+
+
+template<int width>
+inline void get_three(const char* data, size_t ndx, ref_type& v0, ref_type& v1, ref_type& v2) TIGHTDB_NOEXCEPT
+{
+    v0 = to_ref(get_direct<width>(data, ndx + 0));
+    v1 = to_ref(get_direct<width>(data, ndx + 1));
+    v2 = to_ref(get_direct<width>(data, ndx + 2));
+}
+
+inline void get_three(const char* data, size_t width, size_t ndx, ref_type& v0, ref_type& v1, ref_type& v2) TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_TEMPEX(get_three, width, (data, ndx, v0, v1, v2));
 }
 
 
@@ -3796,10 +3808,18 @@ int_fast64_t Array::get(const char* header, size_t ndx) TIGHTDB_NOEXCEPT
 }
 
 
-pair<int_least64_t, int_least64_t> Array::get_two(const char* header, size_t ndx) TIGHTDB_NOEXCEPT
+pair<int64_t, int64_t> Array::get_two(const char* header, size_t ndx) TIGHTDB_NOEXCEPT
 {
     const char* data = get_data_from_header(header);
     int width = get_width_from_header(header);
-    pair<int_fast64_t, int_fast64_t> p = ::get_two(data, width, ndx);
-    return make_pair(int_least64_t(p.first), int_least64_t(p.second));
+    pair<int64_t, int64_t> p = ::get_two(data, width, ndx);
+    return make_pair(int64_t(p.first), int64_t(p.second));
+}
+
+
+void Array::get_three(const char* header, size_t ndx, ref_type& v0, ref_type& v1, ref_type& v2) TIGHTDB_NOEXCEPT
+{
+    const char* data = get_data_from_header(header);
+    int width = get_width_from_header(header);
+    ::get_three(data, width, ndx, v0, v1, v2);
 }

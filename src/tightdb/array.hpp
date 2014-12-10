@@ -863,8 +863,10 @@ public:
 
     /// Like get(const char*, std::size_t) but gets two consecutive
     /// elements.
-    static std::pair<int_least64_t, int_least64_t> get_two(const char* header,
+    static std::pair<int64_t, int64_t> get_two(const char* header,
                                                            std::size_t ndx) TIGHTDB_NOEXCEPT;
+
+    static void get_three(const char* data, size_t ndx, ref_type& v0, ref_type& v1, ref_type& v2) TIGHTDB_NOEXCEPT;
 
     /// The meaning of 'width' depends on the context in which this
     /// array is used.
