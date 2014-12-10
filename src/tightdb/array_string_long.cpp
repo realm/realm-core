@@ -32,7 +32,7 @@ void ArrayStringLong::add(StringData value)
     if (!m_offsets.is_empty())
         end += to_size_t(m_offsets.back());
     m_offsets.add(end);
-    m_nulls.add(1); // value.data() == null_ptr ? 0 : 1);
+    m_nulls.add(value.data() == null_ptr ? 0 : 1);
 }
 
 void ArrayStringLong::set(size_t ndx, StringData value)
@@ -143,7 +143,6 @@ void ArrayStringLong::find_all(Column& result, StringData value, size_t add_offs
 
 StringData ArrayStringLong::get(const char* header, size_t ndx, Allocator& alloc) TIGHTDB_NOEXCEPT
 {
-
     ref_type offsets_ref;
     ref_type blob_ref;
     ref_type nulls_ref;
@@ -231,7 +230,7 @@ MemRef ArrayStringLong::create_array(size_t size, Allocator& alloc)
     }
     {
         bool context_flag = false;
-        int_fast64_t value = 1;
+        int_fast64_t value = 0; // initialize all rows to null
         MemRef mem = Array::create_array(type_Normal, context_flag, size, value, alloc); // Throws
         dg_2.reset(mem.m_ref);
         int_fast64_t v(mem.m_ref); // FIXME: Dangerous cast (unsigned -> signed)
