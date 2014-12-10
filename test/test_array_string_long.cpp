@@ -256,7 +256,7 @@ TEST(ArrayStringLong_Basic)
     c.destroy();
 }
 
-/*
+
 TEST(ArrayStringLong_Null)
 {
     {
@@ -284,32 +284,32 @@ TEST(ArrayStringLong_Null)
     }
 
     {
-    ArrayStringLong a(Allocator::get_default());
-    a.create();
+        ArrayStringLong a(Allocator::get_default());
+        a.create();
 
-    a.add(StringData(0, 0));  // add null (StringData::data() == 0)
-    a.add("");
-    a.add("foo");
+        a.add(StringData(0, 0));  // add null (StringData::data() == 0)
+        a.add("");
+        a.add("foo");
 
-    CHECK_EQUAL(a.is_null(0), true);
-    CHECK_EQUAL(a.is_null(1), false);
-    CHECK_EQUAL(a.is_null(2), false);
-    CHECK(a.get(2) == "foo");
+        CHECK_EQUAL(a.is_null(0), true);
+        CHECK_EQUAL(a.is_null(1), false);
+        CHECK_EQUAL(a.is_null(2), false);
+        CHECK(a.get(2) == "foo");
 
-    // Test insert
-    a.insert(0, StringData(0, 0)); // add null (StringData::data() == 0)
-    a.insert(2, StringData(0, 0)); // add null (StringData::data() == 0)
-    a.insert(4, StringData(0, 0)); // add null (StringData::data() == 0)
+        // Test insert
+        a.insert(0, StringData(0, 0)); // add null (StringData::data() == 0)
+        a.insert(2, StringData(0, 0)); // add null (StringData::data() == 0)
+        a.insert(4, StringData(0, 0)); // add null (StringData::data() == 0)
 
-    CHECK_EQUAL(a.is_null(0), true);
-    CHECK_EQUAL(a.is_null(1), true);
-    CHECK_EQUAL(a.is_null(2), true);
-    CHECK_EQUAL(a.is_null(3), false);
-    CHECK_EQUAL(a.is_null(4), true);
-    CHECK_EQUAL(a.is_null(5), false);
+        CHECK_EQUAL(a.is_null(0), true);
+        CHECK_EQUAL(a.is_null(1), true);
+        CHECK_EQUAL(a.is_null(2), true);
+        CHECK_EQUAL(a.is_null(3), false);
+        CHECK_EQUAL(a.is_null(4), true);
+        CHECK_EQUAL(a.is_null(5), false);
 
-    a.destroy();
-}
+        a.destroy();
+    }
 
     {
         ArrayStringLong a(Allocator::get_default());
@@ -401,5 +401,4 @@ TEST(ArrayStringLong_Null)
     }
 }
 
-*/
 #endif // TEST_ARRAY_STRING_LONG
