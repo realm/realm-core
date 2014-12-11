@@ -195,8 +195,11 @@ void Group::reset_free_space_versions()
         for (size_t i = 0; i != n; ++i)
             m_free_versions.add(0); // Throws
         m_top.add(m_free_versions.get_ref()); // Throws
-        size_t initial_database_version = 0; // A.k.a. transaction number
-        m_top.add(1 + 2*initial_database_version); // Throws
+        // Add a temporary "version_number" just to get the top array
+        // to the proper size. This version number is never used and cannot
+        // escape to the database during commit. The correct version number
+        // is set in GroupWriter::write().
+        m_top.add(0);
     }
     TIGHTDB_ASSERT(m_top.size() >= 7);
 }
