@@ -593,7 +593,7 @@ void SlabAlloc::reset_free_space_tracking()
         chunk.ref = i->ref_end;
     }
 
-    TIGHTDB_ASSERT(is_all_free());
+    TIGHTDB_ASSERT_DEBUG(is_all_free());
 
     m_free_space_state = free_space_Clean;
 }
