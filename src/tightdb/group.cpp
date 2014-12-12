@@ -2183,7 +2183,7 @@ void Group::Verify() const
         mem_usage_1.canonicalize();
     }
 
-    // At this point we have account for all memory managed by the slab
+    // At this point we have accounted for all memory managed by the slab
     // allocator
     mem_usage_1.check_total_coverage();
 }

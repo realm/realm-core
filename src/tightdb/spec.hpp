@@ -116,6 +116,15 @@ public:
 
 private:
     // Underlying array structure.
+    //
+    // `m_subspecs` contains one entry for each subtable column, one entry for
+    // each link or link list columns, two entries for each backlink column, and
+    // zero entries for all other column types. For subtable columns the entry
+    // is a ref pointing to the subtable spec, for link and link list columns it
+    // is the group-level table index of the target table, and for backlink
+    // columns the first entry is the group-level table index of the origin
+    // table, and the second entry is the index of the origin column in the
+    // origin table.
     Array m_top;
     Array m_types;       // 1st slot in m_top
     ArrayString m_names; // 2nd slot in m_top
