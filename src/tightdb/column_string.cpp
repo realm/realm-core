@@ -172,6 +172,17 @@ StringData AdaptiveStringColumn::get(size_t ndx) const TIGHTDB_NOEXCEPT
     return ArrayBigBlobs::get_string(leaf_header, ndx_in_leaf, alloc);
 }
 
+bool AdaptiveStringColumn::is_null(std::size_t ndx) const TIGHTDB_NOEXCEPT
+{
+    StringData sd = get(ndx);
+    return sd.data() == null_ptr;
+}
+
+void AdaptiveStringColumn::set_null(std::size_t ndx)
+{
+    StringData sd = StringData(null_ptr, 0);
+    set(ndx, sd);
+}
 
 StringIndex& AdaptiveStringColumn::create_search_index()
 {
