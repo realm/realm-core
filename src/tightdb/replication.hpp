@@ -694,8 +694,8 @@ inline void Replication::transact_log_reserve(char** buf, int n)
 
 inline void Replication::transact_log_advance(char* ptr) TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(m_transact_log_free_begin <= ptr);
-    TIGHTDB_ASSERT(ptr <= m_transact_log_free_end);
+    TIGHTDB_ASSERT_DEBUG(m_transact_log_free_begin <= ptr);
+    TIGHTDB_ASSERT_DEBUG(ptr <= m_transact_log_free_end);
     m_transact_log_free_begin = ptr;
 }
 

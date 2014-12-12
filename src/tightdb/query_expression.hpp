@@ -672,7 +672,7 @@ public:
         else if (util::SameType<T, StringData>::value)
             source.export_StringData(*this);
         else
-            TIGHTDB_ASSERT(false);
+            TIGHTDB_ASSERT_DEBUG(false);
     }
 
     // Given a TCond (==, !=, >, <, >=, <=) and two Value<T>, return index of first match
@@ -690,12 +690,12 @@ public:
         }
         else if (left->from_link && right->from_link) {
             // Many-to-many links not supported yet. Need to specify behaviour
-            TIGHTDB_ASSERT(false);
+            TIGHTDB_ASSERT_DEBUG(false);
         }
         else if (!left->from_link && right->from_link) {
             // Right values come from link. Left must come from single row. Semantics: Match if at least 1 
             // linked-to-value fulfills the condition
-            TIGHTDB_ASSERT(left->m_values == 0 || left->m_values == ValueBase::default_size);
+            TIGHTDB_ASSERT_DEBUG(left->m_values == 0 || left->m_values == ValueBase::default_size);
             for (size_t r = 0; r < right->ValueBase::m_values; r++) {
                 if (c(left->m_v[0], right->m_v[r]))
                     return 0;
@@ -703,7 +703,7 @@ public:
         }
         else if (left->from_link && !right->from_link) {
             // Same as above, right left values coming from links
-            TIGHTDB_ASSERT(right->m_values == 0 || right->m_values == ValueBase::default_size);
+            TIGHTDB_ASSERT_DEBUG(right->m_values == 0 || right->m_values == ValueBase::default_size);
             for (size_t l = 0; l < left->ValueBase::m_values; l++) {
                 if (c(left->m_v[l], right->m_v[0]))
                     return 0;

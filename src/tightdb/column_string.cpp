@@ -112,7 +112,7 @@ AdaptiveStringColumn::AdaptiveStringColumn(Allocator& alloc, ref_type ref):
             return;
         }
     }
-    TIGHTDB_ASSERT(false);
+    TIGHTDB_ASSERT_DEBUG(false);
 }
 
 
@@ -314,7 +314,7 @@ public:
 
 void AdaptiveStringColumn::set(size_t ndx, StringData value)
 {
-    TIGHTDB_ASSERT(ndx < size());
+    TIGHTDB_ASSERT_DEBUG(ndx < size());
 
     // We must modify the search index before modifying the column, because we
     // need to be able to abort the operation if the modification of the search

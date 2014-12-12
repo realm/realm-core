@@ -153,9 +153,9 @@ SlabAlloc::~SlabAlloc() TIGHTDB_NOEXCEPT
 
 MemRef SlabAlloc::do_alloc(size_t size)
 {
-    TIGHTDB_ASSERT(0 < size);
-    TIGHTDB_ASSERT((size & 0x7) == 0); // only allow sizes that are multiples of 8
-    TIGHTDB_ASSERT(is_attached());
+    TIGHTDB_ASSERT_DEBUG(0 < size);
+    TIGHTDB_ASSERT_DEBUG((size & 0x7) == 0); // only allow sizes that are multiples of 8
+    TIGHTDB_ASSERT_DEBUG(is_attached());
 
     // If we failed to correctly record free space, new allocations cannot be
     // carried out until the free space record is reset.
@@ -216,7 +216,7 @@ MemRef SlabAlloc::do_alloc(size_t size)
             new_size = min_size;
         ref = curr_ref_end;
     }
-    TIGHTDB_ASSERT(0 < new_size);
+    TIGHTDB_ASSERT_DEBUG(0 < new_size);
     UniquePtr<char[]> mem(new char[new_size]); // Throws
     fill(mem.get(), mem.get()+new_size, 0);
 
@@ -334,9 +334,9 @@ void SlabAlloc::do_free(ref_type ref, const char* addr) TIGHTDB_NOEXCEPT
 
 MemRef SlabAlloc::do_realloc(size_t ref, const char* addr, size_t old_size, size_t new_size)
 {
-    TIGHTDB_ASSERT(translate(ref) == addr);
-    TIGHTDB_ASSERT(0 < new_size);
-    TIGHTDB_ASSERT((new_size & 0x7) == 0); // only allow sizes that are multiples of 8
+    TIGHTDB_ASSERT_DEBUG(translate(ref) == addr);
+    TIGHTDB_ASSERT_DEBUG(0 < new_size);
+    TIGHTDB_ASSERT_DEBUG((new_size & 0x7) == 0); // only allow sizes that are multiples of 8
 
     // FIXME: Check if we can extend current space. In that case, remember to
     // check whether m_free_space_state == free_state_Invalid. Also remember to
@@ -364,14 +364,14 @@ MemRef SlabAlloc::do_realloc(size_t ref, const char* addr, size_t old_size, size
 
 char* SlabAlloc::do_translate(ref_type ref) const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(is_attached());
+    TIGHTDB_ASSERT_DEBUG(is_attached());
 
     if (ref < m_baseline)
         return m_data + ref;
 
     typedef slabs::const_iterator iter;
     iter i = upper_bound(m_slabs.begin(), m_slabs.end(), ref, &ref_less_than_slab_ref_end);
-    TIGHTDB_ASSERT(i != m_slabs.end());
+    TIGHTDB_ASSERT_DEBUG(i != m_slabs.end());
 
     ref_type slab_ref = i == m_slabs.begin() ? m_baseline : (i-1)->ref_end;
     return i->addr + (ref - slab_ref);
@@ -601,10 +601,10 @@ void SlabAlloc::reset_free_space_tracking()
 
 bool SlabAlloc::remap(size_t file_size)
 {
-    TIGHTDB_ASSERT(file_size % 8 == 0); // 8-byte alignment required
-    TIGHTDB_ASSERT(m_attach_mode == attach_SharedFile || m_attach_mode == attach_UnsharedFile);
-    TIGHTDB_ASSERT(m_free_space_state == free_space_Clean);
-    TIGHTDB_ASSERT(m_baseline <= file_size);
+    TIGHTDB_ASSERT_DEBUG(file_size % 8 == 0); // 8-byte alignment required
+    TIGHTDB_ASSERT_DEBUG(m_attach_mode == attach_SharedFile || m_attach_mode == attach_UnsharedFile);
+    TIGHTDB_ASSERT_DEBUG(m_free_space_state == free_space_Clean);
+    TIGHTDB_ASSERT_DEBUG(m_baseline <= file_size);
 
     void* addr = m_file.remap(m_data, m_baseline, File::access_ReadOnly, file_size);
     bool addr_changed = addr != m_data;
@@ -616,7 +616,7 @@ bool SlabAlloc::remap(size_t file_size)
     // each entire slab in m_slabs)
     size_t slab_ref = file_size;
     size_t n = m_free_space.size();
-    TIGHTDB_ASSERT(m_slabs.size() == n);
+    TIGHTDB_ASSERT_DEBUG(m_slabs.size() == n);
     for (size_t i = 0; i < n; ++i) {
         Chunk& free_chunk = m_free_space[i];
         free_chunk.ref = slab_ref;
