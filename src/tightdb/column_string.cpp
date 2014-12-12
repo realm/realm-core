@@ -133,7 +133,7 @@ void AdaptiveStringColumn::destroy() TIGHTDB_NOEXCEPT
 
 StringData AdaptiveStringColumn::get(size_t ndx) const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(ndx < size());
+    TIGHTDB_ASSERT_DEBUG(ndx < size());
 
     if (root_is_leaf()) {
         bool long_strings = m_array->has_refs();

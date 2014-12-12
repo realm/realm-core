@@ -776,7 +776,7 @@ inline std::size_t Column::size() const TIGHTDB_NOEXCEPT
 
 inline int_fast64_t Column::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(ndx < size());
+    TIGHTDB_ASSERT_DEBUG(ndx < size());
     if (!m_array->is_inner_bptree_node())
         return m_array->get(ndx);
 
