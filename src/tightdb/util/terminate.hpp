@@ -28,13 +28,14 @@
 #ifdef TIGHTDB_DEBUG
 #  define TIGHTDB_TERMINATE(msg) tightdb::util::terminate((msg), __FILE__, __LINE__)
 #else
-#  define TIGHTDB_TERMINATE(msg) (static_cast<void>(msg), std::abort())
+#  define TIGHTDB_TERMINATE(msg) (static_cast<void>(msg), tightdb::util::abort())
 #endif
 
 namespace tightdb {
 namespace util {
 
 
+TIGHTDB_NORETURN void abort() TIGHTDB_NOEXCEPT;
 TIGHTDB_NORETURN void terminate(std::string message, const char* file, long line) TIGHTDB_NOEXCEPT;
 
 
