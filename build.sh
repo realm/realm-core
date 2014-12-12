@@ -25,6 +25,11 @@ MODE="$1"
 # enabling replication support in core, now required for objective-c/ios
 export TIGHTDB_ENABLE_REPLICATION=1
 
+# enable assertions in release builds by default
+if [ -z ${TIGHTDB_ENABLE_ASSERTIONS+x} ]; then
+    export TIGHTDB_ENABLE_ASSERTIONS=1
+fi
+
 # Extensions corresponding with additional GIT repositories
 EXTENSIONS="java python ruby objc node php c gui"
 if [ "$TIGHTDB_ENABLE_REPLICATION" ]; then
@@ -446,6 +451,11 @@ case "$MODE" in
             enable_encryption="yes"
         fi
 
+        enable_assertions="no"
+        if [ "$TIGHTDB_ENABLE_ASSERTIONS" ]; then
+            enable_assertions="yes"
+        fi
+
         # Find Xcode
         xcode_home="none"
         arm64_supported=""
@@ -518,6 +528,7 @@ INSTALL_LIBEXECDIR    = $install_libexecdir
 MAX_BPNODE_SIZE       = $max_bpnode_size
 MAX_BPNODE_SIZE_DEBUG = $max_bpnode_size_debug
 ENABLE_REPLICATION    = $enable_replication
+ENABLE_ASSERTIONS     = $enable_assertions
 ENABLE_ALLOC_SET_ZERO = $enable_alloc_set_zero
 ENABLE_ENCRYPTION     = $enable_encryption
 XCODE_HOME            = $xcode_home
