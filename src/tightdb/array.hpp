@@ -1195,8 +1195,9 @@ public:
             m_state = reinterpret_cast<int64_t>(akku);
         else if (action == act_CallbackIdx) {
         }
-        else
+        else {
             TIGHTDB_ASSERT_DEBUG(false);
+        }
     }
 
     template <Action action, bool pattern>
@@ -1244,9 +1245,9 @@ public:
             m_state = index;
             return false;
         }
-        else
+        else {
             TIGHTDB_ASSERT_DEBUG(false);
-
+        }
         return (m_limit > m_match_count);
     }
 };
@@ -1278,8 +1279,9 @@ public:
             m_state = std::numeric_limits<R>::infinity();
         else if (action == act_Sum)
             m_state = 0.0;
-        else
+        else {
             TIGHTDB_ASSERT_DEBUG(false);
+        }
     }
 
     template<Action action, bool pattern, typename resulttype>
@@ -1305,9 +1307,9 @@ public:
         }
         else if (action == act_Sum)
             m_state += value;
-        else
+        else {
             TIGHTDB_ASSERT_DEBUG(false);
-
+        }
         return (m_limit > m_match_count);
     }
 };
