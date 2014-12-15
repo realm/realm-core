@@ -65,6 +65,10 @@ public:
 /// easily predicted.
 class LogicError: public std::exception {
 public:
+    static const char* const string_too_big;
+    static const char* const binary_too_big;
+    static const char* const table_name_too_long;
+    static const char* const column_name_too_long;
     static const char* const table_index_out_of_range;
     static const char* const row_index_out_of_range;
     static const char* const column_index_out_of_range;

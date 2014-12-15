@@ -10,7 +10,11 @@
 
 ### Enhancements:
 
-* Lorem ipsum.
+* The following constants were added: `Group::max_table_name_length`,
+  `Table::max_column_name_length`, `Table::max_string_size`, and
+  `Table::max_binary_size`.
+* Now throwing on overlong table and column names, and on oversized strings and
+  binary data values.
 
 -----------
 
