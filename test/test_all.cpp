@@ -51,6 +51,7 @@ const char* file_order[] = {
     "test_basic_utils.cpp",
     "test_file*.cpp",
     "test_thread.cpp",
+    "test_util_network.cpp",
     "test_utf8.cpp",
 
     // /tightdb/ (helpers)
