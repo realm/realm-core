@@ -339,6 +339,9 @@ Table* Group::do_get_or_add_table(StringData name, DescMatcher desc_matcher,
 
 size_t Group::create_table(StringData name)
 {
+    if (TIGHTDB_UNLIKELY(name.size() > max_table_name_length))
+        throw LogicError(LogicError::table_name_too_long);
+
     using namespace _impl;
     typedef TableFriend tf;
     ref_type ref = tf::create_empty_table(m_alloc); // Throws
