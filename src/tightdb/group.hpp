@@ -266,7 +266,10 @@ public:
     /// \param index Index of table in this group.
     ///
     /// \param name Name of table. All strings are valid table names as long as
-    /// they are valid UTF-8 encodings.
+    /// they are valid UTF-8 encodings and the number of bytes does not exceed
+    /// `max_table_name_length`. A call to add_table() or get_or_add_table()
+    /// with a name that is longer than `max_table_name_length` will cause an
+    /// exception to be thrown.
     ///
     /// \param new_name New name for preexisting table.
     ///
@@ -296,6 +299,8 @@ public:
     ///
     /// \throw CrossTableLinkTarget Thrown by remove_table() if the specified
     /// table is the target of a link column of a different table.
+
+    static const std::size_t max_table_name_length = 63;
 
     bool has_table(StringData name) const TIGHTDB_NOEXCEPT;
     std::size_t find_table(StringData name) const TIGHTDB_NOEXCEPT;

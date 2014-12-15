@@ -916,7 +916,7 @@ void SharedGroup::do_async_commits()
         if (!is_same) {
 
 #ifdef TIGHTDB_ENABLE_LOGFILE
-            cerr << "Syncing from version " << m_readlock.m_version 
+            cerr << "Syncing from version " << m_readlock.m_version
                  << " to " << next_readlock.m_version << endl;
 #endif
             GroupWriter writer(m_group);
