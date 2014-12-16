@@ -7,6 +7,7 @@
 #  include <map>
 #endif
 
+#include <tightdb/util/encrypted_file_mapping.hpp>
 #include <tightdb/util/terminate.hpp>
 #include <tightdb/util/unique_ptr.hpp>
 #include <tightdb/array.hpp>
@@ -378,9 +379,9 @@ char* SlabAlloc::do_translate(ref_type ref) const TIGHTDB_NOEXCEPT
 }
 
 
-ref_type SlabAlloc::attach_file(const string& path, bool is_shared, bool read_only, bool no_create,
-                                bool skip_validate, const uint8_t* encryption_key,
-                                bool server_sync_mode)
+ref_type SlabAlloc::attach_file(const string& path, bool is_shared, bool read_only,
+                                bool no_create, bool skip_validate,
+                                const char* encryption_key, bool server_sync_mode)
 {
     TIGHTDB_ASSERT(!is_attached());
 
@@ -436,7 +437,7 @@ ref_type SlabAlloc::attach_file(const string& path, bool is_shared, bool read_on
         size = initial_size;
     }
 
-    {
+    try {
         File::Map<char> map(m_file, File::access_ReadOnly, size); // Throws
 
         m_file_on_streaming_form = false; // May be updated by validate_buffer()
@@ -465,6 +466,9 @@ ref_type SlabAlloc::attach_file(const string& path, bool is_shared, bool read_on
             if (!server_sync_mode &&  stored_server_sync_mode)
                 throw runtime_error(path + ": found db in server sync mode, expected local mode");
         }
+    }
+    catch (DecryptionFailed) {
+        goto invalid_database;
     }
 
     fcg.release(); // Do not close

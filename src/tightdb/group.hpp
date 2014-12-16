@@ -72,9 +72,9 @@ public:
         mode_ReadWriteNoCreate
     };
 
-    /// Equivalent to calling open(const std::string&, const uint8_t*, OpenMode)
+    /// Equivalent to calling open(const std::string&, const char*, OpenMode)
     /// on an unattached group accessor.
-    explicit Group(const std::string& file, const uint8_t* encryption_key = 0, OpenMode = mode_ReadOnly);
+    explicit Group(const std::string& file, const char* encryption_key = 0, OpenMode = mode_ReadOnly);
 
     /// Equivalent to calling open(BinaryData, bool) on an unattached
     /// group accessor. Note that if this constructor throws, the
@@ -175,7 +175,7 @@ public:
     /// types that are derived from util::File::AccessError, the
     /// derived exception type is thrown. Note that InvalidDatabase is
     /// among these derived exception types.
-    void open(const std::string& file, const uint8_t* encryption_key = 0,
+    void open(const std::string& file, const char* encryption_key = 0,
               OpenMode mode = mode_ReadOnly);
 
     /// Attach this Group instance to the specified memory buffer.
@@ -335,7 +335,10 @@ public:
     // Serialization
 
     /// Write this database to the specified output stream.
-    void write(std::ostream&) const;
+    ///
+    /// \param pad If true, the file is padded to ensure the footer is aligned
+    /// to the end of a page
+    void write(std::ostream&, bool pad=false) const;
 
     /// Write this database to a new file. It is an error to specify a
     /// file that already exists. This is to protect against
@@ -352,7 +355,7 @@ public:
     /// types that are derived from util::File::AccessError, the
     /// derived exception type is thrown. In particular,
     /// util::File::Exists will be thrown if the file exists already.
-    void write(const std::string& file, const uint8_t* encryption_key=0) const;
+    void write(const std::string& file, const char* encryption_key=0) const;
 
     /// Write this database to a memory buffer.
     ///
@@ -469,7 +472,7 @@ private:
     class TableWriter;
     class DefaultTableWriter;
 
-    static void write(std::ostream&, TableWriter&);
+    static void write(std::ostream&, TableWriter&, bool);
 
     /// Create a new underlying node structure and attach this
     /// accessor instance to it
@@ -539,7 +542,7 @@ inline Group::Group():
     create(add_free_versions); // Throws
 }
 
-inline Group::Group(const std::string& file, const uint8_t* key, OpenMode mode):
+inline Group::Group(const std::string& file, const char* key, OpenMode mode):
     m_alloc(), // Throws
     m_top(m_alloc), m_tables(m_alloc), m_table_names(m_alloc), m_free_positions(m_alloc),
     m_free_lengths(m_alloc), m_free_versions(m_alloc), m_is_shared(false), m_is_attached(false)

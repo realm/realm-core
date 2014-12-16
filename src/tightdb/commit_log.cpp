@@ -69,7 +69,7 @@ namespace _impl {
 class WriteLogCollector : public Replication
 {
 public:
-    WriteLogCollector(std::string database_name, bool server_synchronization_mode);
+    WriteLogCollector(std::string database_name, bool server_synchronization_mode, const char *encryption_key);
     ~WriteLogCollector() TIGHTDB_NOEXCEPT;
     std::string do_get_database_path() TIGHTDB_OVERRIDE { return m_database_name; }
     void do_begin_write_transact(SharedGroup& sg) TIGHTDB_OVERRIDE;
@@ -90,7 +90,7 @@ public:
     virtual void get_commit_entries(version_type from_version, version_type to_version,
                                     BinaryData* logs_buffer) TIGHTDB_NOEXCEPT;
 protected:
-    static const size_t page_size = 4096; // file and memory mappings are always multipla of this size
+    static const size_t page_size = 4096; // file and memory mappings are always multiples of this size
     static const size_t minimal_pages = 1; 
 
     // Layout of the commit logs preamble and header. The header contains a mutex, two
@@ -101,10 +101,6 @@ protected:
     // updated and sync'ed. This way, should we crash during updates, the old preamble
     // will be in effect once we restart, and the more-or-less written changes are just
     // ignored.
-    // The header is placed at the start of the first commitlog file. The header is mapped
-    // separately from the rest of the file so that the mapping does not need to be resized
-    // as the data area is resized.
-    // (space is reserved at the start of both files, but only the header in m_log_a is used).
     struct CommitLogPreamble {
 
         // indicates which file is active/being written.
@@ -133,6 +129,7 @@ protected:
             // The first commit will be from state 1 -> state 2, so we must set 1 initially
             begin_oldest_commit_range = begin_newest_commit_range = end_commit_range = version;
             last_version_seen_locally = last_version_synced = version;
+            write_offset = 0;
         }
     };
 
@@ -150,8 +147,6 @@ protected:
 
         CommitLogHeader(uint64_t version) : preamble_a(version), preamble_b(version) { 
             use_preamble_a = true; 
-            preamble_a.write_offset = sizeof(*this);
-            preamble_b.write_offset = sizeof(*this);
         }
     };
 
@@ -169,6 +164,7 @@ protected:
     };
 
     std::string m_database_name;
+    std::string m_header_name;
     CommitLogMetadata m_log_a;
     CommitLogMetadata m_log_b;
     util::Buffer<char> m_transact_log_buffer;
@@ -180,9 +176,8 @@ protected:
     uint64_t m_read_offset;
 
 
-    // make sure the header (in log file A) is available and mapped. This is required for
-    // any access to metadata. Calling the method while the mutex is locked will result in
-    // undefined behavior, so DON'T.
+    // make sure the header is available and mapped. This is required for any access to metadata.
+    // Calling the method while the mutex is locked will result in undefined behavior, so DON'T.
     void map_header_if_needed();
 
     // Get the current preamble for reading only - use get_preamble_for_write() if you are
@@ -218,6 +213,9 @@ protected:
 
     // Reset mapping and file
     void reset_file(CommitLogMetadata& log);
+
+    // Reset mapping and file for the header
+    void reset_header();
 
     // Add a single log entry to the logs. The log data is copied.
     version_type internal_submit_log(const char*, uint64_t);
@@ -287,8 +285,8 @@ inline void WriteLogCollector::sync_header()
 inline void WriteLogCollector::map_header_if_needed()
 {
     if (m_header.is_attached() == false) {
-        open_if_needed(m_log_a);
-        m_header.map(m_log_a.file, File::access_ReadWrite, sizeof(CommitLogHeader));
+        File header_file(m_header_name, File::mode_Update);
+        m_header.map(header_file, File::access_ReadWrite, sizeof(CommitLogHeader));
     }
 }
 
@@ -351,6 +349,16 @@ void WriteLogCollector::reset_file(CommitLogMetadata& log)
     log.file.resize(minimal_pages * page_size);
     log.map.map(log.file, File::access_ReadWrite, minimal_pages * page_size);
     log.last_seen_size = minimal_pages * page_size;
+}
+
+void WriteLogCollector::reset_header()
+{
+    m_header.unmap();
+    File::try_remove(m_header_name);
+
+    File header_file(m_header_name, File::mode_Write);
+    header_file.resize(sizeof(CommitLogHeader));
+    m_header.map(header_file, File::access_ReadWrite, sizeof(CommitLogHeader));
 }
 
 
@@ -436,11 +444,6 @@ version_type WriteLogCollector::internal_submit_log(const char* data, uint64_t s
 
 WriteLogCollector::~WriteLogCollector() TIGHTDB_NOEXCEPT 
 {
-    m_log_a.map.unmap();
-    m_log_a.file.close();
-    m_log_b.map.unmap();
-    m_log_b.file.close();
-    m_header.unmap();
 }
 
 void WriteLogCollector::stop_logging()
@@ -450,16 +453,16 @@ void WriteLogCollector::stop_logging()
 
     File::try_remove(m_log_a.name);
     File::try_remove(m_log_b.name);
+    File::try_remove(m_header_name);
 }
 
 void WriteLogCollector::reset_log_management(version_type last_version)
 {
     if (last_version == 1 || m_is_persisting == false) {
         // for version number 1 the log files will be completely (re)initialized.
-        m_header.unmap();
+        reset_header();
         reset_file(m_log_a);
         reset_file(m_log_b);
-        map_header_if_needed();
         new(m_header.get_addr()) CommitLogHeader(last_version);
     }
     else {
@@ -685,22 +688,31 @@ void WriteLogCollector::transact_log_reserve(std::size_t size)
 }
 
 
-WriteLogCollector::WriteLogCollector(std::string database_name, bool server_synchronization_mode)
+WriteLogCollector::WriteLogCollector(std::string database_name,
+                                     bool server_synchronization_mode,
+                                     const char *encryption_key)
     : m_log_a(database_name + ".log_a"), m_log_b(database_name + ".log_b")
 {
     m_database_name = database_name;
+    m_header_name = database_name + ".log";
     m_read_version = 0;
     m_read_offset = 0;
     m_is_persisting = server_synchronization_mode;
+    m_log_a.file.set_encryption_key(encryption_key);
+    m_log_b.file.set_encryption_key(encryption_key);
 }
 
 } // end _impl
 
 
 
-Replication* makeWriteLogCollector(std::string database_name, bool server_synchronization_mode)
+Replication* makeWriteLogCollector(std::string database_name,
+                                   bool server_synchronization_mode,
+                                   const char *encryption_key)
 {
-    return new _impl::WriteLogCollector(database_name, server_synchronization_mode);
+    return new _impl::WriteLogCollector(database_name,
+                                        server_synchronization_mode,
+                                        encryption_key);
 }
 
 

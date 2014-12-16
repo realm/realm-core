@@ -36,7 +36,7 @@ public:
 Initialization initialization;
 } // anonymous namespace
 
-void Group::open(const string& file_path, const uint8_t* encryption_key, OpenMode mode)
+void Group::open(const string& file_path, const char* encryption_key, OpenMode mode)
 {
     TIGHTDB_ASSERT(!is_attached());
     bool is_shared = false;
@@ -561,22 +561,22 @@ private:
     const Group& m_group;
 };
 
-void Group::write(ostream& out) const
+void Group::write(ostream& out, bool pad) const
 {
     TIGHTDB_ASSERT(is_attached());
     DefaultTableWriter table_writer(*this);
-    write(out, table_writer); // Throws
+    write(out, table_writer, pad); // Throws
 }
 
-void Group::write(const string& path, const uint8_t* encrption_key) const
+void Group::write(const string& path, const char* encryption_key) const
 {
     File file;
     int flags = 0;
     file.open(path, File::access_ReadWrite, File::create_Must, flags);
-    file.set_encryption_key(encrption_key);
+    file.set_encryption_key(encryption_key);
     File::Streambuf streambuf(&file);
     ostream out(&streambuf);
-    write(out);
+    write(out, encryption_key != 0);
 }
 
 
@@ -588,7 +588,7 @@ BinaryData Group::write_to_mem() const
     //
     // FIXME: This size could potentially be vastly bigger that what
     // is actually needed.
-    size_t max_size = (m_alloc.get_total_size() + 4095) & ~4095UL;
+    size_t max_size = m_alloc.get_total_size();
 
     char* buffer = static_cast<char*>(malloc(max_size)); // Throws
     if (!buffer)
@@ -607,7 +607,7 @@ BinaryData Group::write_to_mem() const
 }
 
 
-void Group::write(ostream& out, TableWriter& table_writer)
+void Group::write(ostream& out, TableWriter& table_writer, bool pad_for_encryption)
 {
     _impl::OutputStream out_2(out);
 
@@ -654,10 +654,13 @@ void Group::write(ostream& out, TableWriter& table_writer)
 
     top.destroy(); // Shallow
 
-    // ensure the footer is aligned to the end of a page for encryption
-    if ((final_file_size + sizeof(SlabAlloc::StreamingFooter)) & 4095) {
+    // encryption will pad the file to a multiple of the page, so ensure the
+    // footer is aligned to the end of a page
+    if (pad_for_encryption && ((final_file_size + sizeof(SlabAlloc::StreamingFooter)) & 4095)) {
+#ifdef TIGHTDB_ENABLE_ENCRYPTION
         char buffer[4096] = {0};
         out_2.write(buffer, 4096 - ((final_file_size + sizeof(SlabAlloc::StreamingFooter)) & 4095));
+#endif
     }
 
     // Write streaming footer

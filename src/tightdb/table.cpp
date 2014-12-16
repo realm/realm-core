@@ -3870,7 +3870,7 @@ void Table::write(ostream& out, size_t offset, size_t size, StringData override_
     if (!table_name)
         table_name = get_name();
     SliceWriter writer(*this, table_name, offset, size_2);
-    Group::write(out, writer); // Throws
+    Group::write(out, writer, false); // Throws
 }
 
 

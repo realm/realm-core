@@ -281,7 +281,7 @@ public:
     /// mappings are created or any data is read from or written to the file.
     ///
     /// \param key A 64-byte encryption key, or null to disable encryption.
-    void set_encryption_key(const uint8_t* key);
+    void set_encryption_key(const char* key);
 
     enum {
         /// If possible, disable opportunistic flushing of dirted
@@ -437,8 +437,7 @@ private:
     int m_fd;
 #endif
 
-    bool m_encrypt;
-    uint8_t m_encryption_key[64];
+    UniquePtr<const char[]> m_encryption_key;
 
     bool lock(bool exclusive, bool non_blocking);
     void open_internal(const std::string& path, AccessMode, CreateMode, int flags, bool* success);
@@ -624,7 +623,6 @@ inline File::File(const std::string& path, Mode m)
 #else
     m_fd = -1;
 #endif
-    m_encrypt = false;
 
     open(path, m);
 }
@@ -636,8 +634,6 @@ inline File::File() TIGHTDB_NOEXCEPT
 #else
     m_fd = -1;
 #endif
-
-    m_encrypt = false;
 }
 
 inline File::~File() TIGHTDB_NOEXCEPT

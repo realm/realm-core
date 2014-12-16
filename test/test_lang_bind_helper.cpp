@@ -5789,14 +5789,14 @@ TEST(LangBindHelper_AdvanceReadTransact_RemoveTableMovesTableWithLinksOver)
 TEST(LangBindHelper_ImplicitTransactions)
 {
     SHARED_GROUP_TEST_PATH(path);
-    UniquePtr<Replication> repl(makeWriteLogCollector(path));
+    UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
     SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
     {
         WriteTransaction wt(sg);
         wt.add_table<TestTableShared>("table")->add_empty_row();
         wt.commit();
     }
-    UniquePtr<Replication> repl2(makeWriteLogCollector(path));
+    UniquePtr<Replication> repl2(makeWriteLogCollector(path, false, crypt_key()));
     SharedGroup sg2(*repl2, SharedGroup::durability_Full, crypt_key());
     Group& g = const_cast<Group&>(sg.begin_read());
     TestTableShared::Ref table = g.get_table<TestTableShared>("table");
@@ -5838,7 +5838,7 @@ TEST(LangBindHelper_ImplicitTransactions)
 TEST(LangBindHelper_RollbackAndContinueAsRead)
 {
     SHARED_GROUP_TEST_PATH(path);
-    UniquePtr<Replication> repl(makeWriteLogCollector(path));
+    UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
     SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
     {
         Group* group = const_cast<Group*>(&sg.begin_read());
@@ -5913,7 +5913,7 @@ TEST(LangBindHelper_RollbackAndContinueAsRead)
 TEST(LangBindHelper_RollbackAndContinueAsReadGroupLevelTableRemoval)
 {
     SHARED_GROUP_TEST_PATH(path);
-    UniquePtr<Replication> repl(makeWriteLogCollector(path));
+    UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
     SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
     Group* group = const_cast<Group*>(&sg.begin_read());
     {
@@ -5941,7 +5941,7 @@ TEST(LangBindHelper_RollbackAndContinueAsReadGroupLevelTableRemoval)
 TEST(LangBindHelper_RollbackAndContinueAsReadColumnAdd)
 {
     SHARED_GROUP_TEST_PATH(path);
-    UniquePtr<Replication> repl(makeWriteLogCollector(path));
+    UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
     SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
     Group* group = const_cast<Group*>(&sg.begin_read());
     TableRef t;
@@ -5973,7 +5973,7 @@ TEST(LangBindHelper_RollbackAndContinueAsReadColumnAdd)
 TEST(LangBindHelper_RollbackAndContinueAsReadColumnRemove)
 {
     SHARED_GROUP_TEST_PATH(path);
-    UniquePtr<Replication> repl(makeWriteLogCollector(path));
+    UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
     SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
     Group* group = const_cast<Group*>(&sg.begin_read());
     TableRef t;
@@ -6006,7 +6006,7 @@ TEST(LangBindHelper_RollbackAndContinueAsReadColumnRemove)
 TEST(LangBindHelper_RollbackAndContinueAsReadLinkList)
 {
     SHARED_GROUP_TEST_PATH(path);
-    UniquePtr<Replication> repl(makeWriteLogCollector(path));
+    UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
     SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
     Group* group = const_cast<Group*>(&sg.begin_read());
     LangBindHelper::promote_to_write(sg);
@@ -6052,7 +6052,7 @@ TEST(LangBindHelper_RollbackAndContinueAsReadLinkList)
 TEST(LangBindHelper_RollbackAndContinueAsReadLink)
 {
     SHARED_GROUP_TEST_PATH(path);
-    UniquePtr<Replication> repl(makeWriteLogCollector(path));
+    UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
     SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
     Group* group = const_cast<Group*>(&sg.begin_read());
     LangBindHelper::promote_to_write(sg);
@@ -6090,7 +6090,7 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_MoveLastOverSubtables)
 {
     // adapted from earlier move last over test
     SHARED_GROUP_TEST_PATH(path);
-    UniquePtr<Replication> repl(makeWriteLogCollector(path));
+    UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
     SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
     Group* group = const_cast<Group*>(&sg.begin_read());
 
@@ -6194,7 +6194,7 @@ TEST(LangBindHelper_ImplicitTransactions_OverSharedGroupDestruction)
     SHARED_GROUP_TEST_PATH(path);
     // we hold on to write log collector and registry across a complete
     // shutdown/initialization of shared group.
-    UniquePtr<Replication> repl(makeWriteLogCollector(path));
+    UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
     {
         SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
         {
@@ -6208,7 +6208,7 @@ TEST(LangBindHelper_ImplicitTransactions_OverSharedGroupDestruction)
         // no valid shared group anymore
     }
     {
-        UniquePtr<Replication> repl(makeWriteLogCollector(path));
+        UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
         SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
         {
             WriteTransaction wt(sg);
@@ -6224,7 +6224,7 @@ TEST(LangBindHelper_ImplicitTransactions_OverSharedGroupDestruction)
 TEST(LangBindHelper_ImplicitTransactions_LinkList)
 {
     SHARED_GROUP_TEST_PATH(path);
-    UniquePtr<Replication> repl(makeWriteLogCollector(path));
+    UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
     SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
     Group* group = const_cast<Group*>(&sg.begin_read());
     LangBindHelper::promote_to_write(sg);
@@ -6244,7 +6244,7 @@ TEST(LangBindHelper_ImplicitTransactions_LinkList)
 TEST(LangBindHelper_ImplicitTransactions_StringIndex)
 {
     SHARED_GROUP_TEST_PATH(path);
-    UniquePtr<Replication> repl(makeWriteLogCollector(path));
+    UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
     SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
     Group* group = const_cast<Group*>(&sg.begin_read());
     LangBindHelper::promote_to_write(sg);
@@ -6262,7 +6262,7 @@ namespace {
 void multiple_trackers_writer_thread(string path)
 {
     Random random(random_int<unsigned long>());
-    UniquePtr<Replication> repl(makeWriteLogCollector(path));
+    UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
     SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
     for (int i = 0; i < 10; ++i) {
         WriteTransaction wt(sg);
@@ -6286,7 +6286,7 @@ void multiple_trackers_reader_thread(TestResults* test_results_ptr, string path)
     TestResults& test_results = *test_results_ptr;
     Random random(random_int<unsigned long>());
 
-    UniquePtr<Replication> repl(makeWriteLogCollector(path));
+    UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
     SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
     Group& g = const_cast<Group&>(sg.begin_read());
     TableRef tr = g.get_table("table");
@@ -6320,7 +6320,7 @@ TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
 
     SHARED_GROUP_TEST_PATH(path);
 
-    UniquePtr<Replication> repl(makeWriteLogCollector(path));
+    UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
     SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
     {
         WriteTransaction wt(sg);
@@ -6414,7 +6414,7 @@ TEST(LangBindHelper_SyncCannotBeChanged_1)
     }
     {
         // try to access the database with sync disabled
-        UniquePtr<Replication> repl(makeWriteLogCollector(path));
+        UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
         bool did_throw = false;
         try {
             SharedGroup sg(*repl);
@@ -6434,7 +6434,7 @@ TEST(LangBindHelper_SyncCannotBeChanged_2)
     SHARED_GROUP_TEST_PATH(path);
     {
         // enable sync
-        UniquePtr<Replication> repl(makeWriteLogCollector(path));
+        UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
         SharedGroup sg(*repl);
         {
             WriteTransaction wt(sg);
@@ -6473,7 +6473,7 @@ TEST(LangBindHelper_ImplicitTransactions_InterProcess)
 
     int pid = fork();
     if (pid == 0) {
-        UniquePtr<Replication> repl(makeWriteLogCollector(path));
+        UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
         SharedGroup sg(*repl);
         {
             WriteTransaction wt(sg);
@@ -6516,7 +6516,7 @@ TEST(LangBindHelper_ImplicitTransactions_InterProcess)
 
     // signal to all readers to complete
     {
-        UniquePtr<Replication> repl(makeWriteLogCollector(path));
+        UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
         SharedGroup sg(*repl);
         WriteTransaction wt(sg);
         TableRef tr = wt.get_table("table");
@@ -6541,7 +6541,7 @@ TEST(LangBindHelper_ImplicitTransactions_NoExtremeFileSpaceLeaks)
     SHARED_GROUP_TEST_PATH(path);
 
     for (int i = 0; i < 100; ++i) {
-        UniquePtr<Replication> repl(makeWriteLogCollector(path));
+        UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
         SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
         sg.begin_read();
         LangBindHelper::promote_to_write(sg);
@@ -6559,7 +6559,7 @@ TEST(LangBindHelper_ImplicitTransactions_DetachRowAccessorOnMoveLastOver)
 
     Row rows[10];
 
-    UniquePtr<Replication> repl(makeWriteLogCollector(path));
+    UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
     SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
     Group& group = const_cast<Group&>(sg.begin_read());
 
@@ -6597,10 +6597,10 @@ TEST(LangBindHelper_ImplicitTransactions_ContinuedUseOfTable)
 {
     SHARED_GROUP_TEST_PATH(path);
 
-    UniquePtr<Replication> repl(makeWriteLogCollector(path));
+    UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
     SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
     const Group& group = sg.begin_read();
-    UniquePtr<Replication> repl_w(makeWriteLogCollector(path));
+    UniquePtr<Replication> repl_w(makeWriteLogCollector(path, false, crypt_key()));
     SharedGroup sg_w(*repl_w, SharedGroup::durability_Full, crypt_key());
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
@@ -6634,11 +6634,11 @@ TEST(LangBindHelper_ImplicitTransactions_ContinuedUseOfDescriptor)
 {
     SHARED_GROUP_TEST_PATH(path);
 
-    UniquePtr<Replication> repl(makeWriteLogCollector(path));
+    UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
     SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
     const Group& group = sg.begin_read();
 
-    UniquePtr<Replication> repl_w(makeWriteLogCollector(path));
+    UniquePtr<Replication> repl_w(makeWriteLogCollector(path, false, crypt_key()));
     SharedGroup sg_w(*repl_w, SharedGroup::durability_Full, crypt_key());
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
@@ -6672,11 +6672,11 @@ TEST(LangBindHelper_ImplicitTransactions_ContinuedUseOfLinkList)
 {
     SHARED_GROUP_TEST_PATH(path);
 
-    UniquePtr<Replication> repl(makeWriteLogCollector(path));
+    UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
     SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
     const Group& group = sg.begin_read();
 
-    UniquePtr<Replication> repl_w(makeWriteLogCollector(path));
+    UniquePtr<Replication> repl_w(makeWriteLogCollector(path, false, crypt_key()));
     SharedGroup sg_w(*repl_w, SharedGroup::durability_Full, crypt_key());
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
