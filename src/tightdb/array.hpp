@@ -2406,7 +2406,9 @@ template<size_t width> uint64_t Array::cascade(uint64_t a) const
 // This is the main finding function for Array. Other finding functions are just wrappers around this one.
 // Search for 'value' using condition cond2 (Equal, NotEqual, Less, etc) and call find_action() or find_action_pattern()
 // for each match. Break and return if find_action() returns false or 'end' is reached.
-template<class cond2, Action action, size_t bitwidth, class Callback> bool Array::find_optimized(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, Callback callback) const
+template<class cond2, Action action, size_t bitwidth, class Callback> 
+bool Array::find_optimized(int64_t value, size_t start, size_t end, size_t baseindex, 
+                           QueryState<int64_t>* state, Callback callback) const
 {
     cond2 c;
     TIGHTDB_ASSERT_DEBUG(start <= m_size && (end <= m_size || end == std::size_t(-1)) && start <= end);
@@ -2499,27 +2501,25 @@ template<class cond2, Action action, size_t bitwidth, class Callback> bool Array
         __m128i* const a = reinterpret_cast<__m128i*>(round_up(m_data + start * bitwidth / 8, sizeof (__m128i)));
         __m128i* const b = reinterpret_cast<__m128i*>(round_down(m_data + end * bitwidth / 8, sizeof (__m128i)));
 
-        if (!Compare<cond2, action, bitwidth, Callback>(value, start, (reinterpret_cast<char*>(a) - m_data) * 8 / no0(bitwidth), baseindex, state, callback))
+        size_t offset = (reinterpret_cast<char*>(a) - m_data) * 8 / no0(bitwidth);
+        if (!Compare<cond2, action, bitwidth, Callback>(value, start, offset, baseindex, state, callback))
             return false;
 
         // Search aligned area with SSE
         if (b > a) {
             if (sseavx<42>()) {
-                if (!FindSSE<cond2, action, bitwidth, Callback>(value, a, b - a, state, baseindex + ((reinterpret_cast<char*>(a) - m_data) * 8 / no0(bitwidth)), callback))
+                if (!FindSSE<cond2, action, bitwidth, Callback>(value, a, b - a, state, baseindex + offset, callback))
                     return false;
-                }
-                else if (sseavx<30>()) {
-
-                if (!FindSSE<Equal, action, bitwidth, Callback>(value, a, b - a, state, baseindex + ((reinterpret_cast<char*>(a) - m_data) * 8 / no0(bitwidth)), callback))
+            }
+            else if (sseavx<30>()) {
+                if (!FindSSE<Equal, action, bitwidth, Callback>(value, a, b - a, state, baseindex + offset, callback))
                     return false;
-                }
+            }
         }
 
         // Search remainder with CompareEquality()
-        if (!Compare<cond2, action, bitwidth, Callback>(value, (reinterpret_cast<char*>(b) - m_data) * 8 / no0(bitwidth), end, baseindex, state, callback))
-            return false;
-
-        return true;
+        return Compare<cond2, action, bitwidth, Callback>(value, (reinterpret_cast<char*>(b) - m_data) * 8 / no0(bitwidth),
+                                                          end, baseindex, state, callback);
     }
     else {
         return Compare<cond2, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
@@ -2620,7 +2620,8 @@ template<bool gt, size_t width>int64_t Array::FindGTLT_Magic(int64_t v) const
     return magic;
 }
 
-template<bool gt, Action action, size_t width, class Callback> bool Array::FindGTLT_Fast(uint64_t chunk, uint64_t magic, QueryState<int64_t>* state, size_t baseindex, Callback callback) const
+template<bool gt, Action action, size_t width, class Callback> 
+bool Array::FindGTLT_Fast(uint64_t chunk, uint64_t magic, QueryState<int64_t>* state, size_t baseindex, Callback callback) const
 {
     // Tests if a a chunk of values contains values that are greater (if gt == true) or less (if gt == false) than v.
     // Fast, but limited to work when all values in the chunk are positive.
@@ -2649,7 +2650,8 @@ template<bool gt, Action action, size_t width, class Callback> bool Array::FindG
 }
 
 
-template<bool gt, Action action, size_t width, class Callback> bool Array::FindGTLT(int64_t v, uint64_t chunk, QueryState<int64_t>* state, size_t baseindex, Callback callback) const
+template<bool gt, Action action, size_t width, class Callback>
+bool Array::FindGTLT(int64_t v, uint64_t chunk, QueryState<int64_t>* state, size_t baseindex, Callback callback) const
 {
     // Find items in 'chunk' that are greater (if gt == true) or smaller (if gt == false) than 'v'. Fixme, __forceinline can make it crash in vS2010 - find out why
     if (width == 1) {
@@ -2800,7 +2802,8 @@ template<bool gt, Action action, size_t width, class Callback> bool Array::FindG
 }
 
 
-template<bool eq, Action action, size_t width, class Callback> inline bool Array::CompareEquality(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, Callback callback) const
+template<bool eq, Action action, size_t width, class Callback>
+inline bool Array::CompareEquality(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, Callback callback) const
 {
     // Find items in this Array that are equal (eq == true) or different (eq = false) from 'value'
 
@@ -3042,7 +3045,8 @@ bool Array::CompareLeafs(const Array* foreign, size_t start, size_t end, size_t 
 }
 
 
-template<class cond, Action action, size_t width, class Callback> bool Array::CompareLeafs(const Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, Callback callback) const
+template<class cond, Action action, size_t width, class Callback> 
+bool Array::CompareLeafs(const Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, Callback callback) const
 {
     size_t fw = foreign->m_width;
     bool r;
