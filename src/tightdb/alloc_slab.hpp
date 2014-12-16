@@ -398,7 +398,7 @@ inline bool SlabAlloc::nonempty_attachment() const TIGHTDB_NOEXCEPT
 
 inline std::size_t SlabAlloc::get_baseline() const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(is_attached());
+    TIGHTDB_ASSERT_DEBUG(is_attached());
     return m_baseline;
 }
 

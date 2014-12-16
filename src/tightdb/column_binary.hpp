@@ -162,7 +162,7 @@ inline void ColumnBinary::update_from_parent(std::size_t old_baseline) TIGHTDB_N
 
 inline BinaryData ColumnBinary::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(ndx < size());
+    TIGHTDB_ASSERT_DEBUG(ndx < size());
     if (root_is_leaf()) {
         bool is_big = m_array->get_context_flag();
         if (!is_big) {
