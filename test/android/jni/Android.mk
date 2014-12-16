@@ -9,8 +9,7 @@ LOCAL_SRC_FILES  := $(TESTS) main.cpp
 LOCAL_C_INCLUDES := $(LOCAL_PATH)/../../ ../../../src
 LOCAL_LDLIBS     := -llog -landroid
 LOCAL_LDFLAGS    += -L../../../android-lib
-LOCAL_STATIC_LIBRARIES += android_native_app_glue
-LOCAL_STATIC_LIBRARIES += tightdb-android-arm
+LOCAL_STATIC_LIBRARIES += android_native_app_glue tightdb-android-arm
 
 include $(BUILD_SHARED_LIBRARY)
 
