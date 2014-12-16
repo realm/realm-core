@@ -16,10 +16,15 @@ void ArrayBigBlobs::add(BinaryData value, bool add_zero_term)
 {
     TIGHTDB_ASSERT(value.size() == 0 || value.data());
 
-    ArrayBlob new_blob(m_alloc);
-    new_blob.create(); // Throws
-    new_blob.add(value.data(), value.size(), add_zero_term); // Throws
-    Array::add(int_fast64_t(new_blob.get_ref())); // Throws
+    if (value.data() == null_ptr) {
+        Array::add(0); // Throws
+    }
+    else {
+        ArrayBlob new_blob(m_alloc);
+        new_blob.create(); // Throws
+        new_blob.add(value.data(), value.size(), add_zero_term); // Throws
+        Array::add(int_fast64_t(new_blob.get_ref())); // Throws
+    }
 }
 
 
