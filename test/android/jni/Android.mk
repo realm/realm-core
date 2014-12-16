@@ -6,10 +6,11 @@ TESTS := $(wildcard ../../test_*.cpp ../../large_tests/*.cpp ../../util/*.cpp)
 
 LOCAL_MODULE     := native-activity
 LOCAL_SRC_FILES  := $(TESTS) main.cpp
-LOCAL_C_INCLUDES := $(LOCAL_PATH)/../../ ../../../android-lib/include
-LOCAL_LDLIBS     := -llog -landroid -ltightdb-android-arm
+LOCAL_C_INCLUDES := $(LOCAL_PATH)/../../ ../../../src
+LOCAL_LDLIBS     := -llog -landroid
 LOCAL_LDFLAGS    += -L../../../android-lib
 LOCAL_STATIC_LIBRARIES += android_native_app_glue
+LOCAL_STATIC_LIBRARIES += tightdb-android-arm
 
 include $(BUILD_SHARED_LIBRARY)
 
