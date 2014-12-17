@@ -32,6 +32,13 @@
 
 using namespace std;
 
+// extern "C" and noinline so that a readable message shows up in the stack trace
+// of the crash
+extern "C" TIGHTDB_NORETURN TIGHTDB_NOINLINE
+void please_report_this_error_to_help_at_realm_dot_io() {
+    std::abort();
+}
+
 namespace tightdb {
 namespace util {
 
@@ -63,7 +70,7 @@ TIGHTDB_NORETURN void terminate(const char* message, const char* file, long line
 #else
     cerr << support_message << endl;
 #endif
-    abort();
+    please_report_this_error_to_help_at_realm_dot_io();
 }
 
 
