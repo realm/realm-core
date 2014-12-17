@@ -624,6 +624,7 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
     </ClCompile>
+    <ClCompile Include="..\..\src\tightdb\util\file_mapper.cpp" />
     <ClCompile Include="..\..\src\tightdb\util\thread.cpp" />
     <ClCompile Include="..\..\src\tightdb\group.cpp" />
     <ClCompile Include="..\..\src\tightdb\group_shared.cpp" />
@@ -1095,6 +1096,7 @@
     <ClInclude Include="..\..\src\tightdb\string_data.hpp" />
     <ClInclude Include="..\..\src\tightdb\unicode.hpp" />
     <ClInclude Include="..\..\src\tightdb\util\errno.hpp" />
+    <ClInclude Include="..\..\src\tightdb\util\file_mapper.hpp" />
     <ClInclude Include="..\..\src\tightdb\util\shared_ptr.hpp" />
     <ClInclude Include="..\..\src\tightdb\util\terminate.hpp" />
     <ClInclude Include="..\..\src\tightdb\util\unique_ptr.hpp" />

@@ -17,6 +17,9 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
+
+#ifndef _WIN32
+
 #include "file_mapper.hpp"
 
 #include <cerrno>
@@ -221,7 +224,11 @@ void remove_mapping(void* addr, size_t size)
     mappings_by_addr.erase(mappings_by_addr.begin() + (m - &mappings_by_addr[0]));
     for (std::vector<mappings_for_file>::iterator it = mappings_by_file.begin(); it != mappings_by_file.end(); ++it) {
         if (it->info->mappings.empty()) {
-            ::close(it->info->fd);
+            if(::close(it->info->fd) != 0) {
+                int err = errno; // Eliminate any risk of clobbering
+                if(err == EBADF || err == EIO) // todo, how do we handle EINTR?
+                    throw std::runtime_error(get_errno_msg("close() failed: ", err));                
+            }
             mappings_by_file.erase(it);
             break;
         }
@@ -282,7 +289,10 @@ void munmap(void* addr, size_t size) TIGHTDB_NOEXCEPT
 #ifdef TIGHTDB_ENABLE_ENCRYPTION
     remove_mapping(addr, size);
 #endif
-    ::munmap(addr, size);
+    if(::munmap(addr, size) != 0) {
+        int err = errno;
+        throw std::runtime_error(get_errno_msg("munmap() failed: ", err));
+    }
 }
 
 void* mremap(int fd, void* old_addr, size_t old_size, File::AccessMode a, size_t new_size)
@@ -298,7 +308,10 @@ void* mremap(int fd, void* old_addr, size_t old_size, File::AccessMode a, size_t
 
             void* new_addr = mmap_anon(rounded_new_size);
             m->mapping->set(new_addr, rounded_new_size);
-            ::munmap(old_addr, rounded_old_size);
+            if (::munmap(old_addr, rounded_old_size) != 0) {
+                int err = errno;
+                throw std::runtime_error(get_errno_msg("munmap() failed: ", err));
+            }
             m->addr = new_addr;
             m->size = rounded_new_size;
             return new_addr;
@@ -316,7 +329,10 @@ void* mremap(int fd, void* old_addr, size_t old_size, File::AccessMode a, size_t
     throw std::runtime_error(get_errno_msg("mremap(): failed: ", err));
 #else
     void* new_addr = mmap(fd, new_size, a, nullptr);
-    ::munmap(old_addr, old_size);
+    if(::munmap(old_addr, old_size) != 0)
+        int err = errno;
+        throw std::runtime_error(get_errno_msg("munmap() failed: ", err));
+    }
     return new_addr;
 #endif
 }
@@ -343,3 +359,5 @@ void msync(void* addr, size_t size)
 
 }
 }
+
+#endif // _WIN32
