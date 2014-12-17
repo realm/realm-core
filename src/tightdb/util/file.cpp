@@ -307,7 +307,6 @@ void File::close() TIGHTDB_NOEXCEPT
 
     BOOL r = CloseHandle(m_handle);
     TIGHTDB_ASSERT_RELEASE(r);
-    static_cast<void>(r);
     m_handle = 0;
 
 #else // POSIX version
@@ -316,7 +315,6 @@ void File::close() TIGHTDB_NOEXCEPT
         return;
     int r = ::close(m_fd);
     TIGHTDB_ASSERT_RELEASE(r == 0);
-    static_cast<void>(r);
     m_fd = -1;
 
 #endif
@@ -694,7 +692,6 @@ void File::unlock() TIGHTDB_NOEXCEPT
         return;
     BOOL r = UnlockFile(m_handle, 0, 0, 1, 0);
     TIGHTDB_ASSERT_RELEASE(r);
-    static_cast<void>(r);
     m_have_lock = false;
 
 #else // BSD / Linux flock()
@@ -705,7 +702,6 @@ void File::unlock() TIGHTDB_NOEXCEPT
     // non-locked file were unlocked.
     int r = flock(m_fd, LOCK_UN);
     TIGHTDB_ASSERT_RELEASE(r == 0);
-    static_cast<void>(r);
 
 #endif
 }
@@ -739,7 +735,6 @@ void* File::map(AccessMode a, size_t size, int map_flags) const
     {
         BOOL r = CloseHandle(map_handle);
         TIGHTDB_ASSERT_RELEASE(r);
-        static_cast<void>(r);
     }
     if (TIGHTDB_LIKELY(addr))
         return addr;
@@ -767,7 +762,6 @@ void File::unmap(void* addr, size_t size) TIGHTDB_NOEXCEPT
     static_cast<void>(size);
     BOOL r = UnmapViewOfFile(addr);
     TIGHTDB_ASSERT_RELEASE(r);
-    static_cast<void>(r);
 
 #else // POSIX version
 
