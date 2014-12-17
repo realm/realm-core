@@ -475,7 +475,7 @@ TEST(LangBindHelper_AdvanceReadTransact_CreateManyTables)
         SharedGroup sg_w(*repl_w);
 
         WriteTransaction wt(sg_w);
-        for (int i = 0; i < 1; ++i) {
+        for (int i = 0; i < 16; ++i) {
             std::stringstream ss;
             ss << "table_" << i;
             wt.add_table(ss.str());
