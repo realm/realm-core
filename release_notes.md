@@ -8,6 +8,7 @@
 * Now throwing on overlong table and column names, and on oversized strings and
   binary data values.
 * Fall back to the old query nodes for String as well as int/double/float.
+* Log assertions failures to the native logging system on android and Apple.
 
 -----------
 
