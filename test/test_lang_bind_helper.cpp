@@ -377,6 +377,28 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
     CHECK_EQUAL(bar, group.get_table("bar"));
 }
 
+TEST(LangBindHelper_AdvanceReadTransact_CreateManyTables)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    UniquePtr<tightdb::Replication> repl(tightdb::makeWriteLogCollector(path));
+    SharedGroup sg(*repl);
+    ReadTransaction rt(sg);
+
+    {
+        UniquePtr<tightdb::Replication> repl_w(tightdb::makeWriteLogCollector(path));
+        SharedGroup sg_w(*repl_w);
+
+        WriteTransaction wt(sg_w);
+        for (int i = 0; i < 16; ++i) {
+            std::stringstream ss;
+            ss << "table_" << i;
+            wt.add_table(ss.str());
+        }
+        wt.commit();
+    }
+
+    LangBindHelper::advance_read(sg);
+}
 
 TEST(LangBindHelper_AdvanceReadTransact_LinkListSort)
 {
