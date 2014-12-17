@@ -43,18 +43,12 @@ void nslog(const char *message) {
 }
 #endif
 
-TIGHTDB_NORETURN void abort() TIGHTDB_NOEXCEPT
-{
-    std::abort();
-}
-
-
-TIGHTDB_NORETURN void terminate(string message, const char* file, long line) TIGHTDB_NOEXCEPT
+TIGHTDB_NORETURN void terminate(const char* message, const char* file, long line) TIGHTDB_NOEXCEPT
 {
     const char *support_message = "IMPORTANT: if you see this error, please send this log to help@realm.io.";
     cerr << file << ":" << line << ": " << message << endl;
 
-#if defined __APPLE__
+#if defined(__APPLE__)
     void* callstack[128];
     int frames = backtrace(callstack, 128);
     char** strs = backtrace_symbols(callstack, frames);
@@ -64,7 +58,7 @@ TIGHTDB_NORETURN void terminate(string message, const char* file, long line) TIG
     }
     free(strs);
     nslog(support_message);
-#elif defined __ANDROID__
+#elif defined(__ANDROID__)
     __android_log_print(ANDROID_LOG_ERROR, "TIGHTDB", support_message);
 #else
     cerr << support_message << endl;
