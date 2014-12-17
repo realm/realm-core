@@ -380,6 +380,15 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
 TEST(LangBindHelper_AdvanceReadTransact_CreateManyTables)
 {
     SHARED_GROUP_TEST_PATH(path);
+
+    {
+        UniquePtr<tightdb::Replication> repl_w(tightdb::makeWriteLogCollector(path));
+        SharedGroup sg_w(*repl_w);
+        WriteTransaction wt(sg_w);
+        wt.add_table("table");
+        wt.commit();
+    }
+
     UniquePtr<tightdb::Replication> repl(tightdb::makeWriteLogCollector(path));
     SharedGroup sg(*repl);
     ReadTransaction rt(sg);
