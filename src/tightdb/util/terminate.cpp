@@ -43,7 +43,7 @@ namespace util {
 
 #ifdef __APPLE__
 void nslog(const char *message) {
-    CFStringRef str = CFStringCreateWithCString(kCFAllocatorDefault, message, kCFStringEncodingUTF8);
+    CFStringRef str = CFStringCreateWithCStringNoCopy(kCFAllocatorDefault, message, kCFStringEncodingUTF8, kCFAllocatorNull);
     CFShow(str);
     CFRelease(str);
 }
