@@ -631,6 +631,9 @@ void Table::do_insert_column(Descriptor& desc, size_t col_ndx, DataType type,
 {
     TIGHTDB_ASSERT(desc.is_attached());
 
+    if (TIGHTDB_UNLIKELY(name.size() > Descriptor::max_column_name_length))
+        throw LogicError(LogicError::column_name_too_long);
+
     typedef _impl::DescriptorFriend df;
     Table& root_table = df::get_root_table(desc);
     TIGHTDB_ASSERT(!root_table.has_shared_type());
@@ -1556,17 +1559,17 @@ void Table::remove_primary_key()
 
 const ColumnBase& Table::get_column_base(size_t ndx) const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(ndx < m_spec.get_column_count());
-    TIGHTDB_ASSERT(m_cols.size() == m_spec.get_column_count());
+    TIGHTDB_ASSERT_DEBUG(ndx < m_spec.get_column_count());
+    TIGHTDB_ASSERT_DEBUG(m_cols.size() == m_spec.get_column_count());
     return *m_cols[ndx];
 }
 
 
 ColumnBase& Table::get_column_base(size_t ndx)
 {
-    TIGHTDB_ASSERT(ndx < m_spec.get_column_count());
+    TIGHTDB_ASSERT_DEBUG(ndx < m_spec.get_column_count());
     instantiate_before_change();
-    TIGHTDB_ASSERT(m_cols.size() == m_spec.get_column_count());
+    TIGHTDB_ASSERT_DEBUG(m_cols.size() == m_spec.get_column_count());
     return *m_cols[ndx];
 }
 
@@ -1856,8 +1859,8 @@ ref_type Table::clone(Allocator& alloc) const
 void Table::insert_empty_row(size_t row_ndx, size_t num_rows)
 {
     TIGHTDB_ASSERT(is_attached());
-    TIGHTDB_ASSERT(row_ndx <= m_size);
-    TIGHTDB_ASSERT(num_rows <= numeric_limits<size_t>::max() - row_ndx);
+    TIGHTDB_ASSERT_DEBUG(row_ndx <= m_size);
+    TIGHTDB_ASSERT_DEBUG(num_rows <= numeric_limits<size_t>::max() - row_ndx);
     bump_version();
 
     size_t num_cols = m_spec.get_column_count();
@@ -2192,10 +2195,10 @@ void Table::clear_subtable(size_t col_ndx, size_t row_ndx)
 
 const Table* Table::get_parent_table_ptr(size_t* column_ndx_out) const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(is_attached());
+    TIGHTDB_ASSERT_DEBUG(is_attached());
     const Array& real_top = m_top.is_attached() ? m_top : m_columns;
     if (ArrayParent* array_parent = real_top.get_parent()) {
-        TIGHTDB_ASSERT(dynamic_cast<Parent*>(array_parent));
+        TIGHTDB_ASSERT_DEBUG(dynamic_cast<Parent*>(array_parent));
         Parent* table_parent = static_cast<Parent*>(array_parent);
         return table_parent->get_parent_table(column_ndx_out);
     }
@@ -2447,6 +2450,8 @@ StringData Table::get_string(size_t col_ndx, size_t ndx) const TIGHTDB_NOEXCEPT
 
 void Table::set_string(size_t col_ndx, size_t ndx, StringData value)
 {
+    if (TIGHTDB_UNLIKELY(value.size() > max_string_size))
+        throw LogicError(LogicError::string_too_big);
     if (TIGHTDB_UNLIKELY(!is_attached()))
         throw LogicError(LogicError::detached_accessor);
     if (TIGHTDB_UNLIKELY(ndx >= m_size))
@@ -2471,6 +2476,8 @@ void Table::set_string(size_t col_ndx, size_t ndx, StringData value)
 
 void Table::insert_string(size_t col_ndx, size_t ndx, StringData value)
 {
+    if (TIGHTDB_UNLIKELY(value.size() > max_string_size))
+        throw LogicError(LogicError::string_too_big);
     TIGHTDB_ASSERT(col_ndx < get_column_count());
     TIGHTDB_ASSERT(ndx <= m_size);
 
@@ -2503,6 +2510,8 @@ BinaryData Table::get_binary(size_t col_ndx, size_t ndx) const TIGHTDB_NOEXCEPT
 
 void Table::set_binary(size_t col_ndx, size_t ndx, BinaryData value)
 {
+    if (TIGHTDB_UNLIKELY(value.size() > max_binary_size))
+        throw LogicError(LogicError::binary_too_big);
     TIGHTDB_ASSERT(col_ndx < get_column_count());
     TIGHTDB_ASSERT(ndx < m_size);
     bump_version();
@@ -2518,6 +2527,8 @@ void Table::set_binary(size_t col_ndx, size_t ndx, BinaryData value)
 
 void Table::insert_binary(size_t col_ndx, size_t ndx, BinaryData value)
 {
+    if (TIGHTDB_UNLIKELY(value.size() > max_binary_size))
+        throw LogicError(LogicError::binary_too_big);
     TIGHTDB_ASSERT(col_ndx < get_column_count());
     TIGHTDB_ASSERT(ndx <= m_size);
 
@@ -2600,9 +2611,13 @@ void Table::set_mixed(size_t col_ndx, size_t ndx, Mixed value)
             column.set_double(ndx, value.get_double());
             break;
         case type_String:
+            if (TIGHTDB_UNLIKELY(value.get_string().size() > max_string_size))
+                throw LogicError(LogicError::string_too_big);
             column.set_string(ndx, value.get_string());
             break;
         case type_Binary:
+            if (TIGHTDB_UNLIKELY(value.get_binary().size() > max_binary_size))
+                throw LogicError(LogicError::binary_too_big);
             column.set_binary(ndx, value.get_binary());
             break;
         case type_Table:
@@ -2646,9 +2661,13 @@ void Table::insert_mixed(size_t col_ndx, size_t ndx, Mixed value)
             column.insert_double(ndx, value.get_double());
             break;
         case type_String:
+            if (TIGHTDB_UNLIKELY(value.get_string().size() > max_string_size))
+                throw LogicError(LogicError::string_too_big);
             column.insert_string(ndx, value.get_string());
             break;
         case type_Binary:
+            if (TIGHTDB_UNLIKELY(value.get_binary().size() > max_binary_size))
+                throw LogicError(LogicError::binary_too_big);
             column.insert_binary(ndx, value.get_binary());
             break;
         case type_Table:
@@ -3851,7 +3870,7 @@ void Table::write(ostream& out, size_t offset, size_t size, StringData override_
     if (!table_name)
         table_name = get_name();
     SliceWriter writer(*this, table_name, offset, size_2);
-    Group::write(out, writer); // Throws
+    Group::write(out, writer, false); // Throws
 }
 
 

@@ -21,10 +21,9 @@
 #define TIGHTDB_UTIL_ASSERT_HPP
 
 #include <tightdb/util/features.h>
+#include <tightdb/util/terminate.hpp>
 
-
-#ifdef TIGHTDB_DEBUG
-#  include <tightdb/util/terminate.hpp>
+#if defined(TIGHTDB_ENABLE_ASSERTIONS) || defined(TIGHTDB_DEBUG)
 #  define TIGHTDB_ASSERT(condition) \
     ((condition) ? static_cast<void>(0) :                               \
      tightdb::util::terminate("Assertion failed: " #condition, __FILE__, __LINE__))
@@ -32,8 +31,15 @@
 #  define TIGHTDB_ASSERT(condition) static_cast<void>(0)
 #endif
 
+#ifdef TIGHTDB_DEBUG
+#  define TIGHTDB_ASSERT_DEBUG(condition) \
+    ((condition) ? static_cast<void>(0) :                               \
+     tightdb::util::terminate("Assertion failed: " #condition, __FILE__, __LINE__))
+#else
+#  define TIGHTDB_ASSERT_DEBUG(condition) static_cast<void>(0)
+#endif
 
-#include <tightdb/util/terminate.hpp>
+
 #define TIGHTDB_ASSERT_RELEASE(condition) \
     ((condition) ? static_cast<void>(0) : \
     tightdb::util::terminate("Assertion failed: " #condition, __FILE__, __LINE__))
@@ -57,8 +63,5 @@ namespace util {
 }
 #endif
 
-#if defined(TIGHTDB_DEBUG) && !defined(TIGHTDB_COOKIE_CHECK)
-#  define TIGHTDB_COOKIE_CHECK
-#endif
 
 #endif // TIGHTDB_UTIL_ASSERT_HPP

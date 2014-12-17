@@ -270,6 +270,15 @@ TEST(Group_AddTable)
 }
 
 
+TEST(Group_TableNameTooLong)
+{
+    Group group;
+    CHECK_LOGIC_ERROR(group.add_table("0123456789012345678901234567890123456789"
+                                      "0123456789012345678901234567890123456789"),
+                      LogicError::table_name_too_long);
+}
+
+
 TEST(Group_TableIndex)
 {
     Group group;

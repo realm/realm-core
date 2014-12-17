@@ -155,16 +155,17 @@ void Spec::insert_column(size_t column_ndx, ColumnType type, StringData name, Co
             dg.release();
         }
         else if (type == col_type_Link || type == col_type_LinkList) {
-            // Store ref (position) of target table
-            // When we set the target it will be as a tagged integer (low bit set)
-            // Since we don't know it yet we just store zero (null ref)
+            // Store group-level table index of target table. When we set the
+            // target it will be as a tagged integer (low bit set) Since we
+            // don't know it yet we just store zero (null ref).
             size_t subspec_ndx = get_subspec_ndx(column_ndx);
             m_subspecs.insert(subspec_ndx, 0); // Throws
         }
         else if (type == col_type_BackLink) {
-            // Store ref (position) of origin table and origin column
-            // When we set the target it will be as a tagged integer (low bit set)
-            // Since we don't know it yet we just store zero (null ref)
+            // Store group-level table index of origin table and index of origin
+            // column. When we set the target it will be as a tagged integer
+            // (low bit set) Since we don't know it yet we just store zero (null
+            // ref).
             size_t subspec_ndx = get_subspec_ndx(column_ndx);
             m_subspecs.insert(subspec_ndx, 0); // Throws
             m_subspecs.insert(subspec_ndx, 1); // Throws
@@ -458,15 +459,30 @@ void Spec::to_dot(ostream& out, StringData) const
     m_top.to_dot(out);
     m_types.to_dot(out, "types");
     m_names.to_dot(out, "names");
-    if (m_subspecs.is_attached()) {
+
+    size_t num_cols = m_types.size();
+    bool have_subspecs = false;
+    for (size_t i = 0; i < num_cols; ++i) {
+        ColumnType type = ColumnType(m_types.get(i));
+        if (type == col_type_Table) {
+            have_subspecs = true;
+            break;
+        }
+    }
+
+    if (have_subspecs) {
+        TIGHTDB_ASSERT(m_subspecs.is_attached());
         m_subspecs.to_dot(out, "subspecs");
 
         Allocator& alloc = m_top.get_alloc();
 
         // Write out subspecs
-        size_t n = m_subspecs.size();
-        for (size_t i = 0; i < n; ++i) {
-            ref_type ref = m_subspecs.get_as_ref(i);
+        for (size_t i = 0; i < num_cols; ++i) {
+            ColumnType type = ColumnType(m_types.get(i));
+            if (type != col_type_Table)
+                continue;
+            size_t subspec_ndx = get_subspec_ndx(i);
+            ref_type ref = m_subspecs.get_as_ref(subspec_ndx);
             MemRef mem(ref, alloc);
             Spec subspec(alloc);
             subspec.init(mem);

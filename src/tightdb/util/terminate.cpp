@@ -30,6 +30,11 @@ using namespace std;
 namespace tightdb {
 namespace util {
 
+TIGHTDB_NORETURN void abort() TIGHTDB_NOEXCEPT
+{
+    std::abort();
+}
+
 
 TIGHTDB_NORETURN void terminate(string message, const char* file, long line) TIGHTDB_NOEXCEPT
 {

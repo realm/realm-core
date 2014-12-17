@@ -273,8 +273,8 @@ void Array::set_type(Type type)
 
 bool Array::update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(is_attached());
-    TIGHTDB_ASSERT(m_parent);
+    TIGHTDB_ASSERT_DEBUG(is_attached());
+    TIGHTDB_ASSERT_DEBUG(m_parent);
 
     // Array nodes that are part of the previous version of the
     // database will not be overwritten by Group::commit(). This is
@@ -458,7 +458,7 @@ void Array::set(size_t ndx, int64_t value)
     bool do_expand = value < m_lbound || value > m_ubound;
     if (do_expand) {
         size_t width = bit_width(value);
-        TIGHTDB_ASSERT(width > m_width);
+        TIGHTDB_ASSERT_DEBUG(width > m_width);
         Getter old_getter = m_getter;    // Save old getter before width expansion
         alloc(m_size, width); // Throws
         set_width(width);
@@ -516,7 +516,7 @@ void Array::AddPositiveLocal(int64_t value)
 
 void Array::insert(size_t ndx, int_fast64_t value)
 {
-    TIGHTDB_ASSERT(ndx <= m_size);
+    TIGHTDB_ASSERT_DEBUG(ndx <= m_size);
 
     // Check if we need to copy before modifying
     copy_on_write(); // Throws
@@ -526,7 +526,7 @@ void Array::insert(size_t ndx, int_fast64_t value)
     bool do_expand = value < m_lbound || value > m_ubound;
     if (do_expand) {
         size_t width = bit_width(value);
-        TIGHTDB_ASSERT(width > m_width);
+        TIGHTDB_ASSERT_DEBUG(width > m_width);
         alloc(m_size+1, width); // Throws
         set_width(width);
     }
@@ -586,8 +586,8 @@ void Array::truncate(size_t size)
     // would be that the size of the array in memory would remain tiny
     // regardless of the number of elements it constains, as long as
     // all those elements are zero.
-    TIGHTDB_ASSERT(!dynamic_cast<ArrayFloat*>(this));
-    TIGHTDB_ASSERT(!dynamic_cast<ArrayDouble*>(this));
+    TIGHTDB_ASSERT_DEBUG(!dynamic_cast<ArrayFloat*>(this));
+    TIGHTDB_ASSERT_DEBUG(!dynamic_cast<ArrayDouble*>(this));
 
     copy_on_write(); // Throws
 
@@ -612,8 +612,8 @@ void Array::truncate_and_destroy_children(size_t size)
     TIGHTDB_ASSERT(size <= m_size);
 
     // FIXME: See FIXME in truncate().
-    TIGHTDB_ASSERT(!dynamic_cast<ArrayFloat*>(this));
-    TIGHTDB_ASSERT(!dynamic_cast<ArrayDouble*>(this));
+    TIGHTDB_ASSERT_DEBUG(!dynamic_cast<ArrayFloat*>(this));
+    TIGHTDB_ASSERT_DEBUG(!dynamic_cast<ArrayDouble*>(this));
 
     copy_on_write(); // Throws
 
@@ -763,9 +763,7 @@ size_t Array::FindGTE(int64_t target, size_t start, const Array* indirection) co
 
 exit:
 
-#if TIGHTDB_DEBUG
-    TIGHTDB_ASSERT(ref == ret);
-#endif
+    TIGHTDB_ASSERT_DEBUG(ref == ret);
 
     return ret;
 }
@@ -835,7 +833,7 @@ template<size_t width> inline int64_t LowerBits()
     else if (width == 64)
         return 0x0000000000000001ULL;
     else {
-        TIGHTDB_ASSERT(false);
+        TIGHTDB_ASSERT_DEBUG(false);
         return int64_t(-1);
     }
 }
@@ -1477,7 +1475,7 @@ void Array::copy_on_write()
     m_ref = mref.m_ref;
     m_data = get_data_from_header(new_begin);
     m_capacity = CalcItemCount(new_size, m_width);
-    TIGHTDB_ASSERT(m_capacity > 0);
+    TIGHTDB_ASSERT_DEBUG(m_capacity > 0);
 
     // Update capacity in header. Uses m_data to find header, so
     // m_data must be initialized correctly first.
@@ -1505,11 +1503,11 @@ void set_direct(char* data, size_t ndx, int_fast64_t value) TIGHTDB_NOEXCEPT
     // the types `int8_t`, `int16_t`, `int32_t`, and `int64_t`
     // exist. This is not guaranteed by C++03.
     if (width == 0) {
-        TIGHTDB_ASSERT(value == 0);
+        TIGHTDB_ASSERT_DEBUG(value == 0);
         return;
     }
     else if (width == 1) {
-        TIGHTDB_ASSERT(0 <= value && value <= 0x01);
+        TIGHTDB_ASSERT_DEBUG(0 <= value && value <= 0x01);
         size_t byte_ndx = ndx / 8;
         size_t bit_ndx  = ndx % 8;
         typedef unsigned char uchar;
@@ -1517,7 +1515,7 @@ void set_direct(char* data, size_t ndx, int_fast64_t value) TIGHTDB_NOEXCEPT
         *p = uchar((*p & ~(0x01 << bit_ndx)) | (int(value) & 0x01) << bit_ndx);
     }
     else if (width == 2) {
-        TIGHTDB_ASSERT(0 <= value && value <= 0x03);
+        TIGHTDB_ASSERT_DEBUG(0 <= value && value <= 0x03);
         size_t byte_ndx = ndx / 4;
         size_t bit_ndx  = ndx % 4 * 2;
         typedef unsigned char uchar;
@@ -1525,7 +1523,7 @@ void set_direct(char* data, size_t ndx, int_fast64_t value) TIGHTDB_NOEXCEPT
         *p = uchar((*p & ~(0x03 << bit_ndx)) | (int(value) & 0x03) << bit_ndx);
     }
     else if (width == 4) {
-        TIGHTDB_ASSERT(0 <= value && value <= 0x0F);
+        TIGHTDB_ASSERT_DEBUG(0 <= value && value <= 0x0F);
         size_t byte_ndx = ndx / 2;
         size_t bit_ndx  = ndx % 2 * 4;
         typedef unsigned char uchar;
@@ -1533,27 +1531,27 @@ void set_direct(char* data, size_t ndx, int_fast64_t value) TIGHTDB_NOEXCEPT
         *p = uchar((*p & ~(0x0F << bit_ndx)) | (int(value) & 0x0F) << bit_ndx);
     }
     else if (width == 8) {
-        TIGHTDB_ASSERT(numeric_limits<int8_t>::min() <= value &&
-                       value <= numeric_limits<int8_t>::max());
+        TIGHTDB_ASSERT_DEBUG(numeric_limits<int8_t>::min() <= value &&
+                             value <= numeric_limits<int8_t>::max());
         *(reinterpret_cast<int8_t*>(data) + ndx) = int8_t(value);
     }
     else if (width == 16) {
-        TIGHTDB_ASSERT(numeric_limits<int16_t>::min() <= value &&
-                       value <= numeric_limits<int16_t>::max());
+        TIGHTDB_ASSERT_DEBUG(numeric_limits<int16_t>::min() <= value &&
+                             value <= numeric_limits<int16_t>::max());
         *(reinterpret_cast<int16_t*>(data) + ndx) = int16_t(value);
     }
     else if (width == 32) {
-        TIGHTDB_ASSERT(numeric_limits<int32_t>::min() <= value &&
-                       value <= numeric_limits<int32_t>::max());
+        TIGHTDB_ASSERT_DEBUG(numeric_limits<int32_t>::min() <= value &&
+                             value <= numeric_limits<int32_t>::max());
         *(reinterpret_cast<int32_t*>(data) + ndx) = int32_t(value);
     }
     else if (width == 64) {
-        TIGHTDB_ASSERT(numeric_limits<int64_t>::min() <= value &&
-                       value <= numeric_limits<int64_t>::max());
+        TIGHTDB_ASSERT_DEBUG(numeric_limits<int64_t>::min() <= value &&
+                             value <= numeric_limits<int64_t>::max());
         *(reinterpret_cast<int64_t*>(data) + ndx) = int64_t(value);
     }
     else {
-        TIGHTDB_ASSERT(false);
+        TIGHTDB_ASSERT_DEBUG(false);
     }
 }
 
@@ -1702,7 +1700,7 @@ template<size_t width> void Array::set_width() TIGHTDB_NOEXCEPT
         m_ubound =  0x7FFFFFFFFFFFFFFFLL;
     }
     else {
-        TIGHTDB_ASSERT(false);
+        TIGHTDB_ASSERT_DEBUG(false);
     }
 
     m_width = width;
@@ -2094,7 +2092,7 @@ ref_type Array::insert_bptree_child(Array& offsets, size_t orig_child_ndx,
     size_t orig_child_ref_ndx = 1 + orig_child_ndx;
     size_t insert_ndx = orig_child_ref_ndx + 1;
 
-    TIGHTDB_ASSERT(insert_ndx <= size() - 1);
+    TIGHTDB_ASSERT_DEBUG(insert_ndx <= size() - 1);
     if (TIGHTDB_LIKELY(size() < 1 + TIGHTDB_MAX_BPNODE_SIZE + 1)) {
         // Case 1/2: This parent has space for the new child, so it
         // does not have to be split.
@@ -2195,7 +2193,7 @@ ref_type Array::insert_bptree_child(Array& offsets, size_t orig_child_ndx,
 ref_type Array::bptree_leaf_insert(size_t ndx, int64_t value, TreeInsertBase& state)
 {
     size_t leaf_size = size();
-    TIGHTDB_ASSERT(leaf_size <= TIGHTDB_MAX_BPNODE_SIZE);
+    TIGHTDB_ASSERT_DEBUG(leaf_size <= TIGHTDB_MAX_BPNODE_SIZE);
     if (leaf_size < ndx)
         ndx = leaf_size;
     if (TIGHTDB_LIKELY(leaf_size < TIGHTDB_MAX_BPNODE_SIZE)) {
@@ -2621,7 +2619,7 @@ template<int w> int64_t get_direct(const char* data, size_t ndx) TIGHTDB_NOEXCEP
         size_t offset = ndx * 8;
         return *reinterpret_cast<const int64_t*>(data + offset);
     }
-    TIGHTDB_ASSERT(false);
+    TIGHTDB_ASSERT_DEBUG(false);
     return int64_t(-1);
 }
 
@@ -2946,7 +2944,7 @@ bool Array::find(int cond, Action action, int64_t value, size_t start, size_t en
             TIGHTDB_TEMPEX3(return find, None, act_CallbackIdx, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
     }
-    TIGHTDB_ASSERT(false);
+    TIGHTDB_ASSERT_DEBUG(false);
     return false;
 
 }
@@ -3619,7 +3617,7 @@ void Array::erase_bptree_elem(Array* root, size_t elem_ndx, EraseHandler& handle
 {
     TIGHTDB_ASSERT(root->is_inner_bptree_node());
     TIGHTDB_ASSERT(root->size() >= 1 + 1 + 1); // invar:bptree-nonempty-inner
-    TIGHTDB_ASSERT(elem_ndx == npos || elem_ndx+1 != root->get_bptree_size());
+    TIGHTDB_ASSERT_DEBUG(elem_ndx == npos || elem_ndx+1 != root->get_bptree_size());
 
     // Note that this function is implemented in a way that makes it
     // fully exception safe. Please be sure to keep it that way.

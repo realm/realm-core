@@ -1,3 +1,10 @@
+libtightdb (0.87.1~@CODENAME@-1) UNRELEASED; urgency=low
+
+  * Tracking upstream release.
+
+ -- Kristian Spangsege <kristian.spangsege@gmail.com>  Wed, 17 Dec 2014 06:33:58 +0100
+
+
 libtightdb (0.87.0~@CODENAME@-1) UNRELEASED; urgency=low
 
   * Tracking upstream release.

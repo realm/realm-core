@@ -571,7 +571,7 @@ void spawn_daemon(const string& file) {}
 // undefined state.
 
 void SharedGroup::open(const string& path, bool no_create_file,
-                       DurabilityLevel dlevel, bool is_backend, const uint8_t* key)
+                       DurabilityLevel dlevel, bool is_backend, const char* key)
 {
     TIGHTDB_ASSERT(!is_attached());
 
@@ -677,6 +677,11 @@ void SharedGroup::open(const string& path, bool no_create_file,
                         // the database was written by shared group, so it has versioning info
                         TIGHTDB_ASSERT(top.size() == 7);
                         version = top.get(6) / 2;
+                        // In case this was written by an older version of shared group, it
+                        // will have version 0. Version 0 is not a legal initial version, so
+                        // it has to be set to 1 instead.
+                        if (version == 0)
+                            version = 1;
                     }
                 }
                 else {
@@ -690,16 +695,23 @@ void SharedGroup::open(const string& path, bool no_create_file,
                 if (repl)
                     repl->reset_log_management(version);
 #endif
+
+#ifndef _WIN32
                 if (key) {
                     TIGHTDB_STATIC_ASSERT(sizeof(pid_t) <= sizeof(uint64_t), "process identifiers too large");
                     info->session_initiator_pid = uint64_t(getpid());
                 }
+#endif
+
                 info->latest_version_number = version;
                 info->init_versioning(top_ref, file_size, version);
             }
             else { // not the session initiator!
+#ifndef _WIN32
                 if (key && info->session_initiator_pid != uint64_t(getpid()))
                     throw runtime_error(path + ": Encrypted interprocess sharing is currently unsupported");
+#endif
+
             }
 #ifndef _WIN32
             // In async mode, we need to make sure the daemon is running and ready:
@@ -776,7 +788,7 @@ uint_fast64_t SharedGroup::get_number_of_versions()
 }
 #ifdef TIGHTDB_ENABLE_REPLICATION
 
-void SharedGroup::open(Replication& repl, DurabilityLevel dlevel, const uint8_t* key)
+void SharedGroup::open(Replication& repl, DurabilityLevel dlevel, const char* key)
 {
     TIGHTDB_ASSERT(!is_attached());
     string file = repl.get_database_path();
@@ -922,7 +934,7 @@ void SharedGroup::do_async_commits()
         if (!is_same) {
 
 #ifdef TIGHTDB_ENABLE_LOGFILE
-            cerr << "Syncing from version " << m_readlock.m_version 
+            cerr << "Syncing from version " << m_readlock.m_version
                  << " to " << next_readlock.m_version << endl;
 #endif
             GroupWriter writer(m_group);
