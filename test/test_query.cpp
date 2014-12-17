@@ -561,7 +561,7 @@ TEST(Query_NextGenSyntaxMonkey0)
     // table size to test out-of-bounds bugs.
 
     Random random(random_int<unsigned long>()); // Seed from slow global generator
-    for (int iter = 1; iter < 100 + TEST_DURATION * 10000; iter++)
+    for (int iter = 1; iter < 10 + TEST_DURATION * 1000; iter++)
     {
         const size_t rows = 1 + random.draw_int_mod(2 * TIGHTDB_MAX_BPNODE_SIZE);
         Table table;
@@ -617,8 +617,8 @@ TEST(Query_NextGenSyntaxMonkey0)
 TEST(Query_NextGenSyntaxMonkey)
 {
     Random random(random_int<unsigned long>()); // Seed from slow global generator
-    for (int iter = 1; iter < 20 * (TEST_DURATION * TEST_DURATION * TEST_DURATION + 1); iter++) {
-        // Keep at least '* 20' else some tests will give 0 matches and bad coverage
+    for (int iter = 1; iter < 10 * (TEST_DURATION * TEST_DURATION * TEST_DURATION + 1); iter++) {
+        // Set 'rows' to at least '* 20' else some tests will give 0 matches and bad coverage
         const size_t rows =
             1 + random.draw_int_mod<size_t>(TIGHTDB_MAX_BPNODE_SIZE * 20 *
             (TEST_DURATION * TEST_DURATION * TEST_DURATION + 1));
@@ -3762,7 +3762,7 @@ TEST(Query_Sort_And_Requery_Untyped_Monkey2)
         table.add_column(type_Int, "second1");
 
         // Add random data to table
-        for (size_t t = 0; t < 3 * TIGHTDB_MAX_BPNODE_SIZE; t++) {
+        for (size_t t = 0; t < 2 * TIGHTDB_MAX_BPNODE_SIZE; t++) {
             table.add_empty_row();
             int64_t val1 = rand() % 5;
             table.set_int(0, t, val1);
