@@ -382,7 +382,7 @@ void WriteLogCollector::cleanup_stale_versions(CommitLogPreamble* preamble)
         preamble->active_file_is_log_a = !preamble->active_file_is_log_a;
         preamble->begin_oldest_commit_range = preamble->begin_newest_commit_range;
         preamble->begin_newest_commit_range = preamble->end_commit_range;
-        preamble->write_offset = sizeof(CommitLogHeader);
+        preamble->write_offset = 0;
 
         // shrink the recycled file by 1/4
         CommitLogMetadata* active_log = get_active_log(preamble);
@@ -497,7 +497,7 @@ void WriteLogCollector::reset_log_management(version_type last_version)
             const char* old_buffer; 
             const char* buffer;
             get_buffers_in_order(preamble, old_buffer, buffer);
-            preamble->write_offset = sizeof(CommitLogHeader);
+            preamble->write_offset = 0;
             for (current_version = preamble->begin_newest_commit_range; 
                  current_version < last_version;
                  current_version++) {
@@ -575,7 +575,7 @@ void WriteLogCollector::get_commit_entries(version_type from_version, version_ty
     // setup local offset and version tracking variables if needed
     if (m_read_version < preamble->begin_oldest_commit_range) {
         m_read_version = preamble->begin_oldest_commit_range;
-        m_read_offset = sizeof(CommitLogHeader);
+        m_read_offset = 0;
         // cerr << "  -- reset tracking" << endl;
     }
 
@@ -598,7 +598,7 @@ void WriteLogCollector::get_commit_entries(version_type from_version, version_ty
         if (second_buffer && m_read_version >= preamble->begin_newest_commit_range) {
             buffer = second_buffer;
             second_buffer = 0;
-            m_read_offset = sizeof(CommitLogHeader);
+            m_read_offset = 0;
             // cerr << "  -- switching from first to second file" << endl;
         }
 
