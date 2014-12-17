@@ -377,9 +377,95 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
     CHECK_EQUAL(bar, group.get_table("bar"));
 }
 
+
+TEST(LangBindHelper_AdvanceReadTransact_AddTableWithFreshSharedGroup)
+{
+    SHARED_GROUP_TEST_PATH(path);
+
+    // Testing that a foreign transaction, that adds a table, can be applied to
+    // a freshly created SharedGroup, even when another table existed in the
+    // group prior to the one being added in the mentioned transaction. This
+    // test is relevant because of the way table accesors are created and
+    // managed inside a SharedGroup, in particular because table accessors are
+    // created lazily, and will therefore not be present in a freshly created
+    // SharedGroup instance.
+
+    // Add the first table
+    {
+        UniquePtr<tightdb::Replication> repl_w(tightdb::makeWriteLogCollector(path));
+        SharedGroup sg_w(*repl_w);
+        WriteTransaction wt(sg_w);
+        wt.add_table("table_1");
+        wt.commit();
+    }
+
+    // Create a SharedGroup to which we can apply a foreign transaction
+    UniquePtr<tightdb::Replication> repl(tightdb::makeWriteLogCollector(path));
+    SharedGroup sg(*repl);
+    ReadTransaction rt(sg);
+
+    // Add the second table in a "foreign" transaction
+    {
+        UniquePtr<tightdb::Replication> repl_w(tightdb::makeWriteLogCollector(path));
+        SharedGroup sg_w(*repl_w);
+        WriteTransaction wt(sg_w);
+        wt.add_table("table_2");
+        wt.commit();
+    }
+
+    LangBindHelper::advance_read(sg);
+}
+
+
+TEST(LangBindHelper_AdvanceReadTransact_RemoveTableWithFreshSharedGroup)
+{
+    SHARED_GROUP_TEST_PATH(path);
+
+    // Testing that a foreign transaction, that removes a table, can be applied
+    // to a freshly created SharedGroup. This test is relevant because of the
+    // way table accesors are created and managed inside a SharedGroup, in
+    // particular because table accessors are created lazily, and will therefore
+    // not be present in a freshly created SharedGroup instance.
+
+    // Add the table
+    {
+        UniquePtr<tightdb::Replication> repl_w(tightdb::makeWriteLogCollector(path));
+        SharedGroup sg_w(*repl_w);
+        WriteTransaction wt(sg_w);
+        wt.add_table("table");
+        wt.commit();
+    }
+
+    // Create a SharedGroup to which we can apply a foreign transaction
+    UniquePtr<tightdb::Replication> repl(tightdb::makeWriteLogCollector(path));
+    SharedGroup sg(*repl);
+    ReadTransaction rt(sg);
+
+    // remove the table in a "foreign" transaction
+    {
+        UniquePtr<tightdb::Replication> repl_w(tightdb::makeWriteLogCollector(path));
+        SharedGroup sg_w(*repl_w);
+        WriteTransaction wt(sg_w);
+        wt.get_group().remove_table("table");
+        wt.commit();
+    }
+
+    LangBindHelper::advance_read(sg);
+}
+
+
 TEST(LangBindHelper_AdvanceReadTransact_CreateManyTables)
 {
     SHARED_GROUP_TEST_PATH(path);
+
+    {
+        UniquePtr<tightdb::Replication> repl_w(tightdb::makeWriteLogCollector(path));
+        SharedGroup sg_w(*repl_w);
+        WriteTransaction wt(sg_w);
+        wt.add_table("table");
+        wt.commit();
+    }
+
     UniquePtr<tightdb::Replication> repl(tightdb::makeWriteLogCollector(path));
     SharedGroup sg(*repl);
     ReadTransaction rt(sg);
