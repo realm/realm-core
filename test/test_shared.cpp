@@ -1945,8 +1945,16 @@ void waiter(string path, int i)
         LockGuard l(muu);
         shared_state[i] = 5;
     }
+    sg.begin_read();
+    sg.end_read();
+    sg.wait_for_change(); // wait until wait_for_change is disabled...
+    {
+        LockGuard l(muu);
+        shared_state[i] = 6;
+    }
 }
 
+// This test will hang infinitely instead of failing!!!
 TEST(Shared_WaitForChange)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -1956,32 +1964,60 @@ TEST(Shared_WaitForChange)
     Thread threads[num_threads];
     for (int j=0; j < num_threads; j++)
         threads[j].start(bind(&waiter, string(path), j));
-    sleep(1);
-    for (int j=0; j < num_threads; j++) {
-        LockGuard l(muu);
-        CHECK_EQUAL(1, shared_state[j]);
+    bool try_again = true;
+    while (try_again) {
+        sched_yield();
+        try_again = false;
+        for (int j=0; j < num_threads; j++) {
+            LockGuard l(muu);
+            if (shared_state[j] != 1) try_again = true;
+        }
     }
 
     sg.begin_write();
     sg.commit();
-    sleep(1);
-    for (int j=0; j < num_threads; j++) {
-        LockGuard l(muu);
-        CHECK_EQUAL(3, shared_state[j]);
+    try_again = true;
+    while (try_again) {
+        sched_yield();
+        try_again = false;
+        for (int j=0; j < num_threads; j++) {
+            LockGuard l(muu);
+            if (3 != shared_state[j]) try_again = true;
+        }
+    }
+
+    sg.begin_write();
+    sg.commit();
+    try_again = true;
+    while (try_again) {
+        sched_yield();
+        try_again = false;
+        for (int j=0; j < num_threads; j++) {
+            LockGuard l(muu);
+            if (4 != shared_state[j]) try_again = true;
+        }
     }
     sg.begin_write();
     sg.commit();
-    sleep(1);
-    for (int j=0; j < num_threads; j++) {
-        LockGuard l(muu);
-        CHECK_EQUAL(4, shared_state[j]);
+    try_again = true;
+    while (try_again) {
+        sched_yield();
+        try_again = false;
+        for (int j=0; j < num_threads; j++) {
+            LockGuard l(muu);
+            if (5 != shared_state[j]) try_again = true;
+        }
     }
-    sg.begin_write();
-    sg.commit();
-    sleep(1);
-    for (int j=0; j < num_threads; j++) {
-        LockGuard l(muu);
-        CHECK_EQUAL(5, shared_state[j]);
+
+    sg.wait_for_change_enable(false);
+    try_again = true;
+    while (try_again) {
+        sched_yield();
+        try_again = false;
+        for (int j=0; j < num_threads; j++) {
+            LockGuard l(muu);
+            if (6 != shared_state[j]) try_again = true;
+        }
     }
     for (int j=0; j < num_threads; j++)
         threads[j].join();
