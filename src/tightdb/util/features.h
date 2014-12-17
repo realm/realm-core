@@ -266,4 +266,9 @@
 #endif
 
 
+#if defined(TIGHTDB_DEBUG) && !defined(TIGHTDB_COOKIE_CHECK)
+#  define TIGHTDB_COOKIE_CHECK
+#endif
+
+
 #endif /* TIGHTDB_UTIL_FEATURES_H */

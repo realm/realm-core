@@ -25,8 +25,9 @@
 
 namespace {
 
-const uint8_t* crypt_key(bool always=false) {
-    static const uint8_t key[] = "12345678901234567890123456789011234567890123456789012345678901";
+const char* crypt_key(bool always=false)
+{
+    static const char key[] = "12345678901234567890123456789011234567890123456789012345678901";
     if (always) {
 #ifdef TIGHTDB_ENABLE_ENCRYPTION
         return key;

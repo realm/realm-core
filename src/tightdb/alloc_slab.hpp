@@ -100,7 +100,7 @@ public:
     ///
     /// \throw util::File::AccessError
     ref_type attach_file(const std::string& path, bool is_shared, bool read_only, bool no_create,
-                         bool skip_validate, const uint8_t* encryption_key, bool server_sync_mode);
+                         bool skip_validate, const char* encryption_key, bool server_sync_mode);
 
     /// Attach this allocator to the specified memory buffer.
     ///
@@ -404,7 +404,7 @@ inline bool SlabAlloc::nonempty_attachment() const TIGHTDB_NOEXCEPT
 
 inline std::size_t SlabAlloc::get_baseline() const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(is_attached());
+    TIGHTDB_ASSERT_DEBUG(is_attached());
     return m_baseline;
 }
 

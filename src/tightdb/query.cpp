@@ -18,7 +18,7 @@ Query::Query() : m_view(null_ptr)
 
 Query::Query(Table& table, RowIndexes* tv) : m_table(table.get_table_ref()), m_view(tv)
 {
-    TIGHTDB_ASSERT(m_view == null_ptr || m_view->cookie == m_view->cookie_expected);
+    TIGHTDB_ASSERT_DEBUG(m_view == null_ptr || m_view->cookie == m_view->cookie_expected);
     Create();
 }
 
@@ -27,13 +27,13 @@ Query::Query(const Table& table, const LinkViewRef& lv):
     m_view(lv.get()),
     m_source_link_view(lv)
 {
-    TIGHTDB_ASSERT(m_view == null_ptr || m_view->cookie == m_view->cookie_expected);
+    TIGHTDB_ASSERT_DEBUG(m_view == null_ptr || m_view->cookie == m_view->cookie_expected);
     Create();
 }
 
 Query::Query(const Table& table, RowIndexes* tv) : m_table((const_cast<Table&>(table)).get_table_ref()), m_view(tv)
 {
-    TIGHTDB_ASSERT(m_view == null_ptr ||m_view->cookie == m_view->cookie_expected);
+    TIGHTDB_ASSERT_DEBUG(m_view == null_ptr ||m_view->cookie == m_view->cookie_expected);
     Create();
 }
 
@@ -546,7 +546,7 @@ Query& Query::not_equal(size_t column_ndx, StringData value, bool case_sensitive
 size_t Query::peek_tableview(size_t tv_index) const
 {
     TIGHTDB_ASSERT(m_view);
-    TIGHTDB_ASSERT(m_view->cookie == m_view->cookie_expected);
+    TIGHTDB_ASSERT_DEBUG(m_view->cookie == m_view->cookie_expected);
     TIGHTDB_ASSERT(tv_index < m_view->size());
 
     size_t tablerow = m_view->m_row_indexes.get(tv_index);

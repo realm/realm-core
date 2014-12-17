@@ -88,19 +88,18 @@ public:
     /// returns `not_found`.
     std::size_t get_column_index(StringData name) const TIGHTDB_NOEXCEPT;
 
-    /// Shorthand for calling insert_column() with a column index equal to the
-    /// original number of columns. The returned value is that column index.
-    ///
-    /// \sa insert_column()
-    /// \sa add_column_link()
-    /// \sa Table::add_column()
-    std::size_t add_column(DataType type, StringData name, DescriptorRef* subdesc = 0);
+    //@{
 
-    /// Insert a new column into all the tables associated with this
-    /// descriptor. If any of the tables are not empty, the new column will be
-    /// filled with the default value associated with the specified type. This
-    /// function cannot be used to insert link-type columns. For that, you have
-    /// to use insert_column_link() instead.
+    /// add_column() and add_column_link() are a shorthands for calling
+    /// insert_column() and insert_column_link(), respectively, with a column
+    /// index equal to the original number of columns. The returned value is
+    /// that column index.
+    ///
+    /// insert_column() inserts a new column into all the tables associated with
+    /// this descriptor. If any of the tables are not empty, the new column will
+    /// be filled with the default value associated with the specified data
+    /// type. This function cannot be used to insert link-type columns. For
+    /// that, you have to use insert_column_link() instead.
     ///
     /// This function modifies the dynamic type of all the tables that
     /// share this descriptor. It does this by inserting a new column
@@ -108,31 +107,42 @@ public:
     /// specified index, and into each of the tables that share this
     /// descriptor.
     ///
+    /// insert_column_link() is like insert_column(), but inserts a link-type
+    /// column to a group-level table. It is not possible to add link-type
+    /// columns to tables that are not group-level tables. This functions must
+    /// be used in place of insert_column() when the column type is `type_Link`
+    /// or `type_LinkList`. A link-type column is associated with a particular
+    /// target table. All links in a link-type column refer to rows in the
+    /// target table of that column. The target table must also be a group-level
+    /// table.
+    ///
+    /// \param name Name of new column. All strings are valid column names as
+    /// long as they are valid UTF-8 encodings and the number of bytes does not
+    /// exceed `max_column_name_length`. An attempt to add a column with a name
+    /// that is longer than `max_column_name_length` will cause an exception to
+    /// be thrown.
+    ///
     /// \param subdesc If a non-null pointer is passed, and the
     /// specified type is `type_Table`, then this function
     /// automatically retrieves the descriptor associated with the new
     /// subtable column, and stores a reference to its accessor in
     /// `*subdesc`.
     ///
-    /// \sa is_root()
-    /// \sa insert_column_link()
+    /// \param link_type See set_link_type().
+    ///
+    /// \sa Table::add_column()
     /// \sa Table::insert_column()
+    /// \sa Table::add_column_link()
+    /// \sa Table::insert_column_link()
+    /// \sa is_root()
+
+    static const std::size_t max_column_name_length = 63;
+
+    std::size_t add_column(DataType type, StringData name, DescriptorRef* subdesc = 0);
+
     void insert_column(std::size_t column_ndx, DataType type, StringData name,
                        DescriptorRef* subdesc = 0);
 
-    //@{
-    /// Add a link-type column to a group-level table. It is not possible to add
-    /// link-type columns to tables that are not group-level tables. These
-    /// functions must be used in place of the ones without the `_link` suffix
-    /// when the column type is `type_Link` or `type_LinkList`. A link-type
-    /// column is associated with a particular target table. All links in a
-    /// link-type column refer to rows in the target table of that column. The
-    /// target table must also be a group-level table.
-    ///
-    /// \param link_type See set_link_type().
-    ///
-    /// \sa Table::add_column_link()
-    /// \sa Table::insert_column_link()
     std::size_t add_column_link(DataType type, StringData name, Table& target,
                                 LinkType = link_Weak);
     void insert_column_link(std::size_t column_ndx, DataType type, StringData name, Table& target,

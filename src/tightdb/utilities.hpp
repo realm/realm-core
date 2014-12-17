@@ -129,7 +129,7 @@ int fast_popcount64(int64_t x);
 // Safe cast from 64 to 32 bits on 32 bit architecture. Differs from to_ref() by not testing alignment and REF-bitflag.
 inline std::size_t to_size_t(int_fast64_t v) TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(!util::int_cast_has_overflow<std::size_t>(v));
+    TIGHTDB_ASSERT_DEBUG(!util::int_cast_has_overflow<std::size_t>(v));
     return std::size_t(v);
 }
 

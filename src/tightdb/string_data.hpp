@@ -175,7 +175,7 @@ inline StringData::StringData(const char* data, std::size_t size) TIGHTDB_NOEXCE
     m_data(data),
     m_size(size)
 {
-    TIGHTDB_ASSERT(data || size == 0);
+    TIGHTDB_ASSERT_DEBUG(data || size == 0);
 }
 
 template<class T, class A> inline StringData::StringData(const std::basic_string<char, T, A>& s):

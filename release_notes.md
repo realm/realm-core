@@ -1,22 +1,27 @@
-# NEXT RELEASE
-
-### Bugfixes:
-
-* Lorem ipsum.
-
-### API breaking changes:
-
-* Lorem ipsum.
+# 0.87.1 Release notes
 
 ### Enhancements:
 
 * Added 'compact' method to SharedGroup for better control of compaction of the database file.
+* The following constants were added: `Group::max_table_name_length`,
+  `Table::max_column_name_length`, `Table::max_string_size`, and
+  `Table::max_binary_size`.
+* Now throwing on overlong table and column names, and on oversized strings and
+  binary data values.
+* Fall back to the old query nodes for String as well as int/double/float.
 
 -----------
 
 ### Internals:
 
-* Lorem ipsum.
+* There is now three kinds of runtime assertions, `TIGHTDB_ASSERT_DEBUG()`,
+  which is retained only in debug-mode builds, `TIGHTDB_ASSERT_RELEASE()`, which
+  is also retained in release-mode builds, and finally, `TIGHTDB_ASSERT()`,
+  which is normally only retained in debug-mode builds, but may occasionally be
+  retained in release-mode builds too, depending on the specific build
+  configuration.
+* `TIGHTDB_ASSERT()` assertions are now enabled in release-mode builds by
+  default.
 
 ----------------------------------------------
 

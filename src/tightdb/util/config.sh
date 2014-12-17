@@ -73,6 +73,13 @@ else
     enable_encryption="0"
 fi
 
+enable_assertions="$(get_config_param "ENABLE_ASSERTIONS")" || exit 1
+if [ "$enable_assertions" = "yes" ]; then
+    enable_assertions="1"
+else
+    enable_assertions="0"
+fi
+
 cat >"$target" <<EOF
 /*************************************************************************
  *
@@ -107,5 +114,9 @@ cat >"$target" <<EOF
 
 #if $enable_encryption
 #  define TIGHTDB_ENABLE_ENCRYPTION 1
+#endif
+
+#if $enable_assertions
+#  define TIGHTDB_ENABLE_ASSERTIONS 1
 #endif
 EOF

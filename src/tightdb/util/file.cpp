@@ -352,7 +352,7 @@ error:
 
 #else // POSIX version
 
-    if (m_encrypt) {
+    if (m_encryption_key) {
         off_t pos = lseek(m_fd, 0, SEEK_CUR);
         Map<char> map(*this, access_ReadOnly, static_cast<size_t>(pos + size));
         memcpy(data, map.get_addr() + pos, size);
@@ -409,7 +409,7 @@ void File::write(const char* data, size_t size)
 
 #else // POSIX version
 
-    if (m_encrypt) {
+    if (m_encryption_key) {
         off_t pos = lseek(m_fd, 0, SEEK_CUR);
         Map<char> map(*this, access_ReadWrite, static_cast<size_t>(pos + size));
         memcpy(map.get_addr() + pos, data, size);
@@ -460,7 +460,7 @@ File::SizeType File::get_size() const
         SizeType size;
         if (int_cast_with_overflow_detect(statbuf.st_size, size))
             throw runtime_error("File size overflow");
-        if (m_encrypt)
+        if (m_encryption_key)
             return encrypted_size_to_data_size(size);
         return size;
     }
@@ -483,7 +483,7 @@ void File::resize(SizeType size)
 
 #else // POSIX version
 
-    if (m_encrypt)
+    if (m_encryption_key)
         size = data_size_to_encrypted_size(size);
 
     off_t size2;
@@ -527,7 +527,7 @@ void File::prealloc_if_supported(SizeType offset, size_t size)
 
     TIGHTDB_ASSERT(is_prealloc_supported());
 
-    if (m_encrypt)
+    if (m_encryption_key)
         size = data_size_to_encrypted_size(size);
 
     off_t size2;
@@ -754,7 +754,7 @@ void* File::map(AccessMode a, size_t size, int map_flags) const
     // reliably detect these systems?
     static_cast<void>(map_flags);
 
-    return tightdb::util::mmap(m_fd, size, a, m_encrypt ? m_encryption_key : 0);
+    return tightdb::util::mmap(m_fd, size, a, m_encryption_key.get());
 
 #endif
 }
@@ -974,16 +974,16 @@ bool File::is_removed() const
 #endif
 }
 
-void File::set_encryption_key(const uint8_t* key)
+void File::set_encryption_key(const char* key)
 {
 #ifdef TIGHTDB_ENABLE_ENCRYPTION
     if (key) {
-        memcpy(m_encryption_key, key, sizeof(m_encryption_key));
-        m_encrypt = true;
+        char *buffer = new char[64];
+        memcpy(buffer, key, 64);
+        m_encryption_key.reset(buffer);
     }
     else {
-        memset(m_encryption_key, 0, sizeof(m_encryption_key));
-        m_encrypt = false;
+        m_encryption_key.reset();
     }
 #else
     if (key) {

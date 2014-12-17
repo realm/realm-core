@@ -213,8 +213,8 @@ void ColumnBackLink::erase(size_t, bool)
 
 void ColumnBackLink::move_last_over(size_t row_ndx, size_t last_row_ndx, bool)
 {
-    TIGHTDB_ASSERT(row_ndx <= last_row_ndx);
-    TIGHTDB_ASSERT(last_row_ndx + 1 == size());
+    TIGHTDB_ASSERT_DEBUG(row_ndx <= last_row_ndx);
+    TIGHTDB_ASSERT_DEBUG(last_row_ndx + 1 == size());
 
     // Nullify all links pointing to the row being deleted
     bool do_destroy = true;
