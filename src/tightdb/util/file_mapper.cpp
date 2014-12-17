@@ -329,7 +329,7 @@ void* mremap(int fd, void* old_addr, size_t old_size, File::AccessMode a, size_t
     throw std::runtime_error(get_errno_msg("mremap(): failed: ", err));
 #else
     void* new_addr = mmap(fd, new_size, a, nullptr);
-    if(::munmap(old_addr, old_size) != 0)
+    if(::munmap(old_addr, old_size) != 0) {
         int err = errno;
         throw std::runtime_error(get_errno_msg("munmap() failed: ", err));
     }
