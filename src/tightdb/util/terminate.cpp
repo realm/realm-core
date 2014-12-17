@@ -51,7 +51,7 @@ TIGHTDB_NORETURN void abort() TIGHTDB_NOEXCEPT
 
 TIGHTDB_NORETURN void terminate(string message, const char* file, long line) TIGHTDB_NOEXCEPT
 {
-    const char *support_message = "Please send the log and Realm files to help@realm.io.";
+    const char *support_message = "IMPORTANT: if you see this error, please send this log to help@realm.io.";
     cerr << file << ":" << line << ": " << message << endl;
 
 #if defined __APPLE__
