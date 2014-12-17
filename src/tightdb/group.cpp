@@ -1024,13 +1024,14 @@ public:
 
     bool insert_group_level_table(size_t table_ndx, size_t num_tables, StringData) TIGHTDB_NOEXCEPT
     {
+        TIGHTDB_ASSERT(table_ndx <= num_tables);
+        TIGHTDB_ASSERT(m_group.m_table_accessors.empty() ||
+                       m_group.m_table_accessors.size() == num_tables);
+
         if (!m_group.m_table_accessors.empty()) {
             // for end-insertions, table_ndx will be equal to num_tables
-            TIGHTDB_ASSERT(table_ndx <= num_tables);
             m_group.m_table_accessors.push_back(0); // Throws
             size_t last_ndx = num_tables;
-            TIGHTDB_ASSERT(m_group.m_table_accessors.size() > last_ndx);
-            TIGHTDB_ASSERT(m_group.m_table_accessors.size() > table_ndx);
             m_group.m_table_accessors[last_ndx] = m_group.m_table_accessors[table_ndx];
             m_group.m_table_accessors[table_ndx] = 0;
             if (Table* moved_table = m_group.m_table_accessors[last_ndx]) {
@@ -1039,16 +1040,17 @@ public:
                 tf::mark_opposite_link_tables(*moved_table);
             }
         }
+
         return true;
     }
 
     bool erase_group_level_table(size_t table_ndx, size_t num_tables) TIGHTDB_NOEXCEPT
     {
         TIGHTDB_ASSERT(table_ndx < num_tables);
+        TIGHTDB_ASSERT(m_group.m_table_accessors.empty() ||
+                       m_group.m_table_accessors.size() == num_tables);
 
         if (!m_group.m_table_accessors.empty()) {
-            TIGHTDB_ASSERT(m_group.m_table_accessors.size() > table_ndx);
-
             // Link target tables do not need to be considered here, since all
             // columns will already have been removed at this point.
             if (Table* table = m_group.m_table_accessors[table_ndx]) {
@@ -1059,7 +1061,6 @@ public:
 
             size_t last_ndx = num_tables - 1;
             if (table_ndx < last_ndx) {
-                TIGHTDB_ASSERT(m_group.m_table_accessors.size() > last_ndx);
                 if (Table* moved_table = m_group.m_table_accessors[last_ndx]) {
                     typedef _impl::TableFriend tf;
                     tf::mark(*moved_table);
