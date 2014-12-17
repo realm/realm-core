@@ -1,12 +1,4 @@
-# NEXT RELEASE
-
-### Bugfixes:
-
-* Lorem ipsum.
-
-### API breaking changes:
-
-* Lorem ipsum.
+# 0.87.1 Release notes
 
 ### Enhancements:
 
@@ -21,7 +13,14 @@
 
 ### Internals:
 
-* Lorem ipsum.
+* There is now three kinds of runtime assertions, `TIGHTDB_ASSERT_DEBUG()`,
+  which is retained only in debug-mode builds, `TIGHTDB_ASSERT_RELEASE()`, which
+  is also retained in release-mode builds, and finally, `TIGHTDB_ASSERT()`,
+  which is normally only retained in debug-mode builds, but may occasionally be
+  retained in release-mode builds too, depending on the specific build
+  configuration.
+* `TIGHTDB_ASSERT()` assertions are now enabled in release-mode builds by
+  default.
 
 ----------------------------------------------
 
