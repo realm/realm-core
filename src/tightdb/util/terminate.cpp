@@ -18,6 +18,7 @@
  *
  **************************************************************************/
 #include <iostream>
+#include <sstream>
 
 #ifdef __APPLE__
 #include <execinfo.h>
@@ -29,8 +30,6 @@
 #endif
 
 #include <tightdb/util/terminate.hpp>
-
-using namespace std;
 
 // extern "C" and noinline so that a readable message shows up in the stack trace
 // of the crash
@@ -52,24 +51,30 @@ void nslog(const char *message) {
 
 TIGHTDB_NORETURN void terminate(const char* message, const char* file, long line) TIGHTDB_NOEXCEPT
 {
-    const char *support_message = "IMPORTANT: if you see this error, please send this log to help@realm.io.";
-    cerr << file << ":" << line << ": " << message << endl;
+    std::stringstream ss;
+    ss << file << ":" << line << ": " << message << "\n";
 
 #if defined(__APPLE__)
     void* callstack[128];
     int frames = backtrace(callstack, 128);
     char** strs = backtrace_symbols(callstack, frames);
     for (int i = 0; i < frames; ++i) {
-        cerr << strs[i] << endl;
-        nslog(strs[i]);
+        ss << strs[i] << "\n";
     }
     free(strs);
-    nslog(support_message);
-#elif defined(__ANDROID__)
-    __android_log_print(ANDROID_LOG_ERROR, "TIGHTDB", support_message);
-#else
-    cerr << support_message << endl;
 #endif
+
+    ss << "IMPORTANT: if you see this error, please send this log to help@realm.io.";
+#ifdef TIGHTDB_DEBUG
+    std::cerr << ss.rdbuf();
+#endif
+
+#if defined(__APPLE__)
+    nslog(ss.str().c_str());
+#elif defined(__ANDROID__)
+    __android_log_print(ANDROID_LOG_ERROR, "TIGHTDB", ss.str().c_str());
+#endif
+
     please_report_this_error_to_help_at_realm_dot_io();
 }
 
