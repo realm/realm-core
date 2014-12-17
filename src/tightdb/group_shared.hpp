@@ -298,7 +298,7 @@ private:
     util::File::Map<SharedInfo> m_reader_map;
     std::string m_file_path; // path to lock file
     std::string m_path; // path to database file
-    const uint8_t* m_key;
+    const char* m_key;
     enum TransactStage {
         transact_Ready,
         transact_Reading,
