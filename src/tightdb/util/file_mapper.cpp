@@ -308,12 +308,13 @@ void* mremap(int fd, void* old_addr, size_t old_size, File::AccessMode a, size_t
 
             void* new_addr = mmap_anon(rounded_new_size);
             m->mapping->set(new_addr, rounded_new_size);
-            if (::munmap(old_addr, rounded_old_size) != 0) {
+            int i = ::munmap(old_addr, rounded_old_size);
+            m->addr = new_addr;
+            m->size = rounded_new_size;
+            if (i != 0) {
                 int err = errno;
                 throw std::runtime_error(get_errno_msg("munmap() failed: ", err));
             }
-            m->addr = new_addr;
-            m->size = rounded_new_size;
             return new_addr;
         }
     }
