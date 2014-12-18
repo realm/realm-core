@@ -296,8 +296,8 @@ private:
     util::File m_file;
     util::File::Map<SharedInfo> m_file_map; // Never remapped
     util::File::Map<SharedInfo> m_reader_map;
-    std::string m_file_path; // path to lock file
-    std::string m_path; // path to database file
+    std::string m_lockfile_path;
+    std::string m_db_path;
     const char* m_key;
     enum TransactStage {
         transact_Ready,

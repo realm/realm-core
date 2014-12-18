@@ -568,14 +568,14 @@ void SharedGroup::open(const string& path, bool no_create_file,
 {
     TIGHTDB_ASSERT(!is_attached());
 
-    m_path = path;
+    m_db_path = path;
     m_key = key;
-    m_file_path = path + ".lock";
+    m_lockfile_path = path + ".lock";
     SlabAlloc& alloc = m_group.m_alloc;
 
     while (1) {
 
-        m_file.open(m_file_path, File::access_ReadWrite, File::create_Auto, 0);
+        m_file.open(m_lockfile_path, File::access_ReadWrite, File::create_Auto, 0);
         File::CloseGuard fcg(m_file);
         if (m_file.try_lock_exclusive()) {
 
@@ -778,9 +778,9 @@ bool SharedGroup::compact()
 {
     // Verify that preconditions for compacting is met:
     if (m_transact_stage != transact_Ready) {
-        throw runtime_error(m_file_path + ": compact is not supported whithin a transaction");
+        throw runtime_error(m_db_path + ": compact is not supported whithin a transaction");
     }
-    string tmp_path = m_path + ".tmp";
+    string tmp_path = m_db_path + ".tmp";
     SharedInfo* info = m_file_map.get_addr();
     RobustLockGuard lock(info->controlmutex, &recover_from_dead_write_transact); // Throws
     if (info->num_participants > 1)
@@ -794,7 +794,7 @@ bool SharedGroup::compact()
     // so it becomes the database file, replacing the old one in the process.
     // TODO: group::write() must store the version info - this is not done at the moment.
     m_group.write(tmp_path, m_key, info->latest_version_number);
-    rename(tmp_path.c_str(), m_path.c_str());
+    rename(tmp_path.c_str(), m_db_path.c_str());
     end_read();
 
     // We must detach group complety to force it to fully refresh its accessors for use
@@ -809,7 +809,7 @@ bool SharedGroup::compact()
     bool read_only = false;
     bool is_shared = true;
     bool server_sync_mode = false;
-    ref_type top_ref = alloc.attach_file(m_path, is_shared, read_only, no_create, 
+    ref_type top_ref = alloc.attach_file(m_db_path, is_shared, read_only, no_create, 
                                          skip_validate, m_key, server_sync_mode); // Throws
     size_t file_size = alloc.get_baseline();
 
@@ -875,10 +875,8 @@ void SharedGroup::close() TIGHTDB_NOEXCEPT
             // we can delete it when done.
             if (info->flags == durability_MemOnly) {
                 try {
-                    size_t path_len = m_file_path.size()-5; // remove ".lock"
-                    string db_path = m_file_path.substr(0, path_len); // Throws
                     m_group.m_alloc.detach();
-                    util::File::remove(db_path.c_str());
+                    util::File::remove(m_db_path.c_str());
                 }
                 catch(...) {} // ignored on purpose.
             }
