@@ -338,7 +338,7 @@ public:
     ///
     /// \param pad If true, the file is padded to ensure the footer is aligned
     /// to the end of a page
-    void write(std::ostream&, bool pad=false) const;
+    void write(std::ostream&, bool pad=false, uint_fast64_t version_numer = 0) const;
 
     /// Write this database to a new file. It is an error to specify a
     /// file that already exists. This is to protect against
@@ -350,12 +350,16 @@ public:
     /// \param encryption_key 32-byte key used to encrypt the database file,
     /// or nullptr to disable encryption.
     ///
+    /// \param version_number if anything but 0, store full versioning and freelist
+    /// information during the write.
+    ///
     /// \throw util::File::AccessError If the file could not be
     /// opened. If the reason corresponds to one of the exception
     /// types that are derived from util::File::AccessError, the
     /// derived exception type is thrown. In particular,
     /// util::File::Exists will be thrown if the file exists already.
-    void write(const std::string& file, const char* encryption_key=0) const;
+    void write(const std::string& file, const char* encryption_key=0, 
+               uint_fast64_t version_number = 0) const;
 
     /// Write this database to a memory buffer.
     ///
@@ -472,7 +476,7 @@ private:
     class TableWriter;
     class DefaultTableWriter;
 
-    static void write(std::ostream&, TableWriter&, bool);
+    static void write(std::ostream&, TableWriter&, bool, uint_fast64_t = 0);
 
     /// Create a new underlying node structure and attach this
     /// accessor instance to it

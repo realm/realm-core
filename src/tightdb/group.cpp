@@ -561,14 +561,14 @@ private:
     const Group& m_group;
 };
 
-void Group::write(ostream& out, bool pad) const
+void Group::write(ostream& out, bool pad, uint_fast64_t version_number) const
 {
     TIGHTDB_ASSERT(is_attached());
     DefaultTableWriter table_writer(*this);
-    write(out, table_writer, pad); // Throws
+    write(out, table_writer, pad, version_number); // Throws
 }
 
-void Group::write(const string& path, const char* encryption_key) const
+void Group::write(const string& path, const char* encryption_key, uint_fast64_t version_number) const
 {
     File file;
     int flags = 0;
@@ -576,7 +576,7 @@ void Group::write(const string& path, const char* encryption_key) const
     file.set_encryption_key(encryption_key);
     File::Streambuf streambuf(&file);
     ostream out(&streambuf);
-    write(out, encryption_key != 0);
+    write(out, encryption_key != 0, version_number);
 }
 
 
@@ -607,7 +607,8 @@ BinaryData Group::write_to_mem() const
 }
 
 
-void Group::write(ostream& out, TableWriter& table_writer, bool pad_for_encryption)
+void Group::write(ostream& out, TableWriter& table_writer,
+                  bool pad_for_encryption, uint_fast64_t version_number)
 {
     _impl::OutputStream out_2(out);
 
@@ -619,26 +620,52 @@ void Group::write(ostream& out, TableWriter& table_writer, bool pad_for_encrypti
     // top-array, we have to start by writing everything except the
     // top-array, and then finally compute and write a correct version
     // of the top-array. The free-space information of the group will
-    // not be included, as it is not needed in the streamed format.
+    // only be included if a non-zero version number is given as parameter,
+    // indicating that versioning info is to be saved. This is used from
+    // SharedGroup to compact the database by writing only the live data
+    // into a separate file.
     size_t names_pos  = table_writer.write_names(out_2); // Throws
     size_t tables_pos = table_writer.write_tables(out_2); // Throws
-    size_t top_pos = out_2.get_pos();
-
-    // Produce a preliminary version of the top array whose
-    // representation is guaranteed to be able to hold the final file
-    // size
-    int top_size = 3;
-    size_t max_top_byte_size = Array::get_max_byte_size(top_size);
-    uint64_t max_final_file_size = top_pos + max_top_byte_size;
+    int top_size;
     Array top(Allocator::get_default());
     top.create(Array::type_HasRefs); // Throws
-    // FIXME: Dangerous cast: unsigned -> signed
-    top.ensure_minimum_width(1 + 2*max_final_file_size); // Throws
     // FIXME: We really need an alternative to Array::truncate() that is able to expand.
     // FIXME: Dangerous cast: unsigned -> signed
     top.add(names_pos); // Throws
     top.add(tables_pos); // Throws
     top.add(0); // Throws
+
+    if (version_number) {
+        Array free_list(Allocator::get_default());
+        Array size_list(Allocator::get_default());
+        Array version_list(Allocator::get_default());
+        free_list.create(Array::type_Normal);
+        size_list.create(Array::type_Normal);
+        version_list.create(Array::type_Normal);
+        size_t free_list_pos = free_list.write(out_2, /* recurse: */ false, /* persist: */ false);
+        size_t size_list_pos = size_list.write(out_2, /* recurse: */ false, /* persist: */ false);
+        size_t version_list_pos = version_list.write(out_2, /* recurse: */ false, /* persist: */ false);
+        top.add(free_list_pos);
+        top.add(size_list_pos);
+        top.add(version_list_pos);
+        top.add(1 + 2 * version_number);
+        top_size = 7;
+        free_list.destroy();
+        size_list.destroy();
+        version_list.destroy();
+    }
+    else {
+        top_size = 3;
+    }
+    size_t top_pos = out_2.get_pos();
+
+    // Produce a preliminary version of the top array whose
+    // representation is guaranteed to be able to hold the final file
+    // size
+    size_t max_top_byte_size = Array::get_max_byte_size(top_size);
+    uint64_t max_final_file_size = top_pos + max_top_byte_size;
+    // FIXME: Dangerous cast: unsigned -> signed
+    top.ensure_minimum_width(1 + 2*max_final_file_size); // Throws
 
     // Finalize the top array by adding the projected final file size
     // to it
