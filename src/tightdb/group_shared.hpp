@@ -235,13 +235,27 @@ public:
 
     // Transactions:
 
+   struct VersionID {
+        uint_fast64_t version;
+        uint_fast32_t index;
+    };
+
     // Begin a new read transaction. Accessors obtained prior to this point
     // are invalid (if they weren't already) and new accessors must be
     // obtained from the group returned.
-    const Group& begin_read();
+    // If a specific_version is given as parameter, an attempt will be made
+    // to start the read transaction at that specific version. This is only
+    // guaranteed to succeed if at least one other SharedGroup has a transaction
+    // open pointing at that specific version. If the attempt fails, an exception
+    // is thrown
+    const Group& begin_read(VersionID* specific_version = 0);
 
     // End a read transaction. Accessors are detached.
     void end_read() TIGHTDB_NOEXCEPT;
+
+    // Get a version id which may be used to request a different SharedGroup
+    // to start transaction at a specific version.
+    void get_version_of_current_transaction(VersionID* the_version);
 
     // Begin a new write transaction. Accessors obtained prior to this point
     // are invalid (if they weren't already) and new accessors must be
@@ -312,8 +326,12 @@ private:
     // is given an undefined value.
     void grab_latest_readlock(ReadLockInfo& readlock, bool& same_as_before);
 
+    // Try to grab a readlock for a specific version. Fails if the version is no longer
+    // accessible.
+    bool grab_specific_readlock(ReadLockInfo& readlock, bool& same_as_before, VersionID* specific_version);
+
     // Release a specific readlock. The readlock info MUST have been obtained by a
-    // call to grab_latest_readlock().
+    // call to grab_latest_readlock() or grab_specific_readlock().
     void release_readlock(ReadLockInfo& readlock) TIGHTDB_NOEXCEPT;
 
     void do_begin_write();
@@ -338,7 +356,13 @@ private:
     // Advance the current read transaction to include latest state.
     // All accessors are retained and synchronized to the new state
     // according to the (to be) defined operational transform.
-    void advance_read();
+    // If a specific_version is given as parameter, an attempt will be made
+    // to start the read transaction at that specific version. This is only
+    // guaranteed to succeed if at least one other SharedGroup has a transaction
+    // open pointing at that specific version, and if the version requested
+    // is the same or later than the one currently accessed.
+    // Returns true if successfull.
+    bool advance_read(VersionID* specific_version);
 
     // Promote the current read transaction to a write transaction.
     // CAUTION: This also synchronizes with latest state of the database,
