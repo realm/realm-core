@@ -2,7 +2,7 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
+* Fixed bug in String and Integer index where find()/find_all() would return a wrong match.
 
 ### API breaking changes:
 
