@@ -535,6 +535,34 @@ inline SharedGroup::SharedGroup(Replication& repl, DurabilityLevel dlevel, const
 }
 #endif
 
+inline bool operator==(SharedGroup::VersionID& a, SharedGroup::VersionID& b)
+{
+    return a.version == b.version;
+}
+
+inline bool operator!=(SharedGroup::VersionID& a, SharedGroup::VersionID& b)
+{
+    return !(a==b);
+}
+
+inline bool operator<(SharedGroup::VersionID& a, SharedGroup::VersionID& b)
+{
+    return a.version < b.version;
+}
+
+inline bool operator>(SharedGroup::VersionID& a, SharedGroup::VersionID& b)
+{
+    return b < a;
+}
+
+inline bool operator>=(SharedGroup::VersionID& a, SharedGroup::VersionID& b)
+{
+    return !(b < a);
+}
+inline bool operator<=(SharedGroup::VersionID& a, SharedGroup::VersionID& b)
+{
+    return !(a > b);
+}
 
 } // namespace tightdb
 
