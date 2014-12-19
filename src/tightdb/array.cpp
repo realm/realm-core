@@ -3030,15 +3030,6 @@ top:
         if (ref & 1) {
             size_t row_ref = size_t(uint64_t(ref) >> 1);
 
-            // If the last byte in the stored key is zero, we know that we have
-            // compared against the entire (target) string
-            if (!(stored_key << 24)) {
-                result_ref = row_ref;
-                if (all)
-                    result.add(row_ref);
-
-                return first ? row_ref : count ? 1 : FindRes_single;
-            }
             // for integer index, get_func fills out 'buffer' and makes str point at it
             char buffer[8];
             StringData str = (*get_func)(column, row_ref, buffer);
@@ -3069,17 +3060,13 @@ top:
                 const char* sub_data = get_data_from_header(sub_header);
                 const size_t first_row_ref = to_size_t(get_direct(sub_data, sub_width, 0));
 
-                // If the last byte in the stored key is not zero, we have
-                // not yet compared against the entire (target) string
-                if ((stored_key << 24)) {
-                    // for integer index, get_func fills out 'buffer' and makes str point at it
-                    char buffer[8];
-                    StringData str = (*get_func)(column, first_row_ref, buffer);
-                    if (str != value) {
-                        if (count)
-                            return 0;
-                        return allnocopy ? size_t(FindRes_not_found) : first ? not_found : 0;
-                    }
+                // for integer index, get_func fills out 'buffer' and makes str point at it
+                char buffer[8];
+                StringData str = (*get_func)(column, first_row_ref, buffer);
+                if (str != value) {
+                    if (count)
+                        return 0;
+                    return allnocopy ? size_t(FindRes_not_found) : first ? not_found : 0;
                 }
 
                 result_ref = to_ref(ref);
@@ -3105,15 +3092,11 @@ top:
                 if (count)
                     sub_count = sub.size();
 
-                // If the last byte in the stored key is not zero, we have
-                // not yet compared against the entire (target) string
-                if ((stored_key << 24)) {
-                    // for integer index, get_func fills out 'buffer' and makes str point at it
-                    char buffer[8];
-                    StringData str = (*get_func)(column, first_row_ref, buffer);
-                    if (str != value)
-                        return allnocopy ? size_t(FindRes_not_found) : first ? not_found : 0;
-                }
+                // for integer index, get_func fills out 'buffer' and makes str point at it
+                char buffer[8];
+                StringData str = (*get_func)(column, first_row_ref, buffer);
+                if (str != value)
+                    return allnocopy ? size_t(FindRes_not_found) : first ? not_found : 0;
 
                 result_ref = to_ref(ref);
                 if (all) {
