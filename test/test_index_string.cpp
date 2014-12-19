@@ -710,6 +710,7 @@ TEST(StringIndex_Bug1)
     ref_type ref2 = AdaptiveStringColumn::create(Allocator::get_default());
     AdaptiveStringColumn col2(Allocator::get_default(), ref2);
     const StringIndex& ndx2 = col2.create_search_index();
+    static_cast<void>(ndx2);
     col2.add(StringData("\0\0\0\0\0\x001\0\0", 8));
     size_t t = col2.find_first(StringData("\0\0\0\0\0\x002\0\0"));
     CHECK_EQUAL(t, not_found);
