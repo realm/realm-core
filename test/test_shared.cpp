@@ -99,7 +99,7 @@ void writer(string path, int id)
     try {
         SharedGroup sg(path, true, SharedGroup::durability_Full);
         // cerr << "Opened sg, pid " << getpid() << endl;
-        for (int i=0; i<1000; ++i) {
+        for (int i=0;; ++i) {
             // cerr << "       - " << getpid() << endl;
             WriteTransaction wt(sg);
             if (i & 1) {
@@ -156,7 +156,6 @@ void killer(TestResults& test_results, int pid, string path, int id)
         ReadTransaction rt(sg);
         rt.get_group().Verify();
         TestTableShared::ConstRef t1 = rt.get_table<TestTableShared>("test");
-        CHECK(500 > t1[id].first);
         CHECK(10 < t1[id].first);
     }
 }
