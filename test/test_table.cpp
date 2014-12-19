@@ -9,6 +9,7 @@
 
 #include <tightdb.hpp>
 #include <tightdb/lang_bind_helper.hpp>
+#include <tightdb/util/buffer.hpp>
 
 #include "util/misc.hpp"
 
@@ -5489,6 +5490,21 @@ TEST(Table_ClearWithTwoLevelBptree)
     table.add_empty_row(TIGHTDB_MAX_BPNODE_SIZE+1);
     table.clear();
     table.Verify();
+}
+
+TEST(Table_MaximumDataLength)
+{
+    Table table;
+    table.add_column(type_String, "");
+    table.add_column(type_Binary, "");
+    table.add_empty_row();
+
+    Buffer<char> str(Table::max_string_size + 1);
+    CHECK_THROW(table.set_string(0, 0, StringData(str.data(), str.size())), LogicError);
+    CHECK_THROW(table.set_binary(1, 0, BinaryData(str.data(), str.size())), LogicError);
+
+    table.set_string(0, 0, StringData(str.data(), Table::max_string_size));
+    table.set_binary(1, 0, BinaryData(str.data(), Table::max_binary_size));
 }
 
 #endif // TEST_TABLE

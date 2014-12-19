@@ -439,8 +439,8 @@ public:
     /// key, if that would result in a violation the implied *unique constraint*
     /// of that primary key. The consequenses of doing so are unspecified.
 
-    static const std::size_t max_string_size = 0xFFFFFF; // 16 MiB
-    static const std::size_t max_binary_size = 0xFFFFFF; // 16 MiB
+    static const std::size_t max_string_size = 0xFFFFFF - 16; // 16 MiB minus the allocation header
+    static const std::size_t max_binary_size = 0xFFFFFF - 16; // 16 MiB minus the allocation header
 
     void set_int(std::size_t column_ndx, std::size_t row_ndx, int_fast64_t value);
     void set_bool(std::size_t column_ndx, std::size_t row_ndx, bool value);
