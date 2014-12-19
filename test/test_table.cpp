@@ -5507,4 +5507,13 @@ TEST(Table_MaximumDataLength)
     table.set_binary(1, 0, BinaryData(str.data(), Table::max_binary_size));
 }
 
+TEST(Table_MaximumColumnNameLength)
+{
+    Buffer<char> str(Descriptor::max_column_name_length + 1);
+
+    Table table;
+    CHECK_THROW(table.add_column(type_String, StringData(str.data(), Descriptor::max_column_name_length + 1)), LogicError);
+    table.add_column(type_String, StringData(str.data(), Descriptor::max_column_name_length));
+}
+
 #endif // TEST_TABLE
