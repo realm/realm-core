@@ -5491,4 +5491,30 @@ TEST(Table_ClearWithTwoLevelBptree)
     table.Verify();
 }
 
+
+TEST(Table_IndexStringDelete)
+{
+    Table t;
+    t.add_column(type_String, "str");
+    t.add_search_index(0);
+
+    ostringstream out;
+
+    for (size_t i = 0; i < 1000; ++i) {
+        t.add_empty_row();
+        out.clear();
+        out << i;
+        t.set_string(0, i, out.str());
+    }
+
+    t.clear();
+
+    for (size_t i = 0; i < 1000; ++i) {
+        t.add_empty_row();
+        out.clear();
+        out << i;
+        t.set_string(0, i, out.str());
+    }
+}
+
 #endif // TEST_TABLE
