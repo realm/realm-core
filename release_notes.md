@@ -2,8 +2,11 @@
 
 ### Bugfixes:
 
-* Fixed bug in String and Integer index where find()/find_all() would return a wrong match.
+* Fixed bug in String and Integer index where find()/find_all() would return a
+  wrong match.
 * Fixed the values of `Table::max_string_size`, and `Table::max_binary_size`.
+* Fixed a bug occuring when claring a table with a search index on a string
+  column many rows (>1000).
 
 ### API breaking changes:
 
