@@ -6,7 +6,7 @@
   wrong match.
 * Fixed the values of `Table::max_string_size`, and `Table::max_binary_size`.
 * Fixed a bug occuring when claring a table with a search index on a string
-  column many rows (>1000).
+  column with many rows (>1000).
 
 ----------------------------------------------
 
