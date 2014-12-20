@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 0.87.3 Release notes
 
 ### Bugfixes:
 
@@ -7,20 +7,6 @@
 * Fixed the values of `Table::max_string_size`, and `Table::max_binary_size`.
 * Fixed a bug occuring when claring a table with a search index on a string
   column many rows (>1000).
-
-### API breaking changes:
-
-* Lorem ipsum.
-
-### Enhancements:
-
-* Lorem ipsum.
-
------------
-
-### Internals:
-
-* Lorem ipsum.
 
 ----------------------------------------------
 
