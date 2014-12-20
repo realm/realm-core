@@ -5502,7 +5502,7 @@ TEST(Table_IndexStringDelete)
 
     for (size_t i = 0; i < 1000; ++i) {
         t.add_empty_row();
-        out.clear();
+        out.str(string());
         out << i;
         t.set_string(0, i, out.str());
     }
@@ -5511,7 +5511,7 @@ TEST(Table_IndexStringDelete)
 
     for (size_t i = 0; i < 1000; ++i) {
         t.add_empty_row();
-        out.clear();
+        out.str(string());
         out << i;
         t.set_string(0, i, out.str());
     }
