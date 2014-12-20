@@ -3,6 +3,7 @@
 ### Bugfixes:
 
 * Fixed bug in String and Integer index where find()/find_all() would return a wrong match.
+* Fixed the values of `Table::max_string_size`, and `Table::max_binary_size`.
 
 ### API breaking changes:
 

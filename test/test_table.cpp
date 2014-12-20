@@ -9,6 +9,7 @@
 
 #include <tightdb.hpp>
 #include <tightdb/lang_bind_helper.hpp>
+#include <tightdb/util/buffer.hpp>
 
 #include "util/misc.hpp"
 
@@ -192,22 +193,25 @@ TEST(Table_ColumnNameTooLong)
 {
     Group group;
     TableRef table = group.add_table("foo");
-    CHECK_LOGIC_ERROR(table->add_column(type_Int, "01234567890123456789"
-                                        "012345678901234567890123456789"
-                                        "012345678901234567890123456789"),
+    const size_t buf_size = 64;
+    UniquePtr<char[]> buf(new char[buf_size]);
+    CHECK_LOGIC_ERROR(table->add_column(type_Int, StringData(buf.get(), buf_size)),
                       LogicError::column_name_too_long);
-    CHECK_LOGIC_ERROR(table->insert_column(0, type_Int, "01234567890123456789"
-                                           "012345678901234567890123456789"
-                                           "012345678901234567890123456789"),
+    CHECK_LOGIC_ERROR(table->insert_column(0, type_Int, StringData(buf.get(), buf_size)),
                       LogicError::column_name_too_long);
-    CHECK_LOGIC_ERROR(table->add_column_link(type_Link, "01234567890123456789"
-                                             "012345678901234567890123456789"
-                                             "012345678901234567890123456789", *table),
+    CHECK_LOGIC_ERROR(table->add_column_link(type_Link,
+                                             StringData(buf.get(), buf_size),
+                                             *table),
                       LogicError::column_name_too_long);
-    CHECK_LOGIC_ERROR(table->insert_column_link(0, type_Link, "01234567890123456789"
-                                                "012345678901234567890123456789"
-                                                "012345678901234567890123456789", *table),
+    CHECK_LOGIC_ERROR(table->insert_column_link(0, type_Link,
+                                                StringData(buf.get(), buf_size),
+                                                *table),
                       LogicError::column_name_too_long);
+
+    table->add_column(type_Int, StringData(buf.get(), buf_size - 1));
+    table->insert_column(0, type_Int, StringData(buf.get(), buf_size - 1));
+    table->add_column_link(type_Link, StringData(buf.get(), buf_size - 1), *table);
+    table->insert_column_link(0, type_Link, StringData(buf.get(), buf_size - 1), *table);
 }
 
 
@@ -219,29 +223,37 @@ TEST(Table_StringOrBinaryTooBig)
     table.add_column(type_Mixed,  "m1");
     table.add_column(type_Mixed,  "m2");
     table.add_empty_row();
-    size_t large_buf_size = 0x1000000;
-    UniquePtr<char[]> large_buf(new char[large_buf_size]);
-    CHECK_LOGIC_ERROR(table.set_string(0, 0, StringData(large_buf.get(), large_buf_size)),
-                      LogicError::string_too_big);
-    CHECK_LOGIC_ERROR(table.set_binary(1, 0, BinaryData(large_buf.get(), large_buf_size)),
-                      LogicError::binary_too_big);
-    CHECK_LOGIC_ERROR(table.set_mixed(2, 0, Mixed(StringData(large_buf.get(), large_buf_size))),
-                      LogicError::string_too_big);
-    CHECK_LOGIC_ERROR(table.set_mixed(3, 0, Mixed(BinaryData(large_buf.get(), large_buf_size))),
-                      LogicError::binary_too_big);
 
-    CHECK_LOGIC_ERROR(table.insert_string(0, 0, StringData(large_buf.get(), large_buf_size)),
+    table.set_string(0, 0, "01234567");
+
+    size_t large_bin_size = 0xFFFFF1;
+    size_t large_str_size = 0xFFFFF0; // null-terminate reduces max size by 1
+    UniquePtr<char[]> large_buf(new char[large_bin_size]);
+    CHECK_LOGIC_ERROR(table.set_string(0, 0, StringData(large_buf.get(), large_str_size)),
                       LogicError::string_too_big);
-    table.insert_string(0, 0, StringData());
-    CHECK_LOGIC_ERROR(table.insert_binary(1, 0, BinaryData(large_buf.get(), large_buf_size)),
+    CHECK_LOGIC_ERROR(table.set_binary(1, 0, BinaryData(large_buf.get(), large_bin_size)),
                       LogicError::binary_too_big);
-    table.insert_binary(1, 0, BinaryData());
-    CHECK_LOGIC_ERROR(table.insert_mixed(2, 0, Mixed(StringData(large_buf.get(), large_buf_size))),
+    CHECK_LOGIC_ERROR(table.set_mixed(2, 0, Mixed(StringData(large_buf.get(), large_str_size))),
                       LogicError::string_too_big);
-    table.insert_mixed(2, 0, Mixed());
-    CHECK_LOGIC_ERROR(table.insert_mixed(3, 0, Mixed(BinaryData(large_buf.get(), large_buf_size))),
+    CHECK_LOGIC_ERROR(table.set_mixed(3, 0, Mixed(BinaryData(large_buf.get(), large_bin_size))),
                       LogicError::binary_too_big);
-    table.insert_mixed(3, 0, Mixed());
+    table.set_string(0, 0, StringData(large_buf.get(), large_str_size - 1));
+    table.set_binary(1, 0, BinaryData(large_buf.get(), large_bin_size - 1));
+    table.set_mixed(2, 0, Mixed(StringData(large_buf.get(), large_str_size - 1)));
+    table.set_mixed(3, 0, Mixed(BinaryData(large_buf.get(), large_bin_size - 1)));
+
+    CHECK_LOGIC_ERROR(table.insert_string(0, 1, StringData(large_buf.get(), large_str_size)),
+                      LogicError::string_too_big);
+    table.insert_string(0, 0, StringData(large_buf.get(), large_str_size - 1));
+    CHECK_LOGIC_ERROR(table.insert_binary(1, 1, BinaryData(large_buf.get(), large_bin_size)),
+                      LogicError::binary_too_big);
+    table.insert_binary(1, 0, BinaryData(large_buf.get(), large_bin_size - 1));
+    CHECK_LOGIC_ERROR(table.insert_mixed(2, 1, Mixed(StringData(large_buf.get(), large_str_size))),
+                      LogicError::string_too_big);
+    table.insert_mixed(2, 0, Mixed(StringData(large_buf.get(), large_str_size - 1)));
+    CHECK_LOGIC_ERROR(table.insert_mixed(3, 1, Mixed(BinaryData(large_buf.get(), large_bin_size))),
+                      LogicError::binary_too_big);
+    table.insert_mixed(3, 0, Mixed(BinaryData(large_buf.get(), large_bin_size - 1)));
     table.insert_done();
 }
 
