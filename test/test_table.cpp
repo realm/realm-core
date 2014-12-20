@@ -224,33 +224,36 @@ TEST(Table_StringOrBinaryTooBig)
     table.add_column(type_Mixed,  "m2");
     table.add_empty_row();
 
-    size_t large_buf_size = 0xFFFFF0;
-    UniquePtr<char[]> large_buf(new char[large_buf_size]);
-    CHECK_LOGIC_ERROR(table.set_string(0, 0, StringData(large_buf.get(), large_buf_size)),
-                      LogicError::string_too_big);
-    CHECK_LOGIC_ERROR(table.set_binary(1, 0, BinaryData(large_buf.get(), large_buf_size)),
-                      LogicError::binary_too_big);
-    CHECK_LOGIC_ERROR(table.set_mixed(2, 0, Mixed(StringData(large_buf.get(), large_buf_size))),
-                      LogicError::string_too_big);
-    CHECK_LOGIC_ERROR(table.set_mixed(3, 0, Mixed(BinaryData(large_buf.get(), large_buf_size))),
-                      LogicError::binary_too_big);
-    table.set_string(0, 0, StringData(large_buf.get(), large_buf_size - 1));
-    table.set_binary(1, 0, BinaryData(large_buf.get(), large_buf_size - 1));
-    table.set_mixed(2, 0, Mixed(StringData(large_buf.get(), large_buf_size - 1)));
-    table.set_mixed(3, 0, Mixed(BinaryData(large_buf.get(), large_buf_size - 1)));
+    table.set_string(0, 0, "01234567");
 
-    CHECK_LOGIC_ERROR(table.insert_string(0, 1, StringData(large_buf.get(), large_buf_size)),
+    size_t large_bin_size = 0xFFFFF1;
+    size_t large_str_size = 0xFFFFF0; // null-terminate reduces max size by 1
+    UniquePtr<char[]> large_buf(new char[large_bin_size]);
+    CHECK_LOGIC_ERROR(table.set_string(0, 0, StringData(large_buf.get(), large_str_size)),
                       LogicError::string_too_big);
-    table.insert_string(0, 0, StringData(large_buf.get(), large_buf_size - 1));
-    CHECK_LOGIC_ERROR(table.insert_binary(1, 1, BinaryData(large_buf.get(), large_buf_size)),
+    CHECK_LOGIC_ERROR(table.set_binary(1, 0, BinaryData(large_buf.get(), large_bin_size)),
                       LogicError::binary_too_big);
-    table.insert_binary(1, 0, BinaryData(large_buf.get(), large_buf_size - 1));
-    CHECK_LOGIC_ERROR(table.insert_mixed(2, 1, Mixed(StringData(large_buf.get(), large_buf_size))),
+    CHECK_LOGIC_ERROR(table.set_mixed(2, 0, Mixed(StringData(large_buf.get(), large_str_size))),
                       LogicError::string_too_big);
-    table.insert_mixed(2, 0, Mixed(StringData(large_buf.get(), large_buf_size - 1)));
-    CHECK_LOGIC_ERROR(table.insert_mixed(3, 1, Mixed(BinaryData(large_buf.get(), large_buf_size))),
+    CHECK_LOGIC_ERROR(table.set_mixed(3, 0, Mixed(BinaryData(large_buf.get(), large_bin_size))),
                       LogicError::binary_too_big);
-    table.insert_mixed(3, 0, Mixed(BinaryData(large_buf.get(), large_buf_size - 1)));
+    table.set_string(0, 0, StringData(large_buf.get(), large_str_size - 1));
+    table.set_binary(1, 0, BinaryData(large_buf.get(), large_bin_size - 1));
+    table.set_mixed(2, 0, Mixed(StringData(large_buf.get(), large_str_size - 1)));
+    table.set_mixed(3, 0, Mixed(BinaryData(large_buf.get(), large_bin_size - 1)));
+
+    CHECK_LOGIC_ERROR(table.insert_string(0, 1, StringData(large_buf.get(), large_str_size)),
+                      LogicError::string_too_big);
+    table.insert_string(0, 0, StringData(large_buf.get(), large_str_size - 1));
+    CHECK_LOGIC_ERROR(table.insert_binary(1, 1, BinaryData(large_buf.get(), large_bin_size)),
+                      LogicError::binary_too_big);
+    table.insert_binary(1, 0, BinaryData(large_buf.get(), large_bin_size - 1));
+    CHECK_LOGIC_ERROR(table.insert_mixed(2, 1, Mixed(StringData(large_buf.get(), large_str_size))),
+                      LogicError::string_too_big);
+    table.insert_mixed(2, 0, Mixed(StringData(large_buf.get(), large_str_size - 1)));
+    CHECK_LOGIC_ERROR(table.insert_mixed(3, 1, Mixed(BinaryData(large_buf.get(), large_bin_size))),
+                      LogicError::binary_too_big);
+    table.insert_mixed(3, 0, Mixed(BinaryData(large_buf.get(), large_bin_size - 1)));
     table.insert_done();
 }
 
