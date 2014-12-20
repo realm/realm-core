@@ -125,6 +125,8 @@
 		3F5ED51519D9D4D1001FCFF4 /* test_link_query_view.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3F5ED51319D9D4D1001FCFF4 /* test_link_query_view.cpp */; };
 		3FA0DBCC1A0BF29C003548DC /* test_encrypted_file_mapping.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3FA0DBCA1A0BF28C003548DC /* test_encrypted_file_mapping.cpp */; };
 		3FC68FDA1A0AD3FE005F3103 /* encrypted_file_mapping.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3FC68FD91A0AD3FE005F3103 /* encrypted_file_mapping.cpp */; };
+		3FCA03C61A44F57A009067D0 /* CoreFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3FCA03C51A44F57A009067D0 /* CoreFoundation.framework */; };
+		3FCA03C71A44F5B3009067D0 /* CoreFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3FCA03C51A44F57A009067D0 /* CoreFoundation.framework */; };
 		3FE557F71A150F2100A18CCB /* errno.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3FE557F51A150F2100A18CCB /* errno.cpp */; };
 		3FE557F81A150F2100A18CCB /* errno.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 3FE557F61A150F2100A18CCB /* errno.hpp */; };
 		3FF6A2A11A02B1FC0074A601 /* column_link.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3F18531F19DF12A200843ECD /* column_link.cpp */; };
@@ -491,6 +493,7 @@
 		3FA0DBCA1A0BF28C003548DC /* test_encrypted_file_mapping.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = test_encrypted_file_mapping.cpp; sourceTree = "<group>"; };
 		3FC68FD81A0AD3BF005F3103 /* encrypted_file_mapping.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = encrypted_file_mapping.hpp; sourceTree = "<group>"; };
 		3FC68FD91A0AD3FE005F3103 /* encrypted_file_mapping.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = encrypted_file_mapping.cpp; sourceTree = "<group>"; };
+		3FCA03C51A44F57A009067D0 /* CoreFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreFoundation.framework; path = System/Library/Frameworks/CoreFoundation.framework; sourceTree = SDKROOT; };
 		3FE557F51A150F2100A18CCB /* errno.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = errno.cpp; sourceTree = "<group>"; };
 		3FE557F61A150F2100A18CCB /* errno.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = errno.hpp; sourceTree = "<group>"; };
 		4142C9951623478700B3B902 /* liblibtightdb ios.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "liblibtightdb ios.a"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -608,6 +611,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				3FCA03C61A44F57A009067D0 /* CoreFoundation.framework in Frameworks */,
 				3626F56B14A228850097F17B /* libtightdb.a in Frameworks */,
 				526F3F0B18246B33005217F1 /* test-util.a in Frameworks */,
 			);
@@ -617,6 +621,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				3FCA03C71A44F5B3009067D0 /* CoreFoundation.framework in Frameworks */,
 				36AD7F9917FB94F800F046FC /* libtightdb.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -777,6 +782,7 @@
 		3647DFF214209CE600D56FD7 /* test */ = {
 			isa = PBXGroup;
 			children = (
+				3FCA03C51A44F57A009067D0 /* CoreFoundation.framework */,
 				52F2E0E017D5F8F500415958 /* large_tests */,
 				3647DFF414209CE600D56FD7 /* Makefile */,
 				3647DFFD14209CE600D56FD7 /* test-sqlite3 */,
