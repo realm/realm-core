@@ -566,7 +566,7 @@ void spawn_daemon(const string& file) {}
 // undefined state.
 
 void SharedGroup::open(const string& path, bool no_create_file,
-                       DurabilityLevel dlevel, bool is_backend, const uint8_t* key)
+                       DurabilityLevel dlevel, bool is_backend, const char* key)
 {
     TIGHTDB_ASSERT(!is_attached());
 
@@ -783,7 +783,7 @@ uint_fast64_t SharedGroup::get_number_of_versions()
 }
 #ifdef TIGHTDB_ENABLE_REPLICATION
 
-void SharedGroup::open(Replication& repl, DurabilityLevel dlevel, const uint8_t* key)
+void SharedGroup::open(Replication& repl, DurabilityLevel dlevel, const char* key)
 {
     TIGHTDB_ASSERT(!is_attached());
     string file = repl.get_database_path();

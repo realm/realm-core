@@ -1559,17 +1559,17 @@ void Table::remove_primary_key()
 
 const ColumnBase& Table::get_column_base(size_t ndx) const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(ndx < m_spec.get_column_count());
-    TIGHTDB_ASSERT(m_cols.size() == m_spec.get_column_count());
+    TIGHTDB_ASSERT_DEBUG(ndx < m_spec.get_column_count());
+    TIGHTDB_ASSERT_DEBUG(m_cols.size() == m_spec.get_column_count());
     return *m_cols[ndx];
 }
 
 
 ColumnBase& Table::get_column_base(size_t ndx)
 {
-    TIGHTDB_ASSERT(ndx < m_spec.get_column_count());
+    TIGHTDB_ASSERT_DEBUG(ndx < m_spec.get_column_count());
     instantiate_before_change();
-    TIGHTDB_ASSERT(m_cols.size() == m_spec.get_column_count());
+    TIGHTDB_ASSERT_DEBUG(m_cols.size() == m_spec.get_column_count());
     return *m_cols[ndx];
 }
 
@@ -1859,8 +1859,8 @@ ref_type Table::clone(Allocator& alloc) const
 void Table::insert_empty_row(size_t row_ndx, size_t num_rows)
 {
     TIGHTDB_ASSERT(is_attached());
-    TIGHTDB_ASSERT(row_ndx <= m_size);
-    TIGHTDB_ASSERT(num_rows <= numeric_limits<size_t>::max() - row_ndx);
+    TIGHTDB_ASSERT_DEBUG(row_ndx <= m_size);
+    TIGHTDB_ASSERT_DEBUG(num_rows <= numeric_limits<size_t>::max() - row_ndx);
     bump_version();
 
     size_t num_cols = m_spec.get_column_count();
@@ -2195,10 +2195,10 @@ void Table::clear_subtable(size_t col_ndx, size_t row_ndx)
 
 const Table* Table::get_parent_table_ptr(size_t* column_ndx_out) const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(is_attached());
+    TIGHTDB_ASSERT_DEBUG(is_attached());
     const Array& real_top = m_top.is_attached() ? m_top : m_columns;
     if (ArrayParent* array_parent = real_top.get_parent()) {
-        TIGHTDB_ASSERT(dynamic_cast<Parent*>(array_parent));
+        TIGHTDB_ASSERT_DEBUG(dynamic_cast<Parent*>(array_parent));
         Parent* table_parent = static_cast<Parent*>(array_parent);
         return table_parent->get_parent_table(column_ndx_out);
     }
@@ -3870,7 +3870,7 @@ void Table::write(ostream& out, size_t offset, size_t size, StringData override_
     if (!table_name)
         table_name = get_name();
     SliceWriter writer(*this, table_name, offset, size_2);
-    Group::write(out, writer); // Throws
+    Group::write(out, writer, false); // Throws
 }
 
 

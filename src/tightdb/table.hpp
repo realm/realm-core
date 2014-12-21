@@ -21,8 +21,9 @@
 #define TIGHTDB_TABLE_HPP
 
 #include <algorithm>
-#include <utility>
 #include <map>
+#include <utility>
+#include <typeinfo>
 
 #include <tightdb/util/features.h>
 #include <tightdb/util/tuple.hpp>
@@ -438,8 +439,8 @@ public:
     /// key, if that would result in a violation the implied *unique constraint*
     /// of that primary key. The consequenses of doing so are unspecified.
 
-    static const std::size_t max_string_size = 0xFFFFFF; // 16 MiB
-    static const std::size_t max_binary_size = 0xFFFFFF; // 16 MiB
+    static const std::size_t max_string_size = 0xFFFFF8 - Array::header_size - 1;
+    static const std::size_t max_binary_size = 0xFFFFF8 - Array::header_size;
 
     void set_int(std::size_t column_ndx, std::size_t row_ndx, int_fast64_t value);
     void set_bool(std::size_t column_ndx, std::size_t row_ndx, bool value);
@@ -1466,7 +1467,7 @@ template<class Col, ColumnType col_type> inline Col& Table::get_column(std::size
 #ifdef TIGHTDB_DEBUG
     validate_column_type(col, col_type, ndx);
 #endif
-    TIGHTDB_ASSERT(dynamic_cast<Col*>(&col));
+    TIGHTDB_ASSERT(typeid(Col) == typeid(col));
     return static_cast<Col&>(col);
 }
 
@@ -1477,7 +1478,7 @@ inline const Col& Table::get_column(std::size_t ndx) const TIGHTDB_NOEXCEPT
 #ifdef TIGHTDB_DEBUG
     validate_column_type(col, col_type, ndx);
 #endif
-    TIGHTDB_ASSERT(dynamic_cast<const Col*>(&col));
+    TIGHTDB_ASSERT(typeid(Col) == typeid(col));
     return static_cast<const Col&>(col);
 }
 

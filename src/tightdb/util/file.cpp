@@ -164,7 +164,7 @@ string make_temp_dir()
 
 void File::open_internal(const string& path, AccessMode a, CreateMode c, int flags, bool* success)
 {
-    TIGHTDB_ASSERT(!is_attached());
+    TIGHTDB_ASSERT_RELEASE(!is_attached());
 
 #ifdef _WIN32 // Windows version
 
@@ -306,8 +306,7 @@ void File::close() TIGHTDB_NOEXCEPT
         unlock();
 
     BOOL r = CloseHandle(m_handle);
-    TIGHTDB_ASSERT(r);
-    static_cast<void>(r);
+    TIGHTDB_ASSERT_RELEASE(r);
     m_handle = 0;
 
 #else // POSIX version
@@ -315,8 +314,7 @@ void File::close() TIGHTDB_NOEXCEPT
     if (m_fd < 0)
         return;
     int r = ::close(m_fd);
-    TIGHTDB_ASSERT(r == 0);
-    static_cast<void>(r);
+    TIGHTDB_ASSERT_RELEASE(r == 0);
     m_fd = -1;
 
 #endif
@@ -325,7 +323,7 @@ void File::close() TIGHTDB_NOEXCEPT
 
 size_t File::read(char* data, size_t size)
 {
-    TIGHTDB_ASSERT(is_attached());
+    TIGHTDB_ASSERT_RELEASE(is_attached());
 
 #ifdef _WIN32 // Windows version
 
@@ -339,7 +337,7 @@ size_t File::read(char* data, size_t size)
             goto error;
         if (r == 0)
             break;
-        TIGHTDB_ASSERT(r <= n);
+        TIGHTDB_ASSERT_RELEASE(r <= n);
         size -= size_t(r);
         data += size_t(r);
     }
@@ -352,7 +350,7 @@ error:
 
 #else // POSIX version
 
-    if (m_encrypt) {
+    if (m_encryption_key) {
         off_t pos = lseek(m_fd, 0, SEEK_CUR);
         Map<char> map(*this, access_ReadOnly, static_cast<size_t>(pos + size));
         memcpy(data, map.get_addr() + pos, size);
@@ -368,7 +366,7 @@ error:
             break;
         if (r < 0)
             goto error;
-        TIGHTDB_ASSERT(size_t(r) <= n);
+        TIGHTDB_ASSERT_RELEASE(size_t(r) <= n);
         size -= size_t(r);
         data += size_t(r);
     }
@@ -385,7 +383,7 @@ error:
 
 void File::write(const char* data, size_t size)
 {
-    TIGHTDB_ASSERT(is_attached());
+    TIGHTDB_ASSERT_RELEASE(is_attached());
 
 #ifdef _WIN32 // Windows version
 
@@ -396,7 +394,7 @@ void File::write(const char* data, size_t size)
         DWORD r = 0;
         if (!WriteFile(m_handle, data, n, &r, 0))
             goto error;
-        TIGHTDB_ASSERT(r == n); // Partial writes are not possible.
+        TIGHTDB_ASSERT_RELEASE(r == n); // Partial writes are not possible.
         size -= size_t(r);
         data += size_t(r);
     }
@@ -409,7 +407,7 @@ void File::write(const char* data, size_t size)
 
 #else // POSIX version
 
-    if (m_encrypt) {
+    if (m_encryption_key) {
         off_t pos = lseek(m_fd, 0, SEEK_CUR);
         Map<char> map(*this, access_ReadWrite, static_cast<size_t>(pos + size));
         memcpy(map.get_addr() + pos, data, size);
@@ -422,8 +420,8 @@ void File::write(const char* data, size_t size)
         ssize_t r = ::write(m_fd, data, n);
         if (r < 0)
             goto error;
-        TIGHTDB_ASSERT(r != 0);
-        TIGHTDB_ASSERT(size_t(r) <= n);
+        TIGHTDB_ASSERT_RELEASE(r != 0);
+        TIGHTDB_ASSERT_RELEASE(size_t(r) <= n);
         size -= size_t(r);
         data += size_t(r);
     }
@@ -440,7 +438,7 @@ void File::write(const char* data, size_t size)
 
 File::SizeType File::get_size() const
 {
-    TIGHTDB_ASSERT(is_attached());
+    TIGHTDB_ASSERT_RELEASE(is_attached());
 
 #ifdef _WIN32 // Windows version
 
@@ -460,7 +458,7 @@ File::SizeType File::get_size() const
         SizeType size;
         if (int_cast_with_overflow_detect(statbuf.st_size, size))
             throw runtime_error("File size overflow");
-        if (m_encrypt)
+        if (m_encryption_key)
             return encrypted_size_to_data_size(size);
         return size;
     }
@@ -472,7 +470,7 @@ File::SizeType File::get_size() const
 
 void File::resize(SizeType size)
 {
-    TIGHTDB_ASSERT(is_attached());
+    TIGHTDB_ASSERT_RELEASE(is_attached());
 
 #ifdef _WIN32 // Windows version
 
@@ -483,7 +481,7 @@ void File::resize(SizeType size)
 
 #else // POSIX version
 
-    if (m_encrypt)
+    if (m_encryption_key)
         size = data_size_to_encrypted_size(size);
 
     off_t size2;
@@ -502,7 +500,7 @@ void File::resize(SizeType size)
 
 void File::prealloc(SizeType offset, size_t size)
 {
-    TIGHTDB_ASSERT(is_attached());
+    TIGHTDB_ASSERT_RELEASE(is_attached());
 
 #if _POSIX_C_SOURCE >= 200112L // POSIX.1-2001 version
 
@@ -521,13 +519,13 @@ void File::prealloc(SizeType offset, size_t size)
 
 void File::prealloc_if_supported(SizeType offset, size_t size)
 {
-    TIGHTDB_ASSERT(is_attached());
+    TIGHTDB_ASSERT_RELEASE(is_attached());
 
 #if _POSIX_C_SOURCE >= 200112L // POSIX.1-2001 version
 
-    TIGHTDB_ASSERT(is_prealloc_supported());
+    TIGHTDB_ASSERT_RELEASE(is_prealloc_supported());
 
-    if (m_encrypt)
+    if (m_encryption_key)
         size = data_size_to_encrypted_size(size);
 
     off_t size2;
@@ -553,7 +551,7 @@ void File::prealloc_if_supported(SizeType offset, size_t size)
     static_cast<void>(offset);
     static_cast<void>(size);
 
-    TIGHTDB_ASSERT(!is_prealloc_supported());
+    TIGHTDB_ASSERT_RELEASE(!is_prealloc_supported());
 
 #endif
 }
@@ -571,7 +569,7 @@ bool File::is_prealloc_supported()
 
 void File::seek(SizeType position)
 {
-    TIGHTDB_ASSERT(is_attached());
+    TIGHTDB_ASSERT_RELEASE(is_attached());
 
 #ifdef _WIN32 // Windows version
 
@@ -602,7 +600,7 @@ void File::seek(SizeType position)
 // http://www.humboldt.co.uk/2009/03/fsync-across-platforms.html.
 void File::sync()
 {
-    TIGHTDB_ASSERT(is_attached());
+    TIGHTDB_ASSERT_RELEASE(is_attached());
 
 #ifdef _WIN32 // Windows version
 
@@ -622,11 +620,11 @@ void File::sync()
 
 bool File::lock(bool exclusive, bool non_blocking)
 {
-    TIGHTDB_ASSERT(is_attached());
+    TIGHTDB_ASSERT_RELEASE(is_attached());
 
 #ifdef _WIN32 // Windows version
 
-    TIGHTDB_ASSERT(!m_have_lock);
+    TIGHTDB_ASSERT_RELEASE(!m_have_lock);
 
     // Under Windows a file lock must be explicitely released before
     // the file is closed. It will eventually be released by the
@@ -693,8 +691,7 @@ void File::unlock() TIGHTDB_NOEXCEPT
     if (!m_have_lock)
         return;
     BOOL r = UnlockFile(m_handle, 0, 0, 1, 0);
-    TIGHTDB_ASSERT(r);
-    static_cast<void>(r);
+    TIGHTDB_ASSERT_RELEASE(r);
     m_have_lock = false;
 
 #else // BSD / Linux flock()
@@ -704,8 +701,7 @@ void File::unlock() TIGHTDB_NOEXCEPT
     // is no mention of the error that would be reported if a
     // non-locked file were unlocked.
     int r = flock(m_fd, LOCK_UN);
-    TIGHTDB_ASSERT(r == 0);
-    static_cast<void>(r);
+    TIGHTDB_ASSERT_RELEASE(r == 0);
 
 #endif
 }
@@ -738,8 +734,7 @@ void* File::map(AccessMode a, size_t size, int map_flags) const
     void* addr = MapViewOfFile(map_handle, desired_access, 0, 0, 0);
     {
         BOOL r = CloseHandle(map_handle);
-        TIGHTDB_ASSERT(r);
-        static_cast<void>(r);
+        TIGHTDB_ASSERT_RELEASE(r);
     }
     if (TIGHTDB_LIKELY(addr))
         return addr;
@@ -754,7 +749,7 @@ void* File::map(AccessMode a, size_t size, int map_flags) const
     // reliably detect these systems?
     static_cast<void>(map_flags);
 
-    return tightdb::util::mmap(m_fd, size, a, m_encrypt ? m_encryption_key : 0);
+    return tightdb::util::mmap(m_fd, size, a, m_encryption_key.get());
 
 #endif
 }
@@ -766,8 +761,7 @@ void File::unmap(void* addr, size_t size) TIGHTDB_NOEXCEPT
 
     static_cast<void>(size);
     BOOL r = UnmapViewOfFile(addr);
-    TIGHTDB_ASSERT(r);
-    static_cast<void>(r);
+    TIGHTDB_ASSERT_RELEASE(r);
 
 #else // POSIX version
 
@@ -902,8 +896,8 @@ void File::move(const string& old_path, const string& new_path)
 
 bool File::is_same_file(const File& f) const
 {
-    TIGHTDB_ASSERT(is_attached());
-    TIGHTDB_ASSERT(f.is_attached());
+    TIGHTDB_ASSERT_RELEASE(is_attached());
+    TIGHTDB_ASSERT_RELEASE(f.is_attached());
 
 #ifdef _WIN32 // Windows version
 
@@ -958,7 +952,7 @@ bool File::is_same_file(const File& f) const
 
 bool File::is_removed() const
 {
-    TIGHTDB_ASSERT(is_attached());
+    TIGHTDB_ASSERT_RELEASE(is_attached());
 
 #ifdef _WIN32 // Windows version
 
@@ -974,16 +968,16 @@ bool File::is_removed() const
 #endif
 }
 
-void File::set_encryption_key(const uint8_t* key)
+void File::set_encryption_key(const char* key)
 {
 #ifdef TIGHTDB_ENABLE_ENCRYPTION
     if (key) {
-        memcpy(m_encryption_key, key, sizeof(m_encryption_key));
-        m_encrypt = true;
+        char *buffer = new char[64];
+        memcpy(buffer, key, 64);
+        m_encryption_key.reset(buffer);
     }
     else {
-        memset(m_encryption_key, 0, sizeof(m_encryption_key));
-        m_encrypt = false;
+        m_encryption_key.reset();
     }
 #else
     if (key) {

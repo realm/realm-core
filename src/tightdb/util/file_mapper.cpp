@@ -17,6 +17,9 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
+
+#ifndef _WIN32
+
 #include "file_mapper.hpp"
 
 #include <cerrno>
@@ -33,7 +36,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include <tightdb/alloc_slab.hpp>
+#include <tightdb/util/errno.hpp>
 #include <tightdb/util/shared_ptr.hpp>
 #include <tightdb/util/terminate.hpp>
 #include <tightdb/util/thread.hpp>
@@ -134,8 +137,17 @@ size_t round_up_to_page_size(size_t size)
     return (size + page_size - 1) & ~(page_size - 1);
 }
 
-void add_mapping(void* addr, size_t size, int fd, File::AccessMode access, const uint8_t* encryption_key)
+void add_mapping(void* addr, size_t size, int fd, File::AccessMode access, const char* encryption_key)
 {
+    struct stat st;
+    if (fstat(fd, &st)) {
+        int err = errno; // Eliminate any risk of clobbering
+        throw std::runtime_error(get_errno_msg("fstat() failed: ", err));
+    }
+
+    if (st.st_size > 0 && static_cast<size_t>(st.st_size) < page_size)
+        throw DecryptionFailed();
+
     SpinLockGuard lock(mapping_lock);
 
     static bool has_installed_handler = false;
@@ -152,13 +164,6 @@ void add_mapping(void* addr, size_t size, int fd, File::AccessMode access, const
             TIGHTDB_TERMINATE("sigaction SIGBUS");
     }
 
-    struct stat st;
-    if (fstat(fd, &st))
-        TIGHTDB_TERMINATE("fstat failed"); // FIXME: throw instead
-
-    if (st.st_size > 0 && static_cast<size_t>(st.st_size) < page_size)
-        throw InvalidDatabase();
-
     std::vector<mappings_for_file>::iterator it;
     for (it = mappings_by_file.begin(); it != mappings_by_file.end(); ++it) {
         if (it->inode == st.st_ino && it->device == st.st_dev)
@@ -169,12 +174,27 @@ void add_mapping(void* addr, size_t size, int fd, File::AccessMode access, const
     mappings_by_addr.reserve(mappings_by_addr.size() + 1);
 
     if (it == mappings_by_file.end()) {
+        mappings_by_file.reserve(mappings_by_file.size() + 1);
+
+        fd = dup(fd);
+        if (fd == -1) {
+            int err = errno; // Eliminate any risk of clobbering
+            throw std::runtime_error(get_errno_msg("dup() failed: ", err));
+        }
+
         mappings_for_file f;
         f.device = st.st_dev;
         f.inode = st.st_ino;
-        f.info = new SharedFileInfo(encryption_key, dup(fd));
-        mappings_by_file.push_back(f);
-        it = --mappings_by_file.end();
+        try {
+            f.info = new SharedFileInfo(reinterpret_cast<const uint8_t*>(encryption_key), fd);
+        }
+        catch (...) {
+            ::close(fd);
+            throw;
+        }
+
+        mappings_by_file.push_back(f); // can't throw due to reserve() above
+        it = mappings_by_file.end() - 1;
     }
 
     try {
@@ -182,7 +202,7 @@ void add_mapping(void* addr, size_t size, int fd, File::AccessMode access, const
         m.addr = addr;
         m.size = size;
         m.mapping = new EncryptedFileMapping(*it->info, addr, size, access);
-        mappings_by_addr.push_back(m);
+        mappings_by_addr.push_back(m); // can't throw due to reserve() above
     }
     catch (...) {
         if (it->info->mappings.empty()) {
@@ -204,7 +224,11 @@ void remove_mapping(void* addr, size_t size)
     mappings_by_addr.erase(mappings_by_addr.begin() + (m - &mappings_by_addr[0]));
     for (std::vector<mappings_for_file>::iterator it = mappings_by_file.begin(); it != mappings_by_file.end(); ++it) {
         if (it->info->mappings.empty()) {
-            ::close(it->info->fd);
+            if(::close(it->info->fd) != 0) {
+                int err = errno; // Eliminate any risk of clobbering
+                if(err == EBADF || err == EIO) // todo, how do we handle EINTR?
+                    throw std::runtime_error(get_errno_msg("close() failed: ", err));                
+            }
             mappings_by_file.erase(it);
             break;
         }
@@ -227,7 +251,7 @@ void* mmap_anon(size_t size)
 namespace tightdb {
 namespace util {
 
-void* mmap(int fd, size_t size, File::AccessMode access, const uint8_t* encryption_key)
+void* mmap(int fd, size_t size, File::AccessMode access, const char* encryption_key)
 {
 #ifdef TIGHTDB_ENABLE_ENCRYPTION
     if (encryption_key) {
@@ -265,7 +289,10 @@ void munmap(void* addr, size_t size) TIGHTDB_NOEXCEPT
 #ifdef TIGHTDB_ENABLE_ENCRYPTION
     remove_mapping(addr, size);
 #endif
-    ::munmap(addr, size);
+    if(::munmap(addr, size) != 0) {
+        int err = errno;
+        throw std::runtime_error(get_errno_msg("munmap() failed: ", err));
+    }
 }
 
 void* mremap(int fd, void* old_addr, size_t old_size, File::AccessMode a, size_t new_size)
@@ -281,9 +308,13 @@ void* mremap(int fd, void* old_addr, size_t old_size, File::AccessMode a, size_t
 
             void* new_addr = mmap_anon(rounded_new_size);
             m->mapping->set(new_addr, rounded_new_size);
-            ::munmap(old_addr, rounded_old_size);
+            int i = ::munmap(old_addr, rounded_old_size);
             m->addr = new_addr;
             m->size = rounded_new_size;
+            if (i != 0) {
+                int err = errno;
+                throw std::runtime_error(get_errno_msg("munmap() failed: ", err));
+            }
             return new_addr;
         }
     }
@@ -299,7 +330,10 @@ void* mremap(int fd, void* old_addr, size_t old_size, File::AccessMode a, size_t
     throw std::runtime_error(get_errno_msg("mremap(): failed: ", err));
 #else
     void* new_addr = mmap(fd, new_size, a, nullptr);
-    ::munmap(old_addr, old_size);
+    if(::munmap(old_addr, old_size) != 0) {
+        int err = errno;
+        throw std::runtime_error(get_errno_msg("munmap() failed: ", err));
+    }
     return new_addr;
 #endif
 }
@@ -326,3 +360,5 @@ void msync(void* addr, size_t size)
 
 }
 }
+
+#endif // _WIN32

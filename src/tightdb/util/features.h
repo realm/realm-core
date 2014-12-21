@@ -244,6 +244,15 @@
 #endif
 
 
+#if defined(__GNUC__) || defined(__HP_aCC)
+    #define TIGHTDB_NOINLINE  __attribute__((noinline))
+#elif defined(_MSC_VER)
+    #define TIGHTDB_NOINLINE __declspec(noinline)
+#else
+    #define TIGHTDB_NOINLINE
+#endif
+
+
 #if defined ANDROID
 #  define TIGHTDB_ANDROID 1
 /* std::is_integral doesn't work on some Android platforms for whatever reason */

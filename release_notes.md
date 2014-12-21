@@ -10,17 +10,60 @@
 
 ### Enhancements:
 
-* The following constants were added: `Group::max_table_name_length`,
-  `Table::max_column_name_length`, `Table::max_string_size`, and
-  `Table::max_binary_size`.
-* Now throwing on overlong table and column names, and on oversized strings and
-  binary data values.
+* Lorem ipsum.
 
 -----------
 
 ### Internals:
 
 * Lorem ipsum.
+
+----------------------------------------------
+
+# 0.87.3 Release notes
+
+### Bugfixes:
+
+* Fixed bug in String and Integer index where find()/find_all() would return a
+  wrong match.
+* Fixed the values of `Table::max_string_size`, and `Table::max_binary_size`.
+* Fixed a bug occuring when claring a table with a search index on a string
+  column with many rows (>1000).
+
+----------------------------------------------
+
+# 0.87.2 Release notes
+
+### Internals:
+
+* Extra assertions in `src/tightdb/util.file.cpp`.
+
+----------------------------------------------
+
+# 0.87.1 Release notes
+
+### Enhancements:
+
+* The following constants were added: `Group::max_table_name_length`,
+  `Table::max_column_name_length`, `Table::max_string_size`, and
+  `Table::max_binary_size`.
+* Now throwing on overlong table and column names, and on oversized strings and
+  binary data values.
+* Fall back to the old query nodes for String as well as int/double/float.
+* Log assertions failures to the native logging system on android and Apple.
+
+-----------
+
+### Internals:
+
+* There is now three kinds of runtime assertions, `TIGHTDB_ASSERT_DEBUG()`,
+  which is retained only in debug-mode builds, `TIGHTDB_ASSERT_RELEASE()`, which
+  is also retained in release-mode builds, and finally, `TIGHTDB_ASSERT()`,
+  which is normally only retained in debug-mode builds, but may occasionally be
+  retained in release-mode builds too, depending on the specific build
+  configuration.
+* `TIGHTDB_ASSERT()` assertions are now enabled in release-mode builds by
+  default.
 
 ----------------------------------------------
 

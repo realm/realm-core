@@ -36,7 +36,7 @@ public:
 Initialization initialization;
 } // anonymous namespace
 
-void Group::open(const string& file_path, const uint8_t* encryption_key, OpenMode mode)
+void Group::open(const string& file_path, const char* encryption_key, OpenMode mode)
 {
     TIGHTDB_ASSERT(!is_attached());
     bool is_shared = false;
@@ -561,22 +561,22 @@ private:
     const Group& m_group;
 };
 
-void Group::write(ostream& out) const
+void Group::write(ostream& out, bool pad) const
 {
     TIGHTDB_ASSERT(is_attached());
     DefaultTableWriter table_writer(*this);
-    write(out, table_writer); // Throws
+    write(out, table_writer, pad); // Throws
 }
 
-void Group::write(const string& path, const uint8_t* encrption_key) const
+void Group::write(const string& path, const char* encryption_key) const
 {
     File file;
     int flags = 0;
     file.open(path, File::access_ReadWrite, File::create_Must, flags);
-    file.set_encryption_key(encrption_key);
+    file.set_encryption_key(encryption_key);
     File::Streambuf streambuf(&file);
     ostream out(&streambuf);
-    write(out);
+    write(out, encryption_key != 0);
 }
 
 
@@ -588,7 +588,7 @@ BinaryData Group::write_to_mem() const
     //
     // FIXME: This size could potentially be vastly bigger that what
     // is actually needed.
-    size_t max_size = (m_alloc.get_total_size() + 4095) & ~4095UL;
+    size_t max_size = m_alloc.get_total_size();
 
     char* buffer = static_cast<char*>(malloc(max_size)); // Throws
     if (!buffer)
@@ -607,7 +607,7 @@ BinaryData Group::write_to_mem() const
 }
 
 
-void Group::write(ostream& out, TableWriter& table_writer)
+void Group::write(ostream& out, TableWriter& table_writer, bool pad_for_encryption)
 {
     _impl::OutputStream out_2(out);
 
@@ -654,10 +654,13 @@ void Group::write(ostream& out, TableWriter& table_writer)
 
     top.destroy(); // Shallow
 
-    // ensure the footer is aligned to the end of a page for encryption
-    if ((final_file_size + sizeof(SlabAlloc::StreamingFooter)) & 4095) {
+    // encryption will pad the file to a multiple of the page, so ensure the
+    // footer is aligned to the end of a page
+    if (pad_for_encryption && ((final_file_size + sizeof(SlabAlloc::StreamingFooter)) & 4095)) {
+#ifdef TIGHTDB_ENABLE_ENCRYPTION
         char buffer[4096] = {0};
         out_2.write(buffer, 4096 - ((final_file_size + sizeof(SlabAlloc::StreamingFooter)) & 4095));
+#endif
     }
 
     // Write streaming footer
@@ -1021,42 +1024,52 @@ public:
 
     bool insert_group_level_table(size_t table_ndx, size_t num_tables, StringData) TIGHTDB_NOEXCEPT
     {
-        // for end-insertions, table_ndx will be equal to num_tables
         TIGHTDB_ASSERT(table_ndx <= num_tables);
-        m_group.m_table_accessors.push_back(0); // Throws
-        size_t last_ndx = num_tables;
-        m_group.m_table_accessors[last_ndx] = m_group.m_table_accessors[table_ndx];
-        m_group.m_table_accessors[table_ndx] = 0;
-        if (Table* moved_table = m_group.m_table_accessors[last_ndx]) {
-            typedef _impl::TableFriend tf;
-            tf::mark(*moved_table);
-            tf::mark_opposite_link_tables(*moved_table);
+        TIGHTDB_ASSERT(m_group.m_table_accessors.empty() ||
+                       m_group.m_table_accessors.size() == num_tables);
+
+        if (!m_group.m_table_accessors.empty()) {
+            // for end-insertions, table_ndx will be equal to num_tables
+            m_group.m_table_accessors.push_back(0); // Throws
+            size_t last_ndx = num_tables;
+            m_group.m_table_accessors[last_ndx] = m_group.m_table_accessors[table_ndx];
+            m_group.m_table_accessors[table_ndx] = 0;
+            if (Table* moved_table = m_group.m_table_accessors[last_ndx]) {
+                typedef _impl::TableFriend tf;
+                tf::mark(*moved_table);
+                tf::mark_opposite_link_tables(*moved_table);
+            }
         }
+
         return true;
     }
 
     bool erase_group_level_table(size_t table_ndx, size_t num_tables) TIGHTDB_NOEXCEPT
     {
         TIGHTDB_ASSERT(table_ndx < num_tables);
+        TIGHTDB_ASSERT(m_group.m_table_accessors.empty() ||
+                       m_group.m_table_accessors.size() == num_tables);
 
-        // Link target tables do not need to be considered here, since all
-        // columns will already have been removed at this point.
-        if (Table* table = m_group.m_table_accessors[table_ndx]) {
-            typedef _impl::TableFriend tf;
-            tf::detach(*table);
-            tf::unbind_ref(*table);
-        }
-
-        size_t last_ndx = num_tables - 1;
-        if (table_ndx < last_ndx) {
-            if (Table* moved_table = m_group.m_table_accessors[last_ndx]) {
+        if (!m_group.m_table_accessors.empty()) {
+            // Link target tables do not need to be considered here, since all
+            // columns will already have been removed at this point.
+            if (Table* table = m_group.m_table_accessors[table_ndx]) {
                 typedef _impl::TableFriend tf;
-                tf::mark(*moved_table);
-                tf::mark_opposite_link_tables(*moved_table);
+                tf::detach(*table);
+                tf::unbind_ref(*table);
             }
-            m_group.m_table_accessors[table_ndx] = m_group.m_table_accessors[last_ndx];
+
+            size_t last_ndx = num_tables - 1;
+            if (table_ndx < last_ndx) {
+                if (Table* moved_table = m_group.m_table_accessors[last_ndx]) {
+                    typedef _impl::TableFriend tf;
+                    tf::mark(*moved_table);
+                    tf::mark_opposite_link_tables(*moved_table);
+                }
+                m_group.m_table_accessors[table_ndx] = m_group.m_table_accessors[last_ndx];
+            }
+            m_group.m_table_accessors.pop_back();
         }
-        m_group.m_table_accessors.pop_back();
 
         return true;
     }

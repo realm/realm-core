@@ -94,7 +94,7 @@ const std::size_t not_found = npos;
     else if (wid == 4) {fun<4> arg;} \
     else if (wid == 8) {fun<8> arg;} \
     else if (wid == 64) {fun<64> arg;} \
-    else {TIGHTDB_ASSERT(false); fun<0> arg;}
+    else {TIGHTDB_ASSERT_DEBUG(false); fun<0> arg;}
 
 #define TIGHTDB_TEMPEX2(fun, targ, wid, arg) \
     if (wid == 16) {fun<targ, 16> arg;} \
@@ -105,7 +105,7 @@ const std::size_t not_found = npos;
     else if (wid == 4) {fun<targ, 4> arg;} \
     else if (wid == 8) {fun<targ, 8> arg;} \
     else if (wid == 64) {fun<targ, 64> arg;} \
-    else {TIGHTDB_ASSERT(false); fun<targ, 0> arg;}
+    else {TIGHTDB_ASSERT_DEBUG(false); fun<targ, 0> arg;}
 
 #define TIGHTDB_TEMPEX3(fun, targ1, targ2, wid, arg) \
     if (wid == 16) {fun<targ1, targ2, 16> arg;} \
@@ -116,7 +116,7 @@ const std::size_t not_found = npos;
     else if (wid == 4) {fun<targ1, targ2, 4> arg;} \
     else if (wid == 8) {fun<targ1, targ2, 8> arg;} \
     else if (wid == 64) {fun<targ1, targ2, 64> arg;} \
-    else {TIGHTDB_ASSERT(false); fun<targ1, targ2, 0> arg;}
+    else {TIGHTDB_ASSERT_DEBUG(false); fun<targ1, targ2, 0> arg;}
 
 #define TIGHTDB_TEMPEX4(fun, targ1, targ2, wid, targ3, arg) \
     if (wid == 16) {fun<targ1, targ2, 16, targ3> arg;} \
@@ -127,7 +127,7 @@ const std::size_t not_found = npos;
     else if (wid == 4) {fun<targ1, targ2, 4, targ3> arg;} \
     else if (wid == 8) {fun<targ1, targ2, 8, targ3> arg;} \
     else if (wid == 64) {fun<targ1, targ2, 64, targ3> arg;} \
-    else {TIGHTDB_ASSERT(false); fun<targ1, targ2, 0, targ3> arg;}
+    else {TIGHTDB_ASSERT_DEBUG(false); fun<targ1, targ2, 0, targ3> arg;}
 
 #define TIGHTDB_TEMPEX5(fun, targ1, targ2, targ3, targ4, wid, arg) \
     if (wid == 16) {fun<targ1, targ2, targ3, targ4, 16> arg;} \
@@ -138,7 +138,7 @@ const std::size_t not_found = npos;
     else if (wid == 4) {fun<targ1, targ2, targ3, targ4, 4> arg;} \
     else if (wid == 8) {fun<targ1, targ2, targ3, targ4, 8> arg;} \
     else if (wid == 64) {fun<targ1, targ2, targ3, targ4, 64> arg;} \
-    else {TIGHTDB_ASSERT(false); fun<targ1, targ2, targ3, targ4, 0> arg;}
+    else {TIGHTDB_ASSERT_DEBUG(false); fun<targ1, targ2, targ3, targ4, 0> arg;}
 
 
 // Pre-definitions
@@ -935,7 +935,6 @@ public:
     void to_dot_parent_edge(std::ostream&) const;
 #endif
 
-protected:
     static const int header_size = 8; // Number of bytes used by header
 
 private:
@@ -1195,8 +1194,9 @@ public:
             m_state = reinterpret_cast<int64_t>(akku);
         else if (action == act_CallbackIdx) {
         }
-        else
-            TIGHTDB_ASSERT(false);
+        else {
+            TIGHTDB_ASSERT_DEBUG(false);
+        }
     }
 
     template <Action action, bool pattern>
@@ -1244,9 +1244,9 @@ public:
             m_state = index;
             return false;
         }
-        else
-            TIGHTDB_ASSERT(false);
-
+        else {
+            TIGHTDB_ASSERT_DEBUG(false);
+        }
         return (m_limit > m_match_count);
     }
 };
@@ -1278,8 +1278,9 @@ public:
             m_state = std::numeric_limits<R>::infinity();
         else if (action == act_Sum)
             m_state = 0.0;
-        else
-            TIGHTDB_ASSERT(false);
+        else {
+            TIGHTDB_ASSERT_DEBUG(false);
+        }
     }
 
     template<Action action, bool pattern, typename resulttype>
@@ -1305,9 +1306,9 @@ public:
         }
         else if (action == act_Sum)
             m_state += value;
-        else
-            TIGHTDB_ASSERT(false);
-
+        else {
+            TIGHTDB_ASSERT_DEBUG(false);
+        }
         return (m_limit > m_match_count);
     }
 };
@@ -1340,7 +1341,7 @@ inline void Array::create(Type type, bool context_flag)
 
 inline void Array::init_from_ref(ref_type ref) TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(ref);
+    TIGHTDB_ASSERT_DEBUG(ref);
     char* header = m_alloc.translate(ref);
     init_from_mem(MemRef(header, ref));
 }
@@ -1356,7 +1357,7 @@ inline void Array::init_from_parent() TIGHTDB_NOEXCEPT
 inline Array::Type Array::get_type() const TIGHTDB_NOEXCEPT
 {
     if (m_is_inner_bptree_node) {
-        TIGHTDB_ASSERT(m_has_refs);
+        TIGHTDB_ASSERT_DEBUG(m_has_refs);
         return type_InnerBptreeNode;
     }
     if (m_has_refs)
@@ -1367,15 +1368,15 @@ inline Array::Type Array::get_type() const TIGHTDB_NOEXCEPT
 
 inline void Array::get_chunk(std::size_t ndx, int64_t res[8]) const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(ndx < m_size);
+    TIGHTDB_ASSERT_DEBUG(ndx < m_size);
     (this->*m_chunk_getter)(ndx, res);
 }
 
 
 inline int64_t Array::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(is_attached());
-    TIGHTDB_ASSERT(ndx < m_size);
+    TIGHTDB_ASSERT_DEBUG(is_attached());
+    TIGHTDB_ASSERT_DEBUG(ndx < m_size);
     return (this->*m_getter)(ndx);
 
 // Two ideas that are not efficient but may be worth looking into again:
@@ -1413,8 +1414,8 @@ inline int64_t Array::back() const TIGHTDB_NOEXCEPT
 
 inline ref_type Array::get_as_ref(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(is_attached());
-    TIGHTDB_ASSERT(m_has_refs);
+    TIGHTDB_ASSERT_DEBUG(is_attached());
+    TIGHTDB_ASSERT_DEBUG(m_has_refs);
     int64_t v = get(ndx);
     return to_ref(v);
 }
@@ -1801,7 +1802,7 @@ inline std::size_t Array::get_byte_size() const TIGHTDB_NOEXCEPT
             num_bytes = m_size;
             goto found;
     }
-    TIGHTDB_ASSERT(false);
+    TIGHTDB_ASSERT_DEBUG(false);
 
   found:
     // Ensure 8-byte alignment
@@ -1840,7 +1841,7 @@ inline std::size_t Array::get_byte_size_from_header(const char* header) TIGHTDB_
             num_bytes = size;
             goto found;
     }
-    TIGHTDB_ASSERT(false);
+    TIGHTDB_ASSERT_DEBUG(false);
 
   found:
     // Ensure 8-byte alignment
@@ -2026,7 +2027,7 @@ inline void Array::detach() TIGHTDB_NOEXCEPT
 
 inline std::size_t Array::size() const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(is_attached());
+    TIGHTDB_ASSERT_DEBUG(is_attached());
     return m_size;
 }
 
@@ -2060,14 +2061,14 @@ inline ref_type Array::get_child_ref(size_t child_ndx) const TIGHTDB_NOEXCEPT
 
 inline std::size_t Array::get_bptree_size() const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(is_inner_bptree_node());
+    TIGHTDB_ASSERT_DEBUG(is_inner_bptree_node());
     int_fast64_t v = back();
     return std::size_t(v / 2); // v = 1 + 2*total_elems_in_tree
 }
 
 inline std::size_t Array::get_bptree_size_from_header(const char* root_header) TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(get_is_inner_bptree_node_from_header(root_header));
+    TIGHTDB_ASSERT_DEBUG(get_is_inner_bptree_node_from_header(root_header));
     size_t root_size = get_size_from_header(root_header);
     int_fast64_t v = get(root_header, root_size-1);
     return size_t(v / 2); // v = 1 + 2*total_elems_in_tree
@@ -2116,7 +2117,7 @@ ref_type Array::bptree_append(TreeInsert<TreeTraits>& state)
     // What about the 'offsets' array? It will always be
     // present. Consider this carefully.
 
-    TIGHTDB_ASSERT(size() >= 1 + 1 + 1); // At least one child
+    TIGHTDB_ASSERT_DEBUG(size() >= 1 + 1 + 1); // At least one child
 
     ArrayParent& childs_parent = *this;
     std::size_t child_ref_ndx = size() - 2;
@@ -2257,7 +2258,7 @@ template<std::size_t w> int64_t Array::GetUniversal(const char* data, std::size_
         return *reinterpret_cast<const int64_t*>(data + offset);
     }
     else {
-        TIGHTDB_ASSERT(false);
+        TIGHTDB_ASSERT_DEBUG(false);
         return int64_t(-1);
     }
 }
@@ -2396,7 +2397,7 @@ template<size_t width> uint64_t Array::cascade(uint64_t a) const
         return a == 0 ? 1 : 0;
     }
     else {
-        TIGHTDB_ASSERT(false);
+        TIGHTDB_ASSERT_DEBUG(false);
         return uint64_t(-1);
     }
 }
@@ -2407,7 +2408,7 @@ template<size_t width> uint64_t Array::cascade(uint64_t a) const
 template<class cond2, Action action, size_t bitwidth, class Callback> bool Array::find_optimized(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, Callback callback) const
 {
     cond2 c;
-    TIGHTDB_ASSERT(start <= m_size && (end <= m_size || end == std::size_t(-1)) && start <= end);
+    TIGHTDB_ASSERT_DEBUG(start <= m_size && (end <= m_size || end == std::size_t(-1)) && start <= end);
 
     // Test first few items with no initial time overhead
     if (start > 0) {
@@ -2457,7 +2458,7 @@ template<class cond2, Action action, size_t bitwidth, class Callback> bool Array
         if (action == act_CallbackIdx)
             end2 = end;
         else {
-            TIGHTDB_ASSERT(state->m_match_count < state->m_limit);
+            TIGHTDB_ASSERT_DEBUG(state->m_match_count < state->m_limit);
             size_t process = state->m_limit - state->m_match_count;
             end2 = end - start > process ? start + process : end;
         }
@@ -2544,7 +2545,7 @@ template<size_t width> inline int64_t Array::LowerBits() const
     else if (width == 64)
         return 0x0000000000000001ULL;
     else {
-        TIGHTDB_ASSERT(false);
+        TIGHTDB_ASSERT_DEBUG(false);
         return int64_t(-1);
     }
 }
@@ -2802,7 +2803,7 @@ template<bool eq, Action action, size_t width, class Callback> inline bool Array
 {
     // Find items in this Array that are equal (eq == true) or different (eq = false) from 'value'
 
-    TIGHTDB_ASSERT(start <= m_size && (end <= m_size || end == std::size_t(-1)) && start <= end);
+    TIGHTDB_ASSERT_DEBUG(start <= m_size && (end <= m_size || end == std::size_t(-1)) && start <= end);
 
     size_t ee = round_up(start, 64 / no0(width));
     ee = ee > end ? end : ee;
@@ -3226,7 +3227,7 @@ bool Array::Compare(int64_t value, size_t start, size_t end, size_t baseindex, Q
     else if (cond == cond_Less)
         ret = CompareRelation<false, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
     else
-        TIGHTDB_ASSERT(false);
+        TIGHTDB_ASSERT_DEBUG(false);
 
     return ret;
 }

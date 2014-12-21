@@ -50,8 +50,8 @@ public:
 
     void set_file_size(off_t new_size);
 
-    void try_read(int fd, off_t pos, char* dst);
-    void read(int fd, off_t pos, char* dst) TIGHTDB_NOEXCEPT;
+    bool try_read(int fd, off_t pos, char* dst);
+    bool read(int fd, off_t pos, char* dst) TIGHTDB_NOEXCEPT;
     void write(int fd, off_t pos, const char* src) TIGHTDB_NOEXCEPT;
 
 private:
@@ -146,4 +146,17 @@ private:
 }
 
 #endif // TIGHTDB_ENABLE_ENCRYPTION
+
+namespace tightdb {
+namespace util {
+
+/// Thrown by EncryptedFileMapping if a file opened is non-empty and does not
+/// contain valid encrypted data
+struct DecryptionFailed: util::File::AccessError {
+    DecryptionFailed(): util::File::AccessError("Decryption failed") {}
+};
+
+}
+}
+
 #endif // TIGHTDB_UTIL_ENCRYPTED_FILE_MAPPING_HPP

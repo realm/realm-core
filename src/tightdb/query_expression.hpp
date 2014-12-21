@@ -156,22 +156,50 @@ template<class T> struct EitherIsString<T, StringData>
     typedef StringData type;
 };
 
-// Hack to avoid template instantiation errors. See create(). Todo, see if we can simplify OnlyNumberic and
+// Hack to avoid template instantiation errors. See create(). Todo, see if we can simplify only_numeric and
 // EitherIsString somehow
-template<class T> struct OnlyNumeric
+namespace {
+template<class T, class U> T only_numeric(U in)
 {
-    static T get(T in) { return in; }
-    typedef T type;
-    typedef T type2;
-};
+    return static_cast<T>(in);
+}
 
-template<> struct OnlyNumeric<StringData>
+template<class T> int only_numeric(const StringData& in)
 {
-    static int get(StringData in) { static_cast<void>(in); return 0; }
-    typedef StringData type;
-    typedef int type2;
-};
+    TIGHTDB_ASSERT(false);
+    static_cast<void>(in);
+    return 0;
+}
 
+template<class T> StringData only_string(T in)
+{
+    TIGHTDB_ASSERT(false);
+    static_cast<void>(in);
+    return StringData();
+}
+
+StringData only_string(StringData in)
+{
+    return in;
+}
+
+// Modify in to refer to a deep clone of the data it points to, if applicable,
+// and return a pointer which must be deleted if non-NULL
+template<class T> char* in_place_deep_clone(T* in)
+{
+    static_cast<void>(in);
+    return 0;
+}
+
+char* in_place_deep_clone(StringData* in)
+{
+    char* payload = new char[in->size()];
+    memcpy(payload, in->data(), in->size());
+    *in = StringData(payload, in->size());
+    return payload;
+}
+
+} // anonymous namespace
 
 template<class T>struct Plus {
     T operator()(T v1, T v2) const { return v1 + v2; }
@@ -285,8 +313,7 @@ class ColumnAccessorBase;
 
 
 // Handle cases where left side is a constant (int, float, int64_t, double, StringData)
-template <class L, class Cond, class R> Query create(L left, const Subexpr2<R>& right,
-    const char* compare_string = null_ptr)
+template <class L, class Cond, class R> Query create(L left, const Subexpr2<R>& right)
 {
     // Purpose of below code is to intercept the creation of a condition and test if it's supported by the old
     // query_engine.hpp which is faster. If it's supported, create a query_engine.hpp node, otherwise create a
@@ -295,34 +322,44 @@ template <class L, class Cond, class R> Query create(L left, const Subexpr2<R>& 
     // This method intercepts only Value <cond> Subexpr2. Interception of Subexpr2 <cond> Subexpr is elsewhere.
 
 #ifdef TIGHTDB_OLDQUERY_FALLBACK // if not defined, then never fallback to query_engine.hpp; always use query_expression
-    OnlyNumeric<L> num;
-    static_cast<void>(num);
-
     const Columns<R>* column = dynamic_cast<const Columns<R>*>(&right);
 
     if (column &&
         ((std::numeric_limits<L>::is_integer && std::numeric_limits<L>::is_integer) ||
         (util::SameType<L, double>::value && util::SameType<R, double>::value) ||
-        (util::SameType<L, float>::value && util::SameType<R, float>::value))
+        (util::SameType<L, float>::value && util::SameType<R, float>::value) ||
+        (util::SameType<L, StringData>::value && util::SameType<R, StringData>::value))
         &&
         column->m_link_map.m_tables.size() == 0) {
         const Table* t = (const_cast<Columns<R>*>(column))->get_table();
         Query q = Query(*t);
 
-        typedef typename OnlyNumeric<R>::type2 type2;
-
         if (util::SameType<Cond, Less>::value)
-            q.greater(column->m_column, static_cast<type2>(num.get(left)));
+            q.greater(column->m_column, only_numeric<R>(left));
         else if (util::SameType<Cond, Greater>::value)
-            q.less(column->m_column, static_cast<type2>(num.get(left)));
+            q.less(column->m_column, only_numeric<R>(left));
         else if (util::SameType<Cond, Equal>::value)
-            q.equal(column->m_column, static_cast<type2>(num.get(left)));
+            q.equal(column->m_column, left);
         else if (util::SameType<Cond, NotEqual>::value)
-            q.not_equal(column->m_column, static_cast<type2>(num.get(left)));
+            q.not_equal(column->m_column, left);
         else if (util::SameType<Cond, LessEqual>::value)
-            q.greater_equal(column->m_column, static_cast<type2>(num.get(left)));
+            q.greater_equal(column->m_column, only_numeric<R>(left));
         else if (util::SameType<Cond, GreaterEqual>::value)
-            q.less_equal(column->m_column, static_cast<type2>(num.get(left)));
+            q.less_equal(column->m_column, only_numeric<R>(left));
+        else if (util::SameType<Cond, EqualIns>::value)
+            q.equal(column->m_column, only_string(left), false);
+        else if (util::SameType<Cond, BeginsWith>::value)
+            q.begins_with(column->m_column, only_string(left));
+        else if (util::SameType<Cond, BeginsWithIns>::value)
+            q.begins_with(column->m_column, only_string(left), false);
+        else if (util::SameType<Cond, EndsWith>::value)
+            q.ends_with(column->m_column, only_string(left));
+        else if (util::SameType<Cond, EndsWithIns>::value)
+            q.ends_with(column->m_column, only_string(left), false);
+        else if (util::SameType<Cond, Contains>::value)
+            q.contains(column->m_column, only_string(left));
+        else if (util::SameType<Cond, ContainsIns>::value)
+            q.contains(column->m_column, only_string(left), false);
         else {
             // query_engine.hpp does not support this Cond. Please either add support for it in query_engine.hpp or
             // fallback to using use 'return *new Compare<>' instead.
@@ -334,6 +371,10 @@ template <class L, class Cond, class R> Query create(L left, const Subexpr2<R>& 
     else
 #endif
     {
+        // If we're searching for a string, create a deep copy of the search string
+        // which will be deleted by the Compare instance.
+        char* compare_string = in_place_deep_clone(&left);
+
         // Return query_expression.hpp node
         return *new Compare<Cond, typename Common<L, R>::type>(*new Value<L>(left),
             const_cast<Subexpr2<R>&>(right).clone(), true, compare_string);
@@ -672,7 +713,7 @@ public:
         else if (util::SameType<T, StringData>::value)
             source.export_StringData(*this);
         else
-            TIGHTDB_ASSERT(false);
+            TIGHTDB_ASSERT_DEBUG(false);
     }
 
     // Given a TCond (==, !=, >, <, >=, <=) and two Value<T>, return index of first match
@@ -690,12 +731,12 @@ public:
         }
         else if (left->from_link && right->from_link) {
             // Many-to-many links not supported yet. Need to specify behaviour
-            TIGHTDB_ASSERT(false);
+            TIGHTDB_ASSERT_DEBUG(false);
         }
         else if (!left->from_link && right->from_link) {
             // Right values come from link. Left must come from single row. Semantics: Match if at least 1 
             // linked-to-value fulfills the condition
-            TIGHTDB_ASSERT(left->m_values == 0 || left->m_values == ValueBase::default_size);
+            TIGHTDB_ASSERT_DEBUG(left->m_values == 0 || left->m_values == ValueBase::default_size);
             for (size_t r = 0; r < right->ValueBase::m_values; r++) {
                 if (c(left->m_v[0], right->m_v[r]))
                     return 0;
@@ -703,7 +744,7 @@ public:
         }
         else if (left->from_link && !right->from_link) {
             // Same as above, right left values coming from links
-            TIGHTDB_ASSERT(right->m_values == 0 || right->m_values == ValueBase::default_size);
+            TIGHTDB_ASSERT_DEBUG(right->m_values == 0 || right->m_values == ValueBase::default_size);
             for (size_t l = 0; l < left->ValueBase::m_values; l++) {
                 if (c(left->m_v[l], right->m_v[0]))
                     return 0;
@@ -1124,12 +1165,8 @@ public:
 
 template <class T, class C> Query string_compare(const Columns<StringData>& left, T right)
 {
-    // Create deep copy of search string. Destructor of the Compare class will delete it.
     StringData sd(right);
-    char* string_payload(new char[sd.size()]);
-    memcpy(string_payload, sd.data(), sd.size());
-    StringData sd2(StringData(string_payload, sd.size()));
-    return create<StringData, C, StringData>(sd2, left, string_payload);
+    return create<StringData, C, StringData>(sd, left);
 }
 
 // String == Columns<String>

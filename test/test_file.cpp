@@ -205,7 +205,7 @@ TEST(File_SetEncryptionKey)
 {
     TEST_PATH(path);
     File f(path, File::mode_Write);
-    uint8_t key[64] = {0};
+    const char key[64] = {0};
 
 #ifdef TIGHTDB_ENABLE_ENCRYPTION
     f.set_encryption_key(key); // should not throw
