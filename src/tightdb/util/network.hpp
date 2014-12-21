@@ -35,9 +35,24 @@
 #include <tightdb/util/basic_system_errors.hpp>
 #include <tightdb/util/system_error.hpp>
 
+/// \file The design of this networking API is heavily inspired by the ASIO C++
+/// library (http://think-async.com).
+
 namespace tightdb {
 namespace util {
 namespace network {
+
+std::string host_name();
+
+
+class protocol;
+class address;
+class endpoint;
+class io_service;
+class resolver;
+class socket;
+class acceptor;
+class buffered_input_stream;
 
 
 class protocol {
@@ -132,14 +147,85 @@ private:
 };
 
 
+/// While a thread is executing run(), all objects with asynchronous operation
+/// in progress (such as socket and acceptor) must be considered accessed by
+/// that thread. This means that no other thread is allowed to access those
+/// objects concurrently. An asynchronous operation is considered complete when
+/// the completion handler is called by the thread that executes run() (i.e.,
+/// before the completion handler returns).
+class io_service {
+public:
+    io_service();
+    ~io_service() TIGHTDB_NOEXCEPT;
+
+    /// Wait for asynchronous operations to complete, and execute the associated
+    /// completion handlers. Keep doing this until there are no more
+    /// asynchronous operations in progress. If asynchronous operations such as
+    /// acceptor::async_accept() or post() are used, one thread must call this
+    /// function. At most one thread is allowed to execute it concurrently. All
+    /// completion handlers associated with asynchronous operations, including
+    /// handlers passed to post(), will be executed by the thread that calls
+    /// run(), and only by that thread. Exceptions thrown by completion handlers
+    /// will propagate back through run().
+    void run();
+
+    /// Stop any thread that is currently executing run(). If a thread is
+    /// currently executing run() and is blocked, it will be unblocked. Handlers
+    /// that can be executed immediately may or may not be executed before the
+    /// thread returns from run(), but it is guaranteed that the thread will not
+    /// become blocked again before returning. Subsequent calls to run() will
+    /// return immediately until reset() is called.
+    ///
+    /// This function may be called by any thread, even via handlers executed by
+    /// the thread that executes run().
+    void stop();
+
+    void reset();
+
+    /// Post the specified handler for immediate asynchronous execution. The
+    /// specified handler object will be copied as necessary, and will be
+    /// executed by an expression on the form `handler()`.
+    ///
+    /// This function may be called by any thread, even via handlers executed by
+    /// the thread that executes run().
+    template<class H> void post(const H& handler);
+
+private:
+    class async_handler;
+    template<class H> class post_handler;
+
+    // Handler ownership is passed from caller to callee in calls to
+    // add_io_handler(), add_imm_handler(), and add_post_handler().
+    enum io_op { op_Read, op_Write };
+    void add_io_handler(int fd, async_handler*, io_op);
+    void add_imm_handler(async_handler*);
+    void add_post_handler(async_handler*);
+
+    template<class H> class write_handler;
+
+    class impl;
+    const UniquePtr<impl> m_impl;
+
+    friend class acceptor;
+    friend class buffered_input_stream;
+    template<class H> friend void async_write(socket&, const char*, std::size_t, const H&);
+};
+
+
 class resolver {
 public:
     class query;
 
+    resolver(io_service&);
+    ~resolver() TIGHTDB_NOEXCEPT {}
+
+    io_service& service();
+
     void resolve(const query&, endpoint::list&);
     error_code resolve(const query&, endpoint::list&, error_code&);
 
-    ~resolver() TIGHTDB_NOEXCEPT {}
+private:
+    io_service& m_service;
 };
 
 
@@ -177,8 +263,10 @@ private:
 
 class socket {
 public:
-    socket();
+    socket(io_service&);
     ~socket() TIGHTDB_NOEXCEPT;
+
+    io_service& service();
 
     bool is_open() const;
 
@@ -204,16 +292,22 @@ public:
     error_code close(error_code&);
 
 private:
+    io_service& m_service;
     protocol m_protocol;
     int m_sock_fd;
 
     friend class acceptor;
+    friend class buffered_input_stream;
+    template<class H> friend void async_write(socket&, const char*, std::size_t, const H&);
 };
 
 
 class acceptor: private socket {
 public:
+    acceptor(io_service&);
     ~acceptor() TIGHTDB_NOEXCEPT {}
+
+    io_service& service();
 
     bool is_open() const;
 
@@ -236,8 +330,16 @@ public:
     error_code accept(socket&, error_code&);
     error_code accept(socket&, endpoint&, error_code&);
 
+    template<class H> void async_accept(socket&, const H& handler);
+    template<class H> void async_accept(socket&, endpoint&, const H& handler);
+
     void close();
     error_code close(error_code&);
+
+private:
+    error_code accept(socket&, endpoint*, error_code&);
+    template<class H> class accept_handler;
+    template<class H> void async_accept(socket&, endpoint*, const H&);
 };
 
 
@@ -253,17 +355,34 @@ public:
     std::size_t read_until(char* buffer, std::size_t size, char delim,
                            error_code&) TIGHTDB_NOEXCEPT;
 
+    template<class H>
+    void async_read(char* buffer, std::size_t size, const H& handler);
+
+    template<class H>
+    void async_read_until(char* buffer, std::size_t size, char delim, const H& handler);
+
 private:
+    class read_handler_base;
+    template<class H> class read_handler;
+
     socket& m_socket;
     static const std::size_t s_buffer_size = 1024;
     UniquePtr<char[]> m_buffer;
     char* m_begin;
     char* m_end;
+
+    std::size_t read(char* buffer, std::size_t size, int delim, error_code&) TIGHTDB_NOEXCEPT;
+
+    template<class H>
+    void async_read(char* buffer, std::size_t size, int delim, const H& handler);
+    void async_read(read_handler_base*);
 };
 
 
 error_code write(socket&, const char* data, std::size_t size, error_code&) TIGHTDB_NOEXCEPT;
 void write(socket&, const char* data, std::size_t size);
+
+template<class H> void async_write(socket&, const char* data, std::size_t size, const H& handler);
 
 
 enum errors {
@@ -402,6 +521,44 @@ inline endpoint::list::iterator endpoint::list::end() const
     return m_endpoints.data() + m_endpoints.size();
 }
 
+class io_service::async_handler {
+public:
+    virtual bool exec() = 0;
+    virtual ~async_handler() TIGHTDB_NOEXCEPT {}
+};
+
+template<class H> class io_service::post_handler:
+        public async_handler {
+public:
+    post_handler(const H& h):
+        m_handler(h)
+    {
+    }
+    bool exec() TIGHTDB_OVERRIDE
+    {
+        m_handler(); // Throws
+        return true;
+    }
+private:
+    const H m_handler;
+};
+
+template<class H> inline void io_service::post(const H& handler)
+{
+    io_service::post_handler<H>* h = new io_service::post_handler<H>(handler); // Throws
+    add_post_handler(h); // Throws
+}
+
+inline resolver::resolver(io_service& serv):
+    m_service(serv)
+{
+}
+
+inline io_service& resolver::service()
+{
+    return m_service;
+}
+
 inline void resolver::resolve(const query& q, endpoint::list& l)
 {
     error_code ec;
@@ -458,7 +615,8 @@ inline std::string resolver::query::service() const
     return m_service;
 }
 
-inline socket::socket():
+inline socket::socket(io_service& serv):
+    m_service(serv),
     m_sock_fd(-1)
 {
 }
@@ -468,6 +626,11 @@ inline socket::~socket() TIGHTDB_NOEXCEPT
     error_code ec;
     close(ec);
     // Ignore errors
+}
+
+inline io_service& socket::service()
+{
+    return m_service;
 }
 
 inline bool socket::is_open() const
@@ -530,6 +693,16 @@ inline void socket::close()
         throw system_error(ec);
 }
 
+inline acceptor::acceptor(io_service& serv):
+    socket(serv)
+{
+}
+
+inline io_service& acceptor::service()
+{
+    return socket::service();
+}
+
 inline bool acceptor::is_open() const
 {
     return socket::is_open();
@@ -574,8 +747,9 @@ inline void acceptor::listen(int backlog)
 
 inline void acceptor::accept(socket& sock)
 {
-    endpoint ep; // Dummy
-    accept(sock, ep);
+    error_code ec;
+    if (accept(sock, ec))
+        throw system_error(ec);
 }
 
 inline void acceptor::accept(socket& sock, endpoint& ep)
@@ -587,8 +761,24 @@ inline void acceptor::accept(socket& sock, endpoint& ep)
 
 inline error_code acceptor::accept(socket& sock, error_code& ec)
 {
-    endpoint ep; // Dummy
+    endpoint* ep = 0;
     return accept(sock, ep, ec);
+}
+
+inline error_code acceptor::accept(socket& sock, endpoint& ep, error_code& ec)
+{
+    return accept(sock, &ep, ec);
+}
+
+template<class H> inline void acceptor::async_accept(socket& sock, const H& handler)
+{
+    endpoint* ep = 0;
+    async_accept(sock, ep, handler);
+}
+
+template<class H> inline void acceptor::async_accept(socket& sock, endpoint& ep, const H& handler)
+{
+    async_accept(sock, &ep, handler);
 }
 
 inline void acceptor::close()
@@ -601,9 +791,39 @@ inline error_code acceptor::close(error_code& ec)
     return socket::close(ec);
 }
 
+template<class H> class acceptor::accept_handler:
+        public io_service::async_handler {
+public:
+    accept_handler(acceptor& a, socket& s, endpoint* e, const H& h):
+        m_acceptor(a),
+        m_socket(s),
+        m_endpoint(e),
+        m_handler(h)
+    {
+    }
+    bool exec() TIGHTDB_OVERRIDE
+    {
+        error_code ec;
+        m_acceptor.accept(m_socket, m_endpoint, ec);
+        m_handler(ec); // Throws
+        return true;
+    }
+private:
+    acceptor& m_acceptor;
+    socket& m_socket;
+    endpoint* const m_endpoint;
+    const H m_handler;
+};
+
+template<class H> inline void acceptor::async_accept(socket& sock, endpoint* ep, const H& handler)
+{
+    accept_handler<H>* h = new accept_handler<H>(*this, sock, ep, handler); // Throws
+    m_service.add_io_handler(m_sock_fd, h, io_service::op_Read); // Throws
+}
+
 inline buffered_input_stream::buffered_input_stream(socket& sock):
     m_socket(sock),
-    m_buffer(new char[s_buffer_size]),
+    m_buffer(new char[s_buffer_size]), // Throws
     m_begin(m_buffer.get()),
     m_end(m_buffer.get())
 {
@@ -618,6 +838,12 @@ inline std::size_t buffered_input_stream::read(char* buffer, std::size_t size)
     return n;
 }
 
+inline std::size_t buffered_input_stream::read(char* buffer, std::size_t size,
+                                               error_code& ec) TIGHTDB_NOEXCEPT
+{
+    return read(buffer, size, std::char_traits<char>::eof(), ec);
+}
+
 inline std::size_t buffered_input_stream::read_until(char* buffer, std::size_t size, char delim)
 {
     error_code ec;
@@ -627,11 +853,139 @@ inline std::size_t buffered_input_stream::read_until(char* buffer, std::size_t s
     return n;
 }
 
-void write(socket& sock, const char* data, std::size_t size)
+inline std::size_t buffered_input_stream::read_until(char* buffer, std::size_t size, char delim,
+                                                     error_code& ec) TIGHTDB_NOEXCEPT
+{
+    return read(buffer, size, std::char_traits<char>::to_int_type(delim), ec);
+}
+
+template<class H>
+inline void buffered_input_stream::async_read(char* buffer, std::size_t size, const H& handler)
+{
+    async_read(buffer, size, std::char_traits<char>::eof(), handler);
+}
+
+template<class H>
+inline void buffered_input_stream::async_read_until(char* buffer, std::size_t size, char delim,
+                                                    const H& handler)
+{
+    async_read(buffer, size, std::char_traits<char>::to_int_type(delim), handler);
+}
+
+class buffered_input_stream::read_handler_base:
+        public io_service::async_handler {
+public:
+    read_handler_base(buffered_input_stream& s, char* buffer, std::size_t size, int delim):
+        m_stream(s),
+        m_out_begin(buffer),
+        m_out_end(buffer + size),
+        m_out_curr(buffer),
+        m_delim(delim),
+        m_complete(false)
+    {
+    }
+    void process_input() TIGHTDB_NOEXCEPT;
+    bool is_complete() const
+    {
+        return m_complete;
+    }
+protected:
+    buffered_input_stream& m_stream;
+    char* const m_out_begin;
+    char* const m_out_end;
+    char* m_out_curr;
+    const int m_delim;
+    bool m_complete;
+    void read_some(error_code& ec) TIGHTDB_NOEXCEPT;
+};
+
+template<class H>
+class buffered_input_stream::read_handler:
+        public read_handler_base {
+public:
+    read_handler(buffered_input_stream& s, char* buffer, std::size_t size, int delim, const H& h):
+        read_handler_base(s, buffer, size, delim),
+        m_handler(h)
+    {
+    }
+    bool exec() TIGHTDB_OVERRIDE
+    {
+        error_code ec;
+        if (!m_complete) {
+            read_some(ec);
+            if (!m_complete && !ec)
+                return false;
+        }
+        std::size_t num_bytes_transferred = m_out_curr - m_out_begin;
+        m_handler(ec, num_bytes_transferred); // Throws
+        return true;
+    }
+private:
+    const H m_handler;
+};
+
+template<class H>
+inline void buffered_input_stream::async_read(char* buffer, std::size_t size, int delim,
+                                              const H& handler)
+{
+    async_read(new read_handler<H>(*this, buffer, size, delim, handler)); // Throws
+}
+
+inline void buffered_input_stream::async_read(read_handler_base* handler)
+{
+    handler->process_input();
+    if (handler->is_complete()) {
+        m_socket.m_service.add_imm_handler(handler); // Throws
+    }
+    else {
+        m_socket.m_service.add_io_handler(m_socket.m_sock_fd, handler,
+                                          io_service::op_Read); // Throws
+    }
+}
+
+inline void write(socket& sock, const char* data, std::size_t size)
 {
     error_code ec;
     if (write(sock, data, size, ec))
         throw system_error(ec);
+}
+
+template<class H> class io_service::write_handler: public async_handler {
+public:
+    write_handler(socket& s, const char* data, std::size_t size, const H& h):
+        m_socket(s),
+        m_begin(data),
+        m_end(data + size),
+        m_curr(data),
+        m_handler(h)
+    {
+    }
+    bool exec() TIGHTDB_OVERRIDE
+    {
+        error_code ec;
+        std::size_t n = m_socket.write_some(m_curr, m_end-m_curr, ec);
+        m_curr += n;
+        bool complete = m_curr == m_end;
+        if (!complete && !ec)
+            return false;
+        std::size_t num_bytes_transferred = m_curr - m_begin;
+        m_handler(ec, num_bytes_transferred); // Throws
+        return true;
+    }
+private:
+    socket& m_socket;
+    const char* const m_begin;
+    const char* const m_end;
+    const char* m_curr;
+    const H m_handler;
+};
+
+template<class H>
+inline void async_write(socket& sock, const char* data, std::size_t size, const H& handler)
+{
+    io_service::write_handler<H>* h =
+        new io_service::write_handler<H>(sock, data, size, handler); // Throws
+    sock.service().add_io_handler(sock.m_sock_fd, h, io_service::op_Write); // Throws
 }
 
 

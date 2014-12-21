@@ -24,8 +24,12 @@
 #include <tightdb/util/terminate.hpp>
 
 #if defined(TIGHTDB_ENABLE_ASSERTIONS) || defined(TIGHTDB_DEBUG)
+#  define TIGHTDB_ASSERTIONS_ENABLED 1
+#endif
+
+#if TIGHTDB_ASSERTIONS_ENABLED
 #  define TIGHTDB_ASSERT(condition) \
-    ((condition) ? static_cast<void>(0) :                               \
+    ((condition) ? static_cast<void>(0) : \
      tightdb::util::terminate("Assertion failed: " #condition, __FILE__, __LINE__))
 #else
 #  define TIGHTDB_ASSERT(condition) static_cast<void>(0)
@@ -33,7 +37,7 @@
 
 #ifdef TIGHTDB_DEBUG
 #  define TIGHTDB_ASSERT_DEBUG(condition) \
-    ((condition) ? static_cast<void>(0) :                               \
+    ((condition) ? static_cast<void>(0) : \
      tightdb::util::terminate("Assertion failed: " #condition, __FILE__, __LINE__))
 #else
 #  define TIGHTDB_ASSERT_DEBUG(condition) static_cast<void>(0)

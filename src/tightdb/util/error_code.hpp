@@ -21,6 +21,7 @@
 #define TIGHTDB_UTIL_ERROR_CODE_HPP
 
 #include <string>
+#include <ostream>
 
 #include <tightdb/util/features.h>
 
@@ -60,10 +61,20 @@ private:
 
 class error_category {
 public:
+    virtual const char* name() const = 0;
+
     virtual std::string message(int value) const = 0;
 
     virtual ~error_category() TIGHTDB_NOEXCEPT {}
 };
+
+
+template<class C, class T>
+std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>& out, const error_code& ec)
+{
+    out << ec.category().name() << ':' << ec.value();
+    return out;
+}
 
 
 namespace error {

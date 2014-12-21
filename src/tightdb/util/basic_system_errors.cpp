@@ -10,10 +10,16 @@ using namespace tightdb::util;
 namespace {
 
 class system_category: public error_category {
+    const char* name() const TIGHTDB_OVERRIDE;
     string message(int) const TIGHTDB_OVERRIDE;
 };
 
 system_category g_system_category;
+
+const char* system_category::name() const
+{
+    return "tightdb.basic_system";
+}
 
 string system_category::message(int value) const
 {

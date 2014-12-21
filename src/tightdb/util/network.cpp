@@ -1,19 +1,41 @@
 #include <cerrno>
 #include <algorithm>
+#include <vector>
 #include <stdexcept>
 
 #include <unistd.h>
+#include <fcntl.h>
+#include <poll.h>
 
+#include <tightdb/util/thread.hpp>
 #include <tightdb/util/network.hpp>
 
 using std::size_t;
+using std::char_traits;
 using std::string;
+using std::vector;
 using std::runtime_error;
 using namespace tightdb::util;
 using namespace tightdb::util::network;
 
 
 namespace {
+
+void make_nonblocking(int fd)
+{
+    int flags = fcntl(fd, F_GETFL, 0);
+    if(flags == -1) {
+        error_code ec = make_basic_system_error_code(errno);
+        throw system_error(ec);
+    }
+    flags |= O_NONBLOCK;
+    int ret = fcntl(fd, F_SETFL, flags);
+    if(ret == -1) {
+        error_code ec = make_basic_system_error_code(errno);
+        throw system_error(ec);
+    }
+}
+
 
 error_code translate_addrinfo_error(int err)
 {
@@ -61,10 +83,16 @@ struct getaddrinfo_result_owner {
 
 
 class network_error_category: public error_category {
+    const char* name() const TIGHTDB_OVERRIDE;
     string message(int) const TIGHTDB_OVERRIDE;
 };
 
 network_error_category g_network_error_category;
+
+const char* network_error_category::name() const
+{
+    return "tightdb.network";
+}
 
 string network_error_category::message(int value) const
 {
@@ -89,6 +117,360 @@ string network_error_category::message(int value) const
 }
 
 } // anonymous namespace
+
+
+class io_service::impl {
+public:
+    impl():
+        m_num_poll_handlers(0),
+        m_stopped(false)
+    {
+        int fildes[2];
+        int ret = pipe(fildes);
+        if (ret == -1) {
+            error_code ec = make_basic_system_error_code(errno);
+            throw system_error(ec);
+        }
+        try {
+            make_nonblocking(fildes[0]); // Throws
+            make_nonblocking(fildes[1]); // Throws
+            m_wakeup_pipe_read_fd  = fildes[0];
+            m_wakeup_pipe_write_fd = fildes[1];
+            pollfd slot = pollfd(); // Cleared slot
+            slot.fd = m_wakeup_pipe_read_fd;
+            slot.events = POLLRDNORM;
+            m_pollfd_slots.push_back(slot); // Throws
+        }
+        catch (...) {
+            close(fildes[0]);
+            close(fildes[1]);
+            throw;
+        }
+    }
+
+    ~impl()
+    {
+        close(m_wakeup_pipe_read_fd);
+        close(m_wakeup_pipe_write_fd);
+        {
+            size_t n = m_post_handlers.size();
+            for (size_t i = 0; i < n; ++i)
+                delete m_post_handlers[i];
+        }
+        {
+            size_t n = m_imm_handlers.size();
+            for (size_t i = 0; i < n; ++i)
+                delete m_imm_handlers[i];
+        }
+        {
+            size_t n = m_poll_handlers.size();
+            for (size_t i = 0; i < n; ++i) {
+                delete m_poll_handlers[i].read_handler;
+                delete m_poll_handlers[i].write_handler;
+            }
+        }
+#if TIGHTDB_ASSERTIONS_ENABLED
+        size_t num_poll_handlers = 0;
+        for (size_t i = 0; i < m_poll_handlers.size(); ++i) {
+            if (m_poll_handlers[i].read_handler)
+                ++num_poll_handlers;
+            if (m_poll_handlers[i].read_handler)
+                ++num_poll_handlers;
+        }
+        TIGHTDB_ASSERT(num_poll_handlers == m_num_poll_handlers);
+#endif
+    }
+
+    void run()
+    {
+      restart:
+        clear_wake_up_pipe();
+        for (;;) {
+            {
+                LockGuard l(m_mutex);
+                if (m_stopped)
+                    break;
+                if (m_imm_handlers.empty()) {
+                    if (m_post_handlers.empty()) {
+                        if (m_num_poll_handlers == 0)
+                            break; // Out of work
+                    }
+                    else {
+                        swap(m_post_handlers, m_imm_handlers);
+                    }
+                }
+            }
+
+            while (!m_imm_handlers.empty()) {
+                UniquePtr<async_handler> h(m_imm_handlers.back());
+                m_imm_handlers.pop_back();
+                h->exec(); // Throws
+            }
+
+            if (m_num_poll_handlers == 0)
+                continue;
+
+            size_t num_ready_descriptors;
+            {
+                pollfd* fds = &m_pollfd_slots.front(); // std::vector guarantees contiguous storage
+                nfds_t nfds = m_pollfd_slots.size();
+                for (;;) {
+                    int timeout = -1;
+                    int ret = poll(fds, nfds, timeout);
+                    if (ret >= 0) {
+                        num_ready_descriptors = ret;
+                        break;
+                    }
+                    // Ignore interruptions due to system signals
+                    if (errno != EINTR) {
+                        error_code ec = make_basic_system_error_code(errno);
+                        throw system_error(ec);
+                    }
+                }
+            }
+            TIGHTDB_ASSERT(num_ready_descriptors >= 1);
+            // Check wake-up descriptor
+            if ((m_pollfd_slots[0].revents & (POLLRDNORM|POLLERR|POLLHUP)) != 0)
+                goto restart;
+            TIGHTDB_ASSERT(m_pollfd_slots[0].revents == 0);
+            size_t n = m_poll_handlers.size();
+            TIGHTDB_ASSERT(n == m_pollfd_slots.size() - 1);
+            for (size_t fd = 0; fd < n; ++fd) {
+                pollfd* pollfd_slot = &m_pollfd_slots[fd+1];
+                if (TIGHTDB_LIKELY(pollfd_slot->revents == 0))
+                    continue;
+
+                TIGHTDB_ASSERT((pollfd_slot->revents & POLLNVAL) == 0);
+
+                if ((pollfd_slot->revents & (POLLHUP|POLLERR)) != 0) {
+                    TIGHTDB_ASSERT((pollfd_slot->events & (POLLRDNORM|POLLWRNORM)) != 0);
+                    if ((pollfd_slot->events & POLLRDNORM) != 0)
+                        pollfd_slot->revents |= POLLRDNORM;
+                    if ((pollfd_slot->events & POLLWRNORM) != 0)
+                        pollfd_slot->revents |= POLLWRNORM;
+                }
+
+                // Check read readiness
+                if ((pollfd_slot->revents & POLLRDNORM) != 0) {
+                    pollfd_slot->events &= ~POLLRDNORM;
+                    if (pollfd_slot->events == 0)
+                        pollfd_slot->fd = -1;
+                    UniquePtr<async_handler> handler;
+                    poll_handler_slot& handler_slot = m_poll_handlers[fd];
+                    handler.reset(handler_slot.read_handler);
+                    handler_slot.read_handler = 0;
+                    --m_num_poll_handlers;
+                    bool done = handler->exec(); // Throws
+                    if (!done) {
+                        // Users handler is not executed in this case
+                        pollfd_slot->fd = fd;
+                        pollfd_slot->events |= POLLRDNORM;
+                        handler_slot.read_handler = handler.release();
+                        ++m_num_poll_handlers;
+                    }
+                }
+
+                // A user handler may have been executed, which may have
+                // initiated new asynchronous operations, which means that the
+                // m_pollfd_slots vector may have reallocated its underlying
+                // memory.
+                pollfd_slot = &m_pollfd_slots[fd+1];
+
+                // Check write readiness
+                if ((pollfd_slot->revents & POLLWRNORM) != 0) {
+                    pollfd_slot->events &= ~POLLWRNORM;
+                    if (pollfd_slot->events == 0)
+                        pollfd_slot->fd = -1;
+                    UniquePtr<async_handler> handler;
+                    poll_handler_slot& handler_slot = m_poll_handlers[fd];
+                    handler.reset(handler_slot.write_handler);
+                    handler_slot.write_handler = 0;
+                    --m_num_poll_handlers;
+                    bool done = handler->exec(); // Throws
+                    if (!done) {
+                        // Users handler is not executed in this case
+                        pollfd_slot->fd = fd;
+                        pollfd_slot->events |= POLLWRNORM;
+                        handler_slot.write_handler = handler.release();
+                        ++m_num_poll_handlers;
+                    }
+                }
+            }
+        }
+    }
+
+    void stop()
+    {
+        {
+            LockGuard l(m_mutex);
+            if (m_stopped)
+                return;
+            m_stopped = true;
+        }
+
+        wake_up_poll_thread(); // Throws
+    }
+
+    void reset()
+    {
+        LockGuard l(m_mutex);
+        m_stopped = false;
+   }
+
+    void add_io_handler(int fd, async_handler* handler, io_op op)
+    {
+        TIGHTDB_ASSERT(fd >= 0);
+        UniquePtr<async_handler> h(handler);
+
+        size_t n = m_poll_handlers.size();
+        TIGHTDB_ASSERT(n == m_pollfd_slots.size() - 1);
+        size_t n_2 = fd + 1;
+        if (n_2 > n) {
+            poll_handler_slot handler_slot = poll_handler_slot(); // Cleared slot
+            pollfd pollfd_slot = pollfd(); // Cleared slot
+            pollfd_slot.fd = -1; // Unused
+            m_pollfd_slots.reserve(n_2+1); // Throws
+            m_poll_handlers.resize(n_2, handler_slot); // Throws
+            m_pollfd_slots.resize(n_2+1, pollfd_slot);
+        }
+
+        pollfd&            pollfd_slot  = m_pollfd_slots[fd+1];
+        poll_handler_slot& handler_slot = m_poll_handlers[fd];
+        TIGHTDB_ASSERT(pollfd_slot.fd == -1 || pollfd_slot.fd == fd);
+        TIGHTDB_ASSERT((pollfd_slot.fd == -1) == (pollfd_slot.events == 0));
+        TIGHTDB_ASSERT(((pollfd_slot.events & POLLRDNORM) != 0) ==
+                       (handler_slot.read_handler != 0));
+        TIGHTDB_ASSERT(((pollfd_slot.events & POLLWRNORM) != 0) ==
+                       (handler_slot.write_handler != 0));
+        TIGHTDB_ASSERT((pollfd_slot.events & ~(POLLRDNORM|POLLWRNORM)) == 0);
+        switch (op) {
+            case op_Read:
+                TIGHTDB_ASSERT(!handler_slot.read_handler);
+                pollfd_slot.events |= POLLRDNORM;
+                handler_slot.read_handler = handler;
+                goto finish;
+            case op_Write:
+                TIGHTDB_ASSERT(!handler_slot.write_handler);
+                pollfd_slot.events |= POLLWRNORM;
+                handler_slot.write_handler = handler;
+                goto finish;
+        }
+        TIGHTDB_ASSERT(false);
+        return;
+
+      finish:
+        pollfd_slot.fd = fd;
+        h.release();
+        ++m_num_poll_handlers;
+    }
+
+    void add_imm_handler(async_handler* handler)
+    {
+        UniquePtr<async_handler> h(handler);
+        m_imm_handlers.push_back(handler); // Throws
+        h.release();
+    }
+
+    void add_post_handler(async_handler* handler)
+    {
+        UniquePtr<async_handler> h(handler);
+        {
+            LockGuard l(m_mutex);
+            m_post_handlers.push_back(handler); // Throws
+        }
+        h.release();
+        wake_up_poll_thread(); // Throws
+    }
+
+private:
+    typedef struct pollfd pollfd;
+
+    struct poll_handler_slot {
+        async_handler* read_handler;
+        async_handler* write_handler;
+    };
+
+    int m_wakeup_pipe_read_fd;
+    int m_wakeup_pipe_write_fd;
+
+    vector<async_handler*> m_imm_handlers;
+    vector<pollfd> m_pollfd_slots;
+    vector<poll_handler_slot> m_poll_handlers;
+    size_t m_num_poll_handlers;
+
+    Mutex m_mutex;
+    vector<async_handler*> m_post_handlers; // Protected by `m_mutex`
+    bool m_stopped; // Protected by `m_mutex`
+
+    void wake_up_poll_thread()
+    {
+        char c = 0;
+        ssize_t ret = ::write(m_wakeup_pipe_write_fd, &c, 1);
+        // EAGAIN can be ignored in this case, as it would imply that a previous
+        // "signal" is already pending.
+        if (ret == -1 && errno != EAGAIN) {
+            error_code ec = make_basic_system_error_code(errno);
+            throw system_error(ec);
+        }
+    }
+
+    void clear_wake_up_pipe()
+    {
+        char buffer[64];
+        for (;;) {
+            ssize_t ret = ::read(m_wakeup_pipe_read_fd, buffer, sizeof buffer);
+            // EAGAIN can be ignored in this case, as it would imply that a previous
+            // "signal" is already pending.
+            if (ret < 0) {
+                if (errno == EAGAIN)
+                    break;
+                error_code ec = make_basic_system_error_code(errno);
+                throw system_error(ec);
+            }
+            TIGHTDB_ASSERT_RELEASE(ret > 0);
+        }
+    }
+};
+
+
+io_service::io_service():
+    m_impl(new impl) // Throws
+{
+}
+
+io_service::~io_service() TIGHTDB_NOEXCEPT
+{
+}
+
+void io_service::run()
+{
+    m_impl->run();
+}
+
+void io_service::stop()
+{
+    m_impl->stop();
+}
+
+void io_service::reset()
+{
+    m_impl->reset();
+}
+
+void io_service::add_io_handler(int fd, async_handler* handler, io_op op)
+{
+    m_impl->add_io_handler(fd, handler, op);
+}
+
+void io_service::add_imm_handler(async_handler* handler)
+{
+    m_impl->add_imm_handler(handler);
+}
+
+void io_service::add_post_handler(async_handler* handler)
+{
+    m_impl->add_post_handler(handler);
+}
 
 
 error_code resolver::resolve(const query& query, endpoint::list& list, error_code& ec)
@@ -318,7 +700,7 @@ error_code acceptor::listen(int backlog, error_code& ec)
 }
 
 
-error_code acceptor::accept(socket& sock, endpoint& ep, error_code& ec)
+error_code acceptor::accept(socket& sock, endpoint* ep, error_code& ec)
 {
     if (sock.is_open())
         throw runtime_error("Socket is already open");
@@ -352,14 +734,17 @@ error_code acceptor::accept(socket& sock, endpoint& ep, error_code& ec)
 #endif
 
     sock.m_sock_fd = sock_fd;
-    ep.m_protocol = m_protocol;
-    ep.m_sockaddr_union = buffer.m_sockaddr_union;
+    if (ep) {
+        ep->m_protocol = m_protocol;
+        ep->m_sockaddr_union = buffer.m_sockaddr_union;
+    }
     ec = error_code(); // Success
     return ec;
 }
 
 
-size_t buffered_input_stream::read(char* buffer, size_t size, error_code& ec) TIGHTDB_NOEXCEPT
+size_t buffered_input_stream::read(char* buffer, size_t size, int delim,
+                                   error_code& ec) TIGHTDB_NOEXCEPT
 {
     char* out_begin = buffer;
     char* out_end = buffer + size;
@@ -367,38 +752,14 @@ size_t buffered_input_stream::read(char* buffer, size_t size, error_code& ec) TI
         size_t in_avail = m_end - m_begin;
         size_t out_avail = out_end - out_begin;
         size_t n = std::min(in_avail, out_avail);
-        char* i = m_begin + n;
-        out_begin = std::copy(m_begin, i, out_begin);
-        m_begin = i;
-        if (out_begin == out_end)
-            break;
-        TIGHTDB_ASSERT(m_begin == m_end);
-        size_t m = m_socket.read_some(m_buffer.get(), s_buffer_size, ec);
-        if (ec)
-            return out_begin - buffer;
-        m_begin = m_buffer.get();
-        m_end = m_begin + m;
-    }
-    ec = error_code(); // Success
-    return out_begin - buffer;
-}
-
-
-size_t buffered_input_stream::read_until(char* buffer, size_t size, char delim,
-                                         error_code& ec) TIGHTDB_NOEXCEPT
-{
-    char* out_begin = buffer;
-    char* out_end = buffer + size;
-    for (;;) {
-        size_t in_avail = m_end - m_begin;
-        size_t out_avail = out_end - out_begin;
-        size_t n = std::min(in_avail, out_avail);
-        char* i = std::find(m_begin, m_begin + n, delim);
+        char* i = delim == char_traits<char>::eof() ? m_begin + n :
+            std::find(m_begin, m_begin + n, char_traits<char>::to_char_type(delim));
         out_begin = std::copy(m_begin, i, out_begin);
         m_begin = i;
         if (out_begin == out_end)
             break;
         if (m_begin != m_end) {
+            TIGHTDB_ASSERT(delim != char_traits<char>::eof());
             *out_begin++ = *m_begin++; // Transfer delimiter
             break;
         }
@@ -415,9 +776,71 @@ size_t buffered_input_stream::read_until(char* buffer, size_t size, char delim,
 }
 
 
+void buffered_input_stream::read_handler_base::process_input() TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(!m_complete);
+    size_t in_avail = m_stream.m_end - m_stream.m_begin;
+    size_t out_avail = m_out_end - m_out_curr;
+    size_t n = std::min(in_avail, out_avail);
+    char* i = m_delim == char_traits<char>::eof() ? m_stream.m_begin + n :
+        std::find(m_stream.m_begin, m_stream.m_begin + n,
+                  char_traits<char>::to_char_type(m_delim));
+    m_out_curr = std::copy(m_stream.m_begin, i, m_out_curr);
+    m_stream.m_begin = i;
+    if (m_out_curr != m_out_end) {
+        if (m_stream.m_begin == m_stream.m_end)
+            return;
+        TIGHTDB_ASSERT(m_delim != char_traits<char>::eof());
+        *m_out_curr++ = *m_stream.m_begin++; // Transfer delimiter
+    }
+    m_complete = true;
+}
+
+
+void buffered_input_stream::read_handler_base::read_some(error_code& ec) TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(!m_complete);
+    size_t n = m_stream.m_socket.read_some(m_stream.m_buffer.get(), s_buffer_size, ec);
+    if (TIGHTDB_UNLIKELY(ec))
+        return;
+    TIGHTDB_ASSERT(n > 0);
+    TIGHTDB_ASSERT(n <= s_buffer_size);
+    m_stream.m_begin = m_stream.m_buffer.get();
+    m_stream.m_end = m_stream.m_begin + n;
+    process_input();
+}
+
+
 namespace tightdb {
 namespace util {
 namespace network {
+
+string host_name()
+{
+    // POSIX allows for gethostname() to report success even if the buffer is
+    // too small to hold the name, and in that case POSIX requires that the
+    // buffer is filled, but not that it contains a final null-termination.
+    char small_stack_buffer[256];
+    int ret = gethostname(small_stack_buffer, sizeof small_stack_buffer);
+    if (ret != -1) {
+        // Check that a null-termination was included
+        char* end = small_stack_buffer + sizeof small_stack_buffer;
+        char* i = std::find(small_stack_buffer, end, 0);
+        if (i != end)
+            return string(small_stack_buffer, i);
+    }
+    const size_t large_heap_buffer_size = 4096;
+    UniquePtr<char[]> large_heap_buffer(new char[large_heap_buffer_size]); // Throws
+    ret = gethostname(large_heap_buffer.get(), large_heap_buffer_size);
+    if (ret != -1) {
+        // Check that a null-termination was included
+        char* end = large_heap_buffer.get() + large_heap_buffer_size;
+        char* i = std::find(large_heap_buffer.get(), end, 0);
+        if (i != end)
+            return string(large_heap_buffer.get(), i);
+    }
+    throw runtime_error("gethostname() failed");
+}
 
 error_code write(socket& sock, const char* data, size_t size, error_code& ec) TIGHTDB_NOEXCEPT
 {

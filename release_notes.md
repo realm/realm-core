@@ -10,7 +10,7 @@
 
 ### Enhancements:
 
-* Lorem ipsum.
+* Generic networking API added.
 
 -----------
 
@@ -240,11 +240,9 @@
   of a Query after add_constraint_to_query() had been executed. The fix may not
   be optimal as it limits nesting of group/end_group to 16 levels, and also
   makes Query take 128 extra bytes of space. Asana task has been made.
-
 * Fixed bug that would cause `Group::commit()` and
   `LangBindHelper::commit_and_continue_as_read()` to fail in the presence of
   search indexes.
-
 * Bugfix: Replication::m_selected_link_list was not cleared. This bug could lead
   to general corruption in cases involving link lists.
 
