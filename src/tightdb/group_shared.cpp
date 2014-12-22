@@ -992,12 +992,19 @@ void SharedGroup::grab_latest_readlock(ReadLockInfo& readlock, bool& same_as_bef
 }
 
 
-const Group& SharedGroup::begin_read()
+const Group& SharedGroup::begin_read(VersionID* specific_version)
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Ready);
 
     bool same_version_as_before;
-    grab_latest_readlock(m_readlock, same_version_as_before);
+    if (specific_version) {
+        bool success = grab_specific_readlock(m_readlock, same_version_as_before, specific_version);
+        if (!success)
+            throw runtime_error(m_file_path + ": unable to lock onto requested version");
+    }
+    else {
+        grab_latest_readlock(m_readlock, same_version_as_before);
+    }
     if (same_version_as_before && m_group.may_reattach_if_same_version()) {
         m_group.reattach_from_retained_data();
     }
@@ -1052,7 +1059,7 @@ void SharedGroup::promote_to_write()
         repl->begin_write_transact(*this); // Throws
         try {
             do_begin_write();
-            advance_read();
+            advance_read(0);
         }
         catch (...) {
             repl->rollback_write_transact(*this);
@@ -1066,12 +1073,12 @@ void SharedGroup::promote_to_write()
     do_begin_write();
 
     // Advance to latest state (accessor update)
-    advance_read();
+    advance_read(0);
     m_transact_stage = transact_Writing;
 }
 
 
-void SharedGroup::advance_read()
+bool SharedGroup::advance_read(VersionID* specific_version)
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Reading);
 
@@ -1079,16 +1086,27 @@ void SharedGroup::advance_read()
     bool same_as_before;
     Replication* repl = _impl::GroupFriend::get_replication(m_group);
 
+    // we cannot move backward in time (yet)
+    if (specific_version && specific_version->version < old_readlock.m_version) {
+        return false;
+    }
+
     // advance current readlock while holding onto old one - we MUST hold onto
     // the old readlock until after the call to advance_transact. Once a readlock
     // is released, the release may propagate to the commit log management, causing
     // it to reclaim memory for old commit logs. We must finished use of the commit log
     // before allowing that to happen.
-    grab_latest_readlock(m_readlock, same_as_before); // Throws
-
+    if (specific_version) {
+        bool success = grab_specific_readlock(m_readlock, same_as_before, specific_version);
+        if (!success) 
+            return false;
+    }
+    else {
+        grab_latest_readlock(m_readlock, same_as_before); // Throws
+    }
     if (same_as_before) {
         release_readlock(old_readlock);
-        return;
+        return true;
     }
 
     // If the new top-ref is zero, then the previous top-ref must have
@@ -1100,7 +1118,7 @@ void SharedGroup::advance_read()
     // valid state.
     if (m_readlock.m_top_ref == 0) {
         release_readlock(old_readlock);
-        return;
+        return true;
     }
 
     // We know that the log_registry already knows about the new_version,
@@ -1118,6 +1136,7 @@ void SharedGroup::advance_read()
 
     // OK to release the readlock here:
     release_readlock(old_readlock);
+    return true;
 }
 
 #endif // TIGHTDB_ENABLE_REPLICATION
@@ -1133,7 +1152,7 @@ Group& SharedGroup::begin_write()
 
     try {
         do_begin_write();
-        begin_read();
+        begin_read(0);
     }
     catch (...) {
 #ifdef TIGHTDB_ENABLE_REPLICATION

@@ -116,7 +116,7 @@ public:
 #ifdef TIGHTDB_ENABLE_REPLICATION
 
     /// Wrappers - forward calls to shared group. A bit like NSA. Circumventing privacy :-)
-    static void advance_read(SharedGroup&);
+    static void advance_read(SharedGroup&, SharedGroup::VersionID* version = 0);
     static void promote_to_write(SharedGroup&);
     static void commit_and_continue_as_read(SharedGroup&);
     static void rollback_and_continue_as_read(SharedGroup&);
@@ -296,9 +296,9 @@ inline void LangBindHelper::unbind_linklist_ptr(LinkView* link_view)
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
 
-inline void LangBindHelper::advance_read(SharedGroup& sg)
+inline void LangBindHelper::advance_read(SharedGroup& sg, SharedGroup::VersionID* version_id)
 {
-    sg.advance_read();
+    sg.advance_read(version_id);
 }
 
 inline void LangBindHelper::promote_to_write(SharedGroup& sg)
