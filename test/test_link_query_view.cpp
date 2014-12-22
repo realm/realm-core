@@ -1007,6 +1007,21 @@ TEST(LinkList_SortLinkView)
 }
 
 
+TEST(Link_EmptySortedView)
+{
+    Group group;
+    TableRef source = group.add_table("source");
+    TableRef destination = group.add_table("destination");
+
+    source->add_column_link(type_LinkList, "link", *destination);
+    source->add_empty_row();
+    LinkViewRef lvr = source->get_linklist(0, 0);
+
+    CHECK_EQUAL(lvr->size(), 0);
+    CHECK_EQUAL(lvr->get_sorted_view(0).size(), 0);
+}
+
+
 TEST(Link_FindNullLink)
 {
     size_t match;
