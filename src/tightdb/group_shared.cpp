@@ -57,7 +57,7 @@ namespace {
 // Constants controlling the amount of uncommited writes in flight:
 const uint16_t max_write_slots = 100;
 const uint16_t relaxed_sync_threshold = 50;
-#define SHAREDINFO_VERSION 3
+#define SHAREDINFO_VERSION 4
 
 // The following functions are carefully designed for minimal overhead
 // in case of contention among read transactions. In case of contention,
@@ -372,10 +372,6 @@ struct SharedGroup::SharedInfo
     // Cleared by the daemon when it decides to exit.
     bool daemon_ready;
 
-    // controls whether wait_for_change() will actually wait for a change or return
-    // immediately
-    bool wait_for_change_enabled;
-
     // Latest version number. Guarded by the controlmutex (for lock-free access, use
     // get_current_version() instead)
     uint64_t latest_version_number;
@@ -385,7 +381,7 @@ struct SharedGroup::SharedInfo
     // because interprocess sharing is not supported by our current encryption mechanisms.
     uint64_t session_initiator_pid;
 
-    // Tracks the most recent version number. Should only be accessed 
+    // Tracks the most recent version number.
     uint16_t version;
     uint16_t flags;
     uint16_t free_write_slots;
@@ -442,7 +438,6 @@ SharedGroup::SharedInfo::SharedInfo(DurabilityLevel dlevel):
     session_initiator_pid = 0;
     daemon_started = false;
     daemon_ready = false;
-    wait_for_change_enabled = true;
     init_complete = 1;
 }
 
@@ -863,7 +858,8 @@ bool SharedGroup::wait_for_change()
 {
     SharedInfo* info = m_file_map.get_addr();
     RobustLockGuard lock(info->controlmutex, recover_from_dead_write_transact);
-    while (m_readlock.m_version == info->latest_version_number && info->wait_for_change_enabled) {
+    m_waiting_for_change = true;
+    while (m_readlock.m_version == info->latest_version_number && m_waiting_for_change) {
         info->new_commit_available.wait(info->controlmutex,
                                         &recover_from_dead_write_transact,
                                         0);
@@ -872,15 +868,12 @@ bool SharedGroup::wait_for_change()
 }
 
 
-void SharedGroup::wait_for_change_enable(bool enabled)
+void SharedGroup::wait_for_change_release()
 {
     SharedInfo* info = m_file_map.get_addr();
     RobustLockGuard lock(info->controlmutex, recover_from_dead_write_transact);
-    if (info->wait_for_change_enabled && !enabled) {
-        // someone might be waiting, so wake them up
-        info->new_commit_available.notify_all();
-    }
-    info->wait_for_change_enabled = enabled;
+    m_waiting_for_change = false;
+    info->new_commit_available.notify_all();
 }
 
 void SharedGroup::do_async_commits()

@@ -1912,6 +1912,7 @@ TEST_IF(Shared_AsyncMultiprocess, allow_async)
 
 static const int num_threads = 3;
 static int shared_state[num_threads];
+static SharedGroup* sgs[num_threads];
 static Mutex muu;
 void waiter(string path, int i)
 {
@@ -1919,6 +1920,7 @@ void waiter(string path, int i)
     {
         LockGuard l(muu);
         shared_state[i] = 1;
+        sgs[i] = &sg;
     }
     sg.wait_for_change();
     {
@@ -2008,8 +2010,10 @@ TEST(Shared_WaitForChange)
             if (5 != shared_state[j]) try_again = true;
         }
     }
-
-    sg.wait_for_change_enable(false);
+    for (int i=0; i < num_threads; i++) {
+        CHECK(sgs[i] != 0);
+        sgs[i]->wait_for_change_release();
+    }
     try_again = true;
     while (try_again) {
         sched_yield();
