@@ -991,6 +991,34 @@ void SharedGroup::grab_latest_readlock(ReadLockInfo& readlock, bool& same_as_bef
     }
 }
 
+bool SharedGroup::grab_specific_readlock(ReadLockInfo& readlock, bool& same_as_before, VersionID* specific_version)
+{
+    for (;;) {
+        SharedInfo* r_info = m_reader_map.get_addr();
+        readlock.m_reader_idx = specific_version->index;
+        if (grow_reader_mapping(readlock.m_reader_idx)) { // throws
+            // remapping takes time, so retry with a fresh entry
+            continue;
+        }
+        const Ringbuffer::ReadCount& r = r_info->readers.get(readlock.m_reader_idx);
+        // if the entry is stale and has been cleared by the cleanup process,
+        // we need to start all over again. This is extremely unlikely, but possible.
+        if (! atomic_double_inc_if_even(r.count)) // <-- most of the exec time spent here!
+            continue;
+        // we managed to lock an entry in the ringbuffer, but it may be so old that
+        // the version doesn't match the specific request. In that case we must release and fail
+        if (r.version != specific_version->version) {
+            atomic_double_dec(r.count); // <-- release
+            return false;
+        }
+        same_as_before = readlock.m_version == r.version;
+        readlock.m_version      = r.version;
+        readlock.m_top_ref    = to_size_t(r.current_top);
+        readlock.m_file_size  = to_size_t(r.filesize);
+        return true;
+    }
+}
+
 
 const Group& SharedGroup::begin_read(VersionID* specific_version)
 {
