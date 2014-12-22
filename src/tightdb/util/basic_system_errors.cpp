@@ -3,7 +3,8 @@
 
 #include <tightdb/util/basic_system_errors.hpp>
 
-using namespace std;
+using std::size_t;
+using std::string;
 using namespace tightdb::util;
 
 

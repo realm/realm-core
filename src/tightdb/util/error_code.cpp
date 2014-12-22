@@ -1,7 +1,7 @@
 #include <tightdb/util/assert.hpp>
 #include <tightdb/util/error_code.hpp>
 
-using namespace std;
+using std::string;
 using namespace tightdb::util;
 
 
