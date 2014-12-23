@@ -1929,40 +1929,40 @@ static SharedGroup* sgs[num_threads];
 static Mutex muu;
 void waiter(string path, int i)
 {
-    SharedGroup sg(path, true, SharedGroup::durability_Full);
+    SharedGroup* sg = new SharedGroup(path, true, SharedGroup::durability_Full);
     {
         LockGuard l(muu);
         shared_state[i] = 1;
-        sgs[i] = &sg;
+        sgs[i] = sg;
     }
-    sg.wait_for_change();
+    sg->wait_for_change();
     {
         LockGuard l(muu);
         shared_state[i] = 2; // this state should not be observed by the writer
     }
-    sg.wait_for_change(); // we'll fall right through here, because we haven't advanced our readlock
+    sg->wait_for_change(); // we'll fall right through here, because we haven't advanced our readlock
     {
         LockGuard l(muu);
         shared_state[i] = 3;
     }
-    sg.begin_read();
-    sg.end_read();
-    sg.wait_for_change(); // this time we'll wait because state hasn't advanced since we did.
+    sg->begin_read();
+    sg->end_read();
+    sg->wait_for_change(); // this time we'll wait because state hasn't advanced since we did.
     {
         LockGuard l(muu);
         shared_state[i] = 4;
     }
     // works within a read transaction as well
-    sg.begin_read();
-    sg.wait_for_change();
-    sg.end_read();
+    sg->begin_read();
+    sg->wait_for_change();
+    sg->end_read();
     {
         LockGuard l(muu);
         shared_state[i] = 5;
     }
-    sg.begin_read();
-    sg.end_read();
-    sg.wait_for_change(); // wait until wait_for_change is disabled...
+    sg->begin_read();
+    sg->end_read();
+    sg->wait_for_change(); // wait until wait_for_change is released
     {
         LockGuard l(muu);
         shared_state[i] = 6;
@@ -2023,17 +2023,22 @@ TEST(Shared_WaitForChange)
             if (5 != shared_state[j]) try_again = true;
         }
     }
-    for (int i=0; i < num_threads; i++) {
-        CHECK(sgs[i] != 0);
-        sgs[i]->wait_for_change_release();
-    }
     try_again = true;
     while (try_again) {
         sched_yield();
         try_again = false;
         for (int j=0; j < num_threads; j++) {
             LockGuard l(muu);
-            if (6 != shared_state[j]) try_again = true;
+            if (sgs[j]) {
+                sgs[j]->wait_for_change_release();
+            }
+            if (6 != shared_state[j]) {
+                try_again = true;
+            }
+            else { 
+                delete sgs[j];
+                sgs[j] = 0;
+            }
         }
     }
     for (int j=0; j < num_threads; j++)
