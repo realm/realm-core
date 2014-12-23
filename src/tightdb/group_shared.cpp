@@ -991,6 +991,14 @@ void SharedGroup::grab_latest_readlock(ReadLockInfo& readlock, bool& same_as_bef
     }
 }
 
+void SharedGroup::get_version_of_current_transaction(VersionID* version_id)
+{
+    if (version_id) {
+        version_id->version = m_readlock.m_version;
+        version_id->index = m_readlock.m_reader_idx;
+    }
+}
+
 bool SharedGroup::grab_specific_readlock(ReadLockInfo& readlock, bool& same_as_before, VersionID* specific_version)
 {
     for (;;) {
@@ -1001,10 +1009,12 @@ bool SharedGroup::grab_specific_readlock(ReadLockInfo& readlock, bool& same_as_b
             continue;
         }
         const Ringbuffer::ReadCount& r = r_info->readers.get(readlock.m_reader_idx);
+
         // if the entry is stale and has been cleared by the cleanup process,
-        // we need to start all over again. This is extremely unlikely, but possible.
+        // the requested version is no longer available
         if (! atomic_double_inc_if_even(r.count)) // <-- most of the exec time spent here!
-            continue;
+            return false;
+
         // we managed to lock an entry in the ringbuffer, but it may be so old that
         // the version doesn't match the specific request. In that case we must release and fail
         if (r.version != specific_version->version) {
