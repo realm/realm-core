@@ -102,6 +102,7 @@
     <ClCompile Include="..\..\test\util\unit_test.cpp" />
     <ClCompile Include="..\..\test\util\wildcard.cpp" />
     <ClCompile Include="..\..\src\tightdb\util\errno.cpp" />
+    <ClCompile Include="..\..\src\tightdb\util\file_mapper.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\tightdb.hpp" />
@@ -188,6 +189,7 @@
     <ClInclude Include="..\..\test\pthread_test.hpp" />
     <ClInclude Include="..\..\test\testsettings.hpp" />
     <ClInclude Include="..\..\src\tightdb\util\errno.hpp" />
+    <ClInclude Include="..\..\src\tightdb\util\file_mapper.hpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="changelog.txt" />

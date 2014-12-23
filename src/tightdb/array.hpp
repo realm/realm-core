@@ -935,7 +935,6 @@ public:
     void to_dot_parent_edge(std::ostream&) const;
 #endif
 
-protected:
     static const int header_size = 8; // Number of bytes used by header
 
 private:

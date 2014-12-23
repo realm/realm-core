@@ -1,3 +1,46 @@
+# NEXT RELEASE
+
+### Bugfixes:
+
+* Lorem ipsum.
+
+### API breaking changes:
+
+* Lorem ipsum.
+
+### Enhancements:
+
+* Added `SharedGroup::wait_for_change_release()` which allows you to release a
+  thread waiting inside wait_for_change() on a specific SharedGroup instance.
+
+-----------
+
+### Internals:
+
+* Lorem ipsum.
+
+----------------------------------------------
+
+# 0.87.3 Release notes
+
+### Bugfixes:
+
+* Fixed bug in String and Integer index where find()/find_all() would return a
+  wrong match.
+* Fixed the values of `Table::max_string_size`, and `Table::max_binary_size`.
+* Fixed a bug occuring when claring a table with a search index on a string
+  column with many rows (>1000).
+
+----------------------------------------------
+
+# 0.87.2 Release notes
+
+### Internals:
+
+* Extra assertions in `src/tightdb/util.file.cpp`.
+
+----------------------------------------------
+
 # 0.87.1 Release notes
 
 ### Enhancements:
@@ -8,8 +51,7 @@
 * Now throwing on overlong table and column names, and on oversized strings and
   binary data values.
 * Fall back to the old query nodes for String as well as int/double/float.
-* Added `SharedGroup::wait_for_change_release()` which allows you to release a
-  thread waiting inside wait_for_change() on a specific SharedGroup instance.
+* Log assertions failures to the native logging system on android and Apple.
 
 -----------
 
