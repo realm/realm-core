@@ -6853,6 +6853,59 @@ TEST(LangBindHelper_MemOnly)
     CHECK(!rt.get_group().is_empty());
 }
 
+
+TIGHTDB_TABLE_1(MyTable, first,  Int)
+
+
+TEST(Shared_VersionControl)
+{
+    const int num_versions = 10;
+    SharedGroup::VersionID versions[num_versions];
+    SHARED_GROUP_TEST_PATH(path);
+    {
+        // Create a new shared db
+        SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());
+        SharedGroup sg_w(path, false, SharedGroup::durability_Full, crypt_key());
+        // first create 10 versions
+        sg.begin_read();
+        for (int i = 0; i < num_versions; ++i) {
+            WriteTransaction wt(sg_w);
+            MyTable::Ref t = wt.get_or_add_table<MyTable>("test");
+            t->add(i);
+            wt.commit();
+            ReadTransaction rt(sg_w);
+            sg_w.get_version_of_current_transaction(&versions[i]);
+        }
+        // step through the versions backward:
+        for (int i = num_versions-1; i >= 0; --i) {
+            const Group& g = sg_w.begin_read(&versions[i]);
+            MyTable::ConstRef t = g.get_table<MyTable>("test");
+            CHECK_EQUAL(i, t[i].first);
+            sg_w.end_read();
+        }
+        // release the first readlock and commit something to force a cleanup
+        // we need to commit twice, because cleanup is done before the actual
+        // commit, so during the first commit, the last of the previous versions
+        // will still be kept. To get rid of it, we must commit once more.
+        sg.end_read();
+        sg_w.begin_write();
+        sg_w.commit();
+        sg_w.begin_write();
+        sg_w.commit();
+
+        // validate that all the versions are now unreachable
+        for (int i = 0; i < num_versions; ++i) {
+            try {
+                sg.begin_read(&versions[i]);
+                CHECK(false);
+            } catch (...) {
+            }
+        }
+    }
+}
+
+
+
 #endif // TIGHTDB_ENABLE_REPLICATION
 
 #endif
