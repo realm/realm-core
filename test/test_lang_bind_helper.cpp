@@ -6857,25 +6857,33 @@ TEST(LangBindHelper_MemOnly)
 TIGHTDB_TABLE_1(MyTable, first,  Int)
 
 
-TEST(Shared_VersionControl)
+TEST(LangBindHelper_VersionControl)
 {
     const int num_versions = 10;
+    const int num_random_tests = 100;
     SharedGroup::VersionID versions[num_versions];
     SHARED_GROUP_TEST_PATH(path);
     {
         // Create a new shared db
-        SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());
-        SharedGroup sg_w(path, false, SharedGroup::durability_Full, crypt_key());
-        // first create 10 versions
+        UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
+        SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
+        UniquePtr<Replication> repl_w(makeWriteLogCollector(path, false, crypt_key()));
+        SharedGroup sg_w(*repl_w, SharedGroup::durability_Full, crypt_key());
+        // first create 'num_version' versions
         sg.begin_read();
         for (int i = 0; i < num_versions; ++i) {
-            WriteTransaction wt(sg_w);
-            MyTable::Ref t = wt.get_or_add_table<MyTable>("test");
-            t->add(i);
-            wt.commit();
-            ReadTransaction rt(sg_w);
-            sg_w.get_version_of_current_transaction(&versions[i]);
+            {
+                WriteTransaction wt(sg_w);
+                MyTable::Ref t = wt.get_or_add_table<MyTable>("test");
+                t->add(i);
+                wt.commit();
+            }
+            {
+                ReadTransaction rt(sg_w);
+                sg_w.get_version_of_current_transaction(&versions[i]);
+            }
         }
+
         // step through the versions backward:
         for (int i = num_versions-1; i >= 0; --i) {
             const Group& g = sg_w.begin_read(&versions[i]);
@@ -6883,6 +6891,31 @@ TEST(Shared_VersionControl)
             CHECK_EQUAL(i, t[i].first);
             sg_w.end_read();
         }
+
+        // sync to a randomly selected version - use advance_read when going
+        // forward in time, but begin_read when going back in time
+        int old_version = 0;
+        const Group& g = sg_w.begin_read(&versions[old_version]);
+        MyTable::ConstRef t = g.get_table<MyTable>("test");
+        CHECK_EQUAL(old_version, t[old_version].first);
+        for (int k = num_random_tests; k; --k) {
+            int new_version = random() % num_versions;
+            cerr << "version " << old_version << " -> " << new_version << endl;
+            if (new_version < old_version) {
+                CHECK(versions[new_version] < versions[old_version]);
+                sg_w.end_read();
+                sg_w.begin_read(&versions[new_version]);
+                t = g.get_table<MyTable>("test");
+                CHECK_EQUAL(new_version, t[new_version].first);
+            }
+            else {
+                CHECK(versions[new_version] >= versions[old_version]);
+                CHECK(LangBindHelper::advance_read(sg_w, &versions[new_version]));
+                CHECK_EQUAL(new_version, t[new_version].first);
+            }
+            old_version = new_version;
+        }
+        sg_w.end_read();
         // release the first readlock and commit something to force a cleanup
         // we need to commit twice, because cleanup is done before the actual
         // commit, so during the first commit, the last of the previous versions

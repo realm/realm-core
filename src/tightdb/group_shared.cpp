@@ -999,7 +999,8 @@ void SharedGroup::get_version_of_current_transaction(VersionID* version_id)
     }
 }
 
-bool SharedGroup::grab_specific_readlock(ReadLockInfo& readlock, bool& same_as_before, VersionID* specific_version)
+bool SharedGroup::grab_specific_readlock(ReadLockInfo& readlock, bool& same_as_before, 
+					 const VersionID* specific_version)
 {
     for (;;) {
         SharedInfo* r_info = m_reader_map.get_addr();
@@ -1030,7 +1031,7 @@ bool SharedGroup::grab_specific_readlock(ReadLockInfo& readlock, bool& same_as_b
 }
 
 
-const Group& SharedGroup::begin_read(VersionID* specific_version)
+const Group& SharedGroup::begin_read(const VersionID* specific_version)
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Ready);
 
@@ -1116,7 +1117,7 @@ void SharedGroup::promote_to_write()
 }
 
 
-bool SharedGroup::advance_read(VersionID* specific_version)
+bool SharedGroup::advance_read(const VersionID* specific_version)
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Reading);
 

@@ -248,7 +248,7 @@ public:
     // guaranteed to succeed if at least one other SharedGroup has a transaction
     // open pointing at that specific version. If the attempt fails, an exception
     // is thrown
-    const Group& begin_read(VersionID* specific_version = 0);
+    const Group& begin_read(const VersionID* specific_version = 0);
 
     // End a read transaction. Accessors are detached.
     void end_read() TIGHTDB_NOEXCEPT;
@@ -328,7 +328,8 @@ private:
 
     // Try to grab a readlock for a specific version. Fails if the version is no longer
     // accessible.
-    bool grab_specific_readlock(ReadLockInfo& readlock, bool& same_as_before, VersionID* specific_version);
+    bool grab_specific_readlock(ReadLockInfo& readlock, bool& same_as_before, 
+                                const VersionID* specific_version);
 
     // Release a specific readlock. The readlock info MUST have been obtained by a
     // call to grab_latest_readlock() or grab_specific_readlock().
@@ -362,7 +363,7 @@ private:
     // open pointing at that specific version, and if the version requested
     // is the same or later than the one currently accessed.
     // Returns true if successfull.
-    bool advance_read(VersionID* specific_version);
+    bool advance_read(const VersionID* specific_version);
 
     // Promote the current read transaction to a write transaction.
     // CAUTION: This also synchronizes with latest state of the database,
@@ -557,7 +558,7 @@ inline bool operator>(SharedGroup::VersionID& a, SharedGroup::VersionID& b)
 
 inline bool operator>=(SharedGroup::VersionID& a, SharedGroup::VersionID& b)
 {
-    return !(b < a);
+    return !(a < b);
 }
 inline bool operator<=(SharedGroup::VersionID& a, SharedGroup::VersionID& b)
 {
