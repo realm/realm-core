@@ -6402,6 +6402,9 @@ void multiple_trackers_reader_thread(TestResults* test_results_ptr, string path)
     size_t row_ndx = q.find();
     Row row = tr->get(row_ndx);
     TableView tv = q.find_all();
+    LangBindHelper::promote_to_write(sg);
+    tr->set_int(0, 0, 1 + tr->get_int(0, 0));
+    LangBindHelper::commit_and_continue_as_read(sg);
     for (;;) {
         int_fast64_t val = row.get_int(0);
         tv.sync_if_needed();
@@ -6424,7 +6427,7 @@ void multiple_trackers_reader_thread(TestResults* test_results_ptr, string path)
 TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
 {
     const int write_thread_count = 7;
-    const int read_thread_count = 3;
+    const int read_thread_count = 3; // must be less than 42 for correct operation
 
     SHARED_GROUP_TEST_PATH(path);
 
@@ -6434,7 +6437,7 @@ TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
         WriteTransaction wt(sg);
         TableRef tr = wt.add_table("table");
         tr->add_column(type_Int, "first");
-        for (int i = 0; i < 200; ++i)
+        for (int i = 0; i < 200; ++i) // use first entry in table to count readers which have locked on
             tr->add_empty_row();
         tr->set_int(0, 100, 42);
         wt.commit();
@@ -6452,6 +6455,13 @@ TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
     for (int i = 0; i < write_thread_count; ++i)
         threads[i].join();
 
+    // Wait for all reader threads to find and lock onto value '42'
+    for (;;) {
+        ReadTransaction rt(sg);
+        ConstTableRef tr = rt.get_table("table");
+        if (tr->get_int(0,0) == read_thread_count) break;
+        sched_yield();
+    }
     // signal to all readers to complete
     {
         WriteTransaction wt(sg);
@@ -6620,6 +6630,18 @@ TEST(LangBindHelper_ImplicitTransactions_InterProcess)
     for (int i = 0; i < write_process_count; ++i) {
         int status = 0;
         waitpid(writepids[i], &status, 0);
+    }
+
+    // Wait for all reader threads to find and lock onto value '42'
+    {
+        UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
+        SharedGroup sg(*repl);
+        for (;;) {
+            ReadTransaction rt(sg);
+            ConstTableRef tr = rt.get_table("table");
+            if (tr->get_int(0,0) == read_process_count) break;
+            sched_yield();
+        }
     }
 
     // signal to all readers to complete

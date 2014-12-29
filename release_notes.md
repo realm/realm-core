@@ -2,7 +2,7 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
+* Fixed a crash when calling get_sorted_view() on an empty LinkList.
 
 ### API breaking changes:
 
@@ -22,6 +22,26 @@
 ### Internals:
 
 * Lorem ipsum.
+
+----------------------------------------------
+
+# 0.87.3 Release notes
+
+### Bugfixes:
+
+* Fixed bug in String and Integer index where find()/find_all() would return a
+  wrong match.
+* Fixed the values of `Table::max_string_size`, and `Table::max_binary_size`.
+* Fixed a bug occuring when claring a table with a search index on a string
+  column with many rows (>1000).
+
+----------------------------------------------
+
+# 0.87.2 Release notes
+
+### Internals:
+
+* Extra assertions in `src/tightdb/util.file.cpp`.
 
 ----------------------------------------------
 
