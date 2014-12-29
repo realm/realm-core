@@ -6871,10 +6871,15 @@ TEST(LangBindHelper_VersionControl)
         SharedGroup sg_w(*repl_w, SharedGroup::durability_Full, crypt_key());
         // first create 'num_version' versions
         sg.begin_read();
+        {
+                WriteTransaction wt(sg_w);
+                MyTable::Ref t = wt.get_or_add_table<MyTable>("test");
+                wt.commit();
+        }
         for (int i = 0; i < num_versions; ++i) {
             {
                 WriteTransaction wt(sg_w);
-                MyTable::Ref t = wt.get_or_add_table<MyTable>("test");
+                MyTable::Ref t = wt.get_table<MyTable>("test");
                 t->add(i);
                 wt.commit();
             }
@@ -6887,9 +6892,40 @@ TEST(LangBindHelper_VersionControl)
         // step through the versions backward:
         for (int i = num_versions-1; i >= 0; --i) {
             const Group& g = sg_w.begin_read(&versions[i]);
+            g.Verify();
             MyTable::ConstRef t = g.get_table<MyTable>("test");
             CHECK_EQUAL(i, t[i].first);
             sg_w.end_read();
+        }
+
+        // then advance through the versions going forward
+        {
+            const Group& g = sg_w.begin_read(&versions[0]);
+            g.Verify();
+            MyTable::ConstRef t = g.get_table<MyTable>("test");
+            for (int k = 1; k < num_versions; ++k) {
+                CHECK(versions[k] >= versions[k-1]);
+                CHECK(LangBindHelper::advance_read(sg_w, &versions[k]));
+                g.Verify();
+                CHECK_EQUAL(k, t[k].first);
+            }
+            sg_w.end_read();
+        }
+
+        // do steps of increasing size from the first version to the last,
+        // including a "step on the spot" (from version 0 to 0)
+        {
+            for (int k = 0; k < num_versions; ++k) {
+                cerr << "Advancing from initial version to version " << k << endl;
+                const Group& g = sg_w.begin_read(&versions[0]);
+                MyTable::ConstRef t = g.get_table<MyTable>("test");
+                CHECK(versions[k] >= versions[0]);
+                g.Verify();
+                CHECK(LangBindHelper::advance_read(sg_w, &versions[k]));
+                g.Verify();
+                CHECK_EQUAL(k, t[k].first);
+                sg_w.end_read();
+            }
         }
 
         // sync to a randomly selected version - use advance_read when going
@@ -6905,12 +6941,15 @@ TEST(LangBindHelper_VersionControl)
                 CHECK(versions[new_version] < versions[old_version]);
                 sg_w.end_read();
                 sg_w.begin_read(&versions[new_version]);
+                g.Verify();
                 t = g.get_table<MyTable>("test");
                 CHECK_EQUAL(new_version, t[new_version].first);
             }
             else {
                 CHECK(versions[new_version] >= versions[old_version]);
+                g.Verify();
                 CHECK(LangBindHelper::advance_read(sg_w, &versions[new_version]));
+                g.Verify();
                 CHECK_EQUAL(new_version, t[new_version].first);
             }
             old_version = new_version;
