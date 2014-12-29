@@ -2,7 +2,7 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
+* Fixed a crash when calling get_sorted_view() on an empty LinkList.
 
 ### API breaking changes:
 
