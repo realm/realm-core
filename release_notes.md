@@ -1,22 +1,8 @@
-# NEXT RELEASE
+# 0.87.4 Release notes
 
 ### Bugfixes:
 
 * Fixed a crash when calling get_sorted_view() on an empty LinkList.
-
-### API breaking changes:
-
-* Lorem ipsum.
-
-### Enhancements:
-
-* Lorem ipsum.
-
------------
-
-### Internals:
-
-* Lorem ipsum.
 
 ----------------------------------------------
 
