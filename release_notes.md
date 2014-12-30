@@ -2,7 +2,7 @@
 
 ### Bugfixes:
 
-* Fixed a crash when calling get_sorted_view() on an empty LinkList.
+* Lorem ipsum.
 
 ### API breaking changes:
 
@@ -22,6 +22,14 @@
 ### Internals:
 
 * Lorem ipsum.
+
+----------------------------------------------
+
+# 0.87.4 Release notes
+
+### Bugfixes:
+
+* Fixed a crash when calling get_sorted_view() on an empty LinkList.
 
 ----------------------------------------------
 
