@@ -6911,8 +6911,25 @@ TEST(LangBindHelper_VersionControl)
             }
         }
 
+        // do steps of increasing size from the first version to the last,
+        // including a "step on the spot" (from version 0 to 0)
+        {
+            for (int k = 0; k < num_versions; ++k) {
+                // cerr << "Advancing from initial version to version " << k << endl;
+                const Group& g = sg_w.begin_read(&versions[0]);
+                MyTable::ConstRef t = g.get_table<MyTable>("test");
+                CHECK(versions[k] >= versions[0]);
+                g.Verify();
+                CHECK(LangBindHelper::advance_read(sg_w, &versions[k]));
+                g.Verify();
+                CHECK_EQUAL(k, t[k].first);
+                sg_w.end_read();
+            }
+        }
+
         // step through the versions backward:
         for (int i = num_versions-1; i >= 0; --i) {
+            // cerr << "Jumping directly to version " << i << endl;
             const Group& g = sg_w.begin_read(&versions[i]);
             g.Verify();
             MyTable::ConstRef t = g.get_table<MyTable>("test");
@@ -6925,29 +6942,14 @@ TEST(LangBindHelper_VersionControl)
             const Group& g = sg_w.begin_read(&versions[0]);
             g.Verify();
             MyTable::ConstRef t = g.get_table<MyTable>("test");
-            for (int k = 1; k < num_versions; ++k) {
-                CHECK(versions[k] >= versions[k-1]);
+            for (int k = 0; k < num_versions; ++k) {
+                // cerr << "Advancing to version " << k << endl;
+                CHECK(k==0 || versions[k] >= versions[k-1]);
                 CHECK(LangBindHelper::advance_read(sg_w, &versions[k]));
                 g.Verify();
                 CHECK_EQUAL(k, t[k].first);
             }
             sg_w.end_read();
-        }
-
-        // do steps of increasing size from the first version to the last,
-        // including a "step on the spot" (from version 0 to 0)
-        {
-            for (int k = 0; k < num_versions; ++k) {
-                cerr << "Advancing from initial version to version " << k << endl;
-                const Group& g = sg_w.begin_read(&versions[0]);
-                MyTable::ConstRef t = g.get_table<MyTable>("test");
-                CHECK(versions[k] >= versions[0]);
-                g.Verify();
-                CHECK(LangBindHelper::advance_read(sg_w, &versions[k]));
-                g.Verify();
-                CHECK_EQUAL(k, t[k].first);
-                sg_w.end_read();
-            }
         }
 
         // sync to a randomly selected version - use advance_read when going
@@ -6958,7 +6960,7 @@ TEST(LangBindHelper_VersionControl)
         CHECK_EQUAL(old_version, t[old_version].first);
         for (int k = num_random_tests; k; --k) {
             int new_version = random() % num_versions;
-            cerr << "version " << old_version << " -> " << new_version << endl;
+            // cerr << "Random jump: version " << old_version << " -> " << new_version << endl;
             if (new_version < old_version) {
                 CHECK(versions[new_version] < versions[old_version]);
                 sg_w.end_read();
