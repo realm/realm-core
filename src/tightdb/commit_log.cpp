@@ -573,7 +573,7 @@ void WriteLogCollector::get_commit_entries(version_type from_version, version_ty
     get_buffers_in_order(preamble, buffer, second_buffer);
 
     // setup local offset and version tracking variables if needed
-    if (m_read_version < preamble->begin_oldest_commit_range) {
+    if ((m_read_version != from_version) || (m_read_version < preamble->begin_oldest_commit_range)) {
         m_read_version = preamble->begin_oldest_commit_range;
         m_read_offset = 0;
         // cerr << "  -- reset tracking" << endl;
