@@ -1,4 +1,4 @@
-# 0.87.4 Release Notes
+# 0.87.4 Release notes
 
 ### Bugfixes:
 
