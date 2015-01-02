@@ -20,6 +20,14 @@
 
 ----------------------------------------------
 
+# 0.87.4 Release notes
+
+### Bugfixes:
+
+* Fixed a crash when calling get_sorted_view() on an empty LinkList.
+
+----------------------------------------------
+
 # 0.87.3 Release notes
 
 ### Bugfixes:
