@@ -2764,7 +2764,7 @@ EOF
             echo "Bad check mode '$check_mode'" 1>&2
             exit 1
         fi
-        TIGHTDB_MAX_BPNODE_SIZE_DEBUG="4" sh build.sh config || exit 1
+        TIGHTDB_MAX_BPNODE_SIZE_DEBUG="4" TIGHTDB_ENABLE_ENCRYPTION="$2" sh build.sh config || exit 1
         UNITTEST_SHUFFLE="1" UNITTEST_REANDOM_SEED="random" UNITTEST_XML="1" sh build.sh "$check_mode" || exit 1
         exit 0
         ;;
