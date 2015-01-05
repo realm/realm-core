@@ -131,6 +131,9 @@ void Group::init_from_ref(ref_type top_ref) TIGHTDB_NOEXCEPT
     size_t top_size = m_top.size();
     TIGHTDB_ASSERT(top_size >= 3);
 
+    // Logical file size must not exceed actual file size
+    TIGHTDB_ASSERT(size_t(m_top.get(2)/2) <= m_alloc.get_baseline());
+
     m_table_names.init_from_parent();
     m_tables.init_from_parent();
     m_is_attached = true;

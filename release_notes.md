@@ -1,3 +1,53 @@
+# NEXT RELEASE
+
+### Bugfixes:
+
+* Lorem ipsum.
+
+### API breaking changes:
+
+* Lorem ipsum.
+
+### Enhancements:
+
+* Lorem ipsum.
+
+-----------
+
+### Internals:
+
+* Lorem ipsum.
+
+----------------------------------------------
+
+# 0.87.4 Release notes
+
+### Bugfixes:
+
+* Fixed a crash when calling get_sorted_view() on an empty LinkList.
+
+----------------------------------------------
+
+# 0.87.3 Release notes
+
+### Bugfixes:
+
+* Fixed bug in String and Integer index where find()/find_all() would return a
+  wrong match.
+* Fixed the values of `Table::max_string_size`, and `Table::max_binary_size`.
+* Fixed a bug occuring when claring a table with a search index on a string
+  column with many rows (>1000).
+
+----------------------------------------------
+
+# 0.87.2 Release notes
+
+### Internals:
+
+* Extra assertions in `src/tightdb/util.file.cpp`.
+
+----------------------------------------------
+
 # 0.87.1 Release notes
 
 ### Enhancements:
@@ -9,6 +59,7 @@
 * Now throwing on overlong table and column names, and on oversized strings and
   binary data values.
 * Fall back to the old query nodes for String as well as int/double/float.
+* Log assertions failures to the native logging system on android and Apple.
 
 -----------
 

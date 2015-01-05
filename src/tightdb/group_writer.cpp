@@ -80,7 +80,7 @@ size_t GroupWriter::write_group()
         num_free_lists * Array::get_max_byte_size(max_free_list_size);
 
     // Reserve space for remaining arrays. We ask for one extra byte beyond the
-    // maxumum number that is required. This ensures that even if we end up
+    // maximum number that is required. This ensures that even if we end up
     // using the maximum size possible, we still do not end up with a zero size
     // free-space chunk as we deduct the actually used size from it.
     pair<size_t, size_t> reserve = reserve_free_space(max_free_space_needed + 1); // Throws
@@ -107,7 +107,7 @@ size_t GroupWriter::write_group()
             flengths.insert(ndx, size); // Throws
             if (is_shared)
                 fversions.insert(ndx, m_current_version); // Throws
-            // Adjust reserve_ndx to keep in valid
+            // Adjust reserve_ndx if necessary
             if (ndx <= reserve_ndx)
                 ++reserve_ndx;
         }

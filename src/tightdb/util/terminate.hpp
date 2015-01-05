@@ -25,19 +25,12 @@
 
 #include <tightdb/util/features.h>
 
-#ifdef TIGHTDB_DEBUG
-#  define TIGHTDB_TERMINATE(msg) tightdb::util::terminate((msg), __FILE__, __LINE__)
-#else
-#  define TIGHTDB_TERMINATE(msg) (static_cast<void>(msg), tightdb::util::abort())
-#endif
+#define TIGHTDB_TERMINATE(msg) tightdb::util::terminate((msg), __FILE__, __LINE__)
 
 namespace tightdb {
 namespace util {
 
-
-TIGHTDB_NORETURN void abort() TIGHTDB_NOEXCEPT;
-TIGHTDB_NORETURN void terminate(std::string message, const char* file, long line) TIGHTDB_NOEXCEPT;
-
+TIGHTDB_NORETURN void terminate(const char* message, const char* file, long line) TIGHTDB_NOEXCEPT;
 
 } // namespace util
 } // namespace tightdb
