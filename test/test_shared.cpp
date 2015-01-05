@@ -92,13 +92,13 @@ TIGHTDB_TABLE_4(TestTableShared,
 
 
 
-void writer(string path, int id)
+void writer(string path, int id, int limit)
 {
     // cerr << "Started pid " << getpid() << endl;
     try {
         SharedGroup sg(path, true, SharedGroup::durability_Full);
         // cerr << "Opened sg, pid " << getpid() << endl;
-        for (int i=0;; ++i) {
+        for (int i=0; limit==0 || i < limit; ++i) {
             // cerr << "       - " << getpid() << endl;
             WriteTransaction wt(sg);
             if (i & 1) {
@@ -187,7 +187,7 @@ TEST(Shared_PipelinedWritesWithKills)
         TIGHTDB_TERMINATE("fork() failed");
     if (pid == 0) {
         // first writer!
-        writer(path, 0);
+        writer(path, 0, 0);
         _exit(0);
     }
     else {
@@ -197,7 +197,7 @@ TEST(Shared_PipelinedWritesWithKills)
             if (pid == pid_t(-1))
                 TIGHTDB_TERMINATE("fork() failed");
             if (pid == 0) {
-                writer(path, k);
+                writer(path, k, 0);
                 _exit(0);
             }
             else {
@@ -229,7 +229,7 @@ TEST(Shared_CompactingOnTheFly)
         wt.commit();
         {
             ReadTransaction rt(sg);
-            writer_thread.start(bind(&writer, old_path, 42));
+            writer_thread.start(bind(&writer, old_path, 42, 100));
             sleep(1);
         }
         // we cannot compact while a writer is still running:
