@@ -52,7 +52,7 @@ usage()
 Unspecified or bad mode '$MODE'.
 Available modes are:
     config clean build build-config-progs build-iphone build-android
-    build-osx-framework build-cocoa
+    build-osx-framework build-cocoa config-param
     check check-debug show-install install uninstall
     test-installed wipe-installed install-prod install-devel uninstall-prod
     uninstall-devel dist-copy src-dist bin-dist dist-deb dist-status
@@ -544,6 +544,16 @@ EOF
         exit 0
         ;;
 
+    "config-param")
+        parameter="$1"
+        if ! [ "$parameter" ]; then
+            echo "Parameter excepted."
+            exit 1
+        fi
+        get_config_param "$parameter"
+        exit 0
+        ;;
+
     "clean")
         auto_configure || exit 1
         export TIGHTDB_HAVE_CONFIG="1"
@@ -781,11 +791,11 @@ EOF
 
         tightdb_version="$(sh build.sh get-version)" || exit
         dir_name="core-$tightdb_version"
-        file_name="core-android-$tightdb_version.tar.gz"
+        file_name="realm-core-android-$tightdb_version.tar.gz"
         tar_files='libtightdb*'
         if [ $enable_encryption = yes ]; then
             dir_name="$dir_name-encryption"
-            file_name="core-android-$tightdb_version-encryption.tar.gz"
+            file_name="realm-core-android-$tightdb_version-encryption.tar.gz"
             tar_files='libtightdb* *.txt'
         fi
 
