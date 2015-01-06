@@ -350,6 +350,7 @@ private:
 
     friend class Group;
     friend class GroupWriter;
+    friend class SharedGroup;
 };
 
 

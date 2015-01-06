@@ -187,8 +187,6 @@ public:
     // at a time tries to perform cleanup. This is ensured by doing the cleanup
     // as part of write transactions, where mutual exclusion is assured by the
     // write mutex.
-
-    // FIXME: The use of uint_fast64_t is in principle wrong
     struct ReadCount {
         uint64_t version;
         uint64_t filesize;
@@ -381,7 +379,7 @@ struct SharedGroup::SharedInfo
     // because interprocess sharing is not supported by our current encryption mechanisms.
     uint64_t session_initiator_pid;
 
-    // Tracks the most recent version number. Should only be accessed 
+    // Tracks the most recent version number.
     uint16_t version;
     uint16_t flags;
     uint16_t free_write_slots;
@@ -654,9 +652,20 @@ void SharedGroup::open(const string& path, bool no_create_file,
                                                  no_create, skip_validate, key, server_sync_mode); // Throws
             size_t file_size = alloc.get_baseline();
 
-            // determine version
-            uint_fast64_t version;
             if (begin_new_session) {
+
+                // make sure the database is not on streaming format. This has to be done at
+                // session initialization, even if it means writing the database during open.
+                {
+                    util::File::Map<char> db_map;
+                    db_map.map(alloc.m_file, File::access_ReadWrite, file_size);
+                    File::UnmapGuard db_ug(db_map);
+                    alloc.prepare_for_update(db_map.get_addr());
+                    db_map.sync();
+                }
+
+                // determine version
+                uint_fast64_t version;
                 Array top(alloc);
                 if (top_ref) {
 

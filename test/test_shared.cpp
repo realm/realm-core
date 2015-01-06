@@ -2134,7 +2134,7 @@ TEST(Shared_MixedWithNonShared)
         {
             ReadTransaction rt(sg);
             rt.get_group().Verify();
-            CHECK(rt.has_table("baz"));
+            CHECK(rt.has_table("bar"));
         }
     }
 
