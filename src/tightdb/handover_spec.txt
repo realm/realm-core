@@ -1,0 +1,63 @@
+Spec: handover of query results between threads
+===============================================
+
+Use case
+--------
+
+The main use case is that we want to offload queries from the main thread to a worker thread,
+but we want to use the query result in the main thread.
+
+Preliminary observation: The obvious solution is to make core thread safe.
+
+
+Generalization
+--------------
+
+We may generalize from
+
+a) query result -> result of any computation, as long as the result is a set of references
+   to database objects residing in the same table
+
+a2) further generalization of a) to objects in multiple tables.
+
+b) the main versus worker thread pattern -> transfer of results between any pair of threads
+
+
+Solution
+--------
+
+Recuring observation: The obvious solution is to make core thread safe :-)
+
+Other observations
+
+1) versioning
+To handover data from one SharedGroup to another, you must take into account
+the versioning of the data. Data computed from one version of the database may
+not be correct when examined in the context of another version.
+
+2) thread safety
+Our SharedGroup is not thread-safe but thread specific. Accessors are part of
+a datastructure rooted at SharedGroup so that they can be updated (implicitly).
+To transfer a result from one SharedGroup to another, we need to add thread safe
+mechanisms for unlinking the result from one SharedGroup and adding it to the other.
+
+
+re Versioning
+
+A simple way of ensuring that data transferred from one SharedGroup to another
+is by ensuring that the two SharedGroups refer to the same version of data. This is
+trivial, and requires adding the following
+ - the ability to query a shared group which version of the database it is locked onto.
+ - the ability to ask a shared group to "lock on to" a given version
+ - the ability to compare versions to determine which is oldest.
+This has been implemented and resides in PR #614
+
+With this implemented *and* thread safety also implemented (which it isn't yet) we can
+handover queries as long as we are careful that the queries are run in the context of
+the same version of data, as the query results are later used in.
+
+But when we want to *change* the database in accordance with a query result we get
+an additional problem, because then we want to use a write transaction which by its very
+nature must be the latest possible.
+
+Important observation: this additional problem is not related to only handover, and is not
