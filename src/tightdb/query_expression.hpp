@@ -1052,7 +1052,7 @@ private:
     std::vector<tightdb::DataType> m_link_types;
 };
 
-template <class T, class C> Query string_compare(const Columns<StringData>& left, T right);
+template <class T, class S, class I> Query string_compare(const Columns<StringData>& left, T right, bool case_insensitive);
 
 // Handling of String columns. These support only == and != compare operators. No 'arithmetic' operators (+, etc).
 template <> class Columns<StringData> : public Subexpr2<StringData>
@@ -1114,42 +1114,27 @@ public:
 
     Query equal(StringData sd, bool case_sensitive = true)
     {
-        if (case_sensitive)
-            return string_compare<StringData, Equal>(*this, sd);
-        else
-            return string_compare<StringData, EqualIns>(*this, sd);
+        return string_compare<StringData, Equal, EqualIns>(*this, sd, case_sensitive);
     }
 
     Query not_equal(StringData sd, bool case_sensitive = true)
     {
-        if (case_sensitive)
-            return string_compare<StringData, NotEqual>(*this, sd);
-        else
-            return string_compare<StringData, NotEqualIns>(*this, sd);
+        return string_compare<StringData, NotEqual, NotEqualIns>(*this, sd, case_sensitive);
     }
     
     Query begins_with(StringData sd, bool case_sensitive = true)
     {
-        if (case_sensitive)
-            return string_compare<StringData, BeginsWith>(*this, sd);
-        else
-            return string_compare<StringData, BeginsWithIns>(*this, sd);
+        return string_compare<StringData, BeginsWith, BeginsWithIns>(*this, sd, case_sensitive);
     }
 
     Query ends_with(StringData sd, bool case_sensitive = true)
     {
-        if (case_sensitive)
-            return string_compare<StringData, EndsWith>(*this, sd);
-        else
-            return string_compare<StringData, EndsWithIns>(*this, sd);
+        return string_compare<StringData, EndsWith, EndsWithIns>(*this, sd, case_sensitive);
     }
     
     Query contains(StringData sd, bool case_sensitive = true)
     {
-        if (case_sensitive)
-            return string_compare<StringData, Contains>(*this, sd);
-        else
-            return string_compare<StringData, ContainsIns>(*this, sd);
+        return string_compare<StringData, Contains, ContainsIns>(*this, sd, case_sensitive);
     }
     
     const Table* m_table_linked_from;
@@ -1164,10 +1149,33 @@ public:
 };
 
 
-template <class T, class C> Query string_compare(const Columns<StringData>& left, T right)
+template <class T, class S, class I> Query string_compare(const Columns<StringData>& left, T right, bool case_sensitive)
 {
     StringData sd(right);
-    return create<StringData, C, StringData>(sd, left);
+    if (case_sensitive)
+        return create<StringData, S, StringData>(sd, left);
+    else
+        return create<StringData, I, StringData>(sd, left);
+}
+
+template <class S, class I> Query string_compare(const Columns<StringData>& left, const Columns<StringData>& right, bool case_sensitive)
+{
+    Subexpr& left_copy = const_cast<Columns<StringData>&>(left).clone();
+    Subexpr& right_copy = const_cast<Columns<StringData>&>(right).clone();
+    if (case_sensitive)
+        return *new Compare<S, StringData>(left_copy, right_copy, /* auto_delete */ true);
+    else
+        return *new Compare<I, StringData>(left_copy, right_copy, /* auto_delete */ true);
+}
+
+// Columns<String> == Columns<String>
+inline Query operator == (const Columns<StringData>& left, const Columns<StringData>& right) {
+    return string_compare<Equal, EqualIns>(left, right, true);
+}
+
+// Columns<String> != Columns<String>
+inline Query operator != (const Columns<StringData>& left, const Columns<StringData>& right) {
+    return string_compare<NotEqual, NotEqualIns>(left, right, true);
 }
 
 // String == Columns<String>
@@ -1182,12 +1190,12 @@ template <class T> Query operator != (T left, const Columns<StringData>& right) 
 
 // Columns<String> == String
 template <class T> Query operator == (const Columns<StringData>& left, T right) {
-    return string_compare<T, Equal>(left, right);
+    return string_compare<T, Equal, EqualIns>(left, right, true);
 }
 
 // Columns<String> != String
 template <class T> Query operator != (const Columns<StringData>& left, T right) {
-    return string_compare<T, NotEqual>(left, right);
+    return string_compare<T, NotEqual, NotEqualIns>(left, right, true);
 }
 
 // This class is intended to perform queries on the *pointers* of links, contrary to performing queries on *payload* 
@@ -1592,20 +1600,6 @@ private:
     // Compare object is destructed and the copy is no longer needed. 
     const char* m_compare_string;
 };
-
-// Columns<String> == Columns<String>
-inline Query operator == (const Columns<StringData>& left, const Columns<StringData>& right) {
-    return *new Compare<Equal, StringData>(const_cast<Columns<StringData>&>(left).clone(),
-                                           const_cast<Columns<StringData>&>(right).clone(),
-                                           /* auto_delete */ true);
-}
-
-// Columns<String> != Columns<String>
-inline Query operator != (const Columns<StringData>& left, const Columns<StringData>& right) {
-    return *new Compare<NotEqual, StringData>(const_cast<Columns<StringData>&>(left).clone(),
-                                              const_cast<Columns<StringData>&>(right).clone(),
-                                              /* auto_delete */ true);
-}
 
 
 //}
