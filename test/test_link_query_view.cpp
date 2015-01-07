@@ -189,8 +189,8 @@ TEST(LinkList_Basic2)
     match = (table1->link(col_link2).column<String>(1) == "foobar").find();
     CHECK_EQUAL(not_found, match);
 
-    //    match = (table1->column<String>(1) == table1->column<String>(1)  ).find(); // not yet implemented
-    //    CHECK_EQUAL(1, match);
+    match = (table1->link(col_link2).column<String>(1) == table1->column<String>(1)).find();
+    CHECK_EQUAL(1, match);
 }
 
 

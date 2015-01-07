@@ -19,6 +19,7 @@
   Operators are provided so that VersionID's may be compared.
 * Creating distinct views on integer, datetime, bool and enum columns is now possible.
 * Add `Table::minimum_datetime()` and `Table::maximum_datetime()`.
+* Add support for comparing string columns to other string columns in queries.
 
 -----------
 

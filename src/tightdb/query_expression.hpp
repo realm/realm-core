@@ -1064,6 +1064,7 @@ public:
     {
         m_link_map.init(const_cast<Table*>(table), links);
         m_table = table;
+        TIGHTDB_ASSERT(m_link_map.m_table->get_column_type(column) == type_String);
     }
 
     Columns(size_t column, const Table* table) : m_table_linked_from(null_ptr), m_table(null_ptr), m_column(column)
@@ -1592,6 +1593,19 @@ private:
     const char* m_compare_string;
 };
 
+// Columns<String> == Columns<String>
+inline Query operator == (const Columns<StringData>& left, const Columns<StringData>& right) {
+    return *new Compare<Equal, StringData>(const_cast<Columns<StringData>&>(left).clone(),
+                                           const_cast<Columns<StringData>&>(right).clone(),
+                                           /* auto_delete */ true);
+}
+
+// Columns<String> != Columns<String>
+inline Query operator != (const Columns<StringData>& left, const Columns<StringData>& right) {
+    return *new Compare<NotEqual, StringData>(const_cast<Columns<StringData>&>(left).clone(),
+                                              const_cast<Columns<StringData>&>(right).clone(),
+                                              /* auto_delete */ true);
+}
 
 
 //}

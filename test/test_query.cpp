@@ -1890,36 +1890,54 @@ TEST(Query_TwoSameCols)
     table.add_column(type_Bool, "first2");
     table.add_column(type_DateTime, "second1");
     table.add_column(type_DateTime, "second2");
+    table.add_column(type_String, "third1");
+    table.add_column(type_String, "third2");
 
     table.add_empty_row();
     table.set_bool(0, 0, false);
     table.set_bool(1, 0, true);
     table.set_datetime(2, 0, DateTime(0));
     table.set_datetime(3, 0, DateTime(1));
+    table.set_string(4, 0, StringData("a"));
+    table.set_string(5, 0, StringData("b"));
 
     table.add_empty_row();
     table.set_bool(0, 1, true);
     table.set_bool(1, 1, true);
     table.set_datetime(2, 1, DateTime(1));
     table.set_datetime(3, 1, DateTime(1));
+    table.set_string(4, 1, StringData("b"));
+    table.set_string(5, 1, StringData("b"));
 
     table.add_empty_row();
     table.set_bool(0, 2, false);
     table.set_bool(1, 2, true);
     table.set_datetime(2, 2, DateTime(0));
     table.set_datetime(3, 2, DateTime(1));
+    table.set_string(4, 2, StringData("a"));
+    table.set_string(5, 2, StringData("b"));
 
     Query q1 = table.column<Bool>(0) == table.column<Bool>(1);
-    Query q2 = table.column<DateTime>(0) == table.column<DateTime>(1);
+    Query q2 = table.column<DateTime>(2) == table.column<DateTime>(3);
+    Query q3 = table.column<String>(4) == table.column<String>(5);
 
     CHECK_EQUAL(1, q1.find());
     CHECK_EQUAL(1, q2.find());
+    CHECK_EQUAL(1, q3.find());
+    CHECK_EQUAL(1, q1.count());
+    CHECK_EQUAL(1, q2.count());
+    CHECK_EQUAL(1, q3.count());
 
-    Query q3 = table.column<Bool>(0) != table.column<Bool>(1);
-    Query q4 = table.column<DateTime>(0) != table.column<DateTime>(1);
+    Query q4 = table.column<Bool>(0) != table.column<Bool>(1);
+    Query q5 = table.column<DateTime>(2) != table.column<DateTime>(3);
+    Query q6 = table.column<String>(4) != table.column<String>(5);
 
-    CHECK_EQUAL(0, q3.find());
-    CHECK_EQUAL(0, q4.find());
+    CHECK_EQUAL(0, q5.find());
+    CHECK_EQUAL(0, q5.find());
+    CHECK_EQUAL(0, q6.find());
+    CHECK_EQUAL(2, q5.count());
+    CHECK_EQUAL(2, q5.count());
+    CHECK_EQUAL(2, q6.count());
 }
 
 TEST(Query_DateTest)
