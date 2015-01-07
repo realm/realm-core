@@ -1053,6 +1053,7 @@ private:
 };
 
 template <class T, class S, class I> Query string_compare(const Columns<StringData>& left, T right, bool case_insensitive);
+template <class S, class I> Query string_compare(const Columns<StringData>& left, const Columns<StringData>& right, bool case_insensitive);
 
 // Handling of String columns. These support only == and != compare operators. No 'arithmetic' operators (+, etc).
 template <> class Columns<StringData> : public Subexpr2<StringData>
@@ -1117,9 +1118,19 @@ public:
         return string_compare<StringData, Equal, EqualIns>(*this, sd, case_sensitive);
     }
 
+    Query equal(const Columns<StringData>& col, bool case_sensitive = true)
+    {
+        return string_compare<Equal, EqualIns>(*this, col, case_sensitive);
+    }
+
     Query not_equal(StringData sd, bool case_sensitive = true)
     {
         return string_compare<StringData, NotEqual, NotEqualIns>(*this, sd, case_sensitive);
+    }
+
+    Query not_equal(const Columns<StringData>& col, bool case_sensitive = true)
+    {
+        return string_compare<NotEqual, NotEqualIns>(*this, col, case_sensitive);
     }
     
     Query begins_with(StringData sd, bool case_sensitive = true)
@@ -1127,14 +1138,29 @@ public:
         return string_compare<StringData, BeginsWith, BeginsWithIns>(*this, sd, case_sensitive);
     }
 
+    Query begins_with(const Columns<StringData>& col, bool case_sensitive = true)
+    {
+        return string_compare<BeginsWith, BeginsWithIns>(*this, col, case_sensitive);
+    }
+
     Query ends_with(StringData sd, bool case_sensitive = true)
     {
         return string_compare<StringData, EndsWith, EndsWithIns>(*this, sd, case_sensitive);
+    }
+
+    Query ends_with(const Columns<StringData>& col, bool case_sensitive = true)
+    {
+        return string_compare<EndsWith, EndsWithIns>(*this, col, case_sensitive);
     }
     
     Query contains(StringData sd, bool case_sensitive = true)
     {
         return string_compare<StringData, Contains, ContainsIns>(*this, sd, case_sensitive);
+    }
+
+    Query contains(const Columns<StringData>& col, bool case_sensitive = true)
+    {
+        return string_compare<Contains, ContainsIns>(*this, col, case_sensitive);
     }
     
     const Table* m_table_linked_from;
@@ -1163,9 +1189,9 @@ template <class S, class I> Query string_compare(const Columns<StringData>& left
     Subexpr& left_copy = const_cast<Columns<StringData>&>(left).clone();
     Subexpr& right_copy = const_cast<Columns<StringData>&>(right).clone();
     if (case_sensitive)
-        return *new Compare<S, StringData>(left_copy, right_copy, /* auto_delete */ true);
+        return *new Compare<S, StringData>(right_copy, left_copy, /* auto_delete */ true);
     else
-        return *new Compare<I, StringData>(left_copy, right_copy, /* auto_delete */ true);
+        return *new Compare<I, StringData>(right_copy, left_copy, /* auto_delete */ true);
 }
 
 // Columns<String> == Columns<String>

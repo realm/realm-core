@@ -491,14 +491,18 @@ TEST(Query_NextGen_StringConditions)
     Group group;
     TableRef table1 = group.add_table("table1");
     table1->add_column(type_String, "str1");
+    table1->add_column(type_String, "str2");
 
     // add some rows
     table1->add_empty_row();
     table1->set_string(0, 0, "foo");
+    table1->set_string(1, 0, "F");
     table1->add_empty_row();
     table1->set_string(0, 1, "!");
+    table1->set_string(1, 1, "x");
     table1->add_empty_row();
     table1->set_string(0, 2, "bar");
+    table1->set_string(1, 2, "r");
 
     size_t m;
     // Equal
@@ -527,6 +531,12 @@ TEST(Query_NextGen_StringConditions)
     m = table1->column<String>(0).contains("A", false).find();
     CHECK_EQUAL(m, 2);
 
+    m = table1->column<String>(0).contains(table1->column<String>(1), false).find();
+    CHECK_EQUAL(m, 0);
+
+    m = table1->column<String>(0).contains(table1->column<String>(1), true).find();
+    CHECK_EQUAL(m, 2);
+
     // Begins with
     m = table1->column<String>(0).begins_with("b", false).find();
     CHECK_EQUAL(m, 2);
@@ -540,6 +550,12 @@ TEST(Query_NextGen_StringConditions)
     m = table1->column<String>(0).begins_with("B", false).find();
     CHECK_EQUAL(m, 2);
 
+    m = table1->column<String>(0).begins_with(table1->column<String>(1), false).find();
+    CHECK_EQUAL(m, 0);
+
+    m = table1->column<String>(0).begins_with(table1->column<String>(1), true).find();
+    CHECK_EQUAL(m, not_found);
+
     // Ends with
     m = table1->column<String>(0).ends_with("r", false).find();
     CHECK_EQUAL(m, 2);
@@ -551,6 +567,12 @@ TEST(Query_NextGen_StringConditions)
     CHECK_EQUAL(m, not_found);
 
     m = table1->column<String>(0).ends_with("R", false).find();
+    CHECK_EQUAL(m, 2);
+
+    m = table1->column<String>(0).ends_with(table1->column<String>(1), false).find();
+    CHECK_EQUAL(m, 2);
+
+    m = table1->column<String>(0).ends_with(table1->column<String>(1), true).find();
     CHECK_EQUAL(m, 2);
 }
 

@@ -58,12 +58,21 @@ TEST(LinkList_Basic1)
     CHECK_EQUAL(tv2.size(), 1);
     CHECK_EQUAL(tv2[0].get_index(), 0);
 
-    // Just a single test for the new string conditions, to see if they work with links too. 
+    // Just a few tests for the new string conditions to see if they work with links too.
     // The new string conditions are tested themself in Query_NextGen_StringConditions in test_query.cpp 
     Query q3 = table2->link(col_link2).column<String>(1).contains("A", false);
     TableView tv3 = q3.find_all();
     CHECK_EQUAL(tv3.size(), 1);
     CHECK_EQUAL(tv3[0].get_index(), 1); // "bar" contained an "A"
+
+    table2->add_column(type_String, "str2");
+    table2->set_string(1, 0, "A");
+    table2->set_string(1, 1, "A");
+
+    Query q4 = table2->link(col_link2).column<String>(1).contains(table2->column<String>(1), false);
+    TableView tv4 = q4.find_all();
+    CHECK_EQUAL(tv4.size(), 1);
+    CHECK_EQUAL(tv4[0].get_index(), 1); // "bar" contained an "A"
 }
 
 
