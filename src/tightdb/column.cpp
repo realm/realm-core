@@ -102,7 +102,7 @@ template<class Op> void col_type_deleg(Op& op, ColumnType type)
         case col_type_BackLink:
             break;
     }
-    TIGHTDB_ASSERT(false);
+    TIGHTDB_ASSERT_DEBUG(false);
 }
 
 
@@ -541,7 +541,7 @@ struct AdjustLeafElem: Array::UpdateHandler {
 
 void Column::set(size_t ndx, int64_t value)
 {
-    TIGHTDB_ASSERT(ndx < size());
+    TIGHTDB_ASSERT_DEBUG(ndx < size());
 
     if (m_search_index) {
         static_cast<StringIndex*>(m_search_index)->set(ndx, to_str(value));
@@ -554,6 +554,20 @@ void Column::set(size_t ndx, int64_t value)
 
     SetLeafElem set_leaf_elem(m_array->get_alloc(), value);
     m_array->update_bptree_elem(ndx, set_leaf_elem); // Throws
+}
+
+// When a value of a signed type is converted to an unsigned type, the C++ standard guarantees that negative values 
+// are converted from the native representation to 2's complement, but the opposite conversion is left as undefined. 
+// tightdb::util::from_twos_compl() is used here to perform the correct opposite unsigned-to-signed conversion,
+// which reduces to a no-op when 2's complement is the native representation of negative values.
+void Column::set_uint(size_t ndx, uint64_t value)
+{
+    set(ndx, from_twos_compl<int_fast64_t>(value));
+}
+
+void Column::set_as_ref(size_t ndx, ref_type ref)
+{
+    set(ndx, from_ref(ref));
 }
 
 void Column::adjust(size_t ndx, int_fast64_t diff)
@@ -845,14 +859,14 @@ bool Column::compare_int(const Column& c) const TIGHTDB_NOEXCEPT
 
 void Column::do_insert(size_t row_ndx, int_fast64_t value, size_t num_rows)
 {
-    TIGHTDB_ASSERT(row_ndx == tightdb::npos || row_ndx < size());
+    TIGHTDB_ASSERT_DEBUG(row_ndx == tightdb::npos || row_ndx < size());
 
     ref_type new_sibling_ref;
     Array::TreeInsert<Column> state;
     for (size_t i = 0; i != num_rows; ++i) {
         size_t row_ndx_2 = row_ndx == tightdb::npos ? tightdb::npos : row_ndx + i;
         if (root_is_leaf()) {
-            TIGHTDB_ASSERT(row_ndx_2 == tightdb::npos || row_ndx_2 < TIGHTDB_MAX_BPNODE_SIZE);
+            TIGHTDB_ASSERT_DEBUG(row_ndx_2 == tightdb::npos || row_ndx_2 < TIGHTDB_MAX_BPNODE_SIZE);
             new_sibling_ref = m_array->bptree_leaf_insert(row_ndx_2, value, state); // Throws
         }
         else {
@@ -930,8 +944,8 @@ public:
 
 void Column::do_erase(size_t ndx, bool is_last)
 {
-    TIGHTDB_ASSERT(ndx < size());
-    TIGHTDB_ASSERT(is_last == (ndx == size()-1));
+    TIGHTDB_ASSERT_DEBUG(ndx < size());
+    TIGHTDB_ASSERT_DEBUG(is_last == (ndx == size()-1));
 
     if (m_search_index)
         static_cast<StringIndex*>(m_search_index)->erase<StringData>(ndx, is_last);
@@ -950,7 +964,7 @@ void Column::do_erase(size_t ndx, bool is_last)
 void Column::do_move_last_over(size_t row_ndx, size_t last_row_ndx)
 {
     TIGHTDB_ASSERT(row_ndx <= last_row_ndx);
-    TIGHTDB_ASSERT(last_row_ndx + 1 == size());
+    TIGHTDB_ASSERT_DEBUG(last_row_ndx + 1 == size());
 
     if (m_search_index) {
         // remove the value to be overwritten from index

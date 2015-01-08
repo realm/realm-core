@@ -35,7 +35,7 @@ each of our major platforms:
     sudo apt-get install python-cheetah
     sudo apt-get install libprocps0-dev
 
-### Linux Mint 17, Ubuntu 14.04
+### Linux Mint 17, 17.1, Ubuntu 14.04
 
     sudo apt-get install build-essential
     sudo apt-get install python-cheetah

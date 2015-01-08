@@ -14,7 +14,7 @@ TIGHTDB_TABLE_2(PeopleTable,
 
 void func()
 {
-    Group g("people.tightdb", Group::mode_ReadWrite);
+    Group g("people.tightdb", 0, Group::mode_ReadWrite);
 
     PeopleTable::Ref table = g.add_table<PeopleTable>("people");
 

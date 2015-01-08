@@ -52,9 +52,14 @@
 #define TEST_COLUMN_LARGE
 #define TEST_JSON
 #define TEST_LINKS
+#define TEST_ENCRYPTED_FILE_MAPPING
 
 // Takes a long time. Also currently fails to reproduce the Java bug, but once it has been identified, this
 // test could perhaps be modified to trigger it (unless it's a language binding problem).
 //#define JAVA_MANY_COLUMNS_CRASH
+
+// Temporarily disable async testing until use of sleep() in the async tests have
+// been replaced with a better solution.
+#define DISABLE_ASYNC
 
 #endif

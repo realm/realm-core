@@ -15,6 +15,8 @@ using namespace tightdb;
 
 size_t TableViewBase::find_first_integer(size_t column_ndx, int64_t value) const
 {
+    check_cookie();
+
     for (size_t i = 0; i < m_row_indexes.size(); i++)
         if (get_int(column_ndx, i) == value)
             return i;
@@ -23,6 +25,8 @@ size_t TableViewBase::find_first_integer(size_t column_ndx, int64_t value) const
 
 size_t TableViewBase::find_first_float(size_t column_ndx, float value) const
 {
+    check_cookie();
+
     for (size_t i = 0; i < m_row_indexes.size(); i++)
         if (get_float(column_ndx, i) == value)
             return i;
@@ -31,6 +35,8 @@ size_t TableViewBase::find_first_float(size_t column_ndx, float value) const
 
 size_t TableViewBase::find_first_double(size_t column_ndx, double value) const
 {
+    check_cookie();
+
     for (size_t i = 0; i < m_row_indexes.size(); i++)
         if (get_double(column_ndx, i) == value)
             return i;
@@ -39,6 +45,8 @@ size_t TableViewBase::find_first_double(size_t column_ndx, double value) const
 
 size_t TableViewBase::find_first_string(size_t column_ndx, StringData value) const
 {
+    check_cookie();
+
     TIGHTDB_ASSERT_COLUMN_AND_TYPE(column_ndx, type_String);
 
     for (size_t i = 0; i < m_row_indexes.size(); i++)
@@ -48,6 +56,8 @@ size_t TableViewBase::find_first_string(size_t column_ndx, StringData value) con
 
 size_t TableViewBase::find_first_binary(size_t column_ndx, BinaryData value) const
 {
+    check_cookie();
+
     TIGHTDB_ASSERT_COLUMN_AND_TYPE(column_ndx, type_Binary);
 
     for (size_t i = 0; i < m_row_indexes.size(); i++)
@@ -63,6 +73,8 @@ size_t TableViewBase::find_first_binary(size_t column_ndx, BinaryData value) con
 template <int function, typename T, typename R, class ColType>
 R TableViewBase::aggregate(R(ColType::*aggregateMethod)(size_t, size_t, size_t, size_t*) const, size_t column_ndx, T count_target, size_t* return_ndx) const
 {
+    check_cookie();
+
     TIGHTDB_ASSERT_COLUMN_AND_TYPE(column_ndx, ColumnTypeTraits<T>::id);
     TIGHTDB_ASSERT(function == act_Sum || function == act_Max || function == act_Min || function == act_Count);
     TIGHTDB_ASSERT(m_table);
@@ -220,6 +232,8 @@ void TableViewBase::aggregate(size_t group_by_column, size_t aggr_column, Table:
 
 void TableViewBase::to_json(ostream& out) const
 {
+    check_cookie();
+
     // Represent table as list of objects
     out << "[";
 
@@ -236,6 +250,8 @@ void TableViewBase::to_json(ostream& out) const
 
 void TableViewBase::to_string(ostream& out, size_t limit) const
 {
+    check_cookie();
+
     // Print header (will also calculate widths)
     vector<size_t> widths;
     m_table->to_string_header(out, widths);
@@ -259,6 +275,8 @@ void TableViewBase::to_string(ostream& out, size_t limit) const
 
 void TableViewBase::row_to_string(size_t row_ndx, ostream& out) const
 {
+    check_cookie();
+
     TIGHTDB_ASSERT(row_ndx < m_row_indexes.size());
 
     // Print header (will also calculate widths)
@@ -273,8 +291,9 @@ void TableViewBase::row_to_string(size_t row_ndx, ostream& out) const
 
 uint64_t TableViewBase::outside_version() const
 {
-    // Return version of whatever this TableView depends on
+    check_cookie();
 
+    // Return version of whatever this TableView depends on
     LinkView* lvp = dynamic_cast<LinkView*>(m_query.m_view);
     if (lvp) {
         // This TableView was created by a Query that had a LinkViewRef inside its .where() clause
@@ -293,6 +312,8 @@ uint64_t TableViewBase::outside_version() const
 
 bool TableViewBase::is_in_sync() const TIGHTDB_NOEXCEPT
 {
+    check_cookie();
+
     bool table = bool(m_table);
     bool version = bool(m_last_seen_version == outside_version());
     bool view = bool(m_query.m_view);
@@ -315,6 +336,8 @@ uint_fast64_t sync_if_needed() const { return 0; };
 // O(n) for n = this->size()
 void TableView::remove(size_t ndx)
 {
+    check_cookie();
+
     TIGHTDB_ASSERT(m_table);
     TIGHTDB_ASSERT(ndx < m_row_indexes.size());
 

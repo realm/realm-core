@@ -1,3 +1,23 @@
+/*************************************************************************
+ *
+ * TIGHTDB CONFIDENTIAL
+ * __________________
+ *
+ *  [2011] - [2012] TightDB Inc
+ *  All Rights Reserved.
+ *
+ * NOTICE:  All information contained herein is, and remains
+ * the property of TightDB Incorporated and its suppliers,
+ * if any.  The intellectual and technical concepts contained
+ * herein are proprietary to TightDB Incorporated
+ * and its suppliers and may be covered by U.S. and Foreign Patents,
+ * patents in process, and are protected by trade secret or copyright law.
+ * Dissemination of this information or reproduction of this material
+ * is strictly forbidden unless prior written permission is obtained
+ * from TightDB Incorporated.
+ *
+ **************************************************************************/
+
 #include <cerrno>
 #include <algorithm>
 #include <iostream>
@@ -5,6 +25,7 @@
 #include <fcntl.h>
 
 #include <tightdb/util/features.h>
+#include <tightdb/util/errno.hpp>
 #include <tightdb/util/safe_int_ops.hpp>
 #include <tightdb/util/thread.hpp>
 #include <tightdb/group_writer.hpp>
@@ -36,7 +57,7 @@ namespace {
 // Constants controlling the amount of uncommited writes in flight:
 const uint16_t max_write_slots = 100;
 const uint16_t relaxed_sync_threshold = 50;
-#define SHAREDINFO_VERSION 1
+#define SHAREDINFO_VERSION 3
 
 // The following functions are carefully designed for minimal overhead
 // in case of contention among read transactions. In case of contention,
@@ -173,7 +194,7 @@ public:
         uint64_t filesize;
         uint64_t current_top;
         // The count field acts as synchronization point for accesses to the above
-        // fields. A succesfull inc implies acquire wrt memory consistency.
+        // fields. A succesfull inc implies acquire with regard to memory consistency.
         // Release is triggered by explicitly storing into count whenever a
         // new entry has been initialized.
         mutable Atomic<uint32_t> count;
@@ -351,14 +372,21 @@ struct SharedGroup::SharedInfo
     // Cleared by the daemon when it decides to exit.
     bool daemon_ready;
 
-    // Set when the database and the .lock file is in sync with respect to versioning
-    // (and a few other metadata)
-    bool versioning_ready;
+    // Latest version number. Guarded by the controlmutex (for lock-free access, use
+    // get_current_version() instead)
+    uint64_t latest_version_number;
 
+    // Pid of process initiating the session, but only if that process runs with encryption
+    // enabled, zero otherwise. Other processes cannot join a session wich uses encryption,
+    // because interprocess sharing is not supported by our current encryption mechanisms.
+    uint64_t session_initiator_pid;
+
+    // Tracks the most recent version number. Should only be accessed 
     uint16_t version;
     uint16_t flags;
     uint16_t free_write_slots;
 
+    uint64_t number_of_versions;
     RobustMutex writemutex;
     RobustMutex balancemutex;
     RobustMutex controlmutex;
@@ -367,6 +395,7 @@ struct SharedGroup::SharedInfo
     CondVar room_to_write;
     CondVar work_to_do;
     CondVar daemon_becomes_ready;
+    CondVar new_commit_available;
 #endif
     // IMPORTANT: The ringbuffer MUST be the last field in SharedInfo - see above.
     Ringbuffer readers;
@@ -395,7 +424,8 @@ SharedGroup::SharedInfo::SharedInfo(DurabilityLevel dlevel):
     controlmutex(), // Throws
     room_to_write(CondVar::process_shared_tag()), // Throws
     work_to_do(CondVar::process_shared_tag()), // Throws
-    daemon_becomes_ready(CondVar::process_shared_tag()) // Throws
+    daemon_becomes_ready(CondVar::process_shared_tag()), // Throws
+    new_commit_available(CondVar::process_shared_tag()) // Throws
 #else
     writemutex(), // Throws
     balancemutex() // Throws
@@ -405,9 +435,9 @@ SharedGroup::SharedInfo::SharedInfo(DurabilityLevel dlevel):
     flags = dlevel; // durability level is fixed from creation
     free_write_slots = 0;
     num_participants = 0;
+    session_initiator_pid = 0;
     daemon_started = false;
     daemon_ready = false;
-    versioning_ready = false;
     init_complete = 1;
 }
 
@@ -428,8 +458,8 @@ void spawn_daemon(const string& file)
     int m = int(sysconf(_SC_OPEN_MAX));
     if (m < 0) {
         if (errno) {
-            // int err = errno; // TODO: include err in exception string
-            throw runtime_error("'sysconf(_SC_OPEN_MAX)' failed ");
+            int err = errno; // Eliminate any risk of clobbering
+            throw runtime_error(get_errno_msg("'sysconf(_SC_OPEN_MAX)' failed: ", err));
         }
         throw runtime_error("'sysconf(_SC_OPEN_MAX)' failed with no reason");
     }
@@ -536,7 +566,7 @@ void spawn_daemon(const string& file) {}
 // undefined state.
 
 void SharedGroup::open(const string& path, bool no_create_file,
-                       DurabilityLevel dlevel, bool is_backend)
+                       DurabilityLevel dlevel, bool is_backend, const char* key)
 {
     TIGHTDB_ASSERT(!is_attached());
 
@@ -593,7 +623,8 @@ void SharedGroup::open(const string& path, bool no_create_file,
         // - attachment of the database file
         // - start of the async daemon
         // - stop of the async daemon
-        // - SharedGroup joining/leaving the sharing scheme
+        // - SharedGroup beginning/ending a session
+        // - Waiting for and signalling database changes
         {
             RobustLockGuard lock(info->controlmutex, &recover_from_dead_write_transact); // Throws
             // Even though we checked init_complete before grabbing the write mutex,
@@ -601,31 +632,51 @@ void SharedGroup::open(const string& path, bool no_create_file,
             // an exclusive file lock, and we checked it under a shared file lock
 
             // proceed to initialize versioning and other metadata information related to
-            // the database. Also create the database if we're first to get here.
+            // the database. Also create the database if we're beginning a new session
+            bool begin_new_session = info->num_participants == 0;
             bool is_shared = true;
             bool read_only = false;
-            bool no_create = true;
             bool skip_validate = false;
-            if (info->versioning_ready == false) {
-                no_create = no_create_file;
-            }
-            ref_type top_ref = alloc.attach_file(path, is_shared, read_only, no_create, skip_validate); // Throws
+
+            // only the session initiator is allowed to create the database, all other
+            // must assume that it already exists.
+            bool no_create = begin_new_session ? no_create_file : true;
+
+            // If replication is enabled, we need to ask it whether we're in server-sync mode
+            // and check that the database is operated in the same mode.
+            bool server_sync_mode = false;
+#ifdef TIGHTDB_ENABLE_REPLICATION
+            Replication* repl = _impl::GroupFriend::get_replication(m_group);
+            if (repl)
+                server_sync_mode = repl->is_in_server_synchronization_mode();
+#endif
+            ref_type top_ref = alloc.attach_file(path, is_shared, read_only,
+                                                 no_create, skip_validate, key, server_sync_mode); // Throws
             size_t file_size = alloc.get_baseline();
 
-            // determine initial version
+            // determine version
             uint_fast64_t version;
-            if (info->versioning_ready == false) {
+            if (begin_new_session) {
                 Array top(alloc);
                 if (top_ref) {
+
+                    // top_ref is non-zero implying that the database has seen at least one commit,
+                    // so we can get the versioning info from the database
                     top.init_from_ref(top_ref);
                     if (top.size() <= 5) {
                         // the database wasn't written by shared group, so no versioning info
                         version = 1;
+                        TIGHTDB_ASSERT(! server_sync_mode);
                     }
                     else {
                         // the database was written by shared group, so it has versioning info
                         TIGHTDB_ASSERT(top.size() == 7);
-                        version = (top.get(6) - 1) / 2;
+                        version = top.get(6) / 2;
+                        // In case this was written by an older version of shared group, it
+                        // will have version 0. Version 0 is not a legal initial version, so
+                        // it has to be set to 1 instead.
+                        if (version == 0)
+                            version = 1;
                     }
                 }
                 else {
@@ -635,14 +686,28 @@ void SharedGroup::open(const string& path, bool no_create_file,
 #ifdef TIGHTDB_ENABLE_REPLICATION
                 // If replication is enabled, we need to inform it of the latest version,
                 // allowing it to discard any surplus log entries
-                Replication* repl = _impl::GroupFriend::get_replication(m_group);
+                repl = _impl::GroupFriend::get_replication(m_group);
                 if (repl)
                     repl->reset_log_management(version);
 #endif
-                info->init_versioning(top_ref, file_size, version);
-                info->versioning_ready = true;
-            }
 
+#ifndef _WIN32
+                if (key) {
+                    TIGHTDB_STATIC_ASSERT(sizeof(pid_t) <= sizeof(uint64_t), "process identifiers too large");
+                    info->session_initiator_pid = uint64_t(getpid());
+                }
+#endif
+
+                info->latest_version_number = version;
+                info->init_versioning(top_ref, file_size, version);
+            }
+            else { // not the session initiator!
+#ifndef _WIN32
+                if (key && info->session_initiator_pid != uint64_t(getpid()))
+                    throw runtime_error(path + ": Encrypted interprocess sharing is currently unsupported");
+#endif
+
+            }
 #ifndef _WIN32
             // In async mode, we need to make sure the daemon is running and ready:
             if (dlevel == durability_Async && !is_backend) {
@@ -686,6 +751,9 @@ void SharedGroup::open(const string& path, bool no_create_file,
             // make our presence noted:
             ++info->num_participants;
 
+            // Initially there is a single version in the file
+            info->number_of_versions = 1;
+
             // Keep the mappings and file open:
             fug_2.release(); // Do not unmap
             fug_1.release(); // Do not unmap
@@ -707,16 +775,23 @@ void SharedGroup::open(const string& path, bool no_create_file,
 }
 
 
+uint_fast64_t SharedGroup::get_number_of_versions()
+{
+    SharedInfo* info = m_file_map.get_addr();
+    RobustLockGuard lock(info->controlmutex, &recover_from_dead_write_transact); // Throws
+    return info->number_of_versions;
+}
 #ifdef TIGHTDB_ENABLE_REPLICATION
 
-void SharedGroup::open(Replication& repl, DurabilityLevel dlevel)
+void SharedGroup::open(Replication& repl, DurabilityLevel dlevel, const char* key)
 {
     TIGHTDB_ASSERT(!is_attached());
     string file = repl.get_database_path();
     bool no_create   = false;
+    bool is_backend  = false;
     typedef _impl::GroupFriend gf;
     gf::set_replication(m_group, &repl);
-    open(file, no_create, dlevel); // Throws
+    open(file, no_create, dlevel, is_backend, key); // Throws
 }
 
 #endif
@@ -742,8 +817,9 @@ SharedGroup::~SharedGroup() TIGHTDB_NOEXCEPT
     {
         RobustLockGuard lock(info->controlmutex, recover_from_dead_write_transact);
         --info->num_participants;
+        bool end_of_session = info->num_participants == 0;
         // cerr << "closing" << endl;
-        if (info->num_participants == 0) {
+        if (end_of_session) {
 
             // If the db file is just backing for a transient data structure,
             // we can delete it when done.
@@ -755,13 +831,13 @@ SharedGroup::~SharedGroup() TIGHTDB_NOEXCEPT
                     util::File::remove(db_path.c_str());
                 }
                 catch(...) {} // ignored on purpose.
-#ifdef TIGHTDB_ENABLE_REPLICATION
-                // If replication is enabled, we need to stop log management:
-                Replication* repl = _impl::GroupFriend::get_replication(m_group);
-                if (repl)
-                    repl->stop_logging();
-#endif
             }
+#ifdef TIGHTDB_ENABLE_REPLICATION
+            // If replication is enabled, we need to stop log management:
+            Replication* repl = _impl::GroupFriend::get_replication(m_group);
+            if (repl)
+                repl->stop_logging();
+#endif
         }
     }
     m_file.unlock();
@@ -778,15 +854,21 @@ bool SharedGroup::has_changed()
 }
 
 #ifndef _WIN32
+void SharedGroup::wait_for_change()
+{
+    SharedInfo* info = m_file_map.get_addr();
+    RobustLockGuard lock(info->controlmutex, recover_from_dead_write_transact);
+    while (m_readlock.m_version == info->latest_version_number) {
+        info->new_commit_available.wait(info->controlmutex,
+                                        &recover_from_dead_write_transact,
+                                        0);
+    }
+}
 
 void SharedGroup::do_async_commits()
 {
     bool shutdown = false;
     SharedInfo* info = m_file_map.get_addr();
-    // NO client are allowed to proceed through open and update current_version
-    // until they see 'daemon_running == true'
-    // As we haven't set daemon_running yet, the following must hold:
-    //    TIGHTDB_ASSERT(get_current_version() == 0 || get_current_version() == 1);
 
     // We always want to keep a read lock on the last version
     // that was commited to disk, to protect it against being
@@ -834,7 +916,7 @@ void SharedGroup::do_async_commits()
         if (!is_same) {
 
 #ifdef TIGHTDB_ENABLE_LOGFILE
-            cerr << "Syncing from version " << m_readlock.m_version 
+            cerr << "Syncing from version " << m_readlock.m_version
                  << " to " << next_readlock.m_version << endl;
 #endif
             GroupWriter writer(m_group);
@@ -1365,6 +1447,14 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
         r.version     = new_version;
         r_info->readers.use_next();
     }
+#ifndef _WIN32
+    {
+        RobustLockGuard lock(info->controlmutex, recover_from_dead_write_transact);
+        info->number_of_versions = new_version - readlock_version + 1;
+        info->latest_version_number = new_version;
+        info->new_commit_available.notify_all();
+    }
+#endif
 }
 
 

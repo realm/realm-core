@@ -31,6 +31,17 @@ ifeq ($(OS),Darwin)
   endif
 endif
 
+
+# CoreFoundation is required for logging
+ifeq ($(OS),Darwin)
+  PROJECT_LDFLAGS += -framework CoreFoundation
+endif
+
+# Android logging
+ifeq ($(TIGHTDB_ANDROID),)
+  PROJECTS_LDFLAGS += -llog
+endif
+
 # Note: While CFLAGS (those specified above) can be overwritten by
 # setting the CFLAGS variable on the command line, PROJECT_CFLAGS are
 # retained.
@@ -57,6 +68,14 @@ ifneq ($(TIGHTDB_HAVE_CONFIG),)
     TIGHTDB_ENABLE_REPLICATION = x
   else
     TIGHTDB_ENABLE_REPLICATION = $(EMPTY)
+  endif
+  ifeq ($(ENABLE_ENCRYPTION),yes)
+    ifeq ($(TIGHTDB_ANDROID),)
+      PROJECT_CFLAGS += -DTIGHTDB_ENABLE_ENCRYPTION
+    else
+      PROJECT_CFLAGS += -DTIGHTDB_ENABLE_ENCRYPTION -I../../openssl/include
+      PROJECT_LDFLAGS += -lcrypto
+    endif
   endif
 else
   ifneq ($(TIGHTDB_ENABLE_REPLICATION),)

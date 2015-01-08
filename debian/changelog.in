@@ -1,3 +1,45 @@
+libtightdb (0.87.4~@CODENAME@-1) UNRELEASED; urgency=low
+
+  * Tracking upstream release.
+
+ -- Finn Schiermer Andersen <fsa@realm.io>  Tue, 30 Dec 2014 11:18:00 +0100
+
+
+libtightdb (0.87.3~@CODENAME@-1) UNRELEASED; urgency=low
+
+  * Tracking upstream release.
+
+ -- Kristian Spangsege <kristian.spangsege@gmail.com>  Sat, 20 Dec 2014 08:31:33 +0100
+
+
+libtightdb (0.87.2~@CODENAME@-1) UNRELEASED; urgency=low
+
+  * Tracking upstream release.
+
+ -- Kristian Spangsege <kristian.spangsege@gmail.com>  Thu, 18 Dec 2014 16:34:17 +0100
+
+
+libtightdb (0.87.1~@CODENAME@-1) UNRELEASED; urgency=low
+
+  * Tracking upstream release.
+
+ -- Kristian Spangsege <kristian.spangsege@gmail.com>  Wed, 17 Dec 2014 06:33:58 +0100
+
+
+libtightdb (0.87.0~@CODENAME@-1) UNRELEASED; urgency=low
+
+  * Tracking upstream release.
+
+ -- Kristian Spangsege <kristian.spangsege@gmail.com>  Thu, 04 Dec 2014 17:39:32 +0100
+
+
+libtightdb (0.86.1~@CODENAME@-1) UNRELEASED; urgency=low
+
+  * Tracking upstream release.
+
+ -- Kristian Spangsege <kristian.spangsege@gmail.com>  Wed, 26 Nov 2014 15:49:24 +0100
+
+
 libtightdb (0.86.0~@CODENAME@-1) UNRELEASED; urgency=low
 
   * Tracking upstream release.

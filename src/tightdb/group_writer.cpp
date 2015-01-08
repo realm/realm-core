@@ -20,10 +20,9 @@ GroupWriter::GroupWriter(Group& group):
 
 size_t GroupWriter::write_group()
 {
-    // Streamed files have the top-ref specified in a footer but this
-    // form is incompatible with in-place updating of database
-    // files. For this reason we have to convert the file now if it is
-    // the the streamed form.
+    // Streamed files have the top-ref specified in a footer but this form is
+    // incompatible with in-place updating of database files. For this reason we
+    // have to convert the file now if it is the the streamed form.
     m_group.m_alloc.prepare_for_update(m_file_map.get_addr());
 
     merge_free_space(); // Throws
@@ -36,32 +35,32 @@ size_t GroupWriter::write_group()
     TIGHTDB_ASSERT(fpositions.size() == flengths.size());
     TIGHTDB_ASSERT(!is_shared || fversions.size() == flengths.size());
 
-    // Recursively write all changed arrays (but not 'top' and
-    // free-lists yet, as they a going to change along the way.) If
-    // free space is available in the attached database file, we use
-    // it, but this does not include space that has been release
-    // during the current transaction (or since the last commit), as
-    // that would lead to clobbering of the previous database version.
+    // Recursively write all changed arrays (but not 'top' and free-lists yet,
+    // as they a going to change along the way.) If free space is available in
+    // the attached database file, we use it, but this does not include space
+    // that has been release during the current transaction (or since the last
+    // commit), as that would lead to clobbering of the previous database
+    // version.
     bool recurse = true, persist = true;
     size_t names_pos  = m_group.m_table_names.write(*this, recurse, persist); // Throws
     size_t tables_pos = m_group.m_tables.write(*this, recurse, persist); // Throws
 
-    // We now have a bit of a chicken-and-egg problem. We need to
-    // write the free-lists to the file, but the act of writing them
-    // will consume free space, and thereby change the free-lists. To
-    // solve this problem, we calculate an upper bound on the amount
-    // af space required for all of the remaining arrays and allocate
-    // the space as one big chunk. This way we can finalize the
-    // free-lists before writing them to the file.
+    // We now have a bit of a chicken-and-egg problem. We need to write the
+    // free-lists to the file, but the act of writing them will consume free
+    // space, and thereby change the free-lists. To solve this problem, we
+    // calculate an upper bound on the amount af space required for all of the
+    // remaining arrays and allocate the space as one big chunk. This way we can
+    // finalize the free-lists before writing them to the file.
     size_t max_free_list_size = fpositions.size();
 
-    // We need to add to the free-list any space that was freed during
-    // the current transaction, but to avoid clobering the previous
-    // version, we cannot add it yet. Instead we simply account for
-    // the space required. Since we will modify the free-lists
-    // themselves, we must ensure that the original arrays used by the
-    // free-lists are counted as part of the space that was freed
-    // during the current transaction.
+    // We need to add to the free-list any space that was freed during the
+    // current transaction, but to avoid clobering the previous version, we
+    // cannot add it yet. Instead we simply account for the space
+    // required. Since we will modify the free-lists themselves, we must ensure
+    // that the original arrays used by the free-lists are counted as part of
+    // the space that was freed during the current transaction. Note that a
+    // copy-on-write on fpositions, for example, also implies a copy-on-write on
+    // Group::m_top.
     fpositions.copy_on_write(); // Throws
     flengths.copy_on_write(); // Throws
     if (is_shared)
@@ -70,8 +69,7 @@ size_t GroupWriter::write_group()
     max_free_list_size += new_free_space.size();
 
     // The final allocation of free space (i.e., the call to
-    // reserve_free_space() below) may add an extra entry to the
-    // free-lists.
+    // reserve_free_space() below) may add an extra entry to the free-lists.
     ++max_free_list_size;
 
     int num_free_lists = is_shared ? 3 : 2;
@@ -81,47 +79,44 @@ size_t GroupWriter::write_group()
     size_t max_free_space_needed = Array::get_max_byte_size(max_top_size) +
         num_free_lists * Array::get_max_byte_size(max_free_list_size);
 
-    // Reserve space for remaining arrays. We ask for one extra byte
-    // beyond the maxumum number that is required. This ensures that
-    // even if we end up using the maximum size possible, we still do
-    // not end up with a zero size free-space chunk as we deduct the
-    // actually used size from it.
+    // Reserve space for remaining arrays. We ask for one extra byte beyond the
+    // maximum number that is required. This ensures that even if we end up
+    // using the maximum size possible, we still do not end up with a zero size
+    // free-space chunk as we deduct the actually used size from it.
     pair<size_t, size_t> reserve = reserve_free_space(max_free_space_needed + 1); // Throws
     size_t reserve_ndx  = reserve.first;
     size_t reserve_size = reserve.second;
 
-    // At this point we have allocated all the space we need, so we
-    // can add to the free-lists any free space created during the
-    // current transaction (or since last commit). Had we added it
-    // earlier, we would have risked clobering the previous database
-    // version. Note, however, that this risk would only have been
-    // present in the non-transactionl case where there is no version
-    // tracking on the free-space chunks.
+    // At this point we have allocated all the space we need, so we can add to
+    // the free-lists any free space created during the current transaction (or
+    // since last commit). Had we added it earlier, we would have risked
+    // clobering the previous database version. Note, however, that this risk
+    // would only have been present in the non-transactionl case where there is
+    // no version tracking on the free-space chunks.
     {
         typedef SlabAlloc::chunks::const_iterator iter;
         iter end = new_free_space.end();
         for (iter i = new_free_space.begin(); i != end; ++i) {
             ref_type ref = i->ref;
             size_t size  = i->size;
-            // We always want to keep the list of free space in sorted
-            // order (by ascending position) to facilitate merge of
-            // adjacent segments. We can find the correct insert
-            // postion by binary search
+            // We always want to keep the list of free space in sorted order (by
+            // ascending position) to facilitate merge of adjacent segments. We
+            // can find the correct insert postion by binary search
             size_t ndx = fpositions.lower_bound_int(ref);
             fpositions.insert(ndx, ref); // Throws
             flengths.insert(ndx, size); // Throws
             if (is_shared)
                 fversions.insert(ndx, m_current_version); // Throws
-            // Adjust reserve_ndx to keep in valid
+            // Adjust reserve_ndx if necessary
             if (ndx <= reserve_ndx)
                 ++reserve_ndx;
         }
     }
 
-    // Before we calculate the actual sizes of the free-list arrays,
-    // we must make sure that the final adjustments of the free lists
-    // (i.e., the deduction of the actually used space from the
-    // reserved chunk,) will not change the byte-size of those arrays.
+    // Before we calculate the actual sizes of the free-list arrays, we must
+    // make sure that the final adjustments of the free lists (i.e., the
+    // deduction of the actually used space from the reserved chunk,) will not
+    // change the byte-size of those arrays.
     size_t reserve_pos = to_size_t(fpositions.get(reserve_ndx));
     TIGHTDB_ASSERT(reserve_size > max_free_space_needed);
     fpositions.ensure_minimum_width(reserve_pos + max_free_space_needed); // Throws
@@ -130,6 +125,9 @@ size_t GroupWriter::write_group()
     size_t free_positions_size = fpositions.get_byte_size();
     size_t free_sizes_size     = flengths.get_byte_size();
     size_t free_versions_size  = is_shared ? fversions.get_byte_size() : 0;
+    TIGHTDB_ASSERT(!is_shared ||
+                   Array::get_wtype_from_header(Array::get_header_from_data(fversions.m_data)) ==
+                   Array::wtype_Bits);
 
     // Calculate write positions
     size_t free_positions_pos = reserve_pos;
@@ -154,18 +152,17 @@ size_t GroupWriter::write_group()
     size_t end_pos = top_pos + top_byte_size;
     TIGHTDB_ASSERT(end_pos <= reserve_pos + max_free_space_needed);
 
-    // Deduct the used space from the reserved chunk. Note that we
-    // have made sure that the remaining size is never zero. Also, by
-    // the call to fpositions.ensure_minimum_width() above, we have
-    // made sure that fpositions has the capacity to store the new
-    // larger value without reallocation.
+    // Deduct the used space from the reserved chunk. Note that we have made
+    // sure that the remaining size is never zero. Also, by the call to
+    // fpositions.ensure_minimum_width() above, we have made sure that
+    // fpositions has the capacity to store the new larger value without
+    // reallocation.
     size_t rest = reserve_pos + reserve_size - end_pos;
     TIGHTDB_ASSERT(rest > 0);
     fpositions.set(reserve_ndx, end_pos); // Throws
     flengths.set(reserve_ndx, rest); // Throws
 
-    // The free-list now have their final form, so we can write them
-    // to the file
+    // The free-list now have their final form, so we can write them to the file
     write_array_at(free_positions_pos, fpositions.get_header(), free_positions_size); // Throws
     write_array_at(free_sizes_pos, flengths.get_header(), free_sizes_size); // Throws
     if (is_shared)
@@ -174,8 +171,7 @@ size_t GroupWriter::write_group()
     // Write top
     write_array_at(top_pos, top.get_header(), top_byte_size); // Throws
 
-    // Return top_pos so that it can be saved in lock file used
-    // for coordination
+    // Return top_pos so that it can be saved in lock file used for coordination
     return top_pos;
 }
 
@@ -208,6 +204,12 @@ void GroupWriter::merge_free_space()
                     continue;
             }
 
+            // FIXME: Performing a series of calls to Array::erase() is
+            // unnecessarily expensive because we have to shift the contents
+            // above i2 multiple times in general. A more efficient way would be
+            // to use assigments only, and then make a final call to
+            // Array::truncate() when the new size is know.
+
             // Merge
             size_t size2 = to_size_t(lengths.get(i2));
             lengths.set(i, size1 + size2);
@@ -217,7 +219,7 @@ void GroupWriter::merge_free_space()
                 versions.erase(i2);
 
             --n;
-            --i;
+            --i; // May underflow, but that is ok
         }
     }
 }
@@ -312,6 +314,10 @@ pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
     // the new top-ref, but after having extended the file size.
     size_t logical_file_size = to_size_t(m_group.m_top.get(2) / 2);
 
+    // If we already have a free chunk at the end of the file, we only need to
+    // extend that chunk. If not, we need to add a new entry to the list of free
+    // chunks.
+    size_t extend_size = requested_size;
     bool extend_last_chunk = false;
     size_t last_chunk_size = 0;
     if (!positions.is_empty()) {
@@ -324,18 +330,18 @@ pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
         if (!in_use) {
             size_t last_pos  = to_size_t(positions.back());
             size_t last_size = to_size_t(lengths.back());
-            TIGHTDB_ASSERT(last_size < requested_size);
+            TIGHTDB_ASSERT(last_size < extend_size);
             TIGHTDB_ASSERT(last_pos + last_size <= logical_file_size);
             if (last_pos + last_size == logical_file_size) {
                 extend_last_chunk = true;
                 last_chunk_size = last_size;
-                requested_size -= last_size;
+                extend_size -= last_size;
             }
         }
     }
 
     size_t min_file_size = logical_file_size;
-    if (int_add_with_overflow_detect(min_file_size, requested_size))
+    if (int_add_with_overflow_detect(min_file_size, extend_size))
         throw runtime_error("File size overflow");
 
     // We double the size until we reach 'stop_doubling_size'. From
@@ -360,7 +366,7 @@ pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
         else {
             if (int_add_with_overflow_detect(new_file_size, stop_doubling_size)) {
                 new_file_size = numeric_limits<size_t>::max();
-                new_file_size &= ~size_t(0x7); // 8-byte alignment
+                new_file_size &= ~size_t(7); // 8-byte alignment
             }
         }
     }
@@ -370,11 +376,10 @@ pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
     TIGHTDB_ASSERT(new_file_size % 8 == 0);
 
     // Note: File::prealloc() may misbehave under race conditions (see
-    // documentation of File::prealloc()). Fortunately, no race
-    // conditions can occur, because in transactional mode we hold a
-    // write lock at this time, and in non-transactional mode it is
-    // the responsibility of the user to ensure non-concurrent
-    // mutation access.
+    // documentation of File::prealloc()). Fortunately, no race conditions can
+    // occur, because in transactional mode we hold a write lock at this time,
+    // and in non-transactional mode it is the responsibility of the user to
+    // ensure non-concurrent file mutation.
     m_alloc.m_file.prealloc(0, new_file_size);
 
     m_file_map.remap(m_alloc.m_file, File::access_ReadWrite, new_file_size);
@@ -409,8 +414,8 @@ void GroupWriter::write(const char* data, size_t size)
     TIGHTDB_ASSERT((pos & 0x7) == 0); // Write position should always be 64bit aligned
 
     // Write the block
-    char* dest = m_file_map.get_addr() + pos;
-    copy(data, data+size, dest);
+    char* dest_addr = m_file_map.get_addr() + pos;
+    copy(data, data+size, dest_addr);
 }
 
 
@@ -421,14 +426,14 @@ size_t GroupWriter::write_array(const char* data, size_t size, uint_fast32_t che
     TIGHTDB_ASSERT((pos & 0x7) == 0); // Write position should always be 64bit aligned
 
     // Write the block
-    char* dest = m_file_map.get_addr() + pos;
+    char* dest_addr = m_file_map.get_addr() + pos;
 #ifdef TIGHTDB_DEBUG
     const char* cksum_bytes = reinterpret_cast<const char*>(&checksum);
-    copy(cksum_bytes, cksum_bytes+4, dest);
-    copy(data+4, data+size, dest+4);
+    copy(cksum_bytes, cksum_bytes+4, dest_addr);
+    copy(data+4, data+size, dest_addr+4);
 #else
     static_cast<void>(checksum);
-    copy(data, data+size, dest);
+    copy(data, data+size, dest_addr);
 #endif
 
     // return the position it was written
@@ -438,21 +443,17 @@ size_t GroupWriter::write_array(const char* data, size_t size, uint_fast32_t che
 
 void GroupWriter::write_array_at(size_t pos, const char* data, size_t size)
 {
-    char* dest = m_file_map.get_addr() + pos;
-
-    char* mmap_end = m_file_map.get_addr() + m_file_map.get_size();
-    char* copy_end = dest + size;
-    TIGHTDB_ASSERT(copy_end <= mmap_end);
-    static_cast<void>(mmap_end);
-    static_cast<void>(copy_end);
+    TIGHTDB_ASSERT(pos + size <= to_size_t(m_group.m_top.get(2)/2));
+    TIGHTDB_ASSERT(pos + size <= m_file_map.get_size());
+    char* dest_addr = m_file_map.get_addr() + pos;
 
 #ifdef TIGHTDB_DEBUG
     uint_fast32_t dummy_checksum = 0x01010101UL;
     const char* cksum_bytes = reinterpret_cast<const char*>(&dummy_checksum);
-    copy(cksum_bytes, cksum_bytes+4, dest);
-    copy(data+4, data+size, dest+4);
+    copy(cksum_bytes, cksum_bytes+4, dest_addr);
+    copy(data+4, data+size, dest_addr+4);
 #else
-    copy(data, data+size, dest);
+    copy(data, data+size, dest_addr);
 #endif
 }
 
@@ -468,9 +469,10 @@ void GroupWriter::commit(ref_type new_top_ref)
     char* file_header = m_file_map.get_addr();
 
     // Least significant bit in last byte of info block indicates
-    // which top_ref block is valid
-    int current_valid_ref = file_header[16+7] & 0x1;
-    int new_valid_ref = current_valid_ref ^ 0x1;
+    // which top_ref block is valid - other bits remain unchanged
+    int select_field = file_header[16+7];
+    select_field ^= 0x1;
+    int new_valid_ref = select_field & 0x1;
 
     // FIXME: What rule guarantees that the new top ref is written to
     // physical medium before the swapping bit?
@@ -478,7 +480,7 @@ void GroupWriter::commit(ref_type new_top_ref)
     // Update top ref pointer
     uint64_t* top_refs = reinterpret_cast<uint64_t*>(file_header);
     top_refs[new_valid_ref] = new_top_ref;
-    file_header[16+7] = char(new_valid_ref); // swap
+    file_header[16+7] = char(select_field); // swap
 
     // Write new header to disk
     m_file_map.sync(); // Throws

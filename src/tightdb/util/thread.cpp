@@ -1,4 +1,3 @@
-#include <cerrno>
 #include <stdexcept>
 
 #include <tightdb/util/thread.hpp>
@@ -218,6 +217,19 @@ TIGHTDB_NORETURN void CondVar::init_failed(int err)
         default:
             throw runtime_error("pthread_cond_init() failed");
     }
+}
+
+void CondVar::handle_wait_error(int err)
+{
+#ifdef TIGHTDB_HAVE_ROBUST_PTHREAD_MUTEX
+    if (err == ENOTRECOVERABLE)
+        throw RobustMutex::NotRecoverable();
+    if (err == EOWNERDEAD)
+        return;
+#else
+    static_cast<void>(err);
+#endif
+    TIGHTDB_TERMINATE("pthread_mutex_lock() failed");
 }
 
 TIGHTDB_NORETURN void CondVar::attr_init_failed(int err)

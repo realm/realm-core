@@ -125,7 +125,8 @@ public:
     /// Equivalent to calling open(const std::string&, bool,
     /// DurabilityLevel) on a default constructed instance.
     explicit SharedGroup(const std::string& file, bool no_create = false,
-                         DurabilityLevel dlevel = durability_Full);
+                         DurabilityLevel dlevel = durability_Full,
+                         const char *encryption_key = 0);
 
     struct unattached_tag {};
 
@@ -169,19 +170,21 @@ public:
     /// among these derived exception types.
     void open(const std::string& file, bool no_create = false,
               DurabilityLevel dlevel = durability_Full,
-              bool is_backend = false);
+              bool is_backend = false, const char *encryption_key = 0);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
 
     /// Equivalent to calling open(Replication&) on a
     /// default constructed instance.
     explicit SharedGroup(Replication& repl,
-                         DurabilityLevel dlevel = durability_Full);
+                         DurabilityLevel dlevel = durability_Full,
+                         const char* encryption_key = 0);
 
     /// Open this group in replication mode. The specified Replication
     /// instance must remain in exixtence for as long as the
     /// SharedGroup.
-    void open(Replication&, DurabilityLevel dlevel = durability_Full);
+    void open(Replication&, DurabilityLevel dlevel = durability_Full,
+              const char* encryption_key = 0);
 
     friend class Replication;
 
@@ -214,8 +217,21 @@ public:
     /// group. Doing so will result in undefined behavior.
     void reserve(std::size_t size_in_bytes);
 
-    // Has db been modified since last transaction?
+    // Querying for changes:
+    //
+    // NOTE:
+    // "changed" means that one or more commits has been made to the database
+    // since the SharedGroup (on which wait_for_change() is called) last
+    // started, committed, promoted or advanced a transaction.
+    //
+    // No distinction is made between changes done by another process
+    // and changes done by another thread in the same process as the caller.
+    //
+    // Has db been changed ?
     bool has_changed();
+
+    // The calling thread goes to sleep until the database is changed.
+    void wait_for_change();
 
     // Transactions:
 
@@ -239,31 +255,14 @@ public:
     // End the current write transaction. All accessors are detached.
     void rollback() TIGHTDB_NOEXCEPT;
 
+    // Report the number of distinct versions currently stored in the database.
+    // Note: the database only cleans up versions as part of commit, so ending
+    // a read transaction will not immediately release any versions.
+    uint_fast64_t get_number_of_versions();
+
 #ifdef TIGHTDB_DEBUG
     void test_ringbuf();
 #endif
-
-    /// If a stale .lock file is present when a SharedGroup is opened,
-    /// an Exception of type PresumablyStaleLockFile will be thrown.
-    /// The name of the stale lock file will be given as argument to the
-    /// exception. Important: In a heavily loaded scenario a lock file
-    /// may be considered stale, merely because the system is unresponsive
-    /// for a long period of time. Depending on your knowledge of the
-    /// system and its load, you must choose to either retry the operation
-    /// or manually remove the stale lock file.
-    class PresumablyStaleLockFile : public std::runtime_error {
-    public:
-        PresumablyStaleLockFile(const std::string& msg): std::runtime_error(msg) {}
-    };
-
-    // If the database file is deleted while there are open shared groups,
-    // subsequent attempts to open shared groups will try to join an already
-    // active sharing scheme, but fail due to the missing database file.
-    // This causes the following exception to be thrown from Open or the constructor.
-    class LockFileButNoData : public std::runtime_error {
-    public:
-        LockFileButNoData(const std::string& msg) : std::runtime_error(msg) {}
-    };
 
 private:
     struct SharedInfo;
@@ -488,10 +487,10 @@ private:
 
 // Implementation:
 
-inline SharedGroup::SharedGroup(const std::string& file, bool no_create, DurabilityLevel dlevel):
+inline SharedGroup::SharedGroup(const std::string& file, bool no_create, DurabilityLevel dlevel, const char* key):
     m_group(Group::shared_tag())
 {
-    open(file, no_create, dlevel);
+    open(file, no_create, dlevel, false, key);
 }
 
 inline SharedGroup::SharedGroup(unattached_tag) TIGHTDB_NOEXCEPT:
@@ -505,10 +504,10 @@ inline bool SharedGroup::is_attached() const TIGHTDB_NOEXCEPT
 }
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-inline SharedGroup::SharedGroup(Replication& repl, DurabilityLevel dlevel):
+inline SharedGroup::SharedGroup(Replication& repl, DurabilityLevel dlevel, const char* key):
     m_group(Group::shared_tag())
 {
-    open(repl, dlevel);
+    open(repl, dlevel, key);
 }
 #endif
 

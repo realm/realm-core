@@ -112,7 +112,7 @@ AdaptiveStringColumn::AdaptiveStringColumn(Allocator& alloc, ref_type ref):
             return;
         }
     }
-    TIGHTDB_ASSERT(false);
+    TIGHTDB_ASSERT_DEBUG(false);
 }
 
 
@@ -133,7 +133,7 @@ void AdaptiveStringColumn::destroy() TIGHTDB_NOEXCEPT
 
 StringData AdaptiveStringColumn::get(size_t ndx) const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(ndx < size());
+    TIGHTDB_ASSERT_DEBUG(ndx < size());
 
     if (root_is_leaf()) {
         bool long_strings = m_array->has_refs();
@@ -314,7 +314,7 @@ public:
 
 void AdaptiveStringColumn::set(size_t ndx, StringData value)
 {
-    TIGHTDB_ASSERT(ndx < size());
+    TIGHTDB_ASSERT_DEBUG(ndx < size());
 
     // We must modify the search index before modifying the column, because we
     // need to be able to abort the operation if the modification of the search

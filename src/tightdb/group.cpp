@@ -1,4 +1,3 @@
-#include <cerrno>
 #include <new>
 #include <algorithm>
 #include <set>
@@ -35,20 +34,18 @@ public:
 };
 
 Initialization initialization;
-
 } // anonymous namespace
 
-
-
-void Group::open(const string& file_path, OpenMode mode)
+void Group::open(const string& file_path, const char* encryption_key, OpenMode mode)
 {
     TIGHTDB_ASSERT(!is_attached());
     bool is_shared = false;
     bool read_only = mode == mode_ReadOnly;
     bool no_create = mode == mode_ReadWriteNoCreate;
     bool skip_validate = false;
+    bool server_sync_mode = false;
     ref_type top_ref = m_alloc.attach_file(file_path, is_shared, read_only, no_create,
-                                           skip_validate); // Throws
+                                           skip_validate, encryption_key, server_sync_mode); // Throws
     SlabAlloc::DetachGuard dg(m_alloc);
     m_alloc.reset_free_space_tracking(); // Throws
     if (top_ref == 0) {
@@ -134,6 +131,9 @@ void Group::init_from_ref(ref_type top_ref) TIGHTDB_NOEXCEPT
     size_t top_size = m_top.size();
     TIGHTDB_ASSERT(top_size >= 3);
 
+    // Logical file size must not exceed actual file size
+    TIGHTDB_ASSERT(size_t(m_top.get(2)/2) <= m_alloc.get_baseline());
+
     m_table_names.init_from_parent();
     m_tables.init_from_parent();
     m_is_attached = true;
@@ -198,8 +198,11 @@ void Group::reset_free_space_versions()
         for (size_t i = 0; i != n; ++i)
             m_free_versions.add(0); // Throws
         m_top.add(m_free_versions.get_ref()); // Throws
-        size_t initial_database_version = 0; // A.k.a. transaction number
-        m_top.add(1 + 2*initial_database_version); // Throws
+        // Add a temporary "version_number" just to get the top array
+        // to the proper size. This version number is never used and cannot
+        // escape to the database during commit. The correct version number
+        // is set in GroupWriter::write().
+        m_top.add(0);
     }
     TIGHTDB_ASSERT(m_top.size() >= 7);
 }
@@ -339,6 +342,9 @@ Table* Group::do_get_or_add_table(StringData name, DescMatcher desc_matcher,
 
 size_t Group::create_table(StringData name)
 {
+    if (TIGHTDB_UNLIKELY(name.size() > max_table_name_length))
+        throw LogicError(LogicError::table_name_too_long);
+
     using namespace _impl;
     typedef TableFriend tf;
     ref_type ref = tf::create_empty_table(m_alloc); // Throws
@@ -558,21 +564,22 @@ private:
     const Group& m_group;
 };
 
-void Group::write(ostream& out) const
+void Group::write(ostream& out, bool pad) const
 {
     TIGHTDB_ASSERT(is_attached());
     DefaultTableWriter table_writer(*this);
-    write(out, table_writer); // Throws
+    write(out, table_writer, pad); // Throws
 }
 
-void Group::write(const string& path) const
+void Group::write(const string& path, const char* encryption_key) const
 {
     File file;
     int flags = 0;
     file.open(path, File::access_ReadWrite, File::create_Must, flags);
+    file.set_encryption_key(encryption_key);
     File::Streambuf streambuf(&file);
     ostream out(&streambuf);
-    write(out);
+    write(out, encryption_key != 0);
 }
 
 
@@ -603,7 +610,7 @@ BinaryData Group::write_to_mem() const
 }
 
 
-void Group::write(ostream& out, TableWriter& table_writer)
+void Group::write(ostream& out, TableWriter& table_writer, bool pad_for_encryption)
 {
     _impl::OutputStream out_2(out);
 
@@ -649,6 +656,15 @@ void Group::write(ostream& out, TableWriter& table_writer)
     TIGHTDB_ASSERT(out_2.get_pos() == final_file_size);
 
     top.destroy(); // Shallow
+
+    // encryption will pad the file to a multiple of the page, so ensure the
+    // footer is aligned to the end of a page
+    if (pad_for_encryption && ((final_file_size + sizeof(SlabAlloc::StreamingFooter)) & 4095)) {
+#ifdef TIGHTDB_ENABLE_ENCRYPTION
+        char buffer[4096] = {0};
+        out_2.write(buffer, 4096 - ((final_file_size + sizeof(SlabAlloc::StreamingFooter)) & 4095));
+#endif
+    }
 
     // Write streaming footer
     SlabAlloc::StreamingFooter footer;
@@ -1011,42 +1027,52 @@ public:
 
     bool insert_group_level_table(size_t table_ndx, size_t num_tables, StringData) TIGHTDB_NOEXCEPT
     {
-        // for end-insertions, table_ndx will be equal to num_tables
         TIGHTDB_ASSERT(table_ndx <= num_tables);
-        m_group.m_table_accessors.push_back(0); // Throws
-        size_t last_ndx = num_tables;
-        m_group.m_table_accessors[last_ndx] = m_group.m_table_accessors[table_ndx];
-        m_group.m_table_accessors[table_ndx] = 0;
-        if (Table* moved_table = m_group.m_table_accessors[last_ndx]) {
-            typedef _impl::TableFriend tf;
-            tf::mark(*moved_table);
-            tf::mark_opposite_link_tables(*moved_table);
+        TIGHTDB_ASSERT(m_group.m_table_accessors.empty() ||
+                       m_group.m_table_accessors.size() == num_tables);
+
+        if (!m_group.m_table_accessors.empty()) {
+            // for end-insertions, table_ndx will be equal to num_tables
+            m_group.m_table_accessors.push_back(0); // Throws
+            size_t last_ndx = num_tables;
+            m_group.m_table_accessors[last_ndx] = m_group.m_table_accessors[table_ndx];
+            m_group.m_table_accessors[table_ndx] = 0;
+            if (Table* moved_table = m_group.m_table_accessors[last_ndx]) {
+                typedef _impl::TableFriend tf;
+                tf::mark(*moved_table);
+                tf::mark_opposite_link_tables(*moved_table);
+            }
         }
+
         return true;
     }
 
     bool erase_group_level_table(size_t table_ndx, size_t num_tables) TIGHTDB_NOEXCEPT
     {
         TIGHTDB_ASSERT(table_ndx < num_tables);
+        TIGHTDB_ASSERT(m_group.m_table_accessors.empty() ||
+                       m_group.m_table_accessors.size() == num_tables);
 
-        // Link target tables do not need to be considered here, since all
-        // columns will already have been removed at this point.
-        if (Table* table = m_group.m_table_accessors[table_ndx]) {
-            typedef _impl::TableFriend tf;
-            tf::detach(*table);
-            tf::unbind_ref(*table);
-        }
-
-        size_t last_ndx = num_tables - 1;
-        if (table_ndx < last_ndx) {
-            if (Table* moved_table = m_group.m_table_accessors[last_ndx]) {
+        if (!m_group.m_table_accessors.empty()) {
+            // Link target tables do not need to be considered here, since all
+            // columns will already have been removed at this point.
+            if (Table* table = m_group.m_table_accessors[table_ndx]) {
                 typedef _impl::TableFriend tf;
-                tf::mark(*moved_table);
-                tf::mark_opposite_link_tables(*moved_table);
+                tf::detach(*table);
+                tf::unbind_ref(*table);
             }
-            m_group.m_table_accessors[table_ndx] = m_group.m_table_accessors[last_ndx];
+
+            size_t last_ndx = num_tables - 1;
+            if (table_ndx < last_ndx) {
+                if (Table* moved_table = m_group.m_table_accessors[last_ndx]) {
+                    typedef _impl::TableFriend tf;
+                    tf::mark(*moved_table);
+                    tf::mark_opposite_link_tables(*moved_table);
+                }
+                m_group.m_table_accessors[table_ndx] = m_group.m_table_accessors[last_ndx];
+            }
+            m_group.m_table_accessors.pop_back();
         }
-        m_group.m_table_accessors.pop_back();
 
         return true;
     }
@@ -2176,7 +2202,7 @@ void Group::Verify() const
         mem_usage_1.canonicalize();
     }
 
-    // At this point we have account for all memory managed by the slab
+    // At this point we have accounted for all memory managed by the slab
     // allocator
     mem_usage_1.check_total_coverage();
 }

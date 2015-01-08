@@ -17,22 +17,33 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_UTIL_TERMINATE_HPP
-#define TIGHTDB_UTIL_TERMINATE_HPP
+#ifndef TIGHTDB_TEST_CRYPT_KEY_HPP
+#define TIGHTDB_TEST_CRYPT_KEY_HPP
 
-#include <cstdlib>
-#include <string>
+#include <stdint.h>
+#include <stdlib.h>
 
-#include <tightdb/util/features.h>
+namespace {
 
-#define TIGHTDB_TERMINATE(msg) tightdb::util::terminate((msg), __FILE__, __LINE__)
+const char* crypt_key(bool always=false)
+{
+    static const char key[] = "12345678901234567890123456789011234567890123456789012345678901";
+    if (always) {
+#ifdef TIGHTDB_ENABLE_ENCRYPTION
+        return key;
+#else
+        return 0;
+#endif
+    }
 
-namespace tightdb {
-namespace util {
+    const char* str = getenv("UNITTEST_ENCRYPT_ALL");
+    if (str && *str) {
+        return key;
+    }
 
-TIGHTDB_NORETURN void terminate(const char* message, const char* file, long line) TIGHTDB_NOEXCEPT;
+    return 0;
+}
 
-} // namespace util
-} // namespace tightdb
+} // anonymous namespace
 
-#endif // TIGHTDB_UTIL_TERMINATE_HPP
+#endif // TIGHTDB_TEST_CRYPT_KEY_HPP

@@ -87,11 +87,20 @@ public:
     /// that creates/initlializes the coordination file) may validate
     /// the header, otherwise it will result in a race condition.
     ///
+    /// \param encryption_key 32-byte key to use to encrypt and decrypt
+    /// the backing storage, or nullptr to disable encryption.
+    ///
+    /// \param server_sync_mode bool indicating whether the database is operated
+    /// in server_synchronization mode or not. If the database is created,
+    /// this setting is stored in it. If the database exists already, it is validated
+    /// that the database was created with the same setting. In case of conflict
+    /// a runtime_error is thrown.
+    ///
     /// \return The `ref` of the root node, or zero if there is none.
     ///
     /// \throw util::File::AccessError
     ref_type attach_file(const std::string& path, bool is_shared, bool read_only, bool no_create,
-                         bool skip_validate);
+                         bool skip_validate, const char* encryption_key, bool server_sync_mode);
 
     /// Attach this allocator to the specified memory buffer.
     ///
@@ -261,6 +270,11 @@ private:
         uint8_t m_mnemonic[4]; // "T-DB"
         uint8_t m_file_format_version[2];
         uint8_t m_reserved;
+        // bit 0 of m_select_bit is used to select between the two top refs.
+        // bit 1 of m_select_bit is to be set for persistent commit-logs (Sync support).
+        // when clear, the commit-logs will be removed at the end of a session.
+        // when set, the commmit-logs are persisted, and IFF the database exists
+        // already at the start of a session, the commit logs too must exist.
         uint8_t m_select_bit;
     };
 
@@ -384,7 +398,7 @@ inline bool SlabAlloc::nonempty_attachment() const TIGHTDB_NOEXCEPT
 
 inline std::size_t SlabAlloc::get_baseline() const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(is_attached());
+    TIGHTDB_ASSERT_DEBUG(is_attached());
     return m_baseline;
 }
 

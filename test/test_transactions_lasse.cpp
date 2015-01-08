@@ -161,7 +161,7 @@ void read_thread(TestResults* test_results_ptr, string path)
 } // anonymous namespace
 
 
-TEST_IF(Transactions_Stress1, TEST_DURATION >= 2)
+TEST_IF(Transactions_Stress1, TEST_DURATION >= 3)
 {
     test_util::ThreadWrapper read_threads[READERS1];
     test_util::ThreadWrapper write_threads[WRITERS1];
@@ -238,7 +238,7 @@ void create_groups(string path)
 
 } // anonymous namespace
 
-TEST_IF(Transactions_Stress2, TEST_DURATION >= 2)
+TEST_IF(Transactions_Stress2, TEST_DURATION >= 3)
 {
     test_util::ThreadWrapper threads[THREADS2];
 
@@ -331,7 +331,7 @@ void read_thread3(TestResults* test_results_ptr, string path)
 } // anonymous namespace
 
 
-TEST_IF(Transactions_Stress3, TEST_DURATION >= 2)
+TEST_IF(Transactions_Stress3, TEST_DURATION >= 3)
 {
     test_util::ThreadWrapper write_threads[WRITERS3];
     test_util::ThreadWrapper read_threads[READERS3];
@@ -425,7 +425,7 @@ void read_thread4(TestResults* test_results_ptr, string path)
 } // anonymous namespace
 
 
-TEST_IF(Transactions_Stress4, TEST_DURATION >= 2)
+TEST_IF(Transactions_Stress4, TEST_DURATION >= 3)
 {
     test_util::ThreadWrapper read_threads[READERS4];
     test_util::ThreadWrapper write_threads[WRITERS4];

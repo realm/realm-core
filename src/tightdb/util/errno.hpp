@@ -17,22 +17,18 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_UTIL_TERMINATE_HPP
-#define TIGHTDB_UTIL_TERMINATE_HPP
+#ifndef TIGHTDB_UTIL_ERRNO_HPP
+#define TIGHTDB_UTIL_ERRNO_HPP
 
-#include <cstdlib>
 #include <string>
-
-#include <tightdb/util/features.h>
-
-#define TIGHTDB_TERMINATE(msg) tightdb::util::terminate((msg), __FILE__, __LINE__)
 
 namespace tightdb {
 namespace util {
 
-TIGHTDB_NORETURN void terminate(const char* message, const char* file, long line) TIGHTDB_NOEXCEPT;
+// Get the error message for a given error code, and append it to `prefix`
+std::string get_errno_msg(const char* prefix, int err);
 
-} // namespace util
-} // namespace tightdb
+}
+}
 
-#endif // TIGHTDB_UTIL_TERMINATE_HPP
+#endif

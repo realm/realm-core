@@ -6,14 +6,11 @@
 
 ### API breaking changes:
 
-* `TransactLogRegistry` is no longer available and must therefore no longer be
-  passed to `LangBindHelper::advance_read()` and
-  `LangBindHelper::promote_to_write()`.
+* Lorem ipsum.
 
 ### Enhancements:
 
-* Support for implicit transactions has been extended to work between multiple
-  processes.
+* Lorem ipsum.
 
 -----------
 
@@ -23,11 +20,99 @@
 
 ----------------------------------------------
 
+# 0.87.4 Release notes
+
+### Bugfixes:
+
+* Fixed a crash when calling get_sorted_view() on an empty LinkList.
+
+----------------------------------------------
+
+# 0.87.3 Release notes
+
+### Bugfixes:
+
+* Fixed bug in String and Integer index where find()/find_all() would return a
+  wrong match.
+* Fixed the values of `Table::max_string_size`, and `Table::max_binary_size`.
+* Fixed a bug occuring when claring a table with a search index on a string
+  column with many rows (>1000).
+
+----------------------------------------------
+
+# 0.87.2 Release notes
+
+### Internals:
+
+* Extra assertions in `src/tightdb/util.file.cpp`.
+
+----------------------------------------------
+
+# 0.87.1 Release notes
+
+### Enhancements:
+
+* The following constants were added: `Group::max_table_name_length`,
+  `Table::max_column_name_length`, `Table::max_string_size`, and
+  `Table::max_binary_size`.
+* Now throwing on overlong table and column names, and on oversized strings and
+  binary data values.
+* Fall back to the old query nodes for String as well as int/double/float.
+* Log assertions failures to the native logging system on android and Apple.
+
+-----------
+
+### Internals:
+
+* There is now three kinds of runtime assertions, `TIGHTDB_ASSERT_DEBUG()`,
+  which is retained only in debug-mode builds, `TIGHTDB_ASSERT_RELEASE()`, which
+  is also retained in release-mode builds, and finally, `TIGHTDB_ASSERT()`,
+  which is normally only retained in debug-mode builds, but may occasionally be
+  retained in release-mode builds too, depending on the specific build
+  configuration.
+* `TIGHTDB_ASSERT()` assertions are now enabled in release-mode builds by
+  default.
+
+----------------------------------------------
+
+# 0.87.0 Release notes
+
+### API breaking changes:
+
+* `TransactLogRegistry` is no longer available and must therefore no longer be
+  passed to `LangBindHelper::advance_read()` and
+  `LangBindHelper::promote_to_write()`.
+* The exceptions `PresumablyStaleLockFile` and `LockFileButNoData` are no longer
+  thrown from SharedGroup and has been removed from the API.
+
+### Enhancements:
+
+* Support for implicit transactions has been extended to work between multiple
+  processes.
+* Commitlogs can now be persisted and support server-synchronization
+
+----------------------------------------------
+
+# 0.86.1 Release notes
+
+### Enhancements:
+
+* Added `SharedGroup::get_number_of_versions()` which will report the number of
+  distinct versions kept in the database.
+* Added support for encryption
+* Adding `SharedGroup::wait_for_change()` which allows a thread to sleep until
+  the database changes.
+
+----------------------------------------------
+
 # 0.86.0 Release notes
 
 ### Bugfixes:
 
 * Fixed a bug where rollback of an empty transaction could cause a crash.
+
+### API breaking changes:
+
 * Table::erase() can no longer be used with unordered tables. Previously it was
   allowed if the specified index was the index of the last row in the table. One
   must now always use Table::move_last_over() with unordered tables. Whether a

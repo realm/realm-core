@@ -63,17 +63,12 @@ public:
     class Interrupted; // Exception
 
     /// Reset transaction logs. This call informs the commitlog subsystem of
-    /// the initial version chosen as part of establishing a sharing scheme.
+    /// the initial version chosen as part of establishing a sharing scheme
+    /// (also called a "session").
     /// Following a crash, the commitlog subsystem may hold multiple commitlogs
     /// for versions which are lost during the crash. When SharedGroup establishes
     /// a sharing scheme it will continue from the last version commited to
-    /// the database. The commitlog subsystem will then discard any commitlogs
-    /// for later versions. When run with durability_Full there can be a disparity
-    /// of at most one version, but if run with durability_Async the two subsystems
-    /// can be many versions apart. Note: the commitlogs may hold entries, which
-    /// are not in the database after a crash, but the reverse is not possible.
-    /// Version number '1' is the very first version of any database and indicates
-    /// a full reset of the commitlogs.
+    /// the database.
     ///
     /// The call also indicates that the current thread (and current process) has
     /// exclusive access to the commitlogs, allowing them to reset synchronization
@@ -84,10 +79,26 @@ public:
     /// Cleanup, remove any log files
     virtual void stop_logging();
 
+    /// The commitlog subsystem can be operated in either of two modes:
+    /// server-synchronization mode and normal mode.
+    /// When operating in server-synchronization mode.
+    /// - the log files are persisted in a crash safe fashion
+    /// - when a sharing scheme is established, the logs are assumed to exist already
+    ///   (unless we are creating a new database), and an exception is thrown if they
+    ///   are missing.
+    /// - even after a crash which leaves the log files out of sync wrt to the database,
+    ///   the log files can re-synchronized transparently
+    /// When operating in normal-mode
+    /// - the log files are not updated in a crash safe way
+    /// - the log files are removed when the session ends
+    /// - the log files are not assumed to be there when a session starts, but are 
+    ///   created on demand.
+    virtual bool is_in_server_synchronization_mode();
+
     /// Called by SharedGroup during a write transaction, when readlocks are recycled, to
     /// keep the commit log management in sync with what versions can possibly be interesting
     /// in the future.
-    virtual void set_last_version_seen_locally(uint_fast64_t last_seen_version_number) TIGHTDB_NOEXCEPT;
+    virtual void set_last_version_seen_locally(version_type last_seen_version_number) TIGHTDB_NOEXCEPT;
 
     /// Get all transaction logs between the specified versions. The number
     /// of requested logs is exactly `to_version - from_version`. If this
@@ -98,7 +109,7 @@ public:
     /// referenced by those entries, but the memory will remain accessible
     /// to the caller until they are declared stale by calls to 'set_last_version_seen_locally' 
     /// and 'set_last_version_synced', OR until a new call to get_commit_entries() is made.
-    virtual void get_commit_entries(uint_fast64_t from_version, uint_fast64_t to_version,
+    virtual void get_commit_entries(version_type from_version, version_type to_version,
                                     BinaryData* logs_buffer) TIGHTDB_NOEXCEPT;
 
     /// Support for global sync. The commit logs will be retained until
@@ -106,13 +117,13 @@ public:
     /// and 'set_last_version_synced'. Providing a version number of zero disables
     /// the use of sync versioning. Providing a non-zero version number enables the
     /// use of sync versioning.
-    virtual void set_last_version_synced(uint_fast64_t last_seen_version_number) TIGHTDB_NOEXCEPT;
+    virtual void set_last_version_synced(version_type last_seen_version_number) TIGHTDB_NOEXCEPT;
 
     /// Get the value set by last call to 'set_last_version_synced'
     /// If 'end_version_number' is non null, a limit to version numbering is returned.
     /// The limit returned is the version number of the latest commit.
     /// If sync versioning is disabled, the last version seen locally is returned.
-    virtual uint_fast64_t get_last_version_synced(uint_fast64_t* end_version_number = 0) TIGHTDB_NOEXCEPT;
+    virtual version_type get_last_version_synced(version_type* end_version_number = 0) TIGHTDB_NOEXCEPT;
 
     /// Submit a transact log directly into the system bypassing the normal
     /// collection of replication entries. This is used to add a transactlog
@@ -633,19 +644,24 @@ inline void Replication::reset_log_management(version_type)
 {
 }
 
+inline bool Replication::is_in_server_synchronization_mode()
+{
+    return false;
+}
+
 inline void Replication::stop_logging()
 {
 }
 
-inline void Replication::set_last_version_seen_locally(uint_fast64_t) TIGHTDB_NOEXCEPT
+inline void Replication::set_last_version_seen_locally(version_type) TIGHTDB_NOEXCEPT
 {
 }
 
-inline void Replication::set_last_version_synced(uint_fast64_t) TIGHTDB_NOEXCEPT
+inline void Replication::set_last_version_synced(version_type) TIGHTDB_NOEXCEPT
 {
 }
 
-inline uint_fast64_t Replication::get_last_version_synced(uint_fast64_t*) TIGHTDB_NOEXCEPT
+inline Replication::version_type Replication::get_last_version_synced(version_type*) TIGHTDB_NOEXCEPT
 {
     return 0;
 }
@@ -656,7 +672,7 @@ inline void Replication::submit_transact_log(BinaryData)
     TIGHTDB_ASSERT(false);
 }
 
-inline void Replication::get_commit_entries(uint_fast64_t, uint_fast64_t, BinaryData*) TIGHTDB_NOEXCEPT
+inline void Replication::get_commit_entries(version_type, version_type, BinaryData*) TIGHTDB_NOEXCEPT
 {
     // Unimplemented!
     TIGHTDB_ASSERT(false);
@@ -703,8 +719,8 @@ inline void Replication::transact_log_reserve(char** buf, int n)
 
 inline void Replication::transact_log_advance(char* ptr) TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(m_transact_log_free_begin <= ptr);
-    TIGHTDB_ASSERT(ptr <= m_transact_log_free_end);
+    TIGHTDB_ASSERT_DEBUG(m_transact_log_free_begin <= ptr);
+    TIGHTDB_ASSERT_DEBUG(ptr <= m_transact_log_free_end);
     m_transact_log_free_begin = ptr;
 }
 

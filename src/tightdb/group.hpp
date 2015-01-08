@@ -72,9 +72,9 @@ public:
         mode_ReadWriteNoCreate
     };
 
-    /// Equivalent to calling open(const std::string&, OpenMode) on an
-    /// unattached group accessor.
-    explicit Group(const std::string& file, OpenMode = mode_ReadOnly);
+    /// Equivalent to calling open(const std::string&, const char*, OpenMode)
+    /// on an unattached group accessor.
+    explicit Group(const std::string& file, const char* encryption_key = 0, OpenMode = mode_ReadOnly);
 
     /// Equivalent to calling open(BinaryData, bool) on an unattached
     /// group accessor. Note that if this constructor throws, the
@@ -161,6 +161,9 @@ public:
     ///
     /// \param file File system path to a TightDB database file.
     ///
+    /// \param encryption_key 32-byte key used to encrypt and decrypt
+    /// the database file, or nullptr to disable encryption.
+    ///
     /// \param mode Specifying a mode that is not mode_ReadOnly
     /// requires that the specified file can be opened in read/write
     /// mode. In general there is no reason to open a group in
@@ -172,7 +175,8 @@ public:
     /// types that are derived from util::File::AccessError, the
     /// derived exception type is thrown. Note that InvalidDatabase is
     /// among these derived exception types.
-    void open(const std::string& file, OpenMode mode = mode_ReadOnly);
+    void open(const std::string& file, const char* encryption_key = 0,
+              OpenMode mode = mode_ReadOnly);
 
     /// Attach this Group instance to the specified memory buffer.
     ///
@@ -262,7 +266,10 @@ public:
     /// \param index Index of table in this group.
     ///
     /// \param name Name of table. All strings are valid table names as long as
-    /// they are valid UTF-8 encodings.
+    /// they are valid UTF-8 encodings and the number of bytes does not exceed
+    /// `max_table_name_length`. A call to add_table() or get_or_add_table()
+    /// with a name that is longer than `max_table_name_length` will cause an
+    /// exception to be thrown.
     ///
     /// \param new_name New name for preexisting table.
     ///
@@ -292,6 +299,8 @@ public:
     ///
     /// \throw CrossTableLinkTarget Thrown by remove_table() if the specified
     /// table is the target of a link column of a different table.
+
+    static const std::size_t max_table_name_length = 63;
 
     bool has_table(StringData name) const TIGHTDB_NOEXCEPT;
     std::size_t find_table(StringData name) const TIGHTDB_NOEXCEPT;
@@ -326,7 +335,10 @@ public:
     // Serialization
 
     /// Write this database to the specified output stream.
-    void write(std::ostream&) const;
+    ///
+    /// \param pad If true, the file is padded to ensure the footer is aligned
+    /// to the end of a page
+    void write(std::ostream&, bool pad=false) const;
 
     /// Write this database to a new file. It is an error to specify a
     /// file that already exists. This is to protect against
@@ -335,12 +347,15 @@ public:
     ///
     /// \param file A filesystem path.
     ///
+    /// \param encryption_key 32-byte key used to encrypt the database file,
+    /// or nullptr to disable encryption.
+    ///
     /// \throw util::File::AccessError If the file could not be
     /// opened. If the reason corresponds to one of the exception
     /// types that are derived from util::File::AccessError, the
     /// derived exception type is thrown. In particular,
     /// util::File::Exists will be thrown if the file exists already.
-    void write(const std::string& file) const;
+    void write(const std::string& file, const char* encryption_key=0) const;
 
     /// Write this database to a memory buffer.
     ///
@@ -457,7 +472,7 @@ private:
     class TableWriter;
     class DefaultTableWriter;
 
-    static void write(std::ostream&, TableWriter&);
+    static void write(std::ostream&, TableWriter&, bool);
 
     /// Create a new underlying node structure and attach this
     /// accessor instance to it
@@ -527,13 +542,13 @@ inline Group::Group():
     create(add_free_versions); // Throws
 }
 
-inline Group::Group(const std::string& file, OpenMode mode):
+inline Group::Group(const std::string& file, const char* key, OpenMode mode):
     m_alloc(), // Throws
     m_top(m_alloc), m_tables(m_alloc), m_table_names(m_alloc), m_free_positions(m_alloc),
     m_free_lengths(m_alloc), m_free_versions(m_alloc), m_is_shared(false), m_is_attached(false)
 {
     init_array_parents();
-    open(file, mode); // Throws
+    open(file, key, mode); // Throws
 }
 
 inline Group::Group(BinaryData buffer, bool take_ownership):

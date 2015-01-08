@@ -205,11 +205,18 @@ inline bool Allocator::should_propagate_version(uint_fast64_t& local_version) TI
 
 // Implementation:
 
+inline int_fast64_t from_ref(ref_type v) TIGHTDB_NOEXCEPT
+{
+    // Check that v is divisible by 8 (64-bit aligned).
+    TIGHTDB_ASSERT_DEBUG(v % 8 == 0);
+    return util::from_twos_compl<int_fast64_t>(v);
+}
+
 inline ref_type to_ref(int_fast64_t v) TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(!util::int_cast_has_overflow<ref_type>(v));
+    TIGHTDB_ASSERT_DEBUG(!util::int_cast_has_overflow<ref_type>(v));
     // Check that v is divisible by 8 (64-bit aligned).
-    TIGHTDB_ASSERT(v % 8 == 0);
+    TIGHTDB_ASSERT_DEBUG(v % 8 == 0);
     return ref_type(v);
 }
 
@@ -272,8 +279,8 @@ inline char* Allocator::translate(ref_type ref) const TIGHTDB_NOEXCEPT
 
 inline bool Allocator::is_read_only(ref_type ref) const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(ref != 0);
-    TIGHTDB_ASSERT(m_baseline != 0); // Attached SlabAlloc
+    TIGHTDB_ASSERT_DEBUG(ref != 0);
+    TIGHTDB_ASSERT_DEBUG(m_baseline != 0); // Attached SlabAlloc
     return ref < m_baseline;
 }
 

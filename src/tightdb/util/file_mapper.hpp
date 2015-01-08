@@ -17,22 +17,22 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_UTIL_TERMINATE_HPP
-#define TIGHTDB_UTIL_TERMINATE_HPP
+#ifndef TIGHTDB_UTIL_FILE_MAPPER_HPP
+#define TIGHTDB_UTIL_FILE_MAPPER_HPP
 
-#include <cstdlib>
-#include <string>
-
-#include <tightdb/util/features.h>
-
-#define TIGHTDB_TERMINATE(msg) tightdb::util::terminate((msg), __FILE__, __LINE__)
+#include <tightdb/util/file.hpp>
 
 namespace tightdb {
 namespace util {
 
-TIGHTDB_NORETURN void terminate(const char* message, const char* file, long line) TIGHTDB_NOEXCEPT;
+void *mmap(int fd, size_t size, File::AccessMode access, const char *encryption_key);
+void munmap(void *addr, size_t size) TIGHTDB_NOEXCEPT;
+void* mremap(int fd, void* old_addr, size_t old_size, File::AccessMode a, size_t new_size);
+void msync(void *addr, size_t size);
 
-} // namespace util
-} // namespace tightdb
+File::SizeType encrypted_size_to_data_size(File::SizeType size) TIGHTDB_NOEXCEPT;
+File::SizeType data_size_to_encrypted_size(File::SizeType size) TIGHTDB_NOEXCEPT;
 
-#endif // TIGHTDB_UTIL_TERMINATE_HPP
+}
+}
+#endif

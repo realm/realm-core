@@ -277,6 +277,12 @@ public:
     /// is idempotent.
     void unlock() TIGHTDB_NOEXCEPT;
 
+    /// Set the encryption key used for this file. Must be called before any
+    /// mappings are created or any data is read from or written to the file.
+    ///
+    /// \param key A 64-byte encryption key, or null to disable encryption.
+    void set_encryption_key(const char* key);
+
     enum {
         /// If possible, disable opportunistic flushing of dirted
         /// pages of a memory mapped file to physical medium. On some
@@ -430,6 +436,8 @@ private:
 #else
     int m_fd;
 #endif
+
+    UniquePtr<const char[]> m_encryption_key;
 
     bool lock(bool exclusive, bool non_blocking);
     void open_internal(const std::string& path, AccessMode, CreateMode, int flags, bool* success);

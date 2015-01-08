@@ -24,7 +24,7 @@ void func(Group& g)
 
 int main()
 {
-    Group g("people.tightdb", Group::mode_ReadWrite);
+    Group g("people.tightdb", 0, Group::mode_ReadWrite);
     func(g);
     util::File::remove("people.tightdb");
 }

@@ -7,6 +7,7 @@
 #  include <map>
 #endif
 
+#include <tightdb/util/encrypted_file_mapping.hpp>
 #include <tightdb/util/terminate.hpp>
 #include <tightdb/util/unique_ptr.hpp>
 #include <tightdb/array.hpp>
@@ -153,9 +154,9 @@ SlabAlloc::~SlabAlloc() TIGHTDB_NOEXCEPT
 
 MemRef SlabAlloc::do_alloc(size_t size)
 {
-    TIGHTDB_ASSERT(0 < size);
-    TIGHTDB_ASSERT((size & 0x7) == 0); // only allow sizes that are multiples of 8
-    TIGHTDB_ASSERT(is_attached());
+    TIGHTDB_ASSERT_DEBUG(0 < size);
+    TIGHTDB_ASSERT_DEBUG((size & 0x7) == 0); // only allow sizes that are multiples of 8
+    TIGHTDB_ASSERT_DEBUG(is_attached());
 
     // If we failed to correctly record free space, new allocations cannot be
     // carried out until the free space record is reset.
@@ -216,7 +217,7 @@ MemRef SlabAlloc::do_alloc(size_t size)
             new_size = min_size;
         ref = curr_ref_end;
     }
-    TIGHTDB_ASSERT(0 < new_size);
+    TIGHTDB_ASSERT_DEBUG(0 < new_size);
     UniquePtr<char[]> mem(new char[new_size]); // Throws
     fill(mem.get(), mem.get()+new_size, 0);
 
@@ -334,9 +335,9 @@ void SlabAlloc::do_free(ref_type ref, const char* addr) TIGHTDB_NOEXCEPT
 
 MemRef SlabAlloc::do_realloc(size_t ref, const char* addr, size_t old_size, size_t new_size)
 {
-    TIGHTDB_ASSERT(translate(ref) == addr);
-    TIGHTDB_ASSERT(0 < new_size);
-    TIGHTDB_ASSERT((new_size & 0x7) == 0); // only allow sizes that are multiples of 8
+    TIGHTDB_ASSERT_DEBUG(translate(ref) == addr);
+    TIGHTDB_ASSERT_DEBUG(0 < new_size);
+    TIGHTDB_ASSERT_DEBUG((new_size & 0x7) == 0); // only allow sizes that are multiples of 8
 
     // FIXME: Check if we can extend current space. In that case, remember to
     // check whether m_free_space_state == free_state_Invalid. Also remember to
@@ -362,34 +363,33 @@ MemRef SlabAlloc::do_realloc(size_t ref, const char* addr, size_t old_size, size
     return new_mem;
 }
 
-
 char* SlabAlloc::do_translate(ref_type ref) const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(is_attached());
+    TIGHTDB_ASSERT_DEBUG(is_attached());
 
     if (ref < m_baseline)
         return m_data + ref;
 
     typedef slabs::const_iterator iter;
     iter i = upper_bound(m_slabs.begin(), m_slabs.end(), ref, &ref_less_than_slab_ref_end);
-    TIGHTDB_ASSERT(i != m_slabs.end());
+    TIGHTDB_ASSERT_DEBUG(i != m_slabs.end());
 
     ref_type slab_ref = i == m_slabs.begin() ? m_baseline : (i-1)->ref_end;
     return i->addr + (ref - slab_ref);
 }
 
 
-ref_type SlabAlloc::attach_file(const string& path, bool is_shared, bool read_only, bool no_create,
-                                bool skip_validate)
+ref_type SlabAlloc::attach_file(const string& path, bool is_shared, bool read_only,
+                                bool no_create, bool skip_validate,
+                                const char* encryption_key, bool server_sync_mode)
 {
     TIGHTDB_ASSERT(!is_attached());
 
-    // When 'read_only' is true, this function will throw
-    // InvalidDatabase if the file exists already but is empty. This
-    // can happen if another process is currently creating it. Note
-    // however, that it is only legal for multiple processes to access
-    // a database file concurrently if it is done via a SharedGroup,
-    // and in that case 'read_only' can never be true.
+    // When 'read_only' is true, this function will throw InvalidDatabase if the
+    // file exists already but is empty. This can happen if another process is
+    // currently creating it. Note however, that it is only legal for multiple
+    // processes to access a database file concurrently if it is done via a
+    // SharedGroup, and in that case 'read_only' can never be true.
     TIGHTDB_ASSERT(!(is_shared && read_only));
     static_cast<void>(is_shared);
 
@@ -397,34 +397,35 @@ ref_type SlabAlloc::attach_file(const string& path, bool is_shared, bool read_on
     File::AccessMode access = read_only ? File::access_ReadOnly : File::access_ReadWrite;
     File::CreateMode create = read_only || no_create ? File::create_Never : File::create_Auto;
     m_file.open(path.c_str(), access, create, 0); // Throws
+    if (encryption_key)
+        m_file.set_encryption_key(encryption_key);
     File::CloseGuard fcg(m_file);
 
-    size_t initial_size = 4 * 1024; // a single page sure feels tight
+    size_t initial_size = 4 * 1024; // 4 KiB
 
     ref_type top_ref = 0;
 
-    // The size of a database file must not exceed what can be encoded
-    // in std::size_t.
+    // The size of a database file must not exceed what can be encoded in
+    // std::size_t.
     size_t size;
+    bool did_create = false;
     if (int_cast_with_overflow_detect(m_file.get_size(), size))
         goto invalid_database;
 
-    // FIXME: This initialization procedure does not provide
-    // sufficient robustness given that processes may be abruptly
-    // terminated at any point in time. In unshared mode, we must be
-    // able to reliably detect any invalid file as long as its
-    // invalidity is due to a terminated serialization process
-    // (e.g. due to a power failure). In shared mode we can guarantee
-    // that if the database file was ever valid, then it will remain
-    // valid, however, there is no way we can ensure that
-    // initialization of an empty database file succeeds. Thus, in
-    // shared mode we must be able to reliably distiguish between
-    // three cases when opening a database file: A) It was never
-    // properly initialized. In this case we should simply
-    // reinitialize it. B) It looks corrupt. In this case we throw an
-    // exception. C) It looks good. In this case we proceede as
-    // normal.
+    // FIXME: This initialization procedure does not provide sufficient
+    // robustness given that processes may be abruptly terminated at any point
+    // in time. In unshared mode, we must be able to reliably detect any invalid
+    // file as long as its invalidity is due to a terminated serialization
+    // process (e.g. due to a power failure). In shared mode we can guarantee
+    // that if the database file was ever valid, then it will remain valid,
+    // however, there is no way we can ensure that initialization of an empty
+    // database file succeeds. Thus, in shared mode we must be able to reliably
+    // distiguish between three cases when opening a database file: A) It was
+    // never properly initialized. In this case we should simply reinitialize
+    // it. B) It looks corrupt. In this case we throw an exception. C) It looks
+    // good. In this case we proceede as normal.
     if (size == 0) {
+        did_create = true;
         if (read_only)
             goto invalid_database;
 
@@ -436,7 +437,7 @@ ref_type SlabAlloc::attach_file(const string& path, bool is_shared, bool read_on
         size = initial_size;
     }
 
-    {
+    try {
         File::Map<char> map(m_file, File::access_ReadOnly, size); // Throws
 
         m_file_on_streaming_form = false; // May be updated by validate_buffer()
@@ -445,10 +446,29 @@ ref_type SlabAlloc::attach_file(const string& path, bool is_shared, bool read_on
             if (!validate_buffer(map.get_addr(), size, top_ref))
                 goto invalid_database;
         }
-
         m_data        = map.release();
         m_baseline    = size;
         m_attach_mode = is_shared ? attach_SharedFile : attach_UnsharedFile;
+        if (did_create) {
+            File::Map<Header> writable_map(m_file, File::access_ReadWrite, sizeof (Header)); // Throws
+            Header* header = writable_map.get_addr();
+            header->m_select_bit |= server_sync_mode ? 0x2 : 0x0;
+            header = reinterpret_cast<Header*>(m_data);
+            bool stored_server_sync_mode = (header->m_select_bit & 0x2) != 0;
+            if (server_sync_mode != stored_server_sync_mode)
+                throw runtime_error(path + ": failed to write!");
+        }
+        else {
+            Header* header = reinterpret_cast<Header*>(m_data);
+            bool stored_server_sync_mode = (header->m_select_bit & 0x2) != 0;
+            if (server_sync_mode &&  !stored_server_sync_mode)
+                throw runtime_error(path + ": expected db in server sync mode, found local mode");
+            if (!server_sync_mode &&  stored_server_sync_mode)
+                throw runtime_error(path + ": found db in server sync mode, expected local mode");
+        }
+    }
+    catch (DecryptionFailed) {
+        goto invalid_database;
     }
 
     fcg.release(); // Do not close
@@ -545,7 +565,8 @@ void SlabAlloc::do_prepare_for_update(char* mutable_data)
     StreamingFooter* footer = reinterpret_cast<StreamingFooter*>(mutable_data+m_baseline) - 1;
     TIGHTDB_ASSERT(footer->m_magic_cookie == footer_magic_cookie);
     header->m_top_ref[1] = footer->m_top_ref;
-    header->m_select_bit = 1;
+    // FIXME: We probably need a call to msync() here
+    header->m_select_bit |= 1; // keep bit 1 used for server sync mode unchanged
     m_file_on_streaming_form = false;
 }
 
@@ -577,7 +598,7 @@ void SlabAlloc::reset_free_space_tracking()
         chunk.ref = i->ref_end;
     }
 
-    TIGHTDB_ASSERT(is_all_free());
+    TIGHTDB_ASSERT_DEBUG(is_all_free());
 
     m_free_space_state = free_space_Clean;
 }
@@ -585,10 +606,10 @@ void SlabAlloc::reset_free_space_tracking()
 
 bool SlabAlloc::remap(size_t file_size)
 {
-    TIGHTDB_ASSERT(file_size % 8 == 0); // 8-byte alignment required
-    TIGHTDB_ASSERT(m_attach_mode == attach_SharedFile || m_attach_mode == attach_UnsharedFile);
-    TIGHTDB_ASSERT(m_free_space_state == free_space_Clean);
-    TIGHTDB_ASSERT(m_baseline <= file_size);
+    TIGHTDB_ASSERT_DEBUG(file_size % 8 == 0); // 8-byte alignment required
+    TIGHTDB_ASSERT_DEBUG(m_attach_mode == attach_SharedFile || m_attach_mode == attach_UnsharedFile);
+    TIGHTDB_ASSERT_DEBUG(m_free_space_state == free_space_Clean);
+    TIGHTDB_ASSERT_DEBUG(m_baseline <= file_size);
 
     void* addr = m_file.remap(m_data, m_baseline, File::access_ReadOnly, file_size);
     bool addr_changed = addr != m_data;
@@ -600,7 +621,7 @@ bool SlabAlloc::remap(size_t file_size)
     // each entire slab in m_slabs)
     size_t slab_ref = file_size;
     size_t n = m_free_space.size();
-    TIGHTDB_ASSERT(m_slabs.size() == n);
+    TIGHTDB_ASSERT_DEBUG(m_slabs.size() == n);
     for (size_t i = 0; i < n; ++i) {
         Chunk& free_chunk = m_free_space[i];
         free_chunk.ref = slab_ref;
