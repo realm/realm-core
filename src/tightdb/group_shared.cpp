@@ -656,7 +656,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
 
                 // make sure the database is not on streaming format. This has to be done at
                 // session initialization, even if it means writing the database during open.
-                {
+                if (alloc.m_file_on_streaming_form) {
                     util::File::Map<char> db_map;
                     db_map.map(alloc.m_file, File::access_ReadWrite, file_size);
                     File::UnmapGuard db_ug(db_map);
