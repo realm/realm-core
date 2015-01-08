@@ -187,8 +187,6 @@ public:
     // at a time tries to perform cleanup. This is ensured by doing the cleanup
     // as part of write transactions, where mutual exclusion is assured by the
     // write mutex.
-
-    // FIXME: The use of uint_fast64_t is in principle wrong
     struct ReadCount {
         uint64_t version;
         uint64_t filesize;
@@ -331,9 +329,9 @@ public:
 
 private:
     // number of entries. Access synchronized through put_pos.
-    uint_fast32_t entries;
+    uint32_t entries;
     Atomic<uint32_t> put_pos; // only changed under lock, but accessed outside lock
-    uint_fast32_t old_pos; // only accessed during write transactions and under lock
+    uint32_t old_pos; // only accessed during write transactions and under lock
 
     const static int init_readers_size = 32;
 
