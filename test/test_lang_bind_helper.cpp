@@ -6907,7 +6907,7 @@ TEST(LangBindHelper_VersionControl)
             }
             {
                 ReadTransaction rt(sg_w);
-                sg_w.get_version_of_current_transaction(&versions[i]);
+                versions[i] = sg_w.get_version_of_current_transaction();
             }
         }
 
@@ -6916,11 +6916,11 @@ TEST(LangBindHelper_VersionControl)
         {
             for (int k = 0; k < num_versions; ++k) {
                 // cerr << "Advancing from initial version to version " << k << endl;
-                const Group& g = sg_w.begin_read(&versions[0]);
+                const Group& g = sg_w.begin_read(versions[0]);
                 MyTable::ConstRef t = g.get_table<MyTable>("test");
                 CHECK(versions[k] >= versions[0]);
                 g.Verify();
-                CHECK(LangBindHelper::advance_read(sg_w, &versions[k]));
+                LangBindHelper::advance_read(sg_w, versions[k]);
                 g.Verify();
                 CHECK_EQUAL(k, t[k].first);
                 sg_w.end_read();
@@ -6930,7 +6930,7 @@ TEST(LangBindHelper_VersionControl)
         // step through the versions backward:
         for (int i = num_versions-1; i >= 0; --i) {
             // cerr << "Jumping directly to version " << i << endl;
-            const Group& g = sg_w.begin_read(&versions[i]);
+            const Group& g = sg_w.begin_read(versions[i]);
             g.Verify();
             MyTable::ConstRef t = g.get_table<MyTable>("test");
             CHECK_EQUAL(i, t[i].first);
@@ -6939,13 +6939,13 @@ TEST(LangBindHelper_VersionControl)
 
         // then advance through the versions going forward
         {
-            const Group& g = sg_w.begin_read(&versions[0]);
+            const Group& g = sg_w.begin_read(versions[0]);
             g.Verify();
             MyTable::ConstRef t = g.get_table<MyTable>("test");
             for (int k = 0; k < num_versions; ++k) {
                 // cerr << "Advancing to version " << k << endl;
                 CHECK(k==0 || versions[k] >= versions[k-1]);
-                CHECK(LangBindHelper::advance_read(sg_w, &versions[k]));
+                LangBindHelper::advance_read(sg_w, versions[k]);
                 g.Verify();
                 CHECK_EQUAL(k, t[k].first);
             }
@@ -6955,7 +6955,7 @@ TEST(LangBindHelper_VersionControl)
         // sync to a randomly selected version - use advance_read when going
         // forward in time, but begin_read when going back in time
         int old_version = 0;
-        const Group& g = sg_w.begin_read(&versions[old_version]);
+        const Group& g = sg_w.begin_read(versions[old_version]);
         MyTable::ConstRef t = g.get_table<MyTable>("test");
         CHECK_EQUAL(old_version, t[old_version].first);
         for (int k = num_random_tests; k; --k) {
@@ -6964,7 +6964,7 @@ TEST(LangBindHelper_VersionControl)
             if (new_version < old_version) {
                 CHECK(versions[new_version] < versions[old_version]);
                 sg_w.end_read();
-                sg_w.begin_read(&versions[new_version]);
+                sg_w.begin_read(versions[new_version]);
                 g.Verify();
                 t = g.get_table<MyTable>("test");
                 CHECK_EQUAL(new_version, t[new_version].first);
@@ -6972,7 +6972,7 @@ TEST(LangBindHelper_VersionControl)
             else {
                 CHECK(versions[new_version] >= versions[old_version]);
                 g.Verify();
-                CHECK(LangBindHelper::advance_read(sg_w, &versions[new_version]));
+                LangBindHelper::advance_read(sg_w, versions[new_version]);
                 g.Verify();
                 CHECK_EQUAL(new_version, t[new_version].first);
             }
@@ -6992,7 +6992,7 @@ TEST(LangBindHelper_VersionControl)
         // validate that all the versions are now unreachable
         for (int i = 0; i < num_versions; ++i) {
             try {
-                sg.begin_read(&versions[i]);
+                sg.begin_read(versions[i]);
                 CHECK(false);
             } catch (...) {
             }
