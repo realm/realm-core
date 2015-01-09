@@ -849,12 +849,12 @@ TEST(Table_DegenerateSubtableSearchAndAggregate)
     CHECK_EQUAL(0, degen_child->minimum_int(0));
     CHECK_EQUAL(0, degen_child->minimum_float(2));
     CHECK_EQUAL(0, degen_child->minimum_double(3));
-//    CHECK_EQUAL(Date(), degen_child->minimum_date(4, Date())); // Not yet implemented
+    CHECK_EQUAL(0, degen_child->minimum_datetime(4));
 
     CHECK_EQUAL(0, degen_child->maximum_int(0));
     CHECK_EQUAL(0, degen_child->maximum_float(2));
     CHECK_EQUAL(0, degen_child->maximum_double(3));
-//    CHECK_EQUAL(Date(), degen_child->maximum_date(4, Date())); // Not yet implemented
+    CHECK_EQUAL(0, degen_child->maximum_datetime(4));
 
     CHECK_EQUAL(0, degen_child->sum_int(0));
     CHECK_EQUAL(0, degen_child->sum_float(2));

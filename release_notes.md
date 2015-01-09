@@ -18,6 +18,7 @@
   by new forms of `SharedGroup::begin_read()`, `SharedGroup::advance_read()`.
   Operators are provided so that VersionID's may be compared.
 * Creating distinct views on integer, datetime, bool and enum columns is now possible.
+* Add `Table::minimum_datetime()` and `Table::maximum_datetime()`.
 
 -----------
 

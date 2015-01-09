@@ -2979,6 +2979,15 @@ double Table::minimum_double(size_t col_ndx, size_t* return_ndx) const
     return column.minimum(0, npos, npos, return_ndx);
 }
 
+DateTime Table::minimum_datetime(size_t col_ndx, size_t* return_ndx) const
+{
+    if(!m_columns.is_attached())
+        return 0.;
+
+    const Column& column = get_column<Column, col_type_DateTime>(col_ndx);
+    return column.minimum(0, npos, npos, return_ndx);
+}
+
 // maximum ----------------------------------------------
 
 int64_t Table::maximum_int(size_t col_ndx, size_t* return_ndx) const
@@ -3019,6 +3028,15 @@ double Table::maximum_double(size_t col_ndx, size_t* return_ndx) const
         return 0.;
 
     const ColumnDouble& column = get_column<ColumnDouble, col_type_Double>(col_ndx);
+    return column.maximum(0, npos, npos, return_ndx);
+}
+
+DateTime Table::maximum_datetime(size_t col_ndx, size_t* return_ndx) const
+{
+    if(!m_columns.is_attached())
+        return 0.;
+
+    const Column& column = get_column<Column, col_type_DateTime>(col_ndx);
     return column.maximum(0, npos, npos, return_ndx);
 }
 
