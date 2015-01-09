@@ -187,8 +187,6 @@ public:
     // at a time tries to perform cleanup. This is ensured by doing the cleanup
     // as part of write transactions, where mutual exclusion is assured by the
     // write mutex.
-
-    // FIXME: The use of uint_fast64_t is in principle wrong
     struct ReadCount {
         uint64_t version;
         uint64_t filesize;
@@ -331,9 +329,9 @@ public:
 
 private:
     // number of entries. Access synchronized through put_pos.
-    uint_fast32_t entries;
+    uint32_t entries;
     Atomic<uint32_t> put_pos; // only changed under lock, but accessed outside lock
-    uint_fast32_t old_pos; // only accessed during write transactions and under lock
+    uint32_t old_pos; // only accessed during write transactions and under lock
 
     const static int init_readers_size = 32;
 
@@ -1305,12 +1303,13 @@ void SharedGroup::do_commit()
 }
 
 
-// FIXME: This method must work correctly even if it is called after a
-// failed call to commit(). A failed call to commit() is any that
-// returns to the caller by throwing an exception. As it is right now,
-// rollback() does not handle all cases.
 void SharedGroup::rollback() TIGHTDB_NOEXCEPT
 {
+    // FIXME: This method must work correctly even if it is called after a
+    // failed call to commit(). A failed call to commit() is any that returns to
+    // the caller by throwing an exception. As it is right now, rollback() does
+    // not handle all cases.
+
     if (m_group.is_attached()) {
         TIGHTDB_ASSERT(m_transact_stage == transact_Writing);
 
@@ -1332,9 +1331,6 @@ void SharedGroup::rollback() TIGHTDB_NOEXCEPT
 }
 
 
-
-// given an index (which the caller wants to used to index the ringbuffer), verify
-// that the given entry is within the memory mapped. If not, remap it!
 bool SharedGroup::grow_reader_mapping(uint_fast32_t index)
 {
     if (index >= m_local_max_entry) {
@@ -1348,6 +1344,7 @@ bool SharedGroup::grow_reader_mapping(uint_fast32_t index)
     }
     return false;
 }
+
 
 uint_fast64_t SharedGroup::get_current_version()
 {
