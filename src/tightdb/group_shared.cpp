@@ -1303,12 +1303,13 @@ void SharedGroup::do_commit()
 }
 
 
-// FIXME: This method must work correctly even if it is called after a
-// failed call to commit(). A failed call to commit() is any that
-// returns to the caller by throwing an exception. As it is right now,
-// rollback() does not handle all cases.
 void SharedGroup::rollback() TIGHTDB_NOEXCEPT
 {
+    // FIXME: This method must work correctly even if it is called after a
+    // failed call to commit(). A failed call to commit() is any that returns to
+    // the caller by throwing an exception. As it is right now, rollback() does
+    // not handle all cases.
+
     if (m_group.is_attached()) {
         TIGHTDB_ASSERT(m_transact_stage == transact_Writing);
 
@@ -1330,9 +1331,6 @@ void SharedGroup::rollback() TIGHTDB_NOEXCEPT
 }
 
 
-
-// given an index (which the caller wants to used to index the ringbuffer), verify
-// that the given entry is within the memory mapped. If not, remap it!
 bool SharedGroup::grow_reader_mapping(uint_fast32_t index)
 {
     if (index >= m_local_max_entry) {
@@ -1346,6 +1344,7 @@ bool SharedGroup::grow_reader_mapping(uint_fast32_t index)
     }
     return false;
 }
+
 
 uint_fast64_t SharedGroup::get_current_version()
 {
