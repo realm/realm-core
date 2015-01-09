@@ -465,6 +465,15 @@ void EncryptedFileMapping::flush() TIGHTDB_NOEXCEPT
 void EncryptedFileMapping::sync() TIGHTDB_NOEXCEPT
 {
     fsync(m_file.fd);
+    // FIXME: on iOS/OSX fsync may not be enough to ensure crash safety.
+    // Consider adding fcntl(F_FULLFSYNC). This most likely also applies to msync.
+    //
+    // See description of fsync on iOS here:
+    // https://developer.apple.com/library/ios/documentation/System/Conceptual/ManPages_iPhoneOS/man2/fsync.2.html
+    //
+    // See also
+    // https://developer.apple.com/library/ios/documentation/Cocoa/Conceptual/CoreData/Articles/cdPersistentStores.html
+    // for a discussion of this related to core data.
 }
 
 void EncryptedFileMapping::handle_access(void* addr) TIGHTDB_NOEXCEPT
