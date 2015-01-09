@@ -10,12 +10,13 @@
 
 ### Enhancements:
 
-* Added version control. The type `VersionID` represents a specific commit to the
+* SharedGroup now allows you to coordinate which version of the data a read transaction
+  can see. The type `VersionID` represents a specific commit to the
   database. A user can obtain the `VersionID` for the active transaction from
   `SharedGroup::get_version_of_current_transaction()`, and use it to obtain a
   a transaction accessing that same version from another ShareGroup. This is done
   by new forms of `SharedGroup::begin_read()`, `SharedGroup::advance_read()`.
-  Comparions operators are provided so that VersionID's may be compared.
+  Operators are provided so that VersionID's may be compared.
 
 -----------
 
