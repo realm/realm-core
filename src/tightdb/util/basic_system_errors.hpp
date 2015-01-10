@@ -17,21 +17,48 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_UTIL_ERRNO_HPP
-#define TIGHTDB_UTIL_ERRNO_HPP
+#ifndef TIGHTDB_UTIL_BASIC_SYSTEM_ERRORS_HPP
+#define TIGHTDB_UTIL_BASIC_SYSTEM_ERRORS_HPP
 
-#include <tightdb/util/basic_system_errors.hpp>
+#include <cerrno>
+
+#include <tightdb/util/error_code.hpp>
 
 namespace tightdb {
 namespace util {
 
-// Get the error message for a given error code, and append it to `prefix`
-inline std::string get_errno_msg(const char* prefix, int err)
+namespace error {
+
+enum basic_system_errors {
+    /// Address family not supported by protocol.
+    address_family_not_supported = EAFNOSUPPORT,
+
+    /// Invalid argument.
+    invalid_argument = EINVAL,
+
+    /// Cannot allocate memory.
+    no_memory = ENOMEM
+};
+
+error_code make_error_code(basic_system_errors);
+
+} // namespace error
+
+
+error_code make_basic_system_error_code(int);
+
+
+
+
+// implementation
+
+inline error_code make_basic_system_error_code(int err)
 {
-    return prefix + make_basic_system_error_code(err).message();
+    using namespace error;
+    return make_error_code(basic_system_errors(err));
 }
 
 } // namespace util
 } // namespace tightdb
 
-#endif
+#endif // TIGHTDB_UTIL_BASIC_SYSTEM_ERRORS_HPP

@@ -3,15 +3,16 @@ REPLICATION_CPP = $(if $(TIGHTDB_ENABLE_REPLICATION),replication.cpp)
 
 nobase_subinclude_HEADERS = util/features.h util/meta.hpp util/assert.hpp util/terminate.hpp \
 util/type_list.hpp util/tuple.hpp util/type_traits.hpp util/bind.hpp util/safe_int_ops.hpp \
-util/unique_ptr.hpp util/bind_ptr.hpp util/buffer.hpp util/string_buffer.hpp util/shared_ptr.hpp \
-util/memory_stream.hpp util/logger.hpp util/thread.hpp util/file.hpp util/utf8.hpp exceptions.hpp \
-utilities.hpp alloc.hpp alloc_slab.hpp array.hpp array_string.hpp data_type.hpp column_type.hpp \
-column_fwd.hpp spec.hpp impl/destroy_guard.hpp impl/output_stream.hpp datetime.hpp string_data.hpp \
-binary_data.hpp mixed.hpp table.hpp table_ref.hpp table_basic_fwd.hpp table_accessors.hpp \
-table_basic.hpp table_view.hpp table_view_basic.hpp table_macros.hpp row.hpp descriptor_fwd.hpp \
-descriptor.hpp group.hpp group_shared.hpp $(REPLICATION_HPP) query.hpp query_conditions.hpp \
-lang_bind_helper.hpp tightdb_nmmintrin.h importer.hpp version.hpp unicode.hpp commit_log.hpp \
-link_view_fwd.hpp link_view.hpp views.hpp
+util/bind_ptr.hpp util/unique_ptr.hpp util/shared_ptr.hpp util/buffer.hpp util/string_buffer.hpp \
+util/memory_stream.hpp util/logger.hpp util/utf8.hpp util/error_code.hpp \
+util/basic_system_errors.hpp util/system_error.hpp util/thread.hpp util/file.hpp util/network.hpp \
+exceptions.hpp utilities.hpp alloc.hpp alloc_slab.hpp array.hpp array_string.hpp data_type.hpp \
+column_type.hpp column_fwd.hpp spec.hpp impl/destroy_guard.hpp impl/output_stream.hpp \
+datetime.hpp string_data.hpp binary_data.hpp mixed.hpp table.hpp table_ref.hpp \
+table_basic_fwd.hpp table_accessors.hpp table_basic.hpp table_view.hpp table_view_basic.hpp \
+table_macros.hpp row.hpp descriptor_fwd.hpp descriptor.hpp group.hpp group_shared.hpp \
+$(REPLICATION_HPP) query.hpp query_conditions.hpp lang_bind_helper.hpp tightdb_nmmintrin.h \
+importer.hpp version.hpp unicode.hpp commit_log.hpp link_view_fwd.hpp link_view.hpp views.hpp
 
 nobase_subinclude_HEADERS_EXTRA_UNINSTALL = *.h *.hpp util/*.h util/*.hpp impl/*.h impl/*.hpp
 
@@ -29,15 +30,16 @@ libexec_PROGRAMS = tightdbd
 bin_PROGRAMS     = tightdb-import
 DEV_PROGRAMS     = tightdb-config
 
-libtightdb_a_SOURCES = util/encrypted_file_mapping.cpp util/errno.cpp util/file.cpp \
-util/file_mapper.cpp util/memory_stream.cpp util/string_buffer.cpp util/terminate.cpp \
-util/thread.cpp $(REPLICATION_CPP) alloc.cpp alloc_slab.cpp array.cpp array_binary.cpp \
-array_blob.cpp array_blobs_big.cpp array_string.cpp array_string_long.cpp column.cpp \
-column_backlink.cpp column_binary.cpp column_link.cpp column_link_base.cpp column_linklist.cpp \
-column_mixed.cpp column_string.cpp column_string_enum.cpp column_table.cpp commit_log.cpp \
-descriptor.cpp exceptions.cpp group.cpp group_shared.cpp group_writer.cpp impl/output_stream.cpp \
-importer.cpp index_string.cpp lang_bind_helper.cpp link_view.cpp query.cpp row.cpp spec.cpp \
-table.cpp table_view.cpp unicode.cpp utilities.cpp version.cpp views.cpp
+libtightdb_a_SOURCES = util/terminate.cpp util/string_buffer.cpp util/memory_stream.cpp \
+util/error_code.cpp util/basic_system_errors.cpp util/file.cpp util/network.cpp \
+util/encrypted_file_mapping.cpp util/file_mapper.cpp util/thread.cpp $(REPLICATION_CPP) alloc.cpp \
+alloc_slab.cpp array.cpp array_binary.cpp array_blob.cpp array_blobs_big.cpp array_string.cpp \
+array_string_long.cpp column.cpp column_backlink.cpp column_binary.cpp column_link.cpp \
+column_link_base.cpp column_linklist.cpp column_mixed.cpp column_string.cpp \
+column_string_enum.cpp column_table.cpp commit_log.cpp descriptor.cpp exceptions.cpp group.cpp \
+group_shared.cpp group_writer.cpp impl/output_stream.cpp importer.cpp index_string.cpp \
+lang_bind_helper.cpp link_view.cpp query.cpp row.cpp spec.cpp table.cpp table_view.cpp \
+unicode.cpp utilities.cpp version.cpp views.cpp
 
 # Format: CURRENT[:REVISION[:AGE]]
 #
