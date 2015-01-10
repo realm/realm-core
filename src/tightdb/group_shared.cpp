@@ -981,21 +981,64 @@ void SharedGroup::grab_latest_readlock(ReadLockInfo& readlock, bool& same_as_bef
         // we need to start all over again. This is extremely unlikely, but possible.
         if (! atomic_double_inc_if_even(r.count)) // <-- most of the exec time spent here!
             continue;
-        same_as_before = readlock.m_version == r.version;
-        readlock.m_version      = r.version;
-        readlock.m_top_ref    = to_size_t(r.current_top);
-        readlock.m_file_size  = to_size_t(r.filesize);
+        same_as_before       = readlock.m_version == r.version;
+        readlock.m_version   = r.version;
+        readlock.m_top_ref   = to_size_t(r.current_top);
+        readlock.m_file_size = to_size_t(r.filesize);
         return;
     }
 }
 
+SharedGroup::VersionID SharedGroup::get_version_of_current_transaction()
+{
+    return VersionID(m_readlock.m_version, m_readlock.m_reader_idx);
+}
 
-const Group& SharedGroup::begin_read()
+bool SharedGroup::grab_specific_readlock(ReadLockInfo& readlock, bool& same_as_before, 
+					 VersionID specific_version)
+{
+    for (;;) {
+        SharedInfo* r_info = m_reader_map.get_addr();
+        readlock.m_reader_idx = specific_version.index;
+        if (grow_reader_mapping(readlock.m_reader_idx)) { // throws
+            // remapping takes time, so retry with a fresh entry
+            continue;
+        }
+        const Ringbuffer::ReadCount& r = r_info->readers.get(readlock.m_reader_idx);
+
+        // if the entry is stale and has been cleared by the cleanup process,
+        // the requested version is no longer available
+        if (! atomic_double_inc_if_even(r.count)) // <-- most of the exec time spent here!
+            return false;
+
+        // we managed to lock an entry in the ringbuffer, but it may be so old that
+        // the version doesn't match the specific request. In that case we must release and fail
+        if (r.version != specific_version.version) {
+            atomic_double_dec(r.count); // <-- release
+            return false;
+        }
+        same_as_before       = readlock.m_version == r.version;
+        readlock.m_version   = r.version;
+        readlock.m_top_ref   = to_size_t(r.current_top);
+        readlock.m_file_size = to_size_t(r.filesize);
+        return true;
+    }
+}
+
+
+const Group& SharedGroup::begin_read(VersionID specific_version)
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Ready);
 
     bool same_version_as_before;
-    grab_latest_readlock(m_readlock, same_version_as_before);
+    if (specific_version.version) {
+        bool success = grab_specific_readlock(m_readlock, same_version_as_before, specific_version);
+        if (!success)
+            throw UnreachableVersion();
+    }
+    else {
+        grab_latest_readlock(m_readlock, same_version_as_before);
+    }
     if (same_version_as_before && m_group.may_reattach_if_same_version()) {
         m_group.reattach_from_retained_data();
     }
@@ -1069,7 +1112,7 @@ void SharedGroup::promote_to_write()
 }
 
 
-void SharedGroup::advance_read()
+void SharedGroup::advance_read(VersionID specific_version)
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Reading);
 
@@ -1077,13 +1120,24 @@ void SharedGroup::advance_read()
     bool same_as_before;
     Replication* repl = _impl::GroupFriend::get_replication(m_group);
 
+    // we cannot move backward in time (yet)
+    if (specific_version.version && specific_version.version < old_readlock.m_version) {
+        throw UnreachableVersion();
+    }
+
     // advance current readlock while holding onto old one - we MUST hold onto
     // the old readlock until after the call to advance_transact. Once a readlock
     // is released, the release may propagate to the commit log management, causing
     // it to reclaim memory for old commit logs. We must finished use of the commit log
     // before allowing that to happen.
-    grab_latest_readlock(m_readlock, same_as_before); // Throws
-
+    if (specific_version.version) {
+        bool success = grab_specific_readlock(m_readlock, same_as_before, specific_version);
+        if (!success) 
+            throw UnreachableVersion();
+    }
+    else {
+        grab_latest_readlock(m_readlock, same_as_before); // Throws
+    }
     if (same_as_before) {
         release_readlock(old_readlock);
         return;
@@ -1131,7 +1185,7 @@ Group& SharedGroup::begin_write()
 
     try {
         do_begin_write();
-        begin_read();
+        begin_read(0);
     }
     catch (...) {
 #ifdef TIGHTDB_ENABLE_REPLICATION
