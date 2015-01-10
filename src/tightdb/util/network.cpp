@@ -174,7 +174,7 @@ public:
         for (size_t i = 0; i < m_poll_handlers.size(); ++i) {
             if (m_poll_handlers[i].read_handler)
                 ++num_poll_handlers;
-            if (m_poll_handlers[i].read_handler)
+            if (m_poll_handlers[i].write_handler)
                 ++num_poll_handlers;
         }
         TIGHTDB_ASSERT(num_poll_handlers == m_num_poll_handlers);
