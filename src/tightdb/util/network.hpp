@@ -72,7 +72,7 @@ private:
     int m_protocol;
 
     friend class resolver;
-    friend class socket;
+    friend class socket_base;
 };
 
 
@@ -126,6 +126,7 @@ private:
     sockaddr_union_type m_sockaddr_union;
 
     friend class resolver;
+    friend class socket_base;
     friend class socket;
     friend class acceptor;
 };
@@ -261,10 +262,9 @@ private:
 };
 
 
-class socket {
+class socket_base {
 public:
-    socket(io_service&);
-    ~socket() TIGHTDB_NOEXCEPT;
+    ~socket_base() TIGHTDB_NOEXCEPT;
 
     io_service& service();
 
@@ -273,11 +273,99 @@ public:
     void open(const protocol&);
     error_code open(const protocol&, error_code&);
 
+    void close();
+    error_code close(error_code&);
+
+    template<class O> void get_option(O& option) const;
+    template<class O> error_code get_option(O& option, error_code& ec) const
+    {
+        option.get(*this, ec);
+        return ec;
+    }
+
+    template<class O> void set_option(const O& option);
+    template<class O> error_code set_option(const O& option, error_code& ec)
+    {
+        option.set(*this, ec);
+        return ec;
+    }
+
     void bind(const endpoint&);
     error_code bind(const endpoint&, error_code&);
 
     endpoint local_endpoint() const;
     endpoint local_endpoint(error_code&) const;
+
+private:
+    enum opt_enum {
+        opt_ReuseAddr ///< `SOL_SOCKET`, `SO_REUSEADDR`
+    };
+
+    template<class, int, class> class option;
+
+public:
+    typedef option<bool, opt_ReuseAddr, int> reuse_address;
+
+protected:
+    io_service& m_service;
+    protocol m_protocol;
+    int m_sock_fd;
+
+    socket_base(io_service&);
+
+    void get_option(opt_enum, void* value_data, std::size_t& value_size, error_code&);
+    void set_option(opt_enum, const void* value_data, std::size_t value_size, error_code&);
+    void map_option(opt_enum, int& level, int& option_name);
+
+    friend class acceptor;
+    friend class buffered_input_stream;
+    template<class H> friend void async_write(socket&, const char*, std::size_t, const H&);
+};
+
+
+template<class T, int opt, class U> class socket_base::option {
+public:
+    option(T value = T()):
+        m_value(value)
+    {
+    }
+
+    T value() const
+    {
+        return m_value;
+    }
+
+private:
+    T m_value;
+
+    void get(const socket_base& sock, error_code& ec)
+    {
+        union {
+            U value;
+            char strut[sizeof (U) + 1];
+        };
+        size_t value_size = sizeof strut;
+        sock.get_option(opt_enum(opt), &value, value_size, ec);
+        if (!ec) {
+            TIGHTDB_ASSERT(value_size == sizeof value);
+            m_value = T(value);
+        }
+    }
+
+    void set(socket_base& sock, error_code& ec) const
+    {
+        U value = U(m_value);
+        sock.set_option(opt_enum(opt), &value, sizeof value, ec);
+    }
+
+    friend class socket_base;
+};
+
+
+class socket: public socket_base {
+public:
+    socket(io_service&);
+    ~socket() TIGHTDB_NOEXCEPT {}
 
     void connect(const endpoint&);
     error_code connect(const endpoint&, error_code&);
@@ -287,38 +375,13 @@ public:
 
     std::size_t write_some(const char* data, std::size_t size);
     std::size_t write_some(const char* data, std::size_t size, error_code&) TIGHTDB_NOEXCEPT;
-
-    void close();
-    error_code close(error_code&);
-
-private:
-    io_service& m_service;
-    protocol m_protocol;
-    int m_sock_fd;
-
-    friend class acceptor;
-    friend class buffered_input_stream;
-    template<class H> friend void async_write(socket&, const char*, std::size_t, const H&);
 };
 
 
-class acceptor: private socket {
+class acceptor: public socket_base {
 public:
     acceptor(io_service&);
     ~acceptor() TIGHTDB_NOEXCEPT {}
-
-    io_service& service();
-
-    bool is_open() const;
-
-    void open(const protocol&);
-    error_code open(const protocol&, error_code&);
-
-    void bind(const endpoint&);
-    error_code bind(const endpoint&, error_code&);
-
-    endpoint local_endpoint() const;
-    endpoint local_endpoint(error_code&) const;
 
     static const int max_connections = SOMAXCONN;
 
@@ -332,9 +395,6 @@ public:
 
     template<class H> void async_accept(socket&, const H& handler);
     template<class H> void async_accept(socket&, endpoint&, const H& handler);
-
-    void close();
-    error_code close(error_code&);
 
 private:
     error_code accept(socket&, endpoint*, error_code&);
@@ -615,50 +675,62 @@ inline std::string resolver::query::service() const
     return m_service;
 }
 
-inline socket::socket(io_service& serv):
-    m_service(serv),
+inline socket_base::socket_base(io_service& service):
+    m_service(service),
     m_sock_fd(-1)
 {
 }
 
-inline socket::~socket() TIGHTDB_NOEXCEPT
+inline socket_base::~socket_base() TIGHTDB_NOEXCEPT
 {
     error_code ec;
     close(ec);
     // Ignore errors
 }
 
-inline io_service& socket::service()
+inline io_service& socket_base::service()
 {
     return m_service;
 }
 
-inline bool socket::is_open() const
+inline bool socket_base::is_open() const
 {
     return m_sock_fd != -1;
 }
 
-inline void socket::open(const protocol& prot)
+inline void socket_base::open(const protocol& prot)
 {
     error_code ec;
     if (open(prot, ec))
         throw system_error(ec);
 }
 
-inline void socket::bind(const endpoint& ep)
+inline void socket_base::close()
+{
+    error_code ec;
+    if (close(ec))
+        throw system_error(ec);
+}
+
+inline void socket_base::bind(const endpoint& ep)
 {
     error_code ec;
     if (bind(ep, ec))
         throw system_error(ec);
 }
 
-inline endpoint socket::local_endpoint() const
+inline endpoint socket_base::local_endpoint() const
 {
     error_code ec;
     endpoint ep = local_endpoint(ec);
     if (ec)
         throw system_error(ec);
     return ep;
+}
+
+inline socket::socket(io_service& service):
+    socket_base(service)
+{
 }
 
 inline void socket::connect(const endpoint& ep)
@@ -686,56 +758,9 @@ inline std::size_t socket::write_some(const char* data, std::size_t size)
     return n;
 }
 
-inline void socket::close()
+inline acceptor::acceptor(io_service& service):
+    socket_base(service)
 {
-    error_code ec;
-    if (close(ec))
-        throw system_error(ec);
-}
-
-inline acceptor::acceptor(io_service& serv):
-    socket(serv)
-{
-}
-
-inline io_service& acceptor::service()
-{
-    return socket::service();
-}
-
-inline bool acceptor::is_open() const
-{
-    return socket::is_open();
-}
-
-inline void acceptor::open(const protocol& prot)
-{
-    socket::open(prot);
-}
-
-inline error_code acceptor::open(const protocol& prot, error_code& ec)
-{
-    return socket::open(prot, ec);
-}
-
-inline void acceptor::bind(const endpoint& ep)
-{
-    socket::bind(ep);
-}
-
-inline error_code acceptor::bind(const endpoint& ep, error_code& ec)
-{
-    return socket::bind(ep, ec);
-}
-
-inline endpoint acceptor::local_endpoint() const
-{
-    return socket::local_endpoint();
-}
-
-inline endpoint acceptor::local_endpoint(error_code& ec) const
-{
-    return socket::local_endpoint(ec);
 }
 
 inline void acceptor::listen(int backlog)
@@ -779,16 +804,6 @@ template<class H> inline void acceptor::async_accept(socket& sock, const H& hand
 template<class H> inline void acceptor::async_accept(socket& sock, endpoint& ep, const H& handler)
 {
     async_accept(sock, &ep, handler);
-}
-
-inline void acceptor::close()
-{
-    socket::close();
-}
-
-inline error_code acceptor::close(error_code& ec)
-{
-    return socket::close(ec);
 }
 
 template<class H> class acceptor::accept_handler:
