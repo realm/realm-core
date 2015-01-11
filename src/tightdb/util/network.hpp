@@ -276,8 +276,8 @@ public:
     void bind(const endpoint&);
     error_code bind(const endpoint&, error_code&);
 
-    endpoint local_endpoint();
-    endpoint local_endpoint(error_code&);
+    endpoint local_endpoint() const;
+    endpoint local_endpoint(error_code&) const;
 
     void connect(const endpoint&);
     error_code connect(const endpoint&, error_code&);
@@ -317,8 +317,8 @@ public:
     void bind(const endpoint&);
     error_code bind(const endpoint&, error_code&);
 
-    endpoint local_endpoint();
-    endpoint local_endpoint(error_code&);
+    endpoint local_endpoint() const;
+    endpoint local_endpoint(error_code&) const;
 
     static const int max_connections = SOMAXCONN;
 
@@ -652,7 +652,7 @@ inline void socket::bind(const endpoint& ep)
         throw system_error(ec);
 }
 
-inline endpoint socket::local_endpoint()
+inline endpoint socket::local_endpoint() const
 {
     error_code ec;
     endpoint ep = local_endpoint(ec);
@@ -728,12 +728,12 @@ inline error_code acceptor::bind(const endpoint& ep, error_code& ec)
     return socket::bind(ep, ec);
 }
 
-inline endpoint acceptor::local_endpoint()
+inline endpoint acceptor::local_endpoint() const
 {
     return socket::local_endpoint();
 }
 
-inline endpoint acceptor::local_endpoint(error_code& ec)
+inline endpoint acceptor::local_endpoint(error_code& ec) const
 {
     return socket::local_endpoint(ec);
 }

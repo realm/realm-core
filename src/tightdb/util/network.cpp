@@ -592,7 +592,7 @@ error_code socket::bind(const endpoint& ep, error_code& ec)
 }
 
 
-endpoint socket::local_endpoint(error_code& ec)
+endpoint socket::local_endpoint(error_code& ec) const
 {
     endpoint ep;
     union union_type {
