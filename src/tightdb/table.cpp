@@ -2839,7 +2839,7 @@ void Table::insert_done()
 
 size_t Table::count_int(size_t col_ndx, int64_t value) const
 {
-    if(!m_columns.is_attached())
+    if (!m_columns.is_attached())
         return 0;
 
     const Column& column = get_column<Column, col_type_Int>(col_ndx);
@@ -2847,7 +2847,7 @@ size_t Table::count_int(size_t col_ndx, int64_t value) const
 }
 size_t Table::count_float(size_t col_ndx, float value) const
 {
-    if(!m_columns.is_attached())
+    if (!m_columns.is_attached())
         return 0;
 
     const ColumnFloat& column = get_column<ColumnFloat, col_type_Float>(col_ndx);
@@ -2855,7 +2855,7 @@ size_t Table::count_float(size_t col_ndx, float value) const
 }
 size_t Table::count_double(size_t col_ndx, double value) const
 {
-    if(!m_columns.is_attached())
+    if (!m_columns.is_attached())
         return 0;
 
     const ColumnDouble& column = get_column<ColumnDouble, col_type_Double>(col_ndx);
@@ -2865,7 +2865,7 @@ size_t Table::count_string(size_t col_ndx, StringData value) const
 {
     TIGHTDB_ASSERT(!m_columns.is_attached() || col_ndx < get_column_count());
 
-    if(!m_columns.is_attached())
+    if (!m_columns.is_attached())
         return 0;
 
     ColumnType type = get_real_column_type(col_ndx);
@@ -2884,7 +2884,7 @@ size_t Table::count_string(size_t col_ndx, StringData value) const
 
 int64_t Table::sum_int(size_t col_ndx) const
 {
-    if(!m_columns.is_attached())
+    if (!m_columns.is_attached())
         return 0;
 
     const Column& column = get_column<Column, col_type_Int>(col_ndx);
@@ -2892,7 +2892,7 @@ int64_t Table::sum_int(size_t col_ndx) const
 }
 double Table::sum_float(size_t col_ndx) const
 {
-    if(!m_columns.is_attached())
+    if (!m_columns.is_attached())
         return 0.f;
 
     const ColumnFloat& column = get_column<ColumnFloat, col_type_Float>(col_ndx);
@@ -2900,7 +2900,7 @@ double Table::sum_float(size_t col_ndx) const
 }
 double Table::sum_double(size_t col_ndx) const
 {
-    if(!m_columns.is_attached())
+    if (!m_columns.is_attached())
         return 0.;
 
     const ColumnDouble& column = get_column<ColumnDouble, col_type_Double>(col_ndx);
@@ -2911,7 +2911,7 @@ double Table::sum_double(size_t col_ndx) const
 
 double Table::average_int(size_t col_ndx) const
 {
-    if(!m_columns.is_attached())
+    if (!m_columns.is_attached())
         return 0;
 
     const Column& column = get_column<Column, col_type_Int>(col_ndx);
@@ -2919,7 +2919,7 @@ double Table::average_int(size_t col_ndx) const
 }
 double Table::average_float(size_t col_ndx) const
 {
-    if(!m_columns.is_attached())
+    if (!m_columns.is_attached())
         return 0.f;
 
     const ColumnFloat& column = get_column<ColumnFloat, col_type_Float>(col_ndx);
@@ -2927,7 +2927,7 @@ double Table::average_float(size_t col_ndx) const
 }
 double Table::average_double(size_t col_ndx) const
 {
-    if(!m_columns.is_attached())
+    if (!m_columns.is_attached())
         return 0.;
 
     const ColumnDouble& column = get_column<ColumnDouble, col_type_Double>(col_ndx);
@@ -2940,7 +2940,7 @@ double Table::average_double(size_t col_ndx) const
 
 int64_t Table::minimum_int(size_t col_ndx, size_t* return_ndx) const
 {
-    if(!m_columns.is_attached())
+    if (!m_columns.is_attached())
         return 0;
 
 #if USE_COLUMN_AGGREGATE
@@ -2963,7 +2963,7 @@ int64_t Table::minimum_int(size_t col_ndx, size_t* return_ndx) const
 
 float Table::minimum_float(size_t col_ndx, size_t* return_ndx) const
 {
-    if(!m_columns.is_attached())
+    if (!m_columns.is_attached())
         return 0.f;
 
     const ColumnFloat& column = get_column<ColumnFloat, col_type_Float>(col_ndx);
@@ -2972,7 +2972,7 @@ float Table::minimum_float(size_t col_ndx, size_t* return_ndx) const
 
 double Table::minimum_double(size_t col_ndx, size_t* return_ndx) const
 {
-    if(!m_columns.is_attached())
+    if (!m_columns.is_attached())
         return 0.;
 
     const ColumnDouble& column = get_column<ColumnDouble, col_type_Double>(col_ndx);
@@ -2981,7 +2981,7 @@ double Table::minimum_double(size_t col_ndx, size_t* return_ndx) const
 
 DateTime Table::minimum_datetime(size_t col_ndx, size_t* return_ndx) const
 {
-    if(!m_columns.is_attached())
+    if (!m_columns.is_attached())
         return 0.;
 
     const Column& column = get_column<Column, col_type_DateTime>(col_ndx);
@@ -2992,7 +2992,7 @@ DateTime Table::minimum_datetime(size_t col_ndx, size_t* return_ndx) const
 
 int64_t Table::maximum_int(size_t col_ndx, size_t* return_ndx) const
 {
-    if(!m_columns.is_attached())
+    if (!m_columns.is_attached())
         return 0;
 
 #if USE_COLUMN_AGGREGATE
@@ -3015,7 +3015,7 @@ int64_t Table::maximum_int(size_t col_ndx, size_t* return_ndx) const
 
 float Table::maximum_float(size_t col_ndx, size_t* return_ndx) const
 {
-    if(!m_columns.is_attached())
+    if (!m_columns.is_attached())
         return 0.f;
 
     const ColumnFloat& column = get_column<ColumnFloat, col_type_Float>(col_ndx);
@@ -3024,7 +3024,7 @@ float Table::maximum_float(size_t col_ndx, size_t* return_ndx) const
 
 double Table::maximum_double(size_t col_ndx, size_t* return_ndx) const
 {
-    if(!m_columns.is_attached())
+    if (!m_columns.is_attached())
         return 0.;
 
     const ColumnDouble& column = get_column<ColumnDouble, col_type_Double>(col_ndx);
@@ -3033,7 +3033,7 @@ double Table::maximum_double(size_t col_ndx, size_t* return_ndx) const
 
 DateTime Table::maximum_datetime(size_t col_ndx, size_t* return_ndx) const
 {
-    if(!m_columns.is_attached())
+    if (!m_columns.is_attached())
         return 0.;
 
     const Column& column = get_column<Column, col_type_DateTime>(col_ndx);
@@ -3102,7 +3102,7 @@ template<class T> size_t Table::find_first(size_t col_ndx, T value) const
     TIGHTDB_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
     TIGHTDB_ASSERT(get_real_column_type(col_ndx) == ColumnTypeTraits3<T>::ct_id_real);
 
-    if(!m_columns.is_attached())
+    if (!m_columns.is_attached())
         return not_found;
 
     typedef typename ColumnTypeTraits3<T>::column_type ColType;
@@ -3132,7 +3132,7 @@ size_t Table::find_first_datetime(size_t col_ndx, DateTime value) const
     TIGHTDB_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
     TIGHTDB_ASSERT(get_real_column_type(col_ndx) == col_type_DateTime);
 
-    if(!m_columns.is_attached())
+    if (!m_columns.is_attached())
         return not_found;
 
     const Column& column = get_column(col_ndx);
@@ -3153,7 +3153,7 @@ size_t Table::find_first_double(size_t col_ndx, double value) const
 size_t Table::find_first_string(size_t col_ndx, StringData value) const
 {
     TIGHTDB_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
-    if(!m_columns.is_attached())
+    if (!m_columns.is_attached())
         return not_found;
 
     ColumnType type = get_real_column_type(col_ndx);
@@ -3272,7 +3272,7 @@ TableView Table::get_distinct_view(size_t col_ndx)
     TableView tv(*this);
     Column& refs = tv.m_row_indexes;
 
-    if(m_columns.is_attached()) {
+    if (m_columns.is_attached()) {
         ColumnType type = get_real_column_type(col_ndx);
         const StringIndex* index;
         if (type == col_type_String) {
@@ -3680,7 +3680,7 @@ size_t Table::upper_bound_double(size_t col_ndx, double value) const TIGHTDB_NOE
 size_t Table::lower_bound_string(size_t col_ndx, StringData value) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
-    if(!m_columns.is_attached())
+    if (!m_columns.is_attached())
         return 0;
 
     ColumnType type = get_real_column_type(col_ndx);
@@ -3696,7 +3696,7 @@ size_t Table::lower_bound_string(size_t col_ndx, StringData value) const TIGHTDB
 size_t Table::upper_bound_string(size_t col_ndx, StringData value) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
-    if(!m_columns.is_attached())
+    if (!m_columns.is_attached())
         return 0;
 
     ColumnType type = get_real_column_type(col_ndx);
