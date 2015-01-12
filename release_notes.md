@@ -2,7 +2,8 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
+* Creating distinct views on integer columns no longer causes an assert.
+* `AdaptiveStringColumn::find_all` with an index no longer returns its results twice.
 
 ### API breaking changes:
 
