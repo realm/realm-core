@@ -660,7 +660,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
                     util::File::Map<char> db_map;
                     db_map.map(alloc.m_file, File::access_ReadWrite, file_size);
                     File::UnmapGuard db_ug(db_map);
-                    alloc.prepare_for_update(db_map.get_addr());
+                    alloc.prepare_for_update(db_map.get_addr(), db_map);
                     db_map.sync();
                 }
 
