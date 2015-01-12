@@ -604,6 +604,16 @@ void SharedGroup::open(const string& path, bool no_create_file,
         if (int_cast_with_overflow_detect(m_file.get_size(), info_size))
             throw runtime_error("Lock file too large");
         if (info_size < sizeof (SharedInfo)) {
+            // If the file is marked as being initialized but is too small to
+            // contain a valid shared info block, then it was probably
+            // initialized by a different architecture
+            if (info_size > 0) {
+                TIGHTDB_STATIC_ASSERT(offsetof(SharedInfo, init_complete) == 0,
+                                      "init_complete should be the first field in SharedInfo");
+                File::Map<bool> info(m_file, File::access_ReadOnly, sizeof (bool), File::map_NoSync);
+                if (*info.get_addr())
+                    throw IncompatibleLockFile();
+            }
             continue;
         }
         // Map to memory
