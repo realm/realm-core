@@ -3256,17 +3256,19 @@ TableView Table::get_distinct_view(size_t col_ndx)
 
     if(m_columns.is_attached()) {
         ColumnType type = get_real_column_type(col_ndx);
+        const StringIndex* index;
         if (type == col_type_String) {
             const AdaptiveStringColumn& column = get_column_string(col_ndx);
-            const StringIndex& index = column.get_search_index();
-            index.distinct(refs);
+            index = &column.get_search_index();
         }
-        else {
-            TIGHTDB_ASSERT(type == col_type_StringEnum);
+        else if (type == col_type_StringEnum) {
             const ColumnStringEnum& column = get_column_string_enum(col_ndx);
-            const StringIndex& index = column.get_search_index();
-            index.distinct(refs);
+            index = &column.get_search_index();
+        } else {
+            const Column& column = get_column(col_ndx);
+            index = &column.get_search_index();
         }
+        index->distinct(refs);
     }
     return tv;
 }

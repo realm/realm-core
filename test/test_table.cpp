@@ -1455,6 +1455,70 @@ TEST(Table_Distinct)
 }
 
 
+TEST(Table_DistinctEnums)
+{
+    TestTableEnum table;
+    table.add(Mon, "A");
+    table.add(Tue, "B");
+    table.add(Wed, "C");
+    table.add(Thu, "B");
+    table.add(Fri, "C");
+    table.add(Sat, "D");
+    table.add(Sun, "D");
+    table.add(Mon, "D");
+
+    table.column().first.add_search_index();
+    CHECK(table.column().first.has_search_index());
+
+    TestTableEnum::View view = table.column().first.get_distinct_view();
+
+    CHECK_EQUAL(7, view.size());
+    CHECK_EQUAL(0, view.get_source_ndx(0));
+    CHECK_EQUAL(1, view.get_source_ndx(1));
+    CHECK_EQUAL(2, view.get_source_ndx(2));
+    CHECK_EQUAL(3, view.get_source_ndx(3));
+    CHECK_EQUAL(4, view.get_source_ndx(4));
+    CHECK_EQUAL(5, view.get_source_ndx(5));
+    CHECK_EQUAL(6, view.get_source_ndx(6));
+}
+
+
+TEST(Table_DistinctIntegers)
+{
+    Table table;
+    table.add_column(type_Int, "first");
+    table.add_empty_row(4);
+    table.set_int(0, 0, 1);
+    table.set_int(0, 1, 2);
+    table.set_int(0, 2, 3);
+    table.set_int(0, 3, 3);
+
+    table.add_search_index(0);
+    CHECK(table.has_search_index(0));
+
+    TableView view = table.get_distinct_view(0);
+
+    CHECK_EQUAL(3, view.size());
+}
+
+
+TEST(Table_DistinctBools)
+{
+    Table table;
+    table.add_column(type_Bool, "first");
+    table.add_empty_row(3);
+    table.set_bool(0, 0, true);
+    table.set_bool(0, 1, false);
+    table.set_bool(0, 2, true);
+
+    table.add_search_index(0);
+    CHECK(table.has_search_index(0));
+
+    TableView view = table.get_distinct_view(0);
+    CHECK_EQUAL(2, view.size());
+}
+
+
 /*
 TEST(Table_IndexInt)
 {
