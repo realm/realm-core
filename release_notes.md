@@ -2,7 +2,6 @@
 
 ### Bugfixes:
 
-* Creating distinct views on integer columns no longer causes an assert.
 * `AdaptiveStringColumn::find_all` with an index no longer returns its results twice.
 
 ### API breaking changes:
@@ -18,6 +17,7 @@
   a transaction accessing that same version from another ShareGroup. This is done
   by new forms of `SharedGroup::begin_read()`, `SharedGroup::advance_read()`.
   Operators are provided so that VersionID's may be compared.
+* Creating distinct views on integer, datetime, bool and enum columns is now possible.
 
 -----------
 
