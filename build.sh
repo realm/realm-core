@@ -395,9 +395,9 @@ download_openssl()
     fi
 
     echo 'Downloading OpenSSL...'
-    curl -L -s "http://www.openssl.org/source/openssl-1.0.1i.tar.gz" -o openssl.tar.gz || return 1
+    curl -L -s "http://www.openssl.org/source/openssl-1.0.1k.tar.gz" -o openssl.tar.gz || return 1
     tar -xzf openssl.tar.gz || return 1
-    mv openssl-1.0.1i openssl || return 1
+    mv openssl-1.0.1k openssl || return 1
     rm openssl.tar.gz || return 1
 
     # A function we don't use calls OPENSSL_cleanse, which has all sorts of
