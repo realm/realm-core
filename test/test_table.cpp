@@ -1519,7 +1519,7 @@ TEST(Table_DistinctBools)
 }
 
 
-/*
+
 TEST(Table_IndexInt)
 {
     TestTable table;
@@ -1536,11 +1536,11 @@ TEST(Table_IndexInt)
     table.add(0,  9, true, Wed);
 
     // Create index for column two
-//    table.cols().second.add_search_index();
+    table.column().second.add_search_index();
 
     // Search for a value that does not exits
     const size_t r1 = table.column().second.find_first(2);
-    CHECK_EQUAL(-1, r1);
+    CHECK_EQUAL(npos, r1);
 
     // Find existing values
     CHECK_EQUAL(0, table.column().second.find_first(1));
@@ -1603,7 +1603,7 @@ TEST(Table_IndexInt)
     table.Verify();
 #endif
 }
-*/
+
 
 
 namespace {
