@@ -168,7 +168,7 @@ public:
     /// The specified address must be a writable memory mapping of the
     /// attached file, and the mapped region must be at least as big
     /// as what is returned by get_baseline().
-    void prepare_for_update(char* mutable_data);
+    void prepare_for_update(char* mutable_data, util::File::Map<char>& mapping);
 
     /// Reserve disk space now to avoid allocation errors at a later
     /// point in time, and to minimize on-disk fragmentation. In some
@@ -342,7 +342,7 @@ private:
 
     bool validate_buffer(const char* data, std::size_t len, ref_type& top_ref);
 
-    void do_prepare_for_update(char* mutable_data);
+    void do_prepare_for_update(char* mutable_data, util::File::Map<char>& mapping);
 
     class ChunkRefEq;
     class ChunkRefEndEq;
@@ -356,6 +356,7 @@ private:
 
     friend class Group;
     friend class GroupWriter;
+    friend class SharedGroup;
 };
 
 
@@ -408,12 +409,12 @@ inline std::size_t SlabAlloc::get_baseline() const TIGHTDB_NOEXCEPT
     return m_baseline;
 }
 
-inline void SlabAlloc::prepare_for_update(char* mutable_data)
+inline void SlabAlloc::prepare_for_update(char* mutable_data, util::File::Map<char>& mapping)
 {
     TIGHTDB_ASSERT(m_attach_mode == attach_SharedFile || m_attach_mode == attach_UnsharedFile);
     if (TIGHTDB_LIKELY(!m_file_on_streaming_form))
         return;
-    do_prepare_for_update(mutable_data);
+    do_prepare_for_update(mutable_data, mapping);
 }
 
 inline void SlabAlloc::reserve(std::size_t size)

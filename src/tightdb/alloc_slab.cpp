@@ -556,7 +556,7 @@ bool SlabAlloc::validate_buffer(const char* data, size_t size, ref_type& top_ref
 }
 
 
-void SlabAlloc::do_prepare_for_update(char* mutable_data)
+void SlabAlloc::do_prepare_for_update(char* mutable_data, util::File::Map<char>& mapping)
 {
     TIGHTDB_ASSERT(m_file_on_streaming_form);
     Header* header = reinterpret_cast<Header*>(mutable_data);
@@ -565,7 +565,7 @@ void SlabAlloc::do_prepare_for_update(char* mutable_data)
     StreamingFooter* footer = reinterpret_cast<StreamingFooter*>(mutable_data+m_baseline) - 1;
     TIGHTDB_ASSERT(footer->m_magic_cookie == footer_magic_cookie);
     header->m_top_ref[1] = footer->m_top_ref;
-    // FIXME: We probably need a call to msync() here
+    mapping.sync();
     header->m_flags |= flags_SelectBit; // keep bit 1 used for server sync mode unchanged
     m_file_on_streaming_form = false;
 }
