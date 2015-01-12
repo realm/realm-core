@@ -626,6 +626,9 @@ void SharedGroup::open(const string& path, bool no_create_file,
             continue;
         }
 
+        if (!info->controlmutex.is_valid())
+            throw IncompatibleLockFile();
+
         // OK! lock file appears valid. We can now continue operations under the protection
         // of the controlmutex. The controlmutex protects the following activities:
         // - attachment of the database file

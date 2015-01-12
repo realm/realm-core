@@ -218,6 +218,9 @@ public:
     /// lock() function.
     void mark_as_consistent() TIGHTDB_NOEXCEPT;
 
+    /// Check if this mutex is a valid mutex for the current platform.
+    bool is_valid() TIGHTDB_NOEXCEPT;
+
     friend class CondVar;
 };
 
