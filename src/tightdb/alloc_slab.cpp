@@ -450,7 +450,7 @@ ref_type SlabAlloc::attach_file(const string& path, bool is_shared, bool read_on
         m_baseline    = size;
         m_attach_mode = is_shared ? attach_SharedFile : attach_UnsharedFile;
         if (did_create) {
-            File::Map<Header> writable_map(m_file, File::access_ReadWrite, sizeof(Header)); // Throws
+            File::Map<Header> writable_map(m_file, File::access_ReadWrite, sizeof (Header)); // Throws
             Header* header = writable_map.get_addr();
             header->m_select_bit |= server_sync_mode ? 0x2 : 0x0;
             header = reinterpret_cast<Header*>(m_data);
@@ -556,7 +556,7 @@ bool SlabAlloc::validate_buffer(const char* data, size_t size, ref_type& top_ref
 }
 
 
-void SlabAlloc::do_prepare_for_update(char* mutable_data)
+void SlabAlloc::do_prepare_for_update(char* mutable_data, util::File::Map<char>& mapping)
 {
     TIGHTDB_ASSERT(m_file_on_streaming_form);
     Header* header = reinterpret_cast<Header*>(mutable_data);
@@ -565,6 +565,7 @@ void SlabAlloc::do_prepare_for_update(char* mutable_data)
     StreamingFooter* footer = reinterpret_cast<StreamingFooter*>(mutable_data+m_baseline) - 1;
     TIGHTDB_ASSERT(footer->m_magic_cookie == footer_magic_cookie);
     header->m_top_ref[1] = footer->m_top_ref;
+    mapping.sync();
     header->m_select_bit |= 1; // keep bit 1 used for server sync mode unchanged
     m_file_on_streaming_form = false;
 }

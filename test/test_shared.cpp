@@ -2047,6 +2047,41 @@ TEST(Shared_WaitForChange)
 
 #endif // endif not on windows
 
+TEST(Shared_MultipleSharersOfStreamingFormat)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    {
+        // Create non-empty file without free-space tracking
+        Group g;
+        g.add_table("x");
+        g.write(path, crypt_key());
+    }
+    {
+        // See if we can handle overlapped accesses through multiple shared groups
+        SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());
+        SharedGroup sg2(path, false, SharedGroup::durability_Full, crypt_key());
+        {
+            ReadTransaction rt(sg);
+            rt.get_group().Verify();
+            CHECK(rt.has_table("x"));
+            CHECK(!rt.has_table("gnyf"));
+            CHECK(!rt.has_table("baz"));
+        }
+        {
+            WriteTransaction wt(sg);
+            wt.get_group().Verify();
+            wt.add_table("baz"); // Add table "baz"
+            wt.commit();
+        }
+        {
+            WriteTransaction wt2(sg2);
+            wt2.get_group().Verify();
+            wt2.add_table("gnyf"); // Add table "gnyf"
+            wt2.commit();
+        }
+    }
+}
+
 TEST(Shared_MixedWithNonShared)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -2140,28 +2175,11 @@ TEST(Shared_MixedWithNonShared)
         g.commit();
     }
     {
-        // See if we can still acces using shared group
         SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());
         {
             ReadTransaction rt(sg);
             rt.get_group().Verify();
-            CHECK(rt.has_table("foo"));
             CHECK(rt.has_table("bar"));
-            CHECK(!rt.has_table("baz"));
-        }
-        {
-            WriteTransaction wt(sg);
-            wt.get_group().Verify();
-            wt.add_table("baz"); // Add table "baz"
-            wt.commit();
-        }
-    }
-    {
-        SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());
-        {
-            ReadTransaction rt(sg);
-            rt.get_group().Verify();
-            CHECK(rt.has_table("baz"));
         }
     }
 
