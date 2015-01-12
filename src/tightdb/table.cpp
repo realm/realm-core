@@ -1373,8 +1373,7 @@ void Table::add_search_index(size_t col_ndx)
     }
     else if (type == col_type_Int || type == col_type_DateTime || type == col_type_Bool) {
         Column& col = get_column(col_ndx);
-        col.create_search_index(); // Throws
-        StringIndex& index = *static_cast<StringIndex*>(col.m_search_index);
+        StringIndex& index = col.create_search_index(); // Throws
         index.set_parent(&m_columns, column_pos + 1);
         index_ref = index.get_ref();
     }
@@ -1448,7 +1447,7 @@ bool Table::try_add_primary_key(size_t col_ndx)
     }
     else if (type == col_type_Int) {
         Column& col_2 = static_cast<Column&>(col);
-        StringIndex& index = *static_cast<StringIndex*>(col_2.get_search_index());
+        StringIndex& index = col_2.get_search_index();
         if (index.has_duplicate_values())
             return false;
         index.set_allow_duplicate_values(false);
