@@ -99,6 +99,9 @@ inline ArrayBigBlobs::ArrayBigBlobs(Allocator& alloc) TIGHTDB_NOEXCEPT:
 inline BinaryData ArrayBigBlobs::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
     ref_type ref = get_as_ref(ndx);
+    if (ref == 0)
+        return BinaryData(null_ptr, 0);
+
     const char* blob_header = get_alloc().translate(ref);
     const char* value = ArrayBlob::get(blob_header, 0);
     size_t size = get_size_from_header(blob_header);
@@ -109,6 +112,9 @@ inline BinaryData ArrayBigBlobs::get(const char* header, size_t ndx,
                                      Allocator& alloc) TIGHTDB_NOEXCEPT
 {
     ref_type blob_ref = to_ref(Array::get(header, ndx));
+    if (blob_ref == 0)
+        return BinaryData(null_ptr, 0);
+
     const char* blob_header = alloc.translate(blob_ref);
     const char* blob_data = Array::get_data_from_header(blob_header);
     size_t blob_size = Array::get_size_from_header(blob_header);
@@ -118,7 +124,9 @@ inline BinaryData ArrayBigBlobs::get(const char* header, size_t ndx,
 inline void ArrayBigBlobs::erase(std::size_t ndx)
 {
     ref_type blob_ref = Array::get_as_ref(ndx);
-    Array::destroy(blob_ref, get_alloc()); // Shallow
+    if (blob_ref != 0) { // nothing to destroy if null
+        Array::destroy(blob_ref, get_alloc()); // Shallow
+    }
     Array::erase(ndx);
 }
 
@@ -140,7 +148,10 @@ inline void ArrayBigBlobs::destroy()
 inline StringData ArrayBigBlobs::get_string(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
     BinaryData bin = get(ndx);
-    return StringData(bin.data(), bin.size()-1); // Do not include terminating zero
+    if (bin.data() == null_ptr)
+        return StringData(null_ptr, 0);
+    else
+        return StringData(bin.data(), bin.size()-1); // Do not include terminating zero
 }
 
 inline void ArrayBigBlobs::set_string(std::size_t ndx, StringData value)
@@ -168,7 +179,10 @@ inline StringData ArrayBigBlobs::get_string(const char* header, size_t ndx,
                                             Allocator& alloc) TIGHTDB_NOEXCEPT
 {
     BinaryData bin = get(header, ndx, alloc);
-    return StringData(bin.data(), bin.size()-1); // Do not include terminating zero
+    if (bin.data() == null_ptr)
+        return StringData(null_ptr, 0);
+    else
+        return StringData(bin.data(), bin.size()-1); // Do not include terminating zero
 }
 
 inline ref_type ArrayBigBlobs::bptree_leaf_insert_string(std::size_t ndx, StringData value,

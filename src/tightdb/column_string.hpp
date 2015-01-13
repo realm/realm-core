@@ -56,6 +56,8 @@ public:
     std::size_t size() const TIGHTDB_NOEXCEPT;
     bool is_empty() const TIGHTDB_NOEXCEPT { return size() == 0; }
 
+    bool is_null(std::size_t ndx) const TIGHTDB_NOEXCEPT;
+    void set_null(std::size_t ndx);
     StringData get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
     void set(std::size_t ndx, StringData);
     void add(StringData value = StringData());

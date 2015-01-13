@@ -16,10 +16,15 @@ void ArrayBigBlobs::add(BinaryData value, bool add_zero_term)
 {
     TIGHTDB_ASSERT(value.size() == 0 || value.data());
 
-    ArrayBlob new_blob(m_alloc);
-    new_blob.create(); // Throws
-    new_blob.add(value.data(), value.size(), add_zero_term); // Throws
-    Array::add(int_fast64_t(new_blob.get_ref())); // Throws
+    if (value.data() == null_ptr) {
+        Array::add(0); // Throws
+    }
+    else {
+        ArrayBlob new_blob(m_alloc);
+        new_blob.create(); // Throws
+        new_blob.add(value.data(), value.size(), add_zero_term); // Throws
+        Array::add(int_fast64_t(new_blob.get_ref())); // Throws
+    }
 }
 
 
@@ -30,10 +35,31 @@ void ArrayBigBlobs::set(std::size_t ndx, BinaryData value, bool add_zero_term)
 
     ArrayBlob blob(m_alloc);
     ref_type ref = get_as_ref(ndx);
-    blob.init_from_ref(ref);
-    blob.set_parent(this, ndx);
-    blob.clear(); // Throws
-    blob.add(value.data(), value.size(), add_zero_term); // Throws
+
+    if (ref == 0 && value.data() == null_ptr) {
+        return;
+    }
+    else if (ref == 0 && value.data() != null_ptr) {
+        ArrayBlob new_blob(m_alloc);
+        new_blob.create(); // Throws
+        new_blob.add(value.data(), value.size(), add_zero_term); // Throws
+        ref = new_blob.get_ref();
+        Array::set(ndx, int_fast64_t(ref));
+        return;
+    }
+    else if (ref != 0 && value.data() != null_ptr) {
+        blob.init_from_ref(ref);
+        blob.set_parent(this, ndx);
+        blob.clear(); // Throws
+        blob.add(value.data(), value.size(), add_zero_term); // Throws
+        return;
+    }
+    else if (ref != 0 && value.data() == null_ptr) {
+        Array::destroy(ref, get_alloc()); // Shallow
+        Array::set(ndx, 0);
+        return;
+    }
+    TIGHTDB_ASSERT(false);
 }
 
 
@@ -42,10 +68,16 @@ void ArrayBigBlobs::insert(size_t ndx, BinaryData value, bool add_zero_term)
     TIGHTDB_ASSERT(ndx <= size());
     TIGHTDB_ASSERT(value.size() == 0 || value.data());
 
-    ArrayBlob new_blob(m_alloc);
-    new_blob.create(); // Throws
-    new_blob.add(value.data(), value.size(), add_zero_term); // Throws
-    Array::insert(ndx, int_fast64_t(new_blob.get_ref())); // Throws
+    if (value.data() == null_ptr) {
+        Array::insert(ndx, 0); // Throws
+    }
+    else {
+        ArrayBlob new_blob(m_alloc);
+        new_blob.create(); // Throws
+        new_blob.add(value.data(), value.size(), add_zero_term); // Throws
+
+        Array::insert(ndx, int_fast64_t(new_blob.get_ref())); // Throws
+    }
 }
 
 
@@ -148,9 +180,11 @@ void ArrayBigBlobs::Verify() const
     TIGHTDB_ASSERT(has_refs());
     for (size_t i = 0; i < size(); ++i) {
         ref_type blob_ref = Array::get_as_ref(i);
-        ArrayBlob blob(m_alloc);
-        blob.init_from_ref(blob_ref);
-        blob.Verify();
+        if (blob_ref != 0) {
+            ArrayBlob blob(m_alloc);
+            blob.init_from_ref(blob_ref);
+            blob.Verify();
+        }
     }
 }
 
