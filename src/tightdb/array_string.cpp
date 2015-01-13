@@ -231,9 +231,7 @@ size_t ArrayString::find_first(StringData value, size_t begin, size_t end) const
     if (value.is_null()) {
         const char* data = m_data + (m_width-1);
         for (size_t i = begin; i != end; ++i) {
-            size_t size = (m_width-1) - data[i * m_width];
-            // left-hand-side tests if array element is NULL
-            if (TIGHTDB_UNLIKELY(size == static_cast<size_t>(-1)))
+            if (is_null(i))
                 return i;
         }
     }

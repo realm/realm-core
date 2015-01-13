@@ -5646,7 +5646,19 @@ ONLY(Query_NullStrings)
     CHECK_EQUAL(1, v.size());
     CHECK_EQUAL(2, v.get_source_ndx(0));
 
-    // Medium strings
+    // Medium strings (16+)
+    table.set_string(0, 0, "AlbertslundAlbertslundAlbert");
+    q = table.column<StringData>(0) == StringData(0, 0);
+    v = q.find_all();
+    CHECK_EQUAL(1, v.size());
+    CHECK_EQUAL(1, v.get_source_ndx(0));
+
+    q = table.column<StringData>(0) == "";
+    v = q.find_all();
+    CHECK_EQUAL(1, v.size());
+    CHECK_EQUAL(2, v.get_source_ndx(0));
+
+    // Long strings (64+)
     table.set_string(0, 0, "AlbertslundAlbertslundAlbertslundAlbertslundAlbertslundAlbertslundAlbertslund");
     q = table.column<StringData>(0) == StringData(0, 0);
     v = q.find_all();

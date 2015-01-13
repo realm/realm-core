@@ -119,7 +119,7 @@ size_t ArrayStringLong::find_first(StringData value, size_t begin,
         size_t end_2 = to_size_t(m_offsets.get(i));
         size_t end_3 = end_2 - 1; // Discount terminating zero
         StringData value_2 = StringData(m_blob.get(begin_2), end_3-begin_2);
-        if (value_2 == value)
+        if (value_2 == value && is_null(i) == value.is_null())
             return i;
         begin_2 = end_2;
     }
