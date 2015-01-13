@@ -126,7 +126,7 @@ public:
     /// DurabilityLevel) on a default constructed instance.
     explicit SharedGroup(const std::string& file, bool no_create = false,
                          DurabilityLevel dlevel = durability_Full,
-                         const uint8_t *encryption_key = 0);
+                         const char *encryption_key = 0);
 
     struct unattached_tag {};
 
@@ -170,7 +170,7 @@ public:
     /// among these derived exception types.
     void open(const std::string& file, bool no_create = false,
               DurabilityLevel dlevel = durability_Full,
-              bool is_backend = false, const uint8_t *encryption_key = 0);
+              bool is_backend = false, const char *encryption_key = 0);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
 
@@ -178,13 +178,13 @@ public:
     /// default constructed instance.
     explicit SharedGroup(Replication& repl,
                          DurabilityLevel dlevel = durability_Full,
-                         const uint8_t* encryption_key = 0);
+                         const char* encryption_key = 0);
 
     /// Open this group in replication mode. The specified Replication
     /// instance must remain in exixtence for as long as the
     /// SharedGroup.
     void open(Replication&, DurabilityLevel dlevel = durability_Full,
-              const uint8_t* encryption_key = 0);
+              const char* encryption_key = 0);
 
     friend class Replication;
 
@@ -235,29 +235,68 @@ public:
 
     // Transactions:
 
-    // Begin a new read transaction. Accessors obtained prior to this point
-    // are invalid (if they weren't already) and new accessors must be
-    // obtained from the group returned.
-    const Group& begin_read();
+    struct VersionID {
+        uint_fast64_t version;
+        uint_fast32_t index;
+        VersionID(const VersionID& v)
+        {
+            version = v.version;
+            index = v.index;
+        }
+        VersionID(uint_fast64_t version = 0, uint_fast32_t index = 0)
+        {
+            this->version = version;
+            this->index = index;
+        }
+        bool operator==(const VersionID& other) { return version == other.version; }
+        bool operator!=(const VersionID& other) { return version != other.version; }
+        bool operator<(const VersionID& other) { return version < other.version; }
+        bool operator<=(const VersionID& other) { return version <= other.version; }
+        bool operator>(const VersionID& other) { return version > other.version; }
+        bool operator>=(const VersionID& other) { return version >= other.version; }
+    };
 
-    // End a read transaction. Accessors are detached.
+    /// Exception thrown if an attempt to lock on to a specific version fails.
+    class UnreachableVersion : public std::exception {
+    public:
+        const char* what() const TIGHTDB_NOEXCEPT_OR_NOTHROW TIGHTDB_OVERRIDE
+        {
+            return "Failed to lock on to specific version";
+        }
+    };
+
+    /// Begin a new read transaction. Accessors obtained prior to this point
+    /// are invalid (if they weren't already) and new accessors must be
+    /// obtained from the group returned.
+    /// If a \a specific_version is given as parameter, an attempt will be made
+    /// to start the read transaction at that specific version. This is only
+    /// guaranteed to succeed if at least one other SharedGroup has a transaction
+    /// open pointing at that specific version. If the attempt fails, an exception
+    /// of type UnreachableVersion is thrown
+    const Group& begin_read(VersionID specific_version = VersionID());
+
+    /// End a read transaction. Accessors are detached.
     void end_read() TIGHTDB_NOEXCEPT;
 
-    // Begin a new write transaction. Accessors obtained prior to this point
-    // are invalid (if they weren't already) and new accessors must be
-    // obtained from the group returned. It is illegal to call begin_write
-    // inside an active transaction.
+    /// Get a version id which may be used to request a different SharedGroup
+    /// to start transaction at a specific version.
+    VersionID get_version_of_current_transaction();
+
+    /// Begin a new write transaction. Accessors obtained prior to this point
+    /// are invalid (if they weren't already) and new accessors must be
+    /// obtained from the group returned. It is illegal to call begin_write
+    /// inside an active transaction.
     Group& begin_write();
 
-    // End the current write transaction. All accessors are detached.
+    /// End the current write transaction. All accessors are detached.
     void commit();
 
-    // End the current write transaction. All accessors are detached.
+    /// End the current write transaction. All accessors are detached.
     void rollback() TIGHTDB_NOEXCEPT;
 
-    // Report the number of distinct versions currently stored in the database.
-    // Note: the database only cleans up versions as part of commit, so ending
-    // a read transaction will not immediately release any versions.
+    /// Report the number of distinct versions currently stored in the database.
+    /// Note: the database only cleans up versions as part of commit, so ending
+    /// a read transaction will not immediately release any versions.
     uint_fast64_t get_number_of_versions();
 
 #ifdef TIGHTDB_DEBUG
@@ -312,8 +351,13 @@ private:
     // is given an undefined value.
     void grab_latest_readlock(ReadLockInfo& readlock, bool& same_as_before);
 
+    // Try to grab a readlock for a specific version. Fails if the version is no longer
+    // accessible.
+    bool grab_specific_readlock(ReadLockInfo& readlock, bool& same_as_before, 
+                                VersionID specific_version);
+
     // Release a specific readlock. The readlock info MUST have been obtained by a
-    // call to grab_latest_readlock().
+    // call to grab_latest_readlock() or grab_specific_readlock().
     void release_readlock(ReadLockInfo& readlock) TIGHTDB_NOEXCEPT;
 
     void do_begin_write();
@@ -335,33 +379,39 @@ private:
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
 
-    // Advance the current read transaction to include latest state.
-    // All accessors are retained and synchronized to the new state
-    // according to the (to be) defined operational transform.
-    void advance_read();
+    /// Advance the current read transaction to include latest state.
+    /// All accessors are retained and synchronized to the new state
+    /// according to the (to be) defined operational transform.
+    /// If a \a specific_version is given as parameter, an attempt will be made
+    /// to start the read transaction at that specific version. This is only
+    /// guaranteed to succeed if at least one other SharedGroup has a transaction
+    /// open pointing at that specific version, and if the version requested
+    /// is the same or later than the one currently accessed.
+    /// Fails with exception UnreachableVersion.
+    void advance_read(VersionID specific_version = VersionID());
 
-    // Promote the current read transaction to a write transaction.
-    // CAUTION: This also synchronizes with latest state of the database,
-    // including synchronization of all accessors.
-    // FIXME: A version of this which does NOT synchronize with latest
-    // state will be made available later, once we are able to merge commits.
+    /// Promote the current read transaction to a write transaction.
+    /// CAUTION: This also synchronizes with latest state of the database,
+    /// including synchronization of all accessors.
+    /// FIXME: A version of this which does NOT synchronize with latest
+    /// state will be made available later, once we are able to merge commits.
     void promote_to_write();
 
-    // End the current write transaction and transition atomically into
-    // a read transaction, WITHOUT synchronizing to external changes
-    // to data. All accessors are retained and continue to reflect the
-    // state at commit.
+    /// End the current write transaction and transition atomically into
+    /// a read transaction, WITHOUT synchronizing to external changes
+    /// to data. All accessors are retained and continue to reflect the
+    /// state at commit.
     void commit_and_continue_as_read();
 
-    // Abort the current write transaction, discarding all changes within it,
-    // and thus restoring state to when promote_to_write() was last called.
-    // Any accessors referring to the aborted state will be detached. Accessors
-    // which was detached during the write transaction (for whatever reason)
-    // are not restored but will remain detached.
+    /// Abort the current write transaction, discarding all changes within it,
+    /// and thus restoring state to when promote_to_write() was last called.
+    /// Any accessors referring to the aborted state will be detached. Accessors
+    /// which was detached during the write transaction (for whatever reason)
+    /// are not restored but will remain detached.
     void rollback_and_continue_as_read();
 
-    // called by WriteLogCollector to transfer the actual commit log for
-    // accessor retention/update as part of rollback.
+    /// called by WriteLogCollector to transfer the actual commit log for
+    /// accessor retention/update as part of rollback.
     void do_rollback_and_continue_as_read(const char* begin, const char* end);
 #endif
     friend class ReadTransaction;
@@ -369,6 +419,7 @@ private:
     friend class LangBindHelper;
     friend class _impl::WriteLogCollector;
 };
+
 
 
 class ReadTransaction {
@@ -487,7 +538,7 @@ private:
 
 // Implementation:
 
-inline SharedGroup::SharedGroup(const std::string& file, bool no_create, DurabilityLevel dlevel, const uint8_t* key):
+inline SharedGroup::SharedGroup(const std::string& file, bool no_create, DurabilityLevel dlevel, const char* key):
     m_group(Group::shared_tag())
 {
     open(file, no_create, dlevel, false, key);
@@ -504,13 +555,12 @@ inline bool SharedGroup::is_attached() const TIGHTDB_NOEXCEPT
 }
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-inline SharedGroup::SharedGroup(Replication& repl, DurabilityLevel dlevel, const uint8_t* key):
+inline SharedGroup::SharedGroup(Replication& repl, DurabilityLevel dlevel, const char* key):
     m_group(Group::shared_tag())
 {
     open(repl, dlevel, key);
 }
 #endif
-
 
 } // namespace tightdb
 

@@ -73,6 +73,7 @@ private:
     uint64_t   m_readlock_version;
     util::File::Map<char> m_file_map;
 
+    // Merge adjacent chunks
     void merge_free_space();
 
     /// Allocate a chunk of free space of the specified size. The

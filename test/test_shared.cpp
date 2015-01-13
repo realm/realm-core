@@ -99,7 +99,7 @@ void writer(string path, int id)
     try {
         SharedGroup sg(path, true, SharedGroup::durability_Full);
         // cerr << "Opened sg, pid " << getpid() << endl;
-        for (int i=0; i<1000; ++i) {
+        for (int i=0;; ++i) {
             // cerr << "       - " << getpid() << endl;
             WriteTransaction wt(sg);
             if (i & 1) {
@@ -156,7 +156,6 @@ void killer(TestResults& test_results, int pid, string path, int id)
         ReadTransaction rt(sg);
         rt.get_group().Verify();
         TestTableShared::ConstRef t1 = rt.get_table<TestTableShared>("test");
-        CHECK(500 > t1[id].first);
         CHECK(10 < t1[id].first);
     }
 }
@@ -884,7 +883,9 @@ TEST(Shared_ManyReaders)
         for (int i = N-1; i >= 0; --i) {
             {
                 WriteTransaction wt(root_sg);
+#if !defined(_WIN32) || TEST_DURATION > 0  // These .Verify() calls are horribly slow on Windows
                 wt.get_group().Verify();
+#endif
                 TableRef test_1 = wt.get_table("test_1");
                 test_1->add_int(0,2);
                 wt.commit();
@@ -908,7 +909,9 @@ TEST(Shared_ManyReaders)
         // Initiate 6*N extra read transactionss with further progressive changes
         for (int i = 2*N; i < 8*N; ++i) {
             read_transactions[i].reset(new ReadTransaction(*shared_groups[i]));
+#if !defined(_WIN32) || TEST_DURATION > 0 
             read_transactions[i]->get_group().Verify();
+#endif
             {
                 ConstTableRef test_1 = read_transactions[i]->get_table("test_1");
                 CHECK_EQUAL(1u, test_1->size());
@@ -925,7 +928,9 @@ TEST(Shared_ManyReaders)
             }
             {
                 WriteTransaction wt(root_sg);
+#if !defined(_WIN32) || TEST_DURATION > 0 
                 wt.get_group().Verify();
+#endif
                 TableRef test_1 = wt.get_table("test_1");
                 test_1->add_int(0,1);
                 TableRef test_2 = wt.get_table("test_2");
@@ -935,7 +940,9 @@ TEST(Shared_ManyReaders)
             }
             {
                 WriteTransaction wt(root_sg);
+#if !defined(_WIN32) || TEST_DURATION > 0 
                 wt.get_group().Verify();
+#endif
                 TableRef test_2 = wt.get_table("test_2");
                 for (int j = 0; j < 18; ++j) {
                     test_2->insert_binary(0, test_2->size(), BinaryData(chunk_2));
@@ -949,7 +956,9 @@ TEST(Shared_ManyReaders)
         for (int i = 1*N; i < 8*N; ++i) {
             {
                 WriteTransaction wt(root_sg);
+#if !defined(_WIN32) || TEST_DURATION > 0 
                 wt.get_group().Verify();
+#endif
                 TableRef test_1 = wt.get_table("test_1");
                 test_1->add_int(0,2);
                 wt.commit();
@@ -975,7 +984,9 @@ TEST(Shared_ManyReaders)
         for (int i=0; i<8*N; ++i) {
             {
                 ReadTransaction rt(*shared_groups[i]);
+#if !defined(_WIN32) || TEST_DURATION > 0 
                 rt.get_group().Verify();
+#endif
                 ConstTableRef test_1 = rt.get_table("test_1");
                 CHECK_EQUAL(1, test_1->size());
                 CHECK_EQUAL(3*8*N, test_1->get_int(0,0));
@@ -995,7 +1006,9 @@ TEST(Shared_ManyReaders)
         {
             SharedGroup sg(path, no_create, SharedGroup::durability_MemOnly);
             ReadTransaction rt(sg);
+#if !defined(_WIN32) || TEST_DURATION > 0 
             rt.get_group().Verify();
+#endif
             ConstTableRef test_1 = rt.get_table("test_1");
             CHECK_EQUAL(1, test_1->size());
             CHECK_EQUAL(3*8*N, test_1->get_int(0,0));
@@ -1516,7 +1529,7 @@ TEST(Shared_FromSerialized)
 }
 
 
-TEST_IF(Shared_StringIndexBug1, TEST_DURATION >= 3)
+TEST_IF(Shared_StringIndexBug1, TEST_DURATION >= 1)
 {
     SHARED_GROUP_TEST_PATH(path);
     SharedGroup db(path, false, SharedGroup::durability_Full, crypt_key());
@@ -1989,6 +2002,41 @@ TEST(Shared_WaitForChange)
 
 #endif // endif not on windows
 
+TEST(Shared_MultipleSharersOfStreamingFormat)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    {
+        // Create non-empty file without free-space tracking
+        Group g;
+        g.add_table("x");
+        g.write(path, crypt_key());
+    }
+    {
+        // See if we can handle overlapped accesses through multiple shared groups
+        SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());
+        SharedGroup sg2(path, false, SharedGroup::durability_Full, crypt_key());
+        {
+            ReadTransaction rt(sg);
+            rt.get_group().Verify();
+            CHECK(rt.has_table("x"));
+            CHECK(!rt.has_table("gnyf"));
+            CHECK(!rt.has_table("baz"));
+        }
+        {
+            WriteTransaction wt(sg);
+            wt.get_group().Verify();
+            wt.add_table("baz"); // Add table "baz"
+            wt.commit();
+        }
+        {
+            WriteTransaction wt2(sg2);
+            wt2.get_group().Verify();
+            wt2.add_table("gnyf"); // Add table "gnyf"
+            wt2.commit();
+        }
+    }
+}
+
 TEST(Shared_MixedWithNonShared)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -2082,28 +2130,11 @@ TEST(Shared_MixedWithNonShared)
         g.commit();
     }
     {
-        // See if we can still acces using shared group
         SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());
         {
             ReadTransaction rt(sg);
             rt.get_group().Verify();
-            CHECK(rt.has_table("foo"));
             CHECK(rt.has_table("bar"));
-            CHECK(!rt.has_table("baz"));
-        }
-        {
-            WriteTransaction wt(sg);
-            wt.get_group().Verify();
-            wt.add_table("baz"); // Add table "baz"
-            wt.commit();
-        }
-    }
-    {
-        SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());
-        {
-            ReadTransaction rt(sg);
-            rt.get_group().Verify();
-            CHECK(rt.has_table("baz"));
         }
     }
 
@@ -2472,7 +2503,7 @@ TEST(Shared_MovingSearchIndex)
 }
 
 
-TEST(Shared_ArrayEraseBug)
+TEST_IF(Shared_ArrayEraseBug, TEST_DURATION >= 1)
 {
     // This test only makes sense when we can insert a number of rows
     // equal to the square of the maximum B+-tree node size.

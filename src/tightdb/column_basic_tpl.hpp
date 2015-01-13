@@ -73,7 +73,7 @@ inline std::size_t BasicColumn<T>::size() const TIGHTDB_NOEXCEPT
 template<class T>
 T BasicColumn<T>::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(ndx < size());
+    TIGHTDB_ASSERT_DEBUG(ndx < size());
     if (root_is_leaf())
         return static_cast<const BasicArray<T>*>(m_array)->get(ndx);
 

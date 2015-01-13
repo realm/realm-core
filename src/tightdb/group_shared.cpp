@@ -187,8 +187,6 @@ public:
     // at a time tries to perform cleanup. This is ensured by doing the cleanup
     // as part of write transactions, where mutual exclusion is assured by the
     // write mutex.
-
-    // FIXME: The use of uint_fast64_t is in principle wrong
     struct ReadCount {
         uint64_t version;
         uint64_t filesize;
@@ -331,9 +329,9 @@ public:
 
 private:
     // number of entries. Access synchronized through put_pos.
-    uint_fast32_t entries;
+    uint32_t entries;
     Atomic<uint32_t> put_pos; // only changed under lock, but accessed outside lock
-    uint_fast32_t old_pos; // only accessed during write transactions and under lock
+    uint32_t old_pos; // only accessed during write transactions and under lock
 
     const static int init_readers_size = 32;
 
@@ -381,7 +379,7 @@ struct SharedGroup::SharedInfo
     // because interprocess sharing is not supported by our current encryption mechanisms.
     uint64_t session_initiator_pid;
 
-    // Tracks the most recent version number. Should only be accessed 
+    // Tracks the most recent version number.
     uint16_t version;
     uint16_t flags;
     uint16_t free_write_slots;
@@ -566,7 +564,7 @@ void spawn_daemon(const string& file) {}
 // undefined state.
 
 void SharedGroup::open(const string& path, bool no_create_file,
-                       DurabilityLevel dlevel, bool is_backend, const uint8_t* key)
+                       DurabilityLevel dlevel, bool is_backend, const char* key)
 {
     TIGHTDB_ASSERT(!is_attached());
 
@@ -654,9 +652,20 @@ void SharedGroup::open(const string& path, bool no_create_file,
                                                  no_create, skip_validate, key, server_sync_mode); // Throws
             size_t file_size = alloc.get_baseline();
 
-            // determine version
-            uint_fast64_t version;
             if (begin_new_session) {
+
+                // make sure the database is not on streaming format. This has to be done at
+                // session initialization, even if it means writing the database during open.
+                if (alloc.m_file_on_streaming_form) {
+                    util::File::Map<char> db_map;
+                    db_map.map(alloc.m_file, File::access_ReadWrite, file_size);
+                    File::UnmapGuard db_ug(db_map);
+                    alloc.prepare_for_update(db_map.get_addr(), db_map);
+                    db_map.sync();
+                }
+
+                // determine version
+                uint_fast64_t version;
                 Array top(alloc);
                 if (top_ref) {
 
@@ -672,6 +681,11 @@ void SharedGroup::open(const string& path, bool no_create_file,
                         // the database was written by shared group, so it has versioning info
                         TIGHTDB_ASSERT(top.size() == 7);
                         version = top.get(6) / 2;
+                        // In case this was written by an older version of shared group, it
+                        // will have version 0. Version 0 is not a legal initial version, so
+                        // it has to be set to 1 instead.
+                        if (version == 0)
+                            version = 1;
                     }
                 }
                 else {
@@ -778,7 +792,7 @@ uint_fast64_t SharedGroup::get_number_of_versions()
 }
 #ifdef TIGHTDB_ENABLE_REPLICATION
 
-void SharedGroup::open(Replication& repl, DurabilityLevel dlevel, const uint8_t* key)
+void SharedGroup::open(Replication& repl, DurabilityLevel dlevel, const char* key)
 {
     TIGHTDB_ASSERT(!is_attached());
     string file = repl.get_database_path();
@@ -911,7 +925,7 @@ void SharedGroup::do_async_commits()
         if (!is_same) {
 
 #ifdef TIGHTDB_ENABLE_LOGFILE
-            cerr << "Syncing from version " << m_readlock.m_version 
+            cerr << "Syncing from version " << m_readlock.m_version
                  << " to " << next_readlock.m_version << endl;
 #endif
             GroupWriter writer(m_group);
@@ -978,21 +992,64 @@ void SharedGroup::grab_latest_readlock(ReadLockInfo& readlock, bool& same_as_bef
         // we need to start all over again. This is extremely unlikely, but possible.
         if (! atomic_double_inc_if_even(r.count)) // <-- most of the exec time spent here!
             continue;
-        same_as_before = readlock.m_version == r.version;
-        readlock.m_version      = r.version;
-        readlock.m_top_ref    = to_size_t(r.current_top);
-        readlock.m_file_size  = to_size_t(r.filesize);
+        same_as_before       = readlock.m_version == r.version;
+        readlock.m_version   = r.version;
+        readlock.m_top_ref   = to_size_t(r.current_top);
+        readlock.m_file_size = to_size_t(r.filesize);
         return;
     }
 }
 
+SharedGroup::VersionID SharedGroup::get_version_of_current_transaction()
+{
+    return VersionID(m_readlock.m_version, m_readlock.m_reader_idx);
+}
 
-const Group& SharedGroup::begin_read()
+bool SharedGroup::grab_specific_readlock(ReadLockInfo& readlock, bool& same_as_before, 
+					 VersionID specific_version)
+{
+    for (;;) {
+        SharedInfo* r_info = m_reader_map.get_addr();
+        readlock.m_reader_idx = specific_version.index;
+        if (grow_reader_mapping(readlock.m_reader_idx)) { // throws
+            // remapping takes time, so retry with a fresh entry
+            continue;
+        }
+        const Ringbuffer::ReadCount& r = r_info->readers.get(readlock.m_reader_idx);
+
+        // if the entry is stale and has been cleared by the cleanup process,
+        // the requested version is no longer available
+        if (! atomic_double_inc_if_even(r.count)) // <-- most of the exec time spent here!
+            return false;
+
+        // we managed to lock an entry in the ringbuffer, but it may be so old that
+        // the version doesn't match the specific request. In that case we must release and fail
+        if (r.version != specific_version.version) {
+            atomic_double_dec(r.count); // <-- release
+            return false;
+        }
+        same_as_before       = readlock.m_version == r.version;
+        readlock.m_version   = r.version;
+        readlock.m_top_ref   = to_size_t(r.current_top);
+        readlock.m_file_size = to_size_t(r.filesize);
+        return true;
+    }
+}
+
+
+const Group& SharedGroup::begin_read(VersionID specific_version)
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Ready);
 
     bool same_version_as_before;
-    grab_latest_readlock(m_readlock, same_version_as_before);
+    if (specific_version.version) {
+        bool success = grab_specific_readlock(m_readlock, same_version_as_before, specific_version);
+        if (!success)
+            throw UnreachableVersion();
+    }
+    else {
+        grab_latest_readlock(m_readlock, same_version_as_before);
+    }
     if (same_version_as_before && m_group.may_reattach_if_same_version()) {
         m_group.reattach_from_retained_data();
     }
@@ -1066,7 +1123,7 @@ void SharedGroup::promote_to_write()
 }
 
 
-void SharedGroup::advance_read()
+void SharedGroup::advance_read(VersionID specific_version)
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Reading);
 
@@ -1074,13 +1131,24 @@ void SharedGroup::advance_read()
     bool same_as_before;
     Replication* repl = _impl::GroupFriend::get_replication(m_group);
 
+    // we cannot move backward in time (yet)
+    if (specific_version.version && specific_version.version < old_readlock.m_version) {
+        throw UnreachableVersion();
+    }
+
     // advance current readlock while holding onto old one - we MUST hold onto
     // the old readlock until after the call to advance_transact. Once a readlock
     // is released, the release may propagate to the commit log management, causing
     // it to reclaim memory for old commit logs. We must finished use of the commit log
     // before allowing that to happen.
-    grab_latest_readlock(m_readlock, same_as_before); // Throws
-
+    if (specific_version.version) {
+        bool success = grab_specific_readlock(m_readlock, same_as_before, specific_version);
+        if (!success) 
+            throw UnreachableVersion();
+    }
+    else {
+        grab_latest_readlock(m_readlock, same_as_before); // Throws
+    }
     if (same_as_before) {
         release_readlock(old_readlock);
         return;
@@ -1128,7 +1196,7 @@ Group& SharedGroup::begin_write()
 
     try {
         do_begin_write();
-        begin_read();
+        begin_read(0);
     }
     catch (...) {
 #ifdef TIGHTDB_ENABLE_REPLICATION
@@ -1300,12 +1368,13 @@ void SharedGroup::do_commit()
 }
 
 
-// FIXME: This method must work correctly even if it is called after a
-// failed call to commit(). A failed call to commit() is any that
-// returns to the caller by throwing an exception. As it is right now,
-// rollback() does not handle all cases.
 void SharedGroup::rollback() TIGHTDB_NOEXCEPT
 {
+    // FIXME: This method must work correctly even if it is called after a
+    // failed call to commit(). A failed call to commit() is any that returns to
+    // the caller by throwing an exception. As it is right now, rollback() does
+    // not handle all cases.
+
     if (m_group.is_attached()) {
         TIGHTDB_ASSERT(m_transact_stage == transact_Writing);
 
@@ -1327,9 +1396,6 @@ void SharedGroup::rollback() TIGHTDB_NOEXCEPT
 }
 
 
-
-// given an index (which the caller wants to used to index the ringbuffer), verify
-// that the given entry is within the memory mapped. If not, remap it!
 bool SharedGroup::grow_reader_mapping(uint_fast32_t index)
 {
     if (index >= m_local_max_entry) {
@@ -1343,6 +1409,7 @@ bool SharedGroup::grow_reader_mapping(uint_fast32_t index)
     }
     return false;
 }
+
 
 uint_fast64_t SharedGroup::get_current_version()
 {

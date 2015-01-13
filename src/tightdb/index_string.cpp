@@ -531,6 +531,8 @@ void StringIndex::clear()
 
     size_t size = 1;
     m_array->truncate_and_destroy_children(size); // Don't touch `values` array
+
+    m_array->set_type(Array::type_HasRefs);
 }
 
 

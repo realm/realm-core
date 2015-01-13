@@ -25,6 +25,11 @@ MODE="$1"
 # enabling replication support in core, now required for objective-c/ios
 export TIGHTDB_ENABLE_REPLICATION=1
 
+# enable assertions in release builds by default
+if [ -z ${TIGHTDB_ENABLE_ASSERTIONS+x} ]; then
+    export TIGHTDB_ENABLE_ASSERTIONS=1
+fi
+
 # Extensions corresponding with additional GIT repositories
 EXTENSIONS="java python ruby objc node php c gui"
 if [ "$TIGHTDB_ENABLE_REPLICATION" ]; then
@@ -47,7 +52,7 @@ usage()
 Unspecified or bad mode '$MODE'.
 Available modes are:
     config clean build build-config-progs build-iphone build-android
-    build-osx-framework build-cocoa
+    build-osx-framework build-cocoa config-param
     check check-debug show-install install uninstall
     test-installed wipe-installed install-prod install-devel uninstall-prod
     uninstall-devel dist-copy src-dist bin-dist dist-deb dist-status
@@ -390,9 +395,9 @@ download_openssl()
     fi
 
     echo 'Downloading OpenSSL...'
-    curl -L -s "http://www.openssl.org/source/openssl-1.0.1i.tar.gz" -o openssl.tar.gz || return 1
+    curl -L -s "http://www.openssl.org/source/openssl-1.0.1k.tar.gz" -o openssl.tar.gz || return 1
     tar -xzf openssl.tar.gz || return 1
-    mv openssl-1.0.1i openssl || return 1
+    mv openssl-1.0.1k openssl || return 1
     rm openssl.tar.gz || return 1
 
     # A function we don't use calls OPENSSL_cleanse, which has all sorts of
@@ -444,6 +449,11 @@ case "$MODE" in
         enable_encryption="no"
         if [ "$TIGHTDB_ENABLE_ENCRYPTION" ]; then
             enable_encryption="yes"
+        fi
+
+        enable_assertions="no"
+        if [ "$TIGHTDB_ENABLE_ASSERTIONS" ]; then
+            enable_assertions="yes"
         fi
 
         # Find Xcode
@@ -518,6 +528,7 @@ INSTALL_LIBEXECDIR    = $install_libexecdir
 MAX_BPNODE_SIZE       = $max_bpnode_size
 MAX_BPNODE_SIZE_DEBUG = $max_bpnode_size_debug
 ENABLE_REPLICATION    = $enable_replication
+ENABLE_ASSERTIONS     = $enable_assertions
 ENABLE_ALLOC_SET_ZERO = $enable_alloc_set_zero
 ENABLE_ENCRYPTION     = $enable_encryption
 XCODE_HOME            = $xcode_home
@@ -530,6 +541,16 @@ EOF
             cat "$CONFIG_MK" | sed 's/^/    /' || exit 1
             echo "Done configuring"
         fi
+        exit 0
+        ;;
+
+    "config-param")
+        parameter="$1"
+        if ! [ "$parameter" ]; then
+            echo "Parameter excepted."
+            exit 1
+        fi
+        get_config_param "$parameter"
         exit 0
         ;;
 
@@ -588,8 +609,8 @@ EOF
         (
             cd src/tightdb
             export TIGHTDB_ENABLE_FAT_BINARIES="1"
-            TIGHTDB_ENABLE_FAT_BINARIES="1" $MAKE libtightdb.a EXTRA_CFLAGS="-fPIC -DPIC" || exit 1
-            TIGHTDB_ENABLE_FAT_BINARIES="1" $MAKE libtightdb-dbg.a EXTRA_CFLAGS="-fPIC -DPIC" || exit 1
+            TIGHTDB_ENABLE_FAT_BINARIES="1" $MAKE libtightdb.a EXTRA_CFLAGS="-fPIC -DPIC -std=c++11" || exit 1
+            TIGHTDB_ENABLE_FAT_BINARIES="1" $MAKE libtightdb-dbg.a EXTRA_CFLAGS="-fPIC -DPIC -std=c++11" || exit 1
         ) || exit 1
         exit 0
         ;;
@@ -615,12 +636,12 @@ EOF
                 word_list_append "cflags_arch" "-arch $y" || exit 1
             done
             sdk_root="$xcode_home/Platforms/$platform.platform/Developer/SDKs/$sdk"
-            $MAKE -C "src/tightdb" "libtightdb-$platform.a" "libtightdb-$platform-dbg.a" BASE_DENOM="$platform" CFLAGS_ARCH="$cflags_arch -isysroot $sdk_root" || exit 1
+            $MAKE -C "src/tightdb" "libtightdb-$platform.a" "libtightdb-$platform-dbg.a" BASE_DENOM="$platform" CFLAGS_ARCH="$cflags_arch -isysroot $sdk_root -std=c++11 -mstrict-align" || exit 1
             mkdir "$temp_dir/platforms/$platform" || exit 1
             cp "src/tightdb/libtightdb-$platform.a"     "$temp_dir/platforms/$platform/libtightdb.a"     || exit 1
             cp "src/tightdb/libtightdb-$platform-dbg.a" "$temp_dir/platforms/$platform/libtightdb-dbg.a" || exit 1
         done
-        TIGHTDB_ENABLE_FAT_BINARIES="1" $MAKE -C "src/tightdb" "tightdb-config-ios" "tightdb-config-ios-dbg" BASE_DENOM="ios" CFLAGS_ARCH="-DTIGHTDB_CONFIG_IOS" || exit 1
+        TIGHTDB_ENABLE_FAT_BINARIES="1" $MAKE -C "src/tightdb" "tightdb-config-ios" "tightdb-config-ios-dbg" BASE_DENOM="ios" CFLAGS_ARCH="-DTIGHTDB_CONFIG_IOS -std=c++11" || exit 1
         mkdir -p "$IPHONE_DIR" || exit 1
         echo "Creating '$IPHONE_DIR/libtightdb-ios.a'"
         lipo "$temp_dir/platforms"/*/"libtightdb.a"     -create -output "$IPHONE_DIR/libtightdb-ios.a"     || exit 1
@@ -770,11 +791,11 @@ EOF
 
         tightdb_version="$(sh build.sh get-version)" || exit
         dir_name="core-$tightdb_version"
-        file_name="core-android-$tightdb_version.tar.gz"
+        file_name="realm-core-android-$tightdb_version.tar.gz"
         tar_files='libtightdb*'
         if [ $enable_encryption = yes ]; then
             dir_name="$dir_name-encryption"
-            file_name="core-android-$tightdb_version-encryption.tar.gz"
+            file_name="realm-core-android-$tightdb_version-encryption.tar.gz"
             tar_files='libtightdb* *.txt'
         fi
 
@@ -2753,7 +2774,11 @@ EOF
             echo "Bad check mode '$check_mode'" 1>&2
             exit 1
         fi
-        TIGHTDB_MAX_BPNODE_SIZE_DEBUG="4" sh build.sh config || exit 1
+        encryption="$2"
+        if [ "$encryption" ]; then
+            encryption="no"
+        fi
+        TIGHTDB_MAX_BPNODE_SIZE_DEBUG="4" TIGHTDB_ENABLE_ENCRYPTION="$encryption" sh build.sh config || exit 1
         UNITTEST_SHUFFLE="1" UNITTEST_REANDOM_SEED="random" UNITTEST_XML="1" sh build.sh "$check_mode" || exit 1
         exit 0
         ;;

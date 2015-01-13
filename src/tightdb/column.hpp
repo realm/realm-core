@@ -37,6 +37,7 @@ namespace tightdb {
 
 // Pre-definitions
 class Column;
+class StringIndex;
 
 struct ColumnTemplateBase
 {
@@ -440,8 +441,9 @@ public:
                   std::size_t begin = 0, std::size_t end = npos) const;
 
     void set_search_index_ref(ref_type ref, ArrayParent* parent, size_t ndx_in_parent, bool allow_duplicate_valaues);
-    void create_search_index();
-    void* get_search_index() TIGHTDB_NOEXCEPT;
+    StringIndex& create_search_index();
+    StringIndex& get_search_index() TIGHTDB_NOEXCEPT;
+    const StringIndex& get_search_index() const TIGHTDB_NOEXCEPT;
 
     //@{
     /// Find the lower/upper bound for the specified value assuming
@@ -481,9 +483,6 @@ public:
     void do_dump_node_structure(std::ostream&, int) const TIGHTDB_OVERRIDE;
 #endif
 
-    // todo, make private, and correct type
-    void* m_search_index;
-
 protected:
     Column(Array* root = 0) TIGHTDB_NOEXCEPT;
 
@@ -521,6 +520,8 @@ private:
 
     friend class Array;
     friend class ColumnBase;
+
+    StringIndex* m_search_index;
 };
 
 
@@ -776,7 +777,7 @@ inline std::size_t Column::size() const TIGHTDB_NOEXCEPT
 
 inline int_fast64_t Column::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(ndx < size());
+    TIGHTDB_ASSERT_DEBUG(ndx < size());
     if (!m_array->is_inner_bptree_node())
         return m_array->get(ndx);
 

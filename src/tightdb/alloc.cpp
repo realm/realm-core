@@ -47,7 +47,7 @@ public:
     {
         char* addr = static_cast<char*>(::malloc(size));
         if (TIGHTDB_UNLIKELY(!addr)) {
-            TIGHTDB_ASSERT(errno == ENOMEM);
+            TIGHTDB_ASSERT_DEBUG(errno == ENOMEM);
             throw bad_alloc();
         }
 #ifdef TIGHTDB_ENABLE_ALLOC_SET_ZERO
@@ -61,7 +61,7 @@ public:
     {
         char* new_addr = static_cast<char*>(::realloc(const_cast<char*>(addr), new_size));
         if (TIGHTDB_UNLIKELY(!new_addr)) {
-            TIGHTDB_ASSERT(errno == ENOMEM);
+            TIGHTDB_ASSERT_DEBUG(errno == ENOMEM);
             throw bad_alloc();
         }
 #ifdef TIGHTDB_ENABLE_ALLOC_SET_ZERO

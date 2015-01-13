@@ -270,6 +270,17 @@ TEST(Group_AddTable)
 }
 
 
+TEST(Group_TableNameTooLong)
+{
+    Group group;
+    size_t buf_len = 64;
+    UniquePtr<char[]> buf(new char[buf_len]);
+    CHECK_LOGIC_ERROR(group.add_table(StringData(buf.get(), buf_len)),
+                      LogicError::table_name_too_long);
+    group.add_table(StringData(buf.get(), buf_len - 1));
+}
+
+
 TEST(Group_TableIndex)
 {
     Group group;

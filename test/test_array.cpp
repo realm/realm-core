@@ -1465,8 +1465,8 @@ TEST(Array_Sort3)
     a.create(Array::type_Normal);
 
     Random random(random_int<unsigned long>()); // Seed from slow global generator
-    for (size_t t = 0; t < 1000000ULL; ++t)
-        a.add(random.draw_int_max(RAND_MAX));
+    for (size_t t = 0; t < 1000; ++t)
+        a.add(random.draw_int_max(200)); // 200 will make some duplicate values which is good
 
     size_t orig_size = a.size();
     a.sort();

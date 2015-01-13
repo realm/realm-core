@@ -21,8 +21,9 @@
 #define TIGHTDB_TABLE_HPP
 
 #include <algorithm>
-#include <utility>
 #include <map>
+#include <utility>
+#include <typeinfo>
 
 #include <tightdb/util/features.h>
 #include <tightdb/util/tuple.hpp>
@@ -182,19 +183,8 @@ public:
     /// If you need to change the shared dynamic type of the subtables in a
     /// subtable column, consider using the API offered by the Descriptor class.
     ///
-    /// \param subdesc If a non-null pointer is passed, and the specified type
-    /// is `type_Table`, then this function automatically reteives the
-    /// descriptor associated with the new subtable column, and stores a
-    /// reference to its accessor in `*subdesc`.
-    ///
-    /// \param link_type See Descriptor::set_link_type().
-    ///
-    /// \return The value returned by add_column() and add_column_link(), is the
-    /// index of the added column.
-    ///
     /// \sa has_shared_type()
     /// \sa get_descriptor()
-    /// \sa Descriptor
     std::size_t add_column(DataType type, StringData name, DescriptorRef* subdesc = 0);
     void insert_column(std::size_t column_ndx, DataType type, StringData name,
                        DescriptorRef* subdesc = 0);
@@ -389,6 +379,9 @@ public:
     /// NOTE: You have to insert values in ALL columns followed by
     /// insert_done(). The values must be inserted in column index order.
     ///
+    /// Restrictions apply to strings and binary data values. See set_string(),
+    /// set_binary(), and set_mixed() for more.
+    ///
     /// It is an error to insert a value into a column that is part of a primary
     /// key, if that would result in a violation the implied *unique constraint*
     /// of the primary key. The consequenses of doing so are unspecified.
@@ -436,9 +429,18 @@ public:
 
     /// Set cell values.
     ///
+    /// The number of bytes in a string value must not exceed `max_string_size`,
+    /// and the number of bytes in a binary data value must not exceed
+    /// `max_binary_size`. String must also be valid UTF-8 encodings. These
+    /// requirements also apply when calling set_mixed(). Passing an oversized
+    /// string or binary data value will cause an exception to be thrown.
+    ///
     /// It is an error to assign a value to a column that is part of a primary
     /// key, if that would result in a violation the implied *unique constraint*
     /// of that primary key. The consequenses of doing so are unspecified.
+
+    static const std::size_t max_string_size = 0xFFFFF8 - Array::header_size - 1;
+    static const std::size_t max_binary_size = 0xFFFFF8 - Array::header_size;
 
     void set_int(std::size_t column_ndx, std::size_t row_ndx, int_fast64_t value);
     void set_bool(std::size_t column_ndx, std::size_t row_ndx, bool value);
@@ -534,9 +536,11 @@ public:
     int64_t maximum_int(std::size_t column_ndx, std::size_t* return_ndx = 0) const;
     float   maximum_float(std::size_t column_ndx, std::size_t* return_ndx = 0) const;
     double  maximum_double(std::size_t column_ndx, std::size_t* return_ndx = 0) const;
+    DateTime maximum_datetime(size_t column_ndx, size_t* return_ndx = 0) const;
     int64_t minimum_int(std::size_t column_ndx, std::size_t* return_ndx = 0) const;
     float   minimum_float(std::size_t column_ndx, std::size_t* return_ndx = 0) const;
     double  minimum_double(std::size_t column_ndx, std::size_t* return_ndx = 0) const;
+    DateTime minimum_datetime(size_t column_ndx, size_t* return_ndx = 0) const;
     double  average_int(std::size_t column_ndx) const;
     double  average_float(std::size_t column_ndx) const;
     double  average_double(std::size_t column_ndx) const;
@@ -1465,7 +1469,7 @@ template<class Col, ColumnType col_type> inline Col& Table::get_column(std::size
 #ifdef TIGHTDB_DEBUG
     validate_column_type(col, col_type, ndx);
 #endif
-    TIGHTDB_ASSERT(dynamic_cast<Col*>(&col));
+    TIGHTDB_ASSERT(typeid(Col) == typeid(col));
     return static_cast<Col&>(col);
 }
 
@@ -1476,7 +1480,7 @@ inline const Col& Table::get_column(std::size_t ndx) const TIGHTDB_NOEXCEPT
 #ifdef TIGHTDB_DEBUG
     validate_column_type(col, col_type, ndx);
 #endif
-    TIGHTDB_ASSERT(dynamic_cast<const Col*>(&col));
+    TIGHTDB_ASSERT(typeid(Col) == typeid(col));
     return static_cast<const Col&>(col);
 }
 

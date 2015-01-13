@@ -1,3 +1,5 @@
+#include "testsettings.hpp"
+
 #include <limits>
 #include <vector>
 #include <set>
@@ -218,7 +220,7 @@ template<class T_1, int> struct test_two_args_1 {
 
 
 
-TEST(SafeIntOps_General)
+TEST_IF(SafeIntOps_General, TEST_DURATION >= 1)
 {
     // Generate a set of interesting values in three steps
     set<super_int> values;

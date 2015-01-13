@@ -378,6 +378,114 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
 }
 
 
+TEST(LangBindHelper_AdvanceReadTransact_AddTableWithFreshSharedGroup)
+{
+    SHARED_GROUP_TEST_PATH(path);
+
+    // Testing that a foreign transaction, that adds a table, can be applied to
+    // a freshly created SharedGroup, even when another table existed in the
+    // group prior to the one being added in the mentioned transaction. This
+    // test is relevant because of the way table accesors are created and
+    // managed inside a SharedGroup, in particular because table accessors are
+    // created lazily, and will therefore not be present in a freshly created
+    // SharedGroup instance.
+
+    // Add the first table
+    {
+        UniquePtr<tightdb::Replication> repl_w(tightdb::makeWriteLogCollector(path));
+        SharedGroup sg_w(*repl_w);
+        WriteTransaction wt(sg_w);
+        wt.add_table("table_1");
+        wt.commit();
+    }
+
+    // Create a SharedGroup to which we can apply a foreign transaction
+    UniquePtr<tightdb::Replication> repl(tightdb::makeWriteLogCollector(path));
+    SharedGroup sg(*repl);
+    ReadTransaction rt(sg);
+
+    // Add the second table in a "foreign" transaction
+    {
+        UniquePtr<tightdb::Replication> repl_w(tightdb::makeWriteLogCollector(path));
+        SharedGroup sg_w(*repl_w);
+        WriteTransaction wt(sg_w);
+        wt.add_table("table_2");
+        wt.commit();
+    }
+
+    LangBindHelper::advance_read(sg);
+}
+
+
+TEST(LangBindHelper_AdvanceReadTransact_RemoveTableWithFreshSharedGroup)
+{
+    SHARED_GROUP_TEST_PATH(path);
+
+    // Testing that a foreign transaction, that removes a table, can be applied
+    // to a freshly created SharedGroup. This test is relevant because of the
+    // way table accesors are created and managed inside a SharedGroup, in
+    // particular because table accessors are created lazily, and will therefore
+    // not be present in a freshly created SharedGroup instance.
+
+    // Add the table
+    {
+        UniquePtr<tightdb::Replication> repl_w(tightdb::makeWriteLogCollector(path));
+        SharedGroup sg_w(*repl_w);
+        WriteTransaction wt(sg_w);
+        wt.add_table("table");
+        wt.commit();
+    }
+
+    // Create a SharedGroup to which we can apply a foreign transaction
+    UniquePtr<tightdb::Replication> repl(tightdb::makeWriteLogCollector(path));
+    SharedGroup sg(*repl);
+    ReadTransaction rt(sg);
+
+    // remove the table in a "foreign" transaction
+    {
+        UniquePtr<tightdb::Replication> repl_w(tightdb::makeWriteLogCollector(path));
+        SharedGroup sg_w(*repl_w);
+        WriteTransaction wt(sg_w);
+        wt.get_group().remove_table("table");
+        wt.commit();
+    }
+
+    LangBindHelper::advance_read(sg);
+}
+
+
+TEST(LangBindHelper_AdvanceReadTransact_CreateManyTables)
+{
+    SHARED_GROUP_TEST_PATH(path);
+
+    {
+        UniquePtr<tightdb::Replication> repl_w(tightdb::makeWriteLogCollector(path));
+        SharedGroup sg_w(*repl_w);
+        WriteTransaction wt(sg_w);
+        wt.add_table("table");
+        wt.commit();
+    }
+
+    UniquePtr<tightdb::Replication> repl(tightdb::makeWriteLogCollector(path));
+    SharedGroup sg(*repl);
+    ReadTransaction rt(sg);
+
+    {
+        UniquePtr<tightdb::Replication> repl_w(tightdb::makeWriteLogCollector(path));
+        SharedGroup sg_w(*repl_w);
+
+        WriteTransaction wt(sg_w);
+        for (int i = 0; i < 16; ++i) {
+            std::stringstream ss;
+            ss << "table_" << i;
+            wt.add_table(ss.str());
+        }
+        wt.commit();
+    }
+
+    LangBindHelper::advance_read(sg);
+}
+
 TEST(LangBindHelper_AdvanceReadTransact_LinkListSort)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -5789,14 +5897,14 @@ TEST(LangBindHelper_AdvanceReadTransact_RemoveTableMovesTableWithLinksOver)
 TEST(LangBindHelper_ImplicitTransactions)
 {
     SHARED_GROUP_TEST_PATH(path);
-    UniquePtr<Replication> repl(makeWriteLogCollector(path));
+    UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
     SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
     {
         WriteTransaction wt(sg);
         wt.add_table<TestTableShared>("table")->add_empty_row();
         wt.commit();
     }
-    UniquePtr<Replication> repl2(makeWriteLogCollector(path));
+    UniquePtr<Replication> repl2(makeWriteLogCollector(path, false, crypt_key()));
     SharedGroup sg2(*repl2, SharedGroup::durability_Full, crypt_key());
     Group& g = const_cast<Group&>(sg.begin_read());
     TestTableShared::Ref table = g.get_table<TestTableShared>("table");
@@ -5838,7 +5946,7 @@ TEST(LangBindHelper_ImplicitTransactions)
 TEST(LangBindHelper_RollbackAndContinueAsRead)
 {
     SHARED_GROUP_TEST_PATH(path);
-    UniquePtr<Replication> repl(makeWriteLogCollector(path));
+    UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
     SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
     {
         Group* group = const_cast<Group*>(&sg.begin_read());
@@ -5913,7 +6021,7 @@ TEST(LangBindHelper_RollbackAndContinueAsRead)
 TEST(LangBindHelper_RollbackAndContinueAsReadGroupLevelTableRemoval)
 {
     SHARED_GROUP_TEST_PATH(path);
-    UniquePtr<Replication> repl(makeWriteLogCollector(path));
+    UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
     SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
     Group* group = const_cast<Group*>(&sg.begin_read());
     {
@@ -5941,7 +6049,7 @@ TEST(LangBindHelper_RollbackAndContinueAsReadGroupLevelTableRemoval)
 TEST(LangBindHelper_RollbackAndContinueAsReadColumnAdd)
 {
     SHARED_GROUP_TEST_PATH(path);
-    UniquePtr<Replication> repl(makeWriteLogCollector(path));
+    UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
     SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
     Group* group = const_cast<Group*>(&sg.begin_read());
     TableRef t;
@@ -5973,7 +6081,7 @@ TEST(LangBindHelper_RollbackAndContinueAsReadColumnAdd)
 TEST(LangBindHelper_RollbackAndContinueAsReadColumnRemove)
 {
     SHARED_GROUP_TEST_PATH(path);
-    UniquePtr<Replication> repl(makeWriteLogCollector(path));
+    UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
     SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
     Group* group = const_cast<Group*>(&sg.begin_read());
     TableRef t;
@@ -6006,7 +6114,7 @@ TEST(LangBindHelper_RollbackAndContinueAsReadColumnRemove)
 TEST(LangBindHelper_RollbackAndContinueAsReadLinkList)
 {
     SHARED_GROUP_TEST_PATH(path);
-    UniquePtr<Replication> repl(makeWriteLogCollector(path));
+    UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
     SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
     Group* group = const_cast<Group*>(&sg.begin_read());
     LangBindHelper::promote_to_write(sg);
@@ -6052,7 +6160,7 @@ TEST(LangBindHelper_RollbackAndContinueAsReadLinkList)
 TEST(LangBindHelper_RollbackAndContinueAsReadLink)
 {
     SHARED_GROUP_TEST_PATH(path);
-    UniquePtr<Replication> repl(makeWriteLogCollector(path));
+    UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
     SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
     Group* group = const_cast<Group*>(&sg.begin_read());
     LangBindHelper::promote_to_write(sg);
@@ -6090,7 +6198,7 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_MoveLastOverSubtables)
 {
     // adapted from earlier move last over test
     SHARED_GROUP_TEST_PATH(path);
-    UniquePtr<Replication> repl(makeWriteLogCollector(path));
+    UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
     SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
     Group* group = const_cast<Group*>(&sg.begin_read());
 
@@ -6194,7 +6302,7 @@ TEST(LangBindHelper_ImplicitTransactions_OverSharedGroupDestruction)
     SHARED_GROUP_TEST_PATH(path);
     // we hold on to write log collector and registry across a complete
     // shutdown/initialization of shared group.
-    UniquePtr<Replication> repl(makeWriteLogCollector(path));
+    UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
     {
         SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
         {
@@ -6208,7 +6316,7 @@ TEST(LangBindHelper_ImplicitTransactions_OverSharedGroupDestruction)
         // no valid shared group anymore
     }
     {
-        UniquePtr<Replication> repl(makeWriteLogCollector(path));
+        UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
         SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
         {
             WriteTransaction wt(sg);
@@ -6224,7 +6332,7 @@ TEST(LangBindHelper_ImplicitTransactions_OverSharedGroupDestruction)
 TEST(LangBindHelper_ImplicitTransactions_LinkList)
 {
     SHARED_GROUP_TEST_PATH(path);
-    UniquePtr<Replication> repl(makeWriteLogCollector(path));
+    UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
     SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
     Group* group = const_cast<Group*>(&sg.begin_read());
     LangBindHelper::promote_to_write(sg);
@@ -6244,7 +6352,7 @@ TEST(LangBindHelper_ImplicitTransactions_LinkList)
 TEST(LangBindHelper_ImplicitTransactions_StringIndex)
 {
     SHARED_GROUP_TEST_PATH(path);
-    UniquePtr<Replication> repl(makeWriteLogCollector(path));
+    UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
     SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
     Group* group = const_cast<Group*>(&sg.begin_read());
     LangBindHelper::promote_to_write(sg);
@@ -6262,7 +6370,7 @@ namespace {
 void multiple_trackers_writer_thread(string path)
 {
     Random random(random_int<unsigned long>());
-    UniquePtr<Replication> repl(makeWriteLogCollector(path));
+    UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
     SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
     for (int i = 0; i < 10; ++i) {
         WriteTransaction wt(sg);
@@ -6286,7 +6394,7 @@ void multiple_trackers_reader_thread(TestResults* test_results_ptr, string path)
     TestResults& test_results = *test_results_ptr;
     Random random(random_int<unsigned long>());
 
-    UniquePtr<Replication> repl(makeWriteLogCollector(path));
+    UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
     SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
     Group& g = const_cast<Group&>(sg.begin_read());
     TableRef tr = g.get_table("table");
@@ -6294,6 +6402,9 @@ void multiple_trackers_reader_thread(TestResults* test_results_ptr, string path)
     size_t row_ndx = q.find();
     Row row = tr->get(row_ndx);
     TableView tv = q.find_all();
+    LangBindHelper::promote_to_write(sg);
+    tr->set_int(0, 0, 1 + tr->get_int(0, 0));
+    LangBindHelper::commit_and_continue_as_read(sg);
     for (;;) {
         int_fast64_t val = row.get_int(0);
         tv.sync_if_needed();
@@ -6316,17 +6427,17 @@ void multiple_trackers_reader_thread(TestResults* test_results_ptr, string path)
 TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
 {
     const int write_thread_count = 7;
-    const int read_thread_count = 3;
+    const int read_thread_count = 3; // must be less than 42 for correct operation
 
     SHARED_GROUP_TEST_PATH(path);
 
-    UniquePtr<Replication> repl(makeWriteLogCollector(path));
+    UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
     SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
     {
         WriteTransaction wt(sg);
         TableRef tr = wt.add_table("table");
         tr->add_column(type_Int, "first");
-        for (int i = 0; i < 200; ++i)
+        for (int i = 0; i < 200; ++i) // use first entry in table to count readers which have locked on
             tr->add_empty_row();
         tr->set_int(0, 100, 42);
         wt.commit();
@@ -6344,6 +6455,13 @@ TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
     for (int i = 0; i < write_thread_count; ++i)
         threads[i].join();
 
+    // Wait for all reader threads to find and lock onto value '42'
+    for (;;) {
+        ReadTransaction rt(sg);
+        ConstTableRef tr = rt.get_table("table");
+        if (tr->get_int(0,0) == read_thread_count) break;
+        sched_yield();
+    }
     // signal to all readers to complete
     {
         WriteTransaction wt(sg);
@@ -6414,7 +6532,7 @@ TEST(LangBindHelper_SyncCannotBeChanged_1)
     }
     {
         // try to access the database with sync disabled
-        UniquePtr<Replication> repl(makeWriteLogCollector(path));
+        UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
         bool did_throw = false;
         try {
             SharedGroup sg(*repl);
@@ -6434,7 +6552,7 @@ TEST(LangBindHelper_SyncCannotBeChanged_2)
     SHARED_GROUP_TEST_PATH(path);
     {
         // enable sync
-        UniquePtr<Replication> repl(makeWriteLogCollector(path));
+        UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
         SharedGroup sg(*repl);
         {
             WriteTransaction wt(sg);
@@ -6473,7 +6591,7 @@ TEST(LangBindHelper_ImplicitTransactions_InterProcess)
 
     int pid = fork();
     if (pid == 0) {
-        UniquePtr<Replication> repl(makeWriteLogCollector(path));
+        UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
         SharedGroup sg(*repl);
         {
             WriteTransaction wt(sg);
@@ -6514,9 +6632,21 @@ TEST(LangBindHelper_ImplicitTransactions_InterProcess)
         waitpid(writepids[i], &status, 0);
     }
 
+    // Wait for all reader threads to find and lock onto value '42'
+    {
+        UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
+        SharedGroup sg(*repl);
+        for (;;) {
+            ReadTransaction rt(sg);
+            ConstTableRef tr = rt.get_table("table");
+            if (tr->get_int(0,0) == read_process_count) break;
+            sched_yield();
+        }
+    }
+
     // signal to all readers to complete
     {
-        UniquePtr<Replication> repl(makeWriteLogCollector(path));
+        UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
         SharedGroup sg(*repl);
         WriteTransaction wt(sg);
         TableRef tr = wt.get_table("table");
@@ -6541,7 +6671,7 @@ TEST(LangBindHelper_ImplicitTransactions_NoExtremeFileSpaceLeaks)
     SHARED_GROUP_TEST_PATH(path);
 
     for (int i = 0; i < 100; ++i) {
-        UniquePtr<Replication> repl(makeWriteLogCollector(path));
+        UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
         SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
         sg.begin_read();
         LangBindHelper::promote_to_write(sg);
@@ -6559,7 +6689,7 @@ TEST(LangBindHelper_ImplicitTransactions_DetachRowAccessorOnMoveLastOver)
 
     Row rows[10];
 
-    UniquePtr<Replication> repl(makeWriteLogCollector(path));
+    UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
     SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
     Group& group = const_cast<Group&>(sg.begin_read());
 
@@ -6597,10 +6727,10 @@ TEST(LangBindHelper_ImplicitTransactions_ContinuedUseOfTable)
 {
     SHARED_GROUP_TEST_PATH(path);
 
-    UniquePtr<Replication> repl(makeWriteLogCollector(path));
+    UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
     SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
     const Group& group = sg.begin_read();
-    UniquePtr<Replication> repl_w(makeWriteLogCollector(path));
+    UniquePtr<Replication> repl_w(makeWriteLogCollector(path, false, crypt_key()));
     SharedGroup sg_w(*repl_w, SharedGroup::durability_Full, crypt_key());
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
@@ -6634,11 +6764,11 @@ TEST(LangBindHelper_ImplicitTransactions_ContinuedUseOfDescriptor)
 {
     SHARED_GROUP_TEST_PATH(path);
 
-    UniquePtr<Replication> repl(makeWriteLogCollector(path));
+    UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
     SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
     const Group& group = sg.begin_read();
 
-    UniquePtr<Replication> repl_w(makeWriteLogCollector(path));
+    UniquePtr<Replication> repl_w(makeWriteLogCollector(path, false, crypt_key()));
     SharedGroup sg_w(*repl_w, SharedGroup::durability_Full, crypt_key());
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
@@ -6672,11 +6802,11 @@ TEST(LangBindHelper_ImplicitTransactions_ContinuedUseOfLinkList)
 {
     SHARED_GROUP_TEST_PATH(path);
 
-    UniquePtr<Replication> repl(makeWriteLogCollector(path));
+    UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
     SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
     const Group& group = sg.begin_read();
 
-    UniquePtr<Replication> repl_w(makeWriteLogCollector(path));
+    UniquePtr<Replication> repl_w(makeWriteLogCollector(path, false, crypt_key()));
     SharedGroup sg_w(*repl_w, SharedGroup::durability_Full, crypt_key());
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
@@ -6744,6 +6874,133 @@ TEST(LangBindHelper_MemOnly)
     LangBindHelper::advance_read(sg_r);
     CHECK(!rt.get_group().is_empty());
 }
+
+
+TIGHTDB_TABLE_1(MyTable, first,  Int)
+
+
+TEST(LangBindHelper_VersionControl)
+{
+    const int num_versions = 10;
+    const int num_random_tests = 100;
+    SharedGroup::VersionID versions[num_versions];
+    SHARED_GROUP_TEST_PATH(path);
+    {
+        // Create a new shared db
+        UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
+        SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
+        UniquePtr<Replication> repl_w(makeWriteLogCollector(path, false, crypt_key()));
+        SharedGroup sg_w(*repl_w, SharedGroup::durability_Full, crypt_key());
+        // first create 'num_version' versions
+        sg.begin_read();
+        {
+                WriteTransaction wt(sg_w);
+                MyTable::Ref t = wt.get_or_add_table<MyTable>("test");
+                wt.commit();
+        }
+        for (int i = 0; i < num_versions; ++i) {
+            {
+                WriteTransaction wt(sg_w);
+                MyTable::Ref t = wt.get_table<MyTable>("test");
+                t->add(i);
+                wt.commit();
+            }
+            {
+                ReadTransaction rt(sg_w);
+                versions[i] = sg_w.get_version_of_current_transaction();
+            }
+        }
+
+        // do steps of increasing size from the first version to the last,
+        // including a "step on the spot" (from version 0 to 0)
+        {
+            for (int k = 0; k < num_versions; ++k) {
+                // cerr << "Advancing from initial version to version " << k << endl;
+                const Group& g = sg_w.begin_read(versions[0]);
+                MyTable::ConstRef t = g.get_table<MyTable>("test");
+                CHECK(versions[k] >= versions[0]);
+                g.Verify();
+                LangBindHelper::advance_read(sg_w, versions[k]);
+                g.Verify();
+                CHECK_EQUAL(k, t[k].first);
+                sg_w.end_read();
+            }
+        }
+
+        // step through the versions backward:
+        for (int i = num_versions-1; i >= 0; --i) {
+            // cerr << "Jumping directly to version " << i << endl;
+            const Group& g = sg_w.begin_read(versions[i]);
+            g.Verify();
+            MyTable::ConstRef t = g.get_table<MyTable>("test");
+            CHECK_EQUAL(i, t[i].first);
+            sg_w.end_read();
+        }
+
+        // then advance through the versions going forward
+        {
+            const Group& g = sg_w.begin_read(versions[0]);
+            g.Verify();
+            MyTable::ConstRef t = g.get_table<MyTable>("test");
+            for (int k = 0; k < num_versions; ++k) {
+                // cerr << "Advancing to version " << k << endl;
+                CHECK(k==0 || versions[k] >= versions[k-1]);
+                LangBindHelper::advance_read(sg_w, versions[k]);
+                g.Verify();
+                CHECK_EQUAL(k, t[k].first);
+            }
+            sg_w.end_read();
+        }
+
+        // sync to a randomly selected version - use advance_read when going
+        // forward in time, but begin_read when going back in time
+        int old_version = 0;
+        const Group& g = sg_w.begin_read(versions[old_version]);
+        MyTable::ConstRef t = g.get_table<MyTable>("test");
+        CHECK_EQUAL(old_version, t[old_version].first);
+        for (int k = num_random_tests; k; --k) {
+            int new_version = random() % num_versions;
+            // cerr << "Random jump: version " << old_version << " -> " << new_version << endl;
+            if (new_version < old_version) {
+                CHECK(versions[new_version] < versions[old_version]);
+                sg_w.end_read();
+                sg_w.begin_read(versions[new_version]);
+                g.Verify();
+                t = g.get_table<MyTable>("test");
+                CHECK_EQUAL(new_version, t[new_version].first);
+            }
+            else {
+                CHECK(versions[new_version] >= versions[old_version]);
+                g.Verify();
+                LangBindHelper::advance_read(sg_w, versions[new_version]);
+                g.Verify();
+                CHECK_EQUAL(new_version, t[new_version].first);
+            }
+            old_version = new_version;
+        }
+        sg_w.end_read();
+        // release the first readlock and commit something to force a cleanup
+        // we need to commit twice, because cleanup is done before the actual
+        // commit, so during the first commit, the last of the previous versions
+        // will still be kept. To get rid of it, we must commit once more.
+        sg.end_read();
+        sg_w.begin_write();
+        sg_w.commit();
+        sg_w.begin_write();
+        sg_w.commit();
+
+        // validate that all the versions are now unreachable
+        for (int i = 0; i < num_versions; ++i) {
+            try {
+                sg.begin_read(versions[i]);
+                CHECK(false);
+            } catch (...) {
+            }
+        }
+    }
+}
+
+
 
 #endif // TIGHTDB_ENABLE_REPLICATION
 

@@ -20,11 +20,6 @@ GroupWriter::GroupWriter(Group& group):
 
 size_t GroupWriter::write_group()
 {
-    // Streamed files have the top-ref specified in a footer but this form is
-    // incompatible with in-place updating of database files. For this reason we
-    // have to convert the file now if it is the the streamed form.
-    m_group.m_alloc.prepare_for_update(m_file_map.get_addr());
-
     merge_free_space(); // Throws
 
     Array& top        = m_group.m_top;
@@ -80,7 +75,7 @@ size_t GroupWriter::write_group()
         num_free_lists * Array::get_max_byte_size(max_free_list_size);
 
     // Reserve space for remaining arrays. We ask for one extra byte beyond the
-    // maxumum number that is required. This ensures that even if we end up
+    // maximum number that is required. This ensures that even if we end up
     // using the maximum size possible, we still do not end up with a zero size
     // free-space chunk as we deduct the actually used size from it.
     pair<size_t, size_t> reserve = reserve_free_space(max_free_space_needed + 1); // Throws
@@ -107,7 +102,7 @@ size_t GroupWriter::write_group()
             flengths.insert(ndx, size); // Throws
             if (is_shared)
                 fversions.insert(ndx, m_current_version); // Throws
-            // Adjust reserve_ndx to keep in valid
+            // Adjust reserve_ndx if necessary
             if (ndx <= reserve_ndx)
                 ++reserve_ndx;
         }
@@ -460,9 +455,6 @@ void GroupWriter::write_array_at(size_t pos, const char* data, size_t size)
 
 void GroupWriter::commit(ref_type new_top_ref)
 {
-    // Write data
-    m_file_map.sync(); // Throws
-
     // File header is 24 bytes, composed of three 64-bit
     // blocks. The two first being top_refs (only one valid
     // at a time) and the last being the info block.
@@ -480,9 +472,15 @@ void GroupWriter::commit(ref_type new_top_ref)
     // Update top ref pointer
     uint64_t* top_refs = reinterpret_cast<uint64_t*>(file_header);
     top_refs[new_valid_ref] = new_top_ref;
+
+    // Make sure that all data and the top pointer is written to stable storage
+    m_file_map.sync(); // Throws
+
+    // update selector - must happen after write of all data and top pointer
     file_header[16+7] = char(select_field); // swap
 
-    // Write new header to disk
+    // Write new selector to disk
+    // FIXME: we might optimize this to write of a single page?
     m_file_map.sync(); // Throws
 }
 

@@ -31,6 +31,17 @@ ifeq ($(OS),Darwin)
   endif
 endif
 
+
+# CoreFoundation is required for logging
+ifeq ($(OS),Darwin)
+  PROJECT_LDFLAGS += -framework CoreFoundation
+endif
+
+# Android logging
+ifeq ($(TIGHTDB_ANDROID),)
+  PROJECTS_LDFLAGS += -llog
+endif
+
 # Note: While CFLAGS (those specified above) can be overwritten by
 # setting the CFLAGS variable on the command line, PROJECT_CFLAGS are
 # retained.

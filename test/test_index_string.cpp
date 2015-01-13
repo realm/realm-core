@@ -529,7 +529,7 @@ TEST(StringIndex_FindAllNoCopy2_Int)
 
     // Create a new index on column
     col.create_search_index();
-    StringIndex& ndx = *static_cast<StringIndex*>(col.m_search_index);
+    StringIndex& ndx = col.get_search_index();
     size_t results = not_found;
 
     for (size_t t = 0; t < sizeof(ints) / sizeof(ints[0]); t++) {
@@ -570,7 +570,7 @@ TEST(StringIndex_Count_Int)
 
     // Create a new index on column
     col.create_search_index();
-    StringIndex& ndx = *static_cast<StringIndex*>(col.m_search_index);
+    StringIndex& ndx = col.get_search_index();
 
     for (size_t t = 0; t < sizeof(ints) / sizeof(ints[0]); t++) {
         size_t count = ndx.count(ints[t]);
@@ -601,7 +601,7 @@ TEST(StringIndex_Distinct_Int)
     col.create_search_index();
 
     
-    StringIndex& ndx = *static_cast<StringIndex*>(col.m_search_index);
+    StringIndex& ndx = col.get_search_index();
     
     ref_type results_ref = Column::create(Allocator::get_default());
     Column results(Allocator::get_default(), results_ref);
@@ -633,7 +633,7 @@ TEST(StringIndex_Set_Add_Erase_Insert_Int)
 
     // Create a new index on column
     col.create_search_index();
-    StringIndex& ndx = *static_cast<StringIndex*>(col.m_search_index);
+    StringIndex& ndx = col.get_search_index();
 
     size_t f = ndx.find_first(int64_t(2));
     CHECK_EQUAL(1, f);
@@ -700,6 +700,33 @@ TEST(StringIndex_FuzzyTest_Int)
         }
     }
     col.destroy();
+}
+
+
+// Tests for a bug with strings containing zeroes
+TEST(StringIndex_Bug1)
+{
+    // String index
+    ref_type ref2 = AdaptiveStringColumn::create(Allocator::get_default());
+    AdaptiveStringColumn col2(Allocator::get_default(), ref2);
+    const StringIndex& ndx2 = col2.create_search_index();
+    static_cast<void>(ndx2);
+    col2.add(StringData("\0\0\0\0\0\x001\0\0", 8));
+    size_t t = ndx2.find_first(StringData("\0\0\0\0\0\x002\0\0"));
+    CHECK_EQUAL(t, not_found);
+
+    // Integer index (uses String index internally)
+    int64_t v = 1ULL << 41;
+    ref_type ref = Column::create(Allocator::get_default());
+    Column col(Allocator::get_default(), ref);
+    col.create_search_index();
+    col.add(1ULL << 40);
+    StringIndex& ndx = col.get_search_index();
+    size_t f = ndx.find_first(v);
+    CHECK_EQUAL(f, not_found);
+
+    col.destroy();
+    col2.destroy();
 }
 
 #endif // TEST_INDEX_STRING
