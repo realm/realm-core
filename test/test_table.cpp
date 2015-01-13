@@ -1502,6 +1502,25 @@ TEST(Table_DistinctIntegers)
 }
 
 
+TEST(Table_DistinctBool)
+{
+    Table table;
+    table.add_column(type_Bool, "first");
+    table.add_empty_row(4);
+    table.set_bool(0, 0, true);
+    table.set_bool(0, 1, false);
+    table.set_bool(0, 2, true);
+    table.set_bool(0, 3, false);
+
+    table.add_search_index(0);
+    CHECK(table.has_search_index(0));
+
+    TableView view = table.get_distinct_view(0);
+
+    CHECK_EQUAL(2, view.size());
+}
+
+
 /*
 // FIXME Commented out because indexes on floats and doubles are not supported (yet).
 
