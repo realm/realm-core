@@ -3288,7 +3288,7 @@ TableView Table::get_distinct_view(size_t col_ndx)
             index = &column.get_search_index();
         }
         else {
-            throw runtime_error("Not implemented");
+            throw runtime_error("Table::get_distinct_view() only supports columns of String, Integer, Bool, and DateTime.");
         }
         index->distinct(refs);
     }
