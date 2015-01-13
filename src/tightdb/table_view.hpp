@@ -230,7 +230,7 @@ protected:
 
     mutable uint_fast64_t m_last_seen_version;
 
-    // m_distinct_column_source != npos if this view was created from distinct values in a column
+    // m_distinct_column_source != npos if this view was created from distinct values in a column of m_table.
     size_t m_distinct_column_source;
 
     // A valid query holds a reference to it's table which must match our m_table.
