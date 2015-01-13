@@ -94,11 +94,11 @@ TIGHTDB_TABLE_4(TestTableShared,
 
 void writer(string path, int id)
 {
-    cerr << "Started writer " << endl;
+    // cerr << "Started writer " << endl;
     try {
         bool done = false;
         SharedGroup sg(path, true, SharedGroup::durability_Full);
-        cerr << "Opened sg " << endl;
+        // cerr << "Opened sg " << endl;
         for (int i=0; !done; ++i) {
             // cerr << "       - " << getpid() << endl;
             WriteTransaction wt(sg);
@@ -110,9 +110,9 @@ void writer(string path, int id)
             sched_yield(); // increase chance of signal arriving in the middle of a transaction
             wt.commit();
         }
-        cerr << "Ended pid " << getpid() << endl;
+        // cerr << "Ended pid " << getpid() << endl;
     } catch (...) {
-        cerr << "Exception from " << getpid() << endl;
+        // cerr << "Exception from " << getpid() << endl;
     }
 }
 
@@ -232,19 +232,29 @@ TEST(Shared_CompactingOnTheFly)
             wt.commit();
         }
         {
-            ReadTransaction rt(sg);
-            writer_thread.start(bind(&writer, old_path, 42));
-            sched_yield();
+            writer_thread.start(bind(&writer, old_path, 41));
+
+            // make sure writer has started:
+            bool waiting = true;
+            while (waiting) {
+                sched_yield();
+                ReadTransaction rt(sg);
+                TestTableShared::ConstRef t1 = rt.get_table<TestTableShared>("test");
+                waiting = t1[41].first == 0;
+                // cerr << t1[41].first << endl;
+            }
+
+            // since the writer is running, we cannot compact:
+            CHECK(sg.compact() == false);
         }
-        // we cannot compact while a writer is still running:
-        CHECK_EQUAL(false, sg.compact());
         {
             // make the writer thread terminate:
             WriteTransaction wt(sg);
             TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
-            t1[42].third = true;
+            t1[41].third = true;
             wt.commit();
         }
+
     }
     writer_thread.join();
     {
