@@ -3265,33 +3265,10 @@ ConstTableView Table::find_all_binary(size_t, BinaryData) const
 
 TableView Table::get_distinct_view(size_t col_ndx)
 {
-    // FIXME: lacks support for reactive updates
     TIGHTDB_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
-    TIGHTDB_ASSERT(has_search_index(col_ndx));
 
-    TableView tv(*this);
-    Column& refs = tv.m_row_indexes;
-
-    if (m_columns.is_attached()) {
-        ColumnType type = get_real_column_type(col_ndx);
-        const StringIndex* index;
-        if (type == col_type_String) {
-            const AdaptiveStringColumn& column = get_column_string(col_ndx);
-            index = &column.get_search_index();
-        }
-        else if (type == col_type_StringEnum) {
-            const ColumnStringEnum& column = get_column_string_enum(col_ndx);
-            index = &column.get_search_index();
-        }
-        else if (type == col_type_Int || type == col_type_Bool || type == col_type_DateTime) {
-            const Column& column = get_column(col_ndx);
-            index = &column.get_search_index();
-        }
-        else {
-            throw runtime_error("Table::get_distinct_view() only supports columns of String, Integer, Bool, and DateTime.");
-        }
-        index->distinct(refs);
-    }
+    TableView tv(*this, col_ndx);
+    tv.sync_if_needed();
     return tv;
 }
 
