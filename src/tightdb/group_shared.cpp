@@ -597,7 +597,6 @@ void SharedGroup::open(const string& path, bool no_create_file,
             File::UnmapGuard fug_1(m_file_map);
             SharedInfo* info = m_file_map.get_addr();
             new (info) SharedInfo(dlevel); // Throws
-            m_file_map.sync();
         }
 
         // we hold the shared lock from here until we close the file!
