@@ -21,6 +21,12 @@
 * Add `Table::minimum_datetime()` and `Table::maximum_datetime()`.
 * Extending `Table::get_sorted_view()` to support multi-column sorting.
 
+-----------
+
+### Internals:
+
+* Now uses system OpenSSL on Android rather than a statically-linked copy for encryption.
+
 ----------------------------------------------
 
 # 0.87.4 Release notes
