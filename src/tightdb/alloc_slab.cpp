@@ -20,7 +20,7 @@ using namespace tightdb::util;
 
 namespace {
 
-// Bumped to 3 because of support of storing NULL in Strings (the array types ArrayString, ArrayStringLong 
+// Bumped to 3 because of support of storing NULL in Strings (the array types ArrayString, ArrayStringLong
 // and ArrayBigBlobs)
 const int current_file_format_version = 3;
 

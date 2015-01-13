@@ -514,7 +514,7 @@ TEST(ArrayString_Null)
         CHECK_EQUAL(a.is_null(0), false);
         CHECK_EQUAL(a.is_null(1), false);
         CHECK_EQUAL(a.is_null(2), true);
-        CHECK_EQUAL(memcmp(a.get(0).data(), "foo", 3), 0);
+        CHECK(a.get(0) == "foo");
 
         // Test set
         a.set_null(0);
@@ -538,7 +538,7 @@ TEST(ArrayString_Null)
         CHECK_EQUAL(a.is_null(0), true);
         CHECK_EQUAL(a.is_null(1), false);
         CHECK_EQUAL(a.is_null(2), false);
-        CHECK_EQUAL(memcmp(a.get(2).data(), "foo", 3), 0);
+        CHECK(a.get(2) == "foo");
 
         // Test insert
         a.insert(0, StringData(0, 0)); // add null (StringData::data() == 0)
@@ -566,7 +566,7 @@ TEST(ArrayString_Null)
         CHECK_EQUAL(a.is_null(0), false);
         CHECK_EQUAL(a.is_null(1), true);
         CHECK_EQUAL(a.is_null(2), false);
-        CHECK_EQUAL(memcmp(a.get(2).data(), "foo", 3), 0);
+        CHECK(a.get(2) == "foo");
 
         a.erase(0);
         CHECK_EQUAL(a.is_null(0), true);
