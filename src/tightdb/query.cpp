@@ -652,7 +652,7 @@ template <Action action, typename T, typename R, class ColType>
             // on. Can be called on any node; yields same result, but different performance. Returns prematurely if
             // condition of called node has evaluated to true local_matches number of times.
             // Return value is the next row for resuming aggregating (next row that caller must call aggregate_local on)
-                              start = pn->m_children[best]->aggregate_local(st, start, td, findlocals, source_column);
+            start = pn->m_children[best]->aggregate_local(st, start, td, findlocals, source_column);
 
             // Make remaining conditions compute their m_dD (statistics)
             for (size_t c = 0; c < pn->m_children.size() && start < end; c++) {

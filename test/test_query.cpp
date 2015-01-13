@@ -5669,7 +5669,6 @@ ONLY(Query_NullStrings)
     v = q.find_all();
     CHECK_EQUAL(1, v.size());
     CHECK_EQUAL(2, v.get_source_ndx(0));
-
 }
 
 #endif // TEST_QUERY
