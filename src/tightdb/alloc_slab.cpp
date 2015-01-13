@@ -21,9 +21,7 @@ using namespace tightdb::util;
 namespace {
 
 // Limited to 8 bits (max 255).
-// Bumped to 3 because of support of storing NULL in Strings (the array types ArrayString, ArrayStringLong 
-// and ArrayBigBlobs)
-const int current_file_format_version = 3;
+const int current_file_format_version = 2;
 
 #ifdef TIGHTDB_SLAB_ALLOC_DEBUG
 map<ref_type, void*> malloc_debug_map;
