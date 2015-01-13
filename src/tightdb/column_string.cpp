@@ -173,7 +173,7 @@ StringData AdaptiveStringColumn::get(size_t ndx) const TIGHTDB_NOEXCEPT
 }
 
 
-StringIndex& AdaptiveStringColumn::create_search_index()
+StringIndex* AdaptiveStringColumn::create_search_index()
 {
     TIGHTDB_ASSERT(!m_search_index);
 
@@ -190,7 +190,7 @@ StringIndex& AdaptiveStringColumn::create_search_index()
     }
 
     m_search_index = index.release();
-    return *m_search_index;
+    return m_search_index;
 }
 
 

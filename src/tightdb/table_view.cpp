@@ -452,24 +452,8 @@ void TableViewBase::do_sync()
         m_row_indexes.clear();
         TIGHTDB_ASSERT(m_table->has_search_index(m_distinct_column_source));
         if (!m_table->is_degenerate()) {
-            ColumnType type = m_table->get_real_column_type(m_distinct_column_source);
-            const StringIndex* index;
-            if (type == col_type_String) {
-                const AdaptiveStringColumn& column = m_table->get_column_string(m_distinct_column_source);
-                index = &column.get_search_index();
-            }
-            else if (type == col_type_StringEnum) {
-                const ColumnStringEnum& column = m_table->get_column_string_enum(m_distinct_column_source);
-                index = &column.get_search_index();
-            }
-            else if (type == col_type_Int || type == col_type_Bool || type == col_type_DateTime) {
-                const Column& column = m_table->get_column(m_distinct_column_source);
-                index = &column.get_search_index();
-            }
-            else {
-                throw runtime_error("Distinct views only support columns of String, Integer, Bool, and DateTime.");
-            }
-            index->distinct(m_row_indexes);
+            const ColumnBase& col = m_table->get_column_base(m_distinct_column_source);
+            col.get_search_index()->distinct(m_row_indexes);
         }
     }
     // precondition: m_table is attached
