@@ -5628,14 +5628,35 @@ ONLY(Query_NullStrings)
     table.add_column(type_String, "s");
     table.add_empty_row(3);
 
+    Query q;
+    TableView v;
+    
+    // Short strings
     table.set_string(0, 0, "Albertslund");       // Normal non-empty string
     table.set_string(0, 1, StringData(0, 0));    // NULL string
     table.set_string(0, 2, "");                  // Empty string
 
-    Query q = table.column<StringData>(0) == StringData(0, 0);
-    TableView v = q.find_all();
+    q = table.column<StringData>(0) == StringData(0, 0);
+    v = q.find_all();
     CHECK_EQUAL(1, v.size());
     CHECK_EQUAL(1, v.get_source_ndx(0));
+
+    q = table.column<StringData>(0) == "";
+    v = q.find_all();
+    CHECK_EQUAL(1, v.size());
+    CHECK_EQUAL(2, v.get_source_ndx(0));
+
+    // Medium strings
+    table.set_string(0, 0, "AlbertslundAlbertslundAlbertslundAlbertslundAlbertslundAlbertslundAlbertslund");
+    q = table.column<StringData>(0) == StringData(0, 0);
+    v = q.find_all();
+    CHECK_EQUAL(1, v.size());
+    CHECK_EQUAL(1, v.get_source_ndx(0));
+
+    q = table.column<StringData>(0) == "";
+    v = q.find_all();
+    CHECK_EQUAL(1, v.size());
+    CHECK_EQUAL(2, v.get_source_ndx(0));
 
 }
 

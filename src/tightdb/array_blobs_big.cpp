@@ -111,14 +111,25 @@ size_t ArrayBigBlobs::find_first(BinaryData value, bool is_string,
     size_t value_size = value.size();
     size_t full_size = is_string ? value_size+1 : value_size;
 
-    for (size_t i = begin; i != end; ++i) {
-        ref_type ref = get_as_ref(i);
-        const char* blob_header = get_alloc().translate(ref);
-        size_t blob_size = get_size_from_header(blob_header);
-        if (blob_size == full_size) {
-            const char* blob_value = ArrayBlob::get(blob_header, 0);
-            if (equal(blob_value, blob_value + value_size, value.data()))
+    if (value.data() == null_ptr) {
+        for (size_t i = begin; i != end; ++i) {
+            ref_type ref = get_as_ref(i);
+            if (ref == 0)
                 return i;
+        }
+    }
+    else {
+        for (size_t i = begin; i != end; ++i) {
+            ref_type ref = get_as_ref(i);
+            if (ref) {
+                const char* blob_header = get_alloc().translate(ref);
+                size_t blob_size = get_size_from_header(blob_header);
+                if (blob_size == full_size) {
+                    const char* blob_value = ArrayBlob::get(blob_header, 0);
+                    if (equal(blob_value, blob_value + value_size, value.data()))
+                        return i;
+                }
+            }
         }
     }
 

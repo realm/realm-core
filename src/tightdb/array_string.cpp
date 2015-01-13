@@ -228,14 +228,22 @@ size_t ArrayString::find_first(StringData value, size_t begin, size_t end) const
     if (m_width <= value.size())
         return size_t(-1);
 
-    if (value.size() == 0) {
+    if (value.is_null()) {
         const char* data = m_data + (m_width-1);
         for (size_t i = begin; i != end; ++i) {
             size_t size = (m_width-1) - data[i * m_width];
             // left-hand-side tests if array element is NULL
-            if (TIGHTDB_UNLIKELY(size == static_cast<size_t>(-1) == value.is_null())) {
+            if (TIGHTDB_UNLIKELY(size == static_cast<size_t>(-1)))
                 return i;
-            }
+        }
+    }
+    else if (value.size() == 0) {
+        const char* data = m_data + (m_width - 1);
+        for (size_t i = begin; i != end; ++i) {
+            size_t size = (m_width - 1) - data[i * m_width];
+            // left-hand-side tests if array element is NULL
+            if (TIGHTDB_UNLIKELY(size == 0))
+                return i;
         }
     }
     else {

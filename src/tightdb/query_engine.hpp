@@ -1155,7 +1155,7 @@ public:
     StringNodeBase(const StringNodeBase& from) 
         : ParentNode(from)
     {
-        char* data = new char[from.m_value.size()];
+        char* data = from.m_value.data() ? new char[from.m_value.size()] : null_ptr;
         memcpy(data, from.m_value.data(), from.m_value.size());
         m_value = StringData(data, from.m_value.size());
         m_condition_column = from.m_condition_column;
