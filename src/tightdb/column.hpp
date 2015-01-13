@@ -565,22 +565,22 @@ inline void ColumnBase::destroy() TIGHTDB_NOEXCEPT
 
 inline bool ColumnBase::has_search_index() const TIGHTDB_NOEXCEPT
 {
-    return get_search_index() != NULL;
+    return get_search_index() != null_ptr;
 }
 
 inline StringIndex* ColumnBase::create_search_index()
 {
-    return NULL;
+    return null_ptr;
 }
 
 inline const StringIndex* ColumnBase::get_search_index() const TIGHTDB_NOEXCEPT
 {
-    return NULL;
+    return null_ptr;
 }
 
 inline StringIndex* ColumnBase::get_search_index() TIGHTDB_NOEXCEPT
 {
-    return NULL;
+    return null_ptr;
 }
 
 inline void ColumnBase::set_search_index_ref(ref_type, ArrayParent*, std::size_t, bool)
