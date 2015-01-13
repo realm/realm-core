@@ -803,7 +803,6 @@ bool SharedGroup::compact()
 
     // Compact by writing a new file holding only live data, then renaming the new file
     // so it becomes the database file, replacing the old one in the process.
-    // TODO: group::write() must store the version info - this is not done at the moment.
     m_group.write(tmp_path, m_key, info->latest_version_number);
     rename(tmp_path.c_str(), m_db_path.c_str());
     end_read();

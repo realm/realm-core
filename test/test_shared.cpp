@@ -92,23 +92,25 @@ TIGHTDB_TABLE_4(TestTableShared,
 
 
 
-void writer(string path, int id, int limit)
+void writer(string path, int id)
 {
-    // cerr << "Started pid " << getpid() << endl;
+    cerr << "Started writer " << endl;
     try {
+        bool done = false;
         SharedGroup sg(path, true, SharedGroup::durability_Full);
-        // cerr << "Opened sg, pid " << getpid() << endl;
-        for (int i=0; limit==0 || i < limit; ++i) {
+        cerr << "Opened sg " << endl;
+        for (int i=0; !done; ++i) {
             // cerr << "       - " << getpid() << endl;
             WriteTransaction wt(sg);
+            TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
+            done = t1[id].third;
             if (i & 1) {
-                TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
                 t1[id].first = 1 + t1[id].first;
             }
             sched_yield(); // increase chance of signal arriving in the middle of a transaction
             wt.commit();
         }
-        // cerr << "Ended pid " << getpid() << endl;
+        cerr << "Ended pid " << getpid() << endl;
     } catch (...) {
         cerr << "Exception from " << getpid() << endl;
     }
@@ -187,7 +189,7 @@ TEST(Shared_PipelinedWritesWithKills)
         TIGHTDB_TERMINATE("fork() failed");
     if (pid == 0) {
         // first writer!
-        writer(path, 0, 0);
+        writer(path, 0);
         _exit(0);
     }
     else {
@@ -197,7 +199,7 @@ TEST(Shared_PipelinedWritesWithKills)
             if (pid == pid_t(-1))
                 TIGHTDB_TERMINATE("fork() failed");
             if (pid == 0) {
-                writer(path, k, 0);
+                writer(path, k);
                 _exit(0);
             }
             else {
@@ -220,20 +222,29 @@ TEST(Shared_CompactingOnTheFly)
     {
         SharedGroup sg(path, false, SharedGroup::durability_Full);
         // Create table entries
-        WriteTransaction wt(sg);
-        TestTableShared::Ref t1 = wt.add_table<TestTableShared>("test");
-        for (int i = 0; i < 100; ++i)
         {
-            t1->add(0, i, false, "test");
+            WriteTransaction wt(sg);
+            TestTableShared::Ref t1 = wt.add_table<TestTableShared>("test");
+            for (int i = 0; i < 100; ++i)
+            {
+                t1->add(0, i, false, "test");
+            }
+            wt.commit();
         }
-        wt.commit();
         {
             ReadTransaction rt(sg);
-            writer_thread.start(bind(&writer, old_path, 42, 100));
-            sleep(1);
+            writer_thread.start(bind(&writer, old_path, 42));
+            sched_yield();
         }
         // we cannot compact while a writer is still running:
         CHECK_EQUAL(false, sg.compact());
+        {
+            // make the writer thread terminate:
+            WriteTransaction wt(sg);
+            TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
+            t1[42].third = true;
+            wt.commit();
+        }
     }
     writer_thread.join();
     {
