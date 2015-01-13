@@ -97,7 +97,7 @@ void ArrayString::set(size_t ndx, StringData value)
                 {
                     // copy string payload
                     const char* old_begin = old_end - (m_width-1);
-                    if(static_cast<size_t>(old_end - old_begin) < m_width) // non-null string
+                    if (static_cast<size_t>(old_end - old_begin) < m_width) // non-null string
                         new_end = copy_backward(old_begin, old_end, new_end);
                     old_end = old_begin;
                 }
