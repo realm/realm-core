@@ -1503,13 +1503,15 @@ TEST(Table_DistinctIntegers)
 
 
 /*
+// FIXME Commented out because indexes on floats and doubles are not supported (yet).
+
 TEST(Table_DistinctFloat)
 {
     Table table;
     table.add_column(type_Float, "first");
     table.add_empty_row(12);
     for (size_t i = 0; i < 10; ++i) {
-        table.set_float(0, i, (float)i + 0.5f);
+        table.set_float(0, i, static_cast<float>(i) + 0.5f);
     }
     table.set_float(0, 10, 0.5f);
     table.set_float(0, 11, 1.5f);
@@ -1528,7 +1530,7 @@ TEST(Table_DistinctDouble)
     table.add_column(type_Double, "first");
     table.add_empty_row(12);
     for (size_t i = 0; i < 10; ++i) {
-        table.set_double(0, i, (double)i + 0.5);
+        table.set_double(0, i, static_cast<double>(i) + 0.5);
     }
     table.set_double(0, 10, 0.5);
     table.set_double(0, 11, 1.5);
