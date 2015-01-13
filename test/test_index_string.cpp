@@ -529,7 +529,7 @@ TEST(StringIndex_FindAllNoCopy2_Int)
 
     // Create a new index on column
     col.create_search_index();
-    StringIndex& ndx = *static_cast<StringIndex*>(col.m_search_index);
+    StringIndex& ndx = col.get_search_index();
     size_t results = not_found;
 
     for (size_t t = 0; t < sizeof(ints) / sizeof(ints[0]); t++) {
@@ -570,7 +570,7 @@ TEST(StringIndex_Count_Int)
 
     // Create a new index on column
     col.create_search_index();
-    StringIndex& ndx = *static_cast<StringIndex*>(col.m_search_index);
+    StringIndex& ndx = col.get_search_index();
 
     for (size_t t = 0; t < sizeof(ints) / sizeof(ints[0]); t++) {
         size_t count = ndx.count(ints[t]);
@@ -601,7 +601,7 @@ TEST(StringIndex_Distinct_Int)
     col.create_search_index();
 
     
-    StringIndex& ndx = *static_cast<StringIndex*>(col.m_search_index);
+    StringIndex& ndx = col.get_search_index();
     
     ref_type results_ref = Column::create(Allocator::get_default());
     Column results(Allocator::get_default(), results_ref);
@@ -633,7 +633,7 @@ TEST(StringIndex_Set_Add_Erase_Insert_Int)
 
     // Create a new index on column
     col.create_search_index();
-    StringIndex& ndx = *static_cast<StringIndex*>(col.m_search_index);
+    StringIndex& ndx = col.get_search_index();
 
     size_t f = ndx.find_first(int64_t(2));
     CHECK_EQUAL(1, f);
@@ -721,7 +721,7 @@ TEST(StringIndex_Bug1)
     Column col(Allocator::get_default(), ref);
     col.create_search_index();
     col.add(1ULL << 40);
-    StringIndex& ndx = *static_cast<StringIndex*>(col.m_search_index);
+    StringIndex& ndx = col.get_search_index();
     size_t f = ndx.find_first(v);
     CHECK_EQUAL(f, not_found);
 

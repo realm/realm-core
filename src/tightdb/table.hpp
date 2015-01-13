@@ -536,9 +536,11 @@ public:
     int64_t maximum_int(std::size_t column_ndx, std::size_t* return_ndx = 0) const;
     float   maximum_float(std::size_t column_ndx, std::size_t* return_ndx = 0) const;
     double  maximum_double(std::size_t column_ndx, std::size_t* return_ndx = 0) const;
+    DateTime maximum_datetime(size_t column_ndx, size_t* return_ndx = 0) const;
     int64_t minimum_int(std::size_t column_ndx, std::size_t* return_ndx = 0) const;
     float   minimum_float(std::size_t column_ndx, std::size_t* return_ndx = 0) const;
     double  minimum_double(std::size_t column_ndx, std::size_t* return_ndx = 0) const;
+    DateTime minimum_datetime(size_t column_ndx, size_t* return_ndx = 0) const;
     double  average_int(std::size_t column_ndx) const;
     double  average_float(std::size_t column_ndx) const;
     double  average_double(std::size_t column_ndx) const;

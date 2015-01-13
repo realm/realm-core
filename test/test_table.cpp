@@ -849,12 +849,12 @@ TEST(Table_DegenerateSubtableSearchAndAggregate)
     CHECK_EQUAL(0, degen_child->minimum_int(0));
     CHECK_EQUAL(0, degen_child->minimum_float(2));
     CHECK_EQUAL(0, degen_child->minimum_double(3));
-//    CHECK_EQUAL(Date(), degen_child->minimum_date(4, Date())); // Not yet implemented
+    CHECK_EQUAL(0, degen_child->minimum_datetime(4));
 
     CHECK_EQUAL(0, degen_child->maximum_int(0));
     CHECK_EQUAL(0, degen_child->maximum_float(2));
     CHECK_EQUAL(0, degen_child->maximum_double(3));
-//    CHECK_EQUAL(Date(), degen_child->maximum_date(4, Date())); // Not yet implemented
+    CHECK_EQUAL(0, degen_child->maximum_datetime(4));
 
     CHECK_EQUAL(0, degen_child->sum_int(0));
     CHECK_EQUAL(0, degen_child->sum_float(2));
@@ -1455,7 +1455,71 @@ TEST(Table_Distinct)
 }
 
 
-/*
+TEST(Table_DistinctEnums)
+{
+    TestTableEnum table;
+    table.add(Mon, "A");
+    table.add(Tue, "B");
+    table.add(Wed, "C");
+    table.add(Thu, "B");
+    table.add(Fri, "C");
+    table.add(Sat, "D");
+    table.add(Sun, "D");
+    table.add(Mon, "D");
+
+    table.column().first.add_search_index();
+    CHECK(table.column().first.has_search_index());
+
+    TestTableEnum::View view = table.column().first.get_distinct_view();
+
+    CHECK_EQUAL(7, view.size());
+    CHECK_EQUAL(0, view.get_source_ndx(0));
+    CHECK_EQUAL(1, view.get_source_ndx(1));
+    CHECK_EQUAL(2, view.get_source_ndx(2));
+    CHECK_EQUAL(3, view.get_source_ndx(3));
+    CHECK_EQUAL(4, view.get_source_ndx(4));
+    CHECK_EQUAL(5, view.get_source_ndx(5));
+    CHECK_EQUAL(6, view.get_source_ndx(6));
+}
+
+
+TEST(Table_DistinctIntegers)
+{
+    Table table;
+    table.add_column(type_Int, "first");
+    table.add_empty_row(4);
+    table.set_int(0, 0, 1);
+    table.set_int(0, 1, 2);
+    table.set_int(0, 2, 3);
+    table.set_int(0, 3, 3);
+
+    table.add_search_index(0);
+    CHECK(table.has_search_index(0));
+
+    TableView view = table.get_distinct_view(0);
+
+    CHECK_EQUAL(3, view.size());
+}
+
+
+TEST(Table_DistinctBools)
+{
+    Table table;
+    table.add_column(type_Bool, "first");
+    table.add_empty_row(3);
+    table.set_bool(0, 0, true);
+    table.set_bool(0, 1, false);
+    table.set_bool(0, 2, true);
+
+    table.add_search_index(0);
+    CHECK(table.has_search_index(0));
+
+    TableView view = table.get_distinct_view(0);
+    CHECK_EQUAL(2, view.size());
+}
+
+
+
 TEST(Table_IndexInt)
 {
     TestTable table;
@@ -1472,11 +1536,11 @@ TEST(Table_IndexInt)
     table.add(0,  9, true, Wed);
 
     // Create index for column two
-//    table.cols().second.add_search_index();
+    table.column().second.add_search_index();
 
     // Search for a value that does not exits
     const size_t r1 = table.column().second.find_first(2);
-    CHECK_EQUAL(-1, r1);
+    CHECK_EQUAL(npos, r1);
 
     // Find existing values
     CHECK_EQUAL(0, table.column().second.find_first(1));
@@ -1539,7 +1603,7 @@ TEST(Table_IndexInt)
     table.Verify();
 #endif
 }
-*/
+
 
 
 namespace {
