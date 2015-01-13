@@ -57,7 +57,7 @@ namespace {
 // Constants controlling the amount of uncommited writes in flight:
 const uint16_t max_write_slots = 100;
 const uint16_t relaxed_sync_threshold = 50;
-#define SHAREDINFO_VERSION 3
+#define SHAREDINFO_VERSION 4
 
 // The following functions are carefully designed for minimal overhead
 // in case of contention among read transactions. In case of contention,
@@ -357,8 +357,9 @@ struct SharedGroup::SharedInfo
     // guarded by the exclusive file lock.
     bool init_complete;
 
-    // number of participating shared groups:
-    uint32_t num_participants;
+    // size of critical structures. Must match among all participants in a session
+    uint8_t size_of_mutex;
+    uint8_t size_of_condvar;
 
     // set when a participant decides to start the daemon, cleared by the daemon
     // when it decides to exit. Participants check during open() and start the
@@ -369,6 +370,9 @@ struct SharedGroup::SharedInfo
     // wait during open() on 'daemon_becomes_ready' for this to become true.
     // Cleared by the daemon when it decides to exit.
     bool daemon_ready;
+
+    // number of participating shared groups:
+    uint32_t num_participants;
 
     // Latest version number. Guarded by the controlmutex (for lock-free access, use
     // get_current_version() instead)
@@ -417,6 +421,8 @@ struct SharedGroup::SharedInfo
 
 SharedGroup::SharedInfo::SharedInfo(DurabilityLevel dlevel):
 #ifndef _WIN32
+    size_of_mutex(sizeof(writemutex)),
+    size_of_condvar(sizeof(room_to_write)),
     writemutex(), // Throws
     balancemutex(), // Throws
     controlmutex(), // Throws
@@ -425,6 +431,8 @@ SharedGroup::SharedInfo::SharedInfo(DurabilityLevel dlevel):
     daemon_becomes_ready(CondVar::process_shared_tag()), // Throws
     new_commit_available(CondVar::process_shared_tag()) // Throws
 #else
+    size_of_mutex(sizeof(writemutex),
+    size_of_condvar(0),
     writemutex(), // Throws
     balancemutex() // Throws
 #endif
@@ -589,6 +597,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
             File::UnmapGuard fug_1(m_file_map);
             SharedInfo* info = m_file_map.get_addr();
             new (info) SharedInfo(dlevel); // Throws
+            m_file_map.sync();
         }
 
         // we hold the shared lock from here until we close the file!
@@ -603,6 +612,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
         size_t info_size;
         if (int_cast_with_overflow_detect(m_file.get_size(), info_size))
             throw runtime_error("Lock file too large");
+        
         if (info_size < sizeof (SharedInfo)) {
             // If the file is marked as being initialized but is too small to
             // contain a valid shared info block, then it was probably
@@ -625,6 +635,14 @@ void SharedGroup::open(const string& path, bool no_create_file,
         if (info->init_complete == 0) {
             continue;
         }
+
+        if (info->size_of_mutex != sizeof(info->controlmutex))
+            throw IncompatibleLockFile();
+
+#ifndef _WIN32
+        if (info->size_of_condvar != sizeof(info->room_to_write))
+            throw IncompatibleLockFile();
+#endif
 
         if (!info->controlmutex.is_valid())
             throw IncompatibleLockFile();
