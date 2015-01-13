@@ -113,7 +113,7 @@ int main()
     {
         timer.reset();
 
-        table.column().first.set_index();
+        table.column().first.add_search_index();
 
         cout << "Add index: "<<timer<<"\n";
     }
