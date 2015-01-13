@@ -3282,9 +3282,13 @@ TableView Table::get_distinct_view(size_t col_ndx)
         else if (type == col_type_StringEnum) {
             const ColumnStringEnum& column = get_column_string_enum(col_ndx);
             index = &column.get_search_index();
-        } else {
+        }
+        else if (type == col_type_Int || type == col_type_Bool || type == col_type_DateTime) {
             const Column& column = get_column(col_ndx);
             index = &column.get_search_index();
+        }
+        else {
+            throw runtime_error("Not implemented");
         }
         index->distinct(refs);
     }
