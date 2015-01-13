@@ -52,6 +52,7 @@ public:
 
     StringData get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
 
+
     void add(StringData value);
     void set(std::size_t ndx, StringData value);
     void insert(std::size_t ndx, StringData value);
@@ -59,6 +60,9 @@ public:
     void truncate(std::size_t size);
     void clear();
     void destroy();
+
+    bool is_null(size_t ndx) const;
+    void set_null(size_t ndx);
 
     std::size_t count(StringData value, std::size_t begin = 0,
                       std::size_t end = npos) const TIGHTDB_NOEXCEPT;
@@ -94,6 +98,7 @@ public:
 private:
     Array m_offsets;
     ArrayBlob m_blob;
+    Array m_nulls;
 };
 
 
@@ -102,10 +107,11 @@ private:
 // Implementation:
 
 inline ArrayStringLong::ArrayStringLong(Allocator& alloc) TIGHTDB_NOEXCEPT:
-    Array(alloc), m_offsets(alloc), m_blob(alloc)
+    Array(alloc), m_offsets(alloc), m_blob(alloc), m_nulls(alloc)
 {
     m_offsets.set_parent(this, 0);
     m_blob.set_parent(this, 1);
+    m_nulls.set_parent(this, 2);
 }
 
 inline void ArrayStringLong::create()
@@ -141,6 +147,10 @@ inline std::size_t ArrayStringLong::size() const TIGHTDB_NOEXCEPT
 inline StringData ArrayStringLong::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < m_offsets.size());
+
+    if (m_nulls.get(ndx) == 0)
+        return StringData(null_ptr, 0);
+
     std::size_t begin, end;
     if (0 < ndx) {
         // FIXME: Consider how much of a performance problem it is,
@@ -154,6 +164,7 @@ inline StringData ArrayStringLong::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
         end   = to_size_t(m_offsets.get(0));
     }
     --end; // Discount the terminating zero
+
     return StringData(m_blob.get(begin), end-begin);
 }
 
@@ -165,18 +176,21 @@ inline void ArrayStringLong::truncate(std::size_t size)
 
     m_offsets.truncate(size);
     m_blob.truncate(blob_size);
+    m_nulls.truncate(size);
 }
 
 inline void ArrayStringLong::clear()
 {
     m_blob.clear();
     m_offsets.clear();
+    m_nulls.clear();
 }
 
 inline void ArrayStringLong::destroy()
 {
     m_blob.destroy();
     m_offsets.destroy();
+    m_nulls.destroy();
     Array::destroy();
 }
 
@@ -186,6 +200,7 @@ inline bool ArrayStringLong::update_from_parent(size_t old_baseline) TIGHTDB_NOE
     if (res) {
         m_blob.update_from_parent(old_baseline);
         m_offsets.update_from_parent(old_baseline);
+        m_nulls.update_from_parent(old_baseline);
     }
     return res;
 }
