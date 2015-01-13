@@ -80,6 +80,70 @@ TEST(Network_Post)
 
 namespace {
 
+void handle_accept_1(bool* was_canceled, error_code ec)
+{
+    if (ec == error::operation_aborted)
+        *was_canceled = true;
+}
+
+void handle_accept_2(bool* was_accepted, error_code ec)
+{
+    if (!ec)
+        *was_accepted = true;
+}
+
+void handle_read_write(bool* was_canceled, error_code ec, size_t)
+{
+    if (ec == error::operation_aborted)
+        *was_canceled = true;
+}
+
+} // anonymous namespace
+
+TEST(Network_CancelAsyncAccept)
+{
+    network::io_service service;
+    network::acceptor acceptor(service);
+    acceptor.open(network::protocol::ip_v4());
+    network::socket socket(service);
+    bool accept_was_canceled = false;
+    acceptor.async_accept(socket, bind(&handle_accept_1, &accept_was_canceled));
+    acceptor.close();
+    service.run();
+    CHECK(accept_was_canceled);
+}
+
+
+TEST(Network_CancelAsyncReadWrite)
+{
+    network::io_service service;
+    network::acceptor acceptor(service);
+    acceptor.open(network::protocol::ip_v4());
+    acceptor.listen();
+    network::socket socket_1(service);
+    bool was_accepted = false;
+    acceptor.async_accept(socket_1, bind(&handle_accept_2, &was_accepted));
+    network::socket socket_2(service);
+    socket_2.connect(acceptor.local_endpoint());
+    service.run();
+    CHECK(was_accepted);
+    const size_t size = 1;
+    char data[size] = { 'a' };
+    bool write_was_canceled = false;
+    async_write(socket_2, data, size, bind(&handle_read_write, &write_was_canceled));
+    network::buffered_input_stream input(socket_2);
+    char buffer[size];
+    bool read_was_canceled = false;
+    input.async_read(buffer, size, bind(&handle_read_write, &read_was_canceled));
+    socket_2.close();
+    service.run();
+    CHECK(read_was_canceled);
+    CHECK(write_was_canceled);
+}
+
+
+namespace {
+
 char echo_body[] = {
     '\xC1', '\x2C', '\xEF', '\x48', '\x8C', '\xCD', '\x41', '\xFA',
     '\x12', '\xF9', '\xF4', '\x72', '\xDF', '\x92', '\x8E', '\x68',

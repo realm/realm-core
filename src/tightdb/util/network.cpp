@@ -99,6 +99,8 @@ string network_error_category::message(int value) const
     switch (errors(value)) {
         case end_of_input:
             return "End of input";
+        case delim_not_found:
+            return "Delimiter not found";
         case host_not_found:
             return "Host not found (authoritative)";
         case host_not_found_try_again:
@@ -163,6 +165,11 @@ public:
                 delete m_imm_handlers[i];
         }
         {
+            size_t n = m_cancel_handlers.size();
+            for (size_t i = 0; i < n; ++i)
+                delete m_cancel_handlers[i];
+        }
+        {
             size_t n = m_poll_handlers.size();
             for (size_t i = 0; i < n; ++i) {
                 delete m_poll_handlers[i].read_handler;
@@ -192,7 +199,7 @@ public:
                     break;
                 if (m_imm_handlers.empty()) {
                     if (m_post_handlers.empty()) {
-                        if (m_num_poll_handlers == 0)
+                        if (m_num_poll_handlers == 0 && m_cancel_handlers.empty())
                             break; // Out of work
                     }
                     else {
@@ -205,6 +212,12 @@ public:
                 UniquePtr<async_handler> h(m_imm_handlers.back());
                 m_imm_handlers.pop_back();
                 h->exec(); // Throws
+            }
+
+            while (!m_cancel_handlers.empty()) {
+                UniquePtr<async_handler> h(m_cancel_handlers.back());
+                m_cancel_handlers.pop_back();
+                h->cancel(); // Throws
             }
 
             if (m_num_poll_handlers == 0)
@@ -240,6 +253,7 @@ public:
                 if (TIGHTDB_LIKELY(pollfd_slot->revents == 0))
                     continue;
 
+                TIGHTDB_ASSERT(pollfd_slot->fd >= 0);
                 TIGHTDB_ASSERT((pollfd_slot->revents & POLLNVAL) == 0);
 
                 if ((pollfd_slot->revents & (POLLHUP|POLLERR)) != 0) {
@@ -261,7 +275,17 @@ public:
                     handler_slot.read_handler = 0;
                     --m_num_poll_handlers;
                     bool done = handler->exec(); // Throws
-                    if (!done) {
+                    if (done) {
+                        // A user handler has been executed, which may have
+                        // closed the current socket, or initiated new
+                        // asynchronous operations. The latter may have caused
+                        // the m_pollfd_slots vector to reallocate its
+                        // underlying memory.
+                        pollfd_slot = &m_pollfd_slots[fd+1];
+                        if (pollfd_slot->fd < 0)
+                            continue;
+                    }
+                    else {
                         // Users handler is not executed in this case
                         pollfd_slot->fd = fd;
                         pollfd_slot->events |= POLLRDNORM;
@@ -270,11 +294,6 @@ public:
                     }
                 }
 
-                // A user handler may have been executed, which may have
-                // initiated new asynchronous operations, which means that the
-                // m_pollfd_slots vector may have reallocated its underlying
-                // memory.
-                pollfd_slot = &m_pollfd_slots[fd+1];
 
                 // Check write readiness
                 if ((pollfd_slot->revents & POLLWRNORM) != 0) {
@@ -382,6 +401,31 @@ public:
         wake_up_poll_thread(); // Throws
     }
 
+    void cancel_io_ops(int fd)
+    {
+        TIGHTDB_ASSERT(fd >= 0);
+        if (unsigned(fd) < m_poll_handlers.size()) {
+            TIGHTDB_ASSERT(m_poll_handlers.size() == m_pollfd_slots.size() - 1);
+            pollfd&            pollfd_slot  = m_pollfd_slots[fd+1];
+            poll_handler_slot& handler_slot = m_poll_handlers[fd];
+            if (pollfd_slot.fd >= 0) {
+                m_cancel_handlers.reserve(m_cancel_handlers.size() + 2); // Throws
+                pollfd_slot.fd = -1; // Mark unused
+                pollfd_slot.events = 0;
+                if (handler_slot.read_handler) {
+                    m_cancel_handlers.push_back(handler_slot.read_handler);
+                    handler_slot.read_handler = 0;
+                    --m_num_poll_handlers;
+                }
+                if (handler_slot.write_handler) {
+                    m_cancel_handlers.push_back(handler_slot.write_handler);
+                    handler_slot.write_handler = 0;
+                    --m_num_poll_handlers;
+                }
+            }
+        }
+    }
+
 private:
     typedef struct pollfd pollfd;
 
@@ -394,6 +438,7 @@ private:
     int m_wakeup_pipe_write_fd;
 
     vector<async_handler*> m_imm_handlers;
+    vector<async_handler*> m_cancel_handlers;
     vector<pollfd> m_pollfd_slots;
     vector<poll_handler_slot> m_poll_handlers;
     size_t m_num_poll_handlers;
@@ -470,6 +515,11 @@ void io_service::add_imm_handler(async_handler* handler)
 void io_service::add_post_handler(async_handler* handler)
 {
     m_impl->add_post_handler(handler);
+}
+
+void io_service::cancel_io_ops(int fd)
+{
+    m_impl->cancel_io_ops(fd);
 }
 
 
@@ -579,6 +629,7 @@ error_code socket_base::close(error_code& ec)
             ec = make_basic_system_error_code(errno);
             return ec;
         }
+        m_service.cancel_io_ops(m_sock_fd);
         m_sock_fd = -1;
     }
     ec = error_code(); // Success

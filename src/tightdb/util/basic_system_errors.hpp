@@ -37,7 +37,10 @@ enum basic_system_errors {
     invalid_argument = EINVAL,
 
     /// Cannot allocate memory.
-    no_memory = ENOMEM
+    no_memory = ENOMEM,
+
+    /// Operation cancelled.
+    operation_aborted = ECANCELED
 };
 
 error_code make_error_code(basic_system_errors);

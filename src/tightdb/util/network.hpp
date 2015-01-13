@@ -201,12 +201,14 @@ private:
     void add_io_handler(int fd, async_handler*, io_op);
     void add_imm_handler(async_handler*);
     void add_post_handler(async_handler*);
+    void cancel_io_ops(int fd);
 
     template<class H> class write_handler;
 
     class impl;
     const UniquePtr<impl> m_impl;
 
+    friend class socket_base;
     friend class acceptor;
     friend class buffered_input_stream;
     template<class H> friend void async_write(socket&, const char*, std::size_t, const H&);
@@ -449,6 +451,9 @@ enum errors {
     /// End of input.
     end_of_input = 1,
 
+    /// Delimiter not found.
+    delim_not_found,
+
     /// Host not found (authoritative).
     host_not_found,
 
@@ -584,6 +589,7 @@ inline endpoint::list::iterator endpoint::list::end() const
 class io_service::async_handler {
 public:
     virtual bool exec() = 0;
+    virtual void cancel() = 0;
     virtual ~async_handler() TIGHTDB_NOEXCEPT {}
 };
 
@@ -598,6 +604,10 @@ public:
     {
         m_handler(); // Throws
         return true;
+    }
+    void cancel() TIGHTDB_OVERRIDE
+    {
+        TIGHTDB_ASSERT(false);
     }
 private:
     const H m_handler;
@@ -823,6 +833,11 @@ public:
         m_handler(ec); // Throws
         return true;
     }
+    void cancel() TIGHTDB_OVERRIDE
+    {
+        error_code ec = error::operation_aborted;
+        m_handler(ec); // Throws
+    }
 private:
     acceptor& m_acceptor;
     socket& m_socket;
@@ -932,8 +947,20 @@ public:
                 return false;
         }
         std::size_t num_bytes_transferred = m_out_curr - m_out_begin;
+        if (!ec && m_delim != std::char_traits<char>::eof()) {
+            bool delim_found = num_bytes_transferred >= 1 &&
+                m_out_curr[-1] == std::char_traits<char>::to_char_type(m_delim);
+            if (!delim_found)
+                ec = delim_not_found;
+        }
         m_handler(ec, num_bytes_transferred); // Throws
         return true;
+    }
+    void cancel() TIGHTDB_OVERRIDE
+    {
+        error_code ec = error::operation_aborted;
+        std::size_t num_bytes_transferred = m_out_curr - m_out_begin;
+        m_handler(ec, num_bytes_transferred); // Throws
     }
 private:
     const H m_handler;
@@ -986,6 +1013,12 @@ public:
         std::size_t num_bytes_transferred = m_curr - m_begin;
         m_handler(ec, num_bytes_transferred); // Throws
         return true;
+    }
+    void cancel() TIGHTDB_OVERRIDE
+    {
+        error_code ec = error::operation_aborted;
+        std::size_t num_bytes_transferred = m_curr - m_begin;
+        m_handler(ec, num_bytes_transferred); // Throws
     }
 private:
     socket& m_socket;
