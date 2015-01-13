@@ -5622,4 +5622,21 @@ TEST(Query_StringIndexCrash)
     Query(q, Query::TCopyExpressionTag());
 }
 
+ONLY(Query_NullStrings)
+{
+    Table table;
+    table.add_column(type_String, "s");
+    table.add_empty_row(3);
+
+    table.set_string(0, 0, "Albertslund");       // Normal non-empty string
+    table.set_string(0, 1, StringData(0, 0));    // NULL string
+    table.set_string(0, 2, "");                  // Empty string
+
+    Query q = table.column<StringData>(0) == StringData(0, 0);
+    TableView v = q.find_all();
+    CHECK_EQUAL(1, v.size());
+    CHECK_EQUAL(1, v.get_source_ndx(0));
+
+}
+
 #endif // TEST_QUERY

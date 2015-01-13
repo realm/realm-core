@@ -220,8 +220,9 @@ size_t ArrayString::find_first(StringData value, size_t begin, size_t end) const
         end = m_size;
     TIGHTDB_ASSERT(begin <= m_size && end <= m_size && begin <= end);
 
+    // m_width == 0 implies that all elements in the array are NULL
     if (m_width == 0)
-        return value.size() == 0 && begin < end ? begin : size_t(-1);
+        return value.size() == 0 && value.data() == null_ptr && begin < end ? begin : size_t(-1);
 
     // A string can never be wider than the column width
     if (m_width <= value.size())
@@ -231,8 +232,10 @@ size_t ArrayString::find_first(StringData value, size_t begin, size_t end) const
         const char* data = m_data + (m_width-1);
         for (size_t i = begin; i != end; ++i) {
             size_t size = (m_width-1) - data[i * m_width];
-            if (TIGHTDB_UNLIKELY(size == 0))
+            // left-hand-side tests if array element is NULL
+            if (TIGHTDB_UNLIKELY(size == static_cast<size_t>(-1) == value.is_null())) {
                 return i;
+            }
         }
     }
     else {

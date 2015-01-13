@@ -1106,7 +1106,8 @@ public:
 
         // FIXME: Store these in std::string instead.
         // '*6' because case converted strings can take up more space. Todo, investigate
-        char* data = new char[6 * v.size()]; // FIXME: Arithmetic is prone to overflow
+        char* data;
+        data = v.data() ? new char[6 * v.size()] : null_ptr; // FIXME: Arithmetic is prone to overflow
         memcpy(data, v.data(), v.size());
         m_value = StringData(data, v.size());
     }
