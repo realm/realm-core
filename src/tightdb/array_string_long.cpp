@@ -14,9 +14,13 @@ using namespace tightdb;
 void ArrayStringLong::init_from_mem(MemRef mem) TIGHTDB_NOEXCEPT
 {
     Array::init_from_mem(mem);
-    ref_type offsets_ref = get_as_ref(0), blob_ref = get_as_ref(1);
+    ref_type offsets_ref = get_as_ref(0);
+    ref_type blob_ref = get_as_ref(1);
+    ref_type nulls_ref = get_as_ref(2);
+
     m_offsets.init_from_ref(offsets_ref);
     m_blob.init_from_ref(blob_ref);
+    m_nulls.init_from_ref(nulls_ref);
 }
 
 
@@ -28,6 +32,7 @@ void ArrayStringLong::add(StringData value)
     if (!m_offsets.is_empty())
         end += to_size_t(m_offsets.back());
     m_offsets.add(end);
+    m_nulls.add(value.data() == null_ptr ? 0 : 1);
 }
 
 void ArrayStringLong::set(size_t ndx, StringData value)
@@ -42,6 +47,7 @@ void ArrayStringLong::set(size_t ndx, StringData value)
     size_t new_end = begin + value.size() + 1;
     int64_t diff =  int64_t(new_end) - int64_t(end);
     m_offsets.adjust(ndx, m_offsets.size(), diff);
+    m_nulls.set(ndx, value.data() == null_ptr ? 0 : 1);
 }
 
 void ArrayStringLong::insert(size_t ndx, StringData value)
@@ -54,6 +60,8 @@ void ArrayStringLong::insert(size_t ndx, StringData value)
 
     m_offsets.insert(ndx, pos + value.size() + 1);
     m_offsets.adjust(ndx+1, m_offsets.size(), value.size() + 1);
+
+    m_nulls.insert(ndx, value.data() == null_ptr ? 0 : 1);
 }
 
 void ArrayStringLong::erase(size_t ndx)
@@ -66,6 +74,19 @@ void ArrayStringLong::erase(size_t ndx)
     m_blob.erase(begin, end);
     m_offsets.erase(ndx);
     m_offsets.adjust(ndx, m_offsets.size(), int64_t(begin) - int64_t(end));
+    m_nulls.erase(ndx);
+}
+
+bool ArrayStringLong::is_null(size_t ndx) const
+{
+    TIGHTDB_ASSERT(ndx < m_nulls.size());
+    return !m_nulls.get(ndx);
+}
+
+void ArrayStringLong::set_null(size_t ndx)
+{
+    TIGHTDB_ASSERT(ndx < m_nulls.size());
+    m_nulls.set(ndx, false);
 }
 
 size_t ArrayStringLong::count(StringData value, size_t begin,
@@ -122,14 +143,20 @@ void ArrayStringLong::find_all(Column& result, StringData value, size_t add_offs
 
 StringData ArrayStringLong::get(const char* header, size_t ndx, Allocator& alloc) TIGHTDB_NOEXCEPT
 {
-    pair<int_least64_t, int_least64_t> p = get_two(header, 0);
-    ref_type offsets_ref = to_ref(p.first);
-    ref_type blob_ref    = to_ref(p.second);
+    ref_type offsets_ref;
+    ref_type blob_ref;
+    ref_type nulls_ref;
+
+    get_three(header, 0, offsets_ref, blob_ref, nulls_ref);
+
+    const char* nulls_header = alloc.translate(nulls_ref);
+    if (Array::get(nulls_header, ndx) == 0)
+        return StringData(null_ptr, 0);
 
     const char* offsets_header = alloc.translate(offsets_ref);
     size_t begin, end;
     if (0 < ndx) {
-        p = get_two(offsets_header, ndx-1);
+        pair<int64_t, int64_t> p = get_two(offsets_header, ndx - 1);
         begin = to_size_t(p.first);
         end   = to_size_t(p.second);
     }
@@ -201,6 +228,16 @@ MemRef ArrayStringLong::create_array(size_t size, Allocator& alloc)
         top.add(v); // Throws
         dg_2.release();
     }
+    {
+        bool context_flag = false;
+        int_fast64_t value = 0; // initialize all rows to null
+        MemRef mem = Array::create_array(type_Normal, context_flag, size, value, alloc); // Throws
+        dg_2.reset(mem.m_ref);
+        int_fast64_t v(mem.m_ref); // FIXME: Dangerous cast (unsigned -> signed)
+        top.add(v); // Throws
+        dg_2.release();
+    }
+
 
     dg.release();
     return top.get_mem();
