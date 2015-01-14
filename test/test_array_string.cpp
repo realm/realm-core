@@ -507,6 +507,17 @@ TEST(ArrayString_Null)
         ArrayString a(Allocator::get_default());
         a.create();
 
+        a.add("");
+        size_t t = a.find_first("");
+        CHECK_EQUAL(t, 0);
+
+        a.destroy();
+    }
+
+    {
+        ArrayString a(Allocator::get_default());
+        a.create();
+
         a.add("foo");
         a.add("");
         a.add(StringData(0, 0)); // add null (StringData::data() == 0)

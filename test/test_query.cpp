@@ -5622,7 +5622,7 @@ TEST(Query_StringIndexCrash)
     Query(q, Query::TCopyExpressionTag());
 }
 
-ONLY(Query_NullStrings)
+TEST(Query_NullStrings)
 {
     Table table;
     table.add_column(type_String, "s");
