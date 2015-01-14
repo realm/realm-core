@@ -163,7 +163,7 @@ void killer(TestResults& test_results, int pid, string path, int id)
 
 } // anonymous namespace
 
-#if !defined(__APPLE__) && !defined(_WIN32)&& !defined TIGHTDB_ENABLE_ENCRYPTION
+#if !defined(__APPLE__) && !defined(_WIN32)&& !defined TIGHTDB_ENABLE_ENCRYPTION && !defined(TIGHTDB_ANDROID)
 
 TEST(Shared_PipelinedWritesWithKills)
 {
@@ -1162,6 +1162,8 @@ TEST(Shared_WriterThreads)
 
 
 #if defined TEST_ROBUSTNESS && defined ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE && !defined TIGHTDB_ENABLE_ENCRYPTION
+#if !defined TIGHTDB_ANDROID && !defined TIGHTDB_IOS
+
 // Not supported on Windows in particular? Keywords: winbug
 TEST(Shared_RobustAgainstDeathDuringWrite)
 {
@@ -1227,6 +1229,7 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
     }
 }
 
+#endif // not ios or android
 #endif // defined TEST_ROBUSTNESS && defined ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE && !defined TIGHTDB_ENABLE_ENCRYPTION
 
 
