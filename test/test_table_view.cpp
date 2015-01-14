@@ -680,7 +680,7 @@ TEST(TableView_DoubleSortPrecision)
     CHECK_EQUAL(d2, tv[1].second);
 }
 
-ONLY(TableView_SortNullString)
+TEST(TableView_SortNullString)
 {
     Table t;
     t.add_column(type_String, "s");

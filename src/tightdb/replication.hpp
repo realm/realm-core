@@ -554,7 +554,8 @@ private:
     float read_float();
     double read_double();
 
-    void read_string(util::StringBuffer&);
+    // returns false if null-string, else true
+    bool read_string(util::StringBuffer&);
     void read_mixed(Mixed*);
 
     // Advance m_input_begin and m_input_end to reflect the next block of instructions
@@ -883,7 +884,7 @@ inline void Replication::string_value(const char* data, std::size_t size)
 {
     char* buf;
     transact_log_reserve(&buf, max_enc_bytes_per_num);
-    buf = encode_int(buf, size);
+    buf = encode_int(buf, data ? size : -1);
     transact_log_advance(buf);
     transact_log_append(data, size); // Throws   
 }
@@ -1486,8 +1487,8 @@ bool Replication::TransactLogParser::do_parse(InstructionHandler& handler)
                 std::size_t col_ndx = read_int<std::size_t>(); // Throws
                 std::size_t row_ndx = read_int<std::size_t>(); // Throws
                 std::size_t tbl_sz = read_int<std::size_t>(); // Throws
-                read_string(m_string_buffer); // Throws
-                StringData value(m_string_buffer.data(), m_string_buffer.size());
+                bool null = !read_string(m_string_buffer); // Throws
+                StringData value(null ? null_ptr : m_string_buffer.data(), m_string_buffer.size());
                 if (!handler.insert_string(col_ndx, row_ndx, tbl_sz, value)) // Throws
                     return false;
                 continue;
@@ -1856,12 +1857,18 @@ inline double Replication::TransactLogParser::read_double()
 }
 
 
-inline void Replication::TransactLogParser::read_string(util::StringBuffer& buf)
+inline bool Replication::TransactLogParser::read_string(util::StringBuffer& buf)
 {
     buf.clear();
     std::size_t size = read_int<std::size_t>(); // Throws
+
+    if (size == static_cast<size_t>(-1))
+        return false; // null
+
     buf.resize(size); // Throws
     read_bytes(buf.data(), size);
+
+    return true;
 }
 
 

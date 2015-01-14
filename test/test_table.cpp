@@ -114,6 +114,18 @@ TEST(Table_ManyColumnsCrash2)
 
 #endif // JAVA_MANY_COLUMNS_CRASH
 
+TEST(Table_Null)
+{
+    // Check that add_empty_row() adds NULL string as default
+    Group group;
+    TableRef table = group.add_table("test");
+
+    table->add_column(type_String, "name");
+    table->add_empty_row();
+    
+    CHECK(table->get_string(0, 0).is_null());
+}
+
 TEST(Table_DeleteCrash)
 {
     Group group;
