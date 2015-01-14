@@ -1499,6 +1499,9 @@ TEST(Table_DistinctIntegers)
     TableView view = table.get_distinct_view(0);
 
     CHECK_EQUAL(3, view.size());
+    CHECK_EQUAL(0, view.get_source_ndx(0));
+    CHECK_EQUAL(1, view.get_source_ndx(1));
+    CHECK_EQUAL(2, view.get_source_ndx(2));
 }
 
 
@@ -1518,6 +1521,8 @@ TEST(Table_DistinctBool)
     TableView view = table.get_distinct_view(0);
 
     CHECK_EQUAL(2, view.size());
+    CHECK_EQUAL(0, view.get_source_ndx(1));
+    CHECK_EQUAL(1, view.get_source_ndx(0));
 }
 
 
