@@ -142,8 +142,8 @@ inline bool Utf8x16<Char16, Traits16>::to_utf16(const char*& in_begin, const cha
                 invalid = true;
                 break; // Incomplete UTF-8 sequence
             }
+            TIGHTDB_ASSERT(&in[1] >= in_begin && &in[2] < in_end);
             uint_fast16_t v2 = uint_fast16_t(traits8::to_int_type(in[1]));
-            TIGHTDB_ASSERT(&in[2] >= in_begin && &in[2] < in_end);
             uint_fast16_t v3 = uint_fast16_t(traits8::to_int_type(in[2]));
             // UTF-8 layout: 1110xxxx 10xxxxxx 10xxxxxx
             if (TIGHTDB_UNLIKELY((v2 & 0xC0) != 0x80 || (v3 & 0xC0) != 0x80)) {
