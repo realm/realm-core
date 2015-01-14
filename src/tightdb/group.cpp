@@ -564,11 +564,21 @@ private:
     const Group& m_group;
 };
 
+void Group::write(ostream& out, bool pad) const
+{
+    write(out, pad, 0);
+}
+
 void Group::write(ostream& out, bool pad, uint_fast64_t version_number) const
 {
     TIGHTDB_ASSERT(is_attached());
     DefaultTableWriter table_writer(*this);
     write(out, table_writer, pad, version_number); // Throws
+}
+
+void Group::write(const string& path, const char* encryption_key) const
+{
+    write(path, encryption_key, 0);
 }
 
 void Group::write(const string& path, const char* encryption_key, uint_fast64_t version_number) const
