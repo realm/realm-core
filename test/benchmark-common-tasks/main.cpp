@@ -26,8 +26,8 @@ using namespace tightdb::test_util;
     https://github.com/realm/realm-java/blob/bp-performance-test/realm/src/androidTest/java/io/realm/RealmPerformanceTest.java
 */
 
-static const char REALM_PATH[] = "/tmp/benchmark-common-tasks.tightdb";
-static const size_t REPETITIONS[] = { 10, 100, 1000 };
+static const char realm_path[] = "/tmp/benchmark-common-tasks.tightdb";
+static const size_t repetitions[] = { 10, 100, 1000 };
 
 struct Benchmark {
   virtual const char* name() const = 0;
@@ -40,7 +40,8 @@ struct Benchmark {
 struct AddTable : Benchmark {
   const char* name() const { return "AddTable"; }
 
-  void operator()(SharedGroup& group) {
+  void operator()(SharedGroup& group)
+  {
     WriteTransaction tr(group);
     TableRef t = tr.add_table(name());
     t->add_column(type_String, "first");
@@ -49,7 +50,8 @@ struct AddTable : Benchmark {
     tr.commit();
   }
 
-  void teardown(SharedGroup& group) {
+  void teardown(SharedGroup& group)
+  {
     Group& g = group.begin_write();
     g.remove_table(name());
     group.commit();
@@ -57,14 +59,16 @@ struct AddTable : Benchmark {
 };
 
 struct BenchmarkWithStringsTable : Benchmark {
-  void setup(SharedGroup& group) {
+  void setup(SharedGroup& group)
+  {
     WriteTransaction tr(group);
     TableRef t = tr.add_table("StringOnly");
     t->add_column(type_String, "chars");
     tr.commit();
   }
 
-  void teardown(SharedGroup& group) {
+  void teardown(SharedGroup& group)
+  {
     Group& g = group.begin_write();
     g.remove_table("StringOnly");
     group.commit();
@@ -72,7 +76,8 @@ struct BenchmarkWithStringsTable : Benchmark {
 };
 
 struct BenchmarkWithStrings : BenchmarkWithStringsTable {
-  void setup(SharedGroup& group) {
+  void setup(SharedGroup& group)
+  {
     BenchmarkWithStringsTable::setup(group);
     WriteTransaction tr(group);
     TableRef t = tr.get_table("StringOnly");
@@ -88,7 +93,9 @@ struct BenchmarkWithStrings : BenchmarkWithStringsTable {
 
 struct BenchmarkQuery : BenchmarkWithStrings {
   const char* name() const { return "BenchmarkQuery"; }
-  void operator()(SharedGroup& group) {
+
+  void operator()(SharedGroup& group)
+  {
     ReadTransaction tr(group);
     ConstTableRef table = tr.get_table("StringOnly");
     ConstTableView view = table->find_all_string(0, "200");
@@ -97,7 +104,9 @@ struct BenchmarkQuery : BenchmarkWithStrings {
 
 struct BenchmarkSize : BenchmarkWithStrings {
   const char* name() const { return "BenchmarkSize"; }
-  void operator()(SharedGroup& group) {
+
+  void operator()(SharedGroup& group)
+  {
     ReadTransaction tr(group);
     ConstTableRef table = tr.get_table("StringOnly");
     avoid_optimization(table->size());
@@ -106,7 +115,9 @@ struct BenchmarkSize : BenchmarkWithStrings {
 
 struct BenchmarkSort : BenchmarkWithStrings {
   const char* name() const { return "BenchmarkSort"; }
-  void operator()(SharedGroup& group) {
+
+  void operator()(SharedGroup& group)
+  {
     ReadTransaction tr(group);
     ConstTableRef table = tr.get_table("StringOnly");
     ConstTableView view = table->get_sorted_view(0);
@@ -115,7 +126,9 @@ struct BenchmarkSort : BenchmarkWithStrings {
 
 struct BenchmarkInsert : BenchmarkWithStringsTable {
   const char* name() const { return "BenchmarkInsert"; }
-  void operator()(SharedGroup& group) {
+
+  void operator()(SharedGroup& group)
+  {
     WriteTransaction tr(group);
     TableRef t = tr.get_table("StringOnly");
     for (size_t i = 0; i < 10000; ++i) {
@@ -128,7 +141,9 @@ struct BenchmarkInsert : BenchmarkWithStringsTable {
 
 struct BenchmarkGetString : BenchmarkWithStrings {
   const char* name() const { return "BenchmarkGetString"; }
-  void operator()(SharedGroup& group) {
+
+  void operator()(SharedGroup& group)
+  {
     ReadTransaction tr(group);
     ConstTableRef table = tr.get_table("StringOnly");
     size_t len = table->size();
@@ -142,7 +157,9 @@ struct BenchmarkGetString : BenchmarkWithStrings {
 
 struct BenchmarkSetString : BenchmarkWithStrings {
   const char* name() const { return "BenchmarkSetString"; }
-  void operator()(SharedGroup& group) {
+
+  void operator()(SharedGroup& group)
+  {
     WriteTransaction tr(group);
     TableRef table = tr.get_table("StringOnly");
     size_t len = table->size();
@@ -156,7 +173,8 @@ struct BenchmarkSetString : BenchmarkWithStrings {
 
 
 
-static const char* durability_level_to_cstr(SharedGroup::DurabilityLevel level) {
+static const char* durability_level_to_cstr(SharedGroup::DurabilityLevel level)
+{
   switch (level) {
     case SharedGroup::durability_Full: return "Full";
     case SharedGroup::durability_MemOnly: return "MemOnly";
@@ -170,19 +188,20 @@ static const char* durability_level_to_cstr(SharedGroup::DurabilityLevel level) 
 /// This little piece of likely over-engineering runs the benchmark a number of times,
 /// with each durability setting, and reports the results for each run.
 template <typename B>
-void run_benchmark(BenchmarkResults& results) {
+void run_benchmark(BenchmarkResults& results)
+{
 #ifdef _WIN32
   const size_t num_durabilities = 2;
 #else
   const size_t num_durabilities = 2; // FIXME Figure out how to run the async commit daemon.
 #endif
-  static const size_t num_repetition_groups = sizeof(REPETITIONS) / sizeof(*REPETITIONS);
+  static const size_t num_repetition_groups = sizeof(repetitions) / sizeof(*repetitions);
 
   Timer timer(Timer::type_UserTime);
   for (size_t i = 0; i < num_durabilities; ++i) {
     SharedGroup::DurabilityLevel level = static_cast<SharedGroup::DurabilityLevel>(i);
     for (size_t j = 0; j < num_repetition_groups; ++j) {
-      size_t rep = REPETITIONS[j];
+      size_t rep = repetitions[j];
       B benchmark;
 
       // Generate the benchmark result texts:
@@ -194,9 +213,9 @@ void run_benchmark(BenchmarkResults& results) {
       std::string ident = ident_ss.str();
 
       // Open a SharedGroup:
-      File::try_remove(REALM_PATH);
+      File::try_remove(realm_path);
       UniquePtr<SharedGroup> group;
-      group.reset(new SharedGroup(REALM_PATH, false, level));
+      group.reset(new SharedGroup(realm_path, false, level));
       
       // Run the benchmarks with cumulative results.
       timer.reset();
@@ -217,7 +236,8 @@ void run_benchmark(BenchmarkResults& results) {
 }
 
 
-int main(int, const char**) {
+int main(int, const char**)
+{
   BenchmarkResults results(40);
 
   run_benchmark<AddTable>(results);
