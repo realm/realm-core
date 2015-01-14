@@ -72,6 +72,11 @@ benchmark-transaction: check-norun/subdir/util
 benchmark-row-accessor: check-norun/subdir/util
 	@$(MAKE) -C benchmark-row-accessor check
 
+# Build and run the "common tasks" benchmarking program
+.PHONY: benchmark-common-tasks
+benchmark-common-tasks: check-norun/subdir/util
+	@$(MAKE) -C benchmark-common-tasks check
+
 # Build and run whatever is in experiements/testcase.cpp
 .PHONY: check-testcase check-testcase-debug memcheck-testcase memcheck-testcase-debug
 .PHONY: gdb-testcase gdb-testcase-debug
