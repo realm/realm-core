@@ -219,17 +219,17 @@ void run_benchmark(BenchmarkResults& results)
 
             // Run the benchmarks with cumulative results.
             timer.reset();
+            timer.pause();
             for (size_t r = 0; r < rep; ++r) {
-                timer.pause();
                 benchmark.setup(*group);
-                timer.unpause();
 
+                timer.unpause();
                 benchmark(*group);
-
                 timer.pause();
+                
                 benchmark.teardown(*group);
-                timer.unpause();
             }
+            timer.unpause();
             results.submit(timer, ident.c_str(), lead_text.c_str());
         }
     }
