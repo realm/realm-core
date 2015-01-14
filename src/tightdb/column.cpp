@@ -743,7 +743,7 @@ namespace {
 
 } // anonymous namespace
 
-StringIndex& Column::create_search_index()
+StringIndex* Column::create_search_index()
 {
    TIGHTDB_ASSERT(!m_search_index);
    UniquePtr<StringIndex> index;
@@ -760,19 +760,17 @@ StringIndex& Column::create_search_index()
     }
 
     m_search_index = index.release();
-    return *m_search_index;
+    return m_search_index;
 }
 
-StringIndex& Column::get_search_index() TIGHTDB_NOEXCEPT
+StringIndex* Column::get_search_index() TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(m_search_index);
-    return *m_search_index;
+    return m_search_index;
 }
 
-const StringIndex& Column::get_search_index() const TIGHTDB_NOEXCEPT
+const StringIndex* Column::get_search_index() const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(m_search_index);
-    return *m_search_index;
+    return m_search_index;
 }
 
 void Column::set_search_index_ref(ref_type ref, ArrayParent* parent,

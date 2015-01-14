@@ -1502,20 +1502,82 @@ TEST(Table_DistinctIntegers)
 }
 
 
-TEST(Table_DistinctBools)
+TEST(Table_DistinctBool)
 {
     Table table;
     table.add_column(type_Bool, "first");
-    table.add_empty_row(3);
+    table.add_empty_row(4);
     table.set_bool(0, 0, true);
     table.set_bool(0, 1, false);
     table.set_bool(0, 2, true);
+    table.set_bool(0, 3, false);
 
     table.add_search_index(0);
     CHECK(table.has_search_index(0));
 
     TableView view = table.get_distinct_view(0);
+
     CHECK_EQUAL(2, view.size());
+}
+
+
+/*
+// FIXME Commented out because indexes on floats and doubles are not supported (yet).
+
+TEST(Table_DistinctFloat)
+{
+    Table table;
+    table.add_column(type_Float, "first");
+    table.add_empty_row(12);
+    for (size_t i = 0; i < 10; ++i) {
+        table.set_float(0, i, static_cast<float>(i) + 0.5f);
+    }
+    table.set_float(0, 10, 0.5f);
+    table.set_float(0, 11, 1.5f);
+
+    table.add_search_index(0);
+    CHECK(table.has_search_index(0));
+
+    TableView view = table.get_distinct_view(0);
+    CHECK_EQUAL(10, view.size());
+}
+
+
+TEST(Table_DistinctDouble)
+{
+    Table table;
+    table.add_column(type_Double, "first");
+    table.add_empty_row(12);
+    for (size_t i = 0; i < 10; ++i) {
+        table.set_double(0, i, static_cast<double>(i) + 0.5);
+    }
+    table.set_double(0, 10, 0.5);
+    table.set_double(0, 11, 1.5);
+
+    table.add_search_index(0);
+    CHECK(table.has_search_index(0));
+
+    TableView view = table.get_distinct_view(0);
+    CHECK_EQUAL(10, view.size());
+}
+*/
+
+
+TEST(Table_DistinctDateTime)
+{
+    Table table;
+    table.add_column(type_DateTime, "first");
+    table.add_empty_row(4);
+    table.set_datetime(0, 0, DateTime(0));
+    table.set_datetime(0, 1, DateTime(1));
+    table.set_datetime(0, 2, DateTime(3));
+    table.set_datetime(0, 3, DateTime(3));
+
+    table.add_search_index(0);
+    CHECK(table.has_search_index(0));
+
+    TableView view = table.get_distinct_view(0);
+    CHECK_EQUAL(3, view.size());
 }
 
 

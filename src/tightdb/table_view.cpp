@@ -5,6 +5,7 @@
 #include <tightdb/query_conditions.hpp>
 #include <tightdb/column_basic.hpp>
 #include <tightdb/util/utf8.hpp>
+#include <tightdb/index_string.hpp>
 
 using namespace std;
 using namespace tightdb;
@@ -446,6 +447,14 @@ void TableViewBase::do_sync()
         m_row_indexes.clear();
         for (size_t t = 0; t < m_linkview_source->size(); t++)
             m_row_indexes.add(m_linkview_source->get(t).get_index());
+    }
+    else if (m_table && m_distinct_column_source != npos) {
+        m_row_indexes.clear();
+        TIGHTDB_ASSERT(m_table->has_search_index(m_distinct_column_source));
+        if (!m_table->is_degenerate()) {
+            const ColumnBase& col = m_table->get_column_base(m_distinct_column_source);
+            col.get_search_index()->distinct(m_row_indexes);
+        }
     }
     // precondition: m_table is attached
     else if (!m_query.m_table) {

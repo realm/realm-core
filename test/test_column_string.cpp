@@ -914,7 +914,7 @@ TEST(ColumnString_Index)
     asc.add("15");
     asc.add("HEJSA"); // 16
 
-    const StringIndex& ndx = asc.create_search_index();
+    const StringIndex& ndx = *asc.create_search_index();
     CHECK(asc.has_search_index());
 #ifdef TIGHTDB_DEBUG
     ndx.verify_entries(asc);
