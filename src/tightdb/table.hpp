@@ -572,6 +572,7 @@ public:
     TableView      find_all_binary(std::size_t column_ndx, BinaryData value);
     ConstTableView find_all_binary(std::size_t column_ndx, BinaryData value) const;
 
+    /// The following column types are supported: String, Integer, DateTime, Bool
     TableView      get_distinct_view(std::size_t column_ndx);
     ConstTableView get_distinct_view(std::size_t column_ndx) const;
 

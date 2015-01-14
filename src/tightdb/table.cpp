@@ -1352,32 +1352,18 @@ void Table::add_search_index(size_t col_ndx)
 
     TIGHTDB_ASSERT(!m_primary_key);
 
-    ColumnType type = get_real_column_type(col_ndx);
     Spec::ColumnInfo info;
     m_spec.get_column_info(col_ndx, info);
     size_t column_pos = info.m_column_ref_ndx;
     ref_type index_ref = 0;
 
     // Create the index
-    if (type == col_type_String) {
-        AdaptiveStringColumn& col = get_column_string(col_ndx);
-        StringIndex& index = col.create_search_index(); // Throws
-        index.set_parent(&m_columns, column_pos+1);
-        index_ref = index.get_ref();
-    }
-    else if (type == col_type_StringEnum) {
-        ColumnStringEnum& col = get_column_string_enum(col_ndx);
-        StringIndex& index = col.create_search_index(); // Throws
-        index.set_parent(&m_columns, column_pos+1);
-        index_ref = index.get_ref();
-    }
-    else if (type == col_type_Int || type == col_type_DateTime || type == col_type_Bool) {
-        Column& col = get_column(col_ndx);
-        StringIndex& index = col.create_search_index(); // Throws
-        index.set_parent(&m_columns, column_pos + 1);
-        index_ref = index.get_ref();
-    }
-    else {
+    ColumnBase& col = get_column_base(col_ndx);
+    StringIndex* index = col.create_search_index(); // Throws
+    if (index) {
+        index->set_parent(&m_columns, column_pos + 1);
+        index_ref = index->get_ref();
+    } else {
         throw LogicError(LogicError::illegal_combination);
     }
 
@@ -1433,21 +1419,21 @@ bool Table::try_add_primary_key(size_t col_ndx)
     ColumnBase& col = get_column_base(col_ndx);
     if (type == col_type_String) {
         AdaptiveStringColumn& col_2 = static_cast<AdaptiveStringColumn&>(col);
-        StringIndex& index = col_2.get_search_index();
+        StringIndex& index = *col_2.get_search_index();
         if (index.has_duplicate_values())
             return false;
         index.set_allow_duplicate_values(false);
     }
     else if (type == col_type_StringEnum) {
         ColumnStringEnum& col_2 = static_cast<ColumnStringEnum&>(col);
-        StringIndex& index = col_2.get_search_index();
+        StringIndex& index = *col_2.get_search_index();
         if (index.has_duplicate_values())
             return false;
         index.set_allow_duplicate_values(false);
     }
     else if (type == col_type_Int) {
         Column& col_2 = static_cast<Column&>(col);
-        StringIndex& index = col_2.get_search_index();
+        StringIndex& index = *col_2.get_search_index();
         if (index.has_duplicate_values())
             return false;
         index.set_allow_duplicate_values(false);
@@ -1491,12 +1477,12 @@ void Table::remove_primary_key()
             ColumnBase& col = get_column_base(col_ndx);
             if (type == col_type_String) {
                 AdaptiveStringColumn& col_2 = static_cast<AdaptiveStringColumn&>(col);
-                StringIndex& index = col_2.get_search_index();
+                StringIndex& index = *col_2.get_search_index();
                 index.set_allow_duplicate_values(true);
             }
             else if (type == col_type_StringEnum) {
                 ColumnStringEnum& col_2 = static_cast<ColumnStringEnum&>(col);
-                StringIndex& index = col_2.get_search_index();
+                StringIndex& index = *col_2.get_search_index();
                 index.set_allow_duplicate_values(true);
             }
             else {
@@ -3051,12 +3037,12 @@ void Table::reveal_primary_key() const
             const ColumnBase& col = get_column_base(i);
             if (type == col_type_String) {
                 const AdaptiveStringColumn& col_2 = static_cast<const AdaptiveStringColumn&>(col);
-                m_primary_key = &col_2.get_search_index();
+                m_primary_key = col_2.get_search_index();
                 return;
             }
             if (type == col_type_StringEnum) {
                 const ColumnStringEnum& col_2 = static_cast<const ColumnStringEnum&>(col);
-                m_primary_key = &col_2.get_search_index();
+                m_primary_key = col_2.get_search_index();
                 return;
             }
             TIGHTDB_ASSERT(false);
@@ -3265,29 +3251,10 @@ ConstTableView Table::find_all_binary(size_t, BinaryData) const
 
 TableView Table::get_distinct_view(size_t col_ndx)
 {
-    // FIXME: lacks support for reactive updates
     TIGHTDB_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
-    TIGHTDB_ASSERT(has_search_index(col_ndx));
 
-    TableView tv(*this);
-    Column& refs = tv.m_row_indexes;
-
-    if (m_columns.is_attached()) {
-        ColumnType type = get_real_column_type(col_ndx);
-        const StringIndex* index;
-        if (type == col_type_String) {
-            const AdaptiveStringColumn& column = get_column_string(col_ndx);
-            index = &column.get_search_index();
-        }
-        else if (type == col_type_StringEnum) {
-            const ColumnStringEnum& column = get_column_string_enum(col_ndx);
-            index = &column.get_search_index();
-        } else {
-            const Column& column = get_column(col_ndx);
-            index = &column.get_search_index();
-        }
-        index->distinct(refs);
-    }
+    TableView tv(*this, col_ndx);
+    tv.sync_if_needed();
     return tv;
 }
 
@@ -3414,7 +3381,7 @@ void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, T
         // If the group_by column is not auto-enumerated, we have to do
         // (more expensive) direct lookups.
         result.add_search_index(0);
-        const StringIndex& dst_index = result.get_column_string(0).get_search_index();
+        const StringIndex& dst_index = *result.get_column_string(0).get_search_index();
 
         state.table = this;
         state.dst_index = &dst_index;

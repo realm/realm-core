@@ -39,12 +39,14 @@ public:
 
     Timer(Type type = type_RealTime): m_type(type) { reset(); }
 
-    void reset() { m_start = get_timer_ticks(); }
+    void reset();
+    void pause();
+    void unpause();
 
     /// Returns elapsed time in seconds since last call to reset().
     double get_elapsed_time() const
     {
-        return calc_elapsed_seconds(get_timer_ticks() - m_start);
+        return calc_elapsed_seconds(get_timer_ticks() - m_start - m_paused_for);
     }
 
     /// Same as get_elapsed_time().
@@ -63,16 +65,33 @@ public:
 private:
     const Type m_type;
     uint_fast64_t m_start;
+    uint_fast64_t m_paused_at;
+    uint_fast64_t m_paused_for;
 
     uint_fast64_t get_timer_ticks() const;
     static double calc_elapsed_seconds(uint_fast64_t ticks);
 };
 
 
-
-
-
 // Implementation:
+
+
+inline void Timer::reset() {
+    m_start = get_timer_ticks();
+    m_paused_at = 0;
+    m_paused_for = 0;
+}
+
+inline void Timer::pause() {
+    m_paused_at = get_timer_ticks();
+}
+
+inline void Timer::unpause() {
+    if (m_paused_at) {
+        m_paused_for += get_timer_ticks() - m_paused_at;
+        m_paused_at = 0;
+    }
+}
 
 template<class Ch, class Tr>
 inline std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, const Timer& timer)
