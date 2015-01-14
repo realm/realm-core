@@ -229,7 +229,6 @@ size_t ArrayString::find_first(StringData value, size_t begin, size_t end) const
         return size_t(-1);
 
     if (value.is_null()) {
-        const char* data = m_data + (m_width-1);
         for (size_t i = begin; i != end; ++i) {
             if (is_null(i))
                 return i;

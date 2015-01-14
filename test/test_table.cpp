@@ -3430,7 +3430,7 @@ TEST(Table_WriteSlice)
     // check that the name of the written table is as expected
     {
         Table table;
-        test_write_slice_name(test_results, table, "",    false);
+        test_write_slice_name(test_results, table, StringData(),    false);
         test_write_slice_name(test_results, table, "foo", true); // Override
         test_write_slice_name(test_results, table, "",    true); // Override
     }

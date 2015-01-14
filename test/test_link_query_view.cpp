@@ -850,14 +850,14 @@ TEST(LinkList_SortLinkView)
     table1->set_string(1, 1, "alfa");
     table1->set_float(2, 1, 100.f);
     table1->set_double(3, 1, 100.);
-    table1->set_string(4, 0, "alfa");
+    table1->set_string(4, 1, "alfa");
 
     table1->add_empty_row();
     table1->set_int(0, 2, 200);
     table1->set_string(1, 2, "beta");
     table1->set_float(2, 2, 200.f);
     table1->set_double(3, 2, 200.);
-    table1->set_string(4, 0, "alfa");
+    table1->set_string(4, 2, "alfa");
 
     size_t col_link2 = table2->add_column_link(type_LinkList, "linklist", *table1);
     table2->add_empty_row();

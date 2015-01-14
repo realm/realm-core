@@ -256,6 +256,14 @@ inline int AdaptiveStringColumn::compare_values(std::size_t row1, std::size_t ro
 {
     StringData a = get(row1);
     StringData b = get(row2);
+
+    if (a.is_null() && !b.is_null())
+        return 1;
+    else if (b.is_null() && !a.is_null())
+        return -1;
+    else if (a.is_null() && b.is_null())
+        return 0;
+
     if (a == b)
         return 0;
     return utf8_compare(a, b) ? 1 : -1;
