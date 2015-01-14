@@ -34,7 +34,6 @@ struct Benchmark {
   virtual void setup(SharedGroup&) {}
   virtual void teardown(SharedGroup&) {}
   virtual void operator()(SharedGroup&) = 0;
-  virtual void avoid_optimization(int) {}
 };
 
 struct AddTable : Benchmark {
@@ -109,7 +108,8 @@ struct BenchmarkSize : BenchmarkWithStrings {
   {
     ReadTransaction tr(group);
     ConstTableRef table = tr.get_table("StringOnly");
-    avoid_optimization(table->size());
+    volatile size_t dummy = table->size();
+    static_cast<void>(dummy);
   }
 };
 
@@ -147,7 +147,7 @@ struct BenchmarkGetString : BenchmarkWithStrings {
     ReadTransaction tr(group);
     ConstTableRef table = tr.get_table("StringOnly");
     size_t len = table->size();
-    char dummy = 0;
+    volatile int dummy = 0;
     for (size_t i = 0; i < len; ++i) {
       StringData str = table->get_string(0, i);
       dummy += str[0]; // to avoid over-optimization
