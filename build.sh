@@ -52,7 +52,7 @@ usage()
 Unspecified or bad mode '$MODE'.
 Available modes are:
     config clean build build-config-progs build-iphone build-android
-    build-osx-framework build-cocoa config-param
+    build-osx-framework build-cocoa
     check check-debug show-install install uninstall
     test-installed wipe-installed install-prod install-devel uninstall-prod
     uninstall-devel dist-copy src-dist bin-dist dist-deb dist-status
@@ -395,9 +395,9 @@ download_openssl()
     fi
 
     echo 'Downloading OpenSSL...'
-    curl -L -s "http://www.openssl.org/source/openssl-1.0.1i.tar.gz" -o openssl.tar.gz || return 1
+    curl -L -s "http://www.openssl.org/source/openssl-1.0.1k.tar.gz" -o openssl.tar.gz || return 1
     tar -xzf openssl.tar.gz || return 1
-    mv openssl-1.0.1i openssl || return 1
+    mv openssl-1.0.1k openssl || return 1
     rm openssl.tar.gz || return 1
 
     # A function we don't use calls OPENSSL_cleanse, which has all sorts of
@@ -541,16 +541,6 @@ EOF
             cat "$CONFIG_MK" | sed 's/^/    /' || exit 1
             echo "Done configuring"
         fi
-        exit 0
-        ;;
-
-    "config-param")
-        parameter="$1"
-        if ! [ "$parameter" ]; then
-            echo "Parameter excepted."
-            exit 1
-        fi
-        get_config_param "$parameter"
         exit 0
         ;;
 
@@ -791,11 +781,11 @@ EOF
 
         tightdb_version="$(sh build.sh get-version)" || exit
         dir_name="core-$tightdb_version"
-        file_name="realm-core-android-$tightdb_version.tar.gz"
+        file_name="core-android-$tightdb_version.tar.gz"
         tar_files='libtightdb*'
         if [ $enable_encryption = yes ]; then
             dir_name="$dir_name-encryption"
-            file_name="realm-core-android-$tightdb_version-encryption.tar.gz"
+            file_name="core-android-$tightdb_version-encryption.tar.gz"
             tar_files='libtightdb* *.txt'
         fi
 
@@ -2774,11 +2764,7 @@ EOF
             echo "Bad check mode '$check_mode'" 1>&2
             exit 1
         fi
-        encryption="$2"
-        if [ "$encryption" ]; then
-            encryption="no"
-        fi
-        TIGHTDB_MAX_BPNODE_SIZE_DEBUG="4" TIGHTDB_ENABLE_ENCRYPTION="$encryption" sh build.sh config || exit 1
+        TIGHTDB_MAX_BPNODE_SIZE_DEBUG="4" sh build.sh config || exit 1
         UNITTEST_SHUFFLE="1" UNITTEST_REANDOM_SEED="random" UNITTEST_XML="1" sh build.sh "$check_mode" || exit 1
         exit 0
         ;;

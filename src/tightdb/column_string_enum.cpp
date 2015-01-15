@@ -254,7 +254,7 @@ bool ColumnStringEnum::compare_string(const ColumnStringEnum& c) const
 }
 
 
-StringIndex& ColumnStringEnum::create_search_index()
+StringIndex* ColumnStringEnum::create_search_index()
 {
     TIGHTDB_ASSERT(!m_search_index);
 
@@ -271,7 +271,7 @@ StringIndex& ColumnStringEnum::create_search_index()
     }
 
     m_search_index = index.release();
-    return *m_search_index;
+    return m_search_index;
 }
 
 

@@ -463,8 +463,8 @@ void GroupWriter::commit(ref_type new_top_ref)
     // Least significant bit in last byte of info block indicates
     // which top_ref block is valid - other bits remain unchanged
     int select_field = file_header[16+7];
-    select_field ^= 0x1;
-    int new_valid_ref = select_field & 0x1;
+    select_field ^= SlabAlloc::flags_SelectBit;
+    int new_valid_ref = select_field & SlabAlloc::flags_SelectBit;
 
     // FIXME: What rule guarantees that the new top ref is written to
     // physical medium before the swapping bit?

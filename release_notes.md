@@ -2,7 +2,7 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
+* `AdaptiveStringColumn::find_all` with an index no longer returns its results twice.
 
 ### API breaking changes:
 
@@ -19,6 +19,9 @@
   a transaction accessing that same version from another ShareGroup. This is done
   by new forms of `SharedGroup::begin_read()`, `SharedGroup::advance_read()`.
   Operators are provided so that VersionID's may be compared.
+* Creating distinct views on integer, datetime, bool and enum columns is now possible.
+* Add `Table::minimum_datetime()` and `Table::maximum_datetime()`.
+* Extending `Table::get_sorted_view()` to support multi-column sorting.
 
 -----------
 
@@ -60,6 +63,7 @@
 
 ### Enhancements:
 
+* Added 'compact' method to SharedGroup for better control of compaction of the database file.
 * The following constants were added: `Group::max_table_name_length`,
   `Table::max_column_name_length`, `Table::max_string_size`, and
   `Table::max_binary_size`.

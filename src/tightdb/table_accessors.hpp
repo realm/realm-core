@@ -841,6 +841,11 @@ public:
         return Base::m_table->get_impl()->find_all_int(col_idx, value);
     }
 
+    BasicTableView<typename Base::RealTable> get_distinct_view() const
+    {
+        return Base::m_table->get_impl()->get_distinct_view(col_idx);
+    }
+
     size_t count(int64_t target) const
     {
         return Base::m_table->get_impl()->count_int(col_idx, target);
@@ -911,6 +916,11 @@ public:
     BasicTableView<typename Base::RealTable> find_all(float value) const
     {
         return Base::m_table->get_impl()->find_all_float(col_idx, value);
+    }
+
+    BasicTableView<typename Base::RealTable> get_distinct_view() const
+    {
+        return Base::m_table->get_impl()->get_distinct_view(col_idx);
     }
 
     size_t count(float target) const
@@ -985,6 +995,11 @@ public:
         return Base::m_table->get_impl()->find_all_double(col_idx, value);
     }
 
+    BasicTableView<typename Base::RealTable> get_distinct_view() const
+    {
+        return Base::m_table->get_impl()->get_distinct_view(col_idx);
+    }
+
     size_t count(double target) const
     {
         return Base::m_table->get_impl()->count_double(col_idx, target);
@@ -1056,6 +1071,11 @@ public:
     {
         return Base::m_table->upper_bound_bool(col_idx, value);
     }
+
+    BasicTableView<typename Base::RealTable> get_distinct_view() const
+    {
+        return Base::m_table->get_impl()->get_distinct_view(col_idx);
+    }
 };
 
 
@@ -1077,6 +1097,11 @@ public:
     BasicTableView<typename Base::RealTable> find_all(E value) const
     {
         return Base::m_table->get_impl()->find_all_int(col_idx, int64_t(value));
+    }
+
+    BasicTableView<typename Base::RealTable> get_distinct_view() const
+    {
+        return Base::m_table->get_impl()->get_distinct_view(col_idx);
     }
 };
 
@@ -1108,6 +1133,11 @@ public:
     BasicTableView<typename Base::RealTable> find_all(DateTime value) const
     {
         return Base::m_table->get_impl()->find_all_datetime(col_idx, value);
+    }
+
+    BasicTableView<typename Base::RealTable> get_distinct_view() const
+    {
+        return Base::m_table->get_impl()->get_distinct_view(col_idx);
     }
 };
 
