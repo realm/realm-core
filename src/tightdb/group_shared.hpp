@@ -226,21 +226,27 @@ public:
     /// group. Doing so will result in undefined behavior.
     void reserve(std::size_t size_in_bytes);
 
-    // Querying for changes:
-    //
-    // NOTE:
-    // "changed" means that one or more commits has been made to the database
-    // since the SharedGroup (on which wait_for_change() is called) last
-    // started, committed, promoted or advanced a transaction.
-    //
-    // No distinction is made between changes done by another process
-    // and changes done by another thread in the same process as the caller.
-    //
-    // Has db been changed ?
+    /// Querying for changes:
+    ///
+    /// NOTE:
+    /// "changed" means that one or more commits has been made to the database
+    /// since the SharedGroup (on which wait_for_change() is called) last
+    /// started, committed, promoted or advanced a transaction.
+    ///
+    /// No distinction is made between changes done by another process
+    /// and changes done by another thread in the same process as the caller.
+    ///
+    /// Has db been changed ?
     bool has_changed();
 
-    // The calling thread goes to sleep until the database is changed.
-    void wait_for_change();
+    /// The calling thread goes to sleep until the database is changed, or
+    /// until wait_for_change_release() is called. Return true if the database
+    /// has changed, false if it might have. At most one thread may wait in 
+    /// wait_for_change() on any single SharedGroup.
+    bool wait_for_change();
+
+    /// release any thread waiting in wait_for_change() on *this* SharedGroup.
+    void wait_for_change_release();
 
     // Transactions:
 
@@ -341,6 +347,7 @@ private:
     util::File m_file;
     util::File::Map<SharedInfo> m_file_map; // Never remapped
     util::File::Map<SharedInfo> m_reader_map;
+    bool m_waiting_for_change;
     std::string m_lockfile_path;
     std::string m_db_path;
     const char* m_key;

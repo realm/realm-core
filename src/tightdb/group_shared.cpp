@@ -956,15 +956,26 @@ bool SharedGroup::has_changed()
 }
 
 #ifndef _WIN32
-void SharedGroup::wait_for_change()
+bool SharedGroup::wait_for_change()
 {
     SharedInfo* info = m_file_map.get_addr();
     RobustLockGuard lock(info->controlmutex, recover_from_dead_write_transact);
-    while (m_readlock.m_version == info->latest_version_number) {
+    m_waiting_for_change = true;
+    while (m_readlock.m_version == info->latest_version_number && m_waiting_for_change) {
         info->new_commit_available.wait(info->controlmutex,
                                         &recover_from_dead_write_transact,
                                         0);
     }
+    return m_readlock.m_version != info->latest_version_number;
+}
+
+
+void SharedGroup::wait_for_change_release()
+{
+    SharedInfo* info = m_file_map.get_addr();
+    RobustLockGuard lock(info->controlmutex, recover_from_dead_write_transact);
+    m_waiting_for_change = false;
+    info->new_commit_available.notify_all();
 }
 
 void SharedGroup::do_async_commits()
