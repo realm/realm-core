@@ -6579,6 +6579,9 @@ TEST(LangBindHelper_SyncCannotBeChanged_2)
 #ifndef TIGHTDB_ENABLE_ENCRYPTION
 // Interprocess communication does not work with encryption enabled
 
+#if !defined(TIGHTDB_ANDROID) && !defined(TIGHTDB_IOS)
+// fork should not be used on android or ios.
+
 TEST(LangBindHelper_ImplicitTransactions_InterProcess)
 {
     const int write_process_count = 7;
@@ -6662,6 +6665,7 @@ TEST(LangBindHelper_ImplicitTransactions_InterProcess)
     }
 
 }
+#endif
 #endif
 #endif
 
