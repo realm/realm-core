@@ -630,6 +630,9 @@ void SharedGroup::open(const string& path, bool no_create_file,
         TIGHTDB_STATIC_ASSERT(offsetof(SharedInfo,size_of_mutex) == 1, "misalignment of size_of_mutex");
         TIGHTDB_STATIC_ASSERT(offsetof(SharedInfo,size_of_condvar) == 2, "misalignment of size_of_condvar");
 
+        // If this ever triggers we are on a really weird architecture 
+        TIGHTDB_STATIC_ASSERT(offsetof(SharedInfo,latest_version_number) == 16, "misalignment of latest_version_number");
+
         // we need to have the size_of_mutex, size_of_condvar and init_complete
         // fields available before we can check for compatibility
         if (info_size < 4)
