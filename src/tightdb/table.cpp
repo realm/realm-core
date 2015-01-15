@@ -3275,6 +3275,18 @@ ConstTableView Table::get_sorted_view(size_t col_ndx, bool ascending) const
     return const_cast<Table*>(this)->get_sorted_view(col_ndx, ascending);
 }
 
+TableView Table::get_sorted_view(std::vector<size_t> col_ndx, std::vector<bool> ascending)
+{
+    TableView tv = where().find_all();
+    tv.sort(col_ndx, ascending);
+    return tv;
+}
+
+ConstTableView Table::get_sorted_view(std::vector<size_t> col_ndx, std::vector<bool> ascending) const
+{
+    return const_cast<Table*>(this)->get_sorted_view(col_ndx, ascending);
+}
+
 
 namespace {
 
