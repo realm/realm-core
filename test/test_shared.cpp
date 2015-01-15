@@ -1981,10 +1981,13 @@ TEST_IF(Shared_AsyncMultiprocess, allow_async)
 #endif
 }
 
+namespace {
+
 static const int num_threads = 3;
 static int shared_state[num_threads];
 static SharedGroup* sgs[num_threads];
 static Mutex muu;
+
 void waiter(string path, int i)
 {
     SharedGroup* sg = new SharedGroup(path, true, SharedGroup::durability_Full);
@@ -2025,6 +2028,7 @@ void waiter(string path, int i)
         LockGuard l(muu);
         shared_state[i] = 6;
     }
+}
 }
 
 // This test will hang infinitely instead of failing!!!
