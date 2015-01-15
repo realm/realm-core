@@ -352,14 +352,6 @@ private:
 
 struct SharedGroup::SharedInfo
 {
-    // We attempt to ensure that every field of this structure will be at the same
-    // offset regardless of whether it is compiled for a 32 bit or a 64 bit
-    // ABI. This is done by adding padding/ordering fields so that we remove the 
-    // compilers freedom to align a type to less than its size (e.g. placing a 
-    // 64-bit value on a 32-bit boundary when compiling for a 32-bit ABI). 
-    // Basically, we declare the fields such that they are naturally aligned
-    // so that the compiler doesn't add padding.
-
     // indicates lock file has valid content, implying that all the following member
     // variables have been initialized. All member variables, except for the Ringbuffer,
     // are protected by 'controlmutex', except during initialization, where access is
@@ -379,8 +371,6 @@ struct SharedGroup::SharedInfo
     // wait during open() on 'daemon_becomes_ready' for this to become true.
     // Cleared by the daemon when it decides to exit.
     bool daemon_ready; // offset 4
-
-    uint8_t padding;
 
     // Tracks the most recent version number.
     uint16_t version;
