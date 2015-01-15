@@ -332,7 +332,6 @@ private:
     uint32_t entries;
     Atomic<uint32_t> put_pos; // only changed under lock, but accessed outside lock
     uint32_t old_pos; // only accessed during write transactions and under lock
-    uint32_t padding; // <-- try to force alignment to 64-bit of the data area
 
     const static int init_readers_size = 32;
 
