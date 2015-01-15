@@ -332,6 +332,7 @@ private:
     uint32_t entries;
     Atomic<uint32_t> put_pos; // only changed under lock, but accessed outside lock
     uint32_t old_pos; // only accessed during write transactions and under lock
+    uint32_t padding; // <-- try to force alignment to 64-bit of the data area
 
     const static int init_readers_size = 32;
 
@@ -351,6 +352,14 @@ private:
 
 struct SharedGroup::SharedInfo
 {
+    // We attempt to ensure that every field of this structure will be at the same
+    // offset regardless of whether it is compiled for a 32 bit or a 64 bit
+    // ABI. This is done by adding padding/ordering fields so that we remove the 
+    // compilers freedom to align a type to less than its size (e.g. placing a 
+    // 64-bit value on a 32-bit boundary when compiling for a 32-bit ABI). 
+    // Basically, we declare the fields such that they are naturally aligned
+    // so that the compiler doesn't add padding.
+
     // indicates lock file has valid content, implying that all the following member
     // variables have been initialized. All member variables, except for the Ringbuffer,
     // are protected by 'controlmutex', except during initialization, where access is
@@ -369,24 +378,26 @@ struct SharedGroup::SharedInfo
     // set by the daemon when it is ready to handle commits. Participants must
     // wait during open() on 'daemon_becomes_ready' for this to become true.
     // Cleared by the daemon when it decides to exit.
-    bool daemon_ready;
+    bool daemon_ready; // offset 4
+
+    uint8_t padding;
+
+    // Tracks the most recent version number.
+    uint16_t version;
+    uint16_t flags; // offset 8
+    uint16_t free_write_slots;
 
     // number of participating shared groups:
-    uint32_t num_participants;
+    uint32_t num_participants; // offset 12
 
     // Latest version number. Guarded by the controlmutex (for lock-free access, use
     // get_current_version() instead)
-    uint64_t latest_version_number;
+    uint64_t latest_version_number; // offset 16
 
     // Pid of process initiating the session, but only if that process runs with encryption
     // enabled, zero otherwise. Other processes cannot join a session wich uses encryption,
     // because interprocess sharing is not supported by our current encryption mechanisms.
     uint64_t session_initiator_pid;
-
-    // Tracks the most recent version number.
-    uint16_t version;
-    uint16_t flags;
-    uint16_t free_write_slots;
 
     uint64_t number_of_versions;
     RobustMutex writemutex;
@@ -431,7 +442,7 @@ SharedGroup::SharedInfo::SharedInfo(DurabilityLevel dlevel):
     daemon_becomes_ready(CondVar::process_shared_tag()), // Throws
     new_commit_available(CondVar::process_shared_tag()) // Throws
 #else
-    size_of_mutex(sizeof(writemutex),
+    size_of_mutex(sizeof(writemutex)),
     size_of_condvar(0),
     writemutex(), // Throws
     balancemutex() // Throws
@@ -614,37 +625,47 @@ void SharedGroup::open(const string& path, bool no_create_file,
         if (int_cast_with_overflow_detect(m_file.get_size(), info_size))
             throw runtime_error("Lock file too large");
         
-        if (info_size < sizeof (SharedInfo)) {
-            // If the file is marked as being initialized but is too small to
-            // contain a valid shared info block, then it was probably
-            // initialized by a different architecture
-            if (info_size > 0) {
-                TIGHTDB_STATIC_ASSERT(offsetof(SharedInfo, init_complete) == 0,
-                                      "init_complete should be the first field in SharedInfo");
-                File::Map<bool> info(m_file, File::access_ReadOnly, sizeof (bool), File::map_NoSync);
-                if (*info.get_addr())
-                    throw IncompatibleLockFile();
+        // Compile time validate the alignment of the first three fields in SharedInfo
+        TIGHTDB_STATIC_ASSERT(offsetof(SharedInfo,init_complete) == 0, "misalignment of init_complete");
+        TIGHTDB_STATIC_ASSERT(offsetof(SharedInfo,size_of_mutex) == 1, "misalignment of size_of_mutex");
+        TIGHTDB_STATIC_ASSERT(offsetof(SharedInfo,size_of_condvar) == 2, "misalignment of size_of_condvar");
+
+        // we need to have the size_of_mutex, size_of_condvar and init_complete
+        // fields available before we can check for compatibility
+        if (info_size < 4)
+            continue;
+
+        {
+            // Map the first fields to memory and validate them
+            m_file_map.map(m_file, File::access_ReadOnly, 4, File::map_NoSync);
+            File::UnmapGuard fug_1(m_file_map);
+
+            // validate initialization complete:
+            SharedInfo* info = m_file_map.get_addr();
+            if (info->init_complete == 0) {
+                continue;
             }
-            continue;
-        }
-        // Map to memory
-        m_file_map.map(m_file, File::access_ReadWrite, sizeof (SharedInfo), File::map_NoSync);
-        File::UnmapGuard fug_1(m_file_map);
 
-        // validate initialization complete:
-        SharedInfo* info = m_file_map.get_addr();
-        if (info->init_complete == 0) {
-            continue;
-        }
-
-        if (info->size_of_mutex != sizeof(info->controlmutex))
-            throw IncompatibleLockFile();
+            // validate compatible sizes of mutex and condvar types. Sizes
+            // of all other fields are architecture independent, so if condvar
+            // and mutex sizes match, the entire struct matches.
+            if (info->size_of_mutex != sizeof(info->controlmutex))
+                throw IncompatibleLockFile();
 
 #ifndef _WIN32
-        if (info->size_of_condvar != sizeof(info->room_to_write))
-            throw IncompatibleLockFile();
+            if (info->size_of_condvar != sizeof(info->room_to_write))
+                throw IncompatibleLockFile();
 #endif
+        }
 
+        // initialisation is complete and size and alignment matches for all fields in SharedInfo.
+        // so we can map the entire structure.
+        m_file_map.map(m_file, File::access_ReadWrite, sizeof (SharedInfo), File::map_NoSync);
+        File::UnmapGuard fug_1(m_file_map);
+        SharedInfo* info = m_file_map.get_addr();
+
+        // even though fields match wrt alignment and size, there may still be incompatibilities
+        // between implementations, so lets ask one of the mutexes if it thinks it'll work.
         if (!info->controlmutex.is_valid())
             throw IncompatibleLockFile();
 
