@@ -9,6 +9,7 @@
 #  include <unistd.h>
 #  include <sys/wait.h>
 #  include <signal.h>
+#  include <sched.h>
 #  define ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE
 #else
 #  define NOMINMAX
@@ -2038,7 +2039,6 @@ TEST(Shared_WaitForChange)
         threads[j].start(bind(&waiter, string(path), j));
     bool try_again = true;
     while (try_again) {
-        sched_yield();
         try_again = false;
         for (int j=0; j < num_threads; j++) {
             LockGuard l(muu);
@@ -2050,7 +2050,6 @@ TEST(Shared_WaitForChange)
     sg.commit();
     try_again = true;
     while (try_again) {
-        sched_yield();
         try_again = false;
         for (int j=0; j < num_threads; j++) {
             LockGuard l(muu);
@@ -2062,7 +2061,6 @@ TEST(Shared_WaitForChange)
     sg.commit();
     try_again = true;
     while (try_again) {
-        sched_yield();
         try_again = false;
         for (int j=0; j < num_threads; j++) {
             LockGuard l(muu);
@@ -2073,7 +2071,6 @@ TEST(Shared_WaitForChange)
     sg.commit();
     try_again = true;
     while (try_again) {
-        sched_yield();
         try_again = false;
         for (int j=0; j < num_threads; j++) {
             LockGuard l(muu);
@@ -2082,7 +2079,6 @@ TEST(Shared_WaitForChange)
     }
     try_again = true;
     while (try_again) {
-        sched_yield();
         try_again = false;
         for (int j=0; j < num_threads; j++) {
             LockGuard l(muu);
