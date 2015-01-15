@@ -218,7 +218,16 @@ public:
     /// lock() function.
     void mark_as_consistent() TIGHTDB_NOEXCEPT;
 
-    /// Check if this mutex is a valid mutex for the current platform.
+    /// Attempt to check if this mutex is a valid object.
+    ///
+    /// This attempts to trylock() the mutex, and if that fails returns false if
+    /// the return value indicates that the low-level mutex is invalid (which is
+    /// distinct from 'inconsistent'). Although pthread_mutex_trylock() may
+    /// return EINVAL if the argument is not an initialized mutex object, merely
+    /// attempting to check if an arbitrary blob of memory is a mutex object may
+    /// involve undefined behavior, so it is only safe to assume that this
+    /// function will run correctly when it is known that the mutex object is
+    /// valid.
     bool is_valid() TIGHTDB_NOEXCEPT;
 
     friend class CondVar;
