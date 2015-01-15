@@ -1147,6 +1147,64 @@ TEST(Table_Sorted_Query_where)
 #endif
 }
 
+TEST(Table_Multi_Sort)
+{
+    Table table;
+    table.add_column(type_Int, "first");
+    table.add_column(type_Int, "second");
+
+    table.add_empty_row(5);
+
+    // 1, 10
+    table.set_int(0, 0, 1);
+    table.set_int(1, 0, 10);
+
+    // 2, 10
+    table.set_int(0, 1, 2);
+    table.set_int(1, 1, 10);
+
+    // 0, 10
+    table.set_int(0, 2, 0);
+    table.set_int(1, 2, 10);
+
+    // 2, 14
+    table.set_int(0, 3, 2);
+    table.set_int(1, 3, 14);
+
+    // 1, 14
+    table.set_int(0, 4, 1);
+    table.set_int(1, 4, 14);
+
+    vector<size_t> col_ndx1;
+    col_ndx1.push_back(0);
+    col_ndx1.push_back(1);
+
+    vector<bool> asc;
+    asc.push_back(true);
+    asc.push_back(true);
+
+    // (0, 10); (1, 10); (1, 14); (2, 10); (2; 14)
+    TableView v_sorted1 = table.get_sorted_view(col_ndx1, asc);
+    CHECK_EQUAL(table.size(), v_sorted1.size());
+    CHECK_EQUAL(2, v_sorted1.get_source_ndx(0));
+    CHECK_EQUAL(0, v_sorted1.get_source_ndx(1));
+    CHECK_EQUAL(4, v_sorted1.get_source_ndx(2));
+    CHECK_EQUAL(1, v_sorted1.get_source_ndx(3));
+    CHECK_EQUAL(3, v_sorted1.get_source_ndx(4));
+
+    vector<size_t> col_ndx2;
+    col_ndx2.push_back(1);
+    col_ndx2.push_back(0);
+
+    // (0, 10); (1, 10); (2, 10); (1, 14); (2, 14)
+    TableView v_sorted2 = table.get_sorted_view(col_ndx2, asc);
+    CHECK_EQUAL(table.size(), v_sorted2.size());
+    CHECK_EQUAL(2, v_sorted2.get_source_ndx(0));
+    CHECK_EQUAL(0, v_sorted2.get_source_ndx(1));
+    CHECK_EQUAL(1, v_sorted2.get_source_ndx(2));
+    CHECK_EQUAL(4, v_sorted2.get_source_ndx(3));
+    CHECK_EQUAL(3, v_sorted2.get_source_ndx(4));
+}
 
 
 TEST(Table_IndexString)
@@ -1499,23 +1557,90 @@ TEST(Table_DistinctIntegers)
     TableView view = table.get_distinct_view(0);
 
     CHECK_EQUAL(3, view.size());
+    CHECK_EQUAL(0, view.get_source_ndx(0));
+    CHECK_EQUAL(1, view.get_source_ndx(1));
+    CHECK_EQUAL(2, view.get_source_ndx(2));
 }
 
 
-TEST(Table_DistinctBools)
+TEST(Table_DistinctBool)
 {
     Table table;
     table.add_column(type_Bool, "first");
-    table.add_empty_row(3);
+    table.add_empty_row(4);
     table.set_bool(0, 0, true);
     table.set_bool(0, 1, false);
     table.set_bool(0, 2, true);
+    table.set_bool(0, 3, false);
 
     table.add_search_index(0);
     CHECK(table.has_search_index(0));
 
     TableView view = table.get_distinct_view(0);
+
     CHECK_EQUAL(2, view.size());
+    CHECK_EQUAL(0, view.get_source_ndx(1));
+    CHECK_EQUAL(1, view.get_source_ndx(0));
+}
+
+
+/*
+// FIXME Commented out because indexes on floats and doubles are not supported (yet).
+
+TEST(Table_DistinctFloat)
+{
+    Table table;
+    table.add_column(type_Float, "first");
+    table.add_empty_row(12);
+    for (size_t i = 0; i < 10; ++i) {
+        table.set_float(0, i, static_cast<float>(i) + 0.5f);
+    }
+    table.set_float(0, 10, 0.5f);
+    table.set_float(0, 11, 1.5f);
+
+    table.add_search_index(0);
+    CHECK(table.has_search_index(0));
+
+    TableView view = table.get_distinct_view(0);
+    CHECK_EQUAL(10, view.size());
+}
+
+
+TEST(Table_DistinctDouble)
+{
+    Table table;
+    table.add_column(type_Double, "first");
+    table.add_empty_row(12);
+    for (size_t i = 0; i < 10; ++i) {
+        table.set_double(0, i, static_cast<double>(i) + 0.5);
+    }
+    table.set_double(0, 10, 0.5);
+    table.set_double(0, 11, 1.5);
+
+    table.add_search_index(0);
+    CHECK(table.has_search_index(0));
+
+    TableView view = table.get_distinct_view(0);
+    CHECK_EQUAL(10, view.size());
+}
+*/
+
+
+TEST(Table_DistinctDateTime)
+{
+    Table table;
+    table.add_column(type_DateTime, "first");
+    table.add_empty_row(4);
+    table.set_datetime(0, 0, DateTime(0));
+    table.set_datetime(0, 1, DateTime(1));
+    table.set_datetime(0, 2, DateTime(3));
+    table.set_datetime(0, 3, DateTime(3));
+
+    table.add_search_index(0);
+    CHECK(table.has_search_index(0));
+
+    TableView view = table.get_distinct_view(0);
+    CHECK_EQUAL(3, view.size());
 }
 
 

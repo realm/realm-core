@@ -144,6 +144,9 @@ public:
     /// has undefined behavior.
     SharedGroup(unattached_tag) TIGHTDB_NOEXCEPT;
 
+    // close any open database, returning to the unattached state.
+    void close() TIGHTDB_NOEXCEPT;
+
     ~SharedGroup() TIGHTDB_NOEXCEPT;
 
     /// Attach this SharedGroup instance to the specified database
@@ -305,6 +308,17 @@ public:
     /// a read transaction will not immediately release any versions.
     uint_fast64_t get_number_of_versions();
 
+    // Compact the database file.
+    // - The method will throw if called inside a transaction.
+    // - The method will return false if other SharedGroups are accessing the database
+    //   in which case compaction is not done.
+    // It will return true following succesful compaction.
+    // While compaction is in progress, attempts by other
+    // threads or processes to open the database will wait.
+    // Be warned that resource requirements for compaction is proportional to the amount
+    // of live data in the database.
+    bool compact();
+
 #ifdef TIGHTDB_DEBUG
     void test_ringbuf();
 #endif
@@ -327,7 +341,9 @@ private:
     util::File m_file;
     util::File::Map<SharedInfo> m_file_map; // Never remapped
     util::File::Map<SharedInfo> m_reader_map;
-    std::string m_file_path;
+    std::string m_lockfile_path;
+    std::string m_db_path;
+    const char* m_key;
     enum TransactStage {
         transact_Ready,
         transact_Reading,
