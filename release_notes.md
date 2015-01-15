@@ -10,6 +10,8 @@
 
 ### Enhancements:
 
+* Added `SharedGroup::wait_for_change_release()` which allows you to release a
+  thread waiting inside wait_for_change() on a specific SharedGroup instance.
 * SharedGroup now allows you to coordinate which version of the data a read transaction
   can see. The type `VersionID` represents a specific commit to the
   database. A user can obtain the `VersionID` for the active transaction from
