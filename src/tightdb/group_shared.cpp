@@ -357,8 +357,9 @@ struct SharedGroup::SharedInfo
     // guarded by the exclusive file lock.
     bool init_complete;
 
-    // number of participating shared groups:
-    uint32_t num_participants;
+    // size of critical structures. Must match among all participants in a session
+    uint8_t size_of_mutex;
+    uint8_t size_of_condvar;
 
     // set when a participant decides to start the daemon, cleared by the daemon
     // when it decides to exit. Participants check during open() and start the
@@ -368,21 +369,24 @@ struct SharedGroup::SharedInfo
     // set by the daemon when it is ready to handle commits. Participants must
     // wait during open() on 'daemon_becomes_ready' for this to become true.
     // Cleared by the daemon when it decides to exit.
-    bool daemon_ready;
+    bool daemon_ready; // offset 4
+
+    // Tracks the most recent version number.
+    uint16_t version;
+    uint16_t flags; // offset 8
+    uint16_t free_write_slots;
+
+    // number of participating shared groups:
+    uint32_t num_participants; // offset 12
 
     // Latest version number. Guarded by the controlmutex (for lock-free access, use
     // get_current_version() instead)
-    uint64_t latest_version_number;
+    uint64_t latest_version_number; // offset 16
 
     // Pid of process initiating the session, but only if that process runs with encryption
     // enabled, zero otherwise. Other processes cannot join a session wich uses encryption,
     // because interprocess sharing is not supported by our current encryption mechanisms.
     uint64_t session_initiator_pid;
-
-    // Tracks the most recent version number.
-    uint16_t version;
-    uint16_t flags;
-    uint16_t free_write_slots;
 
     uint64_t number_of_versions;
     RobustMutex writemutex;
@@ -417,6 +421,8 @@ struct SharedGroup::SharedInfo
 
 SharedGroup::SharedInfo::SharedInfo(DurabilityLevel dlevel):
 #ifndef _WIN32
+    size_of_mutex(sizeof(writemutex)),
+    size_of_condvar(sizeof(room_to_write)),
     writemutex(), // Throws
     balancemutex(), // Throws
     controlmutex(), // Throws
@@ -425,6 +431,8 @@ SharedGroup::SharedInfo::SharedInfo(DurabilityLevel dlevel):
     daemon_becomes_ready(CondVar::process_shared_tag()), // Throws
     new_commit_available(CondVar::process_shared_tag()) // Throws
 #else
+    size_of_mutex(sizeof(writemutex)),
+    size_of_condvar(0),
     writemutex(), // Throws
     balancemutex() // Throws
 #endif
@@ -605,18 +613,53 @@ void SharedGroup::open(const string& path, bool no_create_file,
         size_t info_size;
         if (int_cast_with_overflow_detect(m_file.get_size(), info_size))
             throw runtime_error("Lock file too large");
-        if (info_size < sizeof (SharedInfo)) {
+        
+        // Compile time validate the alignment of the first three fields in SharedInfo
+        TIGHTDB_STATIC_ASSERT(offsetof(SharedInfo,init_complete) == 0, "misalignment of init_complete");
+        TIGHTDB_STATIC_ASSERT(offsetof(SharedInfo,size_of_mutex) == 1, "misalignment of size_of_mutex");
+        TIGHTDB_STATIC_ASSERT(offsetof(SharedInfo,size_of_condvar) == 2, "misalignment of size_of_condvar");
+
+        // If this ever triggers we are on a really weird architecture 
+        TIGHTDB_STATIC_ASSERT(offsetof(SharedInfo,latest_version_number) == 16, "misalignment of latest_version_number");
+
+        // we need to have the size_of_mutex, size_of_condvar and init_complete
+        // fields available before we can check for compatibility
+        if (info_size < 4)
             continue;
+
+        {
+            // Map the first fields to memory and validate them
+            m_file_map.map(m_file, File::access_ReadOnly, 4, File::map_NoSync);
+            File::UnmapGuard fug_1(m_file_map);
+
+            // validate initialization complete:
+            SharedInfo* info = m_file_map.get_addr();
+            if (info->init_complete == 0) {
+                continue;
+            }
+
+            // validate compatible sizes of mutex and condvar types. Sizes
+            // of all other fields are architecture independent, so if condvar
+            // and mutex sizes match, the entire struct matches.
+            if (info->size_of_mutex != sizeof(info->controlmutex))
+                throw IncompatibleLockFile();
+
+#ifndef _WIN32
+            if (info->size_of_condvar != sizeof(info->room_to_write))
+                throw IncompatibleLockFile();
+#endif
         }
-        // Map to memory
+
+        // initialisation is complete and size and alignment matches for all fields in SharedInfo.
+        // so we can map the entire structure.
         m_file_map.map(m_file, File::access_ReadWrite, sizeof (SharedInfo), File::map_NoSync);
         File::UnmapGuard fug_1(m_file_map);
-
-        // validate initialization complete:
         SharedInfo* info = m_file_map.get_addr();
-        if (info->init_complete == 0) {
-            continue;
-        }
+
+        // even though fields match wrt alignment and size, there may still be incompatibilities
+        // between implementations, so lets ask one of the mutexes if it thinks it'll work.
+        if (!info->controlmutex.is_valid())
+            throw IncompatibleLockFile();
 
         // OK! lock file appears valid. We can now continue operations under the protection
         // of the controlmutex. The controlmutex protects the following activities:
