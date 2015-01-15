@@ -1636,32 +1636,9 @@ public:
     size_t find_first_local(size_t start, size_t end) TIGHTDB_OVERRIDE
     {
         for (size_t s = start; s < end; ++s) {
-
-            size_t f;
-
-            if (m_last >= end)
-                f = end;
-            else if (m_was_match && m_last >= s)
-                f = m_last;
-            else {
-                size_t fmax = m_last > s ? m_last : s;
-                for (f = fmax; f < end; f++) {
-                    if (m_cond->find_first(f,f+1)==not_found) {
-                        m_was_match = true;
-                        m_last = f;
-                        return f;
-                    }
-                }
-                // ID: f = m_cond->find_first(fmax, end);
-                m_was_match = false;
-                m_last = end;
-                f = end;
+            if (m_cond->find_first(s, s + 1) == not_found) {
+                return s;
             }
-
-            s = f;
-            s = s >= end ? not_found : s;
-
-            return s;
         }
         return not_found;
     }
