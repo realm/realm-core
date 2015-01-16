@@ -1624,8 +1624,11 @@ public:
         m_cond->init(table);
         v.clear();
         m_cond->gather_children(v);
-        m_last = 0;
-        m_was_match = false;
+
+        // Heuristics bookkeeping:
+        m_known_range_start = 0;
+        m_known_range_end = 0;
+        m_first_in_known_range = not_found;
 
         if (m_child)
             m_child->init(table);
@@ -1633,38 +1636,7 @@ public:
         m_table = &table;
     }
 
-    size_t find_first_local(size_t start, size_t end) TIGHTDB_OVERRIDE
-    {
-        for (size_t s = start; s < end; ++s) {
-
-            size_t f;
-
-            if (m_last >= end)
-                f = end;
-            else if (m_was_match && m_last >= s)
-                f = m_last;
-            else {
-                size_t fmax = m_last > s ? m_last : s;
-                for (f = fmax; f < end; f++) {
-                    if (m_cond->find_first(f,f+1)==not_found) {
-                        m_was_match = true;
-                        m_last = f;
-                        return f;
-                    }
-                }
-                // ID: f = m_cond->find_first(fmax, end);
-                m_was_match = false;
-                m_last = end;
-                f = end;
-            }
-
-            s = f;
-            s = s >= end ? not_found : s;
-
-            return s;
-        }
-        return not_found;
-    }
+    size_t find_first_local(size_t start, size_t end) TIGHTDB_OVERRIDE;
 
     std::string validate() TIGHTDB_OVERRIDE
     {
@@ -1699,15 +1671,27 @@ public:
     {
         // here we are just copying the pointers - they'll be remapped by "translate_pointers"
         m_cond = from.m_cond;
-        m_last = from.m_last;
-        m_was_match = from.m_was_match;
+        m_known_range_start = from.m_known_range_start;
+        m_known_range_end = from.m_known_range_end;
+        m_first_in_known_range = from.m_first_in_known_range;
         m_child = from.m_child;
     }
 
     ParentNode* m_cond;
 private:
-    size_t m_last;
-    bool m_was_match;
+    // FIXME This heuristic might as well be reused for all condition nodes.
+    size_t m_known_range_start;
+    size_t m_known_range_end;
+    size_t m_first_in_known_range;
+
+    bool evaluate_at(size_t rowndx);
+    void update_known(size_t start, size_t end, size_t first);
+    size_t find_first_loop(size_t start, size_t end);
+    size_t find_first_covers_known(size_t start, size_t end);
+    size_t find_first_covered_by_known(size_t start, size_t end);
+    size_t find_first_overlap_lower(size_t start, size_t end);
+    size_t find_first_overlap_upper(size_t start, size_t end);
+    size_t find_first_no_overlap(size_t start, size_t end);
 };
 
 
