@@ -99,6 +99,8 @@ string network_error_category::message(int value) const
     switch (errors(value)) {
         case end_of_input:
             return "End of input";
+        case delim_not_found:
+            return "Delimiter not found";
         case host_not_found:
             return "Host not found (authoritative)";
         case host_not_found_try_again:
@@ -163,6 +165,11 @@ public:
                 delete m_imm_handlers[i];
         }
         {
+            size_t n = m_cancel_handlers.size();
+            for (size_t i = 0; i < n; ++i)
+                delete m_cancel_handlers[i];
+        }
+        {
             size_t n = m_poll_handlers.size();
             for (size_t i = 0; i < n; ++i) {
                 delete m_poll_handlers[i].read_handler;
@@ -174,7 +181,7 @@ public:
         for (size_t i = 0; i < m_poll_handlers.size(); ++i) {
             if (m_poll_handlers[i].read_handler)
                 ++num_poll_handlers;
-            if (m_poll_handlers[i].read_handler)
+            if (m_poll_handlers[i].write_handler)
                 ++num_poll_handlers;
         }
         TIGHTDB_ASSERT(num_poll_handlers == m_num_poll_handlers);
@@ -192,7 +199,7 @@ public:
                     break;
                 if (m_imm_handlers.empty()) {
                     if (m_post_handlers.empty()) {
-                        if (m_num_poll_handlers == 0)
+                        if (m_num_poll_handlers == 0 && m_cancel_handlers.empty())
                             break; // Out of work
                     }
                     else {
@@ -205,6 +212,12 @@ public:
                 UniquePtr<async_handler> h(m_imm_handlers.back());
                 m_imm_handlers.pop_back();
                 h->exec(); // Throws
+            }
+
+            while (!m_cancel_handlers.empty()) {
+                UniquePtr<async_handler> h(m_cancel_handlers.back());
+                m_cancel_handlers.pop_back();
+                h->cancel(); // Throws
             }
 
             if (m_num_poll_handlers == 0)
@@ -240,6 +253,7 @@ public:
                 if (TIGHTDB_LIKELY(pollfd_slot->revents == 0))
                     continue;
 
+                TIGHTDB_ASSERT(pollfd_slot->fd >= 0);
                 TIGHTDB_ASSERT((pollfd_slot->revents & POLLNVAL) == 0);
 
                 if ((pollfd_slot->revents & (POLLHUP|POLLERR)) != 0) {
@@ -261,7 +275,17 @@ public:
                     handler_slot.read_handler = 0;
                     --m_num_poll_handlers;
                     bool done = handler->exec(); // Throws
-                    if (!done) {
+                    if (done) {
+                        // A user handler has been executed, which may have
+                        // closed the current socket, or initiated new
+                        // asynchronous operations. The latter may have caused
+                        // the m_pollfd_slots vector to reallocate its
+                        // underlying memory.
+                        pollfd_slot = &m_pollfd_slots[fd+1];
+                        if (pollfd_slot->fd < 0)
+                            continue;
+                    }
+                    else {
                         // Users handler is not executed in this case
                         pollfd_slot->fd = fd;
                         pollfd_slot->events |= POLLRDNORM;
@@ -270,11 +294,6 @@ public:
                     }
                 }
 
-                // A user handler may have been executed, which may have
-                // initiated new asynchronous operations, which means that the
-                // m_pollfd_slots vector may have reallocated its underlying
-                // memory.
-                pollfd_slot = &m_pollfd_slots[fd+1];
 
                 // Check write readiness
                 if ((pollfd_slot->revents & POLLWRNORM) != 0) {
@@ -382,6 +401,31 @@ public:
         wake_up_poll_thread(); // Throws
     }
 
+    void cancel_io_ops(int fd)
+    {
+        TIGHTDB_ASSERT(fd >= 0);
+        if (unsigned(fd) < m_poll_handlers.size()) {
+            TIGHTDB_ASSERT(m_poll_handlers.size() == m_pollfd_slots.size() - 1);
+            pollfd&            pollfd_slot  = m_pollfd_slots[fd+1];
+            poll_handler_slot& handler_slot = m_poll_handlers[fd];
+            if (pollfd_slot.fd >= 0) {
+                m_cancel_handlers.reserve(m_cancel_handlers.size() + 2); // Throws
+                pollfd_slot.fd = -1; // Mark unused
+                pollfd_slot.events = 0;
+                if (handler_slot.read_handler) {
+                    m_cancel_handlers.push_back(handler_slot.read_handler);
+                    handler_slot.read_handler = 0;
+                    --m_num_poll_handlers;
+                }
+                if (handler_slot.write_handler) {
+                    m_cancel_handlers.push_back(handler_slot.write_handler);
+                    handler_slot.write_handler = 0;
+                    --m_num_poll_handlers;
+                }
+            }
+        }
+    }
+
 private:
     typedef struct pollfd pollfd;
 
@@ -394,6 +438,7 @@ private:
     int m_wakeup_pipe_write_fd;
 
     vector<async_handler*> m_imm_handlers;
+    vector<async_handler*> m_cancel_handlers;
     vector<pollfd> m_pollfd_slots;
     vector<poll_handler_slot> m_poll_handlers;
     size_t m_num_poll_handlers;
@@ -472,6 +517,11 @@ void io_service::add_post_handler(async_handler* handler)
     m_impl->add_post_handler(handler);
 }
 
+void io_service::cancel_io_ops(int fd)
+{
+    m_impl->cancel_io_ops(fd);
+}
+
 
 error_code resolver::resolve(const query& query, endpoint::list& list, error_code& ec)
 {
@@ -486,7 +536,7 @@ error_code resolver::resolve(const query& query, endpoint::list& list, error_cod
     const char* service = query.m_service.empty() ? 0 : query.m_service.c_str();
     struct addrinfo* first = 0;
     int ret = getaddrinfo(host, service, &hints, &first);
-    if (ret != 0) {
+    if (TIGHTDB_UNLIKELY(ret != 0)) {
 #ifdef EAI_SYSTEM
         if (ret == EAI_SYSTEM) {
             ec = make_basic_system_error_code(errno);
@@ -544,12 +594,12 @@ error_code resolver::resolve(const query& query, endpoint::list& list, error_cod
 }
 
 
-error_code socket::open(const protocol& prot, error_code& ec)
+error_code socket_base::open(const protocol& prot, error_code& ec)
 {
-    if (is_open())
+    if (TIGHTDB_UNLIKELY(is_open()))
         throw runtime_error("Socket is already open");
     int sock_fd = ::socket(prot.m_family, prot.m_socktype, prot.m_protocol);
-    if (sock_fd == -1) {
+    if (TIGHTDB_UNLIKELY(sock_fd == -1)) {
         ec = make_basic_system_error_code(errno);
         return ec;
     }
@@ -557,7 +607,7 @@ error_code socket::open(const protocol& prot, error_code& ec)
 #if defined(__MACH__) && defined(__APPLE__) || defined(__FreeBSD__)
     int optval = 1;
     int ret = setsockopt(sock_fd, SOL_SOCKET, SO_NOSIGPIPE, &optval, sizeof optval);
-    if (ret == -1) {
+    if (TIGHTDB_UNLIKELY(ret == -1)) {
         ec = make_basic_system_error_code(errno);
         ::close(sock_fd);
         return ec;
@@ -571,18 +621,34 @@ error_code socket::open(const protocol& prot, error_code& ec)
 }
 
 
-error_code socket::bind(const endpoint& ep, error_code& ec)
+error_code socket_base::close(error_code& ec)
+{
+    if (is_open()) {
+        int ret = ::close(m_sock_fd);
+        if (TIGHTDB_UNLIKELY(ret == -1)) {
+            ec = make_basic_system_error_code(errno);
+            return ec;
+        }
+        m_service.cancel_io_ops(m_sock_fd);
+        m_sock_fd = -1;
+    }
+    ec = error_code(); // Success
+    return ec;
+}
+
+
+error_code socket_base::bind(const endpoint& ep, error_code& ec)
 {
     if (!is_open()) {
         open(ep.protocol(), ec);
-        if (ec)
+        if (TIGHTDB_UNLIKELY(ec))
             return ec;
     }
 
     socklen_t addr_len = ep.m_protocol.is_ip_v4() ?
         sizeof (endpoint::sockaddr_ip_v4_type) : sizeof (endpoint::sockaddr_ip_v6_type);
     int ret = ::bind(m_sock_fd, &ep.m_sockaddr_union.m_base, addr_len);
-    if (ret == -1) {
+    if (TIGHTDB_UNLIKELY(ret == -1)) {
         ec = make_basic_system_error_code(errno);
     }
     else {
@@ -592,7 +658,7 @@ error_code socket::bind(const endpoint& ep, error_code& ec)
 }
 
 
-endpoint socket::local_endpoint(error_code& ec)
+endpoint socket_base::local_endpoint(error_code& ec) const
 {
     endpoint ep;
     union union_type {
@@ -603,7 +669,7 @@ endpoint socket::local_endpoint(error_code& ec)
     struct sockaddr* addr = &buffer.m_sockaddr_union.m_base;
     socklen_t addr_len = sizeof buffer;
     int ret = getsockname(m_sock_fd, addr, &addr_len);
-    if (ret == -1) {
+    if (TIGHTDB_UNLIKELY(ret == -1)) {
         ec = make_basic_system_error_code(errno);
         return ep;
     }
@@ -618,18 +684,63 @@ endpoint socket::local_endpoint(error_code& ec)
 }
 
 
+void socket_base::get_option(opt_enum opt, void* value_data, size_t& value_size, error_code& ec)
+{
+    int level = 0;
+    int option_name = 0;
+    map_option(opt, level, option_name);
+
+    socklen_t option_len = socklen_t(value_size);
+    int ret = getsockopt(m_sock_fd, level, option_name, value_data, &option_len);
+    if (TIGHTDB_UNLIKELY(ret == -1)) {
+        ec = make_basic_system_error_code(errno);
+        return;
+    }
+    value_size = size_t(option_len);
+    ec = error_code(); // Success
+}
+
+
+void socket_base::set_option(opt_enum opt, const void* value_data, size_t value_size,
+                             error_code& ec)
+{
+    int level = 0;
+    int option_name = 0;
+    map_option(opt, level, option_name);
+
+    int ret = setsockopt(m_sock_fd, level, option_name, value_data, value_size);
+    if (TIGHTDB_UNLIKELY(ret == -1)) {
+        ec = make_basic_system_error_code(errno);
+        return;
+    }
+    ec = error_code(); // Success
+}
+
+
+void socket_base::map_option(opt_enum opt, int& level, int& option_name)
+{
+    switch (opt) {
+        case opt_ReuseAddr:
+            level       = SOL_SOCKET;
+            option_name = SO_REUSEADDR;
+            return;
+    }
+    TIGHTDB_ASSERT(false);
+}
+
+
 error_code socket::connect(const endpoint& ep, error_code& ec)
 {
     if (!is_open()) {
         open(ep.protocol(), ec);
-        if (ec)
+        if (TIGHTDB_UNLIKELY(ec))
             return ec;
     }
 
     socklen_t addr_len = ep.m_protocol.is_ip_v4() ?
         sizeof (endpoint::sockaddr_ip_v4_type) : sizeof (endpoint::sockaddr_ip_v6_type);
     int ret = ::connect(m_sock_fd, &ep.m_sockaddr_union.m_base, addr_len);
-    if (ret == -1) {
+    if (TIGHTDB_UNLIKELY(ret == -1)) {
         ec = make_basic_system_error_code(errno);
     }
     else {
@@ -643,7 +754,7 @@ size_t socket::read_some(char* buffer, size_t size, error_code& ec) TIGHTDB_NOEX
 {
     int flags = 0;
     ssize_t ret = recv(m_sock_fd, buffer, size, flags);
-    if (ret == -1) {
+    if (TIGHTDB_UNLIKELY(ret == -1)) {
         ec = make_basic_system_error_code(errno);
         return 0;
     }
@@ -663,7 +774,7 @@ size_t socket::write_some(const char* data, size_t size, error_code& ec) TIGHTDB
     flags |= MSG_NOSIGNAL;
 #endif
     ssize_t ret = send(m_sock_fd, data, size, flags);
-    if (ret == -1) {
+    if (TIGHTDB_UNLIKELY(ret == -1)) {
         ec = make_basic_system_error_code(errno);
         return 0;
     }
@@ -672,25 +783,10 @@ size_t socket::write_some(const char* data, size_t size, error_code& ec) TIGHTDB
 }
 
 
-error_code socket::close(error_code& ec)
-{
-    if (is_open()) {
-        int ret = ::close(m_sock_fd);
-        if (ret == -1) {
-            ec = make_basic_system_error_code(errno);
-            return ec;
-        }
-        m_sock_fd = -1;
-    }
-    ec = error_code(); // Success
-    return ec;
-}
-
-
 error_code acceptor::listen(int backlog, error_code& ec)
 {
     int ret = ::listen(m_sock_fd, backlog);
-    if (ret == -1) {
+    if (TIGHTDB_UNLIKELY(ret == -1)) {
         ec = make_basic_system_error_code(errno);
     }
     else {
@@ -702,7 +798,7 @@ error_code acceptor::listen(int backlog, error_code& ec)
 
 error_code acceptor::accept(socket& sock, endpoint* ep, error_code& ec)
 {
-    if (sock.is_open())
+    if (TIGHTDB_UNLIKELY(sock.is_open()))
         throw runtime_error("Socket is already open");
     union union_type {
         endpoint::sockaddr_union_type m_sockaddr_union;
@@ -712,13 +808,13 @@ error_code acceptor::accept(socket& sock, endpoint* ep, error_code& ec)
     struct sockaddr* addr = &buffer.m_sockaddr_union.m_base;
     socklen_t addr_len = sizeof buffer;
     int sock_fd = ::accept(m_sock_fd, addr, &addr_len);
-    if (sock_fd == -1) {
+    if (TIGHTDB_UNLIKELY(sock_fd == -1)) {
         ec = make_basic_system_error_code(errno);
         return ec;
     }
     socklen_t expected_addr_len = m_protocol.is_ip_v4() ?
         sizeof (endpoint::sockaddr_ip_v4_type) : sizeof (endpoint::sockaddr_ip_v6_type);
-    if (addr_len != expected_addr_len) {
+    if (TIGHTDB_UNLIKELY(addr_len != expected_addr_len)) {
         ::close(sock_fd);
         throw runtime_error("Unexpected peer address length");
     }
@@ -726,7 +822,7 @@ error_code acceptor::accept(socket& sock, endpoint* ep, error_code& ec)
 #if defined(__MACH__) && defined(__APPLE__) || defined(__FreeBSD__)
     int optval = 1;
     int ret = setsockopt(sock_fd, SOL_SOCKET, SO_NOSIGPIPE, &optval, sizeof optval);
-    if (ret == -1) {
+    if (TIGHTDB_UNLIKELY(ret == -1)) {
         ec = make_basic_system_error_code(errno);
         ::close(sock_fd);
         return ec;
@@ -764,7 +860,7 @@ size_t buffered_input_stream::read(char* buffer, size_t size, int delim,
             break;
         }
         size_t m = m_socket.read_some(m_buffer.get(), s_buffer_size, ec);
-        if (ec)
+        if (TIGHTDB_UNLIKELY(ec))
             return out_begin - buffer;
         TIGHTDB_ASSERT(m > 0);
         TIGHTDB_ASSERT(m <= s_buffer_size);
@@ -832,7 +928,7 @@ string host_name()
     const size_t large_heap_buffer_size = 4096;
     UniquePtr<char[]> large_heap_buffer(new char[large_heap_buffer_size]); // Throws
     ret = gethostname(large_heap_buffer.get(), large_heap_buffer_size);
-    if (ret != -1) {
+    if (TIGHTDB_LIKELY(ret != -1)) {
         // Check that a null-termination was included
         char* end = large_heap_buffer.get() + large_heap_buffer_size;
         char* i = std::find(large_heap_buffer.get(), end, 0);
@@ -848,7 +944,7 @@ error_code write(socket& sock, const char* data, size_t size, error_code& ec) TI
     const char* end = data + size;
     while (begin != end) {
         size_t n = sock.write_some(begin, end-begin, ec);
-        if (ec)
+        if (TIGHTDB_UNLIKELY(ec))
             return ec;
         TIGHTDB_ASSERT(n > 0);
         TIGHTDB_ASSERT(n <= size_t(end-begin));

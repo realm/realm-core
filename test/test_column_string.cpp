@@ -827,6 +827,30 @@ TEST(ColumnString_FindAllRanges)
     c.destroy();
 }
 
+TEST(ColumnString_FindAll_NoDuplicatesWithIndex)
+{
+    // Create column *without* duplicate values.
+    ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
+    AdaptiveStringColumn col(Allocator::get_default(), ref);
+
+    col.add("a");
+    col.add("b");
+    col.add("c");
+    col.add("d");
+
+    col.create_search_index();
+
+    ref_type col_ref = Column::create(Allocator::get_default());
+    Column res(Allocator::get_default(), col_ref);
+    col.find_all(res, "a", 0, npos);
+
+    CHECK_EQUAL(1, res.size());
+
+    // Clean-up
+    res.destroy();
+    col.destroy();
+}
+
 TEST(ColumnString_Count)
 {
     ref_type asc_ref = AdaptiveStringColumn::create(Allocator::get_default());
@@ -894,7 +918,7 @@ TEST(ColumnString_Index)
     asc.add("15");
     asc.add("HEJSA"); // 16
 
-    const StringIndex& ndx = asc.create_search_index();
+    const StringIndex& ndx = *asc.create_search_index();
     CHECK(asc.has_search_index());
 #ifdef TIGHTDB_DEBUG
     ndx.verify_entries(asc);

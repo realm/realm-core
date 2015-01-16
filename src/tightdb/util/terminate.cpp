@@ -66,7 +66,7 @@ TIGHTDB_NORETURN void terminate(const char* message, const char* file, long line
 
     ss << "IMPORTANT: if you see this error, please send this log to help@realm.io.";
 #ifdef TIGHTDB_DEBUG
-    std::cerr << ss.rdbuf();
+    std::cerr << ss.rdbuf() << "\n";
 #endif
 
 #if defined(__APPLE__)

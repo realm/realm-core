@@ -173,7 +173,7 @@ StringData AdaptiveStringColumn::get(size_t ndx) const TIGHTDB_NOEXCEPT
 }
 
 
-StringIndex& AdaptiveStringColumn::create_search_index()
+StringIndex* AdaptiveStringColumn::create_search_index()
 {
     TIGHTDB_ASSERT(!m_search_index);
 
@@ -190,7 +190,7 @@ StringIndex& AdaptiveStringColumn::create_search_index()
     }
 
     m_search_index = index.release();
-    return *m_search_index;
+    return m_search_index;
 }
 
 
@@ -758,8 +758,10 @@ void AdaptiveStringColumn::find_all(Column& result, StringData value, size_t beg
     TIGHTDB_ASSERT(begin <= size());
     TIGHTDB_ASSERT(end == npos || (begin <= end && end <= size()));
 
-    if (m_search_index && begin == 0 && end == npos)
+    if (m_search_index && begin == 0 && end == npos) {
         m_search_index->find_all(result, value); // Throws
+        return;
+    }
 
     if (root_is_leaf()) {
         size_t leaf_offset = 0;

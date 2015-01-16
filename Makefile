@@ -62,6 +62,11 @@ benchmark-transaction: check-norun/subdir/src
 benchmark-row-accessor: check-norun/subdir/src
 	@$(MAKE) -C test benchmark-row-accessor
 
+# Build and run the "common" benchmarking program
+.PHONY: benchmark-common-tasks
+benchmark-common-tasks: check-norun/subdir/src
+	@$(MAKE) -C test benchmark-common-tasks
+
 # Run coverage analysis after building everything, this time using LCOV
 .PHONY: lcov
 lcov: check-cover

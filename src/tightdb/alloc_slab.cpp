@@ -452,15 +452,15 @@ ref_type SlabAlloc::attach_file(const string& path, bool is_shared, bool read_on
         if (did_create) {
             File::Map<Header> writable_map(m_file, File::access_ReadWrite, sizeof (Header)); // Throws
             Header* header = writable_map.get_addr();
-            header->m_select_bit |= server_sync_mode ? 0x2 : 0x0;
+            header->m_flags |= server_sync_mode ? flags_ServerSyncMode : 0x0;
             header = reinterpret_cast<Header*>(m_data);
-            bool stored_server_sync_mode = (header->m_select_bit & 0x2) != 0;
+            bool stored_server_sync_mode = (header->m_flags & flags_ServerSyncMode) != 0;
             if (server_sync_mode != stored_server_sync_mode)
                 throw runtime_error(path + ": failed to write!");
         }
         else {
             Header* header = reinterpret_cast<Header*>(m_data);
-            bool stored_server_sync_mode = (header->m_select_bit & 0x2) != 0;
+            bool stored_server_sync_mode = (header->m_flags & flags_ServerSyncMode) != 0;
             if (server_sync_mode &&  !stored_server_sync_mode)
                 throw runtime_error(path + ": expected db in server sync mode, found local mode");
             if (!server_sync_mode &&  stored_server_sync_mode)
@@ -556,7 +556,7 @@ bool SlabAlloc::validate_buffer(const char* data, size_t size, ref_type& top_ref
 }
 
 
-void SlabAlloc::do_prepare_for_update(char* mutable_data)
+void SlabAlloc::do_prepare_for_update(char* mutable_data, util::File::Map<char>& mapping)
 {
     TIGHTDB_ASSERT(m_file_on_streaming_form);
     Header* header = reinterpret_cast<Header*>(mutable_data);
@@ -565,8 +565,8 @@ void SlabAlloc::do_prepare_for_update(char* mutable_data)
     StreamingFooter* footer = reinterpret_cast<StreamingFooter*>(mutable_data+m_baseline) - 1;
     TIGHTDB_ASSERT(footer->m_magic_cookie == footer_magic_cookie);
     header->m_top_ref[1] = footer->m_top_ref;
-    // FIXME: We probably need a call to msync() here
-    header->m_select_bit |= 1; // keep bit 1 used for server sync mode unchanged
+    mapping.sync();
+    header->m_flags |= flags_SelectBit; // keep bit 1 used for server sync mode unchanged
     m_file_on_streaming_form = false;
 }
 

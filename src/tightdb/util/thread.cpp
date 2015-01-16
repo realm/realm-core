@@ -179,6 +179,19 @@ bool RobustMutex::low_level_lock()
     lock_failed(r);
 }
 
+bool RobustMutex::is_valid() TIGHTDB_NOEXCEPT
+{
+    int r = pthread_mutex_trylock(&m_impl);
+    if (r == 0) {
+        r = pthread_mutex_unlock(&m_impl);
+        TIGHTDB_ASSERT(r == 0);
+        static_cast<void>(r);
+        return true;
+    }
+    return r != EINVAL;
+}
+
+
 void RobustMutex::mark_as_consistent() TIGHTDB_NOEXCEPT
 {
 #ifdef TIGHTDB_HAVE_ROBUST_PTHREAD_MUTEX
