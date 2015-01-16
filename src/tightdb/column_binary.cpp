@@ -329,7 +329,7 @@ void ColumnBinary::do_move_last_over(size_t row_ndx, size_t last_row_ndx)
     // intermediate copy of the data (constr:bptree-copy-to-self).
     UniquePtr<char[]> buffer(new char[value.size()]); // Throws
     copy(value.data(), value.data()+value.size(), buffer.get());
-    BinaryData copy_of_value(buffer.get(), value.size());
+    BinaryData copy_of_value(value.data() == null_ptr ? null_ptr : buffer.get(), value.size());
 
     set(row_ndx, copy_of_value); // Throws
 
