@@ -700,10 +700,10 @@ EOF
 
         tightdb_version="$(sh build.sh get-version)" || exit
         dir_name="core-$tightdb_version"
-        file_name="core-android-$tightdb_version.tar.gz"
+        file_name="realm-core-android-$tightdb_version.tar.gz"
         if [ $enable_encryption = yes ]; then
             dir_name="$dir_name-encryption"
-            file_name="core-android-$tightdb_version-encryption.tar.gz"
+            file_name="realm-core-android-$tightdb_version-encryption.tar.gz"
         fi
 
         echo "Create tar.gz file $file_name"
