@@ -103,6 +103,7 @@
     <ClCompile Include="..\..\test\util\wildcard.cpp" />
     <ClCompile Include="..\..\src\tightdb\util\errno.cpp" />
     <ClCompile Include="..\..\src\tightdb\util\file_mapper.cpp" />
+    <ClCompile Include="..\..\test\test_replication.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\tightdb.hpp" />

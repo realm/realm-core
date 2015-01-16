@@ -672,6 +672,7 @@
     <ClCompile Include="..\..\test\test_links.cpp" />
     <ClCompile Include="..\..\test\test_link_query_view.cpp" />
     <ClCompile Include="..\..\test\test_basic_utils.cpp" />
+    <ClCompile Include="..\..\test\test_replication.cpp" />
     <ClCompile Include="..\..\test\util\jsmn.cpp" />
     <ClCompile Include="..\..\test\util\verified_integer.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>

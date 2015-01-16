@@ -113,7 +113,7 @@ TIGHTDB_TABLE_9(MyTable,
                 my_mixed,     Mixed)
 
 
-TEST(Replication_General)
+ONLY(Replication_General)
 {
     SHARED_GROUP_TEST_PATH(path_1);
     SHARED_GROUP_TEST_PATH(path_2);
@@ -134,8 +134,11 @@ TEST(Replication_General)
         Mixed mix;
         mix.set_int(1);
         table->set    (0, 2, true, 2.0f, 2.0, "xx",  bin, 728, 0, mix);
-        table->add       (3, true, 3.0f, 3.0, "xxx", bin, 729, 0, mix);
+        table->add    (3, true, 3.0f, 3.0, "xxx", bin, 729, 0, mix);
         table->insert (0, 1, true, 1.0f, 1.0, "x",   bin, 727, 0, mix);
+
+        table->add(3, true, 3.0f, 0.0, "", bin, 729, 0, mix);               // empty string
+        table->add(3, true, 3.0f, 1.0, StringData(), bin, 729, 0, mix);     // null string
         wt.commit();
     }
     {
@@ -181,11 +184,17 @@ TEST(Replication_General)
         rt_2.get_group().Verify();
         CHECK(rt_1.get_group() == rt_2.get_group());
         MyTable::ConstRef table = rt_2.get_table<MyTable>("my_table");
-        CHECK_EQUAL(4, table->size());
+        CHECK_EQUAL(6, table->size());
         CHECK_EQUAL(10, table[0].my_int);
         CHECK_EQUAL(3,  table[1].my_int);
         CHECK_EQUAL(2,  table[2].my_int);
         CHECK_EQUAL(8,  table[3].my_int);
+
+        StringData sd1 = table[4].my_string.get();
+        StringData sd2 = table[5].my_string.get();
+
+        CHECK(!table[4].my_string.get().is_null());
+        CHECK(table[1].my_string.get().is_null());  // The null was in last row which got move_last_over(1)
     }
 }
 
