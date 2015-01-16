@@ -536,9 +536,11 @@ public:
     int64_t maximum_int(std::size_t column_ndx, std::size_t* return_ndx = 0) const;
     float   maximum_float(std::size_t column_ndx, std::size_t* return_ndx = 0) const;
     double  maximum_double(std::size_t column_ndx, std::size_t* return_ndx = 0) const;
+    DateTime maximum_datetime(size_t column_ndx, size_t* return_ndx = 0) const;
     int64_t minimum_int(std::size_t column_ndx, std::size_t* return_ndx = 0) const;
     float   minimum_float(std::size_t column_ndx, std::size_t* return_ndx = 0) const;
     double  minimum_double(std::size_t column_ndx, std::size_t* return_ndx = 0) const;
+    DateTime minimum_datetime(size_t column_ndx, size_t* return_ndx = 0) const;
     double  average_int(std::size_t column_ndx) const;
     double  average_float(std::size_t column_ndx) const;
     double  average_double(std::size_t column_ndx) const;
@@ -570,11 +572,15 @@ public:
     TableView      find_all_binary(std::size_t column_ndx, BinaryData value);
     ConstTableView find_all_binary(std::size_t column_ndx, BinaryData value) const;
 
+    /// The following column types are supported: String, Integer, DateTime, Bool
     TableView      get_distinct_view(std::size_t column_ndx);
     ConstTableView get_distinct_view(std::size_t column_ndx) const;
 
     TableView      get_sorted_view(std::size_t column_ndx, bool ascending = true);
     ConstTableView get_sorted_view(std::size_t column_ndx, bool ascending = true) const;
+
+    TableView      get_sorted_view(std::vector<size_t> column_ndx, std::vector<bool> ascending);
+    ConstTableView get_sorted_view(std::vector<size_t> column_ndx, std::vector<bool> ascending) const;
 
     TableView      get_range_view(std::size_t begin, std::size_t end);
     ConstTableView get_range_view(std::size_t begin, std::size_t end) const;

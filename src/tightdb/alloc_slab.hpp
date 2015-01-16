@@ -168,7 +168,7 @@ public:
     /// The specified address must be a writable memory mapping of the
     /// attached file, and the mapped region must be at least as big
     /// as what is returned by get_baseline().
-    void prepare_for_update(char* mutable_data);
+    void prepare_for_update(char* mutable_data, util::File::Map<char>& mapping);
 
     /// Reserve disk space now to avoid allocation errors at a later
     /// point in time, and to minimize on-disk fragmentation. In some
@@ -263,6 +263,12 @@ private:
         size_t size;
     };
 
+    // Values of each used bit in m_flags
+    enum {
+        flags_SelectBit = 1,
+        flags_ServerSyncMode = 2
+    };
+
     // 24 bytes
     struct Header {
         uint64_t m_top_ref[2]; // 2 * 8 bytes
@@ -270,12 +276,12 @@ private:
         uint8_t m_mnemonic[4]; // "T-DB"
         uint8_t m_file_format_version[2];
         uint8_t m_reserved;
-        // bit 0 of m_select_bit is used to select between the two top refs.
-        // bit 1 of m_select_bit is to be set for persistent commit-logs (Sync support).
+        // bit 0 of m_flags is used to select between the two top refs.
+        // bit 1 of m_flags is to be set for persistent commit-logs (Sync support).
         // when clear, the commit-logs will be removed at the end of a session.
         // when set, the commmit-logs are persisted, and IFF the database exists
         // already at the start of a session, the commit logs too must exist.
-        uint8_t m_select_bit;
+        uint8_t m_flags;
     };
 
     // 16 bytes
@@ -336,7 +342,7 @@ private:
 
     bool validate_buffer(const char* data, std::size_t len, ref_type& top_ref);
 
-    void do_prepare_for_update(char* mutable_data);
+    void do_prepare_for_update(char* mutable_data, util::File::Map<char>& mapping);
 
     class ChunkRefEq;
     class ChunkRefEndEq;
@@ -350,6 +356,7 @@ private:
 
     friend class Group;
     friend class GroupWriter;
+    friend class SharedGroup;
 };
 
 
@@ -402,12 +409,12 @@ inline std::size_t SlabAlloc::get_baseline() const TIGHTDB_NOEXCEPT
     return m_baseline;
 }
 
-inline void SlabAlloc::prepare_for_update(char* mutable_data)
+inline void SlabAlloc::prepare_for_update(char* mutable_data, util::File::Map<char>& mapping)
 {
     TIGHTDB_ASSERT(m_attach_mode == attach_SharedFile || m_attach_mode == attach_UnsharedFile);
     if (TIGHTDB_LIKELY(!m_file_on_streaming_form))
         return;
-    do_prepare_for_update(mutable_data);
+    do_prepare_for_update(mutable_data, mapping);
 }
 
 inline void SlabAlloc::reserve(std::size_t size)

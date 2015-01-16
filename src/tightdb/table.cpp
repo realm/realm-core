@@ -1352,33 +1352,18 @@ void Table::add_search_index(size_t col_ndx)
 
     TIGHTDB_ASSERT(!m_primary_key);
 
-    ColumnType type = get_real_column_type(col_ndx);
     Spec::ColumnInfo info;
     m_spec.get_column_info(col_ndx, info);
     size_t column_pos = info.m_column_ref_ndx;
     ref_type index_ref = 0;
 
     // Create the index
-    if (type == col_type_String) {
-        AdaptiveStringColumn& col = get_column_string(col_ndx);
-        StringIndex& index = col.create_search_index(); // Throws
-        index.set_parent(&m_columns, column_pos+1);
-        index_ref = index.get_ref();
-    }
-    else if (type == col_type_StringEnum) {
-        ColumnStringEnum& col = get_column_string_enum(col_ndx);
-        StringIndex& index = col.create_search_index(); // Throws
-        index.set_parent(&m_columns, column_pos+1);
-        index_ref = index.get_ref();
-    }
-    else if (type == col_type_Int || type == col_type_DateTime || type == col_type_Bool) {
-        Column& col = get_column(col_ndx);
-        col.create_search_index(); // Throws
-        StringIndex& index = *static_cast<StringIndex*>(col.m_search_index);
-        index.set_parent(&m_columns, column_pos + 1);
-        index_ref = index.get_ref();
-    }
-    else {
+    ColumnBase& col = get_column_base(col_ndx);
+    StringIndex* index = col.create_search_index(); // Throws
+    if (index) {
+        index->set_parent(&m_columns, column_pos + 1);
+        index_ref = index->get_ref();
+    } else {
         throw LogicError(LogicError::illegal_combination);
     }
 
@@ -1434,21 +1419,21 @@ bool Table::try_add_primary_key(size_t col_ndx)
     ColumnBase& col = get_column_base(col_ndx);
     if (type == col_type_String) {
         AdaptiveStringColumn& col_2 = static_cast<AdaptiveStringColumn&>(col);
-        StringIndex& index = col_2.get_search_index();
+        StringIndex& index = *col_2.get_search_index();
         if (index.has_duplicate_values())
             return false;
         index.set_allow_duplicate_values(false);
     }
     else if (type == col_type_StringEnum) {
         ColumnStringEnum& col_2 = static_cast<ColumnStringEnum&>(col);
-        StringIndex& index = col_2.get_search_index();
+        StringIndex& index = *col_2.get_search_index();
         if (index.has_duplicate_values())
             return false;
         index.set_allow_duplicate_values(false);
     }
     else if (type == col_type_Int) {
         Column& col_2 = static_cast<Column&>(col);
-        StringIndex& index = *static_cast<StringIndex*>(col_2.get_search_index());
+        StringIndex& index = *col_2.get_search_index();
         if (index.has_duplicate_values())
             return false;
         index.set_allow_duplicate_values(false);
@@ -1492,12 +1477,12 @@ void Table::remove_primary_key()
             ColumnBase& col = get_column_base(col_ndx);
             if (type == col_type_String) {
                 AdaptiveStringColumn& col_2 = static_cast<AdaptiveStringColumn&>(col);
-                StringIndex& index = col_2.get_search_index();
+                StringIndex& index = *col_2.get_search_index();
                 index.set_allow_duplicate_values(true);
             }
             else if (type == col_type_StringEnum) {
                 ColumnStringEnum& col_2 = static_cast<ColumnStringEnum&>(col);
-                StringIndex& index = col_2.get_search_index();
+                StringIndex& index = *col_2.get_search_index();
                 index.set_allow_duplicate_values(true);
             }
             else {
@@ -2840,7 +2825,7 @@ void Table::insert_done()
 
 size_t Table::count_int(size_t col_ndx, int64_t value) const
 {
-    if(!m_columns.is_attached())
+    if (!m_columns.is_attached())
         return 0;
 
     const Column& column = get_column<Column, col_type_Int>(col_ndx);
@@ -2848,7 +2833,7 @@ size_t Table::count_int(size_t col_ndx, int64_t value) const
 }
 size_t Table::count_float(size_t col_ndx, float value) const
 {
-    if(!m_columns.is_attached())
+    if (!m_columns.is_attached())
         return 0;
 
     const ColumnFloat& column = get_column<ColumnFloat, col_type_Float>(col_ndx);
@@ -2856,7 +2841,7 @@ size_t Table::count_float(size_t col_ndx, float value) const
 }
 size_t Table::count_double(size_t col_ndx, double value) const
 {
-    if(!m_columns.is_attached())
+    if (!m_columns.is_attached())
         return 0;
 
     const ColumnDouble& column = get_column<ColumnDouble, col_type_Double>(col_ndx);
@@ -2866,7 +2851,7 @@ size_t Table::count_string(size_t col_ndx, StringData value) const
 {
     TIGHTDB_ASSERT(!m_columns.is_attached() || col_ndx < get_column_count());
 
-    if(!m_columns.is_attached())
+    if (!m_columns.is_attached())
         return 0;
 
     ColumnType type = get_real_column_type(col_ndx);
@@ -2885,7 +2870,7 @@ size_t Table::count_string(size_t col_ndx, StringData value) const
 
 int64_t Table::sum_int(size_t col_ndx) const
 {
-    if(!m_columns.is_attached())
+    if (!m_columns.is_attached())
         return 0;
 
     const Column& column = get_column<Column, col_type_Int>(col_ndx);
@@ -2893,7 +2878,7 @@ int64_t Table::sum_int(size_t col_ndx) const
 }
 double Table::sum_float(size_t col_ndx) const
 {
-    if(!m_columns.is_attached())
+    if (!m_columns.is_attached())
         return 0.f;
 
     const ColumnFloat& column = get_column<ColumnFloat, col_type_Float>(col_ndx);
@@ -2901,7 +2886,7 @@ double Table::sum_float(size_t col_ndx) const
 }
 double Table::sum_double(size_t col_ndx) const
 {
-    if(!m_columns.is_attached())
+    if (!m_columns.is_attached())
         return 0.;
 
     const ColumnDouble& column = get_column<ColumnDouble, col_type_Double>(col_ndx);
@@ -2912,7 +2897,7 @@ double Table::sum_double(size_t col_ndx) const
 
 double Table::average_int(size_t col_ndx) const
 {
-    if(!m_columns.is_attached())
+    if (!m_columns.is_attached())
         return 0;
 
     const Column& column = get_column<Column, col_type_Int>(col_ndx);
@@ -2920,7 +2905,7 @@ double Table::average_int(size_t col_ndx) const
 }
 double Table::average_float(size_t col_ndx) const
 {
-    if(!m_columns.is_attached())
+    if (!m_columns.is_attached())
         return 0.f;
 
     const ColumnFloat& column = get_column<ColumnFloat, col_type_Float>(col_ndx);
@@ -2928,7 +2913,7 @@ double Table::average_float(size_t col_ndx) const
 }
 double Table::average_double(size_t col_ndx) const
 {
-    if(!m_columns.is_attached())
+    if (!m_columns.is_attached())
         return 0.;
 
     const ColumnDouble& column = get_column<ColumnDouble, col_type_Double>(col_ndx);
@@ -2941,7 +2926,7 @@ double Table::average_double(size_t col_ndx) const
 
 int64_t Table::minimum_int(size_t col_ndx, size_t* return_ndx) const
 {
-    if(!m_columns.is_attached())
+    if (!m_columns.is_attached())
         return 0;
 
 #if USE_COLUMN_AGGREGATE
@@ -2964,7 +2949,7 @@ int64_t Table::minimum_int(size_t col_ndx, size_t* return_ndx) const
 
 float Table::minimum_float(size_t col_ndx, size_t* return_ndx) const
 {
-    if(!m_columns.is_attached())
+    if (!m_columns.is_attached())
         return 0.f;
 
     const ColumnFloat& column = get_column<ColumnFloat, col_type_Float>(col_ndx);
@@ -2973,10 +2958,19 @@ float Table::minimum_float(size_t col_ndx, size_t* return_ndx) const
 
 double Table::minimum_double(size_t col_ndx, size_t* return_ndx) const
 {
-    if(!m_columns.is_attached())
+    if (!m_columns.is_attached())
         return 0.;
 
     const ColumnDouble& column = get_column<ColumnDouble, col_type_Double>(col_ndx);
+    return column.minimum(0, npos, npos, return_ndx);
+}
+
+DateTime Table::minimum_datetime(size_t col_ndx, size_t* return_ndx) const
+{
+    if (!m_columns.is_attached())
+        return 0.;
+
+    const Column& column = get_column<Column, col_type_DateTime>(col_ndx);
     return column.minimum(0, npos, npos, return_ndx);
 }
 
@@ -2984,7 +2978,7 @@ double Table::minimum_double(size_t col_ndx, size_t* return_ndx) const
 
 int64_t Table::maximum_int(size_t col_ndx, size_t* return_ndx) const
 {
-    if(!m_columns.is_attached())
+    if (!m_columns.is_attached())
         return 0;
 
 #if USE_COLUMN_AGGREGATE
@@ -3007,7 +3001,7 @@ int64_t Table::maximum_int(size_t col_ndx, size_t* return_ndx) const
 
 float Table::maximum_float(size_t col_ndx, size_t* return_ndx) const
 {
-    if(!m_columns.is_attached())
+    if (!m_columns.is_attached())
         return 0.f;
 
     const ColumnFloat& column = get_column<ColumnFloat, col_type_Float>(col_ndx);
@@ -3016,10 +3010,19 @@ float Table::maximum_float(size_t col_ndx, size_t* return_ndx) const
 
 double Table::maximum_double(size_t col_ndx, size_t* return_ndx) const
 {
-    if(!m_columns.is_attached())
+    if (!m_columns.is_attached())
         return 0.;
 
     const ColumnDouble& column = get_column<ColumnDouble, col_type_Double>(col_ndx);
+    return column.maximum(0, npos, npos, return_ndx);
+}
+
+DateTime Table::maximum_datetime(size_t col_ndx, size_t* return_ndx) const
+{
+    if (!m_columns.is_attached())
+        return 0.;
+
+    const Column& column = get_column<Column, col_type_DateTime>(col_ndx);
     return column.maximum(0, npos, npos, return_ndx);
 }
 
@@ -3034,12 +3037,12 @@ void Table::reveal_primary_key() const
             const ColumnBase& col = get_column_base(i);
             if (type == col_type_String) {
                 const AdaptiveStringColumn& col_2 = static_cast<const AdaptiveStringColumn&>(col);
-                m_primary_key = &col_2.get_search_index();
+                m_primary_key = col_2.get_search_index();
                 return;
             }
             if (type == col_type_StringEnum) {
                 const ColumnStringEnum& col_2 = static_cast<const ColumnStringEnum&>(col);
-                m_primary_key = &col_2.get_search_index();
+                m_primary_key = col_2.get_search_index();
                 return;
             }
             TIGHTDB_ASSERT(false);
@@ -3085,7 +3088,7 @@ template<class T> size_t Table::find_first(size_t col_ndx, T value) const
     TIGHTDB_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
     TIGHTDB_ASSERT(get_real_column_type(col_ndx) == ColumnTypeTraits3<T>::ct_id_real);
 
-    if(!m_columns.is_attached())
+    if (!m_columns.is_attached())
         return not_found;
 
     typedef typename ColumnTypeTraits3<T>::column_type ColType;
@@ -3115,7 +3118,7 @@ size_t Table::find_first_datetime(size_t col_ndx, DateTime value) const
     TIGHTDB_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
     TIGHTDB_ASSERT(get_real_column_type(col_ndx) == col_type_DateTime);
 
-    if(!m_columns.is_attached())
+    if (!m_columns.is_attached())
         return not_found;
 
     const Column& column = get_column(col_ndx);
@@ -3136,7 +3139,7 @@ size_t Table::find_first_double(size_t col_ndx, double value) const
 size_t Table::find_first_string(size_t col_ndx, StringData value) const
 {
     TIGHTDB_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
-    if(!m_columns.is_attached())
+    if (!m_columns.is_attached())
         return not_found;
 
     ColumnType type = get_real_column_type(col_ndx);
@@ -3248,27 +3251,10 @@ ConstTableView Table::find_all_binary(size_t, BinaryData) const
 
 TableView Table::get_distinct_view(size_t col_ndx)
 {
-    // FIXME: lacks support for reactive updates
     TIGHTDB_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
-    TIGHTDB_ASSERT(has_search_index(col_ndx));
 
-    TableView tv(*this);
-    Column& refs = tv.m_row_indexes;
-
-    if(m_columns.is_attached()) {
-        ColumnType type = get_real_column_type(col_ndx);
-        if (type == col_type_String) {
-            const AdaptiveStringColumn& column = get_column_string(col_ndx);
-            const StringIndex& index = column.get_search_index();
-            index.distinct(refs);
-        }
-        else {
-            TIGHTDB_ASSERT(type == col_type_StringEnum);
-            const ColumnStringEnum& column = get_column_string_enum(col_ndx);
-            const StringIndex& index = column.get_search_index();
-            index.distinct(refs);
-        }
-    }
+    TableView tv(*this, col_ndx);
+    tv.sync_if_needed();
     return tv;
 }
 
@@ -3285,6 +3271,18 @@ TableView Table::get_sorted_view(size_t col_ndx, bool ascending)
 }
 
 ConstTableView Table::get_sorted_view(size_t col_ndx, bool ascending) const
+{
+    return const_cast<Table*>(this)->get_sorted_view(col_ndx, ascending);
+}
+
+TableView Table::get_sorted_view(std::vector<size_t> col_ndx, std::vector<bool> ascending)
+{
+    TableView tv = where().find_all();
+    tv.sort(col_ndx, ascending);
+    return tv;
+}
+
+ConstTableView Table::get_sorted_view(std::vector<size_t> col_ndx, std::vector<bool> ascending) const
 {
     return const_cast<Table*>(this)->get_sorted_view(col_ndx, ascending);
 }
@@ -3395,7 +3393,7 @@ void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, T
         // If the group_by column is not auto-enumerated, we have to do
         // (more expensive) direct lookups.
         result.add_search_index(0);
-        const StringIndex& dst_index = result.get_column_string(0).get_search_index();
+        const StringIndex& dst_index = *result.get_column_string(0).get_search_index();
 
         state.table = this;
         state.dst_index = &dst_index;
@@ -3661,7 +3659,7 @@ size_t Table::upper_bound_double(size_t col_ndx, double value) const TIGHTDB_NOE
 size_t Table::lower_bound_string(size_t col_ndx, StringData value) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
-    if(!m_columns.is_attached())
+    if (!m_columns.is_attached())
         return 0;
 
     ColumnType type = get_real_column_type(col_ndx);
@@ -3677,7 +3675,7 @@ size_t Table::lower_bound_string(size_t col_ndx, StringData value) const TIGHTDB
 size_t Table::upper_bound_string(size_t col_ndx, StringData value) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
-    if(!m_columns.is_attached())
+    if (!m_columns.is_attached())
         return 0;
 
     ColumnType type = get_real_column_type(col_ndx);

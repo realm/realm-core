@@ -100,9 +100,9 @@ public:
     bool has_search_index() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     void set_search_index_ref(ref_type, ArrayParent*, std::size_t, bool) TIGHTDB_OVERRIDE;
     void set_search_index_allow_duplicate_values(bool) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-    StringIndex& get_search_index() TIGHTDB_NOEXCEPT;
-    const StringIndex& get_search_index() const TIGHTDB_NOEXCEPT;
-    StringIndex& create_search_index();
+    StringIndex* get_search_index() TIGHTDB_NOEXCEPT;
+    const StringIndex* get_search_index() const TIGHTDB_NOEXCEPT;
+    StringIndex* create_search_index();
     void install_search_index(StringIndex*) TIGHTDB_NOEXCEPT;
 
     // Compare two string columns for equality
@@ -246,14 +246,14 @@ inline bool ColumnStringEnum::has_search_index() const TIGHTDB_NOEXCEPT
     return m_search_index != 0;
 }
 
-inline StringIndex& ColumnStringEnum::get_search_index() TIGHTDB_NOEXCEPT
+inline StringIndex* ColumnStringEnum::get_search_index() TIGHTDB_NOEXCEPT
 {
-    return *m_search_index;
+    return m_search_index;
 }
 
-inline const StringIndex& ColumnStringEnum::get_search_index() const TIGHTDB_NOEXCEPT
+inline const StringIndex* ColumnStringEnum::get_search_index() const TIGHTDB_NOEXCEPT
 {
-    return *m_search_index;
+    return m_search_index;
 }
 
 inline AdaptiveStringColumn& ColumnStringEnum::get_keys()

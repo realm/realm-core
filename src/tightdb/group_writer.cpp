@@ -20,11 +20,6 @@ GroupWriter::GroupWriter(Group& group):
 
 size_t GroupWriter::write_group()
 {
-    // Streamed files have the top-ref specified in a footer but this form is
-    // incompatible with in-place updating of database files. For this reason we
-    // have to convert the file now if it is the the streamed form.
-    m_group.m_alloc.prepare_for_update(m_file_map.get_addr());
-
     merge_free_space(); // Throws
 
     Array& top        = m_group.m_top;
@@ -460,9 +455,6 @@ void GroupWriter::write_array_at(size_t pos, const char* data, size_t size)
 
 void GroupWriter::commit(ref_type new_top_ref)
 {
-    // Write data
-    m_file_map.sync(); // Throws
-
     // File header is 24 bytes, composed of three 64-bit
     // blocks. The two first being top_refs (only one valid
     // at a time) and the last being the info block.
@@ -471,8 +463,8 @@ void GroupWriter::commit(ref_type new_top_ref)
     // Least significant bit in last byte of info block indicates
     // which top_ref block is valid - other bits remain unchanged
     int select_field = file_header[16+7];
-    select_field ^= 0x1;
-    int new_valid_ref = select_field & 0x1;
+    select_field ^= SlabAlloc::flags_SelectBit;
+    int new_valid_ref = select_field & SlabAlloc::flags_SelectBit;
 
     // FIXME: What rule guarantees that the new top ref is written to
     // physical medium before the swapping bit?
@@ -480,9 +472,15 @@ void GroupWriter::commit(ref_type new_top_ref)
     // Update top ref pointer
     uint64_t* top_refs = reinterpret_cast<uint64_t*>(file_header);
     top_refs[new_valid_ref] = new_top_ref;
+
+    // Make sure that all data and the top pointer is written to stable storage
+    m_file_map.sync(); // Throws
+
+    // update selector - must happen after write of all data and top pointer
     file_header[16+7] = char(select_field); // swap
 
-    // Write new header to disk
+    // Write new selector to disk
+    // FIXME: we might optimize this to write of a single page?
     m_file_map.sync(); // Throws
 }
 
