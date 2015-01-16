@@ -25,17 +25,28 @@
 
 #ifdef TIGHTDB_ENABLE_ENCRYPTION
 
-#ifdef _WIN32
-#error Encryption is not yet implemented for Windows.
-#endif
-
 #include <vector>
 
 #ifdef __APPLE__
 #include <CommonCrypto/CommonCrypto.h>
-#else
+#elif defined(TIGHTDB_ANDROID)
+// OpenSSL headers aren't part of the NDK, so declare the bits we need manually
+#define AES_ENCRYPT	1
+#define AES_DECRYPT	0
+#define SHA224_DIGEST_LENGTH 28
+
+typedef struct aes_key_st {
+    unsigned long data[61];
+} AES_KEY;
+
+typedef struct SHA256state_st {
+    unsigned int data[28];
+} SHA256_CTX;
+#elif !defined(_WIN32)
 #include <openssl/aes.h>
 #include <openssl/sha.h>
+#else
+#error Encryption is not yet implemented for this platform.
 #endif
 
 namespace tightdb {
@@ -73,9 +84,23 @@ private:
     AES_KEY m_dctx;
 #endif
 
+#ifdef TIGHTDB_ANDROID
+    // Loaded at runtime with dysym
+    int (*AES_set_encrypt_key)(const unsigned char *, const int, AES_KEY *);
+    int (*AES_set_decrypt_key)(const unsigned char *, const int, AES_KEY *);
+    void (*AES_cbc_encrypt)(const unsigned char *, unsigned char *,
+                            const unsigned long, const AES_KEY *,
+                            unsigned char *, const int);
+
+    int (*SHA224_Init)(SHA256_CTX *);
+    int (*SHA256_Update)(SHA256_CTX *, const void *, size_t);
+    int (*SHA256_Final)(unsigned char *, SHA256_CTX *);
+#endif
+
     uint8_t m_hmacKey[32];
     std::vector<iv_table> m_iv_buffer;
 
+    void calc_hmac(const void* src, size_t len, uint8_t* dst, const uint8_t* key) const;
     bool check_hmac(const void *data, size_t len, const uint8_t *hmac) const;
     void crypt(EncryptionMode mode, off_t pos, char* dst, const char* src,
                const char* stored_iv) TIGHTDB_NOEXCEPT;

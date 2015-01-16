@@ -1,3 +1,25 @@
+# NEXT RELEASE
+
+### Bugfixes:
+
+* Lorem ipsum.
+
+### API breaking changes:
+
+* Lorem ipsum.
+
+### Enhancements:
+
+* Lorem ipsum.
+
+-----------
+
+### Internals:
+
+* Lorem ipsum.
+
+----------------------------------------------
+
 # 0.87.5 Release notes
 
 ### Bugfixes:
@@ -20,6 +42,12 @@
   possible.
 * Add `Table::minimum_datetime()` and `Table::maximum_datetime()`.
 * Extending `Table::get_sorted_view()` to support multi-column sorting.
+
+-----------
+
+### Internals:
+
+* Now uses system OpenSSL on Android rather than a statically-linked copy for encryption.
 
 ----------------------------------------------
 
