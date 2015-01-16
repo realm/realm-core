@@ -2,7 +2,7 @@
 
 ### Bugfixes:
 
-* `AdaptiveStringColumn::find_all` with an index no longer returns its results twice.
+* Lorem ipsum.
 
 ### API breaking changes:
 
@@ -10,21 +10,44 @@
 
 ### Enhancements:
 
-* SharedGroup now allows you to coordinate which version of the data a read transaction
-  can see. The type `VersionID` represents a specific commit to the
-  database. A user can obtain the `VersionID` for the active transaction from
-  `SharedGroup::get_version_of_current_transaction()`, and use it to obtain a
-  a transaction accessing that same version from another ShareGroup. This is done
-  by new forms of `SharedGroup::begin_read()`, `SharedGroup::advance_read()`.
-  Operators are provided so that VersionID's may be compared.
-* Creating distinct views on integer, datetime, bool and enum columns is now possible.
-* Add `Table::minimum_datetime()` and `Table::maximum_datetime()`.
+* Lorem ipsum.
 
 -----------
 
 ### Internals:
 
 * Lorem ipsum.
+
+----------------------------------------------
+
+# 0.87.5 Release notes
+
+### Bugfixes:
+
+* `AdaptiveStringColumn::find_all()` with an index no longer returns its results
+  twice.
+
+### Enhancements:
+
+* Added `SharedGroup::wait_for_change_release()` which allows you to release a
+  thread waiting inside wait_for_change() on a specific SharedGroup instance.
+* SharedGroup now allows you to coordinate which version of the data a read
+  transaction can see. The type `VersionID` represents a specific commit to the
+  database. A user can obtain the `VersionID` for the active transaction from
+  `SharedGroup::get_version_of_current_transaction()`, and use it to obtain a a
+  transaction accessing that same version from another ShareGroup. This is done
+  by new forms of `SharedGroup::begin_read()`, `SharedGroup::advance_read()`.
+  Operators are provided so that VersionID's may be compared.
+* Creating distinct views on integer, datetime, bool and enum columns is now
+  possible.
+* Add `Table::minimum_datetime()` and `Table::maximum_datetime()`.
+* Extending `Table::get_sorted_view()` to support multi-column sorting.
+
+-----------
+
+### Internals:
+
+* Now uses system OpenSSL on Android rather than a statically-linked copy for encryption.
 
 ----------------------------------------------
 
@@ -60,6 +83,7 @@
 
 ### Enhancements:
 
+* Added 'compact' method to SharedGroup for better control of compaction of the database file.
 * The following constants were added: `Group::max_table_name_length`,
   `Table::max_column_name_length`, `Table::max_string_size`, and
   `Table::max_binary_size`.

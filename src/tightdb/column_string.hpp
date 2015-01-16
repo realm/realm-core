@@ -90,10 +90,10 @@ public:
     bool has_search_index() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     void set_search_index_ref(ref_type, ArrayParent*, std::size_t, bool) TIGHTDB_OVERRIDE;
     void set_search_index_allow_duplicate_values(bool) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-    StringIndex& get_search_index() TIGHTDB_NOEXCEPT;
-    const StringIndex& get_search_index() const TIGHTDB_NOEXCEPT;
+    StringIndex* get_search_index() TIGHTDB_NOEXCEPT;
+    const StringIndex* get_search_index() const TIGHTDB_NOEXCEPT;
     StringIndex* release_search_index() TIGHTDB_NOEXCEPT;
-    StringIndex& create_search_index();
+    StringIndex* create_search_index();
 
     // Optimizing data layout
     bool auto_enumerate(ref_type& keys, ref_type& values) const;
@@ -279,14 +279,14 @@ inline bool AdaptiveStringColumn::has_search_index() const TIGHTDB_NOEXCEPT
     return m_search_index != 0;
 }
 
-inline StringIndex& AdaptiveStringColumn::get_search_index() TIGHTDB_NOEXCEPT
+inline StringIndex* AdaptiveStringColumn::get_search_index() TIGHTDB_NOEXCEPT
 {
-    return *m_search_index;
+    return m_search_index;
 }
 
-inline const StringIndex& AdaptiveStringColumn::get_search_index() const TIGHTDB_NOEXCEPT
+inline const StringIndex* AdaptiveStringColumn::get_search_index() const TIGHTDB_NOEXCEPT
 {
-    return *m_search_index;
+    return m_search_index;
 }
 
 inline StringIndex* AdaptiveStringColumn::release_search_index() TIGHTDB_NOEXCEPT

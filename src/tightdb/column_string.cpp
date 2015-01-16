@@ -184,7 +184,7 @@ void AdaptiveStringColumn::set_null(std::size_t ndx)
     set(ndx, sd);
 }
 
-StringIndex& AdaptiveStringColumn::create_search_index()
+StringIndex* AdaptiveStringColumn::create_search_index()
 {
     TIGHTDB_ASSERT(!m_search_index);
 
@@ -201,7 +201,7 @@ StringIndex& AdaptiveStringColumn::create_search_index()
     }
 
     m_search_index = index.release();
-    return *m_search_index;
+    return m_search_index;
 }
 
 

@@ -6375,8 +6375,7 @@ void multiple_trackers_writer_thread(string path)
     for (int i = 0; i < 10; ++i) {
         WriteTransaction wt(sg);
         TestTableInts::Ref tr = wt.get_table<TestTableInts>("table");
-
-        size_t idx = tr->is_empty() ? 0 : random.draw_int_mod(tr->size());
+        size_t idx = 1 + random.draw_int_mod(tr->size()-1);
 
         if (tr[idx].first == 42) {
             // do nothing
@@ -6580,6 +6579,9 @@ TEST(LangBindHelper_SyncCannotBeChanged_2)
 #ifndef TIGHTDB_ENABLE_ENCRYPTION
 // Interprocess communication does not work with encryption enabled
 
+#if !defined(TIGHTDB_ANDROID) && !defined(TIGHTDB_IOS)
+// fork should not be used on android or ios.
+
 TEST(LangBindHelper_ImplicitTransactions_InterProcess)
 {
     const int write_process_count = 7;
@@ -6663,6 +6665,7 @@ TEST(LangBindHelper_ImplicitTransactions_InterProcess)
     }
 
 }
+#endif
 #endif
 #endif
 

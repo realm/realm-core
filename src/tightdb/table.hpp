@@ -572,11 +572,15 @@ public:
     TableView      find_all_binary(std::size_t column_ndx, BinaryData value);
     ConstTableView find_all_binary(std::size_t column_ndx, BinaryData value) const;
 
+    /// The following column types are supported: String, Integer, DateTime, Bool
     TableView      get_distinct_view(std::size_t column_ndx);
     ConstTableView get_distinct_view(std::size_t column_ndx) const;
 
     TableView      get_sorted_view(std::size_t column_ndx, bool ascending = true);
     ConstTableView get_sorted_view(std::size_t column_ndx, bool ascending = true) const;
+
+    TableView      get_sorted_view(std::vector<size_t> column_ndx, std::vector<bool> ascending);
+    ConstTableView get_sorted_view(std::vector<size_t> column_ndx, std::vector<bool> ascending) const;
 
     TableView      get_range_view(std::size_t begin, std::size_t end);
     ConstTableView get_range_view(std::size_t begin, std::size_t end) const;

@@ -27,8 +27,20 @@
 #include <unistd.h>
 #include <string.h>
 #include <stdio.h>
+#include <dlfcn.h>
 
 #include <tightdb/util/terminate.hpp>
+
+namespace {
+template<typename T>
+void dlsym_cast(T& ptr, const char *name) {
+    void* addr = dlsym(RTLD_DEFAULT, name);
+    TIGHTDB_ASSERT(addr);
+    // This cast is forbidden by C++03, but required to work by POSIX, and
+    // C++11 makes it implementation-defined specifically to support dlsym
+    ptr = reinterpret_cast<T>(reinterpret_cast<size_t>(addr));
+}
+}
 
 namespace tightdb {
 namespace util {
@@ -43,6 +55,19 @@ AESCryptor::AESCryptor(const uint8_t* key) {
     CCCryptorCreate(kCCEncrypt, kCCAlgorithmAES, 0 /* options */, key, kCCKeySizeAES256, 0 /* IV */, &m_encr);
     CCCryptorCreate(kCCDecrypt, kCCAlgorithmAES, 0 /* options */, key, kCCKeySizeAES256, 0 /* IV */, &m_decr);
 #else
+#ifdef TIGHTDB_ANDROID
+    // libcrypto isn't exposed as part of the NDK, but it happens to be loaded
+    // into every process with every version of Android, so we can get to it
+    // with dlsym
+    dlsym_cast(AES_set_encrypt_key, "AES_set_encrypt_key");
+    dlsym_cast(AES_set_decrypt_key, "AES_set_decrypt_key");
+    dlsym_cast(AES_cbc_encrypt, "AES_cbc_encrypt");
+
+    dlsym_cast(SHA224_Init, "SHA224_Init");
+    dlsym_cast(SHA256_Update, "SHA256_Update");
+    dlsym_cast(SHA256_Final, "SHA256_Final");
+#endif
+
     AES_set_encrypt_key(key, 256 /* key size in bits */, &m_ectx);
     AES_set_decrypt_key(key, 256 /* key size in bits */, &m_dctx);
 #endif
@@ -134,36 +159,6 @@ size_t check_read(int fd, off_t pos, void *dst, size_t len)
     ssize_t ret = pread(fd, dst, len, pos);
     TIGHTDB_ASSERT(ret >= 0);
     return ret < 0 ? 0 : static_cast<size_t>(ret);
-}
-
-void calc_hmac(const void* src, size_t len, uint8_t* dst, const uint8_t* key)
-{
-#ifdef __APPLE__
-    CCHmac(kCCHmacAlgSHA224, key, 32, src, len, dst);
-#else
-    SHA256_CTX ctx;
-
-    uint8_t ipad[64];
-    for (size_t i = 0; i < 32; ++i)
-        ipad[i] = key[i] ^ 0x36;
-    memset(ipad + 32, 0x36, 32);
-
-    uint8_t opad[64] = {0};
-    for (size_t i = 0; i < 32; ++i)
-        opad[i] = key[i] ^ 0x5C;
-    memset(opad + 32, 0x5C, 32);
-
-    // Full hmac operation is sha224(opad + sha224(ipad + data))
-    SHA224_Init(&ctx);
-    SHA256_Update(&ctx, ipad, 64);
-    SHA256_Update(&ctx, static_cast<const uint8_t*>(src), len);
-    SHA256_Final(dst, &ctx);
-
-    SHA224_Init(&ctx);
-    SHA256_Update(&ctx, opad, 64);
-    SHA256_Update(&ctx, dst, SHA224_DIGEST_LENGTH);
-    SHA256_Final(dst, &ctx);
-#endif
 }
 
 } // anonymous namespace
@@ -297,6 +292,36 @@ void AESCryptor::crypt(EncryptionMode mode, off_t pos, char* dst,
 #else
     AES_cbc_encrypt(reinterpret_cast<const uint8_t*>(src), reinterpret_cast<uint8_t*>(dst),
                     page_size, mode == mode_Encrypt ? &m_ectx : &m_dctx, iv, mode);
+#endif
+}
+
+void AESCryptor::calc_hmac(const void* src, size_t len, uint8_t* dst, const uint8_t* key) const
+{
+#ifdef __APPLE__
+    CCHmac(kCCHmacAlgSHA224, key, 32, src, len, dst);
+#else
+    SHA256_CTX ctx;
+
+    uint8_t ipad[64];
+    for (size_t i = 0; i < 32; ++i)
+        ipad[i] = key[i] ^ 0x36;
+    memset(ipad + 32, 0x36, 32);
+
+    uint8_t opad[64] = {0};
+    for (size_t i = 0; i < 32; ++i)
+        opad[i] = key[i] ^ 0x5C;
+    memset(opad + 32, 0x5C, 32);
+
+    // Full hmac operation is sha224(opad + sha224(ipad + data))
+    SHA224_Init(&ctx);
+    SHA256_Update(&ctx, ipad, 64);
+    SHA256_Update(&ctx, static_cast<const uint8_t*>(src), len);
+    SHA256_Final(dst, &ctx);
+
+    SHA224_Init(&ctx);
+    SHA256_Update(&ctx, opad, 64);
+    SHA256_Update(&ctx, dst, SHA224_DIGEST_LENGTH);
+    SHA256_Final(dst, &ctx);
 #endif
 }
 

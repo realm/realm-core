@@ -476,6 +476,46 @@ TEST(TableView_Follows_Changes)
     CHECK_EQUAL(1, v.get_int(0,0));
 }
 
+
+TEST(TableView_Distinct_Follows_Changes)
+{
+    Table table;
+    table.add_column(type_Int, "first");
+    table.add_column(type_String, "second");
+    table.add_search_index(0);
+
+    table.add_empty_row(5);
+    for (int i = 0; i < 5; ++i) {
+        table.set_int(0, i, i);
+        table.set_string(1, i, "Foo");
+    }
+
+    TableView distinct_ints = table.get_distinct_view(0);
+    CHECK_EQUAL(5, distinct_ints.size());
+    CHECK(distinct_ints.is_in_sync());
+
+    // Check that adding a value that doesn't actually impact the
+    // view still invalidates the view (which is inspected for now).
+    table.add_empty_row();
+    table.set_int(0, 5, 4);
+    table.set_string(1, 5, "Foo");
+    CHECK(!distinct_ints.is_in_sync());
+    distinct_ints.sync_if_needed();
+    CHECK(distinct_ints.is_in_sync());
+    CHECK_EQUAL(5, distinct_ints.size());
+
+    // Check that adding a value that impacts the view invalidates the view.
+    distinct_ints.sync_if_needed();
+    table.add_empty_row();
+    table.set_int(0, 6, 10);
+    table.set_string(1, 6, "Foo");
+    CHECK(!distinct_ints.is_in_sync());
+    distinct_ints.sync_if_needed();
+    CHECK(distinct_ints.is_in_sync());
+    CHECK_EQUAL(6, distinct_ints.size());
+}
+
+
 TEST(TableView_SyncAfterCopy) {
     Table table;
     table.add_column(type_Int, "first");

@@ -32,6 +32,12 @@ namespace _impl {
 class WriteLogCollector;
 }
 
+// Thrown by SharedGroup::open if the lock file is already open in another
+// process which can't share mutexes with this process
+struct IncompatibleLockFile : std::runtime_error {
+    IncompatibleLockFile() : runtime_error("Incompatible lock file") { }
+};
+
 /// A SharedGroup facilitates transactions.
 ///
 /// When multiple threads or processes need to access a database
@@ -138,6 +144,9 @@ public:
     /// has undefined behavior.
     SharedGroup(unattached_tag) TIGHTDB_NOEXCEPT;
 
+    // close any open database, returning to the unattached state.
+    void close() TIGHTDB_NOEXCEPT;
+
     ~SharedGroup() TIGHTDB_NOEXCEPT;
 
     /// Attach this SharedGroup instance to the specified database
@@ -217,21 +226,27 @@ public:
     /// group. Doing so will result in undefined behavior.
     void reserve(std::size_t size_in_bytes);
 
-    // Querying for changes:
-    //
-    // NOTE:
-    // "changed" means that one or more commits has been made to the database
-    // since the SharedGroup (on which wait_for_change() is called) last
-    // started, committed, promoted or advanced a transaction.
-    //
-    // No distinction is made between changes done by another process
-    // and changes done by another thread in the same process as the caller.
-    //
-    // Has db been changed ?
+    /// Querying for changes:
+    ///
+    /// NOTE:
+    /// "changed" means that one or more commits has been made to the database
+    /// since the SharedGroup (on which wait_for_change() is called) last
+    /// started, committed, promoted or advanced a transaction.
+    ///
+    /// No distinction is made between changes done by another process
+    /// and changes done by another thread in the same process as the caller.
+    ///
+    /// Has db been changed ?
     bool has_changed();
 
-    // The calling thread goes to sleep until the database is changed.
-    void wait_for_change();
+    /// The calling thread goes to sleep until the database is changed, or
+    /// until wait_for_change_release() is called. Return true if the database
+    /// has changed, false if it might have. At most one thread may wait in 
+    /// wait_for_change() on any single SharedGroup.
+    bool wait_for_change();
+
+    /// release any thread waiting in wait_for_change() on *this* SharedGroup.
+    void wait_for_change_release();
 
     // Transactions:
 
@@ -299,6 +314,17 @@ public:
     /// a read transaction will not immediately release any versions.
     uint_fast64_t get_number_of_versions();
 
+    // Compact the database file.
+    // - The method will throw if called inside a transaction.
+    // - The method will return false if other SharedGroups are accessing the database
+    //   in which case compaction is not done.
+    // It will return true following succesful compaction.
+    // While compaction is in progress, attempts by other
+    // threads or processes to open the database will wait.
+    // Be warned that resource requirements for compaction is proportional to the amount
+    // of live data in the database.
+    bool compact();
+
 #ifdef TIGHTDB_DEBUG
     void test_ringbuf();
 #endif
@@ -321,7 +347,10 @@ private:
     util::File m_file;
     util::File::Map<SharedInfo> m_file_map; // Never remapped
     util::File::Map<SharedInfo> m_reader_map;
-    std::string m_file_path;
+    bool m_waiting_for_change;
+    std::string m_lockfile_path;
+    std::string m_db_path;
+    const char* m_key;
     enum TransactStage {
         transact_Ready,
         transact_Reading,
