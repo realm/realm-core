@@ -91,11 +91,11 @@ public:
                                     BinaryData* logs_buffer) TIGHTDB_NOEXCEPT;
 protected:
     static const size_t page_size = 4096; // file and memory mappings are always multiples of this size
-    static const size_t minimal_pages = 1; 
+    static const size_t minimal_pages = 1;
 
     // Layout of the commit logs preamble and header. The header contains a mutex, two
     // preambles and a flag indicating which preamble is in use. Changes to the commitlogs
-    // are crash safe because of the order of updates to the file. When commit logs are 
+    // are crash safe because of the order of updates to the file. When commit logs are
     // added, they are appended to the active file, the preamble is copied, the copy
     // is updated and sync'ed to disk. Then the flag selecting which preamble to use is
     // updated and sync'ed. This way, should we crash during updates, the old preamble
@@ -124,7 +124,7 @@ protected:
 
         // proper intialization:
         CommitLogPreamble(uint64_t version)
-        { 
+        {
             active_file_is_log_a = true;
             // The first commit will be from state 1 -> state 2, so we must set 1 initially
             begin_oldest_commit_range = begin_newest_commit_range = end_commit_range = version;
@@ -145,8 +145,8 @@ protected:
         CommitLogPreamble preamble_a;
         CommitLogPreamble preamble_b;
 
-        CommitLogHeader(uint64_t version) : preamble_a(version), preamble_b(version) { 
-            use_preamble_a = true; 
+        CommitLogHeader(uint64_t version) : preamble_a(version), preamble_b(version) {
+            use_preamble_a = true;
         }
     };
 
@@ -207,7 +207,7 @@ protected:
     // Ensure the file is open so that it can be resized or mapped
     void open_if_needed(CommitLogMetadata& log);
 
-    // Ensure the log files memory mapping is up to date (the mapping needs to be changed 
+    // Ensure the log files memory mapping is up to date (the mapping needs to be changed
     // if the size of the file has changed since the previous mapping).
     void remap_if_needed(CommitLogMetadata& log);
 
@@ -294,13 +294,13 @@ inline void WriteLogCollector::map_header_if_needed()
 
 // convenience methods for getting to buffers and logs.
 
-void WriteLogCollector::get_buffers_in_order(const CommitLogPreamble* preamble, 
+void WriteLogCollector::get_buffers_in_order(const CommitLogPreamble* preamble,
                                              const char*& first, const char*& second)
 {
     if (preamble->active_file_is_log_a) {
         first  = reinterpret_cast<char*>(m_log_b.map.get_addr());
         second = reinterpret_cast<char*>(m_log_a.map.get_addr());
-    } 
+    }
     else {
         first  = reinterpret_cast<char*>(m_log_a.map.get_addr());
         second = reinterpret_cast<char*>(m_log_b.map.get_addr());
@@ -376,7 +376,7 @@ void WriteLogCollector::cleanup_stale_versions(CommitLogPreamble* preamble)
         && preamble->last_version_synced < preamble->last_version_seen_locally)
         last_seen_version_number = preamble->last_version_synced;
 
-    // cerr << "oldest_version(" << last_seen_version_number << ")" << endl; 
+    // cerr << "oldest_version(" << last_seen_version_number << ")" << endl;
     if (last_seen_version_number >= preamble->begin_newest_commit_range) {
         // oldest file holds only stale commitlogs, so let's swap files and update the range
         preamble->active_file_is_log_a = !preamble->active_file_is_log_a;
@@ -442,7 +442,7 @@ version_type WriteLogCollector::internal_submit_log(const char* data, uint64_t s
 
 // Public methods:
 
-WriteLogCollector::~WriteLogCollector() TIGHTDB_NOEXCEPT 
+WriteLogCollector::~WriteLogCollector() TIGHTDB_NOEXCEPT
 {
 }
 
@@ -488,17 +488,17 @@ void WriteLogCollector::reset_log_management(version_type last_version)
                 preamble->begin_newest_commit_range = preamble->begin_oldest_commit_range;
                 preamble->active_file_is_log_a = ! preamble->active_file_is_log_a;
             }
-            // writepoint is somewhere in the active file. 
+            // writepoint is somewhere in the active file.
             // We scan from the start to find it.
             TIGHTDB_ASSERT(last_version >= preamble->begin_newest_commit_range);
             CommitLogMetadata* active_log = get_active_log(preamble);
             remap_if_needed(*active_log);
             version_type current_version;
-            const char* old_buffer; 
+            const char* old_buffer;
             const char* buffer;
             get_buffers_in_order(preamble, old_buffer, buffer);
             preamble->write_offset = 0;
-            for (current_version = preamble->begin_newest_commit_range; 
+            for (current_version = preamble->begin_newest_commit_range;
                  current_version < last_version;
                  current_version++) {
                 // advance write ptr to next buffer start:
@@ -620,7 +620,8 @@ void WriteLogCollector::get_commit_entries(version_type from_version, version_ty
         // resume once we've read past the final entry. The reason is that an intervening
         // call to set_oldest_version could shift the write point to the beginning of the
         // other file.
-        if (m_read_version+1 >= preamble->end_commit_range) break;
+        if (m_read_version+1 >= preamble->end_commit_range)
+            break;
         size = aligned_to(sizeof(uint64_t), size);
         m_read_offset = tmp_offset + size;
         m_read_version++;
@@ -634,11 +635,10 @@ void WriteLogCollector::submit_transact_log(BinaryData bd)
 }
 
 
-WriteLogCollector::version_type 
-WriteLogCollector::do_commit_write_transact(SharedGroup& sg, 
-	WriteLogCollector::version_type orig_version)
+WriteLogCollector::version_type
+WriteLogCollector::do_commit_write_transact(SharedGroup&,
+                                            WriteLogCollector::version_type orig_version)
 {
-    static_cast<void>(sg);
     char* data = m_transact_log_buffer.data();
     uint64_t size = m_transact_log_free_begin - data;
     version_type from_version = internal_submit_log(data,size);
@@ -651,7 +651,6 @@ WriteLogCollector::do_commit_write_transact(SharedGroup& sg,
 
 void WriteLogCollector::do_begin_write_transact(SharedGroup& sg)
 {
-    static_cast<void>(sg);
     m_transact_log_free_begin = m_transact_log_buffer.data();
     m_transact_log_free_end   = m_transact_log_free_begin + m_transact_log_buffer.size();
 }

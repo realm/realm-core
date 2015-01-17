@@ -36,7 +36,7 @@ public:
 };
 
 // Create a writelog collector and associate it with a filepath. You'll need one writelog
-// collector for each shared group. Commits from writelog collectors for a specific filepath 
+// collector for each shared group. Commits from writelog collectors for a specific filepath
 // may later be obtained through other writrlog collectors associated with said filepath.
 // The caller assumes ownership of the writelog collector and must destroy it, but only AFTER
 // destruction of the shared group using it.
