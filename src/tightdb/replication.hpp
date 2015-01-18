@@ -91,7 +91,7 @@ public:
     /// When operating in normal-mode
     /// - the log files are not updated in a crash safe way
     /// - the log files are removed when the session ends
-    /// - the log files are not assumed to be there when a session starts, but are 
+    /// - the log files are not assumed to be there when a session starts, but are
     ///   created on demand.
     virtual bool is_in_server_synchronization_mode();
 
@@ -107,7 +107,7 @@ public:
     /// 1`. References to the requested logs are stored in successive entries
     /// of `logs_buffer`. The calee retains ownership of the memory
     /// referenced by those entries, but the memory will remain accessible
-    /// to the caller until they are declared stale by calls to 'set_last_version_seen_locally' 
+    /// to the caller until they are declared stale by calls to 'set_last_version_seen_locally'
     /// and 'set_last_version_synced', OR until a new call to get_commit_entries() is made.
     virtual void get_commit_entries(version_type from_version, version_type to_version,
                                     BinaryData* logs_buffer) TIGHTDB_NOEXCEPT;

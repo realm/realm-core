@@ -117,8 +117,8 @@ protected:
         bool active_file_is_log_a;
 
         // The following are monotonically increasing:
-        uint64_t begin_oldest_commit_range; // for commits residing in in-active file
-        uint64_t begin_newest_commit_range; // for commits residing in the active file
+        uint64_t begin_oldest_commit_range; // for commits residing in inactive file
+        uint64_t begin_newest_commit_range; // for commits residing in active file
         uint64_t end_commit_range;
 
         // The log bringing us from state A to state A+1 is given the number A.
@@ -422,11 +422,9 @@ void WriteLogCollector::cleanup_stale_versions(CommitLogPreamble* preamble)
 // returns the current "from" version
 version_type WriteLogCollector::internal_submit_log(const char* data, uint_fast64_t size)
 {
-    version_type orig_version;
     map_header_if_needed();
     RobustLockGuard rlg(m_header.get_addr()->lock, &recover_from_dead_owner);
     CommitLogPreamble* preamble = get_preamble_for_write();
-    // cerr << "commit_write_transaction(" << orig_version << ")" << endl;
     CommitLogMetadata* active_log = get_active_log(preamble);
 
     // make sure the file is available for potential resizing
@@ -449,11 +447,10 @@ version_type WriteLogCollector::internal_submit_log(const char* data, uint_fast6
     write_ptr += sizeof (uint64_t);
     copy(data, data+size, write_ptr);
     active_log->map.sync();
-    // cerr << "    -- at: " << preamble->write_offset << ", " << size << endl;
 
     // update metadata to reflect the added commit log
     preamble->write_offset += aligned_to(sizeof (uint64_t), size + sizeof (uint64_t));
-    orig_version = preamble->end_commit_range;
+    version_type orig_version = preamble->end_commit_range;
     preamble->end_commit_range = orig_version+1;
     sync_header();
     return orig_version;
@@ -485,7 +482,7 @@ void WriteLogCollector::reset_log_management(version_type last_version)
         reset_header();
         reset_file(m_log_a);
         reset_file(m_log_b);
-        new(m_header.get_addr()) CommitLogHeader(last_version);
+        new (m_header.get_addr()) CommitLogHeader(last_version);
     }
     else {
         // for all other versions, the log files must be there:
@@ -675,7 +672,7 @@ WriteLogCollector::do_commit_write_transact(SharedGroup&,
 }
 
 
-void WriteLogCollector::do_begin_write_transact(SharedGroup& sg)
+void WriteLogCollector::do_begin_write_transact(SharedGroup&)
 {
     m_transact_log_free_begin = m_transact_log_buffer.data();
     m_transact_log_free_end   = m_transact_log_free_begin + m_transact_log_buffer.size();
