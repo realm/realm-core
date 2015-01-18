@@ -307,7 +307,7 @@ inline void WriteLogCollector::map_header_if_needed()
 {
     if (m_header.is_attached() == false) {
         File header_file(m_header_name, File::mode_Update);
-        m_header.map(header_file, File::access_ReadWrite, sizeof(CommitLogHeader));
+        m_header.map(header_file, File::access_ReadWrite, sizeof (CommitLogHeader));
     }
 }
 
@@ -377,8 +377,8 @@ void WriteLogCollector::reset_header()
     File::try_remove(m_header_name);
 
     File header_file(m_header_name, File::mode_Write);
-    header_file.resize(sizeof(CommitLogHeader));
-    m_header.map(header_file, File::access_ReadWrite, sizeof(CommitLogHeader));
+    header_file.resize(sizeof (CommitLogHeader));
+    m_header.map(header_file, File::access_ReadWrite, sizeof (CommitLogHeader));
 }
 
 
@@ -434,7 +434,7 @@ version_type WriteLogCollector::internal_submit_log(const char* data, uint_fast6
 
     // make sure we have space (allocate if not)
     File::SizeType size_needed =
-        aligned_to(sizeof(uint64_t), preamble->write_offset + sizeof(uint64_t) + size);
+        aligned_to(sizeof (uint64_t), preamble->write_offset + sizeof (uint64_t) + size);
     size_needed = aligned_to(page_size, size_needed);
     if (size_needed > active_log->file.get_size())
         active_log->file.resize(size_needed);
@@ -446,13 +446,13 @@ version_type WriteLogCollector::internal_submit_log(const char* data, uint_fast6
     // append data from write pointer and onwards:
     char* write_ptr = reinterpret_cast<char*>(active_log->map.get_addr()) + preamble->write_offset;
     *reinterpret_cast<uint64_t*>(write_ptr) = size;
-    write_ptr += sizeof(uint64_t);
+    write_ptr += sizeof (uint64_t);
     copy(data, data+size, write_ptr);
     active_log->map.sync();
     // cerr << "    -- at: " << preamble->write_offset << ", " << size << endl;
 
     // update metadata to reflect the added commit log
-    preamble->write_offset += aligned_to(sizeof(uint64_t), size + sizeof(uint64_t));
+    preamble->write_offset += aligned_to(sizeof (uint64_t), size + sizeof (uint64_t));
     orig_version = preamble->end_commit_range;
     preamble->end_commit_range = orig_version+1;
     sync_header();
@@ -527,8 +527,8 @@ void WriteLogCollector::reset_log_management(version_type last_version)
                 // advance write ptr to next buffer start:
                 uint_fast64_t size =
                     *reinterpret_cast<const uint64_t*>(buffer + preamble->write_offset);
-                uint_fast64_t tmp_offset = preamble->write_offset + sizeof(uint64_t);
-                size = aligned_to(sizeof(uint64_t), size);
+                uint_fast64_t tmp_offset = preamble->write_offset + sizeof (uint64_t);
+                size = aligned_to(sizeof (uint64_t), size);
                 preamble->write_offset = tmp_offset + size;
             }
             preamble->end_commit_range = current_version;
@@ -635,7 +635,7 @@ void WriteLogCollector::get_commit_entries(version_type from_version, version_ty
         // follow buffer layout
         uint_fast64_t size =
             *reinterpret_cast<const uint64_t*>(buffer + m_read_offset);
-        uint_fast64_t tmp_offset = m_read_offset + sizeof(uint64_t);
+        uint_fast64_t tmp_offset = m_read_offset + sizeof (uint64_t);
         if (m_read_version >= from_version) {
             // cerr << "  --at: " << m_read_offset << ", " << size << endl;
             *logs_buffer = BinaryData(buffer + tmp_offset, size);
@@ -648,7 +648,7 @@ void WriteLogCollector::get_commit_entries(version_type from_version, version_ty
         // write point to the beginning of the other file.
         if (m_read_version+1 >= preamble->end_commit_range)
             break;
-        size = aligned_to(sizeof(uint64_t), size);
+        size = aligned_to(sizeof (uint64_t), size);
         m_read_offset = tmp_offset + size;
         m_read_version++;
     }
