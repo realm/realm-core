@@ -116,7 +116,7 @@ size_t ParentNode::aggregate_local(QueryStateBase* st, size_t start, size_t end,
     }
 }
 
-size_t NotNode::find_first_local(size_t start, size_t end) TIGHTDB_OVERRIDE
+size_t NotNode::find_first_local(size_t start, size_t end)
 {
     if (start <= m_known_range_start && end >= m_known_range_end) {
         return find_first_covers_known(start, end);
