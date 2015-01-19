@@ -539,15 +539,16 @@ void WriteLogCollector::reset_log_management(version_type last_version)
 }
 
 
-void WriteLogCollector::set_last_version_synced(version_type last_seen_version_number)
-    TIGHTDB_NOEXCEPT
+void WriteLogCollector::set_last_version_synced(version_type version) TIGHTDB_NOEXCEPT
 {
     map_header_if_needed();
     RobustLockGuard rlg(m_header.get_addr()->lock, &recover_from_dead_owner);
     CommitLogPreamble* preamble = get_preamble_for_write();
-    preamble->last_version_synced = last_seen_version_number;
-    cleanup_stale_versions(preamble);
-    sync_header();
+    if (version > preamble->last_version_synced) {
+        preamble->last_version_synced = version;
+        cleanup_stale_versions(preamble);
+        sync_header();
+    }
 }
 
 
