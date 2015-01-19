@@ -3253,8 +3253,8 @@ TableView Table::get_distinct_view(size_t col_ndx)
 {
     TIGHTDB_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
 
-    TableView tv(*this, col_ndx);
-    tv.do_sync();
+    TableView tv(*this);
+    tv.sync_distinct_view(col_ndx);
     return tv;
 }
 
