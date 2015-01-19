@@ -29,14 +29,16 @@ using namespace tightdb::test_util;
 static const char realm_path[] = "/tmp/benchmark-common-tasks.tightdb";
 static const size_t repetitions[] = { 10, 100, 1000 };
 
-struct Benchmark {
+struct Benchmark
+{
     virtual const char* name() const = 0;
     virtual void setup(SharedGroup&) {}
     virtual void teardown(SharedGroup&) {}
     virtual void operator()(SharedGroup&) = 0;
 };
 
-struct AddTable : Benchmark {
+struct AddTable : Benchmark
+{
     const char* name() const { return "AddTable"; }
 
     void operator()(SharedGroup& group)
@@ -57,7 +59,8 @@ struct AddTable : Benchmark {
     }
 };
 
-struct BenchmarkWithStringsTable : Benchmark {
+struct BenchmarkWithStringsTable : Benchmark
+{
     void setup(SharedGroup& group)
     {
         WriteTransaction tr(group);
@@ -74,7 +77,8 @@ struct BenchmarkWithStringsTable : Benchmark {
     }
 };
 
-struct BenchmarkWithStrings : BenchmarkWithStringsTable {
+struct BenchmarkWithStrings : BenchmarkWithStringsTable
+{
     void setup(SharedGroup& group)
     {
         BenchmarkWithStringsTable::setup(group);
@@ -90,7 +94,8 @@ struct BenchmarkWithStrings : BenchmarkWithStringsTable {
     }
 };
 
-struct BenchmarkQuery : BenchmarkWithStrings {
+struct BenchmarkQuery : BenchmarkWithStrings
+{
     const char* name() const { return "Query"; }
 
     void operator()(SharedGroup& group)
@@ -101,7 +106,8 @@ struct BenchmarkQuery : BenchmarkWithStrings {
     }
 };
 
-struct BenchmarkSize : BenchmarkWithStrings {
+struct BenchmarkSize : BenchmarkWithStrings
+{
     const char* name() const { return "Size"; }
 
     void operator()(SharedGroup& group)
@@ -113,7 +119,8 @@ struct BenchmarkSize : BenchmarkWithStrings {
     }
 };
 
-struct BenchmarkSort : BenchmarkWithStrings {
+struct BenchmarkSort : BenchmarkWithStrings
+{
     const char* name() const { return "Sort"; }
 
     void operator()(SharedGroup& group)
@@ -124,7 +131,8 @@ struct BenchmarkSort : BenchmarkWithStrings {
     }
 };
 
-struct BenchmarkInsert : BenchmarkWithStringsTable {
+struct BenchmarkInsert : BenchmarkWithStringsTable
+{
     const char* name() const { return "Insert"; }
 
     void operator()(SharedGroup& group)
@@ -139,7 +147,8 @@ struct BenchmarkInsert : BenchmarkWithStringsTable {
     }
 };
 
-struct BenchmarkGetString : BenchmarkWithStrings {
+struct BenchmarkGetString : BenchmarkWithStrings
+{
     const char* name() const { return "GetString"; }
 
     void operator()(SharedGroup& group)
@@ -155,7 +164,8 @@ struct BenchmarkGetString : BenchmarkWithStrings {
     }
 };
 
-struct BenchmarkSetString : BenchmarkWithStrings {
+struct BenchmarkSetString : BenchmarkWithStrings
+{
     const char* name() const { return "SetString"; }
 
     void operator()(SharedGroup& group)
