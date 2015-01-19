@@ -96,7 +96,7 @@ TEST(LangBindHelper_InsertSubtable)
 }
 
 
-// FIXME: Move this test to test_table.cpp
+// FIXME: Move this test to test_tcpp
 TEST(LangBindHelper_SetSubtable)
 {
     Table t1;
@@ -7003,6 +7003,69 @@ TEST(LangBindHelper_VersionControl)
     }
 }
 
+namespace {
+
+void mythread_func(std::string path) 
+{
+    UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
+    SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
+    Group& g = const_cast<Group&>(sg.begin_read());
+    g.Verify();
+    TableRef trend = g.get_table("Trend");
+    TableRef point = g.get_table("Point");
+    for (int i=0; i<1000; ++i) {
+        LangBindHelper::promote_to_write(sg);
+        g.Verify();
+        int limit = random() % 10;
+        for (int k=0; k < limit; ++k) {
+            point->add_empty_row();
+            int pos = point->size()-1;
+            point->set_int(0, pos, random()%100);
+            LinkViewRef lv = trend->get_linklist(0,0);
+            lv->add(pos);
+            //g.Verify();
+        }
+        /*
+        LinkViewRef lv2 = trend->get_linklist(1,0);
+        while (lv2->size() > 30) {
+            lv2->remove(0);
+        }
+        g.Verify();
+        */
+        g.Verify();
+        LangBindHelper::commit_and_continue_as_read(sg);
+        g.Verify();
+    }
+    sg.end_read();
+}
+
+}
+TEST(Shared_LinkListCrash)
+{
+    const int num_threads = 4;
+    SHARED_GROUP_TEST_PATH(path);
+    UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
+    SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
+    {
+        WriteTransaction wt(sg);
+        TableRef points = wt.add_table("Point");
+        points->add_column(type_Int, "value");
+        points->add_empty_row();
+        TableRef trend = wt.add_table("Trend");
+        trend->add_column_link(type_LinkList, "points", *points);
+        trend->add_empty_row();
+        wt.commit();
+
+    }
+    Thread threads[num_threads];
+    for (int i =0; i<num_threads; ++i) {
+        threads[i].start(bind(mythread_func, string(path)));
+    }
+    for (int i =0; i<num_threads; ++i) {
+        threads[i].join();
+    }
+
+}
 
 
 #endif // TIGHTDB_ENABLE_REPLICATION
