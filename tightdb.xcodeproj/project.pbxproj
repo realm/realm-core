@@ -288,6 +288,8 @@
 		B159814B18CF560000E3C5DF /* demangle.hpp in Headers */ = {isa = PBXBuildFile; fileRef = B159814818CF560000E3C5DF /* demangle.hpp */; };
 		B159814C18CF560000E3C5DF /* super_int.hpp in Headers */ = {isa = PBXBuildFile; fileRef = B159814918CF560000E3C5DF /* super_int.hpp */; };
 		B159814E18CF562600E3C5DF /* test_safe_int_ops.cpp in Sources */ = {isa = PBXBuildFile; fileRef = B159814D18CF562600E3C5DF /* test_safe_int_ops.cpp */; };
+		F4C28BBD1A696DB600F8BB2A /* query_engine.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F4C28BBC1A696DB500F8BB2A /* query_engine.cpp */; };
+		F4C28BBE1A696DBB00F8BB2A /* query_engine.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F4C28BBC1A696DB500F8BB2A /* query_engine.cpp */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -597,6 +599,7 @@
 		B159814818CF560000E3C5DF /* demangle.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = demangle.hpp; sourceTree = "<group>"; };
 		B159814918CF560000E3C5DF /* super_int.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = super_int.hpp; sourceTree = "<group>"; };
 		B159814D18CF562600E3C5DF /* test_safe_int_ops.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = test_safe_int_ops.cpp; sourceTree = "<group>"; };
+		F4C28BBC1A696DB500F8BB2A /* query_engine.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = query_engine.cpp; path = tightdb/query_engine.cpp; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -675,6 +678,7 @@
 		3647DEEA14209C1200D56FD7 /* src */ = {
 			isa = PBXGroup;
 			children = (
+				F4C28BBC1A696DB500F8BB2A /* query_engine.cpp */,
 				3620DF0318B6CA7B003AD498 /* impl */,
 				52D7C4661852A01700633748 /* util */,
 				52F6359316B43C79006117C4 /* alloc.cpp */,
@@ -1326,6 +1330,7 @@
 				52C9B60E19B7406D00248011 /* exceptions.cpp in Sources */,
 				52D7C4821852A01700633748 /* file.cpp in Sources */,
 				3F5ED51019D08A11001FCFF4 /* file_mapper.cpp in Sources */,
+				F4C28BBD1A696DB600F8BB2A /* query_engine.cpp in Sources */,
 				365CCE59157CC37D00172BF8 /* group.cpp in Sources */,
 				365CCE80157CCB4100172BF8 /* group_shared.cpp in Sources */,
 				365CCE57157CC37D00172BF8 /* group_writer.cpp in Sources */,
@@ -1433,6 +1438,7 @@
 				4142C9471623478700B3B902 /* column.cpp in Sources */,
 				4142C9421623478700B3B902 /* column_binary.cpp in Sources */,
 				3FF6A2A11A02B1FC0074A601 /* column_link.cpp in Sources */,
+				F4C28BBE1A696DBB00F8BB2A /* query_engine.cpp in Sources */,
 				4142C9431623478700B3B902 /* column_mixed.cpp in Sources */,
 				4142C9451623478700B3B902 /* column_string.cpp in Sources */,
 				4142C9441623478700B3B902 /* column_string_enum.cpp in Sources */,

@@ -38,8 +38,8 @@ array_string_long.cpp column.cpp column_backlink.cpp column_binary.cpp column_li
 column_link_base.cpp column_linklist.cpp column_mixed.cpp column_string.cpp \
 column_string_enum.cpp column_table.cpp commit_log.cpp descriptor.cpp exceptions.cpp group.cpp \
 group_shared.cpp group_writer.cpp impl/output_stream.cpp importer.cpp index_string.cpp \
-lang_bind_helper.cpp link_view.cpp query.cpp row.cpp spec.cpp table.cpp table_view.cpp \
-unicode.cpp utilities.cpp version.cpp views.cpp
+lang_bind_helper.cpp link_view.cpp query.cpp query_engine.cpp row.cpp spec.cpp table.cpp \
+table_view.cpp unicode.cpp utilities.cpp version.cpp views.cpp
 
 # Format: CURRENT[:REVISION[:AGE]]
 #

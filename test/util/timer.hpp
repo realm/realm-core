@@ -40,6 +40,8 @@ public:
     Timer(Type type = type_RealTime): m_type(type) { reset(); }
 
     void reset();
+
+    /// Note: Pausing the timer causes an imprecision of ~1 tick per pause+unpause.
     void pause();
     void unpause();
 
