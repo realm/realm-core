@@ -96,7 +96,7 @@ TEST(LangBindHelper_InsertSubtable)
 }
 
 
-// FIXME: Move this test to test_tcpp
+// FIXME: Move this test to test_table.cpp
 TEST(LangBindHelper_SetSubtable)
 {
     Table t1;
