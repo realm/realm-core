@@ -91,14 +91,15 @@ public:
     /// When operating in normal-mode
     /// - the log files are not updated in a crash safe way
     /// - the log files are removed when the session ends
-    /// - the log files are not assumed to be there when a session starts, but are 
+    /// - the log files are not assumed to be there when a session starts, but are
     ///   created on demand.
     virtual bool is_in_server_synchronization_mode();
 
     /// Called by SharedGroup during a write transaction, when readlocks are recycled, to
     /// keep the commit log management in sync with what versions can possibly be interesting
     /// in the future.
-    virtual void set_last_version_seen_locally(version_type last_seen_version_number) TIGHTDB_NOEXCEPT;
+    virtual void set_last_version_seen_locally(version_type last_seen_version_number)
+        TIGHTDB_NOEXCEPT;
 
     /// Get all transaction logs between the specified versions. The number
     /// of requested logs is exactly `to_version - from_version`. If this
@@ -107,23 +108,24 @@ public:
     /// 1`. References to the requested logs are stored in successive entries
     /// of `logs_buffer`. The calee retains ownership of the memory
     /// referenced by those entries, but the memory will remain accessible
-    /// to the caller until they are declared stale by calls to 'set_last_version_seen_locally' 
+    /// to the caller until they are declared stale by calls to 'set_last_version_seen_locally'
     /// and 'set_last_version_synced', OR until a new call to get_commit_entries() is made.
     virtual void get_commit_entries(version_type from_version, version_type to_version,
                                     BinaryData* logs_buffer) TIGHTDB_NOEXCEPT;
 
-    /// Support for global sync. The commit logs will be retained until
-    /// they grow older than both of the versions indicated by 'set_last_versions_seen_locally'
-    /// and 'set_last_version_synced'. Providing a version number of zero disables
-    /// the use of sync versioning. Providing a non-zero version number enables the
-    /// use of sync versioning.
-    virtual void set_last_version_synced(version_type last_seen_version_number) TIGHTDB_NOEXCEPT;
+    /// Set the latest version that is known to be received and accepted by the
+    /// server. All later versions are guaranteed to be available to the caller
+    /// of get_commit_entries(). This function is guaranteed to have no effect,
+    /// if the specified version is earlier than a version, that has already
+    /// been set.
+    virtual void set_last_version_synced(version_type version) TIGHTDB_NOEXCEPT;
 
     /// Get the value set by last call to 'set_last_version_synced'
     /// If 'end_version_number' is non null, a limit to version numbering is returned.
     /// The limit returned is the version number of the latest commit.
     /// If sync versioning is disabled, the last version seen locally is returned.
-    virtual version_type get_last_version_synced(version_type* end_version_number = 0) TIGHTDB_NOEXCEPT;
+    virtual version_type get_last_version_synced(version_type* end_version_number = 0)
+        TIGHTDB_NOEXCEPT;
 
     /// Submit a transact log directly into the system bypassing the normal
     /// collection of replication entries. This is used to add a transactlog
