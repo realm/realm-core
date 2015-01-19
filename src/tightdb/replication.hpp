@@ -50,8 +50,8 @@ namespace tightdb {
 
 
 
-/// Replication is enabled by passing an instance of an implementation
-/// of this class to the SharedGroup constructor.
+/// Replication is enabled by passing an instance of an implementation of this
+/// class to the SharedGroup constructor.
 class Replication {
 public:
     // Be sure to keep this type aligned with what is actually used in
@@ -254,8 +254,10 @@ public:
 
     class BadTransactLog; // Exception
 
-    /// Called by the local coordinator to apply a transaction log
-    /// received from another local coordinator.
+    /// Apply a foreign transaction log to the specified target group. This is
+    /// done in a way that prevents a new local transaction log from being
+    /// created, even when replication is otherwise enabled in that target
+    /// group.
     ///
     /// \param apply_log If specified, and the library was compiled in
     /// debug mode, then a line describing each individual operation
@@ -317,13 +319,6 @@ protected:
     /// Must be called only from do_begin_write_transact(),
     /// do_commit_write_transact(), or do_rollback_write_transact().
     static Group& get_group(SharedGroup&) TIGHTDB_NOEXCEPT;
-
-    // Part of a temporary ugly hack to avoid generating new
-    // transaction logs during application of ones that have olready
-    // been created elsewhere. See
-    // ReplicationImpl::do_begin_write_transact() in
-    // tightdb/replication/simplified/provider.cpp for more on this.
-    static void set_replication(Group&, Replication*) TIGHTDB_NOEXCEPT;
 
     /// Must be called only from do_begin_write_transact(),
     /// do_commit_write_transact(), or do_rollback_write_transact().
