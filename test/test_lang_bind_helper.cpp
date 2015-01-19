@@ -7007,6 +7007,7 @@ namespace {
 
 void mythread_func(std::string path) 
 {
+    Random random(random_int<unsigned long>());
     UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
     SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
     Group& g = const_cast<Group&>(sg.begin_read());
@@ -7016,11 +7017,11 @@ void mythread_func(std::string path)
     for (int i=0; i<1000; ++i) {
         LangBindHelper::promote_to_write(sg);
         g.Verify();
-        int limit = random() % 10;
+        int limit = random.draw_int_mod(10);
         for (int k=0; k < limit; ++k) {
             point->add_empty_row();
             int pos = point->size()-1;
-            point->set_int(0, pos, random()%100);
+            point->set_int(0, pos, random.draw_int_mod(100));
             LinkViewRef lv = trend->get_linklist(0,0);
             lv->add(pos);
             //g.Verify();
