@@ -255,7 +255,8 @@ public:
 
     /// Apply a foreign transaction log to the specified target group. This is
     /// done in a way that prevents a new local transaction log from being
-    /// created.
+    /// created, even when replication is otherwise enabled in that target
+    /// group.
     ///
     /// \param apply_log If specified, and the library was compiled in
     /// debug mode, then a line describing each individual operation
