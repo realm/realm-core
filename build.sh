@@ -645,6 +645,7 @@ EOF
         fi
 
         enable_encryption="$(get_config_param "ENABLE_ENCRYPTION")" || return 1
+        echo "Encryption enabled: ${enable_encryption}"
 
         export TIGHTDB_ANDROID="1"
         mkdir -p "$ANDROID_DIR" || exit 1
@@ -701,10 +702,6 @@ EOF
         tightdb_version="$(sh build.sh get-version)" || exit
         dir_name="core-$tightdb_version"
         file_name="realm-core-android-$tightdb_version.tar.gz"
-        if [ $enable_encryption = yes ]; then
-            dir_name="$dir_name-encryption"
-            file_name="realm-core-android-$tightdb_version-encryption.tar.gz"
-        fi
 
         echo "Create tar.gz file $file_name"
         rm -f "$TIGHTDB_HOME/$file_name" || exit 1
