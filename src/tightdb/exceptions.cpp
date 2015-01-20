@@ -57,10 +57,26 @@ const char* const LogicError::wrong_kind_of_table = "Wrong kind of table";
 
 const char* const LogicError::detached_accessor = "Detached accessor";
 
+const char* NoSuchTable::what() const TIGHTDB_NOEXCEPT_OR_NOTHROW
+{
+    return TIGHTDB_VER_CHUNK " No such table exists";
+}
 const char* const LogicError::no_search_index = "Column has no search index";
 
+const char* TableNameInUse::what() const TIGHTDB_NOEXCEPT_OR_NOTHROW
+{
+    return TIGHTDB_VER_CHUNK " The specified table name is already in use";
+}
 const char* const LogicError::no_primary_key = "Table has no primary key";
 
+const char* CrossTableLinkTarget::what() const TIGHTDB_NOEXCEPT_OR_NOTHROW
+{
+    return TIGHTDB_VER_CHUNK " Table is target of cross-table link columns";
+}
 const char* const LogicError::has_primary_key = "Primary key already added";
 
+const char* DescriptorMismatch::what() const TIGHTDB_NOEXCEPT_OR_NOTHROW
+{
+    return TIGHTDB_VER_CHUNK " Table descriptor mismatch";
+}
 const char* const LogicError::unique_constraint_violation = "Unique constraint violation";
