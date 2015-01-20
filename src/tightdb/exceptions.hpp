@@ -40,7 +40,6 @@ class RuntimeError: public std::runtime_error {
 public:
     /// RuntimeError prepends the contents of TIGHTDB_VER_CHUNK to the message,
     /// so that what() will contain information about the library version.
-    /// Call message()
     RuntimeError(const std::string& message);
     RuntimeError(const RuntimeError& other);
 
