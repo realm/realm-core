@@ -1,3 +1,10 @@
+libtightdb (0.87.6~@CODENAME@-1) UNRELEASED; urgency=low
+
+  * Tracking upstream release.
+
+ -- Kenneth Geisshirt <kg@realm.io>  Tue, 20 Jan 2015 16:51:56 +0100
+
+
 libtightdb (0.87.5~@CODENAME@-1) UNRELEASED; urgency=low
 
   * Tracking upstream release.
