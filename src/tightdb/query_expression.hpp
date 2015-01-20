@@ -1240,7 +1240,7 @@ template <> class Columns<Link> : public Subexpr2<Link>
 public:
     Query is_null() {
         if (m_link_map.m_link_columns.size() > 1)
-            throw std::runtime_error("Cannot find null-links in a linked-to table (link()...is_null() not supported).");
+            throw RuntimeError("Cannot find null-links in a linked-to table (link()...is_null() not supported).");
         // Todo, it may be useful to support the above, but we would need to figure out an intuitive behaviour
         return *new UnaryLinkCompare(m_link_map);
     }

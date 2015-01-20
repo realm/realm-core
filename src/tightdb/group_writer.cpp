@@ -337,7 +337,7 @@ pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
 
     size_t min_file_size = logical_file_size;
     if (int_add_with_overflow_detect(min_file_size, extend_size))
-        throw runtime_error("File size overflow");
+        throw RuntimeError("File size overflow");
 
     // We double the size until we reach 'stop_doubling_size'. From
     // then on we increment the size in steps of

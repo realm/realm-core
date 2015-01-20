@@ -530,7 +530,7 @@ payload:
                 if(s.length() > 100)
                     s = s.substr(0, 100);
                 sprintf(buf, "Wrong number of delimitors around line %lld (+|- 3) in csv file. First few characters of line: %s", static_cast<unsigned long long>(m_row - 1),  s.c_str());
-                throw runtime_error(buf);
+                throw RuntimeError(buf);
             }
         }
 
@@ -705,7 +705,7 @@ size_t Importer::import_csv(FILE* file, Table& table, vector<DataType> *scheme2,
                         ", but in row " << imported_rows << " of cvs file," << "the field contained '" <<
                         payload[row][col].c_str() << "' which is of another type";
 
-                    throw runtime_error(sstm.str());
+                    throw RuntimeError(sstm.str());
                 }
             }
 

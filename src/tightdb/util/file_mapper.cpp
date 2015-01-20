@@ -142,7 +142,7 @@ void add_mapping(void* addr, size_t size, int fd, File::AccessMode access, const
     struct stat st;
     if (fstat(fd, &st)) {
         int err = errno; // Eliminate any risk of clobbering
-        throw std::runtime_error(get_errno_msg("fstat() failed: ", err));
+        throw RuntimeError(get_errno_msg("fstat() failed: ", err));
     }
 
     if (st.st_size > 0 && static_cast<size_t>(st.st_size) < page_size)
@@ -179,7 +179,7 @@ void add_mapping(void* addr, size_t size, int fd, File::AccessMode access, const
         fd = dup(fd);
         if (fd == -1) {
             int err = errno; // Eliminate any risk of clobbering
-            throw std::runtime_error(get_errno_msg("dup() failed: ", err));
+            throw RuntimeError(get_errno_msg("dup() failed: ", err));
         }
 
         mappings_for_file f;
@@ -227,7 +227,7 @@ void remove_mapping(void* addr, size_t size)
             if(::close(it->info->fd) != 0) {
                 int err = errno; // Eliminate any risk of clobbering
                 if(err == EBADF || err == EIO) // todo, how do we handle EINTR?
-                    throw std::runtime_error(get_errno_msg("close() failed: ", err));                
+                    throw RuntimeError(get_errno_msg("close() failed: ", err));
             }
             mappings_by_file.erase(it);
             break;
@@ -240,7 +240,7 @@ void* mmap_anon(size_t size)
     void* addr = ::mmap(0, size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
     if (addr == MAP_FAILED) {
         int err = errno; // Eliminate any risk of clobbering
-        throw std::runtime_error(get_errno_msg("mmap() failed: ", err));
+        throw RuntimeError(get_errno_msg("mmap() failed: ", err));
     }
     return addr;
 }
@@ -281,7 +281,7 @@ void* mmap(int fd, size_t size, File::AccessMode access, const char* encryption_
     }
 
     int err = errno; // Eliminate any risk of clobbering
-    throw std::runtime_error(get_errno_msg("mmap() failed: ", err));
+    throw RuntimeError(get_errno_msg("mmap() failed: ", err));
 }
 
 void munmap(void* addr, size_t size) TIGHTDB_NOEXCEPT
@@ -291,7 +291,7 @@ void munmap(void* addr, size_t size) TIGHTDB_NOEXCEPT
 #endif
     if(::munmap(addr, size) != 0) {
         int err = errno;
-        throw std::runtime_error(get_errno_msg("munmap() failed: ", err));
+        throw RuntimeError(get_errno_msg("munmap() failed: ", err));
     }
 }
 
@@ -313,7 +313,7 @@ void* mremap(int fd, void* old_addr, size_t old_size, File::AccessMode a, size_t
             m->size = rounded_new_size;
             if (i != 0) {
                 int err = errno;
-                throw std::runtime_error(get_errno_msg("munmap() failed: ", err));
+                throw RuntimeError(get_errno_msg("munmap() failed: ", err));
             }
             return new_addr;
         }
@@ -327,12 +327,12 @@ void* mremap(int fd, void* old_addr, size_t old_size, File::AccessMode a, size_t
     if (new_addr != MAP_FAILED)
         return new_addr;
     int err = errno; // Eliminate any risk of clobbering
-    throw std::runtime_error(get_errno_msg("mremap(): failed: ", err));
+    throw RuntimeError(get_errno_msg("mremap(): failed: ", err));
 #else
     void* new_addr = mmap(fd, new_size, a, nullptr);
     if(::munmap(old_addr, old_size) != 0) {
         int err = errno;
-        throw std::runtime_error(get_errno_msg("munmap() failed: ", err));
+        throw RuntimeError(get_errno_msg("munmap() failed: ", err));
     }
     return new_addr;
 #endif
@@ -364,7 +364,7 @@ void msync(void* addr, size_t size)
     // for a discussion of this related to core data.
     if (::msync(addr, size, MS_SYNC) != 0) {
         int err = errno; // Eliminate any risk of clobbering
-        throw std::runtime_error(get_errno_msg("msync() failed: ", err));
+        throw RuntimeError(get_errno_msg("msync() failed: ", err));
     }
 }
 

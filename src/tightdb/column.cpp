@@ -255,7 +255,7 @@ void TreeWriter::ParentLevel::add_child_ref(ref_type child_ref, size_t elems_in_
             size_t next_level_elems_per_child = m_max_elems_per_child;
             if (int_multiply_with_overflow_detect(next_level_elems_per_child,
                                                   TIGHTDB_MAX_BPNODE_SIZE))
-                throw runtime_error("Overflow in number of elements per child");
+                throw RuntimeError("Overflow in number of elements per child");
             m_prev_parent_level.reset(new ParentLevel(alloc, m_out,
                                                       next_level_elems_per_child)); // Throws
         }

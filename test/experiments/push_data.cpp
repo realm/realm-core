@@ -59,11 +59,11 @@ int main(int argc, const char* const argv[])
     }
 
     Group group(database_file.c_str());
-    if (!group.is_valid()) throw runtime_error("Failed to open database");
+    if (!group.is_valid()) throw RuntimeError("Failed to open database");
 
     {
         if (group.has_table("my_table") && !group.has_table<MyTable>("my_table"))
-            throw runtime_error("Table type mismatch");
+            throw RuntimeError("Table type mismatch");
         MyTable::Ref table = group.get_table<MyTable>("my_table");
 
         int counter = 0;

@@ -262,7 +262,7 @@ bool run_tests()
                 in >> seed;
                 bool bad = !in || in.get() != char_traits<char>::eof();
                 if (bad)
-                    throw runtime_error("Bad random seed");
+                    throw RuntimeError("Bad random seed");
             }
             cout << "Random seed: "<<seed<<"\n\n";
             random_seed(seed);
@@ -318,7 +318,7 @@ bool run_tests()
             bool bad = !in || in.get() != char_traits<char>::eof() ||
                 num_threads < 1 || num_threads > 1024;
             if (bad)
-                throw runtime_error("Bad number of threads");
+                throw RuntimeError("Bad number of threads");
             if (num_threads > 1)
                 cout << "Number of test threads: "<<num_threads<<"\n\n";
         }

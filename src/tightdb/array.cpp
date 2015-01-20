@@ -1352,7 +1352,7 @@ size_t Array::calc_aligned_byte_size(size_t size, int width)
         byte_size = header_size + size * bytes_per_elem;
     }
     if (overflow)
-        throw runtime_error("Byte size overflow");
+        throw RuntimeError("Byte size overflow");
     TIGHTDB_ASSERT(byte_size > 0);
     size_t aligned_byte_size = ((byte_size-1) | 7) + 1; // 8-byte alignment
     return aligned_byte_size;

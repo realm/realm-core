@@ -372,7 +372,7 @@ inline std::size_t BasicArray<T>::calc_aligned_byte_size(std::size_t size)
     std::size_t max = std::numeric_limits<std::size_t>::max();
     std::size_t max_2 = max & ~size_t(7); // Allow for upwards 8-byte alignment
     if (size > (max_2 - header_size) / sizeof (T))
-        throw std::runtime_error("Byte size overflow");
+        throw RuntimeError("Byte size overflow");
     size_t byte_size = header_size + size * sizeof (T);
     TIGHTDB_ASSERT(byte_size > 0);
     size_t aligned_byte_size = ((byte_size-1) | 7) + 1; // 8-byte alignment

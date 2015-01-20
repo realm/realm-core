@@ -30,10 +30,10 @@
 
 namespace tightdb {
 
-class LogFileError: public std::runtime_error {
+class LogFileError: public RuntimeError {
 public:
     LogFileError(std::string file_name):
-        std::runtime_error(file_name)
+        RuntimeError(file_name)
     {
     }
 };

@@ -34,8 +34,8 @@ class WriteLogCollector;
 
 // Thrown by SharedGroup::open if the lock file is already open in another
 // process which can't share mutexes with this process
-struct IncompatibleLockFile : std::runtime_error {
-    IncompatibleLockFile() : runtime_error("Incompatible lock file") { }
+struct IncompatibleLockFile : RuntimeError {
+    IncompatibleLockFile() : RuntimeError("Incompatible lock file") { }
 };
 
 /// A SharedGroup facilitates transactions.

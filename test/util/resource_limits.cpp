@@ -1,6 +1,7 @@
 #include <stdexcept>
 
 #include <tightdb/util/assert.hpp>
+#include <tightdb/exceptions.hpp>
 
 #include "resource_limits.hpp"
 
@@ -32,7 +33,7 @@ long get_rlimit(Resource resource, bool hard)
     rlimit rlimit;
     int status = getrlimit(resource_2, &rlimit);
     if (status < 0)
-        throw runtime_error("getrlimit() failed");
+        throw RuntimeError("getrlimit() failed");
     rlim_t value = hard ? rlimit.rlim_max : rlimit.rlim_cur;
     return value == RLIM_INFINITY ? -1 : long(value);
 }
@@ -49,12 +50,12 @@ void set_rlimit(Resource resource, long value, bool hard)
     rlimit rlimit;
     int status = getrlimit(resource_2, &rlimit);
     if (status < 0)
-        throw runtime_error("getrlimit() failed");
+        throw RuntimeError("getrlimit() failed");
     rlim_t value_2 = value < 0 ? RLIM_INFINITY : rlim_t(value);
     (hard ? rlimit.rlim_max : rlimit.rlim_cur) = value_2;
     status = setrlimit(resource_2, &rlimit);
     if (status < 0)
-        throw runtime_error("setrlimit() failed");
+        throw RuntimeError("setrlimit() failed");
 }
 
 } // anonymous namespace
@@ -99,17 +100,17 @@ bool system_has_rlimit(Resource) TIGHTDB_NOEXCEPT
 
 long get_hard_rlimit(Resource)
 {
-    throw runtime_error("Not supported");
+    throw RuntimeError("Not supported");
 }
 
 long get_soft_rlimit(Resource)
 {
-    throw runtime_error("Not supported");
+    throw RuntimeError("Not supported");
 }
 
 void set_soft_rlimit(Resource, long)
 {
-    throw runtime_error("Not supported");
+    throw RuntimeError("Not supported");
 }
 
 #endif // ! TIGHTDB_HAVE_POSIX_RLIMIT
