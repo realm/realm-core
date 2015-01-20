@@ -59,7 +59,7 @@ StringIndex::key_type StringIndex::GetLastKey() const
 void StringIndex::insert_with_offset(size_t row_ndx, StringData value, size_t offset)
 {
     // Create 4 byte index key
-    key_type key = create_key(value.substr(offset));
+    key_type key = create_key(value, offset);
 
     TreeInsert(row_ndx, key, offset, value); // Throws
 }
@@ -70,7 +70,7 @@ void StringIndex::InsertRowList(size_t ref, size_t offset, StringData value)
     TIGHTDB_ASSERT(!m_array->is_inner_bptree_node()); // only works in leaves
 
     // Create 4 byte index key
-    key_type key = create_key(value.substr(offset));
+    key_type key = create_key(value, offset);
 
     // Get subnode table
     Allocator& alloc = m_array->get_alloc();
@@ -473,6 +473,12 @@ void StringIndex::distinct(Column& result) const
             }
         }
     }
+   
+    
+ //   static_cast<ColumnBase*>(m_target_column)->get_p
+//    StringData sd = m_get_func(m_target_column, 1, buf);
+
+
 }
 
 void StringIndex::adjust_row_indexes(size_t min_row_ndx, int diff)
@@ -544,7 +550,7 @@ void StringIndex::DoDelete(size_t row_ndx, StringData value, size_t offset)
     TIGHTDB_ASSERT(m_array->size() == values.size()+1);
 
     // Create 4 byte index key
-    key_type key = create_key(value.substr(offset));
+    key_type key = create_key(value, offset);
 
     const size_t pos = values.lower_bound_int(key);
     const size_t pos_refs = pos + 1; // first entry in refs points to offsets
@@ -615,7 +621,7 @@ void StringIndex::do_update_ref(StringData value, size_t row_ndx, size_t new_row
     TIGHTDB_ASSERT(m_array->size() == values.size()+1);
 
     // Create 4 byte index key
-    key_type key = create_key(value.substr(offset));
+    key_type key = create_key(value, offset);
 
     size_t pos = values.lower_bound_int(key);
     size_t pos_refs = pos + 1; // first entry in refs points to offsets

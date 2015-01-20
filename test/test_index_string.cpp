@@ -729,4 +729,20 @@ TEST(StringIndex_Bug1)
     col2.destroy();
 }
 
+
+TEST(StringIndex_Null)
+{
+    // Create a column with string values
+    ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
+    AdaptiveStringColumn col(Allocator::get_default(), ref);
+
+    col.add("");
+    col.add(StringData());
+
+    const StringIndex& ndx = *col.create_search_index();
+
+    const size_t r1 = ndx.find_first(StringData());
+    CHECK_EQUAL(r1, 1);
+}
+
 #endif // TEST_INDEX_STRING

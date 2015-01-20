@@ -111,6 +111,7 @@ public:
     typedef int32_t key_type;
 
     static key_type create_key(StringData) TIGHTDB_NOEXCEPT;
+    static key_type create_key(StringData, size_t) TIGHTDB_NOEXCEPT;
 
 private:
     void* m_target_column;
@@ -231,6 +232,23 @@ inline StringIndex::key_type StringIndex::create_key(StringData str) TIGHTDB_NOE
     key |= (key_type(static_cast<unsigned char>(str[0])) << 24);
   none:
     return key;
+}
+
+inline StringIndex::key_type StringIndex::create_key(StringData str, size_t offset) TIGHTDB_NOEXCEPT
+{
+    if (str.is_null())
+        return 0;
+
+    size_t tail = str.size() - offset;
+    if (tail <= 3) {
+        char buf[4] = { ' ', ' ', ' ', ' ' };
+        memcpy(buf, str.data() + offset, tail);
+        return create_key(StringData(buf, tail + 1));
+    }
+    else {
+        return create_key(str.substr(offset));
+    }
+
 }
 
 template <class T> void StringIndex::insert(size_t row_ndx, T value, size_t num_rows, bool is_append)

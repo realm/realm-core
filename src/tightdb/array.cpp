@@ -3001,10 +3001,11 @@ template <IndexMethod method, class T> size_t Array::index_string(StringData val
     bool is_inner_node = m_is_inner_bptree_node;
     typedef StringIndex::key_type key_type;
     key_type key;
+    size_t stringoffset = 0;
 
 top:
     // Create 4 byte index key
-    key = StringIndex::create_key(value_2);
+    key = StringIndex::create_key(value, stringoffset);
 
     for (;;) {
         // Get subnode table
@@ -3075,7 +3076,7 @@ top:
                 // for integer index, get_func fills out 'buffer' and makes str point at it
                 char buffer[8];
                 StringData str = (*get_func)(column, first_row_ref, buffer);
-                if (str != value) {
+                if (str.is_null() != value.is_null() || str != value) {
                     if (count)
                         return 0;
                     return allnocopy ? size_t(FindRes_not_found) : first ? not_found : 0;
@@ -3131,10 +3132,10 @@ top:
         width = get_width_from_header(header);
         is_inner_node = get_is_inner_bptree_node_from_header(header);
 
-        if (value_2.size() <= 4)
-            value_2 = StringData();
+        if (value.size() - stringoffset <= 4)
+            stringoffset = value.size(); // finished parsing entire input string
         else
-            value_2 = value_2.substr(4);
+            stringoffset += 4;
 
         goto top;
     }
