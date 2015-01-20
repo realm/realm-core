@@ -3795,7 +3795,7 @@ pair<int64_t, int64_t> Array::get_two(const char* header, size_t ndx) TIGHTDB_NO
     const char* data = get_data_from_header(header);
     int width = get_width_from_header(header);
     pair<int64_t, int64_t> p = ::get_two(data, width, ndx);
-    return make_pair(int64_t(p.first), int64_t(p.second));
+    return make_pair(p.first, p.second);
 }
 
 

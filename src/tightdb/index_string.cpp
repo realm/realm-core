@@ -473,12 +473,6 @@ void StringIndex::distinct(Column& result) const
             }
         }
     }
-   
-    
- //   static_cast<ColumnBase*>(m_target_column)->get_p
-//    StringData sd = m_get_func(m_target_column, 1, buf);
-
-
 }
 
 void StringIndex::adjust_row_indexes(size_t min_row_ndx, int diff)

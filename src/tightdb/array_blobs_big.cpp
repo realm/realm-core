@@ -23,7 +23,7 @@ void ArrayBigBlobs::add(BinaryData value, bool add_zero_term)
         ArrayBlob new_blob(m_alloc);
         new_blob.create(); // Throws
         new_blob.add(value.data(), value.size(), add_zero_term); // Throws
-        Array::add(int_fast64_t(new_blob.get_ref())); // Throws
+        Array::add(static_cast<int64_t>(new_blob.get_ref())); // Throws
     }
 }
 
@@ -44,7 +44,7 @@ void ArrayBigBlobs::set(std::size_t ndx, BinaryData value, bool add_zero_term)
         new_blob.create(); // Throws
         new_blob.add(value.data(), value.size(), add_zero_term); // Throws
         ref = new_blob.get_ref();
-        Array::set(ndx, int_fast64_t(ref));
+        Array::set_as_ref(ndx, ref);
         return;
     }
     else if (ref != 0 && value.data() != null_ptr) {
