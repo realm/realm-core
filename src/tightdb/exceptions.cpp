@@ -3,16 +3,21 @@
 
 using namespace tightdb;
 
+namespace {
+    const char* chomp_version_chunk(const char* msg)
+    {
+        size_t len = strlen(msg);
+        static const char ver[] = TIGHTDB_VER_CHUNK;
+        if (len > sizeof(ver) && strncmp(msg, ver, sizeof(ver) - 1) == 0) {
+            return msg + sizeof(ver);
+        }
+        return msg;
+    }
+}
+
 const char* ExceptionWithVersionInWhat::message() const TIGHTDB_NOEXCEPT_OR_NOTHROW
 {
-    const char* msg = what();
-    size_t len = strlen(msg);
-    static const char ver[] = TIGHTDB_VER_CHUNK;
-    if (len > sizeof(ver)) {
-        // Assume that what() actually included the version string.
-        return msg + sizeof(ver);
-    }
-    return msg;
+    return chomp_version_chunk(what());
 }
 
 const char* Exception::version() const TIGHTDB_NOEXCEPT_OR_NOTHROW
@@ -32,14 +37,7 @@ RuntimeError::RuntimeError(const RuntimeError& other):
 
 const char* RuntimeError::message() const TIGHTDB_NOEXCEPT_OR_NOTHROW
 {
-    const char* msg = what();
-    size_t len = strlen(msg);
-    static const char ver[] = TIGHTDB_VER_CHUNK;
-    if (len > sizeof(ver)) {
-        // Assume that what() actually included the version string.
-        return msg + sizeof(ver);
-    }
-    return msg;
+    return chomp_version_chunk(what());
 }
 
 const char* RuntimeError::version() const TIGHTDB_NOEXCEPT_OR_NOTHROW
