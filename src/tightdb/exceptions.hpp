@@ -47,6 +47,7 @@ public:
     /// message() returns the error description without embedded release info.
     /// Default implementation has the precondition that what() returns a string
     /// that is prepended with the current release version.
+    /// FIXME: Declare what() final (C++11) to secure the precondition.
     virtual const char* message() const TIGHTDB_NOEXCEPT_OR_NOTHROW;
 
     /// version() returns the version of the TightDB library that threw this exception.
