@@ -35,48 +35,59 @@ const char* RuntimeError::version() const TIGHTDB_NOEXCEPT_OR_NOTHROW
     return TIGHTDB_VER_STRING;
 }
 
-const char* const LogicError::string_too_big = "String too big";
 
-const char* const LogicError::binary_too_big = "Binary too big";
-
-const char* const LogicError::table_name_too_long = "Table name too long";
-
-const char* const LogicError::column_name_too_long = "Column name too long";
-
-const char* const LogicError::table_index_out_of_range = "Table index out of range";
-
-const char* const LogicError::row_index_out_of_range = "Row index out of range";
-
-const char* const LogicError::column_index_out_of_range = "Column index out of range";
-
-const char* const LogicError::illegal_combination = "Illegal combination";
-
-const char* const LogicError::type_mismatch = "Type mismatch";
-
-const char* const LogicError::wrong_kind_of_table = "Wrong kind of table";
-
-const char* const LogicError::detached_accessor = "Detached accessor";
+const char* LogicError::get_message_for_error(LogicError::error_kind kind) TIGHTDB_NOEXCEPT_OR_NOTHROW
+{
+    switch (kind) {
+        case LogicError::string_too_big:
+            return TIGHTDB_VER_CHUNK " String too big";
+        case LogicError::binary_too_big:
+            return TIGHTDB_VER_CHUNK " Binary too big";
+        case LogicError::table_name_too_long:
+            return TIGHTDB_VER_CHUNK " Table name too long";
+        case LogicError::column_name_too_long:
+            return TIGHTDB_VER_CHUNK " Column name too long";
+        case LogicError::table_index_out_of_range:
+            return TIGHTDB_VER_CHUNK " Table index out of range";
+        case LogicError::row_index_out_of_range:
+            return TIGHTDB_VER_CHUNK " Row index out of range";
+        case LogicError::column_index_out_of_range:
+            return TIGHTDB_VER_CHUNK " Column index out of range";
+        case LogicError::illegal_combination:
+            return TIGHTDB_VER_CHUNK " Illegal combination";
+        case LogicError::type_mismatch:
+            return TIGHTDB_VER_CHUNK " Type mismatch";
+        case LogicError::wrong_kind_of_table:
+            return TIGHTDB_VER_CHUNK " Wrong kind of table";
+        case LogicError::detached_accessor:
+            return TIGHTDB_VER_CHUNK " Detached accessor";
+        case LogicError::no_search_index:
+            return TIGHTDB_VER_CHUNK " Column has no search index";
+        case LogicError::no_primary_key:
+            return TIGHTDB_VER_CHUNK " Table has no primary key";
+        case LogicError::has_primary_key:
+            return TIGHTDB_VER_CHUNK " Primary key already added";
+        case LogicError::unique_constraint_violation:
+            return TIGHTDB_VER_CHUNK " Unique constraint violation";
+    }
+}
 
 const char* NoSuchTable::what() const TIGHTDB_NOEXCEPT_OR_NOTHROW
 {
     return TIGHTDB_VER_CHUNK " No such table exists";
 }
-const char* const LogicError::no_search_index = "Column has no search index";
 
 const char* TableNameInUse::what() const TIGHTDB_NOEXCEPT_OR_NOTHROW
 {
     return TIGHTDB_VER_CHUNK " The specified table name is already in use";
 }
-const char* const LogicError::no_primary_key = "Table has no primary key";
 
 const char* CrossTableLinkTarget::what() const TIGHTDB_NOEXCEPT_OR_NOTHROW
 {
     return TIGHTDB_VER_CHUNK " Table is target of cross-table link columns";
 }
-const char* const LogicError::has_primary_key = "Primary key already added";
 
 const char* DescriptorMismatch::what() const TIGHTDB_NOEXCEPT_OR_NOTHROW
 {
     return TIGHTDB_VER_CHUNK " Table descriptor mismatch";
 }
-const char* const LogicError::unique_constraint_violation = "Unique constraint violation";

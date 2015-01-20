@@ -24,7 +24,7 @@
 
 #include "unit_test.hpp"
 
-#define CHECK_LOGIC_ERROR(expr, message_ptr) \
-    CHECK_THROW_EX(expr, tightdb::LogicError, e.what() == message_ptr)
+#define CHECK_LOGIC_ERROR(expr, error_kind) \
+    CHECK_THROW_EX(expr, tightdb::LogicError, e.what() == tightdb::LogicError::get_message_for_error(error_kind))
 
 #endif // TIGHTDB_TEST_UTIL_CHECK_LOGIC_ERROR_HPP
