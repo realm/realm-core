@@ -7003,47 +7003,8 @@ TEST(LangBindHelper_VersionControl)
     }
 }
 
-namespace {
-
-void mythread_func(std::string path) 
-{
-    Random random(random_int<unsigned long>());
-    UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
-    SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
-    Group& g = const_cast<Group&>(sg.begin_read());
-    g.Verify();
-    TableRef trend = g.get_table("Trend");
-    TableRef point = g.get_table("Point");
-    for (int i=0; i<1000; ++i) {
-        LangBindHelper::promote_to_write(sg);
-        g.Verify();
-        int limit = random.draw_int_mod(10);
-        for (int k=0; k < limit; ++k) {
-            point->add_empty_row();
-            int pos = point->size()-1;
-            point->set_int(0, pos, random.draw_int_mod(100));
-            LinkViewRef lv = trend->get_linklist(0,0);
-            lv->add(pos);
-            //g.Verify();
-        }
-        /*
-        LinkViewRef lv2 = trend->get_linklist(1,0);
-        while (lv2->size() > 30) {
-            lv2->remove(0);
-        }
-        g.Verify();
-        */
-        g.Verify();
-        LangBindHelper::commit_and_continue_as_read(sg);
-        g.Verify();
-    }
-    sg.end_read();
-}
-
-}
 TEST(Shared_LinkListCrash)
 {
-    const int num_threads = 4;
     SHARED_GROUP_TEST_PATH(path);
     UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
     SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
@@ -7051,21 +7012,25 @@ TEST(Shared_LinkListCrash)
         WriteTransaction wt(sg);
         TableRef points = wt.add_table("Point");
         points->add_column(type_Int, "value");
-        points->add_empty_row();
-        TableRef trend = wt.add_table("Trend");
-        trend->add_column_link(type_LinkList, "points", *points);
-        trend->add_empty_row();
         wt.commit();
-
-    }
-    Thread threads[num_threads];
-    for (int i =0; i<num_threads; ++i) {
-        threads[i].start(bind(mythread_func, string(path)));
-    }
-    for (int i =0; i<num_threads; ++i) {
-        threads[i].join();
     }
 
+    UniquePtr<Replication> repl2(makeWriteLogCollector(path, false, crypt_key()));
+    SharedGroup sg2(*repl, SharedGroup::durability_Full, crypt_key());
+    Group& g2 = const_cast<Group&>(sg2.begin_read());
+    for (int i = 0; i < 2; ++i) {
+        WriteTransaction wt(sg);
+        wt.commit();
+    }
+    for (int i = 0; i < 1; ++i)
+    {
+        WriteTransaction wt(sg);
+        wt.get_table("Point")->add_empty_row();
+        wt.commit();
+    }
+    g2.Verify();
+    LangBindHelper::advance_read(sg2);
+    g2.Verify();
 }
 
 
