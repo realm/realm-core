@@ -21,11 +21,44 @@
 #ifndef TIGHTDB_EXCEPTIONS_HPP
 #define TIGHTDB_EXCEPTIONS_HPP
 
-#include <exception>
+#include <stdexcept>
 
 #include <tightdb/util/features.h>
 
 namespace tightdb {
+
+class Exception: public std::exception {
+public:
+    /// message() returns the error description without version info.
+    virtual const char* message() const TIGHTDB_NOEXCEPT_OR_NOTHROW = 0;
+
+    /// version() returns the version of the TightDB library that threw this exception.
+    const char* version() const TIGHTDB_NOEXCEPT_OR_NOTHROW;
+};
+
+class RuntimeError: public std::runtime_error {
+public:
+    /// RuntimeError prepends the contents of TIGHTDB_VER_CHUNK to the message,
+    /// so that what() will contain information about the library version.
+    /// Call message()
+    RuntimeError(const std::string& message);
+    RuntimeError(const RuntimeError& other);
+
+    /// message() returns the error description without embedded release info.
+    /// Default implementation has the precondition that what() returns a string
+    /// that is prepended with the current release version.
+    virtual const char* message() const TIGHTDB_NOEXCEPT_OR_NOTHROW;
+
+    /// version() returns the version of the TightDB library that threw this exception.
+    const char* version() const TIGHTDB_NOEXCEPT_OR_NOTHROW;
+};
+
+class ExceptionWithVersionInWhat: public Exception {
+public:
+    /// CAUTION: Deriving from this class means you guarantee that the string
+    /// returned from what() contains TIGHTDB_VER_CHUNK + one space at the beginning.
+    const char* message() const TIGHTDB_NOEXCEPT_OR_NOTHROW TIGHTDB_OVERRIDE;
+};
 
 
 /// Thrown by various functions to indicate that a specified table does not

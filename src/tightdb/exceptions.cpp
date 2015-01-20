@@ -1,7 +1,39 @@
 #include <tightdb/exceptions.hpp>
+#include <tightdb/version.hpp>
 
 using namespace tightdb;
 
+const char* ExceptionWithVersionInWhat::message() const TIGHTDB_NOEXCEPT_OR_NOTHROW
+{
+    static const char ver[] = TIGHTDB_VER_CHUNK;
+    return what() + sizeof(ver);
+}
+
+const char* Exception::version() const TIGHTDB_NOEXCEPT_OR_NOTHROW
+{
+    return TIGHTDB_VER_STRING;
+}
+
+RuntimeError::RuntimeError(const std::string& message):
+    std::runtime_error(std::string(TIGHTDB_VER_CHUNK) + " " + message)
+{
+}
+
+RuntimeError::RuntimeError(const RuntimeError& other):
+    std::runtime_error(other)
+{
+}
+
+const char* RuntimeError::message() const TIGHTDB_NOEXCEPT_OR_NOTHROW
+{
+    static const char ver[] = TIGHTDB_VER_CHUNK;
+    return what() + sizeof(ver);
+}
+
+const char* RuntimeError::version() const TIGHTDB_NOEXCEPT_OR_NOTHROW
+{
+    return TIGHTDB_VER_STRING;
+}
 
 const char* const LogicError::string_too_big = "String too big";
 
