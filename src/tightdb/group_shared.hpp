@@ -240,13 +240,17 @@ public:
     bool has_changed();
 
     /// The calling thread goes to sleep until the database is changed, or
-    /// until wait_for_change_release() is called. Return true if the database
-    /// has changed, false if it might have. At most one thread may wait in 
-    /// wait_for_change() on any single SharedGroup.
+    /// until wait_for_change_release() is called. After a call to wait_for_change_release()
+    /// further calls to wait_for_change() will return immediately. To restore
+    /// the ability to wait for a change, a call to enable_wait_for_change()
+    /// is required. Return true if the database has changed, false if it might have. 
     bool wait_for_change();
 
     /// release any thread waiting in wait_for_change() on *this* SharedGroup.
     void wait_for_change_release();
+
+    /// re-enable waiting for change
+    void enable_wait_for_change();
 
     // Transactions:
 
@@ -347,7 +351,7 @@ private:
     util::File m_file;
     util::File::Map<SharedInfo> m_file_map; // Never remapped
     util::File::Map<SharedInfo> m_reader_map;
-    bool m_waiting_for_change;
+    bool m_wait_for_change_enabled;
     std::string m_lockfile_path;
     std::string m_db_path;
     const char* m_key;
