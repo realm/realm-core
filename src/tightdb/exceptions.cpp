@@ -70,6 +70,7 @@ const char* LogicError::get_message_for_error(LogicError::error_kind kind) TIGHT
         case LogicError::unique_constraint_violation:
             return TIGHTDB_VER_CHUNK " Unique constraint violation";
     }
+    return TIGHTDB_VER_CHUNK " Unknown error";
 }
 
 const char* NoSuchTable::what() const TIGHTDB_NOEXCEPT_OR_NOTHROW
