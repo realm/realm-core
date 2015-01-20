@@ -21,6 +21,7 @@
 #define TIGHTDB_INDEX_STRING_HPP
 
 #include <iostream>
+#include <cstring>
 
 #include <tightdb/column.hpp>
 #include <tightdb/column_string.hpp>
@@ -234,6 +235,9 @@ inline StringIndex::key_type StringIndex::create_key(StringData str) TIGHTDB_NOE
     return key;
 }
 
+// NULL support in Index works as follows: All non-NULL values are stored as if they had appended an 'X' character
+// at the end. So "foo" is stored as if it was "fooX", and "" (empty string) is stored as "X". And NULLs are stored 
+// as empty strings.
 inline StringIndex::key_type StringIndex::create_key(StringData str, size_t offset) TIGHTDB_NOEXCEPT
 {
     if (str.is_null())
@@ -241,7 +245,8 @@ inline StringIndex::key_type StringIndex::create_key(StringData str, size_t offs
 
     size_t tail = str.size() - offset;
     if (tail <= 3) {
-        char buf[4] = { ' ', ' ', ' ', ' ' };
+        char buf[4];
+        buf[tail] = 'X';
         memcpy(buf, str.data() + offset, tail);
         return create_key(StringData(buf, tail + 1));
     }
