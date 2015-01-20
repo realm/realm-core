@@ -22,7 +22,6 @@
 
 #include <cstddef>
 #include <stdint.h>
-#include <stdexcept>
 #include <string>
 #include <streambuf>
 

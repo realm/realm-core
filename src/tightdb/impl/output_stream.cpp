@@ -1,5 +1,4 @@
 #include <limits>
-#include <stdexcept>
 
 #include <tightdb/util/safe_int_ops.hpp>
 #include <tightdb/impl/output_stream.hpp>

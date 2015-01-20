@@ -1,5 +1,3 @@
-#include <stdexcept>
-
 #include <tightdb/util/thread.hpp>
 #include <tightdb/exceptions.hpp>
 

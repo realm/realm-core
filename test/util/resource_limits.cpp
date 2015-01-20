@@ -1,5 +1,3 @@
-#include <stdexcept>
-
 #include <tightdb/util/assert.hpp>
 #include <tightdb/exceptions.hpp>
 
