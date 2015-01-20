@@ -441,8 +441,9 @@ void TableView::clear()
 
 void TableViewBase::do_sync() 
 {
-    // A TableView can be "born" from 3 different sources: LinkView, Table::find_all() or Query. Here
-    // we sync with the respective source
+    // A TableView can be "born" from 4 different sources: LinkView, Table::get_distinct_view(),
+    // Table::find_all() or Query. Here we sync with the respective source.
+    
     if (m_linkview_source) {
         m_row_indexes.clear();
         for (size_t t = 0; t < m_linkview_source->size(); t++)

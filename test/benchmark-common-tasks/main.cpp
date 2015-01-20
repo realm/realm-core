@@ -29,7 +29,8 @@ using namespace tightdb::test_util;
 static const char realm_path[] = "/tmp/benchmark-common-tasks.tightdb";
 static const size_t repetitions[] = { 10, 100, 1000 };
 
-struct Benchmark {
+struct Benchmark
+{
     virtual const char* name() const = 0;
     virtual void setup(SharedGroup&) {}
     virtual void teardown(SharedGroup&) {}

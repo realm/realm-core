@@ -313,31 +313,7 @@ public:
         return 8 * bitwidth_time_unit / m_dD + m_dT; // dt = 1/64 to 1. Match dist is 8 times more important than bitwidth
     }
 
-    size_t find_first(size_t start, size_t end)
-    {
-        size_t m = start;
-        size_t next_cond = 0;
-        size_t first_cond = 0;
-
-        while (start < end) {
-            m = m_children[next_cond]->find_first_local(start, end);
-
-            next_cond++;
-            if (next_cond == m_conds)
-                next_cond = 0;
-
-            if (m == start) {
-                if (next_cond == first_cond)
-                    return m;
-            }
-            else {
-                first_cond = next_cond;
-                start = m;
-            }
-        }
-        return not_found;
-    }
-
+    size_t find_first(size_t start, size_t end);
 
     virtual ~ParentNode() TIGHTDB_NOEXCEPT {}
 
@@ -361,46 +337,7 @@ public:
         return m_child;
     }
 
-    virtual void aggregate_local_prepare(Action TAction, DataType col_id)
-    {
-        if (TAction == act_ReturnFirst)
-            m_column_action_specializer = & ThisType::column_action_specialization<act_ReturnFirst, int64_t>;
-
-        else if (TAction == act_Count)
-            m_column_action_specializer = & ThisType::column_action_specialization<act_Count, int64_t>;
-
-        else if (TAction == act_Sum && col_id == type_Int)
-            m_column_action_specializer = & ThisType::column_action_specialization<act_Sum, int64_t>;
-
-        else if (TAction == act_Sum && col_id == type_Float)
-            m_column_action_specializer = & ThisType::column_action_specialization<act_Sum, float>;
-        else if (TAction == act_Sum && col_id == type_Double)
-            m_column_action_specializer = & ThisType::column_action_specialization<act_Sum, double>;
-
-        else if (TAction == act_Max && col_id == type_Int)
-            m_column_action_specializer = & ThisType::column_action_specialization<act_Max, int64_t>;
-        else if (TAction == act_Max && col_id == type_Float)
-            m_column_action_specializer = & ThisType::column_action_specialization<act_Max, float>;
-        else if (TAction == act_Max && col_id == type_Double)
-            m_column_action_specializer = & ThisType::column_action_specialization<act_Max, double>;
-
-        else if (TAction == act_Min && col_id == type_Int)
-            m_column_action_specializer = & ThisType::column_action_specialization<act_Min, int64_t>;
-        else if (TAction == act_Min && col_id == type_Float)
-            m_column_action_specializer = & ThisType::column_action_specialization<act_Min, float>;
-        else if (TAction == act_Min && col_id == type_Double)
-            m_column_action_specializer = & ThisType::column_action_specialization<act_Min, double>;
-
-        else if (TAction == act_FindAll)
-            m_column_action_specializer = & ThisType::column_action_specialization<act_FindAll, int64_t>;
-
-        else if (TAction == act_CallbackIdx)
-            m_column_action_specializer = & ThisType::column_action_specialization<act_CallbackIdx, int64_t>;
-
-        else {
-            TIGHTDB_ASSERT(false);
-        }
-    }
+    virtual void aggregate_local_prepare(Action TAction, DataType col_id);
 
     template<Action TAction, class TSourceColumn>
     bool column_action_specialization(QueryStateBase* st, SequentialGetterBase* source_column, size_t r)
@@ -424,52 +361,7 @@ public:
     }
 
     virtual size_t aggregate_local(QueryStateBase* st, size_t start, size_t end, size_t local_limit,
-                                   SequentialGetterBase* source_column)
-    {
-        // aggregate called on non-integer column type. Speed of this function is not as critical as speed of the
-        // integer version, because find_first_local() is relatively slower here (because it's non-integers).
-        //
-        // Todo: Two speedups are possible. Simple: Initially test if there are no sub criterias and run find_first_local()
-        // in a tight loop if so (instead of testing if there are sub criterias after each match). Harder: Specialize
-        // data type array to make array call match() directly on each match, like for integers.
-
-        size_t local_matches = 0;
-
-        size_t r = start - 1;
-        for (;;) {
-            if (local_matches == local_limit) {
-                m_dD = double(r - start) / (local_matches + 1.1);
-                return r + 1;
-            }
-
-            // Find first match in this condition node
-            r = find_first_local(r + 1, end);
-            if (r == not_found) {
-                m_dD = double(r - start) / (local_matches + 1.1);
-                return end;
-            }
-
-            local_matches++;
-
-            // Find first match in remaining condition nodes
-            size_t m = r;
-
-            for (size_t c = 1; c < m_conds; c++) {
-                m = m_children[c]->find_first_local(r, r + 1);
-                if (m != r) {
-                    break;
-                }
-            }
-
-            // If index of first match in this node equals index of first match in all remaining nodes, we have a final match
-            if (m == r) {
-                bool cont = (this->* m_column_action_specializer)(st, source_column, r);
-                if (!cont) {
-                    return static_cast<size_t>(-1);
-                }
-            }
-        }
-    }
+                                   SequentialGetterBase* source_column);
 
 
     virtual std::string validate()
@@ -1625,8 +1517,11 @@ public:
         m_cond->init(table);
         v.clear();
         m_cond->gather_children(v);
-        m_last = 0;
-        m_was_match = false;
+
+        // Heuristics bookkeeping:
+        m_known_range_start = 0;
+        m_known_range_end = 0;
+        m_first_in_known_range = not_found;
 
         if (m_child)
             m_child->init(table);
@@ -1634,38 +1529,7 @@ public:
         m_table = &table;
     }
 
-    size_t find_first_local(size_t start, size_t end) TIGHTDB_OVERRIDE
-    {
-        for (size_t s = start; s < end; ++s) {
-
-            size_t f;
-
-            if (m_last >= end)
-                f = end;
-            else if (m_was_match && m_last >= s)
-                f = m_last;
-            else {
-                size_t fmax = m_last > s ? m_last : s;
-                for (f = fmax; f < end; f++) {
-                    if (m_cond->find_first(f,f+1)==not_found) {
-                        m_was_match = true;
-                        m_last = f;
-                        return f;
-                    }
-                }
-                // ID: f = m_cond->find_first(fmax, end);
-                m_was_match = false;
-                m_last = end;
-                f = end;
-            }
-
-            s = f;
-            s = s >= end ? not_found : s;
-
-            return s;
-        }
-        return not_found;
-    }
+    size_t find_first_local(size_t start, size_t end) TIGHTDB_OVERRIDE;
 
     std::string validate() TIGHTDB_OVERRIDE
     {
@@ -1700,15 +1564,27 @@ public:
     {
         // here we are just copying the pointers - they'll be remapped by "translate_pointers"
         m_cond = from.m_cond;
-        m_last = from.m_last;
-        m_was_match = from.m_was_match;
+        m_known_range_start = from.m_known_range_start;
+        m_known_range_end = from.m_known_range_end;
+        m_first_in_known_range = from.m_first_in_known_range;
         m_child = from.m_child;
     }
 
     ParentNode* m_cond;
 private:
-    size_t m_last;
-    bool m_was_match;
+    // FIXME This heuristic might as well be reused for all condition nodes.
+    size_t m_known_range_start;
+    size_t m_known_range_end;
+    size_t m_first_in_known_range;
+
+    bool evaluate_at(size_t rowndx);
+    void update_known(size_t start, size_t end, size_t first);
+    size_t find_first_loop(size_t start, size_t end);
+    size_t find_first_covers_known(size_t start, size_t end);
+    size_t find_first_covered_by_known(size_t start, size_t end);
+    size_t find_first_overlap_lower(size_t start, size_t end);
+    size_t find_first_overlap_upper(size_t start, size_t end);
+    size_t find_first_no_overlap(size_t start, size_t end);
 };
 
 
