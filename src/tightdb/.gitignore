@@ -29,6 +29,13 @@
 /libtightdb-cov.dylib
 /libtightdb-cov.*.dylib
 
+/tightdbd
+/tightdbd-noinst
+/tightdbd-dbg
+/tightdbd-dbg-noinst
+/tightdbd-cov
+/tightdbd-cov-noinst
+
 /tightdb-import
 /tightdb-import-noinst
 /tightdb-import-dbg
@@ -36,12 +43,12 @@
 /tightdb-import-cov
 /tightdb-import-cov-noinst
 
-/tightdbd
-/tightdbd-noinst
-/tightdbd-dbg
-/tightdbd-dbg-noinst
-/tightdbd-cov
-/tightdbd-cov-noinst
+/tightdb-server
+/tightdb-server-noinst
+/tightdb-server-dbg
+/tightdb-server-dbg-noinst
+/tightdb-server-cov
+/tightdb-server-cov-noinst
 
 /tightdb-config
 /tightdb-config-dbg

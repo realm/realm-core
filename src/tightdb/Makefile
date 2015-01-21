@@ -27,7 +27,7 @@ column_mixed_tpl.hpp group_writer.hpp index_string.hpp query_engine.hpp query_ex
 
 lib_LIBRARIES    = libtightdb.a
 libexec_PROGRAMS = tightdbd
-bin_PROGRAMS     = tightdb-import
+bin_PROGRAMS     = tightdb-import tightdb-server
 DEV_PROGRAMS     = tightdb-config
 
 libtightdb_a_SOURCES = util/terminate.cpp util/string_buffer.cpp util/memory_stream.cpp \
@@ -69,6 +69,9 @@ tightdbd_LIBS = libtightdb.a
 
 tightdb_import_SOURCES = importer_tool.cpp
 tightdb_import_LIBS    = libtightdb.a
+
+tightdb_server_SOURCES = server.cpp
+tightdb_server_LIBS    = libtightdb.a
 
 CONFIG_H = util/config.h
 CONFIG_SH = $(CONFIG_H:.h=.sh)
