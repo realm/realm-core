@@ -16,7 +16,6 @@
 
 ### Internals:
 
-* The `what()` string of all exceptions now includes the release version number.
 * All assert failures now print the release version number.
 
 ----------------------------------------------
