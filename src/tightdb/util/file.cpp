@@ -87,7 +87,7 @@ void make_dir(const string& path)
         case ENOTDIR:
             throw File::AccessError(msg);
         default:
-            throw RuntimeError(msg);
+            throw runtime_error(msg);
     }
 }
 
@@ -119,7 +119,7 @@ void remove_dir(const string& path)
         case ENOTDIR:
             throw File::AccessError(msg);
         default:
-            throw RuntimeError(msg);
+            throw runtime_error(msg);
     }
 }
 
@@ -131,18 +131,18 @@ string make_temp_dir()
     StringBuffer buffer1;
     buffer1.resize(MAX_PATH+1);
     if (GetTempPathA(MAX_PATH+1, buffer1.data()) == 0)
-        throw RuntimeError("CreateDirectory() failed");
+        throw runtime_error("CreateDirectory() failed");
     StringBuffer buffer2;
     buffer2.resize(MAX_PATH);
     for (;;) {
         if (GetTempFileNameA(buffer1.c_str(), "tdb", 0, buffer2.data()) == 0)
-            throw RuntimeError("GetTempFileName() failed");
+            throw runtime_error("GetTempFileName() failed");
         if (DeleteFileA(buffer2.c_str()) == 0)
-            throw RuntimeError("DeleteFile() failed");
+            throw runtime_error("DeleteFile() failed");
         if (CreateDirectoryA(buffer2.c_str(), 0) != 0)
             break;
         if (GetLastError() != ERROR_ALREADY_EXISTS)
-            throw RuntimeError("CreateDirectory() failed");
+            throw runtime_error("CreateDirectory() failed");
     }
     return string(buffer2.c_str());
 
@@ -151,7 +151,7 @@ string make_temp_dir()
     StringBuffer buffer;
     buffer.append_c_str(P_tmpdir "/tightdb_XXXXXX");
     if (mkdtemp(buffer.c_str()) == 0)
-        throw RuntimeError("mkdtemp() failed");
+        throw runtime_error("mkdtemp() failed");
     return buffer.str();
 
 #endif
@@ -227,7 +227,7 @@ void File::open_internal(const string& path, AccessMode a, CreateMode c, int fla
         case ERROR_FILE_EXISTS:
             throw Exists(msg);
         default:
-            throw RuntimeError(msg);
+            throw runtime_error(msg);
     }
 
 #else // POSIX version
@@ -289,7 +289,7 @@ void File::open_internal(const string& path, AccessMode a, CreateMode c, int fla
         case ENXIO:
             throw AccessError(msg);
         default:
-            throw RuntimeError(msg);
+            throw runtime_error(msg);
     }
 
 #endif
@@ -346,7 +346,7 @@ size_t File::read(char* data, size_t size)
 error:
     DWORD err = GetLastError(); // Eliminate any risk of clobbering
     string msg = get_last_error_msg("ReadFile() failed: ", err);
-    throw RuntimeError(msg);
+    throw runtime_error(msg);
 
 #else // POSIX version
 
@@ -375,7 +375,7 @@ error:
 error:
     int err = errno; // Eliminate any risk of clobbering
     string msg = get_errno_msg("read(): failed: ", err);
-    throw RuntimeError(msg);
+    throw runtime_error(msg);
 
 #endif
 }
@@ -403,7 +403,7 @@ void File::write(const char* data, size_t size)
   error:
     DWORD err = GetLastError(); // Eliminate any risk of clobbering
     string msg = get_last_error_msg("WriteFile() failed: ", err);
-    throw RuntimeError(msg);
+    throw runtime_error(msg);
 
 #else // POSIX version
 
@@ -430,7 +430,7 @@ void File::write(const char* data, size_t size)
   error:
     int err = errno; // Eliminate any risk of clobbering
     string msg = get_errno_msg("write(): failed: ", err);
-    throw RuntimeError(msg);
+    throw runtime_error(msg);
 
 #endif
 }
@@ -446,10 +446,10 @@ File::SizeType File::get_size() const
     if (GetFileSizeEx(m_handle, &large_int)) {
         SizeType size;
         if (int_cast_with_overflow_detect(large_int.QuadPart, size))
-            throw RuntimeError("File size overflow");
+            throw runtime_error("File size overflow");
         return size;
     }
-    throw RuntimeError("GetFileSizeEx() failed");
+    throw runtime_error("GetFileSizeEx() failed");
 
 #else // POSIX version
 
@@ -457,12 +457,12 @@ File::SizeType File::get_size() const
     if (::fstat(m_fd, &statbuf) == 0) {
         SizeType size;
         if (int_cast_with_overflow_detect(statbuf.st_size, size))
-            throw RuntimeError("File size overflow");
+            throw runtime_error("File size overflow");
         if (m_encryption_key)
             return encrypted_size_to_data_size(size);
         return size;
     }
-    throw RuntimeError("fstat() failed");
+    throw runtime_error("fstat() failed");
 
 #endif
 }
@@ -477,7 +477,7 @@ void File::resize(SizeType size)
     seek(size);
 
     if (!SetEndOfFile(m_handle))
-        throw RuntimeError("SetEndOfFile() failed");
+        throw runtime_error("SetEndOfFile() failed");
 
 #else // POSIX version
 
@@ -486,13 +486,13 @@ void File::resize(SizeType size)
 
     off_t size2;
     if (int_cast_with_overflow_detect(size, size2))
-        throw RuntimeError("File size overflow");
+        throw runtime_error("File size overflow");
 
     // POSIX specifies that introduced bytes read as zero. This is not
     // required by File::resize().
     if (::ftruncate(m_fd, size2) == 0)
         return;
-    throw RuntimeError("ftruncate() failed");
+    throw runtime_error("ftruncate() failed");
 
 #endif
 }
@@ -509,7 +509,7 @@ void File::prealloc(SizeType offset, size_t size)
 #else // Non-atomic fallback
 
     if (int_add_with_overflow_detect(offset, size))
-        throw RuntimeError("File size overflow");
+        throw runtime_error("File size overflow");
     if (get_size() < offset)
         resize(offset);
 
@@ -530,13 +530,13 @@ void File::prealloc_if_supported(SizeType offset, size_t size)
 
     off_t size2;
     if (int_cast_with_overflow_detect(size, size2))
-        throw RuntimeError("File size overflow");
+        throw runtime_error("File size overflow");
 
     if (::posix_fallocate(m_fd, offset, size2) == 0)
         return;
     int err = errno; // Eliminate any risk of clobbering
     string msg = get_errno_msg("posix_fallocate() failed: ", err);
-    throw RuntimeError(msg);
+    throw runtime_error(msg);
 
     // FIXME: OS X does not have any version of fallocate, but see
     // http://stackoverflow.com/questions/11497567/fallocate-command-equivalent-in-os-x
@@ -575,20 +575,20 @@ void File::seek(SizeType position)
 
     LARGE_INTEGER large_int;
     if (int_cast_with_overflow_detect(position, large_int.QuadPart))
-        throw RuntimeError("File position overflow");
+        throw runtime_error("File position overflow");
 
     if (!SetFilePointerEx(m_handle, large_int, 0, FILE_BEGIN))
-        throw RuntimeError("SetFilePointerEx() failed");
+        throw runtime_error("SetFilePointerEx() failed");
 
 #else // POSIX version
 
     off_t position2;
     if (int_cast_with_overflow_detect(position, position2))
-        throw RuntimeError("File position overflow");
+        throw runtime_error("File position overflow");
 
     if (0 <= ::lseek(m_fd, position2, SEEK_SET))
         return;
-    throw RuntimeError("lseek() failed");
+    throw runtime_error("lseek() failed");
 
 #endif
 }
@@ -606,13 +606,13 @@ void File::sync()
 
     if (FlushFileBuffers(m_handle))
         return;
-    throw RuntimeError("FlushFileBuffers() failed");
+    throw runtime_error("FlushFileBuffers() failed");
 
 #else // POSIX version
 
     if (::fsync(m_fd) == 0)
         return;
-    throw RuntimeError("fsync() failed");
+    throw runtime_error("fsync() failed");
 
 #endif
 }
@@ -647,7 +647,7 @@ bool File::lock(bool exclusive, bool non_blocking)
     if (err == ERROR_LOCK_VIOLATION)
         return false;
     string msg = get_last_error_msg("LockFileEx() failed: ", err);
-    throw RuntimeError(msg);
+    throw runtime_error(msg);
 
 #else // BSD / Linux flock()
 
@@ -678,7 +678,7 @@ bool File::lock(bool exclusive, bool non_blocking)
     if (err == EWOULDBLOCK)
         return false;
     string msg = get_errno_msg("flock() failed: ", err);
-    throw RuntimeError(msg);
+    throw runtime_error(msg);
 
 #endif
 }
@@ -726,11 +726,11 @@ void* File::map(AccessMode a, size_t size, int map_flags) const
     }
     LARGE_INTEGER large_int;
     if (int_cast_with_overflow_detect(size, large_int.QuadPart))
-        throw RuntimeError("Map size is too large");
+        throw runtime_error("Map size is too large");
     HANDLE map_handle =
         CreateFileMapping(m_handle, 0, protect, large_int.HighPart, large_int.LowPart, 0);
     if (TIGHTDB_UNLIKELY(!map_handle))
-        throw RuntimeError("CreateFileMapping() failed");
+        throw runtime_error("CreateFileMapping() failed");
     void* addr = MapViewOfFile(map_handle, desired_access, 0, 0, 0);
     {
         BOOL r = CloseHandle(map_handle);
@@ -740,7 +740,7 @@ void* File::map(AccessMode a, size_t size, int map_flags) const
         return addr;
     DWORD err = GetLastError(); // Eliminate any risk of clobbering
     string msg = get_last_error_msg("MapViewOfFile() failed: ", err);
-    throw RuntimeError(msg);
+    throw runtime_error(msg);
 
 #else // POSIX version
 
@@ -791,7 +791,7 @@ void File::sync_map(void* addr, size_t size)
 
     if (FlushViewOfFile(addr, size))
         return;
-    throw RuntimeError("FlushViewOfFile() failed");
+    throw runtime_error("FlushViewOfFile() failed");
 
 #else // POSIX version
 
@@ -818,7 +818,7 @@ bool File::exists(const string& path)
             return false;
     }
     string msg = get_errno_msg("access() failed: ", err);
-    throw RuntimeError(msg);
+    throw runtime_error(msg);
 }
 
 
@@ -858,7 +858,7 @@ bool File::try_remove(const string& path)
         case ENOTDIR:
             throw AccessError(msg);
         default:
-            throw RuntimeError(msg);
+            throw runtime_error(msg);
     }
 }
 
@@ -889,7 +889,7 @@ void File::move(const string& old_path, const string& new_path)
         case ENOTDIR:
             throw AccessError(msg);
         default:
-            throw RuntimeError(msg);
+            throw runtime_error(msg);
     }
 }
 
@@ -931,7 +931,7 @@ bool File::is_same_file(const File& f) const
 
     DWORD err = GetLastError(); // Eliminate any risk of clobbering
     string msg = get_last_error_msg("GetFileInformationByHandleEx() failed: ", err);
-    throw RuntimeError(msg);
+    throw runtime_error(msg);
 
 #else // POSIX version
 
@@ -944,7 +944,7 @@ bool File::is_same_file(const File& f) const
     }
     int err = errno; // Eliminate any risk of clobbering
     string msg = get_errno_msg("fstat() failed: ", err);
-    throw RuntimeError(msg);
+    throw runtime_error(msg);
 
 #endif
 }
@@ -963,7 +963,7 @@ bool File::is_removed() const
     struct stat statbuf;
     if (::fstat(m_fd, &statbuf) == 0)
         return statbuf.st_nlink == 0;
-    throw RuntimeError("fstat() failed");
+    throw runtime_error("fstat() failed");
 
 #endif
 }
@@ -981,7 +981,7 @@ void File::set_encryption_key(const char* key)
     }
 #else
     if (key) {
-        throw RuntimeError("Encryption not enabled");
+        throw runtime_error("Encryption not enabled");
     }
 #endif
 }

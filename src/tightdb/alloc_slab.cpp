@@ -456,15 +456,15 @@ ref_type SlabAlloc::attach_file(const string& path, bool is_shared, bool read_on
             header = reinterpret_cast<Header*>(m_data);
             bool stored_server_sync_mode = (header->m_flags & flags_ServerSyncMode) != 0;
             if (server_sync_mode != stored_server_sync_mode)
-                throw RuntimeError(path + ": failed to write!");
+                throw runtime_error(path + ": failed to write!");
         }
         else {
             Header* header = reinterpret_cast<Header*>(m_data);
             bool stored_server_sync_mode = (header->m_flags & flags_ServerSyncMode) != 0;
             if (server_sync_mode &&  !stored_server_sync_mode)
-                throw RuntimeError(path + ": expected db in server sync mode, found local mode");
+                throw runtime_error(path + ": expected db in server sync mode, found local mode");
             if (!server_sync_mode &&  stored_server_sync_mode)
-                throw RuntimeError(path + ": found db in server sync mode, expected local mode");
+                throw runtime_error(path + ": found db in server sync mode, expected local mode");
         }
     }
     catch (DecryptionFailed) {

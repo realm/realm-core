@@ -166,7 +166,7 @@ int main(int argc, char *argv[])
             try {
                 g.commit();
             }
-            catch (RuntimeError& e) {
+            catch (std::runtime_error& e) {
                 cerr << "Cannot create table: " << e.what() << endl;
                 return 1;
             }
@@ -220,7 +220,7 @@ int main(int argc, char *argv[])
                     cerr << "commit (permission denied): " << e.what() << endl;
                     return 1;
                 }
-                catch (RuntimeError& e) {
+                catch (std::runtime_error& e) {
                     cerr << "commit (runtime error): " << e.what() << endl;
                     return 1;
                 }

@@ -1,3 +1,5 @@
+#include <stdexcept>
+
 #if defined _WIN32
 #  include <windows.h>
 #  include <psapi.h>
@@ -37,7 +39,7 @@ DWORD calculate_ws_private(DWORD process_id)
 
     HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, process_id);
 
-    if (hProcess) throw RuntimeError("Failed");
+    if (hProcess) throw runtime_error("Failed");
 
     __try {
         if (!QueryWorkingSet(hProcess, dWorkingSetPages, sizeof (dWorkingSetPages)))
@@ -93,7 +95,7 @@ DWORD calculate_ws_private(DWORD process_id)
     __finally {
         CloseHandle(hProcess);
     }
-    throw RuntimeError("Failed");
+    throw runtime_error("Failed");
 }
 
 } // anonymous namespace
@@ -137,7 +139,7 @@ size_t get_mem_usage()
 
 #else
 
-    throw RuntimeError("Not supported");
+    throw runtime_error("Not supported");
 
 #endif
 }

@@ -1,5 +1,4 @@
 #include <tightdb/util/thread.hpp>
-#include <tightdb/exceptions.hpp>
 
 #if !defined _WIN32
 #  include <unistd.h>
@@ -71,7 +70,7 @@ void free_threadpool()
 void Thread::join()
 {
     if (!m_joinable)
-        throw RuntimeError("Thread is not joinable");
+        throw runtime_error("Thread is not joinable");
     void** value_ptr = 0; // Ignore return value
     int r = pthread_join(m_id, value_ptr);
     if (TIGHTDB_UNLIKELY(r != 0))
@@ -81,13 +80,13 @@ void Thread::join()
 
 TIGHTDB_NORETURN void Thread::create_failed(int)
 {
-    throw RuntimeError("pthread_create() failed");
+    throw runtime_error("pthread_create() failed");
 }
 
 TIGHTDB_NORETURN void Thread::join_failed(int)
 {
     // It is intentional that the argument is ignored here.
-    throw RuntimeError("pthread_join() failed.");
+    throw runtime_error("pthread_join() failed.");
 }
 
 void Mutex::init_as_process_shared(bool robust_if_available)
@@ -115,7 +114,7 @@ void Mutex::init_as_process_shared(bool robust_if_available)
         init_failed(r);
 #else // !TIGHTDB_HAVE_PTHREAD_PROCESS_SHARED
     static_cast<void>(robust_if_available);
-    throw RuntimeError("No support for process-shared mutexes");
+    throw runtime_error("No support for process-shared mutexes");
 #endif
 }
 
@@ -125,7 +124,7 @@ TIGHTDB_NORETURN void Mutex::init_failed(int err)
         case ENOMEM:
             throw bad_alloc();
         default:
-            throw RuntimeError("pthread_mutex_init() failed");
+            throw runtime_error("pthread_mutex_init() failed");
     }
 }
 
@@ -135,7 +134,7 @@ TIGHTDB_NORETURN void Mutex::attr_init_failed(int err)
         case ENOMEM:
             throw bad_alloc();
         default:
-            throw RuntimeError("pthread_mutexattr_init() failed");
+            throw runtime_error("pthread_mutexattr_init() failed");
     }
 }
 
@@ -217,7 +216,7 @@ CondVar::CondVar(process_shared_tag)
     if (TIGHTDB_UNLIKELY(r != 0))
         init_failed(r);
 #else // !TIGHTDB_HAVE_PTHREAD_PROCESS_SHARED
-    throw RuntimeError("No support for process-shared condition variables");
+    throw runtime_error("No support for process-shared condition variables");
 #endif
 }
 
@@ -227,7 +226,7 @@ TIGHTDB_NORETURN void CondVar::init_failed(int err)
         case ENOMEM:
             throw bad_alloc();
         default:
-            throw RuntimeError("pthread_cond_init() failed");
+            throw runtime_error("pthread_cond_init() failed");
     }
 }
 
@@ -250,7 +249,7 @@ TIGHTDB_NORETURN void CondVar::attr_init_failed(int err)
         case ENOMEM:
             throw bad_alloc();
         default:
-            throw RuntimeError("pthread_condattr_init() failed");
+            throw runtime_error("pthread_condattr_init() failed");
     }
 }
 

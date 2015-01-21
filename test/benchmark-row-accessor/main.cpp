@@ -56,7 +56,7 @@ void balloon(Timer& timer, BenchmarkResults& results, int balloon_size, int deta
             random.shuffle(detach_indexes.get(), detach_indexes.get() + balloon_size);
             break;
         default:
-            throw RuntimeError("Bad order specification");
+            throw runtime_error("Bad order specification");
     }
     int n = (100000000L + balloon_size - 1) / balloon_size;
     timer.reset();

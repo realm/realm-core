@@ -27,7 +27,7 @@ int main()
         File::try_remove("over_alloc_1.tightdb");
         File::try_remove("over_alloc_1.tightdb.lock");
         SharedGroup db("over_alloc_1.tightdb");
-        if (!db.is_valid()) throw RuntimeError("Failed to open database 1");
+        if (!db.is_valid()) throw runtime_error("Failed to open database 1");
 
         for (int i=0; i<n_outer; ++i) {
             {
@@ -46,7 +46,7 @@ int main()
         File::try_remove("over_alloc_2.tightdb");
         File::try_remove("over_alloc_2.tightdb.lock");
         SharedGroup db("over_alloc_2.tightdb");
-        if (!db.is_valid()) throw RuntimeError("Failed to open database 2");
+        if (!db.is_valid()) throw runtime_error("Failed to open database 2");
 
         {
             Group& group = db.begin_write();

@@ -944,7 +944,7 @@ void Table::update_subtables(Descriptor& desc, SubtableUpdater* updater)
             return;
         }
         if (int_multiply_with_overflow_detect(size, 2))
-            throw RuntimeError("Too many subdescriptor nesting levels");
+            throw runtime_error("Too many subdescriptor nesting levels");
         begin = new size_t[size]; // Throws
         end = begin + size;
         dyn_buf.reset(begin);
@@ -3154,7 +3154,7 @@ size_t Table::find_first_string(size_t col_ndx, StringData value) const
 size_t Table::find_first_binary(size_t, BinaryData) const
 {
     // FIXME: Implement this!
-    throw RuntimeError("Not implemented");
+    throw runtime_error("Not implemented");
 }
 
 
@@ -3239,13 +3239,13 @@ ConstTableView Table::find_all_string(size_t col_ndx, StringData value) const
 TableView Table::find_all_binary(size_t, BinaryData)
 {
     // FIXME: Implement this!
-    throw RuntimeError("Not implemented");
+    throw runtime_error("Not implemented");
 }
 
 ConstTableView Table::find_all_binary(size_t, BinaryData) const
 {
     // FIXME: Implement this!
-    throw RuntimeError("Not implemented");
+    throw runtime_error("Not implemented");
 }
 
 TableView Table::get_distinct_view(size_t col_ndx)

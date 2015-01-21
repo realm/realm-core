@@ -290,7 +290,7 @@ int decode_hex_digit(char hex_digit)
         return 10 + (v - traits::to_int_type('A'));
     if (traits::to_int_type('a') <= v && v <= traits::to_int_type('f'))
         return 10 + (v - traits::to_int_type('a'));
-    throw RuntimeError("Bad hex digit");
+    throw runtime_error("Bad hex digit");
 }
 
 char encode_hex_digit(int value)
@@ -300,7 +300,7 @@ char encode_hex_digit(int value)
         if (value < 10) return traits::to_char_type(traits::to_int_type('0') + value);
         if (value < 16) return traits::to_char_type(traits::to_int_type('A') + (value-10));
     }
-    throw RuntimeError("Bad hex digit value");
+    throw runtime_error("Bad hex digit value");
 }
 
 
@@ -312,7 +312,7 @@ string decode_8bit_hex(const string& hex)
     const char* end = begin + hex.size();
     for (const char* i = begin; i != end; ++i) {
         char digit_1 = *i;
-        if (++i == end) throw RuntimeError("Incomplete 8-bit element");
+        if (++i == end) throw runtime_error("Incomplete 8-bit element");
         char digit_2 = *i;
         int value = 16 * decode_hex_digit(digit_1) + decode_hex_digit(digit_2);
         s += char_traits<char>::to_char_type(value);
@@ -343,11 +343,11 @@ template<class String16> String16 decode_16bit_hex(const string& hex)
     const char* end = begin + hex.size();
     for (const char* i = begin; i != end; ++i) {
         char digit_1 = *i;
-        if (++i == end) throw RuntimeError("Incomplete 16-bit element");
+        if (++i == end) throw runtime_error("Incomplete 16-bit element");
         char digit_2 = *i;
-        if (++i == end) throw RuntimeError("Incomplete 16-bit element");
+        if (++i == end) throw runtime_error("Incomplete 16-bit element");
         char digit_3 = *i;
-        if (++i == end) throw RuntimeError("Incomplete 16-bit element");
+        if (++i == end) throw runtime_error("Incomplete 16-bit element");
         char digit_4 = *i;
         long value =
             4096L * decode_hex_digit(digit_1) +
@@ -388,7 +388,7 @@ template<class String16> String16 utf8_to_utf16(const string& s)
     const char* in_begin = s.data();
     const char* in_end = in_begin + s.size();
     size_t utf16_buf_size = Xcode::find_utf16_buf_size(in_begin, in_end);
-    if (in_begin != in_end) throw RuntimeError("Bad UTF-8");
+    if (in_begin != in_end) throw runtime_error("Bad UTF-8");
     in_begin = s.data();
     UniquePtr<Char16[]> utf16_buf(new Char16[utf16_buf_size]);
     Char16* out_begin = utf16_buf.get();
@@ -408,7 +408,7 @@ template<class String16> string utf16_to_utf8(const String16& s)
     const Char16* in_begin = s.data();
     const Char16* in_end = in_begin + s.size();
     size_t utf8_buf_size = Xcode::find_utf8_buf_size(in_begin, in_end);
-    if (in_begin != in_end) throw RuntimeError("Bad UTF-16");
+    if (in_begin != in_end) throw runtime_error("Bad UTF-16");
     in_begin = s.data();
     UniquePtr<char[]> utf8_buf(new char[utf8_buf_size]);
     char* out_begin = utf8_buf.get();
@@ -427,7 +427,7 @@ size_t find_buf_size_utf8_to_utf16(const string& s)
     const char* in_begin = s.data();
     const char* in_end = in_begin + s.size();
     size_t size = Xcode::find_utf16_buf_size(in_begin, in_end);
-    if (in_begin != in_end) throw RuntimeError("Bad UTF-8");
+    if (in_begin != in_end) throw runtime_error("Bad UTF-8");
     return size;
 }
 
@@ -439,7 +439,7 @@ template<class String16> size_t find_buf_size_utf16_to_utf8(const String16& s)
     const Char16* in_begin = s.data();
     const Char16* in_end = in_begin + s.size();
     size_t size = Xcode::find_utf8_buf_size(in_begin, in_end);
-    if (in_begin != in_end) throw RuntimeError("Bad UTF-16");
+    if (in_begin != in_end) throw runtime_error("Bad UTF-16");
     return size;
 }
 

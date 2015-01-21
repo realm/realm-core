@@ -60,7 +60,7 @@ void Replication::select_table(const Table* table)
             break;
         size_t new_size = m_subtab_path_buf.size();
         if (int_multiply_with_overflow_detect(new_size, 2))
-            throw RuntimeError("Too many subtable nesting levels");
+            throw runtime_error("Too many subtable nesting levels");
         m_subtab_path_buf.set_size(new_size); // Throws
     }
     char* buf;
@@ -102,7 +102,7 @@ void Replication::select_desc(const Descriptor& desc)
             break;
         size_t new_size = m_subtab_path_buf.size();
         if (int_multiply_with_overflow_detect(new_size, 2))
-            throw RuntimeError("Too many table type descriptor nesting levels");
+            throw runtime_error("Too many table type descriptor nesting levels");
         m_subtab_path_buf.set_size(new_size); // Throws
     }
     char* buf;

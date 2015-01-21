@@ -6507,9 +6507,9 @@ TEST(LangBindHelper_Logfiles)
         UniquePtr<Replication> repl(makeWriteLogCollector(path, true));
         try {
             SharedGroup sg(*repl);
-        } catch (LogFileError& e)
+        } catch (LogFileError& e) 
         {
-            CHECK_EQUAL(string(path), e.message());
+            CHECK_EQUAL(string(path), e.what());
             did_throw = true;
         };
         CHECK(did_throw);
@@ -6535,10 +6535,10 @@ TEST(LangBindHelper_SyncCannotBeChanged_1)
         bool did_throw = false;
         try {
             SharedGroup sg(*repl);
-        }
-        catch (RuntimeError& e)
+        } 
+        catch (std::runtime_error& e)
         {
-            string error_report = e.message();
+            string error_report = e.what();
             if (error_report == string(path) + ": found db in server sync mode, expected local mode")
                 did_throw = true;
         }
@@ -6565,10 +6565,10 @@ TEST(LangBindHelper_SyncCannotBeChanged_2)
         bool did_throw = false;
         try {
             SharedGroup sg(*repl);
-        }
-        catch (RuntimeError& e)
+        } 
+        catch (std::runtime_error& e)
         {
-            string error_report = e.message();
+            string error_report = e.what();
             if (error_report == string(path) + ": expected db in server sync mode, found local mode")
             did_throw = true;
         }

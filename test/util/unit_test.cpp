@@ -5,7 +5,6 @@
 #include <tightdb/util/unique_ptr.hpp>
 #include <tightdb/util/bind.hpp>
 #include <tightdb/util/thread.hpp>
-#include <tightdb/exceptions.hpp>
 
 #include "demangle.hpp"
 #include "timer.hpp"
@@ -334,7 +333,7 @@ bool TestList::run(Reporter* reporter, Filter* filter, int num_threads, bool shu
     Reporter fallback_reporter;
     Reporter& reporter_2 = reporter ? *reporter : fallback_reporter;
     if (num_threads < 1 || num_threads > 1024)
-        throw RuntimeError("Bad number of threads");
+        throw runtime_error("Bad number of threads");
 
     SharedContext shared(reporter_2);
     size_t num_tests = m_tests.size(), num_disabled = 0;

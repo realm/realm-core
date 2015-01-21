@@ -29,7 +29,6 @@
 #include <tightdb/util/assert.hpp>
 #include <tightdb/util/unique_ptr.hpp>
 #include <tightdb/util/safe_int_ops.hpp>
-#include <tightdb/exceptions.hpp>
 
 namespace tightdb {
 namespace util {
@@ -406,8 +405,8 @@ public:
 
     /// Used for any I/O related exception. Note the derived exception
     /// types that are used for various specific types of errors.
-    struct AccessError: RuntimeError {
-        AccessError(const std::string& msg): RuntimeError(msg) {}
+    struct AccessError: std::runtime_error {
+        AccessError(const std::string& msg): std::runtime_error(msg) {}
     };
 
     /// Thrown if the user does not have permission to open or create
@@ -841,7 +840,7 @@ inline File::Streambuf::pos_type File::Streambuf::seekpos(pos_type pos, std::ios
     flush();
     SizeType pos2 = 0;
     if (int_cast_with_overflow_detect(std::streamsize(pos), pos2))
-        throw RuntimeError("Seek position overflow");
+        throw std::runtime_error("Seek position overflow");
     m_file.seek(pos2);
     return pos;
 }

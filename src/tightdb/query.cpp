@@ -1337,7 +1337,7 @@ Query Query::operator&&(Query q)
 Query Query::operator!()
 {
     if (first[0] == null_ptr)
-        throw RuntimeError("negation of empty query is not supported");
+        throw runtime_error("negation of empty query is not supported");
     Query q(*this->m_table);
     q.Not();
     q.and_query(*this);

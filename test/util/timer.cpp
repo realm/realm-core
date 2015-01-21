@@ -9,11 +9,8 @@
 
 #include "timer.hpp"
 
-#include <tightdb/exceptions.hpp>
-
 using namespace std;
 using namespace tightdb::test_util;
-using tightdb::RuntimeError;
 
 
 #ifdef _WIN32
@@ -46,7 +43,7 @@ struct TimeBase {
     {
         mach_timebase_info_data_t info;
         kern_return_t err = mach_timebase_info(&info);
-        if (err) throw RuntimeError("Failed to get absolute time base");
+        if (err) throw runtime_error("Failed to get absolute time base");
         m_seconds_per_tick = (1E-9 * info.numer) / info.denom;
     }
 };

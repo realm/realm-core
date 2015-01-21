@@ -465,9 +465,9 @@ void spawn_daemon(const string& file)
     if (m < 0) {
         if (errno) {
             int err = errno; // Eliminate any risk of clobbering
-            throw RuntimeError(get_errno_msg("'sysconf(_SC_OPEN_MAX)' failed: ", err));
+            throw runtime_error(get_errno_msg("'sysconf(_SC_OPEN_MAX)' failed: ", err));
         }
-        throw RuntimeError("'sysconf(_SC_OPEN_MAX)' failed with no reason");
+        throw runtime_error("'sysconf(_SC_OPEN_MAX)' failed with no reason");
     }
 
     int pid = fork();
@@ -524,25 +524,25 @@ void spawn_daemon(const string& file)
         }
         while (pid_changed == -1 && errno == EINTR);
         if (pid_changed != pid) {
-            std::cerr << "Waitpid returned pid = " << pid_changed
+            std::cerr << "Waitpid returned pid = " << pid_changed 
                       << " and status = " << std::hex << status << std::endl;
-            throw RuntimeError("call to waitpid failed");
+            throw runtime_error("call to waitpid failed");
         }
         if (!WIFEXITED(status))
-            throw RuntimeError("failed starting async commit (exit)");
+            throw runtime_error("failed starting async commit (exit)");
         if (WEXITSTATUS(status) == 1) {
             // FIXME: Or `ld` could not find a required shared library
-            throw RuntimeError("async commit daemon not found");
+            throw runtime_error("async commit daemon not found");
         }
         if (WEXITSTATUS(status) == 2)
-            throw RuntimeError("async commit daemon failed");
+            throw runtime_error("async commit daemon failed");
         if (WEXITSTATUS(status) == 3)
-            throw RuntimeError("wrong db given to async daemon");
+            throw runtime_error("wrong db given to async daemon");
 
     }
     else { // Parent process, fork failed!
 
-        throw RuntimeError("Failed to spawn async commit");
+        throw runtime_error("Failed to spawn async commit");
     }
 }
 #else
@@ -612,8 +612,8 @@ void SharedGroup::open(const string& path, bool no_create_file,
         // NB! it might be larger due to expansion of the ring buffer.
         size_t info_size;
         if (int_cast_with_overflow_detect(m_file.get_size(), info_size))
-            throw RuntimeError("Lock file too large");
-
+            throw runtime_error("Lock file too large");
+        
         // Compile time validate the alignment of the first three fields in SharedInfo
         TIGHTDB_STATIC_ASSERT(offsetof(SharedInfo,init_complete) == 0, "misalignment of init_complete");
         TIGHTDB_STATIC_ASSERT(offsetof(SharedInfo,size_of_mutex) == 1, "misalignment of size_of_mutex");
@@ -758,7 +758,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
             else { // not the session initiator!
 #ifndef _WIN32
                 if (key && info->session_initiator_pid != uint64_t(getpid()))
-                    throw RuntimeError(path + ": Encrypted interprocess sharing is currently unsupported");
+                    throw runtime_error(path + ": Encrypted interprocess sharing is currently unsupported");
 #endif
 
             }
@@ -796,11 +796,11 @@ void SharedGroup::open(const string& path, bool no_create_file,
             m_readlock.m_version = get_current_version();
 
             if (info->version != SHAREDINFO_VERSION)
-                throw RuntimeError("Unsupported version");
+                throw runtime_error("Unsupported version");
 
             // Durability level cannot be changed at runtime
             if (info->flags != dlevel)
-                throw RuntimeError("Inconsistent durability level");
+                throw runtime_error("Inconsistent durability level");
 
             // make our presence noted:
             ++info->num_participants;
@@ -832,7 +832,7 @@ bool SharedGroup::compact()
 {
     // Verify that preconditions for compacting is met:
     if (m_transact_stage != transact_Ready) {
-        throw RuntimeError(m_db_path + ": compact is not supported whithin a transaction");
+        throw runtime_error(m_db_path + ": compact is not supported whithin a transaction");
     }
     string tmp_path = m_db_path + ".tmp";
     SharedInfo* info = m_file_map.get_addr();

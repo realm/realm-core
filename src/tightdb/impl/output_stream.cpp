@@ -2,7 +2,6 @@
 
 #include <tightdb/util/safe_int_ops.hpp>
 #include <tightdb/impl/output_stream.hpp>
-#include <tightdb/exceptions.hpp>
 
 using namespace std;
 using namespace tightdb;
@@ -31,7 +30,7 @@ void OutputStream::write(const char* data, size_t size)
     m_out.write(data_1, size_1);
 
     if (int_add_with_overflow_detect(m_pos, size_0))
-        throw RuntimeError("File size overflow");
+        throw runtime_error("File size overflow");
 }
 
 
@@ -47,7 +46,7 @@ size_t OutputStream::write_array(const char* data, size_t size, uint_fast32_t ch
     data_1 += 4;
     size_1 -= 4;
     if (int_add_with_overflow_detect(m_pos, 4))
-        throw RuntimeError("File size overflow");
+        throw runtime_error("File size overflow");
 #else
     static_cast<void>(checksum);
 #endif
