@@ -2,7 +2,10 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
+* Fixed a crashbug which could cause a reading thread to miss accessor updates during
+  advance_read(), if the pending updates consisted of two or more empty commits followed
+  by one or more non-empty commit. The left out accessor updates could lead to inconsistent
+  datastructures which could presumably later cause database corruption.
 
 ### API breaking changes:
 
