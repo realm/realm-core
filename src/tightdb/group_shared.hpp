@@ -318,15 +318,19 @@ public:
     /// a read transaction will not immediately release any versions.
     uint_fast64_t get_number_of_versions();
 
-    // Compact the database file.
-    // - The method will throw if called inside a transaction.
-    // - The method will return false if other SharedGroups are accessing the database
-    //   in which case compaction is not done.
-    // It will return true following succesful compaction.
-    // While compaction is in progress, attempts by other
-    // threads or processes to open the database will wait.
-    // Be warned that resource requirements for compaction is proportional to the amount
-    // of live data in the database.
+    /// Compact the database file.
+    /// - The method will throw if called inside a transaction.
+    /// - The method will return false if other SharedGroups are accessing the database
+    ///   in which case compaction is not done.
+    /// It will return true following succesful compaction.
+    /// While compaction is in progress, attempts by other
+    /// threads or processes to open the database will wait.
+    /// Be warned that resource requirements for compaction is proportional to the amount
+    /// of live data in the database.
+    /// Compaction works by writing the database contents to a temporary databasefile and
+    /// then replacing the database with the temporary one. The name of the temporary
+    /// file is formed by appending ".tmp_compaction_space" to the name of the databse
+    /// 
     bool compact();
 
 #ifdef TIGHTDB_DEBUG

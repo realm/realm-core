@@ -10,8 +10,9 @@
 
 ### Enhancements:
 
-* Lorem ipsum.
-
+* SharedGroup::compact() now appends ".tmp_compaction_space" to the database name
+  in order to get the name of its temporary workspace file instead of ".tmp". It also
+  automatically removes the file in case it already exists before compaction.
 -----------
 
 ### Internals:
