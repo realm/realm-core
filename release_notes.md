@@ -43,6 +43,8 @@
 
 * `AdaptiveStringColumn::find_all()` with an index no longer returns its results
   twice.
+* Fixed `Table::get_distinct_view()` on tables which have not been modified
+  since they were loaded.
 
 ### Enhancements:
 
