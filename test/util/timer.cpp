@@ -1,4 +1,7 @@
 #include <stdexcept>
+#include <iomanip>
+#include <cmath>
+#include <sstream>
 
 #if defined _WIN32
 #  define NOMINMAX
@@ -131,5 +134,63 @@ double Timer::calc_elapsed_seconds(uint_fast64_t ticks) const
     return ticks * 1E-9;
 }
 
-
 #endif
+
+std::string Timer::format(double seconds)
+{
+    std::ostringstream out;
+    format(seconds, out);
+    return out.str();
+}
+
+
+void Timer::format(double seconds_float, std::ostream& out)
+{
+    int64_t rounded_minutes = std::llround(seconds_float / 60);
+    if (rounded_minutes > 60) {
+        // 1h0m -> inf
+        int64_t hours   = rounded_minutes / 60;
+        int64_t minutes = rounded_minutes % 60;
+        out << hours << "h" << minutes << "m";
+    }
+    else {
+        int64_t rounded_seconds = std::llround(seconds_float);
+        if (rounded_seconds > 60) {
+            // 1m0s -> 59m59s
+            int64_t minutes = rounded_seconds / 60;
+            int64_t seconds = rounded_seconds % 60;
+            out << minutes << "m" << seconds << "s";
+        }
+        else {
+            int64_t rounded_centies = std::llround(seconds_float * 100);
+            if (rounded_centies > 100) {
+                // 1s -> 59.99s
+                int64_t seconds = rounded_centies / 100;
+                int64_t centies = rounded_centies % 100;
+                out << seconds;
+                if (centies > 0) {
+                    out << '.' << std::setw(2) << std::setfill('0') << centies;
+                }
+                out << 's';
+            }
+            else {
+                int64_t rounded_centi_ms = std::llround(seconds_float * 100000);
+                if (rounded_centi_ms > 100) {
+                    // 0.1ms -> 999.99ms
+                    int64_t ms = rounded_centi_ms / 100;
+                    int64_t centi_ms = rounded_centi_ms % 100;
+                    out << ms;
+                    if (centi_ms > 0) {
+                        out << '.' << std::setw(2) << std::setfill('0') << centi_ms;
+                    }
+                    out << "ms";
+                }
+                else {
+                    // 0 -> 999µs
+                    int64_t us = std::llround(seconds_float * 1000000);
+                    out << us << "us";
+                }
+            }
+        }
+    }
+}
