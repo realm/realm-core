@@ -10,15 +10,13 @@
 
 ### Enhancements:
 
-* Lorem ipsum.
+* Adding `Replication::apply_foreign_transact_log()`.
 
 -----------
 
 ### Internals:
 
-* Temporarily disable replication on a `Group` while a foreign transaction log
-  is applied to it. This prevents a new local transaction log from being
-  generated.
+* Lorem ipsum.
 
 ----------------------------------------------
 

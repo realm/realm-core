@@ -24,6 +24,7 @@
 #include <limits>
 #include <exception>
 #include <string>
+#include <ostream>
 
 #include <tightdb/util/assert.hpp>
 #include <tightdb/util/tuple.hpp>
@@ -37,6 +38,7 @@
 #include <tightdb/group_shared.hpp>
 
 #include <iostream>
+
 
 namespace tightdb {
 
@@ -127,10 +129,28 @@ public:
     virtual version_type get_last_version_synced(version_type* end_version_number = 0)
         TIGHTDB_NOEXCEPT;
 
-    /// Submit a transact log directly into the system bypassing the normal
-    /// collection of replication entries. This is used to add a transactlog
-    /// just for updating accessors. The caller retains ownership of the buffer.
-    virtual void submit_transact_log(BinaryData);
+    /// Apply a foreign transaction log to the specified shared group using a
+    /// local transaction, but only if the specified new version will be the
+    /// version of the shared group after the local transaction. On version
+    /// mismatch, the initiated transaction is canceled by a rollback
+    /// operation. The specified shared group must have this replication
+    /// instance set as its associated Replication instance. The caller retains
+    /// ownership of the specified buffer.
+    ///
+    /// If the version matches, and the local transaction is completed, this
+    /// function also implies the effect of
+    /// `set_last_version_synced(new_version)`.
+    ///
+    /// \return Returns true unless the local transaction was canceled due to a
+    /// version mismatch.
+    ///
+    /// FIXME This function, and several others, do not belong in the
+    /// Replication class. The Replication interface is supposed to be just a
+    /// sink that allows a SharedGroup to submit actions for replication. It is
+    /// then up to the implementation of the Repication interface to define what
+    /// replication means.
+    virtual bool apply_foreign_transact_log(SharedGroup&, version_type new_version,
+                                            BinaryData, std::ostream* apply_log = 0);
 
     /// Acquire permision to start a new 'write' transaction. This
     /// function must be called by a client before it requests a
@@ -250,13 +270,11 @@ public:
     class TransactLogParser;
 
     class InputStream;
+    class SimpleInputStream;
 
     class BadTransactLog; // Exception
 
-    /// Apply a foreign transaction log to the specified target group. This is
-    /// done in a way that prevents a new local transaction log from being
-    /// created, even when replication is otherwise enabled in that target
-    /// group.
+    /// Apply a foreign transaction log to the specified target group.
     ///
     /// \param apply_log If specified, and the library was compiled in
     /// debug mode, then a line describing each individual operation
@@ -437,9 +455,33 @@ public:
     /// For non-zero return value, \a begin and \a end are
     /// updated to reflect the start and limit of a
     /// contiguous memory chunk.
-    virtual size_t next_block(const char*& begin, const char*& end) = 0;
+    virtual std::size_t next_block(const char*& begin, const char*& end) = 0;
 
     virtual ~InputStream() {}
+};
+
+
+class Replication::SimpleInputStream: public InputStream {
+public:
+    SimpleInputStream(const char* data, std::size_t size) TIGHTDB_NOEXCEPT:
+    m_data(data), m_size(size)
+    {
+    }
+
+    std::size_t next_block(const char*& begin, const char*& end) TIGHTDB_OVERRIDE
+    {
+        if (m_size == 0)
+            return 0;
+        std::size_t size = m_size;
+        begin = m_data;
+        end = m_data + size;
+        m_size = 0;
+        return size;
+    }
+
+private:
+    const char* m_data;
+    std::size_t m_size;
 };
 
 
@@ -633,18 +675,22 @@ inline void Replication::set_last_version_synced(version_type) TIGHTDB_NOEXCEPT
 {
 }
 
-inline Replication::version_type Replication::get_last_version_synced(version_type*) TIGHTDB_NOEXCEPT
+inline Replication::version_type Replication::get_last_version_synced(version_type*)
+    TIGHTDB_NOEXCEPT
 {
     return 0;
 }
 
-inline void Replication::submit_transact_log(BinaryData)
+inline bool Replication::apply_foreign_transact_log(SharedGroup&, version_type, BinaryData,
+                                                    std::ostream*)
 {
     // Unimplemented!
     TIGHTDB_ASSERT(false);
+    return false;
 }
 
-inline void Replication::get_commit_entries(version_type, version_type, BinaryData*) TIGHTDB_NOEXCEPT
+inline void Replication::get_commit_entries(version_type, version_type, BinaryData*)
+    TIGHTDB_NOEXCEPT
 {
     // Unimplemented!
     TIGHTDB_ASSERT(false);
