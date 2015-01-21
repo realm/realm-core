@@ -9,7 +9,7 @@
 * Lorem ipsum.
 
 ### Enhancements:
-
+* Add support for comparing string columns to other string columns in queries.
 * `WriteTransaction::has_table()` and `WriteTransaction::rollback()` were
   added. Previously, only implicit rollback was possible with
   `WriteTransaction`.
