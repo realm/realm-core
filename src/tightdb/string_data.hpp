@@ -32,22 +32,21 @@ namespace tightdb {
 
 /// A reference to a chunk of character data.
 ///
-/// An instance of this class can be thought of as a type tag on a
-/// region of memory. It does not own the referenced memory, nor does
-/// it in any other way attempt to manage the lifetime of it.
+/// An instance of this class can be thought of as a type tag on a region of
+/// memory. It does not own the referenced memory, nor does it in any other way
+/// attempt to manage the lifetime of it.
 ///
-/// A null character inside the referenced region is considered a part
-/// of the string by TightDB.
+/// A null character inside the referenced region is considered a part of the
+/// string by TightDB.
 ///
-/// For compatibility with C-style strings, when a string is stored in
-/// a TightDB database, it is always followed by a terminating null
-/// character, regardless of whether the string itself has internal
-/// null characters. This means that when a StringData object is
-/// extracted from TightDB, the referenced region is guaranteed to be
-/// followed immediately by an extra null character, but that null
-/// character is not inside the referenced region. Therefore, all of
-/// the following forms are guaranteed to return a pointer to a
-/// null-terminated string:
+/// For compatibility with C-style strings, when a string is stored in a TightDB
+/// database, it is always followed by a terminating null character, regardless
+/// of whether the string itself has internal null characters. This means that
+/// when a StringData object is extracted from TightDB, the referenced region is
+/// guaranteed to be followed immediately by an extra null character, but that
+/// null character is not inside the referenced region. Therefore, all of the
+/// following forms are guaranteed to return a pointer to a null-terminated
+/// string:
 ///
 /// \code{.cpp}
 ///
@@ -64,13 +63,12 @@ namespace tightdb {
 /// the referenced string is followed by a null character unless there is an
 /// externally provided guarantee.
 ///
-/// This class makes it possible to distinguish between a 'null'
-/// reference and a reference to the empty string (see
-/// is_null()). However, most functions of the TightDB API do not care
-/// about this distinction. In particular, the comparison operators of
-/// this class make no distinction between a null reference and a
-/// reference to the empty string. This is possible because in both
-/// cases, size() returns zero.
+/// This class makes it possible to distinguish between a 'null' reference and a
+/// reference to the empty string (see is_null()). However, most functions of
+/// the TightDB API do not care about this distinction. In particular, the
+/// comparison operators of this class make no distinction between a null
+/// reference and a reference to the empty string. This is possible because in
+/// both cases, size() returns zero.
 ///
 /// \sa BinaryData
 /// \sa Mixed
@@ -85,8 +83,8 @@ public:
     template<class T, class A> StringData(const std::basic_string<char, T, A>&);
     template<class T, class A> operator std::basic_string<char, T, A>() const;
 
-    /// Initialize from a zero terminated C style string. Pass null to
-    /// construct a null reference.
+    /// Initialize from a zero terminated C style string. Pass null to construct
+    /// a null reference.
     StringData(const char* c_str) TIGHTDB_NOEXCEPT;
 
     ~StringData() TIGHTDB_NOEXCEPT;
@@ -98,28 +96,26 @@ public:
 
     /// Is this a null reference?
     ///
-    /// An instance of StringData is a null reference when, and only
-    /// when the stored size is zero (size()) and the stored pointer
-    /// is the null pointer (data()).
+    /// An instance of StringData is a null reference when, and only when the
+    /// stored size is zero (size()) and the stored pointer is the null pointer
+    /// (data()).
     ///
-    /// In the case of the empty string, the stored size is still
-    /// zero, but the stored pointer is **not** the null pointer. It
-    /// could for example point to the empty string literal. Note that
-    /// the actual value of the pointer is immaterial in this case (as
-    /// long as it is not zero), because when the size is zero, it is
-    /// an error to dereference the pointer.
+    /// In the case of the empty string, the stored size is still zero, but the
+    /// stored pointer is **not** the null pointer. It could for example point
+    /// to the empty string literal. Note that the actual value of the pointer
+    /// is immaterial in this case (as long as it is not zero), because when the
+    /// size is zero, it is an error to dereference the pointer.
     ///
-    /// Conversion of a StringData object to `bool` yields the logical
-    /// negation of the result of calling this function. In other
-    /// words, a StringData is converted to true if it is not the null
-    /// reference, otherwise it is converted to false.
+    /// Conversion of a StringData object to `bool` yields the logical negation
+    /// of the result of calling this function. In other words, a StringData
+    /// object is converted to true if it is not the null reference, otherwise
+    /// it is converted to false.
     ///
-    /// It is important to understand that all of the functions and
-    /// operator in this class, and most of the functions in the
-    /// TightDB API in general makes no distinction between a null
-    /// reference and a reference to the empty string. These functions
-    /// and operators never look at the stored pointer if the stored
-    /// size is zero.
+    /// It is important to understand that all of the functions and operators in
+    /// this class, and most of the functions in the TightDB API in general
+    /// makes no distinction between a null reference and a reference to the
+    /// empty string. These functions and operators never look at the stored
+    /// pointer if the stored size is zero.
     bool is_null() const TIGHTDB_NOEXCEPT;
 
     friend bool operator==(const StringData&, const StringData&) TIGHTDB_NOEXCEPT;
@@ -138,8 +134,8 @@ public:
     bool contains(StringData) const TIGHTDB_NOEXCEPT;
 
     //@{
-    /// Undefined behavior if \a n, \a i, or <tt>i+n</tt> is greater
-    /// than size().
+    /// Undefined behavior if \a n, \a i, or <tt>i+n</tt> is greater than
+    /// size().
     StringData prefix(std::size_t n) const TIGHTDB_NOEXCEPT;
     StringData suffix(std::size_t n) const TIGHTDB_NOEXCEPT;
     StringData substr(std::size_t i, std::size_t n) const TIGHTDB_NOEXCEPT;
