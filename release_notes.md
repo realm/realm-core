@@ -10,7 +10,10 @@
 
 ### Enhancements:
 
-* Lorem ipsum.
+* `WriteTransaction::has_table()` and `WriteTransaction::rollback()` were
+  added. Previously, only implicit rollback was possible with
+  `WriteTransaction`.
+* Generic networking API added.
 
 -----------
 
@@ -54,7 +57,7 @@
   `SharedGroup::get_version_of_current_transaction()`, and use it to obtain a a
   transaction accessing that same version from another ShareGroup. This is done
   by new forms of `SharedGroup::begin_read()`, `SharedGroup::advance_read()`.
-  Operators are provided so that VersionID's may be compared.
+  Operators are provided so that VersionID instances may be compared.
 * Creating distinct views on integer, datetime, bool and enum columns is now
   possible.
 * Add `Table::minimum_datetime()` and `Table::maximum_datetime()`.
@@ -297,11 +300,9 @@
   of a Query after add_constraint_to_query() had been executed. The fix may not
   be optimal as it limits nesting of group/end_group to 16 levels, and also
   makes Query take 128 extra bytes of space. Asana task has been made.
-
 * Fixed bug that would cause `Group::commit()` and
   `LangBindHelper::commit_and_continue_as_read()` to fail in the presence of
   search indexes.
-
 * Bugfix: Replication::m_selected_link_list was not cleared. This bug could lead
   to general corruption in cases involving link lists.
 
