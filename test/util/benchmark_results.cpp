@@ -135,12 +135,14 @@ void BenchmarkResults::finish(const std::string& ident, const std::string& lead_
         const Result& br = baseline_iter->second;
         out << "min " << setw(time_width) << format_elapsed_time(r.min)   << " (" << format_change(br.min, r.min, change_type) << ")     ";
         out << "max " << setw(time_width) << format_elapsed_time(r.max)   << " (" << format_change(br.max, r.max, change_type) << ")     ";
-        out << "avg " << setw(time_width) << format_elapsed_time(r.avg()) << " (" << format_change(br.avg(), r.avg(), change_type) << ")";
+        out << "avg " << setw(time_width) << format_elapsed_time(r.avg()) << " (" << format_change(br.avg(), r.avg(), change_type) << ")     ";
+        out << "reps " << r.rep;
     }
     else {
         out << "min " << setw(time_width) << format_elapsed_time(r.min)   << "     ";
         out << "max " << setw(time_width) << format_elapsed_time(r.max)   << "     ";
-        out << "avg " << setw(time_width) << format_elapsed_time(r.avg());
+        out << "avg " << setw(time_width) << format_elapsed_time(r.avg()) << "     ";
+        out << "reps " << r.rep;
     }
     out << endl;
 }
