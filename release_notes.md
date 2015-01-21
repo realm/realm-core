@@ -9,7 +9,7 @@
 
 ### API breaking changes:
 
-* Lorem ipsum.
+* Adding *null* support to `BinaryData` in exactly the same way as it was added to `StringData`.
 
 ### Enhancements:
 
