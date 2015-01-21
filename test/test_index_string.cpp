@@ -784,21 +784,24 @@ void* write_thread(void* ptr)
     ShortCircuitTransactLogManager tlm(p->c_str());
     SharedGroup sg(tlm, SharedGroup::durability_MemOnly, crypt_key());
 
-    Table table;
-    table.add_column(type_Int, "first");
-    table.add_search_index(0);
-
     sg.begin_read();
 
-    for (size_t t = 0; t < 100; t++) {
+    for (size_t t = 0; t < 1000; t++) {
         LangBindHelper::promote_to_write(sg);
-        size_t f = table.find_first_int(0, 0);
+
+        Group group;
+        TableRef table = group.add_table("alpha");
+        table->add_column(type_Int, "first");
+        table->add_search_index(0);
+
+
+        size_t f = table->find_first_int(0, 0);
         if (f == not_found) {
-            table.add_empty_row();
-            table.set_int(0, 0, 0);
+            table->add_empty_row();
+            table->set_int(0, 0, 0);
         }
         else {
-            table.set_int(0, 0, 0);
+            table->set_int(0, 0, 0);
         }
 
         LangBindHelper::commit_and_continue_as_read(sg);
@@ -808,7 +811,7 @@ void* write_thread(void* ptr)
     return 0;
 }
 
-TEST(StringIndex_FindFirstCrash)
+ONLY(StringIndex_FindFirstCrash)
 {
     SHARED_GROUP_TEST_PATH(path);
 
@@ -816,10 +819,10 @@ TEST(StringIndex_FindFirstCrash)
     pthread_win32_process_attach_np();
 #endif
 
-    const size_t writers = 5;
+    const size_t writers = 15;
     pthread_t write_threads[writers];
 
-    for (size_t t = 0; t < 5; t++) {
+    for (size_t t = 0; t < 115; t++) {
         for (size_t i = 0; i < writers; ++i)
             pthread_create(&write_threads[i], 0, &write_thread, &path);
 
