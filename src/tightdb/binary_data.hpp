@@ -32,8 +32,8 @@ namespace tightdb {
 
 /// A reference to a chunk of binary data.
 ///
-/// This class does not own the referenced memory, nor does it in any
-/// other way attempt to manage the lifetime of it.
+/// This class does not own the referenced memory, nor does it in any other way
+/// attempt to manage the lifetime of it.
 ///
 /// \sa StringData
 class BinaryData {
@@ -54,6 +54,30 @@ public:
     const char* data() const TIGHTDB_NOEXCEPT { return m_data; }
     std::size_t size() const TIGHTDB_NOEXCEPT { return m_size; }
 
+    /// Is this a null reference?
+    ///
+    /// An instance of BinaryData is a null reference when, and only when the
+    /// stored size is zero (size()) and the stored pointer is the null pointer
+    /// (data()).
+    ///
+    /// In the case of the empty byte sequence, the stored size is still zero,
+    /// but the stored pointer is **not** the null pointer. Note that the actual
+    /// value of the pointer is immaterial in this case (as long as it is not
+    /// zero), because when the size is zero, it is an error to dereference the
+    /// pointer.
+    ///
+    /// Conversion of a BinaryData object to `bool` yields the logical negation
+    /// of the result of calling this function. In other words, a BinaryData
+    /// object is converted to true if it is not the null reference, otherwise
+    /// it is converted to false.
+    ///
+    /// It is important to understand that all of the functions and operators in
+    /// this class, and most of the functions in the TightDB API in general
+    /// makes no distinction between a null reference and a reference to the
+    /// empty byte sequence. These functions and operators never look at the
+    /// stored pointer if the stored size is zero.
+    bool is_null() const TIGHTDB_NOEXCEPT;
+
     friend bool operator==(const BinaryData&, const BinaryData&) TIGHTDB_NOEXCEPT;
     friend bool operator!=(const BinaryData&, const BinaryData&) TIGHTDB_NOEXCEPT;
 
@@ -71,6 +95,13 @@ public:
 
     template<class C, class T>
     friend std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>&, const BinaryData&);
+
+#ifdef TIGHTDB_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
+    explicit operator bool() const TIGHTDB_NOEXCEPT;
+#else
+    typedef const char* BinaryData::*unspecified_bool_type;
+    operator unspecified_bool_type() const TIGHTDB_NOEXCEPT;
+#endif
 
 private:
     const char* m_data;
@@ -95,6 +126,11 @@ template<class T, class A> inline BinaryData::operator std::basic_string<char, T
 }
 
 #endif
+
+inline bool BinaryData::is_null() const TIGHTDB_NOEXCEPT
+{
+    return !m_data;
+}
 
 inline bool operator==(const BinaryData& a, const BinaryData& b) TIGHTDB_NOEXCEPT
 {
@@ -149,6 +185,18 @@ inline std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>& out, const B
     out << "BinaryData("<<static_cast<const void*>(d.m_data)<<", "<<d.m_size<<")";
     return out;
 }
+
+#ifdef TIGHTDB_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
+inline BinaryData::operator bool() const TIGHTDB_NOEXCEPT
+{
+    return !is_null();
+}
+#else
+inline BinaryData::operator unspecified_bool_type() const TIGHTDB_NOEXCEPT
+{
+    return is_null() ? 0 : &BinaryData::m_data;
+}
+#endif
 
 } // namespace tightdb
 
