@@ -24,8 +24,8 @@
 #include <sstream>
 
 #define TIGHTDB_VER_MAJOR 0
-#define TIGHTDB_VER_MINOR 87
-#define TIGHTDB_VER_PATCH 6
+#define TIGHTDB_VER_MINOR 88
+#define TIGHTDB_VER_PATCH 0
 #define TIGHTDB_PRODUCT_NAME "realm-core"
 
 #define TIGHTDB_QUOTE2(X) #X

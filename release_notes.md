@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 0.88.0 Release notes
 
 ### Bugfixes:
 
