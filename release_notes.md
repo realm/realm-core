@@ -1,13 +1,5 @@
 # 0.88.0 Release notes
 
-### Bugfixes:
-
-* Lorem ipsum.
-
-### API breaking changes:
-
-* Lorem ipsum.
-
 ### Enhancements:
 
 * SharedGroup::compact() now appends ".tmp_compaction_space" to the database name
