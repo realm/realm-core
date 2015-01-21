@@ -139,16 +139,10 @@ public:
     TransactLogApplier(Group& group):
         m_group(group)
     {
-        // Temporarily disable replication
-        typedef _impl::GroupFriend gf;
-        m_temp_disabled_repl = gf::get_replication(group);
-        gf::set_replication(group, 0);
     }
 
     ~TransactLogApplier() TIGHTDB_NOEXCEPT
     {
-        typedef _impl::GroupFriend gf;
-        gf::set_replication(m_group, m_temp_disabled_repl);
     }
 
     void set_apply_log(ostream* log) TIGHTDB_NOEXCEPT
@@ -892,7 +886,6 @@ public:
 
 private:
     Group& m_group;
-    Replication* m_temp_disabled_repl;
     TableRef m_table;
     DescriptorRef m_desc;
     LinkViewRef m_link_list;

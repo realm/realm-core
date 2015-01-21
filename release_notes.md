@@ -13,15 +13,14 @@
 * `WriteTransaction::has_table()` and `WriteTransaction::rollback()` were
   added. Previously, only implicit rollback was possible with
   `WriteTransaction`.
+* Adding `Replication::apply_foreign_transact_log()`.
 * Generic networking API added.
 
 -----------
 
 ### Internals:
 
-* Temporarily disable replication on a `Group` while a foreign transaction log
-  is applied to it. This prevents a new local transaction log from being
-  generated.
+* Lorem ipsum.
 
 ----------------------------------------------
 

@@ -35,6 +35,33 @@ typedef uint_fast64_t version_type;
 using namespace util;
 using namespace std;
 
+
+namespace {
+
+// Temporarily disable replication
+class TempDisableReplication {
+public:
+    TempDisableReplication(Group& group):
+        m_group(group)
+    {
+        typedef _impl::GroupFriend gf;
+        m_temp_disabled_repl = gf::get_replication(m_group);
+        gf::set_replication(m_group, 0);
+    }
+    ~TempDisableReplication()
+    {
+        typedef _impl::GroupFriend gf;
+        gf::set_replication(m_group, m_temp_disabled_repl);
+    }
+private:
+    Group& m_group;
+    Replication* m_temp_disabled_repl;
+};
+
+
+} // anonymous namespace
+
+
 namespace tightdb {
 
 namespace _impl {
@@ -85,7 +112,8 @@ public:
     void do_transact_log_append(const char* data, size_t size) TIGHTDB_OVERRIDE;
     void transact_log_reserve(size_t size);
     virtual bool is_in_server_synchronization_mode() { return m_is_persisting; }
-    virtual void submit_transact_log(BinaryData);
+    bool apply_foreign_transact_log(SharedGroup&, version_type new_version,
+                                    BinaryData, ostream *apply_log) TIGHTDB_OVERRIDE;
     virtual void stop_logging() TIGHTDB_OVERRIDE;
     virtual void reset_log_management(version_type last_version) TIGHTDB_OVERRIDE;
     virtual void set_last_version_seen_locally(version_type last_seen_version_number)
@@ -653,9 +681,24 @@ void WriteLogCollector::get_commit_entries(version_type from_version, version_ty
 }
 
 
-void WriteLogCollector::submit_transact_log(BinaryData bd)
+bool WriteLogCollector::apply_foreign_transact_log(SharedGroup& sg, version_type new_version,
+                                                   BinaryData transact_log, ostream* apply_log)
 {
-    internal_submit_log(bd.data(), bd.size());
+    Group& group = sg.m_group;
+    TIGHTDB_ASSERT(_impl::GroupFriend::get_replication(group) == this);
+    TempDisableReplication tdr(group);
+
+    WriteTransaction transact(sg);
+    version_type current_version = sg.get_current_version();
+    if (new_version != current_version + 1)
+        return false;
+    SimpleInputStream input(transact_log.data(), transact_log.size());
+    apply_transact_log(input, transact.get_group(),
+                       apply_log); // Throws
+    internal_submit_log(transact_log.data(), transact_log.size()); // Throws
+    set_last_version_synced(new_version);
+    transact.commit(); // Throws
+    return true;
 }
 
 
