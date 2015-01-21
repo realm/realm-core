@@ -3,52 +3,9 @@
 
 using namespace tightdb;
 
-namespace {
-    const char* chomp_version_chunk(const char* msg)
-    {
-        size_t len = strlen(msg);
-        static const char ver[] = TIGHTDB_VER_CHUNK;
-        if (len > sizeof(ver) && strncmp(msg, ver, sizeof(ver) - 1) == 0) {
-            return msg + sizeof(ver);
-        }
-        return msg;
-    }
-}
-
-const char* ExceptionWithVersionInWhat::message() const TIGHTDB_NOEXCEPT_OR_NOTHROW
+const char* LogicError::what() const TIGHTDB_NOEXCEPT_OR_NOTHROW
 {
-    return chomp_version_chunk(what());
-}
-
-const char* Exception::version() const TIGHTDB_NOEXCEPT_OR_NOTHROW
-{
-    return TIGHTDB_VER_STRING;
-}
-
-RuntimeError::RuntimeError(const std::string& message):
-    std::runtime_error(std::string(TIGHTDB_VER_CHUNK) + " " + message)
-{
-}
-
-RuntimeError::RuntimeError(const RuntimeError& other):
-    std::runtime_error(other)
-{
-}
-
-const char* RuntimeError::message() const TIGHTDB_NOEXCEPT_OR_NOTHROW
-{
-    return chomp_version_chunk(what());
-}
-
-const char* RuntimeError::version() const TIGHTDB_NOEXCEPT_OR_NOTHROW
-{
-    return TIGHTDB_VER_STRING;
-}
-
-
-const char* LogicError::get_message_for_error(LogicError::error_kind kind) TIGHTDB_NOEXCEPT_OR_NOTHROW
-{
-    switch (kind) {
+    switch (m_kind) {
         case LogicError::string_too_big:
             return TIGHTDB_VER_CHUNK " String too big";
         case LogicError::binary_too_big:

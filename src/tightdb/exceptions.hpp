@@ -27,40 +27,6 @@
 
 namespace tightdb {
 
-class Exception: public std::exception {
-public:
-    /// message() returns the error description without version info.
-    virtual const char* message() const TIGHTDB_NOEXCEPT_OR_NOTHROW = 0;
-
-    /// version() returns the version of the TightDB library that threw this exception.
-    const char* version() const TIGHTDB_NOEXCEPT_OR_NOTHROW;
-};
-
-class RuntimeError: public std::runtime_error {
-public:
-    /// RuntimeError prepends the contents of TIGHTDB_VER_CHUNK to the message,
-    /// so that what() will contain information about the library version.
-    RuntimeError(const std::string& message);
-    RuntimeError(const RuntimeError& other);
-
-    /// message() returns the error description without embedded release info.
-    /// Default implementation has the precondition that what() returns a string
-    /// that is prepended with the current release version.
-    /// FIXME: Declare what() final (C++11) to secure the precondition.
-    virtual const char* message() const TIGHTDB_NOEXCEPT_OR_NOTHROW;
-
-    /// version() returns the version of the TightDB library that threw this exception.
-    const char* version() const TIGHTDB_NOEXCEPT_OR_NOTHROW;
-};
-
-class ExceptionWithVersionInWhat: public Exception {
-public:
-    /// CAUTION: Deriving from this class means you guarantee that the string
-    /// returned from what() contains TIGHTDB_VER_CHUNK + one space at the beginning.
-    const char* message() const TIGHTDB_NOEXCEPT_OR_NOTHROW TIGHTDB_OVERRIDE;
-};
-
-
 /// Thrown by various functions to indicate that a specified table does not
 /// exist.
 class NoSuchTable: public std::exception {
@@ -96,9 +62,9 @@ public:
 /// Reports errors that are a consequence of faulty logic within the program,
 /// such as violating logical preconditions or class invariants, and can be
 /// easily predicted.
-class LogicError: public ExceptionWithVersionInWhat {
+class LogicError: public std::exception {
 public:
-    enum error_kind {
+    enum ErrorKind {
         string_too_big,
         binary_too_big,
         table_name_too_long,
@@ -138,13 +104,12 @@ public:
         unique_constraint_violation
     };
 
-    LogicError(error_kind message);
+    LogicError(ErrorKind message);
 
     const char* what() const TIGHTDB_NOEXCEPT_OR_NOTHROW TIGHTDB_OVERRIDE;
-
-    static const char* get_message_for_error(error_kind) TIGHTDB_NOEXCEPT_OR_NOTHROW;
+    ErrorKind kind() const TIGHTDB_NOEXCEPT_OR_NOTHROW;
 private:
-    const char* m_message;
+    ErrorKind m_kind;
 };
 
 
@@ -170,14 +135,14 @@ inline const char* DescriptorMismatch::what() const TIGHTDB_NOEXCEPT_OR_NOTHROW
     return "Table descriptor mismatch";
 }
 
-inline LogicError::LogicError(LogicError::error_kind kind):
-    m_message(get_message_for_error(kind))
+inline LogicError::LogicError(LogicError::ErrorKind kind):
+    m_kind(kind)
 {
 }
 
-inline const char* LogicError::what() const TIGHTDB_NOEXCEPT_OR_NOTHROW
+inline LogicError::ErrorKind LogicError::kind() const TIGHTDB_NOEXCEPT_OR_NOTHROW
 {
-    return m_message;
+    return m_kind;
 }
 
 
