@@ -71,7 +71,7 @@ private:
     uint_fast64_t m_paused_for;
 
     uint_fast64_t get_timer_ticks() const;
-    static double calc_elapsed_seconds(uint_fast64_t ticks);
+    double calc_elapsed_seconds(uint_fast64_t ticks) const;
 };
 
 

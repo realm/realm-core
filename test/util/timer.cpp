@@ -4,7 +4,9 @@
 #  define NOMINMAX
 #  include <windows.h>
 #elif defined __APPLE__
+#  include <sys/resource.h>
 #  include <mach/mach_time.h>
+#  include <sys/time.h>
 #else
 #  include <time.h>
 #endif
@@ -23,7 +25,7 @@ uint_fast64_t Timer::get_timer_ticks() const
     return GetTickCount();
 }
 
-double Timer::calc_elapsed_seconds(uint_fast64_t ticks)
+double Timer::calc_elapsed_seconds(uint_fast64_t ticks) const
 {
     return ticks * 1E-3;
 }
@@ -34,7 +36,17 @@ double Timer::calc_elapsed_seconds(uint_fast64_t ticks)
 
 uint_fast64_t Timer::get_timer_ticks() const
 {
-    return mach_absolute_time();
+    switch (m_type) {
+        case type_RealTime:
+            return mach_absolute_time();
+        case type_UserTime: {
+            rusage ru;
+            getrusage(RUSAGE_SELF, &ru);
+            timeval tv;
+            timeradd(&ru.ru_utime, &ru.ru_stime, &tv);
+            return tv.tv_sec * 1000000 + tv.tv_usec;
+        }
+    }
 }
 
 namespace {
@@ -52,10 +64,15 @@ struct TimeBase {
 
 } // anonymous namespace
 
-double Timer::calc_elapsed_seconds(uint_fast64_t ticks)
+double Timer::calc_elapsed_seconds(uint_fast64_t ticks) const
 {
     static TimeBase base;
-    return ticks * base.m_seconds_per_tick;
+    switch (m_type) {
+        case type_RealTime:
+            return ticks * base.m_seconds_per_tick;
+        case type_UserTime:
+            return static_cast<double>(ticks) / 1000000;
+    }
 }
 
 
@@ -109,7 +126,7 @@ uint_fast64_t Timer::get_timer_ticks() const
         1000000000 + (time.tv_nsec - init_time->tv_nsec);
 }
 
-double Timer::calc_elapsed_seconds(uint_fast64_t ticks)
+double Timer::calc_elapsed_seconds(uint_fast64_t ticks) const
 {
     return ticks * 1E-9;
 }
