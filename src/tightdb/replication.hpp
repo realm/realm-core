@@ -1371,7 +1371,6 @@ void Replication::TransactLogParser::parse(InstructionHandler& handler)
 template<class InstructionHandler>
 bool Replication::TransactLogParser::do_parse(InstructionHandler& handler)
 {
-    next_input_buffer();
     while (m_input_begin != m_input_end || next_input_buffer()) {
 
         char instr;
