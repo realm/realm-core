@@ -122,8 +122,11 @@ TEST(Table_Null)
 
     table->add_column(type_String, "name");
     table->add_empty_row();
-    
-    CHECK(table->get_string(0, 0).is_null());
+ 
+    if (NULLS)
+        CHECK(table->get_string(0, 0).is_null());
+    else
+        CHECK(table->get_string(0, 0) == "");
 }
 
 TEST(Table_DeleteCrash)
@@ -3567,7 +3570,7 @@ TEST(Table_WriteSlice)
     // check that the name of the written table is as expected
     {
         Table table;
-        test_write_slice_name(test_results, table, StringData(),    false);
+        test_write_slice_name(test_results, table, "",    false);
         test_write_slice_name(test_results, table, "foo", true); // Override
         test_write_slice_name(test_results, table, "",    true); // Override
     }

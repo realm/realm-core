@@ -722,40 +722,42 @@ TEST(TableView_DoubleSortPrecision)
 
 TEST(TableView_SortNullString)
 {
-    Table t;
-    t.add_column(type_String, "s");
-    t.add_empty_row(4);
-    t.set_string(0, 0, StringData("")); // empty string
-    t.set_string(0, 1, StringData());   // null
-    t.set_string(0, 2, StringData("")); // empty string
-    t.set_string(0, 3, StringData());   // null
-    
-    TableView tv;
-    
-    tv = t.where().find_all();
-    tv.sort(0);
-    CHECK(tv.get_string(0, 0).is_null());
-    CHECK(tv.get_string(0, 1).is_null());
-    CHECK(!tv.get_string(0, 2).is_null());
-    CHECK(!tv.get_string(0, 3).is_null());
+    if (NULLS) {
+        Table t;
+        t.add_column(type_String, "s");
+        t.add_empty_row(4);
+        t.set_string(0, 0, StringData("")); // empty string
+        t.set_string(0, 1, StringData());   // null
+        t.set_string(0, 2, StringData("")); // empty string
+        t.set_string(0, 3, StringData());   // null
 
-    t.set_string(0, 0, StringData("medium medium medium medium"));
+        TableView tv;
 
-    tv = t.where().find_all();
-    tv.sort(0);
-    CHECK(tv.get_string(0, 0).is_null());
-    CHECK(tv.get_string(0, 1).is_null());
-    CHECK(!tv.get_string(0, 2).is_null());
-    CHECK(!tv.get_string(0, 3).is_null());
+        tv = t.where().find_all();
+        tv.sort(0);
+        CHECK(tv.get_string(0, 0).is_null());
+        CHECK(tv.get_string(0, 1).is_null());
+        CHECK(!tv.get_string(0, 2).is_null());
+        CHECK(!tv.get_string(0, 3).is_null());
 
-    t.set_string(0, 0, StringData("long long long long long long long long long long long long long long"));
+        t.set_string(0, 0, StringData("medium medium medium medium"));
 
-    tv = t.where().find_all();
-    tv.sort(0);
-    CHECK(tv.get_string(0, 0).is_null());
-    CHECK(tv.get_string(0, 1).is_null());
-    CHECK(!tv.get_string(0, 2).is_null());
-    CHECK(!tv.get_string(0, 3).is_null());
+        tv = t.where().find_all();
+        tv.sort(0);
+        CHECK(tv.get_string(0, 0).is_null());
+        CHECK(tv.get_string(0, 1).is_null());
+        CHECK(!tv.get_string(0, 2).is_null());
+        CHECK(!tv.get_string(0, 3).is_null());
+
+        t.set_string(0, 0, StringData("long long long long long long long long long long long long long long"));
+
+        tv = t.where().find_all();
+        tv.sort(0);
+        CHECK(tv.get_string(0, 0).is_null());
+        CHECK(tv.get_string(0, 1).is_null());
+        CHECK(!tv.get_string(0, 2).is_null());
+        CHECK(!tv.get_string(0, 3).is_null());
+    }
 }
 
 TEST(TableView_Delete)

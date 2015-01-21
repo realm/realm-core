@@ -193,8 +193,10 @@ TEST(Replication_General)
         StringData sd1 = table[4].my_string.get();
         StringData sd2 = table[5].my_string.get();
 
-        CHECK(!table[4].my_string.get().is_null());
-        CHECK(table[1].my_string.get().is_null());  // The null was in last row which got move_last_over(1)
+        if (NULLS) {
+            CHECK(!table[4].my_string.get().is_null());
+            CHECK(table[1].my_string.get().is_null());  // The null was in last row which got move_last_over(1)
+        }
     }
 }
 

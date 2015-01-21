@@ -6,6 +6,7 @@
  *  [2011] - [2012] TightDB Inc
  *  All Rights Reserved.
  *
+
  * NOTICE:  All information contained herein is, and remains
  * the property of TightDB Incorporated and its suppliers,
  * if any.  The intellectual and technical concepts contained
@@ -107,11 +108,12 @@ private:
 // Implementation:
 
 inline ArrayStringLong::ArrayStringLong(Allocator& alloc) TIGHTDB_NOEXCEPT:
-    Array(alloc), m_offsets(alloc), m_blob(alloc), m_nulls(alloc)
+    Array(alloc), m_offsets(alloc), m_blob(alloc), m_nulls(NULLS ? alloc : Allocator::get_default())
 {
     m_offsets.set_parent(this, 0);
     m_blob.set_parent(this, 1);
-    m_nulls.set_parent(this, 2);
+    if (NULLS)
+        m_nulls.set_parent(this, 2);
 }
 
 inline void ArrayStringLong::create()
@@ -200,7 +202,8 @@ inline bool ArrayStringLong::update_from_parent(size_t old_baseline) TIGHTDB_NOE
     if (res) {
         m_blob.update_from_parent(old_baseline);
         m_offsets.update_from_parent(old_baseline);
-        m_nulls.update_from_parent(old_baseline);
+        if (NULLS)
+            m_nulls.update_from_parent(old_baseline);
     }
     return res;
 }

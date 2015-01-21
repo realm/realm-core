@@ -20,7 +20,16 @@ void ArrayStringLong::init_from_mem(MemRef mem) TIGHTDB_NOEXCEPT
 
     m_offsets.init_from_ref(offsets_ref);
     m_blob.init_from_ref(blob_ref);
-    m_nulls.init_from_ref(nulls_ref);
+
+    if (NULLS) {
+        m_nulls.init_from_ref(nulls_ref);
+    }
+    else {
+        m_nulls.create(Array::type_Normal);
+        for (size_t t = 0; t < m_offsets.size(); t++)
+            m_nulls.add(1);
+    }
+
 }
 
 
@@ -32,7 +41,7 @@ void ArrayStringLong::add(StringData value)
     if (!m_offsets.is_empty())
         end += to_size_t(m_offsets.back());
     m_offsets.add(end);
-    m_nulls.add(value.data() == null_ptr ? 0 : 1);
+    m_nulls.add(value.is_null() ? 0 : 1);
 }
 
 void ArrayStringLong::set(size_t ndx, StringData value)
@@ -47,7 +56,7 @@ void ArrayStringLong::set(size_t ndx, StringData value)
     size_t new_end = begin + value.size() + 1;
     int64_t diff =  int64_t(new_end) - int64_t(end);
     m_offsets.adjust(ndx, m_offsets.size(), diff);
-    m_nulls.set(ndx, value.data() == null_ptr ? 0 : 1);
+    m_nulls.set(ndx, value.is_null() ? 0 : 1);
 }
 
 void ArrayStringLong::insert(size_t ndx, StringData value)
@@ -56,12 +65,11 @@ void ArrayStringLong::insert(size_t ndx, StringData value)
 
     size_t pos = 0 < ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
     bool add_zero_term = true;
-    m_blob.insert(pos, value.data(), value.size(), add_zero_term);
 
+    m_blob.insert(pos, value.data(), value.size(), add_zero_term);
     m_offsets.insert(ndx, pos + value.size() + 1);
     m_offsets.adjust(ndx+1, m_offsets.size(), value.size() + 1);
-
-    m_nulls.insert(ndx, value.data() == null_ptr ? 0 : 1);
+    m_nulls.insert(ndx, value.is_null() ? 0 : 1);
 }
 
 void ArrayStringLong::erase(size_t ndx)
@@ -147,11 +155,17 @@ StringData ArrayStringLong::get(const char* header, size_t ndx, Allocator& alloc
     ref_type blob_ref;
     ref_type nulls_ref;
 
-    get_three(header, 0, offsets_ref, blob_ref, nulls_ref);
-
-    const char* nulls_header = alloc.translate(nulls_ref);
-    if (Array::get(nulls_header, ndx) == 0)
-        return StringData(null_ptr, 0);
+    if (NULLS) {
+        get_three(header, 0, offsets_ref, blob_ref, nulls_ref);
+        const char* nulls_header = alloc.translate(nulls_ref);
+        if (Array::get(nulls_header, ndx) == 0)
+            return StringData(null_ptr, 0);
+    }
+    else {
+        pair<int64_t, int64_t> p = get_two(header, 0);
+        offsets_ref = p.first;
+        blob_ref = p.second;
+    }
 
     const char* offsets_header = alloc.translate(offsets_ref);
     size_t begin, end;

@@ -240,15 +240,20 @@ inline StringIndex::key_type StringIndex::create_key(StringData str) TIGHTDB_NOE
 // as empty strings.
 inline StringIndex::key_type StringIndex::create_key(StringData str, size_t offset) TIGHTDB_NOEXCEPT
 {
-    if (str.is_null())
-        return 0;
+    if (NULLS) {
+        if (str.is_null())
+            return 0;
 
-    size_t tail = str.size() - offset;
-    if (tail <= 3) {
-        char buf[4];
-        buf[tail] = 'X';
-        memcpy(buf, str.data() + offset, tail);
-        return create_key(StringData(buf, tail + 1));
+        size_t tail = str.size() - offset;
+        if (tail <= 3) {
+            char buf[4];
+            buf[tail] = 'X';
+            memcpy(buf, str.data() + offset, tail);
+            return create_key(StringData(buf, tail + 1));
+        }
+        else {
+            return create_key(str.substr(offset));
+        }
     }
     else {
         return create_key(str.substr(offset));
