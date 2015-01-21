@@ -2636,4 +2636,18 @@ TEST_IF(Shared_ArrayEraseBug, TEST_DURATION >= 1)
     }
 }
 
+
+TEST(Shared_ScopedRollback)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg(path);
+    WriteTransaction wt(sg);
+    wt.add_table("foo");
+    wt.rollback();
+    // If wt.rollback() did nothing, then the next statement would cause a
+    // dead-lock. Know that this is part of the test.
+    WriteTransaction wt_2(sg);
+    CHECK_NOT(wt_2.has_table("foo"));
+}
+
 #endif // TEST_SHARED
