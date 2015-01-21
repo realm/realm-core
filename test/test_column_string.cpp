@@ -845,6 +845,10 @@ TEST(ColumnString_FindAll_NoDuplicatesWithIndex)
     col.find_all(res, "a", 0, npos);
 
     CHECK_EQUAL(1, res.size());
+
+    // Clean-up
+    res.destroy();
+    col.destroy();
 }
 
 TEST(ColumnString_Count)

@@ -3253,8 +3253,8 @@ TableView Table::get_distinct_view(size_t col_ndx)
 {
     TIGHTDB_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
 
-    TableView tv(*this, col_ndx);
-    tv.sync_if_needed();
+    TableView tv(*this);
+    tv.sync_distinct_view(col_ndx);
     return tv;
 }
 
@@ -3271,6 +3271,18 @@ TableView Table::get_sorted_view(size_t col_ndx, bool ascending)
 }
 
 ConstTableView Table::get_sorted_view(size_t col_ndx, bool ascending) const
+{
+    return const_cast<Table*>(this)->get_sorted_view(col_ndx, ascending);
+}
+
+TableView Table::get_sorted_view(std::vector<size_t> col_ndx, std::vector<bool> ascending)
+{
+    TableView tv = where().find_all();
+    tv.sort(col_ndx, ascending);
+    return tv;
+}
+
+ConstTableView Table::get_sorted_view(std::vector<size_t> col_ndx, std::vector<bool> ascending) const
 {
     return const_cast<Table*>(this)->get_sorted_view(col_ndx, ascending);
 }

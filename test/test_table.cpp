@@ -1147,6 +1147,64 @@ TEST(Table_Sorted_Query_where)
 #endif
 }
 
+TEST(Table_Multi_Sort)
+{
+    Table table;
+    table.add_column(type_Int, "first");
+    table.add_column(type_Int, "second");
+
+    table.add_empty_row(5);
+
+    // 1, 10
+    table.set_int(0, 0, 1);
+    table.set_int(1, 0, 10);
+
+    // 2, 10
+    table.set_int(0, 1, 2);
+    table.set_int(1, 1, 10);
+
+    // 0, 10
+    table.set_int(0, 2, 0);
+    table.set_int(1, 2, 10);
+
+    // 2, 14
+    table.set_int(0, 3, 2);
+    table.set_int(1, 3, 14);
+
+    // 1, 14
+    table.set_int(0, 4, 1);
+    table.set_int(1, 4, 14);
+
+    vector<size_t> col_ndx1;
+    col_ndx1.push_back(0);
+    col_ndx1.push_back(1);
+
+    vector<bool> asc;
+    asc.push_back(true);
+    asc.push_back(true);
+
+    // (0, 10); (1, 10); (1, 14); (2, 10); (2; 14)
+    TableView v_sorted1 = table.get_sorted_view(col_ndx1, asc);
+    CHECK_EQUAL(table.size(), v_sorted1.size());
+    CHECK_EQUAL(2, v_sorted1.get_source_ndx(0));
+    CHECK_EQUAL(0, v_sorted1.get_source_ndx(1));
+    CHECK_EQUAL(4, v_sorted1.get_source_ndx(2));
+    CHECK_EQUAL(1, v_sorted1.get_source_ndx(3));
+    CHECK_EQUAL(3, v_sorted1.get_source_ndx(4));
+
+    vector<size_t> col_ndx2;
+    col_ndx2.push_back(1);
+    col_ndx2.push_back(0);
+
+    // (0, 10); (1, 10); (2, 10); (1, 14); (2, 14)
+    TableView v_sorted2 = table.get_sorted_view(col_ndx2, asc);
+    CHECK_EQUAL(table.size(), v_sorted2.size());
+    CHECK_EQUAL(2, v_sorted2.get_source_ndx(0));
+    CHECK_EQUAL(0, v_sorted2.get_source_ndx(1));
+    CHECK_EQUAL(1, v_sorted2.get_source_ndx(2));
+    CHECK_EQUAL(4, v_sorted2.get_source_ndx(3));
+    CHECK_EQUAL(3, v_sorted2.get_source_ndx(4));
+}
 
 
 TEST(Table_IndexString)
@@ -1583,6 +1641,38 @@ TEST(Table_DistinctDateTime)
 
     TableView view = table.get_distinct_view(0);
     CHECK_EQUAL(3, view.size());
+}
+
+
+TEST(Table_DistinctFromPersistedTable)
+{
+    GROUP_TEST_PATH(path);
+
+    {
+        Group group;
+        TableRef table = group.add_table("table");
+        table->add_column(type_Int, "first");
+        table->add_empty_row(4);
+        table->set_int(0, 0, 1);
+        table->set_int(0, 1, 2);
+        table->set_int(0, 2, 3);
+        table->set_int(0, 3, 3);
+
+        table->add_search_index(0);
+        CHECK(table->has_search_index(0));
+        group.write(path);
+    }
+
+    {
+        Group group(path, 0, Group::mode_ReadOnly);
+        TableRef table = group.get_table("table");
+        TableView view = table->get_distinct_view(0);
+
+        CHECK_EQUAL(3, view.size());
+        CHECK_EQUAL(0, view.get_source_ndx(0));
+        CHECK_EQUAL(1, view.get_source_ndx(1));
+        CHECK_EQUAL(2, view.get_source_ndx(2));
+    }
 }
 
 

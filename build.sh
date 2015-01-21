@@ -52,7 +52,7 @@ usage()
 Unspecified or bad mode '$MODE'.
 Available modes are:
     config clean build build-config-progs build-iphone build-android
-    build-osx-framework build-cocoa config-param
+    build-osx-framework build-cocoa
     check check-debug show-install install uninstall
     test-installed wipe-installed install-prod install-devel uninstall-prod
     uninstall-devel dist-copy src-dist bin-dist dist-deb dist-status
@@ -382,31 +382,6 @@ get_dist_log_path()
     printf "%s\n" "$path"
 }
 
-download_openssl()
-{
-    if [ -d openssl ]; then
-        return 0
-    fi
-
-    local enabled
-    enabled="$(get_config_param "ENABLE_ENCRYPTION")" || return 1
-    if [ "$enabled" != "yes" ]; then
-        return 0
-    fi
-
-    echo 'Downloading OpenSSL...'
-    curl -L -s "http://www.openssl.org/source/openssl-1.0.1k.tar.gz" -o openssl.tar.gz || return 1
-    tar -xzf openssl.tar.gz || return 1
-    mv openssl-1.0.1k openssl || return 1
-    rm openssl.tar.gz || return 1
-
-    # A function we don't use calls OPENSSL_cleanse, which has all sorts of
-    # dependencies due to being written in asm
-    sed '/OPENSSL_cleanse/d' 'openssl/crypto/sha/sha256.c' > sha_tmp
-    mv sha_tmp 'openssl/crypto/sha/sha256.c'
-}
-
-
 case "$MODE" in
 
     "config")
@@ -544,16 +519,6 @@ EOF
         exit 0
         ;;
 
-    "config-param")
-        parameter="$1"
-        if ! [ "$parameter" ]; then
-            echo "Parameter excepted."
-            exit 1
-        fi
-        get_config_param "$parameter"
-        exit 0
-        ;;
-
     "clean")
         auto_configure || exit 1
         export TIGHTDB_HAVE_CONFIG="1"
@@ -665,7 +630,6 @@ EOF
 
     "build-android")
         auto_configure || exit 1
-        download_openssl || exit 1
 
         export TIGHTDB_HAVE_CONFIG="1"
         android_ndk_home="$(get_config_param "ANDROID_NDK_HOME")" || exit 1
@@ -681,6 +645,7 @@ EOF
         fi
 
         enable_encryption="$(get_config_param "ENABLE_ENCRYPTION")" || return 1
+        echo "Encryption enabled: ${enable_encryption}"
 
         export TIGHTDB_ANDROID="1"
         mkdir -p "$ANDROID_DIR" || exit 1
@@ -717,65 +682,10 @@ EOF
             fi
             denom="android-$target"
 
-            # Build OpenSSL if needed
-            libcrypto_name="libcrypto-$denom.a"
-            if ! [ -f "$ANDROID_DIR/$libcrypto_name" ] && [ $enable_encryption = yes ]; then
-                (
-                    cd openssl
-                    export MACHINE=$target
-                    export RELEASE=2.6.37
-                    export SYSTEM=android
-                    export ARCH=arm
-                    export HOSTCC=gcc
-                    export PATH="$path"
-                    export CC="$cc"
-                    ./config no-idea no-camellia no-seed no-bf no-cast no-des \
-                             no-rc2 no-rc4 no-rc5 no-md2 no-md4 no-ripemd \
-                             no-mdc2 no-rsa no-dsa no-dh no-ec no-ecdsa no-ecdh \
-                             no-sock no-ssl2 no-ssl3 no-err no-krb5 no-engine \
-                             no-srtp no-speed -DOPENSSL_NO_SHA512 \
-                             -DOPENSSL_NO_SHA0 -w -fPIC || exit 1
-                    $MAKE clean
-                ) || exit 1
-
-                PATH="$path" CC="$cc" CFLAGS="$cflags_arch" $MAKE -C "openssl" build_libs || exit 1
-                cp "openssl/libcrypto.a" "$ANDROID_DIR/$libcrypto_name" || exit 1
-            fi
-
             # Build tightdb
             PATH="$path" CC="$cc" $MAKE -C "src/tightdb" CC_IS="gcc" BASE_DENOM="$denom" CFLAGS_ARCH="$cflags_arch" "libtightdb-$denom.a" || exit 1
 
-            if [ $enable_encryption = yes ]; then
-                # Merge OpenSSL and tightdb into one static library
-                mkdir ar-temp
-                (
-                    AR="$(echo "$temp_dir/bin/$android_prefix-linux-*-gcc-ar")" || exit 1
-                    RANLIB="$(echo "$temp_dir/bin/$android_prefix-linux-*-gcc-ranlib")" || exit 1
-                    cd ar-temp
-                    echo $AR x "../$ANDROID_DIR/$libcrypto_name" || exit 1
-                    $AR x "../$ANDROID_DIR/$libcrypto_name" || exit 1
-                    find \
-                      . ! -name 'aes*' \
-                      -a ! -name cbc128.o \
-                      -a ! -name sha256.o \
-                      -a ! -name sha256-586.o \
-                      -delete || exit 1
-                    rm -f aes_wrap.o
-                    $AR x "../src/tightdb/libtightdb-$denom.a" || exit 1
-                    $AR r "../$ANDROID_DIR/libtightdb-$denom.a" *.o || exit 1
-                    $RANLIB "../$ANDROID_DIR/libtightdb-$denom.a"
-                ) || exit 1
-                rm -r ar-temp
-
-                echo 'This product includes software developed by the OpenSSL Project for use in the OpenSSL toolkit. (http://www.openssl.org/).' > $ANDROID_DIR/OpenSSL.txt
-                echo '' >> $ANDROID_DIR/OpenSSL.txt
-                echo 'The following license applies only to the portions of this product developed by the OpenSSL Project.' >> $ANDROID_DIR/OpenSSL.txt
-                echo '' >> $ANDROID_DIR/OpenSSL.txt
-
-                cat openssl/LICENSE >> $ANDROID_DIR/OpenSSL.txt
-            else
-                cp "src/tightdb/libtightdb-$denom.a" "$ANDROID_DIR" || exit 1
-            fi
+            cp "src/tightdb/libtightdb-$denom.a" "$ANDROID_DIR" || exit 1
 
             rm -rf "$temp_dir" || exit 1
         done
@@ -792,16 +702,10 @@ EOF
         tightdb_version="$(sh build.sh get-version)" || exit
         dir_name="core-$tightdb_version"
         file_name="realm-core-android-$tightdb_version.tar.gz"
-        tar_files='libtightdb*'
-        if [ $enable_encryption = yes ]; then
-            dir_name="$dir_name-encryption"
-            file_name="realm-core-android-$tightdb_version-encryption.tar.gz"
-            tar_files='libtightdb* *.txt'
-        fi
 
         echo "Create tar.gz file $file_name"
         rm -f "$TIGHTDB_HOME/$file_name" || exit 1
-        (cd "$TIGHTDB_HOME/$ANDROID_DIR" && tar czf "$TIGHTDB_HOME/$file_name" include $tar_files) || exit 1
+        (cd "$TIGHTDB_HOME/$ANDROID_DIR" && tar czf "$TIGHTDB_HOME/$file_name" .) || exit 1
 
         echo "Unpacking in ../tightdb_java/$dir_name"
         mkdir -p ../tightdb_java/realm-jni/build || exit 1 # to help Mr. Jenkins
@@ -2774,11 +2678,7 @@ EOF
             echo "Bad check mode '$check_mode'" 1>&2
             exit 1
         fi
-        encryption="$2"
-        if [ "$encryption" ]; then
-            encryption="no"
-        fi
-        TIGHTDB_MAX_BPNODE_SIZE_DEBUG="4" TIGHTDB_ENABLE_ENCRYPTION="$encryption" sh build.sh config || exit 1
+        TIGHTDB_MAX_BPNODE_SIZE_DEBUG="4" sh build.sh config || exit 1
         UNITTEST_SHUFFLE="1" UNITTEST_REANDOM_SEED="random" UNITTEST_XML="1" sh build.sh "$check_mode" || exit 1
         exit 0
         ;;

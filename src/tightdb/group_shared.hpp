@@ -32,6 +32,12 @@ namespace _impl {
 class WriteLogCollector;
 }
 
+// Thrown by SharedGroup::open if the lock file is already open in another
+// process which can't share mutexes with this process
+struct IncompatibleLockFile : std::runtime_error {
+    IncompatibleLockFile() : runtime_error("Incompatible lock file") { }
+};
+
 /// A SharedGroup facilitates transactions.
 ///
 /// When multiple threads or processes need to access a database
@@ -220,21 +226,31 @@ public:
     /// group. Doing so will result in undefined behavior.
     void reserve(std::size_t size_in_bytes);
 
-    // Querying for changes:
-    //
-    // NOTE:
-    // "changed" means that one or more commits has been made to the database
-    // since the SharedGroup (on which wait_for_change() is called) last
-    // started, committed, promoted or advanced a transaction.
-    //
-    // No distinction is made between changes done by another process
-    // and changes done by another thread in the same process as the caller.
-    //
-    // Has db been changed ?
+    /// Querying for changes:
+    ///
+    /// NOTE:
+    /// "changed" means that one or more commits has been made to the database
+    /// since the SharedGroup (on which wait_for_change() is called) last
+    /// started, committed, promoted or advanced a transaction.
+    ///
+    /// No distinction is made between changes done by another process
+    /// and changes done by another thread in the same process as the caller.
+    ///
+    /// Has db been changed ?
     bool has_changed();
 
-    // The calling thread goes to sleep until the database is changed.
-    void wait_for_change();
+    /// The calling thread goes to sleep until the database is changed, or
+    /// until wait_for_change_release() is called. After a call to wait_for_change_release()
+    /// further calls to wait_for_change() will return immediately. To restore
+    /// the ability to wait for a change, a call to enable_wait_for_change()
+    /// is required. Return true if the database has changed, false if it might have. 
+    bool wait_for_change();
+
+    /// release any thread waiting in wait_for_change() on *this* SharedGroup.
+    void wait_for_change_release();
+
+    /// re-enable waiting for change
+    void enable_wait_for_change();
 
     // Transactions:
 
@@ -335,6 +351,7 @@ private:
     util::File m_file;
     util::File::Map<SharedInfo> m_file_map; // Never remapped
     util::File::Map<SharedInfo> m_reader_map;
+    bool m_wait_for_change_enabled;
     std::string m_lockfile_path;
     std::string m_db_path;
     const char* m_key;
@@ -495,6 +512,11 @@ public:
             m_shared_group->rollback();
     }
 
+    bool has_table(StringData name) const TIGHTDB_NOEXCEPT
+    {
+        return get_group().has_table(name);
+    }
+
     TableRef get_table(std::size_t table_ndx) const
     {
         return get_group().get_table(table_ndx); // Throws
@@ -541,6 +563,13 @@ public:
     {
         TIGHTDB_ASSERT(m_shared_group);
         m_shared_group->commit();
+        m_shared_group = 0;
+    }
+
+    void rollback() TIGHTDB_NOEXCEPT
+    {
+        TIGHTDB_ASSERT(m_shared_group);
+        m_shared_group->rollback();
         m_shared_group = 0;
     }
 

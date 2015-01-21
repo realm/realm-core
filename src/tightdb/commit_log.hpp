@@ -30,22 +30,24 @@
 
 namespace tightdb {
 
-class LogFileError : public std::runtime_error {
+class LogFileError: public std::runtime_error {
 public:
-    LogFileError(const std::string file_name) : std::runtime_error(file_name) {}
+    LogFileError(std::string file_name):
+        std::runtime_error(file_name)
+    {
+    }
 };
 
 // Create a writelog collector and associate it with a filepath. You'll need one writelog
-// collector for each shared group. Commits from writelog collectors for a specific filepath 
+// collector for each shared group. Commits from writelog collectors for a specific filepath
 // may later be obtained through other writrlog collectors associated with said filepath.
 // The caller assumes ownership of the writelog collector and must destroy it, but only AFTER
 // destruction of the shared group using it.
 Replication* makeWriteLogCollector(std::string filepath,
                                    bool server_synchronization_mode = false,
-                                   const char *encryption_key = 0);
+                                   const char* encryption_key = 0);
 
 } // namespace tightdb
 
 #endif // TIGHTDB_ENABLE_REPLICATION
-
 #endif // TIGHTDB_COMMIT_LOG_HPP

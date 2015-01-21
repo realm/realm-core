@@ -6579,6 +6579,9 @@ TEST(LangBindHelper_SyncCannotBeChanged_2)
 #ifndef TIGHTDB_ENABLE_ENCRYPTION
 // Interprocess communication does not work with encryption enabled
 
+#if !defined(TIGHTDB_ANDROID) && !defined(TIGHTDB_IOS)
+// fork should not be used on android or ios.
+
 TEST(LangBindHelper_ImplicitTransactions_InterProcess)
 {
     const int write_process_count = 7;
@@ -6662,6 +6665,7 @@ TEST(LangBindHelper_ImplicitTransactions_InterProcess)
     }
 
 }
+#endif
 #endif
 #endif
 
@@ -6999,6 +7003,35 @@ TEST(LangBindHelper_VersionControl)
     }
 }
 
+TEST(Shared_LinkListCrash)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
+    SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
+    {
+        WriteTransaction wt(sg);
+        TableRef points = wt.add_table("Point");
+        points->add_column(type_Int, "value");
+        wt.commit();
+    }
+
+    UniquePtr<Replication> repl2(makeWriteLogCollector(path, false, crypt_key()));
+    SharedGroup sg2(*repl, SharedGroup::durability_Full, crypt_key());
+    Group& g2 = const_cast<Group&>(sg2.begin_read());
+    for (int i = 0; i < 2; ++i) {
+        WriteTransaction wt(sg);
+        wt.commit();
+    }
+    for (int i = 0; i < 1; ++i)
+    {
+        WriteTransaction wt(sg);
+        wt.get_table("Point")->add_empty_row();
+        wt.commit();
+    }
+    g2.Verify();
+    LangBindHelper::advance_read(sg2);
+    g2.Verify();
+}
 
 
 #endif // TIGHTDB_ENABLE_REPLICATION

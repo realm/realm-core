@@ -9,6 +9,7 @@
 #  include <unistd.h>
 #  include <sys/wait.h>
 #  include <signal.h>
+#  include <sched.h>
 #  define ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE
 #else
 #  define NOMINMAX
@@ -166,7 +167,7 @@ void killer(TestResults& test_results, int pid, string path, int id)
 
 } // anonymous namespace
 
-#if !defined(__APPLE__) && !defined(_WIN32)&& !defined TIGHTDB_ENABLE_ENCRYPTION
+#if !defined(__APPLE__) && !defined(_WIN32)&& !defined TIGHTDB_ENABLE_ENCRYPTION && !defined(TIGHTDB_ANDROID)
 
 TEST(Shared_PipelinedWritesWithKills)
 {
@@ -1219,6 +1220,8 @@ TEST(Shared_WriterThreads)
 
 
 #if defined TEST_ROBUSTNESS && defined ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE && !defined TIGHTDB_ENABLE_ENCRYPTION
+#if !defined TIGHTDB_ANDROID && !defined TIGHTDB_IOS
+
 // Not supported on Windows in particular? Keywords: winbug
 TEST(Shared_RobustAgainstDeathDuringWrite)
 {
@@ -1284,6 +1287,7 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
     }
 }
 
+#endif // not ios or android
 #endif // defined TEST_ROBUSTNESS && defined ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE && !defined TIGHTDB_ENABLE_ENCRYPTION
 
 
@@ -1980,43 +1984,57 @@ TEST_IF(Shared_AsyncMultiprocess, allow_async)
 #endif
 }
 
+namespace {
+
 static const int num_threads = 3;
 static int shared_state[num_threads];
+static SharedGroup* sgs[num_threads];
 static Mutex muu;
+
 void waiter(string path, int i)
 {
-    SharedGroup sg(path, true, SharedGroup::durability_Full);
+    SharedGroup* sg = new SharedGroup(path, true, SharedGroup::durability_Full);
     {
         LockGuard l(muu);
         shared_state[i] = 1;
+        sgs[i] = sg;
     }
-    sg.wait_for_change();
+    sg->wait_for_change();
     {
         LockGuard l(muu);
         shared_state[i] = 2; // this state should not be observed by the writer
     }
-    sg.wait_for_change(); // we'll fall right through here, because we haven't advanced our readlock
+    sg->wait_for_change(); // we'll fall right through here, because we haven't advanced our readlock
     {
         LockGuard l(muu);
         shared_state[i] = 3;
     }
-    sg.begin_read();
-    sg.end_read();
-    sg.wait_for_change(); // this time we'll wait because state hasn't advanced since we did.
+    sg->begin_read();
+    sg->end_read();
+    sg->wait_for_change(); // this time we'll wait because state hasn't advanced since we did.
     {
         LockGuard l(muu);
         shared_state[i] = 4;
     }
     // works within a read transaction as well
-    sg.begin_read();
-    sg.wait_for_change();
-    sg.end_read();
+    sg->begin_read();
+    sg->wait_for_change();
+    sg->end_read();
     {
         LockGuard l(muu);
         shared_state[i] = 5;
     }
+    sg->begin_read();
+    sg->end_read();
+    sg->wait_for_change(); // wait until wait_for_change is released
+    {
+        LockGuard l(muu);
+        shared_state[i] = 6;
+    }
+}
 }
 
+// This test will hang infinitely instead of failing!!!
 TEST(Shared_WaitForChange)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -2026,32 +2044,62 @@ TEST(Shared_WaitForChange)
     Thread threads[num_threads];
     for (int j=0; j < num_threads; j++)
         threads[j].start(bind(&waiter, string(path), j));
-    sleep(1);
-    for (int j=0; j < num_threads; j++) {
-        LockGuard l(muu);
-        CHECK_EQUAL(1, shared_state[j]);
+    bool try_again = true;
+    while (try_again) {
+        try_again = false;
+        for (int j=0; j < num_threads; j++) {
+            LockGuard l(muu);
+            if (shared_state[j] != 1) try_again = true;
+        }
     }
 
     sg.begin_write();
     sg.commit();
-    sleep(1);
-    for (int j=0; j < num_threads; j++) {
-        LockGuard l(muu);
-        CHECK_EQUAL(3, shared_state[j]);
+    try_again = true;
+    while (try_again) {
+        try_again = false;
+        for (int j=0; j < num_threads; j++) {
+            LockGuard l(muu);
+            if (3 != shared_state[j]) try_again = true;
+        }
+    }
+
+    sg.begin_write();
+    sg.commit();
+    try_again = true;
+    while (try_again) {
+        try_again = false;
+        for (int j=0; j < num_threads; j++) {
+            LockGuard l(muu);
+            if (4 != shared_state[j]) try_again = true;
+        }
     }
     sg.begin_write();
     sg.commit();
-    sleep(1);
-    for (int j=0; j < num_threads; j++) {
-        LockGuard l(muu);
-        CHECK_EQUAL(4, shared_state[j]);
+    try_again = true;
+    while (try_again) {
+        try_again = false;
+        for (int j=0; j < num_threads; j++) {
+            LockGuard l(muu);
+            if (5 != shared_state[j]) try_again = true;
+        }
     }
-    sg.begin_write();
-    sg.commit();
-    sleep(1);
-    for (int j=0; j < num_threads; j++) {
-        LockGuard l(muu);
-        CHECK_EQUAL(5, shared_state[j]);
+    try_again = true;
+    while (try_again) {
+        try_again = false;
+        for (int j=0; j < num_threads; j++) {
+            LockGuard l(muu);
+            if (sgs[j]) {
+                sgs[j]->wait_for_change_release();
+            }
+            if (6 != shared_state[j]) {
+                try_again = true;
+            }
+            else { 
+                delete sgs[j];
+                sgs[j] = 0;
+            }
+        }
     }
     for (int j=0; j < num_threads; j++)
         threads[j].join();
@@ -2586,6 +2634,20 @@ TEST_IF(Shared_ArrayEraseBug, TEST_DURATION >= 1)
         table->insert_empty_row(row_ndx);
         wt.commit();
     }
+}
+
+
+TEST(Shared_ScopedRollback)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg(path);
+    WriteTransaction wt(sg);
+    wt.add_table("foo");
+    wt.rollback();
+    // If wt.rollback() did nothing, then the next statement would cause a
+    // dead-lock. Know that this is part of the test.
+    WriteTransaction wt_2(sg);
+    CHECK_NOT(wt_2.has_table("foo"));
 }
 
 #endif // TEST_SHARED
