@@ -18,7 +18,7 @@
 
 ### Internals:
 
-* Lorem ipsum.
+* All assert failures now print the release version number.
 
 ----------------------------------------------
 
