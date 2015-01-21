@@ -27,7 +27,9 @@ using namespace tightdb::test_util;
 */
 
 static const char realm_path[] = "/tmp/benchmark-common-tasks.tightdb";
-static const size_t repetitions[] = { 10, 100, 1000 };
+static const size_t min_repetitions = 10;
+static const size_t max_repetitions = 100;
+static const double min_duration_s = 0.05;
 
 struct Benchmark
 {
@@ -185,6 +187,19 @@ static const char* durability_level_to_cstr(SharedGroup::DurabilityLevel level)
     }
 }
 
+void run_benchmark_once(Benchmark& benchmark, SharedGroup& sg, Timer& timer)
+{
+    timer.pause();
+    benchmark.setup(sg);
+    timer.unpause();
+
+    benchmark(sg);
+
+    timer.pause();
+    benchmark.teardown(sg);
+    timer.unpause();
+}
+
 
 /// This little piece of likely over-engineering runs the benchmark a number of times,
 /// with each durability setting, and reports the results for each run.
@@ -196,43 +211,39 @@ void run_benchmark(BenchmarkResults& results)
 #else
     const size_t num_durabilities = 2; // FIXME Figure out how to run the async commit daemon.
 #endif
-    static const size_t num_repetition_groups = sizeof(repetitions) / sizeof(*repetitions);
 
     Timer timer(Timer::type_UserTime);
     for (size_t i = 0; i < num_durabilities; ++i) {
+        // Open a SharedGroup:
+        File::try_remove(realm_path);
+        UniquePtr<SharedGroup> group;
         SharedGroup::DurabilityLevel level = static_cast<SharedGroup::DurabilityLevel>(i);
-        for (size_t j = 0; j < num_repetition_groups; ++j) {
-            size_t rep = repetitions[j];
-            B benchmark;
+        group.reset(new SharedGroup(realm_path, false, level));
 
-            // Generate the benchmark result texts:
-            std::stringstream lead_text_ss;
-            std::stringstream ident_ss;
-            lead_text_ss << benchmark.name() << " (" << durability_level_to_cstr(level) << ", x" << rep << ")";
-            ident_ss << benchmark.name() << "_" << durability_level_to_cstr(level) << "_" << rep;
-            std::string lead_text = lead_text_ss.str();
-            std::string ident = ident_ss.str();
+        B benchmark;
 
-            // Open a SharedGroup:
-            File::try_remove(realm_path);
-            UniquePtr<SharedGroup> group;
-            group.reset(new SharedGroup(realm_path, false, level));
+        // Generate the benchmark result texts:
+        std::stringstream lead_text_ss;
+        std::stringstream ident_ss;
+        lead_text_ss << benchmark.name() << " (" << durability_level_to_cstr(level) << ")";
+        ident_ss << benchmark.name() << "_" << durability_level_to_cstr(level);
+        std::string ident = ident_ss.str();
 
-            // Run the benchmarks with cumulative results.
-            timer.reset();
-            timer.pause();
-            for (size_t r = 0; r < rep; ++r) {
-                benchmark.setup(*group);
+        // Warm-up and initial measuring:
+        Timer t_unused(Timer::type_UserTime);
+        run_benchmark_once(benchmark, *group, t_unused);
 
-                timer.unpause();
-                benchmark(*group);
-                timer.pause();
-                
-                benchmark.teardown(*group);
-            }
-            timer.unpause();
-            results.submit(timer, ident.c_str(), lead_text.c_str());
+        size_t rep;
+        double total = 0;
+        for (rep = 0; rep < max_repetitions && (rep < min_repetitions || total < min_duration_s); ++rep) {
+            Timer t;
+            run_benchmark_once(benchmark, *group, t);
+            double s = t.get_elapsed_time();
+            total += s;
+            results.submit(ident, s);
         }
+
+        results.finish(ident, lead_text_ss.str());
     }
 }
 

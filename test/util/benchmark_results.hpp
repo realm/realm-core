@@ -39,22 +39,31 @@ public:
         change_RiseFactor
     };
 
-    void submit(double elapsed_seconds, const char* ident, const char* lead_text,
+    /// Use submit_single() when you know there is only going to be a single datapoint.
+    void submit_single(const std::string& ident, const std::string& lead_text, double seconds,
                 ChangeType = change_Percent);
+
+    /// Use submit() when there are multiple data points, and call finish() when you are done.
+    void submit(const std::string& ident, double seconds);
+    void finish(const std::string& ident, const std::string& lead_text, ChangeType = change_Percent);
 
 private:
     int m_max_lead_text_width;
     const char* const m_results_file_stem;
 
     struct Result {
-        Result(double elapsed_seconds, const char* ident):
-            m_elapsed_seconds(elapsed_seconds), m_ident(ident) {}
-        double m_elapsed_seconds;
-        const char* m_ident;
+        Result();
+        double min;
+        double max;
+        double total;
+        size_t rep;
+
+        double avg() const;
     };
-    typedef std::vector<Result> Results;
+
+    typedef std::map<std::string, Result> Results;
     Results m_results;
-    typedef std::map<std::string, double> BaselineResults;
+    typedef std::map<std::string, Result> BaselineResults;
     BaselineResults m_baseline_results;
 
     void try_load_baseline_results();
