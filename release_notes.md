@@ -10,6 +10,9 @@
 
 ### Enhancements:
 
+* `WriteTransaction::has_table()` and `WriteTransaction::rollback()` were
+  added. Previously, only implicit rollback was possible with
+  `WriteTransaction`.
 * Generic networking API added.
 
 -----------
