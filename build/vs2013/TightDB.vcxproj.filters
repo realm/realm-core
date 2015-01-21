@@ -103,6 +103,7 @@
     <ClCompile Include="..\..\test\util\wildcard.cpp" />
     <ClCompile Include="..\..\src\tightdb\util\errno.cpp" />
     <ClCompile Include="..\..\src\tightdb\util\file_mapper.cpp" />
+    <ClCompile Include="..\..\src\tightdb\query_engine.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\tightdb.hpp" />
@@ -190,6 +191,9 @@
     <ClInclude Include="..\..\test\testsettings.hpp" />
     <ClInclude Include="..\..\src\tightdb\util\errno.hpp" />
     <ClInclude Include="..\..\src\tightdb\util\file_mapper.hpp" />
+    <ClInclude Include="..\..\src\tightdb\exceptions.hpp" />
+    <ClInclude Include="..\..\src\tightdb\link_view_fwd.hpp" />
+    <ClInclude Include="..\..\src\tightdb\table_basic_fwd.hpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="changelog.txt" />
