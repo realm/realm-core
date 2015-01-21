@@ -1,25 +1,17 @@
-# NEXT RELEASE
+# 0.87.6 Release notes
 
 ### Bugfixes:
 
-* Fixed a crashbug which could cause a reading thread to miss accessor updates during
-  advance_read(), if the pending updates consisted of two or more empty commits followed
-  by one or more non-empty commit. The left out accessor updates could lead to inconsistent
-  datastructures which could presumably later cause database corruption.
-
-### API breaking changes:
-
-* Adding *null* support to `BinaryData` in exactly the same way as it was added to `StringData`.
+* Fixed a crashbug which could cause a reading thread to miss accessor updates
+  during advance_read(), if the pending updates consisted of two or more empty
+  commits followed by one or more non-empty commit. The left out accessor
+  updates could lead to inconsistent datastructures which could presumably later
+  cause database corruption.
 
 ### Enhancements:
 
-* Lorem ipsum.
-
------------
-
-### Internals:
-
-* Lorem ipsum.
+* Adding *null* support to `BinaryData` in exactly the same way as it was added
+  to `StringData`.
 
 ----------------------------------------------
 
