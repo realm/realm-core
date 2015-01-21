@@ -48,7 +48,7 @@ public:
     /// Returns elapsed time in seconds since last call to reset().
     double get_elapsed_time() const
     {
-        return calc_elapsed_seconds(get_timer_ticks() - m_start - m_paused_for);
+        return calc_elapsed_seconds(get_timer_ticks() - m_start);
     }
 
     /// Same as get_elapsed_time().
@@ -68,7 +68,6 @@ private:
     const Type m_type;
     uint_fast64_t m_start;
     uint_fast64_t m_paused_at;
-    uint_fast64_t m_paused_for;
 
     uint_fast64_t get_timer_ticks() const;
     double calc_elapsed_seconds(uint_fast64_t ticks) const;
@@ -81,7 +80,6 @@ private:
 inline void Timer::reset() {
     m_start = get_timer_ticks();
     m_paused_at = 0;
-    m_paused_for = 0;
 }
 
 inline void Timer::pause() {
@@ -90,7 +88,7 @@ inline void Timer::pause() {
 
 inline void Timer::unpause() {
     if (m_paused_at) {
-        m_paused_for += get_timer_ticks() - m_paused_at;
+        m_start += get_timer_ticks() - m_paused_at;
         m_paused_at = 0;
     }
 }
