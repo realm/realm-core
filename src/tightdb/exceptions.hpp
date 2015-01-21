@@ -63,7 +63,7 @@ public:
 
 /// Thrown by various functions to indicate that a specified table does not
 /// exist.
-class NoSuchTable: public ExceptionWithVersionInWhat {
+class NoSuchTable: public std::exception {
 public:
     const char* what() const TIGHTDB_NOEXCEPT_OR_NOTHROW TIGHTDB_OVERRIDE;
 };
@@ -71,7 +71,7 @@ public:
 
 /// Thrown by various functions to indicate that a specified table name is
 /// already in use.
-class TableNameInUse: public ExceptionWithVersionInWhat {
+class TableNameInUse: public std::exception {
 public:
     const char* what() const TIGHTDB_NOEXCEPT_OR_NOTHROW TIGHTDB_OVERRIDE;
 };
@@ -79,7 +79,7 @@ public:
 
 // Thrown by functions that require a table to **not** be the target of link
 // columns, unless those link columns are part of the table itself.
-class CrossTableLinkTarget: public ExceptionWithVersionInWhat {
+class CrossTableLinkTarget: public std::exception {
 public:
     const char* what() const TIGHTDB_NOEXCEPT_OR_NOTHROW TIGHTDB_OVERRIDE;
 };
@@ -87,7 +87,7 @@ public:
 
 /// Thrown by various functions to indicate that the dynamic type of a table
 /// does not match a particular other table type (dynamic or static).
-class DescriptorMismatch: public ExceptionWithVersionInWhat {
+class DescriptorMismatch: public std::exception {
 public:
     const char* what() const TIGHTDB_NOEXCEPT_OR_NOTHROW TIGHTDB_OVERRIDE;
 };
@@ -149,6 +149,26 @@ private:
 
 
 // Implementation:
+
+inline const char* NoSuchTable::what() const TIGHTDB_NOEXCEPT_OR_NOTHROW
+{
+    return "No such table exists";
+}
+
+inline const char* TableNameInUse::what() const TIGHTDB_NOEXCEPT_OR_NOTHROW
+{
+    return "The specified table name is already in use";
+}
+
+inline const char* CrossTableLinkTarget::what() const TIGHTDB_NOEXCEPT_OR_NOTHROW
+{
+    return "Table is target of cross-table link columns";
+}
+
+inline const char* DescriptorMismatch::what() const TIGHTDB_NOEXCEPT_OR_NOTHROW
+{
+    return "Table descriptor mismatch";
+}
 
 inline LogicError::LogicError(LogicError::error_kind kind):
     m_message(get_message_for_error(kind))

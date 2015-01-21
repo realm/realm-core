@@ -83,22 +83,3 @@ const char* LogicError::get_message_for_error(LogicError::error_kind kind) TIGHT
     return TIGHTDB_VER_CHUNK " Unknown error";
 }
 
-const char* NoSuchTable::what() const TIGHTDB_NOEXCEPT_OR_NOTHROW
-{
-    return TIGHTDB_VER_CHUNK " No such table exists";
-}
-
-const char* TableNameInUse::what() const TIGHTDB_NOEXCEPT_OR_NOTHROW
-{
-    return TIGHTDB_VER_CHUNK " The specified table name is already in use";
-}
-
-const char* CrossTableLinkTarget::what() const TIGHTDB_NOEXCEPT_OR_NOTHROW
-{
-    return TIGHTDB_VER_CHUNK " Table is target of cross-table link columns";
-}
-
-const char* DescriptorMismatch::what() const TIGHTDB_NOEXCEPT_OR_NOTHROW
-{
-    return TIGHTDB_VER_CHUNK " Table descriptor mismatch";
-}
