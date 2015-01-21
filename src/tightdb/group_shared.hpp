@@ -512,6 +512,11 @@ public:
             m_shared_group->rollback();
     }
 
+    bool has_table(StringData name) const TIGHTDB_NOEXCEPT
+    {
+        return get_group().has_table(name);
+    }
+
     TableRef get_table(std::size_t table_ndx) const
     {
         return get_group().get_table(table_ndx); // Throws
@@ -558,6 +563,13 @@ public:
     {
         TIGHTDB_ASSERT(m_shared_group);
         m_shared_group->commit();
+        m_shared_group = 0;
+    }
+
+    void rollback() TIGHTDB_NOEXCEPT
+    {
+        TIGHTDB_ASSERT(m_shared_group);
+        m_shared_group->rollback();
         m_shared_group = 0;
     }
 
