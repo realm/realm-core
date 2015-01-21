@@ -3,8 +3,12 @@
 
 #include <tightdb/index_string.hpp>
 #include <set>
+#include <tightdb/replication.hpp>
+#include <tightdb/commit_log.hpp>
+#include <tightdb/util/bind.hpp>
+
 #include "test.hpp"
-#include "util/misc.hpp"
+#include "crypt_key.hpp"
 
 using namespace tightdb;
 using namespace util;
@@ -728,5 +732,102 @@ TEST(StringIndex_Bug1)
     col.destroy();
     col2.destroy();
 }
+
+
+
+class ShortCircuitTransactLogManager :
+    public TrivialReplication {
+public:
+    typedef Replication::version_type version_type;
+
+    ShortCircuitTransactLogManager(const string& database_file) :
+        TrivialReplication(database_file)
+    {
+    }
+
+    ~ShortCircuitTransactLogManager() TIGHTDB_NOEXCEPT
+    {
+        typedef TransactLogs::const_iterator iter;
+        iter end = m_transact_logs.end();
+        for (iter i = m_transact_logs.begin(); i != end; ++i)
+            delete[] i->second.data();
+    }
+
+    void handle_transact_log(const char* data, size_t size, Replication::version_type new_version)
+        TIGHTDB_OVERRIDE
+    {
+        UniquePtr<char[]> log(new char[size]); // Throws
+        copy(data, data + size, log.get());
+        m_transact_logs[new_version] = BinaryData(log.get(), size); // Throws
+        log.release();
+    }
+
+    void get_commit_entries(uint_fast64_t from_version, uint_fast64_t to_version, BinaryData* logs_buffer)
+        TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
+    {
+        size_t n = to_version - from_version;
+        for (size_t i = 0; i != n; ++i) {
+            uint_fast64_t version = from_version + i + 1;
+            logs_buffer[i] = m_transact_logs[version];
+        }
+    }
+
+private:
+    typedef map<uint_fast64_t, BinaryData> TransactLogs;
+    TransactLogs m_transact_logs;
+};
+
+
+void* write_thread(void* ptr)
+{
+    SharedGroupTestPathGuard *p = static_cast<SharedGroupTestPathGuard*>(ptr);
+    ShortCircuitTransactLogManager tlm(p->c_str());
+    SharedGroup sg(tlm, SharedGroup::durability_MemOnly, crypt_key());
+
+    Table table;
+    table.add_column(type_Int, "first");
+    table.add_search_index(0);
+
+    sg.begin_read();
+
+    for (size_t t = 0; t < 100; t++) {
+        LangBindHelper::promote_to_write(sg);
+        size_t f = table.find_first_int(0, 0);
+        if (f == not_found) {
+            table.add_empty_row();
+            table.set_int(0, 0, 0);
+        }
+        else {
+            table.set_int(0, 0, 0);
+        }
+
+        LangBindHelper::commit_and_continue_as_read(sg);
+    }
+    sg.end_read();
+
+    return 0;
+}
+
+TEST(StringIndex_FindFirstCrash)
+{
+    SHARED_GROUP_TEST_PATH(path);
+
+#if defined(_WIN32) || defined(__WIN32__) || defined(_WIN64)
+    pthread_win32_process_attach_np();
+#endif
+
+    const size_t writers = 5;
+    pthread_t write_threads[writers];
+
+    for (size_t t = 0; t < 5; t++) {
+        for (size_t i = 0; i < writers; ++i)
+            pthread_create(&write_threads[i], 0, &write_thread, &path);
+
+        for (size_t i = 0; i < writers; ++i)
+            pthread_join(write_threads[i], 0);
+    }
+}
+
+
 
 #endif // TEST_INDEX_STRING
