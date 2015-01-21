@@ -9,6 +9,10 @@
 * Lorem ipsum.
 
 ### Enhancements:
+
+* SharedGroup::compact() now appends ".tmp_compaction_space" to the database name
+  in order to get the name of its temporary workspace file instead of ".tmp". It also
+  automatically removes the file in case it already exists before compaction.
 * Add support for comparing string columns to other string columns in queries.
 * `WriteTransaction::has_table()` and `WriteTransaction::rollback()` were
   added. Previously, only implicit rollback was possible with

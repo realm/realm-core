@@ -837,11 +837,16 @@ bool SharedGroup::compact()
     if (m_transact_stage != transact_Ready) {
         throw runtime_error(m_db_path + ": compact is not supported whithin a transaction");
     }
-    string tmp_path = m_db_path + ".tmp";
+    string tmp_path = m_db_path + ".tmp_compaction_space";
     SharedInfo* info = m_file_map.get_addr();
     RobustLockGuard lock(info->controlmutex, &recover_from_dead_write_transact); // Throws
     if (info->num_participants > 1)
         return false;
+
+    // group::write() will throw if the file already exists.
+    // To prevent this, we have to remove the file (should it exist)
+    // before calling group::write().
+    File::try_remove(tmp_path);
 
     // Using begin_read here ensures that we have access to the latest and greatest entry
     // in the ringbuffer. We need to have access to that later to update top_ref and file_size.
