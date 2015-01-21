@@ -22,10 +22,10 @@
 
 #include <algorithm>
 #include <limits>
+#include <stdexcept>
 #include <iomanip>
 
 #include <tightdb/impl/destroy_guard.hpp>
-#include <tightdb/exceptions.hpp>
 
 namespace tightdb {
 

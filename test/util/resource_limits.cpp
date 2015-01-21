@@ -1,3 +1,5 @@
+#include <stdexcept>
+
 #include <tightdb/util/assert.hpp>
 
 #include "resource_limits.hpp"

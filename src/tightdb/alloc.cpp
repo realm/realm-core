@@ -1,5 +1,6 @@
 #include <cerrno>
 #include <cstdlib>
+#include <stdexcept>
 #include <algorithm>
 
 #include <tightdb/alloc_slab.hpp>

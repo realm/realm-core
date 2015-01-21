@@ -1,3 +1,5 @@
+#include <stdexcept>
+
 #include <tightdb/util/thread.hpp>
 
 #if !defined _WIN32
