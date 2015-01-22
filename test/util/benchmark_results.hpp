@@ -49,7 +49,7 @@ public:
 
 private:
     int m_max_lead_text_width;
-    const char* const m_results_file_stem;
+    std::string m_results_file_stem;
 
     struct Result {
         Result();

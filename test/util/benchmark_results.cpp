@@ -8,7 +8,7 @@
 #include <iomanip>
 #include <float.h> // DBL_MIN, DBL_MAX
 
-#include <unistd.h> // link()
+#include <unistd.h> // link, unlink
 
 #include <tightdb/util/file.hpp>
 
@@ -222,10 +222,14 @@ void BenchmarkResults::save_results()
     }
 
     string baseline_file = m_results_file_stem;
+    string latest_csv_file = m_results_file_stem + ".latest.csv";
     baseline_file += ".baseline";
     if (!util::File::exists(baseline_file)) {
-        int r = link(name.c_str(), baseline_file.c_str());
-        static_cast<void>(r);
+        link(name.c_str(), baseline_file.c_str());
     }
+    if (util::File::exists(latest_csv_file)) {
+        unlink(latest_csv_file.c_str());
+    }
+    link(csv_name.c_str(), latest_csv_file.c_str());
 }
 
