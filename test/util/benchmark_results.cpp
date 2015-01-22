@@ -201,12 +201,23 @@ void BenchmarkResults::save_results()
         "" << setw(2) << local.tm_min << ""
         "" << setw(2) << local.tm_sec;
     string name = name_out.str();
+    string csv_name = name + ".csv";
     {
         ofstream out(name.c_str());
+        ofstream csv_out(csv_name.c_str());
+
+        csv_out << "ident,min,max,avg,reps,total" << '\n';
+        csv_out.setf(std::ios_base::fixed, std::ios_base::floatfield);
+
         typedef Results::const_iterator iter;
         for (iter it = m_results.begin(); it != m_results.end(); ++it) {
-            out << it->first << " ";
-            out << it->second.min << " " << it->second.max << " " << it->second.total << " " << it->second.rep << "\n";
+            const Result& r = it->second;
+
+            out << it->first << ' ';
+            out << r.min << " " << r.max << " " << r.total << " " << r.rep << '\n';
+
+            csv_out << '"' << it->first << "\",";
+            csv_out << r.min << ',' << r.max << ',' << r.avg() << ',' << r.rep << ',' << r.total << '\n';
         }
     }
 
