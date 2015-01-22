@@ -742,6 +742,22 @@ TEST(Table_Optimize_SetIndex_Crash)
     table.move_last_over(1);
 }
 
+ONLY(Table_Move_Last_Over_Int_Indexed)
+{
+    Table table;
+    table.add_column(type_Int, "first");
+    table.add_search_index(0);
+
+    table.add_empty_row(3);
+    table.set_int(0, 0, 0);
+    table.set_int(0, 1, 1);
+    table.set_int(0, 2, 2);
+    CHECK_EQUAL(3, table.size());
+
+    table.move_last_over(1);
+    CHECK_EQUAL(2, table.size());
+}
+
 
 TEST(Table_MoveAllTypes)
 {
