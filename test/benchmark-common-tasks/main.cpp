@@ -173,6 +173,39 @@ struct BenchmarkSetString : BenchmarkWithStrings {
     }
 };
 
+struct BenchmarkQueryNot : Benchmark {
+    const char* name() const { return "QueryNot"; }
+
+    void setup(SharedGroup& group)
+    {
+        WriteTransaction tr(group);
+        TableRef table = tr.add_table(name());
+        table->add_column(type_Int, "first");
+        table->add_empty_row(1000);
+        for (size_t i = 0; i < 1000; ++i) {
+            table->set_int(0, i, 1);
+        }
+        tr.commit();
+    }
+
+    void operator()(SharedGroup& group)
+    {
+        ReadTransaction tr(group);
+        ConstTableRef table = tr.get_table(name());
+        Query q = table->where();
+        q.not_equal(0, 2); // never found, = worst case
+        TableView results = q.find_all();
+        results.size();
+    }
+
+    void teardown(SharedGroup& group)
+    {
+        Group& g = group.begin_write();
+        g.remove_table(name());
+        group.commit();
+    }
+};
+
 
 
 
@@ -254,6 +287,7 @@ int main(int, const char**)
 
     run_benchmark<AddTable>(results);
     run_benchmark<BenchmarkQuery>(results);
+    run_benchmark<BenchmarkQueryNot>(results);
     run_benchmark<BenchmarkSize>(results);
     run_benchmark<BenchmarkSort>(results);
     run_benchmark<BenchmarkInsert>(results);
