@@ -1327,7 +1327,7 @@ inline Array::Array(Allocator& alloc) TIGHTDB_NOEXCEPT:
 // and a few other basic things needed for read-only access. Or for use if you just want a way to call
 // some methods written in Array.*
 inline Array::Array(no_prealloc_tag) TIGHTDB_NOEXCEPT:
-    m_alloc(*static_cast<Allocator*>(0))
+    m_alloc(Allocator::get_default())
 {
 }
 
