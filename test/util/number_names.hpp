@@ -47,7 +47,7 @@ std::string number_name(std::size_t n)
     }
     if (n >= 20) {
         txt += tens[n/10];
-        n %= 10;
+        // n %= 10;
     }
     else {
         txt += " ";
