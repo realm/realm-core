@@ -1988,6 +1988,10 @@ TEST_IF(Shared_AsyncMultiprocess, allow_async)
 #endif
 }
 
+#endif // !defined(_WIN32) && !defined(__APPLE__)
+
+#if !defined(_WIN32)
+
 namespace {
 
 static const int num_threads = 3;
