@@ -242,7 +242,7 @@ void CondVar::handle_wait_error(int err)
 #else
     static_cast<void>(err);
 #endif
-    TIGHTDB_TERMINATE("pthread_mutex_lock() failed");
+    TIGHTDB_TERMINATE("pthread_mutex_wait() failed");
 }
 
 TIGHTDB_NORETURN void CondVar::attr_init_failed(int err)
