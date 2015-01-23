@@ -742,20 +742,29 @@ TEST(Table_Optimize_SetIndex_Crash)
     table.move_last_over(1);
 }
 
-ONLY(Table_Move_Last_Over_Int_Indexed)
+TEST(Table_Move_Last_Over_Int_Indexed)
 {
+    const size_t N = 1001;
     Table table;
     table.add_column(type_Int, "first");
+    table.add_column(type_String, "second");
     table.add_search_index(0);
+    table.clear();
 
-    table.add_empty_row(3);
-    table.set_int(0, 0, 0);
-    table.set_int(0, 1, 1);
-    table.set_int(0, 2, 2);
-    CHECK_EQUAL(3, table.size());
+    // 4 rows
+    for (size_t i = 0; i < N; ++i) {
+        table.insert_string(0, 0, "");
+        table.insert_int(0, 0, i);
+        table.insert_done();
+    }
 
-    table.move_last_over(1);
-    CHECK_EQUAL(2, table.size());
+    CHECK_EQUAL(N, table.size());
+
+    // remove last row
+    for (size_t i = 0; i < N; ++i) {
+        table.move_last_over(table.size() - 1);
+    }
+    CHECK_EQUAL(0, table.size());
 }
 
 
