@@ -418,7 +418,7 @@ private:
     Array m_free_lengths;      // 5th slot in m_top (optional)
     Array m_free_versions;     // 6th slot in m_top (optional)
 
-    typedef std::vector<Table*> table_accessors;
+    typedef std::vector<TableRef> table_accessors;
     mutable table_accessors m_table_accessors;
     const bool m_is_shared;
     bool m_is_attached;

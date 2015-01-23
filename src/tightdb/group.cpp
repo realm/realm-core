@@ -234,10 +234,10 @@ void Group::detach_table_accessors() TIGHTDB_NOEXCEPT
     typedef table_accessors::const_iterator iter;
     iter end = m_table_accessors.end();
     for (iter i = m_table_accessors.begin(); i != end; ++i) {
-        if (Table* t = *i) {
+        if (Table* t = i->get()) {
             typedef _impl::TableFriend tf;
             tf::detach(*t);
-            tf::unbind_ref(*t);
+            //tf::unbind_ref(*t);
         }
     }
 }
@@ -280,7 +280,7 @@ Table* Group::do_get_table(size_t table_ndx, DescMatcher desc_matcher)
         m_table_accessors.resize(m_tables.size()); // Throws
 
     // Get table accessor from cache if it exists, else create
-    Table* table = m_table_accessors[table_ndx];
+    Table* table = m_table_accessors[table_ndx].get();
     if (!table)
         table = create_table_accessor(table_ndx); // Throws
 
@@ -355,7 +355,7 @@ size_t Group::create_table(StringData name)
 
     // Need slot for table accessor
     if (!m_table_accessors.empty())
-        m_table_accessors.push_back(0); // Throws
+        m_table_accessors.push_back(TableRef()); // Throws
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     if (Replication* repl = m_alloc.get_replication())
@@ -407,10 +407,10 @@ Table* Group::create_table_accessor(size_t table_ndx)
     // Increase reference count from 0 to 1 to make the group accessor keep
     // the table accessor alive. This extra reference count will be revoked
     // during destruction of the group accessor.
-    tf::bind_ref(*table);
+    //tf::bind_ref(*table);
 
     tf::mark(*table);
-    m_table_accessors[table_ndx] = table;
+    m_table_accessors[table_ndx].reset(table);
     tf::complete_accessor(*table); // Throws
     tf::unmark(*table);
     return table;
@@ -510,7 +510,7 @@ void Group::remove_table(size_t table_ndx)
     m_table_accessors[table_ndx] = m_table_accessors[last_ndx];
     m_table_accessors.pop_back();
     tf::detach(*table);
-    tf::unbind_ref(*table);
+    //tf::unbind_ref(*table);
 
     // Destroy underlying node structure
     Array::destroy_deep(ref, m_alloc);
@@ -807,7 +807,7 @@ void Group::update_refs(ref_type top_ref, size_t old_baseline) TIGHTDB_NOEXCEPT
     iter end = m_table_accessors.end();
     for (iter i = m_table_accessors.begin(); i != end; ++i) {
         typedef _impl::TableFriend tf;
-        if (Table* table = *i)
+        if (Table* table = i->get())
             tf::update_from_parent(*table, old_baseline);
     }
 }
@@ -910,7 +910,7 @@ void Group::mark_all_table_accessors() TIGHTDB_NOEXCEPT
 {
     size_t num_tables = m_table_accessors.size();
     for (size_t table_ndx = 0; table_ndx != num_tables; ++table_ndx) {
-        if (Table* table = m_table_accessors[table_ndx]) {
+        if (Table* table = m_table_accessors[table_ndx].get()) {
             typedef _impl::TableFriend tf;
             tf::recursive_mark(*table); // Also all subtable accessors
         }
@@ -1073,11 +1073,11 @@ public:
 
         if (!m_group.m_table_accessors.empty()) {
             // for end-insertions, table_ndx will be equal to num_tables
-            m_group.m_table_accessors.push_back(0); // Throws
+            m_group.m_table_accessors.push_back(TableRef()); // Throws
             size_t last_ndx = num_tables;
             m_group.m_table_accessors[last_ndx] = m_group.m_table_accessors[table_ndx];
-            m_group.m_table_accessors[table_ndx] = 0;
-            if (Table* moved_table = m_group.m_table_accessors[last_ndx]) {
+            m_group.m_table_accessors[table_ndx].reset();
+            if (Table* moved_table = m_group.m_table_accessors[last_ndx].get()) {
                 typedef _impl::TableFriend tf;
                 tf::mark(*moved_table);
                 tf::mark_opposite_link_tables(*moved_table);
@@ -1096,15 +1096,15 @@ public:
         if (!m_group.m_table_accessors.empty()) {
             // Link target tables do not need to be considered here, since all
             // columns will already have been removed at this point.
-            if (Table* table = m_group.m_table_accessors[table_ndx]) {
+            if (Table* table = m_group.m_table_accessors[table_ndx].get()) {
                 typedef _impl::TableFriend tf;
                 tf::detach(*table);
-                tf::unbind_ref(*table);
+                //tf::unbind_ref(*table);
             }
 
             size_t last_ndx = num_tables - 1;
             if (table_ndx < last_ndx) {
-                if (Table* moved_table = m_group.m_table_accessors[last_ndx]) {
+                if (Table* moved_table = m_group.m_table_accessors[last_ndx].get()) {
                     typedef _impl::TableFriend tf;
                     tf::mark(*moved_table);
                     tf::mark_opposite_link_tables(*moved_table);
@@ -1128,7 +1128,7 @@ public:
     {
         m_table.reset();
         if (group_level_ndx < m_group.m_table_accessors.size()) {
-            if (Table* table = m_group.m_table_accessors[group_level_ndx]) {
+            if (Table* table = m_group.m_table_accessors[group_level_ndx].get()) {
                 const size_t* path_begin = path;
                 const size_t* path_end = path_begin + 2*levels;
                 for (;;) {
@@ -1540,7 +1540,7 @@ void Group::refresh_dirty_accessors()
     // Refresh all remaining dirty table accessors
     size_t num_tables = m_table_accessors.size();
     for (size_t table_ndx = 0; table_ndx != num_tables; ++table_ndx) {
-        if (Table* table = m_table_accessors[table_ndx]) {
+        if (Table* table = m_table_accessors[table_ndx].get()) {
             typedef _impl::TableFriend tf;
             tf::set_ndx_in_parent(*table, table_ndx);
             if (tf::is_marked(*table)) {
