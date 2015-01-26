@@ -376,7 +376,7 @@ public:
 
     void set_as_ref(std::size_t ndx, ref_type ref);
 
-    template<std::size_t w> void Set(std::size_t ndx, int64_t value);
+    template<std::size_t w> void set(std::size_t ndx, int64_t value);
 
     int64_t get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
     inline uint64_t get_uint(std::size_t ndx) const TIGHTDB_NOEXCEPT;
