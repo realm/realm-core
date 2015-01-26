@@ -381,7 +381,7 @@ public:
     int64_t get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
     inline uint64_t get_uint(std::size_t ndx) const TIGHTDB_NOEXCEPT;
 
-    template<std::size_t w> int64_t Get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
+    template<std::size_t w> int64_t get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
     void get_chunk(size_t ndx, int64_t res[8]) const TIGHTDB_NOEXCEPT;
     template<size_t w> void get_chunk(size_t ndx, int64_t res[8]) const TIGHTDB_NOEXCEPT;
 
@@ -700,7 +700,7 @@ public:
     template<size_t width> inline int64_t LowerBits() const;                   // Return chunk with lower bit set in each element
     std::size_t FirstSetBit(unsigned int v) const;
     std::size_t FirstSetBit64(int64_t v) const;
-    template<std::size_t w> int64_t GetUniversal(const char* const data, const std::size_t ndx) const;
+    template<std::size_t w> int64_t get_universal(const char* const data, const std::size_t ndx) const;
 
     // Find value greater/less in 64-bit chunk - only works for positive values
     template<bool gt, Action action, std::size_t width, class Callback>
@@ -1370,13 +1370,13 @@ inline int64_t Array::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
     // Assume correct width is found early in TIGHTDB_TEMPEX, which is the case for B tree offsets that
     // are probably either 2^16 long. Turns out to be 25% faster if found immediately, but 50-300% slower
     // if found later
-    TIGHTDB_TEMPEX(return Get, (ndx));
+    TIGHTDB_TEMPEX(return get, (ndx));
 */
 /*
     // Slightly slower in both of the if-cases. Also needs an matchcount m_size check too, to avoid
     // reading beyond array.
     if (m_width >= 8 && m_size > ndx + 7)
-        return Get<64>(ndx >> m_shift) & m_widthmask;
+        return get<64>(ndx >> m_shift) & m_widthmask;
     else
         return (this->*m_getter)(ndx);
 */
@@ -2135,12 +2135,12 @@ ref_type Array::bptree_insert(std::size_t elem_ndx, TreeInsert<TreeTraits>& stat
 // Finding code                                                                       *
 //*************************************************************************************
 
-template<std::size_t w> int64_t Array::Get(std::size_t ndx) const TIGHTDB_NOEXCEPT
+template<std::size_t w> int64_t Array::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
-    return GetUniversal<w>(m_data, ndx);
+    return get_universal<w>(m_data, ndx);
 }
 
-template<std::size_t w> int64_t Array::GetUniversal(const char* data, std::size_t ndx) const
+template<std::size_t w> int64_t Array::get_universal(const char* data, std::size_t ndx) const
 {
     if (w == 0) {
         return 0;
@@ -2327,29 +2327,29 @@ template<class cond2, Action action, size_t bitwidth, class Callback> bool Array
 
     // Test first few items with no initial time overhead
     if (start > 0) {
-        if (m_size > start && c(Get<bitwidth>(start), value) && start < end) {
-            if (!find_action<action, Callback>(start + baseindex, Get<bitwidth>(start), state, callback))
+        if (m_size > start && c(get<bitwidth>(start), value) && start < end) {
+            if (!find_action<action, Callback>(start + baseindex, get<bitwidth>(start), state, callback))
                 return false;
         }
 
         ++start;
 
-        if (m_size > start && c(Get<bitwidth>(start), value) && start < end) {
-            if (!find_action<action, Callback>(start + baseindex, Get<bitwidth>(start), state, callback))
+        if (m_size > start && c(get<bitwidth>(start), value) && start < end) {
+            if (!find_action<action, Callback>(start + baseindex, get<bitwidth>(start), state, callback))
                 return false;
         }
 
         ++start;
 
-        if (m_size > start && c(Get<bitwidth>(start), value) && start < end) {
-            if (!find_action<action, Callback>(start + baseindex, Get<bitwidth>(start), state, callback))
+        if (m_size > start && c(get<bitwidth>(start), value) && start < end) {
+            if (!find_action<action, Callback>(start + baseindex, get<bitwidth>(start), state, callback))
                 return false;
         }
 
         ++start;
 
-        if (m_size > start && c(Get<bitwidth>(start), value) && start < end) {
-            if (!find_action<action, Callback>(start + baseindex, Get<bitwidth>(start), state, callback))
+        if (m_size > start && c(get<bitwidth>(start), value) && start < end) {
+            if (!find_action<action, Callback>(start + baseindex, get<bitwidth>(start), state, callback))
                 return false;
         }
 
@@ -2396,7 +2396,7 @@ template<class cond2, Action action, size_t bitwidth, class Callback> bool Array
         }
         else {
             for (; start < end2; start++)
-                if (!find_action<action, Callback>(start + baseindex, Get<bitwidth>(start), state, callback))
+                if (!find_action<action, Callback>(start + baseindex, get<bitwidth>(start), state, callback))
                     return false;
         }
         return true;
@@ -2723,8 +2723,8 @@ template<bool eq, Action action, size_t width, class Callback> inline bool Array
     size_t ee = round_up(start, 64 / no0(width));
     ee = ee > end ? end : ee;
     for (; start < ee; ++start)
-        if (eq ? (Get<width>(start) == value) : (Get<width>(start) != value)) {
-            if (!find_action<action, Callback>(start + baseindex, Get<width>(start), state, callback))
+        if (eq ? (get<width>(start) == value) : (get<width>(start) != value)) {
+            if (!find_action<action, Callback>(start + baseindex, get<width>(start), state, callback))
                 return false;
         }
 
@@ -2754,7 +2754,7 @@ template<bool eq, Action action, size_t width, class Callback> inline bool Array
                 if (a >= 64 / no0(width))
                     break;
 
-                if (!find_action<action, Callback>(a + start + baseindex, Get<width>(start + t), state, callback))
+                if (!find_action<action, Callback>(a + start + baseindex, get<width>(start + t), state, callback))
                     return false;
                 v2 >>= (t + 1) * width;
                 a += 1;
@@ -2769,8 +2769,8 @@ template<bool eq, Action action, size_t width, class Callback> inline bool Array
     }
 
     while (start < end) {
-        if (eq ? Get<width>(start) == value : Get<width>(start) != value) {
-            if (!find_action<action, Callback>( start + baseindex, Get<width>(start), state, callback))
+        if (eq ? get<width>(start) == value : get<width>(start) != value) {
+            if (!find_action<action, Callback>( start + baseindex, get<width>(start), state, callback))
                 return false;
         }
         ++start;
@@ -2896,7 +2896,7 @@ TIGHTDB_FORCEINLINE bool Array::FindSSE_intern(__m128i* action_data, __m128i* da
 
             size_t idx = FirstSetBit(resmask) * 8 / no0(width);
             s += idx;
-            if (!find_action<action, Callback>( s + baseindex, GetUniversal<width>(reinterpret_cast<char*>(action_data), s), state, callback))
+            if (!find_action<action, Callback>( s + baseindex, get_universal<width>(reinterpret_cast<char*>(action_data), s), state, callback))
                 return false;
             resmask >>= (idx + 1) * no0(width) / 8;
             ++s;
@@ -2990,8 +2990,8 @@ bool Array::CompareLeafs4(const Array* foreign, size_t start, size_t end, size_t
     if (sseavx<42>() && width == foreign_width && (width == 8 || width == 16 || width == 32)) {
         // We can only use SSE if both bitwidths are equal and above 8 bits and all values are signed
         while (start < end && (((reinterpret_cast<size_t>(m_data) & 0xf) * 8 + start * width) % (128) != 0)) {
-            int64_t v = GetUniversal<width>(m_data, start);
-            int64_t fv = GetUniversal<foreign_width>(foreign_m_data, start);
+            int64_t v = get_universal<width>(m_data, start);
+            int64_t fv = get_universal<foreign_width>(foreign_m_data, start);
             if (c(v, fv)) {
                 if (!find_action<action, Callback>(start + baseindex, v, state, callback))
                     return false;
@@ -3026,8 +3026,8 @@ bool Array::CompareLeafs4(const Array* foreign, size_t start, size_t end, size_t
     size_t a = round_up(start, 8 * sizeof (int64_t) / (width < foreign_width ? width : foreign_width));
 
     while (start < end && start < a) {
-        int64_t v = GetUniversal<width>(m_data, start);
-        int64_t fv = GetUniversal<foreign_width>(foreign_m_data, start);
+        int64_t v = get_universal<width>(m_data, start);
+        int64_t fv = get_universal<foreign_width>(foreign_m_data, start);
 
         if (v == fv)
             r++;
@@ -3090,11 +3090,11 @@ bool Array::CompareLeafs4(const Array* foreign, size_t start, size_t end, size_t
 /*
     // Unrolling helped less than 2% (non-frequent matches). Todo, investigate further
     while (start + 1 < end) {
-        int64_t v = GetUniversal<width>(m_data, start);
-        int64_t v2 = GetUniversal<width>(m_data, start + 1);
+        int64_t v = get_universal<width>(m_data, start);
+        int64_t v2 = get_universal<width>(m_data, start + 1);
 
-        int64_t fv = GetUniversal<foreign_width>(foreign_m_data, start);
-        int64_t fv2 = GetUniversal<foreign_width>(foreign_m_data, start + 1);
+        int64_t fv = get_universal<foreign_width>(foreign_m_data, start);
+        int64_t fv2 = get_universal<foreign_width>(foreign_m_data, start + 1);
 
         if (c(v, fv)) {
             if (!find_action<action, Callback>(start + baseindex, v, state, callback))
@@ -3111,8 +3111,8 @@ bool Array::CompareLeafs4(const Array* foreign, size_t start, size_t end, size_t
  */
 
     while (start < end) {
-        int64_t v = GetUniversal<width>(m_data, start);
-        int64_t fv = GetUniversal<foreign_width>(foreign_m_data, start);
+        int64_t v = get_universal<width>(m_data, start);
+        int64_t fv = get_universal<foreign_width>(foreign_m_data, start);
 
         if (c(v, fv)) {
             if (!find_action<action, Callback>(start + baseindex, v, state, callback))
@@ -3157,8 +3157,8 @@ bool Array::CompareRelation(int64_t value, size_t start, size_t end, size_t base
     size_t ee = round_up(start, 64 / no0(bitwidth));
     ee = ee > end ? end : ee;
     for (; start < ee; start++) {
-        if (gt ? (Get<bitwidth>(start) > value) : (Get<bitwidth>(start) < value)) {
-            if (!find_action<action, Callback>(start + baseindex, Get<bitwidth>(start), state, callback))
+        if (gt ? (get<bitwidth>(start) > value) : (get<bitwidth>(start) < value)) {
+            if (!find_action<action, Callback>(start + baseindex, get<bitwidth>(start), state, callback))
                 return false;
         }
     }
@@ -3216,8 +3216,8 @@ bool Array::CompareRelation(int64_t value, size_t start, size_t end, size_t base
 
     // Test unaligned end and/or values of width > 16 manually
     while (start < end) {
-        if (gt ? Get<bitwidth>(start) > value : Get<bitwidth>(start) < value) {
-            if (!find_action<action, Callback>( start + baseindex, Get<bitwidth>(start), state, callback))
+        if (gt ? get<bitwidth>(start) > value : get<bitwidth>(start) < value) {
+            if (!find_action<action, Callback>( start + baseindex, get<bitwidth>(start), state, callback))
                 return false;
         }
         ++start;
