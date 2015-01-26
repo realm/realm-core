@@ -148,6 +148,8 @@ class GroupWriter;
 class Column;
 template<class T> class QueryState;
 
+typedef Array ArrayInteger;
+
 
 #ifdef TIGHTDB_DEBUG
 class MemStats {
