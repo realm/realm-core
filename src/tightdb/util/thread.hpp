@@ -23,7 +23,10 @@
 #include <exception>
 
 #include <pthread.h>
+
+#ifdef __APPLE__
 #include <libkern/OSAtomic.h>
+#endif // __APPLE__
 
 // Use below line to enable a thread bug detection tool. Note: Will make program execution slower.
 // #include <../test/pthread_test.hpp>
@@ -516,6 +519,8 @@ inline void CondVar::wait(LockGuard& l) TIGHTDB_NOEXCEPT
         TIGHTDB_TERMINATE("pthread_cond_wait() failed");
 }
 
+
+#ifdef __APPLE__
 struct _pthread_mutex {
     long sig;
     OSSpinLock lock;
@@ -545,14 +550,18 @@ struct _pthread_cond {
     uint32_t _reserved[3];
 #endif
 };
+#endif // __APPLE__
+
 
 template<class Func>
 inline void CondVar::wait(RobustMutex& m, Func recover_func, const struct timespec* tp)
 {
     int r;
+#   ifdef __APPLE__
+    _pthread_cond* cond = reinterpret_cast<_pthread_cond*>(&m_impl);
+    cond->busy = 0;
+#   endif // __APPLE__
     if (!tp) {
-        _pthread_cond* cond = reinterpret_cast<_pthread_cond*>(&m_impl);
-        cond->busy = 0;
         r = pthread_cond_wait(&m_impl, &m.m_impl);
     }
     else {
