@@ -977,7 +977,7 @@ template<bool find_max, size_t w> bool Array::minmax(int64_t& result, size_t sta
         return true;
     }
 
-    int64_t m = Get<w>(start);
+    int64_t m = get<w>(start);
     ++start;
 
 #if 0 // We must now return both value AND index of result. SSE does not support finding index, so we've disabled it
@@ -985,8 +985,8 @@ template<bool find_max, size_t w> bool Array::minmax(int64_t& result, size_t sta
     if (sseavx<42>()) {
         // Test manually until 128 bit aligned
         for (; (start < end) && (((size_t(m_data) & 0xf) * 8 + start * w) % (128) != 0); start++) {
-            if (find_max ? Get<w>(start) > m : Get<w>(start) < m) {
-                m = Get<w>(start);
+            if (find_max ? get<w>(start) > m : get<w>(start) < m) {
+                m = get<w>(start);
                 best_index = start;
             }
         }
@@ -1017,7 +1017,7 @@ template<bool find_max, size_t w> bool Array::minmax(int64_t& result, size_t sta
             // read access from char-array (OK aliasing).
             memcpy(&state2, &state, sizeof state);
             for (size_t t = 0; t < sizeof (__m128i) * 8 / no0(w); ++t) {
-                int64_t v = GetUniversal<w>(reinterpret_cast<char*>(&state2), t);
+                int64_t v = get_universal<w>(reinterpret_cast<char*>(&state2), t);
                 if (find_max ? v > m : v < m) {
                     m = v;
                 }
@@ -1028,7 +1028,7 @@ template<bool find_max, size_t w> bool Array::minmax(int64_t& result, size_t sta
 #endif
 
     for (; start < end; ++start) {
-        const int64_t v = Get<w>(start);
+        const int64_t v = get<w>(start);
         if (find_max ? v > m : v < m) {
             m = v;
             best_index = start;
@@ -1069,7 +1069,7 @@ template<size_t w> int64_t Array::sum(size_t start, size_t end) const
 
     // Sum manually until 128 bit aligned
     for (; (start < end) && (((size_t(m_data) & 0xf) * 8 + start * w) % 128 != 0); start++) {
-        s += Get<w>(start);
+        s += get<w>(start);
     }
 
     if (w == 1 || w == 2 || w == 4) {
@@ -1130,7 +1130,7 @@ template<size_t w> int64_t Array::sum(size_t start, size_t end) const
     if (sseavx<42>()) {
 
         // 2000 items summed 500000 times, 8/16/32 bits, miliseconds:
-        // Naive, templated Get<>: 391 371 374
+        // Naive, templated get<>: 391 371 374
         // SSE:                     97 148 282
 
         if ((w == 8 || w == 16 || w == 32) && end - start > sizeof (__m128i) * 8 / no0(w)) {
@@ -1201,13 +1201,13 @@ template<size_t w> int64_t Array::sum(size_t start, size_t end) const
             // prevent taking address of 'state' to make the compiler keep it in SSE register in above loop (vc2010/gcc4.6)
             sum2 = sum;
 
-            // Avoid aliasing bug where sum2 might not yet be initialized when accessed by GetUniversal
+            // Avoid aliasing bug where sum2 might not yet be initialized when accessed by get_universal
             char sum3[sizeof sum2];
             memcpy(&sum3, &sum2, sizeof sum2);
 
             // Sum elements of sum
             for (size_t t = 0; t < sizeof (__m128i) * 8 / ((w == 8 || w == 16) ? 32 : 64); ++t) {
-                int64_t v = GetUniversal<(w == 8 || w == 16) ? 32 : 64>(reinterpret_cast<char*>(&sum3), t);
+                int64_t v = get_universal<(w == 8 || w == 16) ? 32 : 64>(reinterpret_cast<char*>(&sum3), t);
                 s += v;
             }
         }
@@ -1216,7 +1216,7 @@ template<size_t w> int64_t Array::sum(size_t start, size_t end) const
 
     // Sum remaining elements
     for (; start < end; ++start)
-        s += Get<w>(start);
+        s += get<w>(start);
 
     return s;
 }
@@ -1770,9 +1770,9 @@ template<size_t width> void Array::set_width() TIGHTDB_NOEXCEPT
     }
 
     m_width = width;
-    // m_getter = temp is a workaround for a bug in VC2010 that makes it return address of get() instead of Get<n>
+    // m_getter = temp is a workaround for a bug in VC2010 that makes it return address of get() instead of get<n>
     // if the declaration and association of the getter are on two different source lines
-    Getter temp_getter = &Array::Get<width>;
+    Getter temp_getter = &Array::get<width>;
     m_getter = temp_getter;
 
     ChunkGetter temp_chunk_getter = &Array::get_chunk<width>;
@@ -1804,7 +1804,7 @@ template<size_t w> void Array::get_chunk(size_t ndx, int64_t res[8]) const TIGHT
     // memset(res, 0, 8*8);
 
     if (TIGHTDB_X86_OR_X64_TRUE && (w == 1 || w == 2 || w == 4) && ndx + 32 < m_size) {
-        // This method is *multiple* times faster than performing 8 times Get<w>, even if unrolled. Apparently compilers
+        // This method is *multiple* times faster than performing 8 times get<w>, even if unrolled. Apparently compilers
         // can't figure out to optimize it.
         uint64_t c;
         size_t bytealign = ndx / (8 / no0(w));
@@ -1834,7 +1834,7 @@ template<size_t w> void Array::get_chunk(size_t ndx, int64_t res[8]) const TIGHT
     else {
         size_t i = 0;
         for(; i + ndx < m_size && i < 8; i++)
-            res[i] = Get<w>(ndx + i);
+            res[i] = get<w>(ndx + i);
 
         for(; i < 8; i++)
             res[i] = 0;
@@ -1842,7 +1842,7 @@ template<size_t w> void Array::get_chunk(size_t ndx, int64_t res[8]) const TIGHT
 
 #ifdef TIGHTDB_DEBUG
     for(int j = 0; j + ndx < m_size && j < 8; j++) {
-        int64_t expected = Get<w>(ndx + j);
+        int64_t expected = get<w>(ndx + j);
         if (res[j] != expected)
             TIGHTDB_ASSERT(false);
     }
@@ -1873,11 +1873,11 @@ template<size_t w>bool Array::MinMax(size_t from, size_t to, uint64_t maxdiff, i
     int64_t max2;
     size_t t;
 
-    max2 = Get<w>(from);
+    max2 = get<w>(from);
     min2 = max2;
 
     for (t = from + 1; t < to; t++) {
-        int64_t v = Get<w>(t);
+        int64_t v = get<w>(t);
         // Utilizes that range test is only needed if max2 or min2 were changed
         if (v < min2) {
             min2 = v;
@@ -1942,7 +1942,7 @@ template<size_t w>void Array::ReferenceSort(Array& ref) const
 
         // Count occurences of each value
         for (size_t t = 0; t < m_size; t++) {
-            size_t i = to_ref(Get<w>(t) - min);
+            size_t i = to_ref(get<w>(t) - min);
             count.set(i, count.get(i) + 1);
         }
 
@@ -1955,7 +1955,7 @@ template<size_t w>void Array::ReferenceSort(Array& ref) const
             res.add(0);
 
         for (size_t t = m_size; t > 0; t--) {
-            size_t v = to_ref(Get<w>(t - 1) - min);
+            size_t v = to_ref(get<w>(t - 1) - min);
             size_t i = count.get_as_ref(v);
             count.set(v, count.get(v) - 1);
             res.set(i - 1, ref.get(t - 1));
@@ -2008,7 +2008,7 @@ template<size_t w> void Array::sort()
 
         // Count occurences of each value
         for (size_t t = lo; t <= hi; t++) {
-            size_t i = to_size_t(Get<w>(t) - min); // FIXME: The value of (Get<w>(t) - min) cannot necessarily be stored in size_t.
+            size_t i = to_size_t(get<w>(t) - min); // FIXME: The value of (get<w>(t) - min) cannot necessarily be stored in size_t.
             count[i]++;
         }
 
