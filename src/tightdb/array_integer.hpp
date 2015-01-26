@@ -31,6 +31,12 @@ public:
 
     explicit ArrayInteger(Allocator&) TIGHTDB_NOEXCEPT;
     ~ArrayInteger() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
+
+    /// Construct an array of the specified type and size, and return just the
+    /// reference to the underlying memory. All elements will be initialized to
+    /// the specified value.
+    static MemRef create_array(Type, bool context_flag, std::size_t size, int_fast64_t value,
+                               Allocator&);
 };
 
 
@@ -39,6 +45,12 @@ public:
 inline ArrayInteger::ArrayInteger(Allocator& alloc) TIGHTDB_NOEXCEPT:
     Array(alloc)
 {
+}
+
+inline MemRef ArrayInteger::create_array(Type type, bool context_flag, std::size_t size,
+                                  int_fast64_t value, Allocator& alloc)
+{
+    return Array::create(type, context_flag, wtype_Bits, size, value, alloc); // Throws
 }
 
 }

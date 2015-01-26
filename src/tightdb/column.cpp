@@ -14,6 +14,7 @@
 #include <tightdb/exceptions.hpp>
 #include <tightdb/table.hpp>
 #include <tightdb/index_string.hpp>
+#include <tightdb/array_integer.hpp>
 
 using namespace std;
 using namespace tightdb;
@@ -1024,7 +1025,7 @@ public:
     ref_type create_leaf(size_t size) TIGHTDB_OVERRIDE
     {
         bool context_flag = false;
-        MemRef mem = Array::create_array(m_leaf_type, context_flag, size,
+        MemRef mem = ArrayInteger::create_array(m_leaf_type, context_flag, size,
                                          m_value, m_alloc); // Throws
         return mem.m_ref;
     }
