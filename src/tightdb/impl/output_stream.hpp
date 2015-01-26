@@ -27,11 +27,13 @@
 
 #include <tightdb/util/features.h>
 
+#include <tightdb/impl/array_writer.hpp>
+
 namespace tightdb {
 namespace _impl {
 
 
-class OutputStream {
+class OutputStream: public ArrayWriterBase {
 public:
     OutputStream(std::ostream&);
     ~OutputStream() TIGHTDB_NOEXCEPT;
@@ -40,16 +42,11 @@ public:
 
     void write(const char* data, size_t size);
 
-    size_t write_array(const char* data, size_t size, uint_fast32_t checksum);
-
+    size_t write_array(const char* data, size_t size, uint_fast32_t checksum) TIGHTDB_OVERRIDE;
 private:
     std::size_t m_pos;
     std::ostream& m_out;
 };
-
-
-
-
 
 // Implementation:
 

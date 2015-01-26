@@ -587,6 +587,7 @@
 		52F2E0E417D5F93D00415958 /* test_strings.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = test_strings.cpp; path = large_tests/test_strings.cpp; sourceTree = "<group>"; };
 		52F6359316B43C79006117C4 /* alloc.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = alloc.cpp; path = tightdb/alloc.cpp; sourceTree = "<group>"; };
 		65D3F7A01AA74E2900F27CBD /* array_integer.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; name = array_integer.hpp; path = tightdb/array_integer.hpp; sourceTree = "<group>"; };
+		65D3F7A31AA74EA000F27CBD /* array_writer.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = array_writer.hpp; sourceTree = "<group>"; };
 		65D3F7A41AA7549100F27CBD /* test_array_integer.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = test_array_integer.cpp; sourceTree = "<group>"; };
 		80ADCCE718A23DD00049D472 /* version.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = version.cpp; path = tightdb/version.cpp; sourceTree = "<group>"; };
 		80ADCCE818A23DD00049D472 /* version.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = version.hpp; path = tightdb/version.hpp; sourceTree = "<group>"; };
@@ -670,6 +671,7 @@
 		3620DF0318B6CA7B003AD498 /* impl */ = {
 			isa = PBXGroup;
 			children = (
+				65D3F7A31AA74EA000F27CBD /* array_writer.hpp */,
 				3620DF0418B6CA7B003AD498 /* destroy_guard.hpp */,
 				3620DF0518B6CA7B003AD498 /* output_stream.cpp */,
 				3620DF0918B6CA7B003AD498 /* output_stream.hpp */,
