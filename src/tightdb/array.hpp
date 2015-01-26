@@ -315,31 +315,17 @@ public:
 
     void move_assign(Array&) TIGHTDB_NOEXCEPT; // Move semantics for assignment
 
-    /// Construct an array of the specified type and size, and return just the
-    /// reference to the underlying memory. All elements will be initialized to
-    /// the specified value.
-    ///
-    /// FIXME: Belongs in IntegerArray
-    static MemRef create_array(Type, bool context_flag, std::size_t size, int_fast64_t value,
-                               Allocator&);
-
     /// Construct an empty array of the specified type, and return just the
     /// reference to the underlying memory.
-    ///
-    /// FIXME: Belongs in IntegerArray
     static MemRef create_empty_array(Type, bool context_flag, Allocator&);
 
     /// Construct a shallow copy of the specified slice of this array using the
     /// specified target allocator. Subarrays will **not** be cloned. See
     /// slice_and_clone_children() for an alternative.
-    ///
-    /// FIXME: Belongs in IntegerArray
     MemRef slice(std::size_t offset, std::size_t size, Allocator& target_alloc) const;
 
     /// Construct a deep copy of the specified slice of this array using the
     /// specified target allocator. Subarrays will be cloned.
-    ///
-    /// FIXME: Belongs in IntegerArray
     MemRef slice_and_clone_children(std::size_t offset, std::size_t size,
                                     Allocator& target_alloc) const;
 
@@ -1897,17 +1883,11 @@ inline void Array::move_assign(Array& a) TIGHTDB_NOEXCEPT
     a.detach();
 }
 
-inline MemRef Array::create_array(Type type, bool context_flag, std::size_t size,
-                                  int_fast64_t value, Allocator& alloc)
-{
-    return create(type, context_flag, wtype_Bits, size, value, alloc); // Throws
-}
-
 inline MemRef Array::create_empty_array(Type type, bool context_flag, Allocator& alloc)
 {
     std::size_t size = 0;
     int_fast64_t value = 0;
-    return create_array(type, context_flag, size, value, alloc); // Throws
+    return create(type, context_flag, wtype_Bits, size, value, alloc); // Throws
 }
 
 inline bool Array::has_parent() const TIGHTDB_NOEXCEPT
