@@ -598,7 +598,7 @@ struct Table::EraseSubtableColumns: SubtableUpdater {
     }
     void update(const ColumnTable&, Array& subcolumns) TIGHTDB_OVERRIDE
     {
-        ref_type column_ref = to_ref(subcolumns.get(m_column_ndx));
+        ref_type column_ref = to_ref(subcolumns.get_data(m_column_ndx));
         subcolumns.erase(m_column_ndx); // Throws
         Array::destroy_deep(column_ref, subcolumns.get_alloc());
     }
@@ -1067,7 +1067,7 @@ void Table::create_degen_subtab_columns()
         ColumnType type = m_spec.get_column_type(i);
         size_t size = 0;
         ref_type ref = create_column(type, size, alloc); // Throws
-        m_columns.add(int_fast64_t(ref)); // Throws
+        m_columns.add_data(int_fast64_t(ref)); // Throws
 
         // So far, only root tables can have search indexes, and this is not a
         // root table.
@@ -1712,7 +1712,7 @@ size_t Table::get_size_from_ref(ref_type spec_ref, ref_type columns_ref,
         return 0;
     const char* columns_header = alloc.translate(columns_ref);
     TIGHTDB_ASSERT(Array::get_size_from_header(columns_header) != 0);
-    ref_type first_col_ref = to_ref(Array::get(columns_header, 0));
+    ref_type first_col_ref = to_ref(Array::get_data(columns_header, 0));
     size_t size = ColumnBase::get_size_from_type_and_ref(first_col_type, first_col_ref, alloc);
     return size;
 }
@@ -1729,7 +1729,7 @@ ref_type Table::create_empty_table(Allocator& alloc)
         MemRef mem = Spec::create_empty_spec(alloc); // Throws
         dg_2.reset(mem.m_ref);
         int_fast64_t v(mem.m_ref); // FIXME: Dangerous case (unsigned -> signed)
-        top.add(v); // Throws
+        top.add_data(v); // Throws
         dg_2.release();
     }
     {
@@ -1737,7 +1737,7 @@ ref_type Table::create_empty_table(Allocator& alloc)
         MemRef mem = Array::create_empty_array(Array::type_HasRefs, context_flag, alloc); // Throws
         dg_2.reset(mem.m_ref);
         int_fast64_t v(mem.m_ref); // FIXME: Dangerous case (unsigned -> signed)
-        top.add(v); // Throws
+        top.add_data(v); // Throws
         dg_2.release();
     }
 
@@ -1805,7 +1805,7 @@ ref_type Table::clone_columns(Allocator& alloc) const
             MemRef mem = root.clone_deep(alloc); // Throws
             new_col_ref = mem.m_ref;
         }
-        new_columns.add(int_fast64_t(new_col_ref)); // Throws
+        new_columns.add_data(int_fast64_t(new_col_ref)); // Throws
     }
     return new_columns.get_ref();
 }
@@ -1826,14 +1826,14 @@ ref_type Table::clone(Allocator& alloc) const
         MemRef mem = m_spec.m_top.clone_deep(alloc); // Throws
         dg_2.reset(mem.m_ref);
         int_fast64_t v(mem.m_ref); // FIXME: Dangerous cast (unsigned -> signed)
-        new_top.add(v); // Throws
+        new_top.add_data(v); // Throws
         dg_2.release();
     }
     {
         MemRef mem = m_columns.clone_deep(alloc); // Throws
         dg_2.reset(mem.m_ref);
         int_fast64_t v(mem.m_ref); // FIXME: Dangerous cast (unsigned -> signed)
-        new_top.add(v); // Throws
+        new_top.add_data(v); // Throws
         dg_2.release();
     }
     dg.release();
@@ -3330,7 +3330,7 @@ size_t get_group_ndx_blocked(size_t i, AggrState& state, Table& result)
 
     // Since we know the exact number of distinct keys,
     // we can use that to avoid index lookups
-    int64_t key = state.block.get(i - state.offset);
+    int64_t key = state.block.get_data(i - state.offset);
     size_t ndx = state.keys[key];
 
     // Stored position is offset by one, so zero can indicate
@@ -3737,7 +3737,7 @@ void Table::optimize()
             e->set_parent(&m_columns, ndx_in_parent);
             e->get_keys().set_parent(keys_parent, keys_ndx_in_parent);
             m_cols[i] = e;
-            m_columns.set(ndx_in_parent, ref); // Throws
+            m_columns.set_data(ndx_in_parent, ref); // Throws
 
             // Inherit any existing index
             if (info.m_has_search_index) {
@@ -3815,7 +3815,7 @@ public:
                 ColumnBase* column = m_table.m_cols[i];
                 ref_type ref = column->write(m_offset, m_size, table_size, out); // Throws
                 int_fast64_t ref_2(ref); // FIXME: Dangerous cast (unsigned -> signed)
-                column_refs.add(ref_2); // Throws
+                column_refs.add_data(ref_2); // Throws
             }
             bool recurse = false; // Shallow
             size_t pos = column_refs.write(out, recurse); // Throws
@@ -3829,9 +3829,9 @@ public:
             table_top.create(Array::type_HasRefs); // Throws
             _impl::ShallowArrayDestroyGuard dg(&table_top);
             int_fast64_t spec_ref_2(spec_ref); // FIXME: Dangerous cast (unsigned -> signed)
-            table_top.add(spec_ref_2); // Throws
+            table_top.add_data(spec_ref_2); // Throws
             int_fast64_t columns_ref_2(columns_ref); // FIXME: Dangerous cast (unsigned -> signed)
-            table_top.add(columns_ref_2); // Throws
+            table_top.add_data(columns_ref_2); // Throws
             bool recurse = false; // Shallow
             size_t pos = table_top.write(out, recurse); // Throws
             table_top_ref = pos;
@@ -3842,7 +3842,7 @@ public:
         tables.create(Array::type_HasRefs); // Throws
         _impl::ShallowArrayDestroyGuard dg(&tables);
         int_fast64_t table_top_ref_2(table_top_ref); // FIXME: Dangerous cast (unsigned -> signed)
-        tables.add(table_top_ref_2); // Throws
+        tables.add_data(table_top_ref_2); // Throws
         bool recurse = false; // Shallow
         size_t pos = tables.write(out, recurse); // Throws
         return pos;

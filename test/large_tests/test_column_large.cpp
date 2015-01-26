@@ -75,7 +75,7 @@ TEST_IF(ColumnLarge_Less, TEST_DURATION >= 3)
 
     for (size_t w = 0; w < sizeof(v) / sizeof(*v); w++) {
         const size_t LEN = 64 * 20 + 1000;
-        Array a(Allocator::get_default());
+        ArrayInteger a(Allocator::get_default());
         a.create(Array::type_Normal);
         for (size_t t = 0; t < LEN; t++)
             a.add(v[w]);

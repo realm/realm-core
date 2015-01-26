@@ -23,9 +23,9 @@ size_t GroupWriter::write_group()
     merge_free_space(); // Throws
 
     Array& top        = m_group.m_top;
-    Array& fpositions = m_group.m_free_positions;
-    Array& flengths   = m_group.m_free_lengths;
-    Array& fversions  = m_group.m_free_versions;
+    ArrayInteger& fpositions = m_group.m_free_positions;
+    ArrayInteger& flengths   = m_group.m_free_lengths;
+    ArrayInteger& fversions  = m_group.m_free_versions;
     bool is_shared = m_group.m_is_shared;
     TIGHTDB_ASSERT(fpositions.size() == flengths.size());
     TIGHTDB_ASSERT(!is_shared || fversions.size() == flengths.size());
@@ -97,7 +97,7 @@ size_t GroupWriter::write_group()
             // We always want to keep the list of free space in sorted order (by
             // ascending position) to facilitate merge of adjacent segments. We
             // can find the correct insert postion by binary search
-            size_t ndx = fpositions.lower_bound_int(ref);
+            size_t ndx = fpositions.lower_bound_data(ref);
             fpositions.insert(ndx, ref); // Throws
             flengths.insert(ndx, size); // Throws
             if (is_shared)
@@ -131,15 +131,15 @@ size_t GroupWriter::write_group()
     size_t top_pos            = free_versions_pos  + free_versions_size;
 
     // Update top to point to the calculated positions
-    top.set(0, names_pos); // Throws
-    top.set(1, tables_pos); // Throws
+    top.set_data(0, names_pos); // Throws
+    top.set_data(1, tables_pos); // Throws
     // Third slot holds the logical file size
-    top.set(3, free_positions_pos); // Throws
-    top.set(4, free_sizes_pos); // Throws
+    top.set_data(3, free_positions_pos); // Throws
+    top.set_data(4, free_sizes_pos); // Throws
     if (is_shared) {
-        top.set(5, free_versions_pos); // Throws
+        top.set_data(5, free_versions_pos); // Throws
         // Seventh slot holds the database version (a.k.a. transaction number)
-        top.set(6, m_current_version * 2 +1); // Throws
+        top.set_data(6, m_current_version * 2 +1); // Throws
     }
 
     // Get final sizes
@@ -173,9 +173,9 @@ size_t GroupWriter::write_group()
 
 void GroupWriter::merge_free_space()
 {
-    Array& positions = m_group.m_free_positions;
-    Array& lengths   = m_group.m_free_lengths;
-    Array& versions  = m_group.m_free_versions;
+    ArrayInteger& positions = m_group.m_free_positions;
+    ArrayInteger& lengths   = m_group.m_free_lengths;
+    ArrayInteger& versions  = m_group.m_free_versions;
     bool is_shared = m_group.m_is_shared;
 
     if (lengths.is_empty())
@@ -226,9 +226,9 @@ size_t GroupWriter::get_free_space(size_t size)
 
     pair<size_t, size_t> p = reserve_free_space(size);
 
-    Array& positions = m_group.m_free_positions;
-    Array& lengths   = m_group.m_free_lengths;
-    Array& versions  = m_group.m_free_versions;
+    ArrayInteger& positions = m_group.m_free_positions;
+    ArrayInteger& lengths   = m_group.m_free_lengths;
+    ArrayInteger& versions  = m_group.m_free_versions;
     bool is_shared = m_group.m_is_shared;
 
     // Claim space from identified chunk
@@ -255,8 +255,8 @@ size_t GroupWriter::get_free_space(size_t size)
 
 pair<size_t, size_t> GroupWriter::reserve_free_space(size_t size)
 {
-    Array& lengths  = m_group.m_free_lengths;
-    Array& versions = m_group.m_free_versions;
+    ArrayInteger& lengths  = m_group.m_free_lengths;
+    ArrayInteger& versions = m_group.m_free_versions;
     bool is_shared = m_group.m_is_shared;
 
     // Since we do a first-fit search for small chunks, the top pieces
@@ -297,9 +297,9 @@ pair<size_t, size_t> GroupWriter::reserve_free_space(size_t size)
 
 pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
 {
-    Array& positions = m_group.m_free_positions;
-    Array& lengths   = m_group.m_free_lengths;
-    Array& versions  = m_group.m_free_versions;
+    ArrayInteger& positions = m_group.m_free_positions;
+    ArrayInteger& lengths   = m_group.m_free_lengths;
+    ArrayInteger& versions  = m_group.m_free_versions;
     bool is_shared = m_group.m_is_shared;
 
     // We need to consider the "logical" size of the file here, and
@@ -307,7 +307,7 @@ pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
     // free space information having been adjusted accordingly. This
     // can happen, for example, if write_group() fails before writing
     // the new top-ref, but after having extended the file size.
-    size_t logical_file_size = to_size_t(m_group.m_top.get(2) / 2);
+    size_t logical_file_size = to_size_t(m_group.m_top.get_data(2) / 2);
 
     // If we already have a free chunk at the end of the file, we only need to
     // extend that chunk. If not, we need to add a new entry to the list of free
@@ -396,7 +396,7 @@ pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
     }
 
     // Update the logical file size
-    m_group.m_top.set(2, 1 + 2*new_file_size); // Throws
+    m_group.m_top.set_data(2, 1 + 2*new_file_size); // Throws
 
     return make_pair(chunk_ndx, chunk_size);
 }
@@ -438,7 +438,7 @@ size_t GroupWriter::write_array(const char* data, size_t size, uint_fast32_t che
 
 void GroupWriter::write_array_at(size_t pos, const char* data, size_t size)
 {
-    TIGHTDB_ASSERT(pos + size <= to_size_t(m_group.m_top.get(2)/2));
+    TIGHTDB_ASSERT(pos + size <= to_size_t(m_group.m_top.get_data(2)/2));
     TIGHTDB_ASSERT(pos + size <= m_file_map.get_size());
     char* dest_addr = m_file_map.get_addr() + pos;
 
@@ -490,9 +490,9 @@ void GroupWriter::commit(ref_type new_top_ref)
 
 void GroupWriter::dump()
 {
-    Array& fpositions = m_group.m_free_positions;
-    Array& flengths   = m_group.m_free_lengths;
-    Array& fversions  = m_group.m_free_versions;
+    ArrayInteger& fpositions = m_group.m_free_positions;
+    ArrayInteger& flengths   = m_group.m_free_lengths;
+    ArrayInteger& fversions  = m_group.m_free_versions;
     bool is_shared = m_group.m_is_shared;
 
     size_t count = flengths.size();

@@ -123,7 +123,7 @@ private:
     struct inner_node_tag {};
     StringIndex(inner_node_tag, Allocator&);
 
-    static Array* create_node(Allocator&, bool is_leaf);
+    static ArrayInteger* create_node(Allocator&, bool is_leaf);
 
     void insert_with_offset(size_t row_ndx, StringData value, size_t offset);
     void InsertRowList(size_t ref, size_t offset, StringData value);
@@ -277,15 +277,15 @@ template <class T> void StringIndex::erase(size_t row_ndx, bool is_last)
 
     // Collapse top nodes with single item
     while (!root_is_leaf()) {
-        TIGHTDB_ASSERT(m_array->size() > 1); // node cannot be empty
-        if (m_array->size() > 2)
+        TIGHTDB_ASSERT(array()->size() > 1); // node cannot be empty
+        if (array()->size() > 2)
             break;
 
-        ref_type ref = m_array->get_as_ref(1);
-        m_array->set(1, 1); // avoid destruction of the extracted ref
-        m_array->destroy_deep();
-        m_array->init_from_ref(ref);
-        m_array->update_parent();
+        ref_type ref = array()->get_as_ref(1);
+        array()->set(1, 1); // avoid destruction of the extracted ref
+        array()->destroy_deep();
+        array()->init_from_ref(ref);
+        array()->update_parent();
     }
 
     // If it is last item in column, we don't have to update refs

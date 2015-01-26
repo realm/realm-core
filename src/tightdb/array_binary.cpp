@@ -78,18 +78,18 @@ void ArrayBinary::erase(size_t ndx)
 
 BinaryData ArrayBinary::get(const char* header, size_t ndx, Allocator& alloc) TIGHTDB_NOEXCEPT
 {
-    pair<int_least64_t, int_least64_t> p = get_two(header, 0);
+    pair<int_least64_t, int_least64_t> p = get_two_data(header, 0);
     const char* offsets_header = alloc.translate(to_ref(p.first));
     const char* blob_header = alloc.translate(to_ref(p.second));
     size_t begin, end;
     if (ndx) {
-        p = get_two(offsets_header, ndx-1);
+        p = get_two_data(offsets_header, ndx-1);
         begin = to_size_t(p.first);
         end   = to_size_t(p.second);
     }
     else {
         begin = 0;
-        end   = to_size_t(Array::get(offsets_header, ndx));
+        end   = to_size_t(Array::get_data(offsets_header, ndx));
     }
     return BinaryData(ArrayBlob::get(blob_header, begin), end-begin);
 }
@@ -139,7 +139,7 @@ MemRef ArrayBinary::create_array(size_t size, Allocator& alloc)
         MemRef mem = ArrayInteger::create_array(type_Normal, context_flag, size, value, alloc); // Throws
         dg_2.reset(mem.m_ref);
         int_fast64_t v(mem.m_ref); // FIXME: Dangerous cast (unsigned -> signed)
-        top.add(v); // Throws
+        top.add_data(v); // Throws
         dg_2.release();
     }
     {
@@ -147,7 +147,7 @@ MemRef ArrayBinary::create_array(size_t size, Allocator& alloc)
         MemRef mem = ArrayBlob::create_array(blobs_size, alloc); // Throws
         dg_2.reset(mem.m_ref);
         int_fast64_t v(mem.m_ref); // FIXME: Dangerous cast (unsigned -> signed)
-        top.add(v); // Throws
+        top.add_data(v); // Throws
         dg_2.release();
     }
 

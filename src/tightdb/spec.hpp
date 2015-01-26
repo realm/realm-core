@@ -23,6 +23,7 @@
 #include <tightdb/util/features.h>
 #include <tightdb/array.hpp>
 #include <tightdb/array_string.hpp>
+#include <tightdb/array_integer.hpp>
 #include <tightdb/data_type.hpp>
 #include <tightdb/column_type.hpp>
 
@@ -126,9 +127,9 @@ private:
     // table, and the second entry is the index of the origin column in the
     // origin table.
     Array m_top;
-    Array m_types;       // 1st slot in m_top
+    ArrayInteger m_types;// 1st slot in m_top
     ArrayString m_names; // 2nd slot in m_top
-    Array m_attr;        // 3rd slot in m_top
+    ArrayInteger m_attr; // 3rd slot in m_top
     Array m_subspecs;    // 4th slot in m_top (optional)
     Array m_enumkeys;    // 5th slot in m_top (optional)
 
@@ -393,11 +394,11 @@ inline bool Spec::get_first_column_type_from_ref(ref_type top_ref, Allocator& al
                                                  ColumnType& type) TIGHTDB_NOEXCEPT
 {
     const char* top_header = alloc.translate(top_ref);
-    ref_type types_ref = to_ref(Array::get(top_header, 0));
+    ref_type types_ref = to_ref(Array::get_data(top_header, 0));
     const char* types_header = alloc.translate(types_ref);
     if (Array::get_size_from_header(types_header) == 0)
         return false;
-    type = ColumnType(Array::get(types_header, 0));
+    type = ColumnType(Array::get_data(types_header, 0));
     return true;
 }
 
