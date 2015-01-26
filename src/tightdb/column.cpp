@@ -133,7 +133,8 @@ private:
     const size_t m_max_elems_per_child; // A power of `TIGHTDB_MAX_BPNODE_SIZE`
     size_t m_elems_in_parent; // Zero if reinitialization is needed
     bool m_is_on_general_form; // Defined only when m_elems_in_parent > 0
-    Array m_main, m_offsets;
+    Array m_main;
+    ArrayInteger m_offsets;
     _impl::OutputStream& m_out;
     UniquePtr<ParentLevel> m_prev_parent_level;
 };
@@ -549,12 +550,12 @@ void Column::set(size_t ndx, int64_t value)
     }
 
     if (!m_array->is_inner_bptree_node()) {
-        m_array->set(ndx, value); // Throws
+        array()->set(ndx, value); // Throws
         return;
     }
 
     SetLeafElem set_leaf_elem(m_array->get_alloc(), value);
-    m_array->update_bptree_elem(ndx, set_leaf_elem); // Throws
+    array()->update_bptree_elem(ndx, set_leaf_elem); // Throws
 }
 
 // When a value of a signed type is converted to an unsigned type, the C++ standard guarantees that negative values 
@@ -576,12 +577,12 @@ void Column::adjust(size_t ndx, int_fast64_t diff)
     TIGHTDB_ASSERT(ndx < size());
 
     if (!m_array->is_inner_bptree_node()) {
-        m_array->adjust(ndx, diff); // Throws
+        array()->adjust(ndx, diff); // Throws
         return;
     }
 
-    AdjustLeafElem set_leaf_elem(m_array->get_alloc(), diff);
-    m_array->update_bptree_elem(ndx, set_leaf_elem); // Throws
+    AdjustLeafElem set_leaf_elem(array()->get_alloc(), diff);
+    array()->update_bptree_elem(ndx, set_leaf_elem); // Throws
 }
 
 
@@ -683,7 +684,7 @@ void Column::destroy_subtree(size_t ndx, bool clear_value)
 namespace {
 
 template<bool with_limit> struct AdjustHandler: Array::UpdateHandler {
-    Array m_leaf;
+    ArrayInteger m_leaf;
     const int_fast64_t m_limit, m_diff;
     AdjustHandler(Allocator& alloc, int_fast64_t limit, int_fast64_t diff) TIGHTDB_NOEXCEPT:
         m_leaf(alloc), m_limit(limit), m_diff(diff) {}
@@ -705,28 +706,28 @@ template<bool with_limit> struct AdjustHandler: Array::UpdateHandler {
 
 void Column::adjust(int_fast64_t diff)
 {
-    if (!m_array->is_inner_bptree_node()) {
-        m_array->adjust(0, m_array->size(), diff); // Throws
+    if (!array()->is_inner_bptree_node()) {
+        array()->adjust(0, m_array->size(), diff); // Throws
         return;
     }
 
     const bool with_limit = false;
     int_fast64_t dummy_limit = 0;
-    AdjustHandler<with_limit> leaf_handler(m_array->get_alloc(), dummy_limit, diff);
-    m_array->update_bptree_leaves(leaf_handler); // Throws
+    AdjustHandler<with_limit> leaf_handler(array()->get_alloc(), dummy_limit, diff);
+    array()->update_bptree_leaves(leaf_handler); // Throws
 }
 
 
 void Column::adjust_ge(int_fast64_t limit, int_fast64_t diff)
 {
     if (!m_array->is_inner_bptree_node()) {
-        m_array->adjust_ge(limit, diff); // Throws
+        array()->adjust_ge(limit, diff); // Throws
         return;
     }
 
     const bool with_limit = true;
-    AdjustHandler<with_limit> leaf_handler(m_array->get_alloc(), limit, diff);
-    m_array->update_bptree_leaves(leaf_handler); // Throws
+    AdjustHandler<with_limit> leaf_handler(array()->get_alloc(), limit, diff);
+    array()->update_bptree_leaves(leaf_handler); // Throws
 }
 
 namespace {
@@ -987,22 +988,22 @@ void Column::do_move_last_over(size_t row_ndx, size_t last_row_ndx)
 
     // Copy value from last row over
     int_fast64_t value = get(last_row_ndx);
-    if (m_array->is_inner_bptree_node()) {
-        SetLeafElem set_leaf_elem(m_array->get_alloc(), value);
-        m_array->update_bptree_elem(row_ndx, set_leaf_elem); // Throws
+    if (array()->is_inner_bptree_node()) {
+        SetLeafElem set_leaf_elem(array()->get_alloc(), value);
+        array()->update_bptree_elem(row_ndx, set_leaf_elem); // Throws
     }
     else {
-        m_array->set(row_ndx, value); // Throws
+        array()->set(row_ndx, value); // Throws
     }
 
     // Discard last row
-    if (m_array->is_inner_bptree_node()) {
+    if (array()->is_inner_bptree_node()) {
         size_t row_ndx_2 = tightdb::npos;
         EraseLeafElem handler(*this);
-        Array::erase_bptree_elem(m_array, row_ndx_2, handler); // Throws
+        Array::erase_bptree_elem(array(), row_ndx_2, handler); // Throws
     }
     else {
-        m_array->erase(last_row_ndx); // Throws
+        array()->erase(last_row_ndx); // Throws
     }
 }
 

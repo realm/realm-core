@@ -23,6 +23,7 @@
 #include <tightdb/util/features.h>
 #include <tightdb/array.hpp>
 #include <tightdb/array_string.hpp>
+#include <tightdb/array_integer.hpp>
 #include <tightdb/data_type.hpp>
 #include <tightdb/column_type.hpp>
 
@@ -126,9 +127,9 @@ private:
     // table, and the second entry is the index of the origin column in the
     // origin table.
     Array m_top;
-    Array m_types;       // 1st slot in m_top
+    ArrayInteger m_types;// 1st slot in m_top
     ArrayString m_names; // 2nd slot in m_top
-    Array m_attr;        // 3rd slot in m_top
+    ArrayInteger m_attr; // 3rd slot in m_top
     Array m_subspecs;    // 4th slot in m_top (optional)
     Array m_enumkeys;    // 5th slot in m_top (optional)
 

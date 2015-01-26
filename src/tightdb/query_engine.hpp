@@ -149,13 +149,13 @@ template<class T> struct ColumnTypeTraits;
 
 template<> struct ColumnTypeTraits<int64_t> {
     typedef Column column_type;
-    typedef Array array_type;
+    typedef ArrayInteger array_type;
     typedef int64_t sum_type;
     static const DataType id = type_Int;
 };
 template<> struct ColumnTypeTraits<bool> {
     typedef Column column_type;
-    typedef Array array_type;
+    typedef ArrayInteger array_type;
     typedef int64_t sum_type;
     static const DataType id = type_Bool;
 };
@@ -173,14 +173,14 @@ template<> struct ColumnTypeTraits<double> {
 };
 template<> struct ColumnTypeTraits<DateTime> {
     typedef Column column_type;
-    typedef Array array_type;
+    typedef ArrayInteger array_type;
     typedef int64_t sum_type;
     static const DataType id = type_DateTime;
 };
 
 template<> struct ColumnTypeTraits<StringData> {
     typedef Column column_type;
-    typedef Array array_type;
+    typedef ArrayInteger array_type;
     typedef int64_t sum_type;
     static const DataType id = type_String;
 };

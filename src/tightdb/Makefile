@@ -32,7 +32,7 @@ DEV_PROGRAMS     = tightdb-config
 libtightdb_a_SOURCES = util/encrypted_file_mapping.cpp util/errno.cpp util/file.cpp \
 util/file_mapper.cpp util/memory_stream.cpp util/string_buffer.cpp util/terminate.cpp \
 util/thread.cpp $(REPLICATION_CPP) alloc.cpp alloc_slab.cpp array.cpp array_binary.cpp \
-array_blob.cpp array_blobs_big.cpp array_string.cpp array_string_long.cpp column.cpp \
+array_blob.cpp array_blobs_big.cpp array_integer.cpp array_string.cpp array_string_long.cpp column.cpp \
 column_backlink.cpp column_binary.cpp column_link.cpp column_link_base.cpp column_linklist.cpp \
 column_mixed.cpp column_string.cpp column_string_enum.cpp column_table.cpp commit_log.cpp \
 descriptor.cpp exceptions.cpp group.cpp group_shared.cpp group_writer.cpp impl/output_stream.cpp \

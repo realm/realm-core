@@ -542,18 +542,6 @@ void Array::set(size_t ndx, int64_t value)
     (this->*m_setter)(ndx, value);
 }
 
-void Array::set_uint(std::size_t ndx, uint_fast64_t value)
-{
-    // When a value of a signed type is converted to an unsigned type, the C++
-    // standard guarantees that negative values are converted from the native
-    // representation to 2's complement, but the effect of conversions in the
-    // opposite direction is left unspecified by the
-    // standard. `tightdb::util::from_twos_compl()` is used here to perform the
-    // correct opposite unsigned-to-signed conversion, which reduces to a no-op
-    // when 2's complement is the native representation of negative values.
-    set(ndx, from_twos_compl<int_fast64_t>(value));
-}
-
 void Array::set_as_ref(std::size_t ndx, ref_type ref)
 {
     set(ndx, from_ref(ref));
@@ -1857,52 +1845,6 @@ template<size_t width> void Array::set(size_t ndx, int64_t value)
     set_direct<width>(m_data, ndx, value);
 }
 
-
-// Sort array.
-void Array::sort()
-{
-    TIGHTDB_TEMPEX(sort, m_width, ());
-}
-
-
-// Find max and min value, but break search if difference exceeds 'maxdiff' (in which case *min and *max is set to 0)
-// Useful for counting-sort functions
-template<size_t w>bool Array::MinMax(size_t from, size_t to, uint64_t maxdiff, int64_t *min, int64_t *max) const
-{
-    int64_t min2;
-    int64_t max2;
-    size_t t;
-
-    max2 = get<w>(from);
-    min2 = max2;
-
-    for (t = from + 1; t < to; t++) {
-        int64_t v = get<w>(t);
-        // Utilizes that range test is only needed if max2 or min2 were changed
-        if (v < min2) {
-            min2 = v;
-            if (uint64_t(max2 - min2) > maxdiff)
-                break;
-        }
-        else if (v > max2) {
-            max2 = v;
-            if (uint64_t(max2 - min2) > maxdiff)
-                break;
-        }
-    }
-
-    if (t < to) {
-        *max = 0;
-        *min = 0;
-        return false;
-    }
-    else {
-        *max = max2;
-        *min = min2;
-        return true;
-    }
-}
-
 // Take index pointers to elements as argument and sort the pointers according to values they point at. Leave m_array untouched. The ref array
 // is allowed to contain fewer elements than m_array.
 void Array::ReferenceSort(Array& ref) const
@@ -1973,60 +1915,6 @@ template<size_t w>void Array::ReferenceSort(Array& ref) const
     {
         ReferenceQuickSort(ref);
     }
-}
-
-// Sort array
-template<size_t w> void Array::sort()
-{
-    if (m_size < 2)
-        return;
-
-    size_t lo = 0;
-    size_t hi = m_size - 1;
-    vector<size_t> count;
-    int64_t min;
-    int64_t max;
-    bool b = false;
-
-    // in avg case QuickSort is O(n*log(n)) and CountSort O(n + range), and memory usage is sizeof(size_t)*range for CountSort.
-    // Se we chose range < m_size as treshold for deciding which to use
-    if (m_width <= 8) {
-        max = m_ubound;
-        min = m_lbound;
-        b = true;
-    }
-    else {
-        // If range isn't suited for CountSort, it's *probably* discovered very early, within first few values,
-        // in most practical cases, and won't add much wasted work. Max wasted work is O(n) which isn't much
-        // compared to QuickSort.
-        b = MinMax<w>(lo, hi + 1, m_size, &min, &max);
-    }
-
-    if (b) {
-        for (int64_t t = 0; t < max - min + 1; t++)
-            count.push_back(0);
-
-        // Count occurences of each value
-        for (size_t t = lo; t <= hi; t++) {
-            size_t i = to_size_t(get<w>(t) - min); // FIXME: The value of (get<w>(t) - min) cannot necessarily be stored in size_t.
-            count[i]++;
-        }
-
-        // Overwrite original array with sorted values
-        size_t dst = 0;
-        for (int64_t i = 0; i < max - min + 1; i++) {
-            size_t c = count[unsigned(i)];
-            for (size_t j = 0; j < c; j++) {
-                set<w>(dst, i + min);
-                dst++;
-            }
-        }
-    }
-    else {
-        QuickSort(lo, hi);
-    }
-
-    return;
 }
 
 void Array::ReferenceQuickSort(Array& ref) const
@@ -2125,15 +2013,6 @@ template<size_t w> void Array::QuickSort(size_t lo, size_t hi)
         QuickSort(lo, j);
     if (i < int(hi))
         QuickSort(i, hi);
-}
-
-vector<int64_t> Array::ToVector() const
-{
-    vector<int64_t> v;
-    const size_t count = size();
-    for (size_t t = 0; t < count; ++t)
-        v.push_back(get(t));
-    return v;
 }
 
 bool Array::compare_int(const Array& a) const TIGHTDB_NOEXCEPT

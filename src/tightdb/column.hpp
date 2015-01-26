@@ -25,7 +25,7 @@
 #include <vector>
 
 #include <tightdb/util/unique_ptr.hpp>
-#include <tightdb/array.hpp>
+#include <tightdb/array_integer.hpp>
 #include <tightdb/column_type.hpp>
 #include <tightdb/column_fwd.hpp>
 #include <tightdb/spec.hpp>
@@ -487,7 +487,10 @@ public:
 #endif
 
 protected:
-    Column(Array* root = 0) TIGHTDB_NOEXCEPT;
+    Column(ArrayInteger* root = 0) TIGHTDB_NOEXCEPT;
+
+    ArrayInteger* array() { return static_cast<ArrayInteger*>(m_array); }
+    const ArrayInteger* array() const { return static_cast<const ArrayInteger*>(m_array); }
 
     std::size_t do_get_size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return size(); }
 
@@ -781,7 +784,7 @@ inline Column::Column(move_tag, Column& col) TIGHTDB_NOEXCEPT
     col.m_search_index = 0;
 }
 
-inline Column::Column(Array* root) TIGHTDB_NOEXCEPT:
+inline Column::Column(ArrayInteger* root) TIGHTDB_NOEXCEPT:
     ColumnBase(root), m_search_index(null_ptr)
 {
 }
@@ -797,12 +800,12 @@ inline int_fast64_t Column::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT_DEBUG(ndx < size());
     if (!m_array->is_inner_bptree_node())
-        return m_array->get(ndx);
+        return array()->get(ndx);
 
     std::pair<MemRef, std::size_t> p = m_array->get_bptree_leaf(ndx);
     const char* leaf_header = p.first.m_addr;
     std::size_t ndx_in_leaf = p.second;
-    return Array::get(leaf_header, ndx_in_leaf);
+    return ArrayInteger::get(leaf_header, ndx_in_leaf);
 }
 
 inline ref_type Column::get_as_ref(std::size_t ndx) const TIGHTDB_NOEXCEPT
@@ -890,7 +893,7 @@ ref_type Column::leaf_insert(MemRef leaf_mem, ArrayParent& parent, std::size_t n
 inline std::size_t Column::lower_bound_int(int64_t value) const TIGHTDB_NOEXCEPT
 {
     if (root_is_leaf()) {
-        return m_array->lower_bound_int(value);
+        return array()->lower_bound(value);
     }
     return ColumnBase::lower_bound(*this, value);
 }
@@ -898,7 +901,7 @@ inline std::size_t Column::lower_bound_int(int64_t value) const TIGHTDB_NOEXCEPT
 inline std::size_t Column::upper_bound_int(int64_t value) const TIGHTDB_NOEXCEPT
 {
     if (root_is_leaf()) {
-        return m_array->upper_bound_int(value);
+        return array()->upper_bound(value);
     }
     return ColumnBase::upper_bound(*this, value);
 }

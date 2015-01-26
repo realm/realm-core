@@ -371,23 +371,18 @@ public:
     /// returns false (noexcept:array-set). Note that for a value of zero, the
     /// first criterion is trivially satisfied.
     void set(std::size_t ndx, int64_t value);
-    
-    void set_uint(std::size_t ndx, uint64_t value);
 
     void set_as_ref(std::size_t ndx, ref_type ref);
 
     template<std::size_t w> void set(std::size_t ndx, int64_t value);
 
     int64_t get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
-    inline uint64_t get_uint(std::size_t ndx) const TIGHTDB_NOEXCEPT;
-
     template<std::size_t w> int64_t get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
     void get_chunk(size_t ndx, int64_t res[8]) const TIGHTDB_NOEXCEPT;
     template<size_t w> void get_chunk(size_t ndx, int64_t res[8]) const TIGHTDB_NOEXCEPT;
 
     ref_type get_as_ref(std::size_t ndx) const TIGHTDB_NOEXCEPT;
 
-    int64_t operator[](std::size_t ndx) const TIGHTDB_NOEXCEPT { return get(ndx); }
     int64_t front() const TIGHTDB_NOEXCEPT;
     int64_t back() const TIGHTDB_NOEXCEPT;
 
@@ -541,7 +536,6 @@ public:
     bool minimum(int64_t& result, std::size_t start = 0, std::size_t end = std::size_t(-1),
                  std::size_t* return_ndx = null_ptr) const;
 
-    void sort();
     void ReferenceSort(Array& ref) const;
 
     /// This information is guaranteed to be cached in the array accessor.
@@ -600,8 +594,6 @@ public:
     /// The number of bytes that will be written by a non-recursive invocation
     /// of this function is exactly the number returned by get_byte_size().
     size_t write(_impl::ArrayWriterBase& target, bool recurse = true, bool persist = false) const;
-
-    std::vector<int64_t> ToVector() const;
 
     /// Compare two arrays for equality.
     bool compare_int(const Array&) const TIGHTDB_NOEXCEPT;
@@ -926,18 +918,13 @@ public:
 private:
     typedef bool (*CallbackDummy)(int64_t);
 
-    template<size_t w> bool MinMax(size_t from, size_t to, uint64_t maxdiff,
-                                   int64_t* min, int64_t* max) const;
     Array& operator=(const Array&); // not allowed
-    template<size_t w> void QuickSort(size_t lo, size_t hi);
-    void QuickSort(size_t lo, size_t hi);
+protected:
     void ReferenceQuickSort(Array& ref) const;
     template<size_t w> void ReferenceQuickSort(size_t lo, size_t hi, Array& ref) const;
-
-    template<size_t w> void sort();
     template<size_t w> void ReferenceSort(Array& ref) const;
-
-    template<size_t w> int64_t sum(size_t start, size_t end) const;
+    template<size_t w> void QuickSort(size_t lo, size_t hi);
+    void QuickSort(size_t lo, size_t hi);
 
     /// Insert a new child after original. If the parent has to be
     /// split, this function returns the `ref` of the new parent node.
@@ -999,9 +986,10 @@ protected:
 
 private:
     std::size_t m_ref;
+
+    template<size_t w> int64_t sum(size_t start, size_t end) const;
     template<bool max, std::size_t w> bool minmax(int64_t& result, std::size_t start,
                                                   std::size_t end, std::size_t* return_ndx) const;
-
 protected:
     std::size_t m_size;     // Number of elements currently stored.
     std::size_t m_capacity; // Number of elements that fit inside the allocated memory.
@@ -1052,7 +1040,6 @@ protected:
     get_to_dot_parent(std::size_t ndx_in_parent) const TIGHTDB_OVERRIDE;
 #endif
 
-// FIXME: below should be moved to a specific IntegerArray class
 protected:
     // Getters and Setters for adaptive-packed arrays
     typedef int64_t (Array::*Getter)(std::size_t) const; // Note: getters must not throw
@@ -1066,6 +1053,7 @@ private:
     Setter m_setter;
     Finder m_finder[cond_Count]; // one for each COND_XXX enum
 
+protected:
     int64_t m_lbound;       // min number that can be stored with current m_width
     int64_t m_ubound;       // max number that can be stored with current m_width
 
@@ -1382,12 +1370,6 @@ inline int64_t Array::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 */
 }
 
-
-inline uint64_t Array::get_uint(std::size_t ndx) const TIGHTDB_NOEXCEPT
-{
-    return get(ndx);
-}
-
 inline int64_t Array::front() const TIGHTDB_NOEXCEPT
 {
     return get(0);
@@ -1464,7 +1446,6 @@ inline void Array::add(int_fast64_t value)
 {
     insert(m_size, value);
 }
-
 
 inline void Array::erase(std::size_t ndx)
 {
