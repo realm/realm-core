@@ -6,7 +6,7 @@ util/type_list.hpp util/tuple.hpp util/type_traits.hpp util/bind.hpp util/safe_i
 util/unique_ptr.hpp util/bind_ptr.hpp util/buffer.hpp util/string_buffer.hpp util/shared_ptr.hpp \
 util/memory_stream.hpp util/logger.hpp util/thread.hpp util/file.hpp util/utf8.hpp exceptions.hpp \
 utilities.hpp alloc.hpp alloc_slab.hpp array.hpp array_integer.hpp array_string.hpp data_type.hpp column_type.hpp \
-column_fwd.hpp spec.hpp impl/destroy_guard.hpp impl/output_stream.hpp datetime.hpp string_data.hpp \
+column_fwd.hpp spec.hpp impl/array_writer.hpp impl/destroy_guard.hpp impl/output_stream.hpp datetime.hpp string_data.hpp \
 binary_data.hpp mixed.hpp table.hpp table_ref.hpp table_basic_fwd.hpp table_accessors.hpp \
 table_basic.hpp table_view.hpp table_view_basic.hpp table_macros.hpp row.hpp descriptor_fwd.hpp \
 descriptor.hpp group.hpp group_shared.hpp $(REPLICATION_HPP) query.hpp query_conditions.hpp \

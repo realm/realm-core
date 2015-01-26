@@ -25,6 +25,7 @@
 
 #include <tightdb/util/file.hpp>
 #include <tightdb/alloc.hpp>
+#include <tightdb/impl/array_writer.hpp>
 
 
 namespace tightdb {
@@ -33,7 +34,7 @@ namespace tightdb {
 class Group;
 class SlabAlloc;
 
-class GroupWriter {
+class GroupWriter: public _impl::ArrayWriterBase {
 public:
     GroupWriter(Group&);
 
@@ -60,7 +61,7 @@ public:
     ///
     /// Returns the position in the file where the first byte was
     /// written.
-    std::size_t write_array(const char* data, std::size_t size, uint_fast32_t checksum);
+    std::size_t write_array(const char* data, std::size_t size, uint_fast32_t checksum) TIGHTDB_OVERRIDE;
 
 #ifdef TIGHTDB_DEBUG
     void dump();

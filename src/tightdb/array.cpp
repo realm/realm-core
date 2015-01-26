@@ -18,6 +18,7 @@
 #include <tightdb/query_conditions.hpp>
 #include <tightdb/column_string.hpp>
 #include <tightdb/index_string.hpp>
+#include <tightdb/array_integer.hpp>
 
 
 // Header format (8 bytes):
@@ -385,6 +386,71 @@ void Array::destroy_children(size_t offset) TIGHTDB_NOEXCEPT
 
         ref_type ref = to_ref(value);
         destroy_deep(ref, m_alloc);
+    }
+}
+
+size_t Array::write(_impl::ArrayWriterBase& out, bool recurse, bool persist) const
+{
+    TIGHTDB_ASSERT(is_attached());
+
+    // Ignore un-changed arrays when persisting
+    if (persist && m_alloc.is_read_only(m_ref))
+        return m_ref;
+
+    if (!recurse || !m_has_refs) {
+        // FIXME: Replace capacity with checksum
+
+        // Write flat array
+        const char* header = get_header_from_data(m_data);
+        std::size_t size = get_byte_size();
+        uint_fast32_t dummy_checksum = 0x01010101UL;
+        std::size_t array_pos = out.write_array(header, size, dummy_checksum);
+        TIGHTDB_ASSERT(array_pos % 8 == 0); // 8-byte alignment
+
+        return array_pos;
+    }
+
+    // Temp array for updated refs
+    ArrayInteger new_refs(Allocator::get_default());
+    Type type = m_is_inner_bptree_node ? type_InnerBptreeNode : type_HasRefs;
+    new_refs.create(type, m_context_flag); // Throws
+
+    try {
+        // First write out all sub-arrays
+        std::size_t n = size();
+        for (std::size_t i = 0; i != n; ++i) {
+            int_fast64_t value = get(i);
+            if (value == 0 || value % 2 != 0) {
+                // Zero-refs and values that are not 8-byte aligned do
+                // not point to subarrays.
+                new_refs.add(value); // Throws
+            }
+            else if (persist && m_alloc.is_read_only(to_ref(value))) {
+                // Ignore un-changed arrays when persisting
+                new_refs.add(value); // Throws
+            }
+            else {
+                Array sub(get_alloc());
+                sub.init_from_ref(to_ref(value));
+                bool subrecurse = true;
+                std::size_t sub_pos = sub.write(out, subrecurse, persist); // Throws
+                TIGHTDB_ASSERT(sub_pos % 8 == 0); // 8-byte alignment
+                new_refs.add(sub_pos); // Throws
+            }
+        }
+
+        // Write out the replacement array
+        // (but don't write sub-tree as it has alredy been written)
+        bool subrecurse = false;
+        std::size_t refs_pos = new_refs.write(out, subrecurse, persist); // Throws
+
+        new_refs.destroy(); // Shallow
+
+        return refs_pos; // Return position
+    }
+    catch (...) {
+        new_refs.destroy(); // Shallow
+        throw;
     }
 }
 
