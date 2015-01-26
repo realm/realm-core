@@ -150,7 +150,7 @@ inline StringData ArrayStringLong::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < m_offsets.size());
 
-    if (m_nulls.get(ndx) == 0)
+    if (NULLS && m_nulls.get(ndx) == 0)
         return StringData(null_ptr, 0);
 
     std::size_t begin, end;
@@ -178,21 +178,24 @@ inline void ArrayStringLong::truncate(std::size_t size)
 
     m_offsets.truncate(size);
     m_blob.truncate(blob_size);
-    m_nulls.truncate(size);
+    if (NULLS)
+            m_nulls.truncate(size);
 }
 
 inline void ArrayStringLong::clear()
 {
     m_blob.clear();
     m_offsets.clear();
-    m_nulls.clear();
+    if (NULLS)
+        m_nulls.clear();
 }
 
 inline void ArrayStringLong::destroy()
 {
     m_blob.destroy();
     m_offsets.destroy();
-    m_nulls.destroy();
+    if (NULLS)
+        m_nulls.destroy();
     Array::destroy();
 }
 

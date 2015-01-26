@@ -1431,7 +1431,7 @@ inline StringData Table::get_name() const TIGHTDB_NOEXCEPT
     const Array& real_top = m_top.is_attached() ? m_top : m_columns;
     ArrayParent* parent = real_top.get_parent();
     if (!parent)
-        return StringData();
+        return StringData("");
     std::size_t index_in_parent = real_top.get_ndx_in_parent();
     TIGHTDB_ASSERT(dynamic_cast<Parent*>(parent));
     return static_cast<Parent*>(parent)->get_child_name(index_in_parent);

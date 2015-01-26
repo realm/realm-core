@@ -20,16 +20,8 @@ void ArrayStringLong::init_from_mem(MemRef mem) TIGHTDB_NOEXCEPT
 
     m_offsets.init_from_ref(offsets_ref);
     m_blob.init_from_ref(blob_ref);
-
-    if (NULLS) {
+    if (NULLS)
         m_nulls.init_from_ref(nulls_ref);
-    }
-    else {
-        m_nulls.create(Array::type_Normal);
-        for (size_t t = 0; t < m_offsets.size(); t++)
-            m_nulls.add(1);
-    }
-
 }
 
 
@@ -41,7 +33,8 @@ void ArrayStringLong::add(StringData value)
     if (!m_offsets.is_empty())
         end += to_size_t(m_offsets.back());
     m_offsets.add(end);
-    m_nulls.add(value.is_null() ? 0 : 1);
+    if (NULLS)
+        m_nulls.add(!value.is_null());
 }
 
 void ArrayStringLong::set(size_t ndx, StringData value)
@@ -56,7 +49,8 @@ void ArrayStringLong::set(size_t ndx, StringData value)
     size_t new_end = begin + value.size() + 1;
     int64_t diff =  int64_t(new_end) - int64_t(end);
     m_offsets.adjust(ndx, m_offsets.size(), diff);
-    m_nulls.set(ndx, value.is_null() ? 0 : 1);
+    if (NULLS)
+        m_nulls.set(ndx, !value.is_null());
 }
 
 void ArrayStringLong::insert(size_t ndx, StringData value)
@@ -69,7 +63,8 @@ void ArrayStringLong::insert(size_t ndx, StringData value)
     m_blob.insert(pos, value.data(), value.size(), add_zero_term);
     m_offsets.insert(ndx, pos + value.size() + 1);
     m_offsets.adjust(ndx+1, m_offsets.size(), value.size() + 1);
-    m_nulls.insert(ndx, value.is_null() ? 0 : 1);
+    if (NULLS)
+        m_nulls.insert(ndx, !value.is_null());
 }
 
 void ArrayStringLong::erase(size_t ndx)
@@ -82,19 +77,27 @@ void ArrayStringLong::erase(size_t ndx)
     m_blob.erase(begin, end);
     m_offsets.erase(ndx);
     m_offsets.adjust(ndx, m_offsets.size(), int64_t(begin) - int64_t(end));
-    m_nulls.erase(ndx);
+    if (NULLS)
+        m_nulls.erase(ndx);
 }
 
 bool ArrayStringLong::is_null(size_t ndx) const
 {
-    TIGHTDB_ASSERT(ndx < m_nulls.size());
-    return !m_nulls.get(ndx);
+    if (NULLS) {
+        TIGHTDB_ASSERT(ndx < m_nulls.size());
+        return !m_nulls.get(ndx);
+    }
+    else {
+        return false;
+    }
 }
 
 void ArrayStringLong::set_null(size_t ndx)
 {
-    TIGHTDB_ASSERT(ndx < m_nulls.size());
-    m_nulls.set(ndx, false);
+    if (NULLS) {
+        TIGHTDB_ASSERT(ndx < m_nulls.size());
+        m_nulls.set(ndx, false);
+    }
 }
 
 size_t ArrayStringLong::count(StringData value, size_t begin,
