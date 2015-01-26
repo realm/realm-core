@@ -558,6 +558,7 @@ inline void CondVar::wait(RobustMutex& m, Func recover_func, const struct timesp
 {
     int r;
 #   ifdef __APPLE__
+    // http://www.openradar.me/radar?id=6363576352636928
     _pthread_cond* cond = reinterpret_cast<_pthread_cond*>(&m_impl);
     cond->busy = 0;
 #   endif // __APPLE__
