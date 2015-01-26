@@ -2,10 +2,7 @@
 
 ### Bugfixes:
 
-* Fixed a crashbug which could cause a reading thread to miss accessor updates during
-  advance_read(), if the pending updates consisted of two or more empty commits followed
-  by one or more non-empty commit. The left out accessor updates could lead to inconsistent
-  datastructures which could presumably later cause database corruption.
+* Lorem ipsum.
 
 ### API breaking changes:
 
@@ -23,12 +20,51 @@
 
 ----------------------------------------------
 
+# 0.88.0 Release notes
+
+### Enhancements:
+
+* SharedGroup::compact() now appends ".tmp_compaction_space" to the database name
+  in order to get the name of its temporary workspace file instead of ".tmp". It also
+  automatically removes the file in case it already exists before compaction.
+* Add support for comparing string columns to other string columns in queries.
+* `WriteTransaction::has_table()` and `WriteTransaction::rollback()` were
+  added. Previously, only implicit rollback was possible with
+  `WriteTransaction`.
+
+-----------
+
+### Internals:
+
+* All assert failures now print the release version number.
+
+----------------------------------------------
+
+# 0.87.6 Release notes
+
+### Bugfixes:
+
+* Fixed a crashbug which could cause a reading thread to miss accessor updates
+  during advance_read(), if the pending updates consisted of two or more empty
+  commits followed by one or more non-empty commit. The left out accessor
+  updates could lead to inconsistent datastructures which could presumably later
+  cause database corruption.
+
+### Enhancements:
+
+* Adding *null* support to `BinaryData` in exactly the same way as it was added
+  to `StringData`.
+
+----------------------------------------------
+
 # 0.87.5 Release notes
 
 ### Bugfixes:
 
 * `AdaptiveStringColumn::find_all()` with an index no longer returns its results
   twice.
+* Fixed `Table::get_distinct_view()` on tables which have not been modified
+  since they were loaded.
 
 ### Enhancements:
 

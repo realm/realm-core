@@ -1659,6 +1659,38 @@ TEST(Table_DistinctDateTime)
 }
 
 
+TEST(Table_DistinctFromPersistedTable)
+{
+    GROUP_TEST_PATH(path);
+
+    {
+        Group group;
+        TableRef table = group.add_table("table");
+        table->add_column(type_Int, "first");
+        table->add_empty_row(4);
+        table->set_int(0, 0, 1);
+        table->set_int(0, 1, 2);
+        table->set_int(0, 2, 3);
+        table->set_int(0, 3, 3);
+
+        table->add_search_index(0);
+        CHECK(table->has_search_index(0));
+        group.write(path);
+    }
+
+    {
+        Group group(path, 0, Group::mode_ReadOnly);
+        TableRef table = group.get_table("table");
+        TableView view = table->get_distinct_view(0);
+
+        CHECK_EQUAL(3, view.size());
+        CHECK_EQUAL(0, view.get_source_ndx(0));
+        CHECK_EQUAL(1, view.get_source_ndx(1));
+        CHECK_EQUAL(2, view.get_source_ndx(2));
+    }
+}
+
+
 
 TEST(Table_IndexInt)
 {
