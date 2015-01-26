@@ -1778,7 +1778,7 @@ template<size_t width> void Array::set_width() TIGHTDB_NOEXCEPT
     ChunkGetter temp_chunk_getter = &Array::get_chunk<width>;
     m_chunk_getter = temp_chunk_getter;
 
-    Setter temp_setter = &Array::Set<width>;
+    Setter temp_setter = &Array::set<width>;
     m_setter = temp_setter;
 
     Finder feq = &Array::find<Equal, act_ReturnFirst, width>;
@@ -1852,7 +1852,7 @@ template<size_t w> void Array::get_chunk(size_t ndx, int64_t res[8]) const TIGHT
 }
 
 
-template<size_t width> void Array::Set(size_t ndx, int64_t value)
+template<size_t width> void Array::set(size_t ndx, int64_t value)
 {
     set_direct<width>(m_data, ndx, value);
 }
@@ -2017,7 +2017,7 @@ template<size_t w> void Array::sort()
         for (int64_t i = 0; i < max - min + 1; i++) {
             size_t c = count[unsigned(i)];
             for (size_t j = 0; j < c; j++) {
-                Set<w>(dst, i + min);
+                set<w>(dst, i + min);
                 dst++;
             }
         }
