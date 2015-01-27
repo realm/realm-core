@@ -116,7 +116,7 @@ public:
     /// commit_write_transact() is made *on the same commitlog instance*.
 
     /// The two variants differ in the type of data returned. Use the version with
-    /// CommitLogEntry* if you need the additional data provided by that type.
+    /// CommitLogEntry* if you need the additional data provided by that type (see below)
     virtual void get_commit_entries(version_type from_version, version_type to_version,
                                     BinaryData* logs_buffer) TIGHTDB_NOEXCEPT;
 
@@ -456,13 +456,17 @@ private:
     friend class Group::TransactReverser;
 };
 
-
+/// Extended version of a commit log entry. The additional info is required for Sync.
 struct Replication::CommitLogEntry {
-    bool is_a_local_commit;
-    version_type server_version;
-    BinaryData log_data;
+    bool is_a_local_commit;       // true if entry was created by commit_write_transact()
+    version_type server_version;  // see below
+    BinaryData log_data;          // the actual data for the log entry
 };
 
+// re server_version: This field is written by Sync (if enabled) on commits which
+// are foreign. It is carried over as part of a commit, allowing other threads involved
+// with Sync to observet it. For local commits, the value of server_version is taken
+// from any previous forewign commmit.
 
 
 class Replication::InputStream {
