@@ -2,6 +2,8 @@
 
 #include <tightdb/util/thread.hpp>
 
+#include <tightdb/util/file.hpp>
+
 #if !defined _WIN32
 #  include <unistd.h>
 #endif
@@ -266,45 +268,112 @@ TIGHTDB_NORETURN void CondVar::destroy_failed(int err) TIGHTDB_NOEXCEPT
     TIGHTDB_TERMINATE("pthread_cond_destroy() failed");
 }
 
-namespace {
 #ifdef __APPLE__
-struct _pthread_mutex {
-    long sig;
-    OSSpinLock lock;
-    uint32_t mtxopts;
-    int16_t prioceiling;
-    int16_t priority;
-#if defined(__LP64__)
-    uint32_t _pad;
-#endif
-    uint32_t m_tid[2]; // thread id of thread that has mutex locked, misaligned locks may span to first field of m_seq
-    uint32_t m_seq[3];
-#if defined(__LP64__)
-    uint32_t _reserved;
-#endif
-    void *reserved2[2];
-};
-
+namespace {
 struct _pthread_cond {
     long sig;
     OSSpinLock lock;
     uint32_t unused:29,
         misalign:1,
         pshared:2;
-    _pthread_mutex *busy;
+    pthread_mutex_t *busy;
     uint32_t c_seq[3];
 #if defined(__LP64__)
     uint32_t _reserved[3];
 #endif
 };
-#endif // __APPLE__
 }
+
+#include <sys/mman.h>
 
 void CondVar::darwin_shared_wait_hack() TIGHTDB_NOEXCEPT
 {
-#   ifdef __APPLE__
+    // Sharing a pthread_cond_t incorrectly requires that the mutex be at the
+    // same memory address in all processes. Hack around this by setting the
+    // field which the implementation uses to check this to NULL before waiting.
     // http://www.openradar.me/radar?id=6363576352636928
-    _pthread_cond* cond = reinterpret_cast<_pthread_cond*>(&m_impl);
-    cond->busy = 0;
-#   endif // __APPLE__
+
+    static bool use_hack = true;
+    static std::once_flag flag;
+    std::call_once(flag, [&] {
+        // Because we're dynamically linked to libpthread, it can change on us,
+        // so try to verify that it behaves as expected. The priority here is to
+        // minimize the chance of this hack actively making things worse.
+
+        char path[] = "/tmp/realm-share-check.XXXXXX";
+        mktemp(path);
+        File f(path, File::mode_Write);
+        f.resize(sizeof(RobustMutex));
+        File::remove(path);
+
+        File::Map<RobustMutex> mm(f, File::access_ReadWrite);
+        RobustMutex& m = *mm.get_addr();
+        new (&m) RobustMutex;
+        if (m.m_impl.__sig != 0x4D555458) // from libpthread-105.1.4/src/internal.h
+            return;
+
+        CondVar cv((CondVar::process_shared_tag()));
+        if (cv.m_impl.__sig != 0x434F4E44) // from libpthread-105.1.4/src/internal.h
+            return;
+
+        Mutex thread_start_m;
+        CondVar thread_start_cv;
+        LockGuard thread_start_lock(thread_start_m);
+
+        // First check if the pointer to the mutex is stored at the expected
+        // offset in the cond var
+        Thread t([&] {
+            RobustLockGuard lock(m, []{});
+            {
+                LockGuard l(thread_start_m);
+                thread_start_cv.notify_all();
+            }
+
+            int r = pthread_cond_wait(&cv.m_impl, &m.m_impl);
+            TIGHTDB_ASSERT(r == 0);
+            static_cast<void>(r);
+        });
+
+        thread_start_cv.wait(thread_start_lock);
+
+        {
+            RobustLockGuard lock(m, []{});
+            _pthread_cond* cond = reinterpret_cast<_pthread_cond*>(&cv.m_impl);
+            if (cond->busy != &m.m_impl) {
+                cv.notify();
+                t.join();
+                return;
+            }
+        }
+
+        // Next check if waiting with the same mutex mapped to two different
+        // memory address works
+        File::Map<RobustMutex> m2(f, File::access_ReadWrite);
+        Thread t2([&] {
+            RobustLockGuard lock(m, []{});
+            {
+                LockGuard l(thread_start_m);
+                thread_start_cv.notify_all();
+            }
+
+            int r = pthread_cond_wait(&cv.m_impl, &m2.get_addr()->m_impl);
+            if (r == EINVAL)
+                use_hack = true;
+            TIGHTDB_ASSERT(r == 0 || r == EINVAL);
+        });
+
+        thread_start_cv.wait(thread_start_lock);
+        {
+            RobustLockGuard lock(m, []{});
+            cv.notify_all();
+        }
+
+        t.join();
+        t2.join();
+    });
+
+    if (use_hack) {
+        reinterpret_cast<_pthread_cond*>(&m_impl)->busy = 0;
+    }
 }
+#endif // __APPLE__

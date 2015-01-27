@@ -521,7 +521,9 @@ template<class Func>
 inline void CondVar::wait(RobustMutex& m, Func recover_func, const struct timespec* tp)
 {
     int r;
+#ifdef __APPLE__
     darwin_shared_wait_hack();
+#endif
     if (!tp) {
         r = pthread_cond_wait(&m_impl, &m.m_impl);
     }
