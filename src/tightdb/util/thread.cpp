@@ -300,7 +300,12 @@ void CondVar::darwin_shared_wait_hack() TIGHTDB_NOEXCEPT
         // so try to verify that it behaves as expected. The priority here is to
         // minimize the chance of this hack actively making things worse.
 
-        char path[] = "/tmp/realm-share-check.XXXXXX";
+        char path[PATH_MAX];
+        size_t n = confstr(_CS_DARWIN_USER_TEMP_DIR, path, sizeof(path));
+        TIGHTDB_ASSERT(n > 0 && n < sizeof(path));
+        static_cast<void>(n);
+        strlcat(path, "/realm-share-check.XXXXXX", sizeof(path));
+
         mktemp(path);
         File f(path, File::mode_Write);
         f.resize(sizeof(RobustMutex));
