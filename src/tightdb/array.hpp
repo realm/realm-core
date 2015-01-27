@@ -1061,6 +1061,8 @@ protected:
     int64_t m_lbound;       // min number that can be stored with current m_width
     int64_t m_ubound;       // max number that can be stored with current m_width
 
+    static std::size_t bit_width(int64_t value);
+
 #ifdef TIGHTDB_DEBUG
     void report_memory_usage_2(MemUsageHandler&) const;
 #endif

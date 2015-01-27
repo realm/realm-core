@@ -155,12 +155,10 @@ using namespace tightdb;
 using namespace tightdb::util;
 
 
-namespace {
-
 /// Takes a 64-bit value and returns the minimum number of bits needed
 /// to fit the value. For alignment this is rounded up to nearest
 /// log2. Posssible results {0, 1, 2, 4, 8, 16, 32, 64}
-size_t bit_width(int64_t v)
+size_t Array::bit_width(int64_t v)
 {
     // FIXME: Assuming there is a 64-bit CPU reverse bitscan
     // instruction and it is fast, then this function could be
@@ -179,8 +177,6 @@ size_t bit_width(int64_t v)
     // Then check if bits 15-31 used (32b), 7-31 used (16b), else (8b)
     return uint64_t(v) >> 31 ? 64 : uint64_t(v) >> 15 ? 32 : uint64_t(v) >> 7 ? 16 : 8;
 }
-
-} // anonymous namespace
 
 
 void Array::init_from_mem(MemRef mem) TIGHTDB_NOEXCEPT
@@ -509,7 +505,7 @@ void Array::move_backward(size_t begin, size_t end, size_t dest_end)
     copy_backward(begin_2, end_2, dest_end_2);
 }
 
-void Array::add_to_column(Column* column, int64_t value) 
+void Array::add_to_column(Column* column, int64_t value)
 {
     column->add(value);
 }
@@ -2763,14 +2759,14 @@ inline size_t lower_bound(const char* data, size_t size, int64_t value) TIGHTDB_
         // minimizes the length of dependence chains leading up to branches.
         // Making the unfolding of the loop independent of the data being
         // searched, also minimizes the delays incurred by branch
-        // mispredictions, because they can be determined earlier 
+        // mispredictions, because they can be determined earlier
         // and the speculation corrected earlier.
 
         // Counterintuitive:
-        // To make size independent of data, we cannot always split the 
+        // To make size independent of data, we cannot always split the
         // range at the theoretical optimal point. When we determine that
-        // the key is larger than the probe at some index K, and prepare 
-        // to search the upper part of the range, you would normally start 
+        // the key is larger than the probe at some index K, and prepare
+        // to search the upper part of the range, you would normally start
         // the search at the next index, K+1, to get the shortest range.
         // We can only do this when splitting a range with odd number of entries.
         // If there is an even number of entries we search from K instead of K+1.
@@ -3127,7 +3123,7 @@ top:
                     }
                 }
                 else {
-                    return allnocopy ? size_t(FindRes_column) : 
+                    return allnocopy ? size_t(FindRes_column) :
                            first ? to_size_t(get_direct(sub_data, sub_width, 0)) : sub_count;
                 }
             }
