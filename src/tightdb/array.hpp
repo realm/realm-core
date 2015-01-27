@@ -986,10 +986,15 @@ protected:
 private:
     std::size_t m_ref;
 
+protected:
     template<size_t w> int64_t sum(size_t start, size_t end) const;
     template<bool max, std::size_t w> bool minmax(int64_t& result, std::size_t start,
                                                   std::size_t end, std::size_t* return_ndx) const;
-protected:
+    template<size_t w> bool minmax(size_t from, size_t to, uint64_t maxdiff,
+                                   int64_t* min, int64_t* max) const;
+    template<size_t w> void sort_data();
+    void sort_data();
+
     std::size_t m_size;     // Number of elements currently stored.
     std::size_t m_capacity; // Number of elements that fit inside the allocated memory.
 // FIXME: m_width Should be an 'int'
