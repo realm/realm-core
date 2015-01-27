@@ -3132,10 +3132,10 @@ top:
         width = get_width_from_header(header);
         is_inner_node = get_is_inner_bptree_node_from_header(header);
 
-        if (value.size() - stringoffset <= 4)
-            stringoffset = value.size(); // finished parsing entire input string
-        else
+        if (value.size() - stringoffset >= 4)
             stringoffset += 4;
+        else
+            stringoffset += value.size() - stringoffset + 1;
 
         goto top;
     }

@@ -60,7 +60,6 @@ void StringIndex::insert_with_offset(size_t row_ndx, StringData value, size_t of
 {
     // Create 4 byte index key
     key_type key = create_key(value, offset);
-
     TreeInsert(row_ndx, key, offset, value); // Throws
 }
 
