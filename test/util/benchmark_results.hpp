@@ -40,11 +40,11 @@ public:
     };
 
     /// Use submit_single() when you know there is only going to be a single datapoint.
-    void submit_single(const std::string& ident, const std::string& lead_text, double seconds,
+    void submit_single(const char* ident, const char* lead_text, double seconds,
                 ChangeType = change_Percent);
 
     /// Use submit() when there are multiple data points, and call finish() when you are done.
-    void submit(const std::string& ident, double seconds);
+    void submit(const char* ident, double seconds);
     void finish(const std::string& ident, const std::string& lead_text, ChangeType = change_Percent);
 
 private:

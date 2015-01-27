@@ -273,7 +273,7 @@ void run_benchmark(BenchmarkResults& results)
             run_benchmark_once(benchmark, *group, t);
             double s = t.get_elapsed_time();
             total += s;
-            results.submit(ident, s);
+            results.submit(ident.c_str(), s);
         }
 
         results.finish(ident, lead_text_ss.str());

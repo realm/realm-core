@@ -78,14 +78,14 @@ double BenchmarkResults::Result::avg() const
     return total / rep;
 }
 
-void BenchmarkResults::submit_single(const std::string& ident, const std::string& lead_text,
+void BenchmarkResults::submit_single(const char* ident, const char* lead_text,
     double seconds, ChangeType change_type)
 {
     submit(ident, seconds);
     finish(ident, lead_text, change_type);
 }
 
-void BenchmarkResults::submit(const std::string& ident, double seconds)
+void BenchmarkResults::submit(const char* ident, double seconds)
 {
     Results::iterator it = m_results.find(ident);
     if (it == m_results.end()) {
@@ -98,7 +98,7 @@ void BenchmarkResults::submit(const std::string& ident, double seconds)
     r.rep += 1;
 }
 
-void BenchmarkResults::finish(const std::string& ident, const std::string& lead_text, ChangeType change_type) 
+void BenchmarkResults::finish(const std::string& ident, const std::string& lead_text, ChangeType change_type)
 {
     /*
         OUTPUT FOR RESULTS WITHOUT BASELINE:
