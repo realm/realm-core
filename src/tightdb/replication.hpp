@@ -114,6 +114,12 @@ public:
     /// and 'set_last_version_synced' *on any commitlog instance participating in the session*,
     /// OR until a new call to get_commit_entries(), apply_foreign_transact_log() or
     /// commit_write_transact() is made *on the same commitlog instance*.
+
+    /// The two variants differ in the type of data returned. Use the version with
+    /// CommitLogEntry* if you need the additional data provided by that type.
+    virtual void get_commit_entries(version_type from_version, version_type to_version,
+                                    BinaryData* logs_buffer) TIGHTDB_NOEXCEPT;
+
     virtual void get_commit_entries(version_type from_version, version_type to_version,
                                     Replication::CommitLogEntry* logs_buffer) TIGHTDB_NOEXCEPT;
 
@@ -702,6 +708,14 @@ inline bool Replication::apply_foreign_transact_log(SharedGroup&, version_type, 
 }
 
 inline void Replication::get_commit_entries(version_type, version_type, Replication::CommitLogEntry*)
+    TIGHTDB_NOEXCEPT
+{
+    // Unimplemented!
+    TIGHTDB_ASSERT(false);
+}
+
+
+inline void Replication::get_commit_entries(version_type, version_type, BinaryData*)
     TIGHTDB_NOEXCEPT
 {
     // Unimplemented!

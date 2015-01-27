@@ -1275,13 +1275,9 @@ void SharedGroup::advance_read(VersionID specific_version)
     // commit always updates the replication log BEFORE updating the ringbuffer.
     uint_fast64_t log_size = m_readlock.m_version-old_readlock.m_version;
     UniquePtr<BinaryData[]> stripped_logs(new BinaryData[log_size]); // Throws
-    UniquePtr<Replication::CommitLogEntry[]> annotated_logs(new Replication::CommitLogEntry[log_size]); // Throws
-
     repl->get_commit_entries(old_readlock.m_version, m_readlock.m_version, 
-                             annotated_logs.get());
-    for (uint_fast64_t index = 0; index < log_size; ++index)
-        stripped_logs[index] = annotated_logs[index].log_data;
-
+                             stripped_logs.get());
+    
     m_group.advance_transact(m_readlock.m_top_ref, m_readlock.m_file_size,
                              stripped_logs.get(),
                              stripped_logs.get() + (m_readlock.m_version-old_readlock.m_version)); // Throws

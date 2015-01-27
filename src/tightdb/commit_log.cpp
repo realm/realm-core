@@ -123,7 +123,9 @@ public:
     virtual version_type get_last_version_synced(version_type* newest_version_number)
         TIGHTDB_NOEXCEPT;
     void get_commit_entries(version_type from_version, version_type to_version,
-                                    Replication::CommitLogEntry* logs_buffer) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+                            Replication::CommitLogEntry* logs_buffer) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void get_commit_entries(version_type from_version, version_type to_version,
+                            BinaryData* logs_buffer) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
 protected:
     // file and memory mappings are always multiples of this size
@@ -272,6 +274,22 @@ protected:
     // Add a single log entry to the logs. The log data is copied.
     version_type internal_submit_log(const char*, uint_fast64_t, 
                                      bool is_local, version_type server_version = 0);
+
+
+
+    void set_log_entry_internal(Replication::CommitLogEntry* entry,
+                                uint64_t server_version_and_flag, 
+                                const char* log, 
+                                std::size_t size);
+
+    void set_log_entry_internal(BinaryData* entry,
+                                uint64_t server_version_and_flag, 
+                                const char* log, 
+                                std::size_t size);
+
+    template<typename T> 
+    void get_commit_entries_internal(version_type from_version, version_type to_version,
+                                     T* logs_buffer) TIGHTDB_NOEXCEPT;
 
     // Determine if one of the log files hold only stale log entries.  If so,
     // recycle said log file.
@@ -621,8 +639,41 @@ void WriteLogCollector::set_last_version_seen_locally(version_type last_seen_ver
 }
 
 
+void WriteLogCollector::set_log_entry_internal(Replication::CommitLogEntry* entry,
+                                uint64_t server_version_and_flag, const char* log, 
+                                std::size_t size)
+{
+    entry->log_data = BinaryData(log, size);
+    entry->is_a_local_commit = (server_version_and_flag & 0x1);
+    entry->server_version = server_version_and_flag >> 1;
+
+}
+
+void WriteLogCollector::set_log_entry_internal(BinaryData* entry,
+                                uint64_t server_version_and_flag, const char* log, 
+                                std::size_t size)
+{
+    *entry = BinaryData(log, size);
+    static_cast<void>(server_version_and_flag);
+}
+
 void WriteLogCollector::get_commit_entries(version_type from_version, version_type to_version,
                                            Replication::CommitLogEntry* logs_buffer) TIGHTDB_NOEXCEPT
+{
+    get_commit_entries_internal(from_version, to_version, logs_buffer);
+}
+
+
+void WriteLogCollector::get_commit_entries(version_type from_version, version_type to_version,
+                                           BinaryData* logs_buffer) TIGHTDB_NOEXCEPT
+{
+    get_commit_entries_internal(from_version, to_version, logs_buffer);
+}
+
+
+template<typename T>
+void WriteLogCollector::get_commit_entries_internal(version_type from_version, version_type to_version,
+                                           T* logs_buffer) TIGHTDB_NOEXCEPT
 {
     map_header_if_needed();
     RobustLockGuard rlg(m_header.get_addr()->lock, &recover_from_dead_owner);
@@ -681,9 +732,7 @@ void WriteLogCollector::get_commit_entries(version_type from_version, version_ty
         uint_fast64_t tmp_offset = m_read_offset + 2*sizeof (uint64_t);
         if (m_read_version >= from_version) {
             // cerr << "  --at: " << m_read_offset << ", " << size << endl;
-            logs_buffer->log_data = BinaryData(buffer + tmp_offset, size);
-            logs_buffer->is_a_local_commit = (server_version_and_flag & 0x1);
-            logs_buffer->server_version = server_version_and_flag >> 1;
+            set_log_entry_internal(logs_buffer, server_version_and_flag, buffer+tmp_offset, size);
             ++logs_buffer;
         }
         // break early to avoid updating tracking information, if we've reached
