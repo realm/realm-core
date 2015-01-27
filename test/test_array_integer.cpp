@@ -228,3 +228,43 @@ TEST(ArrayInteger_Sum16)
 
     a.destroy();
 }
+
+TEST(ArrayIntNull_SetNull) {
+    ArrayIntNull a(Allocator::get_default());
+    a.create(Array::type_Normal);
+
+    a.add(0);
+    a.set_null(0);
+    CHECK(a.is_null(0));
+
+    a.add(128);
+    CHECK(a.is_null(0));
+
+    a.add(120000);
+    CHECK(a.is_null(0));
+
+    a.destroy();
+}
+
+TEST(ArrayIntNull_SetIntegerToPreviousNullValueChoosesNewNull) {
+    ArrayIntNull a(Allocator::get_default());
+    a.create(Array::type_Normal);
+
+    a.add(126);
+    // NULL value should be 127
+    a.add(0);
+    a.set_null(1);
+    a.set(0, 127);
+    // array should be upgraded now
+    CHECK(a.is_null(1));
+
+    a.add(1000000000000); // upgrade to 64-bit, null should now be a "random" value
+    CHECK(a.is_null(1));
+    int64_t old_null = a.null_value();
+    a.add(old_null);
+    CHECK(a.is_null(1));
+    CHECK_NOT_EQUAL(a.null_value(), old_null);
+
+    a.destroy();
+}
+
