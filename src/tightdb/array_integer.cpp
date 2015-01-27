@@ -20,10 +20,10 @@ void ArrayIntNull::ensure_non_null(int64_t value)
         if (value == m_null) {
             // Find a new value for m_null, and if it's usable, replace existing
             // nulls with the new magic value.
-            // This works because arrays are guaranteed to have a length < 1000.
-            TIGHTDB_ASSERT_DEBUG(size() < 0x10000);
             while (true) {
-                int64_t candidate = rand() & 0xffff;
+                // FIXME: This isn't exploit-proof (except on OpenBSD), because rand() is only pseudorandom,
+                // and btw also isn't thread-safe. Solution is to provide a better random function.
+                int64_t candidate = static_cast<int64_t>(rand()) * rand() * rand();
                 if (can_use_as_null(candidate)) {
                     replace_nulls_with(candidate);
                     break;
