@@ -50,8 +50,6 @@ namespace tightdb {
 
 // FIXME: Checking on same Table* requires that ~Table checks and nullifies on match. Another option would be to store m_selected_table as a TableRef. Yet another option would be to assign unique identifiers to each Table instance vial Allocator. Yet another option would be to explicitely invalidate subtables recursively when parent is modified.
 
-
-
 /// Replication is enabled by passing an instance of an implementation of this
 /// class to the SharedGroup constructor.
 class Replication {
@@ -63,6 +61,8 @@ public:
     std::string get_database_path();
 
     class Interrupted; // Exception
+
+    struct CommitLogEntry;
 
     /// Reset transaction logs. This call informs the commitlog subsystem of
     /// the initial version chosen as part of establishing a sharing scheme
@@ -111,9 +111,11 @@ public:
     /// of `logs_buffer`. The calee retains ownership of the memory
     /// referenced by those entries, but the memory will remain accessible
     /// to the caller until they are declared stale by calls to 'set_last_version_seen_locally'
-    /// and 'set_last_version_synced', OR until a new call to get_commit_entries() is made.
+    /// and 'set_last_version_synced' *on any commitlog instance participating in the session*,
+    /// OR until a new call to get_commit_entries(), apply_foreign_transact_log() or
+    /// commit_write_transact() is made *on the same commitlog instance*.
     virtual void get_commit_entries(version_type from_version, version_type to_version,
-                                    BinaryData* logs_buffer) TIGHTDB_NOEXCEPT;
+                                    Replication::CommitLogEntry* logs_buffer) TIGHTDB_NOEXCEPT;
 
     /// Set the latest version that is known to be received and accepted by the
     /// server. All later versions are guaranteed to be available to the caller
@@ -150,7 +152,8 @@ public:
     /// then up to the implementation of the Repication interface to define what
     /// replication means.
     virtual bool apply_foreign_transact_log(SharedGroup&, version_type new_version,
-                                            BinaryData, std::ostream* apply_log = 0);
+                                            BinaryData, version_type server_version,
+                                            std::ostream* apply_log = 0);
 
     /// Acquire permision to start a new 'write' transaction. This
     /// function must be called by a client before it requests a
@@ -448,6 +451,14 @@ private:
 };
 
 
+struct Replication::CommitLogEntry {
+    bool is_a_local_commit;
+    version_type server_version;
+    BinaryData log_data;
+};
+
+
+
 class Replication::InputStream {
 public:
     /// \return the number of accessible bytes.
@@ -683,14 +694,14 @@ inline Replication::version_type Replication::get_last_version_synced(version_ty
 }
 
 inline bool Replication::apply_foreign_transact_log(SharedGroup&, version_type, BinaryData,
-                                                    std::ostream*)
+                                                    version_type, std::ostream*)
 {
     // Unimplemented!
     TIGHTDB_ASSERT(false);
     return false;
 }
 
-inline void Replication::get_commit_entries(version_type, version_type, BinaryData*)
+inline void Replication::get_commit_entries(version_type, version_type, Replication::CommitLogEntry*)
     TIGHTDB_NOEXCEPT
 {
     // Unimplemented!

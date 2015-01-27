@@ -185,13 +185,13 @@ public:
         log.release();
     }
 
-    void get_commit_entries(uint_fast64_t from_version, uint_fast64_t to_version, BinaryData* logs_buffer)
-        TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
+    void get_commit_entries(uint_fast64_t from_version, uint_fast64_t to_version, 
+                            Replication::CommitLogEntry* logs_buffer) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
     {
         size_t n = to_version - from_version;
         for (size_t i = 0; i != n; ++i) {
             uint_fast64_t version = from_version + i + 1;
-            logs_buffer[i] = m_transact_logs[version];
+            logs_buffer[i].log_data = m_transact_logs[version];
         }
     }
 

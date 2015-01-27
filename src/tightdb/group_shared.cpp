@@ -1273,14 +1273,18 @@ void SharedGroup::advance_read(VersionID specific_version)
     // because in order for us to get the new version when we grab the
     // readlock, the new version must have been entered into the ringbuffer.
     // commit always updates the replication log BEFORE updating the ringbuffer.
-    UniquePtr<BinaryData[]>
-        logs(new BinaryData[m_readlock.m_version-old_readlock.m_version]); // Throws
+    uint_fast64_t log_size = m_readlock.m_version-old_readlock.m_version;
+    UniquePtr<BinaryData[]> stripped_logs(new BinaryData[log_size]); // Throws
+    UniquePtr<Replication::CommitLogEntry[]> annotated_logs(new Replication::CommitLogEntry[log_size]); // Throws
 
-    repl->get_commit_entries(old_readlock.m_version, m_readlock.m_version, logs.get());
+    repl->get_commit_entries(old_readlock.m_version, m_readlock.m_version, 
+                             annotated_logs.get());
+    for (uint_fast64_t index = 0; index < log_size; ++index)
+        stripped_logs[index] = annotated_logs[index].log_data;
 
     m_group.advance_transact(m_readlock.m_top_ref, m_readlock.m_file_size,
-                             logs.get(),
-                             logs.get() + (m_readlock.m_version-old_readlock.m_version)); // Throws
+                             stripped_logs.get(),
+                             stripped_logs.get() + (m_readlock.m_version-old_readlock.m_version)); // Throws
 
     // OK to release the readlock here:
     release_readlock(old_readlock);
