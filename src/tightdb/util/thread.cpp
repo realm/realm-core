@@ -6,6 +6,10 @@
 #  include <unistd.h>
 #endif
 
+#ifdef __APPLE__
+#include <libkern/OSAtomic.h>
+#endif // __APPLE__
+
 // "Process shared mutexes" are not officially supported on Android,
 // but they appear to work anyway.
 #if _POSIX_THREAD_PROCESS_SHARED > 0 || TIGHTDB_ANDROID
@@ -260,4 +264,47 @@ TIGHTDB_NORETURN void CondVar::destroy_failed(int err) TIGHTDB_NOEXCEPT
     if (err == EBUSY)
         TIGHTDB_TERMINATE("Destruction of condition variable in use");
     TIGHTDB_TERMINATE("pthread_cond_destroy() failed");
+}
+
+namespace {
+#ifdef __APPLE__
+struct _pthread_mutex {
+    long sig;
+    OSSpinLock lock;
+    uint32_t mtxopts;
+    int16_t prioceiling;
+    int16_t priority;
+#if defined(__LP64__)
+    uint32_t _pad;
+#endif
+    uint32_t m_tid[2]; // thread id of thread that has mutex locked, misaligned locks may span to first field of m_seq
+    uint32_t m_seq[3];
+#if defined(__LP64__)
+    uint32_t _reserved;
+#endif
+    void *reserved2[2];
+};
+
+struct _pthread_cond {
+    long sig;
+    OSSpinLock lock;
+    uint32_t unused:29,
+        misalign:1,
+        pshared:2;
+    _pthread_mutex *busy;
+    uint32_t c_seq[3];
+#if defined(__LP64__)
+    uint32_t _reserved[3];
+#endif
+};
+#endif // __APPLE__
+}
+
+void CondVar::darwin_shared_wait_hack() TIGHTDB_NOEXCEPT
+{
+#   ifdef __APPLE__
+    // http://www.openradar.me/radar?id=6363576352636928
+    _pthread_cond* cond = reinterpret_cast<_pthread_cond*>(&m_impl);
+    cond->busy = 0;
+#   endif // __APPLE__
 }

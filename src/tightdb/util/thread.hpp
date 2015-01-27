@@ -24,10 +24,6 @@
 
 #include <pthread.h>
 
-#ifdef __APPLE__
-#include <libkern/OSAtomic.h>
-#endif // __APPLE__
-
 // Use below line to enable a thread bug detection tool. Note: Will make program execution slower.
 // #include <../test/pthread_test.hpp>
 
@@ -299,6 +295,7 @@ private:
     TIGHTDB_NORETURN static void attr_init_failed(int);
     TIGHTDB_NORETURN static void destroy_failed(int) TIGHTDB_NOEXCEPT;
     void handle_wait_error(int error);
+    void darwin_shared_wait_hack() TIGHTDB_NOEXCEPT;
 };
 
 
@@ -520,48 +517,11 @@ inline void CondVar::wait(LockGuard& l) TIGHTDB_NOEXCEPT
 }
 
 
-#ifdef __APPLE__
-struct _pthread_mutex {
-    long sig;
-    OSSpinLock lock;
-    uint32_t mtxopts;
-    int16_t prioceiling;
-    int16_t priority;
-#if defined(__LP64__)
-    uint32_t _pad;
-#endif
-    uint32_t m_tid[2]; // thread id of thread that has mutex locked, misaligned locks may span to first field of m_seq
-    uint32_t m_seq[3];
-#if defined(__LP64__)
-    uint32_t _reserved;
-#endif
-    void *reserved2[2];
-};
-
-struct _pthread_cond {
-    long sig;
-    OSSpinLock lock;
-    uint32_t unused:29,
-        misalign:1,
-        pshared:2;
-    _pthread_mutex *busy;
-    uint32_t c_seq[3];
-#if defined(__LP64__)
-    uint32_t _reserved[3];
-#endif
-};
-#endif // __APPLE__
-
-
 template<class Func>
 inline void CondVar::wait(RobustMutex& m, Func recover_func, const struct timespec* tp)
 {
     int r;
-#   ifdef __APPLE__
-    // http://www.openradar.me/radar?id=6363576352636928
-    _pthread_cond* cond = reinterpret_cast<_pthread_cond*>(&m_impl);
-    cond->busy = 0;
-#   endif // __APPLE__
+    darwin_shared_wait_hack();
     if (!tp) {
         r = pthread_cond_wait(&m_impl, &m.m_impl);
     }
