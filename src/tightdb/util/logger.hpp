@@ -152,9 +152,9 @@ private:
 
 #ifdef TIGHTDB_HAVE_CXX11_VARIADIC_TEMPLATES
     template<class Param, class... Params>
-    void log_impl(State& state, const T& param, Params... params)
+    void log_impl(State& state, const Param& param, Params... params)
     {
-        Subst<T>()(param, &state);
+        Subst<Param>()(param, &state);
         log_impl(state, params...);
     }
 #endif

@@ -326,6 +326,12 @@ private:
             BinaryData servers_log = cf.server_file->get_transact_log(client_version);
             if (client_version > 2 || transact_log != servers_log) {
                 log("ERROR: Conflict (%1 vs %2)", transact_log.size(), servers_log.size());
+/*
+                ofstream out_1("/tmp/conflict.1");
+                out_1.write(servers_log.data(), servers_log.size());
+                ofstream out_2("/tmp/conflict.2");
+                out_2.write(transact_log.data(), transact_log.size());
+*/
                 close();
                 return;
             }
