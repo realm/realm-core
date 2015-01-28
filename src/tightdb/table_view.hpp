@@ -213,6 +213,9 @@ public:
     uint_fast64_t sync_if_needed() const;
 #endif
 
+    // Set this undetached TableView to be a distinct view, and sync immediately.
+    void sync_distinct_view(size_t column_ndx);
+
     // This TableView can be "born" from 3 different sources : LinkView, Table::find_all() or Query. Return
     // the version of the source it was created from.
     uint64_t outside_version() const;
@@ -248,7 +251,6 @@ protected:
     /// Construct empty view, ready for addition of row indices.
     TableViewBase(Table* parent);
     TableViewBase(Table* parent, Query& query, size_t start, size_t end, size_t limit);
-    TableViewBase(Table* parent, size_t distinct_column_ndx);
 
     /// Copy constructor.
     TableViewBase(const TableViewBase&);
@@ -383,7 +385,6 @@ public:
 private:
     TableView(Table& parent);
     TableView(Table& parent, Query& query, size_t start, size_t end, size_t limit);
-    TableView(Table& parent, size_t distinct_column_ndx);
     TableView(TableView* tv) TIGHTDB_NOEXCEPT;
 
     TableView find_all_integer(size_t column_ndx, int64_t value);
@@ -532,25 +533,6 @@ inline TableViewBase::TableViewBase(Table* parent, Query& query, size_t start, s
     m_start = start;
     m_end = end;
     m_limit = limit;
-    // FIXME: This code is unreasonably complicated because it uses `Column` as
-    // a free-standing container, and beause `Column` does not conform to the
-    // RAII idiom (nor should it).
-    Allocator& alloc = m_row_indexes.get_alloc();
-    _impl::DeepArrayRefDestroyGuard ref_guard(alloc);
-    ref_guard.reset(Column::create(alloc)); // Throws
-    parent->register_view(this); // Throws
-    m_row_indexes.get_root_array()->init_from_ref(ref_guard.release());
-}
-
-inline TableViewBase::TableViewBase(Table* parent, size_t distinct_column_ndx):
-    RowIndexes(Column::unattached_root_tag(), Allocator::get_default()), // Throws
-    m_table(parent->get_table_ref()),
-    m_distinct_column_source(distinct_column_ndx)
-{
-#ifdef TIGHTDB_ENABLE_REPLICATION
-    m_last_seen_version = 0;
-    m_auto_sort = false;
-#endif
     // FIXME: This code is unreasonably complicated because it uses `Column` as
     // a free-standing container, and beause `Column` does not conform to the
     // RAII idiom (nor should it).
@@ -944,11 +926,6 @@ inline TableView::TableView(Table& parent):
 
 inline TableView::TableView(Table& parent, Query& query, size_t start, size_t end, size_t limit):
     TableViewBase(&parent, query, start, end, limit)
-{
-}
-
-inline TableView::TableView(Table& parent, size_t distinct_column_ndx):
-    TableViewBase(&parent, distinct_column_ndx)
 {
 }
 
