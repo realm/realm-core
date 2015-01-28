@@ -109,8 +109,8 @@ public:
     void do_transact_log_append(const char* data, size_t size) TIGHTDB_OVERRIDE;
     void transact_log_reserve(size_t size);
     virtual bool is_in_server_synchronization_mode() { return m_is_persisting; }
-    version_type apply_changeset(SharedGroup&, version_type, BinaryData, version_type, ostream*)
-        TIGHTDB_OVERRIDE;
+    version_type apply_foreign_changeset(SharedGroup&, version_type, BinaryData, version_type,
+                                         ostream*) TIGHTDB_OVERRIDE;
     virtual void stop_logging() TIGHTDB_OVERRIDE;
     virtual void reset_log_management(version_type last_version) TIGHTDB_OVERRIDE;
     virtual void set_last_version_seen_locally(version_type last_seen_version_number)
@@ -268,22 +268,22 @@ protected:
     void reset_header();
 
     // Add a single log entry to the logs. The log data is copied.
-    version_type internal_submit_log(const char*, uint_fast64_t, 
-                                     bool is_local, version_type server_version = 0);
+    version_type internal_submit_log(const char*, uint_fast64_t,
+                                     bool is_foreign, version_type server_version = 0);
 
 
 
     void set_log_entry_internal(Replication::CommitLogEntry* entry,
-                                uint64_t server_version_and_flag, 
-                                const char* log, 
+                                uint64_t server_version_and_flag,
+                                const char* log,
                                 std::size_t size);
 
     void set_log_entry_internal(BinaryData* entry,
-                                uint64_t server_version_and_flag, 
-                                const char* log, 
+                                uint64_t server_version_and_flag,
+                                const char* log,
                                 std::size_t size);
 
-    template<typename T> 
+    template<typename T>
     void get_commit_entries_internal(version_type from_version, version_type to_version,
                                      T* logs_buffer) TIGHTDB_NOEXCEPT;
 
@@ -467,7 +467,7 @@ void WriteLogCollector::cleanup_stale_versions(CommitLogPreamble* preamble)
 // returns the current "from" version
 Replication::version_type
 WriteLogCollector::internal_submit_log(const char* data, uint_fast64_t size,
-                                       bool is_local, version_type server_version)
+                                       bool is_foreign, version_type server_version)
 {
     map_header_if_needed();
     RobustLockGuard rlg(m_header.get_addr()->lock, &recover_from_dead_owner);
@@ -477,10 +477,12 @@ WriteLogCollector::internal_submit_log(const char* data, uint_fast64_t size,
     // for local commits, the server_version is taken from the previous commit.
     // for foreign commits, the server_version is provided by the caller and saved
     // for later use.
-    if (is_local)
-        server_version = preamble->last_server_version;
-    else
+    if (is_foreign) {
         preamble->last_server_version = server_version;
+    }
+    else {
+        server_version = preamble->last_server_version;
+    }
 
     // make sure the file is available for potential resizing
     open_if_needed(*active_log);
@@ -497,7 +499,7 @@ WriteLogCollector::internal_submit_log(const char* data, uint_fast64_t size,
     remap_if_needed(*active_log);
 
     // append data from write pointer and onwards:
-    uint64_t server_version_and_flag = (server_version << 1) + (is_local ? 1:0);
+    uint64_t server_version_and_flag = (server_version << 1) + (is_foreign ? 1 : 0);
     char* write_ptr = reinterpret_cast<char*>(active_log->map.get_addr()) + preamble->write_offset;
     *reinterpret_cast<uint64_t*>(write_ptr) = server_version_and_flag;
     write_ptr += sizeof (uint64_t);
@@ -638,17 +640,17 @@ void WriteLogCollector::set_last_version_seen_locally(version_type last_seen_ver
 
 
 void WriteLogCollector::set_log_entry_internal(Replication::CommitLogEntry* entry,
-                                uint64_t server_version_and_flag, const char* log, 
+                                uint64_t server_version_and_flag, const char* log,
                                 std::size_t size)
 {
     entry->log_data = BinaryData(log, size);
-    entry->is_a_local_commit = (server_version_and_flag & 0x1);
+    entry->is_foreign = (server_version_and_flag & 0x1);
     entry->server_version = server_version_and_flag >> 1;
 
 }
 
 void WriteLogCollector::set_log_entry_internal(BinaryData* entry,
-                                uint64_t server_version_and_flag, const char* log, 
+                                uint64_t server_version_and_flag, const char* log,
                                 std::size_t size)
 {
     *entry = BinaryData(log, size);
@@ -748,9 +750,9 @@ void WriteLogCollector::get_commit_entries_internal(version_type from_version, v
 
 
 Replication::version_type
-WriteLogCollector::apply_changeset(SharedGroup& sg, version_type base_version,
-                                   BinaryData changeset, version_type server_version,
-                                   ostream* apply_log)
+WriteLogCollector::apply_foreign_changeset(SharedGroup& sg, version_type base_version,
+                                           BinaryData changeset, version_type server_version,
+                                           ostream* apply_log)
 {
     Group& group = sg.m_group;
     TIGHTDB_ASSERT(_impl::GroupFriend::get_replication(group) == this);
@@ -764,7 +766,8 @@ WriteLogCollector::apply_changeset(SharedGroup& sg, version_type base_version,
         throw LogicError(LogicError::bad_version_number);
     SimpleInputStream input(changeset.data(), changeset.size());
     apply_transact_log(input, transact.get_group(), apply_log); // Throws
-    internal_submit_log(changeset.data(), changeset.size(), false, server_version); // Throws
+    bool is_foreign = true;
+    internal_submit_log(changeset.data(), changeset.size(), is_foreign, server_version); // Throws
     return transact.commit(); // Throws
 }
 
@@ -775,7 +778,8 @@ WriteLogCollector::do_commit_write_transact(SharedGroup&,
 {
     char* data = m_transact_log_buffer.data();
     uint_fast64_t size = m_transact_log_free_begin - data;
-    version_type from_version = internal_submit_log(data, size, true);
+    bool is_foreign = false;
+    version_type from_version = internal_submit_log(data, size, is_foreign);
     TIGHTDB_ASSERT(from_version == orig_version);
     static_cast<void>(from_version);
     version_type new_version = orig_version + 1;

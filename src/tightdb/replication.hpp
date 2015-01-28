@@ -62,18 +62,17 @@ public:
 
     struct CommitLogEntry;
 
-    /// Reset transaction logs. This call informs the commitlog subsystem of
-    /// the initial version chosen as part of establishing a sharing scheme
-    /// (also called a "session").
-    /// Following a crash, the commitlog subsystem may hold multiple commitlogs
-    /// for versions which are lost during the crash. When SharedGroup establishes
-    /// a sharing scheme it will continue from the last version commited to
-    /// the database.
+    /// Reset transaction logs. This call informs the commitlog subsystem of the
+    /// initial version chosen as part of establishing a sharing scheme (also
+    /// called a "session").  Following a crash, the commitlog subsystem may
+    /// hold multiple commitlogs for versions which are lost during the
+    /// crash. When SharedGroup establishes a sharing scheme it will continue
+    /// from the last version commited to the database.
     ///
-    /// The call also indicates that the current thread (and current process) has
-    /// exclusive access to the commitlogs, allowing them to reset synchronization
-    /// variables. This can be beneficial on systems without proper support for robust
-    /// mutexes.
+    /// The call also indicates that the current thread (and current process)
+    /// has exclusive access to the commitlogs, allowing them to reset
+    /// synchronization variables. This can be beneficial on systems without
+    /// proper support for robust mutexes.
     virtual void reset_log_management(version_type last_version);
 
     /// Cleanup, remove any log files
@@ -95,26 +94,28 @@ public:
     ///   created on demand.
     virtual bool is_in_server_synchronization_mode();
 
-    /// Called by SharedGroup during a write transaction, when readlocks are recycled, to
-    /// keep the commit log management in sync with what versions can possibly be interesting
-    /// in the future.
+    /// Called by SharedGroup during a write transaction, when readlocks are
+    /// recycled, to keep the commit log management in sync with what versions
+    /// can possibly be interesting in the future.
     virtual void set_last_version_seen_locally(version_type last_seen_version_number)
         TIGHTDB_NOEXCEPT;
 
-    /// Get all transaction logs between the specified versions. The number
-    /// of requested logs is exactly `to_version - from_version`. If this
-    /// number is greater than zero, the first requested log is the one that
-    /// brings the database from `from_version` to `from_version +
-    /// 1`. References to the requested logs are stored in successive entries
-    /// of `logs_buffer`. The calee retains ownership of the memory
-    /// referenced by those entries, but the memory will remain accessible
-    /// to the caller until they are declared stale by calls to 'set_last_version_seen_locally'
-    /// and 'set_last_version_synced' *on any commitlog instance participating in the session*,
-    /// OR until a new call to get_commit_entries(), apply_foreign_transact_log() or
-    /// commit_write_transact() is made *on the same commitlog instance*.
-
-    /// The two variants differ in the type of data returned. Use the version with
-    /// CommitLogEntry* if you need the additional data provided by that type (see below)
+    /// Get all transaction logs between the specified versions. The number of
+    /// requested logs is exactly `to_version - from_version`. If this number is
+    /// greater than zero, the first requested log is the one that brings the
+    /// database from `from_version` to `from_version + 1`. References to the
+    /// requested logs are stored in successive entries of `logs_buffer`. The
+    /// calee retains ownership of the memory referenced by those entries, but
+    /// the memory will remain accessible to the caller until they are declared
+    /// stale by calls to 'set_last_version_seen_locally' and
+    /// 'set_last_version_synced' *on any commitlog instance participating in
+    /// the session*, OR until a new call to get_commit_entries(),
+    /// apply_foreign_changeset() or commit_write_transact() is made *on the
+    /// same commitlog instance*.
+    ///
+    /// The two variants differ in the type of data returned. Use the version
+    /// with CommitLogEntry* if you need the additional data provided by that
+    /// type (see below)
     virtual void get_commit_entries(version_type from_version, version_type to_version,
                                     BinaryData* logs_buffer) TIGHTDB_NOEXCEPT;
 
@@ -128,10 +129,11 @@ public:
     /// been set.
     virtual void set_last_version_synced(version_type version) TIGHTDB_NOEXCEPT;
 
-    /// Get the value set by last call to 'set_last_version_synced'
-    /// If 'end_version_number' is non null, a limit to version numbering is returned.
-    /// The limit returned is the version number of the latest commit.
-    /// If sync versioning is disabled, the last version seen locally is returned.
+    /// Get the value set by last call to 'set_last_version_synced' If
+    /// 'end_version_number' is non null, a limit to version numbering is
+    /// returned.  The limit returned is the version number of the latest
+    /// commit.  If sync versioning is disabled, the last version seen locally
+    /// is returned.
     virtual version_type get_last_version_synced(version_type* end_version_number = 0)
         TIGHTDB_NOEXCEPT;
 
@@ -158,9 +160,9 @@ public:
     /// sink that allows a SharedGroup to submit actions for replication. It is
     /// then up to the implementation of the Repication interface to define what
     /// replication means.
-    virtual version_type apply_changeset(SharedGroup&, version_type base_version,
-                                         BinaryData changeset, version_type server_version,
-                                         std::ostream* apply_log = 0);
+    virtual version_type apply_foreign_changeset(SharedGroup&, version_type base_version,
+                                                 BinaryData changeset, version_type server_version,
+                                                 std::ostream* apply_log = 0);
 
     /// Acquire permision to start a new 'write' transaction. This
     /// function must be called by a client before it requests a
@@ -457,11 +459,17 @@ private:
     friend class Group::TransactReverser;
 };
 
-/// Extended version of a commit log entry. The additional info is required for Sync.
+/// Extended version of a commit log entry. The additional info is required for
+/// Sync.
 struct Replication::CommitLogEntry {
-    bool is_a_local_commit;       // true if entry was created by commit_write_transact()
-    version_type server_version;  // see below
-    BinaryData log_data;          // the actual data for the log entry
+    /// True iff this changeset was submitted via apply_foreign_changeset().
+    bool is_foreign;
+
+    /// Not yet used.
+    version_type server_version;
+
+    /// The changeset.
+    BinaryData log_data;
 };
 
 // re server_version: This field is written by Sync (if enabled) on commits which
@@ -705,7 +713,8 @@ inline Replication::version_type Replication::get_last_version_synced(version_ty
 }
 
 inline Replication::version_type
-Replication::apply_changeset(SharedGroup&, version_type, BinaryData, version_type, std::ostream*)
+Replication::apply_foreign_changeset(SharedGroup&, version_type, BinaryData, version_type,
+                                     std::ostream*)
 {
     // Unimplemented!
     TIGHTDB_ASSERT(false);
