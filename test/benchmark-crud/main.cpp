@@ -106,56 +106,56 @@ int main()
         timer.reset();
         for (int i = 0; i != num_tables; ++i)
             insert(*tables_1[i], rising_order);
-        results.submit_single("insert_end_compact", "Insert at end (compact)", timer);
+        results.submit(timer, "insert_end_compact", "Insert at end (compact)");
         timer.reset();
         for (int i = 0; i != num_tables; ++i)
             dummy += read(*tables_1[i], rising_order);
-        results.submit_single("read_seq_compact", "Sequential read (compact)", timer);
+        results.submit(timer, "read_seq_compact", "Sequential read (compact)");
         timer.reset();
         for (int i = 0; i != num_tables; ++i)
             dummy += read(*tables_1[i], random_order);
-        results.submit_single("read_ran_compact", "Random read (compact)", timer);
+        results.submit(timer, "read_ran_compact", "Random read (compact)");
         timer.reset();
         for (int i = 0; i != num_tables; ++i)
             write(*tables_1[i], rising_order);
-        results.submit_single("write_seq_compact", "Sequential write (compact)", timer);
+        results.submit(timer, "write_seq_compact", "Sequential write (compact)");
         timer.reset();
         for (int i = 0; i != num_tables; ++i)
             write(*tables_1[i], random_order);
-        results.submit_single("write_ran_compact", "Random write (compact)", timer);
+        results.submit(timer, "write_ran_compact", "Random write (compact)");
         timer.reset();
         for (int i = 0; i != num_tables; ++i)
             erase(*tables_1[i], falling_order);
-        results.submit_single("erase_end_compact", "Erase from end (compact)", timer);
+        results.submit(timer, "erase_end_compact", "Erase from end (compact)");
     }
     {
         timer.reset();
         for (int i = 0; i != num_tables; ++i)
             insert(*tables_2[i], random_insert_order);
-        results.submit_single("insert_ran_general", "Random insert (general)", timer);
+        results.submit(timer, "insert_ran_general", "Random insert (general)");
         timer.reset();
         for (int i = 0; i != num_tables; ++i)
             dummy += read(*tables_2[0], rising_order);
-        results.submit_single("read_seq_general", "Sequential read (general)", timer);
+        results.submit(timer, "read_seq_general", "Sequential read (general)");
         timer.reset();
         for (int i = 0; i != num_tables; ++i)
             dummy += read(*tables_2[0], random_order);
-        results.submit_single("read_ran_general", "Random read (general)", timer);
+        results.submit(timer, "read_ran_general", "Random read (general)");
         timer.reset();
         for (int i = 0; i != num_tables; ++i)
             write(*tables_2[i], rising_order);
-        results.submit_single("write_seq_general", "Sequential write (general)", timer);
+        results.submit(timer, "write_seq_general", "Sequential write (general)");
         timer.reset();
         for (int i = 0; i != num_tables; ++i)
             write(*tables_2[i], random_order);
-        results.submit_single("write_ran_general", "Random write (general)", timer);
+        results.submit(timer, "write_ran_general", "Random write (general)");
         timer.reset();
         for (int i = 0; i != num_tables; ++i)
             erase(*tables_2[i], random_erase_order);
-        results.submit_single("erase_ran_general", "Random erase (general)", timer);
+        results.submit(timer, "erase_ran_general", "Random erase (general)");
     }
 
-    results.submit_single("total_time", "Total time", timer_total);
+    results.submit(timer_total, "total_time", "Total time");
 
     cout << "dummy = "<<dummy<<" (to avoid over-optimization)"<<endl;
 }

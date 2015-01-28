@@ -27,9 +27,7 @@ using namespace tightdb::test_util;
 */
 
 static const char realm_path[] = "/tmp/benchmark-common-tasks.tightdb";
-static const size_t min_repetitions = 10;
-static const size_t max_repetitions = 100;
-static const double min_duration_s = 0.05;
+static const size_t repetitions[] = { 10, 100, 1000 };
 
 struct Benchmark
 {
@@ -173,39 +171,6 @@ struct BenchmarkSetString : BenchmarkWithStrings {
     }
 };
 
-struct BenchmarkQueryNot : Benchmark {
-    const char* name() const { return "QueryNot"; }
-
-    void setup(SharedGroup& group)
-    {
-        WriteTransaction tr(group);
-        TableRef table = tr.add_table(name());
-        table->add_column(type_Int, "first");
-        table->add_empty_row(1000);
-        for (size_t i = 0; i < 1000; ++i) {
-            table->set_int(0, i, 1);
-        }
-        tr.commit();
-    }
-
-    void operator()(SharedGroup& group)
-    {
-        ReadTransaction tr(group);
-        ConstTableRef table = tr.get_table(name());
-        Query q = table->where();
-        q.not_equal(0, 2); // never found, = worst case
-        TableView results = q.find_all();
-        results.size();
-    }
-
-    void teardown(SharedGroup& group)
-    {
-        Group& g = group.begin_write();
-        g.remove_table(name());
-        group.commit();
-    }
-};
-
 
 
 
@@ -220,19 +185,6 @@ static const char* durability_level_to_cstr(SharedGroup::DurabilityLevel level)
     }
 }
 
-void run_benchmark_once(Benchmark& benchmark, SharedGroup& sg, Timer& timer)
-{
-    timer.pause();
-    benchmark.setup(sg);
-    timer.unpause();
-
-    benchmark(sg);
-
-    timer.pause();
-    benchmark.teardown(sg);
-    timer.unpause();
-}
-
 
 /// This little piece of likely over-engineering runs the benchmark a number of times,
 /// with each durability setting, and reports the results for each run.
@@ -244,39 +196,43 @@ void run_benchmark(BenchmarkResults& results)
 #else
     const size_t num_durabilities = 2; // FIXME Figure out how to run the async commit daemon.
 #endif
+    static const size_t num_repetition_groups = sizeof(repetitions) / sizeof(*repetitions);
 
     Timer timer(Timer::type_UserTime);
     for (size_t i = 0; i < num_durabilities; ++i) {
-        // Open a SharedGroup:
-        File::try_remove(realm_path);
-        UniquePtr<SharedGroup> group;
         SharedGroup::DurabilityLevel level = static_cast<SharedGroup::DurabilityLevel>(i);
-        group.reset(new SharedGroup(realm_path, false, level));
+        for (size_t j = 0; j < num_repetition_groups; ++j) {
+            size_t rep = repetitions[j];
+            B benchmark;
 
-        B benchmark;
+            // Generate the benchmark result texts:
+            std::stringstream lead_text_ss;
+            std::stringstream ident_ss;
+            lead_text_ss << benchmark.name() << " (" << durability_level_to_cstr(level) << ", x" << rep << ")";
+            ident_ss << benchmark.name() << "_" << durability_level_to_cstr(level) << "_" << rep;
+            std::string lead_text = lead_text_ss.str();
+            std::string ident = ident_ss.str();
 
-        // Generate the benchmark result texts:
-        std::stringstream lead_text_ss;
-        std::stringstream ident_ss;
-        lead_text_ss << benchmark.name() << " (" << durability_level_to_cstr(level) << ")";
-        ident_ss << benchmark.name() << "_" << durability_level_to_cstr(level);
-        std::string ident = ident_ss.str();
+            // Open a SharedGroup:
+            File::try_remove(realm_path);
+            UniquePtr<SharedGroup> group;
+            group.reset(new SharedGroup(realm_path, false, level));
 
-        // Warm-up and initial measuring:
-        Timer t_unused(Timer::type_UserTime);
-        run_benchmark_once(benchmark, *group, t_unused);
+            // Run the benchmarks with cumulative results.
+            timer.reset();
+            timer.pause();
+            for (size_t r = 0; r < rep; ++r) {
+                benchmark.setup(*group);
 
-        size_t rep;
-        double total = 0;
-        for (rep = 0; rep < max_repetitions && (rep < min_repetitions || total < min_duration_s); ++rep) {
-            Timer t;
-            run_benchmark_once(benchmark, *group, t);
-            double s = t.get_elapsed_time();
-            total += s;
-            results.submit(ident.c_str(), s);
+                timer.unpause();
+                benchmark(*group);
+                timer.pause();
+                
+                benchmark.teardown(*group);
+            }
+            timer.unpause();
+            results.submit(timer, ident.c_str(), lead_text.c_str());
         }
-
-        results.finish(ident, lead_text_ss.str());
     }
 }
 
@@ -287,7 +243,6 @@ int main(int, const char**)
 
     run_benchmark<AddTable>(results);
     run_benchmark<BenchmarkQuery>(results);
-    run_benchmark<BenchmarkQueryNot>(results);
     run_benchmark<BenchmarkSize>(results);
     run_benchmark<BenchmarkSort>(results);
     run_benchmark<BenchmarkInsert>(results);
