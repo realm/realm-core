@@ -744,6 +744,8 @@ TEST(StringIndex_Null)
 
         const size_t r1 = ndx.find_first(StringData());
         CHECK_EQUAL(r1, 1);
+
+        col.destroy();
     }
 }
 

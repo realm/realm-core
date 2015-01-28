@@ -49,6 +49,7 @@ public:
     typedef StringData value_type;
 
     AdaptiveStringColumn(Allocator&, ref_type);
+    AdaptiveStringColumn(Allocator&, ref_type, bool nullable);
     ~AdaptiveStringColumn() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
     void destroy() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
@@ -139,6 +140,7 @@ protected:
 
 private:
     StringIndex* m_search_index;
+    bool m_nullable;
 
     std::size_t do_get_size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return size(); }
 

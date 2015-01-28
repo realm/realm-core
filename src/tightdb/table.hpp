@@ -185,9 +185,9 @@ public:
     ///
     /// \sa has_shared_type()
     /// \sa get_descriptor()
-    std::size_t add_column(DataType type, StringData name, DescriptorRef* subdesc = 0);
+    std::size_t add_column(DataType type, StringData name, DescriptorRef* subdesc = 0, bool nullable = false);
     void insert_column(std::size_t column_ndx, DataType type, StringData name,
-                       DescriptorRef* subdesc = 0);
+                       DescriptorRef* subdesc = 0, bool nullable = false);
     std::size_t add_column_link(DataType type, StringData name, Table& target, LinkType link_type = link_Weak);
     void insert_column_link(std::size_t column_ndx, DataType type, StringData name, Table& target,
                             LinkType link_type = link_Weak);
@@ -910,7 +910,7 @@ private:
     std::size_t do_find_pkey_string(StringData) const;
 
     static void do_insert_column(Descriptor&, std::size_t col_ndx, DataType type,
-                                 StringData name, Table* link_target_table);
+                                 StringData name, Table* link_target_table, bool nullable = false);
     static void do_erase_column(Descriptor&, std::size_t col_ndx);
     static void do_rename_column(Descriptor&, std::size_t col_ndx, StringData name);
 
@@ -919,9 +919,9 @@ private:
     struct RenameSubtableColumns;
 
     void insert_root_column(std::size_t col_ndx, DataType type, StringData name,
-                            Table* link_target_table);
+                            Table* link_target_table, bool nullable = false);
     void erase_root_column(std::size_t col_ndx);
-    void do_insert_root_column(std::size_t col_ndx, ColumnType, StringData name);
+    void do_insert_root_column(std::size_t col_ndx, ColumnType, StringData name, bool nullable = false);
     void do_erase_root_column(std::size_t col_ndx);
     void do_set_link_type(std::size_t col_ndx, LinkType);
     void insert_backlink_column(std::size_t origin_table_ndx, std::size_t origin_col_ndx);
@@ -1071,7 +1071,7 @@ private:
     /// Create a column of the specified type, fill it with the
     /// specified number of default values, and return just the
     /// reference to the underlying memory.
-    static ref_type create_column(ColumnType column_type, size_t num_default_values, Allocator&);
+    static ref_type create_column(ColumnType column_type, size_t num_default_values, Allocator&, bool nullable = false);
 
     /// Construct a copy of the columns array of this table using the
     /// specified allocator and return just the ref to that array.
@@ -2062,9 +2062,9 @@ public:
     }
 
     static void insert_column(Descriptor& desc, std::size_t column_ndx, DataType type,
-                              StringData name, Table* link_target_table)
+                              StringData name, Table* link_target_table, bool nullable = false)
     {
-        Table::do_insert_column(desc, column_ndx, type, name, link_target_table); // Throws
+        Table::do_insert_column(desc, column_ndx, type, name, link_target_table, nullable); // Throws
     }
 
     static void erase_column(Descriptor& desc, std::size_t column_ndx)

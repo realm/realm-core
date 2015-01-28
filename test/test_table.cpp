@@ -5765,4 +5765,13 @@ TEST(Table_IndexStringDelete)
     }
 }
 
+
+ONLY(Table_NullableColumn)
+{
+    Table table;
+    table.add_column(type_String, "first", 0, true);
+
+    
+}
+
 #endif // TEST_TABLE

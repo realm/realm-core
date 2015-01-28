@@ -16,12 +16,14 @@ void ArrayStringLong::init_from_mem(MemRef mem) TIGHTDB_NOEXCEPT
     Array::init_from_mem(mem);
     ref_type offsets_ref = get_as_ref(0);
     ref_type blob_ref = get_as_ref(1);
-    ref_type nulls_ref = get_as_ref(2);
 
     m_offsets.init_from_ref(offsets_ref);
     m_blob.init_from_ref(blob_ref);
-    if (NULLS)
+
+    if (NULLS) {
+        ref_type nulls_ref = get_as_ref(2);
         m_nulls.init_from_ref(nulls_ref);
+    }
 }
 
 
@@ -245,6 +247,8 @@ MemRef ArrayStringLong::create_array(size_t size, Allocator& alloc)
         top.add(v); // Throws
         dg_2.release();
     }
+
+    if (NULLS)
     {
         bool context_flag = false;
         int_fast64_t value = 0; // initialize all rows to null
@@ -254,7 +258,6 @@ MemRef ArrayStringLong::create_array(size_t size, Allocator& alloc)
         top.add(v); // Throws
         dg_2.release();
     }
-
 
     dg.release();
     return top.get_mem();

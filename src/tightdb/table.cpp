@@ -279,10 +279,10 @@ template<> struct ColumnTypeTraits3<DateTime> {
 
 // -- Table ---------------------------------------------------------------------------------
 
-size_t Table::add_column(DataType type, StringData name, DescriptorRef* subdesc)
+size_t Table::add_column(DataType type, StringData name, DescriptorRef* subdesc, bool nullable)
 {
     TIGHTDB_ASSERT(!has_shared_type());
-    return get_descriptor()->add_column(type, name, subdesc); // Throws
+    return get_descriptor()->add_column(type, name, subdesc, nullable); // Throws
 }
 
 size_t Table::add_column_link(DataType type, StringData name, Table& target, LinkType link_type)
@@ -392,7 +392,7 @@ void Table::remove_backlink_broken_rows(const CascadeState::row_set& rows)
 
 
 void Table::insert_column(size_t col_ndx, DataType type, StringData name,
-                          DescriptorRef* subdesc)
+                          DescriptorRef* subdesc, bool nullable)
 {
     TIGHTDB_ASSERT(!has_shared_type());
     get_descriptor()->insert_column(col_ndx, type, name, subdesc); // Throws
@@ -627,7 +627,7 @@ struct Table::RenameSubtableColumns: SubtableUpdater {
 
 
 void Table::do_insert_column(Descriptor& desc, size_t col_ndx, DataType type,
-                             StringData name, Table* link_target_table)
+                             StringData name, Table* link_target_table, bool nullable)
 {
     TIGHTDB_ASSERT(desc.is_attached());
 
@@ -640,7 +640,7 @@ void Table::do_insert_column(Descriptor& desc, size_t col_ndx, DataType type,
 
     if (desc.is_root()) {
         root_table.bump_version();
-        root_table.insert_root_column(col_ndx, type, name, link_target_table); // Throws
+        root_table.insert_root_column(col_ndx, type, name, link_target_table, nullable); // Throws
     }
     else {
         Spec& spec = df::get_spec(desc);
@@ -737,11 +737,11 @@ void Table::do_rename_column(Descriptor& desc, size_t col_ndx, StringData name)
 
 
 void Table::insert_root_column(size_t col_ndx, DataType type, StringData name,
-                               Table* link_target_table)
+                               Table* link_target_table, bool nullable)
 {
     TIGHTDB_ASSERT(col_ndx <= m_spec.get_public_column_count());
 
-    do_insert_root_column(col_ndx, ColumnType(type), name); // Throws
+    do_insert_root_column(col_ndx, ColumnType(type), name, nullable); // Throws
     adj_insert_column(col_ndx); // Throws
     update_link_target_tables(col_ndx, col_ndx + 1); // Throws
 
@@ -790,14 +790,14 @@ void Table::erase_root_column(size_t col_ndx)
 }
 
 
-void Table::do_insert_root_column(size_t ndx, ColumnType type, StringData name)
+void Table::do_insert_root_column(size_t ndx, ColumnType type, StringData name, bool nullable)
 {
-    m_spec.insert_column(ndx, type, name); // Throws
+    m_spec.insert_column(ndx, type, name, nullable ? col_attr_Nullable : col_attr_None); // Throws
 
     Spec::ColumnInfo info;
     m_spec.get_column_info(ndx, info);
     size_t ndx_in_parent = info.m_column_ref_ndx;
-    ref_type col_ref = create_column(type, m_size, m_columns.get_alloc()); // Throws
+    ref_type col_ref = create_column(type, m_size, m_columns.get_alloc(), nullable); // Throws
     m_columns.insert(ndx_in_parent, col_ref); // Throws
 }
 
@@ -1188,6 +1188,9 @@ ColumnBase* Table::create_column_accessor(ColumnType col_type, size_t col_ndx, s
     ColumnBase* col = 0;
     ref_type ref = m_columns.get_as_ref(ndx_in_parent);
     Allocator& alloc = m_columns.get_alloc();
+
+    bool nullable = m_spec.get_column_attr(col_ndx) & col_attr_Nullable;
+
     switch (col_type) {
         case col_type_Int:
         case col_type_Bool:
@@ -1201,7 +1204,7 @@ ColumnBase* Table::create_column_accessor(ColumnType col_type, size_t col_ndx, s
             col = new ColumnDouble(alloc, ref); // Throws
             break;
         case col_type_String:
-            col = new AdaptiveStringColumn(alloc, ref); // Throws
+            col = new AdaptiveStringColumn(alloc, ref, nullable); // Throws
             break;
         case col_type_Binary:
             col = new ColumnBinary(alloc, ref); // Throws
@@ -1746,7 +1749,7 @@ ref_type Table::create_empty_table(Allocator& alloc)
 }
 
 
-ref_type Table::create_column(ColumnType col_type, size_t size, Allocator& alloc)
+ref_type Table::create_column(ColumnType col_type, size_t size, Allocator& alloc, bool nullable)
 {
     switch (col_type) {
         case col_type_Int:
@@ -4921,6 +4924,7 @@ void Table::refresh_column_accessors(size_t col_ndx_begin)
         ColumnAttr attr = m_spec.get_column_attr(col_ndx);
         bool has_search_index = (attr & col_attr_Indexed)    != 0;
         bool is_primary_key   = (attr & col_attr_PrimaryKey) != 0;
+
         TIGHTDB_ASSERT(has_search_index || !is_primary_key);
         if (has_search_index) {
             bool allow_duplicate_values = !is_primary_key;

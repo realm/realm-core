@@ -386,6 +386,8 @@ private:
 /// FIXME: Rename Column to IntegerColumn.
 class Column: public ColumnBase, public ColumnTemplate<int64_t> {
 public:
+    bool m_nullable;
+    
     typedef int64_t value_type;
 
     int64_t get_val(size_t row) const { return get(row); }

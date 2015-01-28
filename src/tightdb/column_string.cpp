@@ -63,9 +63,13 @@ void copy_leaf(const ArrayStringLong& from, ArrayBigBlobs& to)
 } // anonymous namespace
 
 
+AdaptiveStringColumn::AdaptiveStringColumn(Allocator& alloc, ref_type ref) : AdaptiveStringColumn(alloc, ref, false)
+{
 
-AdaptiveStringColumn::AdaptiveStringColumn(Allocator& alloc, ref_type ref):
-    m_search_index(0)
+}
+
+AdaptiveStringColumn::AdaptiveStringColumn(Allocator& alloc, ref_type ref, bool nullable):
+    m_search_index(0), m_nullable(nullable)
 {
     char* header = alloc.translate(ref);
     MemRef mem(header, ref);
@@ -926,7 +930,7 @@ bool AdaptiveStringColumn::auto_enumerate(ref_type& keys_ref, ref_type& values_r
 {
     Allocator& alloc = m_array->get_alloc();
     ref_type keys_ref_2 = AdaptiveStringColumn::create(alloc); // Throws
-    AdaptiveStringColumn keys(alloc, keys_ref_2); // Throws
+    AdaptiveStringColumn keys(alloc, keys_ref_2); // Throws // FIXME
 
     // Generate list of unique values (keys)
     size_t n = size();

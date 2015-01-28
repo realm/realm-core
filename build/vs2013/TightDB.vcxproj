@@ -262,7 +262,7 @@
       </PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
-      <AdditionalOptions>/DPTW32_STATIC_LIB /DTIGHTDB_DEBUG /DTIGHTDB_ENABLE_REPLICATION /DNULLS="false" %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/DPTW32_STATIC_LIB /DTIGHTDB_DEBUG /DTIGHTDB_ENABLE_REPLICATION /DNULLS="true" %(AdditionalOptions)</AdditionalOptions>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
     </ClCompile>
     <Link>
