@@ -144,10 +144,12 @@ std::string Timer::format(double seconds)
 }
 
 namespace {
-    // FIXME: This should be std::llround when supported by all platforms.
+    // FIXME: This should be std::llround once we switch to >= C++11.
     int64_t round_to_int64(double x)
     {
-        return static_cast<int64_t>(std::round(x));
+        // FIXME: Assumes x >= 0.
+        // FIXME: The adding of 0.5 is error-prone, see: http://blog.frama-c.com/index.php?post/2013/05/02/nearbyintf1
+        return static_cast<int64_t>(x + 0.5);
     }
 }
 
