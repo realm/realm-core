@@ -489,7 +489,7 @@ WriteLogCollector::internal_submit_log(const char* data, uint_fast64_t size,
 
     // make sure we have space (allocate if not)
     File::SizeType size_needed =
-        aligned_to(sizeof (uint64_t), preamble->write_offset + sizeof (uint64_t) + size);
+        aligned_to(sizeof (uint64_t), preamble->write_offset + 2*sizeof (uint64_t) + size);
     size_needed = aligned_to(page_size, size_needed);
     if (size_needed > active_log->file.get_size())
         active_log->file.resize(size_needed);
