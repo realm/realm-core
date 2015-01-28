@@ -22,6 +22,7 @@
 
 #include <tightdb/util/features.h>
 #include <tightdb/util/terminate.hpp>
+#include <tightdb/version.hpp>
 
 #if defined(TIGHTDB_ENABLE_ASSERTIONS) || defined(TIGHTDB_DEBUG)
 #  define TIGHTDB_ASSERTIONS_ENABLED 1
@@ -30,7 +31,7 @@
 #if TIGHTDB_ASSERTIONS_ENABLED
 #  define TIGHTDB_ASSERT(condition) \
     ((condition) ? static_cast<void>(0) : \
-     tightdb::util::terminate("Assertion failed: " #condition, __FILE__, __LINE__))
+     tightdb::util::terminate(TIGHTDB_VER_CHUNK " Assertion failed: " #condition, __FILE__, __LINE__))
 #else
 #  define TIGHTDB_ASSERT(condition) static_cast<void>(0)
 #endif
@@ -38,7 +39,7 @@
 #ifdef TIGHTDB_DEBUG
 #  define TIGHTDB_ASSERT_DEBUG(condition) \
     ((condition) ? static_cast<void>(0) : \
-     tightdb::util::terminate("Assertion failed: " #condition, __FILE__, __LINE__))
+     tightdb::util::terminate(TIGHTDB_VER_CHUNK " Assertion failed: " #condition, __FILE__, __LINE__))
 #else
 #  define TIGHTDB_ASSERT_DEBUG(condition) static_cast<void>(0)
 #endif
@@ -46,7 +47,7 @@
 
 #define TIGHTDB_ASSERT_RELEASE(condition) \
     ((condition) ? static_cast<void>(0) : \
-    tightdb::util::terminate("Assertion failed: " #condition, __FILE__, __LINE__))
+    tightdb::util::terminate(TIGHTDB_VER_CHUNK " Assertion failed: " #condition, __FILE__, __LINE__))
 
 
 #ifdef TIGHTDB_HAVE_CXX11_STATIC_ASSERT

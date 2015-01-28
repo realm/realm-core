@@ -54,9 +54,7 @@ namespace tightdb {
 /// class to the SharedGroup constructor.
 class Replication {
 public:
-    // Be sure to keep this type aligned with what is actually used in
-    // SharedGroup.
-    typedef uint_fast64_t version_type;
+    typedef SharedGroup::version_type version_type;
 
     std::string get_database_path();
 
@@ -137,29 +135,32 @@ public:
     virtual version_type get_last_version_synced(version_type* end_version_number = 0)
         TIGHTDB_NOEXCEPT;
 
-    /// Apply a foreign transaction log to the specified shared group using a
-    /// local transaction, but only if the specified new version will be the
-    /// version of the shared group after the local transaction. On version
-    /// mismatch, the initiated transaction is canceled by a rollback
-    /// operation. The specified shared group must have this replication
-    /// instance set as its associated Replication instance. The caller retains
-    /// ownership of the specified buffer.
+    /// Apply the specified changeset to the specified group as a single
+    /// transaction, but only if that transaction can be based on the specified
+    /// version. It is an error to specify a base version that is ahead of the
+    /// current version of the group. Doing so will cause an exception to be
+    /// thrown. Otherwise, if the current version is ahead of the specified base
+    /// version (i.e., a conflict), this function returns 0. Otherwise it
+    /// attempts to apply the changeset, and if that succeeds, it returns the
+    /// new version produced by the transaction. Note that this will also have
+    /// the effect of making the specified changeset available as a transaction
+    /// log through this transaction log registry. The caller retains ownership
+    /// of the specified changeset buffer.
     ///
-    /// If the version matches, and the local transaction is completed, this
-    /// function also implies the effect of
-    /// `set_last_version_synced(new_version)`.
+    /// The specified shared group must have this replication instance set as
+    /// its associated Replication instance. The effect of violating this rule
+    /// is unspecified.
     ///
-    /// \return Returns true unless the local transaction was canceled due to a
-    /// version mismatch.
+    /// \param server_version Not yet in used.
     ///
     /// FIXME This function, and several others, do not belong in the
     /// Replication class. The Replication interface is supposed to be just a
     /// sink that allows a SharedGroup to submit actions for replication. It is
     /// then up to the implementation of the Repication interface to define what
     /// replication means.
-    virtual bool apply_foreign_transact_log(SharedGroup&, version_type new_version,
-                                            BinaryData, version_type server_version,
-                                            std::ostream* apply_log = 0);
+    virtual version_type apply_changeset(SharedGroup&, version_type base_version,
+                                         BinaryData changeset, version_type server_version,
+                                         std::ostream* apply_log = 0);
 
     /// Acquire permision to start a new 'write' transaction. This
     /// function must be called by a client before it requests a
@@ -703,8 +704,8 @@ inline Replication::version_type Replication::get_last_version_synced(version_ty
     return 0;
 }
 
-inline bool Replication::apply_foreign_transact_log(SharedGroup&, version_type, BinaryData,
-                                                    version_type, std::ostream*)
+inline Replication::version_type
+Replication::apply_changeset(SharedGroup&, version_type, BinaryData, version_type, std::ostream*)
 {
     // Unimplemented!
     TIGHTDB_ASSERT(false);
