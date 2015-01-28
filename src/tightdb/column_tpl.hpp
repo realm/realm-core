@@ -83,7 +83,7 @@ template <class T, class R, Action action, class condition>
         }
         else {
             for(size_t local_index = s - sg.m_leaf_start; cont && local_index < end2; local_index++) {
-                T v = ((ArrType*)(sg.m_array_ptr))->get(local_index);
+                T v = static_cast<const ArrType*>(sg.m_array_ptr)->get(local_index);
                 if(cond(v, target)) {
                     cont = (static_cast<QueryState<R>*>(&state))->template match<action, false>(s + local_index , 0, static_cast<R>(v));
                 }

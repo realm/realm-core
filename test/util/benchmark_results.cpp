@@ -127,8 +127,8 @@ void BenchmarkResults::try_load_baseline_results()
         while (getline(in, line)) {
             istringstream line_in(line);
             string ident;
-            char space;
-            double elapsed_seconds;
+            char space = 0;
+            double elapsed_seconds = 0;
             line_in >> ident >> noskipws >> space >> skipws >> elapsed_seconds;
             if (!line_in || !isspace(space, line_in.getloc()))
                 error = true;

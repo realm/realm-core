@@ -887,7 +887,7 @@ Query& Query::subtable(size_t column)
     ParentNode* const p = new SubtableNode(column);
     UpdatePointers(p, &p->m_child);
     // once subtable conditions have been evaluated, resume evaluation from m_child2
-    subtables.push_back(&((SubtableNode*)p)->m_child2);
+    subtables.push_back(&static_cast<SubtableNode*>(p)->m_child2);
     group();
     return *this;
 }
