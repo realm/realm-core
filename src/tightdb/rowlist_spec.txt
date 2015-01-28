@@ -60,7 +60,7 @@ detached.
 This can be checked:
  - bool RowList::is_entry_attached(index)
  - note that the reference is not removed from the RowList. It is just detached.
- - this is an enabler for iterating over the RowList.
+ - this is an enabler for iterating over the RowList, see below.
 
 If a table entry referenced from the rowList is moved, the matching reference in the
 RowList is transparently updated.
@@ -116,3 +116,47 @@ table is changed in any way, including removals and moving of elements.
 
 An implementation of TableViews based on RowList will *not* need to rerun the query
 in response to removals and moving of elements. I don't know if that is important or not.
+
+
+
+Iteration over a RowList
+
+case A:
+
+RowList rl = query(....)
+for e in rl:
+    advance_read()  <------ assume this deletes an entry in the table referenced by rl
+    <<< .. do something with e >>
+
+There are multiple ways this can be made to work:
+
+1) directly remove the reference from the RowList
+2) nullify the reference in the RowList
+
+re 1) The rowlist reflects a sort order, so we cannot use move_last_over on the reference table,
+      but must instead move all entries at a higher index one down. This puts the cost of deleting
+      all entries at O(n*n) - further: the iterator must be modified to keep it pointing to the
+      correct reference.
+
+re 2) Simply set the reference to null. The iterator may have to skip ahead over any null entries
+      when it moves, but for the common case of iterating forward through the entire set, this is 
+      limited to a total O(n), so the cost of deleting all entries iteratively is just O(n).
+
+
+Observation: We may have 'e' pointing to the very last reference, when it is removed by advance_read. 
+In that case, there is no valid successor value, so it is just not possible to have a valid iterator 
+after advance_read(). Consequently, We *have* to support checking of the iterator, when iteration and 
+advance_read() are interleaved inside the loop:
+
+case B:
+
+RowList rl = query(....)
+for e in rl:
+    advance_read()  <------ assume this deletes an entry in the table referenced by rl
+    if (e.is_valid()) {
+         <<< .. do something with e >>
+    }
+
+and we must also support detection of the use of an invalid iterator (for the case where users forget
+to check is_valid()). Such usage should throw.
+
