@@ -143,10 +143,18 @@ std::string Timer::format(double seconds)
     return out.str();
 }
 
+namespace {
+    // FIXME: This should be std::llround when supported by all platforms.
+    int64_t round_to_int64(double x)
+    {
+        return static_cast<int64_t>(std::round(x));
+    }
+}
+
 
 void Timer::format(double seconds_float, std::ostream& out)
 {
-    int64_t rounded_minutes = std::llround(seconds_float / 60);
+    int64_t rounded_minutes = round_to_int64(seconds_float / 60);
     if (rounded_minutes > 60) {
         // 1h0m -> inf
         int64_t hours   = rounded_minutes / 60;
@@ -154,7 +162,7 @@ void Timer::format(double seconds_float, std::ostream& out)
         out << hours << "h" << minutes << "m";
     }
     else {
-        int64_t rounded_seconds = std::llround(seconds_float);
+        int64_t rounded_seconds = round_to_int64(seconds_float);
         if (rounded_seconds > 60) {
             // 1m0s -> 59m59s
             int64_t minutes = rounded_seconds / 60;
@@ -162,7 +170,7 @@ void Timer::format(double seconds_float, std::ostream& out)
             out << minutes << "m" << seconds << "s";
         }
         else {
-            int64_t rounded_centies = std::llround(seconds_float * 100);
+            int64_t rounded_centies = round_to_int64(seconds_float * 100);
             if (rounded_centies > 100) {
                 // 1s -> 59.99s
                 int64_t seconds = rounded_centies / 100;
@@ -174,7 +182,7 @@ void Timer::format(double seconds_float, std::ostream& out)
                 out << 's';
             }
             else {
-                int64_t rounded_centi_ms = std::llround(seconds_float * 100000);
+                int64_t rounded_centi_ms = round_to_int64(seconds_float * 100000);
                 if (rounded_centi_ms > 100) {
                     // 0.1ms -> 999.99ms
                     int64_t ms = rounded_centi_ms / 100;
@@ -187,7 +195,7 @@ void Timer::format(double seconds_float, std::ostream& out)
                 }
                 else {
                     // 0 -> 999µs
-                    int64_t us = std::llround(seconds_float * 1000000);
+                    int64_t us = round_to_int64(seconds_float * 1000000);
                     out << us << "us";
                 }
             }
