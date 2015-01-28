@@ -10,7 +10,9 @@
 
 ### Enhancements:
 
-* Adding `Replication::apply_foreign_transact_log()`.
+* Replacing `Replication::submit_transact_log()` with
+  `Replication::apply_changeset()` which both applies the changeset to the
+  database and submits it to the changeset registry.
 
 -----------
 
