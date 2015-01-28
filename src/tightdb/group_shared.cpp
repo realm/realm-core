@@ -1345,14 +1345,16 @@ void SharedGroup::do_begin_write()
 }
 
 
-void SharedGroup::commit()
+SharedGroup::version_type SharedGroup::commit()
 {
-    do_commit();
+    version_type new_version = do_commit();
 
     end_read();
     // complete detach
     // (end_read allows group to retain data, but accessors become invalid after commit):
     m_group.complete_detach();
+
+    return new_version;
 }
 
 
@@ -1408,7 +1410,7 @@ void SharedGroup::do_rollback_and_continue_as_read(const char* begin, const char
 #endif // TIGHTDB_ENABLE_REPLICATION
 
 
-void SharedGroup::do_commit()
+Replication::version_type SharedGroup::do_commit()
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Writing);
 
@@ -1429,8 +1431,8 @@ void SharedGroup::do_commit()
     // local database as not-up-to-date. The exception should not be
     // rethrown, because the commit was effectively successful.
 
+    version_type new_version;
     {
-        uint_fast64_t new_version;
 #ifdef TIGHTDB_ENABLE_REPLICATION
         // It is essential that if Replication::commit_write_transact() fails,
         // then the transaction is not completed. In that case, a subsequent
@@ -1468,6 +1470,8 @@ void SharedGroup::do_commit()
     m_transact_stage = transact_Reading;
     // Release write lock
     info->writemutex.unlock();
+
+    return new_version;
 }
 
 

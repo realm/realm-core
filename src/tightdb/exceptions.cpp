@@ -17,6 +17,8 @@ const char* const LogicError::row_index_out_of_range = "Row index out of range";
 
 const char* const LogicError::column_index_out_of_range = "Column index out of range";
 
+const char* const LogicError::bad_version_number = "Bad version number";
+
 const char* const LogicError::illegal_combination = "Illegal combination";
 
 const char* const LogicError::type_mismatch = "Type mismatch";

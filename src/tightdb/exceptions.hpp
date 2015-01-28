@@ -72,6 +72,7 @@ public:
     static const char* const table_index_out_of_range;
     static const char* const row_index_out_of_range;
     static const char* const column_index_out_of_range;
+    static const char* const bad_version_number;
 
     /// Indicates that an argument has a value that is illegal in combination
     /// with another argument, or with the state of an involved object.
