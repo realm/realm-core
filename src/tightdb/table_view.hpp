@@ -84,22 +84,65 @@ using std::size_t;
 // You can handover both reflective and imperative views. But most often it will only make
 // sense to handover an imperative view, because it is guaranteed not to rerun its query.
 //
-// The third use case (and primary motivator behind the imperative view) is when you want
+// The third use case (and a motivator behind the imperative view) is when you want
 // to make changes to the database in accordance with a query result. Imagine you want to 
 // find all employees with a salary below a limit and raise their salaries to the limit (pseudocode):
 //
+//    promote_to_write();
 //    view = table.where().less_than(salary_column,limit).find_all();
 //    for (size_t i = 0; i < view.size(); ++i)
 //        view.set_int(salary_column, i, limit);
+//    commit_and_continue_as_read();
 //
 // This is idiomatic imperative code and it works if the view is operated in imperative mode.
-// If the view is operated in reflective mode, the behaviour surprises most people. When the
+//
+// If the view is operated in reflective mode, the behaviour surprises most people: When the
 // first salary is changed, the entry no longer fullfills the query, so it is dropped from the
 // view implicitly. view[0] is removed, view[1] moves to view[0] and so forth. But the next
 // loop iteration has i=1 and refers to view[1], thus skipping view[0]. The end result is that
 // every other employee get a raise, while the other half don't.
+//
+// One way of dealing with use case 3 without supporting imperative views, is to *require* that
+// the loop body is expressed as a lambda, which we'll call. This allows us to ensure that the
+// lambda is only called with a valid iterator. Unfortunately, it also adds restrictions on what
+// may be allowed inside the lambda. One of the things you can not easily allow is calling
+// advance_read() or promote_to_write().
+//
+// This leads us to use case 4, which is similar to use case 3, but uses promote_to_write()
+// intermixed with iterating a view. This is actually quite important to some, who do not want
+// to end up with a large write transaction.
+//
+//    view = table.where().less_than(salary_column,limit).find_all();
+//    for (size_t i = 0; i < view.size(); ++i) {
+//        promote_to_write();
+//        view.set_int(salary_column, i, limit);
+//        commit_and_continue_as_write();
+//    }
+//
+// Anything can happen at the call to promote_to_write(). The key question then becomes: how
+// do we support a safe way of realising the original goal (raising salaries) ?
+//
+// using the imperative operating mode:
+//
+//    view = table.where().less_than(salary_column,limit).find_all();
+//    for (size_t i = 0; i < view.size(); ++i) {
+//        promote_to_write();
+//        Row r = view[i];
+//        if (r.is_attached())
+//            r.set_int(salary_column, limit);
+//        commit_and_continue_as_write();
+//    }
+//
+// This is safe, but will it guarantee that all relevant employees get their raise ?
+// Yes and no, it depends..... At every call to promote_to_write() new employees
+// may be added to the underlying table, but as the view is in imperative mode, these new
+// employees are not added to the view. Also at promote_to_write() an existing employee
+// could recieve a (different, larger) raise which would then be overwritten and lost.
+// However, these problems are to be expected, since the activity is spread over multiple
+// transactions. We just aim for providing low level safety: is_attached() can tell
+// if the reference is valid. The rest is up to the application logic.
 
-   
+
 /// Common base class for TableView and ConstTableView.
 class TableViewBase : public RowIndexes {
 public:
