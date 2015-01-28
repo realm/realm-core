@@ -240,13 +240,17 @@ public:
     bool has_changed();
 
     /// The calling thread goes to sleep until the database is changed, or
-    /// until wait_for_change_release() is called. Return true if the database
-    /// has changed, false if it might have. At most one thread may wait in 
-    /// wait_for_change() on any single SharedGroup.
+    /// until wait_for_change_release() is called. After a call to wait_for_change_release()
+    /// further calls to wait_for_change() will return immediately. To restore
+    /// the ability to wait for a change, a call to enable_wait_for_change()
+    /// is required. Return true if the database has changed, false if it might have. 
     bool wait_for_change();
 
     /// release any thread waiting in wait_for_change() on *this* SharedGroup.
     void wait_for_change_release();
+
+    /// re-enable waiting for change
+    void enable_wait_for_change();
 
     // Transactions:
 
@@ -320,15 +324,19 @@ public:
     /// a read transaction will not immediately release any versions.
     uint_fast64_t get_number_of_versions();
 
-    // Compact the database file.
-    // - The method will throw if called inside a transaction.
-    // - The method will return false if other SharedGroups are accessing the database
-    //   in which case compaction is not done.
-    // It will return true following succesful compaction.
-    // While compaction is in progress, attempts by other
-    // threads or processes to open the database will wait.
-    // Be warned that resource requirements for compaction is proportional to the amount
-    // of live data in the database.
+    /// Compact the database file.
+    /// - The method will throw if called inside a transaction.
+    /// - The method will return false if other SharedGroups are accessing the database
+    ///   in which case compaction is not done.
+    /// It will return true following succesful compaction.
+    /// While compaction is in progress, attempts by other
+    /// threads or processes to open the database will wait.
+    /// Be warned that resource requirements for compaction is proportional to the amount
+    /// of live data in the database.
+    /// Compaction works by writing the database contents to a temporary databasefile and
+    /// then replacing the database with the temporary one. The name of the temporary
+    /// file is formed by appending ".tmp_compaction_space" to the name of the databse
+    /// 
     bool compact();
 
 #ifdef TIGHTDB_DEBUG
@@ -353,7 +361,7 @@ private:
     util::File m_file;
     util::File::Map<SharedInfo> m_file_map; // Never remapped
     util::File::Map<SharedInfo> m_reader_map;
-    bool m_waiting_for_change;
+    bool m_wait_for_change_enabled;
     std::string m_lockfile_path;
     std::string m_db_path;
     const char* m_key;
@@ -516,6 +524,11 @@ public:
             m_shared_group->rollback();
     }
 
+    bool has_table(StringData name) const TIGHTDB_NOEXCEPT
+    {
+        return get_group().has_table(name);
+    }
+
     TableRef get_table(std::size_t table_ndx) const
     {
         return get_group().get_table(table_ndx); // Throws
@@ -564,6 +577,13 @@ public:
         SharedGroup::version_type new_version = m_shared_group->commit();
         m_shared_group = 0;
         return new_version;
+    }
+
+    void rollback() TIGHTDB_NOEXCEPT
+    {
+        TIGHTDB_ASSERT(m_shared_group);
+        m_shared_group->rollback();
+        m_shared_group = 0;
     }
 
 private:
