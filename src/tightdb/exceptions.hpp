@@ -72,6 +72,7 @@ public:
         table_index_out_of_range,
         row_index_out_of_range,
         column_index_out_of_range,
+        bad_version_number,
 
         /// Indicates that an argument has a value that is illegal in combination
         /// with another argument, or with the state of an involved object.

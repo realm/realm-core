@@ -35,12 +35,6 @@ Group& Replication::get_group(SharedGroup& sg) TIGHTDB_NOEXCEPT
     return sg.m_group;
 }
 
-void Replication::set_replication(Group& group, Replication* repl) TIGHTDB_NOEXCEPT
-{
-    typedef _impl::GroupFriend gf;
-    gf::set_replication(group, repl);
-}
-
 
 Replication::version_type Replication::get_current_version(SharedGroup& sg)
 {
@@ -144,6 +138,10 @@ class Replication::TransactLogApplier {
 public:
     TransactLogApplier(Group& group):
         m_group(group)
+    {
+    }
+
+    ~TransactLogApplier() TIGHTDB_NOEXCEPT
     {
     }
 

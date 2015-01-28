@@ -24,6 +24,7 @@
 #include <limits>
 #include <exception>
 #include <string>
+#include <ostream>
 
 #include <tightdb/util/assert.hpp>
 #include <tightdb/util/tuple.hpp>
@@ -38,6 +39,7 @@
 
 #include <iostream>
 
+
 namespace tightdb {
 
 
@@ -50,13 +52,11 @@ namespace tightdb {
 
 
 
-/// Replication is enabled by passing an instance of an implementation
-/// of this class to the SharedGroup constructor.
+/// Replication is enabled by passing an instance of an implementation of this
+/// class to the SharedGroup constructor.
 class Replication {
 public:
-    // Be sure to keep this type aligned with what is actually used in
-    // SharedGroup.
-    typedef uint_fast64_t version_type;
+    typedef SharedGroup::version_type version_type;
 
     std::string get_database_path();
 
@@ -127,10 +127,29 @@ public:
     virtual version_type get_last_version_synced(version_type* end_version_number = 0)
         TIGHTDB_NOEXCEPT;
 
-    /// Submit a transact log directly into the system bypassing the normal
-    /// collection of replication entries. This is used to add a transactlog
-    /// just for updating accessors. The caller retains ownership of the buffer.
-    virtual void submit_transact_log(BinaryData);
+    /// Apply the specified changeset to the specified group as a single
+    /// transaction, but only if that transaction can be based on the specified
+    /// version. It is an error to specify a base version that is ahead of the
+    /// current version of the group. Doing so will cause an exception to be
+    /// thrown. Otherwise, if the current version is ahead of the specified base
+    /// version (i.e., a conflict), this function returns 0. Otherwise it
+    /// attempts to apply the changeset, and if that succeeds, it returns the
+    /// new version produced by the transaction. Note that this will also have
+    /// the effect of making the specified changeset available as a transaction
+    /// log through this transaction log registry. The caller retains ownership
+    /// of the specified changeset buffer.
+    ///
+    /// The specified shared group must have this replication instance set as
+    /// its associated Replication instance. The effect of violating this rule
+    /// is unspecified.
+    ///
+    /// FIXME This function, and several others, do not belong in the
+    /// Replication class. The Replication interface is supposed to be just a
+    /// sink that allows a SharedGroup to submit actions for replication. It is
+    /// then up to the implementation of the Repication interface to define what
+    /// replication means.
+    virtual version_type apply_changeset(SharedGroup&, version_type base_version,
+                                         BinaryData changeset, std::ostream* apply_log = 0);
 
     /// Acquire permision to start a new 'write' transaction. This
     /// function must be called by a client before it requests a
@@ -250,11 +269,11 @@ public:
     class TransactLogParser;
 
     class InputStream;
+    class SimpleInputStream;
 
     class BadTransactLog; // Exception
 
-    /// Called by the local coordinator to apply a transaction log
-    /// received from another local coordinator.
+    /// Apply a foreign transaction log to the specified target group.
     ///
     /// \param apply_log If specified, and the library was compiled in
     /// debug mode, then a line describing each individual operation
@@ -316,13 +335,6 @@ protected:
     /// Must be called only from do_begin_write_transact(),
     /// do_commit_write_transact(), or do_rollback_write_transact().
     static Group& get_group(SharedGroup&) TIGHTDB_NOEXCEPT;
-
-    // Part of a temporary ugly hack to avoid generating new
-    // transaction logs during application of ones that have olready
-    // been created elsewhere. See
-    // ReplicationImpl::do_begin_write_transact() in
-    // tightdb/replication/simplified/provider.cpp for more on this.
-    static void set_replication(Group&, Replication*) TIGHTDB_NOEXCEPT;
 
     /// Must be called only from do_begin_write_transact(),
     /// do_commit_write_transact(), or do_rollback_write_transact().
@@ -442,9 +454,33 @@ public:
     /// For non-zero return value, \a begin and \a end are
     /// updated to reflect the start and limit of a
     /// contiguous memory chunk.
-    virtual size_t next_block(const char*& begin, const char*& end) = 0;
+    virtual std::size_t next_block(const char*& begin, const char*& end) = 0;
 
     virtual ~InputStream() {}
+};
+
+
+class Replication::SimpleInputStream: public InputStream {
+public:
+    SimpleInputStream(const char* data, std::size_t size) TIGHTDB_NOEXCEPT:
+    m_data(data), m_size(size)
+    {
+    }
+
+    std::size_t next_block(const char*& begin, const char*& end) TIGHTDB_OVERRIDE
+    {
+        if (m_size == 0)
+            return 0;
+        std::size_t size = m_size;
+        begin = m_data;
+        end = m_data + size;
+        m_size = 0;
+        return size;
+    }
+
+private:
+    const char* m_data;
+    std::size_t m_size;
 };
 
 
@@ -638,18 +674,22 @@ inline void Replication::set_last_version_synced(version_type) TIGHTDB_NOEXCEPT
 {
 }
 
-inline Replication::version_type Replication::get_last_version_synced(version_type*) TIGHTDB_NOEXCEPT
+inline Replication::version_type Replication::get_last_version_synced(version_type*)
+    TIGHTDB_NOEXCEPT
 {
     return 0;
 }
 
-inline void Replication::submit_transact_log(BinaryData)
+inline Replication::version_type
+Replication::apply_changeset(SharedGroup&, version_type, BinaryData, std::ostream*)
 {
     // Unimplemented!
     TIGHTDB_ASSERT(false);
+    return false;
 }
 
-inline void Replication::get_commit_entries(version_type, version_type, BinaryData*) TIGHTDB_NOEXCEPT
+inline void Replication::get_commit_entries(version_type, version_type, BinaryData*)
+    TIGHTDB_NOEXCEPT
 {
     // Unimplemented!
     TIGHTDB_ASSERT(false);

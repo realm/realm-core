@@ -30,10 +30,34 @@
 #include <tightdb/replication.hpp>
 #ifdef TIGHTDB_ENABLE_REPLICATION
 
-typedef uint_fast64_t version_type;
-
 using namespace util;
 using namespace std;
+
+
+namespace {
+
+// Temporarily disable replication
+class TempDisableReplication {
+public:
+    TempDisableReplication(Group& group):
+        m_group(group)
+    {
+        typedef _impl::GroupFriend gf;
+        m_temp_disabled_repl = gf::get_replication(m_group);
+        gf::set_replication(m_group, 0);
+    }
+    ~TempDisableReplication()
+    {
+        typedef _impl::GroupFriend gf;
+        gf::set_replication(m_group, m_temp_disabled_repl);
+    }
+private:
+    Group& m_group;
+    Replication* m_temp_disabled_repl;
+};
+
+} // anonymous namespace
+
 
 namespace tightdb {
 
@@ -85,7 +109,8 @@ public:
     void do_transact_log_append(const char* data, size_t size) TIGHTDB_OVERRIDE;
     void transact_log_reserve(size_t size);
     virtual bool is_in_server_synchronization_mode() { return m_is_persisting; }
-    virtual void submit_transact_log(BinaryData);
+    version_type apply_changeset(SharedGroup&, version_type base_version,
+                                 BinaryData, ostream* apply_log) TIGHTDB_OVERRIDE;
     virtual void stop_logging() TIGHTDB_OVERRIDE;
     virtual void reset_log_management(version_type last_version) TIGHTDB_OVERRIDE;
     virtual void set_last_version_seen_locally(version_type last_seen_version_number)
@@ -420,7 +445,8 @@ void WriteLogCollector::cleanup_stale_versions(CommitLogPreamble* preamble)
 
 
 // returns the current "from" version
-version_type WriteLogCollector::internal_submit_log(const char* data, uint_fast64_t size)
+Replication::version_type
+WriteLogCollector::internal_submit_log(const char* data, uint_fast64_t size)
 {
     map_header_if_needed();
     RobustLockGuard rlg(m_header.get_addr()->lock, &recover_from_dead_owner);
@@ -552,7 +578,8 @@ void WriteLogCollector::set_last_version_synced(version_type version) TIGHTDB_NO
 }
 
 
-version_type WriteLogCollector::get_last_version_synced(version_type* end_version_number)
+Replication::version_type
+WriteLogCollector::get_last_version_synced(version_type* end_version_number)
     TIGHTDB_NOEXCEPT
 {
     map_header_if_needed();
@@ -653,9 +680,24 @@ void WriteLogCollector::get_commit_entries(version_type from_version, version_ty
 }
 
 
-void WriteLogCollector::submit_transact_log(BinaryData bd)
+Replication::version_type
+WriteLogCollector::apply_changeset(SharedGroup& sg, version_type base_version,
+                                   BinaryData changeset, ostream* apply_log)
 {
-    internal_submit_log(bd.data(), bd.size());
+    Group& group = sg.m_group;
+    TIGHTDB_ASSERT(_impl::GroupFriend::get_replication(group) == this);
+    TempDisableReplication tdr(group);
+
+    WriteTransaction transact(sg);
+    version_type current_version = sg.get_current_version();
+    if (base_version < current_version)
+        return 0;
+    if (TIGHTDB_UNLIKELY(base_version > current_version))
+        throw LogicError(LogicError::bad_version_number);
+    SimpleInputStream input(changeset.data(), changeset.size());
+    apply_transact_log(input, transact.get_group(), apply_log); // Throws
+    internal_submit_log(changeset.data(), changeset.size()); // Throws
+    return transact.commit(); // Throws
 }
 
 

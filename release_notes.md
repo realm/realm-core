@@ -10,7 +10,9 @@
 
 ### Enhancements:
 
-* Lorem ipsum.
+* Replacing `Replication::submit_transact_log()` with
+  `Replication::apply_changeset()` which both applies the changeset to the
+  database and submits it to the changeset registry.
 
 -----------
 
@@ -86,7 +88,8 @@
 
 ### Internals:
 
-* Now uses system OpenSSL on Android rather than a statically-linked copy for encryption.
+* Now uses system OpenSSL on Android rather than a statically-linked copy for
+  encryption.
 
 ----------------------------------------------
 
@@ -122,7 +125,8 @@
 
 ### Enhancements:
 
-* Added 'compact' method to SharedGroup for better control of compaction of the database file.
+* Added 'compact' method to SharedGroup for better control of compaction of the
+  database file.
 * The following constants were added: `Group::max_table_name_length`,
   `Table::max_column_name_length`, `Table::max_string_size`, and
   `Table::max_binary_size`.
