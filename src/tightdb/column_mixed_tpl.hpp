@@ -387,7 +387,7 @@ inline std::size_t ColumnMixed::get_size_from_ref(ref_type root_ref,
                                                   Allocator& alloc) TIGHTDB_NOEXCEPT
 {
     const char* root_header = alloc.translate(root_ref);
-    ref_type types_ref = to_ref(Array::get(root_header, 0));
+    ref_type types_ref = to_ref(Array::get_data(root_header, 0));
     return Column::get_size_from_ref(types_ref, alloc);
 }
 

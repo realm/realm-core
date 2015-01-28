@@ -99,17 +99,17 @@ void Group::create(bool add_free_versions)
         m_free_positions.create(Array::type_Normal); // Throws
         m_free_lengths.create(Array::type_Normal); // Throws
 
-        m_top.add(m_table_names.get_ref()); // Throws
-        m_top.add(m_tables.get_ref()); // Throws
-        m_top.add(1 + 2*initial_logical_file_size); // Throws
-        m_top.add(m_free_positions.get_ref()); // Throws
-        m_top.add(m_free_lengths.get_ref()); // Throws
+        m_top.add_data(m_table_names.get_ref()); // Throws
+        m_top.add_data(m_tables.get_ref()); // Throws
+        m_top.add_data(1 + 2*initial_logical_file_size); // Throws
+        m_top.add_data(m_free_positions.get_ref()); // Throws
+        m_top.add_data(m_free_lengths.get_ref()); // Throws
 
         if (add_free_versions) {
             m_free_versions.create(Array::type_Normal); // Throws
-            m_top.add(m_free_versions.get_ref()); // Throws
+            m_top.add_data(m_free_versions.get_ref()); // Throws
             size_t initial_database_version = 0; // A.k.a. transaction number
-            m_top.add(1 + 2*initial_database_version); // Throws
+            m_top.add_data(1 + 2*initial_database_version); // Throws
         }
         m_is_attached = true;
     }
@@ -132,7 +132,7 @@ void Group::init_from_ref(ref_type top_ref) TIGHTDB_NOEXCEPT
     TIGHTDB_ASSERT(top_size >= 3);
 
     // Logical file size must not exceed actual file size
-    TIGHTDB_ASSERT(size_t(m_top.get(2)/2) <= m_alloc.get_baseline());
+    TIGHTDB_ASSERT(size_t(m_top.get_data(2)/2) <= m_alloc.get_baseline());
 
     m_table_names.init_from_parent();
     m_tables.init_from_parent();
@@ -181,8 +181,8 @@ void Group::reset_free_space_versions()
         TIGHTDB_ASSERT(!m_free_lengths.is_attached());
         m_free_positions.create(Array::type_Normal); // Throws
         m_free_lengths.create(Array::type_Normal); // Throws
-        m_top.add(m_free_positions.get_ref()); // Throws
-        m_top.add(m_free_lengths.get_ref()); // Throws
+        m_top.add_data(m_free_positions.get_ref()); // Throws
+        m_top.add_data(m_free_lengths.get_ref()); // Throws
     }
     TIGHTDB_ASSERT(m_top.size() >= 5);
 
@@ -197,12 +197,12 @@ void Group::reset_free_space_versions()
         size_t n = m_free_positions.size();
         for (size_t i = 0; i != n; ++i)
             m_free_versions.add(0); // Throws
-        m_top.add(m_free_versions.get_ref()); // Throws
+        m_top.add_data(m_free_versions.get_ref()); // Throws
         // Add a temporary "version_number" just to get the top array
         // to the proper size. This version number is never used and cannot
         // escape to the database during commit. The correct version number
         // is set in GroupWriter::write().
-        m_top.add(0);
+        m_top.add_data(0);
     }
     TIGHTDB_ASSERT(m_top.size() >= 7);
 }
@@ -452,7 +452,7 @@ void Group::remove_table(size_t table_ndx)
     for (size_t i = n; i > 0; --i)
         table->remove_column(i-1);
 
-    ref_type ref = m_tables.get(table_ndx);
+    ref_type ref = m_tables.get_data(table_ndx);
 
     // If the specified table is not the last one, it will be removed by moving
     // that last table to the index of the removed one. The movement of the last
@@ -644,9 +644,9 @@ void Group::write(ostream& out, TableWriter& table_writer,
     top.create(Array::type_HasRefs); // Throws
     // FIXME: We really need an alternative to Array::truncate() that is able to expand.
     // FIXME: Dangerous cast: unsigned -> signed
-    top.add(names_pos); // Throws
-    top.add(tables_pos); // Throws
-    top.add(0); // Throws
+    top.add_data(names_pos); // Throws
+    top.add_data(tables_pos); // Throws
+    top.add_data(0); // Throws
 
     if (version_number) {
         Array free_list(Allocator::get_default());
@@ -658,10 +658,10 @@ void Group::write(ostream& out, TableWriter& table_writer,
         size_t free_list_pos = free_list.write(out_2, /* recurse: */ false, /* persist: */ false);
         size_t size_list_pos = size_list.write(out_2, /* recurse: */ false, /* persist: */ false);
         size_t version_list_pos = version_list.write(out_2, /* recurse: */ false, /* persist: */ false);
-        top.add(free_list_pos);
-        top.add(size_list_pos);
-        top.add(version_list_pos);
-        top.add(1 + 2 * version_number);
+        top.add_data(free_list_pos);
+        top.add_data(size_list_pos);
+        top.add_data(version_list_pos);
+        top.add_data(1 + 2 * version_number);
         top_size = 7;
         free_list.destroy();
         size_list.destroy();
@@ -685,7 +685,7 @@ void Group::write(ostream& out, TableWriter& table_writer,
     size_t top_byte_size = top.get_byte_size();
     size_t final_file_size = top_pos + top_byte_size;
     // FIXME: Dangerous cast: unsigned -> signed
-    top.set(2, 1 + 2*final_file_size);
+    top.set_data(2, 1 + 2*final_file_size);
 
     // Write the top array
     bool recurse = false;
@@ -734,8 +734,8 @@ void Group::commit()
         TIGHTDB_ASSERT(m_top.size() == 3);
         m_free_positions.create(Array::type_Normal);
         m_free_lengths.create(Array::type_Normal);
-        m_top.add(m_free_positions.get_ref());
-        m_top.add(m_free_lengths.get_ref());
+        m_top.add_data(m_free_positions.get_ref());
+        m_top.add_data(m_free_lengths.get_ref());
     }
 
     GroupWriter out(*this); // Throws
@@ -2174,7 +2174,7 @@ void Group::Verify() const
         }
     }
 
-    size_t logical_file_size = to_size_t(m_top.get(2) / 2);
+    size_t logical_file_size = to_size_t(m_top.get_data(2) / 2);
     size_t ref_begin = sizeof (SlabAlloc::Header);
     ref_type immutable_ref_end = logical_file_size;
     ref_type mutable_ref_end = m_alloc.get_total_size();

@@ -14,6 +14,7 @@
 #include <tightdb/exceptions.hpp>
 #include <tightdb/table.hpp>
 #include <tightdb/index_string.hpp>
+#include <tightdb/array_integer.hpp>
 
 using namespace std;
 using namespace tightdb;
@@ -132,7 +133,8 @@ private:
     const size_t m_max_elems_per_child; // A power of `TIGHTDB_MAX_BPNODE_SIZE`
     size_t m_elems_in_parent; // Zero if reinitialization is needed
     bool m_is_on_general_form; // Defined only when m_elems_in_parent > 0
-    Array m_main, m_offsets;
+    Array m_main;
+    ArrayInteger m_offsets;
     _impl::OutputStream& m_out;
     UniquePtr<ParentLevel> m_prev_parent_level;
 };
@@ -202,7 +204,7 @@ void TreeWriter::ParentLevel::add_child_ref(ref_type child_ref, size_t elems_in_
         }
         {
             int_fast64_t v(child_ref); // FIXME: Dangerous cast (unsigned -> signed)
-            m_main.add(v); // Throws
+            m_main.add_data(v); // Throws
         }
         if (m_is_on_general_form) {
             int_fast64_t v(m_elems_in_parent); // FIXME: Dangerous cast (unsigned -> signed)
@@ -213,9 +215,9 @@ void TreeWriter::ParentLevel::add_child_ref(ref_type child_ref, size_t elems_in_
           return;
     }
     else { // First child in this node
-        m_main.add(0); // Placeholder for `elems_per_child` or `offsets_ref`
+        m_main.add_data(0); // Placeholder for `elems_per_child` or `offsets_ref`
         int_fast64_t v(child_ref); // FIXME: Dangerous cast (unsigned -> signed)
-        m_main.add(v); // Throws
+        m_main.add_data(v); // Throws
         m_elems_in_parent = elems_in_child;
         m_is_on_general_form = force_general_form; // `invar:bptree-node-form`
         if (m_is_on_general_form && !m_offsets.is_attached())
@@ -229,17 +231,17 @@ void TreeWriter::ParentLevel::add_child_ref(ref_type child_ref, size_t elems_in_
     // Write this inner node to the output stream
     if (!m_is_on_general_form) {
         int_fast64_t v(m_max_elems_per_child); // FIXME: Dangerous cast (unsigned -> signed)
-        m_main.set(0, 1 + 2*v); // Throws
+        m_main.set_data(0, 1 + 2*v); // Throws
     }
     else {
         size_t pos = m_offsets.write(m_out); // Throws
         ref_type ref = pos;
         int_fast64_t v(ref); // FIXME: Dangerous cast (unsigned -> signed)
-        m_main.set(0, v); // Throws
+        m_main.set_data(0, v); // Throws
     }
     {
         int_fast64_t v(m_elems_in_parent); // FIXME: Dangerous cast (unsigned -> signed)
-        m_main.add(1 + 2*v); // Throws
+        m_main.add_data(1 + 2*v); // Throws
     }
     bool recurse = false; // Shallow
     size_t pos = m_main.write(m_out, recurse); // Throws
@@ -393,30 +395,30 @@ void ColumnBase::introduce_new_root(ref_type new_sibling_ref, Array::TreeInsertB
     new_root->set_parent(orig_root->get_parent(), orig_root->get_ndx_in_parent());
     new_root->update_parent(); // Throws
     bool compact_form =
-        is_append && (!orig_root->is_inner_bptree_node() || orig_root->get(0) % 2 != 0);
+        is_append && (!orig_root->is_inner_bptree_node() || orig_root->get_data(0) % 2 != 0);
     // Something is wrong if we were not appending and the original
     // root is still on the compact form.
     TIGHTDB_ASSERT(!compact_form || is_append);
     if (compact_form) {
         // FIXME: Dangerous cast here (unsigned -> signed)
         int_fast64_t v = state.m_split_offset; // elems_per_child
-        new_root->add(1 + 2*v); // Throws
+        new_root->add_data(1 + 2*v); // Throws
     }
     else {
         Array new_offsets(alloc);
         new_offsets.create(Array::type_Normal); // Throws
         // FIXME: Dangerous cast here (unsigned -> signed)
-        new_offsets.add(state.m_split_offset); // Throws
+        new_offsets.add_data(state.m_split_offset); // Throws
         // FIXME: Dangerous cast here (unsigned -> signed)
-        new_root->add(new_offsets.get_ref()); // Throws
+        new_root->add_data(new_offsets.get_ref()); // Throws
     }
     // FIXME: Dangerous cast here (unsigned -> signed)
-    new_root->add(orig_root->get_ref()); // Throws
+    new_root->add_data(orig_root->get_ref()); // Throws
     // FIXME: Dangerous cast here (unsigned -> signed)
-    new_root->add(new_sibling_ref); // Throws
+    new_root->add_data(new_sibling_ref); // Throws
     // FIXME: Dangerous cast here (unsigned -> signed)
     int_fast64_t v = state.m_split_size; // total_elems_in_tree
-    new_root->add(1 + 2*v); // Throws
+    new_root->add_data(1 + 2*v); // Throws
     delete orig_root;
     m_array = new_root.release();
 }
@@ -441,16 +443,16 @@ ref_type ColumnBase::build(size_t* rest_size_ptr, size_t fixed_height,
             new_inner_node.create(Array::type_InnerBptreeNode); // Throws
             try {
                 int_fast64_t v = orig_rest_size - rest_size; // elems_per_child
-                new_inner_node.add(1 + 2*v); // Throws
+                new_inner_node.add_data(1 + 2*v); // Throws
                 v = node; // FIXME: Dangerous cast here (unsigned -> signed)
-                new_inner_node.add(v); // Throws
+                new_inner_node.add_data(v); // Throws
                 node = 0;
                 size_t num_children = 1;
                 while (rest_size > 0 && num_children != TIGHTDB_MAX_BPNODE_SIZE) {
                     ref_type child = build(&rest_size, height, alloc, handler); // Throws
                     try {
                         int_fast64_t v = child; // FIXME: Dangerous cast here (unsigned -> signed)
-                        new_inner_node.add(v); // Throws
+                        new_inner_node.add_data(v); // Throws
                     }
                     catch (...) {
                         Array::destroy_deep(child, alloc);
@@ -458,7 +460,7 @@ ref_type ColumnBase::build(size_t* rest_size_ptr, size_t fixed_height,
                     }
                 }
                 v = orig_rest_size - rest_size; // total_elems_in_tree
-                new_inner_node.add(1 + 2*v); // Throws
+                new_inner_node.add_data(1 + 2*v); // Throws
             }
             catch (...) {
                 new_inner_node.destroy_deep();
@@ -519,7 +521,7 @@ struct SetLeafElem: Array::UpdateHandler {
     {
         m_leaf.init_from_mem(mem);
         m_leaf.set_parent(parent, ndx_in_parent);
-        m_leaf.set(elem_ndx_in_leaf, m_value); // Throws
+        m_leaf.set_data(elem_ndx_in_leaf, m_value); // Throws
     }
 };
 
@@ -533,7 +535,7 @@ struct AdjustLeafElem: Array::UpdateHandler {
     {
         m_leaf.init_from_mem(mem);
         m_leaf.set_parent(parent, ndx_in_parent);
-        m_leaf.adjust(elem_ndx_in_leaf, m_value); // Throws
+        m_leaf.adjust_data(elem_ndx_in_leaf, m_value); // Throws
     }
 };
 
@@ -548,12 +550,12 @@ void Column::set(size_t ndx, int64_t value)
     }
 
     if (!m_array->is_inner_bptree_node()) {
-        m_array->set(ndx, value); // Throws
+        array()->set(ndx, value); // Throws
         return;
     }
 
     SetLeafElem set_leaf_elem(m_array->get_alloc(), value);
-    m_array->update_bptree_elem(ndx, set_leaf_elem); // Throws
+    array()->update_bptree_elem(ndx, set_leaf_elem); // Throws
 }
 
 // When a value of a signed type is converted to an unsigned type, the C++ standard guarantees that negative values 
@@ -575,12 +577,12 @@ void Column::adjust(size_t ndx, int_fast64_t diff)
     TIGHTDB_ASSERT(ndx < size());
 
     if (!m_array->is_inner_bptree_node()) {
-        m_array->adjust(ndx, diff); // Throws
+        array()->adjust(ndx, diff); // Throws
         return;
     }
 
-    AdjustLeafElem set_leaf_elem(m_array->get_alloc(), diff);
-    m_array->update_bptree_elem(ndx, set_leaf_elem); // Throws
+    AdjustLeafElem set_leaf_elem(array()->get_alloc(), diff);
+    array()->update_bptree_elem(ndx, set_leaf_elem); // Throws
 }
 
 
@@ -682,7 +684,7 @@ void Column::destroy_subtree(size_t ndx, bool clear_value)
 namespace {
 
 template<bool with_limit> struct AdjustHandler: Array::UpdateHandler {
-    Array m_leaf;
+    ArrayInteger m_leaf;
     const int_fast64_t m_limit, m_diff;
     AdjustHandler(Allocator& alloc, int_fast64_t limit, int_fast64_t diff) TIGHTDB_NOEXCEPT:
         m_leaf(alloc), m_limit(limit), m_diff(diff) {}
@@ -704,28 +706,28 @@ template<bool with_limit> struct AdjustHandler: Array::UpdateHandler {
 
 void Column::adjust(int_fast64_t diff)
 {
-    if (!m_array->is_inner_bptree_node()) {
-        m_array->adjust(0, m_array->size(), diff); // Throws
+    if (!array()->is_inner_bptree_node()) {
+        array()->adjust(0, m_array->size(), diff); // Throws
         return;
     }
 
     const bool with_limit = false;
     int_fast64_t dummy_limit = 0;
-    AdjustHandler<with_limit> leaf_handler(m_array->get_alloc(), dummy_limit, diff);
-    m_array->update_bptree_leaves(leaf_handler); // Throws
+    AdjustHandler<with_limit> leaf_handler(array()->get_alloc(), dummy_limit, diff);
+    array()->update_bptree_leaves(leaf_handler); // Throws
 }
 
 
 void Column::adjust_ge(int_fast64_t limit, int_fast64_t diff)
 {
     if (!m_array->is_inner_bptree_node()) {
-        m_array->adjust_ge(limit, diff); // Throws
+        array()->adjust_ge(limit, diff); // Throws
         return;
     }
 
     const bool with_limit = true;
-    AdjustHandler<with_limit> leaf_handler(m_array->get_alloc(), limit, diff);
-    m_array->update_bptree_leaves(leaf_handler); // Throws
+    AdjustHandler<with_limit> leaf_handler(array()->get_alloc(), limit, diff);
+    array()->update_bptree_leaves(leaf_handler); // Throws
 }
 
 namespace {
@@ -986,22 +988,22 @@ void Column::do_move_last_over(size_t row_ndx, size_t last_row_ndx)
 
     // Copy value from last row over
     int_fast64_t value = get(last_row_ndx);
-    if (m_array->is_inner_bptree_node()) {
-        SetLeafElem set_leaf_elem(m_array->get_alloc(), value);
-        m_array->update_bptree_elem(row_ndx, set_leaf_elem); // Throws
+    if (array()->is_inner_bptree_node()) {
+        SetLeafElem set_leaf_elem(array()->get_alloc(), value);
+        array()->update_bptree_elem(row_ndx, set_leaf_elem); // Throws
     }
     else {
-        m_array->set(row_ndx, value); // Throws
+        array()->set(row_ndx, value); // Throws
     }
 
     // Discard last row
-    if (m_array->is_inner_bptree_node()) {
+    if (array()->is_inner_bptree_node()) {
         size_t row_ndx_2 = tightdb::npos;
         EraseLeafElem handler(*this);
-        Array::erase_bptree_elem(m_array, row_ndx_2, handler); // Throws
+        Array::erase_bptree_elem(array(), row_ndx_2, handler); // Throws
     }
     else {
-        m_array->erase(last_row_ndx); // Throws
+        array()->erase(last_row_ndx); // Throws
     }
 }
 
@@ -1024,7 +1026,7 @@ public:
     ref_type create_leaf(size_t size) TIGHTDB_OVERRIDE
     {
         bool context_flag = false;
-        MemRef mem = Array::create_array(m_leaf_type, context_flag, size,
+        MemRef mem = ArrayInteger::create_array(m_leaf_type, context_flag, size,
                                          m_value, m_alloc); // Throws
         return mem.m_ref;
     }
@@ -1183,7 +1185,7 @@ void leaf_dumper(MemRef mem, Allocator& alloc, ostream& out, int level)
                 break;
             }
         }
-        out_2 << leaf.get(i);
+        out_2 << leaf.get_data(i);
     }
     out << setw(indent) << "" << "  Elems: "<<out_2.str()<<"\n";
 }

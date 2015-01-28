@@ -183,7 +183,7 @@ TEST(DestroyGuard_ArrayShallow)
             bool context_flag = false;
             MemRef child_mem = Array::create_empty_array(Array::type_Normal, context_flag, alloc);
             int_fast64_t v(child_mem.m_ref);
-            root.add(v);
+            root.add_data(v);
         }
     }
     CHECK(!root.is_attached());
@@ -242,7 +242,7 @@ TEST(DestroyGuard_ArrayDeep)
                 MemRef child_mem =
                     Array::create_empty_array(Array::type_Normal, context_flag, alloc);
                 int_fast64_t v(child_mem.m_ref);
-                root.add(v);
+                root.add_data(v);
             }
         }
         CHECK(!root.is_attached());
@@ -301,7 +301,7 @@ TEST(DestroyGuard_ArrayRefDeep)
                 MemRef child_mem =
                     Array::create_empty_array(Array::type_Normal, context_flag, alloc);
                 int_fast64_t v(child_mem.m_ref);
-                root.add(v);
+                root.add_data(v);
                 root_ref = root.get_ref();
             }
             DeepArrayRefDestroyGuard dg(root_ref, alloc);

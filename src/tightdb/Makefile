@@ -5,8 +5,8 @@ nobase_subinclude_HEADERS = util/features.h util/meta.hpp util/assert.hpp util/t
 util/type_list.hpp util/tuple.hpp util/type_traits.hpp util/bind.hpp util/safe_int_ops.hpp \
 util/unique_ptr.hpp util/bind_ptr.hpp util/buffer.hpp util/string_buffer.hpp util/shared_ptr.hpp \
 util/memory_stream.hpp util/logger.hpp util/thread.hpp util/file.hpp util/utf8.hpp exceptions.hpp \
-utilities.hpp alloc.hpp alloc_slab.hpp array.hpp array_string.hpp data_type.hpp column_type.hpp \
-column_fwd.hpp spec.hpp impl/destroy_guard.hpp impl/output_stream.hpp datetime.hpp string_data.hpp \
+utilities.hpp alloc.hpp alloc_slab.hpp array.hpp array_integer.hpp array_string.hpp data_type.hpp column_type.hpp \
+column_fwd.hpp spec.hpp impl/array_writer.hpp impl/destroy_guard.hpp impl/output_stream.hpp datetime.hpp string_data.hpp \
 binary_data.hpp mixed.hpp table.hpp table_ref.hpp table_basic_fwd.hpp table_accessors.hpp \
 table_basic.hpp table_view.hpp table_view_basic.hpp table_macros.hpp row.hpp descriptor_fwd.hpp \
 descriptor.hpp group.hpp group_shared.hpp $(REPLICATION_HPP) query.hpp query_conditions.hpp \
@@ -32,7 +32,7 @@ DEV_PROGRAMS     = tightdb-config
 libtightdb_a_SOURCES = util/encrypted_file_mapping.cpp util/errno.cpp util/file.cpp \
 util/file_mapper.cpp util/memory_stream.cpp util/string_buffer.cpp util/terminate.cpp \
 util/thread.cpp $(REPLICATION_CPP) alloc.cpp alloc_slab.cpp array.cpp array_binary.cpp \
-array_blob.cpp array_blobs_big.cpp array_string.cpp array_string_long.cpp column.cpp \
+array_blob.cpp array_blobs_big.cpp array_integer.cpp array_string.cpp array_string_long.cpp column.cpp \
 column_backlink.cpp column_binary.cpp column_link.cpp column_link_base.cpp column_linklist.cpp \
 column_mixed.cpp column_string.cpp column_string_enum.cpp column_table.cpp commit_log.cpp \
 descriptor.cpp exceptions.cpp group.cpp group_shared.cpp group_writer.cpp impl/output_stream.cpp \

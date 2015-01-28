@@ -108,7 +108,7 @@ inline BinaryData ArrayBigBlobs::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 inline BinaryData ArrayBigBlobs::get(const char* header, size_t ndx,
                                      Allocator& alloc) TIGHTDB_NOEXCEPT
 {
-    ref_type blob_ref = to_ref(Array::get(header, ndx));
+    ref_type blob_ref = to_ref(Array::get_data(header, ndx));
     const char* blob_header = alloc.translate(blob_ref);
     const char* blob_data = Array::get_data_from_header(blob_header);
     size_t blob_size = Array::get_size_from_header(blob_header);

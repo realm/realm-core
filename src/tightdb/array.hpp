@@ -147,6 +147,7 @@ class AdaptiveStringColumn;
 class GroupWriter;
 class Column;
 template<class T> class QueryState;
+namespace _impl { class ArrayWriterBase; }
 
 
 #ifdef TIGHTDB_DEBUG
@@ -314,31 +315,17 @@ public:
 
     void move_assign(Array&) TIGHTDB_NOEXCEPT; // Move semantics for assignment
 
-    /// Construct an array of the specified type and size, and return just the
-    /// reference to the underlying memory. All elements will be initialized to
-    /// the specified value.
-    ///
-    /// FIXME: Belongs in IntegerArray
-    static MemRef create_array(Type, bool context_flag, std::size_t size, int_fast64_t value,
-                               Allocator&);
-
     /// Construct an empty array of the specified type, and return just the
     /// reference to the underlying memory.
-    ///
-    /// FIXME: Belongs in IntegerArray
     static MemRef create_empty_array(Type, bool context_flag, Allocator&);
 
     /// Construct a shallow copy of the specified slice of this array using the
     /// specified target allocator. Subarrays will **not** be cloned. See
     /// slice_and_clone_children() for an alternative.
-    ///
-    /// FIXME: Belongs in IntegerArray
     MemRef slice(std::size_t offset, std::size_t size, Allocator& target_alloc) const;
 
     /// Construct a deep copy of the specified slice of this array using the
     /// specified target allocator. Subarrays will be cloned.
-    ///
-    /// FIXME: Belongs in IntegerArray
     MemRef slice_and_clone_children(std::size_t offset, std::size_t size,
                                     Allocator& target_alloc) const;
 
@@ -376,33 +363,27 @@ public:
     static void add_to_column(Column* column, int64_t value);
 
     void insert(std::size_t ndx, int_fast64_t value);
-    void add(int_fast64_t value);
+    void add_data(int_fast64_t value);
 
     /// This function is guaranteed to not throw if the current width is
     /// sufficient for the specified value (e.g. if you have called
     /// ensure_minimum_width(value)) and get_alloc().is_read_only(get_ref())
     /// returns false (noexcept:array-set). Note that for a value of zero, the
     /// first criterion is trivially satisfied.
-    void set(std::size_t ndx, int64_t value);
-    
-    void set_uint(std::size_t ndx, uint64_t value);
+    void set_data(std::size_t ndx, int64_t value);
+    template<std::size_t w> void set_data(std::size_t ndx, int64_t value);
 
     void set_as_ref(std::size_t ndx, ref_type ref);
 
-    template<std::size_t w> void Set(std::size_t ndx, int64_t value);
-
-    int64_t get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
-    inline uint64_t get_uint(std::size_t ndx) const TIGHTDB_NOEXCEPT;
-
-    template<std::size_t w> int64_t Get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
+    int64_t get_data(std::size_t ndx) const TIGHTDB_NOEXCEPT;
+    template<std::size_t w> int64_t get_data(std::size_t ndx) const TIGHTDB_NOEXCEPT;
     void get_chunk(size_t ndx, int64_t res[8]) const TIGHTDB_NOEXCEPT;
     template<size_t w> void get_chunk(size_t ndx, int64_t res[8]) const TIGHTDB_NOEXCEPT;
 
     ref_type get_as_ref(std::size_t ndx) const TIGHTDB_NOEXCEPT;
 
-    int64_t operator[](std::size_t ndx) const TIGHTDB_NOEXCEPT { return get(ndx); }
-    int64_t front() const TIGHTDB_NOEXCEPT;
-    int64_t back() const TIGHTDB_NOEXCEPT;
+    int64_t front_data() const TIGHTDB_NOEXCEPT;
+    int64_t back_data() const TIGHTDB_NOEXCEPT;
 
     /// Remove the element at the specified index, and move elements at higher
     /// indexes to the next lower index.
@@ -486,14 +467,14 @@ public:
     void set_all_to_zero();
 
     /// Add \a diff to the element at the specified index.
-    void adjust(std::size_t ndx, int_fast64_t diff);
+    void adjust_data(std::size_t ndx, int_fast64_t diff);
 
     /// Add \a diff to all the elements in the specified index range.
-    void adjust(std::size_t begin, std::size_t end, int_fast64_t diff);
+    void adjust_data(std::size_t begin, std::size_t end, int_fast64_t diff);
 
     /// Add signed \a diff to all elements that are greater than, or equal to \a
     /// limit.
-    void adjust_ge(int_fast64_t limit, int_fast64_t diff);
+    void adjust_data_ge(int_fast64_t limit, int_fast64_t diff);
 
     //@{
     /// These are similar in spirit to std::move() and std::move_backward from
@@ -510,8 +491,8 @@ public:
     /// Find the lower/upper bound of the specified value in a sequence of
     /// integers which must already be sorted ascendingly.
     ///
-    /// For an integer value '`v`', lower_bound_int(v) returns the index '`l`'
-    /// of the first element such that `get(l) &ge; v`, and upper_bound_int(v)
+    /// For an integer value '`v`', lower_bound_data(v) returns the index '`l`'
+    /// of the first element such that `get(l) &ge; v`, and upper_bound_data(v)
     /// returns the index '`u`' of the first element such that `get(u) &gt;
     /// v`. In both cases, if no such element is found, the returned value is
     /// the number of elements in the array.
@@ -537,13 +518,13 @@ public:
     ///
     /// FIXME: It may be worth considering if overall efficiency can be improved
     /// by doing a linear search for short sequences.
-    std::size_t lower_bound_int(int64_t value) const TIGHTDB_NOEXCEPT;
-    std::size_t upper_bound_int(int64_t value) const TIGHTDB_NOEXCEPT;
+    std::size_t lower_bound_data(int64_t value) const TIGHTDB_NOEXCEPT;
+    std::size_t upper_bound_data(int64_t value) const TIGHTDB_NOEXCEPT;
     //@}
 
     std::size_t FindGTE(int64_t target, std::size_t start, const Array* indirection) const;
-    void Preset(int64_t min, int64_t max, std::size_t count);
-    void Preset(std::size_t bitwidth, std::size_t count);
+    void preset_data(int64_t min, int64_t max, std::size_t count);
+    void preset_data(std::size_t bitwidth, std::size_t count);
 
     int64_t sum(std::size_t start = 0, std::size_t end = std::size_t(-1)) const;
     std::size_t count(int64_t value) const TIGHTDB_NOEXCEPT;
@@ -554,7 +535,6 @@ public:
     bool minimum(int64_t& result, std::size_t start = 0, std::size_t end = std::size_t(-1),
                  std::size_t* return_ndx = null_ptr) const;
 
-    void sort();
     void ReferenceSort(Array& ref) const;
 
     /// This information is guaranteed to be cached in the array accessor.
@@ -612,10 +592,7 @@ public:
     ///
     /// The number of bytes that will be written by a non-recursive invocation
     /// of this function is exactly the number returned by get_byte_size().
-    template<class S>
-    std::size_t write(S& target, bool recurse = true, bool persist = false) const;
-
-    std::vector<int64_t> ToVector() const;
+    size_t write(_impl::ArrayWriterBase& target, bool recurse = true, bool persist = false) const;
 
     /// Compare two arrays for equality.
     bool compare_int(const Array&) const TIGHTDB_NOEXCEPT;
@@ -714,7 +691,7 @@ public:
     template<size_t width> inline int64_t LowerBits() const;                   // Return chunk with lower bit set in each element
     std::size_t FirstSetBit(unsigned int v) const;
     std::size_t FirstSetBit64(int64_t v) const;
-    template<std::size_t w> int64_t GetUniversal(const char* const data, const std::size_t ndx) const;
+    template<std::size_t w> int64_t get_universal(const char* const data, const std::size_t ndx) const;
 
     // Find value greater/less in 64-bit chunk - only works for positive values
     template<bool gt, Action action, std::size_t width, class Callback>
@@ -859,11 +836,11 @@ public:
     /// array instance. If an array instance is already available, or
     /// you need to get multiple values, then this method will be
     /// slower.
-    static int_fast64_t get(const char* header, std::size_t ndx) TIGHTDB_NOEXCEPT;
+    static int_fast64_t get_data(const char* header, std::size_t ndx) TIGHTDB_NOEXCEPT;
 
-    /// Like get(const char*, std::size_t) but gets two consecutive
+    /// Like get_data(const char*, std::size_t) but gets two consecutive
     /// elements.
-    static std::pair<int_least64_t, int_least64_t> get_two(const char* header,
+    static std::pair<int_least64_t, int_least64_t> get_two_data(const char* header,
                                                            std::size_t ndx) TIGHTDB_NOEXCEPT;
 
     /// The meaning of 'width' depends on the context in which this
@@ -940,18 +917,13 @@ public:
 private:
     typedef bool (*CallbackDummy)(int64_t);
 
-    template<size_t w> bool MinMax(size_t from, size_t to, uint64_t maxdiff,
-                                   int64_t* min, int64_t* max) const;
     Array& operator=(const Array&); // not allowed
-    template<size_t w> void QuickSort(size_t lo, size_t hi);
-    void QuickSort(size_t lo, size_t hi);
+protected:
     void ReferenceQuickSort(Array& ref) const;
     template<size_t w> void ReferenceQuickSort(size_t lo, size_t hi, Array& ref) const;
-
-    template<size_t w> void sort();
     template<size_t w> void ReferenceSort(Array& ref) const;
-
-    template<size_t w> int64_t sum(size_t start, size_t end) const;
+    template<size_t w> void QuickSort(size_t lo, size_t hi);
+    void QuickSort(size_t lo, size_t hi);
 
     /// Insert a new child after original. If the parent has to be
     /// split, this function returns the `ref` of the new parent node.
@@ -1013,9 +985,10 @@ protected:
 
 private:
     std::size_t m_ref;
+
+    template<size_t w> int64_t sum(size_t start, size_t end) const;
     template<bool max, std::size_t w> bool minmax(int64_t& result, std::size_t start,
                                                   std::size_t end, std::size_t* return_ndx) const;
-
 protected:
     std::size_t m_size;     // Number of elements currently stored.
     std::size_t m_capacity; // Number of elements that fit inside the allocated memory.
@@ -1066,7 +1039,6 @@ protected:
     get_to_dot_parent(std::size_t ndx_in_parent) const TIGHTDB_OVERRIDE;
 #endif
 
-// FIXME: below should be moved to a specific IntegerArray class
 protected:
     // Getters and Setters for adaptive-packed arrays
     typedef int64_t (Array::*Getter)(std::size_t) const; // Note: getters must not throw
@@ -1080,6 +1052,7 @@ private:
     Setter m_setter;
     Finder m_finder[cond_Count]; // one for each COND_XXX enum
 
+protected:
     int64_t m_lbound;       // min number that can be stored with current m_width
     int64_t m_ubound;       // max number that can be stored with current m_width
 
@@ -1373,7 +1346,7 @@ inline void Array::get_chunk(std::size_t ndx, int64_t res[8]) const TIGHTDB_NOEX
 }
 
 
-inline int64_t Array::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
+inline int64_t Array::get_data(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT_DEBUG(is_attached());
     TIGHTDB_ASSERT_DEBUG(ndx < m_size);
@@ -1384,40 +1357,35 @@ inline int64_t Array::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
     // Assume correct width is found early in TIGHTDB_TEMPEX, which is the case for B tree offsets that
     // are probably either 2^16 long. Turns out to be 25% faster if found immediately, but 50-300% slower
     // if found later
-    TIGHTDB_TEMPEX(return Get, (ndx));
+    TIGHTDB_TEMPEX(return get, (ndx));
 */
 /*
     // Slightly slower in both of the if-cases. Also needs an matchcount m_size check too, to avoid
     // reading beyond array.
     if (m_width >= 8 && m_size > ndx + 7)
-        return Get<64>(ndx >> m_shift) & m_widthmask;
+        return get_data<64>(ndx >> m_shift) & m_widthmask;
     else
         return (this->*m_getter)(ndx);
 */
-}
-
-
-inline uint64_t Array::get_uint(std::size_t ndx) const TIGHTDB_NOEXCEPT
-{
-    return get(ndx);
-}
-
-inline int64_t Array::front() const TIGHTDB_NOEXCEPT
-{
-    return get(0);
-}
-
-inline int64_t Array::back() const TIGHTDB_NOEXCEPT
-{
-    return get(m_size - 1);
 }
 
 inline ref_type Array::get_as_ref(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT_DEBUG(is_attached());
     TIGHTDB_ASSERT_DEBUG(m_has_refs);
-    int64_t v = get(ndx);
+    int64_t v = get_data(ndx);
     return to_ref(v);
+}
+
+
+inline int64_t Array::front_data() const TIGHTDB_NOEXCEPT
+{
+    return get_data(0);
+}
+
+inline int64_t Array::back_data() const TIGHTDB_NOEXCEPT
+{
+    return get_data(m_size - 1);
 }
 
 inline bool Array::is_inner_bptree_node() const TIGHTDB_NOEXCEPT
@@ -1474,11 +1442,10 @@ inline void Array::destroy_deep() TIGHTDB_NOEXCEPT
 }
 
 
-inline void Array::add(int_fast64_t value)
+inline void Array::add_data(int_fast64_t value)
 {
     insert(m_size, value);
 }
-
 
 inline void Array::erase(std::size_t ndx)
 {
@@ -1541,28 +1508,28 @@ inline void Array::destroy_deep(MemRef mem, Allocator& alloc) TIGHTDB_NOEXCEPT
 }
 
 
-inline void Array::adjust(std::size_t ndx, int_fast64_t diff)
+inline void Array::adjust_data(std::size_t ndx, int_fast64_t diff)
 {
     // FIXME: Should be optimized
     TIGHTDB_ASSERT(ndx <= m_size);
-    int_fast64_t v = get(ndx);
-    set(ndx, int64_t(v + diff)); // Throws
+    int_fast64_t v = get_data(ndx);
+    set_data(ndx, int64_t(v + diff)); // Throws
 }
 
-inline void Array::adjust(std::size_t begin, std::size_t end, int_fast64_t diff)
+inline void Array::adjust_data(std::size_t begin, std::size_t end, int_fast64_t diff)
 {
     // FIXME: Should be optimized
     for (std::size_t i = begin; i != end; ++i)
-        adjust(i, diff); // Throws
+        adjust_data(i, diff); // Throws
 }
 
-inline void Array::adjust_ge(int_fast64_t limit, int_fast64_t diff)
+inline void Array::adjust_data_ge(int_fast64_t limit, int_fast64_t diff)
 {
     size_t n = size();
     for (std::size_t i = 0; i != n; ++i) {
-        int_fast64_t v = get(i);
+        int_fast64_t v = get_data(i);
         if (v >= limit)
-            set(i, int64_t(v + diff)); // Throws
+            set_data(i, int64_t(v + diff)); // Throws
     }
 }
 
@@ -1875,71 +1842,6 @@ inline void Array::init_header(char* header, bool is_inner_bptree_node, bool has
 
 //-------------------------------------------------
 
-template<class S> std::size_t Array::write(S& out, bool recurse, bool persist) const
-{
-    TIGHTDB_ASSERT(is_attached());
-
-    // Ignore un-changed arrays when persisting
-    if (persist && m_alloc.is_read_only(m_ref))
-        return m_ref;
-
-    if (!recurse || !m_has_refs) {
-        // FIXME: Replace capacity with checksum
-
-        // Write flat array
-        const char* header = get_header_from_data(m_data);
-        std::size_t size = get_byte_size();
-        uint_fast32_t dummy_checksum = 0x01010101UL;
-        std::size_t array_pos = out.write_array(header, size, dummy_checksum);
-        TIGHTDB_ASSERT(array_pos % 8 == 0); // 8-byte alignment
-
-        return array_pos;
-    }
-
-    // Temp array for updated refs
-    Array new_refs(Allocator::get_default());
-    Type type = m_is_inner_bptree_node ? type_InnerBptreeNode : type_HasRefs;
-    new_refs.create(type, m_context_flag); // Throws
-
-    try {
-        // First write out all sub-arrays
-        std::size_t n = size();
-        for (std::size_t i = 0; i != n; ++i) {
-            int_fast64_t value = get(i);
-            if (value == 0 || value % 2 != 0) {
-                // Zero-refs and values that are not 8-byte aligned do
-                // not point to subarrays.
-                new_refs.add(value); // Throws
-            }
-            else if (persist && m_alloc.is_read_only(to_ref(value))) {
-                // Ignore un-changed arrays when persisting
-                new_refs.add(value); // Throws
-            }
-            else {
-                Array sub(get_alloc());
-                sub.init_from_ref(to_ref(value));
-                bool subrecurse = true;
-                std::size_t sub_pos = sub.write(out, subrecurse, persist); // Throws
-                TIGHTDB_ASSERT(sub_pos % 8 == 0); // 8-byte alignment
-                new_refs.add(sub_pos); // Throws
-            }
-        }
-
-        // Write out the replacement array
-        // (but don't write sub-tree as it has alredy been written)
-        bool subrecurse = false;
-        std::size_t refs_pos = new_refs.write(out, subrecurse, persist); // Throws
-
-        new_refs.destroy(); // Shallow
-
-        return refs_pos; // Return position
-    }
-    catch (...) {
-        new_refs.destroy(); // Shallow
-        throw;
-    }
-}
-
 inline MemRef Array::clone_deep(Allocator& target_alloc) const
 {
     const char* header = get_header_from_data(m_data);
@@ -1962,17 +1864,11 @@ inline void Array::move_assign(Array& a) TIGHTDB_NOEXCEPT
     a.detach();
 }
 
-inline MemRef Array::create_array(Type type, bool context_flag, std::size_t size,
-                                  int_fast64_t value, Allocator& alloc)
-{
-    return create(type, context_flag, wtype_Bits, size, value, alloc); // Throws
-}
-
 inline MemRef Array::create_empty_array(Type type, bool context_flag, Allocator& alloc)
 {
     std::size_t size = 0;
     int_fast64_t value = 0;
-    return create_array(type, context_flag, size, value, alloc); // Throws
+    return create(type, context_flag, wtype_Bits, size, value, alloc); // Throws
 }
 
 inline bool Array::has_parent() const TIGHTDB_NOEXCEPT
@@ -2051,7 +1947,7 @@ inline void Array::update_parent()
 
 inline void Array::update_child_ref(size_t child_ndx, ref_type new_ref)
 {
-    set(child_ndx, new_ref);
+    set_data(child_ndx, new_ref);
 }
 
 inline ref_type Array::get_child_ref(size_t child_ndx) const TIGHTDB_NOEXCEPT
@@ -2062,7 +1958,7 @@ inline ref_type Array::get_child_ref(size_t child_ndx) const TIGHTDB_NOEXCEPT
 inline std::size_t Array::get_bptree_size() const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT_DEBUG(is_inner_bptree_node());
-    int_fast64_t v = back();
+    int_fast64_t v = back_data();
     return std::size_t(v / 2); // v = 1 + 2*total_elems_in_tree
 }
 
@@ -2070,13 +1966,13 @@ inline std::size_t Array::get_bptree_size_from_header(const char* root_header) T
 {
     TIGHTDB_ASSERT_DEBUG(get_is_inner_bptree_node_from_header(root_header));
     size_t root_size = get_size_from_header(root_header);
-    int_fast64_t v = get(root_header, root_size-1);
+    int_fast64_t v = get_data(root_header, root_size-1);
     return size_t(v / 2); // v = 1 + 2*total_elems_in_tree
 }
 
 inline void Array::ensure_bptree_offsets(Array& offsets)
 {
-    int_fast64_t first_value = get(0);
+    int_fast64_t first_value = get_data(0);
     if (first_value % 2 == 0) {
         offsets.init_from_ref(to_ref(first_value));
     }
@@ -2140,12 +2036,12 @@ ref_type Array::bptree_append(TreeInsert<TreeTraits>& state)
 
     if (TIGHTDB_LIKELY(!new_sibling_ref)) {
         // +2 because stored value is 1 + 2*total_elems_in_subtree
-        adjust(size()-1, +2); // Throws
+        adjust_data(size()-1, +2); // Throws
         return 0; // Child was not split, so parent was not split either
     }
 
     Array offsets(m_alloc);
-    int_fast64_t first_value = get(0);
+    int_fast64_t first_value = get_data(0);
     if (first_value % 2 == 0) {
         // Offsets array is present (general form)
         offsets.init_from_ref(to_ref(first_value));
@@ -2180,9 +2076,9 @@ ref_type Array::bptree_insert(std::size_t elem_ndx, TreeInsert<TreeTraits>& stat
         // one. We currently always append to the first subtree. It is
         // essentially a matter of using the lower vs. the upper bound
         // when searching through the offsets array.
-        child_ndx = offsets.lower_bound_int(elem_ndx);
+        child_ndx = offsets.lower_bound_data(elem_ndx);
         TIGHTDB_ASSERT(child_ndx < size() - 2);
-        std::size_t elem_ndx_offset = child_ndx == 0 ? 0 : to_size_t(offsets.get(child_ndx-1));
+        std::size_t elem_ndx_offset = child_ndx == 0 ? 0 : to_size_t(offsets.get_data(child_ndx-1));
         elem_ndx_in_child = elem_ndx - elem_ndx_offset;
     }
 
@@ -2206,8 +2102,8 @@ ref_type Array::bptree_insert(std::size_t elem_ndx, TreeInsert<TreeTraits>& stat
 
     if (TIGHTDB_LIKELY(!new_sibling_ref)) {
         // +2 because stored value is 1 + 2*total_elems_in_subtree
-        adjust(size()-1, +2); // Throws
-        offsets.adjust(child_ndx, offsets.size(), +1);
+        adjust_data(size()-1, +2); // Throws
+        offsets.adjust_data(child_ndx, offsets.size(), +1);
         return 0; // Child was not split, so parent was not split either
     }
 
@@ -2220,12 +2116,12 @@ ref_type Array::bptree_insert(std::size_t elem_ndx, TreeInsert<TreeTraits>& stat
 // Finding code                                                                       *
 //*************************************************************************************
 
-template<std::size_t w> int64_t Array::Get(std::size_t ndx) const TIGHTDB_NOEXCEPT
+template<std::size_t w> int64_t Array::get_data(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
-    return GetUniversal<w>(m_data, ndx);
+    return get_universal<w>(m_data, ndx);
 }
 
-template<std::size_t w> int64_t Array::GetUniversal(const char* data, std::size_t ndx) const
+template<std::size_t w> int64_t Array::get_universal(const char* data, std::size_t ndx) const
 {
     if (w == 0) {
         return 0;
@@ -2412,29 +2308,29 @@ template<class cond2, Action action, size_t bitwidth, class Callback> bool Array
 
     // Test first few items with no initial time overhead
     if (start > 0) {
-        if (m_size > start && c(Get<bitwidth>(start), value) && start < end) {
-            if (!find_action<action, Callback>(start + baseindex, Get<bitwidth>(start), state, callback))
+        if (m_size > start && c(get_data<bitwidth>(start), value) && start < end) {
+            if (!find_action<action, Callback>(start + baseindex, get_data<bitwidth>(start), state, callback))
                 return false;
         }
 
         ++start;
 
-        if (m_size > start && c(Get<bitwidth>(start), value) && start < end) {
-            if (!find_action<action, Callback>(start + baseindex, Get<bitwidth>(start), state, callback))
+        if (m_size > start && c(get_data<bitwidth>(start), value) && start < end) {
+            if (!find_action<action, Callback>(start + baseindex, get_data<bitwidth>(start), state, callback))
                 return false;
         }
 
         ++start;
 
-        if (m_size > start && c(Get<bitwidth>(start), value) && start < end) {
-            if (!find_action<action, Callback>(start + baseindex, Get<bitwidth>(start), state, callback))
+        if (m_size > start && c(get_data<bitwidth>(start), value) && start < end) {
+            if (!find_action<action, Callback>(start + baseindex, get_data<bitwidth>(start), state, callback))
                 return false;
         }
 
         ++start;
 
-        if (m_size > start && c(Get<bitwidth>(start), value) && start < end) {
-            if (!find_action<action, Callback>(start + baseindex, Get<bitwidth>(start), state, callback))
+        if (m_size > start && c(get_data<bitwidth>(start), value) && start < end) {
+            if (!find_action<action, Callback>(start + baseindex, get_data<bitwidth>(start), state, callback))
                 return false;
         }
 
@@ -2481,7 +2377,7 @@ template<class cond2, Action action, size_t bitwidth, class Callback> bool Array
         }
         else {
             for (; start < end2; start++)
-                if (!find_action<action, Callback>(start + baseindex, Get<bitwidth>(start), state, callback))
+                if (!find_action<action, Callback>(start + baseindex, get_data<bitwidth>(start), state, callback))
                     return false;
         }
         return true;
@@ -2808,8 +2704,8 @@ template<bool eq, Action action, size_t width, class Callback> inline bool Array
     size_t ee = round_up(start, 64 / no0(width));
     ee = ee > end ? end : ee;
     for (; start < ee; ++start)
-        if (eq ? (Get<width>(start) == value) : (Get<width>(start) != value)) {
-            if (!find_action<action, Callback>(start + baseindex, Get<width>(start), state, callback))
+        if (eq ? (get_data<width>(start) == value) : (get_data<width>(start) != value)) {
+            if (!find_action<action, Callback>(start + baseindex, get_data<width>(start), state, callback))
                 return false;
         }
 
@@ -2839,7 +2735,7 @@ template<bool eq, Action action, size_t width, class Callback> inline bool Array
                 if (a >= 64 / no0(width))
                     break;
 
-                if (!find_action<action, Callback>(a + start + baseindex, Get<width>(start + t), state, callback))
+                if (!find_action<action, Callback>(a + start + baseindex, get_data<width>(start + t), state, callback))
                     return false;
                 v2 >>= (t + 1) * width;
                 a += 1;
@@ -2854,8 +2750,8 @@ template<bool eq, Action action, size_t width, class Callback> inline bool Array
     }
 
     while (start < end) {
-        if (eq ? Get<width>(start) == value : Get<width>(start) != value) {
-            if (!find_action<action, Callback>( start + baseindex, Get<width>(start), state, callback))
+        if (eq ? get_data<width>(start) == value : get_data<width>(start) != value) {
+            if (!find_action<action, Callback>( start + baseindex, get_data<width>(start), state, callback))
                 return false;
         }
         ++start;
@@ -2981,7 +2877,7 @@ TIGHTDB_FORCEINLINE bool Array::FindSSE_intern(__m128i* action_data, __m128i* da
 
             size_t idx = FirstSetBit(resmask) * 8 / no0(width);
             s += idx;
-            if (!find_action<action, Callback>( s + baseindex, GetUniversal<width>(reinterpret_cast<char*>(action_data), s), state, callback))
+            if (!find_action<action, Callback>( s + baseindex, get_universal<width>(reinterpret_cast<char*>(action_data), s), state, callback))
                 return false;
             resmask >>= (idx + 1) * no0(width) / 8;
             ++s;
@@ -3005,8 +2901,8 @@ bool Array::CompareLeafs(const Array* foreign, size_t start, size_t end, size_t 
     int64_t v;
 
     // We can compare first element without checking for out-of-range
-    v = get(start);
-    if (c(v, foreign->get(start))) {
+    v = get_data(start);
+    if (c(v, foreign->get_data(start))) {
         if (!find_action<action, Callback>(start + baseindex, v, state, callback))
             return false;
     }
@@ -3014,18 +2910,18 @@ bool Array::CompareLeafs(const Array* foreign, size_t start, size_t end, size_t 
     start++;
 
     if (start + 3 < end) {
-        v = get(start);
-        if (c(v, foreign->get(start)))
+        v = get_data(start);
+        if (c(v, foreign->get_data(start)))
             if (!find_action<action, Callback>(start + baseindex, v, state, callback))
                 return false;
 
-        v = get(start + 1);
-        if (c(v, foreign->get(start + 1)))
+        v = get_data(start + 1);
+        if (c(v, foreign->get_data(start + 1)))
             if (!find_action<action, Callback>(start + 1 + baseindex, v, state, callback))
                 return false;
 
-        v = get(start + 2);
-        if (c(v, foreign->get(start + 2)))
+        v = get_data(start + 2);
+        if (c(v, foreign->get_data(start + 2)))
             if (!find_action<action, Callback>(start + 2 + baseindex, v, state, callback))
                 return false;
 
@@ -3075,8 +2971,8 @@ bool Array::CompareLeafs4(const Array* foreign, size_t start, size_t end, size_t
     if (sseavx<42>() && width == foreign_width && (width == 8 || width == 16 || width == 32)) {
         // We can only use SSE if both bitwidths are equal and above 8 bits and all values are signed
         while (start < end && (((reinterpret_cast<size_t>(m_data) & 0xf) * 8 + start * width) % (128) != 0)) {
-            int64_t v = GetUniversal<width>(m_data, start);
-            int64_t fv = GetUniversal<foreign_width>(foreign_m_data, start);
+            int64_t v = get_universal<width>(m_data, start);
+            int64_t fv = get_universal<foreign_width>(foreign_m_data, start);
             if (c(v, fv)) {
                 if (!find_action<action, Callback>(start + baseindex, v, state, callback))
                     return false;
@@ -3111,8 +3007,8 @@ bool Array::CompareLeafs4(const Array* foreign, size_t start, size_t end, size_t
     size_t a = round_up(start, 8 * sizeof (int64_t) / (width < foreign_width ? width : foreign_width));
 
     while (start < end && start < a) {
-        int64_t v = GetUniversal<width>(m_data, start);
-        int64_t fv = GetUniversal<foreign_width>(foreign_m_data, start);
+        int64_t v = get_universal<width>(m_data, start);
+        int64_t fv = get_universal<foreign_width>(foreign_m_data, start);
 
         if (v == fv)
             r++;
@@ -3175,11 +3071,11 @@ bool Array::CompareLeafs4(const Array* foreign, size_t start, size_t end, size_t
 /*
     // Unrolling helped less than 2% (non-frequent matches). Todo, investigate further
     while (start + 1 < end) {
-        int64_t v = GetUniversal<width>(m_data, start);
-        int64_t v2 = GetUniversal<width>(m_data, start + 1);
+        int64_t v = get_universal<width>(m_data, start);
+        int64_t v2 = get_universal<width>(m_data, start + 1);
 
-        int64_t fv = GetUniversal<foreign_width>(foreign_m_data, start);
-        int64_t fv2 = GetUniversal<foreign_width>(foreign_m_data, start + 1);
+        int64_t fv = get_universal<foreign_width>(foreign_m_data, start);
+        int64_t fv2 = get_universal<foreign_width>(foreign_m_data, start + 1);
 
         if (c(v, fv)) {
             if (!find_action<action, Callback>(start + baseindex, v, state, callback))
@@ -3196,8 +3092,8 @@ bool Array::CompareLeafs4(const Array* foreign, size_t start, size_t end, size_t
  */
 
     while (start < end) {
-        int64_t v = GetUniversal<width>(m_data, start);
-        int64_t fv = GetUniversal<foreign_width>(foreign_m_data, start);
+        int64_t v = get_universal<width>(m_data, start);
+        int64_t fv = get_universal<foreign_width>(foreign_m_data, start);
 
         if (c(v, fv)) {
             if (!find_action<action, Callback>(start + baseindex, v, state, callback))
@@ -3242,8 +3138,8 @@ bool Array::CompareRelation(int64_t value, size_t start, size_t end, size_t base
     size_t ee = round_up(start, 64 / no0(bitwidth));
     ee = ee > end ? end : ee;
     for (; start < ee; start++) {
-        if (gt ? (Get<bitwidth>(start) > value) : (Get<bitwidth>(start) < value)) {
-            if (!find_action<action, Callback>(start + baseindex, Get<bitwidth>(start), state, callback))
+        if (gt ? (get_data<bitwidth>(start) > value) : (get_data<bitwidth>(start) < value)) {
+            if (!find_action<action, Callback>(start + baseindex, get_data<bitwidth>(start), state, callback))
                 return false;
         }
     }
@@ -3301,8 +3197,8 @@ bool Array::CompareRelation(int64_t value, size_t start, size_t end, size_t base
 
     // Test unaligned end and/or values of width > 16 manually
     while (start < end) {
-        if (gt ? Get<bitwidth>(start) > value : Get<bitwidth>(start) < value) {
-            if (!find_action<action, Callback>( start + baseindex, Get<bitwidth>(start), state, callback))
+        if (gt ? get_data<bitwidth>(start) > value : get_data<bitwidth>(start) < value) {
+            if (!find_action<action, Callback>( start + baseindex, get_data<bitwidth>(start), state, callback))
                 return false;
         }
         ++start;

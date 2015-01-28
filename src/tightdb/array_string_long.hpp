@@ -21,6 +21,7 @@
 #define TIGHTDB_ARRAY_STRING_LONG_HPP
 
 #include <tightdb/array_blob.hpp>
+#include <tightdb/array_integer.hpp>
 
 namespace tightdb {
 
@@ -92,7 +93,7 @@ public:
 
     bool update_from_parent(std::size_t old_baseline) TIGHTDB_NOEXCEPT;
 private:
-    Array m_offsets;
+    ArrayInteger m_offsets;
     ArrayBlob m_blob;
 };
 
@@ -193,7 +194,7 @@ inline bool ArrayStringLong::update_from_parent(size_t old_baseline) TIGHTDB_NOE
 inline std::size_t ArrayStringLong::get_size_from_header(const char* header,
                                                          Allocator& alloc) TIGHTDB_NOEXCEPT
 {
-    ref_type offsets_ref = to_ref(Array::get(header, 0));
+    ref_type offsets_ref = to_ref(Array::get_data(header, 0));
     const char* offsets_header = alloc.translate(offsets_ref);
     return Array::get_size_from_header(offsets_header);
 }
