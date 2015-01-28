@@ -35,7 +35,7 @@ void heap(Timer& timer, BenchmarkResults& results, int n, const char* ident, con
         for (int i = 0; i < m; ++i)
             rows[indexes[i]] = table[0];
     }
-    results.submit(timer, ident, lead_text);
+    results.submit_single(ident, lead_text, timer);
 }
 
 void balloon(Timer& timer, BenchmarkResults& results, int balloon_size, int detach_order, const char* ident, const char* lead_text)
@@ -67,7 +67,7 @@ void balloon(Timer& timer, BenchmarkResults& results, int balloon_size, int deta
         for (int i = 0; i < balloon_size; ++i)
             rows[detach_indexes[i]].detach();
     }
-    results.submit(timer, ident, lead_text);
+    results.submit_single(ident, lead_text, timer);
 }
 
 } // anonymous namepsace
@@ -98,5 +98,5 @@ int main()
     balloon(timer, results, 1000, 1, "balloon_1000_reverse", "Balloon 1000 (reverse)");
     balloon(timer, results, 1000, 2, "balloon_1000_random",  "Balloon 1000 (random)");
 
-    results.submit(timer_total, "total_time", "Total time");
+    results.submit_single("total_time", "Total time", timer_total);
 }
