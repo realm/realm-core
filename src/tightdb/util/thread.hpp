@@ -299,6 +299,7 @@ private:
     TIGHTDB_NORETURN static void destroy_failed(int) TIGHTDB_NOEXCEPT;
     void handle_wait_error(int error);
     void darwin_shared_wait_hack() TIGHTDB_NOEXCEPT;
+    static void check_if_darwin_hack_is_needed() TIGHTDB_NOEXCEPT;
 };
 
 

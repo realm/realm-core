@@ -2,6 +2,7 @@
 
 #include <tightdb/util/thread.hpp>
 
+#include <tightdb/util/bind.hpp>
 #include <tightdb/util/file.hpp>
 
 #if !defined _WIN32
@@ -269,6 +270,8 @@ TIGHTDB_NORETURN void CondVar::destroy_failed(int err) TIGHTDB_NOEXCEPT
 }
 
 #ifdef __APPLE__
+#include <sys/mman.h>
+
 namespace {
 struct _pthread_cond {
     long sig;
@@ -282,9 +285,110 @@ struct _pthread_cond {
     uint32_t _reserved[3];
 #endif
 };
+
+struct HackCheckThreadArgs {
+    Mutex notify_mutex;
+    CondVar notify_condition;
+
+    RobustMutex* wait_mutex;
+    pthread_mutex_t* wait_mutex_impl;
+    pthread_cond_t* wait_condition;
+
+    bool einval_expected;
+};
+
+bool use_hack = false;
+void noop() { }
+void hack_check_wait_on_cv(HackCheckThreadArgs* args)
+{
+    RobustLockGuard lock(*args->wait_mutex, &noop);
+    {
+        LockGuard l(args->notify_mutex);
+        args->notify_condition.notify_all();
+    }
+
+    int r = pthread_cond_wait(args->wait_condition, args->wait_mutex_impl);
+    if (args->einval_expected) {
+        TIGHTDB_ASSERT(r == 0 || r == EINVAL);
+        if (r == EINVAL)
+            use_hack = true;
+    }
+    else {
+        TIGHTDB_ASSERT(r == 0);
+    }
+}
+} // anonymous namespace
+
+void CondVar::check_if_darwin_hack_is_needed() TIGHTDB_NOEXCEPT {
+    // Because we're dynamically linked to libpthread, it can change on us,
+    // so try to verify that it behaves as expected. The priority here is to
+    // minimize the chance of this hack actively making things worse.
+
+    char path[PATH_MAX];
+    size_t n = confstr(_CS_DARWIN_USER_TEMP_DIR, path, sizeof(path));
+    TIGHTDB_ASSERT(n > 0 && n < sizeof(path));
+    static_cast<void>(n);
+    strlcat(path, "/realm-share-check.XXXXXX", sizeof(path));
+
+    mktemp(path);
+    File f(path, File::mode_Write);
+    f.resize(sizeof(RobustMutex));
+    File::remove(path);
+
+    File::Map<RobustMutex> mm(f, File::access_ReadWrite);
+    RobustMutex& m = *mm.get_addr();
+    new (&m) RobustMutex;
+    if (m.m_impl.__sig != 0x4D555458) // from libpthread-105.1.4/src/internal.h
+        return;
+
+    CondVar cv((CondVar::process_shared_tag()));
+    if (cv.m_impl.__sig != 0x434F4E44) // from libpthread-105.1.4/src/internal.h
+        return;
+
+    HackCheckThreadArgs args;
+    LockGuard thread_start_lock(args.notify_mutex);
+
+    // Spawn a thread which will wait on the CV
+    args.wait_mutex = &m;
+    args.wait_mutex_impl = &m.m_impl;
+    args.wait_condition = &cv.m_impl;
+    args.einval_expected = false;
+    Thread t(bind(hack_check_wait_on_cv, &args));
+    args.notify_condition.wait(thread_start_lock);
+
+    {
+        // t is now waiting on the CV, so check if a pointer to the mutex is
+        // stored at the expected offset
+        RobustLockGuard lock(m, noop);
+        _pthread_cond* cond = reinterpret_cast<_pthread_cond*>(&cv.m_impl);
+        if (cond->busy != &m.m_impl) {
+            cv.notify();
+            t.join();
+            return;
+        }
+    }
+
+    // Spawn a second thread which will wait on the CV using the same mutex
+    // mapped to a different memory address
+    File::Map<RobustMutex> m2(f, File::access_ReadWrite);
+    args.wait_mutex = m2.get_addr();
+    args.wait_mutex_impl = &m2.get_addr()->m_impl;
+    args.einval_expected = true;
+    Thread t2(bind(hack_check_wait_on_cv, &args));
+    args.notify_condition.wait(thread_start_lock);
+
+    // t2 is now either waiting on the CV, or has set use_hack to true if it could not
+
+    // Wake up the waiting threads and shut them down
+    {
+        RobustLockGuard lock(m, noop);
+        cv.notify_all();
+    }
+
+    t.join();
+    t2.join();
 }
 
-#include <sys/mman.h>
 
 void CondVar::darwin_shared_wait_hack() TIGHTDB_NOEXCEPT
 {
@@ -292,95 +396,13 @@ void CondVar::darwin_shared_wait_hack() TIGHTDB_NOEXCEPT
     if (++m_waiter_count == 1)
         return;
 
+    static pthread_once_t flag = PTHREAD_ONCE_INIT;
+    pthread_once(&flag, &CondVar::check_if_darwin_hack_is_needed);
+
     // Sharing a pthread_cond_t incorrectly requires that the mutex be at the
     // same memory address in all processes. Hack around this by setting the
     // field which the implementation uses to check this to NULL before waiting.
     // http://www.openradar.me/radar?id=6363576352636928
-
-    static bool use_hack = true;
-    static std::once_flag flag;
-    std::call_once(flag, [&] {
-        // Because we're dynamically linked to libpthread, it can change on us,
-        // so try to verify that it behaves as expected. The priority here is to
-        // minimize the chance of this hack actively making things worse.
-
-        char path[PATH_MAX];
-        size_t n = confstr(_CS_DARWIN_USER_TEMP_DIR, path, sizeof(path));
-        TIGHTDB_ASSERT(n > 0 && n < sizeof(path));
-        static_cast<void>(n);
-        strlcat(path, "/realm-share-check.XXXXXX", sizeof(path));
-
-        mktemp(path);
-        File f(path, File::mode_Write);
-        f.resize(sizeof(RobustMutex));
-        File::remove(path);
-
-        File::Map<RobustMutex> mm(f, File::access_ReadWrite);
-        RobustMutex& m = *mm.get_addr();
-        new (&m) RobustMutex;
-        if (m.m_impl.__sig != 0x4D555458) // from libpthread-105.1.4/src/internal.h
-            return;
-
-        CondVar cv((CondVar::process_shared_tag()));
-        if (cv.m_impl.__sig != 0x434F4E44) // from libpthread-105.1.4/src/internal.h
-            return;
-
-        Mutex thread_start_m;
-        CondVar thread_start_cv;
-        LockGuard thread_start_lock(thread_start_m);
-
-        // First check if the pointer to the mutex is stored at the expected
-        // offset in the cond var
-        Thread t([&] {
-            RobustLockGuard lock(m, []{});
-            {
-                LockGuard l(thread_start_m);
-                thread_start_cv.notify_all();
-            }
-
-            int r = pthread_cond_wait(&cv.m_impl, &m.m_impl);
-            TIGHTDB_ASSERT(r == 0);
-            static_cast<void>(r);
-        });
-
-        thread_start_cv.wait(thread_start_lock);
-
-        {
-            RobustLockGuard lock(m, []{});
-            _pthread_cond* cond = reinterpret_cast<_pthread_cond*>(&cv.m_impl);
-            if (cond->busy != &m.m_impl) {
-                cv.notify();
-                t.join();
-                return;
-            }
-        }
-
-        // Next check if waiting with the same mutex mapped to two different
-        // memory address works
-        File::Map<RobustMutex> m2(f, File::access_ReadWrite);
-        Thread t2([&] {
-            RobustLockGuard lock(m, []{});
-            {
-                LockGuard l(thread_start_m);
-                thread_start_cv.notify_all();
-            }
-
-            int r = pthread_cond_wait(&cv.m_impl, &m2.get_addr()->m_impl);
-            if (r == EINVAL)
-                use_hack = true;
-            TIGHTDB_ASSERT(r == 0 || r == EINVAL);
-        });
-
-        thread_start_cv.wait(thread_start_lock);
-        {
-            RobustLockGuard lock(m, []{});
-            cv.notify_all();
-        }
-
-        t.join();
-        t2.join();
-    });
-
     if (use_hack) {
         reinterpret_cast<_pthread_cond*>(&m_impl)->busy = 0;
     }
