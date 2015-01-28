@@ -1,10 +1,15 @@
 #include <stdexcept>
+#include <iomanip>
+#include <cmath>
+#include <sstream>
 
 #if defined _WIN32
 #  define NOMINMAX
 #  include <windows.h>
 #elif defined __APPLE__
+#  include <sys/resource.h>
 #  include <mach/mach_time.h>
+#  include <sys/time.h>
 #else
 #  include <time.h>
 #endif
@@ -23,7 +28,7 @@ uint_fast64_t Timer::get_timer_ticks() const
     return GetTickCount();
 }
 
-double Timer::calc_elapsed_seconds(uint_fast64_t ticks)
+double Timer::calc_elapsed_seconds(uint_fast64_t ticks) const
 {
     return ticks * 1E-3;
 }
@@ -34,7 +39,17 @@ double Timer::calc_elapsed_seconds(uint_fast64_t ticks)
 
 uint_fast64_t Timer::get_timer_ticks() const
 {
-    return mach_absolute_time();
+    switch (m_type) {
+        case type_RealTime:
+            return mach_absolute_time();
+        case type_UserTime: {
+            rusage ru;
+            getrusage(RUSAGE_SELF, &ru);
+            timeval tv;
+            timeradd(&ru.ru_utime, &ru.ru_stime, &tv);
+            return tv.tv_sec * 1000000 + tv.tv_usec;
+        }
+    }
 }
 
 namespace {
@@ -52,10 +67,15 @@ struct TimeBase {
 
 } // anonymous namespace
 
-double Timer::calc_elapsed_seconds(uint_fast64_t ticks)
+double Timer::calc_elapsed_seconds(uint_fast64_t ticks) const
 {
     static TimeBase base;
-    return ticks * base.m_seconds_per_tick;
+    switch (m_type) {
+        case type_RealTime:
+            return ticks * base.m_seconds_per_tick;
+        case type_UserTime:
+            return static_cast<double>(ticks) / 1000000;
+    }
 }
 
 
@@ -109,10 +129,68 @@ uint_fast64_t Timer::get_timer_ticks() const
         1000000000 + (time.tv_nsec - init_time->tv_nsec);
 }
 
-double Timer::calc_elapsed_seconds(uint_fast64_t ticks)
+double Timer::calc_elapsed_seconds(uint_fast64_t ticks) const
 {
     return ticks * 1E-9;
 }
 
-
 #endif
+
+std::string Timer::format(double seconds)
+{
+    std::ostringstream out;
+    format(seconds, out);
+    return out.str();
+}
+
+
+void Timer::format(double seconds_float, std::ostream& out)
+{
+    int64_t rounded_minutes = std::llround(seconds_float / 60);
+    if (rounded_minutes > 60) {
+        // 1h0m -> inf
+        int64_t hours   = rounded_minutes / 60;
+        int64_t minutes = rounded_minutes % 60;
+        out << hours << "h" << minutes << "m";
+    }
+    else {
+        int64_t rounded_seconds = std::llround(seconds_float);
+        if (rounded_seconds > 60) {
+            // 1m0s -> 59m59s
+            int64_t minutes = rounded_seconds / 60;
+            int64_t seconds = rounded_seconds % 60;
+            out << minutes << "m" << seconds << "s";
+        }
+        else {
+            int64_t rounded_centies = std::llround(seconds_float * 100);
+            if (rounded_centies > 100) {
+                // 1s -> 59.99s
+                int64_t seconds = rounded_centies / 100;
+                int64_t centies = rounded_centies % 100;
+                out << seconds;
+                if (centies > 0) {
+                    out << '.' << std::setw(2) << std::setfill('0') << centies;
+                }
+                out << 's';
+            }
+            else {
+                int64_t rounded_centi_ms = std::llround(seconds_float * 100000);
+                if (rounded_centi_ms > 100) {
+                    // 0.1ms -> 999.99ms
+                    int64_t ms = rounded_centi_ms / 100;
+                    int64_t centi_ms = rounded_centi_ms % 100;
+                    out << ms;
+                    if (centi_ms > 0) {
+                        out << '.' << std::setw(2) << std::setfill('0') << centi_ms;
+                    }
+                    out << "ms";
+                }
+                else {
+                    // 0 -> 999µs
+                    int64_t us = std::llround(seconds_float * 1000000);
+                    out << us << "us";
+                }
+            }
+        }
+    }
+}
