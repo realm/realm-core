@@ -288,6 +288,10 @@ struct _pthread_cond {
 
 void CondVar::darwin_shared_wait_hack() TIGHTDB_NOEXCEPT
 {
+    // The single-waiter case works fine
+    if (++m_waiter_count == 1)
+        return;
+
     // Sharing a pthread_cond_t incorrectly requires that the mutex be at the
     // same memory address in all processes. Hack around this by setting the
     // field which the implementation uses to check this to NULL before waiting.

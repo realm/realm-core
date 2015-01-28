@@ -290,6 +290,9 @@ public:
 
 private:
     pthread_cond_t m_impl;
+#ifdef __APPLE__
+    int m_waiter_count;
+#endif
 
     TIGHTDB_NORETURN static void init_failed(int);
     TIGHTDB_NORETURN static void attr_init_failed(int);
@@ -532,6 +535,9 @@ inline void CondVar::wait(RobustMutex& m, Func recover_func, const struct timesp
         if (r == ETIMEDOUT)
             return;
     }
+#ifdef __APPLE__
+    --m_waiter_count;
+#endif
     if (TIGHTDB_LIKELY(r == 0))
         return;
     handle_wait_error(r);
