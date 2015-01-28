@@ -640,7 +640,7 @@ void Table::do_insert_column(Descriptor& desc, size_t col_ndx, DataType type,
 
     if (desc.is_root()) {
         root_table.bump_version();
-        root_table.insert_root_column(col_ndx, type, name, link_target_table, nullable); // Throws
+        root_table.insert_root_column(col_ndx, type, name, link_target_table); // Throws
     }
     else {
         Spec& spec = df::get_spec(desc);
@@ -797,7 +797,7 @@ void Table::do_insert_root_column(size_t ndx, ColumnType type, StringData name, 
     Spec::ColumnInfo info;
     m_spec.get_column_info(ndx, info);
     size_t ndx_in_parent = info.m_column_ref_ndx;
-    ref_type col_ref = create_column(type, m_size, m_columns.get_alloc(), nullable); // Throws
+    ref_type col_ref = create_column(type, m_size, m_columns.get_alloc()); // Throws
     m_columns.insert(ndx_in_parent, col_ref); // Throws
 }
 
@@ -1749,7 +1749,7 @@ ref_type Table::create_empty_table(Allocator& alloc)
 }
 
 
-ref_type Table::create_column(ColumnType col_type, size_t size, Allocator& alloc, bool nullable)
+ref_type Table::create_column(ColumnType col_type, size_t size, Allocator& alloc)
 {
     switch (col_type) {
         case col_type_Int:

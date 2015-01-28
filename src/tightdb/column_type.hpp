@@ -62,6 +62,7 @@ enum ColumnAttr {
     /// only to link columns (`type_Link` and `type_LinkList`).
     col_attr_StrongLinks = 8,
 
+    /// Specifies that elements in the column can be null [null is work in progress]
     col_attr_Nullable = 16
 };
 

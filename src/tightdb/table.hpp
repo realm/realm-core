@@ -1071,7 +1071,7 @@ private:
     /// Create a column of the specified type, fill it with the
     /// specified number of default values, and return just the
     /// reference to the underlying memory.
-    static ref_type create_column(ColumnType column_type, size_t num_default_values, Allocator&, bool nullable = false);
+    static ref_type create_column(ColumnType column_type, size_t num_default_values, Allocator&);
 
     /// Construct a copy of the columns array of this table using the
     /// specified allocator and return just the ref to that array.
