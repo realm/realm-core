@@ -1,3 +1,10 @@
+libtightdb (0.88.0~@CODENAME@-1) UNRELEASED; urgency=low
+
+  * Tracking upstream release.
+
+ -- Finn Schiermer Andersen <fsa@realm.io>  Wed, 21 Jan 2015 15:36:43 +0100
+
+
 libtightdb (0.87.6~@CODENAME@-1) UNRELEASED; urgency=low
 
   * Tracking upstream release.

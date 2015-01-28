@@ -437,6 +437,20 @@ void TableView::clear()
 #endif
 }
 
+void TableViewBase::sync_distinct_view(size_t column)
+{
+    m_row_indexes.clear();
+    m_distinct_column_source = column;
+    if (m_distinct_column_source != npos) {
+        TIGHTDB_ASSERT(m_table);
+        TIGHTDB_ASSERT(m_table->has_search_index(m_distinct_column_source));
+        if (!m_table->is_degenerate()) {
+            const ColumnBase& col = m_table->get_column_base(m_distinct_column_source);
+            col.get_search_index()->distinct(m_row_indexes);
+        }
+    }
+}
+
 #ifdef TIGHTDB_ENABLE_REPLICATION
 
 void TableViewBase::do_sync() 
@@ -450,12 +464,7 @@ void TableViewBase::do_sync()
             m_row_indexes.add(m_linkview_source->get(t).get_index());
     }
     else if (m_table && m_distinct_column_source != npos) {
-        m_row_indexes.clear();
-        TIGHTDB_ASSERT(m_table->has_search_index(m_distinct_column_source));
-        if (!m_table->is_degenerate()) {
-            const ColumnBase& col = m_table->get_column_base(m_distinct_column_source);
-            col.get_search_index()->distinct(m_row_indexes);
-        }
+        sync_distinct_view(m_distinct_column_source);
     }
     // precondition: m_table is attached
     else if (!m_query.m_table) {
