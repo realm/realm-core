@@ -10,7 +10,8 @@
 
 ### Enhancements:
 
-* Lorem ipsum.
+* Adding `Replication::apply_foreign_transact_log()`.
+* Generic networking API added.
 
 -----------
 
@@ -31,8 +32,6 @@
 * `WriteTransaction::has_table()` and `WriteTransaction::rollback()` were
   added. Previously, only implicit rollback was possible with
   `WriteTransaction`.
-* Adding `Replication::apply_foreign_transact_log()`.
-* Generic networking API added.
 
 -----------
 
