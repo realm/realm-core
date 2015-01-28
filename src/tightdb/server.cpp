@@ -87,8 +87,9 @@ private:
 class server: private util::Logger {
 public:
     util::Logger* const root_logger;
+    bool log_everything;
 
-    server(util::Logger* root_logger);
+    server(util::Logger* root_logger, bool log_everything);
     ~server();
 
     void start(string listen_address, string listen_port, bool reuse_address = false);
@@ -286,8 +287,9 @@ private:
             return;
         }
 
-        log("Received: Transaction log %1 -> %2 from client file #%3",
-            client_version-1, client_version, client_file_ident);
+        if (m_server.log_everything)
+            log("Received: Transaction log %1 -> %2 from client file #%3",
+                client_version-1, client_version, client_file_ident);
 
         util::UniquePtr<char[]> transact_log_owner(m_input_body_buffer.release());
         BinaryData transact_log(transact_log_owner.get(), n);
@@ -314,15 +316,24 @@ private:
             cf.client_version = client_version;
             cf.server_file->add_transact_log(transact_log); // Throws
             transact_log_owner.release();
+
+            if (m_server.log_everything)
+                log("Sending: Accepting transaction %1 -> %2 from client file #%3",
+                    client_version-1, client_version, client_file_ident);
+            ostringstream out;
+            out << "accept "<<client_file_ident<<" "<<client_version<<"\n";
+            string head = out.str();
+            enqueue_output_message(head);
         }
         else {
-            // WARNING: Resolving a conflict between two identical initial
-            // transactions in the following way is a dirty hack that was added
-            // to allow the current version of the Cocoa binding to carry out an
-            // initial schema creating transaction without getting into an
-            // immediate unrecoverable conflict. It does not work in general as
-            // even the initial transaction is allowed to contain elements that
-            // are additive rather than idempotent.
+            // WARNING: Strictly speaking, the following is not the correct
+            // resulution of the conflict between two identical initial
+            // transactions, but it is done as a temporary workaround to allow
+            // the current version of the Cocoa binding to carry out an initial
+            // schema creating transaction without getting into an immediate
+            // unrecoverable conflict. It does not work in general as even the
+            // initial transaction is allowed to contain elements that are
+            // additive rather than idempotent.
             BinaryData servers_log = cf.server_file->get_transact_log(client_version);
             if (client_version > 2 || transact_log != servers_log) {
                 log("ERROR: Conflict (%1 vs %2)", transact_log.size(), servers_log.size());
@@ -340,13 +351,6 @@ private:
             log("Conflict resolved %1 -> %2 improperly (identical initial transactions)",
                 client_version-1, client_version);
         }
-
-        log("Sending: Accepting transaction %1 -> %2 from client file #%3",
-            client_version-1, client_version, client_file_ident);
-        ostringstream out;
-        out << "accept "<<client_file_ident<<" "<<client_version<<"\n";
-        string head = out.str();
-        enqueue_output_message(head);
 
         initiate_read_head();
     }
@@ -394,8 +398,9 @@ private:
         version_type latest_server_version = cf.server_file->get_latest_version();
         while (cf.client_version < latest_server_version) {
             version_type next_client_version = cf.client_version + 1;
-            log("Sending: Transaction %1 -> %2 to client file #%3",
-                next_client_version-1, next_client_version, client_file_ident);
+            if (m_server.log_everything)
+                log("Sending: Transaction %1 -> %2 to client file #%3",
+                    next_client_version-1, next_client_version, client_file_ident);
             BinaryData log = cf.server_file->get_transact_log(next_client_version);
             ostringstream out;
             out << "transact "<<client_file_ident<<" "<<next_client_version<<" "<<log.size()<<"\n";
@@ -501,8 +506,9 @@ void file::add_transact_log(BinaryData log)
 }
 
 
-server::server(util::Logger* root_logger_2):
+server::server(util::Logger* root_logger_2, bool log_everything_2):
     root_logger(root_logger_2),
+    log_everything(log_everything_2),
     m_acceptor(m_service),
     m_next_conn_id(0)
 {
@@ -591,7 +597,7 @@ int main(int argc, char* argv[])
     string listen_address = util::network::host_name();
     string listen_port = "7800";
     bool reuse_address = false;
-    bool enable_logging = false;
+    int log_level = 1;
 
     // Process command line
     {
@@ -621,9 +627,17 @@ int main(int argc, char* argv[])
                 reuse_address = true;
                 continue;
             }
-            else if (strcmp(arg, "-l") == 0 || strcmp(arg, "--enable-logging") == 0) {
-                enable_logging = true;
-                continue;
+            else if (strcmp(arg, "-l") == 0 || strcmp(arg, "--log-level") == 0) {
+                if (i+1 < argc) {
+                    istringstream in(argv[++i]);
+                    in.unsetf(std::ios_base::skipws);
+                    int v = 0;
+                    in >> v;
+                    if (in && in.eof() && v >= 0 && v <= 2) {
+                        log_level = v;
+                        continue;
+                    }
+                }
             }
             error = true;
             break;
@@ -644,7 +658,8 @@ int main(int argc, char* argv[])
                 "                       available options.\n"
                 "  -p, --listen-port    The listening port. (default '"<<listen_port<<"')\n"
                 "  -r, --reuse-address  Allow immediate reuse of listening port (unsafe).\n"
-                "  -l, --enable-logging Enable logging.\n";
+                "  -l, --log-level      Set log level (0 for nothing, 1 for normal, 2 for\n"
+                "                       everything).\n";
             return 0;
         }
 
@@ -657,10 +672,12 @@ int main(int argc, char* argv[])
     }
 
     util::UniquePtr<util::Logger> logger;
+    bool enable_logging = (log_level > 0);
     if (enable_logging)
         logger.reset(new util::Logger);
 
-    server serv(logger.get());
+    bool log_everything = (log_level > 1);
+    server serv(logger.get(), log_everything);
     serv.start(listen_address, listen_port, reuse_address);
     serv.run();
 }
