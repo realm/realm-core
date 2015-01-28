@@ -290,11 +290,16 @@ public:
 
 private:
     pthread_cond_t m_impl;
+#ifdef __APPLE__
+    int m_waiter_count;
+#endif
 
     TIGHTDB_NORETURN static void init_failed(int);
     TIGHTDB_NORETURN static void attr_init_failed(int);
     TIGHTDB_NORETURN static void destroy_failed(int) TIGHTDB_NOEXCEPT;
     void handle_wait_error(int error);
+    void darwin_shared_wait_hack() TIGHTDB_NOEXCEPT;
+    static void check_if_darwin_hack_is_needed() TIGHTDB_NOEXCEPT;
 };
 
 
@@ -515,10 +520,14 @@ inline void CondVar::wait(LockGuard& l) TIGHTDB_NOEXCEPT
         TIGHTDB_TERMINATE("pthread_cond_wait() failed");
 }
 
+
 template<class Func>
 inline void CondVar::wait(RobustMutex& m, Func recover_func, const struct timespec* tp)
 {
     int r;
+#ifdef __APPLE__
+    darwin_shared_wait_hack();
+#endif
     if (!tp) {
         r = pthread_cond_wait(&m_impl, &m.m_impl);
     }
@@ -527,6 +536,9 @@ inline void CondVar::wait(RobustMutex& m, Func recover_func, const struct timesp
         if (r == ETIMEDOUT)
             return;
     }
+#ifdef __APPLE__
+    --m_waiter_count;
+#endif
     if (TIGHTDB_LIKELY(r == 0))
         return;
     handle_wait_error(r);
