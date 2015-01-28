@@ -20,6 +20,8 @@ const char* LogicError::what() const TIGHTDB_NOEXCEPT_OR_NOTHROW
             return TIGHTDB_VER_CHUNK " Row index out of range";
         case LogicError::column_index_out_of_range:
             return TIGHTDB_VER_CHUNK " Column index out of range";
+        case LogicError::bad_version_number:
+            return TIGHTDB_VER_CHUNK " Bad version number";
         case LogicError::illegal_combination:
             return TIGHTDB_VER_CHUNK " Illegal combination";
         case LogicError::type_mismatch:
@@ -39,4 +41,3 @@ const char* LogicError::what() const TIGHTDB_NOEXCEPT_OR_NOTHROW
     }
     return TIGHTDB_VER_CHUNK " Unknown error";
 }
-

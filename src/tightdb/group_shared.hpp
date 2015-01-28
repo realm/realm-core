@@ -301,14 +301,20 @@ public:
     /// to start transaction at a specific version.
     VersionID get_version_of_current_transaction();
 
+    typedef uint_fast64_t version_type;
+
     /// Begin a new write transaction. Accessors obtained prior to this point
     /// are invalid (if they weren't already) and new accessors must be
     /// obtained from the group returned. It is illegal to call begin_write
     /// inside an active transaction.
     Group& begin_write();
 
-    /// End the current write transaction. All accessors are detached.
-    void commit();
+    /// Commit the current write transaction.
+    ///
+    /// This with detach all accessors that were previsously attached to objects
+    /// in this group. Returns the version number of the new version produced by
+    /// the comitted transaction.
+    version_type commit();
 
     /// End the current write transaction. All accessors are detached.
     void rollback() TIGHTDB_NOEXCEPT;
@@ -390,7 +396,7 @@ private:
 
     // Try to grab a readlock for a specific version. Fails if the version is no longer
     // accessible.
-    bool grab_specific_readlock(ReadLockInfo& readlock, bool& same_as_before, 
+    bool grab_specific_readlock(ReadLockInfo& readlock, bool& same_as_before,
                                 VersionID specific_version);
 
     // Release a specific readlock. The readlock info MUST have been obtained by a
@@ -398,7 +404,7 @@ private:
     void release_readlock(ReadLockInfo& readlock) TIGHTDB_NOEXCEPT;
 
     void do_begin_write();
-    void do_commit();
+    version_type do_commit();
 
     // return the current version of the database - note, this is not necessarily
     // the version seen by any currently open transactions.
@@ -565,11 +571,12 @@ public:
         return m_shared_group->m_group;
     }
 
-    void commit()
+    SharedGroup::version_type commit()
     {
         TIGHTDB_ASSERT(m_shared_group);
-        m_shared_group->commit();
+        SharedGroup::version_type new_version = m_shared_group->commit();
         m_shared_group = 0;
+        return new_version;
     }
 
     void rollback() TIGHTDB_NOEXCEPT
