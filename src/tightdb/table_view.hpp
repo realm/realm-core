@@ -69,11 +69,13 @@ using std::size_t;
 //
 // Use cases:
 //
+// 1. Presenting data
 // The first use case (and primary motivator behind the reflective view) is to just track
 // and present the state of the database. In this case, the view is operated in reflective
 // mode, it is not modified within the transaction, and it does not cause modification in
 // other parts of the database.
 //
+// 2. Handover
 // The second use case is "handover." The implicit rerun of the query in our first use case
 // may be too costly to be acceptable on the main thread. Instead you want to run the query
 // on a worker thread, but display it on the main thread. To achieve this, you need two
@@ -84,6 +86,14 @@ using std::size_t;
 // You can handover both reflective and imperative views. But most often it will only make
 // sense to handover an imperative view, because it is guaranteed not to rerun its query.
 //
+// Handover is expressed using a new type, HandoverTableView, which can be produced calling
+// TableViewBase::export_for_handover(). After the call to export_for_handover(), the table view
+// becomes detached to prevent misuse. On the receiving side, a new TableView is produced from
+// HandoverTableView::import_from_handover(SharedGroup& sg). Export will fail if the TableView
+// has a restricting view. Import will fail if the importing and exporting SharedGroups are
+// observing different versions of the database.
+//
+// 3. Iterating a view and changing data
 // The third use case (and a motivator behind the imperative view) is when you want
 // to make changes to the database in accordance with a query result. Imagine you want to 
 // find all employees with a salary below a limit and raise their salaries to the limit (pseudocode):
@@ -100,7 +110,7 @@ using std::size_t;
 // first salary is changed, the entry no longer fullfills the query, so it is dropped from the
 // view implicitly. view[0] is removed, view[1] moves to view[0] and so forth. But the next
 // loop iteration has i=1 and refers to view[1], thus skipping view[0]. The end result is that
-// every other employee get a raise, while the other half don't.
+// every other employee get a raise, while the others don't.
 //
 // One way of dealing with use case 3 without supporting imperative views, is to *require* that
 // the loop body is expressed as a lambda, which we'll call. This allows us to ensure that the
@@ -108,6 +118,7 @@ using std::size_t;
 // may be allowed inside the lambda. One of the things you can not easily allow is calling
 // advance_read() or promote_to_write().
 //
+// 4. Iterating intermixed with implicit updates
 // This leads us to use case 4, which is similar to use case 3, but uses promote_to_write()
 // intermixed with iterating a view. This is actually quite important to some, who do not want
 // to end up with a large write transaction.
@@ -134,13 +145,15 @@ using std::size_t;
 //    }
 //
 // This is safe, but will it guarantee that all relevant employees get their raise ?
-// Yes and no, it depends..... At every call to promote_to_write() new employees
-// may be added to the underlying table, but as the view is in imperative mode, these new
+// Unfortunately not. At every call to promote_to_write() new employees may be
+// added to the underlying table, but as the view is in imperative mode, these new
 // employees are not added to the view. Also at promote_to_write() an existing employee
 // could recieve a (different, larger) raise which would then be overwritten and lost.
 // However, these problems are to be expected, since the activity is spread over multiple
 // transactions. We just aim for providing low level safety: is_attached() can tell
-// if the reference is valid. The rest is up to the application logic.
+// if the reference is valid, and the references in the view continue to point to the
+// same object at all times, also following implicit updates. The rest is up to the 
+// application logic.
 
 
 /// Common base class for TableView and ConstTableView.
