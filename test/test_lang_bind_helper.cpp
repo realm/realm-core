@@ -6881,6 +6881,7 @@ TEST(LangBindHelper_MemOnly)
 
 TEST(LangBindHelper_Handover)
 {
+    SHARED_GROUP_TEST_PATH(path);
     UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
     SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
     const Group& group = sg.begin_read();
@@ -6888,14 +6889,18 @@ TEST(LangBindHelper_Handover)
     UniquePtr<Replication> repl_w(makeWriteLogCollector(path, false, crypt_key()));
     SharedGroup sg_w(*repl_w, SharedGroup::durability_Full, crypt_key());
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
-    VersionID vid;
+    SharedGroup::VersionID vid;
     {
         LangBindHelper::promote_to_write(sg_w);
         TestTableInts::Ref table = group_w.add_table<TestTableInts>("table");
         for (int i = 0; i <100; ++i)
-            table.add(i);
+            table->add(i);
         LangBindHelper::commit_and_continue_as_read(sg_w);
-        vid = LangBindHelper::get
+        vid = sg_w.get_version_of_current_transaction();
+    }
+    {
+        LangBindHelper::advance_read(sg,vid);
+
     }
 }
 

@@ -26,7 +26,7 @@
 #include <tightdb/table.hpp>
 #include <tightdb/column.hpp>
 #include <tightdb/util/features.h>
-
+#include <tightdb/group_shared.hpp>
 namespace tightdb {
 
 using std::size_t;
@@ -516,7 +516,7 @@ class HandoverTableView {
 public:
     TableView import_from_handover(SharedGroup&);
     ConstTableView const_import_from_handover(SharedGroup&);
-}
+};
 
 
 // ================================================================================================
