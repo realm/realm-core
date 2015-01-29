@@ -327,7 +327,7 @@ private:
         }
         else {
             // WARNING: Strictly speaking, the following is not the correct
-            // resulution of the conflict between two identical initial
+            // resolution of the conflict between two identical initial
             // transactions, but it is done as a temporary workaround to allow
             // the current version of the Cocoa binding to carry out an initial
             // schema creating transaction without getting into an immediate
