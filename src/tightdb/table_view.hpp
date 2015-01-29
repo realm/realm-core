@@ -506,7 +506,11 @@ private:
     friend class TableViewBase;
 };
 
-
+class HandoverTableView {
+public:
+    TableView import_from_handover(SharedGroup&);
+    ConstTableView const_import_from_handover(SharedGroup&);
+}
 
 
 // ================================================================================================

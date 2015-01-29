@@ -6875,6 +6875,26 @@ TEST(LangBindHelper_MemOnly)
     CHECK(!rt.get_group().is_empty());
 }
 
+TEST(LangBindHelper_Handover)
+{
+    UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
+    SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
+    const Group& group = sg.begin_read();
+
+    UniquePtr<Replication> repl_w(makeWriteLogCollector(path, false, crypt_key()));
+    SharedGroup sg_w(*repl_w, SharedGroup::durability_Full, crypt_key());
+    Group& group_w = const_cast<Group&>(sg_w.begin_read());
+    VersionID vid;
+    {
+        LangBindHelper::promote_to_write(sg_w);
+        TestTableInts::Ref table = group_w.add_table<TestTableInts>("table");
+        for (int i = 0; i <100; ++i)
+            table.add(i);
+        LangBindHelper::commit_and_continue_as_read(sg_w);
+        vid = LangBindHelper::get
+    }
+}
+
 #endif // TIGHTDB_ENABLE_REPLICATION
 
 #endif
