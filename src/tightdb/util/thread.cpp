@@ -203,8 +203,14 @@ void RobustMutex::mark_as_consistent() TIGHTDB_NOEXCEPT
 
 
 CondVar::CondVar(process_shared_tag)
+#ifdef CONDVAR_EMULATION
+    : wait_lock(Mutex::process_shared_tag())
+#endif
 {
 #ifdef TIGHTDB_HAVE_PTHREAD_PROCESS_SHARED
+    waiters = 0;
+#ifdef CONDVAR_EMULATION
+#else
     pthread_condattr_t attr;
     int r = pthread_condattr_init(&attr);
     if (TIGHTDB_UNLIKELY(r != 0))
@@ -217,6 +223,7 @@ CondVar::CondVar(process_shared_tag)
     static_cast<void>(r2);
     if (TIGHTDB_UNLIKELY(r != 0))
         init_failed(r);
+#endif // CONDVAR_EMULATION
 #else // !TIGHTDB_HAVE_PTHREAD_PROCESS_SHARED
     throw runtime_error("No support for process-shared condition variables");
 #endif
