@@ -78,7 +78,7 @@ TEST(StringIndex_IsEmpty)
     AdaptiveStringColumn col(Allocator::get_default(), ref);
 
     // Create a new index on column
-    const StringIndex& ndx = col.create_search_index();
+    const StringIndex& ndx = *col.create_search_index();
 
     CHECK(ndx.is_empty());
 
@@ -101,7 +101,7 @@ TEST(StringIndex_BuildIndex)
     col.add(s6); // common prefix
 
     // Create a new index on column
-    const StringIndex& ndx = col.create_search_index();
+    const StringIndex& ndx = *col.create_search_index();
 
     const size_t r1 = ndx.find_first(s1);
     const size_t r2 = ndx.find_first(s2);
@@ -136,7 +136,7 @@ TEST(StringIndex_DeleteAll)
     col.add(s6); // common prefix
 
     // Create a new index on column
-    const StringIndex& ndx = col.create_search_index();
+    const StringIndex& ndx = *col.create_search_index();
 
     // Delete all entries
     // (reverse order to avoid ref updates)
@@ -194,7 +194,7 @@ TEST(StringIndex_Delete)
     col.add(s1); // duplicate value
 
     // Create a new index on column
-    const StringIndex& ndx = col.create_search_index();
+    const StringIndex& ndx = *col.create_search_index();
 
     // Delete first item (in index)
     col.erase(1, 1 == col.size()-1);
@@ -238,7 +238,7 @@ TEST(StringIndex_ClearEmpty)
     AdaptiveStringColumn col(Allocator::get_default(), ref);
 
     // Create a new index on column
-    const StringIndex& ndx = col.create_search_index();
+    const StringIndex& ndx = *col.create_search_index();
 
     // Clear to remove all entries
     col.clear();
@@ -267,7 +267,7 @@ TEST(StringIndex_Clear)
     col.add(s6); // common prefix
 
     // Create a new index on column
-    const StringIndex& ndx = col.create_search_index();
+    const StringIndex& ndx = *col.create_search_index();
 
     // Clear to remove all entries
     col.clear();
@@ -457,7 +457,7 @@ TEST(StringIndex_Distinct)
     col.add(s4);
 
     // Create a new index on column
-    StringIndex& ndx = col.create_search_index();
+    StringIndex& ndx = *col.create_search_index();
 
     // Get view of unique values
     // (sorted in alphabetical order, each ref to first match)
@@ -494,7 +494,7 @@ TEST(StringIndex_FindAllNoCopy)
     col.add(s4);
 
     // Create a new index on column
-    StringIndex& ndx = col.create_search_index();
+    StringIndex& ndx = *col.create_search_index();
 
     size_t ref_2 = not_found;
     FindRes res1 = ndx.find_all(StringData("not there"), ref_2);
@@ -529,7 +529,7 @@ TEST(StringIndex_FindAllNoCopy2_Int)
 
     // Create a new index on column
     col.create_search_index();
-    StringIndex& ndx = *static_cast<StringIndex*>(col.m_search_index);
+    StringIndex& ndx = *col.get_search_index();
     size_t results = not_found;
 
     for (size_t t = 0; t < sizeof(ints) / sizeof(ints[0]); t++) {
@@ -570,7 +570,7 @@ TEST(StringIndex_Count_Int)
 
     // Create a new index on column
     col.create_search_index();
-    StringIndex& ndx = *static_cast<StringIndex*>(col.m_search_index);
+    StringIndex& ndx = *col.get_search_index();
 
     for (size_t t = 0; t < sizeof(ints) / sizeof(ints[0]); t++) {
         size_t count = ndx.count(ints[t]);
@@ -601,7 +601,7 @@ TEST(StringIndex_Distinct_Int)
     col.create_search_index();
 
     
-    StringIndex& ndx = *static_cast<StringIndex*>(col.m_search_index);
+    StringIndex& ndx = *col.get_search_index();
     
     ref_type results_ref = Column::create(Allocator::get_default());
     Column results(Allocator::get_default(), results_ref);
@@ -633,7 +633,7 @@ TEST(StringIndex_Set_Add_Erase_Insert_Int)
 
     // Create a new index on column
     col.create_search_index();
-    StringIndex& ndx = *static_cast<StringIndex*>(col.m_search_index);
+    StringIndex& ndx = *col.get_search_index();
 
     size_t f = ndx.find_first(int64_t(2));
     CHECK_EQUAL(1, f);
@@ -709,7 +709,7 @@ TEST(StringIndex_Bug1)
     // String index
     ref_type ref2 = AdaptiveStringColumn::create(Allocator::get_default());
     AdaptiveStringColumn col2(Allocator::get_default(), ref2);
-    const StringIndex& ndx2 = col2.create_search_index();
+    const StringIndex& ndx2 = *col2.create_search_index();
     static_cast<void>(ndx2);
     col2.add(StringData("\0\0\0\0\0\x001\0\0", 8));
     size_t t = ndx2.find_first(StringData("\0\0\0\0\0\x002\0\0"));
@@ -721,7 +721,7 @@ TEST(StringIndex_Bug1)
     Column col(Allocator::get_default(), ref);
     col.create_search_index();
     col.add(1ULL << 40);
-    StringIndex& ndx = *static_cast<StringIndex*>(col.m_search_index);
+    StringIndex& ndx = *col.get_search_index();
     size_t f = ndx.find_first(v);
     CHECK_EQUAL(f, not_found);
 

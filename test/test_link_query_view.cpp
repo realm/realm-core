@@ -58,12 +58,21 @@ TEST(LinkList_Basic1)
     CHECK_EQUAL(tv2.size(), 1);
     CHECK_EQUAL(tv2[0].get_index(), 0);
 
-    // Just a single test for the new string conditions, to see if they work with links too. 
+    // Just a few tests for the new string conditions to see if they work with links too.
     // The new string conditions are tested themself in Query_NextGen_StringConditions in test_query.cpp 
     Query q3 = table2->link(col_link2).column<String>(1).contains("A", false);
     TableView tv3 = q3.find_all();
     CHECK_EQUAL(tv3.size(), 1);
     CHECK_EQUAL(tv3[0].get_index(), 1); // "bar" contained an "A"
+
+    table2->add_column(type_String, "str2");
+    table2->set_string(1, 0, "A");
+    table2->set_string(1, 1, "A");
+
+    Query q4 = table2->link(col_link2).column<String>(1).contains(table2->column<String>(1), false);
+    TableView tv4 = q4.find_all();
+    CHECK_EQUAL(tv4.size(), 1);
+    CHECK_EQUAL(tv4[0].get_index(), 1); // "bar" contained an "A"
 }
 
 
@@ -189,8 +198,8 @@ TEST(LinkList_Basic2)
     match = (table1->link(col_link2).column<String>(1) == "foobar").find();
     CHECK_EQUAL(not_found, match);
 
-    //    match = (table1->column<String>(1) == table1->column<String>(1)  ).find(); // not yet implemented
-    //    CHECK_EQUAL(1, match);
+    match = (table1->link(col_link2).column<String>(1) == table1->column<String>(1)).find();
+    CHECK_EQUAL(1, match);
 }
 
 
@@ -1113,6 +1122,88 @@ TEST(Link_FindNullLink)
     // We have not yet defined behaviour of finding null-links in a linked-to table, so we just throw. Todo.
     CHECK_THROW_ANY(table2->link(col_linklist2).column<Link>(col_link1).is_null());
 }
+
+
+TEST(Link_FindNotNullLink)
+{
+    // Regression for HelpScout #315.
+
+    Group g;
+
+    TableRef t0 = g.add_table("t0");
+    TableRef t1 = g.add_table("t1");
+    t0->add_column_link(type_Link, "link", *t1);
+    t1->add_column(type_Int, "int");
+
+    t0->add_empty_row(6);
+    t1->add_empty_row(6);
+    for (size_t i = 0; i < 6; ++i) {
+        t1->set_int(0, i, 123);
+        t0->nullify_link(0, i);
+    }
+
+    Query q0 = t0->column<Link>(0).is_null();
+    TableView tv0 = q0.find_all();
+    CHECK_EQUAL(6, tv0.size());
+
+    for (size_t i = 0; i < 6; ++i) {
+        t0->set_link(0, i, i);
+    }
+
+    Query q1 = t0->column<Link>(0).is_null();
+    TableView tv1 = q1.find_all();
+    CHECK_EQUAL(0, tv1.size());
+
+    Query q2 = t0->where();
+    q2.Not();
+    q2.and_query(q1);
+    TableView tv2 = q2.find_all();
+    CHECK_EQUAL(6, tv2.size());
+}
+
+
+TEST(LinkList_FindNotNullLink)
+{
+    // Regression for HelpScout #315.
+
+    Group g;
+
+    TableRef lists = g.add_table("List");
+    TableRef items = g.add_table("ListItem");
+    TableRef datas = g.add_table("ListItemData");
+
+    lists->add_column_link(type_LinkList, "listItems", *items);
+    items->add_column_link(type_Link, "localData", *datas);
+    datas->add_column(type_String, "title");
+
+    lists->add_empty_row();
+    items->add_empty_row(6);
+    datas->add_empty_row(6);
+    LinkViewRef ll = lists->get_linklist(0, 0);
+    for (size_t i = 0; i < 6; ++i) {
+        datas->set_string(0, i, "foo");
+        items->set_link(0, i, 0);
+        ll->insert(0, i);
+    }
+
+    // This is how the Cocoa bindings do it normally:
+    Query q0 = ll->get_target_table().where(ll);
+    q0.and_query(q0.get_table()->column<Link>(0).is_null());
+    CHECK_EQUAL(0, q0.find_all().size());
+
+    // This is the "correct" way to do the "Not":
+    Query q2 = items->where(ll);
+    q2.Not();
+    q2.and_query(items->column<Link>(0).is_null());
+    CHECK_EQUAL(6, q2.find_all().size());
+
+    // This is how the Cocoa bindings to the "Not":
+    Query q1 = ll->get_target_table().where(ll);
+    q1.Not();
+    q1.and_query(q1.get_table()->column<Link>(0).is_null());
+    CHECK_EQUAL(6, q1.find_all().size());
+}
+
 
 // Tests queries on a LinkList
 TEST(LinkList_QueryOnLinkList)

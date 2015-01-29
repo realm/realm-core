@@ -352,6 +352,16 @@ void msync(void* addr, size_t size)
 #endif
 
     // not an encrypted mapping
+
+    // FIXME: on iOS/OSX fsync may not be enough to ensure crash safety.
+    // Consider adding fcntl(F_FULLFSYNC). This most likely also applies to msync.
+    //
+    // See description of fsync on iOS here:
+    // https://developer.apple.com/library/ios/documentation/System/Conceptual/ManPages_iPhoneOS/man2/fsync.2.html
+    //
+    // See also
+    // https://developer.apple.com/library/ios/documentation/Cocoa/Conceptual/CoreData/Articles/cdPersistentStores.html
+    // for a discussion of this related to core data.
     if (::msync(addr, size, MS_SYNC) != 0) {
         int err = errno; // Eliminate any risk of clobbering
         throw std::runtime_error(get_errno_msg("msync() failed: ", err));

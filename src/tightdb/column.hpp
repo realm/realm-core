@@ -37,6 +37,7 @@ namespace tightdb {
 
 // Pre-definitions
 class Column;
+class StringIndex;
 
 struct ColumnTemplateBase
 {
@@ -109,6 +110,9 @@ public:
 
     // Search index
     virtual bool has_search_index() const TIGHTDB_NOEXCEPT;
+    virtual StringIndex* create_search_index();
+    virtual const StringIndex* get_search_index() const TIGHTDB_NOEXCEPT;
+    virtual StringIndex* get_search_index() TIGHTDB_NOEXCEPT;
     virtual void set_search_index_ref(ref_type, ArrayParent*, std::size_t ndx_in_parent,
                                       bool allow_duplicate_values);
     virtual void set_search_index_allow_duplicate_values(bool) TIGHTDB_NOEXCEPT;
@@ -440,8 +444,9 @@ public:
                   std::size_t begin = 0, std::size_t end = npos) const;
 
     void set_search_index_ref(ref_type ref, ArrayParent* parent, size_t ndx_in_parent, bool allow_duplicate_valaues);
-    void create_search_index();
-    void* get_search_index() TIGHTDB_NOEXCEPT;
+    StringIndex* create_search_index();
+    StringIndex* get_search_index() TIGHTDB_NOEXCEPT;
+    const StringIndex* get_search_index() const TIGHTDB_NOEXCEPT;
 
     //@{
     /// Find the lower/upper bound for the specified value assuming
@@ -481,9 +486,6 @@ public:
     void do_dump_node_structure(std::ostream&, int) const TIGHTDB_OVERRIDE;
 #endif
 
-    // todo, make private, and correct type
-    void* m_search_index;
-
 protected:
     Column(Array* root = 0) TIGHTDB_NOEXCEPT;
 
@@ -521,6 +523,8 @@ private:
 
     friend class Array;
     friend class ColumnBase;
+
+    StringIndex* m_search_index;
 };
 
 
@@ -561,7 +565,22 @@ inline void ColumnBase::destroy() TIGHTDB_NOEXCEPT
 
 inline bool ColumnBase::has_search_index() const TIGHTDB_NOEXCEPT
 {
-    return false;
+    return get_search_index() != null_ptr;
+}
+
+inline StringIndex* ColumnBase::create_search_index()
+{
+    return null_ptr;
+}
+
+inline const StringIndex* ColumnBase::get_search_index() const TIGHTDB_NOEXCEPT
+{
+    return null_ptr;
+}
+
+inline StringIndex* ColumnBase::get_search_index() TIGHTDB_NOEXCEPT
+{
+    return null_ptr;
 }
 
 inline void ColumnBase::set_search_index_ref(ref_type, ArrayParent*, std::size_t, bool)

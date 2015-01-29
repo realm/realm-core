@@ -472,7 +472,7 @@ private:
     class TableWriter;
     class DefaultTableWriter;
 
-    static void write(std::ostream&, TableWriter&, bool);
+    static void write(std::ostream&, TableWriter&, bool, uint_fast64_t = 0);
 
     /// Create a new underlying node structure and attach this
     /// accessor instance to it
@@ -500,6 +500,10 @@ private:
     void detach_table_accessors() TIGHTDB_NOEXCEPT;
 
     void mark_all_table_accessors() TIGHTDB_NOEXCEPT;
+
+    void write(const std::string& file, const char* encryption_key, 
+               uint_fast64_t version_number) const;
+    void write(std::ostream&, bool pad, uint_fast64_t version_numer) const;
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     Replication* get_replication() const TIGHTDB_NOEXCEPT;

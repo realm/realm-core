@@ -9,6 +9,7 @@
 #  include <unistd.h>
 #  include <sys/wait.h>
 #  include <signal.h>
+#  include <sched.h>
 #  define ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE
 #else
 #  define NOMINMAX
@@ -91,19 +92,20 @@ TIGHTDB_TABLE_4(TestTableShared,
                 fourth, String)
 
 
-#if !defined(__APPLE__) && !defined(_WIN32) && !defined TIGHTDB_ENABLE_ENCRYPTION
 
 void writer(string path, int id)
 {
-    // cerr << "Started pid " << getpid() << endl;
+    // cerr << "Started writer " << endl;
     try {
+        bool done = false;
         SharedGroup sg(path, true, SharedGroup::durability_Full);
-        // cerr << "Opened sg, pid " << getpid() << endl;
-        for (int i=0;; ++i) {
+        // cerr << "Opened sg " << endl;
+        for (int i=0; !done; ++i) {
             // cerr << "       - " << getpid() << endl;
             WriteTransaction wt(sg);
+            TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
+            done = t1[id].third;
             if (i & 1) {
-                TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
                 t1[id].first = 1 + t1[id].first;
             }
             sched_yield(); // increase chance of signal arriving in the middle of a transaction
@@ -111,10 +113,12 @@ void writer(string path, int id)
         }
         // cerr << "Ended pid " << getpid() << endl;
     } catch (...) {
-        cerr << "Exception from " << getpid() << endl;
+        // cerr << "Exception from " << getpid() << endl;
     }
-    _exit(0);
 }
+
+
+#if !defined(__APPLE__) && !defined(_WIN32) && !defined TIGHTDB_ENABLE_ENCRYPTION
 
 void killer(TestResults& test_results, int pid, string path, int id)
 {
@@ -163,7 +167,7 @@ void killer(TestResults& test_results, int pid, string path, int id)
 
 } // anonymous namespace
 
-#if !defined(__APPLE__) && !defined(_WIN32)&& !defined TIGHTDB_ENABLE_ENCRYPTION
+#if !defined(__APPLE__) && !defined(_WIN32)&& !defined TIGHTDB_ENABLE_ENCRYPTION && !defined(TIGHTDB_ANDROID)
 
 TEST(Shared_PipelinedWritesWithKills)
 {
@@ -187,6 +191,7 @@ TEST(Shared_PipelinedWritesWithKills)
     if (pid == 0) {
         // first writer!
         writer(path, 0);
+        _exit(0);
     }
     else {
         for (int k=1; k < num_processes; ++k) {
@@ -196,6 +201,7 @@ TEST(Shared_PipelinedWritesWithKills)
                 TIGHTDB_TERMINATE("fork() failed");
             if (pid == 0) {
                 writer(path, k);
+                _exit(0);
             }
             else {
                 // cerr << "New process " << pid << " killing old " << pid2 << endl;
@@ -207,6 +213,62 @@ TEST(Shared_PipelinedWritesWithKills)
     }
 }
 #endif
+
+
+#ifndef _WIN32
+TEST(Shared_CompactingOnTheFly)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    string old_path = path;
+    string tmp_path = string(path)+".tmp";
+    Thread writer_thread;
+    {
+        SharedGroup sg(path, false, SharedGroup::durability_Full);
+        // Create table entries
+        {
+            WriteTransaction wt(sg);
+            TestTableShared::Ref t1 = wt.add_table<TestTableShared>("test");
+            for (int i = 0; i < 100; ++i)
+            {
+                t1->add(0, i, false, "test");
+            }
+            wt.commit();
+        }
+        {
+            writer_thread.start(bind(&writer, old_path, 41));
+
+            // make sure writer has started:
+            bool waiting = true;
+            while (waiting) {
+                sched_yield();
+                ReadTransaction rt(sg);
+                TestTableShared::ConstRef t1 = rt.get_table<TestTableShared>("test");
+                waiting = t1[41].first == 0;
+                // cerr << t1[41].first << endl;
+            }
+
+            // since the writer is running, we cannot compact:
+            CHECK(sg.compact() == false);
+        }
+        {
+            // make the writer thread terminate:
+            WriteTransaction wt(sg);
+            TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
+            t1[41].third = true;
+            wt.commit();
+        }
+
+    }
+    writer_thread.join();
+    {
+        SharedGroup sg2(path, true, SharedGroup::durability_Full);
+        CHECK_EQUAL(true, sg2.compact());
+        ReadTransaction rt2(sg2);
+        rt2.get_group().Verify();
+    }
+}
+#endif // _WIN32
+
 
 #ifdef LOCKFILE_CLEANUP
 // The following two tests are now disabled, as we have abandoned the requirement to
@@ -1162,6 +1224,8 @@ TEST(Shared_WriterThreads)
 
 
 #if defined TEST_ROBUSTNESS && defined ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE && !defined TIGHTDB_ENABLE_ENCRYPTION
+#if !defined TIGHTDB_ANDROID && !defined TIGHTDB_IOS
+
 // Not supported on Windows in particular? Keywords: winbug
 TEST(Shared_RobustAgainstDeathDuringWrite)
 {
@@ -1227,6 +1291,7 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
     }
 }
 
+#endif // not ios or android
 #endif // defined TEST_ROBUSTNESS && defined ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE && !defined TIGHTDB_ENABLE_ENCRYPTION
 
 
@@ -1923,43 +1988,57 @@ TEST_IF(Shared_AsyncMultiprocess, allow_async)
 #endif
 }
 
+namespace {
+
 static const int num_threads = 3;
 static int shared_state[num_threads];
+static SharedGroup* sgs[num_threads];
 static Mutex muu;
+
 void waiter(string path, int i)
 {
-    SharedGroup sg(path, true, SharedGroup::durability_Full);
+    SharedGroup* sg = new SharedGroup(path, true, SharedGroup::durability_Full);
     {
         LockGuard l(muu);
         shared_state[i] = 1;
+        sgs[i] = sg;
     }
-    sg.wait_for_change();
+    sg->wait_for_change();
     {
         LockGuard l(muu);
         shared_state[i] = 2; // this state should not be observed by the writer
     }
-    sg.wait_for_change(); // we'll fall right through here, because we haven't advanced our readlock
+    sg->wait_for_change(); // we'll fall right through here, because we haven't advanced our readlock
     {
         LockGuard l(muu);
         shared_state[i] = 3;
     }
-    sg.begin_read();
-    sg.end_read();
-    sg.wait_for_change(); // this time we'll wait because state hasn't advanced since we did.
+    sg->begin_read();
+    sg->end_read();
+    sg->wait_for_change(); // this time we'll wait because state hasn't advanced since we did.
     {
         LockGuard l(muu);
         shared_state[i] = 4;
     }
     // works within a read transaction as well
-    sg.begin_read();
-    sg.wait_for_change();
-    sg.end_read();
+    sg->begin_read();
+    sg->wait_for_change();
+    sg->end_read();
     {
         LockGuard l(muu);
         shared_state[i] = 5;
     }
+    sg->begin_read();
+    sg->end_read();
+    sg->wait_for_change(); // wait until wait_for_change is released
+    {
+        LockGuard l(muu);
+        shared_state[i] = 6;
+    }
+}
 }
 
+// This test will hang infinitely instead of failing!!!
 TEST(Shared_WaitForChange)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -1969,38 +2048,103 @@ TEST(Shared_WaitForChange)
     Thread threads[num_threads];
     for (int j=0; j < num_threads; j++)
         threads[j].start(bind(&waiter, string(path), j));
-    sleep(1);
-    for (int j=0; j < num_threads; j++) {
-        LockGuard l(muu);
-        CHECK_EQUAL(1, shared_state[j]);
+    bool try_again = true;
+    while (try_again) {
+        try_again = false;
+        for (int j=0; j < num_threads; j++) {
+            LockGuard l(muu);
+            if (shared_state[j] != 1) try_again = true;
+        }
     }
 
     sg.begin_write();
     sg.commit();
-    sleep(1);
-    for (int j=0; j < num_threads; j++) {
-        LockGuard l(muu);
-        CHECK_EQUAL(3, shared_state[j]);
+    try_again = true;
+    while (try_again) {
+        try_again = false;
+        for (int j=0; j < num_threads; j++) {
+            LockGuard l(muu);
+            if (3 != shared_state[j]) try_again = true;
+        }
+    }
+
+    sg.begin_write();
+    sg.commit();
+    try_again = true;
+    while (try_again) {
+        try_again = false;
+        for (int j=0; j < num_threads; j++) {
+            LockGuard l(muu);
+            if (4 != shared_state[j]) try_again = true;
+        }
     }
     sg.begin_write();
     sg.commit();
-    sleep(1);
-    for (int j=0; j < num_threads; j++) {
-        LockGuard l(muu);
-        CHECK_EQUAL(4, shared_state[j]);
+    try_again = true;
+    while (try_again) {
+        try_again = false;
+        for (int j=0; j < num_threads; j++) {
+            LockGuard l(muu);
+            if (5 != shared_state[j]) try_again = true;
+        }
     }
-    sg.begin_write();
-    sg.commit();
-    sleep(1);
-    for (int j=0; j < num_threads; j++) {
-        LockGuard l(muu);
-        CHECK_EQUAL(5, shared_state[j]);
+    try_again = true;
+    while (try_again) {
+        try_again = false;
+        for (int j=0; j < num_threads; j++) {
+            LockGuard l(muu);
+            if (sgs[j]) {
+                sgs[j]->wait_for_change_release();
+            }
+            if (6 != shared_state[j]) {
+                try_again = true;
+            }
+            else { 
+                delete sgs[j];
+                sgs[j] = 0;
+            }
+        }
     }
     for (int j=0; j < num_threads; j++)
         threads[j].join();
 }
 
 #endif // endif not on windows
+
+TEST(Shared_MultipleSharersOfStreamingFormat)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    {
+        // Create non-empty file without free-space tracking
+        Group g;
+        g.add_table("x");
+        g.write(path, crypt_key());
+    }
+    {
+        // See if we can handle overlapped accesses through multiple shared groups
+        SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());
+        SharedGroup sg2(path, false, SharedGroup::durability_Full, crypt_key());
+        {
+            ReadTransaction rt(sg);
+            rt.get_group().Verify();
+            CHECK(rt.has_table("x"));
+            CHECK(!rt.has_table("gnyf"));
+            CHECK(!rt.has_table("baz"));
+        }
+        {
+            WriteTransaction wt(sg);
+            wt.get_group().Verify();
+            wt.add_table("baz"); // Add table "baz"
+            wt.commit();
+        }
+        {
+            WriteTransaction wt2(sg2);
+            wt2.get_group().Verify();
+            wt2.add_table("gnyf"); // Add table "gnyf"
+            wt2.commit();
+        }
+    }
+}
 
 TEST(Shared_MixedWithNonShared)
 {
@@ -2095,28 +2239,11 @@ TEST(Shared_MixedWithNonShared)
         g.commit();
     }
     {
-        // See if we can still acces using shared group
         SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());
         {
             ReadTransaction rt(sg);
             rt.get_group().Verify();
-            CHECK(rt.has_table("foo"));
             CHECK(rt.has_table("bar"));
-            CHECK(!rt.has_table("baz"));
-        }
-        {
-            WriteTransaction wt(sg);
-            wt.get_group().Verify();
-            wt.add_table("baz"); // Add table "baz"
-            wt.commit();
-        }
-    }
-    {
-        SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());
-        {
-            ReadTransaction rt(sg);
-            rt.get_group().Verify();
-            CHECK(rt.has_table("baz"));
         }
     }
 
@@ -2511,6 +2638,20 @@ TEST_IF(Shared_ArrayEraseBug, TEST_DURATION >= 1)
         table->insert_empty_row(row_ndx);
         wt.commit();
     }
+}
+
+
+TEST(Shared_ScopedRollback)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg(path);
+    WriteTransaction wt(sg);
+    wt.add_table("foo");
+    wt.rollback();
+    // If wt.rollback() did nothing, then the next statement would cause a
+    // dead-lock. Know that this is part of the test.
+    WriteTransaction wt_2(sg);
+    CHECK_NOT(wt_2.has_table("foo"));
 }
 
 #endif // TEST_SHARED

@@ -20,6 +20,76 @@
 
 ----------------------------------------------
 
+# 0.88.0 Release notes
+
+### Enhancements:
+
+* SharedGroup::compact() now appends ".tmp_compaction_space" to the database name
+  in order to get the name of its temporary workspace file instead of ".tmp". It also
+  automatically removes the file in case it already exists before compaction.
+* Add support for comparing string columns to other string columns in queries.
+* `WriteTransaction::has_table()` and `WriteTransaction::rollback()` were
+  added. Previously, only implicit rollback was possible with
+  `WriteTransaction`.
+
+-----------
+
+### Internals:
+
+* All assert failures now print the release version number.
+
+----------------------------------------------
+
+# 0.87.6 Release notes
+
+### Bugfixes:
+
+* Fixed a crashbug which could cause a reading thread to miss accessor updates
+  during advance_read(), if the pending updates consisted of two or more empty
+  commits followed by one or more non-empty commit. The left out accessor
+  updates could lead to inconsistent datastructures which could presumably later
+  cause database corruption.
+
+### Enhancements:
+
+* Adding *null* support to `BinaryData` in exactly the same way as it was added
+  to `StringData`.
+
+----------------------------------------------
+
+# 0.87.5 Release notes
+
+### Bugfixes:
+
+* `AdaptiveStringColumn::find_all()` with an index no longer returns its results
+  twice.
+* Fixed `Table::get_distinct_view()` on tables which have not been modified
+  since they were loaded.
+
+### Enhancements:
+
+* Added `SharedGroup::wait_for_change_release()` which allows you to release a
+  thread waiting inside wait_for_change() on a specific SharedGroup instance.
+* SharedGroup now allows you to coordinate which version of the data a read
+  transaction can see. The type `VersionID` represents a specific commit to the
+  database. A user can obtain the `VersionID` for the active transaction from
+  `SharedGroup::get_version_of_current_transaction()`, and use it to obtain a a
+  transaction accessing that same version from another ShareGroup. This is done
+  by new forms of `SharedGroup::begin_read()`, `SharedGroup::advance_read()`.
+  Operators are provided so that VersionID's may be compared.
+* Creating distinct views on integer, datetime, bool and enum columns is now
+  possible.
+* Add `Table::minimum_datetime()` and `Table::maximum_datetime()`.
+* Extending `Table::get_sorted_view()` to support multi-column sorting.
+
+-----------
+
+### Internals:
+
+* Now uses system OpenSSL on Android rather than a statically-linked copy for encryption.
+
+----------------------------------------------
+
 # 0.87.4 Release notes
 
 ### Bugfixes:
@@ -52,6 +122,7 @@
 
 ### Enhancements:
 
+* Added 'compact' method to SharedGroup for better control of compaction of the database file.
 * The following constants were added: `Group::max_table_name_length`,
   `Table::max_column_name_length`, `Table::max_string_size`, and
   `Table::max_binary_size`.

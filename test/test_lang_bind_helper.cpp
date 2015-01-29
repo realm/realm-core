@@ -6375,8 +6375,7 @@ void multiple_trackers_writer_thread(string path)
     for (int i = 0; i < 10; ++i) {
         WriteTransaction wt(sg);
         TestTableInts::Ref tr = wt.get_table<TestTableInts>("table");
-
-        size_t idx = tr->is_empty() ? 0 : random.draw_int_mod(tr->size());
+        size_t idx = 1 + random.draw_int_mod(tr->size()-1);
 
         if (tr[idx].first == 42) {
             // do nothing
@@ -6580,6 +6579,9 @@ TEST(LangBindHelper_SyncCannotBeChanged_2)
 #ifndef TIGHTDB_ENABLE_ENCRYPTION
 // Interprocess communication does not work with encryption enabled
 
+#if !defined(TIGHTDB_ANDROID) && !defined(TIGHTDB_IOS)
+// fork should not be used on android or ios.
+
 TEST(LangBindHelper_ImplicitTransactions_InterProcess)
 {
     const int write_process_count = 7;
@@ -6663,6 +6665,7 @@ TEST(LangBindHelper_ImplicitTransactions_InterProcess)
     }
 
 }
+#endif
 #endif
 #endif
 
@@ -6875,6 +6878,7 @@ TEST(LangBindHelper_MemOnly)
     CHECK(!rt.get_group().is_empty());
 }
 
+
 TEST(LangBindHelper_Handover)
 {
     UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
@@ -6894,6 +6898,162 @@ TEST(LangBindHelper_Handover)
         vid = LangBindHelper::get
     }
 }
+
+
+TIGHTDB_TABLE_1(MyTable, first,  Int)
+
+
+TEST(LangBindHelper_VersionControl)
+{
+    const int num_versions = 10;
+    const int num_random_tests = 100;
+    SharedGroup::VersionID versions[num_versions];
+    SHARED_GROUP_TEST_PATH(path);
+    {
+        // Create a new shared db
+        UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
+        SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
+        UniquePtr<Replication> repl_w(makeWriteLogCollector(path, false, crypt_key()));
+        SharedGroup sg_w(*repl_w, SharedGroup::durability_Full, crypt_key());
+        // first create 'num_version' versions
+        sg.begin_read();
+        {
+                WriteTransaction wt(sg_w);
+                MyTable::Ref t = wt.get_or_add_table<MyTable>("test");
+                wt.commit();
+        }
+        for (int i = 0; i < num_versions; ++i) {
+            {
+                WriteTransaction wt(sg_w);
+                MyTable::Ref t = wt.get_table<MyTable>("test");
+                t->add(i);
+                wt.commit();
+            }
+            {
+                ReadTransaction rt(sg_w);
+                versions[i] = sg_w.get_version_of_current_transaction();
+            }
+        }
+
+        // do steps of increasing size from the first version to the last,
+        // including a "step on the spot" (from version 0 to 0)
+        {
+            for (int k = 0; k < num_versions; ++k) {
+                // cerr << "Advancing from initial version to version " << k << endl;
+                const Group& g = sg_w.begin_read(versions[0]);
+                MyTable::ConstRef t = g.get_table<MyTable>("test");
+                CHECK(versions[k] >= versions[0]);
+                g.Verify();
+                LangBindHelper::advance_read(sg_w, versions[k]);
+                g.Verify();
+                CHECK_EQUAL(k, t[k].first);
+                sg_w.end_read();
+            }
+        }
+
+        // step through the versions backward:
+        for (int i = num_versions-1; i >= 0; --i) {
+            // cerr << "Jumping directly to version " << i << endl;
+            const Group& g = sg_w.begin_read(versions[i]);
+            g.Verify();
+            MyTable::ConstRef t = g.get_table<MyTable>("test");
+            CHECK_EQUAL(i, t[i].first);
+            sg_w.end_read();
+        }
+
+        // then advance through the versions going forward
+        {
+            const Group& g = sg_w.begin_read(versions[0]);
+            g.Verify();
+            MyTable::ConstRef t = g.get_table<MyTable>("test");
+            for (int k = 0; k < num_versions; ++k) {
+                // cerr << "Advancing to version " << k << endl;
+                CHECK(k==0 || versions[k] >= versions[k-1]);
+                LangBindHelper::advance_read(sg_w, versions[k]);
+                g.Verify();
+                CHECK_EQUAL(k, t[k].first);
+            }
+            sg_w.end_read();
+        }
+
+        // sync to a randomly selected version - use advance_read when going
+        // forward in time, but begin_read when going back in time
+        int old_version = 0;
+        const Group& g = sg_w.begin_read(versions[old_version]);
+        MyTable::ConstRef t = g.get_table<MyTable>("test");
+        CHECK_EQUAL(old_version, t[old_version].first);
+        for (int k = num_random_tests; k; --k) {
+            int new_version = random() % num_versions;
+            // cerr << "Random jump: version " << old_version << " -> " << new_version << endl;
+            if (new_version < old_version) {
+                CHECK(versions[new_version] < versions[old_version]);
+                sg_w.end_read();
+                sg_w.begin_read(versions[new_version]);
+                g.Verify();
+                t = g.get_table<MyTable>("test");
+                CHECK_EQUAL(new_version, t[new_version].first);
+            }
+            else {
+                CHECK(versions[new_version] >= versions[old_version]);
+                g.Verify();
+                LangBindHelper::advance_read(sg_w, versions[new_version]);
+                g.Verify();
+                CHECK_EQUAL(new_version, t[new_version].first);
+            }
+            old_version = new_version;
+        }
+        sg_w.end_read();
+        // release the first readlock and commit something to force a cleanup
+        // we need to commit twice, because cleanup is done before the actual
+        // commit, so during the first commit, the last of the previous versions
+        // will still be kept. To get rid of it, we must commit once more.
+        sg.end_read();
+        sg_w.begin_write();
+        sg_w.commit();
+        sg_w.begin_write();
+        sg_w.commit();
+
+        // validate that all the versions are now unreachable
+        for (int i = 0; i < num_versions; ++i) {
+            try {
+                sg.begin_read(versions[i]);
+                CHECK(false);
+            } catch (...) {
+            }
+        }
+    }
+}
+
+TEST(Shared_LinkListCrash)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
+    SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
+    {
+        WriteTransaction wt(sg);
+        TableRef points = wt.add_table("Point");
+        points->add_column(type_Int, "value");
+        wt.commit();
+    }
+
+    UniquePtr<Replication> repl2(makeWriteLogCollector(path, false, crypt_key()));
+    SharedGroup sg2(*repl, SharedGroup::durability_Full, crypt_key());
+    Group& g2 = const_cast<Group&>(sg2.begin_read());
+    for (int i = 0; i < 2; ++i) {
+        WriteTransaction wt(sg);
+        wt.commit();
+    }
+    for (int i = 0; i < 1; ++i)
+    {
+        WriteTransaction wt(sg);
+        wt.get_table("Point")->add_empty_row();
+        wt.commit();
+    }
+    g2.Verify();
+    LangBindHelper::advance_read(sg2);
+    g2.Verify();
+}
+
 
 #endif // TIGHTDB_ENABLE_REPLICATION
 
