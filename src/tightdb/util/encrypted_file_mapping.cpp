@@ -559,7 +559,7 @@ File::SizeType encrypted_size_to_data_size(File::SizeType size) TIGHTDB_NOEXCEPT
 
 File::SizeType data_size_to_encrypted_size(File::SizeType size) TIGHTDB_NOEXCEPT
 {
-    return real_offset(size);
+    return real_offset((size + page_size - 1) & ~(page_size - 1));
 }
 
 #else
