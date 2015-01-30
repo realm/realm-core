@@ -23,11 +23,12 @@
 #include <cstdlib>
 #include <iostream>
 
+#include <cstdio>
+#include <cstring>
+#include <dlfcn.h>
+#include <pthread.h>
 #include <sys/mman.h>
 #include <unistd.h>
-#include <string.h>
-#include <stdio.h>
-#include <dlfcn.h>
 
 #include <tightdb/util/terminate.hpp>
 
@@ -40,10 +41,26 @@ void dlsym_cast(T& ptr, const char *name) {
     // C++11 makes it implementation-defined specifically to support dlsym
     ptr = reinterpret_cast<T>(reinterpret_cast<size_t>(addr));
 }
+
+size_t cached_page_size;
+void get_page_size()
+{
+    long size = sysconf(_SC_PAGESIZE);
+    TIGHTDB_ASSERT(size > 0 && size % 4096 == 0 &&
+                   static_cast<unsigned long>(size) < std::numeric_limits<size_t>::max());
+    cached_page_size = static_cast<size_t>(size);
 }
+} // anonymous namespace
 
 namespace tightdb {
 namespace util {
+
+size_t page_size()
+{
+    pthread_once_t once = PTHREAD_ONCE_INIT;
+    pthread_once(&once, get_page_size);
+    return cached_page_size;
+}
 
 SharedFileInfo::SharedFileInfo(const uint8_t* key, int fd)
 : fd(fd), cryptor(key)
@@ -112,19 +129,19 @@ struct iv_table {
 
 namespace {
 const int aes_block_size = 16;
-const size_t page_size = 4096;
+const size_t block_size = 4096;
 
 const size_t metadata_size = sizeof(iv_table);
-const size_t pages_per_metadata_page = page_size / metadata_size;
+const size_t blocks_per_metadata_block = block_size / metadata_size;
 
 // map an offset in the data to the actual location in the file
 template<typename Int>
 Int real_offset(Int pos)
 {
     TIGHTDB_ASSERT(pos >= 0);
-    const size_t page_index = static_cast<size_t>(pos) / page_size;
-    const size_t metadata_page_count = page_index / pages_per_metadata_page + 1;
-    return pos + metadata_page_count * page_size;
+    const size_t index = static_cast<size_t>(pos) / block_size;
+    const size_t metadata_page_count = index / blocks_per_metadata_block + 1;
+    return pos + metadata_page_count * block_size;
 }
 
 // map a location in the file to the offset in the data
@@ -132,19 +149,19 @@ template<typename Int>
 Int fake_offset(Int pos)
 {
     TIGHTDB_ASSERT(pos >= 0);
-    const size_t page_index = static_cast<size_t>(pos) / page_size;
-    const size_t metadata_page_count = (page_index + pages_per_metadata_page) / (pages_per_metadata_page + 1);
-    return pos - metadata_page_count * page_size;
+    const size_t index = static_cast<size_t>(pos) / block_size;
+    const size_t metadata_page_count = (index + blocks_per_metadata_block) / (blocks_per_metadata_block + 1);
+    return pos - metadata_page_count * block_size;
 }
 
 // get the location of the iv_table for the given data (not file) position
 off_t iv_table_pos(off_t pos)
 {
     TIGHTDB_ASSERT(pos >= 0);
-    const size_t page_index = static_cast<size_t>(pos) / page_size;
-    const size_t metadata_block = page_index / pages_per_metadata_page;
-    const size_t metadata_index = page_index & (pages_per_metadata_page - 1);
-    return metadata_block * (pages_per_metadata_page + 1) * page_size + metadata_index * metadata_size;
+    const size_t index = static_cast<size_t>(pos) / block_size;
+    const size_t metadata_block = index / blocks_per_metadata_block;
+    const size_t metadata_index = index & (blocks_per_metadata_block - 1);
+    return metadata_block * (blocks_per_metadata_block + 1) * block_size + metadata_index * metadata_size;
 }
 
 void check_write(int fd, off_t pos, const void *data, size_t len)
@@ -166,24 +183,24 @@ size_t check_read(int fd, off_t pos, void *dst, size_t len)
 void AESCryptor::set_file_size(off_t new_size)
 {
     TIGHTDB_ASSERT(new_size >= 0);
-    size_t page_count = (new_size + page_size - 1) / page_size;
-    m_iv_buffer.reserve((page_count + pages_per_metadata_page - 1) & ~(pages_per_metadata_page - 1));
+    size_t block_count = (new_size + block_size - 1) / block_size;
+    m_iv_buffer.reserve((block_count + blocks_per_metadata_block - 1) & ~(blocks_per_metadata_block - 1));
 }
 
 iv_table& AESCryptor::get_iv_table(int fd, off_t data_pos) TIGHTDB_NOEXCEPT
 {
-    size_t idx = data_pos / page_size;
+    size_t idx = data_pos / block_size;
     if (idx < m_iv_buffer.size())
         return m_iv_buffer[idx];
 
     size_t old_size = m_iv_buffer.size();
-    size_t new_page_count = 1 + idx / pages_per_metadata_page;
-    TIGHTDB_ASSERT(new_page_count * pages_per_metadata_page <= m_iv_buffer.capacity()); // not safe to allocate here
-    m_iv_buffer.resize(new_page_count * pages_per_metadata_page);
+    size_t new_block_count = 1 + idx / blocks_per_metadata_block;
+    TIGHTDB_ASSERT(new_block_count * blocks_per_metadata_block <= m_iv_buffer.capacity()); // not safe to allocate here
+    m_iv_buffer.resize(new_block_count * blocks_per_metadata_block);
 
-    for (size_t i = old_size; i < new_page_count * pages_per_metadata_page; i += pages_per_metadata_page) {
-        size_t bytes = check_read(fd, iv_table_pos(i * page_size), &m_iv_buffer[i], page_size);
-        if (bytes < page_size)
+    for (size_t i = old_size; i < new_block_count * blocks_per_metadata_block; i += blocks_per_metadata_block) {
+        size_t bytes = check_read(fd, iv_table_pos(i * block_size), &m_iv_buffer[i], block_size);
+        if (bytes < block_size)
             break; // rest is zero-filled by resize()
     }
 
@@ -202,10 +219,10 @@ bool AESCryptor::check_hmac(const void *src, size_t len, const uint8_t *hmac) co
     return result == 0;
 }
 
-bool AESCryptor::read(int fd, off_t pos, char* dst) TIGHTDB_NOEXCEPT
+bool AESCryptor::read(int fd, off_t pos, char* dst, size_t size) TIGHTDB_NOEXCEPT
 {
     try {
-        return try_read(fd, pos, dst);
+        return try_read(fd, pos, dst, size);
     }
     catch (...) {
         // Not recoverable since we're running in a signal handler
@@ -213,63 +230,77 @@ bool AESCryptor::read(int fd, off_t pos, char* dst) TIGHTDB_NOEXCEPT
     }
 }
 
-bool AESCryptor::try_read(int fd, off_t pos, char* dst) {
-    char buffer[page_size];
-    ssize_t bytes_read = check_read(fd, real_offset(pos), buffer, page_size);
+bool AESCryptor::try_read(int fd, off_t pos, char* dst, size_t size) {
+    TIGHTDB_ASSERT(size % block_size == 0);
+    while (size > 0) {
+        char buffer[block_size];
+        ssize_t bytes_read = check_read(fd, real_offset(pos), buffer, block_size);
 
-    if (bytes_read == 0)
-        return false;
+        if (bytes_read == 0)
+            return false;
 
-    iv_table& iv = get_iv_table(fd, pos);
-    if (iv.iv1 == 0) {
-        // This page has never been written to, so we've just read pre-allocated
-        // space. No memset() since the code using this doesn't rely on
-        // pre-allocated space being zeroed.
-        return false;
-    }
-
-    if (!check_hmac(buffer, bytes_read, iv.hmac1)) {
-        // Either the DB is corrupted or we were interrupted between writing the
-        // new IV and writing the data
-        if (iv.iv2 == 0) {
-            // Very first write was interrupted
+        iv_table& iv = get_iv_table(fd, pos);
+        if (iv.iv1 == 0) {
+            // This block has never been written to, so we've just read pre-allocated
+            // space. No memset() since the code using this doesn't rely on
+            // pre-allocated space being zeroed.
             return false;
         }
 
-        if (check_hmac(buffer, bytes_read, iv.hmac2)) {
-            // Un-bump the IV since the write with the bumped IV never actually
-            // happened
-            memcpy(&iv.iv1, &iv.iv2, 32);
-        }
-        else
-            throw DecryptionFailed();
-    }
+        if (!check_hmac(buffer, bytes_read, iv.hmac1)) {
+            // Either the DB is corrupted or we were interrupted between writing the
+            // new IV and writing the data
+            if (iv.iv2 == 0) {
+                // Very first write was interrupted
+                return false;
+            }
 
-    crypt(mode_Decrypt, pos, dst, buffer, reinterpret_cast<const char*>(&iv.iv1));
+            if (check_hmac(buffer, bytes_read, iv.hmac2)) {
+                // Un-bump the IV since the write with the bumped IV never actually
+                // happened
+                memcpy(&iv.iv1, &iv.iv2, 32);
+            }
+            else
+                throw DecryptionFailed();
+        }
+
+        crypt(mode_Decrypt, pos, dst, buffer, reinterpret_cast<const char*>(&iv.iv1));
+
+        pos += block_size;
+        dst += block_size;
+        size -= block_size;
+    }
     return true;
 }
 
-void AESCryptor::write(int fd, off_t pos, const char* src) TIGHTDB_NOEXCEPT
+void AESCryptor::write(int fd, off_t pos, const char* src, size_t size) TIGHTDB_NOEXCEPT
 {
-    iv_table& iv = get_iv_table(fd, pos);
+    TIGHTDB_ASSERT(size % block_size == 0);
+    while (size > 0) {
+        iv_table& iv = get_iv_table(fd, pos);
 
-    memcpy(&iv.iv2, &iv.iv1, 32);
-    char buffer[page_size];
-    do {
-        ++iv.iv1;
-        // 0 is reserved for never-been-used, so bump if we just wrapped around
-        if (iv.iv1 == 0)
+        memcpy(&iv.iv2, &iv.iv1, 32);
+        char buffer[block_size];
+        do {
             ++iv.iv1;
+            // 0 is reserved for never-been-used, so bump if we just wrapped around
+            if (iv.iv1 == 0)
+                ++iv.iv1;
 
-        crypt(mode_Encrypt, pos, buffer, src, reinterpret_cast<const char*>(&iv.iv1));
-        calc_hmac(buffer, page_size, iv.hmac1, m_hmacKey);
-        // In the extremely unlikely case that both the old and new versions have
-        // the same hash we won't know which IV to use, so bump the IV until
-        // they're different.
-    } while (TIGHTDB_UNLIKELY(memcmp(iv.hmac1, iv.hmac2, 4) == 0));
+            crypt(mode_Encrypt, pos, buffer, src, reinterpret_cast<const char*>(&iv.iv1));
+            calc_hmac(buffer, block_size, iv.hmac1, m_hmacKey);
+            // In the extremely unlikely case that both the old and new versions have
+            // the same hash we won't know which IV to use, so bump the IV until
+            // they're different.
+        } while (TIGHTDB_UNLIKELY(memcmp(iv.hmac1, iv.hmac2, 4) == 0));
 
-    check_write(fd, iv_table_pos(pos), &iv, sizeof(iv));
-    check_write(fd, real_offset(pos), buffer, page_size);
+        check_write(fd, iv_table_pos(pos), &iv, sizeof(iv));
+        check_write(fd, real_offset(pos), buffer, block_size);
+
+        pos += block_size;
+        src += block_size;
+        size -= block_size;
+    }
 }
 
 void AESCryptor::crypt(EncryptionMode mode, off_t pos, char* dst,
@@ -284,14 +315,14 @@ void AESCryptor::crypt(EncryptionMode mode, off_t pos, char* dst,
     CCCryptorReset(cryptor, iv);
 
     size_t bytesEncrypted = 0;
-    CCCryptorStatus err = CCCryptorUpdate(cryptor, src, page_size, dst, page_size, &bytesEncrypted);
+    CCCryptorStatus err = CCCryptorUpdate(cryptor, src, block_size, dst, block_size, &bytesEncrypted);
     TIGHTDB_ASSERT(err == kCCSuccess);
-    TIGHTDB_ASSERT(bytesEncrypted == page_size);
+    TIGHTDB_ASSERT(bytesEncrypted == block_size);
     static_cast<void>(bytesEncrypted);
     static_cast<void>(err);
 #else
     AES_cbc_encrypt(reinterpret_cast<const uint8_t*>(src), reinterpret_cast<uint8_t*>(dst),
-                    page_size, mode == mode_Encrypt ? &m_ectx : &m_dctx, iv, mode);
+                    block_size, mode == mode_Encrypt ? &m_ectx : &m_dctx, iv, mode);
 #endif
 }
 
@@ -327,11 +358,17 @@ void AESCryptor::calc_hmac(const void* src, size_t len, uint8_t* dst, const uint
 
 EncryptedFileMapping::EncryptedFileMapping(SharedFileInfo& file, void* addr, size_t size, File::AccessMode access)
 : m_file(file)
+, m_page_size(tightdb::util::page_size())
+, m_blocks_per_page(m_page_size / block_size)
 , m_addr(0)
 , m_size(0)
 , m_page_count(0)
 , m_access(access)
+#ifdef TIGHTDB_DEBUG
+, m_validate_buffer(new char[m_page_size])
+#endif
 {
+    TIGHTDB_ASSERT(m_blocks_per_page * block_size == m_page_size);
     set(addr, size); // throws
     file.mappings.push_back(this);
 }
@@ -345,7 +382,7 @@ EncryptedFileMapping::~EncryptedFileMapping()
 
 char* EncryptedFileMapping::page_addr(size_t i) const TIGHTDB_NOEXCEPT
 {
-    return reinterpret_cast<char*>(((m_first_page + i) * page_size));
+    return reinterpret_cast<char*>(((m_first_page + i) * m_page_size));
 }
 
 void EncryptedFileMapping::mark_unreadable(size_t i) TIGHTDB_NOEXCEPT
@@ -357,7 +394,7 @@ void EncryptedFileMapping::mark_unreadable(size_t i) TIGHTDB_NOEXCEPT
         flush();
 
     if (m_read_pages[i]) {
-        mprotect(page_addr(i), page_size, PROT_NONE);
+        mprotect(page_addr(i), m_page_size, PROT_NONE);
         m_read_pages[i] = false;
     }
 }
@@ -367,7 +404,7 @@ void EncryptedFileMapping::mark_readable(size_t i) TIGHTDB_NOEXCEPT
     if (i >= m_read_pages.size() || (m_read_pages[i] && !m_write_pages[i]))
         return;
 
-    mprotect(page_addr(i), page_size, PROT_READ);
+    mprotect(page_addr(i), m_page_size, PROT_READ);
     m_read_pages[i] = true;
     m_write_pages[i] = false;
 }
@@ -378,7 +415,7 @@ void EncryptedFileMapping::mark_unwritable(size_t i) TIGHTDB_NOEXCEPT
         return;
 
     TIGHTDB_ASSERT(m_read_pages[i]);
-    mprotect(page_addr(i), page_size, PROT_READ);
+    mprotect(page_addr(i), m_page_size, PROT_READ);
     m_write_pages[i] = false;
     // leave dirty bit set
 }
@@ -392,7 +429,7 @@ bool EncryptedFileMapping::copy_read_page(size_t page) TIGHTDB_NOEXCEPT
 
         m->mark_unwritable(page);
         if (m->m_read_pages[page]) {
-            memcpy(page_addr(page), m->page_addr(page), page_size);
+            memcpy(page_addr(page), m->page_addr(page), m_page_size);
             return true;
         }
     }
@@ -402,12 +439,14 @@ bool EncryptedFileMapping::copy_read_page(size_t page) TIGHTDB_NOEXCEPT
 void EncryptedFileMapping::read_page(size_t i) TIGHTDB_NOEXCEPT
 {
     char* addr = page_addr(i);
-    mprotect(addr, page_size, PROT_READ | PROT_WRITE);
+    mprotect(addr, m_page_size, PROT_READ | PROT_WRITE);
 
     if (!copy_read_page(i))
-        m_file.cryptor.read(m_file.fd, i * page_size, addr);
+        m_file.cryptor.read(m_file.fd, i * m_page_size, addr, m_page_size);
 
-    mark_readable(i);
+    mprotect(page_addr(i), m_page_size, PROT_READ);
+    m_read_pages[i] = true;
+    m_write_pages[i] = false;
 }
 
 void EncryptedFileMapping::write_page(size_t page) TIGHTDB_NOEXCEPT
@@ -418,7 +457,7 @@ void EncryptedFileMapping::write_page(size_t page) TIGHTDB_NOEXCEPT
             m->mark_unreadable(page);
     }
 
-    mprotect(page_addr(page), page_size, PROT_READ | PROT_WRITE);
+    mprotect(page_addr(page), m_page_size, PROT_READ | PROT_WRITE);
     m_write_pages[page] = true;
     m_dirty_pages[page] = true;
 }
@@ -429,21 +468,20 @@ void EncryptedFileMapping::validate_page(size_t page) TIGHTDB_NOEXCEPT
     if (!m_read_pages[page])
         return;
 
-    char buffer[page_size];
-    if (!m_file.cryptor.read(m_file.fd, page * page_size, buffer))
+    if (!m_file.cryptor.read(m_file.fd, page * m_page_size, m_validate_buffer.get(), m_page_size))
         return;
 
     for (size_t i = 0; i < m_file.mappings.size(); ++i) {
         EncryptedFileMapping* m = m_file.mappings[i];
         if (m != this && page < m->m_page_count && m->m_dirty_pages[page]) {
-            memcpy(buffer, m->page_addr(page), page_size);
+            memcpy(m_validate_buffer.get(), m->page_addr(page), m_page_size);
             break;
         }
     }
 
-    if (memcmp(buffer, page_addr(page), page_size)) {
+    if (memcmp(m_validate_buffer.get(), page_addr(page), m_page_size)) {
         std::cerr << "mismatch " << this << ": fd(" << m_file.fd << ") page("
-                  << page << "/" << m_page_count << ") " << buffer << " "
+                  << page << "/" << m_page_count << ") " << m_validate_buffer.get() << " "
                   << page_addr(page) << std::endl;
         TIGHTDB_TERMINATE("");
     }
@@ -466,7 +504,7 @@ void EncryptedFileMapping::flush() TIGHTDB_NOEXCEPT
     for (size_t i = 0; i < m_page_count; ++i) {
         if (!m_read_pages[i]) {
             if (start < i)
-                mprotect(page_addr(start), (i - start) * page_size, PROT_READ);
+                mprotect(page_addr(start), (i - start) * m_page_size, PROT_READ);
             start = i + 1;
         }
         else if (start == i && !m_write_pages[i])
@@ -477,12 +515,12 @@ void EncryptedFileMapping::flush() TIGHTDB_NOEXCEPT
             continue;
         }
 
-        m_file.cryptor.write(m_file.fd, i * page_size, page_addr(i));
+        m_file.cryptor.write(m_file.fd, i * m_page_size, page_addr(i), m_page_size);
         m_dirty_pages[i] = false;
         m_write_pages[i] = false;
     }
     if (start < m_page_count)
-        mprotect(page_addr(start), (m_page_count - start) * page_size, PROT_READ);
+        mprotect(page_addr(start), (m_page_count - start) * m_page_size, PROT_READ);
 
     validate();
 }
@@ -503,7 +541,7 @@ void EncryptedFileMapping::sync() TIGHTDB_NOEXCEPT
 
 void EncryptedFileMapping::handle_access(void* addr) TIGHTDB_NOEXCEPT
 {
-    size_t accessed_page = reinterpret_cast<uintptr_t>(addr) / page_size;
+    size_t accessed_page = reinterpret_cast<uintptr_t>(addr) / m_page_size;
 
     size_t idx = accessed_page - m_first_page;
     if (!m_read_pages[idx]) {
@@ -520,7 +558,8 @@ void EncryptedFileMapping::handle_access(void* addr) TIGHTDB_NOEXCEPT
 void EncryptedFileMapping::set(void* new_addr, size_t new_size)
 {
     m_file.cryptor.set_file_size(new_size);
-    TIGHTDB_ASSERT(new_size % page_size == 0);
+    TIGHTDB_ASSERT(new_size % m_page_size == 0);
+    TIGHTDB_ASSERT(new_size > 0);
 
     bool first_init = m_addr == 0;
 
@@ -528,8 +567,8 @@ void EncryptedFileMapping::set(void* new_addr, size_t new_size)
     m_addr = new_addr;
     m_size = new_size;
 
-    m_first_page = reinterpret_cast<uintptr_t>(m_addr) / page_size;
-    m_page_count = (m_size + page_size - 1)  / page_size;
+    m_first_page = reinterpret_cast<uintptr_t>(m_addr) / m_page_size;
+    m_page_count = m_size / m_page_size;
 
     m_read_pages.clear();
     m_write_pages.clear();
@@ -541,13 +580,13 @@ void EncryptedFileMapping::set(void* new_addr, size_t new_size)
 
     if (first_init) {
         if (!copy_read_page(0))
-            m_file.cryptor.try_read(m_file.fd, 0, page_addr(0));
+            m_file.cryptor.try_read(m_file.fd, 0, page_addr(0), m_page_size);
         mark_readable(0);
         if (m_page_count > 0)
-            mprotect(page_addr(1), (m_page_count - 1) * page_size, PROT_NONE);
+            mprotect(page_addr(1), (m_page_count - 1) * m_page_size, PROT_NONE);
     }
     else
-        mprotect(m_addr, m_page_count * page_size, PROT_NONE);
+        mprotect(m_addr, m_page_count * m_page_size, PROT_NONE);
 }
 
 File::SizeType encrypted_size_to_data_size(File::SizeType size) TIGHTDB_NOEXCEPT
@@ -559,7 +598,8 @@ File::SizeType encrypted_size_to_data_size(File::SizeType size) TIGHTDB_NOEXCEPT
 
 File::SizeType data_size_to_encrypted_size(File::SizeType size) TIGHTDB_NOEXCEPT
 {
-    return real_offset((size + page_size - 1) & ~(page_size - 1));
+    size_t ps = page_size();
+    return real_offset((size + ps - 1) & ~(ps - 1));
 }
 
 #else

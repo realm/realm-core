@@ -52,6 +52,8 @@ typedef struct SHA256state_st {
 namespace tightdb {
 namespace util {
 
+size_t page_size();
+
 struct iv_table;
 
 class AESCryptor {
@@ -61,9 +63,9 @@ public:
 
     void set_file_size(off_t new_size);
 
-    bool try_read(int fd, off_t pos, char* dst);
-    bool read(int fd, off_t pos, char* dst) TIGHTDB_NOEXCEPT;
-    void write(int fd, off_t pos, const char* src) TIGHTDB_NOEXCEPT;
+    bool try_read(int fd, off_t pos, char* dst, size_t size);
+    bool read(int fd, off_t pos, char* dst, size_t size) TIGHTDB_NOEXCEPT;
+    void write(int fd, off_t pos, const char* src, size_t size) TIGHTDB_NOEXCEPT;
 
 private:
     enum EncryptionMode {
@@ -141,6 +143,9 @@ public:
 private:
     SharedFileInfo& m_file;
 
+    size_t m_page_size;
+    size_t m_blocks_per_page;
+
     void* m_addr;
     size_t m_size;
 
@@ -152,6 +157,10 @@ private:
     std::vector<bool> m_dirty_pages;
 
     File::AccessMode m_access;
+
+#ifdef TIGHTDB_DEBUG
+    UniquePtr<char[]> m_validate_buffer;
+#endif
 
     char* page_addr(size_t i) const TIGHTDB_NOEXCEPT;
 

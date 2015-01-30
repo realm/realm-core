@@ -45,8 +45,6 @@ using namespace tightdb;
 using namespace tightdb::util;
 
 namespace {
-const size_t page_size = 4096;
-
 class SpinLockGuard {
 public:
     SpinLockGuard(Atomic<bool>& lock) : m_lock(lock)
@@ -132,11 +130,6 @@ mapping_and_addr* find_mapping_for_addr(void* addr, size_t size)
     return 0;
 }
 
-size_t round_up_to_page_size(size_t size)
-{
-    return (size + page_size - 1) & ~(page_size - 1);
-}
-
 void add_mapping(void* addr, size_t size, int fd, File::AccessMode access, const char* encryption_key)
 {
     struct stat st;
@@ -145,7 +138,7 @@ void add_mapping(void* addr, size_t size, int fd, File::AccessMode access, const
         throw std::runtime_error(get_errno_msg("fstat() failed: ", err));
     }
 
-    if (st.st_size > 0 && static_cast<size_t>(st.st_size) < page_size)
+    if (st.st_size > 0 && static_cast<size_t>(st.st_size) < page_size())
         throw DecryptionFailed();
 
     SpinLockGuard lock(mapping_lock);
@@ -155,6 +148,7 @@ void add_mapping(void* addr, size_t size, int fd, File::AccessMode access, const
         has_installed_handler = true;
 
         struct sigaction action;
+        memset(&action, 0, sizeof(action));
         action.sa_sigaction = signal_handler;
         action.sa_flags = SA_SIGINFO;
 
@@ -250,6 +244,13 @@ void* mmap_anon(size_t size)
 
 namespace tightdb {
 namespace util {
+
+#ifdef TIGHTDB_ENABLE_ENCRYPTION
+size_t round_up_to_page_size(size_t size) TIGHTDB_NOEXCEPT
+{
+    return (size + page_size() - 1) & ~(page_size() - 1);
+}
+#endif
 
 void* mmap(int fd, size_t size, File::AccessMode access, const char* encryption_key)
 {
