@@ -88,7 +88,7 @@ AdaptiveStringColumn::AdaptiveStringColumn(Allocator& alloc, ref_type ref, bool 
     switch (type) {
         case Array::type_Normal: {
             // Small strings root leaf
-            ArrayString* root = new ArrayString(alloc); // Throws
+            ArrayString* root = new ArrayString(alloc, nullable); // Throws
             root->init_from_mem(mem);
             m_array = root;
             return;
@@ -97,7 +97,7 @@ AdaptiveStringColumn::AdaptiveStringColumn(Allocator& alloc, ref_type ref, bool 
             bool is_big = Array::get_context_flag_from_header(header);
             if (!is_big) {
                 // Medium strings root leaf
-                ArrayStringLong* root = new ArrayStringLong(alloc); // Throws
+                ArrayStringLong* root = new ArrayStringLong(alloc, nullable); // Throws
                 root->init_from_mem(mem);
                 m_array = root;
                 return;
@@ -193,7 +193,7 @@ StringIndex* AdaptiveStringColumn::create_search_index()
     TIGHTDB_ASSERT(!m_search_index);
 
     UniquePtr<StringIndex> index;
-    index.reset(new StringIndex(this, &get_string, m_array->get_alloc())); // Throws
+    index.reset(new StringIndex(this, &get_string, m_array->get_alloc(), m_nullable)); // Throws
 
     // Populate the index
     size_t num_rows = size();
@@ -214,7 +214,7 @@ void AdaptiveStringColumn::set_search_index_ref(ref_type ref, ArrayParent* paren
 {
     TIGHTDB_ASSERT(!m_search_index);
     m_search_index = new StringIndex(ref, parent, ndx_in_parent, this, &get_string,
-                                     !allow_duplicate_valaues, m_array->get_alloc()); // Throws
+                                     !allow_duplicate_valaues, m_array->get_alloc(), m_nullable); // Throws
 }
 
 
@@ -1146,7 +1146,7 @@ AdaptiveStringColumn::LeafType AdaptiveStringColumn::upgrade_root_leaf(size_t va
     if (value_size <= medium_string_max_size) {
         // Upgrade root leaf from small to medium strings
         UniquePtr<ArrayStringLong> new_leaf;
-        new_leaf.reset(new ArrayStringLong(alloc)); // Throws
+        new_leaf.reset(new ArrayStringLong(alloc, m_nullable)); // Throws
         new_leaf->create(); // Throws
         new_leaf->set_parent(parent, ndx_in_parent);
         new_leaf->update_parent(); // Throws

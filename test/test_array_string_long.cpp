@@ -261,7 +261,7 @@ TEST(ArrayStringLong_Null)
 {
     if (NULLS) {
         {
-            ArrayStringLong a(Allocator::get_default());
+            ArrayStringLong a(Allocator::get_default(), true);
             a.create();
 
             a.add("foo");
@@ -285,7 +285,7 @@ TEST(ArrayStringLong_Null)
         }
 
         {
-            ArrayStringLong a(Allocator::get_default());
+            ArrayStringLong a(Allocator::get_default(), true);
             a.create();
 
             a.add(StringData(0, 0));  // add null (StringData::data() == 0)
@@ -313,7 +313,7 @@ TEST(ArrayStringLong_Null)
         }
 
         {
-            ArrayStringLong a(Allocator::get_default());
+            ArrayStringLong a(Allocator::get_default(), true);
             a.create();
 
             a.add("");
@@ -336,10 +336,11 @@ TEST(ArrayStringLong_Null)
             a.destroy();
         }
 
+
         Random random(random_int<unsigned long>());
 
         for (size_t t = 0; t < 2; t++) {
-            ArrayStringLong a(Allocator::get_default());
+            ArrayStringLong a(Allocator::get_default(), true);
             a.create();
 
             // vector that is kept in sync with the ArrayString so that we can compare with it

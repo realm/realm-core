@@ -44,7 +44,7 @@ class ArrayString: public Array {
 public:
     typedef StringData value_type;
 
-    explicit ArrayString(Allocator&) TIGHTDB_NOEXCEPT;
+    explicit ArrayString(Allocator&, bool nullable = false) TIGHTDB_NOEXCEPT;
     explicit ArrayString(no_prealloc_tag) TIGHTDB_NOEXCEPT;
     ~ArrayString() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
 
@@ -102,6 +102,8 @@ private:
     std::size_t CalcItemCount(std::size_t bytes,
                               std::size_t width) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     WidthType GetWidthType() const TIGHTDB_OVERRIDE { return wtype_Multiply; }
+
+    bool m_nullable;
 };
 
 
@@ -109,8 +111,8 @@ private:
 // Implementation:
 
 // Creates new array (but invalid, call init_from_ref() to init)
-inline ArrayString::ArrayString(Allocator& alloc) TIGHTDB_NOEXCEPT:
-    Array(alloc)
+inline ArrayString::ArrayString(Allocator& alloc, bool nullable) TIGHTDB_NOEXCEPT:
+Array(alloc), m_nullable(nullable)
 {
 }
 

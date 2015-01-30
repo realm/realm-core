@@ -20,7 +20,7 @@ void ArrayStringLong::init_from_mem(MemRef mem) TIGHTDB_NOEXCEPT
     m_offsets.init_from_ref(offsets_ref);
     m_blob.init_from_ref(blob_ref);
 
-    if (NULLS) {
+    if (m_nullable) {
         ref_type nulls_ref = get_as_ref(2);
         m_nulls.init_from_ref(nulls_ref);
     }
@@ -35,7 +35,7 @@ void ArrayStringLong::add(StringData value)
     if (!m_offsets.is_empty())
         end += to_size_t(m_offsets.back());
     m_offsets.add(end);
-    if (NULLS)
+    if (m_nullable)
         m_nulls.add(!value.is_null());
 }
 
@@ -51,7 +51,7 @@ void ArrayStringLong::set(size_t ndx, StringData value)
     size_t new_end = begin + value.size() + 1;
     int64_t diff =  int64_t(new_end) - int64_t(end);
     m_offsets.adjust(ndx, m_offsets.size(), diff);
-    if (NULLS)
+    if (m_nullable)
         m_nulls.set(ndx, !value.is_null());
 }
 
@@ -65,7 +65,7 @@ void ArrayStringLong::insert(size_t ndx, StringData value)
     m_blob.insert(pos, value.data(), value.size(), add_zero_term);
     m_offsets.insert(ndx, pos + value.size() + 1);
     m_offsets.adjust(ndx+1, m_offsets.size(), value.size() + 1);
-    if (NULLS)
+    if (m_nullable)
         m_nulls.insert(ndx, !value.is_null());
 }
 
@@ -79,13 +79,13 @@ void ArrayStringLong::erase(size_t ndx)
     m_blob.erase(begin, end);
     m_offsets.erase(ndx);
     m_offsets.adjust(ndx, m_offsets.size(), int64_t(begin) - int64_t(end));
-    if (NULLS)
+    if (m_nullable)
         m_nulls.erase(ndx);
 }
 
 bool ArrayStringLong::is_null(size_t ndx) const
 {
-    if (NULLS) {
+    if (m_nullable) {
         TIGHTDB_ASSERT(ndx < m_nulls.size());
         return !m_nulls.get(ndx);
     }
@@ -96,7 +96,7 @@ bool ArrayStringLong::is_null(size_t ndx) const
 
 void ArrayStringLong::set_null(size_t ndx)
 {
-    if (NULLS) {
+    if (m_nullable) {
         TIGHTDB_ASSERT(ndx < m_nulls.size());
         m_nulls.set(ndx, false);
     }
@@ -160,7 +160,9 @@ StringData ArrayStringLong::get(const char* header, size_t ndx, Allocator& alloc
     ref_type blob_ref;
     ref_type nulls_ref;
 
-    if (NULLS) {
+    bool nullable = get_size_from_header(header, alloc) == 3;
+
+    if (nullable) {
         get_three(header, 0, offsets_ref, blob_ref, nulls_ref);
         const char* nulls_header = alloc.translate(nulls_ref);
         if (Array::get(nulls_header, ndx) == 0)
@@ -205,7 +207,7 @@ ref_type ArrayStringLong::bptree_leaf_insert(size_t ndx, StringData value, TreeI
     }
 
     // Split leaf node
-    ArrayStringLong new_leaf(get_alloc());
+    ArrayStringLong new_leaf(get_alloc(), m_nullable);
     new_leaf.create(); // Throws
     if (ndx == leaf_size) {
         new_leaf.add(value); // Throws
@@ -268,7 +270,7 @@ MemRef ArrayStringLong::slice(size_t offset, size_t size, Allocator& target_allo
 {
     TIGHTDB_ASSERT(is_attached());
 
-    ArrayStringLong slice(target_alloc);
+    ArrayStringLong slice(target_alloc, m_nullable);
     _impl::ShallowArrayDestroyGuard dg(&slice);
     slice.create(); // Throws
     size_t begin = offset;

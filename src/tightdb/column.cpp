@@ -504,7 +504,7 @@ void Column::move_assign(Column& col)
     col.m_array = 0;
     m_search_index = col.m_search_index;
     col.m_search_index = null_ptr;
-    col.m_nullable = m_nullable;
+//    col.m_nullable = m_nullable;
 }
 
 

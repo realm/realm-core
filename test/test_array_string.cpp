@@ -505,7 +505,7 @@ TEST(ArrayString_Null)
 {
     if (NULLS) {
         {
-            ArrayString a(Allocator::get_default());
+            ArrayString a(Allocator::get_default(), true);
             a.create();
 
             a.add("");
@@ -516,7 +516,7 @@ TEST(ArrayString_Null)
         }
 
         {
-        ArrayString a(Allocator::get_default());
+        ArrayString a(Allocator::get_default(), true);
         a.create();
 
         a.add("foo");
@@ -540,7 +540,7 @@ TEST(ArrayString_Null)
     }
 
         {
-            ArrayString a(Allocator::get_default());
+            ArrayString a(Allocator::get_default(), true);
             a.create();
 
             a.add(StringData(0, 0));  // add null (StringData::data() == 0)
@@ -568,7 +568,7 @@ TEST(ArrayString_Null)
         }
 
         {
-            ArrayString a(Allocator::get_default());
+            ArrayString a(Allocator::get_default(), true);
             a.create();
 
             a.add("");
@@ -593,7 +593,7 @@ TEST(ArrayString_Null)
         Random random(random_int<unsigned long>());
 
         for (size_t t = 0; t < 50; t++) {
-            ArrayString a(Allocator::get_default());
+            ArrayString a(Allocator::get_default(), true);
             a.create();
 
             // vector that is kept in sync with the ArrayString so that we can compare with it

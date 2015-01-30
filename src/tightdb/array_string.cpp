@@ -62,7 +62,7 @@ void ArrayString::set(size_t ndx, StringData value)
     // Make room for the new value plus a zero-termination
     if (m_width <= value.size()) {
         // if m_width == 0 then entire array contains only null entries
-        if ((NULLS ? value.is_null() : value.size() == 0) && m_width == 0) {
+        if ((m_nullable ? value.is_null() : value.size() == 0) && m_width == 0) {
             return; // set null element to null
         }
 
@@ -221,7 +221,7 @@ size_t ArrayString::find_first(StringData value, size_t begin, size_t end) const
     TIGHTDB_ASSERT(begin <= m_size && end <= m_size && begin <= end);
 
     if (m_width == 0) {
-        if (NULLS)
+        if (m_nullable)
             // m_width == 0 implies that all elements in the array are NULL
             return value.is_null() && begin < m_size ? begin : npos;
         else
@@ -232,9 +232,9 @@ size_t ArrayString::find_first(StringData value, size_t begin, size_t end) const
     if (m_width <= value.size())
         return size_t(-1);
 
-    if (NULLS ? value.is_null() : value.size() == 0) {
+    if (m_nullable ? value.is_null() : value.size() == 0) {
         for (size_t i = begin; i != end; ++i) {
-            if (NULLS ? is_null(i) : get(i).size() == 0)
+            if (m_nullable ? is_null(i) : get(i).size() == 0)
                 return i;
         }
     }

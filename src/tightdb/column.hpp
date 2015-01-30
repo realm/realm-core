@@ -258,6 +258,8 @@ protected:
     // const-violating moving copy constructor.
     mutable Array* m_array;
 
+//    bool m_nullable;
+
     ColumnBase(Array* root = 0) TIGHTDB_NOEXCEPT;
 
     virtual std::size_t do_get_size() const TIGHTDB_NOEXCEPT = 0;
@@ -385,9 +387,7 @@ private:
 ///
 /// FIXME: Rename Column to IntegerColumn.
 class Column: public ColumnBase, public ColumnTemplate<int64_t> {
-public:
-    bool m_nullable;
-    
+public:  
     typedef int64_t value_type;
 
     int64_t get_val(size_t row) const { return get(row); }

@@ -2987,7 +2987,7 @@ const Array* Array::GetBlock(size_t ndx, Array& arr, size_t& off,
     return &arr;
 }
 
-template <IndexMethod method, class T> size_t Array::index_string(StringData value, Column& result, size_t &result_ref, void* column, StringGetter get_func) const
+template <IndexMethod method, class T> size_t Array::index_string(StringData value, Column& result, size_t &result_ref, void* column, StringGetter get_func, bool nullable) const
 {
     bool first(method == index_FindFirst);
     bool count(method == index_Count);
@@ -3005,7 +3005,7 @@ template <IndexMethod method, class T> size_t Array::index_string(StringData val
 
 top:
     // Create 4 byte index key
-    key = StringIndex::create_key(value, stringoffset);
+    key = StringIndex::create_key(value, stringoffset, nullable);
 
     for (;;) {
         // Get subnode table
@@ -3141,34 +3141,34 @@ top:
     }
 }
 
-size_t Array::IndexStringFindFirst(StringData value, void* column, StringGetter get_func) const
+size_t Array::IndexStringFindFirst(StringData value, void* column, StringGetter get_func, bool nullable) const
 {
     size_t dummy;
     Column dummycol;
-    return index_string<index_FindFirst, StringData>(value, dummycol, dummy, column, get_func);
+    return index_string<index_FindFirst, StringData>(value, dummycol, dummy, column, get_func, nullable);
 }
 
 
-void Array::IndexStringFindAll(Column& result, StringData value, void* column, StringGetter get_func) const
+void Array::IndexStringFindAll(Column& result, StringData value, void* column, StringGetter get_func, bool nullable) const
 {
     size_t dummy;
 
-    index_string<index_FindAll, StringData>(value, result, dummy, column, get_func);
+    index_string<index_FindAll, StringData>(value, result, dummy, column, get_func, nullable);
 }
 
 
-FindRes Array::IndexStringFindAllNoCopy(StringData value, size_t& res_ref, void* column, StringGetter get_func) const
+FindRes Array::IndexStringFindAllNoCopy(StringData value, size_t& res_ref, void* column, StringGetter get_func, bool nullable) const
 {
     Column dummy;
-    return (FindRes)index_string<index_FindAll_nocopy, StringData>(value, dummy, res_ref, column, get_func);
+    return (FindRes)index_string<index_FindAll_nocopy, StringData>(value, dummy, res_ref, column, get_func, nullable);
 }
 
 
-size_t Array::IndexStringCount(StringData value, void* column, StringGetter get_func) const
+size_t Array::IndexStringCount(StringData value, void* column, StringGetter get_func, bool nullable) const
 {
     Column dummy;
     size_t dummysizet;
-    return index_string<index_Count, StringData>(value, dummy, dummysizet, column, get_func);
+    return index_string<index_Count, StringData>(value, dummy, dummysizet, column, get_func, nullable);
 }
 
 

@@ -59,7 +59,7 @@ StringIndex::key_type StringIndex::GetLastKey() const
 void StringIndex::insert_with_offset(size_t row_ndx, StringData value, size_t offset)
 {
     // Create 4 byte index key
-    key_type key = create_key(value, offset);
+    key_type key = create_key(value, offset, m_nullable);
     TreeInsert(row_ndx, key, offset, value); // Throws
 }
 
@@ -69,7 +69,7 @@ void StringIndex::InsertRowList(size_t ref, size_t offset, StringData value)
     TIGHTDB_ASSERT(!m_array->is_inner_bptree_node()); // only works in leaves
 
     // Create 4 byte index key
-    key_type key = create_key(value, offset);
+    key_type key = create_key(value, offset, m_nullable);
 
     // Get subnode table
     Allocator& alloc = m_array->get_alloc();
@@ -105,7 +105,7 @@ void StringIndex::TreeInsert(size_t row_ndx, key_type key, size_t offset, String
         case NodeChange::none:
             return;
         case NodeChange::insert_before: {
-            StringIndex new_node(inner_node_tag(), m_array->get_alloc());
+            StringIndex new_node(inner_node_tag(), m_array->get_alloc(), m_nullable);
             new_node.NodeAddKey(nc.ref1);
             new_node.NodeAddKey(get_ref());
             m_array->init_from_ref(new_node.get_ref());
@@ -113,7 +113,7 @@ void StringIndex::TreeInsert(size_t row_ndx, key_type key, size_t offset, String
             return;
         }
         case NodeChange::insert_after: {
-            StringIndex new_node(inner_node_tag(), m_array->get_alloc());
+            StringIndex new_node(inner_node_tag(), m_array->get_alloc(), m_nullable);
             new_node.NodeAddKey(get_ref());
             new_node.NodeAddKey(nc.ref1);
             m_array->init_from_ref(new_node.get_ref());
@@ -121,7 +121,7 @@ void StringIndex::TreeInsert(size_t row_ndx, key_type key, size_t offset, String
             return;
         }
         case NodeChange::split: {
-            StringIndex new_node(inner_node_tag(), m_array->get_alloc());
+            StringIndex new_node(inner_node_tag(), m_array->get_alloc(), m_nullable);
             new_node.NodeAddKey(nc.ref1);
             new_node.NodeAddKey(nc.ref2);
             m_array->init_from_ref(new_node.get_ref());
@@ -543,7 +543,7 @@ void StringIndex::DoDelete(size_t row_ndx, StringData value, size_t offset)
     TIGHTDB_ASSERT(m_array->size() == values.size()+1);
 
     // Create 4 byte index key
-    key_type key = create_key(value, offset);
+    key_type key = create_key(value, offset, m_nullable);
 
     const size_t pos = values.lower_bound_int(key);
     const size_t pos_refs = pos + 1; // first entry in refs points to offsets
@@ -614,7 +614,7 @@ void StringIndex::do_update_ref(StringData value, size_t row_ndx, size_t new_row
     TIGHTDB_ASSERT(m_array->size() == values.size()+1);
 
     // Create 4 byte index key
-    key_type key = create_key(value, offset);
+    key_type key = create_key(value, offset, m_nullable);
 
     size_t pos = values.lower_bound_int(key);
     size_t pos_refs = pos + 1; // first entry in refs points to offsets

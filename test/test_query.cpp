@@ -5662,7 +5662,7 @@ TEST(Query_StringIndexCrash)
     Query(q, Query::TCopyExpressionTag());
 }
 
-
+/*
 ONLY(Query_NullStrings)
 {
     if (NULLS) {
@@ -5718,6 +5718,8 @@ ONLY(Query_NullStrings)
         CHECK_EQUAL(2, v.get_source_ndx(0));
     }
 }
+
+*/
 
 
 #endif // TEST_QUERY

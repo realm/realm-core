@@ -640,7 +640,7 @@ void Table::do_insert_column(Descriptor& desc, size_t col_ndx, DataType type,
 
     if (desc.is_root()) {
         root_table.bump_version();
-        root_table.insert_root_column(col_ndx, type, name, link_target_table); // Throws
+        root_table.insert_root_column(col_ndx, type, name, link_target_table, nullable); // Throws
     }
     else {
         Spec& spec = df::get_spec(desc);

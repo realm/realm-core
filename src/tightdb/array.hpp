@@ -476,10 +476,10 @@ public:
                           bool use_retval = false) const TIGHTDB_NOEXCEPT; // FIXME: Constness is not propagated to the sub-array
 
     typedef StringData (*StringGetter)(void*, std::size_t, char*); // Pre-declare getter function from string index
-    size_t IndexStringFindFirst(StringData value, void* column, StringGetter get_func) const;
-    void   IndexStringFindAll(Column& result, StringData value, void* column, StringGetter get_func) const;
-    size_t IndexStringCount(StringData value, void* column, StringGetter get_func) const;
-    FindRes IndexStringFindAllNoCopy(StringData value, size_t& res_ref, void* column, StringGetter get_func) const;
+    size_t IndexStringFindFirst(StringData value, void* column, StringGetter get_func, bool nullable = 0) const;
+    void   IndexStringFindAll(Column& result, StringData value, void* column, StringGetter get_func, bool nullable = 0) const;
+    size_t IndexStringCount(StringData value, void* column, StringGetter get_func, bool nullable = 0) const;
+    FindRes IndexStringFindAllNoCopy(StringData value, size_t& res_ref, void* column, StringGetter get_func, bool nullable = 0) const;
 
     /// This one may change the represenation of the array, so be carefull if
     /// you call it after ensure_minimum_width().
@@ -969,8 +969,7 @@ private:
 
     bool do_erase_bptree_elem(std::size_t elem_ndx, EraseHandler&);
 
-
-    template <IndexMethod method, class T> size_t index_string(StringData value, Column& result, size_t &result_ref, void* column, StringGetter get_func) const;
+    template <IndexMethod method, class T> size_t index_string(StringData value, Column& result, size_t &result_ref, void* column, StringGetter get_func, bool nullable = false) const;
 protected:
 //    void AddPositiveLocal(int64_t value);
 

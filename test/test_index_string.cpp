@@ -735,7 +735,9 @@ TEST(StringIndex_Null)
     if (NULLS) {
         // Create a column with string values
         ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
-        AdaptiveStringColumn col(Allocator::get_default(), ref);
+        AdaptiveStringColumn col(Allocator::get_default(), ref, true);
+
+        size_t tt = col.size();
 
         col.add("");
         col.add(StringData());
