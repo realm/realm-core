@@ -343,7 +343,7 @@ void msync(void* addr, size_t size)
 #ifdef TIGHTDB_ENABLE_ENCRYPTION
     { // first check the encrypted mappings
         SpinLockGuard lock(mapping_lock);
-        if (mapping_and_addr* m = find_mapping_for_addr(addr, size)) {
+        if (mapping_and_addr* m = find_mapping_for_addr(addr, round_up_to_page_size(size))) {
             m->mapping->flush();
             m->mapping->sync();
             return;
