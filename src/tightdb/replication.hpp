@@ -160,9 +160,12 @@ public:
     /// sink that allows a SharedGroup to submit actions for replication. It is
     /// then up to the implementation of the Repication interface to define what
     /// replication means.
-    virtual version_type apply_foreign_changeset(SharedGroup&, version_type base_version,
-                                                 BinaryData changeset, version_type server_version,
+    virtual version_type apply_foreign_changeset(SharedGroup&, version_type latest_local_version_integrated_by_peer,
+                                                 BinaryData changeset, version_type peer_version,
+                                                 // uint64_t peer_id, uint64_t timestamp,
                                                  std::ostream* apply_log = 0);
+
+    virtual version_type get_last_integrated_peer_version() const;
 
     /// Acquire permision to start a new 'write' transaction. This
     /// function must be called by a client before it requests a
@@ -719,6 +722,14 @@ Replication::apply_foreign_changeset(SharedGroup&, version_type, BinaryData, ver
     // Unimplemented!
     TIGHTDB_ASSERT(false);
     return false;
+}
+
+inline Replication::version_type
+Replication::get_last_integrated_peer_version() const
+{
+    // Unimplemented!
+    TIGHTDB_ASSERT(false);
+    return 1;
 }
 
 inline void Replication::get_commit_entries(version_type, version_type, Replication::CommitLogEntry*)

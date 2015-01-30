@@ -111,6 +111,7 @@ public:
     virtual bool is_in_server_synchronization_mode() { return m_is_persisting; }
     version_type apply_foreign_changeset(SharedGroup&, version_type, BinaryData, version_type,
                                          ostream*) TIGHTDB_OVERRIDE;
+    version_type get_last_integrated_peer_version() const { return m_last_integrated_peer_version; }
     virtual void stop_logging() TIGHTDB_OVERRIDE;
     virtual void reset_log_management(version_type last_version) TIGHTDB_OVERRIDE;
     virtual void set_last_version_seen_locally(version_type last_seen_version_number)
@@ -214,6 +215,7 @@ protected:
     util::Buffer<char> m_transact_log_buffer;
     util::File::Map<CommitLogHeader> m_header;
     bool m_is_persisting;
+    version_type m_last_integrated_peer_version;
 
     // last seen version and associated offset - 0 for invalid
     uint_fast64_t m_read_version;
@@ -750,8 +752,8 @@ void WriteLogCollector::get_commit_entries_internal(version_type from_version, v
 
 
 Replication::version_type
-WriteLogCollector::apply_foreign_changeset(SharedGroup& sg, version_type base_version,
-                                           BinaryData changeset, version_type server_version,
+WriteLogCollector::apply_foreign_changeset(SharedGroup& sg, version_type last_version_integrated_by_peer,
+                                           BinaryData changeset, version_type peer_version,
                                            ostream* apply_log)
 {
     Group& group = sg.m_group;
@@ -760,15 +762,17 @@ WriteLogCollector::apply_foreign_changeset(SharedGroup& sg, version_type base_ve
 
     WriteTransaction transact(sg);
     version_type current_version = sg.get_current_version();
-    if (base_version < current_version)
-        return 0;
-    if (TIGHTDB_UNLIKELY(base_version > current_version))
+    //if (last_version_integrated_by_peer < current_version)
+    //    return 0;
+    if (TIGHTDB_UNLIKELY(last_version_integrated_by_peer > current_version))
         throw LogicError(LogicError::bad_version_number);
     SimpleInputStream input(changeset.data(), changeset.size());
     apply_transact_log(input, transact.get_group(), apply_log); // Throws
     bool is_foreign = true;
-    internal_submit_log(changeset.data(), changeset.size(), is_foreign, server_version); // Throws
-    return transact.commit(); // Throws
+    internal_submit_log(changeset.data(), changeset.size(), is_foreign, peer_version); // Throws
+    version_type new_version = transact.commit(); // Throws
+    m_last_integrated_peer_version = peer_version;
+    return new_version;
 }
 
 
@@ -838,6 +842,7 @@ WriteLogCollector::WriteLogCollector(string database_name,
     m_is_persisting = server_synchronization_mode;
     m_log_a.file.set_encryption_key(encryption_key);
     m_log_b.file.set_encryption_key(encryption_key);
+    m_last_integrated_peer_version = 1;
 }
 
 } // end _impl
