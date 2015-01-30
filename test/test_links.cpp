@@ -240,6 +240,82 @@ TEST(Links_Deletes)
 }
 
 
+TEST(Links_Inserts)
+{
+    Group group;
+
+    TestTableLinks::Ref table1 = group.add_table<TestTableLinks>("table1");
+    table1->add("test1", 1, true,  Mon);
+    table1->add("test2", 2, false, Tue);
+    table1->add("test3", 3, true,  Wed);
+
+    // create table with links to table1
+    TableRef table2 = group.add_table("table2");
+    size_t col_link = table2->add_column_link(type_Link, "link", *TableRef(table1));
+    CHECK_EQUAL(table1, table2->get_link_target(col_link));
+
+    // add a few links
+    table2->insert_link(col_link, 0, 1);
+    table2->insert_done();
+    table2->insert_link(col_link, 1, 0);
+    table2->insert_done();
+    table2->insert_link(col_link, 2, 2);
+    table2->insert_done();
+
+    table1->insert_empty_row(0);
+    table1->insert_empty_row(0);
+    table1->insert_empty_row(0);
+
+    CHECK_EQUAL(4, table2->get_link(col_link, 0));
+    CHECK_EQUAL(3, table2->get_link(col_link, 1));
+    CHECK_EQUAL(5, table2->get_link(col_link, 2));
+}
+
+TEST(Links_InsertTrackedByBacklinks)
+{
+    Group group;
+
+    TestTableLinks::Ref table1 = group.add_table<TestTableLinks>("table1");
+    table1->add("test1", 1, true,  Mon);
+    table1->add("test2", 2, false, Tue);
+    table1->add("test3", 3, true,  Wed);
+
+    // create table with links to table1
+    TableRef table2 = group.add_table("table2");
+    size_t col_link = table2->add_column_link(type_Link, "link", *TableRef(table1));
+    CHECK_EQUAL(table1, table2->get_link_target(col_link));
+
+    // add a few links
+    table2->insert_link(col_link, 0, 1);
+    table2->insert_done();
+    table2->insert_link(col_link, 1, 0);
+    table2->insert_done();
+    table2->insert_link(col_link, 2, 2);
+    table2->insert_done();
+
+    // verify backlinks
+    CHECK_EQUAL(1, table1->get_backlink_count(0, *table2, col_link));
+    CHECK_EQUAL(1, table1->get_backlink(0, *table2, col_link, 0));
+    CHECK_EQUAL(1, table1->get_backlink_count(0, *table2, col_link));
+    CHECK_EQUAL(0, table1->get_backlink(1, *table2, col_link, 0));
+    CHECK_EQUAL(1, table1->get_backlink_count(0, *table2, col_link));
+    CHECK_EQUAL(2, table1->get_backlink(2, *table2, col_link, 0));
+
+    // insert in table 2, verify that backlinks are updated
+    table2->insert_empty_row(0);
+    table2->insert_empty_row(0);
+    table2->insert_empty_row(0);
+
+    // verify
+    CHECK_EQUAL(1, table1->get_backlink_count(0, *table2, col_link));
+    CHECK_EQUAL(4, table1->get_backlink(0, *table2, col_link, 0));
+    CHECK_EQUAL(1, table1->get_backlink_count(0, *table2, col_link));
+    CHECK_EQUAL(3, table1->get_backlink(1, *table2, col_link, 0));
+    CHECK_EQUAL(1, table1->get_backlink_count(0, *table2, col_link));
+    CHECK_EQUAL(5, table1->get_backlink(2, *table2, col_link, 0));
+}
+
+
 TEST(Links_Multi)
 {
     // Multiple links to same rows
@@ -469,6 +545,54 @@ TEST(Links_LinkList_Basics)
 }
 
 
+TEST(Links_LinkList_Inserts)
+{
+    Group group;
+
+    TestTableLinks::Ref target = group.add_table<TestTableLinks>("target");
+    target->add("test1", 1, true,  Mon);
+    target->add("test2", 2, false, Tue);
+    target->add("test3", 3, true,  Wed);
+
+    // create table with links to target table
+    TableRef origin = group.add_table("origin");
+    size_t col_link = origin->add_column_link(type_LinkList, "links", *TableRef(target));
+    CHECK_EQUAL(target, origin->get_link_target(col_link));
+
+    origin->insert_linklist(col_link, 0);
+    origin->insert_done();
+
+    LinkViewRef links = origin->get_linklist(col_link, 0);
+
+    // add several links to a single linklist
+    links->add(2);
+    links->add(1);
+    links->add(0);
+    CHECK(!origin->linklist_is_empty(col_link, 0));
+    CHECK_EQUAL(3, links->size());
+    CHECK_EQUAL(2, links->get(0).get_index());
+    CHECK_EQUAL(1, links->get(1).get_index());
+    CHECK_EQUAL(0, links->get(2).get_index());
+    CHECK_EQUAL(Wed, (Days)(*links)[0].get_int(3));
+
+    // verify that backlinks was set correctly
+    CHECK_EQUAL(1, target->get_backlink_count(0, *origin, col_link));
+    CHECK_EQUAL(0, target->get_backlink(0, *origin, col_link, 0));
+    CHECK_EQUAL(1, target->get_backlink_count(1, *origin, col_link));
+    CHECK_EQUAL(0, target->get_backlink(1, *origin, col_link, 0));
+    CHECK_EQUAL(1, target->get_backlink_count(2, *origin, col_link));
+    CHECK_EQUAL(0, target->get_backlink(2, *origin, col_link, 0));
+
+    target->insert_empty_row(0);
+
+    // verify that all links in the linklist has tracked the movement
+    CHECK_EQUAL(3, links->size());
+    CHECK_EQUAL(3, links->get(0).get_index());
+    CHECK_EQUAL(2, links->get(1).get_index());
+    CHECK_EQUAL(1, links->get(2).get_index());
+}
+
+
 TEST(Links_LinkList_Backlinks)
 {
     Group group;
@@ -606,6 +730,59 @@ TEST(Links_LinkList_AccessorUpdates)
     CHECK_EQUAL(false, links2again->is_attached());
 }
 
+
+TEST(Links_LinkListInsert_AccessorUpdates)
+{
+    Group group;
+
+    TestTableLinks::Ref target = group.add_table<TestTableLinks>("target");
+    target->add("test1", 1, true,  Mon);
+    target->add("test2", 2, false, Tue);
+    target->add("test3", 3, true,  Wed);
+
+    // create table with links to target table
+    TableRef origin = group.add_table("origin");
+    size_t col_link = origin->add_column_link(type_LinkList, "links", *TableRef(target));
+    CHECK_EQUAL(target, origin->get_link_target(col_link));
+
+    origin->insert_linklist(col_link, 0);
+    origin->insert_done();
+    origin->insert_linklist(col_link, 1);
+    origin->insert_done();
+    origin->insert_linklist(col_link, 2);
+    origin->insert_done();
+
+    LinkViewRef links0 = origin->get_linklist(col_link, 0);
+    links0->add(2);
+    links0->add(1);
+    links0->add(0);
+
+    LinkViewRef links1 = origin->get_linklist(col_link, 1);
+    links1->add(2);
+    links1->add(1);
+    links1->add(0);
+
+    LinkViewRef links2 = origin->get_linklist(col_link, 2);
+    links2->add(2);
+    links2->add(1);
+    links2->add(0);
+
+    CHECK_EQUAL(0, links0->get_origin_row_index());
+    CHECK_EQUAL(1, links1->get_origin_row_index());
+    CHECK_EQUAL(2, links2->get_origin_row_index());
+
+    // accessors follow movement of linklist entries
+    origin->insert_empty_row(0);
+    CHECK_EQUAL(0, links0->get_origin_row_index());
+    CHECK_EQUAL(1, links1->get_origin_row_index());
+    CHECK_EQUAL(2, links2->get_origin_row_index());
+
+    // and changes of refs are visible through the accessors
+    target->insert_empty_row(0);
+    CHECK_EQUAL(1, links0->get_origin_row_index());
+    CHECK_EQUAL(2, links1->get_origin_row_index());
+    CHECK_EQUAL(3, links2->get_origin_row_index());
+}
 
 TEST(Links_LinkList_FindByOrigin)
 {
