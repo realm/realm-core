@@ -14,7 +14,33 @@
 #include <tightdb/util/memory_stream.hpp>
 #include <tightdb/util/logger.hpp>
 #include <tightdb/util/network.hpp>
+#include <tightdb/string_data.hpp>
 #include <tightdb/binary_data.hpp>
+
+
+// Client --> server
+// -----------------
+//
+//   head:  ident  <temp_client_file_ident>
+//
+//   head:  bind  <client_file_ident>  <client_version>  <path_size>
+//   body:  <path>
+//
+//   head:  unbind  <client_file_ident>
+//
+//   head:  changeset  <client_file_ident>  <client_version>  <latest_integrated_server_version>  <changeset_size>
+//   body:  <changeset>
+//
+//
+// Server --> client
+// -----------------
+//
+//   head:  ident  <temp_client_file_ident>  <client_file_ident>
+//
+//   head:  changeset  <client_file_ident>  <server_version>  <latest_integrated_client_version>  <changeset_size>
+//   body:  <changeset>
+//
+//   head:  accept  <client_file_ident>  <server_version>  <integrated_client_version>
 
 
 using namespace std;
@@ -31,16 +57,19 @@ class connection;
 
 class file {
 public:
-    file()
+    const string path;
+
+    file(const string& p):
+        path(p)
     {
         m_earliest_version = 1;
     }
 
     ~file()
     {
-        typedef transact_logs::const_iterator iter;
-        const iter end = m_transact_logs.end();
-        for (iter i = m_transact_logs.begin(); i != end; ++i)
+        typedef changesets::const_iterator iter;
+        const iter end = m_changesets.end();
+        for (iter i = m_changesets.begin(); i != end; ++i)
             delete[] i->data();
     }
 
@@ -49,8 +78,6 @@ public:
         TIGHTDB_ASSERT(m_client_files.find(make_pair(conn, client_file_ident)) ==
                        m_client_files.end());
         m_client_files.insert(make_pair(conn, client_file_ident));
-
-        // FIXME: Must initiate upload of all newer transaction logs known to the server.
     }
 
     void unbind(connection* conn, file_ident_type client_file_ident)
@@ -62,24 +89,24 @@ public:
 
     version_type get_latest_version()
     {
-        return m_earliest_version + m_transact_logs.size();
+        return m_earliest_version + m_changesets.size();
     }
 
-    /// Get the transaction log that takes us from \a version - 1 to \a version.
-    BinaryData get_transact_log(version_type version)
+    /// Get the changeset that takes us from \a version - 1 to \a version.
+    BinaryData get_changeset(version_type version)
     {
-        return m_transact_logs.at(version - m_earliest_version - 1);
+        return m_changesets.at(version - m_earliest_version - 1);
     }
 
-    void add_transact_log(BinaryData);
+    void add_changeset(BinaryData);
 
 private:
     typedef pair<connection*, file_ident_type> client_file;
     typedef set<client_file> client_files;
     client_files m_client_files;
 
-    typedef vector<BinaryData> transact_logs;
-    transact_logs m_transact_logs;
+    typedef vector<BinaryData> changesets;
+    changesets m_changesets;
     version_type m_earliest_version;
 };
 
@@ -88,6 +115,7 @@ class server: private util::Logger {
 public:
     util::Logger* const root_logger;
     bool log_everything;
+    file_ident_type prev_client_file_ident;
 
     server(util::Logger* root_logger, bool log_everything);
     ~server();
@@ -111,7 +139,7 @@ public:
         typedef files::iterator iter;
         iter i = m_files.insert(pair<string, file*>(path, 0)).first; // Throws
         if (!i->second)
-            i->second = new file; // Throws
+            i->second = new file(path); // Throws
         return i->second;
     }
 
@@ -159,13 +187,13 @@ public:
         initiate_read_head();
     }
 
-    void resume_transact_log_send(file_ident_type client_file_ident)
+    void resume_changeset_send(file_ident_type client_file_ident)
     {
         typedef client_files::iterator iter;
         iter i = m_client_files.find(client_file_ident);
         TIGHTDB_ASSERT(i != m_client_files.end());
         client_file& cf = i->second;
-        resume_transact_log_send(client_file_ident, cf);
+        resume_changeset_send(client_file_ident, cf);
     }
 
 private:
@@ -217,22 +245,19 @@ private:
         in.unsetf(std::ios_base::skipws);
         string message_type;
         in >> message_type;
-        if (message_type == "transact") {
+        if (message_type == "changeset") {
             file_ident_type client_file_ident;
             version_type version;
             size_t log_size;
             char sp_1, sp_2, sp_3;
             in >> sp_1 >> client_file_ident >> sp_2 >> version >> sp_3 >> log_size;
-            if (!in || !in.eof() || sp_1 != ' ' || sp_2 != ' ' || sp_3 != ' ') {
-                log("ERROR: Bad 'transact' message");
-                close();
+            if (in && in.eof() && sp_1 == ' ' && sp_2 == ' ' && sp_3 == ' ') {
+                m_input_body_buffer.reset(new char[log_size]); // Throws
+                m_input_stream.async_read(m_input_body_buffer.get(), log_size,
+                                          bind(&connection::handle_read_changeset,
+                                               this, client_file_ident, version));
                 return;
             }
-            m_input_body_buffer.reset(new char[log_size]); // Throws
-            m_input_stream.async_read(m_input_body_buffer.get(), log_size,
-                                      bind(&connection::handle_read_transact_log,
-                                           this, client_file_ident, version));
-            return;
         }
         else if (message_type == "bind") {
             file_ident_type client_file_ident;
@@ -240,46 +265,57 @@ private:
             size_t path_size;
             char sp_1, sp_2, sp_3;
             in >> sp_1 >> client_file_ident >> sp_2 >> client_version >> sp_3 >> path_size;
-            if (!in || !in.eof() || sp_1 != ' ' || sp_2 != ' ' || sp_3 != ' ') {
-                log("ERROR: Bad 'bind' message");
-                close();
+            if (in && in.eof() && sp_1 == ' ' && sp_2 == ' ' && sp_3 == ' ') {
+                m_input_body_buffer.reset(new char[path_size]); // Throws
+                m_input_stream.async_read(m_input_body_buffer.get(), path_size,
+                                          bind(&connection::handle_read_bind_path,
+                                               this, client_file_ident, client_version));
                 return;
             }
-            m_input_body_buffer.reset(new char[path_size]); // Throws
-            m_input_stream.async_read(m_input_body_buffer.get(), path_size,
-                                      bind(&connection::handle_read_bind_path,
-                                           this, client_file_ident, client_version));
-            return;
         }
         else if (message_type == "unbind") {
             file_ident_type client_file_ident;
             char sp;
             in >> sp >> client_file_ident;
-            if (!in || !in.eof() || sp != ' ') {
-                log("ERROR: Bad 'unbind' message");
-                close();
+            if (in && in.eof() && sp == ' ') {
+                typedef client_files::iterator iter;
+                iter i = m_client_files.find(client_file_ident);
+                if (i == m_client_files.end()) {
+                    log("ERROR: Bad client file identifier %1", client_file_ident);
+                    close();
+                    return;
+                }
+                const client_file& cf = i->second;
+                log("Received: Unbind client file #%1 from '%2'", client_file_ident, cf.server_file->path);
+                cf.server_file->unbind(this, client_file_ident);
+                m_client_files.erase(i);
+                initiate_read_head();
                 return;
             }
-            typedef client_files::iterator iter;
-            iter i = m_client_files.find(client_file_ident);
-            if (i == m_client_files.end()) {
-                log("ERROR: Bad client file identifier %1", client_file_ident);
-                close();
-                return;
-            }
-            const client_file& cf = i->second;
-            cf.server_file->unbind(this, client_file_ident);
-            m_client_files.erase(i);
-            initiate_read_head();
-            return;
         }
-        log("ERROR: Message of unknown type '%1'", message_type);
+        else if (message_type == "ident") {
+            file_ident_type temp_file_ident;
+            char sp;
+            in >> sp >> temp_file_ident;
+            if (in && in.eof() && sp == ' ') {
+                log("Received: Get unique client file identifier");
+                file_ident_type client_file_ident = ++m_server.prev_client_file_ident;
+                log("Sending: New unqiue client file identifier is %1", client_file_ident);
+                ostringstream out;
+                out << "ident "<<temp_file_ident<<" "<<client_file_ident<<"\n";
+                string head = out.str();
+                enqueue_output_message(head);
+                initiate_read_head();
+                return;
+            }
+        }
+        log("ERROR: Bad message header '%1'", StringData(m_input_head_buffer, n-1));
         close();
     }
 
-    void handle_read_transact_log(file_ident_type client_file_ident,
-                                  version_type client_version,
-                                  util::error_code& ec, size_t n)
+    void handle_read_changeset(file_ident_type client_file_ident,
+                               version_type client_version,
+                               util::error_code& ec, size_t n)
     {
         if (ec) {
             if (ec != util::error::operation_aborted)
@@ -288,11 +324,11 @@ private:
         }
 
         if (m_server.log_everything)
-            log("Received: Transaction log %1 -> %2 from client file #%3",
+            log("Received: Changeset %1 -> %2 from client file #%3",
                 client_version-1, client_version, client_file_ident);
 
-        util::UniquePtr<char[]> transact_log_owner(m_input_body_buffer.release());
-        BinaryData transact_log(transact_log_owner.get(), n);
+        util::UniquePtr<char[]> changeset_owner(m_input_body_buffer.release());
+        BinaryData changeset(changeset_owner.get(), n);
 
         typedef client_files::iterator iter;
         iter i = m_client_files.find(client_file_ident);
@@ -314,11 +350,11 @@ private:
         if (client_version == next_server_version) {
             TIGHTDB_ASSERT(client_version == cf.client_version + 1);
             cf.client_version = client_version;
-            cf.server_file->add_transact_log(transact_log); // Throws
-            transact_log_owner.release();
+            cf.server_file->add_changeset(changeset); // Throws
+            changeset_owner.release();
 
             if (m_server.log_everything)
-                log("Sending: Accepting transaction %1 -> %2 from client file #%3",
+                log("Sending: Accepting changeset %1 -> %2 from client file #%3",
                     client_version-1, client_version, client_file_ident);
             ostringstream out;
             out << "accept "<<client_file_ident<<" "<<client_version<<"\n";
@@ -328,28 +364,27 @@ private:
         else {
             // WARNING: Strictly speaking, the following is not the correct
             // resolution of the conflict between two identical initial
-            // transactions, but it is done as a temporary workaround to allow
-            // the current version of the Cocoa binding to carry out an initial
+            // changesets, but it is done as a temporary workaround to allow the
+            // current version of the Cocoa binding to carry out an initial
             // schema creating transaction without getting into an immediate
             // unrecoverable conflict. It does not work in general as even the
-            // initial transaction is allowed to contain elements that are
+            // initial changeset is allowed to contain elements that are
             // additive rather than idempotent.
-            BinaryData servers_log = cf.server_file->get_transact_log(client_version);
-            if (client_version > 2 || transact_log != servers_log) {
-                log("ERROR: Conflict (%1 vs %2)", transact_log.size(), servers_log.size());
+            BinaryData servers_changeset = cf.server_file->get_changeset(client_version);
+            if (client_version > 2 || changeset != servers_changeset) {
+                log("ERROR: Conflict (%1 vs %2)", changeset.size(), servers_changeset.size());
 /*
-                ofstream out_1("/tmp/conflict.1");
-                out_1.write(servers_log.data(), servers_log.size());
-                ofstream out_2("/tmp/conflict.2");
-                out_2.write(transact_log.data(), transact_log.size());
+                ofstream out_1("/tmp/conflict.server");
+                out_1.write(servers_changeset.data(), servers_changeset.size());
+                ofstream out_2("/tmp/conflict.client");
+                out_2.write(changeset.data(), changeset.size());
 */
                 close();
                 return;
             }
             if (cf.client_version < client_version)
                 cf.client_version = client_version;
-            log("Conflict resolved %1 -> %2 improperly (identical initial transactions)",
-                client_version-1, client_version);
+            log("Conflict on identical initial changesets resolved (improperly)");
         }
 
         initiate_read_head();
@@ -366,7 +401,8 @@ private:
         string path(m_input_body_buffer.get(), m_input_body_buffer.get()+n); // Throws
         m_input_body_buffer.reset();
 
-        log("Received: Bind client file #%1 to '%2'", client_file_ident, path);
+        log("Received: Bind client file #%1 at version %2 to '%3'",
+            client_file_ident, client_version, path);
 
         client_file cf;
         cf.server_file = m_server.get_file(path);
@@ -380,30 +416,29 @@ private:
         }
         cf.server_file->bind(this, client_file_ident); // Throws
 
-        resume_transact_log_send(client_file_ident, p.first->second);
+        resume_changeset_send(client_file_ident, p.first->second);
 
         initiate_read_head();
     }
 
-    void resume_transact_log_send(file_ident_type client_file_ident, client_file& cf)
+    void resume_changeset_send(file_ident_type client_file_ident, client_file& cf)
     {
         // FIXME: What is done here, is bad in almost every possible way. The
         // root problem is that it goes ahead immediately and generates output
-        // messages for all outstanding transaction logs. This potentially
-        // allocates **way** too much memory. This becomes even worse due to the
-        // fact that most of the queued output messages will be wasted if the
-        // file binding is broken shortly after it is established. It is
-        // necessary to find a way to generate at most one transaction output
-        // message at a time.
+        // messages for all outstanding changesets. This potentially allocates
+        // **way** too much memory. This becomes even worse due to the fact that
+        // most of the queued output messages will be wasted if the file binding
+        // is broken shortly after it is established. It is necessary to find a
+        // way to generate at most one changeset output message at a time.
         version_type latest_server_version = cf.server_file->get_latest_version();
         while (cf.client_version < latest_server_version) {
             version_type next_client_version = cf.client_version + 1;
             if (m_server.log_everything)
-                log("Sending: Transaction %1 -> %2 to client file #%3",
+                log("Sending: Changeset %1 -> %2 to client file #%3",
                     next_client_version-1, next_client_version, client_file_ident);
-            BinaryData log = cf.server_file->get_transact_log(next_client_version);
+            BinaryData log = cf.server_file->get_changeset(next_client_version);
             ostringstream out;
-            out << "transact "<<client_file_ident<<" "<<next_client_version<<" "<<log.size()<<"\n";
+            out << "changeset "<<client_file_ident<<" "<<next_client_version<<" "<<log.size()<<"\n";
             string head = out.str();
             enqueue_output_message(head, log);
             cf.client_version = next_client_version;
@@ -492,16 +527,16 @@ private:
 };
 
 
-void file::add_transact_log(BinaryData log)
+void file::add_changeset(BinaryData log)
 {
-    m_transact_logs.push_back(log); // Throws
+    m_changesets.push_back(log); // Throws
 
     typedef client_files::const_iterator iter;
     const iter end = m_client_files.end();
     for (iter i = m_client_files.begin(); i != end; ++i) {
         connection* conn = i->first;
         file_ident_type client_file_ident = i->second;
-        conn->resume_transact_log_send(client_file_ident);
+        conn->resume_changeset_send(client_file_ident);
     }
 }
 
@@ -509,6 +544,7 @@ void file::add_transact_log(BinaryData log)
 server::server(util::Logger* root_logger_2, bool log_everything_2):
     root_logger(root_logger_2),
     log_everything(log_everything_2),
+    prev_client_file_ident(0),
     m_acceptor(m_service),
     m_next_conn_id(0)
 {
