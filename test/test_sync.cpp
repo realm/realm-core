@@ -66,7 +66,7 @@ sync_commits(SharedGroup& from_group, SharedGroup& to_group, uint64_t timestamp)
     from_r->get_commit_entries(v0, v1, entries.data());
     TIGHTDB_ASSERT(from_group.get_current_version() == v0 + entries.size());
     for (version_type i = 0; i < entries.size(); ++i) {
-        if (entries[i].is_foreign)
+        if (entries[i].peer_id != 0)
             continue;
         version_type commit_version = v0 + i + 1;
         to_r->apply_foreign_changeset(to_group, from_r->get_last_integrated_peer_version(), entries[i].log_data, commit_version);
@@ -74,7 +74,7 @@ sync_commits(SharedGroup& from_group, SharedGroup& to_group, uint64_t timestamp)
 }
 
 
-ONLY(Sync_MergeWrites)
+TEST(Sync_MergeWrites)
 {
     typedef SharedGroup::version_type version_type;
 

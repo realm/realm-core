@@ -465,11 +465,14 @@ private:
 /// Extended version of a commit log entry. The additional info is required for
 /// Sync.
 struct Replication::CommitLogEntry {
-    /// True iff this changeset was submitted via apply_foreign_changeset().
-    bool is_foreign;
+    /// Nonzero iff this changeset was submitted via apply_foreign_changeset().
+    uint64_t peer_id;
 
-    /// Not yet used.
-    version_type server_version;
+    /// The peer's version, used for sync.
+    version_type peer_version;
+
+    /// Disambiguation of out-of-order entries, used for sync.
+    uint64_t timestamp;
 
     /// The changeset.
     BinaryData log_data;
@@ -979,7 +982,7 @@ inline void Replication::string_value(const char* data, std::size_t size)
     transact_log_reserve(&buf, max_enc_bytes_per_num);
     buf = encode_int(buf, size);
     transact_log_advance(buf);
-    transact_log_append(data, size); // Throws   
+    transact_log_append(data, size); // Throws
 }
 
 inline void Replication::mixed_cmd(Instruction instr, std::size_t col_ndx,
