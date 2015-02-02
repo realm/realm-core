@@ -5654,7 +5654,7 @@ TEST(Query_StringIndexCrash)
     // Test for a crash which occured when a query testing for equality on a
     // string index was deep-copied after being run
     Table table;
-    table.add_column(type_String, "s");
+    table.add_column(type_String, "s", 0, true);
     table.add_search_index(0);
 
     Query q = table.where().equal(0, StringData(""));
@@ -5662,64 +5662,61 @@ TEST(Query_StringIndexCrash)
     Query(q, Query::TCopyExpressionTag());
 }
 
-/*
-ONLY(Query_NullStrings)
+
+TEST(Query_NullStrings)
 {
-    if (NULLS) {
-        Table table;
-        table.add_column(type_String, "s");
-        table.add_empty_row(3);
+    Table table;
+    table.add_column(type_String, "s", 0, true);
+    table.add_empty_row(3);
 
-        Query q;
-        TableView v;
+    Query q;
+    TableView v;
 
-        // Short strings
-        table.set_string(0, 0, "Albertslund");       // Normal non-empty string
-        table.set_string(0, 1, StringData(0, 0));    // NULL string
-        table.set_string(0, 2, "");                  // Empty string
+    // Short strings
+    table.set_string(0, 0, "Albertslund");       // Normal non-empty string
+    table.set_string(0, 1, StringData(0, 0));    // NULL string
+    table.set_string(0, 2, "");                  // Empty string
 
-        q = table.column<StringData>(0) == StringData(0, 0);
-        v = q.find_all();
-        CHECK_EQUAL(1, v.size());
-        CHECK_EQUAL(1, v.get_source_ndx(0));
+    q = table.column<StringData>(0) == StringData(0, 0);
+    v = q.find_all();
+    CHECK_EQUAL(1, v.size());
+    CHECK_EQUAL(1, v.get_source_ndx(0));
 
-        q = table.column<StringData>(0) != StringData(0, 0);
-        v = q.find_all();
-      //  CHECK_EQUAL(2, v.size());
+    q = table.column<StringData>(0) != StringData(0, 0);
+    v = q.find_all();
+    //  CHECK_EQUAL(2, v.size());
 //        CHECK_EQUAL(1, v.get_source_ndx(0));
 
-        q = table.column<StringData>(0) == "";
-        v = q.find_all();
-        CHECK_EQUAL(1, v.size());
-        CHECK_EQUAL(2, v.get_source_ndx(0));
+    q = table.column<StringData>(0) == "";
+    v = q.find_all();
+    CHECK_EQUAL(1, v.size());
+    CHECK_EQUAL(2, v.get_source_ndx(0));
 
-        // Medium strings (16+)
-        table.set_string(0, 0, "AlbertslundAlbertslundAlbert");
-        q = table.column<StringData>(0) == StringData(0, 0);
-        v = q.find_all();
-        CHECK_EQUAL(1, v.size());
-        CHECK_EQUAL(1, v.get_source_ndx(0));
+    // Medium strings (16+)
+    table.set_string(0, 0, "AlbertslundAlbertslundAlbert");
+    q = table.column<StringData>(0) == StringData(0, 0);
+    v = q.find_all();
+    CHECK_EQUAL(1, v.size());
+    CHECK_EQUAL(1, v.get_source_ndx(0));
 
-        q = table.column<StringData>(0) == "";
-        v = q.find_all();
-        CHECK_EQUAL(1, v.size());
-        CHECK_EQUAL(2, v.get_source_ndx(0));
+    q = table.column<StringData>(0) == "";
+    v = q.find_all();
+    CHECK_EQUAL(1, v.size());
+    CHECK_EQUAL(2, v.get_source_ndx(0));
 
-        // Long strings (64+)
-        table.set_string(0, 0, "AlbertslundAlbertslundAlbertslundAlbertslundAlbertslundAlbertslundAlbertslund");
-        q = table.column<StringData>(0) == StringData(0, 0);
-        v = q.find_all();
-        CHECK_EQUAL(1, v.size());
-        CHECK_EQUAL(1, v.get_source_ndx(0));
+    // Long strings (64+)
+    table.set_string(0, 0, "AlbertslundAlbertslundAlbertslundAlbertslundAlbertslundAlbertslundAlbertslund");
+    q = table.column<StringData>(0) == StringData(0, 0);
+    v = q.find_all();
+    CHECK_EQUAL(1, v.size());
+    CHECK_EQUAL(1, v.get_source_ndx(0));
 
-        q = table.column<StringData>(0) == "";
-        v = q.find_all();
-        CHECK_EQUAL(1, v.size());
-        CHECK_EQUAL(2, v.get_source_ndx(0));
-    }
+    q = table.column<StringData>(0) == "";
+    v = q.find_all();
+    CHECK_EQUAL(1, v.size());
+    CHECK_EQUAL(2, v.get_source_ndx(0));
+    
 }
-
-*/
 
 
 #endif // TEST_QUERY

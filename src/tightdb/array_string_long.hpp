@@ -87,7 +87,7 @@ public:
     /// Construct a long string array of the specified size and return
     /// just the reference to the underlying memory. All elements will
     /// be initialized to zero size blobs.
-    static MemRef create_array(std::size_t size, Allocator&);
+    static MemRef create_array(std::size_t size, Allocator&, bool nullable = false);
 
     /// Construct a copy of the specified slice of this long string
     /// array using the specified target allocator.
@@ -121,7 +121,7 @@ inline ArrayStringLong::ArrayStringLong(Allocator& alloc, bool nullable) TIGHTDB
 inline void ArrayStringLong::create()
 {
     std::size_t size = 0;
-    MemRef mem = create_array(size, get_alloc()); // Throws
+    MemRef mem = create_array(size, get_alloc(), m_nullable); // Throws
     init_from_mem(mem);
 }
 

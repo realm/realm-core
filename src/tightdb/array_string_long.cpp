@@ -225,7 +225,7 @@ ref_type ArrayStringLong::bptree_leaf_insert(size_t ndx, StringData value, TreeI
 }
 
 
-MemRef ArrayStringLong::create_array(size_t size, Allocator& alloc)
+MemRef ArrayStringLong::create_array(size_t size, Allocator& alloc, bool nullable)
 {
     Array top(alloc);
     _impl::DeepArrayDestroyGuard dg(&top);
@@ -249,8 +249,7 @@ MemRef ArrayStringLong::create_array(size_t size, Allocator& alloc)
         top.add(v); // Throws
         dg_2.release();
     }
-
-    if (NULLS)
+    if (nullable)
     {
         bool context_flag = false;
         int_fast64_t value = 0; // initialize all rows to null

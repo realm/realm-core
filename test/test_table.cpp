@@ -123,10 +123,8 @@ TEST(Table_Null)
     table->add_column(type_String, "name");
     table->add_empty_row();
  
-    if (NULLS)
-        CHECK(table->get_string(0, 0).is_null());
-    else
-        CHECK(table->get_string(0, 0) == "");
+    CHECK(table->get_string(0, 0).is_null());
+
 }
 
 TEST(Table_DeleteCrash)

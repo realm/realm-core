@@ -602,7 +602,7 @@ void AdaptiveStringColumn::do_clear()
         // Non-leaf root - revert to small strings leaf
         Allocator& alloc = m_array->get_alloc();
         UniquePtr<ArrayString> array;
-        array.reset(new ArrayString(alloc)); // Throws
+        array.reset(new ArrayString(alloc, m_nullable)); // Throws
         array->create(); // Throws
         array->set_parent(m_array->get_parent(), m_array->get_ndx_in_parent());
         array->update_parent(); // Throws
@@ -1187,12 +1187,12 @@ AdaptiveStringColumn::GetBlock(size_t ndx, ArrayParent** ap, size_t& off, bool u
                 *ap = asb2;
                 return leaf_type_Big;
             }
-            ArrayStringLong* asl2 = new ArrayStringLong(alloc); // Throws
+            ArrayStringLong* asl2 = new ArrayStringLong(alloc, m_nullable); // Throws
             asl2->init_from_mem(m_array->get_mem());
             *ap = asl2;
             return leaf_type_Medium;
         }
-        ArrayString* as2 = new ArrayString(alloc); // Throws
+        ArrayString* as2 = new ArrayString(alloc, m_nullable); // Throws
         as2->init_from_mem(m_array->get_mem());
         *ap = as2;
         return leaf_type_Small;
@@ -1208,12 +1208,12 @@ AdaptiveStringColumn::GetBlock(size_t ndx, ArrayParent** ap, size_t& off, bool u
             *ap = asb2;
             return leaf_type_Big;
         }
-        ArrayStringLong* asl2 = new ArrayStringLong(alloc);
+        ArrayStringLong* asl2 = new ArrayStringLong(alloc, m_nullable);
         asl2->init_from_mem(p.first);
         *ap = asl2;
         return leaf_type_Medium;
     }
-    ArrayString* as2 = new ArrayString(alloc);
+    ArrayString* as2 = new ArrayString(alloc, m_nullable);
     as2->init_from_mem(p.first);
     *ap = as2;
     return leaf_type_Small;
@@ -1374,13 +1374,13 @@ void AdaptiveStringColumn::refresh_root_accessor()
     if (new_root_is_leaf) {
         if (new_root_is_small) {
             // New root is 'small strings' leaf
-            ArrayString* root = new ArrayString(alloc); // Throws
+            ArrayString* root = new ArrayString(alloc, m_nullable); // Throws
             root->init_from_mem(root_mem);
             new_root = root;
         }
         else if (new_root_is_medium) {
             // New root is 'medium strings' leaf
-            ArrayStringLong* root = new ArrayStringLong(alloc); // Throws
+            ArrayStringLong* root = new ArrayStringLong(alloc, m_nullable); // Throws
             root->init_from_mem(root_mem);
             new_root = root;
         }

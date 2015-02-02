@@ -259,149 +259,149 @@ TEST(ArrayStringLong_Basic)
 
 TEST(ArrayStringLong_Null)
 {
-    if (NULLS) {
-        {
-            ArrayStringLong a(Allocator::get_default(), true);
-            a.create();
 
-            a.add("foo");
-            a.add("");
-            a.add(StringData(0, 0)); // add null (StringData::data() == 0)
+    {
+        ArrayStringLong a(Allocator::get_default(), true);
+        a.create();
 
-            CHECK_EQUAL(a.is_null(0), false);
-            CHECK_EQUAL(a.is_null(1), false);
-            CHECK_EQUAL(a.is_null(2), true);
-            CHECK(a.get(0) == "foo");
+        a.add("foo");
+        a.add("");
+        a.add(StringData(0, 0)); // add null (StringData::data() == 0)
 
-            // Test set
-            a.set_null(0);
-            a.set_null(1);
-            a.set_null(2);
-            CHECK_EQUAL(a.is_null(1), true);
-            CHECK_EQUAL(a.is_null(0), true);
-            CHECK_EQUAL(a.is_null(2), true);
+        CHECK_EQUAL(a.is_null(0), false);
+        CHECK_EQUAL(a.is_null(1), false);
+        CHECK_EQUAL(a.is_null(2), true);
+        CHECK(a.get(0) == "foo");
 
-            a.destroy();
-        }
+        // Test set
+        a.set_null(0);
+        a.set_null(1);
+        a.set_null(2);
+        CHECK_EQUAL(a.is_null(1), true);
+        CHECK_EQUAL(a.is_null(0), true);
+        CHECK_EQUAL(a.is_null(2), true);
 
-        {
-            ArrayStringLong a(Allocator::get_default(), true);
-            a.create();
+        a.destroy();
+    }
 
-            a.add(StringData(0, 0));  // add null (StringData::data() == 0)
-            a.add("");
-            a.add("foo");
+    {
+        ArrayStringLong a(Allocator::get_default(), true);
+        a.create();
 
-            CHECK_EQUAL(a.is_null(0), true);
-            CHECK_EQUAL(a.is_null(1), false);
-            CHECK_EQUAL(a.is_null(2), false);
-            CHECK(a.get(2) == "foo");
+        a.add(StringData(0, 0));  // add null (StringData::data() == 0)
+        a.add("");
+        a.add("foo");
 
-            // Test insert
-            a.insert(0, StringData(0, 0)); // add null (StringData::data() == 0)
-            a.insert(2, StringData(0, 0)); // add null (StringData::data() == 0)
-            a.insert(4, StringData(0, 0)); // add null (StringData::data() == 0)
+        CHECK_EQUAL(a.is_null(0), true);
+        CHECK_EQUAL(a.is_null(1), false);
+        CHECK_EQUAL(a.is_null(2), false);
+        CHECK(a.get(2) == "foo");
 
-            CHECK_EQUAL(a.is_null(0), true);
-            CHECK_EQUAL(a.is_null(1), true);
-            CHECK_EQUAL(a.is_null(2), true);
-            CHECK_EQUAL(a.is_null(3), false);
-            CHECK_EQUAL(a.is_null(4), true);
-            CHECK_EQUAL(a.is_null(5), false);
+        // Test insert
+        a.insert(0, StringData(0, 0)); // add null (StringData::data() == 0)
+        a.insert(2, StringData(0, 0)); // add null (StringData::data() == 0)
+        a.insert(4, StringData(0, 0)); // add null (StringData::data() == 0)
 
-            a.destroy();
-        }
+        CHECK_EQUAL(a.is_null(0), true);
+        CHECK_EQUAL(a.is_null(1), true);
+        CHECK_EQUAL(a.is_null(2), true);
+        CHECK_EQUAL(a.is_null(3), false);
+        CHECK_EQUAL(a.is_null(4), true);
+        CHECK_EQUAL(a.is_null(5), false);
 
-        {
-            ArrayStringLong a(Allocator::get_default(), true);
-            a.create();
+        a.destroy();
+    }
 
-            a.add("");
-            a.add(StringData(0, 0));
-            a.add("foo");
+    {
+        ArrayStringLong a(Allocator::get_default(), true);
+        a.create();
 
-            CHECK_EQUAL(a.is_null(0), false);
-            CHECK_EQUAL(a.is_null(1), true);
-            CHECK_EQUAL(a.is_null(2), false);
-            CHECK(a.get(2) == "foo");
+        a.add("");
+        a.add(StringData(0, 0));
+        a.add("foo");
 
-
-            a.erase(0);
-            CHECK_EQUAL(a.is_null(0), true);
-            CHECK_EQUAL(a.is_null(1), false);
-
-            a.erase(0);
-            CHECK_EQUAL(a.is_null(0), false);
-
-            a.destroy();
-        }
+        CHECK_EQUAL(a.is_null(0), false);
+        CHECK_EQUAL(a.is_null(1), true);
+        CHECK_EQUAL(a.is_null(2), false);
+        CHECK(a.get(2) == "foo");
 
 
-        Random random(random_int<unsigned long>());
+        a.erase(0);
+        CHECK_EQUAL(a.is_null(0), true);
+        CHECK_EQUAL(a.is_null(1), false);
 
-        for (size_t t = 0; t < 2; t++) {
-            ArrayStringLong a(Allocator::get_default(), true);
-            a.create();
+        a.erase(0);
+        CHECK_EQUAL(a.is_null(0), false);
 
-            // vector that is kept in sync with the ArrayString so that we can compare with it
-            vector<string> v;
+        a.destroy();
+    }
 
-            for (size_t i = 0; i < 2000; i++) {
-                unsigned char rnd = random.draw_int<unsigned char>();  //    = 1234 * ((i + 123) * (t + 432) + 423) + 543;
 
-                // Add more often than removing, so that we grow
-                if (rnd < 80 && a.size() > 0) {
-                    size_t del = rnd % a.size();
-                    a.erase(del);
-                    v.erase(v.begin() + del);
+    Random random(random_int<unsigned long>());
+
+    for (size_t t = 0; t < 2; t++) {
+        ArrayStringLong a(Allocator::get_default(), true);
+        a.create();
+
+        // vector that is kept in sync with the ArrayString so that we can compare with it
+        vector<string> v;
+
+        for (size_t i = 0; i < 2000; i++) {
+            unsigned char rnd = random.draw_int<unsigned char>();  //    = 1234 * ((i + 123) * (t + 432) + 423) + 543;
+
+            // Add more often than removing, so that we grow
+            if (rnd < 80 && a.size() > 0) {
+                size_t del = rnd % a.size();
+                a.erase(del);
+                v.erase(v.begin() + del);
+            }
+            else {
+                // Generate string with good probability of being empty or null
+                static const char str[] = "This is a test of null strings";
+                size_t len;
+
+                if (random.draw_int<unsigned char>() > 100)
+                    len = rnd % 15;
+                else
+                    len = 0;
+
+                StringData sd;
+                string stdstr;
+
+                if (random.draw_int<unsigned char>() > 100) {
+                    sd = StringData(0, 0);
+                    stdstr = "null";
                 }
                 else {
-                    // Generate string with good probability of being empty or null
-                    static const char str[] = "This is a test of null strings";
-                    size_t len;
+                    sd = StringData(str, len);
+                    stdstr = string(str, len);
+                }
 
-                    if (random.draw_int<unsigned char>() > 100)
-                        len = rnd % 15;
-                    else
-                        len = 0;
+                if (random.draw_int<unsigned char>() > 100) {
+                    a.add(sd);
+                    v.push_back(stdstr);
+                }
+                else if (a.size() > 0) {
+                    size_t pos = rnd % a.size();
+                    a.insert(pos, sd);
+                    v.insert(v.begin() + pos, stdstr);
+                }
 
-                    StringData sd;
-                    string stdstr;
-
-                    if (random.draw_int<unsigned char>() > 100) {
-                        sd = StringData(0, 0);
-                        stdstr = "null";
+                CHECK_EQUAL(a.size(), v.size());
+                for (size_t i = 0; i < a.size(); i++) {
+                    if (v[i] == "null") {
+                        CHECK(a.is_null(i));
+                        CHECK(a.get(i).data() == 0);
                     }
                     else {
-                        sd = StringData(str, len);
-                        stdstr = string(str, len);
-                    }
-
-                    if (random.draw_int<unsigned char>() > 100) {
-                        a.add(sd);
-                        v.push_back(stdstr);
-                    }
-                    else if (a.size() > 0) {
-                        size_t pos = rnd % a.size();
-                        a.insert(pos, sd);
-                        v.insert(v.begin() + pos, stdstr);
-                    }
-
-                    CHECK_EQUAL(a.size(), v.size());
-                    for (size_t i = 0; i < a.size(); i++) {
-                        if (v[i] == "null") {
-                            CHECK(a.is_null(i));
-                            CHECK(a.get(i).data() == 0);
-                        }
-                        else {
-                            CHECK(a.get(i) == v[i]);
-                        }
+                        CHECK(a.get(i) == v[i]);
                     }
                 }
             }
-            a.destroy();
         }
+        a.destroy();
     }
+
 }
 
 #endif // TEST_ARRAY_STRING_LONG
