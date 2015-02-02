@@ -60,6 +60,7 @@ public:
     ColumnLinkBase& get_origin_column() const TIGHTDB_NOEXCEPT;
     void set_origin_column(ColumnLinkBase&) TIGHTDB_NOEXCEPT;
 
+    void insert(std::size_t row_ndx, std::size_t num_rows, bool is_append);
     void erase(std::size_t, bool) TIGHTDB_OVERRIDE;
     void move_last_over(std::size_t, std::size_t, bool) TIGHTDB_OVERRIDE;
     void clear(std::size_t, bool) TIGHTDB_OVERRIDE;

@@ -347,6 +347,10 @@ void LinkView::do_update_link(size_t old_target_row_ndx, size_t new_target_row_n
 {
     TIGHTDB_ASSERT(m_row_indexes.is_attached());
 
+    // FIXME: This code assumes that a linklist/view holds exactly one link to
+    // a given target. However, the public interface allows for adding/setting
+    // multiple links to the same target. The following code *only* updates the
+    // first of any target index.
     size_t pos = m_row_indexes.find_first(old_target_row_ndx);
     TIGHTDB_ASSERT(pos != tightdb::not_found);
 
