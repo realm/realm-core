@@ -47,17 +47,17 @@ def add_remote_changeset(_self, remote):
             break
 
     # Find next remote version to integrate
-    next_remote_version_to_intergate = last_remote_version_integrated + 1
+    next_remote_version_to_integrate = last_remote_version_integrated + 1
     while True:
-        remote_entry = remote['history'][next_remote_version_to_intergate-1]
+        remote_entry = remote['history'][next_remote_version_to_integrate-1]
         if remote_entry['remote_peer_id'] != _self['peer_id']:
             break
-        next_remote_version_to_intergate = next_remote_version_to_intergate + 1
+        next_remote_version_to_integrate = next_remote_version_to_integrate + 1
 
     # Find the last local version already integrated into the next remote
-    # version to be intergated
+    # version to be integrated
     last_local_version_integrated = 0
-    for i in range(next_remote_version_to_intergate-1, 0, -1):
+    for i in range(next_remote_version_to_integrate-1, 0, -1):
         remote_entry_2 = remote['history'][i-1]
         if remote_entry_2['remote_peer_id'] == _self['peer_id']:
             last_local_version_integrated = remote_entry_2['remote_version']
@@ -91,7 +91,7 @@ def add_remote_changeset(_self, remote):
                 for j in range(i, len(map)):
                     map[j][0] = map[j][0] + num
 
-    # Use map to transform incoming operations
+    # Use the new map to transform the incoming operations
     new_changeset = []
     remote_entry_peer_id = remote_entry['remote_peer_id']
     if remote_entry_peer_id == None:
