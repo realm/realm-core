@@ -123,19 +123,19 @@ def add_remote_changeset(_self, remote):
                   remote_entry['version'], remote['peer_id'])
 
 
-def set(peer, index, value, reuse_prev_timestamp = False):
-    if index < 0 or index >= len(peer['list']):
+def set(_self, index, value, reuse_prev_timestamp = False):
+    if index < 0 or index >= len(_self['list']):
         raise Exception("Index out of range")
     changeset = [ { 'name': 'set', 'index': index, 'value': value } ]
     timestamp = next_timestamp() if not reuse_prev_timestamp else current_timestamp
-    add_changeset(peer, changeset, timestamp, None, None)
+    add_changeset(_self, changeset, timestamp, None, None)
 
-def insert(peer, index, value, reuse_prev_timestamp = False):
-    if index < 0 or index > len(peer['list']):
+def insert(_self, index, value, reuse_prev_timestamp = False):
+    if index < 0 or index > len(_self['list']):
         raise Exception("Index out of range")
     changeset = [ { 'name': 'insert', 'index': index, 'value': value } ]
     timestamp = next_timestamp() if not reuse_prev_timestamp else current_timestamp
-    add_changeset(peer, changeset, timestamp, None, None)
+    add_changeset(_self, changeset, timestamp, None, None)
 
 
 
