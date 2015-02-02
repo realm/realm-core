@@ -56,6 +56,11 @@ private:
     Replication* m_temp_disabled_repl;
 };
 
+struct PackedCommitLogEntry  {
+    uint64_t server_version_and_flag;
+    uint64_t size;
+};
+
 } // anonymous namespace
 
 
@@ -501,12 +506,13 @@ WriteLogCollector::internal_submit_log(const char* data, uint_fast64_t size,
     remap_if_needed(*active_log);
 
     // append data from write pointer and onwards:
-    uint64_t server_version_and_flag = (server_version << 1) + (is_foreign ? 1 : 0);
+    PackedCommitLogEntry entry;
+    entry.server_version_and_flag = (server_version << 1) + (is_foreign ? 1 : 0);
+    entry.size = size;
     char* write_ptr = reinterpret_cast<char*>(active_log->map.get_addr()) + preamble->write_offset;
-    *reinterpret_cast<uint64_t*>(write_ptr) = server_version_and_flag;
-    write_ptr += sizeof (uint64_t);
-    *reinterpret_cast<uint64_t*>(write_ptr) = size;
-    write_ptr += sizeof (uint64_t);
+    const char* entry_data = reinterpret_cast<const char*>(&entry);
+    copy(entry_data, entry_data + sizeof(PackedCommitLogEntry), write_ptr);
+    write_ptr += sizeof(PackedCommitLogEntry);
     copy(data, data+size, write_ptr);
     active_log->map.sync();
 
@@ -584,9 +590,9 @@ void WriteLogCollector::reset_log_management(version_type last_version)
                  current_version < last_version;
                  current_version++) {
                 // advance write ptr to next buffer start:
-                uint_fast64_t size =
-                    *reinterpret_cast<const uint64_t*>(buffer + preamble->write_offset + sizeof(uint64_t));
-                uint_fast64_t tmp_offset = preamble->write_offset + 2*sizeof (uint64_t);
+                const PackedCommitLogEntry* entry = reinterpret_cast<const PackedCommitLogEntry*>(buffer + preamble->write_offset);
+                uint_fast64_t size = entry->size;
+                uint_fast64_t tmp_offset = preamble->write_offset + sizeof(PackedCommitLogEntry);
                 size = aligned_to(sizeof (uint64_t), size);
                 preamble->write_offset = tmp_offset + size;
             }
@@ -727,11 +733,10 @@ void WriteLogCollector::get_commit_entries_internal(version_type from_version, v
             break;
 
         // follow buffer layout
-        uint_fast64_t server_version_and_flag =
-            *reinterpret_cast<const uint64_t*>(buffer + m_read_offset);
-        uint_fast64_t size =
-            *reinterpret_cast<const uint64_t*>(buffer + m_read_offset + sizeof(uint64_t));
-        uint_fast64_t tmp_offset = m_read_offset + 2*sizeof (uint64_t);
+        const PackedCommitLogEntry* entry = reinterpret_cast<const PackedCommitLogEntry*>(buffer + m_read_offset);
+        uint_fast64_t server_version_and_flag = entry->server_version_and_flag;
+        uint_fast64_t size = entry->size;
+        uint_fast64_t tmp_offset = m_read_offset + sizeof(PackedCommitLogEntry);
         if (m_read_version >= from_version) {
             // cerr << "  --at: " << m_read_offset << ", " << size << endl;
             set_log_entry_internal(logs_buffer, server_version_and_flag, buffer+tmp_offset, size);
