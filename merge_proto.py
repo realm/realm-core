@@ -8,6 +8,10 @@ def next_timestamp():
     return current_timestamp
 
 
+def create(peer_id):
+    return { 'peer_id': peer_id, 'version': 0, 'list': [], 'history': [] }
+
+
 def add_changeset(_self, changeset, timestamp, remote_version, remote_peer_id):
     assert((remote_version == None) == (remote_peer_id == None))
     new_version = _self['version'] + 1
@@ -142,8 +146,8 @@ def insert(_self, index, value, reuse_prev_timestamp = False):
 # Example that sorts a foreign insert in the middle of a sequence of consecutive
 # inserts due to timing
 
-server = { 'peer_id': 0, 'version': 0, 'list': [], 'history': [] }
-client = { 'peer_id': 1, 'version': 0, 'list': [], 'history': [] }
+server = create(peer_id=0)
+client = create(peer_id=1)
 
 insert(server, index=0, value=100)
 insert(server, index=1, value=101)
@@ -168,8 +172,8 @@ print "Client:", client['list']
 # Example that demonstrates that non-end insertions are handled correctly
 # (intuitively)
 
-server = { 'peer_id': 0, 'version': 0, 'list': [], 'history': [] }
-client = { 'peer_id': 1, 'version': 0, 'list': [], 'history': [] }
+server = create(peer_id=0)
+client = create(peer_id=1)
 
 insert(server, index=0, value=100)
 insert(server, index=0, value=101)
@@ -194,10 +198,10 @@ print "Client:", client['list']
 # Example that demonstrates 3-way merge with server in the middle (star-shaped
 # topology)
 
-server   = { 'peer_id': 0, 'version': 0, 'list': [], 'history': [] }
-client_A = { 'peer_id': 1, 'version': 0, 'list': [], 'history': [] }
-client_B = { 'peer_id': 2, 'version': 0, 'list': [], 'history': [] }
-client_C = { 'peer_id': 3, 'version': 0, 'list': [], 'history': [] }
+server   = create(peer_id=0)
+client_A = create(peer_id=1)
+client_B = create(peer_id=2)
+client_C = create(peer_id=3)
 
 insert(client_A, index=0, value=100)
 insert(client_B, index=0, value=200)
