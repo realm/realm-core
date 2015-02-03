@@ -63,7 +63,34 @@ def add_remote_changeset(_self, remote):
             last_local_version_integrated = remote_entry_2['remote_version']
             break
 
-    # Rebuild the operation transformation map
+    # Build the operation transformation map. This map expresses the necessary
+    # translation of the list element index of the next foreign list modifying
+    # operation to be integrated. The index in an incoming 'set' operation will
+    # be translated according to this map, but the situation is more complicated
+    # when the incoming operation is an 'insert' operation, as it may involve
+    # resolving conflicts with insertions already performed locally.
+    #
+    # The map is represented as an ordered sequence of 4-tuples (begin, diff,
+    # timestamp, peer_id) each one representing the next flat piece of the graph
+    # of a 'staircase function'. The domain of a particular entry is
+    # `begin`..`end-1` where `end` is `begin` of the next entry in the map, or
+    # 'infinity' if there is no next entry. In general, some entries in the map
+    # have empty domains, in which case they are in the map only for the purpose
+    # of resolving conflicts. `diff` is the value to be added to the list
+    # element index of the incoming operation, and this value is always strictly
+    # greater than `diff` of the preceeding map entry, or strictly greater than
+    # zero for the first entry in the map. A map with no entries expresses an
+    # identity transformation. `timestamp` and `peer_id` specify the timestamp
+    # and peer identifier of the locally performed insertion operation that gave
+    # rise to the map entry.
+    #
+    # For a non-insertion operation occuring at list index `i`, the effective
+    # change in index is the value of `diff` of the last map entry where `begin
+    # <= i`. For insertion operations, on the other hand, the relevant map entry
+    # is instead the last one that satisfies `begin <= i && (begin < i ||
+    # timestamp <= ts && (timestamp < ts || peer_id <= pid))` where `ts` and
+    # `pid` are the timestamp and the peer identifier of the incoming insertion
+    # operation respectively.
     last_local_version = _self['version']
     map = []
     for version in range(last_local_version_integrated+1, last_local_version+1):
@@ -91,7 +118,8 @@ def add_remote_changeset(_self, remote):
                 for j in range(i, len(map)):
                     map[j][0] = map[j][0] + num
 
-    # Use the new map to transform the incoming operations
+    # Use the new map to transform the incoming operations, updating it as
+    # necessary along the way.
     new_changeset = []
     remote_entry_peer_id = remote_entry['remote_peer_id']
     if remote_entry_peer_id == None:
@@ -116,6 +144,9 @@ def add_remote_changeset(_self, remote):
                             break
                         assert(remote_entry_peer_id < peer_id)
                 i = i - 1
+            num = 1 # Number of inserted list elements
+            for j in range(i, len(map)):
+                map[j][0] = map[j][0] + num
         diff = map[i-1][1] if i > 0 else 0
         new_changeset.append({
             'name':  operation['name'],
