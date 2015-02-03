@@ -1446,8 +1446,8 @@ size_t verify_leaf(MemRef mem, Allocator& alloc)
     }
     bool is_big = Array::get_context_flag_from_header(mem.m_addr);
     if (!is_big) {
-        // Medium strings fixme
-        ArrayStringLong leaf(alloc, false); // for Verify() we don't need null awareness
+        // Medium strings
+        ArrayStringLong leaf(alloc); 
         leaf.init_from_mem(mem);
         leaf.Verify();
         return leaf.size();

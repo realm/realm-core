@@ -5673,19 +5673,25 @@ TEST(Query_NullStrings)
     TableView v;
 
     // Short strings
-    table.set_string(0, 0, "Albertslund");       // Normal non-empty string
-    table.set_string(0, 1, StringData(0, 0));    // NULL string
-    table.set_string(0, 2, "");                  // Empty string
+    table.set_string(0, 0, "Albertslund");      // Normal non-empty string
+    table.set_string(0, 1, null());             // NULL string
+    table.set_string(0, 2, "");                 // Empty string
 
-    q = table.column<StringData>(0) == StringData(0, 0);
+    q = table.column<StringData>(0) == null();
     v = q.find_all();
     CHECK_EQUAL(1, v.size());
     CHECK_EQUAL(1, v.get_source_ndx(0));
 
-    q = table.column<StringData>(0) != StringData(0, 0);
+    q = table.column<StringData>(0) != null();
     v = q.find_all();
-    //  CHECK_EQUAL(2, v.size());
-//        CHECK_EQUAL(1, v.get_source_ndx(0));
+//    CHECK_EQUAL(2, v.size());
+//    CHECK_EQUAL(1, v.get_source_ndx(0));
+
+    // nulls is never a search result unless you compare with null itself
+    q = table.column<StringData>(0) != StringData("Albertslund");
+    v = q.find_all();
+//    CHECK_EQUAL(1, v.size());
+    CHECK_EQUAL(2, v.get_source_ndx(0));
 
     q = table.column<StringData>(0) == "";
     v = q.find_all();
@@ -5694,7 +5700,7 @@ TEST(Query_NullStrings)
 
     // Medium strings (16+)
     table.set_string(0, 0, "AlbertslundAlbertslundAlbert");
-    q = table.column<StringData>(0) == StringData(0, 0);
+    q = table.column<StringData>(0) == null();
     v = q.find_all();
     CHECK_EQUAL(1, v.size());
     CHECK_EQUAL(1, v.get_source_ndx(0));
@@ -5706,7 +5712,7 @@ TEST(Query_NullStrings)
 
     // Long strings (64+)
     table.set_string(0, 0, "AlbertslundAlbertslundAlbertslundAlbertslundAlbertslundAlbertslundAlbertslund");
-    q = table.column<StringData>(0) == StringData(0, 0);
+    q = table.column<StringData>(0) == null();
     v = q.find_all();
     CHECK_EQUAL(1, v.size());
     CHECK_EQUAL(1, v.get_source_ndx(0));

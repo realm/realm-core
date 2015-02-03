@@ -725,10 +725,10 @@ TEST(TableView_SortNullString)
     Table t;
     t.add_column(type_String, "s", true);
     t.add_empty_row(4);
-    t.set_string(0, 0, StringData("")); // empty string
-    t.set_string(0, 1, StringData());   // null
-    t.set_string(0, 2, StringData("")); // empty string
-    t.set_string(0, 3, StringData());   // null
+    t.set_string(0, 0, StringData(""));     // empty string
+    t.set_string(0, 1, null());             // null
+    t.set_string(0, 2, StringData(""));     // empty string
+    t.set_string(0, 3, null());             // null
 
     TableView tv;
 

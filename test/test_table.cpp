@@ -2309,6 +2309,54 @@ TEST(Table_SpecDeleteColumns)
 #endif
 }
 
+TEST(Table_NullInEnum)
+{
+    Group group;
+    TableRef table = group.add_table("test");
+    table->add_column(type_String, "second", true);
+
+    for (size_t c = 0; c < 100; c++) {
+        table->insert_string(0, c, "hello");
+        table->insert_done();
+    }
+
+    size_t r;
+
+    r = table->where().equal(0, "hello").count();
+    CHECK_EQUAL(100, r);
+
+    table->set_string(0, 50, null());
+    r = table->where().equal(0, "hello").count();
+    CHECK_EQUAL(99, r);
+
+    table->optimize();
+
+    table->set_string(0, 50, null());
+    r = table->where().equal(0, "hello").count();
+    CHECK_EQUAL(99, r);
+
+    table->set_string(0, 50, "hello");
+    r = table->where().equal(0, "hello").count();
+    CHECK_EQUAL(100, r);
+
+    table->set_string(0, 50, null());
+    r = table->where().equal(0, "hello").count();
+    CHECK_EQUAL(99, r);
+
+    r = table->where().equal(0, null()).count();
+    CHECK_EQUAL(1, r);
+
+    table->set_string(0, 55, null());
+    r = table->where().equal(0, null()).count();
+    CHECK_EQUAL(2, r);
+
+    r = table->where().equal(0, "hello").count();
+    CHECK_EQUAL(98, r);
+
+    table->remove(55);
+    r = table->where().equal(0, null()).count();
+    CHECK_EQUAL(1, r);
+}
 
 TEST(Table_SpecAddColumns)
 {

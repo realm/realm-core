@@ -504,7 +504,6 @@ void Column::move_assign(Column& col)
     col.m_array = 0;
     m_search_index = col.m_search_index;
     col.m_search_index = null_ptr;
-//    col.m_nullable = m_nullable;
 }
 
 
@@ -778,8 +777,9 @@ void Column::set_search_index_ref(ref_type ref, ArrayParent* parent,
     size_t ndx_in_parent, bool allow_duplicate_valaues)
 {
     TIGHTDB_ASSERT(!m_search_index);
+    // Todo, set nullable argument to m_nullable when we have nullable ints
     m_search_index = new StringIndex(ref, parent, ndx_in_parent, this, &get_string,
-        !allow_duplicate_valaues, m_array->get_alloc(), false); // Throws, fixme index
+        !allow_duplicate_valaues, m_array->get_alloc(), false); // Throws. 
 }
 
 size_t Column::find_first(int64_t value, size_t begin, size_t end) const

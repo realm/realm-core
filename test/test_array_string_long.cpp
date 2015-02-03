@@ -266,7 +266,7 @@ TEST(ArrayStringLong_Null)
 
         a.add("foo");
         a.add("");
-        a.add(StringData(0, 0)); // add null (StringData::data() == 0)
+        a.add(null()); 
 
         CHECK_EQUAL(a.is_null(0), false);
         CHECK_EQUAL(a.is_null(1), false);
@@ -288,7 +288,7 @@ TEST(ArrayStringLong_Null)
         ArrayStringLong a(Allocator::get_default(), true);
         a.create();
 
-        a.add(StringData(0, 0));  // add null (StringData::data() == 0)
+        a.add(null());  
         a.add("");
         a.add("foo");
 
@@ -298,9 +298,9 @@ TEST(ArrayStringLong_Null)
         CHECK(a.get(2) == "foo");
 
         // Test insert
-        a.insert(0, StringData(0, 0)); // add null (StringData::data() == 0)
-        a.insert(2, StringData(0, 0)); // add null (StringData::data() == 0)
-        a.insert(4, StringData(0, 0)); // add null (StringData::data() == 0)
+        a.insert(0, null()); 
+        a.insert(2, null()); 
+        a.insert(4, null()); 
 
         CHECK_EQUAL(a.is_null(0), true);
         CHECK_EQUAL(a.is_null(1), true);
@@ -317,7 +317,7 @@ TEST(ArrayStringLong_Null)
         a.create();
 
         a.add("");
-        a.add(StringData(0, 0));
+        a.add(null());
         a.add("foo");
 
         CHECK_EQUAL(a.is_null(0), false);
@@ -369,7 +369,7 @@ TEST(ArrayStringLong_Null)
                 string stdstr;
 
                 if (random.draw_int<unsigned char>() > 100) {
-                    sd = StringData(0, 0);
+                    sd = null();
                     stdstr = "null";
                 }
                 else {

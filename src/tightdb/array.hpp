@@ -81,6 +81,14 @@ template<class T> inline T no0(T v) { return v == 0 ? 1 : v; }
 /// found'. It is similar in function to std::string::npos.
 const std::size_t npos = std::size_t(-1);
 
+struct null 
+{
+    operator StringData ()
+    {
+        return StringData();
+    }
+};
+
 /// Alias for tightdb::npos.
 const std::size_t not_found = npos;
 
@@ -476,10 +484,10 @@ public:
                           bool use_retval = false) const TIGHTDB_NOEXCEPT; // FIXME: Constness is not propagated to the sub-array
 
     typedef StringData (*StringGetter)(void*, std::size_t, char*); // Pre-declare getter function from string index
-    size_t IndexStringFindFirst(StringData value, void* column, StringGetter get_func, bool nullable = 0) const;
-    void   IndexStringFindAll(Column& result, StringData value, void* column, StringGetter get_func, bool nullable = 0) const;
-    size_t IndexStringCount(StringData value, void* column, StringGetter get_func, bool nullable = 0) const;
-    FindRes IndexStringFindAllNoCopy(StringData value, size_t& res_ref, void* column, StringGetter get_func, bool nullable = 0) const;
+    size_t IndexStringFindFirst(StringData value, void* column, StringGetter get_func, bool nullable) const;
+    void   IndexStringFindAll(Column& result, StringData value, void* column, StringGetter get_func, bool nullable) const;
+    size_t IndexStringCount(StringData value, void* column, StringGetter get_func, bool nullable) const;
+    FindRes IndexStringFindAllNoCopy(StringData value, size_t& res_ref, void* column, StringGetter get_func, bool nullable) const;
 
     /// This one may change the represenation of the array, so be carefull if
     /// you call it after ensure_minimum_width().

@@ -170,8 +170,8 @@ StringData ArrayStringLong::get(const char* header, size_t ndx, Allocator& alloc
     }
     else {
         pair<int64_t, int64_t> p = get_two(header, 0);
-        offsets_ref = p.first;
-        blob_ref = p.second;
+        offsets_ref = to_ref(p.first);
+        blob_ref = to_ref(p.second);
     }
 
     const char* offsets_header = alloc.translate(offsets_ref);
