@@ -557,6 +557,8 @@ template<class Func>
 inline void CondVar::wait(RobustMutex& m, Func recover_func, const struct timespec* tp)
 {
 #ifdef CONDVAR_EMULATION
+    // ignore timeout
+    static_cast<void>(tp);
     sem_t* wait_sem = sem_open("/RealmsBigFriendlySemaphpore", O_CREAT, S_IRWXG | S_IRWXU, 0);
     waiters++;
     uint64_t my_counter = signal_counter;
