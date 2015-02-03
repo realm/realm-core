@@ -2654,7 +2654,7 @@ TEST(Shared_ScopedRollback)
     CHECK_NOT(wt_2.has_table("foo"));
 }
 
-ONLY(Shared_Move_Last_Over_Int_Indexed)
+TEST(Shared_Move_Last_Over_Int_Indexed)
 {
     const size_t N = 5;
     SHARED_GROUP_TEST_PATH(path);
