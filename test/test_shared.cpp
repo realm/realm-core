@@ -2654,4 +2654,100 @@ TEST(Shared_ScopedRollback)
     CHECK_NOT(wt_2.has_table("foo"));
 }
 
+ONLY(Shared_Move_Last_Over_Int_Indexed)
+{
+    const size_t N = 5;
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg(path);
+
+    // Create table with string + int columns and index int column
+    {
+        WriteTransaction wt(sg);
+        TableRef table = wt.add_table("table");
+        table->add_column(type_Int, "second");
+        table->add_column(type_String, "first");
+        table->add_search_index(0);
+        table->clear();
+        wt.commit();
+    }
+
+
+    // Add rows to table
+    {
+        WriteTransaction wt(sg);
+        TableRef table = wt.get_table("table");
+        for (size_t i = 0; i < N; ++i) {
+            table->add_empty_row();
+            table->set_int(1, i, i);
+        }
+        wt.commit();
+        CHECK_EQUAL(N, table->size());
+    }
+    {
+        ReadTransaction rt(sg);
+        ConstTableRef table = rt.get_table("table");
+        CHECK_EQUAL(N, table->size());
+    }
+
+    // Remove all - one by one
+    {
+        WriteTransaction wt(sg);
+        TableRef table = wt.get_table("table");
+        for (size_t i = 0; i < N; ++i) {
+            Row *row = new Row((*table)[0]);   // this is closer to the Java binding
+            table->move_last_over(row->get_index());
+        }
+        wt.commit();
+    }
+    {
+        ReadTransaction rt(sg);
+        ConstTableRef table = rt.get_table("table");
+        CHECK_EQUAL(0, table->size());
+    }
+
+
+    // and clear
+    {
+        WriteTransaction wt(sg);
+        TableRef table = wt.get_table("table");
+        table->clear();
+        wt.commit();
+    }
+    {
+        ReadTransaction rt(sg);
+        ConstTableRef table = rt.get_table("table");
+        CHECK_EQUAL(0, table->size());
+    }
+
+    // add rows again
+    {
+        WriteTransaction wt(sg);
+        TableRef table = wt.get_table("table");
+        for (size_t i = 0; i < N; ++i) {
+            table->add_empty_row();
+            table->set_int(1, i, i);
+        }
+        wt.commit();
+    }
+    {
+        ReadTransaction rt(sg);
+        ConstTableRef table = rt.get_table("table");
+        CHECK_EQUAL(N, table->size());
+    }
+
+    // remove last row
+    {
+        WriteTransaction wt(sg);
+        TableRef table = wt.get_table("table");
+        Row *row = new Row((*table)[N-1]);
+        table->move_last_over(row->get_index());
+        wt.commit();
+    }
+    {
+        ReadTransaction rt(sg);
+        ConstTableRef table = rt.get_table("table");
+        CHECK_EQUAL(N-1, table->size());
+    }
+}
+
 #endif // TEST_SHARED
