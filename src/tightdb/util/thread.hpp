@@ -42,6 +42,12 @@
 
 #define CONDVAR_EMULATION
 
+#ifdef CONDVAR_EMULATION
+#include <stdint.h>
+#include <fcntl.h>
+#include <semaphore.h>
+#endif
+
 namespace tightdb {
 namespace util {
 
@@ -291,8 +297,8 @@ public:
 
 private:
 #ifdef CONDVAR_EMULATION
-    Mutex wait_lock;
-    int waiters;
+    uint32_t waiters;
+    uint64_t signal_counter;
 #else
     pthread_cond_t m_impl;
 #endif
@@ -501,12 +507,10 @@ inline void RobustMutex::unlock() TIGHTDB_NOEXCEPT
 
 
 inline CondVar::CondVar()
-#ifdef CONDVAR_EMULATION
-    : wait_lock(Mutex::process_shared_tag())
-#endif
 {
 #ifdef CONDVAR_EMULATION
     waiters = 0;
+    signal_counter = 0;
 #else
     int r = pthread_cond_init(&m_impl, 0);
     if (TIGHTDB_UNLIKELY(r != 0))
@@ -527,21 +531,20 @@ inline CondVar::~CondVar() TIGHTDB_NOEXCEPT
 inline void CondVar::wait(LockGuard& l) TIGHTDB_NOEXCEPT
 {
 #ifdef CONDVAR_EMULATION
-    if (waiters == 0) {
-        waiters++;
-        wait_lock.lock();
-    }
+    sem_t* wait_sem = sem_open("/RealmsBigFriendlySemaphpore", O_CREAT, S_IRWXG | S_IRWXU, 0);
     waiters++;
+    uint64_t my_counter = signal_counter;
     l.m_mutex.unlock();
-    wait_lock.lock();
-    l.m_mutex.lock();
-    waiters--;
-    if (waiters > 1)
-        wait_lock.unlock();
-    if (waiters == 1) {
-        waiters--;
-        wait_lock.unlock();
+    for (;;) {
+        sem_wait(wait_sem);
+        l.m_mutex.lock();
+        if (signal_counter != my_counter)
+            break;
+        sem_post(wait_sem);
+        sched_yield();
+        l.m_mutex.unlock();
     }
+    sem_close(wait_sem);
 #else
     int r = pthread_cond_wait(&m_impl, &l.m_mutex.m_impl);
     if (TIGHTDB_UNLIKELY(r != 0))
@@ -553,21 +556,20 @@ template<class Func>
 inline void CondVar::wait(RobustMutex& m, Func recover_func, const struct timespec* tp)
 {
 #ifdef CONDVAR_EMULATION
-    if (waiters == 0) {
-        waiters++;
-        wait_lock.lock();
-    }
+    sem_t* wait_sem = sem_open("/RealmsBigFriendlySemaphpore", O_CREAT, S_IRWXG | S_IRWXU, 0);
     waiters++;
+    uint64_t my_counter = signal_counter;
     m.unlock();
-    wait_lock.lock();
-    m.lock(recover_func);
-    waiters--;
-    if (waiters > 1)
-        wait_lock.unlock();
-    if (waiters == 1) {
-        waiters--;
-        wait_lock.unlock();
+    for (;;) {
+        sem_wait(wait_sem);
+        m.lock(recover_func);
+        if (signal_counter != my_counter)
+            break;
+        sem_post(wait_sem);
+        sched_yield();
+        m.unlock();
     }
+    sem_close(wait_sem);
 #else
     int r;
     if (!tp) {
@@ -614,8 +616,13 @@ inline void CondVar::notify() TIGHTDB_NOEXCEPT
 inline void CondVar::notify_all() TIGHTDB_NOEXCEPT
 {
 #ifdef CONDVAR_EMULATION
-    if (waiters > 1)
-        wait_lock.unlock();
+    sem_t* wait_sem = sem_open("/RealmsBigFriendlySemaphpore", O_CREAT, S_IRWXG | S_IRWXU, 0);
+    signal_counter++;
+    while (waiters) {
+        sem_post(wait_sem);
+        --waiters;
+    }
+    sem_close(wait_sem);
 #else
     int r = pthread_cond_broadcast(&m_impl);
     TIGHTDB_ASSERT(r == 0);

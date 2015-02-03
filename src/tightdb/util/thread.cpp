@@ -203,12 +203,10 @@ void RobustMutex::mark_as_consistent() TIGHTDB_NOEXCEPT
 
 
 CondVar::CondVar(process_shared_tag)
-#ifdef CONDVAR_EMULATION
-    : wait_lock(Mutex::process_shared_tag())
-#endif
 {
 #ifdef TIGHTDB_HAVE_PTHREAD_PROCESS_SHARED
     waiters = 0;
+    signal_counter = 0;
 #ifdef CONDVAR_EMULATION
 #else
     pthread_condattr_t attr;
