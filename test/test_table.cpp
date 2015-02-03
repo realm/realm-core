@@ -742,6 +742,31 @@ TEST(Table_Optimize_SetIndex_Crash)
     table.move_last_over(1);
 }
 
+TEST(Table_Move_Last_Over_Int_Indexed)
+{
+    const size_t N = 1001;
+    Table table;
+    table.add_column(type_Int, "first");
+    table.add_column(type_String, "second");
+    table.add_search_index(0);
+    table.clear();
+
+    // 4 rows
+    for (size_t i = 0; i < N; ++i) {
+        table.insert_string(0, 0, "");
+        table.insert_int(0, 0, i);
+        table.insert_done();
+    }
+
+    CHECK_EQUAL(N, table.size());
+
+    // remove last row
+    for (size_t i = 0; i < N; ++i) {
+        table.move_last_over(table.size() - 1);
+    }
+    CHECK_EQUAL(0, table.size());
+}
+
 
 TEST(Table_MoveAllTypes)
 {
