@@ -90,7 +90,8 @@ def add_remote_changeset(_self, remote):
     # is instead the last one that satisfies `begin <= i && (begin < i ||
     # timestamp <= ts && (timestamp < ts || peer_id <= pid))` where `ts` and
     # `pid` are the timestamp and the peer identifier of the incoming insertion
-    # operation respectively.
+    # operation respectively. Note that the process of locating the right map
+    # entry **is** the process of resolving conflicts.
     last_local_version = _self['version']
     map = []
     for version in range(last_local_version_integrated+1, last_local_version+1):
