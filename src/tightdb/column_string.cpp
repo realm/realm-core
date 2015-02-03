@@ -170,7 +170,7 @@ StringData AdaptiveStringColumn::get(size_t ndx) const TIGHTDB_NOEXCEPT
     bool is_big = Array::get_context_flag_from_header(leaf_header);
     if (!is_big) {
         // Medimum strings
-        return ArrayStringLong::get(leaf_header, ndx_in_leaf, alloc);
+        return ArrayStringLong::get(leaf_header, ndx_in_leaf, alloc, m_nullable);
     }
     // Big strings
     return ArrayBigBlobs::get_string(leaf_header, ndx_in_leaf, alloc);
@@ -1452,11 +1452,10 @@ size_t verify_leaf(MemRef mem, Allocator& alloc)
     bool is_big = Array::get_context_flag_from_header(mem.m_addr);
     if (!is_big) {
         // Medium strings fixme
-/*        ArrayStringLong leaf(alloc, nullable);
+        ArrayStringLong leaf(alloc, false); // for Verify() we don't need null awareness
         leaf.init_from_mem(mem);
         leaf.Verify();
         return leaf.size();
-        */
     }
     // Big strings
     ArrayBigBlobs leaf(alloc);
@@ -1469,13 +1468,6 @@ size_t verify_leaf(MemRef mem, Allocator& alloc)
 
 void AdaptiveStringColumn::Verify() const
 {
-    for (size_t t = 0; t < size(); t++)
-        cerr << get(t) << "\n";
-
-    cerr << "\n\n";
-
-
-
     if (root_is_leaf()) {
         bool long_strings = m_array->has_refs();
         if (!long_strings) {

@@ -154,13 +154,11 @@ void ArrayStringLong::find_all(Column& result, StringData value, size_t add_offs
 }
 
 
-StringData ArrayStringLong::get(const char* header, size_t ndx, Allocator& alloc) TIGHTDB_NOEXCEPT
+StringData ArrayStringLong::get(const char* header, size_t ndx, Allocator& alloc, bool nullable) TIGHTDB_NOEXCEPT
 {
     ref_type offsets_ref;
     ref_type blob_ref;
     ref_type nulls_ref;
-
-    bool nullable = get_size_from_header(header, alloc) == 3;
 
     if (nullable) {
         get_three(header, 0, offsets_ref, blob_ref, nulls_ref);

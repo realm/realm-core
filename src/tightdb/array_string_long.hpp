@@ -78,7 +78,7 @@ public:
     /// array instance. If an array instance is already available, or
     /// you need to get multiple values, then this method will be
     /// slower.
-    static StringData get(const char* header, std::size_t ndx, Allocator&) TIGHTDB_NOEXCEPT;
+    static StringData get(const char* header, std::size_t ndx, Allocator&, bool nullable) TIGHTDB_NOEXCEPT;
 
     ref_type bptree_leaf_insert(std::size_t ndx, StringData, TreeInsertBase&);
 
@@ -110,11 +110,11 @@ private:
 
 // Implementation:
 inline ArrayStringLong::ArrayStringLong(Allocator& alloc, bool nullable) TIGHTDB_NOEXCEPT:
-    Array(alloc), m_offsets(alloc), m_blob(alloc), m_nulls(alloc), m_nullable(nullable)
+    Array(alloc), m_offsets(alloc), m_blob(alloc), m_nulls(nullable ? alloc : Allocator::get_default()), m_nullable(nullable)
 {
     m_offsets.set_parent(this, 0);
     m_blob.set_parent(this, 1);
-//    if (nullable)
+    if (nullable)
         m_nulls.set_parent(this, 2);
 }
 

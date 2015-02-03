@@ -40,7 +40,7 @@ using namespace tightdb;
 // check-testcase` (or one of its friends) from the command line.
 
 
-TEST(ColumnString_Basic)
+ONLY(ColumnString_Basic)
 {
     ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
     AdaptiveStringColumn c(Allocator::get_default(), ref);
