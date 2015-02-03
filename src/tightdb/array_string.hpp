@@ -142,7 +142,7 @@ inline StringData ArrayString::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < m_size);
     if (m_width == 0)
-        return StringData(null_ptr, 0); // return null
+        return StringData(m_nullable ? null_ptr : m_data, 0); // we're just using m_data to get any non-0 pointer
     const char* data = m_data + (ndx * m_width);
     std::size_t size = (m_width-1) - data[m_width-1];
 

@@ -53,7 +53,7 @@ class ColumnStringEnum: public Column {
 public:
     typedef StringData value_type;
 
-    ColumnStringEnum(Allocator&, ref_type ref, ref_type keys_ref);
+    ColumnStringEnum(Allocator&, ref_type ref, ref_type keys_ref, bool nullable = false);
     ~ColumnStringEnum() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     void destroy() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
@@ -142,6 +142,7 @@ private:
     // Member variables
     AdaptiveStringColumn m_keys;
     StringIndex* m_search_index;
+    bool m_nullable;
 
     /// If you are appending and have the size of the column readily available,
     /// call the 4 argument version instead. If you are not appending, either

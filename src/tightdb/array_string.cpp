@@ -305,7 +305,7 @@ ref_type ArrayString::bptree_leaf_insert(size_t ndx, StringData value, TreeInser
     }
 
     // Split leaf node
-    ArrayString new_leaf(m_alloc);
+    ArrayString new_leaf(m_alloc, m_nullable);
     new_leaf.create(); // Throws
     if (ndx == leaf_size) {
         new_leaf.add(value); // Throws

@@ -32,7 +32,7 @@ public:
 
     typedef StringData value_type;
 
-    explicit ArrayStringLong(Allocator&, bool nullable = false) TIGHTDB_NOEXCEPT;
+    explicit ArrayStringLong(Allocator&, bool nullable) TIGHTDB_NOEXCEPT;
     ~ArrayStringLong() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE{}
 
     /// Create a new empty long string array and attach this accessor to
@@ -87,7 +87,7 @@ public:
     /// Construct a long string array of the specified size and return
     /// just the reference to the underlying memory. All elements will
     /// be initialized to zero size blobs.
-    static MemRef create_array(std::size_t size, Allocator&, bool nullable = false);
+    static MemRef create_array(std::size_t size, Allocator&, bool nullable);
 
     /// Construct a copy of the specified slice of this long string
     /// array using the specified target allocator.
@@ -110,11 +110,11 @@ private:
 
 // Implementation:
 inline ArrayStringLong::ArrayStringLong(Allocator& alloc, bool nullable) TIGHTDB_NOEXCEPT:
-    Array(alloc), m_offsets(alloc), m_blob(alloc), m_nulls(nullable ? alloc : Allocator::get_default()), m_nullable(nullable)
+    Array(alloc), m_offsets(alloc), m_blob(alloc), m_nulls(alloc), m_nullable(nullable)
 {
     m_offsets.set_parent(this, 0);
     m_blob.set_parent(this, 1);
-    if (nullable)
+//    if (nullable)
         m_nulls.set_parent(this, 2);
 }
 

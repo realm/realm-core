@@ -1,5 +1,4 @@
 // All unit tests here suddenly broke on Windows, maybe after encryption was added
-#ifndef _WIN32
 
 #include <map>
 #include <sstream>
@@ -377,6 +376,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
     CHECK_EQUAL(bar, group.get_table("bar"));
 }
 
+#ifndef _WIN32
 
 TEST(LangBindHelper_AdvanceReadTransact_AddTableWithFreshSharedGroup)
 {
@@ -415,7 +415,6 @@ TEST(LangBindHelper_AdvanceReadTransact_AddTableWithFreshSharedGroup)
 
     LangBindHelper::advance_read(sg);
 }
-
 
 TEST(LangBindHelper_AdvanceReadTransact_RemoveTableWithFreshSharedGroup)
 {
@@ -486,6 +485,8 @@ TEST(LangBindHelper_AdvanceReadTransact_CreateManyTables)
     LangBindHelper::advance_read(sg);
 }
 
+#endif
+
 TEST(LangBindHelper_AdvanceReadTransact_LinkListSort)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -539,6 +540,88 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkListSort)
     CHECK_EQUAL(0, lvr->get(3).get_index());
 }
 
+
+ONLY(LangBindHelper_AdvanceReadTransact_ColumnRootTypeChange2)
+{
+    SHARED_GROUP_TEST_PATH(path);
+
+    // Create a table for strings and one for other types
+    Table strings_w;
+        strings_w.add_column(type_String, "a", 0, true);
+
+
+
+
+    size_t leaf_x4 = 4 * TIGHTDB_MAX_BPNODE_SIZE;
+    size_t leaf_x4p16 = leaf_x4 + 16;
+
+
+    // Change root type in various string columns (including mixed)
+    struct Step { size_t m_str_size, m_num_rows; };
+    Step steps[] = {
+        // 1->max->1
+        { 1, 1 }, { 8191, 1 }, { 1, 1 },
+        // rising, falling
+        { 3, 1 }, { 7, 1 }, { 11, 1 }, { 15, 1 }, { 23, 1 }, { 31, 1 }, { 47, 1 },
+        { 63, 1 }, { 95, 1 }, { 127, 1 }, { 191, 1 }, { 255, 1 }, { 383, 1 }, { 511, 1 },
+        { 767, 1 }, { 1023, 1 }, { 1535, 1 }, { 2047, 1 }, { 3071, 1 }, { 4095, 1 }, { 6143, 1 },
+        { 8191, 1 }, { 6143, 1 }, { 4095, 1 }, { 3071, 1 }, { 2047, 1 }, { 1535, 1 }, { 1023, 1 },
+        { 767, 1 }, { 511, 1 }, { 383, 1 }, { 255, 1 }, { 191, 1 }, { 127, 1 }, { 95, 1 },
+        { 63, 1 }, { 47, 1 }, { 31, 1 }, { 23, 1 }, { 15, 1 }, { 11, 1 }, { 7, 1 },
+        { 3, 1 }, { 1, 1 },
+        // rising -> inner node -> rising
+        { 0, leaf_x4 }, { 3, 1 }, { 0, leaf_x4 }, { 7, 1 }, { 0, leaf_x4 }, { 11, 1 },
+        { 0, leaf_x4 }, { 15, 1 }, { 0, leaf_x4 }, { 23, 1 }, { 0, leaf_x4 }, { 31, 1 },
+        { 0, leaf_x4 }, { 47, 1 }, { 0, leaf_x4 }, { 63, 1 }, { 0, leaf_x4 }, { 95, 1 },
+        { 0, leaf_x4 }, { 127, 1 }, { 0, leaf_x4 }, { 191, 1 }, { 0, leaf_x4 }, { 255, 1 },
+        { 0, leaf_x4 }, { 383, 1 }, { 0, leaf_x4 }, { 511, 1 }, { 0, leaf_x4 }, { 767, 1 },
+        { 0, leaf_x4 }, { 1023, 1 }, { 0, leaf_x4 }, { 1535, 1 }, { 0, leaf_x4 }, { 2047, 1 },
+        { 0, leaf_x4 }, { 3071, 1 }, { 0, leaf_x4 }, { 4095, 1 }, { 0, leaf_x4 }, { 6143, 1 },
+        { 0, leaf_x4 }, { 8191, 1 }
+    };
+    ostringstream out;
+    out << left;
+
+    for (size_t i = 60; i < sizeof steps / sizeof *steps; ++i) {
+
+        Step step = steps[i];
+        out.str("");
+        out << setfill('x') << setw(int(step.m_str_size)) << "A";
+        string str_1 = out.str();
+        StringData str(str_1);
+        out.str("");
+        out << setfill('x') << setw(int(step.m_str_size)) << "B";
+
+        strings_w.add_empty_row(1);
+        strings_w.set_string(0, 0, "oooooooooooooooooooo");
+        strings_w.Verify();
+        strings_w.add_empty_row(4);
+        strings_w.Verify();
+        
+
+
+        {
+            if (step.m_num_rows > strings_w.size()) {
+                strings_w.add_empty_row(step.m_num_rows - strings_w.size());
+            }
+            else if (step.m_num_rows < strings_w.size()) {
+                strings_w.clear();
+                strings_w.add_empty_row(step.m_num_rows);
+            }
+            strings_w.set_string(0, 0, str);
+
+        }
+
+        strings_w.Verify();
+
+
+    }
+
+
+}
+
+
+
 TEST(LangBindHelper_AdvanceReadTransact_ColumnRootTypeChange)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -589,6 +672,8 @@ TEST(LangBindHelper_AdvanceReadTransact_ColumnRootTypeChange)
     size_t leaf_x4    = 4 * TIGHTDB_MAX_BPNODE_SIZE;
     size_t leaf_x4p16 = leaf_x4 + 16;
 
+    group.Verify();
+
     // Change root type in various string columns (including mixed)
     struct Step { size_t m_str_size, m_num_rows; };
     Step steps[] = {
@@ -615,7 +700,9 @@ TEST(LangBindHelper_AdvanceReadTransact_ColumnRootTypeChange)
     ostringstream out;
     out << left;
 
-    for (size_t i = 0; i < sizeof steps / sizeof *steps; ++i) {
+    for (size_t i = 59; i < sizeof steps / sizeof *steps; ++i) {
+        group.Verify();
+        
         Step step = steps[i];
         out.str("");
         out << setfill('x') << setw(int(step.m_str_size)) << "A";
@@ -633,6 +720,8 @@ TEST(LangBindHelper_AdvanceReadTransact_ColumnRootTypeChange)
         out << setfill('x') << setw(int(step.m_str_size)) << "D";
         string str_4 = out.str();
         BinaryData bin_mix(str_4);
+
+        
         {
             WriteTransaction wt(sg_w);
             TableRef strings_w = wt.get_table("strings");
@@ -649,8 +738,12 @@ TEST(LangBindHelper_AdvanceReadTransact_ColumnRootTypeChange)
             strings_w->set_mixed  (3, 0, bin_mix);
             wt.commit();
         }
+        
+
+        group.Verify();
         LangBindHelper::advance_read(sg);
         group.Verify();
+
         CHECK_EQUAL(2, group.size());
         CHECK(strings->is_attached());
         CHECK_EQUAL(4, strings->get_column_count());
@@ -731,7 +824,6 @@ TEST(LangBindHelper_AdvanceReadTransact_ColumnRootTypeChange)
     CHECK_EQUAL(17.0f, other->get_float    (1,0));
 //    CHECK_EQUAL(???,   other->get_subtable (2,0));
 }
-
 
 TEST(LangBindHelper_AdvanceReadTransact_MixedColumn)
 {
@@ -5893,6 +5985,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RemoveTableMovesTableWithLinksOver)
     CHECK_EQUAL(0, fourth->get_backlink_count(1, *third, 0));
 }
 
+#ifndef _WIN32
 
 TEST(LangBindHelper_ImplicitTransactions)
 {
@@ -6109,7 +6202,6 @@ TEST(LangBindHelper_RollbackAndContinueAsReadColumnRemove)
     }
     group->Verify();
 }
-
 
 TEST(LangBindHelper_RollbackAndContinueAsReadLinkList)
 {
@@ -6881,6 +6973,7 @@ TEST(LangBindHelper_MemOnly)
 
 TIGHTDB_TABLE_1(MyTable, first,  Int)
 
+#ifndef _WIN32
 
 TEST(LangBindHelper_VersionControl)
 {
@@ -7003,6 +7096,8 @@ TEST(LangBindHelper_VersionControl)
     }
 }
 
+#endif
+
 TEST(Shared_LinkListCrash)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -7033,9 +7128,8 @@ TEST(Shared_LinkListCrash)
     g2.Verify();
 }
 
+#endif
 
 #endif // TIGHTDB_ENABLE_REPLICATION
 
 #endif
-
-#endif // Disables whole .cpp file on Windows

@@ -491,10 +491,6 @@ public:
     /// Add \a diff to all the elements in the specified index range.
     void adjust(std::size_t begin, std::size_t end, int_fast64_t diff);
 
-    /// Same as adjust(), but for Arrays where the LSB bit is used as a flag, 
-    /// and the remaining MSB bits store the actual value. 
-    void adjust_upper_bits(std::size_t begin, std::size_t end, int64_t diff);
-
     /// Add signed \a diff to all elements that are greater than, or equal to \a
     /// limit.
     void adjust_ge(int_fast64_t limit, int_fast64_t diff);
@@ -843,6 +839,7 @@ public:
 
     template<class TreeTraits> struct TreeInsert: TreeInsertBase {
         typename TreeTraits::value_type m_value;
+        bool m_nullable;
     };
 
     /// Same as bptree_insert() but insert after the last element.
@@ -969,7 +966,9 @@ private:
 
     bool do_erase_bptree_elem(std::size_t elem_ndx, EraseHandler&);
 
-    template <IndexMethod method, class T> size_t index_string(StringData value, Column& result, size_t &result_ref, void* column, StringGetter get_func, bool nullable = false) const;
+    template <IndexMethod method, class T> 
+    size_t index_string(StringData value, Column& result, size_t &result_ref, void* column, 
+                        StringGetter get_func, bool nullable) const;
 protected:
 //    void AddPositiveLocal(int64_t value);
 
@@ -1559,17 +1558,6 @@ inline void Array::adjust(std::size_t begin, std::size_t end, int_fast64_t diff)
     // FIXME: Should be optimized
     for (std::size_t i = begin; i != end; ++i)
         adjust(i, diff); // Throws
-}
-
-inline void Array::adjust_upper_bits(std::size_t begin, std::size_t end, int_fast64_t diff)
-{
-    size_t n = size();
-    for (std::size_t i = 0; i != n; ++i) {
-        int64_t v = get(i);
-        bool bit = v & 1;
-        v = v >> 1 + diff;
-        set(i, int64_t(v << 1 | bit)); // Throws
-    }
 }
 
 inline void Array::adjust_ge(int_fast64_t limit, int_fast64_t diff)

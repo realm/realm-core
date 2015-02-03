@@ -262,9 +262,10 @@ class SetLeafElem: public Array::UpdateHandler {
 public:
     Allocator& m_alloc;
     const StringData m_value;
+    bool m_nullable;
 
-    SetLeafElem(Allocator& alloc, StringData value) TIGHTDB_NOEXCEPT:
-        m_alloc(alloc), m_value(value) {}
+    SetLeafElem(Allocator& alloc, StringData value, bool nullable) TIGHTDB_NOEXCEPT:
+        m_alloc(alloc), m_value(value), m_nullable(nullable) {}
 
     void update(MemRef mem, ArrayParent* parent, size_t ndx_in_parent,
                 size_t elem_ndx_in_leaf) TIGHTDB_OVERRIDE
@@ -279,7 +280,7 @@ public:
                 leaf.set_string(elem_ndx_in_leaf, m_value); // Throws
                 return;
             }
-            ArrayStringLong leaf(m_alloc);
+            ArrayStringLong leaf(m_alloc, m_nullable);
             leaf.init_from_mem(mem);
             leaf.set_parent(parent, ndx_in_parent);
             if (m_value.size() <= medium_string_max_size) {
@@ -305,7 +306,7 @@ public:
         }
         if (m_value.size() <= medium_string_max_size) {
             // Upgrade leaf from small to medium strings
-            ArrayStringLong new_leaf(m_alloc);
+            ArrayStringLong new_leaf(m_alloc, m_nullable);
             new_leaf.create(); // Throws
             new_leaf.set_parent(parent, ndx_in_parent);
             new_leaf.update_parent(); // Throws
@@ -366,15 +367,16 @@ void AdaptiveStringColumn::set(size_t ndx, StringData value)
         TIGHTDB_ASSERT(false);
     }
 
-    SetLeafElem set_leaf_elem(m_array->get_alloc(), value);
+    SetLeafElem set_leaf_elem(m_array->get_alloc(), value, m_nullable);
     m_array->update_bptree_elem(ndx, set_leaf_elem); // Throws
 }
 
 
 class AdaptiveStringColumn::EraseLeafElem: public ColumnBase::EraseHandlerBase {
 public:
-    EraseLeafElem(AdaptiveStringColumn& column) TIGHTDB_NOEXCEPT:
-        EraseHandlerBase(column) {}
+    EraseLeafElem(AdaptiveStringColumn& column, bool nullable) TIGHTDB_NOEXCEPT:
+        EraseHandlerBase(column), m_nullable(nullable) {}
+
     bool erase_leaf_elem(MemRef leaf_mem, ArrayParent* parent,
                          size_t leaf_ndx_in_parent,
                          size_t elem_ndx_in_leaf) TIGHTDB_OVERRIDE
@@ -398,7 +400,7 @@ public:
         bool is_big = Array::get_context_flag_from_header(leaf_mem.m_addr);
         if (!is_big) {
             // Medium strings
-            ArrayStringLong leaf(get_alloc());
+            ArrayStringLong leaf(get_alloc(), m_nullable);
             leaf.init_from_mem(leaf_mem);
             leaf.set_parent(parent, leaf_ndx_in_parent);
             TIGHTDB_ASSERT(leaf.size() >= 1);
@@ -435,7 +437,7 @@ public:
         bool long_strings = Array::get_hasrefs_from_header(leaf_mem.m_addr);
         if (!long_strings) {
             // Small strings
-            ArrayString* leaf_2 = new ArrayString(get_alloc()); // Throws
+            ArrayString* leaf_2 = new ArrayString(get_alloc(), m_nullable); // Throws
             leaf_2->init_from_mem(leaf_mem);
             leaf = leaf_2;
         }
@@ -443,7 +445,7 @@ public:
             bool is_big = Array::get_context_flag_from_header(leaf_mem.m_addr);
             if (!is_big) {
                 // Medium strings
-                ArrayStringLong* leaf_2 = new ArrayStringLong(get_alloc()); // Throws
+                ArrayStringLong* leaf_2 = new ArrayStringLong(get_alloc(), m_nullable); // Throws
                 leaf_2->init_from_mem(leaf_mem);
                 leaf = leaf_2;
             }
@@ -463,6 +465,9 @@ public:
         leaf->create(); // Throws
         replace_root(leaf.release()); // Throws, but accessor ownership is passed to callee
     }
+
+private:
+    bool m_nullable;
 };
 
 void AdaptiveStringColumn::do_erase(size_t ndx, bool is_last)
@@ -502,7 +507,7 @@ void AdaptiveStringColumn::do_erase(size_t ndx, bool is_last)
 
     // Non-leaf root
     size_t ndx_2 = is_last ? npos : ndx;
-    EraseLeafElem erase_leaf_elem(*this);
+    EraseLeafElem erase_leaf_elem(*this, m_nullable);
     Array::erase_bptree_elem(m_array, ndx_2, erase_leaf_elem); // Throws
 }
 
@@ -568,9 +573,9 @@ void AdaptiveStringColumn::do_move_last_over(size_t row_ndx, size_t last_row_ndx
     }
 
     // Non-leaf root
-    SetLeafElem set_leaf_elem(m_array->get_alloc(), copy_of_value);
+    SetLeafElem set_leaf_elem(m_array->get_alloc(), copy_of_value, m_nullable);
     m_array->update_bptree_elem(row_ndx, set_leaf_elem); // Throws
-    EraseLeafElem erase_leaf_elem(*this);
+    EraseLeafElem erase_leaf_elem(*this, m_nullable);
     Array::erase_bptree_elem(m_array, tightdb::npos, erase_leaf_elem); // Throws
 }
 
@@ -667,7 +672,7 @@ size_t AdaptiveStringColumn::count(StringData value) const
         bool is_big = Array::get_context_flag_from_header(leaf_mem.m_addr);
         if (!is_big) {
             // Medium strings
-            ArrayStringLong leaf(m_array->get_alloc());
+            ArrayStringLong leaf(m_array->get_alloc(), m_nullable);
             leaf.init_from_mem(leaf_mem);
             num_matches += leaf.count(value);
             begin += leaf.size();
@@ -742,7 +747,7 @@ size_t AdaptiveStringColumn::find_first(StringData value, size_t begin, size_t e
             bool is_big = Array::get_context_flag_from_header(leaf_mem.m_addr);
             if (!is_big) {
                 // Medium strings
-                ArrayStringLong leaf(m_array->get_alloc());
+                ArrayStringLong leaf(m_array->get_alloc(), m_nullable);
                 leaf.init_from_mem(leaf_mem);
                 end_in_leaf = min(leaf.size(), end - leaf_offset);
                 size_t ndx = leaf.find_first(value, ndx_in_leaf, end_in_leaf);
@@ -828,7 +833,7 @@ void AdaptiveStringColumn::find_all(Column& result, StringData value, size_t beg
             bool is_big = Array::get_context_flag_from_header(leaf_mem.m_addr);
             if (!is_big) {
                 // Medium strings
-                ArrayStringLong leaf(m_array->get_alloc());
+                ArrayStringLong leaf(m_array->get_alloc(), m_nullable);
                 leaf.init_from_mem(leaf_mem);
                 end_in_leaf = min(leaf.size(), end - leaf_offset);
                 leaf.find_all(result, value, leaf_offset, ndx_in_leaf, end_in_leaf); // Throws
@@ -1040,6 +1045,7 @@ void AdaptiveStringColumn::bptree_insert(size_t row_ndx, StringData value, size_
 
         // Non-leaf root
         state.m_value = value;
+        state.m_nullable = m_nullable;
         if (row_ndx_2 == tightdb::npos) {
             new_sibling_ref = m_array->bptree_append(state); // Throws
         }
@@ -1070,7 +1076,7 @@ ref_type AdaptiveStringColumn::leaf_insert(MemRef leaf_mem, ArrayParent& parent,
             leaf.set_parent(&parent, ndx_in_parent);
             return leaf.bptree_leaf_insert_string(insert_ndx, state.m_value, state); // Throws
         }
-        ArrayStringLong leaf(alloc);
+        ArrayStringLong leaf(alloc, state.m_nullable);
         leaf.init_from_mem(leaf_mem);
         leaf.set_parent(&parent, ndx_in_parent);
         if (state.m_value.size() <= medium_string_max_size)
@@ -1084,14 +1090,14 @@ ref_type AdaptiveStringColumn::leaf_insert(MemRef leaf_mem, ArrayParent& parent,
         leaf.destroy();
         return new_leaf.bptree_leaf_insert_string(insert_ndx, state.m_value, state); // Throws
     }
-    ArrayString leaf(alloc);
+    ArrayString leaf(alloc, state.m_nullable);
     leaf.init_from_mem(leaf_mem);
     leaf.set_parent(&parent, ndx_in_parent);
     if (state.m_value.size() <= small_string_max_size)
         return leaf.bptree_leaf_insert(insert_ndx, state.m_value, state); // Throws
     if (state.m_value.size() <= medium_string_max_size) {
         // Upgrade leaf from small to medium strings
-        ArrayStringLong new_leaf(alloc);
+        ArrayStringLong new_leaf(alloc, state.m_nullable);
         new_leaf.create(); // Throws
         new_leaf.set_parent(&parent, ndx_in_parent);
         new_leaf.update_parent(); // Throws
@@ -1241,21 +1247,21 @@ ref_type AdaptiveStringColumn::create(Allocator& alloc, size_t size)
 
 class AdaptiveStringColumn::SliceHandler: public ColumnBase::SliceHandler {
 public:
-    SliceHandler(Allocator& alloc): m_alloc(alloc) {}
+    SliceHandler(Allocator& alloc, bool nullable): m_alloc(alloc), m_nullable(nullable) {}
     MemRef slice_leaf(MemRef leaf_mem, size_t offset, size_t size,
                       Allocator& target_alloc) TIGHTDB_OVERRIDE
     {
         bool long_strings = Array::get_hasrefs_from_header(leaf_mem.m_addr);
         if (!long_strings) {
             // Small strings
-            ArrayString leaf(m_alloc);
+            ArrayString leaf(m_alloc, m_nullable);
             leaf.init_from_mem(leaf_mem);
             return leaf.slice(offset, size, target_alloc); // Throws
         }
         bool is_big = Array::get_context_flag_from_header(leaf_mem.m_addr);
         if (!is_big) {
             // Medium strings
-            ArrayStringLong leaf(m_alloc);
+            ArrayStringLong leaf(m_alloc, m_nullable);
             leaf.init_from_mem(leaf_mem);
             return leaf.slice(offset, size, target_alloc); // Throws
         }
@@ -1266,6 +1272,7 @@ public:
     }
 private:
     Allocator& m_alloc;
+    bool m_nullable;
 };
 
 ref_type AdaptiveStringColumn::write(size_t slice_offset, size_t slice_size,
@@ -1301,7 +1308,7 @@ ref_type AdaptiveStringColumn::write(size_t slice_offset, size_t slice_size,
         ref = pos;
     }
     else {
-        SliceHandler handler(get_alloc());
+        SliceHandler handler(get_alloc(), m_nullable);
         ref = ColumnBase::write(m_array, slice_offset, slice_size,
                                 table_size, handler, out); // Throws
     }
@@ -1444,11 +1451,12 @@ size_t verify_leaf(MemRef mem, Allocator& alloc)
     }
     bool is_big = Array::get_context_flag_from_header(mem.m_addr);
     if (!is_big) {
-        // Medium strings
-        ArrayStringLong leaf(alloc);
+        // Medium strings fixme
+/*        ArrayStringLong leaf(alloc, nullable);
         leaf.init_from_mem(mem);
         leaf.Verify();
         return leaf.size();
+        */
     }
     // Big strings
     ArrayBigBlobs leaf(alloc);
@@ -1461,6 +1469,13 @@ size_t verify_leaf(MemRef mem, Allocator& alloc)
 
 void AdaptiveStringColumn::Verify() const
 {
+    for (size_t t = 0; t < size(); t++)
+        cerr << get(t) << "\n";
+
+    cerr << "\n\n";
+
+
+
     if (root_is_leaf()) {
         bool long_strings = m_array->has_refs();
         if (!long_strings) {
@@ -1537,7 +1552,7 @@ void AdaptiveStringColumn::leaf_to_dot(MemRef leaf_mem, ArrayParent* parent, siz
     bool is_big = Array::get_context_flag_from_header(leaf_mem.m_addr);
     if (!is_big) {
         // Medium strings
-        ArrayStringLong leaf(m_array->get_alloc());
+        ArrayStringLong leaf(m_array->get_alloc(), m_nullable);
         leaf.init_from_mem(leaf_mem);
         leaf.set_parent(parent, ndx_in_parent);
         leaf.to_dot(out);
@@ -1569,11 +1584,14 @@ void leaf_dumper(MemRef mem, Allocator& alloc, ostream& out, int level)
     else {
         bool is_big = Array::get_context_flag_from_header(mem.m_addr);
         if (!is_big) {
-            // Medium strings
-            ArrayStringLong leaf(alloc);
+            // Medium strings 
+            /* fixme
+            ArrayStringLong leaf(alloc, nullable);
             leaf.init_from_mem(mem);
             leaf_size = leaf.size();
             leaf_type = "Medimum strings leaf";
+
+            */
         }
         else {
             // Big strings

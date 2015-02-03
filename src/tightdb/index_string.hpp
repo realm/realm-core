@@ -51,9 +51,9 @@ typedef StringData (*StringGetter)(void*, std::size_t, char*);
 
 class StringIndex: public Column {
 public:
-    StringIndex(void* target_column, StringGetter get_func, Allocator&, bool nullable = false);
+    StringIndex(void* target_column, StringGetter get_func, Allocator&, bool nullable);
     StringIndex(ref_type, ArrayParent*, std::size_t ndx_in_parent, void* target_column,
-                StringGetter get_func, bool allow_duplicate_values, Allocator&, bool nullable = false);
+                StringGetter get_func, bool allow_duplicate_values, Allocator&, bool nullable);
     ~StringIndex() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
     void set_target(void* target_column, StringGetter get_func) TIGHTDB_NOEXCEPT;
 
@@ -112,7 +112,7 @@ public:
     typedef int32_t key_type;
 
     static key_type create_key(StringData) TIGHTDB_NOEXCEPT;
-    static key_type create_key(StringData, size_t, bool nullable = false) TIGHTDB_NOEXCEPT;
+    static key_type create_key(StringData, size_t, bool nullable) TIGHTDB_NOEXCEPT;
 
 private:
     void* m_target_column;
@@ -124,7 +124,7 @@ private:
     using Column::erase;
 
     struct inner_node_tag {};
-    StringIndex(inner_node_tag, Allocator&, bool nullable = false);
+    StringIndex(inner_node_tag, Allocator&, bool nullable);
 
     static Array* create_node(Allocator&, bool is_leaf);
 

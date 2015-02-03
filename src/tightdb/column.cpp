@@ -748,7 +748,7 @@ StringIndex* Column::create_search_index()
 {
    TIGHTDB_ASSERT(!m_search_index);
    UniquePtr<StringIndex> index;
-   StringIndex* si = new StringIndex(this, &get_string, m_array->get_alloc());  // Throws
+   StringIndex* si = new StringIndex(this, &get_string, m_array->get_alloc(), true);  // Throws fixme, index
    index.reset(si);
 
    // Populate the index
@@ -779,7 +779,7 @@ void Column::set_search_index_ref(ref_type ref, ArrayParent* parent,
 {
     TIGHTDB_ASSERT(!m_search_index);
     m_search_index = new StringIndex(ref, parent, ndx_in_parent, this, &get_string,
-        !allow_duplicate_valaues, m_array->get_alloc()); // Throws
+        !allow_duplicate_valaues, m_array->get_alloc(), false); // Throws, fixme index
 }
 
 size_t Column::find_first(int64_t value, size_t begin, size_t end) const
