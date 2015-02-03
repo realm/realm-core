@@ -771,11 +771,40 @@ TEST(Links_LinkListInsert_AccessorUpdates)
     CHECK_EQUAL(1, links1->get_origin_row_index());
     CHECK_EQUAL(2, links2->get_origin_row_index());
 
+    // verify that backlinks was set correctly
+    CHECK_EQUAL(3, target->get_backlink_count(0, *origin, col_link));
+    CHECK_EQUAL(0, target->get_backlink(0, *origin, col_link, 0));
+    CHECK_EQUAL(1, target->get_backlink(0, *origin, col_link, 1));
+    CHECK_EQUAL(2, target->get_backlink(0, *origin, col_link, 2));
+    CHECK_EQUAL(3, target->get_backlink_count(1, *origin, col_link));
+    CHECK_EQUAL(0, target->get_backlink(1, *origin, col_link, 0));
+    CHECK_EQUAL(1, target->get_backlink(1, *origin, col_link, 1));
+    CHECK_EQUAL(2, target->get_backlink(1, *origin, col_link, 2));
+    CHECK_EQUAL(3, target->get_backlink_count(2, *origin, col_link));
+    CHECK_EQUAL(0, target->get_backlink(2, *origin, col_link, 0));
+    CHECK_EQUAL(1, target->get_backlink(2, *origin, col_link, 1));
+    CHECK_EQUAL(2, target->get_backlink(2, *origin, col_link, 2));
+
     // accessors follow movement of linklist entries
     origin->insert_empty_row(0);
-    CHECK_EQUAL(0, links0->get_origin_row_index());
-    CHECK_EQUAL(1, links1->get_origin_row_index());
-    CHECK_EQUAL(2, links2->get_origin_row_index());
+    CHECK_EQUAL(1, links0->get_origin_row_index());
+    CHECK_EQUAL(2, links1->get_origin_row_index());
+    CHECK_EQUAL(3, links2->get_origin_row_index());
+
+    // verify that backlinks was updated correctly
+    CHECK_EQUAL(3, target->get_backlink_count(0, *origin, col_link));
+    CHECK_EQUAL(1, target->get_backlink(0, *origin, col_link, 0));
+    CHECK_EQUAL(2, target->get_backlink(0, *origin, col_link, 1));
+    CHECK_EQUAL(3, target->get_backlink(0, *origin, col_link, 2));
+    CHECK_EQUAL(3, target->get_backlink_count(1, *origin, col_link));
+    CHECK_EQUAL(1, target->get_backlink(1, *origin, col_link, 0));
+    CHECK_EQUAL(2, target->get_backlink(1, *origin, col_link, 1));
+    CHECK_EQUAL(3, target->get_backlink(1, *origin, col_link, 2));
+    CHECK_EQUAL(3, target->get_backlink_count(2, *origin, col_link));
+    CHECK_EQUAL(1, target->get_backlink(2, *origin, col_link, 0));
+    CHECK_EQUAL(2, target->get_backlink(2, *origin, col_link, 1));
+    CHECK_EQUAL(3, target->get_backlink(2, *origin, col_link, 2));
+
 
     // and changes of refs are visible through the accessors
     target->insert_empty_row(0);
