@@ -1,5 +1,4 @@
 // All unit tests here suddenly broke on Windows, maybe after encryption was added
-
 #include <map>
 #include <sstream>
 
@@ -376,7 +375,6 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
     CHECK_EQUAL(bar, group.get_table("bar"));
 }
 
-#ifndef _WIN32
 
 TEST(LangBindHelper_AdvanceReadTransact_AddTableWithFreshSharedGroup)
 {
@@ -415,6 +413,7 @@ TEST(LangBindHelper_AdvanceReadTransact_AddTableWithFreshSharedGroup)
 
     LangBindHelper::advance_read(sg);
 }
+
 
 TEST(LangBindHelper_AdvanceReadTransact_RemoveTableWithFreshSharedGroup)
 {
@@ -484,8 +483,6 @@ TEST(LangBindHelper_AdvanceReadTransact_CreateManyTables)
 
     LangBindHelper::advance_read(sg);
 }
-
-#endif
 
 TEST(LangBindHelper_AdvanceReadTransact_LinkListSort)
 {
@@ -6297,6 +6294,7 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_MoveLastOverSubtables)
     }
 }
 
+#ifndef _WIN32
 
 TEST(LangBindHelper_ImplicitTransactions_OverSharedGroupDestruction)
 {
@@ -6329,6 +6327,7 @@ TEST(LangBindHelper_ImplicitTransactions_OverSharedGroupDestruction)
     }
 }
 
+#endif
 
 TEST(LangBindHelper_ImplicitTransactions_LinkList)
 {

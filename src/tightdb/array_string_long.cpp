@@ -2,6 +2,8 @@
 #include <win32/types.h> //ssize_t
 #endif
 
+#include <iostream>
+
 #include <tightdb/array_string_long.hpp>
 #include <tightdb/array_blob.hpp>
 #include <tightdb/impl/destroy_guard.hpp>

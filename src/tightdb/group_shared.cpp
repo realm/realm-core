@@ -944,8 +944,17 @@ void SharedGroup::close() TIGHTDB_NOEXCEPT
 #ifdef TIGHTDB_ENABLE_REPLICATION
             // If replication is enabled, we need to stop log management:
             Replication* repl = _impl::GroupFriend::get_replication(m_group);
-            if (repl)
+            if (repl) {
+#ifdef _WIN32
+                try {
+                    repl->stop_logging();
+                }
+                catch(...) {} // FIXME, on Windows, stop_logging() fails to delete a file because it's open
+#else
                 repl->stop_logging();
+#endif
+
+            }
 #endif
         }
     }
