@@ -78,16 +78,16 @@ def add_remote_changeset(_self, remote):
     # have empty domains, in which case they are in the map only for the purpose
     # of resolving conflicts. `diff` is the value to be added to the list
     # element index of the incoming operation, and this value is always strictly
-    # greater than `diff` of the preceeding map entry, or strictly greater than
+    # greater than `diff` of the preceding map entry, or strictly greater than
     # zero for the first entry in the map. A map with no entries expresses an
     # identity transformation. `timestamp` and `peer_id` specify the timestamp
     # and peer identifier of the locally performed insertion operation that gave
     # rise to the map entry.
     #
-    # For a non-insertion operation occuring at list index `i`, the effective
+    # For a non-insertion operation occurring at list index `i`, the effective
     # change in index is the value of `diff` of the last map entry where `begin
-    # <= i`. For insertion operations, on the other hand, the relevant map entry
-    # is instead the last one that satisfies `begin <= i && (begin < i ||
+    # <= i`. For *insertion* operations, on the other hand, the relevant map
+    # entry is instead the last one that satisfies `begin <= i && (begin < i ||
     # timestamp <= ts && (timestamp < ts || peer_id <= pid))` where `ts` and
     # `pid` are the timestamp and the peer identifier of the incoming insertion
     # operation respectively. Note that the process of locating the right map
