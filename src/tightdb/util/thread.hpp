@@ -45,6 +45,7 @@
 #ifdef CONDVAR_EMULATION
 #include <stdint.h>
 #include <fcntl.h>
+#include <sys/stat.h>
 #include <semaphore.h>
 #endif
 
