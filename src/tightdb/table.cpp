@@ -279,7 +279,7 @@ template<> struct ColumnTypeTraits3<DateTime> {
 
 // -- Table ---------------------------------------------------------------------------------
 
-size_t Table::add_column(DataType type, StringData name, DescriptorRef* subdesc, bool nullable)
+size_t Table::add_column(DataType type, StringData name, bool nullable, DescriptorRef* subdesc)
 {
     TIGHTDB_ASSERT(!has_shared_type());
     return get_descriptor()->add_column(type, name, subdesc, nullable); // Throws
@@ -391,11 +391,10 @@ void Table::remove_backlink_broken_rows(const CascadeState::row_set& rows)
 }
 
 
-void Table::insert_column(size_t col_ndx, DataType type, StringData name,
-                          DescriptorRef* subdesc, bool nullable)
+void Table::insert_column(size_t col_ndx, DataType type, StringData name, bool nullable, DescriptorRef* subdesc)
 {
     TIGHTDB_ASSERT(!has_shared_type());
-    get_descriptor()->insert_column(col_ndx, type, name, subdesc); // Throws
+    get_descriptor()->insert_column(col_ndx, type, name, subdesc, nullable); // Throws
 }
 
 

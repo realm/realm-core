@@ -48,8 +48,7 @@ class AdaptiveStringColumn: public ColumnBase, public ColumnTemplate<StringData>
 public:
     typedef StringData value_type;
 
-    AdaptiveStringColumn(Allocator&, ref_type);
-    AdaptiveStringColumn(Allocator&, ref_type, bool nullable);
+    AdaptiveStringColumn(Allocator&, ref_type, bool nullable = false);
     ~AdaptiveStringColumn() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
     void destroy() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;

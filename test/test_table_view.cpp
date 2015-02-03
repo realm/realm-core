@@ -723,7 +723,7 @@ TEST(TableView_DoubleSortPrecision)
 TEST(TableView_SortNullString)
 {
     Table t;
-    t.add_column(type_String, "s", 0, true);
+    t.add_column(type_String, "s", true);
     t.add_empty_row(4);
     t.set_string(0, 0, StringData("")); // empty string
     t.set_string(0, 1, StringData());   // null

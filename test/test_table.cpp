@@ -121,7 +121,7 @@ TEST(Table_Null)
         Group group;
         TableRef table = group.add_table("test");
 
-        table->add_column(type_String, "name", 0, true);
+        table->add_column(type_String, "name", true);
         table->add_empty_row();
 
         CHECK(table->get_string(0, 0).is_null());
@@ -5779,9 +5779,7 @@ TEST(Table_IndexStringDelete)
 TEST(Table_NullableColumn)
 {
     Table table;
-    table.add_column(type_String, "first", 0, true);
-
-    
+    table.add_column(type_String, "first", true);    
 }
 
 #endif // TEST_TABLE

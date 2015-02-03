@@ -63,11 +63,6 @@ void copy_leaf(const ArrayStringLong& from, ArrayBigBlobs& to)
 } // anonymous namespace
 
 
-AdaptiveStringColumn::AdaptiveStringColumn(Allocator& alloc, ref_type ref) : AdaptiveStringColumn(alloc, ref, false)
-{
-
-}
-
 AdaptiveStringColumn::AdaptiveStringColumn(Allocator& alloc, ref_type ref, bool nullable):
     m_search_index(0), m_nullable(nullable)
 {

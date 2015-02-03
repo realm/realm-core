@@ -185,9 +185,22 @@ public:
     ///
     /// \sa has_shared_type()
     /// \sa get_descriptor()
-    std::size_t add_column(DataType type, StringData name, DescriptorRef* subdesc = 0, bool nullable = false);
-    void insert_column(std::size_t column_ndx, DataType type, StringData name,
-                       DescriptorRef* subdesc = 0, bool nullable = false);
+
+    std::size_t add_column(DataType type, StringData name, bool nullable = false, DescriptorRef* subdesc = 0);
+    void insert_column(std::size_t column_ndx, DataType type, StringData name, bool nullable = false,
+                       DescriptorRef* subdesc = 0);
+
+    // Todo, these prototypes only exist for backwards compatibility. We should remove them because they are error 
+    // prone (optional arguments and implicit bool to null-ptr conversion)
+    std::size_t add_column(DataType type, StringData name, DescriptorRef* subdesc)
+    {
+        return add_column(type, name, false, subdesc);
+    }
+    void insert_column(std::size_t column_ndx, DataType type, StringData name, DescriptorRef* subdesc)
+    {
+        insert_column(column_ndx, type, name, false, subdesc);
+    }
+
     std::size_t add_column_link(DataType type, StringData name, Table& target, LinkType link_type = link_Weak);
     void insert_column_link(std::size_t column_ndx, DataType type, StringData name, Table& target,
                             LinkType link_type = link_Weak);

@@ -5654,7 +5654,7 @@ TEST(Query_StringIndexCrash)
     // Test for a crash which occured when a query testing for equality on a
     // string index was deep-copied after being run
     Table table;
-    table.add_column(type_String, "s", 0, true);
+    table.add_column(type_String, "s", true);
     table.add_search_index(0);
 
     Query q = table.where().equal(0, StringData(""));
@@ -5666,7 +5666,7 @@ TEST(Query_StringIndexCrash)
 TEST(Query_NullStrings)
 {
     Table table;
-    table.add_column(type_String, "s", 0, true);
+    table.add_column(type_String, "s", true);
     table.add_empty_row(3);
 
     Query q;

@@ -28,8 +28,6 @@ namespace tightdb {
 
 class ArrayStringLong: public Array {
 public:
-    bool m_nullable;
-
     typedef StringData value_type;
 
     explicit ArrayStringLong(Allocator&, bool nullable) TIGHTDB_NOEXCEPT;
@@ -102,7 +100,7 @@ private:
     Array m_offsets;
     ArrayBlob m_blob;
     Array m_nulls;
-
+    bool m_nullable;
 };
 
 
