@@ -1903,6 +1903,8 @@ void Table::move_last_over(size_t row_ndx)
     TIGHTDB_ASSERT(row_ndx < m_size);
 
     size_t table_ndx = get_index_in_group();
+
+    // this is a subtable or freestanding table:
     if (table_ndx == tightdb::npos) {
 #ifdef TIGHTDB_ENABLE_REPLICATION
         if (Replication* repl = get_repl()) {
@@ -2751,7 +2753,7 @@ void Table::insert_linklist(size_t col_ndx, size_t row_ndx)
     TIGHTDB_ASSERT(row_ndx == m_size); // can only append to unorded tables
 
     ColumnLinkList& column = get_column_link_list(col_ndx);
-    column.insert(row_ndx);
+    column.insert(row_ndx, 1, true);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     if (Replication* repl = get_repl())

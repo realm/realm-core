@@ -68,6 +68,55 @@ void ColumnLinkList::move_last_over(size_t row_ndx, size_t last_row_ndx,
 }
 
 
+void ColumnLinkList::insert(std::size_t row_ndx, std::size_t num_rows, bool is_append)
+{
+    std::size_t row_ndx_2 = is_append ? tightdb::npos : row_ndx;
+    int_fast64_t value = 0;
+    ColumnLinkBase::do_insert(row_ndx_2, value, num_rows); // Throws
+
+    // update backlinks to moved entries:
+    size_t last_row_ndx = size()-1;
+    for (size_t target_ndx = last_row_ndx; target_ndx >= row_ndx+num_rows; --target_ndx) {
+        size_t source_ndx = target_ndx - num_rows;
+        if (ref_type ref = get_as_ref(target_ndx)) {
+            Column link_list(get_alloc(), ref);
+            size_t n = link_list.size();
+            for (size_t i = 0; i < n; ++i) {
+                size_t backlink_ndx = to_size_t(link_list.get(i));
+                m_backlink_column->update_backlink(backlink_ndx, source_ndx, target_ndx);
+            }
+        }
+    }
+    adj_acc_insert_rows_and_fix(row_ndx, num_rows);
+}
+
+
+void ColumnLinkList::adj_acc_insert_rows_and_fix(std::size_t row_ndx, std::size_t num_rows)
+{
+    size_t i = 0, n = m_list_accessors.size();
+    while (i < n) {
+        list_entry& e = m_list_accessors[i];
+        if (e.m_row_ndx >= row_ndx) {
+            e.m_row_ndx += num_rows;
+            e.m_list->set_origin_row_index(e.m_row_ndx);
+        }
+        ++i;
+    }
+}
+
+
+void ColumnLinkList::adj_acc_insert_rows(std::size_t row_ndx, std::size_t num_rows) TIGHTDB_NOEXCEPT
+{
+    size_t i = 0, n = m_list_accessors.size();
+    while (i < n) {
+        list_entry& e = m_list_accessors[i];
+        if (e.m_row_ndx >= row_ndx) {
+            e.m_row_ndx += num_rows;
+        }
+        ++i;
+    }
+}
+
 void ColumnLinkList::clear(size_t, bool broken_reciprocal_backlinks)
 {
     if (!broken_reciprocal_backlinks) {

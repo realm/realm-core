@@ -59,12 +59,15 @@ public:
     void to_json_row(std::size_t row_ndx, std::ostream& out) const;
 
     void move_last_over(std::size_t, std::size_t, bool) TIGHTDB_OVERRIDE;
+    void insert(std::size_t row_ndx, std::size_t num_rows, bool is_append) TIGHTDB_OVERRIDE;
     void clear(std::size_t, bool) TIGHTDB_OVERRIDE;
     void cascade_break_backlinks_to(std::size_t, CascadeState&) TIGHTDB_OVERRIDE;
     void cascade_break_backlinks_to_all_rows(std::size_t, CascadeState&) TIGHTDB_OVERRIDE;
     void update_from_parent(std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     void adj_acc_move_over(std::size_t, std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     void adj_acc_clear_root_table() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void adj_acc_insert_rows(std::size_t row_ndx, std::size_t num_rows) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void adj_acc_insert_rows_and_fix(std::size_t row_ndx, std::size_t num_rows);
     void refresh_accessor_tree(std::size_t, const Spec&) TIGHTDB_OVERRIDE;
 
 #ifdef TIGHTDB_DEBUG

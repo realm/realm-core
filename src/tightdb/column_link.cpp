@@ -70,6 +70,26 @@ void ColumnLink::clear(size_t, bool broken_reciprocal_backlinks)
 }
 
 
+void ColumnLink::insert(std::size_t row_ndx, std::size_t num_rows, bool is_append)
+{
+    std::size_t row_ndx_2 = is_append ? tightdb::npos : row_ndx;
+    int_fast64_t value = 0;
+    do_insert(row_ndx_2, value, num_rows); // Throws
+
+    // update all backlinks to reflect the insertion.
+    size_t last_row_ndx = size()-1;
+    for (size_t target_ndx = last_row_ndx; target_ndx >= row_ndx+num_rows; --target_ndx) {
+        size_t source_ndx = target_ndx - num_rows;
+        uint64_t forward_link_ndx = ColumnLinkBase::get_uint(target_ndx);
+        if (forward_link_ndx) {
+            // remember that the forward link index is of by 1 to make room
+            // for 0 to mean "no link" - so subtract one in the call to update_backlink
+            m_backlink_column->update_backlink(forward_link_ndx-1,source_ndx,target_ndx);
+        }
+    }
+}
+
+
 void ColumnLink::cascade_break_backlinks_to(size_t row_ndx, CascadeState& state)
 {
     int_fast64_t value = ColumnLinkBase::get(row_ndx);
