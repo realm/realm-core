@@ -109,7 +109,9 @@ public:
     void do_transact_log_append(const char* data, size_t size) TIGHTDB_OVERRIDE;
     void transact_log_reserve(size_t size);
     virtual bool is_in_server_synchronization_mode() { return m_is_persisting; }
-    version_type apply_foreign_changeset(SharedGroup&, version_type, BinaryData, version_type,
+    version_type apply_foreign_changeset(SharedGroup&, version_type, BinaryData,
+                                         uint_fast64_t timestamp,
+                                         uint_fast64_t peer_id, version_type peer_version,
                                          ostream*) TIGHTDB_OVERRIDE;
     virtual void stop_logging() TIGHTDB_OVERRIDE;
     virtual void reset_log_management(version_type last_version) TIGHTDB_OVERRIDE;
@@ -274,20 +276,19 @@ protected:
     void reset_header();
 
     // Add a single log entry to the logs. The log data is copied.
-    version_type internal_submit_log(const char*, uint_fast64_t,
-                                     bool is_foreign, version_type server_version = 0);
+    version_type internal_submit_log(const char*, uint_fast64_t size,
+                                     uint_fast64_t timestamp, uint_fast64_t peer_id = 0,
+                                     version_type peer_version = 0);
 
 
 
     void set_log_entry_internal(Replication::CommitLogEntry* entry,
-                                uint64_t server_version_and_flag,
-                                const char* log,
-                                std::size_t size);
+                                const EntryHeader* hdr,
+                                const char* log);
 
     void set_log_entry_internal(BinaryData* entry,
-                                uint64_t server_version_and_flag,
-                                const char* log,
-                                std::size_t size);
+                                const EntryHeader* hdr,
+                                const char* log);
 
     template<typename T>
     void get_commit_entries_internal(version_type from_version, version_type to_version,
@@ -473,7 +474,8 @@ void WriteLogCollector::cleanup_stale_versions(CommitLogPreamble* preamble)
 // returns the current "from" version
 Replication::version_type
 WriteLogCollector::internal_submit_log(const char* data, uint_fast64_t size,
-                                       bool is_foreign, version_type server_version)
+                                       uint_fast64_t timestamp, uint_fast64_t peer_id,
+                                       version_type peer_version)
 {
     map_header_if_needed();
     RobustLockGuard rlg(m_header.get_addr()->lock, &recover_from_dead_owner);
@@ -483,11 +485,11 @@ WriteLogCollector::internal_submit_log(const char* data, uint_fast64_t size,
     // for local commits, the server_version is taken from the previous commit.
     // for foreign commits, the server_version is provided by the caller and saved
     // for later use.
-    if (is_foreign) {
-        preamble->last_server_version = server_version;
+    if (peer_id != 0) {
+        preamble->last_server_version = peer_version;
     }
     else {
-        server_version = preamble->last_server_version;
+        peer_version = preamble->last_server_version;
     }
 
     // make sure the file is available for potential resizing
@@ -507,9 +509,9 @@ WriteLogCollector::internal_submit_log(const char* data, uint_fast64_t size,
     // append data from write pointer and onwards:
     char* write_ptr = reinterpret_cast<char*>(active_log->map.get_addr()) + preamble->write_offset;
     EntryHeader hdr;
-    hdr.peer_version = server_version;
-    hdr.peer_id = is_foreign ? 1 : 0; // TODO
-    hdr.timestamp = 0; // TODO
+    hdr.peer_version = peer_version;
+    hdr.peer_id = peer_id;
+    hdr.timestamp = timestamp;
     hdr.size = size;
     *reinterpret_cast<EntryHeader*>(write_ptr) = hdr;
     write_ptr += sizeof(EntryHeader);
@@ -648,21 +650,18 @@ void WriteLogCollector::set_last_version_seen_locally(version_type last_seen_ver
 
 
 void WriteLogCollector::set_log_entry_internal(Replication::CommitLogEntry* entry,
-                                uint64_t server_version_and_flag, const char* log,
-                                std::size_t size)
+                                const EntryHeader* hdr, const char* log)
 {
-    entry->log_data = BinaryData(log, size);
-    entry->is_foreign = (server_version_and_flag & 0x1);
-    entry->server_version = server_version_and_flag >> 1;
-
+    entry->timestamp = hdr->timestamp;
+    entry->peer_id = hdr->peer_id;
+    entry->peer_version = hdr->peer_version;
+    entry->log_data = BinaryData(log, hdr->size);
 }
 
 void WriteLogCollector::set_log_entry_internal(BinaryData* entry,
-                                uint64_t server_version_and_flag, const char* log,
-                                std::size_t size)
+                                const EntryHeader* hdr, const char* log)
 {
-    *entry = BinaryData(log, size);
-    static_cast<void>(server_version_and_flag);
+    *entry = BinaryData(log, hdr->size);
 }
 
 void WriteLogCollector::get_commit_entries(version_type from_version, version_type to_version,
@@ -742,7 +741,7 @@ void WriteLogCollector::get_commit_entries_internal(version_type from_version, v
                 // FIXME!
                 server_version_and_flag |= 1;
             }
-            set_log_entry_internal(logs_buffer, server_version_and_flag, buffer+tmp_offset, hdr->size);
+            set_log_entry_internal(logs_buffer, hdr, buffer+tmp_offset);
             ++logs_buffer;
         }
         // break early to avoid updating tracking information, if we've reached
@@ -761,7 +760,8 @@ void WriteLogCollector::get_commit_entries_internal(version_type from_version, v
 
 Replication::version_type
 WriteLogCollector::apply_foreign_changeset(SharedGroup& sg, version_type base_version,
-                                           BinaryData changeset, version_type server_version,
+                                           BinaryData changeset, uint_fast64_t timestamp,
+                                           uint_fast64_t peer_id, version_type peer_version,
                                            ostream* apply_log)
 {
     Group& group = sg.m_group;
@@ -776,8 +776,7 @@ WriteLogCollector::apply_foreign_changeset(SharedGroup& sg, version_type base_ve
         throw LogicError(LogicError::bad_version_number);
     SimpleInputStream input(changeset.data(), changeset.size());
     apply_transact_log(input, transact.get_group(), apply_log); // Throws
-    bool is_foreign = true;
-    internal_submit_log(changeset.data(), changeset.size(), is_foreign, server_version); // Throws
+    internal_submit_log(changeset.data(), changeset.size(), timestamp, peer_id, peer_version); // Throws
     return transact.commit(); // Throws
 }
 

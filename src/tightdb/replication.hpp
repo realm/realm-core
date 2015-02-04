@@ -161,7 +161,8 @@ public:
     /// then up to the implementation of the Repication interface to define what
     /// replication means.
     virtual version_type apply_foreign_changeset(SharedGroup&, version_type base_version,
-                                                 BinaryData changeset, version_type server_version,
+                                                 BinaryData changeset, uint_fast64_t timestamp,
+                                                 uint_fast64_t peer_id, version_type peer_version,
                                                  std::ostream* apply_log = 0);
 
     /// Acquire permision to start a new 'write' transaction. This
@@ -462,11 +463,14 @@ private:
 /// Extended version of a commit log entry. The additional info is required for
 /// Sync.
 struct Replication::CommitLogEntry {
-    /// True iff this changeset was submitted via apply_foreign_changeset().
-    bool is_foreign;
+    /// When did it happen?
+    uint64_t timestamp;
 
-    /// Not yet used.
-    version_type server_version;
+    /// Nonzero iff this changeset was submitted via apply_foreign_changeset().
+    uint64_t peer_id;
+
+    /// The last remote version that this commit reflects.
+    version_type peer_version;
 
     /// The changeset.
     BinaryData log_data;
@@ -713,7 +717,8 @@ inline Replication::version_type Replication::get_last_version_synced(version_ty
 }
 
 inline Replication::version_type
-Replication::apply_foreign_changeset(SharedGroup&, version_type, BinaryData, version_type,
+Replication::apply_foreign_changeset(SharedGroup&, version_type, BinaryData,
+                                     uint_fast64_t, uint_fast64_t, version_type,
                                      std::ostream*)
 {
     // Unimplemented!
