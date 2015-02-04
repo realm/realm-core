@@ -136,8 +136,8 @@ void Replication::select_link_list(const LinkView& list)
 
 class Replication::TransactLogApplier {
 public:
-    TransactLogApplier(Group& group):
-        m_group(group)
+    TransactLogApplier(Group& group, IndexTranslatorBase& translator):
+        m_group(group), m_translator(translator)
     {
     }
 
@@ -152,8 +152,14 @@ public:
             *m_log << boolalpha;
     }
 
+    size_t translate_row(size_t ndx)
+    {
+        return m_translator.translate_row_index(m_table, ndx);
+    }
+
     bool set_int(size_t col_ndx, size_t row_ndx, int_fast64_t value)
     {
+        row_ndx = translate_row(row_ndx);
         if (TIGHTDB_LIKELY(check_set_cell(col_ndx, row_ndx))) {
 #ifdef TIGHTDB_DEBUG
             if (m_log)
@@ -167,6 +173,7 @@ public:
 
     bool set_bool(size_t col_ndx, size_t row_ndx, bool value)
     {
+        row_ndx = translate_row(row_ndx);
         if (TIGHTDB_LIKELY(check_set_cell(col_ndx, row_ndx))) {
 #ifdef TIGHTDB_DEBUG
             if (m_log)
@@ -180,6 +187,7 @@ public:
 
     bool set_float(size_t col_ndx, size_t row_ndx, float value)
     {
+        row_ndx = translate_row(row_ndx);
         if (TIGHTDB_LIKELY(check_set_cell(col_ndx, row_ndx))) {
 #ifdef TIGHTDB_DEBUG
             if (m_log)
@@ -193,6 +201,7 @@ public:
 
     bool set_double(size_t col_ndx, size_t row_ndx, double value)
     {
+        row_ndx = translate_row(row_ndx);
         if (TIGHTDB_LIKELY(check_set_cell(col_ndx, row_ndx))) {
 #ifdef TIGHTDB_DEBUG
             if (m_log)
@@ -206,6 +215,7 @@ public:
 
     bool set_string(size_t col_ndx, size_t row_ndx, StringData value)
     {
+        row_ndx = translate_row(row_ndx);
         if (TIGHTDB_LIKELY(check_set_cell(col_ndx, row_ndx))) {
 #ifdef TIGHTDB_DEBUG
             if (m_log)
@@ -219,6 +229,7 @@ public:
 
     bool set_binary(size_t col_ndx, size_t row_ndx, BinaryData value)
     {
+        row_ndx = translate_row(row_ndx);
         if (TIGHTDB_LIKELY(check_set_cell(col_ndx, row_ndx))) {
 #ifdef TIGHTDB_DEBUG
             if (m_log)
@@ -232,6 +243,7 @@ public:
 
     bool set_date_time(size_t col_ndx, size_t row_ndx, DateTime value)
     {
+        row_ndx = translate_row(row_ndx);
         if (TIGHTDB_LIKELY(check_set_cell(col_ndx, row_ndx))) {
 #ifdef TIGHTDB_DEBUG
             if (m_log)
@@ -245,6 +257,7 @@ public:
 
     bool set_table(size_t col_ndx, size_t row_ndx)
     {
+        row_ndx = translate_row(row_ndx);
         if (TIGHTDB_LIKELY(check_set_cell(col_ndx, row_ndx))) {
 #ifdef TIGHTDB_DEBUG
             if (m_log)
@@ -258,6 +271,7 @@ public:
 
     bool set_mixed(size_t col_ndx, size_t row_ndx, const Mixed& value)
     {
+        row_ndx = translate_row(row_ndx);
         if (TIGHTDB_LIKELY(check_set_cell(col_ndx, row_ndx))) {
 #ifdef TIGHTDB_DEBUG
             if (m_log)
@@ -271,6 +285,7 @@ public:
 
     bool set_link(size_t col_ndx, size_t row_ndx, std::size_t value)
     {
+        row_ndx = translate_row(row_ndx);
         if (TIGHTDB_LIKELY(check_set_cell(col_ndx, row_ndx))) {
 #ifdef TIGHTDB_DEBUG
             if (m_log) {
@@ -293,6 +308,7 @@ public:
 
     bool insert_int(size_t col_ndx, size_t row_ndx, std::size_t, int_fast64_t value)
     {
+        row_ndx = translate_row(row_ndx);
         if (TIGHTDB_LIKELY(check_insert_cell(col_ndx, row_ndx))) {
 #ifdef TIGHTDB_DEBUG
             if (m_log)
@@ -306,6 +322,7 @@ public:
 
     bool insert_bool(size_t col_ndx, size_t row_ndx, std::size_t, bool value)
     {
+        row_ndx = translate_row(row_ndx);
         if (TIGHTDB_LIKELY(check_insert_cell(col_ndx, row_ndx))) {
 #ifdef TIGHTDB_DEBUG
             if (m_log)
@@ -319,6 +336,7 @@ public:
 
     bool insert_float(size_t col_ndx, size_t row_ndx, std::size_t, float value)
     {
+        row_ndx = translate_row(row_ndx);
         if (TIGHTDB_LIKELY(check_insert_cell(col_ndx, row_ndx))) {
 #ifdef TIGHTDB_DEBUG
             if (m_log)
@@ -332,6 +350,7 @@ public:
 
     bool insert_double(size_t col_ndx, size_t row_ndx, std::size_t, double value)
     {
+        row_ndx = translate_row(row_ndx);
         if (TIGHTDB_LIKELY(check_insert_cell(col_ndx, row_ndx))) {
 #ifdef TIGHTDB_DEBUG
             if (m_log)
@@ -345,6 +364,7 @@ public:
 
     bool insert_string(size_t col_ndx, size_t row_ndx, std::size_t, StringData value)
     {
+        row_ndx = translate_row(row_ndx);
         if (TIGHTDB_LIKELY(check_insert_cell(col_ndx, row_ndx))) {
 #ifdef TIGHTDB_DEBUG
             if (m_log)
@@ -358,6 +378,7 @@ public:
 
     bool insert_binary(size_t col_ndx, size_t row_ndx, std::size_t, BinaryData value)
     {
+        row_ndx = translate_row(row_ndx);
         if (TIGHTDB_LIKELY(check_insert_cell(col_ndx, row_ndx))) {
 #ifdef TIGHTDB_DEBUG
             if (m_log)
@@ -371,6 +392,7 @@ public:
 
     bool insert_date_time(size_t col_ndx, size_t row_ndx, std::size_t, DateTime value)
     {
+        row_ndx = translate_row(row_ndx);
         if (TIGHTDB_LIKELY(check_insert_cell(col_ndx, row_ndx))) {
 #ifdef TIGHTDB_DEBUG
             if (m_log)
@@ -384,6 +406,7 @@ public:
 
     bool insert_table(size_t col_ndx, size_t row_ndx, std::size_t)
     {
+        row_ndx = translate_row(row_ndx);
         if (TIGHTDB_LIKELY(check_insert_cell(col_ndx, row_ndx))) {
 #ifdef TIGHTDB_DEBUG
             if (m_log)
@@ -397,6 +420,7 @@ public:
 
     bool insert_mixed(size_t col_ndx, size_t row_ndx, std::size_t, const Mixed& value)
     {
+        row_ndx = translate_row(row_ndx);
         if (TIGHTDB_LIKELY(check_insert_cell(col_ndx, row_ndx))) {
 #ifdef TIGHTDB_DEBUG
             if (m_log)
@@ -410,6 +434,7 @@ public:
 
     bool insert_link(size_t col_ndx, size_t row_ndx, std::size_t, std::size_t value)
     {
+        row_ndx = translate_row(row_ndx);
         TIGHTDB_ASSERT(value > 0); // Not yet any support for inserting null links
         if (TIGHTDB_LIKELY(check_insert_cell(col_ndx, row_ndx))) {
 #ifdef TIGHTDB_DEBUG
@@ -424,6 +449,7 @@ public:
 
     bool insert_link_list(size_t col_ndx, size_t row_ndx, std::size_t)
     {
+        row_ndx = translate_row(row_ndx);
         if (TIGHTDB_LIKELY(check_insert_cell(col_ndx, row_ndx))) {
 #ifdef TIGHTDB_DEBUG
             if (m_log)
@@ -450,6 +476,7 @@ public:
 
     bool insert_empty_rows(size_t row_ndx, size_t num_rows, std::size_t, bool)
     {
+        row_ndx = translate_row(row_ndx);
         if (TIGHTDB_LIKELY(m_table)) {
             if (TIGHTDB_LIKELY(row_ndx <= m_table->size())) {
 #ifdef TIGHTDB_DEBUG
@@ -465,6 +492,7 @@ public:
 
     bool erase_rows(size_t row_ndx, size_t num_rows, std::size_t last_row_ndx, bool unordered)
     {
+        // FIXME: For this to work in during sync, we need to translate each row index :(
         if (TIGHTDB_UNLIKELY(!m_table))
             return false;
         if (TIGHTDB_UNLIKELY(row_ndx > last_row_ndx || last_row_ndx+1 != m_table->size()))
@@ -491,6 +519,7 @@ public:
 
     bool add_int_to_column(size_t col_ndx, int_fast64_t value)
     {
+        // FIXME: Sync
         if (TIGHTDB_LIKELY(m_table)) {
             if (TIGHTDB_LIKELY(col_ndx < m_table->get_column_count())) {
                 // FIXME: Don't depend on the existence of int64_t,
@@ -629,6 +658,7 @@ public:
 
     bool insert_column(size_t col_ndx, DataType type, StringData name)
     {
+        // FIXME: Sync
         if (TIGHTDB_LIKELY(m_desc)) {
             if (TIGHTDB_LIKELY(col_ndx <= m_desc->get_column_count())) {
                 typedef _impl::TableFriend tf;
@@ -649,6 +679,7 @@ public:
     bool insert_link_column(size_t col_ndx, DataType type, StringData name,
                        size_t link_target_table_ndx, size_t)
     {
+        // FIXME: Sync
         if (TIGHTDB_LIKELY(m_desc)) {
             if (TIGHTDB_LIKELY(col_ndx <= m_desc->get_column_count())) {
                 typedef _impl::TableFriend tf;
@@ -670,6 +701,7 @@ public:
 
     bool erase_column(size_t col_ndx)
     {
+        // FIXME: Sync
         if (TIGHTDB_LIKELY(m_desc)) {
             if (TIGHTDB_LIKELY(col_ndx < m_desc->get_column_count())) {
 #ifdef TIGHTDB_DEBUG
@@ -686,6 +718,7 @@ public:
 
     bool erase_link_column(size_t col_ndx, size_t, size_t)
     {
+        // FIXME: Sync
         if (TIGHTDB_LIKELY(m_desc)) {
             if (TIGHTDB_LIKELY(col_ndx < m_desc->get_column_count())) {
 #ifdef TIGHTDB_DEBUG
@@ -702,6 +735,7 @@ public:
 
     bool rename_column(size_t col_ndx, StringData name)
     {
+        // FIXME: Sync
         if (TIGHTDB_LIKELY(m_desc)) {
             if (TIGHTDB_LIKELY(col_ndx < m_desc->get_column_count())) {
 #ifdef TIGHTDB_DEBUG
@@ -742,6 +776,7 @@ public:
 
     bool insert_group_level_table(size_t table_ndx, size_t num_tables, StringData name)
     {
+        // FIXME: Sync
         if (TIGHTDB_UNLIKELY(table_ndx != num_tables))
             return false;
         if (TIGHTDB_UNLIKELY(num_tables != m_group.size()))
@@ -758,6 +793,7 @@ public:
 
     bool erase_group_level_table(std::size_t table_ndx, size_t num_tables) TIGHTDB_NOEXCEPT
     {
+        // FIXME: Sync
         if (TIGHTDB_UNLIKELY(num_tables != m_group.size()))
             return false;
 #ifdef TIGHTDB_DEBUG
@@ -770,6 +806,7 @@ public:
 
     bool rename_group_level_table(std::size_t table_ndx, StringData new_name) TIGHTDB_NOEXCEPT
     {
+        // FIXME: Sync
 #ifdef TIGHTDB_DEBUG
         if (m_log)
             *m_log << "group->rename_table("<<table_ndx<<", \""<<new_name<<"\")\n";
@@ -812,6 +849,7 @@ public:
 
     bool link_list_set(size_t link_ndx, size_t value)
     {
+        // FIXME: Sync
         if (TIGHTDB_UNLIKELY(!m_link_list))
             return false;
         if (TIGHTDB_UNLIKELY(link_ndx >= m_link_list->size()))
@@ -827,6 +865,7 @@ public:
 
     bool link_list_insert(size_t link_ndx, size_t value)
     {
+        // FIXME: Sync
         if (TIGHTDB_UNLIKELY(!m_link_list))
             return false;
         if (TIGHTDB_UNLIKELY(link_ndx > m_link_list->size()))
@@ -841,6 +880,7 @@ public:
 
     bool link_list_move(size_t old_link_ndx, size_t new_link_ndx)
     {
+        // FIXME: Sync
         if (TIGHTDB_UNLIKELY(!m_link_list))
             return false;
         size_t num_links = m_link_list->size();
@@ -858,6 +898,7 @@ public:
 
     bool link_list_erase(size_t link_ndx)
     {
+        // FIXME: Sync
         if (TIGHTDB_UNLIKELY(!m_link_list))
             return false;
         if (TIGHTDB_UNLIKELY(link_ndx >= m_link_list->size()))
@@ -873,6 +914,7 @@ public:
 
     bool link_list_clear()
     {
+        // FIXME: Sync
         if (TIGHTDB_UNLIKELY(!m_link_list))
             return false;
 #ifdef TIGHTDB_DEBUG
@@ -886,6 +928,7 @@ public:
 
 private:
     Group& m_group;
+    IndexTranslatorBase& m_translator;
     TableRef m_table;
     DescriptorRef m_desc;
     LinkViewRef m_link_list;
@@ -959,8 +1002,14 @@ private:
 
 void Replication::apply_transact_log(InputStream& transact_log, Group& group, ostream* log)
 {
+    SimpleIndexTranslator translator;
+    apply_transact_log(transact_log, group, translator, log); // Throws
+}
+
+void Replication::apply_transact_log(InputStream& transact_log, Group& group, IndexTranslatorBase& translator, ostream* log)
+{
     TransactLogParser parser(transact_log);
-    TransactLogApplier applier(group);
+    TransactLogApplier applier(group, translator);
     applier.set_apply_log(log);
     parser.parse(applier); // Throws
 }

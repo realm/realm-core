@@ -216,6 +216,9 @@ protected:
         CommitLogMetadata(string name): name(name) {}
     };
 
+    class MergingIndexTranslator;
+    friend class MergingIndexTranslator;
+
     string m_database_name;
     string m_header_name;
     CommitLogMetadata m_log_a;
@@ -753,8 +756,35 @@ void WriteLogCollector::get_commit_entries_internal(version_type from_version, v
 }
 
 
+class WriteLogCollector::MergingIndexTranslator : public Replication::IndexTranslatorBase {
+public:
+    MergingIndexTranslator(WriteLogCollector& log, uint_fast64_t timestamp, uint_fast64_t peer_id, version_type base_version, version_type current_version):
+        m_log(log), m_timestamp(timestamp), m_peer_id(peer_id), m_base_version(base_version), m_current_version(current_version)
+    {
+    }
+
+    size_t translate_row_index(TableRef table, size_t row_ndx) TIGHTDB_OVERRIDE
+    {
+        // Go through the commit log from m_base_version to m_current_version.
+        // For each insert in table that has a lower timestamp and a lower row index, bump
+        // row_ndx by one.
+        size_t result = row_ndx;
+        std::vector<Replication::CommitLogEntry> entries(m_current_version - m_base_version);
+        m_log.get_commit_entries(m_base_version, m_current_version, entries.data());
+
+        return result;
+    }
+private:
+    WriteLogCollector& m_log;
+    uint64_t m_timestamp;
+    uint64_t m_peer_id;
+    uint64_t m_base_version;
+    uint64_t m_current_version;
+};
+
+
 Replication::version_type
-WriteLogCollector::apply_foreign_changeset(SharedGroup& sg, version_type base_version,
+WriteLogCollector::apply_foreign_changeset(SharedGroup& sg, version_type last_version_integrated_by_peer,
                                            BinaryData changeset, uint_fast64_t timestamp,
                                            uint_fast64_t peer_id, version_type peer_version,
                                            ostream* apply_log)
@@ -765,15 +795,22 @@ WriteLogCollector::apply_foreign_changeset(SharedGroup& sg, version_type base_ve
 
     WriteTransaction transact(sg);
     version_type current_version = sg.get_current_version();
-    if (base_version < current_version)
-        return 0;
-    if (TIGHTDB_UNLIKELY(base_version > current_version))
+    //if (last_version_integrated_by_peer < current_version)
+    //    return 0;
+    if (TIGHTDB_UNLIKELY(last_version_integrated_by_peer > current_version))
         throw LogicError(LogicError::bad_version_number);
     SimpleInputStream input(changeset.data(), changeset.size());
     MergingIndexTranslator translator(*this, timestamp, peer_id, last_version_integrated_by_peer, current_version);
     apply_transact_log(input, transact.get_group(), translator, apply_log); // Throws
     internal_submit_log(changeset.data(), changeset.size(), timestamp, peer_id, peer_version); // Throws
     return transact.commit(); // Throws
+}
+
+Replication::version_type
+WriteLogCollector::get_last_peer_version(uint_fast64_t) const
+{
+    const CommitLogPreamble* preamble = get_preamble();
+    return preamble->last_server_version;
 }
 
 

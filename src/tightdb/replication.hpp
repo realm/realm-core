@@ -282,6 +282,8 @@ public:
 
 
     class TransactLogParser;
+    class IndexTranslatorBase;
+    class SimpleIndexTranslator;
 
     class InputStream;
     class SimpleInputStream;
@@ -298,6 +300,8 @@ public:
     /// successfully parsed, or ended prematurely.
     static void apply_transact_log(InputStream& transact_log, Group& target,
                                    std::ostream* apply_log = 0);
+    static void apply_transact_log(InputStream& transact_log, Group& target,
+                                   IndexTranslatorBase& translator, std::ostream* apply_log = 0);
 
     virtual ~Replication() TIGHTDB_NOEXCEPT {}
 
@@ -481,6 +485,19 @@ struct Replication::CommitLogEntry {
 // are foreign. It is carried over as part of a commit, allowing other threads involved
 // with Sync to observet it. For local commits, the value of server_version is taken
 // from any previous forewign commmit.
+
+class Replication::IndexTranslatorBase {
+public:
+    virtual size_t translate_row_index(TableRef table, size_t row_ndx) = 0;
+};
+
+class Replication::SimpleIndexTranslator : public Replication::IndexTranslatorBase {
+public:
+    size_t translate_row_index(TableRef, size_t row_ndx) TIGHTDB_OVERRIDE
+    {
+        return row_ndx;
+    }
+};
 
 
 class Replication::InputStream {
