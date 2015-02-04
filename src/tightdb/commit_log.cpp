@@ -880,7 +880,6 @@ WriteLogCollector::WriteLogCollector(string database_name,
     m_is_persisting = server_synchronization_mode;
     m_log_a.file.set_encryption_key(encryption_key);
     m_log_b.file.set_encryption_key(encryption_key);
-    m_last_integrated_peer_version = 1;
 }
 
 } // end _impl
