@@ -2,7 +2,7 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
+* Fix encryption on platforms with non-4KB pages.
 
 ### API breaking changes:
 
