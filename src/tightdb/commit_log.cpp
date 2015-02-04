@@ -768,18 +768,90 @@ public:
         // Go through the commit log from m_base_version to m_current_version.
         // For each insert in table that has a lower timestamp and a lower row index, bump
         // row_ndx by one.
-        size_t result = row_ndx;
+        m_result_ndx = row_ndx;
         std::vector<Replication::CommitLogEntry> entries(m_current_version - m_base_version);
         m_log.get_commit_entries(m_base_version, m_current_version, entries.data());
 
-        return result;
+        for (size_t i = 0; i < entries.size(); ++i) {
+            CommitLogEntry& entry = entries[i];
+            if (entry.timestamp < m_timestamp) { // FIXME Compare peer_id too
+                SimpleInputStream input(entry.log_data.data(), entry.log_data.size());
+                TransactLogParser parser(input);
+                parser.parse(*this);
+            }
+        }
+
+        if (m_result_ndx != row_ndx) {
+            std::cout << "BUMPED " << row_ndx << " TO " << m_result_ndx << "\n";
+        }
+
+        return m_result_ndx;
     }
+
+    void insertions(size_t row_ndx, size_t num) {
+        if (row_ndx <= m_result_ndx) {
+            m_result_ndx += num;
+        }
+    }
+
+    bool insert_group_level_table(std::size_t table_ndx, std::size_t num_tables,
+                                  StringData name) { return true; }
+    bool erase_group_level_table(std::size_t table_ndx, std::size_t num_tables) { return true; }
+    bool rename_group_level_table(std::size_t table_ndx, StringData new_name) { return true; }
+    bool select_table(std::size_t group_level_ndx, int levels, const std::size_t* path) { return true; }
+    bool insert_empty_rows(std::size_t row_ndx, std::size_t num_rows, std::size_t tbl_sz, bool unordered) { insertions(row_ndx, num_rows); return true; }
+    bool erase_rows(std::size_t row_ndx, std::size_t num_rows, std::size_t tbl_sz, bool unordered) { return true; }
+    bool clear_table() { return true; }
+    bool insert_int(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, int_fast64_t) { insertions(row_ndx, 1); return true; }
+    bool insert_bool(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, bool) { insertions(row_ndx, 1); return true; }
+    bool insert_float(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, float) { insertions(row_ndx, 1); return true; }
+    bool insert_double(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, double) { insertions(row_ndx, 1); return true; }
+    bool insert_string(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, StringData) { insertions(row_ndx, 1); return true; }
+    bool insert_binary(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, BinaryData) { insertions(row_ndx, 1); return true; }
+    bool insert_date_time(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, DateTime) { insertions(row_ndx, 1); return true; }
+    bool insert_table(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz) { insertions(row_ndx, 1); return true; }
+    bool insert_mixed(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, const Mixed&) { insertions(row_ndx, 1); return true; }
+    bool insert_link(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, std::size_t) { insertions(row_ndx, 1); return true; }
+    bool insert_link_list(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz) { insertions(row_ndx, 1); return true; }
+    bool row_insert_complete() { return true; }
+    bool set_int(std::size_t col_ndx, std::size_t row_ndx, int_fast64_t) { return true; }
+    bool set_bool(std::size_t col_ndx, std::size_t row_ndx, bool) { return true; }
+    bool set_float(std::size_t col_ndx, std::size_t row_ndx, float) { return true; }
+    bool set_double(std::size_t col_ndx, std::size_t row_ndx, double) { return true; }
+    bool set_string(std::size_t col_ndx, std::size_t row_ndx, StringData) { return true; }
+    bool set_binary(std::size_t col_ndx, std::size_t row_ndx, BinaryData) { return true; }
+    bool set_date_time(std::size_t col_ndx, std::size_t row_ndx, DateTime) { return true; }
+    bool set_table(std::size_t col_ndx, std::size_t row_ndx) { return true; }
+    bool set_mixed(std::size_t col_ndx, std::size_t row_ndx, const Mixed&) { return true; }
+    bool set_link(std::size_t col_ndx, std::size_t row_ndx, std::size_t) { return true; }
+    bool add_int_to_column(std::size_t col_ndx, int_fast64_t value) { return true; }
+    bool optimize_table() { return true; }
+    bool select_descriptor(int levels, const std::size_t* path) { return true; }
+    bool insert_link_column(std::size_t col_ndx, DataType, StringData name,
+                            std::size_t link_target_table_ndx, std::size_t backlink_col_ndx) { return true; }
+    bool insert_column(std::size_t col_ndx, DataType, StringData name) { return true; }
+    bool erase_link_column(std::size_t col_ndx, std::size_t link_target_table_ndx,
+                           std::size_t backlink_col_ndx) { return true; }
+    bool erase_column(std::size_t col_ndx) { return true; }
+    bool rename_column(std::size_t col_ndx, StringData new_name) { return true; }
+    bool add_search_index(std::size_t col_ndx) { return true; }
+    bool add_primary_key(std::size_t col_ndx) { return true; }
+    bool remove_primary_key() { return true; }
+    bool set_link_type(std::size_t col_ndx, LinkType) { return true; }
+    bool select_link_list(std::size_t col_ndx, std::size_t row_ndx) { return true; }
+    bool link_list_set(std::size_t link_ndx, std::size_t value) { return true; }
+    bool link_list_insert(std::size_t link_ndx, std::size_t value) { return true; }
+    bool link_list_move(std::size_t old_link_ndx, std::size_t new_link_ndx) { return true; }
+    bool link_list_erase(std::size_t link_ndx) { return true; }
+    bool link_list_clear() { return true; }
 private:
     WriteLogCollector& m_log;
     uint64_t m_timestamp;
     uint64_t m_peer_id;
     uint64_t m_base_version;
     uint64_t m_current_version;
+
+    size_t m_result_ndx;
 };
 
 
