@@ -113,6 +113,7 @@ public:
                                          uint_fast64_t timestamp,
                                          uint_fast64_t peer_id, version_type peer_version,
                                          ostream*) TIGHTDB_OVERRIDE;
+    version_type get_last_peer_version(uint_fast64_t peer_id) const TIGHTDB_OVERRIDE;
     virtual void stop_logging() TIGHTDB_OVERRIDE;
     virtual void reset_log_management(version_type last_version) TIGHTDB_OVERRIDE;
     virtual void set_last_version_seen_locally(version_type last_seen_version_number)
@@ -170,7 +171,7 @@ protected:
             // The first commit will be from state 1 -> state 2, so we must set 1 initially
             begin_oldest_commit_range = begin_newest_commit_range = end_commit_range = version;
             last_version_seen_locally = last_version_synced = version;
-            last_server_version = 0;
+            last_server_version = 1;
             write_offset = 0;
         }
     };
@@ -236,7 +237,7 @@ protected:
     // Get the current preamble for reading only - use get_preamble_for_write()
     // if you are going to change stuff in the preamble, and remember to call
     // sync_header() to commit those changes.
-    const CommitLogPreamble* get_preamble();
+    const CommitLogPreamble* get_preamble() const;
 
     // Creates in-mapped-memory copy of the active preamble and returns a
     // pointer to it.  Allows you to do in-place updates of the preamble, then
@@ -317,7 +318,7 @@ void recover_from_dead_owner()
 
 // Header access and manipulation methods:
 
-inline const WriteLogCollector::CommitLogPreamble* WriteLogCollector::get_preamble()
+inline const WriteLogCollector::CommitLogPreamble* WriteLogCollector::get_preamble() const
 {
     CommitLogHeader* header = m_header.get_addr();
     if (header->use_preamble_a)
@@ -387,7 +388,6 @@ WriteLogCollector::get_active_log(CommitLogPreamble* preamble)
         return &m_log_a;
     return &m_log_b;
 }
-
 
 
 // File and memory mapping functions:
@@ -770,7 +770,8 @@ WriteLogCollector::apply_foreign_changeset(SharedGroup& sg, version_type base_ve
     if (TIGHTDB_UNLIKELY(base_version > current_version))
         throw LogicError(LogicError::bad_version_number);
     SimpleInputStream input(changeset.data(), changeset.size());
-    apply_transact_log(input, transact.get_group(), apply_log); // Throws
+    MergingIndexTranslator translator(*this, timestamp, peer_id, last_version_integrated_by_peer, current_version);
+    apply_transact_log(input, transact.get_group(), translator, apply_log); // Throws
     internal_submit_log(changeset.data(), changeset.size(), timestamp, peer_id, peer_version); // Throws
     return transact.commit(); // Throws
 }
@@ -842,6 +843,7 @@ WriteLogCollector::WriteLogCollector(string database_name,
     m_is_persisting = server_synchronization_mode;
     m_log_a.file.set_encryption_key(encryption_key);
     m_log_b.file.set_encryption_key(encryption_key);
+    m_last_integrated_peer_version = 1;
 }
 
 } // end _impl
