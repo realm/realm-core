@@ -1,4 +1,4 @@
-
+import random
 
 current_timestamp = 0
 
@@ -91,7 +91,7 @@ def add_remote_changeset(_self, remote):
     # timestamp <= ts && (timestamp < ts || peer_id <= pid))` where `ts` and
     # `pid` are the timestamp and the peer identifier of the incoming insertion
     # operation respectively. Note that the process of locating the right map
-    # entry **is** the process of resolving conflicts.
+    # entry **is** the process that resolves conflicts.
     last_local_version = _self['version']
     map = []
     for version in range(last_local_version_integrated+1, last_local_version+1):
@@ -174,6 +174,26 @@ def insert(_self, index, value, reuse_prev_timestamp = False):
     add_changeset(_self, changeset, timestamp, None, None)
 
 
+def count_outstanding_remote_changesets(_self, remote):
+    assert(_self['peer_id'] != remote['peer_id'])
+
+    # Find the last remote version already integrated
+    last_remote_version_integrated = 0
+    for i in range(len(_self['history']), 0, -1):
+        entry = _self['history'][i-1]
+        if entry['remote_peer_id'] == remote['peer_id']:
+            last_remote_version_integrated = entry['remote_version']
+            break
+
+    # Count subsequent remote versions to integrate
+    n = 0
+    for i in range(last_remote_version_integrated+1, remote['version']+1):
+        remote_entry = remote['history'][i-1]
+        if remote_entry['remote_peer_id'] != _self['peer_id']:
+            n = n + 1
+    return n
+
+
 
 # Example that sorts a foreign insert in the middle of a sequence of consecutive
 # inserts due to timing
@@ -201,8 +221,8 @@ print "Client:", client['list']
 
 
 
-# Example that demonstrates that non-end insertions are handled correctly
-# (intuitively)
+# Example that demonstrates that non-end insertions are handled correctly, that
+# is, intuitively
 
 server = create(peer_id=0)
 client = create(peer_id=1)
@@ -277,3 +297,92 @@ print "Client-A:", client_A['list']
 print "Client-B:", client_B['list']
 print "Client-C:", client_C['list']
 
+
+for _ in range(10000):
+    print "*"
+    num_clients = 3
+
+    server  = create(peer_id=0)
+    clients = [create(peer_id=1+i) for i in range(0, num_clients)]
+
+    current_value = 0
+    def next_value():
+        global current_value
+        current_value = current_value + 1
+        return current_value
+
+    num_remain_set_operations    = 0
+    num_remain_insert_operations = 256
+
+    def do_set(client):
+        global num_remain_set_operations
+        num_remain_set_operations = num_remain_set_operations - 1
+        index = random.randint(0, len(client['list'])-1)
+        value = next_value()
+        reuse_prev_timestamp = random.choice([ False, True ])
+        set(client, index, value, reuse_prev_timestamp)
+
+    def do_insert(client):
+        global num_remain_insert_operations
+        num_remain_insert_operations = num_remain_insert_operations - 1
+        index = random.randint(0, len(client['list']))
+        value = next_value()
+        reuse_prev_timestamp = random.choice([ False, True ])
+        insert(client, index, value, reuse_prev_timestamp)
+
+    def add_actions(actions, client):
+        if num_remain_set_operations > 0:
+            actions.append({
+                'name':   'set[%s]' % (client['peer_id']),
+                'weight': len(client['list']),
+                'exec':   (lambda: do_set(client))
+            })
+        if num_remain_insert_operations > 0:
+            actions.append({
+                'name':   'insert[%s]' % (client['peer_id']),
+                'weight': len(client['list']) + 1,
+                'exec':   (lambda: do_insert(client))
+            })
+        actions.append({
+            'name':   'upload[%s]' % (client['peer_id']),
+            'weight': count_outstanding_remote_changesets(client, server),
+            'exec':   (lambda: add_remote_changeset(client, server))
+        })
+        actions.append({
+            'name':   'download[%s]' % (client['peer_id']),
+            'weight': count_outstanding_remote_changesets(server, client),
+            'exec':   (lambda: add_remote_changeset(server, client))
+        })
+
+    while True:
+        actions = []
+        for client in clients:
+            add_actions(actions, client)
+        total_weight = 0
+        for action in actions:
+            total_weight = total_weight + action['weight']
+        if total_weight == 0:
+            break
+        i = random.randint(0, total_weight-1)
+        found = False
+        for action in actions:
+            weight = action['weight']
+            if i < weight:
+                action['exec']()
+                found = True
+                break
+            i = i - weight
+        assert(found)
+
+    error = False
+    for client in clients:
+        if client['list'] != server['list']:
+            error = True
+            break
+
+    if error:
+        print '------------------ ERROR ------------------'
+        print "Server:   ", server['list']
+        for client in clients:
+            print "Client[%d]:" % (client['peer_id']), client['list']
+        break
