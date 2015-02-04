@@ -56,6 +56,13 @@ private:
     Replication* m_temp_disabled_repl;
 };
 
+struct PackedCommitLogEntry  {
+    uint64_t server_version_and_flag;
+    uint64_t peer_id;
+    uint64_t timestamp;
+    uint64_t size;
+};
+
 } // anonymous namespace
 
 
@@ -111,6 +118,7 @@ public:
     virtual bool is_in_server_synchronization_mode() { return m_is_persisting; }
     version_type apply_foreign_changeset(SharedGroup&, version_type, BinaryData, version_type,
                                          ostream*) TIGHTDB_OVERRIDE;
+    version_type get_last_integrated_peer_version() const { return m_last_integrated_peer_version; }
     virtual void stop_logging() TIGHTDB_OVERRIDE;
     virtual void reset_log_management(version_type last_version) TIGHTDB_OVERRIDE;
     virtual void set_last_version_seen_locally(version_type last_seen_version_number)
@@ -214,6 +222,7 @@ protected:
     util::Buffer<char> m_transact_log_buffer;
     util::File::Map<CommitLogHeader> m_header;
     bool m_is_persisting;
+    version_type m_last_integrated_peer_version;
 
     // last seen version and associated offset - 0 for invalid
     uint_fast64_t m_read_version;
@@ -276,12 +285,16 @@ protected:
     void set_log_entry_internal(Replication::CommitLogEntry* entry,
                                 uint64_t server_version_and_flag,
                                 const char* log,
-                                std::size_t size);
+                                std::size_t size,
+                                uint64_t timestamp,
+                                uint64_t peer_id = 0);
 
     void set_log_entry_internal(BinaryData* entry,
                                 uint64_t server_version_and_flag,
                                 const char* log,
-                                std::size_t size);
+                                std::size_t size,
+                                uint64_t timestamp,
+                                uint64_t peer_id = 0);
 
     template<typename T>
     void get_commit_entries_internal(version_type from_version, version_type to_version,
@@ -489,7 +502,7 @@ WriteLogCollector::internal_submit_log(const char* data, uint_fast64_t size,
 
     // make sure we have space (allocate if not)
     File::SizeType size_needed =
-        aligned_to(sizeof (uint64_t), preamble->write_offset + 2*sizeof (uint64_t) + size);
+        aligned_to(sizeof(uint64_t), preamble->write_offset + sizeof(PackedCommitLogEntry) + size);
     size_needed = aligned_to(page_size, size_needed);
     if (size_needed > active_log->file.get_size())
         active_log->file.resize(size_needed);
@@ -499,17 +512,18 @@ WriteLogCollector::internal_submit_log(const char* data, uint_fast64_t size,
     remap_if_needed(*active_log);
 
     // append data from write pointer and onwards:
-    uint64_t server_version_and_flag = (server_version << 1) + (is_foreign ? 1 : 0);
+    PackedCommitLogEntry entry;
+    entry.server_version_and_flag = (server_version << 1) + (is_foreign ? 1 : 0);
+    entry.size = size;
     char* write_ptr = reinterpret_cast<char*>(active_log->map.get_addr()) + preamble->write_offset;
-    *reinterpret_cast<uint64_t*>(write_ptr) = server_version_and_flag;
-    write_ptr += sizeof (uint64_t);
-    *reinterpret_cast<uint64_t*>(write_ptr) = size;
-    write_ptr += sizeof (uint64_t);
+    const char* entry_data = reinterpret_cast<const char*>(&entry);
+    copy(entry_data, entry_data + sizeof(PackedCommitLogEntry), write_ptr);
+    write_ptr += sizeof(PackedCommitLogEntry);
     copy(data, data+size, write_ptr);
     active_log->map.sync();
 
     // update metadata to reflect the added commit log
-    preamble->write_offset += aligned_to(sizeof (uint64_t), size + 2*sizeof (uint64_t));
+    preamble->write_offset += aligned_to(sizeof(uint64_t), size + sizeof(PackedCommitLogEntry));
     version_type orig_version = preamble->end_commit_range;
     preamble->end_commit_range = orig_version+1;
     sync_header();
@@ -582,10 +596,10 @@ void WriteLogCollector::reset_log_management(version_type last_version)
                  current_version < last_version;
                  current_version++) {
                 // advance write ptr to next buffer start:
-                uint_fast64_t size =
-                    *reinterpret_cast<const uint64_t*>(buffer + preamble->write_offset + sizeof(uint64_t));
-                uint_fast64_t tmp_offset = preamble->write_offset + 2*sizeof (uint64_t);
-                size = aligned_to(sizeof (uint64_t), size);
+                const PackedCommitLogEntry* entry = reinterpret_cast<const PackedCommitLogEntry*>(buffer + preamble->write_offset);
+                uint_fast64_t size = entry->size;
+                uint_fast64_t tmp_offset = preamble->write_offset + sizeof(PackedCommitLogEntry);
+                size = aligned_to(sizeof(uint64_t), size);
                 preamble->write_offset = tmp_offset + size;
             }
             preamble->end_commit_range = current_version;
@@ -641,20 +655,23 @@ void WriteLogCollector::set_last_version_seen_locally(version_type last_seen_ver
 
 void WriteLogCollector::set_log_entry_internal(Replication::CommitLogEntry* entry,
                                 uint64_t server_version_and_flag, const char* log,
-                                std::size_t size)
+                                std::size_t size, uint64_t timestamp, uint64_t peer_id)
 {
     entry->log_data = BinaryData(log, size);
-    entry->is_foreign = (server_version_and_flag & 0x1);
-    entry->server_version = server_version_and_flag >> 1;
+    entry->peer_id = peer_id;
+    entry->peer_version = server_version_and_flag >> 1;
+    entry->timestamp = timestamp;
 
 }
 
 void WriteLogCollector::set_log_entry_internal(BinaryData* entry,
                                 uint64_t server_version_and_flag, const char* log,
-                                std::size_t size)
+                                std::size_t size, uint64_t timestamp, uint64_t peer_id)
 {
     *entry = BinaryData(log, size);
     static_cast<void>(server_version_and_flag);
+    static_cast<void>(timestamp);
+    static_cast<void>(peer_id);
 }
 
 void WriteLogCollector::get_commit_entries(version_type from_version, version_type to_version,
@@ -725,14 +742,15 @@ void WriteLogCollector::get_commit_entries_internal(version_type from_version, v
             break;
 
         // follow buffer layout
-        uint_fast64_t server_version_and_flag =
-            *reinterpret_cast<const uint64_t*>(buffer + m_read_offset);
-        uint_fast64_t size =
-            *reinterpret_cast<const uint64_t*>(buffer + m_read_offset + sizeof(uint64_t));
-        uint_fast64_t tmp_offset = m_read_offset + 2*sizeof (uint64_t);
+        const PackedCommitLogEntry* entry = reinterpret_cast<const PackedCommitLogEntry*>(buffer + m_read_offset);
+        uint_fast64_t server_version_and_flag = entry->server_version_and_flag;
+        uint_fast64_t size = entry->size;
+        uint_fast64_t peer_id = entry->peer_id;
+        uint_fast64_t timestamp = entry->timestamp;
+        uint_fast64_t tmp_offset = m_read_offset + sizeof(PackedCommitLogEntry);
         if (m_read_version >= from_version) {
             // cerr << "  --at: " << m_read_offset << ", " << size << endl;
-            set_log_entry_internal(logs_buffer, server_version_and_flag, buffer+tmp_offset, size);
+            set_log_entry_internal(logs_buffer, server_version_and_flag, buffer+tmp_offset, size, timestamp, peer_id);
             ++logs_buffer;
         }
         // break early to avoid updating tracking information, if we've reached
@@ -742,7 +760,7 @@ void WriteLogCollector::get_commit_entries_internal(version_type from_version, v
         // write point to the beginning of the other file.
         if (m_read_version+1 >= preamble->end_commit_range)
             break;
-        size = aligned_to(sizeof (uint64_t), size);
+        size = aligned_to(sizeof(uint64_t), size);
         m_read_offset = tmp_offset + size;
         m_read_version++;
     }
@@ -750,8 +768,8 @@ void WriteLogCollector::get_commit_entries_internal(version_type from_version, v
 
 
 Replication::version_type
-WriteLogCollector::apply_foreign_changeset(SharedGroup& sg, version_type base_version,
-                                           BinaryData changeset, version_type server_version,
+WriteLogCollector::apply_foreign_changeset(SharedGroup& sg, version_type last_version_integrated_by_peer,
+                                           BinaryData changeset, version_type peer_version,
                                            ostream* apply_log)
 {
     Group& group = sg.m_group;
@@ -760,15 +778,17 @@ WriteLogCollector::apply_foreign_changeset(SharedGroup& sg, version_type base_ve
 
     WriteTransaction transact(sg);
     version_type current_version = sg.get_current_version();
-    if (base_version < current_version)
-        return 0;
-    if (TIGHTDB_UNLIKELY(base_version > current_version))
+    //if (last_version_integrated_by_peer < current_version)
+    //    return 0;
+    if (TIGHTDB_UNLIKELY(last_version_integrated_by_peer > current_version))
         throw LogicError(LogicError::bad_version_number);
     SimpleInputStream input(changeset.data(), changeset.size());
     apply_transact_log(input, transact.get_group(), apply_log); // Throws
     bool is_foreign = true;
-    internal_submit_log(changeset.data(), changeset.size(), is_foreign, server_version); // Throws
-    return transact.commit(); // Throws
+    internal_submit_log(changeset.data(), changeset.size(), is_foreign, peer_version); // Throws
+    version_type new_version = transact.commit(); // Throws
+    m_last_integrated_peer_version = peer_version;
+    return new_version;
 }
 
 
@@ -838,6 +858,7 @@ WriteLogCollector::WriteLogCollector(string database_name,
     m_is_persisting = server_synchronization_mode;
     m_log_a.file.set_encryption_key(encryption_key);
     m_log_b.file.set_encryption_key(encryption_key);
+    m_last_integrated_peer_version = 1;
 }
 
 } // end _impl

@@ -160,9 +160,12 @@ public:
     /// sink that allows a SharedGroup to submit actions for replication. It is
     /// then up to the implementation of the Repication interface to define what
     /// replication means.
-    virtual version_type apply_foreign_changeset(SharedGroup&, version_type base_version,
-                                                 BinaryData changeset, version_type server_version,
+    virtual version_type apply_foreign_changeset(SharedGroup&, version_type latest_local_version_integrated_by_peer,
+                                                 BinaryData changeset, version_type peer_version,
+                                                 // uint64_t peer_id, uint64_t timestamp,
                                                  std::ostream* apply_log = 0);
+
+    virtual version_type get_last_integrated_peer_version() const;
 
     /// Acquire permision to start a new 'write' transaction. This
     /// function must be called by a client before it requests a
@@ -462,11 +465,14 @@ private:
 /// Extended version of a commit log entry. The additional info is required for
 /// Sync.
 struct Replication::CommitLogEntry {
-    /// True iff this changeset was submitted via apply_foreign_changeset().
-    bool is_foreign;
+    /// Nonzero iff this changeset was submitted via apply_foreign_changeset().
+    uint64_t peer_id;
 
-    /// Not yet used.
-    version_type server_version;
+    /// The peer's version, used for sync.
+    version_type peer_version;
+
+    /// Disambiguation of out-of-order entries, used for sync.
+    uint64_t timestamp;
 
     /// The changeset.
     BinaryData log_data;
@@ -721,6 +727,14 @@ Replication::apply_foreign_changeset(SharedGroup&, version_type, BinaryData, ver
     return false;
 }
 
+inline Replication::version_type
+Replication::get_last_integrated_peer_version() const
+{
+    // Unimplemented!
+    TIGHTDB_ASSERT(false);
+    return 1;
+}
+
 inline void Replication::get_commit_entries(version_type, version_type, Replication::CommitLogEntry*)
     TIGHTDB_NOEXCEPT
 {
@@ -968,7 +982,7 @@ inline void Replication::string_value(const char* data, std::size_t size)
     transact_log_reserve(&buf, max_enc_bytes_per_num);
     buf = encode_int(buf, size);
     transact_log_advance(buf);
-    transact_log_append(data, size); // Throws   
+    transact_log_append(data, size); // Throws
 }
 
 inline void Replication::mixed_cmd(Instruction instr, std::size_t col_ndx,
