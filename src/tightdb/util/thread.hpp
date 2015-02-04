@@ -42,9 +42,9 @@
 #endif
 
 // FIXME: enable this only on platforms where it might be needed
-#define CONDVAR_EMULATION
+#define TIGHTDB_CONDVAR_EMULATION
 
-#ifdef CONDVAR_EMULATION
+#ifdef TIGHTDB_CONDVAR_EMULATION
 #include <stdint.h>
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -131,6 +131,7 @@ protected:
     TIGHTDB_NORETURN static void lock_failed(int) TIGHTDB_NOEXCEPT;
 
     friend class CondVar;
+    friend class CondVarEmulation;
 };
 
 
@@ -143,6 +144,7 @@ public:
 private:
     Mutex& m_mutex;
     friend class CondVar;
+    friend class CondVarEmulation;
 };
 
 
@@ -241,6 +243,7 @@ public:
     bool is_valid() TIGHTDB_NOEXCEPT;
 
     friend class CondVar;
+    friend class CondVarEmulation;
 };
 
 class RobustMutex::NotRecoverable: public std::exception {
@@ -263,6 +266,7 @@ public:
 private:
     RobustMutex& m_mutex;
     friend class CondVar;
+    friend class CondVarEmulation;
 };
 
 
@@ -285,13 +289,13 @@ public:
     /// system resources to be leaked.
     CondVar(process_shared_tag);
 
-#ifdef CONDVAR_EMULATION
+#ifdef TIGHTDB_CONDVAR_EMULATION
 #else
     /// Wait for another thread to call notify() or notify_all().
     void wait(LockGuard& l) TIGHTDB_NOEXCEPT;
 
     // FIXME: we're not emulating wait with timeouts yet, so calling this one
-    // with CONDVAR_EMULATION on and tp != 0 will just assert
+    // with TIGHTDB_CONDVAR_EMULATION on and tp != 0 will just assert
     template<class Func>
     void wait(RobustMutex& m, Func recover_func, const struct timespec* tp = 0);
     /// If any threads are wating for this condition, wake up at least
@@ -304,7 +308,7 @@ public:
 #endif
 
 private:
-#ifdef CONDVAR_EMULATION
+#ifdef TIGHTDB_CONDVAR_EMULATION
     uint32_t waiters;
     // FIXME: could this be reduced to 32 bits?
     uint64_t signal_counter;
@@ -319,7 +323,7 @@ private:
     void handle_wait_error(int error);
 };
 
-#ifdef CONDVAR_EMULATION
+#ifdef TIGHTDB_CONDVAR_EMULATION
 // class used for emulation only. The emulation needs local state.
 
 class CondVarEmulation {
@@ -327,21 +331,24 @@ public:
     CondVarEmulation();
     ~CondVarEmulation();
 
-    // bind the emulation to a CondVar in shared/mmapped memory:
+    /// bind the emulation to a CondVar in shared/mmapped memory:
     void set_condvar(CondVar& condvar, dev_t device, ino_t inode, std::size_t offset_of_condvar);
 
-    // bind the emulation to a CondVar in process local memory:
-    void set_condvar(CondVar& condvar);
+    /// bind the emulation to a CondVar in process local memory:
+    void set_condvar(CondVar& condvar) { set_condvar(condvar,0,0,0); }
 
-    // call this one ONLY when you know for a fact that NO OTHER PROCESS
-    // is currently accessing this condition variable.
+    /// release the emulation from its CondVar
+    void close();
+
+    /// call this one ONLY when you know for a fact that NO OTHER PROCESS
+    /// is currently accessing this condition variable.
     void initialize();
 
     /// Wait for another thread to call notify() or notify_all().
     void wait(LockGuard& l) TIGHTDB_NOEXCEPT;
 
-    // FIXME: we're not emulating wait with timeouts yet, so calling this one
-    // with tp != 0 will just assert
+    /// FIXME: we're not emulating wait with timeouts yet, so calling this one
+    /// with tp != 0 will just assert
     template<class Func>
     void wait(RobustMutex& m, Func recover_func, const struct timespec* tp = 0);
     /// If any threads are wating for this condition, wake up at least
@@ -363,40 +370,6 @@ private:
 
 
 // Implementation:
-inline CondVarEmulation::CondVarEmulation()
-{
-    m_name = 0;
-    m_sem = 0;
-    m_shared_part = 0;
-}
-
-inline CondVarEmulation::~CondVarEmulation()
-{
-    if (m_name) delete m_name;
-    if (m_sem) sem_close(m_sem);
-}
-
-inline void CondVarEmulation::set_condvar(CondVar& condvar, dev_t device, ino_t inode, std::size_t offset_of_condvar)
-{
-    TIGHTDB_ASSERT(m_shared_part == 0);
-    if (m_sem) {
-        sem_close(m_sem);
-        m_sem = 0;
-    }
-    if (m_name) delete m_name;
-    m_name = new std::string("/RealmsBigFriendlySemaphore");
-    m_shared_part = &condvar;
-}
-
-inline sem_t* get_semaphore()
-{
-    TIGHTDB_ASSERT(m_name);
-    TIGHTDB_ASSERT(m_shared_part);
-    if (m_sem == 0) {
-        m_sem = sem_open(m_name->c_str(), O_CREAT, S_IRWXG | S_IRWXU, 0);
-        // FIXME: error checking
-    return m_sem;
-}
 
 inline Thread::Thread(): m_joinable(false)
 {
@@ -591,7 +564,7 @@ inline void RobustMutex::unlock() TIGHTDB_NOEXCEPT
 
 inline CondVar::CondVar()
 {
-#ifdef CONDVAR_EMULATION
+#ifdef TIGHTDB_CONDVAR_EMULATION
     waiters = 0;
     signal_counter = 0;
 #else
@@ -603,7 +576,7 @@ inline CondVar::CondVar()
 
 inline CondVar::~CondVar() TIGHTDB_NOEXCEPT
 {
-#ifdef CONDVAR_EMULATION
+#ifdef TIGHTDB_CONDVAR_EMULATION
 #else
     int r = pthread_cond_destroy(&m_impl);
     if (TIGHTDB_UNLIKELY(r != 0))
@@ -611,66 +584,107 @@ inline CondVar::~CondVar() TIGHTDB_NOEXCEPT
 #endif
 }
 
-#ifdef CONDVAR_EMULATION
+#ifdef TIGHTDB_CONDVAR_EMULATION
+inline CondVarEmulation::CondVarEmulation()
+{
+    m_name = 0;
+    m_sem = 0;
+    m_shared_part = 0;
+}
+
+inline CondVarEmulation::~CondVarEmulation()
+{
+    if (m_name) delete m_name;
+    if (m_sem) sem_close(m_sem);
+}
+
+inline void CondVarEmulation::close()
+{
+    if (m_name) delete m_name;
+    m_name = 0;
+    if (m_sem) sem_close(m_sem);
+    m_sem = 0;
+    m_shared_part = 0;
+}
+
+inline void CondVarEmulation::set_condvar(CondVar& condvar, dev_t device, ino_t inode, std::size_t offset_of_condvar)
+{
+    TIGHTDB_ASSERT(m_shared_part == 0);
+    if (m_sem) {
+        sem_close(m_sem);
+        m_sem = 0;
+    }
+    if (m_name) delete m_name;
+    m_name = new std::string("/RealmsBigFriendlySemaphore");
+    m_shared_part = &condvar;
+}
+
+inline sem_t* CondVarEmulation::get_semaphore()
+{
+    TIGHTDB_ASSERT(m_name);
+    TIGHTDB_ASSERT(m_shared_part);
+    if (m_sem == 0) {
+        m_sem = sem_open(m_name->c_str(), O_CREAT, S_IRWXG | S_IRWXU, 0);
+        // FIXME: error checking
+    }
+    return m_sem;
+}
+
 inline void CondVarEmulation::wait(LockGuard& l) TIGHTDB_NOEXCEPT
 {
-    sem_t* wait_sem = sem_open("/RealmsBigFriendlySemaphpore", O_CREAT, S_IRWXG | S_IRWXU, 0);
-    waiters++;
-    uint64_t my_counter = signal_counter;
+    sem_t* wait_sem = get_semaphore();
+    m_shared_part->waiters++;
+    uint64_t my_counter = m_shared_part->signal_counter;
     l.m_mutex.unlock();
     for (;;) {
         sem_wait(wait_sem);
         l.m_mutex.lock();
-        if (signal_counter != my_counter)
+        if (m_shared_part->signal_counter != my_counter)
             break;
         sem_post(wait_sem);
         sched_yield();
         l.m_mutex.unlock();
     }
-    sem_close(wait_sem);
 }
 
 template<class Func>
 inline void CondVarEmulation::wait(RobustMutex& m, Func recover_func, const struct timespec* tp)
 {
     TIGHTDB_ASSERT(tp == 0);
-    sem_t* wait_sem = sem_open("/RealmsBigFriendlySemaphpore", O_CREAT, S_IRWXG | S_IRWXU, 0);
-    waiters++;
-    uint64_t my_counter = signal_counter;
+    sem_t* wait_sem = get_semaphore();
+    m_shared_part->waiters++;
+    uint64_t my_counter = m_shared_part->signal_counter;
     m.unlock();
     for (;;) {
         sem_wait(wait_sem);
         m.lock(recover_func);
-        if (signal_counter != my_counter)
+        if (m_shared_part->signal_counter != my_counter)
             break;
         sem_post(wait_sem);
         sched_yield();
         m.unlock();
     }
-    sem_close(wait_sem);
     static_cast<void>(m);
 }
 
 inline void CondVarEmulation::notify() TIGHTDB_NOEXCEPT
 {
-    sem_t* wait_sem = sem_open("/RealmsBigFriendlySemaphpore", O_CREAT, S_IRWXG | S_IRWXU, 0);
-    signal_counter++;
-    if (waiters) {
+    sem_t* wait_sem = get_semaphore();
+    m_shared_part->signal_counter++;
+    if (m_shared_part->waiters) {
         sem_post(wait_sem);
-        --waiters;
+        --m_shared_part->waiters;
     }
-    sem_close(wait_sem);
 }
 
 inline void CondVarEmulation::notify_all() TIGHTDB_NOEXCEPT
 {
-    sem_t* wait_sem = sem_open("/RealmsBigFriendlySemaphpore", O_CREAT, S_IRWXG | S_IRWXU, 0);
-    signal_counter++;
-    while (waiters) {
+    sem_t* wait_sem = get_semaphore();
+    m_shared_part->signal_counter++;
+    while (m_shared_part->waiters) {
         sem_post(wait_sem);
-        --waiters;
+        --m_shared_part->waiters;
     }
-    sem_close(wait_sem);
 }
 
 #else // No CondVar emulation:

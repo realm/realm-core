@@ -23,6 +23,7 @@
 #include <limits>
 
 #include <tightdb/util/features.h>
+#include <tightdb/util/thread.hpp>
 #include <tightdb/group.hpp>
 //#include <tightdb/commit_log.hpp>
 
@@ -339,6 +340,7 @@ public:
 
 private:
     struct SharedInfo;
+    struct ReadCount;
     struct ReadLockInfo {
         uint_fast64_t   m_version;
         uint_fast32_t   m_reader_idx;
@@ -365,7 +367,14 @@ private:
         transact_Writing
     };
     TransactStage m_transact_stage;
-    struct ReadCount;
+#ifdef TIGHTDB_CONDVAR_EMULATION
+#ifndef _WIN32
+    util::CondVarEmulation m_room_to_write;
+    util::CondVarEmulation m_work_to_do;
+    util::CondVarEmulation m_daemon_becomes_ready;
+    util::CondVarEmulation m_new_commit_available;
+#endif
+#endif
 
     // Ring buffer managment
     bool        ringbuf_is_empty() const TIGHTDB_NOEXCEPT;

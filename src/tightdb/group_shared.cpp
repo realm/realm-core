@@ -763,6 +763,15 @@ void SharedGroup::open(const string& path, bool no_create_file,
 
             }
 #ifndef _WIN32
+#ifdef TIGHTDB_CONDVAR_EMULATION
+            // FIXME: get dev and inode to ensure uniqueness!
+            m_daemon_becomes_ready.set_condvar(info->daemon_becomes_ready,0,0,
+                offsetof(SharedInfo,daemon_becomes_ready));
+            m_work_to_do.set_condvar(info->work_to_do,0,0,offsetof(SharedInfo,work_to_do));
+            m_room_to_write.set_condvar(info->room_to_write,0,0,offsetof(SharedInfo,room_to_write));
+            m_new_commit_available.set_condvar(info->new_commit_available,0,0,
+                offsetof(SharedInfo,new_commit_available));
+#endif
             // In async mode, we need to make sure the daemon is running and ready:
             if (dlevel == durability_Async && !is_backend) {
                 while (info->daemon_ready == false) {
@@ -772,9 +781,13 @@ void SharedGroup::open(const string& path, bool no_create_file,
                     }
                     // FIXME: It might be more robust to sleep a little, then restart the loop
                     // cerr << "Waiting for daemon" << endl;
+#ifdef TIGHTDB_CONDVAR_EMULATION
+                    m_daemon_becomes_ready.wait(info->controlmutex, &recover_from_dead_write_transact, 0);
+#else
                     info->daemon_becomes_ready.wait(info->controlmutex,
                                                     &recover_from_dead_write_transact,
                                                     0);
+#endif
                     // cerr << " - notified" << endl;
                 }
             }
@@ -968,9 +981,13 @@ bool SharedGroup::wait_for_change()
     SharedInfo* info = m_file_map.get_addr();
     RobustLockGuard lock(info->controlmutex, recover_from_dead_write_transact);
     while (m_readlock.m_version == info->latest_version_number && m_wait_for_change_enabled) {
+#ifdef TIGHTDB_CONDVAR_EMULATION
+        m_new_commit_available.wait(info->controlmutex, &recover_from_dead_write_transact, 0);
+#else
         info->new_commit_available.wait(info->controlmutex,
                                         &recover_from_dead_write_transact,
                                         0);
+#endif
     }
     return m_readlock.m_version != info->latest_version_number;
 }
@@ -981,7 +998,11 @@ void SharedGroup::wait_for_change_release()
     SharedInfo* info = m_file_map.get_addr();
     RobustLockGuard lock(info->controlmutex, recover_from_dead_write_transact);
     m_wait_for_change_enabled = false;
+#ifdef TIGHTDB_CONDVAR_EMULATION
+    m_new_commit_available.notify_all();
+#else
     info->new_commit_available.notify_all();
+#endif
 }
 
 
@@ -1008,7 +1029,11 @@ void SharedGroup::do_async_commits()
         RobustLockGuard lock(info->controlmutex, &recover_from_dead_write_transact);
         info->free_write_slots = max_write_slots;
         info->daemon_ready = true;
+#ifdef TIGHTDB_CONDVAR_EMULATION
+        m_daemon_becomes_ready.notify_all();
+#else
         info->daemon_becomes_ready.notify_all();
+#endif
     }
     m_group.detach();
 
@@ -1067,7 +1092,11 @@ void SharedGroup::do_async_commits()
         uint16_t free_write_slots = info->free_write_slots;
         info->free_write_slots = max_write_slots;
         if (free_write_slots <= 0) {
+#ifdef TIGHTDB_CONDVAR_EMULATION
+            m_room_to_write.notify_all();
+#else
             info->room_to_write.notify_all();
+#endif
         }
 
         // If we have plenty of write slots available, relax and wait a bit before syncing
@@ -1084,11 +1113,16 @@ void SharedGroup::do_async_commits()
                 ts.tv_sec += 1;
             }
 
+#ifdef TIGHTDB_CONDVAR_EMULATION
+            // no timeout if the condvars are only emulated
+            m_work_to_do.wait(info->balancemutex, &recover_from_dead_write_transact, 0);
+#else
             // we do a conditional wait instead of a sleep, allowing writers to wake us up
             // immediately if we run low on write slots.
             info->work_to_do.wait(info->balancemutex,
                                   &recover_from_dead_write_transact,
                                   &ts);
+#endif
         }
         info->balancemutex.unlock();
 
@@ -1346,12 +1380,19 @@ void SharedGroup::do_begin_write()
 
         // if we are running low on write slots, kick the sync daemon
         if (info->free_write_slots < relaxed_sync_threshold)
+#ifdef TIGHTDB_CONDVAR_EMULATION
+            m_work_to_do.notify();
+#else
             info->work_to_do.notify();
-
+#endif
         // if we are out of write slots, wait for the sync daemon to catch up
         while (info->free_write_slots <= 0) {
+#ifdef TIGHTDB_CONDVAR_EMULATION
+            m_room_to_write.wait(info->balancemutex, recover_from_dead_write_transact);
+#else
             info->room_to_write.wait(info->balancemutex,
                                      recover_from_dead_write_transact);
+#endif
         }
 
         info->free_write_slots--;
@@ -1633,7 +1674,11 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
         RobustLockGuard lock(info->controlmutex, recover_from_dead_write_transact);
         info->number_of_versions = new_version - readlock_version + 1;
         info->latest_version_number = new_version;
+#ifdef TIGHTDB_CONDVAR_EMULATION
+        m_new_commit_available.notify_all();
+#else
         info->new_commit_available.notify_all();
+#endif
     }
 #endif
 }

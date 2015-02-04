@@ -64,7 +64,12 @@ const int num_slaves = 2;
 map<int, int> results;
 
 Mutex mutex;
+#ifdef TIGHTDB_CONDVAR_EMULATION
+CondVar cond_shared;
+CondVarEmulation cond;
+#else
 CondVar cond;
+#endif
 
 int num_slaves_ready = 0;
 int num_good_locks = 0;
@@ -120,7 +125,9 @@ void slave(int ndx, string path)
 TEST(File_NoSpuriousTryLockFailures)
 {
     TEST_PATH(path);
-
+#ifdef TIGHTDB_CONDVAR_EMULATION
+    cond.set_condvar(cond_shared);
+#endif
     Thread slaves[num_slaves];
     for (int i = 0; i != num_slaves; ++i) {
         slaves_run[i] = false;
