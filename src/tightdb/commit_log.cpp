@@ -736,11 +736,6 @@ void WriteLogCollector::get_commit_entries_internal(version_type from_version, v
         uint_fast64_t tmp_offset = m_read_offset + sizeof(EntryHeader);
         if (m_read_version >= from_version) {
             // cerr << "  --at: " << m_read_offset << ", " << size << endl;
-            uint_fast64_t server_version_and_flag = hdr->peer_version << 1;
-            if (hdr->peer_id) {
-                // FIXME!
-                server_version_and_flag |= 1;
-            }
             set_log_entry_internal(logs_buffer, hdr, buffer+tmp_offset);
             ++logs_buffer;
         }
