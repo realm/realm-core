@@ -29,6 +29,7 @@
 
 #include <cerrno>
 #include <cstddef>
+#include <string>
 
 #include <tightdb/util/features.h>
 #include <tightdb/util/assert.hpp>
@@ -40,6 +41,7 @@
 #  include <atomic>
 #endif
 
+// FIXME: enable this only on platforms where it might be needed
 #define CONDVAR_EMULATION
 
 #ifdef CONDVAR_EMULATION
@@ -283,11 +285,15 @@ public:
     /// system resources to be leaked.
     CondVar(process_shared_tag);
 
+#ifdef CONDVAR_EMULATION
+#else
     /// Wait for another thread to call notify() or notify_all().
     void wait(LockGuard& l) TIGHTDB_NOEXCEPT;
+
+    // FIXME: we're not emulating wait with timeouts yet, so calling this one
+    // with CONDVAR_EMULATION on and tp != 0 will just assert
     template<class Func>
     void wait(RobustMutex& m, Func recover_func, const struct timespec* tp = 0);
-
     /// If any threads are wating for this condition, wake up at least
     /// one.
     void notify() TIGHTDB_NOEXCEPT;
@@ -295,11 +301,14 @@ public:
     /// Wake up every thread that is currently wating on this
     /// condition.
     void notify_all() TIGHTDB_NOEXCEPT;
+#endif
 
 private:
 #ifdef CONDVAR_EMULATION
     uint32_t waiters;
+    // FIXME: could this be reduced to 32 bits?
     uint64_t signal_counter;
+    friend class CondVarEmulation;
 #else
     pthread_cond_t m_impl;
 #endif
@@ -310,11 +319,84 @@ private:
     void handle_wait_error(int error);
 };
 
+#ifdef CONDVAR_EMULATION
+// class used for emulation only. The emulation needs local state.
 
+class CondVarEmulation {
+public:
+    CondVarEmulation();
+    ~CondVarEmulation();
+
+    // bind the emulation to a CondVar in shared/mmapped memory:
+    void set_condvar(CondVar& condvar, dev_t device, ino_t inode, std::size_t offset_of_condvar);
+
+    // bind the emulation to a CondVar in process local memory:
+    void set_condvar(CondVar& condvar);
+
+    // call this one ONLY when you know for a fact that NO OTHER PROCESS
+    // is currently accessing this condition variable.
+    void initialize();
+
+    /// Wait for another thread to call notify() or notify_all().
+    void wait(LockGuard& l) TIGHTDB_NOEXCEPT;
+
+    // FIXME: we're not emulating wait with timeouts yet, so calling this one
+    // with tp != 0 will just assert
+    template<class Func>
+    void wait(RobustMutex& m, Func recover_func, const struct timespec* tp = 0);
+    /// If any threads are wating for this condition, wake up at least
+    /// one.
+    void notify() TIGHTDB_NOEXCEPT;
+
+    /// Wake up every thread that is currently wating on this
+    /// condition.
+    void notify_all() TIGHTDB_NOEXCEPT;
+private:
+    sem_t* get_semaphore();
+
+    std::string* m_name;
+    sem_t* m_sem;
+    CondVar* m_shared_part;
+};
+#endif
 
 
 
 // Implementation:
+inline CondVarEmulation::CondVarEmulation()
+{
+    m_name = 0;
+    m_sem = 0;
+    m_shared_part = 0;
+}
+
+inline CondVarEmulation::~CondVarEmulation()
+{
+    if (m_name) delete m_name;
+    if (m_sem) sem_close(m_sem);
+}
+
+inline void CondVarEmulation::set_condvar(CondVar& condvar, dev_t device, ino_t inode, std::size_t offset_of_condvar)
+{
+    TIGHTDB_ASSERT(m_shared_part == 0);
+    if (m_sem) {
+        sem_close(m_sem);
+        m_sem = 0;
+    }
+    if (m_name) delete m_name;
+    m_name = new std::string("/RealmsBigFriendlySemaphore");
+    m_shared_part = &condvar;
+}
+
+inline sem_t* get_semaphore()
+{
+    TIGHTDB_ASSERT(m_name);
+    TIGHTDB_ASSERT(m_shared_part);
+    if (m_sem == 0) {
+        m_sem = sem_open(m_name->c_str(), O_CREAT, S_IRWXG | S_IRWXU, 0);
+        // FIXME: error checking
+    return m_sem;
+}
 
 inline Thread::Thread(): m_joinable(false)
 {
@@ -529,9 +611,9 @@ inline CondVar::~CondVar() TIGHTDB_NOEXCEPT
 #endif
 }
 
-inline void CondVar::wait(LockGuard& l) TIGHTDB_NOEXCEPT
-{
 #ifdef CONDVAR_EMULATION
+inline void CondVarEmulation::wait(LockGuard& l) TIGHTDB_NOEXCEPT
+{
     sem_t* wait_sem = sem_open("/RealmsBigFriendlySemaphpore", O_CREAT, S_IRWXG | S_IRWXU, 0);
     waiters++;
     uint64_t my_counter = signal_counter;
@@ -546,19 +628,12 @@ inline void CondVar::wait(LockGuard& l) TIGHTDB_NOEXCEPT
         l.m_mutex.unlock();
     }
     sem_close(wait_sem);
-#else
-    int r = pthread_cond_wait(&m_impl, &l.m_mutex.m_impl);
-    if (TIGHTDB_UNLIKELY(r != 0))
-        TIGHTDB_TERMINATE("pthread_cond_wait() failed");
-#endif
 }
 
 template<class Func>
-inline void CondVar::wait(RobustMutex& m, Func recover_func, const struct timespec* tp)
+inline void CondVarEmulation::wait(RobustMutex& m, Func recover_func, const struct timespec* tp)
 {
-#ifdef CONDVAR_EMULATION
-    // ignore timeout
-    static_cast<void>(tp);
+    TIGHTDB_ASSERT(tp == 0);
     sem_t* wait_sem = sem_open("/RealmsBigFriendlySemaphpore", O_CREAT, S_IRWXG | S_IRWXU, 0);
     waiters++;
     uint64_t my_counter = signal_counter;
@@ -573,7 +648,42 @@ inline void CondVar::wait(RobustMutex& m, Func recover_func, const struct timesp
         m.unlock();
     }
     sem_close(wait_sem);
-#else
+    static_cast<void>(m);
+}
+
+inline void CondVarEmulation::notify() TIGHTDB_NOEXCEPT
+{
+    sem_t* wait_sem = sem_open("/RealmsBigFriendlySemaphpore", O_CREAT, S_IRWXG | S_IRWXU, 0);
+    signal_counter++;
+    if (waiters) {
+        sem_post(wait_sem);
+        --waiters;
+    }
+    sem_close(wait_sem);
+}
+
+inline void CondVarEmulation::notify_all() TIGHTDB_NOEXCEPT
+{
+    sem_t* wait_sem = sem_open("/RealmsBigFriendlySemaphpore", O_CREAT, S_IRWXG | S_IRWXU, 0);
+    signal_counter++;
+    while (waiters) {
+        sem_post(wait_sem);
+        --waiters;
+    }
+    sem_close(wait_sem);
+}
+
+#else // No CondVar emulation:
+inline void CondVar::wait(LockGuard& l) TIGHTDB_NOEXCEPT
+{
+    int r = pthread_cond_wait(&m_impl, &l.m_mutex.m_impl);
+    if (TIGHTDB_UNLIKELY(r != 0))
+        TIGHTDB_TERMINATE("pthread_cond_wait() failed");
+}
+
+template<class Func>
+inline void CondVar::wait(RobustMutex& m, Func recover_func, const struct timespec* tp)
+{
     int r;
     if (!tp) {
         r = pthread_cond_wait(&m_impl, &m.m_impl);
@@ -602,36 +712,22 @@ inline void CondVar::wait(RobustMutex& m, Func recover_func, const struct timesp
         m.unlock();
         throw;
     }
-#endif
 }
 
 inline void CondVar::notify() TIGHTDB_NOEXCEPT
 {
-#ifdef CONDVAR_EMULATION
-    TIGHTDB_TERMINATE("signal unimplemented");
-#else
     int r = pthread_cond_signal(&m_impl);
     TIGHTDB_ASSERT(r == 0);
     static_cast<void>(r);
-#endif
 }
 
 inline void CondVar::notify_all() TIGHTDB_NOEXCEPT
 {
-#ifdef CONDVAR_EMULATION
-    sem_t* wait_sem = sem_open("/RealmsBigFriendlySemaphpore", O_CREAT, S_IRWXG | S_IRWXU, 0);
-    signal_counter++;
-    while (waiters) {
-        sem_post(wait_sem);
-        --waiters;
-    }
-    sem_close(wait_sem);
-#else
     int r = pthread_cond_broadcast(&m_impl);
     TIGHTDB_ASSERT(r == 0);
     static_cast<void>(r);
-#endif
 }
+#endif
 
 
 // Support for simple atomic variables, inspired by C++11 atomics, but incomplete.
