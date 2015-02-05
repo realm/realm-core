@@ -214,4 +214,21 @@ TEST(File_SetEncryptionKey)
 #endif
 }
 
+TEST(File_ReadWrite)
+{
+    TEST_PATH(path);
+    File f(path, File::mode_Write);
+    f.set_encryption_key(crypt_key(true));
+    f.resize(100);
+
+    for (char i = 0; i < 100; ++i)
+        f.write(&i, 1);
+    f.seek(0);
+    for (char i = 0; i < 100; ++i) {
+        char read;
+        f.read(&read, 1);
+        CHECK_EQUAL(i, read);
+    }
+}
+
 #endif // TEST_FILE

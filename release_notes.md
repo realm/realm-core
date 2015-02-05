@@ -3,6 +3,7 @@
 ### Bugfixes:
 
 * Fixed crash when std::exit() is called with active encrypted mappings.
+* Fixed writing over 4KB of data to an encrypted file with Group::write().
 
 ### API breaking changes:
 
