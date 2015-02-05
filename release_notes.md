@@ -3,6 +3,7 @@
 ### Bugfixes:
 
 * Fixed out-of-bounds reads when using aggregate functions on sorted TableViews.
+* Fixed writing over 4KB of data to an encrypted file with Group::write().
 
 ### API breaking changes:
 
