@@ -788,11 +788,13 @@ public:
             }
         }
 
-        // Save m_result_ndx so we can parse the future entries for set overwrite.
+        // Save m_result_ndx so we can parse the future entries to detect set overwrite.
         size_t result = m_result_ndx;
 
         // If we need to figure out whether the index was overwritten,
         // parse future log entries and find a set at the index.
+        // We keep bumping any indexes because we need to track the set operation
+        // even if something was inserted under it.
         if (overwritten) {
             for (size_t i = 0; i < entries.size(); ++i) {
                 CommitLogEntry& entry = entries[i];
