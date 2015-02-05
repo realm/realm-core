@@ -60,6 +60,7 @@ sync_commits(SharedGroup& from_group, SharedGroup& to_group)
     Replication* from_r = from_group.get_replication();
     Replication* to_r = to_group.get_replication();
 
+    // Figure out which versions to sync:
     version_type v0 = to_r->get_last_peer_version(1);
     version_type v1 = from_group.get_current_version();
     uint_fast64_t peer_id = 1;
@@ -67,9 +68,12 @@ sync_commits(SharedGroup& from_group, SharedGroup& to_group)
     if (v1 <= v0)
         return; // Already in sync
 
+    // Get the relevant commits:
     std::vector<Replication::CommitLogEntry> entries(v1 - v0);
     from_r->get_commit_entries(v0, v1, entries.data());
     TIGHTDB_ASSERT(from_group.get_current_version() == v0 + entries.size());
+
+    // Send all local commits to the remote end:
     for (version_type i = 0; i < entries.size(); ++i) {
         if (entries[i].peer_id != 0)
             continue;
