@@ -27,6 +27,8 @@
 #include <map>
 #include <tightdb/commit_log.hpp>
 
+#include <sys/time.h> // FIXME!! Not portable
+
 #include <tightdb/replication.hpp>
 #ifdef TIGHTDB_ENABLE_REPLICATION
 
@@ -281,8 +283,8 @@ protected:
 
     // Add a single log entry to the logs. The log data is copied.
     version_type internal_submit_log(const char*, uint_fast64_t size,
-                                     uint_fast64_t timestamp, uint_fast64_t peer_id = 0,
-                                     version_type peer_version = 0);
+                                     uint_fast64_t timestamp, uint_fast64_t peer_id,
+                                     version_type peer_version);
 
 
 
@@ -758,39 +760,76 @@ void WriteLogCollector::get_commit_entries_internal(version_type from_version, v
 
 class WriteLogCollector::MergingIndexTranslator : public Replication::IndexTranslatorBase {
 public:
-    MergingIndexTranslator(WriteLogCollector& log, uint_fast64_t timestamp, uint_fast64_t peer_id, version_type base_version, version_type current_version):
-        m_log(log), m_timestamp(timestamp), m_peer_id(peer_id), m_base_version(base_version), m_current_version(current_version)
+    MergingIndexTranslator(WriteLogCollector& log, Group& group, uint_fast64_t timestamp, uint_fast64_t peer_id, version_type base_version, version_type current_version):
+        m_log(log), m_group(group), m_timestamp(timestamp), m_peer_id(peer_id), m_base_version(base_version), m_current_version(current_version), m_was_set(false)
     {
     }
 
-    size_t translate_row_index(TableRef table, size_t row_ndx) TIGHTDB_OVERRIDE
+    size_t translate_row_index(TableRef table, size_t row_ndx, bool* overwritten) TIGHTDB_OVERRIDE
     {
         // Go through the commit log from m_base_version to m_current_version.
         // For each insert in table that has a lower timestamp and a lower row index, bump
         // row_ndx by one.
+        m_translate_table = table;
         m_result_ndx = row_ndx;
         std::vector<Replication::CommitLogEntry> entries(m_current_version - m_base_version);
         m_log.get_commit_entries(m_base_version, m_current_version, entries.data());
+        std::cout << "Translating row index v" << m_base_version << " -> v" << m_current_version << "\n";
 
         for (size_t i = 0; i < entries.size(); ++i) {
             CommitLogEntry& entry = entries[i];
-            if (entry.timestamp < m_timestamp) { // FIXME Compare peer_id too
+            if (entry.peer_id != 0)
+                continue;
+            std::cout << "Modifying against local commit at t = " << entry.timestamp << "\n";
+            if (entry.timestamp < m_timestamp) { // FIXME Compare peer_id too.
                 SimpleInputStream input(entry.log_data.data(), entry.log_data.size());
                 TransactLogParser parser(input);
                 parser.parse(*this);
             }
         }
 
-        if (m_result_ndx != row_ndx) {
+        // Save m_result_ndx so we can parse the future entries for set overwrite.
+        size_t result = m_result_ndx;
+
+        // If we need to figure out whether the index was overwritten,
+        // parse future log entries and find a set at the index.
+        if (overwritten) {
+            for (size_t i = 0; i < entries.size(); ++i) {
+                CommitLogEntry& entry = entries[i];
+                if (entry.timestamp > m_timestamp) {
+                    std::cout << "Checking for overwrite: " << entry.timestamp << " > " << m_timestamp << "\n";
+                    m_was_set = false;
+                    SimpleInputStream input(entry.log_data.data(), entry.log_data.size());
+                    TransactLogParser parser(input);
+                    parser.parse(*this);
+                    if (m_was_set) {
+                        std::cout << "SET at " << row_ndx << " was overwritten.\n";
+                        *overwritten = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (result != row_ndx) {
             std::cout << "BUMPED " << row_ndx << " TO " << m_result_ndx << "\n";
         }
 
-        return m_result_ndx;
+        return result;
     }
 
     void insertions(size_t row_ndx, size_t num) {
-        if (row_ndx <= m_result_ndx) {
+        std::cout << "Saw insert(" << row_ndx << ", " << num << ")\n";
+        if (m_table == m_translate_table && row_ndx <= m_result_ndx) {
             m_result_ndx += num;
+        }
+    }
+
+    void update(size_t row_ndx) {
+        std::cout << "Saw set(" << row_ndx << ")\n";
+        if (m_table == m_translate_table && row_ndx == m_result_ndx) {
+            std::cout << "MATCH\n";
+            m_was_set = true;
         }
     }
 
@@ -798,47 +837,52 @@ public:
                                   StringData name) { return true; }
     bool erase_group_level_table(std::size_t table_ndx, std::size_t num_tables) { return true; }
     bool rename_group_level_table(std::size_t table_ndx, StringData new_name) { return true; }
-    bool select_table(std::size_t group_level_ndx, int levels, const std::size_t* path) { return true; }
+    bool select_table(std::size_t group_level_ndx, int levels, const std::size_t* path)
+    {
+        std::cout << "SELECT TABLE\n";
+        m_table = m_group.get_table(group_level_ndx); // Throws
+        return true;
+    }
     bool insert_empty_rows(std::size_t row_ndx, std::size_t num_rows, std::size_t tbl_sz, bool unordered) { insertions(row_ndx, num_rows); return true; }
     bool erase_rows(std::size_t row_ndx, std::size_t num_rows, std::size_t tbl_sz, bool unordered) { return true; }
     bool clear_table() { return true; }
-    bool insert_int(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, int_fast64_t) { insertions(row_ndx, 1); return true; }
-    bool insert_bool(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, bool) { insertions(row_ndx, 1); return true; }
-    bool insert_float(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, float) { insertions(row_ndx, 1); return true; }
-    bool insert_double(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, double) { insertions(row_ndx, 1); return true; }
-    bool insert_string(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, StringData) { insertions(row_ndx, 1); return true; }
-    bool insert_binary(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, BinaryData) { insertions(row_ndx, 1); return true; }
-    bool insert_date_time(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, DateTime) { insertions(row_ndx, 1); return true; }
-    bool insert_table(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz) { insertions(row_ndx, 1); return true; }
-    bool insert_mixed(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, const Mixed&) { insertions(row_ndx, 1); return true; }
-    bool insert_link(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, std::size_t) { insertions(row_ndx, 1); return true; }
-    bool insert_link_list(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz) { insertions(row_ndx, 1); return true; }
+    bool insert_int(std::size_t, std::size_t row_ndx, std::size_t, int_fast64_t) { insertions(row_ndx, 1); return true; }
+    bool insert_bool(std::size_t, std::size_t row_ndx, std::size_t, bool) { insertions(row_ndx, 1); return true; }
+    bool insert_float(std::size_t, std::size_t row_ndx, std::size_t, float) { insertions(row_ndx, 1); return true; }
+    bool insert_double(std::size_t, std::size_t row_ndx, std::size_t, double) { insertions(row_ndx, 1); return true; }
+    bool insert_string(std::size_t, std::size_t row_ndx, std::size_t, StringData) { insertions(row_ndx, 1); return true; }
+    bool insert_binary(std::size_t, std::size_t row_ndx, std::size_t, BinaryData) { insertions(row_ndx, 1); return true; }
+    bool insert_date_time(std::size_t, std::size_t row_ndx, std::size_t, DateTime) { insertions(row_ndx, 1); return true; }
+    bool insert_table(std::size_t, std::size_t row_ndx, std::size_t) { insertions(row_ndx, 1); return true; }
+    bool insert_mixed(std::size_t, std::size_t row_ndx, std::size_t, const Mixed&) { insertions(row_ndx, 1); return true; }
+    bool insert_link(std::size_t, std::size_t row_ndx, std::size_t, std::size_t) { insertions(row_ndx, 1); return true; }
+    bool insert_link_list(std::size_t, std::size_t row_ndx, std::size_t) { insertions(row_ndx, 1); return true; }
     bool row_insert_complete() { return true; }
-    bool set_int(std::size_t col_ndx, std::size_t row_ndx, int_fast64_t) { return true; }
-    bool set_bool(std::size_t col_ndx, std::size_t row_ndx, bool) { return true; }
-    bool set_float(std::size_t col_ndx, std::size_t row_ndx, float) { return true; }
-    bool set_double(std::size_t col_ndx, std::size_t row_ndx, double) { return true; }
-    bool set_string(std::size_t col_ndx, std::size_t row_ndx, StringData) { return true; }
-    bool set_binary(std::size_t col_ndx, std::size_t row_ndx, BinaryData) { return true; }
-    bool set_date_time(std::size_t col_ndx, std::size_t row_ndx, DateTime) { return true; }
-    bool set_table(std::size_t col_ndx, std::size_t row_ndx) { return true; }
-    bool set_mixed(std::size_t col_ndx, std::size_t row_ndx, const Mixed&) { return true; }
-    bool set_link(std::size_t col_ndx, std::size_t row_ndx, std::size_t) { return true; }
-    bool add_int_to_column(std::size_t col_ndx, int_fast64_t value) { return true; }
+    bool set_int(std::size_t, std::size_t row_ndx, int_fast64_t) { update(row_ndx); return true; }
+    bool set_bool(std::size_t, std::size_t row_ndx, bool) { update(row_ndx); return true; }
+    bool set_float(std::size_t, std::size_t row_ndx, float) { update(row_ndx); return true; }
+    bool set_double(std::size_t, std::size_t row_ndx, double) { update(row_ndx); return true; }
+    bool set_string(std::size_t, std::size_t row_ndx, StringData) { update(row_ndx); return true; }
+    bool set_binary(std::size_t, std::size_t row_ndx, BinaryData) { update(row_ndx); return true; }
+    bool set_date_time(std::size_t, std::size_t row_ndx, DateTime) { update(row_ndx); return true; }
+    bool set_table(std::size_t, std::size_t row_ndx) { update(row_ndx); return true; }
+    bool set_mixed(std::size_t, std::size_t row_ndx, const Mixed&) { update(row_ndx); return true; }
+    bool set_link(std::size_t, std::size_t row_ndx, std::size_t) { update(row_ndx); return true; }
+    bool add_int_to_column(std::size_t, int_fast64_t value) { return true; }
     bool optimize_table() { return true; }
     bool select_descriptor(int levels, const std::size_t* path) { return true; }
-    bool insert_link_column(std::size_t col_ndx, DataType, StringData name,
+    bool insert_link_column(std::size_t, DataType, StringData name,
                             std::size_t link_target_table_ndx, std::size_t backlink_col_ndx) { return true; }
-    bool insert_column(std::size_t col_ndx, DataType, StringData name) { return true; }
-    bool erase_link_column(std::size_t col_ndx, std::size_t link_target_table_ndx,
+    bool insert_column(std::size_t, DataType, StringData name) { return true; }
+    bool erase_link_column(std::size_t, std::size_t link_target_table_ndx,
                            std::size_t backlink_col_ndx) { return true; }
-    bool erase_column(std::size_t col_ndx) { return true; }
-    bool rename_column(std::size_t col_ndx, StringData new_name) { return true; }
-    bool add_search_index(std::size_t col_ndx) { return true; }
-    bool add_primary_key(std::size_t col_ndx) { return true; }
+    bool erase_column(std::size_t) { return true; }
+    bool rename_column(std::size_t, StringData new_name) { return true; }
+    bool add_search_index(std::size_t) { return true; }
+    bool add_primary_key(std::size_t) { return true; }
     bool remove_primary_key() { return true; }
-    bool set_link_type(std::size_t col_ndx, LinkType) { return true; }
-    bool select_link_list(std::size_t col_ndx, std::size_t row_ndx) { return true; }
+    bool set_link_type(std::size_t, LinkType) { return true; }
+    bool select_link_list(std::size_t, std::size_t row_ndx) { return true; }
     bool link_list_set(std::size_t link_ndx, std::size_t value) { return true; }
     bool link_list_insert(std::size_t link_ndx, std::size_t value) { return true; }
     bool link_list_move(std::size_t old_link_ndx, std::size_t new_link_ndx) { return true; }
@@ -846,12 +890,16 @@ public:
     bool link_list_clear() { return true; }
 private:
     WriteLogCollector& m_log;
+    Group& m_group;
     uint64_t m_timestamp;
     uint64_t m_peer_id;
     uint64_t m_base_version;
     uint64_t m_current_version;
 
+    TableRef m_table;
+    TableRef m_translate_table;
     size_t m_result_ndx;
+    bool m_was_set;
 };
 
 
@@ -864,6 +912,7 @@ WriteLogCollector::apply_foreign_changeset(SharedGroup& sg, version_type last_ve
     Group& group = sg.m_group;
     TIGHTDB_ASSERT(_impl::GroupFriend::get_replication(group) == this);
     TempDisableReplication tdr(group);
+    TIGHTDB_ASSERT(peer_id != 0);
 
     WriteTransaction transact(sg);
     version_type current_version = sg.get_current_version();
@@ -872,7 +921,7 @@ WriteLogCollector::apply_foreign_changeset(SharedGroup& sg, version_type last_ve
     if (TIGHTDB_UNLIKELY(last_version_integrated_by_peer > current_version))
         throw LogicError(LogicError::bad_version_number);
     SimpleInputStream input(changeset.data(), changeset.size());
-    MergingIndexTranslator translator(*this, timestamp, peer_id, last_version_integrated_by_peer, current_version);
+    MergingIndexTranslator translator(*this, group, timestamp, peer_id, last_version_integrated_by_peer, current_version);
     apply_transact_log(input, transact.get_group(), translator, apply_log); // Throws
     internal_submit_log(changeset.data(), changeset.size(), timestamp, peer_id, peer_version); // Throws
     return transact.commit(); // Throws
@@ -892,8 +941,10 @@ WriteLogCollector::do_commit_write_transact(SharedGroup&,
 {
     char* data = m_transact_log_buffer.data();
     uint_fast64_t size = m_transact_log_free_begin - data;
-    bool is_foreign = false;
-    version_type from_version = internal_submit_log(data, size, is_foreign);
+    uint_fast64_t timestamp = get_current_timestamp();
+    uint_fast64_t peer_id = 0;
+    uint_fast64_t peer_version = get_last_peer_version(1);
+    version_type from_version = internal_submit_log(data, size, timestamp, peer_id, peer_version);
     TIGHTDB_ASSERT(from_version == orig_version);
     static_cast<void>(from_version);
     version_type new_version = orig_version + 1;
@@ -965,6 +1016,13 @@ Replication* makeWriteLogCollector(string database_name,
     return new _impl::WriteLogCollector(database_name,
                                         server_synchronization_mode,
                                         encryption_key);
+}
+
+uint_fast64_t get_current_timestamp()
+{
+    struct timeval tv;
+    gettimeofday(&tv, null_ptr);
+    return tv.tv_sec * 1000000 + tv.tv_usec;
 }
 
 

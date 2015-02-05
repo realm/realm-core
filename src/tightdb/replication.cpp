@@ -152,14 +152,17 @@ public:
             *m_log << boolalpha;
     }
 
-    size_t translate_row(size_t ndx)
+    size_t translate_row(size_t ndx, bool* overwritten = null_ptr)
     {
-        return m_translator.translate_row_index(m_table, ndx);
+        return m_translator.translate_row_index(m_table, ndx, overwritten);
     }
 
     bool set_int(size_t col_ndx, size_t row_ndx, int_fast64_t value)
     {
-        row_ndx = translate_row(row_ndx);
+        bool overwritten;
+        row_ndx = translate_row(row_ndx, &overwritten);
+        if (overwritten)
+            return true;
         if (TIGHTDB_LIKELY(check_set_cell(col_ndx, row_ndx))) {
 #ifdef TIGHTDB_DEBUG
             if (m_log)
@@ -173,7 +176,10 @@ public:
 
     bool set_bool(size_t col_ndx, size_t row_ndx, bool value)
     {
-        row_ndx = translate_row(row_ndx);
+        bool overwritten;
+        row_ndx = translate_row(row_ndx, &overwritten);
+        if (overwritten)
+            return true;
         if (TIGHTDB_LIKELY(check_set_cell(col_ndx, row_ndx))) {
 #ifdef TIGHTDB_DEBUG
             if (m_log)
@@ -187,7 +193,10 @@ public:
 
     bool set_float(size_t col_ndx, size_t row_ndx, float value)
     {
-        row_ndx = translate_row(row_ndx);
+        bool overwritten;
+        row_ndx = translate_row(row_ndx, &overwritten);
+        if (overwritten)
+            return true;
         if (TIGHTDB_LIKELY(check_set_cell(col_ndx, row_ndx))) {
 #ifdef TIGHTDB_DEBUG
             if (m_log)
@@ -201,7 +210,10 @@ public:
 
     bool set_double(size_t col_ndx, size_t row_ndx, double value)
     {
-        row_ndx = translate_row(row_ndx);
+        bool overwritten;
+        row_ndx = translate_row(row_ndx, &overwritten);
+        if (overwritten)
+            return true;
         if (TIGHTDB_LIKELY(check_set_cell(col_ndx, row_ndx))) {
 #ifdef TIGHTDB_DEBUG
             if (m_log)
@@ -215,7 +227,10 @@ public:
 
     bool set_string(size_t col_ndx, size_t row_ndx, StringData value)
     {
-        row_ndx = translate_row(row_ndx);
+        bool overwritten;
+        row_ndx = translate_row(row_ndx, &overwritten);
+        if (overwritten)
+            return true;
         if (TIGHTDB_LIKELY(check_set_cell(col_ndx, row_ndx))) {
 #ifdef TIGHTDB_DEBUG
             if (m_log)
@@ -229,7 +244,10 @@ public:
 
     bool set_binary(size_t col_ndx, size_t row_ndx, BinaryData value)
     {
-        row_ndx = translate_row(row_ndx);
+        bool overwritten;
+        row_ndx = translate_row(row_ndx, &overwritten);
+        if (overwritten)
+            return true;
         if (TIGHTDB_LIKELY(check_set_cell(col_ndx, row_ndx))) {
 #ifdef TIGHTDB_DEBUG
             if (m_log)
@@ -243,7 +261,10 @@ public:
 
     bool set_date_time(size_t col_ndx, size_t row_ndx, DateTime value)
     {
-        row_ndx = translate_row(row_ndx);
+        bool overwritten;
+        row_ndx = translate_row(row_ndx, &overwritten);
+        if (overwritten)
+            return true;
         if (TIGHTDB_LIKELY(check_set_cell(col_ndx, row_ndx))) {
 #ifdef TIGHTDB_DEBUG
             if (m_log)
@@ -257,7 +278,10 @@ public:
 
     bool set_table(size_t col_ndx, size_t row_ndx)
     {
-        row_ndx = translate_row(row_ndx);
+        bool overwritten;
+        row_ndx = translate_row(row_ndx, &overwritten);
+        if (overwritten)
+            return true;
         if (TIGHTDB_LIKELY(check_set_cell(col_ndx, row_ndx))) {
 #ifdef TIGHTDB_DEBUG
             if (m_log)
@@ -271,7 +295,10 @@ public:
 
     bool set_mixed(size_t col_ndx, size_t row_ndx, const Mixed& value)
     {
-        row_ndx = translate_row(row_ndx);
+        bool overwritten;
+        row_ndx = translate_row(row_ndx, &overwritten);
+        if (overwritten)
+            return true;
         if (TIGHTDB_LIKELY(check_set_cell(col_ndx, row_ndx))) {
 #ifdef TIGHTDB_DEBUG
             if (m_log)
@@ -285,7 +312,10 @@ public:
 
     bool set_link(size_t col_ndx, size_t row_ndx, std::size_t value)
     {
-        row_ndx = translate_row(row_ndx);
+        bool overwritten;
+        row_ndx = translate_row(row_ndx, &overwritten);
+        if (overwritten)
+            return true;
         if (TIGHTDB_LIKELY(check_set_cell(col_ndx, row_ndx))) {
 #ifdef TIGHTDB_DEBUG
             if (m_log) {

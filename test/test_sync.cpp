@@ -13,6 +13,8 @@
 
 #include "test.hpp"
 
+#include <unistd.h> // usleep
+
 using namespace std;
 using namespace tightdb;
 using namespace tightdb::util;
@@ -50,8 +52,9 @@ using unit_test::TestResults;
 // check-testcase` (or one of its friends) from the command line.
 
 static void
-sync_commits(SharedGroup& from_group, SharedGroup& to_group, uint64_t timestamp)
+sync_commits(SharedGroup& from_group, SharedGroup& to_group)
 {
+    
     typedef SharedGroup::version_type version_type;
 
     Replication* from_r = from_group.get_replication();
@@ -59,6 +62,8 @@ sync_commits(SharedGroup& from_group, SharedGroup& to_group, uint64_t timestamp)
 
     version_type v0 = to_r->get_last_peer_version(1);
     version_type v1 = from_group.get_current_version();
+    uint_fast64_t peer_id = 1;
+    std::cout << "\nSYNC: " << &from_group << " -> " << &to_group << " (v0 = " << v0 << ", v1 = " << v1 << ")\n";
     if (v1 <= v0)
         return; // Already in sync
 
@@ -70,16 +75,34 @@ sync_commits(SharedGroup& from_group, SharedGroup& to_group, uint64_t timestamp)
             continue;
         version_type commit_version = v0 + i + 1;
         to_r->apply_foreign_changeset(to_group,
-            from_r->get_last_peer_version(1),
+            entries[i].peer_version,
             entries[i].log_data,
-            timestamp,
-            1,
+            entries[i].timestamp,
+            peer_id,
             commit_version);
     }
 }
 
+void bump_timestamp()
+{
+    usleep(1);
+}
 
-TEST(Sync_MergeWrites)
+void dump_ints(ConstTableRef tr)
+{
+    std::cout << "[";
+    for (size_t i = 0; i < tr->size();) {
+        std::cout << tr->get_int(0, i);
+        ++i;
+        if (i != tr->size()) {
+            std::cout << ", ";
+        }
+    }
+    std::cout << "]\n";
+}
+
+
+ONLY(Sync_MergeWrites)
 {
     typedef SharedGroup::version_type version_type;
 
@@ -102,7 +125,7 @@ TEST(Sync_MergeWrites)
         tr.commit();
     }
 
-    sync_commits(a, b, 0);
+    sync_commits(a, b);
 
     // Check that we have the same basic structure.
     {
@@ -121,17 +144,17 @@ TEST(Sync_MergeWrites)
         tr.commit();
     }
 
-    sync_commits(b, a, 1);
+    sync_commits(b, a);
 
     // Check that a received the updates from b
     {
         ReadTransaction tr(a);
         ConstTableRef t0 = tr.get_table("t0");
-        CHECK_EQUAL(t0->get_int(0, 0), 456);
+        CHECK_EQUAL(456, t0->get_int(0, 0));
     }
 
     // NOW LET'S GENERATE SOME CONFLICTS!
-
+    std::cout << "\n=> CONFLICT 1:";
     {
         WriteTransaction tr(a);
         TableRef t0 = tr.get_table("t0");
@@ -139,7 +162,7 @@ TEST(Sync_MergeWrites)
         t0->set_int(0, 0, 999);
         tr.commit();
     }
-
+    bump_timestamp();
     {
         WriteTransaction tr(b);
         TableRef t0 = tr.get_table("t0");
@@ -148,21 +171,61 @@ TEST(Sync_MergeWrites)
         tr.commit();
     }
 
-    sync_commits(a, b, 3);
-    sync_commits(b, a, 4);
+    sync_commits(a, b);
+    sync_commits(b, a);
 
-    // Because a's commits "came first", we expect row 0 in a to have 333 from b.
+    // Because a's commits "came first", we expect row 0 in a to have 999 from a.
     {
         ReadTransaction tr(a);
         ConstTableRef t0 = tr.get_table("t0");
-        CHECK_EQUAL(t0->get_int(0, 0), 333);
+        dump_ints(t0);
+        CHECK_EQUAL(999, t0->get_int(0, 0));
+        CHECK_EQUAL(333, t0->get_int(0, 1));
 
         ReadTransaction tr2(b);
         ConstTableRef t1 = tr2.get_table("t0");
-        CHECK_EQUAL(t1->get_int(0, 0), 333); // fails here if merge doesn't work
+        dump_ints(t1);
+        CHECK_EQUAL(999, t1->get_int(0, 0)); // fails here if merge doesn't work
+        CHECK_EQUAL(333, t1->get_int(0, 1));
+    }
+
+    std::cout << "\n=> CONFLICT 2:";
+    {
+        WriteTransaction tr(a);
+        TableRef t0 = tr.get_table("t0");
+        t0->insert_empty_row(0);
+        t0->set_int(0, 0, 999);
+        tr.commit();
+    }
+    bump_timestamp();
+    {
+        WriteTransaction tr(b);
+        TableRef t0 = tr.get_table("t0");
+        t0->insert_empty_row(0);
+        t0->set_int(0, 0, 333);
+        tr.commit();
+    }
+
+    sync_commits(b, a);
+    sync_commits(a, b);
+
+    // Because a's commits "came first", we expect row 0 in a to have 999 from a.
+    {
+        ReadTransaction tr(a);
+        ConstTableRef t0 = tr.get_table("t0");
+        dump_ints(t0);
+        CHECK_EQUAL(999, t0->get_int(0, 0));
+        CHECK_EQUAL(333, t0->get_int(0, 1));
+
+        ReadTransaction tr2(b);
+        ConstTableRef t1 = tr2.get_table("t0");
+        dump_ints(t1);
+        CHECK_EQUAL(999, t1->get_int(0, 0)); // fails here if merge doesn't work
+        CHECK_EQUAL(333, t1->get_int(0, 1));
     }
 
     // Now let's try the same, but with commits arriving out of order:
+
     {
         WriteTransaction tr(a);
         TableRef t0 = tr.get_table("t0");
@@ -170,7 +233,7 @@ TEST(Sync_MergeWrites)
         t0->set_int(0, 0, 888);
         tr.commit();
     }
-
+    bump_timestamp();
     {
         WriteTransaction tr(b);
         TableRef t0 = tr.get_table("t0");
@@ -178,9 +241,10 @@ TEST(Sync_MergeWrites)
         t0->set_int(0, 0, 444);
         tr.commit();
     }
+    
 
-    sync_commits(a, b, 7);
-    sync_commits(b, a, 6);
+    sync_commits(a, b);
+    sync_commits(b, a);
 
     // Because b's commits "came before" a's, we expect row 0 to have 888 from a.
     {
@@ -191,5 +255,61 @@ TEST(Sync_MergeWrites)
         ReadTransaction tr2(b);
         ConstTableRef t1 = tr2.get_table("t0");
         CHECK_EQUAL(t1->get_int(0, 0), 888);
+    }
+
+    // Conflicting set operations:
+    {
+        WriteTransaction tr(a);
+        TableRef t0 = tr.get_table("t0");
+        t0->set_int(0, 0, 999);
+        tr.commit();
+    }
+    bump_timestamp();
+    {
+        WriteTransaction tr(b);
+        TableRef t0 = tr.get_table("t0");
+        t0->set_int(0, 0, 1001);
+        tr.commit();
+    }
+
+    sync_commits(a, b);
+    sync_commits(b, a);
+
+    {
+        ReadTransaction tr(a);
+        ConstTableRef t0 = tr.get_table("t0");
+        CHECK_EQUAL(t0->get_int(0, 0), 1001);
+
+        ReadTransaction tr2(b);
+        ConstTableRef t1 = tr2.get_table("t0");
+        CHECK_EQUAL(t1->get_int(0, 0), 1001);
+    }
+
+    // Conflicting set operations out of order:
+    {
+        WriteTransaction tr(b);
+        TableRef t0 = tr.get_table("t0");
+        t0->set_int(0, 0, 1001);
+        tr.commit();
+    }
+    bump_timestamp();
+    {
+        WriteTransaction tr(a);
+        TableRef t0 = tr.get_table("t0");
+        t0->set_int(0, 0, 999);
+        tr.commit();
+    }
+
+    sync_commits(a, b);
+    sync_commits(b, a);
+
+    {
+        ReadTransaction tr(a);
+        ConstTableRef t0 = tr.get_table("t0");
+        CHECK_EQUAL(t0->get_int(0, 0), 999);
+
+        ReadTransaction tr2(b);
+        ConstTableRef t1 = tr2.get_table("t0");
+        CHECK_EQUAL(t1->get_int(0, 0), 999);
     }
 }
