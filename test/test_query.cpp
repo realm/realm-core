@@ -5684,14 +5684,16 @@ TEST(Query_NullStrings)
 
     q = table.column<StringData>(0) != null();
     v = q.find_all();
-//    CHECK_EQUAL(2, v.size());
-//    CHECK_EQUAL(1, v.get_source_ndx(0));
+    CHECK_EQUAL(2, v.size());
+    CHECK_EQUAL(0, v.get_source_ndx(0));
+    CHECK_EQUAL(2, v.get_source_ndx(1));
 
-    // nulls is never a search result unless you compare with null itself
+    // contrary to SQL, comparisons with null can be true in Realm (todo, discuss if we want this behaviour)
     q = table.column<StringData>(0) != StringData("Albertslund");
     v = q.find_all();
-//    CHECK_EQUAL(1, v.size());
-    CHECK_EQUAL(2, v.get_source_ndx(0));
+    CHECK_EQUAL(2, v.size());
+    CHECK_EQUAL(1, v.get_source_ndx(0));
+    CHECK_EQUAL(2, v.get_source_ndx(1));
 
     q = table.column<StringData>(0) == "";
     v = q.find_all();
@@ -5700,6 +5702,9 @@ TEST(Query_NullStrings)
 
     // Medium strings (16+)
     table.set_string(0, 0, "AlbertslundAlbertslundAlbert");
+
+    bool in = table.get_string(0, 1).is_null();
+
     q = table.column<StringData>(0) == null();
     v = q.find_all();
     CHECK_EQUAL(1, v.size());

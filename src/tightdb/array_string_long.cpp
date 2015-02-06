@@ -124,19 +124,15 @@ size_t ArrayStringLong::count(StringData value, size_t begin,
 size_t ArrayStringLong::find_first(StringData value, size_t begin,
                                    size_t end) const TIGHTDB_NOEXCEPT
 {
-    size_t n = m_offsets.size();
+    size_t n = size();
     if (end == npos)
         end = n;
     TIGHTDB_ASSERT(begin <= n && end <= n && begin <= end);
 
-    size_t begin_2 = 0 < begin ? to_size_t(m_offsets.get(begin-1)) : 0;
     for (size_t i = begin; i < end; ++i) {
-        size_t end_2 = to_size_t(m_offsets.get(i));
-        size_t end_3 = end_2 - 1; // Discount terminating zero
-        StringData value_2 = StringData(m_blob.get(begin_2), end_3-begin_2);
-        if (value_2 == value && is_null(i) == value.is_null())
+        StringData value_2 = get(i);
+        if (value_2 == value)
             return i;
-        begin_2 = end_2;
     }
 
     return not_found;

@@ -244,9 +244,13 @@ inline StringIndex::key_type StringIndex::create_key(StringData str) TIGHTDB_NOE
 // as empty strings.
 inline StringIndex::key_type StringIndex::create_key(StringData str, size_t offset, bool nullable) TIGHTDB_NOEXCEPT
 {
-//    TIGHTDB_ASSERT_RELEASE(offset == 0 || (offset + 1) % 4 == 0);
+    // 'bool trailingzeroes' fixes an old bug (from before null was introduced) in the string index where it could
+    // crash if strings ended with a 0. Such strings are now X-terminated too, even if the column is not nullable. 
+    // Zero terminated strings storedbefore this Realm version can no longer be found with find() in this current Realm
+    // version (will return not_found), but that's better than a crash.
+    bool trailingzeros = str.size() > 0 && *(str.data() + str.size() - 1) == 0;
 
-    if (nullable) {
+    if (nullable || trailingzeros) {
         if (str.is_null())
             return 0;
 

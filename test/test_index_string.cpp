@@ -1,6 +1,7 @@
 #include "testsettings.hpp"
 #ifdef TEST_INDEX_STRING
 
+#include <tightdb.hpp>
 #include <tightdb/index_string.hpp>
 #include <set>
 #include "test.hpp"
@@ -745,6 +746,31 @@ TEST(StringIndex_Null)
     CHECK_EQUAL(r1, 1);
 
     col.destroy();
+}
+
+
+TEST(StringIndex_Zero_Crash)
+{
+    // StringIndex could crash if strings ended with one or more 0-bytes
+    Table table;
+    table.add_column(type_String, "");
+    table.add_empty_row(3);
+
+    table.set_string(0, 0, StringData("", 0));
+    table.set_string(0, 1, StringData("\0", 1));
+    table.set_string(0, 2, StringData("\0\0", 2));
+    table.add_search_index(0);
+
+    size_t t;
+
+    t = table.find_first_string(0, StringData("", 0));
+    CHECK_EQUAL(0, t);
+
+    t = table.find_first_string(0, StringData("\0", 1));
+    CHECK_EQUAL(1, t);
+
+    t = table.find_first_string(0, StringData("\0\0", 2));
+    CHECK_EQUAL(2, t);
 }
 
 #endif // TEST_INDEX_STRING
