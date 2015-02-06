@@ -236,4 +236,38 @@ ONLY(Sync_MergeWrites)
     CHECK_EQUAL(21112, get(a, 6));
     sync_commits(a, b);
     CHECK_EQUAL(12221, get(b, 0));
+
+    // Insert-then-set at different indices, mixed order:
+    insert(a, 0, 23332);
+    insert(b, 1, 34443);
+    set(a, 0, 45554);
+    set(b, 1, 56665);
+    sync_commits(a, b);
+    CHECK_EQUAL(45554, get(b, 0));
+    CHECK_EQUAL(56665, get(b, 2));
+    sync_commits(b, a);
+    CHECK_EQUAL(45554, get(a, 0));
+    CHECK_EQUAL(56665, get(a, 2));
+
+    // Many set, different times:
+    set(a, 4, 123);
+    set(a, 4, 234);
+    set(b, 4, 345);
+    set(a, 4, 456);
+    set(a, 4, 567);
+    sync_commits(a, b);
+    sync_commits(b, a);
+    CHECK_EQUAL(567, get(a, 4));
+    CHECK_EQUAL(567, get(b, 4));
+
+    // Many set, different times, other order:
+    set(a, 4, 123);
+    set(a, 4, 234);
+    set(b, 4, 345);
+    set(a, 4, 456);
+    set(a, 4, 567);
+    sync_commits(b, a);
+    sync_commits(a, b);
+    CHECK_EQUAL(567, get(a, 4));
+    CHECK_EQUAL(567, get(b, 4));
 }
