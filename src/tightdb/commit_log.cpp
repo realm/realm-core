@@ -762,8 +762,9 @@ void WriteLogCollector::get_commit_entries_internal(version_type from_version, v
 class WriteLogCollector::MergingIndexTranslator : public Replication::IndexTranslatorBase {
 public:
     MergingIndexTranslator(WriteLogCollector& log, Group& group, uint_fast64_t timestamp, uint_fast64_t peer_id, version_type base_version, version_type current_version):
-        m_log(log), m_group(group), m_timestamp(timestamp), m_peer_id(peer_id), m_base_version(base_version), m_current_version(current_version), m_was_set(false)
+        m_log(log), m_group(group), m_timestamp(timestamp), /*m_peer_id(peer_id),*/ m_base_version(base_version), m_current_version(current_version), m_was_set(false)
     {
+        static_cast<void>(peer_id); // FIXME: Unused for now.
     }
 
     size_t translate_row_index(TableRef table, size_t row_ndx, bool* overwritten) TIGHTDB_OVERRIDE
@@ -836,18 +837,25 @@ public:
         }
     }
 
-    bool insert_group_level_table(std::size_t table_ndx, std::size_t num_tables,
-                                  StringData name) { return true; }
-    bool erase_group_level_table(std::size_t table_ndx, std::size_t num_tables) { return true; }
-    bool rename_group_level_table(std::size_t table_ndx, StringData new_name) { return true; }
+    bool insert_group_level_table(std::size_t, std::size_t, StringData) { return true; }
+    bool erase_group_level_table(std::size_t, std::size_t) { return true; }
+    bool rename_group_level_table(std::size_t, StringData) { return true; }
     bool select_table(std::size_t group_level_ndx, int levels, const std::size_t* path)
     {
         //std::cout << "SELECT TABLE\n";
+        static_cast<void>(levels); // FIXME: Descend.
+        static_cast<void>(path);
         m_table = m_group.get_table(group_level_ndx); // Throws
         return true;
     }
-    bool insert_empty_rows(std::size_t row_ndx, std::size_t num_rows, std::size_t tbl_sz, bool unordered) { insertions(row_ndx, num_rows); return true; }
-    bool erase_rows(std::size_t row_ndx, std::size_t num_rows, std::size_t tbl_sz, bool unordered) { return true; }
+    bool insert_empty_rows(std::size_t row_ndx, std::size_t num_rows, std::size_t, bool) { insertions(row_ndx, num_rows); return true; }
+    bool erase_rows(std::size_t row_ndx, std::size_t num_rows, std::size_t, bool)
+    {
+        // FIXME: Handle deletes
+        static_cast<void>(row_ndx);
+        static_cast<void>(num_rows);
+        return true;
+    }
     bool clear_table() { return true; }
     bool insert_int(std::size_t, std::size_t row_ndx, std::size_t, int_fast64_t) { insertions(row_ndx, 1); return true; }
     bool insert_bool(std::size_t, std::size_t row_ndx, std::size_t, bool) { insertions(row_ndx, 1); return true; }
@@ -871,31 +879,35 @@ public:
     bool set_table(std::size_t, std::size_t row_ndx) { update(row_ndx); return true; }
     bool set_mixed(std::size_t, std::size_t row_ndx, const Mixed&) { update(row_ndx); return true; }
     bool set_link(std::size_t, std::size_t row_ndx, std::size_t) { update(row_ndx); return true; }
-    bool add_int_to_column(std::size_t, int_fast64_t value) { return true; }
+    bool add_int_to_column(std::size_t, int_fast64_t) { return true; }
     bool optimize_table() { return true; }
-    bool select_descriptor(int levels, const std::size_t* path) { return true; }
-    bool insert_link_column(std::size_t, DataType, StringData name,
-                            std::size_t link_target_table_ndx, std::size_t backlink_col_ndx) { return true; }
-    bool insert_column(std::size_t, DataType, StringData name) { return true; }
-    bool erase_link_column(std::size_t, std::size_t link_target_table_ndx,
-                           std::size_t backlink_col_ndx) { return true; }
+    bool select_descriptor(int levels, const std::size_t* path)
+    {
+        // FIXME: Probably do something?
+        static_cast<void>(levels);
+        static_cast<void>(path);
+        return true;
+    }
+    bool insert_link_column(std::size_t, DataType, StringData, std::size_t, std::size_t) { return true; }
+    bool insert_column(std::size_t, DataType, StringData) { return true; }
+    bool erase_link_column(std::size_t, std::size_t, std::size_t) { return true; }
     bool erase_column(std::size_t) { return true; }
-    bool rename_column(std::size_t, StringData new_name) { return true; }
+    bool rename_column(std::size_t, StringData) { return true; }
     bool add_search_index(std::size_t) { return true; }
     bool add_primary_key(std::size_t) { return true; }
     bool remove_primary_key() { return true; }
     bool set_link_type(std::size_t, LinkType) { return true; }
-    bool select_link_list(std::size_t, std::size_t row_ndx) { return true; }
-    bool link_list_set(std::size_t link_ndx, std::size_t value) { return true; }
-    bool link_list_insert(std::size_t link_ndx, std::size_t value) { return true; }
-    bool link_list_move(std::size_t old_link_ndx, std::size_t new_link_ndx) { return true; }
-    bool link_list_erase(std::size_t link_ndx) { return true; }
+    bool select_link_list(std::size_t, std::size_t) { return true; }
+    bool link_list_set(std::size_t, std::size_t) { return true; }
+    bool link_list_insert(std::size_t, std::size_t) { return true; }
+    bool link_list_move(std::size_t, std::size_t) { return true; }
+    bool link_list_erase(std::size_t) { return true; }
     bool link_list_clear() { return true; }
 private:
     WriteLogCollector& m_log;
     Group& m_group;
     uint64_t m_timestamp;
-    uint64_t m_peer_id;
+    //uint64_t m_peer_id; // FIXME: Unused for now.
     uint64_t m_base_version;
     uint64_t m_current_version;
 
