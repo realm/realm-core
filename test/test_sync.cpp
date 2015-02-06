@@ -15,7 +15,6 @@
 
 #include <unistd.h> // usleep
 
-using namespace std;
 using namespace tightdb;
 using namespace tightdb::util;
 using namespace tightdb::test_util;
@@ -64,7 +63,7 @@ sync_commits(SharedGroup& from_group, SharedGroup& to_group)
     version_type v0 = to_r->get_last_peer_version(1);
     version_type v1 = from_group.get_current_version();
     uint_fast64_t peer_id = 1;
-    std::cout << "\nSYNC: " << &from_group << " -> " << &to_group << " (v0 = " << v0 << ", v1 = " << v1 << ")\n";
+    //std::cout << "\nSYNC: " << &from_group << " -> " << &to_group << " (v0 = " << v0 << ", v1 = " << v1 << ")\n";
     if (v1 <= v0)
         return; // Already in sync
 
@@ -87,18 +86,54 @@ sync_commits(SharedGroup& from_group, SharedGroup& to_group)
     }
 }
 
+static const char TABLE_NAME[] = "t0";
+
+void create_table(SharedGroup& group)
+{
+    WriteTransaction tr(group);
+    TableRef t = tr.add_table(TABLE_NAME);
+    t->add_column(type_Int, "c0");
+    tr.commit();
+}
+
+void insert(SharedGroup& group, size_t row_ndx, int64_t value)
+{
+    WriteTransaction tr(group);
+    TableRef t = tr.get_table(TABLE_NAME);
+    t->insert_empty_row(row_ndx);
+    t->set_int(0, row_ndx, value);
+    tr.commit();
+}
+
+void set(SharedGroup& group, size_t row_ndx, int64_t value)
+{
+    WriteTransaction tr(group);
+    TableRef t = tr.get_table(TABLE_NAME);
+    t->set_int(0, row_ndx, value);
+    tr.commit();
+}
+
+int64_t get(SharedGroup& group, size_t row_ndx)
+{
+    ReadTransaction tr(group);
+    ConstTableRef t = tr.get_table(TABLE_NAME);
+    return t->get_int(0, row_ndx);
+}
+
 void bump_timestamp()
 {
     usleep(1);
 }
 
-void dump_ints(ConstTableRef tr)
+void dump_values(SharedGroup& group)
 {
+    ReadTransaction tr(group);
+    ConstTableRef t = tr.get_table(TABLE_NAME);
     std::cout << "[";
-    for (size_t i = 0; i < tr->size();) {
-        std::cout << tr->get_int(0, i);
+    for (size_t i = 0; i < t->size();) {
+        std::cout << t->get_int(0, i);
         ++i;
-        if (i != tr->size()) {
+        if (i != t->size()) {
             std::cout << ", ";
         }
     }
@@ -120,200 +155,85 @@ ONLY(Sync_MergeWrites)
     SharedGroup b(*rb);
 
     // First, create some entries in ra.
-    {
-        WriteTransaction tr(a);
-        TableRef t0 = tr.add_table("t0");
-        t0->add_column(type_Int, "c0");
-        t0->add_empty_row();
-        t0->set_int(0, 0, 123);
-        tr.commit();
-    }
-
+    create_table(a);
+    insert(a, 0, 123);
     sync_commits(a, b);
 
     // Check that we have the same basic structure.
-    {
-        ReadTransaction tr(b);
-        ConstTableRef t0 = tr.get_table("t0");
-        CHECK(t0);
-        CHECK_EQUAL(t0->get_int(0, 0), 123);
-    }
+    CHECK_EQUAL(123, get(b, 0));
 
     // Insert some things on b
-    {
-        WriteTransaction tr(b);
-        TableRef t0 = tr.get_table("t0");
-        t0->insert_empty_row(0);
-        t0->set_int(0, 0, 456);
-        tr.commit();
-    }
-
+    insert(b, 0, 456);
     sync_commits(b, a);
 
     // Check that a received the updates from b
-    {
-        ReadTransaction tr(a);
-        ConstTableRef t0 = tr.get_table("t0");
-        CHECK_EQUAL(456, t0->get_int(0, 0));
-    }
+    CHECK_EQUAL(456, get(a, 0));
 
     // NOW LET'S GENERATE SOME CONFLICTS!
-    std::cout << "\n=> CONFLICT 1:";
-    {
-        WriteTransaction tr(a);
-        TableRef t0 = tr.get_table("t0");
-        t0->insert_empty_row(0);
-        t0->set_int(0, 0, 999);
-        tr.commit();
-    }
+    insert(a, 0, 999);
     bump_timestamp();
-    {
-        WriteTransaction tr(b);
-        TableRef t0 = tr.get_table("t0");
-        t0->insert_empty_row(0);
-        t0->set_int(0, 0, 333);
-        tr.commit();
-    }
-
+    insert(b, 0, 333);
     sync_commits(a, b);
     sync_commits(b, a);
 
     // Because a's commits "came first", we expect row 0 in a to have 999 from a.
-    {
-        ReadTransaction tr(a);
-        ConstTableRef t0 = tr.get_table("t0");
-        dump_ints(t0);
-        CHECK_EQUAL(999, t0->get_int(0, 0));
-        CHECK_EQUAL(333, t0->get_int(0, 1));
+    CHECK_EQUAL(999, get(a, 0));
+    CHECK_EQUAL(333, get(a, 1));
+    CHECK_EQUAL(999, get(b, 0)); // fails here if merge doesn't work
+    CHECK_EQUAL(333, get(b, 1));
 
-        ReadTransaction tr2(b);
-        ConstTableRef t1 = tr2.get_table("t0");
-        dump_ints(t1);
-        CHECK_EQUAL(999, t1->get_int(0, 0)); // fails here if merge doesn't work
-        CHECK_EQUAL(333, t1->get_int(0, 1));
-    }
-
-    std::cout << "\n=> CONFLICT 2:";
-    {
-        WriteTransaction tr(a);
-        TableRef t0 = tr.get_table("t0");
-        t0->insert_empty_row(0);
-        t0->set_int(0, 0, 999);
-        tr.commit();
-    }
+    insert(a, 0, 999);
     bump_timestamp();
-    {
-        WriteTransaction tr(b);
-        TableRef t0 = tr.get_table("t0");
-        t0->insert_empty_row(0);
-        t0->set_int(0, 0, 333);
-        tr.commit();
-    }
-
+    insert(b, 0, 333);
     sync_commits(b, a);
     sync_commits(a, b);
-
     // Because a's commits "came first", we expect row 0 in a to have 999 from a.
-    {
-        ReadTransaction tr(a);
-        ConstTableRef t0 = tr.get_table("t0");
-        dump_ints(t0);
-        CHECK_EQUAL(999, t0->get_int(0, 0));
-        CHECK_EQUAL(333, t0->get_int(0, 1));
-
-        ReadTransaction tr2(b);
-        ConstTableRef t1 = tr2.get_table("t0");
-        dump_ints(t1);
-        CHECK_EQUAL(999, t1->get_int(0, 0)); // fails here if merge doesn't work
-        CHECK_EQUAL(333, t1->get_int(0, 1));
-    }
+    CHECK_EQUAL(999, get(a, 0));
+    CHECK_EQUAL(333, get(a, 1));
+    CHECK_EQUAL(999, get(b, 0));
+    CHECK_EQUAL(333, get(b, 1));
 
     // Now let's try the same, but with commits arriving out of order:
-
-    {
-        WriteTransaction tr(a);
-        TableRef t0 = tr.get_table("t0");
-        t0->insert_empty_row(0);
-        t0->set_int(0, 0, 888);
-        tr.commit();
-    }
+    insert(a, 0, 888);
     bump_timestamp();
-    {
-        WriteTransaction tr(b);
-        TableRef t0 = tr.get_table("t0");
-        t0->insert_empty_row(0);
-        t0->set_int(0, 0, 444);
-        tr.commit();
-    }
-    
-
+    insert(b, 0, 444);
     sync_commits(a, b);
     sync_commits(b, a);
-
     // Because b's commits "came before" a's, we expect row 0 to have 888 from a.
-    {
-        ReadTransaction tr(a);
-        ConstTableRef t0 = tr.get_table("t0");
-        CHECK_EQUAL(t0->get_int(0, 0), 888); // fails here if merge doesn't work
-
-        ReadTransaction tr2(b);
-        ConstTableRef t1 = tr2.get_table("t0");
-        CHECK_EQUAL(t1->get_int(0, 0), 888);
-    }
+    CHECK_EQUAL(888, get(a, 0)); // fails here if merge doesn't work
+    CHECK_EQUAL(888, get(b, 0));
 
     // Conflicting set operations:
-    {
-        WriteTransaction tr(a);
-        TableRef t0 = tr.get_table("t0");
-        t0->set_int(0, 0, 999);
-        tr.commit();
-    }
+    set(a, 0, 999);
     bump_timestamp();
-    {
-        WriteTransaction tr(b);
-        TableRef t0 = tr.get_table("t0");
-        t0->set_int(0, 0, 1001);
-        tr.commit();
-    }
-
+    set(b, 0, 1001);
     sync_commits(a, b);
     sync_commits(b, a);
-
-    {
-        ReadTransaction tr(a);
-        ConstTableRef t0 = tr.get_table("t0");
-        CHECK_EQUAL(t0->get_int(0, 0), 1001);
-
-        ReadTransaction tr2(b);
-        ConstTableRef t1 = tr2.get_table("t0");
-        CHECK_EQUAL(t1->get_int(0, 0), 1001);
-    }
+    CHECK_EQUAL(1001, get(a, 0));
+    CHECK_EQUAL(1001, get(b, 0));
 
     // Conflicting set operations out of order:
-    {
-        WriteTransaction tr(b);
-        TableRef t0 = tr.get_table("t0");
-        t0->set_int(0, 0, 1001);
-        tr.commit();
-    }
+    set(b, 0, 1002);
     bump_timestamp();
-    {
-        WriteTransaction tr(a);
-        TableRef t0 = tr.get_table("t0");
-        t0->set_int(0, 0, 999);
-        tr.commit();
-    }
-
+    set(a, 0, 1111);
     sync_commits(a, b);
     sync_commits(b, a);
+    CHECK_EQUAL(1111, get(a, 0));
+    CHECK_EQUAL(1111, get(b, 0));
 
-    {
-        ReadTransaction tr(a);
-        ConstTableRef t0 = tr.get_table("t0");
-        CHECK_EQUAL(t0->get_int(0, 0), 999);
+    // Insert at different indices:
+    insert(a, 0, 12221);
+    insert(b, 5, 21112);
+    sync_commits(a, b);
+    CHECK_EQUAL(12221, get(b, 0));
+    sync_commits(b, a);
+    CHECK_EQUAL(21112, get(a, 6));
 
-        ReadTransaction tr2(b);
-        ConstTableRef t1 = tr2.get_table("t0");
-        CHECK_EQUAL(t1->get_int(0, 0), 999);
-    }
+    // Insert at different indices, out of order:
+    insert(a, 0, 12221);
+    insert(b, 5, 21112);
+    sync_commits(b, a);
+    CHECK_EQUAL(21112, get(a, 6));
+    sync_commits(a, b);
+    CHECK_EQUAL(12221, get(b, 0));
 }
