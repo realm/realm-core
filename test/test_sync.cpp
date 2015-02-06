@@ -141,7 +141,7 @@ void dump_values(SharedGroup& group)
 }
 
 
-ONLY(Sync_MergeWrites)
+TEST(Sync_MergeWrites)
 {
     typedef SharedGroup::version_type version_type;
 

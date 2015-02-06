@@ -242,7 +242,7 @@ protected:
     // Get the current preamble for reading only - use get_preamble_for_write()
     // if you are going to change stuff in the preamble, and remember to call
     // sync_header() to commit those changes.
-    const CommitLogPreamble* get_preamble() const;
+    CommitLogPreamble* get_preamble();
 
     // Creates in-mapped-memory copy of the active preamble and returns a
     // pointer to it.  Allows you to do in-place updates of the preamble, then
@@ -323,8 +323,9 @@ void recover_from_dead_owner()
 
 // Header access and manipulation methods:
 
-inline const WriteLogCollector::CommitLogPreamble* WriteLogCollector::get_preamble() const
+inline WriteLogCollector::CommitLogPreamble* WriteLogCollector::get_preamble()
 {
+    map_header_if_needed();
     CommitLogHeader* header = m_header.get_addr();
     if (header->use_preamble_a)
         return & header->preamble_a;
@@ -932,7 +933,8 @@ WriteLogCollector::apply_foreign_changeset(SharedGroup& sg, version_type last_ve
 Replication::version_type
 WriteLogCollector::get_last_peer_version(uint_fast64_t) const
 {
-    const CommitLogPreamble* preamble = get_preamble();
+    // FIXME: Remove this fucking const cast.
+    CommitLogPreamble* preamble = const_cast<WriteLogCollector*>(this)->get_preamble();
     return preamble->last_server_version;
 }
 
