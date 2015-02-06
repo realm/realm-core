@@ -774,13 +774,13 @@ public:
         m_result_ndx = row_ndx;
         std::vector<Replication::CommitLogEntry> entries(m_current_version - m_base_version);
         m_log.get_commit_entries(m_base_version, m_current_version, entries.data());
-        std::cout << "Translating row index v" << m_base_version << " -> v" << m_current_version << "\n";
+        //std::cout << "Translating row index v" << m_base_version << " -> v" << m_current_version << "\n";
 
         for (size_t i = 0; i < entries.size(); ++i) {
             CommitLogEntry& entry = entries[i];
             if (entry.peer_id != 0)
                 continue;
-            std::cout << "Modifying against local commit at t = " << entry.timestamp << "\n";
+            //std::cout << "Modifying against local commit at t = " << entry.timestamp << "\n";
             if (entry.timestamp < m_timestamp) { // FIXME Compare peer_id too.
                 SimpleInputStream input(entry.log_data.data(), entry.log_data.size());
                 TransactLogParser parser(input);
@@ -799,13 +799,13 @@ public:
             for (size_t i = 0; i < entries.size(); ++i) {
                 CommitLogEntry& entry = entries[i];
                 if (entry.timestamp > m_timestamp) {
-                    std::cout << "Checking for overwrite: " << entry.timestamp << " > " << m_timestamp << "\n";
+                    //std::cout << "Checking for overwrite: " << entry.timestamp << " > " << m_timestamp << "\n";
                     m_was_set = false;
                     SimpleInputStream input(entry.log_data.data(), entry.log_data.size());
                     TransactLogParser parser(input);
                     parser.parse(*this);
                     if (m_was_set) {
-                        std::cout << "SET at " << row_ndx << " was overwritten.\n";
+                        //std::cout << "SET at " << row_ndx << " was overwritten.\n";
                         *overwritten = true;
                         break;
                     }
@@ -814,23 +814,23 @@ public:
         }
 
         if (result != row_ndx) {
-            std::cout << "BUMPED " << row_ndx << " TO " << m_result_ndx << "\n";
+            //std::cout << "BUMPED " << row_ndx << " TO " << m_result_ndx << "\n";
         }
 
         return result;
     }
 
     void insertions(size_t row_ndx, size_t num) {
-        std::cout << "Saw insert(" << row_ndx << ", " << num << ")\n";
+        //std::cout << "Saw insert(" << row_ndx << ", " << num << ")\n";
         if (m_table == m_translate_table && row_ndx <= m_result_ndx) {
             m_result_ndx += num;
         }
     }
 
     void update(size_t row_ndx) {
-        std::cout << "Saw set(" << row_ndx << ")\n";
+        //std::cout << "Saw set(" << row_ndx << ")\n";
         if (m_table == m_translate_table && row_ndx == m_result_ndx) {
-            std::cout << "MATCH\n";
+            //std::cout << "MATCH\n";
             m_was_set = true;
         }
     }
@@ -841,7 +841,7 @@ public:
     bool rename_group_level_table(std::size_t table_ndx, StringData new_name) { return true; }
     bool select_table(std::size_t group_level_ndx, int levels, const std::size_t* path)
     {
-        std::cout << "SELECT TABLE\n";
+        //std::cout << "SELECT TABLE\n";
         m_table = m_group.get_table(group_level_ndx); // Throws
         return true;
     }
