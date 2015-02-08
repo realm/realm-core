@@ -1,21 +1,35 @@
 import random
 
-current_timestamp = 0
-
-def next_timestamp():
-    global current_timestamp
-    current_timestamp = current_timestamp + 1
-    return current_timestamp
-
 
 def create(peer_id):
-    return { 'peer_id': peer_id, 'version': 0, 'list': [], 'history': [] }
+    return {
+        'peer_id': peer_id,  # Uniqueness is critical
+        'version': 0,
+        'list': [],
+        'history': [],
+        'current_time': 0, # System realtime clock (not necessarily monotone)
+        'latest_local_time_seen': 0, # Protects against local nonmonotony (must be persisted)
+        'latest_remote_time_seen': 0 # Protects against nonlocal temporal inconsistency (must be persisted)
+    }
+
+# Note: latest_local_time_seen and latest_remote_time_seen could be combined
+# into one thing, but not without increasing the risk of time acceleration,
+# which if occuring over a long time, will have unfortunate effects on perceived
+# temporal realism.
 
 
 def add_changeset(_self, changeset, timestamp, remote_version, remote_peer_id):
+    assert((timestamp == None) == (remote_version == None))
     assert((remote_version == None) == (remote_peer_id == None))
     new_version = _self['version'] + 1
     _self['version'] = new_version
+    if timestamp == None:
+        timestamp = _self['current_time']
+        if timestamp <= _self['latest_remote_time_seen']:
+            timestamp = _self['latest_remote_time_seen'] + 1
+        if timestamp < _self['latest_local_time_seen']:
+            timestamp = _self['latest_local_time_seen']
+        _self['latest_local_time_seen'] = timestamp
     for operation in changeset:
         name  = operation['name']
         index = operation['index']
@@ -54,6 +68,9 @@ def add_remote_changeset(_self, remote):
             break
         next_remote_version_to_integrate = next_remote_version_to_integrate + 1
 
+    if _self['latest_remote_time_seen'] < remote_entry['timestamp']:
+        _self['latest_remote_time_seen'] = remote_entry['timestamp']
+
     # Find the last local version already integrated into the next remote
     # version to be integrated
     last_local_version_integrated = 0
@@ -90,15 +107,14 @@ def add_remote_changeset(_self, remote):
     # entry is instead the last one that satisfies `begin <= i && (begin < i ||
     # timestamp <= ts && (timestamp < ts || peer_id <= pid))` where `ts` and
     # `pid` are the timestamp and the peer identifier of the incoming insertion
-    # operation respectively. Note that the process of locating the right map
-    # entry **is** the process that resolves conflicts.
+    # operation respectively. Note that the map is layed out precisely such that
+    # the process of locating the right map entry **is** the process that
+    # resolves conflicts.
     last_local_version = _self['version']
     map = []
     for version in range(last_local_version_integrated+1, last_local_version+1):
         entry = _self['history'][version-1]
         for operation in entry['changeset']:
-            if operation['name'] != 'insert':
-                continue
             index = operation['index']
             i = 0
             while i < len(map):
@@ -106,18 +122,21 @@ def add_remote_changeset(_self, remote):
                 if index < begin + diff:
                     break
                 i = i + 1
-            num = 1 # Number of inserted list elements
-            if entry['remote_peer_id'] != remote['peer_id']:
-                for j in range(i, len(map)):
-                    map[j][1] = map[j][1] + num
-                diff = map[i-1][1] if i > 0 else 0
-                peer_id = entry['remote_peer_id']
-                if peer_id == None:
-                    peer_id = _self['peer_id']
-                map.insert(i, [index-diff, diff+num, entry['timestamp'], peer_id])
+            num = 1 # Number of overwritten/inserted list elements
+            if operation['name'] == 'set':
+                pass
             else:
-                for j in range(i, len(map)):
-                    map[j][0] = map[j][0] + num
+                if entry['remote_peer_id'] != remote['peer_id']:
+                    for j in range(i, len(map)):
+                        map[j][1] = map[j][1] + num
+                    diff = map[i-1][1] if i > 0 else 0
+                    peer_id = entry['remote_peer_id']
+                    if peer_id == None:
+                        peer_id = _self['peer_id']
+                    map.insert(i, [index-diff, diff+num, entry['timestamp'], peer_id])
+                else:
+                    for j in range(i, len(map)):
+                        map[j][0] = map[j][0] + num
 
     # Use the new map to transform the incoming operations, updating it as
     # necessary along the way.
@@ -159,19 +178,17 @@ def add_remote_changeset(_self, remote):
                   remote_entry['version'], remote['peer_id'])
 
 
-def set(_self, index, value, reuse_prev_timestamp = False):
+def set(_self, index, value):
     if index < 0 or index >= len(_self['list']):
         raise Exception("Index out of range")
     changeset = [ { 'name': 'set', 'index': index, 'value': value } ]
-    timestamp = next_timestamp() if not reuse_prev_timestamp else current_timestamp
-    add_changeset(_self, changeset, timestamp, None, None)
+    add_changeset(_self, changeset, None, None, None)
 
-def insert(_self, index, value, reuse_prev_timestamp = False):
+def insert(_self, index, value):
     if index < 0 or index > len(_self['list']):
         raise Exception("Index out of range")
     changeset = [ { 'name': 'insert', 'index': index, 'value': value } ]
-    timestamp = next_timestamp() if not reuse_prev_timestamp else current_timestamp
-    add_changeset(_self, changeset, timestamp, None, None)
+    add_changeset(_self, changeset, None, None, None)
 
 
 def count_outstanding_remote_changesets(_self, remote):
@@ -194,6 +211,14 @@ def count_outstanding_remote_changesets(_self, remote):
     return n
 
 
+def set_time(_self, time):
+    _self['current_time'] = time
+
+def advance_time(_self, time):
+    _self['current_time'] = _self['current_time'] + time
+
+
+
 
 # Example that sorts a foreign insert in the middle of a sequence of consecutive
 # inserts due to timing
@@ -201,12 +226,17 @@ def count_outstanding_remote_changesets(_self, remote):
 server = create(peer_id=0)
 client = create(peer_id=1)
 
+set_time(server, 0)
 insert(server, index=0, value=100)
+set_time(server, 1)
 insert(server, index=1, value=101)
 
+set_time(client, 2)
 insert(client, index=0, value=200)
 
+set_time(server, 3)
 insert(server, index=2, value=102)
+set_time(server, 4)
 insert(server, index=3, value=103)
 
 add_remote_changeset(server, client)
@@ -227,12 +257,17 @@ print "Client:", client['list']
 server = create(peer_id=0)
 client = create(peer_id=1)
 
+set_time(server, 0)
 insert(server, index=0, value=100)
+set_time(server, 1)
 insert(server, index=0, value=101)
 
+set_time(client, 2)
 insert(client, index=0, value=200)
 
+set_time(server, 3)
 insert(server, index=0, value=102)
+set_time(server, 4)
 insert(server, index=0, value=103)
 
 add_remote_changeset(server, client)
@@ -255,10 +290,14 @@ client_A = create(peer_id=1)
 client_B = create(peer_id=2)
 client_C = create(peer_id=3)
 
+set_time(client_A, 0)
 insert(client_A, index=0, value=100)
+set_time(client_B, 1)
 insert(client_B, index=0, value=200)
 
+set_time(client_A, 2)
 insert(client_A, index=1, value=101)
+set_time(client_B, 3)
 insert(client_B, index=1, value=201)
 
 add_remote_changeset(server, client_A)
@@ -266,6 +305,7 @@ add_remote_changeset(server, client_A)
 add_remote_changeset(client_B, server)
 add_remote_changeset(client_C, server)
 
+set_time(client_C, 4)
 insert(client_C, index=0, value=300)
 
 add_remote_changeset(server, client_A)
@@ -278,6 +318,7 @@ add_remote_changeset(server, client_C)
 add_remote_changeset(client_A, server)
 add_remote_changeset(client_B, server)
 
+set_time(client_A, 5)
 insert(client_A, index=3, value=102)
 add_remote_changeset(server, client_A)
 add_remote_changeset(client_B, server)
@@ -298,10 +339,9 @@ print "Client-B:", client_B['list']
 print "Client-C:", client_C['list']
 
 
-for _ in range(10000):
-    print "*"
-    num_clients = 3
+num_clients = 5
 
+for _ in range(10000000):
     server  = create(peer_id=0)
     clients = [create(peer_id=1+i) for i in range(0, num_clients)]
 
@@ -312,25 +352,33 @@ for _ in range(10000):
         return current_value
 
     num_remain_set_operations    = 0
-    num_remain_insert_operations = 256
+    num_remain_insert_operations = 7
 
     def do_set(client):
         global num_remain_set_operations
         num_remain_set_operations = num_remain_set_operations - 1
         index = random.randint(0, len(client['list'])-1)
         value = next_value()
-        reuse_prev_timestamp = random.choice([ False, True ])
-        set(client, index, value, reuse_prev_timestamp)
+#        print "set(clients[%s], %s, %s)  {time=%s}" % (client['peer_id'], index, value, client['current_time'])
+        set(client, index, value)
 
     def do_insert(client):
         global num_remain_insert_operations
         num_remain_insert_operations = num_remain_insert_operations - 1
         index = random.randint(0, len(client['list']))
         value = next_value()
-        reuse_prev_timestamp = random.choice([ False, True ])
-        insert(client, index, value, reuse_prev_timestamp)
+#        print "insert(clients[%s], %s, %s)  {time=%s}" % (client['peer_id'], index, value, client['current_time'])
+        insert(client, index, value)
 
-    def add_actions(actions, client):
+    def do_download(client):
+#        print "add_remote_changeset(clients[%s], server)" % (client['peer_id'])
+        add_remote_changeset(client, server)
+
+    def do_upload(client):
+#        print "add_remote_changeset(server, clients[%s])" % (client['peer_id'])
+        add_remote_changeset(server, client)
+
+    def add_client_actions(actions, client):
         if num_remain_set_operations > 0:
             actions.append({
                 'name':   'set[%s]' % (client['peer_id']),
@@ -344,20 +392,23 @@ for _ in range(10000):
                 'exec':   (lambda: do_insert(client))
             })
         actions.append({
-            'name':   'upload[%s]' % (client['peer_id']),
+            'name':   'download[%s]' % (client['peer_id']),
             'weight': count_outstanding_remote_changesets(client, server),
-            'exec':   (lambda: add_remote_changeset(client, server))
+            'exec':   (lambda: do_download(client))
         })
         actions.append({
-            'name':   'download[%s]' % (client['peer_id']),
+            'name':   'upload[%s]' % (client['peer_id']),
             'weight': count_outstanding_remote_changesets(server, client),
-            'exec':   (lambda: add_remote_changeset(server, client))
+            'exec':   (lambda: do_upload(client))
         })
 
     while True:
+        for client in clients:
+            if random.randint(0,4) == 0:
+                advance_time(client, 1)
         actions = []
         for client in clients:
-            add_actions(actions, client)
+            add_client_actions(actions, client)
         total_weight = 0
         for action in actions:
             total_weight = total_weight + action['weight']
@@ -385,4 +436,7 @@ for _ in range(10000):
         print "Server:   ", server['list']
         for client in clients:
             print "Client[%d]:" % (client['peer_id']), client['list']
+        print "Server:   ", server['history']
+        for client in clients:
+            print "Client[%d]:" % (client['peer_id']), client['history']
         break
