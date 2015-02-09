@@ -105,8 +105,8 @@ class peer:
                 break
             next_remote_version_to_integrate = next_remote_version_to_integrate + 1
 
-#        if self._latest_remote_time_seen < remote_entry['timestamp']:
-#            self._latest_remote_time_seen = remote_entry['timestamp']
+        if self._latest_remote_time_seen < remote_entry['timestamp']:
+            self._latest_remote_time_seen = remote_entry['timestamp']
 
         # Find the last local version already integrated into the next remote
         # version to be integrated
@@ -374,12 +374,14 @@ def test_threeway_with_server():
 
 # Randomized testing
 def test_randomized():
-    num_clients = 3
+    print('Running randomized tests. This may take a while (half a minute).')
 
-    for _ in range(100000):
-        seed = random.randint(0, 1000000000)
-        seed = 277992091
-        random.seed(seed)
+    num_clients = 5
+
+    for _ in range(10000):
+#        seed = random.randint(0, 1000000000)
+#        seed = 277992091
+#        random.seed(seed)
 
         server  = peer(id=0)
         clients = [peer(id=1+i) for i in range(0, num_clients)]
@@ -391,14 +393,14 @@ def test_randomized():
             return current_value
 
         num_remain_set_operations    = 0
-        num_remain_insert_operations = 3
+        num_remain_insert_operations = 7
 
         def do_set(client):
             nonlocal num_remain_set_operations
             num_remain_set_operations = num_remain_set_operations - 1
             index = random.randint(0, len(client.list)-1)
             value = next_value()
-            print('clients[%s].set(%s, %s)' % (client.get_peer_id(), index, value))
+#            print('clients[%s].set(%s, %s)' % (client.get_peer_id(), index, value))
             client.set(index, value)
 
         def do_insert(client):
@@ -406,15 +408,15 @@ def test_randomized():
             num_remain_insert_operations = num_remain_insert_operations - 1
             index = random.randint(0, len(client.list))
             value = next_value()
-            print('clients[%s].insert(%s, %s)' % (client.get_peer_id(), index, value))
+#            print('clients[%s].insert(%s, %s)' % (client.get_peer_id(), index, value))
             client.insert(index, value)
 
         def do_download(client):
-            print('clients[%s].add_remote_changeset_from(server)' % (client.get_peer_id()))
+#            print('clients[%s].add_remote_changeset_from(server)' % (client.get_peer_id()))
             client.add_remote_changeset_from(server)
 
         def do_upload(client):
-            print('server.add_remote_changeset(clients[%s])' % (client.get_peer_id()))
+#            print('server.add_remote_changeset(clients[%s])' % (client.get_peer_id()))
             server.add_remote_changeset_from(client)
 
         def add_client_actions(actions, client):
@@ -444,7 +446,7 @@ def test_randomized():
         while True:
             for client in clients:
                 if random.randint(0,4) == 0:
-                    print('clients[%s].advance_time(1)' % (client.get_peer_id()))
+#                    print('clients[%s].advance_time(1)' % (client.get_peer_id()))
                     client.advance_time(1)
             actions = []
             for client in clients:
@@ -464,9 +466,9 @@ def test_randomized():
                     break
                 i = i - weight
             assert found
-            print('Server:   ', server.list)
-            for client in clients:
-                print('Client[%d]:' % (client.get_peer_id()), client.list)
+#            print('Server:   ', server.list)
+#            for client in clients:
+#                print('Client[%d]:' % (client.get_peer_id()), client.list)
 
         error = False
         for client in clients:
@@ -476,7 +478,7 @@ def test_randomized():
 
         if error:
             print('------------------ ERROR ------------------')
-            print('seed = ', seed)
+#            print('seed = ', seed)
             print('Server:   ', server.list)
             for client in clients:
                 print('Client[%d]:' % (client.get_peer_id()), client.list)
