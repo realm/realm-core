@@ -140,8 +140,21 @@ void dump_values(SharedGroup& group)
     std::cout << "]\n";
 }
 
+void check_equality(TestResults& test_results, SharedGroup& a, SharedGroup& b)
+{
+    ReadTransaction tr_a(a);
+    ReadTransaction tr_b(b);
+    ConstTableRef ta = tr_a.get_table(TABLE_NAME);
+    ConstTableRef tb = tr_b.get_table(TABLE_NAME);
+    CHECK_EQUAL(ta->size(), tb->size());
+    size_t len = ta->size();
+    for (size_t i = 0; i < len; ++i) {
+        CHECK_EQUAL(ta->get_int(0, i), tb->get_int(0, i));
+    }
+}
 
-TEST(Sync_MergeWrites)
+
+ONLY(Sync_MergeWrites)
 {
     typedef SharedGroup::version_type version_type;
 
@@ -167,7 +180,7 @@ TEST(Sync_MergeWrites)
     sync_commits(b, a);
 
     // Check that a received the updates from b
-    CHECK_EQUAL(456, get(a, 0));
+    check_equality(test_results, a, b);
 
     // NOW LET'S GENERATE SOME CONFLICTS!
     insert(a, 0, 999);
@@ -181,6 +194,7 @@ TEST(Sync_MergeWrites)
     CHECK_EQUAL(333, get(a, 1));
     CHECK_EQUAL(999, get(b, 0)); // fails here if merge doesn't work
     CHECK_EQUAL(333, get(b, 1));
+    check_equality(test_results, a, b);
 
     insert(a, 0, 999);
     bump_timestamp();
@@ -192,6 +206,7 @@ TEST(Sync_MergeWrites)
     CHECK_EQUAL(333, get(a, 1));
     CHECK_EQUAL(999, get(b, 0));
     CHECK_EQUAL(333, get(b, 1));
+    check_equality(test_results, a, b);
 
     // Now let's try the same, but with commits arriving out of order:
     insert(a, 0, 888);
@@ -202,6 +217,7 @@ TEST(Sync_MergeWrites)
     // Because b's commits "came before" a's, we expect row 0 to have 888 from a.
     CHECK_EQUAL(888, get(a, 0)); // fails here if merge doesn't work
     CHECK_EQUAL(888, get(b, 0));
+    check_equality(test_results, a, b);
 
     // Conflicting set operations:
     set(a, 0, 999);
@@ -211,6 +227,7 @@ TEST(Sync_MergeWrites)
     sync_commits(b, a);
     CHECK_EQUAL(1001, get(a, 0));
     CHECK_EQUAL(1001, get(b, 0));
+    check_equality(test_results, a, b);
 
     // Conflicting set operations out of order:
     set(b, 0, 1002);
@@ -220,6 +237,7 @@ TEST(Sync_MergeWrites)
     sync_commits(b, a);
     CHECK_EQUAL(1111, get(a, 0));
     CHECK_EQUAL(1111, get(b, 0));
+    check_equality(test_results, a, b);
 
     // Insert at different indices:
     insert(a, 0, 12221);
@@ -228,6 +246,7 @@ TEST(Sync_MergeWrites)
     CHECK_EQUAL(12221, get(b, 0));
     sync_commits(b, a);
     CHECK_EQUAL(21112, get(a, 6));
+    check_equality(test_results, a, b);
 
     // Insert at different indices, out of order:
     insert(a, 0, 12221);
@@ -236,6 +255,7 @@ TEST(Sync_MergeWrites)
     CHECK_EQUAL(21112, get(a, 6));
     sync_commits(a, b);
     CHECK_EQUAL(12221, get(b, 0));
+    check_equality(test_results, a, b);
 
     // Insert-then-set at different indices, mixed order:
     insert(a, 0, 23332);
@@ -248,6 +268,7 @@ TEST(Sync_MergeWrites)
     sync_commits(b, a);
     CHECK_EQUAL(45554, get(a, 0));
     CHECK_EQUAL(56665, get(a, 2));
+    check_equality(test_results, a, b);
 
     // Many set, different times:
     set(a, 4, 123);
@@ -259,6 +280,7 @@ TEST(Sync_MergeWrites)
     sync_commits(b, a);
     CHECK_EQUAL(567, get(a, 4));
     CHECK_EQUAL(567, get(b, 4));
+    check_equality(test_results, a, b);
 
     // Many set, different times, other order:
     set(a, 4, 123);
@@ -270,4 +292,14 @@ TEST(Sync_MergeWrites)
     sync_commits(a, b);
     CHECK_EQUAL(567, get(a, 4));
     CHECK_EQUAL(567, get(b, 4));
+    check_equality(test_results, a, b);
+
+    // Insert on both ends
+    insert(a, 1, 0xaa);
+    insert(b, 0, 0xcc);
+    insert(b, 1, 0xdd);
+    sync_commits(b, a);
+    sync_commits(a, b);
+    check_equality(test_results, a, b);
+
 }
