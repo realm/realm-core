@@ -219,7 +219,6 @@ protected:
     };
 
     class MergingIndexTranslator;
-    friend class MergingIndexTranslator;
 
     string m_database_name;
     string m_header_name;
@@ -761,8 +760,10 @@ void WriteLogCollector::get_commit_entries_internal(version_type from_version, v
 
 class WriteLogCollector::MergingIndexTranslator : public Replication::IndexTranslatorBase {
 public:
-    MergingIndexTranslator(WriteLogCollector& log, Group& group, uint_fast64_t timestamp, uint_fast64_t peer_id, version_type base_version, version_type current_version):
-        m_log(log), m_group(group), m_timestamp(timestamp), /*m_peer_id(peer_id),*/ m_base_version(base_version), m_current_version(current_version), m_was_set(false)
+    MergingIndexTranslator(WriteLogCollector& log, Group& group, uint_fast64_t timestamp,
+        uint_fast64_t peer_id, version_type base_version, version_type current_version):
+    m_log(log), m_group(group), m_timestamp(timestamp), /*m_peer_id(peer_id),*/
+    m_base_version(base_version), m_current_version(current_version), m_was_set(false)
     {
         static_cast<void>(peer_id); // FIXME: Unused for now.
     }
@@ -936,8 +937,11 @@ WriteLogCollector::apply_foreign_changeset(SharedGroup& sg, version_type last_ve
     if (TIGHTDB_UNLIKELY(last_version_integrated_by_peer > current_version))
         throw LogicError(LogicError::bad_version_number);
     SimpleInputStream input(changeset.data(), changeset.size());
-    MergingIndexTranslator translator(*this, group, timestamp, peer_id, last_version_integrated_by_peer, current_version);
+    MergingIndexTranslator translator(*this, group, timestamp, peer_id,
+        last_version_integrated_by_peer, current_version);
     apply_transact_log(input, transact.get_group(), translator, apply_log); // Throws
+
+    // FIXME: internal_submit_log should get the transformed changeset!
     internal_submit_log(changeset.data(), changeset.size(), timestamp, peer_id, peer_version); // Throws
     return transact.commit(); // Throws
 }

@@ -69,7 +69,7 @@ sync_commits(SharedGroup& from_group, SharedGroup& to_group)
 
     // Get the relevant commits:
     std::vector<Replication::CommitLogEntry> entries(v1 - v0);
-    from_r->get_commit_entries(v0, v1, entries.data());
+    from_r->get_commit_entries(v0, v1, &*entries.begin());
     TIGHTDB_ASSERT(from_group.get_current_version() == v0 + entries.size());
 
     // Send all local commits to the remote end:
@@ -86,12 +86,12 @@ sync_commits(SharedGroup& from_group, SharedGroup& to_group)
     }
 }
 
-static const char TABLE_NAME[] = "t0";
+static const char g_table_name[] = "t0";
 
 void create_table(SharedGroup& group)
 {
     WriteTransaction tr(group);
-    TableRef t = tr.add_table(TABLE_NAME);
+    TableRef t = tr.add_table(g_table_name);
     t->add_column(type_Int, "c0");
     tr.commit();
 }
@@ -99,7 +99,7 @@ void create_table(SharedGroup& group)
 void insert(SharedGroup& group, size_t row_ndx, int64_t value)
 {
     WriteTransaction tr(group);
-    TableRef t = tr.get_table(TABLE_NAME);
+    TableRef t = tr.get_table(g_table_name);
     t->insert_empty_row(row_ndx);
     t->set_int(0, row_ndx, value);
     tr.commit();
@@ -108,7 +108,7 @@ void insert(SharedGroup& group, size_t row_ndx, int64_t value)
 void set(SharedGroup& group, size_t row_ndx, int64_t value)
 {
     WriteTransaction tr(group);
-    TableRef t = tr.get_table(TABLE_NAME);
+    TableRef t = tr.get_table(g_table_name);
     t->set_int(0, row_ndx, value);
     tr.commit();
 }
@@ -116,7 +116,7 @@ void set(SharedGroup& group, size_t row_ndx, int64_t value)
 int64_t get(SharedGroup& group, size_t row_ndx)
 {
     ReadTransaction tr(group);
-    ConstTableRef t = tr.get_table(TABLE_NAME);
+    ConstTableRef t = tr.get_table(g_table_name);
     return t->get_int(0, row_ndx);
 }
 
@@ -128,7 +128,7 @@ void bump_timestamp()
 void dump_values(SharedGroup& group)
 {
     ReadTransaction tr(group);
-    ConstTableRef t = tr.get_table(TABLE_NAME);
+    ConstTableRef t = tr.get_table(g_table_name);
     std::cout << "[";
     for (size_t i = 0; i < t->size();) {
         std::cout << t->get_int(0, i);
@@ -144,8 +144,8 @@ void check_equality(TestResults& test_results, SharedGroup& a, SharedGroup& b)
 {
     ReadTransaction tr_a(a);
     ReadTransaction tr_b(b);
-    ConstTableRef ta = tr_a.get_table(TABLE_NAME);
-    ConstTableRef tb = tr_b.get_table(TABLE_NAME);
+    ConstTableRef ta = tr_a.get_table(g_table_name);
+    ConstTableRef tb = tr_b.get_table(g_table_name);
     CHECK_EQUAL(ta->size(), tb->size());
     size_t len = ta->size();
     for (size_t i = 0; i < len; ++i) {
