@@ -653,7 +653,7 @@ void Table::do_insert_column(Descriptor& desc, size_t col_ndx, DataType type,
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     if (Replication* repl = root_table.get_repl())
-        repl->insert_column(desc, col_ndx, type, name, link_target_table); // Throws
+        repl->insert_column(desc, col_ndx, type, name, link_target_table, nullable); // Throws
 #endif
 }
 
@@ -1189,6 +1189,9 @@ ColumnBase* Table::create_column_accessor(ColumnType col_type, size_t col_ndx, s
     Allocator& alloc = m_columns.get_alloc();
 
     bool nullable = m_spec.get_column_attr(col_ndx) & col_attr_Nullable;
+
+    TIGHTDB_ASSERT(!(nullable && (col_type != col_type_String && 
+                                  col_type != col_type_StringEnum)));
 
     switch (col_type) {
         case col_type_Int:
@@ -2423,16 +2426,19 @@ StringData Table::get_string(size_t col_ndx, size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(col_ndx < m_columns.size());
     TIGHTDB_ASSERT(ndx < m_size);
-
+    StringData sd;
     ColumnType type = get_real_column_type(col_ndx);
     if (type == col_type_String) {
         const AdaptiveStringColumn& column = get_column_string(col_ndx);
-        return column.get(ndx);
+        sd = column.get(ndx);
     }
-
-    TIGHTDB_ASSERT(type == col_type_StringEnum);
-    const ColumnStringEnum& column = get_column_string_enum(col_ndx);
-    return column.get(ndx);
+    else {
+        TIGHTDB_ASSERT(type == col_type_StringEnum);
+        const ColumnStringEnum& column = get_column_string_enum(col_ndx);
+        sd = column.get(ndx);
+    }
+    TIGHTDB_ASSERT(!(!(m_spec.get_column_attr(col_ndx) & col_attr_Nullable) && sd.is_null()));
+    return sd;
 }
 
 void Table::set_string(size_t col_ndx, size_t ndx, StringData value)
@@ -2450,11 +2456,9 @@ void Table::set_string(size_t col_ndx, size_t ndx, StringData value)
     if (TIGHTDB_UNLIKELY(col_ndx >= m_cols.size()))
         throw LogicError(LogicError::column_index_out_of_range);
 
+    TIGHTDB_ASSERT(!(!(m_spec.get_column_attr(col_ndx) & col_attr_Nullable) && value.is_null()));
+    
     bump_version();
-
-    if (value.size() == 0)
-        volatile int i = 123;
-
     ColumnBase& col = get_column_base(col_ndx);
     col.set_string(ndx, value); // Throws
 
@@ -2470,6 +2474,7 @@ void Table::insert_string(size_t col_ndx, size_t ndx, StringData value)
         throw LogicError(LogicError::string_too_big);
     TIGHTDB_ASSERT(col_ndx < get_column_count());
     TIGHTDB_ASSERT(ndx <= m_size);
+    TIGHTDB_ASSERT(!(!(m_spec.get_column_attr(col_ndx) & col_attr_Nullable) && value.is_null()));
 
     ColumnType type = get_real_column_type(col_ndx);
     if (type == col_type_String) {

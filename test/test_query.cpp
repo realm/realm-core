@@ -5703,8 +5703,6 @@ TEST(Query_NullStrings)
     // Medium strings (16+)
     table.set_string(0, 0, "AlbertslundAlbertslundAlbert");
 
-    bool in = table.get_string(0, 1).is_null();
-
     q = table.column<StringData>(0) == null();
     v = q.find_all();
     CHECK_EQUAL(1, v.size());

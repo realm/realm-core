@@ -258,8 +258,6 @@ protected:
     // const-violating moving copy constructor.
     mutable Array* m_array;
 
-//    bool m_nullable;
-
     ColumnBase(Array* root = 0) TIGHTDB_NOEXCEPT;
 
     virtual std::size_t do_get_size() const TIGHTDB_NOEXCEPT = 0;

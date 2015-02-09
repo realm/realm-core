@@ -83,7 +83,7 @@ const std::size_t npos = std::size_t(-1);
 
 struct null 
 {
-    operator StringData ()
+    operator StringData()
     {
         return StringData();
     }

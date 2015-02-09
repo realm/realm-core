@@ -148,7 +148,7 @@ inline void ArrayBigBlobs::destroy()
 inline StringData ArrayBigBlobs::get_string(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
     BinaryData bin = get(ndx);
-    if (bin.data() == null_ptr)
+    if (bin.is_null())
         return StringData(null_ptr, 0);
     else
         return StringData(bin.data(), bin.size()-1); // Do not include terminating zero
@@ -179,7 +179,7 @@ inline StringData ArrayBigBlobs::get_string(const char* header, size_t ndx,
                                             Allocator& alloc) TIGHTDB_NOEXCEPT
 {
     BinaryData bin = get(header, ndx, alloc);
-    if (bin.data() == null_ptr)
+    if (bin.is_null())
         return StringData(null_ptr, 0);
     else
         return StringData(bin.data(), bin.size()-1); // Do not include terminating zero

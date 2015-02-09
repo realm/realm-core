@@ -174,7 +174,7 @@ StringData AdaptiveStringColumn::get(size_t ndx) const TIGHTDB_NOEXCEPT
 bool AdaptiveStringColumn::is_null(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
     StringData sd = get(ndx);
-    return sd.data() == null_ptr;
+    return sd.is_null();
 }
 
 void AdaptiveStringColumn::set_null(std::size_t ndx)

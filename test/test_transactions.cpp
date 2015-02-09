@@ -367,7 +367,7 @@ void round(TestResults& test_results, SharedGroup& db, int index)
         }
         int num = 9;
         for (int i=0; i<num; ++i)
-            subsubtable->add(i, BinaryData(""));
+            subsubtable->add(i, BinaryData("", 0));
         subsubtable->column().value += 31;
         wt.commit();
     }
@@ -388,7 +388,7 @@ void round(TestResults& test_results, SharedGroup& db, int index)
         }
         int num = 9;
         for (int i=0; i<num; ++i)
-            subsubtable->add(i, BinaryData(""));
+            subsubtable->add(i, BinaryData("", 0));
         wt.commit();
     }
 }
@@ -482,7 +482,7 @@ TEST(Transactions_General)
         for (size_t i=0; i<table1_theta_size; ++i) {
             CHECK_EQUAL(false,        subtable[i].beta);
             CHECK_EQUAL(0,            subtable[i].delta);
-            CHECK_EQUAL(BinaryData(""), subtable[i].zeta);
+            CHECK_EQUAL(BinaryData("", 0), subtable[i].zeta);
             CHECK_EQUAL(0u,           subtable[i].eta->size());
             if (4 <= i)
                 CHECK_EQUAL(type_Int, subtable[i].theta.get_type());

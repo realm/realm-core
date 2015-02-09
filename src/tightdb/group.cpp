@@ -1403,8 +1403,9 @@ public:
         return true;
     }
 
-    bool insert_column(size_t col_ndx, DataType, StringData)
+    bool insert_column(size_t col_ndx, DataType, StringData, bool nullable)
     {
+        static_cast<void>(nullable);
         if (m_table) {
             typedef _impl::TableFriend tf;
             InsertColumnUpdater updater(col_ndx);
@@ -1907,7 +1908,7 @@ public:
         return true;
     }
 
-    bool insert_column(std::size_t col_idx, DataType, StringData)
+    bool insert_column(std::size_t col_idx, DataType, StringData, bool)
     {
         m_encoder.simple_cmd(Replication::instr_EraseColumn, util::tuple(col_idx));
         append_instruction();

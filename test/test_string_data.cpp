@@ -232,7 +232,7 @@ TEST(StringData_LexicographicCompare)
 
 TEST(StringData_Substrings)
 {
-    StringData sd_0;
+    StringData sd_0("");
     CHECK(sd_0.begins_with(sd_0));
     CHECK(sd_0.begins_with(""));
     CHECK(sd_0.ends_with(sd_0));

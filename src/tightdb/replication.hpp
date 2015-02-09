@@ -197,7 +197,7 @@ public:
     void erase_group_level_table(std::size_t table_ndx, std::size_t num_tables);
     void rename_group_level_table(std::size_t table_ndx, StringData new_name);
     void insert_column(const Descriptor&, std::size_t col_ndx, DataType type, StringData name,
-                       const Table* link_target_table);
+                       const Table* link_target_table, bool nullable);
     void erase_column(const Descriptor&, std::size_t col_ndx);
     void rename_column(const Descriptor&, std::size_t col_ndx, StringData name);
 
@@ -380,7 +380,8 @@ private:
         instr_LinkListMove          = 45, // Move an entry within a link list
         instr_LinkListErase         = 46, // Remove an entry from a link list
         instr_LinkListClear         = 47, // Ramove all entries from a link list
-        instr_LinkListSetAll        = 48  // Assign to link list entry
+        instr_LinkListSetAll        = 48, // Assign to link list entry
+        instr_InsertNullableColumn  = 49  // Insert new nullable column into to selected descriptor
     };
 
     util::Buffer<std::size_t> m_subtab_path_buf;
@@ -556,7 +557,7 @@ private:
     float read_float();
     double read_double();
 
-    // returns false if null-string, else true
+    // return true if non-null, else false 
     bool read_string(util::StringBuffer&);
     void read_mixed(Mixed*);
 
@@ -975,7 +976,7 @@ inline void Replication::rename_group_level_table(std::size_t table_ndx, StringD
 
 
 inline void Replication::insert_column(const Descriptor& desc, std::size_t col_ndx, DataType type,
-                                       StringData name, const Table* link_target_table)
+                                       StringData name, const Table* link_target_table, bool nullable)
 {
     check_desc(desc); // Throws
     typedef _impl::TableFriend tf;
@@ -994,7 +995,8 @@ inline void Replication::insert_column(const Descriptor& desc, std::size_t col_n
         append_num(backlink_col_ndx);
     }
     else {
-        simple_cmd(instr_InsertColumn, util::tuple(col_ndx, int(type), name.size())); // Throws
+        Instruction instruction = nullable ? instr_InsertNullableColumn : instr_InsertColumn;
+        simple_cmd(instruction, util::tuple(col_ndx, int(type), name.size())); // Throws
         transact_log_append(name.data(), name.size()); // Throws
     }
 }
@@ -1398,8 +1400,10 @@ bool Replication::TransactLogParser::do_parse(InstructionHandler& handler)
             case instr_SetString: {
                 std::size_t col_ndx = read_int<std::size_t>(); // Throws
                 std::size_t row_ndx = read_int<std::size_t>(); // Throws
-                read_string(m_string_buffer); // Throws
-                StringData value(m_string_buffer.data(), m_string_buffer.size());
+                bool null = !read_string(m_string_buffer); // Throws
+                // The "" construction ensures a non-null data pointer
+                StringData value(null ? 0 : m_string_buffer.size() == 0 ? "" : m_string_buffer.data(),
+                                 m_string_buffer.size());
                 if (!handler.set_string(col_ndx, row_ndx, value)) // Throws
                     return false;
                 continue;
@@ -1407,8 +1411,10 @@ bool Replication::TransactLogParser::do_parse(InstructionHandler& handler)
             case instr_SetBinary: {
                 std::size_t col_ndx = read_int<std::size_t>(); // Throws
                 std::size_t row_ndx = read_int<std::size_t>(); // Throws
-                read_string(m_string_buffer); // Throws
-                BinaryData value(m_string_buffer.data(), m_string_buffer.size());
+                bool null = !read_string(m_string_buffer); // Throws
+                // The "" construction ensures a non-null data pointer
+                BinaryData value(null ? 0 : m_string_buffer.size() == 0 ? "" : m_string_buffer.data(),
+                    m_string_buffer.size());
                 if (!handler.set_binary(col_ndx, row_ndx, value)) // Throws
                     return false;
                 continue;
@@ -1678,14 +1684,16 @@ bool Replication::TransactLogParser::do_parse(InstructionHandler& handler)
                     return false;
                 continue;
             }
-            case instr_InsertColumn: {
+            case instr_InsertColumn:
+            case instr_InsertNullableColumn: {
                 std::size_t col_ndx = read_int<std::size_t>(); // Throws
                 int type = read_int<int>(); // Throws
                 if (!is_valid_data_type(type))
                     return false;
                 read_string(m_string_buffer); // Throws
                 StringData name(m_string_buffer.data(), m_string_buffer.size());
-                if (!handler.insert_column(col_ndx, DataType(type), name)) // Throws
+                bool nullable = (Instruction(instr) == instr_InsertNullableColumn);
+                if (!handler.insert_column(col_ndx, DataType(type), name, nullable)) // Throws
                     return false;
                 continue;
             }
@@ -1863,8 +1871,9 @@ inline bool Replication::TransactLogParser::read_string(util::StringBuffer& buf)
     buf.clear();
     std::size_t size = read_int<std::size_t>(); // Throws
 
-    if (size == static_cast<size_t>(-1))
+    if (size == static_cast<size_t>(-1)) {
         return false; // null
+    }
 
     buf.resize(size); // Throws
     read_bytes(buf.data(), size);
@@ -1906,8 +1915,10 @@ inline void Replication::TransactLogParser::read_mixed(Mixed* mixed)
             return;
         }
         case type_String: {
-            read_string(m_string_buffer); // Throws
-            StringData value(m_string_buffer.data(), m_string_buffer.size());
+            bool null = !read_string(m_string_buffer); // Throws
+            // The "" construction ensures a non-null data pointer
+            StringData value(null ? 0 : m_string_buffer.size() == 0 ? "" : m_string_buffer.data(), 
+                             m_string_buffer.size());
             mixed->set_string(value);
             return;
         }

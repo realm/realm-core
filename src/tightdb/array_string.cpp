@@ -41,7 +41,7 @@ bool ArrayString::is_null(size_t ndx) const
 {
     TIGHTDB_ASSERT(ndx < m_size);
     StringData sd = get(ndx);
-    return sd.data() == null_ptr;
+    return sd.is_null();
 }
 
 void ArrayString::set_null(size_t ndx)
@@ -127,7 +127,7 @@ void ArrayString::set(size_t ndx, StringData value)
     fill(begin, end, 0); // Pad with zero bytes
     TIGHTDB_STATIC_ASSERT(max_width <= 128, "Padding size must fit in 7-bits");
 //    TIGHTDB_ASSERT(end - begin < max_width);
-    if (value.data() == null_ptr) {
+    if (value.is_null()) {
         *end = m_width;
     }
     else {

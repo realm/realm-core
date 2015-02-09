@@ -16,7 +16,7 @@ void ArrayBigBlobs::add(BinaryData value, bool add_zero_term)
 {
     TIGHTDB_ASSERT(value.size() == 0 || value.data());
 
-    if (value.data() == null_ptr) {
+    if (value.is_null()) {
         Array::add(0); // Throws
     }
     else {
@@ -36,7 +36,7 @@ void ArrayBigBlobs::set(std::size_t ndx, BinaryData value, bool add_zero_term)
     ArrayBlob blob(m_alloc);
     ref_type ref = get_as_ref(ndx);
 
-    if (ref == 0 && value.data() == null_ptr) {
+    if (ref == 0 && value.is_null()) {
         return;
     }
     else if (ref == 0 && value.data() != null_ptr) {
@@ -54,7 +54,7 @@ void ArrayBigBlobs::set(std::size_t ndx, BinaryData value, bool add_zero_term)
         blob.add(value.data(), value.size(), add_zero_term); // Throws
         return;
     }
-    else if (ref != 0 && value.data() == null_ptr) {
+    else if (ref != 0 && value.is_null()) {
         Array::destroy(ref, get_alloc()); // Shallow
         Array::set(ndx, 0);
         return;
@@ -68,7 +68,7 @@ void ArrayBigBlobs::insert(size_t ndx, BinaryData value, bool add_zero_term)
     TIGHTDB_ASSERT(ndx <= size());
     TIGHTDB_ASSERT(value.size() == 0 || value.data());
 
-    if (value.data() == null_ptr) {
+    if (value.is_null()) {
         Array::insert(ndx, 0); // Throws
     }
     else {
@@ -111,7 +111,7 @@ size_t ArrayBigBlobs::find_first(BinaryData value, bool is_string,
     size_t value_size = value.size();
     size_t full_size = is_string ? value_size+1 : value_size;
 
-    if (value.data() == null_ptr) {
+    if (value.is_null()) {
         for (size_t i = begin; i != end; ++i) {
             ref_type ref = get_as_ref(i);
             if (ref == 0)

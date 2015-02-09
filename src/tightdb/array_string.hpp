@@ -142,12 +142,13 @@ inline StringData ArrayString::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < m_size);
     if (m_width == 0)
-        return StringData(m_nullable ? null_ptr : m_data, 0); // we're just using m_data to get any non-0 pointer
+        return m_nullable ? null() : StringData("", 0);
+
     const char* data = m_data + (ndx * m_width);
     std::size_t size = (m_width-1) - data[m_width-1];
 
     if (size == static_cast<size_t>(-1))
-        return StringData(m_nullable ? null_ptr : m_data, 0);
+        return m_nullable ? null() : StringData("");
 
     TIGHTDB_ASSERT(data[size] == 0); // Realm guarantees 0 terminated return strings
     return StringData(data, size);
@@ -155,12 +156,13 @@ inline StringData ArrayString::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 
 inline void ArrayString::add(StringData value)
 {
+    TIGHTDB_ASSERT(!(!m_nullable && value.is_null()));
     insert(m_size, value); // Throws
 }
 
 inline void ArrayString::add()
 {
-    add(StringData()); // Throws
+    add(m_nullable ? null() : StringData("")); // Throws
 }
 
 inline StringData ArrayString::get(const char* header, std::size_t ndx, bool nullable) TIGHTDB_NOEXCEPT
@@ -170,11 +172,12 @@ inline StringData ArrayString::get(const char* header, std::size_t ndx, bool nul
     const char* data = get_data_from_header(header) + (ndx * width);
 
     if (width == 0)
-        return StringData(nullable ? null_ptr : data, 0);
+        return nullable ? null() : StringData("");
+
     std::size_t size = (width-1) - data[width-1];
 
     if (size == static_cast<size_t>(-1))
-        return StringData(nullable ? null_ptr : data, 0); // return null
+        return nullable ? null() : StringData("");
 
     return StringData(data, size);
 }
