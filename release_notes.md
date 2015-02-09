@@ -2,7 +2,7 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
+* Fixed duplicated results when querying on a link column with matches at row 1000+.
 
 ### API breaking changes:
 
