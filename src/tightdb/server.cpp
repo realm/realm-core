@@ -148,7 +148,7 @@ private:
     const string m_listen_port;
     util::network::io_service m_service;
     util::network::acceptor m_acceptor;
-    unsigned short m_assigned_listen_port;
+//    unsigned short m_assigned_listen_port;
     int_fast64_t m_next_conn_id;
     util::UniquePtr<connection> m_next_conn;
     util::network::endpoint m_next_conn_endpoint;
