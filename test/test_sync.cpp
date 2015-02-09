@@ -154,7 +154,7 @@ void check_equality(TestResults& test_results, SharedGroup& a, SharedGroup& b)
 }
 
 
-ONLY(Sync_MergeWrites)
+TEST(Sync_MergeWrites)
 {
     typedef SharedGroup::version_type version_type;
 
