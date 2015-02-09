@@ -8,6 +8,7 @@
 #include <tightdb/descriptor.hpp>
 #include <tightdb/table_macros.hpp>
 #include <tightdb/lang_bind_helper.hpp>
+#include <tightdb/util/encrypted_file_mapping.hpp>
 #ifdef TIGHTDB_ENABLE_REPLICATION
 #  include <tightdb/replication.hpp>
 #  include <tightdb/commit_log.hpp>
@@ -6682,7 +6683,13 @@ TEST(LangBindHelper_ImplicitTransactions_NoExtremeFileSpaceLeaks)
         sg.end_read();
     }
 
-    CHECK_LESS_EQUAL(File(path).get_size(), 8*1024);
+#ifdef TIGHTDB_ENABLE_ENCRYPTION
+    if (crypt_key())
+        // Encrypted files are always at least a 4096 byte header plus an encrypted page
+        CHECK_LESS_EQUAL(File(path).get_size(), page_size() + 4096);
+    else
+#endif // TIGHTDB_ENABLE_ENCRYPTION
+        CHECK_LESS_EQUAL(File(path).get_size(), 8*1024);
 }
 
 

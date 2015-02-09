@@ -20,6 +20,14 @@
 
 ----------------------------------------------
 
+# 0.88.1 Release notes
+
+### Bugfixes:
+
+* Fix encryption on platforms with non-4KB pages.
+
+----------------------------------------------
+
 # 0.88.0 Release notes
 
 ### Enhancements:
