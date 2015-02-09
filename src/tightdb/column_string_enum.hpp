@@ -77,8 +77,10 @@ public:
 
     StringData get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
     void set(std::size_t ndx, StringData value);
-    void add(StringData value = StringData());
-    void insert(std::size_t ndx, StringData value = StringData());
+    void add();
+    void add(StringData value);
+    void insert(std::size_t ndx);
+    void insert(std::size_t ndx, StringData value);
     void erase(std::size_t row_ndx);
     void move_last_over(std::size_t row_ndx);
     void clear();
@@ -177,11 +179,21 @@ inline StringData ColumnStringEnum::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
     return m_keys.get(key_ndx);
 }
 
+inline void ColumnStringEnum::add()
+{
+    add(m_nullable ? null() : StringData(""));
+}
+
 inline void ColumnStringEnum::add(StringData value)
 {
     std::size_t row_ndx = tightdb::npos;
     std::size_t num_rows = 1;
     do_insert(row_ndx, value, num_rows); // Throws
+}
+
+inline void ColumnStringEnum::insert(std::size_t row_ndx)
+{
+    insert(row_ndx, m_nullable ? null() : StringData(""));
 }
 
 inline void ColumnStringEnum::insert(std::size_t row_ndx, StringData value)
@@ -214,7 +226,7 @@ inline void ColumnStringEnum::clear()
 // Overriding virtual method of Column.
 inline void ColumnStringEnum::insert(std::size_t row_ndx, std::size_t num_rows, bool is_append)
 {
-    StringData value = StringData();
+    StringData value = m_nullable ? null() : StringData("");
     do_insert(row_ndx, value, num_rows, is_append); // Throws
 }
 

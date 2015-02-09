@@ -159,7 +159,7 @@ StringData AdaptiveStringColumn::get(size_t ndx) const TIGHTDB_NOEXCEPT
     bool long_strings = Array::get_hasrefs_from_header(leaf_header);
     if (!long_strings) {
         // Small strings
-        return ArrayString::get(leaf_header, ndx_in_leaf);
+        return ArrayString::get(leaf_header, ndx_in_leaf, m_nullable);
     }
     Allocator& alloc = m_array->get_alloc();
     bool is_big = Array::get_context_flag_from_header(leaf_header);
@@ -930,7 +930,7 @@ bool AdaptiveStringColumn::auto_enumerate(ref_type& keys_ref, ref_type& values_r
 {
     Allocator& alloc = m_array->get_alloc();
     ref_type keys_ref_2 = AdaptiveStringColumn::create(alloc); // Throws
-    AdaptiveStringColumn keys(alloc, keys_ref_2); // Throws // FIXME
+    AdaptiveStringColumn keys(alloc, keys_ref_2, m_nullable); // Throws // FIXME
 
     // Generate list of unique values (keys)
     size_t n = size();

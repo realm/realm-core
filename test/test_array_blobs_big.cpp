@@ -36,7 +36,7 @@ using namespace tightdb;
 // check-testcase` (or one of its friends) from the command line.
 
 
-TEST(ArrayBigBlobs_Basic)
+ONLY(ArrayBigBlobs_Basic)
 {
     ArrayBigBlobs c(Allocator::get_default());
     c.create();
@@ -47,6 +47,10 @@ TEST(ArrayBigBlobs_Basic)
 
 
     // TEST(ArrayBigBlobs_MultiEmpty)
+
+    char cc[] = { 1, 2 };
+    BinaryData bd(cc);
+    BinaryData bd2 = BinaryData("");
 
     c.add(BinaryData("", 0));
     c.add(BinaryData("", 0));

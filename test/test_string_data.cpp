@@ -64,8 +64,8 @@ TEST(StringData_Null)
 TEST(StringData_Equal)
 {
     // Test operator==() and operator!=()
-    StringData sd_00_1;
-    StringData sd_00_2;
+    StringData sd_00_1("");
+    StringData sd_00_2("");
     StringData sd_00_3("");
     StringData sd_01_1("x");
     StringData sd_01_2("x");
@@ -167,7 +167,7 @@ TEST(StringData_LexicographicCompare)
     string s_8_22(8, c_22);
     string s_9_11(9, c_11);
     string s_9_22(9, c_22);
-    StringData sd_0;
+    StringData sd_0("");
     StringData sd_8_11(s_8_11);
     StringData sd_8_22(s_8_22);
     StringData sd_9_11(s_9_11);

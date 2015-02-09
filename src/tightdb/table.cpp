@@ -2452,6 +2452,9 @@ void Table::set_string(size_t col_ndx, size_t ndx, StringData value)
 
     bump_version();
 
+    if (value.size() == 0)
+        volatile int i = 123;
+
     ColumnBase& col = get_column_base(col_ndx);
     col.set_string(ndx, value); // Throws
 
@@ -3735,7 +3738,7 @@ void Table::optimize()
             size_t ndx_in_parent = m_spec.get_column_ndx_in_parent(i);
 
             // Replace column
-            ColumnStringEnum* e = new ColumnStringEnum(alloc, ref, keys_ref); // Throws
+            ColumnStringEnum* e = new ColumnStringEnum(alloc, ref, keys_ref, column->m_nullable); // Throws
             e->set_parent(&m_columns, ndx_in_parent);
             e->get_keys().set_parent(keys_parent, keys_ndx_in_parent);
             m_cols[i] = e;
@@ -4572,7 +4575,7 @@ pair<const Array*, const Array*> Table::get_string_column_roots(size_t col_ndx) 
 
 StringData Table::Parent::get_child_name(size_t) const TIGHTDB_NOEXCEPT
 {
-    return StringData();
+    return StringData("");
 }
 
 

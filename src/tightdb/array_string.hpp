@@ -71,7 +71,7 @@ public:
     /// array instance. If an array instance is already available, or
     /// you need to get multiple values, then this method will be
     /// slower.
-    static StringData get(const char* header, std::size_t ndx) TIGHTDB_NOEXCEPT;
+    static StringData get(const char* header, std::size_t ndx, bool nullable) TIGHTDB_NOEXCEPT;
 
     ref_type bptree_leaf_insert(std::size_t ndx, StringData, TreeInsertBase& state);
 
@@ -147,7 +147,7 @@ inline StringData ArrayString::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
     std::size_t size = (m_width-1) - data[m_width-1];
 
     if (size == static_cast<size_t>(-1))
-        return StringData(null_ptr, 0); // return null
+        return StringData(m_nullable ? null_ptr : m_data, 0);
 
     TIGHTDB_ASSERT(data[size] == 0); // Realm guarantees 0 terminated return strings
     return StringData(data, size);
@@ -163,17 +163,18 @@ inline void ArrayString::add()
     add(StringData()); // Throws
 }
 
-inline StringData ArrayString::get(const char* header, std::size_t ndx) TIGHTDB_NOEXCEPT
+inline StringData ArrayString::get(const char* header, std::size_t ndx, bool nullable) TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < get_size_from_header(header));
     std::size_t width = get_width_from_header(header);
-    if (width == 0)
-        return StringData(null_ptr, 0); // return null
     const char* data = get_data_from_header(header) + (ndx * width);
+
+    if (width == 0)
+        return StringData(nullable ? null_ptr : data, 0);
     std::size_t size = (width-1) - data[width-1];
 
     if (size == static_cast<size_t>(-1))
-        return StringData(null_ptr, 0); // return null
+        return StringData(nullable ? null_ptr : data, 0); // return null
 
     return StringData(data, size);
 }

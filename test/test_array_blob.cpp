@@ -131,7 +131,7 @@ TEST(ArrayBlob_Null)
 {
     {
         ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
-        AdaptiveStringColumn a(Allocator::get_default(), ref);
+        AdaptiveStringColumn a(Allocator::get_default(), ref, true);
         a.add("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ");
         a.clear();
 
@@ -157,7 +157,7 @@ TEST(ArrayBlob_Null)
 
     {
         ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
-        AdaptiveStringColumn a(Allocator::get_default(), ref);
+        AdaptiveStringColumn a(Allocator::get_default(), ref, true);
         a.add("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ");
         a.clear();
 
@@ -187,7 +187,7 @@ TEST(ArrayBlob_Null)
 
     {
         ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
-        AdaptiveStringColumn a(Allocator::get_default(), ref);
+        AdaptiveStringColumn a(Allocator::get_default(), ref, true);
         a.add("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ");
         a.clear();
 
@@ -215,7 +215,7 @@ TEST(ArrayBlob_Null)
 
     for (size_t t = 0; t < 2; t++) {
         ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
-        AdaptiveStringColumn a(Allocator::get_default(), ref);
+        AdaptiveStringColumn a(Allocator::get_default(), ref, true);
         a.add("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ");
         a.clear();
 

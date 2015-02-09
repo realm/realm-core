@@ -134,7 +134,7 @@ inline bool BinaryData::is_null() const TIGHTDB_NOEXCEPT
 
 inline bool operator==(const BinaryData& a, const BinaryData& b) TIGHTDB_NOEXCEPT
 {
-    return a.m_size == b.m_size && safe_equal(a.m_data, a.m_data + a.m_size, b.m_data);
+    return a.m_size == b.m_size && a.is_null() == b.is_null() && safe_equal(a.m_data, a.m_data + a.m_size, b.m_data);
 }
 
 inline bool operator!=(const BinaryData& a, const BinaryData& b) TIGHTDB_NOEXCEPT

@@ -662,8 +662,8 @@ TEST(LangBindHelper_AdvanceReadTransact_ColumnRootTypeChange)
         CHECK_EQUAL(str_mix, strings->get_mixed  (2,0));
         CHECK_EQUAL(bin_mix, strings->get_mixed  (3,0));
         if (step.m_num_rows >= 2) {
-            CHECK_EQUAL(StringData(), strings->get_string (0,1));
-            CHECK_EQUAL(BinaryData(), strings->get_binary (1,1));
+            CHECK_EQUAL(StringData(""), strings->get_string (0,1));
+            CHECK_EQUAL(BinaryData(""), strings->get_binary (1,1));
             CHECK_EQUAL(int64_t(),    strings->get_mixed  (2,1));
             CHECK_EQUAL(int64_t(),    strings->get_mixed  (3,1));
         }

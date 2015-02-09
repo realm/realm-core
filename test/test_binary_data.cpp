@@ -44,8 +44,8 @@ using namespace tightdb;
 TEST(BinaryData_Equal)
 {
     // Test operator==() and operator!=()
-    BinaryData bd_00_1;
-    BinaryData bd_00_2;
+    BinaryData bd_00_1("", 0);
+    BinaryData bd_00_2("", 0);
     BinaryData bd_00_3("", 0);
     BinaryData bd_01_1("x", 1);
     BinaryData bd_01_2("x", 1);

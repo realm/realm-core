@@ -60,8 +60,10 @@ public:
     void set_null(std::size_t ndx);
     StringData get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
     void set(std::size_t ndx, StringData);
-    void add(StringData value = StringData());
-    void insert(std::size_t ndx, StringData value = StringData());
+    void add();
+    void add(StringData value);
+    void insert(std::size_t ndx);
+    void insert(std::size_t ndx, StringData value);
     void erase(std::size_t row_ndx);
     void move_last_over(std::size_t row_ndx);
     void clear();
@@ -139,7 +141,10 @@ protected:
 
 private:
     StringIndex* m_search_index;
+
+public:
     bool m_nullable;
+private:
 
     std::size_t do_get_size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return size(); }
 
@@ -221,18 +226,30 @@ inline std::size_t AdaptiveStringColumn::size() const TIGHTDB_NOEXCEPT
 
 inline void AdaptiveStringColumn::add(StringData value)
 {
+    TIGHTDB_ASSERT(!(value.is_null() && !m_nullable));
     std::size_t row_ndx = tightdb::npos;
     std::size_t num_rows = 1;
     do_insert(row_ndx, value, num_rows); // Throws
 }
 
+inline void AdaptiveStringColumn::add()
+{
+    add(m_nullable ? null() : StringData(""));
+}
+
 inline void AdaptiveStringColumn::insert(std::size_t row_ndx, StringData value)
 {
+    TIGHTDB_ASSERT(!(value.is_null() && !m_nullable));
     std::size_t size = this->size();
     TIGHTDB_ASSERT(row_ndx <= size);
     std::size_t num_rows = 1;
     bool is_append = row_ndx == size;
     do_insert(row_ndx, value, num_rows, is_append); // Throws
+}
+
+inline void AdaptiveStringColumn::insert(std::size_t row_ndx)
+{
+    insert(row_ndx, m_nullable ? null() : StringData(""));
 }
 
 inline void AdaptiveStringColumn::erase(std::size_t row_ndx)
@@ -272,6 +289,7 @@ inline int AdaptiveStringColumn::compare_values(std::size_t row1, std::size_t ro
 
 inline void AdaptiveStringColumn::set_string(std::size_t row_ndx, StringData value)
 {
+    TIGHTDB_ASSERT(!(value.is_null() && !m_nullable));
     set(row_ndx, value); // Throws
 }
 
@@ -327,7 +345,7 @@ inline bool AdaptiveStringColumn::is_string_col() const TIGHTDB_NOEXCEPT
 // Implementing pure virtual method of ColumnBase.
 inline void AdaptiveStringColumn::insert(std::size_t row_ndx, std::size_t num_rows, bool is_append)
 {
-    StringData value = StringData();
+    StringData value = m_nullable ? StringData() : StringData("");
     do_insert(row_ndx, value, num_rows, is_append); // Throws
 }
 

@@ -138,7 +138,7 @@ TEST(Replication_General)
         table->insert (0, 1, true, 1.0f, 1.0, "x",   bin, 727, 0, mix);
 
         table->add(3, true, 3.0f, 0.0, "", bin, 729, 0, mix);               // empty string
-        table->add(3, true, 3.0f, 1.0, StringData(), bin, 729, 0, mix);     // null string
+        table->add(3, true, 3.0f, 1.0, StringData(""), bin, 729, 0, mix);     // null string
         wt.commit();
     }
     {
