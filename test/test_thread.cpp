@@ -115,8 +115,6 @@ class QueueMonitor {
 public:
     QueueMonitor(): m_closed(false) 
     {
-        m_nonempty_or_closed.set_condvar(m_nonempty_or_closed_shared);
-        m_nonfull.set_condvar(m_nonfull_shared);
     }
 
     bool get(int& value)
@@ -157,12 +155,7 @@ public:
 
 private:
     Mutex m_mutex;
-#ifdef TIGHTDB_CONDVAR_EMULATION
-    CondVar m_nonempty_or_closed_shared, m_nonfull_shared;
-    CondVarEmulation m_nonempty_or_closed, m_nonfull;
-#else
     CondVar m_nonempty_or_closed, m_nonfull;
-#endif
     queue<int> m_queue;
     bool m_closed;
 

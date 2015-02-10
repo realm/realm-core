@@ -367,13 +367,11 @@ private:
         transact_Writing
     };
     TransactStage m_transact_stage;
-#ifdef TIGHTDB_CONDVAR_EMULATION
 #ifndef _WIN32
-    util::CondVarEmulation m_room_to_write;
-    util::CondVarEmulation m_work_to_do;
-    util::CondVarEmulation m_daemon_becomes_ready;
-    util::CondVarEmulation m_new_commit_available;
-#endif
+    util::CondVar m_room_to_write;
+    util::CondVar m_work_to_do;
+    util::CondVar m_daemon_becomes_ready;
+    util::CondVar m_new_commit_available;
 #endif
 
     // Ring buffer managment
@@ -597,13 +595,21 @@ private:
 // Implementation:
 
 inline SharedGroup::SharedGroup(const std::string& file, bool no_create, DurabilityLevel dlevel, const char* key):
-    m_group(Group::shared_tag())
+    m_group(Group::shared_tag()),
+    m_room_to_write(util::CondVar::process_shared_tag()), // Throws
+    m_work_to_do(util::CondVar::process_shared_tag()), // Throws
+    m_daemon_becomes_ready(util::CondVar::process_shared_tag()), // Throws
+    m_new_commit_available(util::CondVar::process_shared_tag()) // Throws
 {
     open(file, no_create, dlevel, false, key);
 }
 
 inline SharedGroup::SharedGroup(unattached_tag) TIGHTDB_NOEXCEPT:
-    m_group(Group::shared_tag())
+    m_group(Group::shared_tag()),
+    m_room_to_write(util::CondVar::process_shared_tag()), // Throws
+    m_work_to_do(util::CondVar::process_shared_tag()), // Throws
+    m_daemon_becomes_ready(util::CondVar::process_shared_tag()), // Throws
+    m_new_commit_available(util::CondVar::process_shared_tag()) // Throws
 {
 }
 
@@ -614,7 +620,11 @@ inline bool SharedGroup::is_attached() const TIGHTDB_NOEXCEPT
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
 inline SharedGroup::SharedGroup(Replication& repl, DurabilityLevel dlevel, const char* key):
-    m_group(Group::shared_tag())
+    m_group(Group::shared_tag()),
+    m_room_to_write(util::CondVar::process_shared_tag()), // Throws
+    m_work_to_do(util::CondVar::process_shared_tag()), // Throws
+    m_daemon_becomes_ready(util::CondVar::process_shared_tag()), // Throws
+    m_new_commit_available(util::CondVar::process_shared_tag()) // Throws
 {
     open(repl, dlevel, key);
 }
