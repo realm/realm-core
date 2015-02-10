@@ -60,10 +60,15 @@ string format_rise_factor(double baseline, double seconds)
 string format_change(double baseline, double input, BenchmarkResults::ChangeType change_type)
 {
     switch (change_type) {
-        case BenchmarkResults::change_Percent: return format_change_percent(baseline, input);
-        case BenchmarkResults::change_DropFactor: return format_drop_factor(baseline, input);
-        case BenchmarkResults::change_RiseFactor: return format_rise_factor(baseline, input);
+        case BenchmarkResults::change_Percent:
+            return format_change_percent(baseline, input);
+        case BenchmarkResults::change_DropFactor:
+            return format_drop_factor(baseline, input);
+        case BenchmarkResults::change_RiseFactor:
+            return format_rise_factor(baseline, input);
     }
+    TIGHTDB_ASSERT(false);
+    return string();
 }
 
 } // anonymous namespace
