@@ -16,7 +16,7 @@
 
 ### Internals:
 
-* Lorem ipsum.
+* Added support for Android ARM64
 
 ----------------------------------------------
 
