@@ -726,9 +726,9 @@ TEST(TableView_SortNullString)
     t.add_column(type_String, "s", true);
     t.add_empty_row(4);
     t.set_string(0, 0, StringData(""));     // empty string
-    t.set_string(0, 1, null());             // null
+    t.set_string(0, 1, tightdb::null());             // tightdb::null()
     t.set_string(0, 2, StringData(""));     // empty string
-    t.set_string(0, 3, null());             // null
+    t.set_string(0, 3, tightdb::null());             // tightdb::null()
 
     TableView tv;
 

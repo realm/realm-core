@@ -58,7 +58,7 @@ public:
 /// object and be able to efficiently map any 'ref' to the
 /// corresponding memory address. The 'ref' is an integer and it must
 /// always be divisible by 8. Also, a value of zero is used to
-/// indicate a null-reference, and must therefore never be returned by
+/// indicate a tightdb::null()-reference, and must therefore never be returned by
 /// Allocator::alloc().
 ///
 /// The purpose of the 'refs' is to decouple the memory reference from

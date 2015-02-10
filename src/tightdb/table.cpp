@@ -113,11 +113,11 @@
 ///    crucially, **not** the `index_in_parent` property.
 ///
 ///  - The list of table accessors in a group accessor
-///    (Group::m_table_accessors). All non-null pointers refer to existing table
+///    (Group::m_table_accessors). All non-tightdb::null() pointers refer to existing table
 ///    accessors.
 ///
 ///  - The list of column accessors in a table acccessor (Table::m_cols). All
-///    non-null pointers refer to existing column accessors.
+///    non-tightdb::null() pointers refer to existing column accessors.
 ///
 ///  - The 'root_array' property of a column accessor (ColumnBase::m_array). It
 ///    always refers to an existing array accessor. The exact type of that array
@@ -133,15 +133,15 @@
 ///    of subtables accessors specifying P as parent.
 ///
 ///  - The `descriptor` property of a table accesor (Table::m_descriptor). If it
-///    is not null, then it refers to an existing descriptor accessor.
+///    is not tightdb::null(), then it refers to an existing descriptor accessor.
 ///
 ///  - The map of subdescriptor accessors in a descriptor accessor
-///    (Descriptor::m_subdesc_map). All non-null pointers refer to existing
+///    (Descriptor::m_subdesc_map). All non-tightdb::null() pointers refer to existing
 ///    subdescriptor accessors.
 ///
 ///  - The `search_index` property of a column accesor
 ///    (AdaptiveStringColumn::m_index, ColumnStringEnum::m_index). When it is
-///    non-null, it refers to an existing search index accessor.
+///    non-tightdb::null(), it refers to an existing search index accessor.
 ///
 ///
 /// Structurally Correspondent Accessor Hierarchy (accessor reattachment)
@@ -171,7 +171,7 @@
 ///    of entries in `Group::m_table_accessors` in the group accessor.
 ///
 ///  - For each table in the underlying group, the corresponding entry in
-///    `Table::m_table_accessors` (at same index) is either null, or points to a
+///    `Table::m_table_accessors` (at same index) is either tightdb::null(), or points to a
 ///    table accessor that satisfies all the "requirements for a table".
 ///
 /// Requirements for a table:
@@ -186,7 +186,7 @@
 ///    `Table::m_cols` is empty, otherwise the number of columns in the
 ///    underlying table is equal to the number of entries in `Table::m_cols`.
 ///
-///  - Each entry in `Table::m_cols` is either null, or points to a column
+///  - Each entry in `Table::m_cols` is either tightdb::null(), or points to a column
 ///    accessor whose type agrees with the data type (tightdb::DataType) of the
 ///    corresponding underlying column (at same index).
 ///
@@ -1190,7 +1190,7 @@ ColumnBase* Table::create_column_accessor(ColumnType col_type, size_t col_ndx, s
 
     bool nullable = m_spec.get_column_attr(col_ndx) & col_attr_Nullable;
 
-    TIGHTDB_ASSERT(!(nullable && (col_type != col_type_String && 
+    TIGHTDB_ASSERT_DEBUG(!(nullable && (col_type != col_type_String &&
                                   col_type != col_type_StringEnum)));
 
     switch (col_type) {
@@ -1418,7 +1418,7 @@ bool Table::try_add_primary_key(size_t col_ndx)
     if (TIGHTDB_UNLIKELY(!has_search_index(col_ndx)))
         throw LogicError(LogicError::no_search_index);
 
-    // FIXME: Also check that there are no null values
+    // FIXME: Also check that there are no tightdb::null() values
     // (NoNullConstraintViolation).
     ColumnType type = get_real_column_type(col_ndx);
     ColumnBase& col = get_column_base(col_ndx);
@@ -2437,7 +2437,7 @@ StringData Table::get_string(size_t col_ndx, size_t ndx) const TIGHTDB_NOEXCEPT
         const ColumnStringEnum& column = get_column_string_enum(col_ndx);
         sd = column.get(ndx);
     }
-    TIGHTDB_ASSERT(!(!(m_spec.get_column_attr(col_ndx) & col_attr_Nullable) && sd.is_null()));
+    TIGHTDB_ASSERT_DEBUG(!(!(m_spec.get_column_attr(col_ndx) & col_attr_Nullable) && sd.is_null()));
     return sd;
 }
 
@@ -2456,7 +2456,7 @@ void Table::set_string(size_t col_ndx, size_t ndx, StringData value)
     if (TIGHTDB_UNLIKELY(col_ndx >= m_cols.size()))
         throw LogicError(LogicError::column_index_out_of_range);
 
-    TIGHTDB_ASSERT(!(!(m_spec.get_column_attr(col_ndx) & col_attr_Nullable) && value.is_null()));
+    TIGHTDB_ASSERT_DEBUG(!(!(m_spec.get_column_attr(col_ndx) & col_attr_Nullable) && value.is_null()));
     
     bump_version();
     ColumnBase& col = get_column_base(col_ndx);
@@ -2474,7 +2474,7 @@ void Table::insert_string(size_t col_ndx, size_t ndx, StringData value)
         throw LogicError(LogicError::string_too_big);
     TIGHTDB_ASSERT(col_ndx < get_column_count());
     TIGHTDB_ASSERT(ndx <= m_size);
-    TIGHTDB_ASSERT(!(!(m_spec.get_column_attr(col_ndx) & col_attr_Nullable) && value.is_null()));
+    TIGHTDB_ASSERT_DEBUG(!(!(m_spec.get_column_attr(col_ndx) & col_attr_Nullable) && value.is_null()));
 
     ColumnType type = get_real_column_type(col_ndx);
     if (type == col_type_String) {
@@ -4875,7 +4875,7 @@ void Table::refresh_column_accessors(size_t col_ndx_begin)
             if (col_type == col_type_StringEnum) {
                 delete col;
                 col = 0;
-                // We need to store null in `m_cols` to avoid a crash during
+                // We need to store tightdb::null() in `m_cols` to avoid a crash during
                 // destruction of the table accessor in case an error occurs
                 // before the refresh operation is complete.
                 m_cols[col_ndx] = 0;

@@ -164,7 +164,7 @@ ref_type ArrayBigBlobs::bptree_leaf_insert(size_t ndx, BinaryData value, bool ad
     }
 
     // Split leaf node
-    ArrayBigBlobs new_leaf(m_alloc);
+    ArrayBigBlobs new_leaf(m_alloc, false);
     new_leaf.create(); // Throws
     if (ndx == leaf_size) {
         new_leaf.add(value, add_zero_term);

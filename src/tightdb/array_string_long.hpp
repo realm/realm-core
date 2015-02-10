@@ -30,7 +30,7 @@ class ArrayStringLong: public Array {
 public:
     typedef StringData value_type;
 
-    explicit ArrayStringLong(Allocator&, bool nullable = false) TIGHTDB_NOEXCEPT;
+    explicit ArrayStringLong(Allocator&, bool nullable) TIGHTDB_NOEXCEPT;
     ~ArrayStringLong() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE{}
 
     /// Create a new empty long string array and attach this accessor to

@@ -425,8 +425,8 @@ TEST(Replication_Links)
     repl.replay_transacts(sg_2, replay_log);
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
-    // null       T_2[0]     []                     T_1[1]     [ T_2[1] ]             T_2[1]
-    // T_1[0]     T_2[1]     [ T_1[0] ]             null       [ T_2[0], T_2[1] ]     T_2[0]
+    // tightdb::null()       T_2[0]     []                     T_1[1]     [ T_2[1] ]             T_2[1]
+    // T_1[0]     T_2[1]     [ T_1[0] ]             tightdb::null()       [ T_2[0], T_2[1] ]     T_2[0]
     {
         ReadTransaction rt(sg_2);
         check(test_results, sg_1, rt);
@@ -515,7 +515,7 @@ TEST(Replication_NullStrings)
         table1->add_column(type_String, "c1", true);
         table1->add_empty_row(3);
         table1->set_string(0, 1, StringData(""));
-        table1->set_string(0, 2, null());
+        table1->set_string(0, 2, tightdb::null());
 
         CHECK(table1->get_string(0, 0).is_null());
         CHECK(!table1->get_string(0, 1).is_null());

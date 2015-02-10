@@ -359,7 +359,7 @@ namespace tightdb {
             tmp[n2] = 0;
 
             // Note: If tmp[0] == 0, it is because the string contains a
-            // null-chacarcter, which is perfectly fine.
+            // tightdb::null()-chacarcter, which is perfectly fine.
 
             if (upper)
                 CharUpperW(static_cast<LPWSTR>(tmp));

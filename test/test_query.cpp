@@ -5674,21 +5674,21 @@ TEST(Query_NullStrings)
 
     // Short strings
     table.set_string(0, 0, "Albertslund");      // Normal non-empty string
-    table.set_string(0, 1, null());             // NULL string
+    table.set_string(0, 1, tightdb::null());             // NULL string
     table.set_string(0, 2, "");                 // Empty string
 
-    q = table.column<StringData>(0) == null();
+    q = table.column<StringData>(0) == tightdb::null();
     v = q.find_all();
     CHECK_EQUAL(1, v.size());
     CHECK_EQUAL(1, v.get_source_ndx(0));
 
-    q = table.column<StringData>(0) != null();
+    q = table.column<StringData>(0) != tightdb::null();
     v = q.find_all();
     CHECK_EQUAL(2, v.size());
     CHECK_EQUAL(0, v.get_source_ndx(0));
     CHECK_EQUAL(2, v.get_source_ndx(1));
 
-    // contrary to SQL, comparisons with null can be true in Realm (todo, discuss if we want this behaviour)
+    // contrary to SQL, comparisons with tightdb::null() can be true in Realm (todo, discuss if we want this behaviour)
     q = table.column<StringData>(0) != StringData("Albertslund");
     v = q.find_all();
     CHECK_EQUAL(2, v.size());
@@ -5703,7 +5703,7 @@ TEST(Query_NullStrings)
     // Medium strings (16+)
     table.set_string(0, 0, "AlbertslundAlbertslundAlbert");
 
-    q = table.column<StringData>(0) == null();
+    q = table.column<StringData>(0) == tightdb::null();
     v = q.find_all();
     CHECK_EQUAL(1, v.size());
     CHECK_EQUAL(1, v.get_source_ndx(0));
@@ -5715,7 +5715,7 @@ TEST(Query_NullStrings)
 
     // Long strings (64+)
     table.set_string(0, 0, "AlbertslundAlbertslundAlbertslundAlbertslundAlbertslundAlbertslundAlbertslund");
-    q = table.column<StringData>(0) == null();
+    q = table.column<StringData>(0) == tightdb::null();
     v = q.find_all();
     CHECK_EQUAL(1, v.size());
     CHECK_EQUAL(1, v.get_source_ndx(0));

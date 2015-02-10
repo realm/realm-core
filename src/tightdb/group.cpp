@@ -1346,7 +1346,7 @@ public:
         // its accessor must therefore be marked dirty too. Indeed, when it
         // exists, the link-target table accessor must be marked dirty
         // regardless of whether an accessor exists for the origin table (i.e.,
-        // regardless of whether `m_table` is null or not.) This would seem to
+        // regardless of whether `m_table` is tightdb::null() or not.) This would seem to
         // pose a problem, because there is no easy way to identify the
         // link-target table when there is no accessor for the origin
         // table. Fortunately, due to the fact that back-link column accessors
@@ -1354,8 +1354,8 @@ public:
         // the link-target table accessor exists if, and only if the origin
         // table accessor exists.
         //
-        // get_link_target_table_accessor() will return null if the
-        // m_table->m_cols[col_ndx] is null, but this can happen only when the
+        // get_link_target_table_accessor() will return tightdb::null() if the
+        // m_table->m_cols[col_ndx] is tightdb::null(), but this can happen only when the
         // column was inserted earlier during this transaction advance, and in
         // that case, we have already marked the target table accesor dirty.
 
@@ -1592,7 +1592,7 @@ void Group::advance_transact(ref_type new_top_ref, size_t new_file_size,
     // example, when an "insert column" instruction is seen, we must immediately
     // shift the positions of all existing columns accessors after the point of
     // insertion. For practical reasons, and for efficiency, we will just insert
-    // a null pointer into `Table::m_cols` at this time, and then postpone the
+    // a tightdb::null() pointer into `Table::m_cols` at this time, and then postpone the
     // creation of the column accessor to the final per-table accessor refresh
     // operation.
     //

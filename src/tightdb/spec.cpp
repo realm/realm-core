@@ -157,14 +157,14 @@ void Spec::insert_column(size_t column_ndx, ColumnType type, StringData name, Co
         else if (type == col_type_Link || type == col_type_LinkList) {
             // Store group-level table index of target table. When we set the
             // target it will be as a tagged integer (low bit set) Since we
-            // don't know it yet we just store zero (null ref).
+            // don't know it yet we just store zero (tightdb::null() ref).
             size_t subspec_ndx = get_subspec_ndx(column_ndx);
             m_subspecs.insert(subspec_ndx, 0); // Throws
         }
         else if (type == col_type_BackLink) {
             // Store group-level table index of origin table and index of origin
             // column. When we set the target it will be as a tagged integer
-            // (low bit set) Since we don't know it yet we just store zero (null
+            // (low bit set) Since we don't know it yet we just store zero (tightdb::null()
             // ref).
             size_t subspec_ndx = get_subspec_ndx(column_ndx);
             m_subspecs.insert(subspec_ndx, 0); // Throws

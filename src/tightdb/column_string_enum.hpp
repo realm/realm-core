@@ -176,16 +176,19 @@ inline StringData ColumnStringEnum::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < Column::size());
     std::size_t key_ndx = to_size_t(Column::get(ndx));
-    return m_keys.get(key_ndx);
+    StringData sd = m_keys.get(key_ndx);
+    TIGHTDB_ASSERT_DEBUG(!(!m_nullable && sd.is_null()));
+    return sd;
 }
 
 inline void ColumnStringEnum::add()
 {
-    add(m_nullable ? null() : StringData(""));
+    add(m_nullable ? tightdb::null() : StringData(""));
 }
 
 inline void ColumnStringEnum::add(StringData value)
 {
+    TIGHTDB_ASSERT_DEBUG(!(!m_nullable && value.is_null()));
     std::size_t row_ndx = tightdb::npos;
     std::size_t num_rows = 1;
     do_insert(row_ndx, value, num_rows); // Throws
@@ -193,11 +196,12 @@ inline void ColumnStringEnum::add(StringData value)
 
 inline void ColumnStringEnum::insert(std::size_t row_ndx)
 {
-    insert(row_ndx, m_nullable ? null() : StringData(""));
+    insert(row_ndx, m_nullable ? tightdb::null() : StringData(""));
 }
 
 inline void ColumnStringEnum::insert(std::size_t row_ndx, StringData value)
 {
+    TIGHTDB_ASSERT_DEBUG(!(!m_nullable && value.is_null()));
     std::size_t size = this->size();
     TIGHTDB_ASSERT(row_ndx <= size);
     std::size_t num_rows = 1;
@@ -226,7 +230,7 @@ inline void ColumnStringEnum::clear()
 // Overriding virtual method of Column.
 inline void ColumnStringEnum::insert(std::size_t row_ndx, std::size_t num_rows, bool is_append)
 {
-    StringData value = m_nullable ? null() : StringData("");
+    StringData value = m_nullable ? tightdb::null() : StringData("");
     do_insert(row_ndx, value, num_rows, is_append); // Throws
 }
 

@@ -42,6 +42,12 @@ inline StringData to_str(StringData& input)
     return input;
 }
 
+inline StringData to_str(null& input)
+{
+    return input;
+}
+
+// todo, should be removed
 inline StringData to_str(const char* value)
 {
     return StringData(value);
@@ -244,7 +250,7 @@ inline StringIndex::key_type StringIndex::create_key(StringData str) TIGHTDB_NOE
 // as empty strings.
 inline StringIndex::key_type StringIndex::create_key(StringData str, size_t offset, bool nullable) TIGHTDB_NOEXCEPT
 {
-    // 'bool trailingzeroes' fixes an old bug (from before null was introduced) in the string index where it could
+    // 'bool trailingzeroes' fixes an old bug (from before tightdb::null() was introduced) in the string index where it could
     // crash if strings ended with a 0. Such strings are now X-terminated too, even if the column is not nullable. 
     // Zero terminated strings storedbefore this Realm version can no longer be found with find() in this current Realm
     // version (will return not_found), but that's better than a crash.

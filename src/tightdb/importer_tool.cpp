@@ -54,7 +54,7 @@ const char* legend =
     "  csv -t={s|i|b|f|d}{s|i|b|f|d}... name1 name2 ... [-s=N] [-n=N] <.csv file | -stdin> <.tightdb file>\n"
     "\n"
     " -a: Use the first N rows to auto-detect scheme (default =10000). Lower is faster but more error prone\n"
-    " -e: TightDB does not support null values. Set the -e flag to import a column as a String type column if\n"
+    " -e: TightDB does not support tightdb::null() values. Set the -e flag to import a column as a String type column if\n"
     "     it has occurences of empty fields. Otherwise empty fields may be converted to 0, 0.0 or false\n"
     " -n: Only import first N rows of payload\n"
     " -t: List of column types where s=string, i=integer, b=bool, f=float, d=double\n"

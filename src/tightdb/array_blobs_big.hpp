@@ -29,7 +29,7 @@ class ArrayBigBlobs: public Array {
 public:
     typedef BinaryData value_type;
 
-    explicit ArrayBigBlobs(Allocator&) TIGHTDB_NOEXCEPT;
+    explicit ArrayBigBlobs(Allocator&, bool) TIGHTDB_NOEXCEPT;
 
     BinaryData get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
     void set(std::size_t ndx, BinaryData value, bool add_zero_term = false);
@@ -85,14 +85,17 @@ public:
     void Verify() const;
     void to_dot(std::ostream&, bool is_strings, StringData title = StringData()) const;
 #endif
+
+private:
+    bool m_nullable;
 };
 
 
 
 // Implementation:
 
-inline ArrayBigBlobs::ArrayBigBlobs(Allocator& alloc) TIGHTDB_NOEXCEPT:
-    Array(alloc)
+inline ArrayBigBlobs::ArrayBigBlobs(Allocator& alloc, bool nullable) TIGHTDB_NOEXCEPT:
+Array(alloc), m_nullable(nullable)
 {
 }
 
@@ -124,7 +127,7 @@ inline BinaryData ArrayBigBlobs::get(const char* header, size_t ndx,
 inline void ArrayBigBlobs::erase(std::size_t ndx)
 {
     ref_type blob_ref = Array::get_as_ref(ndx);
-    if (blob_ref != 0) { // nothing to destroy if null
+    if (blob_ref != 0) { // nothing to destroy if tightdb::null()
         Array::destroy(blob_ref, get_alloc()); // Shallow
     }
     Array::erase(ndx);

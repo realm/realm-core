@@ -564,7 +564,7 @@ extern "C"
  *
  * We force all calls to cdecl even though this could slow Watcom code down
  * slightly. If you know that the Watcom compiler will be used to build both
- * the DLL and application, then you can probably define this as a null string.
+ * the DLL and application, then you can probably define this as a tightdb::null() string.
  * Remember that pthread.h (this file) is used for both the DLL and application builds.
  */
 #define PTW32_CDECL __cdecl

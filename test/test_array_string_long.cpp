@@ -266,7 +266,7 @@ TEST(ArrayStringLong_Null)
 
         a.add("foo");
         a.add("");
-        a.add(null()); 
+        a.add(tightdb::null()); 
 
         CHECK_EQUAL(a.is_null(0), false);
         CHECK_EQUAL(a.is_null(1), false);
@@ -288,7 +288,7 @@ TEST(ArrayStringLong_Null)
         ArrayStringLong a(Allocator::get_default(), true);
         a.create();
 
-        a.add(null());  
+        a.add(tightdb::null());  
         a.add("");
         a.add("foo");
 
@@ -298,9 +298,9 @@ TEST(ArrayStringLong_Null)
         CHECK(a.get(2) == "foo");
 
         // Test insert
-        a.insert(0, null()); 
-        a.insert(2, null()); 
-        a.insert(4, null()); 
+        a.insert(0, tightdb::null()); 
+        a.insert(2, tightdb::null()); 
+        a.insert(4, tightdb::null()); 
 
         CHECK_EQUAL(a.is_null(0), true);
         CHECK_EQUAL(a.is_null(1), true);
@@ -317,7 +317,7 @@ TEST(ArrayStringLong_Null)
         a.create();
 
         a.add("");
-        a.add(null());
+        a.add(tightdb::null());
         a.add("foo");
 
         CHECK_EQUAL(a.is_null(0), false);
@@ -356,8 +356,8 @@ TEST(ArrayStringLong_Null)
                 v.erase(v.begin() + del);
             }
             else {
-                // Generate string with good probability of being empty or null
-                static const char str[] = "This is a test of null strings";
+                // Generate string with good probability of being empty or tightdb::null()
+                static const char str[] = "This is a test of tightdb::null() strings";
                 size_t len;
 
                 if (random.draw_int<unsigned char>() > 100)
@@ -369,8 +369,8 @@ TEST(ArrayStringLong_Null)
                 string stdstr;
 
                 if (random.draw_int<unsigned char>() > 100) {
-                    sd = null();
-                    stdstr = "null";
+                    sd = tightdb::null();
+                    stdstr = "tightdb::null()";
                 }
                 else {
                     sd = StringData(str, len);
@@ -389,7 +389,7 @@ TEST(ArrayStringLong_Null)
 
                 CHECK_EQUAL(a.size(), v.size());
                 for (size_t i = 0; i < a.size(); i++) {
-                    if (v[i] == "null") {
+                    if (v[i] == "tightdb::null()") {
                         CHECK(a.is_null(i));
                         CHECK(a.get(i).data() == 0);
                     }

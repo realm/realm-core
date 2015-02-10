@@ -931,7 +931,7 @@ struct FindNullLinks : public LinkMapFunction
     virtual bool consume(size_t row_index) {
         static_cast<void>(row_index);
         m_has_link = true;
-        return false; // we've found a row index, so this can't be a null-link, so exit link harvesting
+        return false; // we've found a row index, so this can't be a tightdb::null()-link, so exit link harvesting
     }
 
     bool m_has_link;
@@ -1225,8 +1225,8 @@ template <class T> Query operator != (const Columns<StringData>& left, T right) 
 }
 
 // This class is intended to perform queries on the *pointers* of links, contrary to performing queries on *payload* 
-// in linked-to tables. Queries can be "find first link that points at row X" or "find first null-link". Currently
-// only "find first null-link" is supported. More will be added later.
+// in linked-to tables. Queries can be "find first link that points at row X" or "find first tightdb::null()-link". Currently
+// only "find first tightdb::null()-link" is supported. More will be added later.
 class UnaryLinkCompare : public Expression
 {
 public:
@@ -1275,7 +1275,7 @@ template <> class Columns<Link> : public Subexpr2<Link>
 public:
     Query is_null() {
         if (m_link_map.m_link_columns.size() > 1)
-            throw std::runtime_error("Cannot find null-links in a linked-to table (link()...is_null() not supported).");
+            throw std::runtime_error("Cannot find tightdb::null()-links in a linked-to table (link()...is_null() not supported).");
         // Todo, it may be useful to support the above, but we would need to figure out an intuitive behaviour
         return *new UnaryLinkCompare(m_link_map);
     }

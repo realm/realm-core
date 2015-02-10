@@ -688,7 +688,7 @@ TEST(ColumnString_Null)
 
         a.add("foo");
         a.add("");
-        a.add(null());
+        a.add(tightdb::null());
 
         CHECK_EQUAL(a.is_null(0), false);
         CHECK_EQUAL(a.is_null(1), false);
@@ -710,7 +710,7 @@ TEST(ColumnString_Null)
         ref_type ref = AdaptiveStringColumn::create(Allocator::get_default());
         AdaptiveStringColumn a(Allocator::get_default(), ref, true);
 
-        a.add(null());
+        a.add(tightdb::null());
         a.add("");
         a.add("foo");
 
@@ -720,9 +720,9 @@ TEST(ColumnString_Null)
         CHECK(a.get(2) == "foo");
 
         // Test insert
-        a.insert(0, null());
-        a.insert(2, null());
-        a.insert(4, null());
+        a.insert(0, tightdb::null());
+        a.insert(2, tightdb::null());
+        a.insert(4, tightdb::null());
 
         CHECK_EQUAL(a.is_null(0), true);
         CHECK_EQUAL(a.is_null(1), true);
@@ -739,7 +739,7 @@ TEST(ColumnString_Null)
         AdaptiveStringColumn a(Allocator::get_default(), ref, true);
 
         a.add("");
-        a.add(null());
+        a.add(tightdb::null());
         a.add("foo");
 
         CHECK_EQUAL(a.is_null(0), false);
@@ -778,7 +778,7 @@ TEST(ColumnString_Null)
                 v.erase(v.begin() + del);
             }
             else {
-                // Generate string with good probability of being empty or null
+                // Generate string with good probability of being empty or tightdb::null()
                 static const char str[] = "This string must be longer than 64 bytes in order to test the BinaryBlob type of strings";
                 size_t len;
                  
@@ -791,8 +791,8 @@ TEST(ColumnString_Null)
                 string stdstr;
 
                 if (random.draw_int<unsigned char>() > 100) {
-                    sd = null();
-                    stdstr = "null";
+                    sd = tightdb::null();
+                    stdstr = "tightdb::null()";
                 }
                 else {
                     sd = StringData(str, len);
@@ -811,7 +811,7 @@ TEST(ColumnString_Null)
 
                 CHECK_EQUAL(a.size(), v.size());
                 for (size_t i = 0; i < a.size(); i++) {
-                    if (v[i] == "null") {
+                    if (v[i] == "tightdb::null()") {
                         CHECK(a.is_null(i));
                         CHECK(a.get(i).data() == 0);
                     }

@@ -252,7 +252,7 @@ TEST(Table_StringOrBinaryTooBig)
     table.set_string(0, 0, "01234567");
 
     size_t large_bin_size = 0xFFFFF1;
-    size_t large_str_size = 0xFFFFF0; // null-terminate reduces max size by 1
+    size_t large_str_size = 0xFFFFF0; // tightdb::null()-terminate reduces max size by 1
     UniquePtr<char[]> large_buf(new char[large_bin_size]);
     CHECK_LOGIC_ERROR(table.set_string(0, 0, StringData(large_buf.get(), large_str_size)),
                       LogicError::string_too_big);
@@ -2325,13 +2325,13 @@ TEST(Table_NullInEnum)
     r = table->where().equal(0, "hello").count();
     CHECK_EQUAL(100, r);
 
-    table->set_string(0, 50, null());
+    table->set_string(0, 50, tightdb::null());
     r = table->where().equal(0, "hello").count();
     CHECK_EQUAL(99, r);
 
     table->optimize();
 
-    table->set_string(0, 50, null());
+    table->set_string(0, 50, tightdb::null());
     r = table->where().equal(0, "hello").count();
     CHECK_EQUAL(99, r);
 
@@ -2339,22 +2339,22 @@ TEST(Table_NullInEnum)
     r = table->where().equal(0, "hello").count();
     CHECK_EQUAL(100, r);
 
-    table->set_string(0, 50, null());
+    table->set_string(0, 50, tightdb::null());
     r = table->where().equal(0, "hello").count();
     CHECK_EQUAL(99, r);
 
-    r = table->where().equal(0, null()).count();
+    r = table->where().equal(0, tightdb::null()).count();
     CHECK_EQUAL(1, r);
 
-    table->set_string(0, 55, null());
-    r = table->where().equal(0, null()).count();
+    table->set_string(0, 55, tightdb::null());
+    r = table->where().equal(0, tightdb::null()).count();
     CHECK_EQUAL(2, r);
 
     r = table->where().equal(0, "hello").count();
     CHECK_EQUAL(98, r);
 
     table->remove(55);
-    r = table->where().equal(0, null()).count();
+    r = table->where().equal(0, tightdb::null()).count();
     CHECK_EQUAL(1, r);
 }
 

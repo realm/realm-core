@@ -38,7 +38,7 @@ using namespace tightdb;
 
 TEST(ArrayBigBlobs_Basic)
 {
-    ArrayBigBlobs c(Allocator::get_default());
+    ArrayBigBlobs c(Allocator::get_default(), false);
     c.create();
 
     // TEST(ArrayBigBlobs_IsEmpty)

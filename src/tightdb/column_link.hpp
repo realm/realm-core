@@ -30,7 +30,7 @@ namespace tightdb {
 /// its node structure.
 ///
 /// The individual values in a link column are indexes of rows in the target
-/// table (offset with one to allow zero to indicate null links.) The target
+/// table (offset with one to allow zero to indicate tightdb::null() links.) The target
 /// table is specified by the table descriptor.
 class ColumnLink: public ColumnLinkBase {
 public:
@@ -45,7 +45,7 @@ public:
     /// nullify_link() is shorthand foe `set_link(tightdb::npos)`, and
     /// insert_null_link() is shorthand for
     /// `insert_link(tightdb::npos)`. set_link() returns the original link, with
-    /// `tightdb::npos` indicating that it was null.
+    /// `tightdb::npos` indicating that it was tightdb::null().
 
     std::size_t get_link(std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
     bool is_null_link(std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
@@ -147,7 +147,7 @@ inline void ColumnLink::do_nullify_link(std::size_t row_ndx, std::size_t)
 inline void ColumnLink::do_update_link(std::size_t row_ndx, std::size_t,
                                        std::size_t new_target_row_ndx)
 {
-    // Row pos is offset by one, to allow null refs
+    // Row pos is offset by one, to allow tightdb::null() refs
     ColumnLinkBase::set(row_ndx, new_target_row_ndx + 1);
 }
 

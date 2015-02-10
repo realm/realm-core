@@ -2550,7 +2550,7 @@ void Array::report_memory_usage_2(MemUsageHandler& handler) const
     Array subarray(m_alloc);
     for (size_t i = 0; i < m_size; ++i) {
         int_fast64_t value = get(i);
-        // Skip null refs and values that are not refs. Values are not refs when
+        // Skip tightdb::null() refs and values that are not refs. Values are not refs when
         // the least significant bit is set.
         if (value == 0 || value % 2 == 1)
             continue;

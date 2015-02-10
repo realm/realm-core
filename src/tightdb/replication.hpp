@@ -121,7 +121,7 @@ public:
     virtual void set_last_version_synced(version_type version) TIGHTDB_NOEXCEPT;
 
     /// Get the value set by last call to 'set_last_version_synced'
-    /// If 'end_version_number' is non null, a limit to version numbering is returned.
+    /// If 'end_version_number' is non tightdb::null(), a limit to version numbering is returned.
     /// The limit returned is the version number of the latest commit.
     /// If sync versioning is disabled, the last version seen locally is returned.
     virtual version_type get_last_version_synced(version_type* end_version_number = 0)
@@ -557,7 +557,7 @@ private:
     float read_float();
     double read_double();
 
-    // return true if non-null, else false 
+    // return true if non-tightdb::null(), else false 
     bool read_string(util::StringBuffer&);
     void read_mixed(Mixed*);
 
@@ -1400,9 +1400,9 @@ bool Replication::TransactLogParser::do_parse(InstructionHandler& handler)
             case instr_SetString: {
                 std::size_t col_ndx = read_int<std::size_t>(); // Throws
                 std::size_t row_ndx = read_int<std::size_t>(); // Throws
-                bool null = !read_string(m_string_buffer); // Throws
-                // The "" construction ensures a non-null data pointer
-                StringData value(null ? 0 : m_string_buffer.size() == 0 ? "" : m_string_buffer.data(),
+                bool isnull = !read_string(m_string_buffer); // Throws
+                // The "" construction ensures a non-tightdb::null() data pointer
+                StringData value(isnull ? 0 : m_string_buffer.size() == 0 ? "" : m_string_buffer.data(),
                                  m_string_buffer.size());
                 if (!handler.set_string(col_ndx, row_ndx, value)) // Throws
                     return false;
@@ -1411,9 +1411,9 @@ bool Replication::TransactLogParser::do_parse(InstructionHandler& handler)
             case instr_SetBinary: {
                 std::size_t col_ndx = read_int<std::size_t>(); // Throws
                 std::size_t row_ndx = read_int<std::size_t>(); // Throws
-                bool null = !read_string(m_string_buffer); // Throws
-                // The "" construction ensures a non-null data pointer
-                BinaryData value(null ? 0 : m_string_buffer.size() == 0 ? "" : m_string_buffer.data(),
+                bool isnull = !read_string(m_string_buffer); // Throws
+                // The "" construction ensures a non-tightdb::null() data pointer
+                BinaryData value(isnull ? 0 : m_string_buffer.size() == 0 ? "" : m_string_buffer.data(),
                     m_string_buffer.size());
                 if (!handler.set_binary(col_ndx, row_ndx, value)) // Throws
                     return false;
@@ -1494,8 +1494,8 @@ bool Replication::TransactLogParser::do_parse(InstructionHandler& handler)
                 std::size_t col_ndx = read_int<std::size_t>(); // Throws
                 std::size_t row_ndx = read_int<std::size_t>(); // Throws
                 std::size_t tbl_sz = read_int<std::size_t>(); // Throws
-                bool null = !read_string(m_string_buffer); // Throws
-                StringData value(null ? null_ptr : m_string_buffer.data(), m_string_buffer.size());
+                bool isnull = !read_string(m_string_buffer); // Throws
+                StringData value(isnull ? null_ptr : m_string_buffer.data(), m_string_buffer.size());
                 if (!handler.insert_string(col_ndx, row_ndx, tbl_sz, value)) // Throws
                     return false;
                 continue;
@@ -1872,7 +1872,7 @@ inline bool Replication::TransactLogParser::read_string(util::StringBuffer& buf)
     std::size_t size = read_int<std::size_t>(); // Throws
 
     if (size == static_cast<size_t>(-1)) {
-        return false; // null
+        return false; // tightdb::null()
     }
 
     buf.resize(size); // Throws
@@ -1915,9 +1915,9 @@ inline void Replication::TransactLogParser::read_mixed(Mixed* mixed)
             return;
         }
         case type_String: {
-            bool null = !read_string(m_string_buffer); // Throws
+            bool isnull = !read_string(m_string_buffer); // Throws
             // The "" construction ensures a non-null data pointer
-            StringData value(null ? 0 : m_string_buffer.size() == 0 ? "" : m_string_buffer.data(), 
+            StringData value(isnull ? 0 : m_string_buffer.size() == 0 ? "" : m_string_buffer.data(),
                              m_string_buffer.size());
             mixed->set_string(value);
             return;

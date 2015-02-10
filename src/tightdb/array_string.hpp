@@ -30,14 +30,14 @@ longest string it can store is (m_width - 1) bytes before it needs to expand.
 
 An example of the format for m_width = 4 is following sequence of bytes, where x is payload:
 
-xxx0 xx01 x002 0003 0004 (strings "xxx",. "xx", "x", "", null)
+xxx0 xx01 x002 0003 0004 (strings "xxx",. "xx", "x", "", tightdb::null())
 
 So each string is 0 terminated, and the last byte in a block tells how many 0s are present, except
-for a null which has the byte set to m_width (4). The byte is used to compute the length of a string
+for a tightdb::null() which has the byte set to m_width (4). The byte is used to compute the length of a string
 in various functions.
 
-New: If m_witdh = 0, then all elements are null. So to add an empty string we must expand m_width
-New: StringData is null if-and-only-if StringData::data() == 0. Todo, maybe make StringData null-aware?
+New: If m_witdh = 0, then all elements are tightdb::null(). So to add an empty string we must expand m_width
+New: StringData is tightdb::null() if-and-only-if StringData::data() == 0. Todo, maybe make StringData tightdb::null()-aware?
 */
 
 class ArrayString: public Array {
@@ -142,13 +142,13 @@ inline StringData ArrayString::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < m_size);
     if (m_width == 0)
-        return m_nullable ? null() : StringData("", 0);
+        return m_nullable ? tightdb::null() : StringData("", 0);
 
     const char* data = m_data + (ndx * m_width);
     std::size_t size = (m_width-1) - data[m_width-1];
 
     if (size == static_cast<size_t>(-1))
-        return m_nullable ? null() : StringData("");
+        return m_nullable ? tightdb::null() : StringData("");
 
     TIGHTDB_ASSERT(data[size] == 0); // Realm guarantees 0 terminated return strings
     return StringData(data, size);
@@ -162,7 +162,7 @@ inline void ArrayString::add(StringData value)
 
 inline void ArrayString::add()
 {
-    add(m_nullable ? null() : StringData("")); // Throws
+    add(m_nullable ? tightdb::null() : StringData("")); // Throws
 }
 
 inline StringData ArrayString::get(const char* header, std::size_t ndx, bool nullable) TIGHTDB_NOEXCEPT
@@ -172,12 +172,12 @@ inline StringData ArrayString::get(const char* header, std::size_t ndx, bool nul
     const char* data = get_data_from_header(header) + (ndx * width);
 
     if (width == 0)
-        return nullable ? null() : StringData("");
+        return nullable ? tightdb::null() : StringData("");
 
     std::size_t size = (width-1) - data[width-1];
 
     if (size == static_cast<size_t>(-1))
-        return nullable ? null() : StringData("");
+        return nullable ? tightdb::null() : StringData("");
 
     return StringData(data, size);
 }

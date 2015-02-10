@@ -248,7 +248,7 @@ MemRef ArrayStringLong::create_array(size_t size, Allocator& alloc, bool nullabl
     if (nullable)
     {
         bool context_flag = false;
-        int_fast64_t value = 0; // initialize all rows to null
+        int_fast64_t value = 0; // initialize all rows to tightdb::null()
         MemRef mem = Array::create_array(type_Normal, context_flag, size, value, alloc); // Throws
         dg_2.reset(mem.m_ref);
         int_fast64_t v(mem.m_ref); // FIXME: Dangerous cast (unsigned -> signed)

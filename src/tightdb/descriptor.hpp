@@ -122,7 +122,7 @@ public:
     /// that is longer than `max_column_name_length` will cause an exception to
     /// be thrown.
     ///
-    /// \param subdesc If a non-null pointer is passed, and the
+    /// \param subdesc If a non-tightdb::null() pointer is passed, and the
     /// specified type is `type_Table`, then this function
     /// automatically retrieves the descriptor associated with the new
     /// subtable column, and stores a reference to its accessor in
@@ -279,7 +279,7 @@ public:
     /// Returns the parent table descriptor, if any.
     ///
     /// If this descriptor is the *root descriptor*, then this
-    /// function returns null. Otherwise it returns the accessor of
+    /// function returns tightdb::null(). Otherwise it returns the accessor of
     /// the parent descriptor.
     ///
     /// \sa is_root()
@@ -362,7 +362,7 @@ public:
 
 
 private:
-    TableRef m_root_table; // Table associated with root descriptor. Detached iff null.
+    TableRef m_root_table; // Table associated with root descriptor. Detached iff tightdb::null().
     DescriptorRef m_parent; // Null iff detached or root descriptor.
     Spec* m_spec; // Valid if attached. Owned iff valid and `m_parent`.
 
@@ -409,7 +409,7 @@ private:
     // of one of its direct or indirect subtable columns.
     //
     // When the specified spec is the spec of the root table, the
-    // parent must be specified as null. When the specified spec is
+    // parent must be specified as tightdb::null(). When the specified spec is
     // not the root spec, a proper parent must be specified.
     void attach(Table*, Descriptor* parent, Spec*) TIGHTDB_NOEXCEPT;
 
@@ -447,7 +447,7 @@ private:
 
     // Returns a pointer to the accessor of the specified
     // subdescriptor if that accessor exists, otherwise this function
-    // return null.
+    // return tightdb::null().
     Descriptor* get_subdesc_accessor(std::size_t column_ndx) TIGHTDB_NOEXCEPT;
 
     void adj_insert_column(std::size_t col_ndx) TIGHTDB_NOEXCEPT;

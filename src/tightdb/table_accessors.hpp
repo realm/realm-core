@@ -664,7 +664,7 @@ private:
     typedef MixedFieldAccessorBase<Taboid, col_idx, This> Base;
 
 public:
-    /// Returns null if the current value is not a subtable.
+    /// Returns tightdb::null() if the current value is not a subtable.
     TableRef get_subtable() const
     {
         return Base::m_table->get_impl()->get_subtable(col_idx, Base::m_row_idx);

@@ -61,9 +61,9 @@ void ArrayString::set(size_t ndx, StringData value)
 
     // Make room for the new value plus a zero-termination
     if (m_width <= value.size()) {
-        // if m_width == 0 then entire array contains only null entries
+        // if m_width == 0 then entire array contains only tightdb::null() entries
         if ((m_nullable ? value.is_null() : value.size() == 0) && m_width == 0) {
-            return; // set null element to null
+            return; // set tightdb::null() element to tightdb::null()
         }
 
 //        TIGHTDB_ASSERT(0 < value.size());
@@ -97,14 +97,14 @@ void ArrayString::set(size_t ndx, StringData value)
                 {
                     // copy string payload
                     const char* old_begin = old_end - (m_width-1);
-                    if (static_cast<size_t>(old_end - old_begin) < m_width) // non-null string
+                    if (static_cast<size_t>(old_end - old_begin) < m_width) // non-tightdb::null() string
                         new_end = copy_backward(old_begin, old_end, new_end);
                     old_end = old_begin;
                 }
             }
         }
         else {
-            // m_width == 0, so all elements are null. Expand that to new width.
+            // m_width == 0, so all elements are tightdb::null(). Expand that to new width.
             while (new_end != base) {
                 *--new_end = new_width; //  char(new_width - 1);
                 {
@@ -147,7 +147,7 @@ void ArrayString::insert(size_t ndx, StringData value)
 
     // Todo: Below code will perform up to 3 memcpy() operations in worst case. Todo, if we improve the
     // allocator to make a gap for the new value for us, we can have just 1. We can also have 2 by merging
-    // memmove() and set(), but it's a bit complex. May be done after support of null is completed.
+    // memmove() and set(), but it's a bit complex. May be done after support of tightdb::null() is completed.
 
     // Allocate room for the new value
     alloc(m_size+1, m_width); // Throws
@@ -329,7 +329,7 @@ MemRef ArrayString::slice(size_t offset, size_t size, Allocator& target_alloc) c
 
     // FIXME: This can be optimized as a single contiguous copy
     // operation.
-    ArrayString slice(target_alloc);
+    ArrayString slice(target_alloc, m_nullable);
     _impl::ShallowArrayDestroyGuard dg(&slice);
     slice.create(); // Throws
     size_t begin = offset;

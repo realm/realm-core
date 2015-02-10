@@ -1088,9 +1088,9 @@ TEST(Link_FindNullLink)
         table2 -> table1:                table1 -> table0:
         Row   LinkCol  LinkListCol       Row   Link
         0     1        {0, 1}            0     0
-        1     null     {}                1     null
+        1     tightdb::null()     {}                1     tightdb::null()
         2     2        {0}               2     0
-        3     null     {}
+        3     tightdb::null()     {}
     */
 
     // Test find_all on Link
@@ -1119,7 +1119,7 @@ TEST(Link_FindNullLink)
     match = table2->column<LinkList>(col_linklist2).is_null().find(2);
     CHECK_EQUAL(3, match);
 
-    // We have not yet defined behaviour of finding null-links in a linked-to table, so we just throw. Todo.
+    // We have not yet defined behaviour of finding tightdb::null()-links in a linked-to table, so we just throw. Todo.
     CHECK_THROW_ANY(table2->link(col_linklist2).column<Link>(col_link1).is_null());
 }
 

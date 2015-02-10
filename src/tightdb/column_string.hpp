@@ -234,7 +234,7 @@ inline void AdaptiveStringColumn::add(StringData value)
 
 inline void AdaptiveStringColumn::add()
 {
-    add(m_nullable ? null() : StringData(""));
+    add(m_nullable ? tightdb::null() : StringData(""));
 }
 
 inline void AdaptiveStringColumn::insert(std::size_t row_ndx, StringData value)
@@ -249,7 +249,7 @@ inline void AdaptiveStringColumn::insert(std::size_t row_ndx, StringData value)
 
 inline void AdaptiveStringColumn::insert(std::size_t row_ndx)
 {
-    insert(row_ndx, m_nullable ? null() : StringData(""));
+    insert(row_ndx, m_nullable ? tightdb::null() : StringData(""));
 }
 
 inline void AdaptiveStringColumn::erase(std::size_t row_ndx)
@@ -345,7 +345,7 @@ inline bool AdaptiveStringColumn::is_string_col() const TIGHTDB_NOEXCEPT
 // Implementing pure virtual method of ColumnBase.
 inline void AdaptiveStringColumn::insert(std::size_t row_ndx, std::size_t num_rows, bool is_append)
 {
-    StringData value = m_nullable ? null() : StringData("");
+    StringData value = m_nullable ? tightdb::null() : StringData("");
     do_insert(row_ndx, value, num_rows, is_append); // Throws
 }
 

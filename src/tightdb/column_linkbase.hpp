@@ -124,7 +124,7 @@ inline void ColumnLinkBase::adj_acc_insert_rows(std::size_t row_ndx,
     Column::adj_acc_insert_rows(row_ndx, num_rows);
 
     // For tables with link-type columns, the insertion point must be after all
-    // existsing rows, but since the inserted link can be non-null, the target
+    // existsing rows, but since the inserted link can be non-tightdb::null(), the target
     // table must still be marked dirty.
     typedef _impl::TableFriend tf;
     tf::mark(*m_target_table);

@@ -126,7 +126,7 @@ public:
     /// get_table(), get_index(), and the destructor. The consequences of
     /// calling other methods on a detached row accessor are unspecified. There
     /// are a few TightDB functions (Table::find_pkey_int()) that return a
-    /// detached row accessor to indicate a 'null' result. In all other cases,
+    /// detached row accessor to indicate a 'tightdb::null()' result. In all other cases,
     /// however, row accessors obtained by calling functions in the TightDB API
     /// are always in the 'attached' state immediately upon return from those
     /// functions.
@@ -141,7 +141,7 @@ public:
     void detach() TIGHTDB_NOEXCEPT;
 
     /// The table containing the row to which this accessor is currently
-    /// bound. For a detached accessor, the returned value is null.
+    /// bound. For a detached accessor, the returned value is tightdb::null().
     const table_type* get_table() const TIGHTDB_NOEXCEPT;
     table_type* get_table() TIGHTDB_NOEXCEPT;
 

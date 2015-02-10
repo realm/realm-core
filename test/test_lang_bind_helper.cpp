@@ -2778,8 +2778,8 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
     group.Verify();
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
-    // null       T_2[0]     []                     T_1[1]     [ T_2[1] ]             T_2[1]
-    // T_1[0]     T_2[1]     [ T_1[0] ]             null       [ T_2[0], T_2[1] ]     T_2[0]
+    // tightdb::null()       T_2[0]     []                     T_1[1]     [ T_2[1] ]             T_2[1]
+    // T_1[0]     T_2[1]     [ T_1[0] ]             tightdb::null()       [ T_2[0], T_2[1] ]     T_2[0]
     CHECK_EQUAL(4, group.size());
     CHECK(origin_1->is_attached());
     CHECK(origin_2->is_attached());
@@ -2850,9 +2850,9 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
     group.Verify();
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
-    // null       T_2[0]     []                     T_1[1]     [ T_2[1] ]             T_2[1]
-    // T_1[0]     T_2[1]     [ T_1[0] ]             null       [ T_2[0], T_2[1] ]     T_2[0]
-    // null       null       []
+    // tightdb::null()       T_2[0]     []                     T_1[1]     [ T_2[1] ]             T_2[1]
+    // T_1[0]     T_2[1]     [ T_1[0] ]             tightdb::null()       [ T_2[0], T_2[1] ]     T_2[0]
+    // tightdb::null()       tightdb::null()       []
     CHECK_EQUAL(3, origin_1->size());
     CHECK_EQUAL(13, origin_1->get_int(1,2));
     CHECK(origin_1->is_null_link(0,0));
@@ -2899,9 +2899,9 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
     group.Verify();
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
-    // null       T_2[0]     []                     T_1[1]     [ T_2[1] ]             T_2[1]
-    // T_1[0]     T_2[1]     [ T_1[0] ]             null       [ T_2[0], T_2[1] ]     T_2[0]
-    // null       null       []
+    // tightdb::null()       T_2[0]     []                     T_1[1]     [ T_2[1] ]             T_2[1]
+    // T_1[0]     T_2[1]     [ T_1[0] ]             tightdb::null()       [ T_2[0], T_2[1] ]     T_2[0]
+    // tightdb::null()       tightdb::null()       []
     CHECK_EQUAL(3, target_1->size());
     CHECK_EQUAL(17, target_1->get_int(0,2));
     CHECK(origin_1->is_null_link(0,0));
@@ -2955,9 +2955,9 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
     group.Verify();
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
-    // null       T_2[0]     []                     T_1[1]     [ T_2[1] ]             T_2[1]
-    // T_1[0]     T_2[1]     [ T_1[0] ]             null       [ T_2[0], T_2[1] ]     T_2[0]
-    // null       null       []                     T_1[1]     []                     T_2[0]
+    // tightdb::null()       T_2[0]     []                     T_1[1]     [ T_2[1] ]             T_2[1]
+    // T_1[0]     T_2[1]     [ T_1[0] ]             tightdb::null()       [ T_2[0], T_2[1] ]     T_2[0]
+    // tightdb::null()       tightdb::null()       []                     T_1[1]     []                     T_2[0]
     CHECK_EQUAL(3, origin_2->size());
     CHECK_EQUAL(19, origin_2->get_int(1,2));
     CHECK(origin_1->is_null_link(0,0));
@@ -3003,9 +3003,9 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
         WriteTransaction wt(sg_w);
         TableRef origin_1_w = wt.get_table("origin_1");
         TableRef origin_2_w = wt.get_table("origin_2");
-        origin_1_w->set_link(0, 2, 1);  // null -> non-null
-        origin_2_w->nullify_link(0, 2); // non-null -> null
-        origin_2_w->set_link(4, 2, 1);  // non-null -> non-null
+        origin_1_w->set_link(0, 2, 1);  // tightdb::null() -> non-tightdb::null()
+        origin_2_w->nullify_link(0, 2); // non-tightdb::null() -> tightdb::null()
+        origin_2_w->set_link(4, 2, 1);  // non-tightdb::null() -> non-tightdb::null()
         // Removes O_2_L_2[2] -> T_1[1]  and  O_2_L_4[2] -> T_2[0]
         // Adds    O_1_L_3[2] -> T_1[1]  and  O_2_L_4[2] -> T_2[1]
         wt.commit();
@@ -3014,9 +3014,9 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
     group.Verify();
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
-    // null       T_2[0]     []                     T_1[1]     [ T_2[1] ]             T_2[1]
-    // T_1[0]     T_2[1]     [ T_1[0] ]             null       [ T_2[0], T_2[1] ]     T_2[0]
-    // T_1[1]     null       []                     null       []                     T_2[1]
+    // tightdb::null()       T_2[0]     []                     T_1[1]     [ T_2[1] ]             T_2[1]
+    // T_1[0]     T_2[1]     [ T_1[0] ]             tightdb::null()       [ T_2[0], T_2[1] ]     T_2[0]
+    // T_1[1]     tightdb::null()       []                     tightdb::null()       []                     T_2[1]
     CHECK(origin_1->is_null_link(0,0));
     CHECK_EQUAL(0, origin_1->get_link(0,1));
     CHECK_EQUAL(1, origin_1->get_link(0,2));
@@ -3072,9 +3072,9 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
     group.Verify();
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
-    // null       T_2[0]     []                     T_1[1]     [ T_2[1] ]             T_2[1]
-    // T_1[0]     T_2[1]     [ T_1[0] ]             null       [ T_2[0], T_2[1] ]     T_2[0]
-    // T_1[1]     null       [ T_1[0], T_1[1] ]     null       [ T_2[0] ]             T_2[1]
+    // tightdb::null()       T_2[0]     []                     T_1[1]     [ T_2[1] ]             T_2[1]
+    // T_1[0]     T_2[1]     [ T_1[0] ]             tightdb::null()       [ T_2[0], T_2[1] ]     T_2[0]
+    // T_1[1]     tightdb::null()       [ T_1[0], T_1[1] ]     tightdb::null()       [ T_2[0] ]             T_2[1]
     ConstLinkViewRef link_list_2_2 = origin_2->get_linklist(2,2);
     CHECK(origin_1->is_null_link(0,0));
     CHECK_EQUAL(0, origin_1->get_link(0,1));
@@ -3137,9 +3137,9 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
     group.Verify();
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
-    // null       T_2[0]     []                     T_1[1]     [ T_2[1] ]             T_2[1]
-    // T_1[0]     T_2[1]     [ T_1[0] ]             null       [ T_2[0], T_2[1] ]     T_2[0]
-    // T_1[1]     null       [ T_1[1] ]             null       [ T_2[0], T_2[1] ]     T_2[1]
+    // tightdb::null()       T_2[0]     []                     T_1[1]     [ T_2[1] ]             T_2[1]
+    // T_1[0]     T_2[1]     [ T_1[0] ]             tightdb::null()       [ T_2[0], T_2[1] ]     T_2[0]
+    // T_1[1]     tightdb::null()       [ T_1[1] ]             tightdb::null()       [ T_2[0], T_2[1] ]     T_2[1]
     CHECK(origin_1->is_null_link(0,0));
     CHECK_EQUAL(0, origin_1->get_link(0,1));
     CHECK_EQUAL(1, origin_1->get_link(0,2));
@@ -3206,9 +3206,9 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
     group.Verify();
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
-    // null       T_2[0]     []                     T_1[1]     [ T_2[1] ]             T_2[1]
-    // T_1[0]     T_2[1]     [ T_1[0] ]             null       [ T_2[0], T_2[1] ]     T_2[0]
-    // T_1[1]     null       []                     null       [ T_2[1], T_2[0] ]     T_2[1]
+    // tightdb::null()       T_2[0]     []                     T_1[1]     [ T_2[1] ]             T_2[1]
+    // T_1[0]     T_2[1]     [ T_1[0] ]             tightdb::null()       [ T_2[0], T_2[1] ]     T_2[0]
+    // T_1[1]     tightdb::null()       []                     tightdb::null()       [ T_2[1], T_2[0] ]     T_2[1]
     CHECK(origin_1->is_null_link(0,0));
     CHECK_EQUAL(0, origin_1->get_link(0,1));
     CHECK_EQUAL(1, origin_1->get_link(0,2));
@@ -3270,8 +3270,8 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
     group.Verify();
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
-    // T_1[1]     null       []                     T_1[1]     [ T_2[1] ]             T_2[1]
-    // T_1[0]     T_2[1]     [ T_1[0] ]             null       [ T_2[0], T_2[1] ]     T_2[0]
+    // T_1[1]     tightdb::null()       []                     T_1[1]     [ T_2[1] ]             T_2[1]
+    // T_1[0]     T_2[1]     [ T_1[0] ]             tightdb::null()       [ T_2[0], T_2[1] ]     T_2[0]
     CHECK_EQUAL(2, origin_1->size());
     CHECK_EQUAL(2, origin_2->size());
     CHECK(!link_list_1_0->is_attached());
@@ -3338,9 +3338,9 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
     group.Verify();
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
-    // T_1[1]     null       []                     null       [ T_2[0], T_2[1] ]     T_2[0]
+    // T_1[1]     tightdb::null()       []                     tightdb::null()       [ T_2[0], T_2[1] ]     T_2[0]
     // T_1[0]     T_2[1]     [ T_1[0] ]
-    // null       T_2[0]     []
+    // tightdb::null()       T_2[0]     []
     CHECK_EQUAL(3, origin_1->size());
     CHECK_EQUAL(1, origin_2->size());
     CHECK(link_list_1_0->is_attached());
@@ -3403,8 +3403,8 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
     group.Verify();
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
-    // T_1[1]     null       []
-    // null       T_2[0]     []
+    // T_1[1]     tightdb::null()       []
+    // tightdb::null()       T_2[0]     []
     CHECK_EQUAL(2, origin_1->size());
     CHECK_EQUAL(0, origin_2->size());
     CHECK(link_list_1_0->is_attached());
@@ -3460,8 +3460,8 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
     group.Verify();
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
-    // T_1[1]     null       []                     T_1[0]     [ T_2[1] ]             T_2[1]
-    //                                              null       [ T_2[0], T_2[1] ]     null
+    // T_1[1]     tightdb::null()       []                     T_1[0]     [ T_2[1] ]             T_2[1]
+    //                                              tightdb::null()       [ T_2[0], T_2[1] ]     tightdb::null()
     //                                              T_1[1]     [ T_2[1], T_2[0] ]     T_2[0]
     CHECK_EQUAL(1, origin_1->size());
     CHECK_EQUAL(3, origin_2->size());
@@ -3525,7 +3525,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
     // T_1[1]     T_2[1]     []                     T_1[0]     [ T_2[1] ]             T_2[1]
-    // null       null       [ T_1[0], T_1[0] ]     null       [ T_2[0], T_2[1] ]     null
+    // tightdb::null()       tightdb::null()       [ T_1[0], T_1[0] ]     tightdb::null()       [ T_2[0], T_2[1] ]     tightdb::null()
     // T_1[0]     T_2[0]     [ T_1[1] ]             T_1[1]     [ T_2[1], T_2[0] ]     T_2[0]
     CHECK_EQUAL(3, origin_1->size());
     CHECK_EQUAL(3, origin_2->size());
@@ -3607,7 +3607,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
     // T_1[1]     T_2[1]     []                     T_1[0]     [ T_2[1] ]             T_2[2]
-    // null       null       [ T_1[2], T_1[0] ]     null       [ T_2[0], T_2[1] ]     null
+    // tightdb::null()       tightdb::null()       [ T_1[2], T_1[0] ]     tightdb::null()       [ T_2[0], T_2[1] ]     tightdb::null()
     // T_1[0]     T_2[0]     [ T_1[1] ]             T_1[1]     [ T_2[1], T_2[2] ]     T_2[0]
     CHECK_EQUAL(3, target_1->size());
     CHECK_EQUAL(3, target_2->size());
@@ -3687,9 +3687,9 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
     group.Verify();
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
-    // T_1[1]     T_2[1]     []                     null       [ T_2[1] ]             null
-    // null       null       [ T_1[0] ]             null       [ T_2[0], T_2[1] ]     null
-    // null       T_2[0]     [ T_1[1] ]             T_1[1]     [ T_2[1] ]             T_2[0]
+    // T_1[1]     T_2[1]     []                     tightdb::null()       [ T_2[1] ]             tightdb::null()
+    // tightdb::null()       tightdb::null()       [ T_1[0] ]             tightdb::null()       [ T_2[0], T_2[1] ]     tightdb::null()
+    // tightdb::null()       T_2[0]     [ T_1[1] ]             T_1[1]     [ T_2[1] ]             T_2[0]
     CHECK_EQUAL(2, target_1->size());
     CHECK_EQUAL(2, target_2->size());
     CHECK(link_list_1_0->is_attached());
@@ -3768,9 +3768,9 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
     group.Verify();
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
-    // T_1[1]     T_2[0]     []                     T_1[2]     [ T_2[0] ]             null
-    // null       null       [ T_1[0], T_1[2] ]     null       [ T_2[0] ]             null
-    // T_1[2]     null       [ T_1[1] ]             T_1[1]     [ T_2[0] ]             null
+    // T_1[1]     T_2[0]     []                     T_1[2]     [ T_2[0] ]             tightdb::null()
+    // tightdb::null()       tightdb::null()       [ T_1[0], T_1[2] ]     tightdb::null()       [ T_2[0] ]             tightdb::null()
+    // T_1[2]     tightdb::null()       [ T_1[1] ]             T_1[1]     [ T_2[0] ]             tightdb::null()
     CHECK_EQUAL(3, target_1->size());
     CHECK_EQUAL(1, target_2->size());
     CHECK(link_list_1_0->is_attached());
@@ -3846,9 +3846,9 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
     group.Verify();
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
-    // null       null       []                     T_1[1]     []                     null
-    // null       null       [ T_1[0], T_1[1] ]     null       []                     null
-    // T_1[1]     null       []                     null       []                     null
+    // tightdb::null()       tightdb::null()       []                     T_1[1]     []                     tightdb::null()
+    // tightdb::null()       tightdb::null()       [ T_1[0], T_1[1] ]     tightdb::null()       []                     tightdb::null()
+    // T_1[1]     tightdb::null()       []                     tightdb::null()       []                     tightdb::null()
     CHECK_EQUAL(2, target_1->size());
     CHECK_EQUAL(0, target_2->size());
     CHECK(link_list_1_0->is_attached());
@@ -3917,9 +3917,9 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
     group.Verify();
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
-    // null       T_2[1]     []                     null       [ T_2[1], T_2[1] ]     T_2[0]
-    // null       null       [ T_1[0] ]             null       []                     T_2[1]
-    // null       T_2[0]     []                     null       [ T_2[0] ]             null
+    // tightdb::null()       T_2[1]     []                     tightdb::null()       [ T_2[1], T_2[1] ]     T_2[0]
+    // tightdb::null()       tightdb::null()       [ T_1[0] ]             tightdb::null()       []                     T_2[1]
+    // tightdb::null()       T_2[0]     []                     tightdb::null()       [ T_2[0] ]             tightdb::null()
     CHECK_EQUAL(1, target_1->size());
     CHECK_EQUAL(3, target_2->size());
     CHECK(link_list_1_0->is_attached());
@@ -3993,8 +3993,8 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
     // T_1[1]     T_2[1]     [ T_1[1], T_1[0] ]     T_1[0]     [ T_2[1], T_2[1] ]     T_2[0]
-    // null       null       [ T_1[0] ]             null       []                     T_2[1]
-    // T_1[0]     T_2[0]     []                     T_1[1]     [ T_2[0] ]             null
+    // tightdb::null()       tightdb::null()       [ T_1[0] ]             tightdb::null()       []                     T_2[1]
+    // T_1[0]     T_2[0]     []                     T_1[1]     [ T_2[0] ]             tightdb::null()
     CHECK_EQUAL(3, target_1->size());
     CHECK_EQUAL(3, target_2->size());
     CHECK(link_list_1_0->is_attached());
@@ -4070,7 +4070,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
     // T_1[1]     T_2[1]     [ T_1[1], T_1[0] ]
-    // null       null       [ T_1[0] ]
+    // tightdb::null()       tightdb::null()       [ T_1[0] ]
     // T_1[0]     T_2[0]     []
     CHECK_EQUAL(3, origin_1->size());
     CHECK_EQUAL(0, origin_2->size());
@@ -4137,8 +4137,8 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
     // T_1[1]     T_2[1]     [ T_1[1], T_1[0] ]     T_1[0]     [ T_2[1], T_2[1] ]     T_2[0]
-    // null       null       [ T_1[0] ]             null       []                     T_2[1]
-    // T_1[0]     T_2[0]     []                     T_1[1]     [ T_2[0] ]             null
+    // tightdb::null()       tightdb::null()       [ T_1[0] ]             tightdb::null()       []                     T_2[1]
+    // T_1[0]     T_2[0]     []                     T_1[1]     [ T_2[0] ]             tightdb::null()
     CHECK_EQUAL(3, origin_1->size());
     CHECK_EQUAL(3, origin_2->size());
     CHECK(link_list_1_0->is_attached());
@@ -4210,9 +4210,9 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
     group.Verify();
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
-    // T_1[1]     null       [ T_1[1], T_1[0] ]     T_1[0]     []                     null
-    // null       null       [ T_1[0] ]             null       []                     null
-    // T_1[0]     null       []                     T_1[1]     []                     null
+    // T_1[1]     tightdb::null()       [ T_1[1], T_1[0] ]     T_1[0]     []                     tightdb::null()
+    // tightdb::null()       tightdb::null()       [ T_1[0] ]             tightdb::null()       []                     tightdb::null()
+    // T_1[0]     tightdb::null()       []                     T_1[1]     []                     tightdb::null()
     CHECK_EQUAL(3, origin_1->size());
     CHECK_EQUAL(3, origin_2->size());
     CHECK_EQUAL(3, target_1->size());
@@ -4285,8 +4285,8 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
     // T_1[1]     T_2[1]     [ T_1[1], T_1[0] ]     T_1[0]     [ T_2[1], T_2[1] ]     T_2[0]
-    // null       null       [ T_1[0] ]             null       []                     T_2[1]
-    // T_1[0]     T_2[0]     []                     T_1[1]     [ T_2[0] ]             null
+    // tightdb::null()       tightdb::null()       [ T_1[0] ]             tightdb::null()       []                     T_2[1]
+    // T_1[0]     T_2[0]     []                     T_1[1]     [ T_2[0] ]             tightdb::null()
     CHECK_EQUAL(3, target_1->size());
     CHECK_EQUAL(3, target_2->size());
     CHECK(link_list_1_0->is_attached());

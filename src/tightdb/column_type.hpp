@@ -54,7 +54,7 @@ enum ColumnAttr {
     /// `col_attr_Indexed`.
     col_attr_Unique = 2,
 
-    /// Specifies that this column forms the primary key. It implies a non-null
+    /// Specifies that this column forms the primary key. It implies a non-tightdb::null()
     /// constraint on the column, and it requires `col_attr_Unique`.
     col_attr_PrimaryKey = 4,
 
@@ -62,7 +62,7 @@ enum ColumnAttr {
     /// only to link columns (`type_Link` and `type_LinkList`).
     col_attr_StrongLinks = 8,
 
-    /// Specifies that elements in the column can be null [null is work in progress]
+    /// Specifies that elements in the column can be tightdb::null() [tightdb::null() is work in progress]
     col_attr_Nullable = 16
 };
 

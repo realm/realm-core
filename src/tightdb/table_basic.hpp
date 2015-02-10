@@ -254,7 +254,7 @@ public:
     template<class T> friend bool is_a(const Table&) TIGHTDB_NOEXCEPT;
 
     //@{
-    /// These functions return null if the specified table is not
+    /// These functions return tightdb::null() if the specified table is not
     /// compatible with the specified table type.
     template<class T> friend BasicTableRef<T> checked_cast(TableRef) TIGHTDB_NOEXCEPT;
     template<class T> friend BasicTableRef<const T> checked_cast(ConstTableRef) TIGHTDB_NOEXCEPT;

@@ -45,14 +45,14 @@ using namespace tightdb;
 
 TEST(StringData_Null)
 {
-    // A default constructed reference must be a null reference.
+    // A default constructed reference must be a tightdb::null() reference.
     {
         StringData sd;
         CHECK(!sd);
         CHECK(sd.is_null());
     }
     // When constructed from the empty string literal, it must not be
-    // a null reference.
+    // a tightdb::null() reference.
     {
         StringData sd("");
         CHECK(sd);

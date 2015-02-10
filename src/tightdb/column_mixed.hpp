@@ -53,7 +53,7 @@ public:
     ///
     /// \param table If this column is used as part of a table you
     /// must pass a pointer to that table. Otherwise you must pass
-    /// null.
+    /// tightdb::null().
     ///
     /// \param column_ndx If this column is used as part of a table
     /// you must pass the logical index of the column within that
@@ -88,7 +88,7 @@ public:
 
     /// If the value at the specified index is a subtable, return a
     /// pointer to that accessor for that subtable. Otherwise return
-    /// null. The accessor will be created if it does not already
+    /// tightdb::null(). The accessor will be created if it does not already
     /// exist.
     ///
     /// The returned table pointer must **always** end up being

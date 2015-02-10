@@ -695,7 +695,7 @@ TEST(StringIndex_FuzzyTest_Int)
         size_t m = col.find_first(r);
         for (size_t t_2 = 0; t_2 < n; ++t_2) {
             if (col.get(t_2) == r) {
-                CHECK_EQUAL(t_2, m); // 238, -1
+                CHECK_EQUAL(t_2, m);
                 break;
             }
         }
@@ -738,11 +738,11 @@ TEST(StringIndex_Null)
     AdaptiveStringColumn col(Allocator::get_default(), ref, true);
 
     col.add("");
-    col.add(StringData());
+    col.add(tightdb::null());
 
     const StringIndex& ndx = *col.create_search_index();
 
-    const size_t r1 = ndx.find_first(StringData());
+    const size_t r1 = ndx.find_first(tightdb::null());
     CHECK_EQUAL(r1, 1);
 
     col.destroy();
