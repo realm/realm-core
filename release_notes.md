@@ -2,7 +2,7 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
+* Fixed out-of-bounds reads when using aggregate functions on sorted TableViews.
 
 ### API breaking changes:
 

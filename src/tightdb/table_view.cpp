@@ -115,7 +115,7 @@ R TableViewBase::aggregate(R(ColType::*aggregateMethod)(size_t, size_t, size_t, 
 
     for (size_t ss = 1; ss < m_row_indexes.size(); ++ss) {
         row_ndx = to_size_t(m_row_indexes.get(ss));
-        if (row_ndx >= leaf_end) {
+        if (row_ndx < leaf_start || row_ndx >= leaf_end) {
             column->GetBlock(row_ndx, arr, leaf_start);
             const size_t leaf_size = arr.size();
             leaf_end = leaf_start + leaf_size;
