@@ -766,12 +766,10 @@ void SharedGroup::open(const string& path, bool no_create_file,
             }
 #ifndef _WIN32
             // FIXME: get dev and inode to ensure uniqueness!
-            m_daemon_becomes_ready.set_shared_part(info->daemon_becomes_ready,0,0,
-                offsetof(SharedInfo,daemon_becomes_ready));
-            m_work_to_do.set_shared_part(info->work_to_do,0,0,offsetof(SharedInfo,work_to_do));
-            m_room_to_write.set_shared_part(info->room_to_write,0,0,offsetof(SharedInfo,room_to_write));
-            m_new_commit_available.set_shared_part(info->new_commit_available,0,0,
-                offsetof(SharedInfo,new_commit_available));
+            m_daemon_becomes_ready.set_shared_part(info->daemon_becomes_ready,0,0,0);
+            m_work_to_do.set_shared_part(info->work_to_do,0,0,1);
+            m_room_to_write.set_shared_part(info->room_to_write,0,0,2);
+            m_new_commit_available.set_shared_part(info->new_commit_available,0,0,3);
             // In async mode, we need to make sure the daemon is running and ready:
             if (dlevel == durability_Async && !is_backend) {
                 while (info->daemon_ready == false) {
