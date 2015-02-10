@@ -1088,9 +1088,9 @@ TEST(Link_FindNullLink)
         table2 -> table1:                table1 -> table0:
         Row   LinkCol  LinkListCol       Row   Link
         0     1        {0, 1}            0     0
-        1     tightdb::null()     {}                1     tightdb::null()
+        1     null     {}                1     null
         2     2        {0}               2     0
-        3     tightdb::null()     {}
+        3     null     {}
     */
 
     // Test find_all on Link
