@@ -252,6 +252,12 @@
     #define TIGHTDB_NOINLINE
 #endif
 
+#if defined(__GNUC__) || defined(__INTEL_COMPILER)
+    #define TIGHTDB_UNREACHABLE() __builtin_unreachable()
+#else
+    #define TIGHTDB_UNREACHABLE() do { abort(); } while(0)
+#endif
+
 
 #if defined ANDROID
 #  define TIGHTDB_ANDROID 1
