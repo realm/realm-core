@@ -88,6 +88,8 @@ public:
 
     FindRes find_all_indexref(StringData value, std::size_t& dst) const;
 
+    bool is_nullable() const;
+
     // Search index
     bool has_search_index() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     void set_search_index_ref(ref_type, ArrayParent*, std::size_t, bool) TIGHTDB_OVERRIDE;

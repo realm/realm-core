@@ -129,6 +129,10 @@ void AdaptiveStringColumn::destroy() TIGHTDB_NOEXCEPT
         m_search_index->destroy();
 }
 
+bool AdaptiveStringColumn::is_nullable() const
+{
+    return m_nullable;
+}
 
 StringData AdaptiveStringColumn::get(size_t ndx) const TIGHTDB_NOEXCEPT
 {

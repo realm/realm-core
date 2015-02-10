@@ -59,6 +59,11 @@ void ColumnStringEnum::update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT
         m_search_index->update_from_parent(old_baseline);
 }
 
+bool ColumnStringEnum::is_nullable() const
+{
+    return m_nullable;
+}
+
 void ColumnStringEnum::set(size_t ndx, StringData value)
 {
     TIGHTDB_ASSERT(ndx < Column::size());

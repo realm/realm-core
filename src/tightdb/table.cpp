@@ -1549,7 +1549,7 @@ void Table::remove_primary_key()
 
 bool Table::is_nullable(size_t col_ndx) const
 {
-    // todo, assert that m_nullable of column instance object matches spec
+    TIGHTDB_ASSERT_DEBUG(col_ndx < m_spec.get_column_count());
     return (m_spec.get_column_attr(col_ndx) & col_attr_Nullable);
 }
 
