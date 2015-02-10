@@ -184,6 +184,7 @@ inline void ArrayBigBlobs::insert_string(std::size_t ndx, StringData value)
 inline StringData ArrayBigBlobs::get_string(const char* header, size_t ndx,
                                             Allocator& alloc, bool nullable) TIGHTDB_NOEXCEPT
 {
+    static_cast<void>(nullable);
     BinaryData bin = get(header, ndx, alloc);
     TIGHTDB_ASSERT_DEBUG(!(!nullable && bin.is_null()));
     if (bin.is_null())
