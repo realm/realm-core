@@ -45,9 +45,9 @@ TEST(ArrayBinary_Basic)
 
     // TEST(ArrayBinary_MultiEmpty)
 
-    c.add(BinaryData("", 0));
-    c.add(BinaryData("", 0));
-    c.add(BinaryData("", 0));
+    c.add(BinaryData());
+    c.add(BinaryData());
+    c.add(BinaryData());
     c.add(BinaryData());
     c.add(BinaryData());
     c.add(BinaryData());

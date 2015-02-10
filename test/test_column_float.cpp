@@ -385,7 +385,7 @@ TEST(ColumnBinary_InitOfEmptyColumn)
     t.remove_column(1);
     t.add_empty_row();
     t.add_column(type_Binary, "doesn't work");
-    CHECK_EQUAL(BinaryData("", 0), t.get_binary(1,0));
+    CHECK_EQUAL(BinaryData(), t.get_binary(1,0));
 }
 
 TEST(ColumnBool_InitOfEmptyColumn)

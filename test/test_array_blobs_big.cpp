@@ -47,9 +47,9 @@ TEST(ArrayBigBlobs_Basic)
 
 
     // TEST(ArrayBigBlobs_MultiEmpty)
-    c.add(BinaryData("", 0));
-    c.add(BinaryData("", 0));
-    c.add(BinaryData("", 0));
+    c.add(BinaryData());
+    c.add(BinaryData());
+    c.add(BinaryData());
     c.add(BinaryData());
     c.add(BinaryData());
     c.add(BinaryData());

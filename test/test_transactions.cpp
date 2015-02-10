@@ -93,7 +93,7 @@ void round(TestResults& test_results, SharedGroup& db, int index)
             table->add(0, false, moja, time_t(), "", BinaryData(0,0), 0, Mixed(int64_t()));
             char binary_data[] = { 7, 6, 5, 7, 6, 5, 4, 3, 113 };
             table->add(749321, true, kumi_na_tatu, time_t(99992), "click",
-                       BinaryData(&binary_data[0], sizeof(binary_data)), 0, Mixed("fido"));
+                       BinaryData(binary_data), 0, Mixed("fido"));
         }
         wt.commit();
     }
@@ -367,7 +367,7 @@ void round(TestResults& test_results, SharedGroup& db, int index)
         }
         int num = 9;
         for (int i=0; i<num; ++i)
-            subsubtable->add(i, BinaryData("", 0));
+            subsubtable->add(i, BinaryData());
         subsubtable->column().value += 31;
         wt.commit();
     }
@@ -388,7 +388,7 @@ void round(TestResults& test_results, SharedGroup& db, int index)
         }
         int num = 9;
         for (int i=0; i<num; ++i)
-            subsubtable->add(i, BinaryData("", 0));
+            subsubtable->add(i, BinaryData());
         wt.commit();
     }
 }
@@ -482,7 +482,7 @@ TEST(Transactions_General)
         for (size_t i=0; i<table1_theta_size; ++i) {
             CHECK_EQUAL(false,        subtable[i].beta);
             CHECK_EQUAL(0,            subtable[i].delta);
-            CHECK_EQUAL(BinaryData("", 0), subtable[i].zeta);
+            CHECK_EQUAL(BinaryData(), subtable[i].zeta);
             CHECK_EQUAL(0u,           subtable[i].eta->size());
             if (4 <= i)
                 CHECK_EQUAL(type_Int, subtable[i].theta.get_type());

@@ -897,7 +897,7 @@ TEST(Table_DegenerateSubtableSearchAndAggregate)
     CHECK_EQUAL(not_found, degen_child->where().equal(3, double()).find());
     CHECK_EQUAL(not_found, degen_child->where().equal_datetime(4, DateTime()).find());
     CHECK_EQUAL(not_found, degen_child->where().equal(5, StringData("")).find());
-    CHECK_EQUAL(not_found, degen_child->where().equal(6, BinaryData("", 0)).find());
+    CHECK_EQUAL(not_found, degen_child->where().equal(6, BinaryData()).find());
 //    CHECK_EQUAL(not_found, degen_child->where().equal(7, subtab).find()); // Not yet implemented
 //    CHECK_EQUAL(not_found, degen_child->where().equal(8, Mixed()).find()); // Not yet implemented
 
@@ -906,7 +906,7 @@ TEST(Table_DegenerateSubtableSearchAndAggregate)
     CHECK_EQUAL(not_found, degen_child->where().not_equal(3, double()).find());
     CHECK_EQUAL(not_found, degen_child->where().not_equal_datetime(4, DateTime()).find());
     CHECK_EQUAL(not_found, degen_child->where().not_equal(5, StringData("")).find());
-    CHECK_EQUAL(not_found, degen_child->where().not_equal(6, BinaryData("", 0)).find());
+    CHECK_EQUAL(not_found, degen_child->where().not_equal(6, BinaryData()).find());
 //    CHECK_EQUAL(not_found, degen_child->where().not_equal(7, subtab).find()); // Not yet implemented
 //    CHECK_EQUAL(not_found, degen_child->where().not_equal(8, Mixed()).find()); // Not yet implemented
 
@@ -4634,7 +4634,7 @@ TEST(Table_RowAccessor)
         CHECK_EQUAL(float(),         table[0].get_float         (2));
         CHECK_EQUAL(double(),        table[0].get_double        (3));
         CHECK_EQUAL(StringData(""),    table[0].get_string        (4));
-        CHECK_EQUAL(BinaryData("", 0),    table[0].get_binary        (5));
+        CHECK_EQUAL(BinaryData(),    table[0].get_binary        (5));
         CHECK_EQUAL(DateTime(),      table[0].get_datetime      (6));
         CHECK_EQUAL(0,               table[0].get_subtable_size (7));
         CHECK_EQUAL(int_fast64_t(),  table[0].get_mixed         (8));
@@ -4675,7 +4675,7 @@ TEST(Table_RowAccessor)
         CHECK_EQUAL(float(),         const_table[0].get_float         (2));
         CHECK_EQUAL(double(),        const_table[0].get_double        (3));
         CHECK_EQUAL(StringData(""),  const_table[0].get_string        (4));
-        CHECK_EQUAL(BinaryData("", 0),  const_table[0].get_binary        (5));
+        CHECK_EQUAL(BinaryData(),  const_table[0].get_binary        (5));
         CHECK_EQUAL(DateTime(),      const_table[0].get_datetime      (6));
         CHECK_EQUAL(0,               const_table[0].get_subtable_size (7));
         CHECK_EQUAL(int_fast64_t(),  const_table[0].get_mixed         (8));
@@ -4717,7 +4717,7 @@ TEST(Table_RowAccessor)
         CHECK_EQUAL(float(),         row_0.get_float         (2));
         CHECK_EQUAL(double(),        row_0.get_double        (3));
         CHECK_EQUAL(StringData(""),  row_0.get_string        (4));
-        CHECK_EQUAL(BinaryData("", 0),  row_0.get_binary        (5));
+        CHECK_EQUAL(BinaryData(),  row_0.get_binary        (5));
         CHECK_EQUAL(DateTime(),      row_0.get_datetime      (6));
         CHECK_EQUAL(0,               row_0.get_subtable_size (7));
         CHECK_EQUAL(int_fast64_t(),  row_0.get_mixed         (8));
@@ -4751,7 +4751,7 @@ TEST(Table_RowAccessor)
         CHECK_EQUAL(float(),         row_0.get_float         (2));
         CHECK_EQUAL(double(),        row_0.get_double        (3));
         CHECK_EQUAL(StringData(""),  row_0.get_string        (4));
-        CHECK_EQUAL(BinaryData("", 0),  row_0.get_binary        (5));
+        CHECK_EQUAL(BinaryData(),  row_0.get_binary        (5));
         CHECK_EQUAL(DateTime(),      row_0.get_datetime      (6));
         CHECK_EQUAL(0,               row_0.get_subtable_size (7));
         CHECK_EQUAL(int_fast64_t(),  row_0.get_mixed         (8));
@@ -4785,7 +4785,7 @@ TEST(Table_RowAccessor)
         CHECK_EQUAL(float(),         row_0.get_float         (2));
         CHECK_EQUAL(double(),        row_0.get_double        (3));
         CHECK_EQUAL(StringData(""),  row_0.get_string        (4));
-        CHECK_EQUAL(BinaryData("", 0),  row_0.get_binary        (5));
+        CHECK_EQUAL(BinaryData(),  row_0.get_binary        (5));
         CHECK_EQUAL(DateTime(),      row_0.get_datetime      (6));
         CHECK_EQUAL(0,               row_0.get_subtable_size (7));
         CHECK_EQUAL(int_fast64_t(),  row_0.get_mixed         (8));
@@ -4819,7 +4819,7 @@ TEST(Table_RowAccessor)
         CHECK_EQUAL(float(),         row_0.get_float         (2));
         CHECK_EQUAL(double(),        row_0.get_double        (3));
         CHECK_EQUAL(StringData(""),  row_0.get_string        (4));
-        CHECK_EQUAL(BinaryData("", 0),  row_0.get_binary        (5));
+        CHECK_EQUAL(BinaryData(),  row_0.get_binary        (5));
         CHECK_EQUAL(DateTime(),      row_0.get_datetime      (6));
         CHECK_EQUAL(0,               row_0.get_subtable_size (7));
         CHECK_EQUAL(int_fast64_t(),  row_0.get_mixed         (8));
@@ -4863,7 +4863,7 @@ TEST(Table_RowAccessor)
         row_1.set_float    (2, float());
         row_1.set_double   (3, double());
         row_1.set_string   (4, StringData(""));
-        row_1.set_binary   (5, BinaryData("", 0));
+        row_1.set_binary   (5, BinaryData());
         row_1.set_datetime (6, DateTime());
         row_1.set_subtable (7, 0);
         row_1.set_mixed    (8, Mixed());
@@ -4884,7 +4884,7 @@ TEST(Table_RowAccessor)
         CHECK_EQUAL(float(),         table.get_float    (2,1));
         CHECK_EQUAL(double(),        table.get_double   (3,1));
         CHECK_EQUAL(StringData(""),  table.get_string   (4,1));
-        CHECK_EQUAL(BinaryData("", 0),  table.get_binary   (5,1));
+        CHECK_EQUAL(BinaryData(),  table.get_binary   (5,1));
         CHECK_EQUAL(DateTime(),      table.get_datetime (6,1));
         CHECK_EQUAL(int_fast64_t(),  table.get_mixed    (8,1));
 
@@ -4914,7 +4914,7 @@ TEST(Table_RowAccessor)
         table[0].set_float    (2, float());
         table[0].set_double   (3, double());
         table[0].set_string   (4, StringData(""));
-        table[0].set_binary   (5, BinaryData("", 0));
+        table[0].set_binary   (5, BinaryData());
         table[0].set_datetime (6, DateTime());
         table[0].set_subtable (7, 0);
         table[0].set_mixed    (8, Mixed());
@@ -4936,7 +4936,7 @@ TEST(Table_RowAccessor)
         CHECK_EQUAL(float(),         table.get_float    (2,0));
         CHECK_EQUAL(double(),        table.get_double   (3,0));
         CHECK_EQUAL(StringData(""),  table.get_string   (4,0));
-        CHECK_EQUAL(BinaryData("", 0),  table.get_binary   (5,0));
+        CHECK_EQUAL(BinaryData(),  table.get_binary   (5,0));
         CHECK_EQUAL(DateTime(),      table.get_datetime (6,0));
         CHECK_EQUAL(int_fast64_t(),  table.get_mixed    (8,0));
 
