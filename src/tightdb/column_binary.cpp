@@ -41,7 +41,7 @@ ColumnBinary::ColumnBinary(Allocator& alloc, ref_type ref)
             return;
         }
         // Big blobs root leaf
-        // fixme, modify the 'nullable' arguments to constructor to support tightdb::null() for binary columns
+        // fixme, modify the 'nullable' arguments to constructor to support null for binary columns
         ArrayBigBlobs* root = new ArrayBigBlobs(alloc, false); // Throws
         root->init_from_mem(mem);
         m_array = root;
@@ -330,10 +330,8 @@ void ColumnBinary::do_move_last_over(size_t row_ndx, size_t last_row_ndx)
     // intermediate copy of the data (constr:bptree-copy-to-self).
     UniquePtr<char[]> buffer(new char[value.size()]); // Throws
     copy(value.data(), value.data()+value.size(), buffer.get());
-    BinaryData copy_of_value(value.data() == null_ptr ? null_ptr : buffer.get(), value.size());
-
+    BinaryData copy_of_value(buffer.get(), value.size());
     set(row_ndx, copy_of_value); // Throws
-
     bool is_last = true;
     erase(last_row_ndx, is_last); // Throws
 }
@@ -626,7 +624,7 @@ void ColumnBinary::leaf_to_dot(MemRef leaf_mem, ArrayParent* parent, size_t ndx_
         return;
     }
     // Big blobs
-    ArrayBigBlobs leaf(m_array->get_alloc(), false); // fixme, tightdb::null() support for to_dot
+    ArrayBigBlobs leaf(m_array->get_alloc(), false); // fixme, null support for to_dot
     leaf.init_from_mem(leaf_mem);
     leaf.set_parent(parent, ndx_in_parent);
     leaf.to_dot(out, is_strings);

@@ -792,7 +792,7 @@ TEST(ColumnString_Null)
 
                 if (random.draw_int<unsigned char>() > 100) {
                     sd = tightdb::null();
-                    stdstr = "tightdb::null()";
+                    stdstr = "null";
                 }
                 else {
                     sd = StringData(str, len);
@@ -811,7 +811,7 @@ TEST(ColumnString_Null)
 
                 CHECK_EQUAL(a.size(), v.size());
                 for (size_t i = 0; i < a.size(); i++) {
-                    if (v[i] == "tightdb::null()") {
+                    if (v[i] == "null") {
                         CHECK(a.is_null(i));
                         CHECK(a.get(i).data() == 0);
                     }

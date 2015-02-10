@@ -103,7 +103,7 @@ inline BinaryData ArrayBigBlobs::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
     ref_type ref = get_as_ref(ndx);
     if (ref == 0)
-        return BinaryData(null_ptr, 0);
+        return BinaryData(); // tightdb::null();
 
     const char* blob_header = get_alloc().translate(ref);
     const char* value = ArrayBlob::get(blob_header, 0);
@@ -116,7 +116,7 @@ inline BinaryData ArrayBigBlobs::get(const char* header, size_t ndx,
 {
     ref_type blob_ref = to_ref(Array::get(header, ndx));
     if (blob_ref == 0)
-        return BinaryData(null_ptr, 0);
+        return BinaryData();
 
     const char* blob_header = alloc.translate(blob_ref);
     const char* blob_data = Array::get_data_from_header(blob_header);
@@ -127,7 +127,7 @@ inline BinaryData ArrayBigBlobs::get(const char* header, size_t ndx,
 inline void ArrayBigBlobs::erase(std::size_t ndx)
 {
     ref_type blob_ref = Array::get_as_ref(ndx);
-    if (blob_ref != 0) { // nothing to destroy if tightdb::null()
+    if (blob_ref != 0) { // nothing to destroy if null
         Array::destroy(blob_ref, get_alloc()); // Shallow
     }
     Array::erase(ndx);

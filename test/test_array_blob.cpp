@@ -232,8 +232,8 @@ TEST(ArrayBlob_Null)
                 v.erase(v.begin() + del);
             }
             else {
-                // Generate string with good probability of being empty or tightdb::null()
-                static const char str[] = "This is a test of tightdb::null() strings";
+                // Generate string with good probability of being empty or null
+                static const char str[] = "This is a test of null strings";
                 size_t len;
 
                 if (random.draw_int<unsigned char>() > 100)
@@ -246,7 +246,7 @@ TEST(ArrayBlob_Null)
 
                 if (random.draw_int<unsigned char>() > 100) {
                     sd = tightdb::null();
-                    stdstr = "tightdb::null()";
+                    stdstr = "null";
                 }
                 else {
                     sd = StringData(str, len);
@@ -265,7 +265,7 @@ TEST(ArrayBlob_Null)
 
                 CHECK_EQUAL(a.size(), v.size());
                 for (size_t i = 0; i < a.size(); i++) {
-                    if (v[i] == "tightdb::null()") {
+                    if (v[i] == "null") {
                         CHECK(a.is_null(i));
                         CHECK(a.get(i).data() == 0);
                     }

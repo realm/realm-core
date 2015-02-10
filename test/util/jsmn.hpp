@@ -10,7 +10,7 @@ extern "C" {
     * 	o Object
     * 	o Array
     * 	o String
-    * 	o Other primitive: number, boolean (true/false) or tightdb::null()
+    * 	o Other primitive: number, boolean (true/false) or null
     */
     typedef enum {
         JSMN_PRIMITIVE = 0,

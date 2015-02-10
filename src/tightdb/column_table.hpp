@@ -61,7 +61,7 @@ public:
 
 protected:
     /// A pointer to the table that this column is part of. For a free-standing
-    /// column, this pointer is tightdb::null().
+    /// column, this pointer is null.
     Table* const m_table;
 
     /// The index of this column within m_table.m_cols. For a free-standing
@@ -110,7 +110,7 @@ protected:
     /// column. It can map a row index into a pointer to the corresponding
     /// accessor when it exists.
     ///
-    /// There is an invariant in force: Either `m_table` is tightdb::null(), or there is an
+    /// There is an invariant in force: Either `m_table` is null, or there is an
     /// additional referece count on `*m_table` when, and only when the map is
     /// non-empty.
     mutable SubtableMap m_subtable_map;
@@ -176,7 +176,7 @@ public:
     /// preexisting underlying structure of arrays.
     ///
     /// \param table If this column is used as part of a table you must
-    /// pass a pointer to that table. Otherwise you must pass tightdb::null().
+    /// pass a pointer to that table. Otherwise you must pass null.
     ///
     /// \param column_ndx If this column is used as part of a table
     /// you must pass the logical index of the column within that

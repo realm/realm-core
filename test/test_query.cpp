@@ -5674,7 +5674,7 @@ TEST(Query_NullStrings)
 
     // Short strings
     table.set_string(0, 0, "Albertslund");      // Normal non-empty string
-    table.set_string(0, 1, tightdb::null());             // NULL string
+    table.set_string(0, 1, tightdb::null());    // NULL string
     table.set_string(0, 2, "");                 // Empty string
 
     q = table.column<StringData>(0) == tightdb::null();

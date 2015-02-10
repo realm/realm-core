@@ -477,7 +477,7 @@ void spawn_daemon(const string& file)
         int i;
         for (i=m-1;i>=0;--i)
             close(i);
-        i = ::open("/dev/tightdb::null()",O_RDWR);
+        i = ::open("/dev/null",O_RDWR);
 #ifdef TIGHTDB_ENABLE_LOGFILE
         // FIXME: Do we want to always open the log file? Should it be configurable?
         i = ::open((file+".log").c_str(),O_RDWR | O_CREAT | O_APPEND | O_SYNC, S_IRWXU);

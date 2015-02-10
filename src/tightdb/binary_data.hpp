@@ -54,26 +54,26 @@ public:
     const char* data() const TIGHTDB_NOEXCEPT { return m_data; }
     std::size_t size() const TIGHTDB_NOEXCEPT { return m_size; }
 
-    /// Is this a tightdb::null() reference?
+    /// Is this a null reference?
     ///
-    /// An instance of BinaryData is a tightdb::null() reference when, and only when the
-    /// stored size is zero (size()) and the stored pointer is the tightdb::null() pointer
+    /// An instance of BinaryData is a null reference when, and only when the
+    /// stored size is zero (size()) and the stored pointer is the null pointer
     /// (data()).
     ///
     /// In the case of the empty byte sequence, the stored size is still zero,
-    /// but the stored pointer is **not** the tightdb::null() pointer. Note that the actual
+    /// but the stored pointer is **not** the null pointer. Note that the actual
     /// value of the pointer is immaterial in this case (as long as it is not
     /// zero), because when the size is zero, it is an error to dereference the
     /// pointer.
     ///
     /// Conversion of a BinaryData object to `bool` yields the logical negation
     /// of the result of calling this function. In other words, a BinaryData
-    /// object is converted to true if it is not the tightdb::null() reference, otherwise
+    /// object is converted to true if it is not the null reference, otherwise
     /// it is converted to false.
     ///
     /// It is important to understand that all of the functions and operators in
     /// this class, and most of the functions in the TightDB API in general
-    /// makes no distinction between a tightdb::null() reference and a reference to the
+    /// makes no distinction between a null reference and a reference to the
     /// empty byte sequence. These functions and operators never look at the
     /// stored pointer if the stored size is zero.
     bool is_null() const TIGHTDB_NOEXCEPT;

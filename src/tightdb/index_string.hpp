@@ -250,10 +250,10 @@ inline StringIndex::key_type StringIndex::create_key(StringData str) TIGHTDB_NOE
 // as empty strings.
 inline StringIndex::key_type StringIndex::create_key(StringData str, size_t offset, bool nullable) TIGHTDB_NOEXCEPT
 {
-    // 'bool trailingzeroes' fixes an old bug (from before tightdb::null() was introduced) in the string index where it could
-    // crash if strings ended with a 0. Such strings are now X-terminated too, even if the column is not nullable. 
-    // Zero terminated strings storedbefore this Realm version can no longer be found with find() in this current Realm
-    // version (will return not_found), but that's better than a crash.
+    // The 'trailingzeros' is due to a bug in existing indexes in the old file format 2. These may crash if they contain
+    // strings with a trailing "\0". This fix makes it only crashable if they in addition also have strings that end with 
+    // "\0X", hence reducing the risk of a crash. That's the best we can offer if we need to remain backwards compatible.
+    // New indexes that are created cannot crash, even if the file is in file version 2 
     bool trailingzeros = str.size() > 0 && *(str.data() + str.size() - 1) == 0;
 
     if (nullable || trailingzeros) {
@@ -274,7 +274,6 @@ inline StringIndex::key_type StringIndex::create_key(StringData str, size_t offs
     else {
         return create_key(str.substr(offset));
     }
-
 }
 
 template <class T> void StringIndex::insert(size_t row_ndx, T value, size_t num_rows, bool is_append)

@@ -47,7 +47,7 @@ bool ArrayString::is_null(size_t ndx) const
 void ArrayString::set_null(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx < m_size);
-    StringData sd = StringData(null_ptr, 0);
+    StringData sd = tightdb::null();
     set(ndx, sd);
 }
 
@@ -61,9 +61,9 @@ void ArrayString::set(size_t ndx, StringData value)
 
     // Make room for the new value plus a zero-termination
     if (m_width <= value.size()) {
-        // if m_width == 0 then entire array contains only tightdb::null() entries
+        // if m_width == 0 then entire array contains only null entries
         if ((m_nullable ? value.is_null() : value.size() == 0) && m_width == 0) {
-            return; // set tightdb::null() element to tightdb::null()
+            return; // element is already null
         }
 
 //        TIGHTDB_ASSERT(0 < value.size());
@@ -97,14 +97,14 @@ void ArrayString::set(size_t ndx, StringData value)
                 {
                     // copy string payload
                     const char* old_begin = old_end - (m_width-1);
-                    if (static_cast<size_t>(old_end - old_begin) < m_width) // non-tightdb::null() string
+                    if (static_cast<size_t>(old_end - old_begin) < m_width) // non-null string
                         new_end = copy_backward(old_begin, old_end, new_end);
                     old_end = old_begin;
                 }
             }
         }
         else {
-            // m_width == 0, so all elements are tightdb::null(). Expand that to new width.
+            // m_width == 0, so all elements are null. Expand that to new width.
             while (new_end != base) {
                 *--new_end = new_width; //  char(new_width - 1);
                 {

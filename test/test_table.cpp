@@ -252,7 +252,7 @@ TEST(Table_StringOrBinaryTooBig)
     table.set_string(0, 0, "01234567");
 
     size_t large_bin_size = 0xFFFFF1;
-    size_t large_str_size = 0xFFFFF0; // tightdb::null()-terminate reduces max size by 1
+    size_t large_str_size = 0xFFFFF0; // null-terminate reduces max size by 1
     UniquePtr<char[]> large_buf(new char[large_bin_size]);
     CHECK_LOGIC_ERROR(table.set_string(0, 0, StringData(large_buf.get(), large_str_size)),
                       LogicError::string_too_big);

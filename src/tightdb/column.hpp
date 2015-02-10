@@ -196,8 +196,8 @@ public:
 
     /// For columns that are able to contain subtables, this function returns
     /// the pointer to the subtable accessor at the specified row index if it
-    /// exists, otherwise it returns tightdb::null(). For other column types, this function
-    /// returns tightdb::null().
+    /// exists, otherwise it returns null. For other column types, this function
+    /// returns null.
     virtual Table* get_subtable_accessor(std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
 
     /// Detach and remove the subtable accessor at the specified row if it
@@ -342,7 +342,7 @@ struct ColumnBase::CascadeState {
     /// insertions must respect this order.
     row_set rows;
 
-    /// If non-tightdb::null(), then no recursion will be performed for rows of that
+    /// If non-null, then no recursion will be performed for rows of that
     /// table. The effect is then exactly as if all the rows of that table were
     /// added to \a state.rows initially, and then removed again after the
     /// explicit invocations of Table::cascade_break_backlinks_to() (one for
@@ -352,7 +352,7 @@ struct ColumnBase::CascadeState {
     /// Must never be set concurrently with stop_on_link_list_column.
     Table* stop_on_table;
 
-    /// If non-tightdb::null(), then Table::cascade_break_backlinks_to() will skip the
+    /// If non-null, then Table::cascade_break_backlinks_to() will skip the
     /// removal of reciprocal backlinks for the link list at
     /// stop_on_link_list_row_ndx in this column, and no recursion will happen
     /// on its behalf. This is used by LinkView::clear() to avoid reentrance.
@@ -360,7 +360,7 @@ struct ColumnBase::CascadeState {
     /// Must never be set concurrently with stop_on_table.
     ColumnLinkList* stop_on_link_list_column;
 
-    /// Is ignored if stop_on_link_list_column is tightdb::null().
+    /// Is ignored if stop_on_link_list_column is null.
     std::size_t stop_on_link_list_row_ndx;
 
     CascadeState();

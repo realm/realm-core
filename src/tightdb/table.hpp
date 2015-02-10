@@ -191,7 +191,7 @@ public:
                        DescriptorRef* subdesc = 0);
 
     // Todo, these prototypes only exist for backwards compatibility. We should remove them because they are error 
-    // prone (optional arguments and implicit bool to tightdb::null()-ptr conversion)
+    // prone (optional arguments and implicit bool to null-ptr conversion)
     std::size_t add_column(DataType type, StringData name, DescriptorRef* subdesc)
     {
         return add_column(type, name, false, subdesc);
@@ -489,7 +489,7 @@ public:
 
     // Sub-tables (works on columns whose type is either 'subtable' or
     // 'mixed', for a value in a mixed column that is not a subtable,
-    // get_subtable() returns tightdb::null(), get_subtable_size() returns zero,
+    // get_subtable() returns null, get_subtable_size() returns zero,
     // and clear_subtable() replaces the value with an empty table.)
     TableRef get_subtable(std::size_t column_ndx, std::size_t row_ndx);
     ConstTableRef get_subtable(std::size_t column_ndx, std::size_t row_ndx) const;
@@ -513,7 +513,7 @@ public:
     /// get_parent_table() returns a reference to the accessor associated with
     /// the parent, and get_parent_row_index() returns the index of the row in
     /// which the subtable resides. In all other cases (free-standing and
-    /// group-level tables), get_parent_table() returns tightdb::null() and
+    /// group-level tables), get_parent_table() returns null and
     /// get_parent_row_index() returns tightdb::npos.
     ///
     /// If this accessor is attached to a subtable, and \a column_ndx_out is
@@ -805,7 +805,7 @@ private:
     //
     // To save space in the database file, a subtable in such a column always
     // starts out in a degenerate form where nothing is allocated on its behalf,
-    // and a tightdb::null() 'ref' is stored in the corresponding slot of the column. A
+    // and a null 'ref' is stored in the corresponding slot of the column. A
     // subtable remains in this degenerate state until the first row is added to
     // the subtable.
     //
@@ -829,9 +829,9 @@ private:
     // `m_columns`), otherwise it contains precisely one column accessor for
     // each column in the table, in order.
     //
-    // In some cases an entry may be tightdb::null(). This is currently possible only in
+    // In some cases an entry may be null. This is currently possible only in
     // connection with Group::advance_transact(), but it means that several
-    // member functions must be prepared to handle these tightdb::null() entries; in
+    // member functions must be prepared to handle these null entries; in
     // particular, detach(), ~Table(), functions called on behalf of detach()
     // and ~Table(), and functiones called on behalf of
     // Group::advance_transact().
@@ -848,14 +848,14 @@ private:
     // accessor exists for each underlying descriptor at any given
     // point in time. Subdescriptors are kept unique by means of a
     // registry in the parent descriptor. Table::m_descriptor is
-    // always tightdb::null() for tables with shared descriptor.
+    // always null for tables with shared descriptor.
     mutable Descriptor* m_descriptor;
 
     // Table view instances
     typedef std::vector<const TableViewBase*> views;
     mutable views m_views;
 
-    // Points to first bound row accessor, or is tightdb::null() if there are none.
+    // Points to first bound row accessor, or is null if there are none.
     mutable RowBase* m_row_accessors;
 
     // Used for queries: Items are added with link() method during buildup of query
@@ -1031,7 +1031,7 @@ private:
     ColumnType get_real_column_type(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
 
     /// If this table is a group-level table, the parent group is returned,
-    /// otherwise tightdb::null() is returned.
+    /// otherwise null is returned.
     Group* get_parent_group() const TIGHTDB_NOEXCEPT;
 
     const Array* get_column_root(std::size_t col_ndx) const TIGHTDB_NOEXCEPT;
@@ -1175,7 +1175,7 @@ private:
     /// cascade_break_backlinks_to() once for each row in the table. When
     /// calling this function, \a state.stop_on_table must be set to the origin
     /// table (origin table of corresponding forward links), and \a
-    /// state.stop_on_link_list_column must be tightdb::null().
+    /// state.stop_on_link_list_column must be null.
     ///
     /// It is immaterial which table remove_backlink_broken_rows() is called on,
     /// as long it that table is in the same group as the specified rows.
@@ -1196,7 +1196,7 @@ private:
                                       std::size_t* end) const TIGHTDB_NOEXCEPT;
 
     /// Check if an accessor exists for the specified subtable. If it does,
-    /// return a pointer to it, otherwise return tightdb::null(). This function assumes
+    /// return a pointer to it, otherwise return null. This function assumes
     /// that the specified column index in a valid index into `m_cols` but does
     /// not otherwise assume more than minimal accessor consistency (see
     /// AccessorConsistencyLevels.)
@@ -1204,7 +1204,7 @@ private:
 
     /// Unless the column accessor is missing, this function returns the
     /// accessor for the target table of the specified link-type column. The
-    /// column accessor is said to be missing if `m_cols[col_ndx]` is tightdb::null(), and
+    /// column accessor is said to be missing if `m_cols[col_ndx]` is null, and
     /// this can happen only during certain operations such as the updating of
     /// the accessor tree when a read transaction is advanced. Note that for
     /// link type columns, the target table accessor exists when, and only when
@@ -1346,13 +1346,13 @@ protected:
     virtual StringData get_child_name(std::size_t child_ndx) const TIGHTDB_NOEXCEPT;
 
     /// If children are group-level tables, then this function returns the
-    /// group. Otherwise it returns tightdb::null().
+    /// group. Otherwise it returns null.
     virtual Group* get_parent_group() TIGHTDB_NOEXCEPT;
 
     /// If children are subtables, then this function returns the
-    /// parent table. Otherwise it returns tightdb::null().
+    /// parent table. Otherwise it returns null.
     ///
-    /// If \a column_ndx_out is not tightdb::null(), this function must assign the index of
+    /// If \a column_ndx_out is not null, this function must assign the index of
     /// the column within the parent table to `*column_ndx_out` when , and only
     /// when this table parent is a column in a parent table.
     virtual Table* get_parent_table(std::size_t* column_ndx_out = 0) TIGHTDB_NOEXCEPT;
@@ -1393,7 +1393,7 @@ inline void Table::bump_version(bool bump_global) const TIGHTDB_NOEXCEPT
         // Recurse through linked tables, use m_mark to avoid infinite recursion
         std::size_t limit = m_cols.size();
         for (std::size_t i = 0; i < limit; ++i) {
-            // We may meet a tightdb::null() pointer in place of a backlink column, pending
+            // We may meet a null pointer in place of a backlink column, pending
             // replacement with a new one. This can happen ONLY when creation of
             // the corresponding forward link column in the origin table is
             // pending as well. In this case it is ok to just ignore the zeroed
@@ -1433,7 +1433,7 @@ inline bool Table::is_attached() const TIGHTDB_NOEXCEPT
     // attachment of m_columns, because subtables with shared spec start out in
     // a degenerate form where they do not have a 'columns' array. For these
     // reasons, it is neccessary to define the notion of attachment for a table
-    // as follows: A table is attached if, and ony if m_column stores a non-tightdb::null()
+    // as follows: A table is attached if, and ony if m_column stores a non-null
     // parent pointer. This works because even for degenerate subtables,
     // m_columns is initialized with the correct parent pointer.
     return m_columns.has_parent();

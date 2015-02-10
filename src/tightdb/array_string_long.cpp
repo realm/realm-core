@@ -162,7 +162,7 @@ StringData ArrayStringLong::get(const char* header, size_t ndx, Allocator& alloc
         get_three(header, 0, offsets_ref, blob_ref, nulls_ref);
         const char* nulls_header = alloc.translate(nulls_ref);
         if (Array::get(nulls_header, ndx) == 0)
-            return StringData(null_ptr, 0);
+            return tightdb::null();
     }
     else {
         pair<int64_t, int64_t> p = get_two(header, 0);
@@ -233,7 +233,7 @@ MemRef ArrayStringLong::create_array(size_t size, Allocator& alloc, bool nullabl
         int_fast64_t value = 0;
         MemRef mem = Array::create_array(type_Normal, context_flag, size, value, alloc); // Throws
         dg_2.reset(mem.m_ref);
-        int_fast64_t v(mem.m_ref); // FIXME: Dangerous cast (unsigned -> signed)
+        int64_t v(mem.m_ref); // FIXME: Dangerous cast (unsigned -> signed)
         top.add(v); // Throws
         dg_2.release();
     }
@@ -241,17 +241,17 @@ MemRef ArrayStringLong::create_array(size_t size, Allocator& alloc, bool nullabl
         size_t blobs_size = 0;
         MemRef mem = ArrayBlob::create_array(blobs_size, alloc); // Throws
         dg_2.reset(mem.m_ref);
-        int_fast64_t v(mem.m_ref); // FIXME: Dangerous cast (unsigned -> signed)
+        int64_t v(mem.m_ref); // FIXME: Dangerous cast (unsigned -> signed)
         top.add(v); // Throws
         dg_2.release();
     }
     if (nullable)
     {
         bool context_flag = false;
-        int_fast64_t value = 0; // initialize all rows to tightdb::null()
+        int64_t value = 0; // initialize all rows to tightdb::null()
         MemRef mem = Array::create_array(type_Normal, context_flag, size, value, alloc); // Throws
         dg_2.reset(mem.m_ref);
-        int_fast64_t v(mem.m_ref); // FIXME: Dangerous cast (unsigned -> signed)
+        int64_t v(mem.m_ref); // FIXME: Dangerous cast (unsigned -> signed)
         top.add(v); // Throws
         dg_2.release();
     }

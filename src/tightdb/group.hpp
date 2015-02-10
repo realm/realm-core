@@ -233,7 +233,7 @@ public:
     /// get_table_name() returns the name of table at the specified index.
     ///
     /// The versions of get_table(), that accepts a \a name argument, return the
-    /// first table with the specified name, or tightdb::null() if no such table exists.
+    /// first table with the specified name, or null if no such table exists.
     ///
     /// add_table() adds a table with the specified name to this group. It
     /// throws TableNameInUse if \a require_unique_name is true and \a name
@@ -283,7 +283,7 @@ public:
     ///
     /// \return get_table(), add_table(), and get_or_add_table() return a table
     /// accessor attached to the requested (or added) table. get_table() may
-    /// return tightdb::null().
+    /// return null.
     ///
     /// \throw DescriptorMismatch Thrown by get_table() and get_or_add_table()
     /// tf the dynamic table type does not match the statically specified custom

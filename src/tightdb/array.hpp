@@ -81,13 +81,11 @@ template<class T> inline T no0(T v) { return v == 0 ? 1 : v; }
 /// found'. It is similar in function to std::string::npos.
 const std::size_t npos = std::size_t(-1);
 
+// Represents null in Query, find(), get(), set(), etc.
 struct null
 {
-    operator StringData() { return StringData(0, 0); }
+    operator StringData() { return StringData(); }
 };
-
-
-// static StringData null = StringData();
 
 /// Alias for tightdb::npos.
 const std::size_t not_found = npos;
@@ -297,7 +295,7 @@ public:
 
     /// Update the parents reference to this child. This requires, of course,
     /// that the parent information stored in this child is up to date. If the
-    /// parent pointer is set to tightdb::null(), this function has no effect.
+    /// parent pointer is set to null, this function has no effect.
     void update_parent();
 
     /// Called in the context of Group::commit() to ensure that attached
@@ -355,7 +353,7 @@ public:
     ArrayParent* get_parent() const TIGHTDB_NOEXCEPT;
 
     /// Setting a new parent affects ownership of the attached array node, if
-    /// any. If a non-tightdb::null() parent is specified, and there was no parent
+    /// any. If a non-null parent is specified, and there was no parent
     /// originally, then the caller passes ownership to the parent, and vice
     /// versa. This assumes, of course, that the change in parentship reflects a
     /// corresponding change in the list of children in the affected parents.
@@ -1039,7 +1037,7 @@ protected:
 
 private:
     ArrayParent* m_parent;
-    std::size_t m_ndx_in_parent; // Ignored if m_parent is tightdb::null().
+    std::size_t m_ndx_in_parent; // Ignored if m_parent is null.
 
 protected:
     Allocator& m_alloc;

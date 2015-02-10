@@ -756,14 +756,14 @@ TEST(StringIndex_Zero_Crash)
     table.add_column(type_String, "");
     table.add_empty_row(3);
 
-    table.set_string(0, 0, StringData("", 0));
+    table.set_string(0, 0, StringData(""));
     table.set_string(0, 1, StringData("\0", 1));
     table.set_string(0, 2, StringData("\0\0", 2));
     table.add_search_index(0);
 
     size_t t;
 
-    t = table.find_first_string(0, StringData("", 0));
+    t = table.find_first_string(0, StringData(""));
     CHECK_EQUAL(0, t);
 
     t = table.find_first_string(0, StringData("\0", 1));

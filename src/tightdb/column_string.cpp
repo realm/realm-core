@@ -181,7 +181,7 @@ bool AdaptiveStringColumn::is_null(std::size_t ndx) const TIGHTDB_NOEXCEPT
 void AdaptiveStringColumn::set_null(std::size_t ndx)
 {
     TIGHTDB_ASSERT_DEBUG(m_nullable);
-    StringData sd = StringData(null_ptr, 0);
+    StringData sd = tightdb::null();
     set(ndx, sd);
 }
 
@@ -1438,7 +1438,8 @@ namespace {
 
 size_t verify_leaf(MemRef mem, Allocator& alloc)
 {
-    // fixme, tightdb::null() support
+    // fixme, null support (validation will still run for nullable leafs, but just not include
+    // any validation of the null properties)
     bool long_strings = Array::get_hasrefs_from_header(mem.m_addr);
     if (!long_strings) {
         // Small strings
@@ -1561,7 +1562,7 @@ namespace {
 
 void leaf_dumper(MemRef mem, Allocator& alloc, ostream& out, int level)
 {
-    // todo, pass correct nullable argument to constructors ('false' is passed now)
+    // todo, support null (will now just show up in dump as empty strings)
     size_t leaf_size;
     const char* leaf_type;
     bool long_strings = Array::get_hasrefs_from_header(mem.m_addr);

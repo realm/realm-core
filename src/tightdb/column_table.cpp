@@ -395,7 +395,7 @@ void ColumnTable::Verify(const Table& table, size_t col_ndx) const
     size_t n = size();
     for (size_t i = 0; i != n; ++i) {
         // We want to verify any cached table accessors so we do not
-        // want to skip tightdb::null() refs here.
+        // want to skip null refs here.
         ConstTableRef subtable = get_subtable_ptr(i)->get_table_ref();
         TIGHTDB_ASSERT(tf::get_spec(*subtable).get_ndx_in_parent() == subspec_ndx);
         TIGHTDB_ASSERT(subtable->get_parent_row_index() == i);

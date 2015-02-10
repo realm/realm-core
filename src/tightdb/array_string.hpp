@@ -37,7 +37,7 @@ for a tightdb::null() which has the byte set to m_width (4). The byte is used to
 in various functions.
 
 New: If m_witdh = 0, then all elements are tightdb::null(). So to add an empty string we must expand m_width
-New: StringData is tightdb::null() if-and-only-if StringData::data() == 0. Todo, maybe make StringData tightdb::null()-aware?
+New: StringData is tightdb::null() if-and-only-if StringData::data() == 0.
 */
 
 class ArrayString: public Array {
@@ -142,7 +142,7 @@ inline StringData ArrayString::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < m_size);
     if (m_width == 0)
-        return m_nullable ? tightdb::null() : StringData("", 0);
+        return m_nullable ? tightdb::null() : StringData("");
 
     const char* data = m_data + (ndx * m_width);
     std::size_t size = (m_width-1) - data[m_width-1];

@@ -747,7 +747,7 @@ StringIndex* Column::create_search_index()
 {
    TIGHTDB_ASSERT(!m_search_index);
    UniquePtr<StringIndex> index;
-   StringIndex* si = new StringIndex(this, &get_string, m_array->get_alloc(), true);  // Throws fixme, index
+   StringIndex* si = new StringIndex(this, &get_string, m_array->get_alloc(), true);  // Throws
    index.reset(si);
 
    // Populate the index

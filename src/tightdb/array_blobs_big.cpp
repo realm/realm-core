@@ -76,7 +76,7 @@ void ArrayBigBlobs::insert(size_t ndx, BinaryData value, bool add_zero_term)
         new_blob.create(); // Throws
         new_blob.add(value.data(), value.size(), add_zero_term); // Throws
 
-        Array::insert(ndx, int_fast64_t(new_blob.get_ref())); // Throws
+        Array::insert(ndx, int64_t(new_blob.get_ref())); // Throws
     }
 }
 
@@ -164,7 +164,7 @@ ref_type ArrayBigBlobs::bptree_leaf_insert(size_t ndx, BinaryData value, bool ad
     }
 
     // Split leaf node
-    ArrayBigBlobs new_leaf(m_alloc, false);
+    ArrayBigBlobs new_leaf(m_alloc, m_nullable);
     new_leaf.create(); // Throws
     if (ndx == leaf_size) {
         new_leaf.add(value, add_zero_term);
@@ -191,6 +191,7 @@ void ArrayBigBlobs::Verify() const
     TIGHTDB_ASSERT(has_refs());
     for (size_t i = 0; i < size(); ++i) {
         ref_type blob_ref = Array::get_as_ref(i);
+        // 0 is used to indicate tightdb::null()
         if (blob_ref != 0) {
             ArrayBlob blob(m_alloc);
             blob.init_from_ref(blob_ref);

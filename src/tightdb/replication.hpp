@@ -121,7 +121,7 @@ public:
     virtual void set_last_version_synced(version_type version) TIGHTDB_NOEXCEPT;
 
     /// Get the value set by last call to 'set_last_version_synced'
-    /// If 'end_version_number' is non tightdb::null(), a limit to version numbering is returned.
+    /// If 'end_version_number' is non null, a limit to version numbering is returned.
     /// The limit returned is the version number of the latest commit.
     /// If sync versioning is disabled, the last version seen locally is returned.
     virtual version_type get_last_version_synced(version_type* end_version_number = 0)
@@ -557,7 +557,7 @@ private:
     float read_float();
     double read_double();
 
-    // return true if non-tightdb::null(), else false 
+    // return true if non-null, else false 
     bool read_string(util::StringBuffer&);
     void read_mixed(Mixed*);
 
@@ -1401,7 +1401,7 @@ bool Replication::TransactLogParser::do_parse(InstructionHandler& handler)
                 std::size_t col_ndx = read_int<std::size_t>(); // Throws
                 std::size_t row_ndx = read_int<std::size_t>(); // Throws
                 bool isnull = !read_string(m_string_buffer); // Throws
-                // The "" construction ensures a non-tightdb::null() data pointer
+                // The "" construction ensures a non-null data pointer
                 StringData value(isnull ? 0 : m_string_buffer.size() == 0 ? "" : m_string_buffer.data(),
                                  m_string_buffer.size());
                 if (!handler.set_string(col_ndx, row_ndx, value)) // Throws
@@ -1412,7 +1412,7 @@ bool Replication::TransactLogParser::do_parse(InstructionHandler& handler)
                 std::size_t col_ndx = read_int<std::size_t>(); // Throws
                 std::size_t row_ndx = read_int<std::size_t>(); // Throws
                 bool isnull = !read_string(m_string_buffer); // Throws
-                // The "" construction ensures a non-tightdb::null() data pointer
+                // The "" construction ensures a non-null data pointer
                 BinaryData value(isnull ? 0 : m_string_buffer.size() == 0 ? "" : m_string_buffer.data(),
                     m_string_buffer.size());
                 if (!handler.set_binary(col_ndx, row_ndx, value)) // Throws
@@ -1872,7 +1872,7 @@ inline bool Replication::TransactLogParser::read_string(util::StringBuffer& buf)
     std::size_t size = read_int<std::size_t>(); // Throws
 
     if (size == static_cast<size_t>(-1)) {
-        return false; // tightdb::null()
+        return false; // null
     }
 
     buf.resize(size); // Throws

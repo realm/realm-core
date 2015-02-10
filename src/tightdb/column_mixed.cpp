@@ -50,7 +50,7 @@ void ColumnMixed::create(Allocator& alloc, ref_type ref, Table* table, size_t co
     // there if needed
     if (top->size() == 3) {
         ref_type binary_data_ref = top->get_as_ref(2);
-        binary_data.reset(new ColumnBinary(alloc, binary_data_ref));
+        binary_data.reset(new ColumnBinary(alloc, binary_data_ref)); // Throws
         binary_data->set_parent(&*top, 2);
     }
 
