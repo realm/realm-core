@@ -196,6 +196,7 @@ public:
               const char* encryption_key = 0);
 
     friend class Replication;
+    Replication* get_replication();
 
 #endif
 
@@ -406,9 +407,11 @@ private:
     void do_begin_write();
     version_type do_commit();
 
+public:
     // return the current version of the database - note, this is not necessarily
     // the version seen by any currently open transactions.
     uint_fast64_t get_current_version();
+private:
 
     // make sure the given index is within the currently mapped area.
     // if not, expand the mapped area. Returns true if the area is expanded.
@@ -617,6 +620,11 @@ inline SharedGroup::SharedGroup(Replication& repl, DurabilityLevel dlevel, const
     m_group(Group::shared_tag())
 {
     open(repl, dlevel, key);
+}
+
+inline Replication* SharedGroup::get_replication()
+{
+    return _impl::GroupFriend::get_replication(m_group);
 }
 #endif
 

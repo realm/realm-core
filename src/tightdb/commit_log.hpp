@@ -47,6 +47,8 @@ Replication* makeWriteLogCollector(std::string filepath,
                                    bool server_synchronization_mode = false,
                                    const char* encryption_key = 0);
 
+uint_fast64_t get_current_timestamp();
+
 } // namespace tightdb
 
 #endif // TIGHTDB_ENABLE_REPLICATION

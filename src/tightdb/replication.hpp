@@ -161,8 +161,10 @@ public:
     /// then up to the implementation of the Repication interface to define what
     /// replication means.
     virtual version_type apply_foreign_changeset(SharedGroup&, version_type base_version,
-                                                 BinaryData changeset, version_type server_version,
+                                                 BinaryData changeset, uint_fast64_t timestamp,
+                                                 uint_fast64_t peer_id, version_type peer_version,
                                                  std::ostream* apply_log = 0);
+    virtual version_type get_last_peer_version(uint_fast64_t peer_id) const;
 
     /// Acquire permision to start a new 'write' transaction. This
     /// function must be called by a client before it requests a
@@ -280,6 +282,8 @@ public:
 
 
     class TransactLogParser;
+    class IndexTranslatorBase;
+    class SimpleIndexTranslator;
 
     class InputStream;
     class SimpleInputStream;
@@ -296,6 +300,8 @@ public:
     /// successfully parsed, or ended prematurely.
     static void apply_transact_log(InputStream& transact_log, Group& target,
                                    std::ostream* apply_log = 0);
+    static void apply_transact_log(InputStream& transact_log, Group& target,
+                                   IndexTranslatorBase& translator, std::ostream* apply_log = 0);
 
     virtual ~Replication() TIGHTDB_NOEXCEPT {}
 
@@ -462,11 +468,14 @@ private:
 /// Extended version of a commit log entry. The additional info is required for
 /// Sync.
 struct Replication::CommitLogEntry {
-    /// True iff this changeset was submitted via apply_foreign_changeset().
-    bool is_foreign;
+    /// When did it happen?
+    uint64_t timestamp;
 
-    /// Not yet used.
-    version_type server_version;
+    /// Nonzero iff this changeset was submitted via apply_foreign_changeset().
+    uint64_t peer_id;
+
+    /// The last remote version that this commit reflects.
+    version_type peer_version;
 
     /// The changeset.
     BinaryData log_data;
@@ -476,6 +485,21 @@ struct Replication::CommitLogEntry {
 // are foreign. It is carried over as part of a commit, allowing other threads involved
 // with Sync to observet it. For local commits, the value of server_version is taken
 // from any previous forewign commmit.
+
+class Replication::IndexTranslatorBase {
+public:
+    virtual size_t translate_row_index(TableRef table, size_t row_ndx, bool* overwritten = null_ptr) = 0;
+};
+
+class Replication::SimpleIndexTranslator : public Replication::IndexTranslatorBase {
+public:
+    size_t translate_row_index(TableRef, size_t row_ndx, bool* overwritten) TIGHTDB_OVERRIDE
+    {
+        if (overwritten)
+            *overwritten = false;
+        return row_ndx;
+    }
+};
 
 
 class Replication::InputStream {
@@ -713,12 +737,21 @@ inline Replication::version_type Replication::get_last_version_synced(version_ty
 }
 
 inline Replication::version_type
-Replication::apply_foreign_changeset(SharedGroup&, version_type, BinaryData, version_type,
+Replication::apply_foreign_changeset(SharedGroup&, version_type, BinaryData,
+                                     uint_fast64_t, uint_fast64_t, version_type,
                                      std::ostream*)
 {
     // Unimplemented!
     TIGHTDB_ASSERT(false);
     return false;
+}
+
+inline Replication::version_type
+Replication::get_last_peer_version(uint_fast64_t) const
+{
+    // Unimplemented!
+    TIGHTDB_ASSERT(false);
+    return 0;
 }
 
 inline void Replication::get_commit_entries(version_type, version_type, Replication::CommitLogEntry*)

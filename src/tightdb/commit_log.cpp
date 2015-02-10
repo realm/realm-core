@@ -27,6 +27,8 @@
 #include <map>
 #include <tightdb/commit_log.hpp>
 
+#include <sys/time.h> // FIXME!! Not portable
+
 #include <tightdb/replication.hpp>
 #ifdef TIGHTDB_ENABLE_REPLICATION
 
@@ -109,8 +111,11 @@ public:
     void do_transact_log_append(const char* data, size_t size) TIGHTDB_OVERRIDE;
     void transact_log_reserve(size_t size);
     virtual bool is_in_server_synchronization_mode() { return m_is_persisting; }
-    version_type apply_foreign_changeset(SharedGroup&, version_type, BinaryData, version_type,
+    version_type apply_foreign_changeset(SharedGroup&, version_type, BinaryData,
+                                         uint_fast64_t timestamp,
+                                         uint_fast64_t peer_id, version_type peer_version,
                                          ostream*) TIGHTDB_OVERRIDE;
+    version_type get_last_peer_version(uint_fast64_t peer_id) const TIGHTDB_OVERRIDE;
     virtual void stop_logging() TIGHTDB_OVERRIDE;
     virtual void reset_log_management(version_type last_version) TIGHTDB_OVERRIDE;
     virtual void set_last_version_seen_locally(version_type last_seen_version_number)
@@ -168,7 +173,7 @@ protected:
             // The first commit will be from state 1 -> state 2, so we must set 1 initially
             begin_oldest_commit_range = begin_newest_commit_range = end_commit_range = version;
             last_version_seen_locally = last_version_synced = version;
-            last_server_version = 0;
+            last_server_version = 1;
             write_offset = 0;
         }
     };
@@ -193,10 +198,16 @@ protected:
         }
     };
 
-    // Each of the actual logs are preceded by their size (in uint64_t format),
+    // Each of the actual logs are preceded by this header,
     // and each log start aligned to uint64_t (required on some
     // architectures). The size does not count any padding needed at the end of
     // each log.
+    struct EntryHeader {
+        uint64_t peer_version;
+        uint64_t peer_id;
+        uint64_t timestamp;
+        uint64_t size;
+    };
 
     // Metadata for a file (in memory):
     struct CommitLogMetadata {
@@ -206,6 +217,8 @@ protected:
         util::File::SizeType last_seen_size;
         CommitLogMetadata(string name): name(name) {}
     };
+
+    class MergingIndexTranslator;
 
     string m_database_name;
     string m_header_name;
@@ -228,7 +241,7 @@ protected:
     // Get the current preamble for reading only - use get_preamble_for_write()
     // if you are going to change stuff in the preamble, and remember to call
     // sync_header() to commit those changes.
-    const CommitLogPreamble* get_preamble();
+    CommitLogPreamble* get_preamble();
 
     // Creates in-mapped-memory copy of the active preamble and returns a
     // pointer to it.  Allows you to do in-place updates of the preamble, then
@@ -268,20 +281,19 @@ protected:
     void reset_header();
 
     // Add a single log entry to the logs. The log data is copied.
-    version_type internal_submit_log(const char*, uint_fast64_t,
-                                     bool is_foreign, version_type server_version = 0);
+    version_type internal_submit_log(const char*, uint_fast64_t size,
+                                     uint_fast64_t timestamp, uint_fast64_t peer_id,
+                                     version_type peer_version);
 
 
 
     void set_log_entry_internal(Replication::CommitLogEntry* entry,
-                                uint64_t server_version_and_flag,
-                                const char* log,
-                                std::size_t size);
+                                const EntryHeader* hdr,
+                                const char* log);
 
     void set_log_entry_internal(BinaryData* entry,
-                                uint64_t server_version_and_flag,
-                                const char* log,
-                                std::size_t size);
+                                const EntryHeader* hdr,
+                                const char* log);
 
     template<typename T>
     void get_commit_entries_internal(version_type from_version, version_type to_version,
@@ -310,8 +322,9 @@ void recover_from_dead_owner()
 
 // Header access and manipulation methods:
 
-inline const WriteLogCollector::CommitLogPreamble* WriteLogCollector::get_preamble()
+inline WriteLogCollector::CommitLogPreamble* WriteLogCollector::get_preamble()
 {
+    map_header_if_needed();
     CommitLogHeader* header = m_header.get_addr();
     if (header->use_preamble_a)
         return & header->preamble_a;
@@ -380,7 +393,6 @@ WriteLogCollector::get_active_log(CommitLogPreamble* preamble)
         return &m_log_a;
     return &m_log_b;
 }
-
 
 
 // File and memory mapping functions:
@@ -467,7 +479,8 @@ void WriteLogCollector::cleanup_stale_versions(CommitLogPreamble* preamble)
 // returns the current "from" version
 Replication::version_type
 WriteLogCollector::internal_submit_log(const char* data, uint_fast64_t size,
-                                       bool is_foreign, version_type server_version)
+                                       uint_fast64_t timestamp, uint_fast64_t peer_id,
+                                       version_type peer_version)
 {
     map_header_if_needed();
     RobustLockGuard rlg(m_header.get_addr()->lock, &recover_from_dead_owner);
@@ -477,11 +490,11 @@ WriteLogCollector::internal_submit_log(const char* data, uint_fast64_t size,
     // for local commits, the server_version is taken from the previous commit.
     // for foreign commits, the server_version is provided by the caller and saved
     // for later use.
-    if (is_foreign) {
-        preamble->last_server_version = server_version;
+    if (peer_id != 0) {
+        preamble->last_server_version = peer_version;
     }
     else {
-        server_version = preamble->last_server_version;
+        peer_version = preamble->last_server_version;
     }
 
     // make sure the file is available for potential resizing
@@ -489,7 +502,7 @@ WriteLogCollector::internal_submit_log(const char* data, uint_fast64_t size,
 
     // make sure we have space (allocate if not)
     File::SizeType size_needed =
-        aligned_to(sizeof (uint64_t), preamble->write_offset + 2*sizeof (uint64_t) + size);
+        aligned_to(sizeof (uint64_t), preamble->write_offset + sizeof(EntryHeader) + size);
     size_needed = aligned_to(page_size, size_needed);
     if (size_needed > active_log->file.get_size())
         active_log->file.resize(size_needed);
@@ -499,17 +512,19 @@ WriteLogCollector::internal_submit_log(const char* data, uint_fast64_t size,
     remap_if_needed(*active_log);
 
     // append data from write pointer and onwards:
-    uint64_t server_version_and_flag = (server_version << 1) + (is_foreign ? 1 : 0);
     char* write_ptr = reinterpret_cast<char*>(active_log->map.get_addr()) + preamble->write_offset;
-    *reinterpret_cast<uint64_t*>(write_ptr) = server_version_and_flag;
-    write_ptr += sizeof (uint64_t);
-    *reinterpret_cast<uint64_t*>(write_ptr) = size;
-    write_ptr += sizeof (uint64_t);
+    EntryHeader hdr;
+    hdr.peer_version = peer_version;
+    hdr.peer_id = peer_id;
+    hdr.timestamp = timestamp;
+    hdr.size = size;
+    *reinterpret_cast<EntryHeader*>(write_ptr) = hdr;
+    write_ptr += sizeof(EntryHeader);
     copy(data, data+size, write_ptr);
     active_log->map.sync();
 
     // update metadata to reflect the added commit log
-    preamble->write_offset += aligned_to(sizeof (uint64_t), size + 2*sizeof (uint64_t));
+    preamble->write_offset += aligned_to(sizeof (uint64_t), size + sizeof(EntryHeader));
     version_type orig_version = preamble->end_commit_range;
     preamble->end_commit_range = orig_version+1;
     sync_header();
@@ -582,10 +597,10 @@ void WriteLogCollector::reset_log_management(version_type last_version)
                  current_version < last_version;
                  current_version++) {
                 // advance write ptr to next buffer start:
-                uint_fast64_t size =
-                    *reinterpret_cast<const uint64_t*>(buffer + preamble->write_offset + sizeof(uint64_t));
-                uint_fast64_t tmp_offset = preamble->write_offset + 2*sizeof (uint64_t);
-                size = aligned_to(sizeof (uint64_t), size);
+                const EntryHeader* hdr = reinterpret_cast<const EntryHeader*>(buffer + preamble->write_offset);
+                uint_fast64_t size = hdr->size;
+                uint_fast64_t tmp_offset = preamble->write_offset + sizeof(EntryHeader);
+                size = aligned_to(sizeof(uint64_t), size);
                 preamble->write_offset = tmp_offset + size;
             }
             preamble->end_commit_range = current_version;
@@ -640,21 +655,18 @@ void WriteLogCollector::set_last_version_seen_locally(version_type last_seen_ver
 
 
 void WriteLogCollector::set_log_entry_internal(Replication::CommitLogEntry* entry,
-                                uint64_t server_version_and_flag, const char* log,
-                                std::size_t size)
+                                const EntryHeader* hdr, const char* log)
 {
-    entry->log_data = BinaryData(log, size);
-    entry->is_foreign = (server_version_and_flag & 0x1);
-    entry->server_version = server_version_and_flag >> 1;
-
+    entry->timestamp = hdr->timestamp;
+    entry->peer_id = hdr->peer_id;
+    entry->peer_version = hdr->peer_version;
+    entry->log_data = BinaryData(log, hdr->size);
 }
 
 void WriteLogCollector::set_log_entry_internal(BinaryData* entry,
-                                uint64_t server_version_and_flag, const char* log,
-                                std::size_t size)
+                                const EntryHeader* hdr, const char* log)
 {
-    *entry = BinaryData(log, size);
-    static_cast<void>(server_version_and_flag);
+    *entry = BinaryData(log, hdr->size);
 }
 
 void WriteLogCollector::get_commit_entries(version_type from_version, version_type to_version,
@@ -725,14 +737,11 @@ void WriteLogCollector::get_commit_entries_internal(version_type from_version, v
             break;
 
         // follow buffer layout
-        uint_fast64_t server_version_and_flag =
-            *reinterpret_cast<const uint64_t*>(buffer + m_read_offset);
-        uint_fast64_t size =
-            *reinterpret_cast<const uint64_t*>(buffer + m_read_offset + sizeof(uint64_t));
-        uint_fast64_t tmp_offset = m_read_offset + 2*sizeof (uint64_t);
+        const EntryHeader* hdr = reinterpret_cast<const EntryHeader*>(buffer + m_read_offset);
+        uint_fast64_t tmp_offset = m_read_offset + sizeof(EntryHeader);
         if (m_read_version >= from_version) {
             // cerr << "  --at: " << m_read_offset << ", " << size << endl;
-            set_log_entry_internal(logs_buffer, server_version_and_flag, buffer+tmp_offset, size);
+            set_log_entry_internal(logs_buffer, hdr, buffer+tmp_offset);
             ++logs_buffer;
         }
         // break early to avoid updating tracking information, if we've reached
@@ -742,33 +751,207 @@ void WriteLogCollector::get_commit_entries_internal(version_type from_version, v
         // write point to the beginning of the other file.
         if (m_read_version+1 >= preamble->end_commit_range)
             break;
-        size = aligned_to(sizeof (uint64_t), size);
+        uint_fast64_t size = aligned_to(sizeof (uint64_t), hdr->size);
         m_read_offset = tmp_offset + size;
         m_read_version++;
     }
 }
 
 
+class WriteLogCollector::MergingIndexTranslator : public Replication::IndexTranslatorBase {
+public:
+    MergingIndexTranslator(WriteLogCollector& log, Group& group, uint_fast64_t timestamp,
+        uint_fast64_t peer_id, version_type base_version, version_type current_version):
+    m_log(log), m_group(group), m_timestamp(timestamp), /*m_peer_id(peer_id),*/
+    m_base_version(base_version), m_current_version(current_version), m_was_set(false)
+    {
+        static_cast<void>(peer_id); // FIXME: Unused for now.
+    }
+
+    size_t translate_row_index(TableRef table, size_t row_ndx, bool* overwritten) TIGHTDB_OVERRIDE
+    {
+        // Go through the commit log from m_base_version to m_current_version.
+        // For each insert in table that has a lower timestamp and a lower row index, bump
+        // row_ndx by one.
+        m_translate_table = table;
+        m_result_ndx = row_ndx;
+        std::vector<Replication::CommitLogEntry> entries(m_current_version - m_base_version);
+        m_log.get_commit_entries(m_base_version, m_current_version, entries.data());
+        //std::cout << "Translating row index v" << m_base_version << " -> v" << m_current_version << "\n";
+
+        for (size_t i = 0; i < entries.size(); ++i) {
+            CommitLogEntry& entry = entries[i];
+            if (entry.peer_id != 0)
+                continue;
+            //std::cout << "Modifying against local commit at t = " << entry.timestamp << "\n";
+            if (entry.timestamp < m_timestamp) { // FIXME Compare peer_id too.
+                SimpleInputStream input(entry.log_data.data(), entry.log_data.size());
+                TransactLogParser parser(input);
+                parser.parse(*this);
+            }
+        }
+
+        // Save m_result_ndx so we can parse the future entries to detect set overwrite.
+        size_t result = m_result_ndx;
+
+        // If we need to figure out whether the index was overwritten,
+        // parse future log entries and find a set at the index.
+        // We keep bumping any indexes because we need to track the set operation
+        // even if something was inserted under it.
+        if (overwritten) {
+            for (size_t i = 0; i < entries.size(); ++i) {
+                CommitLogEntry& entry = entries[i];
+                if (entry.timestamp > m_timestamp) {
+                    //std::cout << "Checking for overwrite: " << entry.timestamp << " > " << m_timestamp << "\n";
+                    m_was_set = false;
+                    SimpleInputStream input(entry.log_data.data(), entry.log_data.size());
+                    TransactLogParser parser(input);
+                    parser.parse(*this);
+                    if (m_was_set) {
+                        //std::cout << "SET at " << row_ndx << " was overwritten.\n";
+                        *overwritten = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (result != row_ndx) {
+            //std::cout << "BUMPED " << row_ndx << " TO " << m_result_ndx << "\n";
+        }
+
+        return result;
+    }
+
+    void insertions(size_t row_ndx, size_t num) {
+        //std::cout << "Saw insert(" << row_ndx << ", " << num << ")\n";
+        if (m_table == m_translate_table && row_ndx <= m_result_ndx) {
+            m_result_ndx += num;
+        }
+    }
+
+    void update(size_t row_ndx) {
+        //std::cout << "Saw set(" << row_ndx << ")\n";
+        if (m_table == m_translate_table && row_ndx == m_result_ndx) {
+            //std::cout << "MATCH\n";
+            m_was_set = true;
+        }
+    }
+
+    bool insert_group_level_table(std::size_t, std::size_t, StringData) { return true; }
+    bool erase_group_level_table(std::size_t, std::size_t) { return true; }
+    bool rename_group_level_table(std::size_t, StringData) { return true; }
+    bool select_table(std::size_t group_level_ndx, int levels, const std::size_t* path)
+    {
+        //std::cout << "SELECT TABLE\n";
+        static_cast<void>(levels); // FIXME: Descend.
+        static_cast<void>(path);
+        m_table = m_group.get_table(group_level_ndx); // Throws
+        return true;
+    }
+    bool insert_empty_rows(std::size_t row_ndx, std::size_t num_rows, std::size_t, bool) { insertions(row_ndx, num_rows); return true; }
+    bool erase_rows(std::size_t row_ndx, std::size_t num_rows, std::size_t, bool)
+    {
+        // FIXME: Handle deletes
+        static_cast<void>(row_ndx);
+        static_cast<void>(num_rows);
+        return true;
+    }
+    bool clear_table() { return true; }
+    bool insert_int(std::size_t, std::size_t row_ndx, std::size_t, int_fast64_t) { insertions(row_ndx, 1); return true; }
+    bool insert_bool(std::size_t, std::size_t row_ndx, std::size_t, bool) { insertions(row_ndx, 1); return true; }
+    bool insert_float(std::size_t, std::size_t row_ndx, std::size_t, float) { insertions(row_ndx, 1); return true; }
+    bool insert_double(std::size_t, std::size_t row_ndx, std::size_t, double) { insertions(row_ndx, 1); return true; }
+    bool insert_string(std::size_t, std::size_t row_ndx, std::size_t, StringData) { insertions(row_ndx, 1); return true; }
+    bool insert_binary(std::size_t, std::size_t row_ndx, std::size_t, BinaryData) { insertions(row_ndx, 1); return true; }
+    bool insert_date_time(std::size_t, std::size_t row_ndx, std::size_t, DateTime) { insertions(row_ndx, 1); return true; }
+    bool insert_table(std::size_t, std::size_t row_ndx, std::size_t) { insertions(row_ndx, 1); return true; }
+    bool insert_mixed(std::size_t, std::size_t row_ndx, std::size_t, const Mixed&) { insertions(row_ndx, 1); return true; }
+    bool insert_link(std::size_t, std::size_t row_ndx, std::size_t, std::size_t) { insertions(row_ndx, 1); return true; }
+    bool insert_link_list(std::size_t, std::size_t row_ndx, std::size_t) { insertions(row_ndx, 1); return true; }
+    bool row_insert_complete() { return true; }
+    bool set_int(std::size_t, std::size_t row_ndx, int_fast64_t) { update(row_ndx); return true; }
+    bool set_bool(std::size_t, std::size_t row_ndx, bool) { update(row_ndx); return true; }
+    bool set_float(std::size_t, std::size_t row_ndx, float) { update(row_ndx); return true; }
+    bool set_double(std::size_t, std::size_t row_ndx, double) { update(row_ndx); return true; }
+    bool set_string(std::size_t, std::size_t row_ndx, StringData) { update(row_ndx); return true; }
+    bool set_binary(std::size_t, std::size_t row_ndx, BinaryData) { update(row_ndx); return true; }
+    bool set_date_time(std::size_t, std::size_t row_ndx, DateTime) { update(row_ndx); return true; }
+    bool set_table(std::size_t, std::size_t row_ndx) { update(row_ndx); return true; }
+    bool set_mixed(std::size_t, std::size_t row_ndx, const Mixed&) { update(row_ndx); return true; }
+    bool set_link(std::size_t, std::size_t row_ndx, std::size_t) { update(row_ndx); return true; }
+    bool add_int_to_column(std::size_t, int_fast64_t) { return true; }
+    bool optimize_table() { return true; }
+    bool select_descriptor(int levels, const std::size_t* path)
+    {
+        // FIXME: Probably do something?
+        static_cast<void>(levels);
+        static_cast<void>(path);
+        return true;
+    }
+    bool insert_link_column(std::size_t, DataType, StringData, std::size_t, std::size_t) { return true; }
+    bool insert_column(std::size_t, DataType, StringData) { return true; }
+    bool erase_link_column(std::size_t, std::size_t, std::size_t) { return true; }
+    bool erase_column(std::size_t) { return true; }
+    bool rename_column(std::size_t, StringData) { return true; }
+    bool add_search_index(std::size_t) { return true; }
+    bool add_primary_key(std::size_t) { return true; }
+    bool remove_primary_key() { return true; }
+    bool set_link_type(std::size_t, LinkType) { return true; }
+    bool select_link_list(std::size_t, std::size_t) { return true; }
+    bool link_list_set(std::size_t, std::size_t) { return true; }
+    bool link_list_insert(std::size_t, std::size_t) { return true; }
+    bool link_list_move(std::size_t, std::size_t) { return true; }
+    bool link_list_erase(std::size_t) { return true; }
+    bool link_list_clear() { return true; }
+private:
+    WriteLogCollector& m_log;
+    Group& m_group;
+    uint64_t m_timestamp;
+    //uint64_t m_peer_id; // FIXME: Unused for now.
+    uint64_t m_base_version;
+    uint64_t m_current_version;
+
+    TableRef m_table;
+    TableRef m_translate_table;
+    size_t m_result_ndx;
+    bool m_was_set;
+};
+
+
 Replication::version_type
-WriteLogCollector::apply_foreign_changeset(SharedGroup& sg, version_type base_version,
-                                           BinaryData changeset, version_type server_version,
+WriteLogCollector::apply_foreign_changeset(SharedGroup& sg, version_type last_version_integrated_by_peer,
+                                           BinaryData changeset, uint_fast64_t timestamp,
+                                           uint_fast64_t peer_id, version_type peer_version,
                                            ostream* apply_log)
 {
     Group& group = sg.m_group;
     TIGHTDB_ASSERT(_impl::GroupFriend::get_replication(group) == this);
     TempDisableReplication tdr(group);
+    TIGHTDB_ASSERT(peer_id != 0);
 
     WriteTransaction transact(sg);
     version_type current_version = sg.get_current_version();
-    if (base_version < current_version)
-        return 0;
-    if (TIGHTDB_UNLIKELY(base_version > current_version))
+    //if (last_version_integrated_by_peer < current_version)
+    //    return 0;
+    if (TIGHTDB_UNLIKELY(last_version_integrated_by_peer > current_version))
         throw LogicError(LogicError::bad_version_number);
     SimpleInputStream input(changeset.data(), changeset.size());
-    apply_transact_log(input, transact.get_group(), apply_log); // Throws
-    bool is_foreign = true;
-    internal_submit_log(changeset.data(), changeset.size(), is_foreign, server_version); // Throws
+    MergingIndexTranslator translator(*this, group, timestamp, peer_id,
+        last_version_integrated_by_peer, current_version);
+    apply_transact_log(input, transact.get_group(), translator, apply_log); // Throws
+
+    // FIXME: internal_submit_log should get the transformed changeset!
+    internal_submit_log(changeset.data(), changeset.size(), timestamp, peer_id, peer_version); // Throws
     return transact.commit(); // Throws
+}
+
+Replication::version_type
+WriteLogCollector::get_last_peer_version(uint_fast64_t) const
+{
+    // FIXME: Remove this fucking const cast.
+    CommitLogPreamble* preamble = const_cast<WriteLogCollector*>(this)->get_preamble();
+    return preamble->last_server_version;
 }
 
 
@@ -778,8 +961,10 @@ WriteLogCollector::do_commit_write_transact(SharedGroup&,
 {
     char* data = m_transact_log_buffer.data();
     uint_fast64_t size = m_transact_log_free_begin - data;
-    bool is_foreign = false;
-    version_type from_version = internal_submit_log(data, size, is_foreign);
+    uint_fast64_t timestamp = get_current_timestamp();
+    uint_fast64_t peer_id = 0;
+    uint_fast64_t peer_version = get_last_peer_version(1);
+    version_type from_version = internal_submit_log(data, size, timestamp, peer_id, peer_version);
     TIGHTDB_ASSERT(from_version == orig_version);
     static_cast<void>(from_version);
     version_type new_version = orig_version + 1;
@@ -851,6 +1036,13 @@ Replication* makeWriteLogCollector(string database_name,
     return new _impl::WriteLogCollector(database_name,
                                         server_synchronization_mode,
                                         encryption_key);
+}
+
+uint_fast64_t get_current_timestamp()
+{
+    struct timeval tv;
+    gettimeofday(&tv, null_ptr);
+    return tv.tv_sec * 1000000 + tv.tv_usec;
 }
 
 
