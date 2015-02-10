@@ -37,13 +37,14 @@ for a tightdb::null() which has the byte set to m_width (4). The byte is used to
 in various functions.
 
 New: If m_witdh = 0, then all elements are tightdb::null(). So to add an empty string we must expand m_width
-New: StringData is tightdb::null() if-and-only-if StringData::data() == 0.
+New: StringData is null() if-and-only-if StringData::data() == 0.
 */
 
 class ArrayString: public Array {
 public:
     typedef StringData value_type;
-
+    // Constructor defaults to non-nullable because we use non-nullable ArrayString so many places internally in core
+    // (data which isn't user payload) where null isn't needed.
     explicit ArrayString(Allocator&, bool nullable = false) TIGHTDB_NOEXCEPT;
     explicit ArrayString(no_prealloc_tag) TIGHTDB_NOEXCEPT;
     ~ArrayString() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
