@@ -142,10 +142,7 @@ protected:
 
 private:
     StringIndex* m_search_index;
-
-public:
     bool m_nullable;
-private:
 
     std::size_t do_get_size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return size(); }
 

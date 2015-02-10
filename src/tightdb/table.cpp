@@ -1549,6 +1549,7 @@ void Table::remove_primary_key()
 
 bool Table::is_nullable(size_t col_ndx) const
 {
+    // todo, assert that m_nullable of column instance object matches spec
     return (m_spec.get_column_attr(col_ndx) & col_attr_Nullable);
 }
 
@@ -3749,7 +3750,7 @@ void Table::optimize(bool enforce)
             size_t ndx_in_parent = m_spec.get_column_ndx_in_parent(i);
 
             // Replace column
-            ColumnStringEnum* e = new ColumnStringEnum(alloc, ref, keys_ref, column->m_nullable); // Throws
+            ColumnStringEnum* e = new ColumnStringEnum(alloc, ref, keys_ref, is_nullable(i)); // Throws
             e->set_parent(&m_columns, ndx_in_parent);
             e->get_keys().set_parent(keys_parent, keys_ndx_in_parent);
             m_cols[i] = e;
