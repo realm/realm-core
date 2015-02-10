@@ -156,8 +156,6 @@ void check_equality(TestResults& test_results, SharedGroup& a, SharedGroup& b)
 
 TEST(Sync_MergeWrites)
 {
-    typedef SharedGroup::version_type version_type;
-
     SHARED_GROUP_TEST_PATH(logfile1);
     SHARED_GROUP_TEST_PATH(logfile2);
 
