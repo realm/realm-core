@@ -425,8 +425,8 @@ TEST(Replication_Links)
     repl.replay_transacts(sg_2, replay_log);
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
-    // tightdb::null()       T_2[0]     []                     T_1[1]     [ T_2[1] ]             T_2[1]
-    // T_1[0]     T_2[1]     [ T_1[0] ]             tightdb::null()       [ T_2[0], T_2[1] ]     T_2[0]
+    // null       T_2[0]     []                     T_1[1]     [ T_2[1] ]             T_2[1]
+    // T_1[0]     T_2[1]     [ T_1[0] ]             null       [ T_2[0], T_2[1] ]     T_2[0]
     {
         ReadTransaction rt(sg_2);
         check(test_results, sg_1, rt);
