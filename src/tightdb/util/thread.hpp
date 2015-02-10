@@ -317,7 +317,10 @@ public:
     void set_shared_part(SharedPart& shared_part, 
                          dev_t device, ino_t inode, std::size_t offset_of_condvar);
 
-    /// Initialize the shared part of a (set of) condition variables.
+    /// Initialize the shared part of a process shared condition variable.
+    /// A process shared condition variables may be represented by any number of
+    /// CondVar instances in any number of different processes, all sharing a SharedPart instance,
+    /// which must be in shared memory.
     static void init_shared_part(SharedPart& shared_part);
 
     /// Wait for another thread to call notify() or notify_all().
@@ -327,15 +330,15 @@ public:
     // with TIGHTDB_CONDVAR_EMULATION on, process sharing and tp != 0 will just assert
     template<class Func>
     void wait(RobustMutex& m, Func recover_func, const struct timespec* tp = 0);
-    /// If any threads are wating for this condition, wake up at least
-    /// one.
+    /// If any threads are waiting for this condition, wake up at least one.
     void notify() TIGHTDB_NOEXCEPT;
 
-    /// Wake up every thread that is currently waiting on this
-    /// condition.
+    /// Wake up every thread that is currently waiting on this condition.
     void notify_all() TIGHTDB_NOEXCEPT;
 
-    /// Cleanup and release system resources if possible
+    /// Cleanup and release system resources if possible. Only relevant for process shared
+    /// condvars. (Calling this for process local condvars have no effect, as they hold on
+    /// to system resources for their entire lifetime.
     void close() TIGHTDB_NOEXCEPT;
 private:
     TIGHTDB_NORETURN static void init_failed(int);
@@ -343,11 +346,22 @@ private:
     TIGHTDB_NORETURN static void destroy_failed(int) TIGHTDB_NOEXCEPT;
     sem_t* get_semaphore();
     void handle_wait_error(int error);
-    // non-zero if a shared part has been registered
+
+    // non-zero if a shared part has been registered (always 0 on process local instances)
     SharedPart* m_shared_part; 
-    sem_t* m_sem; // non-zero if emulation is used
-    pthread_cond_t* m_cond; // non-zero if process local
+
+    // semaphore used for emulation, zero if emulation is not used
+    sem_t* m_sem; 
+
+    // posix condition variable used for implementation, non-zero if process local. 
+    // always set during construction. Note: in process shared scenario without emulation,
+    // the posix condition variable is reachable through m_shared_part, NOT through m_cond.
+    // in the process shared scenario, m_cond is 0 at all times.
+    pthread_cond_t* m_cond; 
     bool is_process_shared() { return m_cond == 0; }
+
+    // name of the semaphore - FIXME: generate a name based on inode, device and offset of
+    // the file used for memory mapping.
     static const char* m_name;
 };
 
@@ -564,13 +578,6 @@ inline void CondVar::close() TIGHTDB_NOEXCEPT
         m_sem = 0;
         return; // we don't need to clean up the SharedPart
     }
-    if (m_cond) {  // == process local, we own the condition variable
-        int r = pthread_cond_destroy(m_cond);
-        if (TIGHTDB_UNLIKELY(r != 0))
-            destroy_failed(r);
-        delete m_cond;
-        m_cond = 0;
-    }
     // we don't do anything to the shared part, other CondVars may shared it
     m_shared_part = 0;
 }
@@ -579,6 +586,13 @@ inline void CondVar::close() TIGHTDB_NOEXCEPT
 inline CondVar::~CondVar() TIGHTDB_NOEXCEPT
 {
     close();
+    if (m_cond) {  // == process local, we own the condition variable
+        int r = pthread_cond_destroy(m_cond);
+        if (TIGHTDB_UNLIKELY(r != 0))
+            destroy_failed(r);
+        delete m_cond;
+        m_cond = 0;
+    }
 }
 
 
