@@ -168,17 +168,19 @@ StringData AdaptiveStringColumn::get(size_t ndx) const TIGHTDB_NOEXCEPT
         return ArrayStringLong::get(leaf_header, ndx_in_leaf, alloc, m_nullable);
     }
     // Big strings
-    return ArrayBigBlobs::get_string(leaf_header, ndx_in_leaf, alloc);
+    return ArrayBigBlobs::get_string(leaf_header, ndx_in_leaf, alloc, m_nullable);
 }
 
 bool AdaptiveStringColumn::is_null(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
     StringData sd = get(ndx);
+    TIGHTDB_ASSERT_DEBUG(!(!m_nullable && sd.is_null()));
     return sd.is_null();
 }
 
 void AdaptiveStringColumn::set_null(std::size_t ndx)
 {
+    TIGHTDB_ASSERT_DEBUG(m_nullable);
     StringData sd = StringData(null_ptr, 0);
     set(ndx, sd);
 }
@@ -919,14 +921,14 @@ size_t AdaptiveStringColumn::upper_bound_string(StringData value) const TIGHTDB_
 
 FindRes AdaptiveStringColumn::find_all_indexref(StringData value, size_t& dst) const
 {
-    TIGHTDB_ASSERT(value.data());
+    TIGHTDB_ASSERT_DEBUG(!(!m_nullable && value.is_null()));
     TIGHTDB_ASSERT(m_search_index);
 
     return m_search_index->find_all(value, dst);
 }
 
 
-bool AdaptiveStringColumn::auto_enumerate(ref_type& keys_ref, ref_type& values_ref) const
+bool AdaptiveStringColumn::auto_enumerate(ref_type& keys_ref, ref_type& values_ref, bool enforce) const
 {
     Allocator& alloc = m_array->get_alloc();
     ref_type keys_ref_2 = AdaptiveStringColumn::create(alloc); // Throws
@@ -943,7 +945,7 @@ bool AdaptiveStringColumn::auto_enumerate(ref_type& keys_ref, ref_type& values_r
             continue;
 
         // Don't bother auto enumerating if there are too few duplicates
-        if (n/2 < keys.size()) {
+        if (!enforce && n/2 < keys.size()) {
             keys.destroy(); // cleanup
             return false;
         }

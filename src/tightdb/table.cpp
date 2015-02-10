@@ -1216,7 +1216,7 @@ ColumnBase* Table::create_column_accessor(ColumnType col_type, size_t col_ndx, s
             size_t keys_ndx_in_parent;
             ref_type keys_ref =
                 m_spec.get_enumkeys_ref(col_ndx, &keys_parent, &keys_ndx_in_parent);
-            ColumnStringEnum* col_2 = new ColumnStringEnum(alloc, ref, keys_ref); // Throws
+            ColumnStringEnum* col_2 = new ColumnStringEnum(alloc, ref, keys_ref, nullable); // Throws
             col_2->get_keys().set_parent(keys_parent, keys_ndx_in_parent);
             col = col_2;
             break;
@@ -3699,7 +3699,7 @@ size_t Table::upper_bound_string(size_t col_ndx, StringData value) const TIGHTDB
 }
 
 
-void Table::optimize()
+void Table::optimize(bool enforce)
 {
     // At the present time there is only one kind of optimization that
     // we can do, and that is to replace a string column with a string
@@ -3718,7 +3718,7 @@ void Table::optimize()
             AdaptiveStringColumn* column = &get_column_string(i);
 
             ref_type ref, keys_ref;
-            bool res = column->auto_enumerate(keys_ref, ref);
+            bool res = column->auto_enumerate(keys_ref, ref, enforce);
             if (!res)
                 continue;
 

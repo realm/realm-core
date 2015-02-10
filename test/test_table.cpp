@@ -5824,10 +5824,94 @@ TEST(Table_IndexStringDelete)
 }
 
 
-TEST(Table_NullableColumn)
+TEST(Table_Nulls)
 {
-    Table table;
-    table.add_column(type_String, "first", true);    
+    // 'round' lets us run this entire test both with and without index and with/without optimize/enum
+    for (size_t round = 0; round < 5; round++) {
+        Table t;
+        TableView tv;
+        t.add_column(type_String, "str", true);
+        
+        if (round == 1)
+            t.add_search_index(0);
+        else if (round == 2)
+            t.optimize(true);
+        else if (round == 3) {
+            t.add_search_index(0);
+            t.optimize(true);
+        }
+        else if (round == 4) {
+            t.optimize(true);
+            t.add_search_index(0);
+        }
+
+        t.add_empty_row(3);
+        t.set_string(0, 0, "foo"); // short strings
+        t.set_string(0, 1, "");
+        t.set_string(0, 2, tightdb::null());
+
+        CHECK_EQUAL(1, t.count_string(0, "foo"));
+        CHECK_EQUAL(1, t.count_string(0, ""));
+        CHECK_EQUAL(1, t.count_string(0, tightdb::null()));
+
+        CHECK_EQUAL(0, t.find_first_string(0, "foo"));
+        CHECK_EQUAL(1, t.find_first_string(0, ""));
+        CHECK_EQUAL(2, t.find_first_string(0, tightdb::null()));
+
+        tv = t.find_all_string(0, "foo");
+        CHECK_EQUAL(1, tv.size());
+        CHECK_EQUAL(0, tv.get_source_ndx(0));
+        tv = t.find_all_string(0, "");
+        CHECK_EQUAL(1, tv.size());
+        CHECK_EQUAL(1, tv.get_source_ndx(0));
+        tv = t.find_all_string(0, tightdb::null());
+        CHECK_EQUAL(1, tv.size());
+        CHECK_EQUAL(2, tv.get_source_ndx(0));
+
+        t.set_string(0, 0, "xxxxxxxxxxYYYYYYYYYY"); // medium strings (< 64)
+
+        CHECK_EQUAL(1, t.count_string(0, "xxxxxxxxxxYYYYYYYYYY"));
+        CHECK_EQUAL(1, t.count_string(0, ""));
+        CHECK_EQUAL(1, t.count_string(0, tightdb::null()));
+
+        CHECK_EQUAL(0, t.find_first_string(0, "xxxxxxxxxxYYYYYYYYYY"));
+        CHECK_EQUAL(1, t.find_first_string(0, ""));
+        CHECK_EQUAL(2, t.find_first_string(0, tightdb::null()));
+
+        tv = t.find_all_string(0, "xxxxxxxxxxYYYYYYYYYY");
+        CHECK_EQUAL(1, tv.size());
+        CHECK_EQUAL(0, tv.get_source_ndx(0));
+        tv = t.find_all_string(0, "");
+        CHECK_EQUAL(1, tv.size());
+        CHECK_EQUAL(1, tv.get_source_ndx(0));
+        tv = t.find_all_string(0, tightdb::null());
+        CHECK_EQUAL(1, tv.size());
+        CHECK_EQUAL(2, tv.get_source_ndx(0));
+
+
+        // long strings (>= 64)
+        t.set_string(0, 0, "xxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYY");
+
+        CHECK_EQUAL(1, t.count_string(0,
+            "xxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYY"));
+        CHECK_EQUAL(1, t.count_string(0, ""));
+        CHECK_EQUAL(1, t.count_string(0, tightdb::null()));
+
+        CHECK_EQUAL(0, t.find_first_string(0,
+            "xxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYY"));
+        CHECK_EQUAL(1, t.find_first_string(0, ""));
+        CHECK_EQUAL(2, t.find_first_string(0, tightdb::null()));
+
+        tv = t.find_all_string(0, "xxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYY");
+        CHECK_EQUAL(1, tv.size());
+        CHECK_EQUAL(0, tv.get_source_ndx(0));
+        tv = t.find_all_string(0, "");
+        CHECK_EQUAL(1, tv.size());
+        CHECK_EQUAL(1, tv.get_source_ndx(0));
+        tv = t.find_all_string(0, tightdb::null());
+        CHECK_EQUAL(1, tv.size());
+        CHECK_EQUAL(2, tv.get_source_ndx(0));
+    }
 }
 
 #endif // TEST_TABLE

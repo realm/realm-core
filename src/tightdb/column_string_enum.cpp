@@ -27,7 +27,7 @@ StringData get_string(void* column, size_t ndx, char*)
 
 ColumnStringEnum::ColumnStringEnum(Allocator& alloc, ref_type ref, ref_type keys_ref, bool nullable):
     Column(alloc, ref), // Throws
-    m_keys(alloc, keys_ref), // Throws
+    m_keys(alloc, keys_ref, nullable), // Throws
     m_search_index(0),
     m_nullable(nullable)
 {

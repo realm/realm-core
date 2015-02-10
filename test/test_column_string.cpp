@@ -513,7 +513,7 @@ TEST(ColumnString_AutoEnumerate)
     ref_type values;
     bool res = c.auto_enumerate(keys, values);
     CHECK(res);
-    ColumnStringEnum e(Allocator::get_default(), values, keys);
+    ColumnStringEnum e(Allocator::get_default(), values, keys, false);
 
     // Verify that all entries match source
     CHECK_EQUAL(c.size(), e.size());
@@ -558,7 +558,7 @@ TEST(ColumnString_AutoEnumerateIndex)
     ref_type values;
     bool res = c.auto_enumerate(keys, values);
     CHECK(res);
-    ColumnStringEnum e(Allocator::get_default(), values, keys);
+    ColumnStringEnum e(Allocator::get_default(), values, keys, false);
 
     // Set index
     e.create_search_index();
@@ -646,7 +646,7 @@ TEST(ColumnString_AutoEnumerateIndexReuse)
     ref_type values;
     bool res = c.auto_enumerate(keys, values);
     CHECK(res);
-    ColumnStringEnum e(Allocator::get_default(), values, keys);
+    ColumnStringEnum e(Allocator::get_default(), values, keys, false);
 
     // Reuse the index from original column
     StringIndex* index = c.release_search_index();
@@ -1041,7 +1041,7 @@ TEST(ColumnString_Count)
     size_t keys;
     size_t values;
     CHECK(asc.auto_enumerate(keys, values));
-    ColumnStringEnum e(Allocator::get_default(), values, keys);
+    ColumnStringEnum e(Allocator::get_default(), values, keys, false);
 
     // Check that enumerated column return same result
     CHECK_EQUAL(9, e.count("HEJSA"));

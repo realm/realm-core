@@ -65,7 +65,7 @@ public:
     void add_string(StringData value);
     void set_string(std::size_t ndx, StringData value);
     void insert_string(std::size_t ndx, StringData value);
-    static StringData get_string(const char* header, std::size_t ndx, Allocator&) TIGHTDB_NOEXCEPT;
+    static StringData get_string(const char* header, std::size_t ndx, Allocator&, bool) TIGHTDB_NOEXCEPT;
     ref_type bptree_leaf_insert_string(std::size_t ndx, StringData, TreeInsertBase& state);
     //@}
 
@@ -152,13 +152,14 @@ inline StringData ArrayBigBlobs::get_string(std::size_t ndx) const TIGHTDB_NOEXC
 {
     BinaryData bin = get(ndx);
     if (bin.is_null())
-        return StringData(null_ptr, 0);
+        return tightdb::null();
     else
         return StringData(bin.data(), bin.size()-1); // Do not include terminating zero
 }
 
 inline void ArrayBigBlobs::set_string(std::size_t ndx, StringData value)
 {
+    TIGHTDB_ASSERT_DEBUG(!(!m_nullable && value.is_null()));
     BinaryData bin(value.data(), value.size());
     bool add_zero_term = true;
     set(ndx, bin, add_zero_term);
@@ -166,6 +167,7 @@ inline void ArrayBigBlobs::set_string(std::size_t ndx, StringData value)
 
 inline void ArrayBigBlobs::add_string(StringData value)
 {
+    TIGHTDB_ASSERT_DEBUG(!(!m_nullable && value.is_null()));
     BinaryData bin(value.data(), value.size());
     bool add_zero_term = true;
     add(bin, add_zero_term);
@@ -173,17 +175,19 @@ inline void ArrayBigBlobs::add_string(StringData value)
 
 inline void ArrayBigBlobs::insert_string(std::size_t ndx, StringData value)
 {
+    TIGHTDB_ASSERT_DEBUG(!(!m_nullable && value.is_null()));
     BinaryData bin(value.data(), value.size());
     bool add_zero_term = true;
     insert(ndx, bin, add_zero_term);
 }
 
 inline StringData ArrayBigBlobs::get_string(const char* header, size_t ndx,
-                                            Allocator& alloc) TIGHTDB_NOEXCEPT
+                                            Allocator& alloc, bool nullable) TIGHTDB_NOEXCEPT
 {
     BinaryData bin = get(header, ndx, alloc);
+    TIGHTDB_ASSERT_DEBUG(!(!nullable && bin.is_null()));
     if (bin.is_null())
-        return StringData(null_ptr, 0);
+        return tightdb::null();
     else
         return StringData(bin.data(), bin.size()-1); // Do not include terminating zero
 }
@@ -191,6 +195,7 @@ inline StringData ArrayBigBlobs::get_string(const char* header, size_t ndx,
 inline ref_type ArrayBigBlobs::bptree_leaf_insert_string(std::size_t ndx, StringData value,
                                                          TreeInsertBase& state)
 {
+    TIGHTDB_ASSERT_DEBUG(!(!m_nullable && value.is_null()));
     BinaryData bin(value.data(), value.size());
     bool add_zero_term = true;
     return bptree_leaf_insert(ndx, bin, add_zero_term, state);

@@ -97,8 +97,9 @@ public:
     StringIndex* release_search_index() TIGHTDB_NOEXCEPT;
     StringIndex* create_search_index();
 
-    // Optimizing data layout
-    bool auto_enumerate(ref_type& keys, ref_type& values) const;
+    // Optimizing data layout. enforce == true will enforce enumeration; 
+    // enforce == false will auto-evaluate if it should be enumerated or not
+    bool auto_enumerate(ref_type& keys, ref_type& values, bool enforce = false) const;
 
     /// Compare two string columns for equality.
     bool compare_string(const AdaptiveStringColumn&) const;

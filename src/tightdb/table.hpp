@@ -689,8 +689,9 @@ public:
 
     Table& link(size_t link_column);
 
-    // Optimizing
-    void optimize();
+    // Optimizing. enforce == true will enforce enumeration of all string columns; 
+    // enforce == false will auto-evaluate if they should be enumerated or not
+    void optimize(bool enforce = false);
 
     /// Write this table (or a slice of this table) to the specified
     /// output stream.

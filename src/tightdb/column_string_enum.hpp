@@ -53,7 +53,7 @@ class ColumnStringEnum: public Column {
 public:
     typedef StringData value_type;
 
-    ColumnStringEnum(Allocator&, ref_type ref, ref_type keys_ref, bool nullable = false);
+    ColumnStringEnum(Allocator&, ref_type ref, ref_type keys_ref, bool nullable);
     ~ColumnStringEnum() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     void destroy() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
