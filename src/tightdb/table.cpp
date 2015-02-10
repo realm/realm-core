@@ -1188,7 +1188,7 @@ ColumnBase* Table::create_column_accessor(ColumnType col_type, size_t col_ndx, s
     ref_type ref = m_columns.get_as_ref(ndx_in_parent);
     Allocator& alloc = m_columns.get_alloc();
 
-    bool nullable = m_spec.get_column_attr(col_ndx) & col_attr_Nullable;
+    bool nullable = is_nullable(col_ndx);
 
     TIGHTDB_ASSERT_DEBUG(!(nullable && (col_type != col_type_String &&
                                   col_type != col_type_StringEnum)));
@@ -1547,6 +1547,11 @@ void Table::remove_primary_key()
 // Note: get_subtable_ptr() has now been collapsed to one version, but
 // the suggested change will still be a significant improvement.
 
+bool Table::is_nullable(size_t col_ndx) const
+{
+    return (m_spec.get_column_attr(col_ndx) & col_attr_Nullable);
+}
+
 const ColumnBase& Table::get_column_base(size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT_DEBUG(ndx < m_spec.get_column_count());
@@ -1796,7 +1801,8 @@ ref_type Table::clone_columns(Allocator& alloc) const
         const ColumnBase* col = &get_column_base(col_ndx);
         if (const ColumnStringEnum* enum_col = dynamic_cast<const ColumnStringEnum*>(col)) {
             ref_type ref = AdaptiveStringColumn::create(alloc); // Throws
-            AdaptiveStringColumn new_col(alloc, ref); // Throws
+            bool nullable = is_nullable(col_ndx);
+            AdaptiveStringColumn new_col(alloc, ref, nullable); // Throws
             // FIXME: Should be optimized with something like
             // new_col.add(seq_tree_accessor.begin(),
             // seq_tree_accessor.end())
@@ -2437,7 +2443,7 @@ StringData Table::get_string(size_t col_ndx, size_t ndx) const TIGHTDB_NOEXCEPT
         const ColumnStringEnum& column = get_column_string_enum(col_ndx);
         sd = column.get(ndx);
     }
-    TIGHTDB_ASSERT_DEBUG(!(!(m_spec.get_column_attr(col_ndx) & col_attr_Nullable) && sd.is_null()));
+    TIGHTDB_ASSERT_DEBUG(!(!is_nullable(col_ndx) && sd.is_null()));
     return sd;
 }
 
@@ -2456,7 +2462,7 @@ void Table::set_string(size_t col_ndx, size_t ndx, StringData value)
     if (TIGHTDB_UNLIKELY(col_ndx >= m_cols.size()))
         throw LogicError(LogicError::column_index_out_of_range);
 
-    TIGHTDB_ASSERT_DEBUG(!(!(m_spec.get_column_attr(col_ndx) & col_attr_Nullable) && value.is_null()));
+    TIGHTDB_ASSERT_DEBUG(!(!is_nullable(col_ndx) && value.is_null()));
     
     bump_version();
     ColumnBase& col = get_column_base(col_ndx);
@@ -2474,7 +2480,7 @@ void Table::insert_string(size_t col_ndx, size_t ndx, StringData value)
         throw LogicError(LogicError::string_too_big);
     TIGHTDB_ASSERT(col_ndx < get_column_count());
     TIGHTDB_ASSERT(ndx <= m_size);
-    TIGHTDB_ASSERT_DEBUG(!(!(m_spec.get_column_attr(col_ndx) & col_attr_Nullable) && value.is_null()));
+    TIGHTDB_ASSERT_DEBUG(!(!is_nullable(col_ndx) && value.is_null()));
 
     ColumnType type = get_real_column_type(col_ndx);
     if (type == col_type_String) {

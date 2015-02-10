@@ -153,6 +153,9 @@ public:
     /// string.
     StringData get_name() const TIGHTDB_NOEXCEPT;
 
+    // Whether or not elements can be null. 
+    bool is_nullable(size_t col_ndx) const;
+
     //@{
     /// Conventience functions for inspecting the dynamic table type.
     ///
