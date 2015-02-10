@@ -23,13 +23,37 @@
 
 ----------------------------------------------
 
+# 0.88.2 Release notes
+
+### Bugfixes:
+
+* Fixed duplicated results when querying on a link column with matches at row
+  1000+.
+
+-----------
+
+### Internals:
+
+* Added support for Android ARM64
+
+----------------------------------------------
+
+# 0.88.1 Release notes
+
+### Bugfixes:
+
+* Fix encryption on platforms with non-4KB pages.
+
+----------------------------------------------
+
 # 0.88.0 Release notes
 
 ### Enhancements:
 
-* SharedGroup::compact() now appends ".tmp_compaction_space" to the database name
-  in order to get the name of its temporary workspace file instead of ".tmp". It also
-  automatically removes the file in case it already exists before compaction.
+* SharedGroup::compact() now appends ".tmp_compaction_space" to the database
+  name in order to get the name of its temporary workspace file instead of
+  ".tmp". It also automatically removes the file in case it already exists
+  before compaction.
 * Add support for comparing string columns to other string columns in queries.
 * `WriteTransaction::has_table()` and `WriteTransaction::rollback()` were
   added. Previously, only implicit rollback was possible with
