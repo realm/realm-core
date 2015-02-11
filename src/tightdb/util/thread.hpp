@@ -354,8 +354,7 @@ public:
     /// You need to bind the emulation to a SharedPart in shared/mmapped memory. 
     /// The SharedPart is assumed to have been initialized (possibly by another process) 
     /// earlier through a call to init_shared_part.
-    void set_shared_part(SharedPart& shared_part, 
-                         dev_t device, ino_t inode, std::size_t offset_of_condvar);
+    void set_shared_part(SharedPart& shared_part, std::string path, std::size_t offset_of_condvar);
 
     /// Initialize the shared part of a process shared condition variable.
     /// A process shared condition variables may be represented by any number of
@@ -386,7 +385,7 @@ private:
     TIGHTDB_NORETURN static void init_failed(int);
     TIGHTDB_NORETURN static void attr_init_failed(int);
     TIGHTDB_NORETURN static void destroy_failed(int) TIGHTDB_NOEXCEPT;
-    sem_t* get_semaphore(dev_t device, ino_t inode, std::size_t offset_of_condvar);
+    sem_t* get_semaphore(std::string path, std::size_t offset_of_condvar);
     void handle_wait_error(int error);
 
     // non-zero if a shared part has been registered (always 0 on process local instances)

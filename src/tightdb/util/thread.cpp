@@ -242,25 +242,36 @@ PlatformSpecificCondVar::~PlatformSpecificCondVar() TIGHTDB_NOEXCEPT
 
 
 
-void PlatformSpecificCondVar::set_shared_part(SharedPart& shared_part, dev_t device, ino_t inode, std::size_t offset_of_condvar)
+void PlatformSpecificCondVar::set_shared_part(SharedPart& shared_part, std::string path, std::size_t offset_of_condvar)
 {
     TIGHTDB_ASSERT(m_shared_part == 0);
     close();
     m_shared_part = &shared_part;
-    static_cast<void>(device);
-    static_cast<void>(inode);
+    static_cast<void>(path);
     static_cast<void>(offset_of_condvar);
 #ifdef TIGHTDB_CONDVAR_EMULATION
-    m_sem = get_semaphore(device,inode,offset_of_condvar);
+    m_sem = get_semaphore(path,offset_of_condvar);
 #endif
 }
 
-sem_t* PlatformSpecificCondVar::get_semaphore(dev_t device, ino_t inode, std::size_t offset)
+sem_t* PlatformSpecificCondVar::get_semaphore(std::string path, std::size_t offset)
 {
+#if 0
+    struct stat su;
+    // if stat does not work, we default to 0/0 for device and inode.
+    su.st_dev = 0; su.st_ino = 0;
+    stat(path.c_str(), &su);
+    dev_t device = su.st_dev;
+    ino_t inode = su.st_ino;
+    uint64_t magic = (device+1);
+    magic *= (inode+1);
+#else
+    uint64_t magic = 1;
+    for (unsigned int i=0; i<path.length(); ++i)
+        magic *= 1 + (unsigned int)(path[i]);
+#endif
     std::string name = internal_naming_prefix;
-    uint64_t magic = device;
-    magic += inode;
-    magic += offset;
+    magic *= (offset+1);
     name += 'A'+(magic % 23);
     magic /= 23;
     name += 'A'+(magic % 23);

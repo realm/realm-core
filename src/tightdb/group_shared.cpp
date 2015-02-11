@@ -765,15 +765,10 @@ void SharedGroup::open(const string& path, bool no_create_file,
 
             }
 #ifndef _WIN32
-            // FIXME: get dev and inode to ensure uniqueness!
-            struct stat su;
-            // if stat does not work, we default to 0/0 for device and inode.
-            su.st_dev = 0; su.st_ino = 0;
-            stat(m_db_path.c_str(), &su);
-            m_daemon_becomes_ready.set_shared_part(info->daemon_becomes_ready,su.st_dev,su.st_ino,0);
-            m_work_to_do.set_shared_part(info->work_to_do,su.st_dev,su.st_ino,1);
-            m_room_to_write.set_shared_part(info->room_to_write,su.st_dev,su.st_ino,2);
-            m_new_commit_available.set_shared_part(info->new_commit_available,su.st_dev,su.st_ino,3);
+            m_daemon_becomes_ready.set_shared_part(info->daemon_becomes_ready,m_db_path,0);
+            m_work_to_do.set_shared_part(info->work_to_do,m_db_path,1);
+            m_room_to_write.set_shared_part(info->room_to_write,m_db_path,2);
+            m_new_commit_available.set_shared_part(info->new_commit_available,m_db_path,3);
             // In async mode, we need to make sure the daemon is running and ready:
             if (dlevel == durability_Async && !is_backend) {
                 while (info->daemon_ready == false) {
