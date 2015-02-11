@@ -753,6 +753,7 @@ inline void PlatformSpecificCondVar::wait(RobustMutex& m, Func recover_func, con
     TIGHTDB_ASSERT(m_shared_part);
 #ifdef TIGHTDB_CONDVAR_EMULATION
     TIGHTDB_ASSERT(tp == 0);
+    static_cast<void>(tp);
     m_shared_part->waiters++;
     uint64_t my_counter = m_shared_part->signal_counter;
     m.unlock();
