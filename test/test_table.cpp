@@ -5890,19 +5890,19 @@ TEST(Table_Nulls)
 
 
         // long strings (>= 64)
-        t.set_string(0, 0, "xxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYY");
+        t.set_string(0, 0, "xxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxx");
 
         CHECK_EQUAL(1, t.count_string(0,
-            "xxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYY"));
+            "xxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxx"));
         CHECK_EQUAL(1, t.count_string(0, ""));
         CHECK_EQUAL(1, t.count_string(0, tightdb::null()));
 
         CHECK_EQUAL(0, t.find_first_string(0,
-            "xxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYY"));
+            "xxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxx"));
         CHECK_EQUAL(1, t.find_first_string(0, ""));
         CHECK_EQUAL(2, t.find_first_string(0, tightdb::null()));
 
-        tv = t.find_all_string(0, "xxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYY");
+        tv = t.find_all_string(0, "xxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxx");
         CHECK_EQUAL(1, tv.size());
         CHECK_EQUAL(0, tv.get_source_ndx(0));
         tv = t.find_all_string(0, "");
