@@ -201,7 +201,12 @@ void RobustMutex::mark_as_consistent() TIGHTDB_NOEXCEPT
 #endif
 }
 
-const char* PlatformSpecificCondVar::m_name = "/RealmsBigFriendlySemaphore";
+string PlatformSpecificCondVar::internal_naming_prefix = "/RealmsBigFriendlySemaphore";
+
+void PlatformSpecificCondVar::set_resource_naming_prefix(std::string prefix)
+{
+    internal_naming_prefix = prefix + "RLM";
+}
 
 PlatformSpecificCondVar::PlatformSpecificCondVar()
 {
@@ -212,6 +217,64 @@ PlatformSpecificCondVar::PlatformSpecificCondVar()
     throw runtime_error("No support for process-shared condition variables");
 #endif
 }
+
+
+
+
+
+
+void PlatformSpecificCondVar::close() TIGHTDB_NOEXCEPT
+{
+    if (m_sem) { // true if emulating a process shared condvar
+        sem_close(m_sem);
+        m_sem = 0;
+        return; // we don't need to clean up the SharedPart
+    }
+    // we don't do anything to the shared part, other CondVars may shared it
+    m_shared_part = 0;
+}
+
+
+PlatformSpecificCondVar::~PlatformSpecificCondVar() TIGHTDB_NOEXCEPT
+{
+    close();
+}
+
+
+
+void PlatformSpecificCondVar::set_shared_part(SharedPart& shared_part, dev_t device, ino_t inode, std::size_t offset_of_condvar)
+{
+    TIGHTDB_ASSERT(m_shared_part == 0);
+    close();
+    m_shared_part = &shared_part;
+    static_cast<void>(device);
+    static_cast<void>(inode);
+    static_cast<void>(offset_of_condvar);
+#ifdef TIGHTDB_CONDVAR_EMULATION
+    m_sem = get_semaphore(device,inode,offset_of_condvar);
+#endif
+}
+
+sem_t* PlatformSpecificCondVar::get_semaphore(dev_t device, ino_t inode, std::size_t offset)
+{
+    std::string name = internal_naming_prefix;
+    uint64_t magic = device;
+    magic += inode;
+    magic += offset;
+    name += 'A'+(magic % 23);
+    magic /= 23;
+    name += 'A'+(magic % 23);
+    magic /= 23;
+    name += 'A'+(magic % 23);
+    magic /= 23;
+    TIGHTDB_ASSERT(m_shared_part);
+    if (m_sem == 0) {
+        m_sem = sem_open(name.c_str(), O_CREAT, S_IRWXG | S_IRWXU, 0);
+        // FIXME: error checking
+    }
+    return m_sem;
+}
+
 
 void PlatformSpecificCondVar::init_shared_part(SharedPart& shared_part) {
 #ifdef TIGHTDB_CONDVAR_EMULATION

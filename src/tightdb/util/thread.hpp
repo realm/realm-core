@@ -42,9 +42,9 @@
 #endif
 
 // FIXME: enable this only on platforms where it might be needed
-#ifdef __APPLE__
+//#ifdef __APPLE__
 #define TIGHTDB_CONDVAR_EMULATION
-#endif
+//#endif
 
 #include <stdint.h>
 #include <fcntl.h>
@@ -378,11 +378,15 @@ public:
 
     /// Cleanup and release system resources if possible. 
     void close() TIGHTDB_NOEXCEPT;
+
+    /// For platforms imposing naming restrictions on system resources,
+    /// a prefix can be set. This must be done before setting any SharedParts
+    static void set_resource_naming_prefix(std::string prefix);
 private:
     TIGHTDB_NORETURN static void init_failed(int);
     TIGHTDB_NORETURN static void attr_init_failed(int);
     TIGHTDB_NORETURN static void destroy_failed(int) TIGHTDB_NOEXCEPT;
-    sem_t* get_semaphore();
+    sem_t* get_semaphore(dev_t device, ino_t inode, std::size_t offset_of_condvar);
     void handle_wait_error(int error);
 
     // non-zero if a shared part has been registered (always 0 on process local instances)
@@ -393,7 +397,7 @@ private:
 
     // name of the semaphore - FIXME: generate a name based on inode, device and offset of
     // the file used for memory mapping.
-    static const char* m_name;
+    static std::string internal_naming_prefix;
 };
 
 
@@ -667,53 +671,6 @@ inline void CondVar::notify_all() TIGHTDB_NOEXCEPT
 
 
 
-
-
-
-
-
-inline void PlatformSpecificCondVar::close() TIGHTDB_NOEXCEPT
-{
-    if (m_sem) { // true if emulating a process shared condvar
-        sem_close(m_sem);
-        m_sem = 0;
-        return; // we don't need to clean up the SharedPart
-    }
-    // we don't do anything to the shared part, other CondVars may shared it
-    m_shared_part = 0;
-}
-
-
-inline PlatformSpecificCondVar::~PlatformSpecificCondVar() TIGHTDB_NOEXCEPT
-{
-    close();
-}
-
-
-
-inline void PlatformSpecificCondVar::set_shared_part(SharedPart& shared_part, dev_t device, ino_t inode, std::size_t offset_of_condvar)
-{
-    TIGHTDB_ASSERT(m_shared_part == 0);
-    close();
-    m_shared_part = &shared_part;
-    static_cast<void>(device);
-    static_cast<void>(inode);
-    static_cast<void>(offset_of_condvar);
-#ifdef TIGHTDB_CONDVAR_EMULATION
-    m_sem = get_semaphore();
-#endif
-}
-
-inline sem_t* PlatformSpecificCondVar::get_semaphore()
-{
-    TIGHTDB_ASSERT(m_name);
-    TIGHTDB_ASSERT(m_shared_part);
-    if (m_sem == 0) {
-        m_sem = sem_open(m_name, O_CREAT, S_IRWXG | S_IRWXU, 0);
-        // FIXME: error checking
-    }
-    return m_sem;
-}
 
 inline void PlatformSpecificCondVar::wait(LockGuard& l) TIGHTDB_NOEXCEPT
 {
