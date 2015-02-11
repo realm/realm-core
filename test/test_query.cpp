@@ -5730,95 +5730,114 @@ TEST(Query_NullStrings)
 
 TEST(Query_Nulls_Fuzzy)
 {
-    Random random(random_int<unsigned long>());
+    for (int attributes = 0; attributes < 5; attributes++) {
+        Random random(random_int<unsigned long>());
 
-    for (size_t t = 0; t < 50; t++) {
-        Table table;
-        table.add_column(type_String, "string", true);
+        for (size_t t = 0; t < 10; t++) {
+            Table table;
+            table.add_column(type_String, "string", true);
 
-        // vector that is kept in sync with the column so that we can compare with it
-        vector<string> v;
+            if (attributes == 0) {
+            }
+            if (attributes == 1) {
+                table.add_search_index(0);
+            }
+            else if (attributes == 2) {
+                table.optimize(true);
+            }
+            else if (attributes == 3) {
+                table.add_search_index(0);
+                table.optimize(true);
+            }
+            else if (attributes == 4) {
+                table.optimize(true);
+                table.add_search_index(0);
+            }
 
-        // ArrayString capacity starts at 128 bytes, so we need lots of elements
-        // to test if relocation works
-        for (size_t i = 0; i < 100; i++) {
-            unsigned char action = random.draw_int_max<unsigned char>(100);
+            // vector that is kept in sync with the column so that we can compare with it
+            vector<string> v;
 
-            if (action > 48 && table.size() < 10) {
-                // Generate string with equal probability of being empty, null, short, medium and long, and with 
-                // their contents having equal proability of being either random or a duplicate of a previous 
-                // string. When it's random, each char must have equal probability of being 0 or non-0
+            // ArrayString capacity starts at 128 bytes, so we need lots of elements
+            // to test if relocation works
+            for (size_t i = 0; i < 100; i++) {
+                unsigned char action = random.draw_int_max<unsigned char>(100);
 
-                char* buf1 = "This string is around 90 bytes long, which falls in the long-string type of Realm strings";
-                char buf2[] = "                                                                                         ";
+                if (action > 48 && table.size() < 10) {
+                    // Generate string with equal probability of being empty, null, short, medium and long, and with 
+                    // their contents having equal proability of being either random or a duplicate of a previous 
+                    // string. When it's random, each char must have equal probability of being 0 or non-0
 
-                StringData sd;
-                string st;
+                    char* buf1 = "This string is around 90 bytes long, which falls in the long-string type of Realm strings";
+                    char buf2[] = "                                                                                         ";
 
-                if (random.draw_int_max<int>(1) == 0) {
-                    // null string
-                    sd = tightdb::null();
-                    st = "null";
-                }
-                else {
-                    // non-null string
-
-                    int len = random.draw_int_max<int>(3);
-                    if (len == 0)
-                        len = 0;
-                    else if (len == 1)
-                        len = 5;
-                    else if (len == 2)
-                        len = 27;
-                    else
-                        len = 73;
+                    StringData sd;
+                    string st;
 
                     if (random.draw_int_max<int>(1) == 0) {
-                        // duplicate string
-                        sd = StringData(buf1, len);
-                        st = string(buf1, len);
+                        // null string
+                        sd = tightdb::null();
+                        st = "null";
                     }
                     else {
-                        // random string
-                        for (size_t t = 0; t < len; t++) {
-                            if (random.draw_int_max<int>(1) == 0)
-                                buf2[t] = 0;                        // zero byte
-                            else
-                                buf2[t] = random.draw_int<char>();  // random byte
-                        }
+                        // non-null string
 
-                        sd = StringData(buf2, len);
-                        st = string(buf2, len);
+                        int len = random.draw_int_max<int>(3);
+                        if (len == 0)
+                            len = 0;
+                        else if (len == 1)
+                            len = 5;
+                        else if (len == 2)
+                            len = 27;
+                        else
+                            len = 73;
+
+                        if (random.draw_int_max<int>(1) == 0) {
+                            // duplicate string
+                            sd = StringData(buf1, len);
+                            st = string(buf1, len);
+                        }
+                        else {
+                            // random string
+                            for (size_t t = 0; t < len; t++) {
+                                if (random.draw_int_max<int>(1) == 0)
+                                    buf2[t] = 0;                        // zero byte
+                                else
+                                    buf2[t] = random.draw_int<char>();  // random byte
+                            }
+
+                            sd = StringData(buf2, len);
+                            st = string(buf2, len);
+                        }
+                    }
+
+                    size_t pos = random.draw_int_max<size_t>(table.size());
+                    table.insert_empty_row(pos);
+                    table.set_string(0, pos, sd);
+
+                    v.insert(v.begin() + pos, st);
+
+                }
+                else if (table.size() > 0) {
+                    // delete
+                    size_t row = random.draw_int_max<size_t>(table.size() - 1);
+                    table.remove(row);
+                    v.erase(v.begin() + row);
+                }
+
+
+                CHECK_EQUAL(table.size(), v.size());
+                for (size_t i = 0; i < table.size(); i++) {
+                    if (v[i] == "null") {
+                        CHECK(table.get_string(0, i).is_null());
+                    }
+                    else {
+                        CHECK(table.get_string(0, i) == v[i]);
                     }
                 }
 
-                size_t pos = random.draw_int_max<size_t>(table.size());
-                table.insert_empty_row(pos);
-                table.set_string(0, pos, sd);
-
-                v.insert(v.begin() + pos, st);
-
-            }
-            else if (table.size() > 0) {
-                // delete
-                size_t row = random.draw_int_max<size_t>(table.size() - 1);
-                table.remove(row);
-                v.erase(v.begin() + row);
-            }
-
-
-            CHECK_EQUAL(table.size(), v.size());
-            for (size_t i = 0; i < table.size(); i++) {
-                if (v[i] == "null") {
-                    CHECK(table.get_string(0, i).is_null());
-                }
-                else {
-                    CHECK(table.get_string(0, i) == v[i]);
-                }
             }
 
         }
-
     }
 }
 
