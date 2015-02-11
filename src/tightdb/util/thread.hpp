@@ -322,10 +322,19 @@ private:
 /// Condition variable for use in synchronization monitors.
 /// This condition variable uses emulation based on semaphores
 /// for the inter-process case, if enabled by TIGHTDB_CONDVAR_EMULATION.
-/// The emulation does not scale well to many databases, since it currently
-/// uses a single shared semaphore. Compared to a good pthread implemenation,
-/// the emulation carries an overhead of at most 2 task switches for
-/// every waiter notified during notify() or notify_all().
+/// Compared to a good pthread implemenation, the emulation carries an 
+/// overhead of at most 2 task switches for every waiter notified during 
+/// notify() or notify_all().
+///
+/// When a semaphore is allocated to a condvar, its name is formed
+/// as prefix + "RLM" + three_letter_code, where the three letters are
+/// created by hashing the path to the file containing the shared part
+/// of the condvar and the offset within the file.
+///
+/// FIXME: This implementation will never release semaphores. This is unlikely
+/// to be a problem as long as only a modest number of different database names
+/// are in use within the kernel lifetime (all semaphores are released when the
+/// kernel is rebooted).
 ///
 /// A PlatformSpecificCondVar is always process shared.
 class PlatformSpecificCondVar {
@@ -379,7 +388,7 @@ public:
     void close() TIGHTDB_NOEXCEPT;
 
     /// For platforms imposing naming restrictions on system resources,
-    /// a prefix can be set. This must be done before setting any SharedParts
+    /// a prefix can be set. This must be done before setting any SharedParts.
     static void set_resource_naming_prefix(std::string prefix);
 private:
     TIGHTDB_NORETURN static void init_failed(int);
