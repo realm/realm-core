@@ -394,10 +394,10 @@ struct SharedGroup::SharedInfo
     RobustMutex controlmutex;
 #ifndef _WIN32
     // FIXME: windows pthread support for condvar not ready
-    CondVar::SharedPart room_to_write;
-    CondVar::SharedPart work_to_do;
-    CondVar::SharedPart daemon_becomes_ready;
-    CondVar::SharedPart new_commit_available;
+    PlatformSpecificCondVar::SharedPart room_to_write;
+    PlatformSpecificCondVar::SharedPart work_to_do;
+    PlatformSpecificCondVar::SharedPart daemon_becomes_ready;
+    PlatformSpecificCondVar::SharedPart new_commit_available;
 #endif
     // IMPORTANT: The ringbuffer MUST be the last field in SharedInfo - see above.
     Ringbuffer readers;
@@ -436,10 +436,10 @@ SharedGroup::SharedInfo::SharedInfo(DurabilityLevel dlevel):
     version = SHAREDINFO_VERSION;
     flags = dlevel; // durability level is fixed from creation
 
-    CondVar::init_shared_part(room_to_write); // Throws
-    CondVar::init_shared_part(work_to_do); // Throws
-    CondVar::init_shared_part(daemon_becomes_ready); // Throws
-    CondVar::init_shared_part(new_commit_available); // Throws
+    PlatformSpecificCondVar::init_shared_part(room_to_write); // Throws
+    PlatformSpecificCondVar::init_shared_part(work_to_do); // Throws
+    PlatformSpecificCondVar::init_shared_part(daemon_becomes_ready); // Throws
+    PlatformSpecificCondVar::init_shared_part(new_commit_available); // Throws
 
     free_write_slots = 0;
     num_participants = 0;

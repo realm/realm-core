@@ -131,7 +131,7 @@ protected:
     TIGHTDB_NORETURN static void lock_failed(int) TIGHTDB_NOEXCEPT;
 
     friend class CondVar;
-    friend class CondVarEmulation;
+    friend class PlatformSpecificCondVar;
 };
 
 
@@ -144,7 +144,7 @@ public:
 private:
     Mutex& m_mutex;
     friend class CondVar;
-    friend class CondVarEmulation;
+    friend class PlatformSpecificCondVar;
 };
 
 
@@ -243,7 +243,7 @@ public:
     bool is_valid() TIGHTDB_NOEXCEPT;
 
     friend class CondVar;
-    friend class CondVarEmulation;
+    friend class PlatformSpecificCondVar;
 };
 
 class RobustMutex::NotRecoverable: public std::exception {
@@ -266,23 +266,13 @@ public:
 private:
     RobustMutex& m_mutex;
     friend class CondVar;
-    friend class CondVarEmulation;
+    friend class PlatformSpecificCondVar;
 };
 
 
 
+
 /// Condition variable for use in synchronization monitors.
-/// This condition variable uses emulation based on semaphores
-/// for the inter-process case, if enabled by TIGHDB_CONDVAR_EMULATION.
-/// The emulation does not scale well to many databases, since it currently
-/// uses a single shared semaphore. Compared to a good pthread implemenation,
-/// the emulation carries an overhead of at most 2 task switches for
-/// every waiter notified during notify() or notify_all().
-///
-/// It is a bit clumsy to have both process local and interprocess
-/// condvars with and without emulation in the same class. We might want
-/// to split it into PLocalCondVar and PSharedCondVar, possibly with a common
-/// base class to express polymorphism.
 class CondVar {
 public:
     CondVar();
@@ -291,13 +281,64 @@ public:
     struct process_shared_tag {};
 
     /// Initialize this condition variable for use across multiple
-    /// processes. When constructed this way, you also must place a structure
-    /// of type CondVar::SharedPart in memory shared by multiple processes
+    /// processes. When constructed this way, the instance may be
+    /// placed in memory shared by multimple processes, as well as in
+    /// a memory mapped file. Such a condition variable remains valid
+    /// even after the constructing process terminates. Deleting the
+    /// instance (freeing the memory or deleting the file) without
+    /// first calling the destructor is legal and will not cause any
+    /// system resources to be leaked.
+    CondVar(process_shared_tag);
+
+    /// Wait for another thread to call notify() or notify_all().
+    void wait(LockGuard& l) TIGHTDB_NOEXCEPT;
+    template<class Func>
+    void wait(RobustMutex& m, Func recover_func, const struct timespec* tp = 0);
+
+    /// If any threads are wating for this condition, wake up at least
+    /// one.
+    void notify() TIGHTDB_NOEXCEPT;
+
+    /// Wake up every thread that is currently wating on this
+    /// condition.
+    void notify_all() TIGHTDB_NOEXCEPT;
+
+private:
+    pthread_cond_t m_impl;
+
+    TIGHTDB_NORETURN static void init_failed(int);
+    TIGHTDB_NORETURN static void attr_init_failed(int);
+    TIGHTDB_NORETURN static void destroy_failed(int) TIGHTDB_NOEXCEPT;
+    void handle_wait_error(int error);
+};
+
+
+
+
+
+
+
+
+/// Condition variable for use in synchronization monitors.
+/// This condition variable uses emulation based on semaphores
+/// for the inter-process case, if enabled by TIGHTDB_CONDVAR_EMULATION.
+/// The emulation does not scale well to many databases, since it currently
+/// uses a single shared semaphore. Compared to a good pthread implemenation,
+/// the emulation carries an overhead of at most 2 task switches for
+/// every waiter notified during notify() or notify_all().
+///
+/// A PlatformSpecificCondVar is always process shared.
+class PlatformSpecificCondVar {
+public:
+    PlatformSpecificCondVar();
+    ~PlatformSpecificCondVar() TIGHTDB_NOEXCEPT;
+
+    /// To use the PlatformSpecificCondVar, you also must place a structure of type
+    /// PlatformSpecificCondVar::SharedPart in memory shared by multiple processes
     /// or in a memory mapped file, and use set_shared_part() to associate
     /// the condition variable with it's shared part. You must initialize
-    /// the shared part using CondVar::init_shared_part(), but only before
+    /// the shared part using PlatformSpecificCondVar::init_shared_part(), but only before
     /// first use and only when you have exclusive access to the shared part.
-    CondVar(process_shared_tag);
 
 #ifdef TIGHTDB_CONDVAR_EMULATION
     struct SharedPart {
@@ -310,17 +351,16 @@ public:
     };
 #endif
 
-    /// If you declare a process shared CondVar you need to
-    /// bind the emulation to a SharedPart in shared/mmapped memory. The SharedPart
-    /// is assumed to have been initialized (possibly by another process) earlier
-    /// through a call to init_shared_part.
+    /// You need to bind the emulation to a SharedPart in shared/mmapped memory. 
+    /// The SharedPart is assumed to have been initialized (possibly by another process) 
+    /// earlier through a call to init_shared_part.
     void set_shared_part(SharedPart& shared_part, 
                          dev_t device, ino_t inode, std::size_t offset_of_condvar);
 
     /// Initialize the shared part of a process shared condition variable.
     /// A process shared condition variables may be represented by any number of
-    /// CondVar instances in any number of different processes, all sharing a SharedPart instance,
-    /// which must be in shared memory.
+    /// PlatformSpecificCondVar instances in any number of different processes, 
+    /// all sharing a common SharedPart instance, which must be in shared memory.
     static void init_shared_part(SharedPart& shared_part);
 
     /// Wait for another thread to call notify() or notify_all().
@@ -336,9 +376,7 @@ public:
     /// Wake up every thread that is currently waiting on this condition.
     void notify_all() TIGHTDB_NOEXCEPT;
 
-    /// Cleanup and release system resources if possible. Only relevant for process shared
-    /// condvars. (Calling this for process local condvars have no effect, as they hold on
-    /// to system resources for their entire lifetime.
+    /// Cleanup and release system resources if possible. 
     void close() TIGHTDB_NOEXCEPT;
 private:
     TIGHTDB_NORETURN static void init_failed(int);
@@ -352,13 +390,6 @@ private:
 
     // semaphore used for emulation, zero if emulation is not used
     sem_t* m_sem; 
-
-    // posix condition variable used for implementation, non-zero if process local. 
-    // always set during construction. Note: in process shared scenario without emulation,
-    // the posix condition variable is reachable through m_shared_part, NOT through m_cond.
-    // in the process shared scenario, m_cond is 0 at all times.
-    pthread_cond_t* m_cond; 
-    bool is_process_shared() { return m_cond == 0; }
 
     // name of the semaphore - FIXME: generate a name based on inode, device and offset of
     // the file used for memory mapping.
@@ -561,17 +592,87 @@ inline void RobustMutex::unlock() TIGHTDB_NOEXCEPT
 }
 
 
+
+
+
 inline CondVar::CondVar()
 {
-    m_sem = 0;
-    m_shared_part = 0;
-    m_cond = new pthread_cond_t;
-    int r = pthread_cond_init(m_cond, 0);
+    int r = pthread_cond_init(&m_impl, 0);
     if (TIGHTDB_UNLIKELY(r != 0))
         init_failed(r);
 }
 
-inline void CondVar::close() TIGHTDB_NOEXCEPT
+inline CondVar::~CondVar() TIGHTDB_NOEXCEPT
+{
+    int r = pthread_cond_destroy(&m_impl);
+    if (TIGHTDB_UNLIKELY(r != 0))
+        destroy_failed(r);
+}
+
+inline void CondVar::wait(LockGuard& l) TIGHTDB_NOEXCEPT
+{
+    int r = pthread_cond_wait(&m_impl, &l.m_mutex.m_impl);
+    if (TIGHTDB_UNLIKELY(r != 0))
+        TIGHTDB_TERMINATE("pthread_cond_wait() failed");
+}
+
+template<class Func>
+inline void CondVar::wait(RobustMutex& m, Func recover_func, const struct timespec* tp)
+{
+    int r;
+    if (!tp) {
+        r = pthread_cond_wait(&m_impl, &m.m_impl);
+    }
+    else {
+        r = pthread_cond_timedwait(&m_impl, &m.m_impl, tp);
+        if (r == ETIMEDOUT)
+            return;
+    }
+    if (TIGHTDB_LIKELY(r == 0))
+        return;
+    handle_wait_error(r);
+    try {
+        recover_func(); // Throws
+        m.mark_as_consistent();
+        // If we get this far, the protected memory has been
+        // brought back into a consistent state, and the mutex has
+        // been notified aboit this. This means that we can safely
+        // enter the applications critical section.
+    }
+    catch (...) {
+        // Unlocking without first calling mark_as_consistent()
+        // means that the mutex enters the "not recoverable"
+        // state, which will cause all future attempts at locking
+        // to fail.
+        m.unlock();
+        throw;
+    }
+}
+
+inline void CondVar::notify() TIGHTDB_NOEXCEPT
+{
+    int r = pthread_cond_signal(&m_impl);
+    TIGHTDB_ASSERT(r == 0);
+    static_cast<void>(r);
+}
+
+inline void CondVar::notify_all() TIGHTDB_NOEXCEPT
+{
+    int r = pthread_cond_broadcast(&m_impl);
+    TIGHTDB_ASSERT(r == 0);
+    static_cast<void>(r);
+}
+
+
+
+
+
+
+
+
+
+
+inline void PlatformSpecificCondVar::close() TIGHTDB_NOEXCEPT
 {
     if (m_sem) { // true if emulating a process shared condvar
         sem_close(m_sem);
@@ -583,24 +684,16 @@ inline void CondVar::close() TIGHTDB_NOEXCEPT
 }
 
 
-inline CondVar::~CondVar() TIGHTDB_NOEXCEPT
+inline PlatformSpecificCondVar::~PlatformSpecificCondVar() TIGHTDB_NOEXCEPT
 {
     close();
-    if (m_cond) {  // == process local, we own the condition variable
-        int r = pthread_cond_destroy(m_cond);
-        if (TIGHTDB_UNLIKELY(r != 0))
-            destroy_failed(r);
-        delete m_cond;
-        m_cond = 0;
-    }
 }
 
 
 
-inline void CondVar::set_shared_part(SharedPart& shared_part, dev_t device, ino_t inode, std::size_t offset_of_condvar)
+inline void PlatformSpecificCondVar::set_shared_part(SharedPart& shared_part, dev_t device, ino_t inode, std::size_t offset_of_condvar)
 {
     TIGHTDB_ASSERT(m_shared_part == 0);
-    TIGHTDB_ASSERT(is_process_shared());
     close();
     m_shared_part = &shared_part;
     static_cast<void>(device);
@@ -611,7 +704,7 @@ inline void CondVar::set_shared_part(SharedPart& shared_part, dev_t device, ino_
 #endif
 }
 
-inline sem_t* CondVar::get_semaphore()
+inline sem_t* PlatformSpecificCondVar::get_semaphore()
 {
     TIGHTDB_ASSERT(m_name);
     TIGHTDB_ASSERT(m_shared_part);
@@ -622,35 +715,30 @@ inline sem_t* CondVar::get_semaphore()
     return m_sem;
 }
 
-inline void CondVar::wait(LockGuard& l) TIGHTDB_NOEXCEPT
+inline void PlatformSpecificCondVar::wait(LockGuard& l) TIGHTDB_NOEXCEPT
 {
-    pthread_cond_t* cond = m_cond;
+    TIGHTDB_ASSERT(m_shared_part);
 #ifdef TIGHTDB_CONDVAR_EMULATION
-    if (m_sem) {
-        TIGHTDB_ASSERT(m_shared_part);
-        m_shared_part->waiters++;
-        uint64_t my_counter = m_shared_part->signal_counter;
+    m_shared_part->waiters++;
+    uint64_t my_counter = m_shared_part->signal_counter;
+    l.m_mutex.unlock();
+    for (;;) {
+        // FIXME: handle premature return due to signal
+        sem_wait(m_sem);
+        l.m_mutex.lock();
+        if (m_shared_part->signal_counter != my_counter)
+            break;
+        sem_post(m_sem);
+        sched_yield();
         l.m_mutex.unlock();
-        for (;;) {
-            // FIXME: handle premature return due to signal
-            sem_wait(m_sem);
-            l.m_mutex.lock();
-            if (m_shared_part->signal_counter != my_counter)
-                break;
-            sem_post(m_sem);
-            sched_yield();
-            l.m_mutex.unlock();
-        }
-        return;
     }
 #else
-    if (m_shared_part)
-        cond = &m_shared_part->m_impl;
-#endif
+    pthread_cond_t* cond = &m_shared_part->m_impl;
     // no emulation (whether local or process shared, same codepath)
     int r = pthread_cond_wait(cond, &l.m_mutex.m_impl);
     if (TIGHTDB_UNLIKELY(r != 0))
         TIGHTDB_TERMINATE("pthread_cond_wait() failed");
+#endif
 }
 
 
@@ -660,33 +748,27 @@ inline void CondVar::wait(LockGuard& l) TIGHTDB_NOEXCEPT
 
 
 template<class Func>
-inline void CondVar::wait(RobustMutex& m, Func recover_func, const struct timespec* tp)
+inline void PlatformSpecificCondVar::wait(RobustMutex& m, Func recover_func, const struct timespec* tp)
 {
-    pthread_cond_t* cond = m_cond;
+    TIGHTDB_ASSERT(m_shared_part);
 #ifdef TIGHTDB_CONDVAR_EMULATION
-    if (m_sem) {
-        TIGHTDB_ASSERT(m_shared_part);
-        TIGHTDB_ASSERT(tp == 0);
-        m_shared_part->waiters++;
-        uint64_t my_counter = m_shared_part->signal_counter;
+    TIGHTDB_ASSERT(tp == 0);
+    m_shared_part->waiters++;
+    uint64_t my_counter = m_shared_part->signal_counter;
+    m.unlock();
+    for (;;) {
+        // FIXME: handle premature return due to signal
+        sem_wait(m_sem);
+        m.lock(recover_func);
+        if (m_shared_part->signal_counter != my_counter)
+            break;
+        sem_post(m_sem);
+        sched_yield();
         m.unlock();
-        for (;;) {
-            // FIXME: handle premature return due to signal
-            sem_wait(m_sem);
-            m.lock(recover_func);
-            if (m_shared_part->signal_counter != my_counter)
-                break;
-            sem_post(m_sem);
-            sched_yield();
-            m.unlock();
-        }
-        return;
     }
 #else
-    if (m_shared_part)
-        cond = &m_shared_part->m_impl;
+    pthread_cond_t* cond = &m_shared_part->m_impl;
     static_cast<void>(m);
-#endif
     int r;
     if (!tp) {
         r = pthread_cond_wait(cond, &m.m_impl);
@@ -715,6 +797,7 @@ inline void CondVar::wait(RobustMutex& m, Func recover_func, const struct timesp
         m.unlock();
         throw;
     }
+#endif
 }
 
 
@@ -722,52 +805,42 @@ inline void CondVar::wait(RobustMutex& m, Func recover_func, const struct timesp
 
 
 
-inline void CondVar::notify() TIGHTDB_NOEXCEPT
+inline void PlatformSpecificCondVar::notify() TIGHTDB_NOEXCEPT
 {
-    pthread_cond_t* cond = m_cond;
+    TIGHTDB_ASSERT(m_shared_part);
 #ifdef TIGHTDB_CONDVAR_EMULATION
-    if (m_sem) {
-        TIGHTDB_ASSERT(m_shared_part);
-        m_shared_part->signal_counter++;
-        if (m_shared_part->waiters) {
-            sem_post(m_sem);
-            --m_shared_part->waiters;
-        }
-        return;
+    m_shared_part->signal_counter++;
+    if (m_shared_part->waiters) {
+        sem_post(m_sem);
+        --m_shared_part->waiters;
     }
 #else
-    if (m_shared_part)
-        cond = &m_shared_part->m_impl;    
-#endif
+    pthread_cond_t* cond = &m_shared_part->m_impl;    
     int r = pthread_cond_signal(cond);
     TIGHTDB_ASSERT(r == 0);
     static_cast<void>(r);
+#endif
 }
 
 
 
 
 
-inline void CondVar::notify_all() TIGHTDB_NOEXCEPT
+inline void PlatformSpecificCondVar::notify_all() TIGHTDB_NOEXCEPT
 {
-    pthread_cond_t* cond = m_cond;
+    TIGHTDB_ASSERT(m_shared_part);
 #ifdef TIGHTDB_CONDVAR_EMULATION
-    if (m_sem) {
-        TIGHTDB_ASSERT(m_shared_part);
-        m_shared_part->signal_counter++;
-        while (m_shared_part->waiters) {
-            sem_post(m_sem);
-            --m_shared_part->waiters;
-        }
-        return;
+    m_shared_part->signal_counter++;
+    while (m_shared_part->waiters) {
+        sem_post(m_sem);
+        --m_shared_part->waiters;
     }
 #else
-    if (m_shared_part)
-        cond = &m_shared_part->m_impl;    
-#endif
+    pthread_cond_t* cond = &m_shared_part->m_impl;    
     int r = pthread_cond_broadcast(cond);
     TIGHTDB_ASSERT(r == 0);
     static_cast<void>(r);
+#endif
 }
 
 

@@ -201,20 +201,19 @@ void RobustMutex::mark_as_consistent() TIGHTDB_NOEXCEPT
 #endif
 }
 
-const char* CondVar::m_name = "/RealmsBigFriendlySemaphore";
+const char* PlatformSpecificCondVar::m_name = "/RealmsBigFriendlySemaphore";
 
-CondVar::CondVar(process_shared_tag)
+PlatformSpecificCondVar::PlatformSpecificCondVar()
 {
 #ifdef TIGHTDB_HAVE_PTHREAD_PROCESS_SHARED
     m_shared_part = 0;
     m_sem = 0;
-    m_cond = 0;
 #else // !TIGHTDB_HAVE_PTHREAD_PROCESS_SHARED
     throw runtime_error("No support for process-shared condition variables");
 #endif
 }
 
-void CondVar::init_shared_part(SharedPart& shared_part) {
+void PlatformSpecificCondVar::init_shared_part(SharedPart& shared_part) {
 #ifdef TIGHTDB_CONDVAR_EMULATION
     shared_part.waiters = 0;
     shared_part.signal_counter = 0;
@@ -232,6 +231,67 @@ void CondVar::init_shared_part(SharedPart& shared_part) {
     if (TIGHTDB_UNLIKELY(r != 0))
         init_failed(r);
 #endif // TIGHTDB_CONDVAR_EMULATION
+}
+
+TIGHTDB_NORETURN void PlatformSpecificCondVar::init_failed(int err)
+{
+    switch (err) {
+        case ENOMEM:
+            throw bad_alloc();
+        default:
+            throw runtime_error("pthread_cond_init() failed");
+    }
+}
+
+void PlatformSpecificCondVar::handle_wait_error(int err)
+{
+#ifdef TIGHTDB_HAVE_ROBUST_PTHREAD_MUTEX
+    if (err == ENOTRECOVERABLE)
+        throw RobustMutex::NotRecoverable();
+    if (err == EOWNERDEAD)
+        return;
+#else
+    static_cast<void>(err);
+#endif
+    TIGHTDB_TERMINATE("pthread_mutex_lock() failed");
+}
+
+TIGHTDB_NORETURN void PlatformSpecificCondVar::attr_init_failed(int err)
+{
+    switch (err) {
+        case ENOMEM:
+            throw bad_alloc();
+        default:
+            throw runtime_error("pthread_condattr_init() failed");
+    }
+}
+
+TIGHTDB_NORETURN void PlatformSpecificCondVar::destroy_failed(int err) TIGHTDB_NOEXCEPT
+{
+    if (err == EBUSY)
+        TIGHTDB_TERMINATE("Destruction of condition variable in use");
+    TIGHTDB_TERMINATE("pthread_cond_destroy() failed");
+}
+
+
+CondVar::CondVar(process_shared_tag)
+{
+#ifdef TIGHTDB_HAVE_PTHREAD_PROCESS_SHARED
+    pthread_condattr_t attr;
+    int r = pthread_condattr_init(&attr);
+    if (TIGHTDB_UNLIKELY(r != 0))
+        attr_init_failed(r);
+    r = pthread_condattr_setpshared(&attr, PTHREAD_PROCESS_SHARED);
+    TIGHTDB_ASSERT(r == 0);
+    r = pthread_cond_init(&m_impl, &attr);
+    int r2 = pthread_condattr_destroy(&attr);
+    TIGHTDB_ASSERT(r2 == 0);
+    static_cast<void>(r2);
+    if (TIGHTDB_UNLIKELY(r != 0))
+        init_failed(r);
+#else // !TIGHTDB_HAVE_PTHREAD_PROCESS_SHARED
+    throw runtime_error("No support for process-shared condition variables");
+#endif
 }
 
 TIGHTDB_NORETURN void CondVar::init_failed(int err)
