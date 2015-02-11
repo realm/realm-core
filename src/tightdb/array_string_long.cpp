@@ -4,6 +4,7 @@
 
 #include <tightdb/array_string_long.hpp>
 #include <tightdb/array_blob.hpp>
+#include <tightdb/array_integer.hpp>
 #include <tightdb/impl/destroy_guard.hpp>
 #include <tightdb/column.hpp>
 
@@ -122,20 +123,20 @@ void ArrayStringLong::find_all(Column& result, StringData value, size_t add_offs
 
 StringData ArrayStringLong::get(const char* header, size_t ndx, Allocator& alloc) TIGHTDB_NOEXCEPT
 {
-    pair<int_least64_t, int_least64_t> p = get_two(header, 0);
+    pair<int_least64_t, int_least64_t> p = get_two_data(header, 0);
     ref_type offsets_ref = to_ref(p.first);
     ref_type blob_ref    = to_ref(p.second);
 
     const char* offsets_header = alloc.translate(offsets_ref);
     size_t begin, end;
     if (0 < ndx) {
-        p = get_two(offsets_header, ndx-1);
+        p = get_two_data(offsets_header, ndx-1);
         begin = to_size_t(p.first);
         end   = to_size_t(p.second);
     }
     else {
         begin = 0;
-        end   = to_size_t(Array::get(offsets_header, 0));
+        end   = to_size_t(Array::get_data(offsets_header, 0));
     }
     --end; // Discount the terminating zero
 
@@ -187,10 +188,10 @@ MemRef ArrayStringLong::create_array(size_t size, Allocator& alloc)
     {
         bool context_flag = false;
         int_fast64_t value = 0;
-        MemRef mem = Array::create_array(type_Normal, context_flag, size, value, alloc); // Throws
+        MemRef mem = ArrayInteger::create_array(type_Normal, context_flag, size, value, alloc); // Throws
         dg_2.reset(mem.m_ref);
         int_fast64_t v(mem.m_ref); // FIXME: Dangerous cast (unsigned -> signed)
-        top.add(v); // Throws
+        top.add_data(v); // Throws
         dg_2.release();
     }
     {
@@ -198,7 +199,7 @@ MemRef ArrayStringLong::create_array(size_t size, Allocator& alloc)
         MemRef mem = ArrayBlob::create_array(blobs_size, alloc); // Throws
         dg_2.reset(mem.m_ref);
         int_fast64_t v(mem.m_ref); // FIXME: Dangerous cast (unsigned -> signed)
-        top.add(v); // Throws
+        top.add_data(v); // Throws
         dg_2.release();
     }
 

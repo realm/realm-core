@@ -19,7 +19,7 @@ void ArrayBigBlobs::add(BinaryData value, bool add_zero_term)
     ArrayBlob new_blob(m_alloc);
     new_blob.create(); // Throws
     new_blob.add(value.data(), value.size(), add_zero_term); // Throws
-    Array::add(int_fast64_t(new_blob.get_ref())); // Throws
+    add_data(int_fast64_t(new_blob.get_ref())); // Throws
 }
 
 
@@ -130,7 +130,7 @@ ref_type ArrayBigBlobs::bptree_leaf_insert(size_t ndx, BinaryData value, bool ad
     else {
         for (size_t i = ndx; i != leaf_size; ++i) {
             ref_type blob_ref = Array::get_as_ref(i);
-            new_leaf.Array::add(blob_ref);
+            new_leaf.add_data(blob_ref);
         }
         Array::truncate(ndx); // Avoiding destruction of transferred blobs
         add(value, add_zero_term);

@@ -123,7 +123,7 @@ void ColumnLinkList::cascade_break_backlinks_to__leaf(size_t row_ndx, const Arra
 
     size_t num_links = link_list_leaf.size();
     for (size_t i = 0; i < num_links; ++i) {
-        size_t target_row_ndx = to_size_t(link_list_leaf.get(i));
+        size_t target_row_ndx = to_size_t(link_list_leaf.get_data(i));
 
         // Remove the reciprocal backlink at target_row_ndx that points to row_ndx
         m_backlink_column->remove_one_backlink(target_row_ndx, row_ndx);
@@ -183,7 +183,7 @@ void ColumnLinkList::cascade_break_backlinks_to_all_rows__leaf(const Array& link
 
     size_t num_links = link_list_leaf.size();
     for (size_t i = 0; i < num_links; ++i) {
-        size_t target_row_ndx = to_size_t(link_list_leaf.get(i));
+        size_t target_row_ndx = to_size_t(link_list_leaf.get_data(i));
 
         // Recurse on target row when appropriate
         check_cascade_break_backlinks_to(target_table_ndx, target_row_ndx, state); // Throws

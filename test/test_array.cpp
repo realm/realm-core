@@ -59,9 +59,9 @@ void has_zero_byte(TestResults& test_results, int64_t value, size_t reps)
     Column r(Allocator::get_default(), column_ref);
 
     for (size_t i = 0; i < reps - 1; ++i)
-        a.add(value);
+        a.add_data(value);
 
-    a.add(0);
+    a.add_data(0);
 
     size_t t = a.find_first(0);
     CHECK_EQUAL(a.size() - 1, t);
@@ -85,108 +85,108 @@ TEST(Array_General)
 
     // TEST(Array_Add0)
 
-    c.add(0);
-    CHECK_EQUAL(c.get(0), 0);
+    c.add_data(0);
+    CHECK_EQUAL(c.get_data(0), 0);
     CHECK_EQUAL(c.size(), 1);
     CHECK_EQUAL(0, c.get_width());
 
 
     // TEST(Array_Add1)
 
-    c.add(1);
-    CHECK_EQUAL(c.get(0), 0);
-    CHECK_EQUAL(c.get(1), 1);
+    c.add_data(1);
+    CHECK_EQUAL(c.get_data(0), 0);
+    CHECK_EQUAL(c.get_data(1), 1);
     CHECK_EQUAL(c.size(), 2);
     CHECK_EQUAL(1, c.get_width());
 
 
     // TEST(Array_Add2)
 
-    c.add(2);
-    CHECK_EQUAL(c.get(0), 0);
-    CHECK_EQUAL(c.get(1), 1);
-    CHECK_EQUAL(c.get(2), 2);
+    c.add_data(2);
+    CHECK_EQUAL(c.get_data(0), 0);
+    CHECK_EQUAL(c.get_data(1), 1);
+    CHECK_EQUAL(c.get_data(2), 2);
     CHECK_EQUAL(c.size(), 3);
     CHECK_EQUAL(2, c.get_width());
 
 
     // TEST(Array_Add3)
 
-    c.add(3);
-    CHECK_EQUAL(c.get(0), 0);
-    CHECK_EQUAL(c.get(1), 1);
-    CHECK_EQUAL(c.get(2), 2);
-    CHECK_EQUAL(c.get(3), 3);
+    c.add_data(3);
+    CHECK_EQUAL(c.get_data(0), 0);
+    CHECK_EQUAL(c.get_data(1), 1);
+    CHECK_EQUAL(c.get_data(2), 2);
+    CHECK_EQUAL(c.get_data(3), 3);
     CHECK_EQUAL(c.size(), 4);
     CHECK_EQUAL(2, c.get_width());
 
 
     // TEST(Array_Add4)
 
-    c.add(4);
-    CHECK_EQUAL(c.get(0), 0);
-    CHECK_EQUAL(c.get(1), 1);
-    CHECK_EQUAL(c.get(2), 2);
-    CHECK_EQUAL(c.get(3), 3);
-    CHECK_EQUAL(c.get(4), 4);
+    c.add_data(4);
+    CHECK_EQUAL(c.get_data(0), 0);
+    CHECK_EQUAL(c.get_data(1), 1);
+    CHECK_EQUAL(c.get_data(2), 2);
+    CHECK_EQUAL(c.get_data(3), 3);
+    CHECK_EQUAL(c.get_data(4), 4);
     CHECK_EQUAL(c.size(), 5);
     CHECK_EQUAL(4, c.get_width());
 
 
     // TEST(Array_Add5)
 
-    c.add(16);
-    CHECK_EQUAL(c.get(0), 0);
-    CHECK_EQUAL(c.get(1), 1);
-    CHECK_EQUAL(c.get(2), 2);
-    CHECK_EQUAL(c.get(3), 3);
-    CHECK_EQUAL(c.get(4), 4);
-    CHECK_EQUAL(c.get(5), 16);
+    c.add_data(16);
+    CHECK_EQUAL(c.get_data(0), 0);
+    CHECK_EQUAL(c.get_data(1), 1);
+    CHECK_EQUAL(c.get_data(2), 2);
+    CHECK_EQUAL(c.get_data(3), 3);
+    CHECK_EQUAL(c.get_data(4), 4);
+    CHECK_EQUAL(c.get_data(5), 16);
     CHECK_EQUAL(c.size(), 6);
     CHECK_EQUAL(8, c.get_width());
 
 
     // TEST(Array_Add6)
 
-    c.add(256);
-    CHECK_EQUAL(c.get(0), 0);
-    CHECK_EQUAL(c.get(1), 1);
-    CHECK_EQUAL(c.get(2), 2);
-    CHECK_EQUAL(c.get(3), 3);
-    CHECK_EQUAL(c.get(4), 4);
-    CHECK_EQUAL(c.get(5), 16);
-    CHECK_EQUAL(c.get(6), 256);
+    c.add_data(256);
+    CHECK_EQUAL(c.get_data(0), 0);
+    CHECK_EQUAL(c.get_data(1), 1);
+    CHECK_EQUAL(c.get_data(2), 2);
+    CHECK_EQUAL(c.get_data(3), 3);
+    CHECK_EQUAL(c.get_data(4), 4);
+    CHECK_EQUAL(c.get_data(5), 16);
+    CHECK_EQUAL(c.get_data(6), 256);
     CHECK_EQUAL(c.size(), 7);
     CHECK_EQUAL(16, c.get_width());
 
 
     // TEST(Array_Add7)
 
-    c.add(65536);
-    CHECK_EQUAL(c.get(0), 0);
-    CHECK_EQUAL(c.get(1), 1);
-    CHECK_EQUAL(c.get(2), 2);
-    CHECK_EQUAL(c.get(3), 3);
-    CHECK_EQUAL(c.get(4), 4);
-    CHECK_EQUAL(c.get(5), 16);
-    CHECK_EQUAL(c.get(6), 256);
-    CHECK_EQUAL(c.get(7), 65536);
+    c.add_data(65536);
+    CHECK_EQUAL(c.get_data(0), 0);
+    CHECK_EQUAL(c.get_data(1), 1);
+    CHECK_EQUAL(c.get_data(2), 2);
+    CHECK_EQUAL(c.get_data(3), 3);
+    CHECK_EQUAL(c.get_data(4), 4);
+    CHECK_EQUAL(c.get_data(5), 16);
+    CHECK_EQUAL(c.get_data(6), 256);
+    CHECK_EQUAL(c.get_data(7), 65536);
     CHECK_EQUAL(c.size(), 8);
     CHECK_EQUAL(32, c.get_width());
 
 
     // TEST(Array_Add8)
 
-    c.add(4294967296LL);
-    CHECK_EQUAL(c.get(0), 0);
-    CHECK_EQUAL(c.get(1), 1);
-    CHECK_EQUAL(c.get(2), 2);
-    CHECK_EQUAL(c.get(3), 3);
-    CHECK_EQUAL(c.get(4), 4);
-    CHECK_EQUAL(c.get(5), 16);
-    CHECK_EQUAL(c.get(6), 256);
-    CHECK_EQUAL(c.get(7), 65536);
-    CHECK_EQUAL(c.get(8), 4294967296LL);
+    c.add_data(4294967296LL);
+    CHECK_EQUAL(c.get_data(0), 0);
+    CHECK_EQUAL(c.get_data(1), 1);
+    CHECK_EQUAL(c.get_data(2), 2);
+    CHECK_EQUAL(c.get_data(3), 3);
+    CHECK_EQUAL(c.get_data(4), 4);
+    CHECK_EQUAL(c.get_data(5), 16);
+    CHECK_EQUAL(c.get_data(6), 256);
+    CHECK_EQUAL(c.get_data(7), 65536);
+    CHECK_EQUAL(c.get_data(8), 4294967296LL);
     CHECK_EQUAL(c.size(), 9);
     CHECK_EQUAL(64, c.get_width());
 
@@ -194,78 +194,78 @@ TEST(Array_General)
     // TEST(Array_AddNeg1)
 
     c.clear();
-    c.add(-1);
+    c.add_data(-1);
 
     CHECK_EQUAL(c.size(), 1);
-    CHECK_EQUAL(c.get(0), -1);
+    CHECK_EQUAL(c.get_data(0), -1);
     CHECK_EQUAL(8, c.get_width());
 
 
     // TEST(Array_AddNeg2)
 
-    c.add(-256);
+    c.add_data(-256);
 
     CHECK_EQUAL(c.size(), 2);
-    CHECK_EQUAL(c.get(0), -1);
-    CHECK_EQUAL(c.get(1), -256);
+    CHECK_EQUAL(c.get_data(0), -1);
+    CHECK_EQUAL(c.get_data(1), -256);
     CHECK_EQUAL(16, c.get_width());
 
 
     // TEST(Array_AddNeg3)
 
-    c.add(-65536);
+    c.add_data(-65536);
 
     CHECK_EQUAL(c.size(), 3);
-    CHECK_EQUAL(c.get(0), -1);
-    CHECK_EQUAL(c.get(1), -256);
-    CHECK_EQUAL(c.get(2), -65536);
+    CHECK_EQUAL(c.get_data(0), -1);
+    CHECK_EQUAL(c.get_data(1), -256);
+    CHECK_EQUAL(c.get_data(2), -65536);
     CHECK_EQUAL(32, c.get_width());
 
 
     // TEST(Array_AddNeg4)
 
-    c.add(-4294967296LL);
+    c.add_data(-4294967296LL);
 
     CHECK_EQUAL(c.size(), 4);
-    CHECK_EQUAL(c.get(0), -1);
-    CHECK_EQUAL(c.get(1), -256);
-    CHECK_EQUAL(c.get(2), -65536);
-    CHECK_EQUAL(c.get(3), -4294967296LL);
+    CHECK_EQUAL(c.get_data(0), -1);
+    CHECK_EQUAL(c.get_data(1), -256);
+    CHECK_EQUAL(c.get_data(2), -65536);
+    CHECK_EQUAL(c.get_data(3), -4294967296LL);
     CHECK_EQUAL(64, c.get_width());
 
 
     // TEST(Array_Set)
 
-    c.set(0, 3);
-    c.set(1, 2);
-    c.set(2, 1);
-    c.set(3, 0);
+    c.set_data(0, 3);
+    c.set_data(1, 2);
+    c.set_data(2, 1);
+    c.set_data(3, 0);
 
     CHECK_EQUAL(c.size(), 4);
-    CHECK_EQUAL(c.get(0), 3);
-    CHECK_EQUAL(c.get(1), 2);
-    CHECK_EQUAL(c.get(2), 1);
-    CHECK_EQUAL(c.get(3), 0);
+    CHECK_EQUAL(c.get_data(0), 3);
+    CHECK_EQUAL(c.get_data(1), 2);
+    CHECK_EQUAL(c.get_data(2), 1);
+    CHECK_EQUAL(c.get_data(3), 0);
 
 
     // TEST(Array_Insert1)
 
     // Set up some initial values
     c.clear();
-    c.add(0);
-    c.add(1);
-    c.add(2);
-    c.add(3);
+    c.add_data(0);
+    c.add_data(1);
+    c.add_data(2);
+    c.add_data(3);
 
     // Insert in middle
     c.insert(2, 16);
 
     CHECK_EQUAL(c.size(), 5);
-    CHECK_EQUAL(c.get(0), 0);
-    CHECK_EQUAL(c.get(1), 1);
-    CHECK_EQUAL(c.get(2), 16);
-    CHECK_EQUAL(c.get(3), 2);
-    CHECK_EQUAL(c.get(4), 3);
+    CHECK_EQUAL(c.get_data(0), 0);
+    CHECK_EQUAL(c.get_data(1), 1);
+    CHECK_EQUAL(c.get_data(2), 16);
+    CHECK_EQUAL(c.get_data(3), 2);
+    CHECK_EQUAL(c.get_data(4), 3);
 
 
     // TEST(Array_Insert2)
@@ -274,12 +274,12 @@ TEST(Array_General)
     c.insert(0, 256);
 
     CHECK_EQUAL(c.size(), 6);
-    CHECK_EQUAL(c.get(0), 256);
-    CHECK_EQUAL(c.get(1), 0);
-    CHECK_EQUAL(c.get(2), 1);
-    CHECK_EQUAL(c.get(3), 16);
-    CHECK_EQUAL(c.get(4), 2);
-    CHECK_EQUAL(c.get(5), 3);
+    CHECK_EQUAL(c.get_data(0), 256);
+    CHECK_EQUAL(c.get_data(1), 0);
+    CHECK_EQUAL(c.get_data(2), 1);
+    CHECK_EQUAL(c.get_data(3), 16);
+    CHECK_EQUAL(c.get_data(4), 2);
+    CHECK_EQUAL(c.get_data(5), 3);
 
 
     // TEST(Array_Insert3)
@@ -288,13 +288,13 @@ TEST(Array_General)
     c.insert(6, 65536);
 
     CHECK_EQUAL(c.size(), 7);
-    CHECK_EQUAL(c.get(0), 256);
-    CHECK_EQUAL(c.get(1), 0);
-    CHECK_EQUAL(c.get(2), 1);
-    CHECK_EQUAL(c.get(3), 16);
-    CHECK_EQUAL(c.get(4), 2);
-    CHECK_EQUAL(c.get(5), 3);
-    CHECK_EQUAL(c.get(6), 65536);
+    CHECK_EQUAL(c.get_data(0), 256);
+    CHECK_EQUAL(c.get_data(1), 0);
+    CHECK_EQUAL(c.get_data(2), 1);
+    CHECK_EQUAL(c.get_data(3), 16);
+    CHECK_EQUAL(c.get_data(4), 2);
+    CHECK_EQUAL(c.get_data(5), 3);
+    CHECK_EQUAL(c.get_data(6), 65536);
 
 
     // TEST(Array_Index1)
@@ -322,12 +322,12 @@ TEST(Array_General)
     c.erase(3);
 
     CHECK_EQUAL(c.size(), 6);
-    CHECK_EQUAL(c.get(0), 256);
-    CHECK_EQUAL(c.get(1), 0);
-    CHECK_EQUAL(c.get(2), 1);
-    CHECK_EQUAL(c.get(3), 2);
-    CHECK_EQUAL(c.get(4), 3);
-    CHECK_EQUAL(c.get(5), 65536);
+    CHECK_EQUAL(c.get_data(0), 256);
+    CHECK_EQUAL(c.get_data(1), 0);
+    CHECK_EQUAL(c.get_data(2), 1);
+    CHECK_EQUAL(c.get_data(3), 2);
+    CHECK_EQUAL(c.get_data(4), 3);
+    CHECK_EQUAL(c.get_data(5), 65536);
 
 
     // TEST(Array_Delete2)
@@ -336,11 +336,11 @@ TEST(Array_General)
     c.erase(0);
 
     CHECK_EQUAL(c.size(), 5);
-    CHECK_EQUAL(c.get(0), 0);
-    CHECK_EQUAL(c.get(1), 1);
-    CHECK_EQUAL(c.get(2), 2);
-    CHECK_EQUAL(c.get(3), 3);
-    CHECK_EQUAL(c.get(4), 65536);
+    CHECK_EQUAL(c.get_data(0), 0);
+    CHECK_EQUAL(c.get_data(1), 1);
+    CHECK_EQUAL(c.get_data(2), 2);
+    CHECK_EQUAL(c.get_data(3), 3);
+    CHECK_EQUAL(c.get_data(4), 65536);
 
 
     // TEST(Array_Delete3)
@@ -349,10 +349,10 @@ TEST(Array_General)
     c.erase(4);
 
     CHECK_EQUAL(c.size(), 4);
-    CHECK_EQUAL(c.get(0), 0);
-    CHECK_EQUAL(c.get(1), 1);
-    CHECK_EQUAL(c.get(2), 2);
-    CHECK_EQUAL(c.get(3), 3);
+    CHECK_EQUAL(c.get_data(0), 0);
+    CHECK_EQUAL(c.get_data(1), 1);
+    CHECK_EQUAL(c.get_data(2), 2);
+    CHECK_EQUAL(c.get_data(3), 3);
 
 
     // TEST(Array_DeleteAll)
@@ -377,8 +377,8 @@ TEST(Array_General)
 
     // zero-bit width
     c.clear();
-    c.add(0);
-    c.add(0);
+    c.add_data(0);
+    c.add_data(0);
 
     CHECK_EQUAL(0, c.find_first(0));
 
@@ -386,7 +386,7 @@ TEST(Array_General)
     // TEST(Array_Find3)
 
     // expand to 1-bit width
-    c.add(1);
+    c.add_data(1);
 
     CHECK_EQUAL(2, c.find_first(1));
 
@@ -394,7 +394,7 @@ TEST(Array_General)
     // TEST(Array_Find4)
 
     // expand to 2-bit width
-    c.add(2);
+    c.add_data(2);
 
     CHECK_EQUAL(3, c.find_first(2));
 
@@ -402,7 +402,7 @@ TEST(Array_General)
     // TEST(Array_Find5)
 
     // expand to 4-bit width
-    c.add(4);
+    c.add_data(4);
 
     CHECK_EQUAL(4, c.find_first(4));
 
@@ -410,12 +410,12 @@ TEST(Array_General)
     // TEST(Array_Find6)
 
     // expand to 8-bit width
-    c.add(16);
+    c.add_data(16);
 
     // Add some more to make sure we
     // can search in 64bit chunks
-    c.add(16);
-    c.add(7);
+    c.add_data(16);
+    c.add_data(7);
 
     CHECK_EQUAL(7, c.find_first(7));
 
@@ -423,7 +423,7 @@ TEST(Array_General)
     // TEST(Array_Find7)
 
     // expand to 16-bit width
-    c.add(256);
+    c.add_data(256);
 
     CHECK_EQUAL(8, c.find_first(256));
 
@@ -431,7 +431,7 @@ TEST(Array_General)
     // TEST(Array_Find8)
 
     // expand to 32-bit width
-    c.add(65536);
+    c.add_data(65536);
 
     CHECK_EQUAL(9, c.find_first(65536));
 
@@ -439,7 +439,7 @@ TEST(Array_General)
     // TEST(Array_Find9)
 
     // expand to 64-bit width
-    c.add(4294967296LL);
+    c.add_data(4294967296LL);
 
     CHECK_EQUAL(10, c.find_first(4294967296LL));
 
@@ -452,7 +452,7 @@ TEST(Array_General)
 
     size_t partial_count = 100;
     for (size_t i = 0; i != partial_count; ++i)
-        c.add(i);
+        c.add_data(i);
 
     CHECK_EQUAL(-1, c.find_first(partial_count+1, 0, partial_count));
     CHECK_EQUAL(-1, c.find_first(0, 1, partial_count));
@@ -470,16 +470,16 @@ TEST(Array_AddNeg1_1)
     Array c(Allocator::get_default());
     c.create(Array::type_Normal);
 
-    c.add(1);
-    c.add(2);
-    c.add(3);
-    c.add(-128);
+    c.add_data(1);
+    c.add_data(2);
+    c.add_data(3);
+    c.add_data(-128);
 
     CHECK_EQUAL(c.size(), 4);
-    CHECK_EQUAL(c.get(0), 1);
-    CHECK_EQUAL(c.get(1), 2);
-    CHECK_EQUAL(c.get(2), 3);
-    CHECK_EQUAL(c.get(3), -128);
+    CHECK_EQUAL(c.get_data(0), 1);
+    CHECK_EQUAL(c.get_data(1), 2);
+    CHECK_EQUAL(c.get_data(2), 3);
+    CHECK_EQUAL(c.get_data(3), -128);
     CHECK_EQUAL(8, c.get_width());
 
     c.destroy();
@@ -509,15 +509,15 @@ TEST(Array_UpperLowerBound)
         v.clear();
 
         for (int e = 0; e < elements; e++) {
-            a.add(val);
+            a.add_data(val);
             v.push_back(val);
             val += random.draw_int_mod(4);
         }
 
         int64_t searches = val; // val exceeds last value by random.draw_int_mod(4)
         for (int64_t s = 0; s < searches; s++) {
-            size_t uarr = a.upper_bound_int(s);
-            size_t larr = a.lower_bound_int(s);
+            size_t uarr = a.upper_bound_data(s);
+            size_t larr = a.lower_bound_data(s);
             size_t uvec = upper_bound(v.begin(), v.end(), s) - v.begin();
             size_t lvec = lower_bound(v.begin(), v.end(), s) - v.begin();
 
@@ -534,86 +534,54 @@ TEST(Array_LowerUpperBound)
     Array a(Allocator::get_default());
     a.create(Array::type_Normal);
 
-    a.add(10);
-    a.add(20);
-    a.add(30);
-    a.add(40);
-    a.add(50);
-    a.add(60);
-    a.add(70);
-    a.add(80);
+    a.add_data(10);
+    a.add_data(20);
+    a.add_data(30);
+    a.add_data(40);
+    a.add_data(50);
+    a.add_data(60);
+    a.add_data(70);
+    a.add_data(80);
 
-    CHECK_EQUAL(0, a.lower_bound_int(0));  CHECK_EQUAL(0, a.upper_bound_int(0));
-    CHECK_EQUAL(0, a.lower_bound_int(1));  CHECK_EQUAL(0, a.upper_bound_int(1));
-    CHECK_EQUAL(0, a.lower_bound_int(9));  CHECK_EQUAL(0, a.upper_bound_int(9));
-    CHECK_EQUAL(0, a.lower_bound_int(10)); CHECK_EQUAL(1, a.upper_bound_int(10));
-    CHECK_EQUAL(1, a.lower_bound_int(11)); CHECK_EQUAL(1, a.upper_bound_int(11));
-    CHECK_EQUAL(1, a.lower_bound_int(19)); CHECK_EQUAL(1, a.upper_bound_int(19));
-    CHECK_EQUAL(1, a.lower_bound_int(20)); CHECK_EQUAL(2, a.upper_bound_int(20));
-    CHECK_EQUAL(2, a.lower_bound_int(21)); CHECK_EQUAL(2, a.upper_bound_int(21));
-    CHECK_EQUAL(2, a.lower_bound_int(29)); CHECK_EQUAL(2, a.upper_bound_int(29));
-    CHECK_EQUAL(2, a.lower_bound_int(30)); CHECK_EQUAL(3, a.upper_bound_int(30));
-    CHECK_EQUAL(3, a.lower_bound_int(31)); CHECK_EQUAL(3, a.upper_bound_int(31));
-    CHECK_EQUAL(3, a.lower_bound_int(32)); CHECK_EQUAL(3, a.upper_bound_int(32));
-    CHECK_EQUAL(3, a.lower_bound_int(39)); CHECK_EQUAL(3, a.upper_bound_int(39));
-    CHECK_EQUAL(3, a.lower_bound_int(40)); CHECK_EQUAL(4, a.upper_bound_int(40));
-    CHECK_EQUAL(4, a.lower_bound_int(41)); CHECK_EQUAL(4, a.upper_bound_int(41));
-    CHECK_EQUAL(4, a.lower_bound_int(42)); CHECK_EQUAL(4, a.upper_bound_int(42));
-    CHECK_EQUAL(4, a.lower_bound_int(49)); CHECK_EQUAL(4, a.upper_bound_int(49));
-    CHECK_EQUAL(4, a.lower_bound_int(50)); CHECK_EQUAL(5, a.upper_bound_int(50));
-    CHECK_EQUAL(5, a.lower_bound_int(51)); CHECK_EQUAL(5, a.upper_bound_int(51));
-    CHECK_EQUAL(5, a.lower_bound_int(52)); CHECK_EQUAL(5, a.upper_bound_int(52));
-    CHECK_EQUAL(5, a.lower_bound_int(59)); CHECK_EQUAL(5, a.upper_bound_int(59));
-    CHECK_EQUAL(5, a.lower_bound_int(60)); CHECK_EQUAL(6, a.upper_bound_int(60));
-    CHECK_EQUAL(6, a.lower_bound_int(61)); CHECK_EQUAL(6, a.upper_bound_int(61));
-    CHECK_EQUAL(6, a.lower_bound_int(62)); CHECK_EQUAL(6, a.upper_bound_int(62));
-    CHECK_EQUAL(6, a.lower_bound_int(69)); CHECK_EQUAL(6, a.upper_bound_int(69));
-    CHECK_EQUAL(6, a.lower_bound_int(70)); CHECK_EQUAL(7, a.upper_bound_int(70));
-    CHECK_EQUAL(7, a.lower_bound_int(71)); CHECK_EQUAL(7, a.upper_bound_int(71));
-    CHECK_EQUAL(7, a.lower_bound_int(72)); CHECK_EQUAL(7, a.upper_bound_int(72));
-    CHECK_EQUAL(7, a.lower_bound_int(78)); CHECK_EQUAL(7, a.upper_bound_int(78));
-    CHECK_EQUAL(7, a.lower_bound_int(79)); CHECK_EQUAL(7, a.upper_bound_int(79));
-    CHECK_EQUAL(7, a.lower_bound_int(80)); CHECK_EQUAL(8, a.upper_bound_int(80));
-    CHECK_EQUAL(8, a.lower_bound_int(81)); CHECK_EQUAL(8, a.upper_bound_int(81));
-    CHECK_EQUAL(8, a.lower_bound_int(82)); CHECK_EQUAL(8, a.upper_bound_int(82));
+    CHECK_EQUAL(0, a.lower_bound_data(0));  CHECK_EQUAL(0, a.upper_bound_data(0));
+    CHECK_EQUAL(0, a.lower_bound_data(1));  CHECK_EQUAL(0, a.upper_bound_data(1));
+    CHECK_EQUAL(0, a.lower_bound_data(9));  CHECK_EQUAL(0, a.upper_bound_data(9));
+    CHECK_EQUAL(0, a.lower_bound_data(10)); CHECK_EQUAL(1, a.upper_bound_data(10));
+    CHECK_EQUAL(1, a.lower_bound_data(11)); CHECK_EQUAL(1, a.upper_bound_data(11));
+    CHECK_EQUAL(1, a.lower_bound_data(19)); CHECK_EQUAL(1, a.upper_bound_data(19));
+    CHECK_EQUAL(1, a.lower_bound_data(20)); CHECK_EQUAL(2, a.upper_bound_data(20));
+    CHECK_EQUAL(2, a.lower_bound_data(21)); CHECK_EQUAL(2, a.upper_bound_data(21));
+    CHECK_EQUAL(2, a.lower_bound_data(29)); CHECK_EQUAL(2, a.upper_bound_data(29));
+    CHECK_EQUAL(2, a.lower_bound_data(30)); CHECK_EQUAL(3, a.upper_bound_data(30));
+    CHECK_EQUAL(3, a.lower_bound_data(31)); CHECK_EQUAL(3, a.upper_bound_data(31));
+    CHECK_EQUAL(3, a.lower_bound_data(32)); CHECK_EQUAL(3, a.upper_bound_data(32));
+    CHECK_EQUAL(3, a.lower_bound_data(39)); CHECK_EQUAL(3, a.upper_bound_data(39));
+    CHECK_EQUAL(3, a.lower_bound_data(40)); CHECK_EQUAL(4, a.upper_bound_data(40));
+    CHECK_EQUAL(4, a.lower_bound_data(41)); CHECK_EQUAL(4, a.upper_bound_data(41));
+    CHECK_EQUAL(4, a.lower_bound_data(42)); CHECK_EQUAL(4, a.upper_bound_data(42));
+    CHECK_EQUAL(4, a.lower_bound_data(49)); CHECK_EQUAL(4, a.upper_bound_data(49));
+    CHECK_EQUAL(4, a.lower_bound_data(50)); CHECK_EQUAL(5, a.upper_bound_data(50));
+    CHECK_EQUAL(5, a.lower_bound_data(51)); CHECK_EQUAL(5, a.upper_bound_data(51));
+    CHECK_EQUAL(5, a.lower_bound_data(52)); CHECK_EQUAL(5, a.upper_bound_data(52));
+    CHECK_EQUAL(5, a.lower_bound_data(59)); CHECK_EQUAL(5, a.upper_bound_data(59));
+    CHECK_EQUAL(5, a.lower_bound_data(60)); CHECK_EQUAL(6, a.upper_bound_data(60));
+    CHECK_EQUAL(6, a.lower_bound_data(61)); CHECK_EQUAL(6, a.upper_bound_data(61));
+    CHECK_EQUAL(6, a.lower_bound_data(62)); CHECK_EQUAL(6, a.upper_bound_data(62));
+    CHECK_EQUAL(6, a.lower_bound_data(69)); CHECK_EQUAL(6, a.upper_bound_data(69));
+    CHECK_EQUAL(6, a.lower_bound_data(70)); CHECK_EQUAL(7, a.upper_bound_data(70));
+    CHECK_EQUAL(7, a.lower_bound_data(71)); CHECK_EQUAL(7, a.upper_bound_data(71));
+    CHECK_EQUAL(7, a.lower_bound_data(72)); CHECK_EQUAL(7, a.upper_bound_data(72));
+    CHECK_EQUAL(7, a.lower_bound_data(78)); CHECK_EQUAL(7, a.upper_bound_data(78));
+    CHECK_EQUAL(7, a.lower_bound_data(79)); CHECK_EQUAL(7, a.upper_bound_data(79));
+    CHECK_EQUAL(7, a.lower_bound_data(80)); CHECK_EQUAL(8, a.upper_bound_data(80));
+    CHECK_EQUAL(8, a.lower_bound_data(81)); CHECK_EQUAL(8, a.upper_bound_data(81));
+    CHECK_EQUAL(8, a.lower_bound_data(82)); CHECK_EQUAL(8, a.upper_bound_data(82));
 
     a.destroy();
 }
 
 
-TEST(Array_Sort)
-{
-    // Create Array with random values
-    Array a(Allocator::get_default());
-    a.create(Array::type_Normal);
 
-    a.add(25);
-    a.add(12);
-    a.add(50);
-    a.add(3);
-    a.add(34);
-    a.add(0);
-    a.add(17);
-    a.add(51);
-    a.add(2);
-    a.add(40);
-
-    a.sort();
-
-    CHECK_EQUAL(0, a.get(0));
-    CHECK_EQUAL(2, a.get(1));
-    CHECK_EQUAL(3, a.get(2));
-    CHECK_EQUAL(12, a.get(3));
-    CHECK_EQUAL(17, a.get(4));
-    CHECK_EQUAL(25, a.get(5));
-    CHECK_EQUAL(34, a.get(6));
-    CHECK_EQUAL(40, a.get(7));
-    CHECK_EQUAL(50, a.get(8));
-    CHECK_EQUAL(51, a.get(9));
-
-    // Cleanup
-    a.destroy();
-}
 
 /** find_all() int tests spread out over bitwidth
  *
@@ -632,7 +600,7 @@ TEST(Array_FindAllInt0)
     const int vReps = 5;
 
     for (int i = 0; i < vReps; i++){
-        a.add(0);
+        a.add_data(0);
     }
 
     a.find_all(&r, value);
@@ -641,7 +609,7 @@ TEST(Array_FindAllInt0)
     size_t i = 0;
     size_t j = 0;
     while (i < a.size()){
-        if (a.get(i) == value)
+        if (a.get_data(i) == value)
             CHECK_EQUAL(int64_t(i), r.get(j++));
         i += 1;
     }
@@ -663,10 +631,10 @@ TEST(Array_FindAllInt1)
     const int vReps = 5;
 
     for (int i = 0; i < vReps; i++){
-        a.add(0);
-        a.add(0);
-        a.add(1);
-        a.add(0);
+        a.add_data(0);
+        a.add_data(0);
+        a.add_data(1);
+        a.add_data(0);
     }
 
     a.find_all(&r, value);
@@ -675,7 +643,7 @@ TEST(Array_FindAllInt1)
     size_t i = 0;
     size_t j = 0;
     while (i < a.size()){
-        if (a.get(i) == value)
+        if (a.get_data(i) == value)
             CHECK_EQUAL(int64_t(i), r.get(j++));
         i += 1;
     }
@@ -697,10 +665,10 @@ TEST(Array_FindAllInt2)
     const int vReps = 5;
 
     for (int i = 0; i < vReps; i++){
-        a.add(0);
-        a.add(1);
-        a.add(2);
-        a.add(3);
+        a.add_data(0);
+        a.add_data(1);
+        a.add_data(2);
+        a.add_data(3);
     }
 
     a.find_all(&r, value);
@@ -709,7 +677,7 @@ TEST(Array_FindAllInt2)
     size_t i = 0;
     size_t j = 0;
     while (i < a.size()){
-        if (a.get(i) == value)
+        if (a.get_data(i) == value)
             CHECK_EQUAL(int64_t(i), r.get(j++));
         i += 1;
     }
@@ -731,10 +699,10 @@ TEST(Array_FindAllInt3)
     const int vReps = 5;
     // 0, 4, 8
     for (int i = 0; i < vReps; i++){
-        a.add(10);
-        a.add(11);
-        a.add(12);
-        a.add(13);
+        a.add_data(10);
+        a.add_data(11);
+        a.add_data(12);
+        a.add_data(13);
     }
 
     a.find_all(&r, value);
@@ -743,7 +711,7 @@ TEST(Array_FindAllInt3)
     size_t i = 0;
     size_t j = 0;
     while (i < a.size()){
-        if (a.get(i) == value)
+        if (a.get_data(i) == value)
             CHECK_EQUAL(int64_t(i), r.get(j++));
         i += 1;
     }
@@ -766,10 +734,10 @@ TEST(Array_FindAllInt4)
 
     for (int i = 0; i < vReps; i++){
         // 8 bitwidth
-        a.add(20);
-        a.add(21);
-        a.add(22);
-        a.add(23);
+        a.add_data(20);
+        a.add_data(21);
+        a.add_data(22);
+        a.add_data(23);
     }
 
     a.find_all(&r, value);
@@ -778,7 +746,7 @@ TEST(Array_FindAllInt4)
     size_t i = 0;
     size_t j = 0;
     while (i < a.size()){
-        if (a.get(i) == value)
+        if (a.get_data(i) == value)
             CHECK_EQUAL(int64_t(i), r.get(j++));
         i += 1;
     }
@@ -801,10 +769,10 @@ TEST(Array_FindAllInt5)
 
     for (int i = 0; i < vReps; i++){
         // 16 bitwidth
-        a.add(300);
-        a.add(301);
-        a.add(302);
-        a.add(303);
+        a.add_data(300);
+        a.add_data(301);
+        a.add_data(302);
+        a.add_data(303);
     }
 
     a.find_all(&r, value);
@@ -813,7 +781,7 @@ TEST(Array_FindAllInt5)
     size_t i = 0;
     size_t j = 0;
     while (i < a.size()){
-        if (a.get(i) == value)
+        if (a.get_data(i) == value)
             CHECK_EQUAL(int64_t(i), r.get(j++));
         i += 1;
     }
@@ -836,10 +804,10 @@ TEST(Array_FindAllInt6)
 
     for (int i = 0; i < vReps; ++i) {
         // 32 bitwidth
-        a.add(70000);
-        a.add(70001);
-        a.add(70002);
-        a.add(70003);
+        a.add_data(70000);
+        a.add_data(70001);
+        a.add_data(70002);
+        a.add_data(70003);
     }
 
     a.find_all(&r, value);
@@ -848,7 +816,7 @@ TEST(Array_FindAllInt6)
     size_t i = 0;
     size_t j = 0;
     while (i < a.size()) {
-        if (a.get(i) == value)
+        if (a.get_data(i) == value)
             CHECK_EQUAL(int64_t(i), r.get(j++));
         i += 1;
     }
@@ -871,10 +839,10 @@ TEST(Array_FindAllInt7)
 
     for (int i = 0; i < vReps; ++i) {
         // 64 bitwidth
-        a.add(4300000000ULL);
-        a.add(4300000001ULL);
-        a.add(4300000002ULL);
-        a.add(4300000003ULL);
+        a.add_data(4300000000ULL);
+        a.add_data(4300000001ULL);
+        a.add_data(4300000002ULL);
+        a.add_data(4300000003ULL);
     }
 
     a.find_all(&r, value);
@@ -883,7 +851,7 @@ TEST(Array_FindAllInt7)
     size_t i = 0;
     size_t j = 0;
     while (i < a.size()) {
-        if (a.get(i) == value)
+        if (a.get_data(i) == value)
             CHECK_EQUAL(int64_t(i), r.get(j++));
         i += 1;
     }
@@ -914,120 +882,20 @@ TEST(Array_FindSSE)
     a.create(Array::type_Normal);
 
     for (uint64_t i = 0; i < 100; ++i) {
-        a.add(10000);
+        a.add_data(10000);
     }
 
     for (size_t i = 0; i < 100; ++i) {
-        a.set(i, 123);
+        a.set_data(i, 123);
         size_t t = a.find_first(123);
         TIGHTDB_ASSERT(t == i);
-        a.set(i, 10000);
+        a.set_data(i, 10000);
         static_cast<void>(t);
     }
     a.destroy();
 }
 
 
-TEST(Array_Sum0)
-{
-    Array a(Allocator::get_default());
-    a.create(Array::type_Normal);
-
-    for (int i = 0; i < 64 + 7; ++i) {
-        a.add(0);
-    }
-    CHECK_EQUAL(0, a.sum(0, a.size()));
-    a.destroy();
-}
-
-TEST(Array_Sum1)
-{
-    Array a(Allocator::get_default());
-    a.create(Array::type_Normal);
-
-    int64_t s1 = 0;
-    for (int i = 0; i < 256 + 7; ++i)
-        a.add(i % 2);
-
-    s1 = 0;
-    for (int i = 0; i < 256 + 7; ++i)
-        s1 += a.get(i);
-    CHECK_EQUAL(s1, a.sum(0, a.size()));
-
-    s1 = 0;
-    for (int i = 3; i < 100; ++i)
-        s1 += a.get(i);
-    CHECK_EQUAL(s1, a.sum(3, 100));
-
-    a.destroy();
-}
-
-TEST(Array_Sum2)
-{
-    Array a(Allocator::get_default());
-    a.create(Array::type_Normal);
-
-    int64_t s1 = 0;
-    for (int i = 0; i < 256 + 7; ++i)
-        a.add(i % 4);
-
-    s1 = 0;
-    for (int i = 0; i < 256 + 7; ++i)
-        s1 += a.get(i);
-    CHECK_EQUAL(s1, a.sum(0, a.size()));
-
-    s1 = 0;
-    for (int i = 3; i < 100; ++i)
-        s1 += a.get(i);
-    CHECK_EQUAL(s1, a.sum(3, 100));
-
-    a.destroy();
-}
-
-
-TEST(Array_Sum4)
-{
-    Array a(Allocator::get_default());
-    a.create(Array::type_Normal);
-
-    int64_t s1 = 0;
-    for (int i = 0; i < 256 + 7; ++i)
-        a.add(i % 16);
-
-    s1 = 0;
-    for (int i = 0; i < 256 + 7; ++i)
-        s1 += a.get(i);
-    CHECK_EQUAL(s1, a.sum(0, a.size()));
-
-    s1 = 0;
-    for (int i = 3; i < 100; ++i)
-        s1 += a.get(i);
-    CHECK_EQUAL(s1, a.sum(3, 100));
-
-    a.destroy();
-}
-
-TEST(Array_Sum16)
-{
-    Array a(Allocator::get_default());
-    a.create(Array::type_Normal);
-
-    int64_t s1 = 0;
-    for (int i = 0; i < 256 + 7; ++i)
-        a.add(i % 30000);
-
-    s1 = 0;
-    for (int i = 0; i < 256 + 7; ++i)
-        s1 += a.get(i);
-    CHECK_EQUAL(s1, a.sum(0, a.size()));
-
-    s1 = 0;
-    for (int i = 3; i < 100; ++i)
-        s1 += a.get(i);
-    CHECK_EQUAL(s1, a.sum(3, 100));
-
-    a.destroy();
-}
 
 TEST(Array_Greater)
 {
@@ -1041,7 +909,7 @@ TEST(Array_Greater)
 
         a.clear();
         for (size_t i = 0; i < items; ++i) {
-            a.add(0);
+            a.add_data(0);
         }
         size_t t = a.find_first<Greater>(0, 0, size_t(-1));
         CHECK_EQUAL(size_t(-1), t);
@@ -1049,103 +917,103 @@ TEST(Array_Greater)
 
         a.clear();
         for (size_t i = 0; i < items; ++i) {
-            a.add(0);
+            a.add_data(0);
         }
         for (size_t i = 0; i < items; ++i) {
-            a.set(i, 1);
+            a.set_data(i, 1);
 
             size_t t = a.find_first<Greater>(0, 0, size_t(-1));
             TIGHTDB_ASSERT(i == t);
 
             CHECK_EQUAL(i, t);
-            a.set(i, 0);
+            a.set_data(i, 0);
         }
 
         a.clear();
         for (size_t i = 0; i < items; ++i) {
-            a.add(2);
+            a.add_data(2);
         }
         for (size_t i = 0; i < items; ++i) {
-            a.set(i, 3);
+            a.set_data(i, 3);
             size_t t = a.find_first<Greater>(2, 0, size_t(-1));
             CHECK_EQUAL(i, t);
-            a.set(i, 2);
+            a.set_data(i, 2);
         }
 
         a.clear();
         for (size_t i = 0; i < items; ++i) {
-            a.add(10);
+            a.add_data(10);
         }
         for (size_t i = 0; i < items; ++i) {
-            a.set(i, 11);
+            a.set_data(i, 11);
             size_t t = a.find_first<Greater>(10, 0, size_t(-1));
             CHECK_EQUAL(i, t);
-            a.set(i, 10);
+            a.set_data(i, 10);
         }
 
         a.clear();
         for (size_t i = 0; i < items; ++i) {
-            a.add(100);
+            a.add_data(100);
         }
         for (size_t i = 0; i < items; ++i) {
-            a.set(i, 110);
+            a.set_data(i, 110);
             size_t t = a.find_first<Greater>(100, 0, size_t(-1));
             CHECK_EQUAL(i, t);
-            a.set(i, 100);
+            a.set_data(i, 100);
         }
         a.clear();
         for (size_t i = 0; i < items; ++i) {
-            a.add(200);
+            a.add_data(200);
         }
         for (size_t i = 0; i < items; ++i) {
-            a.set(i, 210);
+            a.set_data(i, 210);
             size_t t = a.find_first<Greater>(200, 0, size_t(-1));
             CHECK_EQUAL(i, t);
-            a.set(i, 200);
+            a.set_data(i, 200);
         }
 
         a.clear();
         for (size_t i = 0; i < items; ++i) {
-            a.add(10000);
+            a.add_data(10000);
         }
         for (size_t i = 0; i < items; ++i) {
-            a.set(i, 11000);
+            a.set_data(i, 11000);
             size_t t = a.find_first<Greater>(10000, 0, size_t(-1));
             CHECK_EQUAL(i, t);
-            a.set(i, 10000);
+            a.set_data(i, 10000);
         }
         a.clear();
         for (size_t i = 0; i < items; ++i) {
-            a.add(40000);
+            a.add_data(40000);
         }
 
         for (size_t i = 0; i < items; ++i) {
-            a.set(i, 41000);
+            a.set_data(i, 41000);
             size_t t = a.find_first<Greater>(40000, 0, size_t(-1));
             CHECK_EQUAL(i, t);
-            a.set(i, 40000);
+            a.set_data(i, 40000);
         }
 
         a.clear();
         for (size_t i = 0; i < items; ++i) {
-            a.add(1000000);
+            a.add_data(1000000);
         }
         for (size_t i = 0; i < items; ++i) {
-            a.set(i, 1100000);
+            a.set_data(i, 1100000);
             size_t t = a.find_first<Greater>(1000000, 0, size_t(-1));
             CHECK_EQUAL(i, t);
-            a.set(i, 1000000);
+            a.set_data(i, 1000000);
         }
 
         a.clear();
         for (size_t i = 0; i < items; ++i) {
-            a.add(1000ULL*1000ULL*1000ULL*1000ULL);
+            a.add_data(1000ULL*1000ULL*1000ULL*1000ULL);
         }
         for (size_t i = 0; i < items; ++i) {
-            a.set(i, 1000ULL*1000ULL*1000ULL*1000ULL + 1ULL);
+            a.set_data(i, 1000ULL*1000ULL*1000ULL*1000ULL + 1ULL);
             size_t t = a.find_first<Greater>(1000ULL*1000ULL*1000ULL*1000ULL, 0, size_t(-1));
             CHECK_EQUAL(i, t);
-            a.set(i, 1000ULL*1000ULL*1000ULL*1000ULL);
+            a.set_data(i, 1000ULL*1000ULL*1000ULL*1000ULL);
         }
 
     }
@@ -1167,7 +1035,7 @@ TEST(Array_Less)
 
         a.clear();
         for (size_t i = 0; i < items; ++i) {
-            a.add(0);
+            a.add_data(0);
         }
         size_t t = a.find_first<Less>(0, 0, size_t(-1));
         CHECK_EQUAL(size_t(-1), t);
@@ -1175,100 +1043,100 @@ TEST(Array_Less)
 
         a.clear();
         for (size_t i = 0; i < items; ++i) {
-            a.add(1);
+            a.add_data(1);
         }
         for (size_t i = 0; i < items; ++i) {
-            a.set(i, 0);
+            a.set_data(i, 0);
             size_t t = a.find_first<Less>(1, 0, size_t(-1));
             CHECK_EQUAL(i, t);
-            a.set(i, 1);
+            a.set_data(i, 1);
         }
 
         a.clear();
         for (size_t i = 0; i < items; ++i) {
-            a.add(3);
+            a.add_data(3);
         }
         for (size_t i = 0; i < items; ++i) {
-            a.set(i, 2);
+            a.set_data(i, 2);
             size_t t = a.find_first<Less>(3, 0, size_t(-1));
             CHECK_EQUAL(i, t);
-            a.set(i, 3);
+            a.set_data(i, 3);
         }
 
         a.clear();
         for (size_t i = 0; i < items; ++i) {
-            a.add(11);
+            a.add_data(11);
         }
         for (size_t i = 0; i < items; ++i) {
-            a.set(i, 10);
+            a.set_data(i, 10);
             size_t t = a.find_first<Less>(11, 0, size_t(-1));
             CHECK_EQUAL(i, t);
-            a.set(i, 11);
+            a.set_data(i, 11);
         }
 
         a.clear();
         for (size_t i = 0; i < items; ++i) {
-            a.add(110);
+            a.add_data(110);
         }
         for (size_t i = 0; i < items; ++i) {
-            a.set(i, 100);
+            a.set_data(i, 100);
             size_t t = a.find_first<Less>(110, 0, size_t(-1));
             CHECK_EQUAL(i, t);
-            a.set(i, 110);
+            a.set_data(i, 110);
         }
         a.clear();
         for (size_t i = 0; i < items; ++i) {
-            a.add(210);
+            a.add_data(210);
         }
         for (size_t i = 0; i < items; ++i) {
-            a.set(i, 200);
+            a.set_data(i, 200);
             size_t t = a.find_first<Less>(210, 0, size_t(-1));
             CHECK_EQUAL(i, t);
-            a.set(i, 210);
+            a.set_data(i, 210);
         }
 
         a.clear();
         for (size_t i = 0; i < items; ++i) {
-            a.add(11000);
+            a.add_data(11000);
         }
         for (size_t i = 0; i < items; ++i) {
-            a.set(i, 10000);
+            a.set_data(i, 10000);
             size_t t = a.find_first<Less>(11000, 0, size_t(-1));
             CHECK_EQUAL(i, t);
-            a.set(i, 11000);
+            a.set_data(i, 11000);
         }
         a.clear();
         for (size_t i = 0; i < items; ++i) {
-            a.add(41000);
+            a.add_data(41000);
         }
 
         for (size_t i = 0; i < items; ++i) {
-            a.set(i, 40000);
+            a.set_data(i, 40000);
             size_t t = a.find_first<Less>(41000, 0, size_t(-1));
             CHECK_EQUAL(i, t);
-            a.set(i, 41000);
+            a.set_data(i, 41000);
         }
 
         a.clear();
         for (size_t i = 0; i < items; ++i) {
-            a.add(1100000);
+            a.add_data(1100000);
         }
         for (size_t i = 0; i < items; ++i) {
-            a.set(i, 1000000);
+            a.set_data(i, 1000000);
             size_t t = a.find_first<Less>(1100000, 0, size_t(-1));
             CHECK_EQUAL(i, t);
-            a.set(i, 1100000);
+            a.set_data(i, 1100000);
         }
 
         a.clear();
         for (size_t i = 0; i < items; ++i) {
-            a.add(1000ULL*1000ULL*1000ULL*1000ULL);
+            a.add_data(1000ULL*1000ULL*1000ULL*1000ULL);
         }
         for (size_t i = 0; i < items; ++i) {
-            a.set(i, 1000ULL*1000ULL*1000ULL*1000ULL - 1ULL);
+            a.set_data(i, 1000ULL*1000ULL*1000ULL*1000ULL - 1ULL);
             size_t t = a.find_first<Less>(1000ULL*1000ULL*1000ULL*1000ULL, 0, size_t(-1));
             CHECK_EQUAL(i, t);
-            a.set(i, 1000ULL*1000ULL*1000ULL*1000ULL);
+            a.set_data(i, 1000ULL*1000ULL*1000ULL*1000ULL);
         }
 
     }
@@ -1283,9 +1151,9 @@ TEST(Array_NotEqual1)
 
     a.clear();
     for (size_t i = 0; i < 100; ++i) {
-        a.add(0x33);
+        a.add_data(0x33);
     }
-    a.set(50, 0x44);
+    a.set_data(50, 0x44);
     size_t t = a.find_first<NotEqual>(0x33, 0, size_t(-1));
     CHECK_EQUAL(50, t);
     a.destroy();
@@ -1302,7 +1170,7 @@ TEST(Array_NotEqual)
     {
         a.clear();
         for (size_t i = 0; i < items; ++i) {
-            a.add(0);
+            a.add_data(0);
         }
         size_t t = a.find_first<NotEqual>(0, 0, size_t(-1));
         CHECK_EQUAL(size_t(-1), t);
@@ -1310,100 +1178,100 @@ TEST(Array_NotEqual)
 
         a.clear();
         for (size_t i = 0; i < items; ++i) {
-            a.add(0);
+            a.add_data(0);
         }
         for (size_t i = 0; i < items; ++i) {
-            a.set(i, 1);
+            a.set_data(i, 1);
             size_t t = a.find_first<NotEqual>(0, 0, size_t(-1));
             CHECK_EQUAL(i, t);
-            a.set(i, 0);
+            a.set_data(i, 0);
         }
 
         a.clear();
         for (size_t i = 0; i < items; ++i) {
-            a.add(2);
+            a.add_data(2);
         }
         for (size_t i = 0; i < items; ++i) {
-            a.set(i, 3);
+            a.set_data(i, 3);
             size_t t = a.find_first<NotEqual>(2, 0, size_t(-1));
             CHECK_EQUAL(i, t);
-            a.set(i, 2);
+            a.set_data(i, 2);
         }
 
         a.clear();
         for (size_t i = 0; i < items; ++i) {
-            a.add(10);
+            a.add_data(10);
         }
         for (size_t i = 0; i < items; ++i) {
-            a.set(i, 11);
+            a.set_data(i, 11);
             size_t t = a.find_first<NotEqual>(10, 0, size_t(-1));
             CHECK_EQUAL(i, t);
-            a.set(i, 10);
+            a.set_data(i, 10);
         }
 
         a.clear();
         for (size_t i = 0; i < items; ++i) {
-            a.add(100);
+            a.add_data(100);
         }
         for (size_t i = 0; i < items; ++i) {
-            a.set(i, 110);
+            a.set_data(i, 110);
             size_t t = a.find_first<NotEqual>(100, 0, size_t(-1));
             CHECK_EQUAL(i, t);
-            a.set(i, 100);
+            a.set_data(i, 100);
         }
         a.clear();
         for (size_t i = 0; i < items; ++i) {
-            a.add(200);
+            a.add_data(200);
         }
         for (size_t i = 0; i < items; ++i) {
-            a.set(i, 210);
+            a.set_data(i, 210);
             size_t t = a.find_first<NotEqual>(200, 0, size_t(-1));
             CHECK_EQUAL(i, t);
-            a.set(i, 200);
+            a.set_data(i, 200);
         }
 
         a.clear();
         for (size_t i = 0; i < items; ++i) {
-            a.add(10000);
+            a.add_data(10000);
         }
         for (size_t i = 0; i < items; ++i) {
-            a.set(i, 11000);
+            a.set_data(i, 11000);
             size_t t = a.find_first<NotEqual>(10000, 0, size_t(-1));
             CHECK_EQUAL(i, t);
-            a.set(i, 10000);
+            a.set_data(i, 10000);
         }
         a.clear();
         for (size_t i = 0; i < items; ++i) {
-            a.add(40000);
+            a.add_data(40000);
         }
 
         for (size_t i = 0; i < items; ++i) {
-            a.set(i, 41000);
+            a.set_data(i, 41000);
             size_t t = a.find_first<NotEqual>(40000, 0, size_t(-1));
             CHECK_EQUAL(i, t);
-            a.set(i, 40000);
+            a.set_data(i, 40000);
         }
 
         a.clear();
         for (size_t i = 0; i < items; ++i) {
-            a.add(1000000);
+            a.add_data(1000000);
         }
         for (size_t i = 0; i < items; ++i) {
-            a.set(i, 1100000);
+            a.set_data(i, 1100000);
             size_t t = a.find_first<NotEqual>(1000000, 0, size_t(-1));
             CHECK_EQUAL(i, t);
-            a.set(i, 1000000);
+            a.set_data(i, 1000000);
         }
 
         a.clear();
         for (size_t i = 0; i < items; ++i) {
-            a.add(1000ULL*1000ULL*1000ULL*1000ULL);
+            a.add_data(1000ULL*1000ULL*1000ULL*1000ULL);
         }
         for (size_t i = 0; i < items; ++i) {
-            a.set(i, 1000ULL*1000ULL*1000ULL*1000ULL + 1ULL);
+            a.set_data(i, 1000ULL*1000ULL*1000ULL*1000ULL + 1ULL);
             size_t t = a.find_first<NotEqual>(1000ULL*1000ULL*1000ULL*1000ULL, 0, size_t(-1));
             CHECK_EQUAL(i, t);
-            a.set(i, 1000ULL*1000ULL*1000ULL*1000ULL);
+            a.set_data(i, 1000ULL*1000ULL*1000ULL*1000ULL);
         }
 
     }
@@ -1413,101 +1281,18 @@ TEST(Array_NotEqual)
 
 
 
-TEST(Array_Sort1)
-{
-    // negative values
-    Array a(Allocator::get_default());
-    a.create(Array::type_Normal);
 
-    Random random(random_int<unsigned long>()); // Seed from slow global generator
-    for (size_t t = 0; t < 400; ++t)
-        a.add(random.draw_int(-100, 199));
-
-    size_t orig_size = a.size();
-    a.sort();
-
-    CHECK(a.size() == orig_size);
-    for (size_t t = 1; t < a.size(); ++t)
-        CHECK(a.get(t) >= a.get(t - 1));
-
-    a.destroy();
-}
-
-
-TEST(Array_Sort2)
-{
-    // 64 bit values
-    Array a(Allocator::get_default());
-    a.create(Array::type_Normal);
-
-    Random random(random_int<unsigned long>()); // Seed from slow global generator
-    for (size_t t = 0; t < 400; ++t) {
-        int_fast64_t v = 1;
-        for (int i = 0; i != 8; ++i)
-            v *= int64_t(random.draw_int_max(RAND_MAX));
-        a.add(v);
-    }
-
-    size_t orig_size = a.size();
-    a.sort();
-
-    CHECK(a.size() == orig_size);
-    for (size_t t = 1; t < a.size(); ++t)
-        CHECK(a.get(t) >= a.get(t - 1));
-
-    a.destroy();
-}
-
-TEST(Array_Sort3)
-{
-    // many values
-    Array a(Allocator::get_default());
-    a.create(Array::type_Normal);
-
-    Random random(random_int<unsigned long>()); // Seed from slow global generator
-    for (size_t t = 0; t < 1000; ++t)
-        a.add(random.draw_int_max(200)); // 200 will make some duplicate values which is good
-
-    size_t orig_size = a.size();
-    a.sort();
-
-    CHECK(a.size() == orig_size);
-    for (size_t t = 1; t < a.size(); ++t)
-        CHECK(a.get(t) >= a.get(t - 1));
-
-    a.destroy();
-}
-
-
-TEST(Array_Sort4)
-{
-    // same values
-    Array a(Allocator::get_default());
-    a.create(Array::type_Normal);
-
-    for (size_t t = 0; t < 1000; ++t)
-        a.add(0);
-
-    size_t orig_size = a.size();
-    a.sort();
-
-    CHECK(a.size() == orig_size);
-    for (size_t t = 1; t < a.size(); ++t)
-        CHECK(a.get(t) == 0);
-
-    a.destroy();
-}
 
 TEST(Array_Copy)
 {
     Array a(Allocator::get_default());
     a.create(Array::type_Normal);
 
-    a.add(0);
-    a.add(1);
-    a.add(2);
-    a.add(3);
-    a.add(4);
+    a.add_data(0);
+    a.add_data(1);
+    a.add_data(2);
+    a.add_data(3);
+    a.add_data(4);
 
     Array b(Allocator::get_default());
     b.init_from_mem(a.clone_deep(Allocator::get_default()));
@@ -1517,16 +1302,16 @@ TEST(Array_Copy)
 #endif
 
     CHECK_EQUAL(5, b.size());
-    CHECK_EQUAL(0, b.get(0));
-    CHECK_EQUAL(1, b.get(1));
-    CHECK_EQUAL(2, b.get(2));
-    CHECK_EQUAL(3, b.get(3));
-    CHECK_EQUAL(4, b.get(4));
+    CHECK_EQUAL(0, b.get_data(0));
+    CHECK_EQUAL(1, b.get_data(1));
+    CHECK_EQUAL(2, b.get_data(2));
+    CHECK_EQUAL(3, b.get_data(3));
+    CHECK_EQUAL(4, b.get_data(4));
 
     // With sub-arrays
     Array c(Allocator::get_default());
     c.create(Array::type_HasRefs);
-    c.add(a.get_ref());
+    c.add_data(a.get_ref());
 
     Array d(Allocator::get_default());
     d.init_from_mem(c.clone_deep(Allocator::get_default()));
@@ -1539,13 +1324,13 @@ TEST(Array_Copy)
     CHECK_EQUAL(1, d.size());
 
     Array e(d.get_alloc());
-    e.init_from_ref(to_ref(d.get(0)));
+    e.init_from_ref(to_ref(d.get_data(0)));
     CHECK_EQUAL(5, e.size());
-    CHECK_EQUAL(0, e.get(0));
-    CHECK_EQUAL(1, e.get(1));
-    CHECK_EQUAL(2, e.get(2));
-    CHECK_EQUAL(3, e.get(3));
-    CHECK_EQUAL(4, e.get(4));
+    CHECK_EQUAL(0, e.get_data(0));
+    CHECK_EQUAL(1, e.get_data(1));
+    CHECK_EQUAL(2, e.get_data(2));
+    CHECK_EQUAL(3, e.get_data(3));
+    CHECK_EQUAL(4, e.get_data(4));
 
     b.destroy();
     c.destroy_deep();
@@ -1559,7 +1344,7 @@ TEST(Array_Count)
 
     // 0 bit width
     for (size_t i = 0; i < 150; ++i)
-        a.add(0);
+        a.add_data(0);
     const size_t c1 = a.count(0);
     const size_t c2 = a.count(1);
     CHECK_EQUAL(150, c1);
@@ -1569,7 +1354,7 @@ TEST(Array_Count)
 
     // 1 bit width
     for (size_t i = 0; i < 100; ++i) {
-        if (i % 2) a.set(i, 1);
+        if (i % 2) a.set_data(i, 1);
     }
     const size_t c3 = a.count(0);
     const size_t c4 = a.count(1);
@@ -1580,7 +1365,7 @@ TEST(Array_Count)
 
     // 2 bit width
     for (size_t i = 0; i < 100; ++i) {
-        if (i % 2) a.set(i, 2);
+        if (i % 2) a.set_data(i, 2);
     }
     const size_t c5 = a.count(0);
     const size_t c6 = a.count(2);
@@ -1591,7 +1376,7 @@ TEST(Array_Count)
 
     // 4 bit width
     for (size_t i = 0; i < 100; ++i) {
-        if (i % 2) a.set(i, 7);
+        if (i % 2) a.set_data(i, 7);
     }
     const size_t c7 = a.count(0);
     const size_t c8 = a.count(7);
@@ -1602,7 +1387,7 @@ TEST(Array_Count)
 
     // 8 bit width
     for (size_t i = 0; i < 100; ++i) {
-        if (i % 2) a.set(i, 100);
+        if (i % 2) a.set_data(i, 100);
     }
     const size_t c9 = a.count(0);
     const size_t c10 = a.count(100);
@@ -1614,7 +1399,7 @@ TEST(Array_Count)
 
     // 16 bit width
     for (size_t i = 0; i < 100; ++i) {
-        if (i % 2) a.set(i, 500);
+        if (i % 2) a.set_data(i, 500);
     }
     const size_t c11 = a.count(0);
     const size_t c12 = a.count(500);
@@ -1626,7 +1411,7 @@ TEST(Array_Count)
 
     // 32 bit width
     for (size_t i = 0; i < 100; ++i) {
-        if (i % 2) a.set(i, 0x1FFFF);
+        if (i % 2) a.set_data(i, 0x1FFFF);
     }
     const size_t c13 = a.count(0);
     const size_t c14 = a.count(0x1FFFF);

@@ -412,11 +412,11 @@ private:
     // (a.k.a. the "transaction number") and is present only when
     // m_free_versions is present.
     Array m_top;
-    Array m_tables;            // 2nd slot in m_top
-    ArrayString m_table_names; // 1st slot in m_top
-    Array m_free_positions;    // 4th slot in m_top (optional)
-    Array m_free_lengths;      // 5th slot in m_top (optional)
-    Array m_free_versions;     // 6th slot in m_top (optional)
+    ArrayInteger m_tables;         // 2nd slot in m_top
+    ArrayString m_table_names;     // 1st slot in m_top
+    ArrayInteger m_free_positions; // 4th slot in m_top (optional)
+    ArrayInteger m_free_lengths;   // 5th slot in m_top (optional)
+    ArrayInteger m_free_versions;  // 6th slot in m_top (optional)
 
     typedef std::vector<Table*> table_accessors;
     mutable table_accessors m_table_accessors;
@@ -779,7 +779,7 @@ inline bool Group::may_reattach_if_same_version() const TIGHTDB_NOEXCEPT
 
 inline void Group::update_child_ref(std::size_t child_ndx, ref_type new_ref)
 {
-    m_tables.set(child_ndx, new_ref);
+    m_tables.set_data(child_ndx, new_ref);
 }
 
 inline ref_type Group::get_child_ref(std::size_t child_ndx) const TIGHTDB_NOEXCEPT

@@ -725,7 +725,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
                     else {
                         // the database was written by shared group, so it has versioning info
                         TIGHTDB_ASSERT(top.size() == 7);
-                        version = top.get(6) / 2;
+                        version = top.get_data(6) / 2;
                         // In case this was written by an older version of shared group, it
                         // will have version 0. Version 0 is not a legal initial version, so
                         // it has to be set to 1 instead.

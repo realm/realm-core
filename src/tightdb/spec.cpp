@@ -82,7 +82,7 @@ MemRef Spec::create_empty_spec(Allocator& alloc)
         MemRef mem = Array::create_empty_array(Array::type_Normal, context_flag, alloc); // Throws
         dg_2.reset(mem.m_ref);
         int_fast64_t v(mem.m_ref); // FIXME: Dangerous case: unsigned -> signed
-        spec_set.add(v); // Throws
+        spec_set.add_data(v); // Throws
         dg_2.release();
     }
     {
@@ -91,7 +91,7 @@ MemRef Spec::create_empty_spec(Allocator& alloc)
         MemRef mem = ArrayString::create_array(size, alloc); // Throws
         dg_2.reset(mem.m_ref);
         int_fast64_t v = mem.m_ref; // FIXME: Dangerous case: unsigned -> signed
-        spec_set.add(v); // Throws
+        spec_set.add_data(v); // Throws
         dg_2.release();
     }
     {
@@ -100,7 +100,7 @@ MemRef Spec::create_empty_spec(Allocator& alloc)
         MemRef mem = Array::create_empty_array(Array::type_Normal, context_flag, alloc); // Throws
         dg_2.reset(mem.m_ref);
         int_fast64_t v = mem.m_ref; // FIXME: Dangerous case: unsigned -> signed
-        spec_set.add(v); // Throws
+        spec_set.add_data(v); // Throws
         dg_2.release();
     }
 
@@ -134,11 +134,11 @@ void Spec::insert_column(size_t column_ndx, ColumnType type, StringData name, Co
             _impl::DeepArrayRefDestroyGuard dg(subspecs_mem.m_ref, alloc);
             if (m_top.size() == 3) {
                 int_fast64_t v(subspecs_mem.m_ref); // FIXME: Dangerous cast (unsigned -> signed)
-                m_top.add(v); // Throws
+                m_top.add_data(v); // Throws
             }
             else {
                 int_fast64_t v(subspecs_mem.m_ref); // FIXME: Dangerous cast (unsigned -> signed)
-                m_top.set(3, v); // Throws
+                m_top.set_data(3, v); // Throws
             }
             m_subspecs.init_from_ref(subspecs_mem.m_ref);
             m_subspecs.set_parent(&m_top, 3);
@@ -254,12 +254,12 @@ void Spec::upgrade_string_to_enum(size_t column_ndx, ref_type keys_ref,
     if (!m_enumkeys.is_attached()) {
         m_enumkeys.create(Array::type_HasRefs);
         if (m_top.size() == 3)
-            m_top.add(0); // no subtables
+            m_top.add_data(0); // no subtables
         if (m_top.size() == 4) {
-            m_top.add(m_enumkeys.get_ref());
+            m_top.add_data(m_enumkeys.get_ref());
         }
         else {
-            m_top.set(4, m_enumkeys.get_ref());
+            m_top.set_data(4, m_enumkeys.get_ref());
         }
         m_enumkeys.set_parent(&m_top, 4);
     }
@@ -314,7 +314,7 @@ size_t Spec::get_opposite_link_table_ndx(size_t column_ndx) const TIGHTDB_NOEXCE
     // Group-level index of opposite table is stored as tagged int in the
     // subspecs array
     size_t subspec_ndx = get_subspec_ndx(column_ndx);
-    int64_t tagged_value = m_subspecs.get(subspec_ndx);
+    int64_t tagged_value = m_subspecs.get_data(subspec_ndx);
     TIGHTDB_ASSERT(tagged_value != 0); // can't retrieve it if never set
 
     uint64_t table_ref = uint64_t(tagged_value) >> 1;
@@ -333,7 +333,7 @@ void Spec::set_opposite_link_table_ndx(size_t column_ndx, size_t table_ndx)
     size_t tagged_ndx = (table_ndx << 1) + 1;
 
     size_t subspec_ndx = get_subspec_ndx(column_ndx);
-    m_subspecs.set(subspec_ndx, tagged_ndx); // Throws
+    m_subspecs.set_data(subspec_ndx, tagged_ndx); // Throws
 }
 
 
@@ -346,7 +346,7 @@ void Spec::set_backlink_origin_column(size_t backlink_col_ndx, size_t origin_col
     size_t tagged_ndx = (origin_col_ndx << 1) + 1;
 
     size_t subspec_ndx = get_subspec_ndx(backlink_col_ndx);
-    m_subspecs.set(subspec_ndx+1, tagged_ndx); // Throws
+    m_subspecs.set_data(subspec_ndx+1, tagged_ndx); // Throws
 }
 
 
@@ -357,7 +357,7 @@ size_t Spec::get_origin_column_ndx(size_t backlink_col_ndx) const TIGHTDB_NOEXCE
 
     // Origin column is stored as second tagged int in the subspecs array
     size_t subspec_ndx = get_subspec_ndx(backlink_col_ndx);
-    int64_t tagged_value = m_subspecs.get(subspec_ndx+1);
+    int64_t tagged_value = m_subspecs.get_data(subspec_ndx+1);
     TIGHTDB_ASSERT(tagged_value != 0); // can't retrieve it if never set
 
     size_t origin_col_ndx = size_t(uint64_t(tagged_value) >> 1);
@@ -376,8 +376,8 @@ size_t Spec::find_backlink_column(size_t origin_table_ndx, size_t origin_col_ndx
     int64_t tagged_column_ndx = (origin_col_ndx << 1) + 1;
 
     for (size_t i = backlinks_start; i < count; i += 2) {
-        if (m_subspecs.get(i)   == tagged_table_ndx &&
-            m_subspecs.get(i+1) == tagged_column_ndx)
+        if (m_subspecs.get_data(i)   == tagged_table_ndx &&
+            m_subspecs.get_data(i+1) == tagged_column_ndx)
         {
             size_t pos = (i - backlinks_start) / 2;
             return backlinks_column_start + pos;

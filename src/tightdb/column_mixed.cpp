@@ -69,7 +69,7 @@ void ColumnMixed::ensure_binary_data_column()
     ref_type ref = ColumnBinary::create(m_array->get_alloc()); // Throws
     m_binary_data = new ColumnBinary(m_array->get_alloc(), ref); // Throws
     TIGHTDB_ASSERT(m_array->size() == 2);
-    m_array->add(ref); // Throws
+    m_array->add_data(ref); // Throws
     m_binary_data->set_parent(m_array, 2);
 }
 
@@ -307,13 +307,13 @@ ref_type ColumnMixed::create(Allocator& alloc, size_t size)
         int_fast64_t v = mixcol_Int;
         ref_type ref = Column::create(alloc, Array::type_Normal, size, v); // Throws
         v = int_fast64_t(ref); // FIXME: Dangerous cast (unsigned -> signed)
-        top.add(v); // Throws
+        top.add_data(v); // Throws
     }
     {
         int_fast64_t v = 1; // 1 + 2*value where value is 0
         ref_type ref = Column::create(alloc, Array::type_HasRefs, size, v); // Throws
         v = int_fast64_t(ref); // FIXME: Dangerous cast (unsigned -> signed)
-        top.add(v); // Throws
+        top.add_data(v); // Throws
     }
 
     return top.get_ref();
@@ -364,15 +364,15 @@ ref_type ColumnMixed::write(size_t slice_offset, size_t slice_size,
     top.create(Array::type_HasRefs); // Throws
     {
         int_fast64_t v(types_ref); // FIXME: Dangerous cast (unsigned -> signed)
-        top.add(v); // Throws
+        top.add_data(v); // Throws
     }
     {
         int_fast64_t v(data_ref); // FIXME: Dangerous cast (unsigned -> signed)
-        top.add(v); // Throws
+        top.add_data(v); // Throws
     }
     if (binary_data_ref != 0) {
         int_fast64_t v(binary_data_ref); // FIXME: Dangerous cast (unsigned -> signed)
-        top.add(v); // Throws
+        top.add_data(v); // Throws
     }
 
     // Write new top array

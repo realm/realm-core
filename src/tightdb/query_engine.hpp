@@ -149,13 +149,13 @@ template<class T> struct ColumnTypeTraits;
 
 template<> struct ColumnTypeTraits<int64_t> {
     typedef Column column_type;
-    typedef Array array_type;
+    typedef ArrayInteger array_type;
     typedef int64_t sum_type;
     static const DataType id = type_Int;
 };
 template<> struct ColumnTypeTraits<bool> {
     typedef Column column_type;
-    typedef Array array_type;
+    typedef ArrayInteger array_type;
     typedef int64_t sum_type;
     static const DataType id = type_Bool;
 };
@@ -173,14 +173,14 @@ template<> struct ColumnTypeTraits<double> {
 };
 template<> struct ColumnTypeTraits<DateTime> {
     typedef Column column_type;
-    typedef Array array_type;
+    typedef ArrayInteger array_type;
     typedef int64_t sum_type;
     static const DataType id = type_DateTime;
 };
 
 template<> struct ColumnTypeTraits<StringData> {
     typedef Column column_type;
-    typedef Array array_type;
+    typedef ArrayInteger array_type;
     typedef int64_t sum_type;
     static const DataType id = type_String;
 };
@@ -804,7 +804,7 @@ public:
 
             // Do search directly on cached leaf array
             if (start + 1 == end) {
-                if (condition(m_array.get(start - m_leaf_start), m_value))
+                if (condition(m_array.get_data(start - m_leaf_start), m_value))
                     return start;
                 else
                     return not_found;
@@ -1290,7 +1290,7 @@ public:
                         last_indexed = m_index_getter->m_leaf_end;
                     }
                     else {
-                        s = to_size_t(m_index_getter->m_array_ptr->get(f));
+                        s = to_size_t(m_index_getter->m_array_ptr->get_data(f));
                         if (s >= end)
                             return not_found;
                         else {
