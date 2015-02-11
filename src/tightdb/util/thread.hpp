@@ -42,9 +42,9 @@
 #endif
 
 // FIXME: enable this only on platforms where it might be needed
-//#ifdef __APPLE__
+#ifdef __APPLE__
 #define TIGHTDB_CONDVAR_EMULATION
-//#endif
+#endif
 
 #include <stdint.h>
 #include <fcntl.h>
