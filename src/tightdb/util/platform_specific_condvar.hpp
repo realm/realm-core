@@ -172,6 +172,7 @@ inline void PlatformSpecificCondVar::wait(RobustMutex& m, Func recover_func, con
 #ifdef __APPLE__
         // no timeout support on apple
         TIGHTDB_ASSERT(tp == 0);
+        static_cast<void>(tp);
 #else
         if (tp) {
             r = sem_timedwait(m_sem, tp);
