@@ -169,11 +169,17 @@ inline void PlatformSpecificCondVar::wait(RobustMutex& m, Func recover_func, con
     for (;;) {
         // FIXME: handle premature return due to signal
         int r;
+#ifdef __APPLE__
+        // no timeout support on apple
+        TIGHTDB_ASSERT(tp == 0);
+#else
         if (tp) {
             r = sem_timedwait(m_sem, tp);
             if (r == ETIMEDOUT) return;
         }
-        else {
+        else 
+#endif
+        {
             r = sem_wait(m_sem);
         }
         // if wait returns due to a signal, we must retry:
