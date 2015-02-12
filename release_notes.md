@@ -2,7 +2,7 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
+* Fixed out-of-bounds reads when using aggregate functions on sorted TableViews.
 
 ### API breaking changes:
 
@@ -20,6 +20,15 @@
 ### Internals:
 
 * Lorem ipsum.
+
+----------------------------------------------
+
+# 0.88.3 Release notes
+
+### Enhancements:
+
+* Added emulation of inter-process condition variables for use on platforms which
+  do not properly implement them.
 
 ----------------------------------------------
 
