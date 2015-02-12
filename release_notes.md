@@ -1,23 +1,9 @@
-# NEXT RELEASE
-
-### Bugfixes:
-
-* Lorem ipsum.
-
-### API breaking changes:
-
-* Lorem ipsum.
+# 0.88.3 Release notes
 
 ### Enhancements:
 
 * Added emulation of inter-process condition variables for use on platforms which
   do not properly implement them.
-
------------
-
-### Internals:
-
-* Lorem ipsum.
 
 ----------------------------------------------
 
