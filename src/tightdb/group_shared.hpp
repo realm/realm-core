@@ -24,6 +24,7 @@
 
 #include <tightdb/util/features.h>
 #include <tightdb/util/thread.hpp>
+#include <tightdb/util/platform_specific_condvar.hpp>
 #include <tightdb/group.hpp>
 //#include <tightdb/commit_log.hpp>
 
@@ -595,21 +596,13 @@ private:
 // Implementation:
 
 inline SharedGroup::SharedGroup(const std::string& file, bool no_create, DurabilityLevel dlevel, const char* key):
-    m_group(Group::shared_tag()),
-    m_room_to_write(), // Throws
-    m_work_to_do(), // Throws
-    m_daemon_becomes_ready(), // Throws
-    m_new_commit_available() // Throws
+    m_group(Group::shared_tag())
 {
     open(file, no_create, dlevel, false, key);
 }
 
 inline SharedGroup::SharedGroup(unattached_tag) TIGHTDB_NOEXCEPT:
-    m_group(Group::shared_tag()),
-    m_room_to_write(), // Throws
-    m_work_to_do(), // Throws
-    m_daemon_becomes_ready(), // Throws
-    m_new_commit_available() // Throws
+    m_group(Group::shared_tag())
 {
 }
 
@@ -620,11 +613,7 @@ inline bool SharedGroup::is_attached() const TIGHTDB_NOEXCEPT
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
 inline SharedGroup::SharedGroup(Replication& repl, DurabilityLevel dlevel, const char* key):
-    m_group(Group::shared_tag()),
-    m_room_to_write(), // Throws
-    m_work_to_do(), // Throws
-    m_daemon_becomes_ready(), // Throws
-    m_new_commit_available() // Throws
+    m_group(Group::shared_tag())
 {
     open(repl, dlevel, key);
 }

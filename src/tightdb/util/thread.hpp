@@ -41,16 +41,6 @@
 #  include <atomic>
 #endif
 
-// FIXME: enable this only on platforms where it might be needed
-#ifdef __APPLE__
-#define TIGHTDB_CONDVAR_EMULATION
-#endif
-
-#include <stdint.h>
-#include <fcntl.h>
-#include <sys/stat.h>
-#include <semaphore.h>
-
 namespace tightdb {
 namespace util {
 
@@ -243,7 +233,6 @@ public:
     bool is_valid() TIGHTDB_NOEXCEPT;
 
     friend class CondVar;
-    friend class PlatformSpecificCondVar;
 };
 
 class RobustMutex::NotRecoverable: public std::exception {
@@ -266,7 +255,6 @@ public:
 private:
     RobustMutex& m_mutex;
     friend class CondVar;
-    friend class PlatformSpecificCondVar;
 };
 
 
@@ -315,98 +303,6 @@ private:
 
 
 
-
-
-
-
-/// Condition variable for use in synchronization monitors.
-/// This condition variable uses emulation based on semaphores
-/// for the inter-process case, if enabled by TIGHTDB_CONDVAR_EMULATION.
-/// Compared to a good pthread implemenation, the emulation carries an 
-/// overhead of at most 2 task switches for every waiter notified during 
-/// notify() or notify_all().
-///
-/// When a semaphore is allocated to a condvar, its name is formed
-/// as prefix + "RLM" + three_letter_code, where the three letters are
-/// created by hashing the path to the file containing the shared part
-/// of the condvar and the offset within the file.
-///
-/// FIXME: This implementation will never release semaphores. This is unlikely
-/// to be a problem as long as only a modest number of different database names
-/// are in use within the kernel lifetime (all semaphores are released when the
-/// kernel is rebooted).
-///
-/// A PlatformSpecificCondVar is always process shared.
-class PlatformSpecificCondVar {
-public:
-    PlatformSpecificCondVar();
-    ~PlatformSpecificCondVar() TIGHTDB_NOEXCEPT;
-
-    /// To use the PlatformSpecificCondVar, you also must place a structure of type
-    /// PlatformSpecificCondVar::SharedPart in memory shared by multiple processes
-    /// or in a memory mapped file, and use set_shared_part() to associate
-    /// the condition variable with it's shared part. You must initialize
-    /// the shared part using PlatformSpecificCondVar::init_shared_part(), but only before
-    /// first use and only when you have exclusive access to the shared part.
-
-#ifdef TIGHTDB_CONDVAR_EMULATION
-    struct SharedPart {
-        uint64_t signal_counter;
-        uint32_t waiters;
-    };
-#else
-    struct SharedPart {
-        pthread_cond_t m_impl;
-    };
-#endif
-
-    /// You need to bind the emulation to a SharedPart in shared/mmapped memory. 
-    /// The SharedPart is assumed to have been initialized (possibly by another process) 
-    /// earlier through a call to init_shared_part.
-    void set_shared_part(SharedPart& shared_part, std::string path, std::size_t offset_of_condvar);
-
-    /// Initialize the shared part of a process shared condition variable.
-    /// A process shared condition variables may be represented by any number of
-    /// PlatformSpecificCondVar instances in any number of different processes, 
-    /// all sharing a common SharedPart instance, which must be in shared memory.
-    static void init_shared_part(SharedPart& shared_part);
-
-    /// Wait for another thread to call notify() or notify_all().
-    void wait(LockGuard& l) TIGHTDB_NOEXCEPT;
-
-    // FIXME: we're not emulating wait with timeouts yet, so calling this one
-    // with TIGHTDB_CONDVAR_EMULATION on, process sharing and tp != 0 will just assert
-    template<class Func>
-    void wait(RobustMutex& m, Func recover_func, const struct timespec* tp = 0);
-    /// If any threads are waiting for this condition, wake up at least one.
-    void notify() TIGHTDB_NOEXCEPT;
-
-    /// Wake up every thread that is currently waiting on this condition.
-    void notify_all() TIGHTDB_NOEXCEPT;
-
-    /// Cleanup and release system resources if possible. 
-    void close() TIGHTDB_NOEXCEPT;
-
-    /// For platforms imposing naming restrictions on system resources,
-    /// a prefix can be set. This must be done before setting any SharedParts.
-    static void set_resource_naming_prefix(std::string prefix);
-private:
-    TIGHTDB_NORETURN static void init_failed(int);
-    TIGHTDB_NORETURN static void attr_init_failed(int);
-    TIGHTDB_NORETURN static void destroy_failed(int) TIGHTDB_NOEXCEPT;
-    sem_t* get_semaphore(std::string path, std::size_t offset_of_condvar);
-    void handle_wait_error(int error);
-
-    // non-zero if a shared part has been registered (always 0 on process local instances)
-    SharedPart* m_shared_part; 
-
-    // semaphore used for emulation, zero if emulation is not used
-    sem_t* m_sem; 
-
-    // name of the semaphore - FIXME: generate a name based on inode, device and offset of
-    // the file used for memory mapping.
-    static std::string internal_naming_prefix;
-};
 
 
 
@@ -677,137 +573,6 @@ inline void CondVar::notify_all() TIGHTDB_NOEXCEPT
 
 
 
-
-
-
-inline void PlatformSpecificCondVar::wait(LockGuard& l) TIGHTDB_NOEXCEPT
-{
-    TIGHTDB_ASSERT(m_shared_part);
-#ifdef TIGHTDB_CONDVAR_EMULATION
-    m_shared_part->waiters++;
-    uint64_t my_counter = m_shared_part->signal_counter;
-    l.m_mutex.unlock();
-    for (;;) {
-        // FIXME: handle premature return due to signal
-        sem_wait(m_sem);
-        l.m_mutex.lock();
-        if (m_shared_part->signal_counter != my_counter)
-            break;
-        sem_post(m_sem);
-        sched_yield();
-        l.m_mutex.unlock();
-    }
-#else
-    pthread_cond_t* cond = &m_shared_part->m_impl;
-    // no emulation (whether local or process shared, same codepath)
-    int r = pthread_cond_wait(cond, &l.m_mutex.m_impl);
-    if (TIGHTDB_UNLIKELY(r != 0))
-        TIGHTDB_TERMINATE("pthread_cond_wait() failed");
-#endif
-}
-
-
-
-
-
-
-
-template<class Func>
-inline void PlatformSpecificCondVar::wait(RobustMutex& m, Func recover_func, const struct timespec* tp)
-{
-    TIGHTDB_ASSERT(m_shared_part);
-#ifdef TIGHTDB_CONDVAR_EMULATION
-    TIGHTDB_ASSERT(tp == 0);
-    static_cast<void>(tp);
-    m_shared_part->waiters++;
-    uint64_t my_counter = m_shared_part->signal_counter;
-    m.unlock();
-    for (;;) {
-        // FIXME: handle premature return due to signal
-        sem_wait(m_sem);
-        m.lock(recover_func);
-        if (m_shared_part->signal_counter != my_counter)
-            break;
-        sem_post(m_sem);
-        sched_yield();
-        m.unlock();
-    }
-#else
-    pthread_cond_t* cond = &m_shared_part->m_impl;
-    static_cast<void>(m);
-    int r;
-    if (!tp) {
-        r = pthread_cond_wait(cond, &m.m_impl);
-    }
-    else {
-        r = pthread_cond_timedwait(cond, &m.m_impl, tp);
-        if (r == ETIMEDOUT)
-            return;
-    }
-    if (TIGHTDB_LIKELY(r == 0))
-        return;
-    handle_wait_error(r);
-    try {
-        recover_func(); // Throws
-        m.mark_as_consistent();
-        // If we get this far, the protected memory has been
-        // brought back into a consistent state, and the mutex has
-        // been notified aboit this. This means that we can safely
-        // enter the applications critical section.
-    }
-    catch (...) {
-        // Unlocking without first calling mark_as_consistent()
-        // means that the mutex enters the "not recoverable"
-        // state, which will cause all future attempts at locking
-        // to fail.
-        m.unlock();
-        throw;
-    }
-#endif
-}
-
-
-
-
-
-
-inline void PlatformSpecificCondVar::notify() TIGHTDB_NOEXCEPT
-{
-    TIGHTDB_ASSERT(m_shared_part);
-#ifdef TIGHTDB_CONDVAR_EMULATION
-    m_shared_part->signal_counter++;
-    if (m_shared_part->waiters) {
-        sem_post(m_sem);
-        --m_shared_part->waiters;
-    }
-#else
-    pthread_cond_t* cond = &m_shared_part->m_impl;    
-    int r = pthread_cond_signal(cond);
-    TIGHTDB_ASSERT(r == 0);
-    static_cast<void>(r);
-#endif
-}
-
-
-
-
-
-inline void PlatformSpecificCondVar::notify_all() TIGHTDB_NOEXCEPT
-{
-    TIGHTDB_ASSERT(m_shared_part);
-#ifdef TIGHTDB_CONDVAR_EMULATION
-    m_shared_part->signal_counter++;
-    while (m_shared_part->waiters) {
-        sem_post(m_sem);
-        --m_shared_part->waiters;
-    }
-#else
-    pthread_cond_t* cond = &m_shared_part->m_impl;    
-    int r = pthread_cond_broadcast(cond);
-    TIGHTDB_ASSERT(r == 0);
-    static_cast<void>(r);
-#endif
-}
 
 
 // Support for simple atomic variables, inspired by C++11 atomics, but incomplete.

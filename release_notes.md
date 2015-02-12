@@ -10,7 +10,8 @@
 
 ### Enhancements:
 
-* Lorem ipsum.
+* Added emulation of inter-process condition variables for use on platforms which
+  do not properly implement them.
 
 -----------
 
