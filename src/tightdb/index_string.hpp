@@ -247,7 +247,8 @@ inline StringIndex::key_type StringIndex::create_key(StringData str) TIGHTDB_NOE
 
 // NULL support in Index works as follows: All non-NULL values are stored as if they had appended an 'X' character
 // at the end. So "foo" is stored as if it was "fooX", and "" (empty string) is stored as "X". And NULLs are stored 
-// as empty strings.
+// as empty strings. NOTE: Prepending the X instead of appending it would make the index faster (less common
+// prefixes), however, because the StringIndex cannot handle suffixes of 0-bytes we need to append something non-0.
 inline StringIndex::key_type StringIndex::create_key(StringData str, size_t offset, bool nullable) TIGHTDB_NOEXCEPT
 {
     // The 'trailingzeros' is due to a bug in existing indexes in the old file format 2. These may crash if they contain
@@ -260,15 +261,20 @@ inline StringIndex::key_type StringIndex::create_key(StringData str, size_t offs
         if (str.is_null())
             return 0;
 
-        if (str.size() - offset < 4) {
-            char buf[4];
-            size_t use = str.size() - offset > 3 ? 3 : str.size() - offset;
-            buf[use] = 'X';
-            memcpy(buf, str.data() + offset, use);
-            return create_key(StringData(buf, use + 1));
-        } 
+        if (offset > str.size())
+            return 0;
         else {
-            return create_key(str.substr(offset));
+            size_t tail = str.size() - offset;
+            if (tail <= sizeof(key_type)-1) {
+                char buf[sizeof(key_type)];
+                memset(buf, 0, sizeof(key_type));
+                buf[tail] = 'X';
+                memcpy(buf, str.data() + offset, tail);
+                return create_key(StringData(buf, tail + 1));
+            }
+            else {
+                return create_key(str.substr(offset));
+            }
         }
     }
     else {

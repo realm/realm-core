@@ -773,4 +773,66 @@ TEST(StringIndex_Zero_Crash)
     CHECK_EQUAL(2, t);
 }
 
+
+TEST(StringIndex_Zero_Crash2)
+{
+    Random random(random_int<unsigned long>());
+
+    for (size_t iter = 0; iter < 10 + TEST_DURATION * 100; iter++) {
+        // StringIndex could crash if strings ended with one or more 0-bytes
+        Table table;
+        table.add_column(type_String, "", true);
+
+        table.add_search_index(0);
+
+        for (size_t i = 0; i < 100 + TEST_DURATION * 1000; i++) {
+            unsigned char action = random.draw_int_max<unsigned char>(100);
+            if (action > 48 && table.size() < 10) {
+                // Generate string with equal probability of being empty, null, short, medium and long, and with 
+                // their contents having equal proability of being either random or a duplicate of a previous 
+                // string. When it's random, each char must have equal probability of being 0 or non-0
+                char* buf1 = "This string is around 90 bytes long, which falls in the long-string type of Realm strings";
+                char buf2[] = "                                                                                         ";
+                StringData sd;
+
+                int len = random.draw_int_max<int>(3);
+                if (len == 0)
+                    len = 0;
+                else if (len == 1)
+                    len = 7;
+                else if (len == 2)
+                    len = 27;
+                else
+                    len = random.draw_int_max<int>(90);
+
+                if (random.draw_int_max<int>(1) == 0) {
+                    // duplicate string
+                    sd = StringData(buf1, len);
+                }
+                else {
+                    // random string
+                    for (size_t t = 0; t < len; t++) {
+                        if (random.draw_int_max<int>(100) > 20)
+                            buf2[t] = 0;                        // zero byte
+                        else
+                            buf2[t] = random.draw_int<char>();  // random byte
+                    }
+                    // no generated string can equal "null" (our vector magic value for null) because 
+                    // len == 4 is not possible
+                    sd = StringData(buf2, len);
+                }
+
+                size_t pos = random.draw_int_max<size_t>(table.size());
+                table.insert_empty_row(pos);
+                table.set_string(0, pos, sd);
+            }
+            else if (table.size() > 0) {
+                // delete
+                size_t row = random.draw_int_max<size_t>(table.size() - 1);
+                table.remove(row);
+            }
+        }
+    }
+}
+
 #endif // TEST_INDEX_STRING

@@ -5730,7 +5730,7 @@ TEST(Query_NullStrings)
 
 TEST(Query_Nulls_Fuzzy)
 {
-    for (int attributes = 0; attributes < 5; attributes++) {
+    for (int attributes = 1; attributes < 5; attributes++) {
         Random random(random_int<unsigned long>());
 
         for (size_t t = 0; t < 10; t++) {
@@ -5773,7 +5773,7 @@ TEST(Query_Nulls_Fuzzy)
                     StringData sd;
                     string st;
 
-                    if (random.draw_int_max<int>(1) == 0) {
+                    if (false && random.draw_int_max<int>(1) == 0) {
                         // null string
                         sd = tightdb::null();
                         st = "null";
@@ -5785,7 +5785,7 @@ TEST(Query_Nulls_Fuzzy)
                         if (len == 0)
                             len = 0;
                         else if (len == 1)
-                            len = 5;
+                            len = 7;
                         else if (len == 2)
                             len = 27;
                         else
@@ -5799,12 +5799,13 @@ TEST(Query_Nulls_Fuzzy)
                         else {
                             // random string
                             for (size_t t = 0; t < len; t++) {
-                                if (random.draw_int_max<int>(1) == 0)
+                                if (random.draw_int_max<int>(100) > 20)
                                     buf2[t] = 0;                        // zero byte
                                 else
                                     buf2[t] = random.draw_int<char>();  // random byte
                             }
-
+                            // no generated string can equal "null" (our vector magic value for null) because 
+                            // len == 4 is not possible
                             sd = StringData(buf2, len);
                             st = string(buf2, len);
                         }
