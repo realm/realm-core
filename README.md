@@ -131,7 +131,14 @@ Here is a more comple set of build-related commands:
     sh build.sh test-intalled
     sudo sh build.sh uninstall
 
+Building for Android
+--------------------
 
+Building for Android required the NDK of version >= r10d installed.
+
+It can be built using the following command:
+
+    sh build.sh build-android
 
 Building for iOS
 ----------------

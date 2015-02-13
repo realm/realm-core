@@ -44,7 +44,7 @@ IPHONE_PLATFORMS="iPhoneOS iPhoneSimulator"
 IPHONE_DIR="iphone-lib"
 
 ANDROID_DIR="android-lib"
-ANDROID_PLATFORMS="arm arm-v7a mips x86"
+ANDROID_PLATFORMS="arm arm-v7a arm64 mips x86"
 
 usage()
 {
@@ -246,13 +246,13 @@ find_android_ndk()
         return 1
     fi
 
-    latest_ndk=""
+    highest=""
     result=""
     for ndk in "${ndks[@]}"; do
         for i in $(cd "$ndk" && echo *); do
             if [ -f "$ndk/$i/RELEASE.TXT" ]; then
-                current_ndk=$(sed 's/\(r\)\([1-9]\{1,\}\)\([a-z]\)/\1.\2.\3/' < "$ndk/$i/RELEASE.TXT") || return 1
-                sorted="$(printf "%s\n%s\n" "$current_ndk" "$latest_ndk" | sort -t . -k 2,2nr -k 3,3r)" || return 1
+                current_ndk=$(sed 's/^\(r\)\([0-9]\{1,\}\)\([a-z]\{0,1\}\)\(.*\)$/\1.\2.\3/' < "$ndk/$i/RELEASE.TXT") || return 1
+                sorted="$(printf "%s\n%s\n" "$current_ndk" "$highest" | sort -t . -k2 -k3 -n -r)" || return 1
                 highest="$(printf "%s\n" "$sorted" | head -n 1)" || return 1
                 if [ $current_ndk = $highest ]; then
                     result=$ndk/$i
@@ -434,8 +434,9 @@ case "$MODE" in
         # Find Xcode
         xcode_home="none"
         arm64_supported=""
+        xcodeselect="xcode-select"
         if [ "$OS" = "Darwin" ]; then
-            if path="$(xcode-select --print-path 2>/dev/null)"; then
+            if path="$($xcodeselect --print-path 2>/dev/null)"; then
                 xcode_home="$path"
             fi
             xcodebuild="$xcode_home/usr/bin/xcodebuild"
@@ -653,24 +654,33 @@ EOF
             temp_dir="$(mktemp -d /tmp/tightdb.build-android.XXXX)" || exit 1
             if [ "$target" = "arm" ]; then
                 platform="8"
+            elif [ "$target" = "arm64" ]; then
+                platform="21"
             else
                 platform="9"
             fi
-            android_prefix="$target"
-            android_toolchain="arm-linux-androideabi-4.8"
-            if [ "$target" = "arm-v7a" ]; then
+
+            if [ "$target" = "arm" -o "$target" = "arm-v7a" ]; then
+                arch="arm"
                 android_prefix="arm"
+                android_toolchain="arm-linux-androideabi-4.8"
+            elif [ "$target" = "arm64" ]; then
+                arch="arm64"
+                android_prefix="aarch64"
+                android_toolchain="aarch64-linux-android-4.9"
             elif [ "$target" = "mips" ]; then
+                arch="mips"
                 android_prefix="mipsel"
                 android_toolchain="mipsel-linux-android-4.8"
             elif [ "$target" = "x86" ]; then
+                arch="x86"
                 android_prefix="i686"
                 android_toolchain="x86-4.8"
             fi
             # Note that `make-standalone-toolchain.sh` is written for
             # `bash` and must therefore be executed by `bash`.
             make_toolchain="$android_ndk_home/build/tools/make-standalone-toolchain.sh"
-            bash "$make_toolchain" --platform="android-$platform" --toolchain="$android_toolchain" --install-dir="$temp_dir" --arch="$target" || exit 1
+            bash "$make_toolchain" --platform="android-$platform" --toolchain="$android_toolchain" --install-dir="$temp_dir" --arch="$arch" || exit 1
 
             path="$temp_dir/bin:$PATH"
             cc="$(cd "$temp_dir/bin" && echo $android_prefix-linux-*-gcc)" || exit 1

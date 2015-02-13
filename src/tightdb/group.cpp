@@ -5,6 +5,7 @@
 #include <iomanip>
 #include <fstream>
 
+#include <tightdb/util/file_mapper.hpp>
 #include <tightdb/util/memory_stream.hpp>
 #include <tightdb/util/thread.hpp>
 #include <tightdb/impl/destroy_guard.hpp>
@@ -696,10 +697,14 @@ void Group::write(ostream& out, TableWriter& table_writer,
 
     // encryption will pad the file to a multiple of the page, so ensure the
     // footer is aligned to the end of a page
-    if (pad_for_encryption && ((final_file_size + sizeof(SlabAlloc::StreamingFooter)) & 4095)) {
+    if (pad_for_encryption) {
 #ifdef TIGHTDB_ENABLE_ENCRYPTION
-        char buffer[4096] = {0};
-        out_2.write(buffer, 4096 - ((final_file_size + sizeof(SlabAlloc::StreamingFooter)) & 4095));
+        size_t unrounded_size = final_file_size + sizeof(SlabAlloc::StreamingFooter);
+        size_t rounded_size = round_up_to_page_size(unrounded_size);
+        if (rounded_size != unrounded_size) {
+            UniquePtr<char[]> buffer(new char[rounded_size - unrounded_size]());
+            out_2.write(buffer.get(), rounded_size - unrounded_size);
+        }
 #endif
     }
 

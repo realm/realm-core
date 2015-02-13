@@ -11,7 +11,7 @@ binary_data.hpp mixed.hpp table.hpp table_ref.hpp table_basic_fwd.hpp table_acce
 table_basic.hpp table_view.hpp table_view_basic.hpp table_macros.hpp row.hpp descriptor_fwd.hpp \
 descriptor.hpp group.hpp group_shared.hpp $(REPLICATION_HPP) query.hpp query_conditions.hpp \
 lang_bind_helper.hpp tightdb_nmmintrin.h importer.hpp version.hpp unicode.hpp commit_log.hpp \
-link_view_fwd.hpp link_view.hpp views.hpp
+link_view_fwd.hpp link_view.hpp views.hpp util/platform_specific_condvar.hpp
 
 nobase_subinclude_HEADERS_EXTRA_UNINSTALL = *.h *.hpp util/*.h util/*.hpp impl/*.h impl/*.hpp
 
@@ -37,7 +37,7 @@ column_backlink.cpp column_binary.cpp column_link.cpp column_link_base.cpp colum
 column_mixed.cpp column_string.cpp column_string_enum.cpp column_table.cpp commit_log.cpp \
 descriptor.cpp exceptions.cpp group.cpp group_shared.cpp group_writer.cpp impl/output_stream.cpp \
 importer.cpp index_string.cpp lang_bind_helper.cpp link_view.cpp query.cpp query_engine.cpp row.cpp spec.cpp \
-table.cpp table_view.cpp unicode.cpp utilities.cpp version.cpp views.cpp
+table.cpp table_view.cpp unicode.cpp utilities.cpp version.cpp views.cpp util/platform_specific_condvar.cpp
 
 # Format: CURRENT[:REVISION[:AGE]]
 #
