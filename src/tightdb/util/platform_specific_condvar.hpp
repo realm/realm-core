@@ -22,9 +22,10 @@
 #define TIGHTDB_UTIL_PLATFORM_SPECIFIC_CONDVAR
 
 // Enable this only on platforms where it might be needed
-#ifdef __APPLE__
-#define TIGHTDB_CONDVAR_EMULATION
-#endif
+// currently none!
+//#ifdef __APPLE__
+//#define TIGHTDB_CONDVAR_EMULATION
+//#endif
 
 #include <tightdb/util/thread.hpp>
 #include <stdint.h>
