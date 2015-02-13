@@ -334,6 +334,26 @@ uint_fast64_t TableViewBase::sync_if_needed() const
 uint_fast64_t sync_if_needed() const { return 0; };
 #endif
 
+
+
+void TableViewBase::adj_row_acc_insert_rows(std::size_t row_ndx, std::size_t num_rows) TIGHTDB_NOEXCEPT
+{
+}
+
+
+void TableViewBase::adj_row_acc_erase_row(std::size_t row_ndx) TIGHTDB_NOEXCEPT
+{
+}
+
+
+void TableViewBase::adj_row_acc_move_over(std::size_t from_row_ndx, std::size_t to_row_ndx) TIGHTDB_NOEXCEPT
+{
+}
+
+
+
+
+
 // O(n) for n = this->size()
 void TableView::remove(size_t ndx)
 {

@@ -324,14 +324,19 @@ protected:
     template<class R, class V> static R find_all_string(V*, std::size_t, StringData);
 
 private:
-    void detach() const TIGHTDB_NOEXCEPT;
+    void detach() TIGHTDB_NOEXCEPT;
     std::size_t find_first_integer(std::size_t column_ndx, int64_t value) const;
     friend class Table;
     friend class Query;
+
+    // Called by table to adjust any row references:
+    void adj_row_acc_insert_rows(std::size_t row_ndx, std::size_t num_rows) TIGHTDB_NOEXCEPT;
+    void adj_row_acc_erase_row(std::size_t row_ndx) TIGHTDB_NOEXCEPT;
+    void adj_row_acc_move_over(std::size_t from_row_ndx, std::size_t to_row_ndx) TIGHTDB_NOEXCEPT;
 };
 
 
-inline void TableViewBase::detach() const TIGHTDB_NOEXCEPT
+inline void TableViewBase::detach() TIGHTDB_NOEXCEPT
 {
     m_table = TableRef();
 }

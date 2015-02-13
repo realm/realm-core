@@ -838,7 +838,7 @@ private:
     mutable Descriptor* m_descriptor;
 
     // Table view instances
-    typedef std::vector<const TableViewBase*> views;
+    typedef std::vector<TableViewBase*> views;
     mutable views m_views;
 
     // Points to first bound row accessor, or is null if there are none.
@@ -1408,7 +1408,10 @@ inline void Table::remove_last()
 
 inline void Table::register_view(const TableViewBase* view)
 {
-    m_views.push_back(view);
+    // Casting away constness here - operations done on tableviews
+    // through m_views are all internal and preserving "some" kind
+    // of logical constness.
+    m_views.push_back(const_cast<TableViewBase*>(view));
 }
 
 inline bool Table::is_attached() const TIGHTDB_NOEXCEPT
