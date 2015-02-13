@@ -120,8 +120,8 @@ public:
     virtual void reset_log_management(version_type last_version) TIGHTDB_OVERRIDE;
     virtual void set_last_version_seen_locally(version_type last_seen_version_number)
         TIGHTDB_NOEXCEPT;
-    virtual void set_last_version_synced(version_type last_seen_version_number) TIGHTDB_NOEXCEPT;
-    virtual version_type get_last_version_synced(version_type* newest_version_number)
+    virtual void set_persisted_sync_info(Replication::PersistedSyncInfo& info) TIGHTDB_NOEXCEPT;
+    virtual Replication::PersistedSyncInfo get_persisted_sync_info(version_type* newest_version_number)
         TIGHTDB_NOEXCEPT;
     void get_commit_entries(version_type from_version, version_type to_version,
                             Replication::CommitLogEntry* logs_buffer) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
@@ -160,7 +160,7 @@ protected:
 
         // Last seen versions by Sync and local sharing, respectively
         uint64_t last_version_seen_locally;
-        uint64_t last_version_synced;
+        PersistedSyncInfo sync_info;
 
         // Last server_version, as set by calls to apply_foreign_transact_log(),
         // or 0 if never set.
@@ -172,7 +172,7 @@ protected:
             active_file_is_log_a = true;
             // The first commit will be from state 1 -> state 2, so we must set 1 initially
             begin_oldest_commit_range = begin_newest_commit_range = end_commit_range = version;
-            last_version_seen_locally = last_version_synced = version;
+            last_version_seen_locally = sync_info.client_version = version;
             last_server_version = 1;
             write_offset = 0;
         }
@@ -450,8 +450,8 @@ void WriteLogCollector::cleanup_stale_versions(CommitLogPreamble* preamble)
     version_type last_seen_version_number;
     last_seen_version_number = preamble->last_version_seen_locally;
     if (m_is_persisting
-        && preamble->last_version_synced < preamble->last_version_seen_locally)
-        last_seen_version_number = preamble->last_version_synced;
+        && preamble->sync_info.client_version < preamble->last_version_seen_locally)
+        last_seen_version_number = preamble->sync_info.client_version;
 
     // cerr << "oldest_version(" << last_seen_version_number << ")" << endl;
     if (last_seen_version_number >= preamble->begin_newest_commit_range) {
@@ -614,21 +614,21 @@ void WriteLogCollector::reset_log_management(version_type last_version)
 }
 
 
-void WriteLogCollector::set_last_version_synced(version_type version) TIGHTDB_NOEXCEPT
+void WriteLogCollector::set_persisted_sync_info(PersistedSyncInfo& info) TIGHTDB_NOEXCEPT
 {
     map_header_if_needed();
     RobustLockGuard rlg(m_header.get_addr()->lock, &recover_from_dead_owner);
     CommitLogPreamble* preamble = get_preamble_for_write();
-    if (version > preamble->last_version_synced) {
-        preamble->last_version_synced = version;
-        cleanup_stale_versions(preamble);
-        sync_header();
-    }
+    version_type old_version = preamble->sync_info.client_version;
+    version_type new_version = info.client_version;
+    TIGHTDB_ASSERT(new_version >= old_version);
+    cleanup_stale_versions(preamble);
+    sync_header();
 }
 
 
-Replication::version_type
-WriteLogCollector::get_last_version_synced(version_type* end_version_number)
+Replication::PersistedSyncInfo
+WriteLogCollector::get_persisted_sync_info(version_type* end_version_number)
     TIGHTDB_NOEXCEPT
 {
     map_header_if_needed();
@@ -636,9 +636,7 @@ WriteLogCollector::get_last_version_synced(version_type* end_version_number)
     const CommitLogPreamble* preamble = get_preamble();
     if (end_version_number)
         *end_version_number = preamble->end_commit_range;
-    if (preamble->last_version_synced)
-        return preamble->last_version_synced;
-    return preamble->last_version_seen_locally;
+    return preamble->sync_info;
 }
 
 
