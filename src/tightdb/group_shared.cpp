@@ -435,12 +435,12 @@ SharedGroup::SharedInfo::SharedInfo(DurabilityLevel dlevel):
 {
     version = SHAREDINFO_VERSION;
     flags = dlevel; // durability level is fixed from creation
-
+#ifndef _WIN32
     PlatformSpecificCondVar::init_shared_part(room_to_write); // Throws
     PlatformSpecificCondVar::init_shared_part(work_to_do); // Throws
     PlatformSpecificCondVar::init_shared_part(daemon_becomes_ready); // Throws
     PlatformSpecificCondVar::init_shared_part(new_commit_available); // Throws
-
+#endif
     free_write_slots = 0;
     num_participants = 0;
     session_initiator_pid = 0;

@@ -262,6 +262,83 @@ private:
 
 
 
+template<class A, class B, class C, class D, class E> class FunFiveArgBinder0 {
+public:
+    FunFiveArgBinder0(void (*fun)(A,B,C,D,E), const A& a, const B& b, const C& c, const D& d,
+                      const E& e):
+        m_fun(fun),
+        m_a(a),
+        m_b(b),
+        m_c(c),
+        m_d(d),
+        m_e(e)
+    {
+    }
+    void operator()() const
+    {
+        (*m_fun)(m_a, m_b, m_c, m_d, m_e);
+    }
+private:
+    void (*const m_fun)(A,B,C,D,E);
+    const A m_a;
+    const B m_b;
+    const C m_c;
+    const D m_d;
+    const E m_e;
+};
+
+template<class A, class B, class C, class D, class E, class F> class FunFiveArgBinder1 {
+public:
+    FunFiveArgBinder1(void (*fun)(A,B,C,D,E,F), const A& a, const B& b, const C& c, const D& d,
+                      const E& e):
+        m_fun(fun),
+        m_a(a),
+        m_b(b),
+        m_c(c),
+        m_d(d),
+        m_e(e)
+    {
+    }
+    void operator()(F f) const
+    {
+        (*m_fun)(m_a, m_b, m_c, m_d, m_e, f);
+    }
+private:
+    void (*const m_fun)(A,B,C,D,E,F);
+    const A m_a;
+    const B m_b;
+    const C m_c;
+    const D m_d;
+    const E m_e;
+};
+
+template<class A, class B, class C, class D, class E, class F, class G> class FunFiveArgBinder2 {
+public:
+    FunFiveArgBinder2(void (*fun)(A,B,C,D,E,F,G), const A& a, const B& b, const C& c, const D& d,
+                      const E& e):
+        m_fun(fun),
+        m_a(a),
+        m_b(b),
+        m_c(c),
+        m_d(d),
+        m_e(e)
+    {
+    }
+    void operator()(F f, G g) const
+    {
+        (*m_fun)(m_a, m_b, m_c, m_d, m_e, f, g);
+    }
+private:
+    void (*const m_fun)(A,B,C,D,E,F,G);
+    const A m_a;
+    const B m_b;
+    const C m_c;
+    const D m_d;
+    const E m_e;
+};
+
+
+
 template<class O> class MemFunObjZeroArgBinder0 {
 public:
     MemFunObjZeroArgBinder0(void (O::*mem_fun)(), O* obj):
@@ -500,6 +577,84 @@ private:
 };
 
 
+
+template<class O, class A, class B, class C, class D> class MemFunObjFourArgBinder0 {
+public:
+    MemFunObjFourArgBinder0(void (O::*mem_fun)(A,B,C,D), O* obj, const A& a, const B& b,
+                            const C& c, const D& d):
+        m_mem_fun(mem_fun),
+        m_obj(obj),
+        m_a(a),
+        m_b(b),
+        m_c(c),
+        m_d(d)
+    {
+    }
+    void operator()() const
+    {
+        (m_obj->*m_mem_fun)(m_a, m_b, m_c, m_d);
+    }
+private:
+    void (O::*const m_mem_fun)(A,B,C,D);
+    O* const m_obj;
+    const A m_a;
+    const B m_b;
+    const C m_c;
+    const D m_d;
+};
+
+template<class O, class A, class B, class C, class D, class E> class MemFunObjFourArgBinder1 {
+public:
+    MemFunObjFourArgBinder1(void (O::*mem_fun)(A,B,C,D,E), O* obj, const A& a, const B& b,
+                            const C& c, const D& d):
+        m_mem_fun(mem_fun),
+        m_obj(obj),
+        m_a(a),
+        m_b(b),
+        m_c(c),
+        m_d(d)
+    {
+    }
+    void operator()(E e) const
+    {
+        (m_obj->*m_mem_fun)(m_a, m_b, m_c, m_d, e);
+    }
+private:
+    void (O::*const m_mem_fun)(A,B,C,D,E);
+    O* const m_obj;
+    const A m_a;
+    const B m_b;
+    const C m_c;
+    const D m_d;
+};
+
+template<class O, class A, class B, class C, class D, class E, class F>
+class MemFunObjFourArgBinder2 {
+public:
+    MemFunObjFourArgBinder2(void (O::*mem_fun)(A,B,C,D,E,F), O* obj, const A& a, const B& b,
+                            const C& c, const D& d):
+        m_mem_fun(mem_fun),
+        m_obj(obj),
+        m_a(a),
+        m_b(b),
+        m_c(c),
+        m_d(d)
+    {
+    }
+    void operator()(E e, F f) const
+    {
+        (m_obj->*m_mem_fun)(m_a, m_b, m_c, m_d, e, f);
+    }
+private:
+    void (O::*const m_mem_fun)(A,B,C,D,E,F);
+    O* const m_obj;
+    const A m_a;
+    const B m_b;
+    const C m_c;
+    const D m_d;
+};
+
+
 } // namespace _impl
 
 
@@ -585,8 +740,8 @@ inline _impl::FunThreeArgBinder2<A,B,C,D,E> bind(void (*fun)(A,B,C,D,E), const A
 
 
 
-/// Produce a nullary function by binding all four arguments of a function
-/// taking 4 arguments.
+/// Produce a nullary function by binding all 4 arguments of a function taking 4
+/// arguments.
 template<class A, class B, class C, class D>
 inline _impl::FunFourArgBinder0<A,B,C,D> bind(void (*fun)(A,B,C,D), const A& a,
                                               const B& b, const C& c, const D& d)
@@ -594,7 +749,7 @@ inline _impl::FunFourArgBinder0<A,B,C,D> bind(void (*fun)(A,B,C,D), const A& a,
     return _impl::FunFourArgBinder0<A,B,C,D>(fun, a, b, c, d);
 }
 
-/// Produce a unary function by binding the first four arguments of a function
+/// Produce a unary function by binding the first 4 arguments of a function
 /// taking 5 arguments.
 template<class A, class B, class C, class D, class E>
 inline _impl::FunFourArgBinder1<A,B,C,D,E> bind(void (*fun)(A,B,C,D,E), const A& a,
@@ -603,13 +758,45 @@ inline _impl::FunFourArgBinder1<A,B,C,D,E> bind(void (*fun)(A,B,C,D,E), const A&
     return _impl::FunFourArgBinder1<A,B,C,D,E>(fun, a, b, c, d);
 }
 
-/// Produce a binary function by binding the first four arguments of a function
+/// Produce a binary function by binding the first 4 arguments of a function
 /// taking 6 arguments.
 template<class A, class B, class C, class D, class E, class F>
 inline _impl::FunFourArgBinder2<A,B,C,D,E,F> bind(void (*fun)(A,B,C,D,E,F), const A& a,
                                                   const B& b, const C& c, const D& d)
 {
     return _impl::FunFourArgBinder2<A,B,C,D,E,F>(fun, a, b, c, d);
+}
+
+
+
+/// Produce a nullary function by binding all 5 arguments of a function taking 5
+/// arguments.
+template<class A, class B, class C, class D, class E>
+inline _impl::FunFiveArgBinder0<A,B,C,D,E> bind(void (*fun)(A,B,C,D,E), const A& a,
+                                                const B& b, const C& c, const D& d,
+                                                const E& e)
+{
+    return _impl::FunFiveArgBinder0<A,B,C,D,E>(fun, a, b, c, d, e);
+}
+
+/// Produce a unary function by binding the first 5 arguments of a function
+/// taking 6 arguments.
+template<class A, class B, class C, class D, class E, class F>
+inline _impl::FunFiveArgBinder1<A,B,C,D,E,F> bind(void (*fun)(A,B,C,D,E,F), const A& a,
+                                                  const B& b, const C& c, const D& d,
+                                                  const E& e)
+{
+    return _impl::FunFiveArgBinder1<A,B,C,D,E,F>(fun, a, b, c, d, e);
+}
+
+/// Produce a binary function by binding the first 5 arguments of a function
+/// taking 7 arguments.
+template<class A, class B, class C, class D, class E, class F, class G>
+inline _impl::FunFiveArgBinder2<A,B,C,D,E,F,G> bind(void (*fun)(A,B,C,D,E,F,G), const A& a,
+                                                    const B& b, const C& c, const D& d,
+                                                    const E& e)
+{
+    return _impl::FunFiveArgBinder2<A,B,C,D,E,F,G>(fun, a, b, c, d, e);
 }
 
 
@@ -720,6 +907,38 @@ inline _impl::MemFunObjThreeArgBinder2<O,A,B,C,D,E> bind(void (O::*mem_fun)(A,B,
                                                          const A& a, const B& b, const C& c)
 {
     return _impl::MemFunObjThreeArgBinder2<O,A,B,C,D,E>(mem_fun, obj, a, b, c);
+}
+
+
+
+/// Produce a nullary function by binding the target object and all 4 arguments
+/// of a non-static member function taking 4 arguments.
+template<class O, class A, class B, class C, class D>
+inline _impl::MemFunObjFourArgBinder0<O,A,B,C,D> bind(void (O::*mem_fun)(A,B,C,D), O* obj,
+                                                      const A& a, const B& b, const C& c,
+                                                      const D& d)
+{
+    return _impl::MemFunObjFourArgBinder0<O,A,B,C,D>(mem_fun, obj, a, b, c, d);
+}
+
+/// Produce a unary function by binding the target object and the first 4
+/// arguments of a non-static member function taking 5 arguments.
+template<class O, class A, class B, class C, class D, class E>
+inline _impl::MemFunObjFourArgBinder1<O,A,B,C,D,E> bind(void (O::*mem_fun)(A,B,C,D,E), O* obj,
+                                                        const A& a, const B& b, const C& c,
+                                                        const D& d)
+{
+    return _impl::MemFunObjFourArgBinder1<O,A,B,C,D,E>(mem_fun, obj, a, b, c, d);
+}
+
+/// Produce a binary function by binding the target object and the first 4
+/// arguments of a non-static member function taking 6 arguments.
+template<class O, class A, class B, class C, class D, class E, class F>
+inline _impl::MemFunObjFourArgBinder2<O,A,B,C,D,E,F> bind(void (O::*mem_fun)(A,B,C,D,E,F), O* obj,
+                                                          const A& a, const B& b, const C& c,
+                                                          const D& d)
+{
+    return _impl::MemFunObjFourArgBinder2<O,A,B,C,D,E,F>(mem_fun, obj, a, b, c, d);
 }
 
 
