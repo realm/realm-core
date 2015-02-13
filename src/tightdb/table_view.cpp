@@ -338,16 +338,41 @@ uint_fast64_t sync_if_needed() const { return 0; };
 
 void TableViewBase::adj_row_acc_insert_rows(std::size_t row_ndx, std::size_t num_rows) TIGHTDB_NOEXCEPT
 {
+    m_row_indexes.adjust_ge(int_fast64_t(row_ndx), num_rows);
 }
 
 
 void TableViewBase::adj_row_acc_erase_row(std::size_t row_ndx) TIGHTDB_NOEXCEPT
 {
+    std::size_t it = 0;
+    for (;;) {
+        it = m_row_indexes.find_first(row_ndx, it);
+        if (it == not_found) 
+            break;
+        m_row_indexes.set(it, -1);
+    }
+    m_row_indexes.adjust_ge(int_fast64_t(row_ndx)+1, -1);
 }
 
 
 void TableViewBase::adj_row_acc_move_over(std::size_t from_row_ndx, std::size_t to_row_ndx) TIGHTDB_NOEXCEPT
 {
+    std::size_t it = 0;
+    // kill any refs to the target row ndx
+    for (;;) {
+        it = m_row_indexes.find_first(to_row_ndx, it);
+        if (it == not_found) 
+            break;
+        m_row_indexes.set(it, -1);
+    }
+    // adjust any refs to the source row ndx to point to the target row ndx.
+    it = 0;
+    for (;;) {
+        it = m_row_indexes.find_first(from_row_ndx, it);
+        if (it == not_found)
+            break;
+        m_row_indexes.set(it, to_row_ndx);
+    }
 }
 
 
