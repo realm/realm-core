@@ -275,7 +275,6 @@ int fast_popcount64(int64_t x)
 
 // A fast, mediocre-quality random number generator named Xorshift. Thread safe.
 uint64_t fastrand(uint64_t max) {
-    // We use Atomic only to keep helgrind quiet (it's no-op on x64 and is optimized away completely)
     static util::Atomic<uint64_t> state = 1;
     state.fetch_add_release(1); // Prevent two threads from producing the same value if called at the exact same time
     uint64_t x = state.load_acquire();
