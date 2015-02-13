@@ -121,8 +121,7 @@ void checksum_init(checksum_t* t);
 // popcount
 int fast_popcount32(int32_t x);
 int fast_popcount64(int64_t x);
-
-
+uint64_t fastrand(uint64_t max = 0xffffffffffffffffULL);
 
 // Implementation:
 

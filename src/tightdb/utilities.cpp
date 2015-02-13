@@ -5,6 +5,7 @@
 
 #include <tightdb/utilities.hpp>
 #include <tightdb/unicode.hpp>
+#include <tightdb/util/thread.hpp>
 
 #ifdef TIGHTDB_COMPILER_SSE
 #  ifdef _MSC_VER
@@ -270,6 +271,18 @@ int fast_popcount32(int32_t x)
 int fast_popcount64(int64_t x)
 {
     return fast_popcount32(static_cast<int32_t>(x)) + fast_popcount32(static_cast<int32_t>(x >> 32));
+}
+
+// A random number generator named Xorshift. Poor quality because two threads can read the same value twice
+uint64_t fastrand(uint64_t max) {
+    // we use Atomic only to keep helgrind quiet
+    static util::Atomic<uint64_t> state = 1;
+    uint64_t x = state.load_acquire();
+    x ^= x >> 12; // a
+    x ^= x << 25; // b
+    x ^= x >> 27; // c
+    state.store_release(x);
+    return ((x * 2685821657736338717ULL) % max) + 1;
 }
 
 } // namespace tightdb

@@ -5773,15 +5773,14 @@ TEST(Query_Nulls_Fuzzy)
                     StringData sd;
                     string st;
 
-                    if (false && random.draw_int_max<int>(1) == 0) {
+                    if (false && fastrand(1) == 0) {
                         // null string
                         sd = tightdb::null();
                         st = "null";
                     }
                     else {
                         // non-null string
-
-                        int len = random.draw_int_max<int>(3);
+                        int len = fastrand(3);
                         if (len == 0)
                             len = 0;
                         else if (len == 1)
@@ -5791,7 +5790,7 @@ TEST(Query_Nulls_Fuzzy)
                         else
                             len = 73;
 
-                        if (random.draw_int_max<int>(1) == 0) {
+                        if (fastrand(1) == 0) {
                             // duplicate string
                             sd = StringData(buf1, len);
                             st = string(buf1, len);
@@ -5799,10 +5798,10 @@ TEST(Query_Nulls_Fuzzy)
                         else {
                             // random string
                             for (size_t t = 0; t < len; t++) {
-                                if (random.draw_int_max<int>(100) > 20)
+                                if (fastrand(100) > 20)
                                     buf2[t] = 0;                        // zero byte
                                 else
-                                    buf2[t] = random.draw_int<char>();  // random byte
+                                    buf2[t] = fastrand(255);  // random byte
                             }
                             // no generated string can equal "null" (our vector magic value for null) because 
                             // len == 4 is not possible
