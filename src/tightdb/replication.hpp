@@ -619,6 +619,12 @@ private:
 
 // Implementation:
 
+
+inline Replication::Replication()
+{
+}
+
+
 inline std::string Replication::get_database_path()
 {
     return do_get_database_path();
@@ -662,20 +668,6 @@ inline void Replication::get_commit_entries(version_type, version_type, BinaryDa
     TIGHTDB_ASSERT(false);
 }
 
-inline void TransactLogEncoderBase::set_buffer(char* free_begin, char* free_end)
-{
-    TIGHTDB_ASSERT(free_begin <= free_end);
-    m_transact_log_free_begin = free_begin;
-    m_transact_log_free_end   = free_end;
-}
-
-inline void TransactLogEncoderBase::reset_selection_caches()
-{
-    m_selected_table = null_ptr;
-    m_selected_spec  = null_ptr;
-    m_selected_link_list  = null_ptr;
-}
-
 inline void Replication::begin_write_transact(SharedGroup& sg)
 {
     do_begin_write_transact(sg);
@@ -701,6 +693,20 @@ inline void Replication::interrupt() TIGHTDB_NOEXCEPT
 inline void Replication::clear_interrupt() TIGHTDB_NOEXCEPT
 {
     do_clear_interrupt();
+}
+
+inline void TransactLogEncoderBase::set_buffer(char* free_begin, char* free_end)
+{
+    TIGHTDB_ASSERT(free_begin <= free_end);
+    m_transact_log_free_begin = free_begin;
+    m_transact_log_free_end   = free_end;
+}
+
+inline void TransactLogEncoderBase::reset_selection_caches()
+{
+    m_selected_table = null_ptr;
+    m_selected_spec  = null_ptr;
+    m_selected_link_list  = null_ptr;
 }
 
 inline char* TransactLogEncoderBase::reserve(size_t n)
@@ -1333,10 +1339,6 @@ inline void TransactLogEncoderBase::on_link_list_destroyed(const LinkView& list)
 {
     if (m_selected_link_list == &list)
         m_selected_link_list = 0;
-}
-
-inline Replication::Replication()
-{
 }
 
 inline size_t TransactLogEncoderBase::max_required_bytes_for_string_value(size_t size) const
