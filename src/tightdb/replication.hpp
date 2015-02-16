@@ -173,8 +173,7 @@ protected:
     /// refer to a (possibly empty) chunk of free space.
     virtual void transact_log_append(const char* data, size_t size, char** out_free_begin, char** out_free_end) = 0;
 
-    char* free_begin() const { return m_transact_log_free_begin; }
-    char* free_end() const { return m_transact_log_free_end; }
+    char* write_position() const { return m_transact_log_free_begin; }
 private:
     // These two delimit a contiguous region of free space in a
     // transaction log buffer following the last written data. It may
@@ -2007,7 +2006,7 @@ inline TrivialReplication::TrivialReplication(const std::string& database_file):
 
 inline std::size_t TrivialReplication::transact_log_size()
 {
-    return free_begin() - m_transact_log_buffer.data();
+    return write_position() - m_transact_log_buffer.data();
 }
 
 inline void TrivialReplication::transact_log_reserve(size_t n, char** new_begin, char** new_end)
@@ -2018,7 +2017,7 @@ inline void TrivialReplication::transact_log_reserve(size_t n, char** new_begin,
 inline void TrivialReplication::internal_transact_log_reserve(size_t n, char** new_begin, char** new_end)
 {
     char* data = m_transact_log_buffer.data();
-    size_t size = free_begin() - data;
+    size_t size = write_position() - data;
     m_transact_log_buffer.reserve_extra(size, n);
     data = m_transact_log_buffer.data(); // May have changed
     *new_begin = data + size;

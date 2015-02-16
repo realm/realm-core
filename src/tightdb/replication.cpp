@@ -1024,7 +1024,7 @@ Replication::version_type
 TrivialReplication::do_commit_write_transact(SharedGroup&, version_type orig_version)
 {
     char* data = m_transact_log_buffer.data();
-    size_t size = free_begin() - data;
+    size_t size = write_position() - data;
     version_type new_version = orig_version + 1;
     handle_transact_log(data, size, new_version); // Throws
     return new_version;

@@ -663,7 +663,7 @@ WriteLogCollector::do_commit_write_transact(SharedGroup&,
                                             WriteLogCollector::version_type orig_version)
 {
     char* data = m_transact_log_buffer.data();
-    uint_fast64_t size = free_begin() - data;
+    uint_fast64_t size = write_position() - data;
     version_type from_version = internal_submit_log(data,size);
     TIGHTDB_ASSERT(from_version == orig_version);
     static_cast<void>(from_version);
@@ -682,7 +682,7 @@ void WriteLogCollector::do_begin_write_transact(SharedGroup&)
 void WriteLogCollector::do_rollback_write_transact(SharedGroup& sg) TIGHTDB_NOEXCEPT
 {
     // forward transaction log buffer
-    sg.do_rollback_and_continue_as_read(m_transact_log_buffer.data(), free_begin());
+    sg.do_rollback_and_continue_as_read(m_transact_log_buffer.data(), write_position());
 }
 
 
@@ -697,7 +697,7 @@ void WriteLogCollector::transact_log_append(const char* data, size_t size, char*
 void WriteLogCollector::transact_log_reserve(size_t size, char** new_begin, char** new_end)
 {
     char* data = m_transact_log_buffer.data();
-    size_t size2 = free_begin() - data;
+    size_t size2 = write_position() - data;
     m_transact_log_buffer.reserve_extra(size2, size);
     data = m_transact_log_buffer.data();
     *new_begin = data + size2;
