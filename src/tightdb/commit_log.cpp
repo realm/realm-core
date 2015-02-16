@@ -81,9 +81,8 @@ public:
     void do_rollback_write_transact(SharedGroup& sg) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     void do_interrupt() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {};
     void do_clear_interrupt() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {};
-    void do_transact_log_reserve(size_t size) TIGHTDB_OVERRIDE;
-    void do_transact_log_append(const char* data, size_t size) TIGHTDB_OVERRIDE;
-    void transact_log_reserve(size_t size);
+    void transact_log_reserve(size_t size, char** new_begin, char** new_end) TIGHTDB_OVERRIDE;
+    void transact_log_append(const char* data, size_t size, char** new_begin, char** new_end) TIGHTDB_OVERRIDE;
     virtual bool is_in_server_synchronization_mode() { return m_is_persisting; }
     virtual void submit_transact_log(BinaryData);
     virtual void stop_logging() TIGHTDB_OVERRIDE;
@@ -664,7 +663,7 @@ WriteLogCollector::do_commit_write_transact(SharedGroup&,
                                             WriteLogCollector::version_type orig_version)
 {
     char* data = m_transact_log_buffer.data();
-    uint_fast64_t size = m_transact_log_free_begin - data;
+    uint_fast64_t size = free_begin() - data;
     version_type from_version = internal_submit_log(data,size);
     TIGHTDB_ASSERT(from_version == orig_version);
     static_cast<void>(from_version);
@@ -675,39 +674,34 @@ WriteLogCollector::do_commit_write_transact(SharedGroup&,
 
 void WriteLogCollector::do_begin_write_transact(SharedGroup&)
 {
-    m_transact_log_free_begin = m_transact_log_buffer.data();
-    m_transact_log_free_end   = m_transact_log_free_begin + m_transact_log_buffer.size();
+    char* buffer = m_transact_log_buffer.data();
+    set_buffer(buffer, buffer + m_transact_log_buffer.size());
 }
 
 
 void WriteLogCollector::do_rollback_write_transact(SharedGroup& sg) TIGHTDB_NOEXCEPT
 {
     // forward transaction log buffer
-    sg.do_rollback_and_continue_as_read(m_transact_log_buffer.data(), m_transact_log_free_begin);
+    sg.do_rollback_and_continue_as_read(m_transact_log_buffer.data(), free_begin());
 }
 
 
-void WriteLogCollector::do_transact_log_reserve(size_t size)
+
+void WriteLogCollector::transact_log_append(const char* data, size_t size, char** new_begin, char** new_end)
 {
-    transact_log_reserve(size);
+    transact_log_reserve(size, new_begin, new_end);
+    *new_begin = copy(data, data + size, *new_begin);
 }
 
 
-void WriteLogCollector::do_transact_log_append(const char* data, size_t size)
-{
-    transact_log_reserve(size);
-    m_transact_log_free_begin = copy(data, data+size, m_transact_log_free_begin);
-}
-
-
-void WriteLogCollector::transact_log_reserve(size_t size)
+void WriteLogCollector::transact_log_reserve(size_t size, char** new_begin, char** new_end)
 {
     char* data = m_transact_log_buffer.data();
-    size_t size2 = m_transact_log_free_begin - data;
+    size_t size2 = free_begin() - data;
     m_transact_log_buffer.reserve_extra(size2, size);
     data = m_transact_log_buffer.data();
-    m_transact_log_free_begin = data + size2;
-    m_transact_log_free_end = data + m_transact_log_buffer.size();
+    *new_begin = data + size2;
+    *new_end = data + m_transact_log_buffer.size();
 }
 
 

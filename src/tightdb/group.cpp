@@ -1664,14 +1664,12 @@ public:
         sync_table();
         // note that for select table, 'levels' is encoded before 'group_level_ndx'
         // despite the order of arguments
-        m_encoder.simple_cmd(Replication::instr_SelectTable, util::tuple(levels, group_level_ndx));
-        char* buf;
-        m_encoder.transact_log_reserve(&buf, 2*levels*Replication::max_enc_bytes_per_int);
+        m_encoder.simple_cmd(instr_SelectTable, util::tuple(levels, group_level_ndx));
+        m_encoder.reserve(2*levels*TransactLogEncoderBase::max_enc_bytes_per_int);
         for (size_t i = 0; i != levels; ++i) {
-            buf = m_encoder.encode_int(buf, path[i*2+0]);
-            buf = m_encoder.encode_int(buf, path[i*2+1]);
+            m_encoder.append_num(path[i*2+0]);
+            m_encoder.append_num(path[i*2+1]);
         }
-        m_encoder.transact_log_advance(buf);
 
         m_pending_table_select = true;
         m_pending_ts_instr = get_inst();
@@ -1681,13 +1679,11 @@ public:
     bool select_descriptor(size_t levels, const size_t* path)
     {
         sync_descriptor();
-        m_encoder.simple_cmd(Replication::instr_SelectDescriptor, util::tuple(levels));
-        char* buf;
-        m_encoder.transact_log_reserve(&buf, levels*Replication::max_enc_bytes_per_int);
+        m_encoder.simple_cmd(instr_SelectDescriptor, util::tuple(levels));
+        m_encoder.reserve(levels*TransactLogEncoderBase::max_enc_bytes_per_int);
         for (size_t i = 0; i != levels; ++i) {
-            buf = m_encoder.encode_int(buf, path[i]);
+            m_encoder.append_num(path[i]);
         }
-        m_encoder.transact_log_advance(buf);
 
         m_pending_descriptor_select = true;
         m_pending_ds_instr = get_inst();
@@ -1696,14 +1692,14 @@ public:
 
     bool insert_group_level_table(std::size_t table_ndx, std::size_t num_tables, StringData)
     {
-        m_encoder.simple_cmd(Replication::instr_EraseGroupLevelTable, util::tuple(table_ndx, num_tables + 1));
+        m_encoder.simple_cmd(instr_EraseGroupLevelTable, util::tuple(table_ndx, num_tables + 1));
         append_instruction();
         return true;
     }
 
     bool erase_group_level_table(std::size_t table_ndx, std::size_t num_tables)
     {
-        m_encoder.simple_cmd(Replication::instr_InsertGroupLevelTable, util::tuple(table_ndx, num_tables - 1));
+        m_encoder.simple_cmd(instr_InsertGroupLevelTable, util::tuple(table_ndx, num_tables - 1));
         m_encoder.string_value(0, 0);
         append_instruction();
         return true;
@@ -1721,14 +1717,14 @@ public:
 
     bool insert_empty_rows(std::size_t idx, std::size_t num_rows, std::size_t tbl_sz, bool unordered)
     {
-        m_encoder.simple_cmd(Replication::instr_EraseRows, util::tuple(idx, num_rows, tbl_sz, unordered));
+        m_encoder.simple_cmd(instr_EraseRows, util::tuple(idx, num_rows, tbl_sz, unordered));
         append_instruction();
         return true;
     }
 
     bool erase_rows(std::size_t idx, std::size_t num_rows, std::size_t tbl_sz, bool unordered)
     {
-        m_encoder.simple_cmd(Replication::instr_InsertEmptyRows, util::tuple(idx, num_rows, tbl_sz, unordered));
+        m_encoder.simple_cmd(instr_InsertEmptyRows, util::tuple(idx, num_rows, tbl_sz, unordered));
         append_instruction();
         return true;
     }
@@ -1742,7 +1738,7 @@ public:
     bool insert(std::size_t col_idx, std::size_t row_idx, std::size_t tbl_sz)
     {
         if (col_idx == 0) {
-            m_encoder.simple_cmd(Replication::instr_EraseRows, util::tuple(row_idx, 1, tbl_sz, false));
+            m_encoder.simple_cmd(instr_EraseRows, util::tuple(row_idx, 1, tbl_sz, false));
             append_instruction();
         }
         return true;
@@ -1844,21 +1840,21 @@ public:
 
     bool set_table(size_t col_ndx, size_t row_ndx)
     {
-        m_encoder.simple_cmd(Replication::instr_SetTable, util::tuple(col_ndx, row_ndx));
+        m_encoder.simple_cmd(instr_SetTable, util::tuple(col_ndx, row_ndx));
         append_instruction();
         return true;
     }
 
     bool set_mixed(size_t col_ndx, size_t row_ndx, const Mixed& value)
     {
-        m_encoder.mixed_cmd(Replication::instr_SetMixed, col_ndx, row_ndx, value);
+        m_encoder.mixed_cmd(instr_SetMixed, col_ndx, row_ndx, value);
         append_instruction();
         return true;
     }
 
     bool set_link(size_t col_ndx, size_t row_ndx, size_t value)
     {
-        m_encoder.simple_cmd(Replication::instr_SetLink, util::tuple(col_ndx, row_ndx, value));
+        m_encoder.simple_cmd(instr_SetLink, util::tuple(col_ndx, row_ndx, value));
         append_instruction();
         return true;
     }
@@ -1891,7 +1887,7 @@ public:
     bool insert_link_column(std::size_t col_idx, DataType, StringData,
                             std::size_t target_table_idx, std::size_t backlink_col_ndx)
     {
-        m_encoder.simple_cmd(Replication::instr_EraseLinkColumn, util::tuple(col_idx, target_table_idx, backlink_col_ndx));
+        m_encoder.simple_cmd(instr_EraseLinkColumn, util::tuple(col_idx, target_table_idx, backlink_col_ndx));
         append_instruction();
         return true;
     }
@@ -1899,7 +1895,7 @@ public:
     bool erase_link_column(std::size_t col_idx, std::size_t target_table_idx,
                            std::size_t backlink_col_idx)
     {
-        m_encoder.simple_cmd(Replication::instr_InsertLinkColumn, util::tuple(col_idx, int(DataType())));
+        m_encoder.simple_cmd(instr_InsertLinkColumn, util::tuple(col_idx, int(DataType())));
         m_encoder.string_value(0, 0);
         m_encoder.append_num(target_table_idx);
         m_encoder.append_num(backlink_col_idx);
@@ -1909,14 +1905,14 @@ public:
 
     bool insert_column(std::size_t col_idx, DataType, StringData)
     {
-        m_encoder.simple_cmd(Replication::instr_EraseColumn, util::tuple(col_idx));
+        m_encoder.simple_cmd(instr_EraseColumn, util::tuple(col_idx));
         append_instruction();
         return true;
     }
 
     bool erase_column(std::size_t col_idx)
     {
-        m_encoder.simple_cmd(Replication::instr_InsertColumn, util::tuple(col_idx, int(DataType())));
+        m_encoder.simple_cmd(instr_InsertColumn, util::tuple(col_idx, int(DataType())));
         m_encoder.string_value(0, 0);
         append_instruction();
         return true;
@@ -1929,7 +1925,7 @@ public:
 
     bool select_link_list(size_t col_ndx, size_t row_ndx)
     {
-        m_encoder.simple_cmd(Replication::instr_SelectLinkList, util::tuple(col_ndx, row_ndx));
+        m_encoder.simple_cmd(instr_SelectLinkList, util::tuple(col_ndx, row_ndx));
         append_instruction();
         return true;
     }
