@@ -61,7 +61,7 @@ using std::size_t;
 //   An imperative view can be modified explicitly. References can be added, removed or
 //   changed.
 //
-// - In reflective mode, the references in the view tracks movement of the referenced data:
+// - In imperative mode, the references in the view tracks movement of the referenced data:
 //   If you delete an entry which is referenced from a view, said reference is detached,
 //   not removed.
 // - It does not matter whether the delete is done in-line (as part of the current transaction),
@@ -115,7 +115,7 @@ using std::size_t;
 // One way of dealing with use case 3 without supporting imperative views, is to *require* that
 // the loop body is expressed as a lambda, which we'll call. This allows us to ensure that the
 // lambda is only called with a valid iterator. Unfortunately, it also adds restrictions on what
-// may be allowed inside the lambda. One of the things you can not easily allow is calling
+// can be allowed inside the lambda. One of the things you can not easily allow is calling
 // advance_read() or promote_to_write().
 //
 // 4. Iterating intermixed with implicit updates
@@ -144,21 +144,27 @@ using std::size_t;
 //        commit_and_continue_as_write();
 //    }
 //
-// This is safe, but will it guarantee that all relevant employees get their raise ?
-// Unfortunately not. At every call to promote_to_write() new employees may be
-// added to the underlying table, but as the view is in imperative mode, these new
-// employees are not added to the view. Also at promote_to_write() an existing employee
-// could recieve a (different, larger) raise which would then be overwritten and lost.
-// However, these problems are to be expected, since the activity is spread over multiple
-// transactions. We just aim for providing low level safety: is_attached() can tell
+// This is safe, and we just aim for providing low level safety: is_attached() can tell
 // if the reference is valid, and the references in the view continue to point to the
-// same object at all times, also following implicit updates. The rest is up to the 
+// same object at all times, also following implicit updates. The rest is up to the
 // application logic.
+//
+// It is important to see, that there is no guarantee that all relevant employees get
+// their raise in cases whith concurrent updates.At every call to promote_to_write() new
+// employees may be added to the underlying table, but as the view is in imperative mode,
+// these new employees are not added to the view. Also at promote_to_write() an existing
+// employee could recieve a (different, larger) raise which would then be overwritten and lost.
+// However, these are problems that you should expect, since the activity is spread over multiple
+// transactions.
 
 
 /// Common base class for TableView and ConstTableView.
 class TableViewBase : public RowIndexes {
 public:
+// - not in use / implemented yet:
+//    enum mode { mode_Reflective, mode_Imperative };
+//    void set_operating_mode(mode);
+//    mode get_operating_mode();
     bool is_empty() const TIGHTDB_NOEXCEPT;
     bool is_attached() const TIGHTDB_NOEXCEPT;
     std::size_t size() const TIGHTDB_NOEXCEPT;
