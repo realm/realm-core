@@ -1990,7 +1990,7 @@ TEST_IF(Shared_AsyncMultiprocess, allow_async)
 
 #endif // !defined(_WIN32) && !defined(__APPLE__)
 
-#if !defined(_WIN32)
+#if !defined(_WIN32) && !defined(__APPLE__)
 
 namespace {
 
@@ -2113,7 +2113,8 @@ TEST(Shared_WaitForChange)
         threads[j].join();
 }
 
-#endif // endif not on windows
+#endif // endif not on windows (or apple)
+
 
 TEST(Shared_MultipleSharersOfStreamingFormat)
 {
