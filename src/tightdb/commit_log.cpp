@@ -30,6 +30,7 @@
 #include <sys/time.h> // FIXME!! Not portable
 
 #include <tightdb/replication.hpp>
+#include <tightdb/impl/merge_index_map.hpp>
 #ifdef TIGHTDB_ENABLE_REPLICATION
 
 using namespace util;
@@ -761,62 +762,38 @@ class WriteLogCollector::MergingIndexTranslator : public Replication::IndexTrans
 public:
     MergingIndexTranslator(WriteLogCollector& log, Group& group, uint_fast64_t timestamp,
         uint_fast64_t peer_id, version_type base_version, version_type current_version):
-    m_log(log), m_group(group), m_timestamp(timestamp), /*m_peer_id(peer_id),*/
-    m_base_version(base_version), m_current_version(current_version), m_was_set(false)
+    m_log(log), m_group(group), m_base_version(base_version), m_current_version(current_version),
+    m_timestamp(timestamp), m_peer_id(peer_id), m_was_overwritten(false)
     {
-        static_cast<void>(peer_id); // FIXME: Unused for now.
+        // Build the index maps:
+        std::vector<Replication::CommitLogEntry> history(m_current_version - m_base_version);
+        m_log.get_commit_entries(m_base_version, m_current_version, &*history.begin());
+
+        for (size_t i = 0; i < history.size(); ++i) {
+            const CommitLogEntry& entry = history[i];
+            m_commit_log_peer_id = entry.peer_id;
+            m_commit_log_timestamp = entry.timestamp;
+            SimpleInputStream input(entry.log_data.data(), entry.log_data.size());
+            TransactLogParser parser(input);
+            parser.parse(*this);
+        }
     }
 
-    size_t translate_row_index(TableRef table, size_t row_ndx, bool* overwritten) TIGHTDB_OVERRIDE
+    size_t translate_row_index(TableRef table, size_t row_ndx, size_t num_rows, bool* overwritten) TIGHTDB_OVERRIDE
     {
-        // Go through the commit log from m_base_version to m_current_version.
-        // For each insert in table that has a lower timestamp and a lower row index, bump
-        // row_ndx by one.
-        m_translate_table = table;
-        m_result_ndx = row_ndx;
-        std::vector<Replication::CommitLogEntry> entries(m_current_version - m_base_version);
-        m_log.get_commit_entries(m_base_version, m_current_version, entries.data());
-        //std::cout << "Translating row index v" << m_base_version << " -> v" << m_current_version << "\n";
-
-        for (size_t i = 0; i < entries.size(); ++i) {
-            CommitLogEntry& entry = entries[i];
-            if (entry.peer_id != 0)
-                continue;
-            //std::cout << "Modifying against local commit at t = " << entry.timestamp << "\n";
-            if (entry.timestamp < m_timestamp) { // FIXME Compare peer_id too.
-                SimpleInputStream input(entry.log_data.data(), entry.log_data.size());
-                TransactLogParser parser(input);
-                parser.parse(*this);
-            }
+        std::map<TableRef, MergeIndexMap>::iterator it = m_map.find(table);
+        size_t result = row_ndx;
+        if (it == m_map.end()) {
+            // Nothing happened locally to the table.
+            return result;
         }
 
-        // Save m_result_ndx so we can parse the future entries to detect set overwrite.
-        size_t result = m_result_ndx;
-
-        // If we need to figure out whether the index was overwritten,
-        // parse future log entries and find a set at the index.
-        // We keep bumping any indexes because we need to track the set operation
-        // even if something was inserted under it.
         if (overwritten) {
-            for (size_t i = 0; i < entries.size(); ++i) {
-                CommitLogEntry& entry = entries[i];
-                if (entry.timestamp > m_timestamp) {
-                    //std::cout << "Checking for overwrite: " << entry.timestamp << " > " << m_timestamp << "\n";
-                    m_was_set = false;
-                    SimpleInputStream input(entry.log_data.data(), entry.log_data.size());
-                    TransactLogParser parser(input);
-                    parser.parse(*this);
-                    if (m_was_set) {
-                        //std::cout << "SET at " << row_ndx << " was overwritten.\n";
-                        *overwritten = true;
-                        break;
-                    }
-                }
-            }
+            *overwritten = false; // FIXME
+            result = it->second.transform_set(row_ndx, m_timestamp, m_peer_id);
         }
-
-        if (result != row_ndx) {
-            //std::cout << "BUMPED " << row_ndx << " TO " << m_result_ndx << "\n";
+        else { // overwritten == null_ptr => // insertion
+            result = it->second.transform_insert(row_ndx, num_rows, m_timestamp, m_peer_id);
         }
 
         return result;
@@ -824,17 +801,24 @@ public:
 
     void insertions(size_t row_ndx, size_t num) {
         //std::cout << "Saw insert(" << row_ndx << ", " << num << ")\n";
-        if (m_table == m_translate_table && row_ndx <= m_result_ndx) {
-            m_result_ndx += num;
+        std::map<TableRef, MergeIndexMap>::iterator it = m_map.find(m_selected_table);
+        if (it == m_map.end()) {
+            it = m_map.insert(std::make_pair(m_selected_table, MergeIndexMap(0))).first;
+        }
+
+        MergeIndexMap& map = it->second;
+        if (m_commit_log_peer_id != m_peer_id) {
+            map.unknown_insertion_at(row_ndx, num, m_timestamp, m_peer_id);
+        }
+        else {
+            map.known_insertion_at(row_ndx, num);
         }
     }
 
     void update(size_t row_ndx) {
         //std::cout << "Saw set(" << row_ndx << ")\n";
-        if (m_table == m_translate_table && row_ndx == m_result_ndx) {
-            //std::cout << "MATCH\n";
-            m_was_set = true;
-        }
+        //std::cout << "MATCH\n";
+        //m_was_overwritten = true;
     }
 
     bool insert_group_level_table(std::size_t, std::size_t, StringData) { return true; }
@@ -842,10 +826,30 @@ public:
     bool rename_group_level_table(std::size_t, StringData) { return true; }
     bool select_table(std::size_t group_level_ndx, int levels, const std::size_t* path)
     {
-        //std::cout << "SELECT TABLE\n";
-        static_cast<void>(levels); // FIXME: Descend.
-        static_cast<void>(path);
-        m_table = m_group.get_table(group_level_ndx); // Throws
+        if (TIGHTDB_UNLIKELY(group_level_ndx >= m_group.size()))
+            return false;
+        m_selected_table = m_group.get_table(group_level_ndx); // Throws
+        for (int i = 0; i < levels; ++i) {
+            size_t col_ndx = path[2*i + 0];
+            size_t row_ndx = path[2*i + 1];
+            if (TIGHTDB_UNLIKELY(col_ndx >= m_selected_table->get_column_count()))
+                return false;
+            if (TIGHTDB_UNLIKELY(row_ndx >= m_selected_table->size()))
+                return false;
+            DataType type = m_selected_table->get_column_type(col_ndx);
+            switch (type) {
+                case type_Table:
+                    m_selected_table = m_selected_table->get_subtable(col_ndx, row_ndx); // Throws
+                    break;
+                case type_Mixed:
+                    m_selected_table = m_selected_table->get_subtable(col_ndx, row_ndx); // Throws
+                    if (TIGHTDB_UNLIKELY(!m_selected_table))
+                        return false;
+                    break;
+                default:
+                    return false;
+            }
+        }
         return true;
     }
     bool insert_empty_rows(std::size_t row_ndx, std::size_t num_rows, std::size_t, bool) { insertions(row_ndx, num_rows); return true; }
@@ -906,15 +910,26 @@ public:
 private:
     WriteLogCollector& m_log;
     Group& m_group;
-    uint64_t m_timestamp;
-    //uint64_t m_peer_id; // FIXME: Unused for now.
+
+    // FIXME: Store maps for all paths, and handle insertions/removals
+    // along the paths.
+    typedef _impl::MergeIndexMap MergeIndexMap;
+    std::map<TableRef, MergeIndexMap> m_map;
+
     uint64_t m_base_version;
     uint64_t m_current_version;
 
-    TableRef m_table;
-    TableRef m_translate_table;
-    size_t m_result_ndx;
-    bool m_was_set;
+    // There are the incoming values:
+    uint64_t m_timestamp;
+    uint64_t m_peer_id;
+
+    // These are used for storing information about commit log entries that
+    // isn't available to the parser, but needed to build the map.
+    uint64_t m_commit_log_peer_id;
+    uint64_t m_commit_log_timestamp;
+
+    TableRef m_selected_table;
+    bool m_was_overwritten;
 };
 
 

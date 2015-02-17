@@ -498,13 +498,14 @@ struct Replication::CommitLogEntry {
 
 class Replication::IndexTranslatorBase {
 public:
-    virtual size_t translate_row_index(TableRef table, size_t row_ndx, bool* overwritten = null_ptr) = 0;
+    virtual size_t translate_row_index(TableRef table, size_t row_ndx, size_t num_rows, bool* overwritten = null_ptr) = 0;
 };
 
 class Replication::SimpleIndexTranslator : public Replication::IndexTranslatorBase {
 public:
-    size_t translate_row_index(TableRef, size_t row_ndx, bool* overwritten) TIGHTDB_OVERRIDE
+    size_t translate_row_index(TableRef, size_t row_ndx, size_t num_rows, bool* overwritten) TIGHTDB_OVERRIDE
     {
+        static_cast<void>(num_rows);
         if (overwritten)
             *overwritten = false;
         return row_ndx;
