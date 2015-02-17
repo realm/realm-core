@@ -525,6 +525,7 @@ private:
     friend class GroupWriter;
     friend class SharedGroup;
     friend class _impl::GroupFriend;
+    friend class TransactLogEncoderBase;
     friend class Replication;
     friend class TrivialReplication;
 };

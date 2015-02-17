@@ -124,7 +124,7 @@ private:
 #ifdef TIGHTDB_ENABLE_REPLICATION
     Replication* get_repl() TIGHTDB_NOEXCEPT;
     void repl_unselect() TIGHTDB_NOEXCEPT;
-    friend class Replication;
+    friend class TransactLogEncoderBase;
 #endif
 
 #ifdef TIGHTDB_DEBUG

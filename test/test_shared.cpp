@@ -1988,6 +1988,10 @@ TEST_IF(Shared_AsyncMultiprocess, allow_async)
 #endif
 }
 
+#endif // !defined(_WIN32) && !defined(__APPLE__)
+
+#if !defined(_WIN32) && !defined(__APPLE__)
+
 namespace {
 
 static const int num_threads = 3;
@@ -2109,7 +2113,8 @@ TEST(Shared_WaitForChange)
         threads[j].join();
 }
 
-#endif // endif not on windows
+#endif // endif not on windows (or apple)
+
 
 TEST(Shared_MultipleSharersOfStreamingFormat)
 {

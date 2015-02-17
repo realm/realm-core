@@ -125,7 +125,7 @@ private:
     friend class LinkView;
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    friend class Replication;
+    friend class TransactLogEncoderBase;
 #endif
 };
 
