@@ -435,12 +435,12 @@ SharedGroup::SharedInfo::SharedInfo(DurabilityLevel dlevel):
 {
     version = SHAREDINFO_VERSION;
     flags = dlevel; // durability level is fixed from creation
-
+#ifndef _WIN32
     PlatformSpecificCondVar::init_shared_part(room_to_write); // Throws
     PlatformSpecificCondVar::init_shared_part(work_to_do); // Throws
     PlatformSpecificCondVar::init_shared_part(daemon_becomes_ready); // Throws
     PlatformSpecificCondVar::init_shared_part(new_commit_available); // Throws
-
+#endif
     free_write_slots = 0;
     num_participants = 0;
     session_initiator_pid = 0;
@@ -967,6 +967,7 @@ bool SharedGroup::has_changed()
 }
 
 #ifndef _WIN32
+#ifndef __APPLE__
 bool SharedGroup::wait_for_change()
 {
     SharedInfo* info = m_file_map.get_addr();
@@ -993,7 +994,7 @@ void SharedGroup::enable_wait_for_change()
     RobustLockGuard lock(info->controlmutex, recover_from_dead_write_transact);
     m_wait_for_change_enabled = true;
 }
-
+#endif
 
 void SharedGroup::do_async_commits()
 {
