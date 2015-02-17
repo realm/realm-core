@@ -257,9 +257,12 @@ public:
     class TransactLogParser;
     class InputStream;
     class OutputStream;
+    class SimpleInputStream;
     class BadTransactLog; // Exception
     class Interrupted; // Exception
     struct CommitLogEntry;
+    class IndexTranslatorBase;
+    class SimpleIndexTranslator;
 
     std::string get_database_path();
 
