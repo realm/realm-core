@@ -555,7 +555,7 @@ private:
     static const int m_max_levels = 1024;
     util::Buffer<std::size_t> m_path;
 
-    void parser_error() const TIGHTDB_NORETURN;
+    TIGHTDB_NORETURN void parser_error() const;
     template<class InstructionHandler> void do_parse(InstructionHandler&);
 
     template<class T> T read_int();
