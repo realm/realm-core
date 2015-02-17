@@ -967,6 +967,7 @@ bool SharedGroup::has_changed()
 }
 
 #ifndef _WIN32
+#ifndef __APPLE__
 bool SharedGroup::wait_for_change()
 {
     SharedInfo* info = m_file_map.get_addr();
@@ -993,7 +994,7 @@ void SharedGroup::enable_wait_for_change()
     RobustLockGuard lock(info->controlmutex, recover_from_dead_write_transact);
     m_wait_for_change_enabled = true;
 }
-
+#endif
 
 void SharedGroup::do_async_commits()
 {
