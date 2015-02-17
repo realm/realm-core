@@ -407,7 +407,7 @@ public:
 protected:
     Replication();
 
-     virtual std::string do_get_database_path() = 0;
+    virtual std::string do_get_database_path() = 0;
 
     /// As part of the initiation of a write transaction, this method
     /// is supposed to update `m_transact_log_free_begin` and
