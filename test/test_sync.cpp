@@ -14,8 +14,10 @@
 #include "test.hpp"
 
 #include <unistd.h> // usleep
+#include <tightdb/impl/merge_index_map.hpp>
 
 using namespace tightdb;
+using namespace tightdb::_impl;
 using namespace tightdb::util;
 using namespace tightdb::test_util;
 using unit_test::TestResults;
@@ -53,7 +55,7 @@ using unit_test::TestResults;
 static void
 sync_commits(SharedGroup& from_group, SharedGroup& to_group)
 {
-    
+
     typedef SharedGroup::version_type version_type;
 
     Replication* from_r = from_group.get_replication();
@@ -299,5 +301,33 @@ TEST(Sync_MergeWrites)
     sync_commits(b, a);
     sync_commits(a, b);
     check_equality(test_results, a, b);
+}
 
+TEST(Sync_MergeIndexMap)
+{
+    uint64_t self_id = 0;
+    uint64_t peer_id = 1;
+    MergeIndexMap map(0);
+
+    CHECK_EQUAL(0, map.transform_insert(0, 1, 0, peer_id));
+
+    map.clear();
+    map.unknown_insertion_at(0, 1, 0, self_id);
+    map.unknown_insertion_at(0, 1, 1, self_id);
+    size_t i0 = map.transform_insert(0, 1, 2, peer_id);
+    CHECK_EQUAL(2, i0);
+
+    map.clear();
+    map.known_insertion_at(1, 1);
+    //map.debug_print();
+    size_t i1 = map.transform_insert(3, 1, 3, peer_id);
+    CHECK_EQUAL(3, i1);
+
+    map.clear();
+    map.unknown_insertion_at(0, 1, 0, self_id);
+    map.known_insertion_at(0, 1);
+    map.unknown_insertion_at(1, 1, 1, self_id);
+    map.known_insertion_at(1, 1);
+    size_t i2 = map.transform_insert(2, 1, 2, peer_id);
+    CHECK_EQUAL(4, i2);
 }
