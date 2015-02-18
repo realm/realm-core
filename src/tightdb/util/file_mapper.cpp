@@ -449,6 +449,18 @@ Atomic<bool> mapping_lock;
 std::vector<mapping_and_addr> mappings_by_addr;
 std::vector<mappings_for_file> mappings_by_file;
 
+// If there's any active mappings when the program exits, deliberately leak them
+// to avoid flushing things that were in the middle of being modified on a different thrad
+struct AtExit {
+    ~AtExit()
+    {
+        if (!mappings_by_addr.empty())
+            (new std::vector<mapping_and_addr>)->swap(mappings_by_addr);
+        if (!mappings_by_file.empty())
+            (new std::vector<mappings_for_file>)->swap(mappings_by_file);
+    }
+} at_exit;
+
 bool handle_access(void *addr)
 {
     SpinLockGuard lock(mapping_lock);

@@ -9,6 +9,10 @@
 #include "test.hpp"
 #include "crypt_key.hpp"
 
+#if !defined(TIGHTDB_ANDROID) && !defined(TIGHTDB_IOS) && !defined(_WIN32)
+#include <unistd.h>
+#endif
+
 using namespace std;
 using namespace tightdb::util;
 
@@ -213,5 +217,31 @@ TEST(File_SetEncryptionKey)
     CHECK_THROW(f.set_encryption_key(key), std::runtime_error);
 #endif
 }
+
+#if !defined(TIGHTDB_ANDROID) && !defined(TIGHTDB_IOS) && !defined(_WIN32)
+
+TEST(File_ExitWithActiveMapping)
+{
+    TEST_PATH(path);
+    size_t len = 4096;
+
+    File f(path, File::mode_Write);
+    f.set_encryption_key(crypt_key(true));
+    f.resize(len);
+    File::Map<char> map(f, File::access_ReadWrite, len);
+
+    int pid = fork();
+    if (!pid) {
+        std::exit(0);
+    }
+    else {
+        int stat_loc;
+        waitpid(pid, &stat_loc, 0);
+        CHECK(WIFEXITED(stat_loc));
+        CHECK_EQUAL(0, WEXITSTATUS(stat_loc));
+    }
+}
+
+#endif
 
 #endif // TEST_FILE
