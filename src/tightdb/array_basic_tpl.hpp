@@ -121,7 +121,7 @@ inline T BasicArray<T>::get(const char* header, std::size_t ndx) TIGHTDB_NOEXCEP
 template<class T>
 inline void BasicArray<T>::set(std::size_t ndx, T value)
 {
-    TIGHTDB_ASSERT(ndx < m_size);
+    TIGHTDB_ASSERT_3(ndx, <, m_size);
 
     // Check if we need to copy before modifying
     copy_on_write(); // Throws
@@ -134,7 +134,7 @@ inline void BasicArray<T>::set(std::size_t ndx, T value)
 template<class T>
 void BasicArray<T>::insert(std::size_t ndx, T value)
 {
-    TIGHTDB_ASSERT(ndx <= m_size);
+    TIGHTDB_ASSERT_3(ndx, <=, m_size);
 
     // Check if we need to copy before modifying
     copy_on_write(); // Throws
@@ -161,7 +161,7 @@ void BasicArray<T>::insert(std::size_t ndx, T value)
 template<class T>
 void BasicArray<T>::erase(std::size_t ndx)
 {
-    TIGHTDB_ASSERT(ndx < m_size);
+    TIGHTDB_ASSERT_3(ndx, <, m_size);
 
     // Check if we need to copy before modifying
     copy_on_write(); // Throws
@@ -183,7 +183,7 @@ void BasicArray<T>::erase(std::size_t ndx)
 template<class T> void BasicArray<T>::truncate(std::size_t size)
 {
     TIGHTDB_ASSERT(is_attached());
-    TIGHTDB_ASSERT(size <= m_size);
+    TIGHTDB_ASSERT_3(size, <=, m_size);
 
     copy_on_write(); // Throws
 
@@ -322,7 +322,7 @@ template<class T>
 ref_type BasicArray<T>::bptree_leaf_insert(size_t ndx, T value, TreeInsertBase& state)
 {
     size_t leaf_size = size();
-    TIGHTDB_ASSERT(leaf_size <= TIGHTDB_MAX_BPNODE_SIZE);
+    TIGHTDB_ASSERT_3(leaf_size, <=, TIGHTDB_MAX_BPNODE_SIZE);
     if (leaf_size < ndx)
         ndx = leaf_size;
     if (TIGHTDB_LIKELY(leaf_size < TIGHTDB_MAX_BPNODE_SIZE)) {
@@ -374,7 +374,7 @@ inline std::size_t BasicArray<T>::calc_aligned_byte_size(std::size_t size)
     if (size > (max_2 - header_size) / sizeof (T))
         throw std::runtime_error("Byte size overflow");
     size_t byte_size = header_size + size * sizeof (T);
-    TIGHTDB_ASSERT(byte_size > 0);
+    TIGHTDB_ASSERT_3(byte_size, >, 0);
     size_t aligned_byte_size = ((byte_size-1) | 7) + 1; // 8-byte alignment
     return aligned_byte_size;
 }

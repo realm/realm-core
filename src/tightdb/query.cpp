@@ -43,7 +43,7 @@ void Query::Create()
     first.reserve(16);
     update.push_back(0);
     update_override.push_back(0);
-    TIGHTDB_ASSERT(first.capacity() > first.size()); // see above fixme
+    TIGHTDB_ASSERT_3(first.capacity(), >, first.size()); // see above fixme
     first.push_back(0);
     pending_not.push_back(false);
     do_delete = true;
@@ -547,7 +547,7 @@ size_t Query::peek_tableview(size_t tv_index) const
 {
     TIGHTDB_ASSERT(m_view);
     TIGHTDB_ASSERT_DEBUG(m_view->cookie == m_view->cookie_expected);
-    TIGHTDB_ASSERT(tv_index < m_view->size());
+    TIGHTDB_ASSERT_3(tv_index, <, m_view->size());
 
     size_t tablerow = m_view->m_row_indexes.get(tv_index);
 
@@ -783,7 +783,7 @@ Query& Query::group()
 {
     update.push_back(0);
     update_override.push_back(0);
-    TIGHTDB_ASSERT(first.capacity() > first.size()); // see fixme in ::Create()
+    TIGHTDB_ASSERT_3(first.capacity(), >, first.size()); // see fixme in ::Create()
     first.push_back(0);
     pending_not.push_back(false);
     return *this;
@@ -914,7 +914,7 @@ size_t Query::find(size_t begin)
     if (m_table->is_degenerate())
         return not_found;
 
-    TIGHTDB_ASSERT(begin <= m_table->size());
+    TIGHTDB_ASSERT_3(begin, <=, m_table->size());
 
     Init(*m_table);
 
@@ -947,7 +947,7 @@ void Query::find_all(TableViewBase& ret, size_t start, size_t end, size_t limit)
     if (limit == 0 || m_table->is_degenerate())
         return;
 
-    TIGHTDB_ASSERT(start <= m_table->size());
+    TIGHTDB_ASSERT_3(start, <=, m_table->size());
 
     Init(*m_table);
 

@@ -162,7 +162,7 @@ private:
 
 inline StringData ColumnStringEnum::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(ndx < Column::size());
+    TIGHTDB_ASSERT_3(ndx, <, Column::size());
     std::size_t key_ndx = to_size_t(Column::get(ndx));
     return m_keys.get(key_ndx);
 }
@@ -177,7 +177,7 @@ inline void ColumnStringEnum::add(StringData value)
 inline void ColumnStringEnum::insert(std::size_t row_ndx, StringData value)
 {
     std::size_t size = this->size();
-    TIGHTDB_ASSERT(row_ndx <= size);
+    TIGHTDB_ASSERT_3(row_ndx, <=, size);
     std::size_t num_rows = 1;
     bool is_append = row_ndx == size;
     do_insert(row_ndx, value, num_rows, is_append); // Throws

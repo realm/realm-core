@@ -49,10 +49,13 @@ void nslog(const char *message) {
 }
 #endif
 
-TIGHTDB_NORETURN void terminate(const char* message, const char* file, long line) TIGHTDB_NOEXCEPT
+TIGHTDB_NORETURN void terminate(const char* message, const char* file, long line, bool extra, int64_t extra1, int64_t extra2) TIGHTDB_NOEXCEPT
 {
     std::stringstream ss;
-    ss << file << ":" << line << ": " << message << "\n";
+    if (extra)
+        ss << file << ":" << line << ": " << message << " [" << extra1 << ", " << extra2 << "]\n";
+    else
+        ss << file << ":" << line << ": " << message << "\n";
 
 #if defined(__APPLE__)
     void* callstack[128];
