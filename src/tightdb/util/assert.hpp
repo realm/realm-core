@@ -40,6 +40,8 @@
 #  define TIGHTDB_ASSERT_DEBUG(condition) static_cast<void>(0)
 #endif
 
+// Becase the assert is used in noexcept methods, it's a bad idea to allocate buffer space for the message
+// so therefore we must pass it to terminate which will 'cerr' it for us without needing any buffer
 #if defined(TIGHTDB_ENABLE_ASSERTIONS) || defined(TIGHTDB_DEBUG)
 #  define TIGHTDB_ASSERT_3(left, condition, right) \
     ((left condition right) ? static_cast<void>(0) : \
