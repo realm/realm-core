@@ -17,7 +17,7 @@
 
 ### Internals:
 
-* Lorem ipsum.
+* Many TIGHTDB_ASSERT invocations replaced by new TIGHTDB_ASSERT_3 macro that prints variable/argument contents on failure. It's not implemented optimally yet; I'm working on a much more flexible method.
 
 ----------------------------------------------
 
