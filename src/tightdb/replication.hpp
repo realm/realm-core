@@ -238,6 +238,14 @@ private:
     friend class Group::TransactReverser;
 };
 
+class TransactLogEncoder: public TransactLogEncoderBase {
+public:
+    void transact_log_reserve(size_t size, char** out_free_begin, char** out_free_end) TIGHTDB_OVERRIDE;
+    void transact_log_append(const char* data, size_t size, char** out_free_begin, char** out_free_end) TIGHTDB_OVERRIDE;
+    BinaryData get_data() const;
+private:
+    util::Buffer<char> m_buffer;
+};
 
 
 // FIXME: Be careful about the possibility of one modification functions being called by another where both do transaction logging.
@@ -811,6 +819,25 @@ inline void Replication::clear_interrupt() TIGHTDB_NOEXCEPT
     do_clear_interrupt();
 }
 
+inline void TransactLogEncoder::transact_log_reserve(size_t size, char** out_free_begin, char** out_free_end)
+{
+    size_t used = write_position() - m_buffer.data();
+    m_buffer.reserve_extra(used, size);
+    *out_free_begin = m_buffer.data() + used;
+    *out_free_end   = m_buffer.data() + m_buffer.size();
+}
+
+inline void TransactLogEncoder::transact_log_append(const char* data, size_t size, char** out_free_begin, char** out_free_end)
+{
+    transact_log_reserve(size, out_free_begin, out_free_end);
+    *out_free_begin = std::copy(data, data + size, *out_free_begin);
+}
+
+inline BinaryData TransactLogEncoder::get_data() const
+{
+    return BinaryData(m_buffer.data(), m_buffer.size());
+}
+
 inline void TransactLogEncoderBase::set_buffer(char* free_begin, char* free_end)
 {
     TIGHTDB_ASSERT(free_begin <= free_end);
@@ -829,6 +856,7 @@ inline char* TransactLogEncoderBase::reserve(size_t n)
 {
     if (size_t(m_transact_log_free_end - m_transact_log_free_begin) < n) {
         transact_log_reserve(n, &m_transact_log_free_begin, &m_transact_log_free_end);
+        TIGHTDB_ASSERT(m_transact_log_free_begin <= m_transact_log_free_end);
     }
     return m_transact_log_free_begin;
 }
