@@ -119,7 +119,7 @@ size_t* Descriptor::record_subdesc_path(size_t* begin, size_t* end) const TIGHTD
                 break;
             }
         }
-        TIGHTDB_ASSERT_NEW(column_ndx, !=, not_found);
+        TIGHTDB_ASSERT_3(column_ndx, !=, not_found);
         *--begin_2 = column_ndx;
         desc = parent;
     }

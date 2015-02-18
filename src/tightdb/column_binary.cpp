@@ -100,7 +100,7 @@ struct SetLeafElem: Array::UpdateHandler {
 
 void ColumnBinary::set(size_t ndx, BinaryData value, bool add_zero_term)
 {
-    TIGHTDB_ASSERT_NEW(ndx, <, size());
+    TIGHTDB_ASSERT_3(ndx, <, size());
 
     bool root_is_leaf = !m_array->is_inner_bptree_node();
     if (root_is_leaf) {
@@ -224,7 +224,7 @@ public:
             ArrayBinary leaf(get_alloc());
             leaf.init_from_mem(leaf_mem);
             leaf.set_parent(parent, leaf_ndx_in_parent);
-            TIGHTDB_ASSERT_NEW(leaf.size(), >=, 1);
+            TIGHTDB_ASSERT_3(leaf.size(), >=, 1);
             size_t last_ndx = leaf.size() - 1;
             if (last_ndx == 0)
                 return true;
@@ -238,7 +238,7 @@ public:
         ArrayBigBlobs leaf(get_alloc());
         leaf.init_from_mem(leaf_mem);
         leaf.set_parent(parent, leaf_ndx_in_parent);
-        TIGHTDB_ASSERT_NEW(leaf.size(), >=, 1);
+        TIGHTDB_ASSERT_3(leaf.size(), >=, 1);
         size_t last_ndx = leaf.size() - 1;
         if (last_ndx == 0)
             return true;
@@ -281,8 +281,8 @@ public:
 
 void ColumnBinary::do_erase(size_t ndx, bool is_last)
 {
-    TIGHTDB_ASSERT_NEW(ndx, <, size());
-    TIGHTDB_ASSERT_NEW(is_last, ==, (ndx == size() - 1));
+    TIGHTDB_ASSERT_3(ndx, <, size());
+    TIGHTDB_ASSERT_3(is_last, ==, (ndx == size() - 1));
 
     bool root_is_leaf = !m_array->is_inner_bptree_node();
     if (root_is_leaf) {
@@ -308,8 +308,8 @@ void ColumnBinary::do_erase(size_t ndx, bool is_last)
 
 void ColumnBinary::do_move_last_over(size_t row_ndx, size_t last_row_ndx)
 {
-    TIGHTDB_ASSERT_NEW(row_ndx, <=, last_row_ndx);
-    TIGHTDB_ASSERT_NEW(last_row_ndx + 1, ==, size());
+    TIGHTDB_ASSERT_3(row_ndx, <=, last_row_ndx);
+    TIGHTDB_ASSERT_3(last_row_ndx + 1, ==, size());
 
     // FIXME: ExceptionSafety: The current implementation of this
     // function is not exception-safe, and it is hard to see how to

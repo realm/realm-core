@@ -37,8 +37,8 @@ size_t round_up(size_t size)
 
 void ArrayString::set(size_t ndx, StringData value)
 {
-    TIGHTDB_ASSERT_NEW(ndx, <, m_size);
-    TIGHTDB_ASSERT_NEW(value.size(), <, size_t(max_width)); // otherwise we have to use another column type
+    TIGHTDB_ASSERT_3(ndx, <, m_size);
+    TIGHTDB_ASSERT_3(value.size(), <, size_t(max_width)); // otherwise we have to use another column type
 
     // Check if we need to copy before modifying
     copy_on_write(); // Throws
@@ -48,12 +48,12 @@ void ArrayString::set(size_t ndx, StringData value)
         if (value.size() == 0 && m_width == 0)
             return;
 
-        TIGHTDB_ASSERT_NEW(0, <, value.size());
+        TIGHTDB_ASSERT_3(0, <, value.size());
 
         // Calc min column width
         size_t new_width = ::round_up(value.size());
 
-        TIGHTDB_ASSERT_NEW(value.size(), <, new_width);
+        TIGHTDB_ASSERT_3(value.size(), <, new_width);
 
         // FIXME: Should we try to avoid double copying when realloc fails to preserve the address?
         alloc(m_size, new_width); // Throws
@@ -92,7 +92,7 @@ void ArrayString::set(size_t ndx, StringData value)
         m_width = new_width;
     }
 
-    TIGHTDB_ASSERT_NEW(0, <, m_width);
+    TIGHTDB_ASSERT_3(0, <, m_width);
 
     // Set the value
     char* begin = m_data + (ndx * m_width);
@@ -108,8 +108,8 @@ void ArrayString::set(size_t ndx, StringData value)
 
 void ArrayString::insert(size_t ndx, StringData value)
 {
-    TIGHTDB_ASSERT_NEW(ndx, <=, m_size);
-    TIGHTDB_ASSERT_NEW(value.size(), <, size_t(max_width)); // otherwise we have to use another column type
+    TIGHTDB_ASSERT_3(ndx, <=, m_size);
+    TIGHTDB_ASSERT_3(value.size(), <, size_t(max_width)); // otherwise we have to use another column type
 
     // Check if we need to copy before modifying
     copy_on_write(); // Throws
@@ -215,7 +215,7 @@ void ArrayString::insert(size_t ndx, StringData value)
 
 void ArrayString::erase(size_t ndx)
 {
-    TIGHTDB_ASSERT_NEW(ndx, <, m_size);
+    TIGHTDB_ASSERT_3(ndx, <, m_size);
 
     // Check if we need to copy before modifying
     copy_on_write(); // Throws
@@ -336,7 +336,7 @@ bool ArrayString::compare_string(const ArrayString& c) const TIGHTDB_NOEXCEPT
 ref_type ArrayString::bptree_leaf_insert(size_t ndx, StringData value, TreeInsertBase& state)
 {
     size_t leaf_size = size();
-    TIGHTDB_ASSERT_NEW(leaf_size, <=, TIGHTDB_MAX_BPNODE_SIZE);
+    TIGHTDB_ASSERT_3(leaf_size, <=, TIGHTDB_MAX_BPNODE_SIZE);
     if (leaf_size < ndx) ndx = leaf_size;
     if (TIGHTDB_LIKELY(leaf_size < TIGHTDB_MAX_BPNODE_SIZE)) {
         insert(ndx, value); // Throws

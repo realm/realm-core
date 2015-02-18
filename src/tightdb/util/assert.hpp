@@ -41,7 +41,7 @@
 #endif
 
 #if defined(TIGHTDB_ENABLE_ASSERTIONS) || defined(TIGHTDB_DEBUG)
-#  define TIGHTDB_ASSERT_NEW(left, condition, right) \
+#  define TIGHTDB_ASSERT_3(left, condition, right) \
     ((left condition right) ? static_cast<void>(0) : \
         tightdb::util::terminate(TIGHTDB_VER_CHUNK " Assertion failed: " #left #condition #right, \
                                  __FILE__, __LINE__, true, (uint64_t)left, (uint64_t)right))

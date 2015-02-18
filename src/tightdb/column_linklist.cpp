@@ -31,8 +31,8 @@ using namespace tightdb;
 void ColumnLinkList::move_last_over(size_t row_ndx, size_t last_row_ndx,
                                     bool broken_reciprocal_backlinks)
 {
-    TIGHTDB_ASSERT_NEW(row_ndx, <=, last_row_ndx);
-    TIGHTDB_ASSERT_NEW(last_row_ndx + 1, ==, size());
+    TIGHTDB_ASSERT_3(row_ndx, <=, last_row_ndx);
+    TIGHTDB_ASSERT_3(last_row_ndx + 1, ==, size());
 
     // Remove backlinks to the delete row
     if (!broken_reciprocal_backlinks) {
@@ -220,7 +220,7 @@ void ColumnLinkList::do_update_link(size_t row_ndx, size_t old_target_row_ndx, s
 
 LinkView* ColumnLinkList::get_ptr(size_t row_ndx) const
 {
-    TIGHTDB_ASSERT_NEW(row_ndx, <, size());
+    TIGHTDB_ASSERT_3(row_ndx, <, size());
 
     // Check if we already have a linkview for this row
     typedef list_accessors::const_iterator iter;
@@ -397,7 +397,7 @@ void ColumnLinkList::Verify(const Table& table, size_t col_ndx) const
     }
 
     // All backlinks must have been matched by a forward link
-    TIGHTDB_ASSERT_NEW(backlinks_seen, ==, pairs.size());
+    TIGHTDB_ASSERT_3(backlinks_seen, ==, pairs.size());
 }
 
 

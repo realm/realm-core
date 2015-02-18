@@ -8,8 +8,8 @@ using namespace tightdb;
 
 void ArrayBlob::replace(size_t begin, size_t end, const char* data, size_t size, bool add_zero_term)
 {
-    TIGHTDB_ASSERT_NEW(begin, <=, end);
-    TIGHTDB_ASSERT_NEW(end, <=, m_size);
+    TIGHTDB_ASSERT_3(begin, <=, end);
+    TIGHTDB_ASSERT_3(end, <=, m_size);
     TIGHTDB_ASSERT(size == 0 || data);
 
     copy_on_write(); // Throws

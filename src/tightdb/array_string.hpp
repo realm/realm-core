@@ -120,7 +120,7 @@ inline MemRef ArrayString::create_array(std::size_t size, Allocator& alloc)
 
 inline StringData ArrayString::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT_NEW(ndx, <, m_size);
+    TIGHTDB_ASSERT_3(ndx, <, m_size);
     if (m_width == 0)
         return StringData("", 0);
     const char* data = m_data + (ndx * m_width);
@@ -140,7 +140,7 @@ inline void ArrayString::add()
 
 inline StringData ArrayString::get(const char* header, std::size_t ndx) TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT_NEW(ndx, <, get_size_from_header(header));
+    TIGHTDB_ASSERT_3(ndx, <, get_size_from_header(header));
     std::size_t width = get_width_from_header(header);
     if (width == 0)
         return StringData("", 0);

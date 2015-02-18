@@ -44,7 +44,7 @@ void ColumnMixed::create(Allocator& alloc, ref_type ref, Table* table, size_t co
     types->set_parent(&*top, 0);
     data.reset(new RefsColumn(alloc, data_ref, table, column_ndx)); // Throws
     data->set_parent(&*top, 1);
-    TIGHTDB_ASSERT_NEW(types->size(), ==, data->size());
+    TIGHTDB_ASSERT_3(types->size(), ==, data->size());
 
     // Binary data column with values that does not fit in data column is only
     // there if needed
@@ -68,7 +68,7 @@ void ColumnMixed::ensure_binary_data_column()
 
     ref_type ref = ColumnBinary::create(m_array->get_alloc()); // Throws
     m_binary_data = new ColumnBinary(m_array->get_alloc(), ref); // Throws
-    TIGHTDB_ASSERT_NEW(m_array->size(), ==, 2);
+    TIGHTDB_ASSERT_3(m_array->size(), ==, 2);
     m_array->add(ref); // Throws
     m_binary_data->set_parent(m_array, 2);
 }
@@ -76,7 +76,7 @@ void ColumnMixed::ensure_binary_data_column()
 
 ColumnMixed::MixedColType ColumnMixed::clear_value(size_t row_ndx, MixedColType new_type)
 {
-    TIGHTDB_ASSERT_NEW(row_ndx, <, m_types->size());
+    TIGHTDB_ASSERT_3(row_ndx, <, m_types->size());
 
     MixedColType old_type = MixedColType(m_types->get(row_ndx));
     switch (old_type) {
@@ -128,7 +128,7 @@ ColumnMixed::MixedColType ColumnMixed::clear_value(size_t row_ndx, MixedColType 
 
 void ColumnMixed::do_erase(size_t row_ndx, bool is_last)
 {
-    TIGHTDB_ASSERT_NEW(row_ndx, <, m_types->size());
+    TIGHTDB_ASSERT_3(row_ndx, <, m_types->size());
 
     // Remove refs or binary data
     clear_value(row_ndx, mixcol_Int); // Throws
@@ -140,8 +140,8 @@ void ColumnMixed::do_erase(size_t row_ndx, bool is_last)
 
 void ColumnMixed::do_move_last_over(size_t row_ndx, size_t last_row_ndx)
 {
-    TIGHTDB_ASSERT_NEW(row_ndx, <=, last_row_ndx);
-    TIGHTDB_ASSERT_NEW(last_row_ndx + 1, ==, size());
+    TIGHTDB_ASSERT_3(row_ndx, <=, last_row_ndx);
+    TIGHTDB_ASSERT_3(last_row_ndx + 1, ==, size());
 
     // Remove refs or binary data
     clear_value(row_ndx, mixcol_Int); // Throws
@@ -166,7 +166,7 @@ void ColumnMixed::do_clear(size_t num_rows)
 
 DataType ColumnMixed::get_type(size_t ndx) const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT_NEW(ndx, <, m_types->size());
+    TIGHTDB_ASSERT_3(ndx, <, m_types->size());
     MixedColType coltype = MixedColType(m_types->get(ndx));
     switch (coltype) {
         case mixcol_IntNeg:    return type_Int;
@@ -178,7 +178,7 @@ DataType ColumnMixed::get_type(size_t ndx) const TIGHTDB_NOEXCEPT
 
 void ColumnMixed::set_string(size_t ndx, StringData value)
 {
-    TIGHTDB_ASSERT_NEW(ndx, <, m_types->size());
+    TIGHTDB_ASSERT_3(ndx, <, m_types->size());
     ensure_binary_data_column();
 
     MixedColType type = MixedColType(m_types->get(ndx));
@@ -211,7 +211,7 @@ void ColumnMixed::set_string(size_t ndx, StringData value)
 
 void ColumnMixed::set_binary(size_t ndx, BinaryData value)
 {
-    TIGHTDB_ASSERT_NEW(ndx, <, m_types->size());
+    TIGHTDB_ASSERT_3(ndx, <, m_types->size());
     ensure_binary_data_column();
 
     MixedColType type = MixedColType(m_types->get(ndx));
@@ -406,7 +406,7 @@ void ColumnMixed::Verify(const Table& table, size_t col_ndx) const
         if (v == 0 || v & 0x1)
             continue;
         ConstTableRef subtable = m_data->get_subtable_ptr(i)->get_table_ref();
-        TIGHTDB_ASSERT_NEW(subtable->get_parent_row_index(), ==, i);
+        TIGHTDB_ASSERT_3(subtable->get_parent_row_index(), ==, i);
         subtable->Verify();
     }
 }
@@ -427,7 +427,7 @@ void ColumnMixed::do_verify(const Table* table, size_t col_ndx) const
     // types and refs should be in sync
     size_t types_len = m_types->size();
     size_t refs_len  = m_data->size();
-    TIGHTDB_ASSERT_NEW(types_len, ==, refs_len);
+    TIGHTDB_ASSERT_3(types_len, ==, refs_len);
 }
 
 void ColumnMixed::to_dot(ostream& out, StringData title) const

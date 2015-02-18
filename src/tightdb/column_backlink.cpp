@@ -77,16 +77,16 @@ size_t ColumnBackLink::get_backlink_count(size_t row_ndx) const TIGHTDB_NOEXCEPT
 size_t ColumnBackLink::get_backlink(size_t row_ndx, size_t backlink_ndx) const TIGHTDB_NOEXCEPT
 {
     uint64_t value = Column::get_uint(row_ndx);
-    TIGHTDB_ASSERT_NEW(value, !=, 0);
+    TIGHTDB_ASSERT_3(value, !=, 0);
 
     size_t origin_row_ndx;
     if ((value & 1) != 0) {
-        TIGHTDB_ASSERT_NEW(backlink_ndx, ==, 0);
+        TIGHTDB_ASSERT_3(backlink_ndx, ==, 0);
         origin_row_ndx = to_size_t(value >> 1);
     }
     else {
         ref_type ref = to_ref(value);
-        TIGHTDB_ASSERT_NEW(backlink_ndx, <, ColumnBase::get_size_from_ref(ref, get_alloc()));
+        TIGHTDB_ASSERT_3(backlink_ndx, <, ColumnBase::get_size_from_ref(ref, get_alloc()));
         // FIXME: Optimize with direct access (that is, avoid creation of a
         // Column instance, since that implies dynamic allocation).
         Column backlink_list(get_alloc(), ref); // Throws
@@ -100,12 +100,12 @@ size_t ColumnBackLink::get_backlink(size_t row_ndx, size_t backlink_ndx) const T
 void ColumnBackLink::remove_one_backlink(size_t row_ndx, size_t origin_row_ndx)
 {
     uint64_t value = Column::get_uint(row_ndx);
-    TIGHTDB_ASSERT_NEW(value, !=, 0);
+    TIGHTDB_ASSERT_3(value, !=, 0);
 
     // If there is only a single backlink, it can be stored as
     // a tagged value
     if ((value & 1) != 0) {
-        TIGHTDB_ASSERT_NEW(to_size_t(value >> 1), ==, origin_row_ndx);
+        TIGHTDB_ASSERT_3(to_size_t(value >> 1), ==, origin_row_ndx);
         Column::set(row_ndx, 0);
         return;
     }
@@ -117,7 +117,7 @@ void ColumnBackLink::remove_one_backlink(size_t row_ndx, size_t origin_row_ndx)
     backlink_list.set_parent(this, row_ndx);
     int_fast64_t value_2 = int_fast64_t(origin_row_ndx);
     size_t backlink_ndx = backlink_list.find_first(value_2);
-    TIGHTDB_ASSERT_NEW(backlink_ndx, !=, not_found);
+    TIGHTDB_ASSERT_3(backlink_ndx, !=, not_found);
     size_t num_links = backlink_list.size();
     bool is_last = backlink_ndx + 1 == num_links;
     backlink_list.erase(backlink_ndx, is_last);
@@ -154,10 +154,10 @@ void ColumnBackLink::update_backlink(size_t row_ndx, size_t old_origin_row_ndx,
                                      size_t new_origin_row_ndx)
 {
     uint64_t value = Column::get_uint(row_ndx);
-    TIGHTDB_ASSERT_NEW(value, !=, 0);
+    TIGHTDB_ASSERT_3(value, !=, 0);
 
     if ((value & 1) != 0) {
-        TIGHTDB_ASSERT_NEW(to_size_t(value >> 1), ==, old_origin_row_ndx);
+        TIGHTDB_ASSERT_3(to_size_t(value >> 1), ==, old_origin_row_ndx);
         uint64_t value_2 = new_origin_row_ndx << 1 | 1;
         Column::set_uint(row_ndx, value_2);
         return;
@@ -169,7 +169,7 @@ void ColumnBackLink::update_backlink(size_t row_ndx, size_t old_origin_row_ndx,
     backlink_list.set_parent(this, row_ndx);
     int_fast64_t value_2 = int_fast64_t(old_origin_row_ndx);
     size_t backlink_ndx = backlink_list.find_first(value_2);
-    TIGHTDB_ASSERT_NEW(backlink_ndx, !=, not_found);
+    TIGHTDB_ASSERT_3(backlink_ndx, !=, not_found);
     int_fast64_t value_3 = int_fast64_t(new_origin_row_ndx);
     backlink_list.set(backlink_ndx, value_3);
 }
@@ -317,7 +317,7 @@ void ColumnBackLink::Verify(const Table& table, size_t col_ndx) const
     size_t origin_table_ndx = m_origin_table->get_index_in_group();
     typedef _impl::TableFriend tf;
     const Spec& spec = tf::get_spec(table);
-    TIGHTDB_ASSERT_NEW(origin_table_ndx, ==, spec.get_opposite_link_table_ndx(col_ndx));
+    TIGHTDB_ASSERT_3(origin_table_ndx, ==, spec.get_opposite_link_table_ndx(col_ndx));
 }
 
 

@@ -32,7 +32,7 @@ void ArrayStringLong::add(StringData value)
 
 void ArrayStringLong::set(size_t ndx, StringData value)
 {
-    TIGHTDB_ASSERT_NEW(ndx, <, m_offsets.size());
+    TIGHTDB_ASSERT_3(ndx, <, m_offsets.size());
 
     size_t begin = 0 < ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
     size_t end   = to_size_t(m_offsets.get(ndx));
@@ -46,7 +46,7 @@ void ArrayStringLong::set(size_t ndx, StringData value)
 
 void ArrayStringLong::insert(size_t ndx, StringData value)
 {
-    TIGHTDB_ASSERT_NEW(ndx, <=, m_offsets.size());
+    TIGHTDB_ASSERT_3(ndx, <=, m_offsets.size());
 
     size_t pos = 0 < ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
     bool add_zero_term = true;
@@ -58,7 +58,7 @@ void ArrayStringLong::insert(size_t ndx, StringData value)
 
 void ArrayStringLong::erase(size_t ndx)
 {
-    TIGHTDB_ASSERT_NEW(ndx, <, m_offsets.size());
+    TIGHTDB_ASSERT_3(ndx, <, m_offsets.size());
 
     size_t begin = 0 < ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
     size_t end   = to_size_t(m_offsets.get(ndx));
@@ -150,7 +150,7 @@ StringData ArrayStringLong::get(const char* header, size_t ndx, Allocator& alloc
 ref_type ArrayStringLong::bptree_leaf_insert(size_t ndx, StringData value, TreeInsertBase& state)
 {
     size_t leaf_size = size();
-    TIGHTDB_ASSERT_NEW(leaf_size, <=, TIGHTDB_MAX_BPNODE_SIZE);
+    TIGHTDB_ASSERT_3(leaf_size, <=, TIGHTDB_MAX_BPNODE_SIZE);
     if (leaf_size < ndx)
         ndx = leaf_size;
     if (TIGHTDB_LIKELY(leaf_size < TIGHTDB_MAX_BPNODE_SIZE)) {

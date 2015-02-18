@@ -35,8 +35,8 @@ void ArrayBinary::add(BinaryData value, bool add_zero_term)
 
 void ArrayBinary::set(size_t ndx, BinaryData value, bool add_zero_term)
 {
-    TIGHTDB_ASSERT_NEW(ndx, <, m_offsets.size());
-    TIGHTDB_ASSERT_NEW(value.size(), == 0 ||, value.data());
+    TIGHTDB_ASSERT_3(ndx, <, m_offsets.size());
+    TIGHTDB_ASSERT_3(value.size(), == 0 ||, value.data());
 
     size_t start = ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
     size_t current_end = to_size_t(m_offsets.get(ndx));
@@ -50,8 +50,8 @@ void ArrayBinary::set(size_t ndx, BinaryData value, bool add_zero_term)
 
 void ArrayBinary::insert(size_t ndx, BinaryData value, bool add_zero_term)
 {
-    TIGHTDB_ASSERT_NEW(ndx, <=, m_offsets.size());
-    TIGHTDB_ASSERT_NEW(value.size(), == 0 ||, value.data());
+    TIGHTDB_ASSERT_3(ndx, <=, m_offsets.size());
+    TIGHTDB_ASSERT_3(value.size(), == 0 ||, value.data());
 
     size_t pos = ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
     m_blob.insert(pos, value.data(), value.size(), add_zero_term);
@@ -65,7 +65,7 @@ void ArrayBinary::insert(size_t ndx, BinaryData value, bool add_zero_term)
 
 void ArrayBinary::erase(size_t ndx)
 {
-    TIGHTDB_ASSERT_NEW(ndx, <, m_offsets.size());
+    TIGHTDB_ASSERT_3(ndx, <, m_offsets.size());
 
     size_t start = ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
     size_t end = to_size_t(m_offsets.get(ndx));
@@ -98,7 +98,7 @@ ref_type ArrayBinary::bptree_leaf_insert(size_t ndx, BinaryData value, bool add_
                                          TreeInsertBase& state)
 {
     size_t leaf_size = size();
-    TIGHTDB_ASSERT_NEW(leaf_size, <=, TIGHTDB_MAX_BPNODE_SIZE);
+    TIGHTDB_ASSERT_3(leaf_size, <=, TIGHTDB_MAX_BPNODE_SIZE);
     if (leaf_size < ndx)
         ndx = leaf_size;
     if (TIGHTDB_LIKELY(leaf_size < TIGHTDB_MAX_BPNODE_SIZE)) {
