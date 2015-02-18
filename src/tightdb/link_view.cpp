@@ -35,7 +35,7 @@ void LinkView::insert(size_t link_ndx, size_t target_row_ndx)
     TIGHTDB_ASSERT(is_attached());
     TIGHTDB_ASSERT(m_row_indexes.is_attached() || link_ndx == 0);
     TIGHTDB_ASSERT(!m_row_indexes.is_attached() || link_ndx <= m_row_indexes.size());
-    TIGHTDB_ASSERT(target_row_ndx < m_origin_column.get_target_table().size());
+    TIGHTDB_ASSERT_NEW(target_row_ndx, <, m_origin_column.get_target_table().size());
     typedef _impl::TableFriend tf;
     tf::bump_version(*m_origin_table);
 
@@ -43,7 +43,7 @@ void LinkView::insert(size_t link_ndx, size_t target_row_ndx)
 
     // if there are no links yet, we have to create list
     if (!m_row_indexes.is_attached()) {
-        TIGHTDB_ASSERT(link_ndx == 0);
+        TIGHTDB_ASSERT_NEW(link_ndx, ==, 0);
         ref_type ref = Column::create(m_origin_column.get_alloc()); // Throws
         m_origin_column.set_row_ref(origin_row_ndx, ref); // Throws
         m_row_indexes.get_root_array()->init_from_parent(); // re-attach
@@ -63,7 +63,7 @@ void LinkView::set(size_t link_ndx, size_t target_row_ndx)
 {
     TIGHTDB_ASSERT(is_attached());
     TIGHTDB_ASSERT(m_row_indexes.is_attached() && link_ndx < m_row_indexes.size());
-    TIGHTDB_ASSERT(target_row_ndx < m_origin_column.get_target_table().size());
+    TIGHTDB_ASSERT_NEW(target_row_ndx, <, m_origin_column.get_target_table().size());
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     if (Replication* repl = get_repl())
@@ -109,8 +109,8 @@ void LinkView::move(size_t old_link_ndx, size_t new_link_ndx)
 {
     TIGHTDB_ASSERT(is_attached());
     TIGHTDB_ASSERT(m_row_indexes.is_attached());
-    TIGHTDB_ASSERT(old_link_ndx < m_row_indexes.size());
-    TIGHTDB_ASSERT(new_link_ndx <= m_row_indexes.size());
+    TIGHTDB_ASSERT_NEW(old_link_ndx, <, m_row_indexes.size());
+    TIGHTDB_ASSERT_NEW(new_link_ndx, <=, m_row_indexes.size());
 
     if (old_link_ndx == new_link_ndx)
         return;
@@ -330,7 +330,7 @@ void LinkView::do_nullify_link(size_t old_target_row_ndx)
     TIGHTDB_ASSERT(m_row_indexes.is_attached());
 
     size_t pos = m_row_indexes.find_first(old_target_row_ndx);
-    TIGHTDB_ASSERT(pos != tightdb::not_found);
+    TIGHTDB_ASSERT_NEW(pos, !=, tightdb::not_found);
 
     bool is_last = (pos + 1 == m_row_indexes.size());
     m_row_indexes.erase(pos, is_last);
@@ -348,7 +348,7 @@ void LinkView::do_update_link(size_t old_target_row_ndx, size_t new_target_row_n
     TIGHTDB_ASSERT(m_row_indexes.is_attached());
 
     size_t pos = m_row_indexes.find_first(old_target_row_ndx);
-    TIGHTDB_ASSERT(pos != tightdb::not_found);
+    TIGHTDB_ASSERT_NEW(pos, !=, tightdb::not_found);
 
     m_row_indexes.set(pos, new_target_row_ndx);
 }
@@ -372,9 +372,9 @@ void LinkView::Verify(size_t row_ndx) const
     // Only called for attached lists
     TIGHTDB_ASSERT(is_attached());
 
-    TIGHTDB_ASSERT(m_row_indexes.get_root_array()->get_ndx_in_parent() == row_ndx);
+    TIGHTDB_ASSERT_NEW(m_row_indexes.get_root_array()->get_ndx_in_parent(), ==, row_ndx);
     bool not_degenerate = m_row_indexes.get_root_array()->get_ref_from_parent() != 0;
-    TIGHTDB_ASSERT(not_degenerate == m_row_indexes.is_attached());
+    TIGHTDB_ASSERT_NEW(not_degenerate, ==, m_row_indexes.is_attached());
     if (m_row_indexes.is_attached())
         m_row_indexes.Verify();
 }

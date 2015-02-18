@@ -24,27 +24,30 @@
 #include <tightdb/util/terminate.hpp>
 #include <tightdb/version.hpp>
 
+#define TIGHTDB_ASSERT_RELEASE(condition) \
+    ((condition) ? static_cast<void>(0) : \
+    tightdb::util::terminate(TIGHTDB_VER_CHUNK " Assertion failed: " #condition, __FILE__, __LINE__))
+
 #if defined(TIGHTDB_ENABLE_ASSERTIONS) || defined(TIGHTDB_DEBUG)
-#  define TIGHTDB_ASSERT(condition) \
-    ((condition) ? static_cast<void>(0) :                               \
-     tightdb::util::terminate(TIGHTDB_VER_CHUNK " Assertion failed: " #condition, __FILE__, __LINE__))
+#  define TIGHTDB_ASSERT(condition) TIGHTDB_ASSERT_RELEASE(condition)
 #else
 #  define TIGHTDB_ASSERT(condition) static_cast<void>(0)
 #endif
 
 #ifdef TIGHTDB_DEBUG
-#  define TIGHTDB_ASSERT_DEBUG(condition) \
-    ((condition) ? static_cast<void>(0) :                               \
-     tightdb::util::terminate(TIGHTDB_VER_CHUNK " Assertion failed: " #condition, __FILE__, __LINE__))
+#  define TIGHTDB_ASSERT_DEBUG(condition) TIGHTDB_ASSERT_RELEASE(condition)
 #else
 #  define TIGHTDB_ASSERT_DEBUG(condition) static_cast<void>(0)
 #endif
 
-
-#define TIGHTDB_ASSERT_RELEASE(condition) \
-    ((condition) ? static_cast<void>(0) : \
-    tightdb::util::terminate(TIGHTDB_VER_CHUNK " Assertion failed: " #condition, __FILE__, __LINE__))
-
+#if defined(TIGHTDB_ENABLE_ASSERTIONS) || defined(TIGHTDB_DEBUG)
+#  define TIGHTDB_ASSERT_NEW(left, condition, right) \
+    ((left condition right) ? static_cast<void>(0) : \
+        tightdb::util::terminate(TIGHTDB_VER_CHUNK " Assertion failed: " #left #condition #right, \
+                                 __FILE__, __LINE__, true, (uint64_t)left, (uint64_t)right))
+#else
+#  define TIGHTDB_ASSERT(condition) static_cast<void>(0)
+#endif
 
 #ifdef TIGHTDB_HAVE_CXX11_STATIC_ASSERT
 #  define TIGHTDB_STATIC_ASSERT(condition, message) static_assert(condition, message)

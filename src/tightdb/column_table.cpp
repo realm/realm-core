@@ -46,7 +46,7 @@ void ColumnSubtableParent::Verify(const Table& table, size_t col_ndx) const
     Column::Verify(table, col_ndx);
 
     TIGHTDB_ASSERT(m_table == &table);
-    TIGHTDB_ASSERT(m_column_ndx == col_ndx);
+    TIGHTDB_ASSERT_NEW(m_column_ndx, ==, col_ndx);
 }
 
 #endif
@@ -54,7 +54,7 @@ void ColumnSubtableParent::Verify(const Table& table, size_t col_ndx) const
 
 Table* ColumnSubtableParent::get_subtable_ptr(size_t subtable_ndx)
 {
-    TIGHTDB_ASSERT(subtable_ndx < size());
+    TIGHTDB_ASSERT_NEW(subtable_ndx, <, size());
     if (Table* subtable = m_subtable_map.find(subtable_ndx))
         return subtable;
 
@@ -77,7 +77,7 @@ Table* ColumnSubtableParent::get_subtable_ptr(size_t subtable_ndx)
 
 Table* ColumnTable::get_subtable_ptr(size_t subtable_ndx)
 {
-    TIGHTDB_ASSERT(subtable_ndx < size());
+    TIGHTDB_ASSERT_NEW(subtable_ndx, <, size());
     if (Table* subtable = m_subtable_map.find(subtable_ndx))
         return subtable;
 
@@ -264,7 +264,7 @@ pair<ref_type, size_t> ColumnSubtableParent::get_to_dot_parent(size_t ndx_in_par
 
 size_t ColumnTable::get_subtable_size(size_t ndx) const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(ndx < size());
+    TIGHTDB_ASSERT_NEW(ndx, <, size());
 
     ref_type columns_ref = get_as_ref(ndx);
     if (columns_ref == 0)
@@ -299,7 +299,7 @@ void ColumnTable::insert(size_t row_ndx, const Table* subtable)
         columns_ref = clone_table_columns(subtable); // Throws
 
     std::size_t size = this->size(); // Slow
-    TIGHTDB_ASSERT(row_ndx <= size);
+    TIGHTDB_ASSERT_NEW(row_ndx, <=, size);
     std::size_t row_ndx_2 = row_ndx == size ? tightdb::npos : row_ndx;
     int_fast64_t value = int_fast64_t(columns_ref);
     std::size_t num_rows = 1;
@@ -309,7 +309,7 @@ void ColumnTable::insert(size_t row_ndx, const Table* subtable)
 
 void ColumnTable::set(size_t row_ndx, const Table* subtable)
 {
-    TIGHTDB_ASSERT(row_ndx < size());
+    TIGHTDB_ASSERT_NEW(row_ndx, <, size());
     destroy_subtable(row_ndx);
 
     ref_type columns_ref = 0;
@@ -334,7 +334,7 @@ void ColumnTable::set(size_t row_ndx, const Table* subtable)
 
 void ColumnTable::erase(size_t row_ndx, bool is_last)
 {
-    TIGHTDB_ASSERT(row_ndx < size());
+    TIGHTDB_ASSERT_NEW(row_ndx, <, size());
     destroy_subtable(row_ndx);
     ColumnSubtableParent::erase(row_ndx, is_last); // Throws
 }
@@ -343,8 +343,8 @@ void ColumnTable::erase(size_t row_ndx, bool is_last)
 void ColumnTable::move_last_over(size_t row_ndx, size_t last_row_ndx,
                                  bool broken_reciprocal_backlinks)
 {
-    TIGHTDB_ASSERT(row_ndx <= last_row_ndx);
-    TIGHTDB_ASSERT(last_row_ndx + 1 == size());
+    TIGHTDB_ASSERT_NEW(row_ndx, <=, last_row_ndx);
+    TIGHTDB_ASSERT_NEW(last_row_ndx + 1, ==, size());
     destroy_subtable(row_ndx);
     ColumnSubtableParent::move_last_over(row_ndx, last_row_ndx,
                                          broken_reciprocal_backlinks); // Throws
@@ -397,8 +397,8 @@ void ColumnTable::Verify(const Table& table, size_t col_ndx) const
         // We want to verify any cached table accessors so we do not
         // want to skip null refs here.
         ConstTableRef subtable = get_subtable_ptr(i)->get_table_ref();
-        TIGHTDB_ASSERT(tf::get_spec(*subtable).get_ndx_in_parent() == subspec_ndx);
-        TIGHTDB_ASSERT(subtable->get_parent_row_index() == i);
+        TIGHTDB_ASSERT_NEW(tf::get_spec(*subtable).get_ndx_in_parent(), ==, subspec_ndx);
+        TIGHTDB_ASSERT_NEW(subtable->get_parent_row_index(), ==, i);
         subtable->Verify();
     }
 }
