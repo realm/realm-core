@@ -3,6 +3,7 @@
 ### Bugfixes:
 
 * Fixed out-of-bounds reads when using aggregate functions on sorted TableViews.
+* Fixed issues with ArrayString that *could* be the cause of all the asserts the past few days
 
 ### API breaking changes:
 
