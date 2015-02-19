@@ -160,7 +160,7 @@ void send_reply(const RaiseStateIdentityRequest<CodeType>& request, kern_return_
     bzero(&reply, sizeof reply);
 
     mach_msg_size_t state_size = request.state.old_stateCnt * sizeof request.state.old_state[0];
-    TIGHTDB_ASSERT(sizeof(reply.new_state) >= state_size);
+    TIGHTDB_ASSERT_3(sizeof(reply.new_state), >=, state_size);
 
     reply.Head.msgh_bits = MACH_MSGH_BITS(MACH_MSGH_BITS_REMOTE(request.head.msgh_bits), 0);
     reply.Head.msgh_remote_port = request.head.msgh_remote_port;
@@ -189,7 +189,7 @@ void copy_state(ForwardType<ForwardCodeType>& forward,
                 typename ForwardType<ForwardCodeType>::has_state = 0)
 {
     mach_msg_size_t state_size = request.state.old_stateCnt * sizeof request.state.old_state[0];
-    TIGHTDB_ASSERT(sizeof(forward.state.old_state) >= state_size);
+    TIGHTDB_ASSERT_3(sizeof(forward.state.old_state), >=, state_size);
 
     forward.state.flavor = old_flavor;
     if (old_flavor == request.state.flavor) {
@@ -355,8 +355,8 @@ void install_handler()
                                    &old_behavior,
                                    &old_flavor);
     check_error(kr);
-    TIGHTDB_ASSERT(old_mask == EXC_MASK_BAD_ACCESS);
-    TIGHTDB_ASSERT(old_count == 1);
+    TIGHTDB_ASSERT_3(old_mask, ==, EXC_MASK_BAD_ACCESS);
+    TIGHTDB_ASSERT_3(old_count, ==, 1);
 
     new Thread(exception_handler_loop);
 }
