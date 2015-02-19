@@ -181,6 +181,20 @@ public:
         return static_cast<const Tab&>(Base::m_impl.get_parent());
     }
 
+
+public:
+    class Handover {
+        TableView m_impl;
+        std::size_t m_table_num;
+        Handover(TableView& tbv) : m_impl(tbv) { m_table_num = tbv.m_table->get_index_in_group(); tbv.detach(); }
+        Handover() {}
+        friend class SharedGroup;
+    };
+    Handover export_for_handover() {
+        Handover h(*this);
+        return h;
+    }
+    BasicTableView(Handover& handover, Group& group) : Base(move(handover.m_impl.restore(group))) {}
 private:
     BasicTableView(BasicTableView* tv): Base(move(tv->m_impl)) {}
     BasicTableView(TableView tv): Base(move(tv)) {}

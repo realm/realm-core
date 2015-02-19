@@ -6896,6 +6896,7 @@ TEST(LangBindHelper_Handover)
     UniquePtr<Replication> repl_w(makeWriteLogCollector(path, false, crypt_key()));
     SharedGroup sg_w(*repl_w, SharedGroup::durability_Full, crypt_key());
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
+    SharedGroup::Handover<TestTableInts::View> handover;
     SharedGroup::VersionID vid;
     {
         LangBindHelper::promote_to_write(sg_w);
@@ -6904,10 +6905,12 @@ TEST(LangBindHelper_Handover)
             table->add(i);
         LangBindHelper::commit_and_continue_as_read(sg_w);
         vid = sg_w.get_version_of_current_transaction();
+        TestTableInts::View tv = table->where().find_all();
+        handover = sg_w.export_for_handover(tv);
     }
     {
         LangBindHelper::advance_read(sg,vid);
-
+        TestTableInts::View tv = sg.import_from_handover(handover);
     }
 }
 
