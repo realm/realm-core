@@ -2,7 +2,7 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
+* Fixed crash when std::exit() is called with active encrypted mappings.
 
 ### API breaking changes:
 
@@ -16,7 +16,7 @@
 
 ### Internals:
 
-* Lorem ipsum.
+* Switched to using mach exceptions rather than signal() for encrypted mappings on Apple platforms.
 
 ----------------------------------------------
 
