@@ -10,7 +10,7 @@
 #include "crypt_key.hpp"
 
 #if !defined(TIGHTDB_ANDROID) && !defined(TIGHTDB_IOS) && !defined(_WIN32)
-#include <unistd.h>
+#   include <unistd.h>
 #endif
 
 using namespace std;

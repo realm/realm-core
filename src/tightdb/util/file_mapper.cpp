@@ -42,8 +42,8 @@
 #include <tightdb/util/thread.hpp>
 
 #ifdef __APPLE__
-#include <mach/mach.h>
-#include <mach/exc.h>
+#   include <mach/mach.h>
+#   include <mach/exc.h>
 #endif
 
 using namespace tightdb;
@@ -69,7 +69,7 @@ typedef int32_t NativeCodeType;
 // 32-bit handler
 
 #ifdef  __MigPackStructs
-#pragma pack(4)
+#   pragma pack(4)
 #endif
 
 template<typename CodeType>
@@ -122,7 +122,7 @@ struct RaiseStateIdentityRequest {
 };
 
 #ifdef  __MigPackStructs
-#pragma pack()
+#   pragma pack()
 #endif
 
 enum MachExceptionMessageID {
@@ -315,7 +315,8 @@ void handle_exception()
     }
 }
 
-void exception_handler_loop() {
+void exception_handler_loop()
+{
     while (true)
         handle_exception();
 }
