@@ -790,12 +790,14 @@ TEST(StringIndex_Zero_Crash2)
             if (action > 48 && table.size() < 10) {
                 // Generate string with equal probability of being empty, null, short, medium and long, and with 
                 // their contents having equal proability of being either random or a duplicate of a previous 
-                // string. When it's random, each char must have equal probability of being 0 or non-0
-                char* buf1 = "This string is around 90 bytes long, which falls in the long-string type of Realm strings";
+                // string. When it's random, each char must have equal probability of being 0 or non-0e
+                char buf[] = "This string is around 90 bytes long, which falls in the long-string type of Realm strings";
+                char* buf1 = static_cast<char*>(malloc(sizeof(buf)));
+                memcpy(buf1, buf, sizeof(buf));
                 char buf2[] = "                                                                                         ";
                 StringData sd;
 
-                int len = random.draw_int_max<int>(3);
+                size_t len = random.draw_int_max<size_t>(3);
                 if (len == 0)
                     len = 0;
                 else if (len == 1)
@@ -803,7 +805,7 @@ TEST(StringIndex_Zero_Crash2)
                 else if (len == 2)
                     len = 27;
                 else
-                    len = random.draw_int_max<int>(90);
+                    len = random.draw_int_max<size_t>(90);
 
                 if (random.draw_int_max<int>(1) == 0) {
                     // duplicate string
