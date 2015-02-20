@@ -5783,8 +5783,9 @@ TEST(Query_Nulls_Fuzzy)
                     // Generate string with equal probability of being empty, null, short, medium and long, and with 
                     // their contents having equal proability of being either random or a duplicate of a previous 
                     // string. When it's random, each char must have equal probability of being 0 or non-0
-
-                    char* buf1 = "This string is around 90 bytes long, which falls in the long-string type of Realm strings";
+                    char buf[] = "This string is around 90 bytes long, which falls in the long-string type of Realm strings";
+                    char* buf1 = static_cast<char*>(malloc(sizeof(buf)));
+                    memcpy(buf1, buf, sizeof(buf));
                     char buf2[] = "                                                                                         ";
 
                     StringData sd;
