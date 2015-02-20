@@ -5791,7 +5791,7 @@ TEST(Query_Nulls_Fuzzy)
                     StringData sd;
                     string st;
 
-                    if (false && fastrand(1) == 0) {
+                    if (fastrand(1) == 0) {
                         // null string
                         sd = tightdb::null();
                         st = "null";
