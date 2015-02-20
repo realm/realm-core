@@ -273,11 +273,14 @@ int fast_popcount64(int64_t x)
     return fast_popcount32(static_cast<int32_t>(x)) + fast_popcount32(static_cast<int32_t>(x >> 32));
 }
 
-// A fast, mediocre-quality random number generator named Xorshift. Thread safe.
+// A fast, thread safe, mediocre-quality random number generator named Xorshift
 uint64_t fastrand(uint64_t max) {
+    // All the atomics (except the add) may be eliminated completely by the compiler on x64
     static util::Atomic<uint64_t> state(1);
-    state.fetch_add_release(1); // Prevent two threads from producing the same value if called at the exact same time
+    // Thread safe increment to prevent two threads from producing the same value if called at the exact same time
+    state.fetch_add_release(1); 
     uint64_t x = state.load_acquire();
+    // The result of this arithmetic may be overwritten by another thread, but that's fine in a rand generator
     x ^= x >> 12; // a
     x ^= x << 25; // b
     x ^= x >> 27; // c
