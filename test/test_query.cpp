@@ -5798,7 +5798,7 @@ TEST(Query_Nulls_Fuzzy)
                     }
                     else {
                         // non-null string
-                        int len = fastrand(3);
+                        size_t len = fastrand(3);
                         if (len == 0)
                             len = 0;
                         else if (len == 1)
