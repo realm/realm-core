@@ -216,12 +216,15 @@ protected:
     void reattach(Table*, std::size_t row_ndx) TIGHTDB_NOEXCEPT;
     void impl_detach() TIGHTDB_NOEXCEPT;
 
+    void prepare_for_export(std::size_t& table_num);
+    void prepare_for_import(TableRef table);
 private:
     RowBase* m_prev; // Null if first, undefined if detached.
     RowBase* m_next; // Null if last, undefined if detached.
 
     // Table needs to be able to modify m_table and m_row_ndx.
     friend class Table;
+
 };
 
 
@@ -279,6 +282,17 @@ private:
     // Make m_table and m_col_ndx accessible from BasicRow(const BasicRow<U>&)
     // for any U.
     template<class> friend class BasicRow;
+    void prepare_for_export(std::size_t& table_num)
+    {
+        RowBase::prepare_for_export(table_num);
+    }
+    void prepare_for_import(TableRef table)
+    {
+        RowBase::prepare_for_import(table);
+    }
+    friend class SharedGroup;
+
+
 };
 
 typedef BasicRow<Table> Row;

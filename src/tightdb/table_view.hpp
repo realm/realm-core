@@ -343,6 +343,7 @@ protected:
     void prepare_for_import(TableRef tr)
     {
         m_table = tr;
+        m_last_seen_version = tr->m_version;
         tr->register_view(this);
         // FIXME: propagate into base class and members
     }

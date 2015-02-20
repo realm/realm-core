@@ -33,3 +33,16 @@ void RowBase::impl_detach() TIGHTDB_NOEXCEPT
         m_table.reset();
     }
 }
+
+
+void RowBase::prepare_for_export(std::size_t& table_num)
+{
+    table_num = m_table->get_index_in_group();
+}
+
+
+void RowBase::prepare_for_import(TableRef table)
+{
+    attach(table.get(), m_row_ndx);
+}
+

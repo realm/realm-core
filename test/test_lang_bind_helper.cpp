@@ -6929,6 +6929,7 @@ TEST(LangBindHelper_Handover)
 
     // Untyped interface
     SharedGroup::Handover<TableView> handover2;
+    SharedGroup::Handover<Row> handover_row;
     {
         LangBindHelper::promote_to_write(sg_w);
         TableRef table = group_w.add_table("table2");
@@ -6946,14 +6947,23 @@ TEST(LangBindHelper_Handover)
             CHECK_EQUAL(i, tv.get_int(0,i));
         handover2 = sg_w.export_for_handover(tv);
         CHECK(!tv.is_attached());
+        // Aaaaand rows!
+        Row row = (*table)[7];
+        CHECK_EQUAL(7, row.get_int(0));
+        handover_row = sg_w.export_for_handover(row);
+        CHECK(row.is_attached());
     }
     {
         LangBindHelper::advance_read(sg,vid);
         TableView tv = sg.import_from_handover(handover2);
+        CHECK(tv.is_in_sync());
         CHECK(tv.is_attached());
         CHECK_EQUAL(100, tv.size());
         for (int i = 0; i<100; ++i)
             CHECK_EQUAL(i, tv.get_int(0,i));
+
+        Row row = sg.import_from_handover(handover_row);
+        CHECK_EQUAL(7, row.get_int(0));
     }
 }
 
