@@ -825,7 +825,7 @@ inline void Column::add(int_fast64_t value)
 inline void Column::insert(std::size_t row_ndx, int_fast64_t value)
 {
     std::size_t size = this->size(); // Slow
-    TIGHTDB_ASSERT(row_ndx <= size);
+    TIGHTDB_ASSERT_3(row_ndx, <=, size);
     std::size_t row_ndx_2 = row_ndx == size ? tightdb::npos : row_ndx;
     std::size_t num_rows = 1;
     do_insert(row_ndx_2, value, num_rows); // Throws

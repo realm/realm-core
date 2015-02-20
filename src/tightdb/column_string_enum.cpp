@@ -66,7 +66,7 @@ bool ColumnStringEnum::is_nullable() const
 
 void ColumnStringEnum::set(size_t ndx, StringData value)
 {
-    TIGHTDB_ASSERT(ndx < Column::size());
+    TIGHTDB_ASSERT_3(ndx, <, Column::size());
 
     // Update search index
     // (it is important here that we do it before actually setting
@@ -109,7 +109,7 @@ void ColumnStringEnum::do_insert(size_t row_ndx, StringData value, size_t num_ro
 
 void ColumnStringEnum::do_erase(size_t ndx, bool is_last)
 {
-    TIGHTDB_ASSERT(ndx < Column::size());
+    TIGHTDB_ASSERT_3(ndx, <, Column::size());
 
     // Update search index
     // (it is important here that we do it before actually setting
@@ -124,8 +124,8 @@ void ColumnStringEnum::do_erase(size_t ndx, bool is_last)
 
 void ColumnStringEnum::do_move_last_over(size_t row_ndx, size_t last_row_ndx)
 {
-    TIGHTDB_ASSERT(row_ndx <= last_row_ndx);
-    TIGHTDB_ASSERT(last_row_ndx + 1 == size());
+    TIGHTDB_ASSERT_3(row_ndx, <=, last_row_ndx);
+    TIGHTDB_ASSERT_3(last_row_ndx + 1, ==, size());
 
     if (m_search_index) {
         // remove the value to be overwritten from index
@@ -340,15 +340,15 @@ void ColumnStringEnum::Verify(const Table& table, size_t col_ndx) const
 {
     typedef _impl::TableFriend tf;
     const Spec& spec = tf::get_spec(table);
-    TIGHTDB_ASSERT(m_keys.get_root_array()->get_ndx_in_parent() == spec.get_enumkeys_ndx(col_ndx));
+    TIGHTDB_ASSERT_3(m_keys.get_root_array()->get_ndx_in_parent(), ==, spec.get_enumkeys_ndx(col_ndx));
 
     Column::Verify(table, col_ndx);
 
     ColumnAttr attr = spec.get_column_attr(col_ndx);
     bool has_search_index = (attr & col_attr_Indexed) != 0;
-    TIGHTDB_ASSERT(has_search_index == bool(m_search_index));
+    TIGHTDB_ASSERT_3(has_search_index, ==, bool(m_search_index));
     if (has_search_index) {
-        TIGHTDB_ASSERT(m_search_index->get_root_array()->get_ndx_in_parent() ==
+        TIGHTDB_ASSERT_3(m_search_index->get_root_array()->get_ndx_in_parent(), ==,
                        m_array->get_ndx_in_parent() + 1);
     }
 }

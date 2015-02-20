@@ -388,7 +388,7 @@ public:
             ArrayString leaf(get_alloc(), m_nullable);
             leaf.init_from_mem(leaf_mem);
             leaf.set_parent(parent, leaf_ndx_in_parent);
-            TIGHTDB_ASSERT(leaf.size() >= 1);
+            TIGHTDB_ASSERT_3(leaf.size(), >=, 1);
             size_t last_ndx = leaf.size() - 1;
             if (last_ndx == 0)
                 return true;
@@ -404,7 +404,7 @@ public:
             ArrayStringLong leaf(get_alloc(), m_nullable);
             leaf.init_from_mem(leaf_mem);
             leaf.set_parent(parent, leaf_ndx_in_parent);
-            TIGHTDB_ASSERT(leaf.size() >= 1);
+            TIGHTDB_ASSERT_3(leaf.size(), >=, 1);
             size_t last_ndx = leaf.size() - 1;
             if (last_ndx == 0)
                 return true;
@@ -418,7 +418,7 @@ public:
         ArrayBigBlobs leaf(get_alloc(), m_nullable);
         leaf.init_from_mem(leaf_mem);
         leaf.set_parent(parent, leaf_ndx_in_parent);
-        TIGHTDB_ASSERT(leaf.size() >= 1);
+        TIGHTDB_ASSERT_3(leaf.size(), >=, 1);
         size_t last_ndx = leaf.size() - 1;
         if (last_ndx == 0)
             return true;
@@ -473,8 +473,8 @@ private:
 
 void AdaptiveStringColumn::do_erase(size_t ndx, bool is_last)
 {
-    TIGHTDB_ASSERT(ndx < size());
-    TIGHTDB_ASSERT(is_last == (ndx == size()-1));
+    TIGHTDB_ASSERT_3(ndx, <, size());
+    TIGHTDB_ASSERT_3(is_last, ==, (ndx == size() - 1));
 
     // Update search index
     // (it is important here that we do it before actually setting
@@ -515,8 +515,8 @@ void AdaptiveStringColumn::do_erase(size_t ndx, bool is_last)
 
 void AdaptiveStringColumn::do_move_last_over(size_t row_ndx, size_t last_row_ndx)
 {
-    TIGHTDB_ASSERT(row_ndx <= last_row_ndx);
-    TIGHTDB_ASSERT(last_row_ndx + 1 == size());
+    TIGHTDB_ASSERT_3(row_ndx, <=, last_row_ndx);
+    TIGHTDB_ASSERT_3(last_row_ndx + 1, ==, size());
 
     // FIXME: ExceptionSafety: The current implementation of this
     // function is not exception-safe, and it is hard to see how to
@@ -660,7 +660,7 @@ size_t AdaptiveStringColumn::count(StringData value) const
     while (begin < end) {
         pair<MemRef, size_t> p = m_array->get_bptree_leaf(begin);
         MemRef leaf_mem = p.first;
-        TIGHTDB_ASSERT(p.second == 0);
+        TIGHTDB_ASSERT_3(p.second, ==, 0);
         bool long_strings = Array::get_hasrefs_from_header(leaf_mem.m_addr);
         if (!long_strings) {
             // Small strings
@@ -694,7 +694,7 @@ size_t AdaptiveStringColumn::count(StringData value) const
 
 size_t AdaptiveStringColumn::find_first(StringData value, size_t begin, size_t end) const
 {
-    TIGHTDB_ASSERT(begin <= size());
+    TIGHTDB_ASSERT_3(begin, <=, size());
     TIGHTDB_ASSERT(end == npos || (begin <= end && end <= size()));
 
     if (m_search_index && begin == 0 && end == npos)
@@ -776,7 +776,7 @@ size_t AdaptiveStringColumn::find_first(StringData value, size_t begin, size_t e
 
 void AdaptiveStringColumn::find_all(Column& result, StringData value, size_t begin, size_t end) const
 {
-    TIGHTDB_ASSERT(begin <= size());
+    TIGHTDB_ASSERT_3(begin, <=, size());
     TIGHTDB_ASSERT(end == npos || (begin <= end && end <= size()));
 
     if (m_search_index && begin == 0 && end == npos) {
@@ -963,7 +963,7 @@ bool AdaptiveStringColumn::auto_enumerate(ref_type& keys_ref, ref_type& values_r
     for (size_t i = 0; i != n; ++i) {
         StringData v = get(i);
         size_t pos = keys.lower_bound_string(v);
-        TIGHTDB_ASSERT(pos != keys.size());
+        TIGHTDB_ASSERT_3(pos, !=, keys.size());
         values.add(pos); // Throws
     }
 
@@ -1181,7 +1181,7 @@ AdaptiveStringColumn::LeafType
 AdaptiveStringColumn::GetBlock(size_t ndx, ArrayParent** ap, size_t& off, bool use_retval) const
 {
     static_cast<void>(use_retval);
-    TIGHTDB_ASSERT(use_retval == false); // retval optimization not supported. See Array on how to implement
+    TIGHTDB_ASSERT_3(use_retval, ==, false); // retval optimization not supported. See Array on how to implement
 
     Allocator& alloc = m_array->get_alloc();
     if (root_is_leaf()) {
@@ -1512,7 +1512,7 @@ void AdaptiveStringColumn::Verify(const Table& table, size_t col_ndx) const
     const Spec& spec = tf::get_spec(table);
     ColumnAttr attr = spec.get_column_attr(col_ndx);
     bool has_search_index = (attr & col_attr_Indexed) != 0;
-    TIGHTDB_ASSERT(has_search_index == bool(m_search_index));
+    TIGHTDB_ASSERT_3(has_search_index, ==, bool(m_search_index));
     if (has_search_index) {
         TIGHTDB_ASSERT(m_search_index->get_root_array()->get_ndx_in_parent() ==
                        m_array->get_ndx_in_parent() + 1);

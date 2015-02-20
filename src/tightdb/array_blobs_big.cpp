@@ -30,7 +30,7 @@ void ArrayBigBlobs::add(BinaryData value, bool add_zero_term)
 
 void ArrayBigBlobs::set(std::size_t ndx, BinaryData value, bool add_zero_term)
 {
-    TIGHTDB_ASSERT(ndx < size());
+    TIGHTDB_ASSERT_3(ndx, <, size());
     TIGHTDB_ASSERT(value.size() == 0 || value.data());
 
     ArrayBlob blob(m_alloc);
@@ -65,7 +65,7 @@ void ArrayBigBlobs::set(std::size_t ndx, BinaryData value, bool add_zero_term)
 
 void ArrayBigBlobs::insert(size_t ndx, BinaryData value, bool add_zero_term)
 {
-    TIGHTDB_ASSERT(ndx <= size());
+    TIGHTDB_ASSERT_3(ndx, <=, size());
     TIGHTDB_ASSERT(value.size() == 0 || value.data());
 
     if (value.is_null()) {
@@ -155,7 +155,7 @@ ref_type ArrayBigBlobs::bptree_leaf_insert(size_t ndx, BinaryData value, bool ad
                                            TreeInsertBase& state)
 {
     size_t leaf_size = size();
-    TIGHTDB_ASSERT(leaf_size <= TIGHTDB_MAX_BPNODE_SIZE);
+    TIGHTDB_ASSERT_3(leaf_size, <=, TIGHTDB_MAX_BPNODE_SIZE);
     if (leaf_size < ndx)
         ndx = leaf_size;
     if (TIGHTDB_LIKELY(leaf_size < TIGHTDB_MAX_BPNODE_SIZE)) {

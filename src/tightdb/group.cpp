@@ -130,10 +130,10 @@ void Group::init_from_ref(ref_type top_ref) TIGHTDB_NOEXCEPT
 {
     m_top.init_from_ref(top_ref);
     size_t top_size = m_top.size();
-    TIGHTDB_ASSERT(top_size >= 3);
+    TIGHTDB_ASSERT_3(top_size, >=, 3);
 
     // Logical file size must not exceed actual file size
-    TIGHTDB_ASSERT(size_t(m_top.get(2)/2) <= m_alloc.get_baseline());
+    TIGHTDB_ASSERT_3(size_t(m_top.get(2) / 2), <=, m_alloc.get_baseline());
 
     m_table_names.init_from_parent();
     m_tables.init_from_parent();
@@ -145,12 +145,12 @@ void Group::init_from_ref(ref_type top_ref) TIGHTDB_NOEXCEPT
     // tracking, and files that are accessed via a stan-along Group do
     // not need version information for free-space tracking.
     if (top_size > 3) {
-        TIGHTDB_ASSERT(top_size >= 5);
+        TIGHTDB_ASSERT_3(top_size, >=, 5);
         m_free_positions.init_from_parent();
         m_free_lengths.init_from_parent();
 
         if (m_is_shared && top_size > 5) {
-            TIGHTDB_ASSERT(top_size >= 7);
+            TIGHTDB_ASSERT_3(top_size, >= , 7);
             m_free_versions.init_from_parent();
             // Note that the seventh slot is the database version
             // (a.k.a. transaction count,) which is not yet used for
@@ -165,7 +165,7 @@ void Group::reset_free_space_versions()
     TIGHTDB_ASSERT(m_top.is_attached());
     TIGHTDB_ASSERT(m_is_attached);
     if (m_free_versions.is_attached()) {
-        TIGHTDB_ASSERT(m_top.size() == 7);
+        TIGHTDB_ASSERT_3(m_top.size(), ==, 7);
         // If free space tracking is enabled
         // we just have to reset it
         m_free_versions.set_all_to_zero(); // Throws
@@ -185,7 +185,7 @@ void Group::reset_free_space_versions()
         m_top.add(m_free_positions.get_ref()); // Throws
         m_top.add(m_free_lengths.get_ref()); // Throws
     }
-    TIGHTDB_ASSERT(m_top.size() >= 5);
+    TIGHTDB_ASSERT_3(m_top.size(), >=, 5);
 
     // Files that have never been modified via SharedGroup do not
     // have version tracking for the free lists
@@ -205,7 +205,7 @@ void Group::reset_free_space_versions()
         // is set in GroupWriter::write().
         m_top.add(0);
     }
-    TIGHTDB_ASSERT(m_top.size() >= 7);
+    TIGHTDB_ASSERT_3(m_top.size(), >=, 7);
 }
 
 
@@ -350,7 +350,7 @@ size_t Group::create_table(StringData name)
     typedef TableFriend tf;
     ref_type ref = tf::create_empty_table(m_alloc); // Throws
     size_t ndx = m_tables.size();
-    TIGHTDB_ASSERT(ndx == m_table_names.size());
+    TIGHTDB_ASSERT_3(ndx, ==, m_table_names.size());
     m_tables.add(ref); // Throws
     m_table_names.add(name); // Throws
 
@@ -536,7 +536,7 @@ void Group::rename_table(StringData name, StringData new_name, bool require_uniq
 void Group::rename_table(size_t table_ndx, StringData new_name, bool require_unique_name)
 {
     TIGHTDB_ASSERT(is_attached());
-    TIGHTDB_ASSERT(m_tables.size() == m_table_names.size());
+    TIGHTDB_ASSERT_3(m_tables.size(), ==, m_table_names.size());
     if (table_ndx >= m_tables.size())
         throw LogicError(LogicError::table_index_out_of_range);
     if (require_unique_name && has_table(new_name))
@@ -691,7 +691,7 @@ void Group::write(ostream& out, TableWriter& table_writer,
     // Write the top array
     bool recurse = false;
     top.write(out_2, recurse); // Throws
-    TIGHTDB_ASSERT(out_2.get_pos() == final_file_size);
+    TIGHTDB_ASSERT_3(out_2.get_pos(), ==, final_file_size);
 
     top.destroy(); // Shallow
 
@@ -726,9 +726,9 @@ void Group::commit()
     // database files created by Group::write() do not have free-space
     // tracking information.
     if (m_free_positions.is_attached()) {
-        TIGHTDB_ASSERT(m_top.size() >= 5);
+        TIGHTDB_ASSERT_3(m_top.size(), >=, 5);
         if (m_top.size() > 5) {
-            TIGHTDB_ASSERT(m_top.size() >= 7);
+            TIGHTDB_ASSERT_3(m_top.size(), >=, 7);
             // Delete free-list version information and database
             // version (a.k.a. transaction number)
             Array::destroy(m_top.get_as_ref(5), m_top.get_alloc());
@@ -736,7 +736,7 @@ void Group::commit()
         }
     }
     else {
-        TIGHTDB_ASSERT(m_top.size() == 3);
+        TIGHTDB_ASSERT_3(m_top.size(), ==, 3);
         m_free_positions.create(Array::type_Normal);
         m_free_lengths.create(Array::type_Normal);
         m_top.add(m_free_positions.get_ref());
@@ -780,7 +780,7 @@ void Group::update_refs(ref_type top_ref, size_t old_baseline) TIGHTDB_NOEXCEPT
 {
     // After Group::commit() we will always have free space tracking
     // info.
-    TIGHTDB_ASSERT(m_top.size() >= 5);
+    TIGHTDB_ASSERT_3(m_top.size(), >=, 5);
 
     // Array nodes that are part of the previous version of the
     // database will not be overwritten by Group::commit(). This is
@@ -826,7 +826,7 @@ void Group::reattach_from_retained_data()
 
 void Group::init_for_transact(ref_type new_top_ref, size_t new_file_size)
 {
-    TIGHTDB_ASSERT(new_top_ref < new_file_size);
+    TIGHTDB_ASSERT_3(new_top_ref, <, new_file_size);
     TIGHTDB_ASSERT(!is_attached());
 
     if (m_top.is_attached())
@@ -1072,7 +1072,7 @@ public:
 
     bool insert_group_level_table(size_t table_ndx, size_t num_tables, StringData) TIGHTDB_NOEXCEPT
     {
-        TIGHTDB_ASSERT(table_ndx <= num_tables);
+        TIGHTDB_ASSERT_3(table_ndx, <=, num_tables);
         TIGHTDB_ASSERT(m_group.m_table_accessors.empty() ||
                        m_group.m_table_accessors.size() == num_tables);
 
@@ -1094,7 +1094,7 @@ public:
 
     bool erase_group_level_table(size_t table_ndx, size_t num_tables) TIGHTDB_NOEXCEPT
     {
-        TIGHTDB_ASSERT(table_ndx < num_tables);
+        TIGHTDB_ASSERT_3(table_ndx, <, num_tables);
         TIGHTDB_ASSERT(m_group.m_table_accessors.empty() ||
                        m_group.m_table_accessors.size() == num_tables);
 
@@ -1177,7 +1177,7 @@ public:
     {
         if (unordered) {
             // unordered removal of multiple rows is not supported (and not needed) currently.
-            TIGHTDB_ASSERT(num_rows == 1);
+            TIGHTDB_ASSERT_3(num_rows, ==, 1);
             typedef _impl::TableFriend tf;
             if (m_table)
                 tf::adj_acc_move_over(*m_table, tbl_sz, row_ndx);
@@ -2075,11 +2075,11 @@ public:
     }
     void add_immutable(ref_type ref, size_t size)
     {
-        TIGHTDB_ASSERT(ref  % 8 == 0); // 8-byte alignment
-        TIGHTDB_ASSERT(size % 8 == 0); // 8-byte alignment
-        TIGHTDB_ASSERT(size > 0);
-        TIGHTDB_ASSERT(ref >= m_ref_begin);
-        TIGHTDB_ASSERT(size <= m_immutable_ref_end - ref);
+        TIGHTDB_ASSERT_3(ref % 8, ==, 0); // 8-byte alignment
+        TIGHTDB_ASSERT_3(size % 8, ==, 0); // 8-byte alignment
+        TIGHTDB_ASSERT_3(size, >, 0);
+        TIGHTDB_ASSERT_3(ref, >=, m_ref_begin);
+        TIGHTDB_ASSERT_3(size, <=, m_immutable_ref_end - ref);
         Chunk chunk;
         chunk.ref  = ref;
         chunk.size = size;
@@ -2087,11 +2087,11 @@ public:
     }
     void add_mutable(ref_type ref, size_t size)
     {
-        TIGHTDB_ASSERT(ref  % 8 == 0); // 8-byte alignment
-        TIGHTDB_ASSERT(size % 8 == 0); // 8-byte alignment
-        TIGHTDB_ASSERT(size > 0);
-        TIGHTDB_ASSERT(ref >= m_immutable_ref_end);
-        TIGHTDB_ASSERT(size <= m_mutable_ref_end - ref);
+        TIGHTDB_ASSERT_3(ref % 8, ==, 0); // 8-byte alignment
+        TIGHTDB_ASSERT_3(size % 8, ==, 0); // 8-byte alignment
+        TIGHTDB_ASSERT_3(size, >, 0);
+        TIGHTDB_ASSERT_3(ref, >=, m_immutable_ref_end);
+        TIGHTDB_ASSERT_3(size, <=, m_mutable_ref_end - ref);
         Chunk chunk;
         chunk.ref  = ref;
         chunk.size = size;
@@ -2099,10 +2099,10 @@ public:
     }
     void add(ref_type ref, size_t size)
     {
-        TIGHTDB_ASSERT(ref  % 8 == 0); // 8-byte alignment
-        TIGHTDB_ASSERT(size % 8 == 0); // 8-byte alignment
-        TIGHTDB_ASSERT(size > 0);
-        TIGHTDB_ASSERT(ref >= m_ref_begin);
+        TIGHTDB_ASSERT_3(ref % 8, ==, 0); // 8-byte alignment
+        TIGHTDB_ASSERT_3(size % 8, ==, 0); // 8-byte alignment
+        TIGHTDB_ASSERT_3(size, >, 0);
+        TIGHTDB_ASSERT_3(ref, >=, m_ref_begin);
         TIGHTDB_ASSERT(size <= (ref < m_baseline ? m_immutable_ref_end : m_mutable_ref_end) - ref);
         Chunk chunk;
         chunk.ref  = ref;
@@ -2128,7 +2128,7 @@ public:
         if (i_1 != end) {
             while (++i_2 != end) {
                 ref_type prev_ref_end = i_1->ref + i_1->size;
-                TIGHTDB_ASSERT(prev_ref_end <= i_2->ref);
+                TIGHTDB_ASSERT_3(prev_ref_end, <=, i_2->ref);
                 if (i_2->ref == prev_ref_end) {
                     i_1->size += i_2->size; // Merge
                 }
@@ -2145,9 +2145,9 @@ public:
     }
     void check_total_coverage()
     {
-        TIGHTDB_ASSERT(m_chunks.size() == 1);
-        TIGHTDB_ASSERT(m_chunks.front().ref == m_ref_begin);
-        TIGHTDB_ASSERT(m_chunks.front().size == m_mutable_ref_end - m_ref_begin);
+        TIGHTDB_ASSERT_3(m_chunks.size(), ==, 1);
+        TIGHTDB_ASSERT_3(m_chunks.front().ref, ==, m_ref_begin);
+        TIGHTDB_ASSERT_3(m_chunks.front().size, ==, m_mutable_ref_end - m_ref_begin);
     }
 private:
     struct Chunk {
@@ -2175,7 +2175,7 @@ void Group::Verify() const
         size_t n = m_tables.size();
         for (size_t i = 0; i != n; ++i) {
             ConstTableRef table = get_table(i);
-            TIGHTDB_ASSERT(table->get_index_in_group() == i);
+            TIGHTDB_ASSERT_3(table->get_index_in_group(), ==, i);
             table->Verify();
         }
     }
@@ -2196,9 +2196,9 @@ void Group::Verify() const
     MemUsageVerifier mem_usage_2(ref_begin, immutable_ref_end, mutable_ref_end, baseline);
     if (m_free_positions.is_attached()) {
         size_t n = m_free_positions.size();
-        TIGHTDB_ASSERT(n == m_free_lengths.size());
+        TIGHTDB_ASSERT_3(n, ==, m_free_lengths.size());
         if (m_free_versions.is_attached())
-            TIGHTDB_ASSERT(n == m_free_versions.size());
+            TIGHTDB_ASSERT_3(n, ==, m_free_versions.size());
         for (size_t i = 0; i != n; ++i) {
             ref_type ref  = to_ref(m_free_positions.get(i));
             size_t size = to_size_t(m_free_lengths.get(i));
@@ -2240,7 +2240,7 @@ void Group::Verify() const
     // file size, but the physical file size, there is a potential gap of
     // unusable ref-space between the logical file size and the baseline. We
     // need to take that into account here.
-    TIGHTDB_ASSERT(immutable_ref_end <= baseline);
+    TIGHTDB_ASSERT_3(immutable_ref_end, <=, baseline);
     if (immutable_ref_end < baseline) {
         ref_type ref = immutable_ref_end;
         size_t size = baseline - immutable_ref_end;

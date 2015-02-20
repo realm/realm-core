@@ -148,7 +148,7 @@ inline std::size_t ArrayStringLong::size() const TIGHTDB_NOEXCEPT
 
 inline StringData ArrayStringLong::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(ndx < m_offsets.size());
+    TIGHTDB_ASSERT_3(ndx, <, m_offsets.size());
 
     if (m_nullable && m_nulls.get(ndx) == 0)
         return tightdb::null();
@@ -172,7 +172,7 @@ inline StringData ArrayStringLong::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 
 inline void ArrayStringLong::truncate(std::size_t size)
 {
-    TIGHTDB_ASSERT(size < m_offsets.size());
+    TIGHTDB_ASSERT_3(size, <, m_offsets.size());
 
     std::size_t blob_size = size ? to_size_t(m_offsets.get(size-1)) : 0;
 

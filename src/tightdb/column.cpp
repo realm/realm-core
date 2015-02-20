@@ -310,8 +310,8 @@ public:
         size_t size = leaf_info.m_size, pos;
         size_t leaf_begin = leaf_info.m_offset;
         size_t leaf_end   = leaf_begin + size;
-        TIGHTDB_ASSERT(leaf_begin <= m_end);
-        TIGHTDB_ASSERT(leaf_end   >= m_begin);
+        TIGHTDB_ASSERT_3(leaf_begin, <=, m_end);
+        TIGHTDB_ASSERT_3(leaf_end, >=, m_begin);
         bool no_slicing = leaf_begin >= m_begin && leaf_end <= m_end;
         if (no_slicing) {
             m_leaf_cache.init_from_mem(leaf_info.m_mem);
@@ -572,7 +572,7 @@ void Column::set_as_ref(size_t ndx, ref_type ref)
 
 void Column::adjust(size_t ndx, int_fast64_t diff)
 {
-    TIGHTDB_ASSERT(ndx < size());
+    TIGHTDB_ASSERT_3(ndx, <, size());
 
     if (!m_array->is_inner_bptree_node()) {
         m_array->adjust(ndx, diff); // Throws
@@ -784,7 +784,7 @@ void Column::set_search_index_ref(ref_type ref, ArrayParent* parent,
 
 size_t Column::find_first(int64_t value, size_t begin, size_t end) const
 {
-    TIGHTDB_ASSERT(begin <= size());
+    TIGHTDB_ASSERT_3(begin, <=, size());
     TIGHTDB_ASSERT(end == npos || (begin <= end && end <= size()));
 
     if (m_search_index && begin == 0 && end == npos)
@@ -819,7 +819,7 @@ size_t Column::find_first(int64_t value, size_t begin, size_t end) const
 
 void Column::find_all(Column& result, int64_t value, size_t begin, size_t end) const
 {
-    TIGHTDB_ASSERT(begin <= size());
+    TIGHTDB_ASSERT_3(begin, <=, size());
     TIGHTDB_ASSERT(end == npos || (begin <= end && end <= size()));
 
     if (m_search_index && begin == 0 && end == size_t(-1))
@@ -913,7 +913,7 @@ public:
                          size_t elem_ndx_in_leaf) TIGHTDB_OVERRIDE
     {
         m_leaf.init_from_mem(leaf_mem);
-        TIGHTDB_ASSERT(m_leaf.size() >= 1);
+        TIGHTDB_ASSERT_3(m_leaf.size(), >=, 1);
         size_t last_ndx = m_leaf.size() - 1;
         if (last_ndx == 0) {
             m_leaves_have_refs = m_leaf.has_refs();
@@ -970,7 +970,7 @@ void Column::do_erase(size_t ndx, bool is_last)
 
 void Column::do_move_last_over(size_t row_ndx, size_t last_row_ndx)
 {
-    TIGHTDB_ASSERT(row_ndx <= last_row_ndx);
+    TIGHTDB_ASSERT_3(row_ndx, <=, last_row_ndx);
     TIGHTDB_ASSERT_DEBUG(last_row_ndx + 1 == size());
 
     if (m_search_index) {

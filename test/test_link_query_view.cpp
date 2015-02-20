@@ -1204,6 +1204,23 @@ TEST(LinkList_FindNotNullLink)
     CHECK_EQUAL(6, q1.find_all().size());
 }
 
+TEST(Link_FirstResultPastRow1000)
+{
+    Group g;
+
+    TableRef data_table = g.add_table("data_table");
+    TableRef link_table = g.add_table("link_table");
+    link_table->add_column_link(type_Link, "link", *data_table);
+
+    data_table->add_empty_row();
+    link_table->add_empty_row(1001);
+
+    link_table->set_link(0, 1000, 0);
+
+    TableView tv = link_table->where().links_to(0, 0).find_all();
+    CHECK_EQUAL(1, tv.size());
+}
+
 
 // Tests queries on a LinkList
 TEST(LinkList_QueryOnLinkList)

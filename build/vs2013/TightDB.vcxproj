@@ -1100,6 +1100,7 @@
     <ClInclude Include="..\..\src\tightdb\string_data.hpp" />
     <ClInclude Include="..\..\src\tightdb\table_basic_fwd.hpp" />
     <ClInclude Include="..\..\src\tightdb\unicode.hpp" />
+    <ClInclude Include="..\..\src\tightdb\util\assert.hpp" />
     <ClInclude Include="..\..\src\tightdb\util\errno.hpp" />
     <ClInclude Include="..\..\src\tightdb\util\file_mapper.hpp" />
     <ClInclude Include="..\..\src\tightdb\util\shared_ptr.hpp" />

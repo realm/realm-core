@@ -23,6 +23,8 @@
 #include <limits>
 
 #include <tightdb/util/features.h>
+#include <tightdb/util/thread.hpp>
+#include <tightdb/util/platform_specific_condvar.hpp>
 #include <tightdb/group.hpp>
 //#include <tightdb/commit_log.hpp>
 
@@ -239,6 +241,7 @@ public:
     /// Has db been changed ?
     bool has_changed();
 
+#ifndef __APPLE__
     /// The calling thread goes to sleep until the database is changed, or
     /// until wait_for_change_release() is called. After a call to wait_for_change_release()
     /// further calls to wait_for_change() will return immediately. To restore
@@ -251,7 +254,7 @@ public:
 
     /// re-enable waiting for change
     void enable_wait_for_change();
-
+#endif
     // Transactions:
 
     struct VersionID {
@@ -339,6 +342,7 @@ public:
 
 private:
     struct SharedInfo;
+    struct ReadCount;
     struct ReadLockInfo {
         uint_fast64_t   m_version;
         uint_fast32_t   m_reader_idx;
@@ -365,7 +369,12 @@ private:
         transact_Writing
     };
     TransactStage m_transact_stage;
-    struct ReadCount;
+#ifndef _WIN32
+    util::PlatformSpecificCondVar m_room_to_write;
+    util::PlatformSpecificCondVar m_work_to_do;
+    util::PlatformSpecificCondVar m_daemon_becomes_ready;
+    util::PlatformSpecificCondVar m_new_commit_available;
+#endif
 
     // Ring buffer managment
     bool        ringbuf_is_empty() const TIGHTDB_NOEXCEPT;

@@ -2,7 +2,7 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
+* Fixed crash when std::exit() is called with active encrypted mappings.
 
 ### API breaking changes:
 
@@ -16,7 +16,49 @@
 
 ### Internals:
 
-* Lorem ipsum.
+* Switched to using mach exceptions rather than signal() for encrypted mappings on Apple platforms.
+
+----------------------------------------------
+
+# 0.88.4 Release notes
+
+### Bugfixes:
+
+* Fixed out-of-bounds reads when using aggregate functions on sorted TableViews.
+* Fixed issues with ArrayString that *could* be the cause of all the asserts the
+  past few days
+
+-----------
+
+### Internals:
+
+* Many `TIGHTDB_ASSERT` invocations replaced by new `TIGHTDB_ASSERT_3` macro
+  that prints variable/argument contents on failure. It's not implemented
+  optimally yet.
+
+----------------------------------------------
+
+# 0.88.3 Release notes
+
+### Enhancements:
+
+* Added emulation of inter-process condition variables for use on platforms which
+  do not properly implement them.
+
+----------------------------------------------
+
+# 0.88.2 Release notes
+
+### Bugfixes:
+
+* Fixed duplicated results when querying on a link column with matches at row
+  1000+.
+
+-----------
+
+### Internals:
+
+* Added support for Android ARM64
 
 ----------------------------------------------
 
@@ -32,9 +74,10 @@
 
 ### Enhancements:
 
-* SharedGroup::compact() now appends ".tmp_compaction_space" to the database name
-  in order to get the name of its temporary workspace file instead of ".tmp". It also
-  automatically removes the file in case it already exists before compaction.
+* SharedGroup::compact() now appends ".tmp_compaction_space" to the database
+  name in order to get the name of its temporary workspace file instead of
+  ".tmp". It also automatically removes the file in case it already exists
+  before compaction.
 * Add support for comparing string columns to other string columns in queries.
 * `WriteTransaction::has_table()` and `WriteTransaction::rollback()` were
   added. Previously, only implicit rollback was possible with
@@ -94,7 +137,8 @@
 
 ### Internals:
 
-* Now uses system OpenSSL on Android rather than a statically-linked copy for encryption.
+* Now uses system OpenSSL on Android rather than a statically-linked copy for
+  encryption.
 
 ----------------------------------------------
 
@@ -130,7 +174,8 @@
 
 ### Enhancements:
 
-* Added 'compact' method to SharedGroup for better control of compaction of the database file.
+* Added 'compact' method to SharedGroup for better control of compaction of the
+  database file.
 * The following constants were added: `Group::max_table_name_length`,
   `Table::max_column_name_length`, `Table::max_string_size`, and
   `Table::max_binary_size`.

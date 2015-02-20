@@ -195,6 +195,7 @@
     <ClInclude Include="..\..\src\tightdb\exceptions.hpp" />
     <ClInclude Include="..\..\src\tightdb\link_view_fwd.hpp" />
     <ClInclude Include="..\..\src\tightdb\table_basic_fwd.hpp" />
+    <ClInclude Include="..\..\src\tightdb\util\assert.hpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="changelog.txt" />

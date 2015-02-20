@@ -499,7 +499,7 @@ inline void Descriptor::insert_column(std::size_t column_ndx, DataType type, Str
 {
     typedef _impl::TableFriend tf;
     TIGHTDB_ASSERT(is_attached());
-    TIGHTDB_ASSERT(column_ndx <= get_column_count());
+    TIGHTDB_ASSERT_3(column_ndx, <=, get_column_count());
     TIGHTDB_ASSERT(!tf::is_link_type(ColumnType(type)));
 
     Table* link_target_table = 0;
@@ -521,7 +521,7 @@ inline void Descriptor::insert_column_link(std::size_t column_ndx, DataType type
                                            Table& target, LinkType link_type)
 {
     TIGHTDB_ASSERT(is_attached());
-    TIGHTDB_ASSERT(column_ndx <= get_column_count());
+    TIGHTDB_ASSERT_3(column_ndx, <=, get_column_count());
     typedef _impl::TableFriend tf;
     TIGHTDB_ASSERT(tf::is_link_type(ColumnType(type)));
     // Both origin and target must be group-level tables
@@ -552,7 +552,7 @@ inline void Descriptor::rename_column(std::size_t column_ndx, StringData name)
 inline void Descriptor::set_link_type(std::size_t column_ndx, LinkType link_type)
 {
     TIGHTDB_ASSERT(is_attached());
-    TIGHTDB_ASSERT(column_ndx <= get_column_count());
+    TIGHTDB_ASSERT_3(column_ndx, <=, get_column_count());
     typedef _impl::TableFriend tf;
     TIGHTDB_ASSERT(tf::is_link_type(ColumnType(get_column_type(column_ndx))));
     tf::set_link_type(*get_root_table(), column_ndx, link_type); // Throws

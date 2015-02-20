@@ -1,17 +1,13 @@
 #include "testsettings.hpp"
 #ifdef TEST_ARRAY_STRING
 
-#include <vector>
-
 #include <tightdb/array_string.hpp>
 #include <tightdb/column.hpp>
 
 #include "test.hpp"
 
-using namespace std;
 using namespace tightdb;
-using namespace tightdb::util;
-using namespace tightdb::test_util;
+
 
 // Test independence and thread-safety
 // -----------------------------------
@@ -41,6 +37,7 @@ using namespace tightdb::test_util;
 // Another way to debug a particular test, is to copy that test into
 // `experiments/testcase.cpp` and then run `sh build.sh
 // check-testcase` (or one of its friends) from the command line.
+
 
 TEST(ArrayString_Basic)
 {
