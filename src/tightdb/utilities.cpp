@@ -275,14 +275,14 @@ int fast_popcount64(int64_t x)
 
 // A fast, mediocre-quality random number generator named Xorshift. Thread safe.
 uint64_t fastrand(uint64_t max) {
-    static util::Atomic<uint64_t> state = 1;
+    static util::Atomic<uint64_t> state(1);
     state.fetch_add_release(1); // Prevent two threads from producing the same value if called at the exact same time
     uint64_t x = state.load_acquire();
     x ^= x >> 12; // a
     x ^= x << 25; // b
     x ^= x >> 27; // c
     state.store_release(x);
-    return ((x * 2685821657736338717ULL) % max) + 1;
+    return (x * 2685821657736338717ULL) % (max + 1 == 0 ? 1 : max + 1);
 }
 
 } // namespace tightdb
