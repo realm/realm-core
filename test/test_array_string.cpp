@@ -6,7 +6,9 @@
 
 #include "test.hpp"
 
+using namespace std;
 using namespace tightdb;
+using namespace tightdb::test_util;
 
 
 // Test independence and thread-safety

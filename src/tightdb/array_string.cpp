@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <iostream>
 #include <iomanip>
+#include <cstring>
 
 #include <tightdb/utilities.hpp>
 #include <tightdb/array_string.hpp>
@@ -15,22 +16,24 @@ using namespace tightdb;
 
 namespace {
 
-const int max_width = 64;
+    const int max_width = 64;
 
-// When size = 0 returns 0
-// When size = 1 returns 4
-// When 2 <= size < 256, returns 2**ceil(log2(size+1)).
-// Thus, 0 < size < 256 implies that size < round_up(size).
-size_t round_up(size_t size)
-{
-    if (size < 2)
-        return size << 2;
-    size |= size >> 1;
-    size |= size >> 2;
-    size |= size >> 4;
-    ++size;
-    return size;
-}
+    // Round up to nearest possible block length: 0, 1, 4, 8, 16, 32, 64, 128, ... We include 1 to store empty 
+    // strings in as little space as possible, because 0 can only store nulls.
+    size_t round_up(size_t size)
+    {
+        TIGHTDB_ASSERT(size <= 256);
+
+        if (size <= 1)
+            return size;
+
+        size--;
+        size |= size >> 1;
+        size |= size >> 2;
+        size |= size >> 4;
+        ++size;
+        return size;
+    }
 
 } // anonymous namespace
 
@@ -38,20 +41,20 @@ bool ArrayString::is_null(size_t ndx) const
 {
     TIGHTDB_ASSERT(ndx < m_size);
     StringData sd = get(ndx);
-    return sd.is_null();
+    return sd.data() == null_ptr;
 }
 
 void ArrayString::set_null(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx < m_size);
-    StringData sd = tightdb::null();
+    StringData sd = StringData(null_ptr, 0);
     set(ndx, sd);
 }
 
 void ArrayString::set(size_t ndx, StringData value)
 {
-    TIGHTDB_ASSERT_3(ndx, <, m_size);
-    TIGHTDB_ASSERT_3(value.size(), <, size_t(max_width)); // otherwise we have to use another column type
+    TIGHTDB_ASSERT(ndx < m_size);
+    TIGHTDB_ASSERT(value.size() < size_t(max_width)); // otherwise we have to use another column type
 
     // Check if we need to copy before modifying
     copy_on_write(); // Throws
@@ -59,16 +62,20 @@ void ArrayString::set(size_t ndx, StringData value)
     // Make room for the new value plus a zero-termination
     if (m_width <= value.size()) {
         // if m_width == 0 then entire array contains only null entries
-        if ((m_nullable ? value.is_null() : value.size() == 0) && m_width == 0) {
-            return; // element is already null
+        if (value.data() == null_ptr && m_width == 0) {
+            return; // set null element to null
         }
 
-        TIGHTDB_ASSERT_3(0, <, value.size());
+        //        TIGHTDB_ASSERT(0 < value.size());
 
         // Calc min column width
-        size_t new_width = ::round_up(value.size());
+        size_t new_width;
+        if (m_width == 0 && value.size() == 0)
+            new_width = ::round_up(1); // Entire Array is nulls; expand to m_width > 0
+        else
+            new_width = ::round_up(value.size() + 1);
 
-        TIGHTDB_ASSERT_3(value.size(), <, new_width);
+        //TIGHTDB_ASSERT(value.size() < new_width);
 
         // FIXME: Should we try to avoid double copying when realloc fails to preserve the address?
         alloc(m_size, new_width); // Throws
@@ -80,14 +87,16 @@ void ArrayString::set(size_t ndx, StringData value)
         if (0 < m_width) {
             const char* old_end = base + m_size*m_width;
             while (new_end != base) {
-                *--new_end = char(*--old_end + (new_width-m_width));
+                *--new_end = char(*--old_end + (new_width - m_width));
                 {
-                    char* new_begin = new_end - (new_width-m_width);
-                    fill(new_begin, new_end, 0); // Extend zero padding
+                    // extend 0-padding
+                    char* new_begin = new_end - (new_width - m_width);
+                    fill(new_begin, new_end, 0);
                     new_end = new_begin;
                 }
                 {
-                    const char* old_begin = old_end - (m_width-1);
+                    // copy string payload
+                    const char* old_begin = old_end - (m_width - 1);
                     if (static_cast<size_t>(old_end - old_begin) < m_width) // non-null string
                         new_end = copy_backward(old_begin, old_end, new_end);
                     old_end = old_begin;
@@ -95,10 +104,11 @@ void ArrayString::set(size_t ndx, StringData value)
             }
         }
         else {
+            // m_width == 0, so all elements are null. Expand that to new width.
             while (new_end != base) {
-                *--new_end = char(new_width-1);
+                *--new_end = new_width; //  char(new_width - 1);
                 {
-                    char* new_begin = new_end - (new_width-1);
+                    char* new_begin = new_end - (new_width - 1);
                     fill(new_begin, new_end, 0); // Fill with zero bytes
                     new_end = new_begin;
                 }
@@ -108,16 +118,16 @@ void ArrayString::set(size_t ndx, StringData value)
         m_width = new_width;
     }
 
-    TIGHTDB_ASSERT_3(0, <, m_width);
+    TIGHTDB_ASSERT(0 < m_width);
 
     // Set the value
     char* begin = m_data + (ndx * m_width);
-    char* end   = begin + (m_width-1);
-    begin = copy(value.data(), value.data()+value.size(), begin);
+    char* end = begin + (m_width - 1);
+    begin = copy(value.data(), value.data() + value.size(), begin);
     fill(begin, end, 0); // Pad with zero bytes
     TIGHTDB_STATIC_ASSERT(max_width <= 128, "Padding size must fit in 7-bits");
-//    TIGHTDB_ASSERT(end - begin < max_width);
-    if (value.is_null()) {
+    //    TIGHTDB_ASSERT(end - begin < max_width);
+    if (value.data() == null_ptr) {
         *end = m_width;
     }
     else {
@@ -129,124 +139,41 @@ void ArrayString::set(size_t ndx, StringData value)
 
 void ArrayString::insert(size_t ndx, StringData value)
 {
-    TIGHTDB_ASSERT_3(ndx, <=, m_size);
-    TIGHTDB_ASSERT_3(value.size(), <, size_t(max_width)); // otherwise we have to use another column type
+    TIGHTDB_ASSERT(ndx <= m_size);
+    TIGHTDB_ASSERT(value.size() < size_t(max_width)); // otherwise we have to use another column type
 
     // Check if we need to copy before modifying
     copy_on_write(); // Throws
 
     // Todo: Below code will perform up to 3 memcpy() operations in worst case. Todo, if we improve the
     // allocator to make a gap for the new value for us, we can have just 1. We can also have 2 by merging
-    // memmove() and set(), but it's a bit complex. May be done after support of tightdb::null() is completed.
+    // memmove() and set(), but it's a bit complex. May be done after support of null is completed.
 
-    // Make room for the new value
-    alloc(m_size+1, new_width); // Throws
+    // Allocate room for the new value
+    alloc(m_size + 1, m_width); // Throws
 
-    if (0 < value.size() || 0 < m_width) {
-        char* base = m_data;
-        const char* old_end = base + m_size*m_width;
-        char*       new_end = base + m_size*new_width + new_width;
+    // Make gap for new value
+    memmove(m_data + m_width * (ndx + 1), m_data + m_width * ndx, m_width * (m_size - ndx));
 
-        // Move values after insertion point (may expand)
-        if (ndx != m_size) {
-            if (TIGHTDB_UNLIKELY(m_width < new_width)) {
-                char* const new_begin = base + ndx*new_width + new_width;
-                if (0 < m_width) {
-                    // Expand the old values
-                    do {
-                        *--new_end = char(*--old_end + (new_width-m_width));
-                        {
-                            char* new_begin2 = new_end - (new_width-m_width);
-                            fill(new_begin2, new_end, 0); // Extend zero padding
-                            new_end = new_begin2;
-                        }
-                        {
-                            const char* old_begin = old_end - (m_width-1);
-                            new_end = copy_backward(old_begin, old_end, new_end);
-                            old_end = old_begin;
-                        }
-                    }
-                    while (new_end != new_begin);
-                }
-                else {
-                    do {
-                        *--new_end = char(new_width-1);
-                        {
-                            char* new_begin2 = new_end - (new_width-1);
-                            fill(new_begin2, new_end, 0); // Fill with zero bytes
-                            new_end = new_begin2;
-                        }
-                    }
-                    while (new_end != new_begin);
-                }
-            }
-            else {
-                // when no expansion just move the following entries forward
-                const char* old_begin = base + ndx*m_width;
-                new_end = copy_backward(old_begin, old_end, new_end);
-                old_end = old_begin;
-            }
-        }
+    m_size++;
 
-        // Set the value
-        {
-            char* new_begin = new_end - new_width;
-            char* pad_begin = copy(value.data(), value.data()+value.size(), new_begin);
-            --new_end;
-            fill(pad_begin, new_end, 0); // Pad with zero bytes
-            TIGHTDB_STATIC_ASSERT(max_width <= 128, "Padding size must fit in 7-bits");
-            TIGHTDB_ASSERT(new_end - pad_begin < max_width);
-            int pad_size = int(new_end - pad_begin);
-            *new_end = char(pad_size);
-            new_end = new_begin;
-        }
-
-        // Expand values before insertion point
-        if (TIGHTDB_UNLIKELY(m_width < new_width)) {
-            if (0 < m_width) {
-                while (new_end != base) {
-                    *--new_end = char(*--old_end + (new_width-m_width));
-                    {
-                        char* new_begin = new_end - (new_width-m_width);
-                        fill(new_begin, new_end, 0); // Extend zero padding
-                        new_end = new_begin;
-                    }
-                    {
-                        const char* old_begin = old_end - (m_width-1);
-                        new_end = copy_backward(old_begin, old_end, new_end);
-                        old_end = old_begin;
-                    }
-                }
-            }
-            else {
-                while (new_end != base) {
-                    *--new_end = char(new_width-1);
-                    {
-                        char* new_begin = new_end - (new_width-1);
-                        fill(new_begin, new_end, 0); // Fill with zero bytes
-                        new_end = new_begin;
-                    }
-                }
-            }
-            m_width = new_width;
-        }
-    }
-
-    ++m_size;
+    // Set new value
+    set(ndx, value);
+    return;
 }
 
 void ArrayString::erase(size_t ndx)
 {
-    TIGHTDB_ASSERT_3(ndx, <, m_size);
+    TIGHTDB_ASSERT(ndx < m_size);
 
     // Check if we need to copy before modifying
     copy_on_write(); // Throws
 
     // move data backwards after deletion
-    if (ndx < m_size-1) {
+    if (ndx < m_size - 1) {
         char* new_begin = m_data + ndx*m_width;
         char* old_begin = new_begin + m_width;
-        char* old_end   = m_data + m_size*m_width;
+        char* old_end = m_data + m_size*m_width;
         copy(old_begin, old_end, new_begin);
     }
 
@@ -290,32 +217,20 @@ size_t ArrayString::count(StringData value, size_t begin, size_t end) const TIGH
 size_t ArrayString::find_first(StringData value, size_t begin, size_t end) const TIGHTDB_NOEXCEPT
 {
     if (end == size_t(-1))
-        end = m_size;
+    end = m_size;
     TIGHTDB_ASSERT(begin <= m_size && end <= m_size && begin <= end);
 
-    if (m_width == 0) {
-        if (m_nullable)
-            // m_width == 0 implies that all elements in the array are NULL
-            return value.is_null() && begin < m_size ? begin : npos;
-        else
-            return value.size() == 0 && begin < m_size ? begin : npos;
-    }
-            
+    if (m_width == 0)
+        return value.size() == 0 && begin < end ? begin : size_t(-1);
+
     // A string can never be wider than the column width
     if (m_width <= value.size())
         return size_t(-1);
 
-    if (m_nullable ? value.is_null() : value.size() == 0) {
-        for (size_t i = begin; i != end; ++i) {
-            if (m_nullable ? is_null(i) : get(i).size() == 0)
-                return i;
-        }
-    }
-    else if (value.size() == 0) {
+    if (value.size() == 0) {
         const char* data = m_data + (m_width - 1);
         for (size_t i = begin; i != end; ++i) {
             size_t size = (m_width - 1) - data[i * m_width];
-            // left-hand-side tests if array element is NULL
             if (TIGHTDB_UNLIKELY(size == 0))
                 return i;
         }
@@ -329,7 +244,7 @@ size_t ArrayString::find_first(StringData value, size_t begin, size_t end) const
                     break;
                 ++j;
                 if (TIGHTDB_UNLIKELY(j == value.size())) {
-                    size_t size = (m_width-1) - data[m_width-1];
+                    size_t size = (m_width - 1) - data[m_width - 1];
                     if (TIGHTDB_LIKELY(size == value.size()))
                         return i;
                     break;
@@ -342,7 +257,7 @@ size_t ArrayString::find_first(StringData value, size_t begin, size_t end) const
 }
 
 void ArrayString::find_all(Column& result, StringData value, size_t add_offset,
-                           size_t begin, size_t end)
+    size_t begin, size_t end)
 {
     size_t begin_2 = begin;
     for (;;) {
@@ -357,7 +272,7 @@ void ArrayString::find_all(Column& result, StringData value, size_t add_offset,
 bool ArrayString::compare_string(const ArrayString& c) const TIGHTDB_NOEXCEPT
 {
     if (c.size() != size())
-        return false;
+    return false;
 
     for (size_t i = 0; i < size(); ++i) {
         if (get(i) != c.get(i))
@@ -370,7 +285,7 @@ bool ArrayString::compare_string(const ArrayString& c) const TIGHTDB_NOEXCEPT
 ref_type ArrayString::bptree_leaf_insert(size_t ndx, StringData value, TreeInsertBase& state)
 {
     size_t leaf_size = size();
-    TIGHTDB_ASSERT_3(leaf_size, <=, TIGHTDB_MAX_BPNODE_SIZE);
+    TIGHTDB_ASSERT(leaf_size <= TIGHTDB_MAX_BPNODE_SIZE);
     if (leaf_size < ndx) ndx = leaf_size;
     if (TIGHTDB_LIKELY(leaf_size < TIGHTDB_MAX_BPNODE_SIZE)) {
         insert(ndx, value); // Throws
@@ -378,7 +293,7 @@ ref_type ArrayString::bptree_leaf_insert(size_t ndx, StringData value, TreeInser
     }
 
     // Split leaf node
-    ArrayString new_leaf(m_alloc, m_nullable);
+    ArrayString new_leaf(m_alloc);
     new_leaf.create(); // Throws
     if (ndx == leaf_size) {
         new_leaf.add(value); // Throws
@@ -402,11 +317,11 @@ MemRef ArrayString::slice(size_t offset, size_t size, Allocator& target_alloc) c
 
     // FIXME: This can be optimized as a single contiguous copy
     // operation.
-    ArrayString slice(target_alloc, m_nullable);
+    ArrayString slice(target_alloc);
     _impl::ShallowArrayDestroyGuard dg(&slice);
     slice.create(); // Throws
     size_t begin = offset;
-    size_t end   = offset + size;
+    size_t end = offset + size;
     for (size_t i = begin; i != end; ++i) {
         StringData value = get(i);
         slice.add(value); // Throws
