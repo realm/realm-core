@@ -49,15 +49,14 @@ public:
     explicit ArrayString(no_prealloc_tag) TIGHTDB_NOEXCEPT;
     ~ArrayString() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
 
+    bool is_null(size_t ndx) const;
+    void set_null(size_t ndx);
     StringData get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
     void add();
     void add(StringData value);
     void set(std::size_t ndx, StringData value);
     void insert(std::size_t ndx, StringData value);
     void erase(std::size_t ndx);
-
-    bool is_null(size_t ndx) const;
-    void set_null(size_t ndx);
 
     std::size_t count(StringData value, std::size_t begin = 0,
                       std::size_t end = npos) const TIGHTDB_NOEXCEPT;
@@ -142,7 +141,7 @@ inline MemRef ArrayString::create_array(std::size_t size, Allocator& alloc)
 
 inline StringData ArrayString::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT_3(ndx, <, m_size);
+    TIGHTDB_ASSERT(ndx < m_size);
     if (m_width == 0)
         return m_nullable ? tightdb::null() : StringData("");
 
@@ -169,7 +168,7 @@ inline void ArrayString::add()
 
 inline StringData ArrayString::get(const char* header, std::size_t ndx, bool nullable) TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT_3(ndx, <, get_size_from_header(header));
+    TIGHTDB_ASSERT(ndx < get_size_from_header(header));
     std::size_t width = get_width_from_header(header);
     const char* data = get_data_from_header(header) + (ndx * width);
 

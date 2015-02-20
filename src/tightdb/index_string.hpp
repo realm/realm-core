@@ -247,8 +247,7 @@ inline StringIndex::key_type StringIndex::create_key(StringData str) TIGHTDB_NOE
 
 // NULL support in Index works as follows: All non-NULL values are stored as if they had appended an 'X' character
 // at the end. So "foo" is stored as if it was "fooX", and "" (empty string) is stored as "X". And NULLs are stored 
-// as empty strings. NOTE: Prepending the X instead of appending it would make the index faster (less common
-// prefixes), however, because the StringIndex cannot handle suffixes of 0-bytes we need to append something non-0.
+// as empty strings.
 inline StringIndex::key_type StringIndex::create_key(StringData str, size_t offset, bool nullable) TIGHTDB_NOEXCEPT
 {
     // The 'trailingzeros' is due to a bug in existing indexes in the old file format 2. These may crash if they contain

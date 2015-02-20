@@ -41,13 +41,13 @@ bool ArrayString::is_null(size_t ndx) const
 {
     TIGHTDB_ASSERT(ndx < m_size);
     StringData sd = get(ndx);
-    return sd.data() == null_ptr;
+    return sd.is_null();
 }
 
 void ArrayString::set_null(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx < m_size);
-    StringData sd = StringData(null_ptr, 0);
+    StringData sd = tightdb::null();
     set(ndx, sd);
 }
 
@@ -62,8 +62,8 @@ void ArrayString::set(size_t ndx, StringData value)
     // Make room for the new value plus a zero-termination
     if (m_width <= value.size()) {
         // if m_width == 0 then entire array contains only null entries
-        if (value.data() == null_ptr && m_width == 0) {
-            return; // set null element to null
+        if ((m_nullable ? value.is_null() : value.size() == 0) && m_width == 0) {
+            return; // element is already null
         }
 
         //        TIGHTDB_ASSERT(0 < value.size());
@@ -127,7 +127,7 @@ void ArrayString::set(size_t ndx, StringData value)
     fill(begin, end, 0); // Pad with zero bytes
     TIGHTDB_STATIC_ASSERT(max_width <= 128, "Padding size must fit in 7-bits");
     //    TIGHTDB_ASSERT(end - begin < max_width);
-    if (value.data() == null_ptr) {
+    if (value.is_null()) {
         *end = m_width;
     }
     else {
@@ -147,7 +147,7 @@ void ArrayString::insert(size_t ndx, StringData value)
 
     // Todo: Below code will perform up to 3 memcpy() operations in worst case. Todo, if we improve the
     // allocator to make a gap for the new value for us, we can have just 1. We can also have 2 by merging
-    // memmove() and set(), but it's a bit complex. May be done after support of null is completed.
+    // memmove() and set(), but it's a bit complex. May be done after support of tightdb::null() is completed.
 
     // Allocate room for the new value
     alloc(m_size + 1, m_width); // Throws
@@ -220,17 +220,29 @@ size_t ArrayString::find_first(StringData value, size_t begin, size_t end) const
     end = m_size;
     TIGHTDB_ASSERT(begin <= m_size && end <= m_size && begin <= end);
 
-    if (m_width == 0)
-        return value.size() == 0 && begin < end ? begin : size_t(-1);
+    if (m_width == 0) {
+        if (m_nullable)
+            // m_width == 0 implies that all elements in the array are NULL
+            return value.is_null() && begin < m_size ? begin : npos;
+        else
+            return value.size() == 0 && begin < m_size ? begin : npos;
+    }
 
     // A string can never be wider than the column width
     if (m_width <= value.size())
         return size_t(-1);
 
-    if (value.size() == 0) {
+    if (m_nullable ? value.is_null() : value.size() == 0) {
+        for (size_t i = begin; i != end; ++i) {
+            if (m_nullable ? is_null(i) : get(i).size() == 0)
+                return i;
+        }
+    }
+    else if (value.size() == 0) {
         const char* data = m_data + (m_width - 1);
         for (size_t i = begin; i != end; ++i) {
             size_t size = (m_width - 1) - data[i * m_width];
+            // left-hand-side tests if array element is NULL
             if (TIGHTDB_UNLIKELY(size == 0))
                 return i;
         }
@@ -293,7 +305,7 @@ ref_type ArrayString::bptree_leaf_insert(size_t ndx, StringData value, TreeInser
     }
 
     // Split leaf node
-    ArrayString new_leaf(m_alloc);
+    ArrayString new_leaf(m_alloc, m_nullable);
     new_leaf.create(); // Throws
     if (ndx == leaf_size) {
         new_leaf.add(value); // Throws
@@ -317,7 +329,7 @@ MemRef ArrayString::slice(size_t offset, size_t size, Allocator& target_alloc) c
 
     // FIXME: This can be optimized as a single contiguous copy
     // operation.
-    ArrayString slice(target_alloc);
+    ArrayString slice(target_alloc, m_nullable);
     _impl::ShallowArrayDestroyGuard dg(&slice);
     slice.create(); // Throws
     size_t begin = offset;
