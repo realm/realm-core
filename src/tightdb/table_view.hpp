@@ -81,7 +81,8 @@ using std::size_t;
 // on a worker thread, but display it on the main thread. To achieve this, you need two
 // SharedGroups locked on to the same version of the database. If you have that, you can
 // *handover* a view from one thread/SharedGroup to the other. Currently, Handover is limited
-// to views without a restricting view (see above).
+// to views without a restricting view (see above) and to views created from a toplevel table
+// (not a LinkView).
 //
 // You can handover both reflective and imperative views. But most often it will only make
 // sense to handover an imperative view, because it is guaranteed not to rerun its query.
@@ -90,8 +91,9 @@ using std::size_t;
 // TableViewBase::export_for_handover(). After the call to export_for_handover(), the table view
 // becomes detached to prevent misuse. On the receiving side, a new TableView is produced from
 // HandoverTableView::import_from_handover(SharedGroup& sg). Export will fail if the TableView
-// has a restricting view. Import will fail if the importing and exporting SharedGroups are
-// observing different versions of the database.
+// has a restricting view, or is created from a LinkView. 
+// Import will fail if the importing and exporting SharedGroups are observing different 
+// versions of the database.
 //
 // 3. Iterating a view and changing data
 // The third use case (and a motivator behind the imperative view) is when you want
@@ -150,7 +152,7 @@ using std::size_t;
 // application logic.
 //
 // It is important to see, that there is no guarantee that all relevant employees get
-// their raise in cases whith concurrent updates.At every call to promote_to_write() new
+// their raise in cases whith concurrent updates. At every call to promote_to_write() new
 // employees may be added to the underlying table, but as the view is in imperative mode,
 // these new employees are not added to the view. Also at promote_to_write() an existing
 // employee could recieve a (different, larger) raise which would then be overwritten and lost.
@@ -278,8 +280,8 @@ public:
     // Set this undetached TableView to be a distinct view, and sync immediately.
     void sync_distinct_view(size_t column_ndx);
 
-    // This TableView can be "born" from 3 different sources : LinkView, Table::find_all() or Query. Return
-    // the version of the source it was created from.
+    // This TableView can be "born" from 4 different sources : LinkView, Table::get_distinct_view(),
+    // Table::find_all() or Query. Return the version of the source it was created from.
     uint64_t outside_version() const;
 
 protected:
@@ -329,16 +331,34 @@ protected:
     template<class R, class V> static R find_all_double(V*, std::size_t, double);
     template<class R, class V> static R find_all_string(V*, std::size_t, StringData);
 
+    void prepare_for_export(std::size_t& table_num)
+    {
+        table_num = m_table->get_index_in_group();
+        // must be group level table!
+        TIGHTDB_ASSERT(table_num != npos);
+        // FIXME: might need to propagate into base class and members
+
+        detach();
+    }
+    void prepare_for_import(TableRef tr)
+    {
+        m_table = tr;
+        tr->register_view(this);
+        // FIXME: propagate into base class and members
+    }
 private:
     void detach() TIGHTDB_NOEXCEPT;
     std::size_t find_first_integer(std::size_t column_ndx, int64_t value) const;
     friend class Table;
     friend class Query;
+    friend class SharedGroup;
 
     // Called by table to adjust any row references:
     void adj_row_acc_insert_rows(std::size_t row_ndx, std::size_t num_rows) TIGHTDB_NOEXCEPT;
     void adj_row_acc_erase_row(std::size_t row_ndx) TIGHTDB_NOEXCEPT;
     void adj_row_acc_move_over(std::size_t from_row_ndx, std::size_t to_row_ndx) TIGHTDB_NOEXCEPT;
+
+    template<typename Tab> friend class BasicTableView;
 };
 
 

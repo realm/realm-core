@@ -342,17 +342,23 @@ public:
 
     /// Support for handover of typed accessors between shared groups
     template<typename T> struct Handover {
-        typename T::Handover m_payload;
+        T m_payload;
+        std::size_t m_table_num;
         VersionID m_version;
-        Handover(typename T::Handover payload, VersionID version) : m_payload(payload), m_version(version) {}
+        // FIXME: payload construction must be move assign - but is it?
+        Handover(T& payload, std::size_t table_num, VersionID version) 
+            : m_payload(payload), m_table_num(table_num), m_version(version) 
+        {
+        }
         Handover() {};
-        T import_from_handover(Group& group) { return T(m_payload, group); }
     };
 
     template<typename T>
     Handover<T> export_for_handover(T& accessor)
     {
-        Handover<T> handover(accessor.export_for_handover(), get_version_of_current_transaction());
+        std::size_t table_num;
+        accessor.prepare_for_export(table_num);
+        Handover<T> handover(accessor, table_num, get_version_of_current_transaction());
         return handover;
     }
 
@@ -360,7 +366,9 @@ public:
     T import_from_handover(Handover<T>& handover)
     {
         TIGHTDB_ASSERT(handover.m_version == get_version_of_current_transaction());
-        T result(handover.import_from_handover(m_group));
+        // FIXME: must be move assign - but is it?
+        T result(handover.m_payload);
+        result.prepare_for_import(m_group.get_table(handover.m_table_num));
         return result;
     }
 

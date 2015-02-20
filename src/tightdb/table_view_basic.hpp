@@ -183,18 +183,12 @@ public:
 
 
 public:
-    class Handover {
-        TableView m_impl;
-        std::size_t m_table_num;
-        Handover(TableView& tbv) : m_impl(tbv) { m_table_num = tbv.m_table->get_index_in_group(); tbv.detach(); }
-        Handover() {}
-        friend class SharedGroup;
-    };
-    Handover export_for_handover() {
-        Handover h(*this);
-        return h;
+    void prepare_for_export(std::size_t& table_num) {
+        Base::m_impl.prepare_for_export(table_num);
     }
-    BasicTableView(Handover& handover, Group& group) : Base(move(handover.m_impl.restore(group))) {}
+    void prepare_for_import(TableRef table) {
+        Base::m_impl.prepare_for_import(table);
+    }
 private:
     BasicTableView(BasicTableView* tv): Base(move(tv->m_impl)) {}
     BasicTableView(TableView tv): Base(move(tv)) {}
