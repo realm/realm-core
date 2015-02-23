@@ -186,7 +186,7 @@ public:
                                                  BinaryData changeset, uint_fast64_t timestamp,
                                                  uint_fast64_t peer_id, version_type peer_version,
                                                  std::ostream* apply_log = 0);
-    virtual version_type get_last_peer_version(uint_fast64_t peer_id) const;
+    virtual version_type get_last_peer_version(uint_fast64_t peer_id);
 
     /// Acquire permision to start a new 'write' transaction. This
     /// function must be called by a client before it requests a
@@ -771,7 +771,7 @@ Replication::apply_foreign_changeset(SharedGroup&, version_type, BinaryData,
 }
 
 inline Replication::version_type
-Replication::get_last_peer_version(uint_fast64_t) const
+Replication::get_last_peer_version(uint_fast64_t)
 {
     // Unimplemented!
     TIGHTDB_ASSERT(false);

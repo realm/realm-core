@@ -128,7 +128,7 @@ public:
                                          uint_fast64_t timestamp,
                                          uint_fast64_t peer_id, version_type peer_version,
                                          ostream*) TIGHTDB_OVERRIDE;
-    version_type get_last_peer_version(uint_fast64_t peer_id) const TIGHTDB_OVERRIDE;
+    version_type get_last_peer_version(uint_fast64_t peer_id) TIGHTDB_OVERRIDE;
     virtual void stop_logging() TIGHTDB_OVERRIDE;
     virtual void reset_log_management(version_type last_version) TIGHTDB_OVERRIDE;
     virtual void set_last_version_seen_locally(version_type last_seen_version_number)
@@ -178,6 +178,7 @@ protected:
         // Last server_version, as set by calls to apply_foreign_transact_log(),
         // or 0 if never set.
         uint64_t last_server_version;
+        uint64_t last_server_version_backup;
 
         uint64_t last_client_file_ident; // FIXME: Part of a temporary hack
 
@@ -188,7 +189,7 @@ protected:
             // The first commit will be from state 1 -> state 2, so we must set 1 initially
             begin_oldest_commit_range = begin_newest_commit_range = end_commit_range = version;
             last_version_seen_locally = sync_info.client_version = version;
-            last_server_version = 0;
+            last_server_version_backup = last_server_version = 0;
             last_client_file_ident = 0; // FIXME: Part of a temporary hack
             write_offset = 0;
         }
@@ -340,7 +341,6 @@ void recover_from_dead_owner()
 
 inline WriteLogCollector::CommitLogPreamble* WriteLogCollector::get_preamble()
 {
-    map_header_if_needed();
     CommitLogHeader* header = m_header.get_addr();
     if (header->use_preamble_a)
         return & header->preamble_a;
@@ -505,7 +505,9 @@ WriteLogCollector::internal_submit_log(const char* data, uint_fast64_t size,
 
     // for local commits, the server_version is taken from the previous commit.
     // for foreign commits, the server_version is provided by the caller and saved
-    // for later use.
+    // for later use. (we need to make a backup which can be restored if the current
+    // commit is discarded later)
+    preamble->last_server_version_backup = preamble->last_server_version;
     if (peer_id != 0) {
         preamble->last_server_version = peer_version;
     }
@@ -594,6 +596,7 @@ void WriteLogCollector::reset_log_management(version_type last_version)
         TIGHTDB_ASSERT_3(last_version, <=, preamble->end_commit_range);
 
         if (last_version <= preamble->end_commit_range) {
+            preamble->last_server_version = preamble->last_server_version_backup;
             if (last_version < preamble->begin_newest_commit_range) {
                 // writepoint is somewhere in the in-active (oldest) file, so
                 // discard data in the active file, and make the in-active file active
@@ -999,9 +1002,9 @@ WriteLogCollector::apply_foreign_changeset(SharedGroup& sg, version_type last_ve
 }
 
 Replication::version_type
-WriteLogCollector::get_last_peer_version(uint_fast64_t) const
+WriteLogCollector::get_last_peer_version(uint_fast64_t)
 {
-    // FIXME: Remove this fucking const cast.
+    map_header_if_needed();
     CommitLogPreamble* preamble = const_cast<WriteLogCollector*>(this)->get_preamble();
     return preamble->last_server_version;
 }
