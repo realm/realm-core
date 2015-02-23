@@ -404,11 +404,12 @@ void TableView::remove(size_t ndx)
 
     // Update refs
     m_row_indexes.erase(ndx, ndx == size() - 1);
-
+/*
     // Decrement row indexes greater than or equal to ndx
     //
     // O(n) for n = this->size(). FIXME: Dangerous cast below: unsigned -> signed
     m_row_indexes.adjust_ge(int_fast64_t(real_ndx), -1);
+*/
 }
 
 

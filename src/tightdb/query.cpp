@@ -1046,7 +1046,8 @@ size_t Query::remove(size_t start, size_t end, size_t limit)
             size_t r = peek_tableview(start + results);
             if (r != not_found) {
                 m_table->remove(r);
-                m_view->m_row_indexes.adjust_ge(m_view->m_row_indexes.get(start + results), -1);
+                // new semantics for tableview means that the remove from m_table is automatically reflected
+                // m_view->m_row_indexes.adjust_ge(m_view->m_row_indexes.get(start + results), -1);
                 results++;
             }
             else {
