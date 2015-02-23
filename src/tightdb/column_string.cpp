@@ -194,7 +194,7 @@ StringIndex* AdaptiveStringColumn::create_search_index()
     TIGHTDB_ASSERT(!m_search_index);
 
     UniquePtr<StringIndex> index;
-    index.reset(new StringIndex(this, &get_string, m_array->get_alloc(), m_nullable)); // Throws
+    index.reset(new StringIndex(this, &get_string, m_array->get_alloc())); // Throws
 
     // Populate the index
     size_t num_rows = size();
@@ -215,7 +215,7 @@ void AdaptiveStringColumn::set_search_index_ref(ref_type ref, ArrayParent* paren
 {
     TIGHTDB_ASSERT(!m_search_index);
     m_search_index = new StringIndex(ref, parent, ndx_in_parent, this, &get_string,
-                                     !allow_duplicate_valaues, m_array->get_alloc(), m_nullable); // Throws
+                                     !allow_duplicate_valaues, m_array->get_alloc()); // Throws
 }
 
 

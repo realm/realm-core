@@ -37,6 +37,26 @@ public:
 Initialization initialization;
 } // anonymous namespace
 
+void Group::upgrade_file_format()
+{
+    TIGHTDB_ASSERT(is_attached());
+    if (get_file_format_version() >= 3)
+        return;
+
+    for (size_t t = 0; t < m_tables.size(); t++) {
+        TableRef table = get_table(t);
+        for (size_t c = 0; c < table->size(); c++) {
+            if (table->has_search_index(c)) {
+                table->remove_search_index(c);
+                table->add_search_index(c);
+            }
+        }
+    }
+
+    set_file_format_version(3);
+}
+
+
 void Group::open(const string& file_path, const char* encryption_key, OpenMode mode)
 {
     TIGHTDB_ASSERT(!is_attached());
@@ -59,6 +79,22 @@ void Group::open(const string& file_path, const char* encryption_key, OpenMode m
         init_from_ref(top_ref);
     }
     dg.release(); // Do not detach allocator from file
+}
+
+
+unsigned char Group::get_file_format_version()
+{
+    char* file_header = m_alloc.m_data;
+    int valid_part = file_header[16 + 7] & 0x1;
+    return static_cast<unsigned char>(file_header[16 + 4 + valid_part]);
+}
+
+
+void Group::set_file_format_version(unsigned char version)
+{
+    char* file_header = m_alloc.m_data;
+    int valid_part = file_header[16 + 7] & 0x1;
+    file_header[16 + 4 + valid_part] = static_cast<signed char>(version);
 }
 
 

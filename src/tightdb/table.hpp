@@ -242,6 +242,7 @@ public:
     /// \param column_ndx The index of a column of this table.
 
     bool has_search_index(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
+    void remove_search_index(size_t col_ndx);
     void add_search_index(std::size_t column_ndx);
     bool has_primary_key() const TIGHTDB_NOEXCEPT;
     bool try_add_primary_key(std::size_t column_ndx);

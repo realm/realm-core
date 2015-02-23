@@ -1591,7 +1591,7 @@ TEST(Group_ToString)
 }
 
 
-TEST(Group_IndexString)
+ONLY(Group_IndexString)
 {
     Group to_mem;
     TestTableGroup::Ref table = to_mem.add_table<TestTableGroup>("test");
@@ -1636,6 +1636,8 @@ TEST(Group_IndexString)
 
     size_t m1 = table->column().first.find_first("jimmi");
     CHECK_EQUAL(not_found, m1);
+
+    from_mem.upgrade_file_format();
 
     size_t m2 = t->column().first.find_first("jeff");
     size_t m3 = t->column().first.find_first("jim");

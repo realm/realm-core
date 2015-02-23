@@ -20,9 +20,7 @@ using namespace tightdb::util;
 
 namespace {
 
-// Bumped to 3 because of support of storing NULL in Strings (the array types ArrayString, ArrayStringLong
-// and ArrayBigBlobs)
-const int current_file_format_version = 3;
+const int current_file_format_version = 2;
 
 #ifdef TIGHTDB_SLAB_ALLOC_DEBUG
 map<ref_type, void*> malloc_debug_map;
@@ -509,7 +507,6 @@ void SlabAlloc::attach_empty()
     // baseline here.
     m_baseline = sizeof (Header);
 }
-
 
 bool SlabAlloc::validate_buffer(const char* data, size_t size, ref_type& top_ref)
 {

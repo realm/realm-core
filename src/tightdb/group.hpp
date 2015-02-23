@@ -96,6 +96,10 @@ public:
 
     ~Group() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
+    unsigned char get_file_format_version();
+    void Group::set_file_format_version(unsigned char version);
+    void upgrade_file_format();
+
     /// Attach this Group instance to the specified database file.
     ///
     /// By default, the specified file is opened in read-only mode

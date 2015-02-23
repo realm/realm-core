@@ -57,9 +57,9 @@ typedef StringData (*StringGetter)(void*, std::size_t, char*);
 
 class StringIndex: public Column {
 public:
-    StringIndex(void* target_column, StringGetter get_func, Allocator&, bool nullable);
+    StringIndex(void* target_column, StringGetter get_func, Allocator&);
     StringIndex(ref_type, ArrayParent*, std::size_t ndx_in_parent, void* target_column,
-                StringGetter get_func, bool allow_duplicate_values, Allocator&, bool nullable);
+                StringGetter get_func, bool allow_duplicate_values, Allocator&);
     ~StringIndex() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
     void set_target(void* target_column, StringGetter get_func) TIGHTDB_NOEXCEPT;
 
@@ -72,25 +72,25 @@ public:
     template <class T> size_t find_first(T value) const
     {
         // Use direct access method
-        return m_array->IndexStringFindFirst(to_str(value), m_target_column, m_get_func, m_nullable);
+        return m_array->IndexStringFindFirst(to_str(value), m_target_column, m_get_func);
     }
 
     template <class T> void find_all(Column& result, T value) const
     {
         // Use direct access method
-        return m_array->IndexStringFindAll(result, to_str(value), m_target_column, m_get_func, m_nullable);
+        return m_array->IndexStringFindAll(result, to_str(value), m_target_column, m_get_func);
     }
 
     template <class T> FindRes find_all(T value, size_t& ref) const
     {
         // Use direct access method
-        return m_array->IndexStringFindAllNoCopy(to_str(value), ref, m_target_column, m_get_func, m_nullable);
+        return m_array->IndexStringFindAllNoCopy(to_str(value), ref, m_target_column, m_get_func);
     }
 
     template <class T> size_t count(T value) const
     {
         // Use direct access method
-        return m_array->IndexStringCount(to_str(value), m_target_column, m_get_func, m_nullable);
+        return m_array->IndexStringCount(to_str(value), m_target_column, m_get_func);
     }
 
     template <class T> void update_ref(T value, size_t old_row_ndx, size_t new_row_ndx)
@@ -118,19 +118,18 @@ public:
     typedef int32_t key_type;
 
     static key_type create_key(StringData) TIGHTDB_NOEXCEPT;
-    static key_type create_key(StringData, size_t, bool nullable) TIGHTDB_NOEXCEPT;
+    static key_type create_key(StringData, size_t) TIGHTDB_NOEXCEPT;
 
 private:
     void* m_target_column;
     StringGetter m_get_func;
     bool m_deny_duplicate_values;
-    bool m_nullable;
 
     using Column::insert;
     using Column::erase;
 
     struct inner_node_tag {};
-    StringIndex(inner_node_tag, Allocator&, bool nullable);
+    StringIndex(inner_node_tag, Allocator&);
 
     static Array* create_node(Allocator&, bool is_leaf);
 
@@ -177,34 +176,31 @@ private:
 
 // Implementation:
 
-inline StringIndex::StringIndex(void* target_column, StringGetter get_func, Allocator& alloc, bool nullable):
+inline StringIndex::StringIndex(void* target_column, StringGetter get_func, Allocator& alloc):
     Column(create_node(alloc, true)), // Throws
     m_target_column(target_column),
     m_get_func(get_func),
-    m_deny_duplicate_values(false),
-    m_nullable(nullable)
+    m_deny_duplicate_values(false)
 {
 }
 
 inline StringIndex::StringIndex(ref_type ref, ArrayParent* parent, std::size_t ndx_in_parent,
                                 void* target_column, StringGetter get_func,
-                                bool deny_duplicate_values, Allocator& alloc, bool nullable):
+                                bool deny_duplicate_values, Allocator& alloc):
     Column(alloc, ref),
     m_target_column(target_column),
     m_get_func(get_func),
-    m_deny_duplicate_values(deny_duplicate_values),
-    m_nullable(nullable)
+    m_deny_duplicate_values(deny_duplicate_values)
 {
     TIGHTDB_ASSERT(Array::get_context_flag_from_header(alloc.translate(ref)));
     set_parent(parent, ndx_in_parent);
 }
 
-inline StringIndex::StringIndex(inner_node_tag, Allocator& alloc, bool nullable):
+inline StringIndex::StringIndex(inner_node_tag, Allocator& alloc):
     Column(create_node(alloc, false)), // Throws
     m_target_column(0),
     m_get_func(0),
-    m_deny_duplicate_values(false),
-    m_nullable(nullable)
+    m_deny_duplicate_values(false)
 {
 }
 
@@ -245,18 +241,10 @@ inline StringIndex::key_type StringIndex::create_key(StringData str) TIGHTDB_NOE
     return key;
 }
 
-// NULL support in Index works as follows: All non-NULL values are stored as if they had appended an 'X' character
-// at the end. So "foo" is stored as if it was "fooX", and "" (empty string) is stored as "X". And NULLs are stored 
-// as empty strings.
-inline StringIndex::key_type StringIndex::create_key(StringData str, size_t offset, bool nullable) TIGHTDB_NOEXCEPT
+// Index works as follows: All non-NULL values are stored as if they had appended an 'X' character at the end. So 
+// "foo" is stored as if it was "fooX", and "" (empty string) is stored as "X". And NULLs are stored as empty strings.
+inline StringIndex::key_type StringIndex::create_key(StringData str, size_t offset) TIGHTDB_NOEXCEPT
 {
-    // The 'trailingzeros' is due to a bug in existing indexes in the old file format 2. These may crash if they contain
-    // strings with a trailing "\0". This fix makes it only crashable if they in addition also have strings that end with 
-    // "\0X", hence reducing the risk of a crash. That's the best we can offer if we need to remain backwards compatible.
-    // New indexes that are created cannot crash, even if the file is in file version 2 
-    bool trailingzeros = str.size() > 0 && *(str.data() + str.size() - 1) == 0;
-
-    if (nullable || trailingzeros) {
         if (str.is_null())
             return 0;
 
@@ -275,10 +263,6 @@ inline StringIndex::key_type StringIndex::create_key(StringData str, size_t offs
                 return create_key(str.substr(offset));
             }
         }
-    }
-    else {
-        return create_key(str.substr(offset));
-    }
 }
 
 template <class T> void StringIndex::insert(size_t row_ndx, T value, size_t num_rows, bool is_append)
