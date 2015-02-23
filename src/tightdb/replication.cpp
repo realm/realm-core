@@ -23,7 +23,9 @@ const size_t init_subtab_path_buf_size = 2*init_subtab_path_buf_levels - 1;
 TransactLogEncoderBase::TransactLogEncoderBase():
     m_selected_table(null_ptr),
     m_selected_spec(null_ptr),
-    m_selected_link_list(null_ptr)
+    m_selected_link_list(null_ptr),
+    m_transact_log_free_begin(null_ptr),
+    m_transact_log_free_end(null_ptr)
 {
     m_subtab_path_buf.set_size(init_subtab_path_buf_size); // Throws
 }
