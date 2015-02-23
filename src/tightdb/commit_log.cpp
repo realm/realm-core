@@ -115,7 +115,7 @@ public:
                                          uint_fast64_t timestamp,
                                          uint_fast64_t peer_id, version_type peer_version,
                                          ostream*) TIGHTDB_OVERRIDE;
-    version_type get_last_peer_version(uint_fast64_t peer_id) const TIGHTDB_OVERRIDE;
+    version_type get_last_peer_version(uint_fast64_t peer_id) TIGHTDB_OVERRIDE;
     virtual void stop_logging() TIGHTDB_OVERRIDE;
     virtual void reset_log_management(version_type last_version) TIGHTDB_OVERRIDE;
     virtual void set_last_version_seen_locally(version_type last_seen_version_number)
@@ -324,7 +324,6 @@ void recover_from_dead_owner()
 
 inline WriteLogCollector::CommitLogPreamble* WriteLogCollector::get_preamble()
 {
-    map_header_if_needed();
     CommitLogHeader* header = m_header.get_addr();
     if (header->use_preamble_a)
         return & header->preamble_a;
@@ -945,9 +944,9 @@ WriteLogCollector::apply_foreign_changeset(SharedGroup& sg, version_type last_ve
 }
 
 Replication::version_type
-WriteLogCollector::get_last_peer_version(uint_fast64_t) const
+WriteLogCollector::get_last_peer_version(uint_fast64_t)
 {
-    // FIXME: Remove this fucking const cast.
+    map_header_if_needed();
     CommitLogPreamble* preamble = const_cast<WriteLogCollector*>(this)->get_preamble();
     return preamble->last_server_version;
 }
