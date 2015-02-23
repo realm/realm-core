@@ -165,6 +165,7 @@ protected:
         // Last server_version, as set by calls to apply_foreign_transact_log(),
         // or 0 if never set.
         uint64_t last_server_version;
+        uint64_t last_server_version_backup;
 
         // proper intialization:
         CommitLogPreamble(uint_fast64_t version)
@@ -173,7 +174,7 @@ protected:
             // The first commit will be from state 1 -> state 2, so we must set 1 initially
             begin_oldest_commit_range = begin_newest_commit_range = end_commit_range = version;
             last_version_seen_locally = sync_info.client_version = version;
-            last_server_version = 1;
+            last_server_version_backup = last_server_version = 1;
             write_offset = 0;
         }
     };
@@ -488,7 +489,9 @@ WriteLogCollector::internal_submit_log(const char* data, uint_fast64_t size,
 
     // for local commits, the server_version is taken from the previous commit.
     // for foreign commits, the server_version is provided by the caller and saved
-    // for later use.
+    // for later use. (we need to make a backup which can be restored if the current
+    // commit is discarded later)
+    preamble->last_server_version_backup = preamble->last_server_version;
     if (peer_id != 0) {
         preamble->last_server_version = peer_version;
     }
@@ -575,6 +578,7 @@ void WriteLogCollector::reset_log_management(version_type last_version)
         TIGHTDB_ASSERT_3(last_version, <=, preamble->end_commit_range);
 
         if (last_version <= preamble->end_commit_range) {
+            preamble->last_server_version = preamble->last_server_version_backup;
             if (last_version < preamble->begin_newest_commit_range) {
                 // writepoint is somewhere in the in-active (oldest) file, so
                 // discard data in the active file, and make the in-active file active
