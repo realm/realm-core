@@ -573,7 +573,7 @@ void WriteLogCollector::reset_log_management(version_type last_version)
 
         // Verify that end of the commit range is equal to or after 'last_version'
         // TODO: This most likely should throw an exception ?
-        TIGHTDB_ASSERT(last_version <= preamble->end_commit_range);
+        TIGHTDB_ASSERT_3(last_version, <=, preamble->end_commit_range);
 
         if (last_version <= preamble->end_commit_range) {
             if (last_version < preamble->begin_newest_commit_range) {
@@ -585,7 +585,7 @@ void WriteLogCollector::reset_log_management(version_type last_version)
             }
             // writepoint is somewhere in the active file.
             // We scan from the start to find it.
-            TIGHTDB_ASSERT(last_version >= preamble->begin_newest_commit_range);
+            TIGHTDB_ASSERT_3(last_version, >=, preamble->begin_newest_commit_range);
             CommitLogMetadata* active_log = get_active_log(preamble);
             remap_if_needed(*active_log);
             version_type current_version;
@@ -688,8 +688,8 @@ void WriteLogCollector::get_commit_entries_internal(version_type from_version, v
     map_header_if_needed();
     RobustLockGuard rlg(m_header.get_addr()->lock, &recover_from_dead_owner);
     const CommitLogPreamble* preamble = get_preamble();
-    TIGHTDB_ASSERT(from_version >= preamble->begin_oldest_commit_range);
-    TIGHTDB_ASSERT(to_version <= preamble->end_commit_range);
+    TIGHTDB_ASSERT_3(from_version, >=, preamble->begin_oldest_commit_range);
+    TIGHTDB_ASSERT_3(to_version, <=, preamble->end_commit_range);
 
     // - make sure the files are open and mapped, possibly update stale mappings
     remap_if_needed(m_log_a);
@@ -963,7 +963,7 @@ WriteLogCollector::do_commit_write_transact(SharedGroup&,
     uint_fast64_t peer_id = 0;
     uint_fast64_t peer_version = get_last_peer_version(1);
     version_type from_version = internal_submit_log(data, size, timestamp, peer_id, peer_version);
-    TIGHTDB_ASSERT(from_version == orig_version);
+    TIGHTDB_ASSERT_3(from_version, == , orig_version);
     static_cast<void>(from_version);
     version_type new_version = orig_version + 1;
     return new_version;

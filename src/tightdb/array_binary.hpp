@@ -133,7 +133,7 @@ inline std::size_t ArrayBinary::size() const TIGHTDB_NOEXCEPT
 
 inline BinaryData ArrayBinary::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(ndx < m_offsets.size());
+    TIGHTDB_ASSERT_3(ndx, <, m_offsets.size());
 
     std::size_t begin = ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
     std::size_t end   = to_size_t(m_offsets.get(ndx));
@@ -142,7 +142,7 @@ inline BinaryData ArrayBinary::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 
 inline void ArrayBinary::truncate(std::size_t size)
 {
-    TIGHTDB_ASSERT(size < m_offsets.size());
+    TIGHTDB_ASSERT_3(size, <, m_offsets.size());
 
     std::size_t blob_size = size ? to_size_t(m_offsets.get(size-1)) : 0;
 

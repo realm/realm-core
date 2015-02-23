@@ -2,7 +2,7 @@
 
 ### Bugfixes:
 
-* Fixed out-of-bounds reads when using aggregate functions on sorted TableViews.
+* Fixed crash when std::exit() is called with active encrypted mappings.
 
 ### API breaking changes:
 
@@ -19,7 +19,25 @@
 
 ### Internals:
 
-* Lorem ipsum.
+* Switched to using mach exceptions rather than signal() for encrypted mappings on Apple platforms.
+
+----------------------------------------------
+
+# 0.88.4 Release notes
+
+### Bugfixes:
+
+* Fixed out-of-bounds reads when using aggregate functions on sorted TableViews.
+* Fixed issues with ArrayString that *could* be the cause of all the asserts the
+  past few days
+
+-----------
+
+### Internals:
+
+* Many `TIGHTDB_ASSERT` invocations replaced by new `TIGHTDB_ASSERT_3` macro
+  that prints variable/argument contents on failure. It's not implemented
+  optimally yet.
 
 ----------------------------------------------
 

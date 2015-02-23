@@ -255,7 +255,7 @@ MemRef SlabAlloc::do_alloc(size_t size)
 
 void SlabAlloc::do_free(ref_type ref, const char* addr) TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(translate(ref) == addr);
+    TIGHTDB_ASSERT_3(translate(ref), ==, addr);
 
     // Free space in read only segment is tracked separately
     bool read_only = is_read_only(ref);
@@ -280,7 +280,7 @@ void SlabAlloc::do_free(ref_type ref, const char* addr) TIGHTDB_NOEXCEPT
 
     // Mutable memory cannot be freed unless it has first been allocated, and
     // any allocation puts free space tracking into the "dirty" state.
-    TIGHTDB_ASSERT(read_only || m_free_space_state == free_space_Dirty);
+    TIGHTDB_ASSERT_3(read_only, ||, m_free_space_state == free_space_Dirty);
 
     m_free_space_state = free_space_Dirty;
 
@@ -563,7 +563,7 @@ void SlabAlloc::do_prepare_for_update(char* mutable_data, util::File::Map<char>&
     TIGHTDB_ASSERT(equal(reinterpret_cast<char*>(header), reinterpret_cast<char*>(header+1),
                          reinterpret_cast<const char*>(&streaming_header)));
     StreamingFooter* footer = reinterpret_cast<StreamingFooter*>(mutable_data+m_baseline) - 1;
-    TIGHTDB_ASSERT(footer->m_magic_cookie == footer_magic_cookie);
+    TIGHTDB_ASSERT_3(footer->m_magic_cookie, ==, footer_magic_cookie);
     header->m_top_ref[1] = footer->m_top_ref;
     mapping.sync();
     header->m_flags |= flags_SelectBit; // keep bit 1 used for server sync mode unchanged
@@ -678,7 +678,7 @@ void SlabAlloc::Verify() const
 
         ref_type slab_ref_end = slab->ref_end;
         ref_type chunk_ref_end = chunk->ref + chunk->size;
-        TIGHTDB_ASSERT(chunk_ref_end <= slab_ref_end);
+        TIGHTDB_ASSERT_3(chunk_ref_end, <=, slab_ref_end);
     }
 }
 

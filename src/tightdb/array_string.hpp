@@ -24,22 +24,6 @@
 
 namespace tightdb {
 
-/*
-ArrayString stores strings as a concecutive list of fixed-length blocks of m_width bytes. The 
-longest string it can store is (m_width - 1) bytes before it needs to expand.
-
-An example of the format for m_width = 4 is following sequence of bytes, where x is payload:
-
-xxx0 xx01 x002 0003 0004 (strings "xxx",. "xx", "x", "", null)
-
-So each string is 0 terminated, and the last byte in a block tells how many 0s are present, except
-for a null which has the byte set to m_width (4). The byte is used to compute the length of a string
-in various functions.
-
-New: If m_witdh = 0, then all elements are null. So to add an empty string we must expand m_width
-New: StringData is null if-and-only-if StringData::data() == 0. Todo, maybe make StringData null-aware?
-*/
-
 class ArrayString: public Array {
 public:
     typedef StringData value_type;
@@ -48,8 +32,6 @@ public:
     explicit ArrayString(no_prealloc_tag) TIGHTDB_NOEXCEPT;
     ~ArrayString() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
 
-    bool is_null(size_t ndx) const;
-    void set_null(size_t ndx);
     StringData get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
     void add();
     void add(StringData value);
@@ -138,16 +120,11 @@ inline MemRef ArrayString::create_array(std::size_t size, Allocator& alloc)
 
 inline StringData ArrayString::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(ndx < m_size);
+    TIGHTDB_ASSERT_3(ndx, <, m_size);
     if (m_width == 0)
-        return StringData(null_ptr, 0); // return null
+        return StringData("", 0);
     const char* data = m_data + (ndx * m_width);
     std::size_t size = (m_width-1) - data[m_width-1];
-
-    if (size == static_cast<size_t>(-1))
-        return StringData(null_ptr, 0); // return null
-
-    TIGHTDB_ASSERT(data[size] == 0); // Realm guarantees 0 terminated return strings
     return StringData(data, size);
 }
 
@@ -163,16 +140,12 @@ inline void ArrayString::add()
 
 inline StringData ArrayString::get(const char* header, std::size_t ndx) TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(ndx < get_size_from_header(header));
+    TIGHTDB_ASSERT_3(ndx, <, get_size_from_header(header));
     std::size_t width = get_width_from_header(header);
     if (width == 0)
-        return StringData(null_ptr, 0); // return null
+        return StringData("", 0);
     const char* data = get_data_from_header(header) + (ndx * width);
     std::size_t size = (width-1) - data[width-1];
-
-    if (size == static_cast<size_t>(-1))
-        return StringData(null_ptr, 0); // return null
-
     return StringData(data, size);
 }
 
