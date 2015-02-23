@@ -24,11 +24,15 @@
 #include <tightdb/util/terminate.hpp>
 #include <tightdb/version.hpp>
 
+#if defined(TIGHTDB_ENABLE_ASSERTIONS) || defined(TIGHTDB_DEBUG)
+#  define TIGHTDB_ASSERTIONS_ENABLED 1
+#endif
+
 #define TIGHTDB_ASSERT_RELEASE(condition) \
     ((condition) ? static_cast<void>(0) : \
     tightdb::util::terminate(TIGHTDB_VER_CHUNK " Assertion failed: " #condition, __FILE__, __LINE__))
 
-#if defined(TIGHTDB_ENABLE_ASSERTIONS) || defined(TIGHTDB_DEBUG)
+#if TIGHTDB_ASSERTIONS_ENABLED
 #  define TIGHTDB_ASSERT(condition) TIGHTDB_ASSERT_RELEASE(condition)
 #else
 #  define TIGHTDB_ASSERT(condition) static_cast<void>(0)
