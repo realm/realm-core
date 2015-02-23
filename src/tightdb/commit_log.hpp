@@ -43,6 +43,8 @@ public:
 // may later be obtained through other writrlog collectors associated with said filepath.
 // The caller assumes ownership of the writelog collector and must destroy it, but only AFTER
 // destruction of the shared group using it.
+//
+// FIXME: Do not use CamelCase in function names.
 Replication* makeWriteLogCollector(std::string filepath,
                                    bool server_synchronization_mode = false,
                                    const char* encryption_key = 0);

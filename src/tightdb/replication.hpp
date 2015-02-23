@@ -120,31 +120,44 @@ public:
                                     BinaryData* logs_buffer) TIGHTDB_NOEXCEPT;
 
     virtual void get_commit_entries(version_type from_version, version_type to_version,
-                                    Replication::CommitLogEntry* logs_buffer) TIGHTDB_NOEXCEPT;
+                                    CommitLogEntry* logs_buffer) TIGHTDB_NOEXCEPT;
 
-    /// Persist a struct with information related to server synchronization.
-    /// The content is unrelated to the commmitlog management, EXCEPT for the
-    /// first field in the struct, which is used to limit commitlog cleanup.
-    /// Set the latest version that is known to be received and accepted by the
-    /// server. All later versions are guaranteed to be available to the caller
-    /// of get_commit_entries(). Asserts if the client_version in the struct
-    /// is lower than any previously persisted client_version.
-    struct PersistedSyncInfo {
-        uint64_t client_version; // this one limits cleanup of log entries
-        uint64_t server_version;
-        uint64_t client_file_id;
-        PersistedSyncInfo() { client_version = server_version = client_file_id = 0; }
-    };
+    /// See set_client_file_ident() and set_sync_progress().
+    virtual void get_sync_info(uint_fast64_t& client_file_ident, version_type& server_version,
+                               version_type& client_version);
 
-    virtual void set_persisted_sync_info(PersistedSyncInfo& info) TIGHTDB_NOEXCEPT;
+    /// Save the server assigned client file identifier to persistent
+    /// storage. This is done in a way that ensures crash-safety. It is an error
+    /// to set this identifier more than once. It is also an error to specify
+    /// zero, as zero is not a valid identifier. This identifier is used as part
+    /// of the synchronization mechanism.
+    virtual void set_client_file_ident(uint_fast64_t);
 
-    /// Get the PersistedSyncInfo store by last call to 'set_persisted_sync_info' If
-    /// 'end_version_number' is non null, a limit to version numbering is
-    /// returned.  The limit returned is the version number of the latest
-    /// commit.  If sync versioning is disabled, the last version seen locally
-    /// is returned.
-    virtual PersistedSyncInfo get_persisted_sync_info(version_type* end_version_number = 0)
-        TIGHTDB_NOEXCEPT;
+    /// Save the synchronization progress to persistent storage, and as an
+    /// atomic unit. This is done in a way that ensures
+    /// crash-safety. Additionally, `client_version` has an effect on the
+    /// process by which old history entries are discarded. See below for more
+    /// on this.
+    ///
+    /// \param server_version The version number of a server version that was
+    /// recently integrated by this client, or of a server version recently
+    /// produced by integration on the server of a changeset from this client,
+    /// and reported by the server to this client through an 'accept' message.
+    ///
+    /// \param client_version The version number of the last client version
+    /// integrated by the server into `server_version`. All changesets produced
+    /// after `client_version` are potentially needed when conflicting histories
+    /// need to be merged during synchronization, so the Replication class
+    /// promises to retain all history entries produced after
+    /// `client_version`. That is, a history entry with a changeset that takes
+    /// the group from version V to version W is guaranteed to be retained if W
+    /// > `client_version`.
+    ///
+    /// It is an error to specify a client version that is less than the
+    /// currently stored version, since there is no way to get discarded history
+    /// back.
+    virtual void set_sync_progress(version_type server_version,
+                                   version_type client_version);
 
     /// Apply the specified changeset to the specified group as a single
     /// transaction, but only if that transaction can be based on the specified
@@ -735,14 +748,16 @@ inline void Replication::set_last_version_seen_locally(version_type) TIGHTDB_NOE
 {
 }
 
-inline void Replication::set_persisted_sync_info(Replication::PersistedSyncInfo&) TIGHTDB_NOEXCEPT
+inline void Replication::get_sync_info(uint_fast64_t&, version_type&, version_type&)
 {
 }
 
-inline Replication::PersistedSyncInfo Replication::get_persisted_sync_info(version_type*)
-    TIGHTDB_NOEXCEPT
+inline void Replication::set_client_file_ident(uint_fast64_t)
 {
-    return PersistedSyncInfo();
+}
+
+inline void Replication::set_sync_progress(version_type, version_type)
+{
 }
 
 inline Replication::version_type

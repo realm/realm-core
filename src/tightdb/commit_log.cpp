@@ -58,6 +58,19 @@ private:
     Replication* m_temp_disabled_repl;
 };
 
+
+struct SyncInfo {
+    uint64_t client_file_ident;
+    uint64_t server_version;
+    uint64_t client_version; // this one limits cleanup of log entries
+    SyncInfo():
+        client_file_ident(0),
+        server_version(0),
+        client_version(0)
+    {
+    }
+};
+
 } // anonymous namespace
 
 
@@ -120,9 +133,9 @@ public:
     virtual void reset_log_management(version_type last_version) TIGHTDB_OVERRIDE;
     virtual void set_last_version_seen_locally(version_type last_seen_version_number)
         TIGHTDB_NOEXCEPT;
-    virtual void set_persisted_sync_info(Replication::PersistedSyncInfo& info) TIGHTDB_NOEXCEPT;
-    virtual Replication::PersistedSyncInfo get_persisted_sync_info(version_type* newest_version_number)
-        TIGHTDB_NOEXCEPT;
+    void get_sync_info(uint_fast64_t&, version_type&, version_type&) TIGHTDB_OVERRIDE;
+    void set_client_file_ident(uint_fast64_t) TIGHTDB_OVERRIDE;
+    void set_sync_progress(version_type, version_type) TIGHTDB_OVERRIDE;
     void get_commit_entries(version_type from_version, version_type to_version,
                             Replication::CommitLogEntry* logs_buffer) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     void get_commit_entries(version_type from_version, version_type to_version,
@@ -160,11 +173,13 @@ protected:
 
         // Last seen versions by Sync and local sharing, respectively
         uint64_t last_version_seen_locally;
-        PersistedSyncInfo sync_info;
+        SyncInfo sync_info;
 
         // Last server_version, as set by calls to apply_foreign_transact_log(),
         // or 0 if never set.
         uint64_t last_server_version;
+
+        uint64_t last_client_file_ident; // FIXME: Part of a temporary hack
 
         // proper intialization:
         CommitLogPreamble(uint_fast64_t version)
@@ -173,7 +188,8 @@ protected:
             // The first commit will be from state 1 -> state 2, so we must set 1 initially
             begin_oldest_commit_range = begin_newest_commit_range = end_commit_range = version;
             last_version_seen_locally = sync_info.client_version = version;
-            last_server_version = 1;
+            last_server_version = 0;
+            last_client_file_ident = 0; // FIXME: Part of a temporary hack
             write_offset = 0;
         }
     };
@@ -497,6 +513,8 @@ WriteLogCollector::internal_submit_log(const char* data, uint_fast64_t size,
         peer_version = preamble->last_server_version;
     }
 
+    preamble->last_client_file_ident = peer_id; // FIXME: Part of a temporary hack
+
     // make sure the file is available for potential resizing
     open_if_needed(*active_log);
 
@@ -614,32 +632,46 @@ void WriteLogCollector::reset_log_management(version_type last_version)
 }
 
 
-void WriteLogCollector::set_persisted_sync_info(PersistedSyncInfo& info) TIGHTDB_NOEXCEPT
+void WriteLogCollector::get_sync_info(uint_fast64_t& client_file_ident,
+                                      version_type& server_version,
+                                      version_type& client_version)
 {
-    map_header_if_needed();
+    map_header_if_needed(); // Throws
+    RobustLockGuard rlg(m_header.get_addr()->lock, &recover_from_dead_owner);
+    const CommitLogPreamble* preamble = get_preamble();
+    client_file_ident = preamble->sync_info.client_file_ident;
+    server_version    = preamble->sync_info.server_version;
+    client_version    = preamble->sync_info.client_version;
+}
+
+
+void WriteLogCollector::set_client_file_ident(uint_fast64_t client_file_ident)
+{
+    map_header_if_needed(); // Throws
     RobustLockGuard rlg(m_header.get_addr()->lock, &recover_from_dead_owner);
     CommitLogPreamble* preamble = get_preamble_for_write();
-    version_type old_version = preamble->sync_info.client_version;
-    version_type new_version = info.client_version;
-    TIGHTDB_ASSERT(new_version >= old_version);
+    TIGHTDB_ASSERT(client_file_ident != 0 && preamble->sync_info.client_file_ident == 0);
+    preamble->sync_info.client_file_ident = client_file_ident;
+    sync_header();
+}
+
+
+void WriteLogCollector::set_sync_progress(version_type server_version, version_type client_version)
+{
+    map_header_if_needed(); // Throws
+    RobustLockGuard rlg(m_header.get_addr()->lock, &recover_from_dead_owner);
+    CommitLogPreamble* preamble = get_preamble_for_write();
+    TIGHTDB_ASSERT(server_version >= preamble->sync_info.server_version);
+    TIGHTDB_ASSERT(client_version >= preamble->sync_info.client_version);
+    preamble->sync_info.server_version = server_version;
+    preamble->sync_info.client_version = client_version;
     cleanup_stale_versions(preamble);
     sync_header();
 }
 
 
-Replication::PersistedSyncInfo
-WriteLogCollector::get_persisted_sync_info(version_type* end_version_number)
-    TIGHTDB_NOEXCEPT
-{
-    map_header_if_needed();
-    RobustLockGuard rlg(m_header.get_addr()->lock, &recover_from_dead_owner);
-    const CommitLogPreamble* preamble = get_preamble();
-    if (end_version_number)
-        *end_version_number = preamble->end_commit_range;
-    return preamble->sync_info;
-}
-
-
+// FIXME: Finn, `map_header_if_needed()` can throw, so it is an error to declare
+// this one `noexcept`
 void WriteLogCollector::set_last_version_seen_locally(version_type last_seen_version_number)
     TIGHTDB_NOEXCEPT
 {
@@ -930,14 +962,36 @@ WriteLogCollector::apply_foreign_changeset(SharedGroup& sg, version_type last_ve
 
     WriteTransaction transact(sg);
     version_type current_version = sg.get_current_version();
-    //if (last_version_integrated_by_peer < current_version)
-    //    return 0;
+
+//    if (last_version_integrated_by_peer < current_version)
+//        return 0;
+
+    // FIXME: This is a temporary hack
+    if (last_version_integrated_by_peer != 0) {
+        if (last_version_integrated_by_peer < current_version) {
+            uint_fast64_t last_client_file_ident;
+            {
+                map_header_if_needed(); // Throws
+                RobustLockGuard rlg(m_header.get_addr()->lock, &recover_from_dead_owner);
+                const CommitLogPreamble* preamble = get_preamble();
+                TIGHTDB_ASSERT(preamble->end_commit_range == current_version);
+                last_client_file_ident = preamble->last_client_file_ident;
+            }
+            // `last_client_file_ident` will be 0 if the history is empty (empty
+            // database).
+            bool history_ends_with_foreign_changeset = last_client_file_ident != 0;
+            if (!history_ends_with_foreign_changeset)
+                return 0;
+        }
+    }
+
     if (TIGHTDB_UNLIKELY(last_version_integrated_by_peer > current_version))
         throw LogicError(LogicError::bad_version_number);
     SimpleInputStream input(changeset.data(), changeset.size());
-    MergingIndexTranslator translator(*this, group, timestamp, peer_id,
-        last_version_integrated_by_peer, current_version);
-    apply_transact_log(input, transact.get_group(), translator, apply_log); // Throws
+    SimpleIndexTranslator dummy_translator;
+//    MergingIndexTranslator translator(*this, group, timestamp, peer_id,
+//        last_version_integrated_by_peer, current_version);
+    apply_transact_log(input, transact.get_group(), dummy_translator, apply_log); // Throws
 
     // FIXME: internal_submit_log should get the transformed changeset!
     internal_submit_log(changeset.data(), changeset.size(), timestamp, peer_id, peer_version); // Throws
