@@ -7,6 +7,8 @@ util/unique_ptr.hpp util/bind_ptr.hpp util/buffer.hpp util/string_buffer.hpp uti
 util/memory_stream.hpp util/logger.hpp util/thread.hpp util/file.hpp util/utf8.hpp exceptions.hpp \
 utilities.hpp alloc.hpp alloc_slab.hpp array.hpp array_string.hpp data_type.hpp column_type.hpp \
 column_fwd.hpp spec.hpp impl/destroy_guard.hpp impl/output_stream.hpp datetime.hpp string_data.hpp \
+impl/input_stream.hpp \
+impl/transact_log.hpp \
 binary_data.hpp mixed.hpp table.hpp table_ref.hpp table_basic_fwd.hpp table_accessors.hpp \
 table_basic.hpp table_view.hpp table_view_basic.hpp table_macros.hpp row.hpp descriptor_fwd.hpp \
 descriptor.hpp group.hpp group_shared.hpp $(REPLICATION_HPP) query.hpp query_conditions.hpp \
@@ -36,6 +38,7 @@ array_blob.cpp array_blobs_big.cpp array_string.cpp array_string_long.cpp column
 column_backlink.cpp column_binary.cpp column_link.cpp column_link_base.cpp column_linklist.cpp \
 column_mixed.cpp column_string.cpp column_string_enum.cpp column_table.cpp commit_log.cpp \
 descriptor.cpp exceptions.cpp group.cpp group_shared.cpp group_writer.cpp impl/output_stream.cpp \
+impl/transact_log.cpp \
 importer.cpp index_string.cpp lang_bind_helper.cpp link_view.cpp query.cpp query_engine.cpp row.cpp spec.cpp \
 table.cpp table_view.cpp unicode.cpp utilities.cpp version.cpp views.cpp util/platform_specific_condvar.cpp
 
