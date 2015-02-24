@@ -1591,7 +1591,7 @@ TEST(Group_ToString)
 }
 
 
-ONLY(Group_IndexString)
+TEST(Group_IndexString)
 {
     Group to_mem;
     TestTableGroup::Ref table = to_mem.add_table<TestTableGroup>("test");

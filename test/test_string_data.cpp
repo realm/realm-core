@@ -5,6 +5,7 @@
 #include <string>
 #include <sstream>
 
+#include <tightdb.hpp>
 #include <tightdb/string_data.hpp>
 
 #include "test.hpp"
@@ -232,7 +233,44 @@ TEST(StringData_LexicographicCompare)
 
 TEST(StringData_Substrings)
 {
+    // Reasoning behind behaviour is that if you append strings A + B then B is a suffix of a, and hence A
+    // "ends with" B, and B "begins with" A. This is true even though appending a null or empty string keeps the 
+    // original unchanged
+
     StringData sd_0("");
+    StringData ns = tightdb::null();
+    StringData data("x");
+
+    // null.
+    CHECK(ns.begins_with(ns));
+    CHECK(ns.begins_with(sd_0));
+    CHECK(ns.begins_with(""));
+    CHECK(!ns.begins_with("x"));
+
+    CHECK(ns.ends_with(ns));
+    CHECK(ns.ends_with(sd_0));
+    CHECK(ns.ends_with(""));
+    CHECK(!ns.ends_with("x"));
+
+    CHECK(sd_0.begins_with(ns));
+    CHECK(sd_0.ends_with(ns));
+
+    CHECK(data.begins_with(ns));
+    CHECK(data.ends_with(ns));
+
+    CHECK(data.contains(ns));
+    CHECK(!ns.contains(data));
+
+    CHECK(sd_0.contains(ns));
+    CHECK(!sd_0.contains(data));
+
+    CHECK(ns.contains(ns));
+    CHECK(!ns.contains(data));
+
+    CHECK(ns.contains(sd_0));
+    CHECK(sd_0.contains(ns));
+
+    // non-nulls
     CHECK(sd_0.begins_with(sd_0));
     CHECK(sd_0.begins_with(""));
     CHECK(sd_0.ends_with(sd_0));
