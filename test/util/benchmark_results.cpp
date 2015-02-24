@@ -229,12 +229,14 @@ void BenchmarkResults::save_results()
     string baseline_file = m_results_file_stem;
     string latest_csv_file = m_results_file_stem + ".latest.csv";
     baseline_file += ".baseline";
+    int r;
     if (!util::File::exists(baseline_file)) {
-        link(name.c_str(), baseline_file.c_str());
+        r = link(name.c_str(), baseline_file.c_str());
     }
     if (util::File::exists(latest_csv_file)) {
-        unlink(latest_csv_file.c_str());
+        r = unlink(latest_csv_file.c_str());
     }
-    link(csv_name.c_str(), latest_csv_file.c_str());
+    r = link(csv_name.c_str(), latest_csv_file.c_str());
+    static_cast<void>(r); // FIXME: Display if error
 }
 
