@@ -20,8 +20,6 @@ using namespace tightdb::util;
 
 namespace {
 
-const int current_file_format_version = 2;
-
 #ifdef TIGHTDB_SLAB_ALLOC_DEBUG
 map<ref_type, void*> malloc_debug_map;
 #endif
@@ -531,7 +529,7 @@ bool SlabAlloc::validate_buffer(const char* data, size_t size, ref_type& top_ref
 
     // Byte 4 and 5 (depending on valid_part) in the info block is version
     int version = static_cast<unsigned char>(file_header[16 + 4 + valid_part]);
-    if (version != current_file_format_version)
+    if (version > current_file_format_version)
         return false; // unsupported version
 
     // Top_ref should always point within buffer

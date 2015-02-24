@@ -40,7 +40,7 @@ Initialization initialization;
 void Group::upgrade_file_format()
 {
     TIGHTDB_ASSERT(is_attached());
-    if (get_file_format_version() >= 3)
+    if (get_file_format_version() >= current_file_format_version)
         return;
 
     for (size_t t = 0; t < m_tables.size(); t++) {
@@ -53,7 +53,7 @@ void Group::upgrade_file_format()
         }
     }
 
-    set_file_format_version(3);
+    set_file_format_version(current_file_format_version);
 }
 
 
