@@ -72,7 +72,7 @@ using std::size_t;
 // 1. Presenting data
 // The first use case (and primary motivator behind the reflective view) is to just track
 // and present the state of the database. In this case, the view is operated in reflective
-// mode, it is not modified within the transaction, and it does not cause modification in
+// mode, it is not modified within the transaction, and it is not used to modify data in
 // other parts of the database.
 //
 // 2. Handover
@@ -87,13 +87,8 @@ using std::size_t;
 // You can handover both reflective and imperative views. But most often it will only make
 // sense to handover an imperative view, because it is guaranteed not to rerun its query.
 //
-// Handover is expressed using a new type, HandoverTableView, which can be produced calling
-// TableViewBase::export_for_handover(). After the call to export_for_handover(), the table view
-// becomes detached to prevent misuse. On the receiving side, a new TableView is produced from
-// HandoverTableView::import_from_handover(SharedGroup& sg). Export will fail if the TableView
-// has a restricting view, or is created from a LinkView. 
-// Import will fail if the importing and exporting SharedGroups are observing different 
-// versions of the database.
+// Handover is expressed using a templated type 'Handover' available from SharedGroup. See
+// group_shared.hpp for more details on handover.
 //
 // 3. Iterating a view and changing data
 // The third use case (and a motivator behind the imperative view) is when you want

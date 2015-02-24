@@ -340,7 +340,12 @@ public:
     void test_ringbuf();
 #endif
 
-    /// Support for handover of typed accessors between shared groups
+    /// To handover a table view or row accessor of type T, you must wrap it into
+    /// a Handover<T> for the transfer. Wrapping and unwrapping of a handover
+    /// object is done by the methods 'export_for_handover()' and 'import_from_handover()'
+    /// declared below
+
+    /// Type used to support handover of accessors between shared groups.
     template<typename T> struct Handover {
         T m_payload;
         std::size_t m_table_num;
@@ -353,6 +358,12 @@ public:
         Handover() {};
     };
 
+    /// Create a handover object for the given accessor. If the accessor is a table view,
+    /// the table view becomes detached. If the accessor is an ordinary row accessor, the
+    /// accessor is copied and hence does not become detached. The call to export_for_handover
+    /// is not thread-safe. For table views, export is restricted to certain kinds of table
+    /// views and will throw if the restriction is violated. See table_view.hpp for a
+    /// description of the restrictions applying to export of table views.
     template<typename T>
     Handover<T> export_for_handover(T& accessor)
     {
@@ -362,6 +373,9 @@ public:
         return handover;
     }
 
+    /// Import an accessor wrapped in a handover object. The import will fail if the
+    /// importing SharedGroup is viewing a version of the database that is different
+    /// from the exporting SharedGroup. The call to import_from_handover is not thread-safe.
     template<typename T>
     T import_from_handover(Handover<T>& handover)
     {
@@ -372,7 +386,6 @@ public:
         return result;
     }
 
-        //
 private:
     struct SharedInfo;
     struct ReadCount;
