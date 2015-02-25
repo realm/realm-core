@@ -299,6 +299,8 @@ private:
     void find_all(TableViewBase& tv, size_t start = 0, size_t end=size_t(-1), size_t limit = size_t(-1)) const;
     void delete_nodes() TIGHTDB_NOEXCEPT;
 
+    void set_table(TableRef tr) { m_table = tr; }
+    bool supports_export_for_handover() { return m_view == 0; };
     std::string error_code;
 
     friend class Table;

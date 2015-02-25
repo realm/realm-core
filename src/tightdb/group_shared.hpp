@@ -344,7 +344,8 @@ public:
     /// To handover a table view or row accessor of type T, you must wrap it into
     /// a Handover<T> for the transfer. Wrapping and unwrapping of a handover
     /// object is done by the methods 'export_for_handover()' and 'import_from_handover()'
-    /// declared below
+    /// declared below. 'export_for_handover()' returns a UniquePtr to the Handover
+    /// object, and 'import_for_handover()' consumes the object.
 
     /// Type used to support handover of accessors between shared groups.
     template<typename T> struct Handover {
@@ -387,7 +388,9 @@ public:
     template<typename T>
     T import_from_handover(tightdb::util::UniquePtr<Handover<T> >& handover)
     {
-        TIGHTDB_ASSERT(handover->m_version == get_version_of_current_transaction());
+        if (handover->m_version != get_version_of_current_transaction()) {
+            throw std::runtime_error("Handover failed due to version mismatch");
+        }
         T result(handover->m_payload);
         result.prepare_for_import(handover->m_handover_data, m_group);
         handover.reset();

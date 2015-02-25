@@ -25,8 +25,10 @@
 #include <tightdb/views.hpp>
 #include <tightdb/table.hpp>
 #include <tightdb/column.hpp>
+#include <tightdb/exceptions.hpp>
 #include <tightdb/util/features.h>
 #include <tightdb/group_shared.hpp>
+
 namespace tightdb {
 
 using std::size_t;
@@ -337,7 +339,12 @@ protected:
         handover_data.table_num = m_table->get_index_in_group();
         handover_data.has_query = m_query.get_table() != TableRef();
         // must be group level table!
-        TIGHTDB_ASSERT(handover_data.table_num != npos);
+        if (handover_data.table_num == npos) {
+            throw std::runtime_error("Handover failed: not a group level table");
+        }
+        if (!m_query.supports_export_for_handover()) {
+            throw std::runtime_error("Handover failed: query too complex");
+        }
         // FIXME: might need to propagate into base class and members
         detach();
     }
@@ -349,6 +356,10 @@ protected:
         tr->register_view(this);
         // FIXME: propagate into base class and members
         // FIXME: update query !!!
+        if (handover_data.has_query)
+            m_query.set_table(tr);
+        else
+            m_query.set_table(TableRef());
     }
 private:
     void detach() TIGHTDB_NOEXCEPT;
@@ -665,6 +676,8 @@ inline TableViewBase::TableViewBase(const TableViewBase& tv):
     ref_guard.release();
 }
 
+// this constructor is used to "move" results of find_all_xxx into a table view.
+// it is OK, that it just default constructs its view member.
 inline TableViewBase::TableViewBase(TableViewBase* tv) TIGHTDB_NOEXCEPT:
     RowIndexes(Column::move_tag(), tv->m_row_indexes),
     m_table(move(tv->m_table)),
@@ -1034,6 +1047,7 @@ inline TableView::TableView(TableView* tv) TIGHTDB_NOEXCEPT:
     TableViewBase(tv)
 {
 }
+
 
 inline ConstTableView::ConstTableView(ConstTableView* tv) TIGHTDB_NOEXCEPT:
     TableViewBase(tv)
