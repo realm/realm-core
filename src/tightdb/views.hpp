@@ -6,26 +6,26 @@
 
 using namespace tightdb;
 
-// This class is for common functionality of ListView and LinkView which inherit from it. Currently it only 
+// This class is for common functionality of ListView and LinkView which inherit from it. Currently it only
 // supports sorting.
 class RowIndexes
 {
 public:
-    RowIndexes(Column::unattached_root_tag urt, tightdb::Allocator& alloc) : 
-#ifdef TIGHTDB_COOKIE_CHECK
-        cookie(cookie_expected), 
-#endif
-        m_row_indexes(urt, alloc), m_auto_sort(false) 
-    {}
-
-    RowIndexes(Column::move_tag mt, Column& col) : 
+    RowIndexes(Column::unattached_root_tag urt, tightdb::Allocator& alloc) :
 #ifdef TIGHTDB_COOKIE_CHECK
         cookie(cookie_expected),
-#endif      
-        m_row_indexes(mt, col), m_auto_sort(false) 
+#endif
+        m_row_indexes(urt, alloc), m_auto_sort(false)
     {}
 
-    virtual ~RowIndexes() 
+    RowIndexes(Column::move_tag mt, Column& col) :
+#ifdef TIGHTDB_COOKIE_CHECK
+        cookie(cookie_expected),
+#endif
+        m_row_indexes(mt, col), m_auto_sort(false)
+    {}
+
+    virtual ~RowIndexes()
     {
 #ifdef TIGHTDB_COOKIE_CHECK
         cookie = 0x7765697633333333; // 0x77656976 = 'view'; 0x33333333 = '3333' = destructed
@@ -64,9 +64,9 @@ public:
                 TIGHTDB_ASSERT(ctb);
 
                 // todo/fixme, special treatment of ColumnStringEnum by calling ColumnStringEnum::compare_values()
-                // instead of the general ColumnTemplate::compare_values() becuse it cannot overload inherited 
-                // `int64_t get_val()` of Column. Such column inheritance needs to be cleaned up 
-                int c;             
+                // instead of the general ColumnTemplate::compare_values() becuse it cannot overload inherited
+                // `int64_t get_val()` of Column. Such column inheritance needs to be cleaned up
+                int c;
                 if (dynamic_cast<const ColumnStringEnum*>(&cb))
                     c = static_cast<const ColumnStringEnum*>(&cb)->compare_values(i, j);
                 else

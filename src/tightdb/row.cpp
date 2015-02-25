@@ -1,5 +1,6 @@
 #include <tightdb/row.hpp>
 #include <tightdb/table.hpp>
+#include <tightdb/group.hpp>
 
 using namespace std;
 using namespace tightdb;
@@ -35,14 +36,15 @@ void RowBase::impl_detach() TIGHTDB_NOEXCEPT
 }
 
 
-void RowBase::prepare_for_export(std::size_t& table_num)
+void RowBase::prepare_for_export(Handover_data& handover_data)
 {
-    table_num = m_table->get_index_in_group();
+    handover_data.table_num = m_table->get_index_in_group();
 }
 
 
-void RowBase::prepare_for_import(TableRef table)
+void RowBase::prepare_for_import(Handover_data& handover_data, Group& group)
 {
+    TableRef table = group.get_table(handover_data.table_num);
     attach(table.get(), m_row_ndx);
 }
 

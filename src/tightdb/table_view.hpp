@@ -326,21 +326,29 @@ protected:
     template<class R, class V> static R find_all_double(V*, std::size_t, double);
     template<class R, class V> static R find_all_string(V*, std::size_t, StringData);
 
-    void prepare_for_export(std::size_t& table_num)
-    {
-        table_num = m_table->get_index_in_group();
-        // must be group level table!
-        TIGHTDB_ASSERT(table_num != npos);
-        // FIXME: might need to propagate into base class and members
+    struct Handover_data {
+        std::size_t table_num;
+        bool has_query;
+    };
 
+
+    void prepare_for_export(Handover_data& handover_data)
+    {
+        handover_data.table_num = m_table->get_index_in_group();
+        handover_data.has_query = m_query.get_table() != TableRef();
+        // must be group level table!
+        TIGHTDB_ASSERT(handover_data.table_num != npos);
+        // FIXME: might need to propagate into base class and members
         detach();
     }
-    void prepare_for_import(TableRef tr)
+    void prepare_for_import(Handover_data& handover_data, Group& group)
     {
+        TableRef tr = group.get_table(handover_data.table_num);
         m_table = tr;
         m_last_seen_version = tr->m_version;
         tr->register_view(this);
         // FIXME: propagate into base class and members
+        // FIXME: update query !!!
     }
 private:
     void detach() TIGHTDB_NOEXCEPT;
