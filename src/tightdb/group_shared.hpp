@@ -25,6 +25,7 @@
 #include <tightdb/util/features.h>
 #include <tightdb/util/thread.hpp>
 #include <tightdb/util/platform_specific_condvar.hpp>
+#include <tightdb/util/unique_ptr.hpp>
 #include <tightdb/group.hpp>
 //#include <tightdb/commit_log.hpp>
 
@@ -350,12 +351,16 @@ public:
         T m_payload;
         typename T::Handover_data m_handover_data;
         VersionID m_version;
-        // FIXME: payload construction must be move assign - but is it?
         Handover(T& payload, typename T::Handover_data handover_data, VersionID version) 
             : m_payload(payload), m_handover_data(handover_data), m_version(version) 
         {
         }
-        Handover() {};
+        /// Handover objects are not supposed to be copied or assigned, it's too heavy.
+        /// If you want to pass it around, use a UniquePtr to it and "move" that around.
+        /// Privatize operator= and copy constructor.
+    private:
+        Handover<T>& operator=(const Handover<T>&);
+        Handover(const Handover<T>&);
     };
 
     /// Create a handover object for the given accessor. If the accessor is a table view,
@@ -363,26 +368,29 @@ public:
     /// accessor is copied and hence does not become detached. The call to export_for_handover
     /// is not thread-safe. For table views, export is restricted to certain kinds of table
     /// views and will throw if the restriction is violated. See table_view.hpp for a
-    /// description of the restrictions applying to export of table views.
+    /// description of the restrictions applying to export of table views. Also for table views,
+    /// the originating table view becomes "detached" by the export operation. This is not
+    /// the case for row accessors.
+    /// The call will allocate a handover object, and reset the UniquePtr to point to it.
     template<typename T>
-    Handover<T> export_for_handover(T& accessor)
+    void export_for_handover(T& accessor, tightdb::util::UniquePtr<Handover<T> >& handover)
     {
         typename T::Handover_data handover_data;
         accessor.prepare_for_export(handover_data);
-        Handover<T> handover(accessor, handover_data, get_version_of_current_transaction());
-        return handover;
+        handover.reset( new Handover<T>(accessor, handover_data, get_version_of_current_transaction()));
     }
 
     /// Import an accessor wrapped in a handover object. The import will fail if the
     /// importing SharedGroup is viewing a version of the database that is different
     /// from the exporting SharedGroup. The call to import_from_handover is not thread-safe.
+    /// The handover object is "consumed" (and deleted) by the call, leaving the UniquePtr reset.
     template<typename T>
-    T import_from_handover(Handover<T>& handover)
+    T import_from_handover(tightdb::util::UniquePtr<Handover<T> >& handover)
     {
-        TIGHTDB_ASSERT(handover.m_version == get_version_of_current_transaction());
-        // FIXME: must be move assign - but is it?
-        T result(handover.m_payload);
-        result.prepare_for_import(handover.m_handover_data, m_group);
+        TIGHTDB_ASSERT(handover->m_version == get_version_of_current_transaction());
+        T result(handover->m_payload);
+        result.prepare_for_import(handover->m_handover_data, m_group);
+        handover.reset();
         return result;
     }
 

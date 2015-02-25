@@ -6898,7 +6898,7 @@ TEST(LangBindHelper_Handover)
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
     // Typed interface
-    SharedGroup::Handover<TestTableInts::View> handover;
+    UniquePtr<SharedGroup::Handover<TestTableInts::View> > handover;
     SharedGroup::VersionID vid;
     {
         LangBindHelper::promote_to_write(sg_w);
@@ -6915,7 +6915,7 @@ TEST(LangBindHelper_Handover)
         CHECK_EQUAL(100, tv.size());
         for (int i = 0; i<100; ++i)
             CHECK_EQUAL(i, tv[i].first);
-        handover = sg_w.export_for_handover(tv);
+        sg_w.export_for_handover(tv, handover);
         CHECK(!tv.is_attached());
     }
     {
@@ -6928,8 +6928,8 @@ TEST(LangBindHelper_Handover)
     }
 
     // Untyped interface
-    SharedGroup::Handover<TableView> handover2;
-    SharedGroup::Handover<Row> handover_row;
+    UniquePtr<SharedGroup::Handover<TableView> > handover2;
+    UniquePtr<SharedGroup::Handover<Row> > handover_row;
     {
         LangBindHelper::promote_to_write(sg_w);
         TableRef table = group_w.add_table("table2");
@@ -6945,12 +6945,12 @@ TEST(LangBindHelper_Handover)
         CHECK_EQUAL(100, tv.size());
         for (int i = 0; i<100; ++i)
             CHECK_EQUAL(i, tv.get_int(0,i));
-        handover2 = sg_w.export_for_handover(tv);
+        sg_w.export_for_handover(tv, handover2);
         CHECK(!tv.is_attached());
         // Aaaaand rows!
         Row row = (*table)[7];
         CHECK_EQUAL(7, row.get_int(0));
-        handover_row = sg_w.export_for_handover(row);
+        sg_w.export_for_handover(row, handover_row);
         CHECK(row.is_attached());
     }
     {

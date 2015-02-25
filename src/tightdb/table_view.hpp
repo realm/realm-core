@@ -703,6 +703,7 @@ inline void TableViewBase::move_assign(TableViewBase* tv) TIGHTDB_NOEXCEPT
         m_table->move_registered_view(tv, this);
 
     m_row_indexes.move_assign(tv->m_row_indexes);
+    // Hrrmmm - so move_assign of tableviews does *not* use move_assign of query?
     m_query = tv->m_query;
 #ifdef TIGHTDB_ENABLE_REPLICATION
     m_last_seen_version = tv->m_last_seen_version;
