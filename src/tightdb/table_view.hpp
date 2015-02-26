@@ -43,7 +43,7 @@ using std::size_t;
 // Views remember the query from which it was originally built.
 // Views remember the table from which it was originally built.
 // Views remember a restricting view if one was used when it was originally built.
-// Views remember the last sorting criteria (column and direction)
+// Views remember the sorting criteria (columns and direction)
 //
 // A view may be operated in one of two distinct modes: *reflective* and *imperative*.
 // Sometimes the term "reactive" is used instead of "reflective" with the same meaning.
@@ -321,7 +321,7 @@ protected:
 
     ~TableViewBase() TIGHTDB_NOEXCEPT;
 
-    void move_assign(TableViewBase*) TIGHTDB_NOEXCEPT;
+    void move_assign(TableViewBase&) TIGHTDB_NOEXCEPT;
 
     template<class R, class V> static R find_all_integer(V*, std::size_t, int64_t);
     template<class R, class V> static R find_all_float(V*, std::size_t, float);
@@ -707,25 +707,25 @@ inline TableViewBase::~TableViewBase() TIGHTDB_NOEXCEPT
     m_row_indexes.destroy(); // Shallow
 }
 
-inline void TableViewBase::move_assign(TableViewBase* tv) TIGHTDB_NOEXCEPT
+inline void TableViewBase::move_assign(TableViewBase& tv) TIGHTDB_NOEXCEPT
 {
     if (m_table)
         m_table->unregister_view(this);
-    m_table = move(tv->m_table);
+    m_table = move(tv.m_table);
     if (m_table)
-        m_table->move_registered_view(tv, this);
+        m_table->move_registered_view(&tv, this);
 
-    m_row_indexes.move_assign(tv->m_row_indexes);
+    m_row_indexes.move_assign(tv.m_row_indexes);
     // Hrrmmm - so move_assign of tableviews does *not* use move_assign of query?
-    m_query = tv->m_query;
+    m_query = tv.m_query;
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    m_last_seen_version = tv->m_last_seen_version;
-    m_auto_sort = tv->m_auto_sort;
-    m_start = tv->m_start;
-    m_end = tv->m_end;
-    m_limit = tv->m_limit;
-    m_linkview_source = tv->m_linkview_source;
-    m_sorting_predicate = tv->m_sorting_predicate;
+    m_last_seen_version = tv.m_last_seen_version;
+    m_auto_sort = tv.m_auto_sort;
+    m_start = tv.m_start;
+    m_end = tv.m_end;
+    m_limit = tv.m_limit;
+    m_linkview_source = tv.m_linkview_source;
+    m_sorting_predicate = tv.m_sorting_predicate;
 #endif
 }
 
@@ -991,19 +991,19 @@ inline ConstTableView::~ConstTableView() TIGHTDB_NOEXCEPT
 
 inline TableView& TableView::operator=(TableView tv)
 {
-    move_assign(&tv);
+    move_assign(tv);
     return *this;
 }
 
 inline ConstTableView& ConstTableView::operator=(ConstTableView tv)
 {
-    move_assign(&tv);
+    move_assign(tv);
     return *this;
 }
 
 inline ConstTableView& ConstTableView::operator=(TableView tv)
 {
-    move_assign(&tv);
+    move_assign(tv);
     return *this;
 }
 

@@ -221,6 +221,11 @@ protected:
     };
     void prepare_for_export(Handover_data& handover_data);
     void prepare_for_import(Handover_data& handover_data, Group& group);
+    void move_assign(RowBase& src_row)
+    {
+        reattach(src_row.m_table.get(), src_row.m_row_ndx);
+        src_row.impl_detach();
+    }
 private:
     RowBase* m_prev; // Null if first, undefined if detached.
     RowBase* m_next; // Null if last, undefined if detached.
@@ -292,6 +297,10 @@ private:
     void prepare_for_import(Handover_data& handover_data, Group& group)
     {
         RowBase::prepare_for_import(handover_data, group);
+    }
+    void move_assign(BasicRow<T>& row)
+    {
+        RowBase::move_assign(row);
     }
     friend class SharedGroup;
 

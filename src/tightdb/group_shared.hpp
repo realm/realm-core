@@ -349,10 +349,10 @@ public:
 
     /// Type used to support handover of accessors between shared groups.
     template<typename T> struct Handover {
-        T m_payload;
+        T* m_payload;
         typename T::Handover_data m_handover_data;
         VersionID m_version;
-        Handover(T& payload, typename T::Handover_data handover_data, VersionID version) 
+        Handover(T* payload, typename T::Handover_data handover_data, VersionID version) 
             : m_payload(payload), m_handover_data(handover_data), m_version(version) 
         {
         }
@@ -378,7 +378,7 @@ public:
     {
         typename T::Handover_data handover_data;
         accessor.prepare_for_export(handover_data);
-        handover.reset( new Handover<T>(accessor, handover_data, get_version_of_current_transaction()));
+        handover.reset( new Handover<T>(new T(accessor), handover_data, get_version_of_current_transaction()));
     }
 
     /// Import an accessor wrapped in a handover object. The import will fail if the
@@ -386,15 +386,15 @@ public:
     /// from the exporting SharedGroup. The call to import_from_handover is not thread-safe.
     /// The handover object is "consumed" (and deleted) by the call, leaving the UniquePtr reset.
     template<typename T>
-    T import_from_handover(tightdb::util::UniquePtr<Handover<T> >& handover)
+    void import_from_handover(tightdb::util::UniquePtr<Handover<T> >& handover, T& result)
     {
         if (handover->m_version != get_version_of_current_transaction()) {
             throw std::runtime_error("Handover failed due to version mismatch");
         }
-        T result(handover->m_payload);
+        // move data
+        result.move_assign(*handover->m_payload);
         result.prepare_for_import(handover->m_handover_data, m_group);
         handover.reset();
-        return result;
     }
 
 private:
