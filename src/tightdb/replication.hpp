@@ -382,15 +382,15 @@ inline std::size_t TrivialReplication::transact_log_size()
     return write_position() - m_transact_log_buffer.data();
 }
 
-inline void TrivialReplication::transact_log_reserve(size_t n, char** new_begin, char** new_end)
+inline void TrivialReplication::transact_log_reserve(std::size_t n, char** new_begin, char** new_end)
 {
     internal_transact_log_reserve(n, new_begin, new_end);
 }
 
-inline void TrivialReplication::internal_transact_log_reserve(size_t n, char** new_begin, char** new_end)
+inline void TrivialReplication::internal_transact_log_reserve(std::size_t n, char** new_begin, char** new_end)
 {
     char* data = m_transact_log_buffer.data();
-    size_t size = write_position() - data;
+    std::size_t size = write_position() - data;
     m_transact_log_buffer.reserve_extra(size, n);
     data = m_transact_log_buffer.data(); // May have changed
     *new_begin = data + size;

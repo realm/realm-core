@@ -907,7 +907,7 @@ void TrivialReplication::do_begin_write_transact(SharedGroup&)
 void TrivialReplication::prepare_to_write()
 {
     char* data = m_transact_log_buffer.data();
-    size_t size = m_transact_log_buffer.size();
+    std::size_t size = m_transact_log_buffer.size();
     set_buffer(data, data + size);
 }
 
@@ -915,7 +915,7 @@ Replication::version_type
 TrivialReplication::do_commit_write_transact(SharedGroup&, version_type orig_version)
 {
     char* data = m_transact_log_buffer.data();
-    size_t size = write_position() - data;
+    std::size_t size = write_position() - data;
     version_type new_version = orig_version + 1;
     handle_transact_log(data, size, new_version); // Throws
     return new_version;
@@ -933,7 +933,7 @@ void TrivialReplication::do_clear_interrupt() TIGHTDB_NOEXCEPT
 {
 }
 
-void TrivialReplication::transact_log_append(const char* data, size_t size, char** new_begin, char** new_end)
+void TrivialReplication::transact_log_append(const char* data, std::size_t size, char** new_begin, char** new_end)
 {
     internal_transact_log_reserve(size, new_begin, new_end);
     *new_begin = copy(data, data + size, *new_begin);
