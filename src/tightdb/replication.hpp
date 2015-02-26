@@ -49,7 +49,10 @@ namespace tightdb {
 
 /// Replication is enabled by passing an instance of an implementation
 /// of this class to the SharedGroup constructor.
-class Replication: public _impl::TransactLogEncoderBase {
+class Replication:
+    public _impl::TransactLogConvenientEncoder,
+    protected _impl::TransactLogStream
+{
 public:
     // Be sure to keep this type aligned with what is actually used in
     // SharedGroup.
@@ -293,7 +296,8 @@ private:
 
 // Implementation:
 
-inline Replication::Replication()
+inline Replication::Replication():
+    _impl::TransactLogConvenientEncoder(static_cast<_impl::TransactLogStream&>(*this))
 {
 }
 

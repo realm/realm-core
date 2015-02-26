@@ -37,7 +37,7 @@ namespace tightdb {
 class SharedGroup;
 namespace _impl {
 class GroupFriend;
-class TransactLogEncoderBase;
+class TransactLogConvenientEncoder;
 class TransactLogParser;
 }
 
@@ -529,7 +529,7 @@ private:
     friend class GroupWriter;
     friend class SharedGroup;
     friend class _impl::GroupFriend;
-    friend class _impl::TransactLogEncoderBase;
+    friend class _impl::TransactLogConvenientEncoder;
     friend class _impl::TransactLogParser;
     friend class Replication;
     friend class TrivialReplication;

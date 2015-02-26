@@ -33,7 +33,7 @@ class ColumnLinkList;
 
 namespace _impl {
 class LinkListFriend;
-class TransactLogEncoderBase;
+class TransactLogConvenientEncoder;
 }
 
 
@@ -127,7 +127,7 @@ private:
 #ifdef TIGHTDB_ENABLE_REPLICATION
     Replication* get_repl() TIGHTDB_NOEXCEPT;
     void repl_unselect() TIGHTDB_NOEXCEPT;
-    friend class _impl::TransactLogEncoderBase;
+    friend class _impl::TransactLogConvenientEncoder;
 #endif
 
 #ifdef TIGHTDB_DEBUG
