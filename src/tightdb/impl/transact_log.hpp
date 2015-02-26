@@ -128,6 +128,9 @@ private:
 
 class TransactLogEncoder {
 public:
+    /// The following methods are also those that TransactLogParser expects
+    /// to find on the `InstructionHandler`.
+
     // No selection needed:
     bool select_table(std::size_t group_level_ndx, std::size_t levels, const std::size_t* path);
     bool select_descriptor(std::size_t levels, const std::size_t* path);
@@ -183,6 +186,8 @@ public:
     bool link_list_move(std::size_t old_link_ndx, std::size_t new_link_ndx);
     bool link_list_erase(std::size_t link_ndx);
     bool link_list_clear();
+
+    /// End of methods expected by parser.
 
 
     TransactLogEncoder(TransactLogStream& out_stream);
@@ -327,60 +332,7 @@ public:
 
     ~TransactLogParser() TIGHTDB_NOEXCEPT;
 
-    /// `InstructionHandler` must define the following member
-    /// functions:
-    ///
-    ///     bool insert_group_level_table(std::size_t table_ndx, std::size_t num_tables,
-    ///                                   StringData name)
-    ///     bool erase_group_level_table(std::size_t table_ndx, std::size_t num_tables)
-    ///     bool rename_group_level_table(std::size_t table_ndx, StringData new_name)
-    ///     bool select_table(std::size_t group_level_ndx, std::size_t levels, const std::size_t* path)
-    ///     bool insert_empty_rows(std::size_t row_ndx, std::size_t num_rows, std::size_t tbl_sz, bool unordered)
-    ///     bool erase_rows(std::size_t row_ndx, std::size_t num_rows std::size_t tbl_sz, bool unordered)
-    ///     bool clear_table()
-    ///     bool insert_int(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, int_fast64_t)
-    ///     bool insert_bool(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, bool)
-    ///     bool insert_float(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, float)
-    ///     bool insert_double(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, double)
-    ///     bool insert_string(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, StringData)
-    ///     bool insert_binary(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, BinaryData)
-    ///     bool insert_date_time(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, DateTime)
-    ///     bool insert_table(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz)
-    ///     bool insert_mixed(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, const Mixed&)
-    ///     bool insert_link(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, std::size_t)
-    ///     bool insert_link_list(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz)
-    ///     bool row_insert_complete()
-    ///     bool set_int(std::size_t col_ndx, std::std::size_t row_ndx, int_fast64_t)
-    ///     bool set_bool(std::size_t col_ndx, std::size_t row_ndx, bool)
-    ///     bool set_float(std::size_t col_ndx, std::size_t row_ndx, float)
-    ///     bool set_double(std::size_t col_ndx, std::size_t row_ndx, double)
-    ///     bool set_string(std::size_t col_ndx, std::size_t row_ndx, StringData)
-    ///     bool set_binary(std::size_t col_ndx, std::size_t row_ndx, BinaryData)
-    ///     bool set_date_time(std::size_t col_ndx, std::size_t row_ndx, DateTime)
-    ///     bool set_table(std::size_t col_ndx, std::size_t row_ndx)
-    ///     bool set_mixed(std::size_t col_ndx, std::size_t row_ndx, const Mixed&)
-    ///     bool set_link(std::size_t col_ndx, std::size_t row_ndx, std::size_t)
-    ///     bool add_int_to_column(std::size_t col_ndx, int_fast64_t value)
-    ///     bool optimize_table()
-    ///     bool select_descriptor(int levels, const std::size_t* path)
-    ///     bool insert_link_column(std::size_t col_ndx, DataType, StringData name,
-    ///                             std::size_t link_target_table_ndx, std::size_t backlink_col_ndx)
-    ///     bool insert_column(std::size_t col_ndx, DataType, StringData name)
-    ///     bool erase_link_column(std::size_t col_ndx, std::size_t link_target_table_ndx,
-    ///                            std::size_t backlink_col_ndx)
-    ///     bool erase_column(std::size_t col_ndx)
-    ///     bool rename_column(std::size_t col_ndx, StringData new_name)
-    ///     bool add_search_index(std::size_t col_ndx)
-    ///     bool add_primary_key(std::size_t col_ndx)
-    ///     bool remove_primary_key()
-    ///     bool set_link_type(std::size_t col_ndx, LinkType)
-    ///     bool select_link_list(std::size_t col_ndx, std::size_t row_ndx)
-    ///     bool link_list_set(std::size_t link_ndx, std::size_t value)
-    ///     bool link_list_insert(std::size_t link_ndx, std::size_t value)
-    ///     bool link_list_move(std::size_t old_link_ndx, std::size_t new_link_ndx)
-    ///     bool link_list_erase(std::size_t link_ndx)
-    ///     bool link_list_clear()
-    ///
+    /// See `TransactLogEncoder` for a list of methods that the `InstructionHandler` must define.
     /// parse() promises that the path passed by reference to
     /// InstructionHandler::select_descriptor() will remain valid
     /// during subsequent calls to all descriptor modifying functions.
