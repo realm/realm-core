@@ -69,6 +69,7 @@ using std::size_t;
 // - It does not matter whether the delete is done in-line (as part of the current transaction),
 //   or if it is done implicitly as part of advance_read() or promote_to_write().
 //
+//
 // Use cases:
 //
 // 1. Presenting data
@@ -330,14 +331,14 @@ protected:
 
     struct Handover_data {
         std::size_t table_num;
-        bool has_query;
+        Query::Handover_data query_handover_data;
     };
 
 
     void prepare_for_export(Handover_data& handover_data)
     {
         handover_data.table_num = m_table->get_index_in_group();
-        handover_data.has_query = m_query.get_table() != TableRef();
+        m_query.prepare_for_export(handover_data.query_handover_data);
         // must be group level table!
         if (handover_data.table_num == npos) {
             throw std::runtime_error("Handover failed: not a group level table");
@@ -356,10 +357,7 @@ protected:
         tr->register_view(this);
         // FIXME: propagate into base class and members
         // FIXME: update query !!!
-        if (handover_data.has_query)
-            m_query.set_table(tr);
-        else
-            m_query.set_table(TableRef());
+        m_query.prepare_for_import(handover_data.query_handover_data, group);
     }
 private:
     void detach() TIGHTDB_NOEXCEPT;

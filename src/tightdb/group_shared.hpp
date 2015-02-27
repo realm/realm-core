@@ -341,11 +341,14 @@ public:
     void test_ringbuf();
 #endif
 
-    /// To handover a table view or row accessor of type T, you must wrap it into
-    /// a Handover<T> for the transfer. Wrapping and unwrapping of a handover
+    /// To handover a table view, query, linkview or row accessor of type T, you must 
+    /// wrap it into a Handover<T> for the transfer. Wrapping and unwrapping of a handover
     /// object is done by the methods 'export_for_handover()' and 'import_from_handover()'
-    /// declared below. 'export_for_handover()' returns a UniquePtr to the Handover
-    /// object, and 'import_for_handover()' consumes the object.
+    /// declared below. 'export_for_handover()' returns a Handover object, and 
+    /// 'import_for_handover()' consumes the object.
+    /// The Handover object does *not* assume ownership of the object being handed over.
+    /// If the object being handed over depends on other views (table- or link- ), those
+    /// objects will be handed over as well.
 
     /// Type used to support handover of accessors between shared groups.
     template<typename T> struct Handover {
@@ -356,45 +359,38 @@ public:
             : m_payload(payload), m_handover_data(handover_data), m_version(version) 
         {
         }
-        /// Handover objects are not supposed to be copied or assigned, it's too heavy.
-        /// If you want to pass it around, use a UniquePtr to it and "move" that around.
-        /// Privatize operator= and copy constructor.
-    private:
-        Handover<T>& operator=(const Handover<T>&);
-        Handover(const Handover<T>&);
     };
 
-    /// Create a handover object for the given accessor. If the accessor is a table view,
-    /// the table view becomes detached. If the accessor is an ordinary row accessor, the
-    /// accessor is copied and hence does not become detached. The call to export_for_handover
-    /// is not thread-safe. For table views, export is restricted to certain kinds of table
-    /// views and will throw if the restriction is violated. See table_view.hpp for a
-    /// description of the restrictions applying to export of table views. Also for table views,
-    /// the originating table view becomes "detached" by the export operation. This is not
-    /// the case for row accessors.
-    /// The call will allocate a handover object, and reset the UniquePtr to point to it.
+    /// Create a handover object for the given accessor. The object being handed over is 
+    /// detached and cannot be used before it is imported by a SharedGroup. The call to 
+    /// export_for_handover is not thread-safe. For table views, export is restricted to 
+    /// certain kinds of table views and will throw if the restriction is violated. 
+    /// See table_view.hpp for a description of the restrictions applying to export of 
+    /// table views. 
+    /// Note that the object being handed over is passed by reference. The handover does 
+    /// not assume ownership, and the handed over object must be available/in scope where 
+    /// it is imported.
     template<typename T>
-    void export_for_handover(T& accessor, tightdb::util::UniquePtr<Handover<T> >& handover)
+    Handover<T>* export_for_handover(T& accessor)
     {
         typename T::Handover_data handover_data;
         accessor.prepare_for_export(handover_data);
-        handover.reset( new Handover<T>(new T(accessor), handover_data, get_version_of_current_transaction()));
+        return new Handover<T>(&accessor, handover_data, get_version_of_current_transaction());
     }
 
     /// Import an accessor wrapped in a handover object. The import will fail if the
     /// importing SharedGroup is viewing a version of the database that is different
     /// from the exporting SharedGroup. The call to import_from_handover is not thread-safe.
-    /// The handover object is "consumed" (and deleted) by the call, leaving the UniquePtr reset.
+    /// The handover object is "consumed", it cannot be handed over again.
     template<typename T>
-    void import_from_handover(tightdb::util::UniquePtr<Handover<T> >& handover, T& result)
+    void import_from_handover(Handover<T>* handover)
     {
         if (handover->m_version != get_version_of_current_transaction()) {
             throw std::runtime_error("Handover failed due to version mismatch");
         }
         // move data
-        result.move_assign(*handover->m_payload);
-        result.prepare_for_import(handover->m_handover_data, m_group);
-        handover.reset();
+        handover->m_payload->prepare_for_import(handover->m_handover_data, m_group);
+        delete handover;
     }
 
 private:

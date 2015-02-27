@@ -6897,78 +6897,38 @@ TEST(LangBindHelper_HandoverQuery)
     SharedGroup sg_w(*repl_w, SharedGroup::durability_Full, crypt_key());
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
-    // Typed interface
-    UniquePtr<SharedGroup::Handover<TestTableInts::View> > handover;
     SharedGroup::VersionID vid;
     {
-        LangBindHelper::promote_to_write(sg_w);
-        TestTableInts::Ref table = group_w.add_table<TestTableInts>("table");
-        for (int i = 0; i <100; ++i)
-            table->add(i);
-        CHECK_EQUAL(100, table->size());
-        for (int i = 0; i<100; ++i)
-            CHECK_EQUAL(i, table[i].first);
-        LangBindHelper::commit_and_continue_as_read(sg_w);
-        vid = sg_w.get_version_of_current_transaction();
-        TestTableInts::View tv = table->where().find_all();
-        CHECK(tv.is_attached());
-        CHECK_EQUAL(100, tv.size());
-        for (int i = 0; i<100; ++i)
-            CHECK_EQUAL(i, tv[i].first);
-        sg_w.export_for_handover(tv, handover);
-        CHECK(!tv.is_attached());
-    }
-    {
-        LangBindHelper::advance_read(sg,vid);
-        TestTableInts::View tv;
-        sg.import_from_handover(handover, tv);
-        CHECK(tv.is_attached());
-        CHECK_EQUAL(100, tv.size());
-        for (int i = 0; i<100; ++i)
-            CHECK_EQUAL(i, tv[i].first);
-    }
-
-    // Untyped interface
-    UniquePtr<SharedGroup::Handover<TableView> > handover2;
-    UniquePtr<SharedGroup::Handover<Row> > handover_row;
-    {
-        LangBindHelper::promote_to_write(sg_w);
-        TableRef table = group_w.add_table("table2");
-        table->add_column(type_Int, "first");
-        for (int i = 0; i <100; ++i) {
-            table->add_empty_row();
-            table->set_int(0, i, i);
+        // Typed interface
+        UniquePtr<SharedGroup::Handover<TestTableInts::Query> > handover;
+        TestTableInts::Query* q; // <-- must be visible in both exporting and importing scope
+        {
+            LangBindHelper::promote_to_write(sg_w);
+            TestTableInts::Ref table = group_w.add_table<TestTableInts>("table");
+            for (int i = 0; i <100; ++i)
+                table->add(i);
+            CHECK_EQUAL(100, table->size());
+            for (int i = 0; i<100; ++i)
+                CHECK_EQUAL(i, table[i].first);
+            LangBindHelper::commit_and_continue_as_read(sg_w);
+            vid = sg_w.get_version_of_current_transaction();
+            q = new TestTableInts::Query(table->where());
+            handover.reset(sg_w.export_for_handover(*q));
         }
-        LangBindHelper::commit_and_continue_as_read(sg_w);
-        vid = sg_w.get_version_of_current_transaction();
-        TableView tv = table->where().find_all();
-        CHECK(tv.is_attached());
-        CHECK_EQUAL(100, tv.size());
-        for (int i = 0; i<100; ++i)
-            CHECK_EQUAL(i, tv.get_int(0,i));
-        sg_w.export_for_handover(tv, handover2);
-        CHECK(!tv.is_attached());
-        // Aaaaand rows!
-        Row row = (*table)[7];
-        CHECK_EQUAL(7, row.get_int(0));
-        sg_w.export_for_handover(row, handover_row);
-        CHECK(row.is_attached());
-    }
-    {
-        LangBindHelper::advance_read(sg,vid);
-        TableView tv;
-        sg.import_from_handover(handover2, tv);
-        CHECK(tv.is_in_sync());
-        CHECK(tv.is_attached());
-        CHECK_EQUAL(100, tv.size());
-        for (int i = 0; i<100; ++i)
-            CHECK_EQUAL(i, tv.get_int(0,i));
-
-        Row row;
-        sg.import_from_handover(handover_row, row);
-        CHECK_EQUAL(7, row.get_int(0));
+        {
+            LangBindHelper::advance_read(sg,vid);
+            // importing tv - note that tv must still be in scope
+            sg.import_from_handover(handover.release());
+            TestTableInts::View tv = q->find_all();
+            CHECK(tv.is_attached());
+            CHECK_EQUAL(100, tv.size());
+            for (int i = 0; i<100; ++i)
+                CHECK_EQUAL(i, tv[i].first);
+            delete q;
+        }
     }
 }
+
 
 TEST(LangBindHelper_HandoverAccessors)
 {
@@ -6981,77 +6941,85 @@ TEST(LangBindHelper_HandoverAccessors)
     SharedGroup sg_w(*repl_w, SharedGroup::durability_Full, crypt_key());
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
-    // Typed interface
-    UniquePtr<SharedGroup::Handover<TestTableInts::View> > handover;
     SharedGroup::VersionID vid;
     {
-        LangBindHelper::promote_to_write(sg_w);
-        TestTableInts::Ref table = group_w.add_table<TestTableInts>("table");
-        for (int i = 0; i <100; ++i)
-            table->add(i);
-        CHECK_EQUAL(100, table->size());
-        for (int i = 0; i<100; ++i)
-            CHECK_EQUAL(i, table[i].first);
-        LangBindHelper::commit_and_continue_as_read(sg_w);
-        vid = sg_w.get_version_of_current_transaction();
-        TestTableInts::View tv = table->where().find_all();
-        CHECK(tv.is_attached());
-        CHECK_EQUAL(100, tv.size());
-        for (int i = 0; i<100; ++i)
-            CHECK_EQUAL(i, tv[i].first);
-        sg_w.export_for_handover(tv, handover);
-        CHECK(!tv.is_attached());
-    }
-    {
-        LangBindHelper::advance_read(sg,vid);
-        TestTableInts::View tv;
-        sg.import_from_handover(handover, tv);
-        CHECK(tv.is_attached());
-        CHECK_EQUAL(100, tv.size());
-        for (int i = 0; i<100; ++i)
-            CHECK_EQUAL(i, tv[i].first);
-    }
-
-    // Untyped interface
-    UniquePtr<SharedGroup::Handover<TableView> > handover2;
-    UniquePtr<SharedGroup::Handover<Row> > handover_row;
-    {
-        LangBindHelper::promote_to_write(sg_w);
-        TableRef table = group_w.add_table("table2");
-        table->add_column(type_Int, "first");
-        for (int i = 0; i <100; ++i) {
-            table->add_empty_row();
-            table->set_int(0, i, i);
+        // Typed interface
+        UniquePtr<SharedGroup::Handover<TestTableInts::View> > handover;
+        TestTableInts::View tv; // <-- must be visible in both exporting and importing scope
+        {
+            LangBindHelper::promote_to_write(sg_w);
+            TestTableInts::Ref table = group_w.add_table<TestTableInts>("table");
+            for (int i = 0; i <100; ++i)
+                table->add(i);
+            CHECK_EQUAL(100, table->size());
+            for (int i = 0; i<100; ++i)
+                CHECK_EQUAL(i, table[i].first);
+            LangBindHelper::commit_and_continue_as_read(sg_w);
+            vid = sg_w.get_version_of_current_transaction();
+            tv = table->where().find_all();
+            CHECK(tv.is_attached());
+            CHECK_EQUAL(100, tv.size());
+            for (int i = 0; i<100; ++i)
+                CHECK_EQUAL(i, tv[i].first);
+            handover.reset(sg_w.export_for_handover(tv));
+            CHECK(!tv.is_attached());
         }
-        LangBindHelper::commit_and_continue_as_read(sg_w);
-        vid = sg_w.get_version_of_current_transaction();
-        TableView tv = table->where().find_all();
-        CHECK(tv.is_attached());
-        CHECK_EQUAL(100, tv.size());
-        for (int i = 0; i<100; ++i)
-            CHECK_EQUAL(i, tv.get_int(0,i));
-        sg_w.export_for_handover(tv, handover2);
-        CHECK(!tv.is_attached());
-        // Aaaaand rows!
-        Row row = (*table)[7];
-        CHECK_EQUAL(7, row.get_int(0));
-        sg_w.export_for_handover(row, handover_row);
-        CHECK(row.is_attached());
+        {
+            LangBindHelper::advance_read(sg,vid);
+            // importing tv - note that tv must still be in scope
+            sg.import_from_handover(handover.release());
+            CHECK(tv.is_attached());
+            CHECK_EQUAL(100, tv.size());
+            for (int i = 0; i<100; ++i)
+                CHECK_EQUAL(i, tv[i].first);
+        }
     }
-    {
-        LangBindHelper::advance_read(sg,vid);
-        TableView tv;
-        sg.import_from_handover(handover2, tv);
-        CHECK(tv.is_in_sync());
-        CHECK(tv.is_attached());
-        CHECK_EQUAL(100, tv.size());
-        for (int i = 0; i<100; ++i)
-            CHECK_EQUAL(i, tv.get_int(0,i));
 
+    {
+        // Untyped interface
+        UniquePtr<SharedGroup::Handover<TableView> > handover2;
+        UniquePtr<SharedGroup::Handover<Row> > handover_row;
+        TableView tv;
         Row row;
-        sg.import_from_handover(handover_row, row);
-        CHECK_EQUAL(7, row.get_int(0));
+        {
+            LangBindHelper::promote_to_write(sg_w);
+            TableRef table = group_w.add_table("table2");
+            table->add_column(type_Int, "first");
+            for (int i = 0; i <100; ++i) {
+                table->add_empty_row();
+                table->set_int(0, i, i);
+            }
+            LangBindHelper::commit_and_continue_as_read(sg_w);
+            vid = sg_w.get_version_of_current_transaction();
+            tv= table->where().find_all();
+            CHECK(tv.is_attached());
+            CHECK_EQUAL(100, tv.size());
+            for (int i = 0; i<100; ++i)
+                CHECK_EQUAL(i, tv.get_int(0,i));
+            handover2.reset(sg_w.export_for_handover(tv));
+            CHECK(!tv.is_attached());
+            // Aaaaand rows!
+            row = (*table)[7];
+            CHECK_EQUAL(7, row.get_int(0));
+            handover_row.reset(sg_w.export_for_handover(row));
+            CHECK(!row.is_attached());
+        }
+        {
+            LangBindHelper::advance_read(sg,vid);
+            // importing tv:
+            sg.import_from_handover(handover2.release());
+            CHECK(tv.is_in_sync());
+            CHECK(tv.is_attached());
+            CHECK_EQUAL(100, tv.size());
+            for (int i = 0; i<100; ++i)
+                CHECK_EQUAL(i, tv.get_int(0,i));
+            // importing row:
+            sg.import_from_handover(handover_row.release());
+            CHECK(row.is_attached());
+            CHECK_EQUAL(7, row.get_int(0));
+        }
     }
+
 }
 
 

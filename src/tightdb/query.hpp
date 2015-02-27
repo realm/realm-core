@@ -270,10 +270,15 @@ public:
     std::vector<ParentNode**> update_override;
     std::vector<ParentNode**> subtables;
     std::vector<ParentNode*> all_nodes;
-    
+
     RowIndexes* m_view;
     std::vector<bool> pending_not;
-
+    struct Handover_data {
+        std::size_t m_table_num;
+        bool m_has_table;
+    };
+    void prepare_for_import(Handover_data& handover_data, Group& group);
+    void prepare_for_export(Handover_data& handover_data);
 private:
     template <class TColumnType> Query& equal(size_t column_ndx1, size_t column_ndx2);
     template <class TColumnType> Query& less(size_t column_ndx1, size_t column_ndx2);

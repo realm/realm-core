@@ -135,6 +135,26 @@ void Query::delete_nodes() TIGHTDB_NOEXCEPT
     }
 }
 
+
+void Query::prepare_for_export(Handover_data& handover_data)
+{
+    handover_data.m_has_table = bool(m_table);
+    if (bool(m_table)) {
+        handover_data.m_table_num = m_table.get()->get_index_in_group();
+        m_table = TableRef(); // <- detach to prevent misuse until import!
+    }
+}
+
+void Query::prepare_for_import(Handover_data& handover_data, Group& group)
+{
+    if (handover_data.m_has_table)
+        m_table = group.get_table(handover_data.m_table_num);
+    else
+        m_table = TableRef();
+}
+
+
+
 /*
 // use and_query() instead!
 Expression* Query::get_expression() {
