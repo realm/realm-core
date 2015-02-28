@@ -260,8 +260,17 @@ bool AESCryptor::try_read(int fd, off_t pos, char* dst, size_t size) {
                 // happened
                 memcpy(&iv.iv1, &iv.iv2, 32);
             }
-            else
-                throw DecryptionFailed();
+            else {
+                // If the file has been shrunk and then re-expanded, we may have
+                // old hmacs that don't go with this data. ftruncate() is
+                // required to fill any added space with zeroes, so assume that's
+                // what happened if the buffer is all zeroes
+                for (ssize_t i = 0; i < bytes_read; ++i) {
+                    if (buffer[i] != 0)
+                        throw DecryptionFailed();
+                }
+                return false;
+            }
         }
 
         crypt(mode_Decrypt, pos, dst, buffer, reinterpret_cast<const char*>(&iv.iv1));

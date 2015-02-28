@@ -4,6 +4,8 @@
 
 * Fixed crash when std::exit() is called with active encrypted mappings.
 * Fixed writing over 4KB of data to an encrypted file with Group::write().
+* Fixed crash after making commits which produced over 4KB of writelog data
+  with encryption enabled.
 
 ### API breaking changes:
 
