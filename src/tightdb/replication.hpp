@@ -64,8 +64,6 @@ public:
     class TransactLogApplier;
     class Interrupted; // Exception
     struct CommitLogEntry;
-    class IndexTranslatorBase;
-    class SimpleIndexTranslator;
     class SimpleInputStream;
 
     std::string get_database_path();
@@ -247,8 +245,6 @@ public:
     /// successfully parsed, or ended prematurely.
     static void apply_transact_log(InputStream& transact_log, Group& target,
                                    std::ostream* apply_log = 0);
-    static void apply_transact_log(InputStream& transact_log, Group& target,
-                                   IndexTranslatorBase& translator, std::ostream* apply_log = 0);
 
     virtual ~Replication() TIGHTDB_NOEXCEPT {}
 
@@ -304,22 +300,6 @@ struct Replication::CommitLogEntry {
 // are foreign. It is carried over as part of a commit, allowing other threads involved
 // with Sync to observet it. For local commits, the value of server_version is taken
 // from any previous forewign commmit.
-
-class Replication::IndexTranslatorBase {
-public:
-    virtual size_t translate_row_index(TableRef table, size_t row_ndx, size_t num_rows, bool* overwritten = null_ptr) = 0;
-};
-
-class Replication::SimpleIndexTranslator : public Replication::IndexTranslatorBase {
-public:
-    size_t translate_row_index(TableRef, size_t row_ndx, size_t num_rows, bool* overwritten) TIGHTDB_OVERRIDE
-    {
-        static_cast<void>(num_rows);
-        if (overwritten)
-            *overwritten = false;
-        return row_ndx;
-    }
-};
 
 
 class Replication::SimpleInputStream: public Replication::InputStream {
@@ -447,6 +427,20 @@ Replication::get_last_peer_version(uint_fast64_t) const
     // Unimplemented!
     TIGHTDB_ASSERT(false);
     return 0;
+}
+
+inline void Replication::get_commit_entries(version_type, version_type, Replication::CommitLogEntry*)
+    TIGHTDB_NOEXCEPT
+{
+    // Unimplemented!
+    TIGHTDB_ASSERT(false);
+}
+
+inline void Replication::get_commit_entries(version_type, version_type, BinaryData*)
+    TIGHTDB_NOEXCEPT
+{
+    // Unimplemented!
+    TIGHTDB_ASSERT(false);
 }
 
 inline void Replication::begin_write_transact(SharedGroup& sg)

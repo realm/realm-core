@@ -758,7 +758,7 @@ void WriteLogCollector::get_commit_entries_internal(version_type from_version, v
 }
 
 
-class WriteLogCollector::IndexTranslationMap : public Replication::IndexTranslatorBase {
+class WriteLogCollector::IndexTranslationMap {
 public:
     IndexTranslationMap(WriteLogCollector& log, Group& group, uint64_t self_peer_id, uint_fast64_t timestamp,
         uint_fast64_t peer_id, version_type base_version, version_type current_version):
@@ -779,7 +779,7 @@ public:
         }
     }
 
-    size_t translate_row_index(TableRef table, size_t row_ndx, size_t num_rows, bool* overwritten) TIGHTDB_OVERRIDE
+    size_t translate_row_index(TableRef table, size_t row_ndx, size_t num_rows, bool* overwritten)
     {
         std::map<TableRef, MergeIndexMap>::iterator it = m_map.find(table);
         size_t result = row_ndx;
@@ -937,308 +937,217 @@ class WriteLogCollector::TransformChangesetBeforeMerge {
 public:
     TransformChangesetBeforeMerge(WriteLogCollector& log, Group& group, uint64_t m_self_peer_id, uint_fast64_t timestamp,
         uint_fast64_t peer_id, version_type base_version, version_type current_version):
-    m_map(log, group, m_self_peer_id, timestamp, peer_id, base_version, current_version), m_group(group)
+    m_map(log, group, m_self_peer_id, timestamp, peer_id, base_version, current_version),
+    m_transformed(m_buffer),
+    m_group(group)
     {
+    }
+
+    size_t transformed_size() const
+    {
+        return m_transformed.write_position() - m_buffer.transact_log_data();
     }
 
     BinaryData get_data() const
     {
-        return m_transformed.get_data();
+        return BinaryData(m_buffer.transact_log_data(), transformed_size());
     }
 
     // Parser InstructionHandler:
     bool insert_group_level_table(std::size_t table_ndx, std::size_t num_tables, StringData name)
     {
-        m_transformed.insert_group_level_table(table_ndx, num_tables, name);
-        return true;
+        return m_transformed.insert_group_level_table(table_ndx, num_tables, name);
     }
     bool erase_group_level_table(std::size_t table_ndx, std::size_t num_tables)
     {
-        m_transformed.erase_group_level_table(table_ndx, num_tables);
-        return true;
+        return m_transformed.erase_group_level_table(table_ndx, num_tables);
     }
     bool rename_group_level_table(std::size_t table_ndx, StringData new_name)
     {
-        m_transformed.rename_group_level_table(table_ndx, new_name);
-        return true;
+        return m_transformed.rename_group_level_table(table_ndx, new_name);
     }
     bool select_table(std::size_t group_level_ndx, int levels, const std::size_t* path)
     {
-        if (TIGHTDB_UNLIKELY(group_level_ndx >= m_group.size()))
-            return false;
-        m_selected_table = m_group.get_table(group_level_ndx); // Throws
-        for (int i = 0; i < levels; ++i) {
-            size_t col_ndx = path[2*i + 0];
-            size_t row_ndx = path[2*i + 1];
-            if (TIGHTDB_UNLIKELY(col_ndx >= m_selected_table->get_column_count()))
-                return false;
-            if (TIGHTDB_UNLIKELY(row_ndx >= m_selected_table->size()))
-                return false;
-            DataType type = m_selected_table->get_column_type(col_ndx);
-            switch (type) {
-                case type_Table:
-                    m_selected_table = m_selected_table->get_subtable(col_ndx, row_ndx); // Throws
-                    break;
-                case type_Mixed:
-                    m_selected_table = m_selected_table->get_subtable(col_ndx, row_ndx); // Throws
-                    if (TIGHTDB_UNLIKELY(!m_selected_table))
-                        return false;
-                    break;
-                default:
-                    return false;
-            }
-        }
-        return true;
+        // FIXME: Record path for table to prepare for lookup.
+        return m_transformed.select_table(group_level_ndx, levels, path);
     }
     bool insert_empty_rows(std::size_t row_ndx, std::size_t num_rows, std::size_t tbl_sz, bool unordered)
     {
-        static_cast<void>(tbl_sz);
-        static_cast<void>(unordered);
-        m_transformed.insert_empty_rows(m_selected_table.get(), row_ndx, num_rows);
-        return true;
+        return m_transformed.insert_empty_rows(row_ndx, num_rows, tbl_sz, unordered);
     }
     bool erase_rows(std::size_t row_ndx, std::size_t num_rows, std::size_t tbl_sz, bool unordered)
     {
-        // FIXME: Is this the correct way to achieve this?
-        for (size_t i = 0; i < num_rows; ++i) {
-            m_transformed.erase_row(m_selected_table.get(), row_ndx, false);
-        }
-        return true;
+        // FIXME: We need to translate each index in the range separately.
+        return m_transformed.erase_rows(row_ndx, num_rows, tbl_sz, unordered);
     }
     bool clear_table()
     {
-        m_transformed.clear_table(m_selected_table.get());
-        return true;
+        return m_transformed.clear_table();
     }
     bool insert_int(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, int_fast64_t value)
     {
-        static_cast<void>(tbl_sz);
-        m_transformed.insert_int(m_selected_table.get(), col_ndx, row_ndx, value);
-        return true;
+        return m_transformed.insert_int(col_ndx, row_ndx, tbl_sz, value);
     }
     bool insert_bool(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, bool value)
     {
-        static_cast<void>(tbl_sz);
-        m_transformed.insert_bool(m_selected_table.get(), col_ndx, row_ndx, value);
-        return true;
+        return m_transformed.insert_bool(col_ndx, row_ndx, tbl_sz, value);
     }
     bool insert_float(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, float value)
     {
-        static_cast<void>(tbl_sz);
-        m_transformed.insert_float(m_selected_table.get(), col_ndx, row_ndx, value);
-        return true;
+        return m_transformed.insert_float(col_ndx, row_ndx, tbl_sz, value);
     }
     bool insert_double(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, double value)
     {
-        static_cast<void>(tbl_sz);
-        m_transformed.insert_double(m_selected_table.get(), col_ndx, row_ndx, value);
-        return true;
+        return m_transformed.insert_double(col_ndx, row_ndx, tbl_sz, value);
     }
     bool insert_string(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, StringData value)
     {
-        static_cast<void>(tbl_sz);
-        m_transformed.insert_string(m_selected_table.get(), col_ndx, row_ndx, value);
-        return true;
+        return m_transformed.insert_string(col_ndx, row_ndx, tbl_sz, value);
     }
     bool insert_binary(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, BinaryData value)
     {
-        static_cast<void>(tbl_sz);
-        m_transformed.insert_binary(m_selected_table.get(), col_ndx, row_ndx, value);
-        return true;
+        return m_transformed.insert_binary(col_ndx, row_ndx, tbl_sz, value);
     }
     bool insert_date_time(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, DateTime value)
     {
-        static_cast<void>(tbl_sz);
-        m_transformed.insert_date_time(m_selected_table.get(), col_ndx, row_ndx, value);
-        return true;
+        return m_transformed.insert_date_time(col_ndx, row_ndx, tbl_sz, value);
     }
     bool insert_table(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz)
     {
-        static_cast<void>(tbl_sz);
-        m_transformed.insert_table(m_selected_table.get(), col_ndx, row_ndx);
-        return true;
+        return m_transformed.insert_table(col_ndx, tbl_sz, row_ndx);
     }
     bool insert_mixed(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, const Mixed& value)
     {
-        static_cast<void>(tbl_sz);
-        m_transformed.insert_mixed(m_selected_table.get(), col_ndx, row_ndx, value);
-        return true;
+        return m_transformed.insert_mixed(col_ndx, row_ndx, tbl_sz, value);
     }
     bool insert_link(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, std::size_t value)
     {
-        static_cast<void>(tbl_sz);
-        m_transformed.insert_link(m_selected_table.get(), col_ndx, row_ndx, value);
-        return true;
+        return m_transformed.insert_link(col_ndx, row_ndx, tbl_sz, value);
     }
     bool insert_link_list(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz)
     {
-        static_cast<void>(tbl_sz);
-        m_transformed.insert_link_list(m_selected_table.get(), col_ndx, tbl_sz);
-        return true;
+        return m_transformed.insert_link_list(col_ndx, row_ndx, tbl_sz);
     }
     bool row_insert_complete()
     {
-        m_transformed.row_insert_complete(m_selected_table.get());
-        return true;
+        return m_transformed.row_insert_complete();
     }
     bool set_int(std::size_t col_ndx, std::size_t row_ndx, int_fast64_t value)
     {
-        m_transformed.set_int(m_selected_table.get(), col_ndx, row_ndx, value);
-        return true;
+        return m_transformed.set_int(col_ndx, row_ndx, value);
     }
     bool set_bool(std::size_t col_ndx, std::size_t row_ndx, bool value)
     {
-        m_transformed.set_bool(m_selected_table.get(), col_ndx, row_ndx, value);
-        return true;
+        return m_transformed.set_bool(col_ndx, row_ndx, value);
     }
     bool set_float(std::size_t col_ndx, std::size_t row_ndx, float value)
     {
-        m_transformed.set_float(m_selected_table.get(), col_ndx, row_ndx, value);
-        return true;
+        return m_transformed.set_float(col_ndx, row_ndx, value);
     }
     bool set_double(std::size_t col_ndx, std::size_t row_ndx, double value)
     {
-        m_transformed.set_double(m_selected_table.get(), col_ndx, row_ndx, value);
-        return true;
+        return m_transformed.set_double(col_ndx, row_ndx, value);
     }
     bool set_string(std::size_t col_ndx, std::size_t row_ndx, StringData value)
     {
-        m_transformed.set_string(m_selected_table.get(), col_ndx, row_ndx, value);
-        return true;
+        return m_transformed.set_string(col_ndx, row_ndx, value);
     }
     bool set_binary(std::size_t col_ndx, std::size_t row_ndx, BinaryData value)
     {
-        m_transformed.set_binary(m_selected_table.get(), col_ndx, row_ndx, value);
-        return true;
+        return m_transformed.set_binary(col_ndx, row_ndx, value);
     }
     bool set_date_time(std::size_t col_ndx, std::size_t row_ndx, DateTime value)
     {
-        m_transformed.set_date_time(m_selected_table.get(), col_ndx, row_ndx, value);
-        return true;
+        return m_transformed.set_date_time(col_ndx, row_ndx, value);
     }
     bool set_table(std::size_t col_ndx, std::size_t row_ndx)
     {
-        m_transformed.set_table(m_selected_table.get(), col_ndx, row_ndx);
-        return true;
+        return m_transformed.set_table(col_ndx, row_ndx);
     }
     bool set_mixed(std::size_t col_ndx, std::size_t row_ndx, const Mixed& value)
     {
-        m_transformed.set_mixed(m_selected_table.get(), col_ndx, row_ndx, value);
-        return true;
+        return m_transformed.set_mixed(col_ndx, row_ndx, value);
     }
     bool set_link(std::size_t col_ndx, std::size_t row_ndx, std::size_t value)
     {
-        m_transformed.set_link(m_selected_table.get(), col_ndx, row_ndx, value);
-        return true;
+        return m_transformed.set_link(col_ndx, row_ndx, value);
     }
     bool add_int_to_column(std::size_t col_ndx, int_fast64_t value)
     {
-        m_transformed.add_int_to_column(m_selected_table.get(), col_ndx, value);
-        return true;
+        return m_transformed.add_int_to_column(col_ndx, value);
     }
     bool optimize_table()
     {
-        m_transformed.optimize_table(m_selected_table.get());
-        return true;
+        return m_transformed.optimize_table();
     }
     bool select_descriptor(int levels, const std::size_t* path)
     {
-        m_selected_descriptor.reset();
-        if (m_selected_table) {
-            TIGHTDB_ASSERT(!m_selected_table->has_shared_type());
-            typedef _impl::TableFriend tf;
-            Descriptor* desc = tf::get_root_table_desc_accessor(const_cast<Table&>(*m_selected_table));
-            int i = 0;
-            while (desc) {
-                if (i >= levels) {
-                    m_selected_descriptor.reset(desc);
-                    break;
-                }
-                typedef _impl::DescriptorFriend df;
-                size_t col_ndx = path[i];
-                desc = df::get_subdesc_accessor(*desc, col_ndx);
-                ++i;
-            }
-        }
-        return true;
+        // FIXME: Record path to descriptor to prepare for lookup.
+        return m_transformed.select_descriptor(levels, path);
     }
     bool insert_link_column(std::size_t col_ndx, DataType type, StringData name, std::size_t link_target_table_ndx, std::size_t backlink_col_ndx)
     {
-        TIGHTDB_ASSERT(false); // FIXME: Unimplemented!
-        return true;
+        return m_transformed.insert_link_column(col_ndx, type, name, link_target_table_ndx, backlink_col_ndx);
     }
     bool insert_column(std::size_t col_ndx, DataType type, StringData name)
     {
-        m_transformed.insert_column(*m_selected_descriptor, col_ndx, type, name, null_ptr);
-        return true;
+        return m_transformed.insert_column(col_ndx, type, name);
     }
     bool erase_link_column(std::size_t col_ndx, std::size_t link_target_table_ndx, std::size_t backlink_col_ndx)
     {
-        TIGHTDB_ASSERT(false); // FIXME: Unimplemented!
-        return true;
+        return m_transformed.erase_link_column(col_ndx, link_target_table_ndx, backlink_col_ndx);
     }
     bool erase_column(std::size_t col_ndx)
     {
-        m_transformed.erase_column(*m_selected_descriptor, col_ndx);
-        return true;
+        return m_transformed.erase_column(col_ndx);
     }
     bool rename_column(std::size_t col_ndx, StringData new_name)
     {
-        m_transformed.rename_column(*m_selected_descriptor, col_ndx, new_name);
-        return true;
+        return m_transformed.rename_column(col_ndx, new_name);
     }
     bool add_search_index(std::size_t col_ndx)
     {
-        m_transformed.add_search_index(m_selected_table.get(), col_ndx);
-        return true;
+        return m_transformed.add_search_index(col_ndx);
     }
     bool add_primary_key(std::size_t col_ndx)
     {
-        m_transformed.add_primary_key(m_selected_table.get(), col_ndx);
-        return true;
+        return m_transformed.add_primary_key(col_ndx);
     }
     bool remove_primary_key()
     {
-        m_transformed.remove_primary_key(m_selected_table.get());
-        return true;
+        return m_transformed.remove_primary_key();
     }
     bool set_link_type(std::size_t col_ndx, LinkType type)
     {
-        m_transformed.set_link_type(m_selected_table.get(), col_ndx, type);
-        return true;
+        return m_transformed.set_link_type(col_ndx, type);
     }
     bool select_link_list(std::size_t col_ndx, std::size_t row_ndx)
     {
-        TIGHTDB_ASSERT(false); // FIXME: Support LinkLists
-        return true;
+        return m_transformed.select_link_list(col_ndx, row_ndx);
     }
     bool link_list_set(std::size_t link_ndx, std::size_t value)
     {
-        TIGHTDB_ASSERT(false); // FIXME: Support LinkLists
-        return true;
+        return m_transformed.link_list_set(link_ndx, value);
     }
     bool link_list_insert(std::size_t link_ndx, std::size_t value)
     {
-        TIGHTDB_ASSERT(false); // FIXME: Support LinkLists
-        return true;
+        return m_transformed.link_list_insert(link_ndx, value);
     }
     bool link_list_move(std::size_t old_link_ndx, std::size_t new_link_ndx)
     {
-        TIGHTDB_ASSERT(false); // FIXME: Support LinkLists
-        return true;
+        return m_transformed.link_list_move(old_link_ndx, new_link_ndx);
     }
     bool link_list_erase(std::size_t link_ndx)
     {
-        TIGHTDB_ASSERT(false); // FIXME: Support LinkLists
-        return true;
+        return m_transformed.link_list_erase(link_ndx);
     }
     bool link_list_clear()
     {
-        TIGHTDB_ASSERT(false); // FIXME: Support LinkLists
-        return true;
+        return m_transformed.link_list_clear();
     }
 private:
     IndexTranslationMap m_map;
+    TransactLogBufferStream m_buffer;
     TransactLogEncoder m_transformed;
 
     ConstTableRef m_selected_table;
