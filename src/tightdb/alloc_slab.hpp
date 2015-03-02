@@ -114,6 +114,8 @@ public:
     /// \throw InvalidDatabase
     ref_type attach_buffer(char* data, std::size_t size);
 
+    unsigned char get_file_format() const;
+
     /// Attach this allocator to an empty buffer.
     ///
     /// It is an error to call this function on an attached
@@ -300,6 +302,7 @@ private:
 
     util::File m_file;
     char* m_data;
+    unsigned char m_file_format_version;
     AttachMode m_attach_mode;
 
     /// If a file or buffer is currently attached and validation was

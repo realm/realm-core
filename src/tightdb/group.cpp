@@ -40,12 +40,12 @@ Initialization initialization;
 void Group::upgrade_file_format()
 {
     TIGHTDB_ASSERT(is_attached());
-    if (get_file_format_version() >= current_file_format_version)
+    if (m_alloc.get_file_format() >= default_file_format_version)
         return;
 
     for (size_t t = 0; t < m_tables.size(); t++) {
         TableRef table = get_table(t);
-        for (size_t c = 0; c < table->size(); c++) {
+        for (size_t c = 0; c < table->get_column_count(); c++) {
             if (table->has_search_index(c)) {
                 table->remove_search_index(c);
                 table->add_search_index(c);
@@ -53,7 +53,12 @@ void Group::upgrade_file_format()
         }
     }
 
-    set_file_format_version(current_file_format_version);
+    m_alloc.m_file_format_version = default_file_format_version;
+}
+
+unsigned char Group::get_file_format() const
+{
+    return m_alloc.get_file_format();
 }
 
 
@@ -67,6 +72,7 @@ void Group::open(const string& file_path, const char* encryption_key, OpenMode m
     bool server_sync_mode = false;
     ref_type top_ref = m_alloc.attach_file(file_path, is_shared, read_only, no_create,
                                            skip_validate, encryption_key, server_sync_mode); // Throws
+
     SlabAlloc::DetachGuard dg(m_alloc);
     m_alloc.reset_free_space_tracking(); // Throws
     if (top_ref == 0) {
@@ -79,22 +85,6 @@ void Group::open(const string& file_path, const char* encryption_key, OpenMode m
         init_from_ref(top_ref);
     }
     dg.release(); // Do not detach allocator from file
-}
-
-
-unsigned char Group::get_file_format_version()
-{
-    char* file_header = m_alloc.m_data;
-    int valid_part = file_header[16 + 7] & 0x1;
-    return static_cast<unsigned char>(file_header[16 + 4 + valid_part]);
-}
-
-
-void Group::set_file_format_version(unsigned char version)
-{
-    char* file_header = m_alloc.m_data;
-    int valid_part = file_header[16 + 7] & 0x1;
-    file_header[16 + 4 + valid_part] = static_cast<signed char>(version);
 }
 
 

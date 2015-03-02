@@ -674,6 +674,7 @@
     <ClCompile Include="..\..\test\test_link_query_view.cpp" />
     <ClCompile Include="..\..\test\test_basic_utils.cpp" />
     <ClCompile Include="..\..\test\test_replication.cpp" />
+    <ClCompile Include="..\..\test\test_upgrade_database.cpp" />
     <ClCompile Include="..\..\test\util\jsmn.cpp" />
     <ClCompile Include="..\..\test\util\verified_integer.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
@@ -1102,6 +1103,7 @@
     <ClInclude Include="..\..\src\tightdb\unicode.hpp" />
     <ClInclude Include="..\..\src\tightdb\util\assert.hpp" />
     <ClInclude Include="..\..\src\tightdb\util\errno.hpp" />
+    <ClInclude Include="..\..\src\tightdb\util\file.hpp" />
     <ClInclude Include="..\..\src\tightdb\util\file_mapper.hpp" />
     <ClInclude Include="..\..\src\tightdb\util\shared_ptr.hpp" />
     <ClInclude Include="..\..\src\tightdb\util\terminate.hpp" />
@@ -1157,6 +1159,7 @@
     <ClInclude Include="..\..\src\tightdb\views.hpp" />
     <ClInclude Include="..\..\src\win32\pthread\pthread.h" />
     <ClInclude Include="..\..\test\util\jsmn.hpp" />
+    <ClInclude Include="..\..\test\util\test_path.hpp" />
     <ClInclude Include="..\..\test\util\verified_integer.hpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>

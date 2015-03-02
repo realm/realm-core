@@ -380,6 +380,7 @@ public:
     /// provides the information to unambiguously distinguish that
     /// particular reason).
     static void move(const std::string& old_path, const std::string& new_path);
+    static bool copy(std::string source, std::string destination);
 
     /// Check whether two open file descriptors refer to the same
     /// underlying file, that is, if writing via one of them, will

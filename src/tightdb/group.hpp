@@ -96,9 +96,8 @@ public:
 
     ~Group() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
-    unsigned char get_file_format_version();
-    void Group::set_file_format_version(unsigned char version);
     void upgrade_file_format();
+    unsigned char get_file_format() const;
 
     /// Attach this Group instance to the specified database file.
     ///
@@ -424,6 +423,7 @@ private:
 
     typedef std::vector<Table*> table_accessors;
     mutable table_accessors m_table_accessors;
+    
     const bool m_is_shared;
     bool m_is_attached;
 

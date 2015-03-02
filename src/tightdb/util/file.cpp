@@ -893,6 +893,27 @@ void File::move(const string& old_path, const string& new_path)
     }
 }
 
+bool File::copy(string source, string destination)
+{
+    char buf[1024];
+    size_t read;
+    File::try_remove(destination);
+    FILE* src = fopen(source.c_str(), "rb");
+    if (!src)
+        return false;
+
+    FILE* dst = fopen(destination.c_str(), "wb");
+    if (!dst) {
+        fclose(src);
+        return false;
+    }
+
+    while (read = fread(buf, 1, 1024, src)) {
+        fwrite(buf, 1, read, dst);
+    }
+    fclose(src);
+    fclose(dst);
+}
 
 bool File::is_same_file(const File& f) const
 {

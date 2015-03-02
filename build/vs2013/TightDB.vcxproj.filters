@@ -105,6 +105,7 @@
     <ClCompile Include="..\..\src\tightdb\util\file_mapper.cpp" />
     <ClCompile Include="..\..\test\test_replication.cpp" />
     <ClCompile Include="..\..\src\tightdb\query_engine.cpp" />
+    <ClCompile Include="..\..\test\test_upgrade_database.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\tightdb.hpp" />
@@ -196,6 +197,8 @@
     <ClInclude Include="..\..\src\tightdb\link_view_fwd.hpp" />
     <ClInclude Include="..\..\src\tightdb\table_basic_fwd.hpp" />
     <ClInclude Include="..\..\src\tightdb\util\assert.hpp" />
+    <ClInclude Include="..\..\test\util\test_path.hpp" />
+    <ClInclude Include="..\..\src\tightdb\util\file.hpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="changelog.txt" />
