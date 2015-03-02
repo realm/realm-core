@@ -1544,7 +1544,7 @@ inline void Array::destroy_deep(MemRef mem, Allocator& alloc) TIGHTDB_NOEXCEPT
 inline void Array::adjust(std::size_t ndx, int_fast64_t diff)
 {
     // FIXME: Should be optimized
-    TIGHTDB_ASSERT(ndx <= m_size);
+    TIGHTDB_ASSERT_3(ndx, <=, m_size);
     int_fast64_t v = get(ndx);
     set(ndx, int64_t(v + diff)); // Throws
 }
@@ -1698,7 +1698,7 @@ inline void Array::set_header_width(int value, char* header) TIGHTDB_NOEXCEPT
         ++w;
         value >>= 1;
     }
-    TIGHTDB_ASSERT(w < 8);
+    TIGHTDB_ASSERT_3(w, <, 8);
 
     typedef unsigned char uchar;
     uchar* h = reinterpret_cast<uchar*>(header);
@@ -1707,7 +1707,7 @@ inline void Array::set_header_width(int value, char* header) TIGHTDB_NOEXCEPT
 
 inline void Array::set_header_size(std::size_t value, char* header) TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(value <= 0xFFFFFFL);
+    TIGHTDB_ASSERT_3(value, <=, 0xFFFFFFL);
     typedef unsigned char uchar;
     uchar* h = reinterpret_cast<uchar*>(header);
     h[5] = uchar((value >> 16) & 0x000000FF);
@@ -1718,7 +1718,7 @@ inline void Array::set_header_size(std::size_t value, char* header) TIGHTDB_NOEX
 // Note: There is a copy of this function is test_alloc.cpp
 inline void Array::set_header_capacity(std::size_t value, char* header) TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(value <= 0xFFFFFFL);
+    TIGHTDB_ASSERT_3(value, <=, 0xFFFFFFL);
     typedef unsigned char uchar;
     uchar* h = reinterpret_cast<uchar*>(header);
     h[0] = uchar((value >> 16) & 0x000000FF);
@@ -1891,7 +1891,7 @@ template<class S> std::size_t Array::write(S& out, bool recurse, bool persist) c
         std::size_t size = get_byte_size();
         uint_fast32_t dummy_checksum = 0x01010101UL;
         std::size_t array_pos = out.write_array(header, size, dummy_checksum);
-        TIGHTDB_ASSERT(array_pos % 8 == 0); // 8-byte alignment
+        TIGHTDB_ASSERT_3(array_pos % 8, ==, 0); // 8-byte alignment
 
         return array_pos;
     }
@@ -1920,7 +1920,7 @@ template<class S> std::size_t Array::write(S& out, bool recurse, bool persist) c
                 sub.init_from_ref(to_ref(value));
                 bool subrecurse = true;
                 std::size_t sub_pos = sub.write(out, subrecurse, persist); // Throws
-                TIGHTDB_ASSERT(sub_pos % 8 == 0); // 8-byte alignment
+                TIGHTDB_ASSERT_3(sub_pos % 8, ==, 0); // 8-byte alignment
                 new_refs.add(sub_pos); // Throws
             }
         }
@@ -2159,7 +2159,7 @@ ref_type Array::bptree_append(TreeInsert<TreeTraits>& state)
 template<class TreeTraits>
 ref_type Array::bptree_insert(std::size_t elem_ndx, TreeInsert<TreeTraits>& state)
 {
-    TIGHTDB_ASSERT(size() >= 1 + 1 + 1); // At least one child
+    TIGHTDB_ASSERT_3(size(), >=, 1 + 1 + 1); // At least one child
 
     // Conversion to general form if in compact form. Since this
     // conversion will occur from root to leaf, it will maintain
@@ -2181,7 +2181,7 @@ ref_type Array::bptree_insert(std::size_t elem_ndx, TreeInsert<TreeTraits>& stat
         // essentially a matter of using the lower vs. the upper bound
         // when searching through the offsets array.
         child_ndx = offsets.lower_bound_int(elem_ndx);
-        TIGHTDB_ASSERT(child_ndx < size() - 2);
+        TIGHTDB_ASSERT_3(child_ndx, <, size() - 2);
         std::size_t elem_ndx_offset = child_ndx == 0 ? 0 : to_size_t(offsets.get(child_ndx-1));
         elem_ndx_in_child = elem_ndx - elem_ndx_offset;
     }
@@ -2192,7 +2192,7 @@ ref_type Array::bptree_insert(std::size_t elem_ndx, TreeInsert<TreeTraits>& stat
     char* child_header = static_cast<char*>(m_alloc.translate(child_ref));
     bool child_is_leaf = !get_is_inner_bptree_node_from_header(child_header);
     if (child_is_leaf) {
-        TIGHTDB_ASSERT(elem_ndx_in_child <= TIGHTDB_MAX_BPNODE_SIZE);
+        TIGHTDB_ASSERT_3(elem_ndx_in_child, <=, TIGHTDB_MAX_BPNODE_SIZE);
         new_sibling_ref =
             TreeTraits::leaf_insert(MemRef(child_header, child_ref), childs_parent,
                                     child_ref_ndx, m_alloc, elem_ndx_in_child, state); // Throws
@@ -2488,7 +2488,7 @@ template<class cond2, Action action, size_t bitwidth, class Callback> bool Array
     }
 
     // finder cannot handle this bitwidth
-    TIGHTDB_ASSERT(m_width != 0);
+    TIGHTDB_ASSERT_3(m_width, !=, 0);
 
 #if defined(TIGHTDB_COMPILER_SSE)
     if ((sseavx<42>() &&                                        (end - start >= sizeof (__m128i) && m_width >= 8))
@@ -2603,7 +2603,7 @@ template<bool eq, size_t width>size_t Array::FindZero(uint64_t v) const
 
     while (eq == (((v >> (width * start)) & mask) != 0)) {
         // You must only call FindZero() if you are sure that at least 1 item matches
-        TIGHTDB_ASSERT(start <= 8 * sizeof(v));
+        TIGHTDB_ASSERT_3(start, <=, 8 * sizeof(v));
         start++;
     }
 
@@ -2997,7 +2997,7 @@ bool Array::CompareLeafs(const Array* foreign, size_t start, size_t end, size_t 
                          Callback callback) const
 {
     cond c;
-    TIGHTDB_ASSERT(start <= end);
+    TIGHTDB_ASSERT_3(start, <=, end);
     if (start == end)
         return true;
 

@@ -39,8 +39,8 @@ void ColumnLink::remove_backlinks(size_t row_ndx)
 void ColumnLink::move_last_over(size_t row_ndx, size_t last_row_ndx,
                                 bool broken_reciprocal_backlinks)
 {
-    TIGHTDB_ASSERT(row_ndx <= last_row_ndx);
-    TIGHTDB_ASSERT(last_row_ndx + 1 == size());
+    TIGHTDB_ASSERT_3(row_ndx, <=, last_row_ndx);
+    TIGHTDB_ASSERT_3(last_row_ndx + 1, ==, size());
 
     // Remove backlinks to deleted row
     if (!broken_reciprocal_backlinks)
@@ -137,12 +137,12 @@ void ColumnLink::Verify(const Table& table, size_t col_ndx) const
         pair<iter,iter> range = equal_range(pairs.begin(), pairs.end(), search_value);
         // Exactly one corresponding backlink must exist
         TIGHTDB_ASSERT(range.second - range.first == 1);
-        TIGHTDB_ASSERT(range.first->target_row_ndx == target_row_ndx);
+        TIGHTDB_ASSERT_3(range.first->target_row_ndx, ==, target_row_ndx);
         ++backlinks_seen;
     }
 
     // All backlinks must have been matched by a forward link
-    TIGHTDB_ASSERT(backlinks_seen == pairs.size());
+    TIGHTDB_ASSERT_3(backlinks_seen, ==, pairs.size());
 }
 
 #endif // TIGHTDB_DEBUG

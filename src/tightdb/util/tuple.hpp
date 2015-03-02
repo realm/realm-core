@@ -85,6 +85,13 @@ tuple(const A& a, const B& b, const C& c, const D& d, const E& e, const F& f)
     return cons(a, tuple(b,c,d,e,f));
 }
 
+template<class A, class B, class C, class D, class E, class F, class G> inline
+Tuple<TypeCons<A, TypeCons<B, TypeCons<C, TypeCons<D, TypeCons<E, TypeCons<F, TypeCons<G, void> > > > > > > >
+tuple(const A& a, const B& b, const C& c, const D& d, const E& e, const F& f, const G& g)
+{
+    return cons(a, tuple(b,c,d,e,f,g));
+}
+
 
 template<class L, class V>
 inline Tuple<typename TypeAppend<L,V>::type> append(const Tuple<L>& t, const V& v)

@@ -30,6 +30,8 @@
 
 namespace tightdb {
 
+class CommitLog;
+
 class LogFileError: public std::runtime_error {
 public:
     LogFileError(std::string file_name):

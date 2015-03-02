@@ -31,7 +31,10 @@ namespace tightdb {
 
 class ColumnLinkList;
 
-namespace _impl { class LinkListFriend; }
+namespace _impl {
+class LinkListFriend;
+class TransactLogEncoderBase;
+}
 
 
 /// The effect of calling most of the link list functions on a detached accessor
@@ -124,7 +127,7 @@ private:
 #ifdef TIGHTDB_ENABLE_REPLICATION
     Replication* get_repl() TIGHTDB_NOEXCEPT;
     void repl_unselect() TIGHTDB_NOEXCEPT;
-    friend class Replication;
+    friend class _impl::TransactLogEncoderBase;
 #endif
 
 #ifdef TIGHTDB_DEBUG
