@@ -231,4 +231,49 @@ TEST(File_ReadWrite)
     }
 }
 
+TEST(File_Resize)
+{
+    TEST_PATH(path);
+    File f(path, File::mode_Write);
+    f.set_encryption_key(crypt_key(true));
+
+    f.resize(8192);
+    CHECK_EQUAL(8192, f.get_size());
+    {
+        File::Map<unsigned char> m(f, File::access_ReadWrite, 8192);
+        for (int i = 0; i < 8192; ++i)
+            m.get_addr()[i] = static_cast<unsigned char>(i);
+        m.sync();
+        for (int i = 0; i < 8192; ++i)
+            m.get_addr()[i] = static_cast<unsigned char>(i);
+    }
+
+    f.resize(4096);
+    CHECK_EQUAL(4096, f.get_size());
+    {
+        File::Map<unsigned char> m(f, File::access_ReadWrite, 4096);
+        for (int i = 0; i < 4096; ++i) {
+            CHECK_EQUAL(static_cast<unsigned char>(i), m.get_addr()[i]);
+            if (static_cast<unsigned char>(i) != m.get_addr()[i])
+                return;
+        }
+    }
+
+    f.resize(8192);
+    CHECK_EQUAL(8192, f.get_size());
+    {
+        File::Map<unsigned char> m(f, File::access_ReadWrite, 8192);
+        for (int i = 0; i < 8192; ++i)
+            m.get_addr()[i] = static_cast<unsigned char>(i);
+    }
+    {
+        File::Map<unsigned char> m(f, File::access_ReadWrite, 8192);
+        for (int i = 0; i < 8192; ++i) {
+            CHECK_EQUAL(static_cast<unsigned char>(i), m.get_addr()[i]);
+            if (static_cast<unsigned char>(i) != m.get_addr()[i])
+                return;
+        }
+    }
+}
+
 #endif // TEST_FILE
