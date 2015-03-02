@@ -126,6 +126,8 @@
 		3F5ED51119D08A11001FCFF4 /* file_mapper.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 3F5ED50F19D08A11001FCFF4 /* file_mapper.hpp */; };
 		3F5ED51419D9D4D1001FCFF4 /* test_basic_utils.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3F5ED51219D9D4D1001FCFF4 /* test_basic_utils.cpp */; };
 		3F5ED51519D9D4D1001FCFF4 /* test_link_query_view.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3F5ED51319D9D4D1001FCFF4 /* test_link_query_view.cpp */; };
+		3F967AFA1AA4C00800005C38 /* transact_log.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3F967AF81AA4C00800005C38 /* transact_log.cpp */; };
+		3F967AFB1AA4C00800005C38 /* transact_log.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 3F967AF91AA4C00800005C38 /* transact_log.hpp */; };
 		3FA0DBCC1A0BF29C003548DC /* test_encrypted_file_mapping.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3FA0DBCA1A0BF28C003548DC /* test_encrypted_file_mapping.cpp */; };
 		3FC68FDA1A0AD3FE005F3103 /* encrypted_file_mapping.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3FC68FD91A0AD3FE005F3103 /* encrypted_file_mapping.cpp */; };
 		3FCA03C61A44F57A009067D0 /* CoreFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3FCA03C51A44F57A009067D0 /* CoreFoundation.framework */; };
@@ -498,6 +500,8 @@
 		3F5ED50F19D08A11001FCFF4 /* file_mapper.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = file_mapper.hpp; sourceTree = "<group>"; };
 		3F5ED51219D9D4D1001FCFF4 /* test_basic_utils.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = test_basic_utils.cpp; sourceTree = "<group>"; };
 		3F5ED51319D9D4D1001FCFF4 /* test_link_query_view.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = test_link_query_view.cpp; sourceTree = "<group>"; };
+		3F967AF81AA4C00800005C38 /* transact_log.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = transact_log.cpp; sourceTree = "<group>"; };
+		3F967AF91AA4C00800005C38 /* transact_log.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = transact_log.hpp; sourceTree = "<group>"; };
 		3FA0DBCA1A0BF28C003548DC /* test_encrypted_file_mapping.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = test_encrypted_file_mapping.cpp; sourceTree = "<group>"; };
 		3FC68FD81A0AD3BF005F3103 /* encrypted_file_mapping.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = encrypted_file_mapping.hpp; sourceTree = "<group>"; };
 		3FC68FD91A0AD3FE005F3103 /* encrypted_file_mapping.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = encrypted_file_mapping.cpp; sourceTree = "<group>"; };
@@ -676,6 +680,8 @@
 				3620DF0418B6CA7B003AD498 /* destroy_guard.hpp */,
 				3620DF0518B6CA7B003AD498 /* output_stream.cpp */,
 				3620DF0918B6CA7B003AD498 /* output_stream.hpp */,
+				3F967AF81AA4C00800005C38 /* transact_log.cpp */,
+				3F967AF91AA4C00800005C38 /* transact_log.hpp */,
 			);
 			name = impl;
 			path = tightdb/impl;
@@ -999,6 +1005,7 @@
 				365CCE38157CC37D00172BF8 /* array_binary.hpp in Headers */,
 				365CCE3A157CC37D00172BF8 /* array_blob.hpp in Headers */,
 				36FDACE017D67DDD0084E8BB /* array_blobs_big.hpp in Headers */,
+				3F967AFB1AA4C00800005C38 /* transact_log.hpp in Headers */,
 				365CCE3E157CC37D00172BF8 /* array_string.hpp in Headers */,
 				365CCE3C157CC37D00172BF8 /* array_string_long.hpp in Headers */,
 				52D7C47D1852A01700633748 /* assert.hpp in Headers */,
@@ -1322,6 +1329,7 @@
 				365CCE37157CC37D00172BF8 /* array_binary.cpp in Sources */,
 				365CCE39157CC37D00172BF8 /* array_blob.cpp in Sources */,
 				36FDACDF17D67DDD0084E8BB /* array_blobs_big.cpp in Sources */,
+				3F967AFA1AA4C00800005C38 /* transact_log.cpp in Sources */,
 				365CCE3D157CC37D00172BF8 /* array_string.cpp in Sources */,
 				365CCE3B157CC37D00172BF8 /* array_string_long.cpp in Sources */,
 				365CCE53157CC37D00172BF8 /* column.cpp in Sources */,
