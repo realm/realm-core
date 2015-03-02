@@ -3,6 +3,7 @@
 #include <ostream>
 #include <iomanip>
 
+#include <tightdb/group.hpp>
 #include <tightdb/table.hpp>
 #include <tightdb/descriptor.hpp>
 #include <tightdb/link_view.hpp>

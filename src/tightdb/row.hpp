@@ -303,8 +303,6 @@ private:
         RowBase::move_assign(row);
     }
     friend class SharedGroup;
-
-
 };
 
 typedef BasicRow<Table> Row;
