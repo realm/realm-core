@@ -3,7 +3,7 @@
  * TIGHTDB CONFIDENTIAL
  * __________________
  *
- *  [2011] - [2012] TightDB Inc
+ *  [2011] - [2015] TightDB Inc
  *  All Rights Reserved.
  *
  * NOTICE:  All information contained herein is, and remains
@@ -17,22 +17,26 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_UTIL_TERMINATE_HPP
-#define TIGHTDB_UTIL_TERMINATE_HPP
 
-#include <cstdlib>
-#include <string>
-#include <stdint.h>
-#include <tightdb/util/features.h>
-
-#define TIGHTDB_TERMINATE(msg) tightdb::util::terminate((msg), __FILE__, __LINE__)
+#ifndef TIGHTDB_IMPL_INPUT_STREAM_HPP
+#define TIGHTDB_IMPL_INPUT_STREAM_HPP
 
 namespace tightdb {
-namespace util {
+namespace _impl {
 
-TIGHTDB_NORETURN void terminate(const char* message, const char* file, long line, bool extra = false, int64_t info1 = 0, int64_t info2 = 0) TIGHTDB_NOEXCEPT;
+class InputStream {
+public:
+    /// \return the number of accessible bytes.
+    /// A value of zero indicates end-of-input.
+    /// For non-zero return value, \a begin and \a end are
+    /// updated to reflect the start and limit of a
+    /// contiguous memory chunk.
+    virtual size_t next_block(const char*& begin, const char*& end) = 0;
 
-} // namespace util
-} // namespace tightdb
+    virtual ~InputStream() {}
+};
 
-#endif // TIGHTDB_UTIL_TERMINATE_HPP
+}
+}
+
+#endif // TIGHTDB_IMPL_INPUT_STREAM_HPP

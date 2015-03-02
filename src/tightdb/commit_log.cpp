@@ -325,7 +325,6 @@ void recover_from_dead_owner()
 
 inline WriteLogCollector::CommitLogPreamble* WriteLogCollector::get_preamble()
 {
-    map_header_if_needed();
     CommitLogHeader* header = m_header.get_addr();
     if (header->use_preamble_a)
         return & header->preamble_a;
@@ -574,7 +573,7 @@ void WriteLogCollector::reset_log_management(version_type last_version)
 
         // Verify that end of the commit range is equal to or after 'last_version'
         // TODO: This most likely should throw an exception ?
-        TIGHTDB_ASSERT(last_version <= preamble->end_commit_range);
+        TIGHTDB_ASSERT_3(last_version, <=, preamble->end_commit_range);
 
         if (last_version <= preamble->end_commit_range) {
             if (last_version < preamble->begin_newest_commit_range) {
@@ -586,7 +585,7 @@ void WriteLogCollector::reset_log_management(version_type last_version)
             }
             // writepoint is somewhere in the active file.
             // We scan from the start to find it.
-            TIGHTDB_ASSERT(last_version >= preamble->begin_newest_commit_range);
+            TIGHTDB_ASSERT_3(last_version, >=, preamble->begin_newest_commit_range);
             CommitLogMetadata* active_log = get_active_log(preamble);
             remap_if_needed(*active_log);
             version_type current_version;
@@ -691,8 +690,8 @@ void WriteLogCollector::get_commit_entries_internal(version_type from_version, v
     map_header_if_needed();
     RobustLockGuard rlg(m_header.get_addr()->lock, &recover_from_dead_owner);
     const CommitLogPreamble* preamble = get_preamble();
-    TIGHTDB_ASSERT(from_version >= preamble->begin_oldest_commit_range);
-    TIGHTDB_ASSERT(to_version <= preamble->end_commit_range);
+    TIGHTDB_ASSERT_3(from_version, >=, preamble->begin_oldest_commit_range);
+    TIGHTDB_ASSERT_3(to_version, <=, preamble->end_commit_range);
 
     // - make sure the files are open and mapped, possibly update stale mappings
     remap_if_needed(m_log_a);

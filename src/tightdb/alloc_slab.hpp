@@ -387,7 +387,7 @@ inline SlabAlloc::SlabAlloc():
 
 inline void SlabAlloc::own_buffer() TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(m_attach_mode == attach_UsersBuffer);
+    TIGHTDB_ASSERT_3(m_attach_mode, ==, attach_UsersBuffer);
     TIGHTDB_ASSERT(m_data);
     TIGHTDB_ASSERT(!m_file.is_attached());
     m_attach_mode = attach_OwnedBuffer;

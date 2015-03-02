@@ -20,6 +20,7 @@ nobase_subinclude_HEADERS = \
 	group_shared.hpp \
 	impl/destroy_guard.hpp \
 	impl/output_stream.hpp \
+	impl/transact_log.hpp \
 	importer.hpp \
 	lang_bind_helper.hpp \
 	link_view.hpp \
@@ -132,6 +133,7 @@ libtightdb_a_SOURCES = \
 	group_shared.cpp \
 	group_writer.cpp \
 	impl/output_stream.cpp \
+	impl/transact_log.cpp \
 	importer.cpp \
 	index_string.cpp \
 	lang_bind_helper.cpp \

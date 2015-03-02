@@ -1445,7 +1445,7 @@ inline std::size_t Table::get_column_count() const TIGHTDB_NOEXCEPT
 
 inline StringData Table::get_column_name(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(ndx < get_column_count());
+    TIGHTDB_ASSERT_3(ndx, <, get_column_count());
     return m_spec.get_column_name(ndx);
 }
 
@@ -1457,13 +1457,13 @@ inline std::size_t Table::get_column_index(StringData name) const TIGHTDB_NOEXCE
 
 inline ColumnType Table::get_real_column_type(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(ndx < m_spec.get_column_count());
+    TIGHTDB_ASSERT_3(ndx, <, m_spec.get_column_count());
     return m_spec.get_column_type(ndx);
 }
 
 inline DataType Table::get_column_type(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(ndx < m_spec.get_column_count());
+    TIGHTDB_ASSERT_3(ndx, <, m_spec.get_column_count());
     return m_spec.get_public_column_type(ndx);
 }
 
@@ -1624,13 +1624,13 @@ inline std::size_t Table::size() const TIGHTDB_NOEXCEPT
 
 inline Table::RowExpr Table::get(std::size_t row_ndx) TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(row_ndx < size());
+    TIGHTDB_ASSERT_3(row_ndx, <, size());
     return RowExpr(this, row_ndx);
 }
 
 inline Table::ConstRowExpr Table::get(std::size_t row_ndx) const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(row_ndx < size());
+    TIGHTDB_ASSERT_3(row_ndx, <, size());
     return ConstRowExpr(this, row_ndx);
 }
 
@@ -1828,7 +1828,7 @@ inline std::size_t* Table::record_subtable_path(std::size_t* begin,
 {
     const Array& real_top = m_top.is_attached() ? m_top : m_columns;
     std::size_t index_in_parent = real_top.get_ndx_in_parent();
-    TIGHTDB_ASSERT(begin < end);
+    TIGHTDB_ASSERT_3(begin, <, end);
     *begin++ = index_in_parent;
     ArrayParent* parent = real_top.get_parent();
     TIGHTDB_ASSERT(parent);

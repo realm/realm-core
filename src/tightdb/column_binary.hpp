@@ -192,7 +192,7 @@ inline BinaryData ColumnBinary::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 inline StringData ColumnBinary::get_string(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
     BinaryData bin = get(ndx);
-    TIGHTDB_ASSERT(0 < bin.size());
+    TIGHTDB_ASSERT_3(0, <, bin.size());
     return StringData(bin.data(), bin.size()-1);
 }
 
@@ -214,7 +214,7 @@ inline void ColumnBinary::add(BinaryData value)
 inline void ColumnBinary::insert(std::size_t row_ndx, BinaryData value)
 {
     std::size_t size = this->size(); // Slow
-    TIGHTDB_ASSERT(row_ndx <= size);
+    TIGHTDB_ASSERT_3(row_ndx, <=, size);
     std::size_t row_ndx_2 = row_ndx == size ? tightdb::npos : row_ndx;
     bool add_zero_term = false;
     std::size_t num_rows = 1;
@@ -278,7 +278,7 @@ inline void ColumnBinary::add_string(StringData value)
 inline void ColumnBinary::insert_string(std::size_t row_ndx, StringData value)
 {
     std::size_t size = this->size(); // Slow
-    TIGHTDB_ASSERT(row_ndx <= size);
+    TIGHTDB_ASSERT_3(row_ndx, <=, size);
     std::size_t row_ndx_2 = row_ndx == size ? tightdb::npos : row_ndx;
     BinaryData value_2(value.data(), value.size());
     bool add_zero_term = false;
