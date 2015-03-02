@@ -33,7 +33,7 @@
 namespace tightdb {
 
 namespace _impl {
-class TransactLogEncoderBase;
+class TransactLogConvenientEncoder;
 }
 
 
@@ -129,7 +129,7 @@ private:
     friend class LinkView;
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    friend class _impl::TransactLogEncoderBase;
+    friend class _impl::TransactLogConvenientEncoder;
 #endif
 };
 

@@ -49,7 +49,10 @@ namespace tightdb {
 
 /// Replication is enabled by passing an instance of an implementation
 /// of this class to the SharedGroup constructor.
-class Replication: public _impl::TransactLogEncoderBase {
+class Replication:
+    public _impl::TransactLogConvenientEncoder,
+    protected _impl::TransactLogStream
+{
 public:
     // Be sure to keep this type aligned with what is actually used in
     // SharedGroup.
@@ -293,7 +296,8 @@ private:
 
 // Implementation:
 
-inline Replication::Replication()
+inline Replication::Replication():
+    _impl::TransactLogConvenientEncoder(static_cast<_impl::TransactLogStream&>(*this))
 {
 }
 
@@ -378,15 +382,15 @@ inline std::size_t TrivialReplication::transact_log_size()
     return write_position() - m_transact_log_buffer.data();
 }
 
-inline void TrivialReplication::transact_log_reserve(size_t n, char** new_begin, char** new_end)
+inline void TrivialReplication::transact_log_reserve(std::size_t n, char** new_begin, char** new_end)
 {
     internal_transact_log_reserve(n, new_begin, new_end);
 }
 
-inline void TrivialReplication::internal_transact_log_reserve(size_t n, char** new_begin, char** new_end)
+inline void TrivialReplication::internal_transact_log_reserve(std::size_t n, char** new_begin, char** new_end)
 {
     char* data = m_transact_log_buffer.data();
-    size_t size = write_position() - data;
+    std::size_t size = write_position() - data;
     m_transact_log_buffer.reserve_extra(size, n);
     data = m_transact_log_buffer.data(); // May have changed
     *new_begin = data + size;
