@@ -310,7 +310,7 @@ public:
     bool insert_link(size_t col_ndx, size_t row_ndx, std::size_t num_rows, std::size_t value)
     {
         static_cast<void>(num_rows);
-        TIGHTDB_ASSERT(value > 0); // Not yet any support for inserting null links
+        TIGHTDB_ASSERT_3(value, >, 0); // Not yet any support for inserting null links
         if (TIGHTDB_LIKELY(check_insert_cell(col_ndx, row_ndx))) {
 #ifdef TIGHTDB_DEBUG
             if (m_log)

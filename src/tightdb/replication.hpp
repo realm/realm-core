@@ -129,19 +129,28 @@ public:
     virtual void get_commit_entries(version_type from_version, version_type to_version,
                                     Replication::CommitLogEntry* logs_buffer) TIGHTDB_NOEXCEPT;
 
+    /// Persist a struct with information related to server synchronization.
+    /// The content is unrelated to the commmitlog management, EXCEPT for the
+    /// first field in the struct, which is used to limit commitlog cleanup.
     /// Set the latest version that is known to be received and accepted by the
     /// server. All later versions are guaranteed to be available to the caller
-    /// of get_commit_entries(). This function is guaranteed to have no effect,
-    /// if the specified version is earlier than a version, that has already
-    /// been set.
-    virtual void set_last_version_synced(version_type version) TIGHTDB_NOEXCEPT;
+    /// of get_commit_entries(). Asserts if the client_version in the struct
+    /// is lower than any previously persisted client_version.
+    struct PersistedSyncInfo {
+        uint64_t client_version; // this one limits cleanup of log entries
+        uint64_t server_version;
+        uint64_t client_file_id;
+        PersistedSyncInfo() { client_version = server_version = client_file_id = 0; }
+    };
 
-    /// Get the value set by last call to 'set_last_version_synced' If
+    virtual void set_persisted_sync_info(PersistedSyncInfo& info) TIGHTDB_NOEXCEPT;
+
+    /// Get the PersistedSyncInfo store by last call to 'set_persisted_sync_info' If
     /// 'end_version_number' is non null, a limit to version numbering is
     /// returned.  The limit returned is the version number of the latest
     /// commit.  If sync versioning is disabled, the last version seen locally
     /// is returned.
-    virtual version_type get_last_version_synced(version_type* end_version_number = 0)
+    virtual PersistedSyncInfo get_persisted_sync_info(version_type* end_version_number = 0)
         TIGHTDB_NOEXCEPT;
 
     /// Apply the specified changeset to the specified group as a single
@@ -171,7 +180,7 @@ public:
                                                  BinaryData changeset, uint_fast64_t timestamp,
                                                  uint_fast64_t peer_id, version_type peer_version,
                                                  std::ostream* apply_log = 0);
-    virtual version_type get_last_peer_version(uint_fast64_t peer_id) const;
+    virtual version_type get_last_peer_version(uint_fast64_t peer_id);
 
     /// Acquire permision to start a new 'write' transaction. This
     /// function must be called by a client before it requests a
@@ -401,14 +410,14 @@ inline void Replication::set_last_version_seen_locally(version_type) TIGHTDB_NOE
 {
 }
 
-inline void Replication::set_last_version_synced(version_type) TIGHTDB_NOEXCEPT
+inline void Replication::set_persisted_sync_info(Replication::PersistedSyncInfo&) TIGHTDB_NOEXCEPT
 {
 }
 
-inline Replication::version_type Replication::get_last_version_synced(version_type*)
+inline Replication::PersistedSyncInfo Replication::get_persisted_sync_info(version_type*)
     TIGHTDB_NOEXCEPT
 {
-    return 0;
+    return PersistedSyncInfo();
 }
 
 inline Replication::version_type
@@ -422,7 +431,7 @@ Replication::apply_foreign_changeset(SharedGroup&, version_type, BinaryData,
 }
 
 inline Replication::version_type
-Replication::get_last_peer_version(uint_fast64_t) const
+Replication::get_last_peer_version(uint_fast64_t)
 {
     // Unimplemented!
     TIGHTDB_ASSERT(false);

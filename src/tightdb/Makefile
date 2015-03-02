@@ -42,6 +42,7 @@ nobase_subinclude_HEADERS = \
 	tightdb_nmmintrin.h \
 	unicode.hpp \
 	util/assert.hpp \
+	util/basic_system_errors.hpp \
 	util/bind.hpp \
 	util/bind_ptr.hpp \
 	util/buffer.hpp \
@@ -67,7 +68,6 @@ nobase_subinclude_HEADERS = \
 	utilities.hpp \
 	version.hpp \
 	views.hpp \
-
 
 nobase_subinclude_HEADERS_EXTRA_UNINSTALL = *.h *.hpp util/*.h util/*.hpp impl/*.h impl/*.hpp
 
@@ -159,7 +159,6 @@ libtightdb_a_SOURCES = \
 	utilities.cpp \
 	version.cpp \
 	views.cpp \
-
 
 # Format: CURRENT[:REVISION[:AGE]]
 #

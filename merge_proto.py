@@ -9,21 +9,21 @@
 # operation, is the effective timetsamp of the changeset of which the operation
 # is a part.
 #
-# PROBABLE LEMMA: Consider two insert operations A and B at respective positions
-# P and Q in the changeset history of some participant. Let I and J be the
-# indexes addressed by A and B respectively. If A occurs before B (P < Q), but
-# the effective timestamp of B is strictly less than the effective timestamp of
-# A (time reversal), then J is less than, or equal to T(I,P,Q) (index
+# HYPOTHESIS: Consider two insert operations A and B at respective positions P
+# and Q in the changeset history of some participant. Let I and J be the indexes
+# addressed by A and B respectively. If A occurs before B (P < Q), but the
+# effective timestamp of B is strictly less than the effective timestamp of A
+# (time reversal), then J is less than, or equal to T(I,P,Q) (index
 # reversal). Informally we can say that time reversal implies index
 # reversal. Note that the opposite is not true in general, that is, index
-# reversal does **not** imply time reversal.
+# reversal does not imply time reversal.
 #
 # DEFINITION: The *temporal consistency fix* is the process of ensuring that a
 # locally generated effective timestamp is never less than the effective
 # timestamp of any changeset (with local or remote origin) that has already been
 # locally applied.
 #
-# QUESTIONABLE COROLLARY: The temporal consistency fix is necessary.
+# HYPOTHESIS: The temporal consistency fix is necessary.
 
 
 import random
