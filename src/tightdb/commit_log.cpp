@@ -797,7 +797,7 @@ public:
     IndexTranslationMap(WriteLogCollector& log, uint64_t self_peer_id, uint_fast64_t timestamp,
         uint_fast64_t peer_id, version_type base_version, version_type current_version):
     m_log(log), m_self_peer_id(self_peer_id), m_base_version(base_version),
-    m_current_version(current_version), m_timestamp(timestamp), m_peer_id(peer_id), m_was_overwritten(false)
+    m_current_version(current_version), m_timestamp(timestamp), m_peer_id(peer_id)
     {
         // Build the index maps:
         std::vector<Replication::CommitLogEntry> history(m_current_version - m_base_version);
@@ -861,6 +861,8 @@ public:
     bool select_table(std::size_t group_level_ndx, int levels, const std::size_t* path)
     {
         // FIXME: Translate path, and support lookup by the full path
+        static_cast<void>(levels);
+        static_cast<void>(path);
         m_selected_table = group_level_ndx;
         return true;
     }
@@ -941,7 +943,6 @@ private:
     uint64_t m_commit_log_timestamp;
 
     size_t m_selected_table; // "group_level_ndx"
-    bool m_was_overwritten;
 };
 
 class WriteLogCollector::TransformChangesetBeforeMerge {
