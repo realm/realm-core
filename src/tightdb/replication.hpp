@@ -176,7 +176,7 @@ public:
     /// sink that allows a SharedGroup to submit actions for replication. It is
     /// then up to the implementation of the Repication interface to define what
     /// replication means.
-    virtual version_type apply_foreign_changeset(SharedGroup&, version_type base_version,
+    virtual version_type apply_foreign_changeset(SharedGroup&, uint_fast64_t self_peer_id, version_type base_version,
                                                  BinaryData changeset, uint_fast64_t timestamp,
                                                  uint_fast64_t peer_id, version_type peer_version,
                                                  std::ostream* apply_log = 0);
@@ -421,7 +421,7 @@ inline Replication::PersistedSyncInfo Replication::get_persisted_sync_info(versi
 }
 
 inline Replication::version_type
-Replication::apply_foreign_changeset(SharedGroup&, version_type, BinaryData,
+Replication::apply_foreign_changeset(SharedGroup&, uint_fast64_t, version_type, BinaryData,
                                      uint_fast64_t, uint_fast64_t, version_type,
                                      std::ostream*)
 {

@@ -111,7 +111,7 @@ public:
     void transact_log_reserve(size_t size, char** new_begin, char** new_end) TIGHTDB_OVERRIDE;
     void transact_log_append(const char* data, size_t size, char** new_begin, char** new_end) TIGHTDB_OVERRIDE;
     virtual bool is_in_server_synchronization_mode() { return m_is_persisting; }
-    version_type apply_foreign_changeset(SharedGroup&, version_type, BinaryData,
+    version_type apply_foreign_changeset(SharedGroup&, uint_fast64_t self_peer_id, version_type, BinaryData,
                                          uint_fast64_t timestamp,
                                          uint_fast64_t peer_id, version_type peer_version,
                                          ostream*) TIGHTDB_OVERRIDE;
@@ -914,9 +914,9 @@ private:
 
 class WriteLogCollector::TransformChangesetBeforeMerge {
 public:
-    TransformChangesetBeforeMerge(WriteLogCollector& log, uint64_t m_self_peer_id, uint_fast64_t timestamp,
+    TransformChangesetBeforeMerge(WriteLogCollector& log, uint64_t self_peer_id, uint_fast64_t timestamp,
         uint_fast64_t peer_id, version_type base_version, version_type current_version):
-    m_map(log, m_self_peer_id, timestamp, peer_id, base_version, current_version),
+    m_map(log, self_peer_id, timestamp, peer_id, base_version, current_version),
     m_transformed(m_buffer),
     m_selected_table(-1)
     {
@@ -936,7 +936,7 @@ public:
     {
         TIGHTDB_ASSERT(m_selected_table != size_t(-1));
         size_t result = m_map.translate_row_index(m_selected_table, row_ndx, num_rows, null_ptr);
-        std::cout << "ROW INSERT TRANSLATION (table " << m_selected_table << "): " << row_ndx << " -> " << result << "\n";
+        //std::cout << "ROW INSERT TRANSLATION (table " << m_selected_table << "): " << row_ndx << " -> " << result << "\n";
         return result;
     }
 
@@ -944,7 +944,7 @@ public:
     {
         TIGHTDB_ASSERT(m_selected_table != size_t(-1));
         size_t result = m_map.translate_row_index(m_selected_table, row_ndx, 0, overwritten);
-        std::cout << "ROW UPDATE TRANSLATION (table " << m_selected_table << "): " << row_ndx << " -> " << result << "\n";
+        //std::cout << "ROW UPDATE TRANSLATION (table " << m_selected_table << "): " << row_ndx << " -> " << result << "\n";
         return result;
     }
 
@@ -1180,7 +1180,7 @@ private:
 
 
 Replication::version_type
-WriteLogCollector::apply_foreign_changeset(SharedGroup& sg, version_type last_version_integrated_by_peer,
+WriteLogCollector::apply_foreign_changeset(SharedGroup& sg, uint_fast64_t self_peer_id, version_type last_version_integrated_by_peer,
                                            BinaryData changeset, uint_fast64_t timestamp,
                                            uint_fast64_t peer_id, version_type peer_version,
                                            ostream* apply_log)
@@ -1198,7 +1198,7 @@ WriteLogCollector::apply_foreign_changeset(SharedGroup& sg, version_type last_ve
         throw LogicError(LogicError::bad_version_number);
 
     SimpleInputStream input(changeset.data(), changeset.size());
-    TransformChangesetBeforeMerge transform(*this, 0, timestamp, peer_id,
+    TransformChangesetBeforeMerge transform(*this, self_peer_id, timestamp, peer_id,
         last_version_integrated_by_peer, current_version);
     TransactLogParser parser(input);
     parser.parse(transform);
