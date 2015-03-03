@@ -303,7 +303,6 @@ private:
 
     util::File m_file;
     char* m_data;
-    unsigned char m_file_format_version;
     AttachMode m_attach_mode;
 
     /// If a file or buffer is currently attached and validation was
@@ -330,6 +329,8 @@ private:
     /// placed here (after m_attach_mode) in the hope that it leads to
     /// less padding between members due to alignment requirements.
     FeeeSpaceState m_free_space_state;
+
+    unsigned char m_file_format_version;
 
     typedef std::vector<Slab> slabs;
     typedef std::vector<Chunk> chunks;

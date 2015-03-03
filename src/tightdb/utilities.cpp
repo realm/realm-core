@@ -274,7 +274,8 @@ int fast_popcount64(int64_t x)
 }
 
 // A fast, thread safe, mediocre-quality random number generator named Xorshift
-uint64_t fastrand(uint64_t max) {
+uint64_t fastrand(uint64_t max) 
+{
     // All the atomics (except the add) may be eliminated completely by the compiler on x64
     static util::Atomic<uint64_t> state(1);
     // Thread safe increment to prevent two threads from producing the same value if called at the exact same time

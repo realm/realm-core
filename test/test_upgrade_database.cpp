@@ -118,6 +118,7 @@ TEST(Upgrade_Database_2_3)
     }
 
     // Test an assert that guards against writing version 2 file to disk
+    File::try_remove(path + ".tmp2");
     g.write(path + ".tmp2");
 }
 

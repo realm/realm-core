@@ -134,7 +134,7 @@ TEST(Replication_General)
         Mixed mix;
         mix.set_int(1);
         table->set    (0, 2, true, 2.0f, 2.0, "xx",  bin, 728, 0, mix);
-        table->add    (3, true, 3.0f, 3.0, "xxx", bin, 729, 0, mix);
+        table->add       (3, true, 3.0f, 3.0, "xxx", bin, 729, 0, mix);
         table->insert (0, 1, true, 1.0f, 1.0, "x",   bin, 727, 0, mix);
 
         table->add(3, true, 3.0f, 0.0, "", bin, 729, 0, mix);     // empty string
