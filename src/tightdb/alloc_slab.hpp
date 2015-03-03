@@ -30,6 +30,7 @@
 
 namespace tightdb {
 
+const int default_file_format_version = 3;
 
 // Pre-declarations
 class Group;
@@ -380,7 +381,8 @@ private:
 
 inline SlabAlloc::SlabAlloc():
     m_attach_mode(attach_None),
-    m_free_space_state(free_space_Clean)
+    m_free_space_state(free_space_Clean),
+    m_file_format_version(default_file_format_version)
 {
     m_baseline = 0; // Unattached
 #ifdef TIGHTDB_DEBUG

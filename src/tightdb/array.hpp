@@ -76,8 +76,6 @@ enum Action {act_ReturnFirst, act_Sum, act_Max, act_Min, act_Count, act_FindAll,
 
 template<class T> inline T no0(T v) { return v == 0 ? 1 : v; }
 
-const int default_file_format_version = 3;
-
 /// Special index value. It has various meanings depending on
 /// context. It is returned by some search functions to indicate 'not
 /// found'. It is similar in function to std::string::npos.
