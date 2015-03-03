@@ -86,8 +86,8 @@ ONLY(Upgrade_Database_2_3)
     */
 
     
-    string path = test_util::get_test_path_prefix() + "version_2_database.tightdb";
     // Make a copy of the version 2 database so that we keep the original file intact and unmodified
+    string path = test_util::get_test_path_prefix() + "version_2_database.tightdb";
     File::copy(path, path + ".tmp");
 
     // Open copy

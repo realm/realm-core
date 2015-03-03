@@ -610,6 +610,7 @@
     <ClCompile Include="..\..\src\tightdb\query_engine.cpp" />
     <ClCompile Include="..\..\src\tightdb\replication.cpp" />
     <ClCompile Include="..\..\src\tightdb\unicode.cpp" />
+    <ClCompile Include="..\..\src\tightdb\util\encrypted_file_mapping.cpp" />
     <ClCompile Include="..\..\src\tightdb\util\errno.cpp" />
     <ClCompile Include="..\..\src\tightdb\util\file.cpp" />
     <ClCompile Include="..\..\src\tightdb\importer.cpp" />
@@ -626,6 +627,7 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="..\..\src\tightdb\util\file_mapper.cpp" />
+    <ClCompile Include="..\..\src\tightdb\util\memory_stream.cpp" />
     <ClCompile Include="..\..\src\tightdb\util\thread.cpp" />
     <ClCompile Include="..\..\src\tightdb\group.cpp" />
     <ClCompile Include="..\..\src\tightdb\group_shared.cpp" />
@@ -669,12 +671,12 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
     </ClCompile>
+    <ClCompile Include="..\..\test\test_destroy_guard.cpp" />
     <ClCompile Include="..\..\test\test_json.cpp" />
     <ClCompile Include="..\..\test\test_links.cpp" />
     <ClCompile Include="..\..\test\test_link_query_view.cpp" />
     <ClCompile Include="..\..\test\test_basic_utils.cpp" />
     <ClCompile Include="..\..\test\test_replication.cpp" />
-    <ClCompile Include="..\..\test\test_upgrade_database.cpp" />
     <ClCompile Include="..\..\test\test_upgrade_database.cpp" />
     <ClCompile Include="..\..\test\util\jsmn.cpp" />
     <ClCompile Include="..\..\test\util\verified_integer.cpp">
@@ -1094,7 +1096,10 @@
     <ClInclude Include="..\..\src\tightdb\descriptor.hpp" />
     <ClInclude Include="..\..\src\tightdb\descriptor_fwd.hpp" />
     <ClInclude Include="..\..\src\tightdb\exceptions.hpp" />
+    <ClInclude Include="..\..\src\tightdb\impl\destroy_guard.hpp" />
+    <ClInclude Include="..\..\src\tightdb\impl\input_stream.hpp" />
     <ClInclude Include="..\..\src\tightdb\impl\output_stream.hpp" />
+    <ClInclude Include="..\..\src\tightdb\impl\transact_log.hpp" />
     <ClInclude Include="..\..\src\tightdb\importer.hpp" />
     <ClInclude Include="..\..\src\tightdb\link_view.hpp" />
     <ClInclude Include="..\..\src\tightdb\link_view_fwd.hpp" />
@@ -1103,9 +1108,14 @@
     <ClInclude Include="..\..\src\tightdb\table_basic_fwd.hpp" />
     <ClInclude Include="..\..\src\tightdb\unicode.hpp" />
     <ClInclude Include="..\..\src\tightdb\util\assert.hpp" />
+    <ClInclude Include="..\..\src\tightdb\util\bind.hpp" />
+    <ClInclude Include="..\..\src\tightdb\util\buffer.hpp" />
+    <ClInclude Include="..\..\src\tightdb\util\encrypted_file_mapping.hpp" />
     <ClInclude Include="..\..\src\tightdb\util\errno.hpp" />
     <ClInclude Include="..\..\src\tightdb\util\file.hpp" />
     <ClInclude Include="..\..\src\tightdb\util\file_mapper.hpp" />
+    <ClInclude Include="..\..\src\tightdb\util\logger.hpp" />
+    <ClInclude Include="..\..\src\tightdb\util\memory_stream.hpp" />
     <ClInclude Include="..\..\src\tightdb\util\shared_ptr.hpp" />
     <ClInclude Include="..\..\src\tightdb\util\terminate.hpp" />
     <ClInclude Include="..\..\src\tightdb\util\unique_ptr.hpp" />
@@ -1160,7 +1170,6 @@
     <ClInclude Include="..\..\src\tightdb\views.hpp" />
     <ClInclude Include="..\..\src\win32\pthread\pthread.h" />
     <ClInclude Include="..\..\test\util\jsmn.hpp" />
-    <ClInclude Include="..\..\test\util\test_path.hpp" />
     <ClInclude Include="..\..\test\util\verified_integer.hpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>

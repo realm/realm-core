@@ -103,10 +103,12 @@
     <ClCompile Include="..\..\test\util\wildcard.cpp" />
     <ClCompile Include="..\..\src\tightdb\util\errno.cpp" />
     <ClCompile Include="..\..\src\tightdb\util\file_mapper.cpp" />
-    <ClCompile Include="..\..\test\test_replication.cpp" />
     <ClCompile Include="..\..\src\tightdb\query_engine.cpp" />
+    <ClCompile Include="..\..\src\tightdb\util\encrypted_file_mapping.cpp" />
+    <ClCompile Include="..\..\src\tightdb\util\memory_stream.cpp" />
     <ClCompile Include="..\..\test\test_upgrade_database.cpp" />
-    <ClCompile Include="..\..\test\test_upgrade_file.cpp" />
+    <ClCompile Include="..\..\test\test_destroy_guard.cpp" />
+    <ClCompile Include="..\..\test\test_replication.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\tightdb.hpp" />
@@ -198,8 +200,15 @@
     <ClInclude Include="..\..\src\tightdb\link_view_fwd.hpp" />
     <ClInclude Include="..\..\src\tightdb\table_basic_fwd.hpp" />
     <ClInclude Include="..\..\src\tightdb\util\assert.hpp" />
-    <ClInclude Include="..\..\test\util\test_path.hpp" />
+    <ClInclude Include="..\..\src\tightdb\util\bind.hpp" />
+    <ClInclude Include="..\..\src\tightdb\util\buffer.hpp" />
+    <ClInclude Include="..\..\src\tightdb\util\encrypted_file_mapping.hpp" />
     <ClInclude Include="..\..\src\tightdb\util\file.hpp" />
+    <ClInclude Include="..\..\src\tightdb\util\logger.hpp" />
+    <ClInclude Include="..\..\src\tightdb\util\memory_stream.hpp" />
+    <ClInclude Include="..\..\src\tightdb\impl\destroy_guard.hpp" />
+    <ClInclude Include="..\..\src\tightdb\impl\input_stream.hpp" />
+    <ClInclude Include="..\..\src\tightdb\impl\transact_log.hpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="changelog.txt" />
