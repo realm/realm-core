@@ -13,22 +13,6 @@ using namespace std;
 using namespace tightdb;
 using namespace tightdb::util;
 
-namespace {
-
-const size_t init_subtab_path_buf_levels = 2; // 2 table levels (soft limit)
-const size_t init_subtab_path_buf_size = 2*init_subtab_path_buf_levels - 1;
-
-} // anonymous namespace
-
-
-Replication::Replication():
-    m_selected_table(0),
-    m_selected_spec(0),
-    m_selected_link_list(0)
-{
-    m_subtab_path_buf.set_size(init_subtab_path_buf_size); // Throws
-}
-
 
 Group& Replication::get_group(SharedGroup& sg) TIGHTDB_NOEXCEPT
 {
@@ -45,98 +29,6 @@ void Replication::set_replication(Group& group, Replication* repl) TIGHTDB_NOEXC
 Replication::version_type Replication::get_current_version(SharedGroup& sg)
 {
     return sg.get_current_version();
-}
-
-
-void Replication::select_table(const Table* table)
-{
-    size_t* begin;
-    size_t* end;
-    for (;;) {
-        begin = m_subtab_path_buf.data();
-        end   = begin + m_subtab_path_buf.size();
-        typedef _impl::TableFriend tf;
-        end = tf::record_subtable_path(*table, begin, end);
-        if (end)
-            break;
-        size_t new_size = m_subtab_path_buf.size();
-        if (int_multiply_with_overflow_detect(new_size, 2))
-            throw runtime_error("Too many subtable nesting levels");
-        m_subtab_path_buf.set_size(new_size); // Throws
-    }
-    char* buf;
-    const int max_elems_per_chunk = 8; // FIXME: Use smaller number when compiling in debug mode
-    transact_log_reserve(&buf, 1 + (1+max_elems_per_chunk)*max_enc_bytes_per_int); // Throws
-    *buf++ = char(instr_SelectTable);
-    TIGHTDB_ASSERT(1 <= end - begin);
-    const size_t level = (end - begin) / 2;
-    buf = encode_int(buf, level);
-    for (;;) {
-        for (int i = 0; i < max_elems_per_chunk; ++i) {
-            buf = encode_int(buf, *--end);
-            if (begin == end)
-                goto good;
-        }
-        transact_log_advance(buf);
-        transact_log_reserve(&buf, max_elems_per_chunk*max_enc_bytes_per_int); // Throws
-    }
-
-good:
-    transact_log_advance(buf);
-    m_selected_spec      = 0;
-    m_selected_link_list = 0;
-    m_selected_table     = table;
-}
-
-
-void Replication::select_desc(const Descriptor& desc)
-{
-    typedef _impl::DescriptorFriend df;
-    check_table(&df::get_root_table(desc));
-    size_t* begin;
-    size_t* end;
-    for (;;) {
-        begin = m_subtab_path_buf.data();
-        end   = begin + m_subtab_path_buf.size();
-        begin = df::record_subdesc_path(desc, begin, end);
-        if (begin)
-            break;
-        size_t new_size = m_subtab_path_buf.size();
-        if (int_multiply_with_overflow_detect(new_size, 2))
-            throw runtime_error("Too many table type descriptor nesting levels");
-        m_subtab_path_buf.set_size(new_size); // Throws
-    }
-    char* buf;
-    int max_elems_per_chunk = 8; // FIXME: Use smaller number when compiling in debug mode
-    transact_log_reserve(&buf, 1 + (1+max_elems_per_chunk)*max_enc_bytes_per_int); // Throws
-    *buf++ = char(instr_SelectDescriptor);
-    size_t level = end - begin;
-    buf = encode_int(buf, level);
-    if (begin == end)
-        goto good;
-    for (;;) {
-        for (int i = 0; i < max_elems_per_chunk; ++i) {
-            buf = encode_int(buf, *begin);
-            if (++begin == end)
-                goto good;
-        }
-        transact_log_advance(buf);
-        transact_log_reserve(&buf, max_elems_per_chunk*max_enc_bytes_per_int); // Throws
-    }
-
-good:
-    transact_log_advance(buf);
-    m_selected_spec = &df::get_spec(desc);
-}
-
-
-void Replication::select_link_list(const LinkView& list)
-{
-    check_table(list.m_origin_table.get());
-    size_t col_ndx = list.m_origin_column.m_column_ndx;
-    size_t row_ndx = list.get_origin_row_index();
-    simple_cmd(instr_SelectLinkList, util::tuple(col_ndx, row_ndx)); // Throws
-    m_selected_link_list = &list;
 }
 
 
@@ -970,7 +862,7 @@ void Replication::apply_transact_log(InputStream& transact_log, Group& group, os
 
 namespace {
 
-class InputStreamImpl: public Replication::InputStream {
+class InputStreamImpl: public _impl::InputStream {
 public:
     InputStreamImpl(const char* data, size_t size) TIGHTDB_NOEXCEPT:
         m_begin(data), m_end(data+size) {}
@@ -1015,16 +907,15 @@ void TrivialReplication::do_begin_write_transact(SharedGroup&)
 void TrivialReplication::prepare_to_write()
 {
     char* data = m_transact_log_buffer.data();
-    size_t size = m_transact_log_buffer.size();
-    m_transact_log_free_begin = data;
-    m_transact_log_free_end = data + size;
+    std::size_t size = m_transact_log_buffer.size();
+    set_buffer(data, data + size);
 }
 
 Replication::version_type
 TrivialReplication::do_commit_write_transact(SharedGroup&, version_type orig_version)
 {
     char* data = m_transact_log_buffer.data();
-    size_t size = m_transact_log_free_begin - data;
+    std::size_t size = write_position() - data;
     version_type new_version = orig_version + 1;
     handle_transact_log(data, size, new_version); // Throws
     return new_version;
@@ -1042,13 +933,8 @@ void TrivialReplication::do_clear_interrupt() TIGHTDB_NOEXCEPT
 {
 }
 
-void TrivialReplication::do_transact_log_reserve(size_t n)
+void TrivialReplication::transact_log_append(const char* data, std::size_t size, char** new_begin, char** new_end)
 {
-    internal_transact_log_reserve(n);
-}
-
-void TrivialReplication::do_transact_log_append(const char* data, size_t size)
-{
-    internal_transact_log_reserve(size);
-    m_transact_log_free_begin = copy(data, data+size, m_transact_log_free_begin);
+    internal_transact_log_reserve(size, new_begin, new_end);
+    *new_begin = copy(data, data + size, *new_begin);
 }

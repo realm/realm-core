@@ -74,7 +74,7 @@ TEST(Upgrade_Database_2_3)
         t->add_search_index(0);
         t->add_search_index(1);
 
-        for (size_t i = 0; i < 1000; i++) {
+        for (int i = 0; i < 1000; i++) {
             t->add_empty_row();
             char tmp[20];
             sprintf(tmp, "%d", i);
@@ -102,7 +102,7 @@ TEST(Upgrade_Database_2_3)
     CHECK(t->has_search_index(0));
     CHECK(t->has_search_index(1));
 
-    for (size_t i = 0; i < 1000; i++) {
+    for (int i = 0; i < 1000; i++) {
         t->add_empty_row();
         char tmp[20];
         sprintf(tmp, "%d", i);

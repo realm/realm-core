@@ -32,6 +32,10 @@
 
 namespace tightdb {
 
+namespace _impl {
+class TransactLogConvenientEncoder;
+}
+
 
 /// A column of link lists (ColumnLinkList) is a single B+-tree, and the root of
 /// the column is the root of the B+-tree. All leaf nodes are single arrays of
@@ -125,7 +129,7 @@ private:
     friend class LinkView;
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    friend class Replication;
+    friend class _impl::TransactLogConvenientEncoder;
 #endif
 };
 

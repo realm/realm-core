@@ -513,9 +513,9 @@ TEST(Replication_NullStrings)
         WriteTransaction wt(sg_1);
         TableRef table1 = wt.add_table("table");
         table1->add_column(type_String, "c1", true);
-        table1->add_empty_row(3);
-        table1->set_string(0, 1, StringData(""));
-        table1->set_string(0, 2, tightdb::null());
+        table1->add_empty_row(3);                   // default value is null
+        table1->set_string(0, 1, StringData(""));   // empty string
+        table1->set_string(0, 2, tightdb::null());  // null
 
         CHECK(table1->get_string(0, 0).is_null());
         CHECK(!table1->get_string(0, 1).is_null());

@@ -606,6 +606,7 @@
     <ClCompile Include="..\..\src\tightdb\column_table.cpp" />
     <ClCompile Include="..\..\src\tightdb\commit_log.cpp" />
     <ClCompile Include="..\..\src\tightdb\descriptor.cpp" />
+    <ClCompile Include="..\..\src\tightdb\impl\transact_log.cpp" />
     <ClCompile Include="..\..\src\tightdb\link_view.cpp" />
     <ClCompile Include="..\..\src\tightdb\query_engine.cpp" />
     <ClCompile Include="..\..\src\tightdb\replication.cpp" />

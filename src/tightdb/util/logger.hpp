@@ -97,6 +97,14 @@ public:
         log_impl_with_tuple(state, tuple(a,b,c,d,e,f));
     }
 
+    template<class A, class B, class C, class D, class E, class F, class G>
+    void log(const char* message, const A& a, const B& b, const C& c, const D& d,
+             const E& e, const F& f, const G& g)
+    {
+        State state(message);
+        log_impl_with_tuple(state, tuple(a,b,c,d,e,f,g));
+    }
+
 #endif
 
     template<class L> void log_with_tuple(const char* message, const Tuple<L>& params)
