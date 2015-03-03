@@ -1341,7 +1341,8 @@ bool Table::has_search_index(size_t col_ndx) const TIGHTDB_NOEXCEPT
 }
 
 
-void Table::remove_search_index(size_t col_ndx) {
+void Table::remove_search_index(size_t col_ndx) 
+{
     int attr = m_spec.get_column_attr(col_ndx);
     TIGHTDB_ASSERT(attr |= col_attr_Indexed);
 
@@ -2481,8 +2482,9 @@ void Table::set_string(size_t col_ndx, size_t ndx, StringData value)
     if (TIGHTDB_UNLIKELY(col_ndx >= m_cols.size()))
         throw LogicError(LogicError::column_index_out_of_range);
 
-    TIGHTDB_ASSERT_DEBUG(!(!is_nullable(col_ndx) && value.is_null()));
-    
+    if(!is_nullable(col_ndx) && value.is_null())
+        throw LogicError(LogicError::column_not_nullable);
+
     bump_version();
     ColumnBase& col = get_column_base(col_ndx);
     col.set_string(ndx, value); // Throws
@@ -2499,7 +2501,9 @@ void Table::insert_string(size_t col_ndx, size_t ndx, StringData value)
         throw LogicError(LogicError::string_too_big);
     TIGHTDB_ASSERT_3(col_ndx, <, get_column_count());
     TIGHTDB_ASSERT_3(ndx, <=, m_size);
-    TIGHTDB_ASSERT_DEBUG(!(!is_nullable(col_ndx) && value.is_null()));
+
+    if (!is_nullable(col_ndx) && value.is_null())
+        throw LogicError(LogicError::column_not_nullable);
 
     ColumnType type = get_real_column_type(col_ndx);
     if (type == col_type_String) {

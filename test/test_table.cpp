@@ -128,15 +128,24 @@ TEST(Table_Null)
     }
 
     {
-    // Check that add_empty_row() adds empty string as default
-    Group group;
-    TableRef table = group.add_table("test");
+        // Check that add_empty_row() adds empty string as default
+        Group group;
+        TableRef table = group.add_table("test");
 
-    table->add_column(type_String, "name");
-    table->add_empty_row();
+        table->add_column(type_String, "name");
+        table->add_empty_row();
 
-    CHECK(!table->get_string(0, 0).is_null());
-}
+        CHECK(!table->get_string(0, 0).is_null());
+
+        // Test that inserting null in non-nullable column will throw
+        try {
+            table->set_string(0, 0, tightdb::null());
+            CHECK(false);
+        }
+        catch (...) {
+        }
+    }
+
 }
 
 TEST(Table_DeleteCrash)

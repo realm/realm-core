@@ -82,8 +82,7 @@ template<class T> inline T no0(T v) { return v == 0 ? 1 : v; }
 const std::size_t npos = std::size_t(-1);
 
 // Represents null in Query, find(), get(), set(), etc.
-struct null
-{
+struct null {
     operator StringData() { return StringData(); }
 };
 

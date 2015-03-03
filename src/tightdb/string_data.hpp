@@ -64,11 +64,7 @@ namespace tightdb {
 /// externally provided guarantee.
 ///
 /// This class makes it possible to distinguish between a 'null' reference and a
-/// reference to the empty string (see is_null()). However, most functions of
-/// the TightDB API do not care about this distinction. In particular, the
-/// comparison operators of this class make no distinction between a null
-/// reference and a reference to the empty string. This is possible because in
-/// both cases, size() returns zero.
+/// reference to the empty string (see is_null()).
 ///
 /// \sa BinaryData
 /// \sa Mixed
@@ -110,12 +106,6 @@ public:
     /// of the result of calling this function. In other words, a StringData
     /// object is converted to true if it is not the null reference, otherwise
     /// it is converted to false.
-    ///
-    /// It is important to understand that all of the functions and operators in
-    /// this class, and most of the functions in the TightDB API in general
-    /// makes no distinction between a null reference and a reference to the
-    /// empty string. These functions and operators never look at the stored
-    /// pointer if the stored size is zero.
     bool is_null() const TIGHTDB_NOEXCEPT;
 
     friend bool operator==(const StringData&, const StringData&) TIGHTDB_NOEXCEPT;

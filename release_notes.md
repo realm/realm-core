@@ -2,15 +2,15 @@
 
 ### Bugfixes:
 
-* Fixed crash when std::exit() is called with active encrypted mappings.
+* Fixed very old bug in String and Integer index that could make it crash if strings ended with 0-bytes.
 
 ### API breaking changes:
 
-* Lorem ipsum.
+* IMPORTANT: Before accessing an old version 2 database file (also if just for reads only), you must call Group::upgrade_file_format() on it to upgrade it to version 3! This requires the file to reside on writable storage. See test_upgrade_database.cpp
 
 ### Enhancements:
 
-* Lorem ipsum.
+* Null support for String columns. Call add_column() with nullable = true. You can then use tightdb::null() in place of any StringData (in Query, Table::find(), get(), set(), etc) for that column. You can also call Table::is_null(), Table::set_null(), StringData::is_null() and Table::is_nullable(size_t col_ndx).
 
 -----------
 

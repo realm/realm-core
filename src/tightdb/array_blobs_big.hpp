@@ -95,7 +95,7 @@ private:
 // Implementation:
 
 inline ArrayBigBlobs::ArrayBigBlobs(Allocator& alloc, bool nullable) TIGHTDB_NOEXCEPT:
-Array(alloc), m_nullable(nullable)
+                                    Array(alloc), m_nullable(nullable)
 {
 }
 
