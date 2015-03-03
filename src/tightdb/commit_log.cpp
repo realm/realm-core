@@ -936,14 +936,16 @@ public:
     {
         TIGHTDB_ASSERT(m_selected_table != size_t(-1));
         size_t result = m_map.translate_row_index(m_selected_table, row_ndx, num_rows, null_ptr);
-        std::cout << "ROW INDEX TRANSLATION (table " << m_selected_table << "): " << row_ndx << " -> " << result << "\n";
+        std::cout << "ROW INSERT TRANSLATION (table " << m_selected_table << "): " << row_ndx << " -> " << result << "\n";
         return result;
     }
 
     size_t transform_update(size_t row_ndx, bool* overwritten)
     {
         TIGHTDB_ASSERT(m_selected_table != size_t(-1));
-        return m_map.translate_row_index(m_selected_table, row_ndx, 0, overwritten);
+        size_t result = m_map.translate_row_index(m_selected_table, row_ndx, 0, overwritten);
+        std::cout << "ROW UPDATE TRANSLATION (table " << m_selected_table << "): " << row_ndx << " -> " << result << "\n";
+        return result;
     }
 
     /// Parser InstructionHandler:
