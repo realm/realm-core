@@ -263,8 +263,10 @@ void LinkView::sort(std::vector<size_t> columns, std::vector<bool> ascending)
         repl->set_link_list(*this, m_row_indexes); // Throws
     }
 #endif
-    RowIndexes::sort(columns, ascending);
+    Sorter predicate(columns, ascending);
+    RowIndexes::sort(predicate);
 }
+
 
 TableView LinkView::get_sorted_view(vector<size_t> column_indexes, vector<bool> ascending) const
 {

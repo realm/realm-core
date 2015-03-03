@@ -282,11 +282,23 @@ public:
     // Table::find_all() or Query. Return the version of the source it was created from.
     uint64_t outside_version() const;
 
+    // Re-sort view according to last used criterias
+    void re_sort();
+
+    // Sort m_row_indexes according to one column
+    void sort(size_t column, bool ascending = true);
+
+    // Sort m_row_indexes according to multiple columns
+    void sort(std::vector<size_t> columns, std::vector<bool> ascending);
+
+    // Actual sorting facility is provided by the base class:
+    using RowIndexes::sort;
+
+
 protected:
 #ifdef TIGHTDB_ENABLE_REPLICATION
     void do_sync();
 #endif
-
     // Null if, and only if, the view is detached.
     mutable TableRef m_table;
 
@@ -297,6 +309,8 @@ protected:
 
     // m_distinct_column_source != npos if this view was created from distinct values in a column of m_table.
     size_t m_distinct_column_source;
+    Sorter m_sorting_predicate; // Stores sorting criterias (columns + ascending)
+    bool m_auto_sort;
 
     // A valid query holds a reference to it's table which must match our m_table.
     // hence we can use A query with a null table reference to indicate that the view
@@ -595,7 +609,7 @@ inline std::size_t TableViewBase::find_by_source_ndx(std::size_t source_ndx) con
 
 inline TableViewBase::TableViewBase():
     RowIndexes(Column::unattached_root_tag(), Allocator::get_default()), // Throws
-    m_distinct_column_source(npos)
+    m_distinct_column_source(npos), m_auto_sort(false)
 {
 #ifdef TIGHTDB_ENABLE_REPLICATION
     m_last_seen_version = 0;
@@ -608,7 +622,7 @@ inline TableViewBase::TableViewBase():
 inline TableViewBase::TableViewBase(Table* parent):
     RowIndexes(Column::unattached_root_tag(), Allocator::get_default()), 
     m_table(parent->get_table_ref()), // Throws
-    m_distinct_column_source(npos)
+    m_distinct_column_source(npos), m_auto_sort(false)
     {
 #ifdef TIGHTDB_ENABLE_REPLICATION
     m_last_seen_version = m_table ? m_table->m_version : 0;
@@ -627,7 +641,7 @@ inline TableViewBase::TableViewBase(Table* parent):
 inline TableViewBase::TableViewBase(Table* parent, Query& query, size_t start, size_t end, size_t limit):
     RowIndexes(Column::unattached_root_tag(), Allocator::get_default()), // Throws
     m_table(parent->get_table_ref()),
-    m_distinct_column_source(npos),
+    m_distinct_column_source(npos), m_auto_sort(false),
     m_query(query, Query::TCopyExpressionTag())
 {
 #ifdef TIGHTDB_ENABLE_REPLICATION    
@@ -650,7 +664,7 @@ inline TableViewBase::TableViewBase(Table* parent, Query& query, size_t start, s
 inline TableViewBase::TableViewBase(const TableViewBase& tv):
     RowIndexes(Column::unattached_root_tag(), Allocator::get_default()),
     m_table(tv.m_table),
-    m_distinct_column_source(tv.m_distinct_column_source),
+    m_distinct_column_source(tv.m_distinct_column_source), m_auto_sort(false),
     m_query(tv.m_query, Query::TCopyExpressionTag())
     {
 #ifdef TIGHTDB_ENABLE_REPLICATION
@@ -679,7 +693,7 @@ inline TableViewBase::TableViewBase(const TableViewBase& tv):
 inline TableViewBase::TableViewBase(TableViewBase* tv) TIGHTDB_NOEXCEPT:
     RowIndexes(Column::move_tag(), tv->m_row_indexes),
     m_table(move(tv->m_table)),
-    m_distinct_column_source(tv->m_distinct_column_source)
+    m_distinct_column_source(tv->m_distinct_column_source), m_auto_sort(false)
 {
 #ifdef TIGHTDB_ENABLE_REPLICATION
     // if we are created from a table view which is outdated, take care to use the outdated

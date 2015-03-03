@@ -498,6 +498,30 @@ void TableViewBase::sync_distinct_view(size_t column)
 }
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
+// Sort according to one column
+void TableViewBase::sort(size_t column, bool ascending)
+{
+    std::vector<size_t> c;
+    std::vector<bool> a;
+    c.push_back(column);
+    a.push_back(ascending);
+    sort(c, a);
+}
+
+// Sort according to multiple columns, user specified order on each column
+void TableViewBase::sort(std::vector<size_t> columns, std::vector<bool> ascending)
+{
+    TIGHTDB_ASSERT(columns.size() == ascending.size());
+    m_auto_sort = true;
+    m_sorting_predicate = Sorter(columns, ascending);
+    sort(m_sorting_predicate);
+}
+
+void TableViewBase::re_sort()
+{
+    sort(m_sorting_predicate);
+}
+
 
 void TableViewBase::do_sync() 
 {
