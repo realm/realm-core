@@ -799,8 +799,6 @@ public:
             result = it->second.transform_insert(row_ndx, num_rows, m_timestamp, m_peer_id);
         }
 
-        std::cout << "ROW INDEX (table " << group_level_ndx << "): " << row_ndx << " -> " << result << "\n";
-
         return result;
     }
 
@@ -937,7 +935,9 @@ public:
     size_t transform_insertion(size_t row_ndx, size_t num_rows = 1)
     {
         TIGHTDB_ASSERT(m_selected_table != size_t(-1));
-        return m_map.translate_row_index(m_selected_table, row_ndx, num_rows, null_ptr);
+        size_t result = m_map.translate_row_index(m_selected_table, row_ndx, num_rows, null_ptr);
+        std::cout << "ROW INDEX TRANSLATION (table " << m_selected_table << "): " << row_ndx << " -> " << result << "\n";
+        return result;
     }
 
     size_t transform_update(size_t row_ndx, bool* overwritten)
@@ -967,6 +967,7 @@ public:
     {
         // FIXME: Transform path (and use entire path for lookup)
         m_selected_table = group_level_ndx;
+        TIGHTDB_ASSERT(levels == 0); // Non-group-level tables not supported!
         return m_transformed.select_table(group_level_ndx, levels, path);
     }
     bool insert_empty_rows(std::size_t row_ndx, std::size_t num_rows, std::size_t tbl_sz, bool unordered)
