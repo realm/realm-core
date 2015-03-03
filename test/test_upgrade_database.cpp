@@ -14,7 +14,6 @@
 #include <tightdb/util/file.hpp>
 
 #include "test.hpp"
-#include "crypt_key.hpp"
 
 using namespace std;
 using namespace tightdb;
