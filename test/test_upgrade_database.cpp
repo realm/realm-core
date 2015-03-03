@@ -60,33 +60,38 @@ TEST(Upgrade_Database_2_3)
     // version 2 database file. Then copy it into the /test directory.
 
     /*
-    ONLY(CreateDatabase)
-    {
-        string path = test_util::get_test_path_prefix() + "version_2_database.tightdb";
-        File::try_remove(path);
+ONLY(CreateDatabase)
+{
+    char leafsize[20];
+    sprintf(leafsize, "%d", TIGHTDB_MAX_BPNODE_SIZE);
+    string path = test_util::get_test_path_prefix() + "version_2_database_" + leafsize + ".tightdb";
+    File::try_remove(path);
 
-        Group g;
-        TableRef t = g.add_table("table");
-        t->add_column(type_String, "string");
-        t->add_column(type_Int, "integer");
+    Group g;
+    TableRef t = g.add_table("table");
+    t->add_column(type_String, "string");
+    t->add_column(type_Int, "integer");
 
-        t->add_search_index(0);
-        t->add_search_index(1);
+    t->add_search_index(0);
+    t->add_search_index(1);
 
-        for (int i = 0; i < 1000; i++) {
-            t->add_empty_row();
-            char tmp[20];
-            sprintf(tmp, "%d", i);
-            t->set_string(0, i, tmp);
-            t->set_int(1, i, i);
-        }
-        g.write(path);
+    for (size_t i = 0; i < 1000; i++) {
+        t->add_empty_row();
+        char tmp[20];
+        sprintf(tmp, "%d", i);
+        t->set_string(0, i, tmp);
+        t->set_int(1, i, i);
     }
+    g.write(path);
+}
     */
 
     
     // Make a copy of the version 2 database so that we keep the original file intact and unmodified
-    string path = test_util::get_test_path_prefix() + "version_2_database.tightdb";
+    char leafsize[20];
+    sprintf(leafsize, "%d", TIGHTDB_MAX_BPNODE_SIZE);
+    string path = test_util::get_test_path_prefix() + "version_2_database_" + leafsize + ".tightdb";
+
     File::copy(path, path + ".tmp");
 
     // Open copy
