@@ -636,9 +636,7 @@ inline std::size_t Group::find_table(StringData name) const TIGHTDB_NOEXCEPT
 
 inline TableRef Group::get_table(std::size_t table_ndx)
 {
-    TIGHTDB_ASSERT(is_attached());
-    TIGHTDB_ASSERT_3(get_file_format(), == , default_file_format_version);
-    
+    TIGHTDB_ASSERT(is_attached());    
     DescMatcher desc_matcher = 0; // Do not check descriptor
     Table* table = do_get_table(table_ndx, desc_matcher); // Throws
     return TableRef(table);

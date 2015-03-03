@@ -51,7 +51,7 @@ using namespace tightdb::util;
 // check-testcase` (or one of its friends) from the command line.
 
 
-TEST(Upgrade_Database_2_3)
+ONLY(Upgrade_Database_2_3)
 {
     // Test upgrading the database file format from version 2 to 3. When opening a version 2 file, you must, as the 
     // very first action, call Group::upgrade_file_format() on it. You must not call any reading or modifying 
@@ -116,6 +116,9 @@ TEST(Upgrade_Database_2_3)
         f = t->find_first_int(1, i);
         CHECK_EQUAL(f, i);
     }
+
+    // Test an assert that guards against writing version 2 file to disk
+    g.write(path + ".tmp2");
 }
 
 
