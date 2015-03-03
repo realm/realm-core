@@ -55,7 +55,7 @@ class SequentialGetterBase;
 
 class Query {
 public:
-    Query(const Table& table, RowIndexes* tv = null_ptr);
+    Query(const Table& table, TableViewBase* tv = null_ptr);
     Query(const Table& table, const LinkViewRef& lv);
     Query();
     Query(const Query& copy); // FIXME: Try to remove this
@@ -250,7 +250,7 @@ public:
     mutable bool do_delete;
 
 protected:
-    Query(Table& table, RowIndexes* tv = null_ptr);
+    Query(Table& table, TableViewBase* tv = null_ptr);
 //    Query(const Table& table); // FIXME: This constructor should not exist. We need a ConstQuery class.
     void Create();
 
@@ -271,6 +271,9 @@ public:
     std::vector<ParentNode**> subtables;
     std::vector<ParentNode*> all_nodes;
 
+    // points to the base class of the restricting view. If the restricting
+    // view is a link view, m_source_link_view is non-zero. If it is a table view,
+    // m_source_table_view is non-zero.
     RowIndexes* m_view;
     std::vector<bool> pending_not;
     struct Handover_data {
@@ -314,7 +317,9 @@ private:
     friend class XQueryAccessorString;
     friend class TableViewBase;
 
-    LinkViewRef m_source_link_view;
+    // At most one of these can be non-zero, and if so the non-zero one indicates the restricting view.
+    LinkViewRef m_source_link_view; // link views are refcounted and shared.
+    TableViewBase* m_source_table_view; // table views are not refcounted, and not owned by the query.
 };
 
 // Implementation:
