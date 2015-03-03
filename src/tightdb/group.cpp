@@ -745,6 +745,7 @@ void Group::write(ostream& out, TableWriter& table_writer,
 void Group::commit()
 {
     TIGHTDB_ASSERT(is_attached());
+    TIGHTDB_ASSERT_3(get_file_format(), == , default_file_format_version);
 
     // GroupWriter::write_group() needs free-space tracking
     // information, so if the attached database does not contain it,
