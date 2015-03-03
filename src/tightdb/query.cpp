@@ -10,7 +10,7 @@
 using namespace std;
 using namespace tightdb;
 
-Query::Query() : m_view(null_ptr)
+Query::Query() : m_view(null_ptr), m_source_table_view(0)
 {
     Create();
 //    expression(static_cast<Expression*>(this));
@@ -147,10 +147,30 @@ void Query::prepare_for_export(Handover_data& handover_data)
         handover_data.m_table_num = m_table.get()->get_index_in_group();
         m_table = TableRef(); // <- detach to prevent misuse until import!
     }
+    // prepare any source table view
+    if (m_source_table_view) {
+        TableViewBase::Handover_data* tvb_handover = new TableView::Handover_data;
+        handover_data.table_view_data = tvb_handover;
+        m_source_table_view->prepare_for_export(*tvb_handover);
+    }
+    else
+        handover_data.table_view_data = 0;
+    // FIXME: get enough data to recreate any source link view at recieving side
 }
 
 void Query::prepare_for_import(Handover_data& handover_data, Group& group)
 {
+    TIGHTDB_ASSERT((m_source_table_view != 0) == (handover_data.table_view_data != 0));
+    // prepare any source table view
+    if (m_source_table_view) {
+        TableViewBase::Handover_data* tvb_handover 
+            = reinterpret_cast<TableViewBase::Handover_data*>(handover_data.table_view_data);
+        m_source_table_view->prepare_for_import(*tvb_handover, group);
+        delete tvb_handover;
+        handover_data.table_view_data = 0;
+    }
+    // FIXME: recreate/find source link view
+
     if (handover_data.m_has_table)
         m_table = group.get_table(handover_data.m_table_num);
     else
