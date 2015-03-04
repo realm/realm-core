@@ -286,7 +286,7 @@ uint64_t fastrand(uint64_t max)
     x ^= x << 25; // b
     x ^= x >> 27; // c
     state.store_release(x);
-    return (x * 2685821657736338717ULL) % (max + 1 == 0 ? 1 : max + 1);
+    return (x * 2685821657736338717ULL) % (max + 1 == 0 ? 0xffffffffffffffffULL : max + 1);
 }
 
 std::string int2string(int64_t value) // like C++11's to_string()

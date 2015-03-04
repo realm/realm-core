@@ -853,4 +853,43 @@ TEST(StringIndex_Zero_Crash2)
     }
 }
 
+
+TEST(StringIndex_Integer_Increasing)
+{
+    const size_t rows = 2000 + 1000000 * TEST_DURATION;
+
+    // StringIndex could crash if strings ended with one or more 0-bytes
+    Table table;
+    table.add_column(type_Int, "int");
+    table.add_search_index(0);
+
+    vector<int64_t> reference;
+
+    for (size_t row = 0; row < rows; row++) {
+        int64_t r = fastrand(0x100000);
+        table.add_empty_row();
+        table.set_int(0, row, r);
+        reference.push_back(r);
+    }
+
+    std::sort(reference.begin(), reference.end());
+
+    for (size_t row = 0; row < rows; row++) {
+        int64_t v = table.get_int(0, row);
+        size_t c = table.count_int(0, v);
+        
+        size_t start = std::lower_bound(reference.begin(), reference.end(), v) - reference.begin();
+        size_t ref_count = 0;
+        for (size_t t = start; t < reference.size(); t++) {
+            if (reference[t] == v)
+                ref_count++;
+        }
+
+        CHECK_EQUAL(c, ref_count);
+
+    }
+
+
+}
+
 #endif // TEST_INDEX_STRING
