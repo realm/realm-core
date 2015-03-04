@@ -24,6 +24,7 @@
 #include <cstdlib>
 #include <cstdlib> // size_t
 #include <algorithm>
+#include <cstdio>
 
 #ifdef _MSC_VER
 #  include <win32/types.h>
@@ -199,12 +200,7 @@ private:
     T m_value;
 };
 
-std::string to_str(int64_t value) 
-{
-    char buf[20];
-    sprintf(buf, "%lld", value);
-    return std::string(buf);
-}
+std::string int2string(int64_t value); // like C++11's to_string()
 
 } // namespace tightdb
 

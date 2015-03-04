@@ -778,7 +778,7 @@ TEST(StringIndex_Zero_Crash2)
 {
     Random random(random_int<unsigned long>());
 
-    for (size_t iter = 0; iter < 10 + TEST_DURATION * 100; iter++) {
+    for (size_t iter = 0; iter < 10 + TEST_DURATION * 100 ; iter++) {
         // StringIndex could crash if strings ended with one or more 0-bytes
         Table table;
         table.add_column(type_String, "", true);
@@ -787,7 +787,11 @@ TEST(StringIndex_Zero_Crash2)
 
         for (size_t i = 0; i < 100 + TEST_DURATION * 1000; i++) {
             unsigned char action = random.draw_int_max<unsigned char>(100);
-            if (action > 48 && table.size() < 10) {
+            if (action == 0) {
+                table.remove_search_index(0);
+                table.add_search_index(0);
+            }
+            else if (action > 48 && table.size() < 10) {
                 // Generate string with equal probability of being empty, null, short, medium and long, and with 
                 // their contents having equal proability of being either random or a duplicate of a previous 
                 // string. When it's random, each char must have equal probability of being 0 or non-0e
@@ -834,6 +838,17 @@ TEST(StringIndex_Zero_Crash2)
                 size_t row = random.draw_int_max<size_t>(table.size() - 1);
                 table.remove(row);
             }
+
+            action = random.draw_int_max<unsigned char>(100);
+            if (table.size() > 0) {
+                // Search for value that exists
+                size_t row = random.draw_int_max<size_t>(table.size() - 1);
+                StringData sd = table.get_string(0, row);
+                size_t t = table.find_first_string(0, sd);
+                StringData sd2 = table.get_string(0, t);
+                CHECK_EQUAL(sd, sd2);
+            }
+
         }
     }
 }

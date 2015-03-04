@@ -289,6 +289,15 @@ uint64_t fastrand(uint64_t max)
     return (x * 2685821657736338717ULL) % (max + 1 == 0 ? 1 : max + 1);
 }
 
+std::string int2string(int64_t value) // like C++11's to_string()
+{
+    char buf[20];
+    sprintf(buf, "%lld", static_cast<long long>(value));
+    return std::string(buf);
+}
+
 } // namespace tightdb
+
+
 
 #endif // select best popcount implementations

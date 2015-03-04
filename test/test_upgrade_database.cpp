@@ -86,43 +86,41 @@ ONLY(CreateDatabase)
 }
     */
 
-    if (TIGHTDB_MAX_BPNODE_SIZE == 1000 && TIGHTDB_MAX_BPNODE_SIZE == 4) {
-        // Make a copy of the version 2 database so that we keep the original file intact and unmodified
-        string path = test_util::get_test_path_prefix() + "version_2_database_" + to_str(TIGHTDB_MAX_BPNODE_SIZE) + ".tightdb";
 
-        File::copy(path, path + ".tmp");
+    // Make a copy of the version 2 database so that we keep the original file intact and unmodified
+    string path = test_util::get_test_path_prefix() + "version_2_database_" + int2string(TIGHTDB_MAX_BPNODE_SIZE) + ".tightdb";
 
-        // Open copy
-        Group g(path + ".tmp");
-        TableRef t = g.get_table("table");
+    File::copy(path, path + ".tmp");
 
-        CHECK_EQUAL(g.get_file_format(), 2);
-        // Upgrade from version 2 to version 3
-        g.upgrade_file_format();
-        CHECK_EQUAL(g.get_file_format(), 3);
+    // Open copy
+    Group g(path + ".tmp");
+    TableRef t = g.get_table("table");
 
-        CHECK(t->has_search_index(0));
-        CHECK(t->has_search_index(1));
+    CHECK_EQUAL(g.get_file_format(), 2);
+    // Upgrade from version 2 to version 3
+    g.upgrade_file_format();
+    CHECK_EQUAL(g.get_file_format(), 3);
 
-        for (int i = 0; i < 1000; i++) {
-            t->add_empty_row();
-            // These tests utilize the Integer and String index. That will crash if the database is still
-            // in version 2 format, because the on-disk format of index has changed in version 3.
-            StringData sd(to_str(i));
-            size_t f = t->find_first_string(0, sd);
-            CHECK_EQUAL(f, i);
+    CHECK(t->has_search_index(0));
+    CHECK(t->has_search_index(1));
 
-            f = t->find_first_int(1, i);
-            CHECK_EQUAL(f, i);
-        }
+    for (int i = 0; i < 1000; i++) {
+        t->add_empty_row();
+        // These tests utilize the Integer and String index. That will crash if the database is still
+        // in version 2 format, because the on-disk format of index has changed in version 3.
+        StringData sd(int2string(i));
+        size_t f = t->find_first_string(0, sd);
+        CHECK_EQUAL(f, i);
 
-        // Test an assert that guards against writing version 2 file to disk
-        File::try_remove(path + ".tmp2");
-        g.write(path + ".tmp2");
+        f = t->find_first_int(1, i);
+        CHECK_EQUAL(f, i);
     }
-    else {
-        cerr << "\nWarning, unit test Upgrade_Database_2_3 not because of missing database with particular TIGHTDB_MAX_BPNODE_SIZE\n";
-    }
+
+    // Test an assert that guards against writing version 2 file to disk
+    File::try_remove(path + ".tmp2");
+    g.write(path + ".tmp2");
+    
+
 }
 
 
