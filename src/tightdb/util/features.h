@@ -50,6 +50,10 @@
 #  define TIGHTDB_HAVE_CXX11 1
 #endif
 
+#ifndef TIGHTDB_HAVE_NULL_SUPPORT
+#  define TIGHTDB_HAVE_NULL_SUPPORT 1
+#endif
+
 
 /* See these links for information about feature check macroes in GCC,
  * Clang, and MSVC:
