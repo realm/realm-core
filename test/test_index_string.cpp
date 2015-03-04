@@ -788,7 +788,7 @@ TEST(StringIndex_Zero_Crash2)
         for (size_t i = 0; i < 100 + TEST_DURATION * 1000; i++) {
             unsigned char action = random.draw_int_max<unsigned char>(100);
             if (action == 0) {
-                table.remove_search_index(0);
+//                table.remove_search_index(0);
                 table.add_search_index(0);
             }
             else if (action > 48 && table.size() < 10) {

@@ -447,6 +447,7 @@ public:
     StringIndex* create_search_index();
     StringIndex* get_search_index() TIGHTDB_NOEXCEPT;
     const StringIndex* get_search_index() const TIGHTDB_NOEXCEPT;
+    void populate_search_index();
 
     //@{
     /// Find the lower/upper bound for the specified value assuming

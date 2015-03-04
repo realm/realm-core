@@ -45,12 +45,7 @@ void Group::upgrade_file_format()
 
     for (size_t t = 0; t < m_tables.size(); t++) {
         TableRef table = get_table(t);
-        for (size_t c = 0; c < table->get_column_count(); c++) {
-            if (table->has_search_index(c)) {
-                table->remove_search_index(c);
-                table->add_search_index(c);
-            }
-        }
+        table->upgrade_file_format();
     }
 
     m_alloc.m_file_format_version = default_file_format_version;
@@ -745,7 +740,7 @@ void Group::write(ostream& out, TableWriter& table_writer,
 void Group::commit()
 {
     TIGHTDB_ASSERT(is_attached());
-    TIGHTDB_ASSERT_3(get_file_format(), == , default_file_format_version);
+   // TIGHTDB_ASSERT_3(get_file_format(), == , default_file_format_version);
 
     // GroupWriter::write_group() needs free-space tracking
     // information, so if the attached database does not contain it,

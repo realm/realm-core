@@ -1340,7 +1340,7 @@ bool Table::has_search_index(size_t col_ndx) const TIGHTDB_NOEXCEPT
     return col.has_search_index();
 }
 
-
+/*
 void Table::remove_search_index(size_t col_ndx) 
 {
     int attr = m_spec.get_column_attr(col_ndx);
@@ -1348,16 +1348,49 @@ void Table::remove_search_index(size_t col_ndx)
 
     ColumnBase& col = get_column_base(col_ndx);
     StringIndex* si = col.get_search_index();
-    AdaptiveStringColumn& asc = static_cast<AdaptiveStringColumn&>(col);
 
     ref_type index_ref = m_columns.get_as_ref(col_ndx + 1);
     Array::destroy_deep(index_ref, m_columns.get_alloc());
     delete si;
 
-    asc.release_search_index();
+    if (get_column_type(col_ndx) == type_String) {
+        AdaptiveStringColumn& asc = static_cast<AdaptiveStringColumn&>(col);
+        asc.release_search_index();
+    }
+    else {
+        AdaptiveStringColumn& asc = static_cast<AdaptiveStringColumn&>(col);
+        asc.release_search_index();
+    }
+
     attr ^= col_attr_Indexed;
     m_spec.set_column_attr(col_ndx, ColumnAttr(attr)); // Throws
     m_columns.erase(col_ndx + 1);
+}
+*/
+
+void Table::upgrade_file_format()
+{
+    for (size_t c = 0; c < get_column_count(); c++) {
+        if (has_search_index(c)) {
+            if (get_column_type(c) == type_String) {
+                AdaptiveStringColumn& asc = get_column_string(c);
+                asc.get_search_index()->clear();
+                asc.populate_search_index();
+            }
+            else if (get_real_column_type(c) == type_Int) {
+                ColumnBase& col = get_column_base(c);
+                Column& c = static_cast<Column&>(col);
+                c.get_search_index()->clear();
+                c.populate_search_index();
+            }
+            else {
+                // Fixme, Enum column not supported! But Enum (created by Optimize() is not used in lang. bindings yet
+                // so this is fine for now.
+                TIGHTDB_ASSERT(false); 
+            }
+
+        }
+    }
 }
 
 void Table::add_search_index(size_t col_ndx)

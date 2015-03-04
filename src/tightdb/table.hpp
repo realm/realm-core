@@ -242,7 +242,7 @@ public:
     /// \param column_ndx The index of a column of this table.
 
     bool has_search_index(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
-    void remove_search_index(size_t col_ndx);
+//    void remove_search_index(size_t col_ndx);
     void add_search_index(std::size_t column_ndx);
     bool has_primary_key() const TIGHTDB_NOEXCEPT;
     bool try_add_primary_key(std::size_t column_ndx);
@@ -878,6 +878,8 @@ private:
     void do_clear(bool broken_reciprocal_backlinks);
     std::size_t do_set_link(std::size_t col_ndx, std::size_t row_ndx, std::size_t target_row_ndx);
 
+    void upgrade_file_format();
+
     /// Update the version of this table and all tables which have links to it.
     /// This causes all views referring to those tables to go out of sync, so that
     /// calls to sync_if_needed() will bring the view up to date by reexecuting the
@@ -1338,6 +1340,7 @@ private:
     friend class LinksToNode;
     friend class LinkMap;
     friend class LinkView;
+    friend class Group;
 };
 
 

@@ -50,77 +50,89 @@ using namespace tightdb::util;
 // check-testcase` (or one of its friends) from the command line.
 
 
-TEST(Upgrade_Database_2_3)
+ONLY(Upgrade_Database_2_3)
 {
     // Test upgrading the database file format from version 2 to 3. When opening a version 2 file, you must, as the 
     // very first action, call Group::upgrade_file_format() on it. You must not call any reading or modifying 
     // method on it prior to that, because core is not backwards compatible with the version 2 file format!
 
-    // Copy/paste the below commented-away unit test into test_group.cpp of Realm Core 0.84 or older to create a
-    // version 2 database file. Then copy it into the /test directory.
+    // Copy/paste the bottommost commented-away unit test into test_group.cpp of Realm Core 0.84 or older to create a
+    // version 2 database file. Then copy it into the /test directory of this current Realm core.
+
+    // Automatic upgrade from Group
+    {
+        // Make a copy of the version 2 database so that we keep the original file intact and unmodified
+        string path = test_util::get_test_path_prefix() + "version_2_database_" + int2string(TIGHTDB_MAX_BPNODE_SIZE) + ".tightdb";
+
+        File::copy(path, path + ".tmp");
+
+        // Open copy. Group constructor will upgrade automatically if needed
+        Group g(path + ".tmp", 0, Group::mode_ReadWrite);
+        
+        g.upgrade_file_format();
+   //     g.commit(); 
+
+        TableRef t = g.get_table("table");
+        
+        CHECK_EQUAL(g.get_file_format(), 3);
+
+        CHECK(t->has_search_index(0));
+        CHECK(t->has_search_index(1));
+
+      //  t->set_int(1, 0, 1234);
+
+        for (int i = 0; i < 1000; i++) {
+            // These tests utilize the Integer and String index. That will crash if the database is still
+            // in version 2 format, because the on-disk format of index has changed in version 3.
+            string str = int2string(i);
+            StringData sd(str);
+            size_t f = t->find_first_string(0, sd);
+            CHECK_EQUAL(f, i);
+
+            f = t->find_first_int(1, i);
+            CHECK_EQUAL(f, i);
+        }
+
+        g.commit();
+
+        // Test an assert that guards against writing version 2 file to disk
+        File::try_remove(path + ".tmp2");
+        g.write(path + ".tmp2");
+
+    }
+
+    // Automatic upgrade from SharedGroup
+    {
+        
+    }
+
 
     /*
-ONLY(CreateDatabase)
-{
-    char leafsize[20];
-    sprintf(leafsize, "%d", TIGHTDB_MAX_BPNODE_SIZE);
-    string path = test_util::get_test_path_prefix() + "version_2_database_" + leafsize + ".tightdb";
-    File::try_remove(path);
+    ONLY(CreateDatabase)
+    {
+        char leafsize[20];
+        sprintf(leafsize, "%d", TIGHTDB_MAX_BPNODE_SIZE);
+        string path = test_util::get_test_path_prefix() + "version_2_database_" + leafsize + ".tightdb";
+        File::try_remove(path);
 
-    Group g;
-    TableRef t = g.add_table("table");
-    t->add_column(type_String, "string");
-    t->add_column(type_Int, "integer");
+        Group g;
+        TableRef t = g.add_table("table");
+        t->add_column(type_String, "string");
+        t->add_column(type_Int, "integer");
 
-    t->add_search_index(0);
-    t->add_search_index(1);
+        t->add_search_index(0);
+        t->add_search_index(1);
 
-    for (size_t i = 0; i < 1000; i++) {
-        t->add_empty_row();
-        char tmp[20];
-        sprintf(tmp, "%d", i);
-        t->set_string(0, i, tmp);
-        t->set_int(1, i, i);
+        for (size_t i = 0; i < 1000; i++) {
+            t->add_empty_row();
+            char tmp[20];
+            sprintf(tmp, "%d", i);
+            t->set_string(0, i, tmp);
+            t->set_int(1, i, i);
+        }
+        g.write(path);
     }
-    g.write(path);
-}
     */
-
-
-    // Make a copy of the version 2 database so that we keep the original file intact and unmodified
-    string path = test_util::get_test_path_prefix() + "version_2_database_" + int2string(TIGHTDB_MAX_BPNODE_SIZE) + ".tightdb";
-
-    File::copy(path, path + ".tmp");
-
-    // Open copy
-    Group g(path + ".tmp");
-    TableRef t = g.get_table("table");
-
-    CHECK_EQUAL(g.get_file_format(), 2);
-    // Upgrade from version 2 to version 3
-    g.upgrade_file_format();
-    CHECK_EQUAL(g.get_file_format(), 3);
-
-    CHECK(t->has_search_index(0));
-    CHECK(t->has_search_index(1));
-
-    for (int i = 0; i < 1000; i++) {
-        t->add_empty_row();
-        // These tests utilize the Integer and String index. That will crash if the database is still
-        // in version 2 format, because the on-disk format of index has changed in version 3.
-        StringData sd(int2string(i));
-        size_t f = t->find_first_string(0, sd);
-        CHECK_EQUAL(f, i);
-
-        f = t->find_first_int(1, i);
-        CHECK_EQUAL(f, i);
-    }
-
-    // Test an assert that guards against writing version 2 file to disk
-    File::try_remove(path + ".tmp2");
-    g.write(path + ".tmp2");
-    
-
 }
 
 

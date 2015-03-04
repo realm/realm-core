@@ -98,6 +98,8 @@ public:
     const StringIndex* get_search_index() const TIGHTDB_NOEXCEPT;
     StringIndex* release_search_index() TIGHTDB_NOEXCEPT;
     StringIndex* create_search_index();
+    // Simply inserts all column values in the index in a loop
+    void populate_search_index();
 
     // Optimizing data layout. enforce == true will enforce enumeration; 
     // enforce == false will auto-evaluate if it should be enumerated or not
