@@ -6,6 +6,8 @@
 #include <tightdb/column_fwd.hpp>
 #include <tightdb/query.hpp>
 #include <tightdb/query_engine.hpp>
+#include <tightdb/table_view.hpp>
+#include <tightdb/link_view.hpp>
 
 using namespace std;
 using namespace tightdb;
@@ -149,13 +151,20 @@ void Query::prepare_for_export(Handover_data& handover_data)
     }
     // prepare any source table view
     if (m_source_table_view) {
-        TableViewBase::Handover_data* tvb_handover = new TableView::Handover_data;
+        TableViewBase::Handover_data* tvb_handover = new TableViewBase::Handover_data;
         handover_data.table_view_data = tvb_handover;
         m_source_table_view->prepare_for_export(*tvb_handover);
     }
     else
         handover_data.table_view_data = 0;
-    // FIXME: get enough data to recreate any source link view at recieving side
+    // gather enough data to recreate any source link view at recieving side
+    if (bool(m_source_link_view)) {
+        LinkView::Handover_data* lv_handover = new LinkView::Handover_data;
+        handover_data.link_view_data = lv_handover;
+        m_source_link_view->prepare_for_export(*lv_handover);
+    }
+    else
+        handover_data.link_view_data = 0;
 }
 
 void Query::prepare_for_import(Handover_data& handover_data, Group& group)
@@ -170,7 +179,14 @@ void Query::prepare_for_import(Handover_data& handover_data, Group& group)
         handover_data.table_view_data = 0;
     }
     // FIXME: recreate/find source link view
-
+    if (handover_data.link_view_data) {
+        LinkView::Handover_data* lv_handover
+            = reinterpret_cast<LinkView::Handover_data*>(handover_data.link_view_data);
+        m_source_link_view = LinkView::prepare_for_import(*lv_handover, group);
+        m_view = m_source_link_view.get();
+        delete lv_handover;
+        handover_data.link_view_data = 0;
+    }
     if (handover_data.m_has_table)
         m_table = group.get_table(handover_data.m_table_num);
     else

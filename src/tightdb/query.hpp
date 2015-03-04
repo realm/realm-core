@@ -47,9 +47,6 @@ namespace tightdb {
 class ParentNode;
 class Table;
 class TableView;
-// fwd typedef for TableView::Handover_data
-class TableView_Handover_data;
-
 class TableViewBase;
 class ConstTableView;
 class Array;
@@ -286,6 +283,8 @@ public:
         // void* below - it should be a TableView::Handover_data, but we cant
         // forward declare a nested class...
         void* table_view_data;
+        // Similar for LinkView::Handover_data:
+        void* link_view_data;
     };
     void prepare_for_import(Handover_data& handover_data, Group& group);
     void prepare_for_export(Handover_data& handover_data);

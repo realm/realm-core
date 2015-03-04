@@ -25,9 +25,15 @@
 #ifdef TIGHTDB_ENABLE_REPLICATION
 #  include <tightdb/replication.hpp>
 #endif
+#include <tightdb/table_view.hpp>
 
 using namespace std;
 using namespace tightdb;
+
+LinkViewRef LinkView::prepare_for_import(Handover_data& handover_data, Group& group) {
+    TableRef tr(group.get_table(handover_data.m_table_num));
+    return tr->get_linklist(handover_data.m_col_num, handover_data.m_row_ndx);
+}
 
 
 void LinkView::insert(size_t link_ndx, size_t target_row_ndx)

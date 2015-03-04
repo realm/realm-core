@@ -6901,7 +6901,7 @@ TEST(LangBindHelper_HandoverQuery)
     {
         // Typed interface
         UniquePtr<SharedGroup::Handover<TestTableInts::Query> > handover;
-        TestTableInts::Query* q; // <-- must be visible in both exporting and importing scope
+        UniquePtr<TestTableInts::Query> q; // <-- must be visible in both exporting and importing scope
         {
             LangBindHelper::promote_to_write(sg_w);
             TestTableInts::Ref table = group_w.add_table<TestTableInts>("table");
@@ -6912,7 +6912,7 @@ TEST(LangBindHelper_HandoverQuery)
                 CHECK_EQUAL(i, table[i].first);
             LangBindHelper::commit_and_continue_as_read(sg_w);
             vid = sg_w.get_version_of_current_transaction();
-            q = new TestTableInts::Query(table->where());
+            q.reset( new TestTableInts::Query(table->where()) );
             handover.reset(sg_w.export_for_handover(*q));
         }
         {
@@ -6924,7 +6924,6 @@ TEST(LangBindHelper_HandoverQuery)
             CHECK_EQUAL(100, tv.size());
             for (int i = 0; i<100; ++i)
                 CHECK_EQUAL(i, tv[i].first);
-            delete q;
         }
     }
 }

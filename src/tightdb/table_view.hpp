@@ -23,11 +23,12 @@
 #include <iostream>
 
 #include <tightdb/views.hpp>
-#include <tightdb/table.hpp>
+#include <tightdb/link_view.hpp>
 #include <tightdb/column.hpp>
 #include <tightdb/exceptions.hpp>
 #include <tightdb/util/features.h>
 #include <tightdb/group_shared.hpp>
+#include <tightdb/table.hpp>
 
 namespace tightdb {
 
@@ -156,6 +157,7 @@ using std::size_t;
 // employee could recieve a (different, larger) raise which would then be overwritten and lost.
 // However, these are problems that you should expect, since the activity is spread over multiple
 // transactions.
+
 
 
 /// Common base class for TableView and ConstTableView.
@@ -346,8 +348,8 @@ protected:
     struct Handover_data {
         std::size_t table_num;
         Query::Handover_data query_handover_data;
+        LinkView::Handover_data* linkview_handover_data;
     };
-
 
     void prepare_for_export(Handover_data& handover_data)
     {
@@ -360,6 +362,12 @@ protected:
         if (!m_query.supports_export_for_handover()) {
             throw std::runtime_error("Handover failed: query too complex");
         }
+        if (m_linkview_source) {
+            handover_data.linkview_handover_data = new LinkView::Handover_data;
+            m_linkview_source->prepare_for_export(*handover_data.linkview_handover_data);
+        }
+        else
+            handover_data.linkview_handover_data = 0;
         // FIXME: might need to propagate into base class and members
         detach();
     }
