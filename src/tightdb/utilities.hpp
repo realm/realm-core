@@ -199,6 +199,12 @@ private:
     T m_value;
 };
 
+std::string to_str(int64_t value) 
+{
+    char buf[20];
+    sprintf(buf, "%lld", value);
+    return std::string(buf);
+}
 
 } // namespace tightdb
 
