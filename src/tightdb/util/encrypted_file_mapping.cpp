@@ -57,7 +57,7 @@ namespace util {
 
 size_t page_size()
 {
-    pthread_once_t once = PTHREAD_ONCE_INIT;
+    static pthread_once_t once = PTHREAD_ONCE_INIT;
     pthread_once(&once, get_page_size);
     return cached_page_size;
 }
