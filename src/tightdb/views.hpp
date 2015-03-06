@@ -82,14 +82,6 @@ public:
         std::vector<bool> m_ascending;
     };
 
-
-/*
-    // Sort m_row_indexes according to one column
-    void sort(size_t column, bool ascending = true);
-
-    // Sort m_row_indexes according to multiple columns
-    void sort(std::vector<size_t> columns, std::vector<bool> ascending);
-*/
     void sort(Sorter& sorting_predicate);
 #ifdef TIGHTDB_COOKIE_CHECK
     static const uint64_t cookie_expected = 0x7765697677777777ull; // 0x77656976 = 'view'; 0x77777777 = '7777' = alive

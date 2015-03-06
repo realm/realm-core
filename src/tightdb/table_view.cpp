@@ -349,6 +349,7 @@ void TableViewBase::adj_row_acc_erase_row(std::size_t row_ndx) TIGHTDB_NOEXCEPT
         it = m_row_indexes.find_first(row_ndx, it);
         if (it == not_found) 
             break;
+        ++m_num_detached_refs;
         m_row_indexes.set(it, -1);
     }
     m_row_indexes.adjust_ge(int_fast64_t(row_ndx)+1, -1);
@@ -363,6 +364,7 @@ void TableViewBase::adj_row_acc_move_over(std::size_t from_row_ndx, std::size_t 
         it = m_row_indexes.find_first(to_row_ndx, it);
         if (it == not_found) 
             break;
+        ++m_num_detached_refs;
         m_row_indexes.set(it, -1);
     }
     // adjust any refs to the source row ndx to point to the target row ndx.
@@ -474,7 +476,7 @@ void TableView::clear()
     }
 
     m_row_indexes.clear();
-
+    m_num_detached_refs = 0;
 #ifdef TIGHTDB_ENABLE_REPLICATION
     // It is important to not accidentally bring us in sync, if we were
     // not in sync to start with:
@@ -486,6 +488,7 @@ void TableView::clear()
 void TableViewBase::sync_distinct_view(size_t column)
 {
     m_row_indexes.clear();
+    m_num_detached_refs = 0;
     m_distinct_column_source = column;
     if (m_distinct_column_source != npos) {
         TIGHTDB_ASSERT(m_table);
