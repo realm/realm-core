@@ -25,6 +25,7 @@
 #include <tightdb/util/features.h>
 #include <tightdb/util/thread.hpp>
 #include <tightdb/util/platform_specific_condvar.hpp>
+#include <tightdb/util/unique_ptr.hpp>
 #include <tightdb/group.hpp>
 //#include <tightdb/commit_log.hpp>
 
@@ -339,6 +340,62 @@ public:
 #ifdef TIGHTDB_DEBUG
     void test_ringbuf();
 #endif
+
+    /// To handover a table view, query, linkview or row accessor of type T, you must 
+    /// wrap it into a Handover<T> for the transfer. Wrapping and unwrapping of a handover
+    /// object is done by the methods 'export_for_handover()' and 'import_from_handover()'
+    /// declared below. 'export_for_handover()' returns a Handover object, and 
+    /// 'import_for_handover()' consumes the object.
+    /// The Handover object does *not* assume ownership of the object being handed over.
+    /// If the object being handed over depends on other views (table- or link- ), those
+    /// objects will be handed over as well.
+
+    /// Type used to support handover of accessors between shared groups.
+    template<typename T> struct Handover {
+        T* m_payload;
+        typename T::Handover_data m_handover_data;
+        VersionID m_version;
+        Handover(T* payload, typename T::Handover_data handover_data, VersionID version) 
+            : m_payload(payload), m_handover_data(handover_data), m_version(version) 
+        {
+        }
+    };
+
+    /// Create a handover object for the given accessor. The object being handed over is 
+    /// detached and cannot be used before it is imported by a SharedGroup. The call to 
+    /// export_for_handover is not thread-safe. For table views, export is restricted to 
+    /// certain kinds of table views and will throw if the restriction is violated. 
+    /// See table_view.hpp for a description of the restrictions applying to export of 
+    /// table views. 
+    /// Note that the object being handed over is passed by reference. The handover does 
+    /// not assume ownership, and the handed over object must be available/in scope where 
+    /// it is imported.
+    template<typename T>
+    Handover<T>* export_for_handover(T& accessor)
+    {
+        typename T::Handover_data handover_data;
+        accessor.prepare_for_export(handover_data);
+        return new Handover<T>(&accessor, handover_data, get_version_of_current_transaction());
+    }
+
+    /// Import an accessor wrapped in a handover object. The import will fail if the
+    /// importing SharedGroup is viewing a version of the database that is different
+    /// from the exporting SharedGroup. The call to import_from_handover is not thread-safe.
+    /// The handover object is "consumed", it cannot be handed over again.
+    template<typename T>
+    void import_from_handover(Handover<T>* handover)
+    {
+        if (handover->m_version != get_version_of_current_transaction()) {
+            throw std::runtime_error("Handover failed due to version mismatch");
+        }
+        // move data
+        handover->m_payload->prepare_for_import(handover->m_handover_data, m_group);
+        delete handover;
+    }
+    // we need to special case for LinkViews, because they are not really handed over,
+    // instead a new instance is created at the recieving side
+    Handover<LinkView>* export_for_handover(LinkViewRef& accessor);
+    LinkViewRef import_from_handover(Handover<LinkView>* handover);
 
 private:
     struct SharedInfo;

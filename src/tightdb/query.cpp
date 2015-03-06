@@ -6,17 +6,20 @@
 #include <tightdb/column_fwd.hpp>
 #include <tightdb/query.hpp>
 #include <tightdb/query_engine.hpp>
+#include <tightdb/table_view.hpp>
+#include <tightdb/link_view.hpp>
 
 using namespace std;
 using namespace tightdb;
 
-Query::Query() : m_view(null_ptr)
+Query::Query() : m_view(null_ptr), m_source_table_view(0)
 {
     Create();
 //    expression(static_cast<Expression*>(this));
 }
 
-Query::Query(Table& table, RowIndexes* tv) : m_table(table.get_table_ref()), m_view(tv)
+Query::Query(Table& table, TableViewBase* tv) 
+    : m_table(table.get_table_ref()), m_view(tv), m_source_table_view(tv)
 {
     TIGHTDB_ASSERT_DEBUG(m_view == null_ptr || m_view->cookie == m_view->cookie_expected);
     Create();
@@ -25,13 +28,14 @@ Query::Query(Table& table, RowIndexes* tv) : m_table(table.get_table_ref()), m_v
 Query::Query(const Table& table, const LinkViewRef& lv):
     m_table((const_cast<Table&>(table)).get_table_ref()),
     m_view(lv.get()),
-    m_source_link_view(lv)
+    m_source_link_view(lv), m_source_table_view(0)
 {
     TIGHTDB_ASSERT_DEBUG(m_view == null_ptr || m_view->cookie == m_view->cookie_expected);
     Create();
 }
 
-Query::Query(const Table& table, RowIndexes* tv) : m_table((const_cast<Table&>(table)).get_table_ref()), m_view(tv)
+Query::Query(const Table& table, TableViewBase* tv) 
+    : m_table((const_cast<Table&>(table)).get_table_ref()), m_view(tv), m_source_table_view(tv)
 {
     TIGHTDB_ASSERT_DEBUG(m_view == null_ptr ||m_view->cookie == m_view->cookie_expected);
     Create();
@@ -61,6 +65,7 @@ Query::Query(const Query& copy)
     error_code = copy.error_code;
     m_view = copy.m_view;
     m_source_link_view = copy.m_source_link_view;
+    m_source_table_view = copy.m_source_table_view;
     copy.do_delete = false;
     do_delete = true;
 }
@@ -109,6 +114,7 @@ Query& Query::operator = (const Query& source)
         m_table = source.m_table;
         m_view = source.m_view;
         m_source_link_view = source.m_source_link_view;
+        m_source_table_view = source.m_source_table_view;
 
         if (first[0]) {
             ParentNode* node_to_update = first[0];
@@ -134,6 +140,60 @@ void Query::delete_nodes() TIGHTDB_NOEXCEPT
         }
     }
 }
+
+
+void Query::prepare_for_export(Handover_data& handover_data)
+{
+    handover_data.m_has_table = bool(m_table);
+    if (bool(m_table)) {
+        handover_data.m_table_num = m_table.get()->get_index_in_group();
+        m_table = TableRef(); // <- detach to prevent misuse until import!
+    }
+    // prepare any source table view
+    if (m_source_table_view) {
+        TableViewBase::Handover_data* tvb_handover = new TableViewBase::Handover_data;
+        handover_data.table_view_data = tvb_handover;
+        m_source_table_view->prepare_for_export(*tvb_handover);
+    }
+    else
+        handover_data.table_view_data = 0;
+    // gather enough data to recreate any source link view at recieving side
+    if (bool(m_source_link_view)) {
+        LinkView::Handover_data* lv_handover = new LinkView::Handover_data;
+        handover_data.link_view_data = lv_handover;
+        m_source_link_view->prepare_for_export(*lv_handover);
+    }
+    else
+        handover_data.link_view_data = 0;
+}
+
+void Query::prepare_for_import(Handover_data& handover_data, Group& group)
+{
+    TIGHTDB_ASSERT((m_source_table_view != 0) == (handover_data.table_view_data != 0));
+    // prepare any source table view
+    if (m_source_table_view) {
+        TableViewBase::Handover_data* tvb_handover 
+            = reinterpret_cast<TableViewBase::Handover_data*>(handover_data.table_view_data);
+        m_source_table_view->prepare_for_import(*tvb_handover, group);
+        delete tvb_handover;
+        handover_data.table_view_data = 0;
+    }
+    // FIXME: recreate/find source link view
+    if (handover_data.link_view_data) {
+        LinkView::Handover_data* lv_handover
+            = reinterpret_cast<LinkView::Handover_data*>(handover_data.link_view_data);
+        m_source_link_view = LinkView::prepare_for_import(*lv_handover, group);
+        m_view = m_source_link_view.get();
+        delete lv_handover;
+        handover_data.link_view_data = 0;
+    }
+    if (handover_data.m_has_table)
+        m_table = group.get_table(handover_data.m_table_num);
+    else
+        m_table = TableRef();
+}
+
+
 
 /*
 // use and_query() instead!
@@ -1046,7 +1106,8 @@ size_t Query::remove(size_t start, size_t end, size_t limit)
             size_t r = peek_tableview(start + results);
             if (r != not_found) {
                 m_table->remove(r);
-                m_view->m_row_indexes.adjust_ge(m_view->m_row_indexes.get(start + results), -1);
+                // new semantics for tableview means that the remove from m_table is automatically reflected
+                // m_view->m_row_indexes.adjust_ge(m_view->m_row_indexes.get(start + results), -1);
                 results++;
             }
             else {

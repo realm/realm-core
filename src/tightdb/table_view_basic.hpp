@@ -181,6 +181,19 @@ public:
         return static_cast<const Tab&>(Base::m_impl.get_parent());
     }
 
+
+public:
+    void move_assign(BasicTableView<Tab>& tv)
+    {
+        Base::m_impl.move_assign(tv.m_impl);
+    }
+    typedef TableViewBase::Handover_data Handover_data;
+    void prepare_for_export(Handover_data& handover_data) {
+        Base::m_impl.prepare_for_export(handover_data);
+    }
+    void prepare_for_import(Handover_data& handover_data, Group& group) {
+        Base::m_impl.prepare_for_import(handover_data, group);
+    }
 private:
     BasicTableView(BasicTableView* tv): Base(move(tv->m_impl)) {}
     BasicTableView(TableView tv): Base(move(tv)) {}

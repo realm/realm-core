@@ -31,6 +31,7 @@
 #include <tightdb/group_writer.hpp>
 #include <tightdb/group_shared.hpp>
 #include <tightdb/group_writer.hpp>
+#include <tightdb/link_view.hpp>
 #ifdef TIGHTDB_ENABLE_REPLICATION
 #  include <tightdb/replication.hpp>
 #endif
@@ -927,10 +928,15 @@ void SharedGroup::close() TIGHTDB_NOEXCEPT
             rollback();
             break;
     }
-
+    m_group.detach();
+    m_transact_stage = transact_Ready;
     SharedInfo* info = m_file_map.get_addr();
     {
         RobustLockGuard lock(info->controlmutex, recover_from_dead_write_transact);
+
+        if (m_group.m_alloc.is_attached())
+            m_group.m_alloc.detach();
+
         --info->num_participants;
         bool end_of_session = info->num_participants == 0;
         // cerr << "closing" << endl;
@@ -940,7 +946,6 @@ void SharedGroup::close() TIGHTDB_NOEXCEPT
             // we can delete it when done.
             if (info->flags == durability_MemOnly) {
                 try {
-                    m_group.m_alloc.detach();
                     util::File::remove(m_db_path.c_str());
                 }
                 catch(...) {} // ignored on purpose.
@@ -953,6 +958,12 @@ void SharedGroup::close() TIGHTDB_NOEXCEPT
 #endif
         }
     }
+#ifndef _WIN32
+    m_room_to_write.close();
+    m_work_to_do.close();
+    m_daemon_becomes_ready.close();
+    m_new_commit_available.close();
+#endif
     m_file.unlock();
     // info->~SharedInfo(); // DO NOT Call destructor
     m_file.close();
@@ -1648,3 +1659,25 @@ void SharedGroup::reserve(size_t size)
     // the file. This assumption must be verified though.
     m_group.m_alloc.reserve(size);
 }
+
+
+
+SharedGroup::Handover<LinkView>* SharedGroup::export_for_handover(LinkViewRef& accessor)
+{
+    LinkView::Handover_data handover_data;
+    accessor->prepare_for_export(handover_data);
+    return new Handover<LinkView>(0, handover_data, get_version_of_current_transaction());
+}
+
+
+LinkViewRef SharedGroup::import_from_handover(Handover<LinkView>* handover)
+{
+    if (handover->m_version != get_version_of_current_transaction()) {
+        throw std::runtime_error("Handover failed due to version mismatch");
+    }
+    // move data
+    LinkViewRef result = LinkView::prepare_for_import(handover->m_handover_data, m_group);
+    delete handover;
+    return result;
+}
+

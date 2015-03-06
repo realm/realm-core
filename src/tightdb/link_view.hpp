@@ -25,7 +25,6 @@
 #include <tightdb/column_linklist.hpp>
 #include <tightdb/link_view_fwd.hpp>
 #include <tightdb/table.hpp>
-#include <tightdb/table_view.hpp>
 
 namespace tightdb {
 
@@ -104,6 +103,18 @@ private:
     ColumnLinkList& m_origin_column;
     mutable std::size_t m_ref_count;
 
+    struct Handover_data {
+        std::size_t m_table_num;
+        std::size_t m_col_num;
+        std::size_t m_row_ndx;
+    };
+    void prepare_for_export(Handover_data& handover_data) const {
+        handover_data.m_table_num = m_origin_table->get_index_in_group();
+        handover_data.m_col_num = m_origin_column.m_column_ndx;
+        handover_data.m_row_ndx = get_origin_row_index();
+    }
+    static LinkViewRef prepare_for_import(Handover_data& handover_data, Group& group);
+
     // constructor (protected since it can only be used by friends)
     LinkView(Table* origin_table, ColumnLinkList&, std::size_t row_ndx);
 
@@ -139,10 +150,14 @@ private:
     friend class util::bind_ptr<LinkView>;
     friend class util::bind_ptr<const LinkView>;
     friend class LangBindHelper;
+    friend class SharedGroup;
+    friend class Query;
+    friend class TableViewBase;
 };
 
 
 // Implementation
+//#include <tightdb/table_view.hpp>
 
 inline LinkView::LinkView(Table* origin_table, ColumnLinkList& column, std::size_t row_ndx):
     RowIndexes(Column::unattached_root_tag(), column.get_alloc()), // Throws

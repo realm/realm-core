@@ -666,10 +666,10 @@ public:
     // Queries
     // Using where(tv) is the new method to perform queries on TableView. The 'tv' can have any order; it does not
     // need to be sorted, and, resulting view retains its order.
-    Query where(RowIndexes* tv = null_ptr) { return Query(*this, tv); }
+    Query where(TableViewBase* tv = null_ptr) { return Query(*this, tv); }
 
     // FIXME: We need a ConstQuery class or runtime check against modifications in read transaction.
-    Query where(RowIndexes* tv = null_ptr) const { return Query(*this, tv); }
+    Query where(TableViewBase* tv = null_ptr) const { return Query(*this, tv); }
 
     // Perform queries on a LinkView. The returned Query holds a reference to lv.
     Query where(const LinkViewRef& lv) { return Query(*this, lv); }
@@ -838,7 +838,7 @@ private:
     mutable Descriptor* m_descriptor;
 
     // Table view instances
-    typedef std::vector<const TableViewBase*> views;
+    typedef std::vector<TableViewBase*> views;
     mutable views m_views;
 
     // Points to first bound row accessor, or is null if there are none.
@@ -1408,7 +1408,10 @@ inline void Table::remove_last()
 
 inline void Table::register_view(const TableViewBase* view)
 {
-    m_views.push_back(view);
+    // Casting away constness here - operations done on tableviews
+    // through m_views are all internal and preserving "some" kind
+    // of logical constness.
+    m_views.push_back(const_cast<TableViewBase*>(view));
 }
 
 inline bool Table::is_attached() const TIGHTDB_NOEXCEPT

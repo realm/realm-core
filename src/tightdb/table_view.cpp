@@ -334,6 +334,53 @@ uint_fast64_t TableViewBase::sync_if_needed() const
 uint_fast64_t sync_if_needed() const { return 0; };
 #endif
 
+
+
+void TableViewBase::adj_row_acc_insert_rows(std::size_t row_ndx, std::size_t num_rows) TIGHTDB_NOEXCEPT
+{
+    m_row_indexes.adjust_ge(int_fast64_t(row_ndx), num_rows);
+}
+
+
+void TableViewBase::adj_row_acc_erase_row(std::size_t row_ndx) TIGHTDB_NOEXCEPT
+{
+    std::size_t it = 0;
+    for (;;) {
+        it = m_row_indexes.find_first(row_ndx, it);
+        if (it == not_found) 
+            break;
+        ++m_num_detached_refs;
+        m_row_indexes.set(it, -1);
+    }
+    m_row_indexes.adjust_ge(int_fast64_t(row_ndx)+1, -1);
+}
+
+
+void TableViewBase::adj_row_acc_move_over(std::size_t from_row_ndx, std::size_t to_row_ndx) TIGHTDB_NOEXCEPT
+{
+    std::size_t it = 0;
+    // kill any refs to the target row ndx
+    for (;;) {
+        it = m_row_indexes.find_first(to_row_ndx, it);
+        if (it == not_found) 
+            break;
+        ++m_num_detached_refs;
+        m_row_indexes.set(it, -1);
+    }
+    // adjust any refs to the source row ndx to point to the target row ndx.
+    it = 0;
+    for (;;) {
+        it = m_row_indexes.find_first(from_row_ndx, it);
+        if (it == not_found)
+            break;
+        m_row_indexes.set(it, to_row_ndx);
+    }
+}
+
+
+
+
+
 // O(n) for n = this->size()
 void TableView::remove(size_t ndx)
 {
@@ -359,11 +406,12 @@ void TableView::remove(size_t ndx)
 
     // Update refs
     m_row_indexes.erase(ndx, ndx == size() - 1);
-
+/*
     // Decrement row indexes greater than or equal to ndx
     //
     // O(n) for n = this->size(). FIXME: Dangerous cast below: unsigned -> signed
     m_row_indexes.adjust_ge(int_fast64_t(real_ndx), -1);
+*/
 }
 
 
@@ -428,7 +476,7 @@ void TableView::clear()
     }
 
     m_row_indexes.clear();
-
+    m_num_detached_refs = 0;
 #ifdef TIGHTDB_ENABLE_REPLICATION
     // It is important to not accidentally bring us in sync, if we were
     // not in sync to start with:
@@ -440,6 +488,7 @@ void TableView::clear()
 void TableViewBase::sync_distinct_view(size_t column)
 {
     m_row_indexes.clear();
+    m_num_detached_refs = 0;
     m_distinct_column_source = column;
     if (m_distinct_column_source != npos) {
         TIGHTDB_ASSERT(m_table);
@@ -452,6 +501,30 @@ void TableViewBase::sync_distinct_view(size_t column)
 }
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
+// Sort according to one column
+void TableViewBase::sort(size_t column, bool ascending)
+{
+    std::vector<size_t> c;
+    std::vector<bool> a;
+    c.push_back(column);
+    a.push_back(ascending);
+    sort(c, a);
+}
+
+// Sort according to multiple columns, user specified order on each column
+void TableViewBase::sort(std::vector<size_t> columns, std::vector<bool> ascending)
+{
+    TIGHTDB_ASSERT(columns.size() == ascending.size());
+    m_auto_sort = true;
+    m_sorting_predicate = Sorter(columns, ascending);
+    sort(m_sorting_predicate);
+}
+
+void TableViewBase::re_sort()
+{
+    sort(m_sorting_predicate);
+}
+
 
 void TableViewBase::do_sync() 
 {

@@ -1265,7 +1265,7 @@ TEST(LinkList_QueryOnLinkList)
 
     // q.m_table = table1
     // q.m_view = lvr
-    Query q = table1->where(lvr.get()).and_query(table1->column<Int>(0) > 100);
+    Query q = table1->where(lvr).and_query(table1->column<Int>(0) > 100);
 
     // tv.m_table == table1
     tv = q.find_all(); // tv = { 0, 2 }

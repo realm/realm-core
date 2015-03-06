@@ -6,26 +6,26 @@
 
 using namespace tightdb;
 
-// This class is for common functionality of ListView and LinkView which inherit from it. Currently it only 
+// This class is for common functionality of ListView and LinkView which inherit from it. Currently it only
 // supports sorting.
 class RowIndexes
 {
 public:
-    RowIndexes(Column::unattached_root_tag urt, tightdb::Allocator& alloc) : 
-#ifdef TIGHTDB_COOKIE_CHECK
-        cookie(cookie_expected), 
-#endif
-        m_row_indexes(urt, alloc), m_auto_sort(false) 
-    {}
-
-    RowIndexes(Column::move_tag mt, Column& col) : 
+    RowIndexes(Column::unattached_root_tag urt, tightdb::Allocator& alloc) :
 #ifdef TIGHTDB_COOKIE_CHECK
         cookie(cookie_expected),
-#endif      
-        m_row_indexes(mt, col), m_auto_sort(false) 
+#endif
+        m_row_indexes(urt, alloc)
     {}
 
-    virtual ~RowIndexes() 
+    RowIndexes(Column::move_tag mt, Column& col) :
+#ifdef TIGHTDB_COOKIE_CHECK
+        cookie(cookie_expected),
+#endif
+        m_row_indexes(mt, col)
+    {}
+
+    virtual ~RowIndexes()
     {
 #ifdef TIGHTDB_COOKIE_CHECK
         cookie = 0x7765697633333333; // 0x77656976 = 'view'; 0x33333333 = '3333' = destructed
@@ -64,9 +64,9 @@ public:
                 TIGHTDB_ASSERT(ctb);
 
                 // todo/fixme, special treatment of ColumnStringEnum by calling ColumnStringEnum::compare_values()
-                // instead of the general ColumnTemplate::compare_values() becuse it cannot overload inherited 
-                // `int64_t get_val()` of Column. Such column inheritance needs to be cleaned up 
-                int c;             
+                // instead of the general ColumnTemplate::compare_values() becuse it cannot overload inherited
+                // `int64_t get_val()` of Column. Such column inheritance needs to be cleaned up
+                int c;
                 if (dynamic_cast<const ColumnStringEnum*>(&cb))
                     c = static_cast<const ColumnStringEnum*>(&cb)->compare_values(i, j);
                 else
@@ -82,23 +82,13 @@ public:
         std::vector<bool> m_ascending;
     };
 
-    // Sort m_row_indexes according to one column
-    void sort(size_t column, bool ascending = true);
-
-    // Sort m_row_indexes according to multiple columns
-    void sort(std::vector<size_t> columns, std::vector<bool> ascending);
-
-    // Re-sort view according to last used criterias
-    void re_sort();
-
+    void sort(Sorter& sorting_predicate);
 #ifdef TIGHTDB_COOKIE_CHECK
     static const uint64_t cookie_expected = 0x7765697677777777ull; // 0x77656976 = 'view'; 0x77777777 = '7777' = alive
     uint64_t cookie;
 #endif
 
     Column m_row_indexes;
-    Sorter m_sorting_predicate; // Stores sorting criterias (columns + ascending)
-    bool m_auto_sort;
 };
 
 #endif // TIGHTDB_VIEWS_HPP

@@ -396,11 +396,20 @@ public:
 protected:
     Query(const BasicTable<Spec>& table, TableViewBase* tv):
         Spec::template ColNames<QueryCol, Query*>(this), m_impl(table, tv) {}
-
+    typedef tightdb::Query::Handover_data Handover_data;
+    void prepare_for_export(Handover_data& handover_data)
+    {
+        m_impl.prepare_for_export(handover_data);
+    }
+    void prepare_for_import(Handover_data& handover_data, Group& group)
+    {
+        m_impl.prepare_for_import(handover_data, group);
+    }
 private:
     tightdb::Query m_impl;
-
+    
     friend class BasicTable;
+    friend class SharedGroup;
     template<class, int, class> friend class _impl::QueryColumnBase;
     template<class, int, class> friend class _impl::QueryColumn;
 };
