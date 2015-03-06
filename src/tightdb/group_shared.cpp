@@ -31,6 +31,7 @@
 #include <tightdb/group_writer.hpp>
 #include <tightdb/group_shared.hpp>
 #include <tightdb/group_writer.hpp>
+#include <tightdb/link_view.hpp>
 #ifdef TIGHTDB_ENABLE_REPLICATION
 #  include <tightdb/replication.hpp>
 #endif
@@ -1658,3 +1659,25 @@ void SharedGroup::reserve(size_t size)
     // the file. This assumption must be verified though.
     m_group.m_alloc.reserve(size);
 }
+
+
+
+SharedGroup::Handover<LinkView>* SharedGroup::export_for_handover(LinkViewRef& accessor)
+{
+    LinkView::Handover_data handover_data;
+    accessor->prepare_for_export(handover_data);
+    return new Handover<LinkView>(0, handover_data, get_version_of_current_transaction());
+}
+
+
+LinkViewRef SharedGroup::import_from_handover(Handover<LinkView>* handover)
+{
+    if (handover->m_version != get_version_of_current_transaction()) {
+        throw std::runtime_error("Handover failed due to version mismatch");
+    }
+    // move data
+    LinkViewRef result = LinkView::prepare_for_import(handover->m_handover_data, m_group);
+    delete handover;
+    return result;
+}
+

@@ -150,7 +150,7 @@ private:
     friend class util::bind_ptr<LinkView>;
     friend class util::bind_ptr<const LinkView>;
     friend class LangBindHelper;
-    friend class SharedGRoup;
+    friend class SharedGroup;
     friend class Query;
     friend class TableViewBase;
 };

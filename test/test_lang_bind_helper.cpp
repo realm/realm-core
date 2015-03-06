@@ -7160,6 +7160,82 @@ TEST(LangBindHelper_HandoverTableViewWithLinkView)
         CHECK_EQUAL(2, tv.get_source_ndx(1));
     }
 }
+TEST(LangBindHelper_HandoverLinkView)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
+    SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
+    Group& group = const_cast<Group&>(sg.begin_read());
+
+    UniquePtr<Replication> repl_w(makeWriteLogCollector(path, false, crypt_key()));
+    SharedGroup sg_w(*repl_w, SharedGroup::durability_Full, crypt_key());
+    Group& group_w = const_cast<Group&>(sg_w.begin_read());
+
+    UniquePtr<SharedGroup::Handover<LinkView> > handover;
+    SharedGroup::VersionID vid;
+    {
+
+        LangBindHelper::promote_to_write(sg_w);
+
+        TableRef table1 = group_w.add_table("table1");
+        TableRef table2 = group_w.add_table("table2");
+
+        // add some more columns to table1 and table2
+        table1->add_column(type_Int, "col1");
+        table1->add_column(type_String, "str1");
+
+        // add some rows
+        table1->add_empty_row();
+        table1->set_int(0, 0, 300);
+        table1->set_string(1, 0, "delta");
+
+        table1->add_empty_row();
+        table1->set_int(0, 1, 100);
+        table1->set_string(1, 1, "alfa");
+
+        table1->add_empty_row();
+        table1->set_int(0, 2, 200);
+        table1->set_string(1, 2, "beta");
+
+        size_t col_link2 = table2->add_column_link(type_LinkList, "linklist", *table1);
+
+        table2->add_empty_row();
+        table2->add_empty_row();
+
+        LinkViewRef lvr;
+
+        lvr = table2->get_linklist(col_link2, 0);
+        lvr->clear();
+        lvr->add(0);
+        lvr->add(1);
+        lvr->add(2);
+
+        // TableView tv2 = lvr->get_sorted_view(0);
+        LangBindHelper::commit_and_continue_as_read(sg_w);
+        vid = sg_w.get_version_of_current_transaction();
+        handover.reset(sg_w.export_for_handover(lvr));
+    }
+    {
+        LangBindHelper::advance_read(sg, vid);
+        sg_w.close();
+        LinkViewRef lvr = sg.import_from_handover(handover.release()); // <-- import lvr
+        // Return all rows of table1 (the linked-to-table) that match the criteria and is in the LinkList
+
+        // q.m_table = table1
+        // q.m_view = lvr
+        TableRef table1 = group.get_table("table1");
+        Query q = table1->where(lvr).and_query(table1->column<Int>(0) > 100);
+
+        // tv.m_table == table1
+        TableView tv;
+        tv = q.find_all(); // tv = { 0, 2 }
+
+
+        CHECK_EQUAL(2, tv.size());
+        CHECK_EQUAL(0, tv.get_source_ndx(0));
+        CHECK_EQUAL(2, tv.get_source_ndx(1));
+    }
+}
 
 
 TEST(LangBindHelper_HandoverFailOfReverseDependency)

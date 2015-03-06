@@ -392,6 +392,10 @@ public:
         handover->m_payload->prepare_for_import(handover->m_handover_data, m_group);
         delete handover;
     }
+    // we need to special case for LinkViews, because they are not really handed over,
+    // instead a new instance is created at the recieving side
+    Handover<LinkView>* export_for_handover(LinkViewRef& accessor);
+    LinkViewRef import_from_handover(Handover<LinkView>* handover);
 
 private:
     struct SharedInfo;
