@@ -34,6 +34,7 @@ void OutputStream::write(const char* data, size_t size)
         throw runtime_error("File size overflow");
 }
 
+
 size_t OutputStream::write_array(const char* data, size_t size, uint_fast32_t checksum)
 {
     const char* data_1 = data;

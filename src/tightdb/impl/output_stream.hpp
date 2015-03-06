@@ -48,6 +48,10 @@ private:
     std::ostream& m_out;
 };
 
+
+
+
+
 // Implementation:
 
 inline OutputStream::OutputStream(std::ostream& out):
