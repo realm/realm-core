@@ -35,7 +35,11 @@
 namespace tightdb {
 
 class SharedGroup;
-namespace _impl { class GroupFriend; }
+namespace _impl {
+class GroupFriend;
+class TransactLogConvenientEncoder;
+class TransactLogParser;
+}
 
 
 /// A group is a collection of named tables.
@@ -525,6 +529,8 @@ private:
     friend class GroupWriter;
     friend class SharedGroup;
     friend class _impl::GroupFriend;
+    friend class _impl::TransactLogConvenientEncoder;
+    friend class _impl::TransactLogParser;
     friend class Replication;
     friend class TrivialReplication;
 };

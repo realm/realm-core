@@ -55,6 +55,10 @@
 #  define TIGHTDB_ASSERT_3(left, condition, right) static_cast<void>(0)
 #endif
 
+#define TIGHTDB_UNREACHABLE() \
+    tightdb::util::terminate(TIGHTDB_VER_CHUNK " Unreachable code", __FILE__, __LINE__)
+
+
 #ifdef TIGHTDB_HAVE_CXX11_STATIC_ASSERT
 #  define TIGHTDB_STATIC_ASSERT(condition, message) static_assert(condition, message)
 #else
