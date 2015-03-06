@@ -1928,9 +1928,15 @@ private:
     Instr get_inst() {
         Instr instr;
         instr.begin = current_instr_start;
-        current_instr_start = m_encoder.write_position() - m_buffer.transact_log_data();
+        current_instr_start = transact_log_size();
         instr.end = current_instr_start;
         return instr;
+    }
+
+    size_t transact_log_size() const
+    {
+        TIGHTDB_ASSERT_3(m_encoder.write_position(), >=, m_buffer.transact_log_data());
+        return m_encoder.write_position() - m_buffer.transact_log_data();
     }
 
     void append_instruction() {

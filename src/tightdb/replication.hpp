@@ -348,6 +348,7 @@ private:
     std::size_t m_size;
 };
 
+
 class Replication::Interrupted: public std::exception {
 public:
     const char* what() const TIGHTDB_NOEXCEPT_OR_NOTHROW TIGHTDB_OVERRIDE

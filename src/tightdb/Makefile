@@ -19,7 +19,9 @@ nobase_subinclude_HEADERS = \
 	group.hpp \
 	group_shared.hpp \
 	impl/destroy_guard.hpp \
+	impl/input_stream.hpp \
 	impl/output_stream.hpp \
+	impl/merge_index_map.hpp \
 	impl/transact_log.hpp \
 	importer.hpp \
 	lang_bind_helper.hpp \
@@ -159,6 +161,7 @@ libtightdb_a_SOURCES = \
 	utilities.cpp \
 	version.cpp \
 	views.cpp \
+
 
 # Format: CURRENT[:REVISION[:AGE]]
 #
