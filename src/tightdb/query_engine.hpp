@@ -1772,7 +1772,7 @@ public:
         if (type == type_Link) {
             ColumnLinkBase& clb = const_cast<Table*>(m_table)->get_column_link_base(m_origin_column);
             ColumnLink& cl = static_cast<ColumnLink&>(clb);
-            ret = cl.find_first(m_target_row + 1, start); // ColumnLink stores link to row N as the integer N + 1
+            ret = cl.find_first(m_target_row + 1, start, end); // ColumnLink stores link to row N as the integer N + 1
         }
         else if (type == type_LinkList) {
             ColumnLinkBase& clb = const_cast<Table*>(m_table)->get_column_link_base(m_origin_column);

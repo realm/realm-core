@@ -1,7 +1,15 @@
 SUBDIRS = util
-PASSIVE_SUBDIRS = test-tightdb test-sqlite3 test-stl performance \
-benchmark-insert-add benchmark-crud benchmark-prealloc \
-benchmark-index benchmark-transaction benchmark-row-accessor \
+PASSIVE_SUBDIRS = \
+test-tightdb \
+test-sqlite3 \
+test-stl \
+performance \
+benchmark-insert-add \
+benchmark-crud \
+benchmark-prealloc \
+benchmark-index \
+benchmark-transaction \
+benchmark-row-accessor \
 experiments
 
 RESOURCES=expect_json.json expect_string.txt

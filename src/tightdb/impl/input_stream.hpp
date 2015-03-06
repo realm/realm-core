@@ -3,7 +3,7 @@
  * TIGHTDB CONFIDENTIAL
  * __________________
  *
- *  [2011] - [2012] TightDB Inc
+ *  [2011] - [2015] TightDB Inc
  *  All Rights Reserved.
  *
  * NOTICE:  All information contained herein is, and remains
@@ -17,23 +17,26 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_UTIL_FILE_MAPPER_HPP
-#define TIGHTDB_UTIL_FILE_MAPPER_HPP
 
-#include <tightdb/util/file.hpp>
+#ifndef TIGHTDB_IMPL_INPUT_STREAM_HPP
+#define TIGHTDB_IMPL_INPUT_STREAM_HPP
 
 namespace tightdb {
-namespace util {
+namespace _impl {
 
-void *mmap(int fd, size_t size, File::AccessMode access, const char *encryption_key);
-void munmap(void *addr, size_t size) TIGHTDB_NOEXCEPT;
-void* mremap(int fd, void* old_addr, size_t old_size, File::AccessMode a, size_t new_size);
-void msync(void *addr, size_t size);
+class InputStream {
+public:
+    /// \return the number of accessible bytes.
+    /// A value of zero indicates end-of-input.
+    /// For non-zero return value, \a begin and \a end are
+    /// updated to reflect the start and limit of a
+    /// contiguous memory chunk.
+    virtual size_t next_block(const char*& begin, const char*& end) = 0;
 
-File::SizeType encrypted_size_to_data_size(File::SizeType size) TIGHTDB_NOEXCEPT;
-File::SizeType data_size_to_encrypted_size(File::SizeType size) TIGHTDB_NOEXCEPT;
-size_t round_up_to_page_size(size_t size) TIGHTDB_NOEXCEPT;
+    virtual ~InputStream() {}
+};
 
 }
 }
-#endif
+
+#endif // TIGHTDB_IMPL_INPUT_STREAM_HPP

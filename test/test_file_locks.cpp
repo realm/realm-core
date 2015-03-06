@@ -120,7 +120,6 @@ void slave(int ndx, string path)
 TEST(File_NoSpuriousTryLockFailures)
 {
     TEST_PATH(path);
-
     Thread slaves[num_slaves];
     for (int i = 0; i != num_slaves; ++i) {
         slaves_run[i] = false;

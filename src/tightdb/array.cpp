@@ -405,7 +405,7 @@ size_t Array::write(_impl::ArrayWriterBase& out, bool recurse, bool persist) con
         std::size_t size = get_byte_size();
         uint_fast32_t dummy_checksum = 0x01010101UL;
         std::size_t array_pos = out.write_array(header, size, dummy_checksum);
-        TIGHTDB_ASSERT(array_pos % 8 == 0); // 8-byte alignment
+        TIGHTDB_ASSERT_3(array_pos % 8, ==, 0); // 8-byte alignment
 
         return array_pos;
     }
@@ -434,7 +434,7 @@ size_t Array::write(_impl::ArrayWriterBase& out, bool recurse, bool persist) con
                 sub.init_from_ref(to_ref(value));
                 bool subrecurse = true;
                 std::size_t sub_pos = sub.write(out, subrecurse, persist); // Throws
-                TIGHTDB_ASSERT(sub_pos % 8 == 0); // 8-byte alignment
+                TIGHTDB_ASSERT_3(sub_pos % 8, ==, 0); // 8-byte alignment
                 new_refs.add(sub_pos); // Throws
             }
         }
@@ -457,10 +457,10 @@ size_t Array::write(_impl::ArrayWriterBase& out, bool recurse, bool persist) con
 
 void Array::move(size_t begin, size_t end, size_t dest_begin)
 {
-    TIGHTDB_ASSERT(begin <= end);
-    TIGHTDB_ASSERT(end <= m_size);
-    TIGHTDB_ASSERT(dest_begin <= m_size);
-    TIGHTDB_ASSERT(end - begin <= m_size - dest_begin);
+    TIGHTDB_ASSERT_3(begin, <=, end);
+    TIGHTDB_ASSERT_3(end, <=, m_size);
+    TIGHTDB_ASSERT_3(dest_begin, <=, m_size);
+    TIGHTDB_ASSERT_3(end - begin, <=, m_size - dest_begin);
     TIGHTDB_ASSERT(!(dest_begin >= begin && dest_begin < end)); // Required by std::copy
 
     // Check if we need to copy before modifying
@@ -484,10 +484,10 @@ void Array::move(size_t begin, size_t end, size_t dest_begin)
 
 void Array::move_backward(size_t begin, size_t end, size_t dest_end)
 {
-    TIGHTDB_ASSERT(begin <= end);
-    TIGHTDB_ASSERT(end <= m_size);
-    TIGHTDB_ASSERT(dest_end <= m_size);
-    TIGHTDB_ASSERT(end - begin <= dest_end);
+    TIGHTDB_ASSERT_3(begin, <=, end);
+    TIGHTDB_ASSERT_3(end, <=, m_size);
+    TIGHTDB_ASSERT_3(dest_end, <=, m_size);
+    TIGHTDB_ASSERT_3(end - begin, <=, dest_end);
     TIGHTDB_ASSERT(!(dest_end > begin && dest_end <= end)); // Required by std::copy_backward
 
     // Check if we need to copy before modifying
@@ -516,7 +516,7 @@ void Array::add_to_column(Column* column, int64_t value)
 
 void Array::set(size_t ndx, int64_t value)
 {
-    TIGHTDB_ASSERT(ndx < m_size);
+    TIGHTDB_ASSERT_3(ndx, <, m_size);
 
     // Check if we need to copy before modifying
     copy_on_write(); // Throws
@@ -630,7 +630,7 @@ void Array::insert(size_t ndx, int_fast64_t value)
 void Array::truncate(size_t size)
 {
     TIGHTDB_ASSERT(is_attached());
-    TIGHTDB_ASSERT(size <= m_size);
+    TIGHTDB_ASSERT_3(size, <=, m_size);
 
     // FIXME: BasicArray<> currently does not work if the width is set
     // to zero, so it must override Array::truncate(). In the future
@@ -663,7 +663,7 @@ void Array::truncate(size_t size)
 void Array::truncate_and_destroy_children(size_t size)
 {
     TIGHTDB_ASSERT(is_attached());
-    TIGHTDB_ASSERT(size <= m_size);
+    TIGHTDB_ASSERT_3(size, <=, m_size);
 
     // FIXME: See FIXME in truncate().
     TIGHTDB_ASSERT_DEBUG(!dynamic_cast<ArrayFloat*>(this));
@@ -701,7 +701,7 @@ void Array::ensure_minimum_width(int64_t value)
 
     // Make room for the new value
     size_t width = bit_width(value);
-    TIGHTDB_ASSERT(width > m_width);
+    TIGHTDB_ASSERT_3(width, >, m_width);
 
     Getter old_getter = m_getter; // Save old getter before width expansion
     alloc(m_size, width); // Throws
@@ -1407,14 +1407,14 @@ size_t Array::calc_aligned_byte_size(size_t size, int width)
     }
     if (overflow)
         throw runtime_error("Byte size overflow");
-    TIGHTDB_ASSERT(byte_size > 0);
+    TIGHTDB_ASSERT_3(byte_size, >, 0);
     size_t aligned_byte_size = ((byte_size-1) | 7) + 1; // 8-byte alignment
     return aligned_byte_size;
 }
 
 size_t Array::CalcByteLen(size_t count, size_t width) const
 {
-    TIGHTDB_ASSERT(get_wtype_from_header(get_header_from_data(m_data)) == wtype_Bits);
+    TIGHTDB_ASSERT_3(get_wtype_from_header(get_header_from_data(m_data)), ==, wtype_Bits);
 
     // FIXME: Consider calling `calc_aligned_byte_size(size)`
     // instead. Note however, that CalcByteLen() is supposed to return
@@ -1465,7 +1465,7 @@ MemRef Array::clone(const char* header, Allocator& alloc, Allocator& target_allo
     }
 
     // Refs are integers, and integers arrays use wtype_Bits.
-    TIGHTDB_ASSERT(get_wtype_from_header(header) == wtype_Bits);
+    TIGHTDB_ASSERT_3(get_wtype_from_header(header), ==, wtype_Bits);
 
     Array array((Array::no_prealloc_tag()));
     array.CreateFromHeaderDirect(const_cast<char*>(header));
@@ -1668,7 +1668,7 @@ void Array::alloc(size_t size, size_t width)
 {
     TIGHTDB_ASSERT(is_attached());
     TIGHTDB_ASSERT(!m_alloc.is_read_only(m_ref));
-    TIGHTDB_ASSERT(m_capacity > 0);
+    TIGHTDB_ASSERT_3(m_capacity, >, 0);
     if (m_capacity < size || width != m_width) {
         size_t needed_bytes   = CalcByteLen(size, width);
         size_t orig_capacity_bytes = get_capacity_from_header();
@@ -1786,7 +1786,7 @@ template<size_t width> void Array::set_width() TIGHTDB_NOEXCEPT
 // exceed array length; in this case, remainder of res[8] will be left untouched.
 template<size_t w> void Array::get_chunk(size_t ndx, int64_t res[8]) const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(ndx < m_size);
+    TIGHTDB_ASSERT_3(ndx, <, m_size);
 
     // To make Valgrind happy. Todo, I *think* it should work without, now, but if it reappears, add memset again.
     // memset(res, 0, 8*8);
@@ -2084,7 +2084,7 @@ ref_type Array::insert_bptree_child(Array& offsets, size_t orig_child_ndx,
     }
     size_t new_split_offset, new_split_size;
     if (insert_ndx - 1 >= TIGHTDB_MAX_BPNODE_SIZE) {
-        TIGHTDB_ASSERT(insert_ndx - 1 == TIGHTDB_MAX_BPNODE_SIZE);
+        TIGHTDB_ASSERT_3(insert_ndx - 1, ==, TIGHTDB_MAX_BPNODE_SIZE);
         // Case 1/2: The split child was the last child of the parent
         // to be split. In this case the parent may or may not be on
         // the compact form.
@@ -2100,9 +2100,9 @@ ref_type Array::insert_bptree_child(Array& offsets, size_t orig_child_ndx,
         TIGHTDB_ASSERT(new_offsets.is_attached());
         new_split_offset = elem_ndx_offset + state.m_split_size;
         new_split_size = to_size_t(back()/2) + 1;
-        TIGHTDB_ASSERT(size() >= 2);
+        TIGHTDB_ASSERT_3(size(), >=, 2);
         size_t num_children = size() - 2;
-        TIGHTDB_ASSERT(num_children >= 1); // invar:bptree-nonempty-inner
+        TIGHTDB_ASSERT_3(num_children, >=, 1); // invar:bptree-nonempty-inner
         // Move some refs over
         size_t child_refs_end = 1 + num_children;
         for (size_t i = insert_ndx; i != child_refs_end; ++i)
@@ -2190,7 +2190,7 @@ void Array::Verify() const
 
     // Check that parent is set correctly
     ref_type ref_in_parent = m_parent->get_child_ref(m_ndx_in_parent);
-    TIGHTDB_ASSERT(ref_in_parent == m_ref);
+    TIGHTDB_ASSERT_3(ref_in_parent, ==, m_ref);
 }
 
 
@@ -2204,13 +2204,13 @@ VerifyBptreeResult verify_bptree(const Array& node, Array::LeafVerifier leaf_ver
     node.Verify();
 
     // This node must not be a leaf
-    TIGHTDB_ASSERT(node.get_type() == Array::type_InnerBptreeNode);
+    TIGHTDB_ASSERT_3(node.get_type(), ==, Array::type_InnerBptreeNode);
 
-    TIGHTDB_ASSERT(node.size() >= 2);
+    TIGHTDB_ASSERT_3(node.size(), >=, 2);
     size_t num_children = node.size() - 2;
 
     // Verify invar:bptree-nonempty-inner
-    TIGHTDB_ASSERT(num_children >= 1);
+    TIGHTDB_ASSERT_3(num_children, >=, 1);
 
     Allocator& alloc = node.get_alloc();
     Array offsets(alloc);
@@ -2222,8 +2222,8 @@ VerifyBptreeResult verify_bptree(const Array& node, Array::LeafVerifier leaf_ver
         if (general_form) {
             offsets.init_from_ref(to_ref(first_value));
             offsets.Verify();
-            TIGHTDB_ASSERT(offsets.get_type() == Array::type_Normal);
-            TIGHTDB_ASSERT(offsets.size() == num_children - 1);
+            TIGHTDB_ASSERT_3(offsets.get_type(), ==, Array::type_Normal);
+            TIGHTDB_ASSERT_3(offsets.size(), ==, num_children - 1);
         }
         else {
             TIGHTDB_ASSERT(!int_cast_with_overflow_detect(first_value/2, elems_per_child));
@@ -2241,7 +2241,7 @@ VerifyBptreeResult verify_bptree(const Array& node, Array::LeafVerifier leaf_ver
         if (child_is_leaf) {
             elems_in_child = (*leaf_verifier)(MemRef(child_header, child_ref), alloc);
             // Verify invar:bptree-nonempty-leaf
-            TIGHTDB_ASSERT(elems_in_child >= 1);
+            TIGHTDB_ASSERT_3(elems_in_child, >= , 1);
             leaf_level_of_child = 0;
         }
         else {
@@ -2257,7 +2257,7 @@ VerifyBptreeResult verify_bptree(const Array& node, Array::LeafVerifier leaf_ver
         if (i == 0)
             leaf_level_of_children = leaf_level_of_child;
         // Verify invar:bptree-leaf-depth
-        TIGHTDB_ASSERT(leaf_level_of_child == leaf_level_of_children);
+        TIGHTDB_ASSERT_3(leaf_level_of_child, ==, leaf_level_of_children);
         // Check integrity of aggregated per-child element counts
         TIGHTDB_ASSERT(!int_add_with_overflow_detect(num_elems, elems_in_child));
         if (general_form) {
@@ -2273,13 +2273,13 @@ VerifyBptreeResult verify_bptree(const Array& node, Array::LeafVerifier leaf_ver
             }
         }
     }
-    TIGHTDB_ASSERT(leaf_level_of_children != -1);
+    TIGHTDB_ASSERT_3(leaf_level_of_children, !=, -1);
     {
         int_fast64_t last_value = node.back();
-        TIGHTDB_ASSERT(last_value % 2 != 0);
+        TIGHTDB_ASSERT_3(last_value % 2, !=, 0);
         size_t total_elems = 0;
         TIGHTDB_ASSERT(!int_cast_with_overflow_detect(last_value/2, total_elems));
-        TIGHTDB_ASSERT(num_elems == total_elems);
+        TIGHTDB_ASSERT_3(num_elems, ==, total_elems);
     }
     return tightdb::util::tuple(num_elems, 1 + leaf_level_of_children, general_form);
 }
@@ -2755,7 +2755,7 @@ size_t Array::upper_bound_int(int64_t value) const TIGHTDB_NOEXCEPT
 
 void Array::find_all(Column* result, int64_t value, size_t col_offset, size_t begin, size_t end) const
 {
-    TIGHTDB_ASSERT(begin <= size());
+    TIGHTDB_ASSERT_3(begin, <=, size());
     TIGHTDB_ASSERT(end == npos || (begin <= end && end <= size()));
 
     if (end == npos)
@@ -3054,7 +3054,7 @@ top:
                 }
             }
 
-            TIGHTDB_ASSERT(method != index_FindAll_nocopy);
+            TIGHTDB_ASSERT_3(method, !=, index_FindAll_nocopy);
             return size_t(FindRes_column);
         }
 
@@ -3219,7 +3219,7 @@ bool foreach_bptree_leaf(Array& node, size_t node_offset, size_t node_size,
     size_t child_ndx = 0, child_offset = node_offset;
     size_t elems_per_child = 0;
     {
-        TIGHTDB_ASSERT(node.size() >= 1);
+        TIGHTDB_ASSERT_3(node.size(), >=, 1);
         int_fast64_t first_value = node.get(0);
         bool is_compact = first_value % 2 != 0;
         if (is_compact) {
@@ -3243,9 +3243,9 @@ bool foreach_bptree_leaf(Array& node, size_t node_offset, size_t node_size,
             }
         }
     }
-    TIGHTDB_ASSERT(node.size() >= 2);
+    TIGHTDB_ASSERT_3(node.size(), >=, 2);
     size_t num_children = node.size() - 2;
-    TIGHTDB_ASSERT(num_children >= 1); // invar:bptree-nonempty-inner
+    TIGHTDB_ASSERT_3(num_children, >=, 1); // invar:bptree-nonempty-inner
     Array::NodeInfo child_info;
     child_info.m_parent = &node;
     child_info.m_ndx_in_parent = 1 + child_ndx;
@@ -3305,9 +3305,9 @@ template<class Handler> void simplified_foreach_bptree_leaf(Array& node, Handler
 
     Allocator& alloc = node.get_alloc();
     size_t child_ndx = 0;
-    TIGHTDB_ASSERT(node.size() >= 2);
+    TIGHTDB_ASSERT_3(node.size(), >=, 2);
     size_t num_children = node.size() - 2;
-    TIGHTDB_ASSERT(num_children >= 1); // invar:bptree-nonempty-inner
+    TIGHTDB_ASSERT_3(num_children, >=, 1); // invar:bptree-nonempty-inner
     Array::NodeInfo child_info;
     child_info.m_parent = &node;
     child_info.m_ndx_in_parent = 1 + child_ndx;
@@ -3394,9 +3394,9 @@ void elim_superfluous_bptree_root(Array* root, MemRef parent_mem,
     }
     else {
         size_t child_size = Array::get_size_from_header(child_header);
-        TIGHTDB_ASSERT(child_size >= 2);
+        TIGHTDB_ASSERT_3(child_size, >=, 2);
         size_t num_grandchildren = child_size - 2;
-        TIGHTDB_ASSERT(num_grandchildren >= 1); // invar:bptree-nonempty-inner
+        TIGHTDB_ASSERT_3(num_grandchildren, >=, 1); // invar:bptree-nonempty-inner
         if (num_grandchildren > 1) {
             // This child is an inner node, and is the closest one to
             // the root that has more than one child, so make it the
@@ -3544,7 +3544,7 @@ void Array::update_bptree_elem(size_t elem_ndx, UpdateHandler& handler)
 void Array::erase_bptree_elem(Array* root, size_t elem_ndx, EraseHandler& handler)
 {
     TIGHTDB_ASSERT(root->is_inner_bptree_node());
-    TIGHTDB_ASSERT(root->size() >= 1 + 1 + 1); // invar:bptree-nonempty-inner
+    TIGHTDB_ASSERT_3(root->size(), >=, 1 + 1 + 1); // invar:bptree-nonempty-inner
     TIGHTDB_ASSERT_DEBUG(elem_ndx == npos || elem_ndx+1 != root->get_bptree_size());
 
     // Note that this function is implemented in a way that makes it
@@ -3566,7 +3566,7 @@ void Array::erase_bptree_elem(Array* root, size_t elem_ndx, EraseHandler& handle
     // Table::m_columns.
     if (destroy_root) {
         MemRef root_mem = root->get_mem();
-        TIGHTDB_ASSERT(root->size() >= 2);
+        TIGHTDB_ASSERT_3(root->size(), >=, 2);
         int_fast64_t first_value = root->get(0);
         ref_type child_ref = root->get_as_ref(1);
         Allocator& alloc = root->get_alloc();
@@ -3596,7 +3596,7 @@ void Array::erase_bptree_elem(Array* root, size_t elem_ndx, EraseHandler& handle
     // the root elimination process itself.
     try {
         MemRef root_mem = root->get_mem();
-        TIGHTDB_ASSERT(root->size() >= 2);
+        TIGHTDB_ASSERT_3(root->size(), >=, 2);
         int_fast64_t first_value = root->get(0);
         ref_type child_ref = root->get_as_ref(1);
         elim_superfluous_bptree_root(root, root_mem, first_value,
@@ -3658,7 +3658,7 @@ bool Array::do_erase_bptree_elem(size_t elem_ndx, EraseHandler& handler)
     if (destroy_child) {
         if (num_children == 1)
             return true; // Destroy this node too
-        TIGHTDB_ASSERT(num_children >= 2);
+        TIGHTDB_ASSERT_3(num_children, >=, 2);
         child_ref = get_as_ref(child_ref_ndx);
         child_header = m_alloc.translate(child_ref);
         child_mem = MemRef(child_header, child_ref);

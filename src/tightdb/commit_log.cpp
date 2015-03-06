@@ -81,9 +81,8 @@ public:
     void do_rollback_write_transact(SharedGroup& sg) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     void do_interrupt() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {};
     void do_clear_interrupt() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {};
-    void do_transact_log_reserve(size_t size) TIGHTDB_OVERRIDE;
-    void do_transact_log_append(const char* data, size_t size) TIGHTDB_OVERRIDE;
-    void transact_log_reserve(size_t size);
+    void transact_log_reserve(size_t size, char** new_begin, char** new_end) TIGHTDB_OVERRIDE;
+    void transact_log_append(const char* data, size_t size, char** new_begin, char** new_end) TIGHTDB_OVERRIDE;
     virtual bool is_in_server_synchronization_mode() { return m_is_persisting; }
     virtual void submit_transact_log(BinaryData);
     virtual void stop_logging() TIGHTDB_OVERRIDE;
@@ -498,7 +497,7 @@ void WriteLogCollector::reset_log_management(version_type last_version)
 
         // Verify that end of the commit range is equal to or after 'last_version'
         // TODO: This most likely should throw an exception ?
-        TIGHTDB_ASSERT(last_version <= preamble->end_commit_range);
+        TIGHTDB_ASSERT_3(last_version, <=, preamble->end_commit_range);
 
         if (last_version <= preamble->end_commit_range) {
             if (last_version < preamble->begin_newest_commit_range) {
@@ -510,7 +509,7 @@ void WriteLogCollector::reset_log_management(version_type last_version)
             }
             // writepoint is somewhere in the active file.
             // We scan from the start to find it.
-            TIGHTDB_ASSERT(last_version >= preamble->begin_newest_commit_range);
+            TIGHTDB_ASSERT_3(last_version, >=, preamble->begin_newest_commit_range);
             CommitLogMetadata* active_log = get_active_log(preamble);
             remap_if_needed(*active_log);
             version_type current_version;
@@ -584,8 +583,8 @@ void WriteLogCollector::get_commit_entries(version_type from_version, version_ty
     map_header_if_needed();
     RobustLockGuard rlg(m_header.get_addr()->lock, &recover_from_dead_owner);
     const CommitLogPreamble* preamble = get_preamble();
-    TIGHTDB_ASSERT(from_version >= preamble->begin_oldest_commit_range);
-    TIGHTDB_ASSERT(to_version <= preamble->end_commit_range);
+    TIGHTDB_ASSERT_3(from_version, >=, preamble->begin_oldest_commit_range);
+    TIGHTDB_ASSERT_3(to_version, <=, preamble->end_commit_range);
 
     // - make sure the files are open and mapped, possibly update stale mappings
     remap_if_needed(m_log_a);
@@ -664,9 +663,9 @@ WriteLogCollector::do_commit_write_transact(SharedGroup&,
                                             WriteLogCollector::version_type orig_version)
 {
     char* data = m_transact_log_buffer.data();
-    uint_fast64_t size = m_transact_log_free_begin - data;
+    uint_fast64_t size = write_position() - data;
     version_type from_version = internal_submit_log(data,size);
-    TIGHTDB_ASSERT(from_version == orig_version);
+    TIGHTDB_ASSERT_3(from_version, == , orig_version);
     static_cast<void>(from_version);
     version_type new_version = orig_version + 1;
     return new_version;
@@ -675,39 +674,34 @@ WriteLogCollector::do_commit_write_transact(SharedGroup&,
 
 void WriteLogCollector::do_begin_write_transact(SharedGroup&)
 {
-    m_transact_log_free_begin = m_transact_log_buffer.data();
-    m_transact_log_free_end   = m_transact_log_free_begin + m_transact_log_buffer.size();
+    char* buffer = m_transact_log_buffer.data();
+    set_buffer(buffer, buffer + m_transact_log_buffer.size());
 }
 
 
 void WriteLogCollector::do_rollback_write_transact(SharedGroup& sg) TIGHTDB_NOEXCEPT
 {
     // forward transaction log buffer
-    sg.do_rollback_and_continue_as_read(m_transact_log_buffer.data(), m_transact_log_free_begin);
+    sg.do_rollback_and_continue_as_read(m_transact_log_buffer.data(), write_position());
 }
 
 
-void WriteLogCollector::do_transact_log_reserve(size_t size)
+
+void WriteLogCollector::transact_log_append(const char* data, size_t size, char** new_begin, char** new_end)
 {
-    transact_log_reserve(size);
+    transact_log_reserve(size, new_begin, new_end);
+    *new_begin = copy(data, data + size, *new_begin);
 }
 
 
-void WriteLogCollector::do_transact_log_append(const char* data, size_t size)
-{
-    transact_log_reserve(size);
-    m_transact_log_free_begin = copy(data, data+size, m_transact_log_free_begin);
-}
-
-
-void WriteLogCollector::transact_log_reserve(size_t size)
+void WriteLogCollector::transact_log_reserve(size_t size, char** new_begin, char** new_end)
 {
     char* data = m_transact_log_buffer.data();
-    size_t size2 = m_transact_log_free_begin - data;
+    size_t size2 = write_position() - data;
     m_transact_log_buffer.reserve_extra(size2, size);
     data = m_transact_log_buffer.data();
-    m_transact_log_free_begin = data + size2;
-    m_transact_log_free_end = data + m_transact_log_buffer.size();
+    *new_begin = data + size2;
+    *new_end = data + m_transact_log_buffer.size();
 }
 
 

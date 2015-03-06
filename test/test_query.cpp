@@ -5353,6 +5353,23 @@ TEST(Query_AllTypesDynamicallyTyped)
     CHECK_EQUAL(0.8, query.average_double(3));
 }
 
+TEST(Query_AggregateSortedView)
+{
+    Table table;
+    table.add_column(type_Double, "col");
+
+    const int count = TIGHTDB_MAX_BPNODE_SIZE * 2;
+    table.add_empty_row(count);
+    for (int i = 0; i < count; ++i)
+        table.set_double(0, i, i + 1); // no 0s to reduce chance of passing by coincidence
+
+    TableView tv = table.where().greater(0, 1.0).find_all();
+    tv.sort(0, false);
+
+    CHECK_EQUAL(2.0, tv.minimum_double(0));
+    CHECK_EQUAL(count, tv.maximum_double(0));
+    CHECK_APPROXIMATELY_EQUAL((count + 1) * count / 2, tv.sum_double(0), .1);
+}
 
 namespace {
     TIGHTDB_TABLE_1(TestQuerySub,

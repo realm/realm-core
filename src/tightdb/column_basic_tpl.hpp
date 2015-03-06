@@ -122,7 +122,7 @@ template<class T> inline void BasicColumn<T>::add(T value)
 template<class T> inline void BasicColumn<T>::insert(std::size_t row_ndx, T value)
 {
     std::size_t size = this->size(); // Slow
-    TIGHTDB_ASSERT(row_ndx <= size);
+    TIGHTDB_ASSERT_3(row_ndx, <=, size);
     std::size_t row_ndx_2 = row_ndx == size ? tightdb::npos : row_ndx;
     std::size_t num_rows = 1;
     do_insert(row_ndx_2, value, num_rows); // Throws
@@ -174,7 +174,7 @@ public:
         BasicArray<T> leaf(get_alloc());
         leaf.init_from_mem(leaf_mem);
         leaf.set_parent(parent, leaf_ndx_in_parent);
-        TIGHTDB_ASSERT(leaf.size() >= 1);
+        TIGHTDB_ASSERT_3(leaf.size(), >=, 1);
         std::size_t last_ndx = leaf.size() - 1;
         if (last_ndx == 0)
             return true;
@@ -206,8 +206,8 @@ public:
 template<class T>
 void BasicColumn<T>::do_erase(std::size_t ndx, bool is_last)
 {
-    TIGHTDB_ASSERT(ndx < size());
-    TIGHTDB_ASSERT(is_last == (ndx == size()-1));
+    TIGHTDB_ASSERT_3(ndx, <, size());
+    TIGHTDB_ASSERT_3(is_last, ==, (ndx == size() - 1));
 
     if (!m_array->is_inner_bptree_node()) {
         static_cast<BasicArray<T>*>(m_array)->erase(ndx); // Throws
@@ -223,8 +223,8 @@ void BasicColumn<T>::do_erase(std::size_t ndx, bool is_last)
 template<class T>
 void BasicColumn<T>::do_move_last_over(std::size_t row_ndx, std::size_t last_row_ndx)
 {
-    TIGHTDB_ASSERT(row_ndx <= last_row_ndx);
-    TIGHTDB_ASSERT(last_row_ndx + 1 == size());
+    TIGHTDB_ASSERT_3(row_ndx, <=, last_row_ndx);
+    TIGHTDB_ASSERT_3(last_row_ndx + 1, ==, size());
 
     T value = get(last_row_ndx);
     set(row_ndx, value); // Throws
@@ -470,7 +470,7 @@ inline void BasicColumn<T>::do_dump_node_structure(std::ostream& out, int level)
 template<class T>
 std::size_t BasicColumn<T>::find_first(T value, std::size_t begin, std::size_t end) const
 {
-    TIGHTDB_ASSERT(begin <= size());
+    TIGHTDB_ASSERT_3(begin, <=, size());
     TIGHTDB_ASSERT(end == npos || (begin <= end && end <= size()));
 
     if (root_is_leaf())
@@ -503,7 +503,7 @@ std::size_t BasicColumn<T>::find_first(T value, std::size_t begin, std::size_t e
 template<class T>
 void BasicColumn<T>::find_all(Column &result, T value, std::size_t begin, std::size_t end) const
 {
-    TIGHTDB_ASSERT(begin <= size());
+    TIGHTDB_ASSERT_3(begin, <=, size());
     TIGHTDB_ASSERT(end == npos || (begin <= end && end <= size()));
 
     if (root_is_leaf()) {
