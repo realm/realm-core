@@ -201,7 +201,7 @@ word_list_reverse()
 # Setup OS specific stuff
 OS="$(uname)" || exit 1
 ARCH="$(uname -m)" || exit 1
-MAKE="make"
+: ${MAKE:="make"}
 LD_LIBRARY_PATH_NAME="LD_LIBRARY_PATH"
 if [ "$OS" = "Darwin" ]; then
     LD_LIBRARY_PATH_NAME="DYLD_LIBRARY_PATH"
