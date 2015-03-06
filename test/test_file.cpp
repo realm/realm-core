@@ -243,6 +243,11 @@ TEST(File_Resize)
         File::Map<unsigned char> m(f, File::access_ReadWrite, 8192);
         for (int i = 0; i < 8192; ++i)
             m.get_addr()[i] = static_cast<unsigned char>(i);
+
+        // Resizing away the first write is indistinguishable in encrypted files
+        // from the process being interrupted before it does the first write,
+        // but with subsequent writes it can tell that there was once valid
+        // encrypted data there, so flush and write a second time
         m.sync();
         for (int i = 0; i < 8192; ++i)
             m.get_addr()[i] = static_cast<unsigned char>(i);
