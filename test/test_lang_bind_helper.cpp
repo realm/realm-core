@@ -6917,6 +6917,7 @@ TEST(LangBindHelper_HandoverQuery)
         }
         {
             LangBindHelper::advance_read(sg,vid);
+            sg_w.close();
             // importing tv - note that tv must still be in scope
             sg.import_from_handover(handover.release());
             TestTableInts::View tv = q->find_all();
@@ -6965,6 +6966,8 @@ TEST(LangBindHelper_HandoverAccessors)
         }
         {
             LangBindHelper::advance_read(sg,vid);
+            //sg_w.end_read();
+            sg_w.close();
             // importing tv - note that tv must still be in scope
             sg.import_from_handover(handover.release());
             CHECK(tv.is_attached());
@@ -6981,6 +6984,8 @@ TEST(LangBindHelper_HandoverAccessors)
         TableView tv;
         Row row;
         {
+            sg_w.open(*repl_w, SharedGroup::durability_Full, crypt_key());
+            sg_w.begin_read();
             LangBindHelper::promote_to_write(sg_w);
             TableRef table = group_w.add_table("table2");
             table->add_column(type_Int, "first");
@@ -7005,6 +7010,7 @@ TEST(LangBindHelper_HandoverAccessors)
         }
         {
             LangBindHelper::advance_read(sg,vid);
+            sg_w.close();
             // importing tv:
             sg.import_from_handover(handover2.release());
             CHECK(tv.is_in_sync());
@@ -7016,6 +7022,196 @@ TEST(LangBindHelper_HandoverAccessors)
             sg.import_from_handover(handover_row.release());
             CHECK(row.is_attached());
             CHECK_EQUAL(7, row.get_int(0));
+        }
+    }
+
+}
+
+TEST(LangBindHelper_HandoverDependentViews)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
+    SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
+    const Group& group = sg.begin_read();
+
+    UniquePtr<Replication> repl_w(makeWriteLogCollector(path, false, crypt_key()));
+    SharedGroup sg_w(*repl_w, SharedGroup::durability_Full, crypt_key());
+    Group& group_w = const_cast<Group&>(sg_w.begin_read());
+
+    SharedGroup::VersionID vid;
+    {
+        // Untyped interface
+        UniquePtr<SharedGroup::Handover<TableView> > handover1;
+        UniquePtr<SharedGroup::Handover<TableView> > handover2;
+        TableView tv1;
+        TableView tv2;
+        {
+            LangBindHelper::promote_to_write(sg_w);
+            TableRef table = group_w.add_table("table2");
+            table->add_column(type_Int, "first");
+            for (int i = 0; i <100; ++i) {
+                table->add_empty_row();
+                table->set_int(0, i, i);
+            }
+            LangBindHelper::commit_and_continue_as_read(sg_w);
+            vid = sg_w.get_version_of_current_transaction();
+            tv1 = table->where().find_all();
+            tv2 = table->where(&tv1).find_all();
+            CHECK(tv1.is_attached());
+            CHECK(tv2.is_attached());
+            CHECK_EQUAL(100, tv1.size());
+            for (int i = 0; i<100; ++i)
+                CHECK_EQUAL(i, tv1.get_int(0,i));
+            CHECK_EQUAL(100, tv2.size());
+            for (int i = 0; i<100; ++i)
+                CHECK_EQUAL(i, tv2.get_int(0,i));
+            handover2.reset(sg_w.export_for_handover(tv2));
+            CHECK(!tv1.is_attached());
+            CHECK(!tv2.is_attached());
+        }
+        {
+            LangBindHelper::advance_read(sg,vid);
+            sg_w.close();
+            // importing tv:
+            sg.import_from_handover(handover2.release());
+            CHECK(tv1.is_in_sync());
+            CHECK(tv2.is_in_sync());
+            CHECK(tv1.is_attached());
+            CHECK(tv2.is_attached());
+            CHECK_EQUAL(100, tv2.size());
+            for (int i = 0; i<100; ++i)
+                CHECK_EQUAL(i, tv2.get_int(0,i));
+        }
+    }
+}
+
+
+TEST(LangBindHelper_HandoverTableViewWithLinkView)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
+    SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
+    const Group& group = sg.begin_read();
+
+    UniquePtr<Replication> repl_w(makeWriteLogCollector(path, false, crypt_key()));
+    SharedGroup sg_w(*repl_w, SharedGroup::durability_Full, crypt_key());
+    Group& group_w = const_cast<Group&>(sg_w.begin_read());
+    TableView tv;
+    UniquePtr<SharedGroup::Handover<TableView> > handover;
+    SharedGroup::VersionID vid;
+    {
+
+        LangBindHelper::promote_to_write(sg_w);
+
+        TableRef table1 = group_w.add_table("table1");
+        TableRef table2 = group_w.add_table("table2");
+
+        // add some more columns to table1 and table2
+        table1->add_column(type_Int, "col1");
+        table1->add_column(type_String, "str1");
+
+        // add some rows
+        table1->add_empty_row();
+        table1->set_int(0, 0, 300);
+        table1->set_string(1, 0, "delta");
+
+        table1->add_empty_row();
+        table1->set_int(0, 1, 100);
+        table1->set_string(1, 1, "alfa");
+
+        table1->add_empty_row();
+        table1->set_int(0, 2, 200);
+        table1->set_string(1, 2, "beta");
+
+        size_t col_link2 = table2->add_column_link(type_LinkList, "linklist", *table1);
+
+        table2->add_empty_row();
+        table2->add_empty_row();
+
+        LinkViewRef lvr;
+
+        lvr = table2->get_linklist(col_link2, 0);
+        lvr->clear();
+        lvr->add(0);
+        lvr->add(1);
+        lvr->add(2);
+
+        // Return all rows of table1 (the linked-to-table) that match the criteria and is in the LinkList
+
+        // q.m_table = table1
+        // q.m_view = lvr
+        Query q = table1->where(lvr).and_query(table1->column<Int>(0) > 100);
+
+        // tv.m_table == table1
+        tv = q.find_all(); // tv = { 0, 2 }
+
+        // TableView tv2 = lvr->get_sorted_view(0);
+        LangBindHelper::commit_and_continue_as_read(sg_w);
+        vid = sg_w.get_version_of_current_transaction();
+        handover.reset(sg_w.export_for_handover(tv));
+    }
+    {
+        LangBindHelper::advance_read(sg, vid);
+        sg_w.close();
+        sg.import_from_handover(handover.release()); // <-- import tv
+
+        CHECK_EQUAL(2, tv.size());
+        CHECK_EQUAL(0, tv.get_source_ndx(0));
+        CHECK_EQUAL(2, tv.get_source_ndx(1));
+    }
+}
+
+
+TEST(LangBindHelper_HandoverFailOfReverseDependency)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
+    SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
+    const Group& group = sg.begin_read();
+
+    UniquePtr<Replication> repl_w(makeWriteLogCollector(path, false, crypt_key()));
+    SharedGroup sg_w(*repl_w, SharedGroup::durability_Full, crypt_key());
+    Group& group_w = const_cast<Group&>(sg_w.begin_read());
+
+    SharedGroup::VersionID vid;
+    {
+        // Untyped interface
+        UniquePtr<SharedGroup::Handover<TableView> > handover1;
+        UniquePtr<SharedGroup::Handover<TableView> > handover2;
+        TableView tv1;
+        TableView tv2;
+        {
+            LangBindHelper::promote_to_write(sg_w);
+            TableRef table = group_w.add_table("table2");
+            table->add_column(type_Int, "first");
+            for (int i = 0; i <100; ++i) {
+                table->add_empty_row();
+                table->set_int(0, i, i);
+            }
+            LangBindHelper::commit_and_continue_as_read(sg_w);
+            vid = sg_w.get_version_of_current_transaction();
+            tv1 = table->where().find_all();
+            tv2 = table->where(&tv1).find_all();
+            CHECK(tv1.is_attached());
+            CHECK(tv2.is_attached());
+            CHECK_EQUAL(100, tv1.size());
+            for (int i = 0; i<100; ++i)
+                CHECK_EQUAL(i, tv1.get_int(0,i));
+            CHECK_EQUAL(100, tv2.size());
+            for (int i = 0; i<100; ++i)
+                CHECK_EQUAL(i, tv2.get_int(0,i));
+            // must fail!
+            bool handover_failed = false;
+            try {
+                handover2.reset(sg_w.export_for_handover(tv1));
+            } 
+            catch (...) {
+                handover_failed = true;
+            }
+            CHECK(handover_failed);
+            // views are not affected if handover fails:
+            CHECK(tv1.is_attached());
+            CHECK(tv2.is_attached());
         }
     }
 
@@ -7146,7 +7342,7 @@ TEST(LangBindHelper_VersionControl)
     }
 }
 
-TEST(Shared_LinkListCrash)
+TEST(LangBindHelper_LinkListCrash)
 {
     SHARED_GROUP_TEST_PATH(path);
     UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
@@ -7174,6 +7370,24 @@ TEST(Shared_LinkListCrash)
     g2.Verify();
     LangBindHelper::advance_read(sg2);
     g2.Verify();
+}
+
+TEST(LangBindHelper_OpenCloseOpen)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    UniquePtr<Replication> repl_w(makeWriteLogCollector(path, false, crypt_key()));
+    SharedGroup sg_w(*repl_w, SharedGroup::durability_Full, crypt_key());
+    Group& group_w = const_cast<Group&>(sg_w.begin_read());
+    LangBindHelper::promote_to_write(sg_w);
+    group_w.add_table("bar");
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+    sg_w.close();
+    sg_w.open(*repl_w, SharedGroup::durability_Full, crypt_key());
+    sg_w.begin_read();
+    LangBindHelper::promote_to_write(sg_w);
+    group_w.add_table("foo");
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+    sg_w.close();
 }
 
 

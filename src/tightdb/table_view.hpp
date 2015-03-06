@@ -354,21 +354,17 @@ protected:
     void prepare_for_export(Handover_data& handover_data)
     {
         handover_data.table_num = m_table->get_index_in_group();
-        m_query.prepare_for_export(handover_data.query_handover_data);
-        // must be group level table!
         if (handover_data.table_num == npos) {
             throw std::runtime_error("Handover failed: not a group level table");
         }
-        if (!m_query.supports_export_for_handover()) {
-            throw std::runtime_error("Handover failed: query too complex");
-        }
+        m_query.prepare_for_export(handover_data.query_handover_data);
+        // must be group level table!
         if (m_linkview_source) {
             handover_data.linkview_handover_data = new LinkView::Handover_data;
             m_linkview_source->prepare_for_export(*handover_data.linkview_handover_data);
         }
         else
             handover_data.linkview_handover_data = 0;
-        // FIXME: might need to propagate into base class and members
         detach();
     }
     void prepare_for_import(Handover_data& handover_data, Group& group)
@@ -377,9 +373,14 @@ protected:
         m_table = tr;
         m_last_seen_version = tr->m_version;
         tr->register_view(this);
-        // FIXME: propagate into base class and members
-        // FIXME: update query !!!
+        // update query !!!
         m_query.prepare_for_import(handover_data.query_handover_data, group);
+        if (handover_data.linkview_handover_data) {
+            m_linkview_source = LinkView::prepare_for_import(*handover_data.linkview_handover_data, group);
+            handover_data.linkview_handover_data = 0;
+        }
+        else
+            m_linkview_source.reset(0);
     }
 private:
     void detach() TIGHTDB_NOEXCEPT;
