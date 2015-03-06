@@ -927,10 +927,15 @@ void SharedGroup::close() TIGHTDB_NOEXCEPT
             rollback();
             break;
     }
-
+    m_group.detach();
+    m_transact_stage = transact_Ready;
     SharedInfo* info = m_file_map.get_addr();
     {
         RobustLockGuard lock(info->controlmutex, recover_from_dead_write_transact);
+
+        if (m_group.m_alloc.is_attached())
+            m_group.m_alloc.detach();
+
         --info->num_participants;
         bool end_of_session = info->num_participants == 0;
         // cerr << "closing" << endl;
@@ -940,7 +945,6 @@ void SharedGroup::close() TIGHTDB_NOEXCEPT
             // we can delete it when done.
             if (info->flags == durability_MemOnly) {
                 try {
-                    m_group.m_alloc.detach();
                     util::File::remove(m_db_path.c_str());
                 }
                 catch(...) {} // ignored on purpose.
@@ -953,6 +957,12 @@ void SharedGroup::close() TIGHTDB_NOEXCEPT
 #endif
         }
     }
+#ifndef _WIN32
+    m_room_to_write.close();
+    m_work_to_do.close();
+    m_daemon_becomes_ready.close();
+    m_new_commit_available.close();
+#endif
     m_file.unlock();
     // info->~SharedInfo(); // DO NOT Call destructor
     m_file.close();
