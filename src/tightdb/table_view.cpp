@@ -19,7 +19,7 @@ size_t TableViewBase::find_first_integer(size_t column_ndx, int64_t value) const
     check_cookie();
 
     for (size_t i = 0; i < m_row_indexes.size(); i++)
-        if (get_int(column_ndx, i) == value)
+        if (is_row_attached(i) && get_int(column_ndx, i) == value)
             return i;
     return size_t(-1);
 }
@@ -29,7 +29,7 @@ size_t TableViewBase::find_first_float(size_t column_ndx, float value) const
     check_cookie();
 
     for (size_t i = 0; i < m_row_indexes.size(); i++)
-        if (get_float(column_ndx, i) == value)
+        if (is_row_attached(i) && get_float(column_ndx, i) == value)
             return i;
     return size_t(-1);
 }
@@ -39,7 +39,7 @@ size_t TableViewBase::find_first_double(size_t column_ndx, double value) const
     check_cookie();
 
     for (size_t i = 0; i < m_row_indexes.size(); i++)
-        if (get_double(column_ndx, i) == value)
+        if (is_row_attached(i) && get_double(column_ndx, i) == value)
             return i;
     return size_t(-1);
 }
@@ -51,7 +51,7 @@ size_t TableViewBase::find_first_string(size_t column_ndx, StringData value) con
     TIGHTDB_ASSERT_COLUMN_AND_TYPE(column_ndx, type_String);
 
     for (size_t i = 0; i < m_row_indexes.size(); i++)
-        if (get_string(column_ndx, i) == value) return i;
+        if (is_row_attached(i) && get_string(column_ndx, i) == value) return i;
     return size_t(-1);
 }
 
@@ -62,7 +62,7 @@ size_t TableViewBase::find_first_binary(size_t column_ndx, BinaryData value) con
     TIGHTDB_ASSERT_COLUMN_AND_TYPE(column_ndx, type_Binary);
 
     for (size_t i = 0; i < m_row_indexes.size(); i++)
-        if (get_binary(column_ndx, i) == value) return i;
+        if (is_row_attached(i) && get_binary(column_ndx, i) == value) return i;
     return size_t(-1);
 }
 
@@ -80,12 +80,13 @@ R TableViewBase::aggregate(R(ColType::*aggregateMethod)(size_t, size_t, size_t, 
     TIGHTDB_ASSERT(function == act_Sum || function == act_Max || function == act_Min || function == act_Count);
     TIGHTDB_ASSERT(m_table);
     TIGHTDB_ASSERT(column_ndx < m_table->get_column_count());
-    if (m_row_indexes.size() == 0)
+    if ((m_row_indexes.size() - m_num_detached_refs) == 0)
         return 0;
 
     typedef typename ColumnTypeTraits<T>::array_type ArrType;
     const ColType* column = static_cast<ColType*>(&m_table->get_column_base(column_ndx));
 
+    // TODO: remember that this is not safe in reflective mode
     if (m_row_indexes.size() == column->size()) {
         // direct aggregate on the column
         if(function == act_Count)
@@ -115,6 +116,10 @@ R TableViewBase::aggregate(R(ColType::*aggregateMethod)(size_t, size_t, size_t, 
 
     for (size_t ss = 1; ss < m_row_indexes.size(); ++ss) {
         row_ndx = to_size_t(m_row_indexes.get(ss));
+
+        // skip detached references:
+        if (row_ndx == -1ULL) continue;
+
         if (row_ndx < leaf_start || row_ndx >= leaf_end) {
             column->GetBlock(row_ndx, arr, leaf_start);
             const size_t leaf_size = arr.size();
@@ -200,15 +205,15 @@ DateTime TableViewBase::minimum_datetime(size_t column_ndx, size_t* return_ndx) 
 
 double TableViewBase::average_int(size_t column_ndx) const
 {
-    return aggregate<act_Sum, int64_t>(&Column::sum, column_ndx, 0) / static_cast<double>(size());
+    return aggregate<act_Sum, int64_t>(&Column::sum, column_ndx, 0) / static_cast<double>(num_attached_rows());
 }
 double TableViewBase::average_float(size_t column_ndx) const
 {
-    return aggregate<act_Sum, float>(&ColumnFloat::sum, column_ndx, 0.0) / static_cast<double>(size());
+    return aggregate<act_Sum, float>(&ColumnFloat::sum, column_ndx, 0.0) / static_cast<double>(num_attached_rows());
 }
 double TableViewBase::average_double(size_t column_ndx) const
 {
-    return aggregate<act_Sum, double>(&ColumnDouble::sum, column_ndx, 0.0) / static_cast<double>(size());
+    return aggregate<act_Sum, double>(&ColumnDouble::sum, column_ndx, 0.0) / static_cast<double>(num_attached_rows());
 }
 
 // Count
@@ -240,10 +245,12 @@ void TableViewBase::to_json(ostream& out) const
 
     const size_t row_count = size();
     for (size_t r = 0; r < row_count; ++r) {
-        if (r > 0)
-            out << ",";
         const size_t real_row_index = get_source_ndx(r);
-        m_table->to_json_row(real_row_index, out);
+        if (real_row_index != -1ULL) {
+            if (r > 0)
+                out << ",";
+            m_table->to_json_row(real_row_index, out);
+        }
     }
 
     out << "]";
@@ -258,14 +265,21 @@ void TableViewBase::to_string(ostream& out, size_t limit) const
     m_table->to_string_header(out, widths);
 
     // Set limit=-1 to print all rows, otherwise only print to limit
-    const size_t row_count = size();
-    const size_t out_count = (limit == size_t(-1)) ? row_count
-                                                   : (row_count < limit) ? row_count : limit;
+    const size_t row_count = num_attached_rows();
+    const size_t out_count = (limit == size_t(-1)) 
+        ? row_count
+        : (row_count < limit) ? row_count : limit;
 
     // Print rows
-    for (size_t i = 0; i < out_count; ++i) {
+    size_t i = 0;
+    size_t count = out_count;
+    while (count) {
         const size_t real_row_index = get_source_ndx(i);
-        m_table->to_string_row(real_row_index, out, widths);
+        if (real_row_index != -1ULL) {
+            m_table->to_string_row(real_row_index, out, widths);
+            --count;
+        }
+        ++i;
     }
 
     if (out_count < row_count) {
@@ -285,7 +299,9 @@ void TableViewBase::row_to_string(size_t row_ndx, ostream& out) const
     m_table->to_string_header(out, widths);
 
     // Print row contents
-    m_table->to_string_row(get_source_ndx(row_ndx), out, widths);
+    size_t real_ndx = get_source_ndx(row_ndx);
+    TIGHTDB_ASSERT(real_ndx != -1ULL);
+    m_table->to_string_row(real_ndx, out, widths);
 }
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
@@ -406,12 +422,10 @@ void TableView::remove(size_t ndx)
 
     // Update refs
     m_row_indexes.erase(ndx, ndx == size() - 1);
-/*
-    // Decrement row indexes greater than or equal to ndx
-    //
-    // O(n) for n = this->size(). FIXME: Dangerous cast below: unsigned -> signed
-    m_row_indexes.adjust_ge(int_fast64_t(real_ndx), -1);
-*/
+
+    // Adjustment of row indexes greater than the removed index is done by 
+    // adj_row_acc_move_over or adj_row_acc_erase_row as sideeffect of the actual
+    // update of the table, so we don't need to do it here (it has already been done)
 }
 
 
@@ -424,8 +438,8 @@ void TableView::clear()
 #endif
 
     // If m_table is unordered we must use move_last_over(). Fixme/todo: To test if it's unordered we currently
-    // see if we have any link or backlink columns. This is bad becuase in the future we could have unordered tables
-    // with no links
+    // see if we have any link or backlink columns. This is bad becuase in the future we could have unordered 
+    // tables with no links - and then this test will break.
     bool is_ordered = true;
     for (size_t c = 0; c < m_table->m_spec.get_column_count(); c++) {
         ColumnType t = m_table->m_spec.get_column_type(c);
@@ -449,7 +463,8 @@ void TableView::clear()
         // (in reverse order to avoid index drift)
         for (size_t i = m_row_indexes.size(); i != 0; --i) {
             size_t ndx = size_t(m_row_indexes.get(i - 1));
-
+            if (ndx == -1ULL) // skip detached refs
+                continue;
             // If table is unordered, we must use move_last_over()
             if (is_ordered)
                 m_table->remove(ndx);
@@ -460,11 +475,14 @@ void TableView::clear()
     else {
         // sort tableview
         vector<size_t> v;
-        for (size_t t = 0; t < size(); t++)
-            v.push_back(to_size_t(m_row_indexes.get(t)));
+        for (size_t t = 0; t < size(); t++) {
+            size_t real_ndx = m_row_indexes.get(t);
+            if (real_ndx != -1ULL)
+                v.push_back(to_size_t(real_ndx));
+        }
         std::sort(v.begin(), v.end());
 
-        for (size_t i = m_row_indexes.size(); i != 0; --i) {
+        for (size_t i = v.size(); i != 0; --i) {
             size_t ndx = size_t(v[i - 1]);
 
             // If table is unordered, we must use move_last_over()
