@@ -751,19 +751,21 @@ namespace {
 
 StringIndex* Column::create_search_index()
 {
-   TIGHTDB_ASSERT(!m_search_index);
-   UniquePtr<StringIndex> index;
-   m_search_index = new StringIndex(this, &get_string, m_array->get_alloc()); // Throws
+    TIGHTDB_ASSERT(!m_search_index);
+    UniquePtr<StringIndex> index;
+    StringIndex* si = new StringIndex(this, &get_string, m_array->get_alloc()); // Throws
+    index.reset(si);
 
-   // Populate the index
+    // Populate the index
     size_t num_rows = size();
     for (size_t row_ndx = 0; row_ndx != num_rows; ++row_ndx) {
         int64_t value = get(row_ndx);
         size_t num_rows = 1;
         bool is_append = true;
-        m_search_index->insert(row_ndx, value, num_rows, is_append); // Throws
+        index.get()->insert(row_ndx, value, num_rows, is_append); // Throws
     }
 
+    m_search_index = index.release();
     return m_search_index;
 }
 
