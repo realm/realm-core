@@ -296,13 +296,13 @@ TEST(LinkList_TableViewTracking)
     // make entry NOT satisfy criteria, validate that sync removes entry from view
     table1->set_string(1, 1, "fnyt");
     CHECK_EQUAL(1, tv.size());
-    tv.sync_if_needed();
+    // tv.sync_if_needed();
     CHECK_EQUAL(0, tv.size());
 
     // make it SATISFY criteria again, validate that sync puts entry back in view
     table1->set_string(1, 1, "!");
     CHECK_EQUAL(0, tv.size());
-    tv.sync_if_needed();
+    // tv.sync_if_needed();
     CHECK_EQUAL(1, tv.size());
 }
 
@@ -1282,11 +1282,11 @@ TEST(LinkList_QueryOnLinkList)
     CHECK_EQUAL(2, tv.get_source_ndx(1));
 
     // Should of course work even if nothing has changed
-    tv.sync_if_needed();
+    // tv.sync_if_needed();
   
     // Modify the LinkList and see if sync_if_needed takes it in count
     lvr->remove(2); // bumps version of table2 and only table2
-    tv.sync_if_needed();
+    // tv.sync_if_needed();
     
     CHECK_EQUAL(1, tv.size()); // fail
     CHECK_EQUAL(0, tv.get_source_ndx(0));
@@ -1294,7 +1294,7 @@ TEST(LinkList_QueryOnLinkList)
     // Now test if changes in linked-to table bumps the version of the linked-from table and that 
     // the query of 'tv' is re-run
     table1->set_int(0, 2, 50); // exclude row 2 from tv because of the '> 100' condition in Query
-    tv.sync_if_needed();
+    // tv.sync_if_needed();
     CHECK_EQUAL(1, tv.size());
     CHECK_EQUAL(0, tv.get_source_ndx(0));
 

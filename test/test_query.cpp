@@ -3674,7 +3674,7 @@ TEST(Query_Sort_And_Requery_Untyped2)
     // q5 and q3 should behave the same.
     Query q5 = table.where(&tv2).not_equal(1, "X");
     TableView tv5 = q5.find_all();
-    tv5.sync_if_needed(); // you may think tv5 is in sync, BUT it was generated from tv2 which wasn't
+    // tv5.sync_if_needed(); // you may think tv5 is in sync, BUT it was generated from tv2 which wasn't
     // Note the side effect - as tv5 depends on ... on tv2 etc, all views are synchronized.
     CHECK_EQUAL(3, tv5.size());
     CHECK_EQUAL(1, tv5.get_int(0, 0));
@@ -5605,22 +5605,22 @@ TEST(Query_TableViewMoveAssignLeak2)
     q.and_query(q2);
     tv = q.find_all();
 
-    tv.sync_if_needed();
+    // tv.sync_if_needed();
 
     size_t t2 = q.find();
     static_cast<void>(t2);
     tv = q.find_all();
-    tv.sync_if_needed();
+    // tv.sync_if_needed();
     t2 = q.find();
-    tv.sync_if_needed();
+    // tv.sync_if_needed();
     tv = q.find_all();
-    tv.sync_if_needed();
+    // tv.sync_if_needed();
     t2 = q.find();
-    tv.sync_if_needed();
+    // tv.sync_if_needed();
     tv = q.find_all();
-    tv.sync_if_needed();
+    // tv.sync_if_needed();
     tv = q.find_all();
-    tv.sync_if_needed();
+    // tv.sync_if_needed();
 
     Query q3;
 

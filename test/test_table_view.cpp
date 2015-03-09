@@ -128,8 +128,11 @@ TEST(TableView_GetSetInteger)
     CHECK_EQUAL(2, v[1].first);
 
     // Test of Set
-    v[0].first = 123;
-    CHECK_EQUAL(123, v[0].first);
+    v[0].first = 123; // cause v[0] to magically disappear
+    CHECK_EQUAL(1, v.size());
+    table[1].first = 2;
+    CHECK_EQUAL(2, v.size());
+    CHECK_EQUAL(2, v[0].first);
 }
 
 
@@ -459,19 +462,19 @@ TEST(TableView_Follows_Changes)
     table.add_empty_row();
     CHECK_EQUAL(1, v.size());
     table.set_int(0,1,1);
-    v.sync_if_needed();
+    //v.sync_if_needed();
     CHECK_EQUAL(2, v.size());
     CHECK_EQUAL(1, v.get_int(0,0));
     CHECK_EQUAL(1, v.get_int(0,1));
     table.set_int(0,0,7);
-    v.sync_if_needed();
+    //v.sync_if_needed();
     CHECK_EQUAL(1, v.size());
     CHECK_EQUAL(1, v.get_int(0,0));
     table.set_int(0,1,7);
-    v.sync_if_needed();
+    //v.sync_if_needed();
     CHECK_EQUAL(0, v.size());
     table.set_int(0,1,1);
-    v.sync_if_needed();
+    //v.sync_if_needed();
     CHECK_EQUAL(1, v.size());
     CHECK_EQUAL(1, v.get_int(0,0));
 }
@@ -492,26 +495,26 @@ TEST(TableView_Distinct_Follows_Changes)
 
     TableView distinct_ints = table.get_distinct_view(0);
     CHECK_EQUAL(5, distinct_ints.size());
-    CHECK(distinct_ints.is_in_sync());
+    // CHECK(distinct_ints.is_in_sync());
 
     // Check that adding a value that doesn't actually impact the
     // view still invalidates the view (which is inspected for now).
     table.add_empty_row();
     table.set_int(0, 5, 4);
     table.set_string(1, 5, "Foo");
-    CHECK(!distinct_ints.is_in_sync());
-    distinct_ints.sync_if_needed();
-    CHECK(distinct_ints.is_in_sync());
+    //CHECK(!distinct_ints.is_in_sync());
+    //distinct_ints.sync_if_needed();
+    //CHECK(distinct_ints.is_in_sync());
     CHECK_EQUAL(5, distinct_ints.size());
 
     // Check that adding a value that impacts the view invalidates the view.
-    distinct_ints.sync_if_needed();
+    //distinct_ints.sync_if_needed();
     table.add_empty_row();
     table.set_int(0, 6, 10);
     table.set_string(1, 6, "Foo");
-    CHECK(!distinct_ints.is_in_sync());
-    distinct_ints.sync_if_needed();
-    CHECK(distinct_ints.is_in_sync());
+    //CHECK(!distinct_ints.is_in_sync());
+    //distinct_ints.sync_if_needed();
+    //CHECK(distinct_ints.is_in_sync());
     CHECK_EQUAL(6, distinct_ints.size());
 }
 
@@ -537,7 +540,7 @@ TEST(TableView_SyncAfterCopy) {
     table.set_int(0, ndx2, 1);
 
     // verify that the copied view sees the change
-    v2.sync_if_needed();
+    //v2.sync_if_needed();
     CHECK_EQUAL(2, v2.size());
 }
 

@@ -257,6 +257,7 @@ public:
     void row_to_string(std::size_t row_ndx, std::ostream&) const;
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
+protected:
     // Determine if the view is 'in sync' with the underlying table
     // as well as other views used to generate the view. Note that updates
     // through views maintains synchronization between view and table.
@@ -278,7 +279,7 @@ public:
 #else
     uint_fast64_t sync_if_needed() const;
 #endif
-
+public:
     // Set this undetached TableView to be a distinct view, and sync immediately.
     void sync_distinct_view(size_t column_ndx);
 
@@ -595,6 +596,7 @@ public:
 
 inline bool TableViewBase::is_empty() const TIGHTDB_NOEXCEPT
 {
+    sync_if_needed();
     return m_row_indexes.is_empty();
 }
 
@@ -605,12 +607,15 @@ inline bool TableViewBase::is_attached() const TIGHTDB_NOEXCEPT
 
 inline bool TableViewBase::is_row_attached(std::size_t row_ndx) const TIGHTDB_NOEXCEPT
 {
+    // no sync_if_needed here - it only makes sense to ask if a row is attached,
+    // when operated in imperative mode.
     // ironic or what? -1ULL apparently makes sense somewhere
     return get_source_ndx(row_ndx) != -1ULL;
 }
 
 inline std::size_t TableViewBase::size() const TIGHTDB_NOEXCEPT
 {
+    sync_if_needed();
     return m_row_indexes.size();
 }
 
@@ -621,11 +626,13 @@ inline std::size_t TableViewBase::num_attached_rows() const TIGHTDB_NOEXCEPT
 
 inline std::size_t TableViewBase::get_source_ndx(std::size_t row_ndx) const TIGHTDB_NOEXCEPT
 {
+    sync_if_needed();
     return to_size_t(m_row_indexes.get(row_ndx));
 }
 
 inline std::size_t TableViewBase::find_by_source_ndx(std::size_t source_ndx) const TIGHTDB_NOEXCEPT
 {
+    sync_if_needed();
     TIGHTDB_ASSERT(source_ndx < m_table->size());
     return m_row_indexes.find_first(source_ndx);
 }
@@ -832,6 +839,7 @@ inline DataType TableViewBase::get_column_type(size_t column_ndx) const TIGHTDB_
 inline int64_t TableViewBase::get_int(size_t column_ndx, size_t row_ndx) const
     TIGHTDB_NOEXCEPT
 {
+    sync_if_needed();
     TIGHTDB_ASSERT_INDEX(column_ndx, row_ndx);
 
     const size_t real_ndx = size_t(m_row_indexes.get(row_ndx));
@@ -842,6 +850,7 @@ inline int64_t TableViewBase::get_int(size_t column_ndx, size_t row_ndx) const
 inline bool TableViewBase::get_bool(size_t column_ndx, size_t row_ndx) const
     TIGHTDB_NOEXCEPT
 {
+    sync_if_needed();
     TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Bool);
 
     const size_t real_ndx = size_t(m_row_indexes.get(row_ndx));
@@ -852,6 +861,7 @@ inline bool TableViewBase::get_bool(size_t column_ndx, size_t row_ndx) const
 inline DateTime TableViewBase::get_datetime(size_t column_ndx, size_t row_ndx) const
     TIGHTDB_NOEXCEPT
 {
+    sync_if_needed();
     TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_DateTime);
 
     const size_t real_ndx = size_t(m_row_indexes.get(row_ndx));
@@ -862,6 +872,7 @@ inline DateTime TableViewBase::get_datetime(size_t column_ndx, size_t row_ndx) c
 inline float TableViewBase::get_float(size_t column_ndx, size_t row_ndx) const
     TIGHTDB_NOEXCEPT
 {
+    sync_if_needed();
     TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Float);
 
     const size_t real_ndx = size_t(m_row_indexes.get(row_ndx));
@@ -872,6 +883,7 @@ inline float TableViewBase::get_float(size_t column_ndx, size_t row_ndx) const
 inline double TableViewBase::get_double(size_t column_ndx, size_t row_ndx) const
     TIGHTDB_NOEXCEPT
 {
+    sync_if_needed();
     TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Double);
 
     const size_t real_ndx = size_t(m_row_indexes.get(row_ndx));
@@ -882,6 +894,7 @@ inline double TableViewBase::get_double(size_t column_ndx, size_t row_ndx) const
 inline StringData TableViewBase::get_string(size_t column_ndx, size_t row_ndx) const
     TIGHTDB_NOEXCEPT
 {
+    sync_if_needed();
     TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_String);
 
     const size_t real_ndx = size_t(m_row_indexes.get(row_ndx));
@@ -892,6 +905,7 @@ inline StringData TableViewBase::get_string(size_t column_ndx, size_t row_ndx) c
 inline BinaryData TableViewBase::get_binary(size_t column_ndx, size_t row_ndx) const
     TIGHTDB_NOEXCEPT
 {
+    sync_if_needed();
     TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Binary);
 
     const size_t real_ndx = size_t(m_row_indexes.get(row_ndx));
@@ -902,6 +916,7 @@ inline BinaryData TableViewBase::get_binary(size_t column_ndx, size_t row_ndx) c
 inline Mixed TableViewBase::get_mixed(size_t column_ndx, size_t row_ndx) const
     TIGHTDB_NOEXCEPT
 {
+    sync_if_needed();
     TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Mixed);
 
     const size_t real_ndx = size_t(m_row_indexes.get(row_ndx));
@@ -912,6 +927,7 @@ inline Mixed TableViewBase::get_mixed(size_t column_ndx, size_t row_ndx) const
 inline DataType TableViewBase::get_mixed_type(size_t column_ndx, size_t row_ndx) const
     TIGHTDB_NOEXCEPT
 {
+    sync_if_needed();
     TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Mixed);
 
     const size_t real_ndx = size_t(m_row_indexes.get(row_ndx));
@@ -922,6 +938,7 @@ inline DataType TableViewBase::get_mixed_type(size_t column_ndx, size_t row_ndx)
 inline size_t TableViewBase::get_subtable_size(size_t column_ndx, size_t row_ndx) const
     TIGHTDB_NOEXCEPT
 {
+    sync_if_needed();
     TIGHTDB_ASSERT_INDEX_AND_TYPE_TABLE_OR_MIXED(column_ndx, row_ndx);
 
     const size_t real_ndx = size_t(m_row_indexes.get(row_ndx));
@@ -932,6 +949,7 @@ inline size_t TableViewBase::get_subtable_size(size_t column_ndx, size_t row_ndx
 inline std::size_t TableViewBase::get_link(std::size_t column_ndx, std::size_t row_ndx) const
     TIGHTDB_NOEXCEPT
 {
+    sync_if_needed();
     TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Link);
 
     const size_t real_ndx = size_t(m_row_indexes.get(row_ndx));
@@ -957,6 +975,7 @@ inline ConstTableRef ConstTableView::get_link_target(std::size_t column_ndx) con
 inline bool TableViewBase::is_null_link(std::size_t column_ndx, std::size_t row_ndx) const
     TIGHTDB_NOEXCEPT
 {
+    sync_if_needed();
     TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Link);
 
     const size_t real_ndx = size_t(m_row_indexes.get(row_ndx));
@@ -970,18 +989,21 @@ inline bool TableViewBase::is_null_link(std::size_t column_ndx, std::size_t row_
 
 inline size_t TableViewBase::find_first_int(size_t column_ndx, int64_t value) const
 {
+    sync_if_needed();
     TIGHTDB_ASSERT_COLUMN_AND_TYPE(column_ndx, type_Int);
     return find_first_integer(column_ndx, value);
 }
 
 inline size_t TableViewBase::find_first_bool(size_t column_ndx, bool value) const
 {
+    sync_if_needed();
     TIGHTDB_ASSERT_COLUMN_AND_TYPE(column_ndx, type_Bool);
     return find_first_integer(column_ndx, value ? 1 : 0);
 }
 
 inline size_t TableViewBase::find_first_datetime(size_t column_ndx, DateTime value) const
 {
+    sync_if_needed();
     TIGHTDB_ASSERT_COLUMN_AND_TYPE(column_ndx, type_DateTime);
     return find_first_integer(column_ndx, int64_t(value.get_datetime()));
 }
@@ -1059,6 +1081,7 @@ inline ConstTableView& ConstTableView::operator=(TableView tv)
 
 inline void TableView::remove_last()
 {
+    sync_if_needed();
     const size_t real_ndx = size_t(m_row_indexes.get(size()-1));
     TIGHTDB_ASSERT(real_ndx != -1ULL);
     if (!is_empty())
@@ -1239,6 +1262,7 @@ inline ConstTableView ConstTableView::find_all_datetime(size_t column_ndx, DateT
 
 inline TableView::RowExpr TableView::get(std::size_t row_ndx) TIGHTDB_NOEXCEPT
 {
+    sync_if_needed();
     TIGHTDB_ASSERT_ROW(row_ndx);
     std::size_t real_ndx = std::size_t(m_row_indexes.get(row_ndx));
     TIGHTDB_ASSERT(real_ndx != -1ULL);
@@ -1247,6 +1271,7 @@ inline TableView::RowExpr TableView::get(std::size_t row_ndx) TIGHTDB_NOEXCEPT
 
 inline TableView::ConstRowExpr TableView::get(std::size_t row_ndx) const TIGHTDB_NOEXCEPT
 {
+    sync_if_needed();
     TIGHTDB_ASSERT_ROW(row_ndx);
     std::size_t real_ndx = std::size_t(m_row_indexes.get(row_ndx));
     TIGHTDB_ASSERT(real_ndx != -1ULL);
@@ -1255,12 +1280,14 @@ inline TableView::ConstRowExpr TableView::get(std::size_t row_ndx) const TIGHTDB
 
 inline ConstTableView::ConstRowExpr ConstTableView::get(std::size_t row_ndx) const TIGHTDB_NOEXCEPT
 {
+    sync_if_needed();
     TIGHTDB_ASSERT_ROW(row_ndx);
     std::size_t real_ndx = std::size_t(m_row_indexes.get(row_ndx));
     TIGHTDB_ASSERT(real_ndx != -1ULL);
     return m_table->get(real_ndx);
 }
 
+// FIXME: How should front(), back() and operator[] behave if they hold a detached ref?
 inline TableView::RowExpr TableView::front() TIGHTDB_NOEXCEPT
 {
     return get(0);
@@ -1316,6 +1343,7 @@ ConstTableView::operator[](std::size_t row_ndx) const TIGHTDB_NOEXCEPT
 
 inline TableRef TableView::get_subtable(size_t column_ndx, size_t row_ndx)
 {
+    sync_if_needed();
     TIGHTDB_ASSERT_INDEX_AND_TYPE_TABLE_OR_MIXED(column_ndx, row_ndx);
 
     const size_t real_ndx = size_t(m_row_indexes.get(row_ndx));
@@ -1325,6 +1353,7 @@ inline TableRef TableView::get_subtable(size_t column_ndx, size_t row_ndx)
 
 inline ConstTableRef TableView::get_subtable(size_t column_ndx, size_t row_ndx) const
 {
+    sync_if_needed();
     TIGHTDB_ASSERT_INDEX_AND_TYPE_TABLE_OR_MIXED(column_ndx, row_ndx);
 
     const size_t real_ndx = size_t(m_row_indexes.get(row_ndx));
@@ -1334,6 +1363,7 @@ inline ConstTableRef TableView::get_subtable(size_t column_ndx, size_t row_ndx) 
 
 inline ConstTableRef ConstTableView::get_subtable(size_t column_ndx, size_t row_ndx) const
 {
+    sync_if_needed();
     TIGHTDB_ASSERT_INDEX_AND_TYPE_TABLE_OR_MIXED(column_ndx, row_ndx);
 
     const size_t real_ndx = size_t(m_row_indexes.get(row_ndx));
@@ -1343,6 +1373,7 @@ inline ConstTableRef ConstTableView::get_subtable(size_t column_ndx, size_t row_
 
 inline void TableView::clear_subtable(size_t column_ndx, size_t row_ndx)
 {
+    sync_if_needed();
     TIGHTDB_ASSERT_INDEX_AND_TYPE_TABLE_OR_MIXED(column_ndx, row_ndx);
 
     const size_t real_ndx = size_t(m_row_indexes.get(row_ndx));
@@ -1356,6 +1387,7 @@ inline void TableView::clear_subtable(size_t column_ndx, size_t row_ndx)
 
 inline void TableView::set_int(size_t column_ndx, size_t row_ndx, int64_t value)
 {
+    sync_if_needed();
     TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Int);
 
     const size_t real_ndx = size_t(m_row_indexes.get(row_ndx));
@@ -1365,6 +1397,7 @@ inline void TableView::set_int(size_t column_ndx, size_t row_ndx, int64_t value)
 
 inline void TableView::set_bool(size_t column_ndx, size_t row_ndx, bool value)
 {
+    sync_if_needed();
     TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Bool);
 
     const size_t real_ndx = size_t(m_row_indexes.get(row_ndx));
@@ -1374,6 +1407,7 @@ inline void TableView::set_bool(size_t column_ndx, size_t row_ndx, bool value)
 
 inline void TableView::set_datetime(size_t column_ndx, size_t row_ndx, DateTime value)
 {
+    sync_if_needed();
     TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_DateTime);
 
     const size_t real_ndx = size_t(m_row_indexes.get(row_ndx));
@@ -1383,6 +1417,7 @@ inline void TableView::set_datetime(size_t column_ndx, size_t row_ndx, DateTime 
 
 inline void TableView::set_float(size_t column_ndx, size_t row_ndx, float value)
 {
+    sync_if_needed();
     TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Float);
 
     const size_t real_ndx = size_t(m_row_indexes.get(row_ndx));
@@ -1392,6 +1427,7 @@ inline void TableView::set_float(size_t column_ndx, size_t row_ndx, float value)
 
 inline void TableView::set_double(size_t column_ndx, size_t row_ndx, double value)
 {
+    sync_if_needed();
     TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Double);
 
     const size_t real_ndx = size_t(m_row_indexes.get(row_ndx));
@@ -1401,6 +1437,7 @@ inline void TableView::set_double(size_t column_ndx, size_t row_ndx, double valu
 
 template<class E> inline void TableView::set_enum(size_t column_ndx, size_t row_ndx, E value)
 {
+    sync_if_needed();
     const size_t real_ndx = size_t(m_row_indexes.get(row_ndx));
     TIGHTDB_ASSERT(real_ndx != -1ULL);
     m_table->set_int(column_ndx, real_ndx, value);
@@ -1408,6 +1445,7 @@ template<class E> inline void TableView::set_enum(size_t column_ndx, size_t row_
 
 inline void TableView::set_string(size_t column_ndx, size_t row_ndx, StringData value)
 {
+    sync_if_needed();
     TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_String);
 
     const size_t real_ndx = size_t(m_row_indexes.get(row_ndx));
@@ -1417,6 +1455,7 @@ inline void TableView::set_string(size_t column_ndx, size_t row_ndx, StringData 
 
 inline void TableView::set_binary(size_t column_ndx, size_t row_ndx, BinaryData value)
 {
+    sync_if_needed();
     TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Binary);
 
     const size_t real_ndx = size_t(m_row_indexes.get(row_ndx));
@@ -1426,6 +1465,7 @@ inline void TableView::set_binary(size_t column_ndx, size_t row_ndx, BinaryData 
 
 inline void TableView::set_mixed(size_t column_ndx, size_t row_ndx, Mixed value)
 {
+    sync_if_needed();
     TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Mixed);
 
     const size_t real_ndx = size_t(m_row_indexes.get(row_ndx));
@@ -1435,6 +1475,7 @@ inline void TableView::set_mixed(size_t column_ndx, size_t row_ndx, Mixed value)
 
 inline void TableView::set_subtable(size_t column_ndx, size_t row_ndx, const Table* value)
 {
+    sync_if_needed();
     TIGHTDB_ASSERT_INDEX_AND_TYPE_TABLE_OR_MIXED(column_ndx, row_ndx);
     const size_t real_ndx = size_t(m_row_indexes.get(row_ndx));
     TIGHTDB_ASSERT(real_ndx != -1ULL);
@@ -1443,6 +1484,7 @@ inline void TableView::set_subtable(size_t column_ndx, size_t row_ndx, const Tab
 
 inline void TableView::set_link(std::size_t column_ndx, std::size_t row_ndx, std::size_t target_row_ndx)
 {
+    sync_if_needed();
     TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Link);
     const size_t real_ndx = size_t(m_row_indexes.get(row_ndx));
     TIGHTDB_ASSERT(real_ndx != -1ULL);
@@ -1451,6 +1493,7 @@ inline void TableView::set_link(std::size_t column_ndx, std::size_t row_ndx, std
 
 inline void TableView::nullify_link(std::size_t column_ndx, std::size_t row_ndx)
 {
+    sync_if_needed();
     TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Link);
     const size_t real_ndx = size_t(m_row_indexes.get(row_ndx));
     TIGHTDB_ASSERT(real_ndx != -1ULL);
