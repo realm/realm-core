@@ -2,7 +2,7 @@
 
 ### Bugfixes:
 
-* Fixed crash when std::exit() is called with active encrypted mappings.
+* Lorem ipsum.
 
 ### API breaking changes:
 
@@ -19,7 +19,25 @@
 
 ### Internals:
 
-* Switched to using mach exceptions rather than signal() for encrypted mappings on Apple platforms.
+* Lorem ipsum.
+
+----------------------------------------------
+
+# 0.88.5 Release notes
+
+### Bugfixes:
+
+* Fixed crash when `std::exit()` is called with active encrypted mappings.
+* Fixed writing over 4KB of data to an encrypted file with `Group::write()`.
+* Fixed crash after making commits which produced over 4KB of writelog data with
+  encryption enabled.
+
+-----------
+
+### Internals:
+
+* Switched to using mach exceptions rather than signal() for encrypted mappings
+  on Apple platforms.
 
 ----------------------------------------------
 
