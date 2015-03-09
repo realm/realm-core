@@ -1690,7 +1690,7 @@ TEST(Group_CommitLinkListChange)
 }
 
 
-ONLY(Group_Commit_Update_Integer_Index)
+TEST(Group_Commit_Update_Integer_Index)
 {
     // This reproduces a bug where a commit would fail to update the Column::m_search_index pointer
     // and hence crash or behave erratic for subsequent index operations
