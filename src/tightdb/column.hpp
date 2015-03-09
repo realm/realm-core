@@ -474,6 +474,7 @@ public:
     void move_last_over(std::size_t, std::size_t, bool) TIGHTDB_OVERRIDE;
     void clear(std::size_t, bool) TIGHTDB_OVERRIDE;
     void refresh_accessor_tree(std::size_t, const Spec&) TIGHTDB_OVERRIDE;
+    void update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT;
 
     /// \param row_ndx Must be `tightdb::npos` if appending.
     void do_insert(std::size_t row_ndx, int_fast64_t value, std::size_t num_rows);
@@ -526,8 +527,6 @@ private:
 
     StringIndex* m_search_index;
 };
-
-
 
 
 // Implementation:
