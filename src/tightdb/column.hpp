@@ -529,6 +529,8 @@ private:
 };
 
 
+
+
 // Implementation:
 
 inline std::size_t ColumnBase::size() const TIGHTDB_NOEXCEPT
