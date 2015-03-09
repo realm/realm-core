@@ -62,6 +62,8 @@ void sync_commits(SharedGroup& from_group, SharedGroup& to_group)
 
     // Figure out which versions to sync:
     version_type v0 = to_r->get_last_peer_version(1);
+//    if (v0 == 0)
+//        v0 = 1;
     version_type v1 = from_group.get_current_version();
     uint_fast64_t peer_id = 1;
     //std::cout << "\nSYNC: " << &from_group << " -> " << &to_group << " (v0 = " << v0 << ", v1 = " << v1 << ")\n";
