@@ -7054,6 +7054,7 @@ TEST(LangBindHelper_MixedCommitSizes)
     LangBindHelper::commit_and_continue_as_read(sg);
 
     UniquePtr<char[]> buffer(new char[65536]);
+    fill(buffer.get(), buffer.get() + 65536, 0);
 
     // 4 large commits so that both write log files are large and fully
     // initialized (with both iv slots being non-zero when encryption is
