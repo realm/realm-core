@@ -782,7 +782,7 @@ EOF
         (cd ../tightdb_java/$dir_name && tar xzf "$TIGHTDB_HOME/$file_name") || exit 1
         ;;
 
-   "build-cocoa")
+    "build-cocoa")
         if [ "$OS" != "Darwin" ]; then
             echo "zip for iOS/OSX can only be generated under OS X."
             exit 0
@@ -834,7 +834,7 @@ EOF
         exit 0
         ;;
 
-      "build-osx-framework")
+    "build-osx-framework")
         if [ "$OS" != "Darwin" ]; then
             echo "Framework for OS X can only be generated under Mac OS X."
             exit 0
