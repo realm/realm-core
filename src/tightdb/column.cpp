@@ -25,7 +25,7 @@ void ColumnBase::set_string(size_t, StringData)
 }
 
 void ColumnBase::update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT
-{   
+{
     m_array->update_from_parent(old_baseline);
 }
 
