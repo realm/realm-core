@@ -756,7 +756,7 @@ EOF
         cp src/tightdb/libtightdb.a "$tmpdir/$BASENAME" || exit 1
         cp src/tightdb/libtightdb-dbg.a "$tmpdir/$BASENAME" || exit 1
         cp tools/LICENSE "$tmpdir/$BASENAME" || exit 1
-        if ! [ "$TIGHTDB_DISABLE_MARKDOWN_TO_PDF" ]; then
+        if ! [ "$TIGHTDB_DISABLE_MARKDOWN_CONVERT" ]; then
             command -v pandoc >/dev/null 2>&1 || { echo "Pandoc is required but it's not installed.  Aborting." >&2; exit 1; }
             pandoc -f markdown -t plain -o "$tmpdir/$BASENAME/release_notes.txt" release_notes.md || exit 1
         fi
@@ -2635,7 +2635,7 @@ EOF
         grep -v -f "$TEMP_DIR/exclude.bre" "$TEMP_DIR/files2" >"$TEMP_DIR/files3" || exit 1
         tar czf "$TEMP_DIR/archive.tar.gz" -T "$TEMP_DIR/files3" || exit 1
         (cd "$TARGET_DIR" && tar xzmf "$TEMP_DIR/archive.tar.gz") || exit 1
-        if ! [ "$TIGHTDB_DISABLE_MARKDOWN_TO_PDF" ]; then
+        if ! [ "$TIGHTDB_DISABLE_MARKDOWN_CONVERT" ]; then
             (cd "$TARGET_DIR" && pandoc README.md -o README.pdf) || exit 1
         fi
         exit 0
