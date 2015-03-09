@@ -50,10 +50,11 @@ using unit_test::TestResults;
 // `experiments/testcase.cpp` and then run `sh build.sh
 // check-testcase` (or one of its friends) from the command line.
 
-static void
-sync_commits(SharedGroup& from_group, SharedGroup& to_group)
+
+namespace {
+
+void sync_commits(SharedGroup& from_group, SharedGroup& to_group)
 {
-    
     typedef SharedGroup::version_type version_type;
 
     Replication* from_r = from_group.get_replication();
@@ -86,7 +87,7 @@ sync_commits(SharedGroup& from_group, SharedGroup& to_group)
     }
 }
 
-static const char g_table_name[] = "t0";
+const char g_table_name[] = "t0";
 
 void create_table(SharedGroup& group)
 {
@@ -125,7 +126,7 @@ void bump_timestamp()
     usleep(1);
 }
 
-void dump_values(SharedGroup& group)
+TIGHTDB_UNUSED void dump_values(SharedGroup& group)
 {
     ReadTransaction tr(group);
     ConstTableRef t = tr.get_table(g_table_name);
@@ -152,6 +153,8 @@ void check_equality(TestResults& test_results, SharedGroup& a, SharedGroup& b)
         CHECK_EQUAL(ta->get_int(0, i), tb->get_int(0, i));
     }
 }
+
+} // anonymous namespace
 
 
 TEST(Sync_MergeWrites)
