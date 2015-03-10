@@ -30,6 +30,7 @@
 #include <sys/time.h> // FIXME!! Not portable
 
 #include <tightdb/replication.hpp>
+#include <tightdb/impl/merge_index_map.hpp>
 #ifdef TIGHTDB_ENABLE_REPLICATION
 
 using namespace util;
@@ -123,7 +124,7 @@ public:
     void transact_log_reserve(size_t size, char** new_begin, char** new_end) TIGHTDB_OVERRIDE;
     void transact_log_append(const char* data, size_t size, char** new_begin, char** new_end) TIGHTDB_OVERRIDE;
     virtual bool is_in_server_synchronization_mode() { return m_is_persisting; }
-    version_type apply_foreign_changeset(SharedGroup&, version_type, BinaryData,
+    version_type apply_foreign_changeset(SharedGroup&, uint_fast64_t self_peer_id, version_type, BinaryData,
                                          uint_fast64_t timestamp,
                                          uint_fast64_t peer_id, version_type peer_version,
                                          ostream*) TIGHTDB_OVERRIDE;
@@ -234,7 +235,8 @@ protected:
         CommitLogMetadata(string name): name(name) {}
     };
 
-    class MergingIndexTranslator;
+    class IndexTranslationMap;
+    class TransformChangesetBeforeMerge;
 
     string m_database_name;
     string m_header_name;
@@ -791,66 +793,43 @@ void WriteLogCollector::get_commit_entries_internal(version_type from_version, v
 }
 
 
-class WriteLogCollector::MergingIndexTranslator : public Replication::IndexTranslatorBase {
+class WriteLogCollector::IndexTranslationMap {
 public:
-    MergingIndexTranslator(WriteLogCollector& log, Group& group, uint_fast64_t timestamp,
+    IndexTranslationMap(WriteLogCollector& log, uint64_t self_peer_id, uint_fast64_t timestamp,
         uint_fast64_t peer_id, version_type base_version, version_type current_version):
-    m_log(log), m_group(group), m_timestamp(timestamp), /*m_peer_id(peer_id),*/
-    m_base_version(base_version), m_current_version(current_version), m_was_set(false)
+    m_log(log), m_self_peer_id(self_peer_id), m_base_version(base_version),
+    m_current_version(current_version), m_timestamp(timestamp), m_peer_id(peer_id)
     {
-        static_cast<void>(peer_id); // FIXME: Unused for now.
+        // Build the index maps:
+        std::vector<Replication::CommitLogEntry> history(m_current_version - m_base_version);
+        m_log.get_commit_entries(m_base_version, m_current_version, &*history.begin());
+
+        for (size_t i = 0; i < history.size(); ++i) {
+            const CommitLogEntry& entry = history[i];
+            m_commit_log_peer_id = entry.peer_id;
+            m_commit_log_timestamp = entry.timestamp;
+            SimpleInputStream input(entry.log_data.data(), entry.log_data.size());
+            TransactLogParser parser(input);
+            parser.parse(*this);
+        }
     }
 
-    size_t translate_row_index(TableRef table, size_t row_ndx, bool* overwritten) TIGHTDB_OVERRIDE
+    // FIXME: Translate by full path instead of just group_level_ndx
+    size_t translate_row_index(size_t group_level_ndx, size_t row_ndx, size_t num_rows, bool* overwritten)
     {
-        // Go through the commit log from m_base_version to m_current_version.
-        // For each insert in table that has a lower timestamp and a lower row index, bump
-        // row_ndx by one.
-        m_translate_table = table;
-        m_result_ndx = row_ndx;
-        std::vector<Replication::CommitLogEntry> entries(m_current_version - m_base_version);
-        m_log.get_commit_entries(m_base_version, m_current_version, entries.data());
-        //std::cout << "Translating row index v" << m_base_version << " -> v" << m_current_version << "\n";
-
-        for (size_t i = 0; i < entries.size(); ++i) {
-            CommitLogEntry& entry = entries[i];
-            if (entry.peer_id != 0)
-                continue;
-            //std::cout << "Modifying against local commit at t = " << entry.timestamp << "\n";
-            if (entry.timestamp < m_timestamp) { // FIXME Compare peer_id too.
-                SimpleInputStream input(entry.log_data.data(), entry.log_data.size());
-                TransactLogParser parser(input);
-                parser.parse(*this);
-            }
+        std::map<size_t, MergeIndexMap>::iterator it = m_map.find(group_level_ndx);
+        size_t result = row_ndx;
+        if (it == m_map.end()) {
+            // Nothing happened locally to the table.
+            return result;
         }
 
-        // Save m_result_ndx so we can parse the future entries to detect set overwrite.
-        size_t result = m_result_ndx;
-
-        // If we need to figure out whether the index was overwritten,
-        // parse future log entries and find a set at the index.
-        // We keep bumping any indexes because we need to track the set operation
-        // even if something was inserted under it.
         if (overwritten) {
-            for (size_t i = 0; i < entries.size(); ++i) {
-                CommitLogEntry& entry = entries[i];
-                if (entry.timestamp > m_timestamp) {
-                    //std::cout << "Checking for overwrite: " << entry.timestamp << " > " << m_timestamp << "\n";
-                    m_was_set = false;
-                    SimpleInputStream input(entry.log_data.data(), entry.log_data.size());
-                    TransactLogParser parser(input);
-                    parser.parse(*this);
-                    if (m_was_set) {
-                        //std::cout << "SET at " << row_ndx << " was overwritten.\n";
-                        *overwritten = true;
-                        break;
-                    }
-                }
-            }
+            *overwritten = false; // FIXME: Support sets (= detect overwritten values)
+            result = it->second.transform_set(row_ndx, m_timestamp, m_peer_id);
         }
-
-        if (result != row_ndx) {
-            //std::cout << "BUMPED " << row_ndx << " TO " << m_result_ndx << "\n";
+        else { // overwritten == null_ptr => // insertion
+            result = it->second.transform_insert(row_ndx, num_rows, m_timestamp, m_peer_id);
         }
 
         return result;
@@ -858,17 +837,23 @@ public:
 
     void insertions(size_t row_ndx, size_t num) {
         //std::cout << "Saw insert(" << row_ndx << ", " << num << ")\n";
-        if (m_table == m_translate_table && row_ndx <= m_result_ndx) {
-            m_result_ndx += num;
+        std::map<size_t, MergeIndexMap>::iterator it = m_map.find(m_selected_table);
+        if (it == m_map.end()) {
+            it = m_map.insert(std::make_pair(m_selected_table, MergeIndexMap(m_self_peer_id))).first;
+        }
+
+        MergeIndexMap& map = it->second;
+        if (m_commit_log_peer_id != m_peer_id) {
+            map.unknown_insertion_at(row_ndx, num, m_timestamp, m_peer_id);
+        }
+        else {
+            map.known_insertion_at(row_ndx, num);
         }
     }
 
     void update(size_t row_ndx) {
-        //std::cout << "Saw set(" << row_ndx << ")\n";
-        if (m_table == m_translate_table && row_ndx == m_result_ndx) {
-            //std::cout << "MATCH\n";
-            m_was_set = true;
-        }
+        // FIXME: TODO
+        static_cast<void>(row_ndx);
     }
 
     bool insert_group_level_table(std::size_t, std::size_t, StringData) { return true; }
@@ -876,10 +861,10 @@ public:
     bool rename_group_level_table(std::size_t, StringData) { return true; }
     bool select_table(std::size_t group_level_ndx, int levels, const std::size_t* path)
     {
-        //std::cout << "SELECT TABLE\n";
-        static_cast<void>(levels); // FIXME: Descend.
+        // FIXME: Translate path, and support lookup by the full path
+        static_cast<void>(levels);
         static_cast<void>(path);
-        m_table = m_group.get_table(group_level_ndx); // Throws
+        m_selected_table = group_level_ndx;
         return true;
     }
     bool insert_empty_rows(std::size_t row_ndx, std::size_t num_rows, std::size_t, bool) { insertions(row_ndx, num_rows); return true; }
@@ -939,21 +924,297 @@ public:
     bool link_list_clear() { return true; }
 private:
     WriteLogCollector& m_log;
-    Group& m_group;
-    uint64_t m_timestamp;
-    //uint64_t m_peer_id; // FIXME: Unused for now.
+    uint64_t m_self_peer_id;
+
+    // FIXME: Store maps for all paths, and handle insertions/removals
+    // along the paths.
+    typedef _impl::MergeIndexMap MergeIndexMap;
+    std::map<size_t, MergeIndexMap> m_map;
+
     uint64_t m_base_version;
     uint64_t m_current_version;
 
-    TableRef m_table;
-    TableRef m_translate_table;
-    size_t m_result_ndx;
-    bool m_was_set;
+    // There are the incoming values:
+    uint64_t m_timestamp;
+    uint64_t m_peer_id;
+
+    // These are used for storing information about commit log entries that
+    // isn't available to the parser, but needed to build the map.
+    uint64_t m_commit_log_peer_id;
+    uint64_t m_commit_log_timestamp;
+
+    size_t m_selected_table; // "group_level_ndx"
+};
+
+class WriteLogCollector::TransformChangesetBeforeMerge {
+public:
+    TransformChangesetBeforeMerge(WriteLogCollector& log, uint64_t self_peer_id, uint_fast64_t timestamp,
+        uint_fast64_t peer_id, version_type base_version, version_type current_version):
+    m_map(log, self_peer_id, timestamp, peer_id, base_version, current_version),
+    m_transformed(m_buffer),
+    m_selected_table(-1)
+    {
+    }
+
+    size_t transformed_size() const
+    {
+        return m_transformed.write_position() - m_buffer.transact_log_data();
+    }
+
+    BinaryData get_data() const
+    {
+        return BinaryData(m_buffer.transact_log_data(), transformed_size());
+    }
+
+    size_t transform_insertion(size_t row_ndx, size_t num_rows = 1)
+    {
+        TIGHTDB_ASSERT(m_selected_table != size_t(-1));
+        size_t result = m_map.translate_row_index(m_selected_table, row_ndx, num_rows, null_ptr);
+        //std::cout << "ROW INSERT TRANSLATION (table " << m_selected_table << "): " << row_ndx << " -> " << result << "\n";
+        return result;
+    }
+
+    size_t transform_update(size_t row_ndx, bool* overwritten)
+    {
+        TIGHTDB_ASSERT(m_selected_table != size_t(-1));
+        size_t result = m_map.translate_row_index(m_selected_table, row_ndx, 0, overwritten);
+        //std::cout << "ROW UPDATE TRANSLATION (table " << m_selected_table << "): " << row_ndx << " -> " << result << "\n";
+        return result;
+    }
+
+    /// Parser InstructionHandler:
+
+    bool insert_group_level_table(std::size_t table_ndx, std::size_t num_tables, StringData name)
+    {
+        // FIXME: Transform group-level
+        return m_transformed.insert_group_level_table(table_ndx, num_tables, name);
+    }
+    bool erase_group_level_table(std::size_t table_ndx, std::size_t num_tables)
+    {
+        // FIXME: Transform group-level
+        return m_transformed.erase_group_level_table(table_ndx, num_tables);
+    }
+    bool rename_group_level_table(std::size_t table_ndx, StringData new_name)
+    {
+        // FIXME: Transform group-level
+        return m_transformed.rename_group_level_table(table_ndx, new_name);
+    }
+    bool select_table(std::size_t group_level_ndx, int levels, const std::size_t* path)
+    {
+        // FIXME: Transform path (and use entire path for lookup)
+        m_selected_table = group_level_ndx;
+        TIGHTDB_ASSERT(levels == 0); // Non-group-level tables not supported!
+        return m_transformed.select_table(group_level_ndx, levels, path);
+    }
+    bool insert_empty_rows(std::size_t row_ndx, std::size_t num_rows, std::size_t tbl_sz, bool unordered)
+    {
+        return m_transformed.insert_empty_rows(transform_insertion(row_ndx, num_rows), num_rows, tbl_sz, unordered);
+    }
+    bool erase_rows(std::size_t row_ndx, std::size_t num_rows, std::size_t tbl_sz, bool unordered)
+    {
+        // FIXME: We need to translate each index in the range separately.
+        // FIXME: Support erase
+        return m_transformed.erase_rows(row_ndx, num_rows, tbl_sz, unordered);
+    }
+    bool clear_table()
+    {
+        return m_transformed.clear_table();
+    }
+    bool insert_int(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, int_fast64_t value)
+    {
+        return m_transformed.insert_int(col_ndx, transform_insertion(row_ndx), tbl_sz, value);
+    }
+    bool insert_bool(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, bool value)
+    {
+        return m_transformed.insert_bool(col_ndx, transform_insertion(row_ndx), tbl_sz, value);
+    }
+    bool insert_float(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, float value)
+    {
+        return m_transformed.insert_float(col_ndx, transform_insertion(row_ndx), tbl_sz, value);
+    }
+    bool insert_double(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, double value)
+    {
+        return m_transformed.insert_double(col_ndx, transform_insertion(row_ndx), tbl_sz, value);
+    }
+    bool insert_string(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, StringData value)
+    {
+        return m_transformed.insert_string(col_ndx, transform_insertion(row_ndx), tbl_sz, value);
+    }
+    bool insert_binary(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, BinaryData value)
+    {
+        return m_transformed.insert_binary(col_ndx, transform_insertion(row_ndx), tbl_sz, value);
+    }
+    bool insert_date_time(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, DateTime value)
+    {
+        return m_transformed.insert_date_time(col_ndx, transform_insertion(row_ndx), tbl_sz, value);
+    }
+    bool insert_table(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz)
+    {
+        return m_transformed.insert_table(col_ndx, tbl_sz, transform_insertion(row_ndx));
+    }
+    bool insert_mixed(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, const Mixed& value)
+    {
+        return m_transformed.insert_mixed(col_ndx, transform_insertion(row_ndx), tbl_sz, value);
+    }
+    bool insert_link(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz, std::size_t value)
+    {
+        return m_transformed.insert_link(col_ndx, transform_insertion(row_ndx), tbl_sz, value);
+    }
+    bool insert_link_list(std::size_t col_ndx, std::size_t row_ndx, std::size_t tbl_sz)
+    {
+        return m_transformed.insert_link_list(col_ndx, transform_insertion(row_ndx), tbl_sz);
+    }
+    bool row_insert_complete()
+    {
+        return m_transformed.row_insert_complete();
+    }
+    bool set_int(std::size_t col_ndx, std::size_t row_ndx, int_fast64_t value)
+    {
+        bool overwritten = false;
+        return m_transformed.set_int(col_ndx, transform_update(row_ndx, &overwritten), value);
+    }
+    bool set_bool(std::size_t col_ndx, std::size_t row_ndx, bool value)
+    {
+        bool overwritten = false;
+        return m_transformed.set_bool(col_ndx, transform_update(row_ndx, &overwritten), value);
+    }
+    bool set_float(std::size_t col_ndx, std::size_t row_ndx, float value)
+    {
+        bool overwritten = false;
+        return m_transformed.set_float(col_ndx, transform_update(row_ndx, &overwritten), value);
+    }
+    bool set_double(std::size_t col_ndx, std::size_t row_ndx, double value)
+    {
+        bool overwritten = false;
+        return m_transformed.set_double(col_ndx, transform_update(row_ndx, &overwritten), value);
+    }
+    bool set_string(std::size_t col_ndx, std::size_t row_ndx, StringData value)
+    {
+        bool overwritten = false;
+        return m_transformed.set_string(col_ndx, transform_update(row_ndx, &overwritten), value);
+    }
+    bool set_binary(std::size_t col_ndx, std::size_t row_ndx, BinaryData value)
+    {
+        bool overwritten = false;
+        return m_transformed.set_binary(col_ndx, transform_update(row_ndx, &overwritten), value);
+    }
+    bool set_date_time(std::size_t col_ndx, std::size_t row_ndx, DateTime value)
+    {
+        bool overwritten = false;
+        return m_transformed.set_date_time(col_ndx, transform_update(row_ndx, &overwritten), value);
+    }
+    bool set_table(std::size_t col_ndx, std::size_t row_ndx)
+    {
+        bool overwritten = false;
+        return m_transformed.set_table(col_ndx, transform_update(row_ndx, &overwritten));
+    }
+    bool set_mixed(std::size_t col_ndx, std::size_t row_ndx, const Mixed& value)
+    {
+        bool overwritten = false;
+        return m_transformed.set_mixed(col_ndx, transform_update(row_ndx, &overwritten), value);
+    }
+    bool set_link(std::size_t col_ndx, std::size_t row_ndx, std::size_t value)
+    {
+        bool overwritten = false;
+        return m_transformed.set_link(col_ndx, transform_update(row_ndx, &overwritten), value);
+    }
+    bool add_int_to_column(std::size_t col_ndx, int_fast64_t value)
+    {
+        return m_transformed.add_int_to_column(col_ndx, value);
+    }
+    bool optimize_table()
+    {
+        return m_transformed.optimize_table();
+    }
+    bool select_descriptor(int levels, const std::size_t* path)
+    {
+        // FIXME: Record path to descriptor to prepare for lookup.
+        return m_transformed.select_descriptor(levels, path);
+    }
+    bool insert_link_column(std::size_t col_ndx, DataType type, StringData name, std::size_t link_target_table_ndx, std::size_t backlink_col_ndx)
+    {
+        // FIXME: Support schema changes.
+        return m_transformed.insert_link_column(col_ndx, type, name, link_target_table_ndx, backlink_col_ndx);
+    }
+    bool insert_column(std::size_t col_ndx, DataType type, StringData name)
+    {
+        // FIXME: Support schema changes.
+        return m_transformed.insert_column(col_ndx, type, name);
+    }
+    bool erase_link_column(std::size_t col_ndx, std::size_t link_target_table_ndx, std::size_t backlink_col_ndx)
+    {
+        // FIXME: Support schema changes.
+        return m_transformed.erase_link_column(col_ndx, link_target_table_ndx, backlink_col_ndx);
+    }
+    bool erase_column(std::size_t col_ndx)
+    {
+        // FIXME: Support schema changes.
+        return m_transformed.erase_column(col_ndx);
+    }
+    bool rename_column(std::size_t col_ndx, StringData new_name)
+    {
+        // FIXME: Support schema changes.
+        return m_transformed.rename_column(col_ndx, new_name);
+    }
+    bool add_search_index(std::size_t col_ndx)
+    {
+        // FIXME: Support column transform.
+        return m_transformed.add_search_index(col_ndx);
+    }
+    bool add_primary_key(std::size_t col_ndx)
+    {
+        return m_transformed.add_primary_key(col_ndx);
+    }
+    bool remove_primary_key()
+    {
+        return m_transformed.remove_primary_key();
+    }
+    bool set_link_type(std::size_t col_ndx, LinkType type)
+    {
+        // FIXME: Support schema changes.
+        return m_transformed.set_link_type(col_ndx, type);
+    }
+    bool select_link_list(std::size_t col_ndx, std::size_t row_ndx)
+    {
+        // FIXME: Support link lists.
+        return m_transformed.select_link_list(col_ndx, row_ndx);
+    }
+    bool link_list_set(std::size_t link_ndx, std::size_t value)
+    {
+        // FIXME: Support link lists.
+        return m_transformed.link_list_set(link_ndx, value);
+    }
+    bool link_list_insert(std::size_t link_ndx, std::size_t value)
+    {
+        // FIXME: Support link lists.
+        return m_transformed.link_list_insert(link_ndx, value);
+    }
+    bool link_list_move(std::size_t old_link_ndx, std::size_t new_link_ndx)
+    {
+        // FIXME: Support link lists.
+        return m_transformed.link_list_move(old_link_ndx, new_link_ndx);
+    }
+    bool link_list_erase(std::size_t link_ndx)
+    {
+        // FIXME: Support link lists.
+        return m_transformed.link_list_erase(link_ndx);
+    }
+    bool link_list_clear()
+    {
+        // FIXME: Support link lists.
+        return m_transformed.link_list_clear();
+    }
+private:
+    IndexTranslationMap m_map;
+    TransactLogBufferStream m_buffer;
+    TransactLogEncoder m_transformed;
+
+    size_t m_selected_table; // "group_level_ndx"
 };
 
 
 Replication::version_type
-WriteLogCollector::apply_foreign_changeset(SharedGroup& sg, version_type last_version_integrated_by_peer,
+WriteLogCollector::apply_foreign_changeset(SharedGroup& sg, uint_fast64_t self_peer_id, version_type last_version_integrated_by_peer,
                                            BinaryData changeset, uint_fast64_t timestamp,
                                            uint_fast64_t peer_id, version_type peer_version,
                                            ostream* apply_log)
@@ -966,38 +1227,20 @@ WriteLogCollector::apply_foreign_changeset(SharedGroup& sg, version_type last_ve
     WriteTransaction transact(sg);
     version_type current_version = sg.get_current_version();
 
-//    if (last_version_integrated_by_peer < current_version)
-//        return 0;
-
-    // FIXME: This is a temporary hack
-    if (last_version_integrated_by_peer != 0) {
-        if (last_version_integrated_by_peer < current_version) {
-            uint_fast64_t last_client_file_ident;
-            {
-                map_header_if_needed(); // Throws
-                RobustLockGuard rlg(m_header.get_addr()->lock, &recover_from_dead_owner);
-                const CommitLogPreamble* preamble = get_preamble();
-                TIGHTDB_ASSERT(preamble->end_commit_range == current_version);
-                last_client_file_ident = preamble->last_client_file_ident;
-            }
-            // `last_client_file_ident` will be 0 if the history is empty (empty
-            // database).
-            bool history_ends_with_foreign_changeset = last_client_file_ident != 0;
-            if (!history_ends_with_foreign_changeset)
-                return 0;
-        }
-    }
-
     if (TIGHTDB_UNLIKELY(last_version_integrated_by_peer > current_version))
         throw LogicError(LogicError::bad_version_number);
-    SimpleInputStream input(changeset.data(), changeset.size());
-    SimpleIndexTranslator dummy_translator;
-//    MergingIndexTranslator translator(*this, group, timestamp, peer_id,
-//        last_version_integrated_by_peer, current_version);
-    apply_transact_log(input, transact.get_group(), dummy_translator, apply_log); // Throws
 
-    // FIXME: internal_submit_log should get the transformed changeset!
-    internal_submit_log(changeset.data(), changeset.size(), timestamp, peer_id, peer_version); // Throws
+    SimpleInputStream input(changeset.data(), changeset.size());
+    TransformChangesetBeforeMerge transform(*this, self_peer_id, timestamp, peer_id,
+        last_version_integrated_by_peer, current_version);
+    TransactLogParser parser(input);
+    parser.parse(transform);
+
+    BinaryData transformed_changeset = transform.get_data();
+    SimpleInputStream transformed_input(transformed_changeset.data(), transformed_changeset.size());
+    apply_transact_log(transformed_input, transact.get_group(), apply_log); // Throws
+    internal_submit_log(transformed_changeset.data(), transformed_changeset.size(), timestamp, peer_id, peer_version); // Throws
+
     return transact.commit(); // Throws
 }
 

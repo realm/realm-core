@@ -36,7 +36,9 @@ impl/output_stream.hpp \
 datetime.hpp \
 string_data.hpp \
 impl/input_stream.hpp \
+impl/output_stream.hpp \
 impl/transact_log.hpp \
+impl/merge_index_map.hpp \
 binary_data.hpp \
 mixed.hpp \
 table.hpp \
@@ -65,6 +67,7 @@ link_view_fwd.hpp \
 link_view.hpp \
 views.hpp \
 util/platform_specific_condvar.hpp
+
 
 nobase_subinclude_HEADERS_EXTRA_UNINSTALL = *.h *.hpp util/*.h util/*.hpp impl/*.h impl/*.hpp
 

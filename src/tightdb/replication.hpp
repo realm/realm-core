@@ -64,8 +64,6 @@ public:
     class TransactLogApplier;
     class Interrupted; // Exception
     struct CommitLogEntry;
-    class IndexTranslatorBase;
-    class SimpleIndexTranslator;
     class SimpleInputStream;
 
     std::string get_database_path();
@@ -168,17 +166,13 @@ public:
     virtual void set_sync_progress(version_type server_version,
                                    version_type client_version);
 
-    /// Apply the specified changeset to the specified group as a single
-    /// transaction, but only if that transaction can be based on the specified
-    /// version. It is an error to specify a base version that is ahead of the
-    /// current version of the group. Doing so will cause an exception to be
-    /// thrown. Otherwise, if the current version is ahead of the specified base
-    /// version (i.e., a conflict), this function returns 0. Otherwise it
-    /// attempts to apply the changeset, and if that succeeds, it returns the
-    /// new version produced by the transaction. Note that this will also have
-    /// the effect of making the specified changeset available as a transaction
-    /// log through this transaction log registry. The caller retains ownership
-    /// of the specified changeset buffer.
+    /// Integrate the specified changeset to the specified group as a single
+    /// transaction. It attempts to apply the changeset, and returns
+    /// the new version produced by the transaction. The changeset will be
+    /// operationally transformed to produce identical results on both ends.
+    /// Note that this will also have the effect of making the transformed
+    /// changeset available as a transaction log through this transaction log
+    /// registry. The caller retains ownership of the specified changeset buffer.
     ///
     /// The specified shared group must have this replication instance set as
     /// its associated Replication instance. The effect of violating this rule
@@ -191,7 +185,7 @@ public:
     /// sink that allows a SharedGroup to submit actions for replication. It is
     /// then up to the implementation of the Repication interface to define what
     /// replication means.
-    virtual version_type apply_foreign_changeset(SharedGroup&, version_type base_version,
+    virtual version_type apply_foreign_changeset(SharedGroup&, uint_fast64_t self_peer_id, version_type base_version,
                                                  BinaryData changeset, uint_fast64_t timestamp,
                                                  uint_fast64_t peer_id, version_type peer_version,
                                                  std::ostream* apply_log = 0);
@@ -269,8 +263,6 @@ public:
     /// successfully parsed, or ended prematurely.
     static void apply_transact_log(InputStream& transact_log, Group& target,
                                    std::ostream* apply_log = 0);
-    static void apply_transact_log(InputStream& transact_log, Group& target,
-                                   IndexTranslatorBase& translator, std::ostream* apply_log = 0);
 
     virtual ~Replication() TIGHTDB_NOEXCEPT {}
 
@@ -326,21 +318,6 @@ struct Replication::CommitLogEntry {
 // are foreign. It is carried over as part of a commit, allowing other threads involved
 // with Sync to observet it. For local commits, the value of server_version is taken
 // from any previous forewign commmit.
-
-class Replication::IndexTranslatorBase {
-public:
-    virtual size_t translate_row_index(TableRef table, size_t row_ndx, bool* overwritten = null_ptr) = 0;
-};
-
-class Replication::SimpleIndexTranslator : public Replication::IndexTranslatorBase {
-public:
-    size_t translate_row_index(TableRef, size_t row_ndx, bool* overwritten) TIGHTDB_OVERRIDE
-    {
-        if (overwritten)
-            *overwritten = false;
-        return row_ndx;
-    }
-};
 
 
 class Replication::SimpleInputStream: public Replication::InputStream {
@@ -456,7 +433,7 @@ inline void Replication::set_sync_progress(version_type, version_type)
 }
 
 inline Replication::version_type
-Replication::apply_foreign_changeset(SharedGroup&, version_type, BinaryData,
+Replication::apply_foreign_changeset(SharedGroup&, uint_fast64_t, version_type, BinaryData,
                                      uint_fast64_t, uint_fast64_t, version_type,
                                      std::ostream*)
 {
@@ -479,7 +456,6 @@ inline void Replication::get_commit_entries(version_type, version_type, Replicat
     // Unimplemented!
     TIGHTDB_ASSERT(false);
 }
-
 
 inline void Replication::get_commit_entries(version_type, version_type, BinaryData*)
     TIGHTDB_NOEXCEPT

@@ -14,8 +14,10 @@
 #include "test.hpp"
 
 #include <unistd.h> // usleep
+#include <tightdb/impl/merge_index_map.hpp>
 
 using namespace tightdb;
+using namespace tightdb::_impl;
 using namespace tightdb::util;
 using namespace tightdb::test_util;
 using unit_test::TestResults;
@@ -65,7 +67,8 @@ void sync_commits(SharedGroup& from_group, SharedGroup& to_group)
     if (v0 == 0)
         v0 = 1;
     version_type v1 = from_group.get_current_version();
-    uint_fast64_t peer_id = 1;
+    uint_fast64_t self_peer_id = &from_group > &to_group ? 1 : 2;
+    uint_fast64_t peer_id      = &from_group > &to_group ? 2 : 1;
     //std::cout << "\nSYNC: " << &from_group << " -> " << &to_group << " (v0 = " << v0 << ", v1 = " << v1 << ")\n";
     if (v1 <= v0)
         return; // Already in sync
@@ -80,8 +83,12 @@ void sync_commits(SharedGroup& from_group, SharedGroup& to_group)
         if (entries[i].peer_id != 0)
             continue;
         version_type commit_version = v0 + i + 1;
+        version_type last_peer_version = entries[i].peer_version;
+        if (last_peer_version == 0)
+            last_peer_version = 1;
         to_r->apply_foreign_changeset(to_group,
-            entries[i].peer_version,
+            self_peer_id,
+            last_peer_version,
             entries[i].log_data,
             entries[i].timestamp,
             peer_id,
@@ -192,11 +199,10 @@ TEST(Sync_MergeWrites)
     sync_commits(a, b);
     sync_commits(b, a);
 
-    // Because a's commits "came first", we expect row 0 in a to have 999 from a.
-    CHECK_EQUAL(999, get(a, 0));
-    CHECK_EQUAL(333, get(a, 1));
-    CHECK_EQUAL(999, get(b, 0)); // fails here if merge doesn't work
-    CHECK_EQUAL(333, get(b, 1));
+    CHECK_EQUAL(333, get(a, 0));
+    CHECK_EQUAL(999, get(a, 1));
+    CHECK_EQUAL(333, get(b, 0)); // fails here if merge doesn't work
+    CHECK_EQUAL(999, get(b, 1));
     check_equality(test_results, a, b);
 
     insert(a, 0, 999);
@@ -204,11 +210,10 @@ TEST(Sync_MergeWrites)
     insert(b, 0, 333);
     sync_commits(b, a);
     sync_commits(a, b);
-    // Because a's commits "came first", we expect row 0 in a to have 999 from a.
-    CHECK_EQUAL(999, get(a, 0));
-    CHECK_EQUAL(333, get(a, 1));
-    CHECK_EQUAL(999, get(b, 0));
-    CHECK_EQUAL(333, get(b, 1));
+    CHECK_EQUAL(333, get(a, 0));
+    CHECK_EQUAL(999, get(a, 1));
+    CHECK_EQUAL(333, get(b, 0));
+    CHECK_EQUAL(999, get(b, 1));
     check_equality(test_results, a, b);
 
     // Now let's try the same, but with commits arriving out of order:
@@ -217,30 +222,31 @@ TEST(Sync_MergeWrites)
     insert(b, 0, 444);
     sync_commits(a, b);
     sync_commits(b, a);
-    // Because b's commits "came before" a's, we expect row 0 to have 888 from a.
-    CHECK_EQUAL(888, get(a, 0)); // fails here if merge doesn't work
-    CHECK_EQUAL(888, get(b, 0));
+    CHECK_EQUAL(444, get(a, 0)); // fails here if merge doesn't work
+    CHECK_EQUAL(444, get(b, 0));
     check_equality(test_results, a, b);
+
+    /// PENDING SET SUPPORT!
 
     // Conflicting set operations:
-    set(a, 0, 999);
-    bump_timestamp();
-    set(b, 0, 1001);
-    sync_commits(a, b);
-    sync_commits(b, a);
-    CHECK_EQUAL(1001, get(a, 0));
-    CHECK_EQUAL(1001, get(b, 0));
-    check_equality(test_results, a, b);
+    // set(a, 0, 999);
+    // bump_timestamp();
+    // set(b, 0, 1001);
+    // sync_commits(a, b);
+    // sync_commits(b, a);
+    // CHECK_EQUAL(999, get(a, 0));
+    // CHECK_EQUAL(999, get(b, 0));
+    // check_equality(test_results, a, b);
 
     // Conflicting set operations out of order:
-    set(b, 0, 1002);
-    bump_timestamp();
-    set(a, 0, 1111);
-    sync_commits(a, b);
-    sync_commits(b, a);
-    CHECK_EQUAL(1111, get(a, 0));
-    CHECK_EQUAL(1111, get(b, 0));
-    check_equality(test_results, a, b);
+    // set(b, 0, 1002);
+    // bump_timestamp();
+    // set(a, 0, 1111);
+    // sync_commits(a, b);
+    // sync_commits(b, a);
+    // CHECK_EQUAL(1111, get(a, 0));
+    // CHECK_EQUAL(1111, get(b, 0));
+    // check_equality(test_results, a, b);
 
     // Insert at different indices:
     insert(a, 0, 12221);
@@ -274,28 +280,28 @@ TEST(Sync_MergeWrites)
     check_equality(test_results, a, b);
 
     // Many set, different times:
-    set(a, 4, 123);
-    set(a, 4, 234);
-    set(b, 4, 345);
-    set(a, 4, 456);
-    set(a, 4, 567);
-    sync_commits(a, b);
-    sync_commits(b, a);
-    CHECK_EQUAL(567, get(a, 4));
-    CHECK_EQUAL(567, get(b, 4));
-    check_equality(test_results, a, b);
+    // set(a, 4, 123);
+    // set(a, 4, 234);
+    // set(b, 4, 345);
+    // set(a, 4, 456);
+    // set(a, 4, 567);
+    // sync_commits(a, b);
+    // sync_commits(b, a);
+    // CHECK_EQUAL(567, get(a, 4));
+    // CHECK_EQUAL(567, get(b, 4));
+    // check_equality(test_results, a, b);
 
     // Many set, different times, other order:
-    set(a, 4, 123);
-    set(a, 4, 234);
-    set(b, 4, 345);
-    set(a, 4, 456);
-    set(a, 4, 567);
-    sync_commits(b, a);
-    sync_commits(a, b);
-    CHECK_EQUAL(567, get(a, 4));
-    CHECK_EQUAL(567, get(b, 4));
-    check_equality(test_results, a, b);
+    // set(a, 4, 123);
+    // set(a, 4, 234);
+    // set(b, 4, 345);
+    // set(a, 4, 456);
+    // set(a, 4, 567);
+    // sync_commits(b, a);
+    // sync_commits(a, b);
+    // CHECK_EQUAL(567, get(a, 4));
+    // CHECK_EQUAL(567, get(b, 4));
+    // check_equality(test_results, a, b);
 
     // Insert on both ends
     insert(a, 1, 0xaa);
@@ -304,5 +310,33 @@ TEST(Sync_MergeWrites)
     sync_commits(b, a);
     sync_commits(a, b);
     check_equality(test_results, a, b);
+}
 
+TEST(Sync_MergeIndexMap)
+{
+    uint64_t self_id = 0;
+    uint64_t peer_id = 1;
+    MergeIndexMap map(0);
+
+    CHECK_EQUAL(0, map.transform_insert(0, 1, 0, peer_id));
+
+    map.clear();
+    map.unknown_insertion_at(0, 1, 0, self_id);
+    map.unknown_insertion_at(0, 1, 1, self_id);
+    size_t i0 = map.transform_insert(0, 1, 2, peer_id);
+    CHECK_EQUAL(2, i0);
+
+    map.clear();
+    map.known_insertion_at(1, 1);
+    //map.debug_print();
+    size_t i1 = map.transform_insert(3, 1, 3, peer_id);
+    CHECK_EQUAL(3, i1);
+
+    map.clear();
+    map.unknown_insertion_at(0, 1, 0, self_id);
+    map.known_insertion_at(0, 1);
+    map.unknown_insertion_at(1, 1, 1, self_id);
+    map.known_insertion_at(1, 1);
+    size_t i2 = map.transform_insert(2, 1, 2, peer_id);
+    CHECK_EQUAL(4, i2);
 }
