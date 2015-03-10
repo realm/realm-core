@@ -43,7 +43,7 @@ TIGHTDB_NORETURN void terminate(const char* message, const char* file, long line
     std::stringstream ss;
     ss << file << ":" << line << ": " << message << " [" << info1 << ", " << info2 << "]\n";
     terminate_internal(ss);
-};
+}
 
 } // namespace util
 } // namespace tightdb
