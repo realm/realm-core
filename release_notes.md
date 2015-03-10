@@ -23,10 +23,20 @@
 
 ----------------------------------------------
 
+# 0.88.6 Release notes
+
+### Bugfixes:
+
+* Fixed bug that coudl easily cause corruption after adding a seach index to an
+  integer column.
+
+----------------------------------------------
+
 # 0.88.5 Release notes
 
 ### Bugfixes:
 
+* Fixed bug in Integer index that could make it crash or return bad results (String index not affected)
 * Fixed crash when `std::exit()` is called with active encrypted mappings.
 * Fixed writing over 4KB of data to an encrypted file with `Group::write()`.
 * Fixed crash after making commits which produced over 4KB of writelog data with

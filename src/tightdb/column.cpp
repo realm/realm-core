@@ -24,7 +24,6 @@ void ColumnBase::set_string(size_t, StringData)
     throw LogicError(LogicError::type_mismatch);
 }
 
-
 void ColumnBase::update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT
 {
     m_array->update_from_parent(old_baseline);
@@ -506,6 +505,13 @@ void Column::move_assign(Column& col)
     col.m_search_index = null_ptr;
 }
 
+void Column::update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT
+{
+    m_array->update_from_parent(old_baseline);
+
+    if (m_search_index)
+        m_search_index->update_from_parent(old_baseline);
+}
 
 namespace {
 
@@ -745,18 +751,18 @@ namespace {
 
 StringIndex* Column::create_search_index()
 {
-   TIGHTDB_ASSERT(!m_search_index);
-   UniquePtr<StringIndex> index;
-   StringIndex* si = new StringIndex(this, &get_string, m_array->get_alloc());  // Throws
-   index.reset(si);
+    TIGHTDB_ASSERT(!m_search_index);
+    UniquePtr<StringIndex> index;
+    StringIndex* si = new StringIndex(this, &get_string, m_array->get_alloc()); // Throws
+    index.reset(si);
 
-   // Populate the index
+    // Populate the index
     size_t num_rows = size();
     for (size_t row_ndx = 0; row_ndx != num_rows; ++row_ndx) {
         int64_t value = get(row_ndx);
         size_t num_rows = 1;
         bool is_append = true;
-        static_cast<StringIndex*>(index.get())->insert(row_ndx, value, num_rows, is_append); // Throws
+        index.get()->insert(row_ndx, value, num_rows, is_append); // Throws
     }
 
     m_search_index = index.release();
