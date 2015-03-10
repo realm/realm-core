@@ -1690,6 +1690,34 @@ TEST(Group_CommitLinkListChange)
 }
 
 
+TEST(Group_Commit_Update_Integer_Index)
+{
+    // This reproduces a bug where a commit would fail to update the Column::m_search_index pointer
+    // and hence crash or behave erratic for subsequent index operations
+    GROUP_TEST_PATH(path);
+
+    Group g(path, 0, Group::mode_ReadWrite);
+    TableRef t = g.add_table("table");
+    t->add_column(type_Int, "integer");
+
+    for (size_t i = 0; i < 200; i++) {
+        t->add_empty_row();
+        t->set_int(0, i, (i + 1) * 0xeeeeeeeeeeeeeeeeULL);
+    }
+
+    t->add_search_index(0);
+
+    // This would always work
+    CHECK(t->find_first_int(0, (0 + 1) * 0xeeeeeeeeeeeeeeeeULL) == 0);
+
+    g.commit();
+
+    // This would fail (sometimes return not_found, sometimes crash) 
+    CHECK(t->find_first_int(0, (0 + 1) * 0xeeeeeeeeeeeeeeeeULL) == 0);
+}
+
+
+
 #ifdef TIGHTDB_DEBUG
 #ifdef TIGHTDB_TO_DOT
 

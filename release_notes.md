@@ -24,6 +24,7 @@
 
 ### Bugfixes:
 
+* Fixed bug in Integer index that could make it crash or return bad results (String index not affected)
 * Fixed crash when `std::exit()` is called with active encrypted mappings.
 * Fixed writing over 4KB of data to an encrypted file with `Group::write()`.
 * Fixed crash after making commits which produced over 4KB of writelog data with
