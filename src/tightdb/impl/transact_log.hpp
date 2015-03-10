@@ -364,7 +364,8 @@ private:
     float read_float();
     double read_double();
 
-    void read_string(util::StringBuffer&);
+    StringData read_string(util::StringBuffer&);
+    BinaryData read_binary(util::StringBuffer&);
     void read_mixed(Mixed*);
 
     // Advance m_input_begin and m_input_end to reflect the next block of instructions
@@ -1408,8 +1409,7 @@ void TransactLogParser::do_parse(InstructionHandler& handler)
             case instr_SetString: {
                 std::size_t col_ndx = read_int<std::size_t>(); // Throws
                 std::size_t row_ndx = read_int<std::size_t>(); // Throws
-                read_string(m_string_buffer); // Throws
-                StringData value(m_string_buffer.data(), m_string_buffer.size());
+                StringData value = read_string(m_string_buffer); // Throws
                 if (!handler.set_string(col_ndx, row_ndx, value)) // Throws
                     parser_error();
                 continue;
@@ -1417,8 +1417,7 @@ void TransactLogParser::do_parse(InstructionHandler& handler)
             case instr_SetBinary: {
                 std::size_t col_ndx = read_int<std::size_t>(); // Throws
                 std::size_t row_ndx = read_int<std::size_t>(); // Throws
-                read_string(m_string_buffer); // Throws
-                BinaryData value(m_string_buffer.data(), m_string_buffer.size());
+                BinaryData value = read_binary(m_string_buffer); // Throws
                 if (!handler.set_binary(col_ndx, row_ndx, value)) // Throws
                     parser_error();
                 continue;
@@ -1498,8 +1497,7 @@ void TransactLogParser::do_parse(InstructionHandler& handler)
                 std::size_t col_ndx = read_int<std::size_t>(); // Throws
                 std::size_t row_ndx = read_int<std::size_t>(); // Throws
                 std::size_t tbl_sz = read_int<std::size_t>(); // Throws
-                read_string(m_string_buffer); // Throws
-                StringData value(m_string_buffer.data(), m_string_buffer.size());
+                StringData value = read_string(m_string_buffer); // Throws
                 if (!handler.insert_string(col_ndx, row_ndx, tbl_sz, value)) // Throws
                     parser_error();
                 continue;
@@ -1508,8 +1506,7 @@ void TransactLogParser::do_parse(InstructionHandler& handler)
                 std::size_t col_ndx = read_int<std::size_t>(); // Throws
                 std::size_t row_ndx = read_int<std::size_t>(); // Throws
                 std::size_t tbl_sz = read_int<std::size_t>(); // Throws
-                read_string(m_string_buffer); // Throws
-                BinaryData value(m_string_buffer.data(), m_string_buffer.size());
+                BinaryData value = read_binary(m_string_buffer); // Throws
                 if (!handler.insert_binary(col_ndx, row_ndx, tbl_sz, value)) // Throws
                     parser_error();
                 continue;
@@ -1693,8 +1690,7 @@ void TransactLogParser::do_parse(InstructionHandler& handler)
                 int type = read_int<int>(); // Throws
                 if (!is_valid_data_type(type))
                     parser_error();
-                read_string(m_string_buffer); // Throws
-                StringData name(m_string_buffer.data(), m_string_buffer.size());
+                StringData name = read_string(m_string_buffer); // Throws
                 if (!handler.insert_column(col_ndx, DataType(type), name)) // Throws
                     parser_error();
                 continue;
@@ -1704,8 +1700,7 @@ void TransactLogParser::do_parse(InstructionHandler& handler)
                 int type = read_int<int>(); // Throws
                 if (!is_valid_data_type(type))
                     parser_error();
-                read_string(m_string_buffer); // Throws
-                StringData name(m_string_buffer.data(), m_string_buffer.size());
+                StringData name = read_string(m_string_buffer); // Throws
                 std::size_t link_target_table_ndx = read_int<std::size_t>(); // Throws
                 std::size_t backlink_col_ndx = read_int<std::size_t>(); // Throws
                 if (!handler.insert_link_column(col_ndx, DataType(type), name,
@@ -1730,8 +1725,7 @@ void TransactLogParser::do_parse(InstructionHandler& handler)
             }
             case instr_RenameColumn: {
                 std::size_t col_ndx = read_int<std::size_t>(); // Throws
-                read_string(m_string_buffer); // Throws
-                StringData name(m_string_buffer.data(), m_string_buffer.size());
+                StringData name = read_string(m_string_buffer); // Throws
                 if (!handler.rename_column(col_ndx, name)) // Throws
                     parser_error();
                 continue;
@@ -1753,8 +1747,7 @@ void TransactLogParser::do_parse(InstructionHandler& handler)
             case instr_InsertGroupLevelTable: {
                 std::size_t table_ndx  = read_int<std::size_t>(); // Throws
                 std::size_t num_tables = read_int<std::size_t>(); // Throws
-                read_string(m_string_buffer); // Throws
-                StringData name(m_string_buffer.data(), m_string_buffer.size());
+                StringData name = read_string(m_string_buffer); // Throws
                 if (!handler.insert_group_level_table(table_ndx, num_tables, name)) // Throws
                     parser_error();
                 continue;
@@ -1768,8 +1761,7 @@ void TransactLogParser::do_parse(InstructionHandler& handler)
             }
             case instr_RenameGroupLevelTable: {
                 std::size_t table_ndx = read_int<std::size_t>(); // Throws
-                read_string(m_string_buffer); // Throws
-                StringData new_name(m_string_buffer.data(), m_string_buffer.size());
+                StringData new_name = read_string(m_string_buffer); // Throws
                 if (!handler.rename_group_level_table(table_ndx, new_name)) // Throws
                     parser_error();
                 continue;
@@ -1866,12 +1858,27 @@ inline double TransactLogParser::read_double()
 }
 
 
-inline void TransactLogParser::read_string(util::StringBuffer& buf)
+inline StringData TransactLogParser::read_string(util::StringBuffer& buf)
 {
-    buf.clear();
     std::size_t size = read_int<std::size_t>(); // Throws
+
+    const std::size_t avail = m_input_end - m_input_begin;
+    if (avail >= size) {
+        m_input_begin += size;
+        return StringData(m_input_begin - size, size);
+    }
+
+    buf.clear();
     buf.resize(size); // Throws
     read_bytes(buf.data(), size);
+    return StringData(buf.data(), size);
+}
+
+
+inline BinaryData TransactLogParser::read_binary(util::StringBuffer& buf)
+{
+    StringData str = read_string(buf); // Throws;
+    return BinaryData(str.data(), str.size());
 }
 
 
@@ -1908,14 +1915,12 @@ inline void TransactLogParser::read_mixed(Mixed* mixed)
             return;
         }
         case type_String: {
-            read_string(m_string_buffer); // Throws
-            StringData value(m_string_buffer.data(), m_string_buffer.size());
+            StringData value = read_string(m_string_buffer); // Throws
             mixed->set_string(value);
             return;
         }
         case type_Binary: {
-            read_string(m_string_buffer); // Throws
-            BinaryData value(m_string_buffer.data(), m_string_buffer.size());
+            BinaryData value = read_binary(m_string_buffer); // Throws
             mixed->set_binary(value);
             return;
         }
