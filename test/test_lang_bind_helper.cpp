@@ -7043,6 +7043,50 @@ TEST(Shared_LinkListCrash)
     g2.Verify();
 }
 
+TEST(LangBindHelper_MixedCommitSizes)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
+    SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
+
+    Group& g = const_cast<Group&>(sg.begin_read());
+
+    LangBindHelper::promote_to_write(sg);
+    TableRef table = g.add_table("table");
+    table->add_column(type_Binary, "value");
+    LangBindHelper::commit_and_continue_as_read(sg);
+
+    UniquePtr<char[]> buffer(new char[65536]);
+    fill(buffer.get(), buffer.get() + 65536, 0);
+
+    // 4 large commits so that both write log files are large and fully
+    // initialized (with both iv slots being non-zero when encryption is
+    // enabled), two small commits to shrink both of the log files, then two
+    // large commits to re-expand them
+    for (int i = 0; i < 4; ++i) {
+        LangBindHelper::promote_to_write(sg);
+        table->insert_binary(0, 0, BinaryData(buffer.get(), 65536));
+        table->insert_done();
+        LangBindHelper::commit_and_continue_as_read(sg);
+        g.Verify();
+    }
+
+    for (int i = 0; i < 2; ++i) {
+        LangBindHelper::promote_to_write(sg);
+        table->insert_binary(0, 0, BinaryData(buffer.get(), 1024));
+        table->insert_done();
+        LangBindHelper::commit_and_continue_as_read(sg);
+        g.Verify();
+    }
+
+    for (int i = 0; i < 2; ++i) {
+        LangBindHelper::promote_to_write(sg);
+        table->insert_binary(0, 0, BinaryData(buffer.get(), 65536));
+        table->insert_done();
+        LangBindHelper::commit_and_continue_as_read(sg);
+        g.Verify();
+    }
+}
 
 #endif // TIGHTDB_ENABLE_REPLICATION
 

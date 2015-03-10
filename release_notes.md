@@ -2,7 +2,7 @@
 
 ### Bugfixes:
 
-* Fixed very old bug in String and Integer index that could make it crash if strings ended with 0-bytes.
+* Lorem ipsum.
 
 ### API breaking changes:
 
@@ -16,7 +16,33 @@
 
 ### Internals:
 
-* Switched to using mach exceptions rather than signal() for encrypted mappings on Apple platforms.
+* Lorem ipsum.
+
+----------------------------------------------
+
+# 0.88.6 Release notes
+
+### Bugfixes:
+
+* Fixed bug in Integer index that could make it crash or return bad results (String index not affected)
+
+----------------------------------------------
+
+# 0.88.5 Release notes
+
+### Bugfixes:
+
+* Fixed crash when `std::exit()` is called with active encrypted mappings.
+* Fixed writing over 4KB of data to an encrypted file with `Group::write()`.
+* Fixed crash after making commits which produced over 4KB of writelog data with
+  encryption enabled.
+
+-----------
+
+### Internals:
+
+* Switched to using mach exceptions rather than signal() for encrypted mappings
+  on Apple platforms.
 
 ----------------------------------------------
 
