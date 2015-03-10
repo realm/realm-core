@@ -42,7 +42,6 @@ template <typename T1, typename T2>
 TIGHTDB_NORETURN void terminate(const char* message, const char* file, long line, T1 info1, T2 info2) TIGHTDB_NOEXCEPT {
     std::stringstream ss;
     ss << file << ":" << line << ": " << message << " [" << info1 << ", " << info2 << "]\n";
-    ss << file << ":" << line << ": " << message << "\n";
     terminate_internal(ss);
 };
 
