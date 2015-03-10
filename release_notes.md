@@ -1,22 +1,9 @@
-# NEXT RELEASE
+# 0.88.6 Release notes
 
 ### Bugfixes:
 
-* Lorem ipsum.
-
-### API breaking changes:
-
-* Lorem ipsum.
-
-### Enhancements:
-
-* Lorem ipsum.
-
------------
-
-### Internals:
-
-* Lorem ipsum.
+* Fixed bug that coudl easily cause corruption after adding a seach index to an
+  integer column.
 
 ----------------------------------------------
 
