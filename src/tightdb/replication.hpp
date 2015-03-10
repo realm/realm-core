@@ -166,17 +166,13 @@ public:
     virtual void set_sync_progress(version_type server_version,
                                    version_type client_version);
 
-    /// Apply the specified changeset to the specified group as a single
-    /// transaction, but only if that transaction can be based on the specified
-    /// version. It is an error to specify a base version that is ahead of the
-    /// current version of the group. Doing so will cause an exception to be
-    /// thrown. Otherwise, if the current version is ahead of the specified base
-    /// version (i.e., a conflict), this function returns 0. Otherwise it
-    /// attempts to apply the changeset, and if that succeeds, it returns the
-    /// new version produced by the transaction. Note that this will also have
-    /// the effect of making the specified changeset available as a transaction
-    /// log through this transaction log registry. The caller retains ownership
-    /// of the specified changeset buffer.
+    /// Integrate the specified changeset to the specified group as a single
+    /// transaction. It attempts to apply the changeset, and returns
+    /// the new version produced by the transaction. The changeset will be
+    /// operationally transformed to produce identical results on both ends.
+    /// Note that this will also have the effect of making the transformed
+    /// changeset available as a transaction log through this transaction log
+    /// registry. The caller retains ownership of the specified changeset buffer.
     ///
     /// The specified shared group must have this replication instance set as
     /// its associated Replication instance. The effect of violating this rule

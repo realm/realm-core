@@ -83,9 +83,12 @@ void sync_commits(SharedGroup& from_group, SharedGroup& to_group)
         if (entries[i].peer_id != 0)
             continue;
         version_type commit_version = v0 + i + 1;
+        version_type last_peer_version = entries[i].peer_version;
+        if (last_peer_version == 0)
+            last_peer_version = 1;
         to_r->apply_foreign_changeset(to_group,
             self_peer_id,
-            entries[i].peer_version,
+            last_peer_version,
             entries[i].log_data,
             entries[i].timestamp,
             peer_id,

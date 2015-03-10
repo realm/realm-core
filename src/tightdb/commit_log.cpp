@@ -1227,28 +1227,6 @@ WriteLogCollector::apply_foreign_changeset(SharedGroup& sg, uint_fast64_t self_p
     WriteTransaction transact(sg);
     version_type current_version = sg.get_current_version();
 
-//    if (last_version_integrated_by_peer < current_version)
-//        return 0;
-
-    // FIXME: This is a temporary hack
-    if (last_version_integrated_by_peer != 0) {
-        if (last_version_integrated_by_peer < current_version) {
-            uint_fast64_t last_client_file_ident;
-            {
-                map_header_if_needed(); // Throws
-                RobustLockGuard rlg(m_header.get_addr()->lock, &recover_from_dead_owner);
-                const CommitLogPreamble* preamble = get_preamble();
-                TIGHTDB_ASSERT(preamble->end_commit_range == current_version);
-                last_client_file_ident = preamble->last_client_file_ident;
-            }
-            // `last_client_file_ident` will be 0 if the history is empty (empty
-            // database).
-            bool history_ends_with_foreign_changeset = last_client_file_ident != 0;
-            if (!history_ends_with_foreign_changeset)
-                return 0;
-        }
-    }
-
     if (TIGHTDB_UNLIKELY(last_version_integrated_by_peer > current_version))
         throw LogicError(LogicError::bad_version_number);
 
