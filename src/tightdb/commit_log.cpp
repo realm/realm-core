@@ -487,6 +487,7 @@ void WriteLogCollector::cleanup_stale_versions(CommitLogPreamble* preamble)
         if (size > 4) {
             size -= size/4;
             size *= page_size * minimal_pages;
+            active_log->map.unmap();
             active_log->file.resize(size);
         }
     }

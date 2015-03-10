@@ -25,7 +25,7 @@
 
 #define TIGHTDB_VER_MAJOR 0
 #define TIGHTDB_VER_MINOR 88
-#define TIGHTDB_VER_PATCH 4
+#define TIGHTDB_VER_PATCH 5
 #define TIGHTDB_PRODUCT_NAME "realm-core"
 
 #define TIGHTDB_QUOTE2(X) #X
