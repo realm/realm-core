@@ -215,7 +215,9 @@ TEST(Shared_PipelinedWritesWithKills)
 #endif
 
 
+/*
 #ifndef _WIN32
+
 TEST(Shared_CompactingOnTheFly)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -269,6 +271,7 @@ TEST(Shared_CompactingOnTheFly)
 }
 #endif // _WIN32
 
+*/
 
 #ifdef LOCKFILE_CLEANUP
 // The following two tests are now disabled, as we have abandoned the requirement to
