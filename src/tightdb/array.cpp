@@ -1978,43 +1978,6 @@ template<size_t w> void Array::ReferenceQuickSort(size_t lo, size_t hi, Array& r
         ReferenceQuickSort<w>(i, hi, ref);
 }
 
-
-void Array::QuickSort(size_t lo, size_t hi)
-{
-    TIGHTDB_TEMPEX(QuickSort, m_width, (lo, hi);)
-}
-
-template<size_t w> void Array::QuickSort(size_t lo, size_t hi)
-{
-    // Quicksort based on
-    // http://www.inf.fh-flensburg.de/lang/algorithmen/sortieren/quick/quicken.htm
-    int i = int(lo);
-    int j = int(hi);
-
-    // comparison element x
-    const size_t ndx = (lo + hi)/2;
-    const int64_t x = get(ndx);
-
-    // partition
-    do {
-        while (get(i) < x) ++i;
-        while (get(j) > x) --j;
-        if (i <= j) {
-            int64_t h = get(i);
-            set(i, get(j));
-            set(j, h);
-            ++i; --j;
-        }
-    }
-    while (i <= j);
-
-    //  recursion
-    if (int(lo) < j)
-        QuickSort(lo, j);
-    if (i < int(hi))
-        QuickSort(i, hi);
-}
-
 bool Array::compare_int(const Array& a) const TIGHTDB_NOEXCEPT
 {
     if (a.size() != size())
