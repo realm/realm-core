@@ -11,6 +11,7 @@
 ### Enhancements:
 
 * Improved performance of advance_read() over commits with string or binary data insertions.
+* Improved performance sorting TableView and LinkView.
 
 -----------
 
