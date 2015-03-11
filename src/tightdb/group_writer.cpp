@@ -23,9 +23,9 @@ size_t GroupWriter::write_group()
     merge_free_space(); // Throws
 
     Array& top        = m_group.m_top;
-    Array& fpositions = m_group.m_free_positions;
-    Array& flengths   = m_group.m_free_lengths;
-    Array& fversions  = m_group.m_free_versions;
+    ArrayInteger& fpositions = m_group.m_free_positions;
+    ArrayInteger& flengths   = m_group.m_free_lengths;
+    ArrayInteger& fversions  = m_group.m_free_versions;
     bool is_shared = m_group.m_is_shared;
     TIGHTDB_ASSERT_3(fpositions.size(), ==, flengths.size());
     TIGHTDB_ASSERT(!is_shared || fversions.size() == flengths.size());
@@ -173,9 +173,9 @@ size_t GroupWriter::write_group()
 
 void GroupWriter::merge_free_space()
 {
-    Array& positions = m_group.m_free_positions;
-    Array& lengths   = m_group.m_free_lengths;
-    Array& versions  = m_group.m_free_versions;
+    ArrayInteger& positions = m_group.m_free_positions;
+    ArrayInteger& lengths   = m_group.m_free_lengths;
+    ArrayInteger& versions  = m_group.m_free_versions;
     bool is_shared = m_group.m_is_shared;
 
     if (lengths.is_empty())
@@ -226,9 +226,9 @@ size_t GroupWriter::get_free_space(size_t size)
 
     pair<size_t, size_t> p = reserve_free_space(size);
 
-    Array& positions = m_group.m_free_positions;
-    Array& lengths   = m_group.m_free_lengths;
-    Array& versions  = m_group.m_free_versions;
+    ArrayInteger& positions = m_group.m_free_positions;
+    ArrayInteger& lengths   = m_group.m_free_lengths;
+    ArrayInteger& versions  = m_group.m_free_versions;
     bool is_shared = m_group.m_is_shared;
 
     // Claim space from identified chunk
@@ -255,8 +255,8 @@ size_t GroupWriter::get_free_space(size_t size)
 
 pair<size_t, size_t> GroupWriter::reserve_free_space(size_t size)
 {
-    Array& lengths  = m_group.m_free_lengths;
-    Array& versions = m_group.m_free_versions;
+    ArrayInteger& lengths  = m_group.m_free_lengths;
+    ArrayInteger& versions = m_group.m_free_versions;
     bool is_shared = m_group.m_is_shared;
 
     // Since we do a first-fit search for small chunks, the top pieces
@@ -297,9 +297,9 @@ pair<size_t, size_t> GroupWriter::reserve_free_space(size_t size)
 
 pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
 {
-    Array& positions = m_group.m_free_positions;
-    Array& lengths   = m_group.m_free_lengths;
-    Array& versions  = m_group.m_free_versions;
+    ArrayInteger& positions = m_group.m_free_positions;
+    ArrayInteger& lengths   = m_group.m_free_lengths;
+    ArrayInteger& versions  = m_group.m_free_versions;
     bool is_shared = m_group.m_is_shared;
 
     // We need to consider the "logical" size of the file here, and
@@ -490,9 +490,9 @@ void GroupWriter::commit(ref_type new_top_ref)
 
 void GroupWriter::dump()
 {
-    Array& fpositions = m_group.m_free_positions;
-    Array& flengths   = m_group.m_free_lengths;
-    Array& fversions  = m_group.m_free_versions;
+    ArrayInteger& fpositions = m_group.m_free_positions;
+    ArrayInteger& flengths   = m_group.m_free_lengths;
+    ArrayInteger& fversions  = m_group.m_free_versions;
     bool is_shared = m_group.m_is_shared;
 
     size_t count = flengths.size();

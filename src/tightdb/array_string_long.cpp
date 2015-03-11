@@ -4,6 +4,7 @@
 
 #include <tightdb/array_string_long.hpp>
 #include <tightdb/array_blob.hpp>
+#include <tightdb/array_integer.hpp>
 #include <tightdb/impl/destroy_guard.hpp>
 #include <tightdb/column.hpp>
 
@@ -187,7 +188,7 @@ MemRef ArrayStringLong::create_array(size_t size, Allocator& alloc)
     {
         bool context_flag = false;
         int_fast64_t value = 0;
-        MemRef mem = Array::create_array(type_Normal, context_flag, size, value, alloc); // Throws
+        MemRef mem = ArrayInteger::create_array(type_Normal, context_flag, size, value, alloc); // Throws
         dg_2.reset(mem.m_ref);
         int_fast64_t v(mem.m_ref); // FIXME: Dangerous cast (unsigned -> signed)
         top.add(v); // Throws

@@ -26,11 +26,13 @@ utilities.hpp \
 alloc.hpp \
 alloc_slab.hpp \
 array.hpp \
+array_integer.hpp \
 array_string.hpp \
 data_type.hpp \
 column_type.hpp \
 column_fwd.hpp \
 spec.hpp \
+impl/array_writer.hpp \
 impl/destroy_guard.hpp \
 impl/output_stream.hpp \
 datetime.hpp \
@@ -118,6 +120,7 @@ array.cpp \
 array_binary.cpp \
 array_blob.cpp \
 array_blobs_big.cpp \
+array_integer.cpp \
 array_string.cpp \
 array_string_long.cpp \
 column.cpp \

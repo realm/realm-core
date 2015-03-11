@@ -2977,7 +2977,7 @@ TEST(Query_FindAllRangeOrMonkey2)
 
     for (size_t u = 0; u < ITER; u++) {
         TwoIntTable tit;
-        Array a(Allocator::get_default());
+        ArrayInteger a(Allocator::get_default());
         a.create(Array::type_Normal);
         size_t start = random.draw_int_max(ROWS);
         size_t end = start + random.draw_int_max(ROWS);
