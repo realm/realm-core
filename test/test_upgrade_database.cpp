@@ -123,10 +123,84 @@ TEST(Upgrade_Database_2_3)
             f = t->find_first_int(1, i);
             CHECK_EQUAL(f, i);
         }
-
-        // Test an assert that guards against writing version 2 file to disk
-        File::try_remove(path + ".tmp2");
     }
+
+
+    // Now see if we can open the upgraded file and also commit to it
+    {
+        // Make a copy of the version 2 database so that we keep the original file intact and unmodified
+        string path = test_util::get_test_path_prefix() + "version_2_database_" + int2string(TIGHTDB_MAX_BPNODE_SIZE) + ".tightdb";
+
+        SharedGroup sg(path + ".tmp");
+        WriteTransaction rt(sg);
+        TableRef t = rt.get_table("table");
+
+        CHECK(t->has_search_index(0));
+        CHECK(t->has_search_index(1));
+
+        for (int i = 0; i < 1000; i++) {
+            // These tests utilize the Integer and String index. That will crash if the database is still
+            // in version 2 format, because the on-disk format of index has changed in version 3.
+            string str = int2string(i);
+            StringData sd(str);
+            size_t f = t->find_first_string(0, sd);
+            CHECK_EQUAL(f, i);
+
+            f = t->find_first_int(1, i);
+            CHECK_EQUAL(f, i);
+        }
+
+        sg.commit();
+    }
+    
+    
+    // Begin from scratch; see if we can upgrade file and then use a write transaction
+    {
+        // Make a copy of the version 2 database so that we keep the original file intact and unmodified
+        string path = test_util::get_test_path_prefix() + "version_2_database_" + int2string(TIGHTDB_MAX_BPNODE_SIZE) + ".tightdb";
+
+        File::copy(path, path + ".tmp");
+
+        SharedGroup sg(path + ".tmp");
+        WriteTransaction rt(sg);
+        TableRef t = rt.get_table("table");
+
+        CHECK(t->has_search_index(0));
+        CHECK(t->has_search_index(1));
+
+        for (int i = 0; i < 1000; i++) {
+            // These tests utilize the Integer and String index. That will crash if the database is still
+            // in version 2 format, because the on-disk format of index has changed in version 3.
+            string str = int2string(i);
+            StringData sd(str);
+            size_t f = t->find_first_string(0, sd);
+            CHECK_EQUAL(f, i);
+
+            f = t->find_first_int(1, i);
+            CHECK_EQUAL(f, i);
+        }
+
+        sg.commit();
+
+        WriteTransaction rt2(sg);
+        TableRef t2 = rt.get_table("table");
+
+        CHECK(t2->has_search_index(0));
+        CHECK(t2->has_search_index(1));
+
+        for (int i = 0; i < 1000; i++) {
+            // These tests utilize the Integer and String index. That will crash if the database is still
+            // in version 2 format, because the on-disk format of index has changed in version 3.
+            string str = int2string(i);
+            StringData sd(str);
+            size_t f = t2->find_first_string(0, sd);
+            CHECK_EQUAL(f, i);
+
+            f = t2->find_first_int(1, i);
+            CHECK_EQUAL(f, i);
+        }
+    }
+
 
 
 #else   
