@@ -536,8 +536,6 @@ public:
     bool minimum(int64_t& result, std::size_t start = 0, std::size_t end = std::size_t(-1),
                  std::size_t* return_ndx = null_ptr) const;
 
-    void ReferenceSort(Array& ref) const;
-
     /// This information is guaranteed to be cached in the array accessor.
     bool is_inner_bptree_node() const TIGHTDB_NOEXCEPT;
 
