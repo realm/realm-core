@@ -920,10 +920,6 @@ private:
 
     Array& operator=(const Array&); // not allowed
 protected:
-    void ReferenceQuickSort(Array& ref) const;
-    template<size_t w> void ReferenceQuickSort(size_t lo, size_t hi, Array& ref) const;
-    template<size_t w> void ReferenceSort(Array& ref) const;
-
     /// Insert a new child after original. If the parent has to be
     /// split, this function returns the `ref` of the new parent node.
     ref_type insert_bptree_child(Array& offsets, std::size_t orig_child_ndx,
