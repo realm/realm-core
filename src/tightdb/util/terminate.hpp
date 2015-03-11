@@ -20,6 +20,7 @@
 #ifndef TIGHTDB_UTIL_TERMINATE_HPP
 #define TIGHTDB_UTIL_TERMINATE_HPP
 
+#include <sstream>
 #include <cstdlib>
 #include <string>
 #include <stdint.h>
@@ -29,8 +30,20 @@
 
 namespace tightdb {
 namespace util {
+TIGHTDB_NORETURN void terminate_internal(std::stringstream&) TIGHTDB_NOEXCEPT;
 
-TIGHTDB_NORETURN void terminate(const char* message, const char* file, long line, bool extra = false, int64_t info1 = 0, int64_t info2 = 0) TIGHTDB_NOEXCEPT;
+TIGHTDB_NORETURN inline void terminate(const char* message, const char* file, long line) TIGHTDB_NOEXCEPT {
+    std::stringstream ss;
+    ss << file << ":" << line << ": " << message << "\n";
+    terminate_internal(ss);
+}
+
+template <typename T1, typename T2>
+TIGHTDB_NORETURN void terminate(const char* message, const char* file, long line, T1 info1, T2 info2) TIGHTDB_NOEXCEPT {
+    std::stringstream ss;
+    ss << file << ":" << line << ": " << message << " [" << info1 << ", " << info2 << "]\n";
+    terminate_internal(ss);
+}
 
 } // namespace util
 } // namespace tightdb
