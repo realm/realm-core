@@ -1350,7 +1350,7 @@ void Table::upgrade_file_format()
                 asc.get_search_index()->clear();
                 asc.populate_search_index();
             }
-            else if (get_real_column_type(c) == type_Int) {
+            else if (get_real_column_type(c) == col_type_Int) {
                 ColumnBase& col = get_column_base(c);
                 Column& c = static_cast<Column&>(col);
                 c.get_search_index()->clear();

@@ -63,9 +63,7 @@ void Group::open(const string& file_path, const char* encryption_key, OpenMode m
     bool is_shared = false;
 
     // FIXME! In order to upgrade the database file format we need to open the file for writing, even
-    // though the user requested ReadOnly. A fix could be to place a `bool read_only` member in Group
-    // and check that in ::commit(). It's currently no problem because language bindings currently
-    // don't use Group at all.
+    // though the user requested ReadOnly.
 //    bool read_only = mode == mode_ReadOnly;
     bool read_only = false;
 
