@@ -562,7 +562,11 @@ inline Group::Group(const std::string& file, const char* key, OpenMode mode):
     m_free_lengths(m_alloc), m_free_versions(m_alloc), m_is_shared(false), m_is_attached(false)
 {
     init_array_parents();
+
+    // FIXME: open() will open file for write even though user requested ReadOnly. This is to be able to
+    // upgrade the database file format. See notes inside open().
     open(file, key, mode); // Throws
+    upgrade_file_format();
 }
 
 inline Group::Group(BinaryData buffer, bool take_ownership):

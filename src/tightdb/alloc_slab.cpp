@@ -568,8 +568,17 @@ void SlabAlloc::do_prepare_for_update(char* mutable_data, util::File::Map<char>&
 {
     TIGHTDB_ASSERT(m_file_on_streaming_form);
     Header* header = reinterpret_cast<Header*>(mutable_data);
-    TIGHTDB_ASSERT(equal(reinterpret_cast<char*>(header), reinterpret_cast<char*>(header+1),
-                         reinterpret_cast<const char*>(&streaming_header)));
+
+    // Don't compare file format version fields as they are allowed to differ. 
+    // Also don't compare reserved fields (todo, is it correct to ignore?)
+    TIGHTDB_ASSERT_3(header->m_flags, == , streaming_header.m_flags);
+    TIGHTDB_ASSERT_3(header->m_mnemonic[0], == , streaming_header.m_mnemonic[0]);
+    TIGHTDB_ASSERT_3(header->m_mnemonic[1], == , streaming_header.m_mnemonic[1]);
+    TIGHTDB_ASSERT_3(header->m_mnemonic[2], == , streaming_header.m_mnemonic[2]);
+    TIGHTDB_ASSERT_3(header->m_mnemonic[3], == , streaming_header.m_mnemonic[3]);
+    TIGHTDB_ASSERT_3(header->m_top_ref[0], == , streaming_header.m_top_ref[0]);
+    TIGHTDB_ASSERT_3(header->m_top_ref[1], == , streaming_header.m_top_ref[1]);
+
     StreamingFooter* footer = reinterpret_cast<StreamingFooter*>(mutable_data+m_baseline) - 1;
     TIGHTDB_ASSERT_3(footer->m_magic_cookie, ==, footer_magic_cookie);
     header->m_top_ref[1] = footer->m_top_ref;

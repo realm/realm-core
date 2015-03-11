@@ -700,13 +700,6 @@ void SharedGroup::open(const string& path, bool no_create_file,
             size_t file_size = alloc.get_baseline();
 
             if (begin_new_session) {
-
-                m_group.upgrade_file_format();
-                alloc.detach();
-                top_ref = alloc.attach_file(path, is_shared, read_only,
-                    no_create, skip_validate, key, server_sync_mode); // Throws
-                file_size = alloc.get_baseline();
-
                 // make sure the database is not on streaming format. This has to be done at
                 // session initialization, even if it means writing the database during open.
                 if (alloc.m_file_on_streaming_form) {

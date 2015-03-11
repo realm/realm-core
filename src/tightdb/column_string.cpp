@@ -191,6 +191,8 @@ void AdaptiveStringColumn::set_null(std::size_t ndx)
 
 void AdaptiveStringColumn::populate_search_index()
 {
+    TIGHTDB_ASSERT(m_search_index);
+
     size_t num_rows = size();
     for (size_t row_ndx = 0; row_ndx != num_rows; ++row_ndx) {
         StringData value = get(row_ndx);
@@ -208,9 +210,8 @@ StringIndex* AdaptiveStringColumn::create_search_index()
     index.reset(new StringIndex(this, &get_string, m_array->get_alloc())); // Throws
 
     // Populate the index
-    populate_search_index();
-
     m_search_index = index.release();
+    populate_search_index();
     return m_search_index;
 }
 
