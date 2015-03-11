@@ -22,6 +22,7 @@
 #define TIGHTDB_ARRAY_STRING_LONG_HPP
 
 #include <tightdb/array_blob.hpp>
+#include <tightdb/array_integer.hpp>
 
 namespace tightdb {
 
@@ -97,7 +98,7 @@ public:
 
     bool update_from_parent(std::size_t old_baseline) TIGHTDB_NOEXCEPT;
 private:
-    Array m_offsets;
+    ArrayInteger m_offsets;
     ArrayBlob m_blob;
     Array m_nulls;
     bool m_nullable;

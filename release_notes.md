@@ -6,7 +6,6 @@
 
 ### API breaking changes:
 
-* IMPORTANT: Before accessing an old version 2 database file (also if just for reads only), you must call Group::upgrade_file_format() on it to upgrade it to version 3! This requires the file to reside on writable storage. See test_upgrade_database.cpp
 
 ### Enhancements:
 

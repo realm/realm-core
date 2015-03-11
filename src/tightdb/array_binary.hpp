@@ -22,6 +22,7 @@
 
 #include <tightdb/binary_data.hpp>
 #include <tightdb/array_blob.hpp>
+#include <tightdb/array_integer.hpp>
 
 namespace tightdb {
 
@@ -84,7 +85,7 @@ public:
 #endif
     bool update_from_parent(std::size_t old_baseline) TIGHTDB_NOEXCEPT;
 private:
-    Array m_offsets;
+    ArrayInteger m_offsets;
     ArrayBlob m_blob;
 };
 

@@ -18,6 +18,7 @@
 #include <tightdb/query_conditions.hpp>
 #include <tightdb/column_string.hpp>
 #include <tightdb/index_string.hpp>
+#include <tightdb/array_integer.hpp>
 
 
 // Header format (8 bytes):
@@ -388,6 +389,71 @@ void Array::destroy_children(size_t offset) TIGHTDB_NOEXCEPT
     }
 }
 
+size_t Array::write(_impl::ArrayWriterBase& out, bool recurse, bool persist) const
+{
+    TIGHTDB_ASSERT(is_attached());
+
+    // Ignore un-changed arrays when persisting
+    if (persist && m_alloc.is_read_only(m_ref))
+        return m_ref;
+
+    if (!recurse || !m_has_refs) {
+        // FIXME: Replace capacity with checksum
+
+        // Write flat array
+        const char* header = get_header_from_data(m_data);
+        std::size_t size = get_byte_size();
+        uint_fast32_t dummy_checksum = 0x01010101UL;
+        std::size_t array_pos = out.write_array(header, size, dummy_checksum);
+        TIGHTDB_ASSERT_3(array_pos % 8, ==, 0); // 8-byte alignment
+
+        return array_pos;
+    }
+
+    // Temp array for updated refs
+    ArrayInteger new_refs(Allocator::get_default());
+    Type type = m_is_inner_bptree_node ? type_InnerBptreeNode : type_HasRefs;
+    new_refs.create(type, m_context_flag); // Throws
+
+    try {
+        // First write out all sub-arrays
+        std::size_t n = size();
+        for (std::size_t i = 0; i != n; ++i) {
+            int_fast64_t value = get(i);
+            if (value == 0 || value % 2 != 0) {
+                // Zero-refs and values that are not 8-byte aligned do
+                // not point to subarrays.
+                new_refs.add(value); // Throws
+            }
+            else if (persist && m_alloc.is_read_only(to_ref(value))) {
+                // Ignore un-changed arrays when persisting
+                new_refs.add(value); // Throws
+            }
+            else {
+                Array sub(get_alloc());
+                sub.init_from_ref(to_ref(value));
+                bool subrecurse = true;
+                std::size_t sub_pos = sub.write(out, subrecurse, persist); // Throws
+                TIGHTDB_ASSERT_3(sub_pos % 8, ==, 0); // 8-byte alignment
+                new_refs.add(sub_pos); // Throws
+            }
+        }
+
+        // Write out the replacement array
+        // (but don't write sub-tree as it has alredy been written)
+        bool subrecurse = false;
+        std::size_t refs_pos = new_refs.write(out, subrecurse, persist); // Throws
+
+        new_refs.destroy(); // Shallow
+
+        return refs_pos; // Return position
+    }
+    catch (...) {
+        new_refs.destroy(); // Shallow
+        throw;
+    }
+}
+
 
 void Array::move(size_t begin, size_t end, size_t dest_begin)
 {
@@ -474,18 +540,6 @@ void Array::set(size_t ndx, int64_t value)
 
     // Set the value
     (this->*m_setter)(ndx, value);
-}
-
-void Array::set_uint(std::size_t ndx, uint_fast64_t value)
-{
-    // When a value of a signed type is converted to an unsigned type, the C++
-    // standard guarantees that negative values are converted from the native
-    // representation to 2's complement, but the effect of conversions in the
-    // opposite direction is left unspecified by the
-    // standard. `tightdb::util::from_twos_compl()` is used here to perform the
-    // correct opposite unsigned-to-signed conversion, which reduces to a no-op
-    // when 2's complement is the native representation of negative values.
-    set(ndx, from_twos_compl<int_fast64_t>(value));
 }
 
 void Array::set_as_ref(std::size_t ndx, ref_type ref)
@@ -911,7 +965,7 @@ template<bool find_max, size_t w> bool Array::minmax(int64_t& result, size_t sta
         return true;
     }
 
-    int64_t m = Get<w>(start);
+    int64_t m = get<w>(start);
     ++start;
 
 #if 0 // We must now return both value AND index of result. SSE does not support finding index, so we've disabled it
@@ -919,8 +973,8 @@ template<bool find_max, size_t w> bool Array::minmax(int64_t& result, size_t sta
     if (sseavx<42>()) {
         // Test manually until 128 bit aligned
         for (; (start < end) && (((size_t(m_data) & 0xf) * 8 + start * w) % (128) != 0); start++) {
-            if (find_max ? Get<w>(start) > m : Get<w>(start) < m) {
-                m = Get<w>(start);
+            if (find_max ? get<w>(start) > m : get<w>(start) < m) {
+                m = get<w>(start);
                 best_index = start;
             }
         }
@@ -951,7 +1005,7 @@ template<bool find_max, size_t w> bool Array::minmax(int64_t& result, size_t sta
             // read access from char-array (OK aliasing).
             memcpy(&state2, &state, sizeof state);
             for (size_t t = 0; t < sizeof (__m128i) * 8 / no0(w); ++t) {
-                int64_t v = GetUniversal<w>(reinterpret_cast<char*>(&state2), t);
+                int64_t v = get_universal<w>(reinterpret_cast<char*>(&state2), t);
                 if (find_max ? v > m : v < m) {
                     m = v;
                 }
@@ -962,7 +1016,7 @@ template<bool find_max, size_t w> bool Array::minmax(int64_t& result, size_t sta
 #endif
 
     for (; start < end; ++start) {
-        const int64_t v = Get<w>(start);
+        const int64_t v = get<w>(start);
         if (find_max ? v > m : v < m) {
             m = v;
             best_index = start;
@@ -1003,7 +1057,7 @@ template<size_t w> int64_t Array::sum(size_t start, size_t end) const
 
     // Sum manually until 128 bit aligned
     for (; (start < end) && (((size_t(m_data) & 0xf) * 8 + start * w) % 128 != 0); start++) {
-        s += Get<w>(start);
+        s += get<w>(start);
     }
 
     if (w == 1 || w == 2 || w == 4) {
@@ -1064,7 +1118,7 @@ template<size_t w> int64_t Array::sum(size_t start, size_t end) const
     if (sseavx<42>()) {
 
         // 2000 items summed 500000 times, 8/16/32 bits, miliseconds:
-        // Naive, templated Get<>: 391 371 374
+        // Naive, templated get<>: 391 371 374
         // SSE:                     97 148 282
 
         if ((w == 8 || w == 16 || w == 32) && end - start > sizeof (__m128i) * 8 / no0(w)) {
@@ -1135,13 +1189,13 @@ template<size_t w> int64_t Array::sum(size_t start, size_t end) const
             // prevent taking address of 'state' to make the compiler keep it in SSE register in above loop (vc2010/gcc4.6)
             sum2 = sum;
 
-            // Avoid aliasing bug where sum2 might not yet be initialized when accessed by GetUniversal
+            // Avoid aliasing bug where sum2 might not yet be initialized when accessed by get_universal
             char sum3[sizeof sum2];
             memcpy(&sum3, &sum2, sizeof sum2);
 
             // Sum elements of sum
             for (size_t t = 0; t < sizeof (__m128i) * 8 / ((w == 8 || w == 16) ? 32 : 64); ++t) {
-                int64_t v = GetUniversal<(w == 8 || w == 16) ? 32 : 64>(reinterpret_cast<char*>(&sum3), t);
+                int64_t v = get_universal<(w == 8 || w == 16) ? 32 : 64>(reinterpret_cast<char*>(&sum3), t);
                 s += v;
             }
         }
@@ -1150,7 +1204,7 @@ template<size_t w> int64_t Array::sum(size_t start, size_t end) const
 
     // Sum remaining elements
     for (; start < end; ++start)
-        s += Get<w>(start);
+        s += get<w>(start);
 
     return s;
 }
@@ -1704,15 +1758,15 @@ template<size_t width> void Array::set_width() TIGHTDB_NOEXCEPT
     }
 
     m_width = width;
-    // m_getter = temp is a workaround for a bug in VC2010 that makes it return address of get() instead of Get<n>
+    // m_getter = temp is a workaround for a bug in VC2010 that makes it return address of get() instead of get<n>
     // if the declaration and association of the getter are on two different source lines
-    Getter temp_getter = &Array::Get<width>;
+    Getter temp_getter = &Array::get<width>;
     m_getter = temp_getter;
 
     ChunkGetter temp_chunk_getter = &Array::get_chunk<width>;
     m_chunk_getter = temp_chunk_getter;
 
-    Setter temp_setter = &Array::Set<width>;
+    Setter temp_setter = &Array::set<width>;
     m_setter = temp_setter;
 
     Finder feq = &Array::find<Equal, act_ReturnFirst, width>;
@@ -1738,7 +1792,7 @@ template<size_t w> void Array::get_chunk(size_t ndx, int64_t res[8]) const TIGHT
     // memset(res, 0, 8*8);
 
     if (TIGHTDB_X86_OR_X64_TRUE && (w == 1 || w == 2 || w == 4) && ndx + 32 < m_size) {
-        // This method is *multiple* times faster than performing 8 times Get<w>, even if unrolled. Apparently compilers
+        // This method is *multiple* times faster than performing 8 times get<w>, even if unrolled. Apparently compilers
         // can't figure out to optimize it.
         uint64_t c;
         size_t bytealign = ndx / (8 / no0(w));
@@ -1768,7 +1822,7 @@ template<size_t w> void Array::get_chunk(size_t ndx, int64_t res[8]) const TIGHT
     else {
         size_t i = 0;
         for(; i + ndx < m_size && i < 8; i++)
-            res[i] = Get<w>(ndx + i);
+            res[i] = get<w>(ndx + i);
 
         for(; i < 8; i++)
             res[i] = 0;
@@ -1776,7 +1830,7 @@ template<size_t w> void Array::get_chunk(size_t ndx, int64_t res[8]) const TIGHT
 
 #ifdef TIGHTDB_DEBUG
     for(int j = 0; j + ndx < m_size && j < 8; j++) {
-        int64_t expected = Get<w>(ndx + j);
+        int64_t expected = get<w>(ndx + j);
         if (res[j] != expected)
             TIGHTDB_ASSERT(false);
     }
@@ -1786,55 +1840,9 @@ template<size_t w> void Array::get_chunk(size_t ndx, int64_t res[8]) const TIGHT
 }
 
 
-template<size_t width> void Array::Set(size_t ndx, int64_t value)
+template<size_t width> void Array::set(size_t ndx, int64_t value)
 {
     set_direct<width>(m_data, ndx, value);
-}
-
-
-// Sort array.
-void Array::sort()
-{
-    TIGHTDB_TEMPEX(sort, m_width, ());
-}
-
-
-// Find max and min value, but break search if difference exceeds 'maxdiff' (in which case *min and *max is set to 0)
-// Useful for counting-sort functions
-template<size_t w>bool Array::MinMax(size_t from, size_t to, uint64_t maxdiff, int64_t *min, int64_t *max) const
-{
-    int64_t min2;
-    int64_t max2;
-    size_t t;
-
-    max2 = Get<w>(from);
-    min2 = max2;
-
-    for (t = from + 1; t < to; t++) {
-        int64_t v = Get<w>(t);
-        // Utilizes that range test is only needed if max2 or min2 were changed
-        if (v < min2) {
-            min2 = v;
-            if (uint64_t(max2 - min2) > maxdiff)
-                break;
-        }
-        else if (v > max2) {
-            max2 = v;
-            if (uint64_t(max2 - min2) > maxdiff)
-                break;
-        }
-    }
-
-    if (t < to) {
-        *max = 0;
-        *min = 0;
-        return false;
-    }
-    else {
-        *max = max2;
-        *min = min2;
-        return true;
-    }
 }
 
 // Take index pointers to elements as argument and sort the pointers according to values they point at. Leave m_array untouched. The ref array
@@ -1876,7 +1884,7 @@ template<size_t w>void Array::ReferenceSort(Array& ref) const
 
         // Count occurences of each value
         for (size_t t = 0; t < m_size; t++) {
-            size_t i = to_ref(Get<w>(t) - min);
+            size_t i = to_ref(get<w>(t) - min);
             count.set(i, count.get(i) + 1);
         }
 
@@ -1889,7 +1897,7 @@ template<size_t w>void Array::ReferenceSort(Array& ref) const
             res.add(0);
 
         for (size_t t = m_size; t > 0; t--) {
-            size_t v = to_ref(Get<w>(t - 1) - min);
+            size_t v = to_ref(get<w>(t - 1) - min);
             size_t i = count.get_as_ref(v);
             count.set(v, count.get(v) - 1);
             res.set(i - 1, ref.get(t - 1));
@@ -1907,60 +1915,6 @@ template<size_t w>void Array::ReferenceSort(Array& ref) const
     {
         ReferenceQuickSort(ref);
     }
-}
-
-// Sort array
-template<size_t w> void Array::sort()
-{
-    if (m_size < 2)
-        return;
-
-    size_t lo = 0;
-    size_t hi = m_size - 1;
-    vector<size_t> count;
-    int64_t min;
-    int64_t max;
-    bool b = false;
-
-    // in avg case QuickSort is O(n*log(n)) and CountSort O(n + range), and memory usage is sizeof(size_t)*range for CountSort.
-    // Se we chose range < m_size as treshold for deciding which to use
-    if (m_width <= 8) {
-        max = m_ubound;
-        min = m_lbound;
-        b = true;
-    }
-    else {
-        // If range isn't suited for CountSort, it's *probably* discovered very early, within first few values,
-        // in most practical cases, and won't add much wasted work. Max wasted work is O(n) which isn't much
-        // compared to QuickSort.
-        b = MinMax<w>(lo, hi + 1, m_size, &min, &max);
-    }
-
-    if (b) {
-        for (int64_t t = 0; t < max - min + 1; t++)
-            count.push_back(0);
-
-        // Count occurences of each value
-        for (size_t t = lo; t <= hi; t++) {
-            size_t i = to_size_t(Get<w>(t) - min); // FIXME: The value of (Get<w>(t) - min) cannot necessarily be stored in size_t.
-            count[i]++;
-        }
-
-        // Overwrite original array with sorted values
-        size_t dst = 0;
-        for (int64_t i = 0; i < max - min + 1; i++) {
-            size_t c = count[unsigned(i)];
-            for (size_t j = 0; j < c; j++) {
-                Set<w>(dst, i + min);
-                dst++;
-            }
-        }
-    }
-    else {
-        QuickSort(lo, hi);
-    }
-
-    return;
 }
 
 void Array::ReferenceQuickSort(Array& ref) const
@@ -2059,15 +2013,6 @@ template<size_t w> void Array::QuickSort(size_t lo, size_t hi)
         QuickSort(lo, j);
     if (i < int(hi))
         QuickSort(i, hi);
-}
-
-vector<int64_t> Array::ToVector() const
-{
-    vector<int64_t> v;
-    const size_t count = size();
-    for (size_t t = 0; t < count; ++t)
-        v.push_back(get(t));
-    return v;
 }
 
 bool Array::compare_int(const Array& a) const TIGHTDB_NOEXCEPT

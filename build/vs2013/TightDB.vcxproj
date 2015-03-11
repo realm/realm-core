@@ -592,6 +592,7 @@
     <ClCompile Include="..\..\src\tightdb\array_binary.cpp" />
     <ClCompile Include="..\..\src\tightdb\array_blob.cpp" />
     <ClCompile Include="..\..\src\tightdb\array_blobs_big.cpp" />
+    <ClCompile Include="..\..\src\tightdb\array_integer.cpp" />
     <ClCompile Include="..\..\src\tightdb\array_string.cpp" />
     <ClCompile Include="..\..\src\tightdb\array_string_long.cpp" />
     <ClCompile Include="..\..\src\tightdb\column.cpp" />
@@ -1086,6 +1087,7 @@
       <FileType>CppHeader</FileType>
     </ClInclude>
     <ClInclude Include="..\..\src\tightdb\array_blobs_big.hpp" />
+    <ClInclude Include="..\..\src\tightdb\array_integer.hpp" />
     <ClInclude Include="..\..\src\tightdb\array_string.hpp" />
     <ClInclude Include="..\..\src\tightdb\array_string_long.hpp" />
     <ClInclude Include="..\..\src\tightdb\binary_data.hpp" />
@@ -1097,6 +1099,7 @@
     <ClInclude Include="..\..\src\tightdb\descriptor.hpp" />
     <ClInclude Include="..\..\src\tightdb\descriptor_fwd.hpp" />
     <ClInclude Include="..\..\src\tightdb\exceptions.hpp" />
+    <ClInclude Include="..\..\src\tightdb\impl\array_writer.hpp" />
     <ClInclude Include="..\..\src\tightdb\impl\destroy_guard.hpp" />
     <ClInclude Include="..\..\src\tightdb\impl\input_stream.hpp" />
     <ClInclude Include="..\..\src\tightdb\impl\output_stream.hpp" />

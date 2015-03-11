@@ -109,6 +109,8 @@
     <ClCompile Include="..\..\test\test_upgrade_database.cpp" />
     <ClCompile Include="..\..\test\test_destroy_guard.cpp" />
     <ClCompile Include="..\..\test\test_replication.cpp" />
+    <ClCompile Include="..\..\src\tightdb\impl\transact_log.cpp" />
+    <ClCompile Include="..\..\src\tightdb\array_integer.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\tightdb.hpp" />
@@ -209,6 +211,8 @@
     <ClInclude Include="..\..\src\tightdb\impl\destroy_guard.hpp" />
     <ClInclude Include="..\..\src\tightdb\impl\input_stream.hpp" />
     <ClInclude Include="..\..\src\tightdb\impl\transact_log.hpp" />
+    <ClInclude Include="..\..\src\tightdb\array_integer.hpp" />
+    <ClInclude Include="..\..\src\tightdb\impl\array_writer.hpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="changelog.txt" />
