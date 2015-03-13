@@ -79,6 +79,7 @@ enum Instruction {
     instr_EraseLinkColumn       = 36, // Remove link-type column from selected descriptor
     instr_RenameColumn          = 37, // Rename column in selected descriptor
     instr_AddSearchIndex        = 38, // Add a search index to a column
+    instr_RemoveSearchIndex     = 49, // Remove a search index from a column
     instr_AddPrimaryKey         = 39, // Add a primary key to a table
     instr_RemovePrimaryKey      = 40, // Remove primary key from a table
     instr_SetLinkType           = 41, // Strong/weak
@@ -175,6 +176,7 @@ public:
     bool erase_column(std::size_t col_ndx);
     bool rename_column(std::size_t col_ndx, StringData new_name);
     bool add_search_index(std::size_t col_ndx);
+    bool remove_search_index(std::size_t col_ndx);
     bool add_primary_key(std::size_t col_ndx);
     bool remove_primary_key();
     bool set_link_type(std::size_t col_ndx, LinkType);
@@ -281,6 +283,7 @@ public:
     void erase_row(const Table*, std::size_t row_ndx, bool move_last_over);
     void add_int_to_column(const Table*, std::size_t col_ndx, int_fast64_t value);
     void add_search_index(const Table*, std::size_t col_ndx);
+    void remove_search_index(const Table*, std::size_t col_ndx);
     void add_primary_key(const Table*, std::size_t col_ndx);
     void remove_primary_key(const Table*);
     void set_link_type(const Table*, std::size_t col_ndx, LinkType);
@@ -1167,6 +1170,19 @@ inline void TransactLogConvenientEncoder::add_search_index(const Table* t, std::
 }
 
 
+inline bool TransactLogEncoder::remove_search_index(std::size_t col_ndx)
+{
+    simple_cmd(instr_RemoveSearchIndex, util::tuple(col_ndx)); // Throws
+    return true;
+}
+
+inline void TransactLogConvenientEncoder::remove_search_index(const Table* t, std::size_t col_ndx)
+{
+    select_table(t); // Throws
+    m_encoder.remove_search_index(col_ndx); // Throws
+}
+
+
 inline bool TransactLogEncoder::add_primary_key(std::size_t col_ndx)
 {
     simple_cmd(instr_AddPrimaryKey, util::tuple(col_ndx)); // Throws
@@ -1662,6 +1678,12 @@ void TransactLogParser::do_parse(InstructionHandler& handler)
             case instr_AddSearchIndex: {
                 std::size_t col_ndx = read_int<std::size_t>(); // Throws
                 if (!handler.add_search_index(col_ndx)) // Throws
+                    parser_error();
+                continue;
+            }
+            case instr_RemoveSearchIndex: {
+                std::size_t col_ndx = read_int<std::size_t>(); // Throws
+                if (!handler.remove_search_index(col_ndx)) // Throws
                     parser_error();
                 continue;
             }

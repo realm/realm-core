@@ -1479,6 +1479,11 @@ public:
         return true; // No-op
     }
 
+    bool remove_search_index(size_t) TIGHTDB_NOEXCEPT
+    {
+        return true; // No-op
+    }
+
     bool add_primary_key(size_t) TIGHTDB_NOEXCEPT
     {
         return true; // No-op
@@ -1826,6 +1831,11 @@ public:
     }
 
     bool add_search_index(size_t)
+    {
+        return true; // No-op
+    }
+
+    bool remove_search_index(size_t)
     {
         return true; // No-op
     }

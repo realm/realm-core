@@ -470,6 +470,23 @@ public:
         return false;
     }
 
+    bool remove_search_index(size_t col_ndx)
+    {
+        if (TIGHTDB_LIKELY(m_table)) {
+            if (TIGHTDB_LIKELY(!m_table->has_shared_type())) {
+                if (TIGHTDB_LIKELY(col_ndx < m_table->get_column_count())) {
+#ifdef TIGHTDB_DEBUG
+                    if (m_log)
+                        *m_log << "table->add_search_index("<<col_ndx<<")\n";
+#endif
+                    m_table->remove_search_index(col_ndx); // Throws
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     bool add_primary_key(size_t col_ndx)
     {
         if (TIGHTDB_LIKELY(m_table)) {
