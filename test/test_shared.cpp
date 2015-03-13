@@ -269,9 +269,9 @@ TEST(Shared_CompactingOnTheFly)
         rt2.get_group().Verify();
     }
 }
-#endif // _WIN32
 
 */
+
 
 #ifdef LOCKFILE_CLEANUP
 // The following two tests are now disabled, as we have abandoned the requirement to
