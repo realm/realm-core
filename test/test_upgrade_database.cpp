@@ -50,7 +50,7 @@ using namespace tightdb::util;
 // check-testcase` (or one of its friends) from the command line.
 
 
-TEST(Upgrade_Database_2_3)
+ONLY(Upgrade_Database_2_3)
 {
     // Test upgrading the database file format from version 2 to 3. When opening a version 2 file, you must, as the 
     // very first action, call Group::upgrade_file_format() on it. You must not call any reading or modifying 
@@ -204,6 +204,7 @@ TEST(Upgrade_Database_2_3)
 
 
 #else   
+    // For creating a version 2 database; use in OLD (0.84) core
     char leafsize[20];
     sprintf(leafsize, "%d", TIGHTDB_MAX_BPNODE_SIZE);
     string path = test_util::get_test_path_prefix() + "version_2_database_" + leafsize + ".tightdb";

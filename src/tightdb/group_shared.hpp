@@ -600,8 +600,8 @@ inline SharedGroup::SharedGroup(const std::string& file, bool no_create, Durabil
     m_group(Group::shared_tag())
 {
     open(file, no_create, dlevel, false, key);
-    begin_write();
     // Upgrade file format from 2 to 3 (no-op if already 3)
+    begin_write();
     m_group.upgrade_file_format();
     commit();
 }
