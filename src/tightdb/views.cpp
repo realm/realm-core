@@ -24,12 +24,19 @@ void RowIndexes::sort(std::vector<size_t> columns, std::vector<bool> ascending)
 // Re-sort view according to last used criterias
 void RowIndexes::re_sort()
 {
+    size_t sz = size();
+    if (sz == 0)
+        return;
+
     std::vector<size_t> v;
-    for (size_t t = 0; t < size(); t++)
+    v.reserve(sz);
+    for (size_t t = 0; t < sz; t++)
         v.push_back(m_row_indexes.get(t));
-    m_sorting_predicate.m_row_indexes_class = this;
+
+    m_sorting_predicate.init(this);
     std::stable_sort(v.begin(), v.end(), m_sorting_predicate);
+
     m_row_indexes.clear();
-    for (size_t t = 0; t < v.size(); t++)
+    for (size_t t = 0; t < sz; t++)
         m_row_indexes.add(v[t]);
 }

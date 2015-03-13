@@ -64,14 +64,11 @@ public:
     std::size_t lower_bound(int64_t value) const TIGHTDB_NOEXCEPT;
     std::size_t upper_bound(int64_t value) const TIGHTDB_NOEXCEPT;
 
-    void sort();
-
     std::vector<int64_t> ToVector() const;
 
 private:
     template<size_t w> bool minmax(size_t from, size_t to, uint64_t maxdiff,
                                    int64_t* min, int64_t* max) const;
-    template<size_t w> void sort();
 };
 
 
