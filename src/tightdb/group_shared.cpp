@@ -855,15 +855,14 @@ bool SharedGroup::compact()
     // Using begin_read here ensures that we have access to the latest and greatest entry
     // in the ringbuffer. We need to have access to that later to update top_ref and file_size.
     begin_read();
-    SharedInfo* r_info = m_reader_map.get_addr();
-    size_t idx = r_info->readers.last();
-    if (grow_reader_mapping(idx)) { // throws
-        r_info = m_reader_map.get_addr();
-    }
 
     // Compact by writing a new file holding only live data, then renaming the new file
     // so it becomes the database file, replacing the old one in the process.
     m_group.write(tmp_path, m_key, info->latest_version_number);
+    {
+        Group test_group(tmp_path, m_key);
+        test_group.Verify();
+    }
     rename(tmp_path.c_str(), m_db_path.c_str());
     end_read();
 
@@ -884,10 +883,20 @@ bool SharedGroup::compact()
     size_t file_size = alloc.get_baseline();
 
     // update the versioning info to match
+    SharedInfo* r_info = m_reader_map.get_addr();
     Ringbuffer::ReadCount& rc = const_cast<Ringbuffer::ReadCount&>(r_info->readers.get_last());
     TIGHTDB_ASSERT(rc.version == info->latest_version_number);
     rc.filesize = file_size;
     rc.current_top = top_ref;
+    {
+        Group test_group(m_db_path, m_key);
+        test_group.Verify();
+    }
+    {
+        begin_read();
+        m_group.Verify();
+        end_read();
+    }
     return true;
 }
 
