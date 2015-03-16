@@ -207,7 +207,8 @@ public:
     ///
     /// remove_search_index() removes the search index from the specified column
     /// of this table. It has no effect if the specified column has no search
-    /// index.
+    /// index. The search index cannot be removed from the primary key of a
+    /// table.
     ///
     /// has_primary_key() returns true if, and only if a primary key has been
     /// added to this table. Rather than throwing, it returns false if the table
