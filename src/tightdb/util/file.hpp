@@ -237,6 +237,9 @@ public:
     /// offsets, as long as the cucrrent process is not forked.
     void seek(SizeType);
 
+    // Return file position (like ftell())
+    SizeType get_file_position();
+
     /// Flush in-kernel buffers to disk. This blocks the caller until
     /// the synchronization operation is complete.
     void sync();
