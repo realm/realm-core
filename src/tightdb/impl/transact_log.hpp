@@ -79,17 +79,17 @@ enum Instruction {
     instr_EraseLinkColumn       = 36, // Remove link-type column from selected descriptor
     instr_RenameColumn          = 37, // Rename column in selected descriptor
     instr_AddSearchIndex        = 38, // Add a search index to a column
-    instr_RemoveSearchIndex     = 49, // Remove a search index from a column
-    instr_AddPrimaryKey         = 39, // Add a primary key to a table
-    instr_RemovePrimaryKey      = 40, // Remove primary key from a table
-    instr_SetLinkType           = 41, // Strong/weak
-    instr_SelectLinkList        = 42,
-    instr_LinkListSet           = 43, // Assign to link list entry
-    instr_LinkListInsert        = 44, // Insert entry into link list
-    instr_LinkListMove          = 45, // Move an entry within a link list
-    instr_LinkListErase         = 46, // Remove an entry from a link list
-    instr_LinkListClear         = 47, // Ramove all entries from a link list
-    instr_LinkListSetAll        = 48  // Assign to link list entry
+    instr_RemoveSearchIndex     = 39, // Remove a search index from a column
+    instr_AddPrimaryKey         = 40, // Add a primary key to a table
+    instr_RemovePrimaryKey      = 41, // Remove primary key from a table
+    instr_SetLinkType           = 42, // Strong/weak
+    instr_SelectLinkList        = 43,
+    instr_LinkListSet           = 44, // Assign to link list entry
+    instr_LinkListInsert        = 45, // Insert entry into link list
+    instr_LinkListMove          = 46, // Move an entry within a link list
+    instr_LinkListErase         = 47, // Remove an entry from a link list
+    instr_LinkListClear         = 48, // Ramove all entries from a link list
+    instr_LinkListSetAll        = 49  // Assign to link list entry
 };
 
 
