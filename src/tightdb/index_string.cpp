@@ -20,6 +20,17 @@ void get_child(Array& parent, size_t child_ref_ndx, Array& child) TIGHTDB_NOEXCE
 } // anonymous namespace
 
 
+void StringIndex::validate_value(int64_t) const TIGHTDB_NOEXCEPT {
+    // no-op: All ints are valid
+}
+
+
+void StringIndex::validate_value(StringData str) const {
+    if (std::find(str.data(), str.data() + str.size(), '\0') != str.data() + str.size())
+        throw std::invalid_argument("Cannot add string with embedded NULs to indexed column");
+}
+
+
 ArrayInteger* StringIndex::create_node(Allocator& alloc, bool is_leaf)
 {
     Array::Type type = is_leaf ? Array::type_HasRefs : Array::type_InnerBptreeNode;

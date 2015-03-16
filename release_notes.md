@@ -2,7 +2,7 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
+* Added a check for NUL bytes in indexed strings to avoid corrupting data structures.
 
 ### API breaking changes:
 
