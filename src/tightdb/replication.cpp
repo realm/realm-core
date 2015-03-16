@@ -477,7 +477,7 @@ public:
                 if (TIGHTDB_LIKELY(col_ndx < m_table->get_column_count())) {
 #ifdef TIGHTDB_DEBUG
                     if (m_log)
-                        *m_log << "table->add_search_index("<<col_ndx<<")\n";
+                        *m_log << "table->remove_search_index("<<col_ndx<<")\n";
 #endif
                     m_table->remove_search_index(col_ndx); // Throws
                     return true;
