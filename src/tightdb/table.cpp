@@ -1394,10 +1394,11 @@ void Table::remove_search_index(size_t col_ndx)
     if (TIGHTDB_UNLIKELY(col_ndx >= m_cols.size()))
         throw LogicError(LogicError::column_index_out_of_range);
 
+    if (TIGHTDB_UNLIKELY(m_primary_key))
+        throw LogicError(LogicError::is_primary_key);
+
     if (!has_search_index(col_ndx))
         return;
-
-    TIGHTDB_ASSERT(!m_primary_key);
 
     // Remove the index column
     ColumnBase& col = get_column_base(col_ndx);
