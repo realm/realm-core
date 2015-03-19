@@ -37,7 +37,7 @@ namespace tightdb {
 class SharedGroup;
 namespace _impl {
 class GroupFriend;
-class TransactLogEncoderBase;
+class TransactLogConvenientEncoder;
 class TransactLogParser;
 }
 
@@ -416,11 +416,11 @@ private:
     // (a.k.a. the "transaction number") and is present only when
     // m_free_versions is present.
     Array m_top;
-    Array m_tables;            // 2nd slot in m_top
-    ArrayString m_table_names; // 1st slot in m_top
-    Array m_free_positions;    // 4th slot in m_top (optional)
-    Array m_free_lengths;      // 5th slot in m_top (optional)
-    Array m_free_versions;     // 6th slot in m_top (optional)
+    ArrayInteger m_tables;         // 2nd slot in m_top
+    ArrayString m_table_names;     // 1st slot in m_top
+    ArrayInteger m_free_positions; // 4th slot in m_top (optional)
+    ArrayInteger m_free_lengths;   // 5th slot in m_top (optional)
+    ArrayInteger m_free_versions;  // 6th slot in m_top (optional)
 
     typedef std::vector<Table*> table_accessors;
     mutable table_accessors m_table_accessors;
@@ -529,7 +529,7 @@ private:
     friend class GroupWriter;
     friend class SharedGroup;
     friend class _impl::GroupFriend;
-    friend class _impl::TransactLogEncoderBase;
+    friend class _impl::TransactLogConvenientEncoder;
     friend class _impl::TransactLogParser;
     friend class Replication;
     friend class TrivialReplication;

@@ -286,4 +286,5 @@ TEST(Index_Set)
     col.Destroy();
     ndx.Destroy();
 }
+
 #endif

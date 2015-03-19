@@ -6885,6 +6885,65 @@ TEST(LangBindHelper_MemOnly)
     CHECK(!rt.get_group().is_empty());
 }
 
+TEST(LangBindHelper_ImplicitTransactions_SearchIndex)
+{
+    SHARED_GROUP_TEST_PATH(path);
+
+    UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
+    SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
+    const Group& group = sg.begin_read();
+
+    UniquePtr<Replication> repl_w(makeWriteLogCollector(path, false, crypt_key()));
+    SharedGroup sg_w(*repl_w, SharedGroup::durability_Full, crypt_key());
+    Group& group_w = const_cast<Group&>(sg_w.begin_read());
+
+    // Add initial data
+    LangBindHelper::promote_to_write(sg_w);
+    TableRef table_w = group_w.add_table("table");
+    table_w->add_column(type_Int, "int1");
+    table_w->add_column(type_String, "str");
+    table_w->add_column(type_Int, "int2");
+    table_w->add_empty_row();
+    table_w->set_int(0, 0, 1);
+    table_w->set_string(1, 0, "2");
+    table_w->set_int(2, 0, 3);
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+    group_w.Verify();
+
+    LangBindHelper::advance_read(sg);
+    ConstTableRef table = group.get_table("table");
+    CHECK_EQUAL(1, table->get_int(0, 0));
+    CHECK_EQUAL("2", table->get_string(1, 0));
+    CHECK_EQUAL(3, table->get_int(2, 0));
+    group.Verify();
+
+    // Add search index and re-verify
+    LangBindHelper::promote_to_write(sg_w);
+    table_w->add_search_index(1);
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+    group_w.Verify();
+
+    LangBindHelper::advance_read(sg);
+    CHECK_EQUAL(1, table->get_int(0, 0));
+    CHECK_EQUAL("2", table->get_string(1, 0));
+    CHECK_EQUAL(3, table->get_int(2, 0));
+    CHECK(table->has_search_index(1));
+    group.Verify();
+
+    // Remove search index and re-verify
+    LangBindHelper::promote_to_write(sg_w);
+    table_w->remove_search_index(1);
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+    group_w.Verify();
+
+    LangBindHelper::advance_read(sg);
+    CHECK_EQUAL(1, table->get_int(0, 0));
+    CHECK_EQUAL("2", table->get_string(1, 0));
+    CHECK_EQUAL(3, table->get_int(2, 0));
+    CHECK(!table->has_search_index(1));
+    group.Verify();
+}
+
 
 TEST(LangBindHelper_HandoverQuery)
 {
@@ -7454,6 +7513,7 @@ TEST(LangBindHelper_LinkListCrash)
     g2.Verify();
 }
 
+
 TEST(LangBindHelper_OpenCloseOpen)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -7472,6 +7532,51 @@ TEST(LangBindHelper_OpenCloseOpen)
     sg_w.close();
 }
 
+
+TEST(LangBindHelper_MixedCommitSizes)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
+    SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
+
+    Group& g = const_cast<Group&>(sg.begin_read());
+
+    LangBindHelper::promote_to_write(sg);
+    TableRef table = g.add_table("table");
+    table->add_column(type_Binary, "value");
+    LangBindHelper::commit_and_continue_as_read(sg);
+
+    UniquePtr<char[]> buffer(new char[65536]);
+    fill(buffer.get(), buffer.get() + 65536, 0);
+
+    // 4 large commits so that both write log files are large and fully
+    // initialized (with both iv slots being non-zero when encryption is
+    // enabled), two small commits to shrink both of the log files, then two
+    // large commits to re-expand them
+    for (int i = 0; i < 4; ++i) {
+        LangBindHelper::promote_to_write(sg);
+        table->insert_binary(0, 0, BinaryData(buffer.get(), 65536));
+        table->insert_done();
+        LangBindHelper::commit_and_continue_as_read(sg);
+        g.Verify();
+    }
+
+    for (int i = 0; i < 2; ++i) {
+        LangBindHelper::promote_to_write(sg);
+        table->insert_binary(0, 0, BinaryData(buffer.get(), 1024));
+        table->insert_done();
+        LangBindHelper::commit_and_continue_as_read(sg);
+        g.Verify();
+    }
+
+    for (int i = 0; i < 2; ++i) {
+        LangBindHelper::promote_to_write(sg);
+        table->insert_binary(0, 0, BinaryData(buffer.get(), 65536));
+        table->insert_done();
+        LangBindHelper::commit_and_continue_as_read(sg);
+        g.Verify();
+    }
+}
 
 #endif // TIGHTDB_ENABLE_REPLICATION
 

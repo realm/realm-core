@@ -1634,7 +1634,7 @@ TEST(Group_IndexString)
 
     CHECK(t->column().first.has_search_index());
 
-    size_t m1 = table->column().first.find_first("jimmi");
+    size_t m1 = t->column().first.find_first("jimmi");
     CHECK_EQUAL(not_found, m1);
 
     size_t m2 = t->column().first.find_first("jeff");
@@ -1648,6 +1648,16 @@ TEST(Group_IndexString)
 
     size_t m6 = t->column().first.count("jennifer");
     CHECK_EQUAL(2, m6);
+
+    // Remove the search index and verify
+    t->column().first.remove_search_index();
+    CHECK(!t->column().first.has_search_index());
+    from_mem.Verify();
+
+    size_t m7 = t->column().first.find_first("jimmi");
+    size_t m8 = t->column().first.find_first("johnny");
+    CHECK_EQUAL(not_found, m7);
+    CHECK_EQUAL(6, m8);
 }
 
 
@@ -1688,6 +1698,34 @@ TEST(Group_CommitLinkListChange)
     group.commit();
     group.Verify();
 }
+
+
+TEST(Group_Commit_Update_Integer_Index)
+{
+    // This reproduces a bug where a commit would fail to update the Column::m_search_index pointer
+    // and hence crash or behave erratic for subsequent index operations
+    GROUP_TEST_PATH(path);
+
+    Group g(path, 0, Group::mode_ReadWrite);
+    TableRef t = g.add_table("table");
+    t->add_column(type_Int, "integer");
+
+    for (size_t i = 0; i < 200; i++) {
+        t->add_empty_row();
+        t->set_int(0, i, (i + 1) * 0xeeeeeeeeeeeeeeeeULL);
+    }
+
+    t->add_search_index(0);
+
+    // This would always work
+    CHECK(t->find_first_int(0, (0 + 1) * 0xeeeeeeeeeeeeeeeeULL) == 0);
+
+    g.commit();
+
+    // This would fail (sometimes return not_found, sometimes crash) 
+    CHECK(t->find_first_int(0, (0 + 1) * 0xeeeeeeeeeeeeeeeeULL) == 0);
+}
+
 
 
 #ifdef TIGHTDB_DEBUG

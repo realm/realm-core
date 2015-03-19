@@ -354,6 +354,7 @@ error:
         off_t pos = lseek(m_fd, 0, SEEK_CUR);
         Map<char> map(*this, access_ReadOnly, static_cast<size_t>(pos + size));
         memcpy(data, map.get_addr() + pos, size);
+        lseek(m_fd, size, SEEK_CUR);
         return map.get_size() - pos;
     }
 
@@ -411,6 +412,7 @@ void File::write(const char* data, size_t size)
         off_t pos = lseek(m_fd, 0, SEEK_CUR);
         Map<char> map(*this, access_ReadWrite, static_cast<size_t>(pos + size));
         memcpy(map.get_addr() + pos, data, size);
+        lseek(m_fd, size, SEEK_CUR);
         return;
     }
 
@@ -474,10 +476,15 @@ void File::resize(SizeType size)
 
 #ifdef _WIN32 // Windows version
 
-    seek(size);
+    // Save file position
+    SizeType p = get_file_position();
 
+    seek(size);
     if (!SetEndOfFile(m_handle))
         throw runtime_error("SetEndOfFile() failed");
+
+    // Restore file position
+    seek(p);
 
 #else // POSIX version
 
@@ -590,6 +597,23 @@ void File::seek(SizeType position)
         return;
     throw runtime_error("lseek() failed");
 
+#endif
+}
+
+
+File::SizeType File::get_file_position()
+{
+    TIGHTDB_ASSERT_RELEASE(is_attached());
+
+#ifdef _WIN32 // Windows version
+    LARGE_INTEGER liOfs = { 0 };
+    LARGE_INTEGER liNew = { 0 };
+    if(!SetFilePointerEx(m_handle, liOfs, &liNew, FILE_CURRENT))
+        throw runtime_error("SetFilePointerEx() failed");
+    return liNew.QuadPart;
+#else 
+    // POSIX version not needed because it's only used by Windows version of resize().
+    TIGHTDB_ASSERT(false);
 #endif
 }
 

@@ -50,7 +50,7 @@
 #  define TIGHTDB_ASSERT_3(left, condition, right) \
     ((left condition right) ? static_cast<void>(0) : \
         tightdb::util::terminate(TIGHTDB_VER_CHUNK " Assertion failed: " #left #condition #right, \
-                                 __FILE__, __LINE__, true, (uint64_t)left, (uint64_t)right))
+                                 __FILE__, __LINE__, left, right))
 #else
 #  define TIGHTDB_ASSERT_3(left, condition, right) static_cast<void>(0)
 #endif
