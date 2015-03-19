@@ -173,6 +173,18 @@ struct BenchmarkSetString : BenchmarkWithStrings {
     }
 };
 
+struct BenchmarkCreateIndex : BenchmarkWithStrings {
+    const char* name() const { return "CreateIndex"; }
+
+    void operator()(SharedGroup& group)
+    {
+        WriteTransaction tr(group);
+        TableRef table = tr.get_table("StringOnly");
+        table->add_search_index(0);
+        tr.commit();
+    }
+};
+
 struct BenchmarkQueryNot : Benchmark {
     const char* name() const { return "QueryNot"; }
 
@@ -293,6 +305,7 @@ int main(int, const char**)
     run_benchmark<BenchmarkInsert>(results);
     run_benchmark<BenchmarkGetString>(results);
     run_benchmark<BenchmarkSetString>(results);
+    run_benchmark<BenchmarkCreateIndex>(results);
 
     return 0;
 }

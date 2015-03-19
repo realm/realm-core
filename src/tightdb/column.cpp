@@ -552,7 +552,7 @@ void Column::set(size_t ndx, int64_t value)
     TIGHTDB_ASSERT_DEBUG(ndx < size());
 
     if (m_search_index) {
-        static_cast<StringIndex*>(m_search_index)->set(ndx, to_str(value));
+        static_cast<StringIndex*>(m_search_index)->set(ndx, value);
     }
 
     if (!m_array->is_inner_bptree_node()) {
