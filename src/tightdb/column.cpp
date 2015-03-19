@@ -781,6 +781,12 @@ const StringIndex* Column::get_search_index() const TIGHTDB_NOEXCEPT
     return m_search_index;
 }
 
+void Column::destroy_search_index() TIGHTDB_NOEXCEPT
+{
+    delete m_search_index;
+    m_search_index = 0;
+}
+
 void Column::set_search_index_ref(ref_type ref, ArrayParent* parent,
     size_t ndx_in_parent, bool allow_duplicate_valaues)
 {

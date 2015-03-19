@@ -2614,6 +2614,32 @@ TEST(Shared_MovingSearchIndex)
         CHECK_EQUAL(63, table->find_first_string(1, "bar63"));
         wt.commit();
     }
+    // Insert a column after the string columns and remove the indexes
+    {
+        WriteTransaction wt(sg);
+        TableRef table = wt.get_table("foo");
+        CHECK_EQUAL(0, table->get_descriptor()->get_num_unique_values(0));
+        CHECK_EQUAL(4, table->get_descriptor()->get_num_unique_values(1));
+        CHECK_EQUAL(62, table->find_first_string(0, "foo62"));
+        CHECK_EQUAL(63, table->find_first_string(1, "bar63"));
+
+        table->insert_column(2, type_Int, "i");
+        for (size_t i = 0; i < table->size(); ++i)
+            table->set_int(2, i, i);
+        wt.get_group().Verify();
+        table->remove_search_index(0);
+        wt.get_group().Verify();
+        table->remove_search_index(1);
+        wt.get_group().Verify();
+
+        CHECK_EQUAL(0, table->get_descriptor()->get_num_unique_values(0));
+        CHECK_EQUAL(4, table->get_descriptor()->get_num_unique_values(1));
+        CHECK_EQUAL(0, table->get_descriptor()->get_num_unique_values(2));
+        CHECK_EQUAL(62, table->find_first_string(0, "foo62"));
+        CHECK_EQUAL(63, table->find_first_string(1, "bar63"));
+        CHECK_EQUAL(60, table->find_first_int(2, 60));
+        wt.commit();
+    }
 }
 
 

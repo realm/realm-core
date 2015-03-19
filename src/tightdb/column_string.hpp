@@ -92,6 +92,7 @@ public:
     const StringIndex* get_search_index() const TIGHTDB_NOEXCEPT;
     StringIndex* release_search_index() TIGHTDB_NOEXCEPT;
     StringIndex* create_search_index();
+    void destroy_search_index() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
     // Optimizing data layout
     bool auto_enumerate(ref_type& keys, ref_type& values) const;
