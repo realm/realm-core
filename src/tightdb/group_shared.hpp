@@ -600,6 +600,8 @@ inline SharedGroup::SharedGroup(const std::string& file, bool no_create, Durabil
     m_group(Group::shared_tag())
 {
     open(file, no_create, dlevel, false, key);
+    begin_write();
+    commit();
 }
 
 inline SharedGroup::SharedGroup(unattached_tag) TIGHTDB_NOEXCEPT:
