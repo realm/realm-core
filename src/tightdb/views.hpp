@@ -6,6 +6,8 @@
 
 using namespace tightdb;
 
+const std::size_t detached_ref = std::size_t(-1);
+
 // This class is for common functionality of ListView and LinkView which inherit from it. Currently it only
 // supports sorting.
 class RowIndexes

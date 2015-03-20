@@ -18,7 +18,7 @@ void RowIndexes::sort(Sorter& sorting_predicate)
     size_t detached_ref_count = 0;
     for (size_t t = 0; t < sz; t++) {
         size_t ndx = m_row_indexes.get(t);
-        if (ndx != (unsigned) -1ULL) {
+        if (ndx != detached_ref) {
             v.push_back(ndx);
         }
         else

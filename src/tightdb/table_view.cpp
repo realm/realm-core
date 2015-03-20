@@ -118,7 +118,7 @@ R TableViewBase::aggregate(R(ColType::*aggregateMethod)(size_t, size_t, size_t, 
         row_ndx = to_size_t(m_row_indexes.get(ss));
 
         // skip detached references:
-        if (row_ndx == -1ULL) continue;
+        if (row_ndx == detached_ref) continue;
 
         if (row_ndx < leaf_start || row_ndx >= leaf_end) {
             column->GetBlock(row_ndx, arr, leaf_start);
@@ -246,7 +246,7 @@ void TableViewBase::to_json(ostream& out) const
     const size_t row_count = size();
     for (size_t r = 0; r < row_count; ++r) {
         const size_t real_row_index = get_source_ndx(r);
-        if (real_row_index != -1ULL) {
+        if (real_row_index != detached_ref) {
             if (r > 0)
                 out << ",";
             m_table->to_json_row(real_row_index, out);
@@ -275,7 +275,7 @@ void TableViewBase::to_string(ostream& out, size_t limit) const
     size_t count = out_count;
     while (count) {
         const size_t real_row_index = get_source_ndx(i);
-        if (real_row_index != -1ULL) {
+        if (real_row_index != detached_ref) {
             m_table->to_string_row(real_row_index, out, widths);
             --count;
         }
@@ -300,7 +300,7 @@ void TableViewBase::row_to_string(size_t row_ndx, ostream& out) const
 
     // Print row contents
     size_t real_ndx = get_source_ndx(row_ndx);
-    TIGHTDB_ASSERT(real_ndx != -1ULL);
+    TIGHTDB_ASSERT(real_ndx != detached_ref);
     m_table->to_string_row(real_ndx, out, widths);
 }
 
@@ -463,7 +463,7 @@ void TableView::clear()
         // (in reverse order to avoid index drift)
         for (size_t i = m_row_indexes.size(); i != 0; --i) {
             size_t ndx = size_t(m_row_indexes.get(i - 1));
-            if (ndx == -1ULL) // skip detached refs
+            if (ndx == detached_ref) // skip detached refs
                 continue;
             // If table is unordered, we must use move_last_over()
             if (is_ordered)
@@ -477,7 +477,7 @@ void TableView::clear()
         vector<size_t> v;
         for (size_t t = 0; t < size(); t++) {
             size_t real_ndx = m_row_indexes.get(t);
-            if (real_ndx != -1ULL)
+            if (real_ndx != detached_ref)
                 v.push_back(to_size_t(real_ndx));
         }
         std::sort(v.begin(), v.end());
