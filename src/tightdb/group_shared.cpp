@@ -864,6 +864,7 @@ bool SharedGroup::compact()
         test_group.Verify();
     }
     rename(tmp_path.c_str(), m_db_path.c_str());
+    m_group.Verify();
     end_read();
 
     // We must detach group complety to force it to fully refresh its accessors for use
