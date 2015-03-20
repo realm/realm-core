@@ -104,6 +104,7 @@ public:
     const StringIndex* get_search_index() const TIGHTDB_NOEXCEPT;
     StringIndex* create_search_index();
     void install_search_index(StringIndex*) TIGHTDB_NOEXCEPT;
+    void destroy_search_index() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
     // Compare two string columns for equality
     bool compare_string(const AdaptiveStringColumn&) const;

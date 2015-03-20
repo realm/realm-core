@@ -2,7 +2,7 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
+* Added a check for NUL bytes in indexed strings to avoid corrupting data structures.
 
 ### API breaking changes:
 
@@ -11,6 +11,8 @@
 ### Enhancements:
 
 * Improved performance of advance_read() over commits with string or binary data insertions.
+* Improved performance sorting TableView and LinkView.
+* Added Table::remove_search_index().
 
 -----------
 

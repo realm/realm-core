@@ -552,7 +552,7 @@ void Column::set(size_t ndx, int64_t value)
     TIGHTDB_ASSERT_DEBUG(ndx < size());
 
     if (m_search_index) {
-        static_cast<StringIndex*>(m_search_index)->set(ndx, to_str(value));
+        static_cast<StringIndex*>(m_search_index)->set(ndx, value);
     }
 
     if (!m_array->is_inner_bptree_node()) {
@@ -779,6 +779,12 @@ StringIndex* Column::get_search_index() TIGHTDB_NOEXCEPT
 const StringIndex* Column::get_search_index() const TIGHTDB_NOEXCEPT
 {
     return m_search_index;
+}
+
+void Column::destroy_search_index() TIGHTDB_NOEXCEPT
+{
+    delete m_search_index;
+    m_search_index = 0;
 }
 
 void Column::set_search_index_ref(ref_type ref, ArrayParent* parent,

@@ -53,33 +53,47 @@ public:
     struct Sorter
     {
         Sorter(){}
-        Sorter(std::vector<size_t> columns, std::vector<bool> ascending) : m_columns(columns), m_ascending(ascending) {};
+        Sorter(std::vector<size_t> columns, std::vector<bool> ascending) : m_column_indexes(columns), m_ascending(ascending) {}
         bool operator()(size_t i, size_t j) const
         {
             for (size_t t = 0; t < m_columns.size(); t++) {
-                const ColumnBase& cb = m_row_indexes_class->get_column_base(m_columns[t]);
-
-                // todo/fixme, cache casted pointers for speed
-                const ColumnTemplateBase* ctb = dynamic_cast<const ColumnTemplateBase*>(&cb);
-                TIGHTDB_ASSERT(ctb);
-
                 // todo/fixme, special treatment of ColumnStringEnum by calling ColumnStringEnum::compare_values()
                 // instead of the general ColumnTemplate::compare_values() becuse it cannot overload inherited 
                 // `int64_t get_val()` of Column. Such column inheritance needs to be cleaned up 
-                int c;             
-                if (dynamic_cast<const ColumnStringEnum*>(&cb))
-                    c = static_cast<const ColumnStringEnum*>(&cb)->compare_values(i, j);
+                int c;
+                if (const ColumnStringEnum* cse = m_string_enum_columns[t])
+                    c = cse->compare_values(i, j);
                 else
-                    c = ctb->compare_values(i, j);
+                    c = m_columns[t]->compare_values(i, j);
 
                 if (c != 0)
                     return m_ascending[t] ? c > 0 : c < 0;
             }
             return false; // row i == row j
         }
-        std::vector<size_t> m_columns;
-        RowIndexes* m_row_indexes_class;
+
+        void init(RowIndexes* row_indexes)
+        {
+            m_columns.clear();
+            m_string_enum_columns.clear();
+            m_columns.resize(m_column_indexes.size(), 0);
+            m_string_enum_columns.resize(m_column_indexes.size(), 0);
+
+            for (size_t i = 0; i < m_column_indexes.size(); i++) {
+                const ColumnBase& cb = row_indexes->get_column_base(m_column_indexes[i]);
+                const ColumnTemplateBase* ctb = dynamic_cast<const ColumnTemplateBase*>(&cb);
+                TIGHTDB_ASSERT(ctb);
+                if (const ColumnStringEnum* cse = dynamic_cast<const ColumnStringEnum*>(&cb))
+                    m_string_enum_columns[i] = cse;
+                else
+                    m_columns[i] = ctb;
+            }
+        }
+
+        std::vector<size_t> m_column_indexes;
         std::vector<bool> m_ascending;
+        std::vector<const ColumnTemplateBase*> m_columns;
+        std::vector<const ColumnStringEnum*> m_string_enum_columns;
     };
 
     // Sort m_row_indexes according to one column
