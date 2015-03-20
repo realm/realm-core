@@ -1058,8 +1058,6 @@ inline ConstTableView& ConstTableView::operator=(TableView tv)
 
 inline void TableView::remove_last()
 {
-    const size_t real_ndx = size_t(m_row_indexes.get(size()-1));
-    TIGHTDB_ASSERT(real_ndx != detached_ref);
     if (!is_empty())
         remove(size()-1);
 }

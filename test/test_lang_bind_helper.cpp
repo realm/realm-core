@@ -6950,7 +6950,7 @@ TEST(LangBindHelper_HandoverQuery)
     SHARED_GROUP_TEST_PATH(path);
     UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
     SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
-    const Group& group = sg.begin_read();
+    sg.begin_read();
 
     UniquePtr<Replication> repl_w(makeWriteLogCollector(path, false, crypt_key()));
     SharedGroup sg_w(*repl_w, SharedGroup::durability_Full, crypt_key());
@@ -6994,7 +6994,7 @@ TEST(LangBindHelper_HandoverAccessors)
     SHARED_GROUP_TEST_PATH(path);
     UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
     SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
-    const Group& group = sg.begin_read();
+    sg.begin_read();
 
     UniquePtr<Replication> repl_w(makeWriteLogCollector(path, false, crypt_key()));
     SharedGroup sg_w(*repl_w, SharedGroup::durability_Full, crypt_key());
@@ -7091,7 +7091,7 @@ TEST(LangBindHelper_HandoverDependentViews)
     SHARED_GROUP_TEST_PATH(path);
     UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
     SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
-    const Group& group = sg.begin_read();
+    sg.begin_read();
 
     UniquePtr<Replication> repl_w(makeWriteLogCollector(path, false, crypt_key()));
     SharedGroup sg_w(*repl_w, SharedGroup::durability_Full, crypt_key());
@@ -7150,7 +7150,7 @@ TEST(LangBindHelper_HandoverTableViewWithLinkView)
     SHARED_GROUP_TEST_PATH(path);
     UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
     SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
-    const Group& group = sg.begin_read();
+    sg.begin_read();
 
     UniquePtr<Replication> repl_w(makeWriteLogCollector(path, false, crypt_key()));
     SharedGroup sg_w(*repl_w, SharedGroup::durability_Full, crypt_key());
@@ -7302,7 +7302,7 @@ TEST(LangBindHelper_HandoverFailOfReverseDependency)
     SHARED_GROUP_TEST_PATH(path);
     UniquePtr<Replication> repl(makeWriteLogCollector(path, false, crypt_key()));
     SharedGroup sg(*repl, SharedGroup::durability_Full, crypt_key());
-    const Group& group = sg.begin_read();
+    sg.begin_read();
 
     UniquePtr<Replication> repl_w(makeWriteLogCollector(path, false, crypt_key()));
     SharedGroup sg_w(*repl_w, SharedGroup::durability_Full, crypt_key());
