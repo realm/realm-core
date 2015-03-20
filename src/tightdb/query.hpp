@@ -52,6 +52,7 @@ class ConstTableView;
 class Array;
 class Expression;
 class SequentialGetterBase;
+class Group;
 
 class Query {
 public:

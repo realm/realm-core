@@ -206,6 +206,8 @@ private:
     friend class Table;
 };
 
+// fwd decl
+class Group;
 
 class RowBase {
 protected:
