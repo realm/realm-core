@@ -215,7 +215,9 @@ TEST(Shared_PipelinedWritesWithKills)
 #endif
 
 
+
 #ifndef _WIN32
+
 TEST(Shared_CompactingOnTheFly)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -262,12 +264,19 @@ TEST(Shared_CompactingOnTheFly)
     writer_thread.join();
     {
         SharedGroup sg2(path, true, SharedGroup::durability_Full);
+        {
+            WriteTransaction wt2(sg2);
+            wt2.commit();
+        }
         CHECK_EQUAL(true, sg2.compact());
-        ReadTransaction rt2(sg2);
-        rt2.get_group().Verify();
+        {
+            ReadTransaction rt2(sg2);
+            rt2.get_group().Verify();
+        }
     }
 }
-#endif // _WIN32
+
+#endif
 
 
 #ifdef LOCKFILE_CLEANUP

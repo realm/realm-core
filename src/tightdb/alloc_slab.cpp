@@ -471,6 +471,9 @@ ref_type SlabAlloc::attach_file(const string& path, bool is_shared, bool read_on
         goto invalid_database;
     }
 
+    // make sure that any free space has its refs correctly assigned during begin_read
+    m_free_space_state = free_space_Invalid;
+
     fcg.release(); // Do not close
     return top_ref;
 
