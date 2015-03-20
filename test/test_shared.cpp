@@ -262,6 +262,10 @@ TEST(Shared_CompactingOnTheFly)
     writer_thread.join();
     {
         SharedGroup sg2(path, true, SharedGroup::durability_Full);
+        {
+            sg2.begin_write();
+            sg2.commit();
+        }
         CHECK_EQUAL(true, sg2.compact());
         ReadTransaction rt2(sg2);
         rt2.get_group().Verify();
