@@ -2056,7 +2056,6 @@ TEST(Shared_WaitForChange)
     Thread threads[num_threads];
     for (int j=0; j < num_threads; j++)
         threads[j].start(bind(&waiter, string(path), j));
-    cerr << "waiting for all to enter state 1" << endl;
     bool try_again = true;
     while (try_again) {
         try_again = false;
@@ -2068,7 +2067,6 @@ TEST(Shared_WaitForChange)
 
     sg.begin_write();
     sg.commit();
-    cerr << "waiting for all to enter state 3" << endl;
     try_again = true;
     while (try_again) {
         try_again = false;
@@ -2080,7 +2078,6 @@ TEST(Shared_WaitForChange)
 
     sg.begin_write();
     sg.commit();
-    cerr << "waiting for all to enter state 4" << endl;
     try_again = true;
     while (try_again) {
         try_again = false;
@@ -2091,7 +2088,6 @@ TEST(Shared_WaitForChange)
     }
     sg.begin_write();
     sg.commit();
-    cerr << "waiting for all to enter state 5" << endl;
     try_again = true;
     while (try_again) {
         try_again = false;
@@ -2100,7 +2096,6 @@ TEST(Shared_WaitForChange)
             if (5 != shared_state[j]) try_again = true;
         }
     }
-    cerr << "waiting for all to enter state 6" << endl;
     try_again = true;
     while (try_again) {
         try_again = false;
@@ -2114,17 +2109,13 @@ TEST(Shared_WaitForChange)
             }
         }
     }
-    cerr << "waiting to join" << endl;
     for (int j=0; j < num_threads; j++)
         threads[j].join();
-    cerr << "joined" << endl;
     for (int j=0; j < num_threads; j++) {
         delete sgs[j];
         sgs[j] = 0;
     }
     delete muu;
-    cerr << "done cleaning up" << endl;
-
 }
 
 #endif // endif not on windows (or apple)
