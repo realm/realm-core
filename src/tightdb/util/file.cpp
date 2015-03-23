@@ -476,10 +476,15 @@ void File::resize(SizeType size)
 
 #ifdef _WIN32 // Windows version
 
-    seek(size);
+    // Save file position
+    SizeType p = get_file_position();
 
+    seek(size);
     if (!SetEndOfFile(m_handle))
         throw runtime_error("SetEndOfFile() failed");
+
+    // Restore file position
+    seek(p);
 
 #else // POSIX version
 
@@ -592,6 +597,23 @@ void File::seek(SizeType position)
         return;
     throw runtime_error("lseek() failed");
 
+#endif
+}
+
+
+File::SizeType File::get_file_position()
+{
+    TIGHTDB_ASSERT_RELEASE(is_attached());
+
+#ifdef _WIN32 // Windows version
+    LARGE_INTEGER liOfs = { 0 };
+    LARGE_INTEGER liNew = { 0 };
+    if(!SetFilePointerEx(m_handle, liOfs, &liNew, FILE_CURRENT))
+        throw runtime_error("SetFilePointerEx() failed");
+    return liNew.QuadPart;
+#else 
+    // POSIX version not needed because it's only used by Windows version of resize().
+    TIGHTDB_ASSERT(false);
 #endif
 }
 
