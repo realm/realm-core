@@ -2000,31 +2000,31 @@ namespace {
 static const int num_threads = 3;
 static int shared_state[num_threads];
 static SharedGroup* sgs[num_threads];
-static Mutex muu;
+static Mutex* muu;
 
 void waiter(string path, int i)
 {
     SharedGroup* sg = new SharedGroup(path, true, SharedGroup::durability_Full);
     {
-        LockGuard l(muu);
+        LockGuard l(*muu);
         shared_state[i] = 1;
         sgs[i] = sg;
     }
     sg->wait_for_change();
     {
-        LockGuard l(muu);
+        LockGuard l(*muu);
         shared_state[i] = 2; // this state should not be observed by the writer
     }
     sg->wait_for_change(); // we'll fall right through here, because we haven't advanced our readlock
     {
-        LockGuard l(muu);
+        LockGuard l(*muu);
         shared_state[i] = 3;
     }
     sg->begin_read();
     sg->end_read();
     sg->wait_for_change(); // this time we'll wait because state hasn't advanced since we did.
     {
-        LockGuard l(muu);
+        LockGuard l(*muu);
         shared_state[i] = 4;
     }
     // works within a read transaction as well
@@ -2032,14 +2032,14 @@ void waiter(string path, int i)
     sg->wait_for_change();
     sg->end_read();
     {
-        LockGuard l(muu);
+        LockGuard l(*muu);
         shared_state[i] = 5;
     }
     sg->begin_read();
     sg->end_read();
     sg->wait_for_change(); // wait until wait_for_change is released
     {
-        LockGuard l(muu);
+        LockGuard l(*muu);
         shared_state[i] = 6;
     }
 }
@@ -2048,6 +2048,7 @@ void waiter(string path, int i)
 // This test will hang infinitely instead of failing!!!
 TEST(Shared_WaitForChange)
 {
+    muu = new Mutex;
     SHARED_GROUP_TEST_PATH(path);
     for (int j=0; j < num_threads; j++)
         shared_state[j] = 0;
@@ -2055,65 +2056,75 @@ TEST(Shared_WaitForChange)
     Thread threads[num_threads];
     for (int j=0; j < num_threads; j++)
         threads[j].start(bind(&waiter, string(path), j));
+    cerr << "waiting for all to enter state 1" << endl;
     bool try_again = true;
     while (try_again) {
         try_again = false;
         for (int j=0; j < num_threads; j++) {
-            LockGuard l(muu);
+            LockGuard l(*muu);
             if (shared_state[j] != 1) try_again = true;
         }
     }
 
     sg.begin_write();
     sg.commit();
+    cerr << "waiting for all to enter state 3" << endl;
     try_again = true;
     while (try_again) {
         try_again = false;
         for (int j=0; j < num_threads; j++) {
-            LockGuard l(muu);
+            LockGuard l(*muu);
             if (3 != shared_state[j]) try_again = true;
         }
     }
 
     sg.begin_write();
     sg.commit();
+    cerr << "waiting for all to enter state 4" << endl;
     try_again = true;
     while (try_again) {
         try_again = false;
         for (int j=0; j < num_threads; j++) {
-            LockGuard l(muu);
+            LockGuard l(*muu);
             if (4 != shared_state[j]) try_again = true;
         }
     }
     sg.begin_write();
     sg.commit();
+    cerr << "waiting for all to enter state 5" << endl;
     try_again = true;
     while (try_again) {
         try_again = false;
         for (int j=0; j < num_threads; j++) {
-            LockGuard l(muu);
+            LockGuard l(*muu);
             if (5 != shared_state[j]) try_again = true;
         }
     }
+    cerr << "waiting for all to enter state 6" << endl;
     try_again = true;
     while (try_again) {
         try_again = false;
         for (int j=0; j < num_threads; j++) {
-            LockGuard l(muu);
+            LockGuard l(*muu);
             if (sgs[j]) {
                 sgs[j]->wait_for_change_release();
             }
             if (6 != shared_state[j]) {
                 try_again = true;
             }
-            else { 
-                delete sgs[j];
-                sgs[j] = 0;
-            }
         }
     }
+    cerr << "waiting to join" << endl;
     for (int j=0; j < num_threads; j++)
         threads[j].join();
+    cerr << "joined" << endl;
+    for (int j=0; j < num_threads; j++) {
+        delete sgs[j];
+        sgs[j] = 0;
+    }
+    delete muu;
+    cerr << "done cleaning up" << endl;
+
 }
 
 #endif // endif not on windows (or apple)
