@@ -5,11 +5,11 @@
 ID         : class_dyn_table
 TITLE      : Table (dynamic)
 SUMMARY    : &g_dyn_table_intro_summary
-             TightDB table.
+             Realm table.
 DESCR      :
 - TEXT     : &g_dyn_table_intro_descr_core
              >
-             The Table class is the core class of the TightDB framework. It allows you
+             The Table class is the core class of the Realm framework. It allows you
              to efficiently work with data in terms of rows and columns. The value of
              a cell (specific column, specific row) is compacted in order to keep the
              overall memory consumption as small as possible. The internal data structure
@@ -27,11 +27,11 @@ DESCR      :
              >
              You can add and remove columns at run time as your application requires it. When you
              add a column, a type must be specified. The most common types including integers,
-             timestamps and strings are supported. It is also possible to use a TightDB table class
+             timestamps and strings are supported. It is also possible to use a Realm table class
              as column type. This means that you can have tables of tables.
 
-             Moreover, TightDB introduces a column type called mixed. A value of the
-             mixed type can be a value any type supported by TightDB. This implies - as the name
+             Moreover, Realm introduces a column type called mixed. A value of the
+             mixed type can be a value any type supported by Realm. This implies - as the name
              indicates - that you can mix the type of values in the column. In one row the
              value could be an integer, in another row the value could be a string or even a table.
 
@@ -740,7 +740,7 @@ CATEGORIES :
                  This method will find the first row where the value of first column matches
                  a given string value. Defining the first column as a string with unique values,
                  it is possible to combine such a table with this method to emulate a hash
-                 array using TightDB.
+                 array using Realm.
                  For optimal performance set an index on the string column, using {@link g_dyn_table_set_index}.
       CONST    : True
       PARAMS:

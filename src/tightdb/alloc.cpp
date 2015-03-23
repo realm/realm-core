@@ -30,7 +30,7 @@ using namespace realm;
 namespace {
 
 /// For use with free-standing objects (objects that are not part of a
-/// TightDB group)
+/// Realm group)
 ///
 /// Note that it is essential that this class is stateless as it may
 /// be used by multiple threads. Although it has m_replication, this

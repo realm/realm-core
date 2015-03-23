@@ -1548,7 +1548,7 @@ EOF
 
             if ! [ "$INTERACTIVE" ]; then
                 cat >"$PKG_DIR/README" <<EOF
-TightDB version $REALM_VERSION
+Realm version $REALM_VERSION
 
 Configure specific extensions:    ./build  config  EXT1  [EXT2]...
 Configure all extensions:         ./build  config  all
@@ -1598,7 +1598,7 @@ EOF
                 if [ "$INCLUDE_IPHONE" ]; then
                     cat >>"$PKG_DIR/README" <<EOF
 
-To build TightDB for iPhone, run the following command:
+To build Realm for iPhone, run the following command:
 
     ./build build-iphone
 
@@ -1612,7 +1612,7 @@ EOF
                 cat >>"$PKG_DIR/README" <<EOF
 
 Note that each build step creates a new log file in the subdirectory
-called "log". When contacting TightDB at <support@tightdb.com> because
+called "log". When contacting Realm at <support@tightdb.com> because
 of a problem in the installation process, we recommend that you attach
 all these log files as a bundle to your mail.
 EOF
@@ -1854,7 +1854,7 @@ EOF
         fi
         LOG_FILE="$(get_dist_log_path "config" "$TEMP_DIR")" || exit 1
         (
-            echo "TightDB version: ${REALM_VERSION:-Unknown}"
+            echo "Realm version: ${REALM_VERSION:-Unknown}"
             if [ -e ".PREBUILD_INFO" ]; then
                 echo
                 echo "PREBUILD HOST INFO:"
@@ -2045,7 +2045,7 @@ EOF
         TEMP_DIR="$(mktemp -d /tmp/tightdb.dist-build.XXXX)" || exit 1
         LOG_FILE="$(get_dist_log_path "build" "$TEMP_DIR")" || exit 1
         (
-            echo "TightDB version: ${REALM_VERSION:-Unknown}"
+            echo "Realm version: ${REALM_VERSION:-Unknown}"
             if [ -e ".PREBUILD_INFO" ]; then
                 echo
                 echo "PREBUILD HOST INFO:"
@@ -2160,7 +2160,7 @@ EOF
         TEMP_DIR="$(mktemp -d /tmp/tightdb.dist-build-iphone.XXXX)" || exit 1
         LOG_FILE="$(get_dist_log_path "build-iphone" "$TEMP_DIR")" || exit 1
         (
-            echo "TightDB version: ${REALM_VERSION:-Unknown}"
+            echo "Realm version: ${REALM_VERSION:-Unknown}"
             if [ -e ".PREBUILD_INFO" ]; then
                 echo
                 echo "PREBUILD HOST INFO:"
@@ -2261,7 +2261,7 @@ EOF
         TEMP_DIR="$(mktemp -d /tmp/tightdb.dist-$test_mode.XXXX)" || exit 1
         LOG_FILE="$(get_dist_log_path "$test_mode" "$TEMP_DIR")" || exit 1
         (
-            echo "TightDB version: ${REALM_VERSION:-Unknown}"
+            echo "Realm version: ${REALM_VERSION:-Unknown}"
             if [ -e ".PREBUILD_INFO" ]; then
                 echo
                 echo "PREBUILD HOST INFO:"
@@ -2321,7 +2321,7 @@ EOF
         touch "$LOG_FILE" || exit 1
         chmod a+r "$LOG_FILE" || exit 1
         (
-            echo "TightDB version: ${REALM_VERSION:-Unknown}"
+            echo "Realm version: ${REALM_VERSION:-Unknown}"
             if [ -e ".PREBUILD_INFO" ]; then
                 echo
                 echo "PREBUILD HOST INFO:"
@@ -2388,7 +2388,7 @@ NOTE: Shared libraries have been installed in '$libdir'.
 
 We believe that on your system this directory is not part of the
 default library search path. If this is true, you probably have to do
-one of the following things to successfully use TightDB in a C, C++,
+one of the following things to successfully use Realm in a C, C++,
 or Objective-C application:
 
  - Either run 'export LD_RUN_PATH=$libdir' before building your
@@ -2447,7 +2447,7 @@ EOF
         touch "$LOG_FILE" || exit 1
         chmod a+r "$LOG_FILE" || exit 1
         (
-            echo "TightDB version: ${REALM_VERSION:-Unknown}"
+            echo "Realm version: ${REALM_VERSION:-Unknown}"
             if [ -e ".PREBUILD_INFO" ]; then
                 echo
                 echo "PREBUILD HOST INFO:"
@@ -2506,7 +2506,7 @@ EOF
         TEMP_DIR="$(mktemp -d /tmp/tightdb.dist-test-installed.XXXX)" || exit 1
         LOG_FILE="$(get_dist_log_path "test-installed" "$TEMP_DIR")" || exit 1
         (
-            echo "TightDB version: ${REALM_VERSION:-Unknown}"
+            echo "Realm version: ${REALM_VERSION:-Unknown}"
             if [ -e ".PREBUILD_INFO" ]; then
                 echo
                 echo "PREBUILD HOST INFO:"

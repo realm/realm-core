@@ -3,18 +3,18 @@
  * TIGHTDB CONFIDENTIAL
  * __________________
  *
- *  [2011] - [2012] TightDB Inc
+ *  [2011] - [2012] Realm Inc
  *  All Rights Reserved.
  *
  * NOTICE:  All information contained herein is, and remains
- * the property of TightDB Incorporated and its suppliers,
+ * the property of Realm Incorporated and its suppliers,
  * if any.  The intellectual and technical concepts contained
- * herein are proprietary to TightDB Incorporated
+ * herein are proprietary to Realm Incorporated
  * and its suppliers and may be covered by U.S. and Foreign Patents,
  * patents in process, and are protected by trade secret or copyright law.
  * Dissemination of this information or reproduction of this material
  * is strictly forbidden unless prior written permission is obtained
- * from TightDB Incorporated.
+ * from Realm Incorporated.
  *
  **************************************************************************/
 #ifndef REALM_ALLOC_HPP
@@ -52,9 +52,9 @@ public:
 };
 
 
-/// The common interface for TightDB allocators.
+/// The common interface for Realm allocators.
 ///
-/// A TightDB allocator must associate a 'ref' to each allocated
+/// A Realm allocator must associate a 'ref' to each allocated
 /// object and be able to efficiently map any 'ref' to the
 /// corresponding memory address. The 'ref' is an integer and it must
 /// always be divisible by 8. Also, a value of zero is used to
@@ -101,7 +101,7 @@ public:
     bool is_read_only(ref_type) const REALM_NOEXCEPT;
 
     /// Returns a simple allocator that can be used with free-standing
-    /// TightDB objects (such as a free-standing table). A
+    /// Realm objects (such as a free-standing table). A
     /// free-standing object is one that is not part of a Group, and
     /// therefore, is not part of an actual database.
     static Allocator& get_default() REALM_NOEXCEPT;

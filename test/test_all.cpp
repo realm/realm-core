@@ -160,7 +160,7 @@ void display_build_config()
 
     cout <<
         "\n"
-        "TightDB version: "<<Version::get_version()<<"\n"
+        "Realm version: "<<Version::get_version()<<"\n"
         "  with Debug "<<with_debug<<"\n"
         "  with Replication "<<with_replication<<"\n"
         "\n"

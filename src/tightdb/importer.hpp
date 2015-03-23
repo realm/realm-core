@@ -14,8 +14,8 @@ This library supports:
     * Auto detection of float vs. double, depending on number of significant digits
     * Bool types can be case insensitive "true, false, 0, 1, yes, no"
     * Newline inside data fields, plus auto detection of non-conforming non-quoted newlines (as in some IBM sample files)
-    * TightDB types String, Integer, Bool, Float and Double
-    * Auto detection of header and naming of TightDB columns accordingly
+    * Realm types String, Integer, Bool, Float and Double
+    * Auto detection of header and naming of Realm columns accordingly
     * double-quoted and non-quoted fields, and these can be mixed arbitrarely
     * double-quotes inside data field
     * *nix + MacOSv9 + Windows line feed
@@ -27,7 +27,7 @@ This library supports:
 Problems:
 ---------------------------------------------------------------------------------------------------------------------
     A csv file does not tell its sheme. So we auto-detect it, based on the first N rows. However if a given column
-    contains 'false, false, false, hello' and we detect and create TightDB table scheme using the first 3 rows, we fail
+    contains 'false, false, false, hello' and we detect and create Realm table scheme using the first 3 rows, we fail
     when we meet 'hello' (this error is handled with a thorough error message)
 
     Does not support commas in floats unless field is double-quoted

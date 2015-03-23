@@ -1,5 +1,5 @@
 //
-// TightDB C++ coding standard - by example
+// Realm C++ coding standard - by example
 //
 
 

@@ -3,18 +3,18 @@
  * TIGHTDB CONFIDENTIAL
  * __________________
  *
- *  [2011] - [2012] TightDB Inc
+ *  [2011] - [2012] Realm Inc
  *  All Rights Reserved.
  *
  * NOTICE:  All information contained herein is, and remains
- * the property of TightDB Incorporated and its suppliers,
+ * the property of Realm Incorporated and its suppliers,
  * if any.  The intellectual and technical concepts contained
- * herein are proprietary to TightDB Incorporated
+ * herein are proprietary to Realm Incorporated
  * and its suppliers and may be covered by U.S. and Foreign Patents,
  * patents in process, and are protected by trade secret or copyright law.
  * Dissemination of this information or reproduction of this material
  * is strictly forbidden unless prior written permission is obtained
- * from TightDB Incorporated.
+ * from Realm Incorporated.
  *
  **************************************************************************/
 
@@ -54,7 +54,7 @@ const char* legend =
     "  csv -t={s|i|b|f|d}{s|i|b|f|d}... name1 name2 ... [-s=N] [-n=N] <.csv file | -stdin> <.tightdb file>\n"
     "\n"
     " -a: Use the first N rows to auto-detect scheme (default =10000). Lower is faster but more error prone\n"
-    " -e: TightDB does not support null values. Set the -e flag to import a column as a String type column if\n"
+    " -e: Realm does not support null values. Set the -e flag to import a column as a String type column if\n"
     "     it has occurences of empty fields. Otherwise empty fields may be converted to 0, 0.0 or false\n"
     " -n: Only import first N rows of payload\n"
     " -t: List of column types where s=string, i=integer, b=bool, f=float, d=double\n"

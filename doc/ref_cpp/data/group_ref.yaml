@@ -30,7 +30,7 @@ DESCR       :
               (another) file.
 
               A group can be serialized into a memory buffer or a file in
-              TightDB's highly efficient binary format, or it can be serialized
+              Realm's highly efficient binary format, or it can be serialized
               to a stream in either ascii or json format.
 
               The result of serializing in Tightdb's own binary format (whether as a file
@@ -41,7 +41,7 @@ DESCR       :
               serialized, you must create the table using the group. It is not
               possible to dynamically add a table to a group.
 
-              Accessing a TightDB database file through manual
+              Accessing a Realm database file through manual
               construction of a Group object does not offer any
               level of thread safety or transaction safety. When
               any of those kinds of safety are a concern, consider
@@ -95,7 +95,7 @@ CATEGORIES  :
       - NAME   : file
         TYPES  : const std::string&
         DESCR  : &g_open_filesystem_path_descr
-                 Filesystem path of the TightDB database file to be opened. Only ASCII characters are allowed.
+                 Filesystem path of the Realm database file to be opened. Only ASCII characters are allowed.
       - NAME   : mode
         TYPES  : Group::OpenMode
         DESCR  : |
@@ -205,7 +205,7 @@ CATEGORIES  :
                  it does not already exist in the file system.
 
                  In any case, if the file already exists, it must
-                 contain a valid TightDB database. In many cases
+                 contain a valid Realm database. In many cases
                  invalidity will be detected and cause the
                  InvalidDatabase exception to be thrown, but you
                  should not rely on it.

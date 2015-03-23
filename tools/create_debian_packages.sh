@@ -35,7 +35,7 @@
 # Codename: lucid
 # Components: main
 # Architectures: i386 amd64
-# Description: TightDB for Ubuntu
+# Description: Realm for Ubuntu
 # SignWith: 6C518649
 #
 # Each ubuntu (and mint) version have a codename. For each supported

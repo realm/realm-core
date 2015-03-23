@@ -32,7 +32,7 @@
 /// \page AccessorConsistencyLevels
 ///
 /// These are the three important levels of consistency of a hierarchy of
-/// TightDB accessors rooted in a common group accessor (tables, columns, rows,
+/// Realm accessors rooted in a common group accessor (tables, columns, rows,
 /// descriptors, arrays):
 ///
 /// ### Fully Consistent Accessor Hierarchy (or just "Full Consistency")

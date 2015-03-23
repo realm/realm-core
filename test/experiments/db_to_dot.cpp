@@ -14,7 +14,7 @@ int main(int argc, const char* const argv[])
     }
     Group g(argv[1], GROUP_READONLY);
     if (!g.is_valid()) {
-        cerr << "Failed to open TightDB database '" << argv[1] << "'" << endl;
+        cerr << "Failed to open Realm database '" << argv[1] << "'" << endl;
         return 1;
     }
     g.to_dot(cout);

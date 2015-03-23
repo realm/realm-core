@@ -1292,7 +1292,7 @@
 			isa = PBXProject;
 			attributes = {
 				LastUpgradeCheck = 0620;
-				ORGANIZATIONNAME = TightDB;
+				ORGANIZATIONNAME = Realm;
 			};
 			buildConfigurationList = 3611F2FF14209B7000017263 /* Build configuration list for PBXProject "tightdb" */;
 			compatibilityVersion = "Xcode 3.2";

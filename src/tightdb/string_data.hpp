@@ -3,18 +3,18 @@
  * TIGHTDB CONFIDENTIAL
  * __________________
  *
- *  [2011] - [2012] TightDB Inc
+ *  [2011] - [2012] Realm Inc
  *  All Rights Reserved.
  *
  * NOTICE:  All information contained herein is, and remains
- * the property of TightDB Incorporated and its suppliers,
+ * the property of Realm Incorporated and its suppliers,
  * if any.  The intellectual and technical concepts contained
- * herein are proprietary to TightDB Incorporated
+ * herein are proprietary to Realm Incorporated
  * and its suppliers and may be covered by U.S. and Foreign Patents,
  * patents in process, and are protected by trade secret or copyright law.
  * Dissemination of this information or reproduction of this material
  * is strictly forbidden unless prior written permission is obtained
- * from TightDB Incorporated.
+ * from Realm Incorporated.
  *
  **************************************************************************/
 #ifndef REALM_STRING_HPP
@@ -37,12 +37,12 @@ namespace realm {
 /// attempt to manage the lifetime of it.
 ///
 /// A null character inside the referenced region is considered a part of the
-/// string by TightDB.
+/// string by Realm.
 ///
-/// For compatibility with C-style strings, when a string is stored in a TightDB
+/// For compatibility with C-style strings, when a string is stored in a Realm
 /// database, it is always followed by a terminating null character, regardless
 /// of whether the string itself has internal null characters. This means that
-/// when a StringData object is extracted from TightDB, the referenced region is
+/// when a StringData object is extracted from Realm, the referenced region is
 /// guaranteed to be followed immediately by an extra null character, but that
 /// null character is not inside the referenced region. Therefore, all of the
 /// following forms are guaranteed to return a pointer to a null-terminated
@@ -65,7 +65,7 @@ namespace realm {
 ///
 /// This class makes it possible to distinguish between a 'null' reference and a
 /// reference to the empty string (see is_null()). However, most functions of
-/// the TightDB API do not care about this distinction. In particular, the
+/// the Realm API do not care about this distinction. In particular, the
 /// comparison operators of this class make no distinction between a null
 /// reference and a reference to the empty string. This is possible because in
 /// both cases, size() returns zero.
@@ -112,7 +112,7 @@ public:
     /// it is converted to false.
     ///
     /// It is important to understand that all of the functions and operators in
-    /// this class, and most of the functions in the TightDB API in general
+    /// this class, and most of the functions in the Realm API in general
     /// makes no distinction between a null reference and a reference to the
     /// empty string. These functions and operators never look at the stored
     /// pointer if the stored size is zero.

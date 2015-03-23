@@ -2,7 +2,7 @@
 #define REALM_NMMINTRIN_H
 
 /*
-    We must support runtime detection of CPU support of SSE when distributing TightDB as a closed source library.
+    We must support runtime detection of CPU support of SSE when distributing Realm as a closed source library.
 
     This is a problem on gcc and llvm: To use SSE intrinsics we need to pass -msse on the command line (to get offered
     __builtin_ accessors used by intrinsics functions). However, the -msse flag allows gcc to emit SSE instructions

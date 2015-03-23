@@ -36,7 +36,7 @@ gdb-debug: check-debug-norun
 .PHONY: benchmark
 benchmark: check-norun/subdir/test-tightdb check-norun/subdir/test-sqlite3 check-norun/subdir/test-stl
 	@echo ""
-	@echo ".:: TightDB ::."
+	@echo ".:: Realm ::."
 	test-tightdb/test-tightdb
 	@echo ""
 	@echo ".:: SQLite 3 ::."

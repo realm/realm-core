@@ -3,18 +3,18 @@
  * TIGHTDB CONFIDENTIAL
  * __________________
  *
- *  [2011] - [2012] TightDB Inc
+ *  [2011] - [2012] Realm Inc
  *  All Rights Reserved.
  *
  * NOTICE:  All information contained herein is, and remains
- * the property of TightDB Incorporated and its suppliers,
+ * the property of Realm Incorporated and its suppliers,
  * if any.  The intellectual and technical concepts contained
- * herein are proprietary to TightDB Incorporated
+ * herein are proprietary to Realm Incorporated
  * and its suppliers and may be covered by U.S. and Foreign Patents,
  * patents in process, and are protected by trade secret or copyright law.
  * Dissemination of this information or reproduction of this material
  * is strictly forbidden unless prior written permission is obtained
- * from TightDB Incorporated.
+ * from Realm Incorporated.
  *
  **************************************************************************/
 #ifndef REALM_TABLE_REF_HPP
@@ -52,12 +52,12 @@ template<class> class BasicTable;
 ///
 /// Table accessors are either created directly by an application via
 /// a call to one of the public table constructors, or they are
-/// created internally by the TightDB library, such as when the
+/// created internally by the Realm library, such as when the
 /// application calls Group::get_table(), Table::get_subtable(), or
 /// Table::create().
 ///
 /// Applications can safely assume that all table accessors, created
-/// internally by the TightDB library, have a lifetime that is managed
+/// internally by the Realm library, have a lifetime that is managed
 /// by reference counting. This means that the application can prolong
 /// the lifetime of *such* table accessors indefinitely by holding on
 /// to at least one smart pointer, but note that the guarantee of the

@@ -1,19 +1,19 @@
-TightDB
+Realm
 =======
 
-This README file explains how to build and install the TightDB core
+This README file explains how to build and install the Realm core
 library.
 
 
 Prerequisites
 -------------
 
-To build the TightDB core library, you need the standard set of build
-tools. This includes a C/C++ compiler and GNU make. TightDB is
+To build the Realm core library, you need the standard set of build
+tools. This includes a C/C++ compiler and GNU make. Realm is
 thoroughly tested with both GCC and Clang. It is known to work with
 GCC 4.2 and newer, as well as with Clang 3.0 and newer.
 
-If you are going to modify the TightDB core library, you will need
+If you are going to modify the Realm core library, you will need
 Cheetah for Python (http://www.cheetahtemplate.org). It is needed
 because some source files are generated from Cheetah templates.
 
@@ -112,10 +112,10 @@ The following programs will be installed:
     /usr/local/libexec/realmd-dbg
 
 The `realm-import` tool lets you load files containing
-comma-separated values into TightDB. The next two are used
-transparently by the TightDB library when `async` transactions are
+comma-separated values into Realm. The next two are used
+transparently by the Realm library when `async` transactions are
 enabled. The two `config` programs provide the necessary compiler
-flags for an application that needs to link against TightDB. They work
+flags for an application that needs to link against Realm. They work
 with GCC and other compilers, such as Clang, that are mostly command
 line compatible with GCC. Here is an example:
 
@@ -143,11 +143,11 @@ It can be built using the following command:
 Building for iOS
 ----------------
 
-On Mac OS X it is possible to build a version of the TightDB core
+On Mac OS X it is possible to build a version of the Realm core
 library for iOS (the iPhone OS). It requires that the iPhoneOS and
 iPhoneSimulator SDKs for Xcode are installed.
 
-Run the following command to build the TightDB core library for
+Run the following command to build the Realm core library for
 iPhone/iOS:
 
     sh build.sh build-iphone
@@ -182,7 +182,7 @@ following command before building and installing:
 Here, `PREFIX` is the installation prefix. If it is not specified, it
 defaults to `/usr/local`.
 
-Normally the TightDB version is taken to be what is returned by `git
+Normally the Realm version is taken to be what is returned by `git
 describe`. To override this, set `REALM_VERSION` as in the following
 examples:
 
@@ -197,7 +197,7 @@ or `sh build.sh bin-dist`, as in the following example:
 
 ### Replication
 
-To enable replication in TightDB, set `REALM_ENABLE_REPLICATION` to
+To enable replication in Realm, set `REALM_ENABLE_REPLICATION` to
 a nonempty value during configuration as in the following example:
 
     REALM_ENABLE_REPLICATION=1 sh build.sh config
@@ -270,7 +270,7 @@ These are the available variables:
 
 Memory debugging:
 
-TightDB currently allows for uninitialized data to be written to a
+Realm currently allows for uninitialized data to be written to a
 database file. This is not an error (technically), but it does cause
 Valgrind to report errors. To avoid these 'false positives' during
 testing and debugging, set `REALM_ENABLE_ALLOC_SET_ZERO` to a

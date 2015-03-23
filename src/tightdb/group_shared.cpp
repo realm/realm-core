@@ -3,18 +3,18 @@
  * TIGHTDB CONFIDENTIAL
  * __________________
  *
- *  [2011] - [2012] TightDB Inc
+ *  [2011] - [2012] Realm Inc
  *  All Rights Reserved.
  *
  * NOTICE:  All information contained herein is, and remains
- * the property of TightDB Incorporated and its suppliers,
+ * the property of Realm Incorporated and its suppliers,
  * if any.  The intellectual and technical concepts contained
- * herein are proprietary to TightDB Incorporated
+ * herein are proprietary to Realm Incorporated
  * and its suppliers and may be covered by U.S. and Foreign Patents,
  * patents in process, and are protected by trade secret or copyright law.
  * Dissemination of this information or reproduction of this material
  * is strictly forbidden unless prior written permission is obtained
- * from TightDB Incorporated.
+ * from Realm Incorporated.
  *
  **************************************************************************/
 
@@ -1274,7 +1274,7 @@ void SharedGroup::advance_read(VersionID specific_version)
     }
 
     // If the new top-ref is zero, then the previous top-ref must have
-    // been zero too, and we are still seing an empty TightDB file
+    // been zero too, and we are still seing an empty Realm file
     // (note that this is possible even if the version has
     // changed). The purpose of the early-out in this case, is to
     // retain the temporary arrays that were created earlier by

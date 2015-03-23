@@ -10,10 +10,10 @@ Package: librealm
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Description: Fast, embedded database
- TightDB is a fast, embedded database.
+ Realm is a fast, embedded database.
 
 Package: librealm-dev
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, g++
 Description: Fast, embedded database.
- TightDB is a fast, embedded database: Development and header files.
+ Realm is a fast, embedded database: Development and header files.

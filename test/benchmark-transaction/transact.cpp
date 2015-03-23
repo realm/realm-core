@@ -1,7 +1,7 @@
 /*
- * Transaction benchmark for SQLite 3 and TightDB
+ * Transaction benchmark for SQLite 3 and Realm
  *
- * (C) Copyright 2012 by TightDB, Inc. <http://www.tightdb.com/>
+ * (C) Copyright 2012 by Realm, Inc. <http://www.tightdb.com/>
  *
  */
 

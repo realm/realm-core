@@ -3,18 +3,18 @@
  * TIGHTDB CONFIDENTIAL
  * __________________
  *
- *  [2011] - [2012] TightDB Inc
+ *  [2011] - [2012] Realm Inc
  *  All Rights Reserved.
  *
  * NOTICE:  All information contained herein is, and remains
- * the property of TightDB Incorporated and its suppliers,
+ * the property of Realm Incorporated and its suppliers,
  * if any.  The intellectual and technical concepts contained
- * herein are proprietary to TightDB Incorporated
+ * herein are proprietary to Realm Incorporated
  * and its suppliers and may be covered by U.S. and Foreign Patents,
  * patents in process, and are protected by trade secret or copyright law.
  * Dissemination of this information or reproduction of this material
  * is strictly forbidden unless prior written permission is obtained
- * from TightDB Incorporated.
+ * from Realm Incorporated.
  *
  **************************************************************************/
 #ifndef REALM_ALLOC_SLAB_HPP
@@ -37,15 +37,15 @@ class GroupWriter;
 
 
 /// Thrown by Group and SharedGroup constructors if the specified file
-/// (or memory buffer) does not appear to contain a valid TightDB
+/// (or memory buffer) does not appear to contain a valid Realm
 /// database.
 struct InvalidDatabase: util::File::AccessError {
     InvalidDatabase(): util::File::AccessError("Invalid database") {}
 };
 
 
-/// The allocator that is used to manage the memory of a TightDB
-/// group, i.e., a TightDB database.
+/// The allocator that is used to manage the memory of a Realm
+/// group, i.e., a Realm database.
 ///
 /// Optionally, it can be attached to an pre-existing database (file
 /// or memory buffer) which then becomes an immuatble part of the
@@ -184,7 +184,7 @@ public:
     /// occur only for the initial section that corresponds to the
     /// specified size. On systems that do not support preallocation,
     /// this function has no effect. To know whether preallocation is
-    /// supported by TightDB on your platform, call
+    /// supported by Realm on your platform, call
     /// util::File::is_prealloc_supported().
     ///
     /// It is an error to call this function on an allocator that is

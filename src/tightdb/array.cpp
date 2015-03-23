@@ -3026,7 +3026,7 @@ inline pair<ref_type, size_t> find_bptree_child(const char* data, size_t ndx,
 // field in the inner B+-tree node
 // (a.k.a. `total_elems_in_subtree`). This was done in anticipation of
 // the removal of the deprecated field in a future version of the
-// TightDB file format.
+// Realm file format.
 //
 // This function is also designed in anticipation of a change in the
 // way column accessors work. Some aspects of the implementation of

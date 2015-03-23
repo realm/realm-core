@@ -28,10 +28,10 @@ If You have access to many cores, or two computers you can do vs2010 on one comp
 
 2. select Build->Batch Build. Unmark *all* , mark the 4 called 
 project:  configuration: Platform
-TightDB   Debug      Win32
-TightDB   Debug      x64
-TightDB   Release    Win32
-TightDB   Release    x64
+Realm   Debug      Win32
+Realm   Debug      x64
+Realm   Release    Win32
+Realm   Release    x64
 click clean
 
 3. select Build->Batch Build, click Rebuild. Wait for the build process to finish.
@@ -80,10 +80,10 @@ Press ENTER.
 
 12. select Build->Batch Build. Unmark *all* , mark the 4 called 
 project:  configuration: Platform
-TightDB   Static library, debug    Win32
-TightDB   Static library, debug    x64
-TightDB   Static library, release  Win32
-TightDB   Static library, release  x64
+Realm   Static library, debug    Win32
+Realm   Static library, debug    x64
+Realm   Static library, release  Win32
+Realm   Static library, release  x64
 click clean
 
 13. select Build->Batch build. Click Rebuild (wait until the build has finished)
@@ -96,7 +96,7 @@ click clean
 otherwise a c++ developer will have to evaluate the warning and fix the problem or write a note
 6. Assuming all warnigs are noted in the source, and all 8 projects build, continue..
 
-17. right click "Solution 'TightDB' (8 projects) in Solution Explorer
+17. right click "Solution 'Realm' (8 projects) in Solution Explorer
 
 18. Select 'open folder in windows explorer'
 
@@ -107,7 +107,7 @@ otherwise a c++ developer will have to evaluate the warning and fix the problem 
 
 ***Visual studio 2012 build 
 
-21. Open TightDb.sln with visual studio 2012 . right click "Solution 'TightDB' (8 projects) in Solution Explorer
+21. Open TightDb.sln with visual studio 2012 . right click "Solution 'Realm' (8 projects) in Solution Explorer
 
 22. select Update VC++ Projects
 
@@ -117,10 +117,10 @@ otherwise a c++ developer will have to evaluate the warning and fix the problem 
 
 25. select Build->Batch Build. Unmark *all* , mark the 4 called 
 project:  configuration: Platform
-TightDB   Debug      Win32
-TightDB   Debug      x64
-TightDB   Release    Win32
-TightDB   Release    x64
+Realm   Debug      Win32
+Realm   Debug      x64
+Realm   Release    Win32
+Realm   Release    x64
 click clean
 
 26. select Build->Batch Build, click Rebuild. Wait for the build process to finish.
@@ -169,10 +169,10 @@ Press ENTER.
 
 35. select Build->Batch Build. Unmark *all* , mark the 4 called 
 project:  configuration: Platform
-TightDB   Static library, debug    Win32
-TightDB   Static library, debug    x64
-TightDB   Static library, release  Win32
-TightDB   Static library, release  x64
+Realm   Static library, debug    Win32
+Realm   Static library, debug    x64
+Realm   Static library, release  Win32
+Realm   Static library, release  x64
 click clean
 
 36. select Build->Batch build. Click Rebuild (wait until the build has finished)
@@ -186,7 +186,7 @@ otherwise a c++ developer will have to evaluate the warning and fix the problem 
 
 40. Assuming all warnigs are noted in the source, and all 8 projects build, continue..
 
-41. right click "Solution 'TightDB' (8 projects) in Solution Explorer
+41. right click "Solution 'Realm' (8 projects) in Solution Explorer
 
 42. Select 'open folder in windows explorer'
 

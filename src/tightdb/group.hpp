@@ -3,18 +3,18 @@
  * TIGHTDB CONFIDENTIAL
  * __________________
  *
- *  [2011] - [2012] TightDB Inc
+ *  [2011] - [2012] Realm Inc
  *  All Rights Reserved.
  *
  * NOTICE:  All information contained herein is, and remains
- * the property of TightDB Incorporated and its suppliers,
+ * the property of Realm Incorporated and its suppliers,
  * if any.  The intellectual and technical concepts contained
- * herein are proprietary to TightDB Incorporated
+ * herein are proprietary to Realm Incorporated
  * and its suppliers and may be covered by U.S. and Foreign Patents,
  * patents in process, and are protected by trade secret or copyright law.
  * Dissemination of this information or reproduction of this material
  * is strictly forbidden unless prior written permission is obtained
- * from TightDB Incorporated.
+ * from Realm Incorporated.
  *
  **************************************************************************/
 
@@ -119,7 +119,7 @@ public:
     /// be made, if it does not already exist in the file system.
     ///
     /// In any case, if the file already exists, it must contain a
-    /// valid TightDB database. In many cases invalidity will be
+    /// valid Realm database. In many cases invalidity will be
     /// detected and cause the InvalidDatabase exception to be thrown,
     /// but you should not rely on it.
     ///
@@ -141,7 +141,7 @@ public:
     /// Calling open() on a Group instance that is already in the
     /// attached state has undefined behavior.
     ///
-    /// Accessing a TightDB database file through manual construction
+    /// Accessing a Realm database file through manual construction
     /// of a Group object does not offer any level of thread safety or
     /// transaction safety. When any of those kinds of safety are a
     /// concern, consider using a SharedGroup instead. When accessing
@@ -163,7 +163,7 @@ public:
     /// read/write mode (mode_ReadWrite) was requested, and the file
     /// did not already exist.
     ///
-    /// \param file File system path to a TightDB database file.
+    /// \param file File system path to a Realm database file.
     ///
     /// \param encryption_key 32-byte key used to encrypt and decrypt
     /// the database file, or nullptr to disable encryption.

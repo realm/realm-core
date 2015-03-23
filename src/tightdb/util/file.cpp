@@ -685,7 +685,7 @@ bool File::lock(bool exclusive, bool non_blocking)
     //
     // To make matters worse, flock() may be a simple wrapper around
     // fcntl() based locks on some systems. This is bad news, because
-    // the robustness of the TightDB API relies in part by the
+    // the robustness of the Realm API relies in part by the
     // assumption that a single process (even a single thread) can
     // hold multiple overlapping independent shared locks on a single
     // file as long as they are placed via distinct file descriptors.

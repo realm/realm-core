@@ -3,18 +3,18 @@
  * TIGHTDB CONFIDENTIAL
  * __________________
  *
- *  [2011] - [2012] TightDB Inc
+ *  [2011] - [2012] Realm Inc
  *  All Rights Reserved.
  *
  * NOTICE:  All information contained herein is, and remains
- * the property of TightDB Incorporated and its suppliers,
+ * the property of Realm Incorporated and its suppliers,
  * if any.  The intellectual and technical concepts contained
- * herein are proprietary to TightDB Incorporated
+ * herein are proprietary to Realm Incorporated
  * and its suppliers and may be covered by U.S. and Foreign Patents,
  * patents in process, and are protected by trade secret or copyright law.
  * Dissemination of this information or reproduction of this material
  * is strictly forbidden unless prior written permission is obtained
- * from TightDB Incorporated.
+ * from Realm Incorporated.
  *
  **************************************************************************/
 
@@ -86,7 +86,7 @@ void print_col_names(Table& table)
     cout << "\n" << string(table.get_column_count() * (print_width + 1), '-').c_str() << "\n";
 }
 
-// Prints row 'r' of a TightDB table
+// Prints row 'r' of a Realm table
 void print_row(Table& table, size_t r)
 {
     for(size_t c = 0; c < table.get_column_count(); c++) {
@@ -355,8 +355,8 @@ template <bool can_fail> double Importer::parse_double(const char* col, bool* su
     return x;
 }
 
-// Takes a row of payload and returns a vector of TightDB types that can represent them. If a value can be represented
-// by multiple TightDB types, it prioritizes Bool > Int > Float > Double > String. If Empty_as_string == true, then
+// Takes a row of payload and returns a vector of Realm types that can represent them. If a value can be represented
+// by multiple Realm types, it prioritizes Bool > Int > Float > Double > String. If Empty_as_string == true, then
 // empty strings turns into String type.
 vector<DataType> Importer::types (vector<string> v)
 {
@@ -387,7 +387,7 @@ vector<DataType> Importer::types (vector<string> v)
     return res;
 }
 
-// Takes two vectors of TightDB types, and for each field finds best type that can represent both.
+// Takes two vectors of Realm types, and for each field finds best type that can represent both.
 vector<DataType> Importer::lowest_common(vector<DataType> types1, vector<DataType> types2)
 {
     vector<DataType> res;
@@ -634,7 +634,7 @@ size_t Importer::import_csv(FILE* file, Table& table, vector<DataType> *scheme2,
         header = *column_names;
     }
 
-    // Create sheme in TightDB table
+    // Create sheme in Realm table
     for(size_t t = 0; t < scheme.size(); t++)
         table.add_column(scheme[t], StringData(header[t]).data());
 
@@ -658,7 +658,7 @@ size_t Importer::import_csv(FILE* file, Table& table, vector<DataType> *scheme2,
             if(!Quiet && imported_rows % 123 == 0)
                 cout << imported_rows << " rows\r";
 
-            // Add empty row to TightDB
+            // Add empty row to Realm
             table.add_empty_row();
 
             // Add all fields to new row

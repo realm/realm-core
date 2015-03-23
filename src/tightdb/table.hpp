@@ -3,18 +3,18 @@
  * TIGHTDB CONFIDENTIAL
  * __________________
  *
- *  [2011] - [2012] TightDB Inc
+ *  [2011] - [2012] Realm Inc
  *  All Rights Reserved.
  *
  * NOTICE:  All information contained herein is, and remains
- * the property of TightDB Incorporated and its suppliers,
+ * the property of Realm Incorporated and its suppliers,
  * if any.  The intellectual and technical concepts contained
- * herein are proprietary to TightDB Incorporated
+ * herein are proprietary to Realm Incorporated
  * and its suppliers and may be covered by U.S. and Foreign Patents,
  * patents in process, and are protected by trade secret or copyright law.
  * Dissemination of this information or reproduction of this material
  * is strictly forbidden unless prior written permission is obtained
- * from TightDB Incorporated.
+ * from Realm Incorporated.
  *
  **************************************************************************/
 #ifndef REALM_TABLE_HPP
@@ -121,7 +121,7 @@ public:
     /// can no longer be used, except for calling is_attached(). The
     /// consequences of calling other non-static functions on a detached table
     /// accessor are unspecified. Table accessors obtained by calling functions in
-    /// the TightDB API are always in the 'attached' state immediately upon
+    /// the Realm API are always in the 'attached' state immediately upon
     /// return from those functions.
     ///
     /// A table accessor of a free-standing table never becomes detached (except
@@ -688,7 +688,7 @@ public:
     /// Write this table (or a slice of this table) to the specified
     /// output stream.
     ///
-    /// The output will have the same format as any other TightDB
+    /// The output will have the same format as any other Realm
     /// database file, such as those produced by Group::write(). In
     /// this case, however, the resulting database file will contain
     /// exactly one table, and that table will contain only the

@@ -3,18 +3,18 @@
  * TIGHTDB CONFIDENTIAL
  * __________________
  *
- *  [2011] - [2012] TightDB Inc
+ *  [2011] - [2012] Realm Inc
  *  All Rights Reserved.
  *
  * NOTICE:  All information contained herein is, and remains
- * the property of TightDB Incorporated and its suppliers,
+ * the property of Realm Incorporated and its suppliers,
  * if any.  The intellectual and technical concepts contained
- * herein are proprietary to TightDB Incorporated
+ * herein are proprietary to Realm Incorporated
  * and its suppliers and may be covered by U.S. and Foreign Patents,
  * patents in process, and are protected by trade secret or copyright law.
  * Dissemination of this information or reproduction of this material
  * is strictly forbidden unless prior written permission is obtained
- * from TightDB Incorporated.
+ * from Realm Incorporated.
  *
  **************************************************************************/
 #ifndef REALM_GROUP_SHARED_HPP
@@ -44,7 +44,7 @@ struct IncompatibleLockFile : std::runtime_error {
 ///
 /// When multiple threads or processes need to access a database
 /// concurrently, they must do so using transactions. By design,
-/// TightDB does not allow for multiple threads (or processes) to
+/// Realm does not allow for multiple threads (or processes) to
 /// share a single instance of SharedGroup. Instead, each concurrently
 /// executing thread or process must use a separate instance of
 /// SharedGroup.
@@ -108,13 +108,13 @@ struct IncompatibleLockFile : std::runtime_error {
 ///  - A newly created shared group accessor is in state "no transaction in
 ///    progress".
 ///
-///  - In state "error during read", almost all TightDB API functions are
+///  - In state "error during read", almost all Realm API functions are
 ///    illegal on the connected group of accessors. The only valid operations
 ///    are destruction of the shared group, and GroupShared::end_read(). If
 ///    GroupShared::end_read() is called, the new state becomes "no transaction
 ///    in progress".
 ///
-///  - In state "error during write", almost all TightDB API functions are
+///  - In state "error during write", almost all Realm API functions are
 ///    illegal on the connected group of accessors. The only valid operations
 ///    are destruction of the shared group, and GroupShared::rollback(). If
 ///    GroupShared::end_write() is called, the new state becomes "no transaction
@@ -172,7 +172,7 @@ public:
     /// Calling open() on a SharedGroup instance that is already in
     /// the attached state has undefined behavior.
     ///
-    /// \param file Filesystem path to a TightDB database file.
+    /// \param file Filesystem path to a Realm database file.
     ///
     /// \throw util::File::AccessError If the file could not be
     /// opened. If the reason corresponds to one of the exception
@@ -221,7 +221,7 @@ public:
     /// occur only for the initial section that corresponds to the
     /// specified size. On systems that do not support preallocation,
     /// this function has no effect. To know whether preallocation is
-    /// supported by TightDB on your platform, call
+    /// supported by Realm on your platform, call
     /// util::File::is_prealloc_supported().
     ///
     /// It is an error to call this function on an unattached shared

@@ -165,16 +165,16 @@ int main(int argc, char* argv[])
             string msg =
                 "Synopsis: "+string(prog)+"\n\n"
                 "Options:\n"
-                "  --version     Show the version of TightDB that this command was installed\n"
+                "  --version     Show the version of Realm that this command was installed\n"
                 "                as part of\n"
                 "  --cflags      Output all pre-processor and compiler flags\n"
                 "  --libs        Output all linker flags\n"
-                "  --prefix      Show the TightDB installation prefix\n"
-                "  --exec-prefix Show the TightDB installation prefix for executables\n"
-                "  --includedir  Show the directory holding the TightDB header files\n"
-                "  --bindir      Show the directory holding the TightDB executables\n"
-                "  --libdir      Show the directory holding the TightDB libraries\n"
-                "  --libexecdir  Show the directory holding the TightDB executables to be run\n"
+                "  --prefix      Show the Realm installation prefix\n"
+                "  --exec-prefix Show the Realm installation prefix for executables\n"
+                "  --includedir  Show the directory holding the Realm header files\n"
+                "  --bindir      Show the directory holding the Realm executables\n"
+                "  --libdir      Show the directory holding the Realm libraries\n"
+                "  --libexecdir  Show the directory holding the Realm executables to be run\n"
                 "                by programs rather than by users\n";
             if (error) {
                 cerr << "ERROR: Bad command line.\n\n" << msg;

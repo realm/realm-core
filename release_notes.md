@@ -660,7 +660,7 @@ The C++ API has been updated and your code will break!
 ----------------------------------------------
 
 
-TightDB Changelog:
+Realm Changelog:
 ==================
 
 Format:
@@ -711,7 +711,7 @@ Format:
 
 
 2014-02-11 (Kristian Spangsege)
-+ Group::write(std::ostream&) added. This allows general online streaming of TightDB databases in memory for the first time.
++ Group::write(std::ostream&) added. This allows general online streaming of Realm databases in memory for the first time.
 + Adding Table::get_name() which returns the name of the table when the table is a direct member of a group.
 
 
@@ -1050,7 +1050,7 @@ Format:
 
 2012-10-02 (Kristian Spangsege)
 ----------
-+ New program 'realm-config'. Use it to query about the CFLAGs and/or LDFLAGs to use when linking agains the TightDB core library.
++ New program 'realm-config'. Use it to query about the CFLAGs and/or LDFLAGs to use when linking agains the Realm core library.
 
 
 2012-10-01 (Brian Munkholm)
@@ -1100,10 +1100,10 @@ Format:
 ----------
 +  New macro REALM_DEBUG to control compilation mode.
     The library (including all headers) is no longer affected in any way by the definition status of NDEBUG or _DEBUG.
-    When we (TightDB) compile the library in debug mode, we must define this macro.
+    When we (Realm) compile the library in debug mode, we must define this macro.
     We will deliver two versions of the library, one for release mode, and one for debug mode.
     If the customer wishes to use the debugging version of the library, he must do two things:
-    1) Define REALM_DEBUG in any translation unit that includes a TightDB header.
+    1) Define REALM_DEBUG in any translation unit that includes a Realm header.
     2) Use the version of the library that is compiled for debug mode (librealm_d.a).
 + 5 Removed obsolete constructor Mixed(ColumnType). Use Mixed(subtable_tag) instead, since this has no runtime overhead.
 

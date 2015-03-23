@@ -3,18 +3,18 @@
  * TIGHTDB CONFIDENTIAL
  * __________________
  *
- *  [2011] - [2012] TightDB Inc
+ *  [2011] - [2012] Realm Inc
  *  All Rights Reserved.
  *
  * NOTICE:  All information contained herein is, and remains
- * the property of TightDB Incorporated and its suppliers,
+ * the property of Realm Incorporated and its suppliers,
  * if any.  The intellectual and technical concepts contained
- * herein are proprietary to TightDB Incorporated
+ * herein are proprietary to Realm Incorporated
  * and its suppliers and may be covered by U.S. and Foreign Patents,
  * patents in process, and are protected by trade secret or copyright law.
  * Dissemination of this information or reproduction of this material
  * is strictly forbidden unless prior written permission is obtained
- * from TightDB Incorporated.
+ * from Realm Incorporated.
  *
  **************************************************************************/
 #ifndef REALM_MIXED_HPP
@@ -36,7 +36,7 @@
 namespace realm {
 
 
-/// This class represents a polymorphic TightDB value.
+/// This class represents a polymorphic Realm value.
 ///
 /// At any particular moment an instance of this class stores a
 /// definite value of a definite type. If, for instance, that is an
@@ -57,7 +57,7 @@ namespace realm {
 /// way attempt to manage its lifetime.
 ///
 /// For compatibility with C style strings, when a string (character
-/// data) is stored in a TightDB database, it is always followed by a
+/// data) is stored in a Realm database, it is always followed by a
 /// terminating null character. This is also true when strings are
 /// stored in a mixed type column. This means that in the following
 /// code, if the 'mixed' value of the 8th row stores a string, then \c

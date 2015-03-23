@@ -3,18 +3,18 @@
  * TIGHTDB CONFIDENTIAL
  * __________________
  *
- *  [2011] - [2012] TightDB Inc
+ *  [2011] - [2012] Realm Inc
  *  All Rights Reserved.
  *
  * NOTICE:  All information contained herein is, and remains
- * the property of TightDB Incorporated and its suppliers,
+ * the property of Realm Incorporated and its suppliers,
  * if any.  The intellectual and technical concepts contained
- * herein are proprietary to TightDB Incorporated
+ * herein are proprietary to Realm Incorporated
  * and its suppliers and may be covered by U.S. and Foreign Patents,
  * patents in process, and are protected by trade secret or copyright law.
  * Dissemination of this information or reproduction of this material
  * is strictly forbidden unless prior written permission is obtained
- * from TightDB Incorporated.
+ * from Realm Incorporated.
  *
  **************************************************************************/
 #ifndef REALM_DESCRIPTOR_HPP
@@ -35,7 +35,7 @@ namespace _impl { class DescriptorFriend; }
 /// Accessor for table type descriptors.
 ///
 /// A table type descriptor is an entity that specifies the dynamic
-/// type of a TightDB table. Objects of this class are accessors
+/// type of a Realm table. Objects of this class are accessors
 /// through which the descriptor can be inspected and
 /// changed. Accessors can become detached, see is_attached() for more
 /// on this. The descriptor itself is stored inside the database file,
@@ -329,7 +329,7 @@ public:
     /// longer be used, except for calling is_attached(). The
     /// consequences of calling other methods on a detached accessor
     /// are undefined. Descriptor accessors obtained by calling
-    /// functions in the TightDB API are always in the 'attached'
+    /// functions in the Realm API are always in the 'attached'
     /// state immediately upon return from those functions.
     ///
     /// A descriptor accessor that is obtained directly from a table
