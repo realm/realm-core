@@ -25,7 +25,7 @@ using namespace realm;
 
 
 // which databases are possible
-#define DB_TIGHTDB 0
+#define DB_REALM 0
 #define DB_SQLITE  1
 #define DB_MYSQL   2
 #define DB_SQLITE_WAL 3
@@ -550,7 +550,7 @@ void benchmark(bool single, int database, const char *datfile, long n_readers, l
     clock_gettime(CLOCK_REALTIME, &ts_1);
     for(int i=0; i<n_readers; ++i) {
         switch (database) {
-        case DB_TIGHTDB:
+        case DB_REALM:
             pthread_create(&tinfo[i].thread_id, &attr, &tdb_reader, &tinfo[i]);
             break;
         case DB_SQLITE:
@@ -566,7 +566,7 @@ void benchmark(bool single, int database, const char *datfile, long n_readers, l
     for(int i=0; i<n_writers; ++i) {
         int j = i+n_readers;
         switch (database) {
-        case DB_TIGHTDB:
+        case DB_REALM:
             pthread_create(&tinfo[j].thread_id, &attr, &tdb_writer, &tinfo[j]);
             break;
         case DB_SQLITE:
@@ -601,7 +601,7 @@ void benchmark(bool single, int database, const char *datfile, long n_readers, l
     clock_gettime(CLOCK_REALTIME, &ts_2);
     wall_time = delta_time(ts_1, ts_2);
 
-    if (database == DB_TIGHTDB || database == DB_SQLITE) {
+    if (database == DB_REALM || database == DB_SQLITE) {
         unlink(("tmp"+string(datfile)).c_str());
         unlink(("tmp"+string(datfile)+".lock").c_str());
     }
@@ -640,7 +640,7 @@ int main(int argc, char *argv[])
             break;
         case 'd':
             if (strcmp(optarg, "tdb") == 0) {
-                database = DB_TIGHTDB;
+                database = DB_REALM;
             }
             if (strcmp(optarg, "sqlite") == 0) {
                 database = DB_SQLITE;
@@ -682,7 +682,7 @@ int main(int argc, char *argv[])
 
     if (verbose) cout << "Creating test data for " << database << endl;
     switch (database) {
-    case DB_TIGHTDB:
+    case DB_REALM:
         tdb_create(datfile, n_records);
         break;
     case DB_SQLITE:

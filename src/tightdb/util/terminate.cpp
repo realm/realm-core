@@ -1,6 +1,6 @@
 /*************************************************************************
  *
- * TIGHTDB CONFIDENTIAL
+ * REALM CONFIDENTIAL
  * __________________
  *
  *  [2011] - [2012] Realm Inc
@@ -70,7 +70,7 @@ REALM_NORETURN void terminate_internal(std::stringstream& ss) REALM_NOEXCEPT
 #if defined(__APPLE__)
     nslog(ss.str().c_str());
 #elif defined(__ANDROID__)
-    __android_log_print(ANDROID_LOG_ERROR, "TIGHTDB", ss.str().c_str());
+    __android_log_print(ANDROID_LOG_ERROR, "REALM", ss.str().c_str());
 #endif
 
     please_report_this_error_to_help_at_realm_dot_io();
