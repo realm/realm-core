@@ -20,6 +20,27 @@ void get_child(Array& parent, size_t child_ref_ndx, Array& child) TIGHTDB_NOEXCE
 } // anonymous namespace
 
 
+// FIXME: Indexing strings containing zero bytes is currently broken because
+// they result in non-equal strings having identical keys. Inserting such
+// strings can corrupt the index data structures as a result, so we need to not
+// allow users to do so until the index is fixed (which requires a breaking
+// change to how values are indexed). Once the bug is fixed, validate_value()
+// should be removed.
+void StringIndex::validate_value(int64_t) const TIGHTDB_NOEXCEPT
+{
+    // no-op: All ints are valid
+}
+
+void StringIndex::validate_value(StringData str) const
+{
+    // The "nulls on String column" branch fixed all known bugs in the index
+    return;
+
+    if (std::find(str.data(), str.data() + str.size(), '\0') != str.data() + str.size())
+        throw std::invalid_argument("Cannot add string with embedded NULs to indexed column");
+}
+
+
 ArrayInteger* StringIndex::create_node(Allocator& alloc, bool is_leaf)
 {
     Array::Type type = is_leaf ? Array::type_HasRefs : Array::type_InnerBptreeNode;

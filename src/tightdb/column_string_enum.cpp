@@ -281,6 +281,13 @@ StringIndex* ColumnStringEnum::create_search_index()
 }
 
 
+void ColumnStringEnum::destroy_search_index() TIGHTDB_NOEXCEPT
+{
+    delete m_search_index;
+    m_search_index = 0;
+}
+
+
 void ColumnStringEnum::set_search_index_ref(ref_type ref, ArrayParent* parent,
                                             size_t ndx_in_parent, bool allow_duplicate_valaues)
 {

@@ -62,11 +62,15 @@ void Group::open(const string& file_path, const char* encryption_key, OpenMode m
     TIGHTDB_ASSERT(!is_attached());
     bool is_shared = false;
 
-    // FIXME! In order to upgrade the database file format we need to open the file for writing, even
+    // FIXME! In order to upgrade the database file format we need to open the file for writing, even 
     // though the user requested ReadOnly.
-//    bool read_only = mode == mode_ReadOnly;
-    bool read_only = false;
+    if (mode == mode_ReadOnly) {
+        if (!File::exists(file_path))
+            throw File::NotFound("Database file '" + file_path + "' not found");
+        mode = mode_ReadWrite;
+    }
 
+    bool read_only = mode == mode_ReadOnly;
     bool no_create = mode == mode_ReadWriteNoCreate;
     bool skip_validate = false;
     bool server_sync_mode = false;
@@ -1507,6 +1511,11 @@ public:
         return true; // No-op
     }
 
+    bool remove_search_index(size_t) TIGHTDB_NOEXCEPT
+    {
+        return true; // No-op
+    }
+
     bool add_primary_key(size_t) TIGHTDB_NOEXCEPT
     {
         return true; // No-op
@@ -1854,6 +1863,11 @@ public:
     }
 
     bool add_search_index(size_t)
+    {
+        return true; // No-op
+    }
+
+    bool remove_search_index(size_t)
     {
         return true; // No-op
     }

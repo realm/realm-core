@@ -32,6 +32,8 @@ const char* LogicError::what() const TIGHTDB_NOEXCEPT_OR_NOTHROW
             return "Column has no search index";
         case LogicError::no_primary_key:
             return "Table has no primary key";
+        case LogicError::is_primary_key:
+            return "Column is the primary key of the table";
         case LogicError::has_primary_key:
             return "Primary key already added";
         case LogicError::unique_constraint_violation:

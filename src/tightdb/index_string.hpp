@@ -141,6 +141,9 @@ private:
     /// to \a min_row_ndx.
     void adjust_row_indexes(size_t min_row_ndx, int diff);
 
+    void validate_value(StringData data) const;
+    void validate_value(int64_t value) const TIGHTDB_NOEXCEPT;
+
     struct NodeChange {
         size_t ref1;
         size_t ref2;
@@ -267,6 +270,8 @@ inline StringIndex::key_type StringIndex::create_key(StringData str, size_t offs
 
 template <class T> void StringIndex::insert(size_t row_ndx, T value, size_t num_rows, bool is_append)
 {
+    validate_value(value); // Throws
+
     // If the new row is inserted after the last row in the table, we don't need
     // to adjust any row indexes.
     if (!is_append) {
@@ -285,8 +290,10 @@ template <class T> void StringIndex::insert(size_t row_ndx, T value, size_t num_
 
 template <class T> void StringIndex::set(size_t row_ndx, T new_value)
 {
+    validate_value(new_value); // Throws
+
     char buffer[sizeof(T)];
-    T old_value = get(row_ndx, buffer);
+    StringData old_value = get(row_ndx, buffer);
     StringData new_value2 = to_str(new_value);
 
     // Note that insert_with_offset() throws UniqueConstraintViolation.
@@ -303,9 +310,9 @@ template <class T> void StringIndex::set(size_t row_ndx, T new_value)
 template <class T> void StringIndex::erase(size_t row_ndx, bool is_last)
 {
     char buffer[sizeof(T)];
-    T value = get(row_ndx, buffer);
+    StringData value = get(row_ndx, buffer);
 
-    DoDelete(row_ndx, to_str(value), 0);
+    DoDelete(row_ndx, value, 0);
 
     // Collapse top nodes with single item
     while (!root_is_leaf()) {

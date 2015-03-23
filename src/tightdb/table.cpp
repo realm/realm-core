@@ -1413,6 +1413,42 @@ void Table::add_search_index(size_t col_ndx)
 }
 
 
+void Table::remove_search_index(size_t col_ndx)
+{
+    if (TIGHTDB_UNLIKELY(!is_attached()))
+        throw LogicError(LogicError::detached_accessor);
+
+    if (TIGHTDB_UNLIKELY(has_shared_type()))
+        throw LogicError(LogicError::wrong_kind_of_table);
+
+    if (TIGHTDB_UNLIKELY(col_ndx >= m_cols.size()))
+        throw LogicError(LogicError::column_index_out_of_range);
+
+    if (TIGHTDB_UNLIKELY(m_primary_key))
+        throw LogicError(LogicError::is_primary_key);
+
+    if (!has_search_index(col_ndx))
+        return;
+
+    // Remove the index column
+    ColumnBase& col = get_column_base(col_ndx);
+    col.get_search_index()->destroy();
+    col.destroy_search_index();
+
+    int attr = m_spec.get_column_attr(col_ndx);
+    attr &= ~col_attr_Indexed;
+    m_spec.set_column_attr(col_ndx, ColumnAttr(attr)); // Throws
+
+    m_columns.erase(col_ndx + 1);
+    refresh_column_accessors(col_ndx + 1); // Throws
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    if (Replication* repl = get_repl())
+        repl->remove_search_index(this, col_ndx); // Throws
+#endif
+}
+
+
 bool Table::has_primary_key() const TIGHTDB_NOEXCEPT
 {
     // Utilize the guarantee that m_cols.size() == 0 for a detached table accessor.
@@ -4978,6 +5014,9 @@ void Table::refresh_column_accessors(size_t col_ndx_begin)
                 col->set_search_index_ref(ref, &m_columns, ndx_in_parent+1,
                                           allow_duplicate_values); // Throws
             }
+        }
+        else {
+            col->destroy_search_index();
         }
         ndx_in_parent += (has_search_index ? 2 : 1);
     }

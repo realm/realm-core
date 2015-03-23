@@ -221,6 +221,11 @@ public:
     /// table. It has no effect if a search index has already been added to the
     /// specified column (idempotency).
     ///
+    /// remove_search_index() removes the search index from the specified column
+    /// of this table. It has no effect if the specified column has no search
+    /// index. The search index cannot be removed from the primary key of a
+    /// table.
+    ///
     /// has_primary_key() returns true if, and only if a primary key has been
     /// added to this table. Rather than throwing, it returns false if the table
     /// accessor is detached.
@@ -244,6 +249,7 @@ public:
     bool has_search_index(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
 //    void remove_search_index(size_t col_ndx);
     void add_search_index(std::size_t column_ndx);
+    void remove_search_index(std::size_t column_ndx);
     bool has_primary_key() const TIGHTDB_NOEXCEPT;
     bool try_add_primary_key(std::size_t column_ndx);
     void remove_primary_key();

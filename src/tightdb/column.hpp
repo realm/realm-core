@@ -111,6 +111,7 @@ public:
     // Search index
     virtual bool has_search_index() const TIGHTDB_NOEXCEPT;
     virtual StringIndex* create_search_index();
+    virtual void destroy_search_index() TIGHTDB_NOEXCEPT;
     virtual const StringIndex* get_search_index() const TIGHTDB_NOEXCEPT;
     virtual StringIndex* get_search_index() TIGHTDB_NOEXCEPT;
     virtual void set_search_index_ref(ref_type, ArrayParent*, std::size_t ndx_in_parent,
@@ -449,6 +450,8 @@ public:
     const StringIndex* get_search_index() const TIGHTDB_NOEXCEPT;
     void populate_search_index();
 
+    void destroy_search_index() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+
     //@{
     /// Find the lower/upper bound for the specified value assuming
     /// that the elements are already sorted in ascending order
@@ -576,6 +579,10 @@ inline bool ColumnBase::has_search_index() const TIGHTDB_NOEXCEPT
 inline StringIndex* ColumnBase::create_search_index()
 {
     return null_ptr;
+}
+
+inline void ColumnBase::destroy_search_index() TIGHTDB_NOEXCEPT
+{
 }
 
 inline const StringIndex* ColumnBase::get_search_index() const TIGHTDB_NOEXCEPT

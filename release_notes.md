@@ -2,7 +2,7 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
+* Added a check for NUL bytes in indexed strings to avoid corrupting data structures.
 
 ### API breaking changes:
 
@@ -11,6 +11,7 @@
 
 * Null support for String columns. Call add_column() with nullable = true. You can then use tightdb::null() in place of any StringData (in Query, Table::find(), get(), set(), etc) for that column. You can also call Table::is_null(), Table::set_null(), StringData::is_null() and Table::is_nullable(size_t col_ndx).
 * Improved performance sorting TableView and LinkView.
+* Added Table::remove_search_index().
 
 -----------
 

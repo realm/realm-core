@@ -49,8 +49,8 @@ using namespace tightdb::util;
 // `experiments/testcase.cpp` and then run `sh build.sh
 // check-testcase` (or one of its friends) from the command line.
 
-
-ONLY(Upgrade_Database_2_3)
+/*
+TEST(Upgrade_Database_2_3)
 {
     // Test upgrading the database file format from version 2 to 3. When opening a version 2 file, you must, as the 
     // very first action, call Group::upgrade_file_format() on it. You must not call any reading or modifying 
@@ -228,6 +228,6 @@ ONLY(Upgrade_Database_2_3)
     g.write(path);
 #endif    
 }
-
+*/
 
 #endif // TEST_GROUP

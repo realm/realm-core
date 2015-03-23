@@ -83,24 +83,12 @@ struct BenchmarkWithStrings : BenchmarkWithStringsTable {
         BenchmarkWithStringsTable::setup(group);
         WriteTransaction tr(group);
         TableRef t = tr.get_table("StringOnly");
-        t->add_empty_row(999);
-        for (size_t i = 0; i < 999; ++i) {
+        t->add_empty_row(1000);
+        for (size_t i = 0; i < 1000; ++i) {
             std::stringstream ss;
             ss << rand();
             t->set_string(0, i, ss.str());
         }
-        tr.commit();
-    }
-};
-
-struct BenchmarkWithLongStrings : BenchmarkWithStrings {
-    void setup(SharedGroup& group)
-    {
-        BenchmarkWithStrings::setup(group);
-        WriteTransaction tr(group);
-        TableRef t = tr.get_table("StringOnly");
-        t->insert_empty_row(0);
-        t->set_string(0, 0, "A really long string, longer than 63 bytes at least, I guess......");
         tr.commit();
     }
 };
@@ -185,33 +173,14 @@ struct BenchmarkSetString : BenchmarkWithStrings {
     }
 };
 
-struct BenchmarkGetLongString : BenchmarkWithLongStrings {
-    const char* name() const { return "GetLongString"; }
-
-    void operator()(SharedGroup& group)
-    {
-        ReadTransaction tr(group);
-        ConstTableRef table = tr.get_table("StringOnly");
-        size_t len = table->size();
-        volatile int dummy = 0;
-        for (size_t i = 0; i < len; ++i) {
-            StringData str = table->get_string(0, i);
-            dummy += str[0]; // to avoid over-optimization
-        }
-    }
-};
-
-struct BenchmarkSetLongString : BenchmarkWithLongStrings {
-    const char* name() const { return "SetLongString"; }
+struct BenchmarkCreateIndex : BenchmarkWithStrings {
+    const char* name() const { return "CreateIndex"; }
 
     void operator()(SharedGroup& group)
     {
         WriteTransaction tr(group);
         TableRef table = tr.get_table("StringOnly");
-        size_t len = table->size();
-        for (size_t i = 0; i < len; ++i) {
-            table->set_string(0, i, "c");
-        }
+        table->add_search_index(0);
         tr.commit();
     }
 };
@@ -336,8 +305,7 @@ int main(int, const char**)
     run_benchmark<BenchmarkInsert>(results);
     run_benchmark<BenchmarkGetString>(results);
     run_benchmark<BenchmarkSetString>(results);
-    run_benchmark<BenchmarkGetLongString>(results);
-    run_benchmark<BenchmarkSetLongString>(results);
+    run_benchmark<BenchmarkCreateIndex>(results);
 
     return 0;
 }
