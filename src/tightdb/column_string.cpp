@@ -177,7 +177,7 @@ StringIndex* AdaptiveStringColumn::create_search_index()
 {
     TIGHTDB_ASSERT(!m_search_index);
 
-    UniquePtr<StringIndex> index;
+    std::unique_ptr<StringIndex> index;
     index.reset(new StringIndex(this, &get_string, m_array->get_alloc())); // Throws
 
     // Populate the index
@@ -450,7 +450,7 @@ public:
     }
     void replace_root_by_empty_leaf() TIGHTDB_OVERRIDE
     {
-        UniquePtr<ArrayString> leaf;
+        std::unique_ptr<ArrayString> leaf;
         leaf.reset(new ArrayString(get_alloc())); // Throws
         leaf->create(); // Throws
         replace_root(leaf.release()); // Throws, but accessor ownership is passed to callee
@@ -520,7 +520,7 @@ void AdaptiveStringColumn::do_move_last_over(size_t row_ndx, size_t last_row_ndx
 
     // Copying string data from a column to itself requires an
     // intermediate copy of the data (constr:bptree-copy-to-self).
-    UniquePtr<char[]> buffer(new char[value.size()]); // Throws
+    std::unique_ptr<char[]> buffer(new char[value.size()]); // Throws
     copy(value.data(), value.data()+value.size(), buffer.get());
     StringData copy_of_value(buffer.get(), value.size());
 
@@ -593,7 +593,7 @@ void AdaptiveStringColumn::do_clear()
     else {
         // Non-leaf root - revert to small strings leaf
         Allocator& alloc = m_array->get_alloc();
-        UniquePtr<ArrayString> array;
+        std::unique_ptr<ArrayString> array;
         array.reset(new ArrayString(alloc)); // Throws
         array->create(); // Throws
         array->set_parent(m_array->get_parent(), m_array->get_ndx_in_parent());
@@ -1115,7 +1115,7 @@ AdaptiveStringColumn::LeafType AdaptiveStringColumn::upgrade_root_leaf(size_t va
             return leaf_type_Medium;
         // Upgrade root leaf from medium to big strings
         ArrayStringLong* leaf = static_cast<ArrayStringLong*>(m_array);
-        UniquePtr<ArrayBigBlobs> new_leaf;
+        std::unique_ptr<ArrayBigBlobs> new_leaf;
         ArrayParent* parent = leaf->get_parent();
         size_t ndx_in_parent = leaf->get_ndx_in_parent();
         Allocator& alloc = leaf->get_alloc();
@@ -1137,7 +1137,7 @@ AdaptiveStringColumn::LeafType AdaptiveStringColumn::upgrade_root_leaf(size_t va
     Allocator& alloc = leaf->get_alloc();
     if (value_size <= medium_string_max_size) {
         // Upgrade root leaf from small to medium strings
-        UniquePtr<ArrayStringLong> new_leaf;
+        std::unique_ptr<ArrayStringLong> new_leaf;
         new_leaf.reset(new ArrayStringLong(alloc)); // Throws
         new_leaf->create(); // Throws
         new_leaf->set_parent(parent, ndx_in_parent);
@@ -1149,7 +1149,7 @@ AdaptiveStringColumn::LeafType AdaptiveStringColumn::upgrade_root_leaf(size_t va
         return leaf_type_Medium;
     }
     // Upgrade root leaf from small to big strings
-    UniquePtr<ArrayBigBlobs> new_leaf;
+    std::unique_ptr<ArrayBigBlobs> new_leaf;
     new_leaf.reset(new ArrayBigBlobs(alloc)); // Throws
     new_leaf->create(); // Throws
     new_leaf->set_parent(parent, ndx_in_parent);

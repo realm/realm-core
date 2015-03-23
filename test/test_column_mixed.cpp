@@ -298,8 +298,8 @@ TEST(ColumnMixed_Table)
     for (size_t i = 0; i < c.size(); ++i)
         CHECK_EQUAL(type_Table, c.get_type(i));
 
-    UniquePtr<Table> t1(c.get_subtable_ptr(0));
-    UniquePtr<Table> t2(c.get_subtable_ptr(1));
+    std::unique_ptr<Table> t1(c.get_subtable_ptr(0));
+    std::unique_ptr<Table> t2(c.get_subtable_ptr(1));
     CHECK(t1->is_empty());
     CHECK(t2->is_empty());
 

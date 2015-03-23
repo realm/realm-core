@@ -76,7 +76,7 @@ int main()
     Random random;
     random.shuffle(random_order.begin(), random_order.end());
 
-    UniquePtr<Group> group;
+    std::unique_ptr<Group> group;
     IntTable::Ref tables_1[num_tables], tables_2[num_tables];
 
     bool from_group = true;

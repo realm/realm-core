@@ -749,7 +749,7 @@ inline Allocator& ColumnBase::EraseHandlerBase::get_alloc() TIGHTDB_NOEXCEPT
 
 inline void ColumnBase::EraseHandlerBase::replace_root(Array* leaf)
 {
-    util::UniquePtr<Array> leaf_2(leaf);
+    std::unique_ptr<Array> leaf_2(leaf);
     ArrayParent* parent = m_column.m_array->get_parent();
     std::size_t ndx_in_parent = m_column.m_array->get_ndx_in_parent();
     leaf_2->set_parent(parent, ndx_in_parent);

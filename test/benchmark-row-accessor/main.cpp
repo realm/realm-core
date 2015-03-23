@@ -22,11 +22,11 @@ void heap(Timer& timer, BenchmarkResults& results, int n, const char* ident, con
 {
     Table table;
     table.add_empty_row();
-    UniquePtr<Row[]> rows(new Row[n]);
+    std::unique_ptr<Row[]> rows(new Row[n]);
     for (int i = 0; i < n; ++i)
         rows[i] = table[0];
     int m = 10000;
-    UniquePtr<int[]> indexes(new int[m]);
+    std::unique_ptr<int[]> indexes(new int[m]);
     Random random;
     for (int i = 0; i < m; ++i)
         indexes[i] = random.draw_int_mod(n);
@@ -42,8 +42,8 @@ void balloon(Timer& timer, BenchmarkResults& results, int balloon_size, int deta
 {
     Table table;
     table.add_empty_row();
-    UniquePtr<Row[]> rows(new Row[balloon_size]);
-    UniquePtr<int[]> detach_indexes(new int[balloon_size]);
+    std::unique_ptr<Row[]> rows(new Row[balloon_size]);
+    std::unique_ptr<int[]> detach_indexes(new int[balloon_size]);
     for (int i = 0; i < balloon_size; ++i)
         detach_indexes[i] = i;
     Random random;

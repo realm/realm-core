@@ -194,7 +194,7 @@ TEST(Table_ColumnNameTooLong)
     Group group;
     TableRef table = group.add_table("foo");
     const size_t buf_size = 64;
-    UniquePtr<char[]> buf(new char[buf_size]);
+    std::unique_ptr<char[]> buf(new char[buf_size]);
     CHECK_LOGIC_ERROR(table->add_column(type_Int, StringData(buf.get(), buf_size)),
                       LogicError::column_name_too_long);
     CHECK_LOGIC_ERROR(table->insert_column(0, type_Int, StringData(buf.get(), buf_size)),
@@ -228,7 +228,7 @@ TEST(Table_StringOrBinaryTooBig)
 
     size_t large_bin_size = 0xFFFFF1;
     size_t large_str_size = 0xFFFFF0; // null-terminate reduces max size by 1
-    UniquePtr<char[]> large_buf(new char[large_bin_size]);
+    std::unique_ptr<char[]> large_buf(new char[large_bin_size]);
     CHECK_LOGIC_ERROR(table.set_string(0, 0, StringData(large_buf.get(), large_str_size)),
                       LogicError::string_too_big);
     CHECK_LOGIC_ERROR(table.set_binary(1, 0, BinaryData(large_buf.get(), large_bin_size)),

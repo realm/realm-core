@@ -175,7 +175,7 @@ TEST(Group_BadFile)
 TEST(Group_OpenBuffer)
 {
     // Produce a valid buffer
-    UniquePtr<char[]> buffer;
+    std::unique_ptr<char[]> buffer;
     size_t buffer_size;
     {
         GROUP_TEST_PATH(path);
@@ -274,7 +274,7 @@ TEST(Group_TableNameTooLong)
 {
     Group group;
     size_t buf_len = 64;
-    UniquePtr<char[]> buf(new char[buf_len]);
+    std::unique_ptr<char[]> buf(new char[buf_len]);
     CHECK_LOGIC_ERROR(group.add_table(StringData(buf.get(), buf_len)),
                       LogicError::table_name_too_long);
     group.add_table(StringData(buf.get(), buf_len - 1));

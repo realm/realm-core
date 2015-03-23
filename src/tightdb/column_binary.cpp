@@ -272,7 +272,7 @@ public:
     }
     void replace_root_by_empty_leaf() TIGHTDB_OVERRIDE
     {
-        UniquePtr<ArrayBinary> leaf;
+        std::unique_ptr<ArrayBinary> leaf;
         leaf.reset(new ArrayBinary(get_alloc())); // Throws
         leaf->create(); // Throws
         replace_root(leaf.release()); // Throws, but accessor ownership is passed to callee
@@ -327,7 +327,7 @@ void ColumnBinary::do_move_last_over(size_t row_ndx, size_t last_row_ndx)
 
     // Copying binary data from a column to itself requires an
     // intermediate copy of the data (constr:bptree-copy-to-self).
-    UniquePtr<char[]> buffer(new char[value.size()]); // Throws
+    std::unique_ptr<char[]> buffer(new char[value.size()]); // Throws
     copy(value.data(), value.data()+value.size(), buffer.get());
     BinaryData copy_of_value(buffer.get(), value.size());
 
@@ -357,7 +357,7 @@ void ColumnBinary::do_clear()
 
     // Non-leaf root - revert to small blobs leaf
     Allocator& alloc = m_array->get_alloc();
-    UniquePtr<ArrayBinary> array;
+    std::unique_ptr<ArrayBinary> array;
     array.reset(new ArrayBinary(alloc)); // Throws
     array->create(); // Throws
     array->set_parent(m_array->get_parent(), m_array->get_ndx_in_parent());
@@ -383,7 +383,7 @@ bool ColumnBinary::upgrade_root_leaf(size_t value_size)
     // Upgrade root leaf from small to big blobs
     ArrayBinary* leaf = static_cast<ArrayBinary*>(m_array);
     Allocator& alloc = leaf->get_alloc();
-    UniquePtr<ArrayBigBlobs> new_leaf;
+    std::unique_ptr<ArrayBigBlobs> new_leaf;
     new_leaf.reset(new ArrayBigBlobs(alloc)); // Throws
     new_leaf->create(); // Throws
     new_leaf->set_parent(leaf->get_parent(), leaf->get_ndx_in_parent());

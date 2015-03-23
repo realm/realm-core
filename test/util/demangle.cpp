@@ -37,7 +37,7 @@ string demangle(const string& mangled_name)
 {
 #ifdef TIGHTDB_HAVE_CXXABI_DEMANGLE
     int status = 0;
-    UniquePtr<char[], Free> buffer(abi::__cxa_demangle(mangled_name.c_str(), 0, 0, &status));
+    std::unique_ptr<char[], Free> buffer(abi::__cxa_demangle(mangled_name.c_str(), 0, 0, &status));
     if (!buffer)
         return mangled_name;
     string demangled_name = buffer.get();

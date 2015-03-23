@@ -62,7 +62,7 @@ Table* ColumnSubtableParent::get_subtable_ptr(size_t subtable_ndx)
     ref_type top_ref = get_as_ref(subtable_ndx);
     Allocator& alloc = get_alloc();
     ColumnSubtableParent* parent = this;
-    UniquePtr<Table> subtable(tf::create_accessor(alloc, top_ref, parent, subtable_ndx)); // Throws
+    std::unique_ptr<Table> subtable(tf::create_accessor(alloc, top_ref, parent, subtable_ndx)); // Throws
     // FIXME: Note that if the following map insertion fails, then the
     // destructor of the newly created child will call
     // ColumnSubtableParent::child_accessor_destroyed() with a pointer that is
@@ -86,7 +86,7 @@ Table* ColumnTable::get_subtable_ptr(size_t subtable_ndx)
     size_t subspec_ndx = get_subspec_ndx();
     ConstSubspecRef shared_subspec = spec.get_subspec_by_ndx(subspec_ndx);
     ColumnTable* parent = this;
-    UniquePtr<Table> subtable(tf::create_accessor(shared_subspec, parent, subtable_ndx)); // Throws
+    std::unique_ptr<Table> subtable(tf::create_accessor(shared_subspec, parent, subtable_ndx)); // Throws
     // FIXME: Note that if the following map insertion fails, then the
     // destructor of the newly created child will call
     // ColumnSubtableParent::child_accessor_destroyed() with a pointer that is
