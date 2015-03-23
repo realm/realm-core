@@ -1827,7 +1827,7 @@ TEST(Group_ToDot)
 #endif
 
     // Write array graph to file in dot format
-    ofstream fs("tightdb_graph.dot", ios::out | ios::binary);
+    ofstream fs("realm_graph.dot", ios::out | ios::binary);
     if (!fs.is_open())
         cout << "file open error " << strerror << endl;
     mygroup.to_dot(fs);

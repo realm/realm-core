@@ -53,7 +53,7 @@ copy %location%release_Readme.txt %location%\release\vs%vsversion%\files
 
 :archive the files directory and put it in the release directory
 echo creating release archive
-set releasefilename=%location%\release\vs%vsversion%\release\tightdb_cpp_VS%vsversion%_%reldate%_%reltime%_%reldeveloper%
+set releasefilename=%location%\release\vs%vsversion%\release\realm_cpp_VS%vsversion%_%reldate%_%reltime%_%reldeveloper%
 echo release file name set to %releasefilename%
 cd %location%release\vs%vsversion%\files
 echo %location%7z.exe a -tzip -r %location%release\vs%vsversion%\release\%releasefilename% *.*

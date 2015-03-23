@@ -61,7 +61,7 @@ int main(int argc, char *argv[])
 
     // FIXME: 'getopt' is POSIX/Linux specific. We should replace with
     // code similar to what appears in main() in
-    // "tightdb_tools/src/tightdb/tools/prompt/prompt.cpp".
+    // "realm_tools/src/tightdb/tools/prompt/prompt.cpp".
     while ((c = getopt(argc, argv, "hs:iN:n:r:gR")) != EOF) {
         switch (c) {
             case 'h':

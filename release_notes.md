@@ -1015,7 +1015,7 @@ Format:
 
 2012-12-06 (Kristian Spangsege)
 ----------
-. "C" API moved to its own repository "tightdb_c".
+. "C" API moved to its own repository "realm_c".
 
 
 2012-12-03 (Brian Munkholm)
@@ -1050,7 +1050,7 @@ Format:
 
 2012-10-02 (Kristian Spangsege)
 ----------
-+ New program 'tightdb-config'. Use it to query about the CFLAGs and/or LDFLAGs to use when linking agains the TightDB core library.
++ New program 'realm-config'. Use it to query about the CFLAGs and/or LDFLAGs to use when linking agains the TightDB core library.
 
 
 2012-10-01 (Brian Munkholm)
@@ -1104,7 +1104,7 @@ Format:
     We will deliver two versions of the library, one for release mode, and one for debug mode.
     If the customer wishes to use the debugging version of the library, he must do two things:
     1) Define REALM_DEBUG in any translation unit that includes a TightDB header.
-    2) Use the version of the library that is compiled for debug mode (libtightdb_d.a).
+    2) Use the version of the library that is compiled for debug mode (librealm_d.a).
 + 5 Removed obsolete constructor Mixed(ColumnType). Use Mixed(subtable_tag) instead, since this has no runtime overhead.
 
 

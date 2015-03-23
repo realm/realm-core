@@ -65,7 +65,7 @@
 #  define REALM_STATIC_ASSERT(condition, message) typedef \
     realm::util::static_assert_dummy<sizeof(realm::util:: \
         REALM_STATIC_ASSERTION_FAILURE<bool(condition)>)> \
-    REALM_JOIN(_tightdb_static_assert_, __LINE__) REALM_UNUSED
+    REALM_JOIN(_realm_static_assert_, __LINE__) REALM_UNUSED
 #  define REALM_JOIN(x,y) REALM_JOIN2(x,y)
 #  define REALM_JOIN2(x,y) x ## y
 namespace realm {

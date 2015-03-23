@@ -499,9 +499,9 @@ void spawn_daemon(const string& file)
         const char* async_daemon = getenv("REALM_ASYNC_DAEMON");
         if (!async_daemon) {
 #ifndef TIGTHDB_DEBUG
-            async_daemon = REALM_INSTALL_LIBEXECDIR "/tightdbd";
+            async_daemon = REALM_INSTALL_LIBEXECDIR "/realmd";
 #else
-            async_daemon = REALM_INSTALL_LIBEXECDIR "/tightdbd-dbg";
+            async_daemon = REALM_INSTALL_LIBEXECDIR "/realmd-dbg";
 #endif
         }
         execl(async_daemon, async_daemon, file.c_str(), static_cast<char*>(0));

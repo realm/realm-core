@@ -12,7 +12,7 @@ int main()
     util::File::try_remove("test.tightdb.lock");
 
     // Testing 'async' mode because it has the special requirement of
-    // being able to find `tightdbd` (typically in
+    // being able to find `realmd` (typically in
     // /usr/local/libexec/).
     bool no_create = false;
     SharedGroup sg("test.tightdb", no_create, SharedGroup::durability_Async);

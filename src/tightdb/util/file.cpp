@@ -149,7 +149,7 @@ string make_temp_dir()
 #else // POSIX.1-2008 version
 
     StringBuffer buffer;
-    buffer.append_c_str(P_tmpdir "/tightdb_XXXXXX");
+    buffer.append_c_str(P_tmpdir "/realm_XXXXXX");
     if (mkdtemp(buffer.c_str()) == 0)
         throw runtime_error("mkdtemp() failed");
     return buffer.str();

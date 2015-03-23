@@ -1,7 +1,7 @@
 make test-debug-norun static
 make -C test/test-tightdb # Runs with DEBUG disabled (because it would take forever)
 
-#valgrind --leak-check=full --xml=yes --xml-file=valgrind.xml test/tightdb-tests-dbg --no-error-exit-staus
+#valgrind --leak-check=full --xml=yes --xml-file=valgrind.xml test/realm-tests-dbg --no-error-exit-staus
 echo valgrind > valgrind.csv
 (echo 0; cat valgrind.xml | perl -ne 'if (m/lost in loss record \d+ of (\d+)/){ print "$1\n"; }') | tail -1 >> valgrind.csv
 

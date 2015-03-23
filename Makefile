@@ -71,9 +71,9 @@ benchmark-common-tasks: check-norun/subdir/src
 .PHONY: lcov
 lcov: check-cover
 	lcov --capture --directory . --output-file /tmp/tightdb.lcov
-	lcov --extract /tmp/tightdb.lcov '$(abspath .)/src/*' --output-file /tmp/tightdb-clean.lcov
+	lcov --extract /tmp/tightdb.lcov '$(abspath .)/src/*' --output-file /tmp/realm-clean.lcov
 	rm -fr cover_html
-	genhtml --prefix $(abspath .) --output-directory cover_html /tmp/tightdb-clean.lcov
+	genhtml --prefix $(abspath .) --output-directory cover_html /tmp/realm-clean.lcov
 
 # Run coverage analysis after building everything, this time using GCOVR
 .PHONY: gcovr

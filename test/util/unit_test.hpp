@@ -51,9 +51,9 @@
         bool test_enabled() const { return bool(enabled); } \
         void test_run(); \
     }; \
-    Tightdb_UnitTest__##name tightdb_unit_test__##name; \
+    Tightdb_UnitTest__##name realm_unit_test__##name; \
     realm::test_util::unit_test::RegisterTest \
-        tightdb_unit_test_reg__##name((list), tightdb_unit_test__##name, \
+        realm_unit_test_reg__##name((list), realm_unit_test__##name, \
                                       "DefaultSuite", #name, __FILE__, __LINE__); \
     void Tightdb_UnitTest__##name::test_run()
 

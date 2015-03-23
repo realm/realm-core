@@ -1,10 +1,10 @@
 # add an entry to the debian changelog template
 # usage: add-deb-changelog.sh <version> <path-to-changelog.in> <package-name>
-tightdb_version=$1
+realm_version=$1
 changelog=$2
 package=$3
 
-if [ -z "$tightdb_version" ]; then
+if [ -z "$realm_version" ]; then
     echo "No new version"
     exit 1
 fi
@@ -25,7 +25,7 @@ relman_mail="$(git config --get user.email)" || exit 1
 
 # create a new entry in the debian changelog - in reverse order
 tempfile="$(mktemp 'tightdb.XXXXXXXX')" || exit 1
-printf "$package ($tightdb_version~@CODENAME@-1) UNRELEASED; urgency=low\n" >> "$tempfile" || exit 1
+printf "$package ($realm_version~@CODENAME@-1) UNRELEASED; urgency=low\n" >> "$tempfile" || exit 1
 printf "\n" >> "$tempfile" || exit 1
 printf "  * Tracking upstream release.\n" >> "$tempfile" || exit 1
 printf "\n" >> "$tempfile" || exit 1

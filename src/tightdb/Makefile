@@ -99,12 +99,12 @@ index_string.hpp \
 query_engine.hpp \
 query_expression.hpp
 
-lib_LIBRARIES    = libtightdb.a
-libexec_PROGRAMS = tightdbd
-bin_PROGRAMS     = tightdb-import
-DEV_PROGRAMS     = tightdb-config
+lib_LIBRARIES    = librealm.a
+libexec_PROGRAMS = realmd
+bin_PROGRAMS     = realm-import
+DEV_PROGRAMS     = realm-config
 
-libtightdb_a_SOURCES = \
+librealm_a_SOURCES = \
 util/encrypted_file_mapping.cpp \
 util/errno.cpp \
 util/file.cpp \
@@ -176,15 +176,15 @@ util/platform_specific_condvar.cpp
 # The meaning of this version string is identical to the one defined
 # by GNU Libtool. See also
 # http://www.gnu.org/software/libtool/manual/libtool.html#Libtool-versioning
-libtightdb_a_VERSION = 9:0:0
+librealm_a_VERSION = 9:0:0
 
-tightdb_config_SOURCES = config_tool.cpp
+realm_config_SOURCES = config_tool.cpp
 
-tightdbd_SOURCES = tightdbd.cpp
-tightdbd_LIBS = libtightdb.a
+realmd_SOURCES = realmd.cpp
+realmd_LIBS = librealm.a
 
-tightdb_import_SOURCES = importer_tool.cpp
-tightdb_import_LIBS    = libtightdb.a
+realm_import_SOURCES = importer_tool.cpp
+realm_import_LIBS    = librealm.a
 
 CONFIG_H = util/config.h
 CONFIG_SH = $(CONFIG_H:.h=.sh)
@@ -209,7 +209,7 @@ endif
 get-inst-headers:
 	@echo $(nobase_subinclude_HEADERS)
 get-inst-libraries:
-	@echo $(filter-out libtightdb-cov.% libtightdb-dbg.a,$(TARGETS_LIB_STATIC) $(TARGETS_LIB_SHARED_ALIASES))
+	@echo $(filter-out librealm-cov.% librealm-dbg.a,$(TARGETS_LIB_STATIC) $(TARGETS_LIB_SHARED_ALIASES))
 get-inst-programs:
 	@echo $(filter-out %-cov,$(TARGETS_PROG) $(TARGETS_DEV_PROG))
 

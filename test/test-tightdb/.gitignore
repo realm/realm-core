@@ -6,5 +6,5 @@
 /*.gcda
 
 /test-tightdb
-/test-tightdb-dbg
-/test-tightdb-cov
+/test-realm-dbg
+/test-realm-cov

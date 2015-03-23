@@ -113,19 +113,19 @@ void fix_async_daemon_path()
     const char* xcode_env = getenv("__XCODE_BUILT_PRODUCTS_DIR_PATHS");
     if (xcode_env) {
 #  ifdef REALM_DEBUG
-        async_daemon = "tightdbd-dbg-noinst";
+        async_daemon = "realmd-dbg-noinst";
 #  else
-        async_daemon = "tightdbd-noinst";
+        async_daemon = "realmd-noinst";
 #  endif
     }
     else {
 #  ifdef REALM_COVER
-        async_daemon = "../src/tightdb/tightdbd-cov-noinst";
+        async_daemon = "../src/tightdb/realmd-cov-noinst";
 #  else
 #    ifdef REALM_DEBUG
-        async_daemon = "../src/tightdb/tightdbd-dbg-noinst";
+        async_daemon = "../src/tightdb/realmd-dbg-noinst";
 #    else
-        async_daemon = "../src/tightdb/tightdbd-noinst";
+        async_daemon = "../src/tightdb/realmd-noinst";
 #    endif
 #  endif
     }

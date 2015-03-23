@@ -14,47 +14,47 @@
 /impl/*.gcno
 /impl/*.gcda
 
-/libtightdb.a
-/libtightdb.so
-/libtightdb.so.*
-/libtightdb.dylib
-/libtightdb.*.dylib
-/libtightdb-dbg.a
-/libtightdb-dbg.so
-/libtightdb-dbg.so.*
-/libtightdb-dbg.dylib
-/libtightdb-dbg.*.dylib
-/libtightdb-cov.so
-/libtightdb-cov.so.*
-/libtightdb-cov.dylib
-/libtightdb-cov.*.dylib
+/librealm.a
+/librealm.so
+/librealm.so.*
+/librealm.dylib
+/librealm.*.dylib
+/librealm-dbg.a
+/librealm-dbg.so
+/librealm-dbg.so.*
+/librealm-dbg.dylib
+/librealm-dbg.*.dylib
+/librealm-cov.so
+/librealm-cov.so.*
+/librealm-cov.dylib
+/librealm-cov.*.dylib
 
-/tightdb-import
-/tightdb-import-noinst
-/tightdb-import-dbg
-/tightdb-import-dbg-noinst
-/tightdb-import-cov
-/tightdb-import-cov-noinst
+/realm-import
+/realm-import-noinst
+/realm-import-dbg
+/realm-import-dbg-noinst
+/realm-import-cov
+/realm-import-cov-noinst
 
-/tightdbd
-/tightdbd-noinst
-/tightdbd-dbg
-/tightdbd-dbg-noinst
-/tightdbd-cov
-/tightdbd-cov-noinst
+/realmd
+/realmd-noinst
+/realmd-dbg
+/realmd-dbg-noinst
+/realmd-cov
+/realmd-cov-noinst
 
-/tightdb-config
-/tightdb-config-dbg
+/realm-config
+/realm-config-dbg
 
 # iPhone
-/libtightdb-iPhoneOS.a
-/libtightdb-iPhoneOS-dbg.a
-/libtightdb-iPhoneSimulator.a
-/libtightdb-iPhoneSimulator-dbg.a
-/tightdb-config-ios
-/tightdb-config-ios-dbg
+/librealm-iPhoneOS.a
+/librealm-iPhoneOS-dbg.a
+/librealm-iPhoneSimulator.a
+/librealm-iPhoneSimulator-dbg.a
+/realm-config-ios
+/realm-config-ios-dbg
 
 # Android
-/libtightdb-android-*.a
+/librealm-android-*.a
 
 /util/config.h

@@ -9,7 +9,7 @@ Precisely, the library name at the end of this line:
 
 ```
 [...]
-LOCAL_LDLIBS     := -llog -landroid -ltightdb-android-arm
+LOCAL_LDLIBS     := -llog -landroid -lrealm-android-arm
 [...]
 ```
 

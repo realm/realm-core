@@ -127,7 +127,7 @@ sudo dpkg -i *deb
 
 # build extensions
 for i in python java php ruby node gui; do
-    cd tightdb_$i
+    cd realm_$i
     sh build.sh dist-deb
     cd ..
 done

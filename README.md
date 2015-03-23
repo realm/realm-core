@@ -96,22 +96,22 @@ Except for `tightdb.hpp` which is installed as:
 
 The following libraries will be installed:
 
-    /usr/local/lib/libtightdb.so
-    /usr/local/lib/libtightdb-dbg.so
-    /usr/local/lib/libtightdb.a
+    /usr/local/lib/librealm.so
+    /usr/local/lib/librealm-dbg.so
+    /usr/local/lib/librealm.a
 
 Note: '.so' is replaced by '.dylib' on OS X.
 
 The following programs will be installed:
 
-    /usr/local/bin/tightdb-import
-    /usr/local/bin/tightdb-import-dbg
-    /usr/local/bin/tightdb-config
-    /usr/local/bin/tightdb-config-dbg
-    /usr/local/libexec/tightdbd
-    /usr/local/libexec/tightdbd-dbg
+    /usr/local/bin/realm-import
+    /usr/local/bin/realm-import-dbg
+    /usr/local/bin/realm-config
+    /usr/local/bin/realm-config-dbg
+    /usr/local/libexec/realmd
+    /usr/local/libexec/realmd-dbg
 
-The `tightdb-import` tool lets you load files containing
+The `realm-import` tool lets you load files containing
 comma-separated values into TightDB. The next two are used
 transparently by the TightDB library when `async` transactions are
 enabled. The two `config` programs provide the necessary compiler
@@ -119,7 +119,7 @@ flags for an application that needs to link against TightDB. They work
 with GCC and other compilers, such as Clang, that are mostly command
 line compatible with GCC. Here is an example:
 
-    g++  my_app.cpp  `tightdb-config --cflags --libs`
+    g++  my_app.cpp  `realm-config --cflags --libs`
 
 Here is a more comple set of build-related commands:
 
@@ -155,10 +155,10 @@ iPhone/iOS:
 This produces the following files and directories:
 
     iphone-lib/include/
-    iphone-lib/libtightdb-ios.a
-    iphone-lib/libtightdb-ios-dbg.a
-    iphone-lib/tightdb-config
-    iphone-lib/tightdb-config-dbg
+    iphone-lib/librealm-ios.a
+    iphone-lib/librealm-ios-dbg.a
+    iphone-lib/realm-config
+    iphone-lib/realm-config-dbg
 
 The `include` directory holds a copy of the header files, which are
 identical to the ones installed by `sh build.sh install`. There are
@@ -328,20 +328,20 @@ updated the changelog and version number in the `.spec` file. The core
 library and each binding have a `.spec` file. For the core, the
 command is:
 
-    cp libtightdb.spec $HOME/rpmbuild/SPECS
+    cp librealm.spec $HOME/rpmbuild/SPECS
 
 Next, you create a `tar.gz` file with the core, and copy it to the
 build area:
 
-    mkdir /tmp/libtightdb-0.1.5
-    sh build.sh dist-copy /tmp/libtightdb-0.1.5
-    (cd /tmp && tar czf libtightdb-0.1.5.tar.gz libtightdb-0.1.5)
-    mv /tmp/libtightdb-0.1.5.tar.gz $HOME/rpmbuild/SOURCES
+    mkdir /tmp/librealm-0.1.5
+    sh build.sh dist-copy /tmp/librealm-0.1.5
+    (cd /tmp && tar czf librealm-0.1.5.tar.gz librealm-0.1.5)
+    mv /tmp/librealm-0.1.5.tar.gz $HOME/rpmbuild/SOURCES
 
 Finally, you can build the `.rpm` files:
 
     cd $HOME/rpmbuld/SPECS
-    rpmbuild -bb libtightdb.spec
+    rpmbuild -bb librealm.spec
 
 The `.rpm` files can be found in `$HOME/rpmbuild/RPMS`.
 
@@ -352,9 +352,9 @@ Building a distribution package
 In general, it is necessary (and crucial) to properly update the
 versions of the following shared libraries:
 
-    libtightdb.so      (/tightdb/src/tightdb/Makefile)
-    libtightdb-c.so    (/tightdb_c/src/tightdb/c/Makefile)
-    libtightdb-objc.so (/tightdb_objc/src/tightdb/objc/Makefile)
+    librealm.so      (/tightdb/src/tightdb/Makefile)
+    librealm-c.so    (/realm_c/src/tightdb/c/Makefile)
+    librealm-objc.so (/realm_objc/src/tightdb/objc/Makefile)
 
 Do this by editing the the indicated Makefiles.
 

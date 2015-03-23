@@ -98,37 +98,37 @@ type${j+1} name${j+1}%slurp
 %end for
 ) \
         { \
-            ::realm::BasicTable<Table##Spec>* const _tightdb_t = \
+            ::realm::BasicTable<Table##Spec>* const _realm_t = \
                 static_cast< ::realm::BasicTable<Table##Spec>* >(this); \
-            _tightdb_t->add((::realm::util::tuple()%slurp
+            _realm_t->add((::realm::util::tuple()%slurp
 %for $j in range($num_cols)
 , name${j+1}%slurp
 %end for
 )); \
         } \
-        void insert(std::size_t _tightdb_i%slurp
+        void insert(std::size_t _realm_i%slurp
 %for $j in range($num_cols)
 , type${j+1} name${j+1}%slurp
 %end for
 ) \
         { \
-            ::realm::BasicTable<Table##Spec>* const _tightdb_t = \
+            ::realm::BasicTable<Table##Spec>* const _realm_t = \
                 static_cast< ::realm::BasicTable<Table##Spec>* >(this); \
-            _tightdb_t->insert(_tightdb_i, (::realm::util::tuple()%slurp
+            _realm_t->insert(_realm_i, (::realm::util::tuple()%slurp
 %for $j in range($num_cols)
 , name${j+1}%slurp
 %end for
 )); \
         } \
-        void set(std::size_t _tightdb_i%slurp
+        void set(std::size_t _realm_i%slurp
 %for $j in range($num_cols)
 , type${j+1} name${j+1}%slurp
 %end for
 ) \
         { \
-            ::realm::BasicTable<Table##Spec>* const _tightdb_t = \
+            ::realm::BasicTable<Table##Spec>* const _realm_t = \
                 static_cast< ::realm::BasicTable<Table##Spec>* >(this); \
-            _tightdb_t->set(_tightdb_i, (::realm::util::tuple()%slurp
+            _realm_t->set(_realm_i, (::realm::util::tuple()%slurp
 %for $j in range($num_cols)
 , name${j+1}%slurp
 %end for

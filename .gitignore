@@ -54,10 +54,10 @@ Static library*/
 
 # sh build.sh build-iphone
 /iphone-lib/include
-/iphone-lib/libtightdb-ios.a
-/iphone-lib/libtightdb-ios-dbg.a
-/iphone-lib/tightdb-config
-/iphone-lib/tightdb-config-dbg
+/iphone-lib/librealm-ios.a
+/iphone-lib/librealm-ios-dbg.a
+/iphone-lib/realm-config
+/iphone-lib/realm-config-dbg
 
 # sh build.sh build-android
 /android-lib/
@@ -66,13 +66,13 @@ core-android-*.tar.gz
 
 # debian/ubuntu builds
 /debian/tightdb/*
-/debian/libtightdb/*
-/debian/libtightdb-dev/*
-/debian/libtightdb-dev.substvars
-/debian/libtightdb.substvars
+/debian/librealm/*
+/debian/librealm-dev/*
+/debian/librealm-dev.substvars
+/debian/librealm.substvars
 /debian/tightdb.substvars
 /debian/files
 /debian/changelog
 /debian/debhelper.log
-/debian/libtightdb.debhelper.lo
-/debian/libtightdb-dev.debhelper.log
+/debian/librealm.debhelper.lo
+/debian/librealm-dev.debhelper.log

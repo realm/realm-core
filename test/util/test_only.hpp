@@ -23,7 +23,7 @@
 #include "unit_test.hpp"
 
 #define ONLY(name) \
-    realm::test_util::SetTestOnly tightdb_set_test_only__##name(#name); \
+    realm::test_util::SetTestOnly realm_set_test_only__##name(#name); \
     TEST(name)
 
 namespace realm {

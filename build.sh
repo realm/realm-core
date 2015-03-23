@@ -70,7 +70,7 @@ map_ext_name_to_dir()
     local ext_name
     ext_name="$1"
     case $ext_name in
-        *) echo "tightdb_$ext_name";;
+        *) echo "realm_$ext_name";;
     esac
     return 0
 }
@@ -395,11 +395,11 @@ case "$MODE" in
         install_libdir="$($MAKE --no-print-directory prefix="$install_prefix" get-libdir)" || exit 1
         install_libexecdir="$($MAKE --no-print-directory prefix="$install_prefix" get-libexecdir)" || exit 1
 
-        tightdb_version="unknown"
+        realm_version="unknown"
         if [ "$REALM_VERSION" ]; then
-            tightdb_version="$REALM_VERSION"
+            realm_version="$REALM_VERSION"
         elif value="$(git describe 2>/dev/null)"; then
-            tightdb_version="$(printf "%s\n" "$value" | sed 's/^v//')" || exit 1
+            realm_version="$(printf "%s\n" "$value" | sed 's/^v//')" || exit 1
         fi
 
         max_bpnode_size=1000
@@ -494,7 +494,7 @@ case "$MODE" in
         fi
 
         cat >"$CONFIG_MK" <<EOF
-REALM_VERSION       = $tightdb_version
+REALM_VERSION       = $realm_version
 INSTALL_PREFIX        = $install_prefix
 INSTALL_EXEC_PREFIX   = $install_exec_prefix
 INSTALL_INCLUDEDIR    = $install_includedir
@@ -532,8 +532,8 @@ EOF
             if [ -e "$IPHONE_DIR" ]; then
                 echo "Removing '$IPHONE_DIR'"
                 rm -fr "$IPHONE_DIR/include" || exit 1
-                rm -f "$IPHONE_DIR/libtightdb-ios.a" "$IPHONE_DIR/libtightdb-ios-dbg.a" || exit 1
-                rm -f "$IPHONE_DIR/tightdb-config" "$IPHONE_DIR/tightdb-config-dbg" || exit 1
+                rm -f "$IPHONE_DIR/librealm-ios.a" "$IPHONE_DIR/librealm-ios-dbg.a" || exit 1
+                rm -f "$IPHONE_DIR/realm-config" "$IPHONE_DIR/realm-config-dbg" || exit 1
                 rmdir "$IPHONE_DIR" || exit 1
             fi
         fi
@@ -564,7 +564,7 @@ EOF
         # are such that <src/tightdb/util/config.h> is not recreated
         # automatically by src/tightdb/Makfile. Using --always-make is
         # a work-around.
-        REALM_ENABLE_FAT_BINARIES="1" $MAKE --always-make -C "src/tightdb" "tightdb-config" "tightdb-config-dbg" || exit 1
+        REALM_ENABLE_FAT_BINARIES="1" $MAKE --always-make -C "src/tightdb" "realm-config" "realm-config-dbg" || exit 1
         echo "Done building config programs"
         exit 0
         ;;
@@ -575,8 +575,8 @@ EOF
         (
             cd src/tightdb
             export REALM_ENABLE_FAT_BINARIES="1"
-            REALM_ENABLE_FAT_BINARIES="1" $MAKE libtightdb.a EXTRA_CFLAGS="-fPIC -DPIC" || exit 1
-            REALM_ENABLE_FAT_BINARIES="1" $MAKE libtightdb-dbg.a EXTRA_CFLAGS="-fPIC -DPIC" || exit 1
+            REALM_ENABLE_FAT_BINARIES="1" $MAKE librealm.a EXTRA_CFLAGS="-fPIC -DPIC" || exit 1
+            REALM_ENABLE_FAT_BINARIES="1" $MAKE librealm-dbg.a EXTRA_CFLAGS="-fPIC -DPIC" || exit 1
         ) || exit 1
         exit 0
         ;;
@@ -602,17 +602,17 @@ EOF
                 word_list_append "cflags_arch" "-arch $y" || exit 1
             done
             sdk_root="$xcode_home/Platforms/$platform.platform/Developer/SDKs/$sdk"
-            $MAKE -C "src/tightdb" "libtightdb-$platform.a" "libtightdb-$platform-dbg.a" BASE_DENOM="$platform" CFLAGS_ARCH="$cflags_arch -isysroot $sdk_root -mstrict-align" || exit 1
+            $MAKE -C "src/tightdb" "librealm-$platform.a" "librealm-$platform-dbg.a" BASE_DENOM="$platform" CFLAGS_ARCH="$cflags_arch -isysroot $sdk_root -mstrict-align" || exit 1
             mkdir "$temp_dir/platforms/$platform" || exit 1
-            cp "src/tightdb/libtightdb-$platform.a"     "$temp_dir/platforms/$platform/libtightdb.a"     || exit 1
-            cp "src/tightdb/libtightdb-$platform-dbg.a" "$temp_dir/platforms/$platform/libtightdb-dbg.a" || exit 1
+            cp "src/tightdb/librealm-$platform.a"     "$temp_dir/platforms/$platform/librealm.a"     || exit 1
+            cp "src/tightdb/librealm-$platform-dbg.a" "$temp_dir/platforms/$platform/librealm-dbg.a" || exit 1
         done
-        REALM_ENABLE_FAT_BINARIES="1" $MAKE -C "src/tightdb" "tightdb-config-ios" "tightdb-config-ios-dbg" BASE_DENOM="ios" CFLAGS_ARCH="-DREALM_CONFIG_IOS" || exit 1
+        REALM_ENABLE_FAT_BINARIES="1" $MAKE -C "src/tightdb" "realm-config-ios" "realm-config-ios-dbg" BASE_DENOM="ios" CFLAGS_ARCH="-DREALM_CONFIG_IOS" || exit 1
         mkdir -p "$IPHONE_DIR" || exit 1
-        echo "Creating '$IPHONE_DIR/libtightdb-ios.a'"
-        lipo "$temp_dir/platforms"/*/"libtightdb.a"     -create -output "$IPHONE_DIR/libtightdb-ios.a"     || exit 1
-        echo "Creating '$IPHONE_DIR/libtightdb-ios-dbg.a'"
-        lipo "$temp_dir/platforms"/*/"libtightdb-dbg.a" -create -output "$IPHONE_DIR/libtightdb-ios-dbg.a" || exit 1
+        echo "Creating '$IPHONE_DIR/librealm-ios.a'"
+        lipo "$temp_dir/platforms"/*/"librealm.a"     -create -output "$IPHONE_DIR/librealm-ios.a"     || exit 1
+        echo "Creating '$IPHONE_DIR/librealm-ios-dbg.a'"
+        lipo "$temp_dir/platforms"/*/"librealm-dbg.a" -create -output "$IPHONE_DIR/librealm-ios-dbg.a" || exit 1
         echo "Copying headers to '$IPHONE_DIR/include'"
         mkdir -p "$IPHONE_DIR/include" || exit 1
         cp "src/tightdb.hpp" "$IPHONE_DIR/include/" || exit 1
@@ -620,9 +620,9 @@ EOF
         inst_headers="$(cd "src/tightdb" && $MAKE --no-print-directory get-inst-headers)" || exit 1
         (cd "src/tightdb" && tar czf "$temp_dir/headers.tar.gz" $inst_headers) || exit 1
         (cd "$REALM_HOME/$IPHONE_DIR/include/tightdb" && tar xzmf "$temp_dir/headers.tar.gz") || exit 1
-        for x in "tightdb-config" "tightdb-config-dbg"; do
+        for x in "realm-config" "realm-config-dbg"; do
             echo "Creating '$IPHONE_DIR/$x'"
-            y="$(printf "%s\n" "$x" | sed 's/tightdb-config/tightdb-config-ios/')" || exit 1
+            y="$(printf "%s\n" "$x" | sed 's/realm-config/realm-config-ios/')" || exit 1
             cp "src/tightdb/$y" "$REALM_HOME/$IPHONE_DIR/$x" || exit 1
         done
         echo "Done building"
@@ -693,9 +693,9 @@ EOF
             denom="android-$target"
 
             # Build tightdb
-            PATH="$path" CC="$cc" $MAKE -C "src/tightdb" CC_IS="gcc" BASE_DENOM="$denom" CFLAGS_ARCH="$cflags_arch" "libtightdb-$denom.a" || exit 1
+            PATH="$path" CC="$cc" $MAKE -C "src/tightdb" CC_IS="gcc" BASE_DENOM="$denom" CFLAGS_ARCH="$cflags_arch" "librealm-$denom.a" || exit 1
 
-            cp "src/tightdb/libtightdb-$denom.a" "$ANDROID_DIR" || exit 1
+            cp "src/tightdb/librealm-$denom.a" "$ANDROID_DIR" || exit 1
 
             rm -rf "$temp_dir" || exit 1
         done
@@ -709,19 +709,19 @@ EOF
         (cd "src/tightdb" && tar czf "$temp_dir/headers.tar.gz" $inst_headers) || exit 1
         (cd "$REALM_HOME/$ANDROID_DIR/include/tightdb" && tar xzmf "$temp_dir/headers.tar.gz") || exit 1
 
-        tightdb_version="$(sh build.sh get-version)" || exit
-        dir_name="core-$tightdb_version"
-        file_name="realm-core-android-$tightdb_version.tar.gz"
+        realm_version="$(sh build.sh get-version)" || exit
+        dir_name="core-$realm_version"
+        file_name="realm-core-android-$realm_version.tar.gz"
 
         echo "Create tar.gz file $file_name"
         rm -f "$REALM_HOME/$file_name" || exit 1
         (cd "$REALM_HOME/$ANDROID_DIR" && tar czf "$REALM_HOME/$file_name" .) || exit 1
 
-        echo "Unpacking in ../tightdb_java/$dir_name"
-        mkdir -p ../tightdb_java/realm-jni/build || exit 1 # to help Mr. Jenkins
-        cp "$REALM_HOME/$file_name" ../tightdb_java/realm-jni/build
-        (cd ../tightdb_java && rm -rf $dir_name && mkdir $dir_name) || exit 1
-        (cd ../tightdb_java/$dir_name && tar xzf "$REALM_HOME/$file_name") || exit 1
+        echo "Unpacking in ../realm_java/$dir_name"
+        mkdir -p ../realm_java/realm-jni/build || exit 1 # to help Mr. Jenkins
+        cp "$REALM_HOME/$file_name" ../realm_java/realm-jni/build
+        (cd ../realm_java && rm -rf $dir_name && mkdir $dir_name) || exit 1
+        (cd ../realm_java/$dir_name && tar xzf "$REALM_HOME/$file_name") || exit 1
         ;;
 
    "build-cocoa")
@@ -745,16 +745,16 @@ EOF
         BASENAME="core"
         rm -f "$BASENAME-$realm_version.zip" || exit 1
         mkdir -p "$tmpdir/$BASENAME/include" || exit 1
-        cp "$IPHONE_DIR/libtightdb-ios.a" "$tmpdir/$BASENAME" || exit 1
-        cp "$IPHONE_DIR/libtightdb-ios-dbg.a" "$tmpdir/$BASENAME" || exit 1
+        cp "$IPHONE_DIR/librealm-ios.a" "$tmpdir/$BASENAME" || exit 1
+        cp "$IPHONE_DIR/librealm-ios-dbg.a" "$tmpdir/$BASENAME" || exit 1
         cp -r "$IPHONE_DIR/include/"* "$tmpdir/$BASENAME/include" || exit 1
         for x in $iphone_sdks; do
             platform="$(printf "%s\n" "$x" | cut -d: -f1)" || exit 1
-            cp "src/tightdb/libtightdb-$platform.a" "$tmpdir/$BASENAME" || exit 1
-            cp "src/tightdb/libtightdb-$platform-dbg.a" "$tmpdir/$BASENAME" || exit 1
+            cp "src/tightdb/librealm-$platform.a" "$tmpdir/$BASENAME" || exit 1
+            cp "src/tightdb/librealm-$platform-dbg.a" "$tmpdir/$BASENAME" || exit 1
         done
-        cp src/tightdb/libtightdb.a "$tmpdir/$BASENAME" || exit 1
-        cp src/tightdb/libtightdb-dbg.a "$tmpdir/$BASENAME" || exit 1
+        cp src/tightdb/librealm.a "$tmpdir/$BASENAME" || exit 1
+        cp src/tightdb/librealm-dbg.a "$tmpdir/$BASENAME" || exit 1
         cp tools/LICENSE "$tmpdir/$BASENAME" || exit 1
         if ! [ "$REALM_DISABLE_MARKDOWN_CONVERT" ]; then
             command -v pandoc >/dev/null 2>&1 || { echo "Pandoc is required but it's not installed.  Aborting." >&2; exit 1; }
@@ -789,13 +789,13 @@ EOF
         rm -f realm-core-osx-*.zip || exit 1
 
         mkdir -p "$FRAMEWORK/Headers/tightdb" || exit 1
-        if [ ! -f "src/tightdb/libtightdb.a" ]; then
-            echo "\"src/tightdb/libtightdb.a\" missing."
+        if [ ! -f "src/tightdb/librealm.a" ]; then
+            echo "\"src/tightdb/librealm.a\" missing."
             echo "Did you forget to build?"
             exit 1
         fi
 
-        cp "src/tightdb/libtightdb.a" "$FRAMEWORK/$BASENAME" || exit 1
+        cp "src/tightdb/librealm.a" "$FRAMEWORK/$BASENAME" || exit 1
         cp "src/tightdb.hpp" "$FRAMEWORK/Headers/tightdb.hpp" || exit 1
         for header in $(cd "src/tightdb" && $MAKE --no-print-directory get-inst-headers); do
             mkdir -p "$(dirname "$FRAMEWORK/Headers/tightdb/$header")" || exit 1
@@ -893,9 +893,9 @@ EOF
         rm -rf "$TEST_DIR/$IPHONE_DIR" || exit 1
         cp -r "../tightdb/$IPHONE_DIR" "$TEST_DIR/$IPHONE_DIR" || exit 1
         if [ -n "$DEBUG" ]; then
-            FRAMEWORK="$IPHONE_DIR/libtightdb-ios-dbg.a"
+            FRAMEWORK="$IPHONE_DIR/librealm-ios-dbg.a"
         else
-            FRAMEWORK="$IPHONE_DIR/libtightdb-ios.a"
+            FRAMEWORK="$IPHONE_DIR/librealm-ios.a"
         fi
         FRAMEWORKS="'$FRAMEWORK'"
         HEADER_SEARCH_PATHS="'$IPHONE_DIR/include/**'"
@@ -1014,26 +1014,26 @@ EOF
 
     "get-version")
         version_file="src/tightdb/version.hpp"
-        tightdb_ver_major="$(grep ^"#define REALM_VER_MAJOR" $version_file | awk '{print $3}')" || exit 1
-        tightdb_ver_minor="$(grep ^"#define REALM_VER_MINOR" $version_file | awk '{print $3}')" || exit 1
-        tightdb_ver_patch="$(grep ^"#define REALM_VER_PATCH" $version_file | awk '{print $3}')" || exit 1
-        echo "$tightdb_ver_major.$tightdb_ver_minor.$tightdb_ver_patch"
+        realm_ver_major="$(grep ^"#define REALM_VER_MAJOR" $version_file | awk '{print $3}')" || exit 1
+        realm_ver_minor="$(grep ^"#define REALM_VER_MINOR" $version_file | awk '{print $3}')" || exit 1
+        realm_ver_patch="$(grep ^"#define REALM_VER_PATCH" $version_file | awk '{print $3}')" || exit 1
+        echo "$realm_ver_major.$realm_ver_minor.$realm_ver_patch"
         exit 0
         ;;
 
     "set-version")
-        tightdb_version="$1"
+        realm_version="$1"
         version_file="src/tightdb/version.hpp"
-        tightdb_ver_major="$(echo "$tightdb_version" | cut -f1 -d.)" || exit 1
-        tightdb_ver_minor="$(echo "$tightdb_version" | cut -f2 -d.)" || exit 1
-        tightdb_ver_patch="$(echo "$tightdb_version" | cut -f3 -d.)" || exit 1
+        realm_ver_major="$(echo "$realm_version" | cut -f1 -d.)" || exit 1
+        realm_ver_minor="$(echo "$realm_version" | cut -f2 -d.)" || exit 1
+        realm_ver_patch="$(echo "$realm_version" | cut -f3 -d.)" || exit 1
 
         # update version.hpp
-        printf ",s/#define REALM_VER_MAJOR .*/#define REALM_VER_MAJOR $tightdb_ver_major/\nw\nq" | ed -s "$version_file" || exit 1
-        printf ",s/#define REALM_VER_MINOR .*/#define REALM_VER_MINOR $tightdb_ver_minor/\nw\nq" | ed -s "$version_file" || exit 1
-        printf ",s/#define REALM_VER_PATCH .*/#define REALM_VER_PATCH $tightdb_ver_patch/\nw\nq" | ed -s "$version_file" || exit 1
+        printf ",s/#define REALM_VER_MAJOR .*/#define REALM_VER_MAJOR $realm_ver_major/\nw\nq" | ed -s "$version_file" || exit 1
+        printf ",s/#define REALM_VER_MINOR .*/#define REALM_VER_MINOR $realm_ver_minor/\nw\nq" | ed -s "$version_file" || exit 1
+        printf ",s/#define REALM_VER_PATCH .*/#define REALM_VER_PATCH $realm_ver_patch/\nw\nq" | ed -s "$version_file" || exit 1
 
-        sh tools/add-deb-changelog.sh "$tightdb_version" "$(pwd)/debian/changelog.in" libtightdb || exit 1
+        sh tools/add-deb-changelog.sh "$realm_version" "$(pwd)/debian/changelog.in" librealm || exit 1
         sh build.sh release-notes-prerelease || exit 1
         exit 0
         ;;
@@ -1250,7 +1250,7 @@ EOF
             REALM_VERSION="$(printf "%s\n" "$VERSION" | sed 's/^v//')" || exit 1
             export REALM_VERSION
         fi
-        NAME="tightdb-$REALM_VERSION"
+        NAME="realm-$REALM_VERSION"
 
         TEMP_DIR="$(mktemp -d /tmp/tightdb.dist.XXXX)" || exit 1
 
@@ -1434,7 +1434,7 @@ if [ \$# -gt 0 -a "\$1" = "interactive" ]; then
     for x in \$EXT; do
         if [ "\$x" != "c++" -a "\$x" != "c" ]; then
             echo "\$x:"
-            sh $debug tightdb_\$x/build.sh install-report
+            sh $debug realm_\$x/build.sh install-report
             if [ $? -eq 1 ]; then
                 echo " no files has been installed."
             fi
@@ -1442,25 +1442,25 @@ if [ \$# -gt 0 -a "\$1" = "interactive" ]; then
     done
 
     echo
-    echo "Examples can be copied to the folder tightdb_examples in your home directory (\$HOME)."
+    echo "Examples can be copied to the folder realm_examples in your home directory (\$HOME)."
     echo "Do you wish to copy examples to your home directory (y/n)?"
     read answer
     if [ \$(echo \$answer | grep -c ^[yY]) -eq 1 ]; then
-        mkdir -p \$HOME/tightdb_examples
+        mkdir -p \$HOME/realm_examples
         for x in \$EXT; do
             if [ "\$x" != "c++" -a "\$x" != "c" ]; then
-                cp -a tightdb_\$x/examples \$HOME/tightdb_examples/\$x
+                cp -a realm_\$x/examples \$HOME/realm_examples/\$x
             fi
         done
         if [ \$(echo \$EXT | grep -c c++) -eq 1 ]; then
-            cp -a tightdb/examples \$HOME/tightdb_examples/c++
+            cp -a tightdb/examples \$HOME/realm_examples/c++
         fi
         if [ \$(echo \$EXT | grep -c java) -eq 1 ]; then
-            find \$HOME/tightdb_examples/java -name build.xml -exec sed -i -e 's/value="\.\.\/\.\.\/lib"/value="\/usr\/local\/share\/java"/' \{\} \\;
-            find \$HOME/tightdb_examples/java -name build.xml -exec sed -i -e 's/"jnipath" value=".*" \/>/"jnipath" value="\/Library\/Java\/Extensions" \/>/' \{\} \\;
+            find \$HOME/realm_examples/java -name build.xml -exec sed -i -e 's/value="\.\.\/\.\.\/lib"/value="\/usr\/local\/share\/java"/' \{\} \\;
+            find \$HOME/realm_examples/java -name build.xml -exec sed -i -e 's/"jnipath" value=".*" \/>/"jnipath" value="\/Library\/Java\/Extensions" \/>/' \{\} \\;
         fi
 
-        echo "Examples can be found in \$HOME/tightdb_examples."
+        echo "Examples can be found in \$HOME/realm_examples."
         echo "Please consult the README.md files in each subdirectory for information"
         echo "on how to build and run the examples."
     fi
@@ -1651,7 +1651,7 @@ EOF
                 cat >"$TEMP_DIR/transfer/include" <<EOF
 /README.*
 /build.sh
-/libtightdb.spec
+/librealm.spec
 /config
 /Makefile
 /src/generic.mk
@@ -1760,17 +1760,17 @@ EOF
             # work around the fact that it is not going to be
             # installed in the usual place. While the config programs
             # are rebuilt to reflect the unusual installation
-            # directories, other programs (such as `tightdbd`) that
+            # directories, other programs (such as `realmd`) that
             # use the shared core library, are not, so we have to set
             # the runtime library path. Also, the core library will
-            # look for `tightdbd` in the wrong place, so we have to
+            # look for `realmd` in the wrong place, so we have to
             # set `REALM_ASYNC_DAEMON` too.
             if [ "$PREBUILT_CORE" ]; then
                 install_libdir="$(get_config_param "INSTALL_LIBDIR" "$TEST_PKG_DIR/tightdb")" || exit 1
                 path_list_prepend "$LD_LIBRARY_PATH_NAME" "$install_libdir"  || exit 1
                 export "$LD_LIBRARY_PATH_NAME"
                 install_libexecdir="$(get_config_param "INSTALL_LIBEXECDIR" "$TEST_PKG_DIR/tightdb")" || exit 1
-                export REALM_ASYNC_DAEMON="$install_libexecdir/tightdbd"
+                export REALM_ASYNC_DAEMON="$install_libexecdir/realmd"
             fi
 
             log_message "Testing './build test-installed'"
@@ -1894,7 +1894,7 @@ EOF
             fi
             if ! [ "$ERROR" ]; then
                 # At this point we have to build the config commands
-                # `tightdb-config` and `tightdb-config-dbg` such that
+                # `realm-config` and `realm-config-dbg` such that
                 # they are available during configuration and building
                 # of extensions, just as if the core library has been
                 # previously installed.
@@ -1912,7 +1912,7 @@ EOF
         # directory such that they are retained across 'clean'
         # operations.
         mkdir -p "config-progs" || exit 1
-        for x in "tightdb-config" "tightdb-config-dbg"; do
+        for x in "realm-config" "realm-config-dbg"; do
             rm -f "config-progs/$x" || exit 1
             cp "src/tightdb/$x" "config-progs/" || exit 1
         done
@@ -2245,11 +2245,11 @@ EOF
     "dist-test"|"dist-test-debug")
         test_mode="test"
         test_msg="TESTING %s"
-        async_daemon="tightdbd"
+        async_daemon="realmd"
         if [ "$MODE" = "dist-test-debug" ]; then
             test_mode="test-debug"
             test_msg="TESTING %s in debug mode"
-            async_daemon="tightdbd-dbg"
+            async_daemon="realmd-dbg"
         fi
         if ! [ -e ".DIST_CORE_WAS_BUILT" ]; then
             cat 1>&2 <<EOF
@@ -2712,7 +2712,7 @@ EOF
     "jenkins-valgrind")
         REALM_ENABLE_REPLICATION=1 REALM_ENABLE_ALLOC_SET_ZERO=1 sh build.sh config || exit 1
         sh build.sh clean || exit 1
-        VALGRIND_FLAGS="--tool=memcheck --leak-check=full --undef-value-errors=yes --track-origins=yes --child-silent-after-fork=no --trace-children=yes --xml=yes --xml-file=/var/jenkins/workspace/core_valgrind/tightdb-tests-dbg.%p.memreport" sh build.sh memcheck || exit 1
+        VALGRIND_FLAGS="--tool=memcheck --leak-check=full --undef-value-errors=yes --track-origins=yes --child-silent-after-fork=no --trace-children=yes --xml=yes --xml-file=/var/jenkins/workspace/core_valgrind/realm-tests-dbg.%p.memreport" sh build.sh memcheck || exit 1
         exit 0
         ;;
 

@@ -8,7 +8,7 @@ EXTRA_CLEAN = *.example
 
 define EXAMPLE_PROPS
 $(1)_SOURCES = $(2)
-$(1)_LIBS    = ../../../src/tightdb/libtightdb.a
+$(1)_LIBS    = ../../../src/tightdb/librealm.a
 endef
 
 $(foreach x,$(EXAMPLES),$(eval $(call EXAMPLE_PROPS,$(subst -,_,$(patsubst %.cpp,%,$(x))),$(x))))

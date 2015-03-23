@@ -1,11 +1,11 @@
 check_PROGRAMS = test-installed
 
-REALM_INCLUDEDIR    := $(shell tightdb-config     --includedir)
-REALM_CFLAGS        := $(shell tightdb-config     --cflags)
-REALM_CFLAGS_DEBUG  := $(shell tightdb-config-dbg --cflags)
-REALM_LIBDIR        := $(shell tightdb-config     --libdir)
-REALM_LDFLAGS       := $(shell tightdb-config     --libs)
-REALM_LDFLAGS_DEBUG := $(shell tightdb-config-dbg --libs)
+REALM_INCLUDEDIR    := $(shell realm-config     --includedir)
+REALM_CFLAGS        := $(shell realm-config     --cflags)
+REALM_CFLAGS_DEBUG  := $(shell realm-config-dbg --cflags)
+REALM_LIBDIR        := $(shell realm-config     --libdir)
+REALM_LDFLAGS       := $(shell realm-config     --libs)
+REALM_LDFLAGS_DEBUG := $(shell realm-config-dbg --libs)
 
 test_installed_SOURCES       = test.cpp
 test_installed_CFLAGS        = -I$(REALM_INCLUDEDIR)

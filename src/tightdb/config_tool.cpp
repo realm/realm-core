@@ -64,13 +64,13 @@ void emit_flags()
     if (emit_ldflags) {
 #ifdef REALM_CONFIG_IOS
 #  ifdef REALM_DEBUG
-        emit_flags("-ltightdb-ios-dbg");
+        emit_flags("-lrealm-ios-dbg");
 #  else
-        emit_flags("-ltightdb-ios");
+        emit_flags("-lrealm-ios");
 #  endif
 #else
 #  ifdef REALM_DEBUG
-        emit_flags("-ltightdb-dbg");
+        emit_flags("-lrealm-dbg");
 #  else
         emit_flags("-ltightdb");
 #  endif

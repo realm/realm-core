@@ -13,7 +13,7 @@
 		3620DF0D18B6CA7B003AD498 /* destroy_guard.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 3620DF0418B6CA7B003AD498 /* destroy_guard.hpp */; };
 		3620DF0E18B6CA7B003AD498 /* output_stream.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3620DF0518B6CA7B003AD498 /* output_stream.cpp */; };
 		3620DF1218B6CA7B003AD498 /* output_stream.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 3620DF0918B6CA7B003AD498 /* output_stream.hpp */; };
-		3626F56B14A228850097F17B /* libtightdb.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 3647E0E714209E6B00D56FD7 /* libtightdb.a */; };
+		3626F56B14A228850097F17B /* librealm.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 3647E0E714209E6B00D56FD7 /* librealm.a */; };
 		3647E10D1420E66B00D56FD7 /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3647DFF314209CE600D56FD7 /* main.cpp */; };
 		3647E10E1420E69400D56FD7 /* test_array.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3647E04A14209CE600D56FD7 /* test_array.cpp */; };
 		3647E10F1420E69400D56FD7 /* test_array_string.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3647E04B14209CE600D56FD7 /* test_array_string.cpp */; };
@@ -92,10 +92,10 @@
 		36AA59E81937552000D691E0 /* link_view.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 36AA59E61937552000D691E0 /* link_view.cpp */; };
 		36AA59E91937552000D691E0 /* link_view.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 36AA59E71937552000D691E0 /* link_view.hpp */; };
 		36AB350D17E78DA900EC5744 /* string_data.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 36AB350C17E78DA900EC5744 /* string_data.hpp */; };
-		36AD7F9917FB94F800F046FC /* libtightdb.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 3647E0E714209E6B00D56FD7 /* libtightdb.a */; };
-		36AD7FA217FB959A00F046FC /* tightdbd.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 36AD7FA117FB959A00F046FC /* tightdbd.cpp */; };
+		36AD7F9917FB94F800F046FC /* librealm.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 3647E0E714209E6B00D56FD7 /* librealm.a */; };
+		36AD7FA217FB959A00F046FC /* realmd.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 36AD7FA117FB959A00F046FC /* realmd.cpp */; };
 		36E608681459976700CCC3E8 /* test-tightdb.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3647E02214209CE600D56FD7 /* test-tightdb.cpp */; };
-		36E608691459977000CCC3E8 /* libtightdb.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 3647E0E714209E6B00D56FD7 /* libtightdb.a */; };
+		36E608691459977000CCC3E8 /* librealm.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 3647E0E714209E6B00D56FD7 /* librealm.a */; };
 		36E608911459F11200CCC3E8 /* test_array_blob.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 36E608901459F11200CCC3E8 /* test_array_blob.cpp */; };
 		36E60897145A99D800CCC3E8 /* test_array_string_long.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 36E60896145A99D800CCC3E8 /* test_array_string_long.cpp */; };
 		36E60899145AB43600CCC3E8 /* test_column_string.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 36E60898145AB43600CCC3E8 /* test_column_string.cpp */; };
@@ -308,28 +308,28 @@
 			containerPortal = 3611F2FC14209B7000017263 /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = 3647E0E614209E6B00D56FD7;
-			remoteInfo = libtightdb;
+			remoteInfo = librealm;
 		};
 		36AD7F7317FB94F800F046FC /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 3611F2FC14209B7000017263 /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = 3647E0E614209E6B00D56FD7;
-			remoteInfo = libtightdb;
+			remoteInfo = librealm;
 		};
 		36AD7F9F17FB955A00F046FC /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 3611F2FC14209B7000017263 /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = 36AD7F7117FB94F800F046FC;
-			remoteInfo = "tightdbd-noinst";
+			remoteInfo = "realmd-noinst";
 		};
 		36E6086A14599C3300CCC3E8 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 3611F2FC14209B7000017263 /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = 3647E0E614209E6B00D56FD7;
-			remoteInfo = libtightdb;
+			remoteInfo = librealm;
 		};
 		526F3F09182465E3005217F1 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -403,8 +403,8 @@
 		3647E04C14209CE600D56FD7 /* test_column.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = test_column.cpp; sourceTree = "<group>"; };
 		3647E04D14209CE600D56FD7 /* test_index.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = test_index.cpp; sourceTree = "<group>"; };
 		3647E04E14209CE600D56FD7 /* test_table.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = test_table.cpp; sourceTree = "<group>"; };
-		3647E0E714209E6B00D56FD7 /* libtightdb.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libtightdb.a; sourceTree = BUILT_PRODUCTS_DIR; };
-		3647E1031420E4D800D56FD7 /* tightdb_unit_tests */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = tightdb_unit_tests; sourceTree = BUILT_PRODUCTS_DIR; };
+		3647E0E714209E6B00D56FD7 /* librealm.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = librealm.a; sourceTree = BUILT_PRODUCTS_DIR; };
+		3647E1031420E4D800D56FD7 /* realm_unit_tests */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = realm_unit_tests; sourceTree = BUILT_PRODUCTS_DIR; };
 		3658CE6C19209EDD009A7085 /* column_link.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = column_link.hpp; path = tightdb/column_link.hpp; sourceTree = "<group>"; };
 		3658CE6F1921AC6F009A7085 /* column_backlink.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = column_backlink.cpp; path = tightdb/column_backlink.cpp; sourceTree = "<group>"; };
 		3658CE701921AC6F009A7085 /* column_backlink.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = column_backlink.hpp; path = tightdb/column_backlink.hpp; sourceTree = "<group>"; };
@@ -473,8 +473,8 @@
 		36AA59E61937552000D691E0 /* link_view.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = link_view.cpp; path = tightdb/link_view.cpp; sourceTree = "<group>"; };
 		36AA59E71937552000D691E0 /* link_view.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = link_view.hpp; path = tightdb/link_view.hpp; sourceTree = "<group>"; };
 		36AB350C17E78DA900EC5744 /* string_data.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = string_data.hpp; path = tightdb/string_data.hpp; sourceTree = "<group>"; };
-		36AD7F9E17FB94F800F046FC /* tightdbd-dbg-noinst */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "tightdbd-dbg-noinst"; sourceTree = BUILT_PRODUCTS_DIR; };
-		36AD7FA117FB959A00F046FC /* tightdbd.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = tightdbd.cpp; path = tightdb/tightdbd.cpp; sourceTree = "<group>"; };
+		36AD7F9E17FB94F800F046FC /* realmd-dbg-noinst */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "realmd-dbg-noinst"; sourceTree = BUILT_PRODUCTS_DIR; };
+		36AD7FA117FB959A00F046FC /* realmd.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = realmd.cpp; path = tightdb/realmd.cpp; sourceTree = "<group>"; };
 		36E6085E1459972100CCC3E8 /* test-tightdb */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "test-tightdb"; sourceTree = BUILT_PRODUCTS_DIR; };
 		36E608901459F11200CCC3E8 /* test_array_blob.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = test_array_blob.cpp; sourceTree = "<group>"; };
 		36E60896145A99D800CCC3E8 /* test_array_string_long.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = test_array_string_long.cpp; sourceTree = "<group>"; };
@@ -513,7 +513,7 @@
 		3FCA03C51A44F57A009067D0 /* CoreFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreFoundation.framework; path = System/Library/Frameworks/CoreFoundation.framework; sourceTree = SDKROOT; };
 		3FE557F51A150F2100A18CCB /* errno.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = errno.cpp; sourceTree = "<group>"; };
 		3FE557F61A150F2100A18CCB /* errno.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = errno.hpp; sourceTree = "<group>"; };
-		4142C9951623478700B3B902 /* liblibtightdb ios.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "liblibtightdb ios.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		4142C9951623478700B3B902 /* liblibrealm ios.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "liblibrealm ios.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		4222F2F619640A4100EC86A5 /* test_json.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = test_json.cpp; sourceTree = "<group>"; };
 		4222F2F819640A7A00EC86A5 /* jsmn.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = jsmn.cpp; sourceTree = "<group>"; };
 		4222F2F919640A7A00EC86A5 /* jsmn.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = jsmn.hpp; sourceTree = "<group>"; };
@@ -634,7 +634,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				3FCA03C61A44F57A009067D0 /* CoreFoundation.framework in Frameworks */,
-				3626F56B14A228850097F17B /* libtightdb.a in Frameworks */,
+				3626F56B14A228850097F17B /* librealm.a in Frameworks */,
 				526F3F0B18246B33005217F1 /* test-util.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -644,7 +644,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				3FCA03C71A44F5B3009067D0 /* CoreFoundation.framework in Frameworks */,
-				36AD7F9917FB94F800F046FC /* libtightdb.a in Frameworks */,
+				36AD7F9917FB94F800F046FC /* librealm.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -652,7 +652,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				36E608691459977000CCC3E8 /* libtightdb.a in Frameworks */,
+				36E608691459977000CCC3E8 /* librealm.a in Frameworks */,
 				52D6E071175BDD6300B423E5 /* test-util.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -794,7 +794,7 @@
 				365CCE2A157CC37D00172BF8 /* table_view.hpp */,
 				365CCE28157CC37D00172BF8 /* table_view_basic.hpp */,
 				365CCE77157CC3A100172BF8 /* tightdb.hpp */,
-				36AD7FA117FB959A00F046FC /* tightdbd.cpp */,
+				36AD7FA117FB959A00F046FC /* realmd.cpp */,
 				522EA518192C4D3C002AD3B6 /* unicode.cpp */,
 				522EA51A192C4D4B002AD3B6 /* unicode.hpp */,
 				365CCE32157CC37D00172BF8 /* utilities.cpp */,
@@ -903,10 +903,10 @@
 			isa = PBXGroup;
 			children = (
 				36E6085E1459972100CCC3E8 /* test-tightdb */,
-				3647E1031420E4D800D56FD7 /* tightdb_unit_tests */,
-				36AD7F9E17FB94F800F046FC /* tightdbd-dbg-noinst */,
-				4142C9951623478700B3B902 /* liblibtightdb ios.a */,
-				3647E0E714209E6B00D56FD7 /* libtightdb.a */,
+				3647E1031420E4D800D56FD7 /* realm_unit_tests */,
+				36AD7F9E17FB94F800F046FC /* realmd-dbg-noinst */,
+				4142C9951623478700B3B902 /* liblibrealm ios.a */,
+				3647E0E714209E6B00D56FD7 /* librealm.a */,
 				52D6E04E175BD9BC00B423E5 /* test-util.a */,
 			);
 			name = Products;
@@ -1176,9 +1176,9 @@
 /* End PBXHeadersBuildPhase section */
 
 /* Begin PBXNativeTarget section */
-		3647E0E614209E6B00D56FD7 /* libtightdb */ = {
+		3647E0E614209E6B00D56FD7 /* librealm */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 3647E0E914209E6B00D56FD7 /* Build configuration list for PBXNativeTarget "libtightdb" */;
+			buildConfigurationList = 3647E0E914209E6B00D56FD7 /* Build configuration list for PBXNativeTarget "librealm" */;
 			buildPhases = (
 				3647E0E314209E6B00D56FD7 /* Sources */,
 				3647E0E414209E6B00D56FD7 /* Frameworks */,
@@ -1188,14 +1188,14 @@
 			);
 			dependencies = (
 			);
-			name = libtightdb;
-			productName = libtightdb;
-			productReference = 3647E0E714209E6B00D56FD7 /* libtightdb.a */;
+			name = librealm;
+			productName = librealm;
+			productReference = 3647E0E714209E6B00D56FD7 /* librealm.a */;
 			productType = "com.apple.product-type.library.static";
 		};
-		3647E1021420E4D800D56FD7 /* tightdb_unit_tests */ = {
+		3647E1021420E4D800D56FD7 /* realm_unit_tests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 3647E10A1420E4D800D56FD7 /* Build configuration list for PBXNativeTarget "tightdb_unit_tests" */;
+			buildConfigurationList = 3647E10A1420E4D800D56FD7 /* Build configuration list for PBXNativeTarget "realm_unit_tests" */;
 			buildPhases = (
 				3647E0FF1420E4D800D56FD7 /* Sources */,
 				3647E1011420E4D800D56FD7 /* CopyFiles */,
@@ -1209,14 +1209,14 @@
 				3647E2521422197F00D56FD7 /* PBXTargetDependency */,
 				36AD7FA017FB955A00F046FC /* PBXTargetDependency */,
 			);
-			name = tightdb_unit_tests;
-			productName = tightdb_test;
-			productReference = 3647E1031420E4D800D56FD7 /* tightdb_unit_tests */;
+			name = realm_unit_tests;
+			productName = realm_test;
+			productReference = 3647E1031420E4D800D56FD7 /* realm_unit_tests */;
 			productType = "com.apple.product-type.tool";
 		};
-		36AD7F7117FB94F800F046FC /* tightdbd-noinst */ = {
+		36AD7F7117FB94F800F046FC /* realmd-noinst */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 36AD7F9B17FB94F800F046FC /* Build configuration list for PBXNativeTarget "tightdbd-noinst" */;
+			buildConfigurationList = 36AD7F9B17FB94F800F046FC /* Build configuration list for PBXNativeTarget "realmd-noinst" */;
 			buildPhases = (
 				36AD7F7417FB94F800F046FC /* Sources */,
 				36AD7F9717FB94F800F046FC /* Frameworks */,
@@ -1227,9 +1227,9 @@
 			dependencies = (
 				36AD7F7217FB94F800F046FC /* PBXTargetDependency */,
 			);
-			name = "tightdbd-noinst";
-			productName = tightdb_test;
-			productReference = 36AD7F9E17FB94F800F046FC /* tightdbd-dbg-noinst */;
+			name = "realmd-noinst";
+			productName = realm_test;
+			productReference = 36AD7F9E17FB94F800F046FC /* realmd-dbg-noinst */;
 			productType = "com.apple.product-type.tool";
 		};
 		36E6085D1459972100CCC3E8 /* test-tightdb */ = {
@@ -1251,9 +1251,9 @@
 			productReference = 36E6085E1459972100CCC3E8 /* test-tightdb */;
 			productType = "com.apple.product-type.tool";
 		};
-		4142C9391623478700B3B902 /* libtightdb ios */ = {
+		4142C9391623478700B3B902 /* librealm ios */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 4142C9921623478700B3B902 /* Build configuration list for PBXNativeTarget "libtightdb ios" */;
+			buildConfigurationList = 4142C9921623478700B3B902 /* Build configuration list for PBXNativeTarget "librealm ios" */;
 			buildPhases = (
 				4142C93A1623478700B3B902 /* Sources */,
 				4142C9581623478700B3B902 /* Frameworks */,
@@ -1263,9 +1263,9 @@
 			);
 			dependencies = (
 			);
-			name = "libtightdb ios";
-			productName = libtightdb;
-			productReference = 4142C9951623478700B3B902 /* liblibtightdb ios.a */;
+			name = "librealm ios";
+			productName = librealm;
+			productReference = 4142C9951623478700B3B902 /* liblibrealm ios.a */;
 			productType = "com.apple.product-type.library.static";
 		};
 		52D6E04D175BD9BC00B423E5 /* test-utils */ = {
@@ -1306,12 +1306,12 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				3647E0E614209E6B00D56FD7 /* libtightdb */,
-				3647E1021420E4D800D56FD7 /* tightdb_unit_tests */,
+				3647E0E614209E6B00D56FD7 /* librealm */,
+				3647E1021420E4D800D56FD7 /* realm_unit_tests */,
 				36E6085D1459972100CCC3E8 /* test-tightdb */,
-				4142C9391623478700B3B902 /* libtightdb ios */,
+				4142C9391623478700B3B902 /* librealm ios */,
 				52D6E04D175BD9BC00B423E5 /* test-utils */,
-				36AD7F7117FB94F800F046FC /* tightdbd-noinst */,
+				36AD7F7117FB94F800F046FC /* realmd-noinst */,
 			);
 		};
 /* End PBXProject section */
@@ -1448,7 +1448,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				36AD7FA217FB959A00F046FC /* tightdbd.cpp in Sources */,
+				36AD7FA217FB959A00F046FC /* realmd.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1521,22 +1521,22 @@
 /* Begin PBXTargetDependency section */
 		3647E2521422197F00D56FD7 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 3647E0E614209E6B00D56FD7 /* libtightdb */;
+			target = 3647E0E614209E6B00D56FD7 /* librealm */;
 			targetProxy = 3647E2511422197F00D56FD7 /* PBXContainerItemProxy */;
 		};
 		36AD7F7217FB94F800F046FC /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 3647E0E614209E6B00D56FD7 /* libtightdb */;
+			target = 3647E0E614209E6B00D56FD7 /* librealm */;
 			targetProxy = 36AD7F7317FB94F800F046FC /* PBXContainerItemProxy */;
 		};
 		36AD7FA017FB955A00F046FC /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 36AD7F7117FB94F800F046FC /* tightdbd-noinst */;
+			target = 36AD7F7117FB94F800F046FC /* realmd-noinst */;
 			targetProxy = 36AD7F9F17FB955A00F046FC /* PBXContainerItemProxy */;
 		};
 		36E6086B14599C3300CCC3E8 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 3647E0E614209E6B00D56FD7 /* libtightdb */;
+			target = 3647E0E614209E6B00D56FD7 /* librealm */;
 			targetProxy = 36E6086A14599C3300CCC3E8 /* PBXContainerItemProxy */;
 		};
 		526F3F0A182465E3005217F1 /* PBXTargetDependency */ = {
@@ -1720,7 +1720,7 @@
 				GCC_WARN_ABOUT_MISSING_PROTOTYPES = NO;
 				GCC_WARN_ABOUT_RETURN_TYPE = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				PRODUCT_NAME = "tightdbd-dbg-noinst";
+				PRODUCT_NAME = "realmd-dbg-noinst";
 				VERSION_INFO_FILE = "$(TARGET_NAME)";
 			};
 			name = Debug;
@@ -1735,7 +1735,7 @@
 				GCC_WARN_ABOUT_MISSING_PROTOTYPES = NO;
 				GCC_WARN_ABOUT_RETURN_TYPE = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				PRODUCT_NAME = "tightdbd-noinst";
+				PRODUCT_NAME = "realmd-noinst";
 				VERSION_INFO_FILE = "$(TARGET_NAME)";
 			};
 			name = Release;
@@ -1793,7 +1793,7 @@
 				GCC_WARN_ABOUT_MISSING_PROTOTYPES = YES;
 				GCC_WARN_ABOUT_RETURN_TYPE = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				PRODUCT_NAME = "libtightdb ios";
+				PRODUCT_NAME = "librealm ios";
 				SDKROOT = iphoneos;
 			};
 			name = Debug;
@@ -1808,7 +1808,7 @@
 				GCC_WARN_ABOUT_MISSING_PROTOTYPES = YES;
 				GCC_WARN_ABOUT_RETURN_TYPE = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				PRODUCT_NAME = "libtightdb ios";
+				PRODUCT_NAME = "librealm ios";
 				SDKROOT = iphoneos;
 			};
 			name = Release;
@@ -1847,7 +1847,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		3647E0E914209E6B00D56FD7 /* Build configuration list for PBXNativeTarget "libtightdb" */ = {
+		3647E0E914209E6B00D56FD7 /* Build configuration list for PBXNativeTarget "librealm" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				3647E0EA14209E6B00D56FD7 /* Debug */,
@@ -1856,7 +1856,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		3647E10A1420E4D800D56FD7 /* Build configuration list for PBXNativeTarget "tightdb_unit_tests" */ = {
+		3647E10A1420E4D800D56FD7 /* Build configuration list for PBXNativeTarget "realm_unit_tests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				3647E10B1420E4D800D56FD7 /* Debug */,
@@ -1865,7 +1865,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		36AD7F9B17FB94F800F046FC /* Build configuration list for PBXNativeTarget "tightdbd-noinst" */ = {
+		36AD7F9B17FB94F800F046FC /* Build configuration list for PBXNativeTarget "realmd-noinst" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				36AD7F9C17FB94F800F046FC /* Debug */,
@@ -1883,7 +1883,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		4142C9921623478700B3B902 /* Build configuration list for PBXNativeTarget "libtightdb ios" */ = {
+		4142C9921623478700B3B902 /* Build configuration list for PBXNativeTarget "librealm ios" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				4142C9931623478700B3B902 /* Debug */,
