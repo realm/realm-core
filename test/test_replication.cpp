@@ -5,7 +5,7 @@
 
 #include <tightdb.hpp>
 #include <tightdb/util/features.h>
-#include <tightdb/util/unique_ptr.hpp>
+#include <memory>
 #include <tightdb/util/file.hpp>
 #ifdef TIGHTDB_ENABLE_REPLICATION
 #  include <tightdb/replication.hpp>

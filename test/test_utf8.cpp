@@ -8,7 +8,7 @@
 #include <iostream>
 
 #include <tightdb/util/assert.hpp>
-#include <tightdb/util/unique_ptr.hpp>
+#include <memory>
 #include <tightdb/util/utf8.hpp>
 #include <tightdb/unicode.hpp>
 

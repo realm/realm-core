@@ -3,7 +3,7 @@
 #include <iostream>
 
 #include <tightdb.hpp>
-#include <tightdb/util/unique_ptr.hpp>
+#include <memory>
 
 #include "../util/timer.hpp"
 #include "../util/random.hpp"

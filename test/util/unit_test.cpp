@@ -3,7 +3,7 @@
 #include <string>
 #include <iostream>
 
-#include <tightdb/util/unique_ptr.hpp>
+#include <memory>
 #include <tightdb/util/bind.hpp>
 #include <tightdb/util/thread.hpp>
 

@@ -2,7 +2,7 @@
 #include <iostream>
 #include <iomanip>
 
-#include <tightdb/util/unique_ptr.hpp>
+#include <memory>
 #include <tightdb/column_binary.hpp>
 
 using namespace std;

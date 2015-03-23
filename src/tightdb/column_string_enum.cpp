@@ -1,7 +1,7 @@
 #include <iostream>
 #include <iomanip>
 
-#include <tightdb/util/unique_ptr.hpp>
+#include <memory>
 
 #include <tightdb/column_string_enum.hpp>
 #include <tightdb/index_string.hpp>

@@ -1116,7 +1116,6 @@
     <ClInclude Include="..\..\src\tightdb\util\memory_stream.hpp" />
     <ClInclude Include="..\..\src\tightdb\util\shared_ptr.hpp" />
     <ClInclude Include="..\..\src\tightdb\util\terminate.hpp" />
-    <ClInclude Include="..\..\src\tightdb\util\unique_ptr.hpp" />
     <ClInclude Include="..\..\src\tightdb\util\bind_ptr.hpp" />
     <ClInclude Include="..\..\src\tightdb\column.hpp" />
     <ClInclude Include="..\..\src\tightdb\column_binary.hpp" />

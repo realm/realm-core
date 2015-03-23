@@ -3,7 +3,7 @@
 
 #include <string>
 
-#include <tightdb/util/unique_ptr.hpp>
+#include <memory>
 #include <tightdb/util/file.hpp>
 #include <tightdb/alloc_slab.hpp>
 

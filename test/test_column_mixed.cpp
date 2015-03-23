@@ -3,7 +3,7 @@
 
 #include <limits>
 
-#include <tightdb/util/unique_ptr.hpp>
+#include <memory>
 #include <tightdb/column_mixed.hpp>
 
 #include "test.hpp"

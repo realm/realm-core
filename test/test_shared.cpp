@@ -19,7 +19,7 @@
 #include <tightdb.hpp>
 #include <tightdb/util/features.h>
 #include <tightdb/util/safe_int_ops.hpp>
-#include <tightdb/util/unique_ptr.hpp>
+#include <memory>
 #include <tightdb/util/bind.hpp>
 #include <tightdb/util/terminate.hpp>
 #include <tightdb/util/file.hpp>

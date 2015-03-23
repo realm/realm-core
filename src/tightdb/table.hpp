@@ -27,7 +27,7 @@
 
 #include <tightdb/util/features.h>
 #include <tightdb/util/tuple.hpp>
-#include <tightdb/util/unique_ptr.hpp>
+#include <memory>
 #include <tightdb/column_fwd.hpp>
 #include <tightdb/table_ref.hpp>
 #include <tightdb/link_view_fwd.hpp>

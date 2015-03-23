@@ -24,7 +24,7 @@
 #include <cstdlib> // std::size_t
 #include <vector>
 
-#include <tightdb/util/unique_ptr.hpp>
+#include <memory>
 #include <tightdb/array_integer.hpp>
 #include <tightdb/column_type.hpp>
 #include <tightdb/column_fwd.hpp>

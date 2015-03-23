@@ -1,4 +1,4 @@
-#include <tightdb/util/unique_ptr.hpp>
+#include <memory>
 #include <tightdb/descriptor.hpp>
 #include <tightdb/column_string.hpp>
 

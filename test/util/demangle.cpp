@@ -1,7 +1,7 @@
 #include <cstdlib>
 
 #include <tightdb/util/features.h>
-#include <tightdb/util/unique_ptr.hpp>
+#include <memory>
 
 #if TIGHTDB_HAVE_AT_LEAST_GCC(3,2)
 #  define TIGHTDB_HAVE_CXXABI_DEMANGLE
@@ -12,7 +12,6 @@
 
 using namespace std;
 using namespace tightdb;
-using namespace tightdb::util;
 
 namespace {
 

@@ -9,7 +9,7 @@
 
 #include <tightdb/util/encrypted_file_mapping.hpp>
 #include <tightdb/util/terminate.hpp>
-#include <tightdb/util/unique_ptr.hpp>
+#include <memory>
 #include <tightdb/array.hpp>
 #include <tightdb/alloc_slab.hpp>
 

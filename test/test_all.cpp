@@ -15,7 +15,7 @@
 #include <iomanip>
 
 #include <tightdb/util/features.h>
-#include <tightdb/util/unique_ptr.hpp>
+#include <memory>
 #include <tightdb/util/features.h>
 #include <tightdb.hpp>
 #include <tightdb/utilities.hpp>

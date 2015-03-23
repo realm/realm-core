@@ -34,7 +34,7 @@
 #include <tightdb/util/features.h>
 #include <tightdb/util/assert.hpp>
 #include <tightdb/util/terminate.hpp>
-#include <tightdb/util/unique_ptr.hpp>
+#include <memory>
 #include <tightdb/util/meta.hpp>
 
 #ifdef TIGHTDB_HAVE_CXX11_ATOMIC

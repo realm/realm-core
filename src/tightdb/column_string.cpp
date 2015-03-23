@@ -8,7 +8,7 @@
 #  include <win32\types.h>
 #endif
 
-#include <tightdb/util/unique_ptr.hpp>
+#include <memory>
 
 #include <tightdb/query_conditions.hpp>
 #include <tightdb/column_string.hpp>

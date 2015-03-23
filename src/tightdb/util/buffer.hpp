@@ -28,7 +28,7 @@
 
 #include <tightdb/util/features.h>
 #include <tightdb/util/safe_int_ops.hpp>
-#include <tightdb/util/unique_ptr.hpp>
+#include <memory>
 
 namespace tightdb {
 namespace util {
