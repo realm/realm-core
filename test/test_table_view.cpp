@@ -13,7 +13,7 @@
 #include "test.hpp"
 
 using namespace std;
-using namespace tightdb;
+using namespace realm;
 using namespace test_util;
 
 

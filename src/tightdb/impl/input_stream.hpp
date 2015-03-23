@@ -21,7 +21,7 @@
 #ifndef REALM_IMPL_INPUT_STREAM_HPP
 #define REALM_IMPL_INPUT_STREAM_HPP
 
-namespace tightdb {
+namespace realm {
 namespace _impl {
 
 class InputStream {

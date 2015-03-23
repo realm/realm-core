@@ -57,7 +57,7 @@
 #  define REALM_COMPILER_AVX
 #endif
 
-namespace tightdb {
+namespace realm {
 
 typedef bool(*StringCompareCallback)(const char* string1, const char* string2);
 
@@ -201,7 +201,7 @@ private:
 };
 
 
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_UTILITIES_HPP
 

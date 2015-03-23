@@ -27,7 +27,7 @@
 #include <tightdb/column.hpp>
 #include <tightdb/table.hpp>
 
-namespace tightdb {
+namespace realm {
 
 
 /// Base class for any type of column that can contain subtables.
@@ -157,7 +157,7 @@ protected:
     void update_table_accessors(const std::size_t* col_path_begin, const std::size_t* col_path_end,
                                 _impl::TableFriend::AccessorUpdater&);
 
-    /// \param row_ndx Must be `tightdb::npos` if appending.
+    /// \param row_ndx Must be `realm::npos` if appending.
     void do_insert(std::size_t row_ndx, int_fast64_t value, std::size_t num_rows);
 
 #ifdef REALM_DEBUG
@@ -242,7 +242,7 @@ private:
 // Overriding virtual method of Column.
 inline void ColumnSubtableParent::insert(std::size_t row_ndx, std::size_t num_rows, bool is_append)
 {
-    std::size_t row_ndx_2 = is_append ? tightdb::npos : row_ndx;
+    std::size_t row_ndx_2 = is_append ? realm::npos : row_ndx;
     int_fast64_t value = 0;
     do_insert(row_ndx_2, value, num_rows); // Throws
 }
@@ -527,7 +527,7 @@ inline void ColumnSubtableParent::do_insert(std::size_t row_ndx, int_fast64_t va
                                             std::size_t num_rows)
 {
     Column::do_insert(row_ndx, value, num_rows); // Throws
-    bool is_append = row_ndx == tightdb::npos;
+    bool is_append = row_ndx == realm::npos;
     if (!is_append) {
         const bool fix_ndx_in_parent = true;
         m_subtable_map.adj_insert_rows<fix_ndx_in_parent>(row_ndx, num_rows);
@@ -538,7 +538,7 @@ inline void ColumnSubtableParent::do_insert(std::size_t row_ndx, int_fast64_t va
 inline ColumnTable::ColumnTable(Allocator& alloc, ref_type ref,
                                 Table* table, std::size_t column_ndx):
     ColumnSubtableParent(alloc, ref, table, column_ndx),
-    m_subspec_ndx(tightdb::npos)
+    m_subspec_ndx(realm::npos)
 {
 }
 
@@ -556,7 +556,7 @@ inline void ColumnTable::refresh_accessor_tree(std::size_t col_ndx, const Spec& 
 
 inline std::size_t ColumnTable::get_subspec_ndx() const REALM_NOEXCEPT
 {
-    if (REALM_UNLIKELY(m_subspec_ndx == tightdb::npos)) {
+    if (REALM_UNLIKELY(m_subspec_ndx == realm::npos)) {
         typedef _impl::TableFriend tf;
         const Spec& spec = tf::get_spec(*m_table);
         m_subspec_ndx = spec.get_subspec_ndx(m_column_ndx);
@@ -565,6 +565,6 @@ inline std::size_t ColumnTable::get_subspec_ndx() const REALM_NOEXCEPT
 }
 
 
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_COLUMN_TABLE_HPP

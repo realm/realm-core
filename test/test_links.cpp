@@ -8,9 +8,9 @@
 #include "test.hpp"
 
 using namespace std;
-using namespace tightdb;
-using namespace tightdb::util;
-using namespace tightdb::test_util;
+using namespace realm;
+using namespace realm::util;
+using namespace realm::test_util;
 
 namespace {
 

@@ -3,8 +3,8 @@
 #include "test_path.hpp"
 
 using namespace std;
-using namespace tightdb::util;
-using namespace tightdb::test_util::unit_test;
+using namespace realm::util;
+using namespace realm::test_util::unit_test;
 
 namespace {
 
@@ -15,7 +15,7 @@ string resource_path;
 
 } // anonymous namespace
 
-namespace tightdb {
+namespace realm {
 namespace test_util {
 
 
@@ -88,4 +88,4 @@ SharedGroupTestPathGuard::~SharedGroupTestPathGuard()
 }
 
 } // namespace test_util
-} // namespace tightdb
+} // namespace realm

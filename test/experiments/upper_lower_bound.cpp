@@ -19,7 +19,7 @@
 #include "../util/timer.hpp"
 #include "unit_test.hpp"
 
-using namespace tightdb;
+using namespace realm;
 using namespace std;
 
 
@@ -125,7 +125,7 @@ sum: 8.876
         test_util::Timer t;
         double best;
 
-        tightdb::Array a;
+        realm::Array a;
         int64_t val = 0;
         volatile size_t tt = 40;
 
@@ -201,7 +201,7 @@ sum: 8.876
         test_util::Timer t;
         double best;
 
-        tightdb::Array a;
+        realm::Array a;
         int64_t val = 0;
 
         for(int i = 0; i < 1000; i++) {

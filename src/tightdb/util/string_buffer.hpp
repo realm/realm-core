@@ -27,7 +27,7 @@
 #include <tightdb/util/features.h>
 #include <tightdb/util/buffer.hpp>
 
-namespace tightdb {
+namespace realm {
 namespace util {
 
 
@@ -182,6 +182,6 @@ inline void StringBuffer::clear() REALM_NOEXCEPT
 
 
 } // namespace util
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_UTIL_STRING_BUFFER_HPP

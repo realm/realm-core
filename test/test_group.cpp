@@ -26,8 +26,8 @@ static const mode_t2 MS_MODE_MASK = 0x0000ffff;
 #include "crypt_key.hpp"
 
 using namespace std;
-using namespace tightdb;
-using namespace tightdb::util;
+using namespace realm;
+using namespace realm::util;
 
 
 // Test independence and thread-safety

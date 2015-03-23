@@ -28,7 +28,7 @@
 #include <tightdb/util/features.h>
 #include <tightdb/utilities.hpp>
 
-namespace tightdb {
+namespace realm {
 
 /// A reference to a chunk of character data.
 ///
@@ -304,6 +304,6 @@ inline StringData::operator unspecified_bool_type() const REALM_NOEXCEPT
 }
 #endif
 
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_STRING_HPP

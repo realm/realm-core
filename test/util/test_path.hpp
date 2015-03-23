@@ -27,18 +27,18 @@
 #include "unit_test.hpp"
 
 #define TEST_PATH_HELPER(class_name, var_name, suffix) \
-    class_name var_name(tightdb::test_util::get_test_path(test_details, "." #var_name "." suffix))
+    class_name var_name(realm::test_util::get_test_path(test_details, "." #var_name "." suffix))
 
 #define TEST_PATH(var_name) \
-    TEST_PATH_HELPER(tightdb::test_util::TestPathGuard, var_name, "test");
+    TEST_PATH_HELPER(realm::test_util::TestPathGuard, var_name, "test");
 
 #define GROUP_TEST_PATH(var_name) \
-    TEST_PATH_HELPER(tightdb::test_util::TestPathGuard, var_name, "tightdb");
+    TEST_PATH_HELPER(realm::test_util::TestPathGuard, var_name, "tightdb");
 
 #define SHARED_GROUP_TEST_PATH(var_name) \
-    TEST_PATH_HELPER(tightdb::test_util::SharedGroupTestPathGuard, var_name, "tightdb");
+    TEST_PATH_HELPER(realm::test_util::SharedGroupTestPathGuard, var_name, "tightdb");
 
-namespace tightdb {
+namespace realm {
 namespace test_util {
 
 /// Disable removal of test files. If called, the call must complete
@@ -85,6 +85,6 @@ public:
 };
 
 } // namespace test_util
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_TEST_UTIL_TEST_PATH_HPP

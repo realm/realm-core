@@ -1,7 +1,7 @@
 #include <tightdb/impl/transact_log.hpp>
 #include <tightdb/link_view.hpp>
 
-namespace tightdb {
+namespace realm {
 namespace _impl {
 
 namespace {

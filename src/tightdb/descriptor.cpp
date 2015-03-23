@@ -2,8 +2,8 @@
 #include <tightdb/descriptor.hpp>
 #include <tightdb/column_string.hpp>
 
-using namespace tightdb;
-using namespace tightdb::util;
+using namespace realm;
+using namespace realm::util;
 
 
 DescriptorRef Descriptor::get_subdescriptor(size_t column_ndx)

@@ -26,9 +26,9 @@
 #include <stdint.h>
 #include <tightdb/util/features.h>
 
-#define REALM_TERMINATE(msg) tightdb::util::terminate((msg), __FILE__, __LINE__)
+#define REALM_TERMINATE(msg) realm::util::terminate((msg), __FILE__, __LINE__)
 
-namespace tightdb {
+namespace realm {
 namespace util {
 REALM_NORETURN void terminate_internal(std::stringstream&) REALM_NOEXCEPT;
 
@@ -46,6 +46,6 @@ REALM_NORETURN void terminate(const char* message, const char* file, long line, 
 }
 
 } // namespace util
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_UTIL_TERMINATE_HPP

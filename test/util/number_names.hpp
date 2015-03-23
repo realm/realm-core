@@ -23,7 +23,7 @@
 #include <cstddef>
 #include <string>
 
-namespace tightdb {
+namespace realm {
 namespace test_util {
 
 std::string number_name(std::size_t n);
@@ -59,6 +59,6 @@ std::string number_name(std::size_t n)
 
 
 } // namespace test_util
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_TEST_UTIL_NUMBER_NAMES_HPP

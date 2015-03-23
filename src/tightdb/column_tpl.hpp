@@ -28,7 +28,7 @@
 #include <tightdb/column.hpp>
 #include <tightdb/column_fwd.hpp>
 
-namespace tightdb {
+namespace realm {
 
 template<class T, class cond> class FloatDoubleNode;
 template<class T, class cond> class IntegerNode;
@@ -99,6 +99,6 @@ template <class T, class R, Action action, class condition>
 }
 
 
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_COLUMN_TPL_HPP

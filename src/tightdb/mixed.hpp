@@ -33,7 +33,7 @@
 #include <tightdb/string_data.hpp>
 #include <tightdb/binary_data.hpp>
 
-namespace tightdb {
+namespace realm {
 
 
 /// This class represents a polymorphic TightDB value.
@@ -588,6 +588,6 @@ inline bool operator!=(DateTime a, Wrap<Mixed> b) REALM_NOEXCEPT
 }
 
 
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_MIXED_HPP

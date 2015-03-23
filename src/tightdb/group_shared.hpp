@@ -28,7 +28,7 @@
 #include <tightdb/group.hpp>
 //#include <tightdb/commit_log.hpp>
 
-namespace tightdb {
+namespace realm {
 
 namespace _impl {
 class WriteLogCollector;
@@ -620,6 +620,6 @@ inline SharedGroup::SharedGroup(Replication& repl, DurabilityLevel dlevel, const
 }
 #endif
 
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_GROUP_SHARED_HPP

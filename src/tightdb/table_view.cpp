@@ -8,7 +8,7 @@
 #include <tightdb/index_string.hpp>
 
 using namespace std;
-using namespace tightdb;
+using namespace realm;
 
 // Searching
 

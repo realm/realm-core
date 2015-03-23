@@ -35,7 +35,7 @@ typedef uint_fast64_t version_type;
 using namespace util;
 using namespace std;
 
-namespace tightdb {
+namespace realm {
 
 namespace _impl {
 
@@ -735,6 +735,6 @@ Replication* makeWriteLogCollector(string database_name,
 }
 
 
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_ENABLE_REPLICATION

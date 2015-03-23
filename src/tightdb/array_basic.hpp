@@ -22,7 +22,7 @@
 
 #include <tightdb/array.hpp>
 
-namespace tightdb {
+namespace realm {
 
 /// A BasicArray can currently only be used for simple unstructured
 /// types like float, double.
@@ -104,7 +104,7 @@ private:
 typedef BasicArray<float> ArrayFloat;
 typedef BasicArray<double> ArrayDouble;
 
-} // namespace tightdb
+} // namespace realm
 
 #include <tightdb/array_basic_tpl.hpp>
 

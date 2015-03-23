@@ -2,7 +2,7 @@
 
 #include <vector>
 
-using namespace tightdb;
+using namespace realm;
 
 // Find max and min value, but break search if difference exceeds 'maxdiff' (in which case *min and *max is set to 0)
 // Useful for counting-sort functions

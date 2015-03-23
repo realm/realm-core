@@ -21,7 +21,7 @@
 #include <tightdb/group_shared.hpp>
 
 using namespace std;
-using namespace tightdb;
+using namespace realm;
 
 
 // which databases are possible

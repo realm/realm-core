@@ -412,7 +412,7 @@ CATEGORIES:
                  The value to search for.
       RETURN:
         TYPES  : size_t
-        DESCR  : "The row index or <code>tightdb::not_found</code> (equal to <code>size_t(-1)</code>) if there is no match."
+        DESCR  : "The row index or <code>realm::not_found</code> (equal to <code>size_t(-1)</code>) if there is no match."
       EXAMPLES:
       - CODE   : ex_cpp_typed_table_lookup
         DESCR  :
@@ -444,7 +444,7 @@ CATEGORIES:
                  The value.
       RETURN:
         TYPES  : size_t
-        DESCR  : "The row index or <code>tightdb::not_found</code> (equal to <code>size_t(-1)</code>) if there is no match."
+        DESCR  : "The row index or <code>realm::not_found</code> (equal to <code>size_t(-1)</code>) if there is no match."
       EXAMPLES:
       - CODE   : ex_cpp_typed_table_find_first_xxx
         DESCR  :

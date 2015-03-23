@@ -1,6 +1,6 @@
 #include <tightdb.hpp>
 
-using namespace tightdb;
+using namespace realm;
 using namespace std;
 
 REALM_TABLE_3(People,

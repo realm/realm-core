@@ -1,6 +1,6 @@
 #include <tightdb/views.hpp>
 
-using namespace tightdb;
+using namespace realm;
 
 // Sort according to one column
 void RowIndexes::sort(size_t column, bool ascending)

@@ -23,7 +23,7 @@
 #include "column_link.hpp"
 
 using namespace std;
-using namespace tightdb;
+using namespace realm;
 
 
 void ColumnLink::remove_backlinks(size_t row_ndx)

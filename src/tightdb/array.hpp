@@ -69,7 +69,7 @@ Searching: The main finding function is:
 #  include <tightdb/tightdb_nmmintrin.h> // SSE42
 #endif
 
-namespace tightdb {
+namespace realm {
 
 enum Action {act_ReturnFirst, act_Sum, act_Max, act_Min, act_Count, act_FindAll, act_CallIdx, act_CallbackIdx,
              act_CallbackVal, act_CallbackNone, act_CallbackBoth};
@@ -81,7 +81,7 @@ template<class T> inline T no0(T v) { return v == 0 ? 1 : v; }
 /// found'. It is similar in function to std::string::npos.
 const std::size_t npos = std::size_t(-1);
 
-/// Alias for tightdb::npos.
+/// Alias for realm::npos.
 const std::size_t not_found = npos;
 
  /* wid == 16/32 likely when accessing offsets in B tree */
@@ -3215,6 +3215,6 @@ template<class cond> size_t Array::find_first(int64_t value, size_t start, size_
 //*************************************************************************************
 
 
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_ARRAY_HPP

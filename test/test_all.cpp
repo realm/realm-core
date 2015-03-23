@@ -28,10 +28,10 @@
 #include "test.hpp"
 
 using namespace std;
-using namespace tightdb;
-using namespace tightdb::util;
-using namespace tightdb::test_util;
-using namespace tightdb::test_util::unit_test;
+using namespace realm;
+using namespace realm::util;
+using namespace realm::test_util;
+using namespace realm::test_util::unit_test;
 
 
 namespace {
@@ -153,10 +153,10 @@ void display_build_config()
     const char* compiler_avx = "No";
 #endif
 
-    const char* cpu_sse = tightdb::sseavx<42>() ? "4.2" :
-        (tightdb::sseavx<30>() ? "3.0" : "None");
+    const char* cpu_sse = realm::sseavx<42>() ? "4.2" :
+        (realm::sseavx<30>() ? "3.0" : "None");
 
-    const char* cpu_avx = tightdb::sseavx<1>() ? "Yes" : "No";
+    const char* cpu_avx = realm::sseavx<1>() ? "Yes" : "No";
 
     cout <<
         "\n"

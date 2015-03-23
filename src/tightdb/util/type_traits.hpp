@@ -34,7 +34,7 @@
 #include <tightdb/util/meta.hpp>
 #include <tightdb/util/type_list.hpp>
 
-namespace tightdb {
+namespace realm {
 namespace util {
 
 template<class T, class F, bool b> struct EitherType;
@@ -335,6 +335,6 @@ public:
 
 
 } // namespace util
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_UTIL_TYPE_TRAITS_HPP

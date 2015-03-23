@@ -34,7 +34,7 @@
 #endif
 
 
-namespace tightdb {
+namespace realm {
 namespace util {
 
 /// A generic intrusive smart pointer that binds itself explicitely to
@@ -315,6 +315,6 @@ template<class T, class U> bool operator>=(T* a, const bind_ptr<U>& b) REALM_NOE
 
 
 } // namespace util
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_UTIL_BIND_PTR_HPP

@@ -28,7 +28,7 @@
 #include <tightdb/util/file.hpp>
 #include <tightdb/alloc.hpp>
 
-namespace tightdb {
+namespace realm {
 
 
 // Pre-declarations
@@ -440,6 +440,6 @@ inline bool SlabAlloc::ref_less_than_slab_ref_end(ref_type ref, const Slab& slab
     return ref < slab.ref_end;
 }
 
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_ALLOC_SLAB_HPP

@@ -1,7 +1,7 @@
 #include <tightdb.hpp>
 #include <tightdb/util/file.hpp>
 
-using namespace tightdb;
+using namespace realm;
 
 REALM_TABLE_1(TestTable,
                 value, Int)

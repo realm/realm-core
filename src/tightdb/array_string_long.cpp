@@ -9,7 +9,7 @@
 #include <tightdb/column.hpp>
 
 using namespace std;
-using namespace tightdb;
+using namespace realm;
 
 
 void ArrayStringLong::init_from_mem(MemRef mem) REALM_NOEXCEPT

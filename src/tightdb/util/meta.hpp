@@ -20,7 +20,7 @@
 #ifndef REALM_UTIL_META_HPP
 #define REALM_UTIL_META_HPP
 
-namespace tightdb {
+namespace realm {
 namespace util {
 
 
@@ -39,6 +39,6 @@ template<class T> struct EitherTypeIs<T,T,T> { static const bool value = true; }
 
 
 } // namespace util
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_UTIL_META_HPP

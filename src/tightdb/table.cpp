@@ -187,7 +187,7 @@
 ///    underlying table is equal to the number of entries in `Table::m_cols`.
 ///
 ///  - Each entry in `Table::m_cols` is either null, or points to a column
-///    accessor whose type agrees with the data type (tightdb::DataType) of the
+///    accessor whose type agrees with the data type (realm::DataType) of the
 ///    corresponding underlying column (at same index).
 ///
 ///  - If a column accessor is of type `ColumnStringEnum`, then the
@@ -244,8 +244,8 @@
 
 
 using namespace std;
-using namespace tightdb;
-using namespace tightdb::util;
+using namespace realm;
+using namespace realm::util;
 
 
 // fixme, we need to gather all these typetraits definitions to just 1 single
@@ -868,7 +868,7 @@ void Table::insert_backlink_column(size_t origin_table_ndx, size_t origin_col_nd
 void Table::erase_backlink_column(size_t origin_table_ndx, size_t origin_col_ndx)
 {
     size_t backlink_col_ndx = m_spec.find_backlink_column(origin_table_ndx, origin_col_ndx);
-    REALM_ASSERT_3(backlink_col_ndx, !=, tightdb::not_found);
+    REALM_ASSERT_3(backlink_col_ndx, !=, realm::not_found);
     do_erase_root_column(backlink_col_ndx); // Throws
     adj_erase_column(backlink_col_ndx);
     refresh_column_accessors(backlink_col_ndx); // Throws
@@ -1939,7 +1939,7 @@ void Table::move_last_over(size_t row_ndx)
     REALM_ASSERT_3(row_ndx, <, m_size);
 
     size_t table_ndx = get_index_in_group();
-    if (table_ndx == tightdb::npos) {
+    if (table_ndx == realm::npos) {
 #ifdef REALM_ENABLE_REPLICATION
         if (Replication* repl = get_repl()) {
             bool move_last_over = true;
@@ -1992,7 +1992,7 @@ void Table::clear()
 #endif
 
     size_t table_ndx = get_index_in_group();
-    if (table_ndx == tightdb::npos) {
+    if (table_ndx == realm::npos) {
         bool broken_reciprocal_backlinks = false;
         do_clear(broken_reciprocal_backlinks);
         return;
@@ -2235,7 +2235,7 @@ size_t Table::get_parent_row_index() const REALM_NOEXCEPT
     if (!parent)
         return npos; // Free-standing table
     if (parent->get_parent_group())
-        return tightdb::npos; // Group-level table
+        return realm::npos; // Group-level table
     size_t index_in_parent = real_top.get_ndx_in_parent();
     return index_in_parent;
 }
@@ -2260,12 +2260,12 @@ size_t Table::get_index_in_group() const REALM_NOEXCEPT
 {
     REALM_ASSERT(is_attached());
     if (!m_top.is_attached())
-        return tightdb::npos; // Subtable with shared descriptor
+        return realm::npos; // Subtable with shared descriptor
     Parent* parent = static_cast<Parent*>(m_top.get_parent()); // ArrayParent guaranteed to be Table::Parent
     if (!parent)
-        return tightdb::npos; // Free-standing table
+        return realm::npos; // Free-standing table
     if (!parent->get_parent_group())
-        return tightdb::npos; // Subtable with independent descriptor
+        return realm::npos; // Subtable with independent descriptor
     size_t index_in_parent = m_top.get_ndx_in_parent();
     return index_in_parent;
 }
@@ -2732,7 +2732,7 @@ void Table::set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx)
 #endif
 
     size_t old_target_row_ndx = do_set_link(col_ndx, row_ndx, target_row_ndx); // Throws
-    if (old_target_row_ndx == tightdb::npos)
+    if (old_target_row_ndx == realm::npos)
         return;
 
     ColumnLink& col = get_column_link(col_ndx);

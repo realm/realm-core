@@ -28,7 +28,7 @@
 #include <tightdb/group.hpp>
 #include <tightdb/group_shared.hpp>
 
-namespace tightdb {
+namespace realm {
 
 
 /// These functions are only to be used by language bindings to gain
@@ -319,6 +319,6 @@ inline void LangBindHelper::rollback_and_continue_as_read(SharedGroup& sg)
 
 #endif
 
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_LANG_BIND_HELPER_HPP

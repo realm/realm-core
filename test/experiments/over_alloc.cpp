@@ -3,7 +3,7 @@
 #include <tightdb/group_shared.hpp>
 #include <tightdb/util/file.hpp>
 
-using namespace tightdb;
+using namespace realm;
 using namespace std;
 
 namespace {

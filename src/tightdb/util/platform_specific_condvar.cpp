@@ -25,8 +25,8 @@
 
 
 using namespace std;
-using namespace tightdb;
-using namespace tightdb::util;
+using namespace realm;
+using namespace realm::util;
 
 string PlatformSpecificCondVar::internal_naming_prefix = "/RealmsBigFriendlySemaphore";
 

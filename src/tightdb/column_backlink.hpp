@@ -26,7 +26,7 @@
 #include <tightdb/column_linkbase.hpp>
 #include <tightdb/table.hpp>
 
-namespace tightdb {
+namespace realm {
 
 /// A column of backlinks (ColumnBackLink) is a single B+-tree, and the root of
 /// the column is the root of the B+-tree. All leaf nodes are single arrays of
@@ -202,6 +202,6 @@ inline bool ColumnBackLink::VerifyPair::operator<(const VerifyPair& p) const REA
 
 #endif // REALM_DEBUG
 
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_COLUMN_BACKLINK_HPP

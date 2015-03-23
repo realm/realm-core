@@ -36,7 +36,7 @@
 #include <tightdb/group.hpp>
 #include <tightdb/descriptor.hpp>
 
-namespace tightdb {
+namespace realm {
 namespace _impl {
 
 /// Transaction log instruction encoding
@@ -940,7 +940,7 @@ inline void TransactLogConvenientEncoder::set_mixed(const Table* t, std::size_t 
 
 inline bool TransactLogEncoder::set_link(std::size_t col_ndx, std::size_t ndx, std::size_t value)
 {
-    // Map `tightdb::npos` to zero, and `n` to `n+1`, where `n` is a target row
+    // Map `realm::npos` to zero, and `n` to `n+1`, where `n` is a target row
     // index.
     std::size_t value_2 = std::size_t(1) + value;
     simple_cmd(instr_SetLink, util::tuple(col_ndx, ndx, value_2));

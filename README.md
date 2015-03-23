@@ -237,7 +237,7 @@ These are the available variables:
  - `UNITTEST_FILTER` can be used to exclude one or more tests from a
    particular run. For more information about the syntax, see the
    documentation of
-   `tightdb::test_util::unit_test::create_wildcard_filter()` in
+   `realm::test_util::unit_test::create_wildcard_filter()` in
    `test/util/unit_test.hpp`.
 
  - Set `UNITTEST_PROGRESS` to a non-empty value to enable reporting of
@@ -265,7 +265,7 @@ These are the available variables:
 
  - Set `UNITTEST_XML` to a non-empty value to dump the test results to
    an XML file. For details, see
-   `tightdb::test_util::unit_test::create_xml_reporter()` in
+   `realm::test_util::unit_test::create_xml_reporter()` in
    `test/util/unit_test.hpp`.
 
 Memory debugging:

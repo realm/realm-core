@@ -41,7 +41,7 @@
 #  include <atomic>
 #endif
 
-namespace tightdb {
+namespace realm {
 namespace util {
 
 
@@ -984,6 +984,6 @@ inline T Atomic<T>::exchange_acquire(T newvalue)
 #endif
 
 } // namespace util
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_UTIL_THREAD_HPP

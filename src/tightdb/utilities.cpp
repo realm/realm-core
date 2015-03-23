@@ -39,7 +39,7 @@ inline unsigned long long _xgetbv(unsigned index)
 } // anonymous namespace
 
 
-namespace tightdb {
+namespace realm {
 
 signed char sse_support = -1;
 signed char avx_support = -1;
@@ -201,7 +201,7 @@ void checksum_rolling(unsigned char* data, size_t len, checksum_t* t)
     t->result = t->a_val + t->b_val;
 }
 
-} // namespace tightdb
+} // namespace realm
 
 
 // popcount, counts number of set (1) bits in argument. Intrinsics has been disabled because it's just 10-20% faster
@@ -211,7 +211,7 @@ void checksum_rolling(unsigned char* data, size_t len, checksum_t* t)
 #if 0 // defined(_MSC_VER) && _MSC_VER >= 1500
 #  include <intrin.h>
 
-namespace tightdb {
+namespace realm {
 
 int fast_popcount32(int32_t x)
 {
@@ -229,12 +229,12 @@ int fast_popcount64(int64_t x)
 }
 #  endif
 
-} // namespace tightdb
+} // namespace realm
 
 #elif 0 // defined(__GNUC__) && __GNUC__ >= 4 || defined(__INTEL_COMPILER) && __INTEL_COMPILER >= 900
 #  define fast_popcount32 __builtin_popcount
 
-namespace tightdb {
+namespace realm {
 
 #  if ULONG_MAX == 0xffffffff
 int fast_popcount64(int64_t x)
@@ -248,7 +248,7 @@ int fast_popcount64(int64_t x)
 }
 #  endif
 
-} // namespace tightdb
+} // namespace realm
 
 #else
 
@@ -260,7 +260,7 @@ const char a_popcount_bits[256] = {
 
 } // anonymous namespace
 
-namespace tightdb {
+namespace realm {
 
 // Masking away bits might be faster than bit shifting (which can be slow). Note that the compiler may optimize this automatically. Todo, investigate.
 int fast_popcount32(int32_t x)
@@ -272,6 +272,6 @@ int fast_popcount64(int64_t x)
     return fast_popcount32(static_cast<int32_t>(x)) + fast_popcount32(static_cast<int32_t>(x >> 32));
 }
 
-} // namespace tightdb
+} // namespace realm
 
 #endif // select best popcount implementations

@@ -6,7 +6,7 @@
 #endif
 
 using namespace std;
-using namespace tightdb;
+using namespace realm;
 
 
 Spec::~Spec() REALM_NOEXCEPT

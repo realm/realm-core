@@ -28,7 +28,7 @@
 
 #include <tightdb/query_engine.hpp>
 
-namespace tightdb {
+namespace realm {
 
 
 /// A convenience base class for Spec classes that are to be used with
@@ -42,12 +42,12 @@ namespace tightdb {
 struct SpecBase {
     typedef int64_t             Int;
     typedef bool                Bool;
-    typedef tightdb::DateTime   DateTime;
+    typedef realm::DateTime   DateTime;
     typedef float               Float;
     typedef double              Double;
-    typedef tightdb::StringData String;
-    typedef tightdb::BinaryData Binary;
-    typedef tightdb::Mixed      Mixed;
+    typedef realm::StringData String;
+    typedef realm::BinaryData Binary;
+    typedef realm::Mixed      Mixed;
 
     template<class E> class Enum {
     public:
@@ -106,8 +106,8 @@ struct SpecBase {
     /// \code{.cpp}
     ///
     ///   struct MyTableSpec: SpecBase {
-    ///     typedef tightdb::TypeAppend<void, int>::type Columns1;
-    ///     typedef tightdb::TypeAppend<Columns1, bool>::type Columns;
+    ///     typedef realm::TypeAppend<void, int>::type Columns1;
+    ///     typedef realm::TypeAppend<Columns1, bool>::type Columns;
     ///
     ///     struct ConvenienceMethods {
     ///       void add(int foo, bool bar)

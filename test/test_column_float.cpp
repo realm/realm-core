@@ -7,7 +7,7 @@
 
 #include "test.hpp"
 
-using namespace tightdb;
+using namespace realm;
 using test_util::unit_test::TestResults;
 
 

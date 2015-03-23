@@ -48,8 +48,8 @@
 
 
 using namespace std;
-using namespace tightdb;
-using namespace tightdb::util;
+using namespace realm;
+using namespace realm::util;
 
 
 namespace {

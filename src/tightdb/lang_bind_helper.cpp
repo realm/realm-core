@@ -2,7 +2,7 @@
 #include <tightdb/lang_bind_helper.hpp>
 
 using namespace std;
-using namespace tightdb;
+using namespace realm;
 
 
 Table* LangBindHelper::get_subtable_ptr_during_insert(Table* t, size_t col_ndx, size_t row_ndx)

@@ -38,7 +38,7 @@
 #include <tightdb/query.hpp>
 #include <tightdb/column.hpp>
 
-namespace tightdb {
+namespace realm {
 
 class TableView;
 class LinkView;
@@ -507,7 +507,7 @@ public:
     /// the parent, and get_parent_row_index() returns the index of the row in
     /// which the subtable resides. In all other cases (free-standing and
     /// group-level tables), get_parent_table() returns null and
-    /// get_parent_row_index() returns tightdb::npos.
+    /// get_parent_row_index() returns realm::npos.
     ///
     /// If this accessor is attached to a subtable, and \a column_ndx_out is
     /// specified, then `*column_ndx_out` is set to the index of the column of
@@ -527,7 +527,7 @@ public:
     bool is_group_level() const REALM_NOEXCEPT;
 
     /// If this table is a group-level table, then this function returns the
-    /// index of this table within the group. Otherwise it returns tightdb::npos.
+    /// index of this table within the group. Otherwise it returns realm::npos.
     std::size_t get_index_in_group() const REALM_NOEXCEPT;
 
     // Aggregate functions
@@ -1705,7 +1705,7 @@ inline void Table::insert_subtable(std::size_t col_ndx, std::size_t row_ndx)
 
 inline bool Table::is_null_link(std::size_t col_ndx, std::size_t row_ndx) const REALM_NOEXCEPT
 {
-    return get_link(col_ndx, row_ndx) == tightdb::npos;
+    return get_link(col_ndx, row_ndx) == realm::npos;
 }
 
 inline ConstTableRef Table::get_link_target(std::size_t col_ndx) const REALM_NOEXCEPT
@@ -1721,7 +1721,7 @@ inline void Table::set_enum(std::size_t column_ndx, std::size_t row_ndx, E value
 
 inline void Table::nullify_link(std::size_t col_ndx, std::size_t row_ndx)
 {
-    set_link(col_ndx, row_ndx, tightdb::npos);
+    set_link(col_ndx, row_ndx, realm::npos);
 }
 
 inline TableRef Table::get_subtable(std::size_t column_ndx, std::size_t row_ndx)
@@ -1753,7 +1753,7 @@ inline Table::RowExpr Table::find_pkey_int(int_fast64_t value)
 {
     Table* table = 0;
     std::size_t row_ndx = do_find_pkey_int(value); // Throws
-    if (row_ndx != tightdb::not_found)
+    if (row_ndx != realm::not_found)
         table = this;
     return RowExpr(table, row_ndx);
 }
@@ -1762,7 +1762,7 @@ inline Table::ConstRowExpr Table::find_pkey_int(int_fast64_t value) const
 {
     const Table* table = 0;
     std::size_t row_ndx = do_find_pkey_int(value); // Throws
-    if (row_ndx != tightdb::not_found)
+    if (row_ndx != realm::not_found)
         table = this;
     return ConstRowExpr(table, row_ndx);
 }
@@ -1771,7 +1771,7 @@ inline Table::RowExpr Table::find_pkey_string(StringData value)
 {
     Table* table = 0;
     std::size_t row_ndx = do_find_pkey_string(value); // Throws
-    if (row_ndx != tightdb::not_found)
+    if (row_ndx != realm::not_found)
         table = this;
     return RowExpr(table, row_ndx);
 }
@@ -1780,7 +1780,7 @@ inline Table::ConstRowExpr Table::find_pkey_string(StringData value) const
 {
     const Table* table = 0;
     std::size_t row_ndx = do_find_pkey_string(value); // Throws
-    if (row_ndx != tightdb::not_found)
+    if (row_ndx != realm::not_found)
         table = this;
     return ConstRowExpr(table, row_ndx);
 }
@@ -2236,6 +2236,6 @@ public:
 };
 
 
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_TABLE_HPP

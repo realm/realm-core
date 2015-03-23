@@ -30,7 +30,7 @@
 #include <tightdb/utilities.hpp>
 
 
-namespace tightdb {
+namespace realm {
 
 
 // Pre-declarations
@@ -237,7 +237,7 @@ public:
 };
 
 
-} // namespace tightdb
+} // namespace realm
 
 
 // Implementation

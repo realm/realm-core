@@ -26,7 +26,7 @@
 #include <tightdb/array_blobs_big.hpp>
 #include <tightdb/column.hpp>
 
-namespace tightdb {
+namespace realm {
 
 // Pre-declarations
 class StringIndex;
@@ -145,7 +145,7 @@ private:
     /// call the 4 argument version instead. If you are not appending, either
     /// one is fine.
     ///
-    /// \param row_ndx Must be `tightdb::npos` if appending.
+    /// \param row_ndx Must be `realm::npos` if appending.
     void do_insert(std::size_t row_ndx, StringData value, std::size_t num_rows);
 
     /// If you are appending and you do not have the size of the column readily
@@ -156,7 +156,7 @@ private:
     /// size of the column (before insertion).
     void do_insert(std::size_t row_ndx, StringData value, std::size_t num_rows, bool is_append);
 
-    /// \param row_ndx Must be `tightdb::npos` if appending.
+    /// \param row_ndx Must be `realm::npos` if appending.
     void bptree_insert(std::size_t row_ndx, StringData value, std::size_t num_rows);
 
     // Called by Array::bptree_insert().
@@ -219,7 +219,7 @@ inline std::size_t AdaptiveStringColumn::size() const REALM_NOEXCEPT
 
 inline void AdaptiveStringColumn::add(StringData value)
 {
-    std::size_t row_ndx = tightdb::npos;
+    std::size_t row_ndx = realm::npos;
     std::size_t num_rows = 1;
     do_insert(row_ndx, value, num_rows); // Throws
 }
@@ -340,6 +340,6 @@ inline void AdaptiveStringColumn::clear(std::size_t, bool)
     do_clear(); // Throws
 }
 
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_COLUMN_STRING_HPP

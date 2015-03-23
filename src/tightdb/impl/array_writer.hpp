@@ -21,7 +21,7 @@
 #ifndef REALM_ARRAY_WRITER_HPP
 #define REALM_ARRAY_WRITER_HPP
 
-namespace tightdb {
+namespace realm {
 namespace _impl {
 
 class ArrayWriterBase {
@@ -37,6 +37,6 @@ public:
 };
 
 } // namespace impl_
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_ARRAY_WRITER_HPP

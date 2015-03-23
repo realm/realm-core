@@ -23,7 +23,7 @@
 #include <tightdb/array_blob.hpp>
 #include <tightdb/array_integer.hpp>
 
-namespace tightdb {
+namespace realm {
 
 
 class ArrayStringLong: public Array {
@@ -200,6 +200,6 @@ inline std::size_t ArrayStringLong::get_size_from_header(const char* header,
 }
 
 
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_ARRAY_STRING_LONG_HPP

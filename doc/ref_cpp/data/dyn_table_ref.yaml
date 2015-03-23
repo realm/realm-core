@@ -751,7 +751,7 @@ CATEGORIES :
       RETURN:
         TYPES  : size_t
         DESCR  : &g_dyn_table_lookup_return_descr
-                 "The row index or <code>tightdb::not_found</code> (equal to <code>size_t(-1)</code>) if there is no match."
+                 "The row index or <code>realm::not_found</code> (equal to <code>size_t(-1)</code>) if there is no match."
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_lookup
         DESCR  :

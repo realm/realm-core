@@ -15,9 +15,9 @@
 #include "test.hpp"
 
 using namespace std;
-using namespace tightdb;
+using namespace realm;
 using namespace test_util;
-using namespace tightdb::util;
+using namespace realm::util;
 
 TEST(LinkList_Basic1)
 {

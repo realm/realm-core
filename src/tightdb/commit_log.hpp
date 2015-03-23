@@ -28,7 +28,7 @@
 #include <tightdb/binary_data.hpp>
 #include <tightdb/lang_bind_helper.hpp>
 
-namespace tightdb {
+namespace realm {
 
 class CommitLog;
 
@@ -49,7 +49,7 @@ Replication* makeWriteLogCollector(std::string filepath,
                                    bool server_synchronization_mode = false,
                                    const char* encryption_key = 0);
 
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_ENABLE_REPLICATION
 #endif // REALM_COMMIT_LOG_HPP

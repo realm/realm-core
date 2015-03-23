@@ -49,7 +49,7 @@ typedef struct SHA256state_st {
 #error Encryption is not yet implemented for this platform.
 #endif
 
-namespace tightdb {
+namespace realm {
 namespace util {
 
 size_t page_size();
@@ -181,7 +181,7 @@ private:
 
 #endif // REALM_ENABLE_ENCRYPTION
 
-namespace tightdb {
+namespace realm {
 namespace util {
 
 /// Thrown by EncryptedFileMapping if a file opened is non-empty and does not

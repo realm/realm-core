@@ -29,7 +29,7 @@
 
 #include <tightdb/impl/array_writer.hpp>
 
-namespace tightdb {
+namespace realm {
 namespace _impl {
 
 
@@ -71,6 +71,6 @@ inline std::size_t OutputStream::get_pos() const REALM_NOEXCEPT
 
 
 } // namespace _impl
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_IMPL_OUTPUT_STREAM_HPP

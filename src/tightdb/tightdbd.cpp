@@ -4,7 +4,7 @@
 #include <unistd.h>
 #include <iostream>
 
-using namespace tightdb;
+using namespace realm;
 using namespace std;
 
 int main(int argc, char* argv[])

@@ -4,7 +4,7 @@
 #include <tightdb.hpp>
 
 using namespace std;
-using namespace tightdb;
+using namespace realm;
 
 void fill_in_data(SharedGroup&)
 {

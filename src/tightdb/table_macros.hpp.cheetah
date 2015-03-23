@@ -51,9 +51,9 @@ directiveStartToken = %
 , name${j+1}, type${j+1}%slurp
 %end for
 ) \
-struct Table##Spec: ::tightdb::SpecBase { \
+struct Table##Spec: ::realm::SpecBase { \
 %for $j in range($num_cols)
-    typedef ::tightdb::util::TypeAppend< %slurp
+    typedef ::realm::util::TypeAppend< %slurp
 %if $j == 0
 void,     %slurp
 %else
@@ -81,10 +81,10 @@ name${j+1}%slurp
  {} \
     }; \
  \
-    static void dyn_col_names(tightdb::StringData* names) REALM_NOEXCEPT \
+    static void dyn_col_names(realm::StringData* names) REALM_NOEXCEPT \
     { \
 %for $j in range($num_cols)
-        names[$j] = tightdb::StringData(#name${j+1}, sizeof #name${j+1} - 1); \
+        names[$j] = realm::StringData(#name${j+1}, sizeof #name${j+1} - 1); \
 %end for
     } \
  \
@@ -98,9 +98,9 @@ type${j+1} name${j+1}%slurp
 %end for
 ) \
         { \
-            ::tightdb::BasicTable<Table##Spec>* const _tightdb_t = \
-                static_cast< ::tightdb::BasicTable<Table##Spec>* >(this); \
-            _tightdb_t->add((::tightdb::util::tuple()%slurp
+            ::realm::BasicTable<Table##Spec>* const _tightdb_t = \
+                static_cast< ::realm::BasicTable<Table##Spec>* >(this); \
+            _tightdb_t->add((::realm::util::tuple()%slurp
 %for $j in range($num_cols)
 , name${j+1}%slurp
 %end for
@@ -112,9 +112,9 @@ type${j+1} name${j+1}%slurp
 %end for
 ) \
         { \
-            ::tightdb::BasicTable<Table##Spec>* const _tightdb_t = \
-                static_cast< ::tightdb::BasicTable<Table##Spec>* >(this); \
-            _tightdb_t->insert(_tightdb_i, (::tightdb::util::tuple()%slurp
+            ::realm::BasicTable<Table##Spec>* const _tightdb_t = \
+                static_cast< ::realm::BasicTable<Table##Spec>* >(this); \
+            _tightdb_t->insert(_tightdb_i, (::realm::util::tuple()%slurp
 %for $j in range($num_cols)
 , name${j+1}%slurp
 %end for
@@ -126,9 +126,9 @@ type${j+1} name${j+1}%slurp
 %end for
 ) \
         { \
-            ::tightdb::BasicTable<Table##Spec>* const _tightdb_t = \
-                static_cast< ::tightdb::BasicTable<Table##Spec>* >(this); \
-            _tightdb_t->set(_tightdb_i, (::tightdb::util::tuple()%slurp
+            ::realm::BasicTable<Table##Spec>* const _tightdb_t = \
+                static_cast< ::realm::BasicTable<Table##Spec>* >(this); \
+            _tightdb_t->set(_tightdb_i, (::realm::util::tuple()%slurp
 %for $j in range($num_cols)
 , name${j+1}%slurp
 %end for
@@ -136,7 +136,7 @@ type${j+1} name${j+1}%slurp
         } \
     }; \
 }; \
-typedef ::tightdb::BasicTable<Table##Spec> Table;
+typedef ::realm::BasicTable<Table##Spec> Table;
 
 
 %end for

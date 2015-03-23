@@ -103,7 +103,7 @@ DWORD calculate_ws_private(DWORD process_id)
 #endif // _WIN32
 
 
-namespace tightdb {
+namespace realm {
 namespace test_util {
 
 
@@ -145,4 +145,4 @@ size_t get_mem_usage()
 }
 
 } // namespace test_util
-} // namespace tightdb
+} // namespace realm

@@ -30,7 +30,7 @@
 #include <tightdb/util/safe_int_ops.hpp>
 #include <tightdb/util/unique_ptr.hpp>
 
-namespace tightdb {
+namespace realm {
 namespace util {
 
 
@@ -233,6 +233,6 @@ template<class T> inline void AppendBuffer<T>::clear() REALM_NOEXCEPT
 
 
 } // namespace util
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_UTIL_BUFFER_HPP

@@ -25,7 +25,7 @@
 
 #include <tightdb/util/bind_ptr.hpp>
 
-namespace tightdb {
+namespace realm {
 
 
 class Table;
@@ -444,6 +444,6 @@ template<class T, class U> bool operator>=(T* a, const BasicTableRef<U>& b) REAL
 }
 
 
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_TABLE_REF_HPP

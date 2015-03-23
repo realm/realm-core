@@ -28,7 +28,7 @@
 #include <tightdb/util/tuple.hpp>
 #include <tightdb/util/thread.hpp>
 
-namespace tightdb {
+namespace realm {
 namespace util {
 
 
@@ -211,6 +211,6 @@ protected:
 
 
 } // namespace util
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_UTIL_LOGGER_HPP

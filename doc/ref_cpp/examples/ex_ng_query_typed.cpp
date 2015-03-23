@@ -8,7 +8,7 @@ REALM_TABLE_3(Books,
                 author, String,
                 pages, Int)
 
-using namespace tightdb;
+using namespace realm;
 
 int main()
 {

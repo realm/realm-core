@@ -38,7 +38,7 @@ void please_report_this_error_to_help_at_realm_dot_io() {
     std::abort();
 }
 
-namespace tightdb {
+namespace realm {
 namespace util {
 
 #ifdef __APPLE__
@@ -78,4 +78,4 @@ REALM_NORETURN void terminate_internal(std::stringstream& ss) REALM_NOEXCEPT
 
 
 } // namespace util
-} // namespace tightdb
+} // namespace realm

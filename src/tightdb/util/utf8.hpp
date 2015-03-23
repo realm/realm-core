@@ -28,7 +28,7 @@
 #include <tightdb/util/features.h>
 #include <tightdb/utilities.hpp>
 
-namespace tightdb {
+namespace realm {
 namespace util {
 
 
@@ -392,6 +392,6 @@ inline std::size_t Utf8x16<Char16, Traits16>::find_utf8_buf_size(const Char16*& 
     return num_out;
 }
 } // namespace util
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_UTIL_UTF8_HPP

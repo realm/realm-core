@@ -126,7 +126,7 @@ typedef double __m256d __attribute__ ((__vector_size__ (32),
 
 */
 
-namespace tightdb {
+namespace realm {
 
 // Number of matches to find in best condition loop before breaking out to probe other conditions. Too low value gives too many
 // constant time overheads everywhere in the query engine. Too high value makes it adapt less rapidly to changes in match
@@ -647,7 +647,7 @@ public:
 
 };
 
-// IntegerNode is for conditions for types stored as integers in a tightdb::Array (int, date, bool).
+// IntegerNode is for conditions for types stored as integers in a realm::Array (int, date, bool).
 //
 // We don't yet have any integer indexes (only for strings), but when we get one, we should specialize it
 // like: template <class TConditionValue, class Equal> class IntegerNode: public ParentNode
@@ -1766,7 +1766,7 @@ public:
 
     size_t find_first_local(size_t start, size_t end) REALM_OVERRIDE
     {
-        size_t ret = tightdb::npos; // superfluous init, but gives warnings otherwise
+        size_t ret = realm::npos; // superfluous init, but gives warnings otherwise
         DataType type = m_table->get_column_type(m_origin_column);
 
         if (type == type_Link) {
@@ -1801,6 +1801,6 @@ public:
 };
 
 
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_QUERY_ENGINE_HPP

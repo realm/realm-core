@@ -30,9 +30,9 @@
 #include "crypt_key.hpp"
 
 using namespace std;
-using namespace tightdb;
-using namespace tightdb::util;
-using namespace tightdb::test_util;
+using namespace realm;
+using namespace realm::util;
+using namespace realm::test_util;
 using unit_test::TestResults;
 
 
@@ -2550,8 +2550,8 @@ TEST(Shared_MovingSearchIndex)
         wt.get_group().Verify();
         CHECK_EQUAL(0, table->get_descriptor()->get_num_unique_values(1));
         CHECK_EQUAL(3, table->get_descriptor()->get_num_unique_values(2));
-        CHECK_EQUAL(tightdb::not_found, table->find_first_string(1, "bad"));
-        CHECK_EQUAL(tightdb::not_found, table->find_first_string(2, "bad"));
+        CHECK_EQUAL(realm::not_found, table->find_first_string(1, "bad"));
+        CHECK_EQUAL(realm::not_found, table->find_first_string(2, "bad"));
         CHECK_EQUAL(0,  table->find_first_string(1, "foo_X"));
         CHECK_EQUAL(31, table->find_first_string(1, "foo31"));
         CHECK_EQUAL(61, table->find_first_string(1, "foo61"));
@@ -2569,8 +2569,8 @@ TEST(Shared_MovingSearchIndex)
         CHECK(table->has_search_index(1) && table->has_search_index(2));
         CHECK_EQUAL(0, table->get_descriptor()->get_num_unique_values(1));
         CHECK_EQUAL(3, table->get_descriptor()->get_num_unique_values(2));
-        CHECK_EQUAL(tightdb::not_found, table->find_first_string(1, "bad"));
-        CHECK_EQUAL(tightdb::not_found, table->find_first_string(2, "bad"));
+        CHECK_EQUAL(realm::not_found, table->find_first_string(1, "bad"));
+        CHECK_EQUAL(realm::not_found, table->find_first_string(2, "bad"));
         CHECK_EQUAL(0,  table->find_first_string(1, "foo_X"));
         CHECK_EQUAL(31, table->find_first_string(1, "foo31"));
         CHECK_EQUAL(61, table->find_first_string(1, "foo61"));
@@ -2584,8 +2584,8 @@ TEST(Shared_MovingSearchIndex)
         CHECK(table->has_search_index(0) && table->has_search_index(1));
         CHECK_EQUAL(0, table->get_descriptor()->get_num_unique_values(0));
         CHECK_EQUAL(3, table->get_descriptor()->get_num_unique_values(1));
-        CHECK_EQUAL(tightdb::not_found, table->find_first_string(0, "bad"));
-        CHECK_EQUAL(tightdb::not_found, table->find_first_string(1, "bad"));
+        CHECK_EQUAL(realm::not_found, table->find_first_string(0, "bad"));
+        CHECK_EQUAL(realm::not_found, table->find_first_string(1, "bad"));
         CHECK_EQUAL(0,  table->find_first_string(0, "foo_X"));
         CHECK_EQUAL(31, table->find_first_string(0, "foo31"));
         CHECK_EQUAL(61, table->find_first_string(0, "foo61"));
@@ -2600,8 +2600,8 @@ TEST(Shared_MovingSearchIndex)
         CHECK(table->has_search_index(0) && table->has_search_index(1));
         CHECK_EQUAL(0, table->get_descriptor()->get_num_unique_values(0));
         CHECK_EQUAL(4, table->get_descriptor()->get_num_unique_values(1));
-        CHECK_EQUAL(tightdb::not_found, table->find_first_string(0, "bad"));
-        CHECK_EQUAL(tightdb::not_found, table->find_first_string(1, "bad"));
+        CHECK_EQUAL(realm::not_found, table->find_first_string(0, "bad"));
+        CHECK_EQUAL(realm::not_found, table->find_first_string(1, "bad"));
         CHECK_EQUAL(0,  table->find_first_string(0, "foo_X"));
         CHECK_EQUAL(1,  table->find_first_string(0, "foo_Y"));
         CHECK_EQUAL(31, table->find_first_string(0, "foo31"));

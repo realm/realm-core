@@ -28,7 +28,7 @@
 #include <tightdb/impl/array_writer.hpp>
 
 
-namespace tightdb {
+namespace realm {
 
 // Pre-declarations
 class Group;
@@ -128,6 +128,6 @@ inline void GroupWriter::set_versions(uint64_t current, uint64_t read_lock)
     m_readlock_version = read_lock;
 }
 
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_GROUP_WRITER_HPP

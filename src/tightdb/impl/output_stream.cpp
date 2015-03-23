@@ -5,9 +5,9 @@
 #include <tightdb/impl/output_stream.hpp>
 
 using namespace std;
-using namespace tightdb;
-using namespace tightdb::util;
-using namespace tightdb::_impl;
+using namespace realm;
+using namespace realm::util;
+using namespace realm::_impl;
 
 
 void OutputStream::write(const char* data, size_t size)

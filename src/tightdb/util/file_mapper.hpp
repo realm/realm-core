@@ -22,7 +22,7 @@
 
 #include <tightdb/util/file.hpp>
 
-namespace tightdb {
+namespace realm {
 namespace util {
 
 void *mmap(int fd, size_t size, File::AccessMode access, const char *encryption_key);

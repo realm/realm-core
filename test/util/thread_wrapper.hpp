@@ -27,7 +27,7 @@
 #include <tightdb/util/bind.hpp>
 #include <tightdb/util/thread.hpp>
 
-namespace tightdb {
+namespace realm {
 namespace test_util {
 
 
@@ -91,6 +91,6 @@ private:
 
 
 } // namespace test_util
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_TEST_UTIL_THREAD_WRAPPER_HPP

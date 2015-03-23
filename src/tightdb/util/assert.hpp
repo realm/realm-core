@@ -30,7 +30,7 @@
 
 #define REALM_ASSERT_RELEASE(condition) \
     ((condition) ? static_cast<void>(0) : \
-    tightdb::util::terminate(REALM_VER_CHUNK " Assertion failed: " #condition, __FILE__, __LINE__))
+    realm::util::terminate(REALM_VER_CHUNK " Assertion failed: " #condition, __FILE__, __LINE__))
 
 #if REALM_ASSERTIONS_ENABLED
 #  define REALM_ASSERT(condition) REALM_ASSERT_RELEASE(condition)
@@ -49,26 +49,26 @@
 #if defined(REALM_ENABLE_ASSERTIONS) || defined(REALM_DEBUG)
 #  define REALM_ASSERT_3(left, condition, right) \
     ((left condition right) ? static_cast<void>(0) : \
-        tightdb::util::terminate(REALM_VER_CHUNK " Assertion failed: " #left #condition #right, \
+        realm::util::terminate(REALM_VER_CHUNK " Assertion failed: " #left #condition #right, \
                                  __FILE__, __LINE__, left, right))
 #else
 #  define REALM_ASSERT_3(left, condition, right) static_cast<void>(0)
 #endif
 
 #define REALM_UNREACHABLE() \
-    tightdb::util::terminate(REALM_VER_CHUNK " Unreachable code", __FILE__, __LINE__)
+    realm::util::terminate(REALM_VER_CHUNK " Unreachable code", __FILE__, __LINE__)
 
 
 #ifdef REALM_HAVE_CXX11_STATIC_ASSERT
 #  define REALM_STATIC_ASSERT(condition, message) static_assert(condition, message)
 #else
 #  define REALM_STATIC_ASSERT(condition, message) typedef \
-    tightdb::util::static_assert_dummy<sizeof(tightdb::util:: \
+    realm::util::static_assert_dummy<sizeof(realm::util:: \
         REALM_STATIC_ASSERTION_FAILURE<bool(condition)>)> \
     REALM_JOIN(_tightdb_static_assert_, __LINE__) REALM_UNUSED
 #  define REALM_JOIN(x,y) REALM_JOIN2(x,y)
 #  define REALM_JOIN2(x,y) x ## y
-namespace tightdb {
+namespace realm {
 namespace util {
     template<bool> struct REALM_STATIC_ASSERTION_FAILURE;
     template<> struct REALM_STATIC_ASSERTION_FAILURE<true> {};

@@ -23,12 +23,12 @@
 #include <tightdb/util/bind_ptr.hpp>
 
 
-namespace tightdb {
+namespace realm {
 
 class Descriptor;
 typedef util::bind_ptr<Descriptor> DescriptorRef;
 typedef util::bind_ptr<const Descriptor> ConstDescriptorRef;
 
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_DESCRIPTOR_FWD_HPP

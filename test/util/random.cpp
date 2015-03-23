@@ -11,7 +11,7 @@
 
 using namespace std;
 
-namespace tightdb {
+namespace realm {
 namespace test_util {
 
 
@@ -45,4 +45,4 @@ GlobalRandom& GlobalRandom::get() REALM_NOEXCEPT
 
 
 } // namespace _impl
-} // namespace tightdb
+} // namespace realm

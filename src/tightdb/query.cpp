@@ -8,7 +8,7 @@
 #include <tightdb/query_engine.hpp>
 
 using namespace std;
-using namespace tightdb;
+using namespace realm;
 
 Query::Query() : m_view(null_ptr)
 {

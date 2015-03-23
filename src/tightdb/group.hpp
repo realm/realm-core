@@ -32,7 +32,7 @@
 #include <tightdb/table_basic_fwd.hpp>
 #include <tightdb/alloc_slab.hpp>
 
-namespace tightdb {
+namespace realm {
 
 class SharedGroup;
 namespace _impl {
@@ -231,7 +231,7 @@ public:
     /// with the specified name.
     ///
     /// find_table() returns the index of the first table in this group with the
-    /// specified name, or `tightdb::not_found` if this group does not contain a
+    /// specified name, or `realm::not_found` if this group does not contain a
     /// table with the specified name.
     ///
     /// get_table_name() returns the name of table at the specified index.
@@ -896,6 +896,6 @@ public:
 };
 
 
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_GROUP_HPP

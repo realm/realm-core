@@ -6,7 +6,7 @@
 #include <cstdlib>
 #include <cstring>
 
-namespace tightdb {
+namespace realm {
 namespace util {
 
 std::string get_errno_msg(const char* prefix, int err)

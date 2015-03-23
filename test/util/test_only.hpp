@@ -23,10 +23,10 @@
 #include "unit_test.hpp"
 
 #define ONLY(name) \
-    tightdb::test_util::SetTestOnly tightdb_set_test_only__##name(#name); \
+    realm::test_util::SetTestOnly tightdb_set_test_only__##name(#name); \
     TEST(name)
 
-namespace tightdb {
+namespace realm {
 namespace test_util {
 
 struct SetTestOnly {
@@ -36,6 +36,6 @@ struct SetTestOnly {
 const char* get_test_only();
 
 } // namespace test_util
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_TEST_UTIL_TEST_ONLY_HPP

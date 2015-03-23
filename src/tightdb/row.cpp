@@ -2,7 +2,7 @@
 #include <tightdb/table.hpp>
 
 using namespace std;
-using namespace tightdb;
+using namespace realm;
 
 
 void RowBase::attach(Table* table, size_t row_ndx) REALM_NOEXCEPT

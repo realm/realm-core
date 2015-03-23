@@ -25,7 +25,7 @@
 // the call and include inside float and double's .cpp files.
 #include <tightdb/query_engine.hpp>
 
-namespace tightdb {
+namespace realm {
 
 // Predeclarations from query_engine.hpp
 class ParentNode;
@@ -114,7 +114,7 @@ void BasicColumn<T>::set(std::size_t ndx, T value)
 
 template<class T> inline void BasicColumn<T>::add(T value)
 {
-    std::size_t row_ndx = tightdb::npos;
+    std::size_t row_ndx = realm::npos;
     std::size_t num_rows = 1;
     do_insert(row_ndx, value, num_rows); // Throws
 }
@@ -123,7 +123,7 @@ template<class T> inline void BasicColumn<T>::insert(std::size_t row_ndx, T valu
 {
     std::size_t size = this->size(); // Slow
     REALM_ASSERT_3(row_ndx, <=, size);
-    std::size_t row_ndx_2 = row_ndx == size ? tightdb::npos : row_ndx;
+    std::size_t row_ndx_2 = row_ndx == size ? realm::npos : row_ndx;
     std::size_t num_rows = 1;
     do_insert(row_ndx_2, value, num_rows); // Throws
 }
@@ -316,7 +316,7 @@ template<class T> ref_type BasicColumn<T>::write(size_t slice_offset, size_t sli
 template<class T>
 inline void BasicColumn<T>::insert(std::size_t row_ndx, std::size_t num_rows, bool is_append)
 {
-    std::size_t row_ndx_2 = is_append ? tightdb::npos : row_ndx;
+    std::size_t row_ndx_2 = is_append ? realm::npos : row_ndx;
     T value = T();
     do_insert(row_ndx_2, value, num_rows); // Throws
 }
@@ -571,19 +571,19 @@ double BasicColumn<T>::average(std::size_t begin, std::size_t end, std::size_t l
 
 template<class T> void BasicColumn<T>::do_insert(std::size_t row_ndx, T value, std::size_t num_rows)
 {
-    REALM_ASSERT(row_ndx == tightdb::npos || row_ndx < size());
+    REALM_ASSERT(row_ndx == realm::npos || row_ndx < size());
     ref_type new_sibling_ref;
     Array::TreeInsert<BasicColumn<T> > state;
     for (std::size_t i = 0; i != num_rows; ++i) {
-        std::size_t row_ndx_2 = row_ndx == tightdb::npos ? tightdb::npos : row_ndx + i;
+        std::size_t row_ndx_2 = row_ndx == realm::npos ? realm::npos : row_ndx + i;
         if (root_is_leaf()) {
-            REALM_ASSERT(row_ndx_2 == tightdb::npos || row_ndx_2 < REALM_MAX_BPNODE_SIZE);
+            REALM_ASSERT(row_ndx_2 == realm::npos || row_ndx_2 < REALM_MAX_BPNODE_SIZE);
             BasicArray<T>* leaf = static_cast<BasicArray<T>*>(m_array);
             new_sibling_ref = leaf->bptree_leaf_insert(row_ndx_2, value, state);
         }
         else {
             state.m_value = value;
-            if (row_ndx_2 == tightdb::npos) {
+            if (row_ndx_2 == realm::npos) {
                 new_sibling_ref = m_array->bptree_append(state); // Throws
             }
             else {
@@ -591,7 +591,7 @@ template<class T> void BasicColumn<T>::do_insert(std::size_t row_ndx, T value, s
             }
         }
         if (REALM_UNLIKELY(new_sibling_ref)) {
-            bool is_append = row_ndx_2 == tightdb::npos;
+            bool is_append = row_ndx_2 == realm::npos;
             introduce_new_root(new_sibling_ref, state, is_append); // Throws
         }
     }
@@ -627,6 +627,6 @@ template<class T> inline std::size_t BasicColumn<T>::upper_bound(T value) const 
 }
 
 
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_COLUMN_BASIC_TPL_HPP

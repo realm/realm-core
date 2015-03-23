@@ -20,7 +20,7 @@
 #ifndef REALM_TABLE_BASIC_FWD_HPP
 #define REALM_TABLE_BASIC_FWD_HPP
 
-namespace tightdb {
+namespace realm {
 
 
 template<class Spec> class BasicTable;
@@ -30,6 +30,6 @@ template<class Spec> struct IsBasicTable<BasicTable<Spec> > { static const bool 
 template<class Spec> struct IsBasicTable<const BasicTable<Spec> > { static const bool value = true; };
 
 
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_TABLE_BASIC_FWD_HPP

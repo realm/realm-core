@@ -20,7 +20,7 @@
 #ifndef REALM_COLUMN_TYPE_HPP
 #define REALM_COLUMN_TYPE_HPP
 
-namespace tightdb {
+namespace realm {
 
 
 // Note: Enumeration value assignments must be kept in sync with
@@ -64,6 +64,6 @@ enum ColumnAttr {
 };
 
 
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_COLUMN_TYPE_HPP

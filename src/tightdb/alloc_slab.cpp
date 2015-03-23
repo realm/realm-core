@@ -14,8 +14,8 @@
 #include <tightdb/alloc_slab.hpp>
 
 using namespace std;
-using namespace tightdb;
-using namespace tightdb::util;
+using namespace realm;
+using namespace realm::util;
 
 
 namespace {
@@ -393,7 +393,7 @@ ref_type SlabAlloc::attach_file(const string& path, bool is_shared, bool read_on
     REALM_ASSERT(!(is_shared && read_only));
     static_cast<void>(is_shared);
 
-    using namespace tightdb::util;
+    using namespace realm::util;
     File::AccessMode access = read_only ? File::access_ReadOnly : File::access_ReadWrite;
     File::CreateMode create = read_only || no_create ? File::create_Never : File::create_Auto;
     m_file.open(path.c_str(), access, create, 0); // Throws

@@ -5,7 +5,7 @@
 
 // benchmark - requires linux and links with google-pprof
 
-using namespace tightdb;
+using namespace realm;
 
 int main(int argc, char* argv [])
 {

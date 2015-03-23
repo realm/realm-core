@@ -1,7 +1,7 @@
 #include <tightdb/util/features.h>
 #include <tightdb/version.hpp>
 
-using namespace tightdb;
+using namespace realm;
 using namespace std;
 
 

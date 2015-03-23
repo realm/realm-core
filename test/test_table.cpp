@@ -16,9 +16,9 @@
 #include "test.hpp"
 
 using namespace std;
-using namespace tightdb;
-using namespace tightdb::util;
-using namespace tightdb::test_util;
+using namespace realm;
+using namespace realm::util;
+using namespace realm::test_util;
 using unit_test::TestResults;
 
 
@@ -3635,8 +3635,8 @@ TEST(Table_Parent)
 {
     TableRef table = Table::create();
     CHECK_EQUAL(TableRef(), table->get_parent_table());
-    CHECK_EQUAL(tightdb::npos, table->get_parent_row_index()); // Not a subtable
-    CHECK_EQUAL(tightdb::npos, table->get_index_in_group()); // Not a group-level table
+    CHECK_EQUAL(realm::npos, table->get_parent_row_index()); // Not a subtable
+    CHECK_EQUAL(realm::npos, table->get_index_in_group()); // Not a group-level table
 
     DescriptorRef subdesc;
     table->add_column(type_Table, "", &subdesc);

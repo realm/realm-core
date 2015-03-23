@@ -24,7 +24,7 @@
 #include <tightdb/util/features.h>
 #include <tightdb/array.hpp>
 
-namespace tightdb {
+namespace realm {
 namespace _impl {
 
 
@@ -219,6 +219,6 @@ inline ref_type DeepArrayRefDestroyGuard::release() REALM_NOEXCEPT
 
 
 } // namespace _impl
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_IMPL_DESTROY_GUARD_HPP

@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <tightdb.hpp>
 
-using namespace tightdb;
+using namespace realm;
 using namespace std;
 
 REALM_TABLE_7(IndexTable,

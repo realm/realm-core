@@ -25,7 +25,7 @@
 #include <tightdb/column.hpp>
 #include <tightdb/column_string.hpp>
 
-namespace tightdb {
+namespace realm {
 
 // to_str() is used by the integer index. The existing StringIndex is re-used for this
 // by making Column convert its integers to strings by calling to_str().
@@ -300,6 +300,6 @@ template <class T> void StringIndex::erase(size_t row_ndx, bool is_last)
         adjust_row_indexes(row_ndx, -1);
 }
 
-} //namespace tightdb
+} //namespace realm
 
 #endif // REALM_INDEX_STRING_HPP

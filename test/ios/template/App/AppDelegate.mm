@@ -14,7 +14,7 @@
 #include <string>
 
 using namespace std;
-using namespace tightdb::test_util;
+using namespace realm::test_util;
 
 @implementation AppDelegate
 

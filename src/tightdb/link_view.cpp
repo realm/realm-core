@@ -27,7 +27,7 @@
 #endif
 
 using namespace std;
-using namespace tightdb;
+using namespace realm;
 
 
 void LinkView::insert(size_t link_ndx, size_t target_row_ndx)
@@ -330,7 +330,7 @@ void LinkView::do_nullify_link(size_t old_target_row_ndx)
     REALM_ASSERT(m_row_indexes.is_attached());
 
     size_t pos = m_row_indexes.find_first(old_target_row_ndx);
-    REALM_ASSERT_3(pos, !=, tightdb::not_found);
+    REALM_ASSERT_3(pos, !=, realm::not_found);
 
     bool is_last = (pos + 1 == m_row_indexes.size());
     m_row_indexes.erase(pos, is_last);
@@ -348,7 +348,7 @@ void LinkView::do_update_link(size_t old_target_row_ndx, size_t new_target_row_n
     REALM_ASSERT(m_row_indexes.is_attached());
 
     size_t pos = m_row_indexes.find_first(old_target_row_ndx);
-    REALM_ASSERT_3(pos, !=, tightdb::not_found);
+    REALM_ASSERT_3(pos, !=, realm::not_found);
 
     m_row_indexes.set(pos, new_target_row_ndx);
 }

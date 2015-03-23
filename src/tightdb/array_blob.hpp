@@ -22,7 +22,7 @@
 
 #include <tightdb/array.hpp>
 
-namespace tightdb {
+namespace realm {
 
 
 class ArrayBlob: public Array {
@@ -134,6 +134,6 @@ inline std::size_t ArrayBlob::CalcItemCount(std::size_t bytes, std::size_t) cons
 }
 
 
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_ARRAY_BLOB_HPP

@@ -15,9 +15,9 @@
 #include "test.hpp"
 
 using namespace std;
-using namespace tightdb;
-using namespace tightdb::util;
-using namespace tightdb::test_util;
+using namespace realm;
+using namespace realm::util;
+using namespace realm::test_util;
 
 // Test independence and thread-safety
 // -----------------------------------
@@ -215,7 +215,7 @@ TEST(Compare_Core_utf8_invalid_crash)
     // See if we can crash Realm with random data
     char str1[20];
     char str2[20];
-    using namespace tightdb::test_util;
+    using namespace realm::test_util;
     Random r;
 
     set_string_compare_method(STRING_COMPARE_CORE, null_ptr);

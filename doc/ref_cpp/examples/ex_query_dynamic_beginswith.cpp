@@ -2,7 +2,7 @@
 #include <cassert>
 #include <tightdb.hpp>
 
-using namespace tightdb;
+using namespace realm;
 using namespace std;
 
 int main()

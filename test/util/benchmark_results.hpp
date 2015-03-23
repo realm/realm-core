@@ -24,7 +24,7 @@
 #include <map>
 #include <string>
 
-namespace tightdb {
+namespace realm {
 namespace test_util {
 
 
@@ -89,6 +89,6 @@ inline BenchmarkResults::~BenchmarkResults()
 
 
 } // namespace test_util
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_TEST_UTIL_BENCHMARK_RESULTS_HPP

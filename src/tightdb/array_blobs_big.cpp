@@ -9,7 +9,7 @@
 
 
 using namespace std;
-using namespace tightdb;
+using namespace realm;
 
 
 void ArrayBigBlobs::add(BinaryData value, bool add_zero_term)

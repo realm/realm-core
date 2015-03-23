@@ -1,7 +1,7 @@
 // @@Example: ex_cpp_dyn_query_constructor @@
 #include <tightdb.hpp>
 
-using namespace tightdb;
+using namespace realm;
 
 int main()
 {

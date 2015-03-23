@@ -26,7 +26,7 @@
 #include <tightdb/unicode.hpp>
 #include <tightdb/binary_data.hpp>
 
-namespace tightdb {
+namespace realm {
 
 enum {cond_Equal, cond_NotEqual, cond_Greater, cond_GreaterEqual, cond_Less, cond_LessEqual, cond_None, cond_Count};
 
@@ -228,6 +228,6 @@ template <> struct CompareLess<StringData>
     }
 };
 
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_QUERY_CONDITIONS_HPP

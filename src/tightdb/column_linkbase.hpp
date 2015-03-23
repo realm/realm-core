@@ -22,7 +22,7 @@
 
 #include <tightdb/table.hpp>
 
-namespace tightdb {
+namespace realm {
 
 class ColumnBackLink;
 
@@ -162,6 +162,6 @@ inline void ColumnLinkBase::mark(int type) REALM_NOEXCEPT
 }
 
 
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_COLUMN_LINKBASE_HPP

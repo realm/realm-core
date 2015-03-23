@@ -16,8 +16,8 @@
 #include <tightdb/table.hpp>
 
 using namespace std;
-using namespace tightdb;
-using namespace tightdb::util;
+using namespace realm;
+using namespace realm::util;
 
 
 namespace {
@@ -563,7 +563,7 @@ void AdaptiveStringColumn::do_move_last_over(size_t row_ndx, size_t last_row_ndx
     SetLeafElem set_leaf_elem(m_array->get_alloc(), copy_of_value);
     m_array->update_bptree_elem(row_ndx, set_leaf_elem); // Throws
     EraseLeafElem erase_leaf_elem(*this);
-    Array::erase_bptree_elem(m_array, tightdb::npos, erase_leaf_elem); // Throws
+    Array::erase_bptree_elem(m_array, realm::npos, erase_leaf_elem); // Throws
 }
 
 
@@ -979,7 +979,7 @@ void AdaptiveStringColumn::do_insert(size_t row_ndx, StringData value, size_t nu
     bptree_insert(row_ndx, value, num_rows); // Throws
 
     if (m_search_index) {
-        bool is_append = row_ndx == tightdb::npos;
+        bool is_append = row_ndx == realm::npos;
         size_t row_ndx_2 = is_append ? size() - num_rows : row_ndx;
         m_search_index->insert(row_ndx_2, value, num_rows, is_append); // Throws
     }
@@ -988,7 +988,7 @@ void AdaptiveStringColumn::do_insert(size_t row_ndx, StringData value, size_t nu
 
 void AdaptiveStringColumn::do_insert(size_t row_ndx, StringData value, size_t num_rows, bool is_append)
 {
-    size_t row_ndx_2 = is_append ? tightdb::npos : row_ndx;
+    size_t row_ndx_2 = is_append ? realm::npos : row_ndx;
     bptree_insert(row_ndx_2, value, num_rows); // Throws
 
     if (m_search_index)
@@ -998,13 +998,13 @@ void AdaptiveStringColumn::do_insert(size_t row_ndx, StringData value, size_t nu
 
 void AdaptiveStringColumn::bptree_insert(size_t row_ndx, StringData value, size_t num_rows)
 {
-    REALM_ASSERT(row_ndx == tightdb::npos || row_ndx < size());
+    REALM_ASSERT(row_ndx == realm::npos || row_ndx < size());
     ref_type new_sibling_ref;
     Array::TreeInsert<AdaptiveStringColumn> state;
     for (size_t i = 0; i != num_rows; ++i) {
-        size_t row_ndx_2 = row_ndx == tightdb::npos ? tightdb::npos : row_ndx + i;
+        size_t row_ndx_2 = row_ndx == realm::npos ? realm::npos : row_ndx + i;
         if (root_is_leaf()) {
-            REALM_ASSERT(row_ndx_2 == tightdb::npos || row_ndx_2 < REALM_MAX_BPNODE_SIZE);
+            REALM_ASSERT(row_ndx_2 == realm::npos || row_ndx_2 < REALM_MAX_BPNODE_SIZE);
             LeafType leaf_type = upgrade_root_leaf(value.size()); // Throws
             switch (leaf_type) {
                 case leaf_type_Small: {
@@ -1032,7 +1032,7 @@ void AdaptiveStringColumn::bptree_insert(size_t row_ndx, StringData value, size_
 
         // Non-leaf root
         state.m_value = value;
-        if (row_ndx_2 == tightdb::npos) {
+        if (row_ndx_2 == realm::npos) {
             new_sibling_ref = m_array->bptree_append(state); // Throws
         }
         else {
@@ -1041,7 +1041,7 @@ void AdaptiveStringColumn::bptree_insert(size_t row_ndx, StringData value, size_
 
       insert_done:
         if (REALM_UNLIKELY(new_sibling_ref)) {
-            bool is_append = row_ndx_2 == tightdb::npos;
+            bool is_append = row_ndx_2 == realm::npos;
             introduce_new_root(new_sibling_ref, state, is_append); // Throws
         }
     }

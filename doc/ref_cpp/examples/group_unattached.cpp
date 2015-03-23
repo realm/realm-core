@@ -3,7 +3,7 @@
 #include <tightdb.hpp>
 #include <tightdb/util/file.hpp>
 
-using namespace tightdb;
+using namespace realm;
 
 REALM_TABLE_2(PeopleTable,
                 name, String,

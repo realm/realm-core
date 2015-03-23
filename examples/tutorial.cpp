@@ -2,7 +2,7 @@
 #include <tightdb.hpp>
 
 using namespace std;
-using namespace tightdb;
+using namespace realm;
 
 // @@Example: create_table @@
 

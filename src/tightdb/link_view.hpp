@@ -27,7 +27,7 @@
 #include <tightdb/table.hpp>
 #include <tightdb/table_view.hpp>
 
-namespace tightdb {
+namespace realm {
 
 class ColumnLinkList;
 
@@ -86,7 +86,7 @@ public:
 
     /// Search this list for a link to the specified target table row (specified
     /// by its index in the target table). If found, the index of the link to
-    /// that row within this list is returned, otherwise `tightdb::not_found` is
+    /// that row within this list is returned, otherwise `realm::not_found` is
     /// returned.
     std::size_t find(std::size_t target_row_ndx) const REALM_NOEXCEPT;
 
@@ -362,6 +362,6 @@ public:
     }
 };
 
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_LINK_VIEW_HPP

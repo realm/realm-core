@@ -31,9 +31,9 @@
 #include "crypt_key.hpp"
 
 using namespace std;
-using namespace tightdb;
-using namespace tightdb::util;
-using namespace tightdb::test_util;
+using namespace realm;
+using namespace realm::util;
+using namespace realm::test_util;
 using unit_test::TestResults;
 
 
@@ -393,7 +393,7 @@ TEST(LangBindHelper_AdvanceReadTransact_AddTableWithFreshSharedGroup)
 
     // Add the first table
     {
-        UniquePtr<tightdb::Replication> repl_w(tightdb::makeWriteLogCollector(path));
+        UniquePtr<realm::Replication> repl_w(realm::makeWriteLogCollector(path));
         SharedGroup sg_w(*repl_w);
         WriteTransaction wt(sg_w);
         wt.add_table("table_1");
@@ -401,13 +401,13 @@ TEST(LangBindHelper_AdvanceReadTransact_AddTableWithFreshSharedGroup)
     }
 
     // Create a SharedGroup to which we can apply a foreign transaction
-    UniquePtr<tightdb::Replication> repl(tightdb::makeWriteLogCollector(path));
+    UniquePtr<realm::Replication> repl(realm::makeWriteLogCollector(path));
     SharedGroup sg(*repl);
     ReadTransaction rt(sg);
 
     // Add the second table in a "foreign" transaction
     {
-        UniquePtr<tightdb::Replication> repl_w(tightdb::makeWriteLogCollector(path));
+        UniquePtr<realm::Replication> repl_w(realm::makeWriteLogCollector(path));
         SharedGroup sg_w(*repl_w);
         WriteTransaction wt(sg_w);
         wt.add_table("table_2");
@@ -430,7 +430,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RemoveTableWithFreshSharedGroup)
 
     // Add the table
     {
-        UniquePtr<tightdb::Replication> repl_w(tightdb::makeWriteLogCollector(path));
+        UniquePtr<realm::Replication> repl_w(realm::makeWriteLogCollector(path));
         SharedGroup sg_w(*repl_w);
         WriteTransaction wt(sg_w);
         wt.add_table("table");
@@ -438,13 +438,13 @@ TEST(LangBindHelper_AdvanceReadTransact_RemoveTableWithFreshSharedGroup)
     }
 
     // Create a SharedGroup to which we can apply a foreign transaction
-    UniquePtr<tightdb::Replication> repl(tightdb::makeWriteLogCollector(path));
+    UniquePtr<realm::Replication> repl(realm::makeWriteLogCollector(path));
     SharedGroup sg(*repl);
     ReadTransaction rt(sg);
 
     // remove the table in a "foreign" transaction
     {
-        UniquePtr<tightdb::Replication> repl_w(tightdb::makeWriteLogCollector(path));
+        UniquePtr<realm::Replication> repl_w(realm::makeWriteLogCollector(path));
         SharedGroup sg_w(*repl_w);
         WriteTransaction wt(sg_w);
         wt.get_group().remove_table("table");
@@ -460,19 +460,19 @@ TEST(LangBindHelper_AdvanceReadTransact_CreateManyTables)
     SHARED_GROUP_TEST_PATH(path);
 
     {
-        UniquePtr<tightdb::Replication> repl_w(tightdb::makeWriteLogCollector(path));
+        UniquePtr<realm::Replication> repl_w(realm::makeWriteLogCollector(path));
         SharedGroup sg_w(*repl_w);
         WriteTransaction wt(sg_w);
         wt.add_table("table");
         wt.commit();
     }
 
-    UniquePtr<tightdb::Replication> repl(tightdb::makeWriteLogCollector(path));
+    UniquePtr<realm::Replication> repl(realm::makeWriteLogCollector(path));
     SharedGroup sg(*repl);
     ReadTransaction rt(sg);
 
     {
-        UniquePtr<tightdb::Replication> repl_w(tightdb::makeWriteLogCollector(path));
+        UniquePtr<realm::Replication> repl_w(realm::makeWriteLogCollector(path));
         SharedGroup sg_w(*repl_w);
 
         WriteTransaction wt(sg_w);
@@ -6721,9 +6721,9 @@ TEST(LangBindHelper_ImplicitTransactions_DetachRowAccessorOnMoveLastOver)
         size_t row_ndx = random.draw_int_mod(table->size());
         int_fast64_t value = table->get_int(0, row_ndx);
         table->move_last_over(row_ndx);
-        CHECK_EQUAL(tightdb::not_found, table->find_first_int(0, value));
+        CHECK_EQUAL(realm::not_found, table->find_first_int(0, value));
         for (int j = 0; j < 10; ++j) {
-            bool should_be_attached = table->find_first_int(0, j) != tightdb::not_found;
+            bool should_be_attached = table->find_first_int(0, j) != realm::not_found;
             CHECK_EQUAL(should_be_attached, rows[j].is_attached());
         }
     }

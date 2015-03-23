@@ -24,7 +24,7 @@
 #include <tightdb/array.hpp>
 #include <tightdb/util/safe_int_ops.hpp>
 
-namespace tightdb {
+namespace realm {
 
 class ArrayInteger: public Array {
 public:
@@ -121,7 +121,7 @@ inline void ArrayInteger::set_uint(std::size_t ndx, uint_fast64_t value)
     // standard guarantees that negative values are converted from the native
     // representation to 2's complement, but the effect of conversions in the
     // opposite direction is left unspecified by the
-    // standard. `tightdb::util::from_twos_compl()` is used here to perform the
+    // standard. `realm::util::from_twos_compl()` is used here to perform the
     // correct opposite unsigned-to-signed conversion, which reduces to a no-op
     // when 2's complement is the native representation of negative values.
     set(ndx, util::from_twos_compl<int_fast64_t>(value));

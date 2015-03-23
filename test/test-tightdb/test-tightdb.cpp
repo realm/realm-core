@@ -7,7 +7,7 @@
 #include "../util/number_names.hpp"
 
 using namespace std;
-using namespace tightdb;
+using namespace realm;
 
 namespace {
 

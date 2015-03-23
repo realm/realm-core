@@ -27,7 +27,7 @@
 #include <tightdb/util/features.h>
 #include <tightdb/util/type_traits.hpp>
 
-namespace tightdb {
+namespace realm {
 namespace test_util {
 
 
@@ -413,6 +413,6 @@ inline bool super_int::multiply_with_overflow_detect(super_int v) REALM_NOEXCEP
 */
 
 } // namespace test_util
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_TEST_UTIL_SUPER_INT_HPP

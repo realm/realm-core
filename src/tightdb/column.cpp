@@ -17,8 +17,8 @@
 #include <tightdb/array_integer.hpp>
 
 using namespace std;
-using namespace tightdb;
-using namespace tightdb::util;
+using namespace realm;
+using namespace realm::util;
 
 void ColumnBase::set_string(size_t, StringData)
 {
@@ -566,7 +566,7 @@ void Column::set(size_t ndx, int64_t value)
 
 // When a value of a signed type is converted to an unsigned type, the C++ standard guarantees that negative values 
 // are converted from the native representation to 2's complement, but the opposite conversion is left as undefined. 
-// tightdb::util::from_twos_compl() is used here to perform the correct opposite unsigned-to-signed conversion,
+// realm::util::from_twos_compl() is used here to perform the correct opposite unsigned-to-signed conversion,
 // which reduces to a no-op when 2's complement is the native representation of negative values.
 void Column::set_uint(size_t ndx, uint64_t value)
 {
@@ -879,19 +879,19 @@ bool Column::compare_int(const Column& c) const REALM_NOEXCEPT
 
 void Column::do_insert(size_t row_ndx, int_fast64_t value, size_t num_rows)
 {
-    REALM_ASSERT_DEBUG(row_ndx == tightdb::npos || row_ndx < size());
+    REALM_ASSERT_DEBUG(row_ndx == realm::npos || row_ndx < size());
 
     ref_type new_sibling_ref;
     Array::TreeInsert<Column> state;
     for (size_t i = 0; i != num_rows; ++i) {
-        size_t row_ndx_2 = row_ndx == tightdb::npos ? tightdb::npos : row_ndx + i;
+        size_t row_ndx_2 = row_ndx == realm::npos ? realm::npos : row_ndx + i;
         if (root_is_leaf()) {
-            REALM_ASSERT_DEBUG(row_ndx_2 == tightdb::npos || row_ndx_2 < REALM_MAX_BPNODE_SIZE);
+            REALM_ASSERT_DEBUG(row_ndx_2 == realm::npos || row_ndx_2 < REALM_MAX_BPNODE_SIZE);
             new_sibling_ref = m_array->bptree_leaf_insert(row_ndx_2, value, state); // Throws
         }
         else {
             state.m_value = value;
-            if (row_ndx_2 == tightdb::npos) {
+            if (row_ndx_2 == realm::npos) {
                 new_sibling_ref = m_array->bptree_append(state); // Throws
             }
             else {
@@ -899,14 +899,14 @@ void Column::do_insert(size_t row_ndx, int_fast64_t value, size_t num_rows)
             }
         }
         if (REALM_UNLIKELY(new_sibling_ref)) {
-            bool is_append = row_ndx_2 == tightdb::npos;
+            bool is_append = row_ndx_2 == realm::npos;
             introduce_new_root(new_sibling_ref, state, is_append); // Throws
         }
     }
 
 
     if (m_search_index) {
-        bool is_append = row_ndx == tightdb::npos;
+        bool is_append = row_ndx == realm::npos;
         size_t row_ndx_2 = is_append ? size() - num_rows : row_ndx;
         static_cast<StringIndex*>(m_search_index)->insert(row_ndx_2, value, num_rows, is_append); // Throws
     }
@@ -1010,7 +1010,7 @@ void Column::do_move_last_over(size_t row_ndx, size_t last_row_ndx)
 
     // Discard last row
     if (array()->is_inner_bptree_node()) {
-        size_t row_ndx_2 = tightdb::npos;
+        size_t row_ndx_2 = realm::npos;
         EraseLeafElem handler(*this);
         Array::erase_bptree_elem(array(), row_ndx_2, handler); // Throws
     }

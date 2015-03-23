@@ -27,7 +27,7 @@
 #include <tightdb/table.hpp>
 
 
-namespace tightdb {
+namespace realm {
 
 namespace _impl { class DescriptorFriend; }
 
@@ -698,6 +698,6 @@ public:
     }
 };
 
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_DESCRIPTOR_HPP

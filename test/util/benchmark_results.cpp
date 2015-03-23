@@ -16,7 +16,7 @@
 #include "benchmark_results.hpp"
 
 using namespace std;
-using namespace tightdb;
+using namespace realm;
 using namespace test_util;
 
 

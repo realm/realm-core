@@ -6,8 +6,8 @@
 #include "test.hpp"
 
 using namespace std;
-using namespace tightdb::util;
-using namespace tightdb::test_util::unit_test;
+using namespace realm::util;
+using namespace realm::test_util::unit_test;
 
 
 // Test independence and thread-safety

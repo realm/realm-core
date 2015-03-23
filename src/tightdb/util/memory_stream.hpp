@@ -27,7 +27,7 @@
 
 #include <tightdb/util/features.h>
 
-namespace tightdb {
+namespace realm {
 namespace util {
 
 class MemoryInputStreambuf: public std::streambuf {
@@ -194,6 +194,6 @@ inline std::size_t MemoryOutputStream::size() const REALM_NOEXCEPT
 }
 
 } // namespace util
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_UTIL_MEMORY_STREAM_HPP

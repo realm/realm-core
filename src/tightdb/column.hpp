@@ -32,7 +32,7 @@
 #include <tightdb/impl/output_stream.hpp>
 #include <tightdb/query_conditions.hpp>
 
-namespace tightdb {
+namespace realm {
 
 
 // Pre-definitions
@@ -478,7 +478,7 @@ public:
     void refresh_accessor_tree(std::size_t, const Spec&) REALM_OVERRIDE;
     void update_from_parent(size_t old_baseline) REALM_NOEXCEPT;
 
-    /// \param row_ndx Must be `tightdb::npos` if appending.
+    /// \param row_ndx Must be `realm::npos` if appending.
     void do_insert(std::size_t row_ndx, int_fast64_t value, std::size_t num_rows);
 
 #ifdef REALM_DEBUG
@@ -827,7 +827,7 @@ inline uint64_t Column::get_uint(std::size_t ndx) const REALM_NOEXCEPT
 
 inline void Column::add(int_fast64_t value)
 {
-    std::size_t row_ndx = tightdb::npos;
+    std::size_t row_ndx = realm::npos;
     std::size_t num_rows = 1;
     do_insert(row_ndx, value, num_rows); // Throws
 }
@@ -836,7 +836,7 @@ inline void Column::insert(std::size_t row_ndx, int_fast64_t value)
 {
     std::size_t size = this->size(); // Slow
     REALM_ASSERT_3(row_ndx, <=, size);
-    std::size_t row_ndx_2 = row_ndx == size ? tightdb::npos : row_ndx;
+    std::size_t row_ndx_2 = row_ndx == size ? realm::npos : row_ndx;
     std::size_t num_rows = 1;
     do_insert(row_ndx_2, value, num_rows); // Throws
 }
@@ -862,7 +862,7 @@ inline void Column::clear()
 // Implementing pure virtual method of ColumnBase.
 inline void Column::insert(std::size_t row_ndx, std::size_t num_rows, bool is_append)
 {
-    std::size_t row_ndx_2 = is_append ? tightdb::npos : row_ndx;
+    std::size_t row_ndx_2 = is_append ? realm::npos : row_ndx;
     int_fast64_t value = 0;
     do_insert(row_ndx_2, value, num_rows); // Throws
 }
@@ -931,7 +931,7 @@ inline size_t Column::find_gte(int64_t target, size_t start) const
     return ref;
 }
 
-} // namespace tightdb
+} // namespace realm
 
 // Templates
 #include <tightdb/column_tpl.hpp>

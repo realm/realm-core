@@ -8,7 +8,7 @@
 #include <tightdb/impl/destroy_guard.hpp>
 
 using namespace std;
-using namespace tightdb;
+using namespace realm;
 
 
 void ArrayBinary::init_from_mem(MemRef mem) REALM_NOEXCEPT

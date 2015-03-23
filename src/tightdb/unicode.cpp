@@ -45,7 +45,7 @@
 
 using namespace std;
 
-namespace tightdb {
+namespace realm {
 
     bool set_string_compare_method(string_compare_method_t method, StringCompareCallback callback)
     {
@@ -459,4 +459,4 @@ namespace tightdb {
     }
 
 
-} // namespace tightdb
+} // namespace realm

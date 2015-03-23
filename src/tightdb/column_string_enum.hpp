@@ -22,7 +22,7 @@
 
 #include <tightdb/column_string.hpp>
 
-namespace tightdb {
+namespace realm {
 
 // Pre-declarations
 class StringIndex;
@@ -139,7 +139,7 @@ private:
     /// call the 4 argument version instead. If you are not appending, either
     /// one is fine.
     ///
-    /// \param row_ndx Must be `tightdb::npos` if appending.
+    /// \param row_ndx Must be `realm::npos` if appending.
     void do_insert(std::size_t row_ndx, StringData value, std::size_t num_rows);
 
     /// If you are appending and you do not have the size of the column readily
@@ -170,7 +170,7 @@ inline StringData ColumnStringEnum::get(std::size_t ndx) const REALM_NOEXCEPT
 
 inline void ColumnStringEnum::add(StringData value)
 {
-    std::size_t row_ndx = tightdb::npos;
+    std::size_t row_ndx = realm::npos;
     std::size_t num_rows = 1;
     do_insert(row_ndx, value, num_rows); // Throws
 }
@@ -268,6 +268,6 @@ inline const AdaptiveStringColumn& ColumnStringEnum::get_keys() const
 }
 
 
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_COLUMN_STRING_ENUM_HPP

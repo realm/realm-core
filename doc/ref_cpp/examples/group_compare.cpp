@@ -5,7 +5,7 @@
 #include <tightdb/util/file.hpp>
 
 using namespace std;
-using namespace tightdb;
+using namespace realm;
 
 int main()
 {

@@ -8,8 +8,8 @@
 #include <tightdb/table.hpp>
 
 using namespace std;
-using namespace tightdb;
-using namespace tightdb::util;
+using namespace realm;
+using namespace realm::util;
 
 
 namespace {
@@ -82,7 +82,7 @@ void ColumnStringEnum::do_insert(size_t row_ndx, StringData value, size_t num_ro
     Column::do_insert(row_ndx, value_2, num_rows); // Throws
 
     if (m_search_index) {
-        bool is_append = row_ndx == tightdb::npos;
+        bool is_append = row_ndx == realm::npos;
         size_t row_ndx_2 = is_append ? size() - num_rows : row_ndx;
         m_search_index->insert(row_ndx_2, value, num_rows, is_append); // Throws
     }
@@ -92,7 +92,7 @@ void ColumnStringEnum::do_insert(size_t row_ndx, StringData value, size_t num_ro
 void ColumnStringEnum::do_insert(size_t row_ndx, StringData value, size_t num_rows, bool is_append)
 {
     size_t key_ndx = GetKeyNdxOrAdd(value);
-    size_t row_ndx_2 = is_append ? tightdb::npos : row_ndx;
+    size_t row_ndx_2 = is_append ? realm::npos : row_ndx;
     int64_t value_2 = int64_t(key_ndx);
     Column::do_insert(row_ndx_2, value_2, num_rows); // Throws
 
@@ -220,7 +220,7 @@ size_t ColumnStringEnum::GetKeyNdx(StringData value) const
 size_t ColumnStringEnum::GetKeyNdxOrAdd(StringData value)
 {
     size_t res = m_keys.find_first(value);
-    if (res != tightdb::not_found)
+    if (res != realm::not_found)
         return res;
 
     // Add key if it does not exist

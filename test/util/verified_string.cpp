@@ -3,8 +3,8 @@
 #include "verified_string.hpp"
 
 using namespace std;
-using namespace tightdb;
-using namespace tightdb::test_util;
+using namespace realm;
+using namespace realm::test_util;
 
 
 VerifiedString::VerifiedString():

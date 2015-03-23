@@ -22,7 +22,7 @@
 
 #include <cstddef>
 
-namespace tightdb {
+namespace realm {
 namespace test_util {
 
 
@@ -38,6 +38,6 @@ std::size_t get_mem_usage();
 
 
 } // namespace test_util
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_TEST_UTIL_MEM_HPP

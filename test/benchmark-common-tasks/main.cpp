@@ -8,9 +8,9 @@
 #include "../util/random.hpp"
 #include "../util/benchmark_results.hpp"
 
-using namespace tightdb;
-using namespace tightdb::util;
-using namespace tightdb::test_util;
+using namespace realm;
+using namespace realm::util;
+using namespace realm::test_util;
 
 /**
   This bechmark suite represents a number of common use cases,

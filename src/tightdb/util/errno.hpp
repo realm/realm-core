@@ -22,7 +22,7 @@
 
 #include <string>
 
-namespace tightdb {
+namespace realm {
 namespace util {
 
 // Get the error message for a given error code, and append it to `prefix`

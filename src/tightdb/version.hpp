@@ -34,7 +34,7 @@
 #define REALM_VER_STRING REALM_QUOTE(REALM_VER_MAJOR) "." REALM_QUOTE(REALM_VER_MINOR) "." REALM_QUOTE(REALM_VER_PATCH)
 #define REALM_VER_CHUNK "[" REALM_PRODUCT_NAME "-" REALM_VER_STRING "]"
 
-namespace tightdb {
+namespace realm {
 
 enum Feature {
     feature_Debug,
@@ -52,6 +52,6 @@ public:
 };
 
 
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_VERSION_HPP

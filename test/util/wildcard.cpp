@@ -7,7 +7,7 @@
 using namespace std;
 
 
-namespace tightdb {
+namespace realm {
 namespace test_util {
 
 
@@ -83,4 +83,4 @@ bool wildcard_pattern::match(const char* begin, const char* end) const REALM_NOE
 
 
 } // namespace test_util
-} // namespace tightdb
+} // namespace realm

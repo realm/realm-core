@@ -4,14 +4,14 @@
 #include <tightdb/column.hpp>
 #include <tightdb/column_string_enum.hpp>
 
-using namespace tightdb;
+using namespace realm;
 
 // This class is for common functionality of ListView and LinkView which inherit from it. Currently it only 
 // supports sorting.
 class RowIndexes
 {
 public:
-    RowIndexes(Column::unattached_root_tag urt, tightdb::Allocator& alloc) : 
+    RowIndexes(Column::unattached_root_tag urt, realm::Allocator& alloc) : 
 #ifdef REALM_COOKIE_CHECK
         cookie(cookie_expected), 
 #endif

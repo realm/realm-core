@@ -30,7 +30,7 @@
 #include <tightdb/link_view_fwd.hpp>
 #include <iostream>
 
-namespace tightdb {
+namespace realm {
 
 namespace _impl {
 class TransactLogConvenientEncoder;
@@ -220,7 +220,7 @@ inline void ColumnLinkList::remove_backlink(std::size_t target_row, std::size_t 
 }
 
 
-} //namespace tightdb
+} //namespace realm
 
 #endif //REALM_COLUMN_LINKLIST_HPP
 

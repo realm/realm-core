@@ -1,7 +1,7 @@
 #include <tightdb/exceptions.hpp>
 #include <tightdb/version.hpp>
 
-using namespace tightdb;
+using namespace realm;
 
 const char* LogicError::what() const REALM_NOEXCEPT_OR_NOTHROW
 {

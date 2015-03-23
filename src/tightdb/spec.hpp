@@ -27,7 +27,7 @@
 #include <tightdb/data_type.hpp>
 #include <tightdb/column_type.hpp>
 
-namespace tightdb {
+namespace realm {
 
 class Table;
 class SubspecRef;
@@ -439,6 +439,6 @@ inline ConstSubspecRef::ConstSubspecRef(SubspecRef r) REALM_NOEXCEPT:
 }
 
 
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_SPEC_HPP

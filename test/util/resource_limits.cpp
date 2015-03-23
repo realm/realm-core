@@ -13,8 +13,8 @@
 #endif
 
 using namespace std;
-using namespace tightdb;
-using namespace tightdb::test_util;
+using namespace realm;
+using namespace realm::test_util;
 
 #if REALM_HAVE_POSIX_RLIMIT
 
@@ -62,7 +62,7 @@ void set_rlimit(Resource resource, long value, bool hard)
 #endif // REALM_HAVE_POSIX_RLIMIT
 
 
-namespace tightdb {
+namespace realm {
 namespace test_util {
 
 #if REALM_HAVE_POSIX_RLIMIT
@@ -116,5 +116,5 @@ void set_soft_rlimit(Resource, long)
 
 
 } // namespace test_util
-} // namespace tightdb
+} // namespace realm
 

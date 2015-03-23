@@ -15,8 +15,8 @@
 #define LL_MIN (-LL_MAX - 1)
 
 using namespace std;
-using namespace tightdb;
-using namespace tightdb::test_util;
+using namespace realm;
+using namespace realm::test_util;
 
 
 // Test independence and thread-safety

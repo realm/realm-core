@@ -23,7 +23,7 @@
 #include <ctime>
 #include <ostream>
 
-namespace tightdb {
+namespace realm {
 
 
 class DateTime {
@@ -144,7 +144,7 @@ inline std::time_t DateTime::assemble(int year, int month, int day, int hours, i
 }
 
 
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_DATETIME_HPP
 

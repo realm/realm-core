@@ -41,7 +41,7 @@ Then reconsider AND changes for improved optimization
 // Optional dynamic column names in table spec
 
 
-namespace tightdb {
+namespace realm {
 
 
 
@@ -1152,4 +1152,4 @@ private:
 */
 };
 
-} // namespace tightdb
+} // namespace realm

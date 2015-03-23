@@ -32,7 +32,7 @@
 
 #include "random.hpp"
 
-namespace tightdb {
+namespace realm {
 namespace test_util {
 
 
@@ -76,6 +76,6 @@ inline VerifiedInteger::VerifiedInteger(Random& random):
 
 
 } // namespace test_util
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_TEST_UTIL_VERIFIED_INTEGER_HPP

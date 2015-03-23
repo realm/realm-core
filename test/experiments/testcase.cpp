@@ -31,7 +31,7 @@
 #include "../util/random.hpp"
 
 using namespace std;
-using namespace tightdb;
-using namespace tightdb::util;
-using namespace tightdb::test_util;
-using namespace tightdb::_impl;
+using namespace realm;
+using namespace realm::util;
+using namespace realm::test_util;
+using namespace realm::_impl;

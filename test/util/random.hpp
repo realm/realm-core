@@ -31,7 +31,7 @@
 #include <tightdb/util/safe_int_ops.hpp>
 #include <tightdb/util/thread.hpp>
 
-namespace tightdb {
+namespace realm {
 namespace test_util {
 
 
@@ -449,6 +449,6 @@ inline void random_seed(unsigned long seed) REALM_NOEXCEPT
 
 
 } // namespace test_util
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_TEST_UTIL_RANDOM_HPP

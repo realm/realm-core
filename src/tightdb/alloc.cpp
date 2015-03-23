@@ -6,7 +6,7 @@
 #include <tightdb/alloc_slab.hpp>
 
 using namespace std;
-using namespace tightdb;
+using namespace realm;
 
 
 // FIXME: Casting a pointers to std::size_t is inherently
@@ -36,7 +36,7 @@ namespace {
 /// be used by multiple threads. Although it has m_replication, this
 /// is not a problem, as there is no way to modify it, so it will
 /// remain zero.
-class DefaultAllocator: public tightdb::Allocator {
+class DefaultAllocator: public realm::Allocator {
 public:
     DefaultAllocator()
     {

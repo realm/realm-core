@@ -129,7 +129,7 @@ Caveats, notes and todos
 
 #define REALM_OLDQUERY_FALLBACK
 
-// namespace tightdb {
+// namespace realm {
 
 template <class T> T minimum(T a, T b)
 {
@@ -139,10 +139,10 @@ template <class T> T minimum(T a, T b)
 // FIXME, this needs to exist elsewhere
 typedef int64_t             Int;
 typedef bool                Bool;
-typedef tightdb::DateTime   DateTime;
+typedef realm::DateTime   DateTime;
 typedef float               Float;
 typedef double              Double;
-typedef tightdb::StringData String;
+typedef realm::StringData String;
 
 
 // Return StringData if either T or U is StringData, else return T. See description of usage in export2().
@@ -978,14 +978,14 @@ public:
                 ColumnLinkList& cll = table->get_column_link_list(columns[t]);
                 m_tables.push_back(table);
                 m_link_columns.push_back(&(table->get_column_link_list(columns[t])));
-                m_link_types.push_back(tightdb::type_LinkList);
+                m_link_types.push_back(realm::type_LinkList);
                 table = &cll.get_target_table();
             }
             else {
                 ColumnLink& cl = table->get_column_link(columns[t]);
                 m_tables.push_back(table);
                 m_link_columns.push_back(&(table->get_column_link(columns[t])));
-                m_link_types.push_back(tightdb::type_Link);
+                m_link_types.push_back(realm::type_Link);
                 table = &cl.get_target_table();
             }
         }
@@ -1049,7 +1049,7 @@ private:
         map_links(row, mlv);
     }
 
-    std::vector<tightdb::DataType> m_link_types;
+    std::vector<realm::DataType> m_link_types;
 };
 
 template <class T, class S, class I> Query string_compare(const Columns<StringData>& left, T right, bool case_insensitive);

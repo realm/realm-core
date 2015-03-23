@@ -17,8 +17,8 @@
 #include "test.hpp"
 
 using namespace std;
-using namespace tightdb::util;
-using namespace tightdb::test_util;
+using namespace realm::util;
+using namespace realm::test_util;
 using unit_test::TestResults;
 
 
@@ -53,11 +53,11 @@ using unit_test::TestResults;
 
 
 
-// FIXME: Test T -> tightdb::test_util::super_int -> T using min/max
+// FIXME: Test T -> realm::test_util::super_int -> T using min/max
 // values for each fundamental standard type, and also using 0 and -1
 // for signed types.
 
-// FIXME: Test tightdb::util::from_twos_compl(). For each type pair
+// FIXME: Test realm::util::from_twos_compl(). For each type pair
 // (S,U), and for each super_int `i` in special set, if i.get_as<S>(s)
 // && two's compl of `s` can be stored in U without loss of
 // information, then CHECK_EQUAL(s, from_twos_compl(U(s))). Two's
@@ -65,9 +65,9 @@ using unit_test::TestResults;
 // only if make_unsigned<S>::type(s < 0 ?  -1-s : s) <
 // (U(1)<<(lim_u::digits-1)).
 
-// FIXME: Test tightdb::util::int_shift_left_with_overflow_detect().
+// FIXME: Test realm::util::int_shift_left_with_overflow_detect().
 
-// FIXME: Test tightdb::util::int_cast_with_overflow_detect().
+// FIXME: Test realm::util::int_cast_with_overflow_detect().
 
 
 TEST(SafeIntOps_AddWithOverflowDetect)

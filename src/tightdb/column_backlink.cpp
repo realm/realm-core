@@ -25,7 +25,7 @@
 #include <tightdb/table.hpp>
 
 using namespace std;
-using namespace tightdb;
+using namespace realm;
 
 
 void ColumnBackLink::add_backlink(size_t row_ndx, size_t origin_row_ndx)

@@ -39,7 +39,7 @@
 
 #include <iostream>
 
-namespace tightdb {
+namespace realm {
 
 // FIXME: Be careful about the possibility of one modification functions being called by another where both do transaction logging.
 
@@ -397,6 +397,6 @@ inline void TrivialReplication::internal_transact_log_reserve(std::size_t n, cha
     *new_end = data + m_transact_log_buffer.size();
 }
 
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_REPLICATION_HPP

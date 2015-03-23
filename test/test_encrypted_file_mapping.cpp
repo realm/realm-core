@@ -39,7 +39,7 @@
 
 #ifdef REALM_ENABLE_ENCRYPTION
 
-using namespace tightdb::util;
+using namespace realm::util;
 
 TEST(EncryptedFile_CryptorBasic)
 {

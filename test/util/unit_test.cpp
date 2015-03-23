@@ -14,10 +14,10 @@
 #include "unit_test.hpp"
 
 using namespace std;
-using namespace tightdb;
-using namespace tightdb::util;
-using namespace tightdb::test_util;
-using namespace tightdb::test_util::unit_test;
+using namespace realm;
+using namespace realm::util;
+using namespace realm::test_util;
+using namespace realm::test_util::unit_test;
 
 
 
@@ -235,7 +235,7 @@ private:
 
 
 
-namespace tightdb {
+namespace realm {
 namespace test_util {
 namespace unit_test {
 
@@ -655,4 +655,4 @@ Filter* create_wildcard_filter(const string& filter)
 
 } // namespace unit_test
 } // namespace test_util
-} // namespace tightdb
+} // namespace realm

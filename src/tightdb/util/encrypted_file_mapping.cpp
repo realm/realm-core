@@ -52,7 +52,7 @@ void get_page_size()
 }
 } // anonymous namespace
 
-namespace tightdb {
+namespace realm {
 namespace util {
 
 size_t page_size()
@@ -367,7 +367,7 @@ void AESCryptor::calc_hmac(const void* src, size_t len, uint8_t* dst, const uint
 
 EncryptedFileMapping::EncryptedFileMapping(SharedFileInfo& file, void* addr, size_t size, File::AccessMode access)
 : m_file(file)
-, m_page_size(tightdb::util::page_size())
+, m_page_size(realm::util::page_size())
 , m_blocks_per_page(m_page_size / block_size)
 , m_addr(0)
 , m_size(0)
@@ -613,7 +613,7 @@ File::SizeType data_size_to_encrypted_size(File::SizeType size) REALM_NOEXCEPT
 
 #else
 
-namespace tightdb {
+namespace realm {
 namespace util {
 
 File::SizeType encrypted_size_to_data_size(File::SizeType size) REALM_NOEXCEPT
@@ -629,5 +629,5 @@ File::SizeType data_size_to_encrypted_size(File::SizeType size) REALM_NOEXCEPT
 #endif
 
 } // namespace util {
-} // namespace tightdb {
+} // namespace realm {
 

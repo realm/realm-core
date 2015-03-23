@@ -24,7 +24,7 @@
 #include <tightdb/table_view.hpp>
 #include <tightdb/table_accessors.hpp>
 
-namespace tightdb {
+namespace realm {
 
 
 /// Common base class for BasicTableView<Tab> and BasicTableView<const
@@ -255,6 +255,6 @@ private:
 };
 
 
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_TABLE_VIEW_BASIC_HPP

@@ -18,7 +18,7 @@
     #include <emmintrin.h> // SSE2 (using __m128i)
 #endif
 
-namespace tightdb {
+namespace realm {
 
 #if 0
 #ifdef REALM_COMPILER_AVX
@@ -156,7 +156,7 @@ static inline __m128i __attribute__((always_inline)) _mm_cvtepi32_epi64(__m128i 
     return xmm1;
 }
 
-} // namespace tightdb
+} // namespace realm
 
 #endif
 #endif

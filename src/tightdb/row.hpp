@@ -27,7 +27,7 @@
 #include <tightdb/table_ref.hpp>
 #include <tightdb/link_view_fwd.hpp>
 
-namespace tightdb {
+namespace realm {
 
 template<class> class BasicRow;
 
@@ -659,6 +659,6 @@ template<class T> inline std::size_t BasicRow<T>::impl_get_row_ndx() const REALM
     return m_row_ndx;
 }
 
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_ROW_HPP

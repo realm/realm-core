@@ -20,7 +20,7 @@
 #ifndef REALM_DATA_TYPE_HPP
 #define REALM_DATA_TYPE_HPP
 
-namespace tightdb {
+namespace realm {
 
 // Note: Value assignments must be kept in sync with <tightdb/column_type.h>
 // Note: Value assignments must be kept in sync with <tightdb/c/data_type.h>
@@ -46,6 +46,6 @@ enum LinkType {
     link_Weak
 };
 
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_DATA_TYPE_HPP

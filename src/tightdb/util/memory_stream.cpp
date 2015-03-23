@@ -1,8 +1,8 @@
 #include <tightdb/util/memory_stream.hpp>
 
 using namespace std;
-using namespace tightdb;
-using namespace tightdb::util;
+using namespace realm;
+using namespace realm::util;
 
 MemoryInputStreambuf::int_type MemoryInputStreambuf::underflow()
 {

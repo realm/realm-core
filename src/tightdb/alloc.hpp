@@ -28,7 +28,7 @@
 #include <tightdb/util/assert.hpp>
 #include <tightdb/util/safe_int_ops.hpp>
 
-namespace tightdb {
+namespace realm {
 
 class Allocator;
 
@@ -314,6 +314,6 @@ inline void Allocator::watch(ref_type ref)
 #endif
 
 
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_ALLOC_HPP

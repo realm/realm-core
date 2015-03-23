@@ -30,7 +30,7 @@
 #include <stdarg.h>
 
 using namespace std;
-using namespace tightdb;
+using namespace realm;
 
 FILE* out_file;
 FILE* in_file;

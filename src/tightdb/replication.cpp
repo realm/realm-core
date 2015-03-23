@@ -10,8 +10,8 @@
 #include <tightdb/replication.hpp>
 
 using namespace std;
-using namespace tightdb;
-using namespace tightdb::util;
+using namespace realm;
+using namespace realm::util;
 
 
 Group& Replication::get_group(SharedGroup& sg) REALM_NOEXCEPT
@@ -177,7 +177,7 @@ public:
             }
 #endif
             typedef _impl::TableFriend tf;
-            // Map zero to tightdb::npos, and `n+1` to `n`, where `n` is a target row index.
+            // Map zero to realm::npos, and `n+1` to `n`, where `n` is a target row index.
             size_t target_row_ndx = value - size_t(1);
             tf::do_set_link(*m_table, col_ndx, row_ndx, target_row_ndx); // Throws
             return true;

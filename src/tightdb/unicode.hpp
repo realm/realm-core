@@ -32,7 +32,7 @@
     #include <locale>
 #endif
 
-namespace tightdb {
+namespace realm {
 
     enum string_compare_method_t { STRING_COMPARE_CORE, STRING_COMPARE_CPP11, STRING_COMPARE_CALLBACK } ;
 
@@ -149,6 +149,6 @@ namespace tightdb {
         const char* needle_lower, std::size_t needle_size);
 
 
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_UTIL_UTF8_HPP

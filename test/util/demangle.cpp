@@ -11,8 +11,8 @@
 #include "demangle.hpp"
 
 using namespace std;
-using namespace tightdb;
-using namespace tightdb::util;
+using namespace realm;
+using namespace realm::util;
 
 namespace {
 
@@ -25,7 +25,7 @@ struct Free {
 
 } // anonymous namespace
 
-namespace tightdb {
+namespace realm {
 namespace test_util {
 
 
@@ -49,4 +49,4 @@ string demangle(const string& mangled_name)
 
 
 } // namespace test_util
-} // namespace tightdb
+} // namespace realm

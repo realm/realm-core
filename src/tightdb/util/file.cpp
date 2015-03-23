@@ -28,8 +28,8 @@
 #include <tightdb/util/string_buffer.hpp>
 
 using namespace std;
-using namespace tightdb;
-using namespace tightdb::util;
+using namespace realm;
+using namespace realm::util;
 
 namespace {
 #ifdef _WIN32 // Windows - GetLastError()
@@ -59,7 +59,7 @@ string get_last_error_msg(const char* prefix, DWORD err)
 } // anonymous namespace
 
 
-namespace tightdb {
+namespace realm {
 namespace util {
 
 
@@ -159,7 +159,7 @@ string make_temp_dir()
 
 
 } // namespace util
-} // namespace tightdb
+} // namespace realm
 
 
 void File::open_internal(const string& path, AccessMode a, CreateMode c, int flags, bool* success)
@@ -773,7 +773,7 @@ void* File::map(AccessMode a, size_t size, int map_flags) const
     // reliably detect these systems?
     static_cast<void>(map_flags);
 
-    return tightdb::util::mmap(m_fd, size, a, m_encryption_key.get());
+    return realm::util::mmap(m_fd, size, a, m_encryption_key.get());
 
 #endif
 }
@@ -789,7 +789,7 @@ void File::unmap(void* addr, size_t size) REALM_NOEXCEPT
 
 #else // POSIX version
 
-    tightdb::util::munmap(addr, size);
+    realm::util::munmap(addr, size);
 
 #endif
 }
@@ -804,7 +804,7 @@ void* File::remap(void* old_addr, size_t old_size, AccessMode a, size_t new_size
     return new_addr;
 #else
     static_cast<void>(map_flags);
-    return tightdb::util::mremap(m_fd, old_addr, old_size, a, new_size);
+    return realm::util::mremap(m_fd, old_addr, old_size, a, new_size);
 #endif
 }
 
@@ -819,7 +819,7 @@ void File::sync_map(void* addr, size_t size)
 
 #else // POSIX version
 
-    tightdb::util::msync(addr, size);
+    realm::util::msync(addr, size);
 
 #endif
 }

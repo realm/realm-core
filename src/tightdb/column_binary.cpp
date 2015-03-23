@@ -6,8 +6,8 @@
 #include <tightdb/column_binary.hpp>
 
 using namespace std;
-using namespace tightdb;
-using namespace tightdb::util;
+using namespace realm;
+using namespace realm::util;
 
 
 namespace {
@@ -138,13 +138,13 @@ bool ColumnBinary::compare_binary(const ColumnBinary& c) const
 
 void ColumnBinary::do_insert(size_t row_ndx, BinaryData value, bool add_zero_term, size_t num_rows)
 {
-    REALM_ASSERT(row_ndx == tightdb::npos || row_ndx < size());
+    REALM_ASSERT(row_ndx == realm::npos || row_ndx < size());
     ref_type new_sibling_ref;
     InsertState state;
     for (size_t i = 0; i != num_rows; ++i) {
-        size_t row_ndx_2 = row_ndx == tightdb::npos ? tightdb::npos : row_ndx + i;
+        size_t row_ndx_2 = row_ndx == realm::npos ? realm::npos : row_ndx + i;
         if (root_is_leaf()) {
-            REALM_ASSERT(row_ndx_2 == tightdb::npos || row_ndx_2 < REALM_MAX_BPNODE_SIZE);
+            REALM_ASSERT(row_ndx_2 == realm::npos || row_ndx_2 < REALM_MAX_BPNODE_SIZE);
             bool is_big = upgrade_root_leaf(value.size()); // Throws
             if (!is_big) {
                 // Small blobs root leaf
@@ -163,7 +163,7 @@ void ColumnBinary::do_insert(size_t row_ndx, BinaryData value, bool add_zero_ter
             // Non-leaf root
             state.m_value = value;
             state.m_add_zero_term = add_zero_term;
-            if (row_ndx_2 == tightdb::npos) {
+            if (row_ndx_2 == realm::npos) {
                 new_sibling_ref = m_array->bptree_append(state);
             }
             else {
@@ -171,7 +171,7 @@ void ColumnBinary::do_insert(size_t row_ndx, BinaryData value, bool add_zero_ter
             }
         }
         if (REALM_UNLIKELY(new_sibling_ref)) {
-            bool is_append = row_ndx_2 == tightdb::npos;
+            bool is_append = row_ndx_2 == realm::npos;
             introduce_new_root(new_sibling_ref, state, is_append);
         }
     }

@@ -4,7 +4,7 @@
 #include <tightdb.hpp>
 #include <tightdb/util/file.hpp>
 
-using namespace tightdb;
+using namespace realm;
 
 // Define schema for main table
 REALM_TABLE_3(PeopleTable,

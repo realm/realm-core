@@ -46,8 +46,8 @@
 #   include <mach/exc.h>
 #endif
 
-using namespace tightdb;
-using namespace tightdb::util;
+using namespace realm;
+using namespace realm::util;
 
 namespace {
 bool handle_access(void *addr);
@@ -585,7 +585,7 @@ void* mmap_anon(size_t size)
 } // anonymous namespace
 #endif
 
-namespace tightdb {
+namespace realm {
 namespace util {
 
 #ifdef REALM_ENABLE_ENCRYPTION

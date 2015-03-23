@@ -3,7 +3,7 @@
 #include <tightdb/table.hpp>
 
 using namespace std;
-using namespace tightdb;
+using namespace realm;
 
 
 

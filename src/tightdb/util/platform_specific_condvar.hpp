@@ -33,7 +33,7 @@
 #include <sys/stat.h>
 #include <semaphore.h>
 
-namespace tightdb {
+namespace realm {
 namespace util {
 
 
@@ -240,7 +240,7 @@ inline void PlatformSpecificCondVar::notify_all() REALM_NOEXCEPT
 
 
 } // namespace util
-} // namespace tightdb
+} // namespace realm
 
 
 #endif

@@ -10,7 +10,7 @@
 #include "crypt_key.hpp"
 
 using namespace std;
-using namespace tightdb::util;
+using namespace realm::util;
 
 
 // Test independence and thread-safety

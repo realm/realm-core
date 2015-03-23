@@ -27,7 +27,7 @@
 
 #include <tightdb/impl/destroy_guard.hpp>
 
-namespace tightdb {
+namespace realm {
 
 template<class T>
 inline BasicArray<T>::BasicArray(Allocator& alloc) REALM_NOEXCEPT:
@@ -416,6 +416,6 @@ void BasicArray<T>::to_dot(std::ostream& out, StringData title) const
 #endif // REALM_DEBUG
 
 
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_ARRAY_BASIC_TPL_HPP

@@ -2,7 +2,7 @@
 
 #include "../util/unit_test.hpp"
 
-using namespace tightdb::test_util::unit_test;
+using namespace realm::test_util::unit_test;
 
 int main()
 {

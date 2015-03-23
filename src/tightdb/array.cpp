@@ -151,8 +151,8 @@
 
 
 using namespace std;
-using namespace tightdb;
-using namespace tightdb::util;
+using namespace realm;
+using namespace realm::util;
 
 
 namespace {
@@ -2111,7 +2111,7 @@ VerifyBptreeResult verify_bptree(const Array& node, Array::LeafVerifier leaf_ver
         REALM_ASSERT(!int_cast_with_overflow_detect(last_value/2, total_elems));
         REALM_ASSERT_3(num_elems, ==, total_elems);
     }
-    return tightdb::util::tuple(num_elems, 1 + leaf_level_of_children, general_form);
+    return realm::util::tuple(num_elems, 1 + leaf_level_of_children, general_form);
 }
 
 } // anonymous namespace

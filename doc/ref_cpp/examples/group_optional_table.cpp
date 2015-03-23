@@ -5,7 +5,7 @@
 #include <tightdb.hpp>
 
 using namespace std;
-using namespace tightdb;
+using namespace realm;
 
 REALM_TABLE_2(PeopleTable,
                 name, String,

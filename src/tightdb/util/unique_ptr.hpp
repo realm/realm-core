@@ -6,7 +6,7 @@
 #include <tightdb/util/features.h>
 #include <tightdb/util/assert.hpp>
 
-namespace tightdb {
+namespace realm {
 namespace util {
 
 
@@ -219,6 +219,6 @@ template<class T, class D> inline void swap(UniquePtr<T,D>& p, UniquePtr<T,D>& q
 
 
 } // namespace util
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_UTIL_UNIQUE_PTR_HPP

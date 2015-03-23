@@ -4,8 +4,8 @@
 #include <tightdb/column_table.hpp>
 
 using namespace std;
-using namespace tightdb;
-using namespace tightdb::util;
+using namespace realm;
+using namespace realm::util;
 
 void ColumnSubtableParent::update_from_parent(size_t old_baseline) REALM_NOEXCEPT
 {
@@ -285,7 +285,7 @@ void ColumnTable::add(const Table* subtable)
     if (subtable && !subtable->is_empty())
         columns_ref = clone_table_columns(subtable); // Throws
 
-    std::size_t row_ndx = tightdb::npos;
+    std::size_t row_ndx = realm::npos;
     int_fast64_t value = int_fast64_t(columns_ref);
     std::size_t num_rows = 1;
     do_insert(row_ndx, value, num_rows); // Throws
@@ -300,7 +300,7 @@ void ColumnTable::insert(size_t row_ndx, const Table* subtable)
 
     std::size_t size = this->size(); // Slow
     REALM_ASSERT_3(row_ndx, <=, size);
-    std::size_t row_ndx_2 = row_ndx == size ? tightdb::npos : row_ndx;
+    std::size_t row_ndx_2 = row_ndx == size ? realm::npos : row_ndx;
     int_fast64_t value = int_fast64_t(columns_ref);
     std::size_t num_rows = 1;
     do_insert(row_ndx_2, value, num_rows); // Throws
@@ -388,8 +388,8 @@ void ColumnTable::Verify(const Table& table, size_t col_ndx) const
     typedef _impl::TableFriend tf;
     const Spec& spec = tf::get_spec(table);
     size_t subspec_ndx = spec.get_subspec_ndx(col_ndx);
-    if (m_subspec_ndx != tightdb::npos)
-        REALM_ASSERT(m_subspec_ndx == tightdb::npos || m_subspec_ndx == subspec_ndx);
+    if (m_subspec_ndx != realm::npos)
+        REALM_ASSERT(m_subspec_ndx == realm::npos || m_subspec_ndx == subspec_ndx);
 
     // Verify each subtable
     size_t n = size();

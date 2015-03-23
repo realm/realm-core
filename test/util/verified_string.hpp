@@ -31,7 +31,7 @@
 #include <tightdb/string_data.hpp>
 #include <tightdb/column_string.hpp>
 
-namespace tightdb {
+namespace realm {
 namespace test_util {
 
 
@@ -59,6 +59,6 @@ private:
 
 
 } // namespace test_util
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_TEST_UTIL_VERIFIED_STRING_HPP

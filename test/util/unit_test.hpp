@@ -44,15 +44,15 @@
 /// variables which can then be adjusted before calling
 /// TestList::run().
 #define TEST_IF(name, enabled) \
-    TEST_EX(name, tightdb::test_util::unit_test::get_default_test_list(), enabled)
+    TEST_EX(name, realm::test_util::unit_test::get_default_test_list(), enabled)
 
 #define TEST_EX(name, list, enabled) \
-    struct Tightdb_UnitTest__##name: tightdb::test_util::unit_test::Test { \
+    struct Tightdb_UnitTest__##name: realm::test_util::unit_test::Test { \
         bool test_enabled() const { return bool(enabled); } \
         void test_run(); \
     }; \
     Tightdb_UnitTest__##name tightdb_unit_test__##name; \
-    tightdb::test_util::unit_test::RegisterTest \
+    realm::test_util::unit_test::RegisterTest \
         tightdb_unit_test_reg__##name((list), tightdb_unit_test__##name, \
                                       "DefaultSuite", #name, __FILE__, __LINE__); \
     void Tightdb_UnitTest__##name::test_run()
@@ -164,7 +164,7 @@
 //@}
 
 
-namespace tightdb {
+namespace realm {
 namespace test_util {
 namespace unit_test {
 
@@ -719,6 +719,6 @@ inline bool TestResults::check_definitely_greater(long double a, long double b,
 
 } // namespace unit_test
 } // namespace test_util
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_TEST_UTIL_UNIT_TEST_HPP

@@ -4,7 +4,7 @@
 
 #include <unistd.h>
 
-using namespace tightdb;
+using namespace realm;
 using namespace std;
 
 struct thread_info {

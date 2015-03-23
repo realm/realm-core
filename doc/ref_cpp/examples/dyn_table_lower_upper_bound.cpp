@@ -3,7 +3,7 @@
 #include <tightdb.hpp>
 
 using namespace std;
-using namespace tightdb;
+using namespace realm;
 
 // @@EndFold@@
 // Using lower_bound_int() to insert new elements before existsing ones

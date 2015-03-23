@@ -3,7 +3,7 @@
 #include <tightdb.hpp>
 #include <assert.h>
 
-using namespace tightdb;
+using namespace realm;
 
 int main()
 {

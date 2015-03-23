@@ -27,7 +27,7 @@
 #include <tightdb/column.hpp>
 #include <tightdb/util/features.h>
 
-namespace tightdb {
+namespace realm {
 
 using std::size_t;
 
@@ -182,7 +182,7 @@ public:
 
     /// Search this view for the specified source table row (specified by its
     /// index in the source table). If found, the index of that row within this
-    /// view is returned, otherwise `tightdb::not_found` is returned.
+    /// view is returned, otherwise `realm::not_found` is returned.
     std::size_t find_by_source_ndx(std::size_t source_ndx) const REALM_NOEXCEPT;
 
     // Conversion
@@ -1282,6 +1282,6 @@ inline void TableView::add_int(size_t column_ndx, int64_t value)
     m_table->add_int(column_ndx, value);
 }
 
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_TABLE_VIEW_HPP

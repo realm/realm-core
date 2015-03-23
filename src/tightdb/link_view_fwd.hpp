@@ -22,12 +22,12 @@
 
 #include <tightdb/util/bind_ptr.hpp>
 
-namespace tightdb {
+namespace realm {
 
 class LinkView;
 typedef util::bind_ptr<LinkView> LinkViewRef;
 typedef util::bind_ptr<const LinkView> ConstLinkViewRef;
 
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_LINK_VIEW_FWD_HPP

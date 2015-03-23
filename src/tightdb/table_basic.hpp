@@ -32,7 +32,7 @@
 #include <tightdb/table_accessors.hpp>
 #include <tightdb/table_view_basic.hpp>
 
-namespace tightdb {
+namespace realm {
 
 
 namespace _impl {
@@ -182,7 +182,7 @@ public:
 
     template<class L> void add(const util::Tuple<L>& tuple)
     {
-        using namespace tightdb::util;
+        using namespace realm::util;
         REALM_STATIC_ASSERT(TypeCount<L>::value == TypeCount<Columns>::value,
                               "Wrong number of tuple elements");
         ForEachType<Columns, _impl::InsertIntoCol>::exec(static_cast<Table*>(this), size(), tuple);
@@ -193,7 +193,7 @@ public:
 
     template<class L> void insert(std::size_t i, const util::Tuple<L>& tuple)
     {
-        using namespace tightdb::util;
+        using namespace realm::util;
         REALM_STATIC_ASSERT(TypeCount<L>::value == TypeCount<Columns>::value,
                               "Wrong number of tuple elements");
         ForEachType<Columns, _impl::InsertIntoCol>::exec(static_cast<Table*>(this), i, tuple);
@@ -202,7 +202,7 @@ public:
 
     template<class L> void set(std::size_t i, const util::Tuple<L>& tuple)
     {
-        using namespace tightdb::util;
+        using namespace realm::util;
         REALM_STATIC_ASSERT(TypeCount<L>::value == TypeCount<Columns>::value,
                               "Wrong number of tuple elements");
         ForEachType<Columns, _impl::AssignIntoCol>::exec(static_cast<Table*>(this), i, tuple);
@@ -289,7 +289,7 @@ private:
 
     static void set_dynamic_type(Table& table)
     {
-        using namespace tightdb::util;
+        using namespace realm::util;
         DescriptorRef desc = table.get_descriptor(); // Throws
         const int num_cols = TypeCount<typename Spec::Columns>::value;
         StringData dyn_col_names[num_cols];
@@ -297,9 +297,9 @@ private:
         ForEachType<typename Spec::Columns, _impl::AddCol>::exec(&*desc, dyn_col_names); // Throws
     }
 
-    static bool matches_dynamic_type(const tightdb::Spec& spec) REALM_NOEXCEPT
+    static bool matches_dynamic_type(const realm::Spec& spec) REALM_NOEXCEPT
     {
-        using namespace tightdb::util;
+        using namespace realm::util;
         const int num_cols = util::TypeCount<typename Spec::Columns>::value;
         StringData dyn_col_names[num_cols];
         Spec::dyn_col_names(dyn_col_names);
@@ -398,7 +398,7 @@ protected:
         Spec::template ColNames<QueryCol, Query*>(this), m_impl(table, tv) {}
 
 private:
-    tightdb::Query m_impl;
+    realm::Query m_impl;
 
     friend class BasicTable;
     template<class, int, class> friend class _impl::QueryColumnBase;
@@ -462,7 +462,7 @@ template<class Subtab, int col_idx> struct AddCol<SpecBase::Subtable<Subtab>, co
         REALM_ASSERT(col_idx == desc->get_column_count());
         DescriptorRef subdesc;
         desc->add_column(type_Table, col_names[col_idx], &subdesc); // Throws
-        using namespace tightdb::util;
+        using namespace realm::util;
         const int num_subcols = TypeCount<typename Subtab::spec_type::Columns>::value;
         StringData subcol_names[num_subcols];
         Subtab::spec_type::dyn_col_names(subcol_names);
@@ -701,6 +701,6 @@ template<class T> inline BasicTableRef<const T> checked_cast(ConstTableRef t) RE
 }
 
 
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_TABLE_BASIC_HPP

@@ -3,7 +3,7 @@
 #include <tightdb/group.hpp>
 
 using namespace std;
-using namespace tightdb;
+using namespace realm;
 
 int main(int argc, const char* const argv[])
 {

@@ -23,7 +23,7 @@
 #include <tightdb/column.hpp>
 #include <tightdb/array_basic.hpp>
 
-namespace tightdb {
+namespace realm {
 
 template<class T> struct AggReturnType {
     typedef T sum_type;
@@ -110,7 +110,7 @@ protected:
 private:
     std::size_t do_get_size() const REALM_NOEXCEPT REALM_OVERRIDE { return size(); }
 
-    /// \param row_ndx Must be `tightdb::npos` if appending.
+    /// \param row_ndx Must be `realm::npos` if appending.
     void do_insert(std::size_t row_ndx, T value, std::size_t num_rows);
 
     // Called by Array::bptree_insert().
@@ -142,7 +142,7 @@ private:
 };
 
 
-} // namespace tightdb
+} // namespace realm
 
 
 // template implementation

@@ -18,7 +18,7 @@
  *
  **************************************************************************/
 
-namespace tightdb {
+namespace realm {
 
 inline ColumnMixed::ColumnMixed(Allocator& alloc, ref_type ref,
                                 Table* table, std::size_t column_ndx)
@@ -272,7 +272,7 @@ inline void ColumnMixed::insert_value(std::size_t row_ndx, int_fast64_t types_va
 {
     std::size_t size = m_types->size(); // Slow
     bool is_append = row_ndx == size;
-    std::size_t row_ndx_2 = is_append ? tightdb::npos : row_ndx;
+    std::size_t row_ndx_2 = is_append ? realm::npos : row_ndx;
     std::size_t num_rows = 1;
     m_types->do_insert(row_ndx_2, types_value, num_rows); // Throws
     m_data->do_insert(row_ndx_2, data_value, num_rows); // Throws
@@ -401,7 +401,7 @@ inline void ColumnMixed::clear_value_and_discard_subtab_acc(std::size_t row_ndx,
 // Implementing pure virtual method of ColumnBase.
 inline void ColumnMixed::insert(std::size_t row_ndx, std::size_t num_rows, bool is_append)
 {
-    std::size_t row_ndx_2 = is_append ? tightdb::npos : row_ndx;
+    std::size_t row_ndx_2 = is_append ? realm::npos : row_ndx;
 
     int_fast64_t type_value = mixcol_Int;
     m_types->do_insert(row_ndx_2, type_value, num_rows); // Throws
@@ -460,4 +460,4 @@ inline void ColumnMixed::RefsColumn::refresh_accessor_tree(std::size_t col_ndx, 
     m_subtable_map.refresh_accessor_tree(spec_ndx_in_parent); // Throws
 }
 
-} // namespace tightdb
+} // namespace realm

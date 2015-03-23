@@ -25,7 +25,7 @@
 #include <tightdb/link_view.hpp>
 
 using namespace std;
-using namespace tightdb;
+using namespace realm;
 
 
 void ColumnLinkList::move_last_over(size_t row_ndx, size_t last_row_ndx,

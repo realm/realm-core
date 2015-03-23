@@ -24,7 +24,7 @@
 
 #include <tightdb/util/type_list.hpp>
 
-namespace tightdb {
+namespace realm {
 namespace util {
 
 
@@ -174,6 +174,6 @@ inline std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, c
 
 
 } // namespace util
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_UTIL_TUPLE_HPP

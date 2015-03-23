@@ -25,7 +25,7 @@
 
 #include <tightdb/util/features.h>
 
-namespace tightdb {
+namespace realm {
 
 /// Thrown by various functions to indicate that a specified table does not
 /// exist.
@@ -150,6 +150,6 @@ inline LogicError::ErrorKind LogicError::kind() const REALM_NOEXCEPT_OR_NOTHROW
 }
 
 
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_EXCEPTIONS_HPP

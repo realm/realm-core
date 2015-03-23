@@ -8,9 +8,9 @@ using namespace std;
 
 
 
-struct MySubtableSpec: tightdb::SpecBase {
-    typedef typename tightdb::TypeAppend< void, int >::type Columns1;
-    typedef typename tightdb::TypeAppend< Columns1, int >::type Columns;
+struct MySubtableSpec: realm::SpecBase {
+    typedef typename realm::TypeAppend< void, int >::type Columns1;
+    typedef typename realm::TypeAppend< Columns1, int >::type Columns;
 
     template<template<int> class Col, class Init> struct ColNames {
         typename Col<0>::type alpha;
@@ -25,15 +25,15 @@ struct MySubtableSpec: tightdb::SpecBase {
     }
 };
 
-typedef tightdb::BasicTable<MySubtableSpec> MySubtable;
+typedef realm::BasicTable<MySubtableSpec> MySubtable;
 
 
 
 
-struct MyTableSpec: tightdb::SpecBase {
-    typedef typename tightdb::TypeAppend< void, int >::type Columns1;
-    typedef typename tightdb::TypeAppend< Columns1, int >::type Columns2;
-    typedef typename tightdb::TypeAppend< Columns2, tightdb::SpecBase::Subtable<MySubtable> >::type Columns;
+struct MyTableSpec: realm::SpecBase {
+    typedef typename realm::TypeAppend< void, int >::type Columns1;
+    typedef typename realm::TypeAppend< Columns1, int >::type Columns2;
+    typedef typename realm::TypeAppend< Columns2, realm::SpecBase::Subtable<MySubtable> >::type Columns;
 
     template<template<int> class Col, class Init> struct ColNames {
         typename Col<0>::type foo;
@@ -49,7 +49,7 @@ struct MyTableSpec: tightdb::SpecBase {
     }
 };
 
-typedef tightdb::BasicTable<MyTableSpec> MyTable;
+typedef realm::BasicTable<MyTableSpec> MyTable;
 
 
 

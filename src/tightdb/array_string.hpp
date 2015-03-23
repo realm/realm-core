@@ -22,7 +22,7 @@
 
 #include <tightdb/array.hpp>
 
-namespace tightdb {
+namespace realm {
 
 class ArrayString: public Array {
 public:
@@ -150,6 +150,6 @@ inline StringData ArrayString::get(const char* header, std::size_t ndx) REALM_NO
 }
 
 
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_ARRAY_STRING_HPP

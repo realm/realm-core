@@ -4,7 +4,7 @@
 #include <typeinfo>
 #include <string>
 
-namespace tightdb {
+namespace realm {
 namespace test_util {
 
 
@@ -30,6 +30,6 @@ template<typename T> inline std::string get_type_name(const T& v)
 
 
 } // namespace test_util
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_TEST_UTIL_DEMANGLE_HPP

@@ -20,9 +20,9 @@
 #endif
 
 using namespace std;
-using namespace tightdb;
-using namespace tightdb::util;
-using namespace tightdb::_impl;
+using namespace realm;
+using namespace realm::util;
+using namespace realm::_impl;
 
 namespace {
 
@@ -30,7 +30,7 @@ class Initialization {
 public:
     Initialization()
     {
-        tightdb::cpuid_init();
+        realm::cpuid_init();
     }
 };
 

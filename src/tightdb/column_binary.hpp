@@ -24,7 +24,7 @@
 #include <tightdb/array_binary.hpp>
 #include <tightdb/array_blobs_big.hpp>
 
-namespace tightdb {
+namespace realm {
 
 
 /// A binary column (ColumnBinary) is a single B+-tree, and the root
@@ -84,7 +84,7 @@ public:
 private:
     std::size_t do_get_size() const REALM_NOEXCEPT REALM_OVERRIDE { return size(); }
 
-    /// \param row_ndx Must be `tightdb::npos` if appending.
+    /// \param row_ndx Must be `realm::npos` if appending.
     void do_insert(std::size_t row_ndx, BinaryData value, bool add_zero_term,
                    std::size_t num_rows);
 
@@ -205,7 +205,7 @@ inline void ColumnBinary::set_string(std::size_t ndx, StringData value)
 
 inline void ColumnBinary::add(BinaryData value)
 {
-    std::size_t row_ndx = tightdb::npos;
+    std::size_t row_ndx = realm::npos;
     bool add_zero_term = false;
     std::size_t num_rows = 1;
     do_insert(row_ndx, value, add_zero_term, num_rows); // Throws
@@ -215,7 +215,7 @@ inline void ColumnBinary::insert(std::size_t row_ndx, BinaryData value)
 {
     std::size_t size = this->size(); // Slow
     REALM_ASSERT_3(row_ndx, <=, size);
-    std::size_t row_ndx_2 = row_ndx == size ? tightdb::npos : row_ndx;
+    std::size_t row_ndx_2 = row_ndx == size ? realm::npos : row_ndx;
     bool add_zero_term = false;
     std::size_t num_rows = 1;
     do_insert(row_ndx_2, value, add_zero_term, num_rows); // Throws
@@ -242,7 +242,7 @@ inline void ColumnBinary::clear()
 // Implementing pure virtual method of ColumnBase.
 inline void ColumnBinary::insert(std::size_t row_ndx, std::size_t num_rows, bool is_append)
 {
-    std::size_t row_ndx_2 = is_append ? tightdb::npos : row_ndx;
+    std::size_t row_ndx_2 = is_append ? realm::npos : row_ndx;
     BinaryData value = BinaryData();
     bool add_zero_term = false;
     do_insert(row_ndx_2, value, add_zero_term, num_rows); // Throws
@@ -268,7 +268,7 @@ inline void ColumnBinary::clear(std::size_t, bool)
 
 inline void ColumnBinary::add_string(StringData value)
 {
-    std::size_t row_ndx = tightdb::npos;
+    std::size_t row_ndx = realm::npos;
     BinaryData value_2(value.data(), value.size());
     bool add_zero_term = true;
     std::size_t num_rows = 1;
@@ -279,7 +279,7 @@ inline void ColumnBinary::insert_string(std::size_t row_ndx, StringData value)
 {
     std::size_t size = this->size(); // Slow
     REALM_ASSERT_3(row_ndx, <=, size);
-    std::size_t row_ndx_2 = row_ndx == size ? tightdb::npos : row_ndx;
+    std::size_t row_ndx_2 = row_ndx == size ? realm::npos : row_ndx;
     BinaryData value_2(value.data(), value.size());
     bool add_zero_term = false;
     std::size_t num_rows = 1;
@@ -304,6 +304,6 @@ inline std::size_t ColumnBinary::get_size_from_ref(ref_type root_ref,
 }
 
 
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_COLUMN_BINARY_HPP

@@ -24,7 +24,7 @@
 #include <tightdb/array_blob.hpp>
 #include <tightdb/array_integer.hpp>
 
-namespace tightdb {
+namespace realm {
 
 
 class ArrayBinary: public Array {
@@ -182,6 +182,6 @@ inline bool ArrayBinary::update_from_parent(std::size_t old_baseline) REALM_NOEX
     return res;
 }
 
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_ARRAY_BINARY_HPP

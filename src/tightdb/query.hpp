@@ -40,7 +40,7 @@
 #include <tightdb/binary_data.hpp>
 #include <tightdb/datetime.hpp>
 
-namespace tightdb {
+namespace realm {
 
 
 // Pre-declarations
@@ -322,6 +322,6 @@ inline Query& Query::not_equal(size_t column_ndx, const char* c_str, bool case_s
     return not_equal(column_ndx, StringData(c_str), case_sensitive);
 }
 
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_QUERY_HPP

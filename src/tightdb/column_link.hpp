@@ -24,7 +24,7 @@
 #include <tightdb/column_linkbase.hpp>
 #include <tightdb/column_backlink.hpp>
 
-namespace tightdb {
+namespace realm {
 
 /// A link column is an extension of an integer column (Column) and maintains
 /// its node structure.
@@ -41,11 +41,11 @@ public:
 
     //@{
 
-    /// is_null_link() is shorthand for `get_link() == tightdb::npos`,
-    /// nullify_link() is shorthand foe `set_link(tightdb::npos)`, and
+    /// is_null_link() is shorthand for `get_link() == realm::npos`,
+    /// nullify_link() is shorthand foe `set_link(realm::npos)`, and
     /// insert_null_link() is shorthand for
-    /// `insert_link(tightdb::npos)`. set_link() returns the original link, with
-    /// `tightdb::npos` indicating that it was null.
+    /// `insert_link(realm::npos)`. set_link() returns the original link, with
+    /// `realm::npos` indicating that it was null.
 
     std::size_t get_link(std::size_t row_ndx) const REALM_NOEXCEPT;
     bool is_null_link(std::size_t row_ndx) const REALM_NOEXCEPT;
@@ -94,7 +94,7 @@ inline ref_type ColumnLink::create(Allocator& alloc, std::size_t size)
 
 inline std::size_t ColumnLink::get_link(std::size_t row_ndx) const REALM_NOEXCEPT
 {
-    // Map zero to tightdb::npos, and `n+1` to `n`, where `n` is a target row index.
+    // Map zero to realm::npos, and `n+1` to `n`, where `n` is a target row index.
     return to_size_t(ColumnLinkBase::get(row_ndx)) - size_t(1);
 }
 
@@ -114,7 +114,7 @@ inline std::size_t ColumnLink::set_link(std::size_t row_ndx, std::size_t target_
     int_fast64_t new_value = int_fast64_t(size_t(1) + target_row_ndx);
     ColumnLinkBase::set(row_ndx, new_value); // Throws
 
-    if (target_row_ndx != tightdb::npos)
+    if (target_row_ndx != realm::npos)
         m_backlink_column->add_backlink(target_row_ndx, row_ndx); // Throws
 
     return old_target_row_ndx;
@@ -122,7 +122,7 @@ inline std::size_t ColumnLink::set_link(std::size_t row_ndx, std::size_t target_
 
 inline void ColumnLink::nullify_link(size_t row_ndx)
 {
-    set_link(row_ndx, tightdb::npos); // Throws
+    set_link(row_ndx, realm::npos); // Throws
 }
 
 inline void ColumnLink::insert_link(std::size_t row_ndx, std::size_t target_row_ndx)
@@ -130,13 +130,13 @@ inline void ColumnLink::insert_link(std::size_t row_ndx, std::size_t target_row_
     int_fast64_t value = int_fast64_t(size_t(1) + target_row_ndx);
     ColumnLinkBase::insert(row_ndx, value); // Throws
 
-    if (target_row_ndx != tightdb::npos)
+    if (target_row_ndx != realm::npos)
         m_backlink_column->add_backlink(target_row_ndx, row_ndx); // Throws
 }
 
 inline void ColumnLink::insert_null_link(size_t row_ndx)
 {
-    insert_link(row_ndx, tightdb::npos); // Throws
+    insert_link(row_ndx, realm::npos); // Throws
 }
 
 inline void ColumnLink::do_nullify_link(std::size_t row_ndx, std::size_t)
@@ -151,6 +151,6 @@ inline void ColumnLink::do_update_link(std::size_t row_ndx, std::size_t,
     ColumnLinkBase::set(row_ndx, new_target_row_ndx + 1);
 }
 
-} //namespace tightdb
+} //namespace realm
 
 #endif //REALM_COLUMN_LINK_HPP

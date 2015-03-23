@@ -3,7 +3,7 @@
 
 #include <cstdlib> // std::size_t
 
-namespace tightdb {
+namespace realm {
 namespace util {
 
 template <class T> class SharedPtr 

@@ -20,7 +20,7 @@
 #ifndef REALM_COLUMN_FWD_HPP
 #define REALM_COLUMN_FWD_HPP
 
-namespace tightdb {
+namespace realm {
 
 
 class ColumnBase;
@@ -36,6 +36,6 @@ class ColumnMixed;
 class ColumnLink;
 class ColumnLinkList;
 
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_COLUMN_FWD_HPP

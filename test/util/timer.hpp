@@ -24,7 +24,7 @@
 #include <ostream>
 #include <string>
 
-namespace tightdb {
+namespace realm {
 namespace test_util {
 
 
@@ -95,6 +95,6 @@ inline std::ostream& operator<<(std::ostream& out, const Timer& timer)
 
 
 } // namespace test_util
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_TEST_UTIL_TIMER_HPP

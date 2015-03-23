@@ -22,7 +22,7 @@
 
 #include <tightdb/util/meta.hpp>
 
-namespace tightdb {
+namespace realm {
 namespace util {
 
 
@@ -200,6 +200,6 @@ template<template<class T, int i> class Pred, int i> struct HasType<void, Pred, 
 
 
 } // namespace util
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_UTIL_TYPE_LIST_HPP

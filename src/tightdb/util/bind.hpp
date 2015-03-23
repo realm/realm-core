@@ -20,7 +20,7 @@
 #ifndef REALM_UTIL_BIND_HPP
 #define REALM_UTIL_BIND_HPP
 
-namespace tightdb {
+namespace realm {
 
 
 namespace _impl {
@@ -943,6 +943,6 @@ inline _impl::MemFunObjFourArgBinder2<O,A,B,C,D,E,F> bind(void (O::*mem_fun)(A,B
 
 
 } // namespace util
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_UTIL_BIND_HPP

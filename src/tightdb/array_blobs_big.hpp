@@ -22,7 +22,7 @@
 
 #include <tightdb/array_blob.hpp>
 
-namespace tightdb {
+namespace realm {
 
 
 class ArrayBigBlobs: public Array {
@@ -192,6 +192,6 @@ inline MemRef ArrayBigBlobs::slice(std::size_t offset, std::size_t size,
 }
 
 
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_ARRAY_BIG_BLOBS_HPP

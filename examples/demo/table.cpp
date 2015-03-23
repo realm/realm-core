@@ -1,7 +1,7 @@
 #include <tightdb.hpp>
 #include <tightdb/group_shared.hpp>
 
-using namespace tightdb;
+using namespace realm;
 using namespace std;
 
 REALM_TABLE_2(Phones,

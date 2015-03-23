@@ -6,7 +6,7 @@
 
 #include "test.hpp"
 
-using namespace tightdb;
+using namespace realm;
 
 
 // Test independence and thread-safety

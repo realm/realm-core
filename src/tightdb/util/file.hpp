@@ -31,7 +31,7 @@
 #include <tightdb/util/unique_ptr.hpp>
 #include <tightdb/util/safe_int_ops.hpp>
 
-namespace tightdb {
+namespace realm {
 namespace util {
 
 
@@ -858,6 +858,6 @@ inline void File::Streambuf::flush()
 
 
 } // namespace util
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_UTIL_FILE_HPP

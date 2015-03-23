@@ -63,7 +63,7 @@ const size_t print_width = 25;
 #include <tightdb.hpp>
 
 using namespace std;
-using namespace tightdb;
+using namespace realm;
 
 class Importer
 {

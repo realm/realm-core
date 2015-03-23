@@ -28,7 +28,7 @@
 #include <tightdb/util/features.h>
 
 
-namespace tightdb {
+namespace realm {
 namespace test_util {
 
 
@@ -76,6 +76,6 @@ inline wildcard_pattern::card::card(std::size_t begin, std::size_t end) REALM_NO
 
 
 } // namespace test_util
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_TEST_UTIL_WILDCARD_HPP

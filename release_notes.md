@@ -441,7 +441,7 @@
   the spaecified name. Addition is now handled by either `Group::add_table()` or
   `Group::get_or_add_table()`.
 * `Group::get_table()` and Group::get_table_name() now throw
-  `tightdb::InvalidArgument` if the specified table index is out of range.
+  `realm::InvalidArgument` if the specified table index is out of range.
 * Template version of `Group::get_table()` now throws `DescriptorMismatch` if
   the dynamic type disagrees with the statically specified custom table type.
 * `LangBindHelper::bind_table_ref()` was renamed to
@@ -756,7 +756,7 @@ Format:
 
 2013-12-17 (Kristian Spangsege)
 + Implicit termination of active transaction when SharedGroup is destroyed.
-. Class `File` and related exceptions such as `File::AccessError` moved to namespace `tightdb::util`.
+. Class `File` and related exceptions such as `File::AccessError` moved to namespace `realm::util`.
 . Table::add_column() optimized. For integer columns, the speedup is by more than a factor of 1000 for large tables.
 
 
@@ -1087,9 +1087,9 @@ Format:
 
 2012-07-27 (Kristian Spangsege)
 ----------
-+ 6 tightdb::is_a<MyTable>(const Table&) added.
-+ 6 tightdb::unchecked_cast<MyTable>(TableRef) added.
-+ 6 tightdb::checked_cast<MyTable>(TableRef) added.
++ 6 realm::is_a<MyTable>(const Table&) added.
++ 6 realm::unchecked_cast<MyTable>(TableRef) added.
++ 6 realm::checked_cast<MyTable>(TableRef) added.
 + 6 my_table[i].mixed.set_subtable() added.
 + 6 my_table[i].mixed.set_subtable<MySubtable>() added.
 + 6 my_table[i].mixed.is_subtable<MyTable>() added (inefficient, do we want it at all?).

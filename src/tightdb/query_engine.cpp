@@ -1,6 +1,6 @@
 #include <tightdb/query_engine.hpp>
 
-using namespace tightdb;
+using namespace realm;
 
 size_t ParentNode::find_first(size_t start, size_t end)
 {

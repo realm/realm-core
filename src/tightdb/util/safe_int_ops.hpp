@@ -27,7 +27,7 @@
 #include <tightdb/util/meta.hpp>
 #include <tightdb/util/type_traits.hpp>
 
-namespace tightdb {
+namespace realm {
 namespace util {
 
 
@@ -599,6 +599,6 @@ template<class To, class From> inline To from_twos_compl(From twos_compl) REALM_
 
 
 } // namespace util
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_UTIL_SAFE_INT_OPS_HPP

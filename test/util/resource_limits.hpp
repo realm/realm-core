@@ -20,7 +20,7 @@
 #ifndef REALM_TEST_UTIL_RESOURCE_LIMITS_HPP
 #define REALM_TEST_UTIL_RESOURCE_LIMITS_HPP
 
-namespace tightdb {
+namespace realm {
 namespace test_util {
 
 
@@ -42,6 +42,6 @@ void set_soft_rlimit(Resource, long value);
 
 
 } // namespace test_util
-} // namespace tightdb
+} // namespace realm
 
 #endif // REALM_TEST_UTIL_RESOURCE_LIMITS_HPP

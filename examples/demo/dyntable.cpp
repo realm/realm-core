@@ -2,7 +2,7 @@
 #include <tightdb/group_shared.hpp>
 #include <sstream>
 
-using namespace tightdb;
+using namespace realm;
 using namespace std;
 
 int main(int, char*[]) {
